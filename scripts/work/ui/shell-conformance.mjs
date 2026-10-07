@@ -100,103 +100,96 @@ const shown = (workRoot, file) => slash(path.relative(path.dirname(workRoot), fi
 // The tree record
 // ---------------------------------------------------------------------------------------------------------
 
+function shellNodeFindings(r,appNames,at,inApp,out){
+  for(const name of appNames){
+    const tree=treeOf(r,name),nodes=nodesOf(tree),ids=new Set();
+    for(const node of nodes){if(ids.has(node.id))out.push(finding('refuse','LAYOUT_TREE_INVALID',at,inApp(name,`node ${node.id} appears twice`)));ids.add(node.id);if(node.parent!==null&&!nodes.some(parent=>parent.id===node.parent))out.push(finding('refuse','LAYOUT_TREE_INVALID',at,inApp(name,`node ${node.id} names parent ${node.parent}, which is not a node`)));}
+    if(!nodes.some(node=>node.id==='/'))out.push(finding('refuse','LAYOUT_TREE_INVALID',at,inApp(name,'the tree has no root node /')));
+  }
+}
+
+function shellLockupFindings(workRoot,r,lockups,lockupDeferredFor,at,uiRecordsState,out){
+  if(!lockups.length&&lockupDeferredFor)out.push(finding('info','SHELL_LOCKUP_DEFERRED',at,`no brand lockup yet: ${lockupDeferredFor} draws the planned layout it will be cropped from (layout-tree.mjs lockup --from ${lockupDeferredFor}:<layout composite>)`));else if(!lockups.length)out.push(finding('refuse','SHELL_LOCKUP_MISSING',at,'no brand lockup: the rendered lockup is what every direction is handed instead of an invented logo'));
+  for(const image of lockups){
+    const file=captureFileOf(image),named=image.name??'(no name)';
+    if(!file||!fs.existsSync(file))out.push(finding('refuse','SHELL_CAPTURE_MISSING',at,`lockup ${named} is not in the blob store`));else if(image.sha256&&sha256File(file)!==image.sha256)out.push(finding('refuse','SHELL_CAPTURE_DIGEST',at,`lockup ${named} no longer hashes to its recorded sha256`));
+    if(image.source?.kind==='layout-drawing'){
+      const src=lockupSourceOf(r,workRoot,image.source.ref,id=>(uiRecordsState.uiRecords??=loadUiRecords(workRoot)).get(id)??null);
+      if(src.error)out.push(finding('suspect','SHELL_LOCKUP_SOURCE_STALE',at,`lockup ${image.path} was cropped from ${image.source.ref}: ${src.error} - brand.decide re-crops it`));else if(src.sha256!==image.source.sha256)out.push(finding('suspect','SHELL_LOCKUP_SOURCE_STALE',at,`lockup ${image.path} was cropped from ${image.source.ref}, which was redrawn since - brand.decide re-crops it`));
+    }if(image.source?.kind==='layout-drawing'&&r.origin==='repository')out.push(finding('suspect','SHELL_LOCKUP_FROM_DRAWING',at,`lockup ${image.path} is cropped from the layout drawing ${image.source.ref}; the frontend exists now - re-crop it from a real render (layout-tree.mjs lockup --from shell/<capture>)`));
+  }
+}
+
+function shellMetadataFindings(r,at,out){
+  const declared=matrixOf(r),required=requiredMatrixOf(r);
+  for(const bp of required.breakpoints)if(!declared.breakpoints.includes(bp))out.push(finding('refuse','SHELL_BREAKPOINT_MISSING',at,`the tree declares no ${bp} breakpoint - every drawing set covers ${required.breakpoints.join(' and ')}`));for(const theme of required.themes)if(!declared.themes.includes(theme))out.push(finding('refuse','SHELL_THEME_MISSING',at,`the tree declares no ${theme} theme - every drawing set covers ${required.themes.join(', ')} (dark is optional)`));
+  const personas=list(r.personas);if(!personas.length)out.push(finding('refuse','SHELL_PERSONA_INVALID',at,'no demo persona - a drawing may not invent a tenant'));
+  const roles=personas.map(persona=>persona?.role);if(new Set(roles).size!==roles.length)out.push(finding('refuse','SHELL_PERSONA_INVALID',at,'two personas share a role'));if(personas.length>1&&personas.filter(persona=>persona?.default===true).length!==1)out.push(finding('refuse','SHELL_PERSONA_INVALID',at,'more than one persona and not exactly one marked default'));
+}
+
+function shellLocaleFindings(locale,at,out){
+  const locales=list(locale.locales);if(locale.default&&locales.length&&!locales.includes(locale.default))out.push(finding('refuse','SHELL_LOCALE_INVALID',at,`productLocale.default ${locale.default} is not one of productLocale.locales`));if(locale.fallback&&locales.length&&!locales.includes(locale.fallback))out.push(finding('refuse','SHELL_LOCALE_INVALID',at,`productLocale.fallback ${locale.fallback} is not one of productLocale.locales`));
+}
+
+function shellDestinationFindings(tree,node,at,out){
+  const destinations=destinationsOf(tree,node),seenKeys=new Set();
+  for(const destination of destinations){
+    if(seenKeys.has(destination.key))out.push(finding('refuse','LAYOUT_DESTINATION_INVALID',at,`${node.id} records destination ${destination.key} twice`));seenKeys.add(destination.key);
+    if(!destination.routes.length)out.push(finding('refuse','LAYOUT_DESTINATION_INVALID',at,`${node.id} destination ${destination.key} names no route it is active for`));for(const route of destination.routes)if(!nodeById(tree,route)||!(route===node.id||String(route).startsWith(node.id==='/'?'/':`${node.id}/`)))out.push(finding('refuse','LAYOUT_DESTINATION_INVALID',at,`${node.id} destination ${destination.key} is active for ${route}, which is not a node at or below the layout`));if(node.layout.chrome!=='visible')out.push(finding('refuse','LAYOUT_DESTINATION_INVALID',at,`${node.id} is ${node.layout.chrome}, and only a visible layout has destinations`));
+  }
+}
+
+function shellNavigationFindings(tree,nodes,node,locale,at,out){
+  for(const item of list(node.layout.nav?.items)){const label=item?.labels?.[locale.default];
+    if(!(typeof label==='string'&&label.trim()))out.push(finding('suspect','SHELL_NAV_LABEL_MISSING',at,`${node.id} nav item ${item?.key??'(unnamed)'} has no ${locale.default??'(unset)'} label in the catalogs`));if(typeof item?.route==='string'&&!resolveNavRoute(nodes,item.route,tree.app?.localeParam??null))out.push(finding('suspect','NAV_ROUTE_MISSING',at,`${node.id} nav item ${item.key} navigates to ${item.route}, which no page of the tree answers`));
+  }
+  for(const item of list(node.layout.nav?.findings)){
+    if(item.code==='ROUTE_NOT_IN_NAV'||item.code==='NAV_REGISTRY_UNREAD')out.push(finding('suspect',item.code,at,`${node.id}: ${item.detail}`));else if(item.code==='NAV_ROUTE_NULL')out.push(finding('info',item.code,at,`${node.id}: ${item.detail}`));
+  }
+}
+
+function shellLayoutFindings(tree,nodes,node,shell,record,locale,at,requireAll,loader,out){
+  if(requireAll){
+    const {settled,reasons}=layoutSettlement(tree,node,{shellDir:shell.dir,uiLoader:loader});
+    if(!settled)out.push(finding('refuse','LAYOUT_UNSETTLED',at,reasons.join('; ')));
+  }
+  shellDestinationFindings(tree,node,at,out);
+  shellNavigationFindings(tree,nodes,node,locale,at,out);
+}
+
+function shellSourceFindings(workRoot,r,tree,name,at,inApp,driftLevel,out){
+  if(r.origin!=='repository'||!tree.source?.digest)return;
+  const located=frontendOf(workRoot),appDirOf=tree.app?.appDir?path.join(located.repoRoot,tree.app.appDir):null;
+  if(!appDirOf||!fs.existsSync(appDirOf))out.push(finding('info','SHELL_SOURCE_UNAVAILABLE',at,inApp(name,`${tree.app?.appDir??'app/'} is not readable here; the recorded digests could not be compared`)));
+  else{let scan=null;
+    try{scan=scanAppDir(appDirOf,{repoRoot:located.repoRoot,name});}catch(error){out.push(finding('info','SHELL_SOURCE_UNAVAILABLE',at,inApp(name,`app/ could not be scanned (${error.message})`)));}
+    const drift=scan?sourceDrift(tree,scan):null;if(drift?.stale)out.push(finding(driftLevel,'LAYOUT_TREE_STALE',at,inApp(name,`app/ changed since the scan (${drift.changed.slice(0,6).join(', ')})`)+` - brand.decide re-runs starci work layout-tree scan --work <.starciwork> --write and re-captures what moved`));
+  }
+}
+
+function shellAppFindings(workRoot,r,name,shell,locale,at,requireAll,loader,inApp,verifySource,driftLevel,out){
+  const tree=treeOf(r,name),nodes=nodesOf(tree);
+  for(const node of nodes.filter(entry=>entry.layout))shellLayoutFindings(tree,nodes,node,shell,r,locale,at,requireAll,loader,out);
+  if(verifySource&&r.origin==='repository'&&tree.source?.digest)shellSourceFindings(workRoot,r,tree,name,at,inApp,driftLevel,out);
+}
+
 /** Findings about the shell record itself. `verifySource` re-scans app/ and compares the recorded digest. */
-function checkShellRecord(workRoot, shell, { verifySource = true, driftLevel = 'refuse', uiRecords = null, requireAll = true, lockupDeferredFor = null } = {}) {
-  const out = [];
-  const at = shown(workRoot, shell.file);
-  if (shell.error) return [finding('refuse', 'SHELL_RECORD_INVALID', at, `the shell record ${shell.error}`)];
-  const r = shell.record;
-  if (r.schema !== TREE_SCHEMA) return [finding('refuse', 'SHELL_RECORD_NOT_TREE', at, `names schema ${r.schema ?? '(none)'}, not ${TREE_SCHEMA} - the shell record is a layout tree`)];
-  if (requireAll && r.state !== 'done') out.push(finding('refuse', 'SHELL_UNSETTLED', at, `the layout tree is ${r.state ?? 'stateless'}, not done`));
-  if (!appsOf(r).length) out.push(finding('refuse', 'LAYOUT_TREE_INVALID', at, 'the tree declares no app'));
-  const appNames = appNamesOf(r);
-  const inApp = (name, text) => (appNames.length > 1 ? `app ${name}: ${text}` : text);
-  for (const name of appNames) {
-    const tree = treeOf(r, name);
-    const nodes = nodesOf(tree);
-    const ids = new Set();
-    for (const n of nodes) {
-      if (ids.has(n.id)) out.push(finding('refuse', 'LAYOUT_TREE_INVALID', at, inApp(name, `node ${n.id} appears twice`)));
-      ids.add(n.id);
-      if (n.parent !== null && !nodes.some((p) => p.id === n.parent)) out.push(finding('refuse', 'LAYOUT_TREE_INVALID', at, inApp(name, `node ${n.id} names parent ${n.parent}, which is not a node`)));
-    }
-    if (!nodes.some((n) => n.id === '/')) out.push(finding('refuse', 'LAYOUT_TREE_INVALID', at, inApp(name, 'the tree has no root node /')));
-  }
-  const lockups = list(r.brand?.lockups);
-  // A planned layout's own drawing comes before any lockup exists on a greenfield product (nothing renders one
-  // yet): that one draw is exempt, and brand.decide then crops the lockup from its accepted composite.
-  if (!lockups.length && lockupDeferredFor) out.push(finding('info', 'SHELL_LOCKUP_DEFERRED', at, `no brand lockup yet: ${lockupDeferredFor} draws the planned layout it will be cropped from (layout-tree.mjs lockup --from ${lockupDeferredFor}:<layout composite>)`));
-  else if (!lockups.length) out.push(finding('refuse', 'SHELL_LOCKUP_MISSING', at, 'no brand lockup: the rendered lockup is what every direction is handed instead of an invented logo'));
-  for (const image of lockups) {
-    const file = captureFileOf(image);
-    const named = image.name ?? '(no name)';
-    if (!file || !fs.existsSync(file)) out.push(finding('refuse', 'SHELL_CAPTURE_MISSING', at, `lockup ${named} is not in the blob store`));
-    else if (image.sha256 && sha256File(file) !== image.sha256) out.push(finding('refuse', 'SHELL_CAPTURE_DIGEST', at, `lockup ${named} no longer hashes to its recorded sha256`));
-    if (image.source?.kind === 'layout-drawing') {
-      const src = lockupSourceOf(r, workRoot, image.source.ref, (id) => (uiRecords ?? (uiRecords = loadUiRecords(workRoot))).get(id) ?? null);
-      if (src.error) out.push(finding('suspect', 'SHELL_LOCKUP_SOURCE_STALE', at, `lockup ${image.path} was cropped from ${image.source.ref}: ${src.error} - brand.decide re-crops it`));
-      else if (src.sha256 !== image.source.sha256) out.push(finding('suspect', 'SHELL_LOCKUP_SOURCE_STALE', at, `lockup ${image.path} was cropped from ${image.source.ref}, which was redrawn since - brand.decide re-crops it`));
-    }
-    if (image.source?.kind === 'layout-drawing' && r.origin === 'repository') out.push(finding('suspect', 'SHELL_LOCKUP_FROM_DRAWING', at, `lockup ${image.path} is cropped from the layout drawing ${image.source.ref}; the frontend exists now - re-crop it from a real render (layout-tree.mjs lockup --from shell/<capture>)`));
-  }
-  // Every drawing set is desktop and mobile in the light theme (owner ruling 2026-09-24); dark is optional.
-  const declared = matrixOf(r), required = requiredMatrixOf(r);
-  for (const bp of required.breakpoints) if (!declared.breakpoints.includes(bp)) out.push(finding('refuse', 'SHELL_BREAKPOINT_MISSING', at, `the tree declares no ${bp} breakpoint - every drawing set covers ${required.breakpoints.join(' and ')}`));
-  for (const theme of required.themes) if (!declared.themes.includes(theme)) out.push(finding('refuse', 'SHELL_THEME_MISSING', at, `the tree declares no ${theme} theme - every drawing set covers ${required.themes.join(', ')} (dark is optional)`));
-  const personas = list(r.personas);
-  if (!personas.length) out.push(finding('refuse', 'SHELL_PERSONA_INVALID', at, 'no demo persona - a drawing may not invent a tenant'));
-  const roles = personas.map((p) => p?.role);
-  if (new Set(roles).size !== roles.length) out.push(finding('refuse', 'SHELL_PERSONA_INVALID', at, 'two personas share a role'));
-  if (personas.length > 1 && personas.filter((p) => p?.default === true).length !== 1) out.push(finding('refuse', 'SHELL_PERSONA_INVALID', at, 'more than one persona and not exactly one marked default'));
-  const locale = r.productLocale ?? {};
-  const locales = list(locale.locales);
-  if (locale.default && locales.length && !locales.includes(locale.default)) out.push(finding('refuse', 'SHELL_LOCALE_INVALID', at, `productLocale.default ${locale.default} is not one of productLocale.locales`));
-  if (locale.fallback && locales.length && !locales.includes(locale.fallback)) out.push(finding('refuse', 'SHELL_LOCALE_INVALID', at, `productLocale.fallback ${locale.fallback} is not one of productLocale.locales`));
-  const loader = (id) => (uiRecords ?? (uiRecords = loadUiRecords(workRoot))).get(id) ?? null;
-  for (const name of appNames) {
-    const tree = treeOf(r, name);
-    const nodes = nodesOf(tree);
-    for (const node of nodes.filter((n) => n.layout)) {
-      if (requireAll) {
-        const { settled, reasons } = layoutSettlement(tree, node, { shellDir: shell.dir, uiLoader: loader });
-        if (!settled) out.push(finding('refuse', 'LAYOUT_UNSETTLED', at, reasons.join('; ')));
-      }
-      // Destinations: one key each, active for nodes at or below the layout.
-      const dests = destinationsOf(tree, node);
-      const seenKeys = new Set();
-      for (const d of dests) {
-        if (seenKeys.has(d.key)) out.push(finding('refuse', 'LAYOUT_DESTINATION_INVALID', at, `${node.id} records destination ${d.key} twice`));
-        seenKeys.add(d.key);
-        if (!d.routes.length) out.push(finding('refuse', 'LAYOUT_DESTINATION_INVALID', at, `${node.id} destination ${d.key} names no route it is active for`));
-        for (const route of d.routes) if (!nodeById(tree, route) || !(route === node.id || String(route).startsWith(node.id === '/' ? '/' : `${node.id}/`))) out.push(finding('refuse', 'LAYOUT_DESTINATION_INVALID', at, `${node.id} destination ${d.key} is active for ${route}, which is not a node at or below the layout`));
-        if (node.layout.chrome !== 'visible') out.push(finding('refuse', 'LAYOUT_DESTINATION_INVALID', at, `${node.id} is ${node.layout.chrome}, and only a visible layout has destinations`));
-      }
-      // Navigation mismatches are the frontend's own defects: reported on every run for the owner (the
-      // capture shows exactly what the product renders), never refused here and never patched in the record.
-      for (const item of list(node.layout.nav?.items)) {
-        const label = item?.labels?.[locale.default];
-        if (!(typeof label === 'string' && label.trim())) out.push(finding('suspect', 'SHELL_NAV_LABEL_MISSING', at, `${node.id} nav item ${item?.key ?? '(unnamed)'} has no ${locale.default ?? '(unset)'} label in the catalogs`));
-        if (typeof item?.route === 'string' && !resolveNavRoute(nodes, item.route, tree.app?.localeParam ?? null)) out.push(finding('suspect', 'NAV_ROUTE_MISSING', at, `${node.id} nav item ${item.key} navigates to ${item.route}, which no page of the tree answers`));
-      }
-      for (const f of list(node.layout.nav?.findings)) {
-        if (f.code === 'ROUTE_NOT_IN_NAV' || f.code === 'NAV_REGISTRY_UNREAD') out.push(finding('suspect', f.code, at, `${node.id}: ${f.detail}`));
-        else if (f.code === 'NAV_ROUTE_NULL') out.push(finding('info', f.code, at, `${node.id}: ${f.detail}`));
-      }
-    }
-    if (verifySource && r.origin === 'repository' && tree.source?.digest) {
-      const located = frontendOf(workRoot);
-      const appDirOf = tree.app?.appDir ? path.join(located.repoRoot, tree.app.appDir) : null;
-      if (!appDirOf || !fs.existsSync(appDirOf)) out.push(finding('info', 'SHELL_SOURCE_UNAVAILABLE', at, inApp(name, `${tree.app?.appDir ?? 'app/'} is not readable here; the recorded digests could not be compared`)));
-      else {
-        let scan = null;
-        try { scan = scanAppDir(appDirOf, { repoRoot: located.repoRoot, name }); } catch (error) { out.push(finding('info', 'SHELL_SOURCE_UNAVAILABLE', at, inApp(name, `app/ could not be scanned (${error.message})`))); }
-        // A message catalog is judged by the keys the tree uses, never by its whole-file digest: an unrelated
-        // string another workflow adds is not drift (inc-13f6af8494bf).
-        const drift = scan ? sourceDrift(tree, scan) : null;
-        if (drift?.stale) out.push(finding(driftLevel, 'LAYOUT_TREE_STALE', at, inApp(name, `app/ changed since the scan (${drift.changed.slice(0, 6).join(', ')})`) + ` - brand.decide re-runs starci work layout-tree scan --work <.starciwork> --write and re-captures what moved`));
-      }
-    }
-  }
+function checkShellRecord(workRoot,shell,{verifySource=true,driftLevel='refuse',uiRecords=null,requireAll=true,lockupDeferredFor=null}={}){
+  const out=[],at=shown(workRoot,shell.file);
+  if(shell.error)return [finding('refuse','SHELL_RECORD_INVALID',at,`the shell record ${shell.error}`)];
+  const r=shell.record;
+  if(r.schema!==TREE_SCHEMA)return [finding('refuse','SHELL_RECORD_NOT_TREE',at,`names schema ${r.schema??'(none)'}, not ${TREE_SCHEMA} - the shell record is a layout tree`)];
+  if(requireAll&&r.state!=='done')out.push(finding('refuse','SHELL_UNSETTLED',at,`the layout tree is ${r.state??'stateless'}, not done`));
+  if(!appsOf(r).length)out.push(finding('refuse','LAYOUT_TREE_INVALID',at,'the tree declares no app'));
+  const appNames=appNamesOf(r),inApp=(name,text)=>appNames.length>1?`app ${name}: ${text}`:text;
+  shellNodeFindings(r,appNames,at,inApp,out);
+  const uiRecordsState={uiRecords},lockups=list(r.brand?.lockups);
+  shellLockupFindings(workRoot,r,lockups,lockupDeferredFor,at,uiRecordsState,out);
+  shellMetadataFindings(r,at,out);
+  const locale=r.productLocale??{};
+  shellLocaleFindings(locale,at,out);
+  const loader=id=>(uiRecordsState.uiRecords??=loadUiRecords(workRoot)).get(id)??null;
+  for(const name of appNames)shellAppFindings(workRoot,r,name,shell,locale,at,requireAll,loader,inApp,verifySource,driftLevel,out);
   return out;
 }
 
@@ -255,7 +248,7 @@ function checkUiRecord(workRoot, uiFile, record, shell, { mode = 'op', uiRecords
   const node = nodeById(tree, route);
   const values = surfaceValues(record);
   const surfaceDefault = typeof record.surface === 'string' ? record.surface : null;
-  const needsFile = (()=>{if(surfaceDefault&&SURFACE_FILE[surfaceDefault])return SURFACE_FILE[surfaceDefault];if(isOverlayRecord(record)&&record.routed===true)return 'page';return null;})();
+  const needsFile = (()=>{if(surfaceDefault&&SURFACE_FILE[surfaceDefault]){return SURFACE_FILE[surfaceDefault];}if(isOverlayRecord(record)&&record.routed===true){return 'page';}return null;})();
   const declaredNew = !node || (needsFile && !node.files?.[needsFile]);
   let anchor = route;
   if (declaredNew) {
@@ -327,6 +320,17 @@ function checkUiRecord(workRoot, uiFile, record, shell, { mode = 'op', uiRecords
 }
 
 const GEOMETRY_SCRIPT = path.join(path.dirname(fileURLToPath(import.meta.url)), 'grammar-geometry.mjs');
+const geometryViews=(named,breakpoints)=>{if(named.length){return named;}if(breakpoints.length){return breakpoints;}return [{ name: 'default', width: 390, height: 844 }];};
+function appendGeometryViewFindings(out,a,view,file,repo,at,run){
+  const r=run([GEOMETRY_SCRIPT,'--check',file,'--repo',repo,'--viewport',`${view.width}x${view.height}`,'--json'],{timeout:240000,maxBuffer:32*1024*1024});
+  let parsed=null;try{parsed=JSON.parse(r.stdout??'');}catch{parsed=null;}
+  if(r.status===0&&parsed?.ok){return;}
+  if(r.status===1&&Array.isArray(parsed?.findings)){
+    for(const f of parsed.findings){out.push(finding('refuse','GEOMETRY_OFF_GRAMMAR',at,`${a.path} at ${view.width}px: ${f.element} ${f.at} ${f.property} is ${f.got}, the product grammar renders ${f.expected}`));}
+    return;
+  }
+  out.push(finding('refuse','GEOMETRY_CHECK_FAILED',at,`${a.path} at ${view.width}px: grammar-geometry.mjs could not measure it (${parsed?.error??(r.error?.message||String(r.stderr??'').trim().split('\n').pop()||'exit '+r.status)})`));
+}
 
 /**
  * Every html direction of a ui record measured against the product's grammar geometry (grammar-geometry.mjs
@@ -346,18 +350,8 @@ export function checkDrawGeometry(workRoot, uiFile, record, shell, { run = runNo
     const file = path.join(path.dirname(uiFile), a.path);
     if (!fs.existsSync(file)) { out.push(finding('refuse', 'GEOMETRY_CHECK_FAILED', at, `${a.path} is not on disk`)); continue; }
     const named = a.viewport?.width && a.viewport?.height ? [{ name: 'asset', width: a.viewport.width, height: a.viewport.height }] : breakpoints.filter((b) => b.name === (a.composite?.breakpoint ?? a.breakpoint));
-    const views = (()=>{if(named.length)return named;if(breakpoints.length)return breakpoints;return [{ name: 'default', width: 390, height: 844 }];})();
-    for (const view of views) {
-      const r = run([GEOMETRY_SCRIPT, '--check', file, '--repo', repo, '--viewport', `${view.width}x${view.height}`, '--json'], { timeout: 240000, maxBuffer: 32 * 1024 * 1024 });
-      let parsed = null;
-      try { parsed = JSON.parse(r.stdout ?? ''); } catch { parsed = null; }
-      if (r.status === 0 && parsed?.ok) continue;
-      if (r.status === 1 && Array.isArray(parsed?.findings)) {
-        for (const f of parsed.findings) out.push(finding('refuse', 'GEOMETRY_OFF_GRAMMAR', at, `${a.path} at ${view.width}px: ${f.element} ${f.at} ${f.property} is ${f.got}, the product grammar renders ${f.expected}`));
-        continue;
-      }
-      out.push(finding('refuse', 'GEOMETRY_CHECK_FAILED', at, `${a.path} at ${view.width}px: grammar-geometry.mjs could not measure it (${parsed?.error ?? (r.error?.message || String(r.stderr ?? '').trim().split('\n').pop() || 'exit ' + r.status)})`));
-    }
+    const views = geometryViews(named,breakpoints);
+    for (const view of views) appendGeometryViewFindings(out,a,view,file,repo,at,run);
   }
   return out;
 }
@@ -400,7 +394,7 @@ function checkComposites(workRoot, uiFile, record, shell, { mode, level, records
       if (!overlay) out.push(finding('refuse', 'COMPOSITE_INCONSISTENT', at, `${where}: only a modal or drawer has an overlay presentation`));
       const host = resolveHost(records, record.host);
       const hostRef = parseUiRef(c.host?.asset);
-      const hostAsset = host && hostRef?.id === host.id ? assetsOf(host.record).find((x) => x.path === hostRef.path) : null;
+      const hostAsset = Boolean(host) && hostRef?.id === host?.id ? assetsOf(host.record).find((x) => x.path === hostRef.path) : null;
       if (!hostAsset) out.push(finding('refuse', 'COMPOSITE_HOST_MISMATCH', at, `${where} is drawn over ${c.host?.asset ?? '(nothing)'}, which is not an asset of host ${record.host}`));
       else {
         if (hostAsset.sha256 !== c.host.sha256) out.push(finding(level.stale, 'COMPOSITE_HOST_MISMATCH', at, `${where}: host ${c.host.asset} changed since this overlay was drawn over it - recompose`));
@@ -466,13 +460,29 @@ function checkPromptLocale(workRoot, uiFile, record, shell) {
 // ---------------------------------------------------------------------------------------------------------
 
 /** Findings about one implementation record: each routed ui record it builds has its app/ files. */
+function checkImplementationApp(raw,name,tree,uis,located,at,out){
+  const appDir=tree.app?.appDir?path.join(located.repoRoot,tree.app.appDir):null;
+  const inApp=(text)=>(appNamesOf(raw).length>1?`app ${name}: ${text}`:text);
+  if(!appDir||!fs.existsSync(appDir)){out.push(finding('refuse','IMPL_APP_DIR_UNREADABLE',at,inApp(`${tree.app?.appDir??'app/'} is not readable, so the created route files cannot be verified`)));return;}
+  const scan=scanAppDir(appDir,{repoRoot:located.repoRoot,name});
+  const fileAt=(id,kind)=>{const dir=path.join(appDir,...id.split('/').filter(Boolean));return SOURCE_EXT.some(ext=>fs.existsSync(path.join(dir,`${kind}${ext}`)));};
+  for(const ui of uis){
+    const values=surfaceValues(ui),wants=[];
+    for(const v of new Set(values)){if(SURFACE_FILE[v])wants.push(SURFACE_FILE[v]);}
+    if(isOverlayRecord(ui)&&ui.routed===true)wants.push('page');
+    for(const kind of new Set(wants)){if(!fileAt(ui.route,kind))out.push(finding('refuse','IMPL_ROUTE_FILE_MISSING',at,`${ui.id} is a ${values.join('/')} at ${ui.route}, but ${slash(path.relative(located.repoRoot,appDir))}${ui.route==='/'?'':ui.route}/${kind}.tsx does not exist`));}
+    if(isOverlayRecord(ui)&&ui.routed===true&&!scan.nodes.some(n=>n.intercepts===ui.route))out.push(finding('refuse','IMPL_INTERCEPT_MISSING',at,`${ui.id} is a routed overlay: an intercepting route (@slot/(.)segment/page.tsx) presenting ${ui.route} must exist beside its full page`));
+  }
+  const fresh=new Map(scan.nodes.map(n=>[n.id,n]));
+  for(const n of nodesOf(tree).filter(x=>x.files?.layout?.sha256)){if(fresh.get(n.id)?.files?.layout?.sha256&&fresh.get(n.id).files.layout.sha256!==n.files.layout.sha256)out.push(finding('suspect','LAYOUT_SOURCE_DRIFT',at,inApp(`${n.id} layout changed since the tree recorded it - brand.decide re-scans and re-captures`)));}
+}
+
 function checkImplementationRecord(workRoot, implFile, record, shell) {
   const at = shown(workRoot, implFile);
   if (!shell) return [finding('refuse', 'SHELL_RECORD_MISSING', at, 'the tree has no shell/index.yaml layout tree to build routes into')];
   if (shell.error) return [];
   if (!isLayoutTree(shell.record)) return [finding('refuse', 'SHELL_RECORD_NOT_TREE', at, `the shell record is not a layout tree (${TREE_SCHEMA})`)];
-  const raw = shell.record;
-  const records = loadUiRecords(workRoot);
+  const raw = shell.record,records = loadUiRecords(workRoot);
   const ids = [...new Set([...list(record.proves), ...list(record.refs), ...list(record.dependsOn)].filter((id) => typeof id === 'string' && id.startsWith('ui.')))];
   const routed = ids.map((id) => records.get(id)).filter((e) => typeof e?.record?.route === 'string');
   if (!routed.length) return [finding('info', 'IMPL_NO_ROUTED_UI', at, `builds no ui record with a route (${ids.join(', ') || 'none named'}); no app/ path to verify`)];
@@ -486,28 +496,7 @@ function checkImplementationRecord(workRoot, implFile, record, shell) {
     if (!byApp.has(resolved.app)) byApp.set(resolved.app, { tree: resolved.tree, uis: [] });
     byApp.get(resolved.app).uis.push(ui);
   }
-  for (const [name, { tree, uis }] of byApp) {
-    const appDir = tree.app?.appDir ? path.join(located.repoRoot, tree.app.appDir) : null;
-    const inApp = (text) => (appNamesOf(raw).length > 1 ? `app ${name}: ${text}` : text);
-    if (!appDir || !fs.existsSync(appDir)) { out.push(finding('refuse', 'IMPL_APP_DIR_UNREADABLE', at, inApp(`${tree.app?.appDir ?? 'app/'} is not readable, so the created route files cannot be verified`))); continue; }
-    const scan = scanAppDir(appDir, { repoRoot: located.repoRoot, name });
-    const fileAt = (id, kind) => {
-      const dir = path.join(appDir, ...id.split('/').filter(Boolean));
-      return SOURCE_EXT.some((ext) => fs.existsSync(path.join(dir, `${kind}${ext}`)));
-    };
-    for (const ui of uis) {
-      const values = surfaceValues(ui);
-      const wants = [];
-      for (const v of new Set(values)) if (SURFACE_FILE[v]) wants.push(SURFACE_FILE[v]);
-      if (isOverlayRecord(ui) && ui.routed === true) wants.push('page');
-      for (const kind of new Set(wants)) if (!fileAt(ui.route, kind)) out.push(finding('refuse', 'IMPL_ROUTE_FILE_MISSING', at, `${ui.id} is a ${values.join('/')} at ${ui.route}, but ${slash(path.relative(located.repoRoot, appDir))}${ui.route === '/' ? '' : ui.route}/${kind}.tsx does not exist`));
-      if (isOverlayRecord(ui) && ui.routed === true && !scan.nodes.some((n) => n.intercepts === ui.route)) out.push(finding('refuse', 'IMPL_INTERCEPT_MISSING', at, `${ui.id} is a routed overlay: an intercepting route (@slot/(.)segment/page.tsx) presenting ${ui.route} must exist beside its full page`));
-    }
-    // A build that changed a recorded layout file leaves the tree stale for its owner to re-capture.
-    const fresh = new Map(scan.nodes.map((n) => [n.id, n]));
-    for (const n of nodesOf(tree).filter((x) => x.files?.layout?.sha256)) if (fresh.get(n.id)?.files?.layout?.sha256 && fresh.get(n.id).files.layout.sha256 !== n.files.layout.sha256) out.push(finding('suspect', 'LAYOUT_SOURCE_DRIFT', at, inApp(`${n.id} layout changed since the tree recorded it - brand.decide re-scans and re-captures`)));
-  }
-  return out;
+  for(const [name,{tree,uis}] of byApp)checkImplementationApp(raw,name,tree,uis,located,at,out);return out;
 }
 
 // ---------------------------------------------------------------------------------------------------------
@@ -534,8 +523,8 @@ function uiPaletteFindings(workRoot, uiFile, record, ctx = paletteContext(workRo
   if (!ctx.brand) return ctx.note ? [ctx.note] : [];
   const at = shown(workRoot, uiFile);
   return assetsOf(record).flatMap((a) => {
-    const subject = (()=>{if(a.composite)return 'composite';if(a.role==='direction-content'||isPartName(a.path))return 'drawn part';return null;})();
-    return (()=>{if(!subject)return [];return imageFindings(workRoot,ctx,at,path.join(path.dirname(uiFile),a.path),subject,a.composite?{composite:a.composite,uiDir:path.dirname(uiFile)}:{});})();
+    const subject = (()=>{if(a.composite){return 'composite';}if(a.role==='direction-content'||isPartName(a.path)){return 'drawn part';}return null;})();
+    return (()=>{if(!subject){return [];}return imageFindings(workRoot,ctx,at,path.join(path.dirname(uiFile),a.path),subject,a.composite?{composite:a.composite,uiDir:path.dirname(uiFile)}:{});})();
   });
 }
 
@@ -547,12 +536,16 @@ function shellPaletteFindings(workRoot, shell, ctx = paletteContext(workRoot)) {
   const { breakpoints, themes } = matrixOf(shell.record);
   const seen = new Set();
   const out = [];
-  for (const node of nodesOf(shell.record)) for (const bp of breakpoints) for (const th of themes) for (const c of capturesAt(shell.record, node, bp, th)) {
+  for (const {node,c} of layoutCapturesOf(shell.record,breakpoints,themes)) {
     if (seen.has(c.rel)) continue;
     seen.add(c.rel);
     out.push(...imageFindings(workRoot, ctx, at, captureFileOf(c), `layout capture of ${node.id}${c.destination ? ' (' + c.destination + ')' : ''}`));
   }
   return out;
+}
+
+function* layoutCapturesOf(tree,breakpoints,themes){
+  for(const node of nodesOf(tree)){for(const bp of breakpoints){for(const theme of themes){for(const capture of capturesAt(tree,node,bp,theme)){yield {node,c:capture};}}}}
 }
 
 /** Every running-page capture an implementation record cites (blobs, scripts/work/impl-captures.mjs). */
@@ -578,6 +571,34 @@ export function shellBindingFindings(root, workRoot = workRootOf(root)) {
   return out;
 }
 
+function targetFindings(workRoot,dir,indexFile,own,shell,uiRecords){
+  const findings = [];let mode;
+  switch(own?.schema){
+    case UI_SCHEMA:{
+      mode='ui';const lockupDeferredFor=shell&&!shell.error&&isPlannedLayoutDrawing(shell.record,own)?own.id:null;
+      if(shell&&own.shell?.chromeless!==true)findings.push(...checkShellRecord(workRoot,shell,{requireAll:false,uiRecords,lockupDeferredFor}).filter(f=>f.code!=='ROUTE_NOT_IN_NAV'));
+      findings.push(...checkUiRecord(workRoot,indexFile,own,shell,{mode:'op',uiRecords}),...uiPaletteFindings(workRoot,indexFile,own));
+      break;
+    }
+    case IMPL_SCHEMA: mode='implementation';
+      findings.push(...checkImplementationRecord(workRoot,indexFile,own,shell),...implementationPaletteFindings(workRoot,indexFile));
+      break;
+    case TREE_SCHEMA:
+      mode='shell';
+      findings.push(...checkShellRecord(workRoot,shell,{uiRecords}),...shellPaletteFindings(workRoot,shell));
+      break;
+    default:{
+      mode='tree';
+      if(shell)findings.push(...checkShellRecord(workRoot,shell,{uiRecords}));
+      else findings.push(finding('refuse','SHELL_RECORD_MISSING',shown(workRoot,path.join(workRoot,'shell','index.yaml')),'the tree has no layout tree record'));
+      const palette=paletteContext(workRoot);
+      if(shell)findings.push(...shellPaletteFindings(workRoot,shell,palette));
+      for(const {file,record} of uiRecordsUnder(dir))findings.push(...checkUiRecord(workRoot,file,record,shell,{mode:'op',uiRecords}),...uiPaletteFindings(workRoot,file,record,palette));
+    }
+  }
+  return {mode,findings};
+}
+
 /** Check the actual tree, shell, UI or implementation record under current structural rules. */
 export function checkShellConformance(target) {
   const resolved = path.resolve(target);
@@ -586,29 +607,8 @@ export function checkShellConformance(target) {
   const shell = readShell(workRoot);
   const indexFile = path.join(dir, 'index.yaml');
   const own = fs.existsSync(indexFile) ? readRecord(indexFile) : null;
-  const findings = [];
   const uiRecords = loadUiRecords(workRoot);
-  let mode;
-  if (own?.schema === UI_SCHEMA) {
-    mode = 'ui';
-    // A ui record needs the tree whole and its own ancestors settled - not every layout of the product.
-    const lockupDeferredFor = shell && !shell.error && isPlannedLayoutDrawing(shell.record, own) ? own.id : null;
-    if (shell && own.shell?.chromeless !== true) findings.push(...checkShellRecord(workRoot, shell, { requireAll: false, uiRecords, lockupDeferredFor }).filter((f) => f.code !== 'ROUTE_NOT_IN_NAV'));
-    findings.push(...checkUiRecord(workRoot, indexFile, own, shell, { mode: 'op', uiRecords }), ...uiPaletteFindings(workRoot, indexFile, own));
-  } else if (own?.schema === IMPL_SCHEMA) {
-    mode = 'implementation';
-    findings.push(...checkImplementationRecord(workRoot, indexFile, own, shell), ...implementationPaletteFindings(workRoot, indexFile));
-  } else if (own?.schema === TREE_SCHEMA) {
-    mode = 'shell';
-    findings.push(...checkShellRecord(workRoot, shell, { uiRecords }), ...shellPaletteFindings(workRoot, shell));
-  } else {
-    mode = 'tree';
-    if (shell) findings.push(...checkShellRecord(workRoot, shell, { uiRecords }));
-    else findings.push(finding('refuse', 'SHELL_RECORD_MISSING', shown(workRoot, path.join(workRoot, 'shell', 'index.yaml')), 'the tree has no layout tree record'));
-    const palette = paletteContext(workRoot);
-    if (shell) findings.push(...shellPaletteFindings(workRoot, shell, palette));
-    for (const { file, record } of uiRecordsUnder(dir)) findings.push(...checkUiRecord(workRoot, file, record, shell, { mode: 'op', uiRecords }), ...uiPaletteFindings(workRoot, file, record, palette));
-  }
+  const {mode,findings}=targetFindings(workRoot,dir,indexFile,own,shell,uiRecords);
   const pick = (level) => findings.filter((f) => f.level === level).map((f) => `${f.file}: ${f.message} [${f.code}]`);
   const refused = pick('refuse');
   return { schema: 'starci/shell-conformance@2', ok: refused.length === 0, mode, target: slash(dir), workRoot: slash(workRoot), refused, suspect: pick('suspect'), info: pick('info'), findings };
