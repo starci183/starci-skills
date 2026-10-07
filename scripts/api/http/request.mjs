@@ -66,6 +66,6 @@ export const request = (options, onResponse, allow) => {
   // Only the checked URL object reaches node:http: its protocol and hostname are judged again after parsing.
   if (url.protocol !== 'http:' || url.username || url.password || allowedHostOf(allow, url.hostname) === null) throw refuse(`host ${url.hostname} is outside the allowed hosts`);
   const rest = { ...options };
-  for (const key of ['host', 'port', 'path', 'protocol', 'auth']) delete rest[key];
+  for (const key of ['host', 'hostname', 'port', 'path', 'protocol', 'auth', 'socketPath', 'lookup', 'createConnection']) delete rest[key];
   return plainHttp.request(url, rest, onResponse);
 };
