@@ -176,44 +176,61 @@ function rlsFindings(file, facts, exposed, forceRls) {
   return findings;
 }
 
+function policyNameFindings(file, policy, qualified) {
+  const findings = [];
+  if (policy.name === undefined || !policy.name.startsWith(`${policy.table}_`)) {
+    findings.push(found(DB_POLICY_SHAPE, file, `${file}:${policy.line} policy ${JSON.stringify(policy.name)} on ${qualified} is not named <table>_<role>_<action>`, { line: policy.line, policy: policy.name }));
+  } else {
+    const tail = policy.name.slice(policy.table.length + 1);
+    if (tail !== 'public_read' && !new RegExp(`^[a-z][a-z0-9_]*_(${POLICY_ACTIONS.join('|')})$`).test(tail)) {
+      findings.push(found(DB_POLICY_SHAPE, file, `${file}:${policy.line} policy ${policy.name} on ${qualified} is not named <table>_<role>_<action>`, { line: policy.line, policy: policy.name }));
+    }
+  }
+  return findings;
+}
+
+function policyAccessFindings(file, policy, qualified) {
+  const findings = [];
+  const publicRead = typeof policy.name === 'string' && policy.name.endsWith(PUBLIC_READ_SUFFIX);
+  if (WRITE_COMMANDS.has(policy.cmd) && isTrue(policy.qual)) findings.push(found(DB_POLICY_SHAPE, file, `${file}:${policy.line} policy ${policy.name} on ${qualified} is FOR ${policy.cmd.toUpperCase()} with USING (true)`, { line: policy.line, policy: policy.name }));
+  if (WRITE_COMMANDS.has(policy.cmd) && isTrue(policy.withCheck)) findings.push(found(DB_POLICY_SHAPE, file, `${file}:${policy.line} policy ${policy.name} on ${qualified} is FOR ${policy.cmd.toUpperCase()} with WITH CHECK (true)`, { line: policy.line, policy: policy.name }));
+  if (policy.cmd === 'select' && isTrue(policy.qual) && !publicRead) findings.push(found(DB_POLICY_SHAPE, file, `${file}:${policy.line} policy ${policy.name} on ${qualified} is FOR SELECT with USING (true); a world-readable table declares it with *_public_read`, { line: policy.line, policy: policy.name }));
+  if ((policy.roles.includes('anon') || policy.roles.includes('public')) && !(policy.cmd === 'select' && publicRead)) {
+    const roleName = policy.roles.includes('anon') ? 'anon' : 'public';
+    const role = policy.implicitPublic ? 'the implicit TO public default' : `TO ${roleName}`;
+    findings.push(found(DB_POLICY_SHAPE, file, `${file}:${policy.line} policy ${policy.name} on ${qualified} reaches ${role}; anonymous access is only FOR SELECT with *_public_read`, { line: policy.line, policy: policy.name }));
+  }
+  return findings;
+}
+
+function grantPolicyFindings(file, grant) {
+  const findings = [];
+  if (!grant.grant) return findings;
+  if (grant.grantees.includes('service_role')) findings.push(found(DB_POLICY_SHAPE, file, `${file}:${grant.line} grants to service_role; the service role bypasses RLS and is never granted`, { line: grant.line }));
+  const broadRole = grant.grantees.find((role) => ['anon', 'authenticated', 'public'].includes(role));
+  if (grant.targtype === 'ACL_TARGET_ALL_IN_SCHEMA' && grant.objtype === 'OBJECT_TABLE' && broadRole) findings.push(found(DB_POLICY_SHAPE, file, `${file}:${grant.line} grants on all tables in a schema to ${broadRole}; table privileges are declared per table beside the matching policies`, { line: grant.line, role: broadRole }));
+  return findings;
+}
+
+function defaultPrivilegeFindings(file, defaults) {
+  const findings = [];
+  if (!defaults.grant) return findings;
+  if (defaults.grantees.includes('service_role')) findings.push(found(DB_POLICY_SHAPE, file, `${file}:${defaults.line} grants default privileges to service_role; the service role bypasses RLS and is never granted`, { line: defaults.line }));
+  const broadRole = defaults.grantees.find((role) => ['anon', 'public'].includes(role));
+  if (defaults.objtype === 'OBJECT_TABLE' && broadRole) findings.push(found(DB_POLICY_SHAPE, file, `${file}:${defaults.line} alters default table privileges for ${broadRole}; anonymous grants are explicit per table beside *_public_read policies`, { line: defaults.line, role: broadRole }));
+  return findings;
+}
+
 function localPolicyFindings(file, facts) {
   const findings = [];
   for (const policy of facts.policies) {
     const qualified = `${policy.schema}.${policy.table}`;
-    if (policy.name === undefined || !policy.name.startsWith(`${policy.table}_`)) {
-      findings.push(found(DB_POLICY_SHAPE, file, `${file}:${policy.line} policy ${JSON.stringify(policy.name)} on ${qualified} is not named <table>_<role>_<action>`, { line: policy.line, policy: policy.name }));
-    } else {
-      const tail = policy.name.slice(policy.table.length + 1);
-      if (tail !== 'public_read' && !new RegExp(`^[a-z][a-z0-9_]*_(${POLICY_ACTIONS.join('|')})$`).test(tail)) {
-        findings.push(found(DB_POLICY_SHAPE, file, `${file}:${policy.line} policy ${policy.name} on ${qualified} is not named <table>_<role>_<action>`, { line: policy.line, policy: policy.name }));
-      }
-    }
-    const publicRead = typeof policy.name === 'string' && policy.name.endsWith(PUBLIC_READ_SUFFIX);
-    if (WRITE_COMMANDS.has(policy.cmd) && isTrue(policy.qual)) findings.push(found(DB_POLICY_SHAPE, file, `${file}:${policy.line} policy ${policy.name} on ${qualified} is FOR ${policy.cmd.toUpperCase()} with USING (true)`, { line: policy.line, policy: policy.name }));
-    if (WRITE_COMMANDS.has(policy.cmd) && isTrue(policy.withCheck)) findings.push(found(DB_POLICY_SHAPE, file, `${file}:${policy.line} policy ${policy.name} on ${qualified} is FOR ${policy.cmd.toUpperCase()} with WITH CHECK (true)`, { line: policy.line, policy: policy.name }));
-    if (policy.cmd === 'select' && isTrue(policy.qual) && !publicRead) findings.push(found(DB_POLICY_SHAPE, file, `${file}:${policy.line} policy ${policy.name} on ${qualified} is FOR SELECT with USING (true); a world-readable table declares it with *_public_read`, { line: policy.line, policy: policy.name }));
-    if ((policy.roles.includes('anon') || policy.roles.includes('public')) && !(policy.cmd === 'select' && publicRead)) {
-      const roleName = policy.roles.includes('anon') ? 'anon' : 'public';
-      const role = policy.implicitPublic ? 'the implicit TO public default' : `TO ${roleName}`;
-      findings.push(found(DB_POLICY_SHAPE, file, `${file}:${policy.line} policy ${policy.name} on ${qualified} reaches ${role}; anonymous access is only FOR SELECT with *_public_read`, { line: policy.line, policy: policy.name }));
-    }
+    findings.push(...policyNameFindings(file, policy, qualified), ...policyAccessFindings(file, policy, qualified));
   }
   for (const grant of facts.grants) {
-    if (!grant.grant) continue;
-    if (grant.grantees.includes('service_role')) findings.push(found(DB_POLICY_SHAPE, file, `${file}:${grant.line} grants to service_role; the service role bypasses RLS and is never granted`, { line: grant.line }));
-    const broadRole = grant.grantees.find((role) => ['anon', 'authenticated', 'public'].includes(role));
-    if (grant.targtype === 'ACL_TARGET_ALL_IN_SCHEMA' && grant.objtype === 'OBJECT_TABLE' && broadRole) {
-      findings.push(found(DB_POLICY_SHAPE, file, `${file}:${grant.line} grants on all tables in a schema to ${broadRole}; table privileges are declared per table beside the matching policies`, { line: grant.line, role: broadRole }));
-    }
+    findings.push(...grantPolicyFindings(file, grant));
   }
-  for (const defaults of facts.defaultPrivileges) {
-    if (!defaults.grant) continue;
-    if (defaults.grantees.includes('service_role')) findings.push(found(DB_POLICY_SHAPE, file, `${file}:${defaults.line} grants default privileges to service_role; the service role bypasses RLS and is never granted`, { line: defaults.line }));
-    const broadRole = defaults.grantees.find((role) => ['anon', 'public'].includes(role));
-    if (defaults.objtype === 'OBJECT_TABLE' && broadRole) {
-      findings.push(found(DB_POLICY_SHAPE, file, `${file}:${defaults.line} alters default table privileges for ${broadRole}; anonymous grants are explicit per table beside *_public_read policies`, { line: defaults.line, role: broadRole }));
-    }
-  }
+  for (const defaults of facts.defaultPrivileges) findings.push(...defaultPrivilegeFindings(file, defaults));
   return findings;
 }
 
