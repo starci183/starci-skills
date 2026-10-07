@@ -526,9 +526,7 @@ async function main() {
   // order) is held to that order; a kernel function to the sol-think order;
   // every other think kind to the think order.
   const hasRouteOrder = think && route.order && !w.modelFunction && Array.isArray(runtimes?.allocation?.preference?.[route.order]);
-  let thinkKey = 'think';
-  if (w.modelFunction && solThink) thinkKey = 'sol-think';
-  if (hasRouteOrder) thinkKey = route.order;
+  let thinkKey = 'think'; if (w.modelFunction && solThink) thinkKey = 'sol-think'; if (hasRouteOrder) thinkKey = route.order;
   const thinkPools = thinkKey === 'think' ? frontier : runtimes.allocation.preference[thinkKey];
   const orderKey = orderKeyOf(route, w.role);
   let { order, source: orderSource } = candidateOrder(args.kind, orderKey, registry, runtimes);
