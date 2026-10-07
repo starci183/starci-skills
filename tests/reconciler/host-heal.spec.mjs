@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import path from 'node:path';
 import test from 'node:test';
 import { applyHost, ensureHostRuntime, main } from '../../scripts/reconciler/start.mjs';
 import { healLauncherAndTasks, isLauncherOrTaskRow, registerTask, runtimeLink } from '../../scripts/reconciler/start-heal.mjs';
@@ -207,7 +208,7 @@ test('the services scope and a check read seats as a read-only pass; only a star
 test('a seat that is not running is idle without a running workflow and red once a running workflow needs it', async () => {
   assert.deepEqual(await seatNeed({ seatsRequested: true }), { needed: true, rows: null });
   assert.deepEqual(await seatNeed({ seatsRequested: false }, { running: async () => [] }), { needed: false, rows: [] });
-  const busy = [{ repo: 'D:/app', workflowId: 'wf-1' }];
+  const busy = [{ repo: 'work/app', workflowId: 'wf-1' }];
   assert.deepEqual(await seatNeed({ seatsRequested: false }, { running: async () => busy }), { needed: true, rows: busy });
   assert.equal((await seatNeed({ seatsRequested: false }, { running: async () => { throw new Error('ledger unreadable'); } })).needed, false);
 
@@ -237,7 +238,7 @@ test('the core debug seat is idle while nothing needs it and red when a running 
 test('Kernel seats are listed per running workflow: none is one green line, an unreachable Orca is red for each', async () => {
   const none = await kernelSeatItems({ rows: [] });
   assert.deepEqual([none.length, none[0].status, none[0].detail, none[0].required], [1, 'green', 'no running workflow', false]);
-  const rows = [{ repo: 'D:/app', workflowId: 'wf-1' }, { repo: 'D:/app', workflowId: 'wf-2' }];
+  const rows = [{ repo: 'work/app', workflowId: 'wf-1' }, { repo: 'work/app', workflowId: 'wf-2' }];
   const down = await kernelSeatItems({ rows, orcaOk: false });
   assert.deepEqual(down.map((r) => [r.id, r.status, r.detail]), [
     ['seat:kernel:app:wf-1', 'red', 'Orca is not reachable'],
