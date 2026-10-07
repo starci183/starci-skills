@@ -288,7 +288,7 @@ export function checkRepoPresentation({ root, runtime = false, tree = treeView(r
       try {
         const url = new URL(target);
         if (url.protocol !== 'https:' || privateHost(url.hostname) ||
-            /^(?:img\.shields\.io|badgen\.net)$/iu.test(url.hostname) && /^\/badge\//u.test(url.pathname))
+            /^(?:img\.shields\.io|badgen\.net)$/iu.test(url.hostname) && url.pathname.startsWith('/badge/'))
           finding('HFS_README_BADGE_NOT_LIVE', 'README.md', `Badge ${target} must represent a live external HTTPS service.`, index + 1);
       } catch { finding('HFS_README_BADGE_NOT_LIVE', 'README.md', `Badge ${target} must use a live external HTTPS service.`, index + 1); }
     }
@@ -474,7 +474,7 @@ export function checkHfs(config) {
       finding('BE_TEST_TOPOLOGY', file, `${file} uses an unsupported test kind. Only unit *.spec.ts, *.integration-spec.ts, *.e2e-spec.ts and *.contract-spec.ts exist, each in its own folder under src/tests/.`);
     else if (backend && UNSUPPORTED_TEST_FOLDER.test(file))
       finding('BE_TEST_TOPOLOGY', file, `${file} sits in an unsupported test folder. Unit specs sit beside their subject, flows go under src/tests/e2e/<area>/ and test infrastructure under src/tests/world/.`);
-    else if (backend && /^src\/tests\//u.test(file) && EXTRA_TEST_CONFIG.test(file))
+    else if (backend && file.startsWith('src/tests/') && EXTRA_TEST_CONFIG.test(file))
       finding('BE_TEST_TOPOLOGY', file, `${file} is a per-lane test config. One root jest.config.js declares exactly the unit, integration, e2e and contract projects.`);
   }
 
