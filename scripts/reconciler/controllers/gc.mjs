@@ -375,6 +375,11 @@ export function createGcController(overrides = {}) {
     for (const g of byJob.values()) await leaseDecision(ctx, g.rows, { ledgerId: g.ledgerId, entity: g.jobId });
   }
 
+  async function previewBlobSweep(ctx, now) {
+    let plan = null; try { plan = await (deps.planBlobGc ?? (async () => (await import('../../housekeeping/blob-gc.mjs')).planBlobGc({ env: ctx.env ?? process.env, now })))(); } catch (error) { plan = { error: String(error?.message ?? error).slice(0, 200) }; }
+    const blocked = plan?.blocked?.length ? `, blocked: ${plan.blocked.join('; ')}` : '', summary = plan?.error ? `plan failed: ${plan.error}` : `${plan.marked} marked, ${plan.toArchive?.length ?? 0} to archive, ${plan.toSweep?.length ?? 0} to sweep (${Math.round(((plan.archiveBytes ?? 0) + (plan.sweepBytes ?? 0)) / 1e6)} MB)${blocked}`;
+    ctx.log(WOULD, `blob-sweep: ${summary}`, { controller: NAME, action: 'blob-sweep', sources: plan?.sources?.map((s) => ({ name: s.name, kind: s.kind, marks: s.marks, error: s.error ?? null })) ?? null });
+    return plan; }
   /**
    * key gc:blob-sweep, every blobSweepEveryMs (24 h, schedules gc/blob-sweep): the blob store's mark-and-sweep
    * (scripts/housekeeping/blob-gc.mjs). It marks each enrolled ledger read-only, one at a time, then machine.sqlite,
@@ -386,14 +391,7 @@ export function createGcController(overrides = {}) {
     const claim = claimDue(ctx, { controller: NAME, duty: 'blob-sweep', intervalMs: settings.blobSweepEveryMs, now });
     if (!claim.due) return { skipped: 'not due', nextAt: claim.nextAt ?? null };
     let plan = null;
-    if (ctx.mode !== 'active') {
-      try { plan = await (deps.planBlobGc ?? (async () => (await import('../../housekeeping/blob-gc.mjs')).planBlobGc({ env: ctx.env ?? process.env, now })))(); }
-      catch (error) { plan = { error: String(error?.message ?? error).slice(0, 200) }; }
-      const blocked = plan?.blocked?.length ? `, blocked: ${plan.blocked.join('; ')}` : '';
-      const summary = plan?.error ? `plan failed: ${plan.error}` : `${plan.marked} marked, ${plan.toArchive?.length ?? 0} to archive, ${plan.toSweep?.length ?? 0} to sweep (${Math.round(((plan.archiveBytes ?? 0) + (plan.sweepBytes ?? 0)) / 1e6)} MB)${blocked}`;
-      ctx.log(WOULD, `blob-sweep: ${summary}`,
-        { controller: NAME, action: 'blob-sweep', sources: plan?.sources?.map((s) => ({ name: s.name, kind: s.kind, marks: s.marks, error: s.error ?? null })) ?? null });
-    }
+    if (ctx.mode !== 'active') plan = await previewBlobSweep(ctx, now);
     const r = await ctx.run('node', ['scripts/housekeeping/blob-gc.mjs', '--apply', '--json'], { timeoutMs: 3_600_000 });
     const result = r?.value ? r.value.refused ?? `${r.value.items?.length ?? 0} item(s), ${Math.round((r.value.freedBytes ?? 0) / 1e6)} MB freed` : r?.error ?? '';
     const outcome = r?.ok ? 'done' : 'FAILED';
