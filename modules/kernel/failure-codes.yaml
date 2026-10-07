@@ -16207,6 +16207,16 @@ kernel-launch-terminal-unproven:
   nextStep_vi: "Đóng đúng cửa sổ đó rồi chạy lại lệnh start."
   owner: supervisor
   kind: runtime-fault
+check-rerun-worktree-unresolved:
+  title: "The workflow worktree of a check re-run could not be resolved"
+  title_vi: "Không xác định được worktree của workflow để chạy lại check"
+  meaning_vi: "Runtime chỉ chạy lại check của một job trong worktree đã đăng ký của workflow đó. Worktree không xác định được nên check không được chạy lại, và không bao giờ chạy thay trong main."
+  causes_vi:
+    - "Các nơi ghi worktree của lần chạy (attempt, contract, packet) không cùng chỉ một worktree đã đăng ký"
+    - "Worktree của workflow đã bị gỡ hoặc chưa được đăng ký"
+  nextStep_vi: "Chạy starci workflow status để xem worktree của workflow, khôi phục hoặc đăng ký lại worktree đó, rồi chạy lại starci kernel record-checks."
+  owner: supervisor
+  kind: runtime-fault
 kernel-launch-runs-unreadable:
   title: "Orca Run list could not be read"
   title_vi: "Không đọc được danh sách Run của Orca"
