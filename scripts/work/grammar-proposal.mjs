@@ -71,6 +71,14 @@ function markdownHeading(line) {
   let contentStart = hashCount;
   while (WHITESPACE.test(line[contentStart] ?? '')) contentStart += 1;
   const content = line.slice(contentStart);
+  const { firstText, lastText } = textExtent(content);
+  if (firstText < 0) return whitespaceOnlyHeading(line, hashCount);
+  if (LINE_BREAK.test(content.slice(firstText, lastText + 1))) return null;
+  return { level: hashCount, raw: content.slice(firstText, lastText + 1) };
+}
+
+/** The first and last index of non-whitespace in `content` (both -1 when it has none). */
+function textExtent(content) {
   let firstText = -1;
   let lastText = -1;
   for (let index = 0; index < content.length; index += 1) {
@@ -79,15 +87,16 @@ function markdownHeading(line) {
       lastText = index;
     }
   }
-  if (firstText < 0) {
-    const whitespaceTail = line.slice(hashCount);
-    for (let index = whitespaceTail.length - 1; index > 0; index -= 1) {
-      if (!LINE_BREAK.test(whitespaceTail[index])) return { level: hashCount, raw: whitespaceTail[index] };
-    }
-    return null;
+  return { firstText, lastText };
+}
+
+/** A heading with no text after its hashes: the last character after the first that is not a line break, if any. */
+function whitespaceOnlyHeading(line, hashCount) {
+  const whitespaceTail = line.slice(hashCount);
+  for (let index = whitespaceTail.length - 1; index > 0; index -= 1) {
+    if (!LINE_BREAK.test(whitespaceTail[index])) return { level: hashCount, raw: whitespaceTail[index] };
   }
-  if (LINE_BREAK.test(content.slice(firstText, lastText + 1))) return null;
-  return { level: hashCount, raw: content.slice(firstText, lastText + 1) };
+  return null;
 }
 
 function fencedHtml(body) {
@@ -162,19 +171,20 @@ export function readProposals(files) {
   return out;
 }
 
+function collectProposalFiles(dir, left, out) {
+  let entries = [];
+  try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+  for (const e of entries) {
+    const full = path.join(dir, e.name);
+    if (!e.isDirectory()) { if (PROPOSAL_FILE_NAMES.includes(e.name)) out.push(full); }
+    else if (left > 0 && !['node_modules', '.git'].includes(e.name)) collectProposalFiles(full, left - 1, out);
+  }
+}
+
 /** The grammar-proposal files under `dir` (at most `depth` levels, never node_modules or .git). */
 export function proposalFilesUnder(dir, depth = 6) {
   const out = [];
-  const walk = (d, left) => {
-    let entries = [];
-    try { entries = fs.readdirSync(d, { withFileTypes: true }); } catch { return; }
-    for (const e of entries) {
-      const full = path.join(d, e.name);
-      if (e.isDirectory()) { if (left > 0 && !['node_modules', '.git'].includes(e.name)) walk(full, left - 1); }
-      else if (PROPOSAL_FILE_NAMES.includes(e.name)) out.push(full);
-    }
-  };
-  if (isDir(dir)) walk(dir, depth);
+  if (isDir(dir)) collectProposalFiles(dir, depth, out);
   else if (isFile(dir) && PROPOSAL_FILE_NAMES.includes(path.basename(dir))) out.push(dir);
   return out;
 }
