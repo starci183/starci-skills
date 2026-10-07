@@ -172,7 +172,7 @@ export function refuseLaunchInputs(d) {
   const { args, jobId, op, model, launchOrder, allowed, outsideOrder, briefExists, lackingTools, grammarMissing, grammarContext } = d;
   if (!briefExists) throw Object.assign(new Error(`spawn refused — no brief at modules/ops/ops/${op}.yaml`), { code: 'brief-missing' });
   if (outsideOrder) {
-    refuseVerb(d, { ok: false, jobId, op, reason: 'model-outside-order', model: model.target, order: launchOrder.orderKey ?? null,
+    refuseVerb(d, { ok: false, jobId, op, reason: 'model-outside-order', model: model.target, tier: launchOrder.tier ?? null,
       difficulty: launchOrder.difficulty ?? null, allowed, detail: outsideOrder }, `dispatch REFUSED for ${jobId} (${op}): model-outside-order — ${outsideOrder}`);
   }
   // A route persisted before host tools gated routing, an unrouted job's
