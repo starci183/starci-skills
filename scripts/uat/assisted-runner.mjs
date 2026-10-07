@@ -23,6 +23,8 @@ import {acquireUatSlot} from './uat-slots.mjs';
 import {launchFor} from './launch.mjs';
 import {recordingDirUnder,withRecording} from './playwright-recording.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { repeatInOrder } from '../lib/in-order.mjs';
+import { flowReports } from './assisted-flow-report.mjs';
 import { isSpecRun, readEnv } from '../lib/env.mjs';
 import { isInside } from '../lib/walk.mjs';
 import { need as refuseUnless } from '../../engine/refuse.mjs';
@@ -270,12 +272,15 @@ const normalizeProtocolEvent=(prepared,event,sanitize)=>{
   throw Object.assign(new Error(`unsupported driver protocol event '${event.type}'`),{code:'assisted-uat-protocol-invalid'});
 };
 
-const finishReceipt=(prepared,state,data,completionSignal,launchExit)=>{
-  const cleanupActions=[],cleanupFailures=[];
-  for(const item of policyCommands(prepared.cleanupFile,'actions')){const result=runCommand(prepared,item,prepared.session.launch.cwd);cleanupActions.push(result);if(result.exitCode!==0)cleanupFailures.push(`${result.id} exited ${result.exitCode}`);}
-  for(const item of policyCommands(prepared.cleanupFile,'verify')){const result=runCommand(prepared,item,prepared.session.launch.cwd);cleanupActions.push(result);if(result.exitCode!==0)cleanupFailures.push(`${result.id} exited ${result.exitCode}`);}
-  const redactionResults=[],redactionFailures=[];
-  for(const item of policyCommands(prepared.redactionFile,'commands')){const result=runCommand(prepared,item,prepared.session.launch.cwd);redactionResults.push(result);if(result.exitCode!==0)redactionFailures.push(`${result.id} exited ${result.exitCode}`);}
+// Runs one policy list of commands in order; every result is kept, a non-zero exit is a failure line.
+const policyOutcomes=(prepared,file,key)=>{
+  const results=[],failures=[];
+  for(const item of policyCommands(file,key)){const result=runCommand(prepared,item,prepared.session.launch.cwd);results.push(result);if(result.exitCode!==0)failures.push(`${result.id} exited ${result.exitCode}`);}
+  return {results,failures};
+};
+
+// The driver's artifacts that exist inside the run and carry a redaction attestation, hashed; the rest are failure lines.
+const attestedArtifacts=(prepared,data,redactionFailures)=>{
   const artifacts=[];
   for(const artifact of data.artifacts){
     const file=path.resolve(prepared.root,artifact.path);
@@ -284,15 +289,15 @@ const finishReceipt=(prepared,state,data,completionSignal,launchExit)=>{
     artifacts.push({...artifact,sha256:sha256File(file),redacted:true});
   }
   for(const required of prepared.session.artifacts.requiredMedia)if(!artifacts.some(artifact=>artifact.mediaType===required))redactionFailures.push(`required media missing: ${required}`);
-  const flowEvents=new Map(data.steps.map(step=>[`${step.flowId}\0${step.id}`,step]));
-  const flows=prepared.request.flows.map(flow=>{
-    const steps=flow.steps.map(step=>flowEvents.get(`${flow.id}\0${step.id}`)??{id:step.id,status:'not-run',observed:null,evidenceRefs:[]});
-    let status='inconclusive';
-    if(steps.every(step=>step.status==='completed'))status='completed';
-    else if(steps.some(step=>step.status==='failed'))status='failed';
-    else if(steps.some(step=>step.status==='cancelled'))status='cancelled';
-    return {id:flow.id,status,steps:steps.map(({id,status,observed,evidenceRefs})=>({id,status,observed,evidenceRefs}))};
-  });
+  return artifacts;
+};
+
+const finishReceipt=(prepared,state,data,completionSignal,launchExit)=>{
+  const cleanupRuns=[policyOutcomes(prepared,prepared.cleanupFile,'actions'),policyOutcomes(prepared,prepared.cleanupFile,'verify')];
+  const cleanupActions=cleanupRuns.flatMap(run=>run.results),cleanupFailures=cleanupRuns.flatMap(run=>run.failures);
+  const {results:redactionResults,failures:redactionFailures}=policyOutcomes(prepared,prepared.redactionFile,'commands');
+  const artifacts=attestedArtifacts(prepared,data,redactionFailures);
+  const flows=flowReports(prepared,data);
   const gateResults=new Map(data.gates.map(gate=>[gate.id,gate]));
   const humanGates=prepared.request.humanGates.map(gate=>gateResults.get(gate.id)??{id:gate.id,status:'not-run',response:'not-run',evidenceRefs:[]});
   const checks=[...data.checks,{id:'playwright-session',command:'locked Playwright headed chromium session',exitCode:launchExit,evidenceRefs:[]},...redactionResults];
@@ -312,9 +317,40 @@ const finishReceipt=(prepared,state,data,completionSignal,launchExit)=>{
   return receipt;
 };
 
+// A checkpoint event pauses the driver until the human signals; resolves true when the session must stop (a signal other than ok).
+const handleCheckpoint=async(prepared,state,data,child,event,run)=>{
+  const gate=prepared.request.humanGates[data.gates.length];
+  need(gate?.id===event.gateId,`checkpoint ${event.gateId} is not the next frozen gate`,'assisted-uat-protocol-invalid');
+  updateState(prepared,state,'waiting',{type:'checkpoint',gate:{id:gate.id,class:gate.class,instruction:gate.prompt,accepted:['ok','fail','cancel'],secretNotice:'Enter credentials or OTP only in the visible browser, never in chat.'}},{pendingGate:gate.id});
+  let signal;
+  try{signal=await waitForSignal(prepared,gate.id,prepared.request.limits.timeoutMs);}catch(error){signal={value:'cancel',actor:'runner-timeout',recordedAt:iso()};run.protocolError=error;}
+  need(SIGNALS.has(signal.value),`invalid signal for gate ${gate.id}`);
+  let status='cancelled';
+  if(signal.value==='ok')status='completed';
+  else if(signal.value==='fail')status='failed';
+  data.gates.push({id:gate.id,status,response:signal.value,evidenceRefs:[]});
+  run.completionSignal={value:signal.value,actor:signal.actor,recordedAt:signal.recordedAt};
+  child.stdin.write(`${JSON.stringify({type:'human-signal',gateId:gate.id,value:signal.value})}\n`);
+  updateState(prepared,state,signal.value==='ok'?'running':'finalizing',{type:'signal-accepted',gateId:gate.id,value:signal.value},{pendingGate:null});
+  if(signal.value!=='ok'){try{child.kill();}catch{}return true;}
+  return false;
+};
+
+// A step, check, artifact or postcondition event is recorded into its own list of the receipt data.
+const recordDriverEvent=(prepared,data,event)=>{
+  const {type,...record}=event;
+  if(type==='step'){
+    const flow=prepared.request.flows.find(item=>item.id===event.flowId);need(flow?.steps.some(step=>step.id===event.id),`driver named undeclared step ${event.flowId}/${event.id}`,'assisted-uat-protocol-invalid');data.steps.push(record);
+  }else if(type==='check'){
+    need(event.id&&Number.isInteger(event.exitCode),'driver check needs id and integer exitCode');data.checks.push(record);
+  }else if(type==='artifact')data.artifacts.push(record);
+  else if(type==='postcondition')data.postconditions.push(record);
+};
+
 const runSession=async(prepared,state,slot)=>{
   const sanitize=sanitizer(prepared),data={steps:[],checks:[],artifacts:[],postconditions:[],gates:[]};
-  let completionSignal=null,launchExit=1,protocolError=null;
+  const run={completionSignal:null,protocolError:null};
+  let launchExit=1;
   const env=launchEnv(prepared);
   Object.assign(env,{STARCI_ASSISTED_UAT_REQUEST:prepared.requestFile,STARCI_ASSISTED_UAT_RUN_DIR:prepared.runDir,STARCI_ASSISTED_UAT_PROTOCOL:PROTOCOL_PREFIX});
   // The locked command runs as prepared; recording (video, trace, screenshots) is on by default, into this run's directory.
@@ -325,42 +361,23 @@ const runSession=async(prepared,state,slot)=>{
   const child=startProgram(launch.file,launch.args,{cwd:resolveCwd(prepared.root,prepared.session.launch.cwd),env,stdio:['pipe','pipe','ignore'],windowsHide:Boolean(isSpecRun())});
   const childExit=new Promise(resolve=>{
     child.once('exit',code=>resolve(Number.isInteger(code)?code:1));
-    child.once('error',error=>{protocolError=error;resolve(1);});
+    child.once('error',error=>{run.protocolError=error;resolve(1);});
   });
   updateState(prepared,state,'running',{type:'started',runId:prepared.runId},{pid:process.pid,childPid:child.pid,waitingForSlot:false,queuePosition:null,uatSlot:slot.slot});
-  const timeout=setTimeout(()=>{protocolError=Object.assign(new Error('assisted UAT session timed out'),{code:'assisted-uat-timeout'});try{child.kill();}catch{}},prepared.request.limits.timeoutMs);
+  const timeout=setTimeout(()=>{run.protocolError=Object.assign(new Error('assisted UAT session timed out'),{code:'assisted-uat-timeout'});try{child.kill();}catch{}},prepared.request.limits.timeoutMs);
   const lines=readline.createInterface({input:child.stdout,crlfDelay:Infinity});
   try{
     for await(const line of lines){
       if(!line.startsWith(PROTOCOL_PREFIX))continue;
       const event=normalizeProtocolEvent(prepared,JSON.parse(line.slice(PROTOCOL_PREFIX.length)),sanitize);
-      if(event.type==='checkpoint'){
-        const gate=prepared.request.humanGates[data.gates.length];
-        need(gate?.id===event.gateId,`checkpoint ${event.gateId} is not the next frozen gate`,'assisted-uat-protocol-invalid');
-        updateState(prepared,state,'waiting',{type:'checkpoint',gate:{id:gate.id,class:gate.class,instruction:gate.prompt,accepted:['ok','fail','cancel'],secretNotice:'Enter credentials or OTP only in the visible browser, never in chat.'}},{pendingGate:gate.id});
-        let signal;
-        try{signal=await waitForSignal(prepared,gate.id,prepared.request.limits.timeoutMs);}catch(error){signal={value:'cancel',actor:'runner-timeout',recordedAt:iso()};protocolError=error;}
-        need(SIGNALS.has(signal.value),`invalid signal for gate ${gate.id}`);
-        let status='cancelled';
-        if(signal.value==='ok')status='completed';
-        else if(signal.value==='fail')status='failed';
-        data.gates.push({id:gate.id,status,response:signal.value,evidenceRefs:[]});
-        completionSignal={value:signal.value,actor:signal.actor,recordedAt:signal.recordedAt};
-        child.stdin.write(`${JSON.stringify({type:'human-signal',gateId:gate.id,value:signal.value})}\n`);
-        updateState(prepared,state,signal.value==='ok'?'running':'finalizing',{type:'signal-accepted',gateId:gate.id,value:signal.value},{pendingGate:null});
-        if(signal.value!=='ok'){try{child.kill();}catch{}break;}
-      }else if(event.type==='step'){
-        const flow=prepared.request.flows.find(item=>item.id===event.flowId);need(flow?.steps.some(step=>step.id===event.id),`driver named undeclared step ${event.flowId}/${event.id}`,'assisted-uat-protocol-invalid');const {type,...record}=event;data.steps.push(record);
-      }else if(event.type==='check'){
-        need(event.id&&Number.isInteger(event.exitCode),'driver check needs id and integer exitCode');const {type,...record}=event;data.checks.push(record);
-      }else if(event.type==='artifact'){const {type,...record}=event;data.artifacts.push(record);}
-      else if(event.type==='postcondition'){const {type,...record}=event;data.postconditions.push(record);}
+      if(event.type!=='checkpoint'){recordDriverEvent(prepared,data,event);continue;}
+      if(await handleCheckpoint(prepared,state,data,child,event,run))break;
     }
     launchExit=child.exitCode!=null?child.exitCode:await childExit;
-  }catch(error){protocolError=error;try{child.kill();}catch{}}
+  }catch(error){run.protocolError=error;try{child.kill();}catch{}}
   finally{clearTimeout(timeout);lines.close();}
-  if(!completionSignal)completionSignal={value:'cancel',actor:protocolError?'runner-protocol':'runner',recordedAt:iso()};
-  if(protocolError)data.checks.push({id:'runner-protocol',command:'validate assisted UAT event protocol',exitCode:1,evidenceRefs:[]});
+  const completionSignal=run.completionSignal??{value:'cancel',actor:run.protocolError?'runner-protocol':'runner',recordedAt:iso()};
+  if(run.protocolError)data.checks.push({id:'runner-protocol',command:'validate assisted UAT event protocol',exitCode:1,evidenceRefs:[]});
   finishReceipt(prepared,state,data,completionSignal,launchExit);
 };
 // The machine-wide UAT ceiling (config.yaml uat.maxConcurrent): no browser or app work starts before this
@@ -428,14 +445,34 @@ async function interactive(args){
   let state=startSession({requestPath:args.request,receiptPath:args.receipt});print(state);
   const input=readline.createInterface({input:process.stdin,output:process.stdout});
   try{
-    while(state.phase!=='finished'){
+    await repeatInOrder(async()=>{
+      if(state.phase==='finished')return true;
       state=await waitSession({requestPath:args.request,receiptPath:args.receipt,after:state.revision??0});print(state);
       if(state.phase==='waiting'){
         const answer=(await new Promise(resolve=>input.question('Signal [ok/fail/cancel]: ',resolve))).trim().toLowerCase();
         signalSession({requestPath:args.request,receiptPath:args.receipt,value:answer,actor:os.userInfo().username||'user'});
       }
-    }
+      return undefined;
+    });
   }finally{input.close();}
+}
+
+const statusReport=args=>{
+  const prepared=inspectPreparedRequest({requestPath:args.request,receiptPath:args.receipt,allowExistingReceipt:true});
+  if(fs.existsSync(prepared.receiptFile))return {ok:true,runId:prepared.runId,phase:'finished',revision:null,receipt:prepared.receiptFile};
+  need(fs.existsSync(stateFileOf(prepared.runDir)),'assisted UAT session has not been started');
+  const state=readState(prepared.runDir);validateFreshState(prepared,state);
+  return {ok:true,...publicState(state),...(!TERMINAL_PHASES.has(state.phase)&&!pidAlive(state.pid)?{staleProcess:true}:{})};
+};
+
+async function runWorker(args){
+  // A terminating signal exits through process 'exit', so the held UAT slot is released.
+  for(const sig of ['SIGINT','SIGTERM','SIGBREAK','SIGHUP'])process.on(sig,()=>process.exit(143));
+  const prepared=inspectPreparedRequest({requestPath:args.request,receiptPath:args.receipt,allowExistingReceipt:true});
+  try{return await workerMain(prepared);}catch(error){
+    try{const state=readState(prepared.runDir);updateState(prepared,state,'failed',{type:'runner-failed',code:error?.code??'assisted-uat-error'},{pendingGate:null});}catch{}
+    throw error;
+  }
 }
 
 async function main(){
@@ -448,22 +485,8 @@ async function main(){
       case 'wait':return print({ok:true,...await waitSession({requestPath:args.request,receiptPath:args.receipt,after:Number(args.after??0)})});
       case 'signal':return print({ok:true,...signalSession({requestPath:args.request,receiptPath:args.receipt,value:args.value,actor:args.actor??'user'})});
       case 'run':return interactive(args);
-      case 'status':{
-        const prepared=inspectPreparedRequest({requestPath:args.request,receiptPath:args.receipt,allowExistingReceipt:true});
-        if(fs.existsSync(prepared.receiptFile))return print({ok:true,runId:prepared.runId,phase:'finished',revision:null,receipt:prepared.receiptFile});
-        need(fs.existsSync(stateFileOf(prepared.runDir)),'assisted UAT session has not been started');
-        const state=readState(prepared.runDir);validateFreshState(prepared,state);
-        return print({ok:true,...publicState(state),...(!TERMINAL_PHASES.has(state.phase)&&!pidAlive(state.pid)?{staleProcess:true}:{})});
-      }
-      case '_worker':{
-        // A terminating signal exits through process 'exit', so the held UAT slot is released.
-        for(const sig of ['SIGINT','SIGTERM','SIGBREAK','SIGHUP'])process.on(sig,()=>process.exit(143));
-        const prepared=inspectPreparedRequest({requestPath:args.request,receiptPath:args.receipt,allowExistingReceipt:true});
-        try{return await workerMain(prepared);}catch(error){
-          try{const state=readState(prepared.runDir);updateState(prepared,state,'failed',{type:'runner-failed',code:error?.code??'assisted-uat-error'},{pendingGate:null});}catch{}
-          throw error;
-        }
-      }
+      case 'status':return print(statusReport(args));
+      case '_worker':return await runWorker(args);
     }
     use();
   }catch(error){console.error(JSON.stringify({ok:false,code:error?.code??'assisted-uat-error',error:String(error?.message??error)}));process.exit(1);}

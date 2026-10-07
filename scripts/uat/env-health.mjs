@@ -47,7 +47,7 @@ import { killTree } from '../api/process/kill-tree.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { readEnv } from '../lib/env.mjs';
 import { normPath } from '../lib/path-key.mjs';
-import { mapInOrder } from '../lib/in-order.mjs';
+import { eachInOrder, mapInOrder, repeatInOrder } from '../lib/in-order.mjs';
 
 const ENV_HEALTH_SCHEMA = 'starci/env-health@1';
 const EXIT_READY = 0, EXIT_NOT_READY = 3;
@@ -144,12 +144,15 @@ function startServer({ command, cwd, envId, service, env = process.env }) {
 async function waitReady(url, expect, { readyTimeoutMs, probeTimeoutMs }) {
   const until = Date.now() + readyTimeoutMs;
   let last = null;
-  while (Date.now() < until) {
-    last = await probeUrl(url, { timeoutMs: Math.min(probeTimeoutMs, 15000), follow: 0 });
-    if (last.state === 'answered' && (last.status === expect || (last.status >= 200 && last.status < 400))) return { ready: true, last };
-    await new Promise((r) => setTimeout(r, 2000));
-  }
-  return { ready: false, last };
+  return repeatInOrder(async () => {
+    if (Date.now() < until) {
+      last = await probeUrl(url, { timeoutMs: Math.min(probeTimeoutMs, 15000), follow: 0 });
+      if (last.state === 'answered' && (last.status === expect || (last.status >= 200 && last.status < 400))) return { ready: true, last };
+      await new Promise((r) => setTimeout(r, 2000));
+      return undefined;
+    }
+    return { ready: false, last };
+  });
 }
 
 /* ------------------------------------------------------------------------ resolution */
@@ -246,6 +249,17 @@ const startForService = (doc, name, repo, registered) => {
   return { command: splitCommand(start.command), cwd: path.resolve(repo ?? '.', start.cwd ?? '.'), from: 'resource', env: start.env ?? null };
 };
 
+async function restartProbe({ doc, row, url, expect, name, port, start, actions, listener, probeTimeoutMs, readyTimeoutMs, env, repo }) {
+  const started = startServer({ command: start.command, cwd: start.cwd, envId: doc.id, service: name, env: start.env ? { ...env, ...start.env } : env });
+  writeRegistered({ env: doc.id, service: name, repo, port, url, command: start.command, cwd: start.cwd, pid: started.pid, state: 'starting', startedAt: Date.now() }, env);
+  actions.push(`started ${name} (${start.from}) as PID ${started.pid}`);
+  const waited = await waitReady(url, expect, { readyTimeoutMs, probeTimeoutMs });
+  const logSha = judgeServer(doc.id, name, waited.ready, env);
+  if (waited.ready) return { ...row, state: 'restarted', ready: true, status: waited.last.status, action: actions.join('; '), ...(listener ? { listener } : {}) };
+  return { ...row, state: 'restart-failed', ready: false, action: actions.join('; '), last: waited.last, ...(logSha ? { logSha } : {}),
+    remedy: `${name} did not answer ${url} within ${readyTimeoutMs}ms after a restart; read its output: blob ${logSha ?? '(none written)'} (env_servers ${serverIdOf(doc.id, name)} log_sha)` };
+}
+
 async function failedProbe({ doc, row, url, expect, name, port, result, restart, roots, probeTimeoutMs, readyTimeoutMs, env, repo }) {
   if (result.state === 'answered') Object.assign(row, { status: result.status });
   let state = stateOfProbe(result);
@@ -256,16 +270,7 @@ async function failedProbe({ doc, row, url, expect, name, port, result, restart,
   state = listenerResult.state;
   const actions = listenerResult.actions;
   const start = startForService(doc, name, repo, registered);
-  if (restart && state === 'down' && start?.command?.length) {
-    const started = startServer({ command: start.command, cwd: start.cwd, envId: doc.id, service: name, env: start.env ? { ...env, ...start.env } : env });
-    writeRegistered({ env: doc.id, service: name, repo, port, url, command: start.command, cwd: start.cwd, pid: started.pid, state: 'starting', startedAt: Date.now() }, env);
-    actions.push(`started ${name} (${start.from}) as PID ${started.pid}`);
-    const waited = await waitReady(url, expect, { readyTimeoutMs, probeTimeoutMs });
-    const logSha = judgeServer(doc.id, name, waited.ready, env);
-    if (waited.ready) return { ...row, state: 'restarted', ready: true, status: waited.last.status, action: actions.join('; '), ...(listener ? { listener } : {}) };
-    return { ...row, state: 'restart-failed', ready: false, action: actions.join('; '), last: waited.last, ...(logSha ? { logSha } : {}),
-      remedy: `${name} did not answer ${url} within ${readyTimeoutMs}ms after a restart; read its output: blob ${logSha ?? '(none written)'} (env_servers ${serverIdOf(doc.id, name)} log_sha)` };
-  }
+  if (restart && state === 'down' && start?.command?.length) return restartProbe({ doc, row, url, expect, name, port, start, actions, listener, probeTimeoutMs, readyTimeoutMs, env, repo });
   const how = start ? 'starci gate env-health check --restart ...' : `starci gate env-health serve --env ${doc.id} --service ${name} --cwd <checkout> --url ${url} -- <start command>`;
   return { ...row, state, ready: false, ...(listener ? { listener } : {}), ...(actions.length ? { action: actions.join('; ') } : {}),
     remedy: `${name} is ${state} at ${url}: start it with ${how} (serve registers it, so the next pre-step restarts it itself)` };
@@ -309,12 +314,12 @@ export async function checkEnvironments({ repo, ids = [], paths = [], restart = 
   const wanted = [...new Set([...ids, ...environmentIdsOfPaths(repo, paths)])];
   const roots = workspaceRoots(repo);
   const environments = [], unresolved = [];
-  for (const id of wanted) {
+  await eachInOrder(wanted, async (id) => {
     const file = environmentFile(repo, id);
     const declared = file ? readYaml(file) : null;
-    if (!declared) { unresolved.push(id); continue; }
+    if (!declared) { unresolved.push(id); return; }
     environments.push({ file: path.relative(repo, file).replaceAll('\\', '/'), ...(await checkEnvironment(declared, { restart, roots, probeTimeoutMs, readyTimeoutMs, env, repo })) });
-  }
+  });
   const services = environments.flatMap((e) => e.services);
   const ready = environments.every((e) => e.ready);
   return {
@@ -343,6 +348,50 @@ const listOf = (value) => {
   return String(value).split(',').map((s) => s.trim()).filter(Boolean);
 };
 
+const serveTarget = (args, repo) => {
+  const doc = args.repo ? readYaml(environmentFile(repo, args.env) ?? '') : null;
+  const url = typeof args.url === 'string' ? args.url : (doc?.probes ?? []).map((p) => p.target).find((t) => serviceOfUrl(doc, t).service === args.service) ?? null;
+  const port = url ? serviceOfUrl(doc ?? {}, url).port ?? Number(new URL(url).port) : null;
+  return { url, port };
+};
+
+const ownsServeListener = (args, repo, prior, listener) => (prior?.pid === listener.pid) || ownedByWorkspace(listener.commandLine, [path.resolve(args.cwd), ...(args.repo ? workspaceRoots(repo) : [])]);
+
+/** The reply of `serve` when the listener on the port is this workspace's server and already answers, else null. */
+async function adoptAnsweringListener({ args, repo, url, port, listener, env }) {
+  const answered = url ? await probeUrl(url, { timeoutMs: 8000, follow: 0 }) : null;
+  if (answered?.state !== 'answered' || answered.status >= 500) return null;
+  writeRegistered({ env: args.env, service: args.service, ...(args.repo ? { repo } : {}), port, url, command: args.command, cwd: path.resolve(args.cwd), pid: listener.pid, state: 'ready' }, env);
+  return { schema: ENV_HEALTH_SCHEMA, ok: true, ready: true, adopted: true, pid: listener.pid, url };
+}
+
+async function startServing({ args, repo, url, port, actions, env, emit }) {
+  const started = startServer({ command: args.command, cwd: path.resolve(args.cwd), envId: args.env, service: args.service, env });
+  writeRegistered({ env: args.env, service: args.service, ...(args.repo ? { repo } : {}), port, url, command: args.command, cwd: path.resolve(args.cwd), pid: started.pid, state: 'starting', startedAt: Date.now() }, env);
+  actions.push(`started PID ${started.pid}`);
+  if (!url) return emit({ schema: ENV_HEALTH_SCHEMA, ok: true, ready: null, pid: started.pid, log: started.log, actions, note: 'no probe url: readiness not awaited' }, EXIT_READY);
+  const waited = await waitReady(url, 200, { readyTimeoutMs: Number(args['ready-timeout-ms']) || DEFAULT_READY_TIMEOUT_MS, probeTimeoutMs: DEFAULT_PROBE_TIMEOUT_MS });
+  const logSha = judgeServer(args.env, args.service, waited.ready, env);
+  return emit({ schema: ENV_HEALTH_SCHEMA, ok: waited.ready, ready: waited.ready, pid: started.pid, log: started.log, logSha, url, actions, last: waited.last }, waited.ready ? EXIT_READY : EXIT_NOT_READY);
+}
+
+async function serveMain(args, env, emit) {
+  if (!args.env || !args.service || !args.cwd || !args.command?.length) return emit({ ok: false, error: 'serve needs --env <id> --service <name> --cwd <dir> -- <command...>' }, EXIT_USAGE);
+  const repo = path.resolve(args.repo ?? '.');
+  const { url, port } = serveTarget(args, repo);
+  const prior = readRegistered(args.env, args.service, env);
+  const listener = port ? portListener(port) : null;
+  const actions = [];
+  if (listener && ownsServeListener(args, repo, prior, listener)) {
+    const adopted = await adoptAnsweringListener({ args, repo, url, port, listener, env });
+    if (adopted) return emit(adopted, EXIT_READY);
+    if (stopListener(listener.pid)) actions.push(`killed stale own listener PID ${listener.pid}`);
+  } else if (listener) {
+    return emit({ schema: ENV_HEALTH_SCHEMA, ok: false, ready: false, state: 'port-conflict', listener, remedy: `port ${port} is held by a process that is not this workspace's server` }, EXIT_NOT_READY);
+  }
+  return startServing({ args, repo, url, port, actions, env, emit });
+}
+
 export async function envHealthMain(argv, { write = (s) => process.stdout.write(s), env = process.env } = {}) {
   const args = parseArgs(argv);
   const verb = args._[0];
@@ -354,33 +403,7 @@ export async function envHealthMain(argv, { write = (s) => process.stdout.write(
       probeTimeoutMs: Number(args['probe-timeout-ms']) || DEFAULT_PROBE_TIMEOUT_MS, readyTimeoutMs: Number(args['ready-timeout-ms']) || DEFAULT_READY_TIMEOUT_MS, env });
     return emit(result, result.ready ? EXIT_READY : EXIT_NOT_READY);
   }
-  if (verb === 'serve') {
-    if (!args.env || !args.service || !args.cwd || !args.command?.length) return emit({ ok: false, error: 'serve needs --env <id> --service <name> --cwd <dir> -- <command...>' }, EXIT_USAGE);
-    const repo = path.resolve(args.repo ?? '.');
-    const doc = args.repo ? readYaml(environmentFile(repo, args.env) ?? '') : null;
-    const url = typeof args.url === 'string' ? args.url : (doc?.probes ?? []).map((p) => p.target).find((t) => serviceOfUrl(doc, t).service === args.service) ?? null;
-    const port = url ? serviceOfUrl(doc ?? {}, url).port ?? Number(new URL(url).port) : null;
-    const prior = readRegistered(args.env, args.service, env);
-    const listener = port ? portListener(port) : null;
-    const actions = [];
-    if (listener && ((prior?.pid === listener.pid) || ownedByWorkspace(listener.commandLine, [path.resolve(args.cwd), ...(args.repo ? workspaceRoots(repo) : [])]))) {
-      const answered = url ? await probeUrl(url, { timeoutMs: 8000, follow: 0 }) : null;
-      if (answered?.state === 'answered' && answered.status < 500) {
-        writeRegistered({ env: args.env, service: args.service, ...(args.repo ? { repo } : {}), port, url, command: args.command, cwd: path.resolve(args.cwd), pid: listener.pid, state: 'ready' }, env);
-        return emit({ schema: ENV_HEALTH_SCHEMA, ok: true, ready: true, adopted: true, pid: listener.pid, url }, EXIT_READY);
-      }
-      if (stopListener(listener.pid)) actions.push(`killed stale own listener PID ${listener.pid}`);
-    } else if (listener) {
-      return emit({ schema: ENV_HEALTH_SCHEMA, ok: false, ready: false, state: 'port-conflict', listener, remedy: `port ${port} is held by a process that is not this workspace's server` }, EXIT_NOT_READY);
-    }
-    const started = startServer({ command: args.command, cwd: path.resolve(args.cwd), envId: args.env, service: args.service, env });
-    writeRegistered({ env: args.env, service: args.service, ...(args.repo ? { repo } : {}), port, url, command: args.command, cwd: path.resolve(args.cwd), pid: started.pid, state: 'starting', startedAt: Date.now() }, env);
-    actions.push(`started PID ${started.pid}`);
-    if (!url) return emit({ schema: ENV_HEALTH_SCHEMA, ok: true, ready: null, pid: started.pid, log: started.log, actions, note: 'no probe url: readiness not awaited' }, EXIT_READY);
-    const waited = await waitReady(url, 200, { readyTimeoutMs: Number(args['ready-timeout-ms']) || DEFAULT_READY_TIMEOUT_MS, probeTimeoutMs: DEFAULT_PROBE_TIMEOUT_MS });
-    const logSha = judgeServer(args.env, args.service, waited.ready, env);
-    return emit({ schema: ENV_HEALTH_SCHEMA, ok: waited.ready, ready: waited.ready, pid: started.pid, log: started.log, logSha, url, actions, last: waited.last }, waited.ready ? EXIT_READY : EXIT_NOT_READY);
-  }
+  if (verb === 'serve') return serveMain(args, env, emit);
   return emit({ ok: false, error: 'usage: starci gate env-health check|serve|status (see header)' }, EXIT_USAGE);
 }
 
