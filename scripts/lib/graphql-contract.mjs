@@ -268,48 +268,85 @@ function parseValue(cursor) {
 }
 
 /** A selection set: [{ kind: 'field', name, alias, args: Map, selections } | { kind: 'inline', on, selections } | { kind: 'spread', name }]. */
+function parseSpreadSelection(cursor) {
+  cursor.next();
+  if (cursor.is('on')) {
+    cursor.name();
+    const on = cursor.name();
+    skipDirectives(cursor);
+    return { kind: 'inline', on, selections: parseSelectionSet(cursor) };
+  }
+  if (cursor.is('{') || cursor.is('@')) {
+    skipDirectives(cursor);
+    return { kind: 'inline', on: null, selections: parseSelectionSet(cursor) };
+  }
+  const selection = { kind: 'spread', name: cursor.name() };
+  skipDirectives(cursor);
+  return selection;
+}
+
+function parseFieldSelection(cursor) {
+  let name = cursor.name();
+  let alias = null;
+  if (cursor.take(':')) {
+    alias = name;
+    name = cursor.name();
+  }
+  const args = new Map();
+  if (cursor.take('(')) {
+    while (!cursor.take(')')) {
+      const argName = cursor.name();
+      cursor.expect(':');
+      args.set(argName, parseValue(cursor));
+    }
+  }
+  skipDirectives(cursor);
+  const subSelections = cursor.is('{') ? parseSelectionSet(cursor) : null;
+  return { kind: 'field', name, alias, args, selections: subSelections };
+}
+
 function parseSelectionSet(cursor) {
   const selections = [];
   cursor.expect('{');
   while (!cursor.take('}')) {
-    if (cursor.peek()?.kind === 'spread') {
-      cursor.next();
-      if (cursor.is('on')) {
-        cursor.name();
-        const on = cursor.name();
-        skipDirectives(cursor);
-        selections.push({ kind: 'inline', on, selections: parseSelectionSet(cursor) });
-      } else if (cursor.is('{') || cursor.is('@')) {
-        skipDirectives(cursor);
-        selections.push({ kind: 'inline', on: null, selections: parseSelectionSet(cursor) });
-      } else {
-        selections.push({ kind: 'spread', name: cursor.name() });
-        skipDirectives(cursor);
-      }
-      continue;
-    }
-    let name = cursor.name();
-    let alias = null;
-    if (cursor.take(':')) {
-      alias = name;
-      name = cursor.name();
-    }
-    const args = new Map();
-    if (cursor.take('(')) {
-      while (!cursor.take(')')) {
-        const argName = cursor.name();
-        cursor.expect(':');
-        args.set(argName, parseValue(cursor));
-      }
-    }
-    skipDirectives(cursor);
-    const subSelections = cursor.is('{') ? parseSelectionSet(cursor) : null;
-    selections.push({ kind: 'field', name, alias, args, selections: subSelections });
+    if (cursor.peek()?.kind === 'spread') selections.push(parseSpreadSelection(cursor));
+    else selections.push(parseFieldSelection(cursor));
   }
   return selections;
 }
 
 /** The operations and fragments of an executable document. */
+function parseDocumentVariables(cursor) {
+  const variables = new Map();
+  if (cursor.take('(')) {
+    while (!cursor.take(')')) {
+      cursor.expect('$');
+      const variable = cursor.name();
+      cursor.expect(':');
+      const type = parseTypeRef(cursor);
+      if (cursor.take('=')) skipValue(cursor);
+      skipDirectives(cursor);
+      variables.set(variable, type);
+    }
+  }
+  return variables;
+}
+
+function parseFragmentDefinition(cursor) {
+  const name = cursor.name();
+  if (!cursor.take('on')) throw new SyntaxError(`fragment ${name} names no type condition`);
+  const on = cursor.name();
+  skipDirectives(cursor);
+  return { name, fragment: { on, selections: parseSelectionSet(cursor) } };
+}
+
+function parseOperationDefinition(cursor, keyword) {
+  const name = cursor.peek()?.kind === 'name' ? cursor.name() : null;
+  const variables = parseDocumentVariables(cursor);
+  skipDirectives(cursor);
+  return { operation: keyword, name, variables, selections: parseSelectionSet(cursor) };
+}
+
 export function parseDocument(source) {
   const cursor = cursorOf(tokenize(source));
   const operations = [];
@@ -321,29 +358,12 @@ export function parseDocument(source) {
     }
     const keyword = cursor.name();
     if (keyword === 'fragment') {
-      const name = cursor.name();
-      if (!cursor.take('on')) throw new SyntaxError(`fragment ${name} names no type condition`);
-      const on = cursor.name();
-      skipDirectives(cursor);
-      fragments.set(name, { on, selections: parseSelectionSet(cursor) });
+      const definition = parseFragmentDefinition(cursor);
+      fragments.set(definition.name, definition.fragment);
       continue;
     }
     if (keyword !== 'query' && keyword !== 'mutation' && keyword !== 'subscription') throw new SyntaxError(`unexpected "${keyword}" in a document`);
-    const name = cursor.peek()?.kind === 'name' ? cursor.name() : null;
-    const variables = new Map();
-    if (cursor.take('(')) {
-      while (!cursor.take(')')) {
-        cursor.expect('$');
-        const variable = cursor.name();
-        cursor.expect(':');
-        const type = parseTypeRef(cursor);
-        if (cursor.take('=')) skipValue(cursor);
-        skipDirectives(cursor);
-        variables.set(variable, type);
-      }
-    }
-    skipDirectives(cursor);
-    operations.push({ operation: keyword, name, variables, selections: parseSelectionSet(cursor) });
+    operations.push(parseOperationDefinition(cursor, keyword));
   }
   return { operations, fragments };
 }
