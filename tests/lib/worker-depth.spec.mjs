@@ -211,10 +211,10 @@ test('starci kernel dispatch refuses an op whose Kernel already sits at orca.max
   proofRepo(t, repo);
   registerWorkflowWorktree({ env }, { workflowId, orcaWorktreeId: 'depth::tree', path: repo, branch: 'main' });
   const ledger = openLedger({ file: ledgerFileFor(repo) });
-  try { seedWorkflow(ledger, { id: workflowId, jobs: [{ jobId: 'job-deep', opId: 'code.refactor', payload: { opId: 'code.refactor', owned_paths: ['docs/a/'], model: 'claude-agent' } }] }); }
+  try { seedWorkflow(ledger, { id: workflowId, jobs: [{ jobId: 'job-deep', opId: 'code.refactor', payload: { opId: 'code.refactor', owned_paths: ['docs/a/'], model: 'codex-agent' } }] }); }
   finally { ledger.close(); }
   const callsBefore = fs.readFileSync(log, 'utf8').trim().split('\n').length;
-  const d = run(['scripts', 'kernel', 'cli.mjs'], 'dispatch', '--repo', repo, '--job', 'job-deep', '--model', 'claude-agent', '--spawn', '--json');
+  const d = run(['scripts', 'kernel', 'cli.mjs'], 'dispatch', '--repo', repo, '--job', 'job-deep', '--model', 'codex-agent', '--spawn', '--json');
   assert.equal(d.status, 1, d.stdout || d.stderr);
   const out = JSON.parse(d.stdout);
   assert.equal(out.rejected, 'dispatch-rejected');
