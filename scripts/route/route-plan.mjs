@@ -44,7 +44,7 @@ import { phraseHits } from './phrase-match.mjs';
 import { normalizeText } from '../lib/normalize.mjs';
 import { walkFiles } from '../lib/walk.mjs';
 
-const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
+const VAR_NAME = '[A-Za-z][A-Za-z0-9.]*', VAR_STATE_LINE = new RegExp('^(' + VAR_NAME + ')\\s*:\\s*(.+)$'), QUALIFIER_CONTENT = '[^)]*', STATE_QUALIFIER = new RegExp('^(.*?)\\s*\\((' + QUALIFIER_CONTENT + ')\\)\\s*$'), skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 
 // ---------------------------------------------------------------- args -----
 
@@ -55,6 +55,8 @@ args: (--target "<var>: <state>" [--target ...] | --target-json '<json>' | --tex
     [--work <.starciwork dir>] [--opsDir <dir>] [--goalDir <dir>] [--json]`);
   process.exit(code);
 }
+
+function legIdFor(opId, instance) { return instance ? `${opId}#${instance}` : opId; }
 
 function parseArgs(argv) {
   const a = { targets: [] };
@@ -114,12 +116,12 @@ function loadProducesTable(goalDir) {
   const byVar = []; // [{family, suffix, state, qualifier, op, raw}]
   for (const [op, vars] of Object.entries(table)) {
     for (const raw of stringItems(vars)) {
-      const m = /^([A-Za-z][A-Za-z0-9.]*)\s*:\s*(.+)$/.exec(String(raw).trim());
+      const m = VAR_STATE_LINE.exec(String(raw).trim());
       if (!m) continue;
       const varPart = m[1];
       let state = m[2].trim();
       let qualifier = null;
-      const q = /^(.*?)\s*\(([^)]*)\)\s*$/.exec(state);
+      const q = STATE_QUALIFIER.exec(state);
       if (q) { state = q[1].trim(); qualifier = q[2].trim(); }
       const dot = varPart.indexOf('.');
       byVar.push({
@@ -392,7 +394,7 @@ function dedupeVars(vars) {
 /** "feature.A: exists proven" -> [{impl.A: done}, {api.A: verified}].
  *  Explicit target vars normalize into the producesVocabulary state space. */
 function normalizeTargetVar(spec, args) {
-  const m = /^([A-Za-z][A-Za-z0-9.]*)\s*:\s*(.+)$/.exec(String(spec).trim());
+  const m = VAR_STATE_LINE.exec(String(spec).trim());
   if (!m) return { error: `cannot parse target var '${spec}' — expected "<family>.<suffix>: <state>"` };
   const varPart = m[1];
   const states = m[2].trim().toLowerCase().split(/\s+/);
@@ -621,8 +623,6 @@ function planChain({ sstar, s0, ops, prodTable, hints, outOfBand = [] }) {
     assumptions.push(`producer for ${varKey(v)}: ${v.state} is ambiguous — picked ${pick.op}; alternatives: ${cands.map(c => c.op).join(', ')}`);
     return { pick, cands, assumed: true };
   }
-
-  function legIdFor(opId, instance) { return instance ? `${opId}#${instance}` : opId; }
 
   function ensureLeg(opId, { forVar = null, instance = null, injected = null } = {}) {
     const lid = legIdFor(opId, instance);
@@ -1103,9 +1103,9 @@ function main() {
   sstar = dedupeVars(sstar);
 
   // SURVEY -> S0
-  const s0 = args.simulate ? { records: [], vars: new Map(), gaps: [], note: 'simulated: S0 = empty' }
-    : args.state ? surveyS0(path.resolve(args.state))
-    : null;
+  let s0 = null;
+  if (args.simulate) s0 = { records: [], vars: new Map(), gaps: [], note: 'simulated: S0 = empty' };
+  else if (args.state) s0 = surveyS0(path.resolve(args.state));
 
   // IMPACT ANALYSIS before planning (existing.yaml survey): a goal that names a surveyed feature EXTENDS it.
   const impact = args.text && !args.targets.length && !args.targetJson ? impactOf(args.text, s0, hints.archetypes ?? []) : null;

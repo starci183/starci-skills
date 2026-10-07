@@ -23,6 +23,10 @@
 
 const RATE_LIMITED = /rate[- ]?limit|Send a message to retry|Upgrade to .* for higher limits/i;
 const DONE_NO_REPORT = /Worked for .* done|Press enter to continue/i;
+const RESET_HINT_TERMS = '(?:reset|resets|try again|retry|available)';
+const RESET_HINT_WAIT = '\\s+(?:in|after)\\s+';
+const RESET_HINT_DURATION = '(\\d+(?:\\.\\d+)?)\\s*(s|sec|secs|seconds?|m|min|mins|minutes?|h|hr|hours?)\\b';
+const RESET_HINT = new RegExp(RESET_HINT_TERMS + RESET_HINT_WAIT + RESET_HINT_DURATION, 'i');
 export const NUDGE = Object.freeze({
   retry: 'Retry: continue your task from where you stopped.',
   idle: 'Continue your task, or file your report with starci kernel report if done.',
@@ -35,7 +39,7 @@ export const HEALTH_DEFAULTS = Object.freeze({
 
 /** The reset hint of a rate-limit screen in ms from now ("resets in 5 minutes", "try again in 30s", "retry after 2h"), or null. */
 export function resetHintMs(text) {
-  const m = /(?:reset|resets|try again|retry|available)\s+(?:in|after)\s+(\d+(?:\.\d+)?)\s*(s|sec|secs|seconds?|m|min|mins|minutes?|h|hr|hours?)\b/i.exec(String(text ?? ''));
+  const m = RESET_HINT.exec(String(text ?? ''));
   if (!m) return null;
   const n = Number(m[1]), u = m[2].toLowerCase();
   let multiplier = 1000;

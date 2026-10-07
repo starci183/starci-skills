@@ -31,7 +31,9 @@ export function memoryRows() {
       .sort((a, b) => {
         const dueOrder = a.due_at - b.due_at;
         if (dueOrder) return dueOrder;
-        return a.key < b.key ? -1 : a.key > b.key ? 1 : 0;
+        if (a.key < b.key) return -1;
+        if (a.key > b.key) return 1;
+        return 0;
       }).slice(0, limit).map((r) => ({ ...r })),
     all: () => [...rows.values()].map((r) => ({ ...r })),
   };

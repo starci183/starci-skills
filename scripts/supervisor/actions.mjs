@@ -92,6 +92,13 @@ function addClusterActions(add, clusters) {
   }
 }
 
+function addStalledAction(add, finding, frontierOf, workflowId) {
+  if (finding.type !== 'STALLED' || finding.alert === false) return;
+  const frontier = frontierOf.get(workflowId);
+  const ready = frontier?.ready > 0 || finding.actionable === true;
+  add({ key: key(ready ? 'dispatch' : 'stalled', workflowId), class: ready ? 'undispatched' : 'stalled', workflowId, repo: finding.repo, subject: workflowId, evidence: one(finding.line) });
+}
+
 function addStallActions(add, stalls, inCluster, frontierOf) {
   for (const f of stalls) {
     const wf = f.workflowId;
@@ -101,11 +108,7 @@ function addStallActions(add, stalls, inCluster, frontierOf) {
     else if (f.type === 'UNREAD-PEER') add({ key: key('unread', wf, f.peerMessage), class: 'unread-peer', workflowId: wf, repo: f.repo, subject: f.peerMessage, evidence: one(f.line) });
     else if (f.type === 'GATE' && !f.young && !(f.asks?.length) && !(f.waits?.length) && !OWNER_ONLY.test(f.text ?? ''))
       add({ key: key('gate', wf, f.incidentId), class: 'owner-gate-no-ask', workflowId: wf, repo: f.repo, subject: f.incidentId, evidence: one(f.line) });
-    else if (f.type === 'STALLED' && f.alert !== false) {
-      const fr = frontierOf.get(wf);
-      const ready = fr?.ready > 0 || f.actionable === true;
-      add({ key: key(ready ? 'dispatch' : 'stalled', wf), class: ready ? 'undispatched' : 'stalled', workflowId: wf, repo: f.repo, subject: wf, evidence: one(f.line) });
-    }
+    else addStalledAction(add, f, frontierOf, wf);
   }
 }
 
@@ -205,7 +208,11 @@ export function withSla(items, { seen = {}, acted = { byKey: {}, byWorkflow: {} 
 }
 
 export const actionLine = (i) => {
-  const state = i.actedAt ? 'acted ' + hhmm(i.actedAt) + (i.heldUntil ? ' held until ' + hhmm(i.heldUntil) : '') : 'no action yet';
+  let state = 'no action yet';
+  if (i.actedAt) {
+    state = 'acted ' + hhmm(i.actedAt);
+    if (i.heldUntil) state += ' held until ' + hhmm(i.heldUntil);
+  }
   const lessons = (i.lessons ?? []).map((lesson) => '\n    lesson: ' + lesson).join('');
   return `OWED-ACTION ${i.breach ? 'SLA-BREACH ' : ''}[${i.class}] ${i.key} age=${i.ageMin}m ${state}: ${i.evidence}\n    do: ${i.do}${lessons}`;
 };

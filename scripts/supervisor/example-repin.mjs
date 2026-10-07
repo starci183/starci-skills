@@ -23,7 +23,7 @@ function swapHfsForCli(text, pins) {
   if (!swaps) return { text, swaps };
   const indent = /^([ \t]+)"/m.exec(text)?.[1] ?? '  ';
   const eol = text.includes('\r\n') ? '\r\n' : '\n';
-  return { text: JSON.stringify(pkg, null, indent).replaceAll(/\n/g, eol) + (text.endsWith('\n') ? eol : ''), swaps };
+  return { text: JSON.stringify(pkg, null, indent).replaceAll('\n', eol) + (text.endsWith('\n') ? eol : ''), swaps };
 }
 
 export function repinExample(root, name, pins, write) {
