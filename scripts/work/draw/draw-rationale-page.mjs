@@ -221,14 +221,14 @@ export function drawRedlines(arg) {
   const drawComponentLabels = () => {
     for (const n of document.querySelectorAll('[data-grammar-component]')) {
       if (n.closest(`[${redlineAttr}],#redlines`) || !visible(n)) continue;
-      const name = n.getAttribute('data-grammar-component');
-      const upName = n.parentElement?.closest('[data-grammar-component]')?.getAttribute('data-grammar-component');
-      if (leaf.includes(name) || (upName === name && n.hasAttribute('data-grammar-part'))) continue;
+      const name = n.dataset.grammarComponent;
+      const upName = n.parentElement?.closest('[data-grammar-component]')?.dataset.grammarComponent;
+      if (leaf.includes(name) || (upName === name && 'grammarPart' in n.dataset)) continue;
       const b = box(n);
       if (b.w < 48 || b.h < 24) continue;
       const l = labelOf(n);
       if (l?.kind === 'layout') el('rect', { x: b.x, y: b.y, width: b.w, height: b.h, fill: 'none', stroke: BLUE, 'stroke-width': 1, 'stroke-dasharray': '3 2' });
-      const variant = n.getAttribute('data-variant') ?? n.getAttribute('data-tone');
+      const variant = n.dataset.variant ?? n.dataset.tone ?? null;
       label(b.x + 2, b.y + 12, `${name}${variant ? ' ' + variant : ''}`, BLUE);
     }
   };

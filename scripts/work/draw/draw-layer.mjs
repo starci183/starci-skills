@@ -152,7 +152,7 @@ export function measureLayer({ fields, primary, chat }) {
     if (!region || region === document.body || seen.has(region)) continue;
     seen.add(region);
     if (isExcludedRegion(region)) continue;
-    const names = [...region.querySelectorAll(fieldSel)].map((el) => el.getAttribute('data-component') ?? el.getAttribute('data-grammar-component'));
+    const names = [...region.querySelectorAll(fieldSel)].map((el) => el.dataset.component ?? el.dataset.grammarComponent ?? null);
     const cls = typeof region.className === 'string' ? region.className.trim().split(/\s+/).slice(0, 3).join('.') : '';
     const classLabel = cls ? `.${cls}` : '';
     forms.push({ desc: `<${region.tagName.toLowerCase()}${classLabel}>`, width: region.getBoundingClientRect().width, fields: names });

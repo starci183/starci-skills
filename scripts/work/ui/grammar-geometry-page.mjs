@@ -81,7 +81,7 @@ function collectPage(probes) {
       i, parent: p ? index.get(p) : null, tag: e.tagName.toLowerCase(), id: e.id || null, cls: typeof e.className === 'string' ? e.className : '',
       // A real grammar render (draw-render fixture mode of a <XBase>.draw.tsx): the component root it is, and whether it
       // is a layout element the drawing itself wrote (draw-source.mjs LAYOUT_ATTR).
-      comp: e.getAttribute('data-component'), drawLayout: e.hasAttribute('data-draw-layout'), dataWidth: e.getAttribute('data-width'),
+      comp: e.dataset.component ?? null, drawLayout: 'drawLayout' in e.dataset, dataWidth: e.dataset.width ?? null,
       role: e.getAttribute('role'), type: e.getAttribute('type'), href: e.getAttribute('href'),
       aria: { selected: e.getAttribute('aria-selected'), current: e.getAttribute('aria-current'), hidden: e.getAttribute('aria-hidden'), required: e.getAttribute('aria-required'), invalid: e.getAttribute('aria-invalid') },
       required: Boolean(e.required), disabled: Boolean(e.disabled), labelText, described, placeholder: e.getAttribute('placeholder'), value: 'value' in e && typeof e.value === 'string' ? e.value.slice(0, 80) : null,
@@ -131,7 +131,7 @@ export async function snapshotFiles(files, { repo = null, viewport = DEFAULT_VIE
           const e = document.activeElement;
           if (!e || e === document.body) return null;
           const s = getComputedStyle(e);
-          return { i: Number(e.getAttribute('data-gg-i')), outline: { style: s.outlineStyle, w: Number.parseFloat(s.outlineWidth) || 0, offset: Number.parseFloat(s.outlineOffset) || 0 }, shadow: s.boxShadow, focusVisible: e.matches(':focus-visible') };
+          return { i: Number(e.dataset.ggI ?? 0), outline: { style: s.outlineStyle, w: Number.parseFloat(s.outlineWidth) || 0, offset: Number.parseFloat(s.outlineOffset) || 0 }, shadow: s.boxShadow, focusVisible: e.matches(':focus-visible') };
         }));
         return undefined;
       });
