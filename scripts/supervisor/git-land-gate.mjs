@@ -21,8 +21,8 @@ const quotedCharacter = (c, next) => {
   return { next: '', skip: 0, close: false };
 };
 const lineCommentEnd = (text, index) => {
-  while (index < text.length && text[index] !== '\n') { index += 1; }
-  return index;
+  const end = text.indexOf('\n', index);
+  return end < 0 ? text.length : end;
 };
 const blockCommentEnd = (text, index) => {
   index += 2;
