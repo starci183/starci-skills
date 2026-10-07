@@ -1,43 +1,14 @@
 #!/usr/bin/env node
-// starci supervisor workers — [Worker] fix agents, spawned on demand by the one [Supervisor] (modules/supervisor/supervise.yaml
-// workers, docs/supervisor.md). One job per root-cause cluster, never one per incident.
-//
-//   starci supervisor workers create --cluster <id> --title <t> --files <csv> [--incidents <csv>]
-//        [--specs <csv>] [--brief <text> | --brief-file <f>] [--agent <claude|codex|devin>]
-//   starci supervisor workers spawn [--job <id>] [--dry-run]     launch queued jobs up to the cap
-//   starci supervisor workers stage --self --name <slug> --files <csv>   the Supervisor's own checkout
-//   starci supervisor workers report --job <id> --outcome done|diagnosed|blocked|failed [--commit <sha>]
-//        [--specs <csv>] [--summary <t> | --summary-file <f>] [--needs <csv>]  (the worker's last act)
-//   starci supervisor workers list | cap | show --job <id> | cancel --job <id> [--reason <t>]
-//   starci supervisor workers ack --job <id> --reason <t>   a decided diagnosed/blocked/failed report: consumed, never re-announced
-//   starci supervisor workers cleanup [--job <id>]                remove finished staging checkouts
-//   ... [--json]
-//
-// Lifecycle (machine.sqlite, engine/db/machine.mjs B1: sup_jobs / sup_leases / sup_attempts / sup_reports, audit in
-// sup_events): queued -> spawning (staging checkout + file leases, one sup_attempts row per spawn) -> running
-// ([Worker] terminal on the attempt) -> reported (sup_reports row) -> succeeded (landed by scripts/supervisor/land.mjs,
-// checkout removed) | failed | cancelled. The job's working state (cluster, files, staging, routing, result) is
-// its payload_json. The staging checkout is an EPHEMERAL Orca worktree of the runtime (an agent works in it, so Orca
-// owns it: `orca worktree create --name sup-<job> --base-branch main` through scripts/machine/worktree-orca.mjs
-// createOrcaWorktree, which stamps it `starci:supervisor-staging:sup-<job>;sup=<job>` (scripts/lib/orca-orphans.mjs
-// runtimeStampOf); registry kind supervisor-staging keyed by Orca's worktree id). Orca picks
-// its path and its branch; payload.staging records {path, branch, base, orcaId} as Orca reported them, and every reader
-// (the land gate, the GCs, the reports) takes the RECORDED branch and path, never a name built from the job id. It lives
-// only until its commit lands (or the job is cancelled), then goes through removeOrcaWorktree (links unlinked, `orca
-// worktree rm`, the row closed, the branch deleted).
-//
-// Cap: adaptive, at most 10. base (config.yaml supervisor.workers.base, default 4) grows by one per two queued
-// jobs up to max (default 10) and is halved while the machine is loaded (CPU busy >= 85% or free memory < 12%),
-// down to 1 while it is saturated (CPU >= 95% or free memory < 6%).
-//
-// Routing: the worker seat's tier chain (modules/models/tiers.yaml seats.worker) through the common picker
-// (scripts/lib/tier-pick.mjs), skipping a
-// provider whose quota probe is dead or whose provider-health circuit is open on any product ledger, and a
-// provider whose [Worker] spawn proved it cannot serve - its worker-start failed, or the failure text shows
-// the outage its agent card declares (quotaExhausted/capacityExhausted, scripts/agent/provider-outage.mjs
-// outageInText: e.g. an attestation rejected for "Quota exhausted") - for the rest of that spawn pass, for the
-// requeued job it failed (payload.avoidAgents), and for every job once it failed READINESS_FAILS_PER_HOUR times
-// in the last hour.
+// Supervisor fix workers: one job per root-cause cluster (modules/supervisor/supervise.yaml, docs/supervisor.md).
+// CLI: create, spawn, stage --self, report, list, cap, show, cancel, ack, cleanup; workers-cli.mjs owns arguments.
+// machine.sqlite owns sup_jobs, sup_leases, sup_attempts, sup_reports and sup_events; working data is payload_json.
+// queued -> spawning (staging + leases + attempt) -> running (terminal) -> reported -> succeeded | failed | cancelled.
+// Unknown launch effects retain their original Dispatch, staging and leases until the next spawn reconciles them.
+// Staging is an ephemeral Orca worktree from main, stamped starci:supervisor-staging:sup-<job>;sup=<job>.
+// Always use its RECORDED path, branch, base and Orca id for landing/GC; removeOrcaWorktree owns cleanup.
+// Adaptive cap: base + one per two queued jobs, at most 10; halve under load, reduce to 1 when saturated.
+// Route through the worker tier, excluding quota/circuit failures and providers that failed readiness this pass,
+// for the failed job (avoidAgents), or READINESS_FAILS_PER_HOUR times in the last hour.
 import '../api/process/hide-child-windows.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -64,21 +35,19 @@ import { runWorkersCli } from './workers-cli.mjs';
 import { pickWorkerPool } from './worker-pool.mjs';
 import { tierMembers, tierOfSeat, tierSettings } from '../agent/tiers.mjs';
 import { eachInOrder } from '../lib/in-order.mjs';
+import { workerShow } from '../api/orca/worker-show.mjs';
+import { terminalShow } from '../api/orca/terminal-show.mjs';
+import { terminalRead } from '../api/orca/terminal-read.mjs';
+import { draftText } from '../lib/orca-terminal.mjs';
+import { classifyAgentScreen, exitedAgentPromptRow, frameWithDraft, wakeDeliveryOf } from '../lib/terminal-liveness.mjs';
+import { sendEnterWithProof } from '../kernel/wake-delivery.mjs';
 export { pickWorkerPool };
 
 /**
- * The guard layer of a [Worker] launch, the same one op workers get (scripts/guards/hook-install.mjs guardLaunch), bound to
- * the worker's terminal once it starts: its staging checkout has its own node_modules (createStaging runs npm ci), and
- * an install through a node_modules link would empty the link's target (node-modules-link-wipe, 2026-09-28) - the
- * command guard (scripts/guards/command-guard.mjs, a PreToolUse hook) refuses that (DEPS_THROUGH_LINK). No history
- * hook (repos []): a [Worker] commits only in its runtime staging branch, and that checkout is a linked worktree of
- * the live runtime repo, so `git rev-parse --git-path hooks` there is the live repo's SHARED hooks dir - a hook
- * installed "for the staging checkout" lands in the live repo and refuses every branch deletion and ref rewrite
- * there (the land gate's staging-branch cleanup, lanes; land run 26 refused 3a9558930). Its owned paths are the job's leased
- * files resolved against its staging checkout, absolute like op leases (scripts/kernel/cli.mjs opGuardLaunch): a
- * directory lease (a trailing `/**` dropped) covers its subtree. With none, or with paths left relative (resolved
- * against the Supervisor's cwd), the command guard refuses every `git add`/commit (PATH_NOT_OWNED) and no worker can
- * commit (worker-guard-owned-empty). {receipt}.
+ * Bind the common command guard to the worker, with absolute leased paths in its staging checkout.
+ * Directory leases cover their subtrees; empty/relative ownership refuses commits (PATH_NOT_OWNED).
+ * The guard refuses dependency installs through junctions (DEPS_THROUGH_LINK). No history hook
+ * (repos []): linked worktrees share the live runtime's hooks, which would block land cleanup.
  */
 export function workerGuard(jobId, { root = SKILL_ROOT, staging = null, files = [], launch = guardLaunch } = {}) {
   try {
@@ -134,11 +103,7 @@ function rowJob(row) {
 }
 export const jobsOf = (m, statuses = null) => { const statusFilter = statuses ? `AND j.status IN (${statuses.map(() => '?').join(',')})` : ''; return m.db.prepare(`${JOB_SELECT} WHERE j.kind=? ${statusFilter} ORDER BY j.created_at, j.job_id`).all(FIX_KIND, ...(statuses ?? [])).map(rowJob); };
 export const jobOf = (m, jobId) => rowJob(m.db.prepare(`${JOB_SELECT} WHERE j.job_id=?`).get(jobId));
-/**
- * The worker terminals still physically held, including logically finished jobs without qualified closure.
- * Orca lists them under the runtime project next to the [Supervisor]; the seat dedupe and the Orca-tree check
- * treat them as owned, never as duplicates, strays or orphans.
- */
+/** Physically held terminals, including finished jobs without closure proof; dedupe/GC treat these as owned. */
 export const openWorkerHandles = (m) => new Set(jobsOf(m)
   .filter((j) => !j.payload.self && j.worker_id && !workerTerminalClosed(j)).map((j) => j.worker_id));
 /** The job's newest report: the sup_reports row with `report` parsed, or null. */
@@ -176,9 +141,7 @@ export function createJob(m, { cluster, title, files = [], incidents = [], specs
   return { created: true, job: jobOf(m, jobId) };
 }
 
-// How long a worker job's file leases live (modules/models/runtimes.yaml
-// allocation.workerJobs.leaseTtlMs): long enough to outlive any job, so a dead
-// worker's leases still free themselves.
+// Long-lived leases still expire for dead workers (modules/models/runtimes.yaml allocation.workerJobs.leaseTtlMs).
 export const WORKER_LEASE_TTL_MS = allocationMs('workerJobs.leaseTtlMs');
 /** The job's file leases (sup_leases; SHARED_APPEND_FILES stay unleased). {ok} or {ok:false, conflicts}. */
 const takeLeases = (m, job) => m.acquireSupLeases(job.job_id, leasable(job.payload.files), { ttlMs: WORKER_LEASE_TTL_MS });
@@ -196,10 +159,8 @@ const branchDeleteMode = (branch, landed) => {
 };
 
 /**
- * Create the job's staging checkout through Orca: createOrcaWorktree (the slot registered with its [Worker] job for the
- * GC, `orca worktree create --repo path:<runtime> --name sup-<job> --base-branch main --setup skip`, stamped
- * `starci:supervisor-staging:sup-<job>;sup=<job>`, the row bound to Orca's id), its own npm ci (never a node_modules junction, RT_NODE_MODULES_LINK) and a copy of the
- * owner config so specs run there as they do live. {ok, path, branch, base, orcaId} as Orca reported them | {ok:false, reason, code, error}
+ * Create/register an Orca staging checkout from main, install its own dependencies (never a junction),
+ * and copy the owner config. Returns {ok, path, branch, base, orcaId} or {ok:false, reason, code, error}.
  */
 export function createStaging({ jobId, root = SKILL_ROOT, env = process.env, orca = orcaWorktreeClient, install = ci, lockDeps = {} }) {
   const made = createOrcaWorktree({ repoRoot: root, kind: STAGING_KIND, name: stagingNameOf(jobId), base: 'main', owner: { lane: jobId }, env, orca });
@@ -222,11 +183,8 @@ export function createStaging({ jobId, root = SKILL_ROOT, env = process.env, orc
 const stagingRecord = (staging) => ({ path: staging.path, branch: staging.branch, base: staging.base, orcaId: staging.orcaId });
 
 /**
- * Remove a job's staging checkout (`staging`: its payload.staging record) through Orca: removeOrcaWorktree unlinks every
- * link (the node_modules junction included) and asserts none is left, runs `orca worktree rm`, asserts the main checkout
- * untouched and closes the registry row. Its recorded branch goes too when its work landed (`landed`: `git branch -D`)
- * or it holds no commit beyond main (`git branch -d`); otherwise it is kept so nothing a worker committed is lost.
- * Idempotent. {jobId, path, removed, branchDeleted, branchKept?} | {..., removed:false, code, reason?, error, fatal?}
+ * Idempotently remove the recorded Orca checkout, unlinking junctions and protecting main.
+ * Delete its branch only when landed or empty; otherwise preserve the worker's commits.
  */
 export function removeStaging({ jobId, staging, root = SKILL_ROOT, env = process.env, landed = false, orca = orcaWorktreeClient }) {
   const out = { jobId, path: staging?.path ?? null, removed: false, branchDeleted: false };
@@ -365,6 +323,53 @@ const markRunning = (pass, { job, route, staging, leased, spawned, payload }) =>
   result.launched.push({ jobId: job.job_id, terminal: spawned.terminal, agent: route.agent, model: route.model, staging: staging.path });
 };
 
+/** Reconcile the original Dispatch only: uncertain effects never authorize another worker. */
+function reconcileSpawning(pass, job) {
+  const { m, deps, root, now, result } = pass;
+  if (!job.payload.dispatch) return false;
+  try {
+    const worker = (deps.workerShow ?? workerShow)({ dispatch: job.payload.dispatch });
+    if (!worker?.ok) return false;
+    const terminal = worker.dispatch?.assigneeHandle ?? worker.result?.worker?.agentTerminalHandle ?? job.worker_id;
+    if (!terminal || (job.worker_id && job.worker_id !== terminal)) return false;
+    m.updateSupAttempt(job.attempt_id, { terminalHandle: terminal });
+    const shown = (deps.show ?? terminalShow)({ terminal });
+    if (shown?.hostUnavailable) return false;
+    const frame = shown?.ok && shown.connected === true ? (deps.read ?? terminalRead)({ terminal, screen: true }) : null;
+    const dead = (shown?.ok && shown.connected === false) || shown?.errorCode === 'terminal_handle_stale'
+      || (frame?.ok && exitedAgentPromptRow(frame.screen));
+    if (dead) {
+      const reason = shown?.exitCause ?? shown?.errorCode ?? 'agent-exited';
+      m.transaction(() => {
+        releaseLeases(m, job.job_id);
+        m.updateSupAttempt(job.attempt_id, { cancelledAt: now(), failureClass: 'spawn:worker-exited' });
+        setJob(m, job.job_id, { status: 'failed', payload: { ...job.payload, launchEffect: 'dead', result: { reason } } });
+        supervisorEvent(m, { entityType: 'job', entityId: job.job_id, kind: 'worker-spawn-failed', payload: { terminal, reason }, now: now() });
+      });
+      result.failed.push({ jobId: job.job_id, terminal, error: reason, requeued: false });
+      return true;
+    }
+    const effective = worker.effective;
+    if (!shown?.ok || !frame?.ok || (effective?.agent ?? effective?.provider) !== job.payload.agent
+      || (effective?.model ?? effective?.modelId) !== job.payload.model) return false;
+    const prompt = renderWorkerPrompt(job, job.payload.staging), draft = draftText(frame);
+    const screen = draft ? frameWithDraft(frame.screen, draft) : frame.screen;
+    const state = classifyAgentScreen(screen, { sentText: prompt, provider: job.payload.agent }).state;
+    let submitted = state === 'active' || wakeDeliveryOf({ after: screen, text: prompt }).delivery === 'delivered';
+    if (state === 'staged-input' || state === 'queued-input') {
+      if (job.payload.agent !== 'codex' || shown.writable !== true) return false;
+      submitted = sendEnterWithProof({ terminal, sentText: prompt, deps }).ok;
+    }
+    if (!submitted) return false;
+    if (typeof job.payload.guard?.jobFile === 'string') (deps.bindGuard ?? bindGuardTerminal)({ skillRoot: root, handle: terminal, jobFile: job.payload.guard.jobFile });
+    m.updateSupAttempt(job.attempt_id, { failureClass: null });
+    markRunning(pass, { job, route: { agent: job.payload.agent, model: job.payload.model, pool: job.payload.pool },
+      staging: job.payload.staging, leased: { attemptId: job.attempt_id }, spawned: { terminal, dispatchId: job.payload.dispatch },
+      payload: { ...job.payload, launchEffect: 'submitted', lastSpawnError: null } });
+    return true;
+  } catch { return false; } // Host/read failures retain custody for the next pass.
+}
+
 /** One queued job's launch: lease check, route, staging checkout, leases, worker. Records into pass.result. */
 async function launchJob(pass, job) {
   const { m, deps, orca, env, root, now, result } = pass;
@@ -384,24 +389,26 @@ async function launchJob(pass, job) {
   const { spawned, guard } = await startJobWorker(pass, job, route, staging);
   const { payload, heldUnknown } = recordWorkerLaunch({ m, job, route, spawned, staging: stagingRecord(staging), attemptId: leased.attemptId, guard, now });
   const run = { job, route, staging, leased, spawned, payload, heldUnknown };
-  if (spawned?.ok) markRunning(pass, run); else failSpawn(pass, run);
+  if (spawned?.ok) markRunning(pass, run);
+  else if (!heldUnknown || !reconcileSpawning(pass, jobOf(m, job.job_id))) failSpawn(pass, run);
 }
 
 /**
- * Launch queued jobs while the adaptive cap has room. Each launch: lease check, route, staging checkout,
- * leases, [Worker] worker. The worker starts through worker-start ON its staging checkout (scripts/agent/lib.mjs
- * startAgent): a staging checkout is a git worktree of the runtime repository, which Orca resolves under the runtime's
- * project. Its guard is bound to the worker's terminal (bindGuardTerminal). A failed launch releases its leases,
- * removes its checkout and requeues the job (failed after MAX_SPAWN_ATTEMPTS).
- * `deps`: {start, bindGuard, route, load, staging, unstage, orca} for specs (orca: the Orca worktree client).
+ * Reconcile uncertain Dispatches before counting the cap, then launch queued jobs on leased Orca staging trees.
+ * Proven no-effect failures release staging/leases and requeue up to MAX_SPAWN_ATTEMPTS; unknown effects retain custody.
+ * `deps`: {start, bindGuard, route, load, staging, unstage, orca, workerShow, show, read, send, sleep} for specs.
  */
 export async function spawnWorkers(m, { jobId = null, dryRun = false, settings = supervisorSettings(), deps = {}, env = process.env, root = SKILL_ROOT, now = Date.now } = {}) {
   const orca = deps.orca ?? orcaWorktreeClient;
+  const result = { cap: null, launched: [], skipped: [], failed: [] };
+  if (!dryRun) for (const job of jobsOf(m, ['spawning']).filter(j => !j.payload.self && (!jobId || j.job_id === jobId))) {
+    reconcileSpawning({ m, deps, root, now, result, live: 0 }, job);
+  }
   const queuedJobs = jobsOf(m, ['queued']).filter((j) => !j.payload.self && (!jobId || j.job_id === jobId));
   const running = jobsOf(m, ACTIVE_STATUSES).filter((j) => !j.payload.self).length;
   const load = (deps.load ?? machineLoad)();
   const cap = adaptiveCap({ base: settings.workers.base, max: settings.workers.max, queued: queuedJobs.length, running, load });
-  const result = { cap, launched: [], skipped: [], failed: [] };
+  result.cap = cap;
   // Providers whose worker terminal failed readiness this pass, or READINESS_FAILS_PER_HOUR times in the hour.
   const notReady = new Set(readinessFailedProviders(m, { since: now() - 3_600_000 }));
   const pass = { m, dryRun, deps, env, root, now, orca, cap, result, notReady, live: running };
@@ -436,14 +443,9 @@ export function stageSelf(m, { name, files, root = SKILL_ROOT, env = process.env
 /* ------------------------------------------------------------ report, cancel, finish */
 
 /**
- * The Supervisor releases its own [Worker] (owner, 2026-09-28: the Supervisor owns its workers' lifecycle): worker-stop + worker-release on its Dispatch, and
- * records verified physical closure on the job (payload.terminalClosed, the attempt's closed_at) and as a
- * worker-terminal-closed event. Nothing to do for a self job (worker_id 'supervisor'), a job that never got a
- * terminal, or one already closed with proof. A close that is not proven stays unrecorded on the payload so
- * openWorkerHandles still counts the terminal and the tick GC (gc.mjs) retries it as a leftover. `close` is
- * closeSelfSafe (seam). Managed release bookkeeping is retained separately in the event receipt;
- * only workerClosureProven qualifies managed physical closure. Detached verifier acceptance is pending.
- * Returns the close result or null.
+ * Release the Supervisor's worker Dispatch and record physical closure only with workerClosureProven.
+ * Unproven closure retains openWorkerHandles custody for tick GC to retry; detached verification is pending.
+ * Self jobs, absent terminals and already proven closures return null. `close` is the closeSelfSafe seam.
  */
 export function closeWorkerTerminal(m, options = {}) {
   return closeWorkerTerminalState(m, options, jobOf);
@@ -487,9 +489,7 @@ export function cancelJob(m, { jobId, reason = 'cancelled by the Supervisor', ro
 }
 
 /**
- * The Supervisor's decision on a filed report that lands nothing (diagnosed, blocked, failed): the report is marked
- * consumed with the decision recorded, so the watchdog's [report] wake (filedReports: unconsumed, not done) stops
- * announcing it. 2026-09-28: four 2026-09-24 reports whose fixes had long landed resurfaced in [report] wakes all night.
+ * Record the Supervisor's decision on a diagnosed/blocked/failed report and consume it, ending watchdog report wakes.
  */
 export function ackReport(m, { jobId, reason, now = Date.now() }) {
   if (!jobId || !String(reason ?? '').trim()) return { ok: false, error: 'ack needs --job and --reason' };
