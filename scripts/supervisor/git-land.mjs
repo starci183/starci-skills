@@ -35,6 +35,27 @@ const tipOf = (worktree, ref, deps) => (deps.resolveTip ?? revParseCall)(worktre
 const baseOf = (worktree, ref, deps) => (deps.mergeBase ?? mergeBaseCall)(worktree, 'main', ref, { git: deps.git ?? null });
 const ancestor = (worktree, before, after, deps) => (deps.isAncestor ?? isAncestorCall)(worktree, before, after, { git: deps.git ?? null });
 
+function baseForSpecChecks({ worktree, ref, verified, verifiedLog, tip, check }, deps) {
+  if (verified) {
+    if (!verifiedLog || !fs.existsSync(verifiedLog)) return { refusal: refused({ step: STEP.specs, cause: 'verified-log-missing', detail: verifiedLog || '--verified-log is required with --verified', result: { tip, base: verified, check } }) };
+    const verifiedTip = tipOf(worktree, verified, deps);
+    if (!verifiedTip || !ancestor(worktree, verifiedTip, tip, deps)) return { refusal: refused({ step: STEP.specs, cause: 'verified-not-ancestor', detail: `${verified} is not an ancestor of ${ref}`, result: { tip, base: verifiedTip ?? verified, check } }) };
+    return { base: verifiedTip };
+  }
+  const base = baseOf(worktree, ref, deps);
+  if (!base) return { refusal: refused({ step: STEP.specs, cause: 'merge-base-missing', detail: `main and ${ref} have no merge base`, result: { tip, check } }) };
+  return { base };
+}
+
+function specsForLand({ worktree, ref, verified, verifiedLog, tip, base, concurrency, check }, deps) {
+  const changed = changedFiles(worktree, base, tip, deps);
+  if (!changed) return { refusal: refused({ step: STEP.specs, cause: 'diff-unreadable', detail: `${base}..${tip}`, result: { tip, base, check } }) };
+  const specRun = (deps.runSpecs ?? verifyLandSpecs)({ worktree, tip, changed, verifiedLog: verified ? verifiedLog : null, concurrency }, deps);
+  const specs = { selected: Number(specRun?.selected ?? 0), pass: Number(specRun?.pass ?? 0), rerun: Number(specRun?.rerun ?? 0) };
+  if (!specRun?.ok) return { refusal: refused({ step: STEP.specs, cause: specRun?.cause ?? 'specs-red', detail: specRun?.detail ?? 'dependent specs failed', result: { tip, base, specs, check, log: specRun?.log ?? null } }) };
+  return { specRun, specs };
+}
+
 async function lockedLand({ worktree, ref, verified, verifiedLog, dryRun, lane, concurrency }, deps) {
   const tip = tipOf(worktree, ref, deps);
   if (!tip) return refused({ step: STEP.gate, cause: 'ref-unresolved', detail: ref });
@@ -48,19 +69,12 @@ async function lockedLand({ worktree, ref, verified, verifiedLog, dryRun, lane, 
   const check = { pass: Number(checkRun?.pass ?? 0), total: Number(checkRun?.total ?? 1) };
   if (!checkRun?.ok) return refused({ step: STEP.check, cause: 'check-red', detail: String(checkRun?.output ?? 'full runtime check failed').trim().split(/\r?\n/).slice(-8).join(' | '), result: { tip, base: gate.base ?? null, check } });
 
-  let base;
-  if (verified) {
-    if (!verifiedLog || !fs.existsSync(verifiedLog)) return refused({ step: STEP.specs, cause: 'verified-log-missing', detail: verifiedLog || '--verified-log is required with --verified', result: { tip, base: verified, check } });
-    const verifiedTip = tipOf(worktree, verified, deps);
-    if (!verifiedTip || !ancestor(worktree, verifiedTip, tip, deps)) return refused({ step: STEP.specs, cause: 'verified-not-ancestor', detail: `${verified} is not an ancestor of ${ref}`, result: { tip, base: verifiedTip ?? verified, check } });
-    base = verifiedTip;
-  } else base = baseOf(worktree, ref, deps);
-  if (!base) return refused({ step: STEP.specs, cause: 'merge-base-missing', detail: `main and ${ref} have no merge base`, result: { tip, check } });
-  const changed = changedFiles(worktree, base, tip, deps);
-  if (!changed) return refused({ step: STEP.specs, cause: 'diff-unreadable', detail: `${base}..${tip}`, result: { tip, base, check } });
-  const specRun = (deps.runSpecs ?? verifyLandSpecs)({ worktree, tip, changed, verifiedLog: verified ? verifiedLog : null, concurrency }, deps);
-  const specs = { selected: Number(specRun?.selected ?? 0), pass: Number(specRun?.pass ?? 0), rerun: Number(specRun?.rerun ?? 0) };
-  if (!specRun?.ok) return refused({ step: STEP.specs, cause: specRun?.cause ?? 'specs-red', detail: specRun?.detail ?? 'dependent specs failed', result: { tip, base, specs, check, log: specRun?.log ?? null } });
+  const baseResult = baseForSpecChecks({ worktree, ref, verified, verifiedLog, tip, check }, deps);
+  if (baseResult.refusal) return baseResult.refusal;
+  const { base } = baseResult;
+  const specResult = specsForLand({ worktree, ref, verified, verifiedLog, tip, base, concurrency, check }, deps);
+  if (specResult.refusal) return specResult.refusal;
+  const { specRun, specs } = specResult;
 
   const trailers = [`Land-Verified: ${tip}`, `Specs: ${specs.pass}/${specs.selected}`, `Check: ${check.pass}/${check.total}`];
   if (dryRun) {
