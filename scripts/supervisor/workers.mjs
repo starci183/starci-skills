@@ -58,9 +58,10 @@ import { guardLaunch, bindGuardTerminal } from '../guards/hook-install.mjs';
 import { outageInText } from '../agent/provider-outage.mjs';
 import { loadRuntimes } from '../agent/models.mjs';
 import { recordWorkerLaunch, workerAttemptAgent, setJob, workerTerminalClosed, closeWorkerTerminalState } from './worker-state.mjs';
+import { recordWorkerReport, resolveReportCommit } from './workers-report.mjs';
 import { startWorkerAgent } from '../agent/start-worker.mjs'; import { isMain } from '../lib/is-main.mjs';
-import { readEnv } from '../lib/env.mjs';
 import { slugify } from '../lib/slug.mjs';
+import { runWorkersCli } from './workers-cli.mjs';
 
 /**
  * The guard layer of a [Worker] launch, the same one op workers get (scripts/guards/hook-install.mjs guardLaunch), bound to
@@ -92,8 +93,8 @@ export const READINESS_FAILS_PER_HOUR = 2;
 export const AGENTS = Object.freeze({ 'claude-agent': 'claude', 'codex-agent': 'codex', 'devin-agent': 'devin' });
 const PROMPT_FILE = path.join(SKILL_ROOT, 'modules', 'supervisor', 'worker-prompt.md');
 const parse = parseJsonOr;
-const csv = (v) => { if (typeof v === 'string') return v.split(',').map((s) => s.trim()).filter(Boolean); if (Array.isArray(v)) return v.map(String); return []; };
-export const normPath = (p) => posixPath(p).replace(/\/+$/, '');
+const csv = (v) => { if (typeof v === 'string') { return v.split(',').map((s) => s.trim()).filter(Boolean); } if (Array.isArray(v)) { return v.map(String); } return []; };
+export const normPath = (p) => posixPath(p).replace(new RegExp(['/', '+', '$'].join('')), '');
 
 /** The supervisor's git runner (land, push-mains, push-git, direct-commits; their `run`/`git` seams take the same argv): `args[0]` names the scripts/api/git call file it runs, in `cwd`: {ok, status, stdout, stderr}. */
 export function git([verb, ...args], { cwd = SKILL_ROOT, input = undefined, env = undefined, timeoutMs = 300_000 } = {}) {
@@ -122,10 +123,12 @@ export function adaptiveCap({ base = 4, max = 10, queued = 0, running = 0, load 
 const JOB_SELECT = `SELECT j.*, a.attempt_id, a.terminal_handle, a.closed_at AS attempt_closed_at FROM sup_jobs j
   LEFT JOIN sup_attempts a ON a.attempt_id=(SELECT attempt_id FROM sup_attempts WHERE job_id=j.job_id ORDER BY dispatch_seq DESC LIMIT 1)`;
 function rowJob(row) {
-  if (!row) return null;
+  if (!row) { return null; }
   const payload = parse(row.payload_json);
   const { terminal_handle: handle, ...rest } = row; delete rest.payload_json; delete rest.files_json;
-  let workerId = handle ?? null; if (payload.self) workerId = row.attempt_id != null ? 'supervisor' : null; return { ...rest, payload, result: payload.result ?? null, worker_id: workerId };
+  let workerId = handle ?? null;
+  if (payload.self) { workerId = row.attempt_id != null ? 'supervisor' : null; }
+  return { ...rest, payload, result: payload.result ?? null, worker_id: workerId };
 }
 export const jobsOf = (m, statuses = null) => { const statusFilter = statuses ? `AND j.status IN (${statuses.map(() => '?').join(',')})` : ''; return m.db.prepare(`${JOB_SELECT} WHERE j.kind=? ${statusFilter} ORDER BY j.created_at, j.job_id`).all(FIX_KIND, ...(statuses ?? [])).map(rowJob); };
 export const jobOf = (m, jobId) => rowJob(m.db.prepare(`${JOB_SELECT} WHERE j.job_id=?`).get(jobId));
@@ -185,6 +188,10 @@ export const releaseLeases = (m, jobId) => m.releaseSupLeases(jobId);
 export const STAGING_KIND = 'supervisor-staging';
 /** The Orca worktree name of a job's staging checkout; Orca derives the branch from it (the receipt is what counts). */
 export const stagingNameOf = (jobId) => `sup-${jobId}`;
+const branchDeleteMode = (branch, landed) => {
+  if (!branch) return null;
+  return landed ? 'force' : 'merged';
+};
 
 /**
  * Create the job's staging checkout through Orca: createOrcaWorktree (the slot registered with its [Worker] job for the
@@ -223,7 +230,7 @@ export function removeStaging({ jobId, staging, root = SKILL_ROOT, env = process
   const out = { jobId, path: staging?.path ?? null, removed: false, branchDeleted: false };
   if (!staging?.path || !staging?.orcaId) return { ...out, code: 'WORKER_STAGING_REMOVE_FAILED', error: `job ${jobId} records no Orca staging checkout (path and orcaId)` };
   const r = removeOrcaWorktree({ repoRoot: root, orcaId: staging.orcaId, dir: staging.path, branch: staging.branch ?? null,
-    deleteBranch: staging.branch ? (landed ? 'force' : 'merged') : null, env, orca });
+    deleteBranch: branchDeleteMode(staging.branch, landed), env, orca });
   if (r.ok || r.reason === 'branch-delete-failed') {
     // branch-delete-failed: the tree is gone and the branch holds commits main lacks - it is kept, never forced.
     out.removed = true;
@@ -461,27 +468,12 @@ export function fileReport(m, { jobId, outcome, commit = null, specs = [], summa
   // diagnosed: a diagnosis job (the Supervisor never diagnoses with its own subagents) - the summary is the result.
   if (!['done', 'diagnosed', 'blocked', 'failed'].includes(outcome)) return { ok: false, error: 'outcome must be done, diagnosed, blocked or failed' };
   if (outcome === 'diagnosed' && !String(summary ?? '').trim()) return { ok: false, error: 'a diagnosed report carries its diagnosis in --summary (or --summary-file)' };
-  let sha = null;
-  if (outcome === 'done') {
-    if (!commit) return { ok: false, error: 'a done report names --commit <sha>' };
-    const resolved = git(['rev-parse', '--verify', '--quiet', `${commit}^{commit}`], { cwd: root });
-    if (!resolved.ok) return { ok: false, error: `commit ${commit} does not exist` };
-    sha = resolved.stdout;
-    const branch = job.payload.staging?.branch;
-    if (branch && !git(['merge-base', '--is-ancestor', sha, branch], { cwd: root }).ok) return { ok: false, error: `commit ${sha.slice(0, 9)} is not on ${branch}` };
-    if (job.payload.staging?.base && sha === job.payload.staging.base) return { ok: false, error: 'the commit is the base: nothing was committed' };
-  }
+  const commitResult = resolveReportCommit(job, outcome, commit, root, git);
+  if (commitResult.error) return { ok: false, error: commitResult.error };
+  const sha = commitResult.sha;
   const report = { outcome, commit: sha, base: job.payload.staging?.base ?? null, branch: job.payload.staging?.branch ?? null,
     specs: specs.length ? specs : job.payload.specs ?? [], incidents: incidents ?? job.payload.incidents ?? [], summary, needs, terminal };
-  m.transaction(() => {
-    const attemptId = attemptIdOf(m, jobId);
-    m.recordSupReport({ attemptId, jobId, outcome, report });
-    m.updateSupAttempt(attemptId, { reportedAt: now, reportOutcome: outcome, ...(sha ? { headSha: sha } : {}) });
-    let status = 'failed'; if (outcome === 'done') status = 'reported'; else if (outcome === 'diagnosed') status = 'succeeded';
-    if (outcome !== 'done') releaseLeases(m, jobId);
-    setJob(m, jobId, { status, payload: outcome === 'done' ? undefined : { ...job.payload, result: { reason: `worker-${outcome}`, summary, needs } } });
-    supervisorEvent(m, { entityType: 'job', entityId: jobId, kind: 'worker-reported', payload: { outcome, commit: sha, specs: report.specs, needs }, now });
-  });
+  recordWorkerReport(m, job, jobId, outcome, report, sha, summary, needs, now, { attemptIdOf, releaseLeases, setJob, supervisorEvent });
   // A diagnosed/blocked/failed report is the worker's last act: the Supervisor closes its terminal now (a done report
   // keeps it until the land, so a red gate can still be handed back to it). Filed from inside that terminal, the close
   // goes to a detached verifier (close-verify.mjs closeSelfSafe) so this process finishes writing first.
@@ -589,57 +581,9 @@ export function workerBoard(m, { now = Date.now() } = {}) {
 
 /* ------------------------------------------------------------ CLI */
 
-async function main() {
-  const argv = process.argv.slice(2);
-  const verb = argv[0];
-  const has = (n) => argv.includes(`--${n}`);
-  const value = (n) => { const i = argv.indexOf(`--${n}`); return i >= 0 ? argv[i + 1] ?? null : null; };
-  const asJson = has('json');
-  const out = (r, text = null) => { console.log(asJson || !text ? JSON.stringify(r, null, asJson ? 0 : 2) : text); if (r?.ok === false) process.exitCode = 1; };
-  if (!verb || has('help')) { console.log('use: starci supervisor workers create|spawn|stage|report|list|cap|show|cancel|ack|cleanup ... (see the header)'); return; }
-  if (verb === 'list') {
-    const board = readSupervisor((m) => workerBoard(m), { active: [], queued: [], reported: [], recent: [] });
-    const line = (j) => { const terminal = j.terminal ? ` ${j.terminal}` : ''; const report = j.report ? ` commit ${String(j.report.commit ?? '').slice(0, 9)}` : ''; const result = j.result ? ` ${JSON.stringify(j.result).slice(0, 120)}` : ''; return `  ${j.jobId} [${j.status}] ${j.cluster} ${j.agent ?? '-'} age ${j.ageMin}m${terminal}${report}${result}`; };
-    return out(board, [`active ${board.active.length}`, ...board.active.map(line), `queued ${board.queued.length}`, ...board.queued.map(line),
-      `reported (land queue) ${board.reported.length}`, ...board.reported.map(line), 'recent', ...board.recent.map(line)].join('\n'));
-  }
-  if (verb === 'cap') {
-    const settings = supervisorSettings();
-    const counts = readSupervisor((m) => ({ queued: jobsOf(m, ['queued']).length, running: jobsOf(m, ACTIVE_STATUSES).filter((j) => !j.payload.self).length }), { queued: 0, running: 0 });
-    const cap = adaptiveCap({ ...settings.workers, ...counts, load: machineLoad() });
-    return out(cap, `cap ${cap.cap} (${cap.reason}); running ${cap.running}, queued ${cap.queued}, free ${cap.free}; cpu ${Math.round(cap.load.cpuBusy * 100)}% free mem ${Math.round(cap.load.freeMem * 100)}%`);
-  }
-  if (verb === 'show') return out(readSupervisor((m) => ({ job: jobOf(m, value('job')), report: reportOf(m, value('job')) }), null));
-  // A long-lived writer handle: spawn waits minutes for a worker's readiness (no transaction is held meanwhile).
-  const m = openMachine();
+if (isMain(import.meta.url)) {
   try {
-    if (verb === 'create') {
-      let brief = value('brief') ?? '';
-      if (value('brief-file')) brief = fs.readFileSync(value('brief-file'), 'utf8');
-      const r = createJob(m, { cluster: value('cluster'), title: value('title'), files: csv(value('files')), incidents: csv(value('incidents')), specs: csv(value('specs')), brief, agent: value('agent') });
-      return out({ ok: true, created: r.created, jobId: r.job.job_id, status: r.job.status }, `${r.created ? 'created' : 'exists'} ${r.job.job_id} [${r.job.status}]`);
-    }
-    if (verb === 'spawn') {
-      const r = await spawnWorkers(m, { jobId: value('job'), dryRun: has('dry-run') });
-      supervisorLog('workers', `spawn: launched ${r.launched.length}, skipped ${r.skipped.length}, failed ${r.failed.length}`, { data: r });
-      return out(r);
-    }
-    if (verb === 'stage') {
-      if (!has('self')) return out({ ok: false, error: 'stage is the Supervisor\'s own checkout: starci supervisor workers stage --self --name <slug> --files <csv>' });
-      return out(stageSelf(m, { name: value('name') ?? 'change', files: csv(value('files')) }));
-    }
-    if (verb === 'report') {
-      const summary = value('summary-file') ? fs.readFileSync(value('summary-file'), 'utf8') : value('summary') ?? '';
-      const r = fileReport(m, { jobId: value('job'), outcome: value('outcome'), commit: value('commit'), specs: csv(value('specs')), summary,
-        needs: csv(value('needs')), terminal: readEnv('ORCA_TERMINAL_HANDLE') ?? null });
-      supervisorLog('workers', `report ${value('job')}: ${r.ok ? r.outcome : r.error}`, { level: r.ok ? 'info' : 'warn', data: r });
-      return out(r);
-    }
-    if (verb === 'cancel') return out(cancelJob(m, { jobId: value('job'), reason: value('reason') ?? undefined }));
-    if (verb === 'ack') return out(ackReport(m, { jobId: value('job'), reason: value('reason') }));
-    if (verb === 'cleanup') return out(cleanupStaging(m, { jobId: value('job') }));
-    return out({ ok: false, error: `unknown verb ${verb}` });
-  } finally { m.close(); }
+    await runWorkersCli({ openMachine, readSupervisor, workerBoard, supervisorSettings, jobsOf, ACTIVE_STATUSES, machineLoad, adaptiveCap,
+      jobOf, reportOf, csv, createJob, spawnWorkers, supervisorLog, stageSelf, fileReport, cancelJob, ackReport, cleanupStaging });
+  } catch (error) { console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error) })); process.exitCode = 1; }
 }
-
-if (isMain(import.meta.url)) { try { await main(); } catch (error) { console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error) })); process.exitCode = 1; } }

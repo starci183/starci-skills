@@ -28,20 +28,32 @@ function availabilityOf(registry, agent) {
 
 function modelsOf(registry, agent) {
   const models = new Set();
-  for (const [id, row] of Object.entries(registry?.models ?? {})) {
+  addProviderModels(models, registry?.models, agent);
+  addPoolModels(models, registry?.pools, agent);
+  addTargetModels(models, registry?.targets, agent);
+  return models;
+}
+
+function addProviderModels(models, rows, agent) {
+  for (const [id, row] of Object.entries(rows ?? {})) {
     if (row?.provider === agent) models.add(id);
   }
-  for (const pool of Object.values(registry?.pools ?? {})) {
+}
+
+function addPoolModels(models, pools, agent) {
+  for (const pool of Object.values(pools ?? {})) {
     if (pool?.provider !== agent) continue;
     if (pool.defaultModel) models.add(String(pool.defaultModel));
     for (const model of Object.values(pool.models ?? {})) {
       if (model) models.add(String(model));
     }
   }
-  for (const target of Object.values(registry?.targets ?? {})) {
+}
+
+function addTargetModels(models, targets, agent) {
+  for (const target of Object.values(targets ?? {})) {
     if (target?.runtime === agent && target.defaultModel) models.add(String(target.defaultModel));
   }
-  return models;
 }
 
 function defaultModelOf(registry, agent) {

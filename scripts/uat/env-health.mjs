@@ -250,13 +250,10 @@ async function failedProbe({ doc, row, url, expect, name, port, result, restart,
   let state = stateOfProbe(result);
   const registered = readRegistered(doc.id, name, env);
   const listener = port && state !== 'down' ? portListener(port) : null;
-  const actions = [];
-  if (listener && ['hung', 'wrong-status'].includes(state)) {
-    const own = (registered && registered.pid === listener.pid) || ownedByWorkspace(listener.commandLine, roots);
-    if (!own) return { ...row, state: 'port-conflict', ready: false, listener,
-      remedy: `port ${port} is held by PID ${listener.pid} (${listener.commandLine ?? 'unknown command'}), which is not a server of this workspace and does not answer ${url} with ${expect}; free the port or re-declare it - env-health never stops a foreign process` };
-    if (restart) { const killed = stopListener(listener.pid); actions.push(`killed ${state} own listener PID ${listener.pid}${killed ? '' : ' (kill failed)'}`); if (killed) state = 'down'; }
-  }
+  const listenerResult = resolveProbeListener({ listener, state, registered, roots, restart, port, url, expect });
+  if (listenerResult.result) return { ...row, ...listenerResult.result };
+  state = listenerResult.state;
+  const actions = listenerResult.actions;
   const start = startForService(doc, name, repo, registered);
   if (restart && state === 'down' && start?.command?.length) {
     const started = startServer({ command: start.command, cwd: start.cwd, envId: doc.id, service: name, env: start.env ? { ...env, ...start.env } : env });
@@ -271,6 +268,20 @@ async function failedProbe({ doc, row, url, expect, name, port, result, restart,
   const how = start ? 'starci gate env-health check --restart ...' : `starci gate env-health serve --env ${doc.id} --service ${name} --cwd <checkout> --url ${url} -- <start command>`;
   return { ...row, state, ready: false, ...(listener ? { listener } : {}), ...(actions.length ? { action: actions.join('; ') } : {}),
     remedy: `${name} is ${state} at ${url}: start it with ${how} (serve registers it, so the next pre-step restarts it itself)` };
+}
+
+function resolveProbeListener({ listener, state, registered, roots, restart, port, url, expect }) {
+  const actions = [];
+  if (!listener || !['hung', 'wrong-status'].includes(state)) return { state, actions };
+  const own = registered?.pid === listener.pid || ownedByWorkspace(listener.commandLine, roots);
+  if (!own) return { result: { state: 'port-conflict', ready: false, listener,
+    remedy: `port ${port} is held by PID ${listener.pid} (${listener.commandLine ?? 'unknown command'}), which is not a server of this workspace and does not answer ${url} with ${expect}; free the port or re-declare it - env-health never stops a foreign process` } };
+  if (restart) {
+    const killed = stopListener(listener.pid);
+    actions.push(`killed ${state} own listener PID ${listener.pid}${killed ? '' : ' (kill failed)'}`);
+    if (killed) state = 'down';
+  }
+  return { state, actions };
 }
 
 async function checkProbe(doc, probe, { restart, roots, probeTimeoutMs, readyTimeoutMs, env, repo }) {
@@ -352,7 +363,7 @@ export async function envHealthMain(argv, { write = (s) => process.stdout.write(
     const prior = readRegistered(args.env, args.service, env);
     const listener = port ? portListener(port) : null;
     const actions = [];
-    if (listener && ((prior && prior.pid === listener.pid) || ownedByWorkspace(listener.commandLine, [path.resolve(args.cwd), ...(args.repo ? workspaceRoots(repo) : [])]))) {
+    if (listener && ((prior?.pid === listener.pid) || ownedByWorkspace(listener.commandLine, [path.resolve(args.cwd), ...(args.repo ? workspaceRoots(repo) : [])]))) {
       const answered = url ? await probeUrl(url, { timeoutMs: 8000, follow: 0 }) : null;
       if (answered?.state === 'answered' && answered.status < 500) {
         writeRegistered({ env: args.env, service: args.service, ...(args.repo ? { repo } : {}), port, url, command: args.command, cwd: path.resolve(args.cwd), pid: listener.pid, state: 'ready' }, env);

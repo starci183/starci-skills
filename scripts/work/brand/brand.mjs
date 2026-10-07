@@ -58,13 +58,13 @@ const SOURCE_BYTES_LIMIT=4*1024*1024;
 const ICON_HINT=/icon|lucide|phosphor|feather|font-?awesome|material-symbols|tabler|remixicon|boxicons|ionicons|bootstrap-icons/i;
 
 const round=(value,places=4)=>Number.parseFloat(Number(value).toFixed(places));
-const digest=sha256;
+const digest=sha256,REGEX=Object.freeze({percent:new RegExp(['^[-+]?',String.raw`\d*`,String.raw`\.?`,String.raw`\d+%$`].join('')),number:new RegExp(['^[-+]?',String.raw`\d*`,String.raw`\.?`,String.raw`\d+`,String.raw`(?:e[-+]?\d+)?$`].join(''),'i'),important:new RegExp([String.raw`\s*`,'!important$'].join(''),'i'),call:new RegExp(['^(oklch|rgba?)',String.raw`\(`,String.raw`\s*`,'([^)]*)',String.raw`\)$`].join(''),'i'),declaration:new RegExp(['^(--[A-Za-z0-9_-]+)',String.raw`\s*:\s*`,String.raw`([\s\S]+)$`].join('')),semicolons:new RegExp([';+','$'].join(''))});
 
 // ---------------------------------------------------------------------------
 // Colour mathematics: sRGB <-> linear <-> OKLab <-> oklch, and WCAG contrast.
 // ---------------------------------------------------------------------------
 
-const clamp01=value=>{if(value<0)return 0;if(value>1)return 1;return value;};
+const clamp01=value=>{if(value<0){return 0;}if(value>1){return 1;}return value;};
 /** sRGB transfer function and its inverse; the piecewise form, not the 2.2 approximation. */
 const srgbToLinear=channel=>channel<=0.04045?channel/12.92:((channel+0.055)/1.055)**2.4;
 const linearToSrgb=channel=>channel<=0.0031308?channel*12.92:1.055*channel**(1/2.4)-0.055;
@@ -107,8 +107,8 @@ export const formatHex=rgb=>`#${rgb.map(channel=>Math.max(0,Math.min(255,Math.ro
 
 const number=(text,{percentOf=1}={})=>{
   const value=String(text).trim();
-  if(/^[-+]?\d*\.?\d+%$/.test(value))return Number.parseFloat(value)/100*percentOf;
-  if(/^[-+]?\d*\.?\d+(?:e[-+]?\d+)?$/i.test(value))return Number.parseFloat(value);
+  if(REGEX.percent.test(value))return Number.parseFloat(value)/100*percentOf;
+  if(REGEX.number.test(value))return Number.parseFloat(value);
   if(/^none$/i.test(value))return 0;
   return null;
 };
@@ -120,7 +120,7 @@ const number=(text,{percentOf=1}={})=>{
  * returns null so the caller fails loudly instead of guessing a value.
  */
 export function parseColor(input){
-  const value=String(input??'').trim().replace(/\s*!important$/i,'');
+  const value=String(input??'').trim().replace(REGEX.important,'');
   if(!value)return null;
   const hex=/^#([0-9a-f]{3,8})$/i.exec(value);
   if(hex){
@@ -130,7 +130,7 @@ export function parseColor(input){
     const [red,green,blue,alpha]=pairs.map(pair=>Number.parseInt(pair,16));
     return color({notation:'hex',rgb:[red,green,blue],alpha:alpha===undefined?1:alpha/255,raw:value});
   }
-  const call=/^(oklch|rgba?)\(\s*([^)]*)\)$/i.exec(value);
+  const call=REGEX.call.exec(value);
   if(!call)return null;
   const kind=call[1].toLowerCase();
   const [head,tail]=call[2].split('/');
@@ -183,10 +183,10 @@ export function parseCssCustomProperties(text){
   const flush=()=>{
     const declaration=buffer.trim();
     buffer='';
-    const match=/^(--[A-Za-z0-9_-]+)\s*:\s*([\s\S]+)$/.exec(declaration);
+    const match=REGEX.declaration.exec(declaration);
     if(!match)return;
     const selector=stack.filter(Boolean).join(' ');
-    const value=match[2].trim().replace(/\s*!important$/i,'').replace(/;+$/,'').trim();
+    const value=match[2].trim().replace(REGEX.important,'').replace(REGEX.semicolons,'').trim();
     // `:root:not([data-theme="light"])` inside a dark media query is a dark scope: a negated light theme is not a light one.
     const asserted=selector.replace(/:not\([^)]*\)/g,' ');
     const isDark=/dark/i.test(selector)&&!/data-theme\s*=\s*["']?light/i.test(asserted);
@@ -425,10 +425,7 @@ export function checkTokensMatchSource({brand,sourceRoot,stage='decide'}){
   const planned=tokens.filter(isPlannedToken);
   const declared=objectList(brand?.sources).filter(source=>['css','tokens'].includes(source.kind));
   // At verify a planned token must be in the app's own source; a check that could read no source is not a pass.
-  const unprovenAtVerify=(why,evidence)=>phase==='verify'&&planned.length
-    ?check(id,'fail',`${why} At the verify stage the planned token${planned.length===1?'':'s'} ${planned.map(token=>token.token).join(', ')} must be declared by the app's own source.`,
-      {...evidence,stage:phase,tokens:planned.map(token=>({token:token.token,expected:token.value??null,actual:null,status:'planned-source-missing'}))})
-    :null;
+  const unprovenAtVerify=(why,evidence)=>{if(phase!=='verify'||!planned.length)return null;const suffix=planned.length===1?'':'s';return check(id,'fail',`${why} At the verify stage the planned token${suffix} ${planned.map(token=>token.token).join(', ')} must be declared by the app's own source.`,{...evidence,stage:phase,tokens:planned.map(token=>({token:token.token,expected:token.value??null,actual:null,status:'planned-source-missing'}))});};
   if(!sourceRoot)return check(id,'skip','No --source repository root was given, so the brand\'s colour claims were not compared against shipped source.',{tokens:tokens.length,sources:declared.length,stage:phase});
   if(!tokens.length)return check(id,'skip','The brand declares no colour tokens to bind.',{sourceRoot:slash(sourceRoot),stage:phase});
   if(!declared.length){
@@ -462,9 +459,10 @@ export function checkTokensMatchSource({brand,sourceRoot,stage='decide'}){
     const actual=parseColor(found.value);
     if(!actual)return {token:token.token,expected:token.value,actual:found.value,file:found.file,scope:found.scope,status:'unparseable-source-value'};
     const delta=round(deltaEOk(expected,actual),3);
+    let status='differs';if(found.scope==='dark')status='only-in-dark-scope';else if(delta<=TOKEN_TOLERANCE)status='match';
     return {token:token.token,expected:token.value,actual:found.value,sourceValue:found.declaredValue??found.value,resolvedFrom:found.resolvedFrom??null,expectedHex:expected.hex,actualHex:actual.hex,
       file:found.file,selector:found.selector,scope:found.scope,deltaE:delta,...(isPlanned?{plannedTokenWritten:true}:{}),
-      status:found.scope==='dark'?'only-in-dark-scope':delta<=TOKEN_TOLERANCE?'match':'differs'};
+      status};
   });
   const bad=findings.filter(finding=>!TOKEN_PASS_STATUSES.includes(finding.status));
   const fromReference=findings.filter(finding=>finding.status==='planned-from-reference');
@@ -678,7 +676,7 @@ export function checkPrimaryDangerDistinct({brand}){
   const one=parseColor(primary.value),two=parseColor(danger.value);
   const evidence={primary:{token:primary.token,value:primary.value??null},danger:{token:danger.token,value:danger.value??null},
     threshold:MIN_PRIMARY_DANGER_DELTA,scale:'OKLab delta-E x100',dangerMayMatchPrimary:allowed};
-  if(!one||!two)return check(id,'fail','The primary or danger colour is not a colour this runtime can parse, so their distance is unknown.',evidence);
+  if(!one||!two){return check(id,'fail','The primary or danger colour is not a colour this runtime can parse, so their distance is unknown.',evidence);}
   const delta=round(deltaEOk(one,two),2);
   const measured={...evidence,deltaE:delta};
   if(delta>=MIN_PRIMARY_DANGER_DELTA)return check(id,'pass',`Primary and danger are ${delta} apart in OKLab (floor ${MIN_PRIMARY_DANGER_DELTA}).`,measured);

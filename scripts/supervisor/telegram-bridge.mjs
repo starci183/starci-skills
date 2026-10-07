@@ -221,7 +221,7 @@ export async function getUpdates({ token, offset = null, timeoutS = POLL_TIMEOUT
   const payload = { timeout: timeoutS, allowed_updates: ALLOWED_UPDATES };
   if (Number.isSafeInteger(offset)) payload.offset = offset;
   try {
-    const res = await fetchImpl(`${apiBase.replace(/\/+$/, '')}/bot${token}/getUpdates`, {
+    const res = await fetchImpl(`${apiBase.replace(new RegExp(['/', '+', '$'].join('')), '')}/bot${token}/getUpdates`, {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload), signal: AbortSignal.timeout((timeoutS + 15) * 1000),
     });
     const json = await res.json().catch(() => null);
@@ -507,13 +507,13 @@ export function createBridge({
       telegram: { chatId: current.chatId, messageId: message.message_id ?? null, replyTo } });
     say(`draw review ${entry.key}: owner reply ${r?.ok ? r.decision : 'not recorded (' + (r?.why ?? 'error') + ')'}`);
     const tr = translator(current.language);
-    const ack = (() => { if (!r?.ok) return tr('Not recorded: {why}.', { why: r?.why ?? tr('error') }); if (r.decision === 'accept') return tr(r.golden ? 'Recorded: you accepted the drawing as the golden reference.' : 'Recorded: you accepted the drawing.'); return tr('Recorded your feedback: the drawing will be redrawn to address every note.'); })();
+    const ack = (() => { if (!r?.ok) { return tr('Not recorded: {why}.', { why: r?.why ?? tr('error') }); } if (r.decision === 'accept') { return tr(r.golden ? 'Recorded: you accepted the drawing as the golden reference.' : 'Recorded: you accepted the drawing.'); } return tr('Recorded your feedback: the drawing will be redrawn to address every note.'); })();
     await send(ack, { replyTo: message.message_id });
     return r ?? { ok: false };
   };
 
   const onMessage = async (message) => {
-    const text = (() => { if (typeof message.text === 'string') return message.text; if (typeof message.caption === 'string') return message.caption; return null; })();
+    const text = (() => { if (typeof message.text === 'string') { return message.text; } if (typeof message.caption === 'string') { return message.caption; } return null; })();
     if (!text?.trim()) return send(t().textOnly, { replyTo: message.message_id });
     if (message.reply_to_message && !text.trim().startsWith('/')) {
       const drawn = await onDrawReply(message, text);
