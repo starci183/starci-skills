@@ -90,8 +90,8 @@ function segmentWeight(segment) {
 
 /** The RegExp source of one pattern segment (no separators); variables capture, and are listed in `names`. */
 function segmentSource(segment, names) {
-  let source = '';
-  for (let i = 0; i < segment.length; i += 1) {
+  let source = '', i = 0;
+  while (i < segment.length) {
     const c = segment[i];
     if (c === '<') {
       const end = segment.indexOf('>', i);
@@ -100,7 +100,7 @@ function segmentSource(segment, names) {
       i = end;
     } else if (c === '*') source += '[^/]*';
     else if (c === '?') source += '[^/]';
-    else source += /[.+^${}()|[\]\\]/.test(c) ? `\\${c}` : c;
+    else source += /[.+^${}()|[\]\\]/.test(c) ? `\\${c}` : c; i += 1;
   }
   return source;
 }
