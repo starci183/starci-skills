@@ -371,21 +371,36 @@ const runVerb = ({ cf, port, secretEnv, out }) => {
   process.on('SIGINT', stop); process.on('SIGTERM', stop); process.on('exit', managed.release);
 };
 
+const statusVerb = async ({ args, state, out }) => {
+  const health = await tunnelHealth({ processes: args.fast ? null : tunnelProcesses });
+  out({ ok: true, running: Boolean(managerAlive()), publicBase: publicBase(), ...state, health });
+};
+
+const stopVerb = (out) => {
+  const result = stopConnector('tunnel', { source: TUNNEL_FILE, child: true });
+  out(result);
+  if (!result.ok) process.exitCode = 1;
+  return result;
+};
+
+const dryRunVerb = ({ cf, port, secretEnv, out }) => {
+  try {
+    const plan = cloudflaredPlan(cf, { port, configFile: cloudflaredConfigFile(secretEnv), env: secretEnv, secretEnv });
+    out({ ok: true, command: plan.command, args: plan.args, tokenInEnv: Boolean(plan.env.TUNNEL_TOKEN), config: plan.configText });
+  } catch (error) { out({ ok: false, error: error.message }); process.exit(2); }
+};
+
 async function main() {
   const args = argsOf(process.argv.slice(2));
   const verb = args._[0] ?? 'status';
   const state = tunnelState();
   const out = (value) => console.log(JSON.stringify(value));
   if (verb === 'status') {
-    const health = await tunnelHealth({ processes: args.fast ? null : tunnelProcesses });
-    out({ ok: true, running: Boolean(managerAlive()), publicBase: publicBase(), ...state, health });
+    await statusVerb({ args, state, out });
     return;
   }
   if (verb === 'stop') {
-    const result = stopConnector('tunnel', { source: TUNNEL_FILE, child: true });
-    out(result);
-    if (!result.ok) process.exitCode = 1;
-    return result;
+    return stopVerb(out);
   }
   let loaded;
   try { loaded = loadCloudflare(); } catch (error) { out({ ok: false, error: error.message }); process.exit(2); }
@@ -394,10 +409,7 @@ async function main() {
   if (cf.auth === 'credentials-file' && !cf.credentialsPresent) { out({ ok: false, error: `cloudflare.credentialsFile ${cf.credentialsFile} does not exist` }); process.exit(2); }
   for (const warning of connectors.warnings) console.error(`warning: ${warning}`);
   if (verb === 'dry-run') {
-    try {
-      const plan = cloudflaredPlan(cf, { port, configFile: cloudflaredConfigFile(secretEnv), env: secretEnv, secretEnv });
-      out({ ok: true, command: plan.command, args: plan.args, tokenInEnv: Boolean(plan.env.TUNNEL_TOKEN), config: plan.configText });
-    } catch (error) { out({ ok: false, error: error.message }); process.exit(2); }
+    dryRunVerb({ cf, port, secretEnv, out });
     return;
   }
   if (verb === 'start') { startVerb({ cf, port, secretEnv, out }); return; }
@@ -405,4 +417,4 @@ async function main() {
   console.error('usage: starci connect tunnel start|run|status|stop|dry-run [--port <n>]'); process.exit(2);
 }
 
-if (isMain(import.meta.url)) main().catch((error) => { console.error(error); process.exit(1); });
+if (isMain(import.meta.url)) try { await main(); } catch (error) { console.error(error); process.exit(1); }

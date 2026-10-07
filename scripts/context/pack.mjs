@@ -249,8 +249,7 @@ function renderPacket(context) {
   const lines = [`CONTEXT PACKET — op ${context.op}`, ''];
   lines.push('MANDATORY READS — read in this order before any action:');
   context.mandatory.forEach((m, i) => lines.push(`  ${i + 1}. ${m.absolute ?? m.path} — ${m.why}`));
-  lines.push(...placeholderLines(context));
-  lines.push('', 'OWNED WRITE SET — only these paths may be modified:');
+  lines.push(...placeholderLines(context), '', 'OWNED WRITE SET — only these paths may be modified:');
   if (context.ownedPaths.length) {
     for (const o of context.ownedPaths) lines.push(`  - ${o.path}  (record ${o.record}, via ${o.via}${o.exists ? '' : ', MISSING-ON-DISK'})`);
   } else lines.push('  (none bound — writes stay inside the brief write-ceiling)');

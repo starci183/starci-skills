@@ -371,6 +371,21 @@ const applyEslint = async (eslintTask, report, all) => {
 };
 
 /** The architecture machine's outcome folded into the report and the finding pool. */
+const addImportGapFindings = (importGaps, all) => {
+  for (const error of importGaps) all.push({ machine: 'architecture', ruleId: error.ruleId, family: 'architecture', file: posixPath(error.path), line: error.line ?? 0, fixable: false, ...(error.specifier ? { specifier: error.specifier } : {}) });
+};
+
+const recordArchitectureStatus = (report, machineErrors, result, importGaps) => {
+  if (machineErrors.length) {
+    report.machines.architecture = { status: 'unavailable', files: result.files ?? 0 };
+    for (const error of machineErrors) report.issues.push({ machine: 'architecture', code: error.ruleId, message: error.message, ...(error.path ? { path: posixPath(error.path) } : {}) });
+  } else report.machines.architecture = { status: 'ran', files: result.files ?? 0, ...(importGaps.length ? { importGaps: importGaps.length } : {}) };
+};
+
+const addArchitectureViolationFindings = (violations, all) => {
+  for (const violation of violations) all.push({ machine: 'architecture', ruleId: violation.ruleId, family: 'architecture', file: posixPath(violation.path ?? violation.file ?? ''), line: violation.line ?? 0, fixable: false, ...(violation.resolvedPath ? { related: posixPath(violation.resolvedPath) } : {}) });
+};
+
 const applyArchitecture = async (architectureTask, report, all) => {
   let result;
   try {
@@ -384,14 +399,9 @@ const applyArchitecture = async (architectureTask, report, all) => {
   // seam once made every slice's canon-scan exit 3). Anything else the machine could not do stays unavailable.
   const importGaps = (result.errors ?? []).filter((error) => error.ruleId === 'ARCH_INTERNAL_IMPORT_UNRESOLVED' && error.path);
   const machineErrors = (result.errors ?? []).filter((error) => !importGaps.includes(error));
-  for (const error of importGaps) all.push({ machine: 'architecture', ruleId: error.ruleId, family: 'architecture', file: posixPath(error.path), line: error.line ?? 0, fixable: false, ...(error.specifier ? { specifier: error.specifier } : {}) });
-  if (machineErrors.length) {
-    report.machines.architecture = { status: 'unavailable', files: result.files ?? 0 };
-    for (const error of machineErrors) report.issues.push({ machine: 'architecture', code: error.ruleId, message: error.message, ...(error.path ? { path: posixPath(error.path) } : {}) });
-  } else report.machines.architecture = { status: 'ran', files: result.files ?? 0, ...(importGaps.length ? { importGaps: importGaps.length } : {}) };
-  for (const violation of result.violations ?? []) {
-    all.push({ machine: 'architecture', ruleId: violation.ruleId, family: 'architecture', file: posixPath(violation.path ?? violation.file ?? ''), line: violation.line ?? 0, fixable: false, ...(violation.resolvedPath ? { related: posixPath(violation.resolvedPath) } : {}) });
-  }
+  addImportGapFindings(importGaps, all);
+  recordArchitectureStatus(report, machineErrors, result, importGaps);
+  addArchitectureViolationFindings(result.violations ?? [], all);
 };
 
 /** The scoped findings, totals, seams and slices written onto the report. */

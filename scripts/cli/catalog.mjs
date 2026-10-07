@@ -130,25 +130,27 @@ const moduleImplFindings = (errors, file, impl) => {
   if (Object.hasOwn(impl, 'args')) err(errors, file, 'impl.args is only valid with impl.script');
 };
 
+const implementationMapFindings = (errors, file, impl) => {
+  unknownKeys(errors, file, impl, IMPL_KEYS, 'impl');
+  const hasScript = Object.hasOwn(impl, 'script');
+  const hasModule = Object.hasOwn(impl, 'module');
+  if (hasScript === hasModule) err(errors, file, 'impl must name exactly one of script or module');
+  if (hasScript) scriptImplFindings(errors, file, impl);
+  if (hasModule) moduleImplFindings(errors, file, impl);
+  return hasModule;
+};
+
 const implementationFindings = (errors, file, doc) => {
-  let moduleImpl = false;
   if (doc.impl === null) {
     if (doc.owner !== '@starci/hfs') err(errors, file, 'impl must be a script or module map');
-  } else if (doc.impl !== undefined) {
-    if (typeof doc.impl !== 'object' || Array.isArray(doc.impl)) err(errors, file, 'impl must be a map');
-    else {
-      unknownKeys(errors, file, doc.impl, IMPL_KEYS, 'impl');
-      const hasScript = Object.hasOwn(doc.impl, 'script');
-      const hasModule = Object.hasOwn(doc.impl, 'module');
-      if (hasScript === hasModule) err(errors, file, 'impl must name exactly one of script or module');
-      if (hasScript) scriptImplFindings(errors, file, doc.impl);
-      if (hasModule) {
-        moduleImpl = true;
-        moduleImplFindings(errors, file, doc.impl);
-      }
-    }
+    return false;
   }
-  return moduleImpl;
+  if (doc.impl === undefined) return false;
+  if (typeof doc.impl !== 'object' || Array.isArray(doc.impl)) {
+    err(errors, file, 'impl must be a map');
+    return false;
+  }
+  return implementationMapFindings(errors, file, doc.impl);
 };
 
 const positionalFindings = (errors, file, positional) => {
@@ -160,15 +162,27 @@ const positionalFindings = (errors, file, positional) => {
   }
 };
 
+const exitCodeFindings = (errors, file, codes) => {
+  for (const code of codes) if (!/^\d+$/.test(code)) err(errors, file, `exit code "${code}" is not numeric`);
+};
+
+const exitFindings = (errors, file, exit) => {
+  if (exit === undefined) return;
+  if (!exit || typeof exit !== 'object' || Array.isArray(exit)) err(errors, file, 'exit must be a map of <code>: <text>');
+  else exitCodeFindings(errors, file, Object.keys(exit));
+};
+
+const editionFindings = (errors, file, editions) => {
+  if (editions !== undefined) checkStringList(errors, file, editions, 'editions');
+  if (editions !== undefined && !editions.length) err(errors, file, 'editions is empty');
+  for (const edition of editions ?? []) if (!EDITIONS.includes(edition)) err(errors, file, `editions names an unknown edition ${JSON.stringify(edition)} (known: ${EDITIONS.join(', ')})`);
+};
+
 const exitAndEditionFindings = (errors, file, doc) => {
-  if (doc.exit !== undefined) {
-    if (!doc.exit || typeof doc.exit !== 'object' || Array.isArray(doc.exit)) err(errors, file, 'exit must be a map of <code>: <text>');
-    else for (const code of Object.keys(doc.exit)) if (!/^\d+$/.test(code)) err(errors, file, `exit code "${code}" is not numeric`);
-  }
+  exitFindings(errors, file, doc.exit);
   if (doc.json !== undefined && (typeof doc.json !== 'string' || !JSON_RE.test(doc.json))) err(errors, file, 'json must be always | flag | none | starci/<schema>@<n>');
-  for (const k of ['examples', 'editions']) if (doc[k] !== undefined) checkStringList(errors, file, doc[k], k);
-  if (doc.editions !== undefined && !doc.editions.length) err(errors, file, 'editions is empty');
-  for (const e of doc.editions ?? []) if (!EDITIONS.includes(e)) err(errors, file, `editions names an unknown edition ${JSON.stringify(e)} (known: ${EDITIONS.join(', ')})`);
+  if (doc.examples !== undefined) checkStringList(errors, file, doc.examples, 'examples');
+  editionFindings(errors, file, doc.editions);
 };
 
 const checkVerb = (errors, file, groupName, doc) => {

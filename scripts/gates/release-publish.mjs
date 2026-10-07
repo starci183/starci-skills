@@ -128,6 +128,19 @@ const confirmPublished = ({ registry, sleep, pollMinutes, runtimePackage, out },
   return null;
 };
 
+const installPrepackDependencies = (row, install, out) => {
+  if (!row.prepack || !row.lock) return null;
+  const installed = install(row.dir);
+  if (!installed.ok) { out(`release-publish: ${row.name}: npm ci failed: ${installed.stderr}`); return EXIT.failed; }
+  return null;
+};
+
+const archiveForPublish = (runtimePackage, proof, row, root, head, localBefore, out) => {
+  if (!runtimePackage) return { archive: null, code: null };
+  try { return { archive: runtimeArchive(proof, row, root, head, localBefore), code: null }; }
+  catch (error) { out(`release-publish: ${error.message}; publication refused`); return { archive: null, code: EXIT.failed }; }
+};
+
 /** Prove, upload and confirm one row: an exit code, or null when the row published. */
 const publishRow = (row, ctx) => {
   const { root, runtimePackage, out, registry, install, head } = ctx;
@@ -137,23 +150,27 @@ const publishRow = (row, ctx) => {
   if (runtimePackage) out(`  runtime clean proof ${proof.status}; receipt ${proof.attempt ?? 'unavailable'}: ${proof.detail ?? ''}`);
   const unproved = runtimePackage ? proof.status !== 'green' : proof.status !== 0;
   if (unproved) { out(`release-publish: ${row.name}: clean proof not green`); return EXIT.failed; }
-  if (row.prepack && row.lock) {
-    const installed = install(row.dir);
-    if (!installed.ok) { out(`release-publish: ${row.name}: npm ci failed: ${installed.stderr}`); return EXIT.failed; }
-  }
+  const installCode = installPrepackDependencies(row, install, out);
+  if (installCode !== null) return installCode;
   if (runtimePackage) {
     const code = recheckRuntime(row, ctx, localBefore);
     if (code !== null) return code;
   }
-  let archive = null;
-  if (runtimePackage) {
-    try { archive = runtimeArchive(proof, row, root, head, localBefore); }
-    catch (error) { out(`release-publish: ${error.message}; publication refused`); return EXIT.failed; }
-  }
+  const archiveResult = archiveForPublish(runtimePackage, proof, row, root, head, localBefore, out);
+  if (archiveResult.code !== null) return archiveResult.code;
+  const { archive } = archiveResult;
   // Upload the proved archive, so npm cannot repack mutable source or rerun its lifecycle after qualification.
   const published = registry.publish(row.dir, { ...(archive ? {archive} : {}), tag: ctx.publicationTag });
   if (!published.ok) { out(`release-publish: ${row.name}: npm publish failed (exit ${published.status}): ${published.stderr}`); return EXIT.failed; }
   return confirmPublished(ctx, row, proof);
+};
+
+const publishPlannedRows = (rows, ctx) => {
+  for (const row of rows) {
+    const code = publishRow(row, ctx);
+    if (code !== null) return code;
+  }
+  return null;
 };
 
 /** The post-loop result: runtime publishes end here; package publishes need a green canon binding. */
@@ -191,10 +208,8 @@ export function releasePublish({ root = runtimeRoot, publish = false, runtimePac
     if (bound.status !== 0) { out('release-publish: finish and commit the package rebind before the runtime package phase'); return EXIT.failed; }
   }
   const ctx = { root, runtimePackage, publicationTag, pollMinutes, env, head, deps, out, registry, node, install, sleep, git };
-  for (const row of plan.toPublish) {
-    const code = publishRow(row, ctx);
-    if (code !== null) return code;
-  }
+  const publishCode = publishPlannedRows(plan.toPublish, ctx);
+  if (publishCode !== null) return publishCode;
   return finishPublish({ runtimePackage, node, root, out }, plan);
 }
 
