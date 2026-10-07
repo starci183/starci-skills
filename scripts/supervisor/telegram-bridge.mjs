@@ -85,7 +85,8 @@ import { createReloadWatch, reexecSelf, RELOAD_ENV } from '../machine/self-reloa
 import { clipLine } from '../lib/clip.mjs';
 import { translator } from '../lib/i18n.mjs';
 import { sleep } from '../lib/sleep.mjs';
-import { eachInOrder } from '../lib/in-order.mjs';
+import { eachInOrder, findInOrder, repeatInOrder } from '../lib/in-order.mjs';
+import { bridgeText } from './telegram-bridge-text.mjs';
 import { starciSourceRoot } from '../../engine/runtime-root.mjs';
 import { isSpecRun } from '../lib/env.mjs';
 const SERVE_ASK_FILE = fileURLToPath(new URL('../kernel/ask-server.mjs', import.meta.url));
@@ -97,40 +98,7 @@ const ALLOWED_UPDATES = ['message', 'callback_query'];
 const MAX_PENDING = 20;
 // A /creds button: like ASK_CALLBACK, but the ask opens in a new message and the list stays.
 const CRED_CALLBACK = /^cred:([0-9a-f]{16})$/;
-
-// The bridge's English sources translate through the i18n catalog (modules/i18n/messages, scripts/lib/i18n.mjs).
-export const bridgeText = (language) => {
-  const tr = translator(language);
-  return {
-    chooser: tr('Choose the supervisor to talk to:'),
-    none: tr('No supervisor is registered yet.'),
-    held: tr('Your message is held and goes to the supervisor you pick.'),
-    heldNone: tr('No supervisor is registered yet. Your message is held and goes to the first one you pick (/choose).'),
-    talking: (label) => tr('Now talking to {label}.', { label }),
-    forwarded: (label) => tr('📥 Forwarded to {label}.', { label }),
-    offline: tr('(supervisor offline — it will pick this up when it is back)'),
-    gone: tr('That supervisor is no longer registered. /choose another one.'),
-    textOnly: tr('Only text messages are forwarded to a supervisor.'),
-    statusFailed: tr('The progress report could not be built right now.'),
-    asksNone: tr('No question is waiting for you.'),
-    asksHead: (n) => tr('{n} open question(s). Press "Generate URL" under the one you want to answer:', { n }),
-    credsHint: (n) => tr('{n} credential ask(s) wait for values: /creds', { n }),
-    credsNone: tr('No credential ask is waiting.'),
-    credsHead: (n) => tr('🔑 {n} credential ask(s) wait for values. They never hold the main line; only live proof (UAT) waits on them. Press one to open its form:', { n }),
-    askClosed: tr('This question no longer needs an answer.'),
-    askGenerating: tr('Opening the answer form…'),
-    unknown: tr('Unknown command.'),
-    help: [
-      tr('Commands:'),
-      tr('/choose — pick the supervisor to talk to'),
-      tr('/status — the progress report'),
-      tr('/asks — the decisions waiting on you, each with a Generate URL button'),
-      tr('/creds — the credential asks (keys, secrets) in one list; they never hold the main line'),
-      tr('/help — this list'),
-      tr('Any other text goes to the supervisor you picked.'),
-    ].join('\n'),
-  };
-};
+export { bridgeText };
 
 const numericId = (v) => (Number.isSafeInteger(Number(v)) && String(v).trim() !== '' ? String(Number(v)) : '?');
 
@@ -339,10 +307,13 @@ export function createBridge({
   const onStatus = async () => {
     let messages;
     try { messages = statusMessages(); } catch (error) { say(`status report failed: ${error?.message ?? error}`); return send(t().statusFailed); }
-    for (const text of [messages ?? []].flat().filter(Boolean)) {
+    let refused = null;
+    await findInOrder([messages ?? []].flat().filter(Boolean), async (text) => {
       const sent = await send(text, { html: true });
-      if (!sent.ok) return sent;
-    }
+      if (!sent.ok) refused = sent;
+      return !sent.ok;
+    });
+    if (refused) return refused;
     let block = null;
     try { block = await supervisorStatus(current.language); } catch (error) { say(`supervisor status block failed: ${error?.message ?? error}`); }
     if (block) { const sent = await send(block, { html: true }); if (!sent.ok) return sent; }
@@ -355,12 +326,12 @@ export function createBridge({
   // to bind must still take wall-clock time.
   const waitFor = async (probe, ms) => {
     const end = Date.now() + ms;
-    for (;;) {
+    return repeatInOrder(async () => {
       const value = probe();
       if (value) return value;
       if (Date.now() >= end) return null;
       await sleep(waitStepMs);
-    }
+    });
   };
   const askLink = (serving) => {
     const expose = current.telegram?.exposeCredentialAsks === true;
@@ -406,38 +377,46 @@ export function createBridge({
    * The "Generate URL" button: serve the ask's form on demand and put its link in the message. A /creds
    * button (`fresh`) shows the ask in a new message and leaves the list alone.
    */
+  const onAskClosed = async (query, key, state, messageId) => {
+    await call('answerCallbackQuery', { callback_query_id: query.id, text: t().askClosed });
+    if (messageId) await removeMessage(messageId);
+    say(`ask button ${key}: no open ask${state?.closed ? ' (' + state.closed + ')' : ''}; message removed`);
+    return { closed: state?.closed ?? 'unknown' };
+  };
+
+  /** The form serving the ask: {serving}, launching serve-ask when none does; {outcome} when the ask closed or the form never bound. */
+  const ensureServing = async (state, target, key, messageId) => {
+    if (state.serving) return { serving: state.serving };
+    let pid = null;
+    try { pid = spawnServe({ repo: target.repo, workflowId: target.workflowId, dispatchId: target.dispatchId, ttlMs: serveTtlMs }); } catch (error) { say(`ask ${key}: serve-ask did not launch: ${error?.message ?? error}`); }
+    say(`ask ${key}: serve-ask launched on demand (pid ${pid ?? '-'})`);
+    let latest = null;
+    const serving = pid ? await waitFor(() => { latest = stateOf(target); return latest?.closed ? latest : latest?.serving ?? null; }, serveWaitMs) : null;
+    if (serving?.closed) { if (messageId) { await removeMessage(messageId); } return { outcome: { closed: serving.closed } }; }
+    if (serving) return { serving };
+    await showAsk(messageId, key, askText(state, { note: textFor(current.language).serveFailed }));
+    say(`ask ${key}: the form did not bind within ${serveWaitMs} ms`);
+    return { outcome: { served: false } };
+  };
+
+  /** The public base a link needs: the gateway and tunnel are started when they are not up, then waited for. */
+  const tunnelBase = async (key) => {
+    let ensured = null;
+    try { ensured = ensureConnectors(); } catch (error) { ensured = { ok: false, error: String(error?.message ?? error) }; }
+    if (ensured?.ok === false) say(`ask ${key}: connectors not started: ${ensured.error}`);
+    return publicBaseOf() ?? await waitFor(() => publicBaseOf(), tunnelWaitMs);
+  };
+
   const onAskButton = async (query, key, { fresh = false } = {}) => {
     const messageId = fresh ? null : query.message?.message_id ?? null;
     const target = targetOf(key);
     const state = target ? stateOf(target) : null;
-    if (!state || state.closed) {
-      await call('answerCallbackQuery', { callback_query_id: query.id, text: t().askClosed });
-      if (messageId) await removeMessage(messageId);
-      say(`ask button ${key}: no open ask${state?.closed ? ' (' + state.closed + ')' : ''}; message removed`);
-      return { closed: state?.closed ?? 'unknown' };
-    }
+    if (!state || state.closed) return onAskClosed(query, key, state, messageId);
     await call('answerCallbackQuery', { callback_query_id: query.id, text: t().askGenerating });
-    let serving = state.serving;
-    if (!serving) {
-      let pid = null;
-      try { pid = spawnServe({ repo: target.repo, workflowId: target.workflowId, dispatchId: target.dispatchId, ttlMs: serveTtlMs }); } catch (error) { say(`ask ${key}: serve-ask did not launch: ${error?.message ?? error}`); }
-      say(`ask ${key}: serve-ask launched on demand (pid ${pid ?? '-'})`);
-      let latest = null;
-      serving = pid ? await waitFor(() => { latest = stateOf(target); return latest?.closed ? latest : latest?.serving ?? null; }, serveWaitMs) : null;
-      if (serving?.closed) { if (messageId) { await removeMessage(messageId); } return { closed: serving.closed }; }
-      if (!serving) {
-        await showAsk(messageId, key, askText(state, { note: textFor(current.language).serveFailed }));
-        say(`ask ${key}: the form did not bind within ${serveWaitMs} ms`);
-        return { served: false };
-      }
-    }
-    let base = null;
-    if (askLink(serving).needsTunnel) {
-      let ensured = null;
-      try { ensured = ensureConnectors(); } catch (error) { ensured = { ok: false, error: String(error?.message ?? error) }; }
-      if (ensured?.ok === false) say(`ask ${key}: connectors not started: ${ensured.error}`);
-      base = publicBaseOf() ?? await waitFor(() => publicBaseOf(), tunnelWaitMs);
-    }
+    const ensured = await ensureServing(state, target, key, messageId);
+    if (ensured.outcome) return ensured.outcome;
+    const { serving } = ensured;
+    const base = askLink(serving).needsTunnel ? await tunnelBase(key) : null;
     const shown = await showAsk(messageId, key, askText(state, { serving, base }));
     await recordAskMessage({ workflowId: target.workflowId, dispatchId: target.dispatchId, repo: target.repo, ledgerFile: target.ledgerFile, messageId: shown, url: serving.url }, { env, now: now() });
     const link = linkFor({ url: serving.url, credential: serving.credential }, { base, exposeCredentialAsks: askLink(serving).expose });
@@ -479,14 +458,14 @@ export function createBridge({
     const inline_keyboard = creds.map((ask, i) => [{ text: `🔑 ${i + 1}. ${clipLine(ask.title ?? ask.workflowId, 48)}`, callback_data: `cred:${askKeyOf(ask.workflowId, ask.dispatchId)}` }]);
     const sent = await send([t().credsHead(creds.length), '', ...lines].join('\n'), { markup: { inline_keyboard } });
     // A button carries only a key; the store names where its ask lives.
-    for (const ask of creds) await recordAskMessage({ workflowId: ask.workflowId, dispatchId: ask.dispatchId, repo: ask.repo, ledgerFile: ledgerFileFor(ask.repo) }, { env, now: now() });
+    await eachInOrder(creds, (ask) => recordAskMessage({ workflowId: ask.workflowId, dispatchId: ask.dispatchId, repo: ask.repo, ledgerFile: ledgerFileFor(ask.repo) }, { env, now: now() }));
     say(`listed ${creds.length} credential ask(s)`);
     return { ok: sent.ok, count: creds.length };
   };
 
   let lastSweep = -Infinity;
   const sweep = async () => {
-    if (!(sweepEveryMs >= 0) || now() - lastSweep < sweepEveryMs) return null;
+    if (sweepEveryMs >= 0 ? now() - lastSweep < sweepEveryMs : true) return null;
     lastSweep = now();
     const r = await sweepAskMessages({ repos }, { env, apiBase, fetchImpl, sleepImpl, now: now(), settings: current, warn: say });
     if (r.closed?.length || r.unlinked?.length) say(`sweep: ${r.closed.length} closed ask(s) cleared, ${r.unlinked.length} dead link(s) removed`);
@@ -550,7 +529,7 @@ export function createBridge({
       ? await call('editMessageText', { chat_id: current.chatId, message_id: query.message.message_id, text })
       : { ok: false };
     if (!edited.ok) await send(text);
-    for (const entry of pending) await deliver(sup, entry);
+    await eachInOrder(pending, (entry) => deliver(sup, entry));
     return sup;
   };
 
@@ -587,7 +566,7 @@ export function createBridge({
   // bridge stopped 4 times for 1-6 min on exactly that), and a real change of settings is picked up on the next read.
   let lastGood = null, unreadableSince = null;
   /** One getUpdates round: {ok, count} | {stop} | {conflict} | {error, status, retryAfter}. */
-  const pollOnce = async () => {
+  const refreshSettings = () => {
     const fresh = settings();
     if (!fresh?.ready && lastGood && /cannot be read/i.test(String(fresh?.warning ?? ''))) {
       if (unreadableSince == null) { unreadableSince = now(); say(`${fresh.warning}; keeping the last good settings`); }
@@ -596,25 +575,35 @@ export function createBridge({
       if (unreadableSince != null) { say('config.yaml readable again'); unreadableSince = null; }
       current = fresh;
     }
-    if (!current?.ready) return { stop: current?.warning ?? 'telegram off' };
-    lastGood = current;
-    const offset = Number.isSafeInteger(bridgeState(env)?.offset) ? bridgeState(env).offset : null;
-    const r = await getUpdates({ token: current.token, offset, timeoutS, apiBase, fetchImpl });
-    if (!r.ok) {
-      say(`getUpdates failed (${r.status ?? 'network'}): ${r.error}`);
-      if (r.status === 409) return { conflict: true, error: r.error };
-      if ([401, 403, 404].includes(r.status)) return { stop: `the Bot API refused the token (${r.status})` };
-      return { error: r.error, status: r.status, retryAfter: r.retryAfter };
-    }
+  };
+  /** The result of a getUpdates call that failed. */
+  const pollFailure = (r) => {
+    say(`getUpdates failed (${r.status ?? 'network'}): ${r.error}`);
+    if (r.status === 409) return { conflict: true, error: r.error };
+    if ([401, 403, 404].includes(r.status)) return { stop: `the Bot API refused the token (${r.status})` };
+    return { error: r.error, status: r.status, retryAfter: r.retryAfter };
+  };
+  /** Handle each update past the stored offset in order; the offset moves on before the update runs. Returns how many ran. */
+  const handleUpdates = async (updates, offset) => {
     let next = offset, count = 0;
-    for (const update of r.result) {
-      if (!Number.isSafeInteger(update?.update_id)) continue;
-      if (next != null && update.update_id < next) continue;
+    await eachInOrder(updates, async (update) => {
+      if (!Number.isSafeInteger(update?.update_id)) return;
+      if (next != null && update.update_id < next) return;
       next = update.update_id + 1;
       saveOffset(next);   // before handling: a crash mid-update never redelivers it
       await handleUpdate(update);
       count += 1;
-    }
+    });
+    return count;
+  };
+  const pollOnce = async () => {
+    refreshSettings();
+    if (!current?.ready) return { stop: current?.warning ?? 'telegram off' };
+    lastGood = current;
+    const offset = Number.isSafeInteger(bridgeState(env)?.offset) ? bridgeState(env).offset : null;
+    const r = await getUpdates({ token: current.token, offset, timeoutS, apiBase, fetchImpl });
+    if (!r.ok) return pollFailure(r);
+    const count = await handleUpdates(r.result, offset);
     // Asks that closed leave the chat, and links to forms that ended are taken back off.
     try { await sweep(); } catch (error) { say(`sweep failed: ${error?.message ?? error}`); }
     return { ok: true, count };
@@ -624,23 +613,33 @@ export function createBridge({
    * Poll until told to stop; backs off on errors; exits when another bridge owns the updates. Before every round
    * after the first, `reload()` may hand the bridge to a replacement (its pid): the loop then returns.
    */
-  const run = async ({ signal = null, ownPid = process.pid, maxRounds = Infinity, reload = null } = {}) => {
-    let backoff = 1000;
-    for (let round = 0; round < maxRounds && !signal?.aborted; round += 1) {
-      const replacement = round > 0 && reload ? await reload() : null;
-      if (replacement) { say(`stopping: replacement ${replacement} took the bridge over`); return { stopped: 'reloaded', reloaded: replacement }; }
-      let r;
-      try { r = await pollOnce(); } catch (error) { say(`poll round failed: ${error?.message ?? error}`); r = { error: 'poll round failed' }; }
-      if (r.stop) { say(`stopping: ${r.stop}`); return { stopped: r.stop }; }
-      if (r.conflict) {
-        const holder = lockHolder(BRIDGE_NAME, env);
-        if (holder && holder.pid !== ownPid) { say(`stopping: bridge ${holder.pid} owns the updates`); return { stopped: 'another bridge polls this bot' }; }
-        await sleepImpl(30000); continue;
-      }
-      if (r.error) { await sleepImpl(r.retryAfter ? Math.min(r.retryAfter, 60) * 1000 : backoff); backoff = Math.min(backoff * 2, 60000); continue; }
-      backoff = 1000;
+  /** Another bridge may own the updates: stop when it does, else wait and try again (undefined). */
+  const onConflict = async (ownPid) => {
+    const holder = lockHolder(BRIDGE_NAME, env);
+    if (holder && holder.pid !== ownPid) { say(`stopping: bridge ${holder.pid} owns the updates`); return { stopped: 'another bridge polls this bot' }; }
+    await sleepImpl(30000);
+    return undefined;
+  };
+  /** One round of run(): the result that ends the loop, or undefined to go on. */
+  const runRound = async (round, pace, { ownPid, reload }) => {
+    const replacement = round > 0 && reload ? await reload() : null;
+    if (replacement) { say(`stopping: replacement ${replacement} took the bridge over`); return { stopped: 'reloaded', reloaded: replacement }; }
+    let r;
+    try { r = await pollOnce(); } catch (error) { say(`poll round failed: ${error?.message ?? error}`); r = { error: 'poll round failed' }; }
+    if (r.stop) { say(`stopping: ${r.stop}`); return { stopped: r.stop }; }
+    if (r.conflict) return onConflict(ownPid);
+    if (r.error) {
+      await sleepImpl(r.retryAfter ? Math.min(r.retryAfter, 60) * 1000 : pace.backoff);
+      pace.backoff = Math.min(pace.backoff * 2, 60000);
+      return undefined;
     }
-    return { stopped: signal?.aborted ? 'signal' : 'rounds' };
+    pace.backoff = 1000;
+    return undefined;
+  };
+  const run = async ({ signal = null, ownPid = process.pid, maxRounds = Infinity, reload = null } = {}) => {
+    const pace = { backoff: 1000 };
+    const ended = await repeatInOrder((round) => (round < maxRounds && !signal?.aborted ? runRound(round, pace, { ownPid, reload }) : null));
+    return ended ?? { stopped: signal?.aborted ? 'signal' : 'rounds' };
   };
 
   return { pollOnce, handleUpdate, run, settings: () => current };

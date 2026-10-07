@@ -10,6 +10,7 @@ import { canonContentDigest, packedFiles } from '../gates/canon-digest.mjs';
 import { loadPins } from '../gates/canon-pins.mjs';
 import { releasePublish } from '../gates/release-publish.mjs';
 import { discoverExampleApps } from '../lib/example-refs.mjs';
+import { findInOrder } from '../lib/in-order.mjs';
 import { repinExample } from './example-repin.mjs';
 import { resultDetail, resultOk } from '../lib/verb-call.mjs';
 import { underHostLock } from '../machine/verb-lock.mjs';
@@ -138,16 +139,20 @@ function appendExampleRepins(root, ctx, deps, examples, data, lines) {
 }
 
 async function publishExampleBindings(root, ctx, data, node, npm, ok, message) {
-  for (const example of data.examples.filter((entry) => entry.present)) {
+  let failure = null;
+  await findInOrder(data.examples.filter((entry) => entry.present), async (example) => {
+    const refused = (what, result) => { failure = { code: 1, stderr: `starci release publish: ${example.name} ${what} failed (${message(result)})` }; return true; };
     const install = await npm(['install', '--no-audit', '--no-fund'], { cwd: example.directory, timeout: 900_000, env: ctx.env });
-    if (!ok(install)) return { code: 1, stderr: `starci release publish: ${example.name} npm install failed (${message(install)})` };
+    if (!ok(install)) return refused('npm install', install);
     const ci = await npm(['ci', '--no-audit', '--no-fund'], { cwd: example.directory, timeout: 900_000, env: ctx.env });
-    if (!ok(ci)) return { code: 1, stderr: `starci release publish: ${example.name} npm ci failed (${message(ci)})` };
+    if (!ok(ci)) return refused('npm ci', ci);
     const sync = await node([path.join(root, 'packages', 'cli', 'bin', 'starci.mjs'), 'app', 'sync', '--write', '--cwd', example.directory], { cwd: root, timeout: 900_000, env: ctx.env });
-    if (!ok(sync)) return { code: 1, stderr: `starci release publish: ${example.name} sync failed (${message(sync)})` };
+    if (!ok(sync)) return refused('sync', sync);
     const checked = await node([path.join(root, 'scripts', 'checks', 'check-canon-pins.mjs'), '--repo', example.directory], { cwd: root, timeout: 900_000, env: ctx.env });
-    if (!ok(checked)) return { code: 1, stderr: `starci release publish: ${example.name} binding check failed (${message(checked)})` };
-  }
+    if (!ok(checked)) return refused('binding check', checked);
+    return false;
+  });
+  if (failure) return failure;
   const final = await node([path.join(root, 'scripts', 'checks', 'check-canon-pins.mjs')], { cwd: root, timeout: 900_000, env: ctx.env });
   return ok(final) ? { code: 0 } : { code: 1, stderr: `starci release publish: final binding check failed (${message(final)})` };
 }

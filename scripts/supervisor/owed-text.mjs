@@ -8,7 +8,11 @@ import { altOf } from '../lib/source-phrases.mjs';
  * nothing (only owner-gate and peer-wait kinds hold jobs), so they are their Kernel's to resolve
  * when done - unless the note addresses the supervisor (SUPERVISOR_ADDRESSED), which makes it OWED.
  */
-export const NOTE_KIND = /^(?:plan|plan-note|replan-note|scope-decision|owner-ruling|owner-directed-leg|grammar-bump-planned|stall-explanation|cut-decomposition|spec-consistency-followup|kernel-gate|experiment-note|owner-deferred(?:-[a-z0-9-]+)?)$|-note$|-decomposition$|-refinement$/;
+const NOTE_KIND_NAMES = ['plan', 'plan-note', 'replan-note', 'scope-decision', 'owner-ruling', 'owner-directed-leg', 'grammar-bump-planned', 'stall-explanation', 'cut-decomposition', 'spec-consistency-followup', 'kernel-gate', 'experiment-note'];
+const NOTE_KIND_DEFERRED = String.raw`owner-deferred(?:-[a-z0-9-]+)?`;
+const NOTE_KIND_EXACT = [...NOTE_KIND_NAMES, NOTE_KIND_DEFERRED].join('|');
+const NOTE_KIND_SUFFIXED = ['-note', '-decomposition', '-refinement'].map((suffix) => suffix + '$').join('|');
+export const NOTE_KIND = new RegExp(`^(?:${NOTE_KIND_EXACT})$|${NOTE_KIND_SUFFIXED}`);
 /** Text that addresses or waits on the supervisor, the runtime monitor, Source or the file owner. The Vietnamese
  * alternatives a note may carry are lexicon data (modules/goal/source-phrases.yaml owed), never source literals. */
 export const SUPERVISOR_ADDRESSED = new RegExp(

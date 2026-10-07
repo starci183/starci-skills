@@ -36,7 +36,8 @@ const idOf = (controller, duty) => `${controller}/${duty}`;
 function check(controller, duty, intervalMs) {
   if (!SCHEDULE_CONTROLLERS.includes(controller)) throw new Error(`schedules: unknown controller '${controller}'`);
   if (!String(duty ?? '').trim()) throw new Error('schedules: a duty needs a name');
-  if (!(Number(intervalMs) > 0)) throw new Error(`schedules: ${controller}/${duty} needs intervalMs > 0`);
+  const positiveInterval = Number(intervalMs) > 0;
+  if (!positiveInterval) throw new Error(`schedules: ${controller}/${duty} needs intervalMs > 0`);
 }
 
 /** The pure due rule over a stored row (or null): {due, reason} or {due: false, nextAt}. */

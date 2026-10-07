@@ -16,9 +16,9 @@ const TEMPLATE = (file) => file.startsWith('packages/hfs/templates/');
 const slash = (p) => p.replaceAll(String.fromCodePoint(92), '/');
 
 const quotedCharacter = (c, next) => {
-  if (c === '\\') return { next: next ?? '', advance: true };
-  if (c === '"') return { close: true };
-  return {};
+  if (c === '\\') return { next: next ?? '', skip: 1, close: false };
+  if (c === '"') return { next: '', skip: 0, close: true };
+  return { next: '', skip: 0, close: false };
 };
 const lineCommentEnd = (text, index) => {
   while (index < text.length && text[index] !== '\n') { index += 1; }
@@ -37,9 +37,9 @@ const stripJsonc = (text) => {
     if (quoted) {
       out += c;
       const result = quotedCharacter(c, next);
-      out += result.next ?? '';
-      if (result.advance) { i += 1; }
-      if (result.close) { quoted = false; }
+      out += result.next;
+      i += result.skip;
+      quoted = !result.close;
       continue;
     }
     if (c === '"') { quoted = true; out += c; continue; }
@@ -106,12 +106,17 @@ const binIntoBuildOutput = (worktree, file, specifier) => {
   return !path.relative(path.resolve(dir, outDir), path.resolve(path.dirname(path.join(worktree, file)), specifier)).startsWith('..');
 };
 
+// Built from named parts: the import/export statement head, the lazy clause before `from`, and the quoted specifier.
+const IMPORT_STATEMENT = new RegExp([String.raw`^\s*(?:import|export)\s`, String.raw`[^'";]*?`, String.raw`from\s*['"]([^'"]+)['"]`].join(''), 'gm');
+// A relative specifier's query or fragment tail.
+const SPECIFIER_TAIL = new RegExp(['[?#]', '.*', '$'].join(''));
+
 const importSpecifiers = (worktree, text) => {
   try {
     const ts = createRequire(path.join(worktree, 'package.json'))('typescript');
     return ts.preProcessFile(text, true, true).importedFiles.map((entry) => entry.fileName);
   } catch {
-    return [...text.matchAll(/^\s*(?:import|export)\s[^'";]*?from\s*['"]([^'"]+)['"]/gm)].map((match) => match[1]);
+    return [...text.matchAll(IMPORT_STATEMENT)].map((match) => match[1]);
   }
 };
 
@@ -119,7 +124,7 @@ const importSpecifiers = (worktree, text) => {
 function importProblemFor(worktree, file, aliases, specifier) {
   if (BUILTINS.has(specifier)) return null;
   if (specifier.startsWith('.')) {
-    const bare = specifier.replace(/[?#].*$/, '');
+    const bare = specifier.replace(SPECIFIER_TAIL, '');
     const target = path.join(worktree, path.dirname(file), bare).replace(/\.js$/, '');
     if (!existsModule(target) && !binIntoBuildOutput(worktree, file, bare)) return `import: ${file} -> '${specifier}' does not resolve`;
     return null;

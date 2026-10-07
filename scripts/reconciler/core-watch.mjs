@@ -65,7 +65,12 @@ function jsonObjectEnd(text, start) {
   let depth = 0, inStr = false, esc = false;
   for (let i = start; i < text.length; i++) {
     const c = text[i];
-    if (inStr) { if (esc) { esc = false; } else if (c === '\\') { esc = true; } else if (c === '"') { inStr = false; } continue; }
+    if (inStr) {
+      if (esc) esc = false;
+      else if (c === '\\') esc = true;
+      else if (c === '"') inStr = false;
+      continue;
+    }
     if (c === '"') inStr = true; else if (c === '{') depth++; else if (c === '}' && --depth === 0) return i;
   }
   return -1;
@@ -136,19 +141,20 @@ async function serviceFacts(o) {
   const r = await child(['scripts/reconciler/services.mjs', '--list', '--json'], o);
   const rows = r.ok ? firstJson(r.stdout)?.rows : null;
   if (!rows) { facts.set('service:list', `services --list failed (${r.error ?? 'no json'})`); return facts; }
-  for (const row of rows) {
-    if (row.name.startsWith('ledger:') || row.name.startsWith('sched-task:')) continue;
-    const okState = row.name.startsWith('seat:') ? row.state === 'live' : row.state === 'healthy';
-    if (okState) facts.set(`service:${row.name}`, null);
-    else {
-      const probe = row.lastProbe ?? {};
-      let details = '';
-      if (probe.error) details += ` (${String(probe.error).slice(0, 100)})`;
-      if (row.failStreak) details += ` failStreak ${row.failStreak}`;
-      facts.set(`service:${row.name}`, `${row.state}${details}`);
-    }
-  }
+  for (const row of rows) serviceRowFact(facts, row);
   return facts;
+}
+
+/** The fact of one `services --list` row: null while healthy (a seat: live), else its state with the probe error and fail streak. */
+function serviceRowFact(facts, row) {
+  if (row.name.startsWith('ledger:') || row.name.startsWith('sched-task:')) return;
+  const okState = row.name.startsWith('seat:') ? row.state === 'live' : row.state === 'healthy';
+  if (okState) { facts.set(`service:${row.name}`, null); return; }
+  const probe = row.lastProbe ?? {};
+  let details = '';
+  if (probe.error) details += ` (${String(probe.error).slice(0, 100)})`;
+  if (row.failStreak) details += ` failStreak ${row.failStreak}`;
+  facts.set(`service:${row.name}`, `${row.state}${details}`);
 }
 
 function runningWorkflows() {
@@ -219,7 +225,8 @@ async function workflowFacts(o) {
 
 function tokenFacts(o) {
   const facts = new Map();
-  if (!(o.tokenSpike > 0)) return facts;
+  const spikeLimited = o.tokenSpike > 0;
+  if (!spikeLimited) return facts;
   try {
     const now = Date.now();
     const rows = readMachine((m) => m.db.prepare('SELECT provider, COALESCE(SUM(COALESCE(input_tokens,0)+COALESCE(output_tokens,0)),0) AS t, COUNT(*) AS n FROM llm_usage WHERE at >= ? GROUP BY provider ORDER BY t DESC').all(now - o.tokenWindowMs), []);

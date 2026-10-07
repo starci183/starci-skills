@@ -66,8 +66,9 @@ export class WorkQueue {
     const flight = this.inflight.get(WorkQueue.id(controller, key));
     if (flight) { flight.dirty = true; flight.dirtyReason = reason; return true; }
     const cur = this.rows.get(controller, key);
+    const backingOff = Number(cur?.tries) > 0;
     if (!cur) this.rows.put({ controller, key, due_at: at, reason, tries: 0, last_error: null });
-    else if (!(Number(cur.tries) > 0)) this.rows.put({ controller, key, due_at: Math.min(Number(cur.due_at ?? at), at), reason });
+    else if (!backingOff) this.rows.put({ controller, key, due_at: Math.min(Number(cur.due_at ?? at), at), reason });
     return true;
   }
 

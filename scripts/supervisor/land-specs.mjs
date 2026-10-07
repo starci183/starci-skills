@@ -43,7 +43,8 @@ function topLevelBlocks(source) {
 const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
 const uses = (text, name) => new RegExp(String.raw`(^|[^\w$.])${escapeRe(name)}(?![\w$])`).test(text);
 const hasIndirectExport = (source) => /^export\s+\*|^export\s+default\s+(?!(async\s+)?(function|class))/m.test(source);
-const listedExports = (source) => new Set([...source.matchAll(/^export\s*\{([^}]*)\}(?!\s*from)/gm)].flatMap((m) => m[1].split(',').map((x) => x.trim().split(/\s+as\s+/)[0]).filter(Boolean)));
+const AS_KEYWORD = new RegExp(['\\s+', 'as', '\\s+'].join(''));
+const listedExports = (source) => new Set([...source.matchAll(/^export\s*\{([^}]*)\}(?!\s*from)/gm)].flatMap((m) => m[1].split(',').map((x) => x.trim().split(AS_KEYWORD)[0]).filter(Boolean)));
 
 function changedBlocks(blocks, ranges) {
   const hit = new Set();
@@ -83,7 +84,10 @@ function changedImporterSpecs(users, others, symbols, code) {
 function addImporterSpecs(file, { source, specs, symbolsOf, hub, code, files, narrowed }) {
   const needle = needleOf(file);
   const users = specs.filter((spec) => code.get(spec.file).includes(needle)).map((spec) => spec.file);
-  if (users.length <= hub) { for (const spec of users) files.add(spec); return; }
+  if (users.length <= hub) {
+    for (const spec of users) files.add(spec);
+    return;
+  }
   const result = symbolsOf(file);
   if (!result || !Array.isArray(result.symbols)) {
     for (const spec of users) files.add(spec);

@@ -53,6 +53,9 @@ import {
 } from './state.mjs';
 import { WorkQueue, machineRows, memoryRows } from './workqueue.mjs'; import { isMain } from '../lib/is-main.mjs';
 import { readEnv } from '../lib/env.mjs';
+import { eachInOrder, repeatInOrder } from '../lib/in-order.mjs';
+import { crashHandler, logSafeReevaluated, onceLine } from './engine-process.mjs';
+import { runOnce } from './engine-once.mjs';
 import { positiveNumber } from '../lib/number.mjs';
 import { valueAfter } from '../lib/cli-arg.mjs';
 const CONTROLLERS_DIR = path.join(SKILL_ROOT, 'scripts', 'reconciler', 'controllers');
@@ -79,7 +82,7 @@ export async function discoverControllers(dir = CONTROLLERS_DIR) {
   let files = [];
   try { files = fs.readdirSync(dir).filter((f) => f.endsWith('.mjs')).sort(); }
   catch (error) { return { controllers, errors: [{ file: dir, name: null, error: `controller inventory unreadable: ${String(error?.message ?? error).slice(0, 300)}` }] }; }
-  for (const f of files) {
+  await eachInOrder(files, async (f) => {
     const file = path.join(dir, f);
     const name = f.replace(/\.mjs$/, '');
     try {
@@ -89,7 +92,7 @@ export async function discoverControllers(dir = CONTROLLERS_DIR) {
       if (typeof mod.reconcile !== 'function') throw new Error('reconcile() missing');
       controllers.push({ name, file, module: mod });
     } catch (error) { errors.push({ file, name, error: String(error?.message ?? error).slice(0, 400) }); }
-  }
+  });
   return { controllers, errors };
 }
 
@@ -213,12 +216,8 @@ export class Engine {
 
   /** Try to become the leader. {ok, epoch} or {ok:false, standby: reason}. */
   acquire() {
-    if (!this.lock) {
-      let held;
-      try { held = this.claimLock(this.handoverFrom); } catch (error) { held = { ok: false, error: String(error?.message ?? error) }; }
-      if (!held?.ok) return { ok: false, standby: held?.holder?.pid ? `lock held by pid ${held.holder.pid}` : held?.error ?? 'lock held' };
-      this.lock = held;
-    }
+    const refused = this.lock ? null : this.takeLock();
+    if (refused) return refused;
     const now = this.now();
     const { leaseMs } = this.numbers;
     const handoverPid = Number(this.handoverFrom) || null;
@@ -231,24 +230,35 @@ export class Engine {
       if (!r.leader) return { ok: false, standby: `leader ${row?.holder ?? r.holder} epoch ${r.epoch} until ${row ? new Date(row.expires_at).toISOString() : '?'}` };
       return { ok: true, epoch: Number(r.epoch), tookOver: !r.renewed && Boolean(row) };
     });
-    if (out.ok) {
-      const first = !this.leader;
-      this.leader = true;
-      this.lost = false;
-      this.epoch = out.epoch;
-      this.timers.renewAt = now + this.numbers.renewMs;
-      this.hb?.notify({ leader: true, epoch: this.epoch, holder: this.holder, runId: this.processRunId, draining: this.draining });
-      if (first) {
-        // A new leader's first checkpoint waits a full period: the engine it took over from may have just checkpointed,
-        // and two checkpoints back to back while a land writes is the WAL-reset bug window (SQLite < 3.51.3).
-        this.timers.checkpointAt = now + CHECKPOINT_MS;
-        this.markStaleActions({ all: true });
-        this.writeModes();
-        this.heartbeat();
-        this.log('reconciler.event', `leader ${this.holder} epoch ${out.epoch}${out.tookOver ? ' (took over)' : ''}${this.safe ? ' SAFE MODE' : ''}`, { kind: 'reconciler.leader-acquired', epoch: out.epoch, safe: this.safe });
-      }
-    }
+    if (out.ok) this.becomeLeader(out, now);
     return out;
+  }
+
+  /** Claim the host lock; null when held, else the standby answer of acquire(). */
+  takeLock() {
+    let held;
+    try { held = this.claimLock(this.handoverFrom); } catch (error) { held = { ok: false, error: String(error?.message ?? error) }; }
+    if (!held?.ok) return { ok: false, standby: held?.holder?.pid ? `lock held by pid ${held.holder.pid}` : held?.error ?? 'lock held' };
+    this.lock = held;
+    return null;
+  }
+
+  /** The leader row is this engine's at `out.epoch`: the first win starts the duties of a new leader. */
+  becomeLeader(out, now) {
+    const first = !this.leader;
+    this.leader = true;
+    this.lost = false;
+    this.epoch = out.epoch;
+    this.timers.renewAt = now + this.numbers.renewMs;
+    this.hb?.notify({ leader: true, epoch: this.epoch, holder: this.holder, runId: this.processRunId, draining: this.draining });
+    if (!first) return;
+    // A new leader's first checkpoint waits a full period: the engine it took over from may have just checkpointed,
+    // and two checkpoints back to back while a land writes is the WAL-reset bug window (SQLite < 3.51.3).
+    this.timers.checkpointAt = now + CHECKPOINT_MS;
+    this.markStaleActions({ all: true });
+    this.writeModes();
+    this.heartbeat();
+    this.log('reconciler.event', `leader ${this.holder} epoch ${out.epoch}${out.tookOver ? ' (took over)' : ''}${this.safe ? ' SAFE MODE' : ''}`, { kind: 'reconciler.leader-acquired', epoch: out.epoch, safe: this.safe });
   }
 
   /** Renew the leader row; false (and lost) when it no longer names this engine at this epoch. */
@@ -338,9 +348,9 @@ export class Engine {
   /** Queue every key of each non-off controller whose resync is due. */
   async resyncDue({ force = false } = {}) {
     const now = this.now();
-    for (const c of this.controllers) {
-      if (c.mode === 'off' || typeof c.module.list !== 'function') continue;
-      if (!force && now - c.lastResyncAt < c.resyncMs) continue;
+    await eachInOrder(this.controllers, async (c) => {
+      if (c.mode === 'off' || typeof c.module.list !== 'function') return;
+      if (!force && now - c.lastResyncAt < c.resyncMs) return;
       c.lastResyncAt = now;
       try {
         const keys = await this.als.run({ key: null }, () => c.module.list(this.ctxFor(c)));
@@ -348,7 +358,7 @@ export class Engine {
       } catch (error) {
         this.log('reconciler.error', `${c.name} list() failed: ${String(error?.message ?? error).slice(0, 300)}`, { kind: 'reconciler.list-failed', name: c.name, detail: String(error?.message ?? error).slice(0, 600) });
       }
-    }
+    });
   }
 
   /** One reconcile of (controller, key) with try/catch and the time budget; marks the queue done/failed. */
@@ -419,16 +429,21 @@ export class Engine {
     }
   }
 
+  /** The decisions module, loaded once (null when it cannot load). */
+  async decisionsModuleOnce() {
+    if (this.decisionsModule !== undefined) return this.decisionsModule;
+    let mod;
+    try { if (this.loadDecisions) mod = await this.loadDecisions(); else if (fs.existsSync(DECISIONS_FILE)) mod = await import(pathToFileURL(DECISIONS_FILE).href); else mod = null; } catch { mod = null; }
+    this.decisionsModule = mod;
+    return mod;
+  }
+
   /**
    * The Decision Item SLA ladder (scripts/machine/decisions.mjs escalateDue, lane rc-decisions): applied only when
    * the workflow controller is active and this engine holds the epoch; otherwise a plan (logged when it has actions).
    */
   async escalatePass() {
-    let mod = this.decisionsModule;
-    if (mod === undefined) {
-      try { if (this.loadDecisions) mod = await this.loadDecisions(); else if (fs.existsSync(DECISIONS_FILE)) mod = await import(pathToFileURL(DECISIONS_FILE).href); else mod = null; } catch { mod = null; }
-      this.decisionsModule = mod;
-    }
+    const mod = await this.decisionsModuleOnce();
     if (typeof mod?.escalateDue !== 'function') return null;
     const apply = this.modes[CONCERN_OWNER['workflow.progress']] === 'active' && this.isCurrentEpoch();
     try {
@@ -446,13 +461,8 @@ export class Engine {
   /** One loop iteration. Returns {leader, lost?}. */
   async step() {
     const now = this.now();
-    if (!this.leader) {
-      if (now >= this.timers.renewAt) {
-        const got = this.acquire();
-        if (!got.ok) { this.timers.renewAt = now + this.numbers.renewMs; return { leader: false, standby: got.standby }; }
-      } else return { leader: false };
-    }
-    if (now >= this.timers.renewAt && !this.renew()) return { leader: false, lost: true };
+    const notLeading = this.leadGate(now);
+    if (notLeading) return notLeading;
     const phase = (label) => this.hb?.phase(label);
     if (now >= this.timers.configAt) { this.timers.configAt = now + CONFIG_REFRESH_MS; phase('refreshConfig'); this.refreshConfig(); }
     if (now >= this.timers.staleAt) { this.timers.staleAt = now + 60_000; phase('markStaleActions'); this.markStaleActions(); }
@@ -464,13 +474,29 @@ export class Engine {
     if (now >= this.timers.slaAt) { this.timers.slaAt = now + SLA_PASS_MS; phase('slaPass'); await this.slaPass(); }
     if (now >= this.timers.escalateAt) { this.timers.escalateAt = now + ESCALATE_MS; phase('escalatePass'); await this.escalatePass(); }
     phase('idle');
+    this.checkpointDue(now, phase);
+    return { leader: true };
+  }
+
+  /** The leader gate of step(): null while this engine leads (and renewed when due), else the result to return. */
+  leadGate(now) {
+    if (!this.leader) {
+      if (now >= this.timers.renewAt) {
+        const got = this.acquire();
+        if (!got.ok) { this.timers.renewAt = now + this.numbers.renewMs; return { leader: false, standby: got.standby }; }
+      } else return { leader: false };
+    }
+    return now >= this.timers.renewAt && !this.renew() ? { leader: false, lost: true } : null;
+  }
+
+  /** The WAL checkpoint of step(), when due. */
+  checkpointDue(now, phase) {
     if (this.state.checkpointer && now >= this.timers.checkpointAt) {
       this.timers.checkpointAt = now + CHECKPOINT_MS;
       phase('checkpoint');
       // fenced on the leader row: a superseded or expired engine gets {skipped} and checkpoints nothing
       try { this.state.checkpoint({ name: LEADER_NAME, holder: this.holder, epoch: this.epoch }); } catch (error) { this.log('reconciler.error', `checkpoint failed: ${String(error?.message ?? error).slice(0, 300)}`, { kind: 'reconciler.checkpoint-failed' }); }
     }
-    return { leader: true };
   }
 
   /** Wait for every running reconcile; the heartbeat says `draining` meanwhile (boot.mjs ensure leaves it alone). */
@@ -478,37 +504,51 @@ export class Engine {
     this.draining = true;
     this.hb?.notify({ draining: true });
     if (this.leader) this.renew();
-    try { while (this.running.size) await Promise.allSettled(this.running); }
+    try {
+      await repeatInOrder(async () => {
+        if (!this.running.size) return true;
+        await Promise.allSettled(this.running);
+        return undefined;
+      });
+    }
     finally { this.draining = false; this.hb?.notify({ draining: false }); if (this.leader) this.renew(); }
   }
 
   /** The long-lived loop: until stop(), a lost lead, or a reload handed over. */
   async run({ sleep = (ms) => new Promise((r) => setTimeout(r, ms)), tickMs = Math.min(500, this.numbers.pollMs), watch = null, reload = null } = {}) {
-    let reloadCheckAt = this.now() + RELOAD_CHECK_MS;
+    const reloadCheck = { at: this.now() + RELOAD_CHECK_MS };
     // The lease and the heartbeat are the heartbeat worker's (heartbeat-worker.mjs, its own thread and connection): no duty,
     // drain or synchronous block of this thread can lapse them. This timer only proves to the worker that this thread lives.
     const renewal = setInterval(() => this.hb?.touch(), 1000);
     try {
-      while (!this.stopped) {
-        let r;
-        try { r = await this.step(); } catch (error) { this.log('reconciler.error', `step failed: ${String(error?.message ?? error).slice(0, 300)}`, { kind: 'reconciler.step-failed', detail: String(error?.stack ?? error).slice(0, 2000) }); r = { leader: this.leader }; }
+      return await repeatInOrder(async () => {
+        if (this.stopped) { await this.drain(); return { exitCode: 0, stopped: true }; }
+        const r = await this.stepGuarded();
         if (r.lost) { await this.drain(); return { exitCode: 0, lost: true }; }
-        if (watch && reload && this.now() >= reloadCheckAt) {
-          reloadCheckAt = this.now() + RELOAD_CHECK_MS;
-          const check = watch.check();
-          if (check?.reload) {
-            watch.markAttempt();
-            await this.drain();
-            const handed = await reload(check);
-            this.log('reconciler.event', (handed.ok ? 'reloaded: pid ' + `${handed.pid}` + ' took over' : 'reload failed: ' + `${handed.error}`) + ' (' + `${check.reason}` + ')', { kind: 'reconciler.reload', ok: handed.ok === true });
-            if (handed.ok) return { exitCode: 0, reloaded: handed.pid };
-          }
-        }
+        const handed = await this.reloadWhenDue(reloadCheck, watch, reload);
+        if (handed) return handed;
         await sleep(tickMs);
-      }
-      await this.drain();
-      return { exitCode: 0, stopped: true };
+        return undefined;
+      });
     } finally { clearInterval(renewal); }
+  }
+
+  /** step(), its failure logged: the loop goes on as the leader it was. */
+  async stepGuarded() {
+    try { return await this.step(); } catch (error) { this.log('reconciler.error', `step failed: ${String(error?.message ?? error).slice(0, 300)}`, { kind: 'reconciler.step-failed', detail: String(error?.stack ?? error).slice(0, 2000) }); return { leader: this.leader }; }
+  }
+
+  /** The self-reload check when it is due: the loop's result once a new engine took over, else undefined. */
+  async reloadWhenDue(reloadCheck, watch, reload) {
+    if (!(watch && reload && this.now() >= reloadCheck.at)) return undefined;
+    reloadCheck.at = this.now() + RELOAD_CHECK_MS;
+    const check = watch.check();
+    if (!check?.reload) return undefined;
+    watch.markAttempt();
+    await this.drain();
+    const handed = await reload(check);
+    this.log('reconciler.event', (handed.ok ? 'reloaded: pid ' + `${handed.pid}` + ' took over' : 'reload failed: ' + `${handed.error}`) + ' (' + `${check.reason}` + ')', { kind: 'reconciler.reload', ok: handed.ok === true });
+    return handed.ok ? { exitCode: 0, reloaded: handed.pid } : undefined;
   }
 
   stop() { this.stopped = true; }
@@ -524,46 +564,12 @@ export class Engine {
    * --once: every non-off controller (or `controller`, even when off) lists its keys, or reconciles `key`, once.
    * Shadow unless the engine was built with apply and took the lead. Returns {ok, controllers: [...], loadErrors}.
    */
-  async once({ controller = null, key = null } = {}) {
-    const expected = controller ? [controller] : CONTROLLER_NAMES.filter((name) => this.modes[name] !== 'off');
-    const loaded = new Set(this.controllers.map((c) => c.name));
-    const missing = expected.filter((name) => !loaded.has(name));
-    const incomplete = this.loadErrors.some((e) => e.name == null || expected.includes(e.name));
-    const out = { ok: !incomplete && missing.length === 0, epoch: this.epoch, leader: this.leader, controllers: [],
-      coverage: { expected: expected.length, loaded: expected.length - missing.length, missing },
-      loadErrors: this.loadErrors.map((e) => ({ name: e.name, error: e.error })) };
-    const picked = this.controllers.filter((c) => (controller ? c.name === controller : c.mode !== 'off'));
-    if (controller && !picked.length) return { ...out, ok: false, error: `no controller '${controller}' (known: ${this.controllers.map((c) => c.name).join(', ') || 'none'})` };
-    for (const c of picked) {
-      const mode = this.leader && c.mode === 'active' ? 'active' : 'shadow';
-      const entry = { name: c.name, mode, keys: 0, ok: 0, failed: [] };
-      let keys = [];
-      if (key) keys = [key];
-      else {
-        try { keys = typeof c.module.list === 'function' ? await this.als.run({ key: null }, () => c.module.list(this.ctxFor(c, mode))) : []; }
-        catch (error) { entry.listError = String(error?.message ?? error); out.ok = false; }
-      }
-      for (const k of Array.isArray(keys) ? keys : []) this.queue.add(c.name, k, { reason: 'once' });
-      entry.keys = Array.isArray(keys) ? keys.length : 0;
-      for (;;) {
-        const batch = this.queue.take(c.name, c.concurrency);
-        if (!batch.length) break;
-        const results = await Promise.all(batch.map((item) => this.reconcileOne(c, { ...item, attempts: 0 }, { mode })));
-        for (const r of results) {
-          if (r.ok) entry.ok += 1;
-          else { entry.failed.push({ key: r.key, error: r.error }); this.queue.done(c.name, r.key); }
-        }
-      }
-      if (entry.failed.length) out.ok = false;
-      out.controllers.push(entry);
-    }
-    return out;
-  }
+  once({ controller = null, key = null } = {}) { return runOnce(this, { controller, key }); }
 }
 
 /** What the engine process itself runs; a change to one of them (or a new runtime HEAD) reloads it. */
 const reloadWatchedFiles = (root = SKILL_ROOT) => [
-  'scripts/reconciler/engine.mjs', 'scripts/reconciler/ctx.mjs', 'scripts/reconciler/sources.mjs', 'scripts/reconciler/state.mjs',
+  'scripts/reconciler/engine.mjs', 'scripts/reconciler/engine-once.mjs', 'scripts/reconciler/engine-process.mjs', 'scripts/reconciler/ctx.mjs', 'scripts/reconciler/sources.mjs', 'scripts/reconciler/state.mjs',
   'scripts/reconciler/owns.mjs', 'scripts/reconciler/workqueue.mjs', 'scripts/reconciler/heartbeat-worker.mjs', 'scripts/reconciler/boot.mjs', 'scripts/machine/self-reload.mjs', 'engine/config.mjs', 'modules/models/runtimes.yaml',
 ].map((rel) => path.join(root, ...rel.split('/')));
 
@@ -592,27 +598,29 @@ export function safeForStart({ argv = [], reloaded = false, numbers = reconciler
 
 const argValue = (argv, name) => valueAfter(argv, name);
 
+/** `--once`: one pass of the controllers, its result printed; the exit code says whether it was ok. */
+async function mainOnce(argv, json) {
+  const apply = argv.includes('--apply');
+  const engine = new Engine({ apply, memoryQueue: true, safe: argv.includes('--safe'), rev: runtimeHead({ root: SKILL_ROOT }), print: json ? () => {} : (l) => console.log(l), echo: !json,
+  // a debugging pass is not the checkpointer (the long-lived engine's connection is)
+  stateOptions: { checkpointer: false } });
+  let result;
+  try {
+    await engine.load();
+    if (apply) {
+      const got = engine.acquire();
+      if (!got.ok) { console.log(JSON.stringify({ ok: false, error: `not the leader: ${got.standby}` })); process.exitCode = 1; return; }
+    }
+    result = await engine.once({ controller: argValue(argv, '--controller'), key: argValue(argv, '--key') });
+  } finally { engine.close({ releaseLead: apply }); }
+  console.log(json ? JSON.stringify(result) : onceLine(result));
+  process.exitCode = result.ok ? 0 : 1;
+}
+
 async function main(argv = process.argv.slice(2)) {
   setPriority();
   const json = argv.includes('--json');
-  if (argv.includes('--once')) {
-    const apply = argv.includes('--apply');
-    const engine = new Engine({ apply, memoryQueue: true, safe: argv.includes('--safe'), rev: runtimeHead({ root: SKILL_ROOT }), print: json ? () => {} : (l) => console.log(l), echo: !json,
-    // a debugging pass is not the checkpointer (the long-lived engine's connection is)
-    stateOptions: { checkpointer: false } });
-    let result;
-    try {
-      await engine.load();
-      if (apply) {
-        const got = engine.acquire();
-        if (!got.ok) { console.log(JSON.stringify({ ok: false, error: `not the leader: ${got.standby}` })); process.exitCode = 1; return; }
-      }
-      result = await engine.once({ controller: argValue(argv, '--controller'), key: argValue(argv, '--key') });
-    } finally { engine.close({ releaseLead: apply }); }
-    console.log(json ? JSON.stringify(result) : '[reconciler --once] ' + ((result.ok && 'ok') || 'NOT OK') + ' ' + (result.controllers.map((c) => `${c.name}(${c.mode}) keys=${c.keys} ok=${c.ok} failed=${c.failed.length}`).join('; ') || 'no controller on') + ((result.error && ` ${result.error}`) || ''));
-    process.exitCode = result.ok ? 0 : 1;
-    return;
-  }
+  if (argv.includes('--once')) { await mainOnce(argv, json); return; }
   const handoverFrom = readEnv(RELOAD_ENV.handoverFrom) ?? null;
   const reloadedAt = Number(readEnv(RELOAD_ENV.reloadedAt)) || null;
   delete process.env[RELOAD_ENV.handoverFrom];
@@ -628,19 +636,11 @@ async function main(argv = process.argv.slice(2)) {
   try { engine.processRunId = engine.state.startProcessRun({ role: 'engine', rev: rev ?? undefined, startReason }); } catch (error) { console.error(`[reconciler] process run not recorded: ${error?.message ?? error}`); }
   let stopSignal = null;
   const endRun = (fields) => { try { if (engine.processRunId != null) engine.state.endProcessRun(engine.processRunId, fields); } catch { /* best effort */ } };
-  const onCrash = (error) => {
-    try { engine.log('reconciler.error', `engine crashed: ${String(error?.message ?? error).slice(0, 300)}`, { kind: 'reconciler.crash', detail: String(error?.stack ?? error).slice(0, 4000) }); } catch { console.error(error); }
-    endRun({ exitCode: 1, exitReason: 'crash' });
-    try { engine.close({ reason: 'crash' }); } catch { /* closing */ }
-    process.exit(1);
-  };
+  const onCrash = crashHandler(engine, endRun);
   process.on('uncaughtException', onCrash);
   process.on('unhandledRejection', onCrash);
   await engine.load();
-  if (safeStart.reevaluated) {
-    engine.log('reconciler.event', `self-reload re-evaluated safe mode: ${safe ? 'SAFE (a real crash loop is on record)' : 'normal'} (was ${safeStart.inherited ? '--safe' : 'normal'}; ${safeStart.starts} abnormal start(s) in the window, limit ${safeStart.max})`,
-      { kind: 'reconciler.safe-reevaluated', safe, wasSafe: safeStart.inherited, abnormalStarts: safeStart.starts, max: safeStart.max, windowMs: safeStart.windowMs });
-  }
+  if (safeStart.reevaluated) logSafeReevaluated(engine, safeStart);
   // The heartbeat worker (heartbeat-worker.mjs): its own connection renews the lease while a synchronous duty blocks this thread.
   engine.hb = startHeartbeatWorker({ file: engine.stateFile, leaseMs: engine.numbers.leaseMs, renewMs: engine.numbers.renewMs, stallMaxMs: engine.numbers.stallMaxMs ?? DEFAULT_STALL_MAX_MS });
   if (!engine.hb.active) throw new Error('the heartbeat worker did not start: this engine cannot keep its lease');

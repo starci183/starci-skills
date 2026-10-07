@@ -18,13 +18,13 @@ import { sleep } from '../lib/sleep.mjs'; import { isMain } from '../lib/is-main
 import { buildUi, uiBuildState } from './ui-build.mjs';
 export { buildUi, uiBuildState };
 import { workflowCaller } from '../agent/caller-context.mjs';
-import { PROFILE, engineItems, profileItems, safeShadowOf, serviceItems, serviceWanted } from './start-items.mjs';
+import { PROFILE, engineItems, profileItems, safeShadowOf, serviceItems } from './start-items.mjs';
+import { applyEngine, applyUiBuild, startDownServices, startSeats, waitForLeader } from './start-apply.mjs';
+import { eachInOrder, repeatInOrder } from '../lib/in-order.mjs';
 export { PROFILE, engineItems, profileItems, safeShadowOf };
 export { engineIsSafe } from './start-items.mjs';
 
 const MIN_SQLITE = '3.51.3';
-/** Services `start` never launches itself: Orca is a GUI app (the owner opens it); the scheduled task is the owner's. */
-const NOT_ACTUATED = new Set(['orca']);
 const GROUPS = ['preflight', 'config', 'engine', 'controllers', 'services', 'seats', 'sla'];
 const START_WAIT_MS = 120_000;
 
@@ -200,6 +200,77 @@ async function json(args, { timeoutMs = 120_000 } = {}) {
   return error?.killed || error?.code === 'ETIMEDOUT' ? { ok: false, error: 'timeout' } : null;
 }
 
+/** The machine.sqlite preflight row, and the ledgers it registers: `{ ledgers, rows }`. */
+function machineDbRows(env) {
+  try {
+    const q = readMachine((m) => ({ check: m.db.prepare('PRAGMA quick_check').get()?.quick_check, ledgers: m.listLedgers() }), null, { env });
+    if (!q) return { ledgers: [], rows: [red('preflight', 'machine-db', 'machine.sqlite', 'not found or unreadable', 'preserve existing machine.sqlite and WAL; resolve storage access and runtime compatibility; initialise only when absence is confirmed; project snapshots do not contain machine.sqlite')] };
+    return { ledgers: q.ledgers, rows: [q.check === 'ok' ? green('preflight', 'machine-db', 'machine.sqlite quick_check', `ok, ${q.ledgers.length} ledger(s) registered`) : red('preflight', 'machine-db', 'machine.sqlite quick_check', String(q.check), 'restore machine.sqlite (owner-approved)')] };
+  } catch (error) { return { ledgers: [], rows: [red('preflight', 'machine-db', 'machine.sqlite health', String(error?.message ?? error).slice(0, 200), 'preserve machine.sqlite and WAL; diagnose access, compatibility and integrity before selecting an owner-approved recovery point')] }; }
+}
+
+/** The ledger integrity and registration rows of the registered `ledgers`. */
+function ledgerRows(ledgers) {
+  const integrity = ledgerIntegrity(ledgers);
+  const found = ledgerFindings(ledgers);
+  return [integrity.bad.length ? red('preflight', 'ledger-integrity', 'registered ledger health', integrity.bad.map((b) => `${b.name} (${b.reason}): ${b.result}`).join('; ').slice(0, 400), 'preserve original database and WAL; resolve schema/SQLite compatibility, identity or access; restore only confirmed integrity failures from an inspected snapshot with every writer stopped and owner approval of its loss window')
+    : green('preflight', 'ledger-integrity', 'registered ledgers quick_check', `${integrity.checked} ledger file(s) ok`, { required: false }),
+  found.length ? warn('preflight', 'ledgers', 'registered ledgers', found.map((f) => `${f.name ?? f.ledgerId} (${f.problem}: ${(f.problem === 'missing-repo' ? f.repoRoot : f.file) ?? '-'})`).join('; ').slice(0, 400), 'starci reconciler up --retire-stale-ledgers (retires temp/test ledgers via the machine-db API)')
+    : green('preflight', 'ledgers', 'registered ledgers', 'no temp/test path and no missing file', { required: false })];
+}
+
+/** The model-pin row of the kernel and supervisor seats. */
+function pinRows(config) {
+  const pinBad = pinProblems(configuredPins(config));
+  return pinBad.length ? red('preflight', 'pins', 'kernel/supervisor model pins', pinBad.map((p) => `${p.where}: ${p.problem}`).join('; ').slice(0, 400), 'drop the model pin of an agent that takes no --model (modules/models/agents/<agent>.yaml start.modelArgument)')
+    : green('preflight', 'pins', 'kernel/supervisor model pins', 'every pinned model is one worker-start can launch and attest');
+}
+
+/** The config, engine and SLA rows. */
+function engineRows(env, config) {
+  const profile = profileItems(reconcilerConfig({ config }), config?.reconciler ?? null);
+  const s = status({ env });
+  const plan = crashLoopPlan(safeRun(() => crashLoopRecord({ env, windowMs: reconcilerNumbers().crashLoop.windowMs }), { starts: [] }), { max: reconcilerNumbers().crashLoop.max, windowMs: reconcilerNumbers().crashLoop.windowMs });
+  return [profile, s.ok ? engineItems(s, { safeIsCrashLoop: plan.looping }) : red('engine', 'engine', 'reconciler engine', `status unreadable: ${s.error}`, 'starci reconciler status'), s.ok ? slaItems(s) : []];
+}
+
+/** The service rows and the harness UI build row. */
+async function serviceRows(config) {
+  const probes = await probeServices();
+  const services = serviceItems(probes, { publicUrl: safeRun(() => servicePorts().harnessPublicUrl, null), config });
+  const ui = uiBuildState();
+  return [services, ui.stale ? red('services', 'ui-build', 'harness UI build (ui/dist)', ui.reason, 'starci reconciler up (rebuilds the harness UI)') : green('services', 'ui-build', 'harness UI build (ui/dist)', ui.reason)];
+}
+
+/** The Supervisor seat row (read through `start-supervisor --status` when its seat can be reached). */
+async function supervisorRow({ env, config, orca, seats, orcaProbe }) {
+  const mode = safeRun(() => supervisorMode({ env, config }), DEFAULT_SUPERVISOR_MODE);
+  if (mode === 'kernel' && seats && orcaProbe.ok) {
+    const st = await json([path.join(SKILL_ROOT, 'scripts', 'supervisor', 'start-supervisor.mjs'), '--status', '--json'], { timeoutMs: 90_000 });
+    return supervisorItem({ mode, statusJson: st });
+  }
+  if (mode === 'kernel') return red('seats', 'supervisor', 'Supervisor seat', orca ? 'Orca is not reachable' : 'not checked', 'open Orca, then run start again');
+  return supervisorItem({ mode });
+}
+
+/** The Orca reachability row. */
+function orcaRow(orcaProbe) {
+  if (orcaProbe.ok === false) {
+    const error = orcaProbe.error ? `: ${orcaProbe.error}` : '';
+    return red('preflight', 'orca', 'Orca reachable', `${orcaProbe.verdict}${error}`, 'open Orca yourself, then run start again');
+  }
+  return orcaProbe.ok ? green('preflight', 'orca', 'Orca reachable', `${orcaProbe.terminals ?? 0} terminal(s)`) : [];
+}
+
+/** The Core debug seat row. */
+async function coreDebugRow(env) {
+  let health;
+  try { health = (await import('./core-debug.mjs')).coreDebugStatus({ env }); }
+  catch (error) { health = { ready: false, error: String(error?.message ?? error) }; }
+  return health.ready === true ? green('seats', 'core-debug', 'Core debug seat', 'native worker live on its bound caller route')
+    : red('seats', 'core-debug', 'Core debug seat', health.error ?? health.health?.reason ?? 'not ready', 'run the approved StarCi start with its declared caller route');
+}
+
 /**
  * Every checklist row, read-only: preflight, config, engine, controllers, services, seats, sla, ui build. Never throws
  * (a failing section is one red row). Seams (specs): env, config, machine reads, probes.
@@ -209,54 +280,19 @@ export async function gather({ env = process.env, config = safeRun(() => loadCon
   const push = (...rows) => items.push(...rows.flat());
   // preflight
   push(sqliteItem(), hostPlatformItem(platform));
-  let ledgers = [];
-  try {
-    const q = readMachine((m) => ({ check: m.db.prepare('PRAGMA quick_check').get()?.quick_check, ledgers: m.listLedgers() }), null, { env });
-    if (!q) push(red('preflight', 'machine-db', 'machine.sqlite', 'not found or unreadable', 'preserve existing machine.sqlite and WAL; resolve storage access and runtime compatibility; initialise only when absence is confirmed; project snapshots do not contain machine.sqlite'));
-    else { ledgers = q.ledgers; push(q.check === 'ok' ? green('preflight', 'machine-db', 'machine.sqlite quick_check', `ok, ${ledgers.length} ledger(s) registered`) : red('preflight', 'machine-db', 'machine.sqlite quick_check', String(q.check), 'restore machine.sqlite (owner-approved)')); }
-  } catch (error) { push(red('preflight', 'machine-db', 'machine.sqlite health', String(error?.message ?? error).slice(0, 200), 'preserve machine.sqlite and WAL; diagnose access, compatibility and integrity before selecting an owner-approved recovery point')); }
-  const integrity = ledgerIntegrity(ledgers);
-  push(integrity.bad.length ? red('preflight', 'ledger-integrity', 'registered ledger health', integrity.bad.map((b) => `${b.name} (${b.reason}): ${b.result}`).join('; ').slice(0, 400), 'preserve original database and WAL; resolve schema/SQLite compatibility, identity or access; restore only confirmed integrity failures from an inspected snapshot with every writer stopped and owner approval of its loss window')
-    : green('preflight', 'ledger-integrity', 'registered ledgers quick_check', `${integrity.checked} ledger file(s) ok`, { required: false }));
-  const found = ledgerFindings(ledgers);
-  push(found.length ? warn('preflight', 'ledgers', 'registered ledgers', found.map((f) => `${f.name ?? f.ledgerId} (${f.problem}: ${(f.problem === 'missing-repo' ? f.repoRoot : f.file) ?? '-'})`).join('; ').slice(0, 400), 'starci reconciler up --retire-stale-ledgers (retires temp/test ledgers via the machine-db API)')
-    : green('preflight', 'ledgers', 'registered ledgers', 'no temp/test path and no missing file', { required: false }));
-  push(await worktreeItems({ env, repos: ledgers.filter((l) => l.state !== 'retired').map((l) => l.repoRoot) }));
-  const pinBad = pinProblems(configuredPins(config));
-  push(pinBad.length ? red('preflight', 'pins', 'kernel/supervisor model pins', pinBad.map((p) => `${p.where}: ${p.problem}`).join('; ').slice(0, 400), 'drop the model pin of an agent that takes no --model (modules/models/agents/<agent>.yaml start.modelArgument)')
-    : green('preflight', 'pins', 'kernel/supervisor model pins', 'every pinned model is one worker-start can launch and attest'));
+  const machine = machineDbRows(env);
+  push(machine.rows, ledgerRows(machine.ledgers));
+  push(await worktreeItems({ env, repos: machine.ledgers.filter((l) => l.state !== 'retired').map((l) => l.repoRoot) }));
+  push(pinRows(config));
   const orcaProbe = orca ? await probeOrcaAsync({ timeoutMs: 30_000 }) : { ok: null };
   // config + engine + controllers + sla
-  const raw = config?.reconciler ?? null;
-  push(profileItems(reconcilerConfig({ config }), raw));
-  const s = status({ env });
-  const plan = crashLoopPlan(safeRun(() => crashLoopRecord({ env, windowMs: reconcilerNumbers().crashLoop.windowMs }), { starts: [] }), { max: reconcilerNumbers().crashLoop.max, windowMs: reconcilerNumbers().crashLoop.windowMs });
-  push(s.ok ? engineItems(s, { safeIsCrashLoop: plan.looping }) : red('engine', 'engine', 'reconciler engine', `status unreadable: ${s.error}`, 'starci reconciler status'), s.ok ? slaItems(s) : []);
+  push(engineRows(env, config));
   // services
-  const probes = await probeServices();
-  push(serviceItems(probes, { publicUrl: safeRun(() => servicePorts().harnessPublicUrl, null), config }));
-  const ui = uiBuildState();
-  push(ui.stale ? red('services', 'ui-build', 'harness UI build (ui/dist)', ui.reason, 'starci reconciler up (rebuilds the harness UI)') : green('services', 'ui-build', 'harness UI build (ui/dist)', ui.reason));
+  push(await serviceRows(config));
   // seats
-  const mode = safeRun(() => supervisorMode({ env, config }), DEFAULT_SUPERVISOR_MODE);
-  if (mode === 'kernel' && seats && orcaProbe.ok) {
-    const st = await json([path.join(SKILL_ROOT, 'scripts', 'supervisor', 'start-supervisor.mjs'), '--status', '--json'], { timeoutMs: 90_000 });
-    push(supervisorItem({ mode, statusJson: st }));
-  } else if (mode === 'kernel') push(red('seats', 'supervisor', 'Supervisor seat', orca ? 'Orca is not reachable' : 'not checked', 'open Orca, then run start again'));
-  else push(supervisorItem({ mode }));
-  if (orcaProbe.ok === false) {
-    const error = orcaProbe.error ? `: ${orcaProbe.error}` : '';
-    push(red('preflight', 'orca', 'Orca reachable', `${orcaProbe.verdict}${error}`, 'open Orca yourself, then run start again'));
-  } else if (orcaProbe.ok) push(green('preflight', 'orca', 'Orca reachable', `${orcaProbe.terminals ?? 0} terminal(s)`));
-  else push([]);
+  push(await supervisorRow({ env, config, orca, seats, orcaProbe }), orcaRow(orcaProbe));
   if (seats && workflowSeats) push(await kernelSeatItems({ orcaOk: orcaProbe.ok !== false, config }));
-  if (coreDebug && config?.debug === true) {
-    let health;
-    try { health = (await import('./core-debug.mjs')).coreDebugStatus({ env }); }
-    catch (error) { health = { ready: false, error: String(error?.message ?? error) }; }
-    push(health.ready === true ? green('seats', 'core-debug', 'Core debug seat', 'native worker live on its bound caller route')
-      : red('seats', 'core-debug', 'Core debug seat', health.error ?? health.health?.reason ?? 'not ready', 'run the approved StarCi start with its declared caller route'));
-  }
+  if (coreDebug && config?.debug === true) push(await coreDebugRow(env));
   push(await depthItems({ env, config, orcaOk: orcaProbe.ok === true, ...(depthProbe ? { probe: depthProbe } : {}) }));
   return items;
 }
@@ -291,13 +327,13 @@ async function kernelSeatItems({ orcaOk = true, config = null, repair = false } 
   for (const repo of repos) for (const wf of runningWorkflows(repo)) rows.push({ repo, workflowId: wf.workflowId });
   if (!rows.length) return [green('seats', 'seat:kernel', 'Kernel seats', 'no running workflow', { required: false })];
   const out = [];
-  for (const { repo, workflowId } of rows) {
+  await eachInOrder(rows, async ({ repo, workflowId }) => {
     const ledger = path.basename(repo);
-    if (!orcaOk) { out.push(red('seats', `seat:kernel:${ledger}:${workflowId}`, `Kernel seat ${workflowId}`, 'Orca is not reachable', 'open Orca, then run start again')); continue; }
+    if (!orcaOk) { out.push(red('seats', `seat:kernel:${ledger}:${workflowId}`, `Kernel seat ${workflowId}`, 'Orca is not reachable', 'open Orca, then run start again')); return; }
     const args = [path.join(SKILL_ROOT, 'scripts', 'kernel', 'kernel-watchdog.mjs'), '--repo', repo, '--workflow', workflowId, '--once', '--json', ...(repair ? ['--repair'] : [])];
     const answer = await json(args, { timeoutMs: 300_000 });
     out.push(kernelSeatItem({ ledger, workflowId, answer, seatState: answer?.action ? seatStateOf(answer.action) : null }));
-  }
+  });
   return out;
 }
 
@@ -342,6 +378,22 @@ function applyProfileFile({ file = path.join(SKILL_ROOT, 'config.yaml'), now = D
   return { changed: true, backup };
 }
 
+/** The `--retire-stale-ledgers` step: retire the temp/test ledgers and name them. */
+function retireStaleLedgers(env) {
+  const stale = ledgerFindings(readMachine((m) => m.listLedgers(), [], { env })).filter((f) => f.problem === 'temp');
+  if (stale.length) withMachine((m) => { for (const f of stale) m.setLedgerState(f.ledgerId, 'retired', { reason: 'start --retire-stale-ledgers: temp/test path' }); }, { env });
+  const names = stale.length ? `: ${stale.map((f) => f.name ?? f.ledgerId).join(', ')}` : '';
+  return `retired ${stale.length} temp/test ledger(s)${names}`;
+}
+
+/** The `--set-profile` step: write the profile to config.yaml and say what happened. */
+function setProfileResult(setProfile) {
+  const r = applyProfileFile({ profile: setProfile });
+  if (r.error) return `profile NOT set: ${r.error}`;
+  if (r.changed) return `config.yaml reconciler.profile: ${setProfile} (backup ${path.basename(r.backup)})`;
+  return `config.yaml already on profile ${setProfile}`;
+}
+
 export async function applyHost(opts, deps = {}) {
   const applied = [];
   const { env = process.env, waitMs, setProfile, noBuild, retire, workflowSeats = true, platform = process.platform } = opts;
@@ -349,73 +401,25 @@ export async function applyHost(opts, deps = {}) {
   if (unsupported) return [`host startup refused: ${unsupported}`];
   const api = { uiBuildState, buildUi, leaderState, reconcilerNumbers, crashLoopRecord, status, restartEngine, ensure,
     sleep, probeServices, startService, loadConfig, probeOrcaAsync, supervisorMode, json, kernelSeatItems, ...deps };
-  if (retire) {
-    const stale = ledgerFindings(readMachine((m) => m.listLedgers(), [], { env })).filter((f) => f.problem === 'temp');
-    if (stale.length) withMachine((m) => { for (const f of stale) m.setLedgerState(f.ledgerId, 'retired', { reason: 'start --retire-stale-ledgers: temp/test path' }); }, { env });
-    const names = stale.length ? `: ${stale.map((f) => f.name ?? f.ledgerId).join(', ')}` : '';
-    applied.push(`retired ${stale.length} temp/test ledger(s)${names}`);
-  }
-  if (setProfile) {
-    const r = applyProfileFile({ profile: setProfile });
-    let result;
-    if (r.error) result = `profile NOT set: ${r.error}`;
-    else if (r.changed) result = `config.yaml reconciler.profile: ${setProfile} (backup ${path.basename(r.backup)})`;
-    else result = `config.yaml already on profile ${setProfile}`;
-    applied.push(result);
-  }
+  if (retire) applied.push(retireStaleLedgers(env));
+  if (setProfile) applied.push(setProfileResult(setProfile));
   let rebuilt = false;
   if (!noBuild) {
-    const ui = api.uiBuildState();
-    if (ui.stale) {
-      const b = await api.buildUi({ env }); rebuilt = b.ok;
-      applied.push(b.ok ? `ui/dist rebuilt (${ui.reason})` : `ui build FAILED: ${b.output}`);
-      if (!b.ok) return applied;
-    }
+    const ui = await applyUiBuild(api, env, applied);
+    if (ui.failed) return applied;
+    rebuilt = ui.rebuilt;
   }
-  // engine: down -> ensure; safe without a real crash loop -> a planned restart; a config change applies live (refreshConfig).
-  let l = api.leaderState({ env });
+  const leader = api.leaderState({ env });
   const numbers = api.reconcilerNumbers();
   const plan = crashLoopPlan(api.crashLoopRecord({ env, windowMs: numbers.crashLoop.windowMs }), { max: numbers.crashLoop.max, windowMs: numbers.crashLoop.windowMs });
   const live = safeRun(() => api.status({ env }), null);
   const shadowed = live ? safeShadowOf(live) : [];
-  if (l.fresh && (l.safe || shadowed.length) && !plan.looping) {
-    const r = await api.restartEngine({ env });
-    const reasons = l.safeModes?.length ? `controller_modes: ${l.safeModes.join(', ')}` : 'configured active but running shadow';
-    const shadowNote = shadowed.length ? `: ${shadowed.join(', ')}` : '';
-    const safeNote = r.safe ? ' SAFE (real crash loop)' : '';
-    applied.push(`engine restarted out of safe mode (${reasons}${shadowNote}): ${r.action} pid ${r.pid ?? '-'}${safeNote}`);
-  } else if (l.fresh && (l.safe || shadowed.length)) applied.push(`engine left in safe mode: a real crash loop is on record (${plan.starts.length} abnormal start(s) in the window)`);
-  else if (!l.fresh) {
-    const r = await api.ensure({ env, reason: 'start' });
-    const pid = r.pid ? ` pid ${r.pid}` : '';
-    const safe = r.safe ? ' SAFE (real crash loop)' : '';
-    applied.push(`engine ${r.action}${pid}${safe}`);
-  }
-  const deadline = Date.now() + waitMs;
-  while (Date.now() < deadline) { l = api.leaderState({ env }); if (l.fresh) break; await api.sleep(3000); }
-  // services that are down (never Orca)
-  const probes = await api.probeServices();
-  for (const p of probes) {
-    if (p.ok || NOT_ACTUATED.has(p.name) || !serviceWanted(p.name, safeRun(() => api.loadConfig(), null)) || p.name.startsWith('sched-task:') || !p.entry.restart) continue;
-    const r = await api.startService(p.name);
-    const result = r.ok ? 'start requested' : `start FAILED ${String(r.error ?? r.output ?? '').slice(0, 120)}`;
-    applied.push(`service ${p.name}: ${result}`);
-  }
-  if (rebuilt && probes.find((p) => p.name === 'harness-ui')?.ok) { const r = await api.startService('harness-ui'); applied.push(`service harness-ui restarted to serve the new build: ${r.ok ? 'ok' : 'FAILED'}`); }
-  // Supervisor seat (kernel mode only) and the Kernel seats of running workflows
+  await applyEngine(api, { env, leader, plan, shadowed }, applied);
+  await waitForLeader(api, env, waitMs);
+  await startDownServices(api, { loadConfig: () => safeRun(() => api.loadConfig(), null), rebuilt }, applied);
   const orcaUp = (await api.probeOrcaAsync({ timeoutMs: 30_000 })).ok;
   const config = safeRun(() => api.loadConfig(), null);
-  if (orcaUp) {
-    if (api.supervisorMode({ env, config }) === 'kernel') {
-      const r = await api.json([path.join(SKILL_ROOT, 'scripts', 'supervisor', 'start-supervisor.mjs'), '--json'], { timeoutMs: 300_000 });
-      const error = r?.ok === false ? ` (${String(r.error ?? r.reason ?? '').slice(0, 120)})` : '';
-      applied.push(`Supervisor seat: ${r?.action ?? 'no answer'}${error}`);
-    }
-    if (workflowSeats) {
-      const seats = await api.kernelSeatItems({ orcaOk: true, config, repair: true });
-      applied.push(`Kernel seats: ${seats.filter((i) => i.status === 'green').length}/${seats.length} live after repair`);
-    }
-  } else applied.push('Orca is not reachable: services, Supervisor seat and Kernel seats were not touched (open Orca, run start again)');
+  await startSeats(api, { env, orcaUp, config, workflowSeats }, applied);
   return applied;
 }
 
@@ -431,7 +435,10 @@ export async function ensureHostRuntime({ env = process.env, waitMs = START_WAIT
     catch (error) { return { ok: false, summary: summarize(items), applied, items, error: String(error?.message ?? error) }; }
     items = await read(readOptions);
     const until = now() + waitMs;
-    while (!summarize(items).ok && now() < until) { await wait(10_000); items = await read(readOptions); }
+    await repeatInOrder(async () => {
+      if (!summarize(items).ok && now() < until) { await wait(10_000); items = await read(readOptions); return undefined; }
+      return true;
+    });
   }
   const summary = summarize(items);
   return { ok: summary.ok, summary, applied, items };

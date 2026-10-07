@@ -11,6 +11,7 @@
 // Pure planner planLearning; numbers: modules/reconciler/learning.yaml and runtimes.yaml allocation.supervisorLearning.
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { eachInOrder } from '../../lib/in-order.mjs';
 import { yamlNumberSettings } from '../../lib/read-yaml.mjs';
 import { clipLine } from '../../lib/clip.mjs';
 import { ownerLanguage, translator } from '../../lib/i18n.mjs';
@@ -79,7 +80,7 @@ export async function reconcileLearning(key, ctx, { settings = learningControlle
   const language = deps.language ?? ownerLanguage();
   const plan = planLearning({ items, state, settings: ls, now, newHypotheses: lessons.newHypotheses, measureExperiments: lessons.measureExperiments, dueMs: settings.decisionDueMs, language });
   const opened = [];
-  for (const d of plan.decisions) { try { await ctx.openDecision(d); opened.push(d.idempotencyKey); } catch { /* the next pass retries */ } }
+  await eachInOrder(plan.decisions, async (d) => { try { await ctx.openDecision(d); opened.push(d.idempotencyKey); } catch { /* the next pass retries */ } });
   // The recording pass (hypothesis rows, experiment verdicts, lessons) is a write: through ctx.run, so shadow only records it.
   if (plan.hypotheses.length || plan.verdicts.length) await ctx.run('node', ['scripts/machine/lessons.mjs', 'tick', '--items', JSON.stringify(items), '--json'], { timeoutMs: 120_000 });
   return { ok: true, key, items: items.length, hypotheses: plan.hypotheses.map((h) => h.signature), verdicts: plan.verdicts.map((v) => `${v.id}:${v.outcome}`), opened };

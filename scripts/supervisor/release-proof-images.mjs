@@ -7,6 +7,7 @@ import { proofImageInspect as realImageInspect } from '../api/docker/proof-image
 import { resourceRemove } from '../api/docker/resource-remove.mjs';
 import { proofRun as realRun } from '../api/docker/proof-run.mjs';
 import { containerInspect as realContainerInspect } from '../api/docker/container-inspect.mjs';
+import { eachInOrder, repeatInOrder } from '../lib/in-order.mjs';
 import { asList } from '../lib/list.mjs';
 import { protectedPortsInText } from '../lib/protected-installations.mjs';
 import { resultDetail, resultOk } from '../lib/verb-call.mjs';
@@ -59,14 +60,16 @@ async function proveImage(image, { build, imageInspect, run, inspect, removeCont
   if (!success(started) || !container || isForeignContainer(container)) { row.error = `run failed: ${failure(started) || 'no container id'}`; return row; }
   try {
     const attempts = Math.max(2, Math.ceil(waitSeconds / 5));
-    for (let attempt = 0; attempt <= attempts; attempt += 1) {
+    await repeatInOrder(async (attempt) => {
+      if (attempt > attempts) return true;
       const health = await inspect(container, '{{if .State.Health}}{{.State.Health.Status}}{{else}}nohealthcheck{{end}}');
       const running = await inspect(container, '{{.State.Running}}');
       row.health = text(health); row.running = text(running) === 'true';
-      if (row.health === 'healthy' || (row.health === 'nohealthcheck' && row.running && attempt >= 2)) { row.ok = true; break; }
-      if (row.health === 'unhealthy' || !row.running || attempt === attempts) break;
+      if (row.health === 'healthy' || (row.health === 'nohealthcheck' && row.running && attempt >= 2)) { row.ok = true; return true; }
+      if (row.health === 'unhealthy' || !row.running || attempt === attempts) return true;
       await sleep(5_000);
-    }
+      return undefined;
+    });
     if (!row.ok) row.error = `container not healthy (${row.health ?? 'unknown'}, running=${row.running})`;
   } finally {
     const removed = await removeContainer(container);
@@ -108,9 +111,9 @@ export async function releaseProofImages(ctx, deps = {}) {
   if (!Number.isFinite(waitSeconds) || waitSeconds < 10) return commandError('--wait-seconds must be at least 10');
   const results = [];
   const operation = async () => {
-    for (const image of images) {
+    await eachInOrder(images, async (image) => {
       results.push(await proveImage(image, { build, imageInspect, run, inspect, removeContainer, removeImage, sleep, waitSeconds, root, project, removeImages: ctx.args?.['remove-images'] === true, success, failure }));
-    }
+    });
     return { code: results.every((row) => row.ok) ? 0 : 1 };
   };
   let outcome;

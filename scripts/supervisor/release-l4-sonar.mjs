@@ -11,7 +11,7 @@ import path from 'node:path';
 import { containerInspect } from '../api/docker/container-inspect.mjs';
 import { containerLifecycle } from '../api/docker/container-lifecycle.mjs';
 import { sleep } from '../lib/sleep.mjs';
-import { repeatInOrder } from '../lib/in-order.mjs';
+import { findInOrder, repeatInOrder } from '../lib/in-order.mjs';
 import { dashboard, resolveConfig, scan, scrub } from '../gates/sonar-local.mjs';
 import { sonarUp } from '../gates/sonar-status.mjs';
 
@@ -92,13 +92,13 @@ export function sonarSupplier(apps, deps = {}) {
     try { cfg = gate.config(app.dir); } catch (error) { lines.push(`sonar config: ${error.message}`); return finish(false); }
     const up = await bringUp(cfg);
     if (!up.ok) { lines.push(`sonar stack: ${up.reason}`); return finish(false); }
-    for (const [command, run] of [['scan --project-gate', gate.scan], ['dashboard', gate.dashboard]]) {
+    const failed = await findInOrder([['scan --project-gate', gate.scan], ['dashboard', gate.dashboard]], async ([command, run]) => {
       let report;
-      try { report = await run(cfg, app.dir); } catch (error) { lines.push(`== sonar-local ${command} ${app.name}: threw ${scrub(error?.message ?? error)}`); return finish(false); }
+      try { report = await run(cfg, app.dir); } catch (error) { lines.push(`== sonar-local ${command} ${app.name}: threw ${scrub(error?.message ?? error)}`); return true; }
       lines.push(`== sonar-local ${command} ${app.name}: ${report?.outcome ?? 'no outcome'}`, scrub(JSON.stringify(report, null, 2)));
-      if (report?.outcome !== 'pass') return finish(false);
-    }
-    return finish(true);
+      return report?.outcome !== 'pass';
+    });
+    return finish(failed === undefined);
   };
 
   /** Leave the stack as found: stop only what this run started, the server before its database. */

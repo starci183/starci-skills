@@ -64,7 +64,11 @@ const show = (r) => {
 async function main() {
   const argv = process.argv.slice(2);
   const has = (n) => argv.includes(`--${n}`);
-  const value = (n) => { const i = argv.indexOf(`--${n}`); if (i < 0) return null; return argv[i + 1] ?? null; };
+  const value = (n) => {
+    const i = argv.indexOf(`--${n}`);
+    if (i < 0) return null;
+    return argv[i + 1] ?? null;
+  };
   const asJson = has('json');
   if (has('help') || !argv.length) { printHelp(); return; }
   if (has('read')) {

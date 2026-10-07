@@ -35,6 +35,7 @@ import { parseYaml } from '../../../engine/yaml.mjs';
 import { claimDue, finishDuty } from '../schedules.mjs';
 import { SETTLED_JOB_LIST } from '../../../engine/admission.mjs';
 import { releasePlan, workerTerminalHandles } from '../../lib/worker-accounting.mjs';
+import { eachInOrder } from '../../lib/in-order.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const NAME = 'gc';
@@ -234,11 +235,11 @@ export function createGcController(overrides = {}) {
   async function decideTerminals(ctx, { handles, sup, ledgers, owners = null, runs }) {
     const gc = await deps.gc();
     const rows = [];
-    for (const run of runs.filter(Boolean)) {
+    await eachInOrder(runs.filter(Boolean), async (run) => {
       const listed = await deps.workers(run);
       if (!listed?.ok) throw Object.assign(new Error(`WORKER_LIST_UNAVAILABLE: worker-list --run ${run}: ${listed?.error ?? 'Orca did not answer'}`), { retryAfterMs: 60_000 });
       rows.push(...listed.workers);
-    }
+    });
     const mine = (h) => (handles ? handles.includes(h) : true);
     const releases = releasePlan(rows).filter((d) => d.verdict === 'release' && d.terminalHandle && mine(d.terminalHandle)).map((d) => ({ kind: 'release', ...d }));
     const listed = await deps.list();
@@ -282,7 +283,7 @@ export function createGcController(overrides = {}) {
     const key = jobKey(ledgerId, jobId);
     if (updatedAt && ctx.now() - updatedAt < settings.eventGraceMs) return graceWait(ctx, key, { age: ctx.now() - updatedAt, what: `job ${jobId}` });
     const closes = [];
-    for (const d of await decideTerminals(ctx, { handles: job.handles, sup: { seat: null, jobs: [] }, ledgers: [view], runs: [job.task?.runId] })) closes.push(await settleLeftover(ctx, d, { entity: `job ${jobId}` }));
+    await eachInOrder(await decideTerminals(ctx, { handles: job.handles, sup: { seat: null, jobs: [] }, ledgers: [view], runs: [job.task?.runId] }), async (d) => { closes.push(await settleLeftover(ctx, d, { entity: `job ${jobId}` })); });
     const leaks = SETTLED.has(job.status) ? gc.classifyLeases({ rows: (view.leases ?? []).filter((l) => l.jobId === jobId).map((l) => ({ ...l, ledger: ledgerId })), now: ctx.now(), minAgeMs: 0 }) : [];
     const leases = await leaseDecision(ctx, leaks, { ledgerId, entity: jobId });
     await recordEvent(ctx, key, { closes });
@@ -306,8 +307,9 @@ export function createGcController(overrides = {}) {
     const updatedAt = Number(job.updatedAt ?? 0);
     if (updatedAt && ctx.now() - updatedAt < settings.eventGraceMs) return graceWait(ctx, landKey(jobId), { age: ctx.now() - updatedAt, what: `supervisor job ${jobId}` });
     const closes = [];
-    if (job.handle && job.handle !== 'supervisor')
-      for (const d of await decideTerminals(ctx, { handles: [job.handle], sup, ledgers: [], runs: [job.runId] })) closes.push(await settleLeftover(ctx, d, { entity: `[Worker] job ${jobId}` }));
+    if (job.handle && job.handle !== 'supervisor') {
+      await eachInOrder(await decideTerminals(ctx, { handles: [job.handle], sup, ledgers: [], runs: [job.runId] }), async (d) => { closes.push(await settleLeftover(ctx, d, { entity: `[Worker] job ${jobId}` })); });
+    }
     const staging = await reconcileStaging(ctx, job, jobId);
     const leaks = gc.classifyLeases({ rows: (sup.leases ?? []).filter((l) => l.jobId === jobId).map((l) => ({ ...l, ledger: 'supervisor' })), now: ctx.now(), minAgeMs: 0 });
     const leases = await leaseDecision(ctx, leaks, { ledgerId: 'supervisor', entity: jobId });
@@ -325,7 +327,7 @@ export function createGcController(overrides = {}) {
     // The entity's terminals: its Kernel seat, its jobs' terminals, and an unbound [Kernel]/[Op] that names it.
     const owners = new Set([workflowId, ...view.jobs.filter((j) => j.workflowId === workflowId).map((j) => j.jobId)]);
     const closes = [];
-    for (const d of await decideTerminals(ctx, { handles: null, sup: { seat: null, jobs: [] }, ledgers: [view], owners, runs: [...new Set(view.jobs.filter((j) => j.workflowId === workflowId).map((j) => j.task?.runId))] })) closes.push(await settleLeftover(ctx, d, { entity: `workflow ${workflowId}` }));
+    await eachInOrder(await decideTerminals(ctx, { handles: null, sup: { seat: null, jobs: [] }, ledgers: [view], owners, runs: [...new Set(view.jobs.filter((j) => j.workflowId === workflowId).map((j) => j.task?.runId))] }), async (d) => { closes.push(await settleLeftover(ctx, d, { entity: `workflow ${workflowId}` })); });
     const leaks = wf.ended ? gc.classifyLeases({ rows: (view.leases ?? []).filter((l) => l.workflowId === workflowId).map((l) => ({ ...l, ledger: ledgerId })), now: ctx.now(), minAgeMs: 0 }) : [];
     const leases = await leaseDecision(ctx, leaks, { ledgerId, entity: workflowId });
     await recordEvent(ctx, workflowKey(ledgerId, workflowId), { closes });
@@ -372,7 +374,7 @@ export function createGcController(overrides = {}) {
       if (!byJob.has(k)) byJob.set(k, { ledgerId: i.ledger, jobId: i.jobId, rows: [] });
       byJob.get(k).rows.push({ resourceKey: String(i.target).split(':').slice(1).join(':'), workflowId: i.workflowId, why: i.reason });
     }
-    for (const g of byJob.values()) await leaseDecision(ctx, g.rows, { ledgerId: g.ledgerId, entity: g.jobId });
+    await eachInOrder(byJob.values(), (g) => leaseDecision(ctx, g.rows, { ledgerId: g.ledgerId, entity: g.jobId }));
   }
 
   async function previewBlobSweep(ctx, now) {

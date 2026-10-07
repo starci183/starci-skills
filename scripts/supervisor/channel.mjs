@@ -32,6 +32,7 @@
 //       Run it under a Monitor so the supervisor wakes the moment the owner writes.
 import fs from 'node:fs';
 import { isMain } from '../lib/is-main.mjs'; import { logLine } from '../lib/escape.mjs';
+import { findInOrder } from '../lib/in-order.mjs';
 import { argsOf } from '../connectors/lib.mjs';
 import { botCall, DEFAULT_API_BASE, telegramSettings, TEXT_MAX } from '../connectors/telegram.mjs';
 import { redact } from '../connectors/telegram-polite.mjs';
@@ -74,15 +75,17 @@ async function sendTelegramParts({ settings, label, text, replyTo, apiBase, fetc
   const prefix = `[${label}]`;
   const parts = splitText(text, Math.max(500, TEXT_MAX - prefix.length - 12));
   const sent = [];
-  for (let i = 0; i < parts.length; i += 1) {
+  let failure = null;
+  await findInOrder(parts, async (part, i) => {
     const head = parts.length > 1 ? `${prefix} (${i + 1}/${parts.length})` : prefix;
-    const payload = { chat_id: settings.chatId, text: `${head} ${parts[i]}`, link_preview_options: { is_disabled: true } };
+    const payload = { chat_id: settings.chatId, text: `${head} ${part}`, link_preview_options: { is_disabled: true } };
     if (i === 0 && replyTo) payload.reply_parameters = { message_id: replyTo, allow_sending_without_reply: true };
     const result = await botCall({ token: settings.token, method: 'sendMessage', payload, apiBase, fetchImpl, ...(sleepImpl ? { sleepImpl } : {}) });
-    if (!result.ok) return { ok: false, status: result.status, error: redact(result.error, settings.token), sent };
+    if (!result.ok) { failure = { ok: false, status: result.status, error: redact(result.error, settings.token), sent }; return true; }
     sent.push(result.result?.message_id ?? null);
-  }
-  return { ok: true, parts: parts.length, messageIds: sent };
+    return false;
+  });
+  return failure ?? { ok: true, parts: parts.length, messageIds: sent };
 }
 
 /**

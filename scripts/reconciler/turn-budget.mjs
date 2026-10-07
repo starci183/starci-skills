@@ -34,6 +34,67 @@ export async function turnCustodyHold(ctx, key, rec, { ledgerId = 'supervisor', 
   return { ok: false, held: 'turn-custody-unknown', turn: { act: null, custody: effect } };
 }
 
+const turnActTimeoutMs = (step) => (step.act === 'interrupt' ? 120_000 : 180_000);
+
+/** The `services.mjs --turn-<act>` arguments of one overdue-turn action; an interrupt names the seat it targets. */
+function turnActArgs(step, obs, { supervisor, repo, workflowId }) {
+  const turnScope = [];
+  if (step.act === 'interrupt') {
+    if (supervisor) turnScope.push('--supervisor');
+    else turnScope.push('--repo', repo, '--workflow', workflowId);
+  }
+  return [SERVICES_FILE, `--turn-${step.act}`, '--terminal', obs.terminal, '--agent', obs.agent, ...turnScope, '--json'];
+}
+
+/** The watchdog pass that follows a verified replace or interrupt. */
+const turnWatchdogArgs = ({ supervisor, repo, workflowId }) => (supervisor ? ['scripts/supervisor/supervisor-watchdog.mjs', '--once', '--json']
+  : ['scripts/kernel/kernel-watchdog.mjs', '--repo', repo, '--workflow', workflowId, '--once', '--repair', '--json']);
+
+/** Whether the actuator's native receipt proves the action took effect on `obs.terminal`. */
+function turnActVerified(native, data, step, obs) {
+  const complete = native?.ok === true && native.code === 0 && !native.error && !native.signal && !native.timedOut
+    && !native.fenced && !native.recoveryRequired && data?.ok === true && data.terminal === obs.terminal;
+  return complete && (step.act === 'interrupt'
+    ? data.schema === 'starci/turn-interrupt@1' && data.effectState === 'requested'
+    : data.schema === 'starci/turn-replace@1' && data.effectState === 'closed'
+      && data.dispatch && data.closure?.dispatch === data.dispatch && workerClosureProven(data.closure, obs.terminal));
+}
+
+/** Whether the actuator's receipt proves it changed nothing (fenced, or an explicit `none` effect). */
+const turnActHadNoEffect = (native, data, obs) => native?.fenced === true || native?.effectState === 'none'
+  || Number.isInteger(native?.code) && !native.signal && !native.timedOut && data?.ok === false
+    && data.terminal === obs.terminal && data.effectState === 'none';
+
+/** The persisted effect record of an action: confirmed, none or unknown, with the receipt that decided it. */
+function recordTurnEffect(rec, native, data, { verified, noEffect }) {
+  let effectState = 'unknown';
+  if (verified) effectState = 'confirmed';
+  else if (noEffect) effectState = 'none';
+  rec.turn.effect = { ...rec.turn.effect, state: effectState,
+    result: { code: native?.code ?? null, signal: native?.signal ?? null, error: native?.error ?? null,
+      actionId: native?.actionId ?? null, receipt: data } };
+}
+
+/** The overdue clock of a turn: cleared once the turn ended or is back in budget, set while it is over budget. */
+async function settleTurnClocks(ctx, { key, step, clear, clock, budgetMs, meta }) {
+  if (step.ended || !step.overdue) await clear(ctx, key, 'KERNEL_TURN_OVERDUE');
+  if (step.overdue) await clock(ctx, key, 'KERNEL_TURN_OVERDUE', budgetMs, meta);
+}
+
+/** The watchdog pass after a verified action; a restarted replace stamps the record. Returns whether the watchdog restarted the seat. */
+async function runTurnWatchdog(ctx, { rec, step, supervisor, settings, watchdog, now, save }) {
+  const pass = await ctx.run('node', watchdog, { timeoutMs: supervisor ? settings.seats.supervisor.timeoutMs : settings.seats.kernel.timeoutMs });
+  const outcome = lastJson(pass?.stdout ?? '');
+  const restarted = pass?.ok === true && pass.code === 0 && !pass.error && !pass.signal && !pass.timedOut
+    && outcome?.ok === true && outcome.action === 'restarted';
+  if (step.act === 'replace' && restarted) {
+    rec.turn.replacedAt = now;
+    if (!supervisor) rec.restarts = [...(rec.restarts ?? []), now];
+    save(rec);
+  }
+  return restarted;
+}
+
 /** Run one overdue-turn action, persisting intent before it and allowing a watchdog only after verified custody. */
 export async function reconcileTurnBudget(ctx, { key, rec, terminal, ledgerId = 'supervisor', workflowId = 'wf-supervisor',
   repo = null, supervisor, probeTurn, numbers, settings, save, clock, clear }) {
@@ -45,44 +106,25 @@ export async function reconcileTurnBudget(ctx, { key, rec, terminal, ledgerId = 
   rec.turn = step.turn;
   const meta = { code: 'KERNEL_TURN_OVERDUE', owner: 'host-controller', ledgerId, workflowId,
     terminal: obs.terminal, agent: obs.agent, budgetMs, enteredAt: step.turn?.startedAt };
-  if (step.ended || !step.overdue) await clear(ctx, key, 'KERNEL_TURN_OVERDUE');
-  if (step.overdue) await clock(ctx, key, 'KERNEL_TURN_OVERDUE', budgetMs, meta);
+  await settleTurnClocks(ctx, { key, step, clear, clock, budgetMs, meta });
   const minutes = step.turn ? Math.round((now - step.turn.startedAt) / 60_000) : 0;
   if (!step.act) return { ok: true, state: obs.state, minutes, act: null, overdue: step.overdue };
-  const watchdog = supervisor ? ['scripts/supervisor/supervisor-watchdog.mjs', '--once', '--json']
-    : ['scripts/kernel/kernel-watchdog.mjs', '--repo', repo, '--workflow', workflowId, '--once', '--repair', '--json'];
-  const turnScope = [];
-  if (step.act === 'interrupt') {
-    if (supervisor) turnScope.push('--supervisor');
-    else turnScope.push('--repo', repo, '--workflow', workflowId);
-  }
-  const args = [SERVICES_FILE, `--turn-${step.act}`, '--terminal', obs.terminal, '--agent', obs.agent, ...turnScope, '--json'];
+  const watchdog = turnWatchdogArgs({ supervisor, repo, workflowId });
+  const args = turnActArgs(step, obs, { supervisor, repo, workflowId });
   if (ctx.mode !== 'active') {
-    await ctx.run('node', args, { timeoutMs: step.act === 'interrupt' ? 120_000 : 180_000 });
+    await ctx.run('node', args, { timeoutMs: turnActTimeoutMs(step) });
     return { ok: true, shadow: true, state: obs.state, minutes, act: step.act, overdue: step.overdue };
   }
   rec.turn.terminal = obs.terminal;
   rec.turn.effect = { state: 'unknown', act: step.act, at: now, terminal: obs.terminal, agent: obs.agent, result: null };
   save(rec); // If the process disappears after mutation, the original intent still prevents blind replay.
   let native;
-  try { native = await ctx.run('node', args, { timeoutMs: step.act === 'interrupt' ? 120_000 : 180_000 }); }
+  try { native = await ctx.run('node', args, { timeoutMs: turnActTimeoutMs(step) }); }
   catch (error) { native = { ok: false, error: String(error?.message ?? error) }; }
   const data = lastJson(native?.stdout ?? '');
-  const complete = native?.ok === true && native.code === 0 && !native.error && !native.signal && !native.timedOut
-    && !native.fenced && !native.recoveryRequired && data?.ok === true && data.terminal === obs.terminal;
-  const verified = complete && (step.act === 'interrupt'
-    ? data.schema === 'starci/turn-interrupt@1' && data.effectState === 'requested'
-    : data.schema === 'starci/turn-replace@1' && data.effectState === 'closed'
-      && data.dispatch && data.closure?.dispatch === data.dispatch && workerClosureProven(data.closure, obs.terminal));
-  const noEffect = native?.fenced === true || native?.effectState === 'none'
-    || Number.isInteger(native?.code) && !native.signal && !native.timedOut && data?.ok === false
-      && data.terminal === obs.terminal && data.effectState === 'none';
-  let effectState = 'unknown';
-  if (verified) effectState = 'confirmed';
-  else if (noEffect) effectState = 'none';
-  rec.turn.effect = { ...rec.turn.effect, state: effectState,
-    result: { code: native?.code ?? null, signal: native?.signal ?? null, error: native?.error ?? null,
-      actionId: native?.actionId ?? null, receipt: data } };
+  const verified = turnActVerified(native, data, step, obs);
+  const noEffect = turnActHadNoEffect(native, data, obs);
+  recordTurnEffect(rec, native, data, { verified, noEffect });
   if (verified) {
     if (step.act === 'interrupt') rec.turn.interruptedAt = now;
     else rec.turn.closedAt = now;
@@ -95,15 +137,7 @@ export async function reconcileTurnBudget(ctx, { key, rec, terminal, ledgerId = 
     return { ok: false, state: obs.state, minutes, act: step.act, overdue: step.overdue,
       effectState: rec.turn.effect.state, ...(hold ? { held: hold.held } : {}) };
   }
-  const pass = await ctx.run('node', watchdog, { timeoutMs: supervisor ? settings.seats.supervisor.timeoutMs : settings.seats.kernel.timeoutMs });
-  const outcome = lastJson(pass?.stdout ?? '');
-  const restarted = pass?.ok === true && pass.code === 0 && !pass.error && !pass.signal && !pass.timedOut
-    && outcome?.ok === true && outcome.action === 'restarted';
-  if (step.act === 'replace' && restarted) {
-    rec.turn.replacedAt = now;
-    if (!supervisor) rec.restarts = [...(rec.restarts ?? []), now];
-    save(rec);
-  }
+  const restarted = await runTurnWatchdog(ctx, { rec, step, supervisor, settings, watchdog, now, save });
   return { ok: true, state: obs.state, minutes, act: step.act, overdue: step.overdue,
     effectState: rec.turn.effect.state, ...(step.act === 'replace' ? { replaced: restarted } : {}) };
 }

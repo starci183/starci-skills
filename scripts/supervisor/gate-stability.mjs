@@ -49,23 +49,23 @@ function acceptedLegsOf(ledgerFile, family) {
 /** One side: the findings of `tree`'s gates on the accepted legs. {tree, family, gates[], legs:[{ledger, repo, workflowId, jobId, attempt, findings[], errors[]}]} */
 async function loadGateFns(tree, spec) {
   const fns = [];
-  for (const gate of spec) {
+  await eachInOrder(spec, async (gate) => {
     const file = path.join(tree, gate.module);
-    if (!fs.existsSync(file)) { fns.push({ gate, error: 'module absent in this tree' }); continue; }
+    if (!fs.existsSync(file)) { fns.push({ gate, error: 'module absent in this tree' }); return; }
     try { const mod = await import(pathToFileURL(file).href); fns.push({ gate, fn: mod[gate.export], error: typeof mod[gate.export] === 'function' ? null : 'export absent' }); } catch (error) { fns.push({ gate, error: String(error?.message ?? error).slice(0, 200) }); }
-  }
+  });
   return fns;
 }
 
 async function findingsForLeg(repo, leg, fns) {
   const findings = [], errors = [];
-  for (const { gate, fn, error } of fns) {
-    if (error || !fn) { errors.push(`${gate.module}#${gate.export}: ${error}`); continue; }
+  await eachInOrder(fns, async ({ gate, fn, error }) => {
+    if (error || !fn) { errors.push(`${gate.module}#${gate.export}: ${error}`); return; }
     try {
       const verdict = await fn({ repo, files: leg.files });
       for (const f of asList(verdict?.findings)) findings.push({ code: f.code, path: f.path ?? null, gate: `${gate.module}#${gate.export}` });
     } catch (e) { errors.push(`${gate.module}#${gate.export}: ${String(e?.message ?? e).slice(0, 200)}`); }
-  }
+  });
   return { findings, errors };
 }
 
