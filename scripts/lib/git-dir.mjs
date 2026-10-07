@@ -35,6 +35,24 @@ export function checkoutOf(start) {
 
 const FULL_SHA = /^[0-9a-f]{40}$/;
 
+function looseHeadRef(gitDir, common, ref, commonOnly) {
+  for (const dir of commonOnly ? [common] : [gitDir, common]) {
+    try {
+      const loose = fs.readFileSync(path.join(dir, ref), 'utf8').trim();
+      if (FULL_SHA.test(loose)) return loose;
+    } catch { /* packed */ }
+  }
+  return null;
+}
+
+function packedHeadRef(common, ref) {
+  for (const line of fs.readFileSync(path.join(common, 'packed-refs'), 'utf8').split('\n')) {
+    const [sha, name] = line.trim().split(' ');
+    if (name === ref && FULL_SHA.test(sha)) return sha;
+  }
+  return null;
+}
+
 /**
  * The commit the HEAD of the checkout at `root` names, read from .git with no spawn; null when it cannot be told that
  * way (not a top level, reftable, an unreadable ref) and the read then runs live. `headsOnly` accepts only
@@ -55,13 +73,9 @@ export function headShaOf(root, { headsOnly = false, commonOnly = false } = {}) 
     if (!ref) return null;
     let common = gitDir;
     try { common = path.resolve(gitDir, fs.readFileSync(path.join(gitDir, 'commondir'), 'utf8').trim()); } catch { /* not a linked worktree */ }
-    for (const dir of commonOnly ? [common] : [gitDir, common]) {
-      try { const loose = fs.readFileSync(path.join(dir, ref), 'utf8').trim(); if (FULL_SHA.test(loose)) return loose; } catch { /* packed */ }
-    }
-    for (const line of fs.readFileSync(path.join(common, 'packed-refs'), 'utf8').split('\n')) {
-      const [sha, name] = line.trim().split(' ');
-      if (name === ref && FULL_SHA.test(sha)) return sha;
-    }
+    const loose = looseHeadRef(gitDir, common, ref, commonOnly);
+    if (loose) return loose;
+    return packedHeadRef(common, ref);
   } catch { /* no git metadata */ }
   return null;
 }
