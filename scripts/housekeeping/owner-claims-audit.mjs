@@ -9,6 +9,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { isMain } from '../lib/is-main.mjs';
+import { findInOrder } from '../lib/in-order.mjs';
 import { ledgerFileFor } from '../../engine/db/ledger.mjs';
 import { ownerClaimAudit, ownerGatesNotOwnerWork } from '../machine/owner-claim.mjs';
 
@@ -29,11 +30,13 @@ async function main(argv) {
   const workflowId = get('--workflow'), json = argv.includes('--json');
   if (!repos.length) { process.stderr.write('use: starci runtime owner-claims-audit --repo <repo>[,<repo>...] [--workflow <id>] [--json]\n'); return 2; }
   const out = [];
-  for (const repo of repos) {
+  const missing = await findInOrder(repos, async (repo) => {
     const file = ledgerFileFor(path.resolve(repo));
-    if (!fs.existsSync(file)) { process.stderr.write(`no ledger at ${file}\n`); return 2; }
+    if (!fs.existsSync(file)) { process.stderr.write(`no ledger at ${file}\n`); return true; }
     out.push({ repo: path.resolve(repo), ...(await auditLedger(file, { workflowId })) });
-  }
+    return false;
+  });
+  if (missing !== undefined) return 2;
   const found = out.reduce((n, r) => n + r.unproven.length + r.notOwnerWork.length, 0);
   if (json) process.stdout.write(`${JSON.stringify({ ok: found === 0, found, ledgers: out }, null, 2)}\n`);
   else {

@@ -1,6 +1,7 @@
 // telegram-polite.mjs - the Bot API pieces every Telegram sender shares: token scrubbing, the polite retry loop and the
 // never-throw wrapper of one owner-facing send.
 import { sleep } from '../lib/sleep.mjs';
+import { repeatInOrder } from '../lib/in-order.mjs';
 
 /** Replace every occurrence of the secret (and anything shaped like a bot token) in `text`. */
 export const redact = (text, secret) => {
@@ -16,20 +17,22 @@ export const redact = (text, secret) => {
  */
 export async function botPolite({ token, sleepImpl = sleep, attempts = 4 }, issue) {
   let last = null;
-  for (let attempt = 1; attempt <= attempts; attempt++) {
+  return repeatInOrder(async (tried) => {
+    const attempt = tried + 1;
+    if (attempt > attempts) return last;
     try {
       const res = await issue();
       const json = await res.json().catch(() => null);
       if (res.ok && json?.ok !== false) return { ok: true, status: res.status, result: json?.result ?? null };
       last = { ok: false, status: res.status, error: redact(json?.description ?? `HTTP ${res.status}`, token) };
-      if (res.status === 429) { await sleepImpl(Math.min(Number(json?.parameters?.retry_after ?? 1), 60) * 1000); continue; }
+      if (res.status === 429) { await sleepImpl(Math.min(Number(json?.parameters?.retry_after ?? 1), 60) * 1000); return undefined; }
       if (res.status < 500) return last;
     } catch (error) {
       last = { ok: false, status: null, error: redact(error?.cause?.message ?? error?.message ?? error, token) };
     }
     if (attempt < attempts) await sleepImpl(1000 * 2 ** (attempt - 1));
-  }
-  return last;
+    return undefined;
+  });
 }
 
 /** Runs `work` as one owner-facing send: any throw becomes one `warn` line and {ok:false}, never a throw into the caller. */

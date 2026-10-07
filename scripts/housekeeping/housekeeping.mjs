@@ -25,6 +25,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { allocationSettings } from '../../engine/config.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { positiveNumber } from '../lib/number.mjs';
+import { eachInOrder } from '../lib/in-order.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 const SKILL_ROOT = path.resolve(path.dirname(selfFile), '..', '..');
@@ -124,14 +125,14 @@ export async function runHousekeeping({ apply = false, only = null, env = proces
   const names = only ?? AREA_NAMES;
   const depsBefore = nodeModulesEntries(depsRoot);
   const areas = {};
-  for (const name of names) {
+  await eachInOrder(names, async (name) => {
     try {
       const fn = await resolveSweep(name, AREAS[name], sweeps);
       areas[name] = areaResult(await fn({ apply, now, env, allocation: allocation ?? housekeepingAllocation() }));
     } catch (error) {
       areas[name] = { ok: false, freedBytes: 0, movedBytes: 0, skipped: 0, errors: [String(error?.message ?? error)] };
     }
-  }
+  });
   const totals = Object.values(areas).reduce((acc, a) => ({ freedBytes: acc.freedBytes + a.freedBytes, movedBytes: acc.movedBytes + a.movedBytes }), { freedBytes: 0, movedBytes: 0 });
   const depsAfter = nodeModulesEntries(depsRoot);
   const liveDeps = { root: path.join(depsRoot, 'node_modules'), before: depsBefore, after: depsAfter, ok: depsAfter >= depsBefore };

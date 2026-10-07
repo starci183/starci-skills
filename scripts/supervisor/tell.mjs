@@ -15,6 +15,7 @@ import { getSupervisor, supervisorOnline } from './telegram-bridge.mjs';
 import { appendInbox, readInbox, readOutbox } from '../machine/sup-messages.mjs';
 import { SUPERVISOR_ID } from '../machine/home.mjs';
 import { sleep } from '../lib/sleep.mjs';
+import { repeatInOrder } from '../lib/in-order.mjs';
 import { isMain } from '../lib/is-main.mjs';
 
 export const DEFAULT_WAIT_MS = 15 * 60_000;
@@ -47,12 +48,12 @@ export function replies({ since = 0, limit = 20, env = process.env } = {}) {
 /** Resolve with the reply to inbox message `id`, or null after `timeoutMs`. */
 async function waitReply(id, { timeoutMs = DEFAULT_WAIT_MS, intervalMs = 2000, env = process.env } = {}) {
   const end = Date.now() + timeoutMs;
-  for (;;) {
+  return repeatInOrder(async () => {
     const hit = readOutbox(SUPERVISOR_ID, env).find((r) => r.to === id);
     if (hit) return hit;
     if (Date.now() >= end) return null;
     await sleep(intervalMs);
-  }
+  });
 }
 
 const show = (r) => {
