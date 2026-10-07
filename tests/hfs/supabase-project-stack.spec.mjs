@@ -35,7 +35,7 @@ test('reclaim removes the project own stale stack with its volumes and networks,
   const containers = [
     { project: 'litedemo', name: 'supabase_kong_litedemo', workdir: path.join(mkdtemp(t, 'starci-stack-gone-'), 'gone', 'litedemo') },
     { project: 'litedemo', name: 'supabase_db_litedemo', workdir: path.join(mkdtemp(t, 'starci-stack-gone-'), 'gone', 'litedemo') },
-    { project: 'nivo-lite', name: 'supabase_kong_nivo-lite', workdir: 'D:/work/nivo' },
+    { project: 'nivo-lite', name: 'supabase_kong_nivo-lite', workdir: 'elsewhere/nivo' },
   ];
   const docker = fakeDocker(containers);
   const removed = reclaimStaleStack('litedemo', { run: docker.run });
@@ -56,11 +56,11 @@ test('reclaim leaves a stack whose working directory is alive, and a stack of no
 
 test('teardown selection removes only the containers it selects and keeps the volumes while another container remains', () => {
   const containers = [
-    { project: 'litedemo', name: 'mine', workdir: 'C:/t/mine/litedemo' },
-    { project: 'litedemo', name: 'other-run', workdir: 'C:/t/other/litedemo' },
+    { project: 'litedemo', name: 'mine', workdir: 'mine/litedemo' },
+    { project: 'litedemo', name: 'other-run', workdir: 'other/litedemo' },
   ];
   const docker = fakeDocker(containers);
-  const removed = removeProjectStack('litedemo', { run: docker.run, select: (c) => c.workdir.startsWith('C:/t/mine') });
+  const removed = removeProjectStack('litedemo', { run: docker.run, select: (c) => c.workdir.startsWith('mine') });
   assert.deepEqual(removed, ['mine']);
   assert.deepEqual(containers.map((c) => c.name), ['other-run']);
 });
