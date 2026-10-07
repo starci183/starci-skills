@@ -41,6 +41,31 @@ function jobNoEffectProof(db, jobId, attempt) {
   return unsettled ? null : { jobId, attempt, dispatches };
 }
 
+/** The receipts whose scope names an attempt, grouped by owning ledger: {wanted, kept}; a receipt of any other scope is kept. */
+function groupByAttemptScope(rows) {
+  const wanted = new Map(), kept = [];
+  for (const row of rows) {
+    const match = ATTEMPT_SCOPE.exec(String(row.scope?.scopeId ?? ''));
+    if (match) wanted.set(match[1], [...(wanted.get(match[1]) ?? []), { row, jobId: match[2], attempt: Number(match[3]) }]);
+    else kept.push({ id: row.id, why: 'effect-unproven' });
+  }
+  return { wanted, kept };
+}
+
+/** Every ledger's answer for the wanted receipts: [{result: [{row, jobId, attempt, proof}]}]; no ledger is read for an empty set. */
+function ledgerProofs(wanted, settings) {
+  if (!wanted.size) return [];
+  return readMachine((m) => m.forEachLedger(({ ledger, db }) => {
+    const group = wanted.get(ledger.ledgerId) ?? wanted.get(ledger.file);
+    return group ? group.map((item) => ({ ...item, proof: jobNoEffectProof(db, item.jobId, item.attempt) })) : null;
+  }), [], settings);
+}
+
+/** The release proof of a receipt whose job's ledger shows every launch of the attempt settled to no effect. */
+const noEffectReleaseProof = (proof, scopeId) => ({ kind: 'reconciled-no-effect', confirmed: true,
+  source: 'reservation-reap', dispatchId: proof.dispatches.at(-1), dispatches: proof.dispatches,
+  scopeId, jobId: proof.jobId, effectState: 'none' });
+
 /**
  * The attempt-scoped 'unknown' receipts whose owning job's ledger proves every recorded launch of the attempt
  * settled to no effect: [{row, proof, why}]. The reconcile that returned the job to ready marked each rejected
@@ -48,22 +73,13 @@ function jobNoEffectProof(db, jobId, attempt) {
  * keeps its receipts held. kept: [{id, why}] for every receipt no ledger proves.
  */
 function recordedNoEffect(rows, settings) {
-  const wanted = new Map(), kept = [], proven = [], found = new Set();
-  for (const row of rows) {
-    const match = ATTEMPT_SCOPE.exec(String(row.scope?.scopeId ?? ''));
-    if (match) wanted.set(match[1], [...(wanted.get(match[1]) ?? []), { row, jobId: match[2], attempt: Number(match[3]) }]);
-    else kept.push({ id: row.id, why: 'effect-unproven' });
-  }
-  if (wanted.size) for (const entry of readMachine((m) => m.forEachLedger(({ ledger, db }) => {
-    const group = wanted.get(ledger.ledgerId) ?? wanted.get(ledger.file);
-    return group ? group.map((item) => ({ ...item, proof: jobNoEffectProof(db, item.jobId, item.attempt) })) : null;
-  }), [], settings)) {
+  const { wanted, kept } = groupByAttemptScope(rows);
+  const proven = [], found = new Set();
+  for (const entry of ledgerProofs(wanted, settings)) {
     for (const item of entry?.result ?? []) {
       found.add(item.row.id);
-      if (!item.proof) { kept.push({ id: item.row.id, why: 'effect-unproven' }); continue; }
-      proven.push({ row: item.row, why: 'no-effect-recorded', proof: { kind: 'reconciled-no-effect', confirmed: true,
-        source: 'reservation-reap', dispatchId: item.proof.dispatches.at(-1), dispatches: item.proof.dispatches,
-        scopeId: item.row.scope.scopeId, jobId: item.proof.jobId, effectState: 'none' } });
+      if (item.proof) proven.push({ row: item.row, why: 'no-effect-recorded', proof: noEffectReleaseProof(item.proof, item.row.scope.scopeId) });
+      else kept.push({ id: item.row.id, why: 'effect-unproven' });
     }
   }
   for (const row of rows) if (!found.has(row.id) && !kept.some((entry) => entry.id === row.id)) kept.push({ id: row.id, why: 'ledger-unproven' });

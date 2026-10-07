@@ -36,6 +36,6 @@ export function hostHoldOf({ env = process.env, repo, workflowId, db, ledgerFile
     if (host?.lowDisk && !host.testContext) return diskHold(host);
     if (!byOp.has(op)) byOp.set(op, admit(op));
     const admission = byOp.get(op);
-    return admission && admission.ok === false ? ramHold(host, admission) : null;
+    return admission?.ok === false ? ramHold(host, admission) : null;
   };
 }

@@ -15,11 +15,15 @@ export function validateResources(resources){
   if(resources===null)return;
   const bad=invalid('resources');
   const keys=Object.keys(FLOOR_LIMITS);
-  if(!plain(resources))bad(` must be {${keys.map(key=>`${key}?`).join(', ')}} or null.`);
+  const shape=keys.map(key=>`${key}?`).join(', ');
+  if(!plain(resources))bad(` must be {${shape}} or null.`);
   for(const key of Object.keys(resources))if(!keys.includes(key))bad(` has unknown key ${key} (allowed: ${keys.join(', ')}).`);
   for(const key of keys){
     const value=resources[key];
-    if(value!==undefined&&value!==null&&!inRange(value,FLOOR_LIMITS[key]))bad(`.${key} must be a number above 0${FLOOR_LIMITS[key]===Infinity?'':` and at most ${FLOOR_LIMITS[key]}`}, or null.`);
+    if(value!==undefined&&value!==null&&!inRange(value,FLOOR_LIMITS[key])){
+      const cap=FLOOR_LIMITS[key]===Infinity?'':` and at most ${FLOOR_LIMITS[key]}`;
+      bad(`.${key} must be a number above 0${cap}, or null.`);
+    }
   }
 }
 

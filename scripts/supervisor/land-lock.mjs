@@ -10,7 +10,12 @@ import { sleepSync } from '../lib/sleep-sync.mjs';
 const LOCK_WAIT_MS = 600_000;
 const LOCK_POLL_MS = 2000;
 
-const holderText = (o) => `the host lock is held by ${o.role ?? 'an unknown owner'}${o.purpose ? ` (${o.purpose})` : ''}${o.pid ? ` pid ${o.pid}` : ''}${o.since ? ` since ${o.since}` : ''}`;
+const holderText = (o) => {
+  const purpose = o.purpose ? ` (${o.purpose})` : '';
+  const pid = o.pid ? ` pid ${o.pid}` : '';
+  const since = o.since ? ` since ${o.since}` : '';
+  return `the host lock is held by ${o.role ?? 'an unknown owner'}${purpose}${pid}${since}`;
+};
 
 /** The typed refusal of a run whose lock stayed held: {ok:false, reason:'host-lock-held', owner, detail, hint, waitedMs}. */
 const heldRefusal = (owner, waitedMs) => ({ ok: false, reason: 'host-lock-held', owner: owner ?? {}, waitedMs,

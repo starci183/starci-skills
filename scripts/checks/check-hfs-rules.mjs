@@ -34,6 +34,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { byCodeUnit } from '../lib/list.mjs';
+import { eachInOrder } from '../lib/in-order.mjs';
 import { pathToFileURL } from 'node:url';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
@@ -195,11 +196,11 @@ export async function pluginRuleIds(root, kind) {
     const files = eslintContributionFiles(fs.readFileSync(path.join(root, entry), 'utf8'));
     if (!files.length) return { error: `${entry} gathers no CONTRIBUTIONS the check can name` };
     const ids = new Set();
-    for (const file of files) {
+    await eachInOrder(files, async (file) => {
       const loaded = await import(pathToFileURL(path.join(dir, file)).href);
       if (!loaded.rules || typeof loaded.rules !== 'object') throw new Error(`${file} exports no rules`);
       for (const id of Object.keys(loaded.rules)) ids.add(id);
-    }
+    });
     const whyFile = path.join(dir, 'lib', 'why.mjs');
     const whyModule = fs.existsSync(whyFile) ? await import(pathToFileURL(whyFile).href) : {};
     const why = new Map(Object.entries(whyModule.why ?? {}).filter(([, v]) => typeof v?.code === 'string').map(([id, v]) => [id, v.code]));

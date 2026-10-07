@@ -297,14 +297,18 @@ export function createCtx({
         if (now() - cached.at >= ttl || !visible.has(key.split('\u0000')[0])) shared.statusCache.delete(key);
       const hit = shared.statusCache.get(id);
       if (hit && now() - hit.at < ttl) return hit.promise;
-      const promise = Promise.resolve(spawnChild(process.execPath, [API_FILE, 'status', '--repo', l.repo, '--workflow', workflowId, '--json'], { env: childEnv(), timeoutMs: DEFAULT_TIMEOUT_MS }))
-        .then((r) => ({ value: r?.value && typeof r.value === 'object' ? r.value : null, failure: statusFailureOf(r, { timeoutMs: DEFAULT_TIMEOUT_MS }) }),
-          (error) => ({ value: null, failure: { cause: 'spawn', error: clip(`starci kernel status threw: ${error?.message ?? error}`, 300) } }));
-      const entry = { at: now(), promise };
-      shared.statusCache.set(id, entry);
+      const entry = { at: now(), promise: null };
       // A settled failure leaves the cache: the next pass spawns a fresh read instead of replaying one transient miss for the TTL.
-      promise.then((read) => { if (!read?.value && shared.statusCache.get(id) === entry) shared.statusCache.delete(id); });
-      return promise;
+      const dropFailed = (read) => {
+        if (!read?.value && shared.statusCache.get(id) === entry) shared.statusCache.delete(id);
+        return read;
+      };
+      entry.promise = Promise.resolve(spawnChild(process.execPath, [API_FILE, 'status', '--repo', l.repo, '--workflow', workflowId, '--json'], { env: childEnv(), timeoutMs: DEFAULT_TIMEOUT_MS }))
+        .then((r) => ({ value: r?.value && typeof r.value === 'object' ? r.value : null, failure: statusFailureOf(r, { timeoutMs: DEFAULT_TIMEOUT_MS }) }),
+          (error) => ({ value: null, failure: { cause: 'spawn', error: clip(`starci kernel status threw: ${error?.message ?? error}`, 300) } }))
+        .then(dropFailed);
+      shared.statusCache.set(id, entry);
+      return entry.promise;
     },
     async api(ledgerId, verb, argv = [], { timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
       const l = ledgerOf(ledgerId);

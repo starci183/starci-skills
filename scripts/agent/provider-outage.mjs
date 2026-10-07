@@ -26,6 +26,7 @@
 import { agentCardOf } from './credential-fingerprint.mjs';
 import { APP_SERVER_FAILURE } from './codex-app-server.mjs';
 import { normalizeProvider } from '../lib/provider.mjs';
+import { escapeRegExp } from '../lib/regex.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -40,7 +41,7 @@ const DEFAULT_QUOTA_PROBE_EVERY_MS = 3600000;
 const LAUNCH_FAILURE_KIND = 'worker-start';
 // Runtime-owned launch failure texts, per provider. codex: scripts/agent/codex-app-server.mjs codexAppServer, the launch-trust
 // step that asks `codex app-server` for the guard hook's hash - every failure of it starts with this text.
-const LAUNCH_PATH_FAILURES = Object.freeze({ codex: [new RegExp(APP_SERVER_FAILURE.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '[^\\n]*')] });
+const LAUNCH_PATH_FAILURES = Object.freeze({ codex: [new RegExp(escapeRegExp(APP_SERVER_FAILURE) + String.raw`[^\n]*`)] });
 
 const compile = (source, flags) => { try { return new RegExp(source, flags); } catch { return null; } };
 const cardFor = (provider, card) => (card === undefined ? agentCardOf(provider) : card);

@@ -8,6 +8,21 @@ const LEDGER_HEALTH = 'scripts/reconciler/ledger-health.mjs';
 // A file path as the registry compares it: absolute, forward slashes, case-folded where the file system folds case.
 const fileKey = (file) => { const k = path.resolve(String(file)).replaceAll('\\', '/'); return process.platform === 'win32' ? k.toLowerCase() : k; };
 
+// A refusal of the identity check: {ok:false, reason, expected?, detail}, expected only once the registry named one.
+const refused = (reason, detail, expected = null) => ({ ok: false, reason, ...(expected === null ? {} : { expected }), detail });
+
+// The registry rows naming `ledger` (by its label, then by its repo root): {rows}, or the {refusal} that ends the check.
+function registeredRows(ctx, ledger) {
+  const resolve = ctx.machine && typeof ctx.machine.resolveLedger === 'function' ? (q) => ctx.machine.resolveLedger(q) : null;
+  if (!resolve) return { refusal: refused('registry-unavailable', 'ctx.machine.resolveLedger is absent: the machine registry cannot name the expected identity') };
+  let rows;
+  try { rows = [resolve({ name: ledger.ledgerId }), ledger.repo ? resolve({ repoRoot: ledger.repo }) : null].filter((r) => r?.ledgerId); }
+  catch (error) { return { refusal: refused('registry-unavailable', `machine registry read failed: ${error?.message ?? error}`) }; }
+  const repoNote = ledger.repo ? ` or for repo ${ledger.repo}` : '';
+  if (!rows.length) return { refusal: refused('unregistered', `machine.sqlite ledgers has no row named ${ledger.ledgerId}${repoNote}`) };
+  return { rows };
+}
+
 /**
  * The identity a snapshot is bound to. The EXPECTED identity is the machine registry's: machine.sqlite ledgers row
  * named by the ctx.ledgers label (sources.mjs ledgersOf; its repo root when the label was suffixed), and that row
@@ -17,20 +32,16 @@ const fileKey = (file) => { const k = path.resolve(String(file)).replaceAll('\\'
  * registry-file-mismatch | identity-unreadable | identity-mismatch.
  */
 async function ledgerIdentity(ctx, ledger) {
-  const resolve = ctx.machine && typeof ctx.machine.resolveLedger === 'function' ? (q) => ctx.machine.resolveLedger(q) : null;
-  if (!resolve) return { ok: false, reason: 'registry-unavailable', detail: 'ctx.machine.resolveLedger is absent: the machine registry cannot name the expected identity' };
-  let rows;
-  try { rows = [resolve({ name: ledger.ledgerId }), ledger.repo ? resolve({ repoRoot: ledger.repo }) : null].filter((r) => r?.ledgerId); }
-  catch (error) { return { ok: false, reason: 'registry-unavailable', detail: `machine registry read failed: ${error?.message ?? error}` }; }
-  if (!rows.length) return { ok: false, reason: 'unregistered', detail: `machine.sqlite ledgers has no row named ${ledger.ledgerId}${ledger.repo ? ` or for repo ${ledger.repo}` : ''}` };
+  const { rows, refusal } = registeredRows(ctx, ledger);
+  if (refusal) return refusal;
   const row = rows.find((r) => r.file && fileKey(r.file) === fileKey(ledger.file));
-  if (!row) return { ok: false, reason: 'registry-file-mismatch', detail: `registered ledger ${rows[0].ledgerId} is ${rows[0].file ?? 'fileless'}, not ${ledger.file}` };
+  if (!row) return refused('registry-file-mismatch', `registered ledger ${rows[0].ledgerId} is ${rows[0].file ?? 'fileless'}, not ${ledger.file}`);
   const expected = String(row.ledgerId);
   let own;
   try { own = await ctx.read(ledger.ledgerId, (db) => db.prepare("SELECT value FROM meta WHERE key='ledger_id'").get()?.value ?? null); }
-  catch (error) { return { ok: false, reason: 'identity-unreadable', expected, detail: `meta.ledger_id is unreadable: ${error?.message ?? error}` }; }
-  if (own == null) return { ok: false, reason: 'identity-unreadable', expected, detail: 'the file carries no meta.ledger_id' };
-  if (String(own) !== expected) return { ok: false, reason: 'identity-mismatch', expected, detail: `meta.ledger_id ${own} differs from the registered ${expected}` };
+  catch (error) { return refused('identity-unreadable', `meta.ledger_id is unreadable: ${error?.message ?? error}`, expected); }
+  if (own == null) return refused('identity-unreadable', 'the file carries no meta.ledger_id', expected);
+  if (String(own) !== expected) return refused('identity-mismatch', `meta.ledger_id ${own} differs from the registered ${expected}`, expected);
   return { ok: true, ledgerId: expected };
 }
 

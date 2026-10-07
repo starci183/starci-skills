@@ -51,10 +51,11 @@ const tail = (text, n) => { const t = String(text ?? '').replace(/\s+/g, ' ').tr
 function appServerFailure({ home, timeoutMs, r, failed }) {
   const parts = [];
   if (failed) {
-    parts.push(failed.spawnError ? 'did not start: ' + failed.spawnError
-      : 'exited ' + (failed.exit ?? 'on ' + failed.signal) + ' before answering ' + failed.stage);
-    parts.push(failed.stderr ? 'stderr: ' + tail(failed.stderr, 400) : 'no stderr');
-    parts.push(failed.version ? 'codex --version: ' + tail(failed.version, 120) : 'codex --version printed nothing');
+    parts.push(
+      failed.spawnError ? 'did not start: ' + failed.spawnError
+        : 'exited ' + (failed.exit ?? 'on ' + failed.signal) + ' before answering ' + failed.stage,
+      failed.stderr ? 'stderr: ' + tail(failed.stderr, 400) : 'no stderr',
+      failed.version ? 'codex --version: ' + tail(failed.version, 120) : 'codex --version printed nothing');
   } else {
     parts.push('client exit ' + r.status + (r.error ? ': ' + r.error.message : ''));
     if (r.error?.code === 'ETIMEDOUT') parts.push('no answer within ' + timeoutMs + 'ms');

@@ -8,7 +8,7 @@ import { tierSettings } from '../agent/tiers.mjs';
 /** The priced USD per million tokens (input + output) of `model`, or null when it has no complete price. */
 function usdPerMTok(model, prices) {
   const price = priceOf(model, prices);
-  if (!price || price.input == null || price.output == null) return null;
+  if (price?.input == null || price.output == null) return null;
   const total = Number(price.input) + Number(price.output);
   return Number.isFinite(Number(price.input)) && Number.isFinite(Number(price.output)) ? total : null;
 }
