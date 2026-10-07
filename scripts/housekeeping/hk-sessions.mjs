@@ -56,11 +56,10 @@ const housekeepingOf = (allocation) => {
 /** Orca's CODEX_HOME, resolved the way Orca does it (scripts/agent/trust.mjs orcaCodexHome). */
 const orcaHome = (env, home, platform = process.platform) => {
   if (env.STARCI_ORCA_CODEX_HOME) return env.STARCI_ORCA_CODEX_HOME;
-  const appData = platform === 'win32'
-    ? (env.APPDATA || path.join(home, 'AppData', 'Roaming'))
-    : platform === 'darwin'
-      ? path.join(home, 'Library', 'Application Support')
-      : (env.XDG_CONFIG_HOME || path.join(home, '.config'));
+  let appData;
+  if (platform === 'win32') appData = env.APPDATA || path.join(home, 'AppData', 'Roaming');
+  else if (platform === 'darwin') appData = path.join(home, 'Library', 'Application Support');
+  else appData = env.XDG_CONFIG_HOME || path.join(home, '.config');
   return path.join(appData, 'orca', 'codex-runtime-home', 'home');
 };
 
@@ -102,6 +101,13 @@ export function sessionSweepRoots(env = process.env) {
  * {files: [{path,size,mtimeMs}], dirs, links, special, errors}: links and
  * non-regular entries are named so the caller can report them, never followed.
  */
+function scanEntry(p, dirReal, stat, stack, out) {
+  if (isLinkLike(p, { parentReal: dirReal, stat })) { out.links.push(p); return; }
+  if (stat.isDirectory()) { out.dirs.push(p); stack.push(p); return; }
+  if (stat.isFile()) { out.files.push({ path: p, size: stat.size, mtimeMs: stat.mtimeMs }); return; }
+  out.special.push(p);
+}
+
 function scanTree(root) {
   const out = { files: [], dirs: [], links: [], special: [], errors: [] };
   const stack = [root];
@@ -115,10 +121,7 @@ function scanTree(root) {
       const p = path.join(dir, name);
       let st;
       try { st = fs.lstatSync(p); } catch (error) { if (error?.code !== 'ENOENT') { out.errors.push({ path: p, error: message(error) }); } continue; }
-      if (isLinkLike(p, { parentReal: dirReal, stat: st })) { out.links.push(p); continue; }
-      if (st.isDirectory()) { out.dirs.push(p); stack.push(p); continue; }
-      if (st.isFile()) { out.files.push({ path: p, size: st.size, mtimeMs: st.mtimeMs }); continue; }
-      out.special.push(p);
+      scanEntry(p, dirReal, st, stack, out);
     }
   }
   return out;
@@ -148,6 +151,92 @@ function pruneEmptyDirs(root) {
   walk(root, true);
 }
 
+function archiveSessionFile(root, file, { apply, now, archiveAfterMs, archiveRoot, out, skip, fail }) {
+  const underDir = slash(path.relative(root.dir, file.path));
+  if (root.include && !root.include(underDir)) return; // outside the known session/log subdirs
+  if (now - file.mtimeMs < archiveAfterMs) { skip(file.path, 'too-new'); return; }
+  const rel = path.relative(root.home, file.path);
+  if (rel.startsWith('..') || path.isAbsolute(rel)) { skip(file.path, 'outside-home'); return; }
+  const dest = path.join(archiveRoot, root.agent, rel);
+  if (samePath(file.path, dest)) { skip(file.path, 'already-archived'); return; }
+  if (fs.existsSync(dest)) { skip(file.path, 'destination-exists'); return; }
+  if (apply) {
+    try { moveFile(file.path, dest); } catch (error) { fail(file.path, error); return; }
+  }
+  out.moved.push({ from: file.path, to: dest });
+  out.movedBytes += file.size;
+}
+
+function sweepSessionRoot(root, { apply, now, archiveAfterMs, archiveRoot, out, skip, fail }) {
+  let stat;
+  try { stat = fs.lstatSync(root.dir); } catch (error) {
+    if (error?.code === 'ENOENT') skip(root.dir, 'missing'); else fail(root.dir, error);
+    return;
+  }
+  if (isLinkLike(root.dir, { stat })) { skip(root.dir, 'link-like root'); return; }
+  if (!stat.isDirectory()) { skip(root.dir, 'not-a-directory'); return; }
+  const scan = scanTree(root.dir);
+  out.errors.push(...scan.errors);
+  for (const p of scan.links) skip(p, 'link');
+  for (const p of scan.special) skip(p, 'not-a-file');
+  for (const file of scan.files) archiveSessionFile(root, file, { apply, now, archiveAfterMs, archiveRoot, out, skip, fail });
+  if (apply) pruneEmptyDirs(root.dir);
+}
+
+function deleteArchivedFile(file, { apply, now, archiveMaxAgeMs, env, out, skip, fail }) {
+  if (now - file.mtimeMs < archiveMaxAgeMs) { skip(file.path, 'too-new'); return; }
+  if (artifactHoldOf(file.path, { env })) { skip(file.path, 'indexed-job-artifact'); return; }
+  if (apply) {
+    try { fs.unlinkSync(file.path); } catch (error) { fail(file.path, error); return; }
+  }
+  out.deleted.push(file.path);
+  out.freedBytes += file.size;
+}
+
+function pruneSessionArchive(archiveRoot, { apply, now, archiveMaxAgeMs, env, out, skip, fail }) {
+  let archiveStat;
+  try { archiveStat = fs.lstatSync(archiveRoot); } catch (error) {
+    if (error?.code !== 'ENOENT') fail(archiveRoot, error);
+  }
+  if (!archiveStat) return;
+  if (isLinkLike(archiveRoot, { stat: archiveStat })) { skip(archiveRoot, 'link-like root'); return; }
+  if (!archiveStat.isDirectory()) { skip(archiveRoot, 'not-a-directory'); return; }
+  const scan = scanTree(archiveRoot);
+  out.errors.push(...scan.errors);
+  for (const p of scan.links) skip(p, 'link');
+  for (const p of scan.special) skip(p, 'not-a-file');
+  for (const file of scan.files) deleteArchivedFile(file, { apply, now, archiveMaxAgeMs, env, out, skip, fail });
+  if (apply) pruneEmptyDirs(archiveRoot);
+}
+
+function sessionArchiveDestination(src, root, agent, taken) {
+  const parts = path.resolve(src).split(path.sep).filter(Boolean);
+  for (let depth = 1; depth <= Math.min(parts.length, 4); depth += 1) {
+    const name = parts.slice(-depth).join('__');
+    const dest = path.join(root, agent, name);
+    if (samePath(src, dest)) return { dest, same: true };
+    const key = pathKey(dest);
+    if (!taken.has(key) && !fs.existsSync(dest)) { taken.add(key); return { dest }; }
+  }
+  return null;
+}
+
+function archiveOneSessionFile(input, { root, agent, apply, taken, out }) {
+  const src = path.resolve(String(input));
+  let stat;
+  try { stat = fs.lstatSync(src); } catch (error) { out.errors.push({ path: src, error: message(error) }); return; }
+  if (isLinkLike(src, { stat })) { out.skipped.push({ path: src, reason: 'link' }); return; }
+  if (!stat.isFile()) { out.skipped.push({ path: src, reason: 'not-a-file' }); return; }
+  const pick = sessionArchiveDestination(src, root, agent, taken);
+  if (!pick) { out.skipped.push({ path: src, reason: 'destination-taken' }); return; }
+  if (pick.same) { out.skipped.push({ path: src, reason: 'already-archived' }); return; }
+  if (apply) {
+    try { moveFile(src, pick.dest); } catch (error) { out.errors.push({ path: src, error: message(error) }); return; }
+  }
+  out.moved.push({ from: src, to: pick.dest });
+  out.movedBytes += stat.size;
+}
+
 /* ------------------------------------------------------------------ the API */
 
 /**
@@ -169,64 +258,11 @@ export async function sweepAgentSessions({ apply = false, now = Date.now(), env 
 
   // Phase 1: move stale session files into the archive, keeping the path
   // relative to the agent's home so two roots of one agent never collide.
-  for (const root of sessionSweepRoots(env)) {
-    let st;
-    try { st = fs.lstatSync(root.dir); } catch (error) {
-      if (error?.code === 'ENOENT') skip(root.dir, 'missing'); else fail(root.dir, error);
-      continue;
-    }
-    if (isLinkLike(root.dir, { stat: st })) { skip(root.dir, 'link-like root'); continue; }
-    if (!st.isDirectory()) { skip(root.dir, 'not-a-directory'); continue; }
-    const scan = scanTree(root.dir);
-    out.errors.push(...scan.errors);
-    for (const p of scan.links) skip(p, 'link');
-    for (const p of scan.special) skip(p, 'not-a-file');
-    for (const file of scan.files) {
-      const underDir = slash(path.relative(root.dir, file.path));
-      if (root.include && !root.include(underDir)) continue; // outside the known session/log subdirs
-      if (now - file.mtimeMs < archiveAfterMs) { skip(file.path, 'too-new'); continue; }
-      const rel = path.relative(root.home, file.path);
-      if (rel.startsWith('..') || path.isAbsolute(rel)) { skip(file.path, 'outside-home'); continue; }
-      const dest = path.join(archiveRoot, root.agent, rel);
-      if (samePath(file.path, dest)) { skip(file.path, 'already-archived'); continue; }
-      if (fs.existsSync(dest)) { skip(file.path, 'destination-exists'); continue; }
-      if (apply) {
-        try { moveFile(file.path, dest); } catch (error) { fail(file.path, error); continue; }
-      }
-      out.moved.push({ from: file.path, to: dest });
-      out.movedBytes += file.size;
-    }
-    if (apply) pruneEmptyDirs(root.dir);
-  }
+  for (const root of sessionSweepRoots(env)) sweepSessionRoot(root, { apply, now, archiveAfterMs, archiveRoot, out, skip, fail });
 
   // Phase 2: archive files past archiveMaxAgeMs are gone for good — still never
   // through a link, and a link-like archive root refuses the whole phase.
-  let archiveStat;
-  try { archiveStat = fs.lstatSync(archiveRoot); } catch (error) {
-    if (error?.code !== 'ENOENT') fail(archiveRoot, error);
-  }
-  if (archiveStat) {
-    if (isLinkLike(archiveRoot, { stat: archiveStat })) {
-      skip(archiveRoot, 'link-like root');
-    } else if (archiveStat.isDirectory()) {
-      const scan = scanTree(archiveRoot);
-      out.errors.push(...scan.errors);
-      for (const p of scan.links) skip(p, 'link');
-      for (const p of scan.special) skip(p, 'not-a-file');
-      for (const file of scan.files) {
-        if (now - file.mtimeMs < archiveMaxAgeMs) { skip(file.path, 'too-new'); continue; }
-        if (artifactHoldOf(file.path, { env })) { skip(file.path, 'indexed-job-artifact'); continue; }
-        if (apply) {
-          try { fs.unlinkSync(file.path); } catch (error) { fail(file.path, error); continue; }
-        }
-        out.deleted.push(file.path);
-        out.freedBytes += file.size;
-      }
-      if (apply) pruneEmptyDirs(archiveRoot);
-    } else {
-      skip(archiveRoot, 'not-a-directory');
-    }
-  }
+  pruneSessionArchive(archiveRoot, { apply, now, archiveMaxAgeMs, env, out, skip, fail });
 
   // Bytes moved out of the swept homes free their drive exactly like bytes deleted.
   out.freedBytes += out.movedBytes;
@@ -256,32 +292,7 @@ export async function archiveSessionFiles(paths, { archiveRoot, agent, now = Dat
     return out;
   }
   const taken = new Set();
-  const destFor = (src) => {
-    const parts = path.resolve(src).split(path.sep).filter(Boolean);
-    for (let depth = 1; depth <= Math.min(parts.length, 4); depth += 1) {
-      const name = parts.slice(-depth).join('__');
-      const dest = path.join(root, agent, name);
-      if (samePath(src, dest)) return { dest, same: true };
-      const key = pathKey(dest);
-      if (!taken.has(key) && !fs.existsSync(dest)) { taken.add(key); return { dest }; }
-    }
-    return null;
-  };
-  for (const input of paths ?? []) {
-    const src = path.resolve(String(input));
-    let st;
-    try { st = fs.lstatSync(src); } catch (error) { out.errors.push({ path: src, error: message(error) }); continue; }
-    if (isLinkLike(src, { stat: st })) { out.skipped.push({ path: src, reason: 'link' }); continue; }
-    if (!st.isFile()) { out.skipped.push({ path: src, reason: 'not-a-file' }); continue; }
-    const pick = destFor(src);
-    if (!pick) { out.skipped.push({ path: src, reason: 'destination-taken' }); continue; }
-    if (pick.same) { out.skipped.push({ path: src, reason: 'already-archived' }); continue; }
-    if (apply) {
-      try { moveFile(src, pick.dest); } catch (error) { out.errors.push({ path: src, error: message(error) }); continue; }
-    }
-    out.moved.push({ from: src, to: pick.dest });
-    out.movedBytes += st.size;
-  }
+  for (const input of paths ?? []) archiveOneSessionFile(input, { root, agent, apply, taken, out });
   out.freedBytes = out.movedBytes;
   out.ok = out.errors.length === 0;
   return out;
