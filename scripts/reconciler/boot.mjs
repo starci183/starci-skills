@@ -21,6 +21,7 @@ import { lockHolder, markStarting, startingHolder } from '../connectors/lib.mjs'
 import { stopTree } from '../supervisor/host-health.mjs';
 import { CONCERN_OWNER } from './owns.mjs';
 import { translator } from '../lib/i18n.mjs';
+import { driftSummary, engineDrift } from './drift.mjs';
 import { CONTROLLER_NAMES, LEADER_NAME, SKILL_ROOT, START_REASON_ENV, configuredMode, reconcilerConfig, reconcilerNumbers } from './state.mjs';
 import { machineUsage } from '../kernel/usage-report.mjs';
 import { isMain } from '../lib/is-main.mjs';
@@ -214,14 +215,14 @@ export function stopEngine({ env = process.env, stop = (pid) => stopTree(pid), a
   return { ok: stopped.every((item) => item.ok), action: stopped.every((item) => item.ok) ? 'stopped' : 'stop-failed', stopped };
 }
 
-/** --status: {leader, modes: {name: {configured, effective, setBy}}, queue, violations, actions, starts24h, usage (token meter), stateFile}. */
+/** --status: {leader, modes: {name: {configured, effective, setBy, setAt}}, drift: {modes, rev} (drift.mjs), queue, violations, actions, starts24h, usage (token meter), stateFile}. */
 export function status({ env = process.env, now = Date.now(), numbers = reconcilerNumbers(), config = reconcilerConfig() } = {}) {
   const out = { ok: true, stateFile: machineFileFor(env), leader: leaderState({ env, now, numbers }), enabled: config.enabled, modes: {}, queue: {}, queueDepth: 0,
     violations: { open: 0 }, actions: {}, concerns: {}, starts24h: 0 };
-  let effective = {}, setBy = {};
+  let effective = {}, setBy = {}, setAt = {};
   try {
     readMachine((m) => {
-      for (const r of m.db.prepare('SELECT controller, mode, set_by FROM controller_modes').all()) { effective[r.controller] = r.mode; setBy[r.controller] = r.set_by; }
+      for (const r of m.db.prepare('SELECT controller, mode, set_by, set_at FROM controller_modes').all()) { effective[r.controller] = r.mode; setBy[r.controller] = r.set_by; setAt[r.controller] = Number(r.set_at) || 0; }
       for (const r of m.db.prepare('SELECT controller, COUNT(*) AS n, SUM(CASE WHEN tries>0 THEN 1 ELSE 0 END) AS failing FROM engine_queue GROUP BY controller').all()) {
         out.queue[r.controller] = { queued: Number(r.n), failing: Number(r.failing) || 0 };
         out.queueDepth += Number(r.n);
@@ -233,8 +234,9 @@ export function status({ env = process.env, now = Date.now(), numbers = reconcil
     }, null, { env });
   } catch (error) { out.ok = false; out.error = String(error?.message ?? error).slice(0, 200); effective = {}; }
   out.usage = machineUsage({ env, now });
-  for (const name of new Set([...CONTROLLER_NAMES, ...Object.keys(effective)])) out.modes[name] = { configured: configuredMode(name, config), effective: out.leader.fresh ? effective[name] ?? 'off' : 'off', setBy: setBy[name] ?? null };
+  for (const name of new Set([...CONTROLLER_NAMES, ...Object.keys(effective)])) out.modes[name] = { configured: configuredMode(name, config), effective: out.leader.fresh ? effective[name] ?? 'off' : 'off', setBy: setBy[name] ?? null, setAt: setAt[name] ?? null };
   for (const [concern, owner] of Object.entries(CONCERN_OWNER)) out.concerns[concern] = out.leader.fresh && out.modes[owner]?.effective === 'active';
+  out.drift = engineDrift({ leader: out.leader, modes: out.modes, now });
   return out;
 }
 
@@ -266,7 +268,8 @@ const describeStatus = (s) => {
     const failing = q.failing ? `/${q.failing} failing` : '';
     return `${c} ${q.queued}${failing}`;
   }).join(', ') || 'empty';
-  const lines = [`[reconciler] ${state}${l.safe ? ' (safe mode)' : ''}: leader ${l.holder ?? '-'} pid ${l.pid ?? '-'} epoch ${l.epoch ?? '-'} heartbeat ${heartbeat}`,
+  const drift = driftSummary(s.drift);
+  const lines = [...(drift ? [`[reconciler] ${drift}`] : []), `[reconciler] ${state}${l.safe ? ' (safe mode)' : ''}: leader ${l.holder ?? '-'} pid ${l.pid ?? '-'} epoch ${l.epoch ?? '-'} heartbeat ${heartbeat}`,
     `  enabled ${s.enabled}; modes ${modes}`,
     `  queue ${s.queueDepth} (${queue}); open violations ${s.violations.open}; actions 1h ${Object.entries(s.actions).map(([k, n]) => k + ' ' + n).join(', ') || 'none'}; engine starts 24h ${s.starts24h}`,
     `  owned concerns: ${Object.entries(s.concerns).filter(([, v]) => v).map(([k]) => k).join(', ') || 'none (every old loop keeps its duties)'}`,

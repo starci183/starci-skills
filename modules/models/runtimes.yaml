@@ -184,8 +184,9 @@ allocation:
     minDifficulty: hard
     effort: high
   # selfReload (scripts/machine/self-reload.mjs): a watchdog loop re-execs at most once per minIntervalMs; its
-  # replacement takes over the loop's lock within handoverMs or is stopped.
-  selfReload: {minIntervalMs: 300000, handoverMs: 30000}
+  # replacement takes over the loop's lock within handoverMs or is stopped. The reconciler engine checks every checkMs; an engine whose
+  # revision still differs from the live one that long past minIntervalMs + checkMs + handoverMs is a drift row (scripts/reconciler/drift.mjs).
+  selfReload: {minIntervalMs: 300000, handoverMs: 30000, checkMs: 60000, driftGraceMs: 120000}
   # footprint (scripts/guards/footprint-scan.mjs): one host-wide scan at most every everyMs; a crashed
   # tick's claim lock is cleared after lockStaleMs.
   footprint: {everyMs: 600000, lockStaleMs: 60000}
@@ -364,7 +365,7 @@ allocation:
   # heartbeatStaleMs; one starci kernel status snapshot per workflow is shared for statusCacheMs; a failing key backs off
   # backoff.minMs doubling to backoff.maxMs; more than crashLoop.max engine starts in crashLoop.windowMs start it
   # --safe (read-only) and push the owner one urgent Telegram (boot.mjs).
-  reconciler: {pollMs: 2000, leaseMs: 30000, renewMs: 10000, heartbeatStaleMs: 60000, statusCacheMs: 20000, backoff: {minMs: 1000, maxMs: 300000, maxAttempts: 24}, crashLoop: {max: 3, windowMs: 1800000}}
+  reconciler: {pollMs: 2000, leaseMs: 30000, renewMs: 10000, heartbeatStaleMs: 60000, statusCacheMs: 20000, backoff: {minMs: 1000, maxMs: 300000, maxAttempts: 24}, crashLoop: {max: 3, windowMs: 1800000}, modeDriftMs: 60000}
   # resources: the host-floor guards the provider-health / admission path reads. These are the shipped defaults; the owner's
   # config.yaml `resources` (minFreeDiskGb, minFreeDiskPct, minFreeRamPct) overrides them key by key and code holds no number of its own.
   # Below the disk floor (minFreeDiskGb, or minFreeDiskPct of the drive's size when the owner sets it - the larger applies)

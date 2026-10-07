@@ -70,10 +70,25 @@ const controllerItem = (name, mode) => {
   return green('controllers', `mode:${name}`, `controller ${name}`, shown, { required: false });
 };
 
+const RESTART_ENGINE = 'starci reconciler restart (the engine then runs the current code and config)';
+
+/** The drift rows: a controller mode that differs from config.yaml, and an engine on an older code revision than the live one (drift.mjs). */
+function driftItems(s) {
+  const modes = s.drift?.modes ?? [];
+  const rev = s.drift?.rev ?? null;
+  const modeRow = modes.length
+    ? red('engine', 'drift-modes', 'controller modes follow config.yaml', modes.map((m) => `${m.controller} configured ${m.configured} runs ${m.effective}`).join('; '), RESTART_ENGINE)
+    : green('engine', 'drift-modes', 'controller modes follow config.yaml', 'no controller differs from its configured mode');
+  const revRow = rev
+    ? red('engine', 'drift-rev', 'engine runs the live code revision', `engine ${String(rev.engineRev).slice(0, 9)}, live ${String(rev.liveRev).slice(0, 9)}: its reload did not happen`, RESTART_ENGINE)
+    : green('engine', 'drift-rev', 'engine runs the live code revision', 'no reload is owed');
+  return [modeRow, revRow];
+}
+
 /** Engine and controller rows from boot.mjs status(). Pure over the status. */
 export function engineItems(s, { safeIsCrashLoop = false } = {}) {
   const shadowed = safeShadowOf(s);
-  return [leaderItem(s.leader), safeModeItem(s, safeIsCrashLoop, shadowed), ...Object.keys(s.modes).map((name) => controllerItem(name, s.modes[name]))];
+  return [leaderItem(s.leader), safeModeItem(s, safeIsCrashLoop, shadowed), ...driftItems(s), ...Object.keys(s.modes).map((name) => controllerItem(name, s.modes[name]))];
 }
 
 const SERVICE_LABEL = { orca: 'Orca', 'harness-ui': 'harness UI (local /healthz)', 'harness-tunnel': 'harness tunnel (public /healthz)', 'ask-gateway': 'ask gateway', 'ask-tunnel': 'ask tunnel', 'telegram-bridge': 'Telegram bridge' };

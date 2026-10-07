@@ -17,6 +17,9 @@ engine:
     workqueue: scripts/reconciler/workqueue.mjs
     ctx: scripts/reconciler/ctx.mjs            # the ctx every controller acts through
     testing: scripts/reconciler/testing.mjs    # fakeCtx(overrides), tempState() for specs
+    modes: scripts/reconciler/engine-modes.mjs # config.yaml -> effective modes; an unreadable config keeps the running modes (ENGINE_CONFIG_UNREADABLE)
+    reload: scripts/reconciler/reload-env.mjs  # the replacement's environment when the running code cannot read config.yaml; reload-bounds.mjs holds the watched paths and the bound
+    drift: scripts/reconciler/drift.mjs        # controller mode vs config.yaml and engine revision vs live HEAD, seen by boot --status and the start rows
   state: machine.sqlite through engine/db/machine.mjs (DBTREE.sql B2); tables engine_leader + leader_history, process_runs, engine_cursors, engine_queue, engine_actions, schedules, sla_episodes, services + service_events, controller_modes + mode_changes
   heartbeat: engine_leader.heartbeat_at and process_runs.last_heartbeat_at, every allocation.reconciler.renewMs
   log: machine_logs actor reconciler (no text log)

@@ -57,6 +57,7 @@ import { eachInOrder, repeatInOrder } from '../lib/in-order.mjs';
 import { crashHandler, logSafeReevaluated, onceLine } from './engine-process.mjs';
 import { runOnce } from './engine-once.mjs';
 import { readModes, writeModes } from './engine-modes.mjs';
+import { RELOAD_CHECK_MS, RELOAD_HEAD_PATHS } from './reload-bounds.mjs';
 import { releasePinnedTemp, reloadEnv, startTempRoot } from './reload-env.mjs';
 import { positiveNumber } from '../lib/number.mjs';
 import { valueAfter } from '../lib/cli-arg.mjs';
@@ -67,7 +68,6 @@ const SLA_PASS_MS = 30_000;
 /** The Decision Item SLA ladder (scripts/machine/decisions.mjs escalateDue) runs this often; applied only when active. */
 const ESCALATE_MS = 60_000;
 const CONFIG_REFRESH_MS = 10_000;
-const RELOAD_CHECK_MS = 60_000;
 export const DEFAULTS = Object.freeze({ resyncMs: 60_000, concurrency: 1, timeoutMs: 300_000 });
 /** An intent/running action older than this, from an earlier epoch, is `unknown` (DESIGN §7.6). */
 const STALE_ACTION_MS = 150_000;
@@ -550,17 +550,9 @@ export class Engine {
 
 /** What the engine process itself runs; a change to one of them (or a new runtime HEAD) reloads it. */
 const reloadWatchedFiles = (root = SKILL_ROOT) => [
-  'scripts/reconciler/engine.mjs', 'scripts/reconciler/engine-once.mjs', 'scripts/reconciler/engine-process.mjs', 'scripts/reconciler/ctx.mjs', 'scripts/reconciler/sources.mjs', 'scripts/reconciler/state.mjs',
+  'scripts/reconciler/engine.mjs', 'scripts/reconciler/engine-once.mjs', 'scripts/reconciler/engine-process.mjs', 'scripts/reconciler/engine-modes.mjs', 'scripts/reconciler/reload-env.mjs', 'scripts/reconciler/reload-bounds.mjs', 'scripts/reconciler/ctx.mjs', 'scripts/reconciler/sources.mjs', 'scripts/reconciler/state.mjs',
   'scripts/reconciler/owns.mjs', 'scripts/reconciler/workqueue.mjs', 'scripts/reconciler/heartbeat-worker.mjs', 'scripts/reconciler/boot.mjs', 'scripts/machine/self-reload.mjs', 'engine/config.mjs', 'modules/models/runtimes.yaml',
 ].map((rel) => path.join(root, ...rel.split('/')));
-
-/**
- * What the engine imports in process (controllers, the supervisor helpers they wrap, the ledger engine, the numbers):
- * a new runtime HEAD reloads the engine only when it changed a file under these (MB-01: every land of docs or ops
- * contracts re-exec'd the engine about every 6 minutes). Children (cli.mjs, push-mains.mjs, ...) start fresh anyway.
- */
-const RELOAD_HEAD_PATHS = Object.freeze(['scripts/reconciler/', 'scripts/supervisor/', 'scripts/machine/', 'scripts/lib/', 'scripts/connectors/lib.mjs',
-  'scripts/kernel/', 'scripts/api/orca/', 'engine/', 'modules/reconciler/', 'modules/models/runtimes.yaml']);
 
 /**
  * Safe mode of a start. A fresh start (boot ensure) is safe exactly when it was given --safe. A self-reload is NOT
