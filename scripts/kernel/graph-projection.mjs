@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { jobResult } from '../../engine/db/ledger.mjs';
 import { unresolvedFailures } from './failure-steps.mjs';
 import { domainsOfPaths, latestVersion as latestGraphVersion } from '../work/work-graph-store.mjs';
-import { deferredFieldOf, legStatusColorOf } from './leg-status-view.mjs';
+import { deferredFieldOf, externalOpsOf, legStatusColorOf } from './leg-status-view.mjs';
 import { ownerLanguage as ownerLanguageOf, translator } from '../lib/i18n.mjs';
 import { jobPayloadOf, latestGoal } from './verbs/shared/rows.mjs';
 import { isLiveProofOp } from './ask-server.mjs';
@@ -214,9 +214,12 @@ const legsOf = (ctx) => {
   const ops = [...legOps, ...[...jobsByOp.keys()].filter((op) => !legOps.includes(op))];
   const provisional = autopilot?.provisionalOps ?? new Set();
   const tr = translator(ownerLanguage());
+  const external = externalOpsOf(skillRoot);
   const legs = ops.map((op) => {
     const rows = (jobsByOp.get(op) ?? []).filter((row) => row.status !== 'cancelled');
     const latest = rows.at(-1) ?? null;
+    // An external leg (request.analyze) is run by the chat intake before the workflow exists: no job, so never gray-and-waiting.
+    if (!rows.length && external.has(op)) return { op, color: 'external', label: tr('run by the chat intake, not dispatched here'), jobId: null, status: null };
     // Autopilot: a leg whose open work is only deferred reads `deferred`; a green leg resting on a provisional
     // acceptance reads green-provisional, labelled by PROVISIONAL_LABEL (the owner reviews it once at handover).
     if (rows.length && rows.every((row) => row.status === 'succeeded' || deferredJobs.has(row.job_id) || !['queued', 'failed', ...LEG_IN_FLIGHT].includes(row.status))

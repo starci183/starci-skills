@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { withKernelIngress } from '../helpers/kernel-ingress-fixture.mjs';
 import { kernelAuthorityOf } from '../../scripts/kernel/verbs/shared/kernel-seat.mjs';
-import { kernelReadManifest, verifyKernelRead, requireKernelRead } from '../../scripts/kernel/required-read.mjs';
+import { kernelReadManifest, verifyKernelRead, requireKernelRead, unreadFiles } from '../../scripts/kernel/required-read.mjs';
 import { callerAdmission } from '../../scripts/kernel/caller-admission.mjs';
 import ackRev from '../../scripts/kernel/verbs/kernel-ack-rev.mjs';
 import { ENGINE_SCHEMA } from '../../engine/constants.mjs';
@@ -24,6 +24,19 @@ test('required READ plan is complete and server-derived; exact attestation alone
     const wrong=structuredClone(required);tamper(wrong);assert.throws(() => verifyKernelRead(wrong,required),{ code: 'kernel-read-unverified' });
   }
   assert.throws(() => admitRead(w),{ code: 'kernel-read-unverified' });ack(w,required);admitRead(w);
+}));
+
+test('a new leg refuses naming only the files this incarnation has not attested; the plan lists the same unread set', t => withKernelIngress(t,w => {
+  const boot=kernelReadManifest(w.ledger.db,w.workflowId,{ ...options(w),ops: [] });
+  assert.equal(unreadFiles(w.ledger.db,w.workflowId,boot).length,boot.files.length,'at boot every required file is unread');
+  ack(w,boot);
+  const required=kernelReadManifest(w.ledger.db,w.workflowId,options(w));
+  const unread=unreadFiles(w.ledger.db,w.workflowId,required);
+  assert.ok(unread.includes('modules/ops/ops/review.verify.yaml'));
+  assert.ok(unread.length<required.files.length&&!unread.includes('modules/kernel/api.yaml'),'only the files of the new leg remain unread');
+  assert.throws(() => admitRead(w),error => error.code==='kernel-read-unverified'&&error.message.includes('modules/ops/ops/review.verify.yaml')&&!error.message.includes('modules/kernel/api.yaml'));
+  ack(w,required);
+  assert.deepEqual(unreadFiles(w.ledger.db,w.workflowId,required),[]);
 }));
 
 test('boot provenance and an empty READ acknowledgement do not acknowledge current bytes; replaced incarnation owes its own read', t => withKernelIngress(t,w => {

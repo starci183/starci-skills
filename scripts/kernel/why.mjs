@@ -19,6 +19,7 @@ import { blobPath } from '../../engine/db/blob.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { translator } from '../lib/i18n.mjs';
 import { clipLine } from '../lib/clip.mjs';
+import { latestCheckRuns } from '../machine/evidence-store.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const WHY_SCHEMA = 'starci/why@1';
@@ -380,8 +381,8 @@ export function computeWhy(ledger, attemptRow, { catalog = loadCatalog(), readBl
   const db = handleDb(ledger);
   const attempt = typeof attemptRow === 'object' ? attemptRow : one(db, 'SELECT * FROM op_attempts WHERE attempt_id=?', attemptRow);
   if (!attempt) return null;
-  const checks = many(db, 'SELECT name,phase,runner,authority,status,exit_code,declared_exit_code,summary_json,stdout_sha,output_sha FROM check_runs WHERE attempt_id=? ORDER BY check_id', attempt.attempt_id)
-    .map((row) => checkFacts(row, readBlob));
+  // Only each check's latest run speaks: a red re-run that a later run of the same check superseded is not the reason.
+  const checks = latestCheckRuns(db, attempt.attempt_id).map((row) => checkFacts(row, readBlob));
   for (const c of checks) for (const key of kebabTokens(`${c.evidence ?? ''} ${c.lines.join(' ')}`, catalog)) if (!c.codes.includes(key)) c.codes.push(key);
   const report = one(db, 'SELECT report_id, report_json FROM reports WHERE attempt_id=?', attempt.attempt_id);
   const unit = attempt.unit_id ? one(db, 'SELECT tries, try_budget, state FROM work_units WHERE workflow_id=? AND unit_id=?', attempt.workflow_id, attempt.unit_id) : null;

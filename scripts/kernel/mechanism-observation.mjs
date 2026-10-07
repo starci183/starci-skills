@@ -22,7 +22,8 @@ const plain = (file) => {
   }
   return path.resolve(file);
 };
-const flag = (args, name) => {
+/** The one value of a `--name value` or `--name=value` argument; null when absent, a throw when repeated or empty. */
+export const flag = (args, name) => {
   const values = [];
   for (let i = 0; i < args.length; i += 1) {
     if (args[i] === name) values.push(args[++i]);

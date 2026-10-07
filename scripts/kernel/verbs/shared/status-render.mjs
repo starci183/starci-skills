@@ -254,7 +254,7 @@ const hostPhase = (s) => {
 const attachLegWhys = (db, workflowId, legs) => {
   let newestWhy = null;
   for (const leg of legs) {
-    if (['green', 'green-provisional', 'deferred'].includes(leg.color)) continue;
+    if (['green', 'green-provisional', 'deferred', 'external'].includes(leg.color)) continue;
     const rows = db.prepare('SELECT * FROM op_attempts WHERE workflow_id=? AND op_id=? AND dispatched_at IS NOT NULL ORDER BY attempt_id DESC LIMIT 6').all(workflowId, leg.op);
     const attempts = rows.map((a) => ({ attemptId: a.attempt_id, tryNo: a.try_no, verdict: a.verdict ?? null, endState: a.end_state ?? null, why: whyOf(db, a) })).filter((a) => a.why);
     if (!attempts.length) continue;

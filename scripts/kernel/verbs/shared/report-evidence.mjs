@@ -133,6 +133,15 @@ function attachmentFacts(rel) {
   return { role, runId, round };
 }
 
+/** Every file the --attach values name (a directory contributes every file under it) plus the runtime's own agent-data folders: [{abs, rel}], rel relative to the scratch. */
+export function attachedFilesOf(attach, scratch) {
+  const auto = AUTO_ATTACH.map((d) => path.join(scratch, d)).filter((d) => fs.existsSync(d));
+  return [...attach, ...auto].flatMap((given) => {
+    const target = scratchFile(given, scratch, 'report attachment', { dirs: true });
+    return (fs.statSync(target).isDirectory() ? filesUnder(target) : [target]).map((abs) => ({ abs, rel: slash(path.relative(scratch, abs)) }));
+  });
+}
+
 /**
  * Put every file the report carries in the blob store, BEFORE the report transaction: each --attach file (or every
  * file of an --attach directory) as attachments/<its path in the scratch>, each check's stdout/stderr/output as
@@ -155,14 +164,7 @@ export function stageReportEvidence({ report, scratch, attach = [], opId = null,
   };
   // The runtime's own agent-data folders in the scratch ride along even when the op did not name them: a draw loop's
   // rounds and bundle (draw-loop.mjs) and its captures must be ledger artifacts, or the blob GC could sweep them.
-  const auto = AUTO_ATTACH.map((d) => path.join(scratch, d)).filter((d) => fs.existsSync(d));
-  for (const given of [...attach, ...auto]) {
-    const target = scratchFile(given, scratch, 'report attachment', { dirs: true });
-    for (const abs of fs.statSync(target).isDirectory() ? filesUnder(target) : [target]) {
-      const rel = slash(path.relative(scratch, abs));
-      add({ abs, name: `attachments/${rel}`, ...attachmentFacts(rel) });
-    }
-  }
+  for (const { abs, rel } of attachedFilesOf(attach, scratch)) add({ abs, name: `attachments/${rel}`, ...attachmentFacts(rel) });
   (report.checks ?? []).forEach((check, index) => {
     for (const [field, role, stream] of CHECK_FILE_FIELDS) {
       if (check[field] === undefined) continue;

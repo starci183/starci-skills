@@ -8167,6 +8167,26 @@ draw-review-owed:
   nextStep_vi: "Báo cáo chưa được nhận; op gửi câu hỏi kết quả để chủ duyệt bản vẽ rồi báo lại."
   owner: op-retry
   kind: verb-refusal
+report-proof-producer-missing:
+  title: "Report lists no native producer of a mechanism proof"
+  title_vi: "Báo cáo không liệt kê lệnh sinh bằng chứng cơ chế"
+  meaning_vi: "Op của bạn nợ một bằng chứng cơ chế (knowledge/op-gate.yaml opProofs, ví dụ READ) nhưng report.checks không có lệnh starci canonical sinh ra nó. Runtime tự chạy lại lệnh đó để quan sát; tệp đính kèm một mình không thay được lần chạy."
+  causes_vi:
+    - "lệnh starci gate read (hoặc gate run, gate unit, app lint ...) chạy tay nhưng không nằm trong report.checks"
+    - "lệnh trong report.checks không phải argv canonical (có shell, placeholder hoặc cờ ghi)"
+  nextStep_vi: "Báo cáo chưa được nhận; thêm lệnh mà thông báo nêu vào report.checks (--out có thể trỏ vào scratch, runtime bỏ cờ này khi chạy lại) rồi báo lại trong cùng lượt."
+  owner: op-retry
+  kind: verb-refusal
+report-proof-document-missing:
+  title: "Report attaches no document of a mechanism proof"
+  title_vi: "Báo cáo không đính kèm tài liệu của bằng chứng cơ chế"
+  meaning_vi: "Lệnh sinh bằng chứng đã nằm trong report.checks nhưng tài liệu nó in ra (ví dụ read-digest.json) không có trong các tệp --attach."
+  causes_vi:
+    - "lệnh chạy không có --out hoặc --out không nằm trong scratch"
+    - "tệp không được truyền cho --attach"
+  nextStep_vi: "Báo cáo chưa được nhận; chạy lệnh với --out dưới scratch, đính kèm tệp đó rồi báo lại trong cùng lượt."
+  owner: op-retry
+  kind: verb-refusal
 draw-review-unjudged:
   title: "Draw review guard could not judge"
   title_vi: "Bộ canh duyệt bản vẽ không đọc được bản ghi"
