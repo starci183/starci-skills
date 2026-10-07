@@ -219,7 +219,9 @@ export function requireDecision(db, workflowId, id) {
 
 /* ------------------------------------------------------------ overrides (local op variants) */
 
-const WEAKEN = /\b(skip|disable|ignore|bypass|weaken|relax|suppress|turn off|comment out|eslint-disable|no-verify)\b[^.]{0,60}\b(check|gate|test|lint|scan|validator|canon|rule|typecheck|tsc|spec|proof)s?\b/i;
+const WEAKEN_ACTION = String.raw`\b(skip|disable|ignore|bypass|weaken|relax|suppress|turn off|comment out|eslint-disable|no-verify)\b`;
+const WEAKEN_TARGET = String.raw`[^.]{0,60}\b(check|gate|test|lint|scan|validator|canon|rule|typecheck|tsc|spec|proof)s?\b`;
+const WEAKEN = new RegExp(WEAKEN_ACTION + WEAKEN_TARGET, 'i');
 const DIFFICULTIES = ['easy', 'medium', 'hard', 'insane'];
 
 const overrideValidators = new Map([
@@ -311,7 +313,10 @@ export function refuseSettleBacklog(db, workflowId, verb, { now = Date.now() } =
   const backlog = kernelDecisionItems(db, workflowId, { now, ageMs: s.ageMs });
   if (backlog.length >= s.max) {
     const jobName = (b) => b.jobId ?? `${b.op}#${b.attempt}`;
-    const describeJob = (b) => `${jobName(b)} (${b.outcome}${b.reason ? `, ${b.reason}` : ''}, ${b.ageMin}m)`;
+    const describeJob = (b) => {
+      const reason = b.reason ? `, ${b.reason}` : '';
+      return `${jobName(b)} (${b.outcome}${reason}, ${b.ageMin}m)`;
+    };
     const waiting = backlog.slice(0, 12).map(describeJob).join(', ');
     const age = Math.round(s.ageMs / 60_000);
     throw Object.assign(new Error(`settle-backlog: ${backlog.length} reported job(s) of ${workflowId} wait on your settle decision for more than ${age}m - DECIDE THEM FIRST (driver-loop.yaml progress.settleFirst; starci kernel status settleDecisions): starci kernel settle --job <id> --verdict <fail|blocked from its report>, or re-run its checks (starci kernel record-checks) and settle pass, for ${waiting}; then ${verb} again`), { code: 'settle-backlog', backlog });
