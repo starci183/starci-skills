@@ -26,7 +26,7 @@ import { machineUsage } from '../kernel/usage-report.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { reconcilerTaskScript } from '../machine/task-register.mjs';
 
-const ENGINE_FILE = path.join(SKILL_ROOT, 'scripts', 'reconciler', 'engine.mjs');
+export const ENGINE_FILE = path.join(SKILL_ROOT, 'scripts', 'reconciler', 'engine.mjs');
 export { starciShimPath } from '../machine/task-register.mjs';
 /**
  * MB-04: a draining engine (reload handover) or one whose workers:push child still runs is left alone this long past a
