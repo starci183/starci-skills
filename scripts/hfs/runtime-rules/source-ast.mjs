@@ -120,20 +120,29 @@ export function relativeImportTargets(ctx, file) {
   });
 }
 
+/** Adds the names `name` binds (an identifier, or the elements of a destructuring pattern) to `names`. */
+function addBoundNames(t, name, names) {
+  if (!name) return;
+  if (t.isIdentifier(name)) names.add(name.text);
+  else if (t.isObjectBindingPattern(name) || t.isArrayBindingPattern(name)) for (const el of name.elements) if (!t.isOmittedExpression(el)) addBoundNames(t, el.name, names);
+}
+
+const isNamedDeclaration = (t, node) => (t.isFunctionDeclaration(node) || t.isClassDeclaration(node) || t.isFunctionExpression(node) || t.isClassExpression(node)) && node.name;
+
+/** Adds the local name `node` binds, when it binds one, to `names`. */
+function addNodeBindings(t, node, names) {
+  if (t.isVariableDeclaration(node) || t.isParameter(node)) addBoundNames(t, node.name, names);
+  else if (isNamedDeclaration(t, node)) names.add(node.name.text);
+  else if (t.isImportClause(node) && node.name) names.add(node.name.text);
+  else if (t.isNamespaceImport(node) || t.isImportSpecifier(node)) names.add(node.name.text);
+}
+
 /** Every local name a parsed file binds: variable and parameter names (destructuring included), functions, classes, imports. */
 export function localBindings(source) {
   const t = ts();
   const names = new Set();
-  const bindName = (name) => {
-    if (!name) return;
-    if (t.isIdentifier(name)) names.add(name.text);
-    else if (t.isObjectBindingPattern(name) || t.isArrayBindingPattern(name)) for (const el of name.elements) if (!t.isOmittedExpression(el)) bindName(el.name);
-  };
   const visit = (node) => {
-    if (t.isVariableDeclaration(node) || t.isParameter(node)) bindName(node.name);
-    else if ((t.isFunctionDeclaration(node) || t.isClassDeclaration(node) || t.isFunctionExpression(node) || t.isClassExpression(node)) && node.name) names.add(node.name.text);
-    else if (t.isImportClause(node) && node.name) names.add(node.name.text);
-    else if (t.isNamespaceImport(node) || t.isImportSpecifier(node)) names.add(node.name.text);
+    addNodeBindings(t, node, names);
     t.forEachChild(node, visit);
   };
   visit(source);

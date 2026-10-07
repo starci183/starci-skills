@@ -26,7 +26,7 @@ import { braceVariants, globExpression } from '../lib/glob.mjs';
 import { cleanSlotPath } from './slot-path.mjs';
 import { captureNames } from '../lib/i18n.mjs';
 import { isPlainObject } from '../../engine/plain-object.mjs';
-import { APP_KIND, ENV_PREFIX, RUNTIME_KIND, manifestKind } from './manifest-shape.mjs';
+import { APP_KIND, RUNTIME_KIND, manifestKind } from './manifest-shape.mjs';
 import { APP_SCOPE, manifestShapeProblems, PROFILES } from './slot-manifest-shape.mjs';
 import { manifestSemanticProblems } from './slot-semantic-problems.mjs';
 import { declaredSlotEnabled } from './declaration-slots.mjs';
@@ -81,17 +81,17 @@ function segmentWeight(segment) {
 
 /** The RegExp source of one pattern segment (no separators); variables capture, and are listed in `names`. */
 function segmentSource(segment, names) {
-  let source = '', i = 0;
-  while (i < segment.length) {
+  let source = '', variableEnd = -1;
+  for (let i = 0; i < segment.length; i += 1) {
     const c = segment[i];
+    if (i <= variableEnd) continue;
     if (c === '<') {
-      const end = segment.indexOf('>', i);
-      names.push(segment.slice(i + 1, end));
+      variableEnd = segment.indexOf('>', i);
+      names.push(segment.slice(i + 1, variableEnd));
       source += '([^/]+?)';
-      i = end;
     } else if (c === '*') source += '[^/]*';
     else if (c === '?') source += '[^/]';
-    else source += /[.+^${}()|[\]\\]/.test(c) ? `\\${c}` : c; i += 1;
+    else source += /[.+^${}()|[\]\\]/.test(c) ? `\\${c}` : c;
   }
   return source;
 }

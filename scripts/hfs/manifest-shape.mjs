@@ -8,7 +8,7 @@ import { stringList, byCodeUnit } from '../lib/list.mjs';
 
 export const SEMVER = /^(\d+)\.(\d+)\.(\d+)$/;
 export const NAME = /^[a-z][a-z0-9-]*$/;
-export const ENV_PREFIX = /^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$/;
+const ENV_PREFIX =/^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$/;
 /** How a bounded context (a connection) is isolated: its own logical database, or its own schema of a shared one. */
 const CONTEXT_ISOLATIONS = Object.freeze(["database", "schema"]);
 /** The app kinds that may own a context: the services, never the migrate or cli apps that only run migrations. */

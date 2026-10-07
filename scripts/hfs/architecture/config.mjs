@@ -85,25 +85,22 @@ function admitWorkspace(root, directories, queue, candidate, label = 'local pack
   if (!directories.has(relative)) { directories.add(relative); queue.push(absolute); }
 }
 
+function expandSegment(base, segment) {
+  if (segment !== '*') return [path.join(base, segment)];
+  if (!fs.existsSync(base) || !fs.lstatSync(base).isDirectory()) return [];
+  return fs.readdirSync(base, { withFileTypes: true })
+    .filter(item => item.isDirectory())
+    .sort((a, b) => byCodeUnit(a.name, b.name))
+    .map(item => path.join(base, item.name));
+}
+
 function workspaceCandidates(packageRoot, normalized) {
   const segments = normalized.split('/');
   if (path.isAbsolute(normalized) || segments.some(segment => segment === '..' || (segment.includes('*') && segment !== '*'))) {
     throw new Error(`Unsupported local workspace pattern: ${normalized}.`);
   }
   let candidates = [packageRoot];
-  for (const segment of segments) {
-    const next = [];
-    for (const base of candidates) {
-      if (segment === '*') {
-        if (!fs.existsSync(base) || !fs.lstatSync(base).isDirectory()) continue;
-        next.push(...fs.readdirSync(base, { withFileTypes: true })
-          .filter(item => item.isDirectory())
-          .sort((a, b) => byCodeUnit(a.name, b.name))
-          .map(item => path.join(base, item.name)));
-      } else next.push(path.join(base, segment));
-    }
-    candidates = next;
-  }
+  for (const segment of segments) candidates = candidates.flatMap(base => expandSegment(base, segment));
   return { candidates, wildcard: segments.includes('*') };
 }
 

@@ -71,6 +71,17 @@ function chainOf(ts, expression) {
   return ts.isIdentifier(current) ? [current.text, ...names] : null;
 }
 
+/** The initializer of `const <name> = ...` at the top level of `file`. */
+function topLevelConst(ts, file, name) {
+  for (const statement of file.sourceFile.statements) {
+    if (!ts.isVariableStatement(statement)) continue;
+    for (const declaration of statement.declarationList.declarations) {
+      if (ts.isIdentifier(declaration.name) && declaration.name.text === name && declaration.initializer) return declaration.initializer;
+    }
+  }
+  return null;
+}
+
 /**
  * The judge of one app: resolves an import of a parsed file to a repository-relative path, finds the top-level const of a file,
  * and reads files once.
@@ -88,17 +99,7 @@ function judgeOf(ts, repoRoot, side) {
     const rel = path.relative(repoRoot, resolved).split(path.sep).join('/');
     return rel.startsWith('..') ? null : rel;
   };
-  /** The initializer of `const <name> = ...` at the top level of `file`. */
-  const constOf = (file, name) => {
-    for (const statement of file.sourceFile.statements) {
-      if (!ts.isVariableStatement(statement)) continue;
-      for (const declaration of statement.declarationList.declarations) {
-        if (ts.isIdentifier(declaration.name) && declaration.name.text === name && declaration.initializer) return declaration.initializer;
-      }
-    }
-    return null;
-  };
-  return { parsed, resolve, constOf };
+  return { parsed, resolve, constOf: (file, name) => topLevelConst(ts, file, name) };
 }
 
 /** Whether `rel` lies in the integration folder `folder` (its index or any file of it). */
@@ -157,37 +158,63 @@ function exportsEnum(ts, judge, rel, name, depth = 0) {
   return false;
 }
 
+/** The `modules` property of a `useTestWorld({ modules })` call that `node` is, or null. */
+function worldModulesProperty(ts, spec, node) {
+  if (!ts.isCallExpression(node) || !ts.isIdentifier(node.expression) || node.expression.text !== 'useTestWorld' || !spec.imports.has('useTestWorld')) return null;
+  const [argument] = node.arguments;
+  if (!argument || !ts.isObjectLiteralExpression(argument)) return null;
+  return argument.properties.find((property) => ts.isPropertyAssignment(property) && ts.isIdentifier(property.name) && property.name.text === 'modules') ?? null;
+}
+
+/** Whether a `useTestWorld` call of `spec` registers the integration; the variables holding a world join `worlds`. */
+function registersInWorld(ts, judge, spec, folder, worlds) {
+  let proven = false;
+  walk(ts, spec.sourceFile, (node) => {
+    const modules = worldModulesProperty(ts, spec, node);
+    if (!modules) return;
+    if (ts.isVariableDeclaration(node.parent) && ts.isIdentifier(node.parent.name)) worlds.add(node.parent.name.text);
+    if (elementsOf(ts, judge, spec, modules.initializer).some((element) => registersIntegration(ts, judge, element, folder))) proven = true;
+  });
+  return proven;
+}
+
+/** The local names of the enums the spec imports from the integration folder. */
+function enumBindingsOf(ts, judge, spec, folder) {
+  return new Set(
+    [...spec.imports].filter(([, binding]) => {
+      const target = judge.resolve(spec.rel, binding.source);
+      return insideFolder(target, folder) && exportsEnum(ts, judge, target, binding.imported);
+    }).map(([local]) => local),
+  );
+}
+
+/** Whether the property access `node` of the world chain `chain` is a call of an outage verb. */
+function isOutageCall(ts, node, chain) {
+  const [, area, name, call] = chain;
+  if (!(ts.isCallExpression(node.parent) && node.parent.expression === node)) return false;
+  return (area === 'infra' && name !== undefined && INFRA_OUTAGES.has(call))
+    || area === 'interruptDatabase'
+    || (OUTAGE_CALLS[area] !== undefined && name !== undefined && call === OUTAGE_CALLS[area]);
+}
+
+/** Whether `node` reaches an outage through a world variable of `worlds`. */
+function drivesOutage(ts, node, worlds) {
+  if (!ts.isPropertyAccessExpression(node)) return false;
+  const chain = chainOf(ts, node);
+  return Boolean(chain) && worlds.has(chain[0]) && isOutageCall(ts, node, chain);
+}
+
 /** What one spec proves about the integration in `folder`: { modules, errorCode, outage }. */
 function judgeSpec(ts, judge, rel, folder) {
   const spec = judge.parsed(rel);
   const result = { modules: false, errorCode: false, outage: false };
   if (!spec) return result;
   const worlds = new Set();
-  walk(ts, spec.sourceFile, (node) => {
-    if (!ts.isCallExpression(node) || !ts.isIdentifier(node.expression) || node.expression.text !== 'useTestWorld' || !spec.imports.has('useTestWorld')) return;
-    const [argument] = node.arguments;
-    if (!argument || !ts.isObjectLiteralExpression(argument)) return;
-    const modules = argument.properties.find((property) => ts.isPropertyAssignment(property) && ts.isIdentifier(property.name) && property.name.text === 'modules');
-    if (!modules) return;
-    if (ts.isVariableDeclaration(node.parent) && ts.isIdentifier(node.parent.name)) worlds.add(node.parent.name.text);
-    if (elementsOf(ts, judge, spec, modules.initializer).some((element) => registersIntegration(ts, judge, element, folder))) result.modules = true;
-  });
-  const enumBindings = new Set(
-    [...spec.imports].filter(([, binding]) => {
-      const target = judge.resolve(rel, binding.source);
-      return insideFolder(target, folder) && exportsEnum(ts, judge, target, binding.imported);
-    }).map(([local]) => local),
-  );
+  result.modules = registersInWorld(ts, judge, spec, folder, worlds);
+  const enumBindings = enumBindingsOf(ts, judge, spec, folder);
   walk(ts, spec.sourceFile, (node) => {
     if (ts.isIdentifier(node) && enumBindings.has(node.text) && !ts.isImportSpecifier(node.parent)) result.errorCode = true;
-    if (!ts.isPropertyAccessExpression(node)) return;
-    const chain = chainOf(ts, node);
-    if (!chain || !worlds.has(chain[0])) return;
-    const [, area, name, call] = chain;
-    const called = ts.isCallExpression(node.parent) && node.parent.expression === node;
-    if ((area === 'infra' && name !== undefined && INFRA_OUTAGES.has(call) && called)
-      || (area === 'interruptDatabase' && called)
-      || (OUTAGE_CALLS[area] !== undefined && name !== undefined && call === OUTAGE_CALLS[area] && called)) result.outage = true;
+    if (drivesOutage(ts, node, worlds)) result.outage = true;
   });
   return result;
 }

@@ -14,6 +14,16 @@ const LOCAL_RULE_FILE = /(?:^|\/)(?:eslint-local-rules|eslint-plugin|eslint-loca
 const CHECK_SCRIPT = /(?:^|\/)(?:scripts|tools)\/check-[^/]+$/;
 const RUNS_CHECK = /(?:^|[\s&|;(])(?:\.\/)?(?:scripts|tools)\/check-[^\s&|;)]+/;
 
+/** The findings of the package.json scripts of `file` that run a repository-local check. */
+function scriptFindings(repoRoot, file) {
+  const findings = [];
+  const pkg = readJson(repoRoot, file);
+  for (const [name, command] of Object.entries(pkg?.scripts ?? {})) {
+    if (RUNS_CHECK.test(String(command))) findings.push(found(REPO_LOCAL_CHECK, file, `${file} script ${name} runs a repository-local check (${String(command).slice(0, 80)}); delete the script, the check belongs to the .claude runtime`));
+  }
+  return findings;
+}
+
 /** The findings of R103 over the tracked paths `files` of the repository at `repoRoot`. */
 export function repoLocalCheckFindings({ repoRoot, files }) {
   const findings = [];
@@ -21,12 +31,7 @@ export function repoLocalCheckFindings({ repoRoot, files }) {
     if (file.includes('node_modules/')) continue;
     if (LOCAL_RULE_FILE.test(file)) findings.push(found(REPO_LOCAL_CHECK, file, `${file} is a local lint rule or plugin; a repository keeps no rule of its own: the rule is proposed to the canon (@starci/eslint-canon-*) in the .claude runtime`));
     else if (CHECK_SCRIPT.test(file)) findings.push(found(REPO_LOCAL_CHECK, file, `${file} is a check kept in the repository; every check lives in the .claude runtime (starci app check, the canons), so a repository has none to keep`));
-    else if (file === 'package.json' || file.endsWith('/package.json')) {
-      const pkg = readJson(repoRoot, file);
-      for (const [name, command] of Object.entries(pkg?.scripts ?? {})) {
-        if (RUNS_CHECK.test(String(command))) findings.push(found(REPO_LOCAL_CHECK, file, `${file} script ${name} runs a repository-local check (${String(command).slice(0, 80)}); delete the script, the check belongs to the .claude runtime`));
-      }
-    }
+    else if (file === 'package.json' || file.endsWith('/package.json')) findings.push(...scriptFindings(repoRoot, file));
   }
   return findings;
 }
