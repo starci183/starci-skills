@@ -313,3 +313,24 @@ test('I8: the silent defer-to-handover happens only after the owner was told: th
   assert.deepEqual(sweep(late).map((entry) => entry.incidentId), [id], 'the owner was told: the held job is deferred to the handover list');
   assert.deepEqual(sweep(Date.now() + 60_000), [], 'a gate younger than the timeout never defers');
 });
+
+test('I7: starci kernel status shows per gate its handler, step n of m, deadline and watched condition, in the JSON and on the held job', (t) => {
+  const repo = world(t);
+  const watched = openGate(repo, ['--cause', 'runtime-defect', '--no-workaround', 'defect-on-every-path', '--until-runtime-has', NOT_LANDED], STARCI_JOB);
+  const bare = openGate(repo, ['--cause', 'plan-divergence', '--no-workaround', 'answer-not-reversible'], NIVO_JOB);
+  const status = statusOf(repo);
+  const byId = Object.fromEntries(status.autopilot.supervisorGates.map((gate) => [gate.incidentId, gate]));
+  const withCondition = byId[watched];
+  assert.deepEqual([withCondition.cause, withCondition.handler, withCondition.step, typeof withCondition.steps, typeof withCondition.deadlineAt], ['runtime-defect', 'supervisor', 1, 'number', 'number']);
+  assert.ok(withCondition.steps > withCondition.step);
+  assert.equal(withCondition.condition.length, 1);
+  assert.match(withCondition.condition[0].condition, /the live runtime contains deadbeefdead/);
+  assert.equal(withCondition.condition[0].met, false);
+  assert.match(withCondition.condition[0].evidence, /does not contain deadbeefdead yet/);
+  assert.equal(byId[bare].condition, null, 'a gate without a machine condition says so');
+  assert.match(byId[bare].conditionNote, /the ladder carries it/);
+  const held = status.frontier.queued.find((item) => item.jobId === STARCI_JOB);
+  assert.deepEqual([held.queuedBecause, held.blockedBy.incident, held.blockedBy.gate.handler, held.blockedBy.gate.step], ['supervisor-gate', watched, 'supervisor', 1]);
+  const text = spawnSync(process.execPath, [API, 'status', '--workflow', WF, '--repo', repo], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 120000, env: baseEnv }).stdout;
+  assert.match(text, /supervisor-gate: inc-\S+ \[runtime-defect\] holds op-scope\.define-f5c663aa85 - handler supervisor, step 1 of \d+, deadline \d{4}-\d\d-\d\dT.*watching: the live runtime contains deadbeefdead/);
+});

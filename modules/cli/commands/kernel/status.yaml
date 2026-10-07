@@ -130,7 +130,7 @@ returns:
     label: 'self-accepted provisionally', at}], deferred[{jobId, opId, reason, incidentId?, since}],
     deferredToHandover[{key, dispatchId?, jobId?, opId, deferClass:
     credential|real-money|shared-system|owner-decision|review, classes[], fields{files, vars},
-    stubPath, owed, record?, reason?}], supervisorGates[{incidentId, opId, holds[], since}],
+    stubPath, owed, record?, reason?}], supervisorGates[{incidentId, opId, holds[], since, cause, workaround, handler: supervisor|owner|runtime-auto, step, steps, deadlineAt, condition: [{condition, met, evidence}]|null, conditionNote?, answered?{resolution, at}, subject}] (a gate on the Supervisor ladder, modules/kernel/op-incident-policy.yaml gate; a held queued[].blockedBy carries {gate: handler, step, steps, deadlineAt, condition}),
     budget{used, caps, exceeded[]}, checklist?{due, jobId, items}, sweep?}
     (scripts/kernel/autopilot-run.mjs; owner ruling 2026-09-28 autopilot-run-to-finish;
     runtimes.yaml allocation.autopilot). Status runs the autopilot sweep before projecting (api
