@@ -81,7 +81,11 @@ function sinkOf(c) {
 // The variables a kill names in the raw text, once per kill: `Stop-Process -Id $p.Id`, `$p | Stop-Process`, `$p.Kill()`,
 // `kill $pid`, `kill $!`. A kill target that is no plain variable (a $(...), a pipe from a query) names none.
 const ROOTS = [
-  /\b(?:stop-process|spps|kill|taskkill)\b(?:\s+(?:-(?:id|inputobject)(?::|(?=\s))|(?:\/\/?|-)pid(?=\s)|-\w+(?=\s+\S*\$)))*\s*"?\$(\w+|!)/gi,
+  new RegExp([
+    String.raw`\b(?:stop-process|spps|kill|taskkill)\b`,
+    String.raw`(?:\s+(?:-(?:id|inputobject)(?::|(?=\s))|(?:\/\/?|-)pid(?=\s)|-\w+(?=\s+\S*\$)))*`,
+    String.raw`\s*"?\$(\w+|!)`,
+  ].join(''), 'gi'),
   /\$(\w+)\s*\|\s*(?:stop-process|spps)\b/gi,
   /\$(\w+)\.(?:terminate|kill)\s*\(/gi,
 ];
