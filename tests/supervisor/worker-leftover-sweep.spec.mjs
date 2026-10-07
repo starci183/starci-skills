@@ -8,7 +8,7 @@ import { createJob, jobOf } from '../../scripts/supervisor/workers.mjs';
 import { sweepWorkers } from '../../scripts/supervisor/supervisor-watchdog.mjs';
 
 const machineOf = (t, status) => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'sup-leftover-'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-sup-leftover-'));
   const m = openMachine({ env: { STARCI_TEST_MACHINE_FILE: path.join(root, 'machine.sqlite') } });
   t.after(() => { m.close(); fs.rmSync(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }); });
   const { job } = createJob(m, { cluster: 'leak', files: ['scripts/leak.mjs'] });

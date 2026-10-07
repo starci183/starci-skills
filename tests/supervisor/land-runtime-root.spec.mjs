@@ -11,7 +11,7 @@ import { fullCheckStep, FULL_CHECK_ENTRY } from '../../scripts/supervisor/land-f
 const SHOW_RUNTIME = 'console.log(`RUNTIME=${process.env.STARCI_RUNTIME}`);\n';
 
 function tree(t, file, body) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'land-runtime-root-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-land-runtime-root-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   fs.mkdirSync(path.dirname(path.join(dir, file)), { recursive: true });
   fs.writeFileSync(path.join(dir, file), body);

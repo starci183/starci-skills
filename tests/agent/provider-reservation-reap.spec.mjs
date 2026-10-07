@@ -13,7 +13,7 @@ import { fakeAdmission } from '../helpers/fake-admission.mjs';
 const HOST_DOWN = { list: () => ({ ok: false, hostUnavailable: true, terminals: [] }) };
 const member = { provider: 'codex', model: 'gpt-6.1-sol', maxParallel: 99, eligibility: { eligible: true, mode: 'operation-policy' } };
 const fixture = (t) => {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'reservation-reap-'));
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-reservation-reap-'));
   t.after(() => fs.rmSync(directory, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
   const env = { ...process.env, STARCI_TEST_MACHINE_FILE: path.join(directory, 'machine.sqlite') };
   openMachine({ env }).close();
