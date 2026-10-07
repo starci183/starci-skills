@@ -16,7 +16,7 @@ test('the shipped data declares imagegen a call tier with its call spec, and no 
   assert.deepEqual(callSpec('imagegen', settings), { tier: 'imagegen', timeoutMs: 600000, maxImages: 8, maxReferences: 6 });
   assert.equal(callSpec('nothing', settings), null);
   assert.deepEqual(settings.kindTiers, {});
-  const named = [...Object.values(settings.seats), ...Object.values(settings.difficulty), ...Object.values(settings.kindTiers), ...settings.tierOrder, ...settings.callerSeatTiers];
+  const named = [...Object.values(settings.seats), ...Object.values(settings.difficulty), ...Object.values(settings.kindTiers), ...settings.tierOrder];
   assert.equal(named.includes('imagegen'), false);
 });
 

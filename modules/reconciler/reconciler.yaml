@@ -54,7 +54,6 @@ concerns:
   job.close-verify: job
   host.kernel-seat: host
   host.supervisor-seat: host
-  host.core-debug-seat: host
   host.services: host
   host.orca: host
   host.processes: host

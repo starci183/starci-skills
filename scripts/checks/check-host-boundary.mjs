@@ -28,7 +28,7 @@ const ALLOW_SELF='scripts/checks/check-host-boundary.mjs';
 const PROSE_ROOTS=['CONTEXT.md','modules/kernel','modules/ops','modules/supervisor',
   'skills/starci/SKILL.md','skills/starci/references/define-goal.md',
   'skills/starci/references/start-workflow.md','skills/starci/references/workflow-chat.md',
-  'skills/starci/references/assisted-uat.md','skills/starci/references/release.md','skills/starci/references/host-startup.md','skills/starci/references/host-maintenance.md','init'];
+  'skills/starci/references/assisted-uat.md','skills/starci/references/release.md','skills/starci/references/host-startup.md','init'];
 const PROSE_EXT=new Set(['.md','.yaml','.yml','.txt']);
 const CODE_ROOTS=['engine','scripts','modules','bin','init','tests','packages'];
 

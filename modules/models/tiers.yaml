@@ -39,9 +39,6 @@ kindSeats:
   model.classifyScreen: kernelManager
   model.presentOwnerQuestion: kernelManager
   judge: validator
-# The agent of core-debug is the provider of the chat that started the workflow (--caller-agent), and its model that
-# provider's member of the first tier of `callerSeatTiers` that has one. It is never picked down a chain.
-callerSeatTiers: [frontier]
 difficulty:
   insane: frontier
   hard: high

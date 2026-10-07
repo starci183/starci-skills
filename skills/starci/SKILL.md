@@ -23,8 +23,7 @@ Read local config through its existing owner; never rewrite unrelated model or a
 
 Before the requested action, run `starci reconciler up --check --brief` from `<Source>` (read-only, a few seconds, no
 effects) and show its output as the host status: engine, harness UI, harness tunnel, ask gateway and tunnel, launcher
-shim, the three Windows tasks with whether their action is current, the Supervisor seat, the core-debug seat when
-`debug: true`, and the Kernel seat of every running workflow. Then continue with the requested action.
+shim, the three Windows tasks with whether their action is current, the Supervisor seat, and the Kernel seat of every running workflow. Then continue with the requested action.
 
 - When a no-quota service, the launcher shim or a task registration is down, run `starci reconciler up --services`,
   show each applied line, and continue. It never launches an agent seat.
@@ -46,7 +45,6 @@ Load only the reference needed for the requested action:
 | Owner chat visible computer inspection | `references/computer-use.md` |
 | Inspect a selected action's credential requirements | `<Source>/.claude/docs/host-secrets.md` |
 | Inspect or recover host readiness | `<Source>/.claude/skills/starci/references/host-startup.md` |
-| Inspect runtime maintenance | `<Source>/.claude/skills/starci/references/host-maintenance.md` |
 
 For a new workflow, resolve missing project, goal, scope and expected outcome through a read-only context scan and
 clarification. Once sufficient, run the native read-only goal planner, present the exact draft and derived operation

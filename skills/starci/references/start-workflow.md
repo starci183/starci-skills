@@ -6,7 +6,6 @@ job contract. It boots the one long-lived [Kernel] for an already-persisted, acc
 Contract: `modules/kernel/start-workflow.yaml`.
 Executable: `scripts/kernel/start-workflow.mjs`.
 Host readiness: `host-startup.md`.
-Optional runtime maintenance: `host-maintenance.md`.
 Local action credentials: [Host credentials](../../../docs/host-secrets.md).
 
 ## Approval and identity
@@ -25,20 +24,14 @@ Use `starci workflow define --plan` for an unaccepted goal preview instead.
 After acceptance and native persistence:
 
 ```
-starci workflow start --repo <project-owner-repo> --goal <workflowId> --caller-agent <codex|claude|devin> --caller-model <concrete-model-id> --json
+starci workflow start --repo <project-owner-repo> --goal <workflowId> --json
 ```
 
-Use the native lifecycle's caller identity and model contract. Never infer a caller model from a
-routing pool or from another actor's configured model. Workflow ingress validates the accepted
-persisted goal before host readiness, maintenance, inbox claim, dependency installation, worktree
-creation or Kernel launch. Host readiness and configuration-selected maintenance belong to that
+Workflow ingress validates the accepted persisted goal before host readiness, inbox claim,
+dependency installation, worktree creation or Kernel launch. Host readiness belongs to that
 lifecycle: it heals a missing launcher shim or a missing or stale task registration itself and lists
-that action in its receipt. This entry creates no extra loop or maintenance agent.
-
-`--caller-agent`, `--caller-model` and optional `--caller-effort` describe this ingress caller and are
-separate from the Kernel's explicit `--agent`/`--model` pin. If the caller's effective concrete model
-cannot be established, report that missing provenance; do not invent a pin. A repair uses the native
-persisted live caller route. Argument parsing accepts split or equals forms and stops at bare `--`.
+that action in its receipt. The Kernel's explicit `--agent`/`--model` pin is the only model input.
+The start launches no debug agent; the debug watcher is the chat loop below.
 
 Report the actual launch receipt: outcome, workflow identity, Kernel Dispatch and terminal handle,
 and attested execution agent and concrete model. An unavailable explicit pin or mismatched effective

@@ -54,7 +54,6 @@ import { workflowDisplayName, workflowNameOf } from '../lib/display-names.mjs';
 import { KERNEL_BOOT_FILES, currentRuntimeRev, revRootOf, shortRev } from './runtime-rev.mjs';
 import { ensureWorkflowWorktree, workflowAppRepo } from './workflow-worktree.mjs';
 import { ensureWorkflowHost, installWorkflowTree, workflowStartAuthority, commitWorkflowStart, recordWorkflowStartFailure, workflowSender, closedGoalMessage } from './workflow-startup.mjs';
-import { workflowCaller } from '../agent/caller-context.mjs';
 import { guardLaunch, bindGuardTerminal, unbindGuardTerminal, guardReceiptErrors } from '../guards/hook-install.mjs';
 import { readEnv } from '../lib/env.mjs';
 import { arg as argvValue } from '../lib/cli-arg.mjs';
@@ -243,7 +242,7 @@ try {
   const startAuthority = workflowStartAuthority({ workflow: startWorkflow, goal: startGoal });
   if (!startAuthority.ok) refuse(startAuthority.reason, { workflowId: target, authority: startAuthority });
   const sender = workflowSender({ env: process.env, launchedBy, ledger, workflowId: target }); if (!sender.ok) refuse(sender.reason, { workflowId: target, error: sender.error });
-  const hostStartup = await ensureWorkflowHost({ workflow: startWorkflow, goal: startGoal, caller: workflowCaller(process.argv.slice(2)), env: process.env });
+  const hostStartup = await ensureWorkflowHost({ workflow: startWorkflow, goal: startGoal, env: process.env });
   if (hostStartup.ok !== true || hostStartup.ready !== true)
     refuse(hostStartup.reason ?? 'workflow-host-not-ready', { workflowId: target, startup: hostStartup },
       hostStartup.host?.items?.some((item) => item.id === 'orca' && item.status === 'red') ? EXIT_HOST_UNAVAILABLE : 1);

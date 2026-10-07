@@ -6,18 +6,9 @@ title: Host controller - host services, Kernel and Supervisor seats, orphan proc
 # scripts/reconciler/ledger-health.mjs. Every number the host controller acts on is here; ports and URLs are NOT:
 # services.mjs servicePorts reads them once from their one source each (runtimes.yaml
 # allocation.supervisorTick.statusApp.port, ~/.cloudflared/harness.yml ingress, config.yaml connectors.gateway.port).
-concerns: [host.kernel-seat, host.supervisor-seat, host.core-debug-seat, host.services, host.orca, host.processes, host.ledger-health]
+concerns: [host.kernel-seat, host.supervisor-seat, host.services, host.orca, host.processes, host.ledger-health]
 resyncMs: 60000
 concurrency: 1
-
-coreDebug:
-  id: core-debug
-  seatId: core-debug
-  title: '[Debug] core'
-  prompt: skills/starci/references/host-maintenance.md
-  enabledScope: core-debug-enabled
-  eventPrefix: core-debug
-  stateScope: core-debug-diagnostics
 
 # Service state machine (DESIGN 9.7): healthy -> degraded on one failed probe; degraded -> failed after failAfter
 # consecutive failed probes; failed -> backoff (minMs doubling by factor up to maxMs) -> starting; starting ->

@@ -33,7 +33,7 @@ test('all routed procedures exist without public discovery frontmatter',()=>{
   assert.ok(references.length > 0);
   for (const relative of references) assert.equal(read(`skills/starci/${relative}`).startsWith('---\n'), false, relative);
   assert.equal(fs.existsSync(path.join(root, '.starci')), false, 'the host-data namespace holds no release source');
-  for (const name of ['host-maintenance.md', 'host-startup.md']) assert.equal(read(`skills/starci/references/${name}`).startsWith('---\n'), false, name);
+  for (const name of ['host-startup.md']) assert.equal(read(`skills/starci/references/${name}`).startsWith('---\n'), false, name);
 });
 
 test('one bootstrap locates the runtime for supported host projections',()=>{

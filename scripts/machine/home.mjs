@@ -130,9 +130,9 @@ export function enabledOf(m, profile = SUPERVISOR_SEAT) {
   const row = m.supSignal(profile.enabledScope, profile.id);
   return row ? row.value?.enabled === true : null;
 }
-export function setEnabled(m, enabled, { by = 'cli', now = Date.now(), profile = SUPERVISOR_SEAT, route = null } = {}) {
+export function setEnabled(m, enabled, { by = 'cli', now = Date.now(), profile = SUPERVISOR_SEAT } = {}) {
   m.transaction(() => {
-    m.setSupSignal({ scope: profile.enabledScope, key: profile.id, value: { enabled, by, at: new Date(now).toISOString(), ...(route ? { route } : {}) } });
+    m.setSupSignal({ scope: profile.enabledScope, key: profile.id, value: { enabled, by, at: new Date(now).toISOString() } });
     supervisorEvent(m, { entityId: profile.id, kind: `${profile.eventPrefix}-${enabled ? 'enabled' : 'disabled'}`, payload: { by }, now });
   });
 }

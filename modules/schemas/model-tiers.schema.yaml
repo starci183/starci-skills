@@ -2,7 +2,7 @@ $schema: https://json-schema.org/draft/2020-12/schema
 $id: starci://schemas/model-tiers.schema.json
 title: StarCi model tiers
 type: object
-required: [schema, tiers, tierOrder, seats, kindSeats, callerSeatTiers, difficulty, kindTiers, tierUse, calls, balance, usage]
+required: [schema, tiers, tierOrder, seats, kindSeats, difficulty, kindTiers, tierUse, calls, balance, usage]
 additionalProperties: false
 properties:
   schema: {const: starci/model-tiers@1}
@@ -14,7 +14,6 @@ properties:
   tierOrder: {type: array, minItems: 1, uniqueItems: true, items: {type: string, minLength: 1}}
   seats: {type: object, additionalProperties: {type: string, minLength: 1}}
   kindSeats: {type: object, additionalProperties: {type: string, minLength: 1}}
-  callerSeatTiers: {type: array, minItems: 1, uniqueItems: true, items: {type: string, minLength: 1}}
   difficulty:
     type: object
     required: [easy, medium, hard, insane]

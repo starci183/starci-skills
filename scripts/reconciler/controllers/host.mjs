@@ -55,7 +55,7 @@ import { allocationMs, allocationSettings } from '../../../engine/config.mjs';
 import { claimDue, finishDuty, listSchedules } from '../schedules.mjs';
 import { pathKey } from '../../lib/path-key.mjs';
 import os from 'node:os';
-import { seatStateOf, seatHold, coreDebugSeatKey, reconcileCoreDebugSeat } from '../host-seats.mjs';
+import { seatStateOf, seatHold } from '../host-seats.mjs';
 import { createStaleTerminalStep } from '../host-stale.mjs';
 import { eachInOrder } from '../../lib/in-order.mjs';
 export { staleTerminalsOf, STALE_RETRY_MS, STALE_ESCALATE_TRIES, CLOSE_VERIFY } from '../host-stale.mjs'; export { seatStateOf };
@@ -66,7 +66,7 @@ export { staleTerminalsOf, STALE_RETRY_MS, STALE_ESCALATE_TRIES, CLOSE_VERIFY } 
  */
 const hostBootId = ({ now = Date.now(), uptimeS = os.uptime() } = {}) => `boot-${Math.round((now - uptimeS * 1000) / 60_000)}`;
 const BOOT_EVERY_MS = 365 * 86_400_000;
-export const CONCERNS = Object.freeze(['host.kernel-seat', 'host.supervisor-seat', 'host.core-debug-seat', 'host.services', 'host.orca', 'host.processes', 'host.ledger-health']);
+export const CONCERNS = Object.freeze(['host.kernel-seat', 'host.supervisor-seat', 'host.services', 'host.orca', 'host.processes', 'host.ledger-health']);
 const KERNEL_WATCHDOG = 'scripts/kernel/kernel-watchdog.mjs';
 const SUPERVISOR_WATCHDOG = 'scripts/supervisor/supervisor-watchdog.mjs';
 const FOOTPRINT_SCAN = 'scripts/guards/footprint-scan.mjs';
@@ -451,8 +451,7 @@ export function createHostController(deps = {}) {
     claimDue(ctx, { controller: 'host', duty: 'boot', intervalMs: BOOT_EVERY_MS, now: ctx.now(), force: true });
     finishDuty(ctx, { controller: 'host', duty: 'boot', result: ctx.mode === 'active' ? 'done' : 'skipped', digest: bootIdOf(), now: ctx.now() });
     await eachInOrder(productLedgers(ctx), async (l) => eachInOrder(await running(ctx, l.ledgerId), async (wf) => { steps.push({ step: 'seat', ledgerId: l.ledgerId, workflowId: wf, ...(await reconcileKernelSeat(l.ledgerId, wf, ctx)) }); }));
-    steps.push({ step: 'seat:supervisor', ...(await reconcileSupervisorSeat(ctx)) },
-      { step: coreDebugSeatKey(), ...(await reconcileCoreDebugSeat(ctx, { timeoutMs: settings().seats.supervisor.timeoutMs, outputOf })) });
+    steps.push({ step: 'seat:supervisor', ...(await reconcileSupervisorSeat(ctx)) });
     await ctx.log('reconciler.host.boot', `boot order done (${ctx.mode})`, { steps: steps.map((x) => ({ step: x.step, ok: x.ok, to: x.to, action: x.action })) });
     return { ok: true, steps };
   }
@@ -643,7 +642,7 @@ export function createHostController(deps = {}) {
       try { if (ctx.machine) openCorrupt = clocksOf(ctx, { prefixes: ['ledger:'] }).filter((c) => c.state === 'LEDGER_CORRUPT').map((c) => c.entity); } catch { openCorrupt = []; }
       for (const k of openCorrupt) if (!keys.includes(k)) keys.push(k);
       await eachInOrder(productLedgers(ctx), async (l) => { for (const wf of await running(ctx, l.ledgerId)) keys.push(`seat:kernel:${l.ledgerId}:${wf}`); });
-      keys.push('seat:supervisor', coreDebugSeatKey());
+      keys.push('seat:supervisor');
       return keys;
     },
     async reconcile(key, ctx) {
@@ -655,7 +654,6 @@ export function createHostController(deps = {}) {
       if (key.startsWith('seat:')) {
         if (bootPending(ctx)) return { ok: true, deferred: 'boot' };
         if (key === 'seat:supervisor') return reconcileSupervisorSeat(ctx);
-        if (key === coreDebugSeatKey()) return reconcileCoreDebugSeat(ctx, { timeoutMs: settings().seats.supervisor.timeoutMs, outputOf });
         const rest = key.slice('seat:kernel:'.length), cut = rest.lastIndexOf(':');
         return reconcileKernelSeat(rest.slice(0, cut), rest.slice(cut + 1), ctx);
       }

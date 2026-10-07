@@ -4,7 +4,7 @@ import test from 'node:test';
 import { applyHost, ensureHostRuntime, main } from '../../scripts/reconciler/start.mjs';
 import { healLauncherAndTasks, isLauncherOrTaskRow, registerTask, runtimeLink } from '../../scripts/reconciler/start-heal.mjs';
 import { renderBrief } from '../../scripts/reconciler/start-render.mjs';
-import { coreDebugRow, kernelSeatItems, seatNeed, supervisorRow } from '../../scripts/reconciler/seat-items.mjs';
+import { kernelSeatItems, seatNeed, supervisorRow } from '../../scripts/reconciler/seat-items.mjs';
 import { green, red, warn } from '../../scripts/reconciler/checklist-items.mjs';
 import { launcherItem, taskItems } from '../../scripts/reconciler/task-health.mjs';
 import { auditTask } from '../../scripts/machine/task-audit.mjs';
@@ -151,7 +151,7 @@ test('the services-only heal links the shim, registers the tasks, rebuilds the U
   assert.match(applied[3], /^re-registered task StarCi Harness Tunnel /);
   assert.match(applied[4], /^service harness-ui: start requested, healthy after/);
   assert.equal(applied.length, 5);
-  assert.deepEqual(host.state.seats, [], 'no Orca probe, Supervisor mode read, Supervisor start, Kernel watchdog or core debug call');
+  assert.deepEqual(host.state.seats, [], 'no Orca probe, Supervisor mode read, Supervisor start or Kernel watchdog call');
 });
 
 test('the full path is the one that reaches the Supervisor seat, after the same heal', async () => {
@@ -202,7 +202,7 @@ test('the services scope and a check read seats as a read-only pass; only a star
   await ensureHostRuntime({ waitMs: 0, scope: 'services' }, { gather, applyHost: async () => [] });
   await ensureHostRuntime({ waitMs: 0, check: true }, { gather, applyHost: async () => { throw new Error('check applied'); } });
   await ensureHostRuntime({ waitMs: 0 }, { gather, applyHost: async () => [] });
-  assert.deepEqual(reads.map((o) => [o.seatsRequested, o.coreDebug]), [[false, true], [false, true], [true, false]]);
+  assert.deepEqual(reads.map((o) => o.seatsRequested), [false, false, true]);
 });
 
 test('a seat that is not running is idle without a running workflow and red once a running workflow needs it', async () => {
@@ -226,15 +226,6 @@ test('a seat that is not running is idle without a running workflow and red once
   assert.equal((await supervisorRow({ ...noOrca, needed: true })).status, 'red');
 });
 
-test('the core debug seat is idle while nothing needs it and red when a running workflow does', async () => {
-  const notReady = () => ({ ready: false, health: { reason: 'no native worker' } });
-  const idle = await coreDebugRow({}, { needed: false, status: notReady });
-  assert.deepEqual([idle.status, idle.idle, idle.detail], ['green', true, 'not running (starts with a workflow)']);
-  const needed = await coreDebugRow({}, { needed: true, status: notReady });
-  assert.deepEqual([needed.status, needed.required, needed.detail], ['red', true, 'no native worker']);
-  assert.equal((await coreDebugRow({}, { needed: false, status: () => ({ ready: true }) })).idle, undefined);
-});
-
 test('Kernel seats are listed per running workflow: none is one green line, an unreachable Orca is red for each', async () => {
   const none = await kernelSeatItems({ rows: [] });
   assert.deepEqual([none.length, none[0].status, none[0].detail, none[0].required], [1, 'green', 'no running workflow', false]);
@@ -246,7 +237,7 @@ test('Kernel seats are listed per running workflow: none is one green line, an u
   ]);
 });
 
-test('up --services takes no check, profile or retirement, heals the services scope only and never launches maintenance', async () => {
+test('up --services takes no check, profile or retirement, heals the services scope only', async () => {
   const previousExit = process.exitCode, requests = [], printed = [], errors = [];
   const original = console.error;
   console.error = (text) => errors.push(text);
@@ -258,8 +249,7 @@ test('up --services takes no check, profile or retirement, heals the services sc
     assert.equal(errors.length, 3);
     process.exitCode = undefined;
     const deps = {
-      loadConfig: () => ({ debug: true }), print: (text) => printed.push(text),
-      ensureDebug: async () => { throw new Error('the services heal launched maintenance'); },
+      print: (text) => printed.push(text),
       ensureHostRuntime: async (input) => {
         requests.push(input);
         return { ok: true, summary: { ok: true }, applied: ['linked launcher'], items: [green('engine', 'engine', 'reconciler engine', 'up')] };

@@ -308,7 +308,6 @@ allocationFacts:
   difficultyTier: modules/models/tiers.yaml difficulty          # insane frontier, hard high, medium medium, easy low
   kindTiers: modules/models/tiers.yaml kindTiers                # a kind that takes a tier whatever its difficulty (none today: the drawing ops take their difficulty's tier)
   callTiers: modules/models/tiers.yaml tierUse and calls        # a call tier (imagegen) is read by a headless call only; no seat or op is seated on it
-  callerSeat: modules/models/tiers.yaml callerSeatTiers         # core-debug runs in the caller's own app; never picked down a chain
   concurrency: modules/models/registry.yaml executionModel.concurrency
   workerCeiling: modules/models/runtimes.yaml maxParallelOps
   difficultyVocabulary:               # tier keys of difficulty

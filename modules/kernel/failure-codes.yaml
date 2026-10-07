@@ -12035,16 +12035,6 @@ workflow-host-not-ready:
   nextStep_vi: "Xem phiếu startup và starci reconciler up --check, sửa đúng owner của dòng đỏ rồi đối chiếu lại; một timeout không chứng minh rằng dịch vụ chưa được tạo."
   owner: runtime-core
   kind: verb-refusal
-workflow-debug-not-ready:
-  title: "Configured native core debug seat is not ready"
-  title_vi: "Seat debug native đã bật chưa sẵn sàng"
-  meaning_vi: "debug true yêu cầu seat bảo trì native sống trên route caller đã khai báo hoặc đã lưu; phiếu chưa xác nhận sẵn sàng nên Kernel không được claim hay tạo."
-  causes_vi:
-    - "Caller route thiếu, không hợp lệ hoặc xung đột"
-    - "Worker đang khởi động hoặc hiệu ứng launch chưa xác minh"
-  nextStep_vi: "Đọc phiếu maintenance, đối chiếu đúng Dispatch và route caller; không suy model từ Kernel --agent và không tạo worker khác khi phiếu cũ chưa được giải quyết."
-  owner: runtime-core
-  kind: verb-refusal
 workflow-worktree-install-failed:
   title: "Native workflow-tree installation did not succeed"
   title_vi: "Cài đặt native trong cây workflow chưa thành công"

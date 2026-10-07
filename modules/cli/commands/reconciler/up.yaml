@@ -27,16 +27,6 @@ flags:
     type: enum
     enum: [operational, observe]
     summary: update the reconciler profile before bringing services up
-  - name: caller-agent
-    type: enum
-    enum: [codex, claude, devin]
-    summary: declared ingress agent for optional core maintenance; does not change the Supervisor pin
-  - name: caller-model
-    type: string
-    summary: declared concrete ingress model for optional core maintenance; actual worker attestation is required
-  - name: caller-effort
-    type: string
-    summary: declared ingress effort for optional core maintenance
 exit:
   "0": every required checklist row is green (a seat that is not running while no workflow needs it is idle and green)
   "1": one or more required checklist rows are red
@@ -47,5 +37,4 @@ examples:
   - starci reconciler up --check --json
   - starci reconciler up --check --brief
   - starci reconciler up --services
-  - starci reconciler up --caller-agent codex --caller-model gpt-6.1-sol --caller-effort high --json
 editions: [full]

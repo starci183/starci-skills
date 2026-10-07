@@ -23,6 +23,8 @@ const REMOVED_KEYS=Object.freeze([
   ['allocation.mode','allocation holds grants only'],
   ['kernel.group','the Kernel takes the high tier; pin with kernel.agent / kernel.model (an `only` bias)'],
   ['supervisor.kernel.group','the Supervisor takes the frontier tier; pin with supervisor.kernel.agent / .model (an `only` bias)'],
+  ['coreDebug','the debug watcher is a /loop of the calling chat, not a seat; the cadence and the worktree alert limit are debugLoop.interval and debugLoop.worktreeLimit'],
+  ['debug','the debug watcher is started by the /starci skill in the calling chat; there is no switch (debugLoop.interval sets its cadence)'],
 ]);
 
 const hasPath=(root,dotted)=>dotted.split('.').reduce((node,key)=>(plain(node)&&Object.hasOwn(node,key)?node[key]:undefined),root)!==undefined;
@@ -78,7 +80,7 @@ export function effectiveTiers(config,profile){
   const usage={...doc.usage,...(models.usage??{})};
   const names=new Set(Object.keys(tiers));
   const refs=[...Object.entries(seats).map(([seat,tier])=>[`.seats.${seat}`,tier]),...DIFFICULTIES.map(level=>[`difficulty.${level}`,doc.difficulty[level]]),
-    ...Object.entries(doc.kindTiers).map(([kind,tier])=>[`kindTiers.${kind}`,tier]),...doc.tierOrder.map(tier=>['tierOrder',tier]),...doc.callerSeatTiers.map(tier=>['callerSeatTiers',tier])];
+    ...Object.entries(doc.kindTiers).map(([kind,tier])=>[`kindTiers.${kind}`,tier]),...doc.tierOrder.map(tier=>['tierOrder',tier])];
   for(const [where,tier] of refs)if(!names.has(tier))bad(`: ${where} names tier ${tier} (known: ${known(names)}).`);
   validateUse(bad,{doc,names,refs});
   if(!(Number.isInteger(balance.maxStreak)&&balance.maxStreak>=1))bad('.balance.maxStreak must be an integer >= 1.');

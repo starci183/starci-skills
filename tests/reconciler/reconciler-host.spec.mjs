@@ -9,7 +9,6 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { hostSettings, memoryStore, turnMinutesOf } from '../../scripts/reconciler/services.mjs';
 import { goalTextRefusal } from '../../scripts/goal/goal-text.mjs';
 import { quickCheck } from '../../scripts/reconciler/ledger-health.mjs';
-import { coreDebugProfile } from '../../scripts/reconciler/core-debug.mjs';
 
 import { fakeCtx } from '../../scripts/reconciler/testing.mjs';
 // A ledger path is never a real-path literal: the fake ctx only names it, so it is built under the temp root.
@@ -102,24 +101,12 @@ test('ledger backup retry uses the declared positive cooldown and refuses invali
   for(const backupRetryMs of [undefined,0,-1,NaN])assert.throws(()=>hostSettings({...raw,ledgerHealth:{...raw.ledgerHealth,backupRetryMs}}),/ledgerHealth.backupRetryMs must be a positive number/);
 });
 
-test('Host controller maintains the distinct core seat through one nonrecursive native watchdog call', async () => {
-  const c = booted(controller()), key = `seat:${coreDebugProfile().seatId}`;
-  const ctx = hostCtx({ mode: 'active', dbs: {}, runAnswer: () => ({ ok: false, stdout: JSON.stringify({ ok: false, action: 'host-unavailable' }) }) });
-  assert.equal((await c.list({ ...ctx, ledgers: [] })).includes(key), true);
-  const result = await c.reconcile(key, ctx);
-  assert.equal(result.ok, false);
-  assert.equal(result.action, 'host-unavailable');
-  assert.equal(ctx.calls.run.length, 1);
-  assert.deepEqual(ctx.calls.run[0].args, ['scripts/reconciler/core-debug.mjs', '--once', '--json']);
-  assert.equal(ctx.calls.api.length, 0);
-});
-
-test('Host core-seat pass does not turn a missing native result into readiness', async () => {
-  const c = booted(controller()), key = `seat:${coreDebugProfile().seatId}`;
-  const ctx = hostCtx({ mode: 'active', dbs: {}, runAnswer: () => ({ ok: true, stdout: '' }) });
-  const result = await c.reconcile(key, ctx);
-  assert.equal(result.ok, false);
-  assert.equal(result.action, 'unknown');
+test('Host controller lists no debug seat and refuses its removed key', async () => {
+  const c = booted(controller());
+  const ctx = hostCtx({ mode: 'active', dbs: {}, runAnswer: () => ({ ok: true, stdout: '{}' }) });
+  assert.equal((await c.list({ ...ctx, ledgers: [] })).includes('seat:core-debug'), false);
+  assert.deepEqual((await c.reconcile('seat:core-debug', ctx)).ok, false);
+  assert.equal(ctx.calls.run.length, 0);
 });
 
 test('pure helpers: seat states, goal problems, child output', () => {
@@ -289,7 +276,7 @@ test('boot: waits for Orca, then services in order, dedupe (dry-run in shadow), 
   const up = await c.reconcile('host:boot', ctx);
   assert.equal(up.ok, true);
   assert.deepEqual(up.steps.map((s) => s.step), ['orca', 'harness-ui', 'harness-tunnel', 'ask-gateway', 'ask-tunnel', 'telegram-bridge', 'dedupe',
-    'reconcile --orphan-kernel-jobs', 'seat', 'seat:supervisor', `seat:${coreDebugProfile().seatId}`]);
+    'reconcile --orphan-kernel-jobs', 'seat', 'seat:supervisor']);
   assert.deepEqual(ctx.calls.api.map((a) => `${a.id} ${a.verb} ${a.argv.join(' ')}`), ['shop-be reconcile --orphan-kernel-jobs']);
   assert.equal(c._state.bootPending, false);
   assert.ok(!(await c.list(ctx)).includes('host:boot'));
@@ -460,7 +447,7 @@ test('the supervisor seat runs its watchdog pass through ctx.run; chat mode runs
 test('the module export matches the shared contract', async () => {
   const mod = (await import('../../scripts/reconciler/controllers/host.mjs')).default;
   assert.equal(mod.name, 'host');
-  assert.deepEqual(mod.concerns, ['host.kernel-seat', 'host.supervisor-seat', 'host.core-debug-seat', 'host.services', 'host.orca', 'host.processes', 'host.ledger-health']);
+  assert.deepEqual(mod.concerns, ['host.kernel-seat', 'host.supervisor-seat', 'host.services', 'host.orca', 'host.processes', 'host.ledger-health']);
   assert.equal(typeof mod.list, 'function');
   assert.equal(typeof mod.reconcile, 'function');
   assert.equal(mod.routes['workflow-finished']({ ledgerId: 'l', workflowId: 'wf-x' }), 'seat:kernel:l:wf-x');

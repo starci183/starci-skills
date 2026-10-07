@@ -45,7 +45,7 @@ The installer copies the payload declared by `package.json` `files[]` into
 2. Copies the one public `starci` entry into `.agents/skills/starci/`, creating that shared
    discovery root when absent, and into an existing `.devin/skills/` root. The canonical payload
    remains `.claude/skills/starci/`; copies carry the same prompt and provider policy bytes.
-   References beneath that entry, including `host-startup.md` and `host-maintenance.md`, are internal instructions, not skills.
+   References beneath that entry, including `host-startup.md`, are internal instructions, not skills.
 3. Seeds an **untracked** `config.yaml` from `config.example.yaml` — the
    per-project owner config: kernel model, effort, budgets. `route-model` and
    `start-workflow` read it: owner config overrides the route-model default,

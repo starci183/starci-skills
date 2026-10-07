@@ -41,7 +41,6 @@ import { openWorkerHandles } from './workers.mjs';
 import { recordedSeatTerminals, seatSessions, entryTerminalOf, NO_ENTRY_REMEDY } from '../machine/seat-sessions.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { bestEffortCall } from '../agent/best-effort-call.mjs';
-import { loadModelRegistry } from '../agent/model-registry.mjs';
 import { tierMembers, tierOfSeat } from '../agent/tiers.mjs';
 import { planAgentAdmission } from '../agent/admission.mjs';
 import { workerClosureProven } from '../machine/worker-close.mjs';
@@ -203,30 +202,26 @@ const START_LOCK = 'supervisor-start';
  * The launcher lock (host_locks 'supervisor-start', TTL the startup reservation): {ok, release} or {ok:false, holder}.
  * A holder whose process is gone never blocks the next launcher.
  */
-function claimStartLock(m, profile) {
-  const name = profile === SUPERVISOR_SEAT ? START_LOCK : `${profile.seatId}-start`;
-  const take = () => m.acquireHostLock({ name, holder: name, ttlMs: STARTUP_RESERVATION_MS });
+function claimStartLock(m) {
+  const take = () => m.acquireHostLock({ name: START_LOCK, holder: START_LOCK, ttlMs: STARTUP_RESERVATION_MS });
   let got = take();
-  if (!got.ok && !pidAlive(got.holder?.holder_pid)) { m.releaseHostLock({ name, force: true }); got = take(); }
+  if (!got.ok && !pidAlive(got.holder?.holder_pid)) { m.releaseHostLock({ name: START_LOCK, force: true }); got = take(); }
   if (!got.ok) return { ok: false, holder: { pid: got.holder?.holder_pid ?? null } };
-  return { ok: true, release: () => { try { m.releaseHostLock({ name }); } catch { /* expires */ } } };
+  return { ok: true, release: () => { try { m.releaseHostLock({ name: START_LOCK }); } catch { /* expires */ } } };
 }
 
 /** The chat-mode refusal: chat mode never starts a seat, not the owner's start, not the watchdog's replace. */
-function chatModeRefusal({ profile, env, planOnly, mode }) {
-  if (profile !== SUPERVISOR_SEAT || supervisorMode({ env }) !== 'chat') return null;
+function chatModeRefusal({ env, planOnly, mode }) {
+  if (supervisorMode({ env }) !== 'chat') return null;
   return { ok: planOnly || mode === 'replace', exit: planOnly || mode === 'replace' ? 0 : 1, action: 'chat-mode', supervisorMode: 'chat', reason: CHAT_MODE_REASON, wouldLaunch: false };
 }
 
 /** The seat as found: `{ result }` ends the launch pass, otherwise `{ enabled, seat, health }`. */
-function assessSeat({ m, mode, planOnly, route, profile, now, d }) {
+function assessSeat({ m, mode, planOnly, profile, now, d }) {
   let enabled = m ? enabledOf(m, profile) : null;
   if (mode === 'replace' && enabled !== true) return { result: { ok: true, exit: 0, action: 'disabled', reason: 'the seat is disabled (start-supervisor --stop); nothing launched' } };
   const seat = m ? seatOf(m, now(), profile) : null;
-  if (route && seat?.value?.route && ['agent', 'model', 'effort'].some(key => (route[key] ?? null) !== (seat.value.route[key] ?? null))) {
-    return { result: { ok: false, exit: 1, action: 'route-conflict', reason: 'the held maintenance seat has a different caller route', route: seat.value.route } };
-  }
-  if (mode === 'start' && !planOnly) { setEnabled(m, true, { by: `${profile.eventPrefix}-start`, now: now(), profile, route }); enabled = true; }
+  if (mode === 'start' && !planOnly) { setEnabled(m, true, { by: `${profile.eventPrefix}-start`, now: now(), profile }); enabled = true; }
   const unfinished = !seat?.starting && unsettledStartup(m, seat, profile);
   const health = unfinished ? {live:false,unverified:true,reason:'startup reservation expired with an unsettled launch receipt',
     terminal:unfinished.handle ?? null} : seatHealth(seat, d);
@@ -246,16 +241,8 @@ function surveyTerminals({ m, d, profile, health }) {
   return { listing, recorded, dedupe };
 }
 
-/**
- * The launch chain: the members of the seat's tier (tiers.yaml seats.supervisor), each with its provider, model and effort.
- * A caller that brings its own members (core-debug: the invoking agent) is launched on exactly those, with no tier.
- */
+/** The launch chain: the members of the seat's tier (tiers.yaml seats.supervisor), each with its provider, model and effort. */
 function launchGroup(settings, { seat = 'supervisor' } = {}) {
-  if (settings.group?.length) {
-    const registry = loadModelRegistry();
-    return settings.group.map(member => ({ provider: member.agent, effort: settings.effort,
-      model: member.model ?? Object.values(registry.pools ?? {}).find(pool => pool.provider === member.agent)?.defaultModel }));
-  }
   const tier = tierOfSeat(seat);
   return tierMembers(tier).map(member => ({ id: member.id, provider: member.provider, model: member.model, pool: member.pool, effort: settings.effort ?? member.effort, tier }));
 }
@@ -279,12 +266,11 @@ function closePreviousSeat(previous, d) {
 }
 
 /** Record a failed spawn: the seat row is cleared when nothing took effect, else it keeps the unknown launch. */
-function recordSpawnFailure({ m, spawned, token, attempt, route, profile, settings, now }) {
+function recordSpawnFailure({ m, spawned, token, attempt, profile, settings, now }) {
   m.transaction(() => {
     if (spawned?.effectState === 'none') clearSeat(m, { token, profile });
     else writeSeat(m, { token, value: { state: 'launch-unknown', attempt, terminal: spawned?.terminal ?? null,
-      dispatch: spawned?.dispatchId ?? null, runId: spawned?.runId ?? null, admission: spawned?.admission ?? null,
-      ...(route ? { route } : {}) }, now: now(), profile });
+      dispatch: spawned?.dispatchId ?? null, runId: spawned?.runId ?? null, admission: spawned?.admission ?? null }, now: now(), profile });
     supervisorEvent(m, { entityId: profile.id, kind: `${profile.eventPrefix}-start-failed`, payload: { step: spawned?.step ?? null, error: spawned?.error ?? null, terminal: spawned?.terminal ?? null,
       dispatch: spawned?.dispatchId ?? null, effectState: spawned?.effectState ?? null, agent: settings.agent }, now: now() });
   });
@@ -293,12 +279,12 @@ function recordSpawnFailure({ m, spawned, token, attempt, route, profile, settin
 }
 
 /** The spawned seat's value, recorded under the reservation `token` with its booted or restarted event; returns the value. */
-function recordLaunch({ m, d, spawned, group, settings, route, token, attempt, previous, reason, profile, now }) {
+function recordLaunch({ m, d, spawned, group, settings, token, attempt, previous, reason, profile, now }) {
   const guard = bestEffort(() => d.bindSeat(spawned.terminal, spawned.provider ?? group[0].provider));
   const value = { terminal: spawned.terminal, dispatch: spawned.dispatchId, runId: spawned.runId, taskId: spawned.taskId, agent: spawned.provider ?? group[0].provider,
     model: spawned.admission?.selected?.model ?? spawned.model ?? group[0].model, effort: spawned.effort ?? settings.effort,
     admission: spawned.admission ?? null, startedAt: new Date(now()).toISOString(), attempt, effective: spawned.effective ?? null,
-    seatGuard: typeof guard === 'string' ? guard : (guard?.error ?? null), ...(route ? { route } : {}) };
+    seatGuard: typeof guard === 'string' ? guard : (guard?.error ?? null) };
   m.transaction(() => {
     writeSeat(m, { token, value, now: now(), profile });
     supervisorEvent(m, { entityId: profile.id, kind: `${profile.eventPrefix}-${previous ? 'restarted' : 'booted'}`, payload: { ...value, previous, reason }, now: now() });
@@ -307,11 +293,11 @@ function recordLaunch({ m, d, spawned, group, settings, route, token, attempt, p
 }
 
 /** Reserve the seat: a concurrent launcher that got past the lock (a stale lock) still meets this row. */
-function reserveSeat({ m, seat, token, attempt, route, at, profile }) {
+function reserveSeat({ m, seat, token, attempt, at, profile }) {
   return m.transaction(() => {
     const row = seatOf(m, at, profile);
     if (row && (row.starting || (row.token !== seat?.token))) return false;
-    writeSeat(m, { token, value: { state: 'starting', attempt, ...(route ? { route } : {}) }, expiresAt: at + STARTUP_RESERVATION_MS, now: at, profile });
+    writeSeat(m, { token, value: { state: 'starting', attempt }, expiresAt: at + STARTUP_RESERVATION_MS, now: at, profile });
     return true;
   });
 }
@@ -326,7 +312,7 @@ function planResult({ seat, health, dedupe, group, settings, profile, env, d, en
 }
 
 /** The launch proper: reserve the seat, spawn the agent, record the outcome. Runs under the start lock. */
-async function spawnSeat({ m, d, seat, health, listing, recorded, dedupe, group, settings, template, doc, reason, route, profile, env, now }) {
+async function spawnSeat({ m, d, seat, health, listing, recorded, dedupe, group, settings, template, doc, reason, profile, env, now }) {
   const entry = entryTerminalOf({ env, listing, recorded, owned: new Set([...openWorkerHandles(m), ...supervisedSeatHandles(m)]) });
   if (!entry) return { ok: false, exit: 1, action: 'launch-failed', step: 'run-create', error: NO_ENTRY_REMEDY, effectState: 'none' };
 
@@ -339,7 +325,7 @@ async function spawnSeat({ m, d, seat, health, listing, recorded, dedupe, group,
   const { closedPrevious, failure } = closePreviousSeat(previous, d);
   if (failure) return failure;
 
-  if (!reserveSeat({ m, seat, token, attempt, route, at, profile })) return { ok: true, exit: 0, action: 'starting', reason: 'another launcher holds the startup reservation' };
+  if (!reserveSeat({ m, seat, token, attempt, at, profile })) return { ok: true, exit: 0, action: 'starting', reason: 'another launcher holds the startup reservation' };
 
   // Only an affirmatively closed predecessor permits this replacement reservation.
   const closedDuplicates = closeDuplicates(dedupe.close, d, listing);
@@ -354,8 +340,8 @@ async function spawnSeat({ m, d, seat, health, listing, recorded, dedupe, group,
     specFile: path.join(starciLocalRoot(env), profile.seatId, `prompt.a${attempt}.md`), objective: `${profile.title} — ${profile.id}`,
     entry, priorRunId: seat?.value?.runId ?? null,
     request: { seat: profile.id, attempt, token } });
-  if (!spawned?.ok) return recordSpawnFailure({ m, spawned, token, attempt, route, profile, settings, now });
-  const value = recordLaunch({ m, d, spawned, group, settings, route, token, attempt, previous, reason, profile, now });
+  if (!spawned?.ok) return recordSpawnFailure({ m, spawned, token, attempt, profile, settings, now });
+  const value = recordLaunch({ m, d, spawned, group, settings, token, attempt, previous, reason, profile, now });
   return { ok: true, exit: 0, action: previous ? 'restarted' : 'booted', terminal: spawned.terminal, dispatch: spawned.dispatchId, agent: value.agent, model: value.model,
     admission: spawned.admission ?? null,
     attempt, ...(closedDuplicates.length ? { closedDuplicates } : {}), ...(closedPrevious.length ? { closedPrevious } : {}) };
@@ -368,16 +354,16 @@ async function spawnSeat({ m, d, seat, health, listing, recorded, dedupe, group,
  */
 export async function launchSupervisor({ mode = 'start', reason = null, plan: planOnly = false,
   env = process.env, deps = null, settings = supervisorSettings(), template = null, doc = null, now = Date.now,
-  profile = SUPERVISOR_SEAT, route = null } = {}) {
-  const refusal = chatModeRefusal({ profile, env, planOnly, mode });
+  profile = SUPERVISOR_SEAT } = {}) {
+  const refusal = chatModeRefusal({ env, planOnly, mode });
   if (refusal) return refusal;
   const d = deps ?? await orcaDeps();
   // A long-lived writer handle: the spawn below waits for the agent's readiness (no transaction is held meanwhile).
   const m = planOnly ? openMachineReader({ env }) : openMachine({ env });
-  const lock = planOnly ? { ok: true, release() {} } : claimStartLock(m, profile);
+  const lock = planOnly ? { ok: true, release() {} } : claimStartLock(m);
   if (!lock.ok) { m.close(); return { ok: true, exit: 0, action: 'start-in-progress', holder: lock.holder?.pid ?? null }; }
   try {
-    const assessed = assessSeat({ m, mode, planOnly, route, profile, now, d });
+    const assessed = assessSeat({ m, mode, planOnly, profile, now, d });
     if (assessed.result) return assessed.result;
     const { enabled, seat, health } = assessed;
     const surveyed = surveyTerminals({ m, d, profile, health });
@@ -390,7 +376,7 @@ export async function launchSupervisor({ mode = 'start', reason = null, plan: pl
       const closed = closeDuplicates(dedupe.close, d, listing);
       return { ok: true, exit: 0, action: health.starting ? 'starting' : 'already-live', terminal: health.terminal, reason: health.reason, ...(closed.length ? { closedDuplicates: closed } : {}) };
     }
-    return await spawnSeat({ m, d, seat, health, listing, recorded, dedupe, group, settings, template, doc, reason, route, profile, env, now });
+    return await spawnSeat({ m, d, seat, health, listing, recorded, dedupe, group, settings, template, doc, reason, profile, env, now });
   } finally {
     lock.release();
     m?.close();

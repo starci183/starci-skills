@@ -12,10 +12,6 @@ effort: medium
 launchTrust: null
 # retention: {workflowPurge: {approvedBy: owner, approvalRef: '<current approval>', repos: ['<exact absolute ledger-owner repo>']}}
 retention: null
-# debug — automatically pair an approved workflow start with the native core-maintenance seat.
-# false (or absent) starts the workflow without that pairing. The caller route is supplied by the
-# single public /starci entry; it never changes the Supervisor, Kernel or operation model pins.
-debug: false
 # kernel — the long-lived [Kernel] seat. It takes the `high` tier of modules/models/tiers.yaml (an ordered chain of
 # members; the picker takes the first member with tokens after your bias and the balance step; docs/config-format.md).
 # {agent?, model?, effort?}: agent and/or model PIN the seat — the bias `only`, keeping the tier's model of that agent
@@ -139,11 +135,11 @@ uat:
 # real limit and turns red when the two differ.
 orca:
   maxWorkerDepth: 4
-# coreDebug — the native core-maintenance parameters used when debug is true. /starci resolves the
-# declared caller agent/model separately from Kernel routing; the actual worker launch attests its
-# supported identity. The reconciler maintains this host seat after the invoking chat closes.
-# interval is its cadence; worktreeLimit is the per-repository core-watch alert threshold.
-coreDebug:
+# debugLoop — the debug watcher. Workflow DEBUG is a /loop of the chat that started the workflow (the /starci skill sets it up in
+# Claude Code and Codex; no seat, no background agent, nothing in the runtime schedules it). Each tick runs the read-only
+# `starci debug digest`. interval is the loop cadence (<n>s | <n>m | <n>h, shipped default 10m); worktreeLimit is the
+# per-repository core-watch alert threshold (shipped default 40). Both keys are optional (engine/config.mjs DEBUG_LOOP_DEFAULTS).
+debugLoop:
   interval: 10m
   worktreeLimit: 40
 # reconciler — the host's one reconciler engine (scripts/reconciler/engine.mjs; contract

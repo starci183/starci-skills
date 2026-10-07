@@ -43,7 +43,7 @@ _starci() {
       app) _values 'verbs' 'add[add one canonical backend capability and register its patterns]' 'check[judge the app tree, managed output, contracts, formatting and architecture]' 'emit[emit backend GraphQL, operation and event contract snapshots]' 'explain[explain which HFS slot owns one app-relative path]' 'hygiene[judge staged worktree metadata, stack files and plaintext secrets]' 'lint[lint both app sides and report repository, ESLint and stylelint findings together]' 'new[create a canonical service, unit spec or app image definition]' 'scaffold[create a full or lite StarCi app, including an empty unborn main Git repository]' 'secret[list, read, seal or generate an encrypted app secret]' 'stack[start, stop or inspect the shared local test-world infrastructure]' 'sync[compare or write every managed app file from its canonical template]' 'upgrade[upgrade a lite app to the full edition (--edition full); a full app is already current]' ;;
       check) _values 'verbs' 'run[run changed-scope checks or the full structural check set]' ;;
       connect) _values 'verbs' 'ask-gateway[operate the local owner-ask HTTP gateway]' 'telegram[deliver and maintain owner Telegram notifications]' 'telegram-media[deliver settled operation media through Telegram]' 'tunnel[operate the Cloudflare owner-ask tunnel]' ;;
-      debug) _values 'verbs' 'pass[inspect core health and maintain diagnostic custody in the machine ledger]' 'run[run one allowlisted read-only runtime inspector]' ;;
+      debug) _values 'verbs' 'run[run one allowlisted read-only runtime inspector]' ;;
       docker) _values 'verbs' 'build[build one declared application image from the application root]' 'down[remove only the labelled resources owned by one application stack]' 'ps[list StarCi-labelled containers with ports and health]' 'up[start one application stack and wait for its declared healthchecks]' ;;
       gate) _values 'verbs' 'canon-scan[measure canon conformance debt and plan its disjoint slices]' 'custody-exec[decrypt one custody document for a command or a bounded read]' 'env-health[inspect and manage the served environment used by verification]' 'hfs-sync[check an app'\''s generated files and custody trees for drift]' 'install-sandbox[prove the packed runtime tarball installs and runs in an empty home]' 'read[build the recorded READ digest for an operation]' 'reference-conventions[probe the installed backend reference rules of a reference root]' 'repo-presentation[check repository presentation rules for a product or runtime tree]' 'run[run the measured product or document gate]' 'runtime-artifact[describe the packed runtime archive and refuse forbidden material in it]' 'runtime-coverage[run the runtime spec suite under Node coverage and write coverage/lcov.info]' 'sonar[inspect, provision and run the local Sonar quality gate]' 'starcistacks[check a repository'\''s stack declaration and custody layout]' 'test-world[run and judge one managed test-world project]' 'unit[run unit tests and judge per-subject coverage and test-kit use]' ;;
       git) _values 'verbs' 'backup[push local branch tips only to dated backup refs]' 'commit[commit staged work with the message convention and trailers]' 'land[verify a lane and fast-forward it onto local main without pushing]' 'sync[merge local main into a clean lane with rerere enabled]' ;;
@@ -67,7 +67,7 @@ _starci() {
       uat) _values 'verbs' 'assisted-runner[inspect and run a prepared assisted UAT request]' 'slots[inspect UAT slots or run a command while holding one]' ;;
       work) _values 'verbs' 'asset-slot[list or check asset slots in Work records]' 'brand[derive or verify the canonical brand Work record]' 'brand-direction[inspect, ask for, or apply owner review of a brand direction]' 'brand-palette[emit a brand palette prompt or check rendered images against it]' 'check-example-work[check the layout, ids, refs and evidence of every example Work tree]' 'compose-direction[place drawn content into its measured page or overlay shell]' 'draw-acceptance[verify that drawn assets are accepted render shapes]' 'draw-dna[compare a rendered drawing with grammar DNA]' 'draw-feedback[build, inspect, check, or classify drawing feedback]' 'draw-gates[run machine and owner gates for a drawn UI record]' 'draw-grammar[resolve the grammar package used by a drawing]' 'draw-layer[verify that drawings are isolated content layers]' 'draw-loop[render, score, inspect, finish, or verify an iterative drawing loop]' 'draw-rationale[verify the rationale bound to a rendered drawing]' 'draw-render[render HTML or a drawing component at declared viewports]' 'draw-review[inspect, ask for, or apply owner review of a drawing]' 'draw-source[validate a drawing source and its fixture bindings]' 'draw-taste[check a rendered drawing against visual taste rules]' 'evidence-binding[prove that every done leaf'\''s evidence still binds to the source it claims]' 'example-critique[derive example critique records from a Work tree]' 'example-derive[derive example catalog artifacts from a Work tree]' 'example-evidence[collect evidence for one example Work record]' 'example-verify[replay and verify evidence for one example Work record]' 'grammar-geometry[emit grammar geometry guidance or check captured geometry]' 'grammar-knowledge[compare or refresh measured grammar knowledge]' 'grammar-proposal[list or check grammar proposals in Work records]' 'grammar-registry-pin[check a frontend grammar dependency against the registry pin]' 'graph[inspect, validate, diff or propose a workflow work graph]' 'hygiene[parse, scope-validate and secret-check Work and stack files before they are committed]' 'imagegen[generate images headlessly on the imagegen call tier and write them with a receipt]' 'layout-tree[scan, capture, plan, lock, or inspect a product layout tree]' 'render-proof[render a proof document for one Work record]' 'shell-conformance[check Work and implementation records against the measured frontend shell]' 'ui-proof-brief[emit a UI proof brief or score a rendered surface]' ;;
       worker) _values 'verbs' 'close[release a worker, close its terminal and prove its process tree is gone]' 'list[list supervised workers or working-agent counts by worktree lane]' 'read[read a bounded tail of one supervised worker'\''s output]' 'release[release settled Orca worker accounting without claiming full cleanup]' 'show[show one supervised worker and Orca'\''s exact liveness observation]' 'start[start one supervised agent in a registered worktree in an Orca run]' 'stop[stop a supervised worker that Orca still reports as working]' ;;
-      workflow) _values 'verbs' 'assess[cold-scan repositories for goal-definition evidence]' 'bias[normalize a routing bias or extract one from the owner'\''s text]' 'define[define a goal — assess the prompt, plan the op chain, queue it in the ledger inbox]' 'start[ensure the host and optional core maintenance, then claim an approved goal and boot its Kernel]' 'status[the workflow projection — phase, frontier, leases and pending owner asks]' 'stop[stop a workflow — archive it, drop open jobs and retire its asks (the owner stop)]' ;;
+      workflow) _values 'verbs' 'assess[cold-scan repositories for goal-definition evidence]' 'bias[normalize a routing bias or extract one from the owner'\''s text]' 'define[define a goal — assess the prompt, plan the op chain, queue it in the ledger inbox]' 'start[ensure the host, then claim an approved goal and boot its Kernel]' 'status[the workflow projection — phase, frontier, leases and pending owner asks]' 'stop[stop a workflow — archive it, drop open jobs and retire its asks (the owner stop)]' ;;
       completion) _values 'shells' 'bash' 'zsh' 'fish' 'powershell' ;;
       help) return 0 ;;
       explain) _values 'groups' 'app' 'check' 'connect' 'debug' 'docker' 'gate' 'git' 'guard' 'harness' 'kernel' 'lint' 'machine' 'npm' 'orca' 'reconciler' 'release' 'route' 'runtime' 'smoke' 'supabase' 'supervisor' 'task' 'test' 'typecheck' 'uat' 'work' 'worker' 'workflow' ;;
@@ -116,14 +116,6 @@ _starci() {
     'connect:telegram-media:--verdict') _values 'values' 'pass' 'fail' 'blocked'; return 0 ;;
     'connect:telegram-media:--dispatch') return 0 ;;
     'connect:tunnel:--port') return 0 ;;
-    'debug:pass:--dispatch') return 0 ;;
-    'debug:pass:--snapshot') return 0 ;;
-    'debug:pass:--child-timeout') return 0 ;;
-    'debug:pass:--token-window') return 0 ;;
-    'debug:pass:--token-spike') return 0 ;;
-    'debug:pass:--key') return 0 ;;
-    'debug:pass:--lane') return 0 ;;
-    'debug:pass:--reason') return 0 ;;
     'debug:run:--repo') return 0 ;;
     'debug:run:--since-hours') return 0 ;;
     'debug:run:--child-timeout') return 0 ;;
@@ -570,9 +562,6 @@ _starci() {
     'reconciler:once:--key') return 0 ;;
     'reconciler:up:--wait') return 0 ;;
     'reconciler:up:--set-profile') _values 'values' 'operational' 'observe'; return 0 ;;
-    'reconciler:up:--caller-agent') _values 'values' 'codex' 'claude' 'devin'; return 0 ;;
-    'reconciler:up:--caller-model') return 0 ;;
-    'reconciler:up:--caller-effort') return 0 ;;
     'release:check:--only') return 0 ;;
     'release:clean-test:--changed') return 0 ;;
     'release:clean-test:--base') return 0 ;;
@@ -928,9 +917,6 @@ _starci() {
     'workflow:start:--repo') return 0 ;;
     'workflow:start:--goal') return 0 ;;
     'workflow:start:--agent') return 0 ;;
-    'workflow:start:--caller-agent') _values 'values' 'codex' 'claude' 'devin'; return 0 ;;
-    'workflow:start:--caller-model') return 0 ;;
-    'workflow:start:--caller-effort') return 0 ;;
     'workflow:start:--launched-by') _values 'values' 'watchdog' 'supervisor'; return 0 ;;
     'workflow:status:--repo') return 0 ;;
     'workflow:status:--workflow') return 0 ;;
@@ -957,7 +943,6 @@ _starci() {
     'connect:telegram') _values 'flags' '--discover-chat' '--ledger' '--repo' '--workflow' '--dispatch' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'connect:telegram-media') _values 'flags' '--ledger' '--repo' '--workflow' '--job' '--attempt' '--op' '--verdict' '--dispatch' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'connect:tunnel') _values 'flags' '--port' '--fast' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
-    'debug:pass') _values 'flags' '--dispatch' '--snapshot' '--child-timeout' '--token-window' '--token-spike' '--key' '--lane' '--reason' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'debug:run') _values 'flags' '--repo' '--since-hours' '--child-timeout' '--token-window' '--token-spike' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'docker:build') _values 'flags' '--tag' '--no-cache' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'docker:down') _values 'flags' '--env' '--volumes' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
@@ -1062,7 +1047,7 @@ _starci() {
     'reconciler:start') _values 'flags' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'reconciler:status') _values 'flags' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'reconciler:stop') _values 'flags' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
-    'reconciler:up') _values 'flags' '--check' '--services' '--brief' '--wait' '--no-build' '--retire-stale-ledgers' '--set-profile' '--caller-agent' '--caller-model' '--caller-effort' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
+    'reconciler:up') _values 'flags' '--check' '--services' '--brief' '--wait' '--no-build' '--retire-stale-ledgers' '--set-profile' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'release:app-installs') _values 'flags' '--keep' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'release:check') _values 'flags' '--final' '--only' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'release:clean-test') _values 'flags' '--changed' '--base' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
@@ -1168,7 +1153,7 @@ _starci() {
     'workflow:assess') _values 'flags' '--repo' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'workflow:bias') _values 'flags' '--normalize' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'workflow:define') _values 'flags' '--repo' '--project' '--text' '--title' '--display-name' '--params' '--plan' '--revise' '--reason' '--approve-revision' '--defined-by' '--approved-by' '--bridge-id' '--routing-bias' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
-    'workflow:start') _values 'flags' '--repo' '--goal' '--agent' '--caller-agent' '--caller-model' '--caller-effort' '--launched-by' '--plan' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
+    'workflow:start') _values 'flags' '--repo' '--goal' '--agent' '--launched-by' '--plan' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'workflow:status') _values 'flags' '--repo' '--workflow' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'workflow:stop') _values 'flags' '--repo' '--workflow' '--reason' '--by' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     esac

@@ -29,7 +29,6 @@ business:
     - Strategy and hard work (runtimes.yaml roleOfKind work think; difficulty hard and insane) — the high tier (Sonnet 5.5, then Sol) and the frontier tier (Opus 5.5, then Sol) lead with it.
     - The Supervisor, planner, validator and kernel manager seats (tiers.yaml seats: frontier, Opus 5.5 first).
     - The [Kernel] seat (tiers.yaml seats.kernel: high, Sonnet 5.5 first, Sol behind it); config.yaml kernel.agent / kernel.model pin it as an `only` bias.
-    - Core-debug when the chat that started the workflow is Claude: it runs in that app on the frontier model of that provider (Opus 5.5), never picked down a chain.
   whenNot:
     - "Host-tool routes: the agent card lists no host tool, so interface.audit (browser-dom) passes it (route.riskHints host-tool-required, modules/models/agents/claude.yaml capabilities.hostTools). The drawing ops (interface.draw, interface.asset, brand.decide) need no host tool: they take the tier of their difficulty (Sonnet 5.5 first in high) and get images from the headless `starci work imagegen` call; Claude is the draw critic only when Codex drew (drawLoop.criticWhenDrawer)."
     - "Hands-on work as first pick: every hands-on order puts it last, keeping Opus for thinking."

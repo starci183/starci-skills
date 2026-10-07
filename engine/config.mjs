@@ -313,18 +313,17 @@ const validateSupervisorBlock=(supervisor,profile)=>{
 const validateDelegationBlock=d=>{if(!plain(d)||Object.keys(d).some(key=>!['asks','until','excludes','note'].includes(key))||typeof d.asks!=='string'||!d.asks.trim()||typeof d.until!=='string'||Number.isNaN(Date.parse(d.until))||(d.excludes!==undefined&&(!Array.isArray(d.excludes)||d.excludes.some(x=>typeof x!=='string'))))throw new Error('Invalid config.yaml: delegation must be {asks: <delegate>, until: <ISO time>, excludes?: [<class>], note?} or null.');};
 const validateBudgetsBlock=budgets=>{if(!plain(budgets)||Object.keys(budgets).some(key=>!['maxOps'].includes(key))||Object.values(budgets).some(value=>value!==null&&!(Number.isInteger(value)&&value>0)))throw new Error('Invalid config.yaml: budgets must be {maxOps?} with positive-integer-or-null values.');};
 const validateRootKeys=(config)=>{
-  const allowed=new Set(['language','model','effort','models','debug','allocation','kernel','budgets','supervisor','parallel','delegation','connectors','asks','uat','specs','reconciler','coreDebug','orca','roots','resources','launchTrust','retention']);
+  const allowed=new Set(['language','model','effort','models','allocation','kernel','budgets','supervisor','parallel','delegation','connectors','asks','uat','specs','reconciler','debugLoop','orca','roots','resources','launchTrust','retention']);
   if(!plain(config)||Object.keys(config).some(key=>!allowed.has(key))||typeof config.language!=='string'||!/^[a-z]{2,3}(?:-[A-Za-z0-9]+)*$/.test(config.language)||!(config.model===null||typeof config.model==='string'&&config.model.trim())||!EFFORT_LEVELS.has(config.effort))
     throw new Error('Invalid config.yaml: expected language, model, effort and the closed set of config blocks.');
 };
 const validateEarlyConfigBlocks=(config)=>{
   if(config?.launchTrust!==undefined){launchTrustSettings(config);} if(config?.retention!==undefined){workflowPurgeSettings(config);}
   if(config?.connectors!==undefined){validateConnectors(config.connectors);} if(config?.asks!==undefined){validateAsks(config.asks);}
-  if(config?.uat!==undefined){validateUat(config.uat);} if(config?.coreDebug!==undefined){validateCoreDebug(config.coreDebug);}
+  if(config?.uat!==undefined){validateUat(config.uat);} if(config?.debugLoop!==undefined){validateDebugLoop(config.debugLoop);}
   if(config?.orca!==undefined){validateOrca(config.orca);} if(config?.roots!==undefined){validateRoots(config.roots);} if(config?.resources!==undefined){validateResources(config.resources);}
 };
 const validateConfigBlocks=(config,knownProviders,runtimes,profile)=>{
-  if(config?.debug!==undefined&&typeof config.debug!=='boolean')throw new Error('Invalid config.yaml: debug must be true or false.');
   // specs (owner 2026-09-28): {harness?, unit?, e2e?} booleans - each family a boolean; absent = its default (SPEC_DEFAULTS: harness off, unit on, e2e off; specsSettings).
   if(config?.specs!==undefined&&config.specs!==null&&(!plain(config.specs)||Object.keys(config.specs).some(key=>!SPEC_FAMILIES.includes(key)||typeof config.specs[key]!=='boolean')))throw new Error(`Invalid config.yaml: specs must be {${SPEC_FAMILIES.map(k=>k+'?: boolean').join(', ')}}, or null.`);
   // reconciler (scripts/reconciler/state.mjs reconcilerConfig): {enabled?: boolean, profile?: operational|observe, controllers?: {<name>: {mode: off|shadow|active}}}, or null.
@@ -399,27 +398,28 @@ export function specsSettings(config){const specs=plain(config?.specs)?config.sp
 /** specs.harness of the owner file under `root` (tolerant read: inspectOwnerConfig): true only when the owner opted in to `--specs all`. */
 export function harnessSpecsEnabled(root=configRoot){return specsSettings(inspectOwnerConfig(root).config).harness;}
 /**
- * config.yaml `coreDebug` (skills/starci, scripts/reconciler/core-debug.mjs): {interval, worktreeLimit}.
- *   interval       <n>s | <n>m | <n>h — the reconciler's cadence for the native core-maintenance seat.
+ * config.yaml `debugLoop` (skills/starci, scripts/debug/digest): {interval?, worktreeLimit?}, each optional.
+ *   interval       <n>s | <n>m | <n>h — the cadence of the chat /loop that runs `starci debug digest`.
  *   worktreeLimit  integer >= 1 — more registered worktrees than this in one repository is a core-watch alert.
- * Both keys are required when the block is present; code carries no default (config.example.yaml does).
  */
 export const DURATION_PATTERN=/^(\d+)([smh])$/;
+export const DEBUG_LOOP_DEFAULTS=Object.freeze({interval:'10m',worktreeLimit:40});
 /** '10m' | '90s' | '1h' in milliseconds, or null for anything else (zero included). */
 export function durationMs(text){const m=DURATION_PATTERN.exec(String(text??'').trim());const ms=m?Number(m[1])*{s:1000,m:60000,h:3600000}[m[2]]:0;return ms>0?ms:null;}
-function validateCoreDebug(block){
-  const bad=invalid('coreDebug');
-  if(!plain(block))bad(' must be {interval: <n>s|<n>m|<n>h, worktreeLimit: <integer >= 1>}.');
+function validateDebugLoop(block){
+  if(block===null)return;
+  const bad=invalid('debugLoop');
+  if(!plain(block))bad(' must be {interval?: <n>s|<n>m|<n>h, worktreeLimit?: <integer >= 1>} or null.');
   for(const key of Object.keys(block))if(!['interval','worktreeLimit'].includes(key))bad(` has unknown key ${key} (allowed: interval, worktreeLimit).`);
-  if(durationMs(block.interval)===null)bad('.interval must be <n>s, <n>m or <n>h with n >= 1 (e.g. 10m).');
-  if(!Number.isInteger(block.worktreeLimit)||block.worktreeLimit<1)bad('.worktreeLimit must be an integer >= 1.');
+  if(block.interval!==undefined&&durationMs(block.interval)===null)bad('.interval must be <n>s, <n>m or <n>h with n >= 1 (e.g. 10m).');
+  if(block.worktreeLimit!==undefined&&!(Number.isInteger(block.worktreeLimit)&&block.worktreeLimit>=1))bad('.worktreeLimit must be an integer >= 1.');
 }
-/** The owner's coreDebug block: {interval, intervalMs, worktreeLimit}. Refuses when config.yaml has none. */
-export function coreDebugSettings(config=loadConfig()){
-  const block=config?.coreDebug;
-  if(block===undefined||block===null)throw new Error('Invalid config.yaml: coreDebug is missing; copy the coreDebug block from config.example.yaml.');
-  validateCoreDebug(block);
-  return {interval:block.interval,intervalMs:durationMs(block.interval),worktreeLimit:block.worktreeLimit};
+/** The owner's debug-loop settings: {interval, intervalMs, worktreeLimit}; an absent block or key is the default. */
+export function debugLoopSettings(config=loadConfig()){
+  validateDebugLoop(config?.debugLoop??null);
+  const block=plain(config?.debugLoop)?config.debugLoop:{};
+  const interval=block.interval??DEBUG_LOOP_DEFAULTS.interval;
+  return {interval,intervalMs:durationMs(interval),worktreeLimit:block.worktreeLimit??DEBUG_LOOP_DEFAULTS.worktreeLimit};
 }
 /** The owner config of `root` (config.yaml), else the shipped example. The installer seeds config.yaml (scripts/install/install.mjs seedConfig); this reader never writes. */
 export function loadConfig(root=configRoot){

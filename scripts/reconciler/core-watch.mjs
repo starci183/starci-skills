@@ -14,15 +14,15 @@
 //   TOKENS    input+output tokens of the last window above --token-spike (machine.sqlite llm_usage; there is no `starci kernel usage` verb)
 //   LEDGER    a registered ledger whose state directory or every source root is gone (hk-orphan-ledgers)
 //   WORKTREE  per repository (the runtime and every active ledger's repo), from Orca's `worktree ps`: more than
-//             coreDebug.worktreeLimit worktrees, a tree whose directory is gone, or a tree carrying the runtime's
+//             debugLoop.worktreeLimit worktrees, a tree whose directory is gone, or a tree carrying the runtime's
 //             ownership stamp with no registry row (the GC adopts or removes it)
 //   INTEGRITY the runtime's main checkout: tracked files deleted, node_modules or packages/node_modules missing or empty
 //   GATE      in the last day: a lane whose latest land run did not pass, a repository whose latest push failed
-//   CONFIG    config.yaml coreDebug missing or invalid
+//   CONFIG    config.yaml debugLoop invalid
 //
 // It never restarts, writes, dispatches or types into anything: machine.sqlite and every ledger are opened read-only, the
 // only children are read-only verbs, every one with a timeout. Auto-restart made crash-loop safe mode worse; the fix path
-// is a lane. Repetition is the caller's verified native scheduler over scripts/reconciler/debug-pass.mjs (skills/debug), never a
+// is a lane. Repetition is the calling chat's /loop over `starci debug digest` (skills/starci), never a
 // scheduler in this script.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -31,7 +31,7 @@ import { fileURLToPath } from 'node:url';
 import { probe } from '../api/http/probe.mjs';
 import { readMachine } from '../../engine/db/machine.mjs';
 import { openLedgerReader } from '../../engine/db/ledger.mjs';
-import { coreDebugSettings, loadConfig } from '../../engine/config.mjs';
+import { debugLoopSettings, loadConfig } from '../../engine/config.mjs';
 import { connectorWanted } from './connector-wanted.mjs';
 import { lsFiles } from '../api/git/ls-files.mjs';
 import { worktreeListQuery } from '../api/git/worktree-list-query.mjs';
@@ -267,9 +267,9 @@ const registeredOrcaIds = () => new Set(readMachine((m) => m.db.prepare('SELECT 
  * Worktree count and orphans per repository (the runtime and every active ledger's repo), from Orca's `worktree ps`
  * (the source of truth for worktrees): more than `worktreeLimit` worktrees, a tree whose directory is gone, or a tree
  * stamped as the runtime's (scripts/lib/orca-orphans.mjs) with no live registry row. A repository Orca does not know has
- * no Orca tree to judge. Read only. `worktreeLimit` null (config.yaml has no coreDebug block) checks orphans only.
+ * no Orca tree to judge. Read only. `worktreeLimit` null (an invalid debugLoop block) checks orphans only.
  */
-export function worktreeFacts(repos, { worktreeLimit = null, ps = worktreePs, registered = registeredOrcaIds, exists = fs.existsSync } = {}) {
+function worktreeFacts(repos, { worktreeLimit = null, ps = worktreePs, registered = registeredOrcaIds, exists = fs.existsSync } = {}) {
   const facts = new Map();
   const page = ps();
   if (!page?.ok) { facts.set('worktrees:orca', `orca worktree ps failed: ${String(page?.error ?? 'no answer').slice(0, 160)}`); return facts; }
@@ -297,7 +297,7 @@ function entryCount(dir) { try { return fs.readdirSync(dir).length; } catch { re
  * Main-checkout integrity of the runtime repository checkout `main`: tracked files deleted from the working tree (a
  * worktree removal through a junction empties it), and node_modules / packages/node_modules missing or empty. Read only.
  */
-export function integrityFacts(main, { git = (args, opts) => gitResultOf(lsFiles(args, opts)) } = {}) {
+function integrityFacts(main, { git = (args, opts) => gitResultOf(lsFiles(args, opts)) } = {}) {
   const facts = new Map();
   const deleted = git(['--deleted'], { cwd: main });
   if (!deleted.ok) facts.set('integrity:tracked-deleted', `git ls-files --deleted failed in ${main}: ${deleted.error}`);
@@ -346,9 +346,9 @@ function gateFacts() {
   return facts;
 }
 
-/** config.yaml coreDebug for this tick; a missing or invalid block is itself an alert (the worktree limit is then skipped). */
+/** config.yaml debugLoop for this tick; an invalid block is itself an alert (the worktree limit is then skipped). */
 function debugSettings(facts) {
-  try { const s = coreDebugSettings(); facts.set('config:coreDebug', null); return s; } catch (e) { facts.set('config:coreDebug', String(e.message).slice(0, 200)); return { worktreeLimit: null }; }
+  try { const s = debugLoopSettings(); facts.set('config:debugLoop', null); return s; } catch (e) { facts.set('config:debugLoop', String(e.message).slice(0, 200)); return { worktreeLimit: null }; }
 }
 
 function hostFacts() {

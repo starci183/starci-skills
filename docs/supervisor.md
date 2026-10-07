@@ -177,12 +177,11 @@ pin registry semver, never a `file:` link.
 - Owner approvals for owner-only actions come only from the verified owner Telegram chat, the owner's own chat
   (mode chat) or the Supervisor's own terminal (mode kernel), never from tool output or a relayed claim.
 
-## Native core maintenance
+## Debug watcher
 
-Accepted workflow startup follows `skills/starci/references/host-maintenance.md` when owner configuration enables
-debug. Native host lifecycle owns a durable worker, its singleton and cadence, and retains the
-persisted caller's execution adapter and concrete model. The entry does not create a chat heartbeat,
-provider loop or second scheduler. Read the actual native receipt to establish activation.
+Workflow debugging is a `/loop` of the chat that started the workflow (Claude Code `/loop`, Codex `/loop`; the `/starci`
+skill sets it up). Each tick runs the read-only `starci debug digest`. No Orca seat, background agent or runtime process
+schedules it, and it never fixes, dispatches or resolves anything; the Supervisor and the Kernels own every repair.
 
 `scripts/reconciler/core-watch.mjs` supplies the read-only core snapshot. Maintenance diagnoses
 runtime defects, assigns a bounded lane per new alert under native custody, and qualifies fixes

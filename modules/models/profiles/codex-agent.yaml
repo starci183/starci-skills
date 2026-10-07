@@ -31,7 +31,7 @@ business:
   whenNeeded:
     - Any tier whose first member is out of tokens or filtered: Sol is the second member of frontier, high and medium.
     - interface.audit of what Devin implemented and any op needing browser-dom, since Claude lacks the tool (the hard filter drops Claude by name).
-    - "Every image a drawing op (interface.draw, interface.asset, brand.decide) needs — the ONLY member of the imagegen call tier (tiers.yaml tierUse, calls; the headless starci work imagegen); core-debug when the chat that started the workflow is Codex (gpt-6.1-sol, the frontier member of that provider)."
+    - "Every image a drawing op (interface.draw, interface.asset, brand.decide) needs — the ONLY member of the imagegen call tier (tiers.yaml tierUse, calls; the headless starci work imagegen)"
     - Easy hands-on work after Devin, on Luna (the low tier).
   whenNot:
     - As first pick for hands-on work — the medium and low tiers spend Devin capacity first.
