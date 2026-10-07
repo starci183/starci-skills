@@ -103,50 +103,57 @@ export function anyDescendant(ts, node, match) {
  * selected node's symbols to a kind (default `targets.get(symbol)`); `shorthandOf` (when set) also resolves
  * shorthand-property declarations and descends property assignments; `newExpression` descends `new X()` callees.
  */
+const addKinds = (target, source) => { for (const kind of source) target.add(kind); };
+
+const kindsFromReturns = (ts, checker, declaration, targets, options) => {
+  const kinds = new Set();
+  for (const returned of returnedExpressions(ts, declaration)) addKinds(kinds, tracedFrameworkKinds(ts, checker, returned, targets, options));
+  return kinds;
+};
+
+const kindsFromDeclaration = (ts, checker, declaration, targets, options, shorthandOf) => {
+  const kinds = new Set();
+  if (ts.isVariableDeclaration(declaration) && declaration.initializer)
+    addKinds(kinds, tracedFrameworkKinds(ts, checker, declaration.initializer, targets, options));
+  if (shorthandOf && ts.isShorthandPropertyAssignment(declaration)) {
+    const target = normalizedSymbolValue(ts, checker, checker.getShorthandAssignmentValueSymbol?.(declaration));
+    const kind = shorthandOf(ts, checker, target, targets);
+    if (kind) kinds.add(kind);
+  }
+  if (shorthandOf && ts.isPropertyAssignment(declaration))
+    addKinds(kinds, tracedFrameworkKinds(ts, checker, declaration.initializer, targets, options));
+  addKinds(kinds, kindsFromReturns(ts, checker, declaration, targets, options));
+  return kinds;
+};
+
+const kindsFromSymbol = (ts, checker, symbol, targets, seen, options) => {
+  const nextSeen = new Set(seen).add(symbol);
+  const declarationOptions = { ...options, seen: nextSeen };
+  const kinds = new Set();
+  for (const declaration of symbol.getDeclarations?.() ?? [])
+    addKinds(kinds, kindsFromDeclaration(ts, checker, declaration, targets, declarationOptions, options.shorthandOf));
+  return kinds;
+};
+
 export function tracedFrameworkKinds(ts, checker, expression, targets,
   { seen = new Set(), depth = 0, directOf = null, shorthandOf = null, newExpression = false } = {}) {
   if (!expression) return new Set();
   if (depth > 10) return new Set([UNPROVEN_FRAMEWORK]);
-  expression = unwrapExpression(ts, expression);
-  const selected = selectedNode(ts, expression);
+  const unwrapped = unwrapExpression(ts, expression);
+  const selected = selectedNode(ts, unwrapped);
   const symbol = selected ? normalizedSymbol(ts, checker, selected) : null;
   const direct = symbol ? (directOf ?? ((ts2, c, { symbol: s, targets: t }) => t.get(s) ?? null))(ts, checker, { symbol, selected, targets }) : null;
   if (direct) return new Set([direct]);
-  const opts = { depth: depth + 1, directOf, shorthandOf, newExpression };
-  if (ts.isArrowFunction(expression) || ts.isFunctionExpression(expression)) {
-    const kinds = new Set();
-    for (const returned of returnedExpressions(ts, expression)) {
-      for (const kind of tracedFrameworkKinds(ts, checker, returned, targets, { ...opts, seen })) kinds.add(kind);
-    }
-    return kinds;
-  }
-  if (ts.isCallExpression(expression)) {
-    const kinds = tracedFrameworkKinds(ts, checker, expression.expression, targets, { ...opts, seen });
+  const options = { depth: depth + 1, directOf, shorthandOf, newExpression };
+  if (ts.isArrowFunction(unwrapped) || ts.isFunctionExpression(unwrapped)) return kindsFromReturns(ts, checker, unwrapped, targets, { ...options, seen });
+  if (ts.isCallExpression(unwrapped)) {
+    const kinds = tracedFrameworkKinds(ts, checker, unwrapped.expression, targets, { ...options, seen });
     if (kinds.size) return kinds;
   }
-  if (newExpression && ts.isNewExpression(expression)) {
-    return tracedFrameworkKinds(ts, checker, expression.expression, targets, { ...opts, seen });
-  }
+  if (newExpression && ts.isNewExpression(unwrapped))
+    return tracedFrameworkKinds(ts, checker, unwrapped.expression, targets, { ...options, seen });
   if (!symbol || seen.has(symbol)) return new Set();
-  const nextSeen = new Set(seen).add(symbol);
-  const kinds = new Set();
-  for (const declaration of symbol.getDeclarations?.() ?? []) {
-    if (ts.isVariableDeclaration(declaration) && declaration.initializer) {
-      for (const kind of tracedFrameworkKinds(ts, checker, declaration.initializer, targets, { ...opts, seen: nextSeen })) kinds.add(kind);
-    }
-    if (shorthandOf && ts.isShorthandPropertyAssignment(declaration)) {
-      const target = normalizedSymbolValue(ts, checker, checker.getShorthandAssignmentValueSymbol?.(declaration));
-      const kind = shorthandOf(ts, checker, target, targets);
-      if (kind) kinds.add(kind);
-    }
-    if (shorthandOf && ts.isPropertyAssignment(declaration)) {
-      for (const kind of tracedFrameworkKinds(ts, checker, declaration.initializer, targets, { ...opts, seen: nextSeen })) kinds.add(kind);
-    }
-    for (const returned of returnedExpressions(ts, declaration)) {
-      for (const kind of tracedFrameworkKinds(ts, checker, returned, targets, { ...opts, seen: nextSeen })) kinds.add(kind);
-    }
-  }
-  return kinds;
+  return kindsFromSymbol(ts, checker, symbol, targets, seen, options);
 }
 
 /** 'unproven framework' | 'multiple framework' | the one kind | null, for a decorator whose expression constructs. */

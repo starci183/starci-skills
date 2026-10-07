@@ -81,11 +81,15 @@ function sinkOf(c) {
 // The variables a kill names in the raw text, once per kill: `Stop-Process -Id $p.Id`, `$p | Stop-Process`, `$p.Kill()`,
 // `kill $pid`, `kill $!`. A kill target that is no plain variable (a $(...), a pipe from a query) names none.
 const ROOTS = [
-  /\b(?:stop-process|spps|kill|taskkill)\b(?:\s+(?:-(?:id|inputobject)(?::|(?=\s))|(?:\/\/?|-)pid(?=\s)|-\w+(?=\s+\S*\$)))*\s*"?\$(\w+|!)/gi,
+  new RegExp([
+    String.raw`\b(?:stop-process|spps|kill|taskkill)\b`,
+    String.raw`(?:\s+(?:-(?:id|inputobject)(?::|(?=\s))|(?:\/\/?|-)pid(?=\s)|-\w+(?=\s+\S*\$)))*`,
+    String.raw`\s*"?\$(\w+|!)`,
+  ].join(''), 'gi'),
   /\$(\w+)\s*\|\s*(?:stop-process|spps)\b/gi,
   /\$(\w+)\.(?:terminate|kill)\s*\(/gi,
 ];
-const OWN_START = (root) => new RegExp(root === '!' ? '$^' : `(?:\\$${root}\\s*=\\s*\\(?\\s*(?:start-process|start-job|\\[[\\w.]+\\]::start)\\b|(?<![\\w$])${root}=\\$!)`, 'i');
+const OWN_START = (root) => new RegExp(root === '!' ? '$^' : String.raw`(?:\$${root}\s*=\s*\(?\s*(?:start-process|start-job|\[[\w.]+\]::start)\b|(?<![\w$])${root}=\$!)`, 'i');
 
 /** The refusal for a kill whose targets come from a process query, or null. `commands` are the parsed commands, `text` the raw call. */
 export function queryKillVerdict(parsed, text) {

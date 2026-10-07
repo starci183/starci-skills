@@ -62,64 +62,95 @@ function extraEntries(graph, entry) {
   return (found.slot ? graph.resolver.slot(found.slot)?.entries ?? [] : []).map(name => `${found.root}/${name}`).filter(rel => graph.files.has(rel));
 }
 
+const importBindings = (ts, declaration) => {
+  const clause = declaration.importClause;
+  if (!clause) return { all: false, pairs: [] }; // side-effect import: uses nothing
+  const pairs = [];
+  if (clause.name) pairs.push({ imported: 'default', exported: null });
+  const named = clause.namedBindings;
+  if (named && named.kind === ts.SyntaxKind.NamespaceImport) return { all: true, pairs: [] };
+  if (named) for (const element of named.elements) pairs.push({ imported: (element.propertyName ?? element.name).text, exported: null });
+  return { all: false, pairs };
+};
+
+const exportBindings = (ts, declaration) => {
+  const clause = declaration.exportClause;
+  if (!clause || clause.kind === ts.SyntaxKind.NamespaceExport) return { all: true, pairs: [] };
+  return { all: false, pairs: clause.elements.map(element => ({ imported: (element.propertyName ?? element.name).text, exported: element.name.text })) };
+};
+
+const importTypeBindings = (ts, declaration) => {
+  let qualifier = declaration.qualifier;
+  if (!qualifier) return { all: true, pairs: [] };
+  while (qualifier.kind === ts.SyntaxKind.QualifiedName) qualifier = qualifier.left;
+  return { all: false, pairs: [{ imported: qualifier.text, exported: null }] };
+};
+
 /** Names an import/export declaration takes from its target: {all} or {pairs: [{imported, exported}]}. */
 function bindingsOf(ts, declaration) {
-  const kind = ts.SyntaxKind;
   if (!declaration) return { all: true, pairs: [] };
-  if (declaration.kind === kind.ImportDeclaration) {
-    const clause = declaration.importClause;
-    if (!clause) return { all: false, pairs: [] }; // side-effect import: uses nothing
-    const pairs = [];
-    if (clause.name) pairs.push({ imported: 'default', exported: null });
-    const named = clause.namedBindings;
-    if (named && named.kind === kind.NamespaceImport) return { all: true, pairs: [] };
-    if (named) for (const element of named.elements) pairs.push({ imported: (element.propertyName ?? element.name).text, exported: null });
-    return { all: false, pairs };
-  }
-  if (declaration.kind === kind.ExportDeclaration) {
-    const clause = declaration.exportClause;
-    if (!clause || clause.kind === kind.NamespaceExport) return { all: true, pairs: [] };
-    return { all: false, pairs: clause.elements.map(element => ({ imported: (element.propertyName ?? element.name).text, exported: element.name.text })) };
-  }
-  if (declaration.kind === kind.ImportTypeNode) {
-    let qualifier = declaration.qualifier;
-    if (!qualifier) return { all: true, pairs: [] };
-    while (qualifier.kind === kind.QualifiedName) qualifier = qualifier.left;
-    return { all: false, pairs: [{ imported: qualifier.text, exported: null }] };
-  }
+  if (declaration.kind === ts.SyntaxKind.ImportDeclaration) return importBindings(ts, declaration);
+  if (declaration.kind === ts.SyntaxKind.ExportDeclaration) return exportBindings(ts, declaration);
+  if (declaration.kind === ts.SyntaxKind.ImportTypeNode) return importTypeBindings(ts, declaration);
   // ImportEqualsDeclaration, dynamic import(), require(): the whole module is taken.
   return { all: true, pairs: [] };
 }
+
+const addExportName = (found, sourceFile, name, node) => {
+  if (found.has(name)) return;
+  found.set(name, sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1);
+};
+
+const addBindingNames = (ts, found, sourceFile, name, node) => {
+  if (name.kind === ts.SyntaxKind.Identifier) addExportName(found, sourceFile, name.text, node);
+  else for (const element of name.elements) if (element.kind === ts.SyntaxKind.BindingElement) addBindingNames(ts, found, sourceFile, element.name, node);
+};
+
+const addExportDeclarationNames = (ts, statement, add) => {
+  if (statement.exportClause?.kind === ts.SyntaxKind.NamedExports) {
+    for (const element of statement.exportClause.elements) add(element.name.text, element);
+  } else if (statement.exportClause?.kind === ts.SyntaxKind.NamespaceExport) add(statement.exportClause.name.text, statement);
+};
 
 /** The exported names of an entry source file, each with the line of its declaration. */
 export function exportedNames(ts, sourceFile) {
   const kind = ts.SyntaxKind;
   const found = new Map();
-  const add = (name, node) => {
-    if (found.has(name)) return;
-    found.set(name, sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1);
-  };
-  const bindingNames = (name, node) => {
-    if (name.kind === kind.Identifier) add(name.text, node);
-    else for (const element of name.elements) if (element.kind === kind.BindingElement) bindingNames(element.name, node);
-  };
+  const add = (name, node) => addExportName(found, sourceFile, name, node);
   for (const statement of sourceFile.statements) {
     if (statement.kind === kind.ExportDeclaration) {
-      if (statement.exportClause?.kind === kind.NamedExports) for (const element of statement.exportClause.elements) add(element.name.text, element);
-      else if (statement.exportClause?.kind === kind.NamespaceExport) add(statement.exportClause.name.text, statement);
+      addExportDeclarationNames(ts, statement, add);
       continue;
     }
     if (statement.kind === kind.ExportAssignment) { add('default', statement); continue; }
     const modifiers = statement.modifiers ?? [];
     if (!modifiers.some(modifier => modifier.kind === kind.ExportKeyword)) continue;
     if (modifiers.some(modifier => modifier.kind === kind.DefaultKeyword)) { add('default', statement); continue; }
-    if (statement.kind === kind.VariableStatement) for (const declaration of statement.declarationList.declarations) bindingNames(declaration.name, declaration);
+    if (statement.kind === kind.VariableStatement) for (const declaration of statement.declarationList.declarations) addBindingNames(ts, found, sourceFile, declaration.name, declaration);
     else if (statement.name && statement.name.kind === kind.Identifier) add(statement.name.text, statement);
   }
   return found;
 }
 
 const withoutSlash = value => value.replace(/\/$/, '');
+
+const addFrameworkConfigRoots = (graph, config, roots) => {
+  for (const app of config.apps ?? []) {
+    const directory = `apps/${app.name}`;
+    let names = [];
+    try { names = fs.readdirSync(path.join(config.root, ...directory.split('/'))); } catch { continue; }
+    for (const name of names) {
+      if (graph.resolver.classifyPath(`${directory}/${name}`).slot !== 'fe.app.next' || !/\.[cm]?[jt]sx?$/.test(name)) continue;
+      let text = '';
+      try { text = fs.readFileSync(path.join(config.root, ...directory.split('/'), name), 'utf8'); } catch { continue; }
+      for (const match of text.matchAll(CONFIG_STRING)) {
+        const target = path.posix.join(directory, match[1]);
+        const hit = CONFIG_EXTENSIONS.map(extension => `${target}${extension}`).find(candidate => graph.files.has(candidate));
+        if (hit) roots.add(hit);
+      }
+    }
+  }
+};
 
 /** The files the graph serves from: what an app slot requires, every route file, every package entry, every config-named file. */
 function rootFiles(graph, config) {
@@ -137,21 +168,7 @@ function rootFiles(graph, config) {
     if (entry) roots.add(entry);
   }
   // A framework config of an app (slot fe.app.next) names sources by string, never by import.
-  for (const app of config.apps ?? []) {
-    const directory = `apps/${app.name}`;
-    let names = [];
-    try { names = fs.readdirSync(path.join(config.root, ...directory.split('/'))); } catch { continue; }
-    for (const name of names) {
-      if (graph.resolver.classifyPath(`${directory}/${name}`).slot !== 'fe.app.next' || !/\.[cm]?[jt]sx?$/.test(name)) continue;
-      let text = '';
-      try { text = fs.readFileSync(path.join(config.root, ...directory.split('/'), name), 'utf8'); } catch { continue; }
-      for (const match of text.matchAll(CONFIG_STRING)) {
-        const target = path.posix.join(directory, match[1]);
-        const hit = CONFIG_EXTENSIONS.map(extension => `${target}${extension}`).find(candidate => graph.files.has(candidate));
-        if (hit) roots.add(hit);
-      }
-    }
-  }
+  addFrameworkConfigRoots(graph, config, roots);
   return roots;
 }
 
@@ -242,47 +259,53 @@ function testConsumerEdges({ context, graph, config }) {
   return edges;
 }
 
-export function checkDeadExports({ context, graph, config }) {
-  const { ts } = context;
-  const violations = [];
+const edgeIndex = edges => {
   const edgesTo = new Map();
-  const unitOf = rel => {
-    const known = graph.unit(rel);
-    if (known) return known;
-    const classified = graph.resolver.classifyPath(rel);
-    const owner = classified.slot ? graph.resolver.ownerOf(rel) : null;
-    return owner ? `${owner.slot}:${owner.root}` : null;
-  };
-  for (const edge of [...graph.edges, ...testConsumerEdges({ context, graph, config })]) {
+  for (const edge of edges) {
     if (!edgesTo.has(edge.to)) edgesTo.set(edge.to, []);
     edgesTo.get(edge.to).push(edge);
   }
+  return edgesTo;
+};
 
-  /** What the importers of `file` take from it; edges from inside `ownerKey` are skipped when given. */
-  const consumed = (file, ownerKey, depth, visiting) => {
-    const result = { all: false, names: new Set() };
-    for (const edge of edgesTo.get(file) ?? []) {
-      if (ownerKey && unitOf(edge.from) === ownerKey) continue;
-      const bindings = bindingsOf(ts, edge.edge.declaration);
-      if (bindings.all) { result.all = true; continue; }
-      for (const pair of bindings.pairs) {
-        if (pair.exported === null) { result.names.add(pair.imported); continue; }
-        // A re-export by name: the name is used when the re-exporting file's own export is used further on.
-        const reexporter = edge.from;
-        if (visiting.has(reexporter) || depth >= CHAIN_DEPTH) { result.names.add(pair.imported); continue; }
-        if (!(edgesTo.get(reexporter)?.length)) {
-          // nobody imports the re-exporting file: a framework entry (route file) uses it, an unused owner entry does not
-          const holder = graph.files.get(reexporter);
-          if (!holder?.owner || graph.resolver.slot(holder.owner.slot)?.tier === 'app') result.names.add(pair.imported);
-          continue;
-        }
-        const next = consumed(reexporter, null, depth + 1, new Set([...visiting, reexporter]));
-        if (next.all || next.names.has(pair.exported)) result.names.add(pair.imported);
-      }
-    }
-    return result;
-  };
+const unitOfFile = (graph, rel) => {
+  const known = graph.unit(rel);
+  if (known) return known;
+  const classified = graph.resolver.classifyPath(rel);
+  const owner = classified.slot ? graph.resolver.ownerOf(rel) : null;
+  return owner ? `${owner.slot}:${owner.root}` : null;
+};
 
+const consumeReexportedName = (context, result, edge, pair, depth, visiting) => {
+  if (pair.exported === null) { result.names.add(pair.imported); return; }
+  // A re-export by name: the name is used when the re-exporting file's own export is used further on.
+  const reexporter = edge.from;
+  if (visiting.has(reexporter) || depth >= CHAIN_DEPTH) { result.names.add(pair.imported); return; }
+  if (!(context.edgesTo.get(reexporter)?.length)) {
+    // nobody imports the re-exporting file: a framework entry (route file) uses it, an unused owner entry does not
+    const holder = context.graph.files.get(reexporter);
+    if (!holder?.owner || context.graph.resolver.slot(holder.owner.slot)?.tier === 'app') result.names.add(pair.imported);
+    return;
+  }
+  const next = consumedNames(context, reexporter, null, depth + 1, new Set([...visiting, reexporter]));
+  if (next.all || next.names.has(pair.exported)) result.names.add(pair.imported);
+};
+
+/** What the importers of `file` take from it; edges from inside `ownerKey` are skipped when given. */
+const consumedNames = (context, file, ownerKey, depth, visiting) => {
+  const result = { all: false, names: new Set() };
+  for (const edge of context.edgesTo.get(file) ?? []) {
+    if (ownerKey && unitOfFile(context.graph, edge.from) === ownerKey) continue;
+    const bindings = bindingsOf(context.ts, edge.edge.declaration);
+    if (bindings.all) { result.all = true; continue; }
+    for (const pair of bindings.pairs) consumeReexportedName(context, result, edge, pair, depth, visiting);
+  }
+  return result;
+};
+
+const ownerExportFindings = (context, config) => {
+  const { ts, graph } = context;
+  const violations = [];
   let owners = 0;
   let exports = 0;
   for (const [key, owner] of graph.ownerRoots) {
@@ -292,12 +315,12 @@ export function checkDeadExports({ context, graph, config }) {
     owners += 1;
     for (const publicEntry of [entry, ...extraEntries(graph, entry)]) {
       const names = exportedNames(ts, graph.files.get(publicEntry).sourceFile);
-      const used = consumed(publicEntry, key, 0, new Set([publicEntry]));
+      const used = consumedNames(context, publicEntry, key, 0, new Set([publicEntry]));
       // A consumer outside the owner that imports a file the entry re-exports by name reaches the entry's export of that name.
       for (const edge of graph.edges) {
         if (edge.from !== publicEntry || !edge.reexport || graph.unit(edge.to) !== key) continue;
         const reexport = bindingsOf(ts, edge.edge.declaration);
-        const inner = consumed(edge.to, key, 0, new Set([publicEntry, edge.to]));
+        const inner = consumedNames(context, edge.to, key, 0, new Set([publicEntry, edge.to]));
         if (reexport.all) continue;
         for (const pair of reexport.pairs) if (inner.all || inner.names.has(pair.imported)) used.names.add(pair.exported);
       }
@@ -313,8 +336,15 @@ export function checkDeadExports({ context, graph, config }) {
       }
     }
   }
+  return { violations, owners, exports };
+};
+
+export function checkDeadExports({ context, graph, config }) {
+  const edgesTo = edgeIndex([...graph.edges, ...testConsumerEdges({ context, graph, config })]);
+  const analysis = { ...context, graph, edgesTo };
+  const exports = ownerExportFindings(analysis, config);
   const files = deadFiles(graph, config);
-  const deadExports = violations.length;
-  violations.push(...files.violations);
-  return { violations, coverage: { status: 'checked', owners, exports, dead: deadExports, files: files.judged, roots: files.roots, unusedFiles: files.violations.length } };
+  const dead = exports.violations.length;
+  exports.violations.push(...files.violations);
+  return { violations: exports.violations, coverage: { status: 'checked', owners: exports.owners, exports: exports.exports, dead, files: files.judged, roots: files.roots, unusedFiles: files.violations.length } };
 }

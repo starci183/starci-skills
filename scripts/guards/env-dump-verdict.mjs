@@ -14,9 +14,15 @@ const GET_ENV = /^\[(?:system\.)?environment\]::getenvironmentvariables$/i;
 const NODE_PROGRAMS = new Set(['node', 'nodejs']);
 const PYTHON_PROGRAMS = new Set(['python', 'python3', 'python2', 'py']);
 // process.env as the whole argument of a printing or serialising call; or the whole value of `node -p`.
-const NODE_WHOLE = /(?:console\.\w+|JSON\.stringify|util\.inspect|\binspect|Object\.(?:keys|entries|values)|process\.std(?:out|err)\.write|require\(['"]fs['"]\)\.\w+|writeFileSync)\s*\(\s*(?:[^()]*,\s*)?process\.env\s*[,)]/;
-const NODE_PRINT_WHOLE = /^\s*process\.env\s*;?\s*$/;
-const PYTHON_WHOLE = /(?:\bprint|pprint|json\.dumps|\bdict|\blist|\bsorted|\brepr|\bstr)\s*\(\s*(?:[^()]*,\s*)?(?:os\.)?environ\s*[,)\]]|\benviron\.(?:items|keys|values|copy)\s*\(/;
+const NODE_WHOLE = new RegExp([
+  String.raw`(?:console\.\w+|JSON\.stringify|util\.inspect|\binspect|Object\.(?:keys|entries|values)|process\.std(?:out|err)\.write|require\(['"]fs['"]\)\.\w+|writeFileSync)`,
+  String.raw`\s*\(\s*(?:[^()]*,\s*)?process\.env\s*[,)]`,
+].join(''));
+const NODE_PRINT_WHOLE = new RegExp([String.raw`^\s*`, String.raw`process\.env`, String.raw`\s*;?\s*$`].join(''));
+const PYTHON_WHOLE = new RegExp([
+  String.raw`(?:\bprint|pprint|json\.dumps|\bdict|\blist|\bsorted|\brepr|\bstr)`,
+  String.raw`\s*\(\s*(?:[^()]*,\s*)?(?:os\.)?environ\s*[,)\]]|\benviron\.(?:items|keys|values|copy)\s*\(`,
+].join(''));
 const PYTHON_OUTPUT = /\bprint\b|pprint|json\.dumps|stdout|\.write\(/;
 
 const refusal = (c, how) => ({ code: 'ENV_DUMP', command: [c.program, ...c.args].join(' ').slice(0, 200),
@@ -58,11 +64,15 @@ const pythonDumpHow = (args) => {
 };
 
 /** The ENV_DUMP refusal for one parsed command, or null. */
+const interpreterDumpVerdict = (c) => {
+  if (NODE_PROGRAMS.has(c.program)) { const how = nodeDumpHow(c.args); if (how) return refusal(c, how); }
+  if (PYTHON_PROGRAMS.has(c.program)) { const how = pythonDumpHow(c.args); if (how) return refusal(c, how); }
+  return null;
+};
+
 export function envDumpVerdict(parsed) {
   const c = assignedCommand(parsed);
   const shell = shellDumpVerdict(c);
   if (shell) return shell;
-  if (NODE_PROGRAMS.has(c.program)) { const how = nodeDumpHow(c.args); if (how) return refusal(c, how); }
-  if (PYTHON_PROGRAMS.has(c.program)) { const how = pythonDumpHow(c.args); if (how) return refusal(c, how); }
-  return null;
+  return interpreterDumpVerdict(c);
 }

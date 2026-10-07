@@ -8,7 +8,10 @@ const subcommandOf = (args, valued) => {
   for (let i = 0; i < args.length; i += 1) {
     const a = args[i];
     if (a === '--') return args[i + 1] ?? null;
-    if (a.startsWith('-')) { if (valued.test(a)) i += 1; continue; }
+    if (a.startsWith('-')) {
+      if (valued.test(a)) { i += 1; }
+      continue;
+    }
     return a;
   }
   return null;
