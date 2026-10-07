@@ -93,6 +93,7 @@ test('without --settle-failed the recovery keeps its fence; --settle-failed late
   const r=await run('reconcile','--job',JOB,'--dead-worker','--settle-failed');
   assert.equal(r.status,0,r.stderr||r.stdout);
   assert.equal(out(r).recovery,'settled-failed');
+  assert.equal(out(r).alreadyRecovered,undefined,'a fence settled now prints the settle receipt, not the already-recovered one');
   assert.equal(job().status,'failed');
   assert.equal(jobs().filter(j=>j.status==='queued').length,1);
 }));

@@ -2167,7 +2167,8 @@ const alreadyFenced = (ledger, args, job, prior, repo) => {
   if (job.status === 'effect_unknown' && prior.reason === 'dead-worker-fenced') {
     // A fence whose evidence the owned paths bound settles failed-no-report and retries, like a fresh recovery.
     if (args['settle-failed'] && settleableEvidence(prior.evidence)) {
-      return { result: settleFailedNoReport(ledger, job, { workerProof: prior.worker ?? null, evidence: prior.evidence ?? [], dispatchId: prior.dispatchId ?? null, pathProof: prior.paths ?? null, repo, args }) };
+      settleFailedNoReport(ledger, job, { workerProof: prior.worker ?? null, evidence: prior.evidence ?? [], dispatchId: prior.dispatchId ?? null, pathProof: prior.paths ?? null, repo, args });
+      return { result: undefined };
     }
     const released = releaseDeadWorker(ledger, job);
     const out = { ok: true, jobId, recovery: 'fenced', alreadyRecovered: true, status: 'effect_unknown', attempt: tryOf(job), evidence: prior.evidence ?? [], ...(released ? { managedWorker: released } : {}) };
