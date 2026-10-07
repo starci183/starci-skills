@@ -8,6 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { slash } from '../lib/path-key.mjs';
 import { SKILL_ROOT } from './guards-root.mjs';
 import { boundGuard, boundSeat, gitListFormRead, gitSubOf, nodeWholeSuite, pushTargets, refusal as baseRefusal, rightsRoleOf } from './rights.mjs';
 import { refusalLines } from './refusals.mjs';
@@ -15,7 +16,6 @@ import { refusalLines } from './refusals.mjs';
 const policyCache = new Map();
 const compiledCache = new WeakMap();
 const toSet = (value) => new Set(Array.isArray(value) ? value.map(String) : []);
-const slash = (value) => String(value ?? '').replaceAll(/\\/g, '/');
 const programName = (value) => path.basename(slash(value)).toLowerCase().replace(/\.(?:exe|cmd|bat|ps1)$/, '');
 // These utilities have no state-changing form. Keeping this tiny compiled subset beside the evaluator lets the hook avoid
 // filesystem/YAML work for its hottest path; the complete admission table remains command-policy.yaml and is tested through
@@ -145,27 +145,41 @@ const gitPolicyVerdict = ({ role, args, p, policy, text }) => {
   return refusal(code, text, `the ${role} role does not run git ${sub} directly because git writes and synchronization go through the starci git verbs`, use);
 };
 
+const npmReadAllowed = (args, words, verb, p) => p.npmRead.has(verb)
+  || (verb === 'config' && p.npmRead.has(`config ${words[1] ?? ''}`))
+  || (verb === 'pack' && args.includes('--dry-run'));
+
+const npmPublishVerdict = (role, text, policy) => {
+  const denied = policy.npm?.deny?.publish, use = useOf(denied, 'starci release cut');
+  return refusal(codeOf(denied, 'RIGHTS_NPM_PUBLISH'), text, `the ${role} role does not publish a package because packages are published once per release from the release commit`, use);
+};
+
+const npmSuiteVerdict = ({ role, args, p, policy, guard, text, words, verb }) => {
+  if (!suiteScript(words) || afterDashDash(args).length) return undefined;
+  if (p.suiteOps.has(String(guard?.op ?? ''))) return null;
+  const use = useOf(policy.npm?.deny?.[verb === 'run' || verb === 'run-script' ? verb : 'test'], 'starci gate unit --root <app>');
+  return refusal('RIGHTS_SUITE_RUN', text, `the ${role} role does not run a whole suite because full suites run only in the release cut or the requested verify ops`, use);
+};
+
+const npmCleanInstallVerdict = ({ args, policy, handle, lockOwner, text, verb }) => {
+  if (!cleanInstall(verb)) return undefined;
+  if (args.includes('--dry-run')) return null;
+  let owner = null;
+  try { owner = lockOwner(); } catch { /* an unreadable lock proves no ownership */ }
+  if (owner && !owner.stale && (owner.role === 'release' || (handle && owner.handle === handle))) return null;
+  const denied = policy.npm?.deny?.ci, use = useOf(denied, 'the runtime installs dependencies under the host lock');
+  return refusal(codeOf(denied, 'RIGHTS_NPM_CI_UNLOCKED'), text, 'this clean install rewrites node_modules without the caller holding the host lock', use);
+};
+
 const npmPolicyVerdict = ({ role, args, p, policy, guard, handle, lockOwner, text }) => {
   const words = packageWords(args), verb = words[0] ?? '';
   if (args.length === 1 && ['-v', '--version'].includes(args[0])) return null;
-  if (p.npmRead.has(verb) || (verb === 'config' && p.npmRead.has(`config ${words[1] ?? ''}`)) || (verb === 'pack' && args.includes('--dry-run'))) return null;
-  if (publishScript(words)) {
-    const denied = policy.npm?.deny?.publish, use = useOf(denied, 'starci release cut');
-    return refusal(codeOf(denied, 'RIGHTS_NPM_PUBLISH'), text, `the ${role} role does not publish a package because packages are published once per release from the release commit`, use);
-  }
-  if (suiteScript(words) && !afterDashDash(args).length) {
-    if (p.suiteOps.has(String(guard?.op ?? ''))) return null;
-    const use = useOf(policy.npm?.deny?.[verb === 'run' || verb === 'run-script' ? verb : 'test'], 'starci gate unit --root <app>');
-    return refusal('RIGHTS_SUITE_RUN', text, `the ${role} role does not run a whole suite because full suites run only in the release cut or the requested verify ops`, use);
-  }
-  if (cleanInstall(verb)) {
-    if (args.includes('--dry-run')) return null;
-    let owner = null;
-    try { owner = lockOwner(); } catch { /* an unreadable lock proves no ownership */ }
-    if (owner && !owner.stale && (owner.role === 'release' || (handle && owner.handle === handle))) return null;
-    const denied = policy.npm?.deny?.ci, use = useOf(denied, 'the runtime installs dependencies under the host lock');
-    return refusal(codeOf(denied, 'RIGHTS_NPM_CI_UNLOCKED'), text, 'this clean install rewrites node_modules without the caller holding the host lock', use);
-  }
+  if (npmReadAllowed(args, words, verb, p)) return null;
+  if (publishScript(words)) return npmPublishVerdict(role, text, policy);
+  const suite = npmSuiteVerdict({ role, args, p, policy, guard, text, words, verb });
+  if (suite !== undefined) return suite;
+  const install = npmCleanInstallVerdict({ args, policy, handle, lockOwner, text, verb });
+  if (install !== undefined) return install;
   if (suiteScript(words) && afterDashDash(args).length) return null;
   const denied = policy.npm?.deny?.[verb] ?? policy.npm?.deny?.run;
   const use = useOf(denied, 'starci gate run --root <app>');
@@ -194,6 +208,30 @@ const orcaPolicyVerdict = ({ role, args, p, policy, text }) => {
   return raw(role, text, useOf(policy.orca, genericUse), 'Orca mutation');
 };
 
+const specificCommandVerdict = (context) => {
+  const { role, program, args, p, policy, guard, handle, lockOwner, text } = context;
+  if (program === 'git') return gitPolicyVerdict({ role, args, p, policy, text });
+  if (p.npmPrograms.has(program)) return npmPolicyVerdict({ role, args, p, policy, guard, handle, lockOwner, text });
+  if (program === 'node') return nodePolicyVerdict({ role, args, p, guard, text });
+  if (program === 'orca') return orcaPolicyVerdict({ role, args, p, policy, text });
+  return undefined;
+};
+
+const generalCommandVerdict = ({ role, program, args, p, policy, text }) => {
+  const rawTool = policy['raw-tools']?.[program];
+  if (rawTool) return raw(role, text, useOf(rawTool, genericUse));
+  const guarded = policy['guarded-read']?.[program];
+  if (Array.isArray(guarded)) {
+    const use = `use the read-only form of ${program}`;
+    if (forbiddenOption(args, guarded)) return raw(role, text, use, `${program} write form`);
+    const required = policy['require-flag']?.[program];
+    if (Array.isArray(required) && !required.some((flag) => args.includes(String(flag)))) return raw(role, text, use, `${program} emitting form`);
+    return null;
+  }
+  if (p.read.has(program) || p.scopedWrite.has(program)) return null;
+  return raw(role, text);
+};
+
 /**
  * Decide one normalized command for a bound role. Returns null to pass or the shared refusal shape.
  * `lockOwner` is a synchronous reader and is called only for a clean install.
@@ -215,24 +253,9 @@ export function policyVerdict({ role, command, guard = null, handle = null, lock
   if (p.runtime.has(program)) return null;
   if (program === 'node' && nodeEntry(args, p.nodeScripts)) return null;
 
-  if (program === 'git') return gitPolicyVerdict({ role, args, p, policy, text });
-  if (p.npmPrograms.has(program)) return npmPolicyVerdict({ role, args, p, policy, guard, handle, lockOwner, text });
-  if (program === 'node') return nodePolicyVerdict({ role, args, p, guard, text });
-  if (program === 'orca') return orcaPolicyVerdict({ role, args, p, policy, text });
-
-  const rawTool = policy['raw-tools']?.[program];
-  if (rawTool) return raw(role, text, useOf(rawTool, genericUse));
-
-  const guarded = policy['guarded-read']?.[program];
-  if (Array.isArray(guarded)) {
-    const use = `use the read-only form of ${program}`;
-    if (forbiddenOption(args, guarded)) return raw(role, text, use, `${program} write form`);
-    const required = policy['require-flag']?.[program];
-    if (Array.isArray(required) && !required.some((flag) => args.includes(String(flag)))) return raw(role, text, use, `${program} emitting form`);
-    return null;
-  }
-  if (p.read.has(program) || p.scopedWrite.has(program)) return null;
-  return raw(role, text);
+  const specific = specificCommandVerdict({ role, program, args, p, policy, guard, handle, lockOwner, text });
+  if (specific !== undefined) return specific;
+  return generalCommandVerdict({ role, program, args, p, policy, text });
 }
 
 const needsLock = (program, args, env) => {
