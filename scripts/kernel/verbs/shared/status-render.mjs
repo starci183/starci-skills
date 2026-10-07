@@ -9,6 +9,7 @@ import { getWorkflow, goalJsonOf, jobPayloadOf, latestGoal } from './rows.mjs';
 import { kernelSeatOf } from './kernel-seat.mjs';
 import { drainWorkflowMessages, workerQuestionsOf } from './worker-messages.mjs';
 import { blockingHeadsUp, leaseCanonOf, openPeerWaits, pendingPeerMessagesOf, releaseTypedWaits } from './peer-waits.mjs';
+import { hostHoldOf } from '../../host-hold.mjs';
 import { hostThrottle, throttleSummary } from '../../../machine/ram-throttle.mjs';
 import { AUTOPILOT_RULING, autopilotSettings, autopilotSweep } from '../../autopilot-run.mjs';
 import { wakeKernelForTransition } from '../../wake-delivery.mjs';
@@ -119,7 +120,7 @@ const queuePhase = (s) => {
   const recordDeps = recordDependencies(repoRoot, s.workflowJobs);
   const typedGates = tryOr(() => typedIncidents(db, { workflowId }), []);
   const leaseCanon = leaseCanonOf(db, repoRoot);
-  const queueCtx = { planAncestors: s.planAncestors, jobsByOp: s.jobsByOp, slots, rtDoc, poolLoad: s.poolLoad, ownerGates: s.ownerGates, peerWaits: s.peerWaits, recordDeps, canon: leaseCanon, workGraph: s.workGraph, typedGates, now: s.now };
+  const queueCtx = { planAncestors: s.planAncestors, jobsByOp: s.jobsByOp, slots, rtDoc, poolLoad: s.poolLoad, ownerGates: s.ownerGates, peerWaits: s.peerWaits, recordDeps, canon: leaseCanon, workGraph: s.workGraph, typedGates, now: s.now, hostHold: wf.phase === 'finished' ? null : hostHoldOf({ env: process.env, repo: repoRoot, workflowId, db, ledgerFile: s.ledger.path ?? null }) };
   s.queued = s.workflowJobs.filter((row) => row.status === 'queued').map((row) => queuedView(db, row, queuedBecauseOf, queueCtx));
   // Foundation legs run first (driver-loop.yaml foundations): they lead the queued list the Kernel routes from.
   if (s.queued.some((item) => item.foundation)) s.queued.sort((a, b) => Number(Boolean(b.foundation)) - Number(Boolean(a.foundation)));
