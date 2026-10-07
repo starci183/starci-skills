@@ -144,6 +144,19 @@ export const kernelState = (db, wf) => {
   } catch { return { terminal, state: 'unreachable' }; }
 };
 
+function workersOf(db, terminals, workers) {
+  const workerRows = workers ?? [];
+  if (workers === undefined && terminals === undefined) {
+    for (const run of ledgerRuns(db)) {
+      let listed;
+      try { listed = workerListAll({ run }); } catch (e) { listed = { ok: false, error: String(e?.message ?? e) }; }
+      if (!listed?.ok) return { ok: false, reason: `WORKER_LIST_UNAVAILABLE: worker-list --run ${run}: ${listed?.error ?? 'no listing'}` };
+      workerRows.push(...listed.workers);
+    }
+  }
+  return { ok: true, workerRows };
+}
+
 // The Orca tree against the ledger, once per cycle:
 // scripts/checks/check-orca-tree.mjs owns the codes and the projection, this
 // only supplies the listings (the terminals, and Orca's workers of the ledger's Runs). A digest that reads kernel liveness is already
@@ -161,19 +174,25 @@ export const orcaTree = (db, { terminals = undefined, workers = undefined, repo 
   const rows = readTerminals(listing);
   if (!rows) return { listed: false, reason: listing?.error ?? 'terminal-list returned no listing', findings: [] };
   // Orca's workers of this ledger's Runs, Run by Run; a listing handed in is an offline projection with the workers it names.
-  const workerRows = workers ?? [];
-  if (workers === undefined && terminals === undefined) {
-    for (const run of ledgerRuns(db)) {
-      let listed;
-      try { listed = workerListAll({ run }); } catch (e) { listed = { ok: false, error: String(e?.message ?? e) }; }
-      if (!listed?.ok) return { listed: false, reason: `WORKER_LIST_UNAVAILABLE: worker-list --run ${run}: ${listed?.error ?? 'no listing'}`, findings: [] };
-      workerRows.push(...listed.workers);
-    }
-  }
-  return { listed: true, count: rows.length, findings: orcaTreeFindings(db, rows, { repo, workers: workerRows }) };
+  const workerState = workersOf(db, terminals, workers);
+  if (!workerState.ok) return { listed: false, reason: workerState.reason, findings: [] };
+  return { listed: true, count: rows.length, findings: orcaTreeFindings(db, rows, { repo, workers: workerState.workerRows }) };
 };
 
 // Newest direction/artifact images under .starciwork, bounded walk.
+const addArtifactEntry = (entry, dir, sinceMs, queue, found) => {
+  const p = path.join(dir, entry.name);
+  if (entry.isDirectory()) {
+    if (!entry.name.startsWith('.') && entry.name !== 'kernel-strays') { queue.push(p); }
+    return;
+  }
+  if (!/\.(png|jpe?g|webp)$/i.test(entry.name)) return;
+  try {
+    const st = fs.statSync(p);
+    if (st.mtimeMs > sinceMs) found.push({ path: p, mtime: st.mtimeMs });
+  } catch { /* skip */ }
+};
+
 const newArtifacts = (repo, sinceMs) => {
   const root = path.join(repo, '.starciwork');
   const found = [];
@@ -181,12 +200,7 @@ const newArtifacts = (repo, sinceMs) => {
   while (head < queue.length && visited++ < 6000) {
     const dir = queue[head++];
     let ents; try { ents = fs.readdirSync(dir, { withFileTypes: true }); } catch { continue; }
-    for (const e of ents) {
-      const p = path.join(dir, e.name);
-      if (e.isDirectory()) { if (!e.name.startsWith('.') && e.name !== 'kernel-strays') queue.push(p); continue; }
-      if (!/\.(png|jpe?g|webp)$/i.test(e.name)) continue;
-      try { const st = fs.statSync(p); if (st.mtimeMs > sinceMs) found.push({ path: p, mtime: st.mtimeMs }); } catch { /* skip */ }
-    }
+    for (const e of ents) { addArtifactEntry(e, dir, sinceMs, queue, found); }
   }
   return found.toSorted((a, b) => b.mtime - a.mtime).slice(0, 12);
 };
@@ -230,11 +244,7 @@ const launchStreaks = (db, wanted = new Set(), { now = Date.now() } = {}) => {
 };
 
 // --- the cycle ---------------------------------------------------------------
-export const cycle = async (db, { repo, wanted = new Set(), state, timeoutMs = PROBE_TIMEOUT_MS, stall = stallFindings, stallMinutes = stallMinutesOf(),
-  owed = (ledgerDb, opts) => owedFindings(ledgerDb, opts).owed }) => {
-  const lines = [`===== poll ${ts(Date.now())} =====`];
-  const wfs = workflows(db, wanted);
-  const names = workflowNames(db);
+function appendCycleStatus(lines, db, wfs, names, repo, wanted) {
   for (const w of wfs) {
     const k = kernelState(db, w.workflow_id);
     lines.push(`${named(names, w.workflow_id)} [${w.phase}] kernel ${k.state} ${k.terminal ?? ''}`);
@@ -243,27 +253,23 @@ export const cycle = async (db, { repo, wanted = new Set(), state, timeoutMs = P
   for (const i of runtimeIncidents(db, wanted).filter((x) => running.has(x.workflow_id))) lines.push(`  RUNTIME ${named(names, i.workflow_id)} ${i.incident_id} ${String(i.last_progress).replace(/\s+/g, ' ').slice(0, 200)}`);
   for (const o of orphanKernelJobs(db)) lines.push(`  ORPHAN-KERNEL-JOB ${o.job_id} (${o.status}; workflow ${o.phase}${o.archived_at ? ', archived' : ''}): run starci kernel reconcile --orphan-kernel-jobs --repo ${repo}`);
   for (const l of launchStreaks(db, wanted)) lines.push(`  LAUNCH-FAIL ${l.provider}: ${l.count} refused launches in the last hour (last ${l.lastStep}: ${l.lastError})`);
-  // Progress, not liveness (scripts/supervisor/stall.mjs): a live kernel and a
-  // live watchdog idle-waiting on a gate whose reason is gone read healthy above.
-  // The gate and peer-wait verdicts of this cycle, judged once and shared by the stall and owed projections.
-  const verdicts = new Map();
+}
+
+function appendProgressChecks(lines, db, repo, wanted, stall, stallMinutes, owed, verdicts) {
   let stalls = [];
   try { stalls = stall(db, { repo, wanted, stallMinutes, verdicts }); } catch (e) { lines.push(`  stall check failed: ${String(e?.message ?? e).slice(0, 160)}`); }
   for (const f of stalls) lines.push(`  ${f.line}`);
-  // What waits on the supervisor itself (scripts/supervisor/owed.mjs; supervise.yaml step owed).
   let owedItems = [];
   try { owedItems = owed(db, { repo, wanted, stallMinutes, verdicts }); } catch (e) { lines.push(`  owed check failed: ${String(e?.message ?? e).slice(0, 160)}`); }
   for (const i of owedItems) lines.push(`  ${i.line}`);
-  // One BLOCKING line per open job another workflow waits on (scripts/kernel/waiter-priority.mjs).
   try { for (const line of blockingLines(db, { wanted })) lines.push(`  ${line}`); } catch (e) { lines.push(`  blocking check failed: ${String(e?.message ?? e).slice(0, 160)}`); }
-  // One DEPENDENCY line per cross-workflow finding and the action it owes (scripts/supervisor/bridge.mjs;
-  // modules/supervisor/bridging.yaml); `bridge.mjs detect --repo <repo>` prints the command for a clear-cut one.
   try {
     for (const f of dependencyGraph(db, { repo, light: true }).findings.filter((x) => !wanted.size || x.workflows.some((wf) => wanted.has(wf)))) lines.push(`  DEPENDENCY ${findingLine(f).slice(0, 400)}`);
   } catch (e) { lines.push(`  dependency check failed: ${String(e?.message ?? e).slice(0, 160)}`); }
-  const tree = orcaTree(db, { repo });
-  // TASK_OUTSIDE_RUN is a leak count, not an action per job: one line per
-  // workflow; workflows that already finished are summarized, not listed.
+  return { stalls, owedItems };
+}
+
+function appendTreeFindings(lines, tree, wfs, wanted, names) {
   const outside = new Map();
   for (const f of tree.findings) {
     if (f.workflowId && !mine(wanted, f.workflowId)) continue;
@@ -278,11 +284,33 @@ export const cycle = async (db, { repo, wanted = new Set(), state, timeoutMs = P
   }
   if (finishedLeaks) lines.push(`  ORCA-TREE ${finishedLeaks} open Task(s) left by finished workflows`);
   if (!tree.listed && wfs.length) lines.push(`  orca tree unchecked (${tree.reason})`);
+}
+
+async function appendAskLines(lines, db, wanted, timeoutMs, names) {
+  const asks = await openAsks(db, wanted, { timeoutMs });
+  for (const a of asks) lines.push(`  ASK-OPEN ${named(names, a.workflow_id)} ${a.dispatch_id} [${a.liveness}] ${a.url ?? '(not serving)'}`);
+  return asks;
+}
+
+export const cycle = async (db, { repo, wanted = new Set(), state, timeoutMs = PROBE_TIMEOUT_MS, stall = stallFindings, stallMinutes = stallMinutesOf(),
+  owed = (ledgerDb, opts) => owedFindings(ledgerDb, opts).owed }) => {
+  const lines = [`===== poll ${ts(Date.now())} =====`];
+  const wfs = workflows(db, wanted);
+  const names = workflowNames(db);
+  appendCycleStatus(lines, db, wfs, names, repo, wanted);
+  // Progress, not liveness (scripts/supervisor/stall.mjs): a live kernel and a
+  // live watchdog idle-waiting on a gate whose reason is gone read healthy above.
+  // The gate and peer-wait verdicts of this cycle, judged once and shared by the stall and owed projections.
+  const verdicts = new Map();
+  const { stalls, owedItems } = appendProgressChecks(lines, db, repo, wanted, stall, stallMinutes, owed, verdicts);
+  const tree = orcaTree(db, { repo });
+  // TASK_OUTSIDE_RUN is a leak count, not an action per job: one line per
+  // workflow; workflows that already finished are summarized, not listed.
+  appendTreeFindings(lines, tree, wfs, wanted, names);
   const reps = reportsSince(db, state.first ? state.lastReportId - BASELINE_REPORTS : state.lastReportId, wanted);
   for (const r of reps) lines.push(`  report ${named(names, r.workflow_id)} ${opLabel(r.op_id)} (${r.op_id} a${r.attempt}) -> ${r.outcome} @${ts(r.created_at)}`);
   if (reps.length) state.lastReportId = Math.max(state.lastReportId, ...reps.map((r) => r.report_id));
-  const asks = await openAsks(db, wanted, { timeoutMs });
-  for (const a of asks) lines.push(`  ASK-OPEN ${named(names, a.workflow_id)} ${a.dispatch_id} [${a.liveness}] ${a.url ?? '(not serving)'}`);
+  const asks = await appendAskLines(lines, db, wanted, timeoutMs, names);
   const arts = newArtifacts(repo, state.lastArtifacts);
   for (const a of arts) lines.push(`  artifact+ ${path.relative(repo, a.path)}`);
   if (arts.length) state.lastArtifacts = Date.now();
@@ -292,7 +320,13 @@ export const cycle = async (db, { repo, wanted = new Set(), state, timeoutMs = P
 
 const main = () => {
   const argv = process.argv.slice(2);
-  const valuesOf = (name) => { const out = []; for (let i = 0; i < argv.length; i++) if (argv[i] === `--${name}`) out.push(argv[++i]); return out; };
+  const valuesOf = (name) => {
+    const out = [];
+    for (let i = 0; i < argv.length; i++) {
+      if (argv[i] === `--${name}`) { out.push(argv[++i]); }
+    }
+    return out;
+  };
   const valueOf = (name, d = null) => valuesOf(name).pop() ?? d;
   const has = (n) => argv.includes(`--${n}`);
 
