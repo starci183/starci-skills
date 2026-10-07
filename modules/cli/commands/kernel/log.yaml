@@ -101,7 +101,7 @@ writes: "one row into the ledger's logs table (the project's runtime.sqlite;
   tokens and secret-named keys: the value is blanked, the key kept) and capped per job
   (runtimes.yaml allocation.logs.perJobCap, default 2000; the first row past it writes one
   log.truncated row, later ones are dropped)"
-kinds: "step.start {name} | step.end {name, durationMs?, ok?} | cmd.run {cmd, exit, durationMs?,
+kinds: "step.start {name} | step.end {name, ok?} (an op's durationMs is dropped; the runtime measures it from the step.start) | cmd.run {cmd, exit, durationMs?,
   stdoutRef?, stderrRef?, output?, checkName?, evidenceRef?} | file.edit {path, added?, removed?,
   diffRef?, status?, oldPath?} | check.result {name, pass, evidenceRef?} | test.result {suite,
   passed, failed, skipped?, failures?[{name, message?, file?}]} | render {artifactRef, label?,

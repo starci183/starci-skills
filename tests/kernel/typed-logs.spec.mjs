@@ -6,7 +6,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { ledgerFileFor, openLedger } from '../../engine/db/ledger.mjs';
 import {
-  LOG_TRUNCATED, appendLog, fitData, insertLogRows, logsFileFor, openLogs, prepareLogRow, readLogs,
+  LOG_TRUNCATED, appendLog, ingestScratchLog, fitData, insertLogRows, logsFileFor, openLogs, prepareLogRow, readLogs,
   redactData, redactPath, redactText, rowsOfEvent, syncDerivedLogs, validateLogData,
 } from '../../scripts/kernel/typed-logs.mjs';
 import { SECRET_PATTERNS } from '../../scripts/supervisor/push-mains.mjs';
@@ -37,6 +37,22 @@ const logsOf = (t, repo, workflows = [WF]) => {
   return track(t, openLogs(repo));
 };
 const WF = 'wf-typed-logs-spec';
+
+test('a step.end carries the runtime-measured duration from its step.start; a duration the op typed is dropped', (t) => {
+  const repo = repoDir(t);
+  const logs = logsOf(t, repo);
+  const step = (kind, at, data) => appendLog(logs, { workflowId: WF, jobId: 'op-a-1', actor: 'op', kind, msg: 'step', at, data });
+  const durationOf = (seq) => JSON.parse(logs.db.prepare('SELECT data_json FROM logs WHERE seq=?').get(seq).data_json).durationMs;
+  step('step.start', 1_000_000, { name: 'build' });
+  assert.equal(durationOf(step('step.end', 1_003_500, { name: 'build', durationMs: 900000, ok: true }).seq), 3500, 'the typed 900000 is replaced by the measured time');
+  assert.equal(durationOf(step('step.end', 1_009_000, { name: 'build', durationMs: 300000 }).seq), undefined, 'a second end has no open start: nothing is measured, the typed value is dropped');
+  assert.equal(durationOf(step('step.end', 1_009_500, { name: 'never-started', durationMs: 600000 }).seq), undefined);
+  const file = path.join(repo, 'log.jsonl');
+  fs.writeFileSync(file, `${JSON.stringify({ kind: 'step.end', msg: 'written later', at: 2_000_000, data: { name: 'build', durationMs: 120000 } })}
+`);
+  assert.equal(ingestScratchLog(logs, { file, workflowId: WF, jobId: 'op-a-1' }).inserted, 1);
+  assert.equal(durationOf(logs.db.prepare("SELECT max(seq) s FROM logs").get().s), undefined, 'a file the op wrote carries no measured time either');
+});
 
 test('storage: the logs live in the ledger (WAL), and rows are append-only', (t) => {
   const repo = repoDir(t);
