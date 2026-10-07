@@ -108,21 +108,28 @@ function nearestFunction(ts, node) {
   return null;
 }
 
+function configElementProperty(ts, element) {
+  return element.propertyName && ts.isIdentifier(element.propertyName) ? element.propertyName.text
+    : (ts.isIdentifier(element.name) && element.name.text) || null;
+}
+
+function addConfigMutateSymbols(ts, checker, node, targets, symbols) {
+  if (!(ts.isVariableDeclaration(node) && ts.isObjectBindingPattern(node.name) && node.initializer
+    && ts.isCallExpression(unwrapExpression(ts, node.initializer))
+    && callKind(ts, checker, unwrapExpression(ts, node.initializer), targets) === 'config')) return;
+  for (const element of node.name.elements) {
+    if (configElementProperty(ts, element) === 'mutate' && ts.isIdentifier(element.name)) symbols.add(normalizedSymbol(ts, checker, element.name));
+  }
+}
+
 function configMutateSymbols(config, context, targets) {
+  const { ts } = context;
   const symbols = new Set();
   for (const source of context.files) {
     const checker = context.checkerFor(source.fileName);
     const visit = node => {
-      if (context.ts.isVariableDeclaration(node) && context.ts.isObjectBindingPattern(node.name) && node.initializer
-        && context.ts.isCallExpression(unwrapExpression(context.ts, node.initializer))
-        && callKind(context.ts, checker, unwrapExpression(context.ts, node.initializer), targets) === 'config') {
-        for (const element of node.name.elements) {
-          const property = element.propertyName && context.ts.isIdentifier(element.propertyName) ? element.propertyName.text
-            : (context.ts.isIdentifier(element.name) && element.name.text) || null;
-          if (property === 'mutate' && context.ts.isIdentifier(element.name)) symbols.add(normalizedSymbol(context.ts, checker, element.name));
-        }
-      }
-      context.ts.forEachChild(node, visit);
+      addConfigMutateSymbols(ts, checker, node, targets, symbols);
+      ts.forEachChild(node, visit);
     };
     visit(source);
   }
@@ -174,25 +181,25 @@ function exportedHook(config, context, entry, reasons) {
   return { source, checker, fn: functions[0] };
 }
 
+function addBindingName(ts, checker, found, name) {
+  if (ts.isIdentifier(name)) {
+    const symbol = normalizedSymbol(ts, checker, name);
+    if (!symbol) return;
+    if (!found.has(name.text)) found.set(name.text, new Set());
+    found.get(name.text).add(symbol);
+    return;
+  }
+  if (ts.isObjectBindingPattern(name) || ts.isArrayBindingPattern(name)) for (const element of name.elements) {
+    if (element && !ts.isOmittedExpression(element)) addBindingName(ts, checker, found, element.name);
+  }
+}
+
 function bindingSymbols(ts, checker, fn) {
   const found = new Map();
-  const addName = name => {
-    if (ts.isIdentifier(name)) {
-      const symbol = normalizedSymbol(ts, checker, name);
-      if (symbol) {
-        if (!found.has(name.text)) found.set(name.text, new Set());
-        found.get(name.text).add(symbol);
-      }
-      return;
-    }
-    if (ts.isObjectBindingPattern(name) || ts.isArrayBindingPattern(name)) for (const element of name.elements) {
-      if (element && !ts.isOmittedExpression(element)) addName(element.name);
-    }
-  };
-  for (const parameter of fn.parameters) addName(parameter.name);
+  for (const parameter of fn.parameters) addBindingName(ts, checker, found, parameter.name);
   const visit = node => {
     if (node !== fn && (ts.isFunctionDeclaration(node) || ts.isFunctionExpression(node) || ts.isArrowFunction(node) || ts.isMethodDeclaration(node))) return;
-    if (ts.isVariableDeclaration(node)) addName(node.name);
+    if (ts.isVariableDeclaration(node)) addBindingName(ts, checker, found, node.name);
     ts.forEachChild(node, visit);
   };
   if (fn.body) visit(fn.body);
@@ -246,27 +253,38 @@ function symbolOfRequireAlias(ts, checker, expression) {
   return normalizedSymbolValue(ts, checker, symbol);
 }
 
+function isSwrModuleDeclaration(ts, node) {
+  return (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) && node.moduleSpecifier
+    && ts.isStringLiteralLike(node.moduleSpecifier) && SWR_SPECIFIERS.has(node.moduleSpecifier.text);
+}
+
+/** The kind of unsupported SWR binding the node declares, else null. */
+function unsupportedSwrBinding(ts, checker, node) {
+  if (ts.isImportEqualsDeclaration(node) && ts.isExternalModuleReference(node.moduleReference)
+    && node.moduleReference.expression && ts.isStringLiteralLike(node.moduleReference.expression)
+    && SWR_SPECIFIERS.has(node.moduleReference.expression.text)) return 'import-equals binding';
+  if (ts.isCallExpression(node) && node.arguments.length >= 1 && ts.isStringLiteralLike(node.arguments[0])
+    && SWR_SPECIFIERS.has(node.arguments[0].text)) {
+    if (node.expression.kind === ts.SyntaxKind.ImportKeyword) return 'dynamic import binding';
+    if (isUnshadowedCommonJsRequire(ts, checker, node.expression)) return 'CommonJS require binding';
+  }
+  return null;
+}
+
 function swrReferences(config, context) {
+  const { ts } = context;
   let found = false;
   const unsupported = [];
   for (const source of context.files) {
     const checker = context.checkerFor(source.fileName);
-    const report = (node, kind) => {
-      found = true;
-      unsupported.push(`${relativePath(config.root, source.fileName)}:${sourceLocation(source, node).line} uses unsupported ${kind} for SWR`);
-    };
     const visit = node => {
-      if ((context.ts.isImportDeclaration(node) || context.ts.isExportDeclaration(node)) && node.moduleSpecifier
-        && context.ts.isStringLiteralLike(node.moduleSpecifier) && SWR_SPECIFIERS.has(node.moduleSpecifier.text)) found = true;
-      if (context.ts.isImportEqualsDeclaration(node) && context.ts.isExternalModuleReference(node.moduleReference)
-        && node.moduleReference.expression && context.ts.isStringLiteralLike(node.moduleReference.expression)
-        && SWR_SPECIFIERS.has(node.moduleReference.expression.text)) report(node, 'import-equals binding');
-      if (context.ts.isCallExpression(node) && node.arguments.length >= 1 && context.ts.isStringLiteralLike(node.arguments[0])
-        && SWR_SPECIFIERS.has(node.arguments[0].text)) {
-        if (node.expression.kind === context.ts.SyntaxKind.ImportKeyword) report(node, 'dynamic import binding');
-        else if (isUnshadowedCommonJsRequire(context.ts, checker, node.expression)) report(node, 'CommonJS require binding');
+      if (isSwrModuleDeclaration(ts, node)) found = true;
+      const kind = unsupportedSwrBinding(ts, checker, node);
+      if (kind) {
+        found = true;
+        unsupported.push(`${relativePath(config.root, source.fileName)}:${sourceLocation(source, node).line} uses unsupported ${kind} for SWR`);
       }
-      context.ts.forEachChild(node, visit);
+      ts.forEachChild(node, visit);
     };
     visit(source);
   }

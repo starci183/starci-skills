@@ -49,10 +49,8 @@ export function policyFindings({ file = POLICY_FILE, policy }) {
   return found;
 }
 
-/** R224 findings of one parsed protected zone; `tracked(file)` and `catalogued(code)` are the tree's facts. */
-export function zoneFindings({ file = ZONE_FILE, zone, tracked, catalogued }) {
-  const bad = (message) => finding('RIGHTS_PROTECTED_ZONE', file, message);
-  if (!zone) return [bad('the declaration does not parse as a map')];
+/** The findings of the declared zones: each has a unique string id and lists paths, and at least one is declared. */
+function declaredZoneFindings(zone, bad) {
   const found = [];
   const seen = new Set();
   for (const entry of zone.zones ?? []) {
@@ -61,10 +59,24 @@ export function zoneFindings({ file = ZONE_FILE, zone, tracked, catalogued }) {
     if (!Array.isArray(entry?.paths) || !entry.paths.length) found.push(bad(`zone ${entry?.id ?? '?'} lists no paths`));
   }
   if (!seen.size) found.push(bad('no zone is declared'));
+  return found;
+}
+
+/** The findings of the protected catalog entries: a tracked file and catalogued codes. */
+function catalogEntryFindings(zone, tracked, catalogued, bad) {
+  const found = [];
   for (const entry of zone.catalogEntries ?? []) {
     if (!tracked(entry.file)) found.push(bad(`catalog entry file ${entry.file} is not a tracked file`));
     for (const code of entry.codes ?? []) if (!catalogued(code)) found.push(bad(`catalog entry code ${code} is not in ${FAILURE_CODES_FILE}`));
   }
+  return found;
+}
+
+/** R224 findings of one parsed protected zone; `tracked(file)` and `catalogued(code)` are the tree's facts. */
+export function zoneFindings({ file = ZONE_FILE, zone, tracked, catalogued }) {
+  const bad = (message) => finding('RIGHTS_PROTECTED_ZONE', file, message);
+  if (!zone) return [bad('the declaration does not parse as a map')];
+  const found = [...declaredZoneFindings(zone, bad), ...catalogEntryFindings(zone, tracked, catalogued, bad)];
   for (const code of R224_CODES) if (!catalogued(code)) found.push(bad(`${code}, the refusal code of the zone, is not in ${FAILURE_CODES_FILE}`));
   return found;
 }

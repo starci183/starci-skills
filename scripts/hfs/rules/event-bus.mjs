@@ -31,16 +31,23 @@ const typescriptFor = (repoRoot) => loadTypescript(repoRoot, HERE);
 /** The event-bus pattern file name of an event name: dots become dashes (`order.placed` -> `order-placed`). */
 export const stemOfEvent = (name) => name.replaceAll('.', '-');
 
+/** The initializer of a `static` property member with an identifier name, parentheses and `as` casts stripped, else null. */
+function staticMemberValue(ts, member) {
+  if (!ts.isPropertyDeclaration(member) || !member.initializer || !member.name || !ts.isIdentifier(member.name)) return null;
+  const isStatic = member.modifiers?.some((m) => m.kind === ts.SyntaxKind.StaticKeyword);
+  if (!isStatic) return null;
+  let value = member.initializer;
+  while (ts.isAsExpression(value) || ts.isParenthesizedExpression(value)) value = value.expression;
+  return value;
+}
+
 /** The `eventName` and `version` literals a class declares as `static readonly` members, with the line of the class. */
 function eventClassInfo(ts, node) {
   let name = null;
   let version = null;
   for (const member of node.members) {
-    if (!ts.isPropertyDeclaration(member) || !member.initializer || !member.name || !ts.isIdentifier(member.name)) continue;
-    const isStatic = member.modifiers?.some((m) => m.kind === ts.SyntaxKind.StaticKeyword);
-    if (!isStatic) continue;
-    let value = member.initializer;
-    while (ts.isAsExpression(value) || ts.isParenthesizedExpression(value)) value = value.expression;
+    const value = staticMemberValue(ts, member);
+    if (!value) continue;
     if (member.name.text === 'eventName') name = literalText(ts, value);
     if (member.name.text === 'version' && ts.isNumericLiteral(value)) version = Number(value.text);
   }
@@ -62,27 +69,37 @@ function readEventClass(ts, text, file) {
   return classes;
 }
 
+/** The service and file stem of a `be/src/modules/events/<service>/<event>.event.ts` path, else null. */
+function eventFileParts(file) {
+  if (!file.startsWith(EVENT_FILE_PREFIX) || !file.endsWith(EVENT_SUFFIX)) return null;
+  const rest = file.slice(EVENT_FILE_PREFIX.length).split('/');
+  if (rest.length !== 2) return null;
+  const [service, base] = rest;
+  return { service, stem: base.slice(0, -EVENT_SUFFIX.length) };
+}
+
+function recordEventClass(ts, text, file, { service, stem }, findings, classesByService) {
+  const classes = readEventClass(ts, text, file).filter((c) => c.name !== null || c.version !== null);
+  if (classes.length !== 1 || classes[0].name === null || classes[0].version === null) {
+    const candidates = classes.length === 1 ? 'one without both literals' : `${classes.length} candidates`;
+    findings.push(found(EVENT_CLASS_CONTRACT, file, `${file} must declare exactly one event class with literal \`static readonly eventName\` and \`static readonly version\` members (the typed event of be/contracts/${service}/${CONTRACT_NAME}); found ${candidates}.`, { service }));
+    return;
+  }
+  const [event] = classes;
+  if (stemOfEvent(event.name) !== stem) findings.push(found(EVENT_CLASS_CONTRACT, file, `${file} declares the event \`${event.name}\`, so the file is \`${stemOfEvent(event.name)}${EVENT_SUFFIX}\`: a class file is named after its event.`, { service, event: event.name }));
+  if (!classesByService.has(service)) classesByService.set(service, new Map());
+  classesByService.get(service).set(event.name, { file, version: event.version });
+}
+
 function eventClassesOf(repoRoot, files, ts) {
   const findings = [];
   const classesByService = new Map();
   for (const file of files) {
-    if (!file.startsWith(EVENT_FILE_PREFIX) || !file.endsWith(EVENT_SUFFIX)) continue;
-    const rest = file.slice(EVENT_FILE_PREFIX.length).split('/');
-    if (rest.length !== 2) continue;
-    const [service, base] = rest;
-    const stem = base.slice(0, -EVENT_SUFFIX.length);
+    const parts = eventFileParts(file);
+    if (!parts) continue;
     const text = readText(repoRoot, file);
     if (text === null) continue;
-    const classes = readEventClass(ts, text, file).filter((c) => c.name !== null || c.version !== null);
-    if (classes.length !== 1 || classes[0].name === null || classes[0].version === null) {
-      const candidates = classes.length === 1 ? 'one without both literals' : `${classes.length} candidates`;
-      findings.push(found(EVENT_CLASS_CONTRACT, file, `${file} must declare exactly one event class with literal \`static readonly eventName\` and \`static readonly version\` members (the typed event of be/contracts/${service}/${CONTRACT_NAME}); found ${candidates}.`, { service }));
-      continue;
-    }
-    const [event] = classes;
-    if (stemOfEvent(event.name) !== stem) findings.push(found(EVENT_CLASS_CONTRACT, file, `${file} declares the event \`${event.name}\`, so the file is \`${stemOfEvent(event.name)}${EVENT_SUFFIX}\`: a class file is named after its event.`, { service, event: event.name }));
-    if (!classesByService.has(service)) classesByService.set(service, new Map());
-    classesByService.get(service).set(event.name, { file, version: event.version });
+    recordEventClass(ts, text, file, parts, findings, classesByService);
   }
   return { findings, classesByService };
 }
@@ -135,6 +152,19 @@ export function eventClassContractFindings({ repoRoot, files, repo }) {
   return [...classes.findings, ...classContractFindings(classes.classesByService, contracts), ...contractClassFindings(classes.classesByService, contracts)];
 }
 
+/** Adds the `<pattern>` of every `<pattern>/<scenario>:` test title (the first argument of an `it(` or `test(` call) of the source. */
+function addProvenScenarios(ts, source, proven) {
+  const visit = (node) => {
+    if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && TEST_CALLEES.has(node.expression.text)) {
+      const title = literalText(ts, node.arguments[0]);
+      const colon = title === null ? -1 : title.indexOf(':');
+      if (colon > 0) proven.add(title.slice(0, colon));
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+}
+
 /** The scenario ids a back end proves: every `<pattern>/<scenario>:` test title of an e2e or integration spec. */
 function provenScenarios(ts, repoRoot, files) {
   const proven = new Set();
@@ -142,16 +172,7 @@ function provenScenarios(ts, repoRoot, files) {
     if (!TEST_FOLDERS.some((folder) => file.startsWith(folder)) || !SPEC_SUFFIXES.some((suffix) => file.endsWith(suffix))) continue;
     const text = readText(repoRoot, file);
     if (text === null) continue;
-    const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
-    const visit = (node) => {
-      if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && TEST_CALLEES.has(node.expression.text)) {
-        const title = literalText(ts, node.arguments[0]);
-        const colon = title === null ? -1 : title.indexOf(':');
-        if (colon > 0) proven.add(title.slice(0, colon));
-      }
-      ts.forEachChild(node, visit);
-    };
-    visit(source);
+    addProvenScenarios(ts, ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true), proven);
   }
   return proven;
 }

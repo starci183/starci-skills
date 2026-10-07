@@ -11,6 +11,15 @@ import { lineOf, localBindings, moduleRefs, ts } from './source-ast.mjs';
 
 export const CODE = 'RT_EXTERNAL_OWNER';
 
+const GLOBAL_OBJECTS = ['globalThis', 'window', 'global'];
+
+/** The global name a call or construction reaches: a bare identifier the file does not bind, or a member of a global object. */
+function globalCalleeName(t, callee, bound) {
+  if (t.isIdentifier(callee) && !bound.has(callee.text)) return callee.text;
+  if (t.isPropertyAccessExpression(callee) && t.isIdentifier(callee.expression) && GLOBAL_OBJECTS.includes(callee.expression.text)) return callee.name.text;
+  return null;
+}
+
 function globalFindings({ text, source, owner, infraOwners, add }) {
   const t = ts();
   const globals = Object.keys(infraOwners.globals);
@@ -18,11 +27,7 @@ function globalFindings({ text, source, owner, infraOwners, add }) {
   const bound = localBindings(source);
   const visit = (node) => {
     if (t.isCallExpression(node) || t.isNewExpression(node)) {
-      const callee = node.expression;
-      let name = null;
-      if (t.isIdentifier(callee) && !bound.has(callee.text)) name = callee.text;
-      else if (t.isPropertyAccessExpression(callee) && t.isIdentifier(callee.expression)
-        && ['globalThis', 'window', 'global'].includes(callee.expression.text)) name = callee.name.text;
+      const name = globalCalleeName(t, node.expression, bound);
       const owners = name && Object.hasOwn(infraOwners.globals, name) ? infraOwners.globals[name] : null;
       if (owners && !ownedBy(owners, owner)) add(lineOf(source, node), `calls the global ${name}`, owners);
     }

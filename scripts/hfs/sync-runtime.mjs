@@ -42,9 +42,6 @@ const IMPORT_SPEC = /(?:\bfrom\s+|\bimport\s*\(\s*|\bimport\s+)['"](\.[^'"]+)['"
 /** A read of the DDL of one store: `schema/runtime.sql` or `schema/machine.sql`. */
 const SCHEMA_STORE = /schema[/'", ]+(runtime|machine)\.sql/g;
 const URL_SPEC = /new URL\(\s*['"](\.[^'"]+\.ya?ml)['"]\s*,\s*import\.meta\.url/g;
-const WHITESPACE = '\\s';
-const END = '$';
-const TRAILING_WHITESPACE = new RegExp(`${WHITESPACE}+${END}`);
 
 /** The runtime-relative files reachable from `entries` through relative imports and `new URL(..., import.meta.url)` reads. */
 export function importClosure(entries) {
@@ -91,7 +88,7 @@ export const BUNDLES = Object.freeze({
 /** The catalog entries for `codes`, in the catalog's own text, keyed by top-level line. */
 function catalogSlice(text, codes) {
   const blocks = text.replaceAll('\r\n', '\n').split(/\n(?=[A-Za-z][A-Za-z0-9_-]*:\n)/);
-  const byCode = new Map(blocks.map((b) => [b.slice(0, b.indexOf(':')), b.replace(TRAILING_WHITESPACE, '')]));
+  const byCode = new Map(blocks.map((b) => [b.slice(0, b.indexOf(':')), b.trimEnd()]));
   return `${[...codes].sort(byCodeUnit).map((code) => {
     if (!byCode.has(code)) throw new Error(`${CATALOG} has no entry for ${code}`);
     return byCode.get(code);

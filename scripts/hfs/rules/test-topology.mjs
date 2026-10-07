@@ -10,23 +10,36 @@ import { found, readJson } from './read.mjs';
 
 const TEST_TOPOLOGY = 'BE_TEST_TOPOLOGY';
 const DOT_TEST = /\.test\.[cm]?[jt]sx?$/;
-const JEST_CONFIG_SOURCE = String.raw`(?:^|\/)jest(?:\.[^/]+)?\.config(?:\.[^/]+)?\.(?:[cm]?[jt]s|json)$|(?:^|\/)jest\.config\.[^/]+$`;
-const JEST_CONFIG = new RegExp(JEST_CONFIG_SOURCE);
+const JEST_CONFIG_NAMED = /(?:^|\/)jest(?:\.[^/]+)?\.config(?:\.[^/]+)?\.(?:[cm]?[jt]s|json)$/;
+const JEST_CONFIG_ANY_EXTENSION = /(?:^|\/)jest\.config\.[^/]+$/;
 const ROOT_JEST_CONFIG = 'jest.config.js';
+
+const isJestConfig = (file) => JEST_CONFIG_NAMED.test(file) || JEST_CONFIG_ANY_EXTENSION.test(file);
+
+/** The finding of the tracked file's own path, else null. */
+function pathFinding(file) {
+  if (DOT_TEST.test(file)) return found(TEST_TOPOLOGY, file, `${file} is a \`.test\` file; a unit spec is <name>.spec.ts beside its subject and an integration, e2e or contract spec is *.integration-spec.ts, *.e2e-spec.ts or *.contract-spec.ts under its own src/tests folder`);
+  if (file.split('/').slice(0, -1).includes('testing')) return found(TEST_TOPOLOGY, file, `${file} sits in a testing/ folder; doubles and builders live in src/tests/fixtures/ and specs sit beside their subject`);
+  if (isJestConfig(file) && file !== ROOT_JEST_CONFIG) return found(TEST_TOPOLOGY, file, `${file} is a second jest configuration; the one root ${ROOT_JEST_CONFIG} declares the projects unit, integration, e2e and contract`);
+  return null;
+}
+
+/** The finding of a package.json that carries a `jest` key, else null. */
+function packageFinding(repoRoot, file) {
+  if (file !== 'package.json' && !file.endsWith('/package.json')) return null;
+  if (file.includes('node_modules/')) return null;
+  const pkg = readJson(repoRoot, file);
+  return pkg && Object.hasOwn(pkg, 'jest') ? found(TEST_TOPOLOGY, file, `${file} carries a jest key; jest is configured only by the root ${ROOT_JEST_CONFIG}`) : null;
+}
 
 /** The findings of R47 over the tracked paths `files` of a back-end repository at `repoRoot`. */
 export function testTopologyFindings({ repoRoot, files }) {
   const findings = [];
   for (const file of files) {
-    const segments = file.split('/');
-    if (DOT_TEST.test(file)) findings.push(found(TEST_TOPOLOGY, file, `${file} is a \`.test\` file; a unit spec is <name>.spec.ts beside its subject and an integration, e2e or contract spec is *.integration-spec.ts, *.e2e-spec.ts or *.contract-spec.ts under its own src/tests folder`));
-    else if (segments.slice(0, -1).includes('testing')) findings.push(found(TEST_TOPOLOGY, file, `${file} sits in a testing/ folder; doubles and builders live in src/tests/fixtures/ and specs sit beside their subject`));
-    else if (JEST_CONFIG.test(file) && file !== ROOT_JEST_CONFIG) findings.push(found(TEST_TOPOLOGY, file, `${file} is a second jest configuration; the one root ${ROOT_JEST_CONFIG} declares the projects unit, integration, e2e and contract`));
-    if (file === 'package.json' || file.endsWith('/package.json')) {
-      if (file.includes('node_modules/')) continue;
-      const pkg = readJson(repoRoot, file);
-      if (pkg && Object.hasOwn(pkg, 'jest')) findings.push(found(TEST_TOPOLOGY, file, `${file} carries a jest key; jest is configured only by the root ${ROOT_JEST_CONFIG}`));
-    }
+    const own = pathFinding(file);
+    if (own) findings.push(own);
+    const packaged = packageFinding(repoRoot, file);
+    if (packaged) findings.push(packaged);
   }
   return findings;
 }
