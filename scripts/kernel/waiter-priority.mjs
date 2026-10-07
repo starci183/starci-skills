@@ -39,7 +39,7 @@ const JOB_MIDDLE = /[a-z0-9.-]/i;
 const JOB_TAIL = /^[0-9a-f]{10}$/i;
 const WORD_CHARACTER = /^\w$/;
 
-const norm = (p) => posixPath(p).replace(/\/+$/, '');
+const norm = (p) => posixPath(p).replace(/(?<!\/)\/+$/, '');
 const round2 = (n) => Math.round(n * 100) / 100;
 const isWordCharacter = (char) => char !== undefined && WORD_CHARACTER.test(char);
 

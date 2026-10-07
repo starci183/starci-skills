@@ -267,7 +267,7 @@ export function destinationsOf(report, ownedPaths = []) {
   const text = [report?.summary, report?.blocker?.detail, report?.rootCause?.claim].join(' ');
   const owned = ownedPaths.map((p) => String(p).replaceAll('\\', '/').replace(/^[^/]*\/(?=(?:apps|packages)\/)/, '')), out = new Set();
   for (const m of text.matchAll(PATH_RE)) {
-    const p = m[1].replace(/[.,)]+$/, '').replace(/\/+$/, '');
+    const p = m[1].replace(/(?<![.,)])[.,)]+$/, '').replace(/(?<!\/)\/+$/, '');
     if (p.includes('<') || p.includes('*') || owned.some((o) => p === o || p.startsWith(`${o}/`) || o.startsWith(`${p}/`))) continue;
     out.add(p);
   }

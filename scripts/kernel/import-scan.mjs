@@ -22,8 +22,8 @@ export const SOURCE_EXT = Object.freeze(['.ts', '.tsx', '.mts', '.cts', '.js', '
 const RESOLVE_EXT = [...SOURCE_EXT, '.d.ts', '.json'];
 const posix = (p) => String(p).replaceAll('\\', '/');
 const IMPORT_FROM_BODY = String.raw`(?:(?!\bfrom\s*['"])[^'"\x60;])*\bfrom\s*['"]([^'"]+)['"]`;
-const IMPORT_FROM_RE = new RegExp(`${String.raw`\bimport\s+(?:type\s+)?`}${IMPORT_FROM_BODY}`, 'g');
-const EXPORT_FROM_RE = new RegExp(`${String.raw`\bexport\s+(?:type\s+)?`}${IMPORT_FROM_BODY}`, 'g');
+const IMPORT_FROM_RE = new RegExp(String.raw`\bimport\s+(?:type\s+)?` + IMPORT_FROM_BODY, 'g');
+const EXPORT_FROM_RE = new RegExp(String.raw`\bexport\s+(?:type\s+)?` + IMPORT_FROM_BODY, 'g');
 const SPEC_RE = [
   IMPORT_FROM_RE,
   EXPORT_FROM_RE,
@@ -44,7 +44,7 @@ function parseJsonc(text) {
     i += 1;
   };
   const skipLineComment = () => { while (i < s.length && s[i] !== '\n') i += 1; };
-  const skipBlockComment = () => { i += 2; while (i < s.length && !(s[i] === '*' && s[i + 1] === '/')) i += 1; i += 2; };
+  const skipBlockComment = () => { i += 2; while (i < s.length && !(s[i] === '*' && s[i + 1] === '/')) { i += 1; } i += 2; };
   while (i < s.length) {
     const c = s[i], n = s[i + 1];
     if (inStr) { copyStringChar(); continue; }
@@ -195,7 +195,7 @@ const specifierEdge = (from, spec, resolution) => {
 };
 
 const DOUBLE_STAR_SUFFIX = new RegExp(String.raw`\/\*\*$`);
-const TRAILING_SLASHES = new RegExp(String.raw`\/+$`);
+const TRAILING_SLASHES = new RegExp(String.raw`(?<!\/)\/+$`);
 const FILE_EXTENSION = new RegExp(String.raw`\.[^./]+$`);
 
 function scanImports(root, { only = null, list = trackedList, readFile = null } = {}) {

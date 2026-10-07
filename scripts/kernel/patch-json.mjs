@@ -60,7 +60,7 @@ const stripSide = (p) => { const u = unquoteGitPath(p.trim()); return u === '/de
 export function pathsOfDiffLine(line) {
   const rest = line.slice('diff --git '.length);
   if (rest.startsWith('"')) {
-    const m = /^("(?:[^"\\]|\\.)*")\s+(.*)$/.exec(rest);
+    const m = /^("(?:[^"\\]|\\.)*")\s+(?!\s)(.*)$/.exec(rest);
     if (m) return [stripSide(m[1]), stripSide(m[2])];
   }
   const half = (rest.length - 1) / 2;

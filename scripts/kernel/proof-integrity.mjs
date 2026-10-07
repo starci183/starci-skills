@@ -73,7 +73,7 @@ const UI_DIR = /^(\.starciwork\/features\/[^/]+\/ui\/[^/]+)\//;
 const CHECK_OP = /\.(?:verify|audit)$/;
 const PROVEN_OUTCOMES = new Set(['done', 'partial']);
 
-const slashed = (p) => String(p).replaceAll('\\', '/').replace(/^\.\//, '').replace(/\/+$/, '');
+const slashed = (p) => String(p).replaceAll('\\', '/').replace(/^\.\//, '').replace(/(?<!\/)\/+$/, '');
 const uniq = (values) => [...new Set(values.filter((v) => typeof v === 'string' && v))].sort(byCodeUnit);
 const emptyClaims = () => Object.fromEntries(CLAIM_KINDS.map((k) => [k, []]));
 const mergeClaims = (...all) => Object.fromEntries(CLAIM_KINDS.map((k) => [k, uniq(all.flatMap((c) => list(c?.[k])))]));

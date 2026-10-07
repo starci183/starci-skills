@@ -92,7 +92,7 @@ export function failingFromText(text) {
   return out;
 }
 
-const IMPORT_SPEC_PATTERN = String.raw`(?:\bfrom\s*|\b(?:import|require)\s*\(\s*|^\s*import\s+)['"]([^'"]+)['"]`;
+const IMPORT_SPEC_PATTERN = String.raw`(?:\bfrom\s*|\b(?:import|require)\s*\(\s*|^[^\S\r\n  ]*import\s+)['"]([^'"]+)['"]`;
 const IMPORT_SPEC = new RegExp(IMPORT_SPEC_PATTERN, 'gm');
 const dropFirst = (value) => value.split('/').slice(1).join('/');
 /**

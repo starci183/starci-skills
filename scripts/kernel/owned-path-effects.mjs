@@ -43,7 +43,7 @@ export function landingRepos({ base, ownedPaths = [], placements, timeoutMs }) {
     if (!top.ok || !prefix.ok || !top.stdout.trim()) continue;
     const root = path.resolve(top.stdout.trim());
     const rest = path.relative(dir, abs).replaceAll('\\', '/');
-    const spec = `${prefix.stdout.trim()}${rest}`.replace(/\/+$/, '') || '.';
+    const spec = `${prefix.stdout.trim()}${rest}`.replace(/(?<!\/)\/+$/, '') || '.';
     if (!repos.has(root)) repos.set(root, { specs: [], role: item.role ?? null });
     repos.get(root).specs.push(spec);
   }
