@@ -200,7 +200,7 @@ const committedDigestsOf = (buffer) => {
   const raw = sha16(buffer);
   const text = buffer.toString('latin1');
   const crlf = sha16(Buffer.from(text.replaceAll(/\r?\n/g, '\r\n'), 'latin1'));
-  const lf = sha16(Buffer.from(text.replaceAll(/\r\n/g, '\n'), 'latin1'));
+  const lf = sha16(Buffer.from(text.replaceAll('\r\n', '\n'), 'latin1'));
   return [...new Set([raw, crlf, lf])];
 };
 /** Does the committed blob (Buffer, or null when HEAD has no such file) show as this 16-hex digest (null: no file)? */
