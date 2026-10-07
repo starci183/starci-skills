@@ -1,13 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {
-  GRAMMAR_DIST_FIX,assertGrammarDistFresh,cssTokenDeclarations,grammarDistRefusal,grammarDistStatus,grammarPackageOf
+  GRAMMAR_DIST_FIX,assertGrammarDistFresh,cssTokenDeclarations,grammarDistRefusal,grammarDistStatus,grammarPackageOf,shippedGrammarPackageRoot
 } from '../../scripts/gates/grammar-dist.mjs';
 import {grammarDistMain} from '../../scripts/checks/check-grammar-dist.mjs';
+import {pluginRuleIds} from '../../scripts/checks/check-hfs-rules.mjs';
+import {slash} from '../../scripts/lib/path-key.mjs';
 import {STAMP_FILE,sourceDigest,sourceInputs} from '../../packages/grammar/scripts/build-stamp.mjs';
 import {OLD_DANGER,SRC_CSS,grammarFixture} from '../fixtures/grammar-dist.mjs';
 
@@ -158,4 +161,88 @@ test('the CLI exits non-zero with the exact fix message on a stale dist',t=>{
   const run=spawnSync(process.execPath,[path.join(repoRoot,'scripts','checks','check-grammar-dist.mjs'),'--root',g.root],{encoding:'utf8'});
   assert.equal(run.status,1);
   assert.ok(run.stderr.includes('run npm run build in packages/grammar'),run.stderr);
+});
+
+// -------------------------------------------------------------------------------- a linked worktree ships the primary's dist
+// The land gate's full `starci runtime check` runs in a scratch worktree of main with STARCI_RUNTIME pointed at it.
+// dist/ is untracked, so a scratch never carries packages/grammar/dist: the grammar-dist self-check resolves the
+// package the runtime actually ships - the primary worktree's (the lane fallback draw-grammar.mjs documents). The
+// fixtures below write the linked-worktree metadata exactly as `git worktree add` lays it out, so no git runs here.
+
+/** A `live` checkout (its own .git directory, a built packages/grammar unless dist:false) plus a `lane` linked worktree of it. */
+const linkedCheckout=(t,{dist=true}={})=>{
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-grammar-linked-'));
+  t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  const primary=path.join(dir,'live');
+  const gitdir=path.join(primary,'.git','worktrees','lane');
+  fs.mkdirSync(gitdir,{recursive:true});
+  fs.writeFileSync(path.join(gitdir,'commondir'),'../..\n');
+  fs.mkdirSync(path.join(primary,'packages'),{recursive:true});
+  fs.renameSync(grammarFixture(t,{build:dist,label:'grammar-live'}).root,path.join(primary,'packages','grammar'));
+  const lane=path.join(dir,'lane');
+  fs.mkdirSync(lane,{recursive:true});
+  fs.writeFileSync(path.join(lane,'.git'),`gitdir: ${gitdir}\n`);
+  return {primary,lane};
+};
+
+test('a linked worktree that never built packages/grammar/dist judges the primary worktree\'s, the dist the runtime ships',t=>{
+  const {primary,lane}=linkedCheckout(t);
+  const resolved=shippedGrammarPackageRoot(lane);
+  assert.equal(resolved,path.join(primary,'packages','grammar'));
+  const status=grammarDistStatus(resolved);
+  assert.equal(status.state,'fresh',status.detail);
+  assert.equal(status.ok,true);
+});
+
+test('a linked worktree whose primary never built dist still reports missing at the shipped root',t=>{
+  const {primary,lane}=linkedCheckout(t,{dist:false});
+  const status=grammarDistStatus(shippedGrammarPackageRoot(lane));
+  refused(status,'missing');
+  assert.equal(status.root,slash(path.join(primary,'packages','grammar')));
+});
+
+test('the primary worktree itself has no fallback: a missing dist on live main is still refused',t=>{
+  const {primary}=linkedCheckout(t,{dist:false});
+  assert.equal(shippedGrammarPackageRoot(primary),path.join(primary,'packages','grammar'));
+  refused(grammarDistStatus(shippedGrammarPackageRoot(primary)),'missing');
+});
+
+test('a linked worktree that built its own dist is judged on it, not the primary\'s',t=>{
+  const {lane}=linkedCheckout(t);
+  fs.mkdirSync(path.join(lane,'packages'),{recursive:true});
+  fs.renameSync(grammarFixture(t,{stamp:false,label:'grammar-own'}).root,path.join(lane,'packages','grammar'));
+  const resolved=shippedGrammarPackageRoot(lane);
+  assert.equal(resolved,path.join(lane,'packages','grammar'));
+  refused(grammarDistStatus(resolved),'unstamped');
+});
+
+// The same scratch lacks packages/node_modules (the land gate runs a root npm ci alone), so the hfs-rules self-check
+// cannot import the eslint canons' entries: their config module needs @typescript-eslint/parser of the packages
+// workspace. pluginRuleIds names the canon's rules by importing each CONTRIBUTIONS law module instead - those resolve
+// without the packages install.
+test('pluginRuleIds names the canon\'s rules without importing the entry, whose config deps may be absent',async t=>{
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-eslint-canon-'));
+  t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  const pkg=path.join(dir,'packages','eslint','be');
+  fs.mkdirSync(path.join(pkg,'lib'),{recursive:true});
+  fs.writeFileSync(path.join(pkg,'lib','config.mjs'),'import parser from "@definitely/not-installed"\nexport const buildBeConfig=parser\n');
+  fs.writeFileSync(path.join(pkg,'law-one.mjs'),'export const recommended = {}\nexport const rules = { "fixture-rule": {}, "other-rule": {} }\n');
+  fs.writeFileSync(path.join(pkg,'lib','why.mjs'),'export const why = { "fixture-rule": { code: "BE_FIXTURE", en: "x", fix: "y" } }\n');
+  fs.writeFileSync(path.join(pkg,'index.mjs'),[
+    'import { buildBeConfig } from "./lib/config.mjs"',
+    'import { recommended as lawOneRecommended, rules as lawOneRules } from "./law-one.mjs"',
+    'import { why } from "./lib/why.mjs"',
+    'const CONTRIBUTIONS = [',
+    '    { law: "law-one", rules: lawOneRules, recommended: lawOneRecommended },',
+    ']',
+    'export const rules = Object.fromEntries(CONTRIBUTIONS.flatMap((e) => Object.entries(e.rules)))',
+    'export { why }',
+    'export const starciBeConfig = buildBeConfig',
+    '',
+  ].join('\n'));
+  const found=await pluginRuleIds(dir,'eslint-be');
+  assert.deepEqual([...found.ids].sort(),['fixture-rule','other-rule']);
+  assert.equal(found.why.get('fixture-rule'),'BE_FIXTURE');
+  const lost=await pluginRuleIds(path.join(dir,'no-such'),'eslint-be');
+  assert.match(lost.error,/packages\/eslint\/be\/index\.mjs cannot be loaded/);
 });
