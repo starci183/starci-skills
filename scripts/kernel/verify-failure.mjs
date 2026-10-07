@@ -138,6 +138,25 @@ const measurementFailure = (all) => {
   return { class: 'findings', reason: split.findings.length ? `measured findings: ${checkNames(split.findings)}` : 'measurement leg' };
 };
 
+const statedNonReviewFailure = (stated, op, report) => {
+  if ((stated === 'tool' || stated === 'transient') && op !== 'review.verify' && !otherNode(report?.rootCause, op))
+    return { class: stated, reason: 'stated by the report', stated };
+  return null;
+};
+
+const reportedProductFailure = (stated, op, report) => {
+  if (otherNode(report?.rootCause, op)) return { class: 'product', reason: `rootCause names ${report.rootCause.node}`, ...(stated ? { stated } : {}) };
+  if (stated === 'product') return { class: 'product', reason: 'stated by the report', stated };
+  return null;
+};
+
+const repeatedFailure = (report, checks, prior, verify) => {
+  const signature = failureSignature(report, checks);
+  if (signature && prior && signature === failureSignature(prior.report, prior.checks))
+    return { class: verify ? 'product' : 'deterministic', reason: `identical failure to the previous attempt (${signature})` };
+  return null;
+};
+
 export function classifyFailure({ op, report, checks = null, measurement = false, prior = null }) {
   const all = [...(Array.isArray(checks) ? checks : []), ...(Array.isArray(report?.checks) ? report.checks : [])];
   const stated = FAILURE_CLASSES.includes(report?.failureClass) ? report.failureClass : null;
@@ -146,18 +165,16 @@ export function classifyFailure({ op, report, checks = null, measurement = false
   const verify = VERIFY_OPS.has(op);
   if (measurement) return measurementFailure(all);
   // A report may call itself transient only when nothing names a product defect.
-  if ((stated === 'tool' || stated === 'transient') && op !== 'review.verify' && !otherNode(report?.rootCause, op))
-    return { class: stated, reason: 'stated by the report', stated };
+  const reported = statedNonReviewFailure(stated, op, report);
+  if (reported) return reported;
   if (op === 'review.verify') {
     const got = reviewFailure({ all, stated, report, op });
     if (got) return got;
   }
-  if (otherNode(report?.rootCause, op)) return { class: 'product', reason: `rootCause names ${report.rootCause.node}`, ...(stated ? { stated } : {}) };
-  if (stated === 'product') return { class: 'product', reason: 'stated by the report', stated };
-  const signature = failureSignature(report, checks);
-  if (signature && prior && signature === failureSignature(prior.report, prior.checks)) {
-    return { class: verify ? 'product' : 'deterministic', reason: `identical failure to the previous attempt (${signature})` };
-  }
+  const product = reportedProductFailure(stated, op, report);
+  if (product) return product;
+  const repeated = repeatedFailure(report, checks, prior, verify);
+  if (repeated) return repeated;
   if (verify && report) {
     return { class: 'product', reason: 'a verify op filed failed: a defect in what it walked (a report states failureClass transient, tool or environment when it is not)' };
   }
@@ -177,6 +194,23 @@ const ROLE_BUILD = { be: 'backend.implement', backend: 'backend.implement', fe: 
 
 const readYaml = (file) => { try { return parseYaml(fs.readFileSync(file, 'utf8')); } catch { return null; } };
 const posix = (p) => String(p).replaceAll('\\', '/');
+
+const recordOwnerOf = (repo, node, roles, kind) => {
+  if (!/^[a-z]+\.[a-z0-9-]+\..+/.test(node)) return null;
+  const resolved = recordResolution(repo, node, roles);
+  if (!resolved) return null;
+  if (kind) return { resolved, kind, via: null };
+  const family = node.split('.')[0];
+  const resolvedKind = family === 'impl' ? ROLE_BUILD[resolved.role] ?? null : FAMILY_KIND[family] ?? null;
+  const repoDetail = resolved.repository ? ` (repository ${resolved.repository}, role ${resolved.role ?? '?'})` : '';
+  return { resolved, kind: resolvedKind, via: `record ${node}${repoDetail}` };
+};
+
+const resolvedOwnedPaths = (ownedPaths, declared, role, kind, reporterPayload, failing) => {
+  for (const file of declared) ownedPaths.unshift(posix(file));
+  if (!ownedPaths.length) ownedPaths.push(...fallbackPaths(role, kind, reporterPayload, failing));
+  return [...new Set(ownedPaths.map(posix))];
+};
 
 /** The workspace repositories {name → role} of a ledger repo (.starciwork/workspace.yaml). */
 function workspaceRoles(repo) {
@@ -200,7 +234,10 @@ export function findRecord(repo, id) {
   return walkIndex(stack, want);
 }
 
-const idPattern = (want) => new RegExp(String.raw`^id:\s*['"]?${want.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)}['"]?\s*$`, 'm');
+const idPattern = (want) => {
+  const escapedWant = want.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
+  return new RegExp(String.raw`^id:\s*['"]?${escapedWant}['"]?\s*$`, 'm');
+};
 
 /** A bounded scan of a record family for the index.yaml whose `id:` line is `want`, or null. */
 function walkIndex(stack, want) {
@@ -211,15 +248,23 @@ function walkIndex(stack, want) {
     let entries = [];
     try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { continue; }
     for (const e of entries) {
-      if (e.isDirectory() && !/^(evidence|runs|assets|node_modules)$/.test(e.name)) stack.push(path.join(dir, e.name));
-      else if (e.isFile() && e.name === 'index.yaml') {
-        seen += 1;
-        const file = path.join(dir, e.name);
-        try { if (pattern.test(fs.readFileSync(file, 'utf8'))) return file; } catch { /* unreadable */ }
-      }
+      const visited = visitRecordEntry(dir, e, stack, pattern);
+      seen += visited.count;
+      if (visited.file) return visited.file;
     }
   }
   return null;
+}
+
+function visitRecordEntry(dir, entry, stack, pattern) {
+  if (entry.isDirectory() && !/^(evidence|runs|assets|node_modules)$/.test(entry.name)) {
+    stack.push(path.join(dir, entry.name));
+    return { count: 0, file: null };
+  }
+  if (!entry.isFile() || entry.name !== 'index.yaml') return { count: 0, file: null };
+  const file = path.join(dir, entry.name);
+  try { if (pattern.test(fs.readFileSync(file, 'utf8'))) return { count: 1, file }; } catch { /* unreadable */ }
+  return { count: 1, file: null };
 }
 
 /**
@@ -239,25 +284,17 @@ export function resolveRootOwner({ repo, rootCause, kinds, failing = [], reporte
   if (typeof rootCause.op === 'string' && catalog[rootCause.op]) { kind = rootCause.op; via = 'rootCause.op'; }
   const nodeKind = node.split('#')[0];
   if (!kind && catalog[nodeKind]) { kind = nodeKind; via = 'rootCause.node (op)'; }
-  if (repo && /^[a-z]+\.[a-z0-9-]+\..+/.test(node)) {
-    const resolved = recordResolution(repo, node, roles);
-    if (resolved) {
-      record = resolved.record;
-      repository = resolved.repository;
-      role = resolved.role;
-      ownedPaths.push(...resolved.ownedPaths);
-      if (!kind) {
-        const family = node.split('.')[0];
-        kind = family === 'impl' ? ROLE_BUILD[role] ?? null : FAMILY_KIND[family] ?? null;
-        const repoDetail = repository ? ` (repository ${repository}, role ${role ?? '?'})` : '';
-        via = `record ${node}${repoDetail}`;
-      }
-    }
+  const recordOwner = repo ? recordOwnerOf(repo, node, roles, kind) : null;
+  if (recordOwner) {
+    const resolved = recordOwner.resolved;
+    record = resolved.record;
+    repository = resolved.repository;
+    role = resolved.role;
+    ownedPaths.push(...resolved.ownedPaths);
+    if (!kind) { kind = recordOwner.kind; via = recordOwner.via; }
   }
   if (!kind) return null;
-  for (const f of declared) ownedPaths.unshift(posix(f));
-  if (!ownedPaths.length) ownedPaths.push(...fallbackPaths(role, kind, reporterPayload, failing));
-  const unique = [...new Set(ownedPaths.map(posix))];
+  const unique = resolvedOwnedPaths(ownedPaths, declared, role, kind, reporterPayload, failing);
   return { kind, op: opOfKind(kind), family: catalog[kind]?.family ?? null, ...(repository ? { repository } : {}), ...(role ? { role } : {}), ...(record ? { record } : {}), ownedPaths: unique, via };
 }
 
