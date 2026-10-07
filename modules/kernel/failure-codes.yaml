@@ -16113,8 +16113,8 @@ workflow-sender-terminal-missing:
   meaning_vi: "Kernel là worker của một Run mà cửa sổ khởi động làm điều phối; ORCA_TERMINAL_HANDLE không được đặt nên Orca không biết cửa sổ gửi lệnh. Runtime từ chối trước mọi tác động, không tạo worktree hay Kernel."
   causes_vi:
     - "Lệnh start chạy từ một shell thường, không nằm trong cửa sổ Orca"
-    - "Tiến trình nền (watchdog, reconciler) chạy không kế thừa ORCA_TERMINAL_HANDLE"
-  nextStep_vi: "Chạy lại starci workflow start bên trong một cửa sổ Orca; không dùng cửa sổ của người khác làm điều phối."
+    - "Tiến trình nền (watchdog, reconciler) chạy không kế thừa ORCA_TERMINAL_HANDLE và không có cửa sổ nào của worktree runtime (hoặc Supervisor đang sống) để thay thế"
+  nextStep_vi: "Mở một cửa sổ thường trong worktree của runtime (watchdog sẽ thử lại sau blockedRetryMs), hoặc chạy lại starci workflow start bên trong một cửa sổ Orca; không dùng cửa sổ của người khác làm điều phối."
   owner: owner
   kind: verb-refusal
 kernel-launch-custody-incomplete:
