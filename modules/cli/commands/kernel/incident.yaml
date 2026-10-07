@@ -90,6 +90,15 @@ flags:
   - name: until-landed
     type: list
     summary: "release when the workflow lands its product: <workflowId>@<repository>"
+  - name: until-runtime-has
+    type: list
+    summary: "release when the live runtime contains the fix commit: <commit>"
+  - name: until-admission
+    type: list
+    summary: "release when no provider receipt of the job's attempt scope holds a slot: <jobId>"
+  - name: until-check
+    type: list
+    summary: "release when the Kernel-recorded run of the check is green: <jobId>:<checkName>"
 exit:
   "0": raised, resolved or attached
   "1": refused or failed (unknown or not-open incident, wrong kind combination)

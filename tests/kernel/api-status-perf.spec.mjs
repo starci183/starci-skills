@@ -109,7 +109,7 @@ const fixture = (t) => {
       l.write.writeContract({attemptId,markdown:'# contract',context:{contract:{schema:'starci/contract-version@1',op:'interface.draw',runtimeSha:A,admittedAt:now}}});
     }
   });
-  const gates = [1, 2].map(() => ok(['incident', '--workflow', wf, '--kind', 'owner-gate', '--op', 'brand.decide', '--until-commit', `${other}:app/layout.tsx`, '--detail', 'FE app router']).incidentId);
+  const gates = [1, 2].map(() => ok(['incident', '--workflow', wf, '--kind', 'owner-gate', '--op', 'brand.decide', '--until-commit', `${other}:app/layout.tsx`, '--cause', 'peer-dependency', '--no-workaround', 'peer-not-running', '--detail', 'FE app router']).incidentId);
   // The ledger as the fixture left it, restorable so each compared status reads the same state.
   const snapshot = path.join(dir, 'snapshot.sqlite');
   { const db = new DatabaseSync(ledgerFile); db.exec(`VACUUM INTO '${snapshot.replace(/'/g, "''")}'`); db.close(); }

@@ -39,8 +39,9 @@ import { isoOr } from '../lib/time.mjs';
 import { RETRYABLE_JOB_STATUSES, retiredBeforeDispatch } from '../../engine/admission.mjs';
 import { resolveIncident } from '../../engine/db/ledger.mjs';
 import { jobResultSql } from '../machine/job-row.mjs';
+import { GATE_CONDITION_EVALUATORS, GATE_CONDITION_PARSERS, GATE_CONDITION_TYPES, gateConditionLabel, gateConditionProblem } from './gate-runtime-conditions.mjs';
 
-const UNTIL_TYPES = Object.freeze(['record', 'job', 'message', 'commit', 'incident', 'foundation', 'landed']);
+const UNTIL_TYPES = Object.freeze(['record', 'job', 'message', 'commit', 'incident', 'foundation', 'landed', ...GATE_CONDITION_TYPES]);
 const repoMatches = (repoRoot, want) => {
   if (!repoRoot || !want) return false;
   const norm = (p) => path.resolve(String(p)).replace(/(?<![\\/])[\\/]+$/, '').toLowerCase();
@@ -158,6 +159,7 @@ const CONDITION_PARSERS = new Map([
     if (at <= 0 || at === spec.length - 1) throw invalid(`--until-landed ${spec}: the form is <workflowId>@<repository> (a repository name like my-app, or its path)`);
     return { type, workflowId: spec.slice(0, at).trim(), repository: spec.slice(at + 1).trim() };
   }],
+  ...GATE_CONDITION_PARSERS,
 ]);
 
 export function parseCondition(type, raw) {
@@ -195,6 +197,8 @@ const conditionProblem = (db, cond, workflowId) => {
     return Object.assign(new Error(`--until-foundation names no registered shared foundation ${cond.name}; its owner claims it (starci kernel foundation --claim ${cond.name}) or you declare the need (starci kernel foundation --declare-dependent ${cond.name}) first`), { code: 'foundation-unknown' });
   if (cond.type === 'landed' && (cond.workflowId === workflowId || !db.prepare('SELECT 1 FROM workflows WHERE workflow_id=?').get(cond.workflowId)))
     return Object.assign(new Error(`--until-landed names no other workflow ${cond.workflowId} in this ledger`), { code: 'until-landed-workflow-unknown' });
+  const missing = gateConditionProblem(db, cond);
+  if (missing) return missing;
   if (cond.type === 'record' && !cond.path) return invalid('--until-record needs a path');
   if (cond.type === 'commit' && (!cond.repo || !cond.target)) return invalid('--until-commit needs <repo>:<ref-or-path>');
   return null;
@@ -216,7 +220,7 @@ export const conditionLabel = (cond) => {
     case 'incident': return `incident ${cond.incidentId}:resolved`;
     case 'foundation': return `foundation ${cond.name} landed`;
     case 'landed': return `${cond.workflowId} landed into ${cond.repository} main`;
-    default: return JSON.stringify(cond);
+    default: return GATE_CONDITION_TYPES.includes(cond.type) ? gateConditionLabel(cond) : JSON.stringify(cond);
   }
 };
 
@@ -350,6 +354,7 @@ const CONDITION_EVALUATORS = Object.freeze({
   incident: (db, cond) => incidentCondition(db, cond),
   landed: (db, cond) => landedCondition(db, cond),
   foundation: (db, cond) => foundationCondition(db, cond),
+  ...GATE_CONDITION_EVALUATORS,
 });
 
 /**

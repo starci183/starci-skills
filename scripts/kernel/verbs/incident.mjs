@@ -44,7 +44,7 @@ export default {
     const rerouted = internals.OWNER_GATE_KINDS.includes(args.kind) && autopilotOn(db, workflowId) ? { from: args.kind, to: SUPERVISOR_GATE } : null;
     if (rerouted) args = { ...args, kind: SUPERVISOR_GATE };
     // A supervisor-gate is raised after its cause's workaround (policy gateCauses): tried and recorded, or a typed reason there is none.
-    const gate = gateStepOf(ledger, { workflowId, args, holds });
+    const gate = gateStepOf(ledger, { workflowId, args, holds, until });
     if (gate.redirected) { emit(gate.out, gate.text, args.json); return; }
     openRaisedIncident(ledger, { incidentId, workflowId, args, now, rerouted, holds, peerWait, until, foundationWait, workaround: gate.workaround });
     // A condition that already holds resolves the wait now rather than at the next status.

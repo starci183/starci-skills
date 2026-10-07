@@ -179,7 +179,7 @@ test('an open wait raised before the registry is typed onto a foundation with --
   // AUTH: a free-text peer-wait on the peer that owns the module; COLLAB:
   // an owner-gate that was really a peer dependency.
   const plain=fx.ok(['incident','--workflow',AUTH,'--kind','peer-wait','--peer',MOD,'--op','docs.author','--detail','app does not boot until WorkspaceProvisionModule exports its admission token']);
-  const gate=fx.ok(['incident','--workflow',COLLAB,'--kind','owner-gate','--op','docs.author','--detail','Peer dependency: the provision module']);
+  const gate=fx.ok(['incident','--workflow',COLLAB,'--kind','owner-gate','--op','docs.author','--cause','peer-dependency','--workaround','typed peer-wait on the module owner (--attach below)','--detail','Peer dependency: the provision module']);
   fx.refused(['incident','--workflow',AUTH,'--attach',plain.incidentId,'--until-foundation','nowhere'],'foundation-unknown');
   for(const [wf,inc] of [[AUTH,plain.incidentId],[COLLAB,gate.incidentId]]){
     const typed=fx.ok(['incident','--workflow',wf,'--attach',inc,'--until-foundation','workspace-provision-module']);

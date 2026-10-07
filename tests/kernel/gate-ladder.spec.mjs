@@ -25,6 +25,7 @@ const read = (repo, fn) => { const l = inspectLedger({ file: ledgerFileFor(repo)
 const world = (t, { chain = ['claude-agent', 'codex-agent'], rejected = [] } = {}) => {
   const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-gate-ladder-'));
   t.after(() => fs.rmSync(repo, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
+  if (process.env.STARCI_TEST_TEMP_DIR) t.after(() => fs.rmSync(path.join(process.env.STARCI_TEST_TEMP_DIR, 'starci-git-memo'), { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
   seed(repo, (l) => {
     l.ensureWorkflow({ workflowId: WF, title: 'gate ladder spec' });
     l.write.changeWorkflowPhase({ workflowId: WF, to: 'running', by: 'test', reason: 'seed gate workflow' });
@@ -108,4 +109,62 @@ test('the runtime\'s own raises pass their typed reason: a gate opened without o
     assert.throws(() => openSupervisorGate(l, { workflowId: WF, holds: [NIVO_JOB], detail: 'x', workaround: { cause: 'retry-cap' } }), (e) => e.code === 'gate-workaround-required');
     assert.ok(openSupervisorGate(l, { workflowId: WF, holds: [NIVO_JOB], detail: 'x', workaround: { cause: 'retry-cap', noWorkaround: 'retry-cap-spent' } }));
   });
+});
+
+// I3: a gate carries a machine-checkable condition where its cause allows; the status pass resolves it with an evidence event.
+const headSha = () => spawnSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT, encoding: 'utf8' }).stdout.trim();
+const NOT_LANDED = 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef';
+const defectGate = (repo, extra = []) => run(repo, ...gateArgs(['--cause', 'runtime-defect', '--no-workaround', 'defect-on-every-path', ...extra], STARCI_JOB));
+const statusOf = (repo) => json(run(repo, 'status', '--workflow', WF));
+const resolvedEvents = (repo) => read(repo, (db) => db.prepare("SELECT kind,payload_json FROM events WHERE kind IN ('incident-resolved','incident-auto-resolved') ORDER BY seq").all()
+  .map((row) => ({ kind: row.kind, ...JSON.parse(row.payload_json) })).filter((event) => event.by));
+
+test('I3, StarCi inc-5c97fdeac27e: the gate waits on "the live runtime contains the fix" and the status pass resolves it once it does', async (t) => {
+  const { CONDITIONS_ATTACHED_EVENT } = await import('../../scripts/kernel/gate-conditions.mjs');
+  const repo = world(t);
+  const raised = json(defectGate(repo, ['--until-runtime-has', NOT_LANDED]));
+  assert.equal(raised.status, 'open');
+  assert.deepEqual(resolvedEvents(repo), [], 'the fix is not in the runtime yet, so the gate stays open');
+  // The land arrives: the Supervisor's fix commit is now in the runtime. The next status read resolves the gate itself.
+  seed(repo, (l) => l.appendEvent({ workflowId: WF, entityType: 'incident', entityId: raised.incidentId, kind: CONDITIONS_ATTACHED_EVENT, payload: { until: [{ type: 'runtime-has', commit: headSha() }] } }));
+  statusOf(repo);
+  const [byRuntime] = resolvedEvents(repo);
+  assert.equal(byRuntime.by, 'until-conditions');
+  assert.match(byRuntime.detail, /the live runtime \(.{12}\) contains /);
+  assert.equal(read(repo, (db) => db.prepare('SELECT status FROM incidents WHERE incident_id=?').get(raised.incidentId).status), 'resolved');
+});
+
+test('I3: a condition that already holds resolves the gate at once, with the evidence event; a malformed or unknown one is refused', (t) => {
+  const repo = world(t);
+  const met = json(defectGate(repo, ['--until-runtime-has', headSha()]));
+  assert.equal(met.status, 'resolved');
+  assert.match(met.autoResolved.evidence.join(' '), /contains/);
+  assert.equal(json(defectGate(repo, ['--until-runtime-has', 'not-a-sha'])).code, 'until-invalid');
+  assert.equal(json(defectGate(repo, ['--until-admission', 'op-nothing-0123456789'])).code, 'until-job-unknown');
+  assert.equal(json(defectGate(repo, ['--until-check', 'nocolon'])).code, 'until-invalid');
+});
+
+test('I3, Nivo inc-8682f80b8b34: the admission gate carries "no provider receipt of the job holds a slot" and ends when the receipt is released', async (t) => {
+  const { withMachine } = await import('../../engine/db/machine.mjs');
+  const repo = world(t, { chain: ['claude-agent'] });
+  withMachine((m) => {
+    const reserved = m.reserveProvider({ provider: 'claude', account: 'default', attemptId: 'att-stale-1', role: 'op', model: 'claude-opus-5-5', maxParallel: 4, scope: { scopeId: `ledger:${NIVO_JOB}:attempt:2` } });
+    assert.equal(reserved.ok, true);
+    assert.equal(m.markProviderReservation({ ...reserved.reservation, state: 'unknown' }).ok, true);
+  });
+  const raised = json(run(repo, ...gateArgs(['--cause', 'no-eligible-agent', '--no-workaround', 'single-member-chain'])));
+  assert.equal(raised.status, 'open');
+  assert.match(JSON.stringify(raised.until), /admission/);
+  const [event] = read(repo, (db) => db.prepare("SELECT payload_json FROM events WHERE kind='incident-raised'").all().map((row) => JSON.parse(row.payload_json)));
+  assert.equal(event.until[0].jobId, NIVO_JOB, 'the cause class attached the condition: the raise named none');
+  assert.deepEqual(resolvedEvents(repo), []);
+  // The Supervisor's fix releases the stale receipt (reconcile proves no effect); the next status pass resolves the gate.
+  withMachine((m) => {
+    const [row] = m.providerReservations({ activeOnly: true });
+    assert.equal(m.releaseProviderReservation({ ...row, proof: { kind: 'reconciled-no-effect', confirmed: true, source: 'spec', dispatchId: 'ctx_spec', scopeId: row.scope.scopeId, effectState: 'none' } }).ok, true);
+  });
+  statusOf(repo);
+  const [auto] = resolvedEvents(repo);
+  assert.equal(auto.by, 'until-conditions');
+  assert.match(auto.detail, /holds a slot/);
 });
