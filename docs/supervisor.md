@@ -158,7 +158,7 @@ pin registry semver, never a `file:` link.
    and qualify the actual current knowledge edit through its owning checks.
 4. Land through the gate; `dist/` is untracked, so rebuild `packages/grammar/dist` on live main afterwards.
 5. `npm pack --dry-run` from live `packages/grammar`: the file list is dist, README.md, LICENSE, package.json; and
-   `starci release clean-test` (`npm run test:packages`) is green for every package of the publish set.
+   `starci release clean-test` is green for every package of the publish set.
 6. `starci release publish --publish`, then verify the published `@starci/grammar` version in the registry.
 7. Tell the owner afterwards, and the consumer Kernels whose pinned range does not cover the new version.
 
