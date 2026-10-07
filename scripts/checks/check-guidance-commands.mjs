@@ -66,7 +66,7 @@ export function commandSpans(sentence, { prose = true } = {}) {
   for (const m of s.matchAll(/`([^`]+)`/g)) out.push({ text: m[1], at: m.index, end: m.index + m[0].length });
   if (prose) for (const m of s.matchAll(/"([^"]+)"/g)) out.push({ text: m[1], at: m.index, end: m.index + m[0].length });
   for (const p of parenSpans(s)) out.push({ text: p.text.replaceAll('`', ''), at: p.at, end: p.at + p.text.length + 2 });
-  for (const m of s.matchAll(/\brun\s+(?!`)([^,;:`]+?)(?=\s+-\s|[,;:]|\.(?:\s|$)|$)/gi)) out.push({ text: m[1], at: m.index, end: m.index + m[0].length });
+  for (const m of s.matchAll(RUN_COMMAND)) out.push({ text: m[1], at: m.index, end: m.index + m[0].length });
   return out;
 }
 
@@ -75,6 +75,10 @@ const NEGATION = new RegExp(String.raw`\b(?:never|not|no|nor|without|avoid|inste
 const REFUSED_AFTER = new RegExp(String.raw`^[^.;]*?\b(?:refuses?|is refused|are refused|is blocked|are blocked|${altOf('guidance.refused')})\b`, 'i');
 const PAST_BEFORE = /\b(?:was|were|ran|had)\b[^,;:]*$/i;
 const PAST_AFTER = /^\W{0,3}(?:,?\s*which\s+)?(?:ran|followed|deleted|emptied|restarted|wiped)\b/i;
+const RUN_COMMAND_PREFIX = '\\brun\\s+(?!`)';
+const RUN_COMMAND_TEXT = '([^,;:`]+?)';
+const RUN_COMMAND_BOUNDARY = String.raw`(?=\s+-\s|[,;:]|\.(?:\s|$)|$)`;
+const RUN_COMMAND = new RegExp(`${RUN_COMMAND_PREFIX}${RUN_COMMAND_TEXT}${RUN_COMMAND_BOUNDARY}`, 'gi');
 const RUNTIME_ACTOR = /(?:\b(?:the runtime|runtime's|[a-z]+[A-Z]\w*)\b|[\w/.-]+\.mjs\b)(?:\s+\w+){0,3}\s+(?:[\w-]+s|is the only)\b[^,;:]*$/;
 // A clause whose SUBJECT is a runtime actor (the runtime, the host-side controller, the reconciler, the GC, the finish, a script
 // file) describes what the runtime itself does, whatever punctuation follows: the clause is the text after the last . ; | or
