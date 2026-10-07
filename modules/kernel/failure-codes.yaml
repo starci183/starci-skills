@@ -16435,3 +16435,14 @@ pin-lineage-excluded:
   nextStep_vi: "Bỏ --model để route chọn thành viên kế tiếp, hoặc ghi starci kernel op-override với quyết định rõ ràng."
   owner: op-retry
   kind: verb-refusal
+
+ENGINE_CONFIG_UNREADABLE:
+  title: "The engine cannot read config.yaml"
+  title_vi: "Bộ điều phối không đọc được config.yaml"
+  meaning_vi: "Mã của bộ điều phối đang chạy không đọc được config.yaml hiện tại; nó giữ nguyên chế độ các controller đang chạy thay vì tắt chúng."
+  causes_vi:
+    - "config.yaml đã được thay bằng bản mới hơn mã đang nằm trong bộ nhớ của bộ điều phối"
+    - "config.yaml đang được ghi dở hoặc có khóa không hợp lệ"
+  nextStep_vi: "Sửa config.yaml nếu nó sai, hoặc chạy starci reconciler restart để bộ điều phối chạy trên mã mới."
+  owner: owner
+  kind: runtime-fault

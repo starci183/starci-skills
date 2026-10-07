@@ -78,6 +78,7 @@ codes:
   LEDGER_CORRUPT:           {slaMs: 0, severity: critical, owner: host-controller, autoAction: 'PRAGMA quick_check failed: urgent owner alert, restore from the nightly backup'}
   BOOT_TASK_MISSING:        {slaMs: 0, severity: warn, owner: host-controller, autoAction: 'recreate the StarCi-Reconciler scheduled task'}
   ENGINE_STALE:             {slaKey: reconciler.heartbeatStaleMs, severity: critical, owner: host-controller, autoAction: 'boot.mjs ensure restarts the engine (read by boot, not by the engine itself)'}
+  ENGINE_CONFIG_UNREADABLE: {slaMs: 0, severity: critical, owner: host-controller, autoAction: 'none by the engine: it keeps the modes it runs while config.yaml cannot be read by its code (scripts/reconciler/engine-modes.mjs); the owner restarts the engine on the new code (starci reconciler restart)'}
   # ---- Resource (§8.3, §14).
   RAM_CRITICAL:             {slaMs: 0, severity: critical, owner: resource-controller, autoAction: 'stop dispatch; urgent owner alert'}
   DISK_LOW:                 {slaMs: 0, severity: warn, owner: gc-controller, autoAction: 'run housekeeping now'}

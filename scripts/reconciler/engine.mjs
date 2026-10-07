@@ -39,7 +39,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { CONTROLLERS as MACHINE_CONTROLLERS, openMachine } from '../../engine/db/machine.mjs';
+import { openMachine } from '../../engine/db/machine.mjs';
 import { claimOrTakeOver, lockHolder, reassertManager } from '../connectors/lib.mjs';
 import { createReloadWatch, reexecSelf, RELOAD_ENV, runtimeHead } from '../machine/self-reload.mjs';
 import { setPriority } from '../api/process/set-priority.mjs';
@@ -49,13 +49,14 @@ import { DECISIONS_FILE, createCtx, logRowOf, reconcilerLog, spawnJson } from '.
 import { ledgersOf, pollAll } from './sources.mjs';
 import { CONCERN_OWNER } from './owns.mjs';
 import {
-  CONTROLLER_NAMES, LEADER_NAME, MODES, SKILL_ROOT, START_REASON_ENV, configuredMode, controllerModule, reconcilerConfig, reconcilerNumbers,
+  CONTROLLER_NAMES, LEADER_NAME, SKILL_ROOT, START_REASON_ENV, controllerModule, reconcilerConfig, reconcilerNumbers,
 } from './state.mjs';
 import { WorkQueue, machineRows, memoryRows, failureLog } from './workqueue.mjs'; import { isMain } from '../lib/is-main.mjs';
 import { readEnv } from '../lib/env.mjs';
 import { eachInOrder, repeatInOrder } from '../lib/in-order.mjs';
 import { crashHandler, logSafeReevaluated, onceLine } from './engine-process.mjs';
 import { runOnce } from './engine-once.mjs';
+import { readModes, writeModes } from './engine-modes.mjs';
 import { positiveNumber } from '../lib/number.mjs';
 import { valueAfter } from '../lib/cli-arg.mjs';
 const CONTROLLERS_DIR = path.join(SKILL_ROOT, 'scripts', 'reconciler', 'controllers');
@@ -111,7 +112,7 @@ export class Engine {
     this.safe = safe;
     this.apply = apply;
     this.numbers = numbers ?? reconcilerNumbers();
-    this.configFn = typeof config === 'function' ? config : () => (config ?? reconcilerConfig());
+    this.configFn = typeof config === 'function' ? config : () => (config ?? reconcilerConfig({ strict: true }));
     this.ledgersFn = typeof ledgers === 'function' ? ledgers : () => ledgers ?? ledgersOf({ env });
     // The engine's ONE machine.sqlite connection, the WAL checkpointer (engine/db/machine.mjs openMachine).
     this.state = state ?? openMachine({ env, now, checkpointer: true, ...stateOptions });
@@ -135,6 +136,8 @@ export class Engine {
     this.controllers = []; // [{name, module, mode, resyncMs, concurrency, timeoutMs, lastResyncAt}]
     this.loadErrors = [];
     this.modes = {};
+    this.configured = {};
+    this.configFault = null;
     this.epoch = 0;
     this.leader = false;
     this.lock = null;
@@ -177,17 +180,10 @@ export class Engine {
     return this;
   }
 
-  /** Re-read config.yaml reconciler and the ledgers; compute the effective modes (safe: active -> shadow). */
+  /** Re-read config.yaml reconciler and the ledgers; compute the effective modes (safe: active -> shadow). An unreadable config keeps the running modes (engine-modes.mjs). */
   refreshConfig() {
-    let conf;
-    try { conf = this.configFn(); } catch { conf = { enabled: false, controllers: {} }; }
-    const modes = {};
-    for (const name of new Set([...CONTROLLER_NAMES, ...this.controllers.map((c) => c.name)])) {
-      let mode = configuredMode(name, conf);
-      if (!MODES.includes(mode)) mode = MODES[0];
-      if ((this.safe || !this.apply) && mode === 'active') mode = 'shadow';
-      modes[name] = mode;
-    }
+    const names = [...new Set([...CONTROLLER_NAMES, ...this.controllers.map((c) => c.name)])];
+    const modes = readModes(this, names);
     for (const c of this.controllers) {
       if (c.mode === 'off' && modes[c.name] !== 'off') c.lastResyncAt = 0; // a controller turned on resyncs at once
       c.mode = modes[c.name];
@@ -197,22 +193,8 @@ export class Engine {
     if (this.leader) this.writeModes();
   }
 
-  /**
-   * Record the EFFECTIVE mode of each controller in controller_modes; a change is a mode_changes row first (who and why,
-   * G6). The engine never chooses a mode: it records what config.yaml (and --safe / --once) make effective.
-   */
-  writeModes() {
-    try {
-      this.state.transaction(() => {
-        for (const [name, mode] of Object.entries(this.modes)) {
-          if (!MACHINE_CONTROLLERS.includes(name)) continue;
-          const configured = configuredMode(name, (() => { try { return this.configFn(); } catch { return { enabled: false, controllers: {} }; } })());
-          const reason = mode !== configured ? `${(this.safe && 'safe mode') || 'no --apply'}: configured ${configured} runs ${mode}` : `config.yaml reconciler.controllers.${name}.mode`;
-          this.state.setControllerMode({ controller: name, mode, by: `engine:${this.holder}`, reason });
-        }
-      });
-    } catch (error) { this.log('reconciler.error', `modes write failed: ${String(error?.message ?? error).slice(0, 300)}`, { kind: 'reconciler.modes-write-failed' }); }
-  }
+  /** Record the effective mode of each controller (engine-modes.mjs writeModes). */
+  writeModes() { writeModes(this); }
 
   /** Try to become the leader. {ok, epoch} or {ok:false, standby: reason}. */
   acquire() {

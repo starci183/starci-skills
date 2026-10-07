@@ -61,11 +61,15 @@ export const REQUIRED_ACTIVE = Object.freeze(Object.entries(PROFILES.operational
 /**
  * config.yaml `reconciler`: {enabled, profile, controllers: {<name>: {mode}}}. The profile (when named) supplies the
  * default mode of every controller; an explicit controllers.<name>.mode overrides it. An absent block, an unreadable
- * config or an unknown mode reads as off. Never throws.
+ * config or an unknown mode reads as off and the call never throws; with `strict` an unreadable config throws its own
+ * error (the engine keeps its last good modes instead of reading "off").
  */
-export function reconcilerConfig({ config = undefined } = {}) {
+export function reconcilerConfig({ config = undefined, strict = false } = {}) {
   let cfg = config;
-  if (cfg === undefined) { try { cfg = loadConfig(); } catch { cfg = null; } }
+  if (cfg === undefined) {
+    if (strict) cfg = loadConfig();
+    else { try { cfg = loadConfig(); } catch { cfg = null; } }
+  }
   const block = cfg?.reconciler ?? null;
   const profile = Object.hasOwn(PROFILES, block?.profile) ? block.profile : null;
   const controllers = {};
