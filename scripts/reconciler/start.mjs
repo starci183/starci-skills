@@ -18,8 +18,9 @@ import { sleep } from '../lib/sleep.mjs'; import { isMain } from '../lib/is-main
 import { buildUi, uiBuildState } from './ui-build.mjs';
 export { buildUi, uiBuildState };
 import { workflowCaller } from '../agent/caller-context.mjs';
-import { PROFILE, engineItems, engineIsSafe, profileItems, safeShadowOf, serviceItems, serviceWanted } from './start-items.mjs';
-export { PROFILE, engineItems, engineIsSafe, profileItems, safeShadowOf };
+import { PROFILE, engineItems, profileItems, safeShadowOf, serviceItems, serviceWanted } from './start-items.mjs';
+export { PROFILE, engineItems, profileItems, safeShadowOf };
+export { engineIsSafe } from './start-items.mjs';
 
 const MIN_SQLITE = '3.51.3';
 /** Services `start` never launches itself: Orca is a GUI app (the owner opens it); the scheduled task is the owner's. */
