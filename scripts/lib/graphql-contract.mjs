@@ -14,37 +14,40 @@ const PUNCTUATORS = new Set(['{', '}', '(', ')', '[', ']', ':', '!', '=', '$', '
 const BUILT_IN_SCALARS = new Set(['String', 'Int', 'Float', 'Boolean', 'ID']);
 
 /** The tokens of a GraphQL source: names, punctuators, `...`, strings and numbers; comments and commas are insignificant. */
+function commentEnd(source, index) { while (index < source.length && source[index] !== '\n') index += 1; return index; }
+function blockStringAt(source, index) { const end = source.indexOf('"""', index + 3); if (end === -1) throw new SyntaxError('unterminated block string'); return { token: { kind: 'string', value: source.slice(index + 3, end) }, next: end + 3 }; }
+function quotedStringAt(source, index) { let end = index + 1; while (end < source.length && source[end] !== '"') end += source[end] === '\\' ? 2 : 1; return { token: { kind: 'string', value: source.slice(index + 1, end) }, next: end + 1 }; }
+function nameAt(source, index) { const match = /^[_A-Za-z]\w*/.exec(source.slice(index)); return { token: { kind: 'name', value: match[0] }, next: index + match[0].length }; }
+function numberAt(source, index) { return /^-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/.exec(source.slice(index)); }
 export function tokenize(source) {
   const tokens = [];
   let index = 0;
   while (index < source.length) {
     const char = source[index];
     if (char === '#') {
-      while (index < source.length && source[index] !== '\n') index += 1;
+      index = commentEnd(source, index);
     } else if (/[\s,﻿]/.test(char)) {
       index += 1;
     } else if (source.startsWith('...', index)) {
       tokens.push({ kind: 'spread', value: '...' });
       index += 3;
     } else if (source.startsWith('"""', index)) {
-      const end = source.indexOf('"""', index + 3);
-      if (end === -1) throw new SyntaxError('unterminated block string');
-      tokens.push({ kind: 'string', value: source.slice(index + 3, end) });
-      index = end + 3;
+      const parsed = blockStringAt(source, index);
+      tokens.push(parsed.token);
+      index = parsed.next;
     } else if (char === '"') {
-      let end = index + 1;
-      while (end < source.length && source[end] !== '"') end += source[end] === '\\' ? 2 : 1;
-      tokens.push({ kind: 'string', value: source.slice(index + 1, end) });
-      index = end + 1;
+      const parsed = quotedStringAt(source, index);
+      tokens.push(parsed.token);
+      index = parsed.next;
     } else if (PUNCTUATORS.has(char)) {
       tokens.push({ kind: 'punct', value: char });
       index += 1;
     } else if (/[_A-Za-z]/.test(char)) {
-      const match = /^[_A-Za-z]\w*/.exec(source.slice(index));
-      tokens.push({ kind: 'name', value: match[0] });
-      index += match[0].length;
+      const parsed = nameAt(source, index);
+      tokens.push(parsed.token);
+      index = parsed.next;
     } else if (/[-0-9]/.test(char)) {
-      const match = /^-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/.exec(source.slice(index));
+      const match = numberAt(source, index);
       if (!match) throw new SyntaxError(`unexpected character "${char}"`);
       tokens.push({ kind: 'number', value: match[0] });
       index += match[0].length;
