@@ -139,7 +139,7 @@ export default {
   }
 
   // The layout chain above an interface.draw is one shared foundation (`shell`), never a refusal: a draw starts from a
-  // todo shell and unsettled ancestors. The first workflow to find parents to draw claims the foundation and draws them
+  // pending shell and unsettled ancestors. The first workflow to find parents to draw claims the foundation and draws them
   // in this op; a live owner elsewhere makes this dispatch wait (foundation-wait) instead of drafting a second shell.
   const shellNeed = briefForAdmission ? shellFoundationNeed({ brief: briefForAdmission, payload, repo }) : null;
   if (shellNeed?.needed) {

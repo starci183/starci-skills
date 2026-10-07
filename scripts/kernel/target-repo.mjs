@@ -89,7 +89,7 @@ const FRONTEND_OPS = (() => {
   return new Set([...sides].filter(([, frontend]) => frontend).map(([op]) => op));
 })();
 
-const REPO_PREFIX = /^repository:([^/\\]+)[/\\]?(.*)$/;
+const REPO_PREFIX = /^repository:([^/\\]+)(?:[/\\](.*))?$/;
 // A path without the trailing glob a directory grant may use.
 const tidy = (p) => {
   let s = String(p);
@@ -141,7 +141,9 @@ function jobTargetRepository({ op, payload, binding }) {
     if (path.isAbsolute(id) && isDir(id)) return { id, role: null, root: path.resolve(id), via: 'payload.repository' };
     return { id, unresolved: true, via: 'payload.repository' };
   }
-  const role = FRONTEND_OPS.has(op) ? 'fe' : String(op ?? '').startsWith('backend.') ? 'be' : null;
+  let role = null;
+  if (FRONTEND_OPS.has(op)) role = 'fe';
+  else if (String(op ?? '').startsWith('backend.')) role = 'be';
   if (!role) return null;
   const side = bindingRepo(binding, role);
   return side ? { id: role, role, root: side.root, via: 'op-side' } : null;

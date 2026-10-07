@@ -95,8 +95,10 @@ export default {
       const owners = familyOwners(fs.readdirSync(path.join(skillRoot, 'modules', 'ops', 'ops')).filter((f) => f.endsWith('.yaml'))
         .map((f) => { try { return readOpManifest(path.join(skillRoot, 'modules', 'ops', 'ops', f)); } catch { return null; } }).filter(Boolean));
       const hint = [...new Set(wrongFamily.map((v) => v.family).filter(Boolean))].map((family) => `${family}/ -> ${(owners.get(family) ?? ['no op']).join('|')}`).join('; ');
+      const pathDetails = wrongFamily.slice(0, 5).map((v) => `${v.path} (${v.why})`).join('; ');
+      const hintNote = hint ? `. Route by family: ${hint}` : '';
       const out = { ok: false, workflowId, op: args.op, reason: 'owned-paths-outside-writes', violations: wrongFamily, families: [...(familyGuard?.families ?? [])], owners: Object.fromEntries(owners),
-        detail: `${wrongFamily.length} owned path(s) lie outside ${args.op}'s writes: ${wrongFamily.slice(0, 5).map((v) => `${v.path} (${v.why})`).join('; ')}${hint ? `. Route by family: ${hint}` : ''}` };
+        detail: `${wrongFamily.length} owned path(s) lie outside ${args.op}'s writes: ${pathDetails}${hintNote}` };
       emit(out, `enqueue REFUSED for ${args.op}: ${out.reason} — ${out.detail}`, args.json);
       throw new VerbExit(1);
     }
@@ -162,7 +164,8 @@ export default {
     const name = normalizeFoundationName(args.foundation);
     const foundation = readFoundation(db, name);
     if (foundation?.owner?.workflowId !== workflowId) {
-      throw Object.assign(new Error(`--foundation ${name}: ${foundation?.owner ? `owned by ${foundation.owner.workflowId}` : 'not claimed'}; a foundation leg builds a foundation this workflow claimed (starci kernel foundation --claim ${name})`), { code: 'foundation-not-owned' });
+      const ownerStatus = foundation?.owner ? `owned by ${foundation.owner.workflowId}` : 'not claimed';
+      throw Object.assign(new Error(`--foundation ${name}: ${ownerStatus}; a foundation leg builds a foundation this workflow claimed (starci kernel foundation --claim ${name})`), { code: 'foundation-not-owned' });
     }
     foundationLeg = name;
   } else {
@@ -240,10 +243,17 @@ export default {
   const deferredNote = testsDeferred ? `, DEFERRED (${testsDeferred.reason}): not dispatched, no attempt spent; starci kernel run-deferred-tests --workflow ${workflowId} runs it later` : '';
   const repositoryNote = payload.repository ? `, repository ${payload.repository}` : '';
   const cutNote = cut ? `, cut ${cut.ordinal}/${cut.total} ${cut.id}` : '';
-  const paramsNote = payload.params ? `, params ${Object.entries(payload.params).map(([key, value]) => `${key}=${JSON.stringify(value)}`).join(' ')}` : '';
-  const overlapNote = peers.overlap.length
-    ? `; overlaps peer job(s) ${[...new Set(peers.overlap.map((hit) => `${hit.workflowId}/${hit.jobId}`))].join(', ')}, heads-up sent to ${peers.messages.map((message) => message.to).join(', ') || 'nobody new'}`
-    : '';
+  let paramsNote = '';
+  if (payload.params) {
+    const paramsText = Object.entries(payload.params).map(([key, value]) => `${key}=${JSON.stringify(value)}`).join(' ');
+    paramsNote = `, params ${paramsText}`;
+  }
+  let overlapNote = '';
+  if (peers.overlap.length) {
+    const overlapJobs = [...new Set(peers.overlap.map((hit) => `${hit.workflowId}/${hit.jobId}`))].join(', ');
+    const recipients = peers.messages.map((message) => message.to).join(', ') || 'nobody new';
+    overlapNote = `; overlaps peer job(s) ${overlapJobs}, heads-up sent to ${recipients}`;
+  }
   emit(out, `enqueued ${jobId} (op ${args.op}, unit ${unit.unitId} try ${unit.tryNo}/${unit.tryBudget}${retryNote}${reopenNote}, status ${job.status}${deferredNote}${repositoryNote}${cutNote}${paramsNote})${overlapNote}`, args.json);
 
   },

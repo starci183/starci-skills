@@ -33,12 +33,34 @@ const observedOutputOf = (dispatch, lines) => {
 // composed liveness, never a screen state, so it has no entry here.
 const OBSERVE_TURN_STATES = { active: 'active', wedged: 'wedged', 'turn-idle': 'turn-idle', 'interactive-gate': 'turn-idle', 'staged-input': 'staged-input' };
 
+function connectedTerminalState({ db, ledger, handle, job, now, internals, terminal, lastOutputAt }) {
+  const { stagedInputEvidenceOf, livenessMsOf, ACTIVE_STALE_MS, workerOutageEvidence, recordWorkerOutageEvidence } = internals;
+  let read;
+  try { read = terminalRead({ terminal: handle, screen: true }); }
+  catch (error) { read = { ok: false, error: String(error?.message ?? error) }; }
+  if (!read?.ok) return { turnState: 'unreadable', outageCircuit: null };
+  const shellPrompt = exitedAgentPromptRow(read.screen);
+  const screenState = shellPrompt ? 'agent-exited' : classifyAgentScreen(read.screen, stagedInputEvidenceOf(db, job)).state;
+  // The provider card's activeStaleMs, as status reads it: with the global ten minutes a Devin
+  // worker that redrew nothing through a long tool call read turn-idle here while status read it
+  // active (inc-266976b75b25).
+  const stale = staleAwareState(screenState, terminal.idleMs, livenessMsOf(job, 'activeStaleMs', ACTIVE_STALE_MS));
+  const turnState = shellPrompt ? 'agent-exited' : OBSERVE_TURN_STATES[stale.state] ?? 'unknown';
+  if (stale.staleActive) terminal.livenessReason = 'stale-active';
+  let outageCircuit = null;
+  if (screenState !== 'active') {
+    const evidence = workerOutageEvidence(job, read.screen);
+    if (evidence) outageCircuit = recordWorkerOutageEvidence(ledger, [{ jobId: job.job_id, providerOutage: evidence, lastOutputAt }], now)[0] ?? null;
+  }
+  if (screenState) terminal.screenState = screenState;
+  return { turnState, outageCircuit };
+}
+
 // Host reads only — terminal-show and the rendered frame for the turn state. A dead or unreadable
 // terminal is a typed projection, not a refusal: the kernel still needs the context to reason about the op.
 function observeTerminalState({ db, ledger, handle, job, now, internals }) {
-  const { stagedInputEvidenceOf, livenessMsOf, ACTIVE_STALE_MS, workerOutageEvidence, recordWorkerOutageEvidence } = internals;
   const terminal = { handle, connected: false, writable: false, status: null, idleMs: null };
-  let turnState = 'unknown', outageCircuit = null;
+  let turnState, outageCircuit = null;
   let shown;
   try { shown = terminalShow({ terminal: handle }); }
   catch (error) { shown = { ok: false, error: String(error?.message ?? error) }; }
@@ -50,25 +72,9 @@ function observeTerminalState({ db, ledger, handle, job, now, internals }) {
   if (!shown?.ok) turnState = 'unreadable';
   else if (!terminal.connected || !terminal.writable) turnState = 'disconnected';
   else {
-    let read;
-    try { read = terminalRead({ terminal: handle, screen: true }); }
-    catch (error) { read = { ok: false, error: String(error?.message ?? error) }; }
-    if (!read?.ok) turnState = 'unreadable';
-    else {
-      const shellPrompt = exitedAgentPromptRow(read.screen);
-      const screenState = shellPrompt ? 'agent-exited' : classifyAgentScreen(read.screen, stagedInputEvidenceOf(db, job)).state;
-      // The provider card's activeStaleMs, as status reads it: with the global ten minutes a Devin
-      // worker that redrew nothing through a long tool call read turn-idle here while status read it
-      // active (inc-266976b75b25).
-      const stale = staleAwareState(screenState, terminal.idleMs, livenessMsOf(job, 'activeStaleMs', ACTIVE_STALE_MS));
-      turnState = shellPrompt ? 'agent-exited' : OBSERVE_TURN_STATES[stale.state] ?? 'unknown';
-      if (stale.staleActive) terminal.livenessReason = 'stale-active';
-      if (screenState !== 'active') {
-        const evidence = workerOutageEvidence(job, read.screen);
-        if (evidence) outageCircuit = recordWorkerOutageEvidence(ledger, [{ jobId: job.job_id, providerOutage: evidence, lastOutputAt }], now)[0] ?? null;
-      }
-      if (screenState) terminal.screenState = screenState;
-    }
+    const observed = connectedTerminalState({ db, ledger, handle, job, now, internals, terminal, lastOutputAt });
+    turnState = observed.turnState;
+    outageCircuit = observed.outageCircuit;
   }
   return { terminal, turnState, outageCircuit };
 }

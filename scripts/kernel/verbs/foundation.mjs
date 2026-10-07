@@ -110,6 +110,36 @@ function wakeFoundationPeers(ledger, { name, workflowId, record, released, notif
   return wakes;
 }
 
+function assertFoundationWorkflow(wf, workflowId) {
+  if (!wf) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
+  if (!workflowRunning(wf)) {
+    const workflowState = wf.archived_at != null ? 'archived' : `phase ${wf.phase ?? 'unset'}`;
+    throw Object.assign(new Error(`workflow ${workflowId} is ${workflowState}; only a running workflow owns or needs a foundation`), { code: 'workflow-not-running' });
+  }
+}
+
+function foundationActionOf(args) {
+  const actions = FOUNDATION_ACTIONS.filter((action) => args[action] != null);
+  if (actions.length !== 1) {
+    const options = FOUNDATION_ACTIONS.map((action) => `--${action}`).join(' | ');
+    throw Object.assign(new Error(`foundation takes exactly one of ${options}`), { code: 'foundation-action-invalid' });
+  }
+  return actions[0];
+}
+
+function releaseTypedFoundationWaits(ledger, args, action, result, released) {
+  if (action !== 'land' || result.idempotent) return;
+  for (const item of releaseTypedWaits(ledger, { repo: path.resolve(args.repo ?? process.cwd()) }).resolved) {
+    if (!released.some((row) => row.incidentId === item.incidentId)) released.push({ workflowId: item.workflowId, incidentId: item.incidentId, holds: item.holds });
+  }
+}
+
+function nextFoundationInstruction(action, record, workflowId, name) {
+  if (action !== 'declare-dependent' || record.state === 'landed') return undefined;
+  if (record.owner) return `hold the legs that need it with starci kernel incident --workflow ${workflowId} --kind peer-wait --until-foundation ${name} --holds <ops|jobs> --detail <what must land>; the landing releases it`;
+  return `nobody owns ${name} yet: agree the owner with your peers (starci kernel notify --kind request), who claims it; until then no wait can name it`;
+}
+
 export default {
   verb: 'foundation',
   required: ['workflow'],
@@ -118,14 +148,8 @@ export default {
   run({ ledger, args, repo, emit, internals }) {
     const db = ledger.db, workflowId = args.workflow;
     const wf = getWorkflow(db, workflowId);
-    if (!wf) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
-    if (!workflowRunning(wf)) {
-      const workflowState = wf.archived_at != null ? 'archived' : `phase ${wf.phase ?? 'unset'}`;
-      throw Object.assign(new Error(`workflow ${workflowId} is ${workflowState}; only a running workflow owns or needs a foundation`), { code: 'workflow-not-running' });
-    }
-    const actions = FOUNDATION_ACTIONS.filter((action) => args[action] != null);
-    if (actions.length !== 1) throw Object.assign(new Error(`foundation takes exactly one of ${FOUNDATION_ACTIONS.map((a) => `--${a}`).join(' | ')}`), { code: 'foundation-action-invalid' });
-    const action = actions[0], now = Date.now();
+    assertFoundationWorkflow(wf, workflowId);
+    const action = foundationActionOf(args), now = Date.now();
     const text = (value) => (typeof value === 'string' && value.trim() ? value.trim() : null);
     const detail = text(args.detail), version = text(args.version);
     if (action === 'declare-none') {
@@ -142,22 +166,11 @@ export default {
     });
     // Waits typed on the foundation later (starci kernel incident --attach --until-foundation) resolve through the
     // typed-condition release, which now finds the foundation landed (gate-conditions.mjs).
-    if (action === 'land' && !result.idempotent) {
-      for (const item of releaseTypedWaits(ledger, { repo: path.resolve(args.repo ?? process.cwd()) }).resolved) {
-        if (!released.some((r) => r.incidentId === item.incidentId)) released.push({ workflowId: item.workflowId, incidentId: item.incidentId, holds: item.holds });
-      }
-    }
+    releaseTypedFoundationWaits(ledger, args, action, result, released);
     // The released and notified Kernels are woken now rather than at the next watchdog tick.
     const wakes = wakeFoundationPeers(ledger, { name, workflowId, record: result.record, released, notified });
     const record = result.record;
-    let next;
-    if (action === 'declare-dependent' && record.state !== 'landed') {
-      if (record.owner) {
-        next = `hold the legs that need it with starci kernel incident --workflow ${workflowId} --kind peer-wait --until-foundation ${name} --holds <ops|jobs> --detail <what must land>; the landing releases it`;
-      } else {
-        next = `nobody owns ${name} yet: agree the owner with your peers (starci kernel notify --kind request), who claims it; until then no wait can name it`;
-      }
-    }
+    const next = nextFoundationInstruction(action, record, workflowId, name);
     const out = { ok: true, workflowId, action, name, state: record.state, kind: record.kind, version: record.version ?? null,
       owner: record.owner?.workflowId ?? null, dependents: (record.dependents ?? []).map((d) => d.workflowId), idempotent: Boolean(result.idempotent),
       ...(result.transferredFrom ? { transferredFrom: result.transferredFrom } : {}), ...(result.reopened ? { reopened: true } : {}),

@@ -11,11 +11,32 @@ import { workflowWorktreeOf } from '../../machine/workflow-tree.mjs';
 
 const recordRevs = (tree, workDir, keys) => keys.map((file) => { try { return changeNoteOf(fs.readFileSync(path.join(tree, workDir, file.slice('.starciwork/'.length)), 'utf8'))?.rev ?? null; } catch { return null; } }).filter((rev) => rev != null);
 
+function recordChangeReachOf(args) {
+  const reach = String(args.reach ?? '').trim();
+  if (!RECORD_CHANGE_REACHES.includes(reach)) throw Object.assign(new Error(`--reach must be ${RECORD_CHANGE_REACHES.join('|')}, got '${reach}'`), { code: 'record-change-reach-invalid' });
+  return reach;
+}
+
+function recordChangeReasonOf(args) {
+  const reason = typeof args.reason === 'string' ? args.reason.trim() : '';
+  if (!reason) throw Object.assign(new Error('record-change needs --reason <what the change withdraws or replaces, and why>'), { code: 'record-change-reason-missing' });
+  return reason;
+}
+
+function recordChangeRecordOf(args) {
+  const record = normWork(args.record);
+  if (!isWorkInput(record)) throw Object.assign(new Error(`--record must name a .starciwork record (a record directory or file, no glob), got '${args.record}'`), { code: 'record-change-record-invalid' });
+  return record;
+}
+
 // The refusal is a cross-workflow dependency the Supervisor reads (dependency-graph.mjs record-owner edges).
 const refuseForeignOwners = (ledger, { workflowId, record, reach, foreign }) => {
   try { ledger.transaction(() => ledger.appendEvent({ workflowId, entityType: 'workflow', entityId: workflowId, kind: RECORD_CHANGE_REFUSED,
     payload: { record, reach, owners: foreign.slice(0, 20).map((o) => ({ file: o.file, workflowId: o.workflowId ?? null, by: o.by })) } })); } catch { /* the refusal stands either way */ }
-  const detail = foreign.slice(0, 5).map((o) => `${o.file} is owned by ${o.workflowId ?? '-'} (${o.by}${o.detail ? `: ${o.detail}` : ''})`).join('; ');
+  const detail = foreign.slice(0, 5).map((owner) => {
+    const note = owner.detail ? `: ${owner.detail}` : '';
+    return `${owner.file} is owned by ${owner.workflowId ?? '-'} (${owner.by}${note})`;
+  }).join('; ');
   throw Object.assign(new Error(`${workflowId} does not own ${foreign.length} record file(s) of ${record}: ${detail}; only a record's owner declares its change (tell the owner with starci kernel notify --kind request)`), { code: 'record-change-not-owner', owners: foreign });
 };
 
@@ -46,12 +67,9 @@ export default {
       const state = wf.archived_at != null ? 'archived' : `phase ${wf.phase ?? 'unset'}`;
       throw Object.assign(new Error(`workflow ${workflowId} is ${state}; only a running workflow declares a change to a record it owns`), { code: 'workflow-not-running' });
     }
-    const reach = String(args.reach ?? '').trim();
-    if (!RECORD_CHANGE_REACHES.includes(reach)) throw Object.assign(new Error(`--reach must be ${RECORD_CHANGE_REACHES.join('|')}, got '${reach}'`), { code: 'record-change-reach-invalid' });
-    const reason = typeof args.reason === 'string' ? args.reason.trim() : '';
-    if (!reason) throw Object.assign(new Error('record-change needs --reason <what the change withdraws or replaces, and why>'), { code: 'record-change-reason-missing' });
-    const record = normWork(args.record);
-    if (!isWorkInput(record)) throw Object.assign(new Error(`--record must name a .starciwork record (a record directory or file, no glob), got '${args.record}'`), { code: 'record-change-record-invalid' });
+    const reach = recordChangeReachOf(args);
+    const reason = recordChangeReasonOf(args);
+    const record = recordChangeRecordOf(args);
     // The owner's records live in its workflow worktree (WFWT2 2.8): read and judge them there, committed at its branch.
     const workDir = workDirOf(repo), tree = workflowWorktreeOf({ env: process.env }, workflowId)?.path ?? repo;
     const files = createWorkDigester(tree, { workDir }).files(record);

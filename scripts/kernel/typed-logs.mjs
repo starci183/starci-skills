@@ -40,7 +40,7 @@ import { jobResultSql } from '../machine/job-row.mjs';
 import { independentChecksOf } from './verbs/shared/check-evidence.mjs';
 import { logWriterFor } from '../machine/log-writer.mjs';
 import { redactData, redactPath, redactText } from '../lib/redact.mjs';
-import { defaultLogLevel, fitPreparedLogData, normalizeLogRefs, numericExitCode, rowsOfEvent, scratchLogSource, syncDerivedLogBatches, typeOk } from './typed-log-row-helpers.mjs';
+import { defaultLogLevel, fitPreparedLogData, normalizeLogRefs, rowsOfEvent, scratchLogSource, syncDerivedLogBatches, typeOk } from './typed-log-row-helpers.mjs';
 export { rowsOfEvent };
 export const LOG_ACTORS = Object.freeze(['kernel', 'op', 'runtime', 'check', 'land']);
 export const LOG_LEVELS = Object.freeze(['info', 'warn', 'error']);
@@ -180,7 +180,7 @@ export function openLogs(repo, { file = logsFileFor(repo) } = {}) {
   let open = true;
   return {
     file, writer, get db() { return writer.db; },
-    close() { if (!open) return; open = false; writer.release(); },
+    close() { if (!open) { return; } open = false; writer.release(); },
   };
 }
 

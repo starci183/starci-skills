@@ -67,9 +67,10 @@ export default {
       targetMinutes: target, maxSlices, gears,
       overTarget: perSliceMinutes > target[1],
     };
+    const reasonNote = reason ? ` — ${reason}` : '';
     emit(out, [
       `estimate: ${minutes} agent-min -> size ${size} at gear ${gear} (${gearSource})`,
-      `  agents: requested ${agentsRequested}, achievable ${agentsAchievable} (${achievableBasis})${reason ? ` — ${reason}` : ''}`,
+      `  agents: requested ${agentsRequested}, achievable ${agentsAchievable} (${achievableBasis})${reasonNote}`,
       `  ${slices} slice(s) ~${perSliceMinutes}min each (target ${target[0]}-${target[1]}min, cap ${maxSlices})`,
       // What would actually move the number: a gear only helps while the gear is
       // what bounds the set. Once the partition does, a wider closure decomposition is the only lever.
