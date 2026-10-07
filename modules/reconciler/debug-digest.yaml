@@ -1,0 +1,13 @@
+# Numbers of `starci debug digest` (scripts/reconciler/debug-digest*.mjs): the read-only digest a chat /loop runs.
+# A bound is a number here or a `ref` to the yaml key that already owns it (`<file>#<dotted.path>`).
+# leaderStaleMs: a reconciler leader whose heartbeat is older than this is not alive.
+# blocks*: the weight a problem carries in the problems list, which is ordered by how much work each blocks; a problem that
+# stops the whole host outranks any count of held jobs.
+# kernelIdleWakeMs: a Kernel idle with ready work and not woken for this long is a problem.
+# decisionDueMs: how long a failed or blocked op may wait for its policy next step before the step counts as not taken.
+leaderStaleMs: 90000
+blocksEverything: 1000
+revDriftBlocks: 3
+staleGateBlocks: 5
+kernelIdleWakeMs: {ref: "modules/reconciler/job.yaml#decisionDueMs"}
+decisionDueMs: {ref: "modules/reconciler/job.yaml#decisionDueMs"}

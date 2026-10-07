@@ -115,7 +115,7 @@ test('the host contract and the owner-tool references may quote orca commands',t
 test('public entry, lifecycle references and internal host prompts retain the host boundary',t=>{
   const files = ['skills/starci/SKILL.md', 'skills/starci/references/start-workflow.md',
     'skills/starci/references/assisted-uat.md', 'skills/starci/references/release.md',
-    'skills/starci/references/host-startup.md', 'skills/starci/references/host-maintenance.md'];
+    'skills/starci/references/host-startup.md'];
   const root = fixture(t,Object.fromEntries(files.map(file => [file, `Run \`${O} status --json\`.\n`])));
   const report = run(root);
   assert.equal(report.status,1);

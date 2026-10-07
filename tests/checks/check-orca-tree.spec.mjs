@@ -8,14 +8,13 @@ import {orcaTreeFindings,readTerminals,FINDING_CODES,supervisorWorkerHandles} fr
 import os from 'node:os';
 import { openMachine } from '../../engine/db/machine.mjs';
 import { writeSeat } from '../../scripts/machine/home.mjs';
-import { coreDebugProfile } from '../../scripts/reconciler/core-debug.mjs';
 
-test('the Orca tree accounts for a registered maintenance seat with unknown native custody', t => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'core-tree-'));
+test('the Orca tree accounts for a registered Supervisor seat with unknown native custody', t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-core-tree-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const env = { STARCI_TEST_MACHINE_FILE: path.join(root, 'machine.sqlite') };
   const m = openMachine({ env });
-  try { writeSeat(m, { token: 'unknown', profile: coreDebugProfile(), value: { state: 'launch-unknown', terminal: 'held-core-worker', dispatch: 'uncertain-dispatch' } }); }
+  try { writeSeat(m, { token: 'unknown', value: { state: 'launch-unknown', terminal: 'held-core-worker', dispatch: 'uncertain-dispatch' } }); }
   finally { m.close(); }
   assert.equal(supervisorWorkerHandles({ env }).has('held-core-worker'), true);
 });

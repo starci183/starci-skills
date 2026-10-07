@@ -7,7 +7,8 @@ and required physical objects. Each store has exactly one schema. A fresh machin
 executes `schema/machine.sql` and atomically sets its user_version. A host store that is not exactly that
 schema (any other identity or version, or a missing, changed or extra object) is refused unchanged by writers and
 readers alike; the operator replaces it with a fresh store. The current signal domains keep
-Supervisor keys, tokens, values and expiries separate from core-debug enabled/diagnostic scopes.
+Supervisor keys, tokens, values and expiries; the schema keeps its two core-debug scopes, unused, because a store is
+accepted only when it matches the current schema exactly.
 These writers and their SQL files own the storage rules.
 
 ## 1. The layout
@@ -55,7 +56,7 @@ These writers and their SQL files own the storage rules.
   `engine/db/ledger.mjs` `projectsRootFor`) — `projects/`, `machine.sqlite`, `archive/` and `artifacts/` move under it. Narrower seams still win when set:
   `STARCI_PROJECTS_ROOT` (just the `projects/` directory), `STARCI_TEST_MACHINE_FILE` (the exact `machine.sqlite`
   file), `STARCI_ARTIFACT_ROOT` (the blob store, default `<state base>/artifacts`). A debug probe or throwaway repo
-  that would otherwise leave a fake ledger in the real store (`skills/starci/references/host-maintenance.md` §5) must set
+  that would otherwise leave a fake ledger in the real store must set
   `STARCI_LOCAL_ROOT` to a temp directory for its whole process tree.
 
 ## 2. One writer per database

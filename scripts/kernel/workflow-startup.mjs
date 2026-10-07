@@ -1,4 +1,3 @@
-import { loadConfig } from '../../engine/config.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import path from 'node:path';
 import { execNode } from '../api/node/exec-node.mjs';
@@ -14,18 +13,15 @@ import { runShow } from '../api/orca/run-show.mjs';
 import { SKILL_ROOT, supervisedSeatHandles } from '../machine/home.mjs';
 import { entryTerminalsOf, recordedSeatTerminals } from '../machine/seat-sessions.mjs';
 
-async function workflowHost({ caller, env }, run = execNode) {
+async function workflowHost({ env }, run = execNode) {
   const args = [path.join(skillRoot, 'scripts/reconciler/workflow-up.mjs'), '--json'];
-  for (const name of ['agent', 'model', 'effort']) if (caller?.[name] != null)
-    args.push(`--caller-${name}`, String(caller[name]));
   const made = await run(args, { cwd: skillRoot, env: { ...env, STARCI_RUNTIME: skillRoot }, maxBuffer: 256 * 1024 * 1024 });
   const data = parseJsonOr(String(made.stdout ?? ''));
   const code = made.error ? made.error.code : 0;
   const native = { exitCode: Number.isInteger(code) ? code : null, signal: made.error?.signal ?? null,
     error: made.error?.message ?? null, stderr: String(made.stderr ?? '').slice(0, 500) };
   if (!data || typeof data.hostOk !== 'boolean' || typeof data.ok !== 'boolean'
-      || code !== (data.ok ? 0 : 1) || made.error?.killed || native.signal
-      || data.hostOk && !data.ok && (!data.maintenance || data.maintenance.ok === true && data.maintenance.ready === true))
+      || code !== (data.ok ? 0 : 1) || made.error?.killed || native.signal)
     return { ok: false, effectState: 'unknown', native, receipt: data, error: 'native host startup returned no verified outcome' };
   return { ...data, ok: data.hostOk, native };
 }
@@ -36,7 +32,7 @@ const SENDER_MISSING = (detail) => ({ ok: false, reason: 'workflow-sender-termin
 /**
  * The runtime-owned sender of a Kernel launch that has no caller terminal, from one terminal listing. The Run's coordinator
  * is never a foreign terminal: first a plain terminal of the runtime's own worktree (the Run's current coordinator when it is
- * one, so the entry Run stays reusable), else the live Supervisor seat, the runtime's own maintenance authority. Pure.
+ * one, so the entry Run stays reusable), else the live Supervisor seat, the runtime's own authority. Pure.
  */
 export function headlessSenderOf({ listing, recorded = new Set(), seats = new Set(), coordinator = null, root } = {}) {
   const entries = entryTerminalsOf({ listing, recorded, owned: seats, root });
@@ -145,26 +141,16 @@ export function recordWorkflowStartFailure(ledger, { workflowId, token, holderPi
   });
 }
 
-export async function ensureWorkflowHost({ workflow, goal, caller = null, env = process.env, plan = false } = {}, deps = {}) {
+export async function ensureWorkflowHost({ workflow, goal, env = process.env, plan = false } = {}, deps = {}) {
   const authority = workflowStartAuthority({ workflow, goal });
   if (!authority.ok) return { ...authority, ready: false };
   if (plan) return { ...authority, planned: true, ready: false };
-  let config, host;
-  try { config = deps.config ?? (deps.loadConfig ?? loadConfig)(); }
-  catch (error) { return { ok: false, ready: false, reason: 'workflow-host-not-ready', error: String(error?.message ?? error) }; }
-  try { host = await (deps.ensureHost ?? ((input) => workflowHost(input, deps.execNode)))({ caller, env, workflowSeats: false }); }
+  let host;
+  try { host = await (deps.ensureHost ?? ((input) => workflowHost(input, deps.execNode)))({ env, workflowSeats: false }); }
   catch (error) { return { ok: false, ready: false, reason: 'workflow-host-not-ready', authority,
     host: { ok: false, effectState: 'unknown', error: String(error?.message ?? error) } }; }
   if (host?.ok !== true) return { ok: false, ready: false, reason: 'workflow-host-not-ready', authority, host };
-  let maintenance = { ok: true, ready: true, action: 'disabled' };
-  if (config?.debug === true || host.maintenance && (host.maintenance.ok !== true || host.maintenance.ready !== true)) {
-    try { maintenance = deps.ensureDebug ? await deps.ensureDebug({ caller, env, plan: false })
-      : host.maintenance ?? { ok: false, ready: false, effectState: 'unknown', error: 'native maintenance outcome is missing' }; }
-    catch (error) { maintenance = { ok: false, ready: false, effectState: 'unknown', error: String(error?.message ?? error) }; }
-    if (maintenance?.ok !== true || maintenance?.ready !== true)
-      return { ok: false, ready: false, reason: 'workflow-debug-not-ready', authority, host, maintenance };
-  }
-  return { ok: true, ready: true, authority, host, maintenance };
+  return { ok: true, ready: true, authority, host };
 }
 
 export async function installWorkflowTree({ record, env = process.env } = {}, deps = {}) {

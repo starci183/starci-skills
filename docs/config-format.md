@@ -37,13 +37,10 @@ Optional keys:
 - `allocation.grants` — `['<pool>=<slots>@<role>+<role>']`, the default grant every workflow gets; once
   declared it is the whole set, so a `capacityAuthority: explicit-workflow-quota` pool (Devin) routes only
   for the granted roles and up to the granted running slots
-- `debug` — boolean; `true` pairs an owner-approved workflow start with the native core-maintenance
-  seat. `false` or absent continues workflow startup without automatic maintenance. It changes no
-  Supervisor, Kernel or operation pin and does not bypass admission or owner approval.
-- `coreDebug` — `{interval, worktreeLimit}`: the maintenance cadence (`<n>s`, `<n>m` or `<n>h`, positive)
-  and the positive integer worktree alert threshold. Both are required when the block is present;
-  automatic maintenance requires this block. The shipped values live only in `config.example.yaml`,
-  read through `engine/config.mjs` `coreDebugSettings`; there is no code default or provider-specific key.
+- `debugLoop` — `{interval?, worktreeLimit?}`: the cadence of the chat `/loop` that runs `starci debug digest`
+  (`<n>s`, `<n>m` or `<n>h`, positive; shipped default `10m`) and the positive integer worktree alert threshold of
+  `starci debug run core-watch` (shipped default 40). Both keys are optional and read through `engine/config.mjs`
+  `debugLoopSettings`. The removed `debug` and `coreDebug` keys are refused by name.
 - `specs` — `{harness?, unit?, e2e?}` booleans or null (owner, 2026-09-28 and 2026-09-29; `engine/config.mjs`
   `specsSettings`, defaults in `SPEC_DEFAULTS`); a config without the key gets the defaults, so the shipped example
   carries no block. `harness` (default **false**, touching-only): `.claude` work writes and runs the specs of new or changed
@@ -83,27 +80,14 @@ Optional keys:
 ## Caller and automatic maintenance
 
 The single public `/starci` entry resolves the Source host and project binding, presents the concrete
-goal and startup scope, and waits for the owner's `OK` before workflow or paired maintenance startup.
+goal and startup scope, and waits for the owner's `OK` before workflow startup.
 An unclear request or a new goal needs its own approval. The native `starci workflow start` owner
 ensures the host is ready before claiming that goal; `--plan` starts neither services nor workers.
 
-`starci workflow start` and `starci reconciler up` take `--caller-agent`, `--caller-model` and
-`--caller-effort`. These are declared ingress route labels passed to the maintenance owner, not proof
-of a desktop session's active model. Supply a known current concrete route explicitly. An unknown
-desktop session supplies no guessed agent/model metadata. A model omitted from an otherwise declared
-agent can only resolve through that agent's existing catalog/card default, labelled as that default;
-it does not attest the caller's model. The actual native worker must attest the requested supported
-agent/model before pairing is ready. Devin's opaque account-selected model is never inferred or
-reported as concrete model attestation.
+Kernel `--agent`, `kernel` pins, the configured Supervisor and operation routes are the only model inputs of a start;
+the calling chat's own model is not a routing input. Debugging is a `/loop` of that chat (`skills/starci`), not a seat.
 
-Kernel `--agent`, `kernel` pins, the configured Supervisor and operation routes retain their
-own authority. Caller fields do not override them. The native maintenance seat has a distinct host
-slot under the existing Supervisor lifecycle owner, kept alive by the reconciler after the chat
-closes. Matching repeated requests reuse it; a conflicting live or unknown identity refuses a second
-launch. Fresh quota, role floors, reservations and exact closure proof still apply.
-
-`debug: false` removes automatic pairing from workflow startup; it does not stop the engine, a Kernel
-or the owner's configured Supervisor. Public startup readiness belongs to the existing host owner:
+Public startup readiness belongs to the existing host owner:
 `/starci start` succeeds only after the required checklist, including the public harness, is green.
 
 ## Kernel seat
@@ -149,7 +133,7 @@ ordered chain of members `{agent, model, effort?}`; a model may sit in several t
 
 | tier | chain (first to last) | takes |
 | --- | --- | --- |
-| `frontier` | Claude Opus 5.5, Codex `gpt-6.1-sol` | the Supervisor; planner, validator, kernelManager; ops of difficulty `insane`; the core-debug default model |
+| `frontier` | Claude Opus 5.5, Codex `gpt-6.1-sol` | the Supervisor; planner, validator, kernelManager; ops of difficulty `insane` |
 | `high` | Claude Sonnet 5.5, Codex `gpt-6.1-sol` | the Kernel and `[Worker]` seats; ops of difficulty `hard` |
 | `medium` | Devin `swe-2-max`, Codex `gpt-6.1-sol` | ops of difficulty `medium` |
 | `low` | Devin `swe-2-max`, Codex `gpt-6-luna` | ops of difficulty `easy` |
@@ -206,9 +190,6 @@ the live facts. Precedence: hard filter, owner bias, a live seat keeps its membe
    stops for reconciliation (`modules/kernel/start-workflow.yaml` `spawn.fallThrough`).
 7. **Record**: every pick keeps its tier, the chain after each step, who was dropped and why, and the winner with the
    deciding step. `workflow start --plan`, `route-model --plan` and the route receipt print it.
-
-`core-debug` is not picked down a chain: it runs on the provider of the chat that started the workflow
-(`--caller-agent`), on that provider's `frontier` member (`callerSeatTiers`) unless `--caller-model` names one.
 
 The Devin grant gate stays: a pool whose `registry.yaml` `capacityAuthority` is `explicit-workflow-quota` is in the hard
 filter unless `allocation.grants` opens it for the role and slot count.

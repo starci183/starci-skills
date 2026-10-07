@@ -43,18 +43,5 @@ export const tierOfSeat = (seat, settings = tierSettings()) => settings.seats[se
 /** The tier an operation takes: its kind's declared tier (drawing), else the tier of its difficulty. */
 export const tierOfOp = ({ kind, difficulty }, settings = tierSettings()) => settings.kindTiers[kind] ?? settings.difficulty[difficulty] ?? null;
 
-/**
- * The member core-debug runs on for the chat provider that started the workflow: that provider's member of the first
- * tier of callerSeatTiers that has one, else of the highest tier (tierOrder) that has one. Null when the provider sits in no tier.
- */
-export function callerMember(provider, { settings = tierSettings(), registry = loadModelRegistry() } = {}) {
-  const order = [...settings.callerSeatTiers, ...settings.tierOrder.filter((tier) => !settings.callerSeatTiers.includes(tier))];
-  for (const tier of order) {
-    const found = tierMembers(tier, { settings, registry }).find((member) => member.provider === provider);
-    if (found) return found;
-  }
-  return null;
-}
-
 /** The headless call `name` declares in tiers.yaml calls: {tier, timeoutMs, maxImages, maxReferences}, or null when none is declared. */
 export const callSpec = (name, settings = tierSettings()) => settings.calls?.[name] ?? null;

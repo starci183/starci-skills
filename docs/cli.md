@@ -367,31 +367,24 @@ starci connect tunnel dry-run
 
 run a fixed read-only inspector against the StarCi runtime
 
-### starci debug pass
+### starci debug digest
 
-inspect core health and maintain diagnostic custody in the machine ledger
+print the read-only debug digest, with its problems ordered by blocked work
 
 | flag | type | |
 | --- | --- | --- |
-| `--dispatch` | string |  |
-| `--snapshot` | string |  |
+| `--repo` | list |  |
+| `--workflow` | list |  |
 | `--child-timeout` | number |  |
-| `--token-window` | number |  |
-| `--token-spike` | number |  |
-| `--key` | string |  |
-| `--lane` | string |  |
-| `--reason` | string |  |
 
-Positionals: action
+exit: 0 digest printed; 1 the machine store cannot be read; 2 bad usage
 
-exit: 0 diagnostic state action completed; 1 state action failed; 2 bad usage
-
-json: always
+json: flag
 
 ```sh
-starci debug pass pass
-starci debug pass claim --key <alert> --lane <lane>
-starci debug pass status
+starci debug digest
+starci debug digest --json
+starci debug digest --repo <path> --workflow <id>
 ```
 
 ### starci debug run
@@ -2807,9 +2800,6 @@ bring the host services and seats up, or check them read-only, and print the che
 | `--no-build` | boolean |  |
 | `--retire-stale-ledgers` | boolean |  |
 | `--set-profile` | enum operational|observe |  |
-| `--caller-agent` | enum codex|claude|devin |  |
-| `--caller-model` | string |  |
-| `--caller-effort` | string |  |
 
 exit: 0 every required checklist row is green (a seat that is not running while no workflow needs it is idle and green); 1 one or more required checklist rows are red; 2 bad usage, or --services combined with --check, --set-profile or --retire-stale-ledgers
 
@@ -2820,7 +2810,6 @@ starci reconciler up
 starci reconciler up --check --json
 starci reconciler up --check --brief
 starci reconciler up --services
-starci reconciler up --caller-agent codex --caller-model gpt-6.1-sol --caller-effort high --json
 ```
 
 ## starci release
@@ -5189,27 +5178,23 @@ starci workflow define --plan --text "Add password reset"
 
 ### starci workflow start
 
-ensure the host and optional core maintenance, then claim an approved goal and boot its Kernel
+ensure the host, then claim an approved goal and boot its Kernel
 
 | flag | type | |
 | --- | --- | --- |
 | `--repo` | string |  |
 | `--goal` | string |  |
 | `--agent` | string |  |
-| `--caller-agent` | enum codex|claude|devin |  |
-| `--caller-model` | string |  |
-| `--caller-effort` | string |  |
 | `--launched-by` | enum watchdog|supervisor (default supervisor) |  |
 | `--plan` | boolean |  |
 
-exit: 0 approved Kernel booted or already live, or a non-actuating plan; 1 goal approval, host readiness, maintenance admission or Kernel launch refused; 2 bad usage; 3 the previous Kernel dispatch is still alive; 75 Orca is not answering (host unavailable)
+exit: 0 approved Kernel booted or already live, or a non-actuating plan; 1 goal approval, host readiness or Kernel launch refused; 2 bad usage; 3 the previous Kernel dispatch is still alive; 75 Orca is not answering (host unavailable)
 
 json: flag
 
 ```sh
 starci workflow start
 starci workflow start --repo <path> --goal <workflow_id>
-starci workflow start --repo <path> --goal <workflow_id> --caller-agent codex --caller-model gpt-6.1-sol --caller-effort high
 ```
 
 ### starci workflow status

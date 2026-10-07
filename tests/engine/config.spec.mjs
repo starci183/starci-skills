@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {configuredAllocationPolicy,coreDebugSettings,defaultParallelGear,durationMs,loadConfig,parallelGear,runtimeProfile,slicingGears,validateConfig} from '../../engine/config.mjs';
+import {configuredAllocationPolicy,DEBUG_LOOP_DEFAULTS,debugLoopSettings,defaultParallelGear,durationMs,loadConfig,parallelGear,runtimeProfile,slicingGears,validateConfig} from '../../engine/config.mjs';
 import {effectiveTiers,shippedTiers} from '../../engine/model-config.mjs';
 import {parseYaml,stringifyYaml} from '../../engine/yaml.mjs';
 import {winPath,slashPath} from '../fixtures/win-path.mjs';
@@ -14,39 +14,30 @@ const EXAMPLE_MODELS=structuredClone(parseYaml(fs.readFileSync(new URL('../../co
 const EXAMPLE_CONNECTORS=parseYaml(fs.readFileSync(new URL('../../config.example.yaml',import.meta.url),'utf8')).connectors;
 // reconciler is its own closed block too (controller shadow modes are reconciler specs' contract); read it shipped.
 const EXAMPLE_RECONCILER=parseYaml(fs.readFileSync(new URL('../../config.example.yaml',import.meta.url),'utf8')).reconciler;
-const EXAMPLE_CORE_DEBUG=parseYaml(fs.readFileSync(new URL('../../config.example.yaml',import.meta.url),'utf8')).coreDebug;
-const expected=()=>({language:'vi',model:null,effort:'medium',launchTrust:null,retention:null,debug:false,kernel:{effort:'high'},parallel:{gear:1},supervisor:{pollIntervalMs:null,repos:[]},delegation:null,budgets:{maxOps:null},allocation:{grants:['devin-agent=10@implement+verify+write']},models:structuredClone(EXAMPLE_MODELS),connectors:structuredClone(EXAMPLE_CONNECTORS),asks:{autoAcceptRecommended:false,excludes:['credential','irreversible-confirmation','handover']},uat:{maxConcurrent:10},orca:{maxWorkerDepth:4},coreDebug:structuredClone(EXAMPLE_CORE_DEBUG),reconciler:structuredClone(EXAMPLE_RECONCILER)});
-test('coreDebug owns cadence while debug remains boolean and the retired provider-specific key is refused',()=>{
-  assert.doesNotThrow(()=>validateConfig({...expected(),debug:true}));
-  assert.throws(()=>validateConfig({...expected(),debug:{interval:'10m',worktreeLimit:40}}),/debug must be true or false/);
-  assert.throws(()=>validateConfig({...expected(),coreDebug:{interval:'0m',worktreeLimit:40}}),/coreDebug.interval/);
-  assert.throws(()=>validateConfig({...expected(),coreDebug:{interval:'10m',worktreeLimit:0}}),/coreDebug.worktreeLimit/);
-  const retired=expected();delete retired.coreDebug;retired.claudeDebug={interval:'10m',worktreeLimit:40};
+const EXAMPLE_DEBUG_LOOP=parseYaml(fs.readFileSync(new URL('../../config.example.yaml',import.meta.url),'utf8')).debugLoop;
+const expected=()=>({language:'vi',model:null,effort:'medium',launchTrust:null,retention:null,kernel:{effort:'high'},parallel:{gear:1},supervisor:{pollIntervalMs:null,repos:[]},delegation:null,budgets:{maxOps:null},allocation:{grants:['devin-agent=10@implement+verify+write']},models:structuredClone(EXAMPLE_MODELS),connectors:structuredClone(EXAMPLE_CONNECTORS),asks:{autoAcceptRecommended:false,excludes:['credential','irreversible-confirmation','handover']},uat:{maxConcurrent:10},orca:{maxWorkerDepth:4},debugLoop:structuredClone(EXAMPLE_DEBUG_LOOP),reconciler:structuredClone(EXAMPLE_RECONCILER)});
+test('debugLoop owns the cadence of the chat loop; the removed debug and coreDebug keys are refused by name',()=>{
+  assert.doesNotThrow(()=>validateConfig(expected()));
+  assert.throws(()=>validateConfig({...expected(),debugLoop:{interval:'0m',worktreeLimit:40}}),/debugLoop.interval/);
+  assert.throws(()=>validateConfig({...expected(),debugLoop:{interval:'10m',worktreeLimit:0}}),/debugLoop.worktreeLimit/);
+  assert.throws(()=>validateConfig({...expected(),debugLoop:{interval:'10m',model:'gpt-6.1-sol'}}),/debugLoop has unknown key model/);
+  assert.throws(()=>validateConfig({...expected(),debug:true}),/debug is removed \(the debug watcher is started by the \/starci skill/);
+  assert.throws(()=>validateConfig({...expected(),debug:false}),/debug is removed/);
+  assert.throws(()=>validateConfig({...expected(),coreDebug:{interval:'10m',worktreeLimit:40}}),/coreDebug is removed \(the debug watcher is a \/loop of the calling chat, not a seat/);
+  const retired=expected();retired.claudeDebug={interval:'10m',worktreeLimit:40};
   assert.throws(()=>validateConfig(retired),{name:'Error',message:/^Invalid config\.yaml:.*closed set of config blocks/});
 });
 
-test('debug accepts only the master boolean without changing independent Kernel or Supervisor pins',()=>{
-  const base=expected();
-  base.supervisor.kernel={agent:'claude',model:'claude-opus-5-5',effort:'high'};
-  for(const debug of [true,false,undefined]){
-    const config=structuredClone(base);
-    if(debug===undefined)delete config.debug;else config.debug=debug;
-    const pins={kernel:structuredClone(config.kernel),supervisor:structuredClone(config.supervisor)};
-    assert.equal(validateConfig(config),config);
-    assert.deepEqual({kernel:config.kernel,supervisor:config.supervisor},pins);
-  }
-  for(const debug of ['true',1,null,{},[]])assert.throws(()=>validateConfig({...base,debug}),/debug must be true or false/);
-});
-
-test('core maintenance reads authored parameters and refuses a missing or unrelated parameter owner',()=>{
+test('debugLoopSettings reads the authored keys and falls back to the shipped defaults per key',()=>{
   const example=expected();
-  assert.deepEqual(coreDebugSettings(example),{...EXAMPLE_CORE_DEBUG,intervalMs:durationMs(EXAMPLE_CORE_DEBUG.interval)});
-  assert.deepEqual(coreDebugSettings({...example,coreDebug:{interval:'7s',worktreeLimit:2}}),{interval:'7s',intervalMs:7000,worktreeLimit:2});
-  const absent=structuredClone(example);delete absent.coreDebug;
-  assert.doesNotThrow(()=>validateConfig({...absent,debug:false}));
-  assert.throws(()=>coreDebugSettings({...absent,debug:true}),/coreDebug is missing/);
-  for(const coreDebug of [{interval:'7s'}, {worktreeLimit:2}, {interval:'7s',worktreeLimit:2,model:'gpt-6.1-sol'}])
-    assert.throws(()=>coreDebugSettings({...example,coreDebug}),/coreDebug/);
+  assert.deepEqual(debugLoopSettings(example),{...EXAMPLE_DEBUG_LOOP,intervalMs:durationMs(EXAMPLE_DEBUG_LOOP.interval)});
+  assert.deepEqual(EXAMPLE_DEBUG_LOOP,DEBUG_LOOP_DEFAULTS);
+  assert.deepEqual(debugLoopSettings({...example,debugLoop:{interval:'7s',worktreeLimit:2}}),{interval:'7s',intervalMs:7000,worktreeLimit:2});
+  assert.deepEqual(debugLoopSettings({...example,debugLoop:{interval:'2h'}}),{interval:'2h',intervalMs:7200000,worktreeLimit:DEBUG_LOOP_DEFAULTS.worktreeLimit});
+  const absent=structuredClone(example);delete absent.debugLoop;
+  assert.deepEqual(debugLoopSettings(absent),{interval:'10m',intervalMs:600000,worktreeLimit:40});
+  assert.deepEqual(debugLoopSettings({...absent,debugLoop:null}),debugLoopSettings(absent));
+  assert.throws(()=>debugLoopSettings({...example,debugLoop:{interval:'7'}}),/debugLoop.interval/);
 });
 test('local config initializes the shipped tier defaults and refuses removed keys, unknown tiers, members and shapes',()=>{const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-config-'));try{fs.copyFileSync(new URL('../../config.example.yaml',import.meta.url),path.join(root,'config.example.yaml'));assert.deepEqual((fs.copyFileSync(path.join(root,'config.example.yaml'),path.join(root,'config.yaml')),loadConfig(root)),expected());const effective=effectiveTiers(loadConfig(root),runtimeProfile());assert.deepEqual([effective.seats.kernelManager,effective.seats.supervisor,effective.seats.kernel],['frontier','frontier','high']);assert.deepEqual(effective.tiers.frontier.map(member=>member.agent),['claude','codex'],'member order is the route order');const reordered=expected();reordered.models={tiers:{frontier:[{agent:'codex',model:'gpt-6.1-sol'},{agent:'claude',model:'claude-opus-5-5'}]}};assert.deepEqual(effectiveTiers(validateConfig(reordered),runtimeProfile()).tiers.frontier.map(member=>member.agent),['codex','claude'],'the owner reorders a chain by writing it');const extra=expected();extra.models={tiers:{cheap:[{agent:'codex',model:'gpt-6-luna',effort:'low'}]}};assert.deepEqual(Object.keys(effectiveTiers(validateConfig(extra),runtimeProfile()).tiers).sort(),['cheap','frontier','high','imagegen','low','medium'],'a new tier is a line of config');const badModel=expected();badModel.models={tiers:{high:[{agent:'claude',model:'unknown-model'}]}};assert.throws(()=>validateConfig(badModel),/model unknown-model is not declared by agent claude/);const wrongAgent=expected();wrongAgent.models={tiers:{high:[{agent:'claude',model:'gpt-6.1-sol'}]}};assert.throws(()=>validateConfig(wrongAgent),/model gpt-6\.1-sol is not declared by agent claude/);const duplicate=expected();duplicate.models={tiers:{high:[{agent:'claude',model:'claude-opus-5-5'},{agent:'claude',model:'claude-opus-5-5'}]}};assert.throws(()=>validateConfig(duplicate),/names each member once/);const empty=expected();empty.models={tiers:{high:[]}};assert.throws(()=>validateConfig(empty),/non-empty ordered list/);const unknownSeatTier=expected();unknownSeatTier.models={seats:{kernel:'no-such-tier'}};assert.throws(()=>validateConfig(unknownSeatTier),/seats\.kernel names tier no-such-tier/);const unknownKey=expected();unknownKey.models={selection:'quota-aware'};assert.throws(()=>validateConfig(unknownKey),/models\.selection is removed/);const unknownModelsKey=expected();unknownModelsKey.models={rescuer:'high'};assert.throws(()=>validateConfig(unknownModelsKey),/unknown keys are refused/);const badBalance=expected();badBalance.models={balance:{maxStreak:0}};assert.throws(()=>validateConfig(badBalance),/maxStreak must be an integer >= 1/);badBalance.models={balance:{maxSharePercent:101}};assert.throws(()=>validateConfig(badBalance),/maxSharePercent/);const badUsage=expected();badUsage.models={usage:{reservePercent:96}};assert.throws(()=>validateConfig(badUsage),/reservePercent <= biasPercent < exhaustedPercent/);const custom={...expected(),language:'en',model:'test-host-model'};fs.writeFileSync(path.join(root,'config.yaml'),stringifyYaml(custom));assert.deepEqual(loadConfig(root),custom);fs.writeFileSync(path.join(root,'config.yaml'),'null\n');assert.throws(()=>loadConfig(root),/Invalid config/);}finally{fs.rmSync(root,{recursive:true,force:true});}});
 test('top-level supervisor/validator/critique sections are refused as unknown keys',()=>{const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-config-old-'));try{const old=expected();old.supervisor={runtimes:['codex-agent','claude-agent']};old.critique={runtimes:['claude-agent','codex-agent']};fs.writeFileSync(path.join(root,'config.yaml'),stringifyYaml(old));assert.throws(()=>loadConfig(root),/Invalid config/);}finally{fs.rmSync(root,{recursive:true,force:true});}});

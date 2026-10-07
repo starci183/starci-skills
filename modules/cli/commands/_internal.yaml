@@ -90,7 +90,6 @@ internal:
   - {path: scripts/machine/worker-output.mjs, why: "Worker transcript projection", usedBy: [scripts/kernel/transcripts.mjs]}
   - {path: scripts/reconciler/controllers/job.mjs, why: "Engine-discovered job controller", usedBy: [scripts/reconciler/engine.mjs]}
   - {path: scripts/reconciler/controllers/workflow.mjs, why: "Engine-discovered workflow controller", usedBy: [scripts/reconciler/engine.mjs]}
-  - {path: scripts/reconciler/core-debug.mjs, why: "Host core-maintenance watchdog child", usedBy: [scripts/reconciler/host-seats.mjs]}
   - {path: scripts/reconciler/ledger-health.mjs, why: "Host ledger-health controller", usedBy: [scripts/reconciler/controllers/host.mjs]}
   - {path: scripts/reconciler/notifier.mjs, why: "Fleet notification controller", usedBy: [scripts/reconciler/controllers/workers.mjs]}
   - {path: scripts/reconciler/services.mjs, why: "Host service-registry controller", usedBy: [scripts/reconciler/controllers/host.mjs]}

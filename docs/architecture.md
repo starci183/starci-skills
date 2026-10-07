@@ -179,13 +179,13 @@ Kernel seat, open violations and the preflight rows (among them `command guard r
 changes nothing, and `--brief` prints it as one line per row that is not green. A seat that is not running while no
 workflow needs it is idle and green in a `--check`; a start path requires every seat. `--services` heals only the
 no-quota services (launcher shim, the three tasks, UI build, engine, harness UI and tunnel, ask gateway and tunnel),
-lists each applied action and never reaches `start-supervisor.mjs`, a Kernel watchdog or core debug.
+lists each applied action and never reaches `start-supervisor.mjs`, or a Kernel watchdog.
 
 Accepted workflow startup uses this shared native host readiness before launching its Kernel and
 configuration-selected maintenance. It validates persisted goal acceptance before host or agent
 effects. The ingress does not recursively repair Kernel seats while preparing a new launch; the
-standalone host entry retains repair of already-running workflows. `skills/starci/references/host-maintenance.md`
-contains the core-only maintenance instructions; native lifecycle code owns its worker and cadence.
+standalone host entry retains repair of already-running workflows. Debugging is a `/loop` of the calling chat over
+`starci debug digest`, set up by the `/starci` skill; no host process, seat or worker runs it.
 
 ## Ownership
 

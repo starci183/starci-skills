@@ -80,7 +80,6 @@ history:
         imagegen: [gpt-6.1-sol]                   # a call tier: the headless image call of interface.draw, interface.asset, brand.decide; no seat or op
       precedence: hard filter > owner bias > a live seat keeps its member > balance > chain order by tokens
       tokens: automatic picks skip a member at 90 percent of its quota; an owner bias naming it keeps it usable up to 95 percent
-      debug: core-debug runs in the app of the chat that started the workflow, on that provider's frontier model
 
 pools:
   claude-agent:

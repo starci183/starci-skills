@@ -33,7 +33,7 @@ test('all routed procedures exist without public discovery frontmatter',()=>{
   assert.ok(references.length > 0);
   for (const relative of references) assert.equal(read(`skills/starci/${relative}`).startsWith('---\n'), false, relative);
   assert.equal(fs.existsSync(path.join(root, '.starci')), false, 'the host-data namespace holds no release source');
-  for (const name of ['host-maintenance.md', 'host-startup.md']) assert.equal(read(`skills/starci/references/${name}`).startsWith('---\n'), false, name);
+  for (const name of ['host-startup.md']) assert.equal(read(`skills/starci/references/${name}`).startsWith('---\n'), false, name);
 });
 
 test('one bootstrap locates the runtime for supported host projections',()=>{
@@ -58,4 +58,12 @@ test('the entry runs the read-only host status on every invocation and heals onl
   assert.match(status, /starci reconciler up --services/);
   assert.match(status, /Never start an agent seat from an action\s+other than start/);
   for (const seatStart of ['starci workflow start', 'starci supervisor start']) assert.ok(status.includes(seatStart), `${seatStart} is the named way a seat starts`);
+});
+
+test('the entry routes the debug loop and the loop reference names both chat apps, the digest verb and the interval key', () => {
+  assert.match(read('skills/starci/SKILL.md'), /`references\/debug-loop\.md`/);
+  const loop = read('skills/starci/references/debug-loop.md');
+  assert.equal(loop.startsWith('---\n'), false);
+  for (const needle of ['/loop <interval> Run `starci debug digest`', '/loop every <N> minutes', 'debugLoop.interval', 'unverified', 'thread automation'])
+    assert.ok(loop.includes(needle), needle);
 });

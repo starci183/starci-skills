@@ -4,8 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 export async function execNode() {
-  const data = { ok: true, hostOk: true, fixture: true, summary: { ok: true }, applied: [], items: [],
-    maintenance: { ok: true, ready: true, action: 'fixture', fixture: true } };
+  const data = { ok: true, hostOk: true, fixture: true, summary: { ok: true }, applied: [], items: [] };
   return { error: null, stdout: JSON.stringify(data), stderr: '' };
 }
 

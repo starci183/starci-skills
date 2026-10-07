@@ -23,8 +23,7 @@ Read local config through its existing owner; never rewrite unrelated model or a
 
 Before the requested action, run `starci reconciler up --check --brief` from `<Source>` (read-only, a few seconds, no
 effects) and show its output as the host status: engine, harness UI, harness tunnel, ask gateway and tunnel, launcher
-shim, the three Windows tasks with whether their action is current, the Supervisor seat, the core-debug seat when
-`debug: true`, and the Kernel seat of every running workflow. Then continue with the requested action.
+shim, the three Windows tasks with whether their action is current, the Supervisor seat, and the Kernel seat of every running workflow. Then continue with the requested action.
 
 - When a no-quota service, the launcher shim or a task registration is down, run `starci reconciler up --services`,
   show each applied line, and continue. It never launches an agent seat.
@@ -39,6 +38,7 @@ Load only the reference needed for the requested action:
 | Define or revise a workflow goal | `references/define-goal.md` |
 | Start an approved workflow | `references/start-workflow.md` |
 | Read, relay or monitor one workflow | `references/workflow-chat.md` |
+| Debug or watch running workflows (set up the chat loop) | `references/debug-loop.md` |
 | Complete a prepared assisted UAT | `references/assisted-uat.md` |
 | Release or push authorized work | `references/release.md` |
 | Owner chat host operations | `references/orca-cli.md` |
@@ -46,7 +46,6 @@ Load only the reference needed for the requested action:
 | Owner chat visible computer inspection | `references/computer-use.md` |
 | Inspect a selected action's credential requirements | `<Source>/.claude/docs/host-secrets.md` |
 | Inspect or recover host readiness | `<Source>/.claude/skills/starci/references/host-startup.md` |
-| Inspect runtime maintenance | `<Source>/.claude/skills/starci/references/host-maintenance.md` |
 
 For a new workflow, resolve missing project, goal, scope and expected outcome through a read-only context scan and
 clarification. Once sufficient, run the native read-only goal planner, present the exact draft and derived operation
@@ -54,6 +53,7 @@ plan with its identity and intended actions, and obtain the owner's OK before qu
 generic instruction to handle matters do not accept an unclear goal. Reuse approval only while the accepted goal,
 plan and authority remain the same.
 
-Workflow startup runs the full host path (the services heal, the Supervisor seat and configuration-selected maintenance)
-through the native lifecycle. Follow its actual receipt; do not create an additional host loop, maintenance agent or
-scheduler from this entry.
+Workflow startup runs the full host path (the services heal and the Supervisor seat) through the native lifecycle. Follow its
+actual receipt; do not create a host loop, maintenance agent or scheduler from this entry. After a start, and whenever the
+owner asks to debug, set up the debug loop of this chat as `references/debug-loop.md` says (Claude Code `/loop`, Codex per
+that file); the loop runs in this chat on its own model and only reads `starci debug digest`.

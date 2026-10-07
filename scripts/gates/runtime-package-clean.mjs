@@ -88,7 +88,7 @@ const verifyArchive = ({ files, manifest, expectedIntegrity, integrity, root, de
   if (unresolved.length) return { error: finish('red', PROOF_CODES.install, `root archive scripts import modules the archive omits (${unresolved.length}): ${unresolved.slice(0, 5).join('; ')}`) };
   const privateFile = [...files.keys()].find((file) => file.replaceAll('\\', '/').split('/').at(-1).toLowerCase() === SECRET_ENV_FILE.toLowerCase() || /^package[\\/]ext[\\/]sonar[\\/]secrets(?:[\\/]|$)/i.test(file));
   if (privateFile) return { error: finish('red', PROOF_CODES.install, `root archive contains private host configuration or custody: ${privateFile}`) };
-  const required = ['skills/starci/SKILL.md', 'skills/starci/agents/openai.yaml', 'skills/starci/references/host-startup.md', 'skills/starci/references/host-maintenance.md',
+  const required = ['skills/starci/SKILL.md', 'skills/starci/agents/openai.yaml', 'skills/starci/references/host-startup.md',
     'ui/server.mjs', 'ui/api/index.mjs', 'ui/package.json', 'ui/package-lock.json'];
   const uiFiles = (deps.trackedUnder ?? gitTrackedUnder)(path.join(root, 'ui'));
   if (!uiFiles?.some((file) => file.startsWith('src/'))) return { error: finish('unrun', PROOF_CODES.unrun, 'tracked UI source inventory is unavailable or empty') };

@@ -16,14 +16,13 @@ import { probeOrcaAsync, serviceRegistry, servicePorts, servicePlatformProblem, 
 import { sleep } from '../lib/sleep.mjs'; import { isMain } from '../lib/is-main.mjs';
 import { buildUi, uiBuildState } from './ui-build.mjs';
 export { buildUi, uiBuildState };
-import { workflowCaller } from '../agent/caller-context.mjs';
 import { PROFILE, engineItems, profileItems, safeShadowOf, serviceItems } from './start-items.mjs';
 import { auditTasks } from '../machine/task-audit.mjs';
 import { guardCommandRow } from './guard-row.mjs';
 import { launcherItem, taskItems } from './task-health.mjs';
 import { applyEngine, applyUiBuild, startDownServices, startSeats, waitForLeader } from './start-apply.mjs';
 import { repeatInOrder } from '../lib/in-order.mjs';
-import { coreDebugRow, json, kernelSeatItems, seatNeed, supervisorRow } from './seat-items.mjs';
+import { json, kernelSeatItems, seatNeed, supervisorRow } from './seat-items.mjs';
 import { isLauncherOrTaskRow, healLauncherAndTasks, registerTask, runtimeLink } from './start-heal.mjs';
 import { renderBrief, renderText } from './start-render.mjs';
 import { tempRoot } from '../../engine/temp-root.mjs';
@@ -223,7 +222,7 @@ function orcaRow(orcaProbe) {
  * Every checklist row, read-only: preflight, config, engine, controllers, services, seats, sla, ui build. Never throws
  * (a failing section is one red row). Seams (specs): env, config, machine reads, probes.
  */
-export async function gather({ env = process.env, config = safeRun(() => loadConfig(), null), orca = true, seats = true, workflowSeats = true, coreDebug = true, seatsRequested = true, depthProbe = null, platform = process.platform, guardProbe } = {}) {
+export async function gather({ env = process.env, config = safeRun(() => loadConfig(), null), orca = true, seats = true, workflowSeats = true, seatsRequested = true, depthProbe = null, platform = process.platform, guardProbe } = {}) {
   const items = [];
   const push = (...rows) => items.push(...rows.flat());
   // preflight
@@ -241,7 +240,6 @@ export async function gather({ env = process.env, config = safeRun(() => loadCon
   const need = await seatNeed({ config, seatsRequested });
   push(await supervisorRow({ env, config, orca, seats, orcaProbe, needed: need.needed }), orcaRow(orcaProbe));
   if (seats && workflowSeats) push(await kernelSeatItems({ orcaOk: orcaProbe.ok !== false, config, rows: need.rows }));
-  if (coreDebug && config?.debug === true) push(await coreDebugRow(env, { needed: need.needed }));
   push(await depthItems({ env, config, orcaOk: orcaProbe.ok === true, ...(depthProbe ? { probe: depthProbe } : {}) }));
   return items;
 }
@@ -344,7 +342,7 @@ export async function applyHost(opts, deps = {}) {
 export async function ensureHostRuntime({ env = process.env, waitMs = START_WAIT_MS, workflowSeats = false, check = false, platform = process.platform, ...opts } = {}, deps = {}) {
   const read = deps.gather ?? gather, apply = deps.applyHost ?? applyHost, wait = deps.sleep ?? sleep, now = deps.now ?? Date.now;
   const services = opts.scope === 'services';
-  const readOptions = { env, workflowSeats, coreDebug: check || services, seatsRequested: !check && !services, platform };
+  const readOptions = { env, workflowSeats, seatsRequested: !check && !services, platform };
   let items = await read(readOptions);
   const blockers = items.filter((item) => item.required && item.status === 'red' && ['preflight', 'config'].includes(item.group)
     && !(opts.setProfile && item.group === 'config' && item.id === 'profile'));
@@ -376,17 +374,6 @@ function upOptions(argv) {
   return { opts: { waitMs, setProfile, scope, noBuild: has('--no-build'), retire: has('--retire-stale-ledgers') } };
 }
 
-/** The core debug seat after a green full startup (an explicit start): launched through its declared caller route; never from the services heal. */
-async function ensureMaintenance(result, { argv, env, deps }) {
-  const ensureCoreDebug = deps.ensureDebug ?? (await import('./core-debug.mjs')).ensureCoreDebug;
-  result.maintenance = await ensureCoreDebug({ caller: workflowCaller(argv), env, plan: false });
-  const ready = result.maintenance?.ok === true && result.maintenance?.ready === true;
-  result.items.push(ready ? green('seats', 'core-debug', 'Core debug seat', result.maintenance.action ?? 'ready')
-    : red('seats', 'core-debug', 'Core debug seat', result.maintenance.reason ?? result.maintenance.action ?? 'not ready', 'supply the declared caller route and reconcile its native seat'));
-  result.summary = summarize(result.items);
-  result.ok = result.summary.ok;
-}
-
 export async function main(argv = process.argv.slice(2), deps = {}) {
   const has = (f) => argv.includes(f);
   const { opts, error } = upOptions(argv);
@@ -398,7 +385,6 @@ export async function main(argv = process.argv.slice(2), deps = {}) {
   const env = deps.env ?? process.env;
   const result = await (deps.ensureHostRuntime ?? ensureHostRuntime)({ ...opts, env, workflowSeats: deps.workflowEntry !== true, check: has('--check') });
   if (deps.workflowEntry === true) result.hostOk = result.ok;
-  if (result.ok && !has('--check') && opts.scope === 'full' && safeRun(() => (deps.loadConfig ?? loadConfig)(), null)?.debug === true) await ensureMaintenance(result, { argv, env, deps });
   const render = has('--brief') ? renderBrief : renderText;
   (deps.print ?? console.log)(has('--json') ? JSON.stringify(result) : render(result.items, { applied: result.applied, summary: result.summary }));
   process.exitCode = result.ok ? 0 : 1;

@@ -8,9 +8,8 @@ import { withLedger, seedWorkflow } from '../helpers/ledger-fixture.mjs';
 
 const accepted = () => ({ workflow: { workflow_id: 'wf-approved', goal_identity: 'goal-a', phase: 'queued' },
   goal: { approved_by: 'owner', goal_identity: 'goal-a', revision: 0, markdown: 'Implement the accepted login scope.', json: '{}' } });
-const caller = { agent: 'codex', model: 'gpt-6.1-sol', effort: 'high' };
 
-test('unapproved, incomplete, stale and inactive goals cause no host or maintenance effect', async () => {
+test('unapproved, incomplete, stale and inactive goals cause no host effect', async () => {
   const cases = [null, { ...accepted(), goal: { ...accepted().goal, approved_by: null } },
     { ...accepted(), goal: { ...accepted().goal, approved_by: 'supervisor' } },
     { ...accepted(), goal: { ...accepted().goal, markdown: '' } },
@@ -19,54 +18,37 @@ test('unapproved, incomplete, stale and inactive goals cause no host or maintena
     ...['awaiting-approval', 'stopped', 'paused', 'finished', 'archived'].map((phase) => ({ ...accepted(), workflow: { ...accepted().workflow, phase } }))];
   for (const input of cases) {
     const effects = [];
-    const result = await ensureWorkflowHost(input ?? {}, { loadConfig: () => { effects.push('config'); return { debug: true }; },
-      ensureHost: async () => { effects.push('host'); return { ok: true }; }, ensureDebug: async () => { effects.push('debug'); return { ok: true, ready: true }; } });
+    const result = await ensureWorkflowHost(input ?? {}, { ensureHost: async () => { effects.push('host'); return { ok: true }; } });
     assert.equal(result.ok, false);
     assert.deepEqual(effects, []);
   }
 });
 
-test('accepted plan records authority without config, host or native worker effects', async () => {
-  const result = await ensureWorkflowHost({ ...accepted(), plan: true }, { loadConfig: () => { throw Error('plan must not load config'); } });
+test('accepted plan records authority without host or native worker effects', async () => {
+  const result = await ensureWorkflowHost({ ...accepted(), plan: true }, { ensureHost: async () => { throw Error('plan must not reach the host'); } });
   assert.equal(result.ok, true);
   assert.equal(result.ready, false);
   assert.equal(result.planned, true);
   assert.equal(workflowStartAuthority(accepted()).goalRevision, 0);
 });
 
-test('accepted startup ensures nonrecursive host before exact declared caller maintenance', async () => {
+test('accepted startup ensures the nonrecursive host and starts no debug agent', async () => {
   const calls = [], env = { fixture: 'owner' };
-  const result = await ensureWorkflowHost({ ...accepted(), caller, env }, { config: { debug: true },
-    ensureHost: async (input) => { calls.push(['host', input]); return { ok: true, leader: 'engine-a' }; },
-    ensureDebug: async (input) => { calls.push(['debug', input]); return { ok: true, ready: true, dispatch: 'debug-a' }; } });
+  const result = await ensureWorkflowHost({ ...accepted(), env }, {
+    ensureHost: async (input) => { calls.push(['host', input]); return { ok: true, leader: 'engine-a' }; } });
   assert.equal(result.ready, true);
-  assert.deepEqual(calls.map(([name]) => name), ['host', 'debug']);
-  assert.equal(calls[0][1].workflowSeats, false);
-  assert.deepEqual(calls[1][1], { caller, env, plan: false });
-  assert.equal(result.maintenance.dispatch, 'debug-a');
+  assert.deepEqual(calls, [['host', { env, workflowSeats: false }]]);
+  assert.equal(Object.hasOwn(result, 'maintenance'), false);
 });
 
-test('debug false never starts maintenance; red host never reaches maintenance', async () => {
-  let starts = 0;
-  const deps = { config: { debug: false }, ensureHost: async () => ({ ok: true }), ensureDebug: async () => { starts++; } };
-  assert.equal((await ensureWorkflowHost(accepted(), deps)).ready, true);
-  assert.equal(starts, 0);
-  deps.config.debug = true;
-  deps.ensureHost = async () => ({ ok: false, items: [{ id: 'harness-tunnel', status: 'red' }] });
-  const red = await ensureWorkflowHost(accepted(), deps);
+test('a red or throwing host leaves startup not ready with the host receipt', async () => {
+  const red = await ensureWorkflowHost(accepted(), { ensureHost: async () => ({ ok: false, items: [{ id: 'harness-tunnel', status: 'red' }] }) });
   assert.equal(red.ready, false);
+  assert.equal(red.reason, 'workflow-host-not-ready');
   assert.equal(red.host.items[0].id, 'harness-tunnel');
-  assert.equal(starts, 0);
-});
-
-test('unknown or throwing native maintenance leaves startup not ready with actual effects retained', async () => {
-  for (const ensureDebug of [async () => ({ ok: false, ready: false, effectState: 'unknown', dispatch: 'unsettled-a' }),
-    async () => { throw Error('native outcome unavailable'); }]) {
-    const result = await ensureWorkflowHost({ ...accepted(), caller }, { config: { debug: true }, ensureHost: async () => ({ ok: true }), ensureDebug });
-    assert.equal(result.ok, false);
-    assert.equal(result.ready, false);
-    assert.equal(result.maintenance.effectState, 'unknown');
-  }
+  const thrown = await ensureWorkflowHost(accepted(), { ensureHost: async () => { throw Error('native outcome unavailable'); } });
+  assert.equal(thrown.ready, false);
+  assert.equal(thrown.host.effectState, 'unknown');
 });
 
 test('workflow install uses the native npmCi owner in the exact tree with the shared lock role', async () => {
@@ -93,47 +75,28 @@ test('failed native installation retains the exact owned tree identity and never
   assert.match(threw.error, /receipt unreadable/);
 });
 
-test('default workflow host crosses the declared private child boundary with original role and exact caller flags', async () => {
+test('default workflow host crosses the declared private child boundary with the original role and no caller flags', async () => {
   const env = { STARCI_ROLE: 'lead', fixture: 'host' }, calls = [];
-  const maintenance = { ok: true, ready: true, action: 'already-live', dispatch: 'owned-debug' };
-  const result = await ensureWorkflowHost({ ...accepted(), caller: { agent: 'codex', model: 'gpt-6.1-sol', effort: null }, env }, {
-    config: { debug: true }, execNode: async (args, options) => {
+  const result = await ensureWorkflowHost({ ...accepted(), env }, {
+    execNode: async (args, options) => {
       calls.push({ args, options });
-      return { error: null, stdout: JSON.stringify({ ok: true, hostOk: true, items: [], maintenance }), stderr: '' };
+      return { error: null, stdout: JSON.stringify({ ok: true, hostOk: true, items: [] }), stderr: '' };
     }
   });
   assert.equal(result.ready, true);
-  assert.deepEqual(calls[0].args, [path.join(skillRoot, 'scripts/reconciler/workflow-up.mjs'), '--json',
-    '--caller-agent', 'codex', '--caller-model', 'gpt-6.1-sol']);
+  assert.deepEqual(calls[0].args, [path.join(skillRoot, 'scripts/reconciler/workflow-up.mjs'), '--json']);
   assert.deepEqual(calls[0].options.env, { ...env, STARCI_RUNTIME: skillRoot });
   assert.equal(calls[0].options.cwd, skillRoot);
-  assert.equal(result.maintenance.dispatch, 'owned-debug');
-});
-
-test('native child maintenance red retains host success and actual launch custody without a second launch', async () => {
-  let calls = 0;
-  const maintenance = { ok: false, ready: false, action: 'launch-unknown', dispatch: 'partial-debug' };
-  const result = await ensureWorkflowHost({ ...accepted(), caller }, { config: { debug: true }, execNode: async () => {
-    calls++;
-    return { error: { code: 1, message: 'native checklist red' }, stdout: JSON.stringify({ ok: false, hostOk: true, items: [], maintenance }), stderr: '' };
-  } });
-  assert.equal(calls, 1);
-  assert.equal(result.reason, 'workflow-debug-not-ready');
-  assert.equal(result.host.ok, true);
-  assert.equal(result.maintenance.dispatch, 'partial-debug');
 });
 
 test('incomplete, killed or contradictory native startup outcomes remain unknown and refuse readiness', async () => {
-  const green = JSON.stringify({ ok: true, hostOk: true, maintenance: { ok: true, ready: true } });
-  const partial = { ok: false, hostOk: true, maintenance: { ok: false, ready: false, dispatch: 'retained-unknown' } };
+  const green = JSON.stringify({ ok: true, hostOk: true });
   for (const made of [{ stdout: '{}' }, { stdout: green, error: { code: 1 } },
-    { stdout: green, error: { code: 0, killed: true } }, { stdout: 'not-json', error: { code: 'ENOENT' } },
-    { stdout: JSON.stringify(partial), error: { code: 1, killed: true } }]) {
-    const result = await ensureWorkflowHost(accepted(), { config: { debug: true }, execNode: async () => made });
+    { stdout: green, error: { code: 0, killed: true } }, { stdout: 'not-json', error: { code: 'ENOENT' } }]) {
+    const result = await ensureWorkflowHost(accepted(), { execNode: async () => made });
     assert.equal(result.ready, false);
     assert.equal(result.reason, 'workflow-host-not-ready');
     assert.equal(result.host.effectState, 'unknown');
-    if (made.stdout === JSON.stringify(partial)) assert.equal(result.host.receipt.maintenance.dispatch, 'retained-unknown');
   }
 });
 

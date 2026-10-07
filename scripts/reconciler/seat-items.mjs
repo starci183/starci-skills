@@ -1,4 +1,4 @@
-// seat-items.mjs — the agent-seat rows of the host checklist (Supervisor, Kernel, core debug) and the read of the running
+// seat-items.mjs — the agent-seat rows of the host checklist (Supervisor, Kernel) and the read of the running
 // workflows that decide whether an idle seat is a problem. A seat consumes provider quota, so it is started only by
 // `workflow start`, `supervisor start` or an explicit owner request; a read-only pass shows a seat that is not running
 // as idle (green, `idle: true`) until a running workflow, or the owner's own start, needs it.
@@ -59,16 +59,6 @@ export async function supervisorRow({ env, config, orca, seats, orcaProbe, neede
   if (mode !== 'kernel') return supervisorItem({ mode });
   if (!needed) return idleRow('supervisor', 'Supervisor seat');
   return red('seats', 'supervisor', 'Supervisor seat', orca ? 'Orca is not reachable' : 'not checked', 'open Orca, then run start again');
-}
-
-/** The Core debug seat row; `needed` false turns a seat that is not ready into an idle row. Seam: status. */
-export async function coreDebugRow(env, { needed = true, status = null } = {}) {
-  let health;
-  try { health = (status ?? (await import('./core-debug.mjs')).coreDebugStatus)({ env }); }
-  catch (error) { health = { ready: false, error: String(error?.message ?? error) }; }
-  if (health.ready === true) return green('seats', 'core-debug', 'Core debug seat', 'native worker live on its bound caller route');
-  if (!needed) return idleRow('core-debug', 'Core debug seat');
-  return red('seats', 'core-debug', 'Core debug seat', health.error ?? health.health?.reason ?? 'not ready', 'run the approved StarCi start with its declared caller route');
 }
 
 /** Every running workflow of every managed repo: [{repo, workflowId}]. Read-only. */
