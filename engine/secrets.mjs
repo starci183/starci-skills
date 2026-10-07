@@ -45,7 +45,7 @@ export function readSecretBytes(file){
 
 const readCredentialFile = file => { const bytes=readSecretBytes(file); try{return bytes.toString('utf8');}finally{bytes.fill(0);} };
 
-const DOTENV_LINE_PARTS = ['^\\s*', '(?:export\\s+)?', '([A-Za-z_]\\w*)', '\\s*=\\s*', '([^\\r\\n\\u2028\\u2029]*)', '\\s*$'];
+const DOTENV_LINE_PARTS = [String.raw`^\s*`, String.raw`(?:export\s+)?`, String.raw`([A-Za-z_]\w*)`, String.raw`\s*=\s*`, String.raw`([^\r\n\u2028\u2029]*)`, String.raw`\s*$`];
 const DOTENV_LINE = new RegExp(DOTENV_LINE_PARTS.join(''));
 
 /** Parse a dotenv file (KEY=VALUE lines, # comments, optional export/quotes). An absent file is {}. */

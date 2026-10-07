@@ -126,7 +126,7 @@ const validateCloudflareDetails=(cf,bad)=>{
   if(cf.tunnel!==undefined&&cf.tunnel!==null&&(typeof cf.tunnel!=='string'||!TUNNEL_REF.test(cf.tunnel)))bad('.cloudflare.tunnel must be the named tunnel UUID (or name) or null.');
   if(cf.credentialsFile!==undefined&&cf.credentialsFile!==null&&(typeof cf.credentialsFile!=='string'||!cf.credentialsFile.trim()))bad('.cloudflare.credentialsFile must be the tunnel credentials JSON path or null.');
 };
-const validateCloudflareModeConstraints=(cf,bad)=>{if(cf.credentialsFile&&!cf.tunnel)bad('.cloudflare.credentialsFile needs cloudflare.tunnel (the tunnel UUID the credentials belong to).');if(cf.mode==='named'&&!cf.hostname)bad('.cloudflare.mode named needs cloudflare.hostname (the public hostname routed to the gateway).');if(cf.mode==='quick'&&(cf.tunnel||cf.credentialsFile))bad('.cloudflare.mode quick runs no named tunnel; tunnel/credentialsFile are for mode named.');if(cf.mode==='quick'&&cf.hostname)bad('.cloudflare.mode quick gets a random trycloudflare.com hostname; set hostname only for mode named.');};
+const validateCloudflareModeConstraints=(cf,bad)=>{if(cf.credentialsFile&&!cf.tunnel){bad('.cloudflare.credentialsFile needs cloudflare.tunnel (the tunnel UUID the credentials belong to).');}if(cf.mode==='named'&&!cf.hostname){bad('.cloudflare.mode named needs cloudflare.hostname (the public hostname routed to the gateway).');}if(cf.mode==='quick'&&(cf.tunnel||cf.credentialsFile)){bad('.cloudflare.mode quick runs no named tunnel; tunnel/credentialsFile are for mode named.');}if(cf.mode==='quick'&&cf.hostname){bad('.cloudflare.mode quick gets a random trycloudflare.com hostname; set hostname only for mode named.');}};
 const validateCloudflareConnector=cf=>{
   const bad=invalid('connectors');
   closedConnectorShape(bad,cf,'cloudflare',['mode','tunnel','credentialsFile','tokenEnv','hostname','access']);
@@ -266,7 +266,7 @@ const validateGrant=(bad,text,runtimes,seen)=>{
   if(!grant)bad(`grants entry ${JSON.stringify(text)} is not "<pool>=<slots>@<role>+<role>" (e.g. devin-agent=10@implement+verify+write).`);
   const runtime=runtimes[grant.pool];
   if(!plain(runtime))bad(`grants entry ${text}: ${grant.pool} is not a modules/models/registry.yaml pool.`);
-  if(seen.has(grant.pool))bad(`grants names ${grant.pool} more than once.`); seen.add(grant.pool);
+  if(seen.has(grant.pool)){bad(`grants names ${grant.pool} more than once.`);} seen.add(grant.pool);
   const max=Number(runtime.maxParallel); if(!(grant.slots>=1&&(!Number.isFinite(max)||grant.slots<=max)))bad(`grants entry ${text}: slots must be 1..${Number.isFinite(max)?max:'maxParallel'} (registry.yaml maxParallel).`);
   const unserved=grant.roles.filter(role=>!(runtime.roles??[]).includes(role)); if(unserved.length)bad(`grants entry ${text}: ${grant.pool} does not serve role ${unserved.join(', ')} (registry.yaml roles: ${(runtime.roles??[]).join(', ')}).`);
 };
@@ -363,19 +363,19 @@ const validateModelPools=(config,models,runtimes)=>{
   for(const [role,required] of Object.entries(NON_OPERATION_ROLES))validateRolePool(role,required,models,runtimes);
 };
 const validateEarlyConfigBlocks=(config)=>{
-  if(config?.launchTrust!==undefined)launchTrustSettings(config); if(config?.retention!==undefined)workflowPurgeSettings(config);
-  if(config?.connectors!==undefined)validateConnectors(config.connectors); if(config?.asks!==undefined)validateAsks(config.asks);
-  if(config?.uat!==undefined)validateUat(config.uat); if(config?.coreDebug!==undefined)validateCoreDebug(config.coreDebug);
-  if(config?.orca!==undefined)validateOrca(config.orca); if(config?.roots!==undefined)validateRoots(config.roots);
+  if(config?.launchTrust!==undefined){launchTrustSettings(config);} if(config?.retention!==undefined){workflowPurgeSettings(config);}
+  if(config?.connectors!==undefined){validateConnectors(config.connectors);} if(config?.asks!==undefined){validateAsks(config.asks);}
+  if(config?.uat!==undefined){validateUat(config.uat);} if(config?.coreDebug!==undefined){validateCoreDebug(config.coreDebug);}
+  if(config?.orca!==undefined){validateOrca(config.orca);} if(config?.roots!==undefined){validateRoots(config.roots);}
 };
 const validateConfigBlocks=(config,knownProviders,runtimes,profile)=>{
   if(config?.debug!==undefined&&typeof config.debug!=='boolean')throw new Error('Invalid config.yaml: debug must be true or false.');
   // specs (owner 2026-09-28): {harness?, unit?, e2e?} booleans - each family a boolean; absent = its default (SPEC_DEFAULTS: harness off, unit on, e2e off; specsSettings).
   if(config?.specs!==undefined&&config.specs!==null&&(!plain(config.specs)||Object.keys(config.specs).some(key=>!SPEC_FAMILIES.includes(key)||typeof config.specs[key]!=='boolean')))throw new Error(`Invalid config.yaml: specs must be {${SPEC_FAMILIES.map(k=>k+'?: boolean').join(', ')}}, or null.`);
   // reconciler (scripts/reconciler/state.mjs reconcilerConfig): {enabled?: boolean, profile?: operational|observe, controllers?: {<name>: {mode: off|shadow|active}}}, or null.
-  if(config?.reconciler!==undefined&&config.reconciler!==null)validateReconcilerBlock(config.reconciler); if(config?.allocation!==undefined)validateAllocationBlock(config.allocation,knownProviders,runtimes);
-  if(config?.kernel!==undefined)validateAgentSeat(config.kernel,'kernel',profile); if(config?.parallel!==undefined)validateParallelBlock(config.parallel);
-  if(config?.supervisor!==undefined)validateSupervisorBlock(config.supervisor,profile); if(config?.delegation!==undefined&&config.delegation!==null)validateDelegationBlock(config.delegation); if(config?.budgets!==undefined)validateBudgetsBlock(config.budgets);
+  if(config?.reconciler!==undefined&&config.reconciler!==null){validateReconcilerBlock(config.reconciler);} if(config?.allocation!==undefined){validateAllocationBlock(config.allocation,knownProviders,runtimes);}
+  if(config?.kernel!==undefined){validateAgentSeat(config.kernel,'kernel',profile);} if(config?.parallel!==undefined){validateParallelBlock(config.parallel);}
+  if(config?.supervisor!==undefined){validateSupervisorBlock(config.supervisor,profile);} if(config?.delegation!==undefined&&config.delegation!==null){validateDelegationBlock(config.delegation);} if(config?.budgets!==undefined){validateBudgetsBlock(config.budgets);}
 };
 export function validateConfig(config){
   const models=config?.models,profile=runtimeProfile(),runtimes=profile?.runtimes??{};

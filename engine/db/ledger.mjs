@@ -837,7 +837,7 @@ const INCIDENT_KINDS=Object.freeze(['infra-provider','config-defect','owner-ask'
  */
 function incidentClassOf(freeKind){
   const k=String(freeKind??'').toLowerCase();
-  if(INCIDENT_KINDS.includes(k)){let owner='kernel';if(['owner-ask','credential-missing','safety-block','scope-change','partial-effect'].includes(k)){owner='owner';}else if(['runtime-defect','config-defect'].includes(k)){owner='supervisor';}return {kind:k,owner};}
+  if(INCIDENT_KINDS.includes(k)){let owner='kernel';if(['owner-ask','credential-missing','safety-block','scope-change','partial-effect'].includes(k)){owner='owner';}if(['runtime-defect','config-defect'].includes(k)){owner='supervisor';}return {kind:k,owner};}
   if(/owner|handover|approval/.test(k)){return {kind:'owner-ask',owner:'owner'};}
   if(/credential|secret|provision/.test(k)){return {kind:'credential-missing',owner:'owner'};}
   if(/safety/.test(k)){return {kind:'safety-block',owner:'owner'};}
@@ -938,7 +938,7 @@ const FOUNDATION_KIND_ENUM=new Set(['brand','grammar','layout-tree','shell','mod
  * Upsert one foundations row. `kind` outside the table enum is stored as 'other'; `state` 'landed' is 'published'.
  * `detail` is the caller's full record (kept as JSON text: the table has no column for dependents and history).
  */
-const detailText=detail=>{if(detail==null)return null;return typeof detail==='string'?redactText(detail):JSON.stringify(redactData(detail));};
+const detailText=detail=>{if(detail==null){return null;}return typeof detail==='string'?redactText(detail):JSON.stringify(redactData(detail));};
 export function upsertFoundation(db,{name,kind='other',state,ownerWorkflow=null,version=null,detail=null,workRef=null,at=nowMs()}){
   const k=FOUNDATION_KIND_ENUM.has(kind)?kind:'other',st=state==='landed'?'published':state;
   const text=detailText(detail);
@@ -1014,9 +1014,9 @@ const LEDGER_WRITES=Object.freeze({recordBlob,storeBlob,appendEvent,createWorkfl
   postInbox,setInboxStatus,setInboxStatusByKey,updateGoalJson,openDecisionItem,updateDecisionItem,recordDecision,setSignal,updateSignal,clearSignal,queueSettleTail,recordJobResult,bindKernelJob,releaseKernelJob,recordPurge,deleteWorkflowRows,markBlobArchived,pruneAttemptSnapshots,upsertFoundation,declareFoundations,recordPathTransfer,recordRecordChange,updateSettleTail});
 
 // initLedger + verifyLedger + the meta touch-ups of a fresh openLedger open; throws leaving the caller to close db.
-const initAndVerifyLedger=(db,{file,now,sqliteVersion,journalMode,repoRoot,product,fixture})=>{const created=initLedger(db,{file,now,sqliteVersion:fixture?.sqliteVersion??sqliteVersion,journalMode,repoRoot,product,...(fixture?{ledgerId:fixture.ledgerId,blobRoot:fixture.blobRoot,fixtureMarker:fixture.marker}:{})});verifyLedger(db,{file,sqliteVersion});const meta=metaOf(db);if(!fixture)assertOperationalLedger(meta);if(!fixture&&meta.sqlite_version!==sqliteVersion)db.prepare("UPDATE meta SET value=? WHERE key='sqlite_version'").run(sqliteVersion);return created;};
+const initAndVerifyLedger=(db,{file,now,sqliteVersion,journalMode,repoRoot,product,fixture})=>{const created=initLedger(db,{file,now,sqliteVersion:fixture?.sqliteVersion??sqliteVersion,journalMode,repoRoot,product,...(fixture?{ledgerId:fixture.ledgerId,blobRoot:fixture.blobRoot,fixtureMarker:fixture.marker}:{})});verifyLedger(db,{file,sqliteVersion});const meta=metaOf(db);if(!fixture){assertOperationalLedger(meta);}if(!fixture&&meta.sqlite_version!==sqliteVersion){db.prepare("UPDATE meta SET value=? WHERE key='sqlite_version'").run(sqliteVersion);}return created;};
 // A new ledger enrols itself in machine.ledgers (repo_root from its meta); a refusal (temp file on the live registry) is fine.
-const registerNewLedger=(db,created,{file,resolved,ledgerId})=>{if(!created)return;const own=metaOf(db);if(own.repo_root)try{withMachine(m=>m.registerLedger({ledgerId,file:resolved,repoRoot:own.repo_root,product:own.product??null,schemaVersion:LEDGER_VERSION}));}catch{/* registry unavailable: resolved by name until it is */}};
+const registerNewLedger=(db,created,{file,resolved,ledgerId})=>{if(!created){return;}const own=metaOf(db);if(own.repo_root){try{withMachine(m=>m.registerLedger({ledgerId,file:resolved,repoRoot:own.repo_root,product:own.product??null,schemaVersion:LEDGER_VERSION}));}catch{/* registry unavailable: resolved by name until it is */}}};
 /**
  * The read-write handle. A new (empty) file is created from schema/runtime.sql; any other schema is refused (clean slate).
  * `checkpointer:true` is the one connection that checkpoints (the reconciler engine): wal_autocheckpoint=8000 and

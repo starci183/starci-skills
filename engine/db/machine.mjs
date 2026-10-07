@@ -109,10 +109,10 @@ const hex = (bytes) => crypto.randomBytes(bytes).toString('hex');
 export const newTraceId = () => hex(16);
 export const newSpanId = () => hex(8);
 const JSON_LIMIT = 65536;
-const toJson = (value) => { if (value === undefined || value === null) return null; if (typeof value !== 'string') return JSON.stringify(value); JSON.parse(value); return value; };
+const toJson = (value) => { if (value === undefined || value === null) { return null; } if (typeof value !== 'string') { return JSON.stringify(value); } JSON.parse(value); return value; };
 const parse = (text) => { if (text == null) { return null; } try { return JSON.parse(text); } catch { return null; } };
 const int = (v) => (v === undefined || v === null || v === '' ? null : Math.trunc(Number(v)));
-const bool = (v) => { if (v === undefined || v === null) return null; return v ? 1 : 0; };
+const bool = (v) => { if (v === undefined || v === null) { return null; } return v ? 1 : 0; };
 const writerPragmas = (env) => ({ synchronous: 'NORMAL', busy_timeout: busyTimeoutOf(env), temp_store: 'MEMORY', cache_size: -16000,
   journal_size_limit: 67108864, trusted_schema: 'OFF' });
 const pragma = (db, name) => { const row = db.prepare(`PRAGMA ${name}`).get(); return row ? Object.values(row)[0] : null; };
@@ -1246,7 +1246,7 @@ const outboxFileFor = (machineFile) => `${path.resolve(machineFile)}.outbox.json
 const DEFERRABLE = Object.freeze({ recordLandOutcome, log });
 // The outbox 'log' op stamps src:'outbox:<id>' on each row of its first arg; other ops keep args as passed.
 const outboxArgs = (op, args, id) => { if (op !== 'log') return args;
-  return args.map((a, i) => { if (i !== 0) return a; return (Array.isArray(a) ? a : [a]).map((r) => ({ ...r, src: r.src ?? `outbox:${id}` })); }); };
+  return args.map((a, i) => { if (i !== 0) { return a; } return (Array.isArray(a) ? a : [a]).map((r) => ({ ...r, src: r.src ?? `outbox:${id}` })); }); };
 /** Append one deferred write; returns its id. */
 function deferWrite({ op, args = [], file = null, env = process.env, error = null }) {
   need(Object.hasOwn(DEFERRABLE, op), `machine-db: ${op} is not a deferrable write (${Object.keys(DEFERRABLE).join(', ')})`);
