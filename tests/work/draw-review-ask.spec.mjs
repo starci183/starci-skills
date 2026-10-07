@@ -32,7 +32,7 @@ test('a redraw round without open notes says so', () => {
 });
 
 test('every drawn part is shown, and a part with a redline brings it too', () => {
-  const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'draw-review-ask-'));
+  const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-draw-review-ask-'));
   try {
     const dir = path.join(repoRoot, 'ui');
     fs.mkdirSync(dir, { recursive: true });
