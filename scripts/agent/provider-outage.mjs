@@ -18,6 +18,11 @@
 //   A key may declare only `probe`: nothing classifies an outage for that provider, and the probe clears a
 //   quota circuit opened some other way.
 // A card without an outage key is never classified: no guessing for other providers.
+//
+// A launch-path failure the runtime itself reports for a provider's CLI is classified too (LAUNCH_PATH_FAILURES),
+// as failureKind worker-start: the launch never got a worker because the provider's own CLI failed it. It is a strike
+// (runtimes.yaml allocation.providerStrikes.worker-start): one unrelated failure never opens the circuit, a repeat
+// does, and routing (scripts/agent/pool-selection.mjs) skips the open circuit until it expires or is recovered.
 import { agentCardOf } from './credential-fingerprint.mjs';
 import { normalizeProvider } from '../lib/provider.mjs';
 import fs from 'node:fs';
@@ -31,6 +36,10 @@ const CAPACITY_FAILURE_KIND = 'capacity';
 /** The card keys that classify an outage, and the circuit failureKind each opens. */
 export const OUTAGE_KEYS = Object.freeze({ quotaExhausted: QUOTA_FAILURE_KIND, capacityExhausted: CAPACITY_FAILURE_KIND });
 const DEFAULT_QUOTA_PROBE_EVERY_MS = 3600000;
+const LAUNCH_FAILURE_KIND = 'worker-start';
+// Runtime-owned launch failure texts, per provider. codex: scripts/agent/trust.mjs codexAppServer, the launch-trust
+// step that asks `codex app-server` for the guard hook's hash - every failure of it starts with this text.
+const LAUNCH_PATH_FAILURES = Object.freeze({ codex: [/codex app-server answered nothing[^\n]*/] });
 
 const compile = (source, flags) => { try { return new RegExp(source, flags); } catch { return null; } };
 const cardFor = (provider, card) => (card === undefined ? agentCardOf(provider) : card);
@@ -86,7 +95,14 @@ export function outageInText(provider, texts, { card } = {}) {
     const found = textMatch(spec, joined);
     if (found) return found;
   }
-  return null;
+  return launchFailureInText(provider, joined);
+}
+
+/** A runtime-owned launch failure of the provider's CLI (LAUNCH_PATH_FAILURES): {failureKind:'worker-start', ...} or null. */
+function launchFailureInText(provider, joined) {
+  const key = normalizeProvider(provider);
+  const text = LAUNCH_PATH_FAILURES[key] ?? [];
+  return textMatch({ provider: key, failureKind: LAUNCH_FAILURE_KIND, text }, joined);
 }
 
 /** Outage evidence on a rendered terminal screen: {provider, failureKind, source:'screen', match} (the row) or null. */
