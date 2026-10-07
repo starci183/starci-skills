@@ -23,7 +23,7 @@ import path from 'node:path';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { braceVariants, globExpression } from '../lib/glob.mjs';
-import { posixPath } from '../lib/path-key.mjs';
+import { cleanSlotPath } from './slot-path.mjs';
 import { captureNames } from '../lib/i18n.mjs';
 import { isPlainObject } from '../../engine/plain-object.mjs';
 import { APP_KIND, ENV_PREFIX, RUNTIME_KIND, SEMVER, manifestKind, runtimeSemanticProblems } from './manifest-shape.mjs';
@@ -379,7 +379,7 @@ function createScopeResolver(manifest, repo) {
     if (slot.presence !== 'opt-in') return true;
     return declaredSlotEnabled(slot, repo);
   };
-  const clean = (p) => posixPath(p).replace(/\/+$/, '');
+  const clean = cleanSlotPath;
 
   /** Every variant matching `p`, with its root and bindings, minus app-kind slots of another kind. */
   function matches(p, only) {
@@ -600,7 +600,7 @@ export function createSlotResolver(manifest, repo) {
   // side's connection with that provider: the root scope reads the union of the sides' connections.
   const root = createScopeResolver(manifest, { ...repo, connections: SIDES.flatMap((side) => repo.sides[side].connections) });
   const sides = Object.fromEntries(PROFILES.map((side) => [side, createScopeResolver(manifest, repo.sides[side])]));
-  const clean = (p) => posixPath(p).replace(/\/+$/, '');
+  const clean = cleanSlotPath;
   /** { side, rest } when `p` lies below a side folder, else null. */
   const split = (input) => {
     const p = clean(input);
