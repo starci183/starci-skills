@@ -85,6 +85,7 @@ import { createReloadWatch, reexecSelf, RELOAD_ENV } from '../machine/self-reloa
 import { clipLine } from '../lib/clip.mjs';
 import { translator } from '../lib/i18n.mjs';
 import { sleep } from '../lib/sleep.mjs';
+import { eachInOrder } from '../lib/in-order.mjs';
 import { starciSourceRoot } from '../../engine/runtime-root.mjs';
 import { isSpecRun } from '../lib/env.mjs';
 const SERVE_ASK_FILE = fileURLToPath(new URL('../kernel/ask-server.mjs', import.meta.url));
@@ -460,13 +461,12 @@ export function createBridge({
     if (!asks.length) return send(`${t().asksNone}${hint}`);
     await send(`${t().asksHead(asks.length)}${hint}`);
     const base = asks.some((a) => a.serving) ? publicBaseOf() : null;
-    for (const ask of asks) {
-      const key = askKeyOf(ask.workflowId, ask.dispatchId);
-      const sent = await send(askText(ask, { serving: ask.serving, base }), { markup: askButton(current.language, key) });
-      if (!sent.ok) continue;
+    await eachInOrder(asks, async (ask) => {
+      const sent = await send(askText(ask, { serving: ask.serving, base }), { markup: askButton(current.language, askKeyOf(ask.workflowId, ask.dispatchId)) });
+      if (!sent.ok) return;
       await recordAskMessage({ workflowId: ask.workflowId, dispatchId: ask.dispatchId, repo: ask.repo, ledgerFile: ledgerFileFor(ask.repo),
         messageId: sent.result?.message_id ?? null, url: ask.serving?.url ?? undefined }, { env, now: now() });
-    }
+    });
     say(`listed ${asks.length} open ask(s)`);
     return { ok: true, count: asks.length };
   };

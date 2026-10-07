@@ -47,6 +47,7 @@ import { killTree } from '../api/process/kill-tree.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { readEnv } from '../lib/env.mjs';
 import { normPath } from '../lib/path-key.mjs';
+import { mapInOrder } from '../lib/in-order.mjs';
 
 const ENV_HEALTH_SCHEMA = 'starci/env-health@1';
 const EXIT_READY = 0, EXIT_NOT_READY = 3;
@@ -299,8 +300,7 @@ async function checkProbe(doc, probe, { restart, roots, probeTimeoutMs, readyTim
 
 /** Check one environment resource. */
 async function checkEnvironment(doc, { restart = false, roots = [], probeTimeoutMs = DEFAULT_PROBE_TIMEOUT_MS, readyTimeoutMs = DEFAULT_READY_TIMEOUT_MS, env = process.env, repo = null } = {}) {
-  const services = [];
-  for (const probe of Array.isArray(doc?.probes) ? doc.probes : []) services.push(await checkProbe(doc, probe, { restart, roots, probeTimeoutMs, readyTimeoutMs, env, repo }));
+  const services = await mapInOrder(Array.isArray(doc?.probes) ? doc.probes : [], (probe) => checkProbe(doc, probe, { restart, roots, probeTimeoutMs, readyTimeoutMs, env, repo }));
   return { id: doc?.id ?? null, services, ready: services.every((s) => s.ready) };
 }
 
