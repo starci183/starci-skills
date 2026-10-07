@@ -132,6 +132,10 @@ const TOKEN_STOP = new Set(['runtime', 'source', 'defect', 'contract', 'worker',
   'with', 'from', 'into', 'this', 'that', 'owner', 'supervisor', 'workflow', 'status', 'report', 'escalation', 'recurrence', 'second', 'third', 'fourth',
   'read-only', 'follow-up', 'self-heal', 'index', 'index.yaml', 'readme']);
 
+// A source path an incident names (`dir/sub/file.ext`), built from its named parts.
+const PATH_CHAR = String.raw`[\w@.[\]-]`;
+const SOURCE_PATH = new RegExp([`${PATH_CHAR}*`, String.raw`\/`, `(?:${PATH_CHAR}+`, String.raw`\/)*`, `${PATH_CHAR}+`, String.raw`\.`, '(?:mjs|js|ts|tsx|yaml|yml|json|md)', String.raw`\b`].join(''), 'g');
+
 /** Distinctive tokens of an incident: [{token, weight}] (file names and identifiers 2, kind words and plain compounds 1). */
 export function fixTokens(kind, text) {
   const out = new Map();
@@ -141,7 +145,7 @@ export function fixTokens(kind, text) {
     out.set(t, Math.max(out.get(t) ?? 0, weight));
   };
   const body = String(text ?? '');
-  for (const m of body.matchAll(/[\w@.[\]-]*\/(?:[\w@.[\]-]+\/)*[\w@.[\]-]+\.(?:mjs|js|ts|tsx|yaml|yml|json|md)\b/g)) {
+  for (const m of body.matchAll(SOURCE_PATH)) {
     const base = m[0].split('/').pop();
     add(base, 2); add(base.replace(/\.[a-z]+$/i, ''), 2);
   }
