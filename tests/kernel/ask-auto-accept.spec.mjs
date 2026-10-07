@@ -22,7 +22,7 @@ process.env.STARCI_AUTOPILOT ??= 'off';
 // the owner; the flag off changes nothing.
 
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
-const SERVE_ASK=path.join(ROOT,'scripts','kernel','ask-server.mjs');
+const SERVE_ASK=path.join(ROOT,'scripts','kernel','ask-server-main.mjs');
 const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 const EXAMPLE=parseYaml(fs.readFileSync(new URL('../../config.example.yaml',import.meta.url),'utf8'));
 const WORKFLOW='wf-auto-accept';
