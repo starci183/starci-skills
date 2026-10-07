@@ -79,7 +79,7 @@ const enqueueOp=(f,workflowId,jobId,ownedPath)=>{
   const ledger=openLedger({file:ledgerFileFor(f.repo)});
   try{
     seedWorkflow(ledger,{id:workflowId,jobs:[{jobId,opId:'code.refactor',
-      payload:{opId:'code.refactor',owned_paths:[ownedPath],model:'claude-agent'}}]});
+      payload:{opId:'code.refactor',owned_paths:[ownedPath],difficulty:'hard',model:'claude-agent'}}]});
   }finally{ledger.close();}
 };
 const payloadOf=(repo,jobId)=>{
