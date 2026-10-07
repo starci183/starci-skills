@@ -258,7 +258,7 @@ function proofArtifactsOf(db, workflowId, { repo }) {
     WHERE a.workflow_id=? ORDER BY a.artifact_id`).all(workflowId);
   const cd = codeDigester(repo), wd = createWorkDigester(repo);
   const now = new Map();
-  const digestOf = (dep) => { const key = `${dep.kind}\0${dep.path}`; if (!now.has(key)) now.set(key, dep.kind === 'work' ? wd(dep.path) : cd(dep.path)); return now.get(key); };
+  const digestOf = (dep) => { const key = `${dep.kind}\0${dep.path}`; if (!now.has(key)) { now.set(key, dep.kind === 'work' ? wd(dep.path) : cd(dep.path)); } return now.get(key); };
   return rows.map((r) => {
     const claims = r.claims_json ? mergeClaims(parseJson(r.claims_json, {})) : emptyClaims();
     const deps = r.deps_json ? list(parseJson(r.deps_json, [])) : null;
@@ -366,7 +366,7 @@ export function coverageOf(db, workflowId, { repo, briefCases = null, artifacts 
     const doc = recordAt(repo, dir);
     for (const s of list(doc?.ui?.shapes)) { if (s?.base && s?.state && SHAPE_ID.test(`${s.base}#${s.state}`)) shapes.add(`${s.base}#${s.state}`); }
     if (doc && briefCases) {
-      try { for (const id of briefCases(doc, dir)) { if (!cases.has(id)) cases.set(id, []); cases.get(id).push(doc.id ?? dir); } }
+      try { for (const id of briefCases(doc, dir)) { if (!cases.has(id)) { cases.set(id, []); } cases.get(id).push(doc.id ?? dir); } }
       catch (error) { errors.push({ record: dir, error: String(error?.message ?? error).slice(0, 200) }); }
     }
   }
