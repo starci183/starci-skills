@@ -178,45 +178,67 @@ export async function pluginRuleIds(root, kind) {
  * codes: {machine, hfs, refusals}, every code the architecture machine and `starci app check` can emit and the refusal codes among them.
  */
 /** The missing/stale/planned-enforcer findings of one rule's enforcer entries. */
+const lintEnforcerFindings = (rule, enforcer, plugin, label, add) => {
+  if (plugin?.ids === undefined) {
+    if (!enforcer.planned) add('HFS_RULE_ENFORCER_MISSING', rule.id, `${rule.id} names ${label} but ${plugin?.error ?? 'the plugin was not loaded'}`, label);
+    return;
+  }
+  if (enforcer.planned) {
+    if (plugin.ids.has(enforcer.id)) add('HFS_RULE_ENFORCER_STALE', rule.id, `${rule.id} lists ${label} as planned but the plugin already ships it; remove its status`, label);
+    return;
+  }
+  if (!plugin.ids.has(enforcer.id)) add('HFS_RULE_ENFORCER_MISSING', rule.id, `${rule.id} names ${label}, which is not a rule of ${PLUGIN_ENTRY[enforcer.kind]}`, label);
+};
+
+const machineEnforcerFindings = (rule, enforcer, label, files, add) => {
+  if (enforcer.planned || enforcer.at === undefined) return;
+  if (!files.exists(enforcer.at)) add('HFS_RULE_ENFORCER_MISSING', rule.id, `${rule.id} names ${label} at ${enforcer.at}, which does not exist`, label);
+  else if (!rule.failureCodes.some((code) => files.read(enforcer.at).includes(code))) add('HFS_RULE_ENFORCER_MISSING', rule.id, `${rule.id} names ${label} at ${enforcer.at}, but that file emits none of ${rule.failureCodes.join(', ')}`, label);
+};
+
 const enforcerFindings = (rule, plugins, files, add) => {
   for (const enforcer of rule.enforcers) {
     const label = `${enforcer.kind}:${enforcer.id}`;
-    if (LINT_FAMILY.includes(enforcer.kind)) {
-      const plugin = plugins[enforcer.kind];
-      if (plugin?.ids === undefined) {
-        if (!enforcer.planned) add('HFS_RULE_ENFORCER_MISSING', rule.id, `${rule.id} names ${label} but ${plugin?.error ?? 'the plugin was not loaded'}`, label);
-      } else if (enforcer.planned && plugin.ids.has(enforcer.id)) add('HFS_RULE_ENFORCER_STALE', rule.id, `${rule.id} lists ${label} as planned but the plugin already ships it; remove its status`, label);
-      else if (!enforcer.planned && !plugin.ids.has(enforcer.id)) add('HFS_RULE_ENFORCER_MISSING', rule.id, `${rule.id} names ${label}, which is not a rule of ${PLUGIN_ENTRY[enforcer.kind]}`, label);
-    } else if (!enforcer.planned && enforcer.at !== undefined) {
-      if (!files.exists(enforcer.at)) add('HFS_RULE_ENFORCER_MISSING', rule.id, `${rule.id} names ${label} at ${enforcer.at}, which does not exist`, label);
-      else if (!rule.failureCodes.some((c) => files.read(enforcer.at).includes(c))) add('HFS_RULE_ENFORCER_MISSING', rule.id, `${rule.id} names ${label} at ${enforcer.at}, but that file emits none of ${rule.failureCodes.join(', ')}`, label);
-    }
+    if (LINT_FAMILY.includes(enforcer.kind)) lintEnforcerFindings(rule, enforcer, plugins[enforcer.kind], label, add);
+    else machineEnforcerFindings(rule, enforcer, label, files, add);
   }
 };
 
 /** The uncatalogued-code, stale-planned and unemitted-code findings of one rule (the emission pass). */
-const emissionFindings = (rule, plugins, emitters, add) => {
-  const lintBuilt = rule.enforcers.some((e) => LINT_FAMILY.includes(e.kind) && !e.planned);
-  const lintCodes = new Set(rule.enforcers.filter((e) => !e.planned && plugins[e.kind]?.why?.has(e.id)).map((e) => plugins[e.kind].why.get(e.id)));
+const uncataloguedEnforcerFindings = (rule, plugins, add) => {
   for (const e of rule.enforcers) {
     const code = !e.planned && plugins[e.kind]?.why?.get(e.id);
     if (code && !rule.failureCodes.includes(code)) add('HFS_RULE_UNCATALOGUED', rule.id, `${e.kind}:${e.id} reports under ${code}, which ${rule.id} does not list in failureCodes`, `${e.kind}:${e.id}`);
   }
-  const builtAt = new Set(rule.enforcers.filter((e) => !e.planned && e.at).map((e) => e.at));
-  const anyPlanned = rule.enforcers.some((e) => e.planned);
-  const emittedBy = (code, families = CHECK_FAMILY) => families.flatMap((family) => (emitters?.[family] ?? []).filter((f) => quoted(code).test(f.text)).map((f) => f.rel));
+};
+
+const plannedMachineEnforcerFindings = (rule, emitters, builtAt, emittedBy, add) => {
   for (const enforcer of rule.enforcers) {
     if (!enforcer.planned || !CHECK_FAMILY.includes(enforcer.kind) || emitters === undefined) continue;
     // A file another built enforcer of this rule already names is that enforcer's emission, not this one's.
     const shipped = rule.failureCodes.flatMap((code) => emittedBy(code, [enforcer.kind])).filter((rel) => !builtAt.has(rel));
     if (shipped.length) add('HFS_RULE_ENFORCER_STALE', rule.id, `${rule.id} lists ${enforcer.kind}:${enforcer.id} as planned but ${shipped[0]} already emits its code; remove its status and name that file as \`at\``, `${enforcer.kind}:${enforcer.id}`);
   }
+};
+
+const unemittedCodeFindings = (rule, lintBuilt, lintCodes, anyPlanned, emitters, emittedBy, add) => {
   if (emitters !== undefined && !anyPlanned) {
     for (const code of rule.failureCodes) {
       if ((code === rule.code && lintBuilt) || lintCodes.has(code) || emittedBy(code).length) continue;
       add('HFS_RULE_CODE_UNEMITTED', rule.id, `${rule.id} claims every enforcer is built, but no enforcer emits ${code}: no eslint or stylelint rule reports the rule's own code and no check file spells it`);
     }
   }
+};
+
+const emissionFindings = (rule, plugins, emitters, add) => {
+  const lintBuilt = rule.enforcers.some((e) => LINT_FAMILY.includes(e.kind) && !e.planned);
+  const lintCodes = new Set(rule.enforcers.filter((e) => !e.planned && plugins[e.kind]?.why?.has(e.id)).map((e) => plugins[e.kind].why.get(e.id)));
+  uncataloguedEnforcerFindings(rule, plugins, add);
+  const builtAt = new Set(rule.enforcers.filter((e) => !e.planned && e.at).map((e) => e.at));
+  const anyPlanned = rule.enforcers.some((e) => e.planned);
+  const emittedBy = (code, families = CHECK_FAMILY) => families.flatMap((family) => (emitters?.[family] ?? []).filter((f) => quoted(code).test(f.text)).map((f) => f.rel));
+  plannedMachineEnforcerFindings(rule, emitters, builtAt, emittedBy, add);
+  unemittedCodeFindings(rule, lintBuilt, lintCodes, anyPlanned, emitters, emittedBy, add);
 };
 
 /** The untested-enforcer findings of one rule (called only when test sources were read). */
