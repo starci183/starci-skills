@@ -367,6 +367,26 @@ starci connect tunnel dry-run
 
 run a fixed read-only inspector against the StarCi runtime
 
+### starci debug digest
+
+print the read-only debug digest, with its problems ordered by blocked work
+
+| flag | type | |
+| --- | --- | --- |
+| `--repo` | list |  |
+| `--workflow` | list |  |
+| `--child-timeout` | number |  |
+
+exit: 0 digest printed; 1 the machine store cannot be read; 2 bad usage
+
+json: flag
+
+```sh
+starci debug digest
+starci debug digest --json
+starci debug digest --repo <path> --workflow <id>
+```
+
 ### starci debug run
 
 run one allowlisted read-only runtime inspector

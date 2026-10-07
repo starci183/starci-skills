@@ -31,7 +31,7 @@ Workflow ingress validates the accepted persisted goal before host readiness, in
 dependency installation, worktree creation or Kernel launch. Host readiness belongs to that
 lifecycle: it heals a missing launcher shim or a missing or stale task registration itself and lists
 that action in its receipt. The Kernel's explicit `--agent`/`--model` pin is the only model input.
-The start launches no debug agent; the debug watcher is the chat loop below.
+The start launches no debug agent. After the receipt, set up the chat's debug loop (`debug-loop.md`).
 
 Report the actual launch receipt: outcome, workflow identity, Kernel Dispatch and terminal handle,
 and attested execution agent and concrete model. An unavailable explicit pin or mismatched effective

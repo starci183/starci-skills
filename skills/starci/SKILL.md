@@ -38,6 +38,7 @@ Load only the reference needed for the requested action:
 | Define or revise a workflow goal | `references/define-goal.md` |
 | Start an approved workflow | `references/start-workflow.md` |
 | Read, relay or monitor one workflow | `references/workflow-chat.md` |
+| Debug or watch running workflows (set up the chat loop) | `references/debug-loop.md` |
 | Complete a prepared assisted UAT | `references/assisted-uat.md` |
 | Release or push authorized work | `references/release.md` |
 | Owner chat host operations | `references/orca-cli.md` |
@@ -52,6 +53,7 @@ plan with its identity and intended actions, and obtain the owner's OK before qu
 generic instruction to handle matters do not accept an unclear goal. Reuse approval only while the accepted goal,
 plan and authority remain the same.
 
-Workflow startup runs the full host path (the services heal, the Supervisor seat and configuration-selected maintenance)
-through the native lifecycle. Follow its actual receipt; do not create an additional host loop, maintenance agent or
-scheduler from this entry.
+Workflow startup runs the full host path (the services heal and the Supervisor seat) through the native lifecycle. Follow its
+actual receipt; do not create a host loop, maintenance agent or scheduler from this entry. After a start, and whenever the
+owner asks to debug, set up the debug loop of this chat as `references/debug-loop.md` says (Claude Code `/loop`, Codex per
+that file); the loop runs in this chat on its own model and only reads `starci debug digest`.

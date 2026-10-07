@@ -59,3 +59,11 @@ test('the entry runs the read-only host status on every invocation and heals onl
   assert.match(status, /Never start an agent seat from an action\s+other than start/);
   for (const seatStart of ['starci workflow start', 'starci supervisor start']) assert.ok(status.includes(seatStart), `${seatStart} is the named way a seat starts`);
 });
+
+test('the entry routes the debug loop and the loop reference names both chat apps, the digest verb and the interval key', () => {
+  assert.match(read('skills/starci/SKILL.md'), /`references\/debug-loop\.md`/);
+  const loop = read('skills/starci/references/debug-loop.md');
+  assert.equal(loop.startsWith('---\n'), false);
+  for (const needle of ['/loop <interval> Run `starci debug digest`', '/loop every <N> minutes', 'debugLoop.interval', 'unverified', 'thread automation'])
+    assert.ok(loop.includes(needle), needle);
+});

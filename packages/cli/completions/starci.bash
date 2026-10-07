@@ -16,7 +16,7 @@ _starci() {
         app) COMPREPLY=( $(compgen -W "add check emit explain hygiene lint new scaffold secret stack sync upgrade" -- "$cur") );;
         check) COMPREPLY=( $(compgen -W "run" -- "$cur") );;
         connect) COMPREPLY=( $(compgen -W "ask-gateway telegram telegram-media tunnel" -- "$cur") );;
-        debug) COMPREPLY=( $(compgen -W "run" -- "$cur") );;
+        debug) COMPREPLY=( $(compgen -W "digest run" -- "$cur") );;
         docker) COMPREPLY=( $(compgen -W "build down ps up" -- "$cur") );;
         gate) COMPREPLY=( $(compgen -W "canon-scan custody-exec env-health hfs-sync install-sandbox read reference-conventions repo-presentation run runtime-artifact runtime-coverage sonar starcistacks test-world unit" -- "$cur") );;
         git) COMPREPLY=( $(compgen -W "backup commit land sync" -- "$cur") );;
@@ -89,6 +89,9 @@ _starci() {
         connect:telegram-media:--verdict) COMPREPLY=( $(compgen -W "pass fail blocked" -- "$cur") ); return 0;;
         connect:telegram-media:--dispatch) return 0;;
         connect:tunnel:--port) return 0;;
+        debug:digest:--repo) return 0;;
+        debug:digest:--workflow) return 0;;
+        debug:digest:--child-timeout) return 0;;
         debug:run:--repo) return 0;;
         debug:run:--since-hours) return 0;;
         debug:run:--child-timeout) return 0;;
@@ -916,6 +919,7 @@ _starci() {
         connect:telegram) COMPREPLY=( $(compgen -W "--discover-chat --ledger --repo --workflow --dispatch --json --cwd --quiet --help --edition" -- "$cur") );;
         connect:telegram-media) COMPREPLY=( $(compgen -W "--ledger --repo --workflow --job --attempt --op --verdict --dispatch --json --cwd --quiet --help --edition" -- "$cur") );;
         connect:tunnel) COMPREPLY=( $(compgen -W "--port --fast --json --cwd --quiet --help --edition" -- "$cur") );;
+        debug:digest) COMPREPLY=( $(compgen -W "--repo --workflow --child-timeout --json --cwd --quiet --help --edition" -- "$cur") );;
         debug:run) COMPREPLY=( $(compgen -W "--repo --since-hours --child-timeout --token-window --token-spike --json --cwd --quiet --help --edition" -- "$cur") );;
         docker:build) COMPREPLY=( $(compgen -W "--tag --no-cache --json --cwd --quiet --help --edition" -- "$cur") );;
         docker:down) COMPREPLY=( $(compgen -W "--env --volumes --json --cwd --quiet --help --edition" -- "$cur") );;

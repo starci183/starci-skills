@@ -43,7 +43,7 @@ _starci() {
       app) _values 'verbs' 'add[add one canonical backend capability and register its patterns]' 'check[judge the app tree, managed output, contracts, formatting and architecture]' 'emit[emit backend GraphQL, operation and event contract snapshots]' 'explain[explain which HFS slot owns one app-relative path]' 'hygiene[judge staged worktree metadata, stack files and plaintext secrets]' 'lint[lint both app sides and report repository, ESLint and stylelint findings together]' 'new[create a canonical service, unit spec or app image definition]' 'scaffold[create a full or lite StarCi app, including an empty unborn main Git repository]' 'secret[list, read, seal or generate an encrypted app secret]' 'stack[start, stop or inspect the shared local test-world infrastructure]' 'sync[compare or write every managed app file from its canonical template]' 'upgrade[upgrade a lite app to the full edition (--edition full); a full app is already current]' ;;
       check) _values 'verbs' 'run[run changed-scope checks or the full structural check set]' ;;
       connect) _values 'verbs' 'ask-gateway[operate the local owner-ask HTTP gateway]' 'telegram[deliver and maintain owner Telegram notifications]' 'telegram-media[deliver settled operation media through Telegram]' 'tunnel[operate the Cloudflare owner-ask tunnel]' ;;
-      debug) _values 'verbs' 'run[run one allowlisted read-only runtime inspector]' ;;
+      debug) _values 'verbs' 'digest[print the read-only debug digest, with its problems ordered by blocked work]' 'run[run one allowlisted read-only runtime inspector]' ;;
       docker) _values 'verbs' 'build[build one declared application image from the application root]' 'down[remove only the labelled resources owned by one application stack]' 'ps[list StarCi-labelled containers with ports and health]' 'up[start one application stack and wait for its declared healthchecks]' ;;
       gate) _values 'verbs' 'canon-scan[measure canon conformance debt and plan its disjoint slices]' 'custody-exec[decrypt one custody document for a command or a bounded read]' 'env-health[inspect and manage the served environment used by verification]' 'hfs-sync[check an app'\''s generated files and custody trees for drift]' 'install-sandbox[prove the packed runtime tarball installs and runs in an empty home]' 'read[build the recorded READ digest for an operation]' 'reference-conventions[probe the installed backend reference rules of a reference root]' 'repo-presentation[check repository presentation rules for a product or runtime tree]' 'run[run the measured product or document gate]' 'runtime-artifact[describe the packed runtime archive and refuse forbidden material in it]' 'runtime-coverage[run the runtime spec suite under Node coverage and write coverage/lcov.info]' 'sonar[inspect, provision and run the local Sonar quality gate]' 'starcistacks[check a repository'\''s stack declaration and custody layout]' 'test-world[run and judge one managed test-world project]' 'unit[run unit tests and judge per-subject coverage and test-kit use]' ;;
       git) _values 'verbs' 'backup[push local branch tips only to dated backup refs]' 'commit[commit staged work with the message convention and trailers]' 'land[verify a lane and fast-forward it onto local main without pushing]' 'sync[merge local main into a clean lane with rerere enabled]' ;;
@@ -116,6 +116,9 @@ _starci() {
     'connect:telegram-media:--verdict') _values 'values' 'pass' 'fail' 'blocked'; return 0 ;;
     'connect:telegram-media:--dispatch') return 0 ;;
     'connect:tunnel:--port') return 0 ;;
+    'debug:digest:--repo') return 0 ;;
+    'debug:digest:--workflow') return 0 ;;
+    'debug:digest:--child-timeout') return 0 ;;
     'debug:run:--repo') return 0 ;;
     'debug:run:--since-hours') return 0 ;;
     'debug:run:--child-timeout') return 0 ;;
@@ -943,6 +946,7 @@ _starci() {
     'connect:telegram') _values 'flags' '--discover-chat' '--ledger' '--repo' '--workflow' '--dispatch' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'connect:telegram-media') _values 'flags' '--ledger' '--repo' '--workflow' '--job' '--attempt' '--op' '--verdict' '--dispatch' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'connect:tunnel') _values 'flags' '--port' '--fast' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
+    'debug:digest') _values 'flags' '--repo' '--workflow' '--child-timeout' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'debug:run') _values 'flags' '--repo' '--since-hours' '--child-timeout' '--token-window' '--token-spike' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'docker:build') _values 'flags' '--tag' '--no-cache' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'docker:down') _values 'flags' '--env' '--volumes' '--json' '--cwd' '--quiet' '--help' '--edition' ;;

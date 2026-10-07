@@ -1,0 +1,17 @@
+group: debug
+verb: digest
+owner: runtime
+summary: print the read-only debug digest, with its problems ordered by blocked work
+impl:
+  script: scripts/reconciler/debug-digest.mjs
+flags:
+  - {name: repo, type: list, summary: ledger-owner repository path to include (default every active ledger)}
+  - {name: workflow, type: list, summary: workflow id to include (default every running workflow)}
+  - {name: child-timeout, type: number, summary: timeout in seconds of each read verb the digest calls}
+exit: {"0": digest printed, "1": the machine store cannot be read, "2": bad usage}
+json: flag
+examples:
+  - starci debug digest
+  - starci debug digest --json
+  - starci debug digest --repo <path> --workflow <id>
+editions: [full]
