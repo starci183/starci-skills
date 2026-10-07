@@ -66,15 +66,22 @@ function validateSchema(value){
       else if(isObject(shape.additionalProperties))check(child,shape.additionalProperties,`${at}/${key}`);
     }
   };
+  const checkAlternatives=(node,shape,at,check)=>{
+    const matched=shape.anyOf.some((option)=>{
+      const start=errors.length;check(node,option,at);
+      if(errors.length===start)return true;
+      errors.splice(start);return false;
+    });
+    if(!matched)errors.push({path:at,message:'matches none of the allowed shapes'});
+  };
+  const checkArray=(node,shape,at,check)=>{
+    if(shape.minItems&&node.length<shape.minItems)errors.push({path:at,message:'array too short'});
+    node.forEach((item,index)=>shape.items&&check(item,shape.items,`${at}/${index}`));
+  };
   const check=(node,shape,at)=>{
     if(shape?.$ref)return check(node,resolve(shape.$ref),at);
     if(Array.isArray(shape?.anyOf)){
-      const matched=shape.anyOf.some((option)=>{
-        const start=errors.length;check(node,option,at);
-        if(errors.length===start)return true;
-        errors.splice(start);return false;
-      });
-      if(!matched)errors.push({path:at,message:'matches none of the allowed shapes'});
+      checkAlternatives(node,shape,at,check);
       return;
     }
     const typed=typeOk(node,shape?.type);
@@ -84,8 +91,7 @@ function validateSchema(value){
     if(typeof node==='string')checkString(node,shape,at);
     if(typeof node==='number')checkNumber(node,shape,at);
     if(Array.isArray(node)){
-      if(shape.minItems&&node.length<shape.minItems)errors.push({path:at,message:'array too short'});
-      node.forEach((item,index)=>shape.items&&check(item,shape.items,`${at}/${index}`));
+      checkArray(node,shape,at,check);
       return;
     }
     if(!isObject(node))return;
@@ -285,36 +291,50 @@ const checkModel=({model,ids,spec,add})=>{
   if(object(spec)&&spec.runtime==='docker-swarm')checkSwarmServices(services,ids,add);
 };
 
-export function checkApplicationStacks({repoRoot,environment,deploymentModelFile}={}){
-  const root=path.resolve(String(repoRoot??'')),stacksRoot=path.join(root,STACKS_DIR),manifestFile=path.join(stacksRoot,'application-stacks.yaml'),errors=[];
-  const add=(code,at,message)=>errors.push({code,path:at,message});
+const checkInputPaths=({environment,stacksRoot,manifestFile,deploymentModelFile,add})=>{
   if(!nonempty(environment))add('environment-invalid','environment','environment must name a declared environment');
   if(!regular(manifestFile,{root:stacksRoot}))add('manifest-unavailable',`${STACKS_DIR}/application-stacks.yaml`,`manifest must be a regular file inside ${STACKS_DIR}`);
   if(!regular(deploymentModelFile))add('deployment-model-unavailable','deploymentModelFile','rendered deployment evidence must be a regular, non-symlink file');
   for(const [file,at] of [[manifestFile,`${STACKS_DIR}/application-stacks.yaml`],[deploymentModelFile,'deploymentModelFile']])
     try{if(fs.statSync(file).size>MAX_INPUT_BYTES)add('input-too-large',at,'input exceeds the 4 MiB static-check limit');}catch{}
-  const {manifest,model}=loadInputs({manifestFile,deploymentModelFile,errors,add});
-
-  for(const issue of validateSchema(manifest))add('schema-shape-invalid',issue.path,issue.message);
-  if(manifest.schema!==SCHEMA_ID)add('schema-invalid','schema',`expected ${SCHEMA_ID}`);
-
+};
+const componentIdsOf=(manifest,add)=>{
   const catalog=object(manifest.components)?manifest.components:{},ids=new Set(Object.keys(catalog));
   if(!ids.size)add('components-empty','components','declare at least one applicable application component');
   for(const id of ids)if(!/^[a-z][a-z0-9-]*$/.test(id))add('component-invalid',`components.${id}`,'component ids must be lowercase kebab-case');
-
+  return ids;
+};
+const environmentMapOf=(manifest,add)=>{
   const environments=object(manifest.environments)?manifest.environments:{},environmentNames=new Set(Object.keys(environments));
   if(!environmentNames.size)add('environments-empty','environments','declare at least one supported environment');
-
-  checkStacksTree({stacksRoot,manifest,environmentNames,add});
+  return {environments,environmentNames};
+};
+const checkKubernetesDeclaration=(manifest,add)=>{
   if(!['deferred','supported'].includes(manifest.k8s?.status)||!String(manifest.k8s?.reason??'').trim())
     add('k8s-status-invalid','k8s','Kubernetes must be explicitly deferred or supported with a reason');
-
+};
+const checkSelectedEnvironment=({environment,environmentNames,environments,stacksRoot,ids,root,model,add})=>{
   if(nonempty(environment)&&!environmentNames.has(String(environment)))
     add('environment-unknown','environment',`environment must be one the declaration admits: ${[...environmentNames].join(', ')}`);
   const spec=environments[String(environment)],envDir=path.join(stacksRoot,String(environment??''));
-
   if(object(spec))checkEnvironmentSpec({spec,environment,envDir,ids,root,add});
   checkModel({model,ids,spec,add});
+};
+const checkStacksManifest=(manifest,model,{stacksRoot,environment,root,add})=>{
+  for(const issue of validateSchema(manifest))add('schema-shape-invalid',issue.path,issue.message);
+  if(manifest.schema!==SCHEMA_ID)add('schema-invalid','schema',`expected ${SCHEMA_ID}`);
+  const ids=componentIdsOf(manifest,add),{environments,environmentNames}=environmentMapOf(manifest,add);
+  checkStacksTree({stacksRoot,manifest,environmentNames,add});
+  checkKubernetesDeclaration(manifest,add);
+  checkSelectedEnvironment({environment,environmentNames,environments,stacksRoot,ids,root,model,add});
+};
+
+export function checkApplicationStacks({repoRoot,environment,deploymentModelFile}={}){
+  const root=path.resolve(String(repoRoot??'')),stacksRoot=path.join(root,STACKS_DIR),manifestFile=path.join(stacksRoot,'application-stacks.yaml'),errors=[];
+  const add=(code,at,message)=>errors.push({code,path:at,message});
+  checkInputPaths({environment,stacksRoot,manifestFile,deploymentModelFile,add});
+  const {manifest,model}=loadInputs({manifestFile,deploymentModelFile,errors,add});
+  checkStacksManifest(manifest,model,{stacksRoot,environment,root,add});
 
   return {schema:RESULT,ok:errors.length===0,environment,manifest:manifestFile,deploymentModel:path.resolve(String(deploymentModelFile??'')),errors,
     limitations:['static conformance only; Docker was not invoked, host application processes were not started, and remote APIs were not called','the deployment model must be rendered by Docker Compose or Docker Stack tooling; provenance is supplied by the caller and is not independently authenticated','component classification, runbook completeness and secret custody are author assertions checked for consistency and structure, not independently discovered facts','SOPS envelope recognition is structural, not cryptographic verification or decryption','tracked-plaintext detection uses git ls-files when the repository is reachable and is skipped, not assumed clean, when it is not','runbook prepare, doctor and verification commands are declared and documented but not executed']};
