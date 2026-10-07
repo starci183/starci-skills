@@ -68,7 +68,10 @@ export function failingPath(value, repo) {
 }
 
 // A source path the way a gate prints it (tsc `file(12,5)`, jest/eslint `file:12:5`, a bare path).
-const SOURCE_PATH = /(?:^|[\s'`"([,])((?:[A-Za-z]:)?[\w.@~-]*(?:[\\/][\w.@~\[\]()-]+)+\.(?:[mc]?ts|tsx|[mc]?js|jsx))(?:\((\d+),\d+\)|:(\d+)(?::\d+)?)?/g;
+const SOURCE_PATH_PREFIX = String.raw`(?:^|[\s'"\x60([,])`;
+const SOURCE_PATH_NAME = String.raw`((?:[A-Za-z]:)?[\w.@~-]*(?:[\\/][\w.@~\[\]()-]+)+\.(?:[mc]?ts|tsx|[mc]?js|jsx))`;
+const SOURCE_PATH_POSITION = String.raw`(?:\((\d+),\d+\)|:(\d+)(?::\d+)?)?`;
+const SOURCE_PATH = new RegExp(`${SOURCE_PATH_PREFIX}${SOURCE_PATH_NAME}${SOURCE_PATH_POSITION}`, 'g');
 const FAILING_CAP = 20;
 /**
  * The failing files a red check's own text names, for a check that carries no `failing` list: a Kernel
@@ -89,7 +92,8 @@ export function failingFromText(text) {
   return out;
 }
 
-const IMPORT_SPEC = /(?:\bfrom\s*|\b(?:import|require)\s*\(\s*|^\s*import\s+)['"]([^'"]+)['"]/gm;
+const IMPORT_SPEC_PATTERN = String.raw`(?:\bfrom\s*|\b(?:import|require)\s*\(\s*|^\s*import\s+)['"]([^'"]+)['"]`;
+const IMPORT_SPEC = new RegExp(IMPORT_SPEC_PATTERN, 'gm');
 const dropFirst = (value) => value.split('/').slice(1).join('/');
 /**
  * Whether `file` (repo-relative in `root`) imports anything under `owned` (plain repo-relative paths):
