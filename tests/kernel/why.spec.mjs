@@ -10,6 +10,7 @@ import {buildWhy,checkFacts,explainCode,kernelNotesOf,loadCatalog,whyOf,WHY_SCHE
 import {recordWhy} from '../../scripts/kernel/why-record.mjs';
 import {loadAdapter,adapterModelAuthority,loadModelRegistry,loadRuntimes} from '../../scripts/agent/model-registry.mjs';
 import {selectAdmission} from '../../scripts/lib/agent-admission.mjs';
+import {admissionPolicyOf} from '../../scripts/agent/admission.mjs';
 import {fakeAdmission} from '../helpers/fake-admission.mjs';
 
 // Every failed / blocked / refused / waiting attempt explains itself in the owner's language: the catalog
@@ -56,7 +57,7 @@ const scratch=path.join(os.tmpdir(),'starci-job-scratch','4a40','iso','.starciwo
 
 test('actual admission floor, required identity, outside-group and opaque-model refusals have public owner explanations',()=>{
   const now=Date.parse('2026-10-03T08:00:00Z');
-  const policy=loadRuntimes().allocation.admission,registry=loadModelRegistry(),io=fakeAdmission();
+  const policy=admissionPolicyOf(loadRuntimes()),registry=loadModelRegistry(),io=fakeAdmission();
   const candidate=(id,provider,model)=>({id,provider,model,account:'default',
     modelAuthority:adapterModelAuthority(loadAdapter(provider).card),qualityFloor:registry.models[model].tier,
     eligibility:{eligible:true,mode:'operation-policy'},quota:io.quota(provider,{now}),capacity:{running:0,maxParallel:1}});
@@ -67,10 +68,12 @@ test('actual admission floor, required identity, outside-group and opaque-model 
   const choose=(candidates,extra={})=>selectAdmission({policy,now,candidates,request:{role:'op',scopeId:'why/op',
     attemptId:'why-attempt',difficulty:'easy',allowGroup:[pair(sonnet)],...extra}});
   const cases=[
-    {receipt:choose([sonnet],{difficulty:'hard',qualityFloor:'standard'}),reason:'quality-floor-invalid',code:'quality-floor-invalid'},
-    {receipt:choose([sonnet],{require:pair(sol)}),reason:'required-unavailable',code:'required-unavailable'},
+    {receipt:choose([sonnet],{role:'kernel',qualityFloor:'economy'}),reason:'quality-floor-invalid',code:'quality-floor-invalid'},
+    {receipt:choose([sonnet],{only:[pair(sol)]}),reason:'bias-empties-chain',code:'bias-empties-chain'},
     {receipt:choose([sol]),reason:'no-eligible-candidate',code:'outside-allow-group'},
-    {receipt:choose([devin],{allowGroup:[pair(devin)],require:{model:devin.model}}),reason:'required-unavailable',code:'required-model-unverifiable'},
+    {receipt:choose([devin],{allowGroup:[pair(devin)],only:[{model:devin.model}]}),reason:'no-eligible-candidate',code:'only-model-unverifiable'},
+    {receipt:choose([sonnet],{only:[pair(sonnet)],avoid:[pair(sonnet)]}),reason:'only-avoid-conflict',code:'only-avoid-conflict'},
+    {receipt:choose([{...sonnet,quota:fakeAdmission({used:{claude:93}}).quota('claude',{now})}]),reason:'tokens-out',code:'tokens-out'},
   ];
   for(const {receipt,reason,code} of cases){
     assert.equal(receipt.ok,false,code);

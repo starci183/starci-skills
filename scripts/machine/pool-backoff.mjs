@@ -10,7 +10,7 @@
 // ({cap, max, lastRateLimitAt, lastDecreaseAt, lastIncreaseAt, floorSince, provider, reason}); a pool back at max is
 // deleted (poolRowOf / entryOfRow).
 //
-// Readers: route (scripts/agent/models.mjs selectPool, a live route with a capacity map) rejects a pool whose running
+// Readers: route (scripts/agent/op-pick.mjs pickOpModel, a live route with a capacity map) rejects a pool whose running
 // count reached its backed-off cap, so the next eligible pool of the order takes the job (and a job with no other
 // eligible pool stays queued); final agent admission reads the current cap before reserving its provider slot.
 // A row past its until_at is ignored (a dead engine never pins a pool at its floor).

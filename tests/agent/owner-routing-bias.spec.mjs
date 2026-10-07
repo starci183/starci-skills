@@ -13,25 +13,28 @@ test('string aliases normalize to pool ids and avoid wins',()=>{
   assert.deepEqual(normalizeOwnerRoutingBias({prefer:['Codex','claude','codex-agent','unknown'],avoid:['CLAUDE']}),{prefer:['codex-agent'],avoid:['claude-agent']});
   assert.deepEqual(normalizeOwnerRoutingBias(null),{prefer:[],avoid:[]});
 });
-test('concrete model requirements survive normalization',()=>{
-  assert.deepEqual(normalizeOwnerRoutingBias({require:{provider:'Anthropic',model:'claude-sonnet-5-5'}}),{prefer:[],avoid:[],require:{provider:'claude',model:'claude-sonnet-5-5'}});
+test('an only list of concrete members survives normalization',()=>{
+  assert.deepEqual(normalizeOwnerRoutingBias({only:[{provider:'Anthropic',model:'claude-sonnet-5-5'}]}),{prefer:[],avoid:[],only:[{provider:'claude',model:'claude-sonnet-5-5'}]});
+  assert.deepEqual(normalizeOwnerRoutingBias({only:['Codex/gpt-6.1-sol']}),{prefer:[],avoid:[],only:[{provider:'codex',model:'gpt-6.1-sol'}]},'<agent>/<model> names one member');
 });
-test('a hard requirement cannot silently disappear or contradict exclusion',()=>{
-  for(const require of [{},{provider:'missing'},{pool:'missing'},{model:''},{provider:'claude',pool:'codex'},{provider:'claude',fallback:'codex'}])
-    assert.throws(()=>normalizeOwnerRoutingBias({require}),{code:'invalid-owner-routing-bias'});
-  assert.throws(()=>normalizeOwnerRoutingBias({require:{provider:'claude'},avoid:['claude-agent']}),/conflicts with avoid/);
-  assert.throws(()=>normalizeOwnerRoutingBias({require:{pool:'claude'},avoid:[{provider:'claude'}]}),/conflicts with avoid/);
-  assert.doesNotThrow(()=>normalizeOwnerRoutingBias({require:{provider:'claude'},avoid:[{model:'claude-sonnet-5-5'}]}),'excluding Sonnet leaves Opus eligible');
+test('an only list cannot silently disappear or contradict exclusion',()=>{
+  for(const member of [{},{provider:'missing'},{pool:'missing'},{model:''},{provider:'claude',pool:'codex'},{provider:'claude',fallback:'codex'}])
+    assert.throws(()=>normalizeOwnerRoutingBias({only:[member]}),{code:'invalid-owner-routing-bias'});
+  assert.throws(()=>normalizeOwnerRoutingBias({only:[{provider:'claude'}],avoid:['claude-agent']}),/conflicts with avoid/);
+  assert.throws(()=>normalizeOwnerRoutingBias({only:[{pool:'claude'}],avoid:[{provider:'claude'}]}),/conflicts with avoid/);
+  assert.doesNotThrow(()=>normalizeOwnerRoutingBias({only:[{provider:'claude'}],avoid:[{model:'claude-sonnet-5-5'}]}),'excluding Sonnet leaves Opus eligible');
 });
-test('an Op requirement does not become a Critic or Kernel pin',()=>{
-  const bias={require:{provider:'claude'}};
-  assert.equal(biasForRole(bias,'op','job').require.provider,'claude');
-  assert.deepEqual(biasForRole(bias,'critic','job'),{prefer:[],avoid:[]});
-  assert.deepEqual(biasForRole(bias,'kernel','job'),{prefer:[],avoid:[]});
-  assert.equal(biasForRole({...bias,roles:['op','critic']},'critic','job').require.provider,'claude');
+test('an only list applies to every seat unless roles narrows it',()=>{
+  const bias={only:[{provider:'claude'}]};
+  for(const role of ['op','critic','kernel','supervisor','worker'])assert.equal(biasForRole(bias,role,'job').only[0].provider,'claude',role);
+  const narrowed={...bias,roles:['op']};
+  assert.equal(biasForRole(narrowed,'op','job').only[0].provider,'claude');
+  assert.deepEqual(biasForRole(narrowed,'critic','job'),{prefer:[],avoid:[]});
+  assert.deepEqual(biasForRole(narrowed,'kernel','job'),{prefer:[],avoid:[]});
+  assert.equal(biasForRole({...bias,roles:['op','critic']},'critic','job').only[0].provider,'claude');
 });
 test('a reserve override is explicit data scoped to the exact role and attempt',()=>{
-  const bias={require:{provider:'claude'},reserveOverride:grant};
+  const bias={only:[{provider:'claude'}],reserveOverride:grant};
   assert.deepEqual(biasForRole(bias,'op',grant.scopeId).reserveOverride,grant);
   assert.equal(biasForRole(bias,'op','wf/job.a2').reserveOverride,undefined);
   assert.equal(biasForRole(bias,'worker',grant.scopeId).reserveOverride,undefined);
@@ -59,10 +62,10 @@ const cli=(t,args,env={})=>{
   });
   return {result,scratch};
 };
-test('workflow bias preserves a concrete requirement through the public CLI',t=>{
-  const {result}=cli(t,['workflow','bias','--normalize',JSON.stringify({require:{provider:'Anthropic',model:'claude-sonnet-5-5'}})]);
+test('workflow bias preserves a concrete only list through the public CLI',t=>{
+  const {result}=cli(t,['workflow','bias','--normalize',JSON.stringify({only:[{provider:'Anthropic',model:'claude-sonnet-5-5'}]})]);
   assert.equal(result.status,0,result.stderr);
-  assert.deepEqual(JSON.parse(result.stdout),{prefer:[],avoid:[],require:{provider:'claude',model:'claude-sonnet-5-5'}});
+  assert.deepEqual(JSON.parse(result.stdout),{prefer:[],avoid:[],only:[{provider:'claude',model:'claude-sonnet-5-5'}]});
 });
 test('workflow bias extracts the declared English exclusion through the public CLI',t=>{
   const {result}=cli(t,['workflow','bias',"don't use codex"]);
@@ -70,14 +73,14 @@ test('workflow bias extracts the declared English exclusion through the public C
   assert.deepEqual(JSON.parse(result.stdout),{prefer:[],avoid:['codex-agent']});
 });
 test('workflow bias refuses malformed JSON and conflicting hard intent as bad usage',t=>{
-  for(const raw of ['{',JSON.stringify({require:{provider:'claude'},avoid:['claude']})]){
+  for(const raw of ['{',JSON.stringify({only:[{provider:'claude'}],avoid:['claude']})]){
     const {result}=cli(t,['workflow','bias','--normalize',raw]);
     assert.equal(result.status,2,result.stderr);
     assert.equal(result.stdout.trim(),'');
   }
 });
 test('workflow define refuses invalid or delegated reserve authority before writing state',t=>{
-  const cases=[['--routing-bias','{'],['--routing-bias',JSON.stringify({require:{provider:'unknown'}})],
+  const cases=[['--routing-bias','{'],['--routing-bias',JSON.stringify({only:[{provider:'unknown'}]})],
     ['--routing-bias',JSON.stringify({reserveOverride:grant}),'--defined-by','supervisor','--bridge-id','bridge.test']];
   for(const extra of cases){
     const {result,scratch}=cli(t,['workflow','define','--text','assess the model policy','--plan',...extra]);
@@ -96,7 +99,7 @@ test('delegated roles cannot record owner reserve authority through the public C
   }
 });
 test('an owner CLI definition persists the exact reserve grant and ledger authority',t=>{
-  const bias={prefer:[],avoid:[],roles:['op'],require:{provider:'claude',model:grant.model},reserveOverride:grant};
+  const bias={prefer:[],avoid:[],roles:['op'],only:[{provider:'claude',model:grant.model}],reserveOverride:grant};
   const {result,scratch}=cli(t,directory=>{
     const repo=path.join(directory,'app');
     fs.mkdirSync(repo);

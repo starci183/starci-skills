@@ -128,11 +128,10 @@ import {
 // wrappers the managed-agent dispatch path drives — one thin wrapper per
 // calls.yaml verb (run-create/worker-start/worker-show/worker-stop/
 // worker-release).
-import { selectPool, providerCircuitOf, kindRoute as kindRouteOf, isFanOutSlice } from '../agent/models.mjs';
+import { providerCircuitOf } from '../agent/models.mjs';
 import { readProviderCircuit, writeProviderCircuit as storeProviderCircuit } from '../machine/provider-circuit.mjs';
 import { credentialFingerprintOf, credentialRotated } from '../agent/credential-fingerprint.mjs';
 import { QUOTA_FAILURE_KIND, outageSpecsOf, outageInText, outageOnScreen } from '../agent/provider-outage.mjs';
-import { recentDispatchCounts, auditAuthorOf } from '../agent/balance.mjs';
 import { deferJob, deferralOf as testDeferralOf, ownerSpecs, specsOff } from '../route/spec-deferral.mjs';
 import { admittedVersionOf } from './dispatch-admission.mjs';
 import { baselineWorkInputs, inputDrift } from './input-digests.mjs';
@@ -3673,8 +3672,7 @@ const API_INTERNALS = Object.freeze({
   releaseTypedWaits, openPeerWaits, PEER_WAIT,
   goalJsonOf, latestGoal, csvList,
   lineageRouteAdjust, accountList, probeQuotaSafe,
-  configuredAllocationPolicy, loadConfig, recentDispatchCounts, kindRouteOf, auditAuthorOf,
-  isFanOutSlice, selectPool, blockingViewOf, parseYaml, fs, path,
+  configuredAllocationPolicy, loadConfig, blockingViewOf, parseYaml, fs, path,
   reconcileOrphanKernelJobs,
   reconcileDrop, reconcileReleaseWorker, reconcileDeadWorker,
   cleanupManagedWorker,

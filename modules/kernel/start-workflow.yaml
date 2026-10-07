@@ -141,14 +141,14 @@ claim:
 spawn:
   title: '[Kernel] <workflow_id>'
   routing: >-
-    Orca is always the execution host. The Kernel agent and concrete model are
-    resolved by owner config first, otherwise scripts/route/route-model.mjs
-    --kind model.manageWorkflow --risk high --repo <repo>. A config single pin
-    or launcher override is an explicit Kernel identity pin and fails closed
-    when unavailable; it is never silently replaced by Devin or another agent.
-    A config kernel group and the unpinned think-group route declare concrete
-    members admitted by modules/models/selection.yaml newAgentAdmission through
-    scripts/agent/admission.mjs. Operation jobs resolve their own declared groups.
+    Orca is always the execution host. The Kernel takes the members of the `high` tier of modules/models/tiers.yaml
+    (scripts/agent/tiers.mjs tierMembers, seats.kernel) as one ordered chain; config.yaml kernel.agent / kernel.model or
+    the --agent launcher override pin it as the bias `only` over that chain and keep the tier's model of that agent. A pin
+    is an explicit Kernel identity and fails closed when unavailable; it is never silently replaced by Devin or another
+    agent, and a pin naming no member of the tier is refused (kernel-pin-unavailable). The members are admitted by
+    modules/models/selection.yaml newAgentAdmission through scripts/agent/admission.mjs, whose common picker
+    (scripts/lib/tier-pick.mjs) applies the hard filter, the owner bias, the balance step and the token step, and prints
+    its pick record in --plan. Operation jobs resolve their own tier.
   fallThrough:
     rule: >-
       A group boot selects among its admitted members within one boot and one

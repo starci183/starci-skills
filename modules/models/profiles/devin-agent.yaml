@@ -13,7 +13,7 @@ identity:
     CLI may use an account-selected underlying model and StarCi does not rename or
     infer it. modelPolicy: "pin-swe-2-max-and-attest-the-devin-cli-runtime-before-dispatch".
 
-position: modules/models/runtimes.yaml allocation.tiers and roleOfKind; modules/models/registry.yaml operators.<op>.chain
+position: modules/models/tiers.yaml tiers, seats and difficulty; modules/models/runtimes.yaml roleOfKind; modules/models/registry.yaml pools
 
 business:
   question: >-
@@ -21,16 +21,16 @@ business:
     a workflow?" — devin-agent, and only then.
   whenNeeded:
     - Bounded implement/verify/write inside an Orca workflow worktree after explicit slot grant.
-    - Medium and hard hands-on implementation, first in the implement/write/verify tier orders ahead of codex-agent (owner decision 2026-09-25 - backend.implement 70% and interface.implement 68% pass over the 72h scorecard; balanced takes it first until it reaches its share); first on the scaffold order. Slots are owner-granted, so quota grants, not position, decide availability.
-    - "interface.draw (owner ruling 2026-09-27 draw-devin-brand-claude) - first on the draw order, Codex the fallback: token-render HTML/CSS in the Grammar's tokens captured by scripts/work/draw-render.mjs (Playwright, the product's own install, run with node in the product checkout - its browser-dom tool) through the draw loop, with rationale.json and redline evidence per shape. It never paints raster art (no ImageGen): art regions are artworkSlots for interface.asset on Codex."
-    - Review (owner decision 2026-09-25 review-hands, an experiment) - first on the review order (the verify kinds still on it, work.author), interface.audit too, second on the ui order behind Codex as one of the two pools with its browser-dom tool (it passed 11% of those audits over the 72h scorecard; the experiment re-measures it), and the four mechanical ops (provision.ask, workspace.manage, task.execute, knowledge.repair) on the implement order.
+    - Easy and medium hands-on implementation: first member of the medium and low tiers (tiers.yaml), Sol (medium) or Luna (low) behind it. Slots are owner-granted (config.yaml allocation.grants).
+    - "Not drawing: interface.draw takes the imagegen tier (Codex alone); Devin still runs token-render checks in product checkouts through its browser-dom tool."
+    - Verification of hands-on work at easy and medium difficulty, with the browser-dom tool for UI audits.
   whenNot:
     - Anywhere outside Orca — the pool launches only as an Orca command-terminal inside the workflow worktree.
     - decide/plan/manager/planner/validator/ImageGen roles — none exist (modules/models/registry.yaml lists these exclusions verbatim).
-    - Reviewing its own work - the cross-family rule routes a review of what Devin implemented to Opus/Sol (runtimes.yaml allocation.hands, thinkAuditCrossFamily).
+    - Hard and insane work: the high and frontier tiers hold no Devin member.
     - Beyond its owner-assigned cap: absence of granted quota, not the pool itself, is the gate.
   pickedBy: >-
-    Allocator by role + tier + quota; the explicit-workflow-quota gate sits before
+    The common picker over the tier chains and the quota; the explicit-workflow-quota gate sits before
     eligibility — capacity is an owner decision, not a scheduler guess.
   failureModes:
     - "Reading an early chain position as unbounded capacity: the quota gate still bounds admission."

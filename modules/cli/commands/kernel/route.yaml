@@ -69,7 +69,7 @@ lineageAdjust: "retry-aware routing (scripts/kernel/lineage-route.mjs). For a jo
   missing secret, an owner gate), a failed report or a first red check (e.g. a peer's red tests), a
   dispatch refused with no provider fault (leases, reserve), cancelled or dropped rows. One count
   demotes the pool: it moves to the end of the order and is taken only when no other candidate is
-  eligible (under either policy). Two exclude it for this retry: it is rejected \"excluded for this
+  eligible. Two exclude it for this retry: it is rejected \"excluded for this
   retry lineage: failed 2x on it (<cause> (<jobId>), ...)\". route-decided (and the answer) carry
   lineageAdjust {demoted[], excluded[], pools:{<pool>: {failures, causes[]}}, attempts:[{jobId,
   attempt, pool, cause, attributable, detail}], demotedTaken} for any job with a lineage; a first
@@ -81,22 +81,21 @@ blocking: "a routed job's out carries blocking {waiters, workflows[], weight, ou
   opId, weight, workflows[]}]} when other work waits on it or a heavier queued job of the same
   workflow does (scripts/kernel/waiter-priority.mjs): advisory, route never refuses on it; the
   Kernel dispatches the outranking job first (driver-loop.yaml tick.drive.waiterPriority)"
-order: "the pool order is the kind's runtimes.yaml roleOfKind order (scaffold: Devin first; draw:
-  Devin then Codex; review: Devin, Opus and Sol overflow only), else the think order (Opus, Sol) for
-  think work, else the role's order (implementation: Devin, then Codex, then Claude); a hands-on cut
-  slice (payload.cut, total >= 2) walks the scaffold order unless its kind is pinned to draw or
-  review. Under the balanced policy the first eligible pool of that order still below its
-  config.yaml allocation.shares target takes the job; when all are at or over their share, the least
-  over does (owner decision 2026-09-25, 72h model-scorecard evidence). A verify kind is routed away
-  from the family of the op whose output it reviews (scripts/agent/balance.mjs auditAuthorOf;
-  routeCrossFamily on the route): a review of Devin's work goes to Opus or Sol (owner decision
-  2026-09-25 review-hands)"
-writes: jobs.payload_json gains {model, modelId, effort, routeChain, routeOrder, routeRejected,
-  routeBalance, difficulty} — the PERSISTED route dispatch then launches exactly (dispatch reads
+order: "the op takes the tier of its difficulty (modules/models/tiers.yaml difficulty: insane frontier, hard high,
+  medium, easy low; the measured difficulty is first raised to the kind's runtimes.yaml roleOfKind floor), or the tier its
+  kind names under tiers.yaml kindTiers (drawing ops: imagegen). The tier is an ordered chain of members (agent + model);
+  one common picker (scripts/lib/tier-pick.mjs) walks it: hard filter (role, host tool, owner grant, retry lineage,
+  provider circuit, capacity), the goal's routing_bias (prefer moves a member first, avoid removes it, only keeps the named
+  ones), balance (a head picked models.balance.maxStreak times in a row, or holding more than maxSharePercent of the
+  tier's running seats, yields to the next member that has tokens; a bias skips it), then the first member with tokens
+  (a member at 90 percent of its quota is skipped; an owner bias naming it keeps it usable up to 95 percent). The pick record
+  (the chain after each step, who was dropped and why, who was chosen by which step) is persisted as payload.pick and printed
+  by the human form"
+writes: jobs.payload_json gains {model, modelId, effort, tier, routeChain, routeRejected, pick, difficulty} — the PERSISTED route dispatch then launches exactly (dispatch reads
   payload.model/modelId/effort, never re-decides); events 'route-decided' {kind, difficulty, bias,
   lineageAdjust?, ...decided} (bias is the goal's routing_bias actually applied)
 returns: "{ok:true, jobId, kind, difficulty, bias, lineageAdjust?, decision:{model, modelId, effort,
-  routeChain, routeRejected}}"
+  tier, routeChain, routeRejected, pick}}"
 maxOps: "the workflow's concurrent-operation ceiling is min(budgets.maxOps, maxParallelOps) — the
   owner's per-workflow budget and the worker-wide one, lower wins (engine/admission.mjs
   opSlotCeiling). A slot is held from the lease forward: leased, running, answering and the fenced
@@ -138,9 +137,9 @@ refuses:
     holder is only avoided, \"...; the agents that have it (...) are outside that order | no agent
     card lists it under capabilities.hostTools. Raise starci kernel incident --kind tool-unavailable for the
     owner.\" — both end \"The job stays queued; never dispatch it on an agent without the tool.\""
-  - "no decision (UNTYPED): selectPool returned none — capacity, eligibility or quota; a wait
+  - "no decision (UNTYPED): pickOpModel returned none — capacity, eligibility or quota; a wait
     reason, not a failure. This one refusal prints {ok:false, jobId, kind, difficulty, bias,
-    error:<selectPool message>} and exits 1 with no code string for the caller to match on"
+    error:<pickOpModel message>} and exits 1 with no code string for the caller to match on"
 usedBy: "drive.dispatch — `starci kernel route` runs BEFORE every `starci kernel dispatch`: the model decision is a
   ledger fact (payload + route-decided event), never an ad hoc kernel pick and never a dispatch-time
   surprise"

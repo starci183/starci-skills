@@ -132,11 +132,13 @@ test('five roles share one account slot; retries do not charge twice and changed
 test('cap zero, stale evidence and exhausted quota cannot be bypassed by an override', (t) => {
   const options = fixture(t), override = { authorized: true, scopeId: 'scope-a', role: 'worker', provider: 'codex', account: 'a', model: 'gpt-6.1-sol', reason: 'recover an existing critical operation' };
   assert.equal(reserveProviderBudget(input('zero', { maxParallel: 0, override }), options).reason, 'capacity');
-  const limited = { ...input().quota, windows: [{ ...input().quota.windows[0], usedPercent: 96 }] };
+  const limited = { ...input().quota, windows: [{ ...input().quota.windows[0], usedPercent: 93 }] };
   assert.equal(reserveProviderBudget(input('limited', { quota: limited }), options).reason, 'quota-reserve');
   assert.equal(reserveProviderBudget(input('wrong-scope', { quota: limited, override: { ...override, scopeId: 'elsewhere' } }), options).ok, false);
   assert.equal(reserveProviderBudget(input('forged', { quota: limited, override }), options).reason, 'quota-reserve', 'self-asserted authority is not a trusted grant');
   assert.equal(reserveProviderBudget(input('recovery', { quota: limited, override }), { ...options, authorizeOverride: (requested) => requested === override }).ok, true);
+  const beyond = { ...limited, windows: [{ ...limited.windows[0], usedPercent: 96 }] };
+  assert.equal(reserveProviderBudget(input('beyond-band', { quota: beyond, override }), { ...options, authorizeOverride: (requested) => requested === override }).reason, 'quota-reserve', 'the reserve band ends at 95 percent even with an authorized override');
   assert.equal(reserveProviderBudget(input('exhausted', { quota: { ...limited, windows: [{ ...limited.windows[0], usedPercent: 100 }] }, override }), options).reason, 'quota-ineligible');
   assert.equal(reserveProviderBudget(input('stale', { quota: { ...input().quota, observedAt: now - policy.maxAgeMs - 1 }, override }), options).reason, 'quota-ineligible');
 });

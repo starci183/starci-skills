@@ -244,7 +244,7 @@ const fixture=t=>{
   return {repo,env,run,calls,callArgv};
 };
 
-const seedOp=(fx,{jobId,model})=>{
+const seedOp=(fx,{jobId,model,difficulty='hard'})=>{
   const ledger=openLedger({file:ledgerFileFor(fx.repo)});
   try{
     ledger.ensureWorkflow({workflowId:'wf-launch'});
@@ -253,7 +253,7 @@ const seedOp=(fx,{jobId,model})=>{
     ledger.db.prepare("UPDATE jobs SET status='running',worker_id='fake-kernel-terminal' WHERE job_id='kernel-wf-launch'").run();
     ledger.write.createUnit({workflowId:'wf-launch',unitId:jobId,opId:'code.refactor',subjectKey:jobId,goalRevision:1});
     ledger.write.enqueueJob({jobId,workflowId:'wf-launch',opId:'code.refactor',kind:'op',status:'queued',unitId:jobId,
-      payload:{opId:'code.refactor',owned_paths:['docs/'],model,difficulty:'hard'}});
+      payload:{opId:'code.refactor',owned_paths:['docs/'],model,difficulty}});
   }finally{ledger.close();}
 };
 
@@ -292,8 +292,8 @@ test('actual unpinned Kernel boot prepares missing and current stores after its 
     } else assert.equal(fs.existsSync(fx.env.STARCI_TEST_MACHINE_FILE), false);
     const boot = fx.run(START_WORKFLOW, '--repo', fx.repo, '--goal', workflowId, '--json');
     assert.equal(boot.status, 0, boot.stderr || boot.stdout);
-    assert.equal(json(boot.stdout).routedBy, 'route-model');
-    assert.ok(['gpt-6.1-sol', 'claude-opus-5-5'].includes(json(boot.stdout).model), boot.stdout);
+    assert.equal(json(boot.stdout).routedBy, 'tier');
+    assert.ok(['gpt-6.1-sol', 'claude-sonnet-5-5'].includes(json(boot.stdout).model), boot.stdout);
     const raw = new DatabaseSync(fx.env.STARCI_TEST_MACHINE_FILE, { readOnly: true });
     try {
       assert.equal(raw.prepare('PRAGMA user_version').get().user_version, MACHINE_VERSION);
@@ -312,7 +312,7 @@ for(const [model,agent,takesModel] of [['claude-agent','claude',true],['codex-ag
     fs.mkdirSync(path.join(fx.repo,'docs'),{recursive:true});
     registerWorkflowWorktree({env:fx.env},{workflowId:'wf-launch',orcaWorktreeId:made.worktree.id,path:fx.repo,branch:made.worktree.branch});
     const jobId=`job-${agent}`;
-    seedOp(fx,{jobId,model});
+    seedOp(fx,{jobId,model,difficulty:agent==='devin'?'medium':'hard'});
     const r=fx.run(API,'dispatch','--repo',fx.repo,'--job',jobId,'--model',model,'--spawn','--json');
     assert.equal(r.status,0,`dispatch failed: ${r.stderr||r.stdout}`);
     const seen=fx.calls();

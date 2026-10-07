@@ -3,10 +3,12 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { selectAdmission } from '../../scripts/lib/agent-admission.mjs';
-import { selectPool, loadRuntimes, loadModelRegistry } from '../../scripts/agent/models.mjs';
+import { loadRuntimes, loadModelRegistry } from '../../scripts/agent/models.mjs';
+import { shippedTiers } from '../../engine/model-config.mjs';
+import { fakePoolSelection as selectPool } from '../helpers/fake-admission.mjs';
 
 const now = Date.parse('2026-10-03T08:00:00Z');
-const policy = parseYaml(fs.readFileSync(new URL('../../modules/models/runtimes.yaml', import.meta.url), 'utf8')).allocation.admission;
+const policy = { ...parseYaml(fs.readFileSync(new URL('../../modules/models/runtimes.yaml', import.meta.url), 'utf8')).allocation.admission, ...shippedTiers().usage };
 const quota = (provider, usedPercent = 30, extra = {}) => ({ provider, account: 'default', authority: 'provider-windows',
   auth: 'ok', state: usedPercent >= 90 ? 'limited' : 'ok', fresh: true, observedAt: now,
   normalAdmission: usedPercent < 90, allowLaunchAttempt: usedPercent < 90,
@@ -44,52 +46,47 @@ test('null models and preferred identities outside the concrete group never beco
   assert.equal(choose([sol()], { allowGroup: [{ provider: 'codex', model: null }] }).reason, 'allow-group-invalid');
 });
 
-test('difficulty floors cannot be lowered by explicit input and a caller may raise the minimum', () => {
+test('a request cannot lower the role floor and a caller may raise the minimum', () => {
   const sonnet = candidate('sonnet', 'claude', 'claude-sonnet-5-5', { qualityFloor: 'standard' });
-  const allowGroup = [{ provider: 'claude', model: sonnet.model }, { provider: 'claude', model: 'claude-opus-5-5' }];
-  for (const difficulty of ['hard', 'insane']) {
-    for (const qualityFloor of ['economy', 'standard']) {
-      const lower = choose([sonnet, opus()], { difficulty, qualityFloor, allowGroup });
-      assert.equal(lower.reason, 'quality-floor-invalid');
-      assert.equal(lower.selected, null);
-    }
-    const minimum = choose([sonnet, opus()], { difficulty, allowGroup });
-    assert.equal(minimum.selected.id, 'opus');
-    assert.equal(minimum.request.qualityFloor, 'frontier');
-    assert.equal(minimum.request.difficulty, difficulty);
-    assert.ok(minimum.rejected[0].codes.includes('quality-floor-not-met'));
-  }
-  const raised = choose([sonnet], { difficulty: 'easy', qualityFloor: 'standard', allowGroup });
-  assert.equal(raised.ok, true);
+  const luna = candidate('luna', 'codex', 'gpt-6-luna', { qualityFloor: 'economy' });
+  const allowGroup = [{ provider: 'claude', model: sonnet.model }, { provider: 'codex', model: luna.model }];
+  const kernel = (extra) => choose([sonnet, luna], { role: 'kernel', allowGroup, ...extra });
+  assert.equal(kernel({ qualityFloor: 'economy' }).reason, 'quality-floor-invalid');
+  assert.equal(kernel({}).selected.id, 'sonnet');
+  assert.ok(kernel({}).rejected.find((row) => row.id === 'luna').codes.includes('quality-floor-not-met'));
+  const raised = choose([sonnet, luna], { difficulty: 'easy', qualityFloor: 'standard', allowGroup });
+  assert.equal(raised.selected.id, 'sonnet');
   assert.equal(raised.request.qualityFloor, 'standard');
-  assert.equal(choose([opus()], { difficulty: 'unknown' }).reason, 'quality-floor-invalid');
-  const roleMinimum = { ...policy, roles: { ...policy.roles,
-    kernel: { qualityFloor: 'standard', difficultyFloors: { easy: 'economy' } } } };
-  assert.equal(choose([sonnet], { role: 'kernel', difficulty: 'easy', qualityFloor: 'economy', allowGroup },
-    { policy: roleMinimum }).reason, 'quality-floor-invalid');
+  assert.equal(choose([luna], { difficulty: 'easy', allowGroup }).ok, true);
+  assert.equal(choose([sonnet], { qualityFloor: 'unknown', allowGroup }).reason, 'quality-floor-invalid');
 });
 
-test('fresh real headroom changes selection inside a group while scoped prefer remains an eligible bias', () => {
-  const busy = candidate('busy', 'codex', 'gpt-6.1-sol', { quota: quota('codex', 85) });
-  const free = candidate('free', 'claude', 'claude-opus-5-5', { quota: quota('claude', 10) });
-  assert.equal(choose([busy, free]).selected.id, 'free');
-  assert.equal(choose([busy, free], { prefer: [{ provider: 'codex' }] }).selected.id, 'busy');
-  busy.capacity = { running: 5, maxParallel: 5 };
-  assert.equal(choose([busy, free], { prefer: [{ provider: 'codex' }] }).selected.id, 'free');
+test('tokens decide inside a chain: chain order below 90 percent, the next member at or above it', () => {
+  const head = (used, extra = {}) => candidate('head', 'codex', 'gpt-6.1-sol', { quota: quota('codex', used), ...extra });
+  const next = candidate('next', 'claude', 'claude-opus-5-5', { quota: quota('claude', 10) });
+  assert.equal(choose([head(85), next]).selected.id, 'head');
+  const skipped = choose([head(92), next]);
+  assert.equal(skipped.selected.id, 'next');
+  assert.deepEqual(skipped.pick.dropped.map((row) => [row.id, row.step]), [['head', 'tokens']]);
+  assert.equal(choose([head(92), next], { prefer: [{ provider: 'codex' }] }).selected.id, 'next', 'an untrusted bias never widens the band');
+  assert.equal(choose([head(92), next], { prefer: [{ provider: 'codex' }], biasTrusted: true }).selected.id, 'head');
+  assert.equal(choose([head(96), next], { prefer: [{ provider: 'codex' }], biasTrusted: true }).selected.id, 'next');
+  assert.equal(choose([head(5, { capacity: { running: 5, maxParallel: 5 } }), next], { prefer: [{ provider: 'codex' }], biasTrusted: true }).selected.id, 'next');
 });
 
-test('hard require refuses rather than falling back and every specified identity field matches', () => {
-  const result = choose([sol(), opus()], { require: { provider: 'claude', model: 'gpt-6.1-sol' } });
+test('only keeps the named members, refuses an emptied chain and every specified identity field matches', () => {
+  const result = choose([sol(), opus()], { only: [{ provider: 'claude', model: 'gpt-6.1-sol' }] });
   assert.equal(result.ok, false);
-  assert.equal(result.reason, 'required-unavailable');
+  assert.equal(result.reason, 'bias-empties-chain');
   assert.equal(result.selected, null);
-  assert.equal(choose([sol(), opus()], { require: { pool: 'claude-agent', provider: 'claude' } }).selected.id, 'opus');
-  assert.equal(choose([sol()], { require: {} }).reason, 'constraint-invalid');
-  assert.equal(choose([sol()], { require: { provider: 'codex' }, avoid: [{ provider: 'codex' }] }).reason, 'require-avoid-conflict');
+  assert.equal(choose([sol(), opus()], { only: [{ pool: 'claude-agent', provider: 'claude' }] }).selected.id, 'opus');
+  assert.equal(choose([sol(), opus()], { only: [{ provider: 'codex' }, { provider: 'claude' }] }).selected.id, 'sol');
+  assert.equal(choose([sol()], { only: [{}] }).reason, 'constraint-invalid');
+  assert.equal(choose([sol()], { only: [{ provider: 'codex' }], avoid: [{ provider: 'codex' }] }).reason, 'only-avoid-conflict');
   assert.equal(choose([sol()], { prefer: [{ unsupported: 'codex' }] }).reason, 'constraint-invalid');
 });
 
-test('every short and long window blocks normal admission at the reserve boundary', () => {
+test('every short and long window is a token step at the reserve boundary', () => {
   for (const usedPercent of [90, 99, 100]) {
     const snapshot = quota('codex', 5, { windows: [
       { id: 'short', usedPercent: 5, observedAt: now, resetsAt: now + 3_600_000 },
@@ -97,20 +94,21 @@ test('every short and long window blocks normal admission at the reserve boundar
     ] });
     const result = choose([candidate('sol', 'codex', 'gpt-6.1-sol', { quota: snapshot }), opus()]);
     assert.equal(result.selected.id, 'opus');
-    assert.ok(result.rejected[0].codes.includes(usedPercent === 100 ? 'quota-exhausted' : 'quota-reserved'));
+    assert.match(result.pick.dropped[0].reason, usedPercent === 100 ? /exhausted/ : /% or more of its tokens/);
   }
 });
 
-test('a scoped reserve override admits only its exact fresh identity below exhaustion', () => {
+test('a scoped reserve override admits only its exact fresh identity inside the 90 to 95 band', () => {
   const reserveOverride = { authorized: true, scopeId: 'workflow/op', role: 'op', provider: 'codex', model: 'gpt-6.1-sol', reason: 'owner recovery' };
-  const reserved = candidate('sol', 'codex', 'gpt-6.1-sol', { quota: quota('codex', 95) });
+  const reserved = candidate('sol', 'codex', 'gpt-6.1-sol', { quota: quota('codex', 92) });
   const result = choose([reserved], { reserveOverride });
   assert.equal(result.ok, true);
   assert.equal(result.overrideApplied, true);
+  assert.equal(choose([{ ...reserved, quota: quota('codex', 95) }], { reserveOverride }).ok, false, '95 percent is refused even with an override');
   assert.equal(choose([reserved], { reserveOverride: { ...reserveOverride, scopeId: 'other' } }).reason, 'reserve-override-invalid');
   assert.equal(choose([reserved], { reserveOverride: { ...reserveOverride, authorized: false } }).reason, 'reserve-override-invalid');
   assert.equal(choose([reserved], { reserveOverride: { ...reserveOverride, model: 'gpt-6-luna' } }).ok, false);
-  for (const snapshot of [quota('codex', 100), quota('codex', 95, { auth: 'unavailable' }), quota('codex', 95, { observedAt: now - policy.maxAgeMs - 1 }), quota('codex', 95, { state: 'unknown' })])
+  for (const snapshot of [quota('codex', 100), quota('codex', 92, { auth: 'unavailable' }), quota('codex', 92, { observedAt: now - policy.maxAgeMs - 1 }), quota('codex', 92, { state: 'unknown' })])
     assert.equal(choose([{ ...reserved, quota: snapshot }], { reserveOverride }).ok, false);
 });
 
@@ -147,14 +145,14 @@ test('Critic provider independence is mandatory and stricter model independence 
   assert.equal(choose([opus()], { role: 'critic', author, independence: 'both' }).ok, true);
 });
 
-test('opaque logical model identities cannot satisfy concrete requirements or model independence', () => {
+test('opaque logical model identities cannot satisfy concrete only-models or model independence', () => {
   const opaque = candidate('logical', 'claude', 'claude-opus-5-5', { modelAuthority: 'configured-logical-runtime' });
-  assert.equal(choose([opaque], { require: { provider: 'claude' } }).ok, true);
-  const required = choose([opaque], { require: { model: opaque.model } });
-  assert.equal(required.reason, 'required-unavailable');
-  assert.ok(required.rejected[0].codes.includes('required-model-unverifiable'));
-  const unknown = choose([{ ...opaque, modelAuthority: null }], { require: { model: opaque.model } });
-  assert.ok(unknown.rejected[0].codes.includes('required-model-unverifiable'));
+  assert.equal(choose([opaque], { only: [{ provider: 'claude' }] }).ok, true);
+  const required = choose([opaque], { only: [{ model: opaque.model }] });
+  assert.equal(required.reason, 'no-eligible-candidate');
+  assert.ok(required.rejected[0].codes.includes('only-model-unverifiable'));
+  const unknown = choose([{ ...opaque, modelAuthority: null }], { only: [{ model: opaque.model }] });
+  assert.ok(unknown.rejected[0].codes.includes('only-model-unverifiable'));
   const author = { provider: 'codex', model: 'gpt-6.1-sol', modelAuthority: 'supported-model-argument' };
   assert.equal(choose([opaque], { role: 'critic', author }).ok, true);
   const independent = choose([opaque], { role: 'critic', author, independence: 'both' });
@@ -182,29 +180,33 @@ test('plans are deterministic and leave caller inputs unchanged', () => {
   assert.equal(first.policyVersion, policy.version);
 });
 
-test('live Op pool routing uses common headroom and concrete owner constraints without widening its kind group', () => {
+test('live Op routing walks the tier chain by tokens and keeps the concrete owner only inside it', () => {
   const runtimes = loadRuntimes(), modelRegistry = loadModelRegistry();
-  const capacity = Object.fromEntries(Object.entries(runtimes.runtimes).map(([pool, row]) => [pool, {
-    running: 0, auth: 'ok', quota: quota(row.provider, row.provider === 'codex' ? 10 : 70),
-  }]));
+  const capacity = (claude, codex) => ({ 'claude-agent': { running: 0, auth: 'ok', quota: quota('claude', claude) }, 'codex-agent': { running: 0, auth: 'ok', quota: quota('codex', codex) } });
   const route = (extra = {}) => selectPool({ kind: 'backend.implement', difficulty: 'hard', runtimes, modelRegistry,
-    capacity, scopeId: 'workflow/op', attemptId: 'attempt-1', now, backoff: {}, ...extra });
-  assert.equal(route().target, 'codex-agent');
-  assert.equal(route().admission.ok, true);
-  assert.equal(route({ qualityFloor: 'standard' }).admission.reason, 'quality-floor-invalid');
-  assert.equal(route({ bias: { require: { provider: 'claude', model: 'claude-opus-5-5' } } }).target, 'claude-agent');
-  assert.ok(route({ bias: { require: { provider: 'codex', model: 'gpt-6-luna' } } }).error);
-  const unknown = { ...capacity, 'codex-agent': { running: 0, auth: 'ok', quota: { state: 'unknown' } } };
-  const result = route({ capacity: unknown, bias: { require: { provider: 'codex' } } });
-  assert.equal(result.admission.reason, 'required-unavailable');
-  assert.ok(result.admission.rejected.find((row) => row.id === 'codex-agent').codes.includes('quota-unknown'));
+    capacity: capacity(70, 10), scopeId: 'workflow/op', attemptId: 'attempt-1', now, ...extra });
+  const head = route();
+  assert.equal(head.tier, 'high');
+  assert.equal(head.target, 'claude-agent');
+  assert.equal(head.modelId, 'claude-sonnet-5-5');
+  assert.equal(head.admission.ok, true);
+  assert.equal(route({ capacity: capacity(92, 10) }).modelId, 'gpt-6.1-sol');
+  assert.equal(route({ qualityFloor: 'frontier' }).modelId, 'gpt-6.1-sol', 'a raised minimum drops the member below it');
+  assert.equal(route({ bias: { only: [{ provider: 'codex', model: 'gpt-6.1-sol' }] } }).target, 'codex-agent');
+  assert.match(route({ bias: { only: [{ provider: 'codex', model: 'gpt-6-luna' }] } }).error, /refused/);
+  const unknown = { ...capacity(70, 10), 'codex-agent': { running: 0, auth: 'ok', quota: { state: 'unknown' } } };
+  const result = route({ capacity: unknown, bias: { only: [{ provider: 'codex' }] } });
+  assert.equal(result.admission.reason, 'bias-empties-chain');
+  assert.ok(result.admission.rejected.find((row) => row.id.startsWith('codex/')).codes.includes('quota-unknown'));
   assert.equal(route({ kind: 'interface.asset', bias: { prefer: [{ provider: 'claude' }] } }).target, 'codex-agent');
+  assert.equal(route({ kind: 'interface.asset' }).tier, 'imagegen');
 });
 
-test('static pool policy planning cannot claim fresh live admission or spend a concrete owner requirement', () => {
-  const result = selectPool({ kind: 'backend.implement', difficulty: 'medium', backoff: {} });
+test('static pool policy planning cannot claim fresh live admission or spend a concrete owner only-model', () => {
+  const result = selectPool({ kind: 'backend.implement', difficulty: 'medium' });
   assert.equal(result.admission.ok, false);
   assert.equal(result.admission.planOnly, true);
   assert.equal(result.admission.reason, 'live-evidence-required');
-  assert.ok(selectPool({ kind: 'backend.implement', difficulty: 'medium', bias: { require: { provider: 'codex' } }, backoff: {} }).error);
+  assert.ok(selectPool({ kind: 'backend.implement', difficulty: 'medium', bias: { only: [{ provider: 'claude' }] } }).error, 'medium has no Claude member');
+  assert.equal(result.pick.tier, 'medium');
 });

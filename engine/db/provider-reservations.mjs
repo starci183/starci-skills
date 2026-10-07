@@ -8,13 +8,16 @@ export function providerReservationMethods({ need, parse, toJson, hex }) {
     handle: row.handle, pid: row.pid, launchIdentity: row.launch_identity, hostRequestId: row.host_request_id, createdAt: row.created_at, updatedAt: row.updated_at,
     scope: parse(row.scope_json), estimate: parse(row.estimate_json), quota: parse(row.quota_json),
     override: parse(row.override_json), releasedAt: row.released_at, proof: parse(row.proof_json) } : null;
-  function providerReservations(m, { provider = null, account = null, activeOnly = false } = {}) {
+  // `tier` keeps the rows whose scope names that tier; `limit` returns the newest rows first (the tier's recent picks).
+  function providerReservations(m, { provider = null, account = null, activeOnly = false, tier = null, limit = null } = {}) {
     const where = [], args = [];
+    if (tier !== null) { where.push("json_extract(scope_json,'$.tier')=?"); args.push(tier); }
     if (provider !== null) { where.push('provider=?'); args.push(provider); }
     if (account !== null) { where.push('account=?'); args.push(account); }
     if (activeOnly) where.push("state<>'released'");
     const clause = where.length ? ` WHERE ${where.join(' AND ')}` : '';
-    return m.db.prepare(`SELECT * FROM provider_reservations${clause} ORDER BY fence`).all(...args).map(providerReservationRow);
+    const order = limit === null ? 'ORDER BY fence' : `ORDER BY fence DESC LIMIT ${Number(limit) | 0}`;
+    return m.db.prepare(`SELECT * FROM provider_reservations${clause} ${order}`).all(...args).map(providerReservationRow);
   }
   function providerReservationUsage(m, { provider, account = 'default' } = {}) {
     const reservations = providerReservations(m, { provider, account, activeOnly: true });

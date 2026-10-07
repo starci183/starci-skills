@@ -253,9 +253,8 @@ fields:
       Eligibility is evaluated against the kind's ROLE
       (modules/models/kinds.yaml role: resolved through
       modules/models/runtimes.yaml roleOfKind;
-      scripts/agent/models.mjs selectPool); a verify op additionally avoids the
-      implementing runtime
-      (modules/models/runtimes.yaml verifyAvoidsImplementRuntime). A
+      scripts/agent/op-pick.mjs pickOpModel over the tier chain of
+      modules/models/tiers.yaml). A
       model NAME is an
       availability fact, never proof of capability
       (modules/models/selection.yaml, modules/models/capabilities.yaml rule).

@@ -15572,7 +15572,7 @@ capacity-unknown:
 constraint-invalid:
   title: "Invalid admission identity constraint"
   title_vi: "Ràng buộc danh tính admission không hợp lệ"
-  meaning_vi: "Prefer, avoid hoặc require có hình dạng, trường hay giá trị không hợp lệ nên ý định chọn agent không thể được áp dụng an toàn."
+  meaning_vi: "Prefer, avoid hoặc only có hình dạng, trường hay giá trị không hợp lệ nên ý định chọn agent không thể được áp dụng an toàn."
   causes_vi:
     - "Selector trống, dùng trường ngoài pool, provider, model hoặc có giá trị không phải chuỗi có nội dung."
   nextStep_vi: "Sửa ý định chọn agent thành selector cụ thể hợp lệ tại nguồn đã được owner phê duyệt."
@@ -15667,16 +15667,6 @@ outside-allow-group:
     - "Phép chiếu pool và nhóm được phép không khớp, hoặc caller đưa thêm một model ngoài nhóm."
   nextStep_vi: "Sửa nguồn phép chiếu theo nhóm đã khai báo; chỉ thay đổi nhóm khi đúng thẩm quyền cho phép."
   owner: runtime-core
-  kind: dispatch-refusal
-
-owner-avoided:
-  title: "Candidate matches an owner avoid constraint"
-  title_vi: "Ứng viên khớp ràng buộc avoid của owner"
-  meaning_vi: "Ứng viên khớp selector mà owner yêu cầu tránh trong phạm vi vai trò hiện tại nên bị loại khỏi kế hoạch."
-  causes_vi:
-    - "Provider, model hoặc pool của ứng viên khớp ý định avoid đang áp dụng."
-  nextStep_vi: "Chọn ứng viên hợp lệ khác trong nhóm; nếu cần thay ràng buộc thì xin owner cập nhật ý định đã lưu."
-  owner: owner
   kind: dispatch-refusal
 
 owner-grant-full:
@@ -15799,16 +15789,6 @@ quota-policy-invalid:
   owner: runtime-core
   kind: input-invalid
 
-quota-reserved:
-  title: "Quota has reached the protected reserve"
-  title_vi: "Quota đã vào vùng giữ lại được bảo vệ"
-  meaning_vi: "Ít nhất một cửa sổ quota đạt vùng giữ lại và chưa cạn, nhưng yêu cầu không có quyền owner cụ thể hợp lệ để dùng vùng này."
-  causes_vi:
-    - "Quota đạt ngưỡng giữ lại, hoặc override không khớp provider, account, model, vai trò và phạm vi."
-  nextStep_vi: "Chọn ứng viên hợp lệ khác trong nhóm, chờ quota hồi phục hoặc xin owner cấp quyền rõ cho đúng lần thử; quyền này không vượt được quota đã cạn."
-  owner: owner
-  kind: dispatch-refusal
-
 quota-stale:
   title: "Quota admission evidence is stale"
   title_vi: "Chứng cứ quota không còn mới"
@@ -15869,45 +15849,45 @@ request-invalid:
   owner: runtime-core
   kind: input-invalid
 
-require-avoid-conflict:
-  title: "Required identity conflicts with avoid"
-  title_vi: "Danh tính bắt buộc mâu thuẫn với avoid"
-  meaning_vi: "Ràng buộc avoid loại bỏ mọi ứng viên có thể khớp danh tính require của cùng yêu cầu."
+only-avoid-conflict:
+  title: "Only list conflicts with avoid"
+  title_vi: "Danh sách only mâu thuẫn với avoid"
+  meaning_vi: "Ràng buộc avoid loại bỏ mọi thành viên mà only đã chọn trong cùng yêu cầu."
   causes_vi:
-    - "Owner yêu cầu một provider, model hoặc pool đồng thời yêu cầu tránh chính danh tính đó."
-  nextStep_vi: "Owner sửa mâu thuẫn trong ý định đã lưu; bộ chọn không tự bỏ require hay avoid."
+    - "Owner chỉ định một provider, model hoặc pool bằng only đồng thời yêu cầu tránh chính danh tính đó."
+  nextStep_vi: "Owner sửa mâu thuẫn trong ý định đã lưu; bộ chọn không tự bỏ only hay avoid."
   owner: owner
   kind: input-invalid
 
-required-identity-mismatch:
-  title: "Candidate does not match the required identity"
-  title_vi: "Ứng viên không khớp danh tính bắt buộc"
-  meaning_vi: "Ứng viên không khớp toàn bộ các trường pool, provider và model đã được require cho yêu cầu hiện tại."
-  causes_vi:
-    - "Ứng viên chỉ khớp một phần selector bắt buộc hoặc thuộc danh tính khác."
-  nextStep_vi: "Chỉ chọn ứng viên khớp đầy đủ require trong nhóm; nếu không có thì báo thiếu danh tính bắt buộc, không nới ràng buộc."
-  owner: owner
-  kind: dispatch-refusal
-
-required-model-unverifiable:
-  title: "Required concrete model cannot be verified"
-  title_vi: "Không kiểm chứng được model cụ thể bắt buộc"
-  meaning_vi: "Ứng viên không có thẩm quyền chứng minh model cụ thể dù tên khai báo khớp require.model; tên runtime logic không phải bằng chứng model thực tế."
+only-model-unverifiable:
+  title: "A concrete model named by only cannot be verified"
+  title_vi: "Không kiểm chứng được model cụ thể mà only chỉ định"
+  meaning_vi: "Thành viên không có thẩm quyền chứng minh model cụ thể dù tên khai báo khớp only.model; tên runtime logic không phải bằng chứng model thực tế."
   causes_vi:
     - "Agent không hỗ trợ đối số chọn model hoặc chứng cứ khả năng chọn model bị thiếu, không hợp lệ."
-  nextStep_vi: "Dùng ứng viên hỗ trợ model cụ thể có thể kiểm chứng, hoặc xin owner sửa require; không giữ chỗ hay khởi động để thử đoán model."
+  nextStep_vi: "Dùng thành viên hỗ trợ model cụ thể có thể kiểm chứng, hoặc xin owner sửa only; không giữ chỗ hay khởi động để thử đoán model."
   owner: owner
   kind: dispatch-refusal
 
-required-unavailable:
-  title: "Required admission identity is unavailable"
-  title_vi: "Danh tính admission bắt buộc chưa khả dụng"
-  meaning_vi: "Không có ứng viên đủ điều kiện khớp require trong nhóm được phép, nên yêu cầu bị từ chối thay vì chọn danh tính khác."
+bias-empties-chain:
+  title: "The owner bias leaves no member of the tier"
+  title_vi: "Ý định của owner loại hết thành viên của nhóm"
+  meaning_vi: "Sau bộ lọc cứng, only và avoid của owner không để lại thành viên nào trong chuỗi của nhóm, nên yêu cầu bị từ chối thay vì chọn thành viên khác."
   causes_vi:
-    - "Danh tính bắt buộc không có trong nhóm, không kiểm chứng được model hoặc bị loại bởi quota, dung lượng, chất lượng hay độc lập."
-  nextStep_vi: "Đọc mã loại của các ứng viên khớp require và khôi phục điều kiện; chỉ owner đúng thẩm quyền mới được đổi ràng buộc bắt buộc."
+    - "Only chỉ tới thành viên không thuộc nhóm hoặc đã bị loại bởi bộ lọc cứng, hoặc avoid loại mọi thành viên còn lại."
+  nextStep_vi: "Đọc bản ghi chọn: thành viên nào bị loại ở bước nào; chỉ owner đúng thẩm quyền mới được đổi only hoặc avoid."
   owner: owner
   kind: dispatch-refusal
+
+tokens-out:
+  title: "Every member of the tier is out of tokens"
+  title_vi: "Mọi thành viên của nhóm đã hết token"
+  meaning_vi: "Mọi thành viên còn lại của chuỗi đã dùng từ 90 phần trăm token (từ 95 phần trăm khi owner chỉ đích danh thành viên đó) nên việc mới bị từ chối."
+  causes_vi:
+    - "Quota của các provider trong nhóm ở vùng dự phòng hoặc đã cạn."
+  nextStep_vi: "Chờ giờ quota reset sớm nhất ghi trong biên nhận, hoặc owner chỉ đích danh một thành viên còn dưới 95 phần trăm."
+  owner: supervisor
+  kind: blocker
 
 reserve-override-invalid:
   title: "Invalid scoped quota reserve override"

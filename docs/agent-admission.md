@@ -7,19 +7,19 @@ checks membership, the minimum registry tier declared for the role and operation
 quota identity and freshness, available slots, and critic independence before ranking. Registry tier describes model
 policy and keeps qualification evidence separate. The canonical agent card supplies `modelAuthority`: a supported model
 argument identifies a selectable launch model, while a configured logical runtime names an opaque CLI default without
-attesting its underlying model. A concrete `require.model` or model-level Critic independence refuses opaque or unknown authority.
+attesting its underlying model. A concrete `only.model` or model-level Critic independence refuses opaque or unknown authority.
 
 `selectAdmission({request,candidates,policy,now})` in `scripts/lib/agent-admission.mjs` reads no files or runtime state.
-`policy` is `allocation.admission` from `modules/models/runtimes.yaml`. Its receipt reports policy version, the logical
+`policy` is `allocation.admission` from `modules/models/runtimes.yaml` with the usage thresholds of `modules/models/tiers.yaml` (`usage`). The candidates are the members of one tier chain (`modules/models/tiers.yaml`), and the receipt's `pick` is the common picker's record: `scripts/lib/tier-pick.mjs` applies the hard filter, the owner bias, a live seat's own member, the balance step (`balance.maxStreak`, `balance.maxSharePercent`) and the chain order by tokens, in that precedence. Its receipt reports policy version, the logical
 attempt and scope, the selected concrete identity, every eligible identity in deterministic order, and typed rejections.
 
-`prefer` and `avoid` are arrays of selectors; `require` is one selector. A selector names `pool`, `provider`, `model`,
-or a combination. Prefer cannot add a candidate to the allow group. An unavailable require refuses the request. Owner
-bias carries a role scope from `allocation.admission.ownerBiasRoles`, so an Op requirement does not constrain its independent Critic.
+`prefer`, `avoid` and `only` are arrays of selectors. A selector names `pool`, `provider`, `model`,
+or a combination (a pool id string names the pool). Prefer moves a member first and cannot add a candidate to the allow group; avoid removes it; only keeps the named members. A bias that leaves no member refuses the request and says why; the picker never drops the bias itself. Owner
+bias carries a role scope from `allocation.admission.ownerBiasRoles` (every seat by default), narrowed by the bias's own `roles`.
 
 Window authority includes every available short and long window. Each snapshot and window must be fresh, bound to the
-candidate's provider/account, and authenticated. At the declared reserve threshold a window refuses normal new admission. A trusted owner
-may authorize an exact scope, role, provider and model to use this reserve while all windows remain below the declared exhaustion threshold.
+candidate's provider/account, and authenticated. At the declared reserve threshold (90 percent) an automatic pick skips the member for this pick only; it stays in the chain. A trusted owner
+bias that names the member, or an owner reserve grant for an exact scope, role, provider and model, keeps it usable from 90 up to 95 percent (`usage.biasPercent`); from 95 percent a member is refused even with a bias.
 Unknown, stale, exhausted or unauthenticated capacity cannot be overridden. Providers without window telemetry use a
 fresh explicit owner grant with scoped roles and finite slots; they receive no invented usage percentage.
 

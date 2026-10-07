@@ -184,9 +184,12 @@ test('handover.review is a valid op manifest wired into the kind catalog, the ro
   assert.deepEqual(handoverRoutes.map(r=>r.on.answer),HANDOVER_DECISIONS,'one route per answer, in option order');
   for(const r of handoverRoutes)assert.ok(routeIds.indexOf(r.id)<routeIds.indexOf('question-needs-the-user'),`${r.id} stands before the generic ask route`);
   assert.deepEqual(handoverRoutes.map(r=>r.to.kind),['same','lane.build','same'],'feedback repairs the build, approve and question run the handover again');
-  assert.deepEqual(readYaml('modules/models/runtimes.yaml').roleOfKind[HANDOVER_OP],{role:'verify',work:'think',floor:'hard',order:'review'});
-  // Owner decision 2026-09-25 review-hands: the hands write the handover verdict, Opus and Sol as overflow.
-  assert.deepEqual(readYaml('modules/models/registry.yaml').operators[HANDOVER_OP].chain,['devin-agent','claude-agent','codex-agent']);
+  assert.deepEqual(readYaml('modules/models/runtimes.yaml').roleOfKind[HANDOVER_OP],{role:'verify',work:'think',floor:'hard'});
+  // A hard verdict takes the high tier of modules/models/tiers.yaml (Sonnet 5.5, then Sol); no kind pins another tier.
+  const tiers=readYaml('modules/models/tiers.yaml');
+  assert.equal(tiers.difficulty.hard,'high');
+  assert.equal(tiers.kindTiers[HANDOVER_OP],undefined);
+  assert.deepEqual(tiers.tiers.high.map(member=>`${member.agent}/${member.model}`),['claude/claude-sonnet-5-5','codex/gpt-6.1-sol']);
 });
 
 test('a handover ask carries exactly the three options approve, feedback, question; starci kernel report refuses any other shape',async t=>{

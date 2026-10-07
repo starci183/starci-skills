@@ -52,11 +52,12 @@ export function fakePoolCapacity(runtimes, overrides = {}, { now = Date.now() } 
     openIncident: false, ...overrides[pool.target ?? id],
   }]));
 }
-import { selectPool, loadRuntimes } from '../../scripts/agent/models.mjs';
+import { loadRuntimes } from '../../scripts/agent/models.mjs';
+import { pickOpModel } from '../../scripts/agent/op-pick.mjs';
 
-
+/** The op router over explicit provider observations: `capacity` overrides per pool target; no capacity is a static plan. */
 export function fakePoolSelection(options) {
   const runtimes = options.runtimes ?? loadRuntimes();
-  return selectPool({ ...options, runtimes,
+  return pickOpModel({ ...options, runtimes,
     ...(options.capacity ? { capacity: fakePoolCapacity(runtimes, options.capacity) } : {}) });
 }

@@ -75,6 +75,9 @@ schemaToSchema:
   - {from: profile-registry, to: "modules/models/registry.yaml", type: governs,
      note: "registry.yaml carries schema: starci/profile-registry@1",
      source: "modules/models/registry.yaml:1"}
+  - {from: model-tiers, to: "modules/models/tiers.yaml", type: governs,
+     note: "tiers.yaml carries schema: starci/model-tiers@1",
+     source: "modules/models/tiers.yaml:1"}
 
   # --- assisted UAT ----------------------------------------------------------
   - {from: assisted-uat-request, to: assisted-uat-session-manifest, type: prepares,
@@ -137,7 +140,7 @@ schemaToSubsystem:
     note: "the contract document itself lives at modules/host/orca/calls.yaml and carries the schema const."
 
   model:            # model/runtime registry
-    schemas: [profile-registry]
+    schemas: [profile-registry, model-tiers]
     note: "governs modules/models/registry.yaml; the model-side detail lives in modules/models/."
 
   knowledge:        # authored guidance

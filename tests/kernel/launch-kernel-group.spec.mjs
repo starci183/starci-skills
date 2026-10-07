@@ -16,7 +16,7 @@ const fixture = (t, run) => withLedger(t, ({ ledger }) => {
     workflow: ledger.db.prepare('SELECT * FROM workflows WHERE workflow_id=?').get(workflowId),
     goal: ledger.db.prepare('SELECT * FROM goals WHERE workflow_id=?').get(workflowId)
   });
-  const members = [{ agent: 'codex', model: 'gpt-6.1-sol' }, { agent: 'claude', model: 'claude-opus-5-5' }];
+  const members = [{ id: 'codex/gpt-6.1-sol', agent: 'codex', model: 'gpt-6.1-sol' }, { id: 'claude/claude-opus-5-5', agent: 'claude', model: 'claude-opus-5-5' }];
   const config = { ledger, workflowId, token, expected, members, route: { ...members[0], members, fallThrough: true },
     launch: { request: { workflow: workflowId } }, reservationMs: 1000, hostUnavailableExit: 75,
     memberLabel: m => m.agent, failStart: (step, error) => { throw Object.assign(Error(error), { step }); } };
@@ -63,7 +63,7 @@ test('a no-effect refusal falls through under the same renewed accepted reservat
       : { ok: true, provider: input.provider, model: input.model };
   } });
   assert.deepEqual(calls.map(c => c.provider), ['codex', 'claude']);
-  assert.deepEqual(calls[1].allowGroup, [{ provider: 'claude', model: 'claude-opus-5-5', effort: undefined }]);
+  assert.deepEqual(calls[1].allowGroup, [{ id: 'claude/claude-opus-5-5', provider: 'claude', model: 'claude-opus-5-5', effort: undefined }], 'the remaining members keep their tier ids for the pick record');
   assert.equal(result.spawned.ok, true);
   assert.equal(result.fellThrough.length, 1);
 }));

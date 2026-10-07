@@ -3,7 +3,7 @@
 # This file IS the rule: every gate, ladder and named step below is owned here,
 # and the names in them (workloadFor, evaluateModelEligibility, providerFilter,
 # selectEligibleCandidate, ...) name rules in this document. The executable part
-# of the path is scripts/agent/models.mjs (selectPool, poolRejectionReasons) and
+# of the path is scripts/agent/op-pick.mjs (pickOpModel), scripts/lib/tier-pick.mjs (the one picker) and
 # scripts/route/route-model.mjs; the rest is what the kernel agent reasons with.
 # Allocation-order facts that live in modules/models/runtimes.yaml and
 # registry.yaml are in `allocationFacts` and cite those files instead.
@@ -36,9 +36,9 @@ newAgentAdmission:
     allowGroup: Concrete provider/model pairs resolved from the caller's declared role or operation group; null models are invalid.
     difficulty: The caller's measured operation difficulty after its declared kind floor is applied; allocation.admission.roles supplies any difficulty floor.
     qualityFloor: Registry model tier; the greater of the declared role and difficulty floors is the minimum and a caller may only raise it. Qualification/probation remains a separate prerequisite.
-    constraints: Ordered prefer and avoid selectors plus an optional hard require selector. Each selector contains only nonempty pool/provider/model fields, matched together.
+    constraints: Ordered prefer, avoid and only selector lists. Each selector contains only nonempty pool/provider/model fields, matched together. Prefer moves a member first, avoid removes it, only keeps the named members.
     reserveOverride: A trusted owner authorization for one exact scopeId, role, provider and model, optional account, and nonempty reason. The owner extraction path supplies provenance; workers cannot grant themselves an override.
-    ownerScope: Owner bias is applied only to its roles, defaulted through allocation.admission.ownerBiasRoles. A pure request has already been scoped; an Op require is not inherited by its Critic or Kernel.
+    ownerScope: Owner bias is applied only to its roles, defaulted through allocation.admission.ownerBiasRoles. A pure request has already been scoped; a bias applies to every seat unless its own roles narrow it.
   candidate:
     concrete: [id, provider, account, model, modelAuthority, effort, qualityFloor]
     modelAuthority: Canonical agent-card projection through model-registry.adapterModelAuthority; a logical runtime identity does not attest the provider CLI's underlying default model.
@@ -47,16 +47,17 @@ newAgentAdmission:
     capacity: Known running count and maxParallel including reserved, launching, live and uncertain starts; zero slots refuses.
   hardFilters:
     - Validate policy version, role floor, concrete group and caller constraints before ranking.
-    - Require group membership, model floor, existing eligibility, caller require, caller avoid, live capacity and closed incident/cooldown.
+    - Require group membership, model floor, existing eligibility, live capacity and closed incident/cooldown (the hard filter; a bias never restores a member it drops).
     - Missing, stale, invalid or mismatched quota/auth identity refuses every new normal admission; unknown is never presented as verified availability.
-    - Every available quota window participates; any window at or above reservePercent blocks normal admission.
-    - Only a matching scoped reserve override admits a fresh known reserve window below exhaustedPercent; bad auth, exhausted, stale and unknown cannot be overridden.
+    - Every available quota window participates; the most used window sets the member's token use. At or above reservePercent (90) an automatic pick skips the member for this pick only (it stays in the chain).
+    - A member named by the owner bias (prefer or only) or by a matching scoped reserve override stays usable from reservePercent up to biasPercent (95); at or above biasPercent no pick takes it. Bad auth, exhausted, stale and unknown cannot be overridden.
     - Evidence the runtime observes itself (owner grants, direct probes) is fresh within allocation.admission.maxAgeMs; a provider window the host polls (observation host-polled, the Orca account reader only) is fresh within hostPolledMaxAgeMs, which defaults to maxAgeMs.
     - Owner-grant providers have scoped finite slots and fresh owner authority; no window percentages are invented for them.
     - A Critic must have a known author provider and select another provider. A caller may tighten independence to both provider and model, never relax the role rule.
-    - Prefer ranks only candidates that passed every hard filter; require unavailability is a refusal with no silent fallback.
-    - A concrete require.model or model-level critic independence requires supported-model-argument authority; opaque or unknown model authority refuses that constraint.
-  ranking: Scoped preference, then the greater of real worst-window pressure and admitted-slot pressure, then declaration order. Owner-grant candidates contribute only admitted-slot pressure, never an invented quota percentage. Existing share/overflow/lineage rules may order only this eligible set; no synthetic quality score is used.
+    - Prefer ranks only candidates that passed every hard filter; an only list that no member survives is a refusal (bias-empties-chain) with no silent fallback.
+    - A concrete only.model or model-level critic independence requires supported-model-argument authority; opaque or unknown model authority refuses that constraint.
+  ranking: >-
+    The common picker (scripts/lib/tier-pick.mjs) applies the hard filter, owner bias, a live seat's member, balance (maxStreak, maxSharePercent), then chain order by tokens (allocationFacts). Owner-grant candidates contribute only admitted-slot pressure, never an invented quota percentage. No synthetic quality score is used.
   result: Policy-versioned starci/agent-admission@1 plan with the exact request identity, selected concrete candidate, ordered eligible set, and per-candidate typed rejection codes.
   reservation: The pure plan owns no runtime state. The adapter atomically reserves a provider/account slot with attemptId and fence before launch; downstream launchers consume and revalidate the same receipt without double reservation.
   uncertainLaunch: Live or uncertain reservations retain capacity until a matching attempt and fence carry authoritative no-effect or closure/process-exit evidence. An unknown launch requires the exact host-request replay proving no effect or closure evidence bound to its stored execution identity.
@@ -251,12 +252,12 @@ decisionFlow:
   - step: probation-fallback
     do: "if reasons non-empty AND a probation record exists: re-evaluate under recordGates; mode = 'probation'"
   - step: kernel-function
-    do: "if reasons remain AND workload.kind ∈ kernelFunctionKinds AND the runtime is on runtimes.yaml allocation.preference.sol-think (the kernel group; allocation.frontier is the fallback when sol-think is undeclared): eligible, mode = 'kernel-function'; no qualification record is required"
+    do: "if reasons remain AND workload.kind ∈ kernelFunctionKinds AND the runtime is a member of the tier of the kind's seat (modules/models/tiers.yaml kindSeats -> seats; frontier for the planner, validator and kernel manager): eligible, mode = 'kernel-function'; no qualification record is required"
     reason: >-
       The kernel's own model calls (the [Kernel] seat, its decisions and validations) are the
       runtime's control plane, not operation work: they carry no operation effects for a
-      qualification record to scope, and they run only on the owner-declared sol-think order
-      (GPT-6.1 Sol first, Claude Opus 5.5 as overflow — owner routing 2026-09-26). The qualification
+      qualification record to scope, and they run only on the members of their seat's tier
+      (modules/models/tiers.yaml: frontier is Claude Opus 5.5, then GPT-6.1 Sol). The qualification
       store ships empty, so without this step
       an elevated kernel route (model.manageWorkflow --risk high) refuses on every fresh install and
       a single-model config pin becomes the only way to boot a kernel. Qualified and probation
@@ -289,68 +290,71 @@ reviewerPolicy:
     - "candidate.contextDigest ≠ authorAttempt.hiddenContextDigest — 'review context includes author hidden history'."
   notes: >-
     providerDifferent and modelDifferent are REPORTED, not required —
-    capabilities.yaml: "differentProviderAloneIsInsufficient". runtimes.yaml adds
-    verifyAvoidsImplementRuntime: true — the allocator keeps the verifier off the
-    runtime that implemented the slice (scripts/agent/models.mjs selectPool cross-family audit: starci kernel route
-    passes the implementer's pool as auditOf for every verify kind), but eligibility itself is the gates above.
+    capabilities.yaml: "differentProviderAloneIsInsufficient". A Critic is independent by the
+    admission role policy (allocation.admission.roles.critic.independence), but eligibility itself is the gates above.
 
 # ---------------------------------------------------------------------------
 # 8. Ordering, fallback and failure — the facts the algorithm consumes
 #    sources: runtimes.yaml allocation + registry.yaml fallback/selection
 # ---------------------------------------------------------------------------
 allocationFacts:
-  policy: prefer-then-overflow        # runtimes.yaml default — try the preferred pool,
-                                      # overflow downward; never sideways-invent.
-  # config.yaml allocation.policy balanced replaces the pick, never the gates: the chain order ranks and the
-  # allocation.shares target caps - the first eligible pool of the chain still below its share of the recent
-  # dispatches wins, and when every eligible pool is at or over its share the one furthest below (least
-  # over) does (runtimes.yaml allocation.balanced; scripts/agent/balance.mjs counts, models.mjs selectPool
-  # picks).
-  balancedPolicy: modules/models/runtimes.yaml allocation.balanced
+  # One picker for every seat and every operation (scripts/lib/tier-pick.mjs, reached through scripts/lib/agent-admission.mjs
+  # selectAdmission). modules/models/tiers.yaml owns the data: tiers (ordered member chains), seats, difficulty, kindTiers,
+  # balance and usage. config.yaml `models` overrides any of those keys; there is no other policy key.
+  tiers: modules/models/tiers.yaml tiers
+  seats: modules/models/tiers.yaml seats and kindSeats         # supervisor, kernel, worker, planner, validator, kernelManager
+  difficultyTier: modules/models/tiers.yaml difficulty          # insane frontier, hard high, medium medium, easy low
+  kindTiers: modules/models/tiers.yaml kindTiers                # drawing ops take imagegen whatever their difficulty
+  callerSeat: modules/models/tiers.yaml callerSeatTiers         # core-debug runs in the caller's own app; never picked down a chain
   concurrency: modules/models/registry.yaml executionModel.concurrency
   workerCeiling: modules/models/runtimes.yaml maxParallelOps
-  difficultyVocabulary:               # pool models/effort maps and tier keys
+  difficultyVocabulary:               # tier keys of difficulty
     canonical: [easy, medium, hard, insane]
-  tiers: modules/models/runtimes.yaml allocation.tiers        # pool order per difficulty, keyed by role, `think` or a kind order
-  preference: modules/models/runtimes.yaml allocation.preference  # per-key order; `think` is the frontier order, `sol-think` the kernel functions' Sol-first order
+  precedence: hard filter > owner bias > a live seat keeps its member > balance > chain order by tokens
   poolSelection:
-    # The (role, difficulty) candidate chain — scripts/agent/models.mjs selectPool executes this.
+    # The tier of the work, then its chain - scripts/agent/op-pick.mjs pickOpModel executes this for an operation.
     chainRule: >-
-      chain(key, difficulty) = pools present in BOTH tiers[difficulty] (key first, then the tier's
-      default) AND preference[key], where key is the kind's runtimes.yaml roleOfKind `order` when it
-      declares one (scaffold, draw, review, ui, implement, sol-think), else `think` for a kind roleOfKind marks think work, else the role - a
-      hands-on cut slice of a fan-out walks the scaffold order unless its kind is pinned to draw, review or ui - and difficulty is the measured one raised to the kind's roleOfKind
-      floor (a floor never lowers it). Tier position is the outer sort; the preference order breaks
-      ties. A pool missing from either list is not on the chain at all.
+      tier = tiers.yaml kindTiers[kind] when the kind names one, else tiers.yaml difficulty[d] where d is the
+      measured difficulty raised to the kind's runtimes.yaml roleOfKind floor (a floor never lowers it). The
+      candidates are the members of that tier in chain order; a model may sit in several tiers. A seat takes the
+      tier of tiers.yaml seats (the Kernel manager, planner and validator calls through kindSeats).
+    hardFilter: >-
+      Per member, in order: a registry.yaml pool exists for its agent; the role is served by the pool; an
+      explicit-workflow-quota pool holds an owner grant covering the role with running < granted slots (when
+      config.yaml declares allocation.grants); the agent card carries every host tool the kind requires
+      (route.riskHints host-tool-required); the retry lineage has not excluded the pool (two attributable
+      failures; one failure demotes it behind the others); no provider circuit is open; then
+      newAgentAdmission enforces fresh identity-bound quota and auth, known capacity and no open incident. Missing or
+      unknown evidence refuses live routing. A call without a capacity map is only a static plan and reports
+      live-evidence-required; it is not an admission receipt and cannot authorize launch. Every dropped member is
+      reported with its typed reason in the pick record.
     bias: >-
-      newAgentAdmission request.constraints supplies concrete prefer, avoid and require selectors.
-      Pool strings normalize to pool selectors. Hard eligibility precedes preference and live pressure ranking.
-    overflow: >-
-      runtimes.yaml allocation.overflowByOrder[key] names pools the chain takes only when no other eligible
-      pool remains, under either policy - the review order's Opus and Sol (owner decision 2026-09-25
-      review-hands). A verify kind reviewing another op's output (scripts/agent/balance.mjs auditAuthorOf)
-      first narrows the eligible pools to another audit family than the author's (allocation.frontier and
-      allocation.hands, thinkAuditCrossFamily): a review of what Devin implemented goes to Opus or Sol;
-      the author's own family is taken only when no other family is eligible.
-    eligibility: >-
-      Per candidate, in order: pool exists in runtimes.yaml; role ∈ pool.roles OR the kind's order names a role the pool serves (the implement order carries the mechanical ops whatever their kind role — owner routing 2026-09-26); an explicit-workflow-quota
-      pool holds an owner grant covering the role with running < granted slots (when config.yaml declares
-      allocation.grants); pool.models[difficulty]
-      exists (no silent cross-difficulty fallback); then newAgentAdmission enforces fresh provider/account quota,
-      all-window reserve rules, concrete owner constraints, known capacity and no open incident. Missing/unknown
-      evidence refuses live routing. A selectPool call without a capacity map is only a static policy plan and
-      reports live-evidence-required; it is not an admission receipt and cannot authorize launch.
-      Every skipped pool is reported with its typed reason. A stale token is not admitted; the owner
-      re-authenticates in Orca, and admission requires fresh authenticated evidence. A confirmed auth
-      rejection opens the provider circuit and excludes every pool sharing that credential.
+      newAgentAdmission request prefer, avoid and only selectors (goal routing_bias, and the seat pin of config.yaml
+      kernel / supervisor.kernel as an only). Pool strings normalize to pool selectors. The hard filter precedes the bias,
+      and a bias applies to every seat unless its own roles narrow it. A bias that empties the chain refuses
+      (bias-empties-chain) and says why; the picker never drops the bias itself.
+    balance: >-
+      A head member picked tiers.yaml balance.maxStreak times in a row among the tier's recent picks, or holding more than
+      maxSharePercent of the tier's running seats (running seats counted), yields to the next member that passes the hard
+      filter and the token step; with no such member the head stays. A bias skips this step. There are no per-provider
+      weights (the former allocation.shares are removed).
+    tokens: >-
+      The first member below reservePercent (90) of its most used quota window; an automatic pick skips a member at or above
+      it for this pick only, and the member stays in the chain. A member named by the owner bias (prefer or only), or by an
+      owner reserve grant, stays usable up to biasPercent (95); from biasPercent no pick takes it, with or without a bias;
+      exhaustedPercent (100) is never used. Every member out of tokens refuses (tokens-out) and reports the earliest reset.
+    liveSeat: >-
+      A live seat keeps its member; the steps above apply only to a new pick or to the replacement of a dead seat.
+    record: >-
+      Every pick returns {tier, chain, steps[{step, chain}], dropped[{id, step, reason}], balance?, chosen{id, by}}; each
+      --plan and each route prints exactly this record and the route persists it as payload.pick.
     modelRule: >-
-      Each pool's registry.yaml difficulty pin resolves to a declared model identity and effort before common
-      admission; candidate.modelAuthority determines whether it names a selectable launch model or a configured
-      logical runtime. The selector evaluates that declared provider/model pair inside the kind group.
+      Each member names its model and effort; the launch attests the effective model against it (candidate.modelAuthority
+      says whether the card selects a launch model or names a configured logical runtime). The pool's defaultModel
+      only resolves a launch that names no model.
   note: >-
-    Tier/preference lists are within-family suitability for direct consumers,
-    NOT a provider fallback chain in a workflow (runtimes.yaml purpose). In a
-    workflow the kernel's providerFilter + declared operator chains decide.
+    A tier is the within-capability order the picker walks; in a workflow the kernel's providerFilter and the picker's
+    hard filter decide what may launch.
   cooldowns:                          # a failed runtime is parked, doubling per repeat
     rate-limited: 600000
     quota: 3600000
@@ -358,8 +362,9 @@ allocationFacts:
     other: 300000
     backoffFactor: 2
     maxCooldownMs: 3600000
-  onLaunchFailure: next-available-runtime
-  tieBreak: round-robin
+  launchFailure: >-
+    A member whose launch fails is skipped for that pick and the failure is recorded (kernel-start-failed, the provider
+    circuit and strikes); it stays in its chain and is picked again once the circuit is closed.
 fallback:
   # registry.yaml fallback — when a chain MAY advance to the next target
   advanceOnlyWhen:
@@ -381,5 +386,5 @@ misuseModes:
   - "probation-as-qualification: \"Probation never covers high/critical floors or highKinds; elevation strips it before the gates run (workloadFor).\""
   - "fallback-as-retry: \"Advancing a chain on a partial-effect failure re-executes real effects — forbidden without effectState 'none'.\""
   - "pool-name-as-model: \"A pool's models map pins the model per difficulty; attestation must match that pin, not the pool name (runtimes.yaml purpose).\""
-  - "bias-as-eligibility: \"prefer/avoid reorders or removes chain candidates; it cannot make a pool serve a role or difficulty it does not declare (poolSelection.bias).\""
+  - "bias-as-eligibility: \"prefer/avoid/only reorder or remove tier members; they cannot make a member serve a role or tool it does not declare (poolSelection.bias).\""
   - "supervisor-budget-burn: \"Kernel function calls skip the workflow probation budget deliberately — do not route them through operation accounting (MODEL_KINDS comment).\""

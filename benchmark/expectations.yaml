@@ -9,18 +9,19 @@
 # Never invent, estimate or carry a number from memory.
 #
 # Update rule: this file follows the contract. When modules/models/runtimes.yaml, registry.yaml, a profile
-# under modules/models/profiles/ or config.example.yaml allocation.shares changes a pool's role, order or
-# share, the same change (or the next one) updates the matching entry and `asOf`. Snapshots are never edited.
+# under modules/models/profiles/ or modules/models/tiers.yaml changes a pool's role, tier or member order,
+# the same change (or the next one) updates the matching entry and `asOf`. Snapshots are never edited.
 schema: starci/benchmark-expectations@1
 asOf:
-  date: 2026-09-25
-  commit: f17e62112            # the runtime main this file was derived from, plus contract change routing-review-hands (lane routing-review-hands)
+  date: 2026-10-07
+  commit: null                 # filled when the tiered-model-selection contract change lands on main
   derivedFrom:
-    - modules/models/runtimes.yaml          # allocation.tiers/preference/balanced/overflowByOrder/frontier/hands, roleOfKind
-    - modules/models/registry.yaml          # pools.<pool>.provider/roles/models/maxParallel, targets, operators.<op>.chain, costPolicy
+    - modules/models/tiers.yaml             # tiers, seats, kindSeats, difficulty, kindTiers, balance, usage
+    - modules/models/runtimes.yaml          # roleOfKind
+    - modules/models/registry.yaml          # pools.<pool>.provider/roles/defaultModel/maxParallel, targets, costPolicy
     - modules/models/profiles/*.yaml        # business.whenNeeded / whenNot / failureModes
     - modules/models/agents/*.yaml          # capabilities.hostTools
-    - config.example.yaml                   # allocation.policy balanced, allocation.shares, allocation.grants
+    - config.example.yaml                   # allocation.grants, models
 
 # An owner-approved routing change that has not landed yet. None is pending.
 approvedChange: null
@@ -39,7 +40,7 @@ history:
       decideAndReview: [claude-agent, codex-agent]   # qwen-agent removed from think work and its decide/plan roles
       draw: codex-agent
       interfaceAudit: devin-agent removed
-      balanced: first-under-share (the order ranks, the share caps), least-over when every pool is at its share
+      balanced: first-under-share (the order ranks, the share caps), least-over when every pool is at its share   # replaced by tiered-model-selection
   - id: routing-review-hands
     date: 2026-09-25
     decidedBy: owner ("chia bớt cho devin qwen cái này, codex/claude chỉ là quyết định thôi (tức là đưa ra chiến lược), review thì phải cho tay chân làm là ok nhất! cứ thử mảng cho devin/qwen, ghi benchmark sai sửa sau")
@@ -64,27 +65,41 @@ history:
       hands: [devin-agent]                        # allocation.hands
       implement: devin-agent, codex-agent, claude-agent   # scaffold too; codex-agent first at easy (Devin pins no easy model)
       review: [devin-agent, claude-agent, codex-agent]    # claude/codex overflow only; a review of Devin's work goes to claude/codex (cross-family)
+  - id: tiered-model-selection
+    date: 2026-10-07
+    decidedBy: owner (MODEL-SELECTION-PROPOSAL.md sections 6 and 7, approved)
+    amends: provider-qwen-removed
+    landed: {contractChange: tiered-model-selection}
+    shares: removed                               # the 35/20/10 provider shares are gone; models.balance (maxStreak 3, maxSharePercent 70) replaces them
+    routing:
+      tiers:
+        frontier: [claude-opus-5-5, gpt-6.1-sol]  # Supervisor, planner, validator, kernel manager; op difficulty insane
+        high: [claude-sonnet-5-5, gpt-6.1-sol]    # Kernel, worker; op difficulty hard
+        medium: [swe-2-max, gpt-6.1-sol]          # op difficulty medium
+        low: [swe-2-max, gpt-6-luna]              # op difficulty easy
+        imagegen: [gpt-6.1-sol]                   # interface.draw, interface.asset
+      precedence: hard filter > owner bias > a live seat keeps its member > balance > chain order by tokens
+      tokens: automatic picks skip a member at 90 percent of its quota; an owner bias naming it keeps it usable up to 95 percent
+      debug: core-debug runs in the app of the chat that started the workflow, on that provider's frontier model
 
 pools:
   claude-agent:
-    model: claude-opus-5-5                   # Claude Opus 5.5, pinned at every difficulty (runtimes.yaml runtimes.claude-agent.models)
+    model:                                   # two Claude models by tier (tiers.yaml)
+      high: claude-sonnet-5-5
+      frontier: claude-opus-5-5
     provider: claude
     roles: [implement, verify, write, decide, plan]
     maxParallel: 6
-    share: 20                                # config.example.yaml allocation.shares
-    frontier: true                           # runtimes.yaml allocation.frontier
     expected:
       role: >-
-        The strategy seat. First in every think/decide/plan tier order and the [Kernel] seat. Review only as
-        overflow, when Devin is unavailable (runtimes.yaml allocation.overflowByOrder.review); hands-on
-        work only as overflow below insane (allocation.balanced.overflowOnly).
+        The first member of the frontier tier (Opus 5.5: Supervisor, planner, validator, kernel manager, insane ops)
+        and of the high tier (Sonnet 5.5: the Kernel, workers, hard ops). It is in no medium or low tier.
       strengths:
         - strategy kinds: request.analyze, scope.define, business.decide, architecture.decide, brand.decide, decision.prepare, implementation.plan, workspace.manage
         - business/architecture.decide at 72-73% pass over the 72h snapshot
       notExpectedFor:
-        - first pick for any review or verify kind, or work.author (review order, overflow only)
-        - host-tool routes: interface.draw, interface.asset (image_gen) and interface.audit (browser-dom) — agents/claude.yaml hostTools is empty
-        - first pick for hands-on work (last in every hands-on order)
+        - "drawing ops (interface.draw, interface.asset: imagegen tier) and browser-dom routes (interface.audit): agents/claude.yaml hostTools is empty, so the hard filter drops it"
+        - easy and medium work (the medium and low tiers hold no Claude member)
       cites: [modules/models/profiles/claude-agent.yaml, modules/models/runtimes.yaml]
     publicBenchmarks:
       sweBenchVerified: null
@@ -93,29 +108,26 @@ pools:
       sources: []
 
   codex-agent:
-    model:                                   # one Codex window, two models pinned per difficulty (runtimes.yaml runtimes.codex-agent.models)
-      easy: gpt-6-luna
-      medium: gpt-6-luna
-      hard: gpt-6.1-sol                        # every think kind routes at a hard floor, so strategy runs on GPT-6.1 Sol
-      insane: gpt-6.1-sol
+    model:                                   # one Codex window, two models by tier (tiers.yaml)
+      frontier: gpt-6.1-sol
+      high: gpt-6.1-sol
+      medium: gpt-6.1-sol
+      low: gpt-6-luna
+      imagegen: gpt-6.1-sol
     provider: codex
     roles: [implement, verify, write, decide, plan]
     maxParallel: 10
-    share: 10
-    frontier: true
     expected:
       role: >-
-        Sol is the second strategy seat after Opus. Codex is the fleet's ONLY image generator, so interface.draw and
-        interface.asset route nowhere else. Review is overflow only; the exception is the interface.audit of a
-        Devin-implemented UI, which Codex takes because Claude lacks browser-dom. Hands-on work is overflow
-        after Devin.
+        Sol is the second member of the frontier, high and medium tiers and the only member of the imagegen tier;
+        Luna is the second member of the low tier. Codex is the fleet's ONLY image generator, so interface.draw and
+        interface.asset route nowhere else. The interface.audit of any UI goes to it because Claude lacks browser-dom.
       strengths:
         - interface.draw / interface.asset (sole route; image_gen.imagegen host tool)
-        - strategy kinds on Sol, second after claude-agent in every hard/insane think order
+        - second after claude-agent in the frontier and high tiers
         - browser-dom host tool (interface.audit, with devin-agent)
       notExpectedFor:
-        - first pick for any review or verify kind other than that interface.audit case
-        - first pick for hands-on work
+        - first pick for easy or medium hands-on work (Devin leads those tiers)
         - spending its shared Luna/Sol quota on easy fan-out (profile failureModes, inferred)
       cites: [modules/models/profiles/codex-agent.yaml, modules/models/profiles/gpt-6.1-sol.yaml, modules/models/profiles/gpt-6-luna.yaml, modules/models/agents/codex.yaml]
     publicBenchmarks:
@@ -131,27 +143,22 @@ pools:
         sources: []
 
   devin-agent:
-    model: swe-2-max                         # SWE-2 Max, medium and hard only; no easy or insane pin
+    model: swe-2-max                         # SWE-2 Max, first member of the medium and low tiers; in no high or frontier tier
     provider: devin
     roles: [implement, verify, write]        # no decide, no plan
     maxParallel: 10
     capacityAuthority: explicit-workflow-quota   # config.example.yaml allocation.grants devin-agent=10@implement+verify+write
-    share: 35
-    frontier: false
-    hands: true                              # runtimes.yaml allocation.hands — an audit family since routing-review-hands
     expected:
       role: >-
-        The owner-granted executor. First in the medium and hard implement/write/verify orders and first on the
-        scaffold order. First on the review order at medium and hard (every verify kind, work.author). An experiment
-        since 2026-09-25.
+        The owner-granted executor. First member of the medium tier (Sol behind it) and of the low tier (Luna behind it):
+        hands-on implementation, scaffold and verification at easy and medium difficulty.
       strengths:
         - backend.implement 70% and interface.implement 68% pass over the 72h snapshot
         - review (routing-review-hands, unmeasured)
         - browser-dom host tool (interface.audit)
       notExpectedFor:
-        - strategy: decide/plan and every think kind outside the review order (roles gate)
-        - reviewing its own work (cross-family rule)
-        - easy and insane work (no model pin)
+        - strategy: decide/plan and every think kind (roles gate; the high and frontier tiers hold no Devin member)
+        - hard and insane work
         - anything outside an Orca workflow worktree or beyond the granted slots
       watch:
         - interface.audit 11% pass / 83% fail over the 72h snapshot (18 jobs) - now routed to it again as an experiment

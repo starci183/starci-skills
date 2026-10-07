@@ -14,7 +14,8 @@ import { grammarContextRequired, grammarInputsOf, resolveGrammarContext, grammar
 import { loadAdapter } from '../../../agent/lib.mjs';
 import { latestGoal, ownedPathsOf, workDirOf } from './rows.mjs';
 import { leaseCanonOf } from './peer-waits.mjs';
-import { resolveWorkerLaunchModel, missingHostTools, defaultOperationTarget, kindOrder, isFanOutSlice } from '../../../agent/models.mjs';
+import { resolveWorkerLaunchModel, missingHostTools, defaultOperationTarget, kindRoute, raiseToFloor, loadRuntimes, loadModelRegistry } from '../../../agent/models.mjs';
+import { tierMembers, tierOfOp } from '../../../agent/tiers.mjs';
 import { resumeContextOf } from '../../resume-context.mjs';
 import { jobDisplayName, jobWhat, workflowNameOf } from '../../../lib/display-names.mjs';
 import { productLocaleFor } from '../../product-locale.mjs';
@@ -33,17 +34,23 @@ export function planModel(d) {
   const { skillRoot } = internals;
   const model = internals.resolveModel(args.model ?? payload.model ?? defaultOperationTarget());
   if (model.error) throw Object.assign(new Error(model.error), { code: 'model-unknown' });
-  // Dispatch launches only inside the kind's order at its tier, so strategy kinds run on Claude or Codex alone.
-  // A named profile target (gpt-6.1-sol) counts as its provider's pool.
-  const launchOrder = kindOrder({ kind: op, difficulty: payload.difficulty ?? 'medium', fanOut: isFanOutSlice(payload) });
-  const allowed = launchOrder.chain ?? [];
+  // Dispatch launches only inside the op's tier (tiers.yaml), so each kind runs on the members of its difficulty's chain.
+  const route = kindRoute(op, loadRuntimes());
+  const difficulty = raiseToFloor(payload.difficulty ?? 'medium', route.floor);
+  const tier = tierOfOp({ kind: op, difficulty });
+  const chain = tierMembers(tier);
+  const allowed = chain.map((member) => member.id);
   let selectedRoute = 'the unrouted default';
   if (payload.model) selectedRoute = 'the persisted route';
   if (args.model) selectedRoute = '--model';
-  const launchErrorNote = launchOrder.error ? ` (${launchOrder.error})` : '';
-  const correction = args.model ? 'dispatch without --model or name a pool of that order' : `re-run starci kernel route --job ${jobId}`;
-  const outsideDetail = `${selectedRoute} ${model.target} is outside ${op}'s ${launchOrder.orderKey ?? '?'} order at ${launchOrder.difficulty ?? '?'} [${allowed.join(', ')}]${launchErrorNote}; ${correction}. The job stays queued.`;
-  const outsideOrder = allowed.some((p) => p === model.target || launchOrder.rt?.runtimes?.[p]?.provider === model.provider) ? null : outsideDetail;
+  const correction = args.model ? 'dispatch without --model or name a member of that tier' : `re-run starci kernel route --job ${jobId}`;
+  // A persisted route names its member; an explicit agent or pool takes the tier's member of that agent (a launch-only target keeps its own model).
+  const routed = payload.modelId && (!payload.model || payload.model === model.target) ? `${model.provider}/${payload.modelId}` : null;
+  const targetModel = loadModelRegistry().targets?.[model.target]?.defaultModel ?? null;
+  const member = chain.find((candidate) => (routed ? candidate.id === routed : candidate.provider === model.provider && (!targetModel || candidate.model === targetModel))) ?? null;
+  const outsideDetail = `${selectedRoute} ${routed ?? model.target} is outside ${op}'s tier ${tier} at ${difficulty} [${allowed.join(', ')}]; ${correction}. The job stays queued.`;
+  const outsideOrder = member ? null : outsideDetail;
+  const launchOrder = { difficulty, tier, member, routed: Boolean(routed) };
   const briefAbs = path.join(skillRoot, 'modules', 'ops', 'ops', `${op}.yaml`);
   const briefExists = fs.existsSync(briefAbs);
   const lackingTools = missingHostTools({ pool: { provider: model.provider }, kind: op });
@@ -194,7 +201,9 @@ export function planPrompt(d) {
   // The one launch (modules/kernel/start-workflow.yaml, worker-start-spec.yaml): worker-start --spec
   // --agent on the op's own worktree, which files the Task in the same call. The launch model is the persisted route's, else the pool's
   // pin at the kind's tier, else the registry default (resolveWorkerLaunchModel); a card that takes no model flag (devin) starts on its default.
-  d.launchModel = resolveWorkerLaunchModel({ target: model.target, payload: { ...payload, difficulty: launchOrder.difficulty ?? payload.difficulty } });
+  const { member, routed } = launchOrder;
+  d.launchModel = member ? { modelId: member.model, effort: (routed ? payload.effort : null) ?? member.effort ?? null, source: routed ? 'route' : 'tier' }
+    : resolveWorkerLaunchModel({ target: model.target, payload: { ...payload, difficulty: launchOrder.difficulty ?? payload.difficulty } });
   d.takesModel = loadAdapter(model.provider).card?.start?.modelArgument !== false; // the plan shows the flags spawnAgent really sends: a card with start.modelArgument false (devin) gets no --model/--effort
   d.orcaCommands = orcaCommandsOf(d);
 }

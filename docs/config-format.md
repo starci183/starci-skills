@@ -25,30 +25,15 @@ Required keys:
 - `language` — BCP-47-like tag (`vi`, `en`, …)
 - `model` — `null` (inherit host) or non-empty host model name
 - `effort` — one of `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`, `ultra`
-- `models.selection` — `quota-aware`; selection happens before a call
-- `models.pools` — the one closed cross-provider pool, `sol-opus` (`claude-agent` and `codex-agent`, in route
-  order); every member is a known runtime with the role its consumers require
-- `models.nonOperation` — the closed mapping from the three non-operation roles to one declared pool
 
 Optional keys:
 
 - `launchTrust` — null by default, or `{profile: automatic | declined, approvedBy: owner, approvalRef, roots}`. The current owner records adoption and exact absolute repository roots; this declaration authorizes the managed launch trust/settings/guard preparation for those roots. Existing Git worktrees are checked against their exact main repository root. A directory prefix, unrelated checkout, missing profile or provider-side decline grants no consent. The runtime never copies a historical owner's approval into a new installation. Native provider account authentication remains separate.
 - `retention.workflowPurge` — null by default, or `{approvedBy: owner, approvalRef, repos}` with exact absolute ledger-owner repository roots. Adoption permits automatic verified archive-and-purge of settled, uncited workflows after the declared retention window. Without adoption the sweep reports and keeps those candidates. This profile does not authorize deleting an unidentified database or changing live jobs.
-
-- `kernel` — the `[Kernel]` seat: a single pin `{agent?, model?, effort?}` or a group
-  `{group: [{agent, model?}, ...], effort?}` (below); absent or all-null means routing decides
+- `kernel` — the `[Kernel]` seat pin `{agent?, model?, effort?}` (below); absent or all-null means the `high` tier chain decides
+- `models` — optional overlay of the shipped model tiers: `{tiers?, seats?, balance?, usage?}` ("Model tiers" below)
 - `budgets` — `{maxOps?}`: the concurrent-op ceiling of one workflow; a positive integer or null
 - `parallel` — `{gear}`; the one parallelism knob, below
-- `allocation.mode` — `adaptive`; fresh quota, current admitted load, recent service and task/model suitability
-  are recomputed before every future assignment
-- `allocation.preferredProvider` — `null` for automatic capacity or one declared provider id for a bounded
-  preference; this never forms a fallback chain
-- `allocation.policy` — `prefer-then-overflow` (the `runtimes.yaml` default: first eligible pool of the tier
-  order) or `balanced` (the first eligible pool of the order still below its target share of the jobs
-  dispatched in the last `windowHours`, counted over this repo's ledger and the host's other product ledgers;
-  when every eligible pool is at or over its share, the one furthest below)
-- `allocation.shares` — `{<runtime pool>: <weight>}` target shares, normalized over the named pools
-- `allocation.windowHours` — the balanced window in hours (default and bound: `engine/config.mjs`)
 - `allocation.grants` — `['<pool>=<slots>@<role>+<role>']`, the default grant every workflow gets; once
   declared it is the whole set, so a `capacityAuthority: explicit-workflow-quota` pool (Devin) routes only
   for the granted roles and up to the granted running slots
@@ -111,7 +96,7 @@ it does not attest the caller's model. The actual native worker must attest the 
 agent/model before pairing is ready. Devin's opaque account-selected model is never inferred or
 reported as concrete model attestation.
 
-Kernel `--agent`, `kernel` pins/groups, the configured Supervisor and operation routes retain their
+Kernel `--agent`, `kernel` pins, the configured Supervisor and operation routes retain their
 own authority. Caller fields do not override them. The native maintenance seat has a distinct host
 slot under the existing Supervisor lifecycle owner, kept alive by the reconciler after the chat
 closes. Matching repeated requests reuse it; a conflicting live or unknown identity refuses a second
@@ -121,17 +106,13 @@ launch. Fresh quota, role floors, reservations and exact closure proof still app
 or the owner's configured Supervisor. Public startup readiness belongs to the existing host owner:
 `/starci start` succeeds only after the required checklist, including the public harness, is green.
 
-## Kernel group
+## Kernel seat
 
-`kernel` accepts a concrete `{group: [{agent, model}, ...], effort}` or a single `{agent, model, effort}`
-pin; the shipped group lives in `config.example.yaml`. `engine/config.mjs` validates each member against
-the model catalog and refuses empty groups, repeated agents, unsupported identities and mixed group/pin
-forms. A catalog model can serve the Kernel without changing its provider's operation-pool pins.
-`scripts/kernel/start-workflow.mjs` applies `modules/models/selection.yaml` `newAgentAdmission` to the
-resolved group before launch. A single pin constrains that selection to its identity. Eligible group
-members may fall through only after the prior attempt has definitive no-effect evidence, as specified
-by `modules/kernel/start-workflow.yaml` `spawn.fallThrough`. An absent `kernel` key uses the unpinned
-model-function route in `scripts/route/route-model.mjs`.
+`kernel` is `{agent?, model?, effort?}`. The seat takes the `high` tier. `agent` and `model` pin it as the bias
+`only`, keeping the tier's model of that agent; an absent or all-null pin lets the chain decide.
+`scripts/kernel/start-workflow.mjs` applies `modules/models/selection.yaml` `newAgentAdmission` to the chain before launch;
+a later member is tried only after the prior attempt has definitive no-effect evidence, as specified by
+`modules/kernel/start-workflow.yaml` `spawn.fallThrough`.
 
 ## Parallelism
 
@@ -161,34 +142,67 @@ Three rules hold at every gear:
    `agentsAchievable` after the closure's disjoint path partition bounds it — a two-directory
    closure runs two agents however high the gear is, and `reason` says so.
 
-| non-operation role | required runtime role | default pool |
-| --- | --- | --- |
-| `planner` | `plan` | `sol-opus` |
-| `kernelManager` | `decide` | `sol-opus` |
-| `validator` | `verify` | `sol-opus` |
+## Model tiers
 
-The roles and the default pool are `engine/config.mjs`
-(`NON_OPERATION_ROLES`, `DEFAULT_MODEL_POOLS`), which also refuses an unknown
-pool name, a pool that is not its canonical pair, or members that lack the
-required role. The kernel's own model call kinds are
-`modules/models/selection.yaml` `kernelFunctionKinds`.
+`modules/models/tiers.yaml` owns which model takes which work; `config.yaml` `models` overlays it. A **tier** is an
+ordered chain of members `{agent, model, effort?}`; a model may sit in several tiers, and a new tier or member is one line.
+
+| tier | chain (first to last) | takes |
+| --- | --- | --- |
+| `frontier` | Claude Opus 5.5, Codex `gpt-6.1-sol` | the Supervisor; planner, validator, kernelManager; ops of difficulty `insane`; the core-debug default model |
+| `high` | Claude Sonnet 5.5, Codex `gpt-6.1-sol` | the Kernel and `[Worker]` seats; ops of difficulty `hard` |
+| `medium` | Devin `swe-2-max`, Codex `gpt-6.1-sol` | ops of difficulty `medium` |
+| `low` | Devin `swe-2-max`, Codex `gpt-6-luna` | ops of difficulty `easy` |
+| `imagegen` | Codex `gpt-6.1-sol` | drawing ops (`kindTiers`) |
+
+`models` accepts four optional keys: `tiers` (`{<tier>: [{agent, model, effort?}, ...]}` replaces or adds a chain),
+`seats` (`{<seat>: <tier>}` remaps a seat), `balance` (`{maxStreak, maxSharePercent}`) and `usage`
+(`{reservePercent, biasPercent, exhaustedPercent}`). `engine/model-config.mjs` validates every member against
+`registry.yaml` and refuses an unknown key.
+
+### The pick
+
+One function (`scripts/lib/tier-pick.mjs`) serves every seat and every op; `scripts/agent/admission.mjs` runs it with
+the live facts. Precedence: hard filter, owner bias, a live seat keeps its member, balance, chain order by tokens.
+
+1. **Hard filter** (a bias cannot override it): the member is not authenticated or its token is stale; its provider circuit
+   is open or its runtime or binary is missing; it is not qualified for the role (including Devin's explicit grant, below);
+   its pool is at maximum parallel. A member that failed to launch earlier is skipped for that pick and the failure is
+   recorded, but it stays in the chain.
+2. **Owner bias** from the goal prompt applies to every seat: `prefer X` moves X to the front, `avoid Y` removes it,
+   `only X` keeps X. A bias that empties the chain refuses with the reason. `--agent` and `kernel.agent` /
+   `supervisor.kernel.agent` are `only <agent>` and keep the tier's model of that agent.
+3. **A live seat keeps its member.**
+4. **Balance**: a head member picked more than `maxStreak` times in a row, or holding more than `maxSharePercent` of
+   the tier's running seats, yields to the next eligible member; a bias skips this step.
+5. **Tokens**: an automatic pick skips a member at `reservePercent` (90) or more of its tokens. A member the owner bias
+   names stays usable from 90 up to `biasPercent` (95); from 95 it is refused even with a bias; from 100 it is never used.
+   A chain with no member left refuses and reports the earliest reset.
+6. **Reserve, launch, attest.** A proved no-effect failure continues down the chain in the same attempt; an unknown effect
+   stops for reconciliation (`modules/kernel/start-workflow.yaml` `spawn.fallThrough`).
+7. **Record**: every pick keeps its tier, the chain after each step, who was dropped and why, and the winner with the
+   deciding step. `workflow start --plan`, `route-model --plan` and the route receipt print it.
+
+`core-debug` is not picked down a chain: it runs on the provider of the chat that started the workflow
+(`--caller-agent`), on that provider's `frontier` member (`callerSeatTiers`) unless `--caller-model` names one.
+
+The Devin grant gate stays: a pool whose `registry.yaml` `capacityAuthority` is `explicit-workflow-quota` is in the hard
+filter unless `allocation.grants` opens it for the role and slot count.
 
 ## Model routing
 
-Model routing reads each kind's role, order and difficulty floor from
-`modules/models/runtimes.yaml` `roleOfKind`. A floor raises measured difficulty and never lowers it.
-`config.example.yaml` owns the default `[Kernel]` group; the owner config selects its concrete allowed
-members ([Kernel group](#kernel-group)). The non-operation pools remain typed functions with separate
-inputs and independent contexts.
+Model routing reads each kind's role and difficulty floor from `modules/models/runtimes.yaml` `roleOfKind`. A floor raises
+measured difficulty and never lowers it; the difficulty names the tier (`tiers.yaml` `difficulty`).
+`modules/models/selection.yaml` owns common admission for all agent roles: quality and eligibility, every fresh quota
+window, authentication, provider circuit, shared capacity and Critic independence. `allocation.admission` owns the role
+floors. See [agent admission](agent-admission.md) for the reservation and uncertain-launch lifecycle.
 
-Operation policy supplies the concrete candidate group. `modules/models/selection.yaml` owns common
-admission for all agent roles: quality and eligibility, every fresh quota window, authentication,
-provider circuit, shared capacity and Critic independence. Scoped owner preferences rank eligible
-members and never add a provider or model to the allowed group. A hard requirement preserves the
-requested identity; it cannot manufacture eligibility or authority to spend reserved quota.
-`allocation.admission` owns thresholds and role floors. Existing allocation orders and shares distribute
-work only among candidates that pass admission; catalog order alone is not launch permission.
-See [agent admission](agent-admission.md) for the reservation and uncertain-launch lifecycle.
+### Keys of an earlier shape
+
+A `config.yaml` that still holds one of these keys is refused, naming the key and its new place:
+`models.pools`, `models.nonOperation`, `models.selection`, `allocation.shares`, `allocation.windowHours`,
+`allocation.preferredProvider`, `allocation.policy`, `allocation.mode`, `kernel.group`, `supervisor.kernel.group`
+(`engine/model-config.mjs` `REMOVED_KEYS`).
 
 The runtime pin seals the accepted `config.yaml` digest. Config changes apply to future assignments
 through a new pin and an orderly same-id restart or retry boundary; a running dispatch keeps its identity.
@@ -208,8 +222,7 @@ through a new pin and an orderly same-id restart or retry boundary; a running di
 An `agent` and `provider` may currently carry the same string, but their fields
 are not interchangeable. Routing records use `provider` for quota authority.
 
-Files without `allocation` resolve to `{mode:"adaptive", preferredProvider:null, policy:null, shares:null,
-windowHours:24, grants:null}` in memory: the `runtimes.yaml` default policy and no grant gating.
+Files without `allocation` resolve to `{grants:null}` in memory: no grant gating.
 
 ## Product test switches (`specs.unit`, `specs.e2e`)
 

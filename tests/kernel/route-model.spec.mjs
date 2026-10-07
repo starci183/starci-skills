@@ -12,7 +12,7 @@ import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
 const ROUTE=path.join(ROOT,'scripts','route','route-model.mjs');
 // Lane m13: route-model.mjs is the selection.yaml executor. --plan is a
-// what-if view (walks the runtimes.yaml difficulty tier, annotates missing
+// what-if view (walks the tiers.yaml tier of the workload, annotates missing
 // evidence instead of failing on it) and must never write. A route is a pick
 // or a typed refusal ('no eligible model', exit 1) — never a silent swap.
 
@@ -41,27 +41,36 @@ const fixture=t=>{
   return {dir(){const d=fs.mkdtempSync(path.join(os.tmpdir(),'starci-route-'));dirs.push(d);return d;}};
 };
 
-test('--plan --kind code.refactor --difficulty hard walks the tier in declared order and annotates',t=>{
-  // Isolate from the real owner config: preferredProvider is a documented pick bias,
-  // so the declared-tier assertion runs with no owner config at all.
+test('--plan --kind code.refactor --difficulty hard walks the high tier in declared order and prints the pick record',t=>{
+  // Isolate from the real owner config: the declared-tier assertion runs with no owner config at all.
   const ownerRoot=fixture(t).dir();
   const r=run(['--kind','code.refactor','--difficulty','hard','--plan','--json'],ROOT,{STARCI_OWNER_ROOT:ownerRoot});
   assert.equal(r.status,0,r.stderr||r.error?.message);
   const body=out(r);
   assert.ok(body,`expected JSON stdout, got: ${r.stdout}`);
   assert.equal(body.plan,true);
-  // roleOfKind pins code.refactor -> implement; the hard tier's implement chain is the contract.
-  // Owner decision 2026-09-25 (72h scorecard): Devin leads hands-on implementation, Codex seconds it.
-  assert.deepEqual(body.tier?.chain,['devin-agent','codex-agent','claude-agent'],'plan must walk runtimes.yaml allocation.tiers.hard.implement in order');
+  // A hard operation takes the high tier (modules/models/tiers.yaml): Sonnet 5.5, then Sol.
+  assert.equal(body.tier?.name,'high');
+  assert.deepEqual(body.tier?.chain,['claude/claude-sonnet-5-5','codex/gpt-6.1-sol'],'plan must walk tiers.yaml tiers.high in order');
   assert.ok(Array.isArray(body.candidates)&&body.candidates.length===body.tier.chain.length);
   // qualifications.yaml ships empty: every candidate must carry an evidence annotation, not a silent pass.
   for(const c of body.candidates)
     assert.ok(c.status==='qualified'||typeof c.evidence==='string'||(c.reasons??[]).length>0,
       `candidate ${c.target} has neither qualification nor an annotation — evidence gaps must be visible`);
-  assert.equal(body.pick?.primary?.target,'devin-agent','tier order picks the first previewable runtime');
+  assert.equal(body.pick?.primary?.target,'claude-agent','tier order picks the first previewable member');
+  // The per-step selection record of the common picker: chain after every step, who was dropped, who was chosen and by which step.
+  const record=body.pickRecord;
+  assert.deepEqual(record.steps.map(step=>step.step),['hard-filter','bias','balance','tokens']);
+  assert.deepEqual(record.chain,body.tier.chain);
+  assert.deepEqual(record.dropped,[]);
+  assert.deepEqual(record.chosen,{id:'claude/claude-sonnet-5-5',by:'chain-order'});
+  const text=run(['--kind','code.refactor','--difficulty','hard','--plan'],ROOT,{STARCI_OWNER_ROOT:ownerRoot});
+  assert.match(text.stdout,/tier high: claude\/claude-sonnet-5-5 > codex\/gpt-6\.1-sol/);
+  assert.match(text.stdout,/after tokens: /);
+  assert.match(text.stdout,/chosen claude\/claude-sonnet-5-5 by chain-order/);
 });
 
-test('--plan honours config.yaml allocation.preferredProvider as a pick bias',t=>{
+test('--plan reports a removed allocation key as an invalid config and never lets it bias the pick',t=>{
   const ownerRoot=fixture(t).dir();
   fs.writeFileSync(path.join(ownerRoot,'config.yaml'),
     'language: vi\nmodel: null\neffort: medium\nallocation: {mode: adaptive, preferredProvider: codex}\n');
@@ -69,57 +78,70 @@ test('--plan honours config.yaml allocation.preferredProvider as a pick bias',t=
   assert.equal(r.status,0,r.stderr||r.error?.message);
   const body=out(r);
   assert.ok(body,`expected JSON stdout, got: ${r.stdout}`);
-  assert.equal(body.config?.preferredProvider,'codex','the bias must be reported, never hidden');
-  assert.deepEqual(body.tier?.chain,['devin-agent','codex-agent','claude-agent'],'bias permutes the pick, never the declared tier chain');
-  assert.equal(body.pick?.primary?.target,'codex-agent','preferredProvider hoists the first pickable candidate of that provider');
-  // Bias is bounded: the non-preferred tier members remain as fallbacks, never removed.
-  assert.deepEqual(body.pick?.fallbacks?.map(f=>f.target),['devin-agent','claude-agent']);
+  assert.match(body.config?.configInvalid,/allocation\.preferredProvider is removed/,'the removed key must be reported, never hidden');
+  assert.deepEqual(body.tier?.chain,['claude/claude-sonnet-5-5','codex/gpt-6.1-sol']);
+  assert.equal(body.pick?.primary?.target,'claude-agent','a removed key moves nothing: an owner preference is a goal routing bias');
+  assert.deepEqual(body.pick?.fallbacks?.map(f=>f.target),['codex-agent']);
 });
 
-// The kernel route is the sol-think order: GPT-6.1 Sol first, Claude Opus 5.5 as overflow (owner routing
-// 2026-09-26). selection.yaml decisionFlow kernel-function admits it with an empty qualification store.
+// The kernel's own model calls take the tier of their seat (tiers.yaml kindSeats): model.manageWorkflow is the kernel
+// manager's, the frontier tier - Claude Opus 5.5 first, GPT-6.1 Sol second. selection.yaml decisionFlow kernel-function
+// admits it with an empty qualification store.
 const kernelRoute=(t,env={},extra=[])=>{
   const r=run(['--kind','model.manageWorkflow','--risk','high',...extra,'--json'],ROOT,{STARCI_OWNER_ROOT:fixture(t).dir(),...env});
   return {r,body:out(r)};
 };
 
-test('the unpinned --risk high kernel route resolves through the sol-think order to GPT-6.1 Sol',t=>{
+test('the unpinned --risk high kernel route resolves through the frontier tier to Claude Opus 5.5, Sol second',t=>{
   const {r,body}=kernelRoute(t);
   assert.equal(r.status,0,r.stderr||r.stdout);
-  assert.deepEqual([body.pick.target,body.pick.model,body.pick.mode],['codex-agent','gpt-6.1-sol','kernel-function']);
+  assert.equal(body.tier,'frontier');
+  assert.deepEqual([body.pick.target,body.pick.model,body.pick.mode],['claude-agent','claude-opus-5-5','kernel-function']);
   assert.match(body.rule,/decisionFlow\.kernel-function/);
-  assert.deepEqual(body.fallbackChain.map(f=>[f.target,f.model]),[['claude-agent','claude-opus-5-5']]);
-  assert.equal(body.availability['codex-agent'].state,'available');
+  assert.deepEqual(body.fallbackChain.map(f=>[f.target,f.model]),[['codex-agent','gpt-6.1-sol']]);
+  assert.equal(body.availability['claude-agent'].state,'available');
+  assert.deepEqual(body.pickRecord.chosen,{id:'claude/claude-opus-5-5',by:'chain-order'});
 });
 
-test('Sol reserve-window or dead quota excludes it from the kernel admission group',t=>{
-  const limited=kernelRoute(t,{STARCI_FAKE_ORCA_LIMITED:'codex'});
+test('Opus at 90 percent of its tokens or a dead probe leaves the kernel to Sol',t=>{
+  const limited=kernelRoute(t,{STARCI_FAKE_ORCA_LIMITED:'claude'});
   assert.equal(limited.r.status,0,limited.r.stderr);
-  assert.deepEqual([limited.body.pick.target,limited.body.pick.model],['claude-agent','claude-opus-5-5']);
+  assert.deepEqual([limited.body.pick.target,limited.body.pick.model],['codex-agent','gpt-6.1-sol']);
   assert.deepEqual(limited.body.fallbackChain,[],'a reserve window cannot authorize an ordinary fallback launch');
-  assert.ok(limited.body.admission.rejected.find(row=>row.provider==='codex').codes.includes('quota-reserved'));
-  const dead=kernelRoute(t,{STARCI_FAKE_ORCA_DEAD:'codex'});
+  const skipped=limited.body.pickRecord.dropped.find(row=>row.id==='claude/claude-opus-5-5');
+  assert.equal(skipped?.step,'tokens');
+  assert.match(skipped.reason,/9[05]% or more of its tokens/);
+  assert.equal(limited.body.pickRecord.chosen.id,'codex/gpt-6.1-sol');
+  const dead=kernelRoute(t,{STARCI_FAKE_ORCA_DEAD:'claude'});
   assert.equal(dead.r.status,0,dead.r.stderr);
-  assert.deepEqual([dead.body.pick.target,dead.body.pick.model],['claude-agent','claude-opus-5-5']);
+  assert.deepEqual([dead.body.pick.target,dead.body.pick.model],['codex-agent','gpt-6.1-sol']);
   assert.deepEqual(dead.body.fallbackChain,[]);
-  assert.match(dead.body.rejected.find(x=>x.target==='codex-agent').reasons[0],/provider codex unavailable: quota probe dead/);
+  assert.match(dead.body.rejected.find(x=>x.target==='claude-agent').reasons[0],/provider claude unavailable: quota probe dead/);
 });
 
-test('actual shared reservations change the fresh kernel admission ranking',t=>{
+test('actual shared reservations count against capacity: a full Claude pool leaves the kernel to Sol',t=>{
   const machineFile=path.join(fixture(t).dir(),'machine.sqlite');
   const machine=openMachine({file:machineFile});
   try{
-    for(let slot=0;slot<3;slot++)assert.equal(machine.reserveProvider({provider:'codex',account:'default',
-      model:'gpt-6.1-sol',role:'worker',attemptId:`route-pressure-${slot}`,maxParallel:10}).ok,true);
+    for(let slot=0;slot<3;slot++)assert.equal(machine.reserveProvider({provider:'claude',account:'default',
+      model:'claude-opus-5-5',role:'worker',attemptId:`route-pressure-${slot}`,maxParallel:6}).ok,true);
   }finally{machine.close();}
-  const {r,body}=kernelRoute(t,{STARCI_TEST_MACHINE_FILE:machineFile});
-  assert.equal(r.status,0,r.stderr||r.stdout);
-  assert.equal(body.pick.target,'claude-agent','the lower admitted-slot pressure wins at equal quota headroom');
-  assert.equal(body.admission.eligible.find(row=>row.provider==='codex').capacity.running,3);
-  assert.equal(body.admission.selected.capacity.running,0);
+  const partly=kernelRoute(t,{STARCI_TEST_MACHINE_FILE:machineFile});
+  assert.equal(partly.r.status,0,partly.r.stderr||partly.r.stdout);
+  assert.equal(partly.body.pick.target,'claude-agent','free slots keep the head of the chain: reservations never reorder it');
+  assert.equal(partly.body.admission.selected.capacity.running,3);
+  const machineFull=openMachine({file:machineFile});
+  try{
+    for(let slot=3;slot<6;slot++)assert.equal(machineFull.reserveProvider({provider:'claude',account:'default',
+      model:'claude-opus-5-5',role:'worker',attemptId:`route-pressure-${slot}`,maxParallel:6}).ok,true);
+  }finally{machineFull.close();}
+  const full=kernelRoute(t,{STARCI_TEST_MACHINE_FILE:machineFile});
+  assert.equal(full.r.status,0,full.r.stderr||full.r.stdout);
+  assert.deepEqual([full.body.pick.target,full.body.pick.model],['codex-agent','gpt-6.1-sol']);
+  assert.equal(full.body.pickRecord.dropped.find(row=>row.id==='claude/claude-opus-5-5')?.step,'hard-filter');
 });
 
-test('an open provider circuit in the --repo ledger routes the kernel to Claude Opus 5.5',t=>{
+test('an open provider circuit in the --repo ledger routes the kernel to Sol',t=>{
   const repo=fixture(t).dir();
   // The provider circuit is worker-wide machine state (provider-health moved out of the ledger's signals table);
   // --repo still gates the read on the repo having a ledger.
@@ -128,16 +150,16 @@ test('an open provider circuit in the --repo ledger routes the kernel to Claude 
   const machineFile=path.join(fixture(t).dir(),'machine.sqlite');
   const machine=openMachine({file:machineFile});
   try{
-    writeProviderCircuit('codex',{machine,expiresAt:Date.now()+3600000,
-      value:{schema:'starci/provider-health@1',provider:'codex',status:'unavailable',failureKind:'auth'}});
+    writeProviderCircuit('claude',{machine,expiresAt:Date.now()+3600000,
+      value:{schema:'starci/provider-health@1',provider:'claude',status:'unavailable',failureKind:'auth'}});
   }finally{machine.close();}
   const {r,body}=kernelRoute(t,{STARCI_TEST_MACHINE_FILE:machineFile},['--repo',repo]);
   assert.equal(r.status,0,r.stderr);
-  assert.deepEqual([body.pick.target,body.pick.model],['claude-agent','claude-opus-5-5']);
-  assert.match(body.rejected.find(x=>x.target==='codex-agent').reasons[0],/provider circuit open \(auth\)/);
+  assert.deepEqual([body.pick.target,body.pick.model],['codex-agent','gpt-6.1-sol']);
+  assert.match(body.rejected.find(x=>x.target==='claude-agent').reasons[0],/provider circuit open \(auth\)/);
 });
 
-test('both think-group members unavailable is a typed refusal naming both',t=>{
+test('both frontier members unavailable is a typed refusal naming both',t=>{
   const {r,body}=kernelRoute(t,{STARCI_FAKE_ORCA_DEAD:'claude,codex'});
   assert.equal(r.status,1,`route refusal must exit 1, got ${r.status}: ${r.stderr}`);
   assert.equal(body.pick,null);
@@ -152,26 +174,25 @@ test('operation kinds never take the kernel-function step',t=>{
   assert.match(out(r).rule,/no eligible model/);
 });
 
-test('draw order and host-tool gate: interface.draw walks Devin then Codex; a pool lacking a required host tool is rejected by name',t=>{
-  // regression: prefer devin-agent hoisted devin ahead of codex on interface.draw - one burned dispatch. The
-  // draw order holds Codex alone, so no bias reaches another pool; a kind whose route.riskHints names
-  // host-tool-required rejects a pool whose capabilities.hostTools lacks it, by name.
+test('drawing and host-tool gate: interface.draw takes the imagegen tier; a member lacking a required host tool is dropped by name',t=>{
+  // interface.draw takes the imagegen tier (tiers.yaml kindTiers): Codex alone, whatever the difficulty. A kind whose
+  // route.riskHints names host-tool-required drops a member whose capabilities.hostTools lacks it, by name.
   const ownerRoot=fixture(t).dir();
-  // interface.draw walks the draw order (runtimes.yaml allocation.preference.draw; owner ruling 2026-09-27): Devin,
-  // then Codex - claude-agent is not on its chain at all, whatever the owner's bias.
   const r=run(['--kind','interface.draw','--difficulty','medium','--plan','--json'],ROOT,{STARCI_OWNER_ROOT:ownerRoot});
   assert.equal(r.status,0,r.stderr||r.error?.message);
   const body=out(r);
   assert.ok(body,`expected JSON stdout, got: ${r.stdout}`);
-  assert.deepEqual((body.candidates??[]).map(c=>c.target),['devin-agent','codex-agent'],'the draw order is Devin then Codex');
-  assert.equal(body.pick?.primary?.target,'devin-agent','Devin leads the draw order; claude-agent is not on it');
-  // A chain with a pool that lacks the tool rejects it by name: interface.audit needs browser-dom. It walks the
-  // ui order (owner routing 2026-09-26) - Codex, Devin - where both carry the tool and
-  // claude-agent is not on the order at all.
+  assert.equal(body.tier?.name,'imagegen');
+  assert.deepEqual((body.candidates??[]).map(c=>c.target),['codex-agent'],'the imagegen tier holds Codex alone');
+  assert.equal(body.pick?.primary?.target,'codex-agent');
+  assert.deepEqual(body.pick?.fallbacks,[]);
+  // interface.audit needs browser-dom, which the Claude host lacks: its high tier drops Sonnet by name and Sol takes it.
   const audit=out(run(['--kind','interface.audit','--difficulty','hard','--plan','--json'],ROOT,{STARCI_OWNER_ROOT:ownerRoot}));
-  assert.ok(!(audit.candidates??[]).some(x=>x.target==='claude-agent'),'claude-agent is not on the ui order');
-  assert.deepEqual((audit.candidates??[]).map(x=>x.target).sort(),['codex-agent','devin-agent'],'the ui order is Codex then Devin, both carry browser-dom');
-  assert.equal(audit.pick?.primary?.target,'codex-agent','Sol leads the ui order and carries the tool');
+  assert.deepEqual((audit.candidates??[]).map(x=>x.target),['claude-agent','codex-agent']);
+  const dropped=audit.pickRecord.dropped.find(row=>row.id==='claude/claude-sonnet-5-5');
+  assert.equal(dropped?.step,'hard-filter');
+  assert.match(dropped.reason,/lacks host tool 'browser-dom'/);
+  assert.equal(audit.pick?.primary?.target,'codex-agent','Sol carries the tool and takes it');
 });
 
 test('--plan writes nothing to the working directory',t=>{
@@ -188,8 +209,8 @@ test('--help prints the CLI usage and exits 0',()=>{
   assert.match(r.stdout,/--kind <kind>/);
 });
 
-// The model catalog is GPT-6.1 Sol/Luna on the codex-agent window and Claude Opus 5.5 on
-// claude-agent (modules/models/registry.yaml pools). The launch model is the pool's difficulty pin.
+// The model catalog is GPT-6.1 Sol/Luna on the codex-agent window, Claude Opus 5.5 / Sonnet 5.5 on claude-agent and
+// SWE-2-Max on devin-agent. The launch model is the tier member (modules/models/tiers.yaml), never a per-pool difficulty pin.
 const planModels=(t,kind,difficulty)=>{
   const r=run(['--kind',kind,'--difficulty',difficulty,'--plan','--json'],ROOT,{STARCI_OWNER_ROOT:fixture(t).dir()});
   assert.equal(r.status,0,r.stderr||r.error?.message);
@@ -198,22 +219,24 @@ const planModels=(t,kind,difficulty)=>{
   return {body,model:target=>body.candidates.find(c=>c.target===target)?.model};
 };
 
-test('codex-agent launches gpt-6.1-sol on the hard tier and gpt-6-luna on the easy tier',t=>{
+test('codex-agent launches gpt-6.1-sol in the frontier, high and medium tiers and gpt-6-luna in the low tier',t=>{
   const hard=planModels(t,'architecture.decide','hard');
-  assert.deepEqual(hard.body.tier?.chain,['claude-agent','codex-agent'],'think work is Opus then Sol only');
+  assert.deepEqual(hard.body.tier?.chain,['claude/claude-sonnet-5-5','codex/gpt-6.1-sol'],'hard work is Sonnet then Sol');
   assert.equal(hard.body.pick?.primary?.target,'claude-agent');
   assert.equal(hard.model('codex-agent'),'gpt-6.1-sol');
-  assert.equal(planModels(t,'architecture.decide','insane').model('codex-agent'),'gpt-6.1-sol');
+  const insane=planModels(t,'architecture.decide','insane');
+  assert.deepEqual(insane.body.tier?.chain,['claude/claude-opus-5-5','codex/gpt-6.1-sol'],'insane work is Opus then Sol');
+  assert.equal(insane.model('codex-agent'),'gpt-6.1-sol');
   assert.equal(planModels(t,'code.refactor','easy').model('codex-agent'),'gpt-6-luna');
-  assert.equal(planModels(t,'code.refactor','medium').model('codex-agent'),'gpt-6-luna');
+  assert.equal(planModels(t,'code.refactor','medium').model('codex-agent'),'gpt-6.1-sol');
 });
 
-test('claude-agent launches claude-opus-5-5 at the default difficulty and every tier',t=>{
+test('claude-agent launches claude-sonnet-5-5 at hard, claude-opus-5-5 at insane and sits in no lower tier',t=>{
   const r=run(['--kind','architecture.decide','--json'],ROOT,{STARCI_OWNER_ROOT:fixture(t).dir()});
   assert.equal(r.status,0,r.stderr||r.error?.message);
-  assert.deepEqual([out(r)?.pick?.target,out(r)?.pick?.model],['claude-agent','claude-opus-5-5']);
-  for(const difficulty of ['easy','medium','hard','insane'])
-    assert.equal(planModels(t,'code.refactor',difficulty).model('claude-agent'),'claude-opus-5-5',difficulty);
+  assert.deepEqual([out(r)?.pick?.target,out(r)?.pick?.model],['claude-agent','claude-sonnet-5-5']);
+  for(const [difficulty,model] of [['easy',undefined],['medium',undefined],['hard','claude-sonnet-5-5'],['insane','claude-opus-5-5']])
+    assert.equal(planModels(t,'code.refactor',difficulty).model('claude-agent'),model,difficulty);
 });
 
 test('an explicit --model naming a removed catalog id fails closed as unknown',()=>{
@@ -240,9 +263,9 @@ const pick=(t,args,config=null)=>{
   return out(r);
 };
 
-test('a decide op measured medium routes to Claude Opus 5.5; --prefer/--avoid are unknown args',t=>{
+test('a decide op measured medium is raised to hard and routes to Claude Sonnet 5.5; --prefer/--avoid are unknown args',t=>{
   const body=pick(t,['--kind','business.decide','--difficulty','medium']);
-  assert.deepEqual([body.pick.target,body.pick.model],['claude-agent','claude-opus-5-5']);
+  assert.deepEqual([body.tier,body.pick.target,body.pick.model],['high','claude-agent','claude-sonnet-5-5']);
   assert.deepEqual(body.workload.difficulty,{measured:'medium',floor:'hard',effective:'hard'});
   for(const flag of ['--prefer','--avoid']){
     const r=run(['--kind','business.decide','--difficulty','medium',flag,'claude-agent','--json'],ROOT,{STARCI_OWNER_ROOT:fixture(t).dir()});
@@ -251,32 +274,31 @@ test('a decide op measured medium routes to Claude Opus 5.5; --prefer/--avoid ar
   }
 });
 
-test('the unpinned kernel route resolves to GPT-6.1 Sol',t=>{
+test('the unpinned kernel route resolves to Claude Opus 5.5 of the frontier tier',t=>{
   const body=pick(t,['--kind','model.manageWorkflow']);
-  assert.deepEqual([body.pick.target,body.pick.model],['codex-agent','gpt-6.1-sol']);
+  assert.deepEqual([body.tier,body.pick.target,body.pick.model],['frontier','claude-agent','claude-opus-5-5']);
   assert.equal(body.workload.work,'think');
 });
 
-test('operation routes exclude unknown Devin quota and preserve the remaining difficulty pins',t=>{
+test('operation routes exclude unknown Devin quota and fall to the next member of the tier',t=>{
   const body=pick(t,['--kind','backend.implement','--difficulty','medium']);
-  assert.deepEqual([body.pick.target,body.pick.model],['codex-agent','gpt-6-luna']);
+  assert.deepEqual([body.tier,body.pick.target,body.pick.model],['medium','codex-agent','gpt-6.1-sol']);
   assert.ok(body.admission.rejected.find(row=>row.provider==='devin').codes.includes('quota-unknown'));
-  assert.deepEqual(body.fallbackChain.map(f=>f.target),['claude-agent']);
-  const hard=pick(t,['--kind','grammar.update','--difficulty','easy']);
-  assert.deepEqual([hard.pick.target,hard.pick.model],['codex-agent','gpt-6.1-sol']);
-  assert.ok(hard.admission.rejected.find(row=>row.provider==='devin').codes.includes('quota-unknown'));
-  assert.equal(hard.fallbackChain[0]?.target,'claude-agent');
+  assert.deepEqual(body.fallbackChain,[],'Sol is the last member of the medium tier');
+  assert.equal(body.pickRecord.dropped.find(row=>row.id==='devin/swe-2-max')?.step,'hard-filter');
+  const easy=pick(t,['--kind','code.refactor','--difficulty','easy']);
+  assert.deepEqual([easy.tier,easy.pick.target,easy.pick.model],['low','codex-agent','gpt-6-luna']);
+  assert.ok(easy.admission.rejected.find(row=>row.provider==='devin').codes.includes('quota-unknown'));
+  assert.deepEqual(easy.fallbackChain,[]);
 });
 
-test('preferredProvider never moves strategy work onto a non-frontier pool',t=>{
+test('a removed allocation key never moves strategy work: it is reported and the tier decides',t=>{
   const config='language: vi\nmodel: null\neffort: medium\nallocation: {mode: adaptive, preferredProvider: devin}\n';
   const body=pick(t,['--kind','business.decide','--difficulty','easy'],config);
-  assert.equal(body.config.preferredProvider,'devin');
-  assert.deepEqual([body.pick.target,body.pick.model],['claude-agent','claude-opus-5-5']);
-  const devin=body.rejected.find(r=>r.target==='devin-agent');
-  assert.match(devin?.reasons?.[0]??'',/think work runs only on runtimes.yaml allocation.preference.think/);
+  assert.match(body.config.configInvalid,/allocation\.preferredProvider is removed/);
+  assert.deepEqual([body.tier,body.pick.target,body.pick.model],['high','claude-agent','claude-sonnet-5-5']);
+  assert.equal(body.rejected.find(r=>r.target==='devin-agent'),undefined,'Devin is not a member of the high tier at all');
   const review=pick(t,['--kind','review.verify','--difficulty','easy'],config);
-  assert.equal(review.pick.target,'claude-agent','preference cannot manufacture Devin quota evidence');
-  assert.ok(review.admission.rejected.find(row=>row.provider==='devin').codes.includes('quota-unknown'));
-  assert.match(review.orderSource,/registry.yaml operators.review.verify.chain/);
+  assert.equal(review.pick.target,'claude-agent','a removed key cannot manufacture Devin quota evidence');
+  assert.equal(review.orderSource,'tiers.yaml tiers.high');
 });

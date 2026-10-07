@@ -111,7 +111,7 @@ const seedPhWorkflow = (repo, wf) => seed(repo, (l) => seedWorkflow(l, { id: wf,
     { jobId: 'op-docs-queued', opId: 'docs.author', payload: { opId: 'docs.author', owned_paths: ['docs/'] } },
     { jobId: 'op-docs-running', opId: 'docs.author', status: 'running', workerId: 'term_op-running', payload: { opId: 'docs.author' } },
   ] }));
-const devinRejection = (route) => (out(route)?.rejected ?? []).find((r) => r.target === 'devin-agent');
+const devinRejection = (route) => (out(route)?.rejected ?? []).find((r) => r.target === 'devin/swe-2-max');
 
 test('an auth circuit reads closed once the credential in effect has a different fingerprint', (t) => {
   const machineFile = machineFileFor(t);

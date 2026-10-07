@@ -5,20 +5,17 @@ import {skillRoot} from './runtime-root.mjs';
 import {parseYaml} from './yaml.mjs';
 import {isPlainObject as plain} from './plain-object.mjs';
 import {invalid,validateRoots} from './invalid-config.mjs';
-import {validateOrca} from './orca-config.mjs';import {validateResources} from './resources-config.mjs';
+import {validateOrca} from './orca-config.mjs';
+import {validateResources} from './resources-config.mjs';
 import {ENV_NAME,secretEnv,connectorSecret} from './secrets.mjs';
 import {byCodeUnit} from './by-code-unit.mjs';
+import {EFFORT_LEVELS,validateModelsBlock,refuseRemovedKeys,shippedTiers} from './model-config.mjs';
 const knownNames=names=>[...names].sort(byCodeUnit).join(', ');
 export {readDotenv,connectorSecret} from './secrets.mjs';
 
 export const configRoot=skillRoot;
-export const NON_OPERATION_ROLES={planner:'plan',kernelManager:'decide',validator:'verify'};
-export const DEFAULT_MODEL_POOLS={'sol-opus':['claude-agent','codex-agent']};
 /** The owner-facing language when config.yaml `language` is absent — the one default every reader shares (scripts/lib/i18n.mjs ownerLanguage). A base-tier value: machine (home.mjs) re-exports it, not the reverse. */
 export const DEFAULT_OWNER_LANGUAGE='en';
-const ADAPTIVE_ALLOCATION_MODE='adaptive';
-/** The effort vocabulary, ordered weakest to strongest — the only list of it. */
-const EFFORT_LEVELS=new Set(['none','minimal','low','medium','high','xhigh','max','ultra']);
 // Parsed once per file version (mtime + size) per process; each caller gets its own copy.
 // The one runtimes.yaml loader: it throws on a missing or unparsable file, so no caller ever
 // reasons on a silent empty document. The pool map (provider, roles, models, maxParallel)
@@ -43,7 +40,10 @@ export function runtimeProfile(){
  * TTL, the liveness and cadence windows, the slicing weights, the failure cooldowns. Code reads them from
  * here; a literal copy of any of them in a source file would be a second authority.
  */
-export function allocationSettings(){return runtimeProfile()?.allocation??{};}
+export function allocationSettings(){
+  const allocation=runtimeProfile()?.allocation??{};
+  return allocation.admission?{...allocation,admission:{...allocation.admission,...shippedTiers().usage}}:allocation;
+}
 // These are current owner declarations, never a historical runtime owner's consent.
 function validateOwnerProfile(value,name,pathsKey){
   if(value===null)return;
@@ -235,32 +235,16 @@ export function uatSettings(config=loadConfig()){
   return Number.isInteger(value)?{maxConcurrent:value,source:'uat'}:{maxConcurrent:UAT_DEFAULTS.maxConcurrent,source:'default'};
 }
 /**
- * config.yaml `allocation` beyond mode/preferredProvider — how `starci kernel route` spreads jobs over the pools
- * (scripts/agent/models.mjs selectPool):
- *   policy: prefer-then-overflow (the runtimes.yaml default) | balanced — among the eligible pools, the one
- *     furthest below its target share of the recent dispatches wins.
- *   shares: {<runtime pool>: <weight >= 0>} — target shares, normalized over the named pools. Absent = equal.
- *   windowHours: how far back the recent dispatches are counted (default 24).
- *   grants: ['<pool>=<slots>@<role>+<role>'] — the owner's default grant, applied to every workflow, that opens
- *     a capacityAuthority explicit-workflow-quota pool (Devin) for those roles up to <slots> running jobs.
+ * config.yaml `allocation` — {grants?}: ['<pool>=<slots>@<role>+<role>'], the owner's default grant, applied to every
+ * workflow, that opens a capacityAuthority explicit-workflow-quota pool (Devin) for those roles up to <slots> running jobs.
  */
-export const ALLOCATION_POLICIES=Object.freeze(['prefer-then-overflow','balanced']);
-const ALLOCATION_KEYS=Object.freeze(['mode','preferredProvider','policy','shares','windowHours','grants']);
-export const DEFAULT_ALLOCATION_WINDOW_HOURS=24;
+const ALLOCATION_KEYS=Object.freeze(['grants']);
 const GRANT=/^([a-z0-9][a-z0-9.-]*)=(\d+)@([a-z]+(?:\+[a-z]+)*)$/;
 /** One grant string `<pool>=<slots>@<role>+<role>` as {pool, slots, roles}, or null when it is not that shape. */
 export function parseAllocationGrant(text){
   const m=typeof text==='string'?GRANT.exec(text.trim()):null;
   return m?{pool:m[1],slots:Number(m[2]),roles:m[3].split('+')}:null;
 }
-const validateShares=(bad,shares,runtimes)=>{
-  if(!plain(shares)||!Object.keys(shares).length)bad('shares must map runtime pools to non-negative weights, e.g. {claude-agent: 25, codex-agent: 25}.');
-  for(const [pool,weight] of Object.entries(shares)){
-    if(!plain(runtimes[pool]))bad(`shares.${pool} is not a modules/models/registry.yaml pool (known: ${knownNames(Object.keys(runtimes))}).`);
-    if(typeof weight!=='number'||!Number.isFinite(weight)||weight<0)bad(`shares.${pool} must be a non-negative number.`);
-  }
-  if(!Object.values(shares).some(weight=>weight>0))bad('shares must give at least one pool a positive weight.');
-};
 const validateGrant=(bad,text,runtimes,seen)=>{
   const grant=parseAllocationGrant(text);
   if(!grant)bad(`grants entry ${JSON.stringify(text)} is not "<pool>=<slots>@<role>+<role>" (e.g. devin-agent=10@implement+verify+write).`);
@@ -275,35 +259,11 @@ const validateGrants=(bad,grants,runtimes)=>{
   const seen=new Set();
   for(const text of grants)validateGrant(bad,text,runtimes,seen);
 };
-function validateAllocationBalance(allocation,runtimes){
-  const bad=invalid('allocation.');
-  if(allocation.policy!==undefined&&allocation.policy!==null&&!ALLOCATION_POLICIES.includes(allocation.policy))
-    bad(`policy must be one of ${ALLOCATION_POLICIES.join(' | ')}.`);
-  if(allocation.shares!==undefined&&allocation.shares!==null)validateShares(bad,allocation.shares,runtimes);
-  if(allocation.windowHours!==undefined&&allocation.windowHours!==null&&!(typeof allocation.windowHours==='number'&&Number.isFinite(allocation.windowHours)&&allocation.windowHours>0&&allocation.windowHours<=720))
-    bad('windowHours must be a number of hours in (0, 720].');
-  if(allocation.grants!==undefined&&allocation.grants!==null)validateGrants(bad,allocation.grants,runtimes);
-}
-/** Kernel and Supervisor seats share one authoritative pin/group grammar. */
-const validateSeatGroup=(seat,name,profile,runtimes,knownProviders)=>{
-  const group=seat.group;
-  if(Object.keys(seat).some(key=>!['group','effort'].includes(key))||!Array.isArray(group)||!group.length||group.some(member=>!plain(member)||Object.keys(member).some(key=>!['agent','model'].includes(key))||typeof member.agent!=='string'||!member.agent.trim()||!(member.model===undefined||member.model===null||typeof member.model==='string'&&member.model.trim())))
-    throw new Error(`Invalid config.yaml: ${name} group must be {group: [{agent, model?}, ...], effort?} with at least one member.`);
-  if(new Set(group.map(member=>member.agent)).size!==group.length)throw new Error(`Invalid config.yaml: ${name}.group names each agent once — availability is per provider.`);
-  for(const {agent,model} of group){
-    if(!knownProviders.has(agent))throw new Error(`Invalid config.yaml: ${name}.group agent ${agent} is not declared by a runtime (known: ${knownNames(knownProviders)}).`);
-    if(typeof model==='string'&&profile.models?.[model]?.provider!==agent&&!Object.values(runtimes).some(runtime=>runtime?.provider===agent&&(runtime.target===model||Object.values(runtime.models??{}).includes(model))))
-      throw new Error(`Invalid config.yaml: ${name}.group model ${model} is not declared by a ${agent} runtime.`);
-  }
-};
 function validateAgentSeat(seat,name,profile){
   const runtimes=profile?.runtimes??{},knownProviders=new Set(Object.values(runtimes).map(runtime=>runtime?.provider).filter(Boolean));
-  if(plain(seat)&&Object.hasOwn(seat,'group'))validateSeatGroup(seat,name,profile,runtimes,knownProviders);
-  else{
-    if(!plain(seat)||Object.keys(seat).some(key=>!['agent','model','effort'].includes(key))||Object.values(seat).some(value=>value!==null&&(typeof value!=='string'||!value.trim())))
-      throw new Error(`Invalid config.yaml: ${name} must be {agent?, model?, effort?} with string-or-null values, or {group: [{agent, model?}, ...], effort?}.`);
-    if(typeof seat.agent==='string'&&!knownProviders.has(seat.agent))throw new Error(`Invalid config.yaml: ${name}.agent ${seat.agent} is not declared by a runtime (known: ${knownNames(knownProviders)}).`);
-  }
+  if(!plain(seat)||Object.keys(seat).some(key=>!['agent','model','effort'].includes(key))||Object.values(seat).some(value=>value!==null&&(typeof value!=='string'||!value.trim())))
+    throw new Error(`Invalid config.yaml: ${name} must be {agent?, model?, effort?} with string-or-null values (agent and model pin the seat: an \`only\` bias).`);
+  if(typeof seat.agent==='string'&&!knownProviders.has(seat.agent))throw new Error(`Invalid config.yaml: ${name}.agent ${seat.agent} is not declared by a runtime (known: ${knownNames(knownProviders)}).`);
   if(seat.effort!==undefined&&seat.effort!==null&&!EFFORT_LEVELS.has(seat.effort))throw new Error(`Invalid config.yaml: ${name}.effort must use the effort vocabulary.`);
 }
 const validateReconcilerBlock=r=>{
@@ -311,12 +271,10 @@ const validateReconcilerBlock=r=>{
   if(!plain(r)||Object.keys(r).some(key=>!['enabled','profile','controllers'].includes(key))||(r.enabled!==undefined&&typeof r.enabled!=='boolean')||!(r.profile===undefined||r.profile===null||['operational','observe'].includes(r.profile))||!(ctl===undefined||ctl===null||(plain(ctl)&&Object.entries(ctl).every(([name,c])=>/^[a-z][a-z0-9-]*$/.test(name)&&plain(c)&&Object.keys(c).every(key=>key==='mode')&&['off','shadow','active'].includes(c.mode)))))
     throw new Error('Invalid config.yaml: reconciler must be {enabled?: boolean, profile?: operational|observe, controllers?: {<name>: {mode: off|shadow|active}}}, or null.');
 };
-const validateAllocationBlock=(allocation,knownProviders,runtimes)=>{
-  const preferred=allocation?.preferredProvider;
-  if(!plain(allocation)||Object.keys(allocation).some(key=>!ALLOCATION_KEYS.includes(key))||allocation.mode!==ADAPTIVE_ALLOCATION_MODE||!(preferred===null||preferred===undefined||typeof preferred==='string'&&preferred.trim()))
-    throw new Error('Invalid config.yaml: allocation must be {mode:"adaptive", preferredProvider?: <provider|null>, policy?, shares?, windowHours?, grants?}.');
-  if(typeof preferred==='string'&&!knownProviders.has(preferred))throw new Error(`Invalid config.yaml: allocation.preferredProvider ${preferred} is not declared by a runtime (known: ${knownNames(knownProviders)}).`);
-  validateAllocationBalance(allocation,runtimes);
+const validateAllocationBlock=(allocation,runtimes)=>{
+  if(!plain(allocation)||Object.keys(allocation).some(key=>!ALLOCATION_KEYS.includes(key)))
+    throw new Error('Invalid config.yaml: allocation must be {grants?: [<pool>=<slots>@<role>+<role>]}.');
+  if(allocation.grants!==undefined&&allocation.grants!==null)validateGrants(invalid('allocation.'),allocation.grants,runtimes);
 };
 const validateParallelBlock=parallel=>{
   const gears=slicingGears();
@@ -354,13 +312,10 @@ const validateSupervisorBlock=(supervisor,profile)=>{
 };
 const validateDelegationBlock=d=>{if(!plain(d)||Object.keys(d).some(key=>!['asks','until','excludes','note'].includes(key))||typeof d.asks!=='string'||!d.asks.trim()||typeof d.until!=='string'||Number.isNaN(Date.parse(d.until))||(d.excludes!==undefined&&(!Array.isArray(d.excludes)||d.excludes.some(x=>typeof x!=='string'))))throw new Error('Invalid config.yaml: delegation must be {asks: <delegate>, until: <ISO time>, excludes?: [<class>], note?} or null.');};
 const validateBudgetsBlock=budgets=>{if(!plain(budgets)||Object.keys(budgets).some(key=>!['maxOps'].includes(key))||Object.values(budgets).some(value=>value!==null&&!(Number.isInteger(value)&&value>0)))throw new Error('Invalid config.yaml: budgets must be {maxOps?} with positive-integer-or-null values.');};
-const validateCanonicalPool=(pool,members,runtimes)=>{if(!Array.isArray(members)||members.length!==2||new Set(members).size!==2||members.some(id=>typeof id!=='string'||!plain(runtimes[id]))||!(members.length===DEFAULT_MODEL_POOLS[pool].length&&members.every(id=>DEFAULT_MODEL_POOLS[pool].includes(id))))throw new Error(`Invalid config.yaml: models.pools.${pool} must contain its canonical pair of two unique known runtime ids.`);};
-const validateRolePool=(role,required,models,runtimes)=>{const pool=models.nonOperation[role],members=models.pools[pool];if(typeof pool!=='string'||!members||members.some(id=>!runtimes[id].roles?.includes(required)))throw new Error(`Invalid config.yaml: models.nonOperation.${role} must name a pool whose members carry the ${required} role.`);};
-const validateModelPools=(config,models,runtimes)=>{
+const validateRootKeys=(config)=>{
   const allowed=new Set(['language','model','effort','models','debug','allocation','kernel','budgets','supervisor','parallel','delegation','connectors','asks','uat','specs','reconciler','coreDebug','orca','roots','resources','launchTrust','retention']);
-  if(!plain(config)||Object.keys(config).some(key=>!allowed.has(key))||typeof config.language!=='string'||!/^[a-z]{2,3}(?:-[A-Za-z0-9]+)*$/.test(config.language)||!(config.model===null||typeof config.model==='string'&&config.model.trim())||!EFFORT_LEVELS.has(config.effort)||!plain(models)||Object.keys(models).some(key=>!['pools','nonOperation','selection'].includes(key))||models.selection!=='quota-aware'||!plain(models.pools)||!plain(models.nonOperation)||Object.keys(models.pools).length!==Object.keys(DEFAULT_MODEL_POOLS).length||Object.keys(models.pools).some(key=>!Object.hasOwn(DEFAULT_MODEL_POOLS,key))||Object.keys(models.nonOperation).length!==Object.keys(NON_OPERATION_ROLES).length||Object.keys(models.nonOperation).some(key=>!Object.hasOwn(NON_OPERATION_ROLES,key)))throw new Error('Invalid config.yaml: expected language, model, effort and the closed quota-aware model pools/non-operation role map.');
-  for(const [pool,members] of Object.entries(models.pools))validateCanonicalPool(pool,members,runtimes);
-  for(const [role,required] of Object.entries(NON_OPERATION_ROLES))validateRolePool(role,required,models,runtimes);
+  if(!plain(config)||Object.keys(config).some(key=>!allowed.has(key))||typeof config.language!=='string'||!/^[a-z]{2,3}(?:-[A-Za-z0-9]+)*$/.test(config.language)||!(config.model===null||typeof config.model==='string'&&config.model.trim())||!EFFORT_LEVELS.has(config.effort))
+    throw new Error('Invalid config.yaml: expected language, model, effort and the closed set of config blocks.');
 };
 const validateEarlyConfigBlocks=(config)=>{
   if(config?.launchTrust!==undefined){launchTrustSettings(config);} if(config?.retention!==undefined){workflowPurgeSettings(config);}
@@ -373,43 +328,32 @@ const validateConfigBlocks=(config,knownProviders,runtimes,profile)=>{
   // specs (owner 2026-09-28): {harness?, unit?, e2e?} booleans - each family a boolean; absent = its default (SPEC_DEFAULTS: harness off, unit on, e2e off; specsSettings).
   if(config?.specs!==undefined&&config.specs!==null&&(!plain(config.specs)||Object.keys(config.specs).some(key=>!SPEC_FAMILIES.includes(key)||typeof config.specs[key]!=='boolean')))throw new Error(`Invalid config.yaml: specs must be {${SPEC_FAMILIES.map(k=>k+'?: boolean').join(', ')}}, or null.`);
   // reconciler (scripts/reconciler/state.mjs reconcilerConfig): {enabled?: boolean, profile?: operational|observe, controllers?: {<name>: {mode: off|shadow|active}}}, or null.
-  if(config?.reconciler!==undefined&&config.reconciler!==null){validateReconcilerBlock(config.reconciler);} if(config?.allocation!==undefined){validateAllocationBlock(config.allocation,knownProviders,runtimes);}
+  if(config?.reconciler!==undefined&&config.reconciler!==null){validateReconcilerBlock(config.reconciler);} if(config?.allocation!==undefined){validateAllocationBlock(config.allocation,runtimes);}
   if(config?.kernel!==undefined){validateAgentSeat(config.kernel,'kernel',profile);} if(config?.parallel!==undefined){validateParallelBlock(config.parallel);}
   if(config?.supervisor!==undefined){validateSupervisorBlock(config.supervisor,profile);} if(config?.delegation!==undefined&&config.delegation!==null){validateDelegationBlock(config.delegation);} if(config?.budgets!==undefined){validateBudgetsBlock(config.budgets);}
 };
 export function validateConfig(config){
-  const models=config?.models,profile=runtimeProfile(),runtimes=profile?.runtimes??{};
+  const profile=runtimeProfile(),runtimes=profile?.runtimes??{};
+  refuseRemovedKeys(config);
   validateEarlyConfigBlocks(config);
   const knownProviders=new Set(Object.values(runtimes).map(runtime=>runtime?.provider).filter(Boolean));
   validateConfigBlocks(config,knownProviders,runtimes,profile);
-  validateModelPools(config,models,runtimes);
+  validateRootKeys(config);
+  validateModelsBlock(config,profile);
   return config;
 }
-export function effectiveNonOperationModels(config=loadConfig()){const models=validateConfig(config).models;return Object.fromEntries(Object.keys(NON_OPERATION_ROLES).map(role=>[role,{pool:models.nonOperation[role],runtimes:[...models.pools[models.nonOperation[role]]],selection:models.selection}]));}
 /**
- * The owner allocation control. `allocation` is the only shape; adaptive mode with an
- * optional preferredProvider bias — never a fallback chain.
+ * The owner allocation control: `allocation.grants` only. null = the owner declared no grants list: grant-gated pools
+ * keep their ungated routing; a declared list, even [], is the whole set of grants.
  */
 export function configuredAllocationPolicy(config=loadConfig()){
   validateConfig(config);
   const allocation=plain(config.allocation)?config.allocation:null;
-  // null = the owner declared no grants list: grant-gated pools keep their pre-grant (ungated) routing.
-  // A declared list, even [], is the whole set of grants.
   const grants=Array.isArray(allocation?.grants)
     ?Object.fromEntries(allocation.grants.map(parseAllocationGrant).map(({pool,slots,roles})=>[pool,{slots,roles}]))
     :null;
-  return {
-    mode:ADAPTIVE_ALLOCATION_MODE,
-    preferredProvider:allocation?.preferredProvider??null,
-    // null = the runtimes.yaml allocation.policy default
-    policy:allocation?.policy??null,
-    shares:allocation?.shares?{...allocation.shares}:null,
-    windowHours:allocation?.windowHours??DEFAULT_ALLOCATION_WINDOW_HOURS,
-    grants,
-    source:allocation?'allocation':'default',
-  };
+  return {grants,source:allocation?'allocation':'default'};
 }
-export const nonOperationModels=(role,config=loadConfig())=>{if(!Object.hasOwn(NON_OPERATION_ROLES,role)){throw new Error(`Unknown non-operation model role ${role}`);}return effectiveNonOperationModels(config)[role].runtimes;};
 /** The validated config one yaml file holds, or null when the file is absent. */
 const readYamlConfig=(root,name)=>{const yaml=path.join(root,name);return fs.existsSync(yaml)?validateConfig(parseYaml(fs.readFileSync(yaml,'utf8'))):null;};
 function readExample(root=configRoot){const example=readYamlConfig(root,'config.example.yaml');if(example!==null){return example;}throw new Error('Missing config.example.yaml');}

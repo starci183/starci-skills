@@ -302,9 +302,8 @@ kernelSeat:
 workers:
   purpose: |
     Fix agents spawned on demand, one per root-cause cluster, never one per incident. Agents come from the
-    balanced allocator over config.yaml allocation.shares (claude, codex/chatgpt, devin),
-    counting the machine's recent dispatches and this ledger's workers, skipping a provider whose quota probe
-    is dead or whose provider-health circuit is open.
+    worker seat's tier (modules/models/tiers.yaml seats.worker) through the common picker, skipping a
+    provider whose quota probe is dead or whose provider-health circuit is open.
   cap: |
     At most 10 concurrent. Adaptive: config.yaml supervisor.workers.base (default 4) plus one per two queued
     jobs, up to supervisor.workers.max (default 10); halved while the machine is loaded (CPU >= 85% or free

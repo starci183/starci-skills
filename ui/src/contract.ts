@@ -247,7 +247,7 @@ export type AttemptWhere = { repo: string | null; worktree: string | null; mainC
 export type AttemptInput = { what: string | null; op: string | null; records: unknown[]; ownedPaths: string[]; recordsKnown: boolean; writeScopeKnown: boolean;
   source: 'contract' | 'current-job'; sourceAt: number | null; params: unknown; goal: { revision: number | null; identity: string | null } | null;
   cut: unknown; after: unknown; risk: unknown; model: string | null; profile: string | null; effort: string | null; difficulty: string | null;
-  route: { chain: string[]; rejected: unknown[]; order: string | null; policy: string | null; balance: unknown; crossFamily: unknown; at: number | null } };
+  route: { chain: string[]; rejected: unknown[]; tier: string | null; pick: unknown; at: number | null } };
 export type EvidenceGroup = 'evidence'|'op-run'|'check'|'diff'|'media'|'log'|'other';
 export type EvidenceKind = 'json'|'yaml'|'markdown'|'text'|'diff'|'image'|'video'|'audio'|'pdf'|'binary';
 export type EvidenceFile = { artifactId: number; name: string; base: string; group: EvidenceGroup; role: string; kind: EvidenceKind; subkind: string | null;

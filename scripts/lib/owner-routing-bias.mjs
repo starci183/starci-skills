@@ -6,7 +6,7 @@ import { admissionRoles, admissionSelectorFields } from './agent-admission.mjs';
 const POOLS = Object.freeze({codex:'codex-agent','codex-agent':'codex-agent',claude:'claude-agent','claude-agent':'claude-agent',devin:'devin-agent','devin-agent':'devin-agent'});
 const PROVIDERS = Object.freeze({codex:'codex',openai:'codex',claude:'claude',anthropic:'claude',devin:'devin',cursor:'cursor'});
 const plain = value => isPlainObject(value) && [Object.prototype,null].includes(Object.getPrototypeOf(value));
-export const canonicalRoutingPool = value => typeof value === 'string' ? POOLS[value.trim().toLowerCase()] : undefined;
+const canonicalRoutingPool = value => typeof value === 'string' ? POOLS[value.trim().toLowerCase()] : undefined;
 const defaultRoles = () => {
   const policy = allocationSettings().admission;
   const roles = policy?.ownerBiasRoles;
@@ -50,6 +50,14 @@ const role = value => {
   if(!admissionRoles(allocationSettings().admission).includes(found))throw invalid('role is not declared');
   return found;
 };
+/** A member name: `<agent>` / `<pool>` (the whole provider window) or `<agent>/<model>` (one member). */
+const memberName = item => {
+  if(typeof item!=='string' || !item.includes('/'))return null;
+  const [agent,...rest]=item.split('/');
+  return selector({provider:agent.trim(),model:rest.join('/').trim()});
+};
+/** One member name as its canonical selector (or pool id), or undefined when the alias is unknown. */
+export const canonicalRoutingMember = value => { try { return memberName(value) ?? canonicalRoutingPool(value); } catch { return undefined; } };
 const canonicalList = value => {
   if(value===undefined || value===null)return [];
   if(!Array.isArray(value))throw invalid('prefer and avoid must be arrays');
@@ -57,14 +65,15 @@ const canonicalList = value => {
   const seen=new Set();
   for(const item of value){
     // String preferences drop an unknown alias. Hard selectors never drop fields.
-    const normalized=typeof item==='string'?canonicalRoutingPool(item):selector(item);
+    const normalized=typeof item==='string'?(memberName(item)??canonicalRoutingPool(item)):selector(item);
     if(!normalized)continue;
     const key=JSON.stringify(normalized);
     if(!seen.has(key)){seen.add(key);result.push(normalized);}
   }
   return result;
 };
-const asSelector = value => typeof value==='string'?{pool:value}:value;
+/** A bias entry as a selector: a pool id string names the pool, a selector object is kept. */
+export const asSelector = value => typeof value==='string'?{pool:value}:value;
 const covers = (excluded,required) => {
   const a=asSelector(excluded),b=asSelector(required);
   const family=value=>value.provider??value.pool?.replace(/-agent$/,'');
@@ -86,13 +95,14 @@ const override = value => {
 /** Normalize owner-authored data. Authorization is independently checked by the admission adapter. */
 export function normalizeOwnerRoutingBias(value){
   if(value===undefined || value===null)value={};
-  keys(value,['prefer','avoid','require','reserveOverride','roles'],'bias');
+  keys(value,['prefer','avoid','only','reserveOverride','roles'],'bias');
   const avoid=canonicalList(value.avoid);
   const prefer=canonicalList(value.prefer).filter(item=>!avoid.some(excluded=>covers(excluded,item)));
   const result={prefer,avoid};
-  if(value.require!==undefined && value.require!==null){
-    result.require=selector(value.require);
-    if(avoid.some(excluded=>covers(excluded,result.require)))throw invalid('require conflicts with avoid');
+  const only=canonicalList(value.only);
+  if(only.length){
+    result.only=only;
+    if(only.every(named=>avoid.some(excluded=>covers(excluded,named))))throw invalid('only conflicts with avoid');
   }
   if(value.reserveOverride!==undefined && value.reserveOverride!==null)result.reserveOverride=override(value.reserveOverride);
   if(value.roles!==undefined){
@@ -110,7 +120,7 @@ export function biasForRole(value,requestedRole,scopeId){
   if(!(bias.roles??defaultRoles()).includes(actor))return {prefer:[],avoid:[]};
   const reserveOverride=bias.reserveOverride;
   const scoped={prefer:bias.prefer,avoid:bias.avoid};
-  if(bias.require)scoped.require=bias.require;
+  if(bias.only)scoped.only=bias.only;
   if(reserveOverride?.role===actor && reserveOverride.scopeId===scopeId)scoped.reserveOverride=reserveOverride;
   return scoped;
 }

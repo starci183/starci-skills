@@ -1309,7 +1309,7 @@ complete -c starci -n '__starci_using_command worker start' -l task-title -r -d 
 complete -c starci -n '__starci_using_command worker start' -l run -r -d 'Orca Run id (default is the Run bound to this terminal)'
 complete -c starci -n '__starci_using_command worker stop' -l dispatch -r -d 'authoritative Orca Dispatch id'
 complete -c starci -n '__starci_using_command workflow assess' -l repo -r -d 'repository to scan; repeat for several (without --json at least one is required)'
-complete -c starci -n '__starci_using_command workflow bias' -l normalize -r -d 'owner bias JSON: prefer/avoid, role-scoped concrete require and explicit attempt reserveOverride; invalid hard constraints are refused'
+complete -c starci -n '__starci_using_command workflow bias' -l normalize -r -d 'owner bias JSON: prefer/avoid/only member lists (a pool, an agent or agent/model), roles and an explicit attempt reserveOverride; an only list that avoid empties is refused'
 complete -c starci -n '__starci_using_command workflow define' -l repo -r -d 'repository whose .starciwork ledger owns the goal (default: the working directory)'
 complete -c starci -n '__starci_using_command workflow define' -l project -r -d 'registered project name; resolves the work.json binding (mutually exclusive with --repo)'
 complete -c starci -n '__starci_using_command workflow define' -l text -r -d 'the owner prompt the goal is defined from'

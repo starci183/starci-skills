@@ -2,7 +2,7 @@ $schema: https://json-schema.org/draft/2020-12/schema
 $id: starci://schemas/profile-registry.schema.json
 title: StarCi profile registry
 type: object
-required: [schema, runtimes, aliases, executionModel, targets, operators, fallback]
+required: [schema, runtimes, aliases, executionModel, targets, fallback]
 properties:
   schema: {const: starci/profile-registry@1}
   purpose: {type: string}
@@ -61,33 +61,6 @@ properties:
     type: object
     minProperties: 1
     additionalProperties: {$ref: "#/$defs/target"}
-  operators:
-    type: object
-    additionalProperties:
-      type: object
-      additionalProperties: false
-      required: [skill, chain, environments]
-      properties:
-        skill: {type: string, minLength: 1}
-        chain:
-          type: array
-          minItems: 1
-          uniqueItems: true
-          items: {type: string, minLength: 1}
-        environments:
-          type: array
-          minItems: 1
-          items:
-            type: object
-            additionalProperties: false
-            required: [environment, profiles]
-            properties:
-              environment: {type: string, minLength: 1}
-              profiles:
-                type: array
-                minItems: 1
-                uniqueItems: true
-                items: {type: string, minLength: 1}
   fallback:
     type: object
     additionalProperties: false
@@ -125,7 +98,7 @@ $defs:
   pool:
     type: object
     additionalProperties: false
-    required: [target, provider, roles, maxParallel, defaultModel, models]
+    required: [target, provider, roles, maxParallel, defaultModel]
     properties:
       target: {type: string, minLength: 1}
       provider: {type: string, minLength: 1}
@@ -138,13 +111,6 @@ $defs:
       capacityAuthority: {type: string, minLength: 1}
       quotaTelemetry: {type: string, minLength: 1}
       defaultModel: {type: string, minLength: 1}
-      models:
-        type: object
-        minProperties: 1
-        additionalProperties: {type: string, minLength: 1}
-      effort:
-        type: object
-        additionalProperties: {type: string, minLength: 1}
   target:
     type: object
     additionalProperties: false

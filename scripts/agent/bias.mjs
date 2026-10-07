@@ -4,7 +4,7 @@
 //   normalizeBias(obj)   — canonicalize a bias object (agent-supplied or
 //                          regex-extracted): aliases → canonical pool ids,
 //                          unknown soft aliases dropped; hard constraints preserved or refused.
-//   extractRoutingBias(text) -> { prefer: [], avoid: [] }
+//   extractRoutingBias(text) -> { prefer: [], avoid: [], only?: [] }
 //                          — regex floor for callers with no agent in the
 //                          loop (automation, programmatic define-goal). An
 //                          agent reading the owner prompt extracts bias
@@ -22,17 +22,20 @@
 // Args: "<text>" -> extracted JSON; --normalize '<json>' -> normalized JSON.
 import { isMain } from '../lib/is-main.mjs';
 import { altOf } from '../lib/source-phrases.mjs';
-import { normalizeOwnerRoutingBias, canonicalRoutingPool } from '../lib/owner-routing-bias.mjs';
+import { normalizeOwnerRoutingBias, canonicalRoutingMember } from '../lib/owner-routing-bias.mjs';
 
 // Longest alias forms first so 'codex-agent' wins over 'codex' inside the token.
-const PREFER_RE = new RegExp(String.raw`(?:${altOf('bias.prefer')})\s+([a-z][a-z-]*)`, 'gi');
-const AVOID_RE = new RegExp(String.raw`(?:${altOf('bias.avoid')})\s+([a-z][a-z-]*)`, 'gi');
+const MEMBER = String.raw`([a-z][a-z-]*(?:/[a-z0-9][a-z0-9.-]*)?)`;
+const markerRe = (key) => new RegExp(String.raw`(?:${altOf(key)})\s+${MEMBER}`, 'gi');
+const PREFER_RE = markerRe('bias.prefer');
+const AVOID_RE = markerRe('bias.avoid');
+const ONLY_RE = markerRe('bias.only');
 
 const scan = (text, re) => {
   const out = [];
   for (const m of text.matchAll(re)) {
-    const agent = canonicalRoutingPool(m[1]);
-    if (agent && !out.includes(agent)) out.push(agent);
+    const member = canonicalRoutingMember(m[1].toLowerCase());
+    if (member && !out.some((seen) => JSON.stringify(seen) === JSON.stringify(member))) out.push(member);
   }
   return out;
 };
@@ -41,7 +44,8 @@ function extractRoutingBias(text) {
   const t = String(text ?? '');
   const avoid = scan(t, AVOID_RE);
   const prefer = scan(t, PREFER_RE).filter((a) => !avoid.includes(a));
-  return { prefer, avoid };
+  const only = scan(t, ONLY_RE);
+  return { prefer, avoid, ...(only.length ? { only } : {}) };
 }
 
 // Preserve role-scoped concrete requirements and explicit reserve grants. Normalization

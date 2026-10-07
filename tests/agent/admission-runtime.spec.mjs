@@ -19,7 +19,7 @@ const fixture = t => {
   t.after(() => fs.rmSync(directory, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
   const env = { ...process.env, STARCI_TEST_MACHINE_FILE: path.join(directory, 'machine.sqlite') };
   openMachine({ env }).close();
-  const fake = fakeAdmission({ used: { claude: 96, codex: 20 } });
+  const fake = fakeAdmission({ used: { claude: 92, codex: 20 } });
   return { env, io: { quota: fake.quota, circuit: () => null } };
 };
 const request = (role, scopeId, extra = {}) => ({ role, scopeId, allowGroup: group,
@@ -68,20 +68,23 @@ test('an allowed member can lower but cannot raise the registered shared provide
   assert.equal(providerBudgetUsage('codex', 'default', lowerOptions).running, 1);
 });
 
-test('production Op admission cannot lower the difficulty floor through an explicit request', t => {
+test('production Op admission admits a tier member and a raised explicit floor excludes the lower one', t => {
   for (const difficulty of ['hard', 'insane']) {
     const options = fixture(t);
     options.io.quota = fakeAdmission({ used: { claude: 20, codex: 20 } }).quota;
     const scopeId = `op:${difficulty}:attempt:1`;
     const lowGroup = [{ provider: 'claude', model: 'claude-sonnet-5-5', maxParallel: 1,
       eligibility: { eligible: true, mode: 'operation-policy' } }];
-    const denied = launch(options, 'op', scopeId, { difficulty, qualityFloor: 'standard', allowGroup: lowGroup });
-    assert.equal(denied.ok, false, 'an explicit standard floor cannot weaken hard operation policy');
+    const denied = launch(options, 'op', scopeId, { difficulty, qualityFloor: 'frontier', allowGroup: lowGroup });
+    assert.equal(denied.ok, false, 'an explicit frontier floor excludes the standard member');
     assert.equal(denied.effectState, 'none');
     assert.equal(providerBudgetUsage('claude', 'default', options).running, 0, 'refusal cannot reserve capacity');
     const admitted = launch(options, 'op', scopeId, { difficulty, qualityFloor: 'frontier' });
     assert.equal(admitted.ok, true, JSON.stringify(admitted));
     assert.equal(admitted.selected.qualityFloor, 'frontier');
+    const standard = fixture(t);
+    standard.io.quota = options.io.quota;
+    assert.equal(launch(standard, 'op', scopeId, { difficulty, allowGroup: lowGroup }).ok, true, 'the role floor admits a standard member');
   }
 });
 
@@ -114,10 +117,10 @@ test('an unknown or another-provider pool cannot bypass the canonical provider c
   }
 });
 
-test('hard require and scoped owner authority survive the plan to actual SQLite receipt', t => {
+test('an only bias and scoped owner authority survive the plan to actual SQLite receipt', t => {
   const options = fixture(t), scopeId = 'ledger/workflow/job:attempt:1';
   const grant = { authorized: true, scopeId, role: 'op', provider: 'claude', model: 'claude-opus-5-5', reason: 'owner permits this exact recovery attempt' };
-  const bias = { require: { provider: 'claude' }, reserveOverride: grant };
+  const bias = { roles: ['op'], only: [{ provider: 'claude' }], reserveOverride: grant };
   const noGrant = launch(options, 'op', scopeId, { bias });
   assert.equal(noGrant.ok, false);
   assert.equal(providerBudgetUsage('claude', 'default', options).running, 0);

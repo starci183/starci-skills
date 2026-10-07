@@ -53,9 +53,9 @@ export function launchKernelGroup({ ledger, workflowId, token, expected, route, 
       throw new Error(renewed.reason);
     }
     spawned = start({ ...launch, provider: member.agent, model: member.model, effort: member.effort,
-      allowGroup: remaining.map((m) => ({ provider: m.agent, model: m.model, effort: m.effort })) });
+      allowGroup: remaining.map((m) => ({ id: m.id, provider: m.agent, model: m.model, effort: m.effort })) });
     if (spawned.ok) {
-      route = { ...member, agent: spawned.provider, model: spawned.admission?.selected?.model ?? spawned.model,
+      route = { ...route, ...member, agent: spawned.provider, model: spawned.admission?.selected?.model ?? spawned.model,
         effort: spawned.effort, warnings: route.warnings, members: route.members, fallThrough: route.fallThrough };
       break;
     }

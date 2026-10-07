@@ -175,23 +175,21 @@ export function supervisorMode({ env = process.env, config = undefined } = {}) {
   return SUPERVISOR_MODES.includes(mode) ? mode : DEFAULT_SUPERVISOR_MODE;
 }
 
-/** config.yaml supervisor block with defaults: {mode, agent, model, effort, repos, pollIntervalMs, workers, landGate, frozenMinutes}. */
+/**
+ * config.yaml supervisor block with defaults: {mode, agent, model, effort, repos, pollIntervalMs, workers, landGate, frozenMinutes}.
+ * `agent` and `model` are the owner's pin of the seat (an `only` bias over the supervisor tier chain); both are null when unpinned.
+ */
 export function supervisorSettings({ config = undefined } = {}) {
   let cfg = config;
   if (cfg === undefined) cfg = loadConfig();
   const sup = cfg?.supervisor ?? {};
-  const kernel = cfg?.kernel ?? {};
   const seat = sup.kernel ?? {};
   const pick = (...values) => values.find((v) => typeof v === 'string' && v.trim())?.trim() ?? null;
-  let group = null;
-  if (Array.isArray(seat.group)) group = seat.group;
-  else if (!seat.agent && !seat.model && Array.isArray(kernel.group)) group = kernel.group;
   return {
     mode: SUPERVISOR_MODES.includes(sup.mode) ? sup.mode : DEFAULT_SUPERVISOR_MODE,
-    agent: pick(seat.agent, kernel.agent, DEFAULT_AGENT),
-    model: pick(seat.model, seat.agent ? null : kernel.model),
-    group,
-    effort: pick(seat.effort, seat.agent ? null : kernel.effort, cfg?.effort),
+    agent: pick(seat.agent),
+    model: pick(seat.model),
+    effort: pick(seat.effort, cfg?.effort),
     repos: Array.isArray(sup.repos) ? sup.repos : [],
     pollIntervalMs: Number.isInteger(sup.pollIntervalMs) ? sup.pollIntervalMs : DEFAULTS.pollIntervalMs,
     workers: { base: Number.isInteger(sup.workers?.base) ? sup.workers.base : DEFAULTS.workers.base,

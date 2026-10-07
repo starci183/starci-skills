@@ -5,6 +5,7 @@ import { loadConfig, coreDebugSettings } from '../../engine/config.mjs';
 import { openMachine, openMachineReader } from '../../engine/db/machine.mjs';
 import { readYamlFile } from '../lib/read-yaml.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { callerMember } from '../agent/tiers.mjs';
 import { loadAdapter, loadModelRegistry, adapterModelAuthority } from '../agent/model-registry.mjs';
 import { launchSupervisor, stopSupervisor, seatHealth } from '../supervisor/start-supervisor.mjs';
 import { SKILL_ROOT, seatOf, enabledOf, terminalSignalDb, supervisorEvent } from '../machine/home.mjs';
@@ -29,7 +30,8 @@ export function coreDebugRoute(caller, config, { registry = loadModelRegistry(),
   if (!authority) throw new Error('invoking agent has no supported launch identity authority');
   const concrete = loaded.card.start?.modelArgument !== false;
   const pool = Object.values(registry.pools ?? {}).find(row => row.provider === agent);
-  const model = caller.model ?? pool?.defaultModel;
+  // The caller's provider runs the seat; its model defaults to that provider's member of the frontier tier (tiers.yaml callerSeatTiers).
+  const model = caller.model ?? callerMember(agent, { registry })?.model ?? pool?.defaultModel;
   if (!model || registry.models?.[model]?.provider !== agent) throw new Error('invoking agent/model pair is not registered');
   if (!concrete && caller.model && caller.model !== pool?.defaultModel) throw new Error('the invoking agent cannot attest an exact underlying model');
   let match = 'logical-runtime';

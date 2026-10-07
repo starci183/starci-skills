@@ -40,7 +40,7 @@ test('the runtime tree carries no fixture leftovers',()=>{
  * A ledger opened on a hard-coded absolute path registers that path in the host's machine arbiter
  * (machine.sqlite `ledgers`), and the registration outlives the spec. engine-lifecycle.spec once enrolled
  * `<drive>/fixture/.starciwork/runtime.sqlite`: the directory was created outside every temp root, the ledger was
- * registered on the live host, and the allocation balance (scripts/agent/balance.mjs) counted it as a product
+ * registered on the live host, and the tier balance (scripts/agent/tier-history.mjs) counted it as a product
  * ledger long after the spec was deleted. A spec's ledger lives under a temp directory it made (withLedger,
  * mkdtempSync) or is handed an injected registry - never a real path literal.
  */
