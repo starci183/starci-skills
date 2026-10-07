@@ -29,48 +29,62 @@ export default {
     // resolved only by the Kernel. --attach types an incident that is already open.
     const until = parseConditions(db, args.until, { workflowId });
     const typedRepo = path.resolve(args.repo ?? process.cwd());
-    if (args.attach) { incidentAttachConditions(ledger, db, workflowId, args, until, typedRepo, now, emit); return; }
+    if (args.attach) { incidentAttachConditions({ ledger, db, workflowId, args, until, typedRepo, now, emit }); return; }
     const holds = String(args.holds ?? '').split(',').map((item) => item.trim()).filter(Boolean);
     // A peer-wait names the peer workflow it waits on (openPeerWaits): only a running peer of this
     // workflow can land the thing and send the message that wakes it.
     const foundationCond = until.find((cond) => cond.type === 'foundation') ?? null;
     const landedCond = until.find((cond) => cond.type === 'landed') ?? null;
-    let peerWait = null, foundationWait = null;
-    if (args.kind === PEER_WAIT) {
-      ({ peerWait, foundationWait } = peerWaitSpecOf(db, workflowId, args, { foundationCond, landedCond }));
-    } else if (args.peer || args['until-message'] || foundationCond) {
-      // A peer's foundation is waited on as a peer-wait, never an owner-gate (driver-loop.yaml foundations.depend).
-      throw Object.assign(new Error('--peer, a bare --until-message and --until-foundation go with --kind peer-wait (an open incident is typed with --attach)'), { code: 'peer-wait-kind-mismatch' });
-    }
+    const { peerWait, foundationWait } = peerWaitOf(db, workflowId, args, { foundationCond, landedCond });
     const incidentId = `inc-${newToken().slice(0, 12)}`;
     // Autopilot (owner ruling 2026-09-28 autopilot-run-to-finish): nothing waits on the owner mid-flow - an owner gate
     // the Kernel raises is a runtime/process wait and is recorded as the Supervisor's (supervisor-gate). An owner-only
     // need is an ask the runtime defers to handover (starci kernel autopilot --defer-to-handover), never a gate.
     const rerouted = internals.OWNER_GATE_KINDS.includes(args.kind) && autopilotOn(db, workflowId) ? { from: args.kind, to: SUPERVISOR_GATE } : null;
     if (rerouted) args = { ...args, kind: SUPERVISOR_GATE };
-    ledger.transaction(() => {
-      openIncident(db, { incidentId, workflowId, kind: args.kind, opId: args.op ?? null, detail: args.detail, lastProgress: `[${args.kind}] ${args.detail}`, at: now });
-      ledger.appendEvent({
-        workflowId, entityType: 'incident', entityId: incidentId,
-        kind: 'incident-raised', payload: { kind: args.kind, ...(rerouted ? { rerouted, by: AUTOPILOT_BY } : {}), detail: args.detail, opId: args.op ?? null, ...(holds.length ? { holds } : {}), ...(peerWait), ...(until.length ? { until } : {}) },
-      });
-      // A wait on a foundation makes the waiter its dependent, so the landing notifies it.
-      if (foundationWait && !(foundationWait.foundation.dependents ?? []).some((d) => d.workflowId === workflowId)) {
-        writeFoundation(db, declareDependent(foundationWait.foundation, { name: foundationWait.name, workflowId, detail: args.detail, now }).record, now);
-        ledger.appendEvent({ workflowId, entityType: 'foundation', entityId: foundationWait.name, kind: 'foundation-dependent-declared', payload: { name: foundationWait.name, via: incidentId } });
-      }
-    });
+    openRaisedIncident(ledger, { incidentId, workflowId, args, now, rerouted, holds, peerWait, until, foundationWait });
     // A condition that already holds resolves the wait now rather than at the next status.
     const released = until.length ? releaseTypedWaits(ledger, { repo: typedRepo, workflowId }).resolved.find((r) => r.incidentId === incidentId) ?? null : null;
     const sharedBlocker = args.kind === SHARED_BLOCKER ? routeSharedBlocker(ledger, { workflowId, incidentId, args, repo: typedRepo }) : null;
     const out = { ok: true, incidentId, workflowId, kind: args.kind, status: released ? 'resolved' : 'open', ...(holds.length ? { holds } : {}), ...(peerWait), ...(until.length ? { until } : {}), ...(released ? { autoResolved: released } : {}), ...(sharedBlocker ? { sharedBlocker } : {}) };
     emit(out, `incident ${incidentId} open on ${workflowId} — ${args.kind}${peerWaitNote(peerWait)}: ${args.detail}`, args.json);
-    if (until.length && !args.json) console.log(`  typed release: ${until.map(conditionLabel).join(' AND ')}${metNote(released)}`);
-    if (sharedBlocker && !args.json) console.log(sharedBlocker.routed
-      ? `  shared blocker routed to ${sharedBlocker.to} as follow-up ${sharedBlocker.key} (introduced by ${sharedBlocker.introducedBy ?? sharedBlocker.to}, via ${sharedBlocker.via})`
-      : `  shared blocker NOT routed: ${sharedBlocker.why}`);
+    if (!args.json) printRelease({ until, released, sharedBlocker });
   },
 };
+
+// A peer-wait kind names the peer it waits on; a peer, bare --until-message or foundation condition on any other kind is refused.
+function peerWaitOf(db, workflowId, args, { foundationCond, landedCond }) {
+  if (args.kind === PEER_WAIT) return peerWaitSpecOf(db, workflowId, args, { foundationCond, landedCond });
+  if (args.peer || args['until-message'] || foundationCond) {
+    // A peer's foundation is waited on as a peer-wait, never an owner-gate (driver-loop.yaml foundations.depend).
+    throw Object.assign(new Error('--peer, a bare --until-message and --until-foundation go with --kind peer-wait (an open incident is typed with --attach)'), { code: 'peer-wait-kind-mismatch' });
+  }
+  return { peerWait: null, foundationWait: null };
+}
+
+// The incident row and its raised event, in one transaction; a wait on a foundation makes the waiter its dependent.
+function openRaisedIncident(ledger, { incidentId, workflowId, args, now, rerouted, holds, peerWait, until, foundationWait }) {
+  const db = ledger.db;
+  ledger.transaction(() => {
+    openIncident(db, { incidentId, workflowId, kind: args.kind, opId: args.op ?? null, detail: args.detail, lastProgress: `[${args.kind}] ${args.detail}`, at: now });
+    ledger.appendEvent({
+      workflowId, entityType: 'incident', entityId: incidentId,
+      kind: 'incident-raised', payload: { kind: args.kind, ...(rerouted ? { rerouted, by: AUTOPILOT_BY } : {}), detail: args.detail, opId: args.op ?? null, ...(holds.length ? { holds } : {}), ...(peerWait), ...(until.length ? { until } : {}) },
+    });
+    // A wait on a foundation makes the waiter its dependent, so the landing notifies it.
+    if (foundationWait && !(foundationWait.foundation.dependents ?? []).some((d) => d.workflowId === workflowId)) {
+      writeFoundation(db, declareDependent(foundationWait.foundation, { name: foundationWait.name, workflowId, detail: args.detail, now }).record, now);
+      ledger.appendEvent({ workflowId, entityType: 'foundation', entityId: foundationWait.name, kind: 'foundation-dependent-declared', payload: { name: foundationWait.name, via: incidentId } });
+    }
+  });
+}
+
+function printRelease({ until, released, sharedBlocker }) {
+  if (until.length) console.log(`  typed release: ${until.map(conditionLabel).join(' AND ')}${metNote(released)}`);
+  if (!sharedBlocker) return;
+  if (sharedBlocker.routed) console.log(`  shared blocker routed to ${sharedBlocker.to} as follow-up ${sharedBlocker.key} (introduced by ${sharedBlocker.introducedBy ?? sharedBlocker.to}, via ${sharedBlocker.via})`);
+  else console.log(`  shared blocker NOT routed: ${sharedBlocker.why}`);
+}
 
 const SHARED_BLOCKER = 'shared-blocker';
 
@@ -110,7 +124,7 @@ function incidentResolveExisting(ledger, db, workflowId, args, now, emit) {
   emit(out, `incident ${row.incident_id} ${changed ? 'resolved' : 'was already ' + row.status} on ${workflowId}`, args.json);
 }
 
-function incidentAttachConditions(ledger, db, workflowId, args, until, typedRepo, now, emit) {
+function incidentAttachConditions({ ledger, db, workflowId, args, until, typedRepo, now, emit }) {
   const row = db.prepare('SELECT incident_id,status FROM incidents WHERE incident_id=? AND workflow_id=?').get(args.attach, workflowId);
   if (!row) throw Object.assign(new Error(`incident ${args.attach} is not on ${workflowId}`), { code: 'incident-unknown' });
   if (row.status !== 'open') throw Object.assign(new Error(`incident ${args.attach} is ${row.status}; only an open incident takes release conditions`), { code: 'incident-not-open' });
@@ -131,6 +145,16 @@ function incidentAttachConditions(ledger, db, workflowId, args, until, typedRepo
   emit(out, `incident ${row.incident_id} on ${workflowId} now releases on ${until.map(conditionLabel).join(' AND ')}${metNote(released)}`, args.json);
 }
 
+// The shared foundation a peer-wait is typed on; refuses an unknown, landed or unowned foundation or another owner than the named peer.
+function foundationWaitOf(db, name, peer) {
+  const foundation = readFoundation(db, name);
+  if (!foundation) throw Object.assign(new Error(`no shared foundation ${name} is registered; its owner claims it (starci kernel foundation --claim ${name}) or you declare the need (starci kernel foundation --declare-dependent ${name}) first`), { code: 'foundation-unknown' });
+  if (foundation.state === 'landed') throw Object.assign(new Error(`foundation ${name} already landed (${foundation.version ?? 'no version'}: ${foundation.landed?.proof ?? '-'}); there is nothing to wait for`), { code: 'foundation-landed' });
+  if (!foundation.owner) throw Object.assign(new Error(`foundation ${name} has no owner yet, so nothing would land it; agree its owner with your peers (starci kernel notify) and have it claimed first`), { code: 'foundation-unowned' });
+  if (peer && peer !== foundation.owner.workflowId) throw Object.assign(new Error(`foundation ${name} is owned by ${foundation.owner.workflowId}, not ${peer}`), { code: 'foundation-peer-mismatch' });
+  return { name, foundation };
+}
+
 // The --peer spec of a peer-wait, resolved through --until-landed / --until-foundation; throws the refusal.
 function peerWaitSpecOf(db, workflowId, args, { foundationCond, landedCond }) {
   let peer = typeof args.peer === 'string' ? args.peer.trim() : '';
@@ -142,17 +166,8 @@ function peerWaitSpecOf(db, workflowId, args, { foundationCond, landedCond }) {
   // --until-foundation <name>: a typed wait released when that shared foundation lands (a
   // gate-conditions.mjs condition; starci kernel foundation --land resolves it and wakes this Kernel). Its
   // peer is the foundation's owner.
-  let foundationWait = null;
-  if (foundationCond) {
-    const name = foundationCond.name;
-    const foundation = readFoundation(db, name);
-    if (!foundation) throw Object.assign(new Error(`no shared foundation ${name} is registered; its owner claims it (starci kernel foundation --claim ${name}) or you declare the need (starci kernel foundation --declare-dependent ${name}) first`), { code: 'foundation-unknown' });
-    if (foundation.state === 'landed') throw Object.assign(new Error(`foundation ${name} already landed (${foundation.version ?? 'no version'}: ${foundation.landed?.proof ?? '-'}); there is nothing to wait for`), { code: 'foundation-landed' });
-    if (!foundation.owner) throw Object.assign(new Error(`foundation ${name} has no owner yet, so nothing would land it; agree its owner with your peers (starci kernel notify) and have it claimed first`), { code: 'foundation-unowned' });
-    if (peer && peer !== foundation.owner.workflowId) throw Object.assign(new Error(`foundation ${name} is owned by ${foundation.owner.workflowId}, not ${peer}`), { code: 'foundation-peer-mismatch' });
-    peer = foundation.owner.workflowId;
-    foundationWait = { name, foundation };
-  }
+  const foundationWait = foundationCond ? foundationWaitOf(db, foundationCond.name, peer) : null;
+  if (foundationWait) peer = foundationWait.foundation.owner.workflowId;
   if (!peer) throw Object.assign(new Error('a peer-wait names the workflow it waits on: --peer <workflowId>'), { code: 'peer-wait-peer-missing' });
   const refusal = peerRefusalOf(db, getWorkflow(db, workflowId), peer);
   if (refusal) throw Object.assign(new Error(`peer-wait on ${peer} refused: ${refusal.detail}`), { code: refusal.code });
