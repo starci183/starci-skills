@@ -171,12 +171,15 @@ kernel/supervisor pins whose agent card cannot attest the model, Orca reachable)
 reports a `reconciler.profile` other than operational as red (`config.yaml` is never rewritten by a plain run; `--set-profile operational|observe` writes that one block, backup first);
 rebuilds `ui/dist` with `npm run build` in `ui/` when any `ui/src`, `ui/package.json`, `ui/index.html` or vite config is
 newer than the build (a failed build is red); starts the engine, or restarts it out of `--safe` when no real crash loop
-is on record; starts every registry service that is down (never Orca); runs `start-supervisor.mjs` (only in
+is on record; links the launcher shim and registers or refreshes a missing or stale Windows task; starts every registry service that is down (never Orca); runs `start-supervisor.mjs` (only in
 `supervisor.mode: kernel`) and the Kernel watchdog `--once --repair` of each running workflow. It prints one checklist
 (text, or `--json`) of the engine leader and heartbeat, safe mode, each controller against the profile, each service
 (harness UI local and public `/healthz`, tunnels, Telegram, ask gateway), the Supervisor seat, each running workflow's
 Kernel seat, open violations and the preflight rows, and exits 0 only when every required row is green. `--check`
-changes nothing.
+changes nothing, and `--brief` prints it as one line per row that is not green. A seat that is not running while no
+workflow needs it is idle and green in a `--check`; a start path requires every seat. `--services` heals only the
+no-quota services (launcher shim, the three tasks, UI build, engine, harness UI and tunnel, ask gateway and tunnel),
+lists each applied action and never reaches `start-supervisor.mjs`, a Kernel watchdog or core debug.
 
 Accepted workflow startup uses this shared native host readiness before launching its Kernel and
 configuration-selected maintenance. It validates persisted goal acceptance before host or agent

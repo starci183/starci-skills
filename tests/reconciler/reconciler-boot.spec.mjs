@@ -253,7 +253,7 @@ test('a held host lock refuses UI work and a failed awaited build blocks subsequ
 test('host apply keeps Supervisor but excludes Kernel watchdogs during workflow ingress', async () => {
   const calls = [];
   const deps = { leaderState: () => ({ fresh: true }), reconcilerNumbers: () => NUMBERS, crashLoopRecord: () => ({ starts: [] }),
-    status: () => ({ modes: {} }), probeServices: async () => [], probeOrcaAsync: async () => ({ ok: true }),
+    status: () => ({ modes: {} }), probeServices: async () => [], auditTasks: async () => ({ ok: true, audits: {} }), probeOrcaAsync: async () => ({ ok: true }),
     loadConfig: () => ({}), supervisorMode: () => 'kernel', json: async () => { calls.push('supervisor'); return { ok: true, action: 'already-live' }; },
     kernelSeatItems: async () => { calls.push('kernel'); return []; } };
   await applyHost({ noBuild: true, waitMs: 0, workflowSeats: false, platform: 'win32' }, deps);
