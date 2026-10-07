@@ -1,6 +1,7 @@
 // worker-verbs-list.mjs - project Orca worker accounting for the lead-facing worker list.
 import path from 'node:path';
 import { terminalList } from '../api/orca/terminal-list.mjs';
+import { findInOrder } from '../lib/in-order.mjs';
 import { terminalIdentityOf } from '../lib/terminal-liveness.mjs';
 import { worktreePs } from '../api/orca/worktree-ps.mjs';
 import { worktreePathOf } from '../lib/worker-accounting.mjs';
@@ -54,18 +55,20 @@ const terminalAgent = (terminal) => {
 /** Fill the normalized worktree-ps rows from terminal-list when Orca omits their agents array. */
 export async function worktreesWithWorkingAgents(worktrees = [], list = terminalList) {
   const rows = [];
-  for (const row of worktrees) {
-    if (Array.isArray(row?.agents)) { rows.push(row); continue; }
+  let failure = null;
+  await findInOrder(worktrees, async (row) => {
+    if (Array.isArray(row?.agents)) { rows.push(row); return false; }
     const terminals = await list({ worktree: `path:${row.path}` });
-    if (!terminals?.ok) return { ok: false, worktrees: rows, error: terminals?.error ?? `terminal listing failed for ${row.path}` };
+    if (!terminals?.ok) { failure = { ok: false, worktrees: rows, error: terminals?.error ?? `terminal listing failed for ${row.path}` }; return true; }
     const agents = (terminals.terminals ?? []).flatMap((terminal) => {
       if (terminal?.connected === false) return [];
       const agentType = terminalAgent(terminal);
       return agentType ? [{ state: 'working', agentType }] : [];
     });
     rows.push({ ...row, agents });
-  }
-  return { ok: true, worktrees: rows };
+    return false;
+  });
+  return failure ?? { ok: true, worktrees: rows };
 }
 
 /** Resolve a path to a registered worktree in the same Orca repository as cwd. */

@@ -29,6 +29,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { isMain } from '../lib/is-main.mjs';
+import { eachInOrder } from '../lib/in-order.mjs';
 import { probe as probeUrl } from '../api/http/probe.mjs';
 import { openLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
@@ -124,11 +125,11 @@ export const openAsks = async (db, wanted = new Set(), { timeoutMs = PROBE_TIMEO
             AND json_extract(v.payload_json,'$.dispatchId')=r.dispatch_id AND v.seq > s.seq))
       ORDER BY r.report_id DESC`).all();
   const seen = new Set(); const out = [];
-  for (const a of asks) {
-    if (seen.has(a.dispatch_id) || !mine(wanted, a.workflow_id)) continue;
+  await eachInOrder(asks, async (a) => {
+    if (seen.has(a.dispatch_id) || !mine(wanted, a.workflow_id)) return;
     seen.add(a.dispatch_id);
     out.push({ ...a, ...(await askLiveness(db, a.dispatch_id, { timeoutMs, probe })) });
-  }
+  });
   return out;
 };
 

@@ -250,6 +250,31 @@ export function repairSupervisorTabTitles(seatTerminal, workers, d) {
 const DEAD_WORKER_STATE = /stop|fail|dead|exit|release|abandon/i;
 const bestEffort = bestEffortCall;
 
+/** Sweep one job: a reported worker is released and marked closed, a dead one without a report fails. Returns the reason the whole sweep stops (the host did not answer), or null. */
+function sweepJob(job, { m, d, now, out, markClosed, fail }) {
+  const handle = job.worker_id;
+  const dispatch = job.payload.dispatch ?? null;
+  if (!handle || job.payload.self || job.payload.terminalClosed) return null;
+  const reported = job.status === 'reported' || Boolean(reportOf(m, job.job_id));
+  if (!dispatch) return null;
+  const shown = bestEffort(() => d.show(dispatch));
+  if (shown?.hostUnavailable) return shown.error ?? 'worker-show did not answer';
+  if (!shown?.ok) return null; // an unreadable worker proves nothing
+  const dead = Boolean(shown.state && DEAD_WORKER_STATE.test(shown.state));
+  if (reported) {
+    const stop = dead ? null : bestEffort(() => d.stop(dispatch));
+    const release = bestEffort(() => d.release(dispatch));
+    if (release?.ok) { markClosed(job, { released: { at: now, stopped: stop?.ok ?? null } }); out.closed.push({ jobId: job.job_id, handle, dispatch }); }
+    return null;
+  }
+  if (!dead) return null;
+  const reason = `worker ${shown.state} without a report`;
+  const release = bestEffort(() => d.release(dispatch));
+  fail(job, reason, { reason: 'worker-died-no-report', detail: reason }, release?.ok === true, { dispatch });
+  out.deaths.push({ jobId: job.job_id, reason });
+  return null;
+}
+
 /**
  * The [Worker] sweep over the machine handle `m` (sup_jobs): returns {deaths:[{jobId, reason}], closed:[...]}.
  * Liveness is worker-show on the job's Dispatch; a reported or dead worker is fenced and released (worker-stop +
@@ -265,28 +290,109 @@ export function sweepWorkers(m, d, { now = Date.now() } = {}) {
     supervisorEvent(m, { entityType: 'job', entityId: job.job_id, kind: 'worker-died', payload: { terminal: job.worker_id, reason, agent: job.payload.agent ?? null, ...extra }, now });
   });
   for (const job of jobsOf(m, ['running', 'reported'])) {
-    const handle = job.worker_id;
-    const dispatch = job.payload.dispatch ?? null;
-    if (!handle || job.payload.self || job.payload.terminalClosed) continue;
-    const reported = job.status === 'reported' || Boolean(reportOf(m, job.job_id));
-    if (!dispatch) continue;
-    const shown = bestEffort(() => d.show(dispatch));
-    if (shown?.hostUnavailable) return { ...out, skipped: shown.error ?? 'worker-show did not answer' };
-    if (!shown?.ok) continue; // an unreadable worker proves nothing
-    const dead = Boolean(shown.state && DEAD_WORKER_STATE.test(shown.state));
-    if (reported) {
-      const stop = dead ? null : bestEffort(() => d.stop(dispatch));
-      const release = bestEffort(() => d.release(dispatch));
-      if (release?.ok) { markClosed(job, { released: { at: now, stopped: stop?.ok ?? null } }); out.closed.push({ jobId: job.job_id, handle, dispatch }); }
-      continue;
-    }
-    if (!dead) continue;
-    const reason = `worker ${shown.state} without a report`;
-    const release = bestEffort(() => d.release(dispatch));
-    fail(job, reason, { reason: 'worker-died-no-report', detail: reason }, release?.ok === true, { dispatch });
-    out.deaths.push({ jobId: job.job_id, reason });
+    const skipped = sweepJob(job, { m, d, now, out, markClosed, fail });
+    if (skipped) return { ...out, skipped };
   }
   return out;
+}
+
+/** Replace the seat through the host seam, repair the new seat's tab titles and log the replacement: the pass outcome, `fields` after `action`. */
+function replaceSeat(deps, env, label, fields = {}) {
+  const replaced = deps.replace();
+  const titleRepairs = replaced?.ok && replaced?.terminal ? repairSupervisorTabTitles(replaced.terminal, [], deps) : [];
+  supervisorLog('watchdog', `${label}: ${JSON.stringify(replaced)}`, { env });
+  return { ok: replaced?.ok !== false, action: replaced?.action === 'booted' || replaced?.action === 'restarted' ? 'restarted' : (replaced?.action ?? 'replace-failed'), ...fields, detail: replaced, ...(titleRepairs.length ? { titleRepairs } : {}) };
+}
+
+/** The seat's standing: `{ result }` ends the pass (disabled, starting, unverified, dead and replaced), otherwise `{ health }` of a live seat. */
+function liveSeatHealth({ m, deps, env, now }) {
+  const enabled = enabledOf(m);
+  if (enabled !== true) return { result: { ok: true, action: enabled === false ? 'disabled' : 'never-started' } };
+  const seat = seatOf(m, now());
+  let health = seatHealth(seat, deps, now());
+  if (health.starting) return { result: { ok: true, action: 'starting' } };
+  if (health.hostUnavailable || health.unverified) return { result: { ok: true, action: 'host-unavailable', reason: health.reason } };
+  if (!health.live && seat?.value?.terminal) {
+    if (deps.settleMs > 0) deps.sleep(deps.settleMs);
+    health = seatHealth(seatOf(m, now()), deps, now());
+    if (health.live || health.hostUnavailable || health.unverified) return { result: { ok: true, action: 'death-unconfirmed', reason: health.reason } };
+  }
+  if (health.live) return { health };
+  m.close();
+  return { result: replaceSeat(deps, env, 'replace', { reason: health.reason }) };
+}
+
+/** A frozen busy frame: the proven wake, and a replacement of the seat when its frame is still frozen after it. */
+function wakeFrozenSeat({ m, deps, env, now, settings, terminal, plan, sweep, busy, frame: seenFrame }) {
+  const frame = seenFrame ?? deps.screen(terminal);
+  const signature = frame == null ? null : busySignature(frame);
+  if (signature == null) return { ok: true, action: 'busy', state: busy, terminal, pending: plan.tags };
+  const outputAgeMs = deps.outputAge ? deps.outputAge(terminal) : null;
+  const frozen = frozenBusyFrame({ signature, prev: busyFrameOf(m, terminal), now: now(), outputAgeMs, frozenMs: settings.frozenMinutes * 60_000 });
+  m.transaction(() => putBusyFrame(m, terminal, frozen.state));
+  if (!frozen.frozen) return { ok: true, action: 'busy', state: busy, terminal, pending: plan.tags };
+  // A frozen pane is not a busy seat: Escape an input row aimed at a subagent, then the proven wake.
+  const escaped = deps.escape && SUBAGENT_INPUT.test(frame) ? deps.escape(terminal) : null;
+  const woke = deps.wake(terminal, plan.text);
+  noteInputOutcome(terminal, woke.action, { env });
+  const after = deps.screen(terminal);
+  const stillFrozen = after != null && busySignature(after) === signature;
+  m.transaction(() => supervisorEvent(m, { kind: 'supervisor-wake', now: now(), payload: { tags: plan.tags, inbox: plan.inbox, land: plan.land, report: plan.report, decisions: plan.decisions, text: plan.text,
+    delivered: woke.delivered === true, action: woke.action,
+    frozen: { signature, since: frozen.state.since, reads: frozen.state.reads, outputAgeMs, state: busy, escaped: escaped == null ? null : escaped.ok === true } } }));
+  if (stillFrozen) {
+    m.transaction(() => supervisorEvent(m, { kind: 'supervisor-frozen-replace', now: now(), payload: { terminal, signature, since: frozen.state.since, reads: frozen.state.reads, wake: woke.action ?? null } }));
+    m.close();
+    return replaceSeat(deps, env, 'frozen-replace', { terminal, tags: plan.tags });
+  }
+  return { ok: woke.delivered === true || woke.action === 'kernel-busy', action: woke.delivered ? 'frozen-woken' : woke.action, terminal, tags: plan.tags, workers: sweep };
+}
+
+/** The wake of an idle seat; a seat that refuses input SEAT_DEAF_MAX times in a row is replaced, not woken forever (MB-05). */
+function wakeIdleSeat({ m, deps, env, now, terminal, plan, sweep }) {
+  m.db.prepare('DELETE FROM sup_signals WHERE scope=?').run(BUSY_SCOPE);
+  const woke = deps.wake(terminal, plan.text);
+  m.transaction(() => supervisorEvent(m, { kind: 'supervisor-wake', now: now(), payload: { tags: plan.tags, inbox: plan.inbox, land: plan.land, report: plan.report, decisions: plan.decisions, text: plan.text, delivered: woke.delivered === true, action: woke.action } }));
+  const deaf = noteInputOutcome(terminal, woke.action, { env });
+  if (deaf.replace) {
+    m.transaction(() => supervisorEvent(m, { kind: 'supervisor-deaf-replace', now: now(), payload: { terminal, failures: deaf.failures, since: deaf.since, last: woke.action } }));
+    return replaceSeat(deps, env, `deaf-replace after ${deaf.failures} refused input(s)`, { reason: `seat-deaf x${deaf.failures}`, inputFailures: deaf.failures, terminal, tags: plan.tags });
+  }
+  return { ok: woke.delivered === true || woke.action === 'kernel-busy', action: woke.delivered ? 'woken' : woke.action, terminal, tags: plan.tags, workers: sweep, inputFailures: deaf.failures };
+}
+
+/** The wake plan for a live seat on `terminal`, with whether the seat is registered as the Supervisor channel. */
+function wakePlanFor({ m, env, now, terminal }) {
+  const sup = getSupervisor(SUPERVISOR_ID, env);
+  const registered = Boolean(sup && sup.terminal === terminal);
+  if (registered) heartbeatSupervisor(SUPERVISOR_ID, { env });
+  const unread = readInbox(SUPERVISOR_ID, env).filter((m) => !m.read);
+  const reported = jobsOf(m, ['reported']).map((j) => j.job_id);
+  const filed = filedReports(m, now());
+  let decisions = [];
+  try { decisions = supervisorDecisions(m, { now: now() }); } catch { decisions = []; }
+  // [Worker] terminals (deaths, reported-worker close) are the Job controller's: it calls sweepWorkers itself.
+  const sweep = { deaths: [], closed: [], action: 'job-controller' };
+  const plan = planWake({ now: now(), wakes: recentWakes(m), unread, reported, filed, workerDeaths: sweep.deaths, registered, decisions });
+  return { plan, registered, sweep };
+}
+
+/** One pass over a live seat: repair tab titles, plan the wake, and deliver it (or report why not). */
+function wakeLiveSeat({ m, deps, env, now, settings, terminal }) {
+  const titleRepairs = repairSupervisorTabTitles(terminal, jobsOf(m, ['running']), deps);
+  const { plan, registered, sweep } = wakePlanFor({ m, env, now, terminal });
+  if (!plan.text) return { ok: true, action: 'idle', terminal, registered, workers: sweep, ...(titleRepairs.length ? { titleRepairs } : {}) };
+  const state = deps.state(terminal);
+  if (state === 'queued-input' || state === 'staged-input') {
+    const proof = deps.enter(terminal);
+    return { ok: proof?.ok === true, action: `${state}-sent`, terminal, tags: plan.tags };
+  }
+  let frame = null;
+  let busy = state;
+  if (state === 'turn-idle') { frame = deps.screen(terminal); busy = busyScreen(frame) ? 'subagents-running' : null; }
+  if (busy && FROZEN_BUSY.has(busy)) return wakeFrozenSeat({ m, deps, env, now, settings, terminal, plan, sweep, busy, frame });
+  if (busy) return { ok: true, action: 'busy', state: busy, terminal, pending: plan.tags };
+  return wakeIdleSeat({ m, deps, env, now, terminal, plan, sweep });
 }
 
 /** One watchdog pass. `d` = host seams. Returns {ok, action, ...}. */
@@ -296,87 +402,9 @@ export async function watchdogPass({ env = process.env, d = null, now = Date.now
   const settings = supervisorSettings();
   const m = openMachine({ env });
   try {
-    const enabled = enabledOf(m);
-    if (enabled !== true) return { ok: true, action: enabled === false ? 'disabled' : 'never-started' };
-    const seat = seatOf(m, now());
-    let health = seatHealth(seat, deps, now());
-    if (health.starting) return { ok: true, action: 'starting' };
-    if (health.hostUnavailable || health.unverified) return { ok: true, action: 'host-unavailable', reason: health.reason };
-    if (!health.live && seat?.value?.terminal) {
-      if (deps.settleMs > 0) deps.sleep(deps.settleMs);
-      health = seatHealth(seatOf(m, now()), deps, now());
-      if (health.live || health.hostUnavailable || health.unverified) return { ok: true, action: 'death-unconfirmed', reason: health.reason };
-    }
-    if (!health.live) {
-      m.close();
-      const replaced = deps.replace();
-      const titleRepairs = replaced?.ok && replaced?.terminal ? repairSupervisorTabTitles(replaced.terminal, [], deps) : [];
-      supervisorLog('watchdog', `replace: ${JSON.stringify(replaced)}`, { env });
-      return { ok: replaced?.ok !== false, action: replaced?.action === 'booted' || replaced?.action === 'restarted' ? 'restarted' : (replaced?.action ?? 'replace-failed'), reason: health.reason, detail: replaced, ...(titleRepairs.length ? { titleRepairs } : {}) };
-    }
-    const terminal = health.terminal;
-    // [Worker] terminals (deaths, reported-worker close) are the Job controller's: it calls sweepWorkers itself.
-    const sweep = { deaths: [], closed: [], action: 'job-controller' };
-    const titleRepairs = repairSupervisorTabTitles(terminal, jobsOf(m, ['running']), deps);
-    const sup = getSupervisor(SUPERVISOR_ID, env);
-    const registered = Boolean(sup && sup.terminal === terminal);
-    if (registered) heartbeatSupervisor(SUPERVISOR_ID, { env });
-    const unread = readInbox(SUPERVISOR_ID, env).filter((m) => !m.read);
-    const reported = jobsOf(m, ['reported']).map((j) => j.job_id);
-    const filed = filedReports(m, now());
-    let decisions = [];
-    try { decisions = supervisorDecisions(m, { now: now() }); } catch { decisions = []; }
-    const plan = planWake({ now: now(), wakes: recentWakes(m), unread, reported, filed, workerDeaths: sweep.deaths, registered, decisions });
-    if (!plan.text) return { ok: true, action: 'idle', terminal, registered, workers: sweep, ...(titleRepairs.length ? { titleRepairs } : {}) };
-    const state = deps.state(terminal);
-    if (state === 'queued-input' || state === 'staged-input') {
-      const proof = deps.enter(terminal);
-      return { ok: proof?.ok === true, action: `${state}-sent`, terminal, tags: plan.tags };
-    }
-    let frame = null;
-    let busy = state;
-    if (state === 'turn-idle') { frame = deps.screen(terminal); busy = busyScreen(frame) ? 'subagents-running' : null; }
-    if (busy && FROZEN_BUSY.has(busy)) {
-      frame ??= deps.screen(terminal);
-      const signature = frame == null ? null : busySignature(frame);
-      if (signature == null) return { ok: true, action: 'busy', state: busy, terminal, pending: plan.tags };
-      const outputAgeMs = deps.outputAge ? deps.outputAge(terminal) : null;
-      const frozen = frozenBusyFrame({ signature, prev: busyFrameOf(m, terminal), now: now(), outputAgeMs, frozenMs: settings.frozenMinutes * 60_000 });
-      m.transaction(() => putBusyFrame(m, terminal, frozen.state));
-      if (!frozen.frozen) return { ok: true, action: 'busy', state: busy, terminal, pending: plan.tags };
-      // A frozen pane is not a busy seat: Escape an input row aimed at a subagent, then the proven wake.
-      const escaped = deps.escape && SUBAGENT_INPUT.test(frame) ? deps.escape(terminal) : null;
-      const woke = deps.wake(terminal, plan.text);
-      noteInputOutcome(terminal, woke.action, { env });
-      const after = deps.screen(terminal);
-      const stillFrozen = after != null && busySignature(after) === signature;
-      m.transaction(() => supervisorEvent(m, { kind: 'supervisor-wake', now: now(), payload: { tags: plan.tags, inbox: plan.inbox, land: plan.land, report: plan.report, decisions: plan.decisions, text: plan.text,
-        delivered: woke.delivered === true, action: woke.action,
-        frozen: { signature, since: frozen.state.since, reads: frozen.state.reads, outputAgeMs, state: busy, escaped: escaped == null ? null : escaped.ok === true } } }));
-      if (stillFrozen) {
-        m.transaction(() => supervisorEvent(m, { kind: 'supervisor-frozen-replace', now: now(), payload: { terminal, signature, since: frozen.state.since, reads: frozen.state.reads, wake: woke.action ?? null } }));
-        m.close();
-        const replaced = deps.replace();
-        const titleRepairs = replaced?.ok && replaced?.terminal ? repairSupervisorTabTitles(replaced.terminal, [], deps) : [];
-        supervisorLog('watchdog', `frozen-replace: ${JSON.stringify(replaced)}`, { env });
-        return { ok: replaced?.ok !== false, action: replaced?.action === 'booted' || replaced?.action === 'restarted' ? 'restarted' : (replaced?.action ?? 'replace-failed'), terminal, tags: plan.tags, detail: replaced, ...(titleRepairs.length ? { titleRepairs } : {}) };
-      }
-      return { ok: woke.delivered === true || woke.action === 'kernel-busy', action: woke.delivered ? 'frozen-woken' : woke.action, terminal, tags: plan.tags, workers: sweep };
-    }
-    if (busy) return { ok: true, action: 'busy', state: busy, terminal, pending: plan.tags };
-    m.db.prepare('DELETE FROM sup_signals WHERE scope=?').run(BUSY_SCOPE);
-    const woke = deps.wake(terminal, plan.text);
-    m.transaction(() => supervisorEvent(m, { kind: 'supervisor-wake', now: now(), payload: { tags: plan.tags, inbox: plan.inbox, land: plan.land, report: plan.report, decisions: plan.decisions, text: plan.text, delivered: woke.delivered === true, action: woke.action } }));
-    // MB-05: a seat that refuses input SEAT_DEAF_MAX times in a row is replaced, not woken forever.
-    const deaf = noteInputOutcome(terminal, woke.action, { env });
-    if (deaf.replace) {
-      m.transaction(() => supervisorEvent(m, { kind: 'supervisor-deaf-replace', now: now(), payload: { terminal, failures: deaf.failures, since: deaf.since, last: woke.action } }));
-      const replaced = deps.replace();
-      const titleRepairs = replaced?.ok && replaced?.terminal ? repairSupervisorTabTitles(replaced.terminal, [], deps) : [];
-      supervisorLog('watchdog', `deaf-replace after ${deaf.failures} refused input(s): ${JSON.stringify(replaced)}`, { env });
-      return { ok: replaced?.ok !== false, action: replaced?.action === 'booted' || replaced?.action === 'restarted' ? 'restarted' : (replaced?.action ?? 'replace-failed'), reason: `seat-deaf x${deaf.failures}`, inputFailures: deaf.failures, terminal, tags: plan.tags, detail: replaced, ...(titleRepairs.length ? { titleRepairs } : {}) };
-    }
-    return { ok: woke.delivered === true || woke.action === 'kernel-busy', action: woke.delivered ? 'woken' : woke.action, terminal, tags: plan.tags, workers: sweep, inputFailures: deaf.failures };
+    const standing = liveSeatHealth({ m, deps, env, now });
+    if (standing.result) return standing.result;
+    return wakeLiveSeat({ m, deps, env, now, settings, terminal: standing.health.terminal });
   } finally { m.close(); }
 }
 

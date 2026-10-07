@@ -13,6 +13,7 @@
 // Owner asks still reach Telegram only from the kernel (starci kernel serve-ask); this
 // is the supervisor's status digest. Ledgers are read read-only.
 import { isMain } from '../lib/is-main.mjs';
+import { findInOrder } from '../lib/in-order.mjs';
 import { inspectLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
 import { loadConfig } from '../../engine/config.mjs';
 import { botCall, telegramSettings, TEXT_MAX } from '../connectors/telegram.mjs';
@@ -287,12 +288,14 @@ async function main() {
   if (!argv.includes('--send')) return;
   const settings = telegramSettings();
   if (!settings.ready) { console.error(settings.warning ?? 'telegram is off'); process.exitCode = 1; return; }
-  for (const text of messages) {
+  await findInOrder(messages, async (text) => {
     const sent = await botCall({ token: settings.token, method: 'sendMessage',
       payload: { chat_id: settings.chatId, text, parse_mode: 'HTML', link_preview_options: { is_disabled: true } } });
     console.error(sent.ok ? `sent message ${sent.messageId ?? ''}` : `telegram send failed: ${sent.error}`);
-    if (!sent.ok) { process.exitCode = 1; return; }
-  }
+    if (sent.ok) return false;
+    process.exitCode = 1;
+    return true;
+  });
 }
 
 if (isMain(import.meta.url)) await main().catch((error) => { console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error) })); process.exitCode = 1; });
