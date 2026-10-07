@@ -155,6 +155,29 @@ function writeUiCatalog(root) {
   fs.writeFileSync(target, text);
 }
 
+function clearUnlisted(bundle, bundleRoot, expected) {
+  if (!fs.existsSync(bundleRoot)) return;
+  for (const file of listed(bundleRoot)) {
+    if (expected.has(file)) continue;
+    // A generated copy is never a held artifact: nothing but this script writes it.
+    const removed = safeRemove(path.join(bundleRoot, file), { hold: () => null });
+    if (!removed.ok) throw new Error(`cannot clear ${bundle}/${file}: ${removed.errors.map((e) => e.message).join("; ")}`);
+  }
+}
+
+/** Writes each expected file whose bytes differ; returns how many files the bundle holds. */
+function writeExpected(bundleRoot, expected) {
+  for (const [file, text] of expected) {
+    const target = path.join(bundleRoot, file);
+    const current = fs.existsSync(target) ? fs.readFileSync(target, 'utf8') : null;
+    if (current !== text) {
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      fs.writeFileSync(target, text);
+    }
+  }
+  return expected.size;
+}
+
 /**
  * Rewrite every generated copy under the runtime root to what BUNDLES say, and the ui catalog map. Returns the runtime copy file count.
  * Only a file whose bytes differ is written and only a file no bundle lists is removed, so a copy that is already current is never
@@ -167,23 +190,8 @@ export function syncRuntime(root = runtimeRoot) {
   for (const bundle of Object.keys(BUNDLES)) {
     const bundleRoot = path.join(root, bundle);
     const expected = expectedBundle(bundle, root);
-    if (fs.existsSync(bundleRoot)) {
-      for (const file of listed(bundleRoot)) {
-        if (expected.has(file)) continue;
-        // A generated copy is never a held artifact: nothing but this script writes it.
-        const removed = safeRemove(path.join(bundleRoot, file), { hold: () => null });
-        if (!removed.ok) throw new Error(`cannot clear ${bundle}/${file}: ${removed.errors.map((e) => e.message).join("; ")}`);
-      }
-    }
-    for (const [file, text] of expected) {
-      const target = path.join(bundleRoot, file);
-      const current = fs.existsSync(target) ? fs.readFileSync(target, 'utf8') : null;
-      if (current !== text) {
-        fs.mkdirSync(path.dirname(target), { recursive: true });
-        fs.writeFileSync(target, text);
-      }
-      count += 1;
-    }
+    clearUnlisted(bundle, bundleRoot, expected);
+    count += writeExpected(bundleRoot, expected);
   }
   return count;
 }

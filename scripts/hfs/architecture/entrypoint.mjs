@@ -42,10 +42,9 @@ function inspectFactoryCalls(kit, file, isMain, report) {
   const checker = kit.checkerOf(file.sourceFile);
   let entrypoints = 0;
   kit.walk(file.sourceFile, node => {
-    if (!isNestFactoryCreate(kit, ts, checker, node)) return true;
+    if (!isNestFactoryCreate(kit, ts, checker, node)) return;
     if (isMain) entrypoints += 1;
     else report(node, `NestFactory.${node.expression.name.text}() starts a process outside apps/<app>/src/main.ts; entrypoints live in an app's main.ts only.`);
-    return true;
   });
   return entrypoints;
 }

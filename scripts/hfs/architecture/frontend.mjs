@@ -217,7 +217,6 @@ function inspectPureModule(config, context, sourceFile, violations, violation) {
 }
 
 function checkPureAndData(config, context, sourceFile, roots) {
-  const { ts } = context;
   const violations = [];
   const fileName = path.resolve(sourceFile.fileName);
   if (!insideAny(roots.components, fileName)) return violations;

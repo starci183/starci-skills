@@ -11,12 +11,12 @@ import { lineOf, localBindings, moduleRefs, ts } from './source-ast.mjs';
 
 export const CODE = 'RT_EXTERNAL_OWNER';
 
-const GLOBAL_OBJECTS = ['globalThis', 'window', 'global'];
+const GLOBAL_OBJECTS = new Set(['globalThis', 'window', 'global']);
 
 /** The global name a call or construction reaches: a bare identifier the file does not bind, or a member of a global object. */
 function globalCalleeName(t, callee, bound) {
   if (t.isIdentifier(callee) && !bound.has(callee.text)) return callee.text;
-  if (t.isPropertyAccessExpression(callee) && t.isIdentifier(callee.expression) && GLOBAL_OBJECTS.includes(callee.expression.text)) return callee.name.text;
+  if (t.isPropertyAccessExpression(callee) && t.isIdentifier(callee.expression) && GLOBAL_OBJECTS.has(callee.expression.text)) return callee.name.text;
   return null;
 }
 

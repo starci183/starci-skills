@@ -208,7 +208,7 @@ function inspectMessageConstructor(state, constructor) {
 }
 
 function inspectMessageMembers(state) {
-  const { config, context, checker, declaration, violations, reasons } = state;
+  const { config, context, declaration, violations, reasons } = state;
   const ts = context.ts;
   const sourceFile = declaration.getSourceFile();
   const classState = { ...state, sourceFile };
@@ -238,7 +238,7 @@ function classInstanceType(ts, checker, declaration) {
 }
 
 function inspectMessageBases(state) {
-  const { config, context, checker, declaration, localFiles, sourceFile, visited, reasons } = state;
+  const { config, context, checker, declaration, localFiles, sourceFile, reasons } = state;
   const ts = context.ts;
   const type = classInstanceType(ts, checker, declaration);
   for (const base of type && checker.getBaseTypes ? checker.getBaseTypes(type) : []) {
@@ -312,7 +312,7 @@ function inspectInjectedMembers(state) {
 }
 
 function inspectInjectedBases(state) {
-  const { config, context, checker, declaration, classKind, framework, localFiles, violations, reasons, visited } = state;
+  const { config, context, checker, declaration, localFiles, reasons } = state;
   const ts = context.ts;
   const sourceFile = declaration.getSourceFile();
   const type = classInstanceType(ts, checker, declaration);

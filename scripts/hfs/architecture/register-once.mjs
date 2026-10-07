@@ -96,7 +96,7 @@ function moduleReferences(graph, kit, ts, modules, isWorld, isAppRoot, report) {
 }
 
 function isTrueGlobal(kit, ts, options) {
-  if (!Boolean(options) || !ts.isObjectLiteralExpression(options)) return false;
+  if (!options || !ts.isObjectLiteralExpression(options)) return false;
   const property = kit.propertyOf(options, 'isGlobal');
   return Boolean(property) && ts.isPropertyAssignment(property) && property.initializer.kind === ts.SyntaxKind.TrueKeyword;
 }

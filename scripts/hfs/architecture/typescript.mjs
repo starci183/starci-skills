@@ -11,7 +11,7 @@ import { sourceLocation } from '../../lib/ts-ast.mjs';
 import { locateDeclaration } from '../slots.mjs';
 
 const CODE_EXTENSIONS = /\.(?:[cm]?[jt]sx?)$/i;
-const SCRIPT_TAIL = String.raw`[cm]?[jt]sx?`;
+const SCRIPT_TAIL = '[cm]?[jt]sx?';
 const TEST_FILE = new RegExp(String.raw`(?:^|[.-])(?:spec|test)\.${SCRIPT_TAIL}$`, 'i');
 const ASSET_EXTENSION_NAMES = 'css|scss|sass|less|svg|png|jpe?g|gif|webp|avif|ico|woff2?|ttf|eot|ya?ml|json';
 const ASSET_EXTENSION = new RegExp(String.raw`\.(?:${ASSET_EXTENSION_NAMES})$`, 'i');

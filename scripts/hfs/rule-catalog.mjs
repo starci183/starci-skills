@@ -15,8 +15,8 @@ const RULE_KINDS = Object.freeze(['codemod', 'lint', 'check', 'design']);
 const FINDING_CODE = /^[A-Z][A-Z0-9]*(_[A-Z0-9]+)+$/;
 const ENFORCER_ID = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
 const FILE_ENFORCERS = new Set(['machine', 'hfs', 'work-validate', 'sonar', 'runtime']);
-const RULE_KEYS = ['id', 'code', 'law', 'scope', 'kinds', 'gates', 'failureCodes', 'editions', 'enforcers'];
-const ENFORCER_KEYS = ['kind', 'id', 'status', 'at', 'editions'];
+const RULE_KEYS = new Set(['id', 'code', 'law', 'scope', 'kinds', 'gates', 'failureCodes', 'editions', 'enforcers']);
+const ENFORCER_KEYS = new Set(['kind', 'id', 'status', 'at', 'editions']);
 
 function vocabularyProblems(catalog, key, names, bad) {
   if (!isPlainObject(catalog[key])) { bad.push(`${key} must be a map`); return; }
@@ -97,7 +97,7 @@ function checkEnforcer(enforcer, index, ruleLabel, seen, bad) {
   const label = `${ruleLabel}.enforcers[${index}]`;
   if (!isPlainObject(enforcer)) { bad.push(`${label} is not a map`); return; }
   for (const key of Object.keys(enforcer)) {
-    if (!ENFORCER_KEYS.includes(key)) bad.push(`${label} has unknown key ${key}`);
+    if (!ENFORCER_KEYS.has(key)) bad.push(`${label} has unknown key ${key}`);
   }
   bad.push(...ruleEditionProblems(enforcer, label));
   checkEnforcerIdentity(enforcer, label, seen, bad);
@@ -116,7 +116,7 @@ function checkRule(rule, index, catalog, codeOwner, bad) {
   if (!isPlainObject(rule)) { bad.push(`${at} is not a map`); return; }
   const label = typeof rule.id === 'string' ? rule.id : at;
   for (const key of Object.keys(rule)) {
-    if (!RULE_KEYS.includes(key)) bad.push(`${label} has unknown key ${key}`);
+    if (!RULE_KEYS.has(key)) bad.push(`${label} has unknown key ${key}`);
   }
   checkRuleIdentity(rule, index, catalog, at, label, bad);
   checkRuleText(rule, label, bad);

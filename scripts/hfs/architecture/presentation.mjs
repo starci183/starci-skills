@@ -2,13 +2,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { repositoryName } from '../repo-identity.mjs';
 import { managedScriptNames } from './managed-scripts.mjs';
+import { trimTrailingChars } from '../linear-text.mjs';
 
 const RUNTIME_ROOT_MARKDOWN = new Set(['README.md', 'CONTEXT.md', 'CONTRIBUTING.md', 'CHANGELOG.md', 'THIRD_PARTY_NOTICES.md']);
 const PRODUCT_ROOT_MARKDOWN = new Set(['README.md']);
 const README_SECTIONS = ['Overview', 'Stack', 'Repository layout', 'Development'];
 const DEVELOPMENT_SCRIPTS = ['typecheck', 'lint', 'build', 'test'];
-const README_HEADING = new RegExp([String.raw`^## `, String.raw`(.+?)`, String.raw`\s*$`].join(''), 'u');
-const README_URL = new RegExp([String.raw`https?:`, String.raw`\/\/`, String.raw`[^\s<>)"']+`].join(''), 'giu');
+const README_HEADING = new RegExp(['^## ', '(.+?)', String.raw`\s*$`].join(''), 'u');
+const README_URL = new RegExp(['https?:', String.raw`\/\/`, String.raw`[^\s<>)"']+`].join(''), 'giu');
 
 function privateHost(hostname) {
   const host = hostname.toLowerCase().replace(/^\[|\]$/g, '').replace(/\.$/, '');
@@ -132,7 +133,7 @@ function inspectReadmeLine(state, line, index, scan) {
   }
   if (scan.fenced) return;
   const prose = line.replace(/`[^`]*`/gu, '');
-  for (const match of prose.matchAll(README_URL)) inspectReadmeUrl(state, match[0].replace(/[.,;!?]+$/u, ''), index + 1);
+  for (const match of prose.matchAll(README_URL)) inspectReadmeUrl(state, trimTrailingChars(match[0], '.,;!?'), index + 1);
   for (const badge of badgeTargets(prose)) inspectBadgeTarget(state, badge.alt, badge.target, index + 1);
 }
 
