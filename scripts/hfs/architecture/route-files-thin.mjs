@@ -33,16 +33,17 @@ function tagOf(ts, node) {
   return null;
 }
 
+function addExportAssignmentDefaults(ts, statement, kit, checker, defaults) {
+  const target = statement.expression;
+  if (!ts.isIdentifier(target)) { defaults.add(target); return; }
+  for (const declaration of kit.declarationsOf(checker, target)) defaults.add(ts.isVariableDeclaration(declaration) ? declaration.initializer ?? declaration : declaration);
+}
+
 function routeDefaults(ts, file, kit, checker) {
   const defaults = new Set();
   for (const statement of file.sourceFile.statements) {
     if (ts.isFunctionDeclaration(statement) && statement.modifiers?.some(item => item.kind === ts.SyntaxKind.DefaultKeyword)) defaults.add(statement);
-    if (ts.isExportAssignment(statement) && !statement.isExportEquals) {
-      const target = statement.expression;
-      if (ts.isIdentifier(target)) {
-        for (const declaration of kit.declarationsOf(checker, target)) defaults.add(ts.isVariableDeclaration(declaration) ? declaration.initializer ?? declaration : declaration);
-      } else defaults.add(target);
-    }
+    if (ts.isExportAssignment(statement) && !statement.isExportEquals) addExportAssignmentDefaults(ts, statement, kit, checker, defaults);
   }
   return defaults;
 }
@@ -64,27 +65,31 @@ function reportRoute(violations, kit, file, stem, node, message, extra = {}) {
   violations.push({ ruleId: RULE, path: file.rel, ...kit.at(file.rel, file.sourceFile, node), message, route: stem, ...extra });
 }
 
-function inspectRouteNode(node, { graph, kit, ts, file, stem, mounting, checker, defaults, violations, state }) {
+function inspectMountingTag(tag, { graph, kit, ts, file, stem, checker, violations, state }) {
+  if (ts.isIdentifier(tag) && /^[a-z]/u.test(tag.text)) {
+    reportRoute(violations, kit, file, stem, tag, `<${tag.text}> is drawing in a ${stem} route file; a route file mounts one feature and draws nothing. Move the markup into the feature.`);
+  } else if (kit.declarationsOf(checker, ts.isPropertyAccessExpression(tag) ? tag.name : tag).some(declaration => graph.files.get(kit.graphPath(declaration) ?? '')?.tier === 'feature')) {
+    state.owners += 1;
+  }
+}
+
+function inspectHookCall(node, { graph, kit, ts, file, stem, checker, violations }) {
+  const callee = ts.isIdentifier(node.expression) ? node.expression : null;
+  if (!callee || !HOOK_NAME.test(callee.text)) return;
+  const binding = kit.importBinding(checker, callee);
+  const inHooks = kit.declarationsOf(checker, callee).some(declaration => graph.files.get(kit.graphPath(declaration) ?? '')?.slot === HOOKS_SLOT);
+  if (binding || inHooks) reportRoute(violations, kit, file, stem, callee, `${callee.text} is a hook called in a ${stem} route file; a route file is a server adapter and holds no hook. Read the data in the feature it mounts.`);
+}
+
+function inspectRouteNode(node, context) {
+  const { kit, ts, file, stem, mounting, defaults, violations, state } = context;
   if (jsxOf(ts, node)) state.hasJsx = true;
   const tag = tagOf(ts, node);
-  if (mounting && tag) {
-    if (ts.isIdentifier(tag) && /^[a-z]/u.test(tag.text)) {
-      reportRoute(violations, kit, file, stem, tag, `<${tag.text}> is drawing in a ${stem} route file; a route file mounts one feature and draws nothing. Move the markup into the feature.`);
-    } else if (kit.declarationsOf(checker, ts.isPropertyAccessExpression(tag) ? tag.name : tag).some(declaration => graph.files.get(kit.graphPath(declaration) ?? '')?.tier === 'feature')) {
-      state.owners += 1;
-    }
-  }
+  if (mounting && tag) inspectMountingTag(tag, context);
   if (mounting && isFunction(ts, node) && !defaults.has(node) && drawsDirectly(ts, node)) {
     reportRoute(violations, kit, file, stem, node, `A function other than the default export draws JSX in a ${stem} route file; that is an inline component. Move it into the feature the route mounts.`);
   }
-  if (ts.isCallExpression(node)) {
-    const callee = ts.isIdentifier(node.expression) ? node.expression : null;
-    if (callee && HOOK_NAME.test(callee.text)) {
-      const binding = kit.importBinding(checker, callee);
-      const inHooks = kit.declarationsOf(checker, callee).some(declaration => graph.files.get(kit.graphPath(declaration) ?? '')?.slot === HOOKS_SLOT);
-      if (binding || inHooks) reportRoute(violations, kit, file, stem, callee, `${callee.text} is a hook called in a ${stem} route file; a route file is a server adapter and holds no hook. Read the data in the feature it mounts.`);
-    }
-  }
+  if (ts.isCallExpression(node)) inspectHookCall(node, context);
   return true;
 }
 

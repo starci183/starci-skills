@@ -20,20 +20,18 @@ const SKIPPED = /(?:^|\/)(?:package-lock|npm-shrinkwrap)\.json$/;
 
 const finding = (file, line, hit) => ({ code: CODE, level: 'error', path: file, line, message: `${file}:${line} holds a hard-coded ${hit.kind} (${hit.sample}): the runtime repository uses relative paths - resolve from the runtime root, os.tmpdir(), the config or a state-root helper, and build spec fixtures from the temp dir` });
 
-/** The RT_ABSOLUTE_PATH findings of one file's text (the file kind is read from its extension). */
-export function absolutePathFindings(file, text) {
-  if (SKIPPED.test(file)) return [];
-  if (!SOURCE.test(file) && !LINE_TEXT.test(file)) return [];
-  const found = [];
-  if (!SOURCE.test(file)) {
-    for (const hit of hostPathHits(text)) found.push(finding(file, lineOf(text, hit.offset), hit));
-    return found;
-  }
+const scriptKindOf = (t, file) => {
+  if (file.endsWith('.tsx')) return t.ScriptKind.TSX;
+  return /\.(?:ts|mts|cts)$/.test(file) ? t.ScriptKind.TS : t.ScriptKind.JS;
+};
+
+const isTextLiteral = (t, node) => t.isStringLiteralLike(node) || t.isTemplateHead(node) || t.isTemplateMiddle(node) || t.isTemplateTail(node);
+
+/** The findings of the string and template literals and the comments of one parsed source file. */
+function sourceFindings(file, text) {
   const t = ts();
-  let kind = t.ScriptKind.JS;
-  if (/\.(?:ts|mts|cts)$/.test(file)) kind = t.ScriptKind.TS;
-  if (file.endsWith('.tsx')) kind = t.ScriptKind.TSX;
-  const source = t.createSourceFile(file, text, t.ScriptTarget.Latest, true, kind);
+  const source = t.createSourceFile(file, text, t.ScriptTarget.Latest, true, scriptKindOf(t, file));
+  const found = [];
   const lineOfPos = (pos) => source.getLineAndCharacterOfPosition(pos).line + 1;
   const literal = (node) => {
     const value = node.text;
@@ -49,12 +47,20 @@ export function absolutePathFindings(file, text) {
     }
   };
   const visit = (node) => {
-    if (t.isStringLiteralLike(node) || t.isTemplateHead(node) || t.isTemplateMiddle(node) || t.isTemplateTail(node)) literal(node);
+    if (isTextLiteral(t, node)) literal(node);
     comments(node.getFullStart());
     t.forEachChild(node, visit);
   };
   visit(source);
   return found;
+}
+
+/** The RT_ABSOLUTE_PATH findings of one file's text (the file kind is read from its extension). */
+export function absolutePathFindings(file, text) {
+  if (SKIPPED.test(file)) return [];
+  if (!SOURCE.test(file) && !LINE_TEXT.test(file)) return [];
+  if (SOURCE.test(file)) return sourceFindings(file, text);
+  return [...hostPathHits(text)].map((hit) => finding(file, lineOf(text, hit.offset), hit));
 }
 
 /** RT_ABSOLUTE_PATH over every tracked file of the runtime (ctx of scripts/hfs/runtime-check.mjs). */

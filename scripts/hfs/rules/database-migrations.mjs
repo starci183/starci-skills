@@ -5,6 +5,7 @@ import { log } from '../../api/git/log.mjs';
 import { mergeBase } from '../../api/git/merge-base.mjs';
 import { show } from '../../api/git/show.mjs';
 import { withoutGitLocalEnv } from '../../lib/git.mjs';
+import { eachInOrder } from '../../lib/in-order.mjs';
 import { sameText } from '../../lib/same-text.mjs';
 import { found, readText } from './read.mjs';
 import { DB_MIGRATION_SHAPE, MIGRATIONS_DIR } from './database-constants.mjs';
@@ -64,15 +65,15 @@ async function migrationTimeLimit(git, repoRoot, file, now) {
 async function localMigrationFindings(local, repoRoot, git, now) {
   const findings = [];
   const stamps = new Map();
-  for (const entry of local) {
+  await eachInOrder(local, async (entry) => {
     if (!entry.match) {
       findings.push(found(DB_MIGRATION_SHAPE, entry.file, `${entry.file} is not named <ts14>_<kebab>.sql; a migration is created by \`npm run db:new\` (supabase migration new), never renamed by hand`, { expected: '<ts14>_<kebab>.sql' }));
-      continue;
+      return;
     }
     const stamp = migrationStamp(entry.match[1]);
     if (stamp === null) {
       findings.push(found(DB_MIGRATION_SHAPE, entry.file, `${entry.file} carries ${entry.match[1]}, which is no valid UTC time; the stamp is the real creation time`, { stamp: entry.match[1] }));
-      continue;
+      return;
     }
     const limit = await migrationTimeLimit(git, repoRoot, entry.file, now);
     if (stamp > limit.at) {
@@ -81,7 +82,7 @@ async function localMigrationFindings(local, repoRoot, git, now) {
     }
     if (stamps.has(stamp)) findings.push(found(DB_MIGRATION_SHAPE, entry.file, `${entry.file} shares stamp ${entry.match[1]} with ${stamps.get(stamp)}; stamps are strictly increasing`, { stamp: entry.match[1], other: stamps.get(stamp) }));
     stamps.set(stamp, entry.file);
-  }
+  });
   return findings;
 }
 
@@ -120,7 +121,9 @@ export async function migrationShapeFindings({ repoRoot, migrations, git, base, 
   const onBase = new Set(baseNames);
   const baseStamps = baseNames.map((name) => MIGRATION_NAME.exec(name)?.[1]).filter(Boolean).map(migrationStamp).filter((stamp) => stamp !== null);
   const baseMax = baseStamps.length ? Math.max(...baseStamps) : null;
-  for (const entry of local) findings.push(...await baseMigrationEntryFindings(entry, repoRoot, git, baseSha, onBase, baseMax));
+  await eachInOrder(local, async (entry) => {
+    findings.push(...await baseMigrationEntryFindings(entry, repoRoot, git, baseSha, onBase, baseMax));
+  });
   findings.push(...removedMigrationFindings(local, baseNames, baseSha));
   return findings;
 }

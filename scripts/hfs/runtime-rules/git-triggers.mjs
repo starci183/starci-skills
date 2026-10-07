@@ -12,15 +12,24 @@ export const CODE = 'CI_TRIGGERS_RELEASE_ONLY';
 const RELEASE_TAGS = 'v*';
 const RUNTIME_BRANCH = 'main';
 
+const isReleaseTagFilter = (tags) => Array.isArray(tags) && tags.length === 1 && String(tags[0]) === RELEASE_TAGS;
+const isRuntimeBranchFilter = (ownBranch, branches) => ownBranch && Array.isArray(branches) && branches.length === 1 && String(branches[0]) === RUNTIME_BRANCH;
+
+const missingFilterMessage = (ownBranch) => (ownBranch
+  ? `\`push\` must be filtered to \`tags: ['${RELEASE_TAGS}']\` and/or \`branches: [${RUNTIME_BRANCH}]\` (no other branch starts CI)`
+  : `\`push\` must be filtered to \`tags: ['${RELEASE_TAGS}']\` (a branch push never starts an app's CI)`);
+
+const branchFilterMessage = (ownBranch) => (ownBranch
+  ? `\`push.branches\` must be exactly [${RUNTIME_BRANCH}]`
+  : '`push.branches` is not allowed in an example or an app template: its CI runs on the release tag only (`tags: [v*]`)');
+
 function pushFindings({ ownBranch, config, refuse }) {
   const filters = config && typeof config === 'object' && !Array.isArray(config) ? config : {};
   const { tags, branches } = filters;
-  const tagFilter = Array.isArray(tags) && tags.length === 1 && String(tags[0]) === RELEASE_TAGS;
-  const branchFilter = ownBranch && Array.isArray(branches) && branches.length === 1 && String(branches[0]) === RUNTIME_BRANCH;
   const found = [];
-  if (tags === undefined && branches === undefined) found.push(refuse(ownBranch ? `\`push\` must be filtered to \`tags: ['${RELEASE_TAGS}']\` and/or \`branches: [${RUNTIME_BRANCH}]\` (no other branch starts CI)` : `\`push\` must be filtered to \`tags: ['${RELEASE_TAGS}']\` (a branch push never starts an app's CI)`));
-  if (tags !== undefined && !tagFilter) found.push(refuse(`\`push.tags\` must be exactly ['${RELEASE_TAGS}']`));
-  if (branches !== undefined && !branchFilter) found.push(refuse(ownBranch ? `\`push.branches\` must be exactly [${RUNTIME_BRANCH}]` : '`push.branches` is not allowed in an example or an app template: its CI runs on the release tag only (`tags: [v*]`)'));
+  if (tags === undefined && branches === undefined) found.push(refuse(missingFilterMessage(ownBranch)));
+  if (tags !== undefined && !isReleaseTagFilter(tags)) found.push(refuse(`\`push.tags\` must be exactly ['${RELEASE_TAGS}']`));
+  if (branches !== undefined && !isRuntimeBranchFilter(ownBranch, branches)) found.push(refuse(branchFilterMessage(ownBranch)));
   for (const other of Object.keys(filters).filter((key) => key !== 'tags' && key !== 'branches')) found.push(refuse(`\`push.${other}\` is not allowed beside the trigger filters`));
   return found;
 }
