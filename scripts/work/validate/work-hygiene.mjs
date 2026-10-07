@@ -40,13 +40,18 @@ const WORK_PATH = /(^|\/)\.starciwork\//;
 const STACK_PATH = /(^|\/)\.starcistacks\//;
 const YAML_FILE = /\.ya?ml$/i;
 const ENCRYPTED = /\.enc$/i;
-const BINARY = /\.(?:png|jpe?g|gif|webp|avif|ico|bmp|mp4|webm|mov|mp3|wav|pdf|zip|gz|tgz|7z|woff2?|ttf|otf|eot|sqlite|db)$/i;
+const BINARY_EXTENSIONS = ['png', 'jpe?g', 'gif', 'webp', 'avif', 'ico', 'bmp', 'mp4', 'webm', 'mov', 'mp3', 'wav', 'pdf', 'zip', 'gz', 'tgz', '7z', 'woff2?', 'ttf', 'otf', 'eot', 'sqlite', 'db'];
+const BINARY = new RegExp(String.raw`\.(?:${BINARY_EXTENSIONS.join('|')})$`, 'i');
 export const inWorkTree = (rel) => WORK_PATH.test(slashed(rel));
 export const inSecretScope = (rel) => (WORK_PATH.test(slashed(rel)) || STACK_PATH.test(slashed(rel))) && !ENCRYPTED.test(rel);
 
 // ---------------------------------------------------------------------------------------------- secret scan
-const STANDIN = /(?:^\.{2,})|fixture|stub|fake|dummy|placeholder|example|sample|changeme|redacted|mock|todo|tbd|xxx|n\/a|not[-_ ]?set|none|null|undefined|disposable|generated|your[-_ ]|\*{3,}/i;
-const REFERENCE = /^(?:\$|<|\{\{|%|@|secret[:.]|secrets[:.]|ref[:.]|env[:.]|sops[:.]|file[:.]|vault[:.]|kms[:.]|\/run\/secrets\/|identity\.|\[redacted|ENC\[)/i;
+const STANDIN_PARTS = [String.raw`(?:^\.{2,})`, 'fixture', 'stub', 'fake', 'dummy', 'placeholder', 'example', 'sample', 'changeme', 'redacted', 'mock', 'todo', 'tbd', 'xxx', String.raw`n\/a`,
+  String.raw`not[-_ ]?set`, 'none', 'null', 'undefined', 'disposable', 'generated', String.raw`your[-_ ]`, String.raw`\*{3,}`];
+const STANDIN = new RegExp(STANDIN_PARTS.join('|'), 'i');
+const REFERENCE_PARTS = [String.raw`\$`, '<', String.raw`\{\{`, '%', '@', String.raw`secret[:.]`, String.raw`secrets[:.]`, String.raw`ref[:.]`, String.raw`env[:.]`, String.raw`sops[:.]`, String.raw`file[:.]`, String.raw`vault[:.]`, String.raw`kms[:.]`,
+  String.raw`\/run\/secrets\/`, String.raw`identity\.`, String.raw`\[redacted`, String.raw`ENC\[`];
+const REFERENCE = new RegExp(`^(?:${REFERENCE_PARTS.join('|')})`, 'i');
 const CODE_OR_STYLE = /(?:^[-./@~])|[(){}[\]<>`$]|\.\.\./;
 const PROSE_OR_CODE = /\.(?:md|mdx|markdown|java|kt|tf|ts|tsx|js|mjs|cjs|py|go|sql|sh|ps1|cs|rb)$/i;
 const PASSWORD_WORDS = new Set(['password', 'passwd', 'pwd', 'passphrase']);
@@ -73,10 +78,26 @@ function entropy(text) {
   for (const n of counts.values()) { const p = n / text.length; bits -= p * Math.log2(p); }
   return bits;
 }
+/** `value` without a trailing ` # comment`: the whitespace run before the first `#` that has no line break after it, and all that follows. */
+const withoutTrailingComment = (value) => {
+  const lastBreak = Math.max(value.lastIndexOf('\n'), value.lastIndexOf('\r'), value.lastIndexOf('\u2028'), value.lastIndexOf('\u2029'));
+  for (let at = value.indexOf('#', lastBreak + 1); at >= 0; at = value.indexOf('#', at + 1)) {
+    if (at === 0 || !/\s/.test(value[at - 1])) continue;
+    let start = at - 1;
+    while (start > 0 && /\s/.test(value[start - 1])) start -= 1;
+    return value.slice(0, start);
+  }
+  return value;
+};
+const withoutTrailingSeparators = (value) => {
+  let end = value.length;
+  while (end > 0 && (value[end - 1] === ',' || value[end - 1] === ';')) end -= 1;
+  return value.slice(0, end);
+};
 const unquote = (raw) => {
   const v = String(raw).trim();
   const q = /^(["'])(.*)\1$/.exec(v);
-  return q ? { value: q[2], quoted: true } : { value: v.replace(/\s+#.*$/, '').replace(/[,;]+$/, ''), quoted: false };
+  return q ? { value: q[2], quoted: true } : { value: withoutTrailingSeparators(withoutTrailingComment(v)), quoted: false };
 };
 /** True when `value` is a literal credential for a key of `kind` (a reference, a stand-in and an empty value are not). */
 export function isLiteralCredential(value, kind, { quoted = false } = {}) {
@@ -90,7 +111,7 @@ export function isLiteralCredential(value, kind, { quoted = false } = {}) {
   return entropy(v) >= 3.5 || (/[A-Za-z]/.test(v) && /\d/.test(v));
 }
 // `key: value`, `key=value`, `- key: value`, and every pair of an inline {a: b, c: d}.
-const PAIR = /(?<![\w.-])(["']?)([A-Za-z_][\w-]*)\1\s*[:=]\s*("[^"\n]*"|'[^'\n]*'|[^\s,}\]#]+)/g;
+const PAIR = new RegExp([String.raw`(?<![\w.-])`, String.raw`(["']?)`, String.raw`([A-Za-z_][\w-]*)`, String.raw`\1\s*[:=]\s*`, String.raw`("[^"\n]*"|'[^'\n]*'|[^\s,}\]#]+)`].join(''), 'g');
 const isAccountsFile = (rel, text) => /(^|\/)accounts\.ya?ml$/i.test(rel) || /schema:\s*work\/disposable-accounts@/.test(text);
 
 /** The secret findings of one text file: [{code, file, line, detail}]. The value itself never appears in a finding. */
@@ -105,27 +126,36 @@ export function scanSecrets(rel, text) {
   const accounts = isAccountsFile(file, text);
   const proseOrCode = PROSE_OR_CODE.test(file);
   const lines = text.split(/\r?\n/);
-  lines.forEach((line, index) => {
-    const at = index + 1;
-    for (const rule of SECRET_PATTERNS) {
-      if (rule.skipFile?.test(file)) continue;
-      const m = rule.re.exec(line);
-      if (!m) continue;
-      if (rule.placeholder?.test(m[1] ?? line)) continue;
-      pushOnce({ code: WORK_SECRET_PATTERN, file, line: at, detail: `${rule.name} in the text` });
-    }
-    if (proseOrCode) return; // prose explains "password: ..." fields and code assigns expressions; only the provider shapes above apply
-    for (const m of line.matchAll(PAIR)) {
-      const key = m[2];
-      const { value, quoted } = unquote(m[3]);
-      const kind = credentialKind(key);
-      if (kind && isLiteralCredential(value, kind, { quoted })) pushOnce({ code: WORK_SECRET_LITERAL, file, line: at, detail: `key \`${key}\` holds a literal value; keep the value in encrypted custody (.enc) and reference it` });
-      else if (accounts && USER_KEYS.has(key.toLowerCase()) && value && !REFERENCE.test(value) && !STANDIN.test(value) && !/^(?:~|null|true|false)$/i.test(value)) {
-        pushOnce({ code: WORK_ACCOUNT_LITERAL, file, line: at, detail: `accounts record key \`${key}\` holds a literal login; name the account by its identity reference` });
-      }
-    }
-  });
+  lines.forEach((line, index) => scanLine(line, index + 1, { file, accounts, proseOrCode, pushOnce }));
   return findings;
+}
+
+function scanLine(line, at, { file, accounts, proseOrCode, pushOnce }) {
+  for (const rule of SECRET_PATTERNS) {
+    if (ruleMatches(rule, file, line)) pushOnce({ code: WORK_SECRET_PATTERN, file, line: at, detail: `${rule.name} in the text` });
+  }
+  if (proseOrCode) return; // prose explains "password: ..." fields and code assigns expressions; only the provider shapes above apply
+  for (const m of line.matchAll(PAIR)) {
+    const finding = pairFinding(m[2], unquote(m[3]), accounts);
+    if (finding) pushOnce({ code: finding.code, file, line: at, detail: finding.detail });
+  }
+}
+
+/** True when the provider-shape `rule` matches `line` of `file` and what it matched is not a placeholder. */
+const ruleMatches = (rule, file, line) => {
+  if (rule.skipFile?.test(file)) return false;
+  const m = rule.re.exec(line);
+  return Boolean(m) && !rule.placeholder?.test(m[1] ?? line);
+};
+
+/** The finding of one `key: value` pair ({code, detail}), or null: a literal credential, or a literal login in an accounts file. */
+function pairFinding(key, { value, quoted }, accounts) {
+  const kind = credentialKind(key);
+  if (kind && isLiteralCredential(value, kind, { quoted })) return { code: WORK_SECRET_LITERAL, detail: `key \`${key}\` holds a literal value; keep the value in encrypted custody (.enc) and reference it` };
+  if (accounts && USER_KEYS.has(key.toLowerCase()) && value && !REFERENCE.test(value) && !STANDIN.test(value) && !/^(?:~|null|true|false)$/i.test(value)) {
+    return { code: WORK_ACCOUNT_LITERAL, detail: `accounts record key \`${key}\` holds a literal login; name the account by its identity reference` };
+  }
+  return null;
 }
 
 // ------------------------------------------------------------------------------------------------- the check
@@ -149,6 +179,14 @@ export function checkWorkFiles({ repo, files, read = null, strict = true } = {})
   const reader = read ?? ((rel) => { try { return fs.readFileSync(path.join(root, rel), 'utf8'); } catch { return null; } });
   const findings = [];
   const checked = { parse: 0, validate: 0, secrets: 0 };
+  const parsed = parseWorkYaml(rels, reader, checked, findings);
+  validateParsedDirs(root, parsed, strict, checked, findings);
+  scanSecretFiles(rels, reader, checked, findings);
+  return { ok: findings.length === 0, findings, files: rels.length, checked };
+}
+
+/** Parse: every .starciwork yaml file the reader returns; the ones that parse come back, the rest become findings. */
+function parseWorkYaml(rels, reader, checked, findings) {
   const parsed = [];
   for (const rel of rels.filter((f) => inWorkTree(f) && YAML_FILE.test(f))) {
     const text = reader(rel);
@@ -157,7 +195,11 @@ export function checkWorkFiles({ repo, files, read = null, strict = true } = {})
     try { parseYaml(text); parsed.push(rel); }
     catch (error) { findings.push({ code: WORK_YAML_UNPARSEABLE, file: rel, line: Number(/line (\d+)/i.exec(String(error?.message))?.[1] ?? 0), detail: String(error?.message ?? error).split('\n')[0].slice(0, 240) }); }
   }
-  // Validate: each directory that holds a parsed file, once; a refusal counts only when it names one of the given files.
+  return parsed;
+}
+
+// Validate: each directory that holds a parsed file, once; a refusal counts only when it names one of the given files.
+function validateParsedDirs(root, parsed, strict, checked, findings) {
   const dirs = [...new Set(parsed.map((rel) => path.dirname(path.join(root, rel))))].filter((d) => fs.existsSync(d));
   const owned = parsed.map((rel) => path.join(root, rel));
   for (const dir of dirs) {
@@ -167,14 +209,19 @@ export function checkWorkFiles({ repo, files, read = null, strict = true } = {})
     checked.validate += 1;
     for (const refusal of report.refused) findings.push({ code: WORK_VALIDATE_REFUSED, file: relTo(root, dir), line: 0, detail: String(refusal).replace(root, '').replaceAll('\\', '/').slice(0, 300) });
   }
+}
+
+function scanSecretFiles(rels, reader, checked, findings) {
   for (const rel of rels) {
-    if (BINARY.test(rel)) { for (const f of scanSecrets(rel, null)) findings.push(f); continue; }
+    if (BINARY.test(rel)) {
+      findings.push(...scanSecrets(rel, null));
+      continue;
+    }
     const text = reader(rel);
     if (text == null) continue;
     checked.secrets += 1;
     findings.push(...scanSecrets(rel, text));
   }
-  return { ok: findings.length === 0, findings, files: rels.length, checked };
 }
 
 /** The repository root a path under .starciwork/ or .starcistacks/ belongs to: what precedes that folder. */
