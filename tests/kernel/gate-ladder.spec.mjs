@@ -334,3 +334,35 @@ test('I7: starci kernel status shows per gate its handler, step n of m, deadline
   const text = spawnSync(process.execPath, [API, 'status', '--workflow', WF, '--repo', repo], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 120000, env: baseEnv }).stdout;
   assert.match(text, /supervisor-gate: inc-\S+ \[runtime-defect\] holds op-scope\.define-f5c663aa85 - handler supervisor, step 1 of \d+, deadline \d{4}-\d\d-\d\dT.*watching: the live runtime contains deadbeefdead/);
 });
+
+test('the matrix row of supervisor-gate meets I1-I8 with no documented gap, and the table backs each claim', async () => {
+  const { incidentPolicy, boundValue } = await import('../../scripts/kernel/op-incident-policy.mjs');
+  const { gateCauses } = await import('../../scripts/kernel/gate-workaround.mjs');
+  const { gateResolutions } = await import('../../scripts/kernel/gate-ladder.mjs');
+  const policy = incidentPolicy();
+  const row = policy.holds.find((hold) => hold.id === 'supervisor-gate');
+  assert.equal(row.gap, undefined, 'I3, I6 and I8 are met: no invariant is listed as a gap');
+  assert.deepEqual([row.scope, row.handler, row.chain], ['job', 'supervisor', ['supervisor', 'owner']]);
+  assert.ok(boundValue(row.bound.deadlineMs) > 0);
+  assert.match(row.reeval, /runtime-has/);
+  assert.deepEqual(gateResolutions(), ['fixed', 'workaround', 'not-runtime-fault']);
+  assert.ok(boundValue(policy.gate.ackMs) > 0);
+  assert.equal(policy.gate.deferAfter, 'owner-told');
+  for (const cause of gateCauses()) {
+    assert.ok(cause.workaround && cause.situation, `${cause.id}: names its situation and the workaround`);
+    assert.ok(Object.keys(cause.noWorkaround ?? {}).length > 0, `${cause.id}: has typed no-workaround reasons`);
+    assert.ok(cause.condition || cause.conditionWhy, `${cause.id}: carries a condition or says why it has none`);
+  }
+  // Every cause the real gates of 2026-10-07 named is a class of the table.
+  for (const id of ['no-eligible-agent', 'plan-divergence', 'runtime-defect', 'retry-cap', 'budget', 'peer-dependency']) assert.ok(gateCauses().some((cause) => cause.id === id), id);
+});
+
+test('the Kernel loop and the Supervisor are taught the workaround-first rule, the release conditions and the three resolutions', () => {
+  const read = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8');
+  const loop = read('modules/kernel/driver-loop.yaml');
+  for (const needle of ['WORKAROUND FIRST', '--cause', '--no-workaround', '--until-runtime-has', 'not-runtime-fault', 'gate-reraise-without-evidence', 'only after the owner was told']) assert.ok(loop.includes(needle), `driver-loop.yaml: ${needle}`);
+  const supervise = read('modules/supervisor/supervise.yaml');
+  for (const needle of ['GATES:', '--resolution fixed --commit', 'workaround --route', 'not-runtime-fault --detail']) assert.ok(supervise.includes(needle), `supervise.yaml: ${needle}`);
+  const prompt = read('modules/supervisor/supervisor-prompt.md');
+  for (const needle of ['--resolution fixed --commit', 'workaround --route', 'not-runtime-fault --detail']) assert.ok(prompt.includes(needle), `supervisor-prompt.md: ${needle}`);
+});

@@ -160,7 +160,8 @@ HARD RULES (the full rule is the driver-loop.yaml key in brackets):
     reviews provisionally when the machine gates pass, defers credential,
     real-money and shared-system needs to handover (build on sandbox/stub;
     no mid-flow provision.ask), and a retry cap or runtime gate is a
-    supervisor-gate you drive around. The owner's only steps are the
+    supervisor-gate you drive around, raised only after the workaround of its
+    cause class was tried (--cause, --workaround | --no-workaround). The owner's only steps are the
     end-of-flow credential checklist and handover.review with its
     autopilot bundle. Never write that the owner decided anything [autopilot].
   - Your next steps are `starci kernel status` rca.actions (FIRST DUTY above) and then

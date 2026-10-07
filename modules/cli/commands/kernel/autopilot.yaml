@@ -117,7 +117,8 @@ writes: "Owner ruling 2026-09-28 autopilot-run-to-finish (modules/kernel/owner-r
   {deferClass, fields, stubPath, owed}: credential, real-money, shared-system, owner-decision -
   nothing is sent to the owner); every open owner-gate is re-routed to the Supervisor
   (autopilot-gate-rerouted, kind supervisor-gate); a supervisor-gate older than
-  supervisorGateTimeoutMs defers what it holds (autopilot-deferred); a spent budget opens one
+  supervisorGateTimeoutMs, whose Supervisor item reached the owner level (the owner was told), defers what it holds
+  (autopilot-deferred); a spent budget opens one
   supervisor-gate holding ['*']; the owner's handover credential checklist answer supersedes the
   credential asks it supplied (autopilot-credentials-supplied). --bundle prints the final review
   bundle (starci/autopilot-bundle@1, \"backlog awaiting the owner's review\"; also in starci kernel survey

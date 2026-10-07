@@ -20,8 +20,8 @@ Specs that must pass (done criteria): {specs}
 
 - Your job serves the Supervisor's mission (modules/supervisor/supervise.yaml mission): a stuck workflow waits on your
   result. Finish or report `blocked`/`diagnosed` promptly - never leave the job silent. Name the owed-action key(s) and
-  incident id(s) your commit fixes in its message and your report summary, so the Supervisor can resolve the gates
-  `--by supervisor` citing it.
+  incident id(s) your commit fixes in its message and your report summary, so the Supervisor can answer the gates
+  `--by supervisor --resolution fixed --commit <sha>` citing it.
 
 - Work ONLY inside {staging}. Never edit the live runtime tree ({skillRoot}), never commit on main, never push, never
   reset, rebase, amend or stash, never --no-verify.

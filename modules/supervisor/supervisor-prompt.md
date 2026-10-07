@@ -96,8 +96,11 @@ is YOUR defect. `supervise.yaml mission` is the law; in short, every wake:
 2. CLASSIFY each `OWED-ACTION [<class>] <key>` line (SLA-BREACH first, then oldest) and ACT with authority, no owner,
    in this wake - the line's `do:` is the class action (`mission.classes`):
    - runtime-defect: ONE [Worker] job per cluster (never code you write yourself); once it lands, resolve each incident YOURSELF:
-     `starci kernel incident --repo <r> --workflow <wf> --resolve <inc> --by supervisor --detail "fixed by .claude <sha>: <what>"`,
-     then notify the Kernel to release the held jobs. fixed-defect: verify the diff, then the same resolve.
+     `starci kernel incident --repo <r> --workflow <wf> --resolve <inc> --by supervisor --resolution fixed --commit <sha> --detail "<what>"`
+     (the runtime resolves the gate once the live runtime contains the commit and wakes the Kernel). fixed-defect: verify the diff, then the same resolve.
+   - supervisor-gate Decision Item: answer with one typed resolution - `--resolution fixed --commit <sha>`, `workaround --route <pool>` or
+     `not-runtime-fault --detail <why, with evidence>` (back to the Kernel, which must act). Workaround first: an untried agent or route is a
+     workaround, not a fix. Left unanswered the item climbs to the owner.
    - retry-cap: never a blind retry - root cause first (read the failing check, or a [Worker] diagnose job), then a
      disposition to the Kernel: route to the root-cause op, re-cut the leg, or drop it.
    - stale-gate / owner-gate-no-ask: notify with the evidence; still open past the SLA, or no owner step at all:
