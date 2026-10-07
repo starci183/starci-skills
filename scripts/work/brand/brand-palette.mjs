@@ -55,6 +55,7 @@ import path from 'node:path';
 import { isMain } from '../../lib/is-main.mjs';
 import { deltaEOk, oklabToOklch, oklabToRgb, formatHex, readBrandRecord, rgbToOklab } from './brand.mjs';
 import { brandColours } from '../ui/render.mjs';
+import { hueName } from './brand-hue.mjs';
 import { decodePng, keyRect } from '../png.mjs';
 import { sha256File } from '../../../engine/digest.mjs';
 import { isPartName } from '../direction-part.mjs';
@@ -82,21 +83,6 @@ const STATUS_ROLES = new Set(['success', 'warning', 'info', 'danger']);
 
 const round = (v, places = 4) => Number.parseFloat(Number(v).toFixed(places));
 const hueGap = (a, b) => { const d = Math.abs(a - b) % 360; return d > 180 ? 360 - d : d; };
-
-/** A readable name for an OKLCH hue, so a finding says "blue" and not "259 degrees". */
-function hueName(h) {
-  const x = ((h % 360) + 360) % 360;
-  if (x < 12 || x >= 345) return 'pink-red';
-  if (x < 45) return 'red';
-  if (x < 70) return 'orange';
-  if (x < 110) return 'amber-yellow';
-  if (x < 135) return 'lime';
-  if (x < 175) return 'green';
-  if (x < 225) return 'teal-cyan';
-  if (x < 275) return 'blue';
-  if (x < 305) return 'violet';
-  return 'purple-magenta';
-}
 
 /**
  * The brand's palette as the checks read it: every declared colour (tokens with their roles, scale steps, the
@@ -215,6 +201,37 @@ export function readImage(file) {
   return decodePng(fs.readFileSync(file));
 }
 
+/** The palette entry a colour matches within the token tolerance: {e, d} or null. */
+function nearestPaletteEntry(palette, colour) {
+  let best = null;
+  for (const e of palette.entries) {
+    const d = deltaEOk(colour, e.color);
+    if (d <= TOKEN_TOLERANCE && (!best || d < best.d)) best = { e, d };
+  }
+  return best;
+}
+
+/** The chromatic entry whose hue family a colour falls in: {e, d, family: true} or null. */
+function paletteFamilyEntry(palette, L, C, h) {
+  let best = null;
+  for (const e of palette.chromatic) {
+    const gap = hueGap(h, e.oklch.h);
+    if (C > e.oklch.C + CHROMA_SLACK || (best && gap >= best.d)) continue;
+    const status = STATUS_ROLES.has(e.role) && !e.isPrimary;
+    if (gap <= HUE_TOLERANCE || (status && gap <= STATUS_HUE_TOLERANCE && Math.abs(L - e.oklch.L) <= STATUS_LIGHTNESS_BAND)) best = { e, d: gap, family: true };
+  }
+  return best;
+}
+
+/** One sRGB colour judged against a palette: {kind: 'ink'} | {kind: 'brand', entry, family} | {kind: 'off', name, oklab}. */
+function paletteVerdictOf(palette, r, g, b) {
+  const oklab = rgbToOklab([r, g, b]);
+  const { L, C, h } = oklabToOklch(oklab);
+  if (L < INK_LIGHTNESS || L > MAX_LIGHTNESS || C < VIVID_CHROMA) return { kind: 'ink' };
+  const best = nearestPaletteEntry(palette, { oklab }) ?? paletteFamilyEntry(palette, L, C, h);
+  return best ? { kind: 'brand', entry: best.e, family: Boolean(best.family) } : { kind: 'off', name: hueName(h), oklab };
+}
+
 /**
  * Judge one decoded image against one brand palette. Returns {offenders, primary, counts} - no findings yet, so
  * the CLI, the specs and shell-conformance read the same measurement. `exclude` is a rectangle no pixel of
@@ -230,27 +247,7 @@ export function measurePalette(image, palette, { exclude = null } = {}) {
   const classify = (r, g, b) => {
     const key = ((r >> 2) << 12) | ((g >> 2) << 6) | (b >> 2);
     if (cache.has(key)) return cache.get(key);
-    const oklab = rgbToOklab([r, g, b]);
-    const { L, C, h } = oklabToOklch(oklab);
-    let verdict;
-    if (L < INK_LIGHTNESS || L > MAX_LIGHTNESS || C < VIVID_CHROMA) verdict = { kind: 'ink' };
-    else {
-      const colour = { oklab };
-      let best = null;
-      for (const e of palette.entries) {
-        const d = deltaEOk(colour, e.color);
-        if (d <= TOKEN_TOLERANCE && (!best || d < best.d)) best = { e, d };
-      }
-      if (!best) {
-        for (const e of palette.chromatic) {
-          const gap = hueGap(h, e.oklch.h);
-          if (C > e.oklch.C + CHROMA_SLACK || (best && gap >= best.d)) continue;
-          const status = STATUS_ROLES.has(e.role) && !e.isPrimary;
-          if (gap <= HUE_TOLERANCE || (status && gap <= STATUS_HUE_TOLERANCE && Math.abs(L - e.oklch.L) <= STATUS_LIGHTNESS_BAND)) best = { e, d: gap, family: true };
-        }
-      }
-      verdict = best ? { kind: 'brand', entry: best.e, family: Boolean(best.family) } : { kind: 'off', name: hueName(h), oklab };
-    }
+    const verdict = paletteVerdictOf(palette, r, g, b);
     cache.set(key, verdict);
     return verdict;
   };
