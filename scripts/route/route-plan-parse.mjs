@@ -8,9 +8,9 @@ import { normalizeText } from '../lib/normalize.mjs';
 import { phraseHits } from './phrase-match.mjs';
 
 const VAR_NAME = '[A-Za-z][A-Za-z0-9.]*';
-export const VAR_STATE_LINE = new RegExp('^(' + VAR_NAME + ')\\s*:\\s*(.+)$');
+export const VAR_STATE_LINE = new RegExp('^(' + VAR_NAME + String.raw`)\s*:\s*(.+)$`);
 const QUALIFIER_CONTENT = '[^)]*';
-export const STATE_QUALIFIER = new RegExp('^(.*?)\\s*\\((' + QUALIFIER_CONTENT + ')\\)\\s*$');
+export const STATE_QUALIFIER = new RegExp(String.raw`^(.*?)\s*\((` + QUALIFIER_CONTENT + String.raw`)\)\s*$`);
 
 // The intent->S* table for the archetypes in modules/goal/archetypes.yaml. The
 // signals (which prompt phrases select an archetype, in which order, which
@@ -246,6 +246,16 @@ export function dedupeVars(vars) {
   return [...seen.values()];
 }
 
+const PROOF_FAMILIES = new Set(['ui', 'api', 'integration', 'perf', 'security', 'unit']);
+
+// The variable one state word of a target spec asks for.
+function varOfState(st, { family, suffix, dot, surface, spec }) {
+  if (st === 'exists' || st === 'built' || st === 'implemented') return { family: 'impl', suffix, state: 'done', raw: spec };
+  if (st === 'proven' || st === 'verified') return { family: PROOF_FAMILIES.has(family) ? family : surface, suffix, state: 'verified', raw: spec };
+  if (family === 'feature') return { family: 'impl', suffix, state: st, raw: spec };
+  return { family, suffix: dot < 0 ? '' : suffix, state: st, raw: spec };
+}
+
 /** "feature.A: exists proven" -> [{impl.A: done}, {api.A: verified}].
  *  Explicit target vars normalize into the producesVocabulary state space. */
 export function normalizeTargetVar(spec, args) {
@@ -258,17 +268,6 @@ export function normalizeTargetVar(spec, args) {
   const suffix = (dot < 0 ? '' : varPart.slice(dot + 1)) || 'X';
   const out = [];
   const surface = args.surface ?? (family === 'ui' ? 'ui' : 'api');
-  for (const st of states) {
-    if (st === 'exists' || st === 'built' || st === 'implemented') {
-      out.push({ family: 'impl', suffix, state: 'done', raw: spec });
-    } else if (st === 'proven' || st === 'verified') {
-      const fam = ['ui', 'api', 'integration', 'perf', 'security', 'unit'].includes(family) ? family : surface;
-      out.push({ family: fam, suffix, state: 'verified', raw: spec });
-    } else if (family === 'feature') {
-      out.push({ family: 'impl', suffix, state: st, raw: spec });
-    } else {
-      out.push({ family, suffix: dot < 0 ? '' : suffix, state: st, raw: spec });
-    }
-  }
+  for (const st of states) out.push(varOfState(st, { family, suffix, dot, surface, spec }));
   return { vars: dedupeVars(out) };
 }

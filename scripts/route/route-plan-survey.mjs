@@ -63,6 +63,15 @@ export function surveyS0(stateDir) {
   return s0;
 }
 
+// Whether one surveyed variable can stand for `v`: the same family and lane, and (when v names a suffix) the suffix, else the feature scope.
+function s0VarMatches(key, ent, v, { wantSuffix, scope }) {
+  const fam = key.split('.')[0];
+  if (fam !== v.family) return false;
+  if (v.family === 'impl' && v._qual && ent.qualifier !== v._qual) return false;
+  if (wantSuffix && !key.slice(fam.length + 1).replaceAll('.', '-').includes(wantSuffix) && !key.includes(wantSuffix)) return false;
+  return wantSuffix || !scope || scope.has(ent.feature);
+}
+
 /** Does S0 satisfy var {family,suffix,state}? A NAMED suffix needs a settled record whose id
  *  contains it. An unnamed one (X / '' / absent) is a family-level wildcard: it never settles a GOAL
  *  variable (the goal names no unit, so nothing on disk proves it done: settling it would drop the
@@ -79,12 +88,7 @@ export function satisfiedByS0(v, s0, { goal = false } = {}) {
   const scope = s0.scopeFeatures?.size ? s0.scopeFeatures : null;
   let fallback = null;
   for (const [key, ent] of s0.vars) {
-    const fam = key.split('.')[0];
-    if (fam !== v.family) continue;
-    if (v.family === 'impl' && v._qual && ent.qualifier !== v._qual) continue;
-    if (wantSuffix && !key.slice(fam.length + 1).replaceAll('.', '-').includes(wantSuffix)
-      && !key.includes(wantSuffix)) continue;
-    if (!wantSuffix && scope && !scope.has(ent.feature)) continue;
+    if (!s0VarMatches(key, ent, v, { wantSuffix, scope })) continue;
     if (ent.settled) return { by: 's0', recordId: ent.recordId, recordState: ent.state };
     fallback ??= { by: 's0-unsettled', recordId: ent.recordId, recordState: ent.state };
   }
