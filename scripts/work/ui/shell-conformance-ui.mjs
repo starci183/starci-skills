@@ -206,8 +206,8 @@ function placedFindings({ raw, resolved, record, shell, records, mode, level, wo
   const drawingOwnLayout = values.includes('layout') && anchor === route;
   const chain = layoutChainOf(tree, anchor, { self: !drawingOwnLayout }) ?? [];
   const scope = { record, tree, shell, chain, records, mode, level, route, at };
-  out.push(...ancestorFindings(scope), ...chromeFindings(scope), ...destinationFindings(scope));
-  out.push(...checkComposites(workRoot, uiFile, record, shell, { mode, level, records, anchor, drawingOwnLayout, overlay }));
+  out.push(...ancestorFindings(scope), ...chromeFindings(scope), ...destinationFindings(scope),
+    ...checkComposites(workRoot, uiFile, record, shell, { mode, level, records, anchor, drawingOwnLayout, overlay }));
   return out;
 }
 

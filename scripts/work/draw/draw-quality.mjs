@@ -86,11 +86,25 @@ const isComponentSource = (src) => /\.dom\.html$/i.test(String(src)) && isFile(S
 /** The part stem of a render source (`<part>.html` or `<part>.dom.html` -> `<part>`). */
 const partStemOf = (src) => String(src).replace(/(?:\.dom)?\.html$/i, '');
 
+/** The html with each `<...>` tag replaced by a line break; a `<` with no later `>` stays. */
+function tagsToLineBreaks(html) {
+  let out = '';
+  let at = 0;
+  for (let open = html.indexOf('<'); open >= 0; open = html.indexOf('<', open + 1)) {
+    const close = html.indexOf('>', open + 1);
+    if (close < 0) break;
+    if (close === open + 1) continue;
+    out += `${html.slice(at, open)}\n`;
+    at = close + 1;
+    open = at - 1;
+  }
+  return out + html.slice(at);
+}
 /** The visible text of an html render source: tags, scripts, styles and comments removed, entities decoded. */
 export function visibleTextOf(html) {
-  return String(html)
-    .replace(/<!--[\s\S]*?-->/g, ' ').replace(/<(script|style|template|svg)\b[\s\S]*?<\/\1>/gi, ' ')
-    .replace(/<[^>]+>/g, '\n').replaceAll('&nbsp;', ' ').replaceAll('&amp;', '&').replaceAll('&lt;', '<').replaceAll('&gt;', '>').replace(/&#39;|&apos;/g, "'").replaceAll('&quot;', '"')
+  return tagsToLineBreaks(String(html)
+    .replace(/<!--[\s\S]*?-->/g, ' ').replace(/<(script|style|template|svg)\b[\s\S]*?<\/\1>/gi, ' '))
+    .replaceAll('&nbsp;', ' ').replaceAll('&amp;', '&').replaceAll('&lt;', '<').replaceAll('&gt;', '>').replace(/&#39;|&apos;/g, "'").replaceAll('&quot;', '"')
     .split('\n').map((s) => s.replace(/\s+/g, ' ').trim()).filter(Boolean);
 }
 
@@ -126,7 +140,7 @@ const CONTROL_RX = new RegExp([
   String.raw`\brole=["'](button|link|tab|menuitem|switch|checkbox|radio)["']`
 ].join('|'), 'gi');
 /** How many controls a render source draws. */
-export const controlCountOf = (html) => (String(html).match(CONTROL_RX) ?? []).length;
+export const controlCountOf = (html) => [...String(html).matchAll(CONTROL_RX)].length;
 
 const COMMAND_WORDS = ['activates?', 'selects?', 'clicks?', 'press(?:es)?', 'opens?', 'chooses?', 'submits?', 'taps?', 'confirms?', 'cancels?', 'retries', 'installs?', 'uninstalls?', 'configures?', 'toggles?', 'enters?', 'types?'];
 const COMMAND_RX = new RegExp(String.raw`\b(${COMMAND_WORDS.join('|')})\b`, 'i');

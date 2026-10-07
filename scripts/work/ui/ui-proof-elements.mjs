@@ -50,8 +50,8 @@ const RUN_ONLY = /(?:^(the )?run\b)|\bthe run (reaches|is driven|completes|submi
 
 const flatText = (v) => { if (v == null) { return ''; } if (typeof v === 'string') { return v; } if (Array.isArray(v)) { return v.map(flatText).join('\n'); } if (typeof v === 'object') { return Object.entries(v).map(([k, x]) => `${k}: ${flatText(x)}`).join('\n'); } return String(v); };
 
-const OVERLAY_SURFACES = ['modal', 'drawer'];
-const overlaySurface = (surface) => OVERLAY_SURFACES.includes(surface) || (surface && typeof surface === 'object' && Object.values(surface).some((v) => OVERLAY_SURFACES.includes(v)));
+const OVERLAY_SURFACES = new Set(['modal', 'drawer']);
+const overlaySurface = (surface) => OVERLAY_SURFACES.has(surface) || (surface && typeof surface === 'object' && Object.values(surface).some((v) => OVERLAY_SURFACES.has(v)));
 
 /** The record text that shows structure, and that plus the states. */
 function recordTexts(record, ui) {

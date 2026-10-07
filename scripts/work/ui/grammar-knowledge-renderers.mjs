@@ -22,7 +22,7 @@ const RULE_ID=/^[A-Z][A-Z0-9]*(?:-[A-Z][A-Z0-9]*)*-(?:\d+|AUTO)$/;
 const CLASS_LITERAL=new RegExp(String.raw`(?<![\w-])((?:starci-core|grammar)-${DASHED}(?:--${DASHED})?)(?![\w-])`,'g');
 const LITERAL_ALIAS=new RegExp(String.raw`^(?:export\s+)?type\s+([A-Z]\w*)\s*=\s*(${LITERAL_UNION})\s*$`,'gm');
 const LITERAL_UNION_ONLY=new RegExp(`^${LITERAL_UNION}$`);
-const MEMBER_TYPE=String.raw`(?:"[^"]*"|[^;{}"])+?`;
+const MEMBER_TYPE='(?:"[^"]*"|[^;{}"])+?';
 const MEMBER=new RegExp(String.raw`readonly\s+(\w+)\??\s*:\s*(${MEMBER_TYPE})\s*(?=;|\}|,?\s*$)`,'g');
 
 const exportStatements=source=>[...lexSource(source).code.matchAll(/export\s*\{([^}]*)\}\s*from\s*["']([^"']+)["']/g)]

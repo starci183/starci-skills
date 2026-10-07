@@ -3,6 +3,8 @@ import path from 'node:path';
 import { sha256 } from '../../engine/digest.mjs';
 import { isFile, list, workRootOf } from './work-io.mjs';
 import { byCodeUnit } from '../lib/list.mjs';
+import { eachInOrder } from '../lib/in-order.mjs';
+import { bestEffortCallAsync } from '../agent/best-effort-call.mjs';
 import { DRAW_OFF_GRAMMAR_COMPONENT as DOM_OFF_GRAMMAR } from './draw/draw-source.mjs';
 import { anatomyFindings, dnaFindings, loadDna, proposalFilesFor, proposalNamesIn } from './draw/draw-dna.mjs';
 import { measureFindings, nestedVariantFindings } from './draw/draw-layer.mjs';
@@ -104,22 +106,31 @@ function paletteMetric(metrics, captures, brand, palette) {
     .filter((f) => f.level === 'refuse').map((f) => finding('palette', f.code, f.message))) : []);
 }
 
+const sizeOf = (viewport) => `${viewport.width}x${viewport.height}`;
+
+function geometryFindingsAt(result, size) {
+  if (!result || result.error) return [finding('geometry', DRAW_METRICS_UNVERIFIED, `grammar-geometry could not run at ${size}: ${result?.error ?? 'no result'}`)];
+  return list(result.findings).map((f) => finding('geometry', f.code ?? GEOMETRY_OFF_GRAMMAR, `${size} ${f.element ?? ''} ${f.at ?? ''} ${f.property ?? ''} is ${f.got ?? '?'}, the grammar renders ${f.expected ?? '?'}`.replace(/\s+/g, ' ').trim()));
+}
+
+function scoreFindingsAt(result, size, png, scores) {
+  if (!result || result.error) return [finding('score', DRAW_METRICS_UNVERIFIED, `ui-proof-brief --score could not run at ${size}: ${result?.error ?? 'no result'}`)];
+  scores.set(png, result);
+  const failed = [...list(result.spacing), ...list(result.cases)].filter((x) => x?.status === 'fail').map((x) => x.id ?? `${x.rule} ${x.case}`);
+  const failCount = result.summary?.fail ?? failed.length;
+  return failCount > 0 ? [finding('score', DRAW_SCORE_BELOW, `${size} scores ${result.summary?.pass ?? '?'} pass / ${failCount} fail: ${failed.slice(0, 8).join('; ')}`, { count: failed.length })] : [];
+}
+
 async function browserMetrics({ captures, html, ui, repo, probeRepo, family, drawCss, probes, scores }) {
   const geometry = [], score = [];
-  for (const capture of captures) {
+  const probeOptions = { repo: probeRepo ?? repo, family, drawCss };
+  await eachInOrder(captures, async (capture) => {
     const viewport = { width: capture.viewport.width, height: capture.viewport.height };
-    let geometryResult = null, scoreResult = null;
-    try { geometryResult = await probes.geometry(html, viewport, { repo: probeRepo ?? repo, family, drawCss }); } catch (error) { geometryResult = { error: String(error?.message ?? error) }; }
-    if (!geometryResult || geometryResult.error) geometry.push(finding('geometry', DRAW_METRICS_UNVERIFIED, `grammar-geometry could not run at ${viewport.width}x${viewport.height}: ${geometryResult?.error ?? 'no result'}`));
-    else for (const f of list(geometryResult.findings)) geometry.push(finding('geometry', f.code ?? GEOMETRY_OFF_GRAMMAR, `${viewport.width}x${viewport.height} ${f.element ?? ''} ${f.at ?? ''} ${f.property ?? ''} is ${f.got ?? '?'}, the grammar renders ${f.expected ?? '?'}`.replace(/\s+/g, ' ').trim()));
-    try { scoreResult = await probes.score(html, viewport, { repo: probeRepo ?? repo, family, drawCss, record: ui?.record ?? null, recordFile: ui?.file ?? null }); } catch (error) { scoreResult = { error: String(error?.message ?? error) }; }
-    if (!scoreResult || scoreResult.error) score.push(finding('score', DRAW_METRICS_UNVERIFIED, `ui-proof-brief --score could not run at ${viewport.width}x${viewport.height}: ${scoreResult?.error ?? 'no result'}`));
-    else {
-      scores.set(capture.png, scoreResult);
-      const failed = [...list(scoreResult.spacing), ...list(scoreResult.cases)].filter((x) => x?.status === 'fail').map((x) => x.id ?? `${x.rule} ${x.case}`);
-      if ((scoreResult.summary?.fail ?? failed.length) > 0) score.push(finding('score', DRAW_SCORE_BELOW, `${viewport.width}x${viewport.height} scores ${scoreResult.summary?.pass ?? '?'} pass / ${scoreResult.summary?.fail ?? failed.length} fail: ${failed.slice(0, 8).join('; ')}`, { count: failed.length }));
-    }
-  }
+    const size = sizeOf(viewport);
+    geometry.push(...geometryFindingsAt(await bestEffortCallAsync(() => probes.geometry(html, viewport, { ...probeOptions })), size));
+    const scoreOptions = { ...probeOptions, record: ui?.record ?? null, recordFile: ui?.file ?? null };
+    score.push(...scoreFindingsAt(await bestEffortCallAsync(() => probes.score(html, viewport, scoreOptions)), size, capture.png, scores));
+  });
   return { geometry, score };
 }
 

@@ -188,7 +188,7 @@ export function checkTokensMatchSource({brand,sourceRoot,stage='decide'}){
   const planned=tokens.filter(isPlannedToken);
   const declared=objectList(brand?.sources).filter(source=>['css','tokens'].includes(source.kind));
   // At verify a planned token must be in the app's own source; a check that could read no source is not a pass.
-  const unprovenAtVerify=(why,evidence)=>{if(phase!=='verify'||!planned.length)return null;const suffix=planned.length===1?'':'s';return check(id,'fail',`${why} At the verify stage the planned token${suffix} ${planned.map(token=>token.token).join(', ')} must be declared by the app's own source.`,{...evidence,stage:phase,tokens:planned.map(token=>({token:token.token,expected:token.value??null,actual:null,status:'planned-source-missing'}))});};
+  const unprovenAtVerify=(why,evidence)=>{if(phase!=='verify'||!planned.length){return null;}const suffix=planned.length===1?'':'s';return check(id,'fail',`${why} At the verify stage the planned token${suffix} ${planned.map(token=>token.token).join(', ')} must be declared by the app's own source.`,{...evidence,stage:phase,tokens:planned.map(token=>({token:token.token,expected:token.value??null,actual:null,status:'planned-source-missing'}))});};
   if(!sourceRoot)return check(id,'skip','No --source repository root was given, so the brand\'s colour claims were not compared against shipped source.',{tokens:tokens.length,sources:declared.length,stage:phase});
   if(!tokens.length)return check(id,'skip','The brand declares no colour tokens to bind.',{sourceRoot:slash(sourceRoot),stage:phase});
   if(!declared.length){
@@ -471,8 +471,8 @@ export function checkPrimaryDangerDistinct({brand}){
   const tokens=brandTokens(brand);
   const primary=byRole(tokens,'primary'),danger=byRole(tokens,'danger');
   const allowed=brand?.color?.policy?.dangerMayMatchPrimary===true;
-  if(!primary||!danger){let absent='danger';if(!primary&&!danger)absent='primary and no danger';else if(!primary)absent='primary';return check(id,'skip',`The brand declares no ${absent} colour role, so the two cannot be compared.`,
-    {threshold:MIN_PRIMARY_DANGER_DELTA,dangerMayMatchPrimary:allowed});}
+  if(!primary||!danger){let absent='danger';if(!primary&&!danger){absent='primary and no danger';}else if(!primary){absent='primary';}
+  return check(id,'skip',`The brand declares no ${absent} colour role, so the two cannot be compared.`,{threshold:MIN_PRIMARY_DANGER_DELTA,dangerMayMatchPrimary:allowed});}
   const one=parseColor(primary.value),two=parseColor(danger.value);
   const evidence={primary:{token:primary.token,value:primary.value??null},danger:{token:danger.token,value:danger.value??null},
     threshold:MIN_PRIMARY_DANGER_DELTA,scale:'OKLab delta-E x100',dangerMayMatchPrimary:allowed};

@@ -151,7 +151,7 @@ const LOGICAL_SIDE = /^(padding|margin)-(inline|block)-(start|end)$/;
 const SIDES = ['top', 'right', 'bottom', 'left'];
 const BORDER_STYLES = /^(none|hidden|solid|dashed|dotted|double|groove|ridge|inset|outset)$/i;
 const fourSides = (tokens) => { const [t, r = t, b = t, l = r] = tokens; return [t, r, b, l]; };
-const LENGTH_FUNCTIONS = ['calc', 'min', 'max', 'clamp'].map((name) => `${name}\\(.*\\)`).join('|');
+const LENGTH_FUNCTIONS = ['calc', 'min', 'max', 'clamp'].map((name) => String.raw`${name}\(.*\)`).join('|');
 const LENGTH_TOKEN = new RegExp(String.raw`^(0|-?[\d.]+[a-z%]*|${LENGTH_FUNCTIONS}|thin|medium|thick)$`, 'i');
 const isLengthToken = (t) => LENGTH_TOKEN.test(t);
 

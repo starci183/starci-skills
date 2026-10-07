@@ -8,7 +8,7 @@ import {check,runRenderChecks} from './render.mjs';
 // ---------------------------------------------------------------------------
 
 const TRAILING_STAR_SEGMENT=/\/\*+$/;
-const TRAILING_SLASHES=/\/+$/;
+const TRAILING_SLASHES=/(?<!\/)\/+$/;
 const NODE_SEGMENT=/(^|\.starciwork\/)features\/[^/]+\/ui(\/|$)/;
 const ALPHANUMERIC=/^[A-Za-z0-9]+$/;
 /** Whether the path ends in a file name: some `.` followed by letters or digits to the end. */

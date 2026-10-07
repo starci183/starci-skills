@@ -294,12 +294,13 @@ export function measurePalette(image, palette, { exclude = null } = {}) {
   };
 }
 function collectPaletteSamples({ image, step, excluded, classify, coherent }) {
-  const { width, height, data } = image;
+  const { width, height } = image;
   const samples = { groups: new Map(), tokens: new Map(), opaque: 0, vivid: 0, primaryPixels: 0, statusPixels: 0 };
-  for (let y = 0; y < height; y += step) for (let x = 0; x < width; x += step) recordPaletteSample(samples, data, width, x, y, excluded, classify, coherent);
+  const judge = { excluded, classify, coherent };
+  for (let y = 0; y < height; y += step) for (let x = 0; x < width; x += step) recordPaletteSample(samples, image, x, y, judge);
   return samples;
 }
-function recordPaletteSample(samples, data, width, x, y, excluded, classify, coherent) {
+function recordPaletteSample(samples, { data, width }, x, y, { excluded, classify, coherent }) {
   if (excluded(x, y)) return;
   const at = (y * width + x) * 4;
   if (data[at + 3] < ALPHA_FLOOR) return;

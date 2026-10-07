@@ -54,7 +54,7 @@ const SEALED_FILE_RE = /\.enc(?:\.ya?ml|\.json|\.env)?$|\.(?:ya?ml|json|env)\.en
 // reported as SUSPECT, not REFUSE, because a prompt names files it tells the model not to copy as well as
 // the ones it was fed; only lines that claim an input are mined for paths.
 const PROMPT_INPUT_LINE = /(image\s*\d|reference image|anatomy source|edit target|brand authority|knowledge|input images)/i;
-const PROMPT_PATH = /(?:examples|knowledge)\/[\w./\[\]-]*/g;
+const PROMPT_PATH = /(?:examples|knowledge)\/[\w./[\]-]*/g;
 
 function checkPromptFile(file, sink) {
   const text = fs.readFileSync(file, 'utf8');

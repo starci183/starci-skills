@@ -149,8 +149,7 @@ export function validateWork(target, { strict = false } = {}) {
   // Record-scoped validation still resolves refs against the enclosing work
   // tree: a uat-flow's `environment:` names a _resources record above the
   // record dir, and resolving it against the dir alone refuses every such ref.
-  let counts = { records: 0, refs: 0, evidence: 0, payloads: 0 };
-  counts = checkStructure(root, enclosingWorkRoot, refused, suspect, info);
+  const counts = checkStructure(root, enclosingWorkRoot, refused, suspect, info);
 
   // A repository's .starciwork holds product records only (R07): known agent data - evidence, runs, captures, kernel
   // custody, ledgers - is refused [HFS_AGENT_DATA_TRACKED] and a path off the product list is a suspect [STARCIWORK_DRIFT].
@@ -200,8 +199,8 @@ export function validateWork(target, { strict = false } = {}) {
   return result;
 }
 
-const FINDING_FILE = new RegExp([String.raw`^`, String.raw`(.+?)`, ': '].join(''));
-const UNDER_FILE = new RegExp([' under ', String.raw`(.+?)`, String.raw` \[[A-Z_]+\]$`].join(''));
+const FINDING_FILE = new RegExp(['^', '(.+?)', ': '].join(''));
+const UNDER_FILE = new RegExp([' under ', '(.+?)', String.raw` \[[A-Z_]+\]$`].join(''));
 /** The absolute file a finding names, or null: its "under <file>" tail, else its leading path. */
 function findingFile(finding, { roots = [] } = {}) {
   const text = String(finding);

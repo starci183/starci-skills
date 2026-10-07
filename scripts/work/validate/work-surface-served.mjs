@@ -188,7 +188,7 @@ function registerEventEmissions(file,text,kinds,emitted,emittedIds){
 function registerEventSubscriptions(file,text,subscriptions){
   const handled=[...text.matchAll(/instanceof\s+(\w+Event)\b/g)].map(match=>match[1])
     .concat([...text.matchAll(/@EventsHandler\(\s*(\w+)/g)].map(match=>match[1]));
-  if(handled.length||/^\s*@EventsHandler/m.test(text)||/\.subscribe\s*\(/.test(text)){
+  if(handled.length||/^[\t\v\f \u00a0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]*@EventsHandler/m.test(text)||/\.subscribe\s*\(/.test(text)){
     if(handled.length)subscriptions.push({file,classes:[...new Set(handled)]});
   }
 }

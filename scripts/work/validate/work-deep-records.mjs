@@ -10,10 +10,10 @@ import { walk } from './check-example-work.mjs';
 import { fromRoot } from './work-consistency-shared.mjs';
 import { eventClassOf, eventClasses, srcFiles } from './work-deep-surface-scan.mjs';
 
-const PROOF_SPEC_PATH_PART = '[\\w./-]+';
+const PROOF_SPEC_PATH_PART = String.raw`(?<![\w./-])[\w./-]+`;
 const PROOF_SPEC_KIND_PART = '(?:spec|e2e-spec|test)';
-const proofSpecExpression = () => new RegExp(PROOF_SPEC_PATH_PART + '\\.' + PROOF_SPEC_KIND_PART + '\\.ts', 'g');
-const SPEC_TOKEN_FLAG_PREFIX = new RegExp([String.raw`^--`, String.raw`\S+`, String.raw`\s+`].join(''));
+const proofSpecExpression = () => new RegExp(PROOF_SPEC_PATH_PART + String.raw`\.` + PROOF_SPEC_KIND_PART + String.raw`\.ts`, 'g');
+const SPEC_TOKEN_FLAG_PREFIX = new RegExp(['^--', String.raw`\S+`, String.raw`\s+`].join(''));
 
 /** The instant a work/evidence@1 run object was minted, from its id (`20260919T155312Z-5c10a673`); null when there is none. */
 export function runTimeOf(run) {
@@ -87,7 +87,7 @@ function checkCommand(ctx, { command, file, label, indexFile }) {
   if (npmRun && appScripts?.[npmRun[1]] == null) {
     refuse(file, 'PROOF_COMMAND_DEAD', `${label}: npm script "${npmRun[1]}" does not exist in the app root package.json`);
   }
-  for (const token of command.match(proofSpecExpression()) ?? []) {
+  for (const [token] of command.matchAll(proofSpecExpression())) {
     const p = token.replace(SPEC_TOKEN_FLAG_PREFIX, '');
     if (!specExists(ctx, p)) {
       refuse(file, 'PROOF_COMMAND_DEAD', `${label}: spec "${p}" matches no file of the app`);

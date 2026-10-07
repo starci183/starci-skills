@@ -44,7 +44,7 @@ const OWNER_GATE_CODE = 'DRAW_NOT_OWNER_ACCEPTED';
 const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const REFUSAL_FILE = String.raw`(.+?\.(?:ya?ml|json))`;
 const REFUSAL_SPACE = String.raw`\s*`;
-const REFUSAL_MESSAGE = String.raw`(.*?)`;
+const REFUSAL_MESSAGE = '(.*?)';
 const REFUSAL_CODE = String.raw`(?:\s*\[([A-Z0-9_]+)\])?`;
 const REFUSAL_LINE = new RegExp(`^${REFUSAL_FILE}:${REFUSAL_SPACE}${REFUSAL_MESSAGE}${REFUSAL_CODE}${REFUSAL_SPACE}$`);
 const rel = (repo, p) => slash(path.relative(repo, p));
@@ -92,11 +92,9 @@ export async function drawGates({ ui, repo, files = [], remeasure = true, runner
   const acceptance = acceptanceGate(root, bound, recordFile);
   gates.push(acceptance.gate);
   if (remeasure) gates.push(await metricsGate(root, uiDir, bound, recordFile, runners));
-  gates.push(await validationGate(root, uiDir, uiRel, runners));
-  gates.push(await shellConformanceGate(root, uiDir, uiRel, recordFile, runners));
+  gates.push(await validationGate(root, uiDir, uiRel, runners), await shellConformanceGate(root, uiDir, uiRel, recordFile, runners));
   const record = readUiRecord(uiDir);
-  gates.push(await layerGate(root, uiDir, uiRel, recordFile, record, runners));
-  gates.push(drawLoopGate(uiDir, uiRel, recordFile, record));
+  gates.push(await layerGate(root, uiDir, uiRel, recordFile, record, runners), drawLoopGate(uiDir, uiRel, recordFile, record));
 
   const failed = gates.filter((g) => g.exitCode !== 0);
   const checks = gates.map(({ name, command, exitCode, codes, failing, evidence }) => ({ name, command, exitCode, evidence, ...(exitCode !== 0 && codes.length ? { codes } : {}), ...(exitCode !== 0 && failing.length ? { failing } : {}) }));

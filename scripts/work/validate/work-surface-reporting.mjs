@@ -1,4 +1,5 @@
 import path from 'node:path';
+import {servedKey} from './work-surface-declared.mjs';
 
 export function declaredSubscriptions(records,featureOf,canon){
   const byFeature=new Map();
@@ -66,7 +67,8 @@ export function reportFeaturesWithoutSubscribers(records,wiredByFeature,featureO
   }
 }
 
-export function appendSurfaceMap(out,repoRoots,servedRoutes,ops,feRoutesAll,claimedRouteKeys,claimedFe,codeByRepo,eventRecs,emittedRecordIds,subscribesByFeature,records,declaredHttp,integrationEndpoints,declaredGql,claims,ownerOf,servedKey){
+/** One surface-map line per bound repository: what it serves, which of that is declared or owned, its graphql, fe and event counts. */
+export function appendRepoSurfaceMap(out,repoRoots,{servedRoutes,ops,feRoutesAll,codeByRepo},{claimedRouteKeys,claimedFe},ownerOf){
   for(const repo of repoRoots){
     const repoName=path.basename(repo);
     const routes=servedRoutes.filter(route=>route.repo===repo);
@@ -87,6 +89,10 @@ export function appendSurfaceMap(out,repoRoots,servedRoutes,ops,feRoutesAll,clai
     }
     out.map.push(lines.join('; '));
   }
+}
+
+/** The surface map's closing lines: the event records and the totals of what the records declare. */
+export function appendSurfaceTotals(out,{eventRecs,emittedRecordIds,subscribesByFeature,records},{declaredHttp,integrationEndpoints,declaredGql,claims}){
   const doneRecs=eventRecs.filter(([,record])=>record.data?.state==='done').length;
   if(eventRecs.length){
     out.map.push(`${eventRecs.length} work/event@1 record(s) (${doneRecs} done), ${emittedRecordIds.size} `+

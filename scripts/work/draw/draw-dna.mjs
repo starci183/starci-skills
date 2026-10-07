@@ -59,8 +59,10 @@ import { PROPOSAL_FILE_NAMES, readProposals } from '../grammar-proposal.mjs'; im
 import { ancestorsOf } from '../../lib/dom-tree.mjs';
 import { list } from '../../lib/list.mjs';
 import { appendDnaFindings } from './draw-dna-findings.mjs';
-import { ALERT_INDICATOR_MAX_PX, DRAW_ALERT_ANATOMY, DRAW_METER_TRACK, METER_FULL_WIDTH_SHARE, METER_SEGMENTED_TRACK_PX, METER_SEGMENT_GAP_MAX_PX, METER_TRACK_PX, anatomyFindings } from './draw-dna-anatomy.mjs';
-export { DRAW_ALERT_ANATOMY, DRAW_METER_TRACK, anatomyFindings };
+import { attributeSelectorsOf, withoutAttributeBlocks } from './draw-dna-selector.mjs';
+import { ALERT_INDICATOR_MAX_PX, DRAW_ALERT_ANATOMY, DRAW_METER_TRACK, METER_FULL_WIDTH_SHARE, METER_SEGMENTED_TRACK_PX, METER_SEGMENT_GAP_MAX_PX, METER_TRACK_PX } from './draw-dna-anatomy.mjs';
+export { DRAW_ALERT_ANATOMY, DRAW_METER_TRACK };
+export { anatomyFindings } from './draw-dna-anatomy.mjs';
 
 export const DRAW_OFF_GRAMMAR_COMPONENT = 'DRAW_OFF_GRAMMAR_COMPONENT';
 export const DRAW_NOTICE_NOT_ALERT = 'DRAW_NOTICE_NOT_ALERT';
@@ -115,12 +117,12 @@ const OUTCOME_STATES = new Set(['affirmative', 'cautionary', 'negative']);
 
 const VOID = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'param', 'source', 'track', 'wbr']);
 const RAW = new Set(['script', 'style', 'template', 'textarea', 'title', 'noscript', 'xmp']);
-const MARKUP_TAG_PATTERN = '<!--[\\s\\S]*?-->|<!\\[CDATA\\[[\\s\\S]*?\\]\\]>|<![^>]*>|<\\?[^>]*>';
-const END_TAG_PATTERN = '<\\/([a-zA-Z][\\w:-]*)\\s*>';
-const START_TAG_NAME_PATTERN = '<([a-zA-Z][\\w:-]*)';
+const MARKUP_TAG_PATTERN = String.raw`<!--[\s\S]*?-->|<!\[CDATA\[[\s\S]*?\]\]>|<![^>]*>|<\?[^>]*>`;
+const END_TAG_PATTERN = String.raw`<\/([a-zA-Z][\w:-]*)\s*>`;
+const START_TAG_NAME_PATTERN = String.raw`<([a-zA-Z][\w:-]*)`;
 const START_TAG_ATTRIBUTES_PATTERN = "((?:\\s+[^\\s\"'>/=]+(?:\\s*=\\s*(?:\"[^\"]*\"|'[^']*'|[^\\s\"'=<>`]+))?)*)\\s*(\\/?)>";
 const TAG_RX = new RegExp(`${MARKUP_TAG_PATTERN}|${END_TAG_PATTERN}|${START_TAG_NAME_PATTERN}${START_TAG_ATTRIBUTES_PATTERN}`, 'g');
-const ATTR_NAME_PATTERN = "([^\\s\"'>/=]+)";
+const ATTR_NAME_PATTERN = String.raw`([^\s"'>/=]+)`;
 const ATTR_VALUE_PATTERN = "(?:\\s*=\\s*(?:\"([^\"]*)\"|'([^']*)'|([^\\s\"'=<>`]+)))?";
 const ATTR_RX = new RegExp(`${ATTR_NAME_PATTERN}${ATTR_VALUE_PATTERN}`, 'g');
 const decode = (s) => String(s).replaceAll('&nbsp;', ' ').replaceAll('&amp;', '&').replaceAll('&lt;', '<').replaceAll('&gt;', '>').replaceAll('&quot;', '"').replaceAll(/&#39;|&apos;/g, "'");
@@ -335,14 +337,9 @@ const declsOf = (text) => {
   }
   return out;
 };
-const STYLE_RULE_PATTERN = '([^{}]+)\\{([^{}]*)\\}';
-const STYLE_RULE_RX = new RegExp(STYLE_RULE_PATTERN, 'g');
-const SELECTOR_COMBINATOR_PATTERN = '\\s*[>+~]\\s*|\\s+';
-const SELECTOR_COMBINATOR_RX = new RegExp(SELECTOR_COMBINATOR_PATTERN);
-const ATTRIBUTE_BLOCK_PATTERN = '\\[[^\\]]*\\]';
-const ATTRIBUTE_BLOCK_RX = new RegExp(ATTRIBUTE_BLOCK_PATTERN, 'g');
-const ATTRIBUTE_SELECTOR_PATTERN = "\\[([\\w:-]+)(?:\\s*[~|^$*]?=\\s*[\"']?([^\"'\\]]*)[\"']?)?\\]";
-const ATTRIBUTE_SELECTOR_RX = new RegExp(ATTRIBUTE_SELECTOR_PATTERN, 'g');
+// A rule starts after a brace (or at the text start), so a run of selector text is scanned once.
+const STYLE_RULE_RX = /(?<![^{}])([^{}]+)\{([^{}]*)\}/g;
+const SELECTOR_COMBINATOR_RX = /\s+(?:[>+~]\s*)?|[>+~]\s*/;
 
 /** The flat rules of the render's <style> blocks: [{selector, decls}] (innermost blocks of an @media included). */
 function styleRulesOf(tree) {
@@ -360,7 +357,7 @@ function styleRulesOf(tree) {
 /** Whether a selector's last compound (no pseudo-class) matches `el` by tag, id, classes and attributes. */
 function selectorMatches(selector, el) {
   const last = selector.split(SELECTOR_COMBINATOR_RX).findLast(Boolean) ?? '';
-  if (!last || /:/.test(last.replace(ATTRIBUTE_BLOCK_RX, ''))) return false;
+  if (!last || /:/.test(withoutAttributeBlocks(last))) return false;
   const tag = /^[a-zA-Z][\w-]*/.exec(last)?.[0];
   if (tag && tag.toLowerCase() !== el.tag) return false;
   const classes = [...last.matchAll(/\.([\w-]+)/g)].map((m) => m[1]);
@@ -368,9 +365,9 @@ function selectorMatches(selector, el) {
   if (classes.some((c) => !classesOf(el).includes(c))) return false;
   const id = /#([\w-]+)/.exec(last)?.[1];
   if (id && el.attrs.id !== id) return false;
-  for (const m of last.matchAll(ATTRIBUTE_SELECTOR_RX)) {
-    const v = el.attrs[m[1].toLowerCase()];
-    if (v == null || (m[2] != null && v !== m[2])) return false;
+  for (const { name, value } of attributeSelectorsOf(last)) {
+    const v = el.attrs[name.toLowerCase()];
+    if (v == null || (value != null && v !== value)) return false;
   }
   return true;
 }

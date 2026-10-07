@@ -52,7 +52,7 @@ const ENTITY_PARTS = /(^|-)(surface-fact|list-box-item|list-box-row|data-table-r
 const SEPARATOR_CLASS = /(^|[-_])(separator|divider|hairline|rule)($|[-_])/i;
 const BAND_CLASS = /(^|[-_])band($|[-_]|s$)/i;
 const BADGE_CLASS = /(^|[-_])(badge|chip|pill|status-pill)($|[-_]{2}|$)/i;
-const CSS_VAR_WITH_FALLBACK = /^var\(\s*(--[\w-]+)\s*,\s*([^)]*)\)$/;
+const CSS_VAR_WITH_FALLBACK = /^var\(\s*(--[\w-]+)\s*,\s*((?:[^\s)][^)]*)?)\)$/;
 const CSS_VAR_WITHOUT_FALLBACK = /^var\(\s*(--[\w-]+)\s*\)$/;
 const nameOf = (el) => String(el?.attrs?.[COMPONENT_ATTR] ?? '').trim();
 const partOf = (el) => String(el?.attrs?.[PART_ATTR] ?? '').trim();

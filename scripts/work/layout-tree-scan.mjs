@@ -1,8 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { byCodeUnit } from '../lib/list.mjs';
-import { altOf } from '../lib/source-phrases.mjs';
 import { list, sha256File, slash } from './work-io.mjs';
+import { importClausesOf, importSpecifiersOf } from './layout-imports.mjs';
 
 const SCANNER = 'scripts/work/layout-tree.mjs';
 const SPECIAL_FILES = ['layout', 'template', 'page', 'loading', 'error', 'not-found', 'default', 'route'];
@@ -10,13 +10,9 @@ const SOURCE_EXT = ['.tsx', '.ts', '.jsx', '.js', '.mdx'];
 const SKIP_DIRS = new Set(['node_modules', '.next', '.git', 'dist', 'coverage', 'storybook-static', '.turbo']);
 const LOCALE_PARAMS = new Set(['locale', 'lang', 'lng', 'language']);
 const readText = (file) => { try { return fs.readFileSync(file, 'utf8'); } catch { return null; } };
-const IMPORT_FROM_CLAUSE = "(?:[^'\"`;]*?\\s+from\\s+)?";
-const IMPORT_SOURCE = String.raw`['"]([^'"]+)['"]`;
-const IMPORTS_RX = new RegExp(String.raw`(?:import|export)\s+(?:type\s+)?` + IMPORT_FROM_CLAUSE + IMPORT_SOURCE, 'g');
-const LAYOUT_IMPORT_RX = new RegExp(String.raw`import\s+(?:type\s+)?([^'"]*?)\s+from\s+['"][^'"]+['"]`, 'g');
 const IMPORT_ALIAS_RX = new RegExp([String.raw`\s+`, 'as', String.raw`\s+`].join(''));
-const I18N_FILE_RX = new RegExp(String.raw`(?:^|[/\\])i18n[/\\][^/\\]+\.[jt]sx?$|(?:^|[/\\])i18n\.[jt]s$`);
-const TRAILING_SLASHES_RX = new RegExp(String.raw`\/+` + '$');
+const I18N_FILE_RX = /(?:^|[/\\])i18n[/\\][^/\\]+\.[jt]sx?$|(?:^|[/\\])i18n\.[jt]s$/;
+const TRAILING_SLASHES_RX = /(?<!\/)\/+$/;
 
 // Segments
 // ---------------------------------------------------------------------------------------------------------
@@ -89,7 +85,6 @@ function resolveImport(spec, fromFile, aliases, repoRoot) {
   return null;
 }
 
-const importsOf = (text) => [...text.matchAll(IMPORTS_RX)].map((m) => m[1]);
 
 /** The files a layout reaches through its imports, breadth first, within the repository. */
 function importClosure(entry, aliases, repoRoot, { maxDepth = 4, maxFiles = 150 } = {}) {
@@ -100,7 +95,7 @@ function importClosure(entry, aliases, repoRoot, { maxDepth = 4, maxFiles = 150 
     for (const file of frontier) {
       const text = readText(file);
       if (!text) continue;
-      for (const spec of importsOf(text)) {
+      for (const spec of importSpecifiersOf(text)) {
         const resolved = resolveImport(spec, file, aliases, repoRoot);
         if (resolved && !seen.has(resolved) && !resolved.split(path.sep).includes('node_modules') && !/\.(?:spec|test|stories)\.[jt]sx?$/.test(resolved)) {
           seen.add(resolved); next.push(resolved);
@@ -115,8 +110,8 @@ function importClosure(entry, aliases, repoRoot, { maxDepth = 4, maxFiles = 150 
 /** The chrome component a layout file renders, and whether it can only be a passthrough (document + providers). */
 function layoutComponentOf(text) {
   const imported = new Set();
-  for (const m of text.matchAll(LAYOUT_IMPORT_RX)) {
-    for (const name of m[1].replace(/[{}]/g, ',').split(',').map((s) => s.trim().split(IMPORT_ALIAS_RX).pop()).filter(Boolean)) if (/^[A-Z]/.test(name)) imported.add(name);
+  for (const clause of importClausesOf(text)) {
+    for (const name of clause.replace(/[{}]/g, ',').split(',').map((s) => s.trim().split(IMPORT_ALIAS_RX).pop()).filter(Boolean)) if (/^[A-Z]/.test(name)) imported.add(name);
   }
   // A JSX tag, not a TypeScript type argument: `Promise<Metadata>` has an identifier right before the `<`.
   const tags = [...text.matchAll(/(?<![\w$\])])<([A-Z]\w*)[\s/>]/g)].map((m) => m[1]).filter((t) => imported.has(t));
@@ -231,7 +226,7 @@ function gitRevision(repoRoot) {
   try {
     const head = fs.readFileSync(path.join(repoRoot, '.git', 'HEAD'), 'utf8').trim();
     if (/^[a-f0-9]{40}$/.test(head)) return head;
-    const ref = head.match(/^ref:\s*(.+)$/)?.[1];
+    const ref = head.match(/^ref:\s*(?!\s)(.+)$/)?.[1];
     if (!ref) return null;
     const loose = path.join(repoRoot, '.git', ref);
     if (fs.existsSync(loose)) return fs.readFileSync(loose, 'utf8').trim();
@@ -330,17 +325,27 @@ function isWithinNode(page, node, byId) {
   return false;
 }
 
-function navItemOf(item, { ns, prefix, catalogs, nodes, localeParam, findings, rel }) {
-  let i18nKey = ns || prefix ? [ns, `${prefix ?? ''}${item.key}`].filter(Boolean).join('.') : null;
-  if (!i18nKey || !catalogs.some((catalog) => typeof getPath(catalog.messages, i18nKey) === 'string')) {
-    const guesses = [...new Set(catalogs.flatMap((catalog) => keyPathsEndingIn(catalog.messages, `nav.${item.key}`)))];
-    if (guesses.length === 1) i18nKey = guesses[0];
-  }
+/** The catalog key a nav item's label lives at: the namespaced key when a catalog holds it, else the one `nav.<key>` match. */
+function navLabelKeyOf(item, { ns, prefix, catalogs }) {
+  const named = ns || prefix ? [ns, `${prefix ?? ''}${item.key}`].filter(Boolean).join('.') : null;
+  if (named && catalogs.some((catalog) => typeof getPath(catalog.messages, named) === 'string')) return named;
+  const guesses = [...new Set(catalogs.flatMap((catalog) => keyPathsEndingIn(catalog.messages, `nav.${item.key}`)))];
+  return guesses.length === 1 ? guesses[0] : named;
+}
+
+/** The label a catalog gives `i18nKey`, per locale; a locale whose label is missing or blank has no entry. */
+function navLabelsOf(catalogs, i18nKey) {
   const labels = {};
   for (const catalog of catalogs) {
     const label = i18nKey ? getPath(catalog.messages, i18nKey) : undefined;
     if (typeof label === 'string' && label.trim()) labels[catalog.locale] = label;
   }
+  return labels;
+}
+
+function navItemOf(item, { ns, prefix, catalogs, nodes, localeParam, findings, rel }) {
+  const i18nKey = navLabelKeyOf(item, { ns, prefix, catalogs });
+  const labels = navLabelsOf(catalogs, i18nKey);
   for (const catalog of catalogs) {
     if (!labels[catalog.locale]) findings.push({ code: 'NAV_LABEL_MISSING', detail: item.key + ' has no ' + catalog.locale + ' label' + (i18nKey ? ' at ' + i18nKey : '') + ' in ' + rel(catalog.files[0]) });
   }
@@ -365,7 +370,7 @@ function addUnreachedRouteFindings(node, items, pages, byId, localeParam, findin
   }
 }
 
-function navOf(node, registry, catalogs, nodes, pages, byId, localeParam, rel, digests) {
+function navOf(node, registry, { catalogs, nodes, pages, byId, localeParam, rel, digests }) {
   const text = readText(registry.file) ?? '';
   digests.push([rel(registry.file), sha256File(registry.file)]);
   const { ns, prefix } = labelKeyPattern(text);
@@ -376,11 +381,23 @@ function navOf(node, registry, catalogs, nodes, pages, byId, localeParam, rel, d
   return { ...(componentName ? { component: componentName } : {}), source: rel(registry.file), items, ...(findings.length ? { findings } : {}) };
 }
 
+/** The navigation registry of a layout's import closure: the unclaimed file with the most items (at least two). */
+function navRegistryIn(closure, claimed) {
+  let registry = null;
+  for (const file of closure) {
+    if (claimed.has(file)) continue;
+    const found = registryIn(readText(file) ?? '');
+    if (found.length >= 2 && (!registry || found.length > registry.items.length)) registry = { file, items: found };
+  }
+  return registry;
+}
+
 function scanLayouts(nodes, catalogs, appRoot, repoAbs, rel, digests, localeParam) {
   const aliases = aliasesOf(appRoot);
   const claimed = new Set();
   const byId = new Map(nodes.map((node) => [node.id, node]));
   const pages = landingPages(nodes);
+  const navScope = { catalogs, nodes, pages, byId, localeParam, rel, digests };
   for (const node of nodes) {
     if (!node.files?.layout) continue;
     const layoutAbs = path.join(repoAbs, node.files.layout.path);
@@ -388,15 +405,10 @@ function scanLayouts(nodes, catalogs, appRoot, repoAbs, rel, digests, localePara
     const { component, passthrough } = layoutComponentOf(text);
     const layout = { ...(component ? { component } : {}), chrome: passthrough ? 'passthrough' : 'unknown', state: passthrough ? 'done' : 'todo', rev: 1 };
     const closure = importClosure(layoutAbs, aliases, repoAbs).filter((file) => file !== layoutAbs);
-    let registry = null;
-    for (const file of closure) {
-      if (claimed.has(file)) continue;
-      const found = registryIn(readText(file) ?? '');
-      if (found.length >= 2 && (!registry || found.length > registry.items.length)) registry = { file, items: found };
-    }
+    const registry = navRegistryIn(closure, claimed);
     if (registry) {
       claimed.add(registry.file);
-      layout.nav = navOf(node, registry, catalogs, nodes, pages, byId, localeParam, rel, digests);
+      layout.nav = navOf(node, registry, navScope);
     }
     node.layout = layout;
   }
