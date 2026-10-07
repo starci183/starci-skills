@@ -48,7 +48,12 @@ function readEnvFiles(target) {
     for (const raw of text.split(/\r?\n/u)) {
       const line = raw.trim();
       if (!line || line.startsWith('#')) continue;
-      const match = /^(?:export\s+)?([A-Za-z_]\w*)\s*=\s*(.*)$/u.exec(line);
+      const match = new RegExp([
+        String.raw`^(?:export\s+)?`,
+        String.raw`([A-Za-z_]\w*)`,
+        String.raw`\s*=\s*`,
+        String.raw`(.*)$`,
+      ].join(''), 'u').exec(line);
       if (!match) continue;
       let value = match[2].trim();
       if (/^(['"]).*\1$/u.test(value)) value = value.slice(1, -1);
