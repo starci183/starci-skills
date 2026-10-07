@@ -20,7 +20,7 @@ import { sleepSync } from '../../lib/sleep-sync.mjs';
 
 const ZERO_SHA = '0'.repeat(40);
 /** Bound on retrying a rename or delete refused while another process holds the file open (Windows EPERM/EBUSY). */
-export const TREE_MOVE_WAIT_MS = 5_000;
+const TREE_MOVE_WAIT_MS = 5_000;
 const TREE_MOVE_POLL_MS = 50;
 const OPEN_BY_ANOTHER = new Set(['EPERM', 'EBUSY']);
 const REGULAR_BLOB = new Set(['100644', '100755']);
