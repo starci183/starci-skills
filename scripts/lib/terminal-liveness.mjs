@@ -7,6 +7,9 @@ import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { INPUT_GLYPH, INPUT_GLYPH_CLASS, AGENT_GLYPH_CLASS } from './input-glyph.mjs';
 import { squash } from './clip.mjs';
+import {
+  ACTIVE_MARKER, ELAPSED_HOURS, ELAPSED_MINUTES, FRAME_RAIL_PREFIX, FRAME_RAIL_SUFFIX, POSIX_PROMPT_PREFIX, POSIX_PROMPT_ROW, SPINNER_COMPANION, STATUS_WORD,
+} from './terminal-liveness-patterns.mjs';
 
 const TERMINAL_PROVIDERS = Object.freeze(['claude', 'codex', 'devin', 'cursor']);
 const identityText = (value) => typeof value === 'string' ? value.trim().toLowerCase() : '';
@@ -262,20 +265,13 @@ export function draftOwnership(draft, { texts = [], stagedPattern = DEFAULT_STAG
 const SHELL_PROMPT_ROWS = [
   /^PS(?:\s+\S[^>]*)?>$/,                    // PowerShell: "PS D:\Repositories\x>"
   /^[A-Za-z]:\\[^<>|*?"\r\n]*>$/,           // cmd.exe: "D:\Repositories\x>"
-  // POSIX: "$", "#", "%", "user@host:~/x$", "user@host ~ %", "bash-5.2$", "(venv) user@host:~$"
-  new RegExp([
-    String.raw`^(?:\([^)]*\)\s*)?(?:[\w.-]+@[\w.-]+(?:[:\s]\S*)?\s*|[\w.-]+-\d+(?:\.\d+)*)?`,
-    '[$#%]$',
-  ].join('')),
+  POSIX_PROMPT_ROW,
 ];
 // A shell prompt at the START of a row, whatever follows it on that row.
 const SHELL_PROMPT_PREFIXES = [
   /^PS\s+(?:[A-Za-z]:|\\\\|[\w.]+::)[^>]*>(?=\s|$)/,                     // PowerShell: "PS D:\x> ..."
   /^[A-Za-z]:\\[^<>|*?"\r\n]*>(?=\s|$)/,                                   // cmd.exe: "D:\x> ..."
-  new RegExp([
-    String.raw`^(?:\([^)]*\)\s*)?[\w.-]+@[\w.-]+`,
-    String.raw`(?::\S*|\s+\S+)?\s*[$#%](?=\s|$)`,
-  ].join('')),     // POSIX: "user@host:~/x$ ..."
+  POSIX_PROMPT_PREFIX,
 ];
 /** The shell prompt a row starts with, or null. */
 export function shellPromptPrefix(row) {
@@ -338,26 +334,6 @@ export function shellReceivedText(after, text, before = '') {
 
 export const WEDGE_MINUTES = 30;
 
-// Rows that may sit between a live spinner and the provider's input row without
-// meaning the turn ended: blank/rule chrome, Claude's todo list under its
-// spinner (⎿ ☐ ☒ ...), Codex queued-message rows (↳), and a status/footer row.
-// Codex hangs the detail of its status row under it on a tree rail ("  └ orca orchestration ask
-// ...", a background terminal's command) and holds a message sent mid-turn under "• Messages to be
-// submitted after next tool call"; both read as a finished answer, so a Codex worker waiting on a
-// background terminal, or holding a delivered nudge, read turn-idle (inc-29dc6dc51975,
-// inc-b261cf2c56c5, inc-c2793e212c63).
-// Claude folds a long todo list into "… +3 pending" (inc-a579fa590ed8); Devin's model/context
-// footer ("SWE-2 Max  Context: 70k / 262k") may sit above its input row.
-const SPINNER_COMPANION = new RegExp([
-  String.raw`^\s*$`,
-  String.raw`|^\s*[─━═╌┄_-]{3,}`,
-  String.raw`|^\s*[⎿↳└├☐☒◻◼□■✓✔]`,
-  String.raw`|^\s*(?:\d+\s+)?(?:queued|messages? queued)\b`,
-  String.raw`|^\s*(?:tip|hint)\b`,
-  String.raw`|^\s*[•*]?\s*messages? to be submitted\b`,
-  String.raw`|^\s*…\s*\+\d+\s+\w`,
-  String.raw`|^\s*(?:SWE-[\w.-]+(?:\s+\w+)?\s+)?Context:?\s*\d`,
-].join(''), 'iu');
 // A todo list of nine rows or more pushes a live Claude spinner out of the last 14 rows
 // (inc-a579fa590ed8). A spinner up to WIDE_ROWS back still counts when only companion or
 // wrapped rows sit between it and the input row below it.
@@ -394,22 +370,6 @@ const noOutputToolBlock = (lines) => {
   return lines.slice(Math.max(0, top - 1), at + 1);
 };
 
-const ELAPSED_HOURS = new RegExp([
-  String.raw`(\d+)`,
-  'h',
-].join(''));
-const ELAPSED_MINUTES = new RegExp([
-  String.raw`(\d+)m`,
-  String.raw`\b`,
-].join(''));
-const FRAME_RAIL_PREFIX = new RegExp([
-  String.raw`^\s*[│┃]`,
-  String.raw`\s?`,
-].join(''), 'u');
-const FRAME_RAIL_SUFFIX = new RegExp([
-  String.raw`\s*[│┃]`,
-  String.raw`\s*$`,
-].join(''), 'u');
 export function classifyAgentScreen(screen, { stagedPattern = DEFAULT_STAGED_PATTERN, sentText = null, provider = null, draft = null } = {}) {
   // The input box's draft (Orca `terminal read` draft) is read where the agent shows it: a wake or a
   // contract left unsubmitted there is staged input, not an empty prompt (frameWithDraft).
@@ -446,36 +406,8 @@ export function classifyAgentScreen(screen, { stagedPattern = DEFAULT_STAGED_PAT
   // own prose: a yield summary headed "Running now:" once read as activity,
   // and both the watchdog and the report wake skipped a Kernel that sat at its
   // prompt with a filed report.
-  // Status words are matched case-sensitively: a spinner writes "Working",
-  // "Thinking", "Running"; a wrapped prose line that starts with "running."
-  // (a Collab Kernel yield summary) is not one.
-  const statusWord = new RegExp([
-    String.raw`(?:^|\n)\s*[•*○◦]?\s*(?:Working|Thinking|Running)`,
-    String.raw`\b(?!\s*:|\s+now\b|[^\n]*:[ \t]*(?:\n|$))`,
-  ].join(''));
-  // Claude Code 2.1.280 spins with a star glyph and a random gerund plus a
-  // timer ("✶ Osmosing… (1m 0s · ↓ 2.7k tokens)") and no "esc to interrupt";
-  // without this marker a working Claude kernel read turn-idle and every
-  // watchdog wake landed in its queued-message box.
-  // Any Claude spinner row counts, not only the timed one: a hook spinner
-  // ("✢ Transmuting… (running PreToolUse hook · 1m 26s · …)") and a todo
-  // activeForm spinner ("✽ Reading owned records… (…)") read turn-idle, so
-  // status called working ops nudge-ready (inc-dd8b95e58762, inc-5d6556105a98).
-  // The star glyphs need only the ellipsis ("✻ Brewed for 1m 3s", a finished
-  // turn, has none); "·" and "*" double as bullets, so they also need "(".
-  // A tool call still executing ("⎿  Running…", a Bash row offering
-  // "(ctrl+b to run in background)") is active too (inc-a579fa590ed8).
-  const activeMarker = new RegExp([
-    'esc (?:twice )?to (?:interrupt|cancel)',
-    '|background terminal running',
-    String.raw`|\(ctrl\+b to run in background\)`,
-    String.raw`|(?:^|\n)[^\n]*[⠀-⣿][^\n]*\d`,
-    String.raw`|(?:^|\n)\s*[✶✻✳✢✽✺]\s+\S[^\n]*?…`,
-    String.raw`|(?:^|\n)\s*[·*]\s+\S[^\n]*?…\s*\(`,
-    String.raw`|(?:^|\n)\s*⎿\s+Running\b[^\n]*…`,
-  ].join(''), 'i');
   // A card's busyPatterns and chromePatterns read one row at a time.
-  const active = { test: (text) => statusWord.test(text) || activeMarker.test(text) || card.busy.some((pattern) => pattern.test(text)) };
+  const active = { test: (text) => STATUS_WORD.test(text) || ACTIVE_MARKER.test(text) || card.busy.some((pattern) => pattern.test(text)) };
   const companion = (line) => SPINNER_COMPANION.test(line) || card.chrome.some((pattern) => pattern.test(line));
   // The prompt row may contain a provider message (for example Orca's
   // "You have orchestration messages") rather than "Ask ...". Any non-empty
