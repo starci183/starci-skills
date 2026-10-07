@@ -37,7 +37,9 @@ export default {
     const undeclaredNote = undeclared.length ? `; undeclared running workflow(s) with peers: ${undeclared.join(', ')}` : '';
     const summaryOf = (wf) => {
       if (wf.declared) return wf.none ? 'declared none' : `owns ${wf.owns.join(', ') || '-'}; needs ${wf.needs.join(', ') || '-'}`;
-      return wf.peers ? `UNDECLARED (${wf.required ? 'required' : 'advised'})` : 'no running peers';
+      if (!wf.peers) return 'no running peers';
+      const requirement = wf.required ? 'required' : 'advised';
+      return `UNDECLARED (${requirement})`;
     };
     emit(out, [
       `foundations: ${rows.length} registered${undeclaredNote}`,
