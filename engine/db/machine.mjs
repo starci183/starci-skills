@@ -377,6 +377,14 @@ function ledgerMetaOf(file) {
 }
 const repoKey = (root) => path.resolve(String(root)).replaceAll('\\', '/').replace(/^[a-z]:/, (d) => d.toUpperCase());
 export const repoKeyOf = repoKey;
+// The live registry also refuses a repository under the OS temp directory (a repro or test run outside the isolated
+// registry would leave a junk workflow in the harness UI): typed refusal, nothing written.
+const tempRepoRefusal = (m, ledgerId, root) => (m.live && root && isUnderTempDir(String(root), { env: m.env, tempDirs: m.tempDirs })
+  ? { ledgerId, registered: false, code: 'STARCI_REGISTRY_TEMP_REPO',
+    refused: `registry-temp-repo: repo_root ${repoKey(root)} is under the OS temp directory and ${m.file} is the live registry; set ${TEST_REGISTRY_ENV}` } : null);
+const ledgerRefresh = (existing, { target, at, name, repoRoot, product, schemaVersion }) => ({ file: target, seen_at: at, ...(name ? { name } : {}), ...(repoRoot ? { repo_root: repoKey(repoRoot) } : {}),
+  ...(product ? { product } : {}), ...(schemaVersion != null ? { schema_version: int(schemaVersion) } : {}),
+  ...(existing.state === 'retired' ? {} : { state: 'active' }) });
 /**
  * Register (or refresh) a ledger. `ledgerId` is the ledger's own meta.ledger_id. A new row needs name and repoRoot;
  * `file` defaults to projectLedgerFile(ledgerId). The live registry refuses a ledger file under the OS temp directory
@@ -387,11 +395,6 @@ function registerLedger(m, { ledgerId, name = null, repoRoot = null, file = null
   const target = path.resolve(file ?? projectLedgerFile(ledgerId, m.env));
   if (m.live && isUnderTempDir(target, { env: m.env, tempDirs: m.tempDirs }))
     return { ledgerId, registered: false, refused: `registry-temp-ledger: ${target} is under the OS temp directory and ${m.file} is the live registry; set ${TEST_REGISTRY_ENV}` };
-  // The live registry also refuses a repository under the OS temp directory (a repro or test run outside the isolated
-  // registry would leave a junk workflow in the harness UI): typed refusal, nothing written.
-  const tempRepo = (root) => (m.live && root && isUnderTempDir(String(root), { env: m.env, tempDirs: m.tempDirs })
-    ? { ledgerId, registered: false, code: 'STARCI_REGISTRY_TEMP_REPO',
-      refused: `registry-temp-repo: repo_root ${repoKey(root)} is under the OS temp directory and ${m.file} is the live registry; set ${TEST_REGISTRY_ENV}` } : null);
   // A ledger opened by its writer names itself: repo_root / product come from its own meta when not given.
   const insertLedger = (db, at) => { if (!repoRoot) { const own = ledgerMetaOf(target); repoRoot = own.repo_root ?? null; product = product ?? own.product ?? null; }
     name = name ?? (repoRoot ? path.basename(path.resolve(repoRoot)) : null);
@@ -401,13 +404,10 @@ function registerLedger(m, { ledgerId, name = null, repoRoot = null, file = null
   return m.transaction((db) => {
     const at = m.now();
     const existing = db.prepare('SELECT * FROM ledgers WHERE ledger_id=?').get(ledgerId);
-    const refusedRepo = tempRepo(repoRoot ?? (existing ? null : ledgerMetaOf(target).repo_root ?? null));
+    const refusedRepo = tempRepoRefusal(m, ledgerId, repoRoot ?? (existing ? null : ledgerMetaOf(target).repo_root ?? null));
     if (refusedRepo) return refusedRepo;
-    if (existing) {
-      updateRow(db, 'ledgers', { file: target, seen_at: at, ...(name ? { name } : {}), ...(repoRoot ? { repo_root: repoKey(repoRoot) } : {}),
-        ...(product ? { product } : {}), ...(schemaVersion != null ? { schema_version: int(schemaVersion) } : {}),
-        ...(existing.state === 'retired' ? {} : { state: 'active' }) }, { ledger_id: ledgerId });
-    } else {
+    if (existing) updateRow(db, 'ledgers', ledgerRefresh(existing, { target, at, name, repoRoot, product, schemaVersion }), { ledger_id: ledgerId });
+    else {
       const refusedInsert = insertLedger(db, at);
       if (refusedInsert) return refusedInsert;
     }
