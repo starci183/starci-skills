@@ -140,11 +140,11 @@ const scratchNote = tr("the op's scratch directory (starci-job-scratch) is delet
 // A trailing " [code-tag]" stripped off a line without a backtracking regex.
 const stripTrailTag = (text) => {
   const s = String(text);
-  const end = s.replace(/\s+$/, '');
+  const end = s.trimEnd();
   if (!end.endsWith(']')) return s;
   const open = end.lastIndexOf('[');
   if (open < 0 || !/^[A-Z][A-Z0-9_]+$/.test(end.slice(open + 1, -1))) return s;
-  return end.slice(0, open).replace(/\s+$/, '');
+  return end.slice(0, open).trimEnd();
 };
 
 /** The one-line human reading of a red check: its first refused line without absolute paths, else its evidence. */
