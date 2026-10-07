@@ -341,6 +341,7 @@ export function decisionsOf(db, workflowId) {
 const q = (s) => (/[\s,;"'[\]()]/.test(String(s)) ? `"${String(s).replaceAll('"', '\\"')}"` : String(s));
 const actionKey = (...parts) => parts.join(':'), reasonSuffixOf = (item) => item.reason ? ` [${item.reason}]` : '', openCountSuffixOf = (cluster) => cluster.open !== cluster.count ? ` (${cluster.open} open)` : '';
 const act = (key, tier, cause, unblocks, title, command, expected) => ({ key, tier, cause, unblocks, title, command, expected });
+const repointCommandOf = (files, nextUnits, api, base) => { if (!files.length) return `${api} status ${base} --json   (read importsBroken.brokenFiles, then: ${api} graph-edit ${base} --edit wire --op code.refactor --paths <them> --before <the next queued units> --decision <id>)`; const paths = q(files.slice(0, 60).join(',')); let before = ''; if (nextUnits.length) before = ` --before ${nextUnits.join(',')}`; return `${api} graph-edit ${base} --edit wire --op code.refactor --paths ${paths}${before} --decision <id>`; };
 
 /** The settle verdict an unsettled report's outcome maps to for starci kernel settle --verdict. */
 const settleVerdictOf = (it) => {
@@ -366,9 +367,7 @@ const repointAct = ({ importsBroken, brokenCluster, units, queuedOf, N, api, bas
     importsBroken
       ? `enqueue ONE repoint unit owning the ${importsBroken.files} file(s) whose ${importsBroken.count} import(s) resolve to nothing (IMPORTS_BROKEN_AFTER_MOVE): repoint imports to the new locations; no other change`
       : `${brokenCluster.open} unit(s) failed on an unresolved import: enqueue ONE repoint unit owning the importers of the moved paths`,
-    files.length
-      ? `${api} graph-edit ${base} --edit wire --op code.refactor --paths ${q(files.slice(0, 60).join(','))}${nextUnits.length ? ' --before ' + nextUnits.join(',') : ''} --decision <id>`
-      : `${api} status ${base} --json   (read importsBroken.brokenFiles, then: ${api} graph-edit ${base} --edit wire --op code.refactor --paths <them> --before <the next queued units> --decision <id>)`,
+    repointCommandOf(files, nextUnits, api, base),
     'the importers point at the moved code; importsBroken clears and later checkers stop failing on the old paths');
 };
 // 1. parallelism: the cheapest, most certain win.
