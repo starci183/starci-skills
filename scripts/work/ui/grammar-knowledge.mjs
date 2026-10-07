@@ -1,11 +1,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import module from 'node:module';
 import { isMain } from '../../lib/is-main.mjs';
+import { eachInOrder } from '../../lib/in-order.mjs';
 import {parseYaml} from '../../../engine/yaml.mjs';
 import {sha256File} from '../../../engine/digest.mjs';
-import {slash} from '../../lib/path-key.mjs';
 import {skillRoot} from '../../../engine/runtime-root.mjs'; import { byCodeUnit } from '../../lib/list.mjs';
+import {cssDeclarations,cssReads,lexSource,read,uniq} from './grammar-knowledge-lex.mjs';
+import {censusRenderers,registryNames,ruleCatalog} from './grammar-knowledge-renderers.mjs';
+import {censusCommonTokens,censusFamilyTokens,loadDnaModule,shippedCss} from './grammar-knowledge-tokens.mjs';
 
 /**
  * The grammar knowledge snapshots (`knowledge/grammars/<family>/DNA.yaml`) are measurements of
@@ -20,7 +22,10 @@ import {skillRoot} from '../../../engine/runtime-root.mjs'; import { byCodeUnit 
  *
  * Nothing here builds, installs or renders: every measurement is a static read of the package source,
  * and the DNA modules are loaded by stripping their TypeScript types (Node's own `stripTypeScriptTypes`).
+ * The source readers live in grammar-knowledge-lex.mjs, the renderer census in grammar-knowledge-renderers.mjs
+ * and the token census with the DNA loader in grammar-knowledge-tokens.mjs.
  */
+export {cssDeclarations,cssReads,lexSource,loadDnaModule,registryNames,ruleCatalog};
 const GRAMMAR_KNOWLEDGE_CHECK='starci/grammar-knowledge-check@1';
 
 /** The families whose snapshot this check owns, and where each one's source and DNA module live. */
@@ -30,499 +35,8 @@ export const GRAMMAR_FAMILIES=Object.freeze([
   Object.freeze({knowledge:'offset-pop',source:'offset-pop',dnaModule:'src/offset-pop/dna.ts',root:'OffsetPopGrammarRoot',tokenPrefix:'--offset-pop-'}),
 ]);
 
-const read=file=>fs.readFileSync(file,'utf8');
-const lineAt=(text,offset)=>{let line=1;for(let i=0;i<offset&&i<text.length;i++){if(text.codePointAt(i)===10)line++;}return line;};
-const uniq=values=>[...new Set(values)];
-const byName=(a,b)=>{if(a<b){return -1;}if(a>b){return 1;}return 0;};
-
 function defaultPaths(root=skillRoot){
   return {root,packageRoot:path.join(root,'packages','grammar'),grammarRoot:path.join(root,'knowledge','grammars')};
-}
-
-// ---------------------------------------------------------------------------
-// Source lexing: comments blanked (offsets kept), string literals collected.
-// ---------------------------------------------------------------------------
-
-/**
- * A small TS/TSX lexer. Comments become spaces (newlines kept, so offsets and lines survive); every
- * single-, double-quoted and template string chunk is returned with its offset. A quote that does not
- * close on its own line is JSX text (an apostrophe), not a string, and is left as code.
- */
-export function lexSource(source){
-  const out=source.split('');
-  const strings=[];
-  const blank=(from,to)=>{for(let k=from;k<to;k++)if(out[k]!=='\n'&&out[k]!=='\r')out[k]=' ';};
-  const templateDepth=[];
-  let i=0;
-  const n=source.length;
-  const scanTemplate=start=>{
-    let j=start,chunk='',chunkStart=start;
-    while(j<n){
-      const c=source[j];
-      if(c==='\\'){chunk+=source.slice(j,j+2);j+=2;continue;}
-      if(c==='`'){strings.push({value:chunk,start:chunkStart});return {end:j+1,open:false};}
-      if(c==='$'&&source[j+1]==='{'){strings.push({value:chunk,start:chunkStart});return {end:j+2,open:true};}
-      chunk+=c;j++;
-    }
-    strings.push({value:chunk,start:chunkStart});return {end:n,open:false};
-  };
-  let braces=0;
-  while(i<n){
-    const c=source[i];
-    if(c==='/'&&source[i+1]==='/'){const end=source.indexOf('\n',i);const stop=end<0?n:end;blank(i,stop);i=stop;continue;}
-    if(c==='/'&&source[i+1]==='*'){const end=source.indexOf('*/',i+2);const stop=end<0?n:end+2;blank(i,stop);i=stop;continue;}
-    if(c==='"'||c==='\''){
-      let j=i+1,value='',closed=false;
-      while(j<n&&source[j]!=='\n'){
-        if(source[j]==='\\'){value+=source.slice(j,j+2);j+=2;continue;}
-        if(source[j]===c){closed=true;break;}
-        value+=source[j];j++;
-      }
-      if(closed){strings.push({value,start:i});i=j+1;continue;}
-      i++;continue;
-    }
-    if(c==='`'){
-      const result=scanTemplate(i+1);
-      if(result.open){templateDepth.push(braces);braces++;}
-      i=result.end;continue;
-    }
-    if(c==='{'){braces++;i++;continue;}
-    if(c==='}'){
-      braces--;
-      if(templateDepth.length&&templateDepth.at(-1)===braces){
-        templateDepth.pop();
-        const result=scanTemplate(i+1);
-        if(result.open){templateDepth.push(braces);braces++;}
-        i=result.end;continue;
-      }
-      i++;continue;
-    }
-    i++;
-  }
-  return {code:out.join(''),strings};
-}
-
-/** CSS with every comment blanked, offsets and lines kept. */
-function stripCssComments(css){
-  return css.replace(/\/\*[\s\S]*?\*\//g,match=>match.replace(/[^\n\r]/g,' '));
-}
-
-/**
- * Every declaration in a stylesheet with the stack of block preludes it sits in
- * (`@layer x`, `@media (...)`, the rule's selector list), its custom-property name and its value.
- */
-export function cssDeclarations(css){
-  const code=stripCssComments(css);
-  const declarations=[];
-  const stack=[];
-  let segmentStart=0;
-  let depthParen=0;
-  for(let i=0;i<code.length;i++){
-    const c=code[i];
-    if(c==='(')depthParen++;
-    else if(c===')')depthParen=Math.max(0,depthParen-1);
-    else if(depthParen)continue;
-    else if(c==='{'){stack.push(code.slice(segmentStart,i).replace(/\s+/g,' ').trim());segmentStart=i+1;}
-    else if(c==='}'||c===';'){
-      const text=code.slice(segmentStart,i);
-      const match=/^\s*(--[A-Za-z0-9_-]+)\s*:([\s\S]*)$/.exec(text);
-      if(match&&stack.length&&!stack.at(-1).startsWith('@')){
-        const offset=segmentStart+text.indexOf(match[1]);
-        declarations.push({name:match[1],value:match[2].replace(/\s+/g,' ').trim(),context:[...stack],line:lineAt(code,offset)});
-      }
-      if(c==='}')stack.pop();
-      segmentStart=i+1;
-    }
-  }
-  return declarations;
-}
-
-/** Every `var(--name[, fallback])` read in a stylesheet, fallback kept verbatim (whitespace collapsed). */
-export function cssReads(css){
-  const code=stripCssComments(css);
-  const reads=[];
-  const pattern=/var\(\s*(--[A-Za-z0-9_-]+)\s*(,)?/g;
-  let match;
-  while((match=pattern.exec(code))){
-    let fallback=null;
-    if(match[2]){
-      let depth=1,j=pattern.lastIndex;
-      const start=j;
-      while(j<code.length&&depth){if(code[j]==='('){depth++;}else if(code[j]===')'){depth--;}j++;}
-      fallback=code.slice(start,j-1).replace(/\s+/g,' ').trim();
-    }
-    reads.push({name:match[1],fallback,line:lineAt(code,match.index)});
-  }
-  return reads;
-}
-
-/** A stylesheet and the relative sheets it `@import`s, in cascade order, with no repeats. */
-function stylesheetSet(entry,{include=()=>true}={}){
-  const seen=[];
-  const visit=file=>{
-    if(seen.includes(file))return;
-    const text=stripCssComments(read(file));
-    const imports=[...text.matchAll(/@import\s+["']([^"']+)["']\s*;/g)].map(m=>path.resolve(path.dirname(file),m[1]));
-    for(const imported of imports)if(include(imported))visit(imported);
-    seen.push(file);
-  };
-  visit(entry);
-  return seen;
-}
-
-// ---------------------------------------------------------------------------
-// The Common renderer registry.
-// ---------------------------------------------------------------------------
-
-const exportStatements=source=>[...lexSource(source).code.matchAll(/export\s*\{([^}]*)\}\s*from\s*["']([^"']+)["']/g)]
-  .map(m=>({names:m[1].split(',').map(part=>part.trim()).filter(Boolean),from:m[2]}));
-
-const resolveModule=(fromFile,specifier)=>{
-  const base=path.resolve(path.dirname(fromFile),specifier.replace(/\.js$/,''));
-  return ['.tsx','.ts','/index.tsx','/index.ts'].map(ext=>base+ext).find(candidate=>fs.existsSync(candidate))??null;
-};
-
-/** The names `COMMON_GRAMMAR_COMPONENTS` holds, with the frozen group maps it spreads resolved. */
-export function registryNames(packageRoot){
-  const commonDir=path.join(packageRoot,'src','common');
-  const registry=lexSource(read(path.join(commonDir,'registry.tsx'))).code;
-  const body=/COMMON_GRAMMAR_COMPONENTS\s*=\s*Object\.freeze\(\{([\s\S]*?)\}\s*as const\)/.exec(registry);
-  if(!body)throw new Error('COMMON_GRAMMAR_COMPONENTS was not found in src/common/registry.tsx');
-  const names=[];
-  const groups=[];
-  for(const part of body[1].split(',').map(item=>item.trim()).filter(Boolean)){
-    const spread=/^\.\.\.([A-Z0-9_]+)$/.exec(part);
-    if(!spread){names.push({name:part,group:'base'});continue;}
-    const file=fs.readdirSync(commonDir).filter(name=>/^renderers-.+\.ts$/.test(name))
-      .map(name=>path.join(commonDir,name)).find(candidate=>new RegExp(String.raw`export const ${spread[1]}\b`).test(read(candidate)));
-    if(!file)throw new Error(`${spread[1]} is spread into COMMON_GRAMMAR_COMPONENTS but no renderers-*.ts defines it`);
-    const group=/renderers-(.+)\.ts$/.exec(file)[1];
-    groups.push({group,map:spread[1],file:slash(path.relative(packageRoot,file))});
-    const map=new RegExp(String.raw`export const ${spread[1]}\s*=\s*Object\.freeze\(\{([\s\S]*?)\}\s*as const\)`).exec(lexSource(read(file)).code);
-    for(const name of map[1].split(',').map(item=>item.trim()).filter(Boolean))names.push({name,group});
-  }
-  return {names,groups};
-}
-
-/** Every value the Common barrel files re-export, mapped to the module file and the props type beside it. */
-function barrelExports(packageRoot){
-  const commonDir=path.join(packageRoot,'src','common');
-  const files=['renderers.ts',...fs.readdirSync(commonDir).filter(name=>/^renderers-.+\.ts$/.test(name)).sort()];
-  const exported=new Map();
-  for(const name of files){
-    const file=path.join(commonDir,name);
-    for(const statement of exportStatements(read(file))){
-      const moduleFile=resolveModule(file,statement.from);
-      const types=new Set(statement.names.filter(part=>part.startsWith('type ')).map(part=>part.slice(5).trim()));
-      for(const part of statement.names.filter(item=>!item.startsWith('type '))){
-        const value=part.split(/\s+as\s+/).pop().trim();
-        exported.set(value,{moduleFile,propsType:types.has(`${value}Props`)?`${value}Props`:null,barrel:name});
-      }
-    }
-  }
-  return exported;
-}
-
-const RULE_ID=/^[A-Z][A-Z0-9]*(?:-[A-Z][A-Z0-9]*)*-(?:\d+|AUTO)$/;
-
-/** The canonical rule ids and the prefixes they use, from the generated catalog. */
-export function ruleCatalog(packageRoot){
-  const text=read(path.join(packageRoot,'src','common','rule-catalog.generated.ts'));
-  const ids=uniq([...text.matchAll(/"([A-Z][A-Z0-9-]*-\d+)"/g)].map(m=>m[1]));
-  const prefixes=new Set(ids.map(id=>id.replace(/-\d+$/,'')));
-  return {ids,prefixes};
-}
-
-const CLASS_LITERAL=/(?<![\w-])((?:starci-core|grammar)-[a-z0-9]+(?:-[a-z0-9]+)*(?:--[a-z0-9]+(?:-[a-z0-9]+)*)?)(?![\w-])/g;
-const classesIn=value=>[...value.matchAll(CLASS_LITERAL)].map(m=>m[1]);
-
-/** The text of one top-level exported declaration: from its line to the next top-level `export`. */
-function declarationText(code,name){
-  const start=new RegExp(String.raw`^export\s+(?:const|function|let|class)\s+${name}\b`,'m').exec(code);
-  if(!start)return null;
-  const rest=code.slice(start.index+1);
-  const next=/^export\s/m.exec(rest);
-  return {start:start.index,end:next?start.index+1+next.index:code.length};
-}
-
-/** Imports of a module: value names only, with the resolved file. Bare (vendor) specifiers are skipped. */
-function valueImports(file,code){
-  const imports=[];
-  for(const m of code.matchAll(/import\s+(type\s+)?\{([^}]*)\}\s*from\s*["']([^"']+)["']/g)){
-    if(m[1]||!m[3].startsWith('.'))continue;
-    const target=resolveModule(file,m[3]);
-    if(!target)continue;
-    const names=m[2].split(',').map(part=>part.trim()).filter(part=>part&&!part.startsWith('type '))
-      .map(part=>part.split(/\s+as\s+/)[0].trim());
-    imports.push({target,names});
-  }
-  return imports;
-}
-
-/** Literal union aliases (`type X = "a" | "b"`) declared across the package source. */
-function literalAliases(files){
-  const aliases=new Map();
-  for(const file of files){
-    for(const m of read(file).matchAll(/^(?:export\s+)?type\s+([A-Z]\w*)\s*=\s*((?:"[^"]*"|\d+)(?:\s*\|\s*(?:"[^"]*"|\d+))*)\s*$/gm)){
-      aliases.set(m[1],{file,values:literalValues(m[2])});
-    }
-  }
-  return aliases;
-}
-const literalValues=text=>text.split('|').map(part=>part.trim()).map(part=>part.startsWith('"')?part.slice(1,-1):part);
-const isLiteralUnion=text=>/^(?:"[^"]*"|\d+)(?:\s*\|\s*(?:"[^"]*"|\d+))*$/.test(text);
-
-/**
- * The closed values a renderer's props type publishes: every `readonly prop?: <closed type>` member of
- * the props type and of the local object types its declaration names (one level down, e.g. the
- * `ButtonBase & (DestinationButton | CommandButton)` members). A string/number literal union, or a
- * local alias of one, is listed as `values`; a closed alias imported from elsewhere in the package
- * is listed by `type` name.
- */
-function closedValuesOf(moduleFile,propsType,aliases){
-  if(!propsType)return [];
-  const lines=lexSource(read(moduleFile)).code.split(/\r?\n/);
-  const declarations=new Map();
-  for(let index=0;index<lines.length;index++){
-    const m=/^(?:export\s+)?type\s+(\w+)(?:<[^=]*>)?\s*=\s*(.*)$/.exec(lines[index]);
-    if(!m)continue;
-    const text=[m[2]];
-    let open=(m[2].match(/[{(]/g)??[]).length-(m[2].match(/[})]/g)??[]).length;
-    for(let j=index+1;j<lines.length&&(open>0||/^\s*[|&]/.test(lines[j]));j++){
-      text.push(lines[j]);
-      open+=(lines[j].match(/[{(]/g)??[]).length-(lines[j].match(/[})]/g)??[]).length;
-    }
-    declarations.set(m[1],text);
-  }
-  const visited=new Set();
-  const members=[];
-  const MEMBER=/readonly\s+(\w+)\??\s*:\s*((?:"[^"]*"|[^;{}"])+?)\s*(?=;|\}|,?\s*$)/g;
-  const collect=(name,depth)=>{
-    if(visited.has(name)||depth>4)return;
-    visited.add(name);
-    const text=declarations.get(name);
-    if(!text)return;
-    for(const line of text){
-      for(const member of line.matchAll(MEMBER)){
-        members.push({prop:member[1],type:member[2].trim()});
-        // A member typed as a local object type (an item record, say) publishes its own closed members.
-        const ref=/^([A-Z]\w*)(?:\s*\|\s*undefined)?$/.exec(member[2].trim());
-        if(ref&&/^\s*\{/.test(declarations.get(ref[1])?.[0]??''))collect(ref[1],depth+1);
-      }
-      const rest=line.replace(MEMBER,'').replace(/"[^"]*"/g,'');
-      for(const ref of rest.matchAll(/\b([A-Z]\w*)\b/g))collect(ref[1],depth+1);
-    }
-  };
-  collect(propsType,0);
-  const seen=new Set();
-  const closed=[];
-  const moduleDir=path.dirname(path.resolve(moduleFile));
-  for(const {prop,type} of members){
-    if(seen.has(prop))continue;
-    const cleaned=type.replace(/\s*\|\s*undefined$/,'').trim();
-    if(isLiteralUnion(cleaned)){seen.add(prop);closed.push({prop,values:literalValues(cleaned)});continue;}
-    if(!/^[A-Z]\w*$/.test(cleaned)||cleaned.endsWith('Props'))continue;
-    const alias=aliases.get(cleaned);
-    if(alias&&path.dirname(path.resolve(alias.file))===moduleDir){seen.add(prop);closed.push({prop,values:alias.values});continue;}
-    if(alias||['IconSource','PresentationState'].includes(cleaned)){seen.add(prop);closed.push({prop,type:cleaned});}
-  }
-  return closed;
-}
-
-/** One renderer's census: kind, source, classes and rule ids, and closed prop values. */
-function censusRenderer({name,group},{packageRoot,exported,catalog,rendererNames,aliases}){
-  const entry=exported.get(name);
-  if(!entry?.moduleFile)throw new Error(`${name} is registered in COMMON_GRAMMAR_COMPONENTS but no Common barrel re-exports it`);
-  const moduleFile=entry.moduleFile;
-  const coreDir=path.join(packageRoot,'src','core');
-  const relative=slash(path.relative(coreDir,moduleFile));
-  const flat=!relative.includes('/');
-  const kind=flat?'core':relative.split('/')[0];
-  const moduleDir=path.dirname(moduleFile);
-  const ownFiles=flat?[moduleFile]:fs.readdirSync(moduleDir)
-    .filter(file=>/\.(tsx?|mts)$/.test(file)&&!/\.(spec|test)\./.test(file)).map(file=>path.join(moduleDir,file)).sort();
-  const classes=new Set();
-  const claims=new Set();
-  const computed=new Set();
-  const isRuleId=token=>RULE_ID.test(token)&&catalog.prefixes.has(token.replace(/-(?:\d+|AUTO)$/,''));
-  for(const file of ownFiles){
-    const {code,strings}=lexSource(read(file));
-    const literalAt=new Set();
-    for(const m of code.matchAll(/data-contract="([^"]*)"/g)){
-      literalAt.add(m.index+'data-contract='.length);
-      for(const token of m[1].split(/\s+/))if(isRuleId(token))claims.add(token);
-    }
-    for(const string of strings){
-      for(const cls of classesIn(string.value))classes.add(cls);
-      if(literalAt.has(string.start))continue;
-      for(const token of string.value.split(/[\s,]+/))if(isRuleId(token))computed.add(token);
-    }
-    // One hop: helpers (never other renderers) imported by name from another package module.
-    for(const {target,names} of valueImports(file,code)){
-      if(ownFiles.includes(target))continue;
-      const lexed=lexSource(read(target));
-      for(const imported of names){
-        if(rendererNames.has(imported))continue;
-        const span=declarationText(lexed.code,imported);
-        if(!span)continue;
-        for(const string of lexed.strings)if(string.start>=span.start&&string.start<span.end)for(const cls of classesIn(string.value))classes.add(cls);
-      }
-    }
-  }
-  return {
-    component:name,
-    propsType:entry.propsType,
-    kind,
-    group,
-    source:slash(path.relative(path.dirname(packageRoot),moduleFile)).replace(/^/,'packages/'),
-    closedValues:closedValuesOf(moduleFile,entry.propsType,aliases),
-    claims:[...claims].sort(byName),
-    computedClaims:[...computed].filter(id=>!claims.has(id)).sort(byName),
-    classes:[...classes].sort(byName),
-  };
-}
-
-const sourceFilesUnder=dir=>fs.readdirSync(dir,{withFileTypes:true}).flatMap(entry=>{
-  const full=path.join(dir,entry.name);
-  if(entry.isDirectory())return entry.name==='stories'||entry.name==='__test__'?[]:sourceFilesUnder(full);
-  return /\.(tsx?)$/.test(entry.name)&&!/\.(spec|test)\./.test(entry.name)?[full]:[];
-});
-
-/** The 95-renderer census (or however many the registry now holds). */
-function censusRenderers(packageRoot){
-  const {names,groups}=registryNames(packageRoot);
-  const exported=barrelExports(packageRoot);
-  const catalog=ruleCatalog(packageRoot);
-  const rendererNames=new Set(names.map(entry=>entry.name));
-  const aliases=literalAliases(sourceFilesUnder(path.join(packageRoot,'src')));
-  const renderers=names.map(entry=>censusRenderer(entry,{packageRoot,exported,catalog,rendererNames,aliases}))
-    .sort((a,b)=>byName(a.component,b.component));
-  return {renderers,groups,catalog};
-}
-
-// ---------------------------------------------------------------------------
-// Custom properties.
-// ---------------------------------------------------------------------------
-
-const rel=(packageRoot,file)=>`packages/grammar/${slash(path.relative(packageRoot,file))}`;
-
-/** Names written as inline styles by renderer source (`"--x": value`), with the writing component. */
-function inlineWrites(packageRoot,renderers){
-  const writes=new Map();
-  for(const renderer of renderers){
-    const file=path.join(path.dirname(packageRoot),renderer.source.replace(/^packages\//,''));
-    for(const m of lexSource(read(file)).code.matchAll(/["'](--[a-z0-9-]+)["']\s*:/g)){
-      if(!writes.has(m[1]))writes.set(m[1],new Set());
-      writes.get(m[1]).add(renderer.component);
-    }
-  }
-  return writes;
-}
-
-/**
- * Every custom property the Common entry's stylesheet set (`src/common/styles.css` and the sheets it
- * imports) names outside a comment: assigned by that set (value, distinct-value count, reads), written
- * inline by a renderer, or only read (with the first read's fallback).
- */
-function censusCommonTokens(packageRoot,renderers){
-  // The entry sheet is read first, then the sheets it imports: a name's first read (its reported
-  // fallback and source line) is the entry sheet's whenever the entry sheet reads it at all.
-  const entry=path.join(packageRoot,'src','common','styles.css');
-  const sheets=[entry,...stylesheetSet(entry).filter(sheet=>sheet!==entry)];
-  const assigned=new Map();
-  const reads=new Map();
-  for(const sheet of sheets){
-    const css=read(sheet);
-    for(const d of cssDeclarations(css)){
-      if(!assigned.has(d.name))assigned.set(d.name,[]);
-      assigned.get(d.name).push({...d,sheet});
-    }
-    for(const r of cssReads(css)){
-      if(!reads.has(r.name))reads.set(r.name,[]);
-      reads.get(r.name).push({...r,sheet});
-    }
-  }
-  const writes=inlineWrites(packageRoot,renderers);
-  const names=uniq([...assigned.keys(),...reads.keys()]).sort(byName);
-  const tokens=names.map(name=>{
-    const assigns=assigned.get(name)??[];
-    const uses=reads.get(name)??[];
-    if(assigns.length){
-      const first=assigns[0];
-      const distinct=uniq(assigns.map(a=>a.value));
-      return {name,value:first.value,...(distinct.length>1?{valueRules:distinct.length}:{}),assignedBy:'common',
-        ...(uses.length?{alsoReadBy:uses.length}:{}),source:`${rel(packageRoot,first.sheet)}:${first.line}`};
-    }
-    const first=uses[0];
-    const writer=writes.get(name);
-    return {name,assignedBy:(()=>{if(writer){return 'renderer';}if(name.startsWith('--starci-core-')){return 'family';}return 'host';})(),
-      ...(writer?{writtenBy:[...writer].sort(byName)}:{}),readBy:'common',
-      ...(first.fallback===null?{}:{commonFallback:first.fallback}),uses:uses.length,source:`${rel(packageRoot,first.sheet)}:${first.line}`};
-  });
-  return {tokens,sheets:sheets.map(sheet=>rel(packageRoot,sheet))};
-}
-
-const rootSelector=family=>`.grammar-common-root[data-grammar-family="${family}"]`;
-
-/**
- * The tokens one family's own sheets set on its root: the default (light) value, the explicit dark
- * theme value, and every other root-level override (narrow width, reduced motion, forced colours),
- * with the Common-read names in the family's namespace completed from Common's own value or fallback.
- */
-function censusFamilyTokens(packageRoot,family,{commonTokens=[],include=[]}={}){
-  const scope=rootSelector(family.source);
-  const sheets=stylesheetSet(path.join(packageRoot,'src',family.source,'styles.css'),
-    {include:file=>path.dirname(file)===path.join(packageRoot,'src',family.source)});
-  const rows=new Map();
-  for(const sheet of sheets){
-    for(const d of cssDeclarations(read(sheet))){
-      const selectors=d.context.at(-1).split(',').map(s=>s.trim());
-      const atRules=d.context.slice(0,-1).filter(p=>p.startsWith('@media')||p.startsWith('@supports'));
-      const onRoot=selectors.every(s=>s.startsWith(scope)&&!/\s/.test(s.slice(scope.length)));
-      if(!onRoot)continue;
-      const qualifiers=selectors.map(s=>s.slice(scope.length));
-      const qualifier=qualifiers.length===1?qualifiers[0]:qualifiers.map(item=>item||'(any)').join(' | ');
-      if(!rows.has(d.name))rows.set(d.name,{name:d.name,overrides:[]});
-      const row=rows.get(d.name);
-      if(!atRules.length&&qualifier===''){row.value=d.value;row.source=`${rel(packageRoot,sheet)}:${d.line}`;}
-      else if(!atRules.length&&qualifier==='[data-grammar-theme="dark"]')row.dark=d.value;
-      else row.overrides.push({context:[...atRules,qualifier].filter(Boolean).join(' '),value:d.value});
-    }
-  }
-  const common=new Map(commonTokens.map(token=>[token.name,token]));
-  for(const name of include){
-    if(rows.has(name))continue;
-    const token=common.get(name);
-    if(!token)continue;
-    rows.set(name,{name,value:token.value??token.commonFallback??null,valueFrom:(()=>{if(token.value!==undefined){return 'common';}if(token.assignedBy==='renderer'){return 'renderer';}return 'common-fallback';})(),
-      source:token.source,overrides:[]});
-  }
-  return [...rows.values()].map(row=>{
-    const out={name:row.name};
-    if(row.value!==undefined)out.value=row.value;
-    if(row.dark!==undefined)out.dark=row.dark;
-    out.valueFrom=row.valueFrom??'family';
-    if(row.overrides.length)out.overrides=row.overrides;
-    if(row.source)out.source=row.source;
-    return out;
-  }).sort((a,b)=>byName(a.name,b.name));
-}
-
-// ---------------------------------------------------------------------------
-// The DNA modules.
-// ---------------------------------------------------------------------------
-
-/** Loads a family's `dna.ts` by stripping its types; every exported frozen object is returned. */
-export async function loadDnaModule(file){
-  const source=read(file);
-  if(typeof module.stripTypeScriptTypes!=='function')throw new Error('this Node has no module.stripTypeScriptTypes (needs >= 22.13)');
-  const emit=process.emitWarning;
-  process.emitWarning=(warning,...rest)=>{if(!String(warning?.message??warning).includes('stripTypeScriptTypes'))emit.call(process,warning,...rest);};
-  let js;
-  try{js=module.stripTypeScriptTypes(source,{mode:'strip'});}finally{process.emitWarning=emit;}
-  if(/^\s*import\s/m.test(js))throw new Error(`${slash(file)} imports another module; the DNA module must stay self-contained`);
-  const exported=await import(`data:text/javascript;base64,${Buffer.from(js).toString('base64')}`);
-  return Object.fromEntries(Object.entries(exported).filter(([,value])=>value&&typeof value==='object'));
 }
 
 const plain=value=>JSON.parse(JSON.stringify(value));
@@ -535,21 +49,19 @@ export async function censusGrammar({packageRoot=defaultPaths().packageRoot}={})
   const pkg=JSON.parse(read(path.join(packageRoot,'package.json')));
   const {renderers,groups,catalog}=censusRenderers(packageRoot);
   const common=censusCommonTokens(packageRoot,renderers);
-  const shipped=['common','core','heritage','offset-pop'].flatMap(dir=>{
-    const full=path.join(packageRoot,'src',dir);
-    return fs.existsSync(full)?fs.readdirSync(full).filter(name=>name.endsWith('.css')).map(name=>stripCssComments(read(path.join(full,name)))):[];
-  }).join('\n');
-  const emitted=uniq(renderers.flatMap(r=>r.classes)).sort(byName);
+  const shipped=shippedCss(packageRoot);
+  const emitted=uniq(renderers.flatMap(r=>r.classes)).sort(byCodeUnit);
   const painted=emitted.filter(cls=>new RegExp('\\.'+cls.replaceAll('-','\\-')+'(?![\\w-])').test(shipped));
   const families={};
-  for(const family of GRAMMAR_FAMILIES.filter(f=>f.dnaModule)){
+  // One family at a time: loadDnaModule swaps the shared process.emitWarning while it strips types.
+  await eachInOrder(GRAMMAR_FAMILIES.filter(f=>f.dnaModule),async family=>{
     const dna=plain(await loadDnaModule(path.join(packageRoot,family.dnaModule)));
     const bandNames=Object.values(Object.entries(dna).find(([key])=>key.endsWith('BAND_TOKEN_NAMES'))?.[1]??{});
     const include=family.source==='core'
       ?common.tokens.map(t=>t.name).filter(name=>name.startsWith(family.tokenPrefix))
       :bandNames;
     families[family.knowledge]={dna,tokens:censusFamilyTokens(packageRoot,family,{commonTokens:common.tokens,include})};
-  }
+  });
   const assignedRows=common.tokens.filter(t=>t.assignedBy==='common');
   return {
     schema:GRAMMAR_KNOWLEDGE_CHECK,
@@ -589,36 +101,46 @@ function censusDigests(packageRoot,files){
 
 const q=value=>JSON.stringify(String(value));
 const key=value=>/^[A-Za-z_]\w*$/.test(value)?value:q(value);
-const scalar=value=>{if(typeof value==='number'||typeof value==='boolean'){return String(value);}if(value===null){return 'null';}return q(value);};
+const scalar=value=>{
+  if(typeof value==='number'||typeof value==='boolean')return String(value);
+  return value===null?'null':q(value);
+};
 const flow=list=>`[${list.map(q).join(', ')}]`;
+
+/** One entry of a nested plain object as block YAML at `pad`. */
+function yamlEntry(pad,name,value,indent){
+  if(value&&typeof value==='object'&&!Array.isArray(value))return `${pad}${key(name)}:\n${yamlObject(value,indent+2)}`;
+  return `${pad}${key(name)}: ${Array.isArray(value)?flow(value):scalar(value)}`;
+}
 
 /** A nested plain object as block YAML at `indent`. */
 function yamlObject(object,indent){
   const pad=' '.repeat(indent);
-  return Object.entries(object).map(([name,value])=>{if(value&&typeof value==='object'&&!Array.isArray(value)){return `${pad}${key(name)}:\n${yamlObject(value,indent+2)}`;}return `${pad}${key(name)}: ${Array.isArray(value)?flow(value):scalar(value)}`;}).join('\n');
+  return Object.entries(object).map(([name,value])=>yamlEntry(pad,name,value,indent)).join('\n');
+}
+
+function yamlClosedValues(closedValues){
+  if(!closedValues.length)return ['    closedValues: []'];
+  const lines=['    closedValues:'];
+  for(const c of closedValues){
+    lines.push(`      - prop: ${q(c.prop)}`);
+    lines.push(c.values?`        values: ${flow(c.values)}`:`        type: ${q(c.type)}`);
+  }
+  return lines;
+}
+
+function yamlRenderer(r,{closedValues,source}){
+  const lines=[`  - component: ${q(r.component)}`,`    propsType: ${r.propsType?q(r.propsType):'null'}`,`    kind: ${q(r.kind)}`,`    group: ${q(r.group)}`];
+  if(source)lines.push(`    source: ${q(r.source)}`);
+  if(closedValues)lines.push(...yamlClosedValues(r.closedValues));
+  lines.push(`    claims: ${flow(r.claims)}`,`    computedClaims: ${flow(r.computedClaims)}`);
+  if(r.classes.length)lines.push('    classes:',...r.classes.map(c=>`      - ${q(c)}`));
+  else lines.push('    classes: []');
+  return lines;
 }
 
 function yamlRenderers(renderers,{closedValues=false,source=true}={}){
-  const lines=['renderers:'];
-  for(const r of renderers){
-    lines.push(`  - component: ${q(r.component)}`,`    propsType: ${r.propsType?q(r.propsType):'null'}`,`    kind: ${q(r.kind)}`,`    group: ${q(r.group)}`);
-    if(source)lines.push(`    source: ${q(r.source)}`);
-    if(closedValues){
-      if(!r.closedValues.length)lines.push('    closedValues: []');
-      else{
-        lines.push('    closedValues:');
-        for(const c of r.closedValues){
-          lines.push(`      - prop: ${q(c.prop)}`);
-          if(c.values)lines.push(`        values: ${flow(c.values)}`);
-          else lines.push(`        type: ${q(c.type)}`);
-        }
-      }
-    }
-    lines.push(`    claims: ${flow(r.claims)}`,`    computedClaims: ${flow(r.computedClaims)}`);
-    if(!r.classes.length)lines.push('    classes: []');
-    else{lines.push('    classes:');for(const c of r.classes)lines.push(`      - ${q(c)}`);}
-  }
-  return lines.join('\n');
+  return ['renderers:',...renderers.flatMap(r=>yamlRenderer(r,{closedValues,source}))].join('\n');
 }
 
 function yamlCommonTokens(tokens){
@@ -649,26 +171,36 @@ function yamlFamilyTokens(tokens){
   return lines.join('\n');
 }
 
+/** The end of a block that starts at `start` and stops before `next`, without its blank tail. */
+function trimBlankTail(lines,start,next){
+  let end=next<0?lines.length:next;
+  while(end>start+1&&lines[end-1].trim()==='')end--;
+  return end;
+}
+
+/** The line range [start, end) of the top-level `name:` block. */
+function topLevelRange(lines,name){
+  const start=lines.findIndex(line=>line.startsWith(`${name}:`));
+  if(start<0)throw new Error(`no top-level \`${name}:\` block`);
+  return {start,end:trimBlankTail(lines,start,lines.findIndex((line,i)=>i>start&&/^[A-Za-z]/.test(line)))};
+}
+
+/** The line range [start, end) of the block nested two spaces under the top-level `parent:`. */
+function nestedRange(lines,name,parent){
+  const top=lines.findIndex(line=>line.startsWith(`${parent}:`));
+  if(top<0)throw new Error(`no top-level \`${parent}:\` block`);
+  const start=lines.findIndex((line,i)=>i>top&&line.startsWith(`  ${name}:`));
+  if(start<0)throw new Error(`no \`${parent}.${name}\` block`);
+  return {start,end:trimBlankTail(lines,start,lines.findIndex((line,i)=>i>start&&(!/^(\s{3,}|\s*$)/.test(line)||/^\S/.test(line))))};
+}
+
 /**
  * Replace one top-level block (`name:` at column 0 through the line before the next column-0 key) or,
  * with `parent`, one block nested two spaces under a top-level key.
  */
 export function replaceBlock(text,name,replacement,{parent=null}={}){
   const lines=text.split('\n');
-  let start=-1,end=lines.length;
-  if(parent===null){
-    start=lines.findIndex(line=>line.startsWith(`${name}:`));
-    if(start<0)throw new Error(`no top-level \`${name}:\` block`);
-    for(let i=start+1;i<lines.length;i++)if(/^[A-Za-z]/.test(lines[i])){end=i;break;}
-    while(end>start+1&&lines[end-1].trim()==='')end--;
-  }else{
-    const top=lines.findIndex(line=>line.startsWith(`${parent}:`));
-    if(top<0)throw new Error(`no top-level \`${parent}:\` block`);
-    start=lines.findIndex((line,i)=>i>top&&line.startsWith(`  ${name}:`));
-    if(start<0)throw new Error(`no \`${parent}.${name}\` block`);
-    for(let i=start+1;i<lines.length;i++)if(!/^(\s{3,}|\s*$)/.test(lines[i])||/^\S/.test(lines[i])){end=i;break;}
-    while(end>start+1&&lines[end-1].trim()==='')end--;
-  }
+  const {start,end}=parent===null?topLevelRange(lines,name):nestedRange(lines,name,parent);
   return [...lines.slice(0,start),...replacement.split('\n'),...lines.slice(end)].join('\n');
 }
 
@@ -678,6 +210,17 @@ export function replaceBlock(text,name,replacement,{parent=null}={}){
 
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 const readYaml=file=>parseYaml(read(file));
+
+/** The drift of one renderer's measured fields against its snapshot row. */
+function rendererFieldFindings(file,r,row,closedValues){
+  const findings=[];
+  for(const field of ['propsType','kind','group','claims','computedClaims','classes',...(closedValues?['closedValues']:[])]){
+    const expected=r[field]??null;
+    const actual=row[field]??(Array.isArray(expected)?[]:null);
+    if(!same(actual,expected))findings.push({file,what:`renderers.${r.component}.${field}`,detail:`snapshot ${JSON.stringify(actual)} but source ${JSON.stringify(expected)}`});
+  }
+  return findings;
+}
 
 function compareRenderers(findings,file,snapshot,renderers,{closedValues}){
   const rows=Array.isArray(snapshot.renderers)?snapshot.renderers:[];
@@ -689,12 +232,7 @@ function compareRenderers(findings,file,snapshot,renderers,{closedValues}){
   if(extra.length)findings.push({file,what:'renderers',detail:`lists ${extra.length} renderer(s) the registry no longer holds: ${extra.join(', ')}`});
   for(const r of renderers){
     const row=rows.find(entry=>entry.component===r.component);
-    if(!row)continue;
-    for(const field of ['propsType','kind','group','claims','computedClaims','classes',...(closedValues?['closedValues']:[])]){
-      const expected=r[field]??null;
-      const actual=row[field]??(Array.isArray(expected)?[]:null);
-      if(!same(actual,expected))findings.push({file,what:`renderers.${r.component}.${field}`,detail:`snapshot ${JSON.stringify(actual)} but source ${JSON.stringify(expected)}`});
-    }
+    if(row)findings.push(...rendererFieldFindings(file,r,row,closedValues));
   }
 }
 
@@ -711,51 +249,61 @@ function compareTokens(findings,file,snapshot,tokens,fields){
   for(const name of rows.keys())findings.push({file,what:'tokens',detail:`lists ${name}, which the source no longer names`});
 }
 
-/**
- * Every drift between the grammar knowledge snapshots and the package source. Line positions, use
- * counts and digests are pointers, not facts, so they are refreshed by `--write` but never reported.
- */
-export async function checkGrammarKnowledge({packageRoot=defaultPaths().packageRoot,grammarRoot=defaultPaths().grammarRoot,census=null}={}){
-  const measured=census??await censusGrammar({packageRoot});
-  const findings=[];
-  const version=(file,doc)=>{
-    for(const at of [['provenance','version'],['identity','version']]){
-      const value=doc?.[at[0]]?.[at[1]];
-      if(value!==undefined&&value!==measured.version)findings.push({file,what:at.join('.'),detail:`snapshot ${value} but package ${measured.version}`});
-    }
-  };
-  const commonFile=path.join(grammarRoot,'common','DNA.yaml');
-  const common=readYaml(commonFile);
-  version('common/DNA.yaml',common);
+/** Key-order-insensitive canonical form, so a YAML mapping equals the module object it mirrors. */
+function canonical(value){
+  if(Array.isArray(value))return value.map(canonical);
+  if(value&&typeof value==='object')return Object.fromEntries(Object.keys(value).sort(byCodeUnit).map(k=>[k,canonical(value[k])]));
+  return value;
+}
+
+/** The package version a snapshot (or its index) states, against the measured one. */
+function versionFindings(findings,file,doc,measured){
+  for(const [parent,field] of [['provenance','version'],['identity','version']]){
+    const value=doc?.[parent]?.[field];
+    if(value!==undefined&&value!==measured.version)findings.push({file,what:`${parent}.${field}`,detail:`snapshot ${value} but package ${measured.version}`});
+  }
+}
+
+function compareCounts(findings,file,counts,expected){
+  for(const [name,value] of Object.entries(expected)){
+    if(counts[name]!==value)findings.push({file,what:`identity.counts.${name}`,detail:`snapshot ${counts[name]} but source ${value}`});
+  }
+}
+
+function compareDna(findings,file,family,dna,measured){
+  for(const [name,value] of Object.entries(measured)){
+    if(!same(canonical(dna[name]),canonical(value)))findings.push({file,what:`dna.${name}`,detail:`snapshot differs from ${family.dnaModule}`});
+  }
+  for(const name of Object.keys(dna))if(!(name in measured))findings.push({file,what:`dna.${name}`,detail:`${family.dnaModule} exports no ${name}`});
+}
+
+function checkCommonSnapshot(findings,grammarRoot,measured){
+  const common=readYaml(path.join(grammarRoot,'common','DNA.yaml'));
+  versionFindings(findings,'common/DNA.yaml',common,measured);
   compareRenderers(findings,'common/DNA.yaml',common,measured.renderers,{closedValues:false});
   compareTokens(findings,'common/DNA.yaml',common,measured.commonTokens,['value','valueRules','assignedBy','writtenBy','readBy','commonFallback']);
-  for(const [name,value] of Object.entries(measured.counts)){
-    if(common?.identity?.counts?.[name]!==value)findings.push({file:'common/DNA.yaml',what:`identity.counts.${name}`,detail:`snapshot ${common?.identity?.counts?.[name]} but source ${value}`});
-  }
-  if(common?.identity?.counts?.gaps!==(common.gaps??[]).length)findings.push({file:'common/DNA.yaml',what:'identity.counts.gaps',detail:`counts ${common?.identity?.counts?.gaps} but lists ${(common.gaps??[]).length}`});
-  for(const family of GRAMMAR_FAMILIES.filter(f=>f.dnaModule)){
-    const file=`${family.knowledge}/DNA.yaml`;
-    const full=path.join(grammarRoot,family.knowledge,'DNA.yaml');
-    if(!fs.existsSync(full)){findings.push({file,what:'file',detail:'the family has no DNA snapshot'});continue;}
-    const doc=readYaml(full);
-    version(file,doc);
-    const index=path.join(grammarRoot,family.knowledge,'index.yaml');
-    if(fs.existsSync(index))version(`${family.knowledge}/index.yaml`,readYaml(index));
-    compareRenderers(findings,file,doc,measured.renderers,{closedValues:true});
-    const census=measured.families[family.knowledge];
-    compareTokens(findings,file,doc,census.tokens,['value','dark','valueFrom','overrides']);
-    const dna=doc?.dna??{};
-    for(const [name,value] of Object.entries(census.dna)){
-      if(!same(canonical(dna[name]),canonical(value)))findings.push({file,what:`dna.${name}`,detail:`snapshot differs from ${family.dnaModule}`});
-    }
-    for(const name of Object.keys(dna))if(!(name in census.dna))findings.push({file,what:`dna.${name}`,detail:`${family.dnaModule} exports no ${name}`});
-    const counts=doc?.identity?.counts??{};
-    const expected={renderers:measured.renderers.length,tokens:census.tokens.length};
-    for(const [name,value] of Object.entries(expected))if(counts[name]!==value)findings.push({file,what:`identity.counts.${name}`,detail:`snapshot ${counts[name]} but source ${value}`});
-  }
-  const catalog=readYaml(path.join(grammarRoot,'index.yaml'));
-  const listed=new Set((catalog.families??[]).map(f=>f.id));
-  for(const family of GRAMMAR_FAMILIES)if(!listed.has(family.knowledge))findings.push({file:'index.yaml',what:'families',detail:`no \`${family.knowledge}\` family entry`});
+  const counts=common?.identity?.counts??{};
+  compareCounts(findings,'common/DNA.yaml',counts,measured.counts);
+  if(counts.gaps!==(common.gaps??[]).length)findings.push({file:'common/DNA.yaml',what:'identity.counts.gaps',detail:`counts ${counts.gaps} but lists ${(common.gaps??[]).length}`});
+}
+
+function checkFamilySnapshot(findings,family,grammarRoot,measured){
+  const file=`${family.knowledge}/DNA.yaml`;
+  const full=path.join(grammarRoot,family.knowledge,'DNA.yaml');
+  if(!fs.existsSync(full)){findings.push({file,what:'file',detail:'the family has no DNA snapshot'});return;}
+  const doc=readYaml(full);
+  versionFindings(findings,file,doc,measured);
+  const index=path.join(grammarRoot,family.knowledge,'index.yaml');
+  if(fs.existsSync(index))versionFindings(findings,`${family.knowledge}/index.yaml`,readYaml(index),measured);
+  compareRenderers(findings,file,doc,measured.renderers,{closedValues:true});
+  const census=measured.families[family.knowledge];
+  compareTokens(findings,file,doc,census.tokens,['value','dark','valueFrom','overrides']);
+  compareDna(findings,file,family,doc?.dna??{},census.dna);
+  compareCounts(findings,file,doc?.identity?.counts??{},{renderers:measured.renderers.length,tokens:census.tokens.length});
+}
+
+/** The catalog entries (`index.yaml`) that name a path that is not there. */
+function catalogPathFindings(findings,grammarRoot,catalog){
   for(const topic of catalog.topics??[]){
     if(!fs.existsSync(path.join(grammarRoot,topic.path)))findings.push({file:'index.yaml',what:`topics.${topic.id}`,detail:`${topic.path} does not exist`});
   }
@@ -764,17 +312,29 @@ export async function checkGrammarKnowledge({packageRoot=defaultPaths().packageR
       if(family[field]&&!fs.existsSync(path.join(grammarRoot,family[field])))findings.push({file:'index.yaml',what:`families.${family.id}.${field}`,detail:`${family[field]} does not exist`});
     }
   }
+}
+
+function checkCatalog(findings,grammarRoot,measured){
+  const catalog=readYaml(path.join(grammarRoot,'index.yaml'));
+  const listed=new Set((catalog.families??[]).map(f=>f.id));
+  for(const family of GRAMMAR_FAMILIES)if(!listed.has(family.knowledge))findings.push({file:'index.yaml',what:'families',detail:`no \`${family.knowledge}\` family entry`});
+  catalogPathFindings(findings,grammarRoot,catalog);
   const commonSummary=(catalog.topics??[]).find(t=>t.id==='common')?.summary??'';
   const stated=/\b(\d+) renderers\b/.exec(commonSummary);
   if(!stated||Number(stated[1])!==measured.renderers.length)findings.push({file:'index.yaml',what:'topics.common.summary',detail:`states ${stated?stated[1]:'no'} renderers but the registry holds ${measured.renderers.length}`});
-  return {schema:GRAMMAR_KNOWLEDGE_CHECK,ok:findings.length===0,version:measured.version,renderers:measured.renderers.length,findings};
 }
 
-/** Key-order-insensitive canonical form, so a YAML mapping equals the module object it mirrors. */
-function canonical(value){
-  if(Array.isArray(value))return value.map(canonical);
-  if(value&&typeof value==='object')return Object.fromEntries(Object.keys(value).sort(byCodeUnit).map(k=>[k,canonical(value[k])]));
-  return value;
+/**
+ * Every drift between the grammar knowledge snapshots and the package source. Line positions, use
+ * counts and digests are pointers, not facts, so they are refreshed by `--write` but never reported.
+ */
+export async function checkGrammarKnowledge({packageRoot=defaultPaths().packageRoot,grammarRoot=defaultPaths().grammarRoot,census=null}={}){
+  const measured=census??await censusGrammar({packageRoot});
+  const findings=[];
+  checkCommonSnapshot(findings,grammarRoot,measured);
+  for(const family of GRAMMAR_FAMILIES.filter(f=>f.dnaModule))checkFamilySnapshot(findings,family,grammarRoot,measured);
+  checkCatalog(findings,grammarRoot,measured);
+  return {schema:GRAMMAR_KNOWLEDGE_CHECK,ok:findings.length===0,version:measured.version,renderers:measured.renderers.length,findings};
 }
 
 // ---------------------------------------------------------------------------
