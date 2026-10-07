@@ -111,34 +111,33 @@ function waitGone(tree, { read, environments, terminal, sleep, ms, pollMs }) {
   }
 }
 
-function captureWorkerTree({ terminal, own, deps, tableOf, envOf, capture, attempt }) {
-  let tree = null, treeWhy = null;
-  const stubbed = !deps.tableOf && !deps.envOf && Boolean(readEnv('STARCI_ORCA_COMMAND'));
-  if (!terminal) treeWhy = 'the worker has no terminal of its own';
-  else if (stubbed) treeWhy = 'Orca is stubbed: its terminals have no real process tree to prove';
-  else if (own) treeWhy = 'the caller runs inside this terminal: it is not closed or verified from here';
-  else {
-    let table, envRows;
-    try { table = tableOf(); envRows = envOf(); } catch { table = null; envRows = null; }
-    if (!Array.isArray(table) || !Array.isArray(envRows)) treeWhy = 'the process table or the process environments could not be read';
-    else {
-      tree = terminalTree(terminal, { table, envRows }).members;
-      if (!tree.length) { tree = null; treeWhy = 'no process carries the terminal handle: its tree cannot be proven'; }
-      else {
-        const captured = [];
-        for (const row of tree) {
-          if (!createdKnown(row.created) || typeof row.exe !== 'string' || !row.exe) {
-            treeWhy = 'a measured process has no known birth or executable'; break;
-          }
-          const receipt = attempt(() => capture(row.pid, { ownership: { key: HANDLE_ENV, value: terminal } }));
-          if (!capturedIdentity(receipt, row)) { treeWhy = 'native process identity or terminal custody is unverified'; break; }
-          captured.push({ ...row, identity: receipt.identity });
-        }
-        tree = treeWhy ? null : captured;
-      }
-    }
+// The native identity of every process in the terminal's tree: `{ tree }`, or `{ tree: null, treeWhy }` for the first member that cannot be proven.
+function captureIdentities(tree, terminal, { capture, attempt }) {
+  const captured = [];
+  for (const row of tree) {
+    if (!createdKnown(row.created) || typeof row.exe !== 'string' || !row.exe) return { tree: null, treeWhy: 'a measured process has no known birth or executable' };
+    const receipt = attempt(() => capture(row.pid, { ownership: { key: HANDLE_ENV, value: terminal } }));
+    if (!capturedIdentity(receipt, row)) return { tree: null, treeWhy: 'native process identity or terminal custody is unverified' };
+    captured.push({ ...row, identity: receipt.identity });
   }
-  return { tree, treeWhy };
+  return { tree: captured, treeWhy: null };
+}
+
+function readTerminalTree({ terminal, tableOf, envOf, capture, attempt }) {
+  let table, envRows;
+  try { table = tableOf(); envRows = envOf(); } catch { table = null; envRows = null; }
+  if (!Array.isArray(table) || !Array.isArray(envRows)) return { tree: null, treeWhy: 'the process table or the process environments could not be read' };
+  const found = terminalTree(terminal, { table, envRows }).members;
+  if (!found.length) return { tree: null, treeWhy: 'no process carries the terminal handle: its tree cannot be proven' };
+  return captureIdentities(found, terminal, { capture, attempt });
+}
+
+function captureWorkerTree({ terminal, own, deps, tableOf, envOf, capture, attempt }) {
+  const stubbed = !deps.tableOf && !deps.envOf && Boolean(readEnv('STARCI_ORCA_COMMAND'));
+  if (!terminal) return { tree: null, treeWhy: 'the worker has no terminal of its own' };
+  if (stubbed) return { tree: null, treeWhy: 'Orca is stubbed: its terminals have no real process tree to prove' };
+  if (own) return { tree: null, treeWhy: 'the caller runs inside this terminal: it is not closed or verified from here' };
+  return readTerminalTree({ terminal, tableOf, envOf, capture, attempt });
 }
 
 function verifyStoppedWorkers(first, { stopProcess, stopVerifyMs, waitArgs, tree, attempt }) {
