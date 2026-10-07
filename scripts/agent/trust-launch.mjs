@@ -1,11 +1,13 @@
 // scripts/agent/trust-launch.mjs — the launch-time trust flow: pre-trust the directory an agent starts in (see trust.mjs for the
 // writers and the scope rules), per provider, and report the receipt the launch event records.
 import path from 'node:path';
+import { probeGuardCommand } from '../api/process/probe-guard-command.mjs';
+import { toolGuardCommand } from '../lib/guard-command.mjs';
 import { codexLaunchHomes } from './codex-mirror-source.mjs';
 import { codexTrustPaths, launchTrustVerdict } from './launch-trust-policy.mjs';
 import {
   TOOL_GUARD_MATCHER, assertClaudeBypassConsent, assertClaudeSettingsEnv, assertJsonToolGuard, claudeKeyForms, claudeLaunchEnv,
-  codexAppServer, codexKeyForms, codexProjectTables, excludeFromGit, jsonOf, projectTargets, readText, toolGuardCommand, trustCodexToolGuard,
+  codexAppServer, codexKeyForms, codexProjectTables, excludeFromGit, jsonOf, projectTargets, readText, trustCodexToolGuard,
   trustTargets, writeClaudeTrust, writeCodexNoModelNudge, writeCodexNoUpdateCheck, writeCodexToolGuard, writeCodexTrust, writeDevinProfile,
 } from './trust.mjs';
 
@@ -14,9 +16,10 @@ const TRUST_AGENTS = new Set(['claude', 'codex', 'devin']);
 /**
  * Pre-trust `cwd` for `agent` before launch. Never throws; a failure is
  * recorded without a screen-only consent fallback. Returns null for
- * an agent with no trust prompt.
+ * an agent with no trust prompt. A guard command no shell can run refuses the launch (status failed,
+ * code guard-command-unresolvable) before any trust, settings or hook file is written (after the provider's own decline is read). Seam: `guardProbe`.
  */
-export function ensureLaunchTrust({ agent, cwd, config, env = process.env, platform = process.platform, hooks, codexAppServer: appServer = null } = {}) {
+export function ensureLaunchTrust({ agent, cwd, config, env = process.env, platform = process.platform, hooks, codexAppServer: appServer = null, guardProbe = probeGuardCommand } = {}) {
   if (!TRUST_AGENTS.has(agent)) return null;
   const authorization = launchTrustVerdict({ cwd, config, platform });
   if (!authorization.ok) return { agent, paths: [], status: 'declined', reason: authorization.reason };
@@ -30,13 +33,19 @@ export function ensureLaunchTrust({ agent, cwd, config, env = process.env, platf
   try { declined = ownerDeclineOf({ agent, platform, authorization, targets, project, receipt, env }); }
   catch (error) { return { ...receipt, status: 'failed', errors: [{ error: String(error.message) }] }; }
   if (declined) return declined;
-  const ctx = { dir, platform, hooks, env, appServer, targets, project, receipt, command: toolGuardCommand() };
+  const command = toolGuardCommand({ home: targets.home });
+  const resolved = guardProbe({ command, home: targets.home, platform, env });
+  if (!resolved.ok) return unresolvedGuard({ ...receipt, command, resolved });
+  const ctx = { dir, platform, hooks, env, appServer, targets, project, receipt, command };
   const early = trustFlowOf(agent)(ctx);
   if (early) return early;
   receipt.status = receipt.errors.length ? 'failed' : ['already', 'written'][Number(receipt.written.length > 0)];
   if (!receipt.errors.length) delete receipt.errors;
   return receipt;
 }
+
+// The refusal of a launch whose guard command no shell can run: nothing is written, the code is catalogued.
+const unresolvedGuard = ({ command, resolved, ...receipt }) => ({ ...receipt, status: 'failed', code: 'guard-command-unresolvable', reason: `the guard command ${command} cannot run: ${resolved.reason}`, errors: [{ error: resolved.reason }] });
 
 function trustFlowOf(agent) {
   if (agent === 'devin') return trustDevin;

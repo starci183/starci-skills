@@ -8,6 +8,7 @@ import {inspectLedger,openLedger,ledgerFileFor,releaseKernelJob,recordJobResult,
 import {FAKE_ORCA,MISSING_ORCA_COMMAND} from '../helpers/fake-orca.mjs';
 import {hostUnavailableOf} from '../../scripts/api/orca/lib.mjs';
 import {kernelTerminalVerdict,settledKernelVerdict,awaitOrcaHost} from '../../scripts/kernel/host-outage.mjs';
+import { installGuardLauncher } from '../helpers/guard-launcher.mjs';
 
 // 2026-09-24 02:37: Orca auto-updated and restarted. For about a minute the CLI
 // answered runtime_unavailable and spawning orca.exe failed with ENOENT, while
@@ -81,7 +82,7 @@ const buildFixture=root=>{
   const repo=path.join(root,'repo');fs.mkdirSync(repo);
   const fake=path.join(root,'fake-orca.mjs'),state=path.join(root,'orca-state.json'),log=path.join(root,'calls.jsonl');
   const ownerRoot=path.join(root,'owner');fs.mkdirSync(ownerRoot);
-  const trustHome=path.join(root,'trust-home');fs.mkdirSync(trustHome);
+  const trustHome=path.join(root,'trust-home');fs.mkdirSync(trustHome);installGuardLauncher(trustHome);
   // This private fixture owner adopts only its exact launch root; the real trust writer stays enabled.
   const ownerConfig=fs.readFileSync(path.join(ROOT,'config.example.yaml'),'utf8')
     .replace(/^language:.*$/m,'language: en').replace(/^effort:.*$/m,'effort: medium')

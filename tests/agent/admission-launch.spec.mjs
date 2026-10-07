@@ -13,6 +13,7 @@ import { loadModelRegistry, loadAdapter, adapterModelAuthority } from '../../scr
 import { providerBudgetUsage } from '../../scripts/agent/provider-budget.mjs';
 import { orcaRequestIdOf } from '../../scripts/api/orca/lib.mjs';
 import { writeProviderCircuit } from '../../scripts/machine/provider-circuit.mjs';
+import { installGuardLauncher } from '../helpers/guard-launcher.mjs';
 
 const isolatedMachine = t => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-launch-'));
@@ -199,6 +200,7 @@ test('a circuit opened after planning refuses consumption using the strict canon
   fs.writeFileSync(path.join(root, 'config.yaml'), stringifyYaml(owner));
   env.STARCI_AGENT_TRUST_HOME = path.join(root, 'trust-home');
   fs.mkdirSync(env.STARCI_AGENT_TRUST_HOME);
+  installGuardLauncher(env.STARCI_AGENT_TRUST_HOME);
   const request = { role: 'worker', scopeId: 'circuit:attempt:1', allowGroup: [{ provider: 'codex', model: 'gpt-6.1-sol' }] };
   const options = { env, io: { quota: fake.quota } };
   const admission = admitAgent(request, options);

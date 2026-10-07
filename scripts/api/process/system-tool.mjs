@@ -11,10 +11,10 @@ const DEFAULT_SYSTEM_ROOT = ['C:', 'Windows'].join(path.win32.sep);
 const POSIX_DIRS = ['/usr/bin', '/bin', '/usr/sbin', '/sbin'];
 // Windows: path segments under <SystemRoot>\System32 (nvidia-smi also under <drive>\Program Files\NVIDIA Corporation\NVSMI, its legacy home).
 const WINDOWS_TOOLS = {
-  powershell: [['WindowsPowerShell', 'v1.0', 'powershell.exe']], schtasks: [['schtasks.exe']], netstat: [['NETSTAT.EXE']], tasklist: [['tasklist.exe']],
+  cmd: [['cmd.exe']], powershell: [['WindowsPowerShell', 'v1.0', 'powershell.exe']], schtasks: [['schtasks.exe']], netstat: [['NETSTAT.EXE']], tasklist: [['tasklist.exe']],
   'nvidia-smi': [['nvidia-smi.exe'], ['..', '..', 'Program Files', 'NVIDIA Corporation', 'NVSMI', 'nvidia-smi.exe']],
 };
-const POSIX_TOOLS = { lsof: 'lsof', ps: 'ps', 'nvidia-smi': 'nvidia-smi' };
+const POSIX_TOOLS = { sh: 'sh', lsof: 'lsof', ps: 'ps', 'nvidia-smi': 'nvidia-smi' };
 
 const refusal = (tool, platform) => ({ ok: false, code: 'SYSTEM_TOOL_UNAVAILABLE', tool, platform });
 

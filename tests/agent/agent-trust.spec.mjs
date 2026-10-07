@@ -9,9 +9,11 @@ import {openLedger,inspectLedger,ledgerFileFor} from '../../engine/db/ledger.mjs
 import {
   claudeKeyForms,codexKeyForms,codexHeader,codexProjectTables,writeClaudeTrust,writeCodexTrust,writeCodexNoUpdateCheck,writeCodexNoModelNudge,
   assertClaudeBypassConsent,trustTargets,orcaCodexHome,assertClaudeSettingsEnv,claudeLaunchEnv,
-  toolGuardCommand,TOOL_GUARD_MATCHER,assertJsonToolGuard,writeDevinProfile,codexGuardBlock,writeCodexToolGuard,trustCodexToolGuard,projectTargets,excludeFromGit,
+  TOOL_GUARD_MATCHER,assertJsonToolGuard,writeDevinProfile,codexGuardBlock,writeCodexToolGuard,trustCodexToolGuard,projectTargets,excludeFromGit,
 } from '../../scripts/agent/trust.mjs';
 import {ensureLaunchTrust as ensureAdoptedLaunchTrust} from '../../scripts/agent/trust-launch.mjs';
+import {toolGuardCommand} from '../../scripts/lib/guard-command.mjs';
+import {installGuardLauncher} from '../helpers/guard-launcher.mjs';
 import {gateMenuPosition} from '../../scripts/agent/lib.mjs';
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
 import { proofRepo } from '../helpers/sonar-scan.mjs';
@@ -33,7 +35,8 @@ const DEFINE_GOAL=path.join(ROOT,'scripts','goal','define-goal.mjs');
 const START_WORKFLOW=path.join(ROOT,'scripts','kernel','start-workflow.mjs');
 const json=text=>{try{return JSON.parse(text);}catch{return null;}};
 const tmp=(t,prefix)=>{const d=fs.mkdtempSync(path.join(os.tmpdir(),prefix));t.after(()=>fs.rmSync(d,{recursive:true,force:true,maxRetries:20,retryDelay:25}));return d;};
-const ensureLaunchTrust=options=>ensureAdoptedLaunchTrust({...options,config:{launchTrust:{profile:'automatic',approvedBy:'owner',approvalRef:'private fixture owner adoption',roots:[path.resolve(options.cwd)]}}});
+// The shells that resolve the guard command are probed by tests/agent/guard-command-launch.spec.mjs; these specs answer ok.
+const ensureLaunchTrust=options=>ensureAdoptedLaunchTrust({guardProbe:()=>({ok:true}),...options,config:{launchTrust:{profile:'automatic',approvedBy:'owner',approvalRef:'private fixture owner adoption',roots:[path.resolve(options.cwd)]}}});
 
 /* ------------------------------------------------------------ key forms */
 
@@ -242,8 +245,8 @@ test('ensureLaunchTrust writes Claude and the active managed Codex home, then re
 test('launch trust registers the command guard hook in the worktree\'s project settings for Claude and Devin, and pins Devin\'s model there',t=>{
   const home=tmp(t,'starci-trust-guard-home-');const cwd=tmp(t,'starci-trust-guard-cwd-');
   const env={NODE_TEST_CONTEXT:'child-v8',STARCI_AGENT_TRUST_HOME:home};
-  const command=toolGuardCommand();
-  assert.equal(command,'starci guard command');
+  const command=toolGuardCommand({home});
+  assert.equal(command,`"${home.replaceAll(path.sep,'/')}/.starci/bin/starci" guard command`);
   assert.doesNotMatch(command,/\\/,'forward slashes: Claude and Devin run hooks through Git Bash on Windows');
   const {claudeSettings:settings,devinConfig:devinFile}=projectTargets(cwd);
   assert.equal(settings,path.join(cwd,'.claude','settings.local.json'));
@@ -290,7 +293,7 @@ test('launch trust writes only under the op worktree and never touches a user-gl
   }
   const snapshot=(dir)=>{const out=new Map();const walk=d=>{for(const e of fs.readdirSync(d,{withFileTypes:true})){const p=path.join(d,e.name);if(e.isDirectory())walk(p);else out.set(p,fs.readFileSync(p,'utf8'));}};walk(dir);return out;};
   const homeBefore=snapshot(home);
-  const codexServer=({requests})=>requests.map(q=>q.method==='config/batchWrite'?{}:{data:[{hooks:[{key:'k',eventName:'preToolUse',command:toolGuardCommand(),currentHash:'h',trustStatus:'trusted'}]}]});
+  const codexServer=({requests})=>requests.map(q=>q.method==='config/batchWrite'?{}:{data:[{hooks:[{key:'k',eventName:'preToolUse',command:toolGuardCommand({home}),currentHash:'h',trustStatus:'trusted'}]}]});
   for(const agent of ['claude','codex','devin']){
     const r=ensureLaunchTrust({agent,cwd,env,codexAppServer:codexServer});
     assert.notEqual(r.status,'failed',JSON.stringify(r));
@@ -304,7 +307,7 @@ test('launch trust writes only under the op worktree and never touches a user-gl
   assert.deepEqual(changed,[path.join(home,'.claude.json'),codexUsers[0]].sort());
   assert.equal(homeAfter.get(userSettings),homeBefore.get(userSettings),'~/.claude/settings.json is untouched');
   assert.equal(homeAfter.get(devinUser),homeBefore.get(devinUser),'Devin\'s user config is untouched');
-  assert.ok(homeAfter.get(codexUsers[0]).includes(codexGuardBlock(toolGuardCommand())),'the managed Codex home carries the guard hook');
+  assert.ok(homeAfter.get(codexUsers[0]).includes(codexGuardBlock(toolGuardCommand({home}))),'the managed Codex home carries the guard hook');
   assert.doesNotMatch(homeAfter.get(codexUsers[1]),/hooks\.PreToolUse/,'a Codex home the launch does not manage carries no guard hook');
   // Under the worktree: the Claude and Devin project files, each kept out of git status by the repository's own info/exclude.
   const p=projectTargets(cwd);
@@ -351,12 +354,13 @@ test('a Codex home gets the guard block in config.toml and Codex\'s own hash for
   assert.equal(trustCodexToolGuard({home,cwd,command:'node "elsewhere"',appServer}).ok,false,'a guard hook Codex does not list is a failure, never assumed');
   // Through ensureLaunchTrust, with the app-server injected (a spec never starts the real Codex).
   const trustHome=tmp(t,'starci-trust-codex-home-');
+  const trustCommand=toolGuardCommand({home:trustHome});
   const env={NODE_TEST_CONTEXT:'child-v8',STARCI_AGENT_TRUST_HOME:trustHome};
   fs.mkdirSync(path.join(trustHome,'.codex'),{recursive:true});
-  const r=ensureLaunchTrust({agent:'codex',cwd,env,codexAppServer:({requests})=>requests.map(q=>q.method==='config/batchWrite'?{}:{data:[{hooks:[{key:'k',eventName:'preToolUse',command,currentHash:'h',trustStatus:'trusted'}]}]})});
+  const r=ensureLaunchTrust({agent:'codex',cwd,env,codexAppServer:({requests})=>requests.map(q=>q.method==='config/batchWrite'?{}:{data:[{hooks:[{key:'k',eventName:'preToolUse',command:trustCommand,currentHash:'h',trustStatus:'trusted'}]}]})});
   const homeFile=path.join(trustHome,'.codex','config.toml');
   assert.deepEqual(r.toolGuard,[{file:homeFile,written:true,trustedIn:[{home:path.join(trustHome,'.codex'),trusted:'already'}]}],'the hook lives in the Codex home\'s config.toml');
-  assert.ok(fs.readFileSync(homeFile,'utf8').includes(codexGuardBlock(command)));
+  assert.ok(fs.readFileSync(homeFile,'utf8').includes(codexGuardBlock(trustCommand)));
   assert.equal(fs.existsSync(path.join(cwd,'.codex')),false,'no project layer is written');
   assert.deepEqual(ensureLaunchTrust({agent:'codex',cwd,env}).toolGuard,[{file:homeFile,trustedIn:[{home:path.join(trustHome,'.codex'),trusted:'not-checked'}]}],'no app-server injected under a trust home: the hash step waits');
 });
@@ -368,7 +372,7 @@ test('a Codex home gets the guard block in config.toml and Codex\'s own hash for
 test('a Codex launch in a linked worktree is trusted: the guard hook is listed from the home\'s config.toml',t=>{
   const trustHome=tmp(t,'starci-trust-codex-worktree-');const cwd=tmp(t,'starci-trust-codex-linked-');
   fs.writeFileSync(path.join(cwd,'.git'),'gitdir: ../main/.git/worktrees/linked\n');
-  const command=toolGuardCommand();const homeDir=path.join(trustHome,'.codex');
+  const command=toolGuardCommand({home:trustHome});const homeDir=path.join(trustHome,'.codex');
   const homeFile=path.join(homeDir,'config.toml');
   const hookOf=(trust)=>({key:`${homeFile}:pre_tool_use:0:0`,eventName:'preToolUse',handlerType:'command',command,matcher:'^Bash$',sourcePath:homeFile,source:'user',currentHash:'sha256:abc',trustStatus:trust});
   const written=[];
@@ -410,7 +414,7 @@ const opFixture=(t,extra={})=>{
     if(savedProjects===undefined)delete process.env.STARCI_PROJECTS_ROOT;else process.env.STARCI_PROJECTS_ROOT=savedProjects;});
   const mainRepo=path.join(root,'repo');fs.mkdirSync(mainRepo,{recursive:true});
   proofRepo(t,mainRepo);
-  const trustHome=path.join(root,'trust-home');fs.mkdirSync(path.join(trustHome,'.codex'),{recursive:true});
+  const trustHome=path.join(root,'trust-home');fs.mkdirSync(path.join(trustHome,'.codex'),{recursive:true});installGuardLauncher(trustHome);
   const stub=path.join(root,'fake-orca.mjs');fs.writeFileSync(stub,FAKE_ORCA);
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),
     STARCI_FAKE_ORCA_LOG:path.join(root,'calls.jsonl'),STARCI_FAKE_ORCA_STATE:path.join(root,'state.json'),
@@ -482,7 +486,7 @@ const kernelFixture=(t,kernelLine,extra={})=>{
   const repo=path.join(root,'repo');fs.mkdirSync(repo);fs.mkdirSync(path.join(repo,'docs'),{recursive:true});
   const fake=path.join(root,'fake-orca.mjs'),state=path.join(root,'orca-state.json');
   const ownerRoot=path.join(root,'owner');fs.mkdirSync(ownerRoot);
-  const trustHome=path.join(root,'trust-home');fs.mkdirSync(trustHome);
+  const trustHome=path.join(root,'trust-home');fs.mkdirSync(trustHome);installGuardLauncher(trustHome);
   fs.writeFileSync(path.join(ownerRoot,'config.yaml'),fs.readFileSync(path.join(ROOT,'config.example.yaml'),'utf8')
     .replace(/^kernel:.*$/m,kernelLine)
     .replace(/^launchTrust:.*$/m,`launchTrust: ${JSON.stringify({profile:'automatic',approvedBy:'owner',approvalRef:'private kernel fixture adoption',roots:[repo]})}`));

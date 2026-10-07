@@ -11,6 +11,7 @@ import { readMachine } from '../../engine/db/machine.mjs';
 import { fakeOrcaWorktrees } from '../helpers/fake-orca-worktrees.mjs';
 import { ensureWorkflowWorktree } from '../../scripts/kernel/workflow-worktree.mjs';
 import { senderEnv } from '../helpers/sender-env.mjs';
+import { installGuardLauncher } from '../helpers/guard-launcher.mjs';
 // Attestation/settle waits are counted logically; scaled down they cost milliseconds, not load-dependent seconds.
 process.env.STARCI_SLEEP_SCALE??='0.02';
 
@@ -29,7 +30,7 @@ const fixture=t=>{
   const fake=path.join(root,'fake-orca.mjs'),state=path.join(root,'orca-state.json');
   const log=path.join(root,'calls.jsonl');
   const ownerRoot=path.join(root,'owner');fs.mkdirSync(ownerRoot);
-  const trustHome=path.join(root,'trust-home');fs.mkdirSync(trustHome);
+  const trustHome=path.join(root,'trust-home');fs.mkdirSync(trustHome);installGuardLauncher(trustHome);
   // The same exact repo is the Git main root when prepareWorkflowTree creates a registered workflow tree.
   const ownerConfig=fs.readFileSync(path.join(ROOT,'config.example.yaml'),'utf8')
     .replace(/^language:.*$/m,'language: vi').replace(/^effort:.*$/m,'effort: medium')

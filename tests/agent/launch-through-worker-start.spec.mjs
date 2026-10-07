@@ -19,6 +19,7 @@ import { proofRepo } from '../helpers/sonar-scan.mjs';
 import { fakeOrcaWorktrees } from '../helpers/fake-orca-worktrees.mjs';
 import { registerWorkflowWorktree } from '../../scripts/kernel/workflow-worktree.mjs';
 import { senderEnv } from '../helpers/sender-env.mjs';
+import { installGuardLauncher } from '../helpers/guard-launcher.mjs';
 
 // Every agent launch goes through orchestration worker-start (scripts/agent/admission-launch.mjs): the Kernel, the [Supervisor], every [Worker] and every [Op]. This spec fails when
 // any launch bypasses it - statically (runtime code that creates a terminal, a contract call that could) and on the
@@ -243,7 +244,7 @@ const fixture=t=>{
   const savedMachine = process.env.STARCI_TEST_MACHINE_FILE;
   process.env.STARCI_TEST_MACHINE_FILE = env.STARCI_TEST_MACHINE_FILE;
   t.after(() => { if (savedMachine === undefined) delete process.env.STARCI_TEST_MACHINE_FILE; else process.env.STARCI_TEST_MACHINE_FILE = savedMachine; });
-  fs.mkdirSync(path.join(root,'home'),{recursive:true});
+  fs.mkdirSync(path.join(root,'home'),{recursive:true});installGuardLauncher(path.join(root,'home'));
   const run=(script,...args)=>spawnSync(process.execPath,['--loader',new URL('../helpers/workflow-startup-loader.mjs',import.meta.url).href,script,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:senderEnv(script,env)});
   const callArgv=()=>fs.existsSync(env.STARCI_FAKE_ORCA_LOG)
     ?fs.readFileSync(env.STARCI_FAKE_ORCA_LOG,'utf8').trim().split('\n').filter(Boolean).map(l=>JSON.parse(l).argv):[];

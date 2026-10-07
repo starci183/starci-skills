@@ -10,6 +10,12 @@ const wrapperName = (program, platform) => platform === 'win32' ? `${program}.cm
 const wrapperText = ({ program, platform, node, cli }) => platform === 'win32'
   ? `@echo off\r\n"${node}" "${cli}" guard raw ${program} -- %*\r\n`
   : `#!/bin/sh\nexec "${node}" "${cli}" guard raw ${program} -- "$@"\n`;
+// The extensionless launcher bash runs (scripts/lib/guard-command.mjs spells the hook command that names it); on Windows
+// its paths use forward slashes, which bash and node both accept.
+const launcherText = ({ platform, node, cli }) => {
+  const spelled = (file) => platform === 'win32' ? file.replaceAll('\\', '/') : file;
+  return `#!/bin/sh\nexec "${spelled(node)}" "${spelled(cli)}" "$@"\n`;
+};
 
 /** Write the per-user runtime record, StarCi launcher and guarded PATH tool wrappers for that runtime. */
 export function writeRuntimeShim({ root, home = os.homedir(), cli: launcher = null } = {}, deps = {}) {
@@ -29,14 +35,16 @@ export function writeRuntimeShim({ root, home = os.homedir(), cli: launcher = nu
   if (platform === 'win32') {
     const shim = path.join(shimDir, 'starci.cmd');
     write(shim, `@echo off\r\n"${node}" "${cli}" %*\r\n`);
+    const posixShim = path.join(shimDir, 'starci');
+    write(posixShim, launcherText({ platform, node, cli }));
     for (const program of TOOL_WRAPPERS) {
       write(path.join(shimDir, wrapperName(program, platform)), wrapperText({ program, platform, node, cli }));
     }
-    return { root: runtimeRoot, runtimeJson, shim };
+    return { root: runtimeRoot, runtimeJson, shim, posixShim };
   }
 
   const shim = path.join(shimDir, 'starci');
-  write(shim, `#!/bin/sh\nexec "${node}" "${cli}" "$@"\n`);
+  write(shim, launcherText({ platform, node, cli }));
   chmod(shim, 0o755);
   for (const program of TOOL_WRAPPERS) {
     const wrapper = path.join(shimDir, wrapperName(program, platform));

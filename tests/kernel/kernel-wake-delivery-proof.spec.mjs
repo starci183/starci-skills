@@ -10,6 +10,7 @@ import { proofRepo } from '../helpers/sonar-scan.mjs';
 import { fakeOrcaWorktrees } from '../helpers/fake-orca-worktrees.mjs';
 import { registerWorkflowWorktree } from '../../scripts/kernel/workflow-worktree.mjs';
 import { senderEnv } from '../helpers/sender-env.mjs';
+import { installGuardLauncher } from '../helpers/guard-launcher.mjs';
 
 // A terminal-send to a Claude Kernel answered agent_prompt_stalled while the wake text sat on its
 // screen. `starci kernel nudge` already proves delivery from the screen (tests/kernel/nudge-delivery-proof.spec.mjs);
@@ -30,7 +31,7 @@ const world=(t,prefix)=>{
   t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
   const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});fs.mkdirSync(path.join(repo,'docs'),{recursive:true});
   const ownerRoot=path.join(root,'owner');fs.mkdirSync(ownerRoot);
-  const trustHome=path.join(root,'trust-home');fs.mkdirSync(trustHome);
+  const trustHome=path.join(root,'trust-home');fs.mkdirSync(trustHome);installGuardLauncher(trustHome);
   // reportWorld registers a real worktree of this repo; its exact Git main root remains the adopted root.
   const ownerConfig=fs.readFileSync(path.join(ROOT,'config.example.yaml'),'utf8')
     .replace(/^launchTrust:.*$/m,`launchTrust: ${JSON.stringify({profile:'automatic',approvedBy:'owner',approvalRef:'private wake-delivery fixture adoption',roots:[repo]})}`);

@@ -3,6 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { installGuardLauncher } from './guard-launcher.mjs';
 
 const EXAMPLE = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'config.example.yaml');
 
@@ -13,11 +14,12 @@ export function adoptedConfigText({ roots, ref, kernel = null, text = fs.readFil
   return kernel ? adopted.replace(/^kernel:.*$/m, kernel) : adopted;
 }
 
-/** Writes <root>/owner/config.yaml with adoption and creates <root>/trust-home; returns the env that selects both. */
+/** Writes <root>/owner/config.yaml with adoption and creates <root>/trust-home with the guard launcher launch trust probes; returns the env that selects both. */
 export function adoptLaunchTrust(root, { roots, ref, kernel }) {
   const ownerRoot = path.join(root, 'owner'), trustHome = path.join(root, 'trust-home');
   fs.mkdirSync(ownerRoot, { recursive: true });
   fs.mkdirSync(trustHome, { recursive: true });
+  installGuardLauncher(trustHome);
   fs.writeFileSync(path.join(ownerRoot, 'config.yaml'), adoptedConfigText({ roots, ref, kernel }));
   return { STARCI_OWNER_ROOT: ownerRoot, STARCI_AGENT_TRUST_HOME: trustHome };
 }

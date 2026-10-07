@@ -7,11 +7,12 @@ import { spawnAgent, startAgent, loadAdapter } from '../../scripts/agent/lib.mjs
 import { projectTargets, claudeKeyForms } from '../../scripts/agent/trust.mjs';
 import { ensureLaunchTrust } from '../../scripts/agent/trust-launch.mjs';
 import { fakeAdmission } from '../helpers/fake-admission.mjs';
+import { installGuardLauncher } from '../helpers/guard-launcher.mjs';
 
 // Launch preconditions per provider card (owner order 2026-10-02: no first-run dialog, no approval prompt, the command guard
 // stays on). Bypass itself is Orca's (settings.agentDefaultArgs); the runtime's part is trust, the guard hook and the model.
 const tmp = (t, prefix) => { const d = fs.mkdtempSync(path.join(os.tmpdir(), prefix)); t.after(() => fs.rmSync(d, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 })); return d; };
-const withTrust = (t) => { const home = tmp(t, 'starci-card-trust-'); return { STARCI_AGENT_TRUST_HOME: home, home }; };
+const withTrust = (t) => { const home = tmp(t, 'starci-card-trust-'); installGuardLauncher(home); return { STARCI_AGENT_TRUST_HOME: home, home }; };
 
 test('a fresh worktree path gets its trust and the command guard hook before launch, for every launchable card', (t) => {
   for (const agent of ['claude', 'codex', 'devin']) {
@@ -99,4 +100,19 @@ test('an omitted model on a card without a declared default is refused before tr
 test('a card that takes no model flag gets none (Devin)', () => {
   assert.equal(loadAdapter('devin').card.start.modelArgument, false);
   assert.equal(loadAdapter('devin').card.start.defaultModel, undefined);
+});
+
+test('a launch whose guard command cannot run is refused at the launch-trust step with the catalogued code, before worker-start', () => {
+  const calls = [];
+  const io = { admission: fakeAdmission(), assignee: () => ({ ok: true, assigneeHandle: 'term' }),
+    trust: () => ({ agent: 'claude', paths: [], status: 'failed', code: 'guard-command-unresolvable', reason: 'the guard command cannot run: bash exit 127', errors: [{ error: 'bash exit 127' }] }),
+    start: (a) => { calls.push(a); return { ok: true }; } };
+  const eligible = [{ provider: 'codex', model: 'gpt-6-luna', eligibility: { eligible: true, mode: 'operation-policy', reasons: [] } }];
+  const r = spawnAgent({ provider: 'codex', role: 'op', allowGroup: eligible, worktree: 'x', title: 't', spec: 's', task: 't1', run: 'run_1', request: { a: 3 }, io });
+  assert.equal(r.ok, false);
+  assert.equal(r.step, 'launch-trust');
+  assert.equal(r.code, 'guard-command-unresolvable');
+  assert.equal(r.errorCode, 'guard-command-unresolvable');
+  assert.equal(r.effectState, 'none');
+  assert.deepEqual(calls, [], 'no worker starts unguarded');
 });

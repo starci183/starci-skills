@@ -11,6 +11,7 @@ import {openMachine} from '../../engine/db/machine.mjs';
 import {writeProviderCircuit} from '../../scripts/machine/provider-circuit.mjs';
 import {inspectOwnerConfig} from '../../engine/config.mjs';
 import { senderEnv } from '../helpers/sender-env.mjs';
+import { installGuardLauncher } from '../helpers/guard-launcher.mjs';
 
 // The kernel is a model GROUP: config.yaml `kernel: {group: [...]}` (the shipped default) or the unpinned
 // think-group route. Members are tried in order with the provider availability signals; a single pin keeps
@@ -27,7 +28,7 @@ const fixture=(t,kernelLine)=>{
   const repo=path.join(root,'repo');fs.mkdirSync(repo);
   const fake=path.join(root,'fake-orca.mjs'),state=path.join(root,'orca-state.json'),log=path.join(root,'calls.jsonl');
   const ownerRoot=path.join(root,'owner'),trustHome=path.join(root,'trust-home');
-  fs.mkdirSync(ownerRoot);fs.mkdirSync(trustHome);
+  fs.mkdirSync(ownerRoot);fs.mkdirSync(trustHome);installGuardLauncher(trustHome);
   // Adoption and provider trust files belong only to this private fixture's exact repository root.
   const launchTrust={profile:'automatic',approvedBy:'owner',approvalRef:'private kernel-group fixture adoption',roots:[repo]};
   const config=fs.readFileSync(path.join(ROOT,'config.example.yaml'),'utf8')

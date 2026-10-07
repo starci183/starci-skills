@@ -10,6 +10,7 @@ import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
 import {proofRepo} from '../helpers/sonar-scan.mjs';
 import {fakeOrcaWorktrees} from '../helpers/fake-orca-worktrees.mjs';
 import {registerWorkflowWorktree} from '../../scripts/kernel/workflow-worktree.mjs';
+import { installGuardLauncher } from '../helpers/guard-launcher.mjs';
 
 // Live incident (a base-repos backend.scaffold seam attempt): an op worker ran
 // node:sqlite against .starciwork/runtime.sqlite to inspect jobs. The contract forbade it; the owner wants
@@ -30,7 +31,7 @@ const fixture=t=>{
   const made=fakeOrcaWorktrees({root:path.join(root,'worktrees')}).create({repo:`path:${mainRepo}`,name:'wf-op-boundary',baseBranch:'main'});
   assert.equal(made.ok,true,JSON.stringify(made));
   const repo=path.resolve(made.worktree.path);fs.mkdirSync(path.join(repo,'docs'),{recursive:true});
-  const ownerRoot=path.join(root,'owner'),trustHome=path.join(root,'trust-home');fs.mkdirSync(ownerRoot);fs.mkdirSync(trustHome);
+  const ownerRoot=path.join(root,'owner'),trustHome=path.join(root,'trust-home');fs.mkdirSync(ownerRoot);fs.mkdirSync(trustHome);installGuardLauncher(trustHome);
   const example=fs.readFileSync(path.join(ROOT,'config.example.yaml'),'utf8');
   assert.match(example,/^launchTrust:/m,'fixture uses the actual complete owner config');
   fs.writeFileSync(path.join(ownerRoot,'config.yaml'),example.replace(/^launchTrust:.*$/m,`launchTrust: ${JSON.stringify({profile:'automatic',approvedBy:'owner',approvalRef:'private op boundary fixture adoption',roots:[mainRepo]})}`));

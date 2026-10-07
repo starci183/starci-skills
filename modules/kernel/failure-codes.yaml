@@ -16278,3 +16278,14 @@ kernel-launch-run-exists:
   nextStep_vi: "Supervisor kiểm tra Run đó và worker của nó, đóng đúng định danh rồi mới khởi động lại."
   owner: supervisor
   kind: runtime-fault
+
+guard-command-unresolvable:
+  title: "The command guard hook cannot run in the host's shell"
+  title_vi: "Hook của command guard không chạy được trong shell của host"
+  meaning_vi: "Trước khi khởi động một agent, runtime chạy đúng câu lệnh hook của command guard qua từng shell mà host dùng (bash trên Windows, cmd, hoặc sh trên POSIX) và có shell không tìm thấy launcher của starci; vì lỗi hook không chặn, agent đó sẽ chạy mọi lệnh mà không có guard, nên lần khởi động bị từ chối."
+  causes_vi:
+    - "Thư mục ~/.starci/bin thiếu launcher POSIX (starci) hoặc launcher Windows (starci.cmd), vì starci runtime install hoặc runtime link chưa chạy lại sau khi cập nhật runtime"
+    - "launcher trỏ tới một node hoặc một runtime root không còn tồn tại"
+  nextStep_vi: "Không có agent nào được khởi động và không tốn lượt thử; chạy lại starci runtime link (hoặc starci runtime install) để ghi cả hai launcher, rồi khởi động lại; hàng 'command guard resolvable' của starci reconciler up --check cho biết shell nào lỗi."
+  owner: supervisor
+  kind: dispatch-refusal
