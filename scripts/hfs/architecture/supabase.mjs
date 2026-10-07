@@ -333,83 +333,119 @@ const parameterBindings = (ts, name) => {
   return [];
 };
 
+function inspectServerSessionCalls(kit, file, checker, violations) {
+  const { ts } = kit;
+  if (isClientModule(ts, file.sourceFile)) return;
+  kit.walk(file.sourceFile, node => {
+    if (ts.isCallExpression(node) && callName(ts, node) === 'getSession' && signatureFromSupabase(checker, node)) {
+      reportAt(violations, kit, FE_SESSION_TRUST, file, node, 'auth.getSession() trusts cookie-backed session data in server code; call getPrincipal() (getClaims), and getUser() for sensitive mutations.');
+    }
+    return true;
+  });
+}
+
+function inspectPrincipalProvider(kit, file, checker, violations) {
+  const { ts } = kit;
+  if (!FE_DB_SLOTS.has(file.slot)) return;
+  for (const implementation of exportedImplementations(ts, file.sourceFile, 'getPrincipal')) {
+    const readsClaims = contains(kit, implementation, node => ts.isCallExpression(node) && callName(ts, node) === 'getClaims'
+      && signatureFromSupabase(checker, node));
+    if (!readsClaims) reportAt(violations, kit, FE_SESSION_TRUST, file, implementation,
+      'getPrincipal() must establish the server principal through Supabase auth.getClaims().');
+  }
+}
+
+function inspectActionDirective(kit, file, action, violations) {
+  const { ts } = kit;
+  const first = action.body.statements[0];
+  const functionLevel = first?.expression?.text === 'use server' && isDirectiveStatement(ts, first);
+  if (!isServerActionModule(ts, file.sourceFile) && !functionLevel) {
+    reportAt(violations, kit, FE_WRITE_SHAPE, file, action, 'An exported write function must be a Server Action through a file-level or function-level `use server` directive.');
+  }
+}
+
+function inspectActionPrincipal(input, kit, file, checker, action, authenticatesAnonymous, violations) {
+  const { ts } = kit;
+  // Function directives are the prologue, not work: the principal is the first non-directive statement.
+  const work = action.body.statements.slice(action.body.statements.findIndex(statement => !isDirectiveStatement(ts, statement)) >>> 0);
+  const first = work[0];
+  const principal = first ? firstPrincipal(kit, checker, input.graph, first) : { call: null, symbol: null };
+  if (!principal.call || !principal.symbol) {
+    reportAt(violations, kit, FE_SESSION_TRUST, file, first ?? action, 'A write Server Action must begin with `const principal = await getPrincipal()` from the db owner.');
+  } else if (!authenticatesAnonymous) {
+    const refuses = work.slice(1).some(statement => ts.isIfStatement(statement)
+      && contains(kit, statement.expression, node => ts.isIdentifier(node) && sameSymbol(kit, checker, node, principal.symbol))
+      && typedRefusal(kit, statement.thenStatement));
+    if (!refuses) reportAt(violations, kit, FE_SESSION_TRUST, file, action, 'A write Server Action must refuse an anonymous principal with a typed `refused` Outcome before doing work.');
+  }
+}
+
+function inspectActionInputs(kit, file, action, checker, violations) {
+  const { ts } = kit;
+  for (const parameter of action.parameters.flatMap(item => parameterBindings(ts, item.name))) {
+    const symbol = symbolOf(kit, checker, parameter);
+    const references = [];
+    kit.walk(action.body, node => {
+      if (ts.isIdentifier(node) && sameSymbol(kit, checker, node, symbol)) references.push(node);
+      return true;
+    });
+    references.sort((a, b) => a.getStart() - b.getStart());
+    const firstUse = references[0];
+    if (firstUse && !parseUse(ts, firstUse)) reportAt(violations, kit, FE_WRITE_SHAPE, file, firstUse,
+      `Server Action input ${parameter.text} is used before schema.parse(...) or schema.safeParse(...).`, { parameter: parameter.text });
+  }
+}
+
+function inspectSensitiveAction(kit, file, checker, action, violations) {
+  const { ts } = kit;
+  const sensitive = /(?:^|\/)(?:billing|payment|payout|refund|charge|subscription|password|credential|role|permission|membership)[/.-]/iu.test(file.rel);
+  if (sensitive && !contains(kit, action.body, node => ts.isCallExpression(node) && callName(ts, node) === 'getUser' && signatureFromSupabase(checker, node))) {
+    reportAt(violations, kit, FE_SESSION_TRUST, file, action, 'A money, account-security or role-changing Server Action must call auth.getUser() before the mutation.');
+  }
+}
+
+function inspectWriteAction(input, kit, file, checker, action, authenticatesAnonymous, violations) {
+  inspectActionDirective(kit, file, action, violations);
+  inspectActionPrincipal(input, kit, file, checker, action, authenticatesAnonymous, violations);
+  inspectActionInputs(kit, file, action, checker, violations);
+  inspectSensitiveAction(kit, file, checker, action, violations);
+}
+
+function inspectWriteModule(input, kit, file, checker, state) {
+  const { ts } = kit;
+  if (!FE_DB_SLOTS.has(file.slot) || !path.posix.basename(file.rel).startsWith('write-')) return;
+  const classified = input.graph.resolver.classifyPath(file.rel);
+  const belowSlot = classified.root && file.rel.startsWith(`${classified.root}/`) ? file.rel.slice(classified.root.length + 1) : '';
+  const authenticatesAnonymous = (input.graph.resolver.slot(file.slot)?.anonymousActions ?? []).includes(belowSlot);
+  const declared = exportedActions(ts, file.sourceFile);
+  if (!declared.length) reportAt(state.violations, kit, FE_WRITE_SHAPE, file, file.sourceFile, `${file.rel} is a write module but exports no Server Action function.`);
+  for (const action of declared) {
+    state.actions += 1;
+    inspectWriteAction(input, kit, file, checker, action, authenticatesAnonymous, state.violations);
+  }
+}
+
+function inspectRouteHandler(input, kit, file, state) {
+  if (!file.rel.endsWith('/route.ts')) return;
+  state.routes += 1;
+  const classified = input.graph.resolver.classifyPath(file.rel);
+  const app = classified.bindings?.app;
+  const live = app !== undefined && file.rel === `apps/${app}/src/app/health/live/route.ts`;
+  if (!live && file.slot !== 'fe.route.callback') reportAt(state.violations, kit, FE_ROUTE_HANDLER, file, file.sourceFile,
+    `${file.rel} is a front-end route handler outside health/live and the fe.route.callback slot; webhooks, cron, public APIs and third-party callbacks belong to be features.`);
+}
+
 function checkFrontendAuthAndRoutes(input) {
   const kit = machineKit(input);
-  const { ts } = kit;
-  const violations = [];
-  let actions = 0;
-  let routes = 0;
+  const state = { violations: [], actions: 0, routes: 0 };
   for (const file of input.graph.files.values()) {
     const checker = kit.checkerOf(file.sourceFile);
-    if (!isClientModule(ts, file.sourceFile)) {
-      kit.walk(file.sourceFile, node => {
-        if (ts.isCallExpression(node) && callName(ts, node) === 'getSession' && signatureFromSupabase(checker, node)) {
-          reportAt(violations, kit, FE_SESSION_TRUST, file, node, 'auth.getSession() trusts cookie-backed session data in server code; call getPrincipal() (getClaims), and getUser() for sensitive mutations.');
-        }
-        return true;
-      });
-    }
-    if (FE_DB_SLOTS.has(file.slot)) {
-      for (const implementation of exportedImplementations(ts, file.sourceFile, 'getPrincipal')) {
-        const readsClaims = contains(kit, implementation, node => ts.isCallExpression(node) && callName(ts, node) === 'getClaims'
-          && signatureFromSupabase(checker, node));
-        if (!readsClaims) {
-          reportAt(violations, kit, FE_SESSION_TRUST, file, implementation, 'getPrincipal() must establish the server principal through Supabase auth.getClaims().');
-        }
-      }
-    }
-    if (FE_DB_SLOTS.has(file.slot) && path.posix.basename(file.rel).startsWith('write-')) {
-      const classified = input.graph.resolver.classifyPath(file.rel);
-      const belowSlot = classified.root && file.rel.startsWith(`${classified.root}/`) ? file.rel.slice(classified.root.length + 1) : '';
-      const authenticatesAnonymous = (input.graph.resolver.slot(file.slot)?.anonymousActions ?? []).includes(belowSlot);
-      const declared = exportedActions(ts, file.sourceFile);
-      if (!declared.length) reportAt(violations, kit, FE_WRITE_SHAPE, file, file.sourceFile, `${file.rel} is a write module but exports no Server Action function.`);
-      for (const action of declared) {
-        actions += 1;
-        const functionLevel = action.body.statements[0]?.expression?.text === 'use server' && isDirectiveStatement(ts, action.body.statements[0]);
-        if (!isServerActionModule(ts, file.sourceFile) && !functionLevel) {
-          reportAt(violations, kit, FE_WRITE_SHAPE, file, action, 'An exported write function must be a Server Action through a file-level or function-level `use server` directive.');
-        }
-        // Function directives are the prologue, not work: the principal is the first non-directive statement.
-        const work = action.body.statements.slice(action.body.statements.findIndex(statement => !isDirectiveStatement(ts, statement)) >>> 0);
-        const first = work[0];
-        const principal = first ? firstPrincipal(kit, checker, input.graph, first) : { call: null, symbol: null };
-        if (!principal.call || !principal.symbol) {
-          reportAt(violations, kit, FE_SESSION_TRUST, file, first ?? action, 'A write Server Action must begin with `const principal = await getPrincipal()` from the db owner.');
-        } else if (!authenticatesAnonymous) {
-          const refuses = work.slice(1).some(statement => ts.isIfStatement(statement)
-            && contains(kit, statement.expression, node => ts.isIdentifier(node) && sameSymbol(kit, checker, node, principal.symbol))
-            && typedRefusal(kit, statement.thenStatement));
-          if (!refuses) reportAt(violations, kit, FE_SESSION_TRUST, file, action, 'A write Server Action must refuse an anonymous principal with a typed `refused` Outcome before doing work.');
-        }
-        for (const parameter of action.parameters.flatMap(item => parameterBindings(ts, item.name))) {
-          const symbol = symbolOf(kit, checker, parameter);
-          const references = [];
-          kit.walk(action.body, node => {
-            if (ts.isIdentifier(node) && sameSymbol(kit, checker, node, symbol)) references.push(node);
-            return true;
-          });
-          references.sort((a, b) => a.getStart() - b.getStart());
-          const firstUse = references[0];
-          if (firstUse && !parseUse(ts, firstUse)) reportAt(violations, kit, FE_WRITE_SHAPE, file, firstUse, `Server Action input ${parameter.text} is used before schema.parse(...) or schema.safeParse(...).`, { parameter: parameter.text });
-        }
-        const sensitive = /(?:^|\/)(?:billing|payment|payout|refund|charge|subscription|password|credential|role|permission|membership)[/.-]/iu.test(file.rel);
-        if (sensitive && !contains(kit, action.body, node => ts.isCallExpression(node) && callName(ts, node) === 'getUser' && signatureFromSupabase(checker, node))) {
-          reportAt(violations, kit, FE_SESSION_TRUST, file, action, 'A money, account-security or role-changing Server Action must call auth.getUser() before the mutation.');
-        }
-      }
-    }
-    if (file.rel.endsWith('/route.ts')) {
-      routes += 1;
-      const classified = input.graph.resolver.classifyPath(file.rel);
-      const app = classified.bindings?.app;
-      const live = app !== undefined && file.rel === `apps/${app}/src/app/health/live/route.ts`;
-      if (!live && file.slot !== 'fe.route.callback') {
-        reportAt(violations, kit, FE_ROUTE_HANDLER, file, file.sourceFile, `${file.rel} is a front-end route handler outside health/live and the fe.route.callback slot; webhooks, cron, public APIs and third-party callbacks belong to be features.`);
-      }
-    }
+    inspectServerSessionCalls(kit, file, checker, state.violations);
+    inspectPrincipalProvider(kit, file, checker, state.violations);
+    inspectWriteModule(input, kit, file, checker, state);
+    inspectRouteHandler(input, kit, file, state);
   }
-  return { violations, coverage: { status: 'checked', actions, routes } };
+  return { violations: state.violations, coverage: { status: 'checked', actions: state.actions, routes: state.routes } };
 }
 
 export function checkFrontendSupabase(input) {
