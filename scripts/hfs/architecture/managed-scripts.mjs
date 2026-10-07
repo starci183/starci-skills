@@ -10,6 +10,10 @@ const TEMPLATE_ROOTS = [
   path.resolve(import.meta.dirname, '..', '..', '..', '..', 'templates'),
 ];
 const managedScriptCache = new Map();
+const SCRIPT_ENTRY_START = String.raw`^\s*"`;
+const SCRIPT_ENTRY_NAME = String.raw`([^"\n]+)`;
+const SCRIPT_ENTRY_END = String.raw`":\s*"`;
+const SCRIPT_ENTRY = new RegExp([SCRIPT_ENTRY_START, SCRIPT_ENTRY_NAME, SCRIPT_ENTRY_END].join(''), 'gmu');
 
 /** The script names of a profile/edition template after its partials are expanded. */
 export function managedScriptNames(profile, edition = 'full') {
@@ -22,7 +26,7 @@ export function managedScriptNames(profile, edition = 'full') {
     const text = fs.readFileSync(path.join(templates, profile, group, 'package.json'), 'utf8')
       .replace(/^\{\{> ([\w./-]+)\}\}\r?\n/gmu, (_, partial) => fs.readFileSync(path.join(templates, partial), 'utf8'));
     // The key is bounded by quotes, never the colon, so `[^"]` cannot backtrack; the strict script-name class filters after.
-    const names = [...text.matchAll(/^\s*"([^"\n]+)":\s*"/gmu)].map((match) => match[1]);
+    const names = [...text.matchAll(SCRIPT_ENTRY)].map((match) => match[1]);
     managedScriptCache.set(key, new Set(names.filter((name) => /^[A-Za-z0-9:_.-]+$/.test(name))));
   }
   return managedScriptCache.get(key);

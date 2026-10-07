@@ -111,10 +111,7 @@ function fakedByOf(ts, sourceFile, literal) {
   return entries;
 }
 
-export function checkTestWorldFiles(input) {
-  const { config, graph, ts, resolver, tree } = checkerScope(input);
-  const { suffixes } = resolver.ruleParams();
-  const violations = [];
+function collectWorldFiles(resolver, tree, suffixes, violations) {
   const fakeProviders = new Map();
   let worldRoot = null;
   let files = 0;
@@ -138,7 +135,10 @@ export function checkTestWorldFiles(input) {
       slot: verdict.slot,
     });
   }
+  return { fakeProviders, worldRoot, files };
+}
 
+function worldDeclaration(config, graph, ts, worldRoot, violations) {
   const configPath = worldRoot === null ? null : `${worldRoot}${CONFIG_FILE}`;
   const configFile = configPath === null ? null : graph.files.get(configPath) ?? null;
   const literal = configFile ? configLiteral(ts, configFile.sourceFile) : null;
@@ -148,7 +148,10 @@ export function checkTestWorldFiles(input) {
       message: `${configPath} declares no world the machine can read. Declare it in the one named form \`${NAMED_FORM}\` (an exported const of a ${DEFINE} call with an object literal, imported from @starci/test-world); a default export is refused by R89 and is not read.`,
     });
   }
-  const environments = [(literal ? environmentOf(ts, literal) : null) ?? defaultEnvironment];
+  return { configPath, configFile, literal };
+}
+
+function stackServices(config, environments) {
   const services = [];
   for (const environment of environments) {
     let stack = null;
@@ -156,14 +159,15 @@ export function checkTestWorldFiles(input) {
     try { stack = readStack({ root: locateDeclaration(config.root).appRoot, environment }); } catch { stack = null; }
     for (const service of stack?.services ?? []) if (service.role !== 'service' && !services.some(known => known.name === service.name)) services.push({ ...service, environment });
   }
-  const stackHint = `${STACKS_DIRECTORY}/${environments.join(', ')}`;
-  const statefulWhy = service => {
-    if (STATEFUL_KINDS.has(service.kind)) return `a ${service.kind} holds data the app reads back`;
-    return service.persistent ? 'the stack gives it a persistent volume' : null;
-  };
-  const declared = literal ? fakedByOf(ts, configFile.sourceFile, literal) : [];
-  const fakeEntries = literal ? fakeEntriesOf(ts, configFile.sourceFile, literal) : [];
+  return services;
+}
 
+function statefulWhy(service) {
+  if (STATEFUL_KINDS.has(service.kind)) return `a ${service.kind} holds data the app reads back`;
+  return service.persistent ? 'the stack gives it a persistent volume' : null;
+}
+
+function reportDeclaredFakeProblems(declared, services, fakeProviders, fakeEntries, configPath, stackHint, violations) {
   for (const entry of declared) {
     const service = services.find(candidate => candidate.name === entry.service);
     const problems = [];
@@ -178,12 +182,16 @@ export function checkTestWorldFiles(input) {
       });
     }
   }
+}
 
-  // Every fake the world runs: the repository's fakes/<provider>/ folders and the fakes entries of the declaration.
-  const fakes = [
+function worldFakes(fakeProviders, fakeEntries, configPath) {
+  return [
     ...[...fakeProviders].map(([provider, file]) => ({ name: provider, path: file, line: 1, column: 1, what: `fakes/${provider}/` })),
     ...fakeEntries.filter(entry => !fakeProviders.has(entry.name)).map(entry => ({ name: entry.name, path: configPath, line: entry.line, column: entry.column, what: `the fakes entry ${entry.name}` })),
   ].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function reportServiceFakes(fakes, services, declared, configPath, stackHint, violations) {
   for (const fake of fakes) {
     const service = services.find(candidate => namesOfService(candidate).includes(fake.name));
     if (!service) continue;
@@ -199,5 +207,23 @@ export function checkTestWorldFiles(input) {
       message: `${fake.what} fakes ${service.name} (${service.image}), which ${stackHint} declares: a service of the repository's own stack runs real in the test world. ${reason}Delete the fake and let the world run the real service; fakes are otherwise only for external SaaS the team does not operate.`,
     });
   }
+}
+
+export function checkTestWorldFiles(input) {
+  const { config, graph, ts, resolver, tree } = checkerScope(input);
+  const { suffixes } = resolver.ruleParams();
+  const violations = [];
+  const { fakeProviders, worldRoot, files } = collectWorldFiles(resolver, tree, suffixes, violations);
+  const { configPath, configFile, literal } = worldDeclaration(config, graph, ts, worldRoot, violations);
+  const environments = [(literal ? environmentOf(ts, literal) : null) ?? defaultEnvironment];
+  const services = stackServices(config, environments);
+  const stackHint = `${STACKS_DIRECTORY}/${environments.join(', ')}`;
+  const declared = literal ? fakedByOf(ts, configFile.sourceFile, literal) : [];
+  const fakeEntries = literal ? fakeEntriesOf(ts, configFile.sourceFile, literal) : [];
+  reportDeclaredFakeProblems(declared, services, fakeProviders, fakeEntries, configPath, stackHint, violations);
+
+  // Every fake the world runs: the repository's fakes/<provider>/ folders and the fakes entries of the declaration.
+  const fakes = worldFakes(fakeProviders, fakeEntries, configPath);
+  reportServiceFakes(fakes, services, declared, configPath, stackHint, violations);
   return { violations, coverage: { status: 'checked', files } };
 }

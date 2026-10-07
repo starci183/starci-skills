@@ -24,78 +24,94 @@ const HOOK_ROUTES = new Set([...MOUNTING_ROUTES, 'page']);
 const HOOK_NAME = /^use[A-Z0-9]/u;
 const HOOKS_SLOT = 'fe.hooks';
 
+const isFunction = (ts, node) => ts.isFunctionDeclaration(node) || ts.isFunctionExpression(node) || ts.isArrowFunction(node);
+const jsxOf = (ts, node) => ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node) || ts.isJsxFragment(node);
+
+function tagOf(ts, node) {
+  if (ts.isJsxElement(node)) return node.openingElement.tagName;
+  if (ts.isJsxSelfClosingElement(node)) return node.tagName;
+  return null;
+}
+
+function routeDefaults(ts, file, kit, checker) {
+  const defaults = new Set();
+  for (const statement of file.sourceFile.statements) {
+    if (ts.isFunctionDeclaration(statement) && statement.modifiers?.some(item => item.kind === ts.SyntaxKind.DefaultKeyword)) defaults.add(statement);
+    if (ts.isExportAssignment(statement) && !statement.isExportEquals) {
+      const target = statement.expression;
+      if (ts.isIdentifier(target)) {
+        for (const declaration of kit.declarationsOf(checker, target)) defaults.add(ts.isVariableDeclaration(declaration) ? declaration.initializer ?? declaration : declaration);
+      } else defaults.add(target);
+    }
+  }
+  return defaults;
+}
+
+/** True when the function contains JSX that is not inside a nested function. */
+function drawsDirectly(ts, fn) {
+  let found = false;
+  const visit = node => {
+    if (found) return;
+    if (node !== fn && isFunction(ts, node)) return;
+    if (jsxOf(ts, node)) { found = true; return; }
+    ts.forEachChild(node, visit);
+  };
+  visit(fn);
+  return found;
+}
+
+function reportRoute(violations, kit, file, stem, node, message, extra = {}) {
+  violations.push({ ruleId: RULE, path: file.rel, ...kit.at(file.rel, file.sourceFile, node), message, route: stem, ...extra });
+}
+
+function inspectRouteNode(node, { graph, kit, ts, file, stem, mounting, checker, defaults, violations, state }) {
+  if (jsxOf(ts, node)) state.hasJsx = true;
+  const tag = tagOf(ts, node);
+  if (mounting && tag) {
+    if (ts.isIdentifier(tag) && /^[a-z]/u.test(tag.text)) {
+      reportRoute(violations, kit, file, stem, tag, `<${tag.text}> is drawing in a ${stem} route file; a route file mounts one feature and draws nothing. Move the markup into the feature.`);
+    } else if (kit.declarationsOf(checker, ts.isPropertyAccessExpression(tag) ? tag.name : tag).some(declaration => graph.files.get(kit.graphPath(declaration) ?? '')?.tier === 'feature')) {
+      state.owners += 1;
+    }
+  }
+  if (mounting && isFunction(ts, node) && !defaults.has(node) && drawsDirectly(ts, node)) {
+    reportRoute(violations, kit, file, stem, node, `A function other than the default export draws JSX in a ${stem} route file; that is an inline component. Move it into the feature the route mounts.`);
+  }
+  if (ts.isCallExpression(node)) {
+    const callee = ts.isIdentifier(node.expression) ? node.expression : null;
+    if (callee && HOOK_NAME.test(callee.text)) {
+      const binding = kit.importBinding(checker, callee);
+      const inHooks = kit.declarationsOf(checker, callee).some(declaration => graph.files.get(kit.graphPath(declaration) ?? '')?.slot === HOOKS_SLOT);
+      if (binding || inHooks) reportRoute(violations, kit, file, stem, callee, `${callee.text} is a hook called in a ${stem} route file; a route file is a server adapter and holds no hook. Read the data in the feature it mounts.`);
+    }
+  }
+  return true;
+}
+
+function inspectRouteFile(graph, kit, file, stem, violations) {
+  const { ts } = kit;
+  const mounting = MOUNTING_ROUTES.has(stem);
+  const checker = kit.checkerOf(file.sourceFile);
+  const defaults = routeDefaults(ts, file, kit, checker);
+  const state = { hasJsx: false, owners: 0 };
+  kit.walk(file.sourceFile, node => inspectRouteNode(node, { graph, kit, ts, file, stem, mounting, checker, defaults, violations, state }));
+  if (mounting && state.hasJsx && state.owners !== 1) {
+    violations.push({ ruleId: RULE, path: file.rel, line: 1, column: 1, route: stem, owners: state.owners,
+      message: `${file.rel} mounts ${state.owners} feature owners; a ${stem} route file mounts exactly one feature (a layouts- or pages-tier component of the app), optionally inside a package shell.` });
+  }
+}
+
 export function checkRouteFilesThin(input) {
   const { graph } = input;
   const kit = machineKit(input);
-  const { ts } = kit;
   const violations = [];
   let routes = 0;
-
   for (const file of graph.files.values()) {
     if (file.slot !== ROUTE_SLOT) continue;
     const stem = path.posix.basename(file.rel).replace(/\.[cm]?[jt]sx?$/u, '');
     if (!HOOK_ROUTES.has(stem)) continue;
     routes += 1;
-    const mounting = MOUNTING_ROUTES.has(stem);
-    const checker = kit.checkerOf(file.sourceFile);
-    const report = (node, message, extra = {}) => violations.push({ ruleId: RULE, path: file.rel, ...kit.at(file.rel, file.sourceFile, node), message, route: stem, ...extra });
-
-    // The default export function: `export default function X`, `export default X` (X a function), `export default () => ...`.
-    const defaults = new Set();
-    for (const statement of file.sourceFile.statements) {
-      if (ts.isFunctionDeclaration(statement) && statement.modifiers?.some(item => item.kind === ts.SyntaxKind.DefaultKeyword)) defaults.add(statement);
-      if (ts.isExportAssignment(statement) && !statement.isExportEquals) {
-        const target = statement.expression;
-        if (ts.isIdentifier(target)) for (const declaration of kit.declarationsOf(checker, target)) defaults.add(ts.isVariableDeclaration(declaration) ? declaration.initializer ?? declaration : declaration);
-        else defaults.add(target);
-      }
-    }
-    const isFunction = node => ts.isFunctionDeclaration(node) || ts.isFunctionExpression(node) || ts.isArrowFunction(node);
-    const jsxOf = node => ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node) || ts.isJsxFragment(node);
-    const tagOf = node => {
-      if (ts.isJsxElement(node)) return node.openingElement.tagName;
-      if (ts.isJsxSelfClosingElement(node)) return node.tagName;
-      return null;
-    };
-    /** True when the function contains JSX that is not inside a nested function. */
-    const drawsDirectly = fn => {
-      let found = false;
-      const visit = node => {
-        if (found) return;
-        if (node !== fn && isFunction(node)) return;
-        if (jsxOf(node)) { found = true; return; }
-        ts.forEachChild(node, visit);
-      };
-      visit(fn);
-      return found;
-    };
-
-    let hasJsx = false;
-    let owners = 0;
-    kit.walk(file.sourceFile, node => {
-      if (jsxOf(node)) hasJsx = true;
-      const tag = tagOf(node);
-      if (mounting && tag) {
-        if (ts.isIdentifier(tag) && /^[a-z]/u.test(tag.text)) report(tag, `<${tag.text}> is drawing in a ${stem} route file; a route file mounts one feature and draws nothing. Move the markup into the feature.`);
-        else if (kit.declarationsOf(checker, ts.isPropertyAccessExpression(tag) ? tag.name : tag).some(declaration => graph.files.get(kit.graphPath(declaration) ?? '')?.tier === 'feature')) owners += 1;
-      }
-      if (mounting && isFunction(node) && !defaults.has(node) && drawsDirectly(node)) {
-        report(node, `A function other than the default export draws JSX in a ${stem} route file; that is an inline component. Move it into the feature the route mounts.`);
-      }
-      if (ts.isCallExpression(node)) {
-        const callee = ts.isIdentifier(node.expression) ? node.expression : null;
-        if (callee && HOOK_NAME.test(callee.text)) {
-          const binding = kit.importBinding(checker, callee);
-          const inHooks = kit.declarationsOf(checker, callee).some(declaration => graph.files.get(kit.graphPath(declaration) ?? '')?.slot === HOOKS_SLOT);
-          if (binding || inHooks) report(callee, `${callee.text} is a hook called in a ${stem} route file; a route file is a server adapter and holds no hook. Read the data in the feature it mounts.`);
-        }
-      }
-      return true;
-    });
-    if (mounting && hasJsx && owners !== 1) {
-      violations.push({ ruleId: RULE, path: file.rel, line: 1, column: 1, route: stem, owners,
-        message: `${file.rel} mounts ${owners} feature owners; a ${stem} route file mounts exactly one feature (a layouts- or pages-tier component of the app), optionally inside a package shell.` });
-    }
+    inspectRouteFile(graph, kit, file, stem, violations);
   }
   return { violations, coverage: { status: 'checked', routes } };
 }

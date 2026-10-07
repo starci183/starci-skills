@@ -191,6 +191,118 @@ const grammarContractOf = config => {
   return { status: 'unavailable', reason: 'no app has a src/app/globals.css to judge against the Grammar style entry' };
 };
 
+function invalidConfigurationResult(repositoryRoot, error) {
+  const hfs = checkHfsWithoutConfig(repositoryRoot);
+  return { schema: 'starci/architecture-check@1', ok: false, repository: String(repositoryRoot ?? ''), kinds: [], files: 0,
+    compiler: null, violations: stable(hfs.violations), coverage: { hfs: hfs.coverage },
+    errors: [{ ruleId: /^(HFS_[A-Z_]+):/.exec(String(error.message))?.[1] ?? 'ARCH_CONFIG_INVALID', message: String(error.message ?? error).replace(/^HFS_[A-Z_]+:\s*/, '') }], limitations: LIMITATIONS };
+}
+
+function compilerFailureResult(config, hfs, error) {
+  const message = String(error.message ?? error);
+  const match = /^(ARCH_[A-Z_]+):\s*/.exec(message);
+  return { schema: 'starci/architecture-check@1', ok: false, repository: config.root, kinds: config.kinds, files: 0,
+    compiler: null, violations: hfs.violations, coverage: { hfs: hfs.coverage },
+    errors: [{ ruleId: match?.[1] ?? 'ARCH_COMPILER_FAILURE', message: message.replace(/^(ARCH_[A-Z_]+):\s*/, '') }], limitations: LIMITATIONS };
+}
+
+function runBackendChecks(config, context, paths, injectedTypeScript, violations) {
+  violations.push(...checkBackend(config, context));
+  // A slice may omit every app root. Registration ownership needs the complete
+  // composition graph even when the caller asks for findings in only one path.
+  const registrationContext = paths.length && config.backend.moduleRegistration
+    ? buildTypeScriptContext(config, injectedTypeScript) : context;
+  const registration = checkModuleRegistration(config, registrationContext);
+  violations.push(...registration.violations);
+  const sourceShape = checkBackendSourceShape(config, context);
+  violations.push(...sourceShape.violations);
+  const contracts = checkBackendContracts(config, context);
+  violations.push(...contracts.violations);
+  return { moduleRegistration: registration.coverage, backendSourceShape: sourceShape.coverage, backendContractTypeForm: contracts.coverage };
+}
+
+function runFrontendChecks(config, context, violations) {
+  let frontendChecked = true;
+  try {
+    violations.push(...checkFrontend(config, context));
+  } catch (error) {
+    const message = String(error.message ?? error);
+    const match = /^(ARCH_[A-Z_]+):\s*/.exec(message);
+    if (!match) throw error;
+    context.errors.push({ ruleId: match[1], message: message.slice(match[0].length) });
+    frontendChecked = false;
+  }
+  const dataLifecycle = checkFrontendDataLifecycle(config, context);
+  violations.push(...dataLifecycle.violations);
+  return { frontendChecked, frontendDataLifecycle: dataLifecycle.coverage };
+}
+
+function runHfsMachine(config, context, paths, injectedTypeScript, base, fast, violations) {
+  // HFS machine: the slot-driven graph checks read the whole program, also when the caller asked for one path.
+  const hfsContext = paths.length ? buildTypeScriptContext(config, injectedTypeScript) : context;
+  const hfsChecks = { tiers: null, reachability: null, deadExports: null, requiredFiles: null, clones: null, symbols: null, docLanguage: null };
+  if (!hfsContext.program) return hfsChecks;
+  const graph = buildHfsGraph(config, hfsContext);
+  const input = { config, context: hfsContext, graph, base };
+  const runs = { tiers: () => checkTiers(graph), reachability: () => checkReachability(input), deadExports: () => checkDeadExports(input),
+    requiredFiles: () => checkRequiredFiles(input), clones: () => checkClones(input), symbols: () => checkSymbols(input), docLanguage: () => checkDocLanguage(input) };
+  if (graph.profile === 'be') for (const [name, [check]] of Object.entries(BACKEND_MACHINE)) runs[name] = () => check(input);
+  if (graph.profile === 'fe') for (const [name, [check]] of Object.entries(FRONTEND_MACHINE)) runs[name] = () => check(input);
+  if (fast) { delete runs.deadExports; delete runs.clones; delete runs.symbols; }
+  for (const [name, run] of Object.entries(runs)) {
+    const result = run();
+    violations.push(...result.violations.map(violation => ({ ...violation, check: name })));
+    hfsChecks[name] = result.coverage;
+  }
+  return hfsChecks;
+}
+
+function hfsRuleIds(hfs) {
+  return hfs.coverage.status === 'checked' ? HFS_RULE_IDS : [];
+}
+
+function hfsCheckRuleIds(hfsChecks) {
+  return [
+    ...(hfsChecks.tiers ? TIER_RULE_IDS : []),
+    ...(hfsChecks.reachability?.status === 'checked' ? REACHABILITY_RULE_IDS : []),
+    ...(hfsChecks.deadExports?.status === 'checked' ? DEAD_EXPORT_RULE_IDS : []),
+    ...(hfsChecks.requiredFiles?.status === 'checked' ? REQUIRED_FILE_RULE_IDS : []),
+    ...(hfsChecks.clones?.status === 'checked' ? CLONE_RULE_IDS : []),
+    ...(hfsChecks.symbols?.status === 'checked' ? SYMBOL_RULE_IDS : []),
+    ...(hfsChecks.docLanguage?.status === 'checked' ? DOC_LANGUAGE_RULE_IDS : []),
+  ];
+}
+
+function derivedCoverageRuleIds(coverage) {
+  return [
+    ...(coverage.ownerPublicApi.status === 'checked' ? OWNER_RULE_IDS : []),
+    ...(coverage.grammarContract.status === 'checked' ? GRAMMAR_RULE_IDS : []),
+    ...(coverage.moduleRegistration.status === 'checked' ? REGISTRATION_RULE_IDS : []),
+    ...(coverage.backendSourceShape.layout?.status === 'checked' ? [SOURCE_LAYOUT_RULE_ID] : []),
+    ...(coverage.backendSourceShape.naming?.status === 'checked' ? [SOURCE_NAME_RULE_ID] : []),
+    ...(coverage.backendContractTypeForm.publicContracts?.status === 'checked' ? [PUBLIC_CONTRACT_RULE_ID] : []),
+    ...(coverage.backendContractTypeForm.readonlyBoundaries?.status === 'checked' ? [READONLY_BOUNDARY_RULE_ID] : []),
+  ];
+}
+
+function checkedRuleIdsFor(config, hfs, hfsChecks, frontendChecked, coverage) {
+  const machineRuleIds = Object.entries({ ...BACKEND_MACHINE, ...FRONTEND_MACHINE })
+    .flatMap(([name, [, ids]]) => (hfsChecks[name]?.status === 'checked' ? ids : []));
+  const checked = [...new Set([
+    ...COMMON_RULE_IDS,
+    ...hfsRuleIds(hfs),
+    ...(config.kinds.includes('backend') ? BACKEND_RULE_IDS : []),
+    ...hfsCheckRuleIds(hfsChecks),
+    ...CONFIG_UNREAD_RULE_IDS,
+    ...machineRuleIds,
+    ...(frontendChecked ? FRONTEND_RULE_IDS : []),
+    ...derivedCoverageRuleIds(coverage),
+    ...(config.kinds.includes('frontend') && ['checked', 'not-applicable'].includes(coverage.frontendDataLifecycle.status) ? SWR_DATA_RULE_IDS : []),
+  ])];
+  return checked.filter(id => !(id.startsWith('FE_') && !config.kinds.includes('frontend')) && !(id.startsWith('BE_') && !config.kinds.includes('backend')))
+    .sort(byCodeUnit);
+}
+
 /**
  * Check a target repository. injectedTypeScript exists only for hermetic rule fixtures. `fast` leaves out the checks
  * that read the whole repository to answer (clones, dead exports, repository-wide symbols); the pre-push check of the changed owners uses it.
@@ -201,21 +313,14 @@ export function checkArchitecture({ repositoryRoot, injectedTypeScript, paths = 
   try {
     config = loadArchitectureConfig(repositoryRoot, { hfs: openedHfs });
   } catch (error) {
-    const hfs = checkHfsWithoutConfig(repositoryRoot);
-    return { schema: 'starci/architecture-check@1', ok: false, repository: String(repositoryRoot ?? ''), kinds: [], files: 0,
-      compiler: null, violations: stable(hfs.violations), coverage: { hfs: hfs.coverage },
-      errors: [{ ruleId: /^(HFS_[A-Z_]+):/.exec(String(error.message))?.[1] ?? 'ARCH_CONFIG_INVALID', message: String(error.message ?? error).replace(/^HFS_[A-Z_]+:\s*/, '') }], limitations: LIMITATIONS };
+    return invalidConfigurationResult(repositoryRoot, error);
   }
   const hfs = checkHfs(config);
   let context;
   try {
     context = buildTypeScriptContext(config, injectedTypeScript, paths);
   } catch (error) {
-    const message = String(error.message ?? error);
-    const match = /^(ARCH_[A-Z_]+):\s*/.exec(message);
-    return { schema: 'starci/architecture-check@1', ok: false, repository: config.root, kinds: config.kinds, files: 0,
-      compiler: null, violations: hfs.violations, coverage: { hfs: hfs.coverage },
-      errors: [{ ruleId: match?.[1] ?? 'ARCH_COMPILER_FAILURE', message: message.replace(/^(ARCH_[A-Z_]+):\s*/, '') }], limitations: LIMITATIONS };
+    return compilerFailureResult(config, hfs, error);
   }
   const violations = [...hfs.violations];
   const configUnread = checkConfigUnread({ context });
@@ -226,55 +331,20 @@ export function checkArchitecture({ repositoryRoot, injectedTypeScript, paths = 
   let frontendDataLifecycle = { status: 'not-applicable' };
   if (context.program) violations.push(...checkOwners(config, context));
   if (context.program && config.kinds.includes('backend')) {
-    violations.push(...checkBackend(config, context));
-    // A slice may omit every app root. Registration ownership needs the complete
-    // composition graph even when the caller asks for findings in only one path.
-    const registrationContext = paths.length && config.backend.moduleRegistration
-      ? buildTypeScriptContext(config, injectedTypeScript) : context;
-    const registration = checkModuleRegistration(config, registrationContext);
-    violations.push(...registration.violations);
-    moduleRegistration = registration.coverage;
-    const sourceShape = checkBackendSourceShape(config, context);
-    violations.push(...sourceShape.violations);
-    backendSourceShape = sourceShape.coverage;
-    const contracts = checkBackendContracts(config, context);
-    violations.push(...contracts.violations);
-    backendContractTypeForm = contracts.coverage;
+    const backend = runBackendChecks(config, context, paths, injectedTypeScript, violations);
+    moduleRegistration = backend.moduleRegistration;
+    backendSourceShape = backend.backendSourceShape;
+    backendContractTypeForm = backend.backendContractTypeForm;
   }
   let frontendChecked = config.kinds.includes('frontend');
   if (context.program && config.kinds.includes('frontend')) {
     // A broken authored input (the framework-pinned root list in knowledge) is an error, never a
     // silently different contract: the frontend rules are then not reported as checked.
-    try {
-      violations.push(...checkFrontend(config, context));
-    } catch (error) {
-      const message = String(error.message ?? error);
-      const match = /^(ARCH_[A-Z_]+):\s*/.exec(message);
-      if (!match) throw error;
-      context.errors.push({ ruleId: match[1], message: message.slice(match[0].length) });
-      frontendChecked = false;
-    }
-    const dataLifecycle = checkFrontendDataLifecycle(config, context);
-    violations.push(...dataLifecycle.violations);
-    frontendDataLifecycle = dataLifecycle.coverage;
+    const frontend = runFrontendChecks(config, context, violations);
+    frontendChecked = frontend.frontendChecked;
+    frontendDataLifecycle = frontend.frontendDataLifecycle;
   }
-  // HFS machine: the slot-driven graph checks read the whole program, also when the caller asked for one path.
-  const hfsContext = paths.length ? buildTypeScriptContext(config, injectedTypeScript) : context;
-  const hfsChecks = { tiers: null, reachability: null, deadExports: null, requiredFiles: null, clones: null, symbols: null, docLanguage: null };
-  if (hfsContext.program) {
-    const graph = buildHfsGraph(config, hfsContext);
-    const input = { config, context: hfsContext, graph, base };
-    const runs = { tiers: () => checkTiers(graph), reachability: () => checkReachability(input), deadExports: () => checkDeadExports(input),
-      requiredFiles: () => checkRequiredFiles(input), clones: () => checkClones(input), symbols: () => checkSymbols(input), docLanguage: () => checkDocLanguage(input) };
-    if (graph.profile === 'be') for (const [name, [check]] of Object.entries(BACKEND_MACHINE)) runs[name] = () => check(input);
-    if (graph.profile === 'fe') for (const [name, [check]] of Object.entries(FRONTEND_MACHINE)) runs[name] = () => check(input);
-    if (fast) { delete runs.deadExports; delete runs.clones; delete runs.symbols; }
-    for (const [name, run] of Object.entries(runs)) {
-      const result = run();
-      violations.push(...result.violations.map(violation => ({ ...violation, check: name })));
-      hfsChecks[name] = result.coverage;
-    }
-  }
+  const hfsChecks = runHfsMachine(config, context, paths, injectedTypeScript, base, fast, violations);
   const inScope = item => !paths.length || (item.path && paths.some(prefix => sameOrUnder(item.path, prefix.replace(/\/$/, ''))));
   // Two findings travel as context errors (package boundary edges); they are obligations of the lint surface like any other finding.
   const asViolation = item => LINT_CODES.has(item.ruleId);
@@ -298,32 +368,7 @@ export function checkArchitecture({ repositoryRoot, injectedTypeScript, paths = 
     ownerPublicApi: ownerPublicApiOf(config.owners, missingOwnerEntries),
     grammarContract: grammarContractOf(config),
   };
-  coverage.checkedRuleIds = [...new Set([
-    ...COMMON_RULE_IDS,
-    ...(hfs.coverage.status === 'checked' ? HFS_RULE_IDS : []),
-    ...(config.kinds.includes('backend') ? BACKEND_RULE_IDS : []),
-    ...(hfsChecks.tiers ? TIER_RULE_IDS : []),
-    ...(hfsChecks.reachability?.status === 'checked' ? REACHABILITY_RULE_IDS : []),
-    ...(hfsChecks.deadExports?.status === 'checked' ? DEAD_EXPORT_RULE_IDS : []),
-    ...(hfsChecks.requiredFiles?.status === 'checked' ? REQUIRED_FILE_RULE_IDS : []),
-    ...(hfsChecks.clones?.status === 'checked' ? CLONE_RULE_IDS : []),
-    ...(hfsChecks.symbols?.status === 'checked' ? SYMBOL_RULE_IDS : []),
-    ...(hfsChecks.docLanguage?.status === 'checked' ? DOC_LANGUAGE_RULE_IDS : []),
-    ...CONFIG_UNREAD_RULE_IDS,
-    ...Object.entries({ ...BACKEND_MACHINE, ...FRONTEND_MACHINE }).flatMap(([name, [, ids]]) => (hfsChecks[name]?.status === 'checked' ? ids : [])),
-    ...(frontendChecked ? FRONTEND_RULE_IDS : []),
-    ...(coverage.ownerPublicApi.status === 'checked' ? OWNER_RULE_IDS : []),
-    ...(coverage.grammarContract.status === 'checked' ? GRAMMAR_RULE_IDS : []),
-    ...(coverage.moduleRegistration.status === 'checked' ? REGISTRATION_RULE_IDS : []),
-    ...(coverage.backendSourceShape.layout?.status === 'checked' ? [SOURCE_LAYOUT_RULE_ID] : []),
-    ...(coverage.backendSourceShape.naming?.status === 'checked' ? [SOURCE_NAME_RULE_ID] : []),
-    ...(coverage.backendContractTypeForm.publicContracts?.status === 'checked' ? [PUBLIC_CONTRACT_RULE_ID] : []),
-    ...(coverage.backendContractTypeForm.readonlyBoundaries?.status === 'checked' ? [READONLY_BOUNDARY_RULE_ID] : []),
-    ...(config.kinds.includes('frontend') && ['checked', 'not-applicable'].includes(coverage.frontendDataLifecycle.status) ? SWR_DATA_RULE_IDS : []),
-  ])]
-    // A back-end repository checked no FE_ rule and a front-end one no BE_ rule, whatever list a shared check (tiers, required files) carries.
-    .filter(id => !(id.startsWith('FE_') && !config.kinds.includes('frontend')) && !(id.startsWith('BE_') && !config.kinds.includes('backend')))
-    .sort(byCodeUnit);
+  coverage.checkedRuleIds = checkedRuleIdsFor(config, hfs, hfsChecks, frontendChecked, coverage);
   return {
     schema: 'starci/architecture-check@1',
     ok: errors.length === 0 && scopedViolations.length === 0,
