@@ -10,6 +10,7 @@ import {openLedger,inspectLedger,ledgerFileFor} from '../../engine/db/ledger.mjs
 import {openMachine} from '../../engine/db/machine.mjs';
 import {writeProviderCircuit} from '../../scripts/machine/provider-circuit.mjs';
 import {inspectOwnerConfig} from '../../engine/config.mjs';
+import { senderEnv } from '../helpers/sender-env.mjs';
 
 // The kernel is a model GROUP: config.yaml `kernel: {group: [...]}` (the shipped default) or the unpinned
 // think-group route. Members are tried in order with the provider availability signals; a single pin keeps
@@ -42,7 +43,7 @@ const fixture=(t,kernelLine)=>{
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([fake]),
     STARCI_FAKE_ORCA_STATE:state,STARCI_FAKE_ORCA_LOG:log,STARCI_FAKE_ORCA_UNIQUE_TERMINALS:'1',STARCI_OWNER_ROOT:ownerRoot,
     STARCI_AGENT_TRUST_HOME:trustHome,STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite')};
-  const run=(script,args,extra={},loaders=[])=>spawnSync(process.execPath,['--loader',new URL('../helpers/workflow-startup-loader.mjs',import.meta.url).href,...loaders.flatMap(file=>['--loader',pathToFileURL(file).href]),script,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...env,...extra}});
+  const run=(script,args,extra={},loaders=[])=>spawnSync(process.execPath,['--loader',new URL('../helpers/workflow-startup-loader.mjs',import.meta.url).href,...loaders.flatMap(file=>['--loader',pathToFileURL(file).href]),script,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:senderEnv(script,{...env,...extra})});
   const defined=run(DEFINE_GOAL,['--repo',repo,'--text','boot the kernel group','--json']);
   assert.equal(defined.status,0,defined.stderr);
   const workflowId=json(defined.stdout)?.workflowId;assert.ok(workflowId);

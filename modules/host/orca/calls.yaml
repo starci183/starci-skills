@@ -15,11 +15,16 @@ envelope:
   schema: starci/orca-call-result@1
   outcomes: [ok, failed, unknown]
   effectStates: [committed, none, partial, unknown]
+  # Typed errors Orca or its CLI answers before any mutation; a recorded failure carrying one of them as its `<code>: <message>` prefix
+  # is evidence of no effect (scripts/kernel/workflow-launch-no-effect.mjs). Every code here classifies failed/none.
+  preEffectCodes: [no_active_sender_terminal, invalid_argument, run_not_found, not_run_coordinator]
   rules:
     - outcome ok means the call completed and its receipt satisfied every required path.
     - outcome failed with effectState none means the caller may retry the same candidate or fall through to the next candidate without reconciliation.
     - effectState partial names live residual resources; the caller must settle them (worker-stop, worker-release) and prove none before fallback.
     - outcome unknown or effectState unknown blocks fallback until a read-only reconciliation proves the actual state.
+    - A verified failure receipt (JSON with ok false and a typed error code) is failed/none unless a classify rule says otherwise: Orca or its CLI answered it before any mutation. That covers the CLI's own refusals (the payload carries id local and a code such as invalid_argument for a missing required flag) and Orca's pre-effect refusals (no_active_sender_terminal, run_not_found, not_run_coordinator). The mutation wrappers carry effectState and errorCode through to their callers; a wrapper that drops them turns a proven refusal into an unknown effect.
+    - Only an ambiguous transport leaves a mutation unknown, namely a timeout or kill, a spawn error after the process started, a missing exit status, non-JSON output or a receipt without ok or a typed error. Those settle through request-show for a replay-request call and stay unknown when it answers absent or cannot answer.
     - A call without a classify block is classified by exit code alone - 0 is ok/committed, non-zero is failed/none.
     - classify rules are evaluated in the order written and the first match wins, so each block ends with an unconditional rule.
 defaults:
@@ -110,8 +115,9 @@ calls:
   run-list:
     command: orchestration run-list
     kind: read
-    flags: []
+    flags: [limit, cursor]
     receipt: [result.runs]
+    note: Newest Run first, one page per call; result.nextCursor, when present, is the --cursor of the next older page.
   task-list:
     command: orchestration task-list
     kind: read

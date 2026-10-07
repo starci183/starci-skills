@@ -8,6 +8,7 @@ import crypto from 'node:crypto';
 import { clearSignal, updateSignal, openIncident } from '../../engine/db/ledger.mjs';
 import { withMachine } from '../../engine/db/machine.mjs';
 import { shortHash } from '../lib/hash.mjs';
+import { readEnv } from '../lib/env.mjs';
 
 async function workflowHost({ caller, env }, run = execNode) {
   const args = [path.join(skillRoot, 'scripts/reconciler/workflow-up.mjs'), '--json'];
@@ -23,6 +24,19 @@ async function workflowHost({ caller, env }, run = execNode) {
       || data.hostOk && !data.ok && (!data.maintenance || data.maintenance.ok === true && data.maintenance.ready === true))
     return { ok: false, effectState: 'unknown', native, receipt: data, error: 'native host startup returned no verified outcome' };
   return { ...data, ok: data.hostOk, native };
+}
+
+/** The terminal Orca takes as the sender of run-create and worker-start: the caller's own ORCA_TERMINAL_HANDLE. The Kernel's entry Run is coordinated by it, so no other terminal stands in. */
+export function workflowSender({ env = process.env } = {}) {
+  const handle = String(readEnv('ORCA_TERMINAL_HANDLE', env) ?? '').trim();
+  return handle ? { ok: true, handle } : { ok: false, reason: 'workflow-sender-terminal-missing',
+    error: 'no_active_sender_terminal: a Kernel launch needs a live Orca terminal as its sender and coordinator; run starci workflow start inside an Orca terminal (ORCA_TERMINAL_HANDLE is not set here)' };
+}
+
+/** Why a finished or archived goal never gets a Kernel again, or null while it is open. */
+export function closedGoalMessage(goal, wf) {
+  if (wf?.phase === 'finished') return `goal ${goal} is finished — finished goals never re-enter the queue`;
+  return wf?.archived_at != null ? `goal ${goal} is archived — archived goals never re-enter the queue` : null;
 }
 
 export function workflowStartAuthority({ workflow, goal } = {}) {
@@ -90,7 +104,7 @@ export function recordWorkflowStartFailure(ledger, { workflowId, token, holderPi
     const owns = token && held?.token === token && held?.holder_pid === holderPid;
     const signalRetained = unknown && owns ? updateSignal(ledger.db, { scope: 'kernel', key: workflowId, token, holderPid, at, expiresAt: null,
       value: { state: 'launch-unknown', terminal: handle, dispatch: extra.dispatch ?? null,
-        admission: extra.admission ?? null, effectState: extra.effectState } }) : false;
+        admission: extra.admission ?? null, hostRequestId: extra.hostRequestId ?? null, effectState: extra.effectState } }) : false;
     if (!unknown && owns) clearSignal(ledger.db, { scope: 'kernel', key: workflowId, token });
     const payload = { step, error, terminal: handle, ...extra, reservation: token, signalRetained };
     ledger.appendEvent({ workflowId, entityType: 'kernel', entityId: workflowId, generation,

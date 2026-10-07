@@ -53,7 +53,7 @@ import { parseJson, parseJsonOr, readJsonFile } from '../lib/json.mjs';
 import { workflowDisplayName, workflowNameOf } from '../lib/display-names.mjs';
 import { KERNEL_BOOT_FILES, currentRuntimeRev, revRootOf, shortRev } from './runtime-rev.mjs';
 import { ensureWorkflowWorktree, workflowAppRepo } from './workflow-worktree.mjs';
-import { ensureWorkflowHost, installWorkflowTree, workflowStartAuthority, commitWorkflowStart, recordWorkflowStartFailure } from './workflow-startup.mjs';
+import { ensureWorkflowHost, installWorkflowTree, workflowStartAuthority, commitWorkflowStart, recordWorkflowStartFailure, workflowSender, closedGoalMessage } from './workflow-startup.mjs';
 import { workflowCaller } from '../agent/caller-context.mjs';
 import { guardLaunch, bindGuardTerminal, unbindGuardTerminal, guardReceiptErrors } from '../guards/hook-install.mjs';
 import { readEnv } from '../lib/env.mjs';
@@ -173,8 +173,7 @@ function refuse(step, fields = {}, code = 1) {
 }
 // A finished or archived goal never re-enters the queue and never gets a Kernel.
 function refuseClosedGoal(goal, wf) {
-  if (wf?.phase === 'finished') { console.error(`goal ${goal} is finished — finished goals never re-enter the queue`); process.exit(1); }
-  if (wf?.archived_at != null) { console.error(`goal ${goal} is archived — archived goals never re-enter the queue`); process.exit(1); }
+  const closed = closedGoalMessage(goal, wf); if (closed) { console.error(closed); process.exit(1); }
 }
 const EXIT_HOST_UNAVAILABLE = 75;
 const EXIT_KERNEL_ALIVE = 3;
@@ -227,7 +226,7 @@ try {
       ...(route.warnings?.length ? { warnings: route.warnings } : {}),
       ...(route.members ? { group: route.members.map(memberSummary), fallThrough: route.fallThrough === true } : {}),
       sourceHost: sourceRoot, projectBinding: context?.file ?? null,
-      ledger: ledgerFileFor(repo), frontend: context?.fe ?? null,
+      ledger: ledgerFileFor(repo), frontend: context?.fe ?? null, sender: workflowSender({ env: process.env }),
       kernel: kernelLaunchStatus({ health, signal, route }),
     };
     console.log(launchPlanText({ asJson, out, wf, target, chain, route, memberLabel }));
@@ -244,6 +243,7 @@ try {
   const { workflow: startWorkflow, goal: startGoal } = startInput();
   const startAuthority = workflowStartAuthority({ workflow: startWorkflow, goal: startGoal });
   if (!startAuthority.ok) refuse(startAuthority.reason, { workflowId: target, authority: startAuthority });
+  const sender = workflowSender({ env: process.env }); if (!sender.ok) refuse(sender.reason, { workflowId: target, error: sender.error });
   const hostStartup = await ensureWorkflowHost({ workflow: startWorkflow, goal: startGoal, caller: workflowCaller(process.argv.slice(2)), env: process.env });
   if (hostStartup.ok !== true || hostStartup.ready !== true)
     refuse(hostStartup.reason ?? 'workflow-host-not-ready', { workflowId: target, startup: hostStartup },
