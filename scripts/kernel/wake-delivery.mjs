@@ -291,11 +291,11 @@ export function sendEnterWithProof({ terminal, sentText = null, stagedPattern = 
   const readFrame = frameReader(deps.read ?? terminalRead, terminal);
   const send = deps.send ?? terminalSend, sleep = deps.sleep ?? sleepSync;
   const first = readFrame();
+  if (!first) return { ok: false, delivery: 'unreadable', evidence: 'unreadable', sent: null, sendErrorCode: null, screenState: null };
   const exited = exitedRefusal(first?.screen ?? null);
   if (exited) return exited;
   const sent = send({ terminal, text: '', enter: true });
-  // A receipt says nothing about a draft: with text in the input box, the box itself proves the submit.
-  if (sent?.ok && !first?.draft) return { ok: true, delivery: 'delivered', evidence: 'receipt', sent, sendErrorCode: null, screenState: null };
+  // A successful receipt proves no submission, including pasted input visible only on the screen.
   const proof = draftSubmitProof({ draft: first?.draft ?? null, stagedPattern, sentText, reads, intervalMs, readFrame, sleep });
   return enterAnswer(proof, first?.draft, sent);
 }
@@ -319,6 +319,7 @@ function draftSubmitProof({ draft, stagedPattern, sentText, reads, intervalMs, r
     if (i > 0 || draft) sleep(intervalMs);
     const after = readFrame();
     if (after == null) continue;
+    if (exitedAgentPromptRow(after.screen)) return { submitted: false, screenState: 'agent-exited', draftLeft: after.draft };
     screenState = classifyAgentScreen(after.frame, { stagedPattern, sentText }).state;
     draftLeft = was && after.draft && squash(after.draft) === was ? after.draft : null;
     if (!WAITING_FOR_ENTER.has(screenState) && !draftLeft) break;
