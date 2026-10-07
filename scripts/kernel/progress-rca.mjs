@@ -311,7 +311,8 @@ export function decisionsOf(db, workflowId) {
 
 /* ------------------------------------------------------------ ranked actions */
 
-const q = (s) => (/[\s,;"'[\]()]/.test(String(s)) ? `"${String(s).replaceAll('"', '\\"')}"` : String(s));
+const ESCAPED_QUOTE = String.raw`\"`;
+const q = (s) => (/[\s,;"'[\]()]/.test(String(s)) ? `"${String(s).replaceAll('"', ESCAPED_QUOTE)}"` : String(s));
 const actionKey = (...parts) => parts.join(':'), reasonSuffixOf = (item) => item.reason ? ` [${item.reason}]` : '', openCountSuffixOf = (cluster) => cluster.open !== cluster.count ? ` (${cluster.open} open)` : '';
 const act = (key, tier, cause, unblocks, title, command, expected) => ({ key, tier, cause, unblocks, title, command, expected });
 const repointCommandOf = (files, nextUnits, api, base) => {

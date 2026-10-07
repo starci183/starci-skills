@@ -385,7 +385,7 @@ const JOB_ID_RE = new RegExp(`${JOB_ID_PREFIX}${JOB_ID_SUFFIX}`, 'gi');
 export function sharedBlockerUntil(db, { to, text = '', since = 0, ownerJobs = [] }) {
   if (!to) return [];
   const heads = new Map();
-  for (const jobId of new Set([...(String(text).match(JOB_ID_RE) ?? []), ...ownerJobs])) {
+  for (const jobId of new Set([...Array.from(String(text).matchAll(JOB_ID_RE), (found) => found[0]), ...ownerJobs])) {
     const head = lineageHeadById(db, jobId)?.row;
     if (!head || head.workflow_id !== to) continue;
     if (head.status === 'succeeded' && Number(head.updated_at) <= Number(since)) continue;

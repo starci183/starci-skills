@@ -220,7 +220,7 @@ export function dependencyGraph(db, { repo = null, now = Date.now(), light = fal
   function addForeignFileIncidentEdges(row) {
     const { payload, at } = raisedOf(row);
     const text = `${row.last_progress} ${payload.detail ?? ''}`;
-    const files = [...new Set((text.match(FOREIGN_FILE) ?? []).map(normWork))].slice(0, 40);
+    const files = [...new Set(Array.from(text.matchAll(FOREIGN_FILE), (found) => normWork(found[0])))].slice(0, 40);
     for (const file of files) {
       let owner = null;
       if (file.startsWith('.starciwork/') && ownerOf) owner = ownerOf(file)?.workflowId ?? null;
