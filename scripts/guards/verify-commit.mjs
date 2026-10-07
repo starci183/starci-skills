@@ -32,7 +32,7 @@ function foreignPathsOf({ git = 'git', cwd, oldSha, newSha, owned }) {
   const top = gitTop(git, cwd);
   const brought = run(revList, [newSha, '--not', oldSha, '--remotes']);
   if (brought.status !== 0 || !top) return { checked: false, foreign: [] };
-  const roots = owned.map(pathKey);
+  const roots = owned.map((p) => pathKey(p));
   const foreign = new Set();
   for (const sha of brought.stdout.split(/\r?\n/).filter(Boolean)) {
     const listed = run(diffTree, ['-r', '-c', '--root', '--name-only', '--no-commit-id', '-z', sha]);

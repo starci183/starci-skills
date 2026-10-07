@@ -95,7 +95,7 @@ const wholeTreeReasonsOf = (shell, workRoot) => {
 export function shellFoundationNeed({ brief, payload, repo }) {
   const read = (Array.isArray(brief?.reads) ? brief.reads : []).find((item) => item?.layoutFoundation === true);
   if (!read) return null;
-  const records = (Array.isArray(payload?.records) ? payload.records : []).map(normRel).filter(Boolean);
+  const records = (Array.isArray(payload?.records) ? payload.records : []).map((p) => normRel(p)).filter(Boolean);
   const bindings = [...(Array.isArray(payload?.owned_paths) ? payload.owned_paths : []), ...records];
   const workRoot = (() => {
     for (const binding of bindings) {

@@ -279,8 +279,8 @@ export async function critiqueBest({ out, settings = drawLoopSettings(), drawer 
   const roundDir = path.join(out, best.dir);
   const captures = best.parts.map((p) => ({ png: path.join(roundDir, `${p.part}.png`), viewport: { width: p.width, height: p.height } })).filter((c) => isFile(c.png));
   if (!captures.length) return { ran: false, critique: null, round: best.n };
-  const dom = best.parts.map((p) => path.join(roundDir, `${p.part}.dom.html`)).find(isFile);
-  const html = dom ?? [path.join(roundDir, 'source.html'), path.join(roundDir, 'source.tsx')].find(isFile);
+  const dom = best.parts.map((p) => path.join(roundDir, `${p.part}.dom.html`)).find((p) => isFile(p));
+  const html = dom ?? [path.join(roundDir, 'source.html'), path.join(roundDir, 'source.tsx')].find((p) => isFile(p));
   const uiDir = loop.ui != null ? path.resolve(out, loop.ui) : null;
   const ui = loadUi(uiDir);
   const critique = await critiqueRound({ loop, n: best.n, roundDir, captures, html, uiDir, archetype: loop.archetype ?? null, record: ui?.record ?? null, shape: `${loop.base}#${loop.state}`, settings, drawer, orca });
