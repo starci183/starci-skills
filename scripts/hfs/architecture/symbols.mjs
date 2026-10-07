@@ -210,8 +210,8 @@ function isFrameworkName(node, name) {
   return node.slot === ROUTE_SLOT && NEXT_SEGMENT_EXPORTS.has(name);
 }
 
-function addDeclarationAliasViolations(ts, checker, graph, rel, node, point, violations) {
-  for (const alias of declarationAliases(ts, checker, graph, node)) {
+function addDeclarationAliasViolations(ts, checker, graph, rel, node, statement, point, violations) {
+  for (const alias of declarationAliases(ts, checker, graph, statement)) {
     if (isFrameworkName(node, alias.name)) continue;
     const at = point(alias.node);
     violations.push({
@@ -253,7 +253,7 @@ function addExportAliasViolations(ts, rel, node, statement, point, violations) {
 
 function addStatementAliasViolations(context, graph, rel, node, statement, checker, violations) {
   const point = target => node.sourceFile.getLineAndCharacterOfPosition(target.getStart(node.sourceFile));
-  addDeclarationAliasViolations(context.ts, checker, graph, rel, statement, point, violations);
+  addDeclarationAliasViolations(context.ts, checker, graph, rel, node, statement, point, violations);
   addExportAliasViolations(context.ts, rel, node, statement, point, violations);
 }
 
