@@ -194,3 +194,18 @@ test('list: open jobs, recently settled ones and their workflows', () => {
     assert.equal(di.schema, 'starci/decision-item@1');
   } finally { fx.close(); }
 });
+
+test('a worker question the policy table marks owner-only opens its Decision Item for the owner, any other for the Kernel', async () => {
+  const fx = fixture({ status: 'answering' });
+  try {
+    const questions = [{ jobId: 'op-a', questionId: 'q1', text: 'Which API key should I use for the payment provider?' }, { jobId: 'op-a', questionId: 'q2', text: 'Should the helper live in lib or util?' }];
+    const ctx = ctxFor(fx, { status: () => ({ phase: 'running', workerQuestions: questions, frontier: {} }) });
+    const r = await job.reconcile('job:shop-be:op-a', ctx);
+    assert.equal(r.action, 'questions');
+    const byKey = Object.fromEntries(ctx.calls.decisions.map((di) => [di.idempotencyKey, di]));
+    assert.equal(byKey['worker-question:op-a:q1'].decider, 'owner');
+    assert.equal(byKey['worker-question:op-a:q1'].escalateTo, 'owner');
+    assert.equal(byKey['worker-question:op-a:q2'].decider, 'kernel');
+    assert.equal(byKey['worker-question:op-a:q2'].escalateTo, 'supervisor');
+  } finally { fx.close(); }
+});

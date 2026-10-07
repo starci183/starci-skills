@@ -35,7 +35,7 @@ export const NUDGE = Object.freeze({
 });
 export const HEALTH_DEFAULTS = Object.freeze({
   everyMs: 30_000, idleMs: 300_000, maxIdleNudges: 2, staggerMs: 15_000, backoffMinMs: 30_000, backoffMaxMs: 300_000,
-  rateLimitDecisionMs: 1_800_000, doneNudgeEveryMs: 180_000, doneFailAfterMs: 600_000, idleNudgeEveryMs: 300_000,
+  rateLimitDecisionMs: 1_800_000, rateLimitWaitMs: 300_000, doneNudgeEveryMs: 180_000, doneFailAfterMs: 600_000, idleNudgeEveryMs: 300_000,
 });
 
 /** The reset hint of a rate-limit screen in ms from now ("resets in 5 minutes", "try again in 30s", "retry after 2h"), or null. */
@@ -88,6 +88,9 @@ export function planHealth(c, { mem = {}, now = Date.now(), settings = HEALTH_DE
 }
 
 function planRateLimited(c, m, { now, settings, rand, since }) {
+  // A reset further away than the wait budget is a quota window, not a pause: the job moves to the next eligible member
+  // (failed-no-report: the lineage demotes this pool, the retry resumes from the preserved work).
+  if (c.resetMs != null && c.resetMs > settings.rateLimitWaitMs) return { mem: { ...m, switched: true }, action: m.switched ? null : { kind: 'fail-no-report', why: `rate limit resets in ${Math.round(c.resetMs / 60_000)} min, beyond the ${Math.round(settings.rateLimitWaitMs / 60_000)} min wait budget` } };
   if (now - since > settings.rateLimitDecisionMs && !m.decided) return { mem: { ...m, decided: true }, action: { kind: 'decision', why: `rate-limited for ${Math.round((now - since) / 60_000)} min` } };
   const backoffMsOf = () => Math.min(settings.backoffMaxMs, (m.backoffMs ?? settings.backoffMinMs / 2) * 2);
   const wait = c.resetMs != null ? c.resetMs : backoffMsOf() * (1 + 0.2 * rand());

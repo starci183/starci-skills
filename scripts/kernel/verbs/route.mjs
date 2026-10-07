@@ -8,6 +8,7 @@
 // after two pool-attributable failures, a dead provider circuit or a missing host tool refuses typed with
 // 'op-override-ineligible' naming why — never a silent different pool.
 import { updateJob } from '../../../engine/db/ledger.mjs';
+import { escalateExhaustedMembers } from './shared/member-exhaustion.mjs';
 import { eachInOrder } from '../../lib/in-order.mjs';
 import { jobResultOf,jobRowOf } from './shared/rows.mjs';
 import { queuedJobOp, refuseOwnerGate, refusePeerWait, opSlotsOrRefuse } from './shared/job-gates.mjs';
@@ -291,6 +292,7 @@ export default {
   const routeFacts = { ...(lineageAdjust ? { lineageAdjust } : {}),
     ...(overrideModel ? { opOverride: { op: kind, model: overrideModel } } : {}) };
   refuseIneligibleOverride({ decision, overrideModel, pinProvider: pinPoolOf(pools, overrideModel)?.[1]?.provider ?? null, kind, jobId, workflowId: job.workflow_id, difficulty, bias, routeFacts, runningByModel, poolLoad, emit, args });
+  escalateExhaustedMembers(ledger, { job, decision, lineage });
   refuseRouteDecision({ decision, bias, routeFacts, kind, jobId, difficulty, runningByModel, poolLoad, emit, args });
 
   const decided = routeDecidedOf({ decision, redesignAs, payload, rtDoc, overrideModel, kind });

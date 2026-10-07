@@ -1,0 +1,212 @@
+schema: starci/module-kernel-op-incident-policy@1
+id: kernel.op-incident-policy
+
+# The one table of what happens when an op cannot proceed on its own (owner goal G10). Rows are read by
+# scripts/kernel/op-incident-policy.mjs; a bound is a number here or a `ref` to the yaml key that already owns it
+# (`<file>#<dotted.path>`, `[id=<x>]` selects a list entry). The policy spec resolves every ref.
+
+about:
+  en: >-
+    A situation is detected once, by the row's detector, and handled by the row's handler: whoever owns the cause and has
+    the scope to fix it. A mechanical reaction (no judgment) runs in the runtime in the workflow's name and is shown to the
+    Kernel; the Kernel acts where judgment is needed. A bound is counted per (job, agent); the per-job total is not
+    reset by a switch of agent. A spent bound escalates to the row's `next` handler, and every step records its code.
+
+handlers:
+  runtime-auto: "reconciler Job controller, dispatch path or Host controller, in the workflow's name"
+  kernel: "the workflow's [Kernel] agent: one workflow's jobs (route, dispatch, retry, reply, re-plan)"
+  supervisor: "machine-wide and runtime code: capacity across workflows, provider circuits, runtime fixes, gate verdicts"
+  owner: "product intent, credentials, spend, irreversible choices"
+
+# Switching agent for one job (rows quota, launch-failure): counted per (job, pool) by scripts/kernel/job-rejections.mjs and
+# scripts/kernel/lineage-route.mjs. One failure of a pool demotes it for the job, `excludeAfter` exclude it; the route then
+# takes the next eligible member of the job's candidate list. The tiered chain plugs in as that candidate list.
+agentSwitch:
+  excludeAfter: 2
+  # Launch refusals that are the agent's or its provider's fault and spend no try; a refusal at any other step
+  # (leases, reserve, route, depth) is a wait and never moves a pool.
+  switchSteps: [admission, worker-start, attestation, prompt-delivery, agent-launch]
+
+codes:
+  agentSwitch: {code: 'op-incident-agent-switch'}
+  escalateSupervisor: {code: 'op-incident-escalate-supervisor'}
+  escalateOwner: {code: 'op-incident-escalate-owner'}
+
+# The last step of every chain: a Supervisor Decision Item past its due time is escalated one level per stepMs until ownerAfter, where the
+# owner is notified once per item with its evidence (scripts/kernel/supervisor-di-ladder.mjs, scripts/reconciler/controllers/workers.mjs).
+ladder:
+  stepMs: {ref: "modules/reconciler/job.yaml#decisionDueMs"}
+  ownerAfter: {ref: "modules/reconciler/workers.yaml#urgentOverdueEscalations"}
+
+# A worker question matching one of these (case-insensitive) is the owner's, not the Kernel's: credentials and secrets, spend, and irreversible
+# or production-data choices. The Job controller opens its Decision Item for the owner instead of the Kernel (scripts/reconciler/controllers/job.mjs).
+ownerOnlyQuestions:
+  - '\b(password|passphrase|api[ -]?key|secret|token|credential|private key)s?\b'
+  - '\b(pay|payment|billing|invoice|purchase|spend|budget|subscription)\b'
+  - '\b(delete|drop|wipe|overwrite|migrate)\b.{0,40}\b(production|prod|live data|customer data)\b'
+
+# The Kernel seat's wake counters (scripts/kernel/kernel-watchdog.mjs): missed wakes that prove a dead Kernel behind a listed terminal, delivered
+# wakes with no Kernel move that replace it once, and the window within which a second idle spell goes to the owner as a Decision Item.
+seatWake:
+  failReplace: 3
+  failWindowMs: 600000
+  idleReplace: 3
+  idleReplacedWindowMs: 3600000
+
+rows:
+  - id: ask-worker-question
+    situation: ask
+    cause: intent
+    detector: "Job controller: job answering -> Decision Item worker-question (scripts/reconciler/controllers/job.mjs); frontier worker-question"
+    handler: kernel
+    action: "starci kernel questions, then starci kernel reply --body (what the goal, scope and prior decisions determine) or --to-owner"
+    bound: {deadlineMs: {ref: "modules/reconciler/job.yaml#sla.QUESTION_OVERDUE"}}
+    next: supervisor
+    code: worker-question
+  - id: ask-owner
+    situation: ask
+    cause: intent
+    detector: "report outcome ask; frontier ask-reserve / awaiting-owner"
+    handler: kernel
+    action: "starci kernel serve-ask; autopilot answers a reversible choice provisionally and records it for the handover; credentials, spend and costly intent go to the owner"
+    bound: {deadlineMs: {ref: "modules/models/runtimes.yaml#allocation.autopilot.supervisorGateTimeoutMs"}}
+    next: owner
+    code: op-incident-escalate-owner
+  - id: rate-limit-short
+    situation: rate-limit
+    cause: agent-provider
+    detector: "worker-health probe: rate-limit screen with a reset hint inside the wait budget (scripts/reconciler/worker-health.mjs)"
+    handler: runtime-auto
+    action: "wait in place for a reset hint inside the wait budget (else backoff), then send the retry nudge; a reset beyond the budget settles failed-no-report and the retry takes the next eligible agent"
+    bound: {waitMs: {ref: "modules/reconciler/job.yaml#health.rateLimitWaitMs"}, deadlineMs: {ref: "modules/reconciler/job.yaml#health.rateLimitDecisionMs"}}
+    next: kernel
+    code: op-incident-agent-switch
+  - id: quota-or-circuit
+    situation: rate-limit
+    cause: agent-provider
+    detector: "provider-health circuit (quota, capacity, auth, worker-start) read by route and admission; worker screen outage row"
+    handler: runtime-auto
+    action: "route the same job to the next eligible member of its candidate list and dispatch it (dispatch-ready)"
+    bound: {perAgent: {ref: "modules/kernel/op-incident-policy.yaml#agentSwitch.excludeAfter"}, waitMs: {ref: "modules/models/runtimes.yaml#allocation.cooldownMs.quota"}}
+    next: supervisor
+    code: op-incident-escalate-supervisor
+  - id: error-work
+    situation: error
+    cause: work
+    detector: "settle: red check, rejected or failed report"
+    handler: kernel
+    action: "retry the same agent with the failure fed back; the next attempt is routed to another agent; then re-plan (split or amend the contract)"
+    bound: {perJob: {ref: "modules/models/kinds.yaml#routes[id=rejected-report-retries].limit"}}
+    next: supervisor
+    code: op-incident-escalate-supervisor
+  - id: error-agent-crash
+    situation: error
+    cause: agent-provider
+    detector: "worker-health probe: terminal gone or exited; frontier worker-dead"
+    handler: runtime-auto
+    action: "starci kernel reconcile --dead-worker --settle-failed; the no-report route retries on another pool"
+    bound: {perJob: {ref: "modules/models/kinds.yaml#routes[id=no-report-retries-on-another-pool].limit"}}
+    next: kernel
+    code: failed-no-report
+  - id: error-launch
+    situation: error
+    cause: agent-provider
+    detector: "dispatch-rejected at a switch step (rejectDispatch, scripts/kernel/cli.mjs); the job returns to ready with no try spent"
+    handler: runtime-auto
+    action: "route the same job to the next eligible member of its candidate list and dispatch it (dispatch-ready)"
+    bound: {perAgent: {ref: "modules/kernel/op-incident-policy.yaml#agentSwitch.excludeAfter"}}
+    next: supervisor
+    code: op-incident-escalate-supervisor
+  - id: error-host
+    situation: error
+    cause: host
+    detector: "dispatch refusal host-resources-low, host lock held, Orca down; queuedBecause names it"
+    handler: runtime-auto
+    action: "wait with the named reason (never idle); the retry budget re-tries the host call"
+    bound: {deadlineMs: {ref: "modules/models/runtimes.yaml#allocation.hostLock.retryDeadlineMs"}}
+    next: supervisor
+    code: op-incident-escalate-supervisor
+  - id: error-runtime-defect
+    situation: error
+    cause: runtime-defect
+    detector: "the Kernel's evidence: failing command and code that no agent or retry changes"
+    handler: kernel
+    action: "take any available workaround route first, file the defect non-blocking (starci kernel incident --kind runtime-defect), hold only the affected job"
+    bound: {deadlineMs: {ref: "modules/models/runtimes.yaml#allocation.autopilot.supervisorGateTimeoutMs"}}
+    next: supervisor
+    code: op-incident-escalate-supervisor
+  - id: hang-idle
+    situation: hang
+    cause: agent-provider
+    detector: "worker-health probe: idle at its prompt without a report"
+    handler: runtime-auto
+    action: "nudge the worker; past the nudge bound a Decision Item worker-stalled goes to the Kernel"
+    bound: {perJob: {ref: "modules/reconciler/job.yaml#health.maxIdleNudges"}, deadlineMs: {ref: "modules/models/runtimes.yaml#allocation.liveness.quietMs"}}
+    next: kernel
+    code: failed-no-report
+  - id: hang-done-without-report
+    situation: hang
+    cause: agent-provider
+    detector: "worker-health probe: finished its turn with no filed report"
+    handler: runtime-auto
+    action: "nudge to file the report; past the deadline settle failed-no-report and retry on another pool"
+    bound: {deadlineMs: {ref: "modules/reconciler/job.yaml#health.doneFailAfterMs"}}
+    next: kernel
+    code: failed-no-report
+  - id: hang-silent
+    situation: hang
+    cause: agent-provider
+    detector: "terminal liveness: wedged, gate-loop or stale-active; frontier worker-wedged / worker-nudge-ready"
+    handler: kernel
+    action: "starci kernel nudge, else starci kernel reconcile --dead-worker --settle-failed"
+    bound: {deadlineMs: {ref: "modules/models/runtimes.yaml#allocation.liveness.activeStaleMs"}}
+    next: supervisor
+    code: failed-no-report
+  - id: restart-agent
+    situation: restart
+    cause: agent-provider
+    detector: "terminal gone or disconnected for a running op (frontier deadWorkerJobs)"
+    handler: runtime-auto
+    action: "reattach a live worker (live-worker-reconciled) or settle it failed-no-report and retry; a replacement may be another agent"
+    bound: {perJob: {ref: "modules/models/kinds.yaml#routes[id=no-report-retries-on-another-pool].limit"}}
+    next: kernel
+    code: failed-no-report
+  - id: seat-kernel
+    situation: restart
+    cause: agent-provider
+    detector: "Host controller concern host.kernel-seat (scripts/kernel/kernel-watchdog.mjs)"
+    handler: runtime-auto
+    action: "wake an idle Kernel, replace a dead or non-answering one"
+    bound: {perAgent: {ref: "modules/kernel/op-incident-policy.yaml#seatWake.idleReplace"}, deadlineMs: {ref: "modules/kernel/op-incident-policy.yaml#seatWake.failWindowMs"}, windowMs: {ref: "modules/kernel/op-incident-policy.yaml#seatWake.idleReplacedWindowMs"}}
+    next: owner
+    code: op-incident-escalate-owner
+
+# Every hold the runtime can put on a job, a seat or a workflow, checked against the invariants by tests/kernel/op-incident-policy.spec.mjs:
+#   I1 a named cause and its evidence          I2 exactly one current handler           I3 a condition re-evaluated; the runtime clears the hold
+#   I4 a bound, then the next handler          I5 the narrowest scope                   I6 a workaround route before a hold
+#   I7 status shows handler, step, deadline    I8 the chain ends at the owner, told once per cause with what was tried
+# `gap` lists the invariants a hold does not meet today, each with its reason in `gapWhy`: a documented gap, not an exemption.
+# `queuedBecause` names the status projection value (scripts/kernel/cli.mjs QUEUED_BECAUSE reads the list from here, in this order).
+holds:
+  - {id: owner-gate, queuedBecause: owner-gate, scope: job, cause: "owner-gate incident naming the job", handler: owner, reeval: "typed --until conditions (scripts/kernel/gate-conditions.mjs autoResolveTypedIncidents)", bound: {deadlineMs: {ref: "modules/models/runtimes.yaml#allocation.autopilot.supervisorGateTimeoutMs"}}, chain: [owner], visible: "status queued[].queuedBecause, frontier awaiting-owner", gap: [I3], gapWhy: "an untyped owner-gate is cleared only by the Kernel's incident --resolve"}
+  - {id: supervisor-gate, queuedBecause: supervisor-gate, scope: job, cause: "supervisor-gate incident (runtime defect, budget, retry cap)", handler: supervisor, reeval: "none for an untyped gate; the budget gate is re-evaluated by autopilot-budget-gate.mjs", bound: {deadlineMs: {ref: "modules/models/runtimes.yaml#allocation.autopilot.supervisorGateTimeoutMs"}}, chain: [supervisor, owner], visible: "status queued[].blockedBy.incident, frontier supervisor-wait", gap: [I3, I6, I8], gapWhy: "no Supervisor Decision Item is opened for a gate, so the ladder never carries it to the owner; it is cleared only by a Supervisor resolve; the Kernel raises it (plan deadlock after a provisional autopilot answer, Nivo inc-ce67aea64fab) before trying the workaround of re-answering with the non-binding option; past supervisorGateTimeoutMs it defers the held jobs into the handover list"}
+  - {id: budget-gate, scope: workflow, workflowWide: "a workflow cap actually exceeded holds all dispatch; unknown usage holds nothing", cause: "autopilot budget requires review", handler: supervisor, reeval: "scripts/kernel/autopilot-budget-gate.mjs on every status and watchdog read", bound: {deadlineMs: {ref: "modules/models/runtimes.yaml#allocation.autopilot.supervisorGateTimeoutMs"}}, chain: [supervisor, owner], visible: "status autopilot.supervisorGates, frontier supervisor-wait"}
+  - {id: deferred, queuedBecause: deferred, scope: job, cause: "autopilot deferred the leg past a supervisor-gate deadline", handler: owner, reeval: "the autopilot sweep releases it when the gate resolves", bound: {deadlineMs: {ref: "modules/models/runtimes.yaml#allocation.autopilot.supervisorGateTimeoutMs"}}, chain: [owner], visible: "status queued[].queuedBecause, autopilot.deferred"}
+  - {id: deferred-to-handover, queuedBecause: deferred-to-handover, scope: job, cause: "credential, spend or owner-only ask deferred to the end-of-flow checklist", handler: owner, reeval: "the owner's checklist answer supersedes the ask (autopilot supersedeSupplied)", bound: {deadlineMs: {ref: "modules/models/runtimes.yaml#allocation.serveAsk.ttlMs"}}, chain: [owner], visible: "status autopilot.deferredToHandover"}
+  - {id: peer-wait, queuedBecause: peer-wait, scope: job, cause: "peer-wait incident: the peer workflow has not landed what the step needs", handler: runtime-auto, reeval: "typed --until conditions and the peer's message", bound: {deadlineMs: {ref: "modules/models/runtimes.yaml#allocation.opTelemetry.stuckSla.peer-wait.warnMs"}}, chain: [kernel, supervisor, owner], visible: "frontier peer-wait with the peer and its phase", gap: [I4], gapWhy: "an aged wait raises a finding but no Decision Item moves it to the next handler"}
+  - {id: foundation-wait, queuedBecause: foundation-wait, scope: job, cause: "a shared foundation another workflow claimed", handler: runtime-auto, reeval: "the foundation landed (scripts/kernel/shell-foundation.mjs)", bound: {deadlineMs: {ref: "modules/models/runtimes.yaml#allocation.drawLoop.shellFoundationStallMs"}}, chain: [supervisor, owner], visible: "status queued[].blockedBy", gap: [I8], gapWhy: "the stall reaches the Supervisor and stops there"}
+  - {id: dependency, queuedBecause: dependency, scope: job, cause: "a leg or --after job it depends on is not settled", handler: runtime-auto, reeval: "every status read", bound: {deadlineMs: {ref: "modules/models/runtimes.yaml#allocation.opTelemetry.stuckSla.dependency.criticalMs"}}, chain: [kernel], visible: "status queued[].queuedBecause", gap: [I8], gapWhy: "the dependency's own hold carries the chain to the owner; the dependant adds none"}
+  - {id: dependency-failed, queuedBecause: dependency-failed, scope: job, cause: "the job it waits on settled failed", handler: kernel, reeval: "every status read", bound: {perJob: {ref: "modules/models/kinds.yaml#routes[id=no-report-retries-on-another-pool].limit"}}, chain: [kernel, supervisor, owner], visible: "frontier ready work naming the job", gap: [I4], gapWhy: "no count and no deadline: it stays ready work until the Kernel retries, re-points or drops it"}
+  - {id: max-ops, queuedBecause: max-ops, scope: workflow, workflowWide: "the workflow's own parallelism cap", cause: "budgets.maxOps reached", handler: runtime-auto, reeval: "a running job settles", bound: {deadlineMs: {ref: "modules/models/runtimes.yaml#allocation.opTelemetry.stuckSla.throttled.warnMs"}}, chain: [kernel, owner], visible: "status queued[].queuedBecause", gap: [I4], gapWhy: "a capacity wait that ends when a slot frees; the aging finding is its only bound"}
+  - {id: circuit-open, queuedBecause: circuit-open, scope: machine, workflowWide: "a provider circuit is a machine fact shared by every workflow", cause: "provider-health circuit open for the job's pool", handler: runtime-auto, reeval: "circuit expiry and the quota probe (provider-health --quota-probe)", bound: {waitMs: {ref: "modules/models/runtimes.yaml#allocation.cooldownMs.quota"}}, chain: [kernel, supervisor, owner], visible: "status queued[].queuedBecause circuit-open with the expiry", gap: [I6], gapWhy: "the job waits for the circuit before route is asked for another member of its candidate list"}
+  - {id: path-lease, queuedBecause: path-lease, scope: job, cause: "a live lease on the job's write set", handler: runtime-auto, reeval: "the holder settles and releases", bound: {deadlineMs: {ref: "modules/models/runtimes.yaml#allocation.dispatchLeaseTtlMs"}}, chain: [kernel, supervisor], visible: "status queued[].blockedBy holder and expiry", gap: [I8], gapWhy: "lease expiry is a recovery signal only; nothing is raised past it"}
+  - {id: pool-full, queuedBecause: pool-full, scope: machine, workflowWide: "pool capacity is shared by every workflow", cause: "every eligible pool at maxParallel", handler: runtime-auto, reeval: "a running job settles or a reservation is released", bound: {deadlineMs: {ref: "modules/models/runtimes.yaml#allocation.routeHoldMs"}}, chain: [supervisor], visible: "status queued[].queuedBecause pool-full", gap: [I4, I8], gapWhy: "a leaked reservation keeps a pool full with no escalation"}
+  - {id: host-resources-low, queuedBecause: host-resources-low, scope: machine, workflowWide: "disk and RAM floors are machine facts", cause: "dispatch refused below the disk or RAM floor", handler: runtime-auto, reeval: "every dispatch and status read", bound: {deadlineMs: {ref: "modules/models/runtimes.yaml#allocation.hostLock.retryDeadlineMs"}}, chain: [supervisor, owner], visible: "status queued[].queuedBecause, frontier idle-waiting with the reason", gap: [I8], gapWhy: "the Kernel escalates once to the coordinator by hand; no runtime step tells the owner"}
+  - {id: ready, queuedBecause: ready, scope: job, cause: "a launch refused at a switch step returned the job to ready", handler: runtime-auto, reeval: "dispatch-ready routes the job off the refusing pool on every push", bound: {perAgent: {ref: "modules/kernel/op-incident-policy.yaml#agentSwitch.excludeAfter"}}, chain: [runtime-auto, supervisor, owner], visible: "status queued[].policy and frontier.reason carry the step line"}
+  - {id: effect-unknown, scope: job, cause: "a launch of unknown effect is fenced", handler: runtime-auto, reeval: "starci kernel reconcile on the Job controller's effectUnknownMs", bound: {deadlineMs: {ref: "modules/reconciler/job.yaml#sla.EFFECT_UNKNOWN_STUCK"}}, chain: [kernel, supervisor], visible: "SLA EFFECT_UNKNOWN_STUCK", gap: [I7, I8], gapWhy: "status shows no step; a worker that may have started is never forced"}
+  - {id: worker-question, scope: job, cause: "worker-question Decision Item", handler: kernel, reeval: "the reply closes it", bound: {deadlineMs: {ref: "modules/reconciler/job.yaml#sla.QUESTION_OVERDUE"}}, chain: [kernel, supervisor, owner], visible: "frontier worker-question"}
+  - {id: worker-stalled, scope: job, cause: "worker-stalled Decision Item: the nudges did not move the worker", handler: kernel, reeval: "the worker files a report or is settled", bound: {deadlineMs: {ref: "modules/reconciler/job.yaml#decisionDueMs"}}, chain: [kernel, supervisor], visible: "frontier worker-nudge-ready and worker-wedged", gap: [I8], gapWhy: "the chain ends at the Supervisor"}
+  - {id: settle-nongreen, scope: job, cause: "settle-nongreen Decision Item: the runtime did not settle the report", handler: kernel, reeval: "starci kernel settle", bound: {deadlineMs: {ref: "modules/reconciler/job.yaml#decisionDueMs"}}, chain: [kernel, supervisor], visible: "frontier settle-ready and transition-ready", gap: [I8], gapWhy: "the chain ends at the Supervisor"}
+  - {id: progress-stall, scope: workflow, workflowWide: "no unit moved across the whole workflow", cause: "progress-stall Decision Item", handler: kernel, reeval: "progress resumes", bound: {deadlineMs: {ref: "modules/models/runtimes.yaml#allocation.progress.supervisorGraceMs"}}, chain: [kernel, supervisor, owner], visible: "status progress.stall with the rca actions"}
+  - {id: kernel-seat, scope: workflow, workflowWide: "the workflow's single Kernel seat", cause: "Kernel dead, silent or replaced", handler: runtime-auto, reeval: "Host controller concern host.kernel-seat every pass", bound: {perAgent: {ref: "modules/reconciler/host.yaml#seats.kernel.maxReplacementsPerHour"}, wakes: {ref: "modules/kernel/op-incident-policy.yaml#seatWake.idleReplace"}}, chain: [runtime-auto, supervisor, owner], visible: "SLA SEAT_VACANT and status kernel", gap: [I6], gapWhy: "a replacement is the same agent; switching agent on the seat's quota is not declared"}
+  - {id: land-queue, scope: machine, workflowWide: "one land at a time holds the host lock", cause: "supervisor land holds the host lock", handler: supervisor, reeval: "the land finishes or the ticket is cancelled", bound: {deadlineMs: {ref: "modules/models/runtimes.yaml#allocation.landGate.waitMs"}}, chain: [supervisor, owner], visible: "SLA LAND_QUEUE_STALL", gap: [I5, I8], gapWhy: "the lock is coarse (an npm ci waits behind a thirty minute land) and a stall stops at the Supervisor"}

@@ -49,6 +49,7 @@ health:
   backoffMinMs: 30000        # rate limit with no reset hint: 30s -> 5min, +20% jitter
   backoffMaxMs: 300000
   rateLimitDecisionMs: 1800000
+  rateLimitWaitMs: 300000    # a rate-limit reset further away than this moves the job to the next eligible agent
   doneNudgeEveryMs: 180000
   doneFailAfterMs: 600000    # done-without-report this long -> starci kernel reconcile --dead-worker --settle-failed
 # SLA per phase (DESIGN §9.1); codes in modules/reconciler/sla.yaml; entity job:<ledgerId>:<jobId>

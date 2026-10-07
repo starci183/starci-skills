@@ -1,6 +1,7 @@
 // The frontier's state word and reason text (verbs/status.mjs): the first state of the Kernel's priority
 // order that holds, then the prose that says what the Kernel does next.
 import path from 'node:path';
+import { launchRefusalViewOf } from './launch-refusal-step.mjs';
 import { runtimeProfile } from '../../../../engine/config.mjs';
 import { AUTOPILOT_RULING, SUPERVISOR_GATE } from '../../autopilot-run.mjs';
 import { typedIncidents } from '../../gate-conditions.mjs';
@@ -76,7 +77,7 @@ const admitReadyJobs = (s) => {
   for (const row of ready) {
     const foundation = jobPayloadOf(row).foundation;
     s.queued.push({ jobId: row.job_id, opId: row.op_id ?? null, attempt: row.attempt,
-      ...queuedBecauseOf(db, row, queueCtx), ...(foundation ? { foundation } : {}) });
+      ...queuedBecauseOf(db, row, queueCtx), ...launchRefusalViewOf(db, row), ...(foundation ? { foundation } : {}) });
   }
   // The ordering and counts the queue projection settled over the shorter list answer for the merged
   // rows too: waiters' weight first, then the parked-behind notes and the engaged test's wait-held count
@@ -196,6 +197,11 @@ const staleReason = (s) => {
   return [redo, followUp].filter(Boolean).join('; ');
 };
 
+const readyReason = (s) => {
+  const steps = s.queued.filter((item) => item.policy).map((item) => `${item.jobId} ${item.policy}`);
+  return ['queued or fenced operations are waiting on the Kernel; route/dispatch or reconcile them before yielding', ...steps].join('; ');
+};
+
 const REASON_ORDER = [
   [(s) => s.frontierState === 'ask-reserve' || (s.askReserve.length > 0 && !ASK_RESERVE_QUIET.has(s.frontierState)), reserveReason],
   [(s) => s.frontierState === 'worker-question', questionReason],
@@ -211,7 +217,7 @@ const REASON_ORDER = [
   [(s) => s.frontierState === 'orphaned-frontier' && s.peerWaitMovable.length, peerMovableReason],
   [(s) => s.frontierState === 'orphaned-frontier', orphanedReason],
   [(s) => s.frontierState === 'worker-nudge-ready', () => NUDGE_READY_REASON],
-  [(s) => s.actionable && s.readyOperations > 0, () => 'queued or fenced operations are waiting on the Kernel; route/dispatch or reconcile them before yielding'],
+  [(s) => s.actionable && s.readyOperations > 0, readyReason],
   [(s) => s.staleReady.length > 0, staleReason],
 ];
 
