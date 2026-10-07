@@ -40,7 +40,7 @@ test('a healthy workflow lists no problem and the digest says so in the owner la
   assert.equal(d.workflows[0].running[0].op, 'x');
   assert.deepEqual(d.workflows[0].usage, [{ op: 'x', tokens: 1200, turns: 3, attempts: 1, costUsd: 0.5 }]);
   assert.match(renderText(d, { language: 'en' }), /No problem found\./);
-  assert.match(renderText(d, { language: 'vi' }), /Không thấy vấn đề nào\./);
+  assert.match(renderText(d, { language: 'vi' }), /Kh\u00f4ng th\u1ea5y v\u1ea5n \u0111\u1ec1 n\u00e0o\./);
 });
 
 test('a job held past its deadline names the hold, its handler, the step and the overdue time', () => {
@@ -53,7 +53,7 @@ test('a job held past its deadline names the hold, its handler, the step and the
   assert.deepEqual([held.hold, held.handler, held.overdue, held.step.kind], ['path-lease', hold.handler, true, 'bound-spent']);
   assert.equal(d.problems[0].key, 'hold-op-held-1');
   assert.equal(d.problems[0].params.min, 7);
-  assert.match(renderText(d), /held by path-lease 7 min past its deadline/);
+  assert.match(renderText(d, { language: 'en' }), /held by path-lease 7 min past its deadline/);
   const inside = digest(snapshot({ workflows: [workflow({ jobs: [job(), { ...waiting, updatedAt: NOW - MIN }], status: wf.status })] }));
   assert.equal(inside.workflows[0].held[0].overdue, false);
   assert.deepEqual(inside.problems, []);
@@ -117,7 +117,7 @@ test('controllers that are off while the config asks for them are the first line
   assert.equal(d.reconciler.alarm.kind, 'all-off');
   const lines = renderText(d, { language: 'en' }).split('\n');
   assert.match(lines[1], /^ALARM: Controllers job, host are off although the config asks for them/);
-  assert.match(renderText(d, { language: 'vi' }).split('\n')[1], /^BÁO ĐỘNG: Các controller job, host đang tắt/);
+  assert.match(renderText(d, { language: 'vi' }).split('\n')[1], /^B\u00c1O \u0110\u1ed8NG: C\u00e1c controller job, host \u0111ang t\u1eaft/);
   const half = digest(snapshot({ engine: { ...off.engine, modes: { job: 'active', host: 'off' } } }));
   assert.deepEqual([half.reconciler.alarm.kind, half.reconciler.alarm.names], ['some-off', ['host']]);
   const gone = digest(snapshot({ engine: { ...off.engine, leader: null } }));
@@ -170,7 +170,7 @@ test('the problems are ordered by the work each blocks, then by key', () => {
 test('the text names every section in both languages and the JSON carries the same digest', async () => {
   const d = digest(snapshot());
   for (const [language, words] of [['en', ['Reconciler:', 'Supervisor:', 'Workflow Shop (shop) phase running', 'Kernel: alive', 'Admission:']],
-    ['vi', ['Reconciler:', 'Supervisor:', 'Workflow Shop (shop) giai đoạn running', 'Kernel: còn sống', 'Cấp phép:']]]) {
+    ['vi', ['Reconciler:', 'Supervisor:', 'Workflow Shop (shop) giai \u0111o\u1ea1n running', 'Kernel: c\u00f2n s\u1ed1ng', 'C\u1ea5p ph\u00e9p:']]]) {
     const text = renderText(d, { language });
     for (const word of words) assert.ok(text.includes(word), `${language}: ${word}`);
   }

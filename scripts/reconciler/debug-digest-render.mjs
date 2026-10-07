@@ -59,7 +59,7 @@ function workflowLines(tr, w, now) {
 const problemText = (tr, p) => tr(PROBLEM_TEXT[p.code] ?? p.code, p.params);
 
 /** The digest as text in `language`; the controllers alarm, when there is one, is the first line after the title. */
-export function renderText(digest, { language = 'en' } = {}) {
+export function renderText(digest, { language }) {
   const tr = translator(language);
   const lines = [tr(TEXT.title, { time: new Date(digest.at).toISOString() })];
   const alarm = digest.problems.find((p) => p.key === 'controllers-off');
@@ -75,4 +75,4 @@ export function renderText(digest, { language = 'en' } = {}) {
 }
 
 /** The line printed when there is no machine store to read. */
-export const renderUnavailable = (reason, language = 'en') => translator(language)(TEXT.unavailable, { reason });
+export const renderUnavailable = (reason, language) => translator(language)(TEXT.unavailable, { reason });
