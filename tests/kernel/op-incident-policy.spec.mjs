@@ -137,3 +137,25 @@ test('the tier chain takes the switch: one refusal moves the member last in its 
   assert.notEqual(excluded.target, 'claude-agent');
   assert.match(JSON.stringify(excluded.rejected), /excluded for this retry lineage: failed 2x on it/);
 });
+
+test('every member spent: the runtime opens one supervisor-gate holding only that job, once, with the per-member refusals', async (t) => {
+  const { escalateExhaustedMembers } = await import('../../scripts/kernel/verbs/shared/member-exhaustion.mjs');
+  const { supervisorGatesOf } = await import('../../scripts/kernel/autopilot-budget.mjs');
+  withLedger(t, (ledger) => {
+    seed(ledger, { rejections: [] });
+    const job = ledger.db.prepare('SELECT * FROM jobs WHERE job_id=?').get(RETRY);
+    const lineage = { exclude: ['claude-agent', 'codex-agent'], pools: { 'claude-agent': { failures: 2, causes: ['x'] } } };
+    const spent = { error: 'agent admission refused', chain: ['claude/a', 'codex/b'], rejected: [
+      { target: 'claude/a', reason: 'excluded for this retry lineage: failed 2x on it', reasons: ['excluded for this retry lineage: failed 2x on it'] },
+      { target: 'codex/b', reason: 'excluded for this retry lineage: failed 2x on it', reasons: ['excluded for this retry lineage: failed 2x on it'] }] };
+    assert.equal(escalateExhaustedMembers(ledger, { job, decision: { ...spent, rejected: spent.rejected.slice(1) }, lineage }), null, 'a member still unlisted is not exhaustion');
+    const id = escalateExhaustedMembers(ledger, { job, decision: spent, lineage });
+    assert.ok(id);
+    assert.equal(escalateExhaustedMembers(ledger, { job, decision: spent, lineage }), null, 'once per (job, cause)');
+    const gates = supervisorGatesOf(ledger.db, WF);
+    assert.deepEqual(gates.map((g) => [g.incidentId, g.holds]), [[id, [RETRY]]]);
+    const raised = JSON.parse(ledger.db.prepare("SELECT payload_json FROM events WHERE kind='incident-raised'").get().payload_json);
+    assert.equal(raised.evidence.cause, 'op-incident-escalate-supervisor');
+    assert.equal(raised.evidence.members.length, 2);
+  });
+});
