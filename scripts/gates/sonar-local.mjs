@@ -1141,7 +1141,7 @@ const parseArgument=(out,argv,index)=>{
   const arg=argv[index];
   if(arg==='--'){out.rest=argv.slice(index+1);return argv.length;}
   const boolean=BOOLEAN_FLAGS.get(arg);
-  if(boolean){out[boolean]=arg==='--no-ensure'?false:true;return index;}
+  if(boolean){out[boolean]=arg!=='--no-ensure';return index;}
   if(!arg.startsWith('--')){out._.push(arg);return index;}
   const [flag,inline]=arg.slice(2).split(/=(.*)/s),name=flag.replace(/-([a-z])/g,(_,letter)=>letter.toUpperCase());
   const value=inline??argv[index+1];
@@ -1150,8 +1150,8 @@ const parseArgument=(out,argv,index)=>{
 };
 function parseArgs(argv){
   const out={_:[],rest:null};
-  for(let index=0;index<argv.length;index+=1){
-    index=parseArgument(out,argv,index);
+  for(let index=0,nextIndex=0;index<argv.length;index=nextIndex){
+    nextIndex=parseArgument(out,argv,index)+1;
     if(out.rest!==null)break;
   }
   return out;
