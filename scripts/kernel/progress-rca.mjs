@@ -150,7 +150,7 @@ export function progressOf({ jobs, core = {}, workflowId, createdAt = null, now 
   const running = jobs.filter((j) => SLOT_STATUSES.includes(j.status)).length, queued = core.frontier?.queued ?? [];
   const readyJobs = queued.filter((q) => q.queuedBecause === 'ready').map((q) => q.jobId), queuedReady = readyJobs.length;
   const par = allowedParallelOf({ core, running, queuedReady, workflowId, prio });
-  const legs = Array.isArray(core.legs) ? core.legs : [], legsDone = legs.filter((l) => l.color === 'green').length;
+  const legs = (Array.isArray(core.legs) ? core.legs : []).filter((l) => l.color !== 'external'), legsDone = legs.filter((l) => l.color === 'green').length;
   const lastDoneAt = done.length ? Math.max(...done.map((u) => u.doneAt)) : null, priority = isPriority(workflowId, prio);
   const minRate = priority ? settings.minUnitsPerHour.priority : settings.minUnitsPerHour.default;
   const quietSince = lastDoneAt ?? (createdAt != null && Number.isFinite(Number(createdAt)) ? Number(createdAt) : now);
