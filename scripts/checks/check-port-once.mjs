@@ -45,10 +45,13 @@ const RUNTIME_CODE = /^(?:scripts|engine|ui|ext)\//;
 const OUT = /node_modules\/|\/dist\/|^packages\/[^/]+\/runtime\/|^tests\/|\.spec\.|\.starciwork\/|\.starcistacks\/|starcistacks-services\/|CHANGELOG/;
 const inScope = scopeFilter({ scope: SCOPE, ext: TEXT_EXT, out: OUT, exclude: SELF_FILES });
 
+const HOST_NAME_PATTERN = String.raw`(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[[0-9a-f:]*\]|[a-z][\w.-]*\.[\w.-]+)`;
+const HOST_PORT = new RegExp(String.raw`\b${HOST_NAME_PATTERN}:(\d{4,5})\b`, 'gi');
+
 /** The port-position contexts, each capturing the port literal in group 1. */
 const CONTEXTS = [
   /:\/\/[\w.-]+:(\d{4,5})\b/g,                                          // scheme://host:port
-  /\b(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[[0-9a-f:]*\]|[a-z][\w.-]*\.[\w.-]+):(\d{4,5})\b/gi, // host:port
+  HOST_PORT, // host:port
   /\b[a-z_]*port[a-z_]*\s*[:=]\s*['"`]?(\d{4,5})\b/gi,                  // port: NNNN / port = NNNN / containerPort
   /\b[A-Z][A-Z0-9_]*PORT\s*[:=]\s*['"`]?(\d{4,5})\b/g,                  // SOME_PORT = NNNN
   /\.listen\(\s*(\d{4,5})\b/g,                                        // .listen(NNNN)

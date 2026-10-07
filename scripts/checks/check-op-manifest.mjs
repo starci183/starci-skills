@@ -83,23 +83,26 @@ const unitOf = (word) => {
 // -------------------------------------------------------------------- rules
 
 /** The schema findings of one variant of one op: duplicate section keys, undeclared step refs. */
+const duplicateSectionFindings = (id, full, mode, section, add) => {
+  const key = section === 'blockers' ? 'code' : 'id', seen = new Set();
+  const entries = mode === 'envelope' ? full[section] : full.policy.executionModes[mode][section];
+  for (const entry of Array.isArray(entries) ? entries : []) {
+    if (seen.has(entry?.[key])) add(id, 'SCHEMA_INVALID', 'error', `${mode}.${section}: duplicate ${key} ${entry?.[key]}`);
+    seen.add(entry?.[key]);
+  }
+};
+
+const undeclaredStepReferences = (id, mode, effective, i, step, section, add) => {
+  const declared = new Set((effective?.[section] ?? []).map((entry) => entry.id));
+  for (const ref of step?.[section] ?? []) if (!declared.has(ref)) {
+    add(id, 'SCHEMA_INVALID', 'error', `${mode}.steps[${i}].${section}: undeclared ${ref}`);
+  }
+};
+
 const variantSectionFindings = (id, full, mode, effective, add) => {
-  for (const section of ['reads', 'writes', 'proofs', 'blockers']) {
-    const key = section === 'blockers' ? 'code' : 'id', seen = new Set();
-    const entries = mode === 'envelope' ? full[section] : full.policy.executionModes[mode][section];
-    for (const entry of Array.isArray(entries) ? entries : []) {
-      if (seen.has(entry?.[key])) add(id, 'SCHEMA_INVALID', 'error', `${mode}.${section}: duplicate ${key} ${entry?.[key]}`);
-      seen.add(entry?.[key]);
-    }
-  }
-  for (const [i, step] of (Array.isArray(effective?.steps) ? effective.steps : []).entries()) {
-    for (const section of ['reads', 'writes']) {
-      const declared = new Set((effective?.[section] ?? []).map((entry) => entry.id));
-      for (const ref of step?.[section] ?? []) if (!declared.has(ref)) {
-        add(id, 'SCHEMA_INVALID', 'error', `${mode}.steps[${i}].${section}: undeclared ${ref}`);
-      }
-    }
-  }
+  for (const section of ['reads', 'writes', 'proofs', 'blockers']) duplicateSectionFindings(id, full, mode, section, add);
+  for (const [i, step] of (Array.isArray(effective?.steps) ? effective.steps : []).entries())
+    for (const section of ['reads', 'writes']) undeclaredStepReferences(id, mode, effective, i, step, section, add);
 };
 
 /** The variant-only findings of one non-envelope variant: on-disk checks and joined write paths. */

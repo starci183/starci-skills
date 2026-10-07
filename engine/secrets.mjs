@@ -45,12 +45,15 @@ export function readSecretBytes(file){
 
 const readCredentialFile = file => { const bytes=readSecretBytes(file); try{return bytes.toString('utf8');}finally{bytes.fill(0);} };
 
+const DOTENV_LINE_PARTS = ['^\\s*', '(?:export\\s+)?', '([A-Za-z_]\\w*)', '\\s*=\\s*', '([^\\r\\n\\u2028\\u2029]*)', '\\s*$'];
+const DOTENV_LINE = new RegExp(DOTENV_LINE_PARTS.join(''));
+
 /** Parse a dotenv file (KEY=VALUE lines, # comments, optional export/quotes). An absent file is {}. */
 export function readDotenv(file){
   let text='';try{text=readCredentialFile(file);}catch(error){if(error?.code==='ENOENT'){return {};}throw error;}
   const out={};
   for(const line of text.split(/\r?\n/)){
-    const m=/^\s*(?:export\s+)?([A-Za-z_]\w*)\s*=\s*([^\r\n\u2028\u2029]*)\s*$/.exec(line);
+    const m=DOTENV_LINE.exec(line);
     if(!m)continue;
     let value=m[2].trimEnd();
     if(value.length>=2&&(value.startsWith('"')||value.startsWith("'"))&&value.at(-1)===value[0])value=value.slice(1,-1);

@@ -20,29 +20,26 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { gitDirOf, lockStat, processOnRepo } from '../../lib/git-dir.mjs';
 
-/**
- * Recover `repo`'s stale index lock. `staleMs` is the age a lock must pass (allocation.housekeeping.
- * gitIndexLockStaleMs); `apply` false reports `would-remove` and removes nothing; `list()` is the caller's git-process
- * probe ([{pid, name, commandLine}] or null; none given: probe-failed, nothing removed); `record(result)` is called once
- * for a removal.
- * Returns {repo, lock, state, ageMs?, holders?, error?}; state is one of absent | fresh | not-a-file | probe-failed |
- * held | changed | would-remove | removed | error.
- */
-export function indexLock({ repo, staleMs, now = Date.now(), apply = true, list = null, record = null } = {}) {
+const initialLockState = (repo, staleMs, now) => {
   const gitDir = gitDirOf(repo);
   const lock = gitDir ? path.join(gitDir, 'index.lock') : null;
   const out = { repo: path.resolve(String(repo ?? '')), lock, state: 'absent' };
   const before = lock ? lockStat(lock) : null;
-  if (!before) return out;
+  if (!before) return { out, before, result: out };
   out.ageMs = Math.max(0, now - before.mtimeMs);
   out.bytes = before.size;
-  if (before.isSymbolicLink() || !before.isFile()) return { ...out, state: 'not-a-file' };
-  if (!(Number(staleMs) > 0) || out.ageMs < Number(staleMs)) return { ...out, state: 'fresh' };
+  if (before.isSymbolicLink() || !before.isFile()) return { out, before, result: { ...out, state: 'not-a-file' } };
+  if (!(Number(staleMs) > 0) || out.ageMs < Number(staleMs)) return { out, before, result: { ...out, state: 'fresh' } };
+  return { out, before, result: null };
+};
+
+const processHoldersOnRepo = (list, repo) => {
   let procs = null;
   try { procs = typeof list === 'function' ? list() : null; } catch { procs = null; }
-  if (!Array.isArray(procs)) return { ...out, state: 'probe-failed' };
-  const holders = procs.filter((p) => processOnRepo(p, out.repo) !== 'other');
-  if (holders.length) return { ...out, state: 'held', holders: holders.map((p) => ({ pid: p.pid, name: p.name, commandLine: String(p.commandLine ?? '').slice(0, 200) })) };
+  return Array.isArray(procs) ? procs.filter((p) => processOnRepo(p, repo) !== 'other') : null;
+};
+
+const removeVerifiedLock = ({ lock, out, before, apply, record }) => {
   const after = lockStat(lock);
   if (!after) return { ...out, state: 'absent' };
   if (after.mtimeMs !== before.mtimeMs || after.size !== before.size) return { ...out, state: 'changed' };
@@ -53,4 +50,23 @@ export function indexLock({ repo, staleMs, now = Date.now(), apply = true, list 
   const removed = { ...out, state: 'removed', mtime: new Date(before.mtimeMs).toISOString() };
   if (typeof record === 'function') { try { record(removed); } catch { /* the removal stands without its event */ } }
   return removed;
+};
+
+/**
+ * Recover `repo`'s stale index lock. `staleMs` is the age a lock must pass (allocation.housekeeping.
+ * gitIndexLockStaleMs); `apply` false reports `would-remove` and removes nothing; `list()` is the caller's git-process
+ * probe ([{pid, name, commandLine}] or null; none given: probe-failed, nothing removed); `record(result)` is called once
+ * for a removal.
+ * Returns {repo, lock, state, ageMs?, holders?, error?}; state is one of absent | fresh | not-a-file | probe-failed |
+ * held | changed | would-remove | removed | error.
+ */
+export function indexLock({ repo, staleMs, now = Date.now(), apply = true, list = null, record = null } = {}) {
+  const initial = initialLockState(repo, staleMs, now);
+  if (initial.result) return initial.result;
+  const { out, before } = initial;
+  const { lock } = out;
+  const holders = processHoldersOnRepo(list, out.repo);
+  if (holders === null) return { ...out, state: 'probe-failed' };
+  if (holders.length) return { ...out, state: 'held', holders: holders.map((p) => ({ pid: p.pid, name: p.name, commandLine: String(p.commandLine ?? '').slice(0, 200) })) };
+  return removeVerifiedLock({ lock, out, before, apply, record });
 }

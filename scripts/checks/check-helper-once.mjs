@@ -212,8 +212,7 @@ const dice = (a, b) => {
  * The members of a cluster agree on one home: the exported lib helper when there is one, else the first path. Every
  * other member is a finding. A copy RT_HELPER_REDEFINED already reported is not reported twice.
  */
-/** The function rows of `parsed` clustered by near-copy similarity (union-find over Dice-similar pairs). */
-const nearCopyClusters = (parsed) => {
+const nearCopyRows = (parsed) => {
   const rows = [];
   for (const file of parsed) {
     for (const row of file.rows) {
@@ -222,16 +221,26 @@ const nearCopyClusters = (parsed) => {
       if (tokens.length >= NEAR_MIN_TOKENS) rows.push({ file, row, tokens, grams: trigrams(tokens), id: rows.length });
     }
   }
+  return rows;
+};
+
+const connectNearCopyRows = (rows, parent, find, i, j) => {
+  const [a, b] = [rows[i], rows[j]];
+  if (a.file.rel === b.file.rel) return;
+  if (Math.abs(a.tokens.length - b.tokens.length) > Math.max(a.tokens.length, b.tokens.length) * 0.3) return;
+  if (dice(a, b) >= NEAR_COPY_SIMILARITY) parent[find(i)] = find(j);
+};
+
+const nearCopyParents = (rows) => {
   const parent = rows.map((_, i) => i);
   const find = (i) => { while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; } return i; };
   for (let i = 0; i < rows.length; i += 1) {
-    for (let j = i + 1; j < rows.length; j += 1) {
-      const [a, b] = [rows[i], rows[j]];
-      if (a.file.rel === b.file.rel) continue;
-      if (Math.abs(a.tokens.length - b.tokens.length) > Math.max(a.tokens.length, b.tokens.length) * 0.3) continue;
-      if (dice(a, b) >= NEAR_COPY_SIMILARITY) parent[find(i)] = find(j);
-    }
+    for (let j = i + 1; j < rows.length; j += 1) connectNearCopyRows(rows, parent, find, i, j);
   }
+  return find;
+};
+
+const groupNearCopyRows = (rows, find) => {
   const clusters = new Map();
   for (const r of rows) {
     const root = find(r.id);
@@ -239,6 +248,12 @@ const nearCopyClusters = (parsed) => {
     clusters.get(root).push(r);
   }
   return clusters;
+};
+
+/** The function rows of `parsed` clustered by near-copy similarity (union-find over Dice-similar pairs). */
+const nearCopyClusters = (parsed) => {
+  const rows = nearCopyRows(parsed);
+  return groupNearCopyRows(rows, nearCopyParents(rows));
 };
 
 function nearCopyFindings(parsed, reported) {

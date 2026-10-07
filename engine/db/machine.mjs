@@ -1271,7 +1271,8 @@ const flushOutboxFile = (m, f, base) => { const back = []; let flushed = 0, fail
     let item = null; try { item = JSON.parse(line); } catch { back.push(line); failed += 1; continue; }
     try { need(Object.hasOwn(DEFERRABLE, item.op), `unknown op ${item.op}`); m.transaction(() => DEFERRABLE[item.op](m, ...(item.args ?? []))); flushed += 1; }
     catch (error) { back.push(JSON.stringify({ ...item, error: errText(error), tries: (item.tries ?? 1) + 1 })); failed += 1; } }
-  if (back.length) fs.appendFileSync(base, `${back.join('\n')}\n`); fs.rmSync(f, { force: true });
+  if (back.length) { fs.appendFileSync(base, `${back.join('\n')}\n`); }
+  fs.rmSync(f, { force: true });
   return { flushed, failed }; };
 // The outbox files this flusher owns: the live file renamed aside, plus dead flushers' leftovers.
 const claimOutboxFiles = (m) => { const base = outboxFileFor(m.file), dir = path.dirname(base), stem = path.basename(base); const claimed = [];

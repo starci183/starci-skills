@@ -27,35 +27,41 @@ function procListener(port, fsx) {
       const socket = /^socket:\[(\d+)\]$/.exec(target);
       if (!socket || !inodes.has(socket[1])) continue;
       let commandLine = null;
-      try { commandLine = fsx.readFileSync(`/proc/${pid}/cmdline`, 'utf8').split('\0').join(' ').trim() || null; } catch { /* the process ended or hides its command line */ }
+      try { commandLine = fsx.readFileSync(`/proc/${pid}/cmdline`, 'utf8').replaceAll('\0', ' ').trim() || null; } catch { /* the process ended or hides its command line */ }
       return { pid: Number(pid), commandLine };
     }
   }
   return null;
 }
 
+const windowsPortListener = (port, spawn, tool) => {
+  const netstat = tool('netstat');
+  if (!netstat.ok) return null;
+  const out = spawn(netstat.path, ['-ano'], { encoding: 'utf8', windowsHide: true, timeout: 15000 }).stdout ?? '';
+  const line = out.split(/\r?\n/).find((l) => new RegExp(String.raw`^\s*TCP\s+\S*:${port}\s+\S+\s+LISTENING\s+(\d+)`, 'i').test(l));
+  const pid = line ? Number(/LISTENING\s+(\d+)/i.exec(line)[1]) : null;
+  if (!pid) return null;
+  const shell = tool('powershell');
+  if (!shell.ok) return { pid, commandLine: null };
+  const cmd = spawn(shell.path, ['-NoProfile', '-NonInteractive', '-Command', `(Get-CimInstance Win32_Process -Filter 'ProcessId=${pid}').CommandLine`], { encoding: 'utf8', windowsHide: true, timeout: 20000 });
+  return { pid, commandLine: String(cmd.stdout ?? '').trim() || null };
+};
+
+const unixPortListener = (port, platform, spawn, tool, fsx) => {
+  const lsof = tool('lsof');
+  if (!lsof.ok) return platform === 'linux' ? procListener(port, fsx) : null;
+  const out = spawn(lsof.path, ['-nP', `-iTCP:${port}`, '-sTCP:LISTEN', '-t'], { encoding: 'utf8', timeout: 15000 }).stdout ?? '';
+  const pid = Number(out.split(/\s+/).find(Boolean));
+  if (!pid) return null;
+  const ps = tool('ps');
+  const cmd = ps.ok ? spawn(ps.path, ['-o', 'command=', '-p', String(pid)], { encoding: 'utf8', timeout: 5000 }) : null;
+  return { pid, commandLine: String(cmd?.stdout ?? '').trim() || null };
+};
+
 /** {pid, commandLine} of the listener on `port`, or null (nothing listens, or the host could not say). */
 export function portListener(port, { platform = process.platform, spawn = spawnSync, tool = (name) => systemTool(name, { platform }), fsx = fs } = {}) {
   try {
-    if (platform === 'win32') {
-      const netstat = tool('netstat');
-      if (!netstat.ok) return null;
-      const out = spawn(netstat.path, ['-ano'], { encoding: 'utf8', windowsHide: true, timeout: 15000 }).stdout ?? '';
-      const line = out.split(/\r?\n/).find((l) => new RegExp(String.raw`^\s*TCP\s+\S*:${port}\s+\S+\s+LISTENING\s+(\d+)`, 'i').test(l));
-      const pid = line ? Number(/LISTENING\s+(\d+)/i.exec(line)[1]) : null;
-      if (!pid) return null;
-      const shell = tool('powershell');
-      if (!shell.ok) return { pid, commandLine: null };
-      const cmd = spawn(shell.path, ['-NoProfile', '-NonInteractive', '-Command', `(Get-CimInstance Win32_Process -Filter 'ProcessId=${pid}').CommandLine`], { encoding: 'utf8', windowsHide: true, timeout: 20000 });
-      return { pid, commandLine: String(cmd.stdout ?? '').trim() || null };
-    }
-    const lsof = tool('lsof');
-    if (!lsof.ok) return platform === 'linux' ? procListener(port, fsx) : null;
-    const out = spawn(lsof.path, ['-nP', `-iTCP:${port}`, '-sTCP:LISTEN', '-t'], { encoding: 'utf8', timeout: 15000 }).stdout ?? '';
-    const pid = Number(out.split(/\s+/).find(Boolean));
-    if (!pid) return null;
-    const ps = tool('ps');
-    const cmd = ps.ok ? spawn(ps.path, ['-o', 'command=', '-p', String(pid)], { encoding: 'utf8', timeout: 5000 }) : null;
-    return { pid, commandLine: String(cmd?.stdout ?? '').trim() || null };
+    if (platform === 'win32') return windowsPortListener(port, spawn, tool);
+    return unixPortListener(port, platform, spawn, tool, fsx);
   } catch { return null; }
 }
