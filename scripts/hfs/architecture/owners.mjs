@@ -59,15 +59,8 @@ function arrangesSchema(config, from, to) {
     && resolver.classifyPath(relativePath(config.root, to)).slot === 'be.persistence';
 }
 
-/** Enforce explicit same-source owner entries without constraining imports inside one owner. */
-export function checkOwners(config, context) {
-  if (!config.owners?.length) return [];
-  const owners = ownerDeclarations(config, context);
+function publicEntryViolations(config, context, owners, sourceFiles, actionEntries) {
   const violations = [];
-  const sourceFiles = new Map(context.files.map(file => [canonical(file.fileName), file]));
-  const actionEntries = new Set(config.kinds.includes('frontend')
-    ? [...sourceFiles].filter(([, file]) => isServerActionModule(context.ts, file)).map(([name]) => name)
-    : []);
   for (const owner of owners) {
     const sourceFile = sourceFiles.get(owner.entry);
     if (!sourceFile) {
@@ -87,11 +80,16 @@ export function checkOwners(config, context) {
           path: relativePath(config.root, canonical(entryFile.fileName)),
           ...sourceLocation(entryFile, statement),
           owner: owner.id,
-          message: `Owner ${owner.id} public entry must use explicit named exports rather than export *.`
+          message: `Owner ${owner.id} public entry must use explicit named exports rather than export *.`,
         });
       }
     }
   }
+  return violations;
+}
+
+function ownerImportViolations(config, context, owners, actionEntries) {
+  const violations = [];
   for (const sourceFile of context.files) {
     const from = canonical(sourceFile.fileName);
     for (const edge of context.edges.get(from) ?? []) {
@@ -107,9 +105,23 @@ export function checkOwners(config, context) {
         specifier: edge.specifier,
         resolvedPath: relativePath(config.root, bypass.chain.at(-1)),
         dependencyChain: bypass.chain.map(file => relativePath(config.root, file)),
-        message: `Cross-owner dependency must enter ${bypass.owner.id} through ${relativePath(config.root, bypass.owner.entry)}.`
+        message: `Cross-owner dependency must enter ${bypass.owner.id} through ${relativePath(config.root, bypass.owner.entry)}.`,
       });
     }
   }
   return violations;
+}
+
+/** Enforce explicit same-source owner entries without constraining imports inside one owner. */
+export function checkOwners(config, context) {
+  if (!config.owners?.length) return [];
+  const owners = ownerDeclarations(config, context);
+  const sourceFiles = new Map(context.files.map(file => [canonical(file.fileName), file]));
+  const actionEntries = new Set(config.kinds.includes('frontend')
+    ? [...sourceFiles].filter(([, file]) => isServerActionModule(context.ts, file)).map(([name]) => name)
+    : []);
+  return [
+    ...publicEntryViolations(config, context, owners, sourceFiles, actionEntries),
+    ...ownerImportViolations(config, context, owners, actionEntries),
+  ];
 }
