@@ -77,7 +77,7 @@ const fixture=(t,{dead=[],stale=[],allocationPolicy=null}={})=>{
     STARCI_PROJECTS_ROOT:path.join(root,'projects'),
     STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite'),
     STARCI_GUARDS_ROOT:path.join(root,'guards'),
-    TEMP:root,TMP:root,TMPDIR:root,
+    STARCI_TEMP_ROOT:root,TEMP:root,TMP:root,TMPDIR:root,
   };
   // ownerRoot holds a config.yaml seeded from the shipped example; `kernel`
   // callers may rewrite the pin line.
