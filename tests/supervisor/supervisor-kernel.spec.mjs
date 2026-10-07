@@ -130,6 +130,27 @@ test('Supervisor plans neither create an absent machine store nor rewrite a stor
   }
 });
 
+test('the Supervisor plan takes the frontier tier and prints the picker record: Opus first, Sol when Opus is at 90 percent', async t => {
+  const plan = async (used) => {
+    const env = envOf(t), machine = openMachine({ env });
+    machine.meta(); machine.close();
+    const host = fakeHost(), observations = fakeAdmission({ used });
+    host.admission = { quota: observations.quota, circuit: () => null, usage: observations.usage };
+    return launch(env, host, { plan: true, settings: { ...settings, agent: null, model: null } });
+  };
+  const normal = await plan({ claude: 10, codex: 10 });
+  assert.equal(normal.action, 'plan');
+  assert.equal(normal.admission.pick.tier, 'frontier');
+  assert.deepEqual(normal.admission.pick.chain, ['claude/claude-opus-5-5', 'codex/gpt-6.1-sol']);
+  assert.deepEqual([normal.agent, normal.model], ['claude', 'claude-opus-5-5']);
+  assert.deepEqual(normal.admission.pick.chosen, { id: 'claude/claude-opus-5-5', by: 'chain-order' });
+  const reserve = await plan({ claude: 93, codex: 10 });
+  assert.deepEqual([reserve.agent, reserve.model], ['codex', 'gpt-6.1-sol']);
+  assert.equal(reserve.admission.pick.dropped.find(row => row.id === 'claude/claude-opus-5-5')?.step, 'tokens');
+  assert.deepEqual(reserve.admission.pick.chosen, { id: 'codex/gpt-6.1-sol', by: 'tokens' });
+  assert.equal(reserve.wouldLaunch, true);
+});
+
 test('a stale Supervisor seat survives unproven worker closure and blocks replacement or stop clearance', async t => {
   for (const stop of [false, true]) {
     const env = envOf(t), host = fakeHost();

@@ -257,7 +257,7 @@ function launchGroup(settings, { seat = 'supervisor' } = {}) {
       model: member.model ?? Object.values(registry.pools ?? {}).find(pool => pool.provider === member.agent)?.defaultModel }));
   }
   const tier = tierOfSeat(seat);
-  return tierMembers(tier).map(member => ({ provider: member.provider, model: member.model, pool: member.pool, effort: settings.effort ?? member.effort, tier }));
+  return tierMembers(tier).map(member => ({ id: member.id, provider: member.provider, model: member.model, pool: member.pool, effort: settings.effort ?? member.effort, tier }));
 }
 
 /** The owner's pin of the seat as the bias `only` (config.yaml supervisor.kernel agent/model), or null. */
