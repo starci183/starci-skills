@@ -2,7 +2,7 @@
 
 The runtime's durable memory of how each model pool actually performs against what the routing contract
 expects of it. Routing and profile decisions (`modules/models/runtimes.yaml`, `modules/models/registry.yaml`,
-`modules/models/profiles/*.yaml`, `config.yaml` `allocation.shares`) cite this directory, so a change of who
+`modules/models/profiles/*.yaml`, `modules/models/tiers.yaml`) cite this directory, so a change of who
 runs what is argued from measured evidence rather than from a model's reputation or a subscription label.
 `modules/models/registry.yaml` `costPolicy` already requires it: benchmark bounded representative operations
 before proposing another routing change.

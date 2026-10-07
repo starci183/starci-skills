@@ -22,24 +22,24 @@ launch:
     routes nowhere else and has NO deferral fallback; interface.draw walks Devin first and this pool second (it
     draws token-render, never ImageGen).
 
-position: modules/models/runtimes.yaml allocation.tiers and roleOfKind; modules/models/registry.yaml operators.<op>.chain
+position: modules/models/tiers.yaml tiers, seats and difficulty; modules/models/runtimes.yaml roleOfKind; modules/models/registry.yaml pools
 
 business:
   question: >-
-    "Which pool thinks when Claude is out, overflows hands-on work, and can draw?" —
-    codex-agent, on gpt-6.1-sol for every think kind, the sole image route and the draw fallback.
+    "Which pool is the second member of every Claude tier, the image tier, and the low-tier second?" —
+    codex-agent, on gpt-6.1-sol in the frontier, high, medium and imagegen tiers and gpt-6-luna in the low tier.
   whenNeeded:
-    - Strategy (the think/decide/plan orders) when claude-agent is unavailable — its hard floor pins gpt-6.1-sol.
-    - Review overflow only (owner decision 2026-09-25 review-hands; runtimes.yaml allocation.overflowByOrder) - and interface.audit of what Devin implemented, since Claude lacks its browser-dom tool.
-    - "interface.asset — the ONLY route (image_gen.imagegen); interface.draw when the Devin pool cannot draw (owner ruling 2026-09-27: Devin draws, Codex critiques)."
-    - Hands-on overflow after the Devin pool.
+    - Any tier whose first member is out of tokens or filtered: Sol is the second member of frontier, high and medium.
+    - interface.audit of what Devin implemented and any op needing browser-dom, since Claude lacks the tool (the hard filter drops Claude by name).
+    - "interface.draw and interface.asset — the ONLY member of the imagegen tier (image_gen.imagegen; tiers.yaml kindTiers); core-debug when the chat that started the workflow is Codex (gpt-6.1-sol, the frontier member of that provider)."
+    - Easy hands-on work after Devin, on Luna (the low tier).
   whenNot:
-    - As first pick for hands-on work — the declared order spends Devin capacity first.
+    - As first pick for hands-on work — the medium and low tiers spend Devin capacity first.
     - For anything where image output is needed but the observed host tools lack it — availability is observed, never assumed (registry.yaml examplesNote).
   pickedBy: >-
-    Allocator work/role order + tier lists; the image routes are where it
+    The common picker over the tier chains (hard filter, bias, balance, tokens); the image routes are where it
     structurally dominates.
   failureModes:
-    - "Confusing the pool default (Luna) with the hard-tier pin (Sol): the pool pins per-difficulty models; attestation reads the difficulty's model, not the pool's defaultModel (modules/models/registry.yaml pools.codex-agent)."
-    - Provider-level quota exhaustion disables Luna and Sol at once — the interface.asset route then has no fallback; a failed image op is parked, not rerouted to a non-image pool.
+    - "Confusing the pool default (Luna) with a tier member: the tier names the model and effort per member (modules/models/tiers.yaml); attestation reads the member's model, not the pool's defaultModel (modules/models/registry.yaml pools.codex-agent)."
+    - Provider-level quota exhaustion disables Luna and Sol at once — the imagegen tier has one member, so an image op then waits for the reset; it is never rerouted to a non-image pool.
     - "INFERRED: using its 10-slot pool to parallelize easy implementation burns the shared quota the think and image lanes depend on."

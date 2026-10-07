@@ -781,7 +781,7 @@ schemas:
     file: modules/schemas/profile-registry.schema.yaml
     dialect: json-schema
     subsystem: model
-    governs: "The ONE model catalog — models (id, provider, tier, price), pools (membership, roles, concurrency, difficulty pins), runtimes[], aliases, executionModel, targets, skills, operators, fallback."
+    governs: "The ONE model catalog — models (id, provider, tier, price), pools (membership, roles, concurrency, difficulty pins), runtimes[], aliases, executionModel, targets, skills, fallback."
     binds: "modules/models/registry.yaml (carries schema starci/profile-registry@1)"
     usedBy: [scripts/checks/check-providers.mjs (reads modules/models/registry.yaml targets; Orca admission must use profile resolver output)]
     business:

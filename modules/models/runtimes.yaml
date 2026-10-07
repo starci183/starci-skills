@@ -438,9 +438,6 @@ allocation:
   # readiness loop does not starve the pool (scripts/kernel/cli.mjs poolLoadOf, shared by starci kernel route and starci kernel status).
   # Running, leased and answering jobs always hold theirs. Re-routing refreshes the hold.
   routeHoldMs: 900000
-  verifyAvoidsImplementRuntime: true
-  onLaunchFailure: next-available-runtime
-  tieBreak: round-robin
   # worker-start is a managed launch the host refused without classifying it. Two minutes is long
   # enough for the kernel to reroute the attempt to a different pool, short enough that a one-off
   # host hiccup does not park a healthy pool for the rest of the leg. prompt-delivery-stalled is its

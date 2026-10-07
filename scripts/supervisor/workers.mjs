@@ -30,8 +30,8 @@
 // jobs up to max (default 10) and is halved while the machine is loaded (CPU busy >= 85% or free memory < 12%),
 // down to 1 while it is saturated (CPU >= 95% or free memory < 6%).
 //
-// Routing: the balanced allocator over config.yaml allocation.shares (scripts/agent/models.mjs balanceDeficits),
-// counting the machine's recent op dispatches (scripts/agent/balance.mjs) plus the Supervisor's own workers (sup_jobs), skipping a
+// Routing: the worker seat's tier chain (modules/models/tiers.yaml seats.worker) through the common picker
+// (scripts/lib/tier-pick.mjs), skipping a
 // provider whose quota probe is dead or whose provider-health circuit is open on any product ledger, and a
 // provider whose [Worker] spawn proved it cannot serve - its worker-start failed, or the failure text shows
 // the outage its agent card declares (quotaExhausted/capacityExhausted, scripts/agent/provider-outage.mjs
