@@ -89,7 +89,7 @@ test('browser globals are known only inside a function that runs in a page', () 
 });
 
 test('a function a module passes to page.evaluate through an import and a re-export runs in the page', (t) => {
-  const root = mkdtemp(t, 'undeclared-ids-');
+  const root = mkdtemp(t, 'starci-undeclared-ids-');
   const write = (rel, text) => { fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true }); fs.writeFileSync(path.join(root, rel), text); };
   write('scripts/render.mjs', "import { measure } from './page/index.mjs';\nexport const run = (page) => page.evaluate(measure, 1);\n");
   write('scripts/page/index.mjs', "export { measure } from './measure.mjs';\n");
