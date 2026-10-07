@@ -73,29 +73,45 @@ function requestFilesFor(htmlFile, dirs = []) {
 }
 
 const SLUG = /^[a-z0-9][a-z0-9._-]*$/i;
+const HEADING_PATTERN = new RegExp(['^#{1,6}', String.raw`\s+`, '(.*)$'].join(''));
+const SLOT_LINE_PATTERN = new RegExp([String.raw`^\s*`, '[-*]?', String.raw`\s*(?:slot|id)\s*:\s*`, '`?', String.raw`([\w.-]+)`, '`?', String.raw`\s*$`].join(''), 'i');
 /** The slot requests of asset-request.md files: [{id, file, brief}] - a heading per slot, or `slot: <id>` lines. */
 export function readAssetRequests(files) {
   const out = [];
-  for (const file of files ?? []) {
-    let text = '';
-    try { text = fs.readFileSync(file, 'utf8'); } catch { continue; }
-    const lines = text.split(/\r?\n/);
-    let current = null;
-    const push = (id) => { current = { id, file, brief: '' }; out.push(current); };
-    for (const line of lines) {
-      const heading = /^#{1,6}\s+(.*)$/.exec(line);
-      const slotLine = /^\s*[-*]?\s*(?:slot|id)\s*:\s*`?([\w.-]+)`?\s*$/i.exec(line);
-      if (heading) {
-        const h = heading[1].trim();
-        const id = new RegExp(String.raw`${ASSET_SLOT_ATTR}\s*=\s*["']([^"']+)["']`).exec(h)?.[1] ?? /`([^`]+)`/.exec(h)?.[1] ?? (SLUG.test(h) ? h : null);
-        if (id) push(id.trim());
-        else current = null;
-      } else if (slotLine) {
-        if (current?.id !== slotLine[1]) push(slotLine[1]);
-      } else if (current && line.trim()) current.brief = `${current.brief} ${line.trim()}`.trim().slice(0, 400);
-    }
-  }
+  for (const file of files ?? []) readFileRequests(file, out);
   return out;
+}
+
+function readFileRequests(file, out) {
+  let text = '';
+  try { text = fs.readFileSync(file, 'utf8'); } catch { return; }
+  const lines = text.split(/\r?\n/);
+  let current = null;
+  for (const line of lines) {
+    current = requestLine(line, current, file, out);
+  }
+}
+
+function requestLine(line, current, file, out) {
+  const heading = HEADING_PATTERN.exec(line);
+  const slotLine = SLOT_LINE_PATTERN.exec(line);
+  if (heading) {
+    const id = requestedHeadingId(heading[1].trim());
+    return id ? pushRequest(id.trim(), file, out) : null;
+  }
+  if (slotLine) return current?.id !== slotLine[1] ? pushRequest(slotLine[1], file, out) : current;
+  if (current && line.trim()) current.brief = `${current.brief} ${line.trim()}`.trim().slice(0, 400);
+  return current;
+}
+
+function requestedHeadingId(heading) {
+  return new RegExp(String.raw`${ASSET_SLOT_ATTR}\s*=\s*["']([^"']+)["']`).exec(heading)?.[1] ?? /`([^`]+)`/.exec(heading)?.[1] ?? (SLUG.test(heading) ? heading : null);
+}
+
+function pushRequest(id, file, out) {
+  const current = { id, file, brief: '' };
+  out.push(current);
+  return current;
 }
 
 /** The Set of slot ids the render source's asset-request.md files request. */
@@ -138,26 +154,36 @@ function brandMasterShas(workRoot) {
 export function slotsOfHtml(html, { htmlFile = null, masters = new Set() } = {}) {
   const out = [];
   for (const el of walkElements(parseHtml(html))) {
-    const id = (el.attrs[ASSET_SLOT_ATTR] ?? '').trim();
-    if (!id) continue;
-    const img = el.tag === 'img' ? el : walkElements(el).find((d) => d.tag === 'img') ?? el;
-    const src = (img.attrs.src ?? el.attrs.src ?? '').trim() || null;
-    const sha = (el.attrs[ASSET_SHA_ATTR] ?? img.attrs[ASSET_SHA_ATTR] ?? '').trim().toLowerCase() || null;
-    let file = null, actual = null;
-    if (src && htmlFile && !/^(data:|https?:|\/\/)/i.test(src)) {
-      file = path.resolve(path.dirname(htmlFile), decodeURI(src.split(/[?#]/)[0]));
-      try { actual = isFile(file) ? sha256File(file) : null; } catch { actual = null; }
-    }
-    const master = Boolean(actual && masters.has(actual));
-    const promptAttr = (el.attrs[ASSET_PROMPT_ATTR] ?? img.attrs[ASSET_PROMPT_ATTR] ?? '').trim();
-    let promptFile = null;
-    if (promptAttr && htmlFile) promptFile = path.resolve(path.dirname(htmlFile), promptAttr);
-    else if (actual) promptFile = file.replace(/\.[^.\\/]+$/, '.prompt.txt');
-    const prompt = promptFile && isFile(promptFile) ? promptFile : null;
-    out.push({ id, tag: el.tag, component: el.attrs[COMPONENT_ATTR] ?? null, src, sha256: sha, file: actual ? file : null, master, prompt,
-      filled: Boolean(sha && actual && sha === actual && !master && prompt) });
+    const slot = slotOfElement(el, htmlFile, masters);
+    if (slot) out.push(slot);
   }
   return out;
+}
+
+function slotOfElement(el, htmlFile, masters) {
+  const id = (el.attrs[ASSET_SLOT_ATTR] ?? '').trim();
+  if (!id) return null;
+  const img = el.tag === 'img' ? el : walkElements(el).find((d) => d.tag === 'img') ?? el;
+  const src = (img.attrs.src ?? el.attrs.src ?? '').trim() || null;
+  const sha = (el.attrs[ASSET_SHA_ATTR] ?? img.attrs[ASSET_SHA_ATTR] ?? '').trim().toLowerCase() || null;
+  const { file, actual } = actualAssetFile(src, htmlFile);
+  const master = Boolean(actual && masters.has(actual));
+  const promptAttr = (el.attrs[ASSET_PROMPT_ATTR] ?? img.attrs[ASSET_PROMPT_ATTR] ?? '').trim();
+  let promptFile = null;
+  if (promptAttr && htmlFile) promptFile = path.resolve(path.dirname(htmlFile), promptAttr);
+  else if (actual) promptFile = file.replace(/\.[^.\\/]+$/, '.prompt.txt');
+  const prompt = promptFile && isFile(promptFile) ? promptFile : null;
+  return { id, tag: el.tag, component: el.attrs[COMPONENT_ATTR] ?? null, src, sha256: sha, file: actual ? file : null, master, prompt,
+    filled: Boolean(sha && actual && sha === actual && !master && prompt) };
+}
+
+function actualAssetFile(src, htmlFile) {
+  let file = null, actual = null;
+  if (src && htmlFile && !/^(data:|https?:|\/\/)/i.test(src)) {
+    file = path.resolve(path.dirname(htmlFile), decodeURI(src.split(/[?#]/)[0]));
+    try { actual = isFile(file) ? sha256File(file) : null; } catch { actual = null; }
+  }
+  return { file, actual };
 }
 
 /** The render sources among `targets` (files, or directories walked without draw-loop rounds). */
@@ -186,26 +212,28 @@ function renderSourcesIn(targets, depth = 6) {
 export function assetSlotsOf(targets, { repo = process.cwd() } = {}) {
   const bySlot = new Map();
   const mastersByRoot = new Map();
-  for (const html of renderSourcesIn(targets)) {
-    let text = '';
-    try { text = fs.readFileSync(html, 'utf8'); } catch { continue; }
-    if (!text.includes(ASSET_SLOT_ATTR)) continue;
-    const requests = readAssetRequests(requestFilesFor(html));
-    const ui = slash(path.relative(repo, uiDirOf(html) ?? path.dirname(html)));
-    const workRoot = workRootAbove(html);
-    if (!mastersByRoot.has(workRoot)) mastersByRoot.set(workRoot, brandMasterShas(workRoot));
-    const masters = mastersByRoot.get(workRoot);
-    for (const s of slotsOfHtml(text, { htmlFile: html, masters })) {
-      const key = `${ui}#${s.id}`;
-      const request = requests.find((r) => r.id === s.id) ?? null;
-      const slot = { key, id: s.id, ui, html: slash(path.relative(repo, html)), requested: Boolean(request), request: request ? { file: slash(path.relative(repo, request.file)), brief: request.brief } : null,
-        filled: s.filled, src: s.src, sha256: s.sha256, master: s.master, prompt: s.prompt ? slash(path.relative(repo, s.prompt)) : null };
-      const prior = bySlot.get(key);
-      // A slot is filled only when every part that shows it carries the filled bytes.
-      bySlot.set(key, prior ? { ...prior, filled: prior.filled && slot.filled } : slot);
-    }
-  }
+  for (const html of renderSourcesIn(targets)) addHtmlSlots(bySlot, mastersByRoot, html, repo);
   return [...bySlot.values()];
+}
+
+function addHtmlSlots(bySlot, mastersByRoot, html, repo) {
+  let text = '';
+  try { text = fs.readFileSync(html, 'utf8'); } catch { return; }
+  if (!text.includes(ASSET_SLOT_ATTR)) return;
+  const requests = readAssetRequests(requestFilesFor(html));
+  const ui = slash(path.relative(repo, uiDirOf(html) ?? path.dirname(html)));
+  const workRoot = workRootAbove(html);
+  if (!mastersByRoot.has(workRoot)) mastersByRoot.set(workRoot, brandMasterShas(workRoot));
+  const masters = mastersByRoot.get(workRoot);
+  for (const s of slotsOfHtml(text, { htmlFile: html, masters })) {
+    const key = `${ui}#${s.id}`;
+    const request = requests.find((r) => r.id === s.id) ?? null;
+    const slot = { key, id: s.id, ui, html: slash(path.relative(repo, html)), requested: Boolean(request), request: request ? { file: slash(path.relative(repo, request.file)), brief: request.brief } : null,
+      filled: s.filled, src: s.src, sha256: s.sha256, master: s.master, prompt: s.prompt ? slash(path.relative(repo, s.prompt)) : null };
+    const prior = bySlot.get(key);
+    // A slot is filled only when every part that shows it carries the filled bytes.
+    bySlot.set(key, prior ? { ...prior, filled: prior.filled && slot.filled } : slot);
+  }
 }
 
 /**
