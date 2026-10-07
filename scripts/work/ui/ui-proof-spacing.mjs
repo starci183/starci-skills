@@ -46,16 +46,26 @@ function contentExtent(v, box, within = null) {
   return { top: Math.min(...boxes.map((b) => b.top)), bottom: Math.max(...boxes.map((b) => b.bottom)), left: Math.min(...boxes.map((b) => b.left)), right: Math.max(...boxes.map((b) => b.right)) };
 }
 
+const paintedEdge = (edge) => edge.w >= 1 && edge.style !== 'none' && alphaOf(edge.color) > 0;
+const lineAt = (e, y) => ({ y, left: e.rect.x, right: e.rect.x + e.rect.w });
+
+/** The hairlines one element draws: a painted top or bottom border, or a rule at most 2px tall. */
+function hairlineRows(e) {
+  const [top, , bottom] = e.style.border;
+  const rows = [];
+  if (paintedEdge(top)) rows.push(lineAt(e, e.rect.y));
+  if (paintedEdge(bottom)) rows.push(lineAt(e, e.rect.y + e.rect.h - bottom.w));
+  if (e.rect.h > 0 && e.rect.h <= 2 && alphaOf(e.style.bg) > 0) rows.push(lineAt(e, e.rect.y));
+  return rows;
+}
+
 /** Full-width hairlines inside a card: borders on children spanning >= 80% of it, or <= 2px painted rules. */
 function hairlines(v, card) {
   const cr = card.rect;
   const ys = [];
   for (const e of v.els.filter((x) => x.visible && v.ancestors(x).some((a) => a.i === card.i) && !v.isControl(x))) {
     if (e.rect.w < cr.w * 0.8) continue;
-    const [top, , bottom] = e.style.border;
-    if (top.w >= 1 && top.style !== 'none' && alphaOf(top.color) > 0) ys.push({ y: e.rect.y, left: e.rect.x, right: e.rect.x + e.rect.w });
-    if (bottom.w >= 1 && bottom.style !== 'none' && alphaOf(bottom.color) > 0) ys.push({ y: e.rect.y + e.rect.h - bottom.w, left: e.rect.x, right: e.rect.x + e.rect.w });
-    if (e.rect.h > 0 && e.rect.h <= 2 && alphaOf(e.style.bg) > 0) ys.push({ y: e.rect.y, left: e.rect.x, right: e.rect.x + e.rect.w });
+    ys.push(...hairlineRows(e));
   }
   const unique = [];
   for (const h of ys.toSorted((a, b) => a.y - b.y)) if (!unique.length || h.y - unique.at(-1).y > 2) unique.push(h);
@@ -156,19 +166,31 @@ function plainCardRows(v, card, ctx, add) {
   add('card-inset bottom', CARD_CONTENT_SOURCE, card.rect.y + card.rect.h - ext.bottom, want, tag(card));
 }
 
+const PADDING_4_CASE_6 = 'knowledge/ui/presentation/padding.yaml PADDING-4 case-6';
+const PADDING_3_CASE_3 = 'knowledge/ui/presentation/padding.yaml PADDING-3 case-3';
+const BAND_SOURCE = {
+  top: { outer: `${PADDING_4_CASE_6} (side meets the outer edge)`, inner: `${PADDING_3_CASE_3} (side meets a separator)` },
+  bottom: { outer: PADDING_4_CASE_6, inner: PADDING_3_CASE_3 },
+};
+
+/** The top, bottom and inline insets of band `k` of a joined card: its outer edges meet the card, the others a separator. */
+function bandRows(v, card, bounds, k, ctx, add) {
+  const lead = k ? 1 : 0;
+  const ext = contentExtent(v, card, { top: bounds[k] + lead, bottom: bounds[k + 1] });
+  if (!ext) return;
+  const top = k === 0 ? 'outer' : 'inner', bottom = k === bounds.length - 2 ? 'outer' : 'inner';
+  const inset = (edge) => (edge === 'outer' ? ctx.edgeInset : ctx.separatorInset);
+  add(`band ${k + 1} top`, BAND_SOURCE.top[top], ext.top - bounds[k] - lead, inset(top), tag(card));
+  add(`band ${k + 1} bottom`, BAND_SOURCE.bottom[bottom], bounds[k + 1] - ext.bottom, inset(bottom), tag(card));
+  add(`band ${k + 1} inline`, 'knowledge/ui/presentation/padding.yaml PADDING-4 case-7 (inline sides of any band)', ext.left - card.rect.x, ctx.edgeInset, tag(card));
+}
+
 // A joined card (bands split by hairlines) by side contact.
 function bandedCardRows(v, card, lines, ctx, add, out) {
   const bounds = [card.rect.y, ...lines.map((h) => h.y), card.rect.y + card.rect.h];
   const bleed = lines.filter((h) => Math.abs(h.left - card.rect.x) > 1 || Math.abs(h.right - (card.rect.x + card.rect.w)) > 1);
   out.push({ id: 'band separators edge to edge', source: 'knowledge/ui/presentation/boundary.yaml BOUNDARY-1; knowledge/ui/proof/anatomy-source.yaml observation list-separator-bleed', got: `${lines.length - bleed.length}/${lines.length} full-bleed`, exp: 'every separator touches both card edges', status: bleed.length ? 'fail' : 'pass', evidence: tag(card) });
-  for (let k = 0; k < bounds.length - 1; k++) {
-    const ext = contentExtent(v, card, { top: bounds[k] + (k ? 1 : 0), bottom: bounds[k + 1] });
-    if (!ext) continue;
-    const first = k === 0, last = k === bounds.length - 2;
-    add(`band ${k + 1} top`, first ? 'knowledge/ui/presentation/padding.yaml PADDING-4 case-6 (side meets the outer edge)' : 'knowledge/ui/presentation/padding.yaml PADDING-3 case-3 (side meets a separator)', ext.top - bounds[k] - (k ? 1 : 0), first ? ctx.edgeInset : ctx.separatorInset, tag(card));
-    add(`band ${k + 1} bottom`, last ? 'knowledge/ui/presentation/padding.yaml PADDING-4 case-6' : 'knowledge/ui/presentation/padding.yaml PADDING-3 case-3', bounds[k + 1] - ext.bottom, last ? ctx.edgeInset : ctx.separatorInset, tag(card));
-    add(`band ${k + 1} inline`, 'knowledge/ui/presentation/padding.yaml PADDING-4 case-7 (inline sides of any band)', ext.left - card.rect.x, ctx.edgeInset, tag(card));
-  }
+  for (let k = 0; k < bounds.length - 1; k++) bandRows(v, card, bounds, k, ctx, add);
 }
 
 /** Card insets: a disclosure surface by its trigger, a plain card by its content, a banded card by side contact. */
