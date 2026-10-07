@@ -53,6 +53,26 @@ export function mainCheckoutDamage(before, after) {
 
 const gone = (p) => !fs.existsSync(p) && (() => { try { fs.lstatSync(p); return false; } catch { return true; } })();
 
+function removeWorktreeContents(target, { repo, trees, git, retries, out }) {
+  if (!fs.existsSync(target)) return true;
+  const unlinked = removeLinksUnder(target);
+  out.links = unlinked.links;
+  if (!unlinked.ok) { out.errors.push(...unlinked.errors); out.reason = 'link-stuck'; return false; }
+  out.removed.links = out.links;
+  if (repo && trees.some((tree) => samePath(tree, target))) worktreeRemove(repo, target, { git });
+  if (!fs.existsSync(target)) return true;
+  if (linksUnder(target).length) {
+    out.errors.push({ path: target, code: 'LINK_STUCK', message: 'a link appeared during removal' });
+    out.reason = 'link-stuck';
+    return false;
+  }
+  const rm = safeRemove(target, { retries, hold: artifactHoldReason });
+  out.removed.files += rm.removed.files;
+  out.removed.dirs += rm.removed.dirs;
+  out.errors.push(...rm.errors);
+  return true;
+}
+
 /**
  * Remove a git worktree (the one algorithm; the 490-file .claude incident and a live checkout emptied through a junction):
  *   1. enumerate every link in it WITHOUT following one (linksUnder);
@@ -75,19 +95,7 @@ export function safeRemoveWorktree(worktree, { repo, git = null, retries = 5 } =
   const refused = forbiddenRoot(target, { hold: artifactHoldReason });
   if (refused) { out.errors.push({ path: target, code: 'REFUSED', message: `refusing to remove ${refused}` }); return out; }
   const before = mainRoot ? mainCheckoutGuard(mainRoot, { git }) : null;
-  if (fs.existsSync(target)) {
-    const unlinked = removeLinksUnder(target);
-    out.links = unlinked.links;
-    if (!unlinked.ok) { out.errors.push(...unlinked.errors); out.reason = 'link-stuck'; return out; }
-    out.removed.links = out.links;
-    if (repo && trees.some((t) => samePath(t, target))) worktreeRemove(repo, target, { git });
-    if (fs.existsSync(target)) {
-      if (linksUnder(target).length) { out.errors.push({ path: target, code: 'LINK_STUCK', message: 'a link appeared during removal' }); out.reason = 'link-stuck'; return out; }
-      const rm = safeRemove(target, { retries, hold: artifactHoldReason });
-      out.removed.files += rm.removed.files; out.removed.dirs += rm.removed.dirs;
-      out.errors.push(...rm.errors);
-    }
-  }
+  if (!removeWorktreeContents(target, { repo, trees, git, retries, out })) return out;
   if (repo) { try { worktreePrune(repo, { git }); } catch { /* the registration is pruned on the next prune */ } }
   if (before) {
     const damage = mainCheckoutDamage(before, mainCheckoutGuard(mainRoot, { git }));
@@ -117,6 +125,38 @@ export function preserveWork({ repoRoot, dir, name, main = 'main' }) {
   return { ok: true, ref, sha, dirty };
 }
 
+function clearUnregisteredScratchTarget(target) {
+  if (!fs.existsSync(target)) return null;
+  let entries = [];
+  try { entries = fs.readdirSync(target); } catch { /* unreadable */ }
+  if (entries.length) return { ok: false, reason: 'worktree-path-occupied', detail: `${target} exists and is not a registered worktree` };
+  try { fs.rmdirSync(target); } catch { /* git recreates it */ }
+  return null;
+}
+
+function reserveScratchWorktree({ repoRoot, sourceRoot, target, kind, branch, base, owner, cap, env }) {
+  let registered = false;
+  try {
+    const r = withRegistry((m) => m.reserveWorktree({ path: target, kind, repoRoot, branch: branch ?? null, baseSha: base ? revParse(sourceRoot, base) ?? base : null,
+      ledgerId: owner.ledgerId ?? null, workflowId: owner.workflowId ?? null, jobId: owner.jobId ?? null, lane: owner.lane ?? null }, { cap }), env);
+    if (!r.ok) return { result: { ok: false, reason: r.reason, live: r.live, cap: r.cap, detail: `${repoRoot} holds ${r.live} live worktree(s), cap ${r.cap}` } };
+    registered = true;
+  } catch { /* a scratch tree is created and removed by the same process: it is made even while the registry is busy */ }
+  return { registered };
+}
+
+function addScratchWorktree({ repoRoot, target, base, branch, newBranch, detach, git, env, ownerPid, registered }) {
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  worktreePrune(repoRoot, { git });
+  const added = worktreeAdd({ repoRoot, target, base, branch, newBranch, detach, git });
+  if (!added.ok) {
+    if (registered) { try { withRegistry((m) => m.dropWorktree(target), env); } catch { /* the GC marks it: its dir is gone */ } }
+    return { ok: false, reason: 'worktree-add-failed', detail: added.stderr.slice(0, 400) };
+  }
+  if (registered) claimWorktree({ dir: target, ownerPid, env });
+  return { ok: true, path: target, created: true, registered };
+}
+
 /**
  * Create one runtime-internal scratch worktree. kind: one of SCRATCH_KINDS - an agent's workspace is an Orca kind and is
  * refused here. Exactly one of `detach` (a detached HEAD at `base`), `newBranch` (branch `branch` created at `base`) or an
@@ -131,28 +171,11 @@ export function createScratchWorktree({ repoRoot, dir, kind, base = null, branch
   const home = mainRootOf(repoRoot, { git });
   const reg = registeredAt(repoRoot, target, { git });
   if (reg && fs.existsSync(target)) return { ok: true, path: target, created: false, registered: registerExisting({ repoRoot: home, dir: target, kind, branch, base, owner, ownerPid, env }) };
-  if (fs.existsSync(target)) {
-    let entries = [];
-    try { entries = fs.readdirSync(target); } catch { /* unreadable */ }
-    if (entries.length) return { ok: false, reason: 'worktree-path-occupied', detail: `${target} exists and is not a registered worktree` };
-    try { fs.rmdirSync(target); } catch { /* git recreates it */ }
-  }
-  let registered = false;
-  try {
-    const r = withRegistry((m) => m.reserveWorktree({ path: target, kind, repoRoot: home, branch: branch ?? null, baseSha: base ? revParse(repoRoot, base) ?? base : null,
-      ledgerId: owner.ledgerId ?? null, workflowId: owner.workflowId ?? null, jobId: owner.jobId ?? null, lane: owner.lane ?? null }, { cap }), env);
-    if (!r.ok) return { ok: false, reason: r.reason, live: r.live, cap: r.cap, detail: `${home} holds ${r.live} live worktree(s), cap ${r.cap}` };
-    registered = true;
-  } catch { /* a scratch tree is created and removed by the same process: it is made even while the registry is busy */ }
-  fs.mkdirSync(path.dirname(target), { recursive: true });
-  worktreePrune(repoRoot, { git });
-  const added = worktreeAdd({ repoRoot, target, base, branch, newBranch, detach, git });
-  if (!added.ok) {
-    if (registered) { try { withRegistry((m) => m.dropWorktree(target), env); } catch { /* the GC marks it: its dir is gone */ } }
-    return { ok: false, reason: 'worktree-add-failed', detail: added.stderr.slice(0, 400) };
-  }
-  if (registered) claimWorktree({ dir: target, ownerPid, env });
-  return { ok: true, path: target, created: true, registered };
+  const targetFailure = clearUnregisteredScratchTarget(target);
+  if (targetFailure) return targetFailure;
+  const reservation = reserveScratchWorktree({ repoRoot: home, sourceRoot: repoRoot, target, kind, branch, base, owner, cap, env });
+  if (reservation.result) return reservation.result;
+  return addScratchWorktree({ repoRoot, target, base, branch, newBranch, detach, git, env, ownerPid, registered: reservation.registered });
 }
 
 /** Register a scratch worktree that exists (a requeued attempt reusing its tree): the row is refreshed, never capped. */
@@ -165,6 +188,38 @@ function registerExisting({ repoRoot, dir, kind, branch, base, owner, ownerPid, 
     claimWorktree({ dir, ownerPid, env });
     return true;
   } catch { return false; }
+}
+
+function removeScratchContents(out, target, repoRoot, git, env) {
+  const rm = safeRemoveWorktree(target, { repo: repoRoot, git });
+  out.links = rm.links ?? 0;
+  if (rm.fatal) {
+    markRemoved(target, { error: `main checkout damaged: ${(rm.damage ?? []).join('; ').slice(0, 200)}`, env });
+    return { ...out, reason: 'main-checkout-damaged', fatal: true, damage: rm.damage };
+  }
+  if (!rm.ok) {
+    markRemoved(target, { error: `${rm.reason ?? 'remove-failed'}: ${rm.errors[0]?.path ?? ''}`.slice(0, 300), env });
+    if (rm.reason === 'link-stuck') return { ...out, reason: 'link-stuck', errors: rm.errors.slice(0, 5) };
+    return { ...out, reason: 'remove-failed', errors: rm.errors.slice(0, 5) };
+  }
+  out.verified.dirGone = !fs.existsSync(target);
+  out.verified.pruned = !registeredAt(repoRoot, target, { git });
+  if (out.verified.dirGone && out.verified.pruned) return null;
+  const reason = out.verified.dirGone ? 'prune-unverified' : 'dir-remains';
+  markRemoved(target, { error: reason, env });
+  return { ...out, reason };
+}
+
+function deleteScratchBranch(out, { repoRoot, branch, mode, main, git, target, env }) {
+  if (branch && mode && revParse(repoRoot, `refs/heads/${branch}`)) {
+    const deleted = branchDelete({ repoRoot, branch, mode, main, git });
+    out.branch.deleted = deleted.ok;
+    if (!deleted.ok) {
+      markRemoved(target, { preservedRef: out.preserved?.ref ?? null, env });
+      return { ...out, ok: false, reason: 'branch-delete-failed', detail: deleted.detail };
+    }
+  } else if (out.branch) out.branch.deleted = !revParse(repoRoot, `refs/heads/${branch}`);
+  return null;
 }
 
 /**
@@ -183,26 +238,10 @@ export function removeScratchWorktree({ repoRoot, dir, branch = null, deleteBran
     if (!p.ok) { markRemoved(target, { error: `preserve: ${p.step ?? p.reason}`, env }); return { ...out, reason: 'preserve-failed', detail: p }; }
     out.preserved = p.ref ? { ref: p.ref, sha: p.sha, dirty: p.dirty } : null;
   }
-  const rm = safeRemoveWorktree(target, { repo: repoRoot, git });
-  out.links = rm.links ?? 0;
-  if (rm.fatal) { markRemoved(target, { error: `main checkout damaged: ${(rm.damage ?? []).join('; ').slice(0, 200)}`, env }); return { ...out, reason: 'main-checkout-damaged', fatal: true, damage: rm.damage }; }
-  if (!rm.ok) {
-    markRemoved(target, { error: `${rm.reason ?? 'remove-failed'}: ${rm.errors[0]?.path ?? ''}`.slice(0, 300), env });
-    if (rm.reason === 'link-stuck') return { ...out, reason: 'link-stuck', errors: rm.errors.slice(0, 5) };
-    return { ...out, reason: 'remove-failed', errors: rm.errors.slice(0, 5) };
-  }
-  out.verified.dirGone = !fs.existsSync(target);
-  out.verified.pruned = !registeredAt(repoRoot, target, { git });
-  if (!out.verified.dirGone || !out.verified.pruned) {
-    const reason = out.verified.dirGone ? 'prune-unverified' : 'dir-remains';
-    markRemoved(target, { error: reason, env });
-    return { ...out, reason };
-  }
-  if (branch && mode && revParse(repoRoot, `refs/heads/${branch}`)) {
-    const deleted = branchDelete({ repoRoot, branch, mode, main, git });
-    out.branch.deleted = deleted.ok;
-    if (!deleted.ok) { markRemoved(target, { preservedRef: out.preserved?.ref ?? null, env }); return { ...out, ok: false, reason: 'branch-delete-failed', detail: deleted.detail }; }
-  } else if (out.branch) out.branch.deleted = !revParse(repoRoot, `refs/heads/${branch}`);
+  const removalFailure = removeScratchContents(out, target, repoRoot, git, env);
+  if (removalFailure) return removalFailure;
+  const branchFailure = deleteScratchBranch(out, { repoRoot, branch, mode, main, git, target, env });
+  if (branchFailure) return branchFailure;
   markRemoved(target, { preservedRef: out.preserved?.ref ?? null, env });
   out.ok = true;
   return out;
