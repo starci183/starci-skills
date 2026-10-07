@@ -45,6 +45,16 @@ test('rate limit: backoff 30s doubling to 5 min with jitter, then the retry nudg
   assert.equal(late.action.kind, 'decision');
 });
 
+test('rate limit while running: a reset inside the wait budget waits in place, one beyond it moves the job to the next agent once', () => {
+  const inside = planHealth({ state: 'rate-limited', resetMs: H.rateLimitWaitMs }, { mem: {}, now: T0 });
+  assert.equal(inside.action, null);
+  assert.equal(inside.mem.nextAt, T0 + H.rateLimitWaitMs, 'the worker is not killed: it waits for the hint');
+  const beyond = planHealth({ state: 'rate-limited', resetMs: H.rateLimitWaitMs + 1 }, { mem: {}, now: T0 });
+  assert.equal(beyond.action.kind, 'fail-no-report');
+  assert.match(beyond.action.why, /beyond the 5 min wait budget/);
+  assert.equal(planHealth({ state: 'rate-limited', resetMs: H.rateLimitWaitMs + 1 }, { mem: beyond.mem, now: T0 + 1000 }).action, null, 'once per spell');
+});
+
 test('idle: at most 2 nudges, then one DI; done-without-report: report nudges, then failed-no-report after 10 min', () => {
   const idle = { state: 'idle-at-prompt' };
   let mem = {}, now = T0, sends = 0, decisions = 0;

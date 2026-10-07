@@ -69,7 +69,8 @@ async function act(probe, judged) {
     ctx.log('reconciler.worker-health', `${j.job_id} dead (${a.why}): starci kernel reconcile --dead-worker --settle-failed`, { ...who, state: 'dead', why: a.why });
     await ctx.api(l.ledgerId, 'reconcile', ['--job', j.job_id, '--dead-worker', '--settle-failed']);
   } else if (a?.kind === 'fail-no-report') {
-    // done-without-report past doneFailAfterMs: the failed-no-report path (its salvage continues from the commits).
+    // done-without-report past doneFailAfterMs, or a rate limit beyond the wait budget: the failed-no-report path (its salvage continues from the commits).
+    if (a.why) ctx.log('reconciler.worker-health', `${j.job_id} moves to the next agent: ${a.why}`, { ...who, state: c.state, why: a.why });
     await ctx.api(l.ledgerId, 'reconcile', ['--job', j.job_id, '--dead-worker', '--settle-failed']);
   } else if (a?.kind === 'decision') {
     await openStalledDecision(probe, l, j, c, planned, who, term);

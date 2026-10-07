@@ -56,8 +56,8 @@ rows:
     cause: agent-provider
     detector: "worker-health probe: rate-limit screen with a reset hint inside the wait budget (scripts/reconciler/worker-health.mjs)"
     handler: runtime-auto
-    action: "wait in place for the reset hint (else backoff), then send the retry nudge; the agent is not killed"
-    bound: {waitMs: {ref: "modules/reconciler/job.yaml#health.backoffMaxMs"}, deadlineMs: {ref: "modules/reconciler/job.yaml#health.rateLimitDecisionMs"}}
+    action: "wait in place for a reset hint inside the wait budget (else backoff), then send the retry nudge; a reset beyond the budget settles failed-no-report and the retry takes the next eligible agent"
+    bound: {waitMs: {ref: "modules/reconciler/job.yaml#health.rateLimitWaitMs"}, deadlineMs: {ref: "modules/reconciler/job.yaml#health.rateLimitDecisionMs"}}
     next: kernel
     code: op-incident-agent-switch
   - id: quota-or-circuit
