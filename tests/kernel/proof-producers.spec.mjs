@@ -10,7 +10,7 @@ import { judgeJobProofs } from '../../scripts/kernel/mechanism-proofs.mjs';
 import { greenDocGate, greenReadDigest } from '../helpers/sonar-scan.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
-const READ = 'starci gate read --root D:/work/app --touch .starciwork/features/a/index.yaml --out D:/tmp/starci-job-scratch/x/read-digest.json';
+const READ = 'starci gate read --root work/app --touch .starciwork/features/a/index.yaml --out scratch/read-digest.json';
 const check = (command) => ({ name: 'c', command, exitCode: 0 });
 const report = (...commands) => ({ outcome: 'done', checks: commands.map(check) });
 const dir = (t) => { const d = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-proof-producers-')); t.after(() => fs.rmSync(d, { recursive: true, force: true })); return d; };
@@ -51,8 +51,8 @@ test('only a done report owes proofs; an op without proofs owes none', (t) => {
 test('a document gate is a producer only with --scope docs, and each owed proof is judged on its own', (t) => {
   const d = dir(t);
   const files = [attach(d, 'read-digest.json', greenReadDigest()), attach(d, 'doc-gate.json', greenDocGate())];
-  const codeGate = 'starci gate run --root D:/work/app --changed a.ts';
-  const docGate = 'starci gate run --scope docs --tree D:/work/app/.starciwork';
+  const codeGate = 'starci gate run --root work/app --changed a.ts';
+  const docGate = 'starci gate run --scope docs --tree work/app/.starciwork';
   const op = 'docs.author';
   assert.deepEqual(proofsOwedByReport({ op, report: report(READ, codeGate), files, skillRoot: ROOT }).map((r) => r.proof), ['doc-gate']);
   assert.deepEqual(proofsOwedByReport({ op, report: report(READ, docGate), files, skillRoot: ROOT }), []);
