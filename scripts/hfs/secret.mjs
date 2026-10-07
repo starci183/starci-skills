@@ -26,6 +26,13 @@ class SecretError extends Error {}
 
 const SLUG = /^[a-z0-9][a-z0-9-]*$/u;
 const KEY = /^[A-Za-z_]\w*$/u;
+const WHITESPACE = '\\s';
+const REQUIRED_INDENT = `${WHITESPACE}+`;
+const OPTIONAL_DASH = '-?';
+const OPTIONAL_SPACING = `${WHITESPACE}*`;
+const RECIPIENT_NAME = 'recipient:';
+const RECIPIENT_VALUE = '(\\S+)';
+const RECIPIENT_LINE = new RegExp(`^${REQUIRED_INDENT}${OPTIONAL_DASH}${OPTIONAL_SPACING}${RECIPIENT_NAME}${OPTIONAL_SPACING}${RECIPIENT_VALUE}`, 'gmu');
 const DEFAULT_KEY = 'data';
 const VERBS = new Set(['list', 'show', 'set', 'gen']);
 
@@ -46,7 +53,7 @@ export function envelopeOf(text) {
   }
   if (format === 'yaml') {
     const keys = [...text.matchAll(/^([A-Za-z_]\w*):/gmu)].map((match) => match[1]).filter((name) => name !== 'sops');
-    return { format, keys, recipients: [...text.matchAll(/^\s+-?\s*recipient:\s*(\S+)/gmu)].map((match) => match[1]) };
+    return { format, keys, recipients: [...text.matchAll(RECIPIENT_LINE)].map((match) => match[1]) };
   }
   const keys = [...text.matchAll(/^([A-Za-z_]\w*)=/gmu)].map((match) => match[1]).filter((name) => !name.startsWith('sops_'));
   return { format, keys, recipients: [...text.matchAll(/^sops_age__list_\d+__map_recipient=(\S+)/gmu)].map((match) => match[1]) };
