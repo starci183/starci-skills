@@ -40,6 +40,11 @@ export const PROPOSED = 'proposed';
 /** Section headings inside a proposal, never a proposal's name. */
 const SECTION_WORDS = new Set(['gap', 'why', 'anatomy', 'tokens', 'claims', 'render', 'rules', 'values', 'summary', 'notes', 'rationale', 'a11y', 'accessibility', 'usage', 'example', 'examples']);
 const RULE_ID = /\b[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*-\d+\b/;
+const HEADING_DASH_DELIMITER = /\s+[\u2014\u2013-]\s+/;
+const HEADING_PAREN_DELIMITER = /\s*\(/;
+const HTML_FENCE_OPENING = /```\s*html/i;
+const LINE_BREAK = /[\r\n\u2028\u2029]/;
+const WHITESPACE = /\s/;
 // A section marker matches in either language: the Vietnamese alternatives are lexicon data
 // (modules/goal/source-phrases.yaml proposal).
 const MD_FIELDS = {
@@ -50,6 +55,50 @@ const MD_FIELDS = {
   render: /```\s*html|<(div|section|span|article|button|svg)\b|\.(png|html)\b|isolated render/i,
 };
 
+function headingLead(heading) {
+  const dash = HEADING_DASH_DELIMITER.exec(heading);
+  const paren = HEADING_PAREN_DELIMITER.exec(heading);
+  let end = heading.length;
+  if (dash) end = dash.index;
+  if (paren && paren.index < end) end = paren.index;
+  return heading.slice(0, end).trim();
+}
+
+function markdownHeading(line) {
+  let hashCount = 0;
+  while (hashCount < 4 && line[hashCount] === '#') hashCount += 1;
+  if (hashCount === 0 || !WHITESPACE.test(line[hashCount] ?? '')) return null;
+  let contentStart = hashCount;
+  while (WHITESPACE.test(line[contentStart] ?? '')) contentStart += 1;
+  const content = line.slice(contentStart);
+  let firstText = -1;
+  let lastText = -1;
+  for (let index = 0; index < content.length; index += 1) {
+    if (!WHITESPACE.test(content[index])) {
+      if (firstText < 0) firstText = index;
+      lastText = index;
+    }
+  }
+  if (firstText < 0) {
+    const whitespaceTail = line.slice(hashCount);
+    for (let index = whitespaceTail.length - 1; index > 0; index -= 1) {
+      if (!LINE_BREAK.test(whitespaceTail[index])) return { level: hashCount, raw: whitespaceTail[index] };
+    }
+    return null;
+  }
+  if (LINE_BREAK.test(content.slice(firstText, lastText + 1))) return null;
+  return { level: hashCount, raw: content.slice(firstText, lastText + 1) };
+}
+
+function fencedHtml(body) {
+  const opening = HTML_FENCE_OPENING.exec(body);
+  if (!opening) return null;
+  const contentStart = opening.index + opening[0].length;
+  const closingIndex = body.indexOf('```', contentStart);
+  if (closingIndex < 0) return null;
+  return body.slice(contentStart, closingIndex).trim();
+}
+
 /** The names a markdown heading declares for its proposal. */
 function headingNames(raw) {
   const names = new Set();
@@ -58,7 +107,7 @@ function headingNames(raw) {
   const variant = /^([A-Z]\w*)\s+(?:variant|slot|part)\s+([A-Za-z][\w-]*)/.exec(heading);
   if (variant) names.add(`${variant[1]}.${variant[2]}`);
   if (!names.size) for (const q of String(raw).matchAll(/`([A-Z]\w*(?:\.[\w-]+)?)`/g)) names.add(q[1]);
-  const lead = /^([A-Za-z][\w.-]*)$/.exec(heading.split(/\s+[—–-]\s+|\s*\(|:/)[0].trim());
+  const lead = /^([A-Za-z][\w.-]*)$/.exec(headingLead(heading).split(':')[0].trim());
   if (!names.size && lead && !SECTION_WORDS.has(lead[1].toLowerCase())) names.add(lead[1]);
   return [...names];
 }
@@ -66,7 +115,7 @@ function headingNames(raw) {
 function markdownProposals(text, file) {
   const lines = String(text).split(/\r?\n/);
   const heads = [];
-  lines.forEach((line, i) => { const m = /^(#{1,4})\s+(.+?)\s*$/.exec(line); if (m) heads.push({ level: m[1].length, raw: m[2], line: i }); });
+  lines.forEach((line, i) => { const heading = markdownHeading(line); if (heading) heads.push({ ...heading, line: i }); });
   const out = [];
   for (const [k, h] of heads.entries()) {
     const names = headingNames(h.raw);
@@ -79,7 +128,7 @@ function markdownProposals(text, file) {
     if (missing.length === PROPOSAL_FIELDS.length) continue;
     const gap = /(?:^|\n)#{1,4}\s*gap[^\n]*\n+([^\n#]+)/i.exec(body)?.[1] ?? body.split('\n').find((l) => MD_FIELDS.gap.test(l)) ?? '';
     out.push({ name: names[0], names, file, format: 'md', gap: gap.trim().slice(0, 300), claims: [...new Set([...body.matchAll(new RegExp(RULE_ID.source, 'g'))].map((m) => m[0]))],
-      render: /```\s*html([\s\S]*?)```/i.exec(body)?.[1]?.trim() ?? (/\(([^)]+\.(?:png|html))\)|`([^`]+\.(?:png|html))`/.exec(body)?.slice(1).find(Boolean) ?? null),
+      render: fencedHtml(body) ?? (/\(([^)]+\.(?:png|html))\)|`([^`]+\.(?:png|html))`/.exec(body)?.slice(1).find(Boolean) ?? null),
       status: PROPOSED, complete: missing.length === 0, missing });
   }
   return out;
