@@ -20,7 +20,7 @@ test('a reference to the folder, a glob under it or a trailing dot stays the fol
   assert.equal(dirOf('features/a/ui/home/***'), 'features/a/ui/home');
   assert.equal(dirOf('features/a/ui/x.'), 'features/a/ui/x.');
   assert.equal(dirOf('features/a/ui/home/f.a-b'), 'features/a/ui/home/f.a-b');
-  assert.equal(dirOf('features/a/ui/home/f.é'), 'features/a/ui/home/f.é');
+  assert.equal(dirOf('features/a/ui/home/f.ü'), 'features/a/ui/home/f.ü');
 });
 
 test('only a canonical Work UI node is a design input', () => {
