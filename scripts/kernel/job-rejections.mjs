@@ -12,6 +12,8 @@ export function rejectionAttemptsOf(db, job) {
   const rows = db.prepare("SELECT payload_json FROM events WHERE entity_type='job' AND entity_id=? AND kind='dispatch-rejected' ORDER BY seq").all(job.job_id);
   return rows.map((row) => parseJsonOr(row.payload_json, {}))
     .filter((payload) => payload.effectState === 'none' && payload.model && switchSteps.includes(payload.step))
-    .map((payload) => ({ jobId: job.job_id, attempt: job.attempt ?? job.try_no ?? null, pool: payload.model, cause: code, attributable: true,
-      detail: `launch refused at ${payload.step}${payload.error ? ` (${String(payload.error).slice(0, 80)})` : ''}` }));
+    .map((payload) => {
+      const error = payload.error ? ' (' + String(payload.error).slice(0, 80) + ')' : '';
+      return { jobId: job.job_id, attempt: job.attempt ?? job.try_no ?? null, pool: payload.model, cause: code, attributable: true, detail: `launch refused at ${payload.step}${error}` };
+    });
 }
