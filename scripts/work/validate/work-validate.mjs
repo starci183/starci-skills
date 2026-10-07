@@ -29,25 +29,32 @@ const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '
 
 const uniqueSorted = (items) => [...new Set(items.map(String))].sort(byCodeUnit);
 
+/** The `schema:` of the root index.yaml, or null when it is missing or does not parse (structural validation owns that refusal). */
+function rootSchemaOf(root) {
+  const indexFile = path.join(root, 'index.yaml');
+  try { if (fs.existsSync(indexFile)) return parseYaml(fs.readFileSync(indexFile, 'utf8'))?.schema ?? null; }
+  catch { /* structural validation below owns the parse refusal */ }
+  return null;
+}
+
+/** The work root a record directory belongs to: the nearest ancestor that is .starciwork or holds workspace.yaml, else `root`. */
+function enclosingWorkRootOf(root) {
+  let dir = root;
+  while (true) {
+    if (path.basename(dir) === '.starciwork' || fs.existsSync(path.join(dir, 'workspace.yaml'))) return dir;
+    const parent = path.dirname(dir);
+    if (parent === dir) return root;
+    dir = parent;
+  }
+}
+
 function workContextFor(requested) {
   const root = fs.statSync(requested).isDirectory() ? requested : path.dirname(requested);
   const yamlFiles = walk(root).filter((file) => /\.ya?ml$/i.test(file));
-  const indexFile = path.join(root, 'index.yaml');
-  let rootSchema = null;
-  try { if (fs.existsSync(indexFile)) rootSchema = parseYaml(fs.readFileSync(indexFile, 'utf8'))?.schema ?? null; }
-  catch { /* structural validation below owns the parse refusal */ }
+  const rootSchema = rootSchemaOf(root);
   const mode = fs.existsSync(path.join(root, 'workspace.yaml')) || rootSchema === 'work/catalog@1'
     ? 'tree' : 'record';
-  const enclosingWorkRoot = (() => {
-    if (mode === 'tree') return root;
-    let dir = root;
-    while (true) {
-      if (path.basename(dir) === '.starciwork' || fs.existsSync(path.join(dir, 'workspace.yaml'))) return dir;
-      const parent = path.dirname(dir);
-      if (parent === dir) return root;
-      dir = parent;
-    }
-  })();
+  const enclosingWorkRoot = mode === 'tree' ? root : enclosingWorkRootOf(root);
   return {root, yamlFiles, mode, enclosingWorkRoot};
 }
 
@@ -193,8 +200,8 @@ export function validateWork(target, { strict = false } = {}) {
   return result;
 }
 
-const FINDING_FILE = /^(.+?): /;
-const UNDER_FILE = / under (.+?) \[[A-Z_]+\]$/;
+const FINDING_FILE = new RegExp([String.raw`^`, String.raw`(.+?)`, ': '].join(''));
+const UNDER_FILE = new RegExp([' under ', String.raw`(.+?)`, String.raw` \[[A-Z_]+\]$`].join(''));
 /** The absolute file a finding names, or null: its "under <file>" tail, else its leading path. */
 function findingFile(finding, { roots = [] } = {}) {
   const text = String(finding);
