@@ -184,7 +184,7 @@ export const disposeSlot = async (slot: SlotHandles): Promise<ReadonlyArray<unkn
     await attempt(() => slot.fakes.close())
     await attempt(() => removeSiblings(slot.siblings))
     await attempt(async () => {
-        const { stack } = await import("../stack")
+        const { stack } = require("../stack") as typeof import("../stack")
         await stack.detach({ namespace: context.namespace, runId: context.runId, infra: context.infra })
     })
     await attempt(() => {
@@ -201,7 +201,7 @@ const setupSlot = async (plan: SlotPlan, slot: number): Promise<SlotHandles> => 
     const runDirectory = mkdtempSync(join(tmpdir(), `starci-tw-${runId}-`))
     mkdirSync(runDirectory, { recursive: true })
     const fakes = new FakesHost(config.fakes ?? {}, { runId, secret: (label) => secretOf(plan.secretSeed, label), now: () => new Date() })
-    const { stack } = await import("../stack")
+    const { stack } = require("../stack") as typeof import("../stack")
     let infra: RunInfra | null = null
     let siblings: ReadonlyArray<StartedSibling> = []
     try {

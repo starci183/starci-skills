@@ -98,7 +98,7 @@ const isInfraName = (value: string): value is InfraName => (INFRA_SERVICES as Re
 
 const loadCluster = async (): Promise<ClusterApi> => {
     const specifier = "./cluster"
-    const loaded = (await import(specifier)) as { readonly clusterApi: ClusterApi }
+    const loaded = require(specifier) as { readonly clusterApi: ClusterApi }
     return loaded.clusterApi
 }
 
