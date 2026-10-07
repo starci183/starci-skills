@@ -84,9 +84,8 @@ export function parseGateArgs(argv) {
   while (i < argv.length) {
     const arg = argv[i++];
     if (arg === '--changed') {
-      const stop = argv.findIndex((value, at) => at >= i && value.startsWith('--'));
-      opts.changed = argv.slice(i, stop < 0 ? argv.length : stop);
-      i += opts.changed.length;
+      opts.changed = [];
+      while (argv[i]?.startsWith('--') === false) opts.changed.push(argv[i++]);
       continue;
     }
     if (!GATE_VALUE_FLAGS.has(arg)) throw new Error(`unknown argument ${arg}; ${USAGE}`);
