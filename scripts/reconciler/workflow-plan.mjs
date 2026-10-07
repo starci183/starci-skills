@@ -117,7 +117,11 @@ function planUnreadable(p) {
   if (!unreadable) return;
   const held = unreadable.heldAt != null && status ? `holding the status read ${Math.round((now - unreadable.heldAt) / 60_000)}m ago` : 'no readable status held; stall not judged';
   p.out.lines.push(`STATUS-UNREADABLE ${workflowId}: ${unreadable.misses} consecutive pass(es) since ${iso(unreadable.since)}: ${unreadable.error}; ${held}`);
-  if (unreadable.misses >= (p.s.statusUnreadablePasses ?? 3)) openStatusDefect(p);
+  // A busy read is the child running no code at all (its entry module read mid-swap during a land/reload): it clears
+  // on its own on the next pass, so it defects only on a streak far past the read's own cadence.
+  const passes = p.s.statusUnreadablePasses ?? 3;
+  const streak = unreadable.failure?.cause === 'busy' ? passes * 4 : passes;
+  if (unreadable.misses >= streak) openStatusDefect(p);
 }
 
 /** The Supervisor's runtime-defect DI of a status read that kept failing. */
