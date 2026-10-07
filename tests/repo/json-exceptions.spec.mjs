@@ -92,6 +92,7 @@ test('root-local runtime JSON is excluded without hiding authored JSON or nested
     '.starciwork/kernel-evidence/wf/state.json',
     'runtime/engine/builds/digest/runtime-pin.json',
     'settings.local.json',
+    '.claude/settings.local.json',
   ];
   const authoredFiles = [
     'packages/app/.starciwork/state.json',
