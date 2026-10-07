@@ -43,8 +43,7 @@ import { recordNewProbe, recordServiceEvents } from './service-events.mjs';
 import { outcomeOf, probeCommand, reopenCommand } from './service-commands.mjs';
 import { auditTasks } from '../machine/task-audit.mjs';
 import { TASK_DEFINITIONS, starciShimPath } from '../machine/task-register.mjs';
-import { RECONCILER_SERVICE, reconcilerTaskProbe } from './task-health.mjs';
-import { serviceWanted } from './start-items.mjs';
+import { RECONCILER_SERVICE, reconcilerTaskProbe } from './task-health.mjs'; import { offInConfig } from './connector-wanted.mjs';
 export { httpUp };
 export const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const SERVICES_FILE = 'scripts/reconciler/services.mjs';
@@ -190,20 +189,6 @@ async function connectorUp(service, { timeoutMs, tries = 1, run = runChild, extr
     return last;
   });
 }
-
-/**
- * A connector probe that honors the owner's config.yaml connectors: a connector serviceWanted says is off and that
- * does not answer is `unmanaged` (not an outage: no restart, no SERVICE_DOWN clock, no failStreak). An answering one
- * stays healthy, and a config that cannot be read keeps the plain probe (an outage still alerts).
- */
-const offInConfig = (name, probe, config) => async () => {
-  const r = await probe();
-  if (r?.ok === true) return r;
-  let cfg;
-  try { cfg = typeof config === 'function' ? config() : config; } catch { return r; }
-  if (cfg == null || serviceWanted(name, cfg)) return r;
-  return { ...r, ok: false, unmanaged: true, notRequired: true, error: 'off in config.yaml connectors (not required)' };
-};
 
 /* ------------------------------------------------------------ the registry */
 
