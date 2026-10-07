@@ -71,3 +71,21 @@ test('the engine, the services actuator, Orca and every scheduled task resolve t
     assert.ok(exists(target), `${name}: ${target} does not exist`);
   }
 });
+
+test('every service launched through a Windows task has a registration the owner can run, under exactly the task name the actuator runs', async () => {
+  const { startService } = await import('../../scripts/reconciler/services.mjs');
+  const { SERVICE_TASKS } = await import('../../scripts/reconciler/task-health.mjs');
+  const { taskRegister } = await import('../../scripts/machine/task-register.mjs');
+  const taskServices = Object.entries(MANAGED).filter(([, how]) => how === 'task').map(([name]) => name).sort();
+  assert.deepEqual(Object.keys(SERVICE_TASKS).sort(), taskServices, 'every task-launched service maps to a runtime task');
+  const settings = hostSettings();
+  for (const [service, key] of Object.entries(SERVICE_TASKS)) {
+    const printed = await taskRegister({ positionals: [key], args: {}, env: {} });
+    assert.equal(printed.code, 0, `${service}: starci task register ${key} prints a registration`);
+    if (service.startsWith('sched-task:')) { assert.equal(service, `sched-task:${printed.data.taskName}`); continue; }
+    const ran = [];
+    await startService(service, { platform: 'win32', settings, ports: PORTS, env: {}, tasks: (args) => { ran.push(args); return { status: 0, stdout: '' }; }, powershell: () => ({ status: 0 }) });
+    assert.deepEqual(ran.map((args) => args.join(' ')), [`/End /TN ${printed.data.taskName}`, `/Run /TN ${printed.data.taskName}`], `${service} restarts the task ${key} registers`);
+    assert.match(printed.text, new RegExp(`Register-ScheduledTask -TaskName '${printed.data.taskName}'`));
+  }
+});

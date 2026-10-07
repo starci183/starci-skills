@@ -41,19 +41,20 @@ import { httpUp } from '../api/http/http-up.mjs';
 import { repeatInOrder } from '../lib/in-order.mjs';
 import { recordNewProbe, recordServiceEvents } from './service-events.mjs';
 import { outcomeOf, probeCommand, reopenCommand } from './service-commands.mjs';
+import { auditTasks } from '../machine/task-audit.mjs';
+import { TASK_DEFINITIONS, starciShimPath } from '../machine/task-register.mjs';
+import { RECONCILER_SERVICE, reconcilerTaskProbe } from './task-health.mjs';
 export { httpUp };
 export const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const SERVICES_FILE = 'scripts/reconciler/services.mjs';
 const HOST_YAML = path.join(SKILL_ROOT, 'modules', 'reconciler', 'host.yaml');
 const HARNESS_TUNNEL_YML = path.join(os.homedir(), '.cloudflared', 'harness.yml');
-const RECONCILER_TASK = 'StarCi-Reconciler';
-const starciLauncher = () => path.join(os.homedir(), '.starci', 'bin', process.platform === 'win32' ? 'starci.cmd' : 'starci');
 
 /** Return the platform refusal for a Windows service actuator, or null when none applies. */
 export function servicePlatformProblem(name, platform = process.platform) {
   if (platform === 'win32') return null;
   if (name === 'orca') return `Windows desktop restart is unsupported on ${platform}`;
-  if (['harness-ui', 'harness-tunnel', `sched-task:${RECONCILER_TASK}`].includes(name)) return `Windows Task Scheduler is unsupported on ${platform}`;
+  if (['harness-ui', 'harness-tunnel', RECONCILER_SERVICE].includes(name)) return `Windows Task Scheduler is unsupported on ${platform}`;
   return null;
 }
 
@@ -189,17 +190,6 @@ async function connectorUp(service, { timeoutMs, tries = 1, run = runChild, extr
   });
 }
 
-/** schtasks /query of one task: {ok, exists, status} (status Ready|Running|Disabled|...). */
-async function taskState(name, { timeoutMs = 30_000, run = runChild, platform = process.platform } = {}) {
-  const error = servicePlatformProblem(`sched-task:${name}`, platform);
-  if (error) return { ok: false, exists: false, unsupported: true, unmanaged: true, error };
-  const r = await run('schtasks.exe', ['/Query', '/TN', name, '/FO', 'CSV', '/NH'], { timeoutMs });
-  if (r.status !== 0) return { ok: false, exists: false };
-  const cols = String(r.stdout).trim().split(/\r?\n/)[0]?.split('","').map((c) => c.replace(/^"|"$/g, '')) ?? [];
-  const status = cols[2] ?? null;
-  return { ok: status != null && !/disabled/i.test(status), exists: true, status };
-}
-
 /* ------------------------------------------------------------ the registry */
 
 /**
@@ -208,7 +198,7 @@ async function taskState(name, { timeoutMs = 30_000, run = runChild, platform = 
  * host.yaml allowTaskRepair is false). `ownerPath`: the owner reaches the runtime through it, so a quarantine is
  * urgent for the owner too (DESIGN 9.7). Every seam is injectable for the specs.
  */
-export function serviceRegistry({ settings = hostSettings(), ports = servicePorts(), run = runChild, http = httpUp, platform = process.platform } = {}) {
+export function serviceRegistry({ settings = hostSettings(), ports = servicePorts(), run = runChild, http = httpUp, platform = process.platform, audit = auditTasks } = {}) {
   const s = settings.services;
   const startCli = (name) => ({ cmd: 'node', args: [SERVICES_FILE, '--start', name, '--json'] });
   const entry = (name, fields) => {
@@ -243,12 +233,9 @@ export function serviceRegistry({ settings = hostSettings(), ports = servicePort
     // The bridge long-polls: its offset advances only when an update arrives, so liveness is the recorded pid
     // alive (status.running); the offset is kept in the probe detail for the digest.
     entry('telegram-bridge', { ownerPath: true, probe: () => connectorUp('telegram-bridge', { timeoutMs: s['telegram-bridge'].probeTimeoutMs, tries: s['telegram-bridge'].probeTries ?? 1, run }) }),
-    entry(`sched-task:${RECONCILER_TASK}`, { restart: settings.allowTaskRepair,
-      probe: async () => {
-        const t = await taskState(RECONCILER_TASK, { timeoutMs: s[`sched-task:${RECONCILER_TASK}`].probeTimeoutMs, run, platform });
-        return t.exists || settings.allowTaskRepair ? t : { ...t, unmanaged: true };
-      },
-      start: () => ({ cmd: starciLauncher(), args: ['task', 'register', 'reconciler', '--apply', '--json'] }) }),
+    entry(RECONCILER_SERVICE, { restart: settings.allowTaskRepair,
+      probe: () => reconcilerTaskProbe({ audit, allowTaskRepair: settings.allowTaskRepair }),
+      start: () => ({ cmd: starciShimPath(), args: ['task', 'register', 'reconciler', '--apply', '--json'] }) }),
   ];
   for (const c of settings.checkers) {
     out.push({ name: `checker:${c.name}`, kind: 'checker', restart: false, ownerPath: false, ...c, start: () => null,
@@ -446,7 +433,8 @@ export async function startService(name, { settings = hostSettings(), ports = se
       return { ok: r.status === 0, app, ...lastJson(r.stdout), ...(r.status ? { error: String(r.stderr ?? '').trim().slice(0, 300) } : {}) };
     }
     case 'harness-ui': case 'harness-tunnel': {
-      const task = s.task; // tunnel-task.mjs registers `starci harness start --tunnel` as the harness-tunnel action
+      // The harness app task is declared once (runtimes.yaml statusApp.task, read by TASK_DEFINITIONS); the tunnel's by host.yaml.
+      const task = name === 'harness-ui' ? TASK_DEFINITIONS['harness-app'].taskName : s.task;
       tasks(['/End', '/TN', task]);
       if (name === 'harness-ui' && ports.harnessPort) {
         // A listener that holds the port but does not answer blocks the new server: stop it first.

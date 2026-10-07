@@ -5,6 +5,7 @@ import {
   orcaRestartScript, cleanEnv, DOWN_STATES, seatAgentOf, httpUp, OUTAGE_STATES, startService, servicePlatformProblem,
 } from '../../scripts/reconciler/services.mjs';
 import { tempState } from '../../scripts/reconciler/testing.mjs';
+import { TASK_DEFINITIONS } from '../../scripts/machine/task-register.mjs';
 
 // Lane D rc-host: the ONE host-service registry (scripts/reconciler/services.mjs). The DESIGN 9.7 state machine,
 // its backoff, the quarantine after more than five restarts in thirty minutes, and one source per port.
@@ -14,6 +15,8 @@ const HARNESS_YML = 'tunnel: x\ningress:\n  - hostname: harness.example.org\n   
 const ALLOC = { supervisorTick: { statusApp: { port: 4547 } } };
 const CONFIG = { connectors: { gateway: { port: 7070 } } };
 const entryOf = (name, over = {}) => ({ name, restart: true, ...S.services[name], ...over });
+// The Windows task a service restarts through: the harness app's is declared once, by TASK_DEFINITIONS; the tunnel's by host.yaml.
+const taskNameOf = (name) => (name === 'harness-ui' ? TASK_DEFINITIONS['harness-app'].taskName : S.services[name].task);
 const opts = (entry, now) => ({ now, entry, backoff: S.backoff, quarantine: S.quarantine });
 
 test('host.yaml carries every number the registry needs', () => {
@@ -145,11 +148,13 @@ test('restart:false (checkers, the task while allowTaskRepair is false) never st
 });
 
 test('the registry marks the scheduled task unmanaged when it is absent and repair is not allowed', async () => {
-  const reg = serviceRegistry({ platform: 'win32', settings: S, ports: servicePorts({ allocation: ALLOC, config: CONFIG, harnessYml: HARNESS_YML }), run: async () => ({ status: 1, stdout: '' }) });
+  const audit = async () => ({ ok: true, audits: { reconciler: { name: 'reconciler', taskName: 'StarCi-Reconciler', ok: false, problem: 'missing', reason: 'not registered', fix: 'starci task register reconciler --apply' } } });
+  const reg = serviceRegistry({ platform: 'win32', settings: S, ports: servicePorts({ allocation: ALLOC, config: CONFIG, harnessYml: HARNESS_YML }), audit });
   const task = reg.find((e) => e.name === 'sched-task:StarCi-Reconciler');
   assert.equal(task.restart, false);
   const p = await task.probe();
   assert.equal(p.unmanaged, true);
+  assert.equal(p.audit.problem, 'missing');
 });
 
 test('Orca restarts through explorer.exe with no agent session variables', async () => {
@@ -313,7 +318,7 @@ test('portable connector registry probes and start commands remain available off
 test('Windows harness starts preserve End, listener stop, then Run ordering', async () => {
   const ports = servicePorts({ allocation: ALLOC, config: CONFIG, harnessYml: HARNESS_YML });
   for (const name of ['harness-ui', 'harness-tunnel']) {
-    const task = S.services[name].task;
+    const task = taskNameOf(name);
     const calls = [];
     const result = await startService(name, {
       platform: 'win32', settings: S, ports, env: {},
@@ -331,7 +336,7 @@ test('Windows harness starts preserve End, listener stop, then Run ordering', as
 test('Windows harness starts retain the raw Run failure instead of reporting success', async () => {
   const ports = servicePorts({ allocation: ALLOC, config: CONFIG, harnessYml: HARNESS_YML });
   for (const name of ['harness-ui', 'harness-tunnel']) {
-    const task = S.services[name].task;
+    const task = taskNameOf(name);
     const calls = [];
     const result = await startService(name, {
       platform: 'win32', settings: S, ports, env: {},
