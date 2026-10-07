@@ -34,7 +34,7 @@ import { clusterOwed } from '../../scripts/supervisor/cluster.mjs';
 import { renderSupervisorBlock, supervisorSnapshot } from '../../scripts/supervisor/status-block.mjs';
 import { recordedSeatTerminals, seatSessions, entryTerminalOf } from '../../scripts/supervisor/seat-sessions.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { loadRuntimes } from '../../scripts/agent/models.mjs';
+import { tierMembers, tierOfSeat } from '../../scripts/agent/tiers.mjs';
 import { withMachine, openMachine } from '../../engine/db/machine.mjs';
 import { fakeOrcaWorktrees } from '../helpers/fake-orca-worktrees.mjs';
 
@@ -355,73 +355,72 @@ test('workers: one job per cluster, launches stop at the cap, a leased file wait
   assert.deepEqual(leaseConflicts(m, ['scripts/a.mjs']).map((c) => c.jobId), [a.job.job_id]);
 });
 
-test('worker routing: the balanced pick skips an unavailable provider and prefers the furthest below its share', async () => {
-  const runtimes = loadRuntimes(path.join(SKILL_ROOT, 'modules', 'models'));
-  const shares = { 'claude-agent': 25, 'codex-agent': 25, 'devin-agent': 25 };
-  const pick = await pickWorkerPool({ shares, runtimes, recent: { 'claude-agent': 5, 'codex-agent': 5, 'devin-agent': 0 } });
-  assert.equal(pick.agent, 'devin');
-  const skip = await pickWorkerPool({ shares, runtimes, recent: { 'devin-agent': 0, 'claude-agent': 9, 'codex-agent': 1 },
-    availabilityOf: (p) => (p === 'devin' ? { state: 'unavailable', reason: 'circuit open' } : { state: 'available' }) });
+test('worker routing: the worker seat takes the first available member of its tier, skips an unavailable provider and honours prefer and avoid', () => {
+  const members = tierMembers(tierOfSeat('worker'));
+  const pick = pickWorkerPool({ members });
+  assert.deepEqual([pick.agent, pick.model, pick.tier], ['claude', 'claude-sonnet-5-5', 'high']);
+  assert.deepEqual(pick.allowGroup.map((member) => member.provider), ['claude', 'codex'], 'the launch picker receives the whole tier chain');
+  const skip = pickWorkerPool({ members, availabilityOf: (p) => (p === 'claude' ? { state: 'unavailable', reason: 'circuit open' } : { state: 'available' }) });
   assert.equal(skip.agent, 'codex');
-  assert.ok(skip.skipped.some((s) => s.pool === 'devin-agent'));
+  assert.ok(skip.skipped.some((s) => s.pool === 'claude-agent'));
+  assert.equal(pickWorkerPool({ members, prefer: 'codex' }).agent, 'codex');
+  assert.equal(pickWorkerPool({ members, avoid: ['claude'] }).agent, 'codex');
+  assert.match(pickWorkerPool({ members, avoid: ['claude', 'codex'] }).error, /no worker pool is available/);
 });
 
 test('worker readiness: a refused worker-start excludes the provider', async (t) => {
   const env = envOf(t);
   const m = machineOf(t, env);
-  const runtimes = loadRuntimes(path.join(SKILL_ROOT, 'modules', 'models'));
-  const shares = { 'claude-agent': 25, 'codex-agent': 25, 'devin-agent': 25 };
-  const recent = { 'claude-agent': 9, 'codex-agent': 5, 'devin-agent': 0 };
+  const members = tierMembers(tierOfSeat('worker'));
   const a = createJob(m, { cluster: 'r1', files: ['scripts/r1.mjs'] });
   const b = createJob(m, { cluster: 'r2', files: ['scripts/r2.mjs'] });
   const routed = [], spawned = [];
   const deps = {
     load: () => ({ cpuBusy: 0, freeMem: 1 }),
-    route: async ({ prefer, avoid }) => { routed.push({ prefer, avoid }); return pickWorkerPool({ shares, runtimes, recent, prefer, avoid }); },
+    route: async ({ prefer, avoid }) => { routed.push({ prefer, avoid }); return pickWorkerPool({ members, prefer, avoid }); },
     staging: ({ jobId }) => ({ ok: true, path: `/tmp/${jobId}`, branch: `sup-${jobId}`, base: 'abc', orcaId: `repo::/tmp/${jobId}` }),
     unstage: () => ({}),
-    start: (opts) => { spawned.push(opts); return opts.provider === 'devin' ? { ok: false, step: 'worker-start', effectState: 'none', error: 'agent_readiness_failed' } : { ok: true, terminal: `term_${spawned.length}`, dispatchId: `ctx_${spawned.length}` }; },
+    start: (opts) => { spawned.push(opts); return opts.provider === 'claude' ? { ok: false, step: 'worker-start', effectState: 'none', error: 'agent_readiness_failed' } : { ok: true, terminal: `term_${spawned.length}`, dispatchId: `ctx_${spawned.length}` }; },
   };
   const r = await spawnWorkers(m, { settings, deps, env });
-  assert.equal(spawned[0].provider, 'devin', 'devin is furthest below its share');
+  assert.equal(spawned[0].provider, 'claude', 'claude leads the worker tier');
   assert.equal(spawned[1].provider, 'codex', 'the rest of the pass skips the provider that just failed readiness');
   assert.deepEqual(r.failed.map((f) => f.jobId), [a.job.job_id]);
   const requeued = jobOf(m, a.job.job_id);
   assert.equal(requeued.status, 'queued');
-  assert.deepEqual(requeued.payload.avoidAgents, ['devin']);
+  assert.deepEqual(requeued.payload.avoidAgents, ['claude']);
   assert.equal(requeued.payload.agent, null, 'the requeued job keeps its own agent request, not the provider routed to it');
   assert.ok(m.latestSupAttempt(a.job.job_id).cancelled_at, 'the failed spawn attempt is closed');
   const r2 = await spawnWorkers(m, { settings, deps, env });
   assert.equal(r2.launched[0].jobId, a.job.job_id);
-  assert.notEqual(r2.launched[0].agent, 'devin', 'a requeued job is never re-routed to the provider that failed it');
-  assert.ok(routed.at(-1).avoid.includes('devin'));
+  assert.notEqual(r2.launched[0].agent, 'claude', 'a requeued job is never re-routed to the provider that failed it');
+  assert.ok(routed.at(-1).avoid.includes('claude'));
   assert.equal(jobOf(m, b.job.job_id).status, 'running');
   // READINESS_FAILS_PER_HOUR failures in the hour exclude the provider for every job, fresh ones included.
-  for (let i = 0; i < READINESS_FAILS_PER_HOUR; i += 1) supervisorEvent(m, { entityType: 'job', entityId: `x${i}`, kind: 'worker-spawn-failed', payload: { agent: 'claude', step: 'worker-start' } });
+  for (let i = 0; i < READINESS_FAILS_PER_HOUR; i += 1) supervisorEvent(m, { entityType: 'job', entityId: `x${i}`, kind: 'worker-spawn-failed', payload: { agent: 'codex', step: 'worker-start' } });
   createJob(m, { cluster: 'r3', files: ['scripts/r3.mjs'] });
   await spawnWorkers(m, { settings, deps, env });
-  assert.ok(routed.at(-1).avoid.includes('claude'), JSON.stringify(routed.at(-1)));
+  assert.ok(routed.at(-1).avoid.includes('codex'), JSON.stringify(routed.at(-1)));
 });
 
 test('worker outage: an attestation refused for a provider capacity outage excludes the provider like a readiness failure', async (t) => {
   const env = envOf(t);
   const m = machineOf(t, env);
-  const runtimes = loadRuntimes(path.join(SKILL_ROOT, 'modules', 'models'));
-  const shares = { 'claude-agent': 25, 'codex-agent': 25, 'devin-agent': 25 };
-  const recent = { 'claude-agent': 9, 'codex-agent': 5, 'devin-agent': 0 };
+  // Only the Devin card declares a capacity text, so this scenario walks the medium tier (Devin, then Sol).
+  const members = tierMembers('medium');
   const a = createJob(m, { cluster: 'q1', files: ['scripts/q1.mjs'] });
   const b = createJob(m, { cluster: 'q2', files: ['scripts/q2.mjs'] });
   const routed = [], spawned = [];
   const quota = 'attestation rejected: We are currently experiencing capacity issues with this serving model';
   const deps = {
     load: () => ({ cpuBusy: 0, freeMem: 1 }),
-    route: async ({ prefer, avoid }) => { routed.push({ prefer, avoid }); return pickWorkerPool({ shares, runtimes, recent, prefer, avoid }); },
+    route: async ({ prefer, avoid }) => { routed.push({ prefer, avoid }); return pickWorkerPool({ members, prefer, avoid }); },
     staging: ({ jobId }) => ({ ok: true, path: `/tmp/${jobId}`, branch: `sup-${jobId}`, base: 'abc', orcaId: `repo::/tmp/${jobId}` }),
     unstage: () => ({}),
     start: (opts) => { spawned.push(opts); return opts.provider === 'devin' ? { ok: false, step: 'attestation', effectState: 'none', error: quota } : { ok: true, terminal: `term_${spawned.length}`, dispatchId: `ctx_${spawned.length}` }; },
   };
   await spawnWorkers(m, { settings, deps, env });
-  assert.equal(spawned[0].provider, 'devin', 'devin is furthest below its share');
+  assert.equal(spawned[0].provider, 'devin', 'claude leads the worker tier');
   assert.equal(spawned[1].provider, 'codex', 'the rest of the pass skips the provider in outage');
   const requeued = jobOf(m, a.job.job_id);
   assert.equal(requeued.status, 'queued');
@@ -433,7 +432,7 @@ test('worker outage: an attestation refused for a provider capacity outage exclu
   assert.equal(jobOf(m, b.job.job_id).status, 'running');
   // An attestation failure that is no outage (a wrong model on screen) excludes nothing.
   const c = createJob(m, { cluster: 'q3', files: ['scripts/q3.mjs'] });
-  const other = { ...deps, route: async () => pickWorkerPool({ shares, runtimes, recent, prefer: 'devin' }), start: () => ({ ok: false, step: 'attestation', error: 'attestation rejected: model mismatch' }) };
+  const other = { ...deps, route: async () => pickWorkerPool({ members, prefer: 'devin' }), start: () => ({ ok: false, step: 'attestation', error: 'attestation rejected: model mismatch' }) };
   await spawnWorkers(m, { settings, deps: other, env, jobId: c.job.job_id });
   assert.equal(jobOf(m, c.job.job_id).payload.avoidAgents, undefined);
 });
