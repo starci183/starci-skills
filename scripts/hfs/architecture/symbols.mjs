@@ -14,6 +14,7 @@
  * Specs and tests are not in the graph. The public entry of an owner is found the way dead-exports.mjs finds it.
  */
 import { canonical } from './config.mjs';
+import { hasAnyFlag } from '../../lib/ts-ast.mjs';
 import { entryOf } from './dead-exports.mjs';
 
 export const SYMBOL_RULE_IDS = ['HFS_DUPLICATE_SYMBOL', 'HFS_ALIAS_REEXPORT'];
@@ -72,7 +73,7 @@ function declaredExports(ts, sourceFile) {
 
 /** The declaration an export of an entry resolves to: its repository-relative file and its own name, or null. */
 function declaringFile(ts, checker, graph, symbol) {
-  const resolved = symbol.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol;
+  const resolved = hasAnyFlag(symbol.flags, ts.SymbolFlags.Alias) ? checker.getAliasedSymbol(symbol) : symbol;
   for (const declaration of resolved?.declarations ?? []) {
     const rel = graph.abs(canonical(declaration.getSourceFile().fileName));
     if (rel) return { rel, name: resolved.getName() };
@@ -153,7 +154,7 @@ function repositoryDeclaration(ts, checker, graph, node, kinds) {
   else if (ts.isQualifiedName(node)) target = node.right;
   const symbol = checker?.getSymbolAtLocation(target);
   if (!symbol) return null;
-  const resolved = symbol.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol;
+  const resolved = hasAnyFlag(symbol.flags, ts.SymbolFlags.Alias) ? checker.getAliasedSymbol(symbol) : symbol;
   const home = (resolved?.declarations ?? []).some(declaration => kinds.includes(declaration.kind) && graph.abs(canonical(declaration.getSourceFile().fileName)));
   return home ? resolved.getName() : null;
 }

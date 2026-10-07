@@ -1,6 +1,6 @@
 // ast-walks.mjs - AST walks the architecture checkers share (moved out of typescript.mjs, which keeps the program loading and module resolution).
 import { canonical, isInside } from './config.mjs';
-import { isConstVariable, sourceLocation } from '../../lib/ts-ast.mjs';
+import { hasAnyFlag, isConstVariable, sourceLocation } from '../../lib/ts-ast.mjs';
 import { UNPROVEN_FRAMEWORK, isUnshadowedCommonJsRequire, relativePath, unwrapExpression } from './typescript.mjs';
 
 /** `expression` unwrapped by the caller's own predicate set (a predicate absent on an older ts reads as never). */
@@ -14,7 +14,7 @@ export function unwrapEach(ts, expression, predicates) {
 export function normalizedSymbolValue(ts, checker, value = null) {
   let symbol = value;
   const seen = new Set();
-  while (symbol && (symbol.flags & ts.SymbolFlags.Alias) && !seen.has(symbol)) {
+  while (symbol && hasAnyFlag(symbol.flags, ts.SymbolFlags.Alias) && !seen.has(symbol)) {
     seen.add(symbol);
     const target = checker.getAliasedSymbol(symbol);
     if (!target || target === symbol) break;

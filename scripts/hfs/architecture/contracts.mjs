@@ -3,6 +3,7 @@ import { isInside } from './config.mjs';
 import { referencedExports, relativePath, unwrapExpression } from './typescript.mjs';
 import { commonJsRequireReasons, constructedDecoratorKind as sharedConstructedDecoratorKind, decoratorCallee, moduleExportsOf, nodeDecorators, normalizedSymbol, normalizedSymbolValue, programSourcesOf, selectedNode, valueSymbol, violation } from './ast-walks.mjs';
 import { byCodeUnit } from '../../lib/list.mjs';
+import { hasAnyFlag } from '../../lib/ts-ast.mjs';
 import { canonical, checkInjectedClass, checkMessageReadonly, isPublicMember, messageClass } from './contracts-readonly.mjs';
 export const PUBLIC_CONTRACT_RULE_ID = 'BE_PUBLIC_CONTRACT_FORM';
 export { READONLY_BOUNDARY_RULE_ID } from './contracts-readonly.mjs';
@@ -137,7 +138,7 @@ function contractTypeStatus(ts, checker, node, seen = new Set(), depth = 0) {
 
 function wrappedTypeStatus(ts, checker, type, named, nextSeen, depth) {
   for (const wrapper of ['Promise', 'Readonly', 'Awaited', 'Array', 'ReadonlyArray']) if (builtinSymbol(ts, named, wrapper)) {
-    const argumentsList = type.aliasTypeArguments ?? (checker.getTypeArguments && (type.objectFlags & ts.ObjectFlags.Reference)
+    const argumentsList = type.aliasTypeArguments ?? (checker.getTypeArguments && hasAnyFlag(type.objectFlags, ts.ObjectFlags.Reference)
       ? checker.getTypeArguments(type) : type.typeArguments) ?? [];
     return argumentsList.length === 1 ? contractTypeStatusFromType(ts, checker, argumentsList[0], nextSeen, depth + 1) : 'unavailable';
   }
@@ -159,18 +160,18 @@ function objectContractTypeStatus(ts, checker, type, nextSeen, depth) {
 
 function contractTypeStatusFromType(ts, checker, type, seen = new Set(), depth = 0) {
   if (!type || depth > 12 || seen.has(type)) return 'unavailable';
-  if (type.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) return 'unavailable';
+  if (hasAnyFlag(type.flags, ts.TypeFlags.Any | ts.TypeFlags.Unknown)) return 'unavailable';
   const nextSeen = new Set(seen).add(type);
   const named = type.aliasSymbol ?? type.symbol ?? null;
   const wrapperStatus = wrappedTypeStatus(ts, checker, type, named, nextSeen, depth);
   if (wrapperStatus !== null) return wrapperStatus;
   if (type.aliasSymbol) return 'named';
   if ((type.symbol?.getDeclarations?.() ?? []).some(declaration => ts.isEnumDeclaration(declaration))) return 'named';
-  if (type.flags & ts.TypeFlags.TypeParameter) return 'named';
-  if (type.flags & ts.TypeFlags.Boolean) return 'scalar';
-  if (type.flags & (ts.TypeFlags.Union | ts.TypeFlags.Intersection)) return 'inline';
-  if (type.flags & ts.TypeFlags.Object) return objectContractTypeStatus(ts, checker, type, nextSeen, depth);
-  if (type.flags & (ts.TypeFlags.Conditional | ts.TypeFlags.IndexedAccess | ts.TypeFlags.Substitution)) return 'unavailable';
+  if (hasAnyFlag(type.flags, ts.TypeFlags.TypeParameter)) return 'named';
+  if (hasAnyFlag(type.flags, ts.TypeFlags.Boolean)) return 'scalar';
+  if (hasAnyFlag(type.flags, ts.TypeFlags.Union | ts.TypeFlags.Intersection)) return 'inline';
+  if (hasAnyFlag(type.flags, ts.TypeFlags.Object)) return objectContractTypeStatus(ts, checker, type, nextSeen, depth);
+  if (hasAnyFlag(type.flags, ts.TypeFlags.Conditional | ts.TypeFlags.IndexedAccess | ts.TypeFlags.Substitution)) return 'unavailable';
   return 'scalar';
 }
 
@@ -184,8 +185,8 @@ function callableSignatures(ts, symbol, checker, location) {
 function signatureParameterStatus(ts, checker, signature, location, parameter, signatureIndex) {
   const parameterSymbol = signature.getParameters()[signatureIndex];
   const actual = parameterSymbol ? checker.getTypeOfSymbolAtLocation(parameterSymbol, location) : null;
-  if (actual && parameter.questionToken && !ts.isUnionTypeNode(parameter.type) && (actual.flags & ts.TypeFlags.Union)) {
-    const selected = actual.types.filter(type => !(type.flags & ts.TypeFlags.Undefined));
+  if (actual && parameter.questionToken && !ts.isUnionTypeNode(parameter.type) && hasAnyFlag(actual.flags, ts.TypeFlags.Union)) {
+    const selected = actual.types.filter(type => !hasAnyFlag(type.flags, ts.TypeFlags.Undefined));
     return selected.length === 1 ? contractTypeStatusFromType(ts, checker, selected[0]) : 'inline';
   }
   return actual ? contractTypeStatusFromType(ts, checker, actual) : contractTypeStatus(ts, checker, parameter.type);
