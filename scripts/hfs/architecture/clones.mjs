@@ -105,6 +105,10 @@ const cloneBuckets = (entries, N, T) => {
   return buckets;
 };
 
+function signedInt32(value) {
+  return Math.imul(value, 1);
+}
+
 const addFileWindows = (buckets, file, fileIndex, N, T, pow1, pow2, B1, B2) => {
   const { kinds, lines } = file;
   const count = kinds.length;
@@ -123,7 +127,7 @@ const addFileWindows = (buckets, file, fileIndex, N, T, pow1, pow2, B1, B2) => {
     if (end === start || lines[end - 1] - lines[start] + 1 < N) continue;
     const length = end - start;
     if (length < T) continue;
-    const key = `${(pre1[end] - Math.imul(pre1[start], pow1[length])) | 0}:${(pre2[end] - Math.imul(pre2[start], pow2[length])) | 0}:${length}`;
+    const key = `${signedInt32(pre1[end] - Math.imul(pre1[start], pow1[length]))}:${signedInt32(pre2[end] - Math.imul(pre2[start], pow2[length]))}:${length}`;
     const list = buckets.get(key);
     const item = [fileIndex, start, end];
     if (list) list.push(item); else buckets.set(key, [item]);
@@ -160,7 +164,7 @@ const blockShape = (file, start, end) => {
   const shapes = new Map();
   for (let i = start; i < end; i += 1) {
     if (!file.types[i]) nonType.add(file.lines[i]);
-    shapes.set(file.lines[i], ((shapes.get(file.lines[i]) ?? 7) * 31 + file.kinds[i] + 5) | 0);
+    shapes.set(file.lines[i], signedInt32((shapes.get(file.lines[i]) ?? 7) * 31 + file.kinds[i] + 5));
   }
   return { nonType: nonType.size, distinct: new Set(shapes.values()).size };
 };
