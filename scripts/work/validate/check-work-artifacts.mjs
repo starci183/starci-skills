@@ -1,13 +1,15 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import {parseYaml} from '../../../engine/yaml.mjs';
-import {ID_RE, walk} from './check-example-work.mjs';
-import {appRootOf, loadRecords, indexInlineCriteria, resolveRecordRef} from '../record-ownership.mjs';
+import {walk} from './check-example-work.mjs';
+import {appRootOf, loadRecords, indexInlineCriteria} from '../record-ownership.mjs';
 import {slash} from '../../lib/path-key.mjs';
+import { repoRoot } from './work-consistency-shared.mjs';
+import { trimTrailing } from './trailing-text.mjs';
 import {exampleArtifactReadOptions, exampleWorkRoots} from '../../lib/example-refs.mjs'; import { isMain } from '../../lib/is-main.mjs'; import { byCodeUnit } from '../../lib/list.mjs';
 import {verifyDeclaration,checkRunMedia,checkReceipt} from './work-artifact-verification.mjs';
+import {declarationsOf, RECORD_DECLARATIONS, EVIDENCE_DECLARATIONS, RECEIPT_DECLARATIONS, MANIFEST_DECLARATIONS, RESOURCE_DECLARATIONS} from './work-artifact-declarations.mjs';
 
 /**
  * Byte verification for Work declarations: file existence, size, media signatures
@@ -20,7 +22,7 @@ import {verifyDeclaration,checkRunMedia,checkReceipt} from './work-artifact-veri
  * INFO describes the checked coverage. A declared file is never proof by name.
  */
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+const root = repoRoot;
 const relativeToRoot = file => slash(path.relative(root, file));
 
 /**
@@ -28,91 +30,6 @@ const relativeToRoot = file => slash(path.relative(root, file));
  * 10,186 bytes and the smallest committed webm recording 41,771 bytes, so both floors sit under every
  * genuine artifact and well above a stub, a truncation, or a file created only to satisfy a count.
  */
-
-// ---- concept 2: what counts as a declared path, and what it is declared relative to ----
-// A blanket "any string with a dot" sweep is wrong on this layout: `inputRefs` mixes in record ids
-// (`fr.plan.usage.view` reads as a `.view` file), `brand.grammar.version` is `0.4.13`, and `owners[].path`
-// is a MODULE DIRECTORY that check-example-work already resolves through resolveOwnedDirs
-// (OWNER_PATH_MISSING). So the shapes are named one by one below, each with the directory its value is
-// relative to, and a declaration that also stamps a digest is byte-compared (`digestKey`).
-const FILE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'webp', 'gif', 'webm', 'mp4', 'txt', 'md', 'json',
-  'yaml', 'yml', 'mjs', 'cjs', 'html', 'css', 'sql', 'enc', 'csv', 'xml', 'svg', 'ts', 'tsx', 'jsonl']);
-
-/** Whether a scalar is offered as a file path, rather than an id, a version, or a sentence about one. */
-function looksLikeFilePath(value) {
-  if (typeof value !== 'string') return false;
-  const text = value.trim();
-  if (!text || text.includes(' ') || /[*?\\]/.test(text)) return false;
-  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(text)) return false;
-  if (ID_RE.test(text)) return false;
-  const last = text.split('/').pop();
-  const ext = (last.split('.').pop() ?? '').toLowerCase();
-  return FILE_EXTENSIONS.has(ext) && last !== ext;
-}
-
-/** `*` stands for exactly one path segment, and a segment may carry the `[]` a list contributes. */
-function trailMatches(pattern, trail) {
-  const want = pattern.split('.');
-  const have = trail.split('.');
-  if (want.length !== have.length) return false;
-  return want.every((segment, index) => segment === '*' || segment === have[index]);
-}
-
-const RECORD_DECLARATIONS = [
-  {trail: 'assets[].path', base: 'record', what: 'asset', digestKey: 'sha256'},
-  {trail: 'asset.path', base: 'record', what: 'asset', digestKey: 'sha256'},
-  {trail: 'ui.assets[].path', base: 'record', what: 'asset', digestKey: 'sha256'},
-  {trail: 'assets[].generation.promptPath', base: 'record', what: 'prompt', digestKey: null},
-  {trail: 'ui.assets[].generation.promptPath', base: 'record', what: 'prompt', digestKey: null},
-  {trail: 'ui.coverage.map[].directionAsset', base: 'record', what: 'asset', digestKey: null},
-  // A superseded direction names the path the replaced raster occupied and the digest it had at that
-  // revision; the file beside it now holds the newer revision on purpose, so path and digest can never
-  // both describe today's bytes. Its path is still checked (a superseded entry pointing at nothing is a
-  // dangling revision note), its sha256 deliberately is not - the one false-positive class this script
-  // found on the live trees (7 of 37 digest refusals before the digestKey was dropped here).
-  {trail: 'ui.supersededDirection.path', base: 'repo', what: 'asset', digestKey: null},
-  {trail: 'ui.anatomyReview.reviewPath', base: 'record', what: 'review', digestKey: null},
-  // An artwork slot borrows the brand's master rather than repeating a `../../..` path: the entry says whose
-  // record it reads (`master: {record: brand, path: assets/turtle-master.png}`), so that is the base.
-  {trail: 'ui.artworkSlots[].master.path', base: 'named-record', what: 'asset', digestKey: 'sha256'},
-  // The one uat resource the base gate reads only `if existsSync` - a missing file passes there.
-  {trail: 'accounts', base: 'record', what: 'accounts', digestKey: null},
-  // Declared inputs: the bytes an artifact was built from. Nothing here is refused when it moves - the
-  // Work tree keeps the artifact, not what the artifact was drawn from - so `what: 'input'` is the tier.
-  {trail: 'assets[].generation.inputRefs[]', base: 'repo', what: 'input', digestKey: null},
-  {trail: 'ui.assets[].generation.inputRefs[]', base: 'repo', what: 'input', digestKey: null},
-  {trail: 'assets[].generation.referencedImages[]', base: 'repo', what: 'input', digestKey: null},
-  {trail: 'ui.assets[].generation.referencedImages[]', base: 'repo', what: 'input', digestKey: null},
-  {trail: 'ui.acceptedInputs.*.path', base: 'repo', what: 'input', digestKey: 'sha256'},
-  {trail: 'ui.provenance.*.path', base: 'repo', what: 'input', digestKey: 'sha256'},
-];
-
-const EVIDENCE_DECLARATIONS = [
-  {trail: 'assets[].path', base: 'record', what: 'asset', digestKey: 'sha256'},
-  {trail: 'directionReview.reviewPath', base: 'record', what: 'review', digestKey: null},
-  {trail: 'directionReview.anatomySources[].path', base: 'repo', what: 'input', digestKey: 'sha256'},
-];
-
-const RECEIPT_DECLARATIONS = [
-  {trail: 'calls[].artifact', base: 'record', what: 'asset', digestKey: 'sha256'},
-  {trail: 'calls[].prompt', base: 'record', what: 'prompt', digestKey: 'promptSha256'},
-  {trail: 'calls[].referencedImages[].path', base: 'repo', what: 'input', digestKey: 'sha256'},
-];
-
-const MANIFEST_DECLARATIONS = [
-  {trail: 'assets[].path', base: 'run', what: 'asset', digestKey: 'sha256'},
-];
-
-// A work/resource@1 is the only record whose declared files are repository paths: the seed SQL, the compose
-// file and the sealed credential are what ops/uat.verify reads before a flow may run.
-const RESOURCE_DECLARATIONS = [
-  {trail: 'target.compose', base: 'repo', what: 'input', digestKey: null},
-  {trail: 'configuration.renderedFrom', base: 'repo', what: 'input', digestKey: null},
-  {trail: 'configuration.rendered', base: 'repo', what: 'input', digestKey: null},
-  {trail: 'schemaFiles[]', base: 'repo', what: 'input', digestKey: null},
-  {trail: 'seedFiles[]', base: 'repo', what: 'input', digestKey: null},
-  {trail: 'custody.sealed', base: 'repo', what: 'input', digestKey: null},
-];
 
 // The one place a sealed secret lives (owner 2026-09-29, corrected 2026-10-01): .starcistacks/<env>/secrets/<slug>.enc,
 // a sops (age) file, by app-relative path: .starcistacks sits at the app root beside be/, fe/ and .starciwork, never under a
@@ -131,69 +48,6 @@ export function sealedLocationProblem(sealed) {
 // A sealed (sops) file kept inside the Work tree, in any of the retired spellings.
 const SEALED_FILE_RE = /\.enc(?:\.ya?ml|\.json|\.env)?$|\.(?:ya?ml|json|env)\.enc$/i;
 
-/**
- * Every declaration in one document that the tables name, resolved to an absolute path.
- * `ctx` carries the directories the bases can point at plus the records map (for a `named-record` base).
- * Resolution is value-first: a declaration that already names the tree from its root (`examples/...`,
- * `knowledge/...`, `.starcistacks/...` at the app root) is read from that root, because a path written out in full is its
- * own address. Only a short path (`assets/x.png`) needs the base its shape declares.
- */
-function declarationsOf(doc, table, ctx) {
-  const found = [];
-  const baseFor = (rule, entry) => {
-    if (rule.base === 'repo') return {dir: ctx.repoRoot, name: 'the app root'};
-    if (rule.base === 'run') return {dir: ctx.runDir ?? ctx.recordDir, name: `${slash(path.relative(ctx.workRoot, ctx.runDir ?? ctx.recordDir))} run dir`};
-    if (rule.base === 'named-record') {
-      // Compact format: a `record:` naming `P#frag` or a collapsed `ac.*` id resolves to the record
-      // carrying the criterion - its dir is where the artifact's relative paths anchor.
-      const named = entry?.record ? ctx.records.get(resolveRecordRef(ctx.records, entry.record, ctx.inline) ?? entry.record) : null;
-      return named
-        ? {dir: named.dir, name: `the ${entry.record} record's dir`}
-        : {dir: ctx.recordDir, name: `${slash(path.relative(ctx.workRoot, ctx.recordDir))} node dir`};
-    }
-    return {dir: ctx.recordDir, name: `${slash(path.relative(ctx.workRoot, ctx.recordDir))} node dir`};
-  };
-  const resolve = (rule, text, entry) => {
-    if (text.startsWith('examples/') || text.startsWith('knowledge/')) return {abs: path.join(root, text), base: 'the skill root'};
-    if (text.startsWith('.starcistacks/')) return {abs: path.join(ctx.repoRoot, text), base: 'the app root'};
-    const {dir, name} = baseFor(rule, entry);
-    return {abs: path.join(dir, text), base: name};
-  };
-  const push = (rule, trail, text, entry) => {
-    if (!looksLikeFilePath(text)) return;
-    const {abs, base} = resolve(rule, text, entry);
-    found.push({rule, trail, text, abs, base, entry, digest: rule.digestKey ? entry?.[rule.digestKey] ?? null : null});
-  };
-  // Agent output (draw rounds, shell captures, lockups, superseded directions) is a blob citation
-  // {artifact?, name, sha256}, never a file on disk (work-layout.yaml): the same entry that would carry
-  // `<x>.path` may instead carry `name` + `sha256`, and that citation is verified against the blob store.
-  const citationTrails = table.filter(rule => rule.what === 'asset' && rule.trail.endsWith('.path')).map(rule => rule.trail.slice(0, -'.path'.length));
-  const citationAt = (node, trail) => !Array.isArray(node) && typeof node === 'object' && typeof node.path !== 'string'
-    && typeof node.name === 'string' && citationTrails.some(pattern => trailMatches(pattern, trail));
-  const visit = (node, trail) => {
-    if (node == null) return;
-    if (citationAt(node, trail)) {
-      found.push({rule: {trail: `${trail}.name`, what: 'asset', digestKey: 'sha256'}, trail, text: node.name, citation: true, entry: node, digest: node.sha256 ?? null});
-      return;
-    }
-    if (Array.isArray(node)) return node.forEach(item => visit(item, `${trail}[]`));
-    if (typeof node === 'string') {
-      const rule = table.find(candidate => trailMatches(candidate.trail, trail));
-      if (rule) push(rule, trail, node.trim(), null);
-      return;
-    }
-    if (typeof node !== 'object') return;
-    for (const [key, value] of Object.entries(node)) {
-      const childTrail = trail ? `${trail}.${key}` : key;
-      const rule = table.find(candidate => trailMatches(candidate.trail, childTrail));
-      if (rule && typeof value === 'string') push(rule, childTrail, value.trim(), node);
-      else visit(value, childTrail);
-    }
-  };
-  visit(doc, '');
-  return found;
-}
-
 // ---- concept 4: a prompt is the generation's input claim, kept beside the raster ----
 // Both trees keep `<asset>.prompt.txt` (or the `generation.promptPath` a record names) as the exact bytes
 // sent to the tool. An empty one is a generation nobody can re-read. The paths quoted inside it are
@@ -211,7 +65,7 @@ function checkPromptFile(file, sink) {
   const quoted = new Set();
   for (const line of text.split(/\r?\n/)) {
     if (!PROMPT_INPUT_LINE.test(line)) continue;
-    for (const match of line.matchAll(PROMPT_PATH)) quoted.add(match[0].replace(/[.,;:)\]]+$/, ''));
+    for (const match of line.matchAll(PROMPT_PATH)) quoted.add(trimTrailing(match[0], '.,;:)]'));
   }
   const missing = [...quoted].filter(token => !fs.existsSync(path.join(root, token)));
   if (missing.length) {
@@ -269,15 +123,18 @@ function checkRecordDeclarations(data, table, ctx, indexFile, sealedMisplaced, s
   }
 }
 
+/** The prompt file a generated asset owes: the `generation.promptPath` it names, else `<asset>.prompt.txt` beside it. */
+const expectedPromptOf = entry => (typeof entry.generation.promptPath === 'string' && entry.generation.promptPath.trim()
+  ? entry.generation.promptPath.trim()
+  : `${entry.path.replace(/\.[^.]+$/, '')}.prompt.txt`);
+
 function checkGeneratedAssets(data, ctx, indexFile, state) {
   const entries = [...(Array.isArray(data.assets) ? data.assets : []), ...(Array.isArray(data.ui?.assets) ? data.ui.assets : [])]
     .filter(entry => entry && typeof entry === 'object' && typeof entry.path === 'string');
   for (const entry of entries) {
     if (!entry.generation) continue;
     state.counts.generatedAssets += 1;
-    const expected = typeof entry.generation.promptPath === 'string' && entry.generation.promptPath.trim()
-      ? entry.generation.promptPath.trim()
-      : `${entry.path.replace(/\.[^.]+$/, '')}.prompt.txt`;
+    const expected = expectedPromptOf(entry);
     if (!fs.existsSync(path.join(ctx.recordDir, expected))) {
       state.wrapped.refuse(indexFile, 'PROMPT_MISSING', `${entry.path} carries a generation but ${expected} is not beside it - a direction with no prompt is not a re-runnable generation`);
     }
@@ -355,26 +212,31 @@ function scanReceiptAndPromptFiles(state) {
   }
 }
 
+/** A done feature/catalog parent is complete only when every record under it is done and its artifacts are the bytes on disk. */
+function checkDoneParent(state, id, rec) {
+  const members = [...state.records.entries()]
+    .filter(([, other]) => other !== rec && !path.relative(rec.dir, other.dir).startsWith('..'));
+  const notDone = members.filter(([, other]) => other.data?.state !== 'done');
+  if (notDone.length) {
+    const named = notDone.slice(0, 3).map(([memberId, member]) => `${memberId}=${member.data?.state ?? '(no state)'}`).join(', ');
+    const preview = `${named}${notDone.length > 3 ? ', ...' : ''}`;
+    state.wrapped.refuse(path.join(rec.dir, 'index.yaml'), 'FEATURE_DONE_INCOMPLETE',
+      `${id} is done while ${notDone.length} member record(s) are not (${preview}) - a parent is done only once the records under it are`);
+  }
+  for (const [memberId, member] of members) {
+    if (state.failedDirs.has(member.dir)) {
+      state.wrapped.refuse(path.join(rec.dir, 'index.yaml'), 'FEATURE_DONE_INCOMPLETE',
+        `${id} is done while ${memberId}'s declared artifacts are not the bytes on disk`);
+    }
+  }
+}
+
 function reportParentArtifactState(state) {
   let doneParents = 0;
   for (const [id, rec] of state.records) {
     if (!['work/feature@1', 'work/catalog@1'].includes(rec.schema) || rec.data?.state !== 'done') continue;
     doneParents += 1;
-    const members = [...state.records.entries()]
-      .filter(([, other]) => other !== rec && !path.relative(rec.dir, other.dir).startsWith('..'));
-    const notDone = members.filter(([, other]) => other.data?.state !== 'done');
-    if (notDone.length) {
-      const named = notDone.slice(0, 3).map(([memberId, member]) => `${memberId}=${member.data?.state ?? '(no state)'}`).join(', ');
-      const preview = `${named}${notDone.length > 3 ? ', ...' : ''}`;
-      state.wrapped.refuse(path.join(rec.dir, 'index.yaml'), 'FEATURE_DONE_INCOMPLETE',
-        `${id} is done while ${notDone.length} member record(s) are not (${preview}) - a parent is done only once the records under it are`);
-    }
-    for (const [memberId, member] of members) {
-      if (state.failedDirs.has(member.dir)) {
-        state.wrapped.refuse(path.join(rec.dir, 'index.yaml'), 'FEATURE_DONE_INCOMPLETE',
-          `${id} is done while ${memberId}'s declared artifacts are not the bytes on disk`);
-      }
-    }
+    checkDoneParent(state, id, rec);
   }
   const parents = [...state.records.values()].filter(rec => ['work/feature@1', 'work/catalog@1'].includes(rec.schema)).length;
   const latent = parents && !doneParents ? ', so the rule is latent here today' : '';

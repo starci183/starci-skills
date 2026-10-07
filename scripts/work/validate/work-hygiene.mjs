@@ -27,6 +27,7 @@ import { withoutGitLocalEnv } from '../../lib/git.mjs';
 import { samePath } from '../../lib/path-key.mjs';
 import { readEnv } from '../../lib/env.mjs';
 import { byCodeUnit } from '../../lib/list.mjs';
+import { trimTrailing } from './trailing-text.mjs';
 
 export const WORK_YAML_UNPARSEABLE = 'WORK_YAML_UNPARSEABLE';
 export const WORK_VALIDATE_REFUSED = 'WORK_VALIDATE_REFUSED';
@@ -89,15 +90,10 @@ const withoutTrailingComment = (value) => {
   }
   return value;
 };
-const withoutTrailingSeparators = (value) => {
-  let end = value.length;
-  while (end > 0 && (value[end - 1] === ',' || value[end - 1] === ';')) end -= 1;
-  return value.slice(0, end);
-};
 const unquote = (raw) => {
   const v = String(raw).trim();
   const q = /^(["'])(.*)\1$/.exec(v);
-  return q ? { value: q[2], quoted: true } : { value: withoutTrailingSeparators(withoutTrailingComment(v)), quoted: false };
+  return q ? { value: q[2], quoted: true } : { value: trimTrailing(withoutTrailingComment(v), ',;'), quoted: false };
 };
 /** True when `value` is a literal credential for a key of `kind` (a reference, a stand-in and an empty value are not). */
 export function isLiteralCredential(value, kind, { quoted = false } = {}) {
