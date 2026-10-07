@@ -280,61 +280,73 @@ function equalityColumns(conjunct, qualifiers) {
  * a LIMIT/FETCH at the statement depth, no FROM at all (one row), only aggregates without GROUP BY, or an equality on
  * every column of the primary key or of one unique key of the first table of FROM.
  */
-function aggregateSelectItems(tokens, select, from, at0) {
+function aggregateSelectItems(tokens, level, select, from) {
   const items = [];
   let item = [];
   for (let i = select + 1; i < from; i += 1) {
-    if (at0(i) && tokens[i].v === ',' && tokens[i].t === 'punct') { items.push(item); item = []; continue; }
+    if (level[i] === 0 && tokens[i].v === ',' && tokens[i].t === 'punct') { items.push(item); item = []; continue; }
     if (!(items.length === 0 && item.length === 0 && (isWord(tokens[i], 'DISTINCT') || isWord(tokens[i], 'ALL')))) item.push(tokens[i]);
   }
   items.push(item);
   return items;
 }
 
-function whereRegion(tokens, level, where, at0) {
+function whereRegion(tokens, level, where) {
   const region = [];
   for (let i = where + 1; i < tokens.length; i += 1) {
-    if (at0(i) && tokens[i].t === 'word' && WHERE_END.has(tokens[i].up)) break;
+    if (level[i] === 0 && tokens[i].t === 'word' && WHERE_END.has(tokens[i].up)) break;
     region.push({ token: tokens[i], level: level[i] });
   }
   return region;
 }
 
-function uniqueWhereColumns(region, primary) {
-  if (region.some(entry => entry.level === 0 && isWord(entry.token, 'OR'))) return null;
+/** The tokens of a WHERE region split at its top-level AND; the AND of a BETWEEN stays inside its conjunct. */
+function splitConjuncts(region) {
   const conjuncts = [[]];
   let between = false;
   for (const entry of region) {
-    if (entry.level === 0 && isWord(entry.token, 'BETWEEN')) between = true;
-    if (entry.level === 0 && isWord(entry.token, 'AND')) {
-      if (between) { between = false; } else { conjuncts.push([]); continue; }
-    }
+    const top = entry.level === 0;
+    if (top && isWord(entry.token, 'BETWEEN')) between = true;
+    const isAnd = top && isWord(entry.token, 'AND');
+    if (isAnd && !between) { conjuncts.push([]); continue; }
+    if (isAnd) between = false;
     conjuncts.at(-1).push(entry.token);
   }
+  return conjuncts;
+}
+
+function uniqueWhereColumns(region, primary) {
+  if (region.some(entry => entry.level === 0 && isWord(entry.token, 'OR'))) return null;
+  const conjuncts = splitConjuncts(region);
   const qualifiers = new Set([primary.table, primary.alias].filter(Boolean));
   const columns = new Set();
   for (const conjunct of conjuncts) for (const column of equalityColumns(conjunct, qualifiers)) columns.add(column);
   return columns;
 }
 
+function findTopWord(tokens, level, up, from = 0) {
+  for (let i = from; i < tokens.length; i += 1) { if (level[i] === 0 && isWord(tokens[i], up)) return i; }
+  return -1;
+}
+
+const hasTopGroupBy = (tokens, level) => tokens.some((token, i) => level[i] === 0 && isWord(token, 'GROUP') && isWord(tokens[i + 1], 'BY'));
+
+function isUniqueBounded(tokens, level, from, primary, uniqueSets) {
+  const where = findTopWord(tokens, level, 'WHERE', from);
+  if (!uniqueSets?.length || where < 0) return false;
+  const columns = uniqueWhereColumns(whereRegion(tokens, level, where), primary);
+  return Boolean(columns) && covers(uniqueSets, columns);
+}
+
 function selectBound(tokens, level, uniqueSetsOf, cte) {
-  const at0 = index => level[index] === 0;
-  const find = (up, from = 0) => { for (let i = from; i < tokens.length; i += 1) { if (at0(i) && isWord(tokens[i], up)) return i; } return -1; };
-  if (find('LIMIT') >= 0 || find('FETCH') >= 0) return { bounded: true, basis: 'limit' };
-  const select = find('SELECT');
-  const from = find('FROM', select);
+  if (findTopWord(tokens, level, 'LIMIT') >= 0 || findTopWord(tokens, level, 'FETCH') >= 0) return { bounded: true, basis: 'limit' };
+  const select = findTopWord(tokens, level, 'SELECT');
+  const from = findTopWord(tokens, level, 'FROM', select);
   if (from < 0) return { bounded: true, basis: 'no from' };
-  const groupBy = tokens.findIndex((token, i) => at0(i) && isWord(token, 'GROUP') && isWord(tokens[i + 1], 'BY'));
-  if (groupBy < 0 && aggregateSelectItems(tokens, select, from, at0).every(isAggregateItem)) return { bounded: true, basis: 'aggregate' };
+  if (!hasTopGroupBy(tokens, level) && aggregateSelectItems(tokens, level, select, from).every(isAggregateItem)) return { bounded: true, basis: 'aggregate' };
   const primary = tableRef(tokens, from + 1);
   if (!primary || primary.dynamic || cte.has(primary.table)) return { bounded: false, basis: 'unbounded', table: primary?.table ?? null };
-  const uniqueSets = uniqueSetsOf(primary.table);
-  const where = find('WHERE', from);
-  if (uniqueSets?.length && where >= 0) {
-    const region = whereRegion(tokens, level, where, at0);
-    const columns = uniqueWhereColumns(region, primary);
-    if (columns && covers(uniqueSets, columns)) return { bounded: true, basis: 'unique' };
-  }
+  if (isUniqueBounded(tokens, level, from, primary, uniqueSetsOf(primary.table))) return { bounded: true, basis: 'unique' };
   return { bounded: false, basis: 'unbounded', table: primary.table };
 }
 
@@ -357,26 +369,19 @@ function recordTableList(tokens, start, list, record, commaIsPunctuation) {
   }
 }
 
+// Where the table reference of a write verb starts (an offset from the verb) and whether it may carry a column list; null for any other token.
+function writeTarget(token, next, previous) {
+  if (token.up === 'INSERT' && isWord(next, 'INTO')) return { offset: 2, columns: true };
+  if (token.up === 'UPDATE' && !(previous?.t === 'word' && NOT_A_WRITE_BEFORE_UPDATE.has(previous.up))) return { offset: 1, columns: false };
+  if ((token.up === 'DELETE' && isWord(next, 'FROM')) || (token.up === 'MERGE' && isWord(next, 'INTO'))) return { offset: 2, columns: false };
+  return null;
+}
+
 function processWriteToken(tokens, level, index, token, record, state) {
-  const next = tokens[index + 1];
-  if (token.up === 'INSERT' && isWord(next, 'INTO')) {
+  const target = writeTarget(token, tokens[index + 1], state.previous);
+  if (target) {
     if (level[index] === 0) state.hasWriteVerb = true;
-    record(state.writes, tableRef(tokens, index + 2, { columns: true }));
-    return true;
-  }
-  if (token.up === 'UPDATE' && !(state.previous?.t === 'word' && NOT_A_WRITE_BEFORE_UPDATE.has(state.previous.up))) {
-    if (level[index] === 0) state.hasWriteVerb = true;
-    record(state.writes, tableRef(tokens, index + 1));
-    return true;
-  }
-  if (token.up === 'DELETE' && isWord(next, 'FROM')) {
-    if (level[index] === 0) state.hasWriteVerb = true;
-    record(state.writes, tableRef(tokens, index + 2));
-    return true;
-  }
-  if (token.up === 'MERGE' && isWord(next, 'INTO')) {
-    if (level[index] === 0) state.hasWriteVerb = true;
-    record(state.writes, tableRef(tokens, index + 2));
+    record(state.writes, tableRef(tokens, index + target.offset, { columns: target.columns }));
     return true;
   }
   if (token.up !== 'TRUNCATE') return false;
@@ -395,15 +400,22 @@ function processReadToken(tokens, index, token, record, state, mergeOrDelete) {
   if (token.up === 'USING' && mergeOrDelete && tokens[index + 1]?.v !== '(') record(state.reads, tableRef(tokens, index + 1));
 }
 
+function trackParenthesis(tokens, index, state) {
+  const token = tokens[index];
+  if (token.t !== 'punct') return false;
+  if (token.v === '(') { state.parens.push(index > 0 && tokens[index - 1].t === 'word' && FROM_INSIDE.has(tokens[index - 1].up)); return true; }
+  if (token.v !== ')') return false;
+  state.parens.pop();
+  return true;
+}
+
 function statementReferences(tokens, level, cte) {
   const state = { writes: [], reads: [], parens: [], dynamic: 0, hasWriteVerb: false };
   const record = (list, ref) => recordSqlReference(list, ref, state.reads, cte, state);
   const mergeOrDelete = tokens.some(token => isWord(token, 'MERGE')) || tokens.some(token => isWord(token, 'DELETE'));
   for (let i = 0; i < tokens.length; i += 1) {
     const token = tokens[i];
-    if (token.t === 'punct' && token.v === '(') { state.parens.push(i > 0 && tokens[i - 1].t === 'word' && FROM_INSIDE.has(tokens[i - 1].up)); continue; }
-    if (token.t === 'punct' && token.v === ')') { state.parens.pop(); continue; }
-    if (token.t !== 'word') continue;
+    if (trackParenthesis(tokens, i, state) || token.t !== 'word') continue;
     state.previous = tokens[i - 1];
     if (processWriteToken(tokens, level, i, token, record, state)) {
       if (token.up === 'DELETE') i += 1;

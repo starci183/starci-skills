@@ -11,7 +11,8 @@ import { sourceLocation } from '../../lib/ts-ast.mjs';
 import { locateDeclaration } from '../slots.mjs';
 
 const CODE_EXTENSIONS = /\.(?:[cm]?[jt]sx?)$/i;
-const TEST_FILE = /(?:^|[.-])(?:spec|test)\.[cm]?[jt]sx?$/i;
+const SCRIPT_TAIL = String.raw`[cm]?[jt]sx?`;
+const TEST_FILE = new RegExp(String.raw`(?:^|[.-])(?:spec|test)\.${SCRIPT_TAIL}$`, 'i');
 const ASSET_EXTENSION_NAMES = 'css|scss|sass|less|svg|png|jpe?g|gif|webp|avif|ico|woff2?|ttf|eot|ya?ml|json';
 const ASSET_EXTENSION = new RegExp(String.raw`\.(?:${ASSET_EXTENSION_NAMES})$`, 'i');
 // Framework build output a tsconfig may include (Next writes `.next/types/**/*.ts` back into tsconfig.json on
@@ -112,17 +113,19 @@ export function isUnshadowedCommonJsRequire(ts, checker, expression) {
  * existing directory and a data-asset extension tail qualify; code never does, since a context of code would
  * be an import graph nobody wrote down. Returns the specifiers, or null when the import stays unproven.
  */
-function assetContextSpecifiers(ts, sourceFile, argument) {
+/** The data-asset extension tail and relative head of an import template, or null when the template cannot name a data context. */
+function assetContextParts(ts, argument) {
   if (!argument || !ts.isTemplateExpression(argument)) return null;
   const head = argument.head.text;
   const spans = argument.templateSpans;
   const tail = spans[spans.length - 1].literal.text;
   if (!/^\.\.?\//.test(head) || !head.endsWith('/') || !/^\.[a-z0-9]+$/i.test(tail) || !ASSET_EXTENSION.test(tail)) return null;
   if (spans.slice(0, -1).some(span => span.literal.text.split('/').includes('..'))) return null;
-  const directory = path.resolve(path.dirname(sourceFile.fileName), head);
-  let stat;
-  try { stat = fs.statSync(directory); } catch { return null; }
-  if (!stat.isDirectory()) return null;
+  return { head, tail };
+}
+
+/** The specifiers of every file below `directory` (node_modules skipped) whose name ends in `tail`, sorted by name at each level. */
+function assetFileSpecifiers(directory, head, tail) {
   const specifiers = [];
   const visit = (dir) => {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
@@ -133,6 +136,17 @@ function assetContextSpecifiers(ts, sourceFile, argument) {
     }
   };
   visit(directory);
+  return specifiers;
+}
+
+function assetContextSpecifiers(ts, sourceFile, argument) {
+  const parts = assetContextParts(ts, argument);
+  if (!parts) return null;
+  const directory = path.resolve(path.dirname(sourceFile.fileName), parts.head);
+  let stat;
+  try { stat = fs.statSync(directory); } catch { return null; }
+  if (!stat.isDirectory()) return null;
+  const specifiers = assetFileSpecifiers(directory, parts.head, parts.tail);
   return specifiers.length ? specifiers : null;
 }
 
@@ -288,20 +302,24 @@ function sourceOfTarget(ts, workspace, target) {
   return null;
 }
 
+const manifestEntryTargets = manifest => [manifest?.types, manifest?.typings, manifest?.module, manifest?.main].filter(item => typeof item === 'string');
+
+const packageIndexSource = workspace => {
+  for (const name of ['index.ts', 'index.tsx']) if (fs.existsSync(path.join(workspace.root, 'src', name))) return canonical(path.join(workspace.root, 'src', name));
+  return null;
+};
+
 /** The source entry a workspace import resolves to without a build: its export targets mapped back to source, `src/index.ts` for the package root. */
 function workspaceSourceEntry(ts, workspace, specifier) {
   if (!workspace.workspace || !workspace.name || !sameOrUnder(specifier, workspace.name)) return null;
-  let candidates = exportCandidates(workspace, specifier);
-  if (specifier === workspace.name && !workspace.exports) candidates = [workspace.manifest?.types, workspace.manifest?.typings, workspace.manifest?.module, workspace.manifest?.main].filter(item => typeof item === 'string');
+  const isRoot = specifier === workspace.name;
+  const candidates = isRoot && !workspace.exports ? manifestEntryTargets(workspace.manifest) : exportCandidates(workspace, specifier);
   for (const target of candidates) {
     if (!target.startsWith('./') || target.includes('..')) continue;
     const source = sourceOfTarget(ts, workspace, target);
     if (source) return source;
   }
-  if (specifier === workspace.name) {
-    for (const name of ['index.ts', 'index.tsx']) if (fs.existsSync(path.join(workspace.root, 'src', name))) return canonical(path.join(workspace.root, 'src', name));
-  }
-  return null;
+  return isRoot ? packageIndexSource(workspace) : null;
 }
 
 /** Every source file the package.json `exports` of a workspace package maps (each non-wildcard subpath, dist back to source): its public entries. */

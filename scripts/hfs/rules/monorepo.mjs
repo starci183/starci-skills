@@ -100,6 +100,26 @@ function workspaceManifestFindings(repoRoot, project, workspaces) {
   return findings;
 }
 
+const nestProjectShape = (project) => JSON.stringify({ type: project.type, root: project.root, sourceRoot: project.sourceRoot });
+
+/** One finding per declared project whose type, root or sourceRoot departs from the application layout. */
+function nestProjectFindings(cli, projects, declared) {
+  const findings = [];
+  for (const name of projects.filter((project) => declared.includes(project))) {
+    const project = cli.projects[name] ?? {};
+    if (project.type !== 'application' || project.root !== `apps/${name}` || project.sourceRoot !== `apps/${name}/src`) findings.push(found(MONO_NEST_PROJECTS, NEST_CLI, `${NEST_CLI} project ${name} is ${nestProjectShape(project)}; it is {"type":"application","root":"apps/${name}","sourceRoot":"apps/${name}/src"}.`, { project: name }));
+  }
+  return findings;
+}
+
+/** The finding when the default project of nest-cli.json is no declared api app, or null. */
+function nestRootFinding(cli, beApps) {
+  const apis = beApps.filter((app) => app.kind === 'api').map((app) => app.name);
+  const rootApp = /^apps\/([^/]+)$/.exec(String(cli.root ?? ''))?.[1];
+  if (apis.includes(rootApp) && cli.sourceRoot === `apps/${rootApp}/src`) return null;
+  return found(MONO_NEST_PROJECTS, NEST_CLI, `${NEST_CLI} has root ${JSON.stringify(cli.root ?? null)} and sourceRoot ${JSON.stringify(cli.sourceRoot ?? null)}; the default project is an api app (${apis.join(', ') || 'none declared'}): root apps/<api>, sourceRoot apps/<api>/src.`, { root: cli.root ?? null });
+}
+
 /** R145: be/nest-cli.json is the Nest monorepo of exactly the declared be apps. */
 function nestFindings(repoRoot, files, beApps) {
   if (!files.includes(NEST_CLI)) return [];
@@ -110,13 +130,9 @@ function nestFindings(repoRoot, files, beApps) {
   const declared = beApps.map((app) => app.name).sort(byCodeUnit);
   const projects = Object.keys(cli.projects ?? {}).sort(byCodeUnit);
   if (!sameList(projects, declared)) findings.push(found(MONO_NEST_PROJECTS, NEST_CLI, `${NEST_CLI} has projects ${JSON.stringify(projects)}, but hfs.json declares the be apps ${JSON.stringify(declared)}; one project per declared app, no other.`, { projects, declared }));
-  for (const name of projects.filter((project) => declared.includes(project))) {
-    const project = cli.projects[name] ?? {};
-    if (project.type !== 'application' || project.root !== `apps/${name}` || project.sourceRoot !== `apps/${name}/src`) findings.push(found(MONO_NEST_PROJECTS, NEST_CLI, `${NEST_CLI} project ${name} is ${JSON.stringify({ type: project.type, root: project.root, sourceRoot: project.sourceRoot })}; it is {"type":"application","root":"apps/${name}","sourceRoot":"apps/${name}/src"}.`, { project: name }));
-  }
-  const apis = beApps.filter((app) => app.kind === 'api').map((app) => app.name);
-  const rootApp = /^apps\/([^/]+)$/.exec(String(cli.root ?? ''))?.[1];
-  if (!apis.includes(rootApp) || cli.sourceRoot !== `apps/${rootApp}/src`) findings.push(found(MONO_NEST_PROJECTS, NEST_CLI, `${NEST_CLI} has root ${JSON.stringify(cli.root ?? null)} and sourceRoot ${JSON.stringify(cli.sourceRoot ?? null)}; the default project is an api app (${apis.join(', ') || 'none declared'}): root apps/<api>, sourceRoot apps/<api>/src.`, { root: cli.root ?? null }));
+  findings.push(...nestProjectFindings(cli, projects, declared));
+  const rootFinding = nestRootFinding(cli, beApps);
+  if (rootFinding) findings.push(rootFinding);
   return findings;
 }
 
@@ -139,32 +155,38 @@ const packageOf = (specifier) => {
   return specifier.startsWith('@') ? parts.slice(0, 2).join('/') : parts[0];
 };
 
-function workspaceMissingDependencies(repoRoot, files, folder, names, ts) {
-  const findings = [];
-  const manifest = `${folder}/${MANIFEST}`;
-  const pkg = readJson(repoRoot, manifest);
-  if (!pkg) return findings;
-  const declared = declaredIn(pkg);
+/** Records the first importing file of every package `file` imports without the workspace declaring it. */
+function collectUndeclaredImports(ts, file, text, isAlias, pkg, declared, missing) {
+  for (const { fileName: specifier } of ts.preProcessFile(text, true, true).importedFiles) {
+    if (specifier.startsWith('.') || specifier.startsWith('/') || isBuiltin(specifier) || isAlias(specifier)) continue;
+    const name = packageOf(specifier);
+    if (declared.has(name) || name === pkg.name) continue;
+    if (!missing.has(name)) missing.set(name, file);
+  }
+}
+
+/** The first importing file of every undeclared package a workspace's sources import, by package name. */
+function undeclaredImports(repoRoot, files, folder, pkg, declared, ts) {
   const aliases = aliasesOf(ts, path.join(repoRoot, folder));
   const isAlias = (specifier) => aliases.some((alias) => (alias.exact ? specifier === alias.prefix : specifier.startsWith(alias.prefix)));
   const missing = new Map();
   for (const file of files) {
     if (!file.startsWith(`${folder}/`) || !SOURCE.test(file) || file.endsWith('.d.ts')) continue;
     const text = readText(repoRoot, file);
-    if (text === null) continue;
-    for (const { fileName: specifier } of ts.preProcessFile(text, true, true).importedFiles) {
-      if (specifier.startsWith('.') || specifier.startsWith('/') || isBuiltin(specifier) || isAlias(specifier)) continue;
-      const name = packageOf(specifier);
-      if (declared.has(name) || name === pkg.name) continue;
-      if (!missing.has(name)) missing.set(name, file);
-    }
+    if (text !== null) collectUndeclaredImports(ts, file, text, isAlias, pkg, declared, missing);
   }
-  for (const [name, file] of [...missing].sort(byCodeUnit)) {
-    const sibling = names.get(name);
-    const declaration = sibling ? `declare the workspace package ${name} as "*"` : `declare ${name} in the dependencies of ${manifest} (one version across the workspace, R14)`;
-    findings.push(found(MONO_WORKSPACE_DEP, manifest, `${file} imports ${name}, which ${manifest} does not declare; ${declaration}.`, { dependency: name, importedBy: file }));
-  }
-  return findings;
+  return missing;
+}
+
+function workspaceMissingDependencies(repoRoot, files, folder, names, ts) {
+  const manifest = `${folder}/${MANIFEST}`;
+  const pkg = readJson(repoRoot, manifest);
+  if (!pkg) return [];
+  const missing = undeclaredImports(repoRoot, files, folder, pkg, declaredIn(pkg), ts);
+  return [...missing].sort(byCodeUnit).map(([name, file]) => {
+    const declaration = names.get(name) ? `declare the workspace package ${name} as "*"` : `declare ${name} in the dependencies of ${manifest} (one version across the workspace, R14)`;
+    return found(MONO_WORKSPACE_DEP, manifest, `${file} imports ${name}, which ${manifest} does not declare; ${declaration}.`, { dependency: name, importedBy: file });
+  });
 }
 
 /** R146: what each fe workspace imports, it declares; the root declares no workspace package. */

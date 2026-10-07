@@ -43,6 +43,12 @@ export function contradictions(fact, text) {
   return found;
 }
 
+const isProseFile = (file, generated) => file !== FACTS_FILE && PROSE.test(file) && !generated.some((root) => file.startsWith(root));
+
+/** The RT_FACT_FALSE findings of the prose of one tracked file, one per contradicted fact line. */
+const proseFindings = (file, prose, facts) => facts.flatMap((fact) => contradictions(fact, prose)
+  .map((hit) => finding(file, hit.line, `states the opposite of fact ${fact.id} (${fact.claim}); delete the sentence and quote the fact id or the slot`)));
+
 /** RT_FACT_FALSE over the facts file, the product manifest and every tracked prose file (ctx of scripts/hfs/runtime-check.mjs). */
 export function factFindings(ctx) {
   const text = ctx.read(FACTS_FILE);
@@ -57,12 +63,10 @@ export function factFindings(ctx) {
     if (problem) found.push(finding(FACTS_FILE, 0, problem));
   }
   for (const file of ctx.files) {
-    if (file === FACTS_FILE || !PROSE.test(file) || generated.some((root) => file.startsWith(root))) continue;
+    if (!isProseFile(file, generated)) continue;
     const prose = ctx.read(file);
     if (prose === null || prose === undefined) continue;
-    for (const fact of facts) {
-      for (const hit of contradictions(fact, prose)) found.push(finding(file, hit.line, `states the opposite of fact ${fact.id} (${fact.claim}); delete the sentence and quote the fact id or the slot`));
-    }
+    found.push(...proseFindings(file, prose, facts));
   }
   return found;
 }

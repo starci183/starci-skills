@@ -168,22 +168,29 @@ function reportFoundCapabilities(input, kit, found, registered, connections, pla
   for (const [key, kinds] of found) reportFoundCapability(input, kit, key, kinds, registered, connections, plain, report);
 }
 
+function reportPersistenceExport(capabilityRoot, index, statement, element, wanted, report) {
+  const from = statement.moduleSpecifier?.text;
+  const inPersistence = from?.startsWith('.') && path.posix.join(capabilityRoot, from).split('/').includes('persistence');
+  if (inPersistence && !Object.values(wanted).includes(element.name.text)) {
+    report(index, element, `${element.name.text} is exported from persistence/; the persistence of a capability is exposed only as ${wanted.Entities} and ${wanted.Migrations}.`, { name: element.name.text });
+  }
+}
+
+function addStatementExports(kit, capabilityRoot, index, statement, wanted, report, exported) {
+  const { ts } = kit;
+  if (ts.isExportDeclaration(statement) && statement.exportClause && ts.isNamedExports(statement.exportClause)) {
+    for (const element of statement.exportClause.elements) {
+      exported.add(element.name.text);
+      reportPersistenceExport(capabilityRoot, index, statement, element, wanted, report);
+    }
+  } else if (ts.isVariableStatement(statement) && kit.isExported(statement)) {
+    for (const declaration of statement.declarationList.declarations) if (ts.isIdentifier(declaration.name)) exported.add(declaration.name.text);
+  }
+}
+
 function collectIndexExports(kit, capabilityRoot, index, wanted, report) {
   const exported = new Set();
-  for (const statement of index.sourceFile.statements) {
-    if (kit.ts.isExportDeclaration(statement) && statement.exportClause && kit.ts.isNamedExports(statement.exportClause)) {
-      for (const element of statement.exportClause.elements) {
-        exported.add(element.name.text);
-        const from = statement.moduleSpecifier?.text;
-        const inPersistence = from?.startsWith('.') && path.posix.join(capabilityRoot, from).split('/').includes('persistence');
-        if (inPersistence && !Object.values(wanted).includes(element.name.text)) {
-          report(index, element, `${element.name.text} is exported from persistence/; the persistence of a capability is exposed only as ${wanted.Entities} and ${wanted.Migrations}.`, { name: element.name.text });
-        }
-      }
-    } else if (kit.ts.isVariableStatement(statement) && kit.isExported(statement)) {
-      for (const declaration of statement.declarationList.declarations) if (kit.ts.isIdentifier(declaration.name)) exported.add(declaration.name.text);
-    }
-  }
+  for (const statement of index.sourceFile.statements) addStatementExports(kit, capabilityRoot, index, statement, wanted, report, exported);
   return exported;
 }
 

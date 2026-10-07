@@ -136,6 +136,35 @@ function eventClassesOf({ repoRoot, files, ts }) {
   return { classes, problems };
 }
 
+/** Findings for each service whose vendored `events.json` is missing or differs from what its event classes emit. */
+function snapshotDriftFindings(repoRoot, tracked, services, classes) {
+  const findings = [];
+  for (const service of services) {
+    const snapshot = `be/contracts/${service}/events.json`;
+    const events = classes.filter((event) => event.service === service);
+    if (!tracked.has(snapshot)) findings.push(found(EVENT_CONTRACT, snapshot, `${service} declares event classes (be/src/modules/events/${service}/) but ${snapshot} is not committed; run \`npm run contract:emit\` and commit the snapshot, the contract its consumers rely on.`, { service }));
+    else if (folded(readText(repoRoot, snapshot) ?? '') !== snapshotText(service, events)) findings.push(found(EVENT_CONTRACT, snapshot, `${snapshot} differs from what the event classes of ${service} emit now; run \`npm run contract:emit\` and commit the result.`, { service, drift: 'stale' }));
+  }
+  return findings;
+}
+
+/** Findings for committed snapshots of a service that declares no event class. */
+function leftBehindSnapshotFindings(snapshots, services, problems) {
+  const findings = [];
+  for (const snapshot of snapshots) {
+    const service = SNAPSHOT.exec(snapshot)[1];
+    if (!services.includes(service) && !problems.some((entry) => entry.service === service)) findings.push(found(EVENT_CONTRACT, snapshot, `${snapshot} is committed but be/src/modules/events/${service}/ declares no event class; delete the snapshot or restore the classes.`, { service, drift: 'left-behind' }));
+  }
+  return findings;
+}
+
+/** Findings for compensating events that name an event no class declares. */
+function undeclaredCompensationFindings(classes, declared) {
+  return classes
+    .filter((event) => event.compensates !== undefined && !declared.has(event.compensates))
+    .map((event) => found(EVENT_CONTRACT, event.file, `${event.file}: event "${event.name}" compensates "${event.compensates}", which no event class declares; name the event whose step it undoes.`, { service: event.service, event: event.name }));
+}
+
 /** Findings of R166: each service's event classes are the one source of its vendored `events.json`, and a compensating event names a declared event. */
 function eventContractFindings({ repoRoot, files }) {
   const classFiles = files.filter((file) => EVENT_CLASS_FILE.test(file));
@@ -148,19 +177,9 @@ function eventContractFindings({ repoRoot, files }) {
   const findings = problems.map(({ service, file, problem }) => found(EVENT_CONTRACT, file, `${file} is not an event class the contract can be emitted from: ${problem}.`, { service }));
   const services = [...new Set(classes.map((event) => event.service))].sort(byCodeUnit);
   const declared = new Set(classes.map((event) => event.name));
-  for (const service of services) {
-    const snapshot = `be/contracts/${service}/events.json`;
-    const events = classes.filter((event) => event.service === service);
-    if (!tracked.has(snapshot)) findings.push(found(EVENT_CONTRACT, snapshot, `${service} declares event classes (be/src/modules/events/${service}/) but ${snapshot} is not committed; run \`npm run contract:emit\` and commit the snapshot, the contract its consumers rely on.`, { service }));
-    else if (folded(readText(repoRoot, snapshot) ?? '') !== snapshotText(service, events)) findings.push(found(EVENT_CONTRACT, snapshot, `${snapshot} differs from what the event classes of ${service} emit now; run \`npm run contract:emit\` and commit the result.`, { service, drift: 'stale' }));
-  }
-  for (const snapshot of snapshots) {
-    const service = SNAPSHOT.exec(snapshot)[1];
-    if (!services.includes(service) && !problems.some((entry) => entry.service === service)) findings.push(found(EVENT_CONTRACT, snapshot, `${snapshot} is committed but be/src/modules/events/${service}/ declares no event class; delete the snapshot or restore the classes.`, { service, drift: 'left-behind' }));
-  }
-  for (const event of classes) {
-    if (event.compensates !== undefined && !declared.has(event.compensates)) findings.push(found(EVENT_CONTRACT, event.file, `${event.file}: event "${event.name}" compensates "${event.compensates}", which no event class declares; name the event whose step it undoes.`, { service: event.service, event: event.name }));
-  }
+  findings.push(...snapshotDriftFindings(repoRoot, tracked, services, classes));
+  findings.push(...leftBehindSnapshotFindings(snapshots, services, problems));
+  findings.push(...undeclaredCompensationFindings(classes, declared));
   return findings;
 }
 

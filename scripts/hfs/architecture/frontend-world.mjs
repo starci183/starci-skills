@@ -114,26 +114,33 @@ class WorldAnalysis {
     return declarations.length > 0 && declarations.every(declaration => this.intrinsicUiHookFile(declaration.getSourceFile().fileName));
   }
 
+  worldEdgeOf(edge) {
+    return edge && Boolean(reachableViolation(this.context.edges, edge,
+      target => this.insideAny(this.roots.hooks, target) || this.insideAny(this.roots.transport, target),
+      { follow: candidate => candidate.reexport && candidate.runtime }));
+  }
+
+  collectNamedWorldImports(checker, named, specifier, worldEdge, symbols) {
+    for (const element of named.elements) {
+      if (element.isTypeOnly) continue;
+      const imported = element.propertyName?.text ?? element.name.text;
+      const symbol = checker.getSymbolAtLocation(element.name);
+      if (symbol && (worldEdge || knownWorldImport(specifier, imported))) symbols.add(symbol);
+    }
+  }
+
   inspectWorldImportStatement(sourceFile, checker, byStart, symbols, namespaces, statement) {
     if (!this.ts.isImportDeclaration(statement) || !statement.importClause || statement.importClause.isTypeOnly
       || !this.ts.isStringLiteralLike(statement.moduleSpecifier)) return;
     const specifier = statement.moduleSpecifier.text;
-    const edge = byStart.get(statement.moduleSpecifier.getStart(sourceFile));
-    const worldEdge = edge && Boolean(reachableViolation(this.context.edges, edge,
-      target => this.insideAny(this.roots.hooks, target) || this.insideAny(this.roots.transport, target),
-      { follow: candidate => candidate.reexport && candidate.runtime }));
+    const worldEdge = this.worldEdgeOf(byStart.get(statement.moduleSpecifier.getStart(sourceFile)));
     const clause = statement.importClause;
     if (clause.name) {
       const symbol = checker.getSymbolAtLocation(clause.name);
       if (symbol && (worldEdge || knownWorldImport(specifier, 'default'))) symbols.add(symbol);
     }
     const named = clause.namedBindings;
-    if (named && this.ts.isNamedImports(named)) for (const element of named.elements) {
-      if (element.isTypeOnly) continue;
-      const imported = element.propertyName?.text ?? element.name.text;
-      const symbol = checker.getSymbolAtLocation(element.name);
-      if (symbol && (worldEdge || knownWorldImport(specifier, imported))) symbols.add(symbol);
-    }
+    if (named && this.ts.isNamedImports(named)) this.collectNamedWorldImports(checker, named, specifier, worldEdge, symbols);
     if (named && this.ts.isNamespaceImport(named)) {
       const symbol = checker.getSymbolAtLocation(named.name);
       if (symbol) namespaces.set(symbol, { specifier, worldEdge });
@@ -164,6 +171,12 @@ class WorldAnalysis {
     }
   }
 
+  isComponentWrapperCall(call) {
+    const selected = unwrapExpression(this.ts, call.expression);
+    const name = (this.ts.isIdentifier(selected) && selected.text) || (this.ts.isPropertyAccessExpression(selected) && selected.name.text) || null;
+    return ['forwardRef', 'memo'].includes(name);
+  }
+
   expressionFunctions(expression, checker, seen = new Set()) {
     expression = unwrapExpression(this.ts, expression);
     if (!expression) return [];
@@ -172,10 +185,8 @@ class WorldAnalysis {
     if (this.ts.isConditionalExpression(expression)) {
       return [...this.expressionFunctions(expression.whenTrue, checker, seen), ...this.expressionFunctions(expression.whenFalse, checker, seen)];
     }
-    if (this.ts.isCallExpression(expression)) {
-      const selected = unwrapExpression(this.ts, expression.expression);
-      const name = (this.ts.isIdentifier(selected) && selected.text) || (this.ts.isPropertyAccessExpression(selected) && selected.name.text) || null;
-      if (['forwardRef', 'memo'].includes(name) && expression.arguments[0]) return this.expressionFunctions(expression.arguments[0], checker, seen);
+    if (this.ts.isCallExpression(expression) && this.isComponentWrapperCall(expression) && expression.arguments[0]) {
+      return this.expressionFunctions(expression.arguments[0], checker, seen);
     }
     const symbol = normalizedSymbolValue(this.ts, checker, selectedSymbol(this.ts, checker, expression));
     if (!symbol || seen.has(symbol)) return [];

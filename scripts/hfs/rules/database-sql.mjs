@@ -37,7 +37,7 @@ function statementList(stmts, lineAt) {
   return (stmts ?? []).map((entry, index) => {
     const type = Object.keys(entry.stmt ?? {})[0] ?? '';
     const node = entry.stmt?.[type] ?? {};
-    const nodeOffset = node.location >= 0 ? node.location : 0;
+    const nodeOffset = Math.max(node.location ?? 0, 0);
     const offset = entry.stmt_location >= 0 ? entry.stmt_location : nodeOffset;
     return { type, node, index, line: lineAt(offset) };
   });

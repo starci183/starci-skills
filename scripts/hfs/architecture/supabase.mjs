@@ -1,8 +1,9 @@
 import path from 'node:path';
 import { machineKit } from './machine-ast.mjs';
 import { isServerActionModule } from './server-action.mjs';
-import { callName, chainParts, contextTypesClient, isDatabaseType, isSupabaseCall, isSupabaseValue, moduleNameOf, reportAt, signatureFromSupabase, supabaseClientType, SUPABASE_MODULES, unwrap } from './supabase-ast.mjs';
+import { callName, chainParts, contextTypesClient, isDatabaseType, isSupabaseCall, moduleNameOf, reportAt, signatureFromSupabase, supabaseClientType, SUPABASE_MODULES, unwrap } from './supabase-ast.mjs';
 import { checkBackendJwt } from './supabase-be.mjs';
+import { checkFrontendQueryResults, FE_DB_SLOTS, sameSymbol, symbolOf } from './supabase-results.mjs';
 
 /**
  * L10-L16, the slot-driven Supabase machine. Supabase is one data transport with one owner on each side:
@@ -22,43 +23,48 @@ export const BACKEND_SUPABASE_RULE_IDS = Object.freeze(['BE_SUPABASE_CLIENT_OWNE
 
 const FE_CLIENT_OWNER = 'FE_SUPABASE_CLIENT_OWNER';
 const BE_CLIENT_OWNER = 'BE_SUPABASE_CLIENT_OWNER';
-const FE_RESULT_TYPED = 'FE_DB_RESULT_TYPED';
-const FE_ERROR_HANDLED = 'FE_DB_ERROR_HANDLED';
 const FE_SERVICE_ROLE = 'FE_SERVICE_ROLE_FORBIDDEN';
 const FE_SESSION_TRUST = 'FE_AUTH_SESSION_TRUST';
 const FE_WRITE_SHAPE = 'FE_DB_WRITE_SHAPE';
 const FE_ROUTE_HANDLER = 'FE_ROUTE_HANDLER_FORBIDDEN';
-const FE_DB_SLOTS = new Set(['fe.modules.db', 'fe.package.db', 'fe.modules.db.outcome']);
 const BE_SUPABASE_SLOT = 'be.integrations.supabase';
 const FE_CONFIG_SLOT = 'fe.modules.config';
 const SUPABASE_CALLS = new Set(['from', 'rpc']);
-const QUERY_TERMINALS = new Set(['single', 'maybeSingle', 'returns']);
-const QUERY_WRITES = new Set(['insert', 'update', 'upsert', 'delete']);
-const LIST_BOUNDS = new Set(['gt', 'gte', 'lt', 'lte', 'range']);
 const supabaseSlotEnabled = (input, slotId) => {
   const slot = input.graph.resolver.slot(slotId);
   return Boolean(slot && input.graph.resolver.slotEnabled(slot));
 };
 
-function inspectOwnershipNode(kit, checker, file, slots, ruleId, violations, counters, node) {
-  const { ts } = kit;
-  const moduleName = moduleNameOf(ts, node);
-  if (moduleName && SUPABASE_MODULES.has(moduleName)) {
-    counters.imports += 1;
-    if (!slots.has(file.slot)) reportAt(violations, kit, ruleId, file, node, `${moduleName} is imported by ${file.rel}, whose slot is ${file.slot ?? 'unowned'}; Supabase imports belong only to ${[...slots].join(' or ')}.`, { module: moduleName, slot: file.slot ?? null });
-  }
-  if (ts.isTypeReferenceNode(node) && supabaseClientType(kit, checker, node)) {
-    counters.clients += 1;
-    if (!isDatabaseType(ts, node.typeArguments?.[0])) reportAt(violations, kit, ruleId, file, node, 'SupabaseClient must carry the committed Database type as SupabaseClient<Database>.');
-  }
-  if (!ts.isCallExpression(node)) return;
+const CLIENT_FACTORY = /^create(?:Client|ServerClient|BrowserClient)$/u;
+
+function inspectSupabaseImport(scope, node) {
+  const { kit, file, slots, ruleId, violations, counters } = scope;
+  const moduleName = moduleNameOf(kit.ts, node);
+  if (!moduleName || !SUPABASE_MODULES.has(moduleName)) return;
+  counters.imports += 1;
+  if (!slots.has(file.slot)) reportAt(violations, kit, ruleId, file, node, `${moduleName} is imported by ${file.rel}, whose slot is ${file.slot ?? 'unowned'}; Supabase imports belong only to ${[...slots].join(' or ')}.`, { module: moduleName, slot: file.slot ?? null });
+}
+
+function inspectClientTypeReference(scope, node) {
+  const { kit, checker, file, ruleId, violations, counters } = scope;
+  if (!kit.ts.isTypeReferenceNode(node) || !supabaseClientType(kit, checker, node)) return;
+  counters.clients += 1;
+  if (!isDatabaseType(kit.ts, node.typeArguments?.[0])) reportAt(violations, kit, ruleId, file, node, 'SupabaseClient must carry the committed Database type as SupabaseClient<Database>.');
+}
+
+function inspectClientFactoryCall(scope, node) {
+  const { kit, checker, file, ruleId, violations, counters } = scope;
   const binding = kit.importBinding(checker, node.expression);
-  if (binding && SUPABASE_MODULES.has(binding.module) && /^create(?:Client|ServerClient|BrowserClient)$/u.test(binding.name)) {
-    counters.clients += 1;
-    if (!isDatabaseType(ts, node.typeArguments?.[0]) && !contextTypesClient(kit, checker, node)) {
-      reportAt(violations, kit, ruleId, file, node, `${binding.name} creates an untyped Supabase client; create it as ${binding.name}<Database>(...) (or give it the contextual type SupabaseClient<Database>).`);
-    }
+  if (!binding || !SUPABASE_MODULES.has(binding.module) || !CLIENT_FACTORY.test(binding.name)) return;
+  counters.clients += 1;
+  if (!isDatabaseType(kit.ts, node.typeArguments?.[0]) && !contextTypesClient(kit, checker, node)) {
+    reportAt(violations, kit, ruleId, file, node, `${binding.name} creates an untyped Supabase client; create it as ${binding.name}<Database>(...) (or give it the contextual type SupabaseClient<Database>).`);
   }
+}
+
+function inspectProviderCall(scope, node) {
+  const { kit, checker, file, slots, ruleId, violations, counters } = scope;
+  const { ts } = kit;
   if (!isSupabaseCall(kit, checker, node)) return;
   const properties = chainParts(ts, node);
   const method = callName(ts, node);
@@ -67,149 +73,24 @@ function inspectOwnershipNode(kit, checker, file, slots, ruleId, violations, cou
   if (!slots.has(file.slot)) reportAt(violations, kit, ruleId, file, node, `A Supabase ${method ?? 'client'} call is made from ${file.slot ?? 'an unowned path'}; database, auth and storage calls belong only to ${[...slots].join(' or ')}.`, { method, slot: file.slot ?? null });
 }
 
+function inspectOwnershipNode(scope, node) {
+  inspectSupabaseImport(scope, node);
+  inspectClientTypeReference(scope, node);
+  if (!scope.kit.ts.isCallExpression(node)) return;
+  inspectClientFactoryCall(scope, node);
+  inspectProviderCall(scope, node);
+}
+
 function checkClientOwnership(input, { slots, ruleId }) {
   const kit = machineKit(input);
   const violations = [];
   const counters = { imports: 0, clients: 0, calls: 0 };
   for (const file of input.graph.files.values()) {
     const checker = kit.checkerOf(file.sourceFile);
-    kit.walk(file.sourceFile, node => inspectOwnershipNode(kit, checker, file, slots, ruleId, violations, counters, node));
+    const scope = { kit, checker, file, slots, ruleId, violations, counters };
+    kit.walk(file.sourceFile, node => inspectOwnershipNode(scope, node));
   }
   return { violations, coverage: { status: 'checked', ...counters, ownerSlots: [...slots] } };
-}
-
-const symbolOf = (kit, checker, node) => kit.aliased(checker, kit.symbolAt(checker, node)) ?? kit.symbolAt(checker, node);
-
-const sameSymbol = (kit, checker, node, symbol) => Boolean(symbol && symbolOf(kit, checker, node) === symbol);
-
-const fromAwaitedSupabase = (kit, checker, node, seen = new Set()) => {
-  const current = unwrap(kit.ts, node);
-  if (!current || seen.has(current)) return false;
-  seen.add(current);
-  if (kit.ts.isCallExpression(current)) return isSupabaseCall(kit, checker, current);
-  if (!kit.ts.isIdentifier(current)) return false;
-  for (const declaration of kit.declarationsOf(checker, current)) {
-    if (kit.ts.isVariableDeclaration(declaration) && declaration.initializer && fromAwaitedSupabase(kit, checker, declaration.initializer, seen)) return true;
-  }
-  return false;
-};
-
-const callIsToOutcome = (kit, checker, graph, call) => {
-  if (!kit.ts.isCallExpression(call)) return false;
-  const expression = call.expression;
-  let name = null;
-  if (kit.ts.isIdentifier(expression)) name = expression.text;
-  else if (kit.ts.isPropertyAccessExpression(expression)) name = expression.name.text;
-  if (name !== 'toOutcome') return false;
-  return kit.declarationsOf(checker, kit.ts.isPropertyAccessExpression(expression) ? expression.name : expression)
-    .some(declaration => {
-      const rel = kit.graphPath(declaration);
-      return rel !== null && FE_DB_SLOTS.has(graph.files.get(rel)?.slot);
-    });
-};
-
-const parentCall = (ts, node) => {
-  let current = node;
-  while (current.parent && ts.isParenthesizedExpression(current.parent)) current = current.parent;
-  return ts.isCallExpression(current.parent) ? current.parent : null;
-};
-
-const handledAwait = (kit, checker, graph, awaitNode) => {
-  const direct = parentCall(kit.ts, awaitNode);
-  if (direct && callIsToOutcome(kit, checker, graph, direct) && direct.arguments.some(argument => argument === awaitNode || argument === awaitNode.parent)) return true;
-  let cursor = awaitNode;
-  while (cursor.parent && kit.ts.isParenthesizedExpression(cursor.parent)) cursor = cursor.parent;
-  const declaration = kit.ts.isVariableDeclaration(cursor.parent) ? cursor.parent : null;
-  if (!declaration) return false;
-  if (kit.ts.isIdentifier(declaration.name)) {
-    const result = symbolOf(kit, checker, declaration.name);
-    let handled = false;
-    kit.walk(fileOf(awaitNode), node => {
-      if (kit.ts.isPropertyAccessExpression(node) && node.name.text === 'error' && sameSymbol(kit, checker, node.expression, result)) handled = true;
-      if (kit.ts.isElementAccessExpression(node) && kit.ts.isStringLiteralLike(node.argumentExpression) && node.argumentExpression.text === 'error' && sameSymbol(kit, checker, node.expression, result)) handled = true;
-      if (kit.ts.isCallExpression(node) && callIsToOutcome(kit, checker, graph, node) && node.arguments.some(argument => sameSymbol(kit, checker, unwrap(kit.ts, argument), result))) handled = true;
-      return !handled;
-    });
-    return handled;
-  }
-  if (!kit.ts.isObjectBindingPattern(declaration.name)) return false;
-  const errorBinding = declaration.name.elements.find(element => {
-    const property = element.propertyName ?? element.name;
-    return kit.ts.isIdentifier(property) && property.text === 'error';
-  });
-  if (!errorBinding || !kit.ts.isIdentifier(errorBinding.name)) return false;
-  const error = symbolOf(kit, checker, errorBinding.name);
-  let references = 0;
-  kit.walk(fileOf(awaitNode), node => {
-    if (kit.ts.isIdentifier(node) && sameSymbol(kit, checker, node, error)) references += 1;
-    return true;
-  });
-  return references > 1;
-};
-
-const fileOf = node => node.getSourceFile();
-
-const dataSymbolFromAwait = (kit, checker, identifier) => {
-  const symbol = symbolOf(kit, checker, identifier);
-  for (const declaration of symbol?.declarations ?? []) {
-    if (!kit.ts.isBindingElement(declaration) || !kit.ts.isObjectBindingPattern(declaration.parent)) continue;
-    const property = declaration.propertyName ?? declaration.name;
-    if (!kit.ts.isIdentifier(property) || property.text !== 'data') continue;
-    const variable = declaration.parent.parent;
-    if (kit.ts.isVariableDeclaration(variable) && variable.initializer && fromAwaitedSupabase(kit, checker, variable.initializer)) return symbol;
-  }
-  return null;
-};
-
-function inspectQueryResultNode(kit, input, file, checker, report, counters, node) {
-  const { ts } = kit;
-  if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) && QUERY_TERMINALS.has(node.expression.name.text)
-    && node.typeArguments?.length && isSupabaseValue(kit, checker, node.expression.expression)) {
-    report(FE_RESULT_TYPED, node, `${node.expression.name.text}<T>() supplies a result generic; derive the row type from Database and let the Supabase chain infer it.`);
-  }
-  if ((ts.isAsExpression(node) || ts.isTypeAssertionExpression(node) || ts.isNonNullExpression(node)) && fromAwaitedSupabase(kit, checker, node.expression)) {
-    report(FE_RESULT_TYPED, node, 'A Supabase query result is cast or non-null asserted; narrow its typed data/error outcome instead.');
-  }
-  if (ts.isAwaitExpression(node) && isSupabaseValue(kit, checker, node.expression)) {
-    const expression = unwrap(ts, node.expression);
-    if (!ts.isCallExpression(expression)) return true;
-    counters.awaited += 1;
-    const methods = chainParts(ts, expression);
-    if (methods.includes('select') && !methods.some(method => QUERY_WRITES.has(method)) && !methods.includes('single') && !methods.includes('maybeSingle')) {
-      counters.listReads += 1;
-      if (!methods.includes('limit') && !methods.some(method => LIST_BOUNDS.has(method))) {
-        report(FE_RESULT_TYPED, node, 'A Supabase list read has no .limit(), .range(), or keyset bound (.gt/.gte/.lt/.lte); bound every multi-row read.');
-      }
-    }
-    if (!handledAwait(kit, checker, input.graph, node)) {
-      report(FE_ERROR_HANDLED, node, 'The awaited Supabase result does not read its error and is not passed whole to toOutcome(result).');
-    }
-  }
-  if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken && ts.isArrayLiteralExpression(node.right) && node.right.elements.length === 0) {
-    const left = unwrap(ts, node.left);
-    const swallowed = ts.isIdentifier(left) ? Boolean(dataSymbolFromAwait(kit, checker, left))
-      : ts.isPropertyAccessExpression(left) && left.name.text === 'data' && fromAwaitedSupabase(kit, checker, left.expression);
-    if (swallowed) report(FE_ERROR_HANDLED, node, 'Supabase data is collapsed with ?? []; refused or unavailable is not empty data. Pass the whole result to toOutcome.');
-  }
-  return true;
-}
-
-function checkFrontendQueryResults(input) {
-  const kit = machineKit(input);
-  const violations = [];
-  const counters = { awaited: 0, listReads: 0 };
-  for (const file of input.graph.files.values()) {
-    const checker = kit.checkerOf(file.sourceFile);
-    const seen = new Set();
-    const report = (ruleId, node, message) => {
-      const key = `${ruleId}:${node.pos}:${message}`;
-      if (seen.has(key)) return;
-      seen.add(key);
-      reportAt(violations, kit, ruleId, file, node, message);
-    };
-    kit.walk(file.sourceFile, node => inspectQueryResultNode(kit, input, file, checker, report, counters, node));
-  }
-  return { violations, coverage: { status: 'checked', awaited: counters.awaited, listReads: counters.listReads } };
 }
 
 const words = text => String(text).replace(/([a-z0-9])([A-Z])/gu, '$1_$2').toUpperCase();
@@ -227,32 +108,41 @@ const envRead = (ts, node) => {
   return ts.isStringLiteralLike(node.argumentExpression) ? node.argumentExpression.text : null;
 };
 
+/** Reports a SERVICE_ROLE identifier or string literal: the browser and Next process never hold the service role. */
+function inspectServiceRoleText(ts, node, report) {
+  if (ts.isIdentifier(node) && serviceRoleText(node.text)) report(node, 'A SERVICE_ROLE identifier appears in the front end; the browser and Next process never hold the Supabase service role.', node.text);
+  if (ts.isStringLiteralLike(node) && serviceRoleText(node.text)) report(node, 'A service_role string appears in the front end; the service role belongs behind the back-end guard chain.', node.text);
+}
+
+/** Counts an environment read and reports a credential-shaped or product-specific public variable. */
+function inspectEnvironmentRead(state, file, node, name) {
+  state.reads += 1;
+  if (credentialEnv(name)) state.report(node, `${name} is a credential-shaped environment read in the front end; no *_SECRET, *_PRIVATE, *_TOKEN, *_PASSWORD or service-role value enters fe/.`, name);
+  else if (name.startsWith('NEXT_PUBLIC_') && !CORE_PUBLIC_ENV.has(name) && file.slot !== FE_CONFIG_SLOT) {
+    state.report(node, `${name} is not a core Supabase/site public variable and is read outside ${FE_CONFIG_SLOT}; product public configuration is declared by the one config owner.`, name);
+  }
+}
+
 function checkFrontendSecretNames(input) {
   const kit = machineKit(input);
   const { ts } = kit;
   const violations = [];
-  let reads = 0;
+  const state = { reads: 0, report: null };
   for (const file of input.graph.files.values()) {
     const seen = new Set();
-    const report = (node, message, name) => {
+    state.report = (node, message, name) => {
       const key = `${node.pos}:${name ?? ''}`;
       if (seen.has(key)) return;
       seen.add(key);
       reportAt(violations, kit, FE_SERVICE_ROLE, file, node, message, name ? { name } : {});
     };
     kit.walk(file.sourceFile, node => {
-      if (ts.isIdentifier(node) && serviceRoleText(node.text)) report(node, 'A SERVICE_ROLE identifier appears in the front end; the browser and Next process never hold the Supabase service role.', node.text);
-      if (ts.isStringLiteralLike(node) && serviceRoleText(node.text)) report(node, 'A service_role string appears in the front end; the service role belongs behind the back-end guard chain.', node.text);
+      inspectServiceRoleText(ts, node, state.report);
       const name = envRead(ts, node);
-      if (!name) return;
-      reads += 1;
-      if (credentialEnv(name)) report(node, `${name} is a credential-shaped environment read in the front end; no *_SECRET, *_PRIVATE, *_TOKEN, *_PASSWORD or service-role value enters fe/.`, name);
-      else if (name.startsWith('NEXT_PUBLIC_') && !CORE_PUBLIC_ENV.has(name) && file.slot !== FE_CONFIG_SLOT) {
-        report(node, `${name} is not a core Supabase/site public variable and is read outside ${FE_CONFIG_SLOT}; product public configuration is declared by the one config owner.`, name);
-      }
+      if (name) inspectEnvironmentRead(state, file, node, name);
     });
   }
-  return { violations, coverage: { status: 'checked', envReads: reads } };
+  return { violations, coverage: { status: 'checked', envReads: state.reads } };
 }
 
 const isClientModule = (ts, sourceFile) => sourceFile.statements.some((statement, index) => index < 4 && ts.isExpressionStatement(statement)
@@ -260,23 +150,24 @@ const isClientModule = (ts, sourceFile) => sourceFile.statements.some((statement
 
 const isDirectiveStatement = (ts, statement) => ts.isExpressionStatement(statement) && ts.isStringLiteralLike(statement.expression);
 
-const exportedValues = (ts, sourceFile) => {
-  const hasExport = node => node.modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.ExportKeyword);
-  const out = [];
-  for (const statement of sourceFile.statements) {
-    if (ts.isFunctionDeclaration(statement) && hasExport(statement) && statement.name && statement.body) {
-      out.push({ name: statement.name.text, implementation: statement.body, functionNode: statement });
-    }
-    if (!ts.isVariableStatement(statement) || !hasExport(statement)) continue;
-    for (const declaration of statement.declarationList.declarations) {
-      if (!ts.isIdentifier(declaration.name) || !declaration.initializer) continue;
+const hasExportModifier = (ts, node) => node.modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.ExportKeyword);
+
+const exportedValuesOf = (ts, statement) => {
+  if (ts.isFunctionDeclaration(statement)) {
+    return hasExportModifier(ts, statement) && statement.name && statement.body
+      ? [{ name: statement.name.text, implementation: statement.body, functionNode: statement }] : [];
+  }
+  if (!ts.isVariableStatement(statement) || !hasExportModifier(ts, statement)) return [];
+  return statement.declarationList.declarations
+    .filter(declaration => ts.isIdentifier(declaration.name) && declaration.initializer)
+    .map(declaration => {
       const functionNode = (ts.isArrowFunction(declaration.initializer) || ts.isFunctionExpression(declaration.initializer))
         && ts.isBlock(declaration.initializer.body) ? declaration.initializer : null;
-      out.push({ name: declaration.name.text, implementation: declaration.initializer, functionNode });
-    }
-  }
-  return out;
+      return { name: declaration.name.text, implementation: declaration.initializer, functionNode };
+    });
 };
+
+const exportedValues = (ts, sourceFile) => sourceFile.statements.flatMap(statement => exportedValuesOf(ts, statement));
 
 const exportedActions = (ts, sourceFile) => exportedValues(ts, sourceFile).map(value => value.functionNode).filter(Boolean);
 const exportedImplementations = (ts, sourceFile, name) => exportedValues(ts, sourceFile)

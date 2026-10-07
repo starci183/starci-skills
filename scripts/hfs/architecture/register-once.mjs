@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { machineKit } from './machine-ast.mjs';
+import { callName } from './supabase-ast.mjs';
 import { isTestWorldSlot } from '../test-world-slot.mjs';
 import { byCodeUnit } from '../../lib/list.mjs';
 
@@ -53,34 +54,43 @@ function enclosingModule(ts, modules, node) {
   return null;
 }
 
+/** Records the reference an element of an imports list, or a register call, makes to a module. */
+function noteReference(scan, element, viaImports) {
+  const { ts, kit, modules, checker, file, seen, references, isAppRoot } = scan;
+  const call = callName(ts, element) === 'register';
+  if (ts.isCallExpression(element) && !call) return;
+  const target = targetOf(kit, modules, checker, call ? element.expression.expression : element);
+  if (!target) return;
+  seen.add(element);
+  const owner = enclosingModule(ts, modules, element);
+  references.push({ file, node: element, target, register: call, viaImports, importer: owner ?? file.rel, importerOwner: file.owner?.root ?? null,
+    options: call ? element.arguments[0] : null, root: isAppRoot(file) });
+}
+
+const isImportsList = (scan, node) => scan.ts.isPropertyAssignment(node) && scan.kit.propertyNameText(node.name) === 'imports' && scan.ts.isArrayLiteralExpression(node.initializer);
+
+const isStrayGlobal = (scan, node) => scan.ts.isPropertyAssignment(node) && scan.kit.propertyNameText(node.name) === 'isGlobal'
+  && node.initializer.kind === scan.ts.SyntaxKind.TrueKeyword && !scan.isAppRoot(scan.file) && !scan.isWorld(scan.file);
+
+function visitReferenceNode(scan, node) {
+  if (isImportsList(scan, node)) {
+    for (const element of node.initializer.elements) noteReference(scan, element, true);
+  } else if (callName(scan.ts, node) === 'register' && !scan.seen.has(node)) {
+    noteReference(scan, node, false);
+  }
+  if (isStrayGlobal(scan, node)) {
+    scan.report(scan.file, node, '`isGlobal: true` appears only in the app root (apps/<app>/src/app.module.ts), where the representative module of a capability is registered; a module never decides its own globality.');
+  }
+  return true;
+}
+
 function moduleReferences(graph, kit, ts, modules, isWorld, isAppRoot, report) {
   // The references to modules: importer (the enclosing module class, else the file), target, node, whether it is a register call.
   const references = [];
   for (const file of graph.files.values()) {
     if (isWorld(file)) continue; // the test composition root assembles modules; it is not a module importer
-    const checker = kit.checkerOf(file.sourceFile);
-    const seen = new Set();
-    const note = (element, viaImports) => {
-      const call = ts.isCallExpression(element) && ts.isPropertyAccessExpression(element.expression) && element.expression.name.text === 'register';
-      if (ts.isCallExpression(element) && !call) return;
-      const target = targetOf(kit, modules, checker, call ? element.expression.expression : element);
-      if (!target) return;
-      seen.add(element);
-      const owner = enclosingModule(ts, modules, element);
-      references.push({ file, node: element, target, register: call, viaImports, importer: owner ?? file.rel, importerOwner: file.owner?.root ?? null,
-        options: call ? element.arguments[0] : null, root: isAppRoot(file) });
-    };
-    kit.walk(file.sourceFile, node => {
-      if (ts.isPropertyAssignment(node) && kit.propertyNameText(node.name) === 'imports' && ts.isArrayLiteralExpression(node.initializer)) {
-        for (const element of node.initializer.elements) note(element, true);
-      } else if (ts.isCallExpression(node) && !seen.has(node) && ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'register') {
-        note(node, false);
-      }
-      if (ts.isPropertyAssignment(node) && kit.propertyNameText(node.name) === 'isGlobal' && node.initializer.kind === ts.SyntaxKind.TrueKeyword && !isAppRoot(file) && !isWorld(file)) {
-        report(file, node, '`isGlobal: true` appears only in the app root (apps/<app>/src/app.module.ts), where the representative module of a capability is registered; a module never decides its own globality.');
-      }
-      return true;
-    });
+    const scan = { ts, kit, modules, file, isWorld, isAppRoot, report, references, checker: kit.checkerOf(file.sourceFile), seen: new Set() };
+    kit.walk(file.sourceFile, node => visitReferenceNode(scan, node));
   }
   return references;
 }
@@ -120,28 +130,36 @@ function reportCapabilityRegistrations(rootReferences, kit, ts, report) {
   }
 }
 
-function reportNonAppImporters(references, modules, inApps, report) {
-  // Non-app importers: no importer of an app-registered module, exactly one importer otherwise (the feature case excepted).
+/** The references that import a module from a non-app module, grouped by the imported module declaration. */
+function importersByModule(references) {
   const importersOf = new Map(); // module declaration -> [reference]
   for (const item of references.filter(entry => !entry.root && entry.viaImports)) {
     if (!importersOf.has(item.target.declaration)) importersOf.set(item.target.declaration, []);
     importersOf.get(item.target.declaration).push(item);
   }
-  for (const [declaration, list] of importersOf) {
+  return importersOf;
+}
+
+function reportSharedSubModule(target, list, report) {
+  const distinct = [...new Set(list.map(item => item.importer))];
+  const featureCase = target.file.tier === 'feature' && target.file.owner && list.every(item => item.importerOwner === target.file.owner.root);
+  if (distinct.length <= 1 || featureCase) return;
+  for (const item of list.filter(entry => entry.importer !== list[0].importer)) {
+    report(item.file, item.node, `${target.name} is imported by ${distinct.length} modules; a sub-module has exactly one importer, its parent. Another capability's module is consumed through its Inject*() decorators, never imported.`, { module: target.name });
+  }
+}
+
+function reportNonAppImporters(references, modules, inApps, report) {
+  // Non-app importers: no importer of an app-registered module, exactly one importer otherwise (the feature case excepted).
+  for (const [declaration, list] of importersByModule(references)) {
     const target = modules.get(declaration);
     const apps = inApps.get(declaration);
-    if (apps) {
-      for (const item of list) {
-        report(item.file, item.node, `${target.name} is registered in the root of app ${[...apps].sort(byCodeUnit).join(', ')}, so no other module imports it; consume it through its Inject*() decorators.`, { module: target.name });
-      }
+    if (!apps) {
+      reportSharedSubModule(target, list, report);
       continue;
     }
-    const distinct = [...new Set(list.map(item => item.importer))];
-    const featureCase = target.file.tier === 'feature' && target.file.owner && list.every(item => item.importerOwner === target.file.owner.root);
-    if (distinct.length > 1 && !featureCase) {
-      for (const item of list.filter(entry => entry.importer !== list[0].importer)) {
-        report(item.file, item.node, `${target.name} is imported by ${distinct.length} modules; a sub-module has exactly one importer, its parent. Another capability's module is consumed through its Inject*() decorators, never imported.`, { module: target.name });
-      }
+    for (const item of list) {
+      report(item.file, item.node, `${target.name} is registered in the root of app ${[...apps].sort(byCodeUnit).join(', ')}, so no other module imports it; consume it through its Inject*() decorators.`, { module: target.name });
     }
   }
 }

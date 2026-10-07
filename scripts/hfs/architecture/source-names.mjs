@@ -119,18 +119,20 @@ function combineClassValue(results) {
   return { status: 'class', names: [...new Set(classes.flatMap(result => result.names))] };
 }
 
+function pushReturnedClassStatuses(ts, checker, results, container, nextSeen, depth) {
+  for (const returned of returnedExpressions(ts, container)) results.push(classValueStatus(ts, checker, returned, nextSeen, depth + 1));
+}
+
 function classDeclarationResults(ts, checker, expression, declaration, nextSeen, depth) {
   const results = [];
   if (ts.isClassDeclaration(declaration)) results.push({ status: 'class', names: declaration.name ? [declaration.name.text] : [] });
   if (ts.isVariableDeclaration(declaration) && declaration.initializer) {
     if (ts.isCallExpression(expression)
       && (ts.isArrowFunction(declaration.initializer) || ts.isFunctionExpression(declaration.initializer))) {
-      for (const returned of returnedExpressions(ts, declaration.initializer)) results.push(classValueStatus(ts, checker, returned, nextSeen, depth + 1));
+      pushReturnedClassStatuses(ts, checker, results, declaration.initializer, nextSeen, depth);
     } else results.push(classValueStatus(ts, checker, declaration.initializer, nextSeen, depth + 1));
   }
-  if (ts.isCallExpression(expression)) for (const returned of returnedExpressions(ts, declaration)) {
-    results.push(classValueStatus(ts, checker, returned, nextSeen, depth + 1));
-  }
+  if (ts.isCallExpression(expression)) pushReturnedClassStatuses(ts, checker, results, declaration, nextSeen, depth);
   return results;
 }
 
@@ -162,6 +164,22 @@ function combineObjectStatus(statuses) {
   return 'not-object';
 }
 
+function declarationObjectStatus(ts, checker, declaration, seen, depth) {
+  if (ts.isInterfaceDeclaration(declaration)) return 'object';
+  if (ts.isTypeAliasDeclaration(declaration)) return objectTypeStatus(ts, checker, declaration.type, seen, depth + 1);
+  if (ts.isTypeParameterDeclaration(declaration) || ts.isClassDeclaration(declaration)) return 'unavailable';
+  return 'not-object';
+}
+
+function typeReferenceStatus(ts, checker, node, seen, depth) {
+  const symbol = normalizedSymbol(ts, checker, node.typeName);
+  if (!symbol || seen.has(symbol)) return 'unavailable';
+  const nextSeen = new Set(seen).add(symbol);
+  const declarations = symbol.getDeclarations?.() ?? [];
+  if (!declarations.length) return 'unavailable';
+  return combineObjectStatus(declarations.map(declaration => declarationObjectStatus(ts, checker, declaration, nextSeen, depth)));
+}
+
 function objectTypeStatus(ts, checker, node, seen = new Set(), depth = 0) {
   if (!node || depth > 12) return 'unavailable';
   if (ts.isTypeLiteralNode(node) || ts.isMappedTypeNode(node)) return 'object';
@@ -169,20 +187,7 @@ function objectTypeStatus(ts, checker, node, seen = new Set(), depth = 0) {
   if (ts.isIntersectionTypeNode(node) || ts.isUnionTypeNode(node)) {
     return combineObjectStatus(node.types.map(type => objectTypeStatus(ts, checker, type, seen, depth + 1)));
   }
-  if (ts.isTypeReferenceNode(node)) {
-    const symbol = normalizedSymbol(ts, checker, node.typeName);
-    if (!symbol || seen.has(symbol)) return 'unavailable';
-    const nextSeen = new Set(seen).add(symbol);
-    const declarations = symbol.getDeclarations?.() ?? [];
-    if (!declarations.length) return 'unavailable';
-    return combineObjectStatus(declarations.map(declaration => {
-      if (ts.isInterfaceDeclaration(declaration)) return 'object';
-      if (ts.isTypeAliasDeclaration(declaration)) return objectTypeStatus(ts, checker, declaration.type, nextSeen, depth + 1);
-      if (ts.isTypeParameterDeclaration(declaration)) return 'unavailable';
-      if (ts.isClassDeclaration(declaration)) return 'unavailable';
-      return 'not-object';
-    }));
-  }
+  if (ts.isTypeReferenceNode(node)) return typeReferenceStatus(ts, checker, node, seen, depth);
   if (ts.isConditionalTypeNode(node) || ts.isIndexedAccessTypeNode(node) || ts.isInferTypeNode(node) || ts.isTypeQueryNode(node)) return 'unavailable';
   return 'not-object';
 }

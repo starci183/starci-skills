@@ -17,6 +17,8 @@ const BE_CAPABILITY_SLOTS = new Set(['be.domain', 'be.integrations', 'be.platfor
 const TEST_FILE = /(?:\.(?:spec|test|stories|e2e-spec)\.[cm]?[jt]sx?$)|(?:(?:^|\/)__tests__\/)/;
 const ROUTE_FILE = /^(?:page|route)\.(?:tsx|ts|jsx|js)$/;
 const PLACEHOLDER = '\u0000';
+const REGEX_SPECIALS = /[.*+?^${}()|[\]\\]/g;
+const ESCAPE_MATCH = String.raw`\$&`;
 
 /** Breadth-first reach over runtime, non-type-only edges (re-exports included) from `roots`. */
 function reachFrom(graph, roots) {
@@ -52,7 +54,8 @@ function ownerFiles(graph) {
 /** The file that stands for an owner in a finding: its public entry when the graph holds one, else its first file. */
 function entryOf(root, files) {
   const base = root.replace(/\/$/, '');
-  return files.find(rel => new RegExp(String.raw`^${base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/index\.[tj]sx?$`).test(rel)) ?? [...files].sort(byCodeUnit)[0];
+  const entry = new RegExp(String.raw`^${base.replace(REGEX_SPECIALS, ESCAPE_MATCH)}/index\.[tj]sx?$`);
+  return files.find(rel => entry.test(rel)) ?? [...files].sort(byCodeUnit)[0];
 }
 
 function backendAppRoots(byUnit) {

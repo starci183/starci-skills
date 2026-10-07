@@ -35,6 +35,21 @@ function tokenOfArgument(kit, checker, argument) {
   return { kind: 'unresolved', reason: `the token ${argument.text} does not resolve to a declaration`, node: argument };
 }
 
+/** The first `injector(...)` call under a decorator declaration, or null. */
+function injectorCallOf(kit, declaration) {
+  const { ts } = kit;
+  let injectorCall = null;
+  kit.walk(declaration, node => {
+    if (injectorCall) return false;
+    if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)) {
+      const binding = kit.importBinding(kit.checkerOf(declaration.getSourceFile()), node.expression);
+      if ((binding?.name ?? node.expression.text) === 'injector') injectorCall = node;
+    }
+    return true;
+  });
+  return injectorCall;
+}
+
 /** The injector token of a custom `Inject<Thing>()` decorator, or an unresolved reason. */
 function tokenOfInjectDecorator(kit, checker, parameter, decorator) {
   const { ts } = kit;
@@ -43,16 +58,7 @@ function tokenOfInjectDecorator(kit, checker, parameter, decorator) {
   if (head.callee.text === 'Inject' && head.call?.arguments.length) return { ...tokenOfArgument(kit, checker, head.call.arguments[0]), decorator: head.callee.text, decoratorDeclaration: null, decoratorFile: null };
   const declaration = kit.declarationsOf(checker, head.callee).find(item => ts.isVariableDeclaration(item) || ts.isFunctionDeclaration(item));
   if (!declaration) return { kind: 'unresolved', reason: `${head.callee.text}() does not resolve to a declaration`, node: parameter, decorator: head.callee.text };
-  let injectorCall = null;
-  kit.walk(declaration, node => {
-    if (injectorCall) return false;
-    if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)) {
-      const declarationChecker = kit.checkerOf(declaration.getSourceFile());
-      const binding = kit.importBinding(declarationChecker, node.expression);
-      if ((binding?.name ?? node.expression.text) === 'injector') injectorCall = node;
-    }
-    return true;
-  });
+  const injectorCall = injectorCallOf(kit, declaration);
   if (!injectorCall) return { kind: 'unresolved', reason: `${head.callee.text}() is not built with injector<T>(TOKEN)`, node: parameter, decorator: head.callee.text };
   const declarationChecker = kit.checkerOf(declaration.getSourceFile());
   return { ...tokenOfArgument(kit, declarationChecker, injectorCall.arguments[0]), decorator: head.callee.text, decoratorDeclaration: declaration, injectorCall };

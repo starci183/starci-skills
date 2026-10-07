@@ -31,6 +31,16 @@ function testPathFinding(file) {
   return found(FE_NO_TESTS, file, `${file} is ${what}; a front-end repository has no tests, no test tooling and no exception: delete it`);
 }
 
+function testDependencyFindings(file, pkg) {
+  const findings = [];
+  for (const section of DEPENDENCY_SECTIONS) {
+    for (const name of Object.keys(pkg[section] ?? {})) {
+      if (TEST_DEPENDENCY.test(name)) findings.push(found(FE_NO_TESTS, file, `${file} ${section} names ${name}, a test dependency; a front-end repository has no tests: delete the dependency`));
+    }
+  }
+  return findings;
+}
+
 function packageTestFindings(repoRoot, file) {
   if (file !== 'package.json' && !file.endsWith('/package.json')) return [];
   if (file.includes('node_modules/')) return [];
@@ -40,11 +50,7 @@ function packageTestFindings(repoRoot, file) {
   for (const [name, command] of Object.entries(pkg.scripts ?? {})) {
     if (TEST_SCRIPT_NAME.test(name) || TEST_RUNNER_COMMAND.test(String(command))) findings.push(found(FE_NO_TESTS, file, `${file} script ${name} is a test script (${String(command).slice(0, 80)}); a front-end repository has no tests: delete the script`));
   }
-  for (const section of DEPENDENCY_SECTIONS) {
-    for (const name of Object.keys(pkg[section] ?? {})) {
-      if (TEST_DEPENDENCY.test(name)) findings.push(found(FE_NO_TESTS, file, `${file} ${section} names ${name}, a test dependency; a front-end repository has no tests: delete the dependency`));
-    }
-  }
+  findings.push(...testDependencyFindings(file, pkg));
   return findings;
 }
 

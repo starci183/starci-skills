@@ -3,6 +3,7 @@ import path from 'node:path';
 import { lsFiles } from '../../api/git/ls-files.mjs';
 import { revParseQuery } from '../../api/git/rev-parse-query.mjs';
 import { gitOutputOf } from '../../lib/git.mjs';
+import { trimTrailingSlashes } from '../trailing-slashes.mjs';
 
 /**
  * HFS check 5: the files and directories the slot manifest requires (knowledge/hfs/slots.yaml `requires`,
@@ -68,16 +69,14 @@ export function checkerScope({ config, graph, context }) {
   return { config, graph, context, ts: context.ts, resolver: graph.resolver, tree: treeOf(config.root) };
 }
 
-const TRAILING_SLASH = new RegExp('/+$', 'u');
-const strip = entry => entry.replace(TRAILING_SLASH, '');
 const rootOfTarget = target => {
-  if (target.endsWith('/')) return strip(target);
+  if (target.endsWith('/')) return trimTrailingSlashes(target);
   const parent = path.posix.dirname(target);
   return parent === '.' ? '' : parent;
 };
 
 function ruleFor(slotId, target, rootExists) {
-  if (slotId === 'fe.app.next' && rootExists && ERROR_BOUNDARY_FILE.test(path.posix.basename(strip(target)))) return 'FE_ERROR_BOUNDARY_MISSING';
+  if (slotId === 'fe.app.next' && rootExists && ERROR_BOUNDARY_FILE.test(path.posix.basename(trimTrailingSlashes(target)))) return 'FE_ERROR_BOUNDARY_MISSING';
   return 'HFS_REQUIRED_FILE_MISSING';
 }
 
@@ -150,7 +149,7 @@ function collectTreeRequirements(tree, resolver, requirements, instances, judged
 }
 
 function requirementExists(tree, target) {
-  return target.endsWith('/') ? tree.directories.has(strip(target)) : tree.files.has(target);
+  return target.endsWith('/') ? tree.directories.has(trimTrailingSlashes(target)) : tree.files.has(target);
 }
 
 function reportMissingRequirement(requirement, tree, report) {
@@ -163,8 +162,8 @@ function reportMissingRequirement(requirement, tree, report) {
   }
   const kind = requirement.target.endsWith('/') ? 'directory' : 'file';
   const rootNote = requirement.root ? ` (${requirement.root})` : '';
-  report(ruleFor(requirement.slot, requirement.target, true), strip(requirement.target), requirement.slot, requirement.root, { kind },
-    `Required ${kind} ${strip(requirement.target)} is missing; slot ${requirement.slot} requires it in every instance${rootNote}.`);
+  report(ruleFor(requirement.slot, requirement.target, true), trimTrailingSlashes(requirement.target), requirement.slot, requirement.root, { kind },
+    `Required ${kind} ${trimTrailingSlashes(requirement.target)} is missing; slot ${requirement.slot} requires it in every instance${rootNote}.`);
 }
 
 function reportMissingRequirements(requirements, tree, report) {

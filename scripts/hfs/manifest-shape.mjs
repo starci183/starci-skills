@@ -8,7 +8,7 @@ import { stringList, byCodeUnit } from '../lib/list.mjs';
 
 export const SEMVER = /^(\d+)\.(\d+)\.(\d+)$/;
 export const NAME = /^[a-z][a-z0-9-]*$/;
-export const ENV_PREFIX = /^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$/;
+const ENV_PREFIX =/^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$/;
 /** How a bounded context (a connection) is isolated: its own logical database, or its own schema of a shared one. */
 const CONTEXT_ISOLATIONS = Object.freeze(["database", "schema"]);
 /** The app kinds that may own a context: the services, never the migrate or cli apps that only run migrations. */
@@ -92,20 +92,43 @@ const LITE_OVERLAY_KEYS = ['path', 'requires', 'allows', 'forbids', 'minInstance
 /** A runtime slot has no app kind, side composition, layer or managed template; it may name the generator of a generated copy. */
 const RUNTIME_SLOT_KEYS = ['id', 'profiles', 'path', 'presence', 'tracked', 'tier', 'tests', 'owner', 'minInstances', 'requires', 'allows', 'forbids', 'budget', 'rules', 'goesTo', 'why', 'since', 'generatedBy', 'parent', 'coverage'];
 
+const isPositiveInt = (v) => Number.isInteger(v) && v >= 1;
+const instancesShapeOk = (v) => isPlainObject(v) && Object.values(v).every((list) => strList(list) && list.length);
+
+const generatedByInvalid = (generatedBy) => typeof generatedBy !== 'string' || !generatedBy || generatedBy.startsWith('/') || generatedBy.includes('..');
+
+const profilesInvalid = (profiles, appScope, scopes) => !Array.isArray(profiles) || !profiles.length || !profiles.every((p) => scopes.includes(p)) || new Set(profiles).size !== profiles.length || (profiles.includes(appScope) && profiles.length !== 1);
+
+function runtimeIdentityProblems(slot, at) {
+  const bad = [];
+  if (!RUNTIME_SLOT_ID.test(String(slot.id))) bad.push(`${at}: id must look like runtime.<name>`);
+  if (JSON.stringify(slot.profiles) !== JSON.stringify([RUNTIME_KIND])) bad.push(`${at}: profiles must be [runtime]`);
+  if (slot.tracked === 'generated' && generatedByInvalid(slot.generatedBy)) bad.push(`${at}: a generated slot names its generator (generatedBy, a repository-relative path)`);
+  if (slot.generatedBy !== undefined && slot.tracked !== 'generated') bad.push(`${at}: generatedBy belongs to a generated slot`);
+  return bad;
+}
+
+function appIdentityProblems(slot, at, appScope, scopes) {
+  const bad = [];
+  if (!SLOT_ID.test(String(slot.id))) bad.push(`${at}: id must look like be.transport.http`);
+  if (profilesInvalid(slot.profiles, appScope, scopes)) bad.push(`${at}: profiles must be [app] or a unique non-empty subset of be, fe`);
+  else if ((slot.profiles[0] === appScope) !== String(slot.id).startsWith(`${appScope}.`)) bad.push(`${at}: an app-root slot has profiles [app] and an id app.<name>, and only it`);
+  return bad;
+}
+
 /** Shape problems of one slot of a manifest of `kind` (app or runtime). */
-function slotIdentityProblems(slot, runtime, slotKeys, tracked, at, appScope, scopes) {
+function slotIdentityProblems(slot, runtime, slotKeys, at, appScope, scopes) {
   const bad = [];
   for (const key of Object.keys(slot)) if (!slotKeys.has(key)) bad.push(`${at}: unknown field ${key}`);
-  if (runtime) {
-    if (!RUNTIME_SLOT_ID.test(String(slot.id))) bad.push(`${at}: id must look like runtime.<name>`);
-    if (JSON.stringify(slot.profiles) !== JSON.stringify([RUNTIME_KIND])) bad.push(`${at}: profiles must be [runtime]`);
-    if (slot.tracked === 'generated' && (typeof slot.generatedBy !== 'string' || !slot.generatedBy || slot.generatedBy.startsWith('/') || slot.generatedBy.includes('..'))) bad.push(`${at}: a generated slot names its generator (generatedBy, a repository-relative path)`);
-    if (slot.generatedBy !== undefined && slot.tracked !== 'generated') bad.push(`${at}: generatedBy belongs to a generated slot`);
-  } else {
-    if (!SLOT_ID.test(String(slot.id))) bad.push(`${at}: id must look like be.transport.http`);
-    if (!Array.isArray(slot.profiles) || !slot.profiles.length || !slot.profiles.every((p) => scopes.includes(p)) || new Set(slot.profiles).size !== slot.profiles.length || (slot.profiles.includes(appScope) && slot.profiles.length !== 1)) bad.push(`${at}: profiles must be [app] or a unique non-empty subset of be, fe`);
-    else if ((slot.profiles[0] === appScope) !== String(slot.id).startsWith(`${appScope}.`)) bad.push(`${at}: an app-root slot has profiles [app] and an id app.<name>, and only it`);
-  }
+  bad.push(...(runtime ? runtimeIdentityProblems(slot, at) : appIdentityProblems(slot, at, appScope, scopes)));
+  return bad;
+}
+
+function slotCoverageProblems(slot, at, runtime) {
+  const bad = [];
+  const measured = slot.tracked === 'tracked' && (runtime || (Array.isArray(slot.profiles) && slot.profiles.includes('be')));
+  if (measured && !COVERAGE.includes(slot.coverage)) bad.push(`${at}: coverage must be one of ${COVERAGE.join(', ')} (every tracked slot of ${runtime ? 'a runtime manifest' : 'the be profile'} declares it)`);
+  if (!measured && slot.coverage !== undefined) bad.push(`${at}: coverage belongs to a tracked slot of ${runtime ? 'a runtime manifest' : 'the be profile'} only`);
   return bad;
 }
 
@@ -118,33 +141,44 @@ function slotLocationProblems(slot, at, runtime, tracked) {
   if (!NAME.test(String(slot.tier))) bad.push(`${at}: tier must be a tier name, none or inherit`);
   if (!TESTS.includes(slot.tests)) bad.push(`${at}: tests must be one of ${TESTS.join(', ')}`);
   if (slot.owner !== undefined && typeof slot.owner !== 'boolean') bad.push(`${at}: owner must be a boolean`);
-  const measured = slot.tracked === 'tracked' && (runtime || (Array.isArray(slot.profiles) && slot.profiles.includes('be')));
-  if (measured && !COVERAGE.includes(slot.coverage)) bad.push(`${at}: coverage must be one of ${COVERAGE.join(', ')} (every tracked slot of ${runtime ? 'a runtime manifest' : 'the be profile'} declares it)`);
-  if (!measured && slot.coverage !== undefined) bad.push(`${at}: coverage belongs to a tracked slot of ${runtime ? 'a runtime manifest' : 'the be profile'} only`);
+  bad.push(...slotCoverageProblems(slot, at, runtime));
+  return bad;
+}
+
+const NAMED_SLOT_FIELDS = [['appKind', 'appKind must be a name'], ['trigger', 'trigger must be a trigger kind name'], ['pattern', 'pattern must be a pattern name']];
+
+function slotInstanceProblems(slot, at) {
+  const bad = [];
+  if (slot.pattern !== undefined && !/^[a-z][a-z0-9-]*$/.test(String(slot.pattern))) bad.push(`${at}: pattern must be a kebab-case pattern name`);
+  if (slot.requiredInstances !== undefined && !instancesShapeOk(slot.requiredInstances)) bad.push(`${at}: requiredInstances must map a variable to a non-empty list of names`);
   return bad;
 }
 
 function slotPatternProblems(slot, at) {
   const bad = [];
-  if (slot.appKind !== undefined && !NAME.test(String(slot.appKind))) bad.push(`${at}: appKind must be a name`);
-  if (slot.trigger !== undefined && !NAME.test(String(slot.trigger))) bad.push(`${at}: trigger must be a trigger kind name`);
-  if (slot.pattern !== undefined && !NAME.test(String(slot.pattern))) bad.push(`${at}: pattern must be a pattern name`);
-  if (slot.minInstances !== undefined && !(Number.isInteger(slot.minInstances) && slot.minInstances >= 1)) bad.push(`${at}: minInstances must be a positive integer`);
+  for (const [key, what] of NAMED_SLOT_FIELDS) if (slot[key] !== undefined && !NAME.test(String(slot[key]))) bad.push(`${at}: ${what}`);
+  if (slot.minInstances !== undefined && !isPositiveInt(slot.minInstances)) bad.push(`${at}: minInstances must be a positive integer`);
   if (slot.requiredWhen !== undefined && slot.requiredWhen !== 'connections') bad.push(`${at}: requiredWhen may only be connections`);
-  if (slot.pattern !== undefined && !/^[a-z][a-z0-9-]*$/.test(String(slot.pattern))) bad.push(`${at}: pattern must be a kebab-case pattern name`);
-  if (slot.requiredInstances !== undefined && !(isPlainObject(slot.requiredInstances) && Object.values(slot.requiredInstances).every((v) => strList(v) && v.length))) bad.push(`${at}: requiredInstances must map a variable to a non-empty list of names`);
+  bad.push(...slotInstanceProblems(slot, at));
   return bad;
 }
+
+const kindsInvalid = (slot) => {
+  if (slot.kinds === undefined || !strList(slot.kinds)) return false;
+  return !slot.kinds.length || new Set(slot.kinds).size !== slot.kinds.length || slot.kinds.some((k) => !NAME.test(k) || (slot.layers ?? []).includes(k));
+};
+const rolesValid = (roles) => isPlainObject(roles) && Object.keys(roles).length && Object.entries(roles).every(([role, file]) => NAME.test(role) && typeof file === 'string' && file && !file.includes('/'));
+const composedByValid = (list) => strList(list) && list.length && new Set(list).size === list.length;
+const budgetValid = (budget) => isPlainObject(budget) && Object.keys(budget).length && Object.values(budget).every(isPositiveInt);
 
 function slotListProblems(slot, at) {
   const bad = [];
   for (const key of ['requires', 'allows', 'forbids', 'layers', 'kinds']) if (slot[key] !== undefined && !strList(slot[key])) bad.push(`${at}: ${key} must be a list of strings`);
-  if (slot.kinds !== undefined && strList(slot.kinds) && (!slot.kinds.length || new Set(slot.kinds).size !== slot.kinds.length || slot.kinds.some((k) => !NAME.test(k) || (slot.layers ?? []).includes(k)))) bad.push(`${at}: kinds must be a non-empty list of unique folder names that are not layers`);
-  if (slot.roles !== undefined && !(isPlainObject(slot.roles) && Object.keys(slot.roles).length && Object.entries(slot.roles).every(([role, file]) => NAME.test(role) && typeof file === 'string' && file && !file.includes('/')))) bad.push(`${at}: roles must map a role name to a file name`);
-  if (slot.composedBy !== undefined && !(strList(slot.composedBy) && slot.composedBy.length && new Set(slot.composedBy).size === slot.composedBy.length)) bad.push(`${at}: composedBy must be a non-empty list of unique app kinds`);
-  if (slot.budget !== undefined && !(isPlainObject(slot.budget) && Object.keys(slot.budget).length && Object.values(slot.budget).every((v) => Number.isInteger(v) && v >= 1))) bad.push(`${at}: budget must map names to positive integers`);
-  if (slot.managedBy !== undefined && !NAME.test(String(slot.managedBy))) bad.push(`${at}: managedBy must be a template id`);
-  if (slot.liteManagedBy !== undefined && !NAME.test(String(slot.liteManagedBy))) bad.push(`${at}: liteManagedBy must be a template id`);
+  if (kindsInvalid(slot)) bad.push(`${at}: kinds must be a non-empty list of unique folder names that are not layers`);
+  if (slot.roles !== undefined && !rolesValid(slot.roles)) bad.push(`${at}: roles must map a role name to a file name`);
+  if (slot.composedBy !== undefined && !composedByValid(slot.composedBy)) bad.push(`${at}: composedBy must be a non-empty list of unique app kinds`);
+  if (slot.budget !== undefined && !budgetValid(slot.budget)) bad.push(`${at}: budget must map names to positive integers`);
+  for (const key of ['managedBy', 'liteManagedBy']) if (slot[key] !== undefined && !NAME.test(String(slot[key]))) bad.push(`${at}: ${key} must be a template id`);
   return bad;
 }
 
@@ -198,7 +232,7 @@ export function slotProblems(slot, index, kind, { appScope = 'app', scopes = [] 
   const tracked = runtime ? RUNTIME_TRACKED : TRACKED;
   const at = isPlainObject(slot) && typeof slot.id === 'string' ? `slot ${slot.id}` : `slots[${index}]`;
   if (!isPlainObject(slot)) return [`${at} is not a map`];
-  const bad = slotIdentityProblems(slot, runtime, slotKeys, tracked, at, appScope, scopes);
+  const bad = slotIdentityProblems(slot, runtime, slotKeys, at, appScope, scopes);
   bad.push(...slotLocationProblems(slot, at, runtime, tracked), ...slotPatternProblems(slot, at), ...slotListProblems(slot, at));
   if (!runtime) bad.push(...slotAppOptionProblems(slot, at), ...slotLiteOverlayProblems(slot, at));
   bad.push(...slotEntryProblems(slot, at), ...slotPolicyProblems(slot, at));

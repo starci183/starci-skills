@@ -29,6 +29,43 @@ function relativeSource(repository, value, label) {
   return relative;
 }
 
+const CONTRACT_LABEL = 'package.json#starci.codePatterns.next.dataLifecycle';
+
+function parseSwr(swr) {
+  exactKeys(swr, SWR_KEYS, 'dataLifecycle.swr');
+  if (swr.package !== 'swr' || !Number.isInteger(swr.major) || swr.major < 1) {
+    throw new Error('dataLifecycle.swr must bind package swr and one positive integer major version.');
+  }
+}
+
+function parseIdentity(identity, identityLabel, seen) {
+  exactKeys(identity, IDENTITY_KEYS, identityLabel);
+  if (typeof identity.id !== 'string' || !identity.id.trim() || seen.ids.has(identity.id.trim())) throw new Error(`${identityLabel}.id must be unique and non-empty.`);
+  if (typeof identity.binding !== 'string' || !BINDING.test(identity.binding) || seen.bindings.has(identity.binding)) throw new Error(`${identityLabel}.binding must be a unique identifier or property path.`);
+  if (typeof identity.gatesRequest !== 'boolean' || typeof identity.resource !== 'boolean') throw new Error(`${identityLabel} must explicitly declare gatesRequest and resource booleans.`);
+  seen.ids.add(identity.id.trim());
+  seen.bindings.add(identity.binding);
+  return { id: identity.id.trim(), binding: identity.binding, gatesRequest: identity.gatesRequest, resource: identity.resource };
+}
+
+function parseHook(config, hook, label, ids) {
+  exactKeys(hook, HOOK_KEYS, label);
+  if (typeof hook.id !== 'string' || !hook.id.trim() || ids.has(hook.id.trim())) throw new Error(`${label}.id must be unique and non-empty.`);
+  ids.add(hook.id.trim());
+  const source = relativeSource(config.root, hook.path, `${label}.path`);
+  if (typeof hook.export !== 'string' || !/^use[A-Z0-9_$][\w$]*$/.test(hook.export)) throw new Error(`${label}.export must name one exported use* hook.`);
+  if (!['query', 'mutation'].includes(hook.kind)) throw new Error(`${label}.kind must be query or mutation.`);
+  if (hook.resultBinding !== undefined && (typeof hook.resultBinding !== 'string' || !IDENTIFIER.test(hook.resultBinding))) {
+    throw new Error(`${label}.resultBinding must be one local identifier.`);
+  }
+  if (!Array.isArray(hook.identities)) throw new Error(`${label}.identities must be an array.`);
+  const seen = { ids: new Set(), bindings: new Set() };
+  const identities = hook.identities.map((identity, identityIndex) => parseIdentity(identity, `${label}.identities[${identityIndex}]`, seen));
+  if (hook.kind === 'mutation' && !identities.some(identity => identity.resource)) throw new Error(`${label} mutation must declare at least one resource identity.`);
+  return { id: hook.id.trim(), path: source, export: hook.export, kind: hook.kind,
+    ...(hook.resultBinding === undefined ? {} : { resultBinding: hook.resultBinding }), identities };
+}
+
 export function parseContract(config) {
   // The contract is declared in the app's one package.json (the app root; config.root is the fe side folder).
   const manifest = JSON.parse(fs.readFileSync(path.join(config.packageRoot ?? config.root, 'package.json'), 'utf8'));
@@ -36,41 +73,12 @@ export function parseContract(config) {
   const value = next?.dataLifecycle;
   if (value === undefined) return null;
   if (next.schema !== 'starci/next-code-pattern-contract@1') throw new Error('package.json#starci.codePatterns.next must use starci/next-code-pattern-contract@1.');
-  exactKeys(value, TOP_KEYS, 'package.json#starci.codePatterns.next.dataLifecycle');
+  exactKeys(value, TOP_KEYS, CONTRACT_LABEL);
   if (value.schema !== CONTRACT_SCHEMA) throw new Error(`dataLifecycle.schema must be ${CONTRACT_SCHEMA}.`);
-  exactKeys(value.swr, SWR_KEYS, 'dataLifecycle.swr');
-  if (value.swr.package !== 'swr' || !Number.isInteger(value.swr.major) || value.swr.major < 1) {
-    throw new Error('dataLifecycle.swr must bind package swr and one positive integer major version.');
-  }
+  parseSwr(value.swr);
   if (!Array.isArray(value.hooks) || value.hooks.length === 0) throw new Error('dataLifecycle.hooks must contain at least one declared lifecycle call.');
   const ids = new Set();
-  const hooks = value.hooks.map((hook, index) => {
-    const label = `dataLifecycle.hooks[${index}]`;
-    exactKeys(hook, HOOK_KEYS, label);
-    if (typeof hook.id !== 'string' || !hook.id.trim() || ids.has(hook.id.trim())) throw new Error(`${label}.id must be unique and non-empty.`);
-    ids.add(hook.id.trim());
-    const source = relativeSource(config.root, hook.path, `${label}.path`);
-    if (typeof hook.export !== 'string' || !/^use[A-Z0-9_$][\w$]*$/.test(hook.export)) throw new Error(`${label}.export must name one exported use* hook.`);
-    if (!['query', 'mutation'].includes(hook.kind)) throw new Error(`${label}.kind must be query or mutation.`);
-    if (hook.resultBinding !== undefined && (typeof hook.resultBinding !== 'string' || !IDENTIFIER.test(hook.resultBinding))) {
-      throw new Error(`${label}.resultBinding must be one local identifier.`);
-    }
-    if (!Array.isArray(hook.identities)) throw new Error(`${label}.identities must be an array.`);
-    const identityIds = new Set(), bindings = new Set();
-    const identities = hook.identities.map((identity, identityIndex) => {
-      const identityLabel = `${label}.identities[${identityIndex}]`;
-      exactKeys(identity, IDENTITY_KEYS, identityLabel);
-      if (typeof identity.id !== 'string' || !identity.id.trim() || identityIds.has(identity.id.trim())) throw new Error(`${identityLabel}.id must be unique and non-empty.`);
-      if (typeof identity.binding !== 'string' || !BINDING.test(identity.binding) || bindings.has(identity.binding)) throw new Error(`${identityLabel}.binding must be a unique identifier or property path.`);
-      if (typeof identity.gatesRequest !== 'boolean' || typeof identity.resource !== 'boolean') throw new Error(`${identityLabel} must explicitly declare gatesRequest and resource booleans.`);
-      identityIds.add(identity.id.trim());
-      bindings.add(identity.binding);
-      return { id: identity.id.trim(), binding: identity.binding, gatesRequest: identity.gatesRequest, resource: identity.resource };
-    });
-    if (hook.kind === 'mutation' && !identities.some(identity => identity.resource)) throw new Error(`${label} mutation must declare at least one resource identity.`);
-    return { id: hook.id.trim(), path: source, export: hook.export, kind: hook.kind,
-      ...(hook.resultBinding === undefined ? {} : { resultBinding: hook.resultBinding }), identities };
-  });
+  const hooks = value.hooks.map((hook, index) => parseHook(config, hook, `dataLifecycle.hooks[${index}]`, ids));
   return { schema: value.schema, swr: { package: 'swr', major: value.swr.major }, hooks };
 }
 

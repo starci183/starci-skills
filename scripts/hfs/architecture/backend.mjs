@@ -95,6 +95,22 @@ function destructuredTransportBindings(ts, elements, detail) {
   });
 }
 
+const namespaceMemberUsages = (ts, node, isAlias) => {
+  if (ts.isPropertyAccessExpression(node) && isAlias(node.expression)
+    && NEST_COMMON_TRANSPORT.has(node.name.text)) return [{ node: node.name, detail: node.name.text }];
+  if (ts.isElementAccessExpression(node) && isAlias(node.expression)) {
+    const selected = ts.isStringLiteralLike(node.argumentExpression) ? node.argumentExpression.text : null;
+    if (selected === null || NEST_COMMON_TRANSPORT.has(selected)) return [{ node: node.argumentExpression, detail: selected ?? 'computed @nestjs/common namespace access' }];
+  }
+  return [];
+};
+
+const namespaceEscapeUsages = (ts, node, isAlias) => {
+  if (!ts.isVariableDeclaration(node) || !isAlias(node.initializer)) return [];
+  if (!ts.isObjectBindingPattern(node.name)) return [{ node: node.name, detail: 'escaped @nestjs/common namespace access' }];
+  return destructuredTransportBindings(ts, node.name.elements, 'computed @nestjs/common namespace destructuring');
+};
+
 function namespaceTransportUsages(ts, sourceFile, checker, binding) {
   const usages = [];
   const alias = binding.text;
@@ -102,19 +118,7 @@ function namespaceTransportUsages(ts, sourceFile, checker, binding) {
   const isAlias = node => ts.isIdentifier(node) && node.text === alias
     && (!bindingSymbol || checker?.getSymbolAtLocation(node) === bindingSymbol);
   const visit = node => {
-    if (ts.isPropertyAccessExpression(node) && isAlias(node.expression)
-      && NEST_COMMON_TRANSPORT.has(node.name.text)) usages.push({ node: node.name, detail: node.name.text });
-    if (ts.isElementAccessExpression(node) && isAlias(node.expression)) {
-      const selected = ts.isStringLiteralLike(node.argumentExpression) ? node.argumentExpression.text : null;
-      if (selected === null || NEST_COMMON_TRANSPORT.has(selected)) usages.push({ node: node.argumentExpression, detail: selected ?? 'computed @nestjs/common namespace access' });
-    }
-    if (ts.isVariableDeclaration(node) && isAlias(node.initializer)) {
-      if (!ts.isObjectBindingPattern(node.name)) {
-        usages.push({ node: node.name, detail: 'escaped @nestjs/common namespace access' });
-      } else {
-        usages.push(...destructuredTransportBindings(ts, node.name.elements, 'computed @nestjs/common namespace destructuring'));
-      }
-    }
+    usages.push(...namespaceMemberUsages(ts, node, isAlias), ...namespaceEscapeUsages(ts, node, isAlias));
     ts.forEachChild(node, visit);
   };
   visit(sourceFile);
@@ -172,16 +176,20 @@ function requiredSpecifier(ts, call) {
     : null;
 }
 
+const requiredMemberSelection = (ts, node) => {
+  if (ts.isPropertyAccessExpression(node)) return node.name.text;
+  return ts.isStringLiteralLike(node.argumentExpression) ? node.argumentExpression.text : null;
+};
+
 function requiredMemberEvidence(ts, node, found) {
   if (!(ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) || !ts.isCallExpression(node.expression)) return;
   const specifier = requiredSpecifier(ts, node.expression);
-  let selected = null;
-  if (ts.isPropertyAccessExpression(node)) selected = node.name.text;
-  else if (ts.isStringLiteralLike(node.argumentExpression)) selected = node.argumentExpression.text;
+  const selected = requiredMemberSelection(ts, node);
+  const member = ts.isPropertyAccessExpression(node) ? node.name : node.argumentExpression;
   if (specifier && TRANSPORT_PACKAGES.test(specifier)) {
-    found.push({ node: ts.isPropertyAccessExpression(node) ? node.name : node.argumentExpression, specifier, detail: `${selected ?? 'computed member'} from ${specifier}` });
+    found.push({ node: member, specifier, detail: `${selected ?? 'computed member'} from ${specifier}` });
   } else if (specifier === '@nestjs/common' && (selected === null || NEST_COMMON_TRANSPORT.has(selected))) {
-    found.push({ node: ts.isPropertyAccessExpression(node) ? node.name : node.argumentExpression, specifier, detail: selected ?? 'computed @nestjs/common require access' });
+    found.push({ node: member, specifier, detail: selected ?? 'computed @nestjs/common require access' });
   }
 }
 
@@ -253,55 +261,60 @@ function importedTransportBindings(ts, sourceFile) {
   return imported;
 }
 
-function directTransportReexport(ts, statement, specifier, selected) {
-  const clause = statement.exportClause;
-  if (!clause) {
-    if (specifier !== '@nestjs/common' || selected === null || [...selected].some(name => NEST_COMMON_TRANSPORT.has(name))) {
-      return { node: statement.moduleSpecifier, specifier, detail: selected === null ? `unbounded ${specifier} re-export` : `re-exported ${[...selected].join(', ')}` };
-    }
-    return null;
+const unnamedReexport = (statement, specifier, selected) => {
+  if (specifier !== '@nestjs/common' || selected === null || [...selected].some(name => NEST_COMMON_TRANSPORT.has(name))) {
+    return { node: statement.moduleSpecifier, specifier, detail: selected === null ? `unbounded ${specifier} re-export` : `re-exported ${[...selected].join(', ')}` };
   }
-  if (ts.isNamespaceExport(clause)) {
-    return selected === null || selected.has(clause.name.text) ? { node: clause.name, specifier, detail: `namespace re-export from ${specifier}` } : null;
-  }
-  if (!ts.isNamedExports(clause)) return null;
+  return null;
+};
+
+const namedReexport = (clause, specifier, selected) => {
   for (const element of clause.elements) {
     if (selected !== null && !selected.has(element.name.text)) continue;
     const original = element.propertyName?.text ?? element.name.text;
     if (specifier !== '@nestjs/common' || NEST_COMMON_TRANSPORT.has(original)) return { node: element, specifier, detail: `${element.name.text} re-exported from ${specifier}` };
   }
   return null;
+};
+
+function directTransportReexport(ts, statement, specifier, selected) {
+  const clause = statement.exportClause;
+  if (!clause) return unnamedReexport(statement, specifier, selected);
+  if (ts.isNamespaceExport(clause)) {
+    return selected === null || selected.has(clause.name.text) ? { node: clause.name, specifier, detail: `namespace re-export from ${specifier}` } : null;
+  }
+  return ts.isNamedExports(clause) ? namedReexport(clause, specifier, selected) : null;
 }
+
+/** True for an import binding of a transport package, or of a transport symbol of @nestjs/common. */
+const isTransportBinding = binding => (binding.specifier === '@nestjs/common'
+  ? binding.imported !== null && NEST_COMMON_TRANSPORT.has(binding.imported)
+  : TRANSPORT_PACKAGES.test(binding.specifier));
 
 function localTransportReexport(ts, statement, selected, imported) {
   const clause = statement.exportClause;
   if (!clause || !ts.isNamedExports(clause)) return null;
   for (const element of clause.elements) {
     if (selected !== null && !selected.has(element.name.text)) continue;
-    const local = element.propertyName?.text ?? element.name.text;
-    const binding = imported.get(local);
-    if (!binding) continue;
-    if (binding.specifier !== '@nestjs/common' && !TRANSPORT_PACKAGES.test(binding.specifier)) continue;
-    if (binding.specifier === '@nestjs/common' && (binding.imported === null || !NEST_COMMON_TRANSPORT.has(binding.imported))) continue;
+    const binding = imported.get(element.propertyName?.text ?? element.name.text);
+    if (!binding || !isTransportBinding(binding)) continue;
     return { node: element, specifier: binding.specifier, detail: `${element.name.text} re-exported from ${binding.specifier}` };
   }
   return null;
 }
 
+const statementTransportReexport = (ts, statement, selected, imported) => {
+  const specifier = statement.moduleSpecifier && ts.isStringLiteralLike(statement.moduleSpecifier) ? statement.moduleSpecifier.text : null;
+  if (specifier && (specifier === '@nestjs/common' || TRANSPORT_PACKAGES.test(specifier))) return directTransportReexport(ts, statement, specifier, selected);
+  return specifier ? null : localTransportReexport(ts, statement, selected, imported);
+};
+
 function externalTransportReexport(ts, sourceFile, selected) {
   const imported = importedTransportBindings(ts, sourceFile);
   for (const statement of sourceFile.statements) {
     if (!ts.isExportDeclaration(statement)) continue;
-    const specifier = statement.moduleSpecifier && ts.isStringLiteralLike(statement.moduleSpecifier) ? statement.moduleSpecifier.text : null;
-    if (specifier && (specifier === '@nestjs/common' || TRANSPORT_PACKAGES.test(specifier))) {
-      const evidence = directTransportReexport(ts, statement, specifier, selected);
-      if (evidence) return evidence;
-      continue;
-    }
-    if (!specifier) {
-      const evidence = localTransportReexport(ts, statement, selected, imported);
-      if (evidence) return evidence;
-    }
+    const evidence = statementTransportReexport(ts, statement, selected, imported);
+    if (evidence) return evidence;
   }
   return null;
 }

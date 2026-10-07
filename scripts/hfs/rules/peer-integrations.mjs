@@ -11,8 +11,21 @@ import { found, readJson } from './read.mjs';
 const PEER_INTEGRATION_MISSING = 'HFS_PEER_INTEGRATION_MISSING';
 const MANIFEST = 'package.json';
 const CATALOG_FILE = new URL('../../../knowledge/hfs/peer-integrations.yaml', import.meta.url);
-const MAJOR_OF_SOURCE = String.raw`^\s*(?:[\^~]|>=?|=)?\s*v?(\d+)(?:\.|\s|$)`;
-const MAJOR_OF = new RegExp(MAJOR_OF_SOURCE);
+const WHITESPACE = /\s/;
+const isDigit = (char) => char >= '0' && char <= '9';
+
+/** The index of the first non-whitespace character of `text` at or after `from`. */
+function skipWhitespace(text, from) {
+  let index = from;
+  while (index < text.length && WHITESPACE.test(text[index])) index += 1;
+  return index;
+}
+
+/** The index after an optional range operator (`^`, `~`, `>`, `>=`, `=`) at `from`. */
+function skipOperator(text, from) {
+  if (text[from] === '>') return text[from + 1] === '=' ? from + 2 : from + 1;
+  return text[from] === '^' || text[from] === '~' || text[from] === '=' ? from + 1 : from;
+}
 
 /** The pairs of the catalog: [{ id, when: [{ package, major? }], requires, why }]. */
 function peerIntegrationPairs() {
@@ -23,8 +36,14 @@ function peerIntegrationPairs() {
 
 /** The major a dependency spec allows (`11.2.5`, `^11.0.0`, `~11.1`, `>=11 <12`), or null when the spec names none (a tag, a link, `*`). */
 function majorOf(spec) {
-  const match = MAJOR_OF.exec(String(spec));
-  return match ? Number(match[1]) : null;
+  const text = String(spec);
+  let index = skipWhitespace(text, skipOperator(text, skipWhitespace(text, 0)));
+  if (text[index] === 'v') index += 1;
+  const digits = index;
+  while (isDigit(text[index] ?? '')) index += 1;
+  if (index === digits) return null;
+  const next = text[index];
+  return next === undefined || next === '.' || WHITESPACE.test(next) ? Number(text.slice(digits, index)) : null;
 }
 
 /** The findings of R111 over the app root package.json of `repoRoot`; `pairs` defaults to the catalog. */

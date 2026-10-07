@@ -40,78 +40,104 @@ const exportedInjectorName = (ts, kit, node) => {
   return null;
 };
 
+const ENV_ASSIGNMENT = /^(?:export\s+)?([A-Za-z_]\w*)\s*=/u;
+const LINE_BREAK = /[\n\r\u2028\u2029]/u;
+
+// One `KEY=value` line: a value holding a line break after its first character is not an assignment.
+function parseEnvLine(raw) {
+  const line = raw.trim();
+  if (!line || line.startsWith('#')) return null;
+  const match = ENV_ASSIGNMENT.exec(line);
+  if (!match) return null;
+  let value = line.slice(match[0].length).trim();
+  if (LINE_BREAK.test(value)) return null;
+  if (/^(['"]).*\1$/u.test(value)) value = value.slice(1, -1);
+  return [match[1], value.trim()];
+}
+
+function readEnvFile(file, merged) {
+  let text;
+  try { text = fs.readFileSync(file, 'utf8'); } catch { return; }
+  for (const raw of text.split(/\r?\n/u)) {
+    const parsed = parseEnvLine(raw);
+    if (parsed) merged.set(parsed[0], parsed[1]);
+  }
+}
+
 function readEnvFiles(target) {
   const merged = new Map();
-  const readFile = file => {
-    let text;
-    try { text = fs.readFileSync(file, 'utf8'); } catch { return; }
-    for (const raw of text.split(/\r?\n/u)) {
-      const line = raw.trim();
-      if (!line || line.startsWith('#')) continue;
-      const match = new RegExp([
-        String.raw`^(?:export\s+)?`,
-        String.raw`([A-Za-z_]\w*)`,
-        String.raw`\s*=\s*`,
-        String.raw`(.*)$`,
-      ].join(''), 'u').exec(line);
-      if (!match) continue;
-      let value = match[2].trim();
-      if (/^(['"]).*\1$/u.test(value)) value = value.slice(1, -1);
-      merged.set(match[1], value.trim());
-    }
-  };
   let stat;
   try { stat = fs.statSync(target); } catch { return null; }
-  if (stat.isFile()) readFile(target);
+  if (stat.isFile()) readEnvFile(target, merged);
   else for (const entry of fs.readdirSync(target, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
-    if (entry.isFile() && !entry.name.toLowerCase().endsWith('.md')) readFile(path.join(target, entry.name));
+    if (entry.isFile() && !entry.name.toLowerCase().endsWith('.md')) readEnvFile(path.join(target, entry.name), merged);
   }
   return merged;
 }
 
+const exportsVariable = (ts, kit, item, name) => ts.isVariableStatement(item) && kit.isExported(item)
+  && item.declarationList.declarations.some(declaration => ts.isIdentifier(declaration.name) && declaration.name.text === name);
+
+const checkConnectionFile = (connection, kit, ts, report) => {
+  const connectionRel = `${DATABASE_DIR}/${connection.name}.connection.ts`;
+  const constant = `${upperSnake(connection.name)}_CONNECTION`;
+  const connectionFile = kit.graphFile(connectionRel);
+  if (!connectionFile) {
+    report(connectionRel, `hfs.json declares connection ${connection.name} but ${connectionRel} does not exist; declare \`export const ${constant} = "${connection.name}"\` there.`, { connection: connection.name });
+    return;
+  }
+  const checker = kit.checkerOf(connectionFile.sourceFile);
+  const statement = connectionFile.sourceFile.statements.find(item => exportsVariable(ts, kit, item, constant));
+  const initializer = statement?.declarationList.declarations.find(declaration => declaration.name.text === constant)?.initializer;
+  if (!statement || kit.stringValue(checker, initializer) !== connection.name) {
+    report(connectionRel, `${connectionRel} must export \`${constant} = "${connection.name}"\` (the connection name declared in hfs.json).`, { connection: connection.name });
+  }
+};
+
+const checkInjectorFile = (connection, kit, ts, report, decoratorsFile) => {
+  const decorators = kit.graphFile(decoratorsFile(connection.name));
+  const injector = `Inject${pascal(connection.name)}EntityManager`;
+  const exported = decorators?.sourceFile.statements.some(item => exportsVariable(ts, kit, item, injector)
+    || (ts.isFunctionDeclaration(item) && kit.isExported(item) && item.name?.text === injector));
+  if (!exported) report(decoratorsFile(connection.name), `Connection ${connection.name} needs ${decoratorsFile(connection.name)} exporting ${injector}, the one injector of its shared EntityManager.`, { connection: connection.name });
+};
+
+const isProcessEnvAccess = (ts, node) => ts.isPropertyAccessExpression(node) && ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'env'
+  && ts.isIdentifier(node.expression.expression) && node.expression.expression.text === 'process';
+
+const configEnvKey = (ts, node) => {
+  if (ts.isStringLiteralLike(node) && ENV_KEY.test(node.text)) return node.text;
+  if (isProcessEnvAccess(ts, node) && ENV_KEY.test(node.name.text)) return node.name.text;
+  return null;
+};
+
+const checkConfigFile = (connection, declared, kit, ts, report, configRel, configFile) => {
+  let readsSchema = false;
+  kit.walk(configFile.sourceFile, node => {
+    const key = configEnvKey(ts, node);
+    if (key === null) return true;
+    if (key === `${connection.envPrefix}_SCHEMA`) readsSchema = true;
+    const own = key.startsWith(`${connection.envPrefix}_`);
+    const foreign = declared.some(other => other !== connection && key.startsWith(`${other.envPrefix}_`));
+    if (!own || foreign) {
+      report(configRel, `${configRel} reads ${key}; the config of connection ${connection.name} reads only ${connection.envPrefix}_* keys.`, { ...kit.at(configRel, configFile.sourceFile, node), connection: connection.name });
+    }
+    return false;
+  });
+  if (connection.isolation === 'schema' && !readsSchema) report(configRel, `Connection ${connection.name} is isolated as a schema of a shared database (hfs.json isolation), so ${configRel} must read ${connection.envPrefix}_SCHEMA and hand it to the data source; splitting the context out into its own database is then an env change only.`, { connection: connection.name });
+};
+
 const checkDeclaredConnections = (declared, kit, ts, report, decoratorsFile) => {
   for (const connection of declared) {
-    const connectionRel = `${DATABASE_DIR}/${connection.name}.connection.ts`;
-    const constant = `${upperSnake(connection.name)}_CONNECTION`;
-    const connectionFile = kit.graphFile(connectionRel);
-    if (!connectionFile) report(connectionRel, `hfs.json declares connection ${connection.name} but ${connectionRel} does not exist; declare \`export const ${constant} = "${connection.name}"\` there.`, { connection: connection.name });
-    else {
-      const checker = kit.checkerOf(connectionFile.sourceFile);
-      const statement = connectionFile.sourceFile.statements.find(item => ts.isVariableStatement(item) && kit.isExported(item)
-        && item.declarationList.declarations.some(declaration => ts.isIdentifier(declaration.name) && declaration.name.text === constant));
-      const initializer = statement?.declarationList.declarations.find(declaration => declaration.name.text === constant)?.initializer;
-      if (!statement || kit.stringValue(checker, initializer) !== connection.name) {
-        report(connectionRel, `${connectionRel} must export \`${constant} = "${connection.name}"\` (the connection name declared in hfs.json).`, { connection: connection.name });
-      }
-    }
-    const decorators = kit.graphFile(decoratorsFile(connection.name));
-    const injector = `Inject${pascal(connection.name)}EntityManager`;
-    const exported = decorators?.sourceFile.statements.some(item => (ts.isVariableStatement(item) && kit.isExported(item)
-      && item.declarationList.declarations.some(declaration => ts.isIdentifier(declaration.name) && declaration.name.text === injector))
-      || (ts.isFunctionDeclaration(item) && kit.isExported(item) && item.name?.text === injector));
-    if (!exported) report(decoratorsFile(connection.name), `Connection ${connection.name} needs ${decoratorsFile(connection.name)} exporting ${injector}, the one injector of its shared EntityManager.`, { connection: connection.name });
+    checkConnectionFile(connection, kit, ts, report);
+    checkInjectorFile(connection, kit, ts, report, decoratorsFile);
     const configRel = `${DATABASE_DIR}/${connection.name}.config.ts`;
     const configFile = kit.graphFile(configRel);
     if (!configFile) {
       report(configRel, `Connection ${connection.name} needs ${configRel}, the one place its ${connection.envPrefix}_* keys are read.`, { connection: connection.name });
       continue;
     }
-    let readsSchema = false;
-    kit.walk(configFile.sourceFile, node => {
-      let key = null;
-      if (ts.isStringLiteralLike(node) && ENV_KEY.test(node.text)) key = node.text;
-      else if (ts.isPropertyAccessExpression(node) && ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'env'
-        && ts.isIdentifier(node.expression.expression) && node.expression.expression.text === 'process' && ENV_KEY.test(node.name.text)) key = node.name.text;
-      if (key === null) return true;
-      if (key === `${connection.envPrefix}_SCHEMA`) readsSchema = true;
-      const own = key.startsWith(`${connection.envPrefix}_`);
-      const foreign = declared.some(other => other !== connection && key.startsWith(`${other.envPrefix}_`));
-      if (!own || foreign) {
-        report(configRel, `${configRel} reads ${key}; the config of connection ${connection.name} reads only ${connection.envPrefix}_* keys.`, { ...kit.at(configRel, configFile.sourceFile, node), connection: connection.name });
-      }
-      return false;
-    });
-    if (connection.isolation === 'schema' && !readsSchema) report(configRel, `Connection ${connection.name} is isolated as a schema of a shared database (hfs.json isolation), so ${configRel} must read ${connection.envPrefix}_SCHEMA and hand it to the data source; splitting the context out into its own database is then an env change only.`, { connection: connection.name });
+    checkConfigFile(connection, declared, kit, ts, report, configRel, configFile);
   }
 };
 
@@ -124,34 +150,45 @@ const reportUndeclaredDatabaseFiles = (databaseFiles, byName, report) => {
   }
 };
 
-const inspectManagerNode = (file, checker, node, state) => {
-  const { ts, kit, byName, decoratorsFile, report, perDecorators } = state;
-  if (ts.isCallExpression(node)) {
-    const binding = kit.importBinding(checker, node.expression);
-    if (binding?.module === TYPEORM && MANAGER_CALLS.has(binding.name)) {
-      const value = kit.stringValue(checker, node.arguments[0]);
-      const home = value === null ? null : decoratorsFile(value);
-      if (value === null || !byName.has(value)) {
-        const target = value === null ? 'a connection that cannot be resolved to a constant' : `connection ${value}, which hfs.json does not declare`;
-        report(file.rel, `${binding.name}() names ${target}; only the declared connections have an entity manager token.`, kit.at(file.rel, file.sourceFile, node));
-      } else if (file.rel !== home) {
-        report(file.rel, `${binding.name}(${value}) belongs in ${home} only; inject the shared manager with Inject${pascal(value)}EntityManager() instead of a second path to connection ${value}.`, { ...kit.at(file.rel, file.sourceFile, node), connection: value });
-      } else {
-        perDecorators.set(value, (perDecorators.get(value) ?? 0) + 1);
-        if (perDecorators.get(value) > 1) report(file.rel, `${home} resolves connection ${value} more than once; one connection has one injector.`, { ...kit.at(file.rel, file.sourceFile, node), connection: value });
-      }
-    } else if (binding?.module === TYPEORM && SOURCE_CALLS.has(binding.name)) {
-      const allowed = file.rel.startsWith(`${DATABASE_DIR}/`) || state.slotIs(file, 'be.app.cli') || state.slotIs(file, 'be.cli') || state.slotIs(file, 'be.tests.fixtures');
-      if (!allowed) report(file.rel, `${binding.name}() reaches the DataSource outside platform/database and the cli; inject the shared EntityManager of the connection instead.`, kit.at(file.rel, file.sourceFile, node));
-    }
+const inspectManagerToken = (file, checker, node, binding, state) => {
+  const { kit, byName, decoratorsFile, report, perDecorators } = state;
+  const value = kit.stringValue(checker, node.arguments[0]);
+  const home = value === null ? null : decoratorsFile(value);
+  if (value === null || !byName.has(value)) {
+    const target = value === null ? 'a connection that cannot be resolved to a constant' : `connection ${value}, which hfs.json does not declare`;
+    report(file.rel, `${binding.name}() names ${target}; only the declared connections have an entity manager token.`, kit.at(file.rel, file.sourceFile, node));
+  } else if (file.rel !== home) {
+    report(file.rel, `${binding.name}(${value}) belongs in ${home} only; inject the shared manager with Inject${pascal(value)}EntityManager() instead of a second path to connection ${value}.`, { ...kit.at(file.rel, file.sourceFile, node), connection: value });
+  } else {
+    perDecorators.set(value, (perDecorators.get(value) ?? 0) + 1);
+    if (perDecorators.get(value) > 1) report(file.rel, `${home} resolves connection ${value} more than once; one connection has one injector.`, { ...kit.at(file.rel, file.sourceFile, node), connection: value });
   }
+};
+
+const inspectDataSourceCall = (file, node, binding, state) => {
+  const allowed = file.rel.startsWith(`${DATABASE_DIR}/`) || state.slotIs(file, 'be.app.cli') || state.slotIs(file, 'be.cli') || state.slotIs(file, 'be.tests.fixtures');
+  if (!allowed) state.report(file.rel, `${binding.name}() reaches the DataSource outside platform/database and the cli; inject the shared EntityManager of the connection instead.`, state.kit.at(file.rel, file.sourceFile, node));
+};
+
+const inspectTypeormCall = (file, checker, node, state) => {
+  const binding = state.kit.importBinding(checker, node.expression);
+  if (binding?.module === TYPEORM && MANAGER_CALLS.has(binding.name)) inspectManagerToken(file, checker, node, binding, state);
+  else if (binding?.module === TYPEORM && SOURCE_CALLS.has(binding.name)) inspectDataSourceCall(file, node, binding, state);
+};
+
+const inspectInjectorExport = (file, node, state) => {
+  const { ts, kit, byName, decoratorsFile, report } = state;
   const exportedName = exportedInjectorName(ts, kit, node);
-  if (exportedName && INJECTOR_NAME.test(exportedName)) {
-    const home = [...byName.keys()].find(name => `Inject${pascal(name)}EntityManager` === exportedName);
-    if (!home || file.rel !== decoratorsFile(home)) {
-      report(file.rel, `${exportedName} is exported here, but the only injector of an entity manager is Inject<Conn>EntityManager in src/modules/platform/database/<conn>.decorators.ts, one per declared connection.`, kit.at(file.rel, file.sourceFile, node));
-    }
+  if (!exportedName || !INJECTOR_NAME.test(exportedName)) return;
+  const home = [...byName.keys()].find(name => `Inject${pascal(name)}EntityManager` === exportedName);
+  if (!home || file.rel !== decoratorsFile(home)) {
+    report(file.rel, `${exportedName} is exported here, but the only injector of an entity manager is Inject<Conn>EntityManager in src/modules/platform/database/<conn>.decorators.ts, one per declared connection.`, kit.at(file.rel, file.sourceFile, node));
   }
+};
+
+const inspectManagerNode = (file, checker, node, state) => {
+  if (state.ts.isCallExpression(node)) inspectTypeormCall(file, checker, node, state);
+  inspectInjectorExport(file, node, state);
   return true;
 };
 
@@ -164,33 +201,87 @@ const checkManagerCalls = (graph, state) => {
   }
 };
 
+/** The receiver of a `<receiver>.register(...)` call that `node` is, or null. */
+const registerReceiver = (ts, node) => {
+  if (!ts.isCallExpression(node)) return null;
+  const callee = node.expression;
+  return ts.isPropertyAccessExpression(callee) && callee.name.text === 'register' ? callee.expression : null;
+};
+
+const isPropertyName = (ts, node) => (ts.isPropertyAssignment(node.parent ?? {}) || ts.isPropertyAccessExpression(node.parent ?? {})) && node.parent.name === node;
+
+const passConnections = (argument, scope) => {
+  const { ts, kit, checker, byName, passed, root, app, report } = scope;
+  kit.walk(argument, inner => {
+    if (isPropertyName(ts, inner)) return true;
+    if (!(ts.isIdentifier(inner) || ts.isStringLiteralLike(inner) || ts.isPropertyAccessExpression(inner))) return true;
+    const value = kit.stringValue(checker, inner);
+    if (value === null || !byName.has(value)) return true;
+    passed.set(value, (passed.get(value) ?? 0) + 1);
+    if (passed.get(value) > 1) report(root.rel, `App ${app.name} passes connection ${value} to the database module registration more than once; one connection is registered once per app.`, { ...kit.at(root.rel, root.sourceFile, inner), connection: value, app: app.name });
+    return false;
+  });
+};
+
 const checkAppRegistrations = (config, kit, ts, byName, report) => {
   let registrations = 0;
   for (const app of config.apps) {
     const root = kit.appRoot(app.name);
     if (!root) continue;
     const checker = kit.checkerOf(root.sourceFile);
-    const passed = new Map();
+    const scope = { ts, kit, checker, byName, passed: new Map(), root, app, report };
     kit.walk(root.sourceFile, node => {
-      if (!(ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'register')) return;
-      const owner = kit.declarationsOf(checker, node.expression.expression).map(kit.ownerOfDeclaration).find(Boolean);
+      const receiver = registerReceiver(ts, node);
+      if (!receiver) return;
+      const owner = kit.declarationsOf(checker, receiver).map(kit.ownerOfDeclaration).find(Boolean);
       if (owner?.tier !== 'platform' || owner.name !== 'database') return;
       registrations += 1;
-      for (const argument of node.arguments) {
-        kit.walk(argument, inner => {
-          if (ts.isPropertyAssignment(inner.parent ?? {}) && inner.parent.name === inner) return true;
-          if (ts.isPropertyAccessExpression(inner.parent ?? {}) && inner.parent.name === inner) return true;
-          if (!(ts.isIdentifier(inner) || ts.isStringLiteralLike(inner) || ts.isPropertyAccessExpression(inner))) return true;
-          const value = kit.stringValue(checker, inner);
-          if (value === null || !byName.has(value)) return true;
-          passed.set(value, (passed.get(value) ?? 0) + 1);
-          if (passed.get(value) > 1) report(root.rel, `App ${app.name} passes connection ${value} to the database module registration more than once; one connection is registered once per app.`, { ...kit.at(root.rel, root.sourceFile, inner), connection: value, app: app.name });
-          return false;
-        });
-      }
+      for (const argument of node.arguments) passConnections(argument, scope);
     });
   }
   return registrations;
+};
+
+const listStackEnvs = stacksRoot => {
+  try { return fs.readdirSync(stacksRoot, { withFileTypes: true }).filter(entry => entry.isDirectory()).map(entry => entry.name).sort(byCodeUnit); } catch { return []; }
+};
+
+// The resolved database of one connection in one stack env, or null while its host, port or name is unset.
+const resolveStackConnection = (kit, connection, values) => {
+  const configFile = kit.graphFile(`${DATABASE_DIR}/${connection.name}.config.ts`);
+  const nameKey = configFile?.sourceFile.text.includes(`${connection.envPrefix}_DATABASE`) ? `${connection.envPrefix}_DATABASE` : `${connection.envPrefix}_NAME`;
+  const host = values.get(`${connection.envPrefix}_HOST`);
+  const port = values.get(`${connection.envPrefix}_PORT`);
+  const database = values.get(nameKey);
+  if (!host || !port || !database) return null;
+  const schema = connection.isolation === 'schema' ? (values.get(`${connection.envPrefix}_SCHEMA`) ?? '') : null;
+  return { host, port, database, triple: `${host.toLowerCase()}|${port}|${database}`, schema };
+};
+
+// True when the env resolves at least one connection; false when it is skipped.
+const checkStackEnv = (config, kit, declared, report, stacksRoot, env) => {
+  // Relative to the side folder the machine judges (`../.starcistacks/...` for a side): the app-relative path once the side is prefixed.
+  const rel = path.relative(config.root, path.join(stacksRoot, env, 'runtime', 'env')).split(path.sep).join('/');
+  const values = readEnvFiles(path.join(stacksRoot, env, 'runtime', 'env'));
+  if (!values || values.size === 0) return false;
+  const seen = new Map(); // host|port|database -> [{name, isolation, schema}]
+  let resolved = 0;
+  for (const connection of declared) {
+    const found = resolveStackConnection(kit, connection, values);
+    if (!found) continue;
+    resolved += 1;
+    const { host, port, database, triple, schema } = found;
+    const sharing = seen.get(triple) ?? [];
+    // Two contexts may share one database only as distinct, named schemas; a context that is its own database shares it with nobody.
+    const clash = sharing.find(other => schema === null || other.schema === null || other.schema === schema);
+    if (clash) {
+      const schemaDetail = schema !== null && clash.schema === schema ? `, schema ${schema || '(none)'}` : '';
+      report(rel, `Connections ${clash.name} and ${connection.name} resolve to the same database (${host}:${port}/${database}${schemaDetail}) in stack ${env}; contexts share a database only as distinct schemas (isolation schema, a different ${connection.envPrefix}_SCHEMA), otherwise one physical database is one connection.`, { connection: connection.name, env });
+    }
+    sharing.push({ name: connection.name, schema });
+    seen.set(triple, sharing);
+  }
+  return resolved > 0;
 };
 
 const checkStackConnections = (config, kit, declared, report) => {
@@ -198,36 +289,8 @@ const checkStackConnections = (config, kit, declared, report) => {
   let stacksSkipped = 0;
   // .starcistacks sits at the app root: the side folder the machine judges reads its app's tree (locateDeclaration).
   const stacksRoot = path.join(locateDeclaration(config.root).appRoot, '.starcistacks');
-  let envs = [];
-  try { envs = fs.readdirSync(stacksRoot, { withFileTypes: true }).filter(entry => entry.isDirectory()).map(entry => entry.name).sort(byCodeUnit); } catch { envs = []; }
-  for (const env of envs) {
-    // Relative to the side folder the machine judges (`../.starcistacks/...` for a side): the app-relative path once the side is prefixed.
-    const rel = path.relative(config.root, path.join(stacksRoot, env, 'runtime', 'env')).split(path.sep).join('/');
-    const values = readEnvFiles(path.join(stacksRoot, env, 'runtime', 'env'));
-    if (!values || values.size === 0) { stacksSkipped += 1; continue; }
-    const seen = new Map(); // host|port|database -> [{name, isolation, schema}]
-    let resolved = 0;
-    for (const connection of declared) {
-      const configFile = kit.graphFile(`${DATABASE_DIR}/${connection.name}.config.ts`);
-      const nameKey = configFile?.sourceFile.text.includes(`${connection.envPrefix}_DATABASE`) ? `${connection.envPrefix}_DATABASE` : `${connection.envPrefix}_NAME`;
-      const host = values.get(`${connection.envPrefix}_HOST`);
-      const port = values.get(`${connection.envPrefix}_PORT`);
-      const database = values.get(nameKey);
-      if (!host || !port || !database) continue;
-      resolved += 1;
-      const triple = `${host.toLowerCase()}|${port}|${database}`;
-      const schema = connection.isolation === 'schema' ? (values.get(`${connection.envPrefix}_SCHEMA`) ?? '') : null;
-      const sharing = seen.get(triple) ?? [];
-      // Two contexts may share one database only as distinct, named schemas; a context that is its own database shares it with nobody.
-      const clash = sharing.find(other => schema === null || other.schema === null || other.schema === schema);
-      if (clash) {
-        const schemaDetail = schema !== null && clash.schema === schema ? `, schema ${schema || '(none)'}` : '';
-        report(rel, `Connections ${clash.name} and ${connection.name} resolve to the same database (${host}:${port}/${database}${schemaDetail}) in stack ${env}; contexts share a database only as distinct schemas (isolation schema, a different ${connection.envPrefix}_SCHEMA), otherwise one physical database is one connection.`, { connection: connection.name, env });
-      }
-      sharing.push({ name: connection.name, schema });
-      seen.set(triple, sharing);
-    }
-    if (resolved) stacksChecked += 1; else stacksSkipped += 1;
+  for (const env of listStackEnvs(stacksRoot)) {
+    if (checkStackEnv(config, kit, declared, report, stacksRoot, env)) stacksChecked += 1; else stacksSkipped += 1;
   }
   return { stacksChecked, stacksSkipped };
 };

@@ -31,6 +31,10 @@ function ownerOf(owners, file) {
   return owners.find(owner => isInside(owner.root, file)) ?? null;
 }
 
+function reexportSteps(context, current) {
+  return (context.edges.get(current.file) ?? []).filter(candidate => candidate.reexport).map(candidate => ({ file: candidate.to, chain: [...current.chain, candidate.to] }));
+}
+
 function privateOwnerChain(context, owners, actionEntries, edge) {
   const sourceOwner = ownerOf(owners, edge.from);
   const queue = [{ file: edge.to, chain: [edge.from, edge.to] }];
@@ -41,9 +45,7 @@ function privateOwnerChain(context, owners, actionEntries, edge) {
     visited.add(current.file);
     const owner = ownerOf(owners, current.file);
     if (owner && sourceOwner?.id !== owner.id) return owner.entries.has(current.file) || actionEntries.has(current.file) ? null : { owner, chain: current.chain };
-    for (const candidate of context.edges.get(current.file) ?? []) if (candidate.reexport) {
-      queue.push({ file: candidate.to, chain: [...current.chain, candidate.to] });
-    }
+    queue.push(...reexportSteps(context, current));
   }
   return null;
 }

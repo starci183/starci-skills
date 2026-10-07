@@ -22,11 +22,14 @@ const exportedVariableHasName = (ts, kit, statement, name) => {
     || (ts.isObjectBindingPattern(declaration.name) && declaration.name.elements.some(element => ts.isIdentifier(element.name) && element.name.text === name)));
 };
 
-const exportedDeclarationHasName = (ts, statement, name) => ts.isExportDeclaration(statement) && statement.exportClause
-  && ts.isNamedExports(statement.exportClause) && statement.exportClause.elements.some(element => element.name.text === name);
+const exportedDeclarationHasName = (ts, statement, name) => {
+  if (!ts.isExportDeclaration(statement)) return false;
+  const clause = statement.exportClause;
+  return clause !== undefined && ts.isNamedExports(clause) && clause.elements.some(element => element.name.text === name);
+};
 
-const exportsName = (ts, kit, file, name) => Boolean(file?.sourceFile.statements.some(statement =>
-  exportedVariableHasName(ts, kit, statement, name) || exportedDeclarationHasName(ts, statement, name)));
+const exportsName = (ts, kit, file, name) => file?.sourceFile.statements.some(statement =>
+  exportedVariableHasName(ts, kit, statement, name) || exportedDeclarationHasName(ts, statement, name)) === true;
 
 const indexOf = (graph, file) => (file?.owner ? graph.files.get(`${file.owner.root}/index.ts`) : null);
 

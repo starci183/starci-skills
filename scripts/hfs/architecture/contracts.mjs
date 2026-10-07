@@ -242,6 +242,17 @@ function isRepositoryDeclaration(declaration, localFiles) {
   return localFiles.has(canonical(declaration.getSourceFile().fileName));
 }
 
+const isPublicCallableDeclaration = (ts, declaration) => ts.isMethodDeclaration(declaration) || ts.isMethodSignature(declaration)
+  || ts.isPropertyDeclaration(declaration) || ts.isPropertySignature(declaration) || ts.isGetAccessorDeclaration(declaration);
+
+function isCallableMember(ts, checker, member, location, localFiles) {
+  if (member.getName() === 'prototype') return false;
+  const selected = member.getDeclarations?.() ?? [];
+  return selected.some(declaration => isPublicCallableDeclaration(ts, declaration)
+    && isPublicMember(ts, declaration) && isRepositoryDeclaration(declaration, localFiles))
+    && checker.getSignaturesOfType(checker.getTypeOfSymbolAtLocation(member, location), ts.SignatureKind.Call).length;
+}
+
 function callableMembers(ts, checker, symbol, location, localFiles) {
   const declarations = symbol.getDeclarations?.() ?? [];
   const classExpressions = declarations.flatMap(declaration => ts.isVariableDeclaration(declaration)
@@ -254,14 +265,7 @@ function callableMembers(ts, checker, symbol, location, localFiles) {
   if (declaredClassLike || classExpressions.length) types.push(valueType);
   for (const signature of checker.getSignaturesOfType(valueType, ts.SignatureKind.Construct)) types.push(checker.getReturnTypeOfSignature(signature));
   const direct = checker.getSignaturesOfType(primary, ts.SignatureKind.Call).length ? [symbol] : [];
-  const members = types.flatMap(type => checker.getPropertiesOfType(type)).filter(member => {
-    if (member.getName() === 'prototype') return false;
-    const selected = member.getDeclarations?.() ?? [];
-    return selected.some(declaration => (ts.isMethodDeclaration(declaration) || ts.isMethodSignature(declaration)
-      || ts.isPropertyDeclaration(declaration) || ts.isPropertySignature(declaration) || ts.isGetAccessorDeclaration(declaration))
-      && isPublicMember(ts, declaration) && isRepositoryDeclaration(declaration, localFiles))
-      && checker.getSignaturesOfType(checker.getTypeOfSymbolAtLocation(member, location), ts.SignatureKind.Call).length;
-  });
+  const members = types.flatMap(type => checker.getPropertiesOfType(type)).filter(member => isCallableMember(ts, checker, member, location, localFiles));
   return [...new Set([...direct, ...members])];
 }
 
@@ -312,29 +316,34 @@ function checkOwnerCoverage(state) {
   }
 }
 
-function checkPublicOwners(state) {
-  const { config, context, ts, sourceFiles, localFiles, publicReasons, violations, publicSeen } = state;
-  if (config.owners) for (const owner of config.owners) {
-    const entry = sourceFiles.get(canonical(path.resolve(config.root, ...owner.entry.split('/'))));
-    if (!entry) {
-      publicReasons.push(`${owner.entry} is outside the checked production program`);
-      continue;
-    }
-    const checker = context.checkerFor(entry.fileName);
-    const framework = frameworkFor(state, checker);
-    if (entry.statements.some(statement => ts.isExportAssignment(statement) && statement.isExportEquals)) {
-      publicReasons.push(`${owner.entry} uses export =, so named capability API discovery is unavailable`);
-    }
-    for (const symbol of exportedSymbols(ts, checker, entry)) {
-      const declarations = (symbol.getDeclarations?.() ?? []).filter(declaration => localFiles.has(canonical(declaration.getSourceFile().fileName))) ?? [];
-      if (!declarations.length) continue;
-      const representative = declarations[0];
-      if (isFrameworkHelper(representative.getSourceFile(), representative, framework)) continue;
-      state.callableSignatures += checkCallableSymbol({ config, context, checker, symbol, location: representative,
-        reportSource: representative.getSourceFile(), reportNode: representative.name ?? representative,
-        violations, reasons: publicReasons, seen: publicSeen, localFiles });
-    }
+function checkExportedSymbol(state, checker, framework, symbol) {
+  const { context, localFiles, publicReasons, violations, publicSeen } = state;
+  const declarations = (symbol.getDeclarations?.() ?? []).filter(declaration => localFiles.has(canonical(declaration.getSourceFile().fileName))) ?? [];
+  if (!declarations.length) return;
+  const representative = declarations[0];
+  if (isFrameworkHelper(representative.getSourceFile(), representative, framework)) return;
+  state.callableSignatures += checkCallableSymbol({ config: state.config, context, checker, symbol, location: representative,
+    reportSource: representative.getSourceFile(), reportNode: representative.name ?? representative,
+    violations, reasons: publicReasons, seen: publicSeen, localFiles });
+}
+
+function checkOwnerEntry(state, owner) {
+  const { config, context, ts, sourceFiles, publicReasons } = state;
+  const entry = sourceFiles.get(canonical(path.resolve(config.root, ...owner.entry.split('/'))));
+  if (!entry) {
+    publicReasons.push(`${owner.entry} is outside the checked production program`);
+    return;
   }
+  const checker = context.checkerFor(entry.fileName);
+  const framework = frameworkFor(state, checker);
+  if (entry.statements.some(statement => ts.isExportAssignment(statement) && statement.isExportEquals)) {
+    publicReasons.push(`${owner.entry} uses export =, so named capability API discovery is unavailable`);
+  }
+  for (const symbol of exportedSymbols(ts, checker, entry)) checkExportedSymbol(state, checker, framework, symbol);
+}
+
+function checkPublicOwners(state) {
+  for (const owner of state.config.owners ?? []) checkOwnerEntry(state, owner);
 }
 
 function classesInSource(ts, sourceFile) {
@@ -356,15 +365,19 @@ function checkConstructedClassDecorators(state, sourceFile, checker, decorators,
   }
 }
 
-function checkConstructedMemberDecorators(state, sourceFile, declaration, checker, targets) {
+function checkConstructedMemberDecorator(state, sourceFile, checker, decorator, targets) {
   const { ts, config, readonlyReasons } = state;
+  if (decoratorKind(ts, checker, decorator, targets)) return;
+  const constructed = constructedDecoratorKind(ts, checker, decorator, targets);
+  if (constructed === 'Inject' || constructed === 'unproven framework') {
+    readonlyReasons.push(`${relativePath(config.root, sourceFile.fileName)} has a constructed ${constructed} injection decorator identity`);
+  }
+}
+
+function checkConstructedMemberDecorators(state, sourceFile, declaration, checker, targets) {
+  const { ts } = state;
   for (const member of declaration.members) for (const decorated of [member, ...(ts.isConstructorDeclaration(member) ? member.parameters : [])]) {
-    for (const decorator of nodeDecorators(ts, decorated)) if (!decoratorKind(ts, checker, decorator, targets)) {
-      const constructed = constructedDecoratorKind(ts, checker, decorator, targets);
-      if (constructed === 'Inject' || constructed === 'unproven framework') {
-        readonlyReasons.push(`${relativePath(config.root, sourceFile.fileName)} has a constructed ${constructed} injection decorator identity`);
-      }
-    }
+    for (const decorator of nodeDecorators(ts, decorated)) checkConstructedMemberDecorator(state, sourceFile, checker, decorator, targets);
   }
 }
 

@@ -88,27 +88,39 @@ function fakeEntriesOf(ts, sourceFile, literal) {
     .filter(entry => entry.name);
 }
 
+/** The `fakedBy` entry of one `stacks` property, or null when the property does not declare one. */
+function fakedByEntry(ts, sourceFile, property) {
+  if (!ts.isPropertyAssignment(property)) return null;
+  const body = unwrap(ts, property.initializer);
+  if (!body || !ts.isObjectLiteralExpression(body)) return null;
+  const fake = propertyOf(ts, body, 'fakedBy');
+  if (!fake) return null;
+  const reason = propertyOf(ts, body, 'reason');
+  return {
+    service: nameText(ts, property.name),
+    fake: ts.isStringLiteralLike(fake) ? fake.text : '',
+    reason: reason && ts.isStringLiteralLike(reason) ? reason.text.trim() : '',
+    ...sourceLocation(sourceFile, property),
+  };
+}
+
 /** The `stacks` entries that declare `fakedBy`: [{service, fake, reason, line, column}]; a value the reader cannot read statically has an empty fake and reason. */
 function fakedByOf(ts, sourceFile, literal) {
   const node = literal ? propertyOf(ts, literal, 'stacks') : null;
   const value = node ? unwrap(ts, node) : null;
   if (!value || !ts.isObjectLiteralExpression(value)) return [];
-  const entries = [];
-  for (const property of value.properties) {
-    if (!ts.isPropertyAssignment(property)) continue;
-    const body = unwrap(ts, property.initializer);
-    if (!body || !ts.isObjectLiteralExpression(body)) continue;
-    const fake = propertyOf(ts, body, 'fakedBy');
-    if (!fake) continue;
-    const reason = propertyOf(ts, body, 'reason');
-    entries.push({
-      service: nameText(ts, property.name),
-      fake: ts.isStringLiteralLike(fake) ? fake.text : '',
-      reason: reason && ts.isStringLiteralLike(reason) ? reason.text.trim() : '',
-      ...sourceLocation(sourceFile, property),
-    });
-  }
-  return entries;
+  return value.properties.map(property => fakedByEntry(ts, sourceFile, property)).filter(Boolean);
+}
+
+function registerFakeProvider(fakeProviders, relative, file) {
+  if (!relative.startsWith(FAKES_DIRECTORY)) return;
+  const [provider, ...rest] = relative.slice(FAKES_DIRECTORY.length).split('/');
+  if (rest.length > 0 && !fakeProviders.has(provider)) fakeProviders.set(provider, file);
+}
+
+function isRoleFileAtRoot(relative, suffixes) {
+  const parts = relative.slice(0, -'.ts'.length).split('.');
+  return !relative.includes('/') && parts.length >= 2 && parts.every(part => KEBAB.test(part)) && suffixes.includes(parts.at(-1));
 }
 
 function collectWorldFiles(resolver, tree, suffixes, violations) {
@@ -121,14 +133,8 @@ function collectWorldFiles(resolver, tree, suffixes, violations) {
     if (verdict?.slot !== WORLD_SLOT) continue;
     files += 1;
     worldRoot ??= file.slice(0, file.length - verdict.relative.length);
-    if (verdict.relative.startsWith(FAKES_DIRECTORY)) {
-      const [provider, ...rest] = verdict.relative.slice(FAKES_DIRECTORY.length).split('/');
-      if (rest.length > 0 && !fakeProviders.has(provider)) fakeProviders.set(provider, file);
-    }
-    if (verdict.allowed) continue;
-    const parts = verdict.relative.slice(0, -'.ts'.length).split('.');
-    const roleFileAtRoot = !verdict.relative.includes('/') && parts.length >= 2 && parts.every(part => KEBAB.test(part)) && suffixes.includes(parts.at(-1));
-    if (roleFileAtRoot) continue;
+    registerFakeProvider(fakeProviders, verdict.relative, file);
+    if (verdict.allowed || isRoleFileAtRoot(verdict.relative, suffixes)) continue;
     violations.push({
       ruleId: RULE, path: file, line: 1, column: 1,
       message: `${file} is not allowed in the test world; src/tests/world/ holds only ${verdict.allows.join(', ')} and role-suffixed files (<name>.<role>.ts) at its root. Move it to fakes/ or kit/ (be.tests.world.kit), give it a role suffix, or delete it.`,

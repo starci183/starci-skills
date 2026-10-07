@@ -39,9 +39,15 @@ function proseDeclaration(manifest, examples) {
   };
 }
 
+const PLACEHOLDER = '<[^>]+>';
+const BE_APP_PLACEHOLDER = new RegExp(`^(be/apps/)${PLACEHOLDER}`);
+const FE_APP_PLACEHOLDER = new RegExp(`^(fe/apps/)${PLACEHOLDER}`);
+const ANY_PLACEHOLDER = new RegExp(PLACEHOLDER, 'g');
+const STAR_RUN = new RegExp(String.raw`\*+`, 'g');
+
 export const sample = (token) => token
-  .replace(/^(be\/apps\/)<[^>]+>/, '$1identity').replace(/^(fe\/apps\/)<[^>]+>/, '$1app')
-  .replace(/<[^>]+>/g, 'x').replace(/\*+/g, 'x');
+  .replace(BE_APP_PLACEHOLDER, '$1identity').replace(FE_APP_PLACEHOLDER, '$1app')
+  .replace(ANY_PLACEHOLDER, 'x').replace(STAR_RUN, 'x');
 
 const segmentMatches = (a, b) => a === b || a === 'x' || b === 'x' || /[<*]/.test(b);
 
@@ -71,6 +77,12 @@ export function createProseResolver(ctx, manifest) {
   return { owned, classify: (p) => resolver.classifyPath(p), sample };
 }
 
+const unownedFinding = (file, index, token) => ({ code: CODE, level: 'error', path: file, line: index + 1, message: `${CODE} ${file}:${index + 1}: ${token} is owned by no slot of knowledge/hfs/slots.yaml; name the slot id instead, or use a <placeholder> or a declared example app` });
+
+const lineFindings = (resolver, file, line, index) => pathTokens(line)
+  .filter(({ paths }) => paths.some((p) => !resolver.owned(p)))
+  .map(({ token }) => unownedFinding(file, index, token));
+
 /** RT_PROSE_PATH_NO_SLOT over the prose files of the runtime (ctx of scripts/hfs/runtime-check.mjs). */
 export function prosePathFindings(ctx) {
   const resolver = createProseResolver(ctx, loadSlotManifest({ root: ctx.root }));
@@ -81,11 +93,7 @@ export function prosePathFindings(ctx) {
     if (!PROSE.test(file) || generated.some((root) => file.startsWith(root))) continue;
     const text = ctx.read(file);
     if (text === null || text === undefined) continue;
-    text.split('\n').forEach((line, index) => {
-      for (const { token, paths } of pathTokens(line)) {
-        if (paths.some((p) => !resolver.owned(p))) found.push({ code: CODE, level: 'error', path: file, line: index + 1, message: `${CODE} ${file}:${index + 1}: ${token} is owned by no slot of knowledge/hfs/slots.yaml; name the slot id instead, or use a <placeholder> or a declared example app` });
-      }
-    });
+    text.split('\n').forEach((line, index) => { found.push(...lineFindings(resolver, file, line, index)); });
   }
   return found;
 }

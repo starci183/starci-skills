@@ -45,20 +45,20 @@ function editionGone(resolver) {
   return gone;
 }
 
-/** The findings one package.json's scripts and dependencies produce under lite. */
-function packageFindings(repoRoot, rel) {
-  const pkg = readJson(repoRoot, rel);
-  if (pkg === null || typeof pkg !== 'object' || Array.isArray(pkg)) return [];
+const isPlainObject = (value) => typeof value === 'object' && value !== null && !Array.isArray(value);
+
+function testScriptFindings(rel, pkg) {
+  const scripts = isPlainObject(pkg.scripts) ? pkg.scripts : {};
+  return Object.entries(scripts)
+    .filter(([name, command]) => TEST_SCRIPT_NAME.test(name) || TYPECHECK_TESTS.test(name) || TEST_RUNNER_COMMAND.test(String(command)))
+    .map(([name]) => found(HFS_EDITION_FORBIDDEN_PRESENT, rel, `${rel} has script ${JSON.stringify(name)}: the lite edition has no tests - a lite app does not typecheck or run a test world`, { name }));
+}
+
+function testDependencyFindings(rel, pkg) {
   const findings = [];
-  const scripts = typeof pkg.scripts === 'object' && pkg.scripts !== null && !Array.isArray(pkg.scripts) ? pkg.scripts : {};
-  for (const [name, command] of Object.entries(scripts)) {
-    if (TEST_SCRIPT_NAME.test(name) || TYPECHECK_TESTS.test(name) || TEST_RUNNER_COMMAND.test(String(command))) {
-      findings.push(found(HFS_EDITION_FORBIDDEN_PRESENT, rel, `${rel} has script ${JSON.stringify(name)}: the lite edition has no tests - a lite app does not typecheck or run a test world`, { name }));
-    }
-  }
   for (const section of DEPENDENCY_SECTIONS) {
     const deps = pkg[section];
-    if (typeof deps !== 'object' || deps === null || Array.isArray(deps)) continue;
+    if (!isPlainObject(deps)) continue;
     for (const name of Object.keys(deps)) {
       if (TEST_DEPENDENCY.test(name)) {
         findings.push(found(HFS_EDITION_FORBIDDEN_PRESENT, rel, `${rel} ${section} has ${name}: the lite edition has no tests - the dependency belongs to the full edition`, { section, name }));
@@ -68,23 +68,28 @@ function packageFindings(repoRoot, rel) {
   return findings;
 }
 
+/** The findings one package.json's scripts and dependencies produce under lite. */
+function packageFindings(repoRoot, rel) {
+  const pkg = readJson(repoRoot, rel);
+  if (!isPlainObject(pkg)) return [];
+  return [...testScriptFindings(rel, pkg), ...testDependencyFindings(rel, pkg)];
+}
+
+const goneAppFindings = (repo, gone) => (repo.apps ?? [])
+  .filter((app) => gone.appKind.has(app.kind))
+  .map((app) => found(HFS_EDITION_FORBIDDEN_PRESENT, 'hfs.json', `hfs.json declares the ${app.kind} app ${app.name}: a ${app.kind} belongs to the full edition, a lite app has none`, { app: app.name, kind: app.kind }));
+
+const goneNameFindings = (field, verb, declared, goneNames) => declared
+  .filter((name) => goneNames.has(name))
+  .map((name) => found(HFS_EDITION_FORBIDDEN_PRESENT, 'hfs.json', `hfs.json ${verb} the ${name} ${field}: ${name} belongs to the full edition, a lite app has none`, { name }));
+
 /** The findings one be-side declaration produces under lite: a worker app, an event pattern or a gone trigger kind. */
 function declarationFindings(repo, gone) {
-  const findings = [];
-  for (const app of repo.apps ?? []) {
-    if (gone.appKind.has(app.kind)) {
-      findings.push(found(HFS_EDITION_FORBIDDEN_PRESENT, 'hfs.json', `hfs.json declares the ${app.kind} app ${app.name}: a ${app.kind} belongs to the full edition, a lite app has none`, { app: app.name, kind: app.kind }));
-    }
-  }
-  for (const [field, goneNames] of [['pattern', gone.pattern], ['trigger', gone.trigger]]) {
-    const declared = field === 'pattern' ? (repo.patterns ?? []) : (repo.kinds ?? []);
-    for (const name of declared) {
-      if (goneNames.has(name)) {
-        findings.push(found(HFS_EDITION_FORBIDDEN_PRESENT, 'hfs.json', `hfs.json ${field === 'pattern' ? 'declares' : 'names'} the ${name} ${field}: ${name} belongs to the full edition, a lite app has none`, { name }));
-      }
-    }
-  }
-  return findings;
+  return [
+    ...goneAppFindings(repo, gone),
+    ...goneNameFindings('pattern', 'declares', repo.patterns ?? [], gone.pattern),
+    ...goneNameFindings('trigger', 'names', repo.kinds ?? [], gone.trigger),
+  ];
 }
 
 /**

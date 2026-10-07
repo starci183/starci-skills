@@ -2,14 +2,13 @@
 // under a generated root of ruleParams.runtime.generated. A generated root holds only what its generatedBy writes
 // (scripts/hfs/sync-runtime.mjs for the packages' runtime/ copies); it is git-ignored so a checkout regenerates it
 // and the index can never pin a stale copy. Pure: the generated roots and the tracked files come in through ctx.
+import { trimTrailingSlashes } from '../trailing-slashes.mjs';
+
 export const GENERATED_UNTRACKED = 'GENERATED_UNTRACKED';
-const SLASH = '/';
-const END = '$';
-const TRAILING_SLASHES = new RegExp(`${SLASH}+${END}`);
 
 /** GENERATED_UNTRACKED findings: one per tracked file inside a generated root. */
 export function generatedUntrackedFindings(ctx) {
-  const roots = (ctx.params.generated ?? []).map((g) => ({ root: `${String(g.root).replace(TRAILING_SLASHES, '')}/`, by: g.generatedBy }));
+  const roots = (ctx.params.generated ?? []).map((g) => ({ root: `${trimTrailingSlashes(String(g.root))}/`, by: g.generatedBy }));
   const found = [];
   for (const file of ctx.files) {
     const root = roots.find((r) => file.startsWith(r.root));

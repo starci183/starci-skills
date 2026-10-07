@@ -78,29 +78,35 @@ function envOf(stage) {
   return env;
 }
 
+/** True when a header comment states `docker build -f <wanted> ... .`. */
+const statesBuildCommand = (parsed, wanted) => parsed.comments.some((comment) => {
+  const parts = words(comment.text);
+  const build = parts.findIndex((part, index) => part === 'docker' && parts[index + 1] === 'build');
+  if (build < 0) return false;
+  const flag = parts.indexOf('-f', build);
+  return flag > 0 && parts[flag + 1] === wanted && parts.at(-1) === '.';
+});
+
+function copySourceFindings(file, item) {
+  const findings = [];
+  const parts = words(item.text).filter((part) => !part.startsWith('--'));
+  const sources = parts.slice(0, -1);
+  const fromStage = words(item.text).some((part) => part.startsWith('--from='));
+  if (fromStage) return findings;
+  for (const source of sources) {
+    if (/^[a-z]+:\/\//i.test(source)) continue;
+    const segments = source.split('/');
+    if (source.startsWith('/') || segments.includes('..')) findings.push(found(DOCKER_BUILD_CONTEXT, file, `${file}:${item.line} ${item.keyword} source ${source} leaves the build context; every source is a path inside the app root.`, { line: item.line, source }));
+  }
+  return findings;
+}
+
 /** R187: the header states this app's build command, and the build never reaches outside its context. */
 function contextFindings(file, parsed, side, app) {
   const findings = [];
   const wanted = dockerfilePath(side, app);
-  const named = parsed.comments.some((comment) => {
-    const parts = words(comment.text);
-    const build = parts.findIndex((part, index) => part === 'docker' && parts[index + 1] === 'build');
-    if (build < 0) return false;
-    const flag = parts.indexOf('-f', build);
-    return flag > 0 && parts[flag + 1] === wanted && parts.at(-1) === '.';
-  });
-  if (!named) findings.push(found(DOCKER_BUILD_CONTEXT, file, `${file} does not state its build command in a header comment: \`docker build -f ${wanted} -t <image> .\` (the context is the app root, the folder with the one package.json and lockfile).`, { expected: wanted }));
-  for (const item of parsed.instructions.filter((entry) => entry.keyword === 'COPY' || entry.keyword === 'ADD')) {
-    const parts = words(item.text).filter((part) => !part.startsWith('--'));
-    const sources = parts.slice(0, -1);
-    const fromStage = words(item.text).some((part) => part.startsWith('--from='));
-    if (fromStage) continue;
-    for (const source of sources) {
-      if (/^[a-z]+:\/\//i.test(source)) continue;
-      const segments = source.split('/');
-      if (source.startsWith('/') || segments.includes('..')) findings.push(found(DOCKER_BUILD_CONTEXT, file, `${file}:${item.line} ${item.keyword} source ${source} leaves the build context; every source is a path inside the app root.`, { line: item.line, source }));
-    }
-  }
+  if (!statesBuildCommand(parsed, wanted)) findings.push(found(DOCKER_BUILD_CONTEXT, file, `${file} does not state its build command in a header comment: \`docker build -f ${wanted} -t <image> .\` (the context is the app root, the folder with the one package.json and lockfile).`, { expected: wanted }));
+  for (const item of parsed.instructions.filter((entry) => entry.keyword === 'COPY' || entry.keyword === 'ADD')) findings.push(...copySourceFindings(file, item));
   return findings;
 }
 
@@ -149,21 +155,32 @@ function nextOutput(ts, text) {
   return propertyText(ts, text, { file: 'next.config.ts', key: 'output' });
 }
 
-function entryHealthFindings(file, runtime, side, kind, exposes, health, none) {
+function listenerHealthFindings(file, runtime, exposes, health, none) {
   const findings = [];
-  const listens = side === 'fe' || BE_KINDS_WITH_LISTENER.has(kind);
-  if (listens) {
-    const port = envOf(runtime).get('PORT');
-    if (!port || !exposes.includes(port)) findings.push(found(DOCKER_ENTRY, file, `${file} ${RUNTIME_STAGE} stage must set \`ENV PORT=<port>\` and \`EXPOSE\` the same port (found PORT ${JSON.stringify(port ?? null)}, EXPOSE ${JSON.stringify(exposes)}); a listening app declares the port it serves.`, { port: port ?? null, exposes }));
-    if (!health.length || none) findings.push(found(DOCKER_ENTRY, file, `${file} ${RUNTIME_STAGE} stage has no HEALTHCHECK; an api or Next app answers a health probe the platform can run.`, {}));
-  } else if (BE_KINDS_ONE_SHOT.has(kind)) {
-    if (!none) findings.push(found(DOCKER_ENTRY, file, `${file} ${RUNTIME_STAGE} stage must say \`HEALTHCHECK NONE\`; a ${kind} app is a one-shot command, not a service.`, { kind }));
-    if (exposes.length) findings.push(found(DOCKER_ENTRY, file, `${file} ${RUNTIME_STAGE} stage EXPOSEs ${exposes.join(', ')}; a ${kind} app listens on nothing.`, { exposes }));
-  } else {
-    if (!health.length || none) findings.push(found(DOCKER_ENTRY, file, `${file} ${RUNTIME_STAGE} stage has no process HEALTHCHECK; a ${kind} app serves nothing, so its healthcheck probes its process.`, { kind }));
-    if (exposes.length) findings.push(found(DOCKER_ENTRY, file, `${file} ${RUNTIME_STAGE} stage EXPOSEs ${exposes.join(', ')}; a ${kind} app listens on nothing.`, { exposes }));
-  }
+  const port = envOf(runtime).get('PORT');
+  if (!port || !exposes.includes(port)) findings.push(found(DOCKER_ENTRY, file, `${file} ${RUNTIME_STAGE} stage must set \`ENV PORT=<port>\` and \`EXPOSE\` the same port (found PORT ${JSON.stringify(port ?? null)}, EXPOSE ${JSON.stringify(exposes)}); a listening app declares the port it serves.`, { port: port ?? null, exposes }));
+  if (!health.length || none) findings.push(found(DOCKER_ENTRY, file, `${file} ${RUNTIME_STAGE} stage has no HEALTHCHECK; an api or Next app answers a health probe the platform can run.`, {}));
   return findings;
+}
+
+function oneShotHealthFindings(file, kind, exposes, none) {
+  const findings = [];
+  if (!none) findings.push(found(DOCKER_ENTRY, file, `${file} ${RUNTIME_STAGE} stage must say \`HEALTHCHECK NONE\`; a ${kind} app is a one-shot command, not a service.`, { kind }));
+  if (exposes.length) findings.push(found(DOCKER_ENTRY, file, `${file} ${RUNTIME_STAGE} stage EXPOSEs ${exposes.join(', ')}; a ${kind} app listens on nothing.`, { exposes }));
+  return findings;
+}
+
+function processHealthFindings(file, kind, exposes, health, none) {
+  const findings = [];
+  if (!health.length || none) findings.push(found(DOCKER_ENTRY, file, `${file} ${RUNTIME_STAGE} stage has no process HEALTHCHECK; a ${kind} app serves nothing, so its healthcheck probes its process.`, { kind }));
+  if (exposes.length) findings.push(found(DOCKER_ENTRY, file, `${file} ${RUNTIME_STAGE} stage EXPOSEs ${exposes.join(', ')}; a ${kind} app listens on nothing.`, { exposes }));
+  return findings;
+}
+
+function entryHealthFindings(file, runtime, side, kind, exposes, health, none) {
+  if (side === 'fe' || BE_KINDS_WITH_LISTENER.has(kind)) return listenerHealthFindings(file, runtime, exposes, health, none);
+  if (BE_KINDS_ONE_SHOT.has(kind)) return oneShotHealthFindings(file, kind, exposes, none);
+  return processHealthFindings(file, kind, exposes, health, none);
 }
 
 function nextEntryFindings({ repoRoot, file, parsed, app, project, ts }) {

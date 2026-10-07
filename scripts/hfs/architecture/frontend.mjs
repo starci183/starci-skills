@@ -102,40 +102,50 @@ function declarationName(ts, declaration) {
   return null;
 }
 
+const HOOK_NAME = /^use[A-Z0-9]/;
+
+function reportCustomHook(state, symbol, node) {
+  const { ts, checker, seen, violations, config, sourceFile } = state;
+  const identity = normalizedSymbolValue(ts, checker, symbol) ?? symbol;
+  if (!identity || seen.has(identity) || checker.getTypeOfSymbolAtLocation(identity, node).getCallSignatures().length === 0) return;
+  seen.add(identity);
+  violations.push(violation(config, sourceFile, node, 'FE_CUSTOM_HOOK_LOCATION',
+    'Every authored custom useX hook declaration belongs under the configured hooks root; calling built-in React hooks inside a visual is still valid.', { ts }));
+}
+
+function inspectHookDeclaration(state, declaration) {
+  const name = declarationName(state.ts, declaration);
+  if (!name || !HOOK_NAME.test(name.text)) return;
+  const symbol = state.checker.getSymbolAtLocation(name);
+  reportCustomHook(state, symbol, name);
+}
+
+function visitHookDeclarations(state, node) {
+  const { ts } = state;
+  if (ts.isFunctionDeclaration(node) || ts.isMethodDeclaration(node) || ts.isVariableDeclaration(node)) inspectHookDeclaration(state, node);
+  ts.forEachChild(node, child => visitHookDeclarations(state, child));
+}
+
+function reportExportedHooks(state) {
+  const { ts, checker, sourceFile } = state;
+  const module = checker.getSymbolAtLocation(sourceFile);
+  for (const exposed of module ? checker.getExportsOfModule(module) : []) {
+    if (!HOOK_NAME.test(exposed.name)) continue;
+    const identity = normalizedSymbolValue(ts, checker, exposed);
+    for (const declaration of identity?.getDeclarations?.() ?? []) {
+      if (declaration.getSourceFile() !== sourceFile) continue;
+      reportCustomHook(state, identity, declarationName(ts, declaration) ?? declaration);
+    }
+  }
+}
+
 function checkCustomHookLocations(config, context, sourceFile, roots) {
   if (insideAny(roots.hooks, sourceFile.fileName)) return [];
   const { ts } = context;
-  const checker = context.checkerFor(sourceFile.fileName);
-  const violations = [];
-  const seen = new Set();
-  const report = (symbol, node) => {
-    const identity = normalizedSymbolValue(ts, checker, symbol) ?? symbol;
-    if (!identity || seen.has(identity) || checker.getTypeOfSymbolAtLocation(identity, node).getCallSignatures().length === 0) return;
-    seen.add(identity);
-    violations.push(violation(config, sourceFile, node, 'FE_CUSTOM_HOOK_LOCATION',
-      'Every authored custom useX hook declaration belongs under the configured hooks root; calling built-in React hooks inside a visual is still valid.', { ts }));
-  };
-  const inspect = declaration => {
-    const name = declarationName(ts, declaration);
-    if (!name || !/^use[A-Z0-9]/.test(name.text)) return;
-    const symbol = checker.getSymbolAtLocation(name);
-    report(symbol, name);
-  };
-  const visit = node => {
-    if (ts.isFunctionDeclaration(node) || ts.isMethodDeclaration(node) || ts.isVariableDeclaration(node)) inspect(node);
-    ts.forEachChild(node, visit);
-  };
-  visit(sourceFile);
-  const module = checker.getSymbolAtLocation(sourceFile);
-  for (const exposed of module ? checker.getExportsOfModule(module) : []) {
-    if (!/^use[A-Z0-9]/.test(exposed.name)) continue;
-    const identity = normalizedSymbolValue(ts, checker, exposed);
-    for (const declaration of identity?.getDeclarations?.() ?? []) if (declaration.getSourceFile() === sourceFile) {
-      const node = declarationName(ts, declaration) ?? declaration;
-      report(identity, node);
-    }
-  }
-  return violations;
+  const state = { ts, config, sourceFile, checker: context.checkerFor(sourceFile.fileName), violations: [], seen: new Set() };
+  visitHookDeclarations(state, sourceFile);
+  reportExportedHooks(state);
+  return state.violations;
 }
 
 function importsForSource(context, fileName) {
@@ -163,19 +173,28 @@ function inspectPureDataReachability(config, context, roots, fileName, edge, vio
     message: 'Pure component.tsx cannot reach hooks or API transport through an alias, relative import, package, or barrel.' });
 }
 
+function reportWorldHookImports(config, sourceFile, named, state, violation) {
+  const { ts, worldHooks, violations } = state;
+  for (const element of named.elements) {
+    const imported = element.propertyName?.text ?? element.name.text;
+    if (!element.isTypeOnly && worldHooks.has(imported)) violations.push(violation(config, sourceFile, element, 'FE_PURE_WORLD_HOOK', `Pure component.tsx imports ${imported}; its connected index.tsx owns application/world state.`, { ts }));
+  }
+}
+
+function recordReactNamespaces(ts, clause, named, reactNamespaces) {
+  if (clause?.name) reactNamespaces.add(clause.name.text);
+  if (named && ts.isNamespaceImport(named)) reactNamespaces.add(named.name.text);
+}
+
 function inspectPureImport(config, sourceFile, statement, state, violation) {
-  const { ts, worldHooks, reactNamespaces, violations } = state;
+  const { ts, reactNamespaces, violations } = state;
   if (!ts.isImportDeclaration(statement) || !ts.isStringLiteralLike(statement.moduleSpecifier) || statement.importClause?.isTypeOnly) return;
   const source = statement.moduleSpecifier.text;
   const named = statement.importClause?.namedBindings;
-  if (source === 'react' && named && ts.isNamedImports(named)) {
-    for (const element of named.elements) {
-      const imported = element.propertyName?.text ?? element.name.text;
-      if (!element.isTypeOnly && worldHooks.has(imported)) violations.push(violation(config, sourceFile, element, 'FE_PURE_WORLD_HOOK', `Pure component.tsx imports ${imported}; its connected index.tsx owns application/world state.`, { ts }));
-    }
+  if (source === 'react') {
+    if (named && ts.isNamedImports(named)) reportWorldHookImports(config, sourceFile, named, state, violation);
+    recordReactNamespaces(ts, statement.importClause, named, reactNamespaces);
   }
-  if (source === 'react' && statement.importClause?.name) reactNamespaces.add(statement.importClause.name.text);
-  if (source === 'react' && named && ts.isNamespaceImport(named)) reactNamespaces.add(named.name.text);
   if ((source === 'next/navigation' || source === 'next-intl') && statement.importClause) {
     violations.push(violation(config, sourceFile, statement, 'FE_PURE_WORLD_IMPORT', `Pure component.tsx imports ${source}; its connected index.tsx owns router and locale context.`, { ts }));
   }

@@ -38,16 +38,22 @@ function walk(ts, root, visit) {
   step(root);
 }
 
+const importsFakesOf = (from, provider) => from.includes(`${FAKES_DIRECTORY}${provider}/`) || from.endsWith(`${FAKES_DIRECTORY}${provider}`);
+
+const shapeNamesOf = (ts, statement, helper) => {
+  const named = statement.importClause?.namedBindings;
+  if (!named || !ts.isNamedImports(named)) return [];
+  return named.elements.filter(element => (element.propertyName ?? element.name).text === helper).map(element => element.name.text);
+};
+
 const importsOfSpec = (ts, sourceFile, helper, providers) => {
   const shapeNames = new Set();
   const referenced = new Set();
   for (const statement of sourceFile.statements) {
     if (!ts.isImportDeclaration(statement)) continue;
     const from = statement.moduleSpecifier.text;
-    for (const provider of providers) if (from.includes(`${FAKES_DIRECTORY}${provider}/`) || from.endsWith(`${FAKES_DIRECTORY}${provider}`)) referenced.add(provider);
-    const named = statement.importClause?.namedBindings;
-    if (!named || !ts.isNamedImports(named)) continue;
-    for (const element of named.elements) if ((element.propertyName ?? element.name).text === helper) shapeNames.add(element.name.text);
+    for (const provider of providers) if (importsFakesOf(from, provider)) referenced.add(provider);
+    for (const name of shapeNamesOf(ts, statement, helper)) shapeNames.add(name);
   }
   return { shapeNames, referenced };
 };
@@ -58,22 +64,39 @@ const callsShape = (ts, node, shapeNames) => {
   return found;
 };
 
-const referenceAndCompare = (ts, node, providers, referenced, shapeNames) => {
+const TEST_BLOCKS = new Set(['describe', 'it', 'test']);
+
+const referenceProviders = (ts, node, providers, referenced) => {
   if (ts.isStringLiteralLike(node)) for (const provider of providers) if (node.text.includes(`${FAKES_DIRECTORY}${provider}/`)) referenced.add(provider);
-  if (!ts.isCallExpression(node)) return false;
+  if (!ts.isCallExpression(node)) return;
   const named = ts.isIdentifier(node.expression) ? node.expression.text : null;
   for (const argument of node.arguments) {
     const value = unwrap(ts, argument);
-    if (value && ts.isStringLiteralLike(value) && providers.has(value.text) && named !== 'describe' && named !== 'it' && named !== 'test') referenced.add(value.text);
+    if (value && ts.isStringLiteralLike(value) && providers.has(value.text) && !TEST_BLOCKS.has(named)) referenced.add(value.text);
   }
+};
+
+/** The `expect(...)` call a shape matcher call hangs off (through `.not` / `.resolves`), or null. */
+const expectReceiverOf = (ts, callee) => {
+  let receiver = unwrap(ts, callee.expression);
+  while (receiver && ts.isPropertyAccessExpression(receiver)) receiver = unwrap(ts, receiver.expression);
+  return receiver && ts.isCallExpression(receiver) && ts.isIdentifier(receiver.expression) && receiver.expression.text === 'expect' ? receiver : null;
+};
+
+const comparesShapes = (ts, node, shapeNames) => {
+  if (!ts.isCallExpression(node)) return false;
   const callee = node.expression;
   if (!ts.isPropertyAccessExpression(callee) || !SHAPE_MATCHERS.has(callee.name.text)) return false;
-  let receiver = unwrap(ts, callee.expression);
-  while (receiver && ts.isPropertyAccessExpression(receiver)) receiver = unwrap(ts, receiver.expression); // .not / .resolves
-  if (!receiver || !ts.isCallExpression(receiver) || !ts.isIdentifier(receiver.expression) || receiver.expression.text !== 'expect') return false;
+  const receiver = expectReceiverOf(ts, callee);
+  if (!receiver) return false;
   const [actual] = receiver.arguments;
   const [expected] = node.arguments;
   return Boolean(actual && expected && callsShape(ts, actual, shapeNames) && callsShape(ts, expected, shapeNames));
+};
+
+const referenceAndCompare = (ts, node, providers, referenced, shapeNames) => {
+  referenceProviders(ts, node, providers, referenced);
+  return comparesShapes(ts, node, shapeNames);
 };
 
 /** Facts one contract spec establishes: the providers whose fixtures it references and whether it compares shapes. */
@@ -83,6 +106,14 @@ function readSpec(ts, sourceFile, helper, providers) {
   walk(ts, sourceFile, node => { if (referenceAndCompare(ts, node, providers, referenced, shapeNames)) compares = true; });
   return { referenced, compares };
 }
+
+/** The payload fixture a file of the world slot is, as `[provider, file]`, or null. */
+const payloadFixtureOf = (resolver, file) => {
+  const verdict = allowsFile(resolver, file);
+  if (verdict?.slot !== WORLD_SLOT || !verdict.relative.startsWith(FAKES_DIRECTORY)) return null;
+  const match = PAYLOADS.exec(verdict.relative.slice(FAKES_DIRECTORY.length));
+  return match ? [match[1], file] : null;
+};
 
 const fixtureFilesOf = (tree, resolver) => {
   const fixtures = new Map(); // provider -> first payload fixture file
@@ -95,10 +126,8 @@ const fixtureFilesOf = (tree, resolver) => {
       if (provider && file.endsWith('.contract-spec.ts')) specs.set(provider, [...(specs.get(provider) ?? []), file]);
       continue;
     }
-    const verdict = classified.slot === WORLD_SLOT ? allowsFile(resolver, file) : null;
-    if (verdict?.slot !== WORLD_SLOT || !verdict.relative.startsWith(FAKES_DIRECTORY)) continue;
-    const match = PAYLOADS.exec(verdict.relative.slice(FAKES_DIRECTORY.length));
-    if (match && !fixtures.has(match[1])) fixtures.set(match[1], file);
+    const fixture = classified.slot === WORLD_SLOT ? payloadFixtureOf(resolver, file) : null;
+    if (fixture && !fixtures.has(fixture[0])) fixtures.set(...fixture);
   }
   return { fixtures, specs };
 };

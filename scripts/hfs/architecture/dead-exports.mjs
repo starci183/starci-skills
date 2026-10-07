@@ -112,44 +112,52 @@ const addExportDeclarationNames = (ts, statement, add) => {
   } else if (statement.exportClause?.kind === ts.SyntaxKind.NamespaceExport) add(statement.exportClause.name.text, statement);
 };
 
+const addStatementNames = (ts, found, sourceFile, statement) => {
+  const kind = ts.SyntaxKind;
+  const add = (name, node) => addExportName(found, sourceFile, name, node);
+  if (statement.kind === kind.ExportDeclaration) return addExportDeclarationNames(ts, statement, add);
+  if (statement.kind === kind.ExportAssignment) return add('default', statement);
+  const modifiers = statement.modifiers ?? [];
+  if (!modifiers.some(modifier => modifier.kind === kind.ExportKeyword)) return undefined;
+  if (modifiers.some(modifier => modifier.kind === kind.DefaultKeyword)) return add('default', statement);
+  if (statement.kind === kind.VariableStatement) {
+    for (const declaration of statement.declarationList.declarations) addBindingNames(ts, found, sourceFile, declaration.name, declaration);
+    return undefined;
+  }
+  return statement.name && statement.name.kind === kind.Identifier ? add(statement.name.text, statement) : undefined;
+};
+
 /** The exported names of an entry source file, each with the line of its declaration. */
 export function exportedNames(ts, sourceFile) {
-  const kind = ts.SyntaxKind;
   const found = new Map();
-  const add = (name, node) => addExportName(found, sourceFile, name, node);
-  for (const statement of sourceFile.statements) {
-    if (statement.kind === kind.ExportDeclaration) {
-      addExportDeclarationNames(ts, statement, add);
-      continue;
-    }
-    if (statement.kind === kind.ExportAssignment) { add('default', statement); continue; }
-    const modifiers = statement.modifiers ?? [];
-    if (!modifiers.some(modifier => modifier.kind === kind.ExportKeyword)) continue;
-    if (modifiers.some(modifier => modifier.kind === kind.DefaultKeyword)) { add('default', statement); continue; }
-    if (statement.kind === kind.VariableStatement) for (const declaration of statement.declarationList.declarations) addBindingNames(ts, found, sourceFile, declaration.name, declaration);
-    else if (statement.name && statement.name.kind === kind.Identifier) add(statement.name.text, statement);
-  }
+  for (const statement of sourceFile.statements) addStatementNames(ts, found, sourceFile, statement);
   return found;
 }
 
 const withoutSlash = value => value.replace(/\/$/, '');
 
-const addFrameworkConfigRoots = (graph, config, roots) => {
-  for (const app of config.apps ?? []) {
-    const directory = `apps/${app.name}`;
-    let names = [];
-    try { names = fs.readdirSync(path.join(config.root, ...directory.split('/'))); } catch { continue; }
-    for (const name of names) {
-      if (graph.resolver.classifyPath(`${directory}/${name}`).slot !== 'fe.app.next' || !/\.[cm]?[jt]sx?$/.test(name)) continue;
-      let text = '';
-      try { text = fs.readFileSync(path.join(config.root, ...directory.split('/'), name), 'utf8'); } catch { continue; }
-      for (const match of text.matchAll(CONFIG_STRING)) {
-        const target = path.posix.join(directory, match[1]);
-        const hit = CONFIG_EXTENSIONS.map(extension => `${target}${extension}`).find(candidate => graph.files.has(candidate));
-        if (hit) roots.add(hit);
-      }
-    }
+const addConfigTextRoots = (graph, directory, text, roots) => {
+  for (const match of text.matchAll(CONFIG_STRING)) {
+    const target = path.posix.join(directory, match[1]);
+    const hit = CONFIG_EXTENSIONS.map(extension => `${target}${extension}`).find(candidate => graph.files.has(candidate));
+    if (hit) roots.add(hit);
   }
+};
+
+const addAppConfigRoots = (graph, config, app, roots) => {
+  const directory = `apps/${app.name}`;
+  let names = [];
+  try { names = fs.readdirSync(path.join(config.root, ...directory.split('/'))); } catch { return; }
+  for (const name of names) {
+    if (graph.resolver.classifyPath(`${directory}/${name}`).slot !== 'fe.app.next' || !/\.[cm]?[jt]sx?$/.test(name)) continue;
+    let text = '';
+    try { text = fs.readFileSync(path.join(config.root, ...directory.split('/'), name), 'utf8'); } catch { continue; }
+    addConfigTextRoots(graph, directory, text, roots);
+  }
+};
+
+const addFrameworkConfigRoots = (graph, config, roots) => {
+  for (const app of config.apps ?? []) addAppConfigRoots(graph, config, app, roots);
 };
 
 /** The files the graph serves from: what an app slot requires, every route file, every package entry, every config-named file. */
@@ -172,31 +180,25 @@ function rootFiles(graph, config) {
   return roots;
 }
 
+const unusedFileViolation = (rel, node) => ({
+  ruleId: 'HFS_UNUSED_FILE',
+  path: rel, line: 1, column: 1,
+  slot: node.slot, owner: node.owner?.root ?? null,
+  message: `${rel} is not reached from any root (an app main.ts or app.module.ts, a route file, a package entry): nothing imports it, so no process runs it. Delete the file, or import it where it is used (a spec alone does not count).`,
+});
+
 /** HFS_UNUSED_FILE: production files no root reaches through runtime or type-only imports and re-exports. */
 function deadFiles(graph, config) {
   const roots = rootFiles(graph, config);
-  const forward = new Map();
-  for (const edge of graph.edges) {
-    if (!forward.has(edge.from)) forward.set(edge.from, []);
-    forward.get(edge.from).push(edge.to);
-  }
+  const forward = Map.groupBy(graph.edges, edge => edge.from);
   const reached = new Set(roots);
   const queue = [...roots];
-  while (queue.length) for (const next of forward.get(queue.shift()) ?? []) if (!reached.has(next)) { reached.add(next); queue.push(next); }
-  const violations = [];
-  let judged = 0;
-  for (const [rel, node] of [...graph.files].sort(([a], [b]) => a.localeCompare(b))) {
-    if (node.tier === null || UNJUDGED_TIERS.has(node.tier) || node.tier === 'route') continue;
-    judged += 1;
-    if (reached.has(rel)) continue;
-    violations.push({
-      ruleId: 'HFS_UNUSED_FILE',
-      path: rel, line: 1, column: 1,
-      slot: node.slot, owner: node.owner?.root ?? null,
-      message: `${rel} is not reached from any root (an app main.ts or app.module.ts, a route file, a package entry): nothing imports it, so no process runs it. Delete the file, or import it where it is used (a spec alone does not count).`,
-    });
-  }
-  return { violations, judged, roots: roots.size };
+  while (queue.length) for (const { to } of forward.get(queue.shift()) ?? []) if (!reached.has(to)) { reached.add(to); queue.push(to); }
+  const judgedFiles = [...graph.files]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .filter(([, node]) => !(node.tier === null || UNJUDGED_TIERS.has(node.tier) || node.tier === 'route'));
+  const violations = judgedFiles.filter(([rel]) => !reached.has(rel)).map(([rel, node]) => unusedFileViolation(rel, node));
+  return { violations, judged: judgedFiles.length, roots: roots.size };
 }
 
 /** The unit spec of a webhook, gateway or subscription door: a door has no service of its own, so its spec is the only unit spec of its kind. */
@@ -231,32 +233,34 @@ function inIntegrationOf(graph, to, provider) {
   return owner?.slot === INTEGRATION_SLOT && owner.bindings?.provider === provider;
 }
 
+/** The pseudo edges of one test consumer file: its import/export declarations that resolve to graph files it may reach. */
+function consumerFileEdges({ ts, options, graph, config }, rel, provider) {
+  const abs = path.join(config.root, ...rel.split('/'));
+  let text;
+  try { text = fs.readFileSync(abs, 'utf8'); } catch { return []; }
+  const sourceFile = ts.createSourceFile(abs, text, ts.ScriptTarget.Latest, true);
+  const edges = [];
+  for (const statement of sourceFile.statements) {
+    if (!(ts.isImportDeclaration(statement) || ts.isExportDeclaration(statement)) || !statement.moduleSpecifier || !ts.isStringLiteralLike(statement.moduleSpecifier)) continue;
+    const resolved = ts.resolveModuleName(statement.moduleSpecifier.text, abs, options, ts.sys).resolvedModule?.resolvedFileName;
+    const to = resolved ? graph.abs(canonical(resolved)) : null;
+    if (to && (provider === null || inIntegrationOf(graph, to, provider))) edges.push({ from: rel, to, edge: { declaration: statement }, reexport: false });
+  }
+  return edges;
+}
+
 /**
  * Pseudo edges (read from disk, outside the production program) to graph files: from the unit role specs, the fixture builders and
  * the test world files to anything, and from an integration spec only to the integration of its own provider folder.
  */
 function testConsumerEdges({ context, graph, config }) {
-  const { ts } = context;
-  const options = context.projects?.[0]?.options ?? {};
-  const edges = [];
+  const resolution = { ts: context.ts, options: context.projects?.[0]?.options ?? {}, graph, config };
   const consumers = [...treeOf(config.root).files]
     .map(file => ({ file, any: testConsumer(graph, file) }))
     .map(({ file, any }) => ({ file, provider: any ? null : integrationSpecProvider(graph, file), any }))
     .filter(({ any, provider }) => any || provider !== null)
     .sort((a, b) => a.file.localeCompare(b.file));
-  for (const { file: rel, provider } of consumers) {
-    const abs = path.join(config.root, ...rel.split('/'));
-    let text;
-    try { text = fs.readFileSync(abs, 'utf8'); } catch { continue; }
-    const sourceFile = ts.createSourceFile(abs, text, ts.ScriptTarget.Latest, true);
-    for (const statement of sourceFile.statements) {
-      if (!(ts.isImportDeclaration(statement) || ts.isExportDeclaration(statement)) || !statement.moduleSpecifier || !ts.isStringLiteralLike(statement.moduleSpecifier)) continue;
-      const resolved = ts.resolveModuleName(statement.moduleSpecifier.text, abs, options, ts.sys).resolvedModule?.resolvedFileName;
-      const to = resolved ? graph.abs(canonical(resolved)) : null;
-      if (to && (provider === null || inIntegrationOf(graph, to, provider))) edges.push({ from: rel, to, edge: { declaration: statement }, reexport: false });
-    }
-  }
-  return edges;
+  return consumers.flatMap(({ file: rel, provider }) => consumerFileEdges(resolution, rel, provider));
 }
 
 const edgeIndex = edges => {
@@ -303,8 +307,38 @@ const consumedNames = (context, file, ownerKey, depth, visiting) => {
   return result;
 };
 
-const ownerExportFindings = (context, config) => {
+/** Adds to `used` the entry exports reached by a consumer outside the owner that imports a file the entry re-exports by name. */
+const addReexportedUses = (context, key, publicEntry, used) => {
   const { ts, graph } = context;
+  for (const edge of graph.edges) {
+    if (edge.from !== publicEntry || !edge.reexport || graph.unit(edge.to) !== key) continue;
+    const reexport = bindingsOf(ts, edge.edge.declaration);
+    const inner = consumedNames(context, edge.to, key, 0, new Set([publicEntry, edge.to]));
+    if (reexport.all) continue;
+    for (const pair of reexport.pairs) if (inner.all || inner.names.has(pair.imported)) used.names.add(pair.exported);
+  }
+};
+
+const unusedExportViolation = (publicEntry, name, line, owner) => ({
+  ruleId: 'HFS_UNUSED_EXPORT',
+  path: publicEntry, line, column: 1,
+  name, owner: owner.root, slot: owner.slot,
+  message: `${publicEntry} exports ${name}, but no production file outside ${owner.root || 'the repository root'} imports it; remove the export (only a unit role spec, a fixture builder, a test world file, or an integration spec of this integration's own provider folder counts besides production files).`,
+});
+
+/** The unused-export violations and the export count of one public entry of an owner. */
+const publicEntryExports = (context, key, owner, publicEntry) => {
+  const names = exportedNames(context.ts, context.graph.files.get(publicEntry).sourceFile);
+  const used = consumedNames(context, publicEntry, key, 0, new Set([publicEntry]));
+  addReexportedUses(context, key, publicEntry, used);
+  const violations = [...names]
+    .filter(([name]) => !(used.all || used.names.has(name)))
+    .map(([name, line]) => unusedExportViolation(publicEntry, name, line, owner));
+  return { violations, exports: names.size };
+};
+
+const ownerExportFindings = (context, config) => {
+  const { graph } = context;
   const violations = [];
   let owners = 0;
   let exports = 0;
@@ -314,26 +348,9 @@ const ownerExportFindings = (context, config) => {
     if (!entry) continue;
     owners += 1;
     for (const publicEntry of [entry, ...extraEntries(graph, entry)]) {
-      const names = exportedNames(ts, graph.files.get(publicEntry).sourceFile);
-      const used = consumedNames(context, publicEntry, key, 0, new Set([publicEntry]));
-      // A consumer outside the owner that imports a file the entry re-exports by name reaches the entry's export of that name.
-      for (const edge of graph.edges) {
-        if (edge.from !== publicEntry || !edge.reexport || graph.unit(edge.to) !== key) continue;
-        const reexport = bindingsOf(ts, edge.edge.declaration);
-        const inner = consumedNames(context, edge.to, key, 0, new Set([publicEntry, edge.to]));
-        if (reexport.all) continue;
-        for (const pair of reexport.pairs) if (inner.all || inner.names.has(pair.imported)) used.names.add(pair.exported);
-      }
-      for (const [name, line] of names) {
-        exports += 1;
-        if (used.all || used.names.has(name)) continue;
-        violations.push({
-          ruleId: 'HFS_UNUSED_EXPORT',
-          path: publicEntry, line, column: 1,
-          name, owner: owner.root, slot: owner.slot,
-          message: `${publicEntry} exports ${name}, but no production file outside ${owner.root || 'the repository root'} imports it; remove the export (only a unit role spec, a fixture builder, a test world file, or an integration spec of this integration's own provider folder counts besides production files).`,
-        });
-      }
+      const found = publicEntryExports(context, key, owner, publicEntry);
+      exports += found.exports;
+      violations.push(...found.violations);
     }
   }
   return { violations, owners, exports };

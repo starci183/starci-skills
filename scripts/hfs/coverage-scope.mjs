@@ -14,16 +14,31 @@
 import { braceVariants, globExpression } from '../lib/glob.mjs';
 import { logicRolesOf } from './manifest-shape.mjs';
 import { byCodeUnit } from '../lib/list.mjs';
+import { trimTrailingSlashes } from './trailing-slashes.mjs';
 
 /** The component that holds the shared infrastructure: the platform tier and every capability more than one service app composes. */
 export const PLATFORM_COMPONENT = 'platform';
 const SERVICE_APP_KINDS = new Set(['api', 'worker']);
-const STAR_PLACEHOLDER_SOURCE = String.raw`<[^>]+>`;
-const STAR_PLACEHOLDER = new RegExp(STAR_PLACEHOLDER_SOURCE, 'g');
-const TRAILING_SLASHES_SOURCE = String.raw`\/+$`;
-const TRAILING_SLASHES = new RegExp(TRAILING_SLASHES_SOURCE);
-export const star = (text) => String(text).replace(STAR_PLACEHOLDER, '*');
-export const segments = (dir, trimTrailingSlashes = false) => (trimTrailingSlashes ? dir.replace(TRAILING_SLASHES, '') : dir).split('/').filter(Boolean);
+/** `text` with every `<placeholder>` (a `<`, at least one character, the next `>`) replaced by `*`; a `<` with no closing `>` stays. */
+export const star = (text) => {
+  const source = String(text);
+  let result = '';
+  let copied = 0;
+  let open = source.indexOf('<');
+  while (open !== -1) {
+    const close = source.indexOf('>', open + 1);
+    if (close === -1) break;
+    if (close === open + 1) {
+      open = source.indexOf('<', close);
+      continue;
+    }
+    result += `${source.slice(copied, open)}*`;
+    copied = close + 1;
+    open = source.indexOf('<', copied);
+  }
+  return result + source.slice(copied);
+};
+export const segments = (dir, trimSlashes = false) => (trimSlashes ? trimTrailingSlashes(dir) : dir).split('/').filter(Boolean);
 const isDir = (path) => path.endsWith('/');
 
 /** True when directory pattern `inner` lies inside `outer` (an outer `*` segment matches any one inner segment) or is the same. */
@@ -152,22 +167,7 @@ export function coverageComponents(manifest, { files, read, apps, providers = []
   const imports = new Map(services.map((app) => [app.name, files.filter((file) => file.startsWith(`apps/${app.name}/`) && /\.[cm]?ts$/.test(file)).map((file) => read(file)).join('\n')]));
   const platformPaths = [];
   const ownedBy = new Map(services.map((app) => [app.name, []]));
-  for (const root of roots) {
-    const module = /^src\/modules\/(.+)\/\*\/$/.exec(root)?.[1] ?? null;
-    const capabilities = [...new Set(files.map((file) => capabilityOf(root, file)).filter(Boolean))].sort(byCodeUnit);
-    const base = root.slice(0, -2);
-    if (module === null || module === 'platform' || !capabilities.length) {
-      platformPaths.push(`be/${root}**`);
-      continue;
-    }
-    for (const capability of capabilities) {
-      const spec = new RegExp(String.raw`from\s+["']@modules/${escapeImportPart(module)}/${escapeImportPart(capability)}["']`);
-      const importers = services.filter((app) => spec.test(imports.get(app.name)));
-      const owners = importers.length === 1 ? importers : importers.filter((app) => app.name === capability);
-      if (owners.length === 1) ownedBy.get(owners[0].name).push(`be/${base}${capability}/**`);
-      else platformPaths.push(`be/${base}${capability}/**`);
-    }
-  }
+  for (const root of roots) assignRoot({ root, files, services, imports, platformPaths, ownedBy });
   const components = services.filter((app) => ownedBy.get(app.name).length).map((app) => {
     const paths = ownedBy.get(app.name);
     paths.sort(byCodeUnit);
@@ -178,6 +178,24 @@ export function coverageComponents(manifest, { files, read, apps, providers = []
     ...components,
     ...(platformPaths.length ? [{ id: PLATFORM_COMPONENT, name: PLATFORM_COMPONENT, paths: platformPaths }] : []),
   ];
+}
+
+/** Puts the measured root, or each capability below it, into the platform paths or the paths of the one service app that composes it. */
+function assignRoot({ root, files, services, imports, platformPaths, ownedBy }) {
+  const module = /^src\/modules\/(.+)\/\*\/$/.exec(root)?.[1] ?? null;
+  const capabilities = [...new Set(files.map((file) => capabilityOf(root, file)).filter(Boolean))].sort(byCodeUnit);
+  const base = root.slice(0, -2);
+  if (module === null || module === 'platform' || !capabilities.length) {
+    platformPaths.push(`be/${root}**`);
+    return;
+  }
+  for (const capability of capabilities) {
+    const spec = new RegExp(String.raw`from\s+["']@modules/${escapeImportPart(module)}/${escapeImportPart(capability)}["']`);
+    const importers = services.filter((app) => spec.test(imports.get(app.name)));
+    const owners = importers.length === 1 ? importers : importers.filter((app) => app.name === capability);
+    if (owners.length === 1) ownedBy.get(owners[0].name).push(`be/${base}${capability}/**`);
+    else platformPaths.push(`be/${base}${capability}/**`);
+  }
 }
 
 /** True when the be-relative `file` is measured: it is `<name>.<role>.ts` of a logic role below a measured root and inside no none directory of it. */

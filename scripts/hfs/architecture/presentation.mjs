@@ -32,8 +32,16 @@ function addFinding(state, ruleId, entry, message, line = 1) {
   state.violations.push({ ruleId, path: entry, line, column: 1, message });
 }
 
+function checkRootPackageManager(state) {
+  try {
+    const pkg = JSON.parse(fs.readFileSync(path.join(state.root, 'package.json'), 'utf8'));
+    if (pkg.packageManager && !/^npm@\d/u.test(pkg.packageManager))
+      addFinding(state, 'HFS_PACKAGE_MANAGER_MIXED', 'package.json', `packageManager ${pkg.packageManager} contradicts the npm package-lock.json contract.`);
+  } catch { /* The repository's package/config checks own unreadable or invalid JSON. */ }
+}
+
 function checkRootPresentation(state) {
-  const { root, runtime, tree } = state;
+  const { runtime, tree } = state;
   for (const entry of tree.top) {
     if (/\.md$/iu.test(entry) && !(runtime ? RUNTIME_ROOT_MARKDOWN : PRODUCT_ROOT_MARKDOWN).has(entry))
       addFinding(state, 'HFS_ROOT_MARKDOWN_FORBIDDEN', entry, `Root Markdown ${entry} belongs under docs/ or the owning Work record.`);
@@ -42,13 +50,7 @@ function checkRootPresentation(state) {
   for (const entry of ['.gitattributes', 'README.md']) {
     if (!tree.hasFile(entry)) addFinding(state, 'HFS_ROOT_ENTRY_MISSING', entry, `Repository presentation requires root ${entry}.`);
   }
-  if (tree.hasFile('package.json')) {
-    try {
-      const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
-      if (pkg.packageManager && !/^npm@\d/u.test(pkg.packageManager))
-        addFinding(state, 'HFS_PACKAGE_MANAGER_MIXED', 'package.json', `packageManager ${pkg.packageManager} contradicts the npm package-lock.json contract.`);
-    } catch { /* The repository's package/config checks own unreadable or invalid JSON. */ }
-  }
+  if (tree.hasFile('package.json')) checkRootPackageManager(state);
 }
 
 function readmeSectionBody(lines, headings, section) {
