@@ -72,6 +72,51 @@ const heldWhy = (o) => {
 /** The default L4 runner (scripts/supervisor/release-l4.mjs): every step of the L4 row once, each to a log: [{name, ok, log, ms, skips, absent?}]. The Sonar proofs come from the existing gate (release-l4-sonar.mjs), the Linux step from release-linux-parity.mjs. */
 const defaultSuite = (repo, deps = {}) => runL4(repo, { proofs: deps.proofs, supplier: deps.supplier, ...(deps.parity !== undefined ? { parity: deps.parity } : {}), parityDeps: deps.parityDeps ?? {} });
 
+function releaseTagState({ tag, branch, remote, cwd, run, out, refuse }) {
+  if (!tag) return { refusal: refuse('no-release-tag', 'name the release tag: v<version>') };
+  if (!RELEASE_TAG.test(tag)) return { refusal: refuse('bad-tag', `${tag} is not a release tag: only v<version> tags are created and pushed`) };
+  const onBranch = run(['symbolic-ref', '--short', 'HEAD'], { cwd }).stdout;
+  if (onBranch !== branch) return { refusal: refuse('not-on-main', `the checkout is on ${onBranch || 'a detached HEAD'}, not ${branch}`) };
+  const dirty = run(['status', '--porcelain', '--untracked-files=no'], { cwd }).stdout.split(/\r?\n/).filter(Boolean);
+  if (dirty.length) return { refusal: refuse('dirty', `the tree has ${dirty.length} tracked change(s): commit them first (nothing is stashed or reset)`, { dirty: dirty.slice(0, 20) }) };
+  const head = run(['rev-parse', 'HEAD'], { cwd }).stdout;
+  out.head = head;
+  const local = run(['tag', '--list', tag], { cwd }).stdout.trim() === tag;
+  if (local) {
+    if (run(['rev-parse', `refs/tags/${tag}^{commit}`], { cwd }).stdout !== head) return { refusal: refuse('tag-elsewhere', `${tag} already exists on another commit: a tag is never moved; cut the next version`) };
+    if (run(['cat-file', '-t', `refs/tags/${tag}`], { cwd }).stdout !== 'tag') return { refusal: refuse('tag-not-annotated', `${tag} is a lightweight tag: a release tag is annotated, its message is the release notes`) };
+  }
+  const remoteHas = run(['ls-remote', '--tags', remote, `refs/tags/${tag}`], { cwd });
+  if (!remoteHas.ok) return { refusal: refuse('remote-unreachable', `could not read the tags of ${remote}: ${remoteHas.stderr.slice(0, 200)}`) };
+  if (remoteHas.stdout) return { refusal: refuse('tag-exists-on-remote', `${tag} already exists on ${remote}: a tag is never moved or re-pushed; cut the next version`) };
+  return { head, local };
+}
+
+async function releaseSuite({ repo, deps, out, refuse, lock }) {
+  const ran = await lock(() => (deps.suite ?? defaultSuite)(repo, deps));
+  if (heldBy(ran)) return { refusal: refuse('host-lock-held', heldWhy(heldBy(ran))) };
+  const steps = ran;
+  out.suite = steps;
+  const red = steps.filter((s) => !s.ok);
+  if (red.length) {
+    const names = red.map((s) => `${s.name}${s.absent ? ' (absent)' : ''}`).join(', ');
+    const logs = red.map((s) => s.log).filter(Boolean).join(', ');
+    return { refusal: refuse('suite-red', `${names} red: fix, land, and cut again (logs: ${logs})`) };
+  }
+  if (!steps.length) return { refusal: refuse('suite-red', 'the full suite did not run') };
+  const skips = skipReport(steps);
+  out.skips = skips.skips;
+  out.declaredSkips = skips.declared;
+  out.coveredSkips = skips.covered;
+  const unmatched = steps.flatMap((s) => s.unmatched ?? []);
+  if (skips.failures.length) {
+    const skipped = skips.failures.slice(0, 8).map((k) => `${k.name} [${k.class}: ${k.reason || 'no reason'}]`).join('; ');
+    const missingTitles = unmatched.length ? `; no spec file holds the literal title of: ${unmatched.slice(0, 6).join(' | ')} (the Linux leg could not run it)` : '';
+    return { refusal: refuse('suite-skips', `${skips.failures.length} skipped test(s) executed in no leg and fail L4: ${skipped}${missingTitles}`) };
+  }
+  return { steps };
+}
+
 /**
  * Cut the release `tag` (v<version>) of `repo`: see the header. Async (the L4 Sonar gate is): a Promise of {ok, verdict, why, tag, head, suite, skips, declaredSkips, pushed, tagCreated}.
  * The tag is required, must be `v*`, and is created here, ANNOTATED, with the CHANGELOG section as its message (an existing annotated tag on HEAD is reused).
@@ -82,52 +127,20 @@ export async function cutRelease({ repo, remote = 'origin', branch = 'main', tag
   const refuse = (verdict, why, extra = {}) => ({ ...out, ...extra, verdict, why });
   const cwd = repo;
 
-  if (!tag) return refuse('no-release-tag', 'name the release tag: v<version>');
-  if (!RELEASE_TAG.test(tag)) return refuse('bad-tag', `${tag} is not a release tag: only v<version> tags are created and pushed`);
-  const onBranch = run(['symbolic-ref', '--short', 'HEAD'], { cwd }).stdout;
-  if (onBranch !== branch) return refuse('not-on-main', `the checkout is on ${onBranch || 'a detached HEAD'}, not ${branch}`);
-  const dirty = run(['status', '--porcelain', '--untracked-files=no'], { cwd }).stdout.split(/\r?\n/).filter(Boolean);
-  if (dirty.length) return refuse('dirty', `the tree has ${dirty.length} tracked change(s): commit them first (nothing is stashed or reset)`, { dirty: dirty.slice(0, 20) });
-  const head = run(['rev-parse', 'HEAD'], { cwd }).stdout;
-  out.head = head;
-
-  const local = run(['tag', '--list', tag], { cwd }).stdout.trim() === tag;
-  if (local) {
-    if (run(['rev-parse', `refs/tags/${tag}^{commit}`], { cwd }).stdout !== head) return refuse('tag-elsewhere', `${tag} already exists on another commit: a tag is never moved; cut the next version`);
-    if (run(['cat-file', '-t', `refs/tags/${tag}`], { cwd }).stdout !== 'tag') return refuse('tag-not-annotated', `${tag} is a lightweight tag: a release tag is annotated, its message is the release notes`);
-  }
-  const remoteHas = run(['ls-remote', '--tags', remote, `refs/tags/${tag}`], { cwd });
-  if (!remoteHas.ok) return refuse('remote-unreachable', `could not read the tags of ${remote}: ${remoteHas.stderr.slice(0, 200)}`);
-  if (remoteHas.stdout) return refuse('tag-exists-on-remote', `${tag} already exists on ${remote}: a tag is never moved or re-pushed; cut the next version`);
+  const tagState = releaseTagState({ tag, branch, remote, cwd, run, out, refuse });
+  if (tagState.refusal) return tagState.refusal;
+  const { head, local } = tagState;
 
   const changelog = (deps.changelog ?? (() => fs.readFileSync(path.join(repo, 'CHANGELOG.md'), 'utf8')))();
   const notes = releaseNotesFindings({ tags: [tag], changelog });
   if (notes.length) return refuse('release-notes', notes.map((f) => f.message).join('; '), { findings: notes });
 
-  const lock = deps.lock ?? withHostLock;
-  const ran = await lock(() => (deps.suite ?? defaultSuite)(repo, deps));
-  if (heldBy(ran)) return refuse('host-lock-held', heldWhy(heldBy(ran)));
-  const steps = ran;
-  out.suite = steps;
-  const red = steps.filter((s) => !s.ok);
-  if (red.length) {
-    const names = red.map((s) => `${s.name}${s.absent ? ' (absent)' : ''}`).join(', ');
-    const logs = red.map((s) => s.log).filter(Boolean).join(', ');
-    return refuse('suite-red', `${names} red: fix, land, and cut again (logs: ${logs})`);
-  }
-  if (!steps.length) return refuse('suite-red', 'the full suite did not run');
   // L4 reports every skipped test with its reason, and every test must have passed in at least one leg (the host run or the Linux container run): a skip that passed in the other leg is covered and listed with where it passed;
   // a skip nothing covered (missing infrastructure, a platform no leg has, any undeclared skip) fails L4.
-  const skips = skipReport(steps);
-  out.skips = skips.skips;
-  out.declaredSkips = skips.declared;
-  out.coveredSkips = skips.covered;
-  const unmatched = steps.flatMap((s) => s.unmatched ?? []);
-  if (skips.failures.length) {
-    const skipped = skips.failures.slice(0, 8).map((k) => `${k.name} [${k.class}: ${k.reason || 'no reason'}]`).join('; ');
-    const missingTitles = unmatched.length ? `; no spec file holds the literal title of: ${unmatched.slice(0, 6).join(' | ')} (the Linux leg could not run it)` : '';
-    return refuse('suite-skips', `${skips.failures.length} skipped test(s) executed in no leg and fail L4: ${skipped}${missingTitles}`);
-  }
+  const lock = deps.lock ?? withHostLock;
+  const suiteResult = await releaseSuite({ repo, deps, out, refuse, lock });
+  if (suiteResult.refusal) return suiteResult.refusal;
+  const { steps } = suiteResult;
 
   if (run(['rev-parse', 'HEAD'], { cwd }).stdout !== head || run(['status', '--porcelain', '--untracked-files=no'], { cwd }).stdout) return refuse('main-moved', 'the checkout changed while the suite ran: start over');
   const scan = (deps.scan ?? scanRange)({ cwd, from: `${remote}/${branch}`, to: branch });
