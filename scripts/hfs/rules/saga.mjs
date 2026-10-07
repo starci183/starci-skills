@@ -140,31 +140,46 @@ function stateFindings(ts, repoRoot, states) {
   return findings;
 }
 
-function eventFindings(ts, repoRoot, steps, compensations, events) {
+const STEP_EVENT = { label: 'step', action: 'puts on the wire', key: (stem) => `step:${stem}` };
+const COMPENSATION_EVENT = { label: 'compensation', action: 'answers', key: (stem) => `compensation:${stem}` };
+
+/** Findings for the steps (or compensations) that name no event or an event no vendored contract declares; fills `eventOfFile`. */
+function declaredEventFindings(ts, repoRoot, kind, entries, events, eventOfFile) {
   const findings = [];
-  const eventOfFile = new Map();
-  for (const [kind, map] of [['step', steps], ['compensation', compensations]]) {
-    for (const [stem, file] of map) {
-      const text = readText(repoRoot, file);
-      const name = text === null ? null : eventOf(ts, parse(ts, text));
-      const kindName = kind === 'step' ? 'step' : 'compensation';
-      const kindAction = kind === 'step' ? 'puts on the wire' : 'answers';
-      const key = kind === 'step' ? `step:${stem}` : `compensation:${stem}`;
-      eventOfFile.set(key, name);
-      if (name === null) findings.push(found(SAGA_EVENT_CONTRACT, file, `${file} names no event: a ${kindName} of a saga declares \`readonly event = "<name>"\`, the event of the contract it ${kindAction}.`, { step: stem }));
-      else if (!events.has(name)) findings.push(found(SAGA_EVENT_CONTRACT, file, `${file} names the event "${name}", which no be/contracts/<service>/events.json declares; every event of a saga is in a vendored contract.`, { step: stem, event: name }));
-    }
+  for (const [stem, file] of entries) {
+    const text = readText(repoRoot, file);
+    const name = text === null ? null : eventOf(ts, parse(ts, text));
+    eventOfFile.set(kind.key(stem), name);
+    if (name === null) findings.push(found(SAGA_EVENT_CONTRACT, file, `${file} names no event: a ${kind.label} of a saga declares \`readonly event = "<name>"\`, the event of the contract it ${kind.action}.`, { step: stem }));
+    else if (!events.has(name)) findings.push(found(SAGA_EVENT_CONTRACT, file, `${file} names the event "${name}", which no be/contracts/<service>/events.json declares; every event of a saga is in a vendored contract.`, { step: stem, event: name }));
   }
+  return findings;
+}
+
+/** Findings for compensation events whose contract does not name the step event it undoes, with the compensation paths found. */
+function compensatesFindings(compensations, events, eventOfFile) {
+  const findings = [];
   const compensationPaths = [];
   for (const [stem, file] of compensations) {
-    const compensationEvent = eventOfFile.get(`compensation:${stem}`);
-    const stepEvent = eventOfFile.get(`step:${stem}`);
+    const compensationEvent = eventOfFile.get(COMPENSATION_EVENT.key(stem));
+    const stepEvent = eventOfFile.get(STEP_EVENT.key(stem));
     if (compensationEvent && stepEvent && events.has(compensationEvent) && events.get(compensationEvent).compensates !== stepEvent) {
       findings.push(found(SAGA_EVENT_CONTRACT, file, `${file}: the contract of "${compensationEvent}" (${events.get(compensationEvent).contract}) does not declare \`compensates: "${stepEvent}"\`; the failure event of a compensation says which step's event it undoes.`, { step: stem, event: compensationEvent }));
     }
     if (compensationEvent) compensationPaths.push({ file, stem, event: compensationEvent });
   }
   return { findings, compensationPaths };
+}
+
+function eventFindings(ts, repoRoot, steps, compensations, events) {
+  const eventOfFile = new Map();
+  const findings = [
+    ...declaredEventFindings(ts, repoRoot, STEP_EVENT, steps, events, eventOfFile),
+    ...declaredEventFindings(ts, repoRoot, COMPENSATION_EVENT, compensations, events, eventOfFile),
+  ];
+  const compensated = compensatesFindings(compensations, events, eventOfFile);
+  findings.push(...compensated.findings);
+  return { findings, compensationPaths: compensated.compensationPaths };
 }
 
 function consumerFindings(ts, repoRoot, feature, files) {

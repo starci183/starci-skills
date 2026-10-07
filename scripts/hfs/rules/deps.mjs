@@ -57,25 +57,31 @@ function overrideFindings(specs, overrides) {
   return findings;
 }
 
-function nestedLockFindings(specs, lock) {
-  const findings = [];
-  if (lock?.packages) {
-    const declared = new Set(specs.keys());
-    const hoisted = new Map();
-    for (const [key, entry] of Object.entries(lock.packages)) {
-      const top = HOISTED.exec(key);
-      if (top && !entry.link) hoisted.set(top[1], entry.version);
-    }
-    for (const [key, entry] of Object.entries(lock.packages)) {
-      const nested = NESTED.exec(key);
-      if (!nested || entry.link || entry.inBundle || HOISTED.test(key) || !declared.has(nested[1])) continue;
-      const name = nested[1];
-      const versionNote = entry.version ? ` ${entry.version}` : '';
-      const hoistedNote = hoisted.has(name) ? ` next to the hoisted ${hoisted.get(name)}` : '';
-      findings.push(found(DEP_VERSION_SKEW, 'package-lock.json', `${key} is a nested copy of ${name}${versionNote}${hoistedNote}; the workspace keeps one copy (align the ranges or add a root override)`, { dependency: name, lockPath: key, version: entry.version }));
-    }
+/** The versions of the top-level (hoisted) packages of a lockfile, by package name. */
+function hoistedVersions(packages) {
+  const hoisted = new Map();
+  for (const [key, entry] of Object.entries(packages)) {
+    const top = HOISTED.exec(key);
+    if (top && !entry.link) hoisted.set(top[1], entry.version);
   }
-  return findings;
+  return hoisted;
+}
+
+/** The finding for a lockfile entry that nests a second copy of a declared dependency, or null. */
+function nestedCopyFinding(key, entry, declared, hoisted) {
+  const nested = NESTED.exec(key);
+  if (!nested || entry.link || entry.inBundle || HOISTED.test(key) || !declared.has(nested[1])) return null;
+  const name = nested[1];
+  const versionNote = entry.version ? ` ${entry.version}` : '';
+  const hoistedNote = hoisted.has(name) ? ` next to the hoisted ${hoisted.get(name)}` : '';
+  return found(DEP_VERSION_SKEW, 'package-lock.json', `${key} is a nested copy of ${name}${versionNote}${hoistedNote}; the workspace keeps one copy (align the ranges or add a root override)`, { dependency: name, lockPath: key, version: entry.version });
+}
+
+function nestedLockFindings(specs, lock) {
+  if (!lock?.packages) return [];
+  const declared = new Set(specs.keys());
+  const hoisted = hoistedVersions(lock.packages);
+  return Object.entries(lock.packages).map(([key, entry]) => nestedCopyFinding(key, entry, declared, hoisted)).filter(Boolean);
 }
 
 /** The findings of R14 over the tracked paths `files` of `repoRoot`. */

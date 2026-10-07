@@ -13,14 +13,47 @@ export const CONTEXT_TRANSACTION_RULE_IDS = ['BE_CONTEXT_TRANSACTION'];
 
 const RULE = 'BE_CONTEXT_TRANSACTION';
 
+const SPAN_ADVICE = "one transaction touches one context's connection. Span contexts with a saga: one transaction per context, linked by events.";
+
+/** Reports an entity manager of another connection, or a call into another context's capability, found inside a transaction callback. */
+function inspectInner(scope, file, checker, connection, inner) {
+  const { ts, kit, model, graph, report } = scope;
+  if (ts.isPropertyAccessExpression(inner)) {
+    const other = model.connectionOfManager(checker, inner);
+    if (other && other !== connection) report(file, inner, `A transaction on connection ${connection} uses the entity manager of connection ${other}; ${SPAN_ADVICE}`, { connection, other });
+  }
+  if (!ts.isCallExpression(inner)) return;
+  const callee = ts.isPropertyAccessExpression(inner.expression) ? inner.expression.name : inner.expression;
+  const declaration = kit.declarationsOf(checker, callee)[0];
+  const rel = declaration ? kit.graphPath(declaration) : null;
+  const context = rel ? model.contextOfFile(rel) : null;
+  if (context && context !== connection) {
+    report(file, inner, `A transaction on connection ${connection} calls ${graph.files.get(rel).owner.root} of context ${context}; ${SPAN_ADVICE}`, { connection, other: context });
+  }
+}
+
+/** Judges a `.transaction(...)` call: counts it as proven or unproven and inspects its callback body; any other node is skipped. */
+function inspectTransaction(scope, file, checker, node) {
+  const { ts, kit, model, counts } = scope;
+  if (!(ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'transaction')) return;
+  const callback = node.arguments.find(argument => ts.isArrowFunction(argument) || ts.isFunctionExpression(argument));
+  if (!callback) return;
+  const connection = model.connectionOfManager(checker, node.expression.expression);
+  if (!connection) { counts.unproven += 1; return; }
+  counts.transactions += 1;
+  kit.walk(callback.body, inner => {
+    inspectInner(scope, file, checker, connection, inner);
+    return true;
+  });
+}
+
 export function checkContextTransaction(input) {
   const { graph } = input;
   const kit = machineKit(input);
   const { ts } = kit;
   const model = contextModelOf(kit, graph);
   const violations = [];
-  let transactions = 0;
-  let unproven = 0;
+  const counts = { transactions: 0, unproven: 0 };
   const seen = new Set();
   const report = (file, node, message, extra) => {
     const key = `${file.rel}|${node.getStart()}|${message}`;
@@ -28,33 +61,13 @@ export function checkContextTransaction(input) {
     seen.add(key);
     violations.push({ ruleId: RULE, ...kit.at(file.rel, file.sourceFile, node), message, ...extra });
   };
+  const scope = { ts, kit, model, graph, report, counts };
   for (const file of graph.files.values()) {
     const checker = kit.checkerOf(file.sourceFile);
     kit.walk(file.sourceFile, node => {
-      if (!(ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'transaction')) return true;
-      const callback = node.arguments.find(argument => ts.isArrowFunction(argument) || ts.isFunctionExpression(argument));
-      if (!callback) return true;
-      const connection = model.connectionOfManager(checker, node.expression.expression);
-      if (!connection) { unproven += 1; return true; }
-      transactions += 1;
-      kit.walk(callback.body, inner => {
-        if (ts.isPropertyAccessExpression(inner)) {
-          const other = model.connectionOfManager(checker, inner);
-          if (other && other !== connection) report(file, inner, `A transaction on connection ${connection} uses the entity manager of connection ${other}; one transaction touches one context's connection. Span contexts with a saga: one transaction per context, linked by events.`, { connection, other });
-        }
-        if (ts.isCallExpression(inner)) {
-          const callee = ts.isPropertyAccessExpression(inner.expression) ? inner.expression.name : inner.expression;
-          const declaration = kit.declarationsOf(checker, callee)[0];
-          const rel = declaration ? kit.graphPath(declaration) : null;
-          const context = rel ? model.contextOfFile(rel) : null;
-          if (context && context !== connection) {
-            report(file, inner, `A transaction on connection ${connection} calls ${graph.files.get(rel).owner.root} of context ${context}; one transaction touches one context's connection. Span contexts with a saga: one transaction per context, linked by events.`, { connection, other: context });
-          }
-        }
-        return true;
-      });
+      inspectTransaction(scope, file, checker, node);
       return true;
     });
   }
-  return { violations, coverage: { status: 'checked', transactions, unproven } };
+  return { violations, coverage: { status: 'checked', transactions: counts.transactions, unproven: counts.unproven } };
 }

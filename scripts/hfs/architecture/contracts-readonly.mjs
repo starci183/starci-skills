@@ -116,26 +116,39 @@ function instanceMutationCall(ts, checker, node) {
   return { node, values: node.arguments.slice(method === 'assign' ? 1 : 2) };
 }
 
+const isFunctionBoundary = (ts, node) => ts.isFunctionDeclaration(node) || ts.isFunctionExpression(node)
+  || ts.isArrowFunction(node) || ts.isMethodDeclaration(node);
+
+/** The instance assignment a `<left> = <origin-derived>` expression performs, or null when its target is no instance member. */
+function instanceAssignment(ts, checker, node) {
+  const target = instanceAssignmentTarget(ts, checker, node.left);
+  if (target.instance) {
+    return { node, name: target.name, supported: target.supported && node.operatorToken.kind === ts.SyntaxKind.EqualsToken };
+  }
+  return assignmentPatternHasInstanceTarget(ts, checker, node.left) ? { node, name: null, supported: false } : null;
+}
+
+/** The assignment or mutation call at `node` that stores the constructor parameter on the instance, or null. */
+function constructorFinding(ts, checker, node, parameterSymbol) {
+  if (ts.isBinaryExpression(node) && expressionReferencesOrigin(ts, checker, node.right, parameterSymbol)
+    && !isSafePrimitiveProjection(ts, checker, node.right, parameterSymbol)) {
+    return instanceAssignment(ts, checker, node);
+  }
+  const mutation = instanceMutationCall(ts, checker, node);
+  return mutation?.values.some(argument => expressionReferencesOrigin(ts, checker, argument, parameterSymbol))
+    ? { node, name: null, supported: false }
+    : null;
+}
+
 function constructorAssignments(ts, checker, constructor, parameter) {
   if (!constructor.body) return [];
   const parameterSymbol = normalizedSymbol(ts, checker, parameter.name);
   const assignments = [];
   const visit = node => {
-    if (node !== constructor.body && (ts.isFunctionDeclaration(node) || ts.isFunctionExpression(node)
-      || ts.isArrowFunction(node) || ts.isMethodDeclaration(node))) return;
-    if (ts.isBinaryExpression(node) && expressionReferencesOrigin(ts, checker, node.right, parameterSymbol)
-      && !isSafePrimitiveProjection(ts, checker, node.right, parameterSymbol)) {
-      const target = instanceAssignmentTarget(ts, checker, node.left);
-      if (target.instance) assignments.push({ node, name: target.name,
-        supported: target.supported && node.operatorToken.kind === ts.SyntaxKind.EqualsToken });
-      else if (assignmentPatternHasInstanceTarget(ts, checker, node.left)) assignments.push({ node, name: null, supported: false });
-      else ts.forEachChild(node, visit);
-    } else {
-      const mutation = instanceMutationCall(ts, checker, node);
-      if (mutation?.values.some(argument => expressionReferencesOrigin(ts, checker, argument, parameterSymbol))) {
-        assignments.push({ node, name: null, supported: false });
-      } else ts.forEachChild(node, visit);
-    }
+    if (node !== constructor.body && isFunctionBoundary(ts, node)) return;
+    const finding = constructorFinding(ts, checker, node, parameterSymbol);
+    if (finding) assignments.push(finding);
+    else ts.forEachChild(node, visit);
   };
   visit(constructor.body);
   return assignments;

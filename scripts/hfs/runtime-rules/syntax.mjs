@@ -3,19 +3,17 @@
 // packages and every other tracked .mjs/.cjs/.js file. Generated roots and vendored build trees are not authored source.
 // The TypeScript compiler parses the batch in-process: no child process is started per file. Pure apart from ctx.read.
 import { ts } from './source-ast.mjs';
+import { trimTrailingSlashes } from '../trailing-slashes.mjs';
 
 export const CODE = 'RT_SYNTAX_INVALID';
 const JAVASCRIPT = /\.(?:mjs|cjs|js)$/;
 // A managed template carries render tokens ({{name}}) that are not JavaScript until `starci app sync` renders them: not authored source.
 const RENDER_TOKEN = /\{\{[A-Za-z][A-Za-z0-9.]*\}\}/;
 const VENDORED_BUILD = /(?:^|\/)(?:node_modules|dist|reference-renders)\//;
-const SLASH = '/';
-const END = '$';
-const TRAILING_SLASHES = new RegExp(`${SLASH}+${END}`);
 
 /** The tracked JavaScript paths in scope, with generated roots and vendored build trees excluded. */
 function syntaxSourceFiles(files, params) {
-  const generated = (params.generated ?? []).map((entry) => `${String(entry.root).replace(TRAILING_SLASHES, '')}/`);
+  const generated = (params.generated ?? []).map((entry) => `${trimTrailingSlashes(String(entry.root))}/`);
   return files.filter((file) => JAVASCRIPT.test(file)
     && !VENDORED_BUILD.test(file)
     && !generated.some((root) => file.startsWith(root)));

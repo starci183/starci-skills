@@ -1,6 +1,7 @@
 // PL/pgSQL inspection for DB_DYNAMIC_DDL and DB_DEFINER_SAFE. Function and DO bodies are parsed by libpg-query;
 // dynamic query expressions are then parsed as PostgreSQL expressions instead of matched as raw migration text.
 import { found } from './read.mjs';
+import { eachInOrder } from '../../lib/in-order.mjs';
 import { parsePlpgsqlBody, parseSql } from '../sql/pg-parse.mjs';
 import { DB_DEFINER_SAFE, DB_DYNAMIC_DDL } from './database-constants.mjs';
 
@@ -21,27 +22,27 @@ const functionReturnKind = (node) => {
   return node.returnType?.setof ? 'setof' : 'scalar';
 };
 
+/** The statement kinds that run a dynamic query, with the field holding its query expression. */
+const DYNAMIC_QUERY_FIELDS = new Map([['PLpgSQL_stmt_dynexecute', 'query'], ['PLpgSQL_stmt_dynfors', 'query'], ['PLpgSQL_stmt_open', 'dynquery']]);
+
+function collectDynamicQueries(value, out) {
+  if (!value || typeof value !== 'object') return;
+  if (Array.isArray(value)) {
+    for (const item of value) collectDynamicQueries(item, out);
+    return;
+  }
+  for (const [key, child] of Object.entries(value)) {
+    const field = DYNAMIC_QUERY_FIELDS.get(key);
+    const text = field === undefined ? undefined : child?.[field]?.PLpgSQL_expr?.query;
+    if (text !== undefined) out.push({ text, lineno: child.lineno });
+    collectDynamicQueries(child, out);
+  }
+}
+
 /** Every dynamic query expression in one parsed PL/pgSQL function. */
 function dynamicQueries(root) {
   const out = [];
-  const visit = (value) => {
-    if (!value || typeof value !== 'object') return;
-    if (Array.isArray(value)) {
-      for (const item of value) visit(item);
-      return;
-    }
-    for (const [key, child] of Object.entries(value)) {
-      if (key === 'PLpgSQL_stmt_dynexecute' || key === 'PLpgSQL_stmt_dynfors') {
-        const text = child?.query?.PLpgSQL_expr?.query;
-        if (text !== undefined) out.push({ text, lineno: child.lineno });
-      } else if (key === 'PLpgSQL_stmt_open') {
-        const text = child?.dynquery?.PLpgSQL_expr?.query;
-        if (text !== undefined) out.push({ text, lineno: child.lineno });
-      }
-      visit(child);
-    }
-  };
-  visit(root);
+  collectDynamicQueries(root, out);
   return out;
 }
 
@@ -80,6 +81,33 @@ function formatSpecifiers(template) {
   return template.slice(cursor).includes('%') ? null : specs;
 }
 
+/** The text one format() conversion renders to; an argument that is no string literal marks the render incomplete. */
+function substituteSpecifier(spec, args, state) {
+  if (spec.type === '%') return '%';
+  const argumentIndex = spec.position ?? state.sequential;
+  if (spec.position === null) state.sequential += 1;
+  if (spec.type === 'I') return 'hfs_identifier';
+  if (spec.type === 'L') return "'hfs_literal'";
+  const value = stringValue(args[argumentIndex + 1]);
+  if (value !== undefined) return value;
+  state.complete = false;
+  return 'hfs_dynamic';
+}
+
+function renderFormat(args) {
+  const template = stringValue(args[0]);
+  if (template === undefined) return { text: 'hfs_dynamic', complete: false };
+  const specs = formatSpecifiers(template);
+  if (specs === null) return { text: template, complete: false };
+  const state = { sequential: 0, specIndex: 0, complete: true };
+  const text = template.replace(FORMAT_SPECIFIER, () => {
+    const spec = specs[state.specIndex];
+    state.specIndex += 1;
+    return substituteSpecifier(spec, args, state);
+  });
+  return { text, complete: state.complete };
+}
+
 /** Render enough of a dynamic expression to let the PostgreSQL parser identify its generated statement kind. */
 function renderExpression(node) {
   const literal = stringValue(node);
@@ -90,31 +118,7 @@ function renderExpression(node) {
     const right = renderExpression(node.A_Expr.rexpr);
     return { text: `${left.text}${right.text}`, complete: left.complete && right.complete };
   }
-  if (formatName(node)) {
-    const args = node.FuncCall.args ?? [];
-    const template = stringValue(args[0]);
-    if (template === undefined) return { text: 'hfs_dynamic', complete: false };
-    const specs = formatSpecifiers(template);
-    if (specs === null) return { text: template, complete: false };
-    let sequential = 0;
-    let specIndex = 0;
-    let complete = true;
-    const text = template.replace(FORMAT_SPECIFIER, () => {
-      const spec = specs[specIndex];
-      specIndex += 1;
-      if (spec.type === '%') return '%';
-      const argumentIndex = spec.position ?? sequential;
-      if (spec.position === null) sequential += 1;
-      const argument = args[argumentIndex + 1];
-      if (spec.type === 'I') return 'hfs_identifier';
-      if (spec.type === 'L') return "'hfs_literal'";
-      const value = stringValue(argument);
-      if (value !== undefined) return value;
-      complete = false;
-      return 'hfs_dynamic';
-    });
-    return { text, complete };
-  }
+  if (formatName(node)) return renderFormat(node.FuncCall.args ?? []);
   return { text: 'hfs_dynamic', complete: false };
 }
 
@@ -142,7 +146,7 @@ async function dynamicQueryAnalysis(text) {
 
 async function dynamicDdlFindings(file, queries, where, baseLine) {
   const findings = [];
-  for (const { text, lineno } of queries) {
+  await eachInOrder(queries, async ({ text, lineno }) => {
     const line = lineno ? baseLine + lineno - 1 : undefined;
     const lineNote = line ? `${file}:${line}` : file;
     const analysis = await dynamicQueryAnalysis(text);
@@ -151,7 +155,7 @@ async function dynamicDdlFindings(file, queries, where, baseLine) {
     } else if (analysis.opaque) {
       findings.push(found(DB_DYNAMIC_DDL, file, `${lineNote} ${where} runs dynamic SQL the pass cannot read (\`${String(text).slice(0, 120)}\`); dynamic DDL is refused and a query built from an opaque value cannot be judged`, { ...(line ? { line } : {}), query: text }));
     }
-  }
+  });
   return findings;
 }
 
@@ -169,13 +173,13 @@ function safeDefinerExpression(node) {
 
 async function definerDynamicFindings(file, fn, queries, baseLine) {
   const findings = [];
-  for (const { text, lineno } of queries) {
+  await eachInOrder(queries, async ({ text, lineno }) => {
     const line = lineno ? baseLine + lineno - 1 : undefined;
     const lineNote = line ? `${file}:${line}` : file;
     const expression = await expressionOf(text);
-    if (expression !== null && safeDefinerExpression(expression)) continue;
+    if (expression !== null && safeDefinerExpression(expression)) return;
     findings.push(found(DB_DEFINER_SAFE, file, `${lineNote} security definer function ${fn.name} builds dynamic SQL without quoting every parameter through format() %I or %L (\`${String(text).slice(0, 120)}\`)`, { ...(line ? { line } : {}), function: fn.name, query: text }));
-  }
+  });
   return findings;
 }
 
@@ -238,7 +242,7 @@ async function functionFindings(file, fn, facts, exposed) {
 /** All PL/pgSQL-backed L04/L06 findings for one migration's extracted facts. */
 export async function plpgsqlFindings(file, facts, exposed) {
   const findings = [];
-  for (const block of facts.doBlocks) findings.push(...await doBlockFindings(file, block));
-  for (const fn of facts.functions) findings.push(...await functionFindings(file, fn, facts, exposed));
+  await eachInOrder(facts.doBlocks, async (block) => { findings.push(...await doBlockFindings(file, block)); });
+  await eachInOrder(facts.functions, async (fn) => { findings.push(...await functionFindings(file, fn, facts, exposed)); });
   return findings;
 }

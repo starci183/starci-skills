@@ -16,43 +16,59 @@ export const ENTRYPOINT_RULE_IDS = ['BE_ENTRYPOINT_ONLY_IN_APPS'];
 
 const RULE = 'BE_ENTRYPOINT_ONLY_IN_APPS';
 
+const TRANSPARENT = ['isVoidExpression', 'isAwaitExpression', 'isParenthesizedExpression', 'isNonNullExpression'];
+
+/** The identifier a top-level statement calls: `bootstrap()`, `void bootstrap()`, `bootstrap().catch(...)`. */
+function calledIdentifier(ts, expression) {
+  let current = expression;
+  for (;;) {
+    if (TRANSPARENT.some(test => ts[test](current))) current = current.expression;
+    else if (ts.isCallExpression(current)) {
+      if (ts.isIdentifier(current.expression)) return current.expression;
+      current = current.expression;
+    } else if (ts.isPropertyAccessExpression(current)) current = current.expression;
+    else return null;
+  }
+}
+
+const isNestFactoryCreate = (kit, ts, checker, node) => ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) && node.expression.name.text.startsWith('create')
+  && kit.isImportOf(checker, node.expression.expression, 'NestFactory', '@nestjs/core');
+
+const isMainFile = file => (Boolean(file.slot?.startsWith('be.app.')) && path.posix.basename(file.rel) === 'main.ts') || isTestWorldSlot(file.slot);
+
+/** Counts the NestFactory.create* calls of an entrypoint owner and reports them in any other file. */
+function inspectFactoryCalls(kit, file, isMain, report) {
+  const { ts } = kit;
+  const checker = kit.checkerOf(file.sourceFile);
+  let entrypoints = 0;
+  kit.walk(file.sourceFile, node => {
+    if (!isNestFactoryCreate(kit, ts, checker, node)) return true;
+    if (isMain) entrypoints += 1;
+    else report(node, `NestFactory.${node.expression.name.text}() starts a process outside apps/<app>/src/main.ts; entrypoints live in an app's main.ts only.`);
+    return true;
+  });
+  return entrypoints;
+}
+
+function inspectBootstrapCalls(ts, file, report) {
+  for (const statement of file.sourceFile.statements) {
+    if (!ts.isExpressionStatement(statement)) continue;
+    if (calledIdentifier(ts, statement.expression)?.text === 'bootstrap') {
+      report(statement, "A top-level bootstrap() call starts a process outside apps/<app>/src/main.ts; entrypoints live in an app's main.ts only.");
+    }
+  }
+}
+
 export function checkEntrypoints(input) {
   const { graph } = input;
   const kit = machineKit(input);
-  const { ts } = kit;
   const violations = [];
   let entrypoints = 0;
-  /** The identifier a top-level statement calls: `bootstrap()`, `void bootstrap()`, `bootstrap().catch(...)`. */
-  const calledIdentifier = expression => {
-    let current = expression;
-    for (;;) {
-      if (ts.isVoidExpression(current) || ts.isAwaitExpression(current) || ts.isParenthesizedExpression(current) || ts.isNonNullExpression(current)) current = current.expression;
-      else if (ts.isCallExpression(current)) {
-        if (ts.isIdentifier(current.expression)) return current.expression;
-        current = current.expression;
-      } else if (ts.isPropertyAccessExpression(current)) current = current.expression;
-      else return null;
-    }
-  };
   for (const file of graph.files.values()) {
-    const isMain = (Boolean(file.slot?.startsWith('be.app.')) && path.posix.basename(file.rel) === 'main.ts') || isTestWorldSlot(file.slot);
-    const checker = kit.checkerOf(file.sourceFile);
+    const isMain = isMainFile(file);
     const report = (node, message) => violations.push({ ruleId: RULE, path: file.rel, ...kit.at(file.rel, file.sourceFile, node), message });
-    kit.walk(file.sourceFile, node => {
-      if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) && node.expression.name.text.startsWith('create')
-        && kit.isImportOf(checker, node.expression.expression, 'NestFactory', '@nestjs/core')) {
-        if (isMain) entrypoints += 1;
-        else report(node, `NestFactory.${node.expression.name.text}() starts a process outside apps/<app>/src/main.ts; entrypoints live in an app's main.ts only.`);
-      }
-      return true;
-    });
-    if (isMain) continue;
-    for (const statement of file.sourceFile.statements) {
-      if (!ts.isExpressionStatement(statement)) continue;
-      if (calledIdentifier(statement.expression)?.text === 'bootstrap') {
-        report(statement, "A top-level bootstrap() call starts a process outside apps/<app>/src/main.ts; entrypoints live in an app's main.ts only.");
-      }
-    }
+    entrypoints += inspectFactoryCalls(kit, file, isMain, report);
+    if (!isMain) inspectBootstrapCalls(kit.ts, file, report);
   }
   return { violations, coverage: { status: 'checked', entrypoints } };
 }

@@ -15,27 +15,46 @@ export const SQL_RETURNING_RULE_IDS = ['BE_SQL_RETURNING_SHAPE'];
 
 const RULE = 'BE_SQL_RETURNING_SHAPE';
 
+/** Ends the statement in progress, recording its leading verb when it carried RETURNING. */
+function closeStatement(state) {
+  if (state.verb && state.returning) state.found.push(state.verb);
+  state.verb = null;
+  state.returning = false;
+}
+
+/** Folds one token into the statement state: parenthesis depth, statement ends and the top-level words. */
+function readToken(state, token) {
+  if (token.t === 'punct') {
+    if (token.v === '(') state.depth += 1;
+    else if (token.v === ')') state.depth = Math.max(0, state.depth - 1);
+    else if (token.v === ';' && state.depth === 0) closeStatement(state);
+    return;
+  }
+  if (state.depth !== 0 || token.t !== 'word') return;
+  if (state.verb === null) state.verb = token.up;
+  else if (token.up === 'RETURNING') state.returning = true;
+}
+
 /** The leading verbs of the top-level statements of `text` that RETURN from an UPDATE or DELETE without a wrapping SELECT. */
 function unwrappedReturning(text) {
-  const found = [];
-  let depth = 0;
-  let verb = null;
-  let returning = false;
-  const close = () => { if (verb && returning) { found.push(verb); } verb = null; returning = false; };
-  for (const token of tokenizeSql(text)) {
-    if (token.t === 'punct') {
-      if (token.v === '(') depth += 1;
-      else if (token.v === ')') depth = Math.max(0, depth - 1);
-      else if (token.v === ';' && depth === 0) close();
-      continue;
-    }
-    if (depth !== 0 || token.t !== 'word') continue;
-    if (verb === null) verb = token.up;
-    else if (token.up === 'RETURNING') returning = true;
-  }
-  close();
-  return found.filter(verb => verb === 'UPDATE' || verb === 'DELETE');
+  const state = { found: [], depth: 0, verb: null, returning: false };
+  for (const token of tokenizeSql(text)) readToken(state, token);
+  closeStatement(state);
+  return state.found.filter(verb => verb === 'UPDATE' || verb === 'DELETE');
 }
+
+/** The SQL text of a tagged template, each substitution replaced by a HOLE marker. */
+function templateText(ts, template) {
+  return ts.isNoSubstitutionTemplateLiteral(template) ? template.text
+    : template.head.text + template.templateSpans.map(span => HOLE + span.literal.text).join('');
+}
+
+const isDatabaseTag = (kit, checker, node) => {
+  const home = kit.declarationsOf(checker, node.tag).map(kit.ownerOfDeclaration).find(Boolean);
+  return home?.tier === 'platform' && home?.name === 'database';
+};
+
+const returningViolation = (kit, file, node, verb) => ({ ruleId: RULE, path: file.rel, ...kit.at(file.rel, file.sourceFile, node), message: `${verb} ... RETURNING in ${file.rel} is returned by EntityManager.query as [rows, affectedCount], not as rows, so a caller reading rows reads the wrong value. Wrap it: WITH changed AS (${verb} ... RETURNING ...) SELECT ... FROM changed.`, verb });
 
 export function checkSqlReturning(input) {
   const { graph } = input;
@@ -47,16 +66,9 @@ export function checkSqlReturning(input) {
     if (file.slot !== 'be.persistence' || !path.posix.basename(file.rel).endsWith('.sql.ts') || !file.owner) continue;
     const checker = kit.checkerOf(file.sourceFile);
     kit.walk(file.sourceFile, node => {
-      if (!ts.isTaggedTemplateExpression(node)) return;
-      const home = kit.declarationsOf(checker, node.tag).map(kit.ownerOfDeclaration).find(Boolean);
-      if (home?.tier !== 'platform' || home?.name !== 'database') return;
+      if (!ts.isTaggedTemplateExpression(node) || !isDatabaseTag(kit, checker, node)) return;
       templates += 1;
-      const template = node.template;
-      const text = ts.isNoSubstitutionTemplateLiteral(template) ? template.text
-        : template.head.text + template.templateSpans.map(span => HOLE + span.literal.text).join('');
-      for (const verb of unwrappedReturning(text)) {
-        violations.push({ ruleId: RULE, path: file.rel, ...kit.at(file.rel, file.sourceFile, node), message: `${verb} ... RETURNING in ${file.rel} is returned by EntityManager.query as [rows, affectedCount], not as rows, so a caller reading rows reads the wrong value. Wrap it: WITH changed AS (${verb} ... RETURNING ...) SELECT ... FROM changed.`, verb });
-      }
+      for (const verb of unwrappedReturning(templateText(ts, node.template))) violations.push(returningViolation(kit, file, node, verb));
     });
   }
   return { violations, coverage: { status: 'checked', templates } };
