@@ -57,6 +57,29 @@ test('idle: at most 2 nudges, then one DI; done-without-report: report nudges, t
   assert.equal(planHealth({ state: 'working', lastOutputAt: T0 }, { mem: { nudges: 2, state: 'idle-at-prompt' }, now: T0 }).mem.nudges, undefined, 'progress resets the memory');
 });
 
+test('a job that is no longer live forgets its probe memory while a live one keeps its own', async () => {
+  _health.reset();
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'rc-health-forget-'));
+  const file = path.join(dir, 'runtime.sqlite');
+  const ledger = openLedger({ file });
+  seedWorkflow(ledger, { id: 'wf-x', state: { phase: 'running' }, now: () => 1, jobs: [
+    { jobId: 'op-a', opId: 'code.refactor', status: 'running', workerId: 'term_a', payload: { provider: 'devin-agent' } },
+    { jobId: 'op-b', opId: 'code.refactor', status: 'running', workerId: 'term_b', payload: { provider: 'devin-agent' } }] });
+  const db = new DatabaseSync(file, { readOnly: true });
+  try {
+    const terminals = ['term_a', 'term_b'].map((handle) => ({ handle, connected: true, lastOutputAt: T0, preview: 'editing files', agentIdentity: 'devin' }));
+    const ctx = fakeCtx({ controller: 'job', now: () => T0, ledgers: [{ ledgerId: 'nivo', repo: dir, file }], dbs: { nivo: db }, terminalList: async () => ({ ok: true, terminals }), terminalShow: async () => null });
+    await job.reconcile('health:all', ctx);
+    assert.deepEqual([..._health.mem.keys()].sort(), ['op-a', 'op-b'], 'both live jobs keep a probe memory');
+    ledger.transaction((handle) => handle.prepare("UPDATE jobs SET status='reported' WHERE job_id='op-a'").run());
+    await job.reconcile('health:all', ctx);
+    assert.deepEqual([..._health.mem.keys()], ['op-b'], 'op-a left the live set and its memory is gone; op-b keeps its own');
+    ctx.ledgers = [];
+    await job.reconcile('health:all', ctx);
+    assert.equal(_health.mem.size, 0, 'with no live job left nothing is remembered');
+  } finally { db.close(); ledger.close(); _health.reset(); fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }); }
+});
+
 test('the probe over a ledger: shadow would-sends, staggered 15 s apart, a rate-limit row for the Resource controller', async () => {
   _health.reset();
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'rc-health-'));
