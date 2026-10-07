@@ -6,6 +6,8 @@ import { kindShapeProblems, patternShapeProblems } from './declaration-slots.mjs
 import { byCodeUnit } from '../lib/list.mjs';
 
 /** Shape problems of the optional hfs.json `supabase` block whose auth posture DB_CONFIG_POLICY checks. */
+const isSupabaseStringList = (value) => Array.isArray(value) && value.every((entry) => typeof entry === 'string' && entry.trim());
+
 function supabaseBlockProblems(block) {
   if (block === undefined) return [];
   if (!isPlainObject(block)) return ['supabase must be an object'];
@@ -14,7 +16,51 @@ function supabaseBlockProblems(block) {
   if (block.enableSignup !== undefined && typeof block.enableSignup !== 'boolean') bad.push('supabase.enableSignup must be true or false');
   if (block.jwtExpiry !== undefined && !(Number.isInteger(block.jwtExpiry) && block.jwtExpiry > 0 && block.jwtExpiry <= 3600)) bad.push('supabase.jwtExpiry must be an integer of seconds, 3600 at most');
   if (block.siteUrl !== undefined && (typeof block.siteUrl !== 'string' || !block.siteUrl.trim())) bad.push('supabase.siteUrl must be a URL string');
-  for (const key of ['redirectUrls', 'forceRls']) if (block[key] !== undefined && !(Array.isArray(block[key]) && block[key].every((value) => typeof value === 'string' && value.trim()))) bad.push(`supabase.${key} must be a list of strings`);
+  for (const key of ['redirectUrls', 'forceRls']) if (block[key] !== undefined && !isSupabaseStringList(block[key])) bad.push(`supabase.${key} must be a list of strings`);
+  return bad;
+}
+
+function appShapeProblems(apps, at, side, names) {
+  const bad = [];
+  if (!Array.isArray(apps) || !apps.length) {
+    bad.push(`${at}.apps must list every ${side}/apps/<name> with its kind`);
+    return bad;
+  }
+  apps.forEach((app, index) => {
+    if (!isPlainObject(app) || !NAME.test(String(app.name)) || !NAME.test(String(app.kind)) || Object.keys(app).some((key) => key !== 'name' && key !== 'kind')) bad.push(`${at}.apps[${index}] must be {name, kind}`);
+    else if (names.has(app.name)) bad.push(`app ${app.name} is declared twice (${names.get(app.name)} and ${side})`);
+    else names.set(app.name, side);
+  });
+  return bad;
+}
+
+function connectionProblems(side, value) {
+  const bad = [];
+  if (side !== 'be') {
+    bad.push('connections belong to the be side');
+    return bad;
+  }
+  const list = Array.isArray(value.connections) ? value.connections : null;
+  const shape = connectionShapeProblems(list, value.apps);
+  if (shape.length) {
+    bad.push(...shape);
+    return bad;
+  }
+  if (new Set(list.map((connection) => connection.name)).size !== list.length) bad.push('connections names must be unique');
+  for (const a of list) for (const b of list) if (a !== b && `${b.envPrefix}_`.startsWith(`${a.envPrefix}_`)) bad.push(`connections ${a.name} and ${b.name} share env keys (${a.envPrefix}_ covers ${b.envPrefix}_)`);
+  return bad;
+}
+
+function declarationSideProblems(side, value, names) {
+  const bad = [];
+  const at = `sides.${side}`;
+  if (!isPlainObject(value)) return [`${at} must be an object`];
+  for (const key of Object.keys(value)) if (!['apps', 'optionalSlots', 'patterns', 'kinds', 'connections', 'reads'].includes(key)) bad.push(`${at} has unknown key ${key}`);
+  bad.push(...appShapeProblems(value.apps, at, side, names));
+  if (value.optionalSlots !== undefined && (!Array.isArray(value.optionalSlots) || !value.optionalSlots.every((slot) => SLOT_ID.test(String(slot))) || new Set(value.optionalSlots).size !== value.optionalSlots.length)) bad.push(`${at}.optionalSlots must be a unique list of slot ids`);
+  bad.push(...patternShapeProblems(value, at, NAME), ...kindShapeProblems(value, at, NAME));
+  if (value.reads !== undefined && (!Array.isArray(value.reads) || !value.reads.every((read) => typeof read === 'string' && read.length > 0) || new Set(value.reads).size !== value.reads.length)) bad.push(`${at}.reads must be a unique list of paths`);
+  if (value.connections !== undefined) bad.push(...connectionProblems(side, value));
   return bad;
 }
 
@@ -34,30 +80,6 @@ export function declarationShapeProblems(declaration, profiles) {
   if (declaration.kind !== APP_KIND) bad.push(`kind must be ${APP_KIND} (a product is one app repository with a be and an fe side) or ${RUNTIME_KIND} (the StarCi runtime repository)`);
   if (!isPlainObject(declaration.sides) || Object.keys(declaration.sides).sort(byCodeUnit).join() !== profiles.join()) { bad.push('sides must declare exactly be and fe'); return bad; }
   const names = new Map();
-  for (const side of profiles) {
-    const value = declaration.sides[side];
-    const at = `sides.${side}`;
-    if (!isPlainObject(value)) { bad.push(`${at} must be an object`); continue; }
-    for (const key of Object.keys(value)) if (!['apps', 'optionalSlots', 'patterns', 'kinds', 'connections', 'reads'].includes(key)) bad.push(`${at} has unknown key ${key}`);
-    if (!Array.isArray(value.apps) || !value.apps.length) bad.push(`${at}.apps must list every ${side}/apps/<name> with its kind`);
-    else value.apps.forEach((app, index) => {
-      if (!isPlainObject(app) || !NAME.test(String(app.name)) || !NAME.test(String(app.kind)) || Object.keys(app).some((key) => key !== 'name' && key !== 'kind')) bad.push(`${at}.apps[${index}] must be {name, kind}`);
-      else if (names.has(app.name)) bad.push(`app ${app.name} is declared twice (${names.get(app.name)} and ${side})`);
-      else names.set(app.name, side);
-    });
-    if (value.optionalSlots !== undefined && (!Array.isArray(value.optionalSlots) || !value.optionalSlots.every((slot) => SLOT_ID.test(String(slot))) || new Set(value.optionalSlots).size !== value.optionalSlots.length)) bad.push(`${at}.optionalSlots must be a unique list of slot ids`);
-    bad.push(...patternShapeProblems(value, at, NAME), ...kindShapeProblems(value, at, NAME));
-    if (value.reads !== undefined && (!Array.isArray(value.reads) || !value.reads.every((read) => typeof read === 'string' && read.length > 0) || new Set(value.reads).size !== value.reads.length)) bad.push(`${at}.reads must be a unique list of paths`);
-    if (value.connections !== undefined) {
-      if (side !== 'be') { bad.push('connections belong to the be side'); continue; }
-      const list = Array.isArray(value.connections) ? value.connections : null;
-      const shape = connectionShapeProblems(list, value.apps);
-      if (shape.length) bad.push(...shape);
-      else {
-        if (new Set(list.map((connection) => connection.name)).size !== list.length) bad.push('connections names must be unique');
-        for (const a of list) for (const b of list) if (a !== b && `${b.envPrefix}_`.startsWith(`${a.envPrefix}_`)) bad.push(`connections ${a.name} and ${b.name} share env keys (${a.envPrefix}_ covers ${b.envPrefix}_)`);
-      }
-    }
-  }
+  for (const side of profiles) bad.push(...declarationSideProblems(side, declaration.sides[side], names));
   return bad;
 }
