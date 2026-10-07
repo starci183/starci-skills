@@ -350,68 +350,111 @@ export function parseDocument(source) {
 
 const typeText = (type) => (type.list ? `[${typeText(type.item)}]` : type.name) + (type.nonNull ? '!' : '');
 
-/** The problems of one value against the input type it is passed as. */
-function valueProblems(schema, value, type, where, operation, used) {
+function variableProblems(value, type, where, operation, used) {
   if (value.kind === 'variable') {
     used.add(value.name);
     const declared = operation.variables.get(value.name);
     if (declared === undefined) return [`${where} uses $${value.name}, which the operation does not declare`];
     return declared.name === type.name ? [] : [`${where} takes ${typeText(type)}, but $${value.name} is ${typeText(declared)}`];
   }
+  return null;
+}
+
+function objectValueProblems(schema, value, type, where, operation, used, named) {
+  if (named?.kind !== 'input') return [`${where} is an object, but ${type.name} is not an input type`];
+  const problems = [];
+  for (const [field, inner] of value.fields) {
+    const declared = named.fields.get(field);
+    if (declared === undefined) problems.push(`${where} names ${field}, which the input ${type.name} does not declare (it declares ${[...named.fields.keys()].join(', ') || 'nothing'})`);
+    else problems.push(...valueProblems(schema, inner, declared.type, `${where}.${field}`, operation, used));
+  }
+  for (const [field, declared] of named.fields) {
+    if (declared.type.nonNull && !declared.hasDefault && !value.fields.has(field)) problems.push(`${where} omits ${field}, which the input ${type.name} requires`);
+  }
+  return problems;
+}
+
+/** The problems of one value against the input type it is passed as. */
+function valueProblems(schema, value, type, where, operation, used) {
+  const variable = variableProblems(value, type, where, operation, used);
+  if (variable !== null) return variable;
   if (type.list && value.kind === 'list') return value.items.flatMap((item, i) => valueProblems(schema, item, type.item, `${where}[${i}]`, operation, used));
   const named = schema.types.get(type.name);
-  if (value.kind === 'object') {
-    if (named?.kind !== 'input') return [`${where} is an object, but ${type.name} is not an input type`];
-    const problems = [];
-    for (const [field, inner] of value.fields) {
-      const declared = named.fields.get(field);
-      if (declared === undefined) problems.push(`${where} names ${field}, which the input ${type.name} does not declare (it declares ${[...named.fields.keys()].join(', ') || 'nothing'})`);
-      else problems.push(...valueProblems(schema, inner, declared.type, `${where}.${field}`, operation, used));
-    }
-    for (const [field, declared] of named.fields) {
-      if (declared.type.nonNull && !declared.hasDefault && !value.fields.has(field)) problems.push(`${where} omits ${field}, which the input ${type.name} requires`);
-    }
-    return problems;
-  }
+  if (value.kind === 'object') return objectValueProblems(schema, value, type, where, operation, used, named);
   return [];
+}
+
+function fragmentSelectionProblems(context, selection) {
+  const { schema, document, parentName, path, operation, used, visiting } = context;
+  const fragment = document.fragments.get(selection.name);
+  if (fragment === undefined) return [`${path} spreads ...${selection.name}, which the document does not define`];
+  if (visiting.has(selection.name)) return [];
+  return selectionProblems({ schema, document, parentName: fragment.on, selections: fragment.selections, path, operation, used, visiting: new Set([...visiting, selection.name]) });
+}
+
+function inlineSelectionProblems(context, selection) {
+  const { schema, document, parentName, path, operation, used, visiting } = context;
+  return selectionProblems({ schema, document, parentName: selection.on ?? parentName, selections: selection.selections, path, operation, used, visiting });
+}
+
+function fieldArgumentProblems({ schema, parentName, operation, used }, selection, where, field) {
+  const problems = [];
+  for (const [arg, value] of selection.args) {
+    const declared = field.args.get(arg);
+    if (declared === undefined) problems.push(`${where} passes ${arg}, which ${parentName}.${selection.name} does not take (it takes ${[...field.args.keys()].join(', ') || 'no argument'})`);
+    else problems.push(...valueProblems(schema, value, declared.type, `${where}(${arg})`, operation, used));
+  }
+  return problems;
+}
+
+function requiredFieldArgumentProblems(parentName, selection, where, field) {
+  const problems = [];
+  for (const [arg, declared] of field.args) {
+    if (declared.type.nonNull && !declared.hasDefault && !selection.args.has(arg)) problems.push(`${where} omits ${arg}, which ${parentName}.${selection.name} requires`);
+  }
+  return problems;
+}
+
+function fieldSelectionShapeProblems(context, selection, where, field) {
+  const { schema, document, operation, used, visiting } = context;
+  const target = schema.types.get(field.type.name);
+  const leaf = BUILT_IN_SCALARS.has(field.type.name) || target?.kind === 'scalar' || target?.kind === 'enum';
+  if (leaf && selection.selections !== null) return [`${where} is a ${field.type.name}, which selects no fields`];
+  if (!leaf && selection.selections === null) return [`${where} is a ${field.type.name}, which needs a selection of its fields`];
+  if (!leaf) return selectionProblems({ schema, document, parentName: field.type.name, selections: selection.selections, path: where, operation, used, visiting });
+  return [];
+}
+
+function fieldSelectionProblems(context, parent, selection) {
+  const { parentName } = context;
+  const where = `${context.path}.${selection.name}`;
+  const field = parent?.fields?.get(selection.name);
+  if (field === undefined) {
+    const known = parent?.fields ? [...parent.fields.keys()].join(', ') : 'nothing';
+    return [`${where} is not a field of ${parentName} (it has ${known})`];
+  }
+  const problems = fieldArgumentProblems(context, selection, where, field);
+  problems.push(...requiredFieldArgumentProblems(parentName, selection, where, field));
+  problems.push(...fieldSelectionShapeProblems(context, selection, where, field));
+  return problems;
 }
 
 /** The problems of one selection set against its parent type. */
 function selectionProblems({ schema, document, parentName, selections, path, operation, used, visiting = new Set() }) {
+  const context = { schema, document, parentName, path, operation, used, visiting };
   const parent = schema.types.get(parentName);
   const problems = [];
   for (const selection of selections) {
     if (selection.kind === 'spread') {
-      const fragment = document.fragments.get(selection.name);
-      if (fragment === undefined) problems.push(`${path} spreads ...${selection.name}, which the document does not define`);
-      else if (!visiting.has(selection.name)) problems.push(...selectionProblems({ schema, document, parentName: fragment.on, selections: fragment.selections, path, operation, used, visiting: new Set([...visiting, selection.name]) }));
+      problems.push(...fragmentSelectionProblems(context, selection));
       continue;
     }
     if (selection.kind === 'inline') {
-      problems.push(...selectionProblems({ schema, document, parentName: selection.on ?? parentName, selections: selection.selections, path, operation, used, visiting }));
+      problems.push(...inlineSelectionProblems(context, selection));
       continue;
     }
     if (selection.name === '__typename') continue;
-    const where = `${path}.${selection.name}`;
-    const field = parent?.fields?.get(selection.name);
-    if (field === undefined) {
-      const known = parent?.fields ? [...parent.fields.keys()].join(', ') : 'nothing';
-      problems.push(`${where} is not a field of ${parentName} (it has ${known})`);
-      continue;
-    }
-    for (const [arg, value] of selection.args) {
-      const declared = field.args.get(arg);
-      if (declared === undefined) problems.push(`${where} passes ${arg}, which ${parentName}.${selection.name} does not take (it takes ${[...field.args.keys()].join(', ') || 'no argument'})`);
-      else problems.push(...valueProblems(schema, value, declared.type, `${where}(${arg})`, operation, used));
-    }
-    for (const [arg, declared] of field.args) {
-      if (declared.type.nonNull && !declared.hasDefault && !selection.args.has(arg)) problems.push(`${where} omits ${arg}, which ${parentName}.${selection.name} requires`);
-    }
-    const target = schema.types.get(field.type.name);
-    const leaf = BUILT_IN_SCALARS.has(field.type.name) || target?.kind === 'scalar' || target?.kind === 'enum';
-    if (leaf && selection.selections !== null) problems.push(`${where} is a ${field.type.name}, which selects no fields`);
-    else if (!leaf && selection.selections === null) problems.push(`${where} is a ${field.type.name}, which needs a selection of its fields`);
-    else if (!leaf) problems.push(...selectionProblems({ schema, document, parentName: field.type.name, selections: selection.selections, path: where, operation, used, visiting }));
+    problems.push(...fieldSelectionProblems(context, parent, selection));
   }
   return problems;
 }
