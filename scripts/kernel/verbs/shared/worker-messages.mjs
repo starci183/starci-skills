@@ -138,16 +138,7 @@ export const workerQuestionsOf = (db, workflowId) => {
   const jobs = operationJobsOf(db, workflowId);
   const reportedDispatches = new Set(db.prepare('SELECT dispatch_id FROM reports WHERE workflow_id=?').all(workflowId).map((row) => row.dispatch_id));
   const repliedTo = new Set(orchestrationMessagesOf(db, workflowId).map((m) => m.threadId).filter(Boolean));
-  const questions = rows.map((row) => {
-    const item = parseJson(row.payload_json, {}) ?? {};
-    const job = item.jobId ? jobs.find((candidate) => candidate.job_id === item.jobId) ?? null : null;
-    const open = Boolean(job) && !JOB_STATUSES.settled.includes(job.status);
-    const reported = Boolean((item.dispatchId && reportedDispatches.has(item.dispatchId))
-      || (job && [...jobDispatchIdsOf(db, job)].some((id) => reportedDispatches.has(id))));
-    const repliedInOrca = repliedTo.has(row.key);
-    const state = questionStateOf({ row, item, open, reported, repliedInOrca });
-    return { ...item, messageId: row.key, jobStatus: job?.status ?? null, repliedInOrca, state };
-  });
+  const questions = rows.map((row) => questionForRow(row, { db, jobs, reportedDispatches, repliedTo }));
   return { questions, pending: questions.filter((item) => item.state === 'pending') };
 };
 
@@ -159,6 +150,17 @@ const questionStateOf = ({ row, item, open, reported, repliedInOrca }) => {
   if (!open) return 'job-settled';
   return 'pending';
 };
+
+function questionForRow(row, { db, jobs, reportedDispatches, repliedTo }) {
+  const item = parseJson(row.payload_json, {}) ?? {};
+  const job = item.jobId ? jobs.find((candidate) => candidate.job_id === item.jobId) ?? null : null;
+  const open = Boolean(job) && !JOB_STATUSES.settled.includes(job.status);
+  const reported = Boolean((item.dispatchId && reportedDispatches.has(item.dispatchId))
+    || (job && [...jobDispatchIdsOf(db, job)].some((id) => reportedDispatches.has(id))));
+  const repliedInOrca = repliedTo.has(row.key);
+  const state = questionStateOf({ row, item, open, reported, repliedInOrca });
+  return { ...item, messageId: row.key, jobStatus: job?.status ?? null, repliedInOrca, state };
+}
 
 /** Close every pending question nobody waits on any more (its job settled or reported, a reply in Orca, no job). The count. */
 const closeStaleQuestions = (db, workflowId, at = Date.now()) => {
