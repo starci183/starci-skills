@@ -39,7 +39,9 @@ export function argvOf(command) {
 }
 
 const norm = (p) => String(p).replaceAll('\\', '/');
-const ACTION = /^(?:git\s+(?:add|commit|status|rev-parse|log|diff|show|push|fetch|cat-file|merge-base|ls-files|branch|stash)|n\/a|read|cat|type|ls|dir)\b/i;
+const GIT_ACTION = /^git\s+(?:add|commit|status|rev-parse|log|diff|show|push|fetch|cat-file|merge-base|ls-files|branch|stash)\b/i;
+const OTHER_ACTION = /^(?:n\/a|read|cat|type|ls|dir)\b/i;
+const isAction = (command) => GIT_ACTION.test(command) || OTHER_ACTION.test(command);
 const MUTATING_FLAG = /^--(?:fix|write|apply|in-place)(?:=|$)/;
 
 const CLI_REL = 'packages/cli/bin/starci.mjs';
@@ -74,7 +76,7 @@ const classifyNodeArgv = (argv, skillRoot, mechanical) => {
  */
 export function classifyCheck(check, { skillRoot = DEFAULT_ROOT, mechanical = false } = {}) {
   const command = String(check?.command ?? '').trim();
-  if (!command || ACTION.test(command)) return { kind: 'action' };
+  if (!command || isAction(command)) return { kind: 'action' };
   const argv = argvOf(command);
   if (!argv) return { kind: 'foreign', why: 'shell-or-placeholder' };
   if (/^starci(?:\.cmd|\.exe)?$/i.test(path.basename(argv[0]))) return classifyStarciArgv(argv.slice(1), skillRoot, mechanical);
