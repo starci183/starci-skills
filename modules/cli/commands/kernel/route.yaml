@@ -137,9 +137,9 @@ refuses:
     holder is only avoided, \"...; the agents that have it (...) are outside that order | no agent
     card lists it under capabilities.hostTools. Raise starci kernel incident --kind tool-unavailable for the
     owner.\" — both end \"The job stays queued; never dispatch it on an agent without the tool.\""
-  - "no decision (UNTYPED): selectPool returned none — capacity, eligibility or quota; a wait
+  - "no decision (UNTYPED): pickOpModel returned none — capacity, eligibility or quota; a wait
     reason, not a failure. This one refusal prints {ok:false, jobId, kind, difficulty, bias,
-    error:<selectPool message>} and exits 1 with no code string for the caller to match on"
+    error:<pickOpModel message>} and exits 1 with no code string for the caller to match on"
 usedBy: "drive.dispatch — `starci kernel route` runs BEFORE every `starci kernel dispatch`: the model decision is a
   ledger fact (payload + route-decided event), never an ad hoc kernel pick and never a dispatch-time
   surprise"

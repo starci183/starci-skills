@@ -50,7 +50,7 @@ const accountOf = (value) => value ?? 'default';
 const selectableModel = (value) => value === 'supported-model-argument';
 const selectorValid = (value) => isPlainObject(value) && Object.keys(value).length > 0
   && Object.keys(value).every((key) => admissionSelectorFields.includes(key) && text(value[key]));
-const matches = (candidate, selector) => Object.entries(selector).every(([key, value]) => candidate[key] === value);
+export const matches = (candidate, selector) => Object.entries(selector).every(([key, value]) => candidate[key] === value);
 const selectorsOverlap = (left, right) => admissionSelectorFields.every((key) => !left[key] || !right[key] || left[key] === right[key]);
 
 /** Role names and model floors are declared once in allocation.admission. */

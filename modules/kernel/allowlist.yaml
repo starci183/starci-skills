@@ -556,6 +556,8 @@ json-exceptions:
 # is a dead script, and an entry whose script is gone or that code now reads is a stale entry, so this
 # list only shrinks. Delete a script that nothing reads rather than declaring it.
 dead-script-entries:
+  - path: scripts/route/route-model.mjs
+    reason: "CLI the owner runs to preview a model pick: `route-model --plan` prints the tier's per-step selection record (docs/config-format.md); the Kernel seat resolves its tier members through scripts/agent/tiers.mjs, so no code spawns it; tests/kernel/route-model.spec.mjs reads it"
   - path: scripts/supervisor/release-cut.mjs
     reason: "release flow function (cutRelease) that the CLI exposes as `starci release cut` (docs/git-governance.md); the CLI lane wires it and removes this entry; a spec reads it"
   - path: scripts/api/orca/task-list.mjs

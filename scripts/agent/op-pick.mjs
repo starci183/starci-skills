@@ -3,7 +3,7 @@
 // token use are its later steps (scripts/lib/tier-pick.mjs through scripts/lib/agent-admission.mjs selectAdmission).
 import { adapterModelAuthority, loadAdapter, loadModelRegistry } from './model-registry.mjs';
 import { pickFromTier } from '../lib/tier-pick.mjs';
-import { selectorOf } from '../lib/owner-routing-bias.mjs';
+import { asSelector } from '../lib/owner-routing-bias.mjs';
 import { selectAdmission, admissionQualityFloor } from '../lib/agent-admission.mjs';
 import { kindRoute, raiseToFloor, missingHostTools, hostToolsRequired } from './models.mjs';
 import { tierMembers, tierOfOp, tierSettings } from './tiers.mjs';
@@ -67,7 +67,7 @@ function rejectedOf(admission, members) {
 }
 
 /** The bias with every entry as a selector: a pool id string names the pool. */
-const selectorBias = (bias) => ({ ...bias, prefer: (bias.prefer ?? []).map(selectorOf), avoid: (bias.avoid ?? []).map(selectorOf), only: (bias.only ?? []).map(selectorOf) });
+const selectorBias = (bias) => ({ ...bias, prefer: (bias.prefer ?? []).map(asSelector), avoid: (bias.avoid ?? []).map(asSelector), only: (bias.only ?? []).map(asSelector) });
 
 /** A pool the retry's lineage failed on once is tried after the others of its tier (an owner bias still moves it first). */
 function demotedLast(members, lineage) {

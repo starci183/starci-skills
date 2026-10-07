@@ -5,7 +5,7 @@ import { loadModelRegistry, loadRuntimes, loadAdapter, adapterModelAuthority } f
 import { selectAdmission, admissionQualityFloor, rejectionSummary } from '../lib/agent-admission.mjs';
 import { probeQuota } from './quota/index.mjs';
 import { prepareProviderBudget, reserveProviderBudget, markProviderBudget, releaseProviderBudget, providerBudgetUsage } from './provider-budget.mjs';
-import { biasForRole, selectorOf } from '../lib/owner-routing-bias.mjs';
+import { biasForRole, asSelector } from '../lib/owner-routing-bias.mjs';
 import { inspectProviderCircuit } from '../machine/provider-circuit.mjs';
 import { poolCapsNow } from '../machine/pool-backoff.mjs';
 import { providerCircuitOf, kindRoute } from './models.mjs';
@@ -145,12 +145,12 @@ export function planAgentAdmission({ role, scopeId, attemptId = null, kind = nul
     history: picks, balance: tier ? { maxStreak: settings.balance.maxStreak, maxSharePercent: settings.balance.maxSharePercent } : null,
     qualityFloor: qualityFloor ?? admissionQualityFloor(role, difficulty, policy), biasTrusted,
     allowGroup: candidates.map(({ provider, model }) => ({ provider, model })),
-    prefer: (scoped.prefer ?? []).map(selectorOf), avoid: (scoped.avoid ?? []).map(selectorOf), only: (scoped.only ?? []).map(selectorOf),
+    prefer: (scoped.prefer ?? []).map(asSelector), avoid: (scoped.avoid ?? []).map(asSelector), only: (scoped.only ?? []).map(asSelector),
     reserveOverride: override, author: author ? { ...author, modelAuthority: adapterModelAuthority(loadAdapter(author.provider).card) } : null,
     independence: independence ?? policy?.roles?.[role]?.independence }, candidates, policy, now: clock() });
 }
 
-const namedBy = (candidate, selectors) => (selectors ?? []).map(selectorOf)
+const namedBy = (candidate, selectors) => (selectors ?? []).map(asSelector)
   .some((selector) => Object.entries(selector).every(([key, value]) => candidate[key] === value));
 /** The override a reservation in the 90..95 band carries: the owner's reserve grant, else a trusted owner bias naming the member. */
 function bandOverrideFor({ candidate, bias, input, override }) {

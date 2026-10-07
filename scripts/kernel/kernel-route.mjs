@@ -5,10 +5,11 @@
 import { inspectOwnerConfig } from '../../engine/config.mjs';
 import { loadAdapter } from '../agent/lib.mjs';
 import { tierMembers, tierOfSeat, tierSettings } from '../agent/tiers.mjs';
+import { matches } from '../lib/agent-admission.mjs';
+import { text as trimmedOrNull } from '../lib/stack-declaration.mjs';
 
 const memberLabel = (m) => `${m.agent}/${m.model ?? '(pool model)'}`;
 const memberSummary = (m) => ({ agent: m.agent, model: m.model ?? null, effort: m.effort ?? null, runtimePool: m.runtimePool ?? null });
-const trimmedOrNull = (value) => (typeof value === 'string' && value.trim() ? value.trim() : null);
 
 // The kernel's own effort pin; the global config effort is inherited only by a member whose card can pin one
 // (start.modelArgument: worker-start takes --effort only with --model) - Devin takes neither.
@@ -22,8 +23,6 @@ function pinSelectorOf({ agentOverride, owner }) {
   if (!agent && !model) return null;
   return { routedBy: 'config', only: { ...(agent ? { provider: agent } : {}), ...(model ? { model } : {}) }, label: `kernel pin ${agent ?? ''}${agent && model ? '/' : ''}${model ?? ''}` };
 }
-
-const matchesPin = (member, only) => Object.entries(only).every(([key, value]) => member[key] === value);
 
 /** The goal's routing bias with the seat pin added as `only` (a pin is the owner's bias over the tier chain). */
 export const kernelBias = (goalBias, route) => (route?.pin ? { ...goalBias, only: [...(goalBias?.only ?? []), route.pin] } : goalBias);
@@ -62,7 +61,7 @@ export function createKernelRoute({ skillRoot, agentOverride, ownerRoot }) {
     const config = configOf(owner, kernelEffort ?? globalEffort);
     const ownerConfig = owner.error || owner.invalid ? null : owner.config;
     const base = { routedBy: pin?.routedBy ?? 'tier', tier, warnings: [], config, ownerConfig, ...(pin ? { pin: pin.only } : {}) };
-    const members = pin ? chain.filter((member) => matchesPin(member, pin.only)) : chain;
+    const members = pin ? chain.filter((member) => matches(member, pin.only)) : chain;
     if (!members.length) return { ...base, agent: pin?.only.provider ?? null, model: pin?.only.model ?? null, errorStep: 'kernel-pin-unavailable',
       error: `${pin ? pin.label : 'the kernel tier'} names no member of tier ${tier} (${chain.map((member) => member.id).join(', ') || 'empty'}); an explicit agent keeps the tier's model` };
     return { ...base, ...members[0], agent: members[0].agent, members, fallThrough: true };

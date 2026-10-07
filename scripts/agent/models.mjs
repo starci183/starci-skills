@@ -41,9 +41,6 @@ export function kindRoute(kind, runtimes) {
   return { role: entry.role ?? null, work: entry.work ?? null, floor: normalizeDifficulty(entry.floor) };
 }
 
-// A job payload that is one cut slice of a fan-out (payload.cut, ordinal of total >= 2).
-export const isFanOutSlice = (payload) => Boolean(payload?.cut && Number(payload.cut.total) >= 2);
-
 // The model + effort a worker launches with (worker-start --model/--effort): the persisted `starci kernel route`
 // decision when it names this target, else the registry default model - the launch-only targets'
 // `targets.<t>.defaultModel` (gpt-6.1-sol/gpt-6-luna/cursor-agent hold no pool) and the pool's `pools.<p>.defaultModel`.
@@ -126,17 +123,4 @@ export function providerAvailability({ probe = null, circuit = null } = {}) {
   if (probe?.state === 'dead') return { state: 'unavailable', reason: `quota probe dead (${probe.detail ?? 'not authenticated'})` };
   if (probe?.state === 'limited') return { state: 'limited', reason: `quota limited (${probe.detail ?? 'near the window cap'})` };
   return { state: 'available', reason: `quota ${probe?.state ?? 'unknown'}` };
-}
-
-// Members in declared order with unavailable ones removed and limited ones
-// moved behind every available one; relative order is otherwise kept.
-export function orderByAvailability(members, availabilityOf) {
-  const rank = { available: 0, limited: 1 };
-  const seen = members.map((member, index) => ({ member, index, availability: availabilityOf(member) }));
-  const ordered = seen.filter(s => s.availability?.state !== 'unavailable')
-    .sort((a, b) => (rank[a.availability?.state] ?? 0) - (rank[b.availability?.state] ?? 0) || a.index - b.index);
-  return {
-    ordered: ordered.map(s => ({ ...s.member, availability: s.availability })),
-    unavailable: seen.filter(s => s.availability?.state === 'unavailable').map(s => ({ ...s.member, availability: s.availability })),
-  };
 }
