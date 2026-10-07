@@ -318,7 +318,7 @@ async function clockTruth(row, code, src, { now = Date.now() } = {}) {
       if (!db) return null;
       let wf = p[2]; if (p[0] === 'workflow') wf = p.slice(2).join(':'); else if (p[0] === 'seat') wf = p.slice(3).join(':');
       const w = db.prepare('SELECT phase, archived_at FROM workflows WHERE workflow_id=?').get(wf);
-      if (w?.phase !== 'running' || w?.archived_at != null) return { holds: false, why: `workflow ${(w && w.archived_at != null && 'archived') || (w?.phase ?? (w ? 'not running' : 'gone'))}` };
+      if (w?.phase !== 'running' || w?.archived_at != null) return { holds: false, why: `workflow ${(w?.archived_at != null && 'archived') || (w?.phase ?? (w ? 'not running' : 'gone'))}` };
       return { holds: true };
     }
     return null;
