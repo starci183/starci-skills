@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { isMain } from '../../lib/is-main.mjs';
 import { eachInOrder } from '../../lib/in-order.mjs';
+import { jsonClone } from '../../lib/json-clone.mjs';
 import {parseYaml} from '../../../engine/yaml.mjs';
 import {sha256File} from '../../../engine/digest.mjs';
 import {skillRoot} from '../../../engine/runtime-root.mjs'; import { byCodeUnit } from '../../lib/list.mjs';
@@ -41,8 +42,6 @@ function defaultPaths(root=skillRoot){
   return {root,packageRoot:path.join(root,'packages','grammar'),grammarRoot:path.join(root,'knowledge','grammars')};
 }
 
-const plain=value=>JSON.parse(JSON.stringify(value));
-
 // ---------------------------------------------------------------------------
 // The whole census.
 // ---------------------------------------------------------------------------
@@ -57,7 +56,7 @@ export async function censusGrammar({packageRoot=defaultPaths().packageRoot}={})
   const families={};
   // One family at a time: loadDnaModule swaps the shared process.emitWarning while it strips types.
   await eachInOrder(GRAMMAR_FAMILIES.filter(f=>f.dnaModule),async family=>{
-    const dna=plain(await loadDnaModule(path.join(packageRoot,family.dnaModule)));
+    const dna=jsonClone(await loadDnaModule(path.join(packageRoot,family.dnaModule)));
     const bandNames=Object.values(Object.entries(dna).find(([key])=>key.endsWith('BAND_TOKEN_NAMES'))?.[1]??{});
     const include=family.source==='core'
       ?common.tokens.map(t=>t.name).filter(name=>name.startsWith(family.tokenPrefix))
