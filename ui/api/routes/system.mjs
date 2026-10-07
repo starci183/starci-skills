@@ -363,10 +363,10 @@ function routeLanes({ url, m }) {
   return { data: many(m, 'SELECT * FROM lanes ORDER BY created_at DESC').filter(row => !url.searchParams.has('state') || row.state === url.searchParams.get('state')).map(row => laneRow(m, row)), sources: source('machine', 'lanes', 'blobs') };
 }
 function routeSupervisor({ store }) { return { data: supervisor(store), sources: source('machine', 'v_seats', 'v_open_sup_decisions', 'sup_owed', 'sup_jobs', 'sup_attempts', 'notifications') }; }
-const RUNNING_JOB_STATES = ['spawning', 'running', 'reported', 'landing'];
+const RUNNING_JOB_STATES = new Set(['spawning', 'running', 'reported', 'landing']);
 function routeSupervisorWorkers({ url, m }) {
   let rows = many(m, 'SELECT j.*,a.* FROM sup_jobs j LEFT JOIN sup_attempts a ON a.attempt_id=(SELECT max(attempt_id) FROM sup_attempts WHERE job_id=j.job_id) ORDER BY j.created_at DESC');
-  if (url.searchParams.get('state') !== 'all') rows = rows.filter(row => RUNNING_JOB_STATES.includes(row.status));
+  if (url.searchParams.get('state') !== 'all') rows = rows.filter(row => RUNNING_JOB_STATES.has(row.status));
   return pageOf(rows.map(row => ({ job: row.job_id, lane: row.lane, kind: row.kind, title: row.title, status: row.status,
     attempt: row.attempt_id == null ? null : { agent: row.agent, model: row.model, terminal: row.terminal_handle,
       worktree: relative(row.worktree_path), branch: row.branch, spawnedAt: row.spawned_at, reportedAt: row.reported_at,

@@ -444,19 +444,17 @@ const resultLine = (r) => {
 // No top-level await: scripts/machine/decisions.mjs imports this module, and a dynamic import of it while this
 // module still evaluates would deadlock (exit 13).
 if (isMain(import.meta.url)) (async () => {
-  try {
-    const argv = process.argv.slice(2);
-    const val = (n) => { const i = argv.indexOf(`--${n}`); return i >= 0 ? argv[i + 1] ?? null : null; };
-    const has = (n) => argv.includes(`--${n}`);
-    let repos = [];
-    if (val('repo')) repos = [path.resolve(val('repo'))];
-    else if (has('all') || has('invariant')) repos = await supervisedRepos();
-    if (!repos.length) { console.error('use: job-settle.mjs --repo <ledger-owner> [--workflow <id>] [--job <id>] [--dry-run] [--json] | --all | --invariant [--repo <r>]'); process.exit(2); }
-    const results = [];
-    await eachInOrder(repos, (repo) => runRepo(repo, { val, has, results }));
-    const out = { ok: results.every((r) => r.ok !== false), results };
-    if (has('json')) console.log(JSON.stringify(out));
-    else for (const r of results) console.log(resultLine(r));
-    process.exitCode = out.ok ? 0 : 1;
-  } catch (error) { console.error(error); process.exit(1); }
-})();
+  const argv = process.argv.slice(2);
+  const val = (n) => { const i = argv.indexOf(`--${n}`); return i >= 0 ? argv[i + 1] ?? null : null; };
+  const has = (n) => argv.includes(`--${n}`);
+  let repos = [];
+  if (val('repo')) repos = [path.resolve(val('repo'))];
+  else if (has('all') || has('invariant')) repos = await supervisedRepos();
+  if (!repos.length) { console.error('use: job-settle.mjs --repo <ledger-owner> [--workflow <id>] [--job <id>] [--dry-run] [--json] | --all | --invariant [--repo <r>]'); process.exit(2); }
+  const results = [];
+  await eachInOrder(repos, (repo) => runRepo(repo, { val, has, results }));
+  const out = { ok: results.every((r) => r.ok !== false), results };
+  if (has('json')) console.log(JSON.stringify(out));
+  else for (const r of results) console.log(resultLine(r));
+  process.exitCode = out.ok ? 0 : 1;
+})().catch((error) => { console.error(error); process.exit(1); });

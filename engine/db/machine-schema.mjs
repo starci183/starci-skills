@@ -9,14 +9,14 @@ import { hasTable } from '../../scripts/lib/sqlite.mjs';
 const require = createRequire(import.meta.url);
 // SQLite ALTER RENAME quotes identifiers. Preserve literals/constraints while ignoring that spelling and formatting.
 const SQL_IDENTITY_TOKEN_PARTS = [
-  String.raw`--[^\r\n]*`, String.raw`\/\*[\s\S]*?\*\/`, String.raw`'[^']*(?:''[^']*)*'`,
-  String.raw`"[^"]*(?:""[^"]*)*"`, '`[^`]*(?:``[^`]*)*`', String.raw`\[[^\]]*\]`,
-  String.raw`[a-z_][a-z_0-9]*`, String.raw`\d+(?:\.\d+)?`, String.raw`[^\s]`,
+  String.raw`--[^\r\n]*`, String.raw`\/\*[\s\S]*?\*\/`, "'[^']*(?:''[^']*)*'",
+  '"[^"]*(?:""[^"]*)*"', '`[^`]*(?:``[^`]*)*`', String.raw`\[[^\]]*\]`,
+  '[a-z_][a-z_0-9]*', String.raw`\d+(?:\.\d+)?`, String.raw`[^\s]`,
 ];
 const SQL_IDENTITY_TOKENS = new RegExp(SQL_IDENTITY_TOKEN_PARTS.join('|'), 'gi');
 
 function sqlIdentity(sql) {
-  const tokens = String(sql).match(SQL_IDENTITY_TOKENS) ?? [];
+  const tokens = Array.from(String(sql).matchAll(SQL_IDENTITY_TOKENS), (found) => found[0]);
   const normalized = tokens.filter(token => !token.startsWith('--') && !token.startsWith('/*')).map(token => {
     if (token.startsWith("'")) return token;
     if (token.startsWith('"')) return token.slice(1, -1).replaceAll('""', '"').toLowerCase();

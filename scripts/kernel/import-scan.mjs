@@ -222,9 +222,9 @@ const specifierEdge = (from, spec, resolution) => {
   return r.kind === 'external' ? null : { from, spec, kind: r.kind, ...(r.file ? { file: r.file } : {}) };
 };
 
-const DOUBLE_STAR_SUFFIX = new RegExp(String.raw`\/\*\*$`);
-const TRAILING_SLASHES = new RegExp(String.raw`(?<!\/)\/+$`);
-const FILE_EXTENSION = new RegExp(String.raw`\.[^./]+$`);
+const DOUBLE_STAR_SUFFIX = /\/\*\*$/;
+const TRAILING_SLASHES = /(?<!\/)\/+$/;
+const FILE_EXTENSION = /\.[^./]+$/;
 
 function scanImports(root, { only = null, list = trackedList, readFile = null } = {}) {
   const files = trackedSources(root, { list });

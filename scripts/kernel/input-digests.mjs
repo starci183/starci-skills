@@ -49,10 +49,10 @@ const WORK_RECORD_FILES = new Set(['index.yaml', 'resource.yaml']);
 const WORK_SKIP_DIRS = new Set(['evidence', 'assets']);
 const WORK_FILE_MAP_MAX = 600;
 const SKIP_DIRS = new Set(['node_modules', '.git']);
-const LAW_WORD_SPLIT = new RegExp(String.raw`[\s+]+`);
-const LAW_TOKEN_PREFIX = new RegExp(String.raw`^[("\x60']+`);
-const LAW_TOKEN_SUFFIX = new RegExp(String.raw`(?<![)"'\x60,;:.])[)"'\x60,;:.]+$`);
-const TRAILING_SLASHES = new RegExp(String.raw`(?<!\/)\/+$`);
+const LAW_WORD_SPLIT = /[\s+]+/;
+const LAW_TOKEN_PREFIX = /^[("\x60']+/;
+const LAW_TOKEN_SUFFIX = /(?<![)"'\x60,;:.])[)"'\x60,;:.]+$/;
+const TRAILING_SLASHES = /(?<!\/)\/+$/;
 
 /** The Source-law path tokens a free-form manifest `path:` string names, in order. */
 export function lawTokens(text) {

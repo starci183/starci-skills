@@ -92,7 +92,8 @@ export function failingFromText(text) {
   return out;
 }
 
-const IMPORT_SPEC_PATTERN = String.raw`(?:\bfrom\s*|\b(?:import|require)\s*\(\s*|^[^\S\r\n  ]*import\s+)['"]([^'"]+)['"]`;
+// The class before `import` is horizontal whitespace: whitespace without a carriage return, a line feed or the Unicode line and paragraph separators.
+const IMPORT_SPEC_PATTERN = String.raw`(?:\bfrom\s*|\b(?:import|require)\s*\(\s*|^[\t\v\f \u00a0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]*import\s+)['"]([^'"]+)['"]`;
 const IMPORT_SPEC = new RegExp(IMPORT_SPEC_PATTERN, 'gm');
 const dropFirst = (value) => value.split('/').slice(1).join('/');
 /**

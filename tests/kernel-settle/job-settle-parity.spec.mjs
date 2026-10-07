@@ -301,3 +301,11 @@ test('a NODE_PATH prefix is dropped before either dispatcher form is classified 
   assert.equal(ran.rel, 'packages/cli/bin/starci.mjs');
   assert.deepEqual(ran.argv, ['runtime', 'validate', 'X', '--strict', '--json']);
 });
+
+test('the CLI entry reports a rejected pass on stderr and exits 1', async (t) => withLedger(t, async ({ repoRoot, ledger, ledgerFile }) => {
+  ledger.close();
+  fs.writeFileSync(ledgerFile, 'not a database '.repeat(64));
+  const run = spawnSync(process.execPath, [path.join(skillRoot, 'scripts', 'kernel', 'settle', 'job-settle.mjs'), '--repo', repoRoot, '--invariant'], { encoding: 'utf8', timeout: 60000 });
+  assert.equal(run.status, 1, run.stdout + run.stderr);
+  assert.match(run.stderr, /file is not a database/);
+}));
