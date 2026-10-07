@@ -121,7 +121,7 @@ test('statusFailureOf: exit 0 with both streams empty is busy — the child ran 
   // JSON. A child that ran the status path always writes something (its JSON or a refusal); a cli.mjs read mid-land —
   // empty, or truncated to a still-valid module ending before main() — evaluates and exits 0 silently. The empty
   // module below is exactly that child, spawned through the real capture.
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'status-busy-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-status-busy-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const midSwapEntry = path.join(dir, 'cli.mjs');
   fs.writeFileSync(midSwapEntry, '');

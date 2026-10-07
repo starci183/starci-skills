@@ -164,11 +164,11 @@ test('the machine scan counts routed picks of registered product ledgers only: n
   // Everything lives under a temp root the spec made, on the runtime's drive (not os.tmpdir(), which the scan
   // skips), and the registry is injected: the host's machine.sqlite is never read or written.
   withLedger(t,({root,ledger,ledgerFile,machine,machineFile,track})=>{
-    // The scan's temp directory is whatever os.tmpdir() answers: a spec-owned one, so the fixture root (also a temp dir on a host with one
+    // The scan's temp directory is whatever os.tmpdir() and the temp root (STARCI_TEMP_ROOT) answer: a spec-owned one, so the fixture root (also a temp dir on a host with one
     // filesystem tree) is not under it, and the temp ledger is.
     const scanTemp=fs.mkdtempSync(path.join(os.tmpdir(),'starci-balance-scan-'));
     const tempRoot=fs.mkdtempSync(path.join(scanTemp,'starci-balance-temp-'));
-    const saved=['TMPDIR','TEMP','TMP'].map(key=>[key,process.env[key]]);
+    const saved=['TMPDIR','TEMP','TMP','STARCI_TEMP_ROOT'].map(key=>[key,process.env[key]]);
     t.after(()=>{for(const [key,value] of saved){if(value===undefined)delete process.env[key];else process.env[key]=value;}fs.rmSync(scanTemp,{recursive:true,force:true,maxRetries:20,retryDelay:25});});
     // A ledger opened by file path (not ledgerFileFor) seeds no meta.repo_root; registerLedger refuses a
     // new row without one (registry-no-repo-root), so the fixture names its root at open.

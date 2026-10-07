@@ -183,7 +183,7 @@ function refuseRouteDecision({ decision, bias, routeFacts, kind, jobId, difficul
     throw new VerbExit(1);
   }
   if (!decision || decision.error) {
-    const out = { ok: false, jobId, kind, difficulty, bias, ...routeFacts, error: decision?.error ?? 'pickOpModel returned no decision', poolLoad: { running: runningByModel, routeHoldMs: poolLoad.routeHoldMs } };
+    const out = { ok: false, jobId, kind, difficulty, bias, ...routeFacts, error: decision?.error ?? 'pickOpModel returned no decision', rejected: decision?.rejected ?? [], poolLoad: { running: runningByModel, routeHoldMs: poolLoad.routeHoldMs } };
     emit(out, `route REFUSED for ${jobId} (${kind}, ${difficulty}): ${out.error}`, args.json);
     throw new VerbExit(1);
   }
