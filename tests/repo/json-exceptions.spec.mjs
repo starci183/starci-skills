@@ -281,3 +281,18 @@ test('a content-addressed blob sidecar of a sample runtime is a store record, no
   const result = checkJsonExceptions({ root: dir, allowlistFile: allowlist });
   assert.deepEqual(result.offenders, ['examples/.runtimes/demo/artifacts/ab/notes.json']);
 });
+
+test('the git-ignored host state directory at the root is not scanned; a same-named directory elsewhere is authored', async t => {
+  const checkJsonExceptions = await loadChecker();
+  const dir = disposable(t, 'starci-json-state-');
+  fs.mkdirSync(path.join(dir, 'modules', 'kernel'), { recursive: true });
+  const allowlist = path.join(dir, 'modules', 'kernel', 'allowlist.yaml');
+  fs.writeFileSync(allowlist, allowlistDoc('  exceptions: []\n'));
+  for (const relative of ['.runtime/artifacts/aa/x.json', '.runtime/services/harness-processes.json', 'examples/.runtime/kept.json']) {
+    const file = path.join(dir, ...relative.split('/'));
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, '{}\n');
+  }
+  const result = checkJsonExceptions({ root: dir, allowlistFile: allowlist });
+  assert.deepEqual(result.offenders, ['examples/.runtime/kept.json']);
+});
