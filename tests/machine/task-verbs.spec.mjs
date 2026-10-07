@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { taskRegister } from '../../scripts/machine/task-register.mjs';
+import { allocationSettings } from '../../engine/config.mjs';
+import { hostSettings } from '../../scripts/reconciler/services.mjs';
+import { TASK_DEFINITIONS, taskRegister } from '../../scripts/machine/task-register.mjs';
 import { taskList, taskShow } from '../../scripts/machine/task-show.mjs';
 
 const ctx = (name, args = {}) => ({ args, positionals: name == null ? [] : [name], env: {}, cwd: process.cwd(), role: 'owner' });
@@ -54,7 +56,7 @@ test('task list maps only registered known tasks from one injected list call', a
   const result = await taskList(ctx(), {
     listScheduledTasks: (names) => {
       calls += 1;
-      assert.deepEqual(names, ['StarCi Harness Tunnel', 'StarCi-Reconciler']);
+      assert.deepEqual(names, ['StarCi Harness App', 'StarCi Harness Tunnel', 'StarCi-Reconciler']);
       return { status: 0, stdout: JSON.stringify([{ taskName: 'StarCi Harness Tunnel', state: 'Running', nextRun: null,
         lastRun: '2026-10-03T09:00:00Z', lastResult: 0, action: 'starci.cmd harness start --tunnel' }]) };
     },
@@ -82,4 +84,53 @@ test('task register --apply refuses a host that is not Windows and never calls t
   assert.equal(result.code, 1);
   assert.match(result.stderr, /not-windows/);
   assert.equal(called, false);
+});
+
+test('task register harness-app prints the harness UI task: starci harness start through the shim, at logon, restarted on failure', async () => {
+  let calls = 0;
+  const printed = await taskRegister(ctx('harness-app'), { registerScheduledTask: () => { calls += 1; return { status: 0 }; } });
+  assert.equal(calls, 0);
+  assert.equal(printed.code, 0);
+  assert.equal(printed.data.taskName, TASK_DEFINITIONS['harness-app'].taskName);
+  assert.equal(printed.data.action, 'starci harness start');
+  assert.match(printed.text, /Register-ScheduledTask -TaskName 'StarCi Harness App'/);
+  assert.match(printed.text, /\$argLine = .*" harness start"'$/m);
+  assert.doesNotMatch(printed.text, /harness start --tunnel/);
+  assert.match(printed.text, /New-ScheduledTaskTrigger -AtLogOn/);
+  assert.doesNotMatch(printed.text, /RepetitionInterval/);
+  assert.match(printed.text, /-ExecutionTimeLimit \(\[TimeSpan\]::Zero\)/);
+  assert.match(printed.text, /-RestartCount 999/);
+  assert.match(printed.text, /-Hidden/);
+  assert.match(printed.text, /-RunLevel Limited/);
+  assert.match(printed.text, /GetFolderPath\('UserProfile'\)/);
+});
+
+test('the harness app task name is the one declared by runtimes.yaml statusApp.task, which is also what the reconciler restarts', () => {
+  assert.equal(TASK_DEFINITIONS['harness-app'].taskName, allocationSettings().supervisorTick.statusApp.task);
+  assert.equal(hostSettings().services['harness-ui'].task, undefined, 'host.yaml declares no second name for the harness UI task');
+});
+
+test('task show queries a task whose name contains a space by that exact name', async () => {
+  const seen = [];
+  const result = await taskShow(ctx('harness-app'), {
+    queryScheduledTask: (taskName) => { seen.push(taskName); return { status: 0, stdout: JSON.stringify({ taskName, state: 'Ready', lastResult: 0, action: 'x' }) }; },
+  });
+  assert.deepEqual(seen, ['StarCi Harness App']);
+  assert.equal(result.code, 0);
+  assert.equal(result.data.taskName, 'StarCi Harness App');
+});
+
+test('unknown task names list every known task in the usage error', async () => {
+  const refusal = await taskRegister(ctx('nope'), {});
+  assert.match(refusal.stderr, /expected harness-app, harness-tunnel or reconciler/);
+  assert.match((await taskShow(ctx('nope'), {})).stderr, /expected harness-app, harness-tunnel or reconciler/);
+});
+
+test('task list reports an invalid scheduler answer and a failed query as exit 1', async () => {
+  const invalid = await taskList(ctx(), { listScheduledTasks: () => ({ status: 0, stdout: 'not json' }) });
+  assert.equal(invalid.code, 1);
+  assert.match(invalid.stderr, /^starci task list: invalid Task Scheduler response/);
+  const failed = await taskList(ctx(), { listScheduledTasks: () => ({ status: 1, stderr: 'A positional parameter cannot be found' }) });
+  assert.equal(failed.code, 1);
+  assert.match(failed.stderr, /^starci task list: could not query Task Scheduler: A positional parameter/);
 });

@@ -6,7 +6,7 @@ impl: {module: scripts/machine/task-verbs.mjs, export: taskList}
 effect: read
 roles: [worker, lead, coordinator, release, owner]
 conventions:
-  - only the runtime-owned harness tunnel and reconciler tasks are listed
+  - only the runtime-owned harness app, harness tunnel and reconciler tasks are listed
 flags: []
 positional: []
 exit: {"0": registered runtime tasks listed, "1": Task Scheduler could not be read, "2": bad usage}

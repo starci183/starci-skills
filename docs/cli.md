@@ -4031,7 +4031,7 @@ Roles: worker, lead, coordinator, release, owner
 
 Conventions:
 
-- only the runtime-owned harness tunnel and reconciler tasks are listed
+- only the runtime-owned harness app, harness tunnel and reconciler tasks are listed
 
 exit: 0 registered runtime tasks listed; 1 Task Scheduler could not be read; 2 bad usage
 
@@ -4060,13 +4060,15 @@ Conventions:
 
 - without --apply the exact PowerShell registration is printed for review and no host state changes
 - registration is idempotent, per-user and limited-privilege; it never needs administrator rights
-- task actions invoke starci through the current user's .starci/bin shim
+- task actions invoke starci through the current user's .starci/bin shim (starci runtime link writes it)
+- harness-app runs starci harness start; its Windows task name is statusApp.task of modules/models/runtimes.yaml, the name the reconciler restarts
 
 exit: 0 registration printed or applied; 1 Task Scheduler registration failed; 2 bad usage or unknown task name
 
 json: starci/task-register@1
 
 ```sh
+starci task register harness-app
 starci task register reconciler
 starci task register harness-tunnel --apply --json
 ```
@@ -4083,7 +4085,7 @@ Roles: worker, lead, coordinator, release, owner
 
 Conventions:
 
-- names select only the runtime-owned harness tunnel and reconciler tasks
+- names select only the runtime-owned harness app, harness tunnel and reconciler tasks
 
 exit: 0 task details listed; 1 Task Scheduler could not be read; 2 bad usage or unknown task name
 

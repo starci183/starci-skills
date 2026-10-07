@@ -6,10 +6,10 @@ impl: {module: scripts/machine/task-verbs.mjs, export: taskShow}
 effect: read
 roles: [worker, lead, coordinator, release, owner]
 conventions:
-  - names select only the runtime-owned harness tunnel and reconciler tasks
+  - names select only the runtime-owned harness app, harness tunnel and reconciler tasks
 flags: []
 positional:
-  - {name: name, enum: [harness-tunnel, reconciler], required: true, variadic: false}
+  - {name: name, enum: [harness-app, harness-tunnel, reconciler], required: true, variadic: false}
 exit: {"0": task details listed, "1": Task Scheduler could not be read, "2": bad usage or unknown task name}
 json: starci/task-show@1
 examples:
