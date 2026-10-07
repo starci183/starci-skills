@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { codexGuardBlock } from '../../scripts/agent/trust.mjs';
+import { codexGuardBlock, codexKeyForms } from '../../scripts/agent/trust.mjs';
 import { toolGuardCommand } from '../../scripts/lib/guard-command.mjs';
 import { codexLaunchHomes, codexMirrorSource } from '../../scripts/agent/codex-mirror-source.mjs';
 import { ensureLaunchTrust as ensureAdoptedLaunchTrust } from '../../scripts/agent/trust-launch.mjs';
@@ -139,7 +139,7 @@ test('a project the owner declined in the system home refuses the launch', (t) =
   fs.mkdirSync(path.join(trustHome, '.codex'), { recursive: true });
   fs.mkdirSync(sourceDir, { recursive: true });
   const sourceFile = path.join(sourceDir, 'config.toml');
-  fs.writeFileSync(sourceFile, `[projects.'${path.resolve(cwd).toLowerCase()}']\ntrust_level = "untrusted"\n`);
+  fs.writeFileSync(sourceFile, `[projects.'${codexKeyForms(cwd)[0]}']\ntrust_level = "untrusted"\n`);
   const env = { NODE_TEST_CONTEXT: 'child-v8', STARCI_AGENT_TRUST_HOME: trustHome };
   const r = ensureLaunchTrust({ agent: 'codex', cwd, env, codexAppServer: appServerFor(toolGuardCommand({ home: trustHome })) });
   assert.equal(r.status, 'declined', JSON.stringify(r));
