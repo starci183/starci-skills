@@ -58,6 +58,9 @@ import { hostResourcesFor, resourceThresholds, machineLoad, HOST_RESOURCES_ENV }
 import { machineLedgerFiles } from './ledger-files.mjs';
 import { isSpecRun } from '../lib/env.mjs';
 import { positiveNumber } from '../lib/number.mjs';
+import { MODES, nextModeOf, num, pct1 } from './ram-mode.mjs';
+
+export { MODES } from './ram-mode.mjs';
 import { isoOr } from '../lib/time.mjs';
 
 /** The Resource controller's writer tag (scripts/reconciler/controllers/resource.mjs) and how long its mode stays usable. */
@@ -68,7 +71,6 @@ export const DISPATCH_THROTTLED = 'dispatch-throttled';
 const OP_RAM_FOOTPRINT = 'op-ram-footprint';
 /** host_samples.kind of one op-ram-footprint sample. */
 export const FOOTPRINT_SAMPLE_KIND = 'op-footprint';
-export const MODES = Object.freeze(['normal', 'heavy-paused', 'critical']);
 // The job statuses that hold a slot (scripts/kernel/cli.mjs SLOT_HOLDING_STATUSES: dispatched and not settled).
 export const SLOT_STATUSES = Object.freeze(['leased', 'running', 'reported', 'effect_unknown', 'answering']);
 
@@ -79,9 +81,7 @@ const DEFAULTS = Object.freeze({
 const DEFAULT_OP = Object.freeze({ mb: 1200, class: 'light' });
 const MB = 1048576;
 
-const num = (v, fallback = 0) => { const n = Number(v); return Number.isFinite(n) ? n : fallback; };
 const median = (list) => { const s = [...list].sort((a, b) => a - b); const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
-const pct1 = (n) => `${Math.round(num(n) * 10) / 10}%`;
 
 /** The thresholds: allocation.resources.minFreeRamPct is the heavy floor; the rest from allocation.resources.ramThrottle. */
 export function throttleThresholds(settings = null) {
@@ -146,31 +146,8 @@ export function opRamEstimates(table, samples = [], thresholds = throttleThresho
 const estimateOf = (op, estimates) => estimates[op] ?? estimates.default;
 const heavyAdmissionText = (mode, held, heavyCap, typical) => { if (mode === 'normal') return ` or ${Math.max(0, heavyCap - held)} heavy (~${Math.round(typical('heavy'))} MB)`; if (mode === 'critical') return ', heavy only for the top priority - and not even that while critical'; return ', heavy only for the top priority'; };
 
-/**
- * The next mode from the previous state and one host sample, with hysteresis. `prev`: {ramMode, cpuHot} (a missing
- * or unknown one reads normal). Returns {mode, ramMode, cpuHot, why}.
- */
-export function nextMode(prev, { freeRamPct, cpuBusy = null }, t = throttleThresholds()) {
-  const was = MODES.includes(prev?.ramMode) ? prev.ramMode : 'normal';
-  const pct = num(freeRamPct, 100);
-  let ramMode;
-  if (pct < t.landSpecPauseBelowPct) ramMode = 'critical';
-  else if (was === 'critical' && pct <= t.landSpecResumeAbovePct) ramMode = 'critical';
-  else if (pct < t.heavyStopBelowPct) ramMode = 'heavy-paused';
-  else if (was !== 'normal' && pct <= t.heavyResumeAbovePct) ramMode = 'heavy-paused';
-  else ramMode = 'normal';
-  const cpu = cpuBusy == null ? null : num(cpuBusy);
-  const cpuHot = cpu == null ? Boolean(prev?.cpuHot) : cpu >= t.cpuHeavyStopAbove || (Boolean(prev?.cpuHot) && cpu > t.cpuHeavyResumeBelow);
-  const mode = ramMode === 'normal' && cpuHot ? 'heavy-paused' : ramMode;
-  const why = [];
-  if (ramMode === 'critical') why.push(pct < t.landSpecPauseBelowPct ? `free RAM ${pct1(pct)} < ${t.landSpecPauseBelowPct}%: heavy ops and land-gate spec runs paused` : `free RAM ${pct1(pct)} not yet above ${t.landSpecResumeAbovePct}% since going critical: heavy ops and land-gate spec runs stay paused`);
-  else if (ramMode === 'heavy-paused') why.push(pct < t.heavyStopBelowPct ? `free RAM ${pct1(pct)} < ${t.heavyStopBelowPct}%: no new heavy op below the top priority` : `free RAM ${pct1(pct)} not yet above ${t.heavyResumeAbovePct}% since the heavy pause: no new heavy op below the top priority`);
-  if (cpuHot) {
-    const threshold = cpu != null && cpu >= t.cpuHeavyStopAbove ? `>= ${Math.round(t.cpuHeavyStopAbove * 100)}%` : `not yet below ${Math.round(t.cpuHeavyResumeBelow * 100)}%`;
-    why.push(`CPU ${Math.round(num(cpu ?? 1) * 100)}% ${threshold}: no new heavy op below the top priority`);
-  }
-  return { mode, ramMode, cpuHot, why: why.join('; ') || `free RAM ${pct1(pct)}: normal` };
-}
+/** The next mode from the previous state and one host sample (ram-mode.mjs), over `t` (default: this host's thresholds). */
+export const nextMode = (prev, sample, t = throttleThresholds()) => nextModeOf(prev, sample, t);
 
 /* ------------------------------------------------------------ priority */
 
@@ -404,6 +381,37 @@ const overrideOf = (env) => {
   try { const v = JSON.parse(raw); return v && typeof v === 'object' ? v : null; } catch { return null; }
 };
 
+// The host's CPU busy fraction: the spec override's, none inside a spec tree without a loader, else a short live sample.
+function cpuBusyOf({ override, testContext, load }) {
+  if (override) return override.cpuBusy != null ? num(override.cpuBusy) : null;
+  if (testContext && !load) return null;
+  try { return (load ?? (() => machineLoad({ sampleMs: 200 })))()?.cpuBusy ?? null; } catch { return null; }
+}
+
+function workersOf({ override, census, db, ledgerFile, env }) {
+  if (Array.isArray(override?.ops)) return { ops: override.ops.map((o) => ({ status: 'running', ...o })), kernels: num(override.kernels) };
+  return (census ?? (() => workersCensus({ db, ledgerFile, env })))();
+}
+
+function footprintSamplesOf({ override, footprints, thresholds, env }) {
+  if (Array.isArray(override?.footprints)) return override.footprints;
+  if (override) return [];
+  try { return (footprints ?? (() => recentFootprints({ limit: thresholds.historySamples, env })))(); } catch { return []; }
+}
+
+// The mode of this call. Single writer (DESIGN §8.3): the reconciler's Resource controller alone writes the mode. This call reads the mode
+// it published (fresh within RECONCILER_MODE_FRESH_MS); a stale or missing publication is computed locally and never
+// written (owner ruling 2026-09-28 "on an error, delete it outright": no dormant fallback writer).
+function throttleModeOf({ prev, host, override, cpuBusy, thresholds, now }) {
+  const ramKnown = num(host.totalRamBytes) > 0 || override?.freeRamPct != null;
+  const published = prev.writer === RECONCILER_WRITER && MODES.includes(prev.mode) && now - Date.parse(prev.at ?? '') < RECONCILER_MODE_FRESH_MS;
+  if (published) return { published, m: { mode: prev.mode, ramMode: MODES.includes(prev.ramMode) ? prev.ramMode : prev.mode, cpuHot: Boolean(prev.cpuHot), why: prev.why ?? `${prev.mode} (published by ${RECONCILER_WRITER})` } };
+  if (ramKnown) return { published, m: nextMode(prev, { freeRamPct: host.freeRamPct, cpuBusy }, thresholds) };
+  return { published, m: { mode: prev.mode ?? 'normal', ramMode: prev.ramMode ?? 'normal', cpuHot: Boolean(prev.cpuHot), why: 'RAM unmeasured: mode unchanged' } };
+}
+
+const maxParallelOpsOf = () => { const n = Number(runtimeProfile()?.maxParallelOps); return Number.isInteger(n) && n > 0 ? n : null; };
+
 /**
  * The throttle verdict for the host now: {host, cpuBusy, mode, ramMode, cpuHot, modeWhy, since, running,
  * runningByKind, queued, estimates, priorities, cap, admission (when `op` is named), thresholds, throttled}.
@@ -419,29 +427,14 @@ export function hostThrottle({ op = null, workflowId = null, env = process.env, 
   const override = overrideOf(env);
   const testContext = Boolean(isSpecRun(env ?? {})) && !override;
   const host = hostResourcesFor({ env, repo, settings: s });
-  let cpuBusy;
-  if (override) cpuBusy = override.cpuBusy != null ? num(override.cpuBusy) : null;
-  else if (testContext && !load) cpuBusy = null;
-  else { try { cpuBusy = (load ?? (() => machineLoad({ sampleMs: 200 })))()?.cpuBusy ?? null; } catch { cpuBusy = null; } }
-  const workers = Array.isArray(override?.ops) ? { ops: override.ops.map((o) => ({ status: 'running', ...o })), kernels: num(override.kernels) }
-    : (census ?? (() => workersCensus({ db, ledgerFile, env })))();
+  const cpuBusy = cpuBusyOf({ override, testContext, load });
+  const workers = workersOf({ override, census, db, ledgerFile, env });
   const ops = workers.ops ?? [];
-  let samples = [];
-  if (Array.isArray(override?.footprints)) samples = override.footprints;
-  else if (!override) { try { samples = (footprints ?? (() => recentFootprints({ limit: thresholds.historySamples, env })))(); } catch { samples = []; } }
-  const estimates = opRamEstimates(table, samples, thresholds);
+  const estimates = opRamEstimates(table, footprintSamplesOf({ override, footprints, thresholds, env }), thresholds);
   const prev = state ?? readThrottleState({ env });
   const priorities = priorityTable(s, prev);
-  const ramKnown = num(host.totalRamBytes) > 0 || override?.freeRamPct != null;
-  // Single writer (DESIGN §8.3): the reconciler's Resource controller alone writes the mode. This call reads the mode
-  // it published (fresh within RECONCILER_MODE_FRESH_MS); a stale or missing publication is computed locally and never
-  // written (owner ruling 2026-09-28 "on an error, delete it outright": no dormant fallback writer).
-  const published = prev.writer === RECONCILER_WRITER && MODES.includes(prev.mode) && now - Date.parse(prev.at ?? '') < RECONCILER_MODE_FRESH_MS;
-  let m;
-  if (published) m = { mode: prev.mode, ramMode: MODES.includes(prev.ramMode) ? prev.ramMode : prev.mode, cpuHot: Boolean(prev.cpuHot), why: prev.why ?? `${prev.mode} (published by ${RECONCILER_WRITER})` };
-  else if (ramKnown) m = nextMode(prev, { freeRamPct: host.freeRamPct, cpuBusy }, thresholds);
-  else m = { mode: prev.mode ?? 'normal', ramMode: prev.ramMode ?? 'normal', cpuHot: Boolean(prev.cpuHot), why: 'RAM unmeasured: mode unchanged' };
-  const maxParallelOps = (() => { const n = Number(runtimeProfile()?.maxParallelOps); return Number.isInteger(n) && n > 0 ? n : null; })();
+  const { m, published } = throttleModeOf({ prev, host, override, cpuBusy, thresholds, now });
+  const maxParallelOps = maxParallelOpsOf();
   const running = ops.filter((o) => o.status !== 'queued');
   const cap = effectiveCapOf({ maxParallelOps, running: running.length, host, mode: m.mode, estimates, thresholds });
   let admission = op ? admitOp({ op, workflowId, ops, maxParallelOps, host, mode: m.mode, modeWhy: m.why, estimates, priorities, thresholds }) : null;
