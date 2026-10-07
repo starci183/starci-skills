@@ -122,17 +122,41 @@ const shortId = (id) => String(id).slice(0, 8);
  * attempted is never sent again: `duplicate` is then true and `text` null. An unread message is announced
  * once, then reminded at most every INBOX_REWAKE_MS.
  */
+function announcedAt(wakes, key) {
+  const announced = new Map();
+  for (const w of [...wakes].reverse()) for (const id of w.payload[key] ?? []) announced.set(id, w.at);
+  return announced;
+}
+
+function inboxWakePart(unread, fresh, remind) {
+  return '[inbox] ' + unread.length + ' unread message(s)' + (fresh.length ? ' (new ' + fresh.map(shortId).join(',') + ')' : '') + (remind.length ? ' (still unread ' + remind.map(shortId).join(',') + ')' : '') + `: starci supervisor channel inbox --id ${SUPERVISOR_ID}, then reply to each (--to <inboxId>).`;
+}
+
+function decisionWakePart(openDis, diFresh, diRemind) {
+  return '[decide] ' + openDis.length + ' open Supervisor decision(s)' + (diFresh.length ? ' (new ' + diFresh.join(',') + ')' : '') + (diRemind.length ? ' (still open ' + diRemind.join(',') + ')' : '') + ': starci machine decisions supervisor --list, then claim and resolve each.';
+}
+
+function wakeText({ tags, unread, fresh, remind, openDis, diFresh, diRemind, land, report, workerDeaths }) {
+  const parts = [];
+  if (tags.includes('register')) parts.push(`[register] channel '${SUPERVISOR_ID}' is not registered from this terminal: starci supervisor channel register --id ${SUPERVISOR_ID} --label "Supervisor".`);
+  if (tags.includes('inbox')) parts.push(inboxWakePart(unread, fresh, remind));
+  if (tags.includes('decide')) parts.push(decisionWakePart(openDis, diFresh, diRemind));
+  if (tags.includes('land')) parts.push(`[land] report(s) filed by ${land.join(', ')}: starci supervisor workers list, then land (starci supervisor land --job <id>) or redirect.`);
+  if (tags.includes('report')) parts.push(`[report] ${report.join(', ')} filed a diagnosis or a blocked/failed report: starci supervisor workers show --job <id>, then decide.`);
+  if (tags.includes('worker')) parts.push(`[worker] ${workerDeaths.map((d) => d.jobId + ' (' + d.reason + ')').join(', ')}: respawn, reassign or take it yourself.`);
+  const text = parts.length ? `${WAKE_TAG} ${parts.join(' ')} Act until nothing is executable, then yield; never sleep or poll in a turn.` : null;
+  return text;
+}
+
 export function planWake({ now = Date.now(), wakes = [], unread = [], reported = [], filed = [], workerDeaths = [], registered = true, decisions = [] }) {
   const tags = [];
-  const announced = new Map();
-  for (const w of [...wakes].reverse()) for (const id of w.payload.inbox ?? []) announced.set(id, w.at);
+  const announced = announcedAt(wakes, 'inbox');
   const fresh = unread.filter((m) => !announced.has(m.id)).map((m) => m.id);
   const remind = unread.filter((m) => announced.has(m.id) && now - announced.get(m.id) >= INBOX_REWAKE_MS).map((m) => m.id);
   const inbox = [...fresh, ...remind];
   if (inbox.length) tags.push('inbox');
   // MB-02: an open Supervisor Decision Item is work: announced once, then reminded every INBOX_REWAKE_MS while open.
-  const diAnnounced = new Map();
-  for (const w of [...wakes].reverse()) for (const id of w.payload.decisions ?? []) diAnnounced.set(id, w.at);
+  const diAnnounced = announcedAt(wakes, 'decisions');
   const openDis = decisions.filter((di) => di?.id && di.status === 'open');
   const diFresh = openDis.filter((di) => !diAnnounced.has(di.id)).map((di) => di.id);
   const diRemind = openDis.filter((di) => diAnnounced.has(di.id) && now - diAnnounced.get(di.id) >= INBOX_REWAKE_MS).map((di) => di.id);
@@ -146,14 +170,7 @@ export function planWake({ now = Date.now(), wakes = [], unread = [], reported =
   if (report.length) tags.push('report');
   if (workerDeaths.length) tags.push('worker');
   if (!registered) tags.push('register');
-  const parts = [];
-  if (tags.includes('register')) parts.push(`[register] channel '${SUPERVISOR_ID}' is not registered from this terminal: starci supervisor channel register --id ${SUPERVISOR_ID} --label "Supervisor".`);
-  if (tags.includes('inbox')) parts.push('[inbox] ' + unread.length + ' unread message(s)' + (fresh.length ? ' (new ' + fresh.map(shortId).join(',') + ')' : '') + (remind.length ? ' (still unread ' + remind.map(shortId).join(',') + ')' : '') + `: starci supervisor channel inbox --id ${SUPERVISOR_ID}, then reply to each (--to <inboxId>).`);
-  if (tags.includes('decide')) parts.push('[decide] ' + openDis.length + ' open Supervisor decision(s)' + (diFresh.length ? ' (new ' + diFresh.join(',') + ')' : '') + (diRemind.length ? ' (still open ' + diRemind.join(',') + ')' : '') + ': starci machine decisions supervisor --list, then claim and resolve each.');
-  if (tags.includes('land')) parts.push(`[land] report(s) filed by ${land.join(', ')}: starci supervisor workers list, then land (starci supervisor land --job <id>) or redirect.`);
-  if (tags.includes('report')) parts.push(`[report] ${report.join(', ')} filed a diagnosis or a blocked/failed report: starci supervisor workers show --job <id>, then decide.`);
-  if (tags.includes('worker')) parts.push(`[worker] ${workerDeaths.map((d) => d.jobId + ' (' + d.reason + ')').join(', ')}: respawn, reassign or take it yourself.`);
-  const text = parts.length ? `${WAKE_TAG} ${parts.join(' ')} Act until nothing is executable, then yield; never sleep or poll in a turn.` : null;
+  const text = wakeText({ tags, unread, fresh, remind, openDis, diFresh, diRemind, land, report, workerDeaths });
   if (text && wakes.some((w) => w.payload.text === text)) return { tags: [], inbox: [], land: [], report: [], decisions: [], text: null, duplicate: true };
   return { tags, inbox, land, report, decisions: decide, text };
 }
