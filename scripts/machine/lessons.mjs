@@ -389,7 +389,7 @@ if (isMain(import.meta.url)) {
       print(r, r.map((l) => `[${l.source} w${l.weight ?? 1} ${l.status}] ${l.signature ?? '-'}: ${l.text}`).join('\n') || 'no matching lesson');
     } else if (verb === 'tier') {
       const r = tierOf(commitFiles(csv(value('commit'))));
-      print(r, `${r.tier}${r.reasons.length ? `: ${r.reasons.join('; ')}` : ''}`);
+      print(r, `${r.tier}${r.reasons.length ? ': ' + r.reasons.join('; ') : ''}`);
     } else if (verb === 'result') {
       const e = readLearning().experiments[value('experiment')];
       if (!e || !['kept', 'reverted', 'did-not-work'].includes(value('outcome')) || !value('reason')) throw Object.assign(new Error('result needs a known --experiment, --outcome kept|reverted|did-not-work and --reason'), { code: 'result-incomplete' });
