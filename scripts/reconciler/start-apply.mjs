@@ -4,6 +4,7 @@ import path from 'node:path';
 import { eachInOrder, repeatInOrder } from '../lib/in-order.mjs';
 import { SKILL_ROOT } from './state.mjs';
 import { serviceWanted } from './start-items.mjs';
+import { startOutcome } from './task-health.mjs';
 
 /** Services `start` never launches itself: Orca is a GUI app (the owner opens it); the scheduled task is the owner's. */
 const NOT_ACTUATED = new Set(['orca']);
@@ -57,7 +58,7 @@ export async function startDownServices(api, { loadConfig, rebuilt }, applied) {
   await eachInOrder(probes, async (p) => {
     if (p.ok || NOT_ACTUATED.has(p.name) || !serviceWanted(p.name, loadConfig()) || p.name.startsWith('sched-task:') || !p.entry.restart) return;
     const r = await api.startService(p.name);
-    const result = r.ok ? 'start requested' : `start FAILED ${String(r.error ?? r.output ?? '').slice(0, 120)}`;
+    const result = r.ok ? await startOutcome(api, p) : `start FAILED ${String(r.error ?? r.output ?? '').slice(0, 120)}`;
     applied.push(`service ${p.name}: ${result}`);
   });
   if (rebuilt && probes.find((p) => p.name === 'harness-ui')?.ok) { const r = await api.startService('harness-ui'); applied.push(`service harness-ui restarted to serve the new build: ${r.ok ? 'ok' : 'FAILED'}`); }

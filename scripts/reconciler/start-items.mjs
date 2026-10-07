@@ -1,6 +1,7 @@
 import { CONNECTOR_DEFAULTS } from '../../engine/config.mjs';
 import { PROFILES, REQUIRED_ACTIVE, configuredMode } from './state.mjs';
 import { green, red, warn } from './checklist-items.mjs';
+import { reconcilerTaskItem, serviceTaskNote } from './task-health.mjs';
 
 export const PROFILE = 'operational';
 
@@ -104,26 +105,20 @@ const serviceDetail = (probe, publicUrl) => {
   return message;
 };
 
-const scheduledTaskItem = (probe) => {
-  const name = `scheduled task ${probe.name.slice(11)}`;
-  if (probe.ok) return green('services', probe.name, name, `exists (${probe.detail?.status ?? 'ok'})`, { required: false });
-  const detail = probe.unmanaged ? 'missing (unmanaged)' : 'not healthy';
-  return warn('services', probe.name, name, detail, 'starci task register reconciler --apply (the owner)');
-};
-
-const serviceItem = (probe, { publicUrl, config }) => {
+const serviceItem = (probe, { publicUrl, config, audits }) => {
   const label = SERVICE_LABEL[probe.name] ?? probe.name;
-  const detail = serviceDetail(probe, publicUrl);
-  if (probe.name.startsWith('sched-task:')) return scheduledTaskItem(probe);
+  if (probe.name.startsWith('sched-task:')) return reconcilerTaskItem(probe);
+  const taskNote = probe.ok ? null : serviceTaskNote(probe.name, audits);
+  const detail = serviceDetail(probe, publicUrl) + (taskNote ? `; ${taskNote.note}` : '');
   if (probe.ok) return green('services', probe.name, label, detail);
   if (!serviceWanted(probe.name, config)) return green('services', probe.name, label, 'off in config.yaml connectors (not required)', { required: false });
-  const fix = probe.name === 'orca'
+  const fix = taskNote?.fix ?? (probe.name === 'orca'
     ? 'open Orca yourself, then run start again (start never launches a GUI app)'
-    : 'the reconciler Host controller manages this service; run starci reconciler start';
+    : 'the reconciler Host controller manages this service; run starci reconciler start');
   return red('services', probe.name, label, detail, fix);
 };
 
 /** Convert service probes to readiness rows without changing registry order. */
-export function serviceItems(probes, { publicUrl = null, config = null } = {}) {
-  return probes.map((probe) => serviceItem(probe, { publicUrl, config }));
+export function serviceItems(probes, { publicUrl = null, config = null, audits = null } = {}) {
+  return probes.map((probe) => serviceItem(probe, { publicUrl, config, audits }));
 }

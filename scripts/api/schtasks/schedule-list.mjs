@@ -2,9 +2,8 @@
 import { scheduleSpawn } from './lib.mjs';
 
 const LIST_SCRIPT = [
-  'param([Parameter(ValueFromRemainingArguments=$true)][string[]]$TaskNames)',
   "$ErrorActionPreference = 'Stop'",
-  '$rows = @(Get-ScheduledTask -ErrorAction Stop | Where-Object { $TaskNames -contains $_.TaskName } | ForEach-Object {',
+  '$rows = @(Get-ScheduledTask -ErrorAction Stop | Where-Object { $Arguments -contains $_.TaskName } | ForEach-Object {',
   '  $task = $_',
   '  $info = Get-ScheduledTaskInfo -TaskName $task.TaskName -TaskPath $task.TaskPath -ErrorAction Stop',
   '  $action = @($task.Actions | ForEach-Object {',

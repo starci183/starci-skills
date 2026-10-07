@@ -2,9 +2,8 @@
 import { scheduleSpawn } from './lib.mjs';
 
 const QUERY_SCRIPT = [
-  'param([string]$TaskName)',
   "$ErrorActionPreference = 'Stop'",
-  '$task = Get-ScheduledTask -TaskName $TaskName -ErrorAction Stop',
+  '$task = Get-ScheduledTask -TaskName $Arguments[0] -ErrorAction Stop',
   '$info = Get-ScheduledTaskInfo -TaskName $task.TaskName -TaskPath $task.TaskPath -ErrorAction Stop',
   '$action = @($task.Actions | ForEach-Object {',
   '  $parts = @($_.Execute, $_.Arguments) | Where-Object { $_ }',

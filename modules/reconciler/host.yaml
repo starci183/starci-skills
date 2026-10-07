@@ -33,9 +33,11 @@ quarantine: {maxRestarts: 5, windowMs: 1800000, retryMs: 3600000}
 # first request after idle can take seconds (harness 2026-09-28: 5.0 s local, 11.5 s through the tunnel, then 2 ms).
 # aliveTimeoutMs: before any restart, the service's port/URL is asked once more with this timeout; one that still
 # answers HTTP is never restarted (the pass counts as degraded). SERVICE_DOWN starts at `failed`, never `degraded`.
+# task: the Windows task a service is restarted through. The harness UI's is statusApp.task of modules/models/runtimes.yaml
+# (one declaration, also read by `starci task register harness-app`).
 services:
   orca: {everyMs: 60000, probeTimeoutMs: 30000, aliveTimeoutMs: 90000, failAfter: 5, startTimeoutMs: 600000, slaMs: 180000, closeWaitMs: 30000}
-  harness-ui: {everyMs: 60000, probeTimeoutMs: 15000, probeTries: 3, aliveTimeoutMs: 30000, failAfter: 3, startTimeoutMs: 120000, slaMs: 120000, probePath: /healthz, task: 'StarCi Harness App'}
+  harness-ui: {everyMs: 60000, probeTimeoutMs: 15000, probeTries: 3, aliveTimeoutMs: 30000, failAfter: 3, startTimeoutMs: 120000, slaMs: 120000, probePath: /healthz}
   harness-tunnel: {everyMs: 300000, probeTimeoutMs: 20000, probeTries: 3, aliveTimeoutMs: 45000, failAfter: 2, startTimeoutMs: 300000, slaMs: 300000, probePath: /healthz, task: 'StarCi Harness Tunnel'}
   ask-gateway: {everyMs: 60000, probeTimeoutMs: 30000, probeTries: 2, aliveTimeoutMs: 30000, failAfter: 3, startTimeoutMs: 120000, slaMs: 120000}
   ask-tunnel: {everyMs: 60000, probeTimeoutMs: 60000, probeTries: 2, failAfter: 3, startTimeoutMs: 300000, slaMs: 300000}

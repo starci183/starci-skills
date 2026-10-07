@@ -1,10 +1,8 @@
 // task-show.mjs - project Windows Task Scheduler query results into stable task show/list data.
-import { scheduleList as listScheduledTasks } from '../api/schtasks/schedule-list.mjs';
+import { scheduleList as listScheduledTasksCall } from '../api/schtasks/schedule-list.mjs';
 import { scheduleQuery as queryScheduledTask } from '../api/schtasks/schedule-query.mjs';
 import { resultDetail as detail, resultOk } from '../lib/verb-call.mjs';
-import { TASK_DEFINITIONS } from './task-register.mjs';
-
-const taskOf = (name) => TASK_DEFINITIONS[String(name ?? '')] ?? null;
+import { KNOWN_TASKS_TEXT, TASK_DEFINITIONS, taskOf } from './task-register.mjs';
 
 function payloadOf(result) {
   if (result?.data != null) return result.data;
@@ -40,7 +38,7 @@ const showText = (task) => [
 
 const unknown = (verb, name) => ({
   code: 2,
-  stderr: `starci task ${verb}: unknown task "${name}" (expected harness-tunnel or reconciler)`,
+  stderr: `starci task ${verb}: unknown task "${name}" (expected ${KNOWN_TASKS_TEXT})`,
   data: { schema: 'starci/task-show@1', ok: false, name: String(name ?? '') },
 });
 
@@ -64,14 +62,16 @@ export async function taskShow(ctx, deps = {}) {
   return { code: 0, text: showText(task), data: { schema: 'starci/task-show@1', ok: true, ...task } };
 }
 
-/** List the registered subset of the runtime's two known tasks in canonical name order. */
-export async function taskList(ctx, deps = {}) {
+/**
+ * One Task Scheduler list call for the runtime's known tasks: {ok: true, tasks} with the registered subset in canonical
+ * name order, or {ok: false, reason} naming why the answer could not be read.
+ */
+export async function readTasks({ env, listScheduledTasks = listScheduledTasksCall } = {}) {
   const entries = Object.entries(TASK_DEFINITIONS);
-  const result = await (deps.listScheduledTasks ?? listScheduledTasks)(entries.map(([, task]) => task.taskName), { env: ctx?.env });
+  const result = await listScheduledTasks(entries.map(([, task]) => task.taskName), { env });
   if (!resultOk(result)) {
     const suffix = detail(result, { limit: 600 });
-    return { code: 1, stderr: `starci task list: could not query Task Scheduler${suffix ? ': ' + suffix : ''}`,
-      data: { schema: 'starci/task-list@1', ok: false, tasks: [] } };
+    return { ok: false, reason: `could not query Task Scheduler${suffix ? ': ' + suffix : ''}` };
   }
   let rows;
   try {
@@ -80,14 +80,21 @@ export async function taskList(ctx, deps = {}) {
     else if (Array.isArray(payload)) rows = payload;
     else rows = [payload];
   } catch (error) {
-    return { code: 1, stderr: `starci task list: invalid Task Scheduler response (${error.message})`,
-      data: { schema: 'starci/task-list@1', ok: false, tasks: [] } };
+    return { ok: false, reason: `invalid Task Scheduler response (${error.message})` };
   }
   const byTaskName = new Map(rows.map((row) => [String(row?.taskName ?? row?.TaskName ?? '').toLowerCase(), row]));
   const tasks = entries.flatMap(([name, definition]) => {
     const row = byTaskName.get(definition.taskName.toLowerCase());
     return row ? [projectTask(name, row)] : [];
   });
+  return { ok: true, tasks };
+}
+
+/** List the registered subset of the runtime's known tasks in canonical name order. */
+export async function taskList(ctx, deps = {}) {
+  const read = await readTasks({ env: ctx?.env, listScheduledTasks: deps.listScheduledTasks });
+  if (!read.ok) return { code: 1, stderr: `starci task list: ${read.reason}`, data: { schema: 'starci/task-list@1', ok: false, tasks: [] } };
+  const { tasks } = read;
   const text = tasks.length ? tasks.map((task) => `${task.name}\t${task.state}\t${task.nextRun ?? '-'}\t${task.lastRun ?? '-'}\t${task.lastResult ?? '-'}\t${task.action ?? '-'}`).join('\n') : 'no StarCi scheduled tasks registered';
   return { code: 0, text, data: { schema: 'starci/task-list@1', ok: true, tasks } };
 }

@@ -16,6 +16,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { RUNTIME_STATE_DIR } from '../../engine/runtime-root.mjs';
 import { ALLOWLIST_FILE, readAllowlistFile } from '../lib/allowlist.mjs';
 import { isMain } from '../lib/is-main.mjs';
 
@@ -61,10 +62,10 @@ const LOCAL_ONLY = new Set(['config.json', 'settings.local.json']);
 
 /**
  * Runtime-owned storage at the skill root. These exact roots contain workflow state and sealed
- * runtime packets, not authored declarative source. A same-named directory nested anywhere else
+ * runtime packets and the git-ignored host state directory (RUNTIME_STATE_DIR: blob sidecars, service records), not authored declarative source. A same-named directory nested anywhere else
  * remains part of the authored-source inventory.
  */
-const RUNTIME_OWNED_ROOTS = new Set(['.starciwork', 'runtime']);
+const RUNTIME_OWNED_ROOTS = new Set(['.starciwork', 'runtime', RUNTIME_STATE_DIR]);
 
 /**
  * The skill-root spec tree: its synthetic checker fixtures (tests/fixtures) must not pollute the walk. Only this

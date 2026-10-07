@@ -19,6 +19,8 @@ import { buildUi, uiBuildState } from './ui-build.mjs';
 export { buildUi, uiBuildState };
 import { workflowCaller } from '../agent/caller-context.mjs';
 import { PROFILE, engineItems, profileItems, safeShadowOf, serviceItems } from './start-items.mjs';
+import { auditTasks } from '../machine/task-audit.mjs';
+import { taskItems } from './task-health.mjs';
 import { applyEngine, applyUiBuild, startDownServices, startSeats, waitForLeader } from './start-apply.mjs';
 import { eachInOrder, repeatInOrder } from '../lib/in-order.mjs';
 export { PROFILE, engineItems, profileItems, safeShadowOf };
@@ -149,9 +151,9 @@ function slaItems(s) {
 
 /* ------------------------------------------------------------ services and seats */
 
-/** Probe every registry service in parallel: [{name, ok, detail, entry}]. Seam: registry. */
-async function probeServices({ registry = serviceRegistry() } = {}) {
-  const wanted = registry.filter((e) => e.kind === 'service');
+/** Probe every registry service (or just `names`) in parallel: [{name, ok, detail, entry}]. Seam: registry. */
+async function probeServices({ registry = serviceRegistry(), names = null } = {}) {
+  const wanted = registry.filter((e) => e.kind === 'service' && (!names || names.includes(e.name)));
   return Promise.all(wanted.map(async (entry) => {
     let p;
     try { p = await entry.probe(); } catch (error) { p = { ok: false, error: String(error?.message ?? error).slice(0, 200) }; }
@@ -235,9 +237,10 @@ function engineRows(env, config) {
 }
 
 /** The service rows and the harness UI build row. */
-async function serviceRows(config) {
+async function serviceRows(config, platform) {
   const probes = await probeServices();
-  const services = serviceItems(probes, { publicUrl: safeRun(() => servicePorts().harnessPublicUrl, null), config });
+  const tasks = servicePlatformProblem('harness-ui', platform) ? null : await auditTasks();
+  const services = [...serviceItems(probes, { publicUrl: safeRun(() => servicePorts().harnessPublicUrl, null), config, audits: tasks?.audits }), ...taskItems(tasks)];
   const ui = uiBuildState();
   return [services, ui.stale ? red('services', 'ui-build', 'harness UI build (ui/dist)', ui.reason, 'starci reconciler up (rebuilds the harness UI)') : green('services', 'ui-build', 'harness UI build (ui/dist)', ui.reason)];
 }
@@ -288,7 +291,7 @@ export async function gather({ env = process.env, config = safeRun(() => loadCon
   // config + engine + controllers + sla
   push(engineRows(env, config));
   // services
-  push(await serviceRows(config));
+  push(await serviceRows(config, platform));
   // seats
   push(await supervisorRow({ env, config, orca, seats, orcaProbe }), orcaRow(orcaProbe));
   if (seats && workflowSeats) push(await kernelSeatItems({ orcaOk: orcaProbe.ok !== false, config }));
@@ -400,7 +403,7 @@ export async function applyHost(opts, deps = {}) {
   const unsupported = servicePlatformProblem('harness-ui', platform);
   if (unsupported) return [`host startup refused: ${unsupported}`];
   const api = { uiBuildState, buildUi, leaderState, reconcilerNumbers, crashLoopRecord, status, restartEngine, ensure,
-    sleep, probeServices, startService, loadConfig, probeOrcaAsync, supervisorMode, json, kernelSeatItems, ...deps };
+    sleep, probeServices, startService, auditTasks, loadConfig, probeOrcaAsync, supervisorMode, json, kernelSeatItems, ...deps };
   if (retire) applied.push(retireStaleLedgers(env));
   if (setProfile) applied.push(setProfileResult(setProfile));
   let rebuilt = false;
