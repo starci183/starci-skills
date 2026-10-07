@@ -28,6 +28,20 @@ const matchesPin = (member, only) => Object.entries(only).every(([key, value]) =
 /** The goal's routing bias with the seat pin added as `only` (a pin is the owner's bias over the tier chain). */
 export const kernelBias = (goalBias, route) => (route?.pin ? { ...goalBias, only: [...(goalBias?.only ?? []), route.pin] } : goalBias);
 
+/**
+ * What a Kernel plan reports as its lead: the member the plan's admission selected (a Claude member at 90 percent of its
+ * tokens is skipped, so the lead is the next one), else the route; or the typed refusal when no member can start.
+ */
+export function planLeadOf(route, admission) {
+  if (route.error || admission.ok) {
+    const picked = admission.ok ? (route.members ?? []).find((member) => member.provider === admission.selected.provider && member.model === admission.selected.model) : null;
+    return { lead: picked ?? route, refusal: null };
+  }
+  const skipped = (admission.pick?.dropped ?? []).map((row) => `${row.id} skipped — ${row.reason}`).join('; ');
+  const step = route.pin ? 'kernel-pin-unavailable' : 'kernel-group-unavailable';
+  return { lead: route, refusal: { step, error: `no member of tier ${route.tier} can start the Kernel (${admission.reason}): ${skipped || 'every member was refused'}` } };
+}
+
 export function createKernelRoute({ skillRoot, agentOverride, ownerRoot }) {
   const ownerFileLabel = (file) => ownerRoot === skillRoot ? file.replace(`${skillRoot}`, '').replace(/^[\\/]/, '') : file;
 
