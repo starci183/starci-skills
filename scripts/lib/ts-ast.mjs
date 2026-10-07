@@ -5,6 +5,9 @@
 /** Whether the single-bit `flag` (a ts.NodeFlags member) is set in `flags`: the bit read as arithmetic, no bitwise operator in the condition. */
 export const hasFlag = (flags, flag) => Math.floor(flags / flag) % 2 === 1;
 
+/** Whether any bit of `mask` (a ts flag or an OR of flags) is set in `flags` (absent flags read as none): an explicit comparison of the masked value. */
+export const hasAnyFlag = (flags, mask) => ((flags ?? 0) & mask) !== 0;
+
 /** Whether the variable `declaration` belongs to a `const` list: the TypeScript node-flag test, an explicit comparison of the masked flags. */
 export const isConstVariable = (ts, declaration) => (ts.getCombinedNodeFlags(declaration.parent) & ts.NodeFlags.Const) !== 0;
 

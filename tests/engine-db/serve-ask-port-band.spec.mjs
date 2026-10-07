@@ -14,7 +14,7 @@ process.env.STARCI_AUTOPILOT ??= 'off';
 // the shared engine/config.mjs ASK_PORT_BAND is raced by every other spec that serves asks.
 
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
-const SERVE_ASK=path.join(ROOT,'scripts','kernel','ask-server.mjs');
+const SERVE_ASK=path.join(ROOT,'scripts','kernel','ask-server-main.mjs');
 const WORKFLOW='wf-port-band';
 const [BAND_FIRST,BAND_LAST]=[29690,29699];
 const bandRange=(from,to)=>Array.from({length:to-from+1},(_,i)=>from+i);

@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 // job-settle.mjs — SETTLE as a deterministic runtime service: the first reconciler controller (one loop engine,
 // idempotent controllers per concern, LLMs as deciders only), called by the watchdog and movable into the engine as is.
 //
@@ -50,7 +49,6 @@ import { openLedger, ledgerFileFor, updateAttempt, releaseLeases, setCondition }
 import { claimManager, lockHolder } from '../../connectors/lib.mjs';
 import { SETTLED_JOB_LIST } from '../../../engine/admission.mjs';
 import { NEEDS_KERNEL_EVENT, KERNEL_ONLY_OPS, reportedJobs, kernelHandoverOf } from '../../machine/reported-jobs.mjs';
-import { isMain } from '../../lib/is-main.mjs';
 import { eachInOrder } from '../../lib/in-order.mjs';
 import { settlerSettings, runtimeEnv, verifyReported, recordSettlerCheck, parse, slug, jsonOf } from './job-settle-verify.mjs';
 export { classifyCheck, argvOf } from './check-command.mjs';
@@ -441,10 +439,8 @@ const resultLine = (r) => {
   return `[settler] ${r.repo}${counts}${action}${errors}`;
 };
 
-// No top-level await: scripts/machine/decisions.mjs imports this module, and a dynamic import of it while this
-// module still evaluates would deadlock (exit 13).
-if (isMain(import.meta.url)) (async () => {
-  const argv = process.argv.slice(2);
+/** The settler CLI (`job-settle-main.mjs` runs it): settles the repos named by the flags in `argv`, prints the results and sets the exit code. */
+export async function main(argv = process.argv.slice(2)) {
   const val = (n) => { const i = argv.indexOf(`--${n}`); return i >= 0 ? argv[i + 1] ?? null : null; };
   const has = (n) => argv.includes(`--${n}`);
   let repos = [];
@@ -457,4 +453,4 @@ if (isMain(import.meta.url)) (async () => {
   if (has('json')) console.log(JSON.stringify(out));
   else for (const r of results) console.log(resultLine(r));
   process.exitCode = out.ok ? 0 : 1;
-})().catch((error) => { console.error(error); process.exit(1); });
+}

@@ -121,7 +121,7 @@ const fakeForm=async t=>{
       if(req.method==='GET'&&(req.url===`/${NONCE}`||req.url===`/${CRED}`)){res.writeHead(200,{'content-type':'text/html'});res.end(`<form method="post" action="${req.url}/answer">form</form>`);return;}
       if(req.method==='GET'&&req.url===`/${NONCE}/img/0`){res.writeHead(200,{'content-type':'image/png'});res.end('PNG');return;}
       if(req.method==='POST'&&req.url===`/${NONCE}/answer`){res.writeHead(200,{'content-type':'text/plain'});res.end(`got ${body}`);return;}
-      if(req.url===`/${NONCE}/go?x=1`){res.writeHead(302,{location:`http://127.0.0.1:${port}/${NONCE}/done?y=2`});res.end();return;}
+      if(req.url===`/${NONCE}/img/1`){res.writeHead(302,{location:`http://127.0.0.1:${port}/${NONCE}/img/2?y=2`});res.end();return;}
       res.writeHead(404);res.end('form 404');
     });
   });
@@ -148,12 +148,12 @@ test('the gateway proxies a served nonce (page, asset, POST, redirect) and forwa
   const post=await request(gw,{method:'POST',path:`/${NONCE}/answer`,body:'option=1&note=ok'});
   assert.equal(post.status,200);assert.equal(post.body,'got option=1&note=ok');
 
-  const redirect=await request(gw,{path:`/${NONCE}/go?x=1`});
+  const redirect=await request(gw,{path:`/${NONCE}/img/1`});
   assert.equal(redirect.status,302);
-  assert.equal(redirect.headers.location,`/${NONCE}/done?y=2`,'a redirect to the loopback origin becomes a public path');
+  assert.equal(redirect.headers.location,`/${NONCE}/img/2?y=2`,'a redirect to the loopback origin becomes a public path');
 
   const before=form.seen.length;
-  for(const p of ['/','/favicon.ico','/a-notanonce',`/a-1111111111111111ff`,`/${NONCE}x`,`/${NONCE}/../${CRED}`,'/.well-known/x','/a-0123456789ABCDEF01']){
+  for(const p of ['/','/favicon.ico','/a-notanonce',`/a-1111111111111111ff`,`/${NONCE}x`,`/${NONCE}/../${CRED}`,'/.well-known/x','/a-0123456789ABCDEF01',`/${NONCE}/favicon.ico`,`/${NONCE}/answer/`,`/${NONCE}%2Fanswer`,`/${NONCE}@evil.test/answer`]){
     const r=await request(gw,{path:p});
     assert.equal(r.status,404,p);
   }

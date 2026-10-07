@@ -38,12 +38,8 @@ const resolved = (from, specifier, known) => {
   return known.has(target) ? target : null;
 };
 
-/**
- * The functions that run in a browser page, per module: those a module passes to page.evaluate, followed through the
- * imports and re-exports that carry them to the module declaring them. Map(file -> Set(local function name)).
- */
-function pageFunctionsByModule(t, files) {
-  const known = new Set(files);
+/** The export links of every module in `files`, and the page-call arguments that name an imported function: {links, pending}. */
+function linksOfModules(t, files, known) {
   const links = new Map();
   const pending = [];
   for (const file of files) {
@@ -56,6 +52,16 @@ function pageFunctionsByModule(t, files) {
       if (target) pending.push({ file: target, name: link.name });
     }
   }
+  return { links, pending };
+}
+
+/**
+ * The functions that run in a browser page, per module: those a module passes to page.evaluate, followed through the
+ * imports and re-exports that carry them to the module declaring them. Map(file -> Set(local function name)).
+ */
+function pageFunctionsByModule(t, files) {
+  const known = new Set(files);
+  const { links, pending } = linksOfModules(t, files, known);
   const byModule = new Map();
   const seen = new Set();
   while (pending.length) {

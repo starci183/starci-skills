@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { relativePath, unwrapExpression } from './typescript.mjs';
 import { anyDescendant, nodeDecorators, normalizedSymbol, normalizedSymbolValue, valueSymbol, violation } from './ast-walks.mjs';
-import { isConstVariable, sourceLocation } from '../../lib/ts-ast.mjs';
+import { hasAnyFlag, isConstVariable, sourceLocation } from '../../lib/ts-ast.mjs';
 
 export const READONLY_BOUNDARY_RULE_ID = 'BE_READONLY_BOUNDARY';
 
@@ -80,7 +80,7 @@ function isSafePrimitiveProjection(ts, checker, expression, expected) {
   const primitive = ts.TypeFlags.StringLike | ts.TypeFlags.NumberLike | ts.TypeFlags.BooleanLike
     | ts.TypeFlags.BigIntLike | ts.TypeFlags.ESSymbolLike | ts.TypeFlags.Null | ts.TypeFlags.Undefined
     | ts.TypeFlags.Void | ts.TypeFlags.Never;
-  return Boolean(type.flags & primitive) && !(type.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown));
+  return hasAnyFlag(type.flags, primitive) && !hasAnyFlag(type.flags, ts.TypeFlags.Any | ts.TypeFlags.Unknown);
 }
 
 function assignmentPatternHasInstanceTarget(ts, checker, expression) {

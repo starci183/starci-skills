@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { canonical } from './config.mjs';
-import { sourceLocation } from '../../lib/ts-ast.mjs';
+import { hasAnyFlag, sourceLocation } from '../../lib/ts-ast.mjs';
 
 const HELPER_DEPTH = 4;
 
@@ -10,7 +10,7 @@ function aliased(env, checker, symbol) {
   const { ts } = env;
   const seen = new Set();
   let current = symbol;
-  while (current && (current.flags & ts.SymbolFlags.Alias) && !seen.has(current)) {
+  while (current && hasAnyFlag(current.flags, ts.SymbolFlags.Alias) && !seen.has(current)) {
     seen.add(current);
     let target;
     try { target = checker.getAliasedSymbol(current); } catch { break; }
@@ -91,7 +91,7 @@ function walk(env, node, visit) {
 }
 
 const decorators = (env, node) => (env.ts.canHaveDecorators?.(node) ? env.ts.getDecorators(node) ?? [] : []);
-const isExported = (env, node) => Boolean(env.ts.getCombinedModifierFlags?.(node) & env.ts.ModifierFlags.Export);
+const isExported = (env, node) => hasAnyFlag(env.ts.getCombinedModifierFlags?.(node), env.ts.ModifierFlags.Export);
 
 function propertyNameText(env, name) {
   if (!name) return null;

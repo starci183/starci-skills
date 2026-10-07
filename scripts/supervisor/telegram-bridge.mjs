@@ -89,7 +89,7 @@ import { eachInOrder, findInOrder, repeatInOrder } from '../lib/in-order.mjs';
 import { bridgeText } from './telegram-bridge-text.mjs';
 import { starciSourceRoot } from '../../engine/runtime-root.mjs';
 import { isSpecRun } from '../lib/env.mjs';
-const SERVE_ASK_FILE = fileURLToPath(new URL('../kernel/ask-server.mjs', import.meta.url));
+const SERVE_ASK_FILE = fileURLToPath(new URL('../kernel/ask-server-main.mjs', import.meta.url));
 export const BRIDGE_NAME = 'telegram-bridge';
 export const BRIDGE_FILE = fileURLToPath(import.meta.url);
 export const ONLINE_MS = 30 * 60 * 1000;

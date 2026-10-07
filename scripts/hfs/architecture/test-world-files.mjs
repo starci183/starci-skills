@@ -3,7 +3,7 @@ import { allowsFile } from '../allows.mjs';
 import { locateDeclaration } from '../slots.mjs';
 import { DEFAULT_ENVIRONMENT, STACKS_DIRECTORY, STATEFUL_KINDS, namesOfService, readStack } from '../../lib/stack-services.mjs';
 import { unwrapEach } from './ast-walks.mjs';
-import { nameText, sourceLocation } from '../../lib/ts-ast.mjs';
+import { hasAnyFlag, nameText, sourceLocation } from '../../lib/ts-ast.mjs';
 import { byCodeUnit } from '../../lib/list.mjs';
 
 /**
@@ -60,8 +60,7 @@ function defineLiteral(ts, expression) {
 function configLiteral(ts, sourceFile) {
   for (const statement of sourceFile.statements) {
     if (!ts.isVariableStatement(statement) || !isExported(ts, statement)) continue;
-    const constFlag = statement.declarationList.flags & ts.NodeFlags.Const;
-    if (constFlag === 0) continue;
+    if (!hasAnyFlag(statement.declarationList.flags, ts.NodeFlags.Const)) continue;
     for (const declaration of statement.declarationList.declarations) {
       const literal = declaration.initializer ? defineLiteral(ts, declaration.initializer) : null;
       if (literal) return literal;

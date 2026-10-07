@@ -75,11 +75,11 @@ internal:
   - {path: scripts/cli/main.mjs, why: "Runtime-side catalog dispatcher", usedBy: [packages/cli/src/main.mjs]}
   - {path: scripts/context/pack.mjs, why: "Operation context-pack builder", usedBy: [scripts/kernel/dispatch-op.mjs]}
   - {path: scripts/housekeeping/blob-gc.mjs, why: "Blob garbage-collection controller", usedBy: [scripts/housekeeping/hk-ledger.mjs]}
-  - {path: scripts/kernel/ask-server.mjs, why: "Kernel ask-form server child", usedBy: [scripts/kernel/cli.mjs]}
+  - {path: scripts/kernel/ask-server-main.mjs, why: "Kernel ask-form server child", usedBy: [scripts/kernel/cli.mjs]}
   - {path: scripts/kernel/dispatch-op.mjs, why: "Kernel operation-dispatch helper", usedBy: [scripts/kernel/cli.mjs]}
   - {path: scripts/kernel/report-render.mjs, why: "Kernel report renderer", usedBy: [scripts/kernel/verbs/report.mjs]}
   - {path: scripts/kernel/settle/canon-parity.mjs, why: "Kernel settlement parity helper", usedBy: [scripts/kernel/settle/job-settle.mjs]}
-  - {path: scripts/kernel/settle/job-settle.mjs, why: "Reconciler-managed settlement service", usedBy: [scripts/reconciler/services.mjs]}
+  - {path: scripts/kernel/settle/job-settle-main.mjs, why: "Reconciler-managed settlement service", usedBy: [scripts/reconciler/services.mjs]}
   - {path: scripts/kernel/transcripts.mjs, why: "Kernel transcript projection helper", usedBy: [scripts/kernel/verbs/report.mjs]}
   - {path: scripts/kernel/typed-logs.mjs, why: "Kernel typed-log helper", usedBy: [scripts/kernel/cli.mjs]}
   - {path: scripts/kernel/usage-record.mjs, why: "Kernel usage-record helper", usedBy: [scripts/kernel/cli.mjs]}

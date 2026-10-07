@@ -121,6 +121,32 @@ export function pageCallNames(t, source) {
 
 const hasModifier = (t, statement, kind) => Boolean(statement.modifiers?.some((modifier) => modifier.kind === kind));
 
+/** Records the relative named and default imports of `statement` into `imports` (local name -> {specifier, name}). */
+function addImportLinks(t, statement, imports) {
+  const specifier = statement.moduleSpecifier.text;
+  const clause = statement.importClause;
+  if (clause?.name) imports.set(clause.name.text, { specifier, name: 'default' });
+  if (clause?.namedBindings && t.isNamedImports(clause.namedBindings)) {
+    for (const element of clause.namedBindings.elements) imports.set(element.name.text, { specifier, name: (element.propertyName ?? element.name).text });
+  }
+}
+
+/** Records the names of an `export { ... }` or `export { ... } from` statement into `exports`. */
+function addExportListLinks(t, statement, exports) {
+  const specifier = statement.moduleSpecifier?.text;
+  for (const element of statement.exportClause.elements) {
+    const from = (element.propertyName ?? element.name).text;
+    exports.set(element.name.text, specifier ? { specifier, name: from } : { local: from });
+  }
+}
+
+/** Records the names a declaration carrying an `export` modifier exports into `exports`. */
+function addDeclarationExports(t, statement, exports) {
+  const names = t.isVariableStatement(statement) ? statement.declarationList.declarations.flatMap((d) => bindingNames(t, d.name)) : [statement.name?.text].filter(Boolean);
+  const isDefault = hasModifier(t, statement, t.SyntaxKind.DefaultKeyword);
+  for (const name of names) exports.set(isDefault ? 'default' : name, { local: name });
+}
+
 /**
  * How a module links to others: `imports` maps a local name to {specifier, name} for each relative named or default import,
  * `exports` maps an exported name to {local} (declared here) or {specifier, name} (re-exported from another module).
@@ -129,24 +155,9 @@ export function moduleLinks(t, source) {
   const imports = new Map();
   const exports = new Map();
   for (const statement of source.statements) {
-    if (t.isImportDeclaration(statement) && t.isStringLiteral(statement.moduleSpecifier)) {
-      const specifier = statement.moduleSpecifier.text;
-      const clause = statement.importClause;
-      if (clause?.name) imports.set(clause.name.text, { specifier, name: 'default' });
-      if (clause?.namedBindings && t.isNamedImports(clause.namedBindings)) {
-        for (const element of clause.namedBindings.elements) imports.set(element.name.text, { specifier, name: (element.propertyName ?? element.name).text });
-      }
-    } else if (t.isExportDeclaration(statement) && statement.exportClause && t.isNamedExports(statement.exportClause)) {
-      const specifier = statement.moduleSpecifier?.text;
-      for (const element of statement.exportClause.elements) {
-        const from = (element.propertyName ?? element.name).text;
-        exports.set(element.name.text, specifier ? { specifier, name: from } : { local: from });
-      }
-    } else if (hasModifier(t, statement, t.SyntaxKind.ExportKeyword)) {
-      const names = t.isVariableStatement(statement) ? statement.declarationList.declarations.flatMap((d) => bindingNames(t, d.name)) : [statement.name?.text].filter(Boolean);
-      const isDefault = hasModifier(t, statement, t.SyntaxKind.DefaultKeyword);
-      for (const name of names) exports.set(isDefault ? 'default' : name, { local: name });
-    }
+    if (t.isImportDeclaration(statement) && t.isStringLiteral(statement.moduleSpecifier)) addImportLinks(t, statement, imports);
+    else if (t.isExportDeclaration(statement) && statement.exportClause && t.isNamedExports(statement.exportClause)) addExportListLinks(t, statement, exports);
+    else if (hasModifier(t, statement, t.SyntaxKind.ExportKeyword)) addDeclarationExports(t, statement, exports);
   }
   return { imports, exports };
 }
@@ -189,30 +200,36 @@ export function undeclaredNames(t, source, { pageFunctions = new Set() } = {}) {
     t.forEachChild(node, (child) => { visit(child, own); });
   }
 
+  function visitStaticBlock(node, scope) {
+    const own = new Scope(scope);
+    own.declare([...varNames(t, node.body, []), ...lexicalNames(t, node.body.statements)]);
+    node.body.statements.forEach((statement) => visit(statement, own));
+    return undefined;
+  }
+
+  function visitLoop(node, scope) {
+    const own = new Scope(scope);
+    const head = node.initializer;
+    if (head && t.isVariableDeclarationList(head) && isBlockScoped(t, head)) own.declare(head.declarations.flatMap((d) => bindingNames(t, d.name)));
+    t.forEachChild(node, (child) => { visit(child, own); });
+    return undefined;
+  }
+
+  function visitCatch(node, scope) {
+    const own = new Scope(scope);
+    if (node.variableDeclaration) own.declare(bindingNames(t, node.variableDeclaration.name));
+    t.forEachChild(node, (child) => { visit(child, own); });
+    return undefined;
+  }
+
   function visit(node, scope) {
     if (isFunctionLike(t, node)) return visitFunction(node, scope);
     if (t.isClassLike(node)) return visitClass(node, scope);
     if (t.isBlock(node) || t.isModuleBlock(node)) return visitBlockLike(node.statements, node, scope);
     if (t.isCaseBlock(node)) return visitBlockLike(node.clauses.flatMap((clause) => [...clause.statements]), node, scope);
-    if (t.isClassStaticBlockDeclaration(node)) {
-      const own = new Scope(scope);
-      own.declare([...varNames(t, node.body, []), ...lexicalNames(t, node.body.statements)]);
-      node.body.statements.forEach((statement) => visit(statement, own));
-      return undefined;
-    }
-    if (t.isForStatement(node) || t.isForInStatement(node) || t.isForOfStatement(node)) {
-      const own = new Scope(scope);
-      const head = node.initializer;
-      if (head && t.isVariableDeclarationList(head) && isBlockScoped(t, head)) own.declare(head.declarations.flatMap((d) => bindingNames(t, d.name)));
-      t.forEachChild(node, (child) => { visit(child, own); });
-      return undefined;
-    }
-    if (t.isCatchClause(node)) {
-      const own = new Scope(scope);
-      if (node.variableDeclaration) own.declare(bindingNames(t, node.variableDeclaration.name));
-      t.forEachChild(node, (child) => { visit(child, own); });
-      return undefined;
-    }
+    if (t.isClassStaticBlockDeclaration(node)) return visitStaticBlock(node, scope);
+    if (t.isForStatement(node) || t.isForInStatement(node) || t.isForOfStatement(node)) return visitLoop(node, scope);
+    if (t.isCatchClause(node)) return visitCatch(node, scope);
     if (t.isTypeOfExpression(node) && t.isIdentifier(node.expression)) return undefined;
     if (t.isIdentifier(node)) {
       if (!isNameOnly(t, node) && !scope.has(node.text)) report(node);

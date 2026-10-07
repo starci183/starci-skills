@@ -46,7 +46,7 @@ import { positiveNumber } from '../../lib/number.mjs';
 const selfFile = fileURLToPath(import.meta.url);
 const skillRoot = path.resolve(path.dirname(selfFile), '..', '..', '..');
 const JOB_FILE = path.join(skillRoot, 'modules', 'reconciler', 'job.yaml');
-export const SETTLER_SCRIPT = 'scripts/kernel/settle/job-settle.mjs';
+export const SETTLER_SCRIPT = 'scripts/kernel/settle/job-settle-main.mjs';
 const WORKERS_KEY = 'workers:supervisor';
 const HEALTH_KEY = 'health:all';
 const OPEN = ['queued', 'leased', 'running', 'answering', 'effect_unknown'];
