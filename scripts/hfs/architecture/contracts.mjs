@@ -102,7 +102,7 @@ function sourceRole(sourceFile) {
 function isFrameworkHelper(sourceFile, declaration, framework) {
   const role = sourceRole(sourceFile);
   if (role.transport || NON_API_SOURCE_ROLES.has(role.role) || NON_API_SOURCE_ROLES.has(role.base)) return true;
-  if (declaration?.name && /Module$/.test(declaration.name.text ?? '')) {
+  if (declaration?.name && (declaration.name.text ?? '').endsWith('Module')) {
     return nodeDecorators(framework.ts, declaration).some(decorator => decoratorKind(framework.ts, framework.checker, decorator, framework.targets) === 'Module');
   }
   return false;
