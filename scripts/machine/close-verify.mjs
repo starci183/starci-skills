@@ -81,6 +81,28 @@ function closeOnce(handle, { list = terminalList, close = terminalClose, byPane 
   } catch (error) { return { ok: false, error: String(error?.message ?? error) }; }
 }
 
+// Orca proves the exit (terminal wait --for exit: an exited or closed handle answers at once); only an answer it cannot give
+// (host down, the verb refused) falls back to polling terminal show. The closing result, or null while the handle stays connected.
+function verifyExit(handle, out, { show, sleep, verifyMs, intervalMs, wait }) {
+  let proven = null;
+  try { proven = wait({ terminal: handle, for: 'exit', timeoutMs: verifyMs }); } catch { proven = null; }
+  const viaWait = proven?.ok === true && !proven.hostUnavailable;
+  const stateNow = () => {
+    if (!viaWait) return terminalState(handle, { show });
+    return proven.satisfied ? 'disconnected' : 'connected';
+  };
+  for (let waited = 0; waited <= (viaWait ? 0 : verifyMs); waited += intervalMs) {
+    if (waited > 0) sleep(intervalMs);
+    const state = stateNow();
+    if (state === 'gone' || state === 'disconnected') {
+      delete out.error;
+      return { ...out, ok: true, proof: state };
+    }
+    if (state === 'unknown') return { ...out, reason: 'host-unavailable' };
+  }
+  return null;
+}
+
 /**
  * Close `handle` and prove it is gone. Seams: show, close, list, sleep, verifyMs. See the header for the result.
  */
@@ -96,22 +118,8 @@ export function closeAndVerify(handle, { show = terminalShow, close = terminalCl
     out.attempts += 1;
     if (r.tab) out.tab = r.tab;
     if (r.error) out.error = r.error;
-    // Orca proves the exit (terminal wait --for exit: an exited or closed handle answers at once); only an answer it cannot give
-    // (host down, the verb refused) falls back to polling terminal show.
-    let proven = null;
-    try { proven = wait({ terminal: handle, for: 'exit', timeoutMs: verifyMs }); } catch { proven = null; }
-    const viaWait = proven?.ok === true && !proven.hostUnavailable;
-    for (let waited = 0; waited <= (viaWait ? 0 : verifyMs); waited += intervalMs) {
-      if (waited > 0) sleep(intervalMs);
-      let state;
-      if (viaWait) state = proven.satisfied ? 'disconnected' : 'connected';
-      else state = terminalState(handle, { show });
-      if (state === 'gone' || state === 'disconnected') {
-        delete out.error;
-        return { ...out, ok: true, proof: state };
-      }
-      if (state === 'unknown') return { ...out, reason: 'host-unavailable' };
-    }
+    const verdict = verifyExit(handle, out, { show, sleep, verifyMs, intervalMs, wait });
+    if (verdict) return verdict;
   }
   return { ...out, reason: 'still-connected' };
 }

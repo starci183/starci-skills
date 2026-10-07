@@ -19,6 +19,12 @@ function printHelp(helpFile) {
   console.log(header.slice(from, to).map((line) => line.replace(/^\/\/ ?/, '')).join('\n').trimEnd());
 }
 
+// A value option lands on its property: --tools is a list, --context-tokens a number.
+function setOption(args, property, value) {
+  if (property === 'tools') args.tools.push(...value.split(','));
+  else args[property] = property === 'contextTokens' ? Number(value) : value;
+}
+
 export function parseArgs(argv, helpFile) {
   const args = { tools: [] };
   const take = (i) => {
@@ -34,9 +40,7 @@ export function parseArgs(argv, helpFile) {
     }
     const property = VALUE_OPTIONS.get(key);
     if (property) {
-      const value = take(i);
-      if (property === 'tools') args.tools.push(...value.split(','));
-      else args[property] = property === 'contextTokens' ? Number(value) : value;
+      setOption(args, property, take(i));
       i += 1;
       continue;
     }

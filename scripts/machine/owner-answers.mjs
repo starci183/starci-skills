@@ -47,6 +47,40 @@ export function lineageJobsOf(db, job) {
 
 const readReceipt = readJsonFile;
 
+// The ask reports of one try (the ones that try itself filed).
+const askReportsOf = (db, row) => db.prepare("SELECT dispatch_id, report_json, created_at FROM reports WHERE job_id=? AND outcome='ask' ORDER BY report_id")
+  .all(row.job_id)
+  .filter((report) => { const from = parse(report.report_json).from; return !from || from === row.job_id; });
+
+// The chosen option of an answer, from the ask-answered event first, then its receipt: {index, label} or null.
+function chosenOf(answered, receipt, options) {
+  const rawIndex = answered.optionIndex ?? receipt?.optionIndex ?? null;
+  const index = Number.isInteger(Number(rawIndex)) && rawIndex !== null && rawIndex !== '' ? Number(rawIndex) : null;
+  const label = answered.option ?? receipt?.option ?? (index != null ? options[index] ?? null : null);
+  return index != null || label != null ? { index, label: label ?? null } : null;
+}
+
+// The answer an ask report received, or null when its ask-answered event is absent.
+function answerOf(db, row, report) {
+  const event = db.prepare("SELECT payload_json, created_at FROM events WHERE workflow_id=? AND kind='ask-answered' AND json_extract(payload_json,'$.dispatchId')=? ORDER BY seq DESC LIMIT 1")
+    .get(row.workflow_id, report.dispatch_id);
+  if (!event) return null;
+  const answered = parse(event.payload_json);
+  const receipt = readReceipt(answered.receiptPath);
+  const question = parse(report.report_json).question ?? {};
+  const options = (Array.isArray(question.options) ? question.options : []).map(labelOf).map(String);
+  return {
+    dispatchId: report.dispatch_id, jobId: row.job_id, attempt: row.attempt,
+    question: String(question.text ?? ''), options,
+    chosen: chosenOf(answered, receipt, options),
+    ...(receipt?.picks ? { picks: receipt.picks } : {}),
+    ...(answered.note ?? receipt?.note ? { note: answered.note ?? receipt.note } : {}),
+    answeredBy: answered.answeredBy ?? receipt?.answeredBy ?? 'owner',
+    answeredAt: receipt?.at ?? new Date(event.created_at).toISOString(),
+    receipt: answered.receiptPath ?? null,
+  };
+}
+
 /**
  * The answered asks of `job`'s work unit (its earlier tries), oldest first:
  * [{dispatchId, jobId, attempt, question, options[], chosen:{index,label}|null, picks, note,
@@ -59,31 +93,10 @@ export function ownerAnswersOf(db, job) {
   const unitId = job?.unit_id ?? null;
   const tries = unitId ? db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE workflow_id=? AND job_id<>? AND unit_id=? ORDER BY try_no`).all(job.workflow_id, job.job_id, unitId) : [];
   for (const row of tries) {
-    const reports = db.prepare("SELECT dispatch_id, report_json, created_at FROM reports WHERE job_id=? AND outcome='ask' ORDER BY report_id")
-      .all(row.job_id)
-      .filter((report) => { const from = parse(report.report_json).from; return !from || from === row.job_id; });
-    for (const report of reports) {
+    for (const report of askReportsOf(db, row)) {
       if (answers.some((a) => a.dispatchId === report.dispatch_id)) continue;
-      const event = db.prepare("SELECT payload_json, created_at FROM events WHERE workflow_id=? AND kind='ask-answered' AND json_extract(payload_json,'$.dispatchId')=? ORDER BY seq DESC LIMIT 1")
-        .get(row.workflow_id, report.dispatch_id);
-      if (!event) continue;
-      const answered = parse(event.payload_json);
-      const receipt = readReceipt(answered.receiptPath);
-      const question = parse(report.report_json).question ?? {};
-      const options = (Array.isArray(question.options) ? question.options : []).map(labelOf).map(String);
-      const rawIndex = answered.optionIndex ?? receipt?.optionIndex ?? null;
-      const index = Number.isInteger(Number(rawIndex)) && rawIndex !== null && rawIndex !== '' ? Number(rawIndex) : null;
-      const label = answered.option ?? receipt?.option ?? (index != null ? options[index] ?? null : null);
-      answers.push({
-        dispatchId: report.dispatch_id, jobId: row.job_id, attempt: row.attempt,
-        question: String(question.text ?? ''), options,
-        chosen: index != null || label != null ? { index, label: label ?? null } : null,
-        ...(receipt?.picks ? { picks: receipt.picks } : {}),
-        ...(answered.note ?? receipt?.note ? { note: answered.note ?? receipt.note } : {}),
-        answeredBy: answered.answeredBy ?? receipt?.answeredBy ?? 'owner',
-        answeredAt: receipt?.at ?? new Date(event.created_at).toISOString(),
-        receipt: answered.receiptPath ?? null,
-      });
+      const answer = answerOf(db, row, report);
+      if (answer) answers.push(answer);
     }
   }
   return answers;
