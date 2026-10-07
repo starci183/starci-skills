@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { contextFromProjects } from './type-context.mjs';
 import { createRequire } from 'node:module';
 import { canonical, isInside, slash } from './config.mjs';
 import { crossesSide } from './side-boundary.mjs';
@@ -11,7 +12,8 @@ import { locateDeclaration } from '../slots.mjs';
 
 const CODE_EXTENSIONS = /\.(?:[cm]?[jt]sx?)$/i;
 const TEST_FILE = /(?:^|[.-])(?:spec|test)\.[cm]?[jt]sx?$/i;
-const ASSET_EXTENSION = /\.(?:css|scss|sass|less|svg|png|jpe?g|gif|webp|avif|ico|woff2?|ttf|eot|ya?ml|json)$/i;
+const ASSET_EXTENSION_NAMES = 'css|scss|sass|less|svg|png|jpe?g|gif|webp|avif|ico|woff2?|ttf|eot|ya?ml|json';
+const ASSET_EXTENSION = new RegExp(String.raw`\.(?:${ASSET_EXTENSION_NAMES})$`, 'i');
 // Framework build output a tsconfig may include (Next writes `.next/types/**/*.ts` back into tsconfig.json on
 // every build) is compiled for type resolution but is never source: it is gitignored, regenerated, and no
 // canon or architecture rule applies to it (inc-ffe60c49f502).
@@ -73,20 +75,25 @@ function pathAliasMatches(specifier, paths = {}) {
   });
 }
 
+function importDeclarationRuntime(ts, node) {
+  const clause = node.importClause;
+  if (!clause) return true;
+  if (clause.isTypeOnly) return false;
+  if (clause.name) return true;
+  const named = clause.namedBindings;
+  if (named && ts.isNamedImports(named)) return named.elements.some(element => !element.isTypeOnly);
+  return Boolean(named);
+}
+
+function exportDeclarationRuntime(ts, node) {
+  if (node.isTypeOnly) return false;
+  if (node.exportClause && ts.isNamedExports(node.exportClause)) return node.exportClause.elements.some(element => !element.isTypeOnly);
+  return true;
+}
+
 function runtimeImport(ts, node) {
-  if (ts.isImportDeclaration(node)) {
-    const clause = node.importClause;
-    if (!clause) return true;
-    if (clause.isTypeOnly) return false;
-    if (clause.name) return true;
-    const named = clause.namedBindings;
-    if (named && ts.isNamedImports(named)) return named.elements.some(element => !element.isTypeOnly);
-    return Boolean(named);
-  }
-  if (ts.isExportDeclaration(node)) {
-    if (node.isTypeOnly) return false;
-    if (node.exportClause && ts.isNamedExports(node.exportClause)) return node.exportClause.elements.some(element => !element.isTypeOnly);
-  }
+  if (ts.isImportDeclaration(node)) return importDeclarationRuntime(ts, node);
+  if (ts.isExportDeclaration(node)) return exportDeclarationRuntime(ts, node);
   return true;
 }
 
@@ -129,31 +136,48 @@ function assetContextSpecifiers(ts, sourceFile, argument) {
   return specifiers.length ? specifiers : null;
 }
 
+function staticModuleReference(ts, node, found, unproven) {
+  if ((ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) && node.moduleSpecifier && ts.isStringLiteralLike(node.moduleSpecifier)) {
+    found.push({ node: node.moduleSpecifier, specifier: node.moduleSpecifier.text, runtime: runtimeImport(ts, node), declaration: node });
+    return true;
+  } else if (ts.isImportEqualsDeclaration(node) && ts.isExternalModuleReference(node.moduleReference)
+    && node.moduleReference.expression && ts.isStringLiteralLike(node.moduleReference.expression)) {
+    found.push({ node: node.moduleReference.expression, specifier: node.moduleReference.expression.text, runtime: !node.isTypeOnly, declaration: node });
+    return true;
+  } else if (ts.isImportTypeNode(node)) {
+    const literal = ts.isLiteralTypeNode(node.argument) && ts.isStringLiteralLike(node.argument.literal) ? node.argument.literal : null;
+    if (literal) found.push({ node: literal, specifier: literal.text, runtime: false, declaration: node });
+    else unproven.push({ node, kind: 'TypeScript import type' });
+    return true;
+  }
+  return false;
+}
+
+function dynamicImportReference(ts, sourceFile, node, found, unproven) {
+  const context = [1, 2].includes(node.arguments.length) ? assetContextSpecifiers(ts, sourceFile, node.arguments[0]) : null;
+  if ([1, 2].includes(node.arguments.length) && ts.isStringLiteralLike(node.arguments[0])) {
+    found.push({ node: node.arguments[0], specifier: node.arguments[0].text, runtime: true, declaration: node });
+  } else if (context) {
+    for (const specifier of context) found.push({ node: node.arguments[0], specifier, runtime: true, declaration: node });
+  } else unproven.push({ node, kind: 'dynamic import()' });
+}
+
+function requireReference(ts, checker, node, found, unproven) {
+  if (node.arguments.length === 1 && ts.isStringLiteralLike(node.arguments[0])) {
+    found.push({ node: node.arguments[0], specifier: node.arguments[0].text, runtime: true, declaration: node });
+  } else unproven.push({ node, kind: 'dynamic require()' });
+}
+
+function callModuleReference(ts, sourceFile, checker, node, found, unproven) {
+  if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) dynamicImportReference(ts, sourceFile, node, found, unproven);
+  else if (ts.isCallExpression(node) && isUnshadowedCommonJsRequire(ts, checker, node.expression)) requireReference(ts, checker, node, found, unproven);
+}
+
 function moduleReferences(ts, sourceFile, checker) {
   const found = [];
   const unproven = [];
   const visit = node => {
-    if ((ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) && node.moduleSpecifier && ts.isStringLiteralLike(node.moduleSpecifier)) {
-      found.push({ node: node.moduleSpecifier, specifier: node.moduleSpecifier.text, runtime: runtimeImport(ts, node), declaration: node });
-    } else if (ts.isImportEqualsDeclaration(node) && ts.isExternalModuleReference(node.moduleReference)
-      && node.moduleReference.expression && ts.isStringLiteralLike(node.moduleReference.expression)) {
-      found.push({ node: node.moduleReference.expression, specifier: node.moduleReference.expression.text, runtime: !node.isTypeOnly, declaration: node });
-    } else if (ts.isImportTypeNode(node)) {
-      const literal = ts.isLiteralTypeNode(node.argument) && ts.isStringLiteralLike(node.argument.literal) ? node.argument.literal : null;
-      if (literal) found.push({ node: literal, specifier: literal.text, runtime: false, declaration: node });
-      else unproven.push({ node, kind: 'TypeScript import type' });
-    } else if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) {
-      const context = [1, 2].includes(node.arguments.length) ? assetContextSpecifiers(ts, sourceFile, node.arguments[0]) : null;
-      if ([1, 2].includes(node.arguments.length) && ts.isStringLiteralLike(node.arguments[0])) {
-        found.push({ node: node.arguments[0], specifier: node.arguments[0].text, runtime: true, declaration: node });
-      } else if (context) {
-        for (const specifier of context) found.push({ node: node.arguments[0], specifier, runtime: true, declaration: node });
-      } else unproven.push({ node, kind: 'dynamic import()' });
-    } else if (ts.isCallExpression(node) && isUnshadowedCommonJsRequire(ts, checker, node.expression)) {
-      if (node.arguments.length === 1 && ts.isStringLiteralLike(node.arguments[0])) {
-        found.push({ node: node.arguments[0], specifier: node.arguments[0].text, runtime: true, declaration: node });
-      } else unproven.push({ node, kind: 'dynamic require()' });
-    }
+    if (!staticModuleReference(ts, node, found, unproven)) callModuleReference(ts, sourceFile, checker, node, found, unproven);
     ts.forEachChild(node, visit);
   };
   visit(sourceFile);
@@ -205,27 +229,29 @@ export function exportTargetStrings(value) {
 }
 
 /** The package-relative export targets a request (`.` or `./sub`) of a workspace package declares, from exports, else types/main. */
+function rootExportCandidates(declaration, request) {
+  if (request !== '.') return [];
+  return exportTargetStrings(declaration);
+}
+
+function exportMapCandidates(declaration, request) {
+  const keys = Object.keys(declaration);
+  if (!keys.some(key => key.startsWith('.'))) return rootExportCandidates(declaration, request);
+  const candidates = [];
+  for (const key of keys) {
+    const capture = exportPatternCapture(key, request);
+    if (capture !== null) candidates.push(...exportTargetStrings(declaration[key]).map(target => target.replaceAll('*', capture)));
+  }
+  return candidates;
+}
+
 function exportCandidates(workspace, specifier) {
   if (!workspace.name || !sameOrUnder(specifier, workspace.name)) return [];
   const request = specifier === workspace.name ? '.' : `.${specifier.slice(workspace.name.length)}`;
   const declaration = workspace.exports;
-  let candidates = [];
-  if (typeof declaration === 'string' || Array.isArray(declaration)) {
-    if (request !== '.') return [];
-    candidates = exportTargetStrings(declaration);
-  } else if (declaration && typeof declaration === 'object') {
-    const keys = Object.keys(declaration);
-    if (!keys.some(key => key.startsWith('.'))) {
-      if (request !== '.') return [];
-      candidates = exportTargetStrings(declaration);
-    } else {
-      for (const key of keys) {
-        const capture = exportPatternCapture(key, request);
-        if (capture !== null) candidates.push(...exportTargetStrings(declaration[key]).map(target => target.replaceAll('*', capture)));
-      }
-    }
-  }
-  return candidates;
+  if (typeof declaration === 'string' || Array.isArray(declaration)) return rootExportCandidates(declaration, request);
+  if (declaration && typeof declaration === 'object') return exportMapCandidates(declaration, request);
+  return [];
 }
 
 const SOURCE_EXTENSIONS = { '.d.ts': ['.ts', '.tsx'], '.d.mts': ['.mts'], '.d.cts': ['.cts'], '.js': ['.ts', '.tsx'], '.jsx': ['.tsx'], '.mjs': ['.mts'], '.cjs': ['.cts'] };
@@ -328,216 +354,13 @@ export function buildTypeScriptContext(config, injectedTypeScript, paths = []) {
 }
 
 function typeScriptContext(config, loaded, paths) {
-  const { ts } = loaded;
-  const errors = [];
-  const projects = [];
-  const parsedProjects = new Map();
-  const invalidProjects = new Set();
-  const queue = [...config.projects];
-  const seenProjects = new Set();
-  while (queue.length) {
-    const relative = queue.shift();
-    if (seenProjects.has(relative)) continue;
-    seenProjects.add(relative);
-    const configFile = path.join(config.root, ...relative.split('/'));
-    if (!fs.existsSync(configFile)) {
-      errors.push({ ruleId: 'ARCH_TSCONFIG_MISSING', project: relative, message: `${relative} does not exist.` });
-      invalidProjects.add(relative);
-      continue;
-    }
-    const { read, parsed } = readTypeScriptProject(ts, configFile);
-    if (read.error) {
-      errors.push(compilerError(ts, config.root, read.error, relative));
-      invalidProjects.add(relative);
-      continue;
-    }
-    if (parsed.errors.length) {
-      errors.push(...parsed.errors.map(item => compilerError(ts, config.root, item, relative)));
-      invalidProjects.add(relative);
-      continue;
-    }
-    for (const reference of parsed.projectReferences ?? []) {
-      const referencedFile = typeScriptProjectReferencePath(ts, reference);
-      const absoluteReference = path.resolve(referencedFile);
-      if (!isInside(config.root, absoluteReference)) {
-        errors.push({ ruleId: 'ARCH_TSCONFIG_REFERENCE_OUTSIDE', project: relative, message: `Project reference leaves the repository: ${slash(path.relative(config.root, absoluteReference))}.` });
-      } else {
-        queue.push(slash(path.relative(config.root, absoluteReference)));
-      }
-    }
-    parsedProjects.set(relative, parsed);
-  }
-  const matches = file => paths.some(prefix => {
-    const relative = slash(path.relative(config.root, file));
-    const normalized = slash(prefix).replace(/\/$/, '');
-    return sameOrUnder(relative, normalized);
+  return contextFromProjects(config, loaded, paths, {
+    canonical, compilerError, isInside, slash, readTypeScriptProject, typeScriptProjectReferencePath,
+    sameOrUnder, createTypeScriptProgram, isProductionSource, sourceLocation, workspaceMetadata, workspaceOf,
+    pathAliasMatches, moduleReferences, workspaceSourceEntry, resolveTypeScriptModule, crossesSide, assetExtension: ASSET_EXTENSION,
+    relativePath, packageExported, boundaryViolation,
   });
-  const selected = new Set();
-  const direct = new Set();
-  if (paths.length) {
-    // TypeScript follows imports from these root files. Referenced projects need their declared
-    // roots as well, since a project reference need not be an import in the selected source.
-    const visit = relative => {
-      if (selected.has(relative)) return;
-      selected.add(relative);
-      for (const reference of parsedProjects.get(relative)?.projectReferences ?? []) {
-        const referencedFile = typeScriptProjectReferencePath(ts, reference);
-        const referenced = slash(path.relative(config.root, path.resolve(referencedFile)));
-        if (parsedProjects.has(referenced)) visit(referenced);
-      }
-    };
-    for (const [relative, parsed] of parsedProjects) if (parsed.fileNames.some(matches)) {
-      direct.add(relative);
-      visit(relative);
-    }
-    for (const relative of invalidProjects) {
-      const directory = path.dirname(path.join(config.root, ...relative.split('/')));
-      if (paths.some(prefix => {
-        const absolute = path.join(config.root, ...slash(prefix).split('/'));
-        return isInside(directory, absolute);
-      })) selected.add(relative);
-    }
-    errors.splice(0, errors.length, ...errors.filter(error => !error.project || selected.has(error.project)));
-  }
-  for (const [relative, parsed] of parsedProjects) {
-    if (paths.length && !selected.has(relative)) continue;
-    const rootNames = paths.length && direct.has(relative) ? parsed.fileNames.filter(matches) : parsed.fileNames;
-    const program = createTypeScriptProgram(ts, { rootNames, options: parsed.options, projectReferences: parsed.projectReferences });
-    errors.push(...program.getSyntacticDiagnostics().filter(item => !item.file || isInside(config.root, item.file.fileName))
-      .map(item => compilerError(ts, config.root, item, relative, 'ARCH_SYNTAX_INVALID')));
-    projects.push({ relative, program, options: parsed.options });
-  }
-  const occurrences = new Map();
-  const sourceIn = new Map();
-  for (const project of projects) {
-    for (const sourceFile of project.program.getSourceFiles().filter(file => isProductionSource(config.root, file))) {
-      const name = canonical(sourceFile.fileName);
-      if (!occurrences.has(name)) occurrences.set(name, []);
-      occurrences.get(name).push(project);
-      sourceIn.set(`${project.relative}|${name}`, sourceFile);
-    }
-  }
-  // The deepest project directory holding a file owns it: its source file, its checker and its resolution. A side or repository
-  // root tsconfig without paths must not shadow the app project whose aliases (`@/*`) the file actually uses.
-  const owningProject = (candidates, file) => candidates.filter(item => isInside(path.dirname(path.join(config.root, ...item.relative.split('/'))), file))
-    .sort((x, y) => y.relative.split('/').length - x.relative.split('/').length)[0] ?? candidates[0];
-  const fileMap = new Map();
-  const checkerByFile = new Map();
-  const ownerByFile = new Map();
-  for (const [name, candidates] of occurrences) {
-    const owner = owningProject(candidates, name);
-    ownerByFile.set(name, owner);
-    fileMap.set(name, sourceIn.get(`${owner.relative}|${name}`));
-    checkerByFile.set(name, owner.program.getTypeChecker());
-  }
-  const files = [...fileMap.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([, file]) => file);
-  const edges = new Map([...fileMap.keys()].map(file => [file, []]));
-  for (const [file, sourceFile] of fileMap) {
-    const sourceName = path.resolve(sourceFile.fileName);
-    if (sourceName !== file) edges.set(sourceName, edges.get(file));
-  }
-  const edgeKeys = new Set();
-  const host = { ...ts.sys, fileExists: ts.sys.fileExists, readFile: ts.sys.readFile, realpath: ts.sys.realpath };
-  const workspaces = workspaceMetadata(config);
-  const workspaceNames = new Set(workspaces.map(item => item.name).filter(Boolean));
-  for (const [from, sourceFile] of fileMap) {
-    const owningWorkspace = workspaceOf(workspaces, from);
-    const project = ownerByFile.get(from);
-    if (!project) continue;
-    const references = moduleReferences(ts, sourceFile, project.program.getTypeChecker());
-    for (const item of references.unproven) errors.push({
-      ruleId: 'ARCH_DYNAMIC_DEPENDENCY_UNPROVEN',
-      project: project.relative,
-      path: relativePath(config.root, sourceFile.fileName),
-      ...sourceLocation(sourceFile, item.node),
-      message: `${item.kind} must use a string-literal module name so architecture coverage can resolve its dependency.`,
-    });
-    for (const reference of references.found) {
-      // A workspace package is read at its source, never at its build: the same import resolves whether or not dist exists.
-      const workspaceTarget = workspaces.filter(item => item.root !== canonical(config.root)).map(item => workspaceSourceEntry(ts, item, reference.specifier)).find(Boolean);
-      const resolvedName = workspaceTarget ?? resolveTypeScriptModule(ts, reference.specifier, sourceFile.fileName, project.options, host);
-      if (!resolvedName) {
-        const codeLike = !ASSET_EXTENSION.test(reference.specifier);
-        const workspaceImport = [...workspaceNames].some(name => sameOrUnder(reference.specifier, name));
-        const internal = reference.specifier.startsWith('.') || pathAliasMatches(reference.specifier, project.options.paths) || workspaceImport;
-        if (codeLike && internal) {
-          errors.push({
-            ruleId: 'ARCH_INTERNAL_IMPORT_UNRESOLVED',
-            project: project.relative,
-            path: relativePath(config.root, sourceFile.fileName),
-            ...sourceLocation(sourceFile, reference.node),
-            specifier: reference.specifier,
-            message: `Internal import ${reference.specifier} is not resolvable with ${project.relative}.`,
-          });
-        }
-        continue;
-      }
-      const actualTarget = canonical(resolvedName);
-      const workspaceImport = [...workspaceNames].some(name => reference.specifier === name || reference.specifier.startsWith(`${name}/`));
-      const internal = reference.specifier.startsWith('.') || pathAliasMatches(reference.specifier, project.options.paths) || workspaceImport;
-      // The boundary is the checkout, not the checked project: a path alias that lands in a sibling
-      // package of the same repository (`@fe-kit/*` -> packages/fe-kit) is still source a reviewer can
-      // open, while anything past the repository, or anything inside an installed dependency tree, is
-      // not. `config.repository` is null when there is no git checkout around the project, and the
-      // project is then the boundary it always was.
-      const reviewable = isInside(config.root, actualTarget)
-        || (config.repository && isInside(config.repository, actualTarget) && !slash(actualTarget).includes('/node_modules/'));
-      // A side of an app (config.root is be/ or fe/) imports nothing of the app outside itself: the root holds no source, the other
-      // side is another program, and a declared read (sides.fe.reads, be/contracts/) is codegen input, never an import.
-      if (internal && crossesSide(config, actualTarget)) {
-        errors.push({
-          ruleId: 'ARCH_INTERNAL_IMPORT_OUTSIDE',
-          project: project.relative,
-          path: relativePath(config.root, sourceFile.fileName),
-          ...sourceLocation(sourceFile, reference.node),
-          specifier: reference.specifier,
-          message: `Internal import ${reference.specifier} leaves the ${path.basename(config.root)} side for ${slash(path.relative(config.packageRoot, actualTarget))}; nothing crosses the sides of an app.`,
-        });
-        continue;
-      }
-      if (internal && !reviewable) {
-        errors.push({
-          ruleId: 'ARCH_INTERNAL_IMPORT_OUTSIDE',
-          project: project.relative,
-          path: relativePath(config.root, sourceFile.fileName),
-          ...sourceLocation(sourceFile, reference.node),
-          specifier: reference.specifier,
-          message: `Internal import ${reference.specifier} resolves outside the checked repository.`,
-        });
-        continue;
-      }
-      if (!fileMap.has(actualTarget)) continue;
-      const edge = {
-        from,
-        to: actualTarget,
-        runtime: reference.runtime,
-        specifier: reference.specifier,
-        node: reference.node,
-        declaration: reference.declaration,
-        reexport: ts.isExportDeclaration(reference.declaration),
-        sourceFile,
-        project: project.relative,
-        ...sourceLocation(sourceFile, reference.node),
-      };
-      const key = `${from}\0${actualTarget}\0${reference.node.getStart(sourceFile)}\0${reference.specifier}`;
-      if (!edgeKeys.has(key)) { edges.get(from).push(edge); edgeKeys.add(key); }
-      const targetWorkspace = workspaceOf(workspaces, actualTarget);
-      if (owningWorkspace && targetWorkspace && owningWorkspace !== targetWorkspace) {
-        if (!owningWorkspace.app && targetWorkspace.app) {
-          errors.push(boundaryViolation(config.root, edge, owningWorkspace, targetWorkspace, 'ARCH_PACKAGE_IMPORTS_APP', 'A reusable workspace package cannot depend on an application workspace.'));
-        }
-        if (!packageExported(ts, targetWorkspace, reference.specifier, actualTarget)) {
-          errors.push(boundaryViolation(config.root, edge, owningWorkspace, targetWorkspace, 'ARCH_PACKAGE_EXPORT_BYPASS', 'Cross-package imports must use the target package name and a declared package export.'));
-        }
-      }
-    }
-  }
-  if (projects.length && files.length === 0) errors.push({ ruleId: 'ARCH_NO_SOURCE', message: 'The configured TypeScript projects contain no production TypeScript or JavaScript source.' });
-  return { loaded, errors, files, edges, programs: projects.map(item => item.program), program: projects[0]?.program ?? null, projects, ts, workspaces,
-    checkerFor: file => checkerByFile.get(canonical(file)) ?? null,
-    workspaceOf: file => workspaceOf(workspaces, canonical(file)) };
 }
-
 export function relativePath(root, fileName) {
   return slash(path.relative(root, fileName));
 }
