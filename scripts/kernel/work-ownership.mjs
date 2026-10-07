@@ -265,6 +265,16 @@ export function workflowCommittedReader({ repo, workDir = '.starciwork', workflo
 }
 
 /** The record's change note (`change: {rev, kind, at}`) read from its YAML text; null when it has none. */
+const CHANGE_NOTE_PREFIX = /^ {2}(rev|kind|at):/;
+const CHANGE_NOTE_LINE_BREAK = /[\r\n\u2028\u2029]/;
+const changeNoteLineOf = (line) => {
+  const prefix = CHANGE_NOTE_PREFIX.exec(line);
+  if (!prefix) return null;
+  const value = line.slice(prefix[0].length).trim();
+  if (CHANGE_NOTE_LINE_BREAK.test(value)) return null;
+  return [line, prefix[1], value];
+};
+
 export function changeNoteOf(text) {
   const lines = String(text ?? '').split(/\r?\n/);
   const start = lines.findIndex((line) => /^change:\s*$/.test(line));
@@ -272,7 +282,7 @@ export function changeNoteOf(text) {
   const note = {};
   for (const line of lines.slice(start + 1)) {
     if (/^\S/.test(line)) break;
-    const m = /^ {2}(rev|kind|at):\s*(.*?)\s*$/.exec(line);
+    const m = changeNoteLineOf(line);
     if (m && note[m[1]] === undefined) note[m[1]] = m[2].replace(/^["']|["']$/g, '');
   }
   const rev = Number(note.rev);
