@@ -22,29 +22,39 @@ export const DEPENDENCY_SECTIONS = ['dependencies', 'devDependencies', 'peerDepe
 /** True for a path FE_NO_TESTS owns: a spec file, a test directory or a test-tool file. */
 export const isFeTestPath = (file) => SPEC_FILE.test(file) || TEST_DIRECTORY.test(file) || TEST_TOOL_FILE.test(file);
 
+function testPathFinding(file) {
+  let what = 'test tooling';
+  if (SPEC_FILE.test(file)) what = 'a test file';
+  else if (TEST_DIRECTORY.test(file)) what = 'inside a test directory';
+  return found(FE_NO_TESTS, file, `${file} is ${what}; a front-end repository has no tests, no test tooling and no exception: delete it`);
+}
+
+function packageTestFindings(repoRoot, file) {
+  if (file !== 'package.json' && !file.endsWith('/package.json')) return [];
+  if (file.includes('node_modules/')) return [];
+  const pkg = readJson(repoRoot, file);
+  if (!pkg || typeof pkg !== 'object') return [];
+  const findings = [];
+  for (const [name, command] of Object.entries(pkg.scripts ?? {})) {
+    if (TEST_SCRIPT_NAME.test(name) || TEST_RUNNER_COMMAND.test(String(command))) findings.push(found(FE_NO_TESTS, file, `${file} script ${name} is a test script (${String(command).slice(0, 80)}); a front-end repository has no tests: delete the script`));
+  }
+  for (const section of DEPENDENCY_SECTIONS) {
+    for (const name of Object.keys(pkg[section] ?? {})) {
+      if (TEST_DEPENDENCY.test(name)) findings.push(found(FE_NO_TESTS, file, `${file} ${section} names ${name}, a test dependency; a front-end repository has no tests: delete the dependency`));
+    }
+  }
+  return findings;
+}
+
 /** The findings of R97 over the tracked paths `files` of a front-end repository at `repoRoot`. */
 export function feNoTestsFindings({ repoRoot, files }) {
   const findings = [];
   for (const file of files) {
     if (isFeTestPath(file)) {
-      let what = 'test tooling';
-      if (SPEC_FILE.test(file)) what = 'a test file';
-      else if (TEST_DIRECTORY.test(file)) what = 'inside a test directory';
-      findings.push(found(FE_NO_TESTS, file, `${file} is ${what}; a front-end repository has no tests, no test tooling and no exception: delete it`));
+      findings.push(testPathFinding(file));
       continue;
     }
-    if (file !== 'package.json' && !file.endsWith('/package.json')) continue;
-    if (file.includes('node_modules/')) continue;
-    const pkg = readJson(repoRoot, file);
-    if (!pkg || typeof pkg !== 'object') continue;
-    for (const [name, command] of Object.entries(pkg.scripts ?? {})) {
-      if (TEST_SCRIPT_NAME.test(name) || TEST_RUNNER_COMMAND.test(String(command))) findings.push(found(FE_NO_TESTS, file, `${file} script ${name} is a test script (${String(command).slice(0, 80)}); a front-end repository has no tests: delete the script`));
-    }
-    for (const section of DEPENDENCY_SECTIONS) {
-      for (const name of Object.keys(pkg[section] ?? {})) {
-        if (TEST_DEPENDENCY.test(name)) findings.push(found(FE_NO_TESTS, file, `${file} ${section} names ${name}, a test dependency; a front-end repository has no tests: delete the dependency`));
-      }
-    }
+    findings.push(...packageTestFindings(repoRoot, file));
   }
   return findings;
 }
