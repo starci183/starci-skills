@@ -34,6 +34,7 @@ import { gitResultOf } from '../lib/git.mjs';
 import { createOrcaWorktree, removeOrcaWorktree } from '../machine/worktree-orca.mjs';
 import { opContextOf } from '../guards/op-context.mjs';
 import { slash } from '../lib/path-key.mjs';
+import { repeatInOrder } from '../lib/in-order.mjs';
 import { ownerRubricChecks } from './draw-feedback.mjs';
 import { startAgent } from '../agent/lib.mjs';
 import { loadAdapter, adapterModelAuthority } from '../agent/model-registry.mjs';
@@ -272,7 +273,7 @@ export function launchCriticWorker({ critic, dir, prompt, entry = null, parentDi
 async function awaitCritic({ client, runId, entry, dispatchId, terminal, taskId, timeoutMs, pollMs, sleep, now }) {
   const deadline = now() + timeoutMs;
   const mine = [];
-  for (;;) {
+  return repeatInOrder(async () => {
     // Every Delivery of the Run is read whole, then acknowledged; the ack call answers the next one.
     for (let delivery = settle(() => client.check({ run: runId, ...(entry ? { terminal: entry } : {}) })); delivery?.ok && delivery.deliveryId;) {
       mine.push(...delivery.messages.filter((m) => {
@@ -291,7 +292,8 @@ async function awaitCritic({ client, runId, entry, dispatchId, terminal, taskId,
     const left = deadline - now();
     if (left <= 0) return { signal: 'timeout' };
     await sleep(Math.min(pollMs, left));
-  }
+    return undefined;
+  });
 }
 
 /**
