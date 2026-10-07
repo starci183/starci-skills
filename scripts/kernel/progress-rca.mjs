@@ -338,8 +338,8 @@ export function decisionsOf(db, workflowId) {
 
 /* ------------------------------------------------------------ ranked actions */
 
-const q = (s) => (/[\s,;"'[\]()]/.test(String(s)) ? `"${String(s).replaceAll('"', String.raw`\"`)}"` : String(s));
-const actionKey = (...parts) => parts.join(':');
+const q = (s) => (/[\s,;"'[\]()]/.test(String(s)) ? `"${String(s).replaceAll('"', '\\"')}"` : String(s));
+const actionKey = (...parts) => parts.join(':'), reasonSuffixOf = (item) => item.reason ? ` [${item.reason}]` : '', openCountSuffixOf = (cluster) => cluster.open !== cluster.count ? ` (${cluster.open} open)` : '';
 const act = (key, tier, cause, unblocks, title, command, expected) => ({ key, tier, cause, unblocks, title, command, expected });
 
 /** The settle verdict an unsettled report's outcome maps to for starci kernel settle --verdict. */
@@ -353,7 +353,7 @@ const settleBacklogAct = (progress, { api, repo }) => {
   if (!progress?.unsettledReports?.length) return null;
   const ids = progress.unsettledReports.filter(Boolean); const items = progress.settleDecisions ?? ids.map((id) => ({ jobId: id, outcome: null, reason: null }));
   return act(actionKey('settle-backlog', ids.length), 'light', 'needs-kernel-decision', 1000 + ids.length,
-    `decide ${ids.length} needs-kernel-decision settle(s) BEFORE any route or dispatch (starci kernel route/dispatch refuse settle-backlog meanwhile): ${items.slice(0, 8).map((it) => it.jobId + (it.reason ? ` [${it.reason}]` : '')).join(', ')}`,
+    `decide ${ids.length} needs-kernel-decision settle(s) BEFORE any route or dispatch (starci kernel route/dispatch refuse settle-backlog meanwhile): ${items.slice(0, 8).map((it) => it.jobId + reasonSuffixOf(it)).join(', ')}`,
     items.slice(0, 20).map((it) => (it.outcome === 'done' ? `${api} check --repo ${q(repo)} --job ${it.jobId} --checks-file <your re-run> && ` : '') + `${api} settle --repo ${q(repo)} --job ${it.jobId} --verdict ${settleVerdictOf(it)}`).join(' ; '),
     'each settle closes its [Op] terminal (verified close), frees its slot and lets the unit count or route its repair');
 };
@@ -519,7 +519,7 @@ export function actionsOf({ progress, rca, units = [], workflowId, repo = '<repo
 /** The `why slow` line (Vietnamese owner digest / English lines). */
 export function whyLine(rca, { language = ownerLanguage(), limit = 5 } = {}) {
   const cls = (rca?.clusters ?? []).filter((c) => c.open || c.cause === 'dead-worker').slice(0, limit); if (!cls.length) return null;
-  return `${translator(language)('Why slow')}: ${cls.map((c) => c.cause + ' x' + c.count + (c.open !== c.count ? ` (${c.open} open)` : '')).join(', ')}`;
+  return `${translator(language)('Why slow')}: ${cls.map((c) => c.cause + ' x' + c.count + openCountSuffixOf(c)).join(', ')}`;
 }
 
 /** A stable id for one RCA snapshot (clusters + counts). */
