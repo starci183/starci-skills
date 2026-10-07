@@ -48,9 +48,12 @@ function processReadyJob({ db, repo, wf, jobId, dryRun }) {
 
 function resultRows(results, includeWould, prefix) {
   return results.map((result) => {
-    const status = includeWould
-      ? (result.dispatched ? 'dispatched' : result.would ?? result.skipped ?? result.waiting ?? result.route ?? result.error)
-      : (result.dispatched ? 'dispatched' : result.skipped ?? result.waiting ?? result.route ?? result.error);
+    let status;
+    if (includeWould) {
+      if (result.dispatched) status = 'dispatched';
+      else status = result.would ?? result.skipped ?? result.waiting ?? result.route ?? result.error;
+    } else if (result.dispatched) status = 'dispatched';
+    else status = result.skipped ?? result.waiting ?? result.route ?? result.error;
     return `${prefix}${result.jobId}: ${status}`;
   }).join('\n');
 }
