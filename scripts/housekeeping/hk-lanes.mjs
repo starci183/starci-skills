@@ -142,6 +142,59 @@ const allocationForLaneGrace = (allocation) => {
   try { return allocationSettings(); } catch { return null; }
 };
 
+function skipLaneBeforeSweep(w, { mainKey, selfKey, baseKey, root, run, skip }) {
+  const key = pathKey(w.path);
+  if (key === mainKey) { skip(w.path, 'main-checkout'); return true; }
+  if (key === selfKey) { skip(w.path, 'current-checkout'); return true; }
+  if (!key.startsWith(baseKey)) { skip(w.path, 'outside-lanes-root'); return true; }
+  if (w.detached || !w.branch) { skip(w.path, 'detached-head'); return true; }
+  if (w.locked) { skip(w.path, 'locked'); return true; }
+  if (!fs.existsSync(w.path)) { skip(w.path, 'missing'); return true; }
+  if (w.dirty) { skip(w.path, 'dirty'); return true; }
+  const status = run(['status', '--porcelain', '--untracked-files=all'], { cwd: w.path });
+  if (!status.ok) { skip(w.path, 'status-unreadable', status.error); return true; }
+  if (status.stdout.trim()) { skip(w.path, 'uncommitted-changes'); return true; }
+  return false;
+}
+
+function skipLaneBeforeRemoval(w, { root, run, skip, graceMs, now }) {
+  const cherry = run(['cherry', 'main', w.branch], { cwd: root });
+  if (!cherry.ok) { skip(w.path, 'merge-check-failed', cherry.error); return true; }
+  const ahead = cherry.stdout.split(/\r?\n/).filter((l) => l.startsWith('+')).length;
+  if (ahead) { skip(w.path, 'unmerged-commits', `${ahead} commit(s) not in main`); return true; }
+  if (graceMs === null) { skip(w.path, 'lane-grace-unset', 'allocation.housekeeping.laneGraceMs'); return true; }
+  const activity = laneActivity({ worktree: w.path, branch: w.branch, root, run });
+  const idleMs = activity.lastActiveMs === null ? null : now - activity.lastActiveMs;
+  const minIdleMs = Math.max(graceMs, LANE_IDLE_MS);
+  if (idleMs === null || idleMs < minIdleMs) {
+    skip(w.path, activity.noWork ? 'no-work-yet' : 'recent-activity', idleMs === null ? 'no activity time readable' : `idle ${Math.round(idleMs)}ms < ${minIdleMs}ms (laneGraceMs, at least 60 min)`);
+    return true;
+  }
+  return false;
+}
+
+function removeLaneWorktree(w, { out, root, run, git, apply, skip, fail }) {
+  const freedBytes = treeBytes(w.path);
+  const branch = shortBranch(w.branch);
+  if (!apply) { out.wouldRemove.push({ path: w.path, branch, freedBytes }); out.freedBytes += freedBytes; return false; }
+  const removed = safeRemoveWorktree(w.path, { repo: root, git });
+  if (removed.fatal) { fail(w.path, `main checkout damaged: ${(removed.damage ?? []).join('; ')}`); out.stopped = { path: w.path, damage: removed.damage }; return true; }
+  if (!removed.ok) { fail(w.path, (removed.errors ?? [])[0]?.message || removed.reason || 'worktree removal failed'); return false; }
+  const dropped = run(['branch', '-d', branch], { cwd: root });
+  out.removed.push({ path: w.path, branch, freedBytes, branchDeleted: dropped.ok });
+  out.freedBytes += freedBytes;
+  return false;
+}
+
+function sweepLane(w, context) {
+  if (skipLaneBeforeSweep(w, context)) return false;
+  if (skipLaneBeforeRemoval(w, context)) return false;
+  const o = context.ownersNow();
+  const owner = laneOwnerOf({ lanePath: w.path, branch: w.branch, workers: o.workers, sup: o.sup });
+  if (owner) { context.skip(w.path, 'live-owner', owner); return false; }
+  return removeLaneWorktree(w, context);
+}
+
 export function sweepLanes({ apply = false, now = Date.now(), env = process.env, allocation = undefined, config = undefined, root = SKILL_ROOT, git = null, owners = undefined } = {}) {
   const run = git ?? laneGit;
   const base = lanesRoot({ env, config });
@@ -159,43 +212,10 @@ export function sweepLanes({ apply = false, now = Date.now(), env = process.env,
   let ownerInfo = owners ?? null;
   const ownersNow = () => (ownerInfo ??= (isSpecRun() ? { workers: [], sup: { jobs: [] } } : liveLaneOwners({ env })));
   const graceMs = laneGraceMs(allocationForLaneGrace(allocation));
+  const context = { mainKey, selfKey, baseKey, root, run, skip, fail, out, git, apply, ownersNow, graceMs, now };
   for (const w of worktrees) {
-    const key = pathKey(w.path);
-    if (key === mainKey) { skip(w.path, 'main-checkout'); continue; }
-    if (key === selfKey) { skip(w.path, 'current-checkout'); continue; }
-    if (!key.startsWith(baseKey)) { skip(w.path, 'outside-lanes-root'); continue; }
-    if (w.detached || !w.branch) { skip(w.path, 'detached-head'); continue; }
-    if (w.locked) { skip(w.path, 'locked'); continue; }
-    if (!fs.existsSync(w.path)) { skip(w.path, 'missing'); continue; }
-    if (w.dirty) { skip(w.path, 'dirty'); continue; }
-    const status = run(['status', '--porcelain', '--untracked-files=all'], { cwd: w.path });
-    if (!status.ok) { skip(w.path, 'status-unreadable', status.error); continue; }
-    if (status.stdout.trim()) { skip(w.path, 'uncommitted-changes'); continue; }
-    const cherry = run(['cherry', 'main', w.branch], { cwd: root });
-    if (!cherry.ok) { skip(w.path, 'merge-check-failed', cherry.error); continue; }
-    const ahead = cherry.stdout.split(/\r?\n/).filter((l) => l.startsWith('+')).length;
-    if (ahead) { skip(w.path, 'unmerged-commits', `${ahead} commit(s) not in main`); continue; }
-    if (graceMs === null) { skip(w.path, 'lane-grace-unset', 'allocation.housekeeping.laneGraceMs'); continue; }
-    const activity = laneActivity({ worktree: w.path, branch: w.branch, root, run });
-    const idleMs = activity.lastActiveMs === null ? null : now - activity.lastActiveMs;
-    const minIdleMs = Math.max(graceMs, LANE_IDLE_MS);
-    if (idleMs === null || idleMs < minIdleMs) {
-      skip(w.path, activity.noWork ? 'no-work-yet' : 'recent-activity', idleMs === null ? 'no activity time readable' : `idle ${Math.round(idleMs)}ms < ${minIdleMs}ms (laneGraceMs, at least 60 min)`);
-      continue;
-    }
-    const o = ownersNow();
-    const owner = laneOwnerOf({ lanePath: w.path, branch: w.branch, workers: o.workers, sup: o.sup });
-    if (owner) { skip(w.path, 'live-owner', owner); continue; }
-    const freedBytes = treeBytes(w.path);
-    const branch = shortBranch(w.branch);
-    if (!out.apply) { out.wouldRemove.push({ path: w.path, branch, freedBytes }); out.freedBytes += freedBytes; continue; }
-    const removed = safeRemoveWorktree(w.path, { repo: root, git });
     // A removal that changed the main checkout stops housekeeping's lane pass at once (safe-remove.mjs mainCheckoutGuard).
-    if (removed.fatal) { fail(w.path, `main checkout damaged: ${(removed.damage ?? []).join('; ')}`); out.stopped = { path: w.path, damage: removed.damage }; break; }
-    if (!removed.ok) { fail(w.path, (removed.errors ?? [])[0]?.message || removed.reason || 'worktree removal failed'); continue; }
-    const dropped = run(['branch', '-d', branch], { cwd: root });
-    out.removed.push({ path: w.path, branch, freedBytes, branchDeleted: dropped.ok });
-    out.freedBytes += freedBytes;
+    if (sweepLane(w, context)) break;
   }
   if (out.apply) run(['worktree', 'prune'], { cwd: root });
   return out;
