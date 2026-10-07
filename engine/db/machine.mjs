@@ -696,7 +696,6 @@ function releaseLeader(m, { name = 'reconciler', epoch, reason = 'stop' }) {
   });
 }
 const leaderHistory = (m, { limit = 50 } = {}) => m.db.prepare('SELECT * FROM leader_history ORDER BY epoch DESC LIMIT ?').all(limit);
-
 const cursorOf = (m, ledgerId) => m.db.prepare('SELECT last_seq FROM engine_cursors WHERE ledger_id=?').get(ledgerId)?.last_seq ?? null;
 const setCursor = (m, ledgerId, lastSeq) => upsertRow(m.db, 'engine_cursors', { ledger_id: ledgerId, last_seq: lastSeq, updated_at: m.now() }, ['ledger_id']);
 const cursors = (m) => m.db.prepare('SELECT * FROM engine_cursors').all();

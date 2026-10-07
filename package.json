@@ -90,6 +90,7 @@
   },
   "scripts": {
     "check": "node packages/cli/bin/starci.mjs runtime check",
+    "pretest": "node packages/cli/bin/starci.mjs release sync-runtime",
     "test": "node --import ./tests/setup/low-priority.mjs --import ./tests/setup/isolated-temp.mjs --import ./tests/setup/isolated-registry.mjs --import ./tests/setup/runtime-copies.mjs --test \"tests/**/*.spec.mjs\"",
     "test:coverage": "node packages/cli/bin/starci.mjs gate runtime-coverage",
     "starci": "node packages/cli/bin/starci.mjs",

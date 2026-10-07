@@ -143,7 +143,6 @@ import { baselineWorkInputs, inputDrift } from './input-digests.mjs';
 import { admittedContractOf, latestContractOf } from '../machine/contract-version.mjs';
 import { queueSettleMedia } from '../connectors/telegram-media.mjs';
 import { guardLaunch } from '../guards/hook-install.mjs';
-
 import { attributeRedGate, failingFromText, peerRouteOf } from './gate-attribution.mjs';
 import { accountList } from '../api/orca/account-list.mjs';
 import { runCreate } from '../api/orca/run-create.mjs';
@@ -757,9 +756,7 @@ const reportFiledWake = (ledger, { workflowId, transition, jobId, dispatchId }) 
 // foundation legs run first; a dependent waits on the landing with a typed wait
 // (starci kernel incident --kind peer-wait --until-foundation <name>), which the landing releases.
 const foundationDutyOf = (db, wf, options) => foundationDutyFor(db, wf, skillRoot, options);
-
 const agentHierarchyOf = (db, workflowId) => agentHierarchyFor(db, workflowId, skillRoot);
-
 const staleInputProjection = (db, wf, repo = null) => {
   if (wf.phase === 'finished') return { staleInput: [], sourceDrift: [], peerDrift: [] };
   try {
@@ -2343,7 +2340,6 @@ const cleanupManagedWorker = (dispatchId) => {
 // path as a dead terminal spawn (job failed + event + infra-provider incident
 // on attestation failures) — after stopping and releasing whatever partial
 // Dispatch the attempt created, per calls.yaml settle-dispatch.
-
 
 /* ----------------------------------------------------------- reconcile */
 // `reconcile --drop --reason <text>`: retire a QUEUED job that never crossed

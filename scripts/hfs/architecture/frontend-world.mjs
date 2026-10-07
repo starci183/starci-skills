@@ -252,7 +252,6 @@ class WorldAnalysis {
     return found;
   }
 
-
   collectFunctionNodes(node, functions) {
     if (this.ts.isFunctionDeclaration(node) || this.ts.isMethodDeclaration(node) || this.ts.isArrowFunction(node) || this.ts.isFunctionExpression(node)) functions.push(node);
     this.ts.forEachChild(node, child => this.collectFunctionNodes(child, functions));

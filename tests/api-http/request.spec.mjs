@@ -35,6 +35,19 @@ test('request refuses a target outside its declared policy before anything is se
   refused({ host: '127.0.0.1', port: 80, protocol: 'file:' }, 'loopback');
   refused({ host: 'other.example', port: 80 }, { hosts: ['api.example'] });
   refused({ host: undefined, port: 80 }, 'loopback');
+  refused({ host: '127.0.0.1', port: 80, path: '@evil.example/x' }, 'loopback');
+  refused({ host: '127.0.0.1', port: 80, path: 'evil.example' }, 'loopback');
+});
+
+test('a request path never changes the host the request goes to', async (t) => {
+  const seen = [];
+  const server = http.createServer((req, res) => { seen.push([req.headers.host, req.url]); res.end('ok'); });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => server.close());
+  const { port } = server.address();
+  assert.equal(await get({ host: '127.0.0.1', port, path: '//evil.example/x?a=b' }, 'loopback'), 200);
+  assert.equal(await get({ host: '127.0.0.1', port, path: '/@evil.example/x' }, 'loopback'), 200);
+  assert.deepEqual(seen, [[`127.0.0.1:${port}`, '//evil.example/x?a=b'], [`127.0.0.1:${port}`, '/@evil.example/x']]);
 });
 
 test('the seat API runner sends only to a seat host over https or to a loopback server, and follows no redirect', async (t) => {

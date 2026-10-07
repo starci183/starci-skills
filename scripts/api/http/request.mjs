@@ -18,6 +18,16 @@ export const request = (options, onResponse, allow) => {
   if (options.protocol != null && options.protocol !== 'http:') throw refuse(`protocol ${options.protocol} is not http:`);
   if (options.auth != null || /[@/\?#\s]/.test(host)) throw refuse('a request target carries no credentials or URL syntax');
   if (options.port != null && options.port !== '' && !(Number.isInteger(Number(options.port)) && Number(options.port) > 0 && Number(options.port) < 65536)) throw refuse(`port ${options.port} is not a TCP port`);
-  if (allow === 'loopback' ? !isLoopbackHost(host) : !hosts.some((name) => String(name).toLowerCase() === host)) throw refuse(`host ${host || '(none)'} is outside the allowed hosts`);
-  return plainHttp.request(options, onResponse);
+  const permitted = (name) => (allow === 'loopback' ? isLoopbackHost(name) : hosts.some((entry) => String(entry).toLowerCase() === name));
+  if (!permitted(host)) throw refuse(`host ${host || '(none)'} is outside the allowed hosts`);
+  const target = String(options.path ?? '/');
+  if (!target.startsWith('/')) throw refuse('a request path starts with /');
+  let url;
+  try { url = new URL(`http://${host.includes(':') && !host.startsWith('[') ? `[${host}]` : host}${options.port == null || options.port === '' ? '' : `:${Number(options.port)}`}${target}`); }
+  catch { throw refuse('the request target is not a URL'); }
+  // Only the checked URL object reaches node:http: its protocol and hostname are judged again after parsing.
+  if (url.protocol !== 'http:' || url.username || url.password || !permitted(url.hostname)) throw refuse(`host ${url.hostname} is outside the allowed hosts`);
+  const rest = { ...options };
+  for (const key of ['host', 'port', 'path', 'protocol', 'auth']) delete rest[key];
+  return plainHttp.request(url, rest, onResponse);
 };

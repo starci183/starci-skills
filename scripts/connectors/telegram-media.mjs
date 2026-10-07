@@ -36,6 +36,7 @@ import { readMachine, withMachine } from '../../engine/db/machine.mjs';
 import { argsOf, connectorLog, ownerConfig } from './lib.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { sleep } from '../lib/sleep.mjs';
+import { eachInOrder } from '../lib/in-order.mjs';
 import { isSpecRun } from '../lib/env.mjs';
 import { LIMITS, MIME, mediaKindOf, planSettleMedia, readSettle } from './telegram-media-plan.mjs';
 export { collectDrawings, fitCaption, mediaKindOf } from './telegram-media-plan.mjs';
@@ -61,7 +62,7 @@ export async function botUpload({ token, method, fields = {}, files = [], apiBas
   return botPolite({ token, sleepImpl, attempts }, async () => {
     const form = new FormData();
     for (const [key, value] of Object.entries(fields)) if (value !== undefined && value !== null) form.append(key, typeof value === 'string' ? value : JSON.stringify(value));
-    for (const { field, file } of files) form.append(field, await blobOf(file), path.basename(file));
+    await eachInOrder(files, async ({ field, file }) => { form.append(field, await blobOf(file), path.basename(file)); });
     return fetchImpl(endpoint(apiBase, token, method), { method: 'POST', body: form, signal: AbortSignal.timeout(timeoutMs) });
   });
 }
@@ -119,11 +120,11 @@ const sendPlanItem = async (item, call, chatId) => {
 
 async function sendPlanItems(plan, call, settings, op, jobId, warn) {
   let sent = 0, failed = 0;
-  for (const item of plan.sends) {
+  await eachInOrder(plan.sends, async (item) => {
     const result = await sendPlanItem(item, call, settings.chatId);
     if (result?.ok) sent++;
     else { failed++; warn(`telegram-media: ${op} ${jobId} ${item.type} not sent: ${redact(result?.error ?? 'unknown error', settings.token)}`); }
-  }
+  });
   return { sent, failed };
 }
 
@@ -220,8 +221,5 @@ async function main() {
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === SELF) {
-  const result = main();
-  if (result && typeof result.then === 'function') {
-    try { await result; } catch (error) { console.error(error); process.exit(1); }
-  }
+  try { await main(); } catch (error) { console.error(error); process.exit(1); }
 }

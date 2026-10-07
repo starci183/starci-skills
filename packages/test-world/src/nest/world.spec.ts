@@ -288,9 +288,9 @@ test("applicationOrigin answers scheme://host:port of the named or first listeni
 
 test("withRequest runs commands, queries and providers in a real request scope that carries the request values", async () => {
     await publish()
-    const { CommandBus, CommandHandler, CqrsModule, QueryBus, QueryHandler } = await import("@nestjs/cqrs")
-    const { Inject, Injectable, Scope } = await import("@nestjs/common")
-    const { REQUEST } = await import("@nestjs/core")
+    const { CommandBus, CommandHandler, CqrsModule, QueryBus, QueryHandler } = require("@nestjs/cqrs") as typeof import("@nestjs/cqrs")
+    const { Inject, Injectable, Scope } = require("@nestjs/common") as typeof import("@nestjs/common")
+    const { REQUEST } = require("@nestjs/core") as typeof import("@nestjs/core")
 
     class WhoAmI {}
     class WhichPlan {}
@@ -339,7 +339,7 @@ test("withRequest runs commands, queries and providers in a real request scope t
 
 test("resolve answers a provider of a modules world by its class, its symbol or its string token", async () => {
     await publish()
-    const { Injectable } = await import("@nestjs/common")
+    const { Injectable } = require("@nestjs/common") as typeof import("@nestjs/common")
     const SYMBOL_TOKEN = Symbol("gateway")
     @Injectable()
     class Gateway {

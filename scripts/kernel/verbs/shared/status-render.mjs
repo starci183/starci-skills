@@ -1,31 +1,31 @@
 // cmdStatus (verbs/status.mjs): the workflow projection phases in ledger order, each writing its slice of
 // the status context `s`, ending in the emitted object and text.
 import path from 'node:path';
-import { runtimeProfile } from '../../../engine/config.mjs';
-import { planAncestorsOf } from '../../route/plan-edges.mjs';
-import { workGraphStatus } from '../../work/work-graph-store.mjs';
-import { JOB_ROW } from '../../machine/job-row.mjs';
-import { getWorkflow, goalJsonOf, jobPayloadOf, latestGoal } from '../verbs/shared/rows.mjs';
-import { kernelSeatOf } from '../verbs/shared/kernel-seat.mjs';
-import { drainWorkflowMessages, workerQuestionsOf } from '../verbs/shared/worker-messages.mjs';
-import { blockingHeadsUp, leaseCanonOf, openPeerWaits, pendingPeerMessagesOf, releaseTypedWaits } from '../verbs/shared/peer-waits.mjs';
-import { hostThrottle, throttleSummary } from '../../machine/ram-throttle.mjs';
-import { AUTOPILOT_RULING, autopilotSettings, autopilotSweep } from '../autopilot-run.mjs';
-import { wakeKernelForTransition } from '../wake-delivery.mjs';
-import { kernelRevState, revRootOf } from '../runtime-rev.mjs';
-import { ownerSpecs, deferredTestsOf, specsOff } from '../../route/spec-deferral.mjs';
-import { dependenciesOf, dependencyGraph } from '../dependency-graph.mjs';
-import { jobDisplayNameOf, opLabel, workflowDisplayName } from '../../lib/display-names.mjs';
-import { typedIncidents } from '../gate-conditions.mjs';
-import { blockingJobs, blockingOthersOf, orderQueuedByBlocking } from '../waiter-priority.mjs';
-import { opMetrics, stuckOf } from '../../machine/op-metrics.mjs';
-import { kernelNotesOf, whyOf } from '../why.mjs';
+import { runtimeProfile } from '../../../../engine/config.mjs';
+import { planAncestorsOf } from '../../../route/plan-edges.mjs';
+import { workGraphStatus } from '../../../work/work-graph-store.mjs';
+import { JOB_ROW } from '../../../machine/job-row.mjs';
+import { getWorkflow, goalJsonOf, jobPayloadOf, latestGoal } from './rows.mjs';
+import { kernelSeatOf } from './kernel-seat.mjs';
+import { drainWorkflowMessages, workerQuestionsOf } from './worker-messages.mjs';
+import { blockingHeadsUp, leaseCanonOf, openPeerWaits, pendingPeerMessagesOf, releaseTypedWaits } from './peer-waits.mjs';
+import { hostThrottle, throttleSummary } from '../../../machine/ram-throttle.mjs';
+import { AUTOPILOT_RULING, autopilotSettings, autopilotSweep } from '../../autopilot-run.mjs';
+import { wakeKernelForTransition } from '../../wake-delivery.mjs';
+import { kernelRevState, revRootOf } from '../../runtime-rev.mjs';
+import { ownerSpecs, deferredTestsOf, specsOff } from '../../../route/spec-deferral.mjs';
+import { dependenciesOf, dependencyGraph } from '../../dependency-graph.mjs';
+import { jobDisplayNameOf, opLabel, workflowDisplayName } from '../../../lib/display-names.mjs';
+import { typedIncidents } from '../../gate-conditions.mjs';
+import { blockingJobs, blockingOthersOf, orderQueuedByBlocking } from '../../waiter-priority.mjs';
+import { opMetrics, stuckOf } from '../../../machine/op-metrics.mjs';
+import { kernelNotesOf, whyOf } from '../../why.mjs';
 import { asksPhase } from './status-asks.mjs';
 import { settlePhase } from './status-settle.mjs';
-import { driftPhase, handoverPhase } from './drift.mjs';
-import { frontierOf, frontierStateOf } from './frontier.mjs';
-import { cutPhase, decorPhase } from './decor.mjs';
-import { statusText } from './lines.mjs';
+import { driftPhase, handoverPhase } from './status-drift.mjs';
+import { frontierOf, frontierStateOf } from './status-frontier.mjs';
+import { cutPhase, decorPhase } from './status-decor.mjs';
+import { statusText } from './status-lines.mjs';
 
 const tryOr = (fn, fallback) => { try { return fn(); } catch { return fallback; } };
 

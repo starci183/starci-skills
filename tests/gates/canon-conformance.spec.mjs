@@ -166,7 +166,7 @@ test('canon-scan fails closed when a selected machine cannot run', () => {
     assert.equal(report.machines.architecture.status, 'unavailable');
     assert.equal(node([path.join(ROOT, 'scripts', 'gates', 'canon-scan.mjs'), '--root', root, '--fix']).status, 2, '--fix without --paths is refused');
     const eslintOnly = node([path.join(ROOT, 'scripts', 'gates', 'canon-scan.mjs'), '--root', root, '--families', 'naming', '--json']);
-    assert.equal(eslintOnly.status, 0, 'families without architecture need only the lint machine');
+    assert.equal(eslintOnly.status, 0, `families without architecture need only the lint machine: ${eslintOnly.stdout}${eslintOnly.stderr}`);
     assert.deepEqual(JSON.parse(eslintOnly.stdout).scope.machines, ['eslint']);
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
