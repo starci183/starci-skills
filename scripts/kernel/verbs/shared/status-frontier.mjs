@@ -196,6 +196,11 @@ const staleReason = (s) => {
   return [redo, followUp].filter(Boolean).join('; ');
 };
 
+const readyReason = (s) => {
+  const steps = s.queued.filter((item) => item.policy).map((item) => `${item.jobId} ${item.policy}`);
+  return ['queued or fenced operations are waiting on the Kernel; route/dispatch or reconcile them before yielding', ...steps].join('; ');
+};
+
 const REASON_ORDER = [
   [(s) => s.frontierState === 'ask-reserve' || (s.askReserve.length > 0 && !ASK_RESERVE_QUIET.has(s.frontierState)), reserveReason],
   [(s) => s.frontierState === 'worker-question', questionReason],
@@ -211,7 +216,7 @@ const REASON_ORDER = [
   [(s) => s.frontierState === 'orphaned-frontier' && s.peerWaitMovable.length, peerMovableReason],
   [(s) => s.frontierState === 'orphaned-frontier', orphanedReason],
   [(s) => s.frontierState === 'worker-nudge-ready', () => NUDGE_READY_REASON],
-  [(s) => s.actionable && s.readyOperations > 0, () => 'queued or fenced operations are waiting on the Kernel; route/dispatch or reconcile them before yielding'],
+  [(s) => s.actionable && s.readyOperations > 0, readyReason],
   [(s) => s.staleReady.length > 0, staleReason],
 ];
 

@@ -55,7 +55,7 @@ function routeReadyJob(jobId, repo, job, db) {
 
 function processReadyJob({ db, repo, wf, jobId, dryRun }) {
   const job = jobRow(db, jobId);
-  if (job?.status !== 'queued') return { result: { jobId, skipped: `status ${job?.status ?? 'gone'}` }, launched: 0, stop: false };
+  if (job?.status !== 'queued' && job?.status !== 'ready') return { result: { jobId, skipped: `status ${job?.status ?? 'gone'}` }, launched: 0, stop: false };
   const failed = failedShapesOf(db, wf, job).get(shapeOf(job.op_id, job.payload));
   if (failed) return { result: { jobId, skipped: `same-failing-shape as ${failed.jobId} (${failed.causes.join(', ')}): change it with starci kernel graph-edit (widen/params/split) first` }, launched: 0, stop: false };
   if (dryRun) return { result: { jobId, would: job.payload.kernelModel ? `dispatch --model ${job.payload.kernelModel}` : 'route + dispatch --spawn' }, launched: 1, stop: false };
