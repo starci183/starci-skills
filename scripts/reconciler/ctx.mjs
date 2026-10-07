@@ -114,6 +114,13 @@ function lastJsonLine(stdout) {
   return null;
 }
 
+function refusalOf(value, stderr) {
+  if (value?.ok === false) return value;
+  const stderrJson = lastJsonLine(stderr);
+  if (stderrJson && typeof stderrJson === 'object' && stderrJson.ok === false) return stderrJson;
+  return null;
+}
+
 /**
  * Run `cmd args` as a child with a timeout; resolves {ok, code, value, stdout, stderr, timedOut, error?}. Never rejects.
  * ok = exit 0 and (no JSON, or JSON whose ok is not false).
@@ -135,12 +142,7 @@ export function statusFailureOf(r, { timeoutMs = null } = {}) {
   if (r?.ok && value) return null;
   const stderr = String(r?.stderr ?? '');
   const stderrHead = clip(stderr.split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !isNodeWarningLine(l)).join(' | '), 300) || null;
-  let refusal = null;
-  if (value?.ok === false) refusal = value;
-  else {
-    const stderrJson = lastJsonLine(stderr);
-    if (stderrJson && typeof stderrJson === 'object' && stderrJson.ok === false) refusal = stderrJson;
-  }
+  const refusal = refusalOf(value, stderr);
   const base = { code: Number.isInteger(r?.code) ? r.code : null, timedOut: Boolean(r?.timedOut), stderrHead };
   if (r?.timedOut) return { cause: 'timeout', error: `starci kernel status timed out after ${timeoutMs ?? '?'}ms`, ...base };
   if (r?.error) return { cause: 'spawn', error: clip(`starci kernel status did not spawn: ${r.error}`, 300), ...base };
