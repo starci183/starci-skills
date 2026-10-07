@@ -23,6 +23,11 @@ const git = (cwd, ...args) => {
   return r.stdout.trim();
 };
 
+test('withoutSeatEnv takes the env as a parameter: no process.env default (RT_BASE_IMPURE)', () => {
+  assert.deepEqual(withoutSeatEnv(), {});
+  assert.deepEqual(withoutSeatEnv({ ...SEATED, PATH: '/bin', GIT_AUTHOR_NAME: 'kept' }), { PATH: '/bin', GIT_AUTHOR_NAME: 'kept' });
+});
+
 test('the gate spec env carries none of the seat identity when the parent exports it', () => {
   const env = specRunEnv({ PATH: '/bin', NODE_TEST_CONTEXT: 'child', GIT_DIR: '/leaked', GIT_AUTHOR_NAME: 'kept', ...SEATED });
   assert.deepEqual(seatKeys(env), []);

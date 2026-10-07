@@ -12,8 +12,8 @@
 /** The variables that bind a process to the calling seat or claim a caller identity. */
 export const SEAT_ENV_VARS = Object.freeze(['ORCA_TERMINAL_HANDLE', 'ORCA_PANE_KEY', 'ORCA_TAB_ID', 'ORCA_WORKTREE_ID', 'STARCI_ROLE', 'STARCI_GUARD_FILE', 'STARCI_CALLER']);
 
-/** `parent` (the caller's env) without the seat identity: a child that is not the seat's own agent tool call runs unbound. Pure. */
-export function withoutSeatEnv(parent = process.env) {
+/** `parent` (the caller's env) without the seat identity: a child that is not the seat's own agent tool call runs unbound. Pure — the caller names the env; the base tier never reads process.env itself (RT_BASE_IMPURE). */
+export function withoutSeatEnv(parent) {
   const env = { ...parent };
   for (const key of Object.keys(env)) if (SEAT_ENV_VARS.includes(key) || key.startsWith('ORCA_AGENT_')) delete env[key];
   return env;
