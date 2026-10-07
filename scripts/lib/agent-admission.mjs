@@ -254,7 +254,7 @@ function pickReason(picked) {
 
 function pickRequest(request, constraints, members, policy) {
   return { tier: request.tier ?? null, members, liveSeat: request.liveSeat ?? null, history: request.history ?? {},
-    bias: { prefer: constraints.prefer, avoid: constraints.avoid, only: constraints.only, trusted: request.biasTrusted !== false },
+    bias: { prefer: constraints.prefer, avoid: constraints.avoid, only: constraints.only, trusted: request.biasTrusted === true },
     override: constraints.override, balance: request.balance ?? { maxStreak: Infinity, maxSharePercent: 100 },
     usage: { reservePercent: policy.reservePercent, biasPercent: policy.biasPercent, exhaustedPercent: policy.exhaustedPercent } };
 }

@@ -42,9 +42,13 @@ function tokenVerdict(member, usage, allowBand) {
   return null;
 }
 
+/** An owner reserve grant names one provider, model and (when it carries one) account. */
+const overrideNames = (member, override) => member.provider === override.provider && member.model === override.model
+  && (override.account === undefined || override.account === member.account);
+
 /** Whether a bias or an owner reserve grant names this member, so its 90..95 band stays usable. */
 const bandAllowed = (member, { bias, override }) => Boolean(bias.trusted !== false && named(member, [...(bias.prefer ?? []), ...(bias.only ?? [])]))
-  || Boolean(override && matchesSelector(member, override));
+  || Boolean(override && overrideNames(member, override));
 
 function streakOf(recent, headId) {
   let streak = 0;
