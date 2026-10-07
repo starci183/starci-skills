@@ -122,15 +122,15 @@ function walkTokens(node,trail,maps){
     }
     return;
   }
-  if(!node||typeof node!=='object')return;
+  if(node&&typeof node==='object')walkTokenEntries(node,trail,maps);
+}
+
+function walkTokenEntries(node,trail,maps){
   for(const [key,value] of Object.entries(node)){
     const next=[...trail,key];
-    if(isTokenLeaf(value)){
-      if(key.startsWith('--'))putToken(maps.exact,key,value);
-      else {putToken(maps.derived,key,value);putToken(maps.derived,`--${next.join('-')}`,value);}
-      continue;
-    }
-    walkTokens(value,key.startsWith('--')?trail:next,maps);
+    if(!isTokenLeaf(value)){walkTokens(value,key.startsWith('--')?trail:next,maps);continue;}
+    if(key.startsWith('--'))putToken(maps.exact,key,value);
+    else {putToken(maps.derived,key,value);putToken(maps.derived,`--${next.join('-')}`,value);}
   }
 }
 
@@ -147,21 +147,17 @@ const readText=file=>{
   return fs.readFileSync(file,'utf8');
 };
 
-/** One declared source file, read into a token lookup. Never throws: an unreadable source is reported. */
-export function readSourceTokens(sourceRoot,source){
-  const declared=slash(source?.path??'');
-  const entry={repository:source?.repository??null,path:declared,kind:source?.kind??null,found:false,declarations:0,scope:null};
-  if(!declared||path.isAbsolute(declared)||declared.split('/').includes('..'))return {...entry,error:'the declared path escapes its repository root'};
+const PATH_ESCAPES='the declared path escapes its repository root';
+/** Why a declared source path cannot be read inside `sourceRoot`, or null. */
+function sourcePathError(sourceRoot,declared){
+  if(!declared||path.isAbsolute(declared)||declared.split('/').includes('..'))return PATH_ESCAPES;
   const file=path.resolve(sourceRoot,declared);
-  const relative=path.relative(path.resolve(sourceRoot),file);
-  if(relative.startsWith('..'))return {...entry,error:'the declared path escapes its repository root'};
-  if(!fs.existsSync(file))return {...entry,error:'this repository does not carry the declared file'};
-  // A source inside a built @starci/grammar dist is read only when that dist is the build of its source:
-  // a stale dist would bind the brand to tokens the package no longer ships.
-  const refusal=grammarDistRefusal(file);
-  if(refusal)return {...entry,found:true,error:refusal.message,staleGrammarDist:{state:refusal.state,root:refusal.root,fix:refusal.fix}};
-  let text;
-  try{text=readText(file);}catch(error){return {...entry,found:true,error:String(error.message??error)};}
+  if(path.relative(path.resolve(sourceRoot),file).startsWith('..'))return PATH_ESCAPES;
+  return fs.existsSync(file)?null:'this repository does not carry the declared file';
+}
+
+/** The token lookup of a read source file: css custom properties, or a JSON/YAML token file. */
+function parseSourceText(file,source,text,entry){
   if(source.kind==='css'||path.extname(file).toLowerCase()==='.css'){
     const parsed=parseCssCustomProperties(text);
     return {...entry,found:true,declarations:parsed.all.length,lookup:{css:parsed}};
@@ -171,6 +167,22 @@ export function readSourceTokens(sourceRoot,source){
     const parsed=parseTokenData(data);
     return {...entry,found:true,declarations:parsed.exact.size+parsed.derived.size,lookup:{tokens:parsed}};
   }catch(error){return {...entry,found:true,error:`unreadable token file: ${String(error.message??error)}`};}
+}
+
+/** One declared source file, read into a token lookup. Never throws: an unreadable source is reported. */
+export function readSourceTokens(sourceRoot,source){
+  const declared=slash(source?.path??'');
+  const entry={repository:source?.repository??null,path:declared,kind:source?.kind??null,found:false,declarations:0,scope:null};
+  const pathError=sourcePathError(sourceRoot,declared);
+  if(pathError)return {...entry,error:pathError};
+  const file=path.resolve(sourceRoot,declared);
+  // A source inside a built @starci/grammar dist is read only when that dist is the build of its source:
+  // a stale dist would bind the brand to tokens the package no longer ships.
+  const refusal=grammarDistRefusal(file);
+  if(refusal)return {...entry,found:true,error:refusal.message,staleGrammarDist:{state:refusal.state,root:refusal.root,fix:refusal.fix}};
+  let text;
+  try{text=readText(file);}catch(error){return {...entry,found:true,error:String(error.message??error)};}
+  return parseSourceText(file,source,text,entry);
 }
 
 /** The first declaration of this token across the declared sources, preferring the default scope. */
@@ -437,6 +449,41 @@ export function findOwnerReceipt({acceptedBy,receipt=null,brandDir=null,answerer
   return {ok:false,why:`no receipt answers ${acceptedBy} in the project ledger`};
 }
 
+const trimmedText=value=>typeof value==='string'&&value.trim()?value.trim():null;
+
+/** Why an exception entry is refused (its two tokens, pair, ratio, reason, answer and measured ratio checked in order), or null. */
+function exceptionRefusal(fields,{foregroundToken,backgroundToken,measured,seen}){
+  if(!foregroundToken)return `foreground ${JSON.stringify(fields.foreground??null)} is not a colour token this brand declares`;
+  if(!backgroundToken)return `background ${JSON.stringify(fields.background??null)} is not a colour token this brand declares`;
+  if(fields.foreground===fields.background)return 'a token is not a contrast pair with itself';
+  const key=`${fields.foreground}\u0000${fields.background}`;
+  if(seen.has(key))return 'a second exception for the same pair; one pair carries one owner answer';
+  seen.add(key);
+  if(!(typeof fields.ratio==='number'&&Number.isFinite(fields.ratio)&&fields.ratio>=1))return 'ratio must be the contrast ratio the owner accepted, a number of at least 1';
+  if(!trimmedText(fields.reason))return 'reason must say why the owner accepted this pair below the floor';
+  if(!trimmedText(fields.acceptedBy))return 'acceptedBy names no owner answer; an exception without an owner receipt is refused';
+  if(measured===null)return 'a token of the pair is not a colour this runtime can parse, so the pair cannot be measured';
+  if(Math.abs(measured-fields.ratio)>CONTRAST_EXCEPTION_TOLERANCE)
+    return `the pair measures ${measured}:1, not the ${fields.ratio}:1 the owner accepted (tolerance ${CONTRAST_EXCEPTION_TOLERANCE}); a changed colour needs a new owner answer`;
+  return null;
+}
+
+/** One `contrastExceptions[]` entry judged: `valid` with its owner receipt, or `refused` with the reason. */
+function judgeContrastException(entry,index,{byName,seen,brandDir}){
+  const fields=entry&&typeof entry==='object'&&!Array.isArray(entry)?entry:{};
+  const foregroundToken=byName.get(fields.foreground)??null,backgroundToken=byName.get(fields.background)??null;
+  const fgColor=foregroundToken?parseColor(foregroundToken.value):null,bgColor=backgroundToken?parseColor(backgroundToken.value):null;
+  const measured=fgColor&&bgColor?round(contrastRatio(bgColor,fgColor),2):null;
+  const base={index,foreground:fields.foreground??null,background:fields.background??null,ratio:fields.ratio??null,measured,
+    reason:fields.reason??null,acceptedBy:fields.acceptedBy??null,receipt:fields.receipt??null,fgColor,bgColor};
+  const refuse=why=>({...base,status:'refused',why});
+  const refusal=exceptionRefusal(fields,{foregroundToken,backgroundToken,measured,seen});
+  if(refusal!==null)return refuse(refusal);
+  const owner=findOwnerReceipt({acceptedBy:trimmedText(fields.acceptedBy),receipt:fields.receipt??null,brandDir});
+  if(!owner.ok)return refuse(`no owner receipt: ${owner.why}`);
+  return {...base,acceptedBy:trimmedText(fields.acceptedBy),receipt:owner.file,answeredBy:owner.answeredBy,answeredAt:owner.at,status:'valid'};
+}
+
 /**
  * `color.policy.contrastExceptions[]`: each entry names one pair by its two brand token names, the ratio the
  * owner accepted, why, and the owner answer that accepted it. An entry is `valid` only when both tokens are
@@ -447,33 +494,88 @@ function readContrastExceptions({brand,tokens,brandDir}){
   const raw=brand?.color?.policy?.contrastExceptions;
   if(raw===undefined||raw===null)return [];
   if(!Array.isArray(raw))return [{index:0,status:'refused',why:'color.policy.contrastExceptions must be a list of exceptions'}];
-  const byName=new Map(tokens.map(token=>[token.token,token]));
-  const seen=new Set();
-  return raw.map((entry,index)=>{
-    const fields=entry&&typeof entry==='object'&&!Array.isArray(entry)?entry:{};
-    const text=value=>typeof value==='string'&&value.trim()?value.trim():null;
-    const foregroundToken=byName.get(fields.foreground)??null,backgroundToken=byName.get(fields.background)??null;
-    const fgColor=foregroundToken?parseColor(foregroundToken.value):null,bgColor=backgroundToken?parseColor(backgroundToken.value):null;
-    const measured=fgColor&&bgColor?round(contrastRatio(bgColor,fgColor),2):null;
-    const base={index,foreground:fields.foreground??null,background:fields.background??null,ratio:fields.ratio??null,measured,
-      reason:fields.reason??null,acceptedBy:fields.acceptedBy??null,receipt:fields.receipt??null,fgColor,bgColor};
-    const refuse=why=>({...base,status:'refused',why});
-    if(!foregroundToken)return refuse(`foreground ${JSON.stringify(fields.foreground??null)} is not a colour token this brand declares`);
-    if(!backgroundToken)return refuse(`background ${JSON.stringify(fields.background??null)} is not a colour token this brand declares`);
-    if(fields.foreground===fields.background)return refuse('a token is not a contrast pair with itself');
-    const key=`${fields.foreground}\u0000${fields.background}`;
-    if(seen.has(key))return refuse('a second exception for the same pair; one pair carries one owner answer');
-    seen.add(key);
-    if(!(typeof fields.ratio==='number'&&Number.isFinite(fields.ratio)&&fields.ratio>=1))return refuse('ratio must be the contrast ratio the owner accepted, a number of at least 1');
-    if(!text(fields.reason))return refuse('reason must say why the owner accepted this pair below the floor');
-    if(!text(fields.acceptedBy))return refuse('acceptedBy names no owner answer; an exception without an owner receipt is refused');
-    if(measured===null)return refuse('a token of the pair is not a colour this runtime can parse, so the pair cannot be measured');
-    if(Math.abs(measured-fields.ratio)>CONTRAST_EXCEPTION_TOLERANCE)
-      return refuse(`the pair measures ${measured}:1, not the ${fields.ratio}:1 the owner accepted (tolerance ${CONTRAST_EXCEPTION_TOLERANCE}); a changed colour needs a new owner answer`);
-    const owner=findOwnerReceipt({acceptedBy:text(fields.acceptedBy),receipt:fields.receipt??null,brandDir});
-    if(!owner.ok)return refuse(`no owner receipt: ${owner.why}`);
-    return {...base,acceptedBy:text(fields.acceptedBy),receipt:owner.file,answeredBy:owner.answeredBy,answeredAt:owner.at,status:'valid'};
-  });
+  const context={byName:new Map(tokens.map(token=>[token.token,token])),seen:new Set(),brandDir};
+  return raw.map((entry,index)=>judgeContrastException(entry,index,context));
+}
+
+/** The declared token a fill's foreground value is: `<token>-foreground` or the `<role>-foreground` role. */
+function foregroundNameOf(tokens,byName,token,colour){
+  const names=[`${token.token}-foreground`,...tokens.filter(other=>token.role&&other.role===`${token.role}-foreground`).map(other=>other.token)];
+  return names.find(name=>{const value=byName.has(name)?parseColor(byName.get(name).value):null;return value&&deltaEOk(value,colour)<=TOKEN_TOLERANCE;})??null;
+}
+
+/** A bare status glyph or title takes the soft foreground; it must read as a non-text mark on every ground the brand declares. */
+function statusGlyphPairs(token,tokens,foreground,softMinimum){
+  const pairs=[];
+  for(const ground of tokens.filter(other=>other.role==='surface'||other.role==='background'||other.role==='canvas')){
+    const groundColor=parseColor(ground.value);
+    if(!groundColor)continue;
+    const glyphRatio=round(contrastRatio(groundColor,foreground),2);
+    pairs.push({kind:'status-glyph',token:token.token,against:ground.token,ratio:glyphRatio,minimum:softMinimum,outcome:glyphRatio>=softMinimum?'pass':'fail'});
+  }
+  return pairs;
+}
+
+/** The pairs one token with a declared foreground puts under test: its text or soft pair and, for a soft tone, its glyph on each ground. */
+function tokenContrastPairs(token,tokens,byName,textMinimum,softMinimum){
+  const soft=softToneOf(token)!==null;
+  const minimum=soft?softMinimum:textMinimum;
+  const background=parseColor(token.value),foreground=parseColor(token.foreground);
+  if(!background||!foreground)return [{kind:'text',token:token.token,background:token.value??null,foreground:token.foreground,minimum,outcome:'unparseable'}];
+  const ratio=round(contrastRatio(background,foreground),2);
+  const pairs=[{kind:soft?'soft':'text',token:token.token,foregroundToken:foregroundNameOf(tokens,byName,token,foreground),background:token.value,foreground:token.foreground,ratio,minimum,
+    outcome:ratio>=minimum?'pass':'fail',_bg:token.token,_fg:foreground}];
+  if(soft)pairs.push(...statusGlyphPairs(token,tokens,foreground,softMinimum));
+  return pairs;
+}
+
+/** The primary against a declared surface: a non-text indicator, or null when either token is missing. */
+function primaryOnSurfacePair(tokens){
+  const primary=byRole(tokens,'primary'),surface=byRole(tokens,'surface');
+  if(!primary||!surface)return null;
+  const one=parseColor(primary.value),two=parseColor(surface.value);
+  if(!one||!two)return {kind:'non-text',token:primary.token,against:surface.token,minimum:NON_TEXT_MIN_CONTRAST,outcome:'unparseable'};
+  const ratio=round(contrastRatio(one,two),2);
+  return {kind:'non-text',token:primary.token,against:surface.token,ratio,minimum:NON_TEXT_MIN_CONTRAST,outcome:ratio>=NON_TEXT_MIN_CONTRAST?'pass':'fail',
+    _bg:surface.token,_fg:one};
+}
+
+const exceptionCovers=(exception,pair)=>Boolean(pair._fg&&exception.fgColor&&exception.background===pair._bg&&deltaEOk(exception.fgColor,pair._fg)<=TOKEN_TOLERANCE);
+
+/** An exception pair no token declares as a fill is measured from its two tokens, so an accepted pair is never unmeasured. */
+function addExceptionPairs(pairs,exceptions,byName,minimum){
+  for(const exception of exceptions){
+    if(!exception.fgColor||!exception.bgColor||pairs.some(pair=>exceptionCovers(exception,pair)))continue;
+    pairs.push({kind:'text',token:exception.background,foregroundToken:exception.foreground,declaredBy:'contrastExceptions',
+      background:byName.get(exception.background).value,foreground:byName.get(exception.foreground).value,ratio:exception.measured,minimum,
+      outcome:exception.measured>=minimum?'pass':'fail',_bg:exception.background,_fg:exception.fgColor});
+  }
+}
+
+/** A valid exception turns the failing pair it covers into a pass; returns the pairs it lifted. */
+function applyExceptions(pairs,exceptions){
+  const applied=[];
+  for(const pair of pairs){
+    const exception=exceptions.find(entry=>entry.status==='valid'&&exceptionCovers(entry,pair));
+    if(!exception)continue;
+    if(pair.outcome==='fail'){
+      pair.outcome='pass';
+      pair.belowFloor=true;
+      pair.exception={foreground:exception.foreground,background:exception.background,acceptedBy:exception.acceptedBy,ratio:exception.ratio,receipt:exception.receipt};
+      exception.status='applied';
+      applied.push(pair);
+    } else if(exception.status==='valid')exception.status='unneeded';
+  }
+  return applied;
+}
+
+const contrastPairName=pair=>pair.declaredBy?pair.foregroundToken+' on '+pair.token:pair.token+(pair.against&&' on '+pair.against||'');
+
+/** The failure sentences of a contrast check: pairs below their floor, then refused exceptions. */
+function contrastFailures(pairs,bad,refused){
+  return [
+    ...(bad.length?[`${bad.length} of ${pairs.length} declared colour pairs miss their contrast floor: ${bad.map(pair=>contrastPairName(pair)+' '+(pair.ratio??'(unparseable)')+':1 < '+pair.minimum+':1').join(', ')}.`]:[]),
+    ...(refused.length?[`${refused.length} contrast exception${refused.length===1?' is':'s are'} refused: ${refused.map(entry=>(entry.foreground??'?')+' on '+(entry.background??'?')+' ('+entry.why+')').join('; ')}.`]:[])];
 }
 
 /**
@@ -490,67 +592,19 @@ function readContrastExceptions({brand,tokens,brandDir}){
 export function checkContrastAa({brand,brandDir=null}){
   const id='contrast-aa';
   const tokens=brandTokens(brand);
-  const textMinimum=Number.isFinite(brand?.color?.policy?.minContrast)?Number(brand.color.policy.minContrast):DEFAULT_MIN_CONTRAST;
-  const minimum=textMinimum;
-  const byName=new Map(tokens.map(token=>[token.token,token]));
-  /** The declared token a fill's foreground value is: `<token>-foreground` or the `<role>-foreground` role. */
-  const foregroundNameOf=(token,colour)=>{
-    const names=[`${token.token}-foreground`,...tokens.filter(other=>token.role&&other.role===`${token.role}-foreground`).map(other=>other.token)];
-    return names.find(name=>{const value=byName.has(name)?parseColor(byName.get(name).value):null;return value&&deltaEOk(value,colour)<=TOKEN_TOLERANCE;})??null;
-  };
+  const minimum=Number.isFinite(brand?.color?.policy?.minContrast)?Number(brand.color.policy.minContrast):DEFAULT_MIN_CONTRAST;
   const softMinimum=Number.isFinite(brand?.color?.policy?.softMinContrast)?Number(brand.color.policy.softMinContrast):SOFT_MIN_CONTRAST;
+  const byName=new Map(tokens.map(token=>[token.token,token]));
   const pairs=[];
   for(const token of tokens){
     if(token.foreground===undefined||token.foreground===null)continue;
-    const soft=softToneOf(token)!==null;
-    const minimum=soft?softMinimum:textMinimum;
-    const background=parseColor(token.value),foreground=parseColor(token.foreground);
-    if(!background||!foreground){
-      pairs.push({kind:'text',token:token.token,background:token.value??null,foreground:token.foreground,minimum,outcome:'unparseable'});
-      continue;
-    }
-    const ratio=round(contrastRatio(background,foreground),2);
-    pairs.push({kind:soft?'soft':'text',token:token.token,foregroundToken:foregroundNameOf(token,foreground),background:token.value,foreground:token.foreground,ratio,minimum,
-      outcome:ratio>=minimum?'pass':'fail',_bg:token.token,_fg:foreground});
-    if(soft){
-      // A bare status glyph or title takes the soft foreground; it must read as a non-text mark on every ground the brand declares.
-      for(const ground of tokens.filter(other=>other.role==='surface'||other.role==='background'||other.role==='canvas')){
-        const groundColor=parseColor(ground.value);
-        if(!groundColor)continue;
-        const glyphRatio=round(contrastRatio(groundColor,foreground),2);
-        pairs.push({kind:'status-glyph',token:token.token,against:ground.token,ratio:glyphRatio,minimum:softMinimum,outcome:glyphRatio>=softMinimum?'pass':'fail'});
-      }
-    }
+    pairs.push(...tokenContrastPairs(token,tokens,byName,minimum,softMinimum));
   }
-  const primary=byRole(tokens,'primary'),surface=byRole(tokens,'surface');
-  if(primary&&surface){
-    const one=parseColor(primary.value),two=parseColor(surface.value);
-    if(one&&two){
-      const ratio=round(contrastRatio(one,two),2);
-      pairs.push({kind:'non-text',token:primary.token,against:surface.token,ratio,minimum:NON_TEXT_MIN_CONTRAST,outcome:ratio>=NON_TEXT_MIN_CONTRAST?'pass':'fail',
-        _bg:surface.token,_fg:one});
-    } else pairs.push({kind:'non-text',token:primary.token,against:surface.token,minimum:NON_TEXT_MIN_CONTRAST,outcome:'unparseable'});
-  }
+  const nonText=primaryOnSurfacePair(tokens);
+  if(nonText)pairs.push(nonText);
   const exceptions=readContrastExceptions({brand,tokens,brandDir});
-  const covers=(exception,pair)=>Boolean(pair._fg&&exception.fgColor&&exception.background===pair._bg&&deltaEOk(exception.fgColor,pair._fg)<=TOKEN_TOLERANCE);
-  for(const exception of exceptions){
-    if(!exception.fgColor||!exception.bgColor||pairs.some(pair=>covers(exception,pair)))continue;
-    pairs.push({kind:'text',token:exception.background,foregroundToken:exception.foreground,declaredBy:'contrastExceptions',
-      background:byName.get(exception.background).value,foreground:byName.get(exception.foreground).value,ratio:exception.measured,minimum,
-      outcome:exception.measured>=minimum?'pass':'fail',_bg:exception.background,_fg:exception.fgColor});
-  }
-  const applied=[];
-  for(const pair of pairs){
-    const exception=exceptions.find(entry=>entry.status==='valid'&&covers(entry,pair));
-    if(!exception)continue;
-    if(pair.outcome==='fail'){
-      pair.outcome='pass';
-      pair.belowFloor=true;
-      pair.exception={foreground:exception.foreground,background:exception.background,acceptedBy:exception.acceptedBy,ratio:exception.ratio,receipt:exception.receipt};
-      exception.status='applied';
-      applied.push(pair);
-    } else if(exception.status==='valid')exception.status='unneeded';
-  }
+  addExceptionPairs(pairs,exceptions,byName,minimum);
+  const applied=applyExceptions(pairs,exceptions);
   for(const pair of pairs){delete pair._bg;delete pair._fg;}
   const refused=exceptions.filter(exception=>exception.status==='refused');
   const reported=exceptions.map(({fgColor,bgColor,...rest})=>rest);
@@ -558,10 +612,7 @@ export function checkContrastAa({brand,brandDir=null}){
   const bad=pairs.filter(pair=>pair.outcome!=='pass');
   const evidence={minimum,nonTextMinimum:NON_TEXT_MIN_CONTRAST,softMinimum,exceptionTolerance:CONTRAST_EXCEPTION_TOLERANCE,pairs,
     ...(exceptions.length?{exceptions:reported}:{})};
-  const named=pair=>pair.declaredBy?pair.foregroundToken+' on '+pair.token:pair.token+(pair.against&&' on '+pair.against||'');
-  const failures=[
-    ...(bad.length?[`${bad.length} of ${pairs.length} declared colour pairs miss their contrast floor: ${bad.map(pair=>named(pair)+' '+(pair.ratio??'(unparseable)')+':1 < '+pair.minimum+':1').join(', ')}.`]:[]),
-    ...(refused.length?[`${refused.length} contrast exception${refused.length===1?' is':'s are'} refused: ${refused.map(entry=>(entry.foreground??'?')+' on '+(entry.background??'?')+' ('+entry.why+')').join('; ')}.`]:[])];
+  const failures=contrastFailures(pairs,bad,refused);
   const accepted=applied.length?` ${applied.length} of them below it by an owner-accepted exception: ${applied.map(pair=>pair.exception.foreground+' on '+pair.exception.background+' '+pair.ratio+':1 ('+pair.exception.acceptedBy+')').join(', ')}.`:'';
   return failures.length
     ?check(id,'fail',failures.join(' '),evidence)
