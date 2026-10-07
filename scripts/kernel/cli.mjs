@@ -2374,7 +2374,7 @@ function reconcileDeadWorker(ledger, args, job, repo) {
   // --settle-failed (the watchdog's recovery): effect evidence the owned paths bound is what the
   // retry continues from, so the attempt settles failed-no-report and its retry is queued.
   if (args['settle-failed'] && recovery === 'fenced' && settleableEvidence(evidence)) {
-    return settleFailedNoReport(ledger, job, { workerProof, evidence: recorded, dispatchId, pathProof, repo, args });
+    settleFailedNoReport(ledger, job, { workerProof, evidence: recorded, dispatchId, pathProof, repo, args }); return undefined;
   }
 
   // A managed Dispatch record may outlive its terminal on a host that did not
