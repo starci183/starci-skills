@@ -272,10 +272,9 @@ function expressionScopesBucket(expression, bucket) {
   return Object.values(expression).some((child) => expressionScopesBucket(child, bucket));
 }
 
-function storageFindings(file, facts) {
-  const findings = [];
+function insertedBucketDeclarations(file, buckets, findings) {
   const declarations = [];
-  for (const { node, line } of facts.buckets) {
+  for (const { node, line } of buckets) {
     const columns = (node.cols ?? []).map((column) => column?.ResTarget?.name);
     const rows = valueRows(node);
     if (!columns.length || !rows.length) {
@@ -287,7 +286,12 @@ function storageFindings(file, facts) {
       declarations.push({ id: asString(cell('id')), publicValue: asBool(cell('public')), fileSize: cell('file_size_limit'), mimeTypes: cell('allowed_mime_types'), line });
     }
   }
-  for (const { node, line } of facts.bucketCalls) {
+  return declarations;
+}
+
+function calledBucketDeclarations(bucketCalls) {
+  const declarations = [];
+  for (const { node, line } of bucketCalls) {
     const positional = (node.args ?? []).filter((argument) => !argument?.NamedArgExpr);
     const named = new Map((node.args ?? []).filter((argument) => argument?.NamedArgExpr).map((argument) => [argument.NamedArgExpr.name, argument.NamedArgExpr.arg]));
     declarations.push({
@@ -298,22 +302,30 @@ function storageFindings(file, facts) {
       line,
     });
   }
-  for (const declaration of declarations) {
-    const { id, publicValue, fileSize, mimeTypes, line } = declaration;
-    if (id === undefined) {
-      findings.push(found(DB_STORAGE_POLICY, file, `${file}:${line} storage.buckets row has no literal id`, { line }));
-      continue;
-    }
-    if (publicValue === null || (publicValue && !id.endsWith('_public'))) {
-      findings.push(found(DB_STORAGE_POLICY, file, `${file}:${line} bucket ${JSON.stringify(id)} declares public = ${publicValue === null ? 'absent' : publicValue}; public must be explicit and only an *_public id may be public`, { line, bucket: id }));
-    }
-    for (const [column, value] of [['file_size_limit', fileSize], ['allowed_mime_types', mimeTypes]]) {
-      if (value === undefined || isNull(value)) findings.push(found(DB_STORAGE_POLICY, file, `${file}:${line} bucket ${JSON.stringify(id)} declares no ${column}`, { line, bucket: id, column }));
-    }
-    const covered = facts.policies.some((policy) => policy.schema === 'storage' && policy.table === 'objects'
-      && (expressionScopesBucket(policy.qual, id) || expressionScopesBucket(policy.withCheck, id)));
-    if (!covered) findings.push(found(DB_STORAGE_POLICY, file, `${file}:${line} bucket ${JSON.stringify(id)} has no storage.objects policy whose bucket_id predicate names it in this migration`, { line, bucket: id }));
+  return declarations;
+}
+
+function bucketDeclarationFindings(file, declaration, policies) {
+  const { id, publicValue, fileSize, mimeTypes, line } = declaration;
+  const findings = [];
+  if (id === undefined) return [found(DB_STORAGE_POLICY, file, `${file}:${line} storage.buckets row has no literal id`, { line })];
+  if (publicValue === null || (publicValue && !id.endsWith('_public'))) {
+    findings.push(found(DB_STORAGE_POLICY, file, `${file}:${line} bucket ${JSON.stringify(id)} declares public = ${publicValue === null ? 'absent' : publicValue}; public must be explicit and only an *_public id may be public`, { line, bucket: id }));
   }
+  for (const [column, value] of [['file_size_limit', fileSize], ['allowed_mime_types', mimeTypes]]) {
+    if (value === undefined || isNull(value)) findings.push(found(DB_STORAGE_POLICY, file, `${file}:${line} bucket ${JSON.stringify(id)} declares no ${column}`, { line, bucket: id, column }));
+  }
+  const covered = policies.some((policy) => policy.schema === 'storage' && policy.table === 'objects'
+    && (expressionScopesBucket(policy.qual, id) || expressionScopesBucket(policy.withCheck, id)));
+  if (!covered) findings.push(found(DB_STORAGE_POLICY, file, `${file}:${line} bucket ${JSON.stringify(id)} has no storage.objects policy whose bucket_id predicate names it in this migration`, { line, bucket: id }));
+  return findings;
+}
+
+function storageFindings(file, facts) {
+  const findings = [];
+  const declarations = insertedBucketDeclarations(file, facts.buckets, findings);
+  declarations.push(...calledBucketDeclarations(facts.bucketCalls));
+  for (const declaration of declarations) findings.push(...bucketDeclarationFindings(file, declaration, facts.policies));
   return findings;
 }
 
