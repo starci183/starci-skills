@@ -82,7 +82,7 @@ export function specFilesFor(repo, names) {
   const texts = paths.map((file) => ({ file: path.relative(repo, file).split(path.sep).join('/'), text: fs.readFileSync(file, 'utf8') }));
   const found = new Set(), unmatched = [];
   for (const name of new Set(names)) {
-    const hits = texts.filter((entry) => entry.text.includes(name) || entry.text.includes(name.replaceAll(/'/g, String.raw`\'`)));
+    const hits = texts.filter((entry) => entry.text.includes(name) || entry.text.includes(name.replaceAll("'", String.raw`\'`)));
     if (hits.length) hits.forEach((entry) => found.add(entry.file)); else unmatched.push(name);
   }
   return { files: [...found].sort(byCodeUnit), unmatched };
