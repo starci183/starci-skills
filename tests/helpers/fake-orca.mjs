@@ -796,24 +796,23 @@ else if (verb === 'orchestration reply') {
 else if (verb === 'worktree show')
   out({ ok: true, result: { worktree: { id: arg('worktree'), path: arg('worktree') } } });
 else if (verb === 'account list') {
-  // Pinned receipt shape (scripts/agent/quota/orca-account.mjs):
-  //   result.rateLimits.<provider> = {status, weekly:{usedPercent,...}, error,
-  //   usageMetadata:{failureKind}} — 'unavailable' / missing-credentials → dead.
+  // The real Orca 1.4.209 shape (modules/host/orca/calls.yaml account-list): result.rateLimits.<provider> =
+  //   {provider, session, weekly, updatedAt, error, status, usageMetadata}; updatedAt is the epoch ms of Orca's
+  //   last usage fetch and the only observation time; a window is {usedPercent, windowMinutes, resetsAt, resetDescription}.
+  //   'unavailable' / missing-credentials → dead. state.quotaWindows[provider] overrides entry fields.
   const rateLimits = {};
-  const quotaObservedAt = Date.now();
-  const weeklyWindow = (usedPercent) => ({ id: 'weekly', usedPercent, windowMinutes: 10080, observedAt: quotaObservedAt, resetsAt: quotaObservedAt + 10080 * 60000 });
+  const updatedAt = Date.now();
+  const weeklyWindow = (usedPercent) => ({ usedPercent, windowMinutes: 10080, resetsAt: updatedAt + 10080 * 60000, resetDescription: 'Wed 10:53 AM' });
+  const okEntry = (p, usedPercent) => ({ provider: p, session: null, weekly: weeklyWindow(usedPercent), updatedAt, error: null, status: 'ok',
+    usageMetadata: { source: 'oauth', attemptedSources: ['oauth'], lastSuccessfulSource: 'oauth' }, ...(state.quotaWindows?.[p] ?? {}) });
   for (const p of ['claude', 'codex', 'devin'])
     rateLimits[p] = deadProviders.has(p)
-      ? { status: 'unavailable', error: 'not authenticated',
-          weekly: { usedPercent: null, windowMinutes: null, resetsAt: null },
+      ? { provider: p, status: 'unavailable', error: 'not authenticated', session: null, weekly: null, updatedAt,
           usageMetadata: { failureKind: 'missing-credentials' } }
       : staleProviders.has(p)
-        ? { status: 'error', error: 'OAuth token expired; refresh may occur on launch',
-            weekly: { usedPercent: null, windowMinutes: 10080, resetsAt: null },
+        ? { provider: p, status: 'error', error: 'OAuth token expired; refresh may occur on launch', session: null, weekly: null, updatedAt,
             usageMetadata: { failureKind: 'stale-token' } }
-      : limitedProviders.has(p)
-        ? { status: 'ok', observedAt: quotaObservedAt, weekly: weeklyWindow(96), ...(state.quotaWindows?.[p] ?? {}) }
-      : { status: 'ok', observedAt: quotaObservedAt, weekly: weeklyWindow(12), ...(state.quotaWindows?.[p] ?? {}) };
+      : okEntry(p, limitedProviders.has(p) ? 96 : 12);
   out({ ok: true, result: { rateLimits } });
 }
 else { out({ ok: false, error: 'fake-orca: unhandled ' + argv.join(' ') }); process.exit(1); }

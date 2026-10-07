@@ -17,11 +17,11 @@ export function probeOrcaAccount(provider, options = {}) {
   const entry = list.rateLimits?.[provider];
   if (!entry) return normalized({ state: 'dead', auth: 'unavailable', failureKind: 'missing-account', detail: `no account quota entry for ${provider}` });
   const account = entry.accountId ?? options.account ?? 'default';
-  const observedAt = entry.observedAt ?? entry.usageMetadata?.observedAt ?? list.observedAt ?? list.accounts?.observedAt ?? null;
+  const observedAt = entry.updatedAt ?? entry.observedAt ?? entry.usageMetadata?.observedAt ?? list.observedAt ?? list.accounts?.observedAt ?? null;
   if (entry.status === 'unavailable' || entry.usageMetadata?.failureKind === 'missing-credentials')
     return normalized({ account, observedAt, entry, state: 'dead', auth: 'unavailable', failureKind: entry.usageMetadata?.failureKind ?? 'unavailable', detail: entry.error ?? 'provider unavailable' });
   if (entry.status !== 'ok') return normalized({ account, observedAt, entry, state: 'unknown',
     auth: entry.usageMetadata?.failureKind === 'stale-token' ? 'refreshable' : 'unknown',
     failureKind: entry.usageMetadata?.failureKind ?? null, detail: entry.error ?? 'account quota status unknown' });
-  return normalized({ account, observedAt, entry, auth: 'ok' });
+  return normalized({ account, observedAt, entry, auth: 'ok', observedBy: 'Orca' });
 }

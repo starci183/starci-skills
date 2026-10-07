@@ -58,6 +58,12 @@ calls:
     kind: read
     flags: [json]
     receipt: [result.rateLimits]
+    note: |-
+      result.rateLimits.<provider> is {provider, session, weekly, ..., updatedAt, error, status, usageMetadata}; each window is
+      {usedPercent, windowMinutes, resetsAt, resetDescription} and carries no timestamp of its own. The observation time of an
+      account entry is its updatedAt, the epoch milliseconds of Orca's last usage fetch for that provider; its windows inherit it
+      (scripts/agent/quota/orca-account.mjs). An entry without updatedAt has no observation time and is stale by allocation.admission.maxAgeMs;
+      the reader takes observedAt (entry, then usageMetadata, then the list) only for a build that sends that spelling instead.
   agent-context:
     command: agent-context
     kind: read
