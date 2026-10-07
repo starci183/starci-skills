@@ -87,9 +87,10 @@ export function handoverAsks(db, workflowId) {
     const superseded = lifecycle('ask-superseded');
     // Parked again after a supersede - served, or notified for on-demand serving - reopens it.
     const reserved = [lifecycle('ask-serving'), lifecycle('ask-notified')].filter(Boolean).sort((a, b) => b.seq - a.seq)[0] ?? null;
+    const reopened = reserved?.seq > superseded?.seq;
     let state = 'pending';
     if (answered) state = 'answered';
-    else if (superseded && !(reserved?.seq > superseded.seq)) state = 'superseded';
+    else if (superseded && !reopened) state = 'superseded';
     const event = parseJson(answered?.payload_json, {}) ?? {};
     const receipt = answered ? readReceipt(event.receiptPath) : null;
     const receiptBound = Boolean(receipt) && receipt.dispatchId === dispatchId && receipt.workflowId === workflowId;

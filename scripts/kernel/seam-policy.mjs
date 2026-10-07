@@ -95,8 +95,8 @@ export function seamStateOf(db, { workflowId, op, cutId, isOwnerWait = () => fal
  *   {hold: false, stub: {mode, seamJobId, seamStatus, since, interface?, reason}} - it runs now on a stub.
  */
 export function siblingSeamHold(db, job, { now = Date.now(), settings = null, isOwnerWait = () => false } = {}) {
-  const payload = payloadOf(job), cut = payload.cut;
-  if (cut?.id == null || !(Number(cut.ordinal) > 1)) return null;
+  const payload = payloadOf(job), cut = payload.cut, nonFirstCut = Number(cut?.ordinal) > 1;
+  if (cut?.id == null || !nonFirstCut) return null;
   const op = job.op_id ?? payload.opId;
   const workflowId = job.workflow_id ?? payload.hierarchy?.workflowId;
   const seam = seamStateOf(db, { workflowId, op, cutId: cut.id, isOwnerWait });
