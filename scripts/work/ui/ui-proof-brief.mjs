@@ -86,7 +86,7 @@ const RUN_ONLY = /(?:^(the )?run\b)|\bthe run (reaches|is driven|completes|submi
 // The surface
 // ---------------------------------------------------------------------------------------------------------
 
-const flatText = (v) => { if(v==null)return '';if(typeof v==='string')return v;if(Array.isArray(v))return v.map(flatText).join('\n');if(typeof v==='object')return Object.entries(v).map(([k,x])=>`${k}: ${flatText(x)}`).join('\n');return String(v); };
+const flatText = (v) => { if(v==null){return '';}if(typeof v==='string'){return v;}if(Array.isArray(v)){return v.map(flatText).join('\n');}if(typeof v==='object'){return Object.entries(v).map(([k,x])=>`${k}: ${flatText(x)}`).join('\n');}return String(v); };
 
 /** The ui record file for a path (the index.yaml itself or its directory). */
 function surfaceFile(p) {
@@ -168,7 +168,7 @@ export function classifyCase(rule, c, elements) {
 // Numbers: rem values, Tailwind classes and CSS tokens resolved through the product cascade
 // ---------------------------------------------------------------------------------------------------------
 
-const remPx = (v) => { const m = /^(-?\d*\.?\d+)(rem|px)?$/.exec(String(v ?? '').trim()); if(!m)return null;return Number(m[1]) * (m[2] === 'px' ? 1 : REM_PX); };
+const remPx = (v) => { const m = /^(-?(?:\d+(?:\.\d+)?|\.\d+))(rem|px)?$/.exec(String(v ?? '').trim()); if(!m){return null;}return Number(m[1]) * (m[2] === 'px' ? 1 : REM_PX); };
 const fmtPx = (n) => (n == null ? '?' : `${Math.round(n * 10) / 10}px`);
 
 /** A token lookup over the family root at one width: `variable(name)` -> {value, px}. */
@@ -197,7 +197,7 @@ export function classValue(cls, scope) {
     if (size === 'none') return { cls, variant, px: 0, how: 'none' };
     if (size === 'full') return { cls, variant, px: Infinity, how: 'a corner larger than the box (pill)' };
     const v = size ? scope?.variable(`--radius-${size}`) : scope?.variable('--radius');
-    if(v?.px!=null)return {cls,variant,px:v.px,how:'--radius'+(size?'-'+size:'')+': '+v.value};return {cls,variant,px:null,how:`--radius-${size} is not bound by the cascade`};
+    if(v?.px!=null){return {cls,variant,px:v.px,how:'--radius'+(size?'-'+size:'')+': '+v.value};}return {cls,variant,px:null,how:`--radius-${size} is not bound by the cascade`};
   }
   m = bare.match(/^text-(xs|sm|base|lg|xl|2xl|3xl|4xl|5xl|6xl)$/);
   if (m) {
@@ -215,7 +215,7 @@ export function classValue(cls, scope) {
   return null;
 }
 
-const evalRatio = (v) => { const m = /^calc\(([\d.]+)\/([\d.]+)\)$/.exec(String(v).replace(/\s+/g, '')); if (m) return Number(m[1]) / Number(m[2]); const n = Number(v); return Number.isFinite(n) ? n : null; };
+const evalRatio = (v) => { const m = /^calc\(([\d.]+)\/([\d.]+)\)$/.exec(String(v).replace(/\s+/g, '')); if (m){return Number(m[1]) / Number(m[2]);} const n = Number(v); return Number.isFinite(n) ? n : null; };
 
 /** Every utility class spelled in a render/title string, with its resolved value. */
 export function classesIn(text, scope) {
@@ -232,8 +232,8 @@ export function classesIn(text, scope) {
   return out;
 }
 
-const describeClass = (v) => { let size;if(v.px===Infinity)size='pill';else if(v.px!=null)size=fmtPx(v.px);else size=v.weight??'?';return v.cls+' = '+size+(v.lineHeight?'/'+fmtPx(v.lineHeight):'')+(v.variant?' (at '+v.variant+')':''); };
-const withPx = (text) => String(text ?? '').replace(/(^|[^\w.])(\d*\.?\d+)rem\b/g, (all, pre, n) => pre+n+'rem ('+fmtPx(Number(n)*REM_PX)+')');
+const describeClass = (v) => { let size;if(v.px===Infinity){size='pill';}else if(v.px!=null){size=fmtPx(v.px);}else{size=v.weight??'?';}return v.cls+' = '+size+(v.lineHeight?'/'+fmtPx(v.lineHeight):'')+(v.variant?' (at '+v.variant+')':''); };
+const withPx = (text) => String(text ?? '').replace(/(^|[^\w.])((?:\d+(?:\.\d+)?|\.\d+))rem\b/g, (all, pre, n) => pre+n+'rem ('+fmtPx(Number(n)*REM_PX)+')');
 
 /** The CSS each component-owned knowledge row can be checked against (selectors only). */
 const OWNED_CSS = (chains) => [
@@ -301,7 +301,7 @@ export function buildBrief({ record, recordFile = null, repo = null, family = nu
   }
   // Two rules claiming one component element.
   const byElement = new Map();
-  for (const r of ownedRows) { const key = `${r.path} ${r.component} | ${r.element}`; if (!byElement.has(key)) byElement.set(key, []); byElement.get(key).push(r); }
+  for (const r of ownedRows) { const key = `${r.path} ${r.component} | ${r.element}`; if (!byElement.has(key)) { byElement.set(key, []); } byElement.get(key).push(r); }
   for (const [key, rows] of byElement) {
     const rules = [...new Set(rows.map((r) => r.rule).filter(Boolean))];
     if (rules.length > 1) conflicts.push({ kind: 'two-owners', text: `${key.split(' ')[0]}: ${rows[0].component} "${rows[0].element}" is owned by ${rules.map((id) => id+(rows.find((r) => r.rule === id)?.px != null?' ('+fmtPx(rows.find((r) => r.rule === id).px)+')':'')).join(' and ')} - the knowledge row does not say which condition selects each` });
@@ -337,7 +337,7 @@ export function briefText(b) {
   lines.push(`UI PROOF BRIEF - ${b.record ?? 'surface'}${b.surface ? ' ('+path.relative(process.cwd(), b.surface).split(path.sep).join('/')+')' : ''}`,
     `Elements: ${Object.entries(b.elements.kinds).map(([k, why]) => k+' ['+why+']').join('; ')}.`,
     `Components: ${b.elements.components.join(', ') || 'none named'}.`,
-    (()=>{if(!b.geometry.ok)return `Numbers: knowledge values only (${b.geometry.errors.join('; ')}).`;const entry=b.geometry.sources.entry?path.relative(b.geometry.sources.repo,b.geometry.sources.entry).split(path.sep).join('/'):'installed packages';return `Numbers resolved through the product CSS (family ${b.geometry.family}, ${entry}).`;})(),
+    (()=>{if(!b.geometry.ok){return `Numbers: knowledge values only (${b.geometry.errors.join('; ')}).`;}const entry=b.geometry.sources.entry?path.relative(b.geometry.sources.repo,b.geometry.sources.entry).split(path.sep).join('/'):'installed packages';return `Numbers resolved through the product CSS (family ${b.geometry.family}, ${entry}).`;})(),
     '',
     `CONFLICTS (${b.conflicts.length}) - named, not resolved here:`);
   for (const c of b.conflicts) lines.push(`- [${c.kind}] ${c.text}`);
@@ -389,7 +389,7 @@ const contrastRatio = (a, b) => wcagRatio({ rgb: a.slice(0, 3) }, { rgb: b.slice
 const WORDS = { one: 1, two: 2, three: 3, four: 4, five: 5 };
 const numberWord = (w) => (WORDS[String(w).toLowerCase()] ?? Number(w));
 const r1 = (n) => Math.round(n * 10) / 10;
-const tag = (e) => `${e.tag}${e.own ? ` "${e.own.slice(0, 28)}"` : ''}`;
+const quote = (value) => ` "${value}"`, tag = (e) => `${e.tag}${e.own ? quote(e.own.slice(0, 28)) : ''}`;
 
 const PASS = (evidence) => ({ status: 'pass', evidence });
 const FAIL = (evidence) => ({ status: 'fail', evidence });
@@ -480,7 +480,7 @@ const scalePx = (knowledge, name) => (knowledge.find((k) => k.rel.endsWith(`pres
 /** The spacing section: measured insets and gaps against the knowledge values. */
 export function spacingChecks(v, ctx) {
   const out = [];
-  const add = (id, source, got, exp, extra = '') => out.push({ id, source, got: got == null ? null : r1(got), exp, status: got == null ? 'unmeasurable' : Math.abs(got - exp) <= 1.5 ? 'pass' : 'fail', evidence: extra });
+  const add = (id, source, got, exp, extra = '') => {const measured=got==null?null:r1(got);let status='unmeasurable';if(got!=null){status='fail';if(Math.abs(got-exp)<=1.5)status='pass';}out.push({id,source,got:measured,exp,status,evidence:extra});};
   // Closed scale for every padding, gap and margin the page draws (component-internal controls excluded).
   const scale = new Set([...scalePx(ctx.knowledge, 'padding'), ...scalePx(ctx.knowledge, 'gap'), ...scalePx(ctx.knowledge, 'margin')].map((n) => Math.round(n)));
   const off = [];
@@ -639,7 +639,7 @@ const MEASURERS = {
   },
   'taste.yaml TASTE-1 case-2': (v) => {
     const heads = v.els.filter((e) => e.visible && /^h[1-6]$/.test(e.tag));
-    const h1 = heads.find((e) => e.tag === 'h1'); if (!h1) heads.sort((a, b) => b.style.fontSize - a.style.fontSize); const title = h1 ?? heads[0];
+    const h1 = heads.find((e) => e.tag === 'h1'); if (!h1){heads.sort((a, b) => b.style.fontSize - a.style.fontSize);} const title = h1 ?? heads[0];
     if (!title) return NONE('no heading rendered');
     const sections = heads.filter((e) => e.i !== title.i && e.tag !== 'h1');
     if (!sections.length) return NONE('no section title beside the page title');
@@ -713,7 +713,7 @@ const MEASURERS = {
     const vh = ctx.height;
     const sticky = ['fixed', 'sticky'].includes(primary.style.position) || v.ancestors(primary).some((a) => ['fixed', 'sticky'].includes(a.style.position));
     const inLowerHalf = primary.rect.y >= vh / 2 && primary.rect.y + primary.rect.h <= vh;
-    return sticky || inLowerHalf ? PASS(`${tag(primary)} at y ${r1(primary.rect.y)}-${r1(primary.rect.y + primary.rect.h)} of ${vh}${sticky ? ' (pinned)' : ''}`) : FAIL(`${tag(primary)} at y ${r1(primary.rect.y)}-${r1(primary.rect.y + primary.rect.h)}; the fold is ${vh}px`);
+    if (sticky || inLowerHalf) { return PASS(`${tag(primary)} at y ${r1(primary.rect.y)}-${r1(primary.rect.y + primary.rect.h)} of ${vh}${sticky ? ' (pinned)' : ''}`); } return FAIL(`${tag(primary)} at y ${r1(primary.rect.y)}-${r1(primary.rect.y + primary.rect.h)}; the fold is ${vh}px`);
   },
   'font.yaml FONT-4 case-1': (v, ctx) => {
     const h1 = v.els.filter((e) => e.visible && e.tag === 'h1');
@@ -824,8 +824,8 @@ export async function scoreRender(brief, html, { repo = null, viewport = DEFAULT
 }
 
 function scoreText(s) {
-  const lines = [`UI PROOF SCORE - ${s.file} at ${s.viewport.width}x${s.viewport.height}: ${s.summary.pass} pass, ${s.summary.fail} fail, ${s.summary.unmeasurable} unmeasurable.`, '', 'SPACING / PADDING'];
-  for (const r of s.spacing) lines.push(`  ${r.status.toUpperCase().padEnd(12)} ${r.id}: ${typeof r.got === 'number' ? `${r.got}px` : r.got} (want ${typeof r.exp === 'number' ? `${r.exp}px` : r.exp}) - ${r.source}${r.evidence ? ` - ${r.evidence}` : ''}`);
+  const lines = [`UI PROOF SCORE - ${s.file} at ${s.viewport.width}x${s.viewport.height}: ${s.summary.pass} pass, ${s.summary.fail} fail, ${s.summary.unmeasurable} unmeasurable.`, '', 'SPACING / PADDING'], value = (v) => typeof v === 'number' ? `${v}px` : v, evidence = (v) => v ? ` - ${v}` : '';
+  for (const r of s.spacing) lines.push(`  ${r.status.toUpperCase().padEnd(12)} ${r.id}: ${value(r.got)} (want ${value(r.exp)}) - ${r.source}${evidence(r.evidence)}`);
   lines.push('', 'CASES');
   for (const c of s.cases) lines.push(`  ${c.status.toUpperCase().padEnd(12)} ${c.path} ${c.rule} ${c.case} - ${c.evidence}`);
   return `${lines.join('\n')}\n`;
