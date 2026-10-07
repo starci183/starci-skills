@@ -58,7 +58,10 @@ function* walk(dir) {
 const UPPER_RE = /(['"`])([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)\1/g;
 const KEBAB = '[a-z][a-z0-9]*(?:-[a-z0-9]+)+';
 // A constant naming environment variables (ARTIFACT_ROOT_ENV = 'STARCI_ARTIFACT_ROOT', CONTROLLED_ENV = new Set(['SOPS_AGE_KEY', ...])): its literals are env names, not codes.
-const ENV_LIST_RE = /\b[A-Z][A-Z0-9_]*_ENV[A-Z0-9_]*\s*=\s*(?:(?:new Set|Object\.freeze)\()?(?:\[([^\]]*)\]|('[^']*'|"[^"]*"))/g;
+const ENV_LIST_NAME_PART = String.raw`\b[A-Z][A-Z0-9_]*_ENV[A-Z0-9_]*`;
+const ENV_LIST_ASSIGNMENT_PART = String.raw`\s*=\s*`;
+const ENV_LIST_VALUE_PART = String.raw`(?:(?:new Set|Object\.freeze)\()?(?:\[([^\]]*)\]|('[^']*'|"[^"]*"))`;
+const ENV_LIST_RE = new RegExp(`${ENV_LIST_NAME_PART}${ENV_LIST_ASSIGNMENT_PART}${ENV_LIST_VALUE_PART}`, 'g');
 // A bracketed code in text: a message prefix ('[TARGET_MISSING] ...'), a comment or a YAML flow list. In JavaScript a
 // bracket around one identifier is code, not text: an element access (`baseline[KEY]`), an array literal (`[ROOT]`)
 // or a computed key (`{ [KEY]: v }`) reads a constant and emits nothing; `codeBrackets` finds those by parsing.
