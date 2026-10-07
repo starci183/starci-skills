@@ -244,6 +244,24 @@ function resolveBlockers(record, records, canon = id => id) {
   return [...roots.values()].sort((a, b) => a.id.localeCompare(b.id));
 }
 
+const usedByOutput = (byKind) => {
+  const usedByOut = {};
+  if (byKind) for (const kind of EDGE_KIND_ORDER) if (byKind.has(kind)) usedByOut[kind] = [...byKind.get(kind)].sort(byCodeUnit);
+  return usedByOut;
+};
+
+const derivedRecordOf = (record, evidenceByDir, appliesToSources, records, workspaceDoc, workRoot, canon, usedBy) => {
+  const {state: effectiveState, reason} = effectiveStateOf(record, evidenceByDir, appliesToSources, records, workspaceDoc, workRoot, canon);
+  const blockedByEdges = Array.isArray(record.data.blockedBy) ? record.data.blockedBy : [];
+  const byKind = usedBy.get(record.id);
+  const usedByOut = usedByOutput(byKind);
+  return {
+    id: record.id, schema: record.schema, feature: record.feature, state: record.state,
+    effectiveState, suspensionReason: reason, usedBy: usedByOut,
+    blockers: blockedByEdges.length ? resolveBlockers(record, records, canon) : [],
+  };
+};
+
 /** The full derivation over one `.starciwork` tree: usedBy/effectiveState/blockers per record, plus the
  * cross-cutting frontier and tally. Pure function of what is on disk right now - no clock, no randomness,
  * so two runs over the same tree always compute byte-identical structures (required for the --write-less
@@ -260,16 +278,8 @@ export function computeDerived(workRoot) {
 
   const derivedRecords = new Map();
   for (const record of records.values()) {
-    const {state: effectiveState, reason} = effectiveStateOf(record, evidenceByDir, appliesToSources, records, workspaceDoc, workRoot, canon);
-    const blockedByEdges = Array.isArray(record.data.blockedBy) ? record.data.blockedBy : [];
-    const byKind = usedBy.get(record.id);
-    const usedByOut = {};
-    if (byKind) for (const kind of EDGE_KIND_ORDER) if (byKind.has(kind)) usedByOut[kind] = [...byKind.get(kind)].sort(byCodeUnit);
-    derivedRecords.set(record.id, {
-      id: record.id, schema: record.schema, feature: record.feature, state: record.state,
-      effectiveState, suspensionReason: reason, usedBy: usedByOut,
-      blockers: blockedByEdges.length ? resolveBlockers(record, records, canon) : [],
-    });
+    const derived = derivedRecordOf(record, evidenceByDir, appliesToSources, records, workspaceDoc, workRoot, canon, usedBy);
+    derivedRecords.set(record.id, derived);
   }
 
   return {
