@@ -1,7 +1,7 @@
 // The settle frontier of `starci kernel status` (verbs/status.mjs): consumed reports whose jobs are still
 // open, split into the settles the Kernel owes now and the ones a recorded wait holds.
 import { PEER_WAIT } from './peer-waits.mjs';
-import { parkedBehindWaits, waitHeldOperations } from '../../frontier-parked.mjs';
+import { parkedBehindWaits, waitHeldOperations, noteParkedBehind } from '../../frontier-parked.mjs';
 
 // A filed report moves its job to reported (starci kernel report); a job still running/answering has a
 // report filed on it by settle's fallback.
@@ -37,14 +37,6 @@ const heldWorkerState = (workers, item) => {
   if (worker?.liveness === 'released') state = 'released';
   item.worker = state;
   if (worker?.terminalHandle) item.terminalHandle = worker.terminalHandle;
-};
-
-/** A queued job parked behind a recorded wait names the wait in its detail; a job outside any wait is left as it is. */
-const noteParkedBehind = (item, root) => {
-  if (!root) return;
-  item.parkedBehind = root;
-  const deferred = root.settle ? ' (its settle is deferred)' : '';
-  item.detail = `${item.detail ?? ''}; parked behind ${root.heldBecause} ${root.incident} through ${root.via}${deferred}`;
 };
 
 export const settlePhase = (s) => {
