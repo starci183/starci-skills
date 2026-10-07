@@ -14,6 +14,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { readJsonFile as readJson } from '../lib/json.mjs';
 import { isWorktreesPath } from '../lib/worktree-exclude.mjs';
+import { slash as relPath } from '../lib/path-key.mjs';
 
 const FILE_CAP = 20000;          // max files enumerated per tree walk
 const CONTENT_CAP = 2000;        // max files content-grepped (eslint-disable / any)
@@ -66,7 +67,6 @@ const daysOld = (f) => {
 };
 
 // ------------------------------------------------------------ assessment --
-const relPath = (f) => f.replaceAll(/\\/g, '/');
 const inStarciwork = (f) => relPath(f).split('/')[0] === '.starciwork';
 const base = (f) => path.basename(f).toLowerCase();
 
@@ -84,6 +84,28 @@ function assessTree(out, repo, pkg, files) {
 }
 
 /** Framework, eslint, sonar and coverage-config detection from file markers and package.json. */
+const detectFramework = (out, pkgDeps, jestCfg, vitestCfg, pwCfg) => {
+  const hasDep = (name) => name in pkgDeps;
+  if (hasDep('vitest') || vitestCfg) out.testInfra.framework = 'vitest';
+  else if (hasDep('jest') || hasDep('@nestjs/testing') || jestCfg) out.testInfra.framework = 'jest';
+  else if (hasDep('@playwright/test') || pwCfg) out.testInfra.framework = 'playwright';
+};
+
+const detectCoverageConfig = (out, repo, pkg, files, pkgScripts, hasFile) => {
+  let covCfg = hasFile(/^\.nycrc|^\.c8rc/) || /\bcoverage\b/.test(pkgScripts)
+    || !!(pkg.jest && (pkg.jest.collectCoverage || pkg.jest.coverageThreshold))
+    || !!(pkg.nyc || pkg.c8);
+  if (!covCfg) {
+    for (const file of files) {
+      if (/^(jest|vitest)\.config\./.test(base(file))) {
+        try { if (/\bcoverage|collectCoverage/.test(fs.readFileSync(path.join(repo, file), 'utf8'))) { covCfg = true; break; } }
+        catch { /* unreadable config — treat as absent */ }
+      }
+    }
+  }
+  out.testInfra.coverageConfig = covCfg;
+};
+
 function detectTooling(out, repo, pkg, files) {
   const pkgDeps = { ...pkg.dependencies, ...pkg.devDependencies };
   const pkgScripts = Object.values(pkg.scripts || {}).join(' ');
@@ -95,39 +117,27 @@ function detectTooling(out, repo, pkg, files) {
   const jestCfg = hasFile(/^jest\.config\./) || !!pkg.jest;
   const vitestCfg = hasFile(/^vitest\.config\.|^vitest\.workspace\./);
   const pwCfg = hasFile(/^playwright\.config\./);
-  const hasDep = (n) => n in pkgDeps;
-  if (hasDep('vitest') || vitestCfg) out.testInfra.framework = 'vitest';
-  else if (hasDep('jest') || hasDep('@nestjs/testing') || jestCfg) out.testInfra.framework = 'jest';
-  else if (hasDep('@playwright/test') || pwCfg) out.testInfra.framework = 'playwright';
+  detectFramework(out, pkgDeps, jestCfg, vitestCfg, pwCfg);
 
   // coverage config: rc files or coverage key in root test configs/scripts
-  let covCfg = hasFile(/^\.nycrc|^\.c8rc/) || /\bcoverage\b/.test(pkgScripts)
-    || !!(pkg.jest && (pkg.jest.collectCoverage || pkg.jest.coverageThreshold))
-    || !!(pkg.nyc || pkg.c8);
-  if (!covCfg) {
-    for (const f of files) {
-      if (/^(jest|vitest)\.config\./.test(base(f))) {
-        try { if (/\bcoverage|collectCoverage/.test(fs.readFileSync(path.join(repo, f), 'utf8'))) { covCfg = true; break; } }
-        catch { /* unreadable config — treat as absent */ }
-      }
-    }
-  }
-  out.testInfra.coverageConfig = covCfg;
+  detectCoverageConfig(out, repo, pkg, files, pkgScripts, hasFile);
 }
 
 /** Content greps + LOC over the bounded set of .ts/.tsx/.js files. */
+const readLocFile = (repo, file) => { try { return fs.readFileSync(path.join(repo, file), 'utf8'); } catch { return null; } };
+const countContentSignals = (out, text) => {
+  if (text.includes('eslint-disable')) out.lint.eslintDisableFiles++;
+  if (/:\s*any\b/.test(text) || /\bas any\b/.test(text)) out.lint.anyLeakFiles++;
+};
 function scanLoc(out, repo, locFiles) {
   let loc = 0, read = 0;
   for (const f of locFiles) {
     if (read >= LOC_READ_CAP) break;
-    let txt;
-    try { txt = fs.readFileSync(path.join(repo, f), 'utf8'); } catch { continue; }
+    const txt = readLocFile(repo, f);
+    if (txt === null) continue;
     read++;
     loc += txt.split('\n').length - (txt.endsWith('\n') ? 1 : 0);
-    if (read <= CONTENT_CAP) {
-      if (txt.includes('eslint-disable')) out.lint.eslintDisableFiles++;
-      if (/:\s*any\b/.test(txt) || /\bas any\b/.test(txt)) out.lint.anyLeakFiles++;
-    }
+    if (read <= CONTENT_CAP) countContentSignals(out, txt);
   }
   // extrapolate LOC for files past the read cap — it is an estimate by contract
   if (read > 0 && locFiles.length > read) loc += Math.round((loc / read) * (locFiles.length - read));
@@ -163,28 +173,44 @@ function assessDeps(out, repo, pkg) {
 }
 
 /** One `<area>: <finding>` line per finding. */
+const pushTestSignals = (out, signals) => {
+  if (out.testInfra.framework === 'none') signals.push('tests: no test framework detected');
+  if (out.testInfra.specFiles === 0) signals.push('tests: zero spec files');
+  if (out.testInfra.e2eFiles === 0) signals.push('tests: no e2e files');
+  else if (out.testInfra.e2eFiles <= 5) signals.push(`tests: e2e is smoke-only (${out.testInfra.e2eFiles} files)`);
+  if (!out.testInfra.coverageConfig) signals.push('tests: no coverage config');
+};
+
+const pushStaticSignals = (out, signals) => {
+  if (!out.lint.eslintConfig) signals.push('static-correctness: no eslint config');
+  if (out.lint.eslintDisableFiles > 50) signals.push(`static-correctness: lint relaxed — ${out.lint.eslintDisableFiles} files with eslint-disable`);
+  else if (out.lint.eslintDisableFiles > 0) signals.push(`static-correctness: ${out.lint.eslintDisableFiles} files with eslint-disable`);
+  if (out.lint.anyLeakFiles > 0) signals.push(`static-correctness: ${out.lint.anyLeakFiles} files contain ': any'/'as any'`);
+};
+
+const pushStarciworkSignals = (out, signals) => {
+  const work = out.starciwork;
+  if (!work.present) signals.push('starciwork-artifacts: starciwork missing');
+  else {
+    if (work.nodeCount === 0) signals.push('starciwork-artifacts: no index nodes');
+    if (work.uatCount === 0) signals.push('starciwork-artifacts: no UAT');
+    if (work.evidenceCount === 0) signals.push('starciwork-artifacts: no evidence');
+    if (work.mediaCount === 0) signals.push('starciwork-artifacts: no media assets');
+  }
+};
+
+const pushDependencySignals = (out, signals) => {
+  if (out.deps.lockfileAge === null) signals.push('dependencies: no lockfile');
+  else if (out.deps.lockfileAge > 90) signals.push(`dependencies: lockfile stale (~${out.deps.lockfileAge}d)`);
+};
+
 function pushSignals(out, truncated, notes) {
   const s = out.signals;
-  if (out.testInfra.framework === 'none') s.push('tests: no test framework detected');
-  if (out.testInfra.specFiles === 0) s.push('tests: zero spec files');
-  if (out.testInfra.e2eFiles === 0) s.push('tests: no e2e files');
-  else if (out.testInfra.e2eFiles <= 5) s.push(`tests: e2e is smoke-only (${out.testInfra.e2eFiles} files)`);
-  if (!out.testInfra.coverageConfig) s.push('tests: no coverage config');
-  if (!out.lint.eslintConfig) s.push('static-correctness: no eslint config');
-  if (out.lint.eslintDisableFiles > 50) s.push(`static-correctness: lint relaxed — ${out.lint.eslintDisableFiles} files with eslint-disable`);
-  else if (out.lint.eslintDisableFiles > 0) s.push(`static-correctness: ${out.lint.eslintDisableFiles} files with eslint-disable`);
-  if (out.lint.anyLeakFiles > 0) s.push(`static-correctness: ${out.lint.anyLeakFiles} files contain ': any'/'as any'`);
+  pushTestSignals(out, s);
+  pushStaticSignals(out, s);
   if (!out.sonar.configured) s.push('sonar: not configured');
-  const w = out.starciwork;
-  if (!w.present) s.push('starciwork-artifacts: starciwork missing');
-  else {
-    if (w.nodeCount === 0) s.push('starciwork-artifacts: no index nodes');
-    if (w.uatCount === 0) s.push('starciwork-artifacts: no UAT');
-    if (w.evidenceCount === 0) s.push('starciwork-artifacts: no evidence');
-    if (w.mediaCount === 0) s.push('starciwork-artifacts: no media assets');
-  }
-  if (out.deps.lockfileAge === null) s.push('dependencies: no lockfile');
-  else if (out.deps.lockfileAge > 90) s.push(`dependencies: lockfile stale (~${out.deps.lockfileAge}d)`);
+  pushStarciworkSignals(out, s);
+  pushDependencySignals(out, s);
   if (truncated) s.push(`scan: truncated at ${FILE_CAP} files`);
   if (notes.length) s.push(`scan: partial — ${notes.length} unreadable dirs`);
 }
