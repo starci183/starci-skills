@@ -18,14 +18,18 @@ import { byCodeUnit } from '../lib/list.mjs';
 /** The component that holds the shared infrastructure: the platform tier and every capability more than one service app composes. */
 export const PLATFORM_COMPONENT = 'platform';
 const SERVICE_APP_KINDS = new Set(['api', 'worker']);
-const star = (text) => String(text).replace(/<[^>]+>/g, '*');
-const segments = (dir) => dir.replace(/\/+$/, '').split('/').filter(Boolean);
+const STAR_PLACEHOLDER_SOURCE = String.raw`<[^>]+>`;
+const STAR_PLACEHOLDER = new RegExp(STAR_PLACEHOLDER_SOURCE, 'g');
+const TRAILING_SLASHES_SOURCE = String.raw`\/+$`;
+const TRAILING_SLASHES = new RegExp(TRAILING_SLASHES_SOURCE);
+export const star = (text) => String(text).replace(STAR_PLACEHOLDER, '*');
+export const segments = (dir, trimTrailingSlashes = false) => (trimTrailingSlashes ? dir.replace(TRAILING_SLASHES, '') : dir).split('/').filter(Boolean);
 const isDir = (path) => path.endsWith('/');
 
 /** True when directory pattern `inner` lies inside `outer` (an outer `*` segment matches any one inner segment) or is the same. */
 export function nested(inner, outer) {
-  const a = segments(inner);
-  const b = segments(outer);
+  const a = segments(inner, true);
+  const b = segments(outer, true);
   return a.length >= b.length && b.every((segment, index) => segment === '*' ? true : segment === a[index]);
 }
 
@@ -121,7 +125,7 @@ export const codecovPaths = (manifest, providers = []) => coverageScope(manifest
  * (`src/modules/domain/*\/` and `src/modules/domain/order/order.service.ts` give `order`).
  */
 function capabilityOf(root, file) {
-  const parts = segments(root);
+  const parts = segments(root, true);
   const at = parts.length - 1;
   if (parts[at] !== '*') return null;
   const own = file.split('/');
