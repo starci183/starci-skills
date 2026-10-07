@@ -108,6 +108,60 @@ const rel = (file, repo) => {
  * a canon-scan JSON record (findings[].file). Anything else is one `(unparsed)` group with the last lines.
  * Returns [{file, items: [string]}] sorted by file, at most MAX_GROUPS groups of MAX_ITEMS_PER_GROUP items.
  */
+function addCanonFailures(name, text, add, groups) {
+  if (name !== 'canon-scan') return false;
+  try {
+    const doc = JSON.parse(text);
+    for (const f of doc?.findings ?? []) add(f.file, `${f.family ?? 'canon'}${f.rule ? ':' + f.rule : ''}${f.line ? ' @' + f.line : ''}${f.message ? ' ' + String(f.message).slice(0, 120) : ''}`.trim());
+    return groups.size > 0;
+  } catch { /* not JSON: the generic parse below */ }
+  return false;
+}
+
+function consumeNodeReporterLine(line, state, add) {
+  let match = /^\s*test at (.+?):\d+:\d+\s*$/.exec(line);
+  // node:test spec reporter: "test at <file>:l:c" then "✖ <name> (12ms)"
+  if (match) { state.pendingFile = match[1]; return true; }
+  if (state.pendingFile) {
+    match = /^\s*[✖x]\s+(.*?)(?:\s+\([\d.]+m?s\))?\s*$/.exec(line);
+    if (match) { add(state.pendingFile, match[1]); state.pendingFile = null; return true; }
+  }
+  // node:test tap reporter: "not ok N - name" ... "location: '<file>:l:c'"
+  match = /^\s*not ok \d+ - (.*?)(?:\s+#.*)?$/.exec(line);
+  if (match) { state.pendingTap = match[1]; return true; }
+  if (state.pendingTap) {
+    match = /^\s*location:\s*'?(.+?):\d+:\d+'?\s*$/.exec(line);
+    if (match) { add(match[1], state.pendingTap); state.pendingTap = null; return true; }
+  }
+  return false;
+}
+
+function consumeJestLine(line, state, add) {
+  let match = /^\s*FAIL\s+(?:\S+\s+)?(\S+\.(?:spec|test)\.[cm]?[jt]sx?)\b.*?(?:>\s*(.*))?$/.exec(line);
+  if (match) { state.jestFile = match[1]; add(match[1], match[2] ?? null); return true; }
+  if (state.jestFile) {
+    match = /^\s*●\s+(.*\S)\s*$/.exec(line);
+    if (match) { add(state.jestFile, match[1]); return true; }
+  }
+  return false;
+}
+
+function consumeTypeScriptLine(line, add) {
+  let match = /^(.+?)\((\d+),(\d+)\):\s+error\s+(TS\d+):\s+(.*)$/.exec(line);
+  if (!match) match = /^(.+?):(\d+):(\d+)\s+-\s+error\s+(TS\d+):\s+(.*)$/.exec(line);
+  if (!match) return false;
+  add(match[1], `${match[4]} @${match[2]} ${match[5].slice(0, 120)}`);
+  return true;
+}
+
+function consumeEslintLine(line, state, add) {
+  if (/^(?:[A-Za-z]:)?[\w./\\@()[\]-]+\.[cm]?[jt]sx?$/.test(line.trim()) && !line.startsWith(' ')) { state.eslintFile = line.trim(); return true; }
+  if (!state.eslintFile) return false;
+  const match = /^\s+(\d+):(\d+)\s+error\s+(.*?)\s{2,}(\S+)\s*$/.exec(line);
+  if (match) add(state.eslintFile, `${match[4]} @${match[1]} ${match[3].slice(0, 100)}`);
+  return false;
+}
+
 export function failuresOf(name, text, { repo = null } = {}) {
   const groups = new Map();
   const add = (file, item) => {
@@ -117,46 +171,13 @@ export function failuresOf(name, text, { repo = null } = {}) {
     if (item && !list.includes(item)) list.push(item);
   };
   const lines = String(text ?? '').split(/\r?\n/);
-  if (name === 'canon-scan') {
-    try {
-      const doc = JSON.parse(text);
-      for (const f of doc?.findings ?? []) add(f.file, `${f.family ?? 'canon'}${f.rule ? ':' + f.rule : ''}${f.line ? ' @' + f.line : ''}${f.message ? ' ' + String(f.message).slice(0, 120) : ''}`.trim());
-      if (groups.size) return finish(groups);
-    } catch { /* not JSON: the generic parse below */ }
-  }
-  let pendingFile = null, pendingTap = null, eslintFile = null, jestFile = null;
+  if (addCanonFailures(name, text, add, groups)) return finish(groups);
+  const state = { pendingFile: null, pendingTap: null, eslintFile: null, jestFile: null };
   for (const line of lines) {
-    let m = /^\s*test at (.+?):\d+:\d+\s*$/.exec(line);
-    // node:test spec reporter: "test at <file>:l:c" then "✖ <name> (12ms)"
-    if (m) { pendingFile = m[1]; continue; }
-    if (pendingFile) {
-      m = /^\s*[✖x]\s+(.*?)(?:\s+\([\d.]+m?s\))?\s*$/.exec(line);
-      if (m) { add(pendingFile, m[1]); pendingFile = null; continue; }
-    }
-    // node:test tap reporter: "not ok N - name" ... "location: '<file>:l:c'"
-    m = /^\s*not ok \d+ - (.*?)(?:\s+#.*)?$/.exec(line);
-    if (m) { pendingTap = m[1]; continue; }
-    if (pendingTap) {
-      m = /^\s*location:\s*'?(.+?):\d+:\d+'?\s*$/.exec(line);
-      if (m) { add(m[1], pendingTap); pendingTap = null; continue; }
-    }
-    // jest / vitest
-    m = /^\s*FAIL\s+(?:\S+\s+)?(\S+\.(?:spec|test)\.[cm]?[jt]sx?)\b.*?(?:>\s*(.*))?$/.exec(line);
-    if (m) { jestFile = m[1]; add(m[1], m[2] ?? null); continue; }
-    if (jestFile) {
-      m = /^\s*●\s+(.*\S)\s*$/.exec(line);
-      if (m) { add(jestFile, m[1]); continue; }
-    }
-    // tsc
-    m = /^(.+?)\((\d+),(\d+)\):\s+error\s+(TS\d+):\s+(.*)$/.exec(line);
-    if (!m) m = /^(.+?):(\d+):(\d+)\s+-\s+error\s+(TS\d+):\s+(.*)$/.exec(line);
-    if (m) { add(m[1], `${m[4]} @${m[2]} ${m[5].slice(0, 120)}`); continue; }
-    // eslint stylish
-    if (/^(?:[A-Za-z]:)?[\w./\\@()[\]-]+\.[cm]?[jt]sx?$/.test(line.trim()) && !line.startsWith(' ')) { eslintFile = line.trim(); continue; }
-    if (eslintFile) {
-      m = /^\s+(\d+):(\d+)\s+error\s+(.*?)\s{2,}(\S+)\s*$/.exec(line);
-      if (m) add(eslintFile, `${m[4]} @${m[1]} ${m[3].slice(0, 100)}`);
-    }
+    if (consumeNodeReporterLine(line, state, add)) continue;
+    if (consumeJestLine(line, state, add)) continue;
+    if (consumeTypeScriptLine(line, add)) continue;
+    consumeEslintLine(line, state, add);
   }
   if (!groups.size) {
     const tail = lines.map((l) => l.trimEnd()).filter(Boolean).slice(-20);
