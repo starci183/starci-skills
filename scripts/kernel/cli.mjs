@@ -334,7 +334,7 @@ const usage = (code) => {
   incident --workflow <id> --resolve <incidentId> [--detail <s>] [--by kernel|owner|supervisor] [--owner-answer <dispatchId>]
            typed release (repeatable; the runtime resolves the incident once all hold):
            [--until-record <path>[@state|>=rev]] [--until-job <jobId>[:settled|succeeded]]
-           [--until-message <peer>[:kind]] [--until-commit <repo>:<ref-or-path>] [--until-incident <id>[:resolved]] [--until-foundation <name>] [--until-landed <workflowId>@<repository>]
+           [--until-message <peer>[:kind]] [--until-commit <repo>:<ref-or-path>] [--until-incident <id>[:resolved]] [--until-foundation <name>] [--until-landed <workflowId>@<repository>] [--until-runtime-has <commit>] [--until-admission <jobId>] [--until-check <jobId>:<name>]
   incident --workflow <id> --attach <incidentId> --until-<type> <spec> ...   type an open incident's release
   provider-health --provider <p> [--recover --reason <text> [--probe]]
            the ledger provider-health row; --recover clears an open circuit (Kernel terminal only)
@@ -2681,7 +2681,7 @@ const supervisorCapStep = (c, route, s, { autopilot, blocker, evidence }) => {
   const detail = route.to?.needUser
     ? `${op} ${job.job_id}: route ${route.id} (${blocker ?? 'needUser'}) cannot run on its own - a runtime/environment issue for the Supervisor (autopilot); fix it (land to .claude) or decide the retry, then resolve --by supervisor`
     : `${op} ${job.job_id}: route ${route.id} already fired ${fired} of ${limit} times for this node group - a runtime/process issue for the Supervisor (autopilot, gate ${autopilot.gates + 1} of ${autopilot.budget}): read the attempts' reports, fix the root cause (land to .claude) or route the fix to the op that owns it, then resolve --by supervisor and the Kernel retries`;
-  const incidentId = openSupervisorGate(ledger, { workflowId: job.workflow_id, opId: op, holds: [job.job_id], detail, evidence, route: route.id });
+  const incidentId = openSupervisorGate(ledger, { workflowId: job.workflow_id, opId: op, holds: [job.job_id], detail, evidence, route: route.id, workaround: { cause: 'retry-cap', noWorkaround: 'retry-cap-spent' } });
   return record({ kind: SUPERVISOR_GATE, route: route.id, limit, firing: fired, incidentId, reason: detail });
 };
 /** Under the autopilot a spent retry cap is the Supervisor's (supervisor-gate, within supervisorExtraBudget gates per node group), then deferred to the final review; null without the autopilot. */

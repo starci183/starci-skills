@@ -281,7 +281,8 @@ allocation:
   #     need it wait for the one end-of-flow credential checklist (provision.ask subject handover-credentials);
   #   - a retry cap or an owner-gate that is really a runtime/process issue is a supervisor-gate incident (the
   #     Supervisor fixes or decides the retry), supervisorExtraBudget gates per node group, then the leg is
-  #     deferred; an unresolved supervisor-gate older than supervisorGateTimeoutMs defers what it holds;
+  #     deferred; an unresolved supervisor-gate older than supervisorGateTimeoutMs defers what it holds once the owner was told
+  #     (its Supervisor item reached the owner level: modules/kernel/op-incident-policy.yaml gate.deferAfter);
   #   - budgets caps one workflow (non-kernel jobs, token total recorded on jobs, wall time since start): past
   #     one, a supervisor-gate holds new dispatch until the Supervisor extends the budget.
   autopilot:

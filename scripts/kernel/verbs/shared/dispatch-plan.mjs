@@ -21,6 +21,7 @@ import { jobDisplayName, jobWhat, workflowNameOf } from '../../../lib/display-na
 import { productLocaleFor } from '../../product-locale.mjs';
 import { cutManifestOf } from '../../seam-policy.mjs';
 import { kernelOverrideFor } from '../../kernel-authority.mjs';
+import { pinNamesPool, recordedPinOf } from '../../lineage-pin.mjs';
 import { jobDirOf } from '../../job-artifacts.mjs';
 import { packetFileOf } from '../../../machine/task-spec.mjs';
 import { ENV_GATED_OPS } from '../../verify-failure.mjs';
@@ -34,7 +35,7 @@ function refuseExcludedPin(d, model) {
   const { args, db, job, op, payload } = d;
   if (!args.model) return;
   const excluded = lineageRouteAdjust(db, job)?.exclude ?? [];
-  if (!excluded.includes(model.target) || kernelOverrideFor(db, job.workflow_id, op, payload)?.model === model.target) return;
+  if (!excluded.includes(model.target) || pinNamesPool(recordedPinOf(db, job.workflow_id, op, payload), [model.target])) return;
   throw Object.assign(new Error(`--model ${model.target} is excluded for ${job.job_id} by its launch and retry history; record the pin with starci kernel op-override --op ${op} --set '{"model":"${model.target}"}' --decision <id> to overrule it, or dispatch without --model`), { code: 'pin-lineage-excluded' });
 }
 

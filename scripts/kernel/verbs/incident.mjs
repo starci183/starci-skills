@@ -10,6 +10,8 @@ import { declareDependent, readFoundation, writeFoundation } from '../foundation
 import { AUTOPILOT_BY, SUPERVISOR_GATE, autopilotOn } from '../autopilot-run.mjs';
 import { commitOwnerJobs, followUpMessage, resolveIntroducer } from '../introducer.mjs';
 import { wakeKernelForTransition } from '../wake-delivery.mjs';
+import { gateStepOf } from './shared/gate-raise.mjs';
+import { answerGate } from './shared/gate-resolution.mjs';
 
 export default {
   verb: 'incident',
@@ -23,7 +25,7 @@ export default {
   run({ ledger, args, emit, internals }) {
     const db = ledger.db, workflowId = args.workflow, now = Date.now();
     if (!getWorkflow(db, workflowId)) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
-    if (args.resolve) { incidentResolveExisting(ledger, db, workflowId, args, now, emit); return; }
+    if (args.resolve) { incidentResolveExisting(ledger, db, workflowId, args, now, emit, path.resolve(args.repo ?? process.cwd())); return; }
     // Typed release conditions (scripts/kernel/gate-conditions.mjs): stored on the incident and checked
     // by the runtime, which resolves it once every one holds. An incident raised without them is
     // resolved only by the Kernel. --attach types an incident that is already open.
@@ -42,7 +44,10 @@ export default {
     // need is an ask the runtime defers to handover (starci kernel autopilot --defer-to-handover), never a gate.
     const rerouted = internals.OWNER_GATE_KINDS.includes(args.kind) && autopilotOn(db, workflowId) ? { from: args.kind, to: SUPERVISOR_GATE } : null;
     if (rerouted) args = { ...args, kind: SUPERVISOR_GATE };
-    openRaisedIncident(ledger, { incidentId, workflowId, args, now, rerouted, holds, peerWait, until, foundationWait });
+    // A supervisor-gate is raised after its cause's workaround (policy gateCauses): tried and recorded, or a typed reason there is none.
+    const gate = gateStepOf(ledger, { workflowId, args, holds, until });
+    if (gate.redirected) { emit(gate.out, gate.text, args.json); return; }
+    openRaisedIncident(ledger, { incidentId, workflowId, args, now, rerouted, holds, peerWait, until, foundationWait, workaround: gate.workaround });
     // A condition that already holds resolves the wait now rather than at the next status.
     const released = until.length ? releaseTypedWaits(ledger, { repo: typedRepo, workflowId }).resolved.find((r) => r.incidentId === incidentId) ?? null : null;
     const sharedBlocker = args.kind === SHARED_BLOCKER ? routeSharedBlocker(ledger, { workflowId, incidentId, args, repo: typedRepo }) : null;
@@ -63,13 +68,13 @@ function peerWaitOf(db, workflowId, args, { foundationCond, landedCond }) {
 }
 
 // The incident row and its raised event, in one transaction; a wait on a foundation makes the waiter its dependent.
-function openRaisedIncident(ledger, { incidentId, workflowId, args, now, rerouted, holds, peerWait, until, foundationWait }) {
+function openRaisedIncident(ledger, { incidentId, workflowId, args, now, rerouted, holds, peerWait, until, foundationWait, workaround }) {
   const db = ledger.db;
   ledger.transaction(() => {
     openIncident(db, { incidentId, workflowId, kind: args.kind, opId: args.op ?? null, detail: args.detail, lastProgress: `[${args.kind}] ${args.detail}`, at: now });
     ledger.appendEvent({
       workflowId, entityType: 'incident', entityId: incidentId,
-      kind: 'incident-raised', payload: { kind: args.kind, ...(rerouted ? { rerouted, by: AUTOPILOT_BY } : {}), detail: args.detail, opId: args.op ?? null, ...(holds.length ? { holds } : {}), ...(peerWait), ...(until.length ? { until } : {}) },
+      kind: 'incident-raised', payload: { kind: args.kind, ...(rerouted ? { rerouted, by: AUTOPILOT_BY } : {}), detail: args.detail, opId: args.op ?? null, ...(holds.length ? { holds } : {}), ...(peerWait), ...(until.length ? { until } : {}), ...(workaround ? { workaround } : {}) },
     });
     // A wait on a foundation makes the waiter its dependent, so the landing notifies it.
     if (foundationWait && !(foundationWait.foundation.dependents ?? []).some((d) => d.workflowId === workflowId)) {
@@ -96,7 +101,7 @@ const peerWaitNote = (peerWait) => {
   return ` on ${peerWait.peer}${messageNote}${foundationNote}`;
 };
 
-function incidentResolveExisting(ledger, db, workflowId, args, now, emit) {
+function incidentResolveExisting(ledger, db, workflowId, args, now, emit, repo) {
   const row = db.prepare('SELECT incident_id,status,last_progress FROM incidents WHERE incident_id=? AND workflow_id=?').get(args.resolve, workflowId);
   if (!row) throw Object.assign(new Error(`incident ${args.resolve} is not on ${workflowId}`), { code: 'incident-unknown' });
   // Who resolves it, and the owner answer any owner claim rests on (scripts/machine/owner-claim.mjs):
@@ -105,6 +110,12 @@ function incidentResolveExisting(ledger, db, workflowId, args, now, emit) {
   if (by && !RESOLVERS.includes(by)) throw Object.assign(new Error(`--by ${by}: a resolution is by ${RESOLVERS.join(', ')}`), { code: 'resolver-invalid' });
   const ownerCheck = resolutionOwnerCheck(db, { kind: incidentKindOf(row.last_progress), detail: args.detail ?? '', by, ownerAnswer: csvList(args['owner-answer']) });
   const changed = row.status === 'open';
+  // A supervisor-gate is answered with a typed resolution (gate-resolution.mjs); a `fixed` whose commit has not landed keeps it open for the runtime to resolve.
+  const answered = answerGate(ledger, { workflowId, row, args, by: ownerCheck.by, repo, isGate: incidentKindOf(row.last_progress) === SUPERVISOR_GATE });
+  if (answered?.waiting) {
+    emit({ ok: true, incidentId: row.incident_id, workflowId, status: 'open', changed: false, answered: answered.answer }, `incident ${row.incident_id} answered fixed ${answered.answer.commit.slice(0, 12)}: the runtime resolves it once the live runtime contains the commit`, args.json);
+    return;
+  }
   if (changed && ownerCheck.needs && !ownerCheck.proven) {
     const tried = ownerCheck.tried.map((t) => t.reason).join('; ');
     const triedNote = tried ? ` (${tried})` : '';
@@ -115,12 +126,13 @@ function incidentResolveExisting(ledger, db, workflowId, args, now, emit) {
       resolveIncident(db, { incidentId: row.incident_id, reason: 'answered', at: now });
       ledger.appendEvent({
         workflowId, entityType: 'incident', entityId: row.incident_id,
-        kind: 'incident-resolved', payload: { detail: args.detail ?? null, by: ownerCheck.by,
+        kind: 'incident-resolved', payload: { detail: args.detail ?? null, by: ownerCheck.by, ...(answered ? { resolution: answered.answer.resolution } : {}),
           ...(ownerCheck.proof ? { ownerAnswer: { dispatchId: ownerCheck.proof.dispatchId, workflowId: ownerCheck.proof.workflowId, receiptPath: ownerCheck.proof.receiptPath } } : {}) },
       });
     });
   }
-  const out = { ok: true, incidentId: row.incident_id, workflowId, status: 'resolved', changed, ...(changed ? { by: ownerCheck.by, ...(ownerCheck.proof ? { ownerAnswer: ownerCheck.proof.dispatchId } : {}) } : {}) };
+  answered?.wake();
+  const out = { ok: true, incidentId: row.incident_id, workflowId, status: 'resolved', changed, ...(answered ? { answered: answered.answer } : {}), ...(changed ? { by: ownerCheck.by, ...(ownerCheck.proof ? { ownerAnswer: ownerCheck.proof.dispatchId } : {}) } : {}) };
   emit(out, `incident ${row.incident_id} ${changed ? 'resolved' : 'was already ' + row.status} on ${workflowId}`, args.json);
 }
 

@@ -38,6 +38,17 @@ ladder:
   stepMs: {ref: "modules/reconciler/job.yaml#decisionDueMs"}
   ownerAfter: {ref: "modules/reconciler/workers.yaml#urgentOverdueEscalations"}
 
+# A supervisor-gate enters the ladder above through one Supervisor Decision Item (scripts/reconciler/gate-plan.mjs): the Supervisor acknowledges within
+# `ackMs`, then the item climbs one level per ladder step until the owner level, where the owner is told once per (workflow, cause, scope) with the
+# workaround tried and the watched condition. The Supervisor's answer is one `resolutions` entry (scripts/kernel/verbs/shared/gate-resolution.mjs):
+# `fixed` (a commit; the gate resolves when the live runtime contains it), `workaround` (a route for the Kernel to dispatch), `not-runtime-fault`
+# (back to the Kernel, which must act; the same cause and scope is not raised again without new evidence). `deferAfter: owner-told` is the only
+# way the held jobs go to the handover list on a gate's timeout: after the owner was told (scripts/kernel/autopilot-state.mjs deferTimedOutGates).
+gate:
+  ackMs: {ref: "modules/reconciler/workflow.yaml#decisionDueMs"}
+  resolutions: [fixed, workaround, not-runtime-fault]
+  deferAfter: owner-told
+
 # A worker question matching one of these (case-insensitive) is the owner's, not the Kernel's: credentials and secrets, spend, and irreversible
 # or production-data choices. The Job controller opens its Decision Item for the owner instead of the Kernel (scripts/reconciler/controllers/job.mjs).
 ownerOnlyQuestions:
@@ -52,6 +63,57 @@ seatWake:
   failWindowMs: 600000
   idleReplace: 3
   idleReplacedWindowMs: 3600000
+
+# The causes a supervisor-gate can name (owner goal G10, invariant I6): raising a gate for a job needs the cause class, then either the
+# workaround the class names, tried and recorded (--workaround), or one typed reason from the class's `noWorkaround` list (--no-workaround).
+# `verify: other-members` makes the runtime refuse a no-workaround claim while the job's route chain still has an untried member;
+# `mechanical: handover-decision` means the runtime records the workaround itself (a revisitable decision in the owner's handover list) and
+# opens no gate (scripts/kernel/gate-workaround.mjs). The runtime's own raises (every member spent, a spent retry cap, a spent budget) pass
+# their typed reason with the evidence they hold. `condition` is the typed release condition the runtime attaches when the raise names none
+# (scripts/kernel/gate-runtime-conditions.mjs): the status pass re-evaluates it and resolves the gate itself with an evidence event; a class
+# without one says why in `conditionWhy` and relies on the ladder.
+gateCauses:
+  - id: no-eligible-agent
+    situation: "a launch or admission refusal that holds one job (no-eligible-candidate, a spent tier chain)"
+    workaround: "dispatch or route the job to another eligible agent of its candidate list (starci kernel dispatch --model <pool>)"
+    verify: other-members
+    condition: admission
+    noWorkaround:
+      chain-spent: "every member of the job's candidate list refused or is excluded for it"
+      single-member-chain: "the job's candidate list has one member"
+  - id: plan-divergence
+    situation: "a provisional answer or the approved plan leaves a step unable to run (plan divergence, plan deadlock)"
+    workaround: "record the provisional reversible answer as a revisitable decision in the owner's handover list and let the job continue"
+    mechanical: handover-decision
+    conditionWhy: "the divergence is cleared by the Supervisor's ruling or a plan edit, which no check can see"
+    noWorkaround:
+      answer-not-reversible: "the answer would spend money, touch production data or set a credential"
+      owner-only-intent: "the choice is product intent no goal record or prior decision determines"
+  - id: runtime-defect
+    conditionWhy: "the fix commit is known only when the Supervisor answers: its fixed resolution attaches the runtime-has condition"
+    situation: "a runtime defect stops one job's step (settle, record-checks, dispatch) that no agent or retry changes"
+    workaround: "a route or agent that avoids the defect, or the step done by an independent leg, with every other leg left running"
+    noWorkaround:
+      no-route-avoids-defect: "every route and agent of the step runs through the defective code"
+      defect-on-every-path: "the defect is in the shared path every leg of the job takes"
+  - id: peer-dependency
+    conditionWhy: "a typed --until condition (job, commit, record, foundation, message) carries it when the raise names one"
+    situation: "a step waits on something another workflow of the ledger must land (a foundation, a commit, a record)"
+    workaround: "a typed peer-wait on the workflow that owns it (starci kernel incident --kind peer-wait --peer <workflow>)"
+    noWorkaround:
+      peer-not-running: "no running peer workflow owns it"
+  - id: retry-cap
+    conditionWhy: "the cap lifts by a decision, not by a state a check can read"
+    situation: "a route spent its retry limit for the node group"
+    workaround: "the retries already switched agents on the tier chain (lineage route)"
+    noWorkaround:
+      retry-cap-spent: "the route's retry limit is spent on every eligible agent"
+  - id: budget
+    conditionWhy: "the budget gate is re-evaluated by scripts/kernel/autopilot-budget-gate.mjs on every status read"
+    situation: "a workflow cap (attempts, tokens, wall time) is exceeded"
+    workaround: "the cap is raised by the Supervisor's extension (autopilot budget extension)"
+    noWorkaround:
+      cap-exceeded: "a cap of the workflow is actually exceeded"
 
 rows:
   - id: ask-worker-question
@@ -189,9 +251,9 @@ rows:
 # `queuedBecause` names the status projection value (scripts/kernel/cli.mjs QUEUED_BECAUSE reads the list from here, in this order).
 holds:
   - {id: owner-gate, queuedBecause: owner-gate, scope: job, cause: "owner-gate incident naming the job", handler: owner, reeval: "typed --until conditions (scripts/kernel/gate-conditions.mjs autoResolveTypedIncidents)", bound: {deadlineMs: {ref: "modules/models/runtimes.yaml#allocation.autopilot.supervisorGateTimeoutMs"}}, chain: [owner], visible: "status queued[].queuedBecause, frontier awaiting-owner", gap: [I3], gapWhy: "an untyped owner-gate is cleared only by the Kernel's incident --resolve"}
-  - {id: supervisor-gate, queuedBecause: supervisor-gate, scope: job, cause: "supervisor-gate incident (runtime defect, budget, retry cap)", handler: supervisor, reeval: "none for an untyped gate; the budget gate is re-evaluated by autopilot-budget-gate.mjs", bound: {deadlineMs: {ref: "modules/models/runtimes.yaml#allocation.autopilot.supervisorGateTimeoutMs"}}, chain: [supervisor, owner], visible: "status queued[].blockedBy.incident, frontier supervisor-wait", gap: [I3, I6, I8], gapWhy: "no Supervisor Decision Item is opened for a gate, so the ladder never carries it to the owner; it is cleared only by a Supervisor resolve; the Kernel raises it (plan deadlock after a provisional autopilot answer, Nivo inc-ce67aea64fab) before trying the workaround of re-answering with the non-binding option; past supervisorGateTimeoutMs it defers the held jobs into the handover list"}
+  - {id: supervisor-gate, queuedBecause: supervisor-gate, scope: job, cause: "supervisor-gate incident raised after the workaround of its cause class (gateCauses: no-eligible-agent, plan-divergence, runtime-defect, peer-dependency, retry-cap), holding only the named jobs", handler: supervisor, reeval: "typed --until conditions (scripts/kernel/gate-runtime-conditions.mjs runtime-has, admission, check; gate-conditions.mjs) on every status and reconciler pass, the runtime resolving the gate with an evidence event; the Supervisor's fixed answer attaches runtime-has; a class without one says why and relies on the ladder", bound: {deadlineMs: {ref: "modules/reconciler/workflow.yaml#decisionDueMs"}}, chain: [supervisor, owner], visible: "status autopilot.supervisorGates and queued[].blockedBy.gate: handler, step, steps, deadlineAt, condition; frontier supervisor-wait"}
   - {id: budget-gate, scope: workflow, workflowWide: "a workflow cap actually exceeded holds all dispatch; unknown usage holds nothing", cause: "autopilot budget requires review", handler: supervisor, reeval: "scripts/kernel/autopilot-budget-gate.mjs on every status and watchdog read", bound: {deadlineMs: {ref: "modules/models/runtimes.yaml#allocation.autopilot.supervisorGateTimeoutMs"}}, chain: [supervisor, owner], visible: "status autopilot.supervisorGates, frontier supervisor-wait"}
-  - {id: deferred, queuedBecause: deferred, scope: job, cause: "autopilot deferred the leg past a supervisor-gate deadline", handler: owner, reeval: "the autopilot sweep releases it when the gate resolves", bound: {deadlineMs: {ref: "modules/models/runtimes.yaml#allocation.autopilot.supervisorGateTimeoutMs"}}, chain: [owner], visible: "status queued[].queuedBecause, autopilot.deferred"}
+  - {id: deferred, queuedBecause: deferred, scope: job, cause: "autopilot deferred the leg after its supervisor-gate passed supervisorGateTimeoutMs and the owner was told (the gate item reached the owner level)", handler: owner, reeval: "the autopilot sweep releases it when the gate resolves", bound: {deadlineMs: {ref: "modules/models/runtimes.yaml#allocation.autopilot.supervisorGateTimeoutMs"}}, chain: [owner], visible: "status queued[].queuedBecause, autopilot.deferred"}
   - {id: deferred-to-handover, queuedBecause: deferred-to-handover, scope: job, cause: "credential, spend or owner-only ask deferred to the end-of-flow checklist", handler: owner, reeval: "the owner's checklist answer supersedes the ask (autopilot supersedeSupplied)", bound: {deadlineMs: {ref: "modules/models/runtimes.yaml#allocation.serveAsk.ttlMs"}}, chain: [owner], visible: "status autopilot.deferredToHandover"}
   - {id: peer-wait, queuedBecause: peer-wait, scope: job, cause: "peer-wait incident: the peer workflow has not landed what the step needs", handler: runtime-auto, reeval: "typed --until conditions and the peer's message", bound: {deadlineMs: {ref: "modules/models/runtimes.yaml#allocation.opTelemetry.stuckSla.peer-wait.warnMs"}}, chain: [kernel, supervisor, owner], visible: "frontier peer-wait with the peer and its phase", gap: [I4], gapWhy: "an aged wait raises a finding but no Decision Item moves it to the next handler"}
   - {id: foundation-wait, queuedBecause: foundation-wait, scope: job, cause: "a shared foundation another workflow claimed", handler: runtime-auto, reeval: "the foundation landed (scripts/kernel/shell-foundation.mjs)", bound: {deadlineMs: {ref: "modules/models/runtimes.yaml#allocation.drawLoop.shellFoundationStallMs"}}, chain: [supervisor, owner], visible: "status queued[].blockedBy", gap: [I8], gapWhy: "the stall reaches the Supervisor and stops there"}

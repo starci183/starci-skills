@@ -40,6 +40,15 @@ const drawRetry = (entry) => {
     reason: `the owner asked for a redraw of ${entry.record} in ask ${entry.redrawOwed.dispatchId} (${entry.redrawOwed.notes.length} note(s)): starci kernel enqueue --op ${DRAW_REVIEW_OP}${retryOf} - the packet carries the answer (context.owner_answers); the redraw must address every note (draw-feedback.mjs brief)` };
 };
 
+// A job a supervisor-gate holds shows where the gate is on the Supervisor ladder: handler, step of steps, deadline and the watched condition.
+const gateOnQueued = (s) => {
+  const gates = new Map((s.autopilotView?.view?.supervisorGates ?? []).map((gate) => [gate.incidentId, gate]));
+  for (const item of s.queued.filter((row) => row.queuedBecause === 'supervisor-gate' && gates.has(row.blockedBy?.incident))) {
+    const { handler, step, steps, deadlineAt, condition } = gates.get(item.blockedBy.incident);
+    item.blockedBy.gate = { handler, step, steps, deadlineAt, condition };
+  }
+};
+
 // Typed release conditions still pending, what this status released, and the jobs of this workflow
 // other workflows wait on (gate-conditions.mjs, waiter-priority.mjs).
 // Each key is present only when non-empty, so a workflow that uses neither reads exactly as before.
@@ -47,6 +56,7 @@ export const decorPhase = (s) => {
   const { db, workflowId, repo, internals } = s;
   const { typedLogWarningsOf } = internals;
   const f = s.frontier;
+  gateOnQueued(s);
   if (s.typedWaits.open.length) f.gateConditions = s.typedWaits.open.map(gateConditionView);
   if (s.typedWaits.resolved.length) f.autoResolved = s.typedWaits.resolved.map(autoResolvedView);
   if (s.blockingOthers.length) f.blockingOthers = s.blockingOthers;

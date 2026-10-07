@@ -4,6 +4,7 @@ import { positiveNumber } from '../lib/number.mjs';
 import { list } from '../lib/list.mjs';
 import { openIncident } from '../../engine/db/ledger.mjs';
 import { usageOfWorkflow } from './usage-report.mjs';
+import { gateWorkaroundOf } from './gate-workaround.mjs';
 
 export const AUTOPILOT_BY = 'autopilot';
 export const AUTOPILOT_RULING = 'autopilot-run-to-finish';
@@ -11,23 +12,27 @@ export const SUPERVISOR_GATE = 'supervisor-gate';
 export const openIncidents = (db, workflowId) => db.prepare("SELECT incident_id,op_id,last_progress,updated_at FROM incidents WHERE workflow_id=? AND status='open' ORDER BY updated_at").all(workflowId);
 export const kindOf = (lastProgress) => /^\[([^\]]+)\]/.exec(String(lastProgress ?? ''))?.[1] ?? null;
 
-/** Open supervisor-gate incidents: [{incidentId, opId, holds[], detail, since}]. */
+/** Open supervisor-gate incidents: [{incidentId, opId, holds[], detail, since, workaround}]; `workaround` is the raise's I6 record or null. */
 export function supervisorGatesOf(db, workflowId) {
   return openIncidents(db, workflowId).filter((row) => kindOf(row.last_progress) === SUPERVISOR_GATE).map((row) => {
     const raised = db.prepare("SELECT created_at,payload_json FROM events WHERE workflow_id=? AND entity_type='incident' AND entity_id=? AND kind='incident-raised' ORDER BY seq DESC LIMIT 1").get(workflowId, row.incident_id);
     const payload = parseJson(raised?.payload_json, {}) ?? {};
     return { incidentId: row.incident_id, opId: row.op_id ?? null, holds: list(payload.holds).length ? payload.holds : [row.op_id].filter(Boolean),
-      detail: String(row.last_progress ?? '').replace(/^\[[^\]]+\]\s*/, ''), since: raised?.created_at ?? row.updated_at };
+      detail: String(row.last_progress ?? '').replace(/^\[[^\]]+\]\s*/, ''), since: raised?.created_at ?? row.updated_at, workaround: payload.workaround ?? null };
   });
 }
 
 const newIncidentId = () => `inc-${randomBytes(3).toString('hex')}${Date.now().toString(16).slice(-6)}`;
-/** Open one supervisor-gate incident (inside the caller's transaction). */
-export function openSupervisorGate(ledger, { workflowId, opId = null, holds = [], detail, evidence = null, route = null, auto = true }) {
+/**
+ * Open one supervisor-gate incident (inside the caller's transaction). `workaround` is the raise's I6 record: {cause, workaround | noWorkaround, because?}
+ * (scripts/kernel/gate-workaround.mjs); a raise without a tried workaround or a typed reason throws the typed refusal.
+ */
+export function openSupervisorGate(ledger, { workflowId, opId = null, holds = [], detail, evidence = null, route = null, auto = true, workaround = {} }) {
+  const tried = gateWorkaroundOf(null, { ...workaround, holds });
   const incidentId = newIncidentId();
   openIncident(ledger.db, { incidentId, workflowId, kind: SUPERVISOR_GATE, opId, lastProgress: `[${SUPERVISOR_GATE}] ${detail}`, detail });
   ledger.appendEvent({ workflowId, entityType: 'incident', entityId: incidentId, kind: 'incident-raised',
-    payload: { kind: SUPERVISOR_GATE, detail, opId, holds, auto, by: AUTOPILOT_BY, ruling: AUTOPILOT_RULING, ...(route ? { route } : {}), ...(evidence ? { evidence } : {}) } });
+    payload: { kind: SUPERVISOR_GATE, detail, opId, holds, auto, workaround: tried, by: AUTOPILOT_BY, ruling: AUTOPILOT_RULING, ...(route ? { route } : {}), ...(evidence ? { evidence } : {}) } });
   return incidentId;
 }
 

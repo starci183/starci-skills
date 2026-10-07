@@ -44,6 +44,7 @@ import { askClassOf, isLiveProofOp } from './ask-server.mjs';
 import { DIRECTION_REVIEW_SCHEMA } from '../work/brand/brand.mjs';
 import { readEnv } from '../lib/env.mjs';
 import { positiveNumber } from '../lib/number.mjs';
+import { gateSubjectOf, gateViewOf } from './gate-ladder.mjs';
 import { workflowBudget, supervisorGatesOf, AUTOPILOT_BY, AUTOPILOT_RULING, SUPERVISOR_GATE } from './autopilot-budget.mjs';
 import {
   AUTOPILOT_EVENTS, HANDOVER_CREDENTIALS_SUBJECT,
@@ -293,7 +294,7 @@ export function autopilotBundle(db, workflowId) {
 }
 
 /** starci kernel status `autopilot` block. */
-export function autopilotProjection(db, workflowId, { settings = autopilotSettings(), sweep = null } = {}) {
+export function autopilotProjection(db, workflowId, { settings = autopilotSettings(), sweep = null, typed = [], now = Date.now() } = {}) {
   const state = autopilotOf(db, workflowId, settings);
   if (!state.on) return { on: false, source: state.source, provisional: [], deferred: [], deferredToHandover: [] };
   const deferredToHandover = deferredToHandoverOf(db, workflowId);
@@ -303,7 +304,7 @@ export function autopilotProjection(db, workflowId, { settings = autopilotSettin
     provisional: provisionalOf(db, workflowId).map(({ dispatchId, opId, jobId, class: cls, record, receiptPath, label, at }) => ({ dispatchId, opId, jobId, class: cls, record, receiptPath, label, at })),
     deferred: deferredLegsOf(db, workflowId),
     deferredToHandover: deferredToHandover.map(({ key, dispatchId, jobId, opId, deferClass, classes, fields, stubPath, owed, record, reason }) => ({ key, dispatchId, jobId, opId, deferClass, classes, fields, stubPath, owed, record, reason })),
-    supervisorGates: supervisorGatesOf(db, workflowId).map(({ incidentId, opId, holds, since }) => ({ incidentId, opId, holds, since })),
+    supervisorGates: supervisorGatesOf(db, workflowId).map((gate) => ({ ...gateViewOf(db, workflowId, gate, { now, typed, timeoutMs: settings.supervisorGateTimeoutMs }), subject: gateSubjectOf(db, workflowId, gate) })),
     budget,
     ...(sweep && (sweep.answered.length || sweep.deferred.length || sweep.rerouted.length || sweep.timedOut.length || sweep.supplied.length || sweep.errors.length) ? { sweep } : {}),
   };

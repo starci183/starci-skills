@@ -104,6 +104,11 @@ const waitResultText = (r) => {
   return `${r.condition} pending`;
 };
 
+// One supervisor-gate on the Supervisor ladder: who acts now, which step of how many, the deadline and what the runtime watches.
+const gateLine = (gate) => {
+  const watched = gate.condition ? gate.condition.map((entry) => `${entry.condition}${entry.met ? ' (met)' : ''}`).join(' AND ') : gate.conditionNote;
+  return `  supervisor-gate: ${gate.incidentId} [${gate.cause}] holds ${gate.holds.join(', ')} - handler ${gate.handler}, step ${gate.step} of ${gate.steps}, deadline ${new Date(gate.deadlineAt).toISOString()}; watching: ${watched}`;
+};
 const openWaitLine = (item) => {
   const results = item.results.map(waitResultText).join(', ');
   return `  gate-conditions: ${item.incidentId} [${item.kind ?? '-'}] ${results}`;
@@ -201,6 +206,7 @@ export const statusText = (s, out) => [
   ...s.askOnDemand.map((dispatchId) => `  ask-on-demand: ${dispatchId} is on Telegram; the owner generates its link (no form until then)`),
   ...s.typedWaits.resolved.map((item) => `  auto-resolved: ${item.incidentId} [${item.kind ?? '-'}] every typed condition holds — ${item.evidence.join('; ').slice(0, 240)}`),
   ...s.typedWaits.open.map(openWaitLine),
+  ...(s.autopilotView?.view?.supervisorGates ?? []).map(gateLine),
   ...s.blockingOthers.map((item) => `  blocking-others: ${item.jobId} (${item.opId ?? '-'} ${item.status}) — ${item.workflows.length} workflow(s) wait on it for ${item.waitedMinutes}m (${item.workflows.join(', ')}); weight ${item.weight}`),
   ...(s.queued.length ? [queuedCausesLine(s)] : []),
   ...s.queued.map(queuedLine),

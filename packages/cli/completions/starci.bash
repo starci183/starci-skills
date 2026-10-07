@@ -332,6 +332,14 @@ _starci() {
         kernel:incident:--detail) return 0;;
         kernel:incident:--op) return 0;;
         kernel:incident:--holds) return 0;;
+        kernel:incident:--cause) return 0;;
+        kernel:incident:--workaround) return 0;;
+        kernel:incident:--no-workaround) return 0;;
+        kernel:incident:--because) return 0;;
+        kernel:incident:--evidence) return 0;;
+        kernel:incident:--resolution) COMPREPLY=( $(compgen -W "fixed workaround not-runtime-fault" -- "$cur") ); return 0;;
+        kernel:incident:--commit) return 0;;
+        kernel:incident:--route) return 0;;
         kernel:incident:--peer) return 0;;
         kernel:incident:--refs) return 0;;
         kernel:incident:--resolve) return 0;;
@@ -348,6 +356,9 @@ _starci() {
         kernel:incident:--until-incident) return 0;;
         kernel:incident:--until-foundation) return 0;;
         kernel:incident:--until-landed) return 0;;
+        kernel:incident:--until-runtime-has) return 0;;
+        kernel:incident:--until-admission) return 0;;
+        kernel:incident:--until-check) return 0;;
         kernel:kernel-ack-rev:--repo) return 0;;
         kernel:kernel-ack-rev:--workflow) return 0;;
         kernel:kernel-ack-rev:--rev) return 0;;
@@ -972,7 +983,7 @@ _starci() {
         kernel:graph-edit) COMPREPLY=( $(compgen -W "--repo --workflow --edit --decision --jobs --job --add-paths --paths --op --before --after --parts --set --cut-id --from-scan --path-prefix --exclude --reason --undo --json --cwd --quiet --help --edition" -- "$cur") );;
         kernel:hierarchy) COMPREPLY=( $(compgen -W "--repo --workflow --json --cwd --quiet --help --edition" -- "$cur") );;
         kernel:inbox) COMPREPLY=( $(compgen -W "--repo --workflow --ack --disposition --json --cwd --quiet --help --edition" -- "$cur") );;
-        kernel:incident) COMPREPLY=( $(compgen -W "--repo --workflow --kind --detail --op --holds --peer --refs --resolve --by --owner-answer --introduced-by --introducer --fix --attach --until-record --until-job --until-message --until-commit --until-incident --until-foundation --until-landed --json --cwd --quiet --help --edition" -- "$cur") );;
+        kernel:incident) COMPREPLY=( $(compgen -W "--repo --workflow --kind --detail --op --holds --cause --workaround --no-workaround --because --evidence --resolution --commit --route --peer --refs --resolve --by --owner-answer --introduced-by --introducer --fix --attach --until-record --until-job --until-message --until-commit --until-incident --until-foundation --until-landed --until-runtime-has --until-admission --until-check --json --cwd --quiet --help --edition" -- "$cur") );;
         kernel:kernel-ack-rev) COMPREPLY=( $(compgen -W "--repo --workflow --rev --plan --read-manifest --op --json --cwd --quiet --help --edition" -- "$cur") );;
         kernel:kernel-proposal) COMPREPLY=( $(compgen -W "--repo --workflow --title --evidence --patch --files --decision --list --json --cwd --quiet --help --edition" -- "$cur") );;
         kernel:lifecycle) COMPREPLY=( $(compgen -W "--repo --workflow --pause --stop --resume --by --reason --json --cwd --quiet --help --edition" -- "$cur") );;

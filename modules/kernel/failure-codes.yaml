@@ -16436,3 +16436,66 @@ ENGINE_CONFIG_UNREADABLE:
   nextStep_vi: "Sửa config.yaml nếu nó sai, hoặc chạy starci reconciler restart để bộ điều phối chạy trên mã mới."
   owner: owner
   kind: runtime-fault
+gate-cause-required:
+  title: "A supervisor-gate raise names no known cause class"
+  title_vi: "Lần dựng gate cho Supervisor không nêu nhóm nguyên nhân hợp lệ"
+  meaning_vi: "Mỗi gate cho Supervisor phải nêu nhóm nguyên nhân trong bảng chính sách (gateCauses) để runtime biết cách tránh nào phải thử trước."
+  causes_vi:
+    - "Thiếu --cause hoặc --cause không nằm trong danh sách nhóm của bảng"
+  nextStep_vi: "Chạy lại starci kernel incident với --cause là một nhóm trong bảng và cách tránh đã thử hoặc lý do không có cách tránh."
+  owner: op-retry
+  kind: verb-refusal
+gate-workaround-required:
+  title: "A supervisor-gate was raised before its workaround was tried"
+  title_vi: "Gate cho Supervisor được dựng trước khi thử cách tránh"
+  meaning_vi: "Nhóm nguyên nhân của gate có một cách tránh trong bảng chính sách; gate chỉ được dựng sau khi cách tránh đó được thử và ghi lại, hoặc kèm lý do không có cách tránh thuộc danh sách của nhóm."
+  causes_vi:
+    - "Thiếu --workaround và --no-workaround"
+  nextStep_vi: "Thử cách tránh mà thông báo nêu rồi ghi lại bằng --workaround, hoặc nêu --no-workaround với một lý do trong danh sách của nhóm."
+  owner: op-retry
+  kind: verb-refusal
+gate-no-workaround-invalid:
+  title: "The reason there is no workaround is not one of the cause class's reasons"
+  title_vi: "Lý do không có cách tránh không thuộc danh sách của nhóm nguyên nhân"
+  meaning_vi: "--no-workaround phải là một lý do có kiểu trong bảng chính sách cho nhóm nguyên nhân đã nêu, không phải văn bản tự do."
+  causes_vi:
+    - "Giá trị --no-workaround không nằm trong danh sách noWorkaround của nhóm"
+  nextStep_vi: "Chọn một lý do trong danh sách thông báo nêu, hoặc thử cách tránh của nhóm."
+  owner: op-retry
+  kind: verb-refusal
+gate-workaround-available:
+  title: "The job still has an agent to try, so the gate is premature"
+  title_vi: "Job vẫn còn agent để thử nên gate chưa cần dựng"
+  meaning_vi: "Quyết định route gần nhất của job còn thành viên chưa bị loại, nên khẳng định không có cách tránh bị runtime bác bỏ."
+  causes_vi:
+    - "Chuỗi route của job còn thành viên chưa thử và chưa bị loại"
+  nextStep_vi: "Chạy starci kernel dispatch --model với thành viên mà thông báo nêu, hoặc ghi --workaround cho kết quả của lần thử."
+  owner: op-retry
+  kind: verb-refusal
+gate-resolution-required:
+  title: "A supervisor-gate was resolved by the Supervisor without a typed resolution"
+  title_vi: "Gate cho Supervisor được Supervisor đóng mà không có kiểu giải quyết"
+  meaning_vi: "Supervisor trả lời gate bằng một trong ba kiểu: đã sửa (kèm commit), có cách tránh (kèm route) hoặc không phải lỗi runtime (kèm lý do), để Kernel và vòng thang biết việc tiếp theo."
+  causes_vi:
+    - "Thiếu --resolution khi chạy starci kernel incident --resolve --by supervisor trên gate"
+  nextStep_vi: "Chạy lại với --resolution fixed --commit, workaround --route hoặc not-runtime-fault --detail."
+  owner: supervisor
+  kind: verb-refusal
+gate-resolution-incomplete:
+  title: "The typed resolution of a supervisor-gate lacks its evidence"
+  title_vi: "Kiểu giải quyết gate cho Supervisor thiếu bằng chứng đi kèm"
+  meaning_vi: "Mỗi kiểu giải quyết cần dữ kiện của nó: fixed cần commit sửa, workaround cần route, not-runtime-fault cần lý do kèm bằng chứng."
+  causes_vi:
+    - "Thiếu --commit, --route hoặc --detail đủ dài tương ứng với --resolution"
+  nextStep_vi: "Bổ sung cờ mà thông báo nêu rồi chạy lại."
+  owner: supervisor
+  kind: verb-refusal
+gate-reraise-without-evidence:
+  title: "A supervisor-gate was raised again for a cause the Supervisor ruled not the runtime's"
+  title_vi: "Gate được dựng lại cho nguyên nhân Supervisor đã kết luận không phải lỗi runtime"
+  meaning_vi: "Supervisor đã trả lời not-runtime-fault cho cùng nguyên nhân và phạm vi; Kernel phải tự xử lý, chỉ được dựng lại gate khi có bằng chứng mới."
+  causes_vi:
+    - "Dựng lại gate cùng nguyên nhân và phạm vi mà không có --evidence khác với bằng chứng của gate trước"
+  nextStep_vi: "Xử lý nguyên nhân trong workflow (thử lại, lập kế hoạch lại hoặc quyết định), hoặc dựng lại với --evidence mới."
+  owner: op-retry
+  kind: verb-refusal

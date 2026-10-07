@@ -21,6 +21,7 @@ import { custodyPresent, questionFields } from './ask-server.mjs';
 import { checkDirection, defaultGrammarRoot, readBrandRecord } from '../work/brand/brand.mjs';
 import { sha256File } from '../work/work-io.mjs';
 import { AUTOPILOT_BY, AUTOPILOT_RULING, SUPERVISOR_GATE, openIncidents, kindOf, supervisorGatesOf } from './autopilot-budget.mjs';
+import { gateOwnerTold } from './gate-ladder.mjs';
 
 export const HANDOVER_CREDENTIALS_SUBJECT = 'handover-credentials';
 export const PROVISIONAL_LABEL = 'self-accepted provisional';
@@ -353,11 +354,11 @@ export const rerouteOwnerGates = ({ ledger, db, workflowId, out, now }) => {
   }
 };
 
-// A supervisor-gate older than supervisorGateTimeoutMs defers the jobs it holds; the gate stays open
-// for the Supervisor and the rest of the graph no longer waits on it.
+// A supervisor-gate older than supervisorGateTimeoutMs, whose Supervisor Decision Item reached the owner (the owner was told: policy gate.deferAfter),
+// defers the jobs it holds; the gate stays open and the rest of the graph no longer waits on it.
 export const deferTimedOutGates = ({ ledger, db, workflowId, settings, out, now }) => {
   for (const gate of supervisorGatesOf(db, workflowId)) {
-    if (now - Number(gate.since) < settings.supervisorGateTimeoutMs) continue;
+    if (now - Number(gate.since) < settings.supervisorGateTimeoutMs || !gateOwnerTold(workflowId, gate)) continue;
     const already = new Set(deferredLegsOf(db, workflowId).map((item) => item.jobId));
     const jobIds = db.prepare("SELECT job_id,op_id FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND status IN ('queued','failed')").all(workflowId)
       .filter((job) => gate.holds.includes('*') || gate.holds.includes(job.job_id) || (job.op_id && gate.holds.includes(job.op_id))).map((job) => job.job_id).filter((id) => !already.has(id));

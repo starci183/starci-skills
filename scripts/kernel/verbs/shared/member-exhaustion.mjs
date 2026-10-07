@@ -23,6 +23,7 @@ export function escalateExhaustedMembers(ledger, { job, decision, lineage }) {
   ledger.transaction(() => {
     incidentId = openSupervisorGate(ledger, { workflowId: job.workflow_id, opId: job.op_id ?? null, holds: [job.job_id],
       detail: `every agent of the tier chain is spent for ${job.job_id} (${members.map((m) => m.member).join(', ')}): the Supervisor restores one of them or decides the retry, then resolves --by supervisor`,
+      workaround: { cause: 'no-eligible-agent', noWorkaround: 'chain-spent' },
       evidence: { cause: CAUSE, jobId: job.job_id, lineage: lineage.pools ?? {}, members } });
   });
   return incidentId;

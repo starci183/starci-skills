@@ -47,7 +47,7 @@ const autopilotViewOf = (s) => {
   const { db, workflowId, internals } = s;
   const { LEG_IN_FLIGHT } = internals;
   try {
-    const view = autopilotProjection(db, workflowId, { settings: s.autopilotSettingsNow, sweep: s.autopilotSweepOut });
+    const view = autopilotProjection(db, workflowId, { settings: s.autopilotSettingsNow, sweep: s.autopilotSweepOut, typed: s.typedWaits?.open ?? [] });
     if (!view.on) return { view, graph: null };
     const owed = credentialsOwed(db, workflowId);
     const deferredJobIds = new Set(view.deferred.map((item) => item.jobId));
