@@ -273,19 +273,19 @@ const unwrap = (expression) => expression?.TypeCast ? unwrap(expression.TypeCast
 const columnName = (expression) => unwrap(expression)?.ColumnRef?.fields?.map(sval).findLast(Boolean);
 const literalString = (expression) => asString(unwrap(expression));
 
+function operationScopesBucket(operation, bucket) {
+  const operator = operation.name?.map(sval).filter(Boolean).join('');
+  if (operator === '=' && ((columnName(operation.lexpr) === 'bucket_id' && literalString(operation.rexpr) === bucket)
+    || (columnName(operation.rexpr) === 'bucket_id' && literalString(operation.lexpr) === bucket))) return true;
+  return operation.kind === 'AEXPR_IN' && columnName(operation.lexpr) === 'bucket_id'
+    && (operation.rexpr ?? []).some((item) => literalString(item) === bucket);
+}
+
 function expressionScopesBucket(expression, bucket) {
   if (!expression || typeof expression !== 'object') return false;
   if (Array.isArray(expression)) return expression.some((item) => expressionScopesBucket(item, bucket));
   const operation = expression.A_Expr;
-  if (operation) {
-    const operator = operation.name?.map(sval).filter(Boolean).join('');
-    if (operator === '=') {
-      if ((columnName(operation.lexpr) === 'bucket_id' && literalString(operation.rexpr) === bucket)
-        || (columnName(operation.rexpr) === 'bucket_id' && literalString(operation.lexpr) === bucket)) return true;
-    }
-    if (operation.kind === 'AEXPR_IN' && columnName(operation.lexpr) === 'bucket_id'
-      && (operation.rexpr ?? []).some((item) => literalString(item) === bucket)) return true;
-  }
+  if (operation && operationScopesBucket(operation, bucket)) return true;
   return Object.values(expression).some((child) => expressionScopesBucket(child, bucket));
 }
 
