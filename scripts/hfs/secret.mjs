@@ -26,6 +26,13 @@ class SecretError extends Error {}
 
 const SLUG = /^[a-z0-9][a-z0-9-]*$/u;
 const KEY = /^[A-Za-z_]\w*$/u;
+const WHITESPACE = '\\s';
+const REQUIRED_INDENT = `${WHITESPACE}+`;
+const OPTIONAL_DASH = '-?';
+const OPTIONAL_SPACING = `${WHITESPACE}*`;
+const RECIPIENT_NAME = 'recipient:';
+const RECIPIENT_VALUE = '(\\S+)';
+const RECIPIENT_LINE = new RegExp(`^${REQUIRED_INDENT}${OPTIONAL_DASH}${OPTIONAL_SPACING}${RECIPIENT_NAME}${OPTIONAL_SPACING}${RECIPIENT_VALUE}`, 'gmu');
 const DEFAULT_KEY = 'data';
 const VERBS = new Set(['list', 'show', 'set', 'gen']);
 
@@ -46,7 +53,7 @@ export function envelopeOf(text) {
   }
   if (format === 'yaml') {
     const keys = [...text.matchAll(/^([A-Za-z_]\w*):/gmu)].map((match) => match[1]).filter((name) => name !== 'sops');
-    return { format, keys, recipients: [...text.matchAll(/^\s+-?\s*recipient:\s*(\S+)/gmu)].map((match) => match[1]) };
+    return { format, keys, recipients: [...text.matchAll(RECIPIENT_LINE)].map((match) => match[1]) };
   }
   const keys = [...text.matchAll(/^([A-Za-z_]\w*)=/gmu)].map((match) => match[1]).filter((name) => !name.startsWith('sops_'));
   return { format, keys, recipients: [...text.matchAll(/^sops_age__list_\d+__map_recipient=(\S+)/gmu)].map((match) => match[1]) };
@@ -155,6 +162,41 @@ export function setSecretValues(repoRoot, { slug, values, env = null }, { sops =
   return { file, via: 'sealed-secret' };
 }
 
+function listSecrets(opts, directory, repoRoot, stdout) {
+  if (opts.positional.length) throw new SecretError('starci app secret list takes no name');
+  const files = fs.existsSync(directory) ? fs.readdirSync(directory).filter((name) => name.endsWith('.enc')).sort(byCodeUnit) : [];
+  for (const name of files) stdout(`${name.slice(0, -'.enc'.length)}  ${envelopeOf(fs.readFileSync(path.join(directory, name), 'utf8')).keys.join(', ')}\n`);
+  stdout(`${files.length} secret${files.length === 1 ? '' : 's'} in ${path.relative(repoRoot, directory).split(path.sep).join('/')}\n`);
+  return 0;
+}
+
+function showSecret(opts, file, seam, stdout) {
+  if (!fs.existsSync(file)) throw new SecretError(`${opts.positional[0]} is not sealed in this env`);
+  const { format, keys } = envelopeOf(fs.readFileSync(file, 'utf8'));
+  if (opts.key === undefined && !keys.includes(DEFAULT_KEY) && keys.length !== 1) throw new SecretError(`${opts.positional[0]} holds ${keys.join(', ')}; name one with --key`);
+  const map = seam.decrypt(file, format);
+  const name = opts.key ?? (keys.includes(DEFAULT_KEY) ? DEFAULT_KEY : keys[0]);
+  if (!Object.hasOwn(map, name)) throw new SecretError(`${opts.positional[0]} has no key ${name}`);
+  stdout(`${String(map[name])}\n`);
+  return 0;
+}
+
+function setSecretFromStdin(opts, file, key, seam, stdin, stdout) {
+  const value = String(stdin()).replace(/\r?\n$/u, '');
+  if (value === '') throw new SecretError('the value on stdin is empty');
+  writeSecret({ file, values: { [key]: value }, age: opts.age, sops: seam });
+  stdout(`sealed ${opts.positional[0]} (${key})\n`);
+  return 0;
+}
+
+function generateSecret(opts, file, key, seam, random, stdout) {
+  const bytes = opts.bytes === undefined ? 32 : Number(opts.bytes);
+  if (!Number.isInteger(bytes) || bytes < 16 || bytes > 1024) throw new SecretError('--bytes is a whole number from 16 to 1024');
+  writeSecret({ file, values: { [key]: random(bytes).toString('base64url') }, age: opts.age, sops: seam });
+  stdout(`generated and sealed ${opts.positional[0]} (${key}, ${bytes} bytes); read it with starci app secret show\n`);
+  return 0;
+}
+
 /** `starci app secret <verb> ...`; `stdin` returns the value `set` seals, `sops` and `random` are test seams. */
 export function secretMain(argv, { stdout = (s) => process.stdout.write(s), stderr = (s) => process.stderr.write(s), stdin = readStdin, sops = null, random = randomBytes, env = process.env, cwd = process.cwd() } = {}) {
   const [verb, ...rest] = argv;
@@ -164,38 +206,13 @@ export function secretMain(argv, { stdout = (s) => process.stdout.write(s), stde
     const repoRoot = path.resolve(cwd, opts.cwd ?? '.');
     const directory = secretsDirectory(repoRoot, opts.env);
     const key = opts.key ?? DEFAULT_KEY;
-    if (verb === 'list') {
-      if (opts.positional.length) throw new SecretError('starci app secret list takes no name');
-      const files = fs.existsSync(directory) ? fs.readdirSync(directory).filter((name) => name.endsWith('.enc')).sort(byCodeUnit) : [];
-      for (const name of files) stdout(`${name.slice(0, -'.enc'.length)}  ${envelopeOf(fs.readFileSync(path.join(directory, name), 'utf8')).keys.join(', ')}\n`);
-      stdout(`${files.length} secret${files.length === 1 ? '' : 's'} in ${path.relative(repoRoot, directory).split(path.sep).join('/')}\n`);
-      return 0;
-    }
+    if (verb === 'list') return listSecrets(opts, directory, repoRoot, stdout);
     if (opts.positional.length !== 1) throw new SecretError(`starci app secret ${verb} takes one secret name`);
     const file = fileOf(directory, opts.positional[0]);
     const seam = sops ?? defaultSops(env);
-    if (verb === 'show') {
-      if (!fs.existsSync(file)) throw new SecretError(`${opts.positional[0]} is not sealed in this env`);
-      const { format, keys } = envelopeOf(fs.readFileSync(file, 'utf8'));
-      if (opts.key === undefined && !keys.includes(DEFAULT_KEY) && keys.length !== 1) throw new SecretError(`${opts.positional[0]} holds ${keys.join(', ')}; name one with --key`);
-      const map = seam.decrypt(file, format);
-      const name = opts.key ?? (keys.includes(DEFAULT_KEY) ? DEFAULT_KEY : keys[0]);
-      if (!Object.hasOwn(map, name)) throw new SecretError(`${opts.positional[0]} has no key ${name}`);
-      stdout(`${String(map[name])}\n`);
-      return 0;
-    }
-    if (verb === 'set') {
-      const value = String(stdin()).replace(/\r?\n$/u, '');
-      if (value === '') throw new SecretError('the value on stdin is empty');
-      writeSecret({ file, values: { [key]: value }, age: opts.age, sops: seam });
-      stdout(`sealed ${opts.positional[0]} (${key})\n`);
-      return 0;
-    }
-    const bytes = opts.bytes === undefined ? 32 : Number(opts.bytes);
-    if (!Number.isInteger(bytes) || bytes < 16 || bytes > 1024) throw new SecretError('--bytes is a whole number from 16 to 1024');
-    writeSecret({ file, values: { [key]: random(bytes).toString('base64url') }, age: opts.age, sops: seam });
-    stdout(`generated and sealed ${opts.positional[0]} (${key}, ${bytes} bytes); read it with starci app secret show\n`);
-    return 0;
+    if (verb === 'show') return showSecret(opts, file, seam, stdout);
+    if (verb === 'set') return setSecretFromStdin(opts, file, key, seam, stdin, stdout);
+    return generateSecret(opts, file, key, seam, random, stdout);
   } catch (error) {
     if (error instanceof SecretError || error instanceof SyntaxError) { stderr(`starci app secret: ${error.message}\n`); return 2; }
     throw error;

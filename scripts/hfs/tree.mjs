@@ -49,6 +49,20 @@ export function readTree(repoRoot, { isIgnored }) {
 const holdsNoFile = (node) => node.files === 0 && node.dirs.every(holdsNoFile);
 const countDirs = (node) => node.dirs.reduce((sum, child) => sum + 1 + countDirs(child), 0);
 
+function collectTreeFacts(node, empty, ghosts) {
+  for (const child of node.dirs) {
+    if (holdsNoFile(child)) empty.push({ path: child.rel, below: countDirs(child) });
+    else collectTreeFacts(child, empty, ghosts);
+  }
+  for (const [i, a] of node.dirs.entries()) {
+    for (const b of node.dirs.slice(i + 1)) {
+      if (editDistance(a.name, b.name) > GHOST_DISTANCE) continue;
+      if (holdsNoFile(a)) ghosts.push({ path: a.rel, of: b.rel, distance: editDistance(a.name, b.name) });
+      if (holdsNoFile(b)) ghosts.push({ path: b.rel, of: a.rel, distance: editDistance(a.name, b.name) });
+    }
+  }
+}
+
 /**
  * The tree's own findings: `empty` are the topmost directories with no file anywhere below them (each with the number of
  * directories it holds); `ghosts` are pairs of sibling directories within GHOST_DISTANCE edits where `ghost` has no file
@@ -57,20 +71,7 @@ const countDirs = (node) => node.dirs.reduce((sum, child) => sum + 1 + countDirs
 export function treeFacts(tree) {
   const empty = [];
   const ghosts = [];
-  const visit = (node) => {
-    for (const child of node.dirs) {
-      if (holdsNoFile(child)) empty.push({ path: child.rel, below: countDirs(child) });
-      else visit(child);
-    }
-    for (const [i, a] of node.dirs.entries()) {
-      for (const b of node.dirs.slice(i + 1)) {
-        if (editDistance(a.name, b.name) > GHOST_DISTANCE) continue;
-        if (holdsNoFile(a)) ghosts.push({ path: a.rel, of: b.rel, distance: editDistance(a.name, b.name) });
-        if (holdsNoFile(b)) ghosts.push({ path: b.rel, of: a.rel, distance: editDistance(a.name, b.name) });
-      }
-    }
-  };
-  visit(tree);
+  collectTreeFacts(tree, empty, ghosts);
   return { empty, ghosts };
 }
 

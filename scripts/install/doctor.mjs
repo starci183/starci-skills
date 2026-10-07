@@ -83,36 +83,7 @@ export function doctorInstallation(input, log = console.log, deps = {}) {
     try { const detail = fn(); log(`ok   ${name}${detail ? ': ' + detail : ''}`); return true; }
     catch (error) { failed++; log(`FAIL ${name}: ${error.message}`); return false; }
   };
-  const integrity = check('installed payload and entry custody', () => {
-    if (isLinkLike(target) || !fs.lstatSync(target, {throwIfNoEntry: false})?.isDirectory()) throw new Error('installed runtime must be a physical directory');
-    if (!manifest || manifest.name !== packageManifest.name || manifest.version !== packageManifest.version) throw new Error('install manifest is missing or does not match the invoking package identity');
-    checkProtocol(manifest);
-    if (!manifest.files || Array.isArray(manifest.files) || typeof manifest.files !== 'object' || !Object.keys(manifest.files).length) throw new Error('install manifest has no payload custody');
-    const installed = JSON.parse(fs.readFileSync(ownedFile(target, 'package.json'), 'utf8'));
-    if (installed.name !== manifest.name || installed.version !== manifest.version) throw new Error('installed package identity differs from its manifest');
-    for (const relative of SOURCE_ENTRIES) ownedFile(target, relative);
-    for (const [relative, digest] of Object.entries(manifest.files)) {
-      if (excluded(relative) || excluded(relative.toLowerCase())) throw new Error(`manifest claims excluded local custody: ${relative}`);
-      if (!/^[a-f0-9]{64}$/.test(digest)) throw new Error(`invalid payload digest: ${relative}`);
-      const actual = installedPayloadDigest(fs.readFileSync(ownedFile(target, relative)), relative);
-      if (actual !== digest) throw new Error(`payload changed since install: ${relative}`);
-    }
-    if (!Object.keys(expectedFiles).length) throw new Error('invoking package has no payload inventory');
-    for (const [relative, digest] of Object.entries(expectedFiles)) {
-      if (manifest.files[relative] !== digest) throw new Error(`payload is absent or differs from the invoking package: ${relative}`);
-    }
-    const entries = planEntries(repo, manifest);
-    const custody = manifest.hostSkills;
-    if (!Object.keys(entries.files).length || entries.write.length || custody?.hashMode !== 'sha256-bytes'
-      || !custody?.files || Array.isArray(custody.files) || typeof custody.files !== 'object') throw new Error('public entry discovery is missing, changed or has no exact-byte custody');
-    for (const [relative, digest] of Object.entries(custody.files)) {
-      if (!/^[a-f0-9]{64}$/.test(digest) || sha256(fs.readFileSync(ownedFile(repo, relative))) !== digest) throw new Error(`recorded public entry custody differs: ${relative}`);
-    }
-    for (const [relative, digest] of Object.entries(entries.files)) {
-      if (custody.files?.[relative] !== digest || sha256(fs.readFileSync(ownedFile(repo, relative))) !== digest) throw new Error(`public entry custody differs: ${relative}`);
-    }
-    return `${manifest.name}@${manifest.version}; ${Object.keys(manifest.files).length} payload files`;
-  });
+  const integrity = check('installed payload and entry custody', () => integrityDetail({ target, repo, manifest, packageManifest, expectedFiles, checkProtocol, planEntries, excluded }));
   if (integrity && !quick) {
     const node = deps.runNode ?? runNode;
     check('installed YAML contracts', () => {
@@ -131,8 +102,41 @@ export function doctorInstallation(input, log = console.log, deps = {}) {
       return report.sqlite.detail;
     });
   }
-  log(failed ? `doctor: ${failed} local check(s) failed` : quick
-    ? 'doctor: install integrity passed; local runtime capabilities were not checked (--quick)'
-    : 'doctor: installed source and local runtime capabilities passed; host, provider and product readiness require their owning checks');
+  let message;
+  if (failed) message = `doctor: ${failed} local check(s) failed`;
+  else if (quick) message = 'doctor: install integrity passed; local runtime capabilities were not checked (--quick)';
+  else message = 'doctor: installed source and local runtime capabilities passed; host, provider and product readiness require their owning checks';
+  log(message);
   return failed;
+}
+
+function integrityDetail({ target, repo, manifest, packageManifest, expectedFiles, checkProtocol, planEntries, excluded }) {
+  if (isLinkLike(target) || !fs.lstatSync(target, {throwIfNoEntry: false})?.isDirectory()) throw new Error('installed runtime must be a physical directory');
+  if (!manifest || manifest.name !== packageManifest.name || manifest.version !== packageManifest.version) throw new Error('install manifest is missing or does not match the invoking package identity');
+  checkProtocol(manifest);
+  if (!manifest.files || Array.isArray(manifest.files) || typeof manifest.files !== 'object' || !Object.keys(manifest.files).length) throw new Error('install manifest has no payload custody');
+  const installed = JSON.parse(fs.readFileSync(ownedFile(target, 'package.json'), 'utf8'));
+  if (installed.name !== manifest.name || installed.version !== manifest.version) throw new Error('installed package identity differs from its manifest');
+  for (const relative of SOURCE_ENTRIES) ownedFile(target, relative);
+  for (const [relative, digest] of Object.entries(manifest.files)) {
+    if (excluded(relative) || excluded(relative.toLowerCase())) throw new Error(`manifest claims excluded local custody: ${relative}`);
+    if (!/^[a-f0-9]{64}$/.test(digest)) throw new Error(`invalid payload digest: ${relative}`);
+    const actual = installedPayloadDigest(fs.readFileSync(ownedFile(target, relative)), relative);
+    if (actual !== digest) throw new Error(`payload changed since install: ${relative}`);
+  }
+  if (!Object.keys(expectedFiles).length) throw new Error('invoking package has no payload inventory');
+  for (const [relative, digest] of Object.entries(expectedFiles)) {
+    if (manifest.files[relative] !== digest) throw new Error(`payload is absent or differs from the invoking package: ${relative}`);
+  }
+  const entries = planEntries(repo, manifest);
+  const custody = manifest.hostSkills;
+  if (!Object.keys(entries.files).length || entries.write.length || custody?.hashMode !== 'sha256-bytes'
+    || !custody?.files || Array.isArray(custody.files) || typeof custody.files !== 'object') throw new Error('public entry discovery is missing, changed or has no exact-byte custody');
+  for (const [relative, digest] of Object.entries(custody.files)) {
+    if (!/^[a-f0-9]{64}$/.test(digest) || sha256(fs.readFileSync(ownedFile(repo, relative))) !== digest) throw new Error(`recorded public entry custody differs: ${relative}`);
+  }
+  for (const [relative, digest] of Object.entries(entries.files)) {
+    if (custody.files?.[relative] !== digest || sha256(fs.readFileSync(ownedFile(repo, relative))) !== digest) throw new Error(`public entry custody differs: ${relative}`);
+  }
+  return `${manifest.name}@${manifest.version}; ${Object.keys(manifest.files).length} payload files`;
 }

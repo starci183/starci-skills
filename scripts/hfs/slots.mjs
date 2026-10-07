@@ -18,40 +18,33 @@
 // runtime repository itself: one profile `runtime`, no sides and no app kinds, slot ids runtime.<name>, the tracked value
 // `generated` (a copy written only by the slot's `generatedBy`). A runtime repository declares itself with
 // hfs.json {"hfs": <major>, "kind": "runtime", "project": <name>}.
-import { ruleParamsProblems } from './rule-params-shape.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { braceVariants, globExpression } from '../lib/glob.mjs';
-import { posixPath } from '../lib/path-key.mjs';
+import { cleanSlotPath } from './slot-path.mjs';
 import { captureNames } from '../lib/i18n.mjs';
 import { isPlainObject } from '../../engine/plain-object.mjs';
-import { APP_KIND, EDITIONS, ENV_PREFIX, MANIFEST_KINDS, NAME, PRESENCE, RUNTIME_KIND, SEMVER, TESTS, TRACKED, manifestKind, runtimeSemanticProblems, runtimeShapeProblems, slotProblems, tierMapProblems } from './manifest-shape.mjs';
-import { declaredSlotEnabled, optionalSlotProblems, triggerProblems } from './declaration-slots.mjs';
+import { APP_KIND, ENV_PREFIX, RUNTIME_KIND, manifestKind } from './manifest-shape.mjs';
+import { APP_SCOPE, manifestShapeProblems, PROFILES } from './slot-manifest-shape.mjs';
+import { manifestSemanticProblems } from './slot-semantic-problems.mjs';
+import { declaredSlotEnabled } from './declaration-slots.mjs';
+import { sideProblems } from './slot-side-problems.mjs';
 import { declarationShapeProblems } from './declaration-shape.mjs';
-import { declarationEdition, editionRuleParams, effectiveSlot, enforcerJudgedInEdition, judgedInEdition, litePresenceOf, ruleEditionProblems, slotInEdition } from './edition-slots.mjs';
+import { declarationEdition, editionRuleParams, effectiveSlot, slotInEdition } from './edition-slots.mjs';
+import { HfsSlotsError, fail } from './slot-errors.mjs';
+import { loadRuleCatalog } from './rule-catalog.mjs';
 import { byCodeUnit } from '../lib/list.mjs';
 export { litePresenceOf, slotInEdition } from './edition-slots.mjs';
+export { HfsSlotsError, loadRuleCatalog };
+export { rules } from './rule-catalog.mjs';
+export { APP_SCOPE };
 export const HFS_MANIFEST_FILE = 'knowledge/hfs/slots.yaml';
 /** The manifest of kind runtime: the standard tree of the StarCi runtime repository (judged by scripts/hfs/runtime-check.mjs). */
 export const RUNTIME_MANIFEST_FILE = 'knowledge/hfs/runtime-slots.yaml';
 export const HFS_DECLARATION_FILE = 'hfs.json';
-/** A refusal with a catalogued code (modules/kernel/failure-codes.yaml) and the facts a check reports. */
-export class HfsSlotsError extends Error {
-  constructor(code, message, details = {}) {
-    super(`${code}: ${message}`);
-    this.name = 'HfsSlotsError';
-    this.code = code;
-    this.details = details;
-  }
-}
-
-/** The sides of an app; each lives in the folder of its name and is the profile of its slots. */
-const PROFILES = ['be', 'fe'];
 export const SIDES = Object.freeze([...PROFILES]);
-/** The profile of the app root's own slots. */
-export const APP_SCOPE = 'app';
 
 /**
  * The rewriter of a side's finding messages: `(message) => message` with its paths made app-relative like the finding's own path.
@@ -71,8 +64,6 @@ export function appRelativeMessages(side, sideRoot) {
     : message);
 }
 
-const SCOPES = [APP_SCOPE, ...PROFILES];
-
 // ------------------------------------------------------------------------------------------------ patterns
 
 const VAR = /<([A-Za-z][A-Za-z0-9-]*)>/g;
@@ -90,8 +81,8 @@ function segmentWeight(segment) {
 
 /** The RegExp source of one pattern segment (no separators); variables capture, and are listed in `names`. */
 function segmentSource(segment, names) {
-  let source = '';
-  for (let i = 0; i < segment.length; i += 1) {
+  let source = '', i = 0;
+  while (i < segment.length) {
     const c = segment[i];
     if (c === '<') {
       const end = segment.indexOf('>', i);
@@ -100,7 +91,7 @@ function segmentSource(segment, names) {
       i = end;
     } else if (c === '*') source += '[^/]*';
     else if (c === '?') source += '[^/]';
-    else source += /[.+^${}()|[\]\\]/.test(c) ? `\\${c}` : c;
+    else source += /[.+^${}()|[\]\\]/.test(c) ? `\\${c}` : c; i += 1;
   }
   return source;
 }
@@ -148,119 +139,6 @@ const levenshtein = (a, b) => {
 
 // ------------------------------------------------------------------------------------------- manifest
 
-const fail = (code, message, details) => { throw new HfsSlotsError(code, message, details); };
-
-/** Shape problems of a parsed manifest, in the words of modules/schemas/hfs-slots.schema.yaml. */
-function manifestShapeProblems(m) {
-  const bad = [];
-  if (!isPlainObject(m)) return ['the manifest is not a map'];
-  if (!MANIFEST_KINDS.includes(manifestKind(m))) return [`kind must be one of ${MANIFEST_KINDS.join(', ')}`];
-  if (manifestKind(m) === RUNTIME_KIND) return runtimeShapeProblems(m);
-  const allowed = new Set(['schema', 'kind', 'version', 'versioning', 'presenceValues', 'trackedValues', 'testValues', 'editions', 'sides', 'appKinds', 'triggerKinds', 'tiers', 'ruleParams', 'crossOwner', 'crossApp', 'slots', 'consumers', 'naming']);
-  for (const key of Object.keys(m)) if (!allowed.has(key)) bad.push(`unknown top-level key ${key}`);
-  if (!/^starci\/hfs-slots@\d+$/.test(String(m.schema))) bad.push('schema must be starci/hfs-slots@<major>');
-  if (!SEMVER.test(String(m.version))) bad.push('version must be MAJOR.MINOR.PATCH');
-  if (!isPlainObject(m.versioning) || !['patch', 'minor', 'major', 'pins'].every((k) => typeof m.versioning[k] === 'string')) bad.push('versioning needs patch, minor, major and pins text');
-  if (JSON.stringify(m.presenceValues) !== JSON.stringify(PRESENCE)) bad.push(`presenceValues must be ${PRESENCE.join(', ')}`);
-  if (JSON.stringify(m.trackedValues) !== JSON.stringify(TRACKED)) bad.push(`trackedValues must be ${TRACKED.join(', ')}`);
-  if (JSON.stringify(m.testValues) !== JSON.stringify(TESTS)) bad.push(`testValues must be ${TESTS.join(', ')}`);
-  if (JSON.stringify(m.editions) !== JSON.stringify(EDITIONS)) bad.push(`editions must be ${EDITIONS.join(', ')}`);
-  if (!isPlainObject(m.sides) || Object.keys(m.sides).sort(byCodeUnit).join() !== PROFILES.join()) bad.push('sides must be a map with exactly be and fe');
-  else for (const side of PROFILES) {
-    const def = m.sides[side];
-    if (!isPlainObject(def) || Object.keys(def).join() !== 'reads' || !Array.isArray(def.reads) || !def.reads.every((r) => typeof r === 'string' && /^[a-z][a-z0-9-]*\/([^/]+\/)+$/.test(r)) || new Set(def.reads).size !== def.reads.length) bad.push(`sides.${side} must be {reads: [unique <owner>/<dir>/ paths]}`);
-  }
-  if (m.triggerKinds !== undefined && (!Array.isArray(m.triggerKinds) || !m.triggerKinds.length || !m.triggerKinds.every((k) => NAME.test(String(k))) || new Set(m.triggerKinds).size !== m.triggerKinds.length)) bad.push('triggerKinds must be a non-empty list of unique names');
-  for (const key of ['appKinds', 'tiers']) {
-    if (!isPlainObject(m[key])) { bad.push(`${key} must be a map with be and fe`); continue; }
-    for (const extra of Object.keys(m[key])) if (!PROFILES.includes(extra)) bad.push(`${key}.${extra} is not a profile`);
-    for (const profile of PROFILES) if (!(profile in m[key])) bad.push(`${key}.${profile} is missing`);
-  }
-  for (const profile of PROFILES) {
-    const kinds = m.appKinds?.[profile];
-    if (kinds !== undefined && (!Array.isArray(kinds) || !kinds.length || !kinds.every((k) => NAME.test(String(k))) || new Set(kinds).size !== kinds.length)) bad.push(`appKinds.${profile} must be a non-empty list of unique names`);
-    const tiers = m.tiers?.[profile];
-    if (tiers === undefined) continue;
-    bad.push(...tierMapProblems(profile, tiers));
-  }
-  bad.push(...ruleParamsProblems(m));
-  if (!Array.isArray(m.slots) || !m.slots.length) { bad.push('slots must be a non-empty list'); return bad; }
-  m.slots.forEach((slot, index) => bad.push(...slotProblems(slot, index, APP_KIND, { appScope: APP_SCOPE, scopes: SCOPES })));
-  return bad;
-}
-
-/** The rules a JSON Schema cannot state: unique ids, tiers named and reachable, app kinds, variables, no duplicate pattern. */
-function manifestSemanticProblems(m) {
-  const bad = [];
-  const ids = new Set();
-  const claimed = new Map();
-  for (const slot of m.slots) {
-    if (ids.has(slot.id)) bad.push(`slot id ${slot.id} appears twice`);
-    ids.add(slot.id);
-    const pathVars = new Set(varsOf(slot.path));
-    for (const profile of slot.profiles) {
-      if (profile === APP_SCOPE) {
-        // The app root holds no source: its slots take no part in import checks and describe no app.
-        for (const key of ['appKind', 'owner', 'layers', 'kinds', 'composedBy', 'requiredWhen', 'requiredInstances']) if (slot[key] !== undefined) bad.push(`slot ${slot.id}: an app-root slot has no ${key}`);
-        if (slot.tier !== 'none') bad.push(`slot ${slot.id}: an app-root slot has tier none`);
-      } else {
-        const tiers = m.tiers[profile];
-        if (slot.tier !== 'none' && slot.tier !== 'inherit' && !(slot.tier in tiers)) bad.push(`slot ${slot.id}: tier ${slot.tier} is not a ${profile} tier`);
-        if (slot.appKind !== undefined && !m.appKinds[profile].includes(slot.appKind)) bad.push(`slot ${slot.id}: app kind ${slot.appKind} is not a ${profile} kind`);
-        bad.push(...triggerProblems(slot, m.triggerKinds));
-      }
-      if (slot.appKind === undefined) {
-        for (const variant of braceVariants(slot.path)) {
-          const key = `${profile}:${variant}`;
-          if (claimed.has(key)) bad.push(`slots ${claimed.get(key)} and ${slot.id} claim the same pattern ${variant} on ${profile}`);
-          else claimed.set(key, slot.id);
-        }
-      }
-    }
-    if (slot.appKind !== undefined && !pathVars.has('app')) bad.push(`slot ${slot.id}: an app-kind slot binds <app> in its path`);
-    if (slot.requiredWhen !== undefined && slot.presence !== 'required') bad.push(`slot ${slot.id}: requiredWhen belongs to a required slot`);
-    if (!slotInEdition(m, slot, 'lite') && (slot.litePresence !== undefined || slot.lite !== undefined)) bad.push(`slot ${slot.id}: litePresence/lite on a slot lite never sees (editions)`);
-    if (isPlainObject(slot.litePresence) && slot.profiles.includes(APP_SCOPE)) bad.push(`slot ${slot.id}: an app-root slot takes a bare litePresence, not a per-side map`);
-    for (const profile of slot.profiles) if (litePresenceOf(slot, profile) === 'forbidden' && typeof slot.goesTo !== 'string') bad.push(`slot ${slot.id}: forbidden in lite for ${profile}, so it says where the content goes (goesTo)`);
-    if (slot.lite?.path !== undefined) {
-      for (const name of varsOf(slot.lite.path)) if (!pathVars.has(name)) bad.push(`slot ${slot.id}: lite.path binds <${name}>, which the path does not`);
-      for (const variant of braceVariants(slot.lite.path)) {
-        try { compileVariant(slot, variant); } catch (error) { bad.push(`slot ${slot.id}: lite.path ${variant} does not compile (${error.message})`); }
-      }
-    }
-    for (const name of Object.keys(slot.requiredInstances ?? {})) if (!pathVars.has(name)) bad.push(`slot ${slot.id}: requiredInstances names <${name}>, which the path does not bind`);
-    for (const file of Object.values(slot.roles ?? {})) for (const name of varsOf(file)) if (!pathVars.has(name)) bad.push(`slot ${slot.id}: roles names <${name}> in ${file}, which the path does not bind`);
-    for (const entry of slot.requires ?? []) for (const name of varsOf(entry)) if (!pathVars.has(name)) bad.push(`slot ${slot.id}: requires ${entry} uses <${name}>, which the path does not bind`);
-    for (const variant of braceVariants(slot.path)) {
-      try { compileVariant(slot, variant); } catch (error) { bad.push(`slot ${slot.id}: pattern ${variant} does not compile (${error.message})`); }
-    }
-    for (const kind of slot.composedBy ?? []) if (!slot.profiles.every((p) => m.appKinds[p].includes(kind))) bad.push(`slot ${slot.id}: composedBy names ${kind}, which is not an app kind of every profile of the slot`);
-    if (slot.layers !== undefined && slot.tier !== 'none' && !slot.profiles.every((p) => m.tiers[p][slot.tier]?.lowerLayerOnly)) bad.push(`slot ${slot.id}: layers need a lowerLayerOnly tier`);
-  }
-  if (manifestKind(m) === RUNTIME_KIND) return [...bad, ...runtimeSemanticProblems(m)];
-  for (const side of PROFILES) for (const read of m.sides[side].reads) {
-    const [owner, ...rest] = read.split('/');
-    const below = rest.join('/');
-    if (owner === side) bad.push(`sides.${side}.reads names ${read}, which is its own side`);
-    // A side read is a path of the other side (be/contracts/); an app-root read (supabase/types/) names a tree an app slot owns.
-    else if (PROFILES.includes(owner)) {
-      if (!m.slots.some((s) => s.profiles.includes(owner) && s.presence !== 'forbidden' && braceVariants(s.path).some((v) => v.startsWith(below)))) bad.push(`sides.${side}.reads names ${read}, which no ${owner} slot owns`);
-    } else if (!m.slots.some((s) => s.profiles.includes(APP_SCOPE) && s.presence !== 'forbidden' && braceVariants(s.path).some((v) => v.startsWith(read)))) bad.push(`sides.${side}.reads names ${read}, which no app-root slot owns`);
-  }
-  for (const profile of PROFILES) {
-    for (const [tier, def] of Object.entries(m.tiers[profile])) {
-      for (const target of def.mayImport) if (!(target in m.tiers[profile])) bad.push(`tiers.${profile}.${tier}.mayImport names ${target}, which is not a ${profile} tier`);
-    }
-    for (const kind of m.appKinds[profile]) {
-      const owners = m.slots.filter((s) => s.profiles.includes(profile) && s.appKind === kind);
-      if (owners.length !== 1) bad.push(`${profile} app kind ${kind} must have exactly one slot (found ${owners.length})`);
-    }
-  }
-  const major = Number(m.version.split('.')[0]);
-  if (String(m.schema) !== `starci/hfs-slots@${major}`) bad.push(`schema ${m.schema} does not carry the major of version ${m.version}`);
-  return bad;
-}
-
 /**
  * The parsed and validated manifest. `text` (or `file`, or `root`) selects the source; the default is the runtime's own
  * knowledge/hfs/slots.yaml. A manifest that fails its shape or a semantic rule is refused whole (HFS_MANIFEST_INVALID).
@@ -269,7 +147,7 @@ export function loadSlotManifest({ root = skillRoot, file = path.join(root, HFS_
   let doc;
   try { doc = parseYaml(text ?? fs.readFileSync(file, 'utf8')); } catch (error) { fail('HFS_MANIFEST_INVALID', `the slot manifest cannot be read (${String(error?.message ?? error).split('\n')[0]})`, { file }); }
   const problems = manifestShapeProblems(doc);
-  if (!problems.length) problems.push(...manifestSemanticProblems(doc));
+  if (!problems.length) problems.push(...manifestSemanticProblems(doc, { varsOf, braceVariants, compileVariant }));
   if (problems.length) fail('HFS_MANIFEST_INVALID', `the slot manifest breaks its schema: ${problems.slice(0, 5).join('; ')}${problems.length > 5 ? '; and ' + (problems.length - 5) + ' more' : ''}`, { file, problems });
   const [major, minor, patch] = doc.version.split('.').map(Number);
   return Object.freeze({ ...doc, major, minor, patch });
@@ -278,21 +156,6 @@ export function loadSlotManifest({ root = skillRoot, file = path.join(root, HFS_
 // ------------------------------------------------------------------------------------- declaration
 
 const declarationInvalid = (problems, file) => fail('HFS_DECLARATION_INVALID', `hfs.json is refused: ${problems.slice(0, 5).join('; ')}${problems.length > 5 ? '; and ' + (problems.length - 5) + ' more' : ''}`, { file, problems });
-
-/** One side of a declaration checked against the manifest: app kinds of the profile, opt-in slots, required app kinds, reads. */
-function sideProblems(manifest, side, s) {
-  const bad = [];
-  for (const app of s.apps) if (!manifest.appKinds[side].includes(app.kind)) bad.push(`${side} app ${app.name} has kind ${app.kind}, which is not a ${side} kind (${manifest.appKinds[side].join(', ')})`);
-  bad.push(...optionalSlotProblems(manifest, side, s));
-  for (const read of s.reads ?? []) if (!manifest.sides[side].reads.includes(read)) bad.push(`sides.${side}.reads names ${read}; ${side} may read only ${manifest.sides[side].reads.join(', ') || 'nothing of the other side'}`);
-  const connections = s.connections ?? [];
-  for (const slot of manifest.slots) {
-    if (slot.appKind === undefined || !slot.profiles.includes(side) || slot.presence !== 'required') continue;
-    if (slot.requiredWhen === 'connections' && !connections.length) continue;
-    if (!s.apps.some((a) => a.kind === slot.appKind)) bad.push(`no ${side} app of kind ${slot.appKind} is declared (${slot.id} is required${slot.requiredWhen ? ' once a connection is declared' : ''})`);
-  }
-  return bad;
-}
 
 /**
  * A declaration checked against the manifest: kind app, the pinned major the manifest's (HFS_MANIFEST_MAJOR_MISMATCH otherwise,
@@ -423,7 +286,7 @@ function createScopeResolver(manifest, repo) {
     if (slot.presence !== 'opt-in') return true;
     return declaredSlotEnabled(slot, repo);
   };
-  const clean = (p) => posixPath(p).replace(/\/+$/, '');
+  const clean = cleanSlotPath;
 
   /** Every variant matching `p`, with its root and bindings, minus app-kind slots of another kind. */
   function matches(p, only) {
@@ -519,6 +382,44 @@ function createScopeResolver(manifest, repo) {
 
   const layerIndex = (slot, root) => (slot.layers ? slot.layers.findIndex((layer) => root.split('/').includes(layer)) : -1);
 
+  function unownedPathProblem(from, to) {
+    for (const side of [from, to]) {
+      if (side.status === 'no-slot') return { allowed: false, reason: 'unowned', code: side.code, path: side.path, nearest: side.nearest };
+    }
+    return null;
+  }
+
+  function unavailableSlotProblem(from, to) {
+    for (const side of [from, to]) {
+      if (side.status !== 'owned') return { allowed: false, reason: `slot${side.status[0].toUpperCase()}${side.status.slice(1).replace(/-(.)/g, (_, c) => c.toUpperCase())}`, path: side.path, slot: side.slot };
+    }
+    return null;
+  }
+
+  function sameOwnerUnit(side, owner) {
+    return owner ? `${owner.slot}:${owner.root}` : `${side.slot}:${side.root}`;
+  }
+
+  function lowerLayerProblem(from, to, fromTier, toTier, fromOwner, toOwner) {
+    if (manifest.tiers[profile][fromTier].lowerLayerOnly && fromTier === toTier) {
+      const fromSlot = byId.get((fromOwner ?? from).slot);
+      const a = layerIndex(fromSlot, fromOwner?.root ?? from.root);
+      const b = layerIndex(byId.get((toOwner ?? to).slot), toOwner?.root ?? to.root);
+      if (a >= 0 && b >= 0 && b <= a) return { allowed: false, reason: 'layerOrder', fromLayer: fromSlot.layers[a], toLayer: fromSlot.layers[b] };
+    }
+    return null;
+  }
+
+  function privateEntryProblem(to, toOwner) {
+    if (toOwner && repo.kind !== RUNTIME_KIND) {
+      const relative = to.path === toOwner.root ? '' : to.path.slice(toOwner.root.length + 1);
+      const ownerSlot = byId.get(toOwner.slot);
+      const entry = isEntryFile(relative) || (byId.get(to.slot).entries ?? []).includes(to.path.slice(to.root.length + 1)) || (ownerSlot.tier === 'package' && relative === 'src/index.ts') || (ownerSlot.tier === 'app' && relative === 'app.module.ts');
+      if (!entry) return { allowed: false, reason: 'notPublicEntry', owner: toOwner.root, path: to.path };
+    }
+    return null;
+  }
+
   /**
    * Whether `fromPath` may import `toPath`: {allowed, reason, ...}. Reasons: sameOwner, untiered, crossApp,
    * tierDirection, layerOrder, notPublicEntry, allowed, slotForbidden, slotNotEnabled, slotAmbiguous, and unowned (HFS_SLOT_UNDECLARED for the path no slot owns).
@@ -527,8 +428,10 @@ function createScopeResolver(manifest, repo) {
   function importAllowed(fromPath, toPath) {
     const from = classifyPath(fromPath);
     const to = classifyPath(toPath);
-    for (const side of [from, to]) if (side.status === 'no-slot') return { allowed: false, reason: 'unowned', code: side.code, path: side.path, nearest: side.nearest };
-    for (const side of [from, to]) if (side.status !== 'owned') return { allowed: false, reason: `slot${side.status[0].toUpperCase()}${side.status.slice(1).replace(/-(.)/g, (_, c) => c.toUpperCase())}`, path: side.path, slot: side.slot };
+    const unowned = unownedPathProblem(from, to);
+    if (unowned) return unowned;
+    const unavailable = unavailableSlotProblem(from, to);
+    if (unavailable) return unavailable;
     const fromTier = tierOf(from.path);
     const toTier = tierOf(to.path);
     if (fromTier === 'none' || toTier === 'none') return { allowed: true, reason: 'untiered' };
@@ -536,22 +439,13 @@ function createScopeResolver(manifest, repo) {
       return { allowed: false, reason: 'crossApp', from: from.bindings.app, to: to.bindings.app };
     const fromOwner = ownerOf(from.path);
     const toOwner = ownerOf(to.path);
-    const unit = (side, owner) => (owner ? `${owner.slot}:${owner.root}` : `${side.slot}:${side.root}`);
-    if (unit(from, fromOwner) === unit(to, toOwner)) return { allowed: true, reason: 'sameOwner' };
+    if (sameOwnerUnit(from, fromOwner) === sameOwnerUnit(to, toOwner)) return { allowed: true, reason: 'sameOwner' };
     if (!manifest.tiers[profile][fromTier]?.mayImport.includes(toTier)) return { allowed: false, reason: 'tierDirection', fromTier, toTier, mayImport: manifest.tiers[profile][fromTier]?.mayImport ?? [] };
-    if (manifest.tiers[profile][fromTier].lowerLayerOnly && fromTier === toTier) {
-      const fromSlot = byId.get((fromOwner ?? from).slot);
-      const a = layerIndex(fromSlot, fromOwner?.root ?? from.root);
-      const b = layerIndex(byId.get((toOwner ?? to).slot), toOwner?.root ?? to.root);
-      if (a >= 0 && b >= 0 && b <= a) return { allowed: false, reason: 'layerOrder', fromLayer: fromSlot.layers[a], toLayer: fromSlot.layers[b] };
-    }
+    const layerProblem = lowerLayerProblem(from, to, fromTier, toTier, fromOwner, toOwner);
+    if (layerProblem) return layerProblem;
     // A runtime owner is imported file by file (crossOwner of knowledge/hfs/runtime-slots.yaml): no public entry.
-    if (toOwner && repo.kind !== RUNTIME_KIND) {
-      const relative = to.path === toOwner.root ? '' : to.path.slice(toOwner.root.length + 1);
-      const ownerSlot = byId.get(toOwner.slot);
-      const entry = isEntryFile(relative) || (byId.get(to.slot).entries ?? []).includes(to.path.slice(to.root.length + 1)) || (ownerSlot.tier === 'package' && relative === 'src/index.ts') || (ownerSlot.tier === 'app' && relative === 'app.module.ts');
-      if (!entry) return { allowed: false, reason: 'notPublicEntry', owner: toOwner.root, path: to.path };
-    }
+    const privateEntry = privateEntryProblem(to, toOwner);
+    if (privateEntry) return privateEntry;
     return { allowed: true, reason: 'allowed', fromTier, toTier };
   }
 
@@ -569,6 +463,52 @@ function createScopeResolver(manifest, repo) {
     });
   }
 
+  function growBindings(combos, name, values) {
+    const next = [];
+    for (const combo of combos) {
+      for (const value of values) next.push({ ...combo, [name]: value });
+    }
+    combos.splice(0, combos.length, ...next);
+  }
+
+  function appendRequiredVariantPaths(slot, variant, paths, expandApps) {
+    const names = [...new Set(varsOf(variant))];
+    const fixed = { ...slot.requiredInstances };
+    const open = names.filter((name) => name !== 'app' && !(name in fixed));
+    if (open.length) return;
+    const combos = [{}];
+    if (names.includes('app')) growBindings(combos, 'app', expandApps(slot).map((app) => app.name));
+    for (const [name, values] of Object.entries(fixed)) growBindings(combos, name, values);
+    const isInstance = names.length > 0;
+    for (const bindings of combos) {
+      const target = fillVars(variant, bindings);
+      paths.push({ slot: slot.id, path: target, via: isInstance ? 'instance' : 'slot' });
+      const root = target.endsWith('/') ? target.slice(0, -1) : path.posix.dirname(target);
+      for (const entry of slot.requires ?? []) {
+        const rooted = entry.startsWith('/');
+        const filled = fillVars(rooted ? entry.slice(1) : entry, bindings);
+        paths.push({ slot: slot.id, path: rooted || !root || root === '.' ? filled : `${root}/${filled}`, via: 'requires' });
+      }
+    }
+  }
+
+  function appendRequiredSlotPaths(slot, paths, minimums, expandApps) {
+    if (slot.presence !== 'required' || !slotEnabled(slot)) return;
+    if (slot.requiredWhen === 'connections' && !repo.connections.length) return;
+    if (slot.minInstances) minimums.push({ slot: slot.id, min: slot.minInstances, ...(slot.appKind ? { appKind: slot.appKind } : {}) });
+    for (const variant of braceVariants(slot.path)) appendRequiredVariantPaths(slot, variant, paths, expandApps);
+  }
+
+  function uniqueRequiredPaths(paths) {
+    const seen = new Set();
+    return paths.filter((entry) => {
+      const key = `${entry.slot}|${entry.path}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+
   /**
    * What the repository must contain, without walking it: {paths: [{slot, path, via}], minimums: [{slot, min}]}.
    * via is slot (a fixed path), instance (a requiredInstances or app-kind root) or requires (a file an instance needs).
@@ -577,34 +517,8 @@ function createScopeResolver(manifest, repo) {
     const paths = [];
     const minimums = [];
     const expandApps = (slot) => repo.apps.filter((a) => slot.appKind === undefined || a.kind === slot.appKind);
-    for (const slot of slots) {
-      if (slot.presence !== 'required' || !slotEnabled(slot)) continue;
-      if (slot.requiredWhen === 'connections' && !repo.connections.length) continue;
-      if (slot.minInstances) minimums.push({ slot: slot.id, min: slot.minInstances, ...(slot.appKind ? { appKind: slot.appKind } : {}) });
-      for (const variant of braceVariants(slot.path)) {
-        const names = [...new Set(varsOf(variant))];
-        const fixed = { ...slot.requiredInstances };
-        const open = names.filter((n) => n !== 'app' && !(n in fixed));
-        if (open.length) continue;            // an instance-level slot: its instances are found by walking the tree
-        const combos = [{}];
-        const grow = (name, values) => { const next = []; for (const c of combos) { for (const v of values) { next.push({ ...c, [name]: v }); } } combos.splice(0, combos.length, ...next); };
-        if (names.includes('app')) grow('app', expandApps(slot).map((a) => a.name));
-        for (const [name, values] of Object.entries(fixed)) grow(name, values);
-        const isInstance = names.length > 0;
-        for (const bindings of combos) {
-          const target = fillVars(variant, bindings);
-          paths.push({ slot: slot.id, path: target, via: isInstance ? 'instance' : 'slot' });
-          const root = target.endsWith('/') ? target.slice(0, -1) : path.posix.dirname(target);
-          for (const entry of slot.requires ?? []) {
-            const rooted = entry.startsWith('/');
-            const filled = fillVars(rooted ? entry.slice(1) : entry, bindings);
-            paths.push({ slot: slot.id, path: rooted || !root || root === '.' ? filled : `${root}/${filled}`, via: 'requires' });
-          }
-        }
-      }
-    }
-    const seen = new Set();
-    return { paths: paths.filter((p) => { const key = `${p.slot}|${p.path}`; if (seen.has(key)) { return false; } seen.add(key); return true; }), minimums };
+    for (const slot of slots) appendRequiredSlotPaths(slot, paths, minimums, expandApps);
+    return { paths: uniqueRequiredPaths(paths), minimums };
   }
 
   /** tracked | ignored | external for the slot owning `p`, or null when no slot owns it. */
@@ -644,7 +558,7 @@ export function createSlotResolver(manifest, repo) {
   // side's connection with that provider: the root scope reads the union of the sides' connections.
   const root = createScopeResolver(manifest, { ...repo, connections: SIDES.flatMap((side) => repo.sides[side].connections) });
   const sides = Object.fromEntries(PROFILES.map((side) => [side, createScopeResolver(manifest, repo.sides[side])]));
-  const clean = (p) => posixPath(p).replace(/\/+$/, '');
+  const clean = cleanSlotPath;
   /** { side, rest } when `p` lies below a side folder, else null. */
   const split = (input) => {
     const p = clean(input);
@@ -731,141 +645,3 @@ export function openHfs({ root = skillRoot, repoRoot, declaration, side = null, 
   const repo = declaration !== undefined ? resolveRepoDeclaration(manifest, declaration, { side }) : readRepoDeclaration(manifest, repoRoot);
   return { manifest, repo, ...createSlotResolver(manifest, repo), rules: () => loadRuleCatalog({ root, manifest }) };
 }
-
-// ------------------------------------------------------------------------------------------ rule catalog
-
-const HFS_RULES_FILE = 'knowledge/hfs/rules.yaml';
-const RULE_GATES = Object.freeze(['pre-commit', 'pre-push', 'settle', 'land', 'ci', 'sonar', 'runtime']);
-const ENFORCER_FAMILIES = Object.freeze(['eslint-be', 'eslint-fe', 'stylelint', 'machine', 'hfs', 'work-validate', 'sonar', 'runtime']);
-const RULE_KINDS = Object.freeze(['codemod', 'lint', 'check', 'design']);
-const FINDING_CODE = /^[A-Z][A-Z0-9]*(_[A-Z0-9]+)+$/;
-const ENFORCER_ID = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
-const FILE_ENFORCERS = new Set(['machine', 'hfs', 'work-validate', 'sonar', 'runtime']);
-
-/** Shape and semantic problems of a parsed knowledge/hfs/rules.yaml, in the words of modules/schemas/hfs-rules.schema.yaml. */
-function ruleCatalogProblems(d) {
-  const bad = [];
-  if (!isPlainObject(d)) return ['the rule catalog is not a map'];
-  for (const key of Object.keys(d)) if (!['schema', 'version', 'gates', 'enforcerKinds', 'rules'].includes(key)) bad.push(`unknown top-level key ${key}`);
-  const schemaOk = /^starci\/hfs-rules@\d+$/.test(String(d.schema));
-  if (!schemaOk) bad.push('schema must be starci/hfs-rules@<major>');
-  if (!SEMVER.test(String(d.version))) bad.push('version must be MAJOR.MINOR.PATCH');
-  else if (schemaOk && d.schema.split('@')[1] !== d.version.split('.')[0]) bad.push('the major of version must equal the number after @ in schema');
-  const vocabulary = (key, names) => {
-    if (!isPlainObject(d[key])) { bad.push(`${key} must be a map`); return; }
-    if (JSON.stringify(Object.keys(d[key])) !== JSON.stringify(names)) bad.push(`${key} must list exactly ${names.join(', ')} in that order`);
-    for (const [name, text] of Object.entries(d[key])) if (typeof text !== 'string' || !text.trim()) bad.push(`${key}.${name} needs a description`);
-  };
-  vocabulary('gates', RULE_GATES);
-  vocabulary('enforcerKinds', ENFORCER_FAMILIES);
-  if (!Array.isArray(d.rules) || !d.rules.length) { bad.push('rules must be a non-empty list'); return bad; }
-  const codeOwner = new Map();
-  d.rules.forEach((r, index) => {
-    const at = `rules[${index}]`;
-    if (!isPlainObject(r)) { bad.push(`${at} is not a map`); return; }
-    const label = typeof r.id === 'string' ? r.id : at;
-    for (const key of Object.keys(r)) if (!['id', 'code', 'law', 'scope', 'kinds', 'gates', 'failureCodes', 'editions', 'enforcers'].includes(key)) bad.push(`${label} has unknown key ${key}`);
-    // Ids are unique and increase; a gap between two of them is fine.
-    if (!/^R\d{2,3}$/.test(String(r.id))) bad.push(`${at}.id must be R<two or three digits>`);
-    else if (index > 0 && typeof d.rules[index - 1]?.id === 'string' && Number(r.id.slice(1)) <= Number(d.rules[index - 1].id.slice(1))) bad.push(`${label} is out of order: ids must increase, and ${d.rules[index - 1].id} comes before it`);
-    if (!FINDING_CODE.test(String(r.code))) bad.push(`${label}.code must be an UPPER_SNAKE finding code`);
-    if (typeof r.law !== 'string' || !r.law.trim()) bad.push(`${label}.law is missing`);
-    if (typeof r.law === 'string' && r.law.includes('\n')) bad.push(`${label}.law must be one line`);
-    if (r.scope !== undefined && r.scope !== 'runtime') bad.push(`${label}.scope is absent or runtime`);
-    const enumList = (key, allowed) => {
-      if (!Array.isArray(r[key]) || !r[key].length) { bad.push(`${label}.${key} must be a non-empty list`); return []; }
-      for (const v of r[key]) if (!allowed.includes(v)) bad.push(`${label}.${key} has ${JSON.stringify(v)}, not one of ${allowed.join(', ')}`);
-      if (new Set(r[key]).size !== r[key].length) bad.push(`${label}.${key} repeats a value`);
-      return r[key];
-    };
-    enumList('kinds', RULE_KINDS);
-    bad.push(...ruleEditionProblems(r, label));
-    const gates = enumList('gates', RULE_GATES);
-    if (gates.length) {
-      if (!gates.includes('land')) bad.push(`${label} must run at the land gate (every rule does)`);
-      if (gates.includes('pre-commit') && !gates.includes('pre-push')) bad.push(`${label} runs at pre-commit, so it also runs at pre-push`);
-    }
-    if (!Array.isArray(r.failureCodes) || !r.failureCodes.length || !r.failureCodes.every((c) => FINDING_CODE.test(String(c)))) bad.push(`${label}.failureCodes must be a non-empty list of UPPER_SNAKE codes`);
-    else {
-      if (r.failureCodes[0] !== r.code) bad.push(`${label}.failureCodes must start with the rule's own code ${r.code}`);
-      if (new Set(r.failureCodes).size !== r.failureCodes.length) bad.push(`${label}.failureCodes repeats a code`);
-      for (const c of r.failureCodes) {
-        if (codeOwner.has(c) && codeOwner.get(c) !== label) bad.push(`${label} names ${c}, which ${codeOwner.get(c)} already owns`);
-        codeOwner.set(c, label);
-      }
-    }
-    if (!Array.isArray(r.enforcers) || !r.enforcers.length) { bad.push(`${label}.enforcers must name at least one enforcer`); return; }
-    const seen = new Set();
-    r.enforcers.forEach((e, n) => {
-      const eat = `${label}.enforcers[${n}]`;
-      if (!isPlainObject(e)) { bad.push(`${eat} is not a map`); return; }
-      for (const key of Object.keys(e)) if (!['kind', 'id', 'status', 'at', 'editions'].includes(key)) bad.push(`${eat} has unknown key ${key}`);
-      bad.push(...ruleEditionProblems(e, eat));
-      if (!ENFORCER_FAMILIES.includes(e.kind)) bad.push(`${eat}.kind must be one of ${ENFORCER_FAMILIES.join(', ')}`);
-      if (!ENFORCER_ID.test(String(e.id))) bad.push(`${eat}.id must be kebab-case`);
-      if (seen.has(`${e.kind}:${e.id}`)) bad.push(`${eat} repeats ${e.kind}:${e.id}`);
-      seen.add(`${e.kind}:${e.id}`);
-      if (e.status !== undefined && e.status !== 'planned') bad.push(`${eat}.status is either absent or planned`);
-      if (e.at !== undefined) {
-        if (typeof e.at !== 'string' || !e.at.trim() || e.at.startsWith('/') || e.at.includes('..')) bad.push(`${eat}.at must be a repository-relative path`);
-        if (e.status === 'planned') bad.push(`${eat} is planned, so it has no file yet (at)`);
-        if (!FILE_ENFORCERS.has(e.kind)) bad.push(`${eat}.at belongs to a machine, hfs, work-validate, sonar or runtime enforcer only`);
-      } else if (FILE_ENFORCERS.has(e.kind) && e.status !== 'planned') bad.push(`${eat} exists, so it names the file (at) that emits its code`);
-    });
-    if (Array.isArray(r.gates)) {
-      const hasSonar = r.enforcers.some((e) => isPlainObject(e) && e.kind === 'sonar');
-      if (r.gates.includes('sonar') !== hasSonar) bad.push(`${label}: the sonar gate and a sonar enforcer go together`);
-    }
-  });
-  return bad;
-}
-
-const deepFreeze = (v) => { if (v && typeof v === 'object') { Object.values(v).forEach(deepFreeze); } return Object.freeze(v); };
-
-/**
- * The parsed and validated HFS rule catalog. `text` (or `file`, or `root`) selects the source; the default is the runtime's
- * own knowledge/hfs/rules.yaml. A catalog that breaks its shape or a semantic rule is refused whole (HFS_RULES_INVALID), and
- * so is one whose major differs from the slot manifest passed as `manifest` (HFS_MANIFEST_MAJOR_MISMATCH).
- * Answers: rule(id), byCode(code), forGate(gate), forEnforcer(kind, id), planned() and unbuilt().
- */
-export function loadRuleCatalog({ root = skillRoot, file = path.join(root, HFS_RULES_FILE), text, manifest } = {}) {
-  let doc;
-  try { doc = parseYaml(text ?? fs.readFileSync(file, 'utf8')); } catch (error) { fail('HFS_RULES_INVALID', `the rule catalog cannot be read (${String(error?.message ?? error).split('\n')[0]})`, { file }); }
-  const problems = ruleCatalogProblems(doc);
-  if (problems.length) { fail('HFS_RULES_INVALID', `the rule catalog breaks its schema: ${problems.slice(0, 5).join('; ')}${problems.length > 5 ? '; and ' + (problems.length - 5) + ' more' : ''}`, { file, problems }); }
-  const [major, minor, patch] = doc.version.split('.').map(Number);
-  if (manifest && manifest.major !== major) fail('HFS_MANIFEST_MAJOR_MISMATCH', `the rule catalog is major ${major} but the slot manifest is major ${manifest.major}`, { catalog: major, manifest: manifest.major });
-  const list = deepFreeze(doc.rules.map((r) => ({ ...r, enforcers: r.enforcers.map((e) => ({ ...e, planned: e.status === 'planned' })) })));
-  const byId = new Map(list.map((r) => [r.id, r]));
-  const byCode = new Map(list.flatMap((r) => r.failureCodes.map((c) => [c, r])));
-  return Object.freeze({
-    version: doc.version, major, minor, patch,
-    gates: deepFreeze(structuredClone(doc.gates)),
-    enforcerKinds: deepFreeze(structuredClone(doc.enforcerKinds)),
-    rules: list,
-    /** The rule with this id (R01..), or null. */
-    rule: (id) => byId.get(id) ?? null,
-    /** The rule that owns this failure code (its own or a sub-check code), or null. */
-    byCode: (code) => byCode.get(code) ?? null,
-    /** Whether a finding code is judged under `edition`: a code of a rule that names `editions` without it is not (a code outside the catalog always is). */
-    judgedIn: (code, edition = 'full') => judgedInEdition(byCode.get(code), edition),
-    enforcerJudgedIn: (kind, id, edition = 'full') => enforcerJudgedInEdition(list, kind, id, edition),
-    /** The rules that run at a gate. */
-    forGate: (gate) => list.filter((r) => r.gates.includes(gate)),
-    /** The catalogued why code of a lint finding's rule id (`starci-be/<id>`, `starci-fe/<id>`), or undefined. */
-    lintCode: (ruleId) => {
-      const [plugin, id] = String(ruleId ?? '').split('/');
-      const kind = (plugin === 'starci-be' && 'eslint-be') || (plugin === 'starci-fe' && 'eslint-fe') || null;
-      return kind ? list.find((r) => r.enforcers.some((e) => e.kind === kind && e.id === id))?.code : undefined;
-    },
-    /** The rules one enforcer judges, e.g. forEnforcer('eslint-be', 'error-home'). */
-    forEnforcer: (kind, id) => list.filter((r) => r.enforcers.some((e) => e.kind === kind && e.id === id)),
-    /** Every enforcer still owed, as {rule, kind, id}. */
-    planned: () => list.flatMap((r) => r.enforcers.filter((e) => e.planned).map((e) => ({ rule: r.id, kind: e.kind, id: e.id }))),
-    /** The rules with no existing enforcer at all. */
-    unbuilt: () => list.filter((r) => r.enforcers.every((e) => e.planned)),
-  });
-}
-
-/** The rules of this runtime's catalog, frozen, in id order. */
-export const rules = (options) => loadRuleCatalog(options).rules;

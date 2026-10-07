@@ -73,22 +73,25 @@ function selectedProfile(opts) {
 // canonical write; claude/devin emit copies of the same template only when the host names them (`--hosts claude,devin` or `all`).
 const HOST_BOOTSTRAP_NAMES = Object.values(HOST_BOOTSTRAP_FILES);
 
+function parseInstallArgument(out, argv, index) {
+  const arg = argv[index];
+  if (arg === '--dir') out.dir = path.resolve(argv[index + 1] ?? '.');
+  else if (arg.startsWith('--dir=')) out.dir = path.resolve(arg.slice(6));
+  else if (arg === '--profile') out.profile = argv[index + 1];
+  else if (arg.startsWith('--profile=')) out.profile = arg.slice(10);
+  else if (arg === '--hosts') out.hosts = parseHosts(argv[index + 1]);
+  else if (arg.startsWith('--hosts=')) out.hosts = parseHosts(arg.slice(8));
+  else if (arg === '--force') out.force = true;
+  else if (arg === '--quick') out.quick = true;
+  else if (arg === '--no-bootstrap') out.bootstrap = false;
+  else if (arg === '-h' || arg === '--help') out.command = 'help';
+  else throw new Error(`unknown argument ${arg}`);
+  return ['--dir', '--profile', '--hosts'].includes(arg) ? index + 1 : index;
+}
+
 function parseArgs(argv) {
   const out = { command: argv[0] ?? 'help', dir: process.cwd(), force: false, quick: false, bootstrap: true, hosts: [] };
-  for (let i = 1; i < argv.length; i += 1) {
-    const a = argv[i];
-    if (a === '--dir') out.dir = path.resolve(argv[++i] ?? '.');
-    else if (a.startsWith('--dir=')) out.dir = path.resolve(a.slice(6));
-    else if (a === '--profile') out.profile = argv[++i];
-    else if (a.startsWith('--profile=')) out.profile = a.slice(10);
-    else if (a === '--hosts') out.hosts = parseHosts(argv[++i]);
-    else if (a.startsWith('--hosts=')) out.hosts = parseHosts(a.slice(8));
-    else if (a === '--force') out.force = true;
-    else if (a === '--quick') out.quick = true;
-    else if (a === '--no-bootstrap') out.bootstrap = false;
-    else if (a === '-h' || a === '--help') out.command = 'help';
-    else throw new Error(`unknown argument ${a}`);
-  }
+  for (let i = 1; i < argv.length; i += 1) i = parseInstallArgument(out, argv, i);
   if (out.profile !== undefined && out.profile !== 'full') throw new Error('only the full profile exists');
   if (argv.includes('--profile') && out.profile === undefined) throw new Error('--profile requires a value of full');
   return out;
@@ -194,45 +197,68 @@ function stalePlan(target, manifest) {
   const current = new Set(payloadFiles(packageRoot));
   const remove = [], preserved = [];
   for (const [relative, originalHash] of Object.entries(manifest?.files ?? {})) {
-    if (typeof relative !== 'string' || relative.includes('\\') || relative.includes(':') || path.isAbsolute(relative) || relative.split('/').some(part => !part || part === '.' || part === '..')) throw new Error('invalid installed manifest path; refusing cleanup before writes');
+    validateStaleManifestPath(relative);
     // A prior payload claim cannot authorize reading or deleting currently excluded local custody.
     if (PRESERVED_ROOTS.has(relative.split('/')[0]) || INSTALLED_IGNORES.includes('/' + relative) || isNegated(relative)) { preserved.push(relative); continue; }
     if (current.has(relative)) continue;
     if (relative.split('/').includes('.git')) { preserved.push(relative); continue; }
-    let cursor = target, missing = false;
-    for (const part of relative.split('/')) {
-      cursor = path.join(cursor, part);
-      const stat = lstatSync(cursor, { throwIfNoEntry: false });
-      if (!stat) { missing = true; break; }
-      if (stat.isSymbolicLink()) throw new Error('stale manifest path uses a symlink/junction; refusing cleanup before writes');
-    }
-    if (missing) continue;
-    if (!statSync(cursor).isFile()) throw new Error('stale manifest entry must name an owned file, not a directory');
-    if (manifest?.keptLocal?.includes(relative) || sha(cursor, relative) !== originalHash) preserved.push(relative);
-    else remove.push({ relative, file: cursor, hash: originalHash });
+    const candidate = staleCandidate(target, relative, originalHash, manifest);
+    if (candidate === 'preserved') preserved.push(relative);
+    else if (candidate) remove.push(candidate);
   }
   return { remove, preserved: [...new Set(preserved)] };
 }
+
+function validateStaleManifestPath(relative) {
+  if (typeof relative !== 'string' || relative.includes('\\') || relative.includes(':') || path.isAbsolute(relative) || relative.split('/').some(part => !part || part === '.' || part === '..')) throw new Error('invalid installed manifest path; refusing cleanup before writes');
+}
+
+function staleCandidate(target, relative, originalHash, manifest) {
+  let cursor = target, missing = false;
+  for (const part of relative.split('/')) {
+    cursor = path.join(cursor, part);
+    const stat = lstatSync(cursor, { throwIfNoEntry: false });
+    if (!stat) { missing = true; break; }
+    if (stat.isSymbolicLink()) throw new Error('stale manifest path uses a symlink/junction; refusing cleanup before writes');
+  }
+  if (missing) return null;
+  if (!statSync(cursor).isFile()) throw new Error('stale manifest entry must name an owned file, not a directory');
+  if (manifest?.keptLocal?.includes(relative) || sha(cursor, relative) !== originalHash) return 'preserved';
+  return { relative, file: cursor, hash: originalHash };
+}
+
+function assertStalePathHasNoLinks(target, relative) {
+  let cursor = target;
+  for (const part of relative.split('/')) {
+    cursor = path.join(cursor, part);
+    if (lstatSync(cursor, { throwIfNoEntry: false })?.isSymbolicLink()) throw new Error('stale target changed to a symlink/junction after planning; stopped cleanup');
+  }
+}
+
+function removeOwnedStaleFile(item) {
+  const stat = lstatSync(item.file, { throwIfNoEntry: false });
+  if (!stat) return true;
+  if (stat.isSymbolicLink() || !stat.isFile() || sha(item.file, item.relative) !== item.hash) return false;
+  rmSync(item.file);
+  return true;
+}
+
+function removeEmptyStaleParents(target, file) {
+  let directory = path.dirname(file);
+  while (directory !== target && path.relative(target, directory) && !path.relative(target, directory).startsWith('..')) {
+    try { rmdirSync(directory); } catch { break; }
+    directory = path.dirname(directory);
+  }
+}
+
 function removeStaleFiles(target, plan) {
   const removed = [], preserved = [...plan.preserved];
   for (const item of plan.remove) {
-    let cursor = target;
-    for (const part of item.relative.split('/')) {
-      cursor = path.join(cursor, part);
-      if (lstatSync(cursor, { throwIfNoEntry: false })?.isSymbolicLink()) throw new Error('stale target changed to a symlink/junction after planning; stopped cleanup');
-    }
-    const stat = lstatSync(item.file, { throwIfNoEntry: false });
+    assertStalePathHasNoLinks(target, item.relative);
     // Payload copy may already have replaced an unshipped nested file.
-    if (stat) {
-      if (stat.isSymbolicLink() || !stat.isFile() || sha(item.file, item.relative) !== item.hash) { preserved.push(item.relative); continue; }
-      rmSync(item.file);
-    }
+    if (!removeOwnedStaleFile(item)) { preserved.push(item.relative); continue; }
     removed.push(item.relative);
-    let directory = path.dirname(item.file);
-    while (directory !== target && path.relative(target, directory) && !path.relative(target, directory).startsWith('..')) {
-      try { rmdirSync(directory); } catch { break; }
-      directory = path.dirname(directory);
-    }
+    removeEmptyStaleParents(target, item.file);
   }
   return { removedStale: removed, preservedStale: [...new Set(preserved)] };
 }

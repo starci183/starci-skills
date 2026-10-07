@@ -58,6 +58,25 @@ const LIST_MAX = 500;
 
 const sizeOf = (p) => { try { return fs.statSync(p).size; } catch { return null; } };
 
+function pruneMachineLogs({ dbFile, apply, machineOpen, env, now, out, fail }) {
+  let state = 'absent';
+  if (fs.existsSync(dbFile)) state = apply ? 'pending' : 'dry-run';
+  out.report.machineLogs = { file: dbFile, state, deleted: 0 };
+  if (apply && fs.existsSync(dbFile)) {
+    let machine;
+    try { machine = machineOpen({ file: dbFile, env, now: () => now }); out.report.machineLogs.deleted = Number(machine.pruneLogs()); out.report.machineLogs.state = 'pruned'; }
+    catch (error) { out.report.machineLogs.state = 'failed'; fail(dbFile, error); }
+    finally { try { machine?.close(); } catch { /* closed */ } }
+  }
+}
+
+function removeEmptyDirs(dirs, apply) {
+  for (let i = dirs.length - 1; i >= 0; i -= 1) {
+    if (!apply) continue;
+    try { fs.rmdirSync(dirs[i]); } catch { /* not empty or not ours to remove */ }
+  }
+}
+
 /**
  * Sweep the log roots. `allocation` is the runtimes.yaml allocation block (default: the real one);
  * only housekeeping.logMaxAgeMs / housekeeping.logCapBytes are read from it. With apply=false nothing
@@ -87,21 +106,20 @@ export async function sweepStarciLogs({ apply = false, now = Date.now(), env = p
 
   const skip = (p, reason) => push('skipped', { path: p, reason });
   const fail = (p, error) => { out.ok = false; push('errors', { path: p, code: error?.code ?? 'ERROR', message: String(error?.message ?? error) }); };
+  const handleLogError = (p, error) => {
+    if (error?.code === 'ENOENT') { skip(p, 'gone'); return; }
+    if (BUSY.has(error?.code)) { skip(p, error.code); return; }
+    fail(p, error);
+  };
   // Use the existing machine log retention owner; never create a missing DB to prune it.
   const dbFile=machineFile??machineFileFor(env);
-  out.report.machineLogs={file:dbFile,state:fs.existsSync(dbFile)?(apply?'pending':'dry-run'):'absent',deleted:0};
-  if(apply&&fs.existsSync(dbFile)){
-    let machine;
-    try{machine=machineOpen({file:dbFile,env,now:()=>now});out.report.machineLogs.deleted=Number(machine.pruneLogs());out.report.machineLogs.state='pruned';}
-    catch(error){out.report.machineLogs.state='failed';fail(dbFile,error);}
-    finally{try{machine?.close();}catch{/* closed */}}
-  }
+  pruneMachineLogs({ dbFile, apply, machineOpen, env, now, out, fail });
   const unlink = (p, st) => {
     if (artifactHoldOf(p, { env })) { skip(p, 'indexed-job-artifact'); return; }
     const entry = { path: p, bytes: st.size, ...(apply ? {} : { dry: true }) };
     if (!apply) { push('deleted', entry); out.freedBytes += st.size; return; }
     try { fs.unlinkSync(p); push('deleted', entry); out.freedBytes += st.size; }
-    catch (error) { error?.code === 'ENOENT' ? skip(p, 'gone') : BUSY.has(error?.code) ? skip(p, error.code) : fail(p, error); }
+    catch (error) { handleLogError(p, error); }
   };
   // The established cap: rename to <file>.1 like rotateLog (keep-tail truncation is used nowhere in
   // this codebase). The bytes move to the sibling — freedBytes counts only the .1 it replaces.
@@ -111,7 +129,7 @@ export async function sweepStarciLogs({ apply = false, now = Date.now(), env = p
     const entry = { path: p, fromBytes: st.size, toBytes: 0, via: 'rename-.1', rotatedTo: sibling, freedBytes: replaced, ...(apply ? {} : { dry: true }) };
     if (!apply) { push('truncated', entry); out.freedBytes += replaced; return; }
     try { rotateLog(p, { cap: capBytes }); push('truncated', entry); out.freedBytes += replaced; }
-    catch (error) { error?.code === 'ENOENT' ? skip(p, 'gone') : BUSY.has(error?.code) ? skip(p, error.code) : fail(p, error); }
+    catch (error) { handleLogError(p, error); }
   };
 
   // One recursive walk: never into a link, never into .git/node_modules, never inside a git
@@ -160,11 +178,7 @@ export async function sweepStarciLogs({ apply = false, now = Date.now(), env = p
     if (st.mtimeMs < cutoff) unlink(p, st);
   };
   for (const name of ['terminal-history', 'logs']) sweepRoot(path.join(orcaRoot, name), orcaFile, orcaDirs);
-  for (let i = orcaDirs.length - 1; i >= 0; i -= 1) {
-    const dir = orcaDirs[i];
-    if (!apply) continue;
-    try { fs.rmdirSync(dir); } catch { /* not empty or not ours to remove */ }
-  }
+  removeEmptyDirs(orcaDirs, apply);
 
   const db = path.join(orcaRoot, 'orchestration.db');
   out.report.orchestrationDbBytes = sizeOf(db);
@@ -176,6 +190,6 @@ export async function sweepStarciLogs({ apply = false, now = Date.now(), env = p
     'machine_logs uses the existing machine.pruneLogs policy during apply (debug 14 days, other logs 90 days). Dry runs leave the machine database unopened.',
     'action, call, probe, metric, notification and event histories have no general retention budget here; this sweep does not delete semantic history or unidentified databases.',
   ];
-  if (Object.values(overflow).some((n) => n)) out.report.overflow = overflow;
+  if (Object.values(overflow).some(Boolean)) out.report.overflow = overflow;
   return out;
 }

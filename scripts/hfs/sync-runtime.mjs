@@ -42,6 +42,9 @@ const IMPORT_SPEC = /(?:\bfrom\s+|\bimport\s*\(\s*|\bimport\s+)['"](\.[^'"]+)['"
 /** A read of the DDL of one store: `schema/runtime.sql` or `schema/machine.sql`. */
 const SCHEMA_STORE = /schema[/'", ]+(runtime|machine)\.sql/g;
 const URL_SPEC = /new URL\(\s*['"](\.[^'"]+\.ya?ml)['"]\s*,\s*import\.meta\.url/g;
+const WHITESPACE = '\\s';
+const END = '$';
+const TRAILING_WHITESPACE = new RegExp(`${WHITESPACE}+${END}`);
 
 /** The runtime-relative files reachable from `entries` through relative imports and `new URL(..., import.meta.url)` reads. */
 export function importClosure(entries) {
@@ -88,7 +91,7 @@ export const BUNDLES = Object.freeze({
 /** The catalog entries for `codes`, in the catalog's own text, keyed by top-level line. */
 function catalogSlice(text, codes) {
   const blocks = text.replaceAll('\r\n', '\n').split(/\n(?=[A-Za-z][A-Za-z0-9_-]*:\n)/);
-  const byCode = new Map(blocks.map((b) => [b.slice(0, b.indexOf(':')), b.replace(/\s+$/, '')]));
+  const byCode = new Map(blocks.map((b) => [b.slice(0, b.indexOf(':')), b.replace(TRAILING_WHITESPACE, '')]));
   return `${[...codes].sort(byCodeUnit).map((code) => {
     if (!byCode.has(code)) throw new Error(`${CATALOG} has no entry for ${code}`);
     return byCode.get(code);
@@ -110,22 +113,31 @@ const listed = (dir, base = dir) => fs.readdirSync(dir, { withFileTypes: true })
 /** The finding code of a generated copy that differs from what this script writes (rule R121, judged by scripts/hfs/runtime-check.mjs). */
 export const GENERATED_DRIFT = 'RT_GENERATED_DRIFT';
 
+function bundleDrift(root, bundle) {
+  const bundleRoot = path.join(root, bundle);
+  const expected = expectedBundle(bundle, root);
+  const problems = [];
+  for (const [file, text] of expected) {
+    const target = path.join(bundleRoot, file);
+    if (!fs.existsSync(target)) problems.push(`missing ${bundle}/${file}`);
+    else if (fs.readFileSync(target, 'utf8').replaceAll('\r\n', '\n') !== text.replaceAll('\r\n', '\n')) problems.push(`stale ${bundle}/${file}`);
+  }
+  if (fs.existsSync(bundleRoot)) for (const file of listed(bundleRoot)) if (!expected.has(file)) problems.push(`extra ${bundle}/${file}`);
+  return problems;
+}
+
+function uiCatalogDrift(root) {
+  const target = path.join(root, UI_CATALOG_FILE);
+  if (!fs.existsSync(target)) return [`missing ${UI_CATALOG_FILE}`];
+  if (fs.readFileSync(target, 'utf8').replaceAll('\r\n', '\n') !== uiCatalogText(root)) return [`stale ${UI_CATALOG_FILE}`];
+  return [];
+}
+
 /** Differences of the package copies and generated UI catalog from the same root's canonical inputs. Never writes. */
 export function driftOfRuntime(root = runtimeRoot) {
   const problems = [];
-  for (const bundle of Object.keys(BUNDLES)) {
-    const bundleRoot = path.join(root, bundle);
-    const expected = expectedBundle(bundle, root);
-    for (const [file, text] of expected) {
-      const target = path.join(bundleRoot, file);
-      if (!fs.existsSync(target)) problems.push(`missing ${bundle}/${file}`);
-      else if (fs.readFileSync(target, 'utf8').replaceAll('\r\n', '\n') !== text.replaceAll('\r\n', '\n')) problems.push(`stale ${bundle}/${file}`);
-    }
-    if (fs.existsSync(bundleRoot)) for (const file of listed(bundleRoot)) if (!expected.has(file)) problems.push(`extra ${bundle}/${file}`);
-  }
-  const target = path.join(root, UI_CATALOG_FILE);
-  if (!fs.existsSync(target)) problems.push(`missing ${UI_CATALOG_FILE}`);
-  else if (fs.readFileSync(target, 'utf8').replaceAll('\r\n', '\n') !== uiCatalogText(root)) problems.push(`stale ${UI_CATALOG_FILE}`);
+  for (const bundle of Object.keys(BUNDLES)) problems.push(...bundleDrift(root, bundle));
+  problems.push(...uiCatalogDrift(root));
   return problems;
 }
 
