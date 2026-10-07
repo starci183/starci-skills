@@ -16332,3 +16332,12 @@ op-incident-escalate-owner:
   nextStep_vi: "Chủ dự án trả lời câu hỏi hoặc quyết định tiếp; việc bị giữ chỉ là job bị ảnh hưởng."
   owner: owner
   kind: runtime-fault
+pin-lineage-excluded:
+  title: "A pinned agent was excluded for this job by its history"
+  title_vi: "Agent được ghim đã bị loại cho job này theo lịch sử"
+  meaning_vi: "Lệnh dispatch --model chỉ định một agent mà lịch sử khởi chạy và thử lại của chính job đã loại; chỉ quyết định op-override do Kernel ghi mới được phép vượt qua."
+  causes_vi:
+    - "Agent đó đã từ chối khởi chạy hoặc làm hỏng job này đến giới hạn loại trừ"
+  nextStep_vi: "Bỏ --model để route chọn thành viên kế tiếp, hoặc ghi starci kernel op-override với quyết định rõ ràng."
+  owner: op-retry
+  kind: verb-refusal

@@ -27,6 +27,16 @@ import { ENV_GATED_OPS } from '../../verify-failure.mjs';
 import { readEnv } from '../../../lib/env.mjs';
 import { admitPacket, captureDispatchInputs } from '../../dispatch-admission.mjs';
 import { refuseVerb } from './verb-exit.mjs';
+import { lineageRouteAdjust } from '../../lineage-route.mjs';
+
+/** An explicit --model pin the job's lineage excluded needs the Kernel's recorded op-override decision naming that pool. */
+function refuseExcludedPin(d, model) {
+  const { args, db, job, op, payload } = d;
+  if (!args.model) return;
+  const excluded = lineageRouteAdjust(db, job)?.exclude ?? [];
+  if (!excluded.includes(model.target) || kernelOverrideFor(db, job.workflow_id, op, payload)?.model === model.target) return;
+  throw Object.assign(new Error(`--model ${model.target} is excluded for ${job.job_id} by its launch and retry history; record the pin with starci kernel op-override --op ${op} --set '{"model":"${model.target}"}' --decision <id> to overrule it, or dispatch without --model`), { code: 'pin-lineage-excluded' });
+}
 
 /** The launch model, the order its kind may launch in, the brief on disk and the host tools the model lacks. */
 export function planModel(d) {
@@ -34,6 +44,7 @@ export function planModel(d) {
   const { skillRoot } = internals;
   const model = internals.resolveModel(args.model ?? payload.model ?? defaultOperationTarget());
   if (model.error) throw Object.assign(new Error(model.error), { code: 'model-unknown' });
+  refuseExcludedPin(d, model);
   // Dispatch launches only inside the op's tier (tiers.yaml), so each kind runs on the members of its difficulty's chain.
   const route = kindRoute(op, loadRuntimes());
   const difficulty = raiseToFloor(payload.difficulty ?? 'medium', route.floor);

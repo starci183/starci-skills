@@ -159,3 +159,17 @@ test('every member spent: the runtime opens one supervisor-gate holding only tha
     assert.equal(raised.evidence.members.length, 2);
   });
 });
+
+test('dispatch refuses a --model pin the job\'s history excluded unless the Kernel recorded an op-override for it', async (t) => {
+  const { planModel } = await import('../../scripts/kernel/verbs/shared/dispatch-plan.mjs');
+  withLedger(t, (ledger) => {
+    seed(ledger, { rejections: [{ step: 'admission', error: 'no-eligible-candidate' }, { step: 'worker-start', error: 'turn_start_unobserved' }] });
+    const job = ledger.db.prepare('SELECT * FROM jobs WHERE job_id=?').get(RETRY);
+    const plan = (model) => planModel({ args: { model }, db: ledger.db, job, jobId: RETRY, op: OP, payload: JSON.parse(job.payload_json),
+      internals: { skillRoot: path.resolve(import.meta.dirname, '..', '..'), resolveModel: (target) => ({ target, provider: target.split('-')[0] }) } });
+    assert.throws(() => plan('claude-agent'), (error) => error.code === 'pin-lineage-excluded' && /op-override/.test(error.message));
+    assert.doesNotThrow(() => plan('codex-agent'), 'a member the history did not exclude is not refused by this gate');
+    ledger.appendEvent({ workflowId: WF, entityType: 'op', entityId: OP, kind: 'kernel-op-override', payload: { override: { model: 'claude-agent' } } });
+    assert.doesNotThrow(() => plan('claude-agent'), 'the recorded override decision is the legitimate path');
+  });
+});
