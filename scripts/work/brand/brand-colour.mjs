@@ -69,13 +69,17 @@ export function parseColor(input){
   const value=String(input??'').trim().replace(COLOUR_REGEX.important,'');
   if(!value)return null;
   const hex=/^#([0-9a-f]{3,8})$/i.exec(value);
-  if(hex){
-    const body=hex[1];
-    if(![3,4,6,8].includes(body.length))return null;
-    const pairs=body.length<=4?[...body].map(char=>char+char):body.match(/../g);
-    const [red,green,blue,alpha]=pairs.map(pair=>Number.parseInt(pair,16));
-    return color({notation:'hex',rgb:[red,green,blue],alpha:alpha===undefined?1:alpha/255,raw:value});
-  }
+  return hex?parseHexColor(hex[1],value):parseFunctionColor(value);
+}
+
+function parseHexColor(body,raw){
+  if(![3,4,6,8].includes(body.length))return null;
+  const pairs=body.length<=4?[...body].map(char=>char+char):body.match(/../g);
+  const [red,green,blue,alpha]=pairs.map(pair=>Number.parseInt(pair,16));
+  return color({notation:'hex',rgb:[red,green,blue],alpha:alpha===undefined?1:alpha/255,raw});
+}
+
+function parseFunctionColor(value){
   const call=COLOUR_REGEX.call.exec(value);
   if(!call)return null;
   const kind=call[1].toLowerCase();
@@ -83,18 +87,23 @@ export function parseColor(input){
   const parts=head.trim().split(/[\s,]+/).filter(Boolean);
   if(parts.length<3)return null;
   const alpha=tail===undefined?1:number(tail,{percentOf:1});
-  if(kind==='oklch'){
-    const lightness=number(parts[0],{percentOf:1});
-    const chroma=number(parts[1],{percentOf:0.4});
-    const hue=number(parts[2]==='none'?'0':String(parts[2]).replace(/deg$/i,''));
-    if([lightness,chroma,hue].includes(null))return null;
-    const lab=oklchToOklab({L:lightness,C:chroma,h:hue});
-    const {rgb,clipped}=oklabToRgb(lab);
-    return color({notation:'oklch',rgb,alpha:alpha??1,raw:value,lab,clipped});
-  }
+  return kind==='oklch'?parseOklchParts(parts,alpha,value):parseRgbParts(parts,alpha,value);
+}
+
+function parseOklchParts(parts,alpha,raw){
+  const lightness=number(parts[0],{percentOf:1});
+  const chroma=number(parts[1],{percentOf:0.4});
+  const hue=number(parts[2]==='none'?'0':String(parts[2]).replace(/deg$/i,''));
+  if([lightness,chroma,hue].includes(null))return null;
+  const lab=oklchToOklab({L:lightness,C:chroma,h:hue});
+  const {rgb,clipped}=oklabToRgb(lab);
+  return color({notation:'oklch',rgb,alpha:alpha??1,raw,lab,clipped});
+}
+
+function parseRgbParts(parts,alpha,raw){
   const channels=parts.slice(0,3).map(part=>number(part,{percentOf:255}));
   if(channels.includes(null))return null;
-  return color({notation:'rgb',rgb:channels.map(channel=>Math.round(channel)),alpha:alpha??1,raw:value});
+  return color({notation:'rgb',rgb:channels.map(channel=>Math.round(channel)),alpha:alpha??1,raw});
 }
 
 function color({notation,rgb,alpha,raw,lab=null,clipped=false}){

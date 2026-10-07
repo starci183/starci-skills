@@ -107,32 +107,38 @@ export function parseCssCustomProperties(text){
  * spells the token (`starci.core.primary` is `--starci-core-primary`).
  */
 export function parseTokenData(data){
-  const exact=new Map(),derived=new Map();
-  const put=(map,name,value)=>{if(typeof name==='string'&&name&&!map.has(name))map.set(name,String(value));};
-  const leaf=value=>typeof value==='string'||typeof value==='number';
-  const walk=(node,trail)=>{
-    if(Array.isArray(node)){
-      for(const item of node){
-        if(item&&typeof item==='object'&&leaf(item.value)){
-          const name=item.name??item.token;
-          if(typeof name==='string')put(name.startsWith('--')?exact:derived,name,item.value);
-        } else if(item&&typeof item==='object')walk(item,trail);
-      }
-      return;
+  const maps={exact:new Map(),derived:new Map()};
+  walkTokens(data,[],maps);
+  return maps;
+}
+
+const putToken=(map,name,value)=>{if(typeof name==='string'&&name&&!map.has(name))map.set(name,String(value));};
+const isTokenLeaf=value=>typeof value==='string'||typeof value==='number';
+
+function walkTokens(node,trail,maps){
+  if(Array.isArray(node)){
+    for(const item of node){
+      if(item&&typeof item==='object')walkTokenItem(item,trail,maps);
     }
-    if(!node||typeof node!=='object')return;
-    for(const [key,value] of Object.entries(node)){
-      const next=[...trail,key];
-      if(leaf(value)){
-        if(key.startsWith('--'))put(exact,key,value);
-        else {put(derived,key,value);put(derived,`--${next.join('-')}`,value);}
-        continue;
-      }
-      walk(value,key.startsWith('--')?trail:next);
+    return;
+  }
+  if(!node||typeof node!=='object')return;
+  for(const [key,value] of Object.entries(node)){
+    const next=[...trail,key];
+    if(isTokenLeaf(value)){
+      if(key.startsWith('--'))putToken(maps.exact,key,value);
+      else {putToken(maps.derived,key,value);putToken(maps.derived,`--${next.join('-')}`,value);}
+      continue;
     }
-  };
-  walk(data,[]);
-  return {exact,derived};
+    walkTokens(value,key.startsWith('--')?trail:next,maps);
+  }
+}
+
+/** One object of a `tokens: [{name,value}]` list: a named leaf, else a nested structure. */
+function walkTokenItem(item,trail,maps){
+  if(!isTokenLeaf(item.value)){walkTokens(item,trail,maps);return;}
+  const name=item.name??item.token;
+  if(typeof name==='string')putToken(name.startsWith('--')?maps.exact:maps.derived,name,item.value);
 }
 
 const readText=file=>{
@@ -171,29 +177,33 @@ export function readSourceTokens(sourceRoot,source){
 function lookupToken(sources,token,seen=new Set()){
   if(seen.has(token))return null;
   const nextSeen=new Set(seen).add(token);
-  const bare=token.replace(/^--/,'');
   for(const scope of ['base','dark']){
     for(const source of sources){
-      const css=source.lookup?.css;
-      if(css){
-        const found=css[scope].get(token);
-        if(found){
-          const reference=/^var\(\s*(--[A-Za-z0-9_-]+)\s*\)$/.exec(String(found.value).trim())?.[1]??null;
-          if(reference){
-            const resolved=lookupToken(sources,reference,nextSeen);
-            if(resolved)return {...resolved,file:source.path,selector:found.selector,scope,declaredValue:found.value,resolvedFrom:reference};
-          }
-          return {value:found.value,file:source.path,selector:found.selector,scope};
-        }
-      }
-      if(scope!=='base')continue;
-      const tokens=source.lookup?.tokens;
-      if(!tokens)continue;
-      const found=tokens.exact.get(token)??tokens.derived.get(token)??tokens.derived.get(bare);
-      if(found!==undefined)return {value:found,file:source.path,selector:null,scope:'base'};
+      const hit=lookupInSource(sources,source,token,scope,nextSeen);
+      if(hit)return hit;
     }
   }
   return null;
+}
+
+/** A css declaration of the token in `scope`, its `var(--other)` followed through the declared sources. */
+function resolveCssDeclaration(sources,source,found,scope,seen){
+  const reference=/^var\(\s*(--[A-Za-z0-9_-]+)\s*\)$/.exec(String(found.value).trim())?.[1]??null;
+  if(reference){
+    const resolved=lookupToken(sources,reference,seen);
+    if(resolved)return {...resolved,file:source.path,selector:found.selector,scope,declaredValue:found.value,resolvedFrom:reference};
+  }
+  return {value:found.value,file:source.path,selector:found.selector,scope};
+}
+
+/** The token as one source declares it in `scope` (a token file only answers the base scope), or null. */
+function lookupInSource(sources,source,token,scope,seen){
+  const found=source.lookup?.css?.[scope].get(token);
+  if(found)return resolveCssDeclaration(sources,source,found,scope,seen);
+  const tokens=scope==='base'?source.lookup?.tokens:null;
+  if(!tokens)return null;
+  const value=tokens.exact.get(token)??tokens.derived.get(token)??tokens.derived.get(token.replace(/^--/,''));
+  return value===undefined?null:{value,file:source.path,selector:null,scope:'base'};
 }
 
 // ---------------------------------------------------------------------------
