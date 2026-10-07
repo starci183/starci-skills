@@ -110,7 +110,7 @@ test('Opus at 90 percent of its tokens or a dead probe leaves the kernel to Sol'
   assert.deepEqual(limited.body.fallbackChain,[],'a reserve window cannot authorize an ordinary fallback launch');
   const skipped=limited.body.pickRecord.dropped.find(row=>row.id==='claude/claude-opus-5-5');
   assert.equal(skipped?.step,'tokens');
-  assert.match(skipped.reason,/9d% or more of its tokens/);
+  assert.match(skipped.reason,/9[05]% or more of its tokens/);
   assert.equal(limited.body.pickRecord.chosen.id,'codex/gpt-6.1-sol');
   const dead=kernelRoute(t,{STARCI_FAKE_ORCA_DEAD:'claude'});
   assert.equal(dead.r.status,0,dead.r.stderr);
