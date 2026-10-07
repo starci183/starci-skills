@@ -9097,6 +9097,17 @@ lock-busy:
   nextStep_vi: "Thao tác thất bại tạm thời; thử lại sau khi khóa nhả."
   owner: op-retry
   kind: runtime-fault
+lock-held:
+  title: "Host lock is held"
+  title_vi: "Khóa của máy đang được giữ"
+  meaning_vi: "Một lệnh nặng (npm ci, npm install) không lấy được khóa của máy vì một lệnh khác đang giữ; runtime thử lại theo khoảng chờ của ngân sách thử lại (allocation.hostLock) và ghi từng lần thử kèm lý do này."
+  causes_vi:
+    - "Một lần land hoặc một lệnh nặng khác đang giữ khóa của máy"
+    - "Chủ khóa cũ chưa hết hạn"
+  nextStep_vi: "Runtime tự thử lại đến hết ngân sách; hết ngân sách thì lệnh bị từ chối kèm danh sách các lần thử và chủ khóa, và Kernel hoặc người giám sát chờ chủ khóa nhả."
+  owner: runtime-core
+  kind: runtime-fault
+
 log-actor-unknown:
   title: "Log actor is not allowed"
   title_vi: "Tác nhân ghi nhật ký không hợp lệ"
@@ -9418,6 +9429,17 @@ release-unknown:
   causes_vi:
     - "Cơ sở dữ liệu máy khóa hoặc lỗi lúc nhả"
   nextStep_vi: "Kiểm tra khóa máy chủ còn bị giữ không và nhả đúng token trước khi chạy lại cài đặt."
+  owner: supervisor
+  kind: runtime-fault
+
+retry-exhausted:
+  title: "Retry budget spent"
+  title_vi: "Đã hết ngân sách thử lại"
+  meaning_vi: "Một khóa công việc của bộ điều phối đã thất bại đủ số lần của ngân sách thử lại (allocation.reconciler.backoff.maxAttempts); hàng đợi giữ nó ở trạng thái đỗ cùng lý do của lần thất bại cuối, cho đến khi một sự kiện mới nhắc tới khóa đó."
+  causes_vi:
+    - "Lỗi vĩnh viễn mà thử lại không sửa được (ví dụ danh tính sổ cái sai)"
+    - "Một sự cố tạm thời kéo dài hơn toàn bộ ngân sách"
+  nextStep_vi: "Người giám sát đọc lý do và lỗi cuối trong hàng đợi, sửa nguyên nhân qua một lane đã land; một sự kiện mới cho khóa đó cấp lại ngân sách."
   owner: supervisor
   kind: runtime-fault
 

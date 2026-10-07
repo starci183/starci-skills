@@ -9,7 +9,7 @@ import { revParseQuery } from '../api/git/rev-parse-query.mjs';
 import { ci } from '../api/npm/ci.mjs';
 import { asList } from '../lib/list.mjs';
 import { refusal as verbRefusal, resultOk as success, resultOutput as output } from '../lib/verb-call.mjs';
-import { underHostLock } from './verb-lock.mjs';
+import { underHostLock, hostLockRetryBudget } from './verb-lock.mjs';
 
 const comparablePath = (value) => {
   const resolved = path.resolve(value);
@@ -45,7 +45,8 @@ export function linkedNodeModules(cwd, lstat = fs.lstatSync) {
 /** Unwrap verb-lock's metadata while still accepting a direct injected lock seam. */
 export function lockedValue(result) {
   if (result?.ok === false && !Object.hasOwn(result, 'code')) {
-    throw new Error(result.reason ? `host lock refused the run: ${result.reason}` : 'host lock refused the run');
+    const waited = result.retries?.length ? ` after ${result.retries.length} attempts (${result.retries[0].reason}, retry budget ${result.exhausted ?? 'open'})` : '';
+    throw new Error(result.reason ? `host lock refused the run: ${result.reason}${waited}` : 'host lock refused the run');
   }
   return result && Object.hasOwn(result, 'value') ? result.value : result;
 }
@@ -85,7 +86,7 @@ export async function npmCi(ctx, deps = {}) {
   if (workspaces.some((item) => !item)) return refusal(cwd, '--workspace values may not be empty');
 
   try {
-    const locked = await api.lock({ role, purpose: 'npm-ci', env: ctx?.env }, async () => {
+    const locked = await api.lock({ role, purpose: 'npm-ci', env: ctx?.env, retry: hostLockRetryBudget() }, async () => {
       const started = api.now();
       const result = await api.ci(cwd, { workspaces });
       const ms = Math.max(0, api.now() - started);

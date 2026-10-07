@@ -11,7 +11,7 @@ import { revParseQuery } from '../api/git/rev-parse-query.mjs';
 import { install } from '../api/npm/install.mjs';
 import { refusal as verbRefusal, resultOk as success, resultOutput as output } from '../lib/verb-call.mjs';
 import { primaryWorktree, linkedNodeModules, lockedValue } from './npm-ci.mjs';
-import { underHostLock } from './verb-lock.mjs';
+import { underHostLock, hostLockRetryBudget } from './verb-lock.mjs';
 
 const PINS_FILE = 'knowledge/hfs/canon-pins.yaml';
 const EXACT_VERSION = /^\d+\.\d+\.\d+$/;
@@ -92,7 +92,7 @@ export async function npmInstall(ctx, deps = {}) {
   if (!resolved.ok) return refusal(cwd, resolved.error);
 
   try {
-    const locked = await api.lock({ role, purpose: 'npm-install', env: ctx?.env }, async () => {
+    const locked = await api.lock({ role, purpose: 'npm-install', env: ctx?.env, retry: hostLockRetryBudget() }, async () => {
       const started = api.now();
       const result = await api.install(cwd, resolved.packages, { dev: Boolean(ctx?.args?.dev) });
       const ms = Math.max(0, api.now() - started);

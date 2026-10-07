@@ -1,6 +1,7 @@
 // host-stale.mjs — the Host controller's retry of replaced Kernel terminals that an open kernel-stale-terminal-unclosed
 // incident names (controllers/host.mjs reconcileKernelSeat -> staleTerminalStep).
 import { mapInOrder } from '../lib/in-order.mjs';
+import { retryAfterFailure } from '../lib/retry-budget.mjs';
 
 const STALE_TERMINAL_CODE = 'kernel-stale-terminal-unclosed';
 export const STALE_RETRY_MS = 5 * 60_000;
@@ -80,8 +81,9 @@ export function createStaleTerminalStep({ state, terminalHandles, outputOf, di }
   };
 
   const retryLater = async (ctx, t, { ledgerId, workflowId, now, closed, reason }) => {
-    const tries = t.tries + 1;
-    state.staleCloses.set(t.k, { tries, nextAt: now + Math.min(STALE_RETRY_MAX_MS, STALE_RETRY_MS * 2 ** (tries - 1)) });
+    const step = retryAfterFailure({ intervalMs: STALE_RETRY_MS, maxIntervalMs: STALE_RETRY_MAX_MS }, { attempts: t.tries }, { now, reason: reason ?? closed.proof ?? 'terminal-not-closed' });
+    const tries = step.attempts;
+    state.staleCloses.set(t.k, { tries, nextAt: step.dueAt, reason: step.reason });
     ctx.log('reconciler.host.stale-terminal', `${workflowId}: replaced Kernel terminal ${t.handle} still not closed (${reason ?? closed.proof ?? 'no proof'}; try ${tries})`, { ledgerId, workflowId, handle: t.handle, incidentId: t.incidentId, tries, reason, proof: closed.proof ?? null });
     if (tries === STALE_ESCALATE_TRIES) {
       await ctx.openDecision(di({

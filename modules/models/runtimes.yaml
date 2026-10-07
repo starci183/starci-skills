@@ -366,7 +366,15 @@ allocation:
   # workerClose (scripts/machine/worker-close.mjs; owner rule: a finished worker is closed COMPLETELY): after worker-release and the terminal
   # close the runtime waits verifyMs for every process of that terminal's shell tree to end (polled every pollMs); a survivor proven to belong
   # to the tree is stopped and given stopVerifyMs to end before the finding is raised.
-  workerClose: {verifyMs: 10000, pollMs: 1000, stopVerifyMs: 5000}
+  # A finished [Worker] job whose terminal has no recorded closure is closed again by the Job controller's worker sweep (scripts/supervisor/supervisor-watchdog.mjs):
+  # every leftoverRetryMs (doubling to leftoverRetryMaxMs) for at most leftoverRetryAttempts attempts, each failure recorded with its reason on the job.
+  workerClose: {verifyMs: 10000, pollMs: 1000, stopVerifyMs: 5000, leftoverRetryMs: 60000, leftoverRetryMaxMs: 900000, leftoverRetryAttempts: 12}
+  # providerReservation (scripts/machine/provider-reservation-reap.mjs): an admission whose receipt stayed `reserved` this long never reached
+  # worker-start (the consume moves it to `launching` first), so its launcher died and the slot is released.
+  providerReservation: {reservedStaleMs: 900000}
+  # hostLock (scripts/machine/verb-lock.mjs): a verb that finds the host lock held (npm ci, npm install) retries on the retry budget
+  # of scripts/lib/retry-budget.mjs (the interval doubles to retryMaxIntervalMs) until retryDeadlineMs, then refuses with every attempt named.
+  hostLock: {retryIntervalMs: 5000, retryMaxIntervalMs: 30000, retryDeadlineMs: 180000}
   # waiterPriority (scripts/kernel/waiter-priority.mjs): a queued job that has blocked another
   # workflow this long earns its Kernel one heads-up per newly waiting workflow.
   waiterPriority: {blockingHeadsUpMs: 900000}
@@ -524,7 +532,7 @@ allocation:
   # heartbeatStaleMs; one starci kernel status snapshot per workflow is shared for statusCacheMs; a failing key backs off
   # backoff.minMs doubling to backoff.maxMs; more than crashLoop.max engine starts in crashLoop.windowMs start it
   # --safe (read-only) and push the owner one urgent Telegram (boot.mjs).
-  reconciler: {pollMs: 2000, leaseMs: 30000, renewMs: 10000, heartbeatStaleMs: 60000, statusCacheMs: 20000, backoff: {minMs: 1000, maxMs: 300000}, crashLoop: {max: 3, windowMs: 1800000}}
+  reconciler: {pollMs: 2000, leaseMs: 30000, renewMs: 10000, heartbeatStaleMs: 60000, statusCacheMs: 20000, backoff: {minMs: 1000, maxMs: 300000, maxAttempts: 24}, crashLoop: {max: 3, windowMs: 1800000}}
   # resources: the host-floor guards the provider-health / admission path reads. Below minFreeDiskGb
   # `starci kernel dispatch --spawn` refuses host-resources-low until there is room again - measured on the
   # drive that holds %TEMP% and the repos. RAM goes through the RAM-aware, priority-aware throttle
