@@ -58,7 +58,7 @@ const SOURCE_BYTES_LIMIT=4*1024*1024;
 const ICON_HINT=/icon|lucide|phosphor|feather|font-?awesome|material-symbols|tabler|remixicon|boxicons|ionicons|bootstrap-icons/i;
 
 const round=(value,places=4)=>Number.parseFloat(Number(value).toFixed(places));
-const digest=sha256;
+const digest=sha256,REGEX=Object.freeze({percent:new RegExp(['^[-+]?',String.raw`\d*`,String.raw`\.?`,String.raw`\d+%$`].join('')),number:new RegExp(['^[-+]?',String.raw`\d*`,String.raw`\.?`,String.raw`\d+`,String.raw`(?:e[-+]?\d+)?$`].join(''),'i'),important:new RegExp([String.raw`\s*`,'!important$'].join(''),'i'),call:new RegExp(['^(oklch|rgba?)',String.raw`\(`,String.raw`\s*`,'([^)]*)',String.raw`\)$`].join(''),'i'),declaration:new RegExp(['^(--[A-Za-z0-9_-]+)',String.raw`\s*:\s*`,String.raw`([\s\S]+)$`].join('')),semicolons:new RegExp([';+','$'].join(''))});
 
 // ---------------------------------------------------------------------------
 // Colour mathematics: sRGB <-> linear <-> OKLab <-> oklch, and WCAG contrast.
@@ -107,8 +107,8 @@ export const formatHex=rgb=>`#${rgb.map(channel=>Math.max(0,Math.min(255,Math.ro
 
 const number=(text,{percentOf=1}={})=>{
   const value=String(text).trim();
-  if(/^[-+]?\d*\.?\d+%$/.test(value))return Number.parseFloat(value)/100*percentOf;
-  if(/^[-+]?\d*\.?\d+(?:e[-+]?\d+)?$/i.test(value))return Number.parseFloat(value);
+  if(REGEX.percent.test(value))return Number.parseFloat(value)/100*percentOf;
+  if(REGEX.number.test(value))return Number.parseFloat(value);
   if(/^none$/i.test(value))return 0;
   return null;
 };
@@ -120,7 +120,7 @@ const number=(text,{percentOf=1}={})=>{
  * returns null so the caller fails loudly instead of guessing a value.
  */
 export function parseColor(input){
-  const value=String(input??'').trim().replace(/\s*!important$/i,'');
+  const value=String(input??'').trim().replace(REGEX.important,'');
   if(!value)return null;
   const hex=/^#([0-9a-f]{3,8})$/i.exec(value);
   if(hex){
@@ -130,7 +130,7 @@ export function parseColor(input){
     const [red,green,blue,alpha]=pairs.map(pair=>Number.parseInt(pair,16));
     return color({notation:'hex',rgb:[red,green,blue],alpha:alpha===undefined?1:alpha/255,raw:value});
   }
-  const call=/^(oklch|rgba?)\(\s*([^)]*)\)$/i.exec(value);
+  const call=REGEX.call.exec(value);
   if(!call)return null;
   const kind=call[1].toLowerCase();
   const [head,tail]=call[2].split('/');
@@ -183,10 +183,10 @@ export function parseCssCustomProperties(text){
   const flush=()=>{
     const declaration=buffer.trim();
     buffer='';
-    const match=/^(--[A-Za-z0-9_-]+)\s*:\s*([\s\S]+)$/.exec(declaration);
+    const match=REGEX.declaration.exec(declaration);
     if(!match)return;
     const selector=stack.filter(Boolean).join(' ');
-    const value=match[2].trim().replace(/\s*!important$/i,'').replace(/;+$/,'').trim();
+    const value=match[2].trim().replace(REGEX.important,'').replace(REGEX.semicolons,'').trim();
     // `:root:not([data-theme="light"])` inside a dark media query is a dark scope: a negated light theme is not a light one.
     const asserted=selector.replace(/:not\([^)]*\)/g,' ');
     const isDark=/dark/i.test(selector)&&!/data-theme\s*=\s*["']?light/i.test(asserted);
