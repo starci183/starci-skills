@@ -28,28 +28,30 @@ const mutableFrameworkAlias = (ts, checker, decorator, targets) => {
   return mutableDecoratorKind(ts, checker, decorator, bySymbol);
 };
 
+function collectFrameworkStatement(config, context, checker, sourceFile, statement, targets, reasons) {
+  const bound = moduleExportsOf(context.ts, checker, statement);
+  if (!bound || ![...FRAMEWORK.values()].includes(bound.specifier)) return;
+  const expected = new Set([...FRAMEWORK].filter(([, packageName]) => packageName === bound.specifier).map(([name]) => name));
+  const selected = referencedExports(context.ts, statement, expected);
+  if (!selected.length) return;
+  if (!bound.symbol) {
+    reasons.push(`${relativePath(config.root, sourceFile.fileName)} cannot resolve ${bound.specifier}`);
+    return;
+  }
+  for (const name of selected) {
+    const target = bound.exports.get(name);
+    if (target) targets.set(name, target);
+    else reasons.push(`${relativePath(config.root, sourceFile.fileName)} cannot resolve ${name} from ${bound.specifier}`);
+  }
+}
+
 function frameworkTargets(config, context, checker, localFiles) {
   const targets = new Map();
   const reasons = [];
   const files = programSourcesOf(context, checker, localFiles);
   if (!files) return { targets, reasons: ['a TypeScript program checker could not be associated with its source'] };
   for (const sourceFile of files) {
-    for (const statement of sourceFile.statements) {
-      const bound = moduleExportsOf(context.ts, checker, statement);
-      if (!bound || ![...FRAMEWORK.values()].includes(bound.specifier)) continue;
-      const expected = new Set([...FRAMEWORK].filter(([, packageName]) => packageName === bound.specifier).map(([name]) => name));
-      const selected = referencedExports(context.ts, statement, expected);
-      if (!selected.length) continue;
-      if (!bound.symbol) {
-        reasons.push(`${relativePath(config.root, sourceFile.fileName)} cannot resolve ${bound.specifier}`);
-        continue;
-      }
-      for (const name of selected) {
-        const target = bound.exports.get(name);
-        if (target) targets.set(name, target);
-        else reasons.push(`${relativePath(config.root, sourceFile.fileName)} cannot resolve ${name} from ${bound.specifier}`);
-      }
-    }
+    for (const statement of sourceFile.statements) collectFrameworkStatement(config, context, checker, sourceFile, statement, targets, reasons);
     commonJsRequireReasons(context.ts, checker, sourceFile, (specifier) => [...FRAMEWORK.values()].includes(specifier),
       reasons, relativePath(config.root, sourceFile.fileName), 'whose decorator identity cannot be proved', 'Nest framework binding');
   }
@@ -74,28 +76,35 @@ function propertyName(ts, property) {
   return null;
 }
 
+function inspectTokenElement(ts, checker, element, localFiles, field, tokens) {
+  if (ts.isSpreadElement(element)) return true;
+  let key;
+  let node = element;
+  if (ts.isObjectLiteralExpression(element)) {
+    if (element.properties.some(property => ts.isSpreadAssignment(property))) return true;
+    const providers = element.properties.filter(property => propertyName(ts, property) === 'provide');
+    if (providers.length !== 1 || !ts.isPropertyAssignment(providers[0])) return true;
+    node = providers[0].initializer;
+    key = localClassKey(ts, checker, node, localFiles);
+  } else {
+    const token = classToken(ts, checker, element, localFiles);
+    key = token.key;
+    if (!key) return field === 'providers' && !token.external;
+  }
+  if (key) {
+    if (!tokens.has(key)) tokens.set(key, []);
+    tokens.get(key).push(node);
+  }
+  return false;
+}
+
 function tokenEntries(ts, checker, initializer, localFiles, field) {
   initializer = unwrapExpression(ts, initializer);
   if (!ts.isArrayLiteralExpression(initializer)) return { tokens: new Map(), unknown: true };
   const tokens = new Map();
   let unknown = false;
-  const add = (key, node) => {
-    if (!tokens.has(key)) tokens.set(key, []);
-    tokens.get(key).push(node);
-  };
   for (const element of initializer.elements) {
-    if (ts.isSpreadElement(element)) { unknown = true; continue; }
-    if (ts.isObjectLiteralExpression(element)) {
-      if (element.properties.some(property => ts.isSpreadAssignment(property))) { unknown = true; continue; }
-      const providers = element.properties.filter(property => propertyName(ts, property) === 'provide');
-      if (providers.length !== 1 || !ts.isPropertyAssignment(providers[0])) { unknown = true; continue; }
-      const key = localClassKey(ts, checker, providers[0].initializer, localFiles);
-      if (key) add(key, providers[0].initializer);
-      continue;
-    }
-    const token = classToken(ts, checker, element, localFiles);
-    if (token.key) add(token.key, element);
-    else if (field === 'providers' && !token.external) unknown = true;
+    if (inspectTokenElement(ts, checker, element, localFiles, field, tokens)) unknown = true;
   }
   return { tokens, unknown };
 }
@@ -164,12 +173,46 @@ function applicationGraphs(config, context, modules) {
   return [...graphs, ...modules.filter(module => !bound.has(module)).map(module => [module])];
 }
 
-/** Prove only static exported class-token identity and selected CQRS handler registration. */
-export function checkModuleRegistration(config, context) {
-  const selected = config.backend.moduleRegistration;
-  if (!selected) return { violations: [], coverage: { status: 'unavailable', reason: 'hfs.json does not select Nest module-registration identity checks' } };
-  const ts = context.ts;
-  const localFiles = new Set(context.files.map(file => canonical(file.fileName)));
+function decoratorKinds(ts, checker, node, framework) {
+  const decorators = ts.canHaveDecorators(node) ? ts.getDecorators(node) ?? [] : node.decorators ?? [];
+  return decorators.map(decorator => ({ decorator, kind: frameworkDecorator(ts, checker, decorator, framework.targets) }));
+}
+
+function recordMutableDecoratorReasons(config, ts, checker, sourceFile, kinds, framework, reasons) {
+  for (const { decorator, kind } of kinds) {
+    const dynamic = kind ? null : mutableFrameworkAlias(ts, checker, decorator, framework.targets);
+    if (dynamic) reasons.push(`${relativePath(config.root, sourceFile.fileName)} uses mutable ${dynamic} decorator identity`);
+  }
+}
+
+function recordModuleDecorator(config, context, sourceFile, node, checker, localFiles, kinds, modules, reasons) {
+  const moduleDecorators = kinds.filter(item => item.kind === 'Module');
+  if (moduleDecorators.length === 1) modules.push(moduleRecord(config, context, sourceFile, node, moduleDecorators[0].decorator, checker, localFiles));
+  else if (moduleDecorators.length > 1) reasons.push(`${relativePath(config.root, sourceFile.fileName)} has multiple resolved @Module decorators`);
+}
+
+function recordHandlerDecorator(ts, config, sourceFile, node, checker, localFiles, kinds, handlers, reasons) {
+  const handlerDecorators = kinds.filter(item => item.kind === 'CommandHandler' || item.kind === 'QueryHandler');
+  if (handlerDecorators.length === 1) handlers.push({
+    key: node.name ? localClassKey(ts, checker, node.name, localFiles) : null,
+    name: node.name?.text ?? '(anonymous)',
+    kind: handlerDecorators[0].kind,
+    path: relativePath(config.root, sourceFile.fileName),
+    ...sourceLocation(sourceFile, node.name ?? node),
+  });
+  else if (handlerDecorators.length > 1) reasons.push(`${relativePath(config.root, sourceFile.fileName)} has multiple resolved CQRS handler decorators`);
+}
+
+function inspectRegistrationClass(config, context, sourceFile, checker, localFiles, framework, node, modules, handlers, reasons) {
+  const { ts } = context;
+  if (!ts.isClassDeclaration(node)) return;
+  const kinds = decoratorKinds(ts, checker, node, framework);
+  recordMutableDecoratorReasons(config, ts, checker, sourceFile, kinds, framework, reasons);
+  recordModuleDecorator(config, context, sourceFile, node, checker, localFiles, kinds, modules, reasons);
+  recordHandlerDecorator(ts, config, sourceFile, node, checker, localFiles, kinds, handlers, reasons);
+}
+
+function discoverRegistrations(config, context, localFiles) {
   const modules = [];
   const handlers = [];
   const reasons = [];
@@ -180,42 +223,28 @@ export function checkModuleRegistration(config, context) {
     const framework = frameworkByChecker.get(checker);
     reasons.push(...framework.reasons);
     const visit = node => {
-      if (ts.isClassDeclaration(node)) {
-        const decorators = ts.canHaveDecorators(node) ? ts.getDecorators(node) ?? [] : node.decorators ?? [];
-        const kinds = decorators.map(decorator => ({ decorator, kind: frameworkDecorator(ts, checker, decorator, framework.targets) }));
-        const recognized = kinds.filter(item => item.kind);
-        for (const { decorator, kind } of kinds) {
-          const dynamic = kind ? null : mutableFrameworkAlias(ts, checker, decorator, framework.targets);
-          if (dynamic) reasons.push(`${relativePath(config.root, sourceFile.fileName)} uses mutable ${dynamic} decorator identity`);
-        }
-        const moduleDecorators = recognized.filter(item => item.kind === 'Module');
-        if (moduleDecorators.length === 1) modules.push(moduleRecord(config, context, sourceFile, node, moduleDecorators[0].decorator, checker, localFiles));
-        else if (moduleDecorators.length > 1) reasons.push(`${relativePath(config.root, sourceFile.fileName)} has multiple resolved @Module decorators`);
-        const handlerDecorators = recognized.filter(item => item.kind === 'CommandHandler' || item.kind === 'QueryHandler');
-        if (handlerDecorators.length === 1) handlers.push({
-          key: node.name ? localClassKey(ts, checker, node.name, localFiles) : null,
-          name: node.name?.text ?? '(anonymous)',
-          kind: handlerDecorators[0].kind,
-          path: relativePath(config.root, sourceFile.fileName),
-          ...sourceLocation(sourceFile, node.name ?? node),
-        });
-        else if (handlerDecorators.length > 1) reasons.push(`${relativePath(config.root, sourceFile.fileName)} has multiple resolved CQRS handler decorators`);
-      }
-      ts.forEachChild(node, visit);
+      inspectRegistrationClass(config, context, sourceFile, checker, localFiles, framework, node, modules, handlers, reasons);
+      context.ts.forEachChild(node, visit);
     };
     visit(sourceFile);
   }
-  for (const module of modules) if (module.unknown) reasons.push(`${module.path} has dynamic or unresolvable @Module providers/exports metadata`);
-  for (const handler of handlers) {
-    if (!handler.key) reasons.push(`${handler.path} handler class identity is not resolvable`);
-    if (!selected.handlerDecorators.includes(handler.kind)) reasons.push(`${handler.path} uses unselected ${handler.kind}`);
-  }
-  const violations = [];
+  return { modules, handlers, reasons };
+}
+
+function providerOwnersOf(modules) {
   const providerOwners = new Map();
-  for (const module of modules) for (const key of module.providers.keys()) if (module.exports.has(key)) {
-    if (!providerOwners.has(key)) providerOwners.set(key, []);
-    providerOwners.get(key).push(module);
+  for (const module of modules) {
+    for (const key of module.providers.keys()) {
+      if (!module.exports.has(key)) continue;
+      if (!providerOwners.has(key)) providerOwners.set(key, []);
+      providerOwners.get(key).push(module);
+    }
   }
+  return providerOwners;
+}
+
+function reregistrationViolations(config, context, modules, providerOwners) {
+  const violations = [];
   const reportedRegistrations = new Set();
   for (const graph of applicationGraphs(config, context, modules)) for (const [key] of providerOwners) {
     const owners = graph.filter(module => module.providers.has(key) && module.exports.has(key))
@@ -239,6 +268,11 @@ export function checkModuleRegistration(config, context) {
         { ownerModule: owner.name, ownerPath: owner.path }));
     }
   }
+  return violations;
+}
+
+function handlerRegistrationViolations(modules, handlers, selected) {
+  const violations = [];
   for (const handler of handlers.filter(item => item.key && selected.handlerDecorators.includes(item.kind))) {
     const registrations = modules.flatMap(module => (module.providers.get(handler.key) ?? []).map(node => ({ module, node })));
     if (registrations.length !== 1) violations.push({
@@ -251,6 +285,23 @@ export function checkModuleRegistration(config, context) {
         ...sourceLocation(registration.node.getSourceFile(), registration.node) })),
     });
   }
+  return violations;
+}
+
+/** Prove only static exported class-token identity and selected CQRS handler registration. */
+export function checkModuleRegistration(config, context) {
+  const selected = config.backend.moduleRegistration;
+  if (!selected) return { violations: [], coverage: { status: 'unavailable', reason: 'hfs.json does not select Nest module-registration identity checks' } };
+  const localFiles = new Set(context.files.map(file => canonical(file.fileName)));
+  const { modules, handlers, reasons } = discoverRegistrations(config, context, localFiles);
+  for (const module of modules) if (module.unknown) reasons.push(`${module.path} has dynamic or unresolvable @Module providers/exports metadata`);
+  for (const handler of handlers) {
+    if (!handler.key) reasons.push(`${handler.path} handler class identity is not resolvable`);
+    if (!selected.handlerDecorators.includes(handler.kind)) reasons.push(`${handler.path} uses unselected ${handler.kind}`);
+  }
+  const providerOwners = providerOwnersOf(modules);
+  const violations = reregistrationViolations(config, context, modules, providerOwners);
+  violations.push(...handlerRegistrationViolations(modules, handlers, selected));
   const coverage = reasons.length
     ? { status: 'unavailable', reason: 'one or more Nest module-registration relations are not statically provable', details: [...new Set(reasons)].sort(byCodeUnit) }
     : { status: 'checked', modules: modules.length, exportedClassTokenProviders: providerOwners.size, handlers: handlers.length,
