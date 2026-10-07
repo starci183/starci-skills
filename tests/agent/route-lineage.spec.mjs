@@ -43,31 +43,29 @@ const worldEnv = (repo) => ({ ...process.env,
   STARCI_LOCAL_ROOT: path.join(repo,'.starciwork','localappdata') });
 const seed = (repo, fn) => { const l = openLedger({ file: ledgerFileFor(repo,{env:worldEnv(repo)}) }); try { return fn(l); } finally { l.close(); } };
 const read = (repo, fn) => { const l = inspectLedger({ file: ledgerFileFor(repo,{env:worldEnv(repo)}) }); try { return fn(l); } finally { l.close(); } };
-const ownerRoot = (t, policy) => {
+const ownerRoot = (t) => {
   const dir = tmp(t, 'starci-owner-');
   const example = path.join(ROOT, 'config.example.yaml');
   fs.copyFileSync(example, path.join(dir, 'config.example.yaml'));
   const config = parseYaml(fs.readFileSync(example, 'utf8'));
-  fs.writeFileSync(path.join(dir, 'config.yaml'), stringifyYaml({ ...config,
-    allocation: { ...(config.allocation ?? {}), policy, preferredProvider: null },
-    budgets: { maxOps: null } }));
+  fs.writeFileSync(path.join(dir, 'config.yaml'), stringifyYaml({ ...config, budgets: { maxOps: null } }));
   return dir;
 };
-const env = (t, policy, repo) => {
+const env = (t, repo) => {
   const dir = tmp(t, 'starci-fake-orca-');
   const stub = path.join(dir, 'fake-orca.mjs'); fs.writeFileSync(stub, FAKE_ORCA);
   fs.writeFileSync(path.join(dir, 'state.json'), '{}');
   const e = { ...worldEnv(repo), STARCI_ORCA_COMMAND: process.execPath, STARCI_ORCA_ARGS: JSON.stringify([stub]),
     STARCI_FAKE_ORCA_LOG: path.join(dir, 'calls.jsonl'), STARCI_FAKE_ORCA_STATE: path.join(dir, 'state.json'),
-    STARCI_OWNER_ROOT: ownerRoot(t, policy), ...fakeDevinQuotaEnv(t, dir) };
+    STARCI_OWNER_ROOT: ownerRoot(t), ...fakeDevinQuotaEnv(t, dir) };
   openMachine({ env: e }).close();
   for (const key of ['ORCA_TERMINAL_HANDLE', 'STARCI_ROLE', 'STARCI_OP_JOB']) delete e[key];
   return e;
 };
-// prefer-then-overflow: the walked order alone decides, so a demotion or exclusion is observable.
-const route = (t, repo, args = [], { policy = 'prefer-then-overflow' } = {}) => {
+// The tier chain alone decides (no bias, no history), so a demotion or exclusion is observable.
+const route = (t, repo, args = []) => {
   const r = spawnSync(process.execPath, [API, 'route', '--repo', repo, '--job', JOB, ...args, '--json'],
-    { cwd: ROOT, env: env(t, policy, repo), encoding: 'utf8', windowsHide: true, timeout: 120000 });
+    { cwd: ROOT, env: env(t, repo), encoding: 'utf8', windowsHide: true, timeout: 120000 });
   assert.equal(r.status, 0, r.stderr || r.stdout);
   return { ...JSON.parse(r.stdout), stderr: r.stderr };
 };
@@ -110,7 +108,7 @@ test('a Kernel --avoid/--prefer is an unknown option on starci kernel route: ref
   seedWorkflow(repo);
   for (const args of [['--avoid', 'devin-agent'], ['--prefer', 'codex-agent']]) {
     const r = spawnSync(process.execPath, [API, 'route', '--repo', repo, '--job', JOB, ...args, '--json'],
-      { cwd: ROOT, env: env(t, 'prefer-then-overflow', repo), encoding: 'utf8', windowsHide: true, timeout: 120000 });
+      { cwd: ROOT, env: env(t, repo), encoding: 'utf8', windowsHide: true, timeout: 120000 });
     assert.notEqual(r.status, 0);
     assert.match(`${r.stderr}${r.stdout}`, /unknown-option|unknown option/);
     assert.equal(read(repo, (l) => l.db.prepare("SELECT count(*) n FROM events WHERE kind='route-decided'").get().n), 0, 'no route was decided');
@@ -126,7 +124,7 @@ test('starci kernel dispatch refuses --prefer/--avoid as unknown options', (t) =
   seedWorkflow(repo);
   route(t, repo);
   const r = spawnSync(process.execPath, [API, 'dispatch', '--repo', repo, '--job', JOB, '--avoid', 'devin-agent', '--json'],
-    { cwd: ROOT, env: env(t, 'prefer-then-overflow', repo), encoding: 'utf8', windowsHide: true, timeout: 120000 });
+    { cwd: ROOT, env: env(t, repo), encoding: 'utf8', windowsHide: true, timeout: 120000 });
   assert.notEqual(r.status, 0);
   assert.match(`${r.stderr}${r.stdout}`, /unknown-option|unknown option/);
 });
@@ -137,11 +135,11 @@ test('the router still skips a pool whose provider-health circuit is open, namin
   openCircuit(repo, 'devin', 'readiness');
   const r = route(t, repo);
   assert.notEqual(r.decision.model, 'devin-agent');
-  const reason = r.rejected.find((x) => x.target === 'devin-agent')?.reason ?? '';
+  const reason = r.rejected.find((x) => x.target === 'devin/swe-2-max')?.reason ?? '';
   assert.match(reason, /^provider readiness is unavailable: readiness rejected \(circuit open until /);
   assert.doesNotMatch(reason, /auth/, 'a readiness, quota or capacity circuit is not an auth failure');
   openCircuit(repo, 'devin', 'capacity');
-  assert.match(route(t, repo).rejected.find((x) => x.target === 'devin-agent')?.reason ?? '', /^provider capacity is unavailable: /);
+  assert.match(route(t, repo).rejected.find((x) => x.target === 'devin/swe-2-max')?.reason ?? '', /^provider capacity is unavailable: /);
 });
 
 test('a retry whose previous attempt died with no report on Devin moves Devin to the end of the order', (t) => {
@@ -149,7 +147,7 @@ test('a retry whose previous attempt died with no report on Devin moves Devin to
   seedWorkflow(repo, { prior: [{ pool: 'devin-agent', result: noReport }] });
   const r = route(t, repo);
   assert.notEqual(r.decision.model, 'devin-agent');
-  assert.equal(r.decision.routeChain.at(-1), 'devin-agent', 'the demoted pool is last in the walked order');
+  assert.equal(r.decision.routeChain.at(-1), 'devin/swe-2-max', 'the demoted pool is last in its tier chain');
   const ev = routeDecided(repo);
   assert.deepEqual(ev.lineageAdjust.demoted, ['devin-agent']);
   assert.deepEqual(ev.lineageAdjust.excluded, []);
@@ -158,10 +156,10 @@ test('a retry whose previous attempt died with no report on Devin moves Devin to
   assert.equal(ev.lineageAdjust.demotedTaken, false);
 });
 
-test('a demotion also holds under the balanced policy', (t) => {
+test('a gate-loop failure demotes the pool like a missing report', (t) => {
   const repo = tmp(t, 'starci-route-demote-balanced-');
   seedWorkflow(repo, { prior: [{ pool: 'devin-agent', result: noReport, gateLoop: true }] });
-  const r = route(t, repo, [], { policy: 'balanced' });
+  const r = route(t, repo);
   assert.notEqual(r.decision.model, 'devin-agent');
   assert.equal(routeDecided(repo).lineageAdjust.attempts[0].cause, 'gate-loop');
 });
@@ -171,7 +169,7 @@ test('a demoted pool is still taken when no other pool of the order is eligible'
   seedWorkflow(repo, { prior: [{ pool: 'devin-agent', result: noReport }] });
   const order = route(t, repo).decision.routeChain;
   seed(repo, (l) => l.db.prepare("UPDATE jobs SET status='queued' WHERE job_id=?").run(JOB));
-  for (const pool of order.filter((p) => p !== 'devin-agent')) openCircuit(repo, pool.replace(/-agent$/, ''));
+  for (const member of order.filter((id) => id !== 'devin/swe-2-max')) openCircuit(repo, member.split('/')[0]);
   const r = route(t, repo);
   assert.equal(r.decision.model, 'devin-agent');
   assert.equal(routeDecided(repo).lineageAdjust.demotedTaken, true);
@@ -185,17 +183,17 @@ test('two pool-attributable failures in the lineage exclude the pool for the ret
   ] });
   const order = route(t, repo).decision.routeChain;
   seed(repo, (l) => l.db.prepare("UPDATE jobs SET status='queued' WHERE job_id=?").run(JOB));
-  for (const pool of order.filter((p) => p !== 'devin-agent')) openCircuit(repo, pool.replace(/-agent$/, ''));
+  for (const member of order.filter((id) => id !== 'devin/swe-2-max')) openCircuit(repo, member.split('/')[0]);
   const r = spawnSync(process.execPath, [API, 'route', '--repo', repo, '--job', JOB, '--json'],
-    { cwd: ROOT, env: env(t, 'prefer-then-overflow', repo), encoding: 'utf8', windowsHide: true, timeout: 120000 });
+    { cwd: ROOT, env: env(t, repo), encoding: 'utf8', windowsHide: true, timeout: 120000 });
   assert.equal(r.status, 1, 'with every other pool down, the excluded pool is not taken either');
   const body = JSON.parse(r.stdout);
-  assert.match(body.error, /no eligible pool/);
+  assert.match(body.error, /agent admission refused/);
   assert.deepEqual(body.lineageAdjust.excluded, ['devin-agent']);
   assert.equal(EXCLUDE_AFTER, 2);
-  const rejected = read(repo, (l) => selectPool({ kind: OP, difficulty: 'medium', capacity: {}, policy: 'prefer-then-overflow',
+  const rejected = read(repo, (l) => selectPool({ kind: OP, difficulty: 'medium', capacity: {},
     lineage: lineageRouteAdjust(l.db, l.db.prepare('SELECT * FROM jobs WHERE job_id=?').get(JOB)) }));
-  assert.match(rejected.rejected?.find((x) => x.target === 'devin-agent')?.reason ?? '',
+  assert.match(rejected.rejected?.find((x) => x.target === 'devin/swe-2-max')?.reason ?? '',
     new RegExp(`excluded for this retry lineage: failed 2x on it \\(quota \\(${P2}\\), no-report \\(${P1}\\)\\)`), 'newest attempt first');
 });
 

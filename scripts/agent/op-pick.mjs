@@ -3,6 +3,7 @@
 // token use are its later steps (scripts/lib/tier-pick.mjs through scripts/lib/agent-admission.mjs selectAdmission).
 import { adapterModelAuthority, loadAdapter, loadModelRegistry } from './model-registry.mjs';
 import { pickFromTier } from '../lib/tier-pick.mjs';
+import { selectorOf } from '../lib/owner-routing-bias.mjs';
 import { selectAdmission, admissionQualityFloor } from '../lib/agent-admission.mjs';
 import { kindRoute, raiseToFloor, missingHostTools, hostToolsRequired } from './models.mjs';
 import { tierMembers, tierOfOp, tierSettings } from './tiers.mjs';
@@ -57,7 +58,22 @@ function candidateOf(member, ctx) {
       openIncident: cap?.openIncident === true, ...(cap?.blockedUntil === undefined ? {} : { blockedUntil: cap.blockedUntil }) } };
 }
 
-const rejectedOf = (admission) => admission.rejected.map((row) => ({ target: row.id, reason: row.codes[0], reasons: row.codes }));
+// A rejected member reports its structural (hard-filter) reasons first, then the admission codes.
+function rejectedOf(admission, members) {
+  return admission.rejected.map((row) => {
+    const reasons = [...new Set([...(members.find((member) => member.id === row.id)?.hard ?? []), ...row.codes])];
+    return { target: row.id, reason: reasons[0], reasons };
+  });
+}
+
+/** The bias with every entry as a selector: a pool id string names the pool. */
+const selectorBias = (bias) => ({ ...bias, prefer: (bias.prefer ?? []).map(selectorOf), avoid: (bias.avoid ?? []).map(selectorOf), only: (bias.only ?? []).map(selectorOf) });
+
+/** A pool the retry's lineage failed on once is tried after the others of its tier (an owner bias still moves it first). */
+function demotedLast(members, lineage) {
+  const demoted = new Set(lineage?.demote ?? []);
+  return [...members.filter((member) => !demoted.has(member.target)), ...members.filter((member) => demoted.has(member.target))];
+}
 
 function noToolHolder(members, ctx, tools) {
   const structural = members.filter((member) => ctx.runtimes.runtimes[member.pool] && !roleReasons(ctx.runtimes.runtimes[member.pool], ctx.role).length);
@@ -75,7 +91,8 @@ function noToolHolder(members, ctx, tools) {
  * Output: {tier, target, modelId, effort, role, work, difficulty, measuredDifficulty, floor, chain, rejected, admission, pick} or {error, ...}.
  */
 export function pickOpModel(input = {}) {
-  const { kind, bias = {}, capacity = null, runtimes, scopeId, attemptId, now = Date.now(), modelsDir, opsDir, grants = null, lineage = null } = input;
+  const { kind, capacity = null, runtimes, scopeId, attemptId, now = Date.now(), modelsDir, opsDir, grants = null, lineage = null } = input;
+  const bias = selectorBias(input.bias ?? {});
   const registry = input.modelRegistry ?? loadModelRegistry(modelsDir);
   const settings = input.settings ?? tierSettings({ registry });
   const route = kindRoute(kind, runtimes), measured = input.difficulty;
@@ -84,7 +101,7 @@ export function pickOpModel(input = {}) {
   if (!route.role) return { error: `no role resolves for kind '${kind}'` };
   const tier = tierOfOp({ kind, difficulty }, settings);
   const ctx = { kind, role: route.role, runtimes, grants, lineage, capacity, modelsDir, opsDir, registry, backoff: input.backoff ?? (capacity ? poolCapsNow() : {}) };
-  const members = tierMembers(tier, { settings, registry }).map((member) => ({ ...member, hard: structuralReasons(member, ctx) }));
+  const members = demotedLast(tierMembers(tier, { settings, registry }).map((member) => ({ ...member, hard: structuralReasons(member, ctx) })), lineage);
   const base = { tier, role: route.role, work: route.work, difficulty, measuredDifficulty: measured, floor: route.floor, chain: members.map((member) => member.id) };
   const tools = noToolHolder(members, ctx, hostToolsRequired(kind, { opsDir }));
   if (tools) return { ...base, error: `no ${route.role} member of tier ${tier} has host tool ${tools.tools.join(', ')}`, toolUnavailable: tools };
@@ -96,11 +113,11 @@ export function pickOpModel(input = {}) {
     reserveOverride: bias.reserveOverride ?? null, history: input.historyOf?.(tier) ?? input.history ?? {},
     balance: { maxStreak: settings.balance.maxStreak, maxSharePercent: settings.balance.maxSharePercent } },
   candidates: members.map((member) => candidateOf(member, ctx)), policy, now });
-  const rejected = rejectedOf(admission);
+  const rejected = rejectedOf(admission, members);
   if (!admission.ok) return { ...base, error: `agent admission refused: ${admission.reason}`, admission, rejected, pick: admission.pick, resetAt: admission.resetAt };
   const chosen = members.find((member) => member.id === admission.selected.id);
   return { ...base, target: chosen.target, modelId: chosen.model, effort: chosen.effort, rejected, admission: { ...admission, selected: admission.selected }, pick: admission.pick,
-    chosenBy: admission.chosenBy };
+    chosenBy: admission.chosenBy, lineage: { demotedTaken: (lineage?.demote ?? []).includes(chosen.target) } };
 }
 
 // With no live evidence the plan applies the structural gates and the bias only: no quota, history or reservation is read.

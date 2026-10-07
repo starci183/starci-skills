@@ -6,6 +6,8 @@ import { admissionRoles, admissionSelectorFields } from './agent-admission.mjs';
 const POOLS = Object.freeze({codex:'codex-agent','codex-agent':'codex-agent',claude:'claude-agent','claude-agent':'claude-agent',devin:'devin-agent','devin-agent':'devin-agent'});
 const PROVIDERS = Object.freeze({codex:'codex',openai:'codex',claude:'claude',anthropic:'claude',devin:'devin',cursor:'cursor'});
 const plain = value => isPlainObject(value) && [Object.prototype,null].includes(Object.getPrototypeOf(value));
+/** A bias entry as a selector: a pool id string names the pool, a selector object is kept. */
+export const selectorOf = item => typeof item === 'string' ? { pool: item } : item;
 export const canonicalRoutingPool = value => typeof value === 'string' ? POOLS[value.trim().toLowerCase()] : undefined;
 const defaultRoles = () => {
   const policy = allocationSettings().admission;

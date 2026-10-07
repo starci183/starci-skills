@@ -102,7 +102,7 @@ function planRoute({ db, ledger, payload, kind, difficulty, rtDoc, rtMerged, reg
   let lineageAdjust = null;
   if (lineage) {
     lineageAdjust = { demoted: lineage.demote, excluded: lineage.exclude, pools: lineage.pools,
-      attempts: lineage.attempts, demotedTaken: false };
+      attempts: lineage.attempts, demotedTaken: decision?.lineage?.demotedTaken ?? false };
   } else if (lineageError) lineageAdjust = { demoted: [], excluded: [], error: lineageError };
   return { redesignAs, decision, lineageAdjust };
 }

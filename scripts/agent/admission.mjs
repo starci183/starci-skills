@@ -5,7 +5,7 @@ import { loadModelRegistry, loadRuntimes, loadAdapter, adapterModelAuthority } f
 import { selectAdmission, admissionQualityFloor, rejectionSummary } from '../lib/agent-admission.mjs';
 import { probeQuota } from './quota/index.mjs';
 import { prepareProviderBudget, reserveProviderBudget, markProviderBudget, releaseProviderBudget, providerBudgetUsage } from './provider-budget.mjs';
-import { biasForRole } from '../lib/owner-routing-bias.mjs';
+import { biasForRole, selectorOf } from '../lib/owner-routing-bias.mjs';
 import { inspectProviderCircuit } from '../machine/provider-circuit.mjs';
 import { poolCapsNow } from '../machine/pool-backoff.mjs';
 import { providerCircuitOf, kindRoute } from './models.mjs';
@@ -33,7 +33,6 @@ export function ownerBiasTrust(goalRow) {
 }
 /** The admission policy: allocation.admission with the tier usage thresholds, the owner's `models.usage` over the shipped ones. */
 export const admissionPolicyOf = (runtimes, settings = tierSettings()) => ({ ...runtimes?.allocation?.admission, ...settings.usage });
-const selectorOf = (item) => typeof item === 'string' ? { pool: item } : item;
 
 /** Both planning and fenced consumption consult the same strict circuit observation. */
 const observeAdmissionCircuit = (provider, { io, env, now }) => io?.circuit ? io.circuit(provider, { now, env })

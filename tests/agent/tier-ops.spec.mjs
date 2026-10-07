@@ -69,6 +69,16 @@ test('a streak of three picks of the head yields the fourth to the next member; 
   assert.equal(biased.target,'devin-agent','a bias beats balance');
 });
 
+test('a pool id string in a bias names the pool; a lineage demotion moves a pool last and reports when it is taken anyway',()=>{
+  const base={kind:'backend.implement',difficulty:'medium'};
+  assert.equal(route({...base,bias:{avoid:['devin-agent']}}).target,'codex-agent');
+  assert.equal(route({...base,bias:{only:['codex-agent']}}).target,'codex-agent');
+  const demoted=route({...base,lineage:{demote:['devin-agent'],exclude:[]}});
+  assert.deepEqual([demoted.target,demoted.chain.at(-1),demoted.lineage.demotedTaken],['codex-agent','devin/swe-2-max',false]);
+  const only=route({...base,bias:{only:['devin-agent']},lineage:{demote:['devin-agent'],exclude:[]}});
+  assert.deepEqual([only.target,only.lineage.demotedTaken],['devin-agent',true]);
+});
+
 test('Devin opens by an owner grant: none declared keeps it ungated, a declared list gates it',()=>{
   const medium={kind:'backend.implement',difficulty:'medium'};
   assert.equal(route(medium).target,'devin-agent','no grants passed: ungated routing');
