@@ -51,6 +51,7 @@ import { claimManager, lockHolder } from '../../connectors/lib.mjs';
 import { SETTLED_JOB_LIST } from '../../../engine/admission.mjs';
 import { NEEDS_KERNEL_EVENT, KERNEL_ONLY_OPS, reportedJobs, kernelHandoverOf } from '../../machine/reported-jobs.mjs';
 import { isMain } from '../../lib/is-main.mjs';
+import { eachInOrder } from '../../lib/in-order.mjs';
 import { settlerSettings, runtimeEnv, verifyReported, recordSettlerCheck, parse, slug, jsonOf } from './job-settle-verify.mjs';
 export { classifyCheck, argvOf } from './check-command.mjs';
 export { settlerSettings, runtimeEnv, verifyReported, recordSettlerCheck, rerunCheck, isBaselineCheck, parityCacheFile } from './job-settle-verify.mjs';
@@ -205,44 +206,90 @@ export async function releaseSettled(ledger, { workflowId = null, jobId = null, 
 
 const lockName = (repo, id) => `job-settle-${repoKey(repo)}-${slug(id)}`;
 
+/** The verifier's verdict for one reported job; a throwing verifier reads as a red `verify-error` verdict. */
+async function verdictOf(ledger, fresh, { repo, settings, env, dryRun, verify }) {
+  try { return await verify(ledger.db, fresh, { repo, settings, env,
+    record: dryRun ? async () => {} : (run) => recordSettlerCheck(ledger, fresh, run) }); }
+  catch (error) { return { green: false, reason: 'verify-error', detail: [String(error?.message ?? error).slice(0, 300)] }; }
+}
+
+/**
+ * A red verdict either ends the settle ({result}: dry-run row, checker unavailable, hand-off to the Kernel) or is
+ * settled mechanically ({settleAs, verdict}: the mechanical verdict and the verdict carrying its checks and `via`).
+ */
+async function redRedirectOf(ledger, fresh, verdict, { now, settings, dryRun }) {
+  const mechanical = verdict.unavailable ? null : mechanicalSettleOf(fresh, verdict);
+  if (dryRun) return { result: { target: mechanical ? 'settled' : 'kernel', row: { jobId: fresh.jobId, reason: verdict.reason, ...(mechanical ? { verdict: mechanical.verdict } : {}), unavailable: Boolean(verdict.unavailable), dryRun: true } } };
+  if (verdict.unavailable) return { result: { target: 'skipped', row: await checkerUnavailable(ledger, fresh, verdict, { now: now(), settings }) } };
+  if (!mechanical) return { result: { target: 'kernel', row: { ...handToKernel(ledger, fresh, verdict, { now: now() }), ...(verdict.detail ? { detail: verdict.detail } : {}) } } };
+  const viaReason = mechanical.checks ? `+${verdict.reason}` : '';
+  return { settleAs: mechanical.verdict, verdict: { ...verdict, checks: mechanical.checks ?? null, via: `report-${fresh.outcome}${viaReason}` } };
+}
+
+/** Records the mechanical settle's checks through the API; a refusal is the hand-off result, success is null. */
+function recordMechanicalChecks(ledger, fresh, verdict, { repo, env, now, api }) {
+  if (!verdict.checks) return null;
+  const file = checksFile(fresh, verdict.checks);
+  const checked = api(['record-checks', '--repo', repo, '--job', fresh.jobId, '--checks-file', file], { env });
+  try { fs.rmSync(file, { force: true }); } catch { /* temp */ }
+  if (checked.ok) return null;
+  return { target: 'kernel', row: handToKernel(ledger, fresh, { reason: 'check-refused', code: checked.code, detail: [checked.error] }, { now: now() }) };
+}
+
+/** The result of a refused settle API call: an already-settled job is skipped, anything else goes to the Kernel. */
+function settleRefused(ledger, fresh, settled, now) {
+  if (settled.code === 'job-settled') return { target: 'skipped', row: { jobId: fresh.jobId, reason: 'already-settled' } };
+  return { target: 'kernel', row: handToKernel(ledger, fresh, { reason: 'settle-refused', code: settled.code, detail: [settled.error] }, { now: now() }) };
+}
+
 /**
  * One reported job's settle inside its per-job lock: verify, then the mechanical write path (record-checks, settle,
  * events). Returns {target: 'skipped'|'kernel'|'settled', row}; the caller pushes row onto out[target]. Ledger writes
  * stay serialized per job - sequential awaits are the ordering guarantee, not a performance bug.
  */
 async function settleReported(ledger, fresh, { repo, settings, env, now, dryRun, verify, api }) {
-  let verdict;
-  try { verdict = await verify(ledger.db, fresh, { repo, settings, env,
-    record: dryRun ? async () => {} : (run) => recordSettlerCheck(ledger, fresh, run) }); }
-  catch (error) { verdict = { green: false, reason: 'verify-error', detail: [String(error?.message ?? error).slice(0, 300)] }; }
+  const verdict = await verdictOf(ledger, fresh, { repo, settings, env, dryRun, verify });
   let settleAs = 'pass';
+  let judged = verdict;
   if (!verdict.green) {
-    const mechanical = verdict.unavailable ? null : mechanicalSettleOf(fresh, verdict);
-    if (dryRun) return { target: mechanical ? 'settled' : 'kernel', row: { jobId: fresh.jobId, reason: verdict.reason, ...(mechanical ? { verdict: mechanical.verdict } : {}), unavailable: Boolean(verdict.unavailable), dryRun: true } };
-    if (verdict.unavailable) return { target: 'skipped', row: await checkerUnavailable(ledger, fresh, verdict, { now: now(), settings }) };
-    if (!mechanical) return { target: 'kernel', row: { ...handToKernel(ledger, fresh, verdict, { now: now() }), ...(verdict.detail ? { detail: verdict.detail } : {}) } };
-    settleAs = mechanical.verdict;
-    const viaReason = mechanical.checks ? `+${verdict.reason}` : '';
-    verdict = { ...verdict, checks: mechanical.checks ?? null, via: `report-${fresh.outcome}${viaReason}` };
+    const redirect = await redRedirectOf(ledger, fresh, verdict, { now, settings, dryRun });
+    if (redirect.result) return redirect.result;
+    ({ settleAs, verdict: judged } = redirect);
   }
-  if (dryRun) return { target: 'settled', row: { jobId: fresh.jobId, via: verdict.via, dryRun: true } };
-  if (verdict.checks) {
-    const file = checksFile(fresh, verdict.checks);
-    const checked = api(['record-checks', '--repo', repo, '--job', fresh.jobId, '--checks-file', file], { env });
-    try { fs.rmSync(file, { force: true }); } catch { /* temp */ }
-    if (!checked.ok) return { target: 'kernel', row: handToKernel(ledger, fresh, { reason: 'check-refused', code: checked.code, detail: [checked.error] }, { now: now() }) };
-  }
+  if (dryRun) return { target: 'settled', row: { jobId: fresh.jobId, via: judged.via, dryRun: true } };
+  const checksRefused = recordMechanicalChecks(ledger, fresh, judged, { repo, env, now, api });
+  if (checksRefused) return checksRefused;
   const settled = api(['settle', '--repo', repo, '--job', fresh.jobId, '--verdict', settleAs], { env });
-  if (!settled.ok) {
-    if (settled.code === 'job-settled') return { target: 'skipped', row: { jobId: fresh.jobId, reason: 'already-settled' } };
-    return { target: 'kernel', row: handToKernel(ledger, fresh, { reason: 'settle-refused', code: settled.code, detail: [settled.error] }, { now: now() }) };
-  }
+  if (!settled.ok) return settleRefused(ledger, fresh, settled, now);
   const at = now();
-  event(ledger, fresh, EVENTS.settled, { from: STATES.reported, to: STATES.settled, op: fresh.op, attempt: fresh.attempt, verdict: settleAs, via: verdict.via,
+  event(ledger, fresh, EVENTS.settled, { from: STATES.reported, to: STATES.settled, op: fresh.op, attempt: fresh.attempt, verdict: settleAs, via: judged.via,
     latencyMs: at - fresh.filedAt, consumedBefore: fresh.consumedAt != null, nextStep: settled.value?.nextStep ?? null, cutSet: settled.value?.cutSet ?? null,
-    tail: settled.value?.tail ?? null, ...(verdict.parity ? { parity: verdict.parity } : {}) });
+    tail: settled.value?.tail ?? null, ...(judged.parity ? { parity: judged.parity } : {}) });
   markAttempt(ledger, fresh, { settledAt: at, settledBy: 'settler' });
-  return { target: 'settled', row: { jobId: fresh.jobId, op: fresh.op, verdict: settleAs, via: verdict.via, latencyMs: at - fresh.filedAt, status: settled.value?.status ?? (settleAs === 'pass' ? 'succeeded' : 'failed') } };
+  return { target: 'settled', row: { jobId: fresh.jobId, op: fresh.op, verdict: settleAs, via: judged.via, latencyMs: at - fresh.filedAt, status: settled.value?.status ?? (settleAs === 'pass' ? 'succeeded' : 'failed') } };
+}
+
+/** One reported job under its per-job lock: re-read, settle, and file the row into `out`; a throw is recorded, not rethrown. */
+async function settleItem(ledger, item, out, { repo, abs, settings, env, now, dryRun, verify, api, locks }) {
+  const held = locks && !dryRun ? claimManager(lockName(repo, item.jobId), { env }) : { ok: true, release: () => {} };
+  if (!held.ok) { out.skipped.push({ jobId: item.jobId, reason: 'in-progress' }); return; }
+  try {
+    // Re-read under the lock: another pass (or the Kernel) may have settled it meanwhile.
+    const fresh = reportedJobs(ledger.db, { jobId: item.jobId })[0];
+    if (!fresh) { out.skipped.push({ jobId: item.jobId, reason: 'no-longer-reported' }); return; }
+    const done = await settleReported(ledger, fresh, { repo: abs, settings, env, now, dryRun, verify, api });
+    out[done.target].push(done.row);
+  } catch (error) {
+    out.ok = false;
+    out.errors.push({ jobId: item.jobId, error: String(error?.stack ?? error).slice(0, 400) });
+  } finally { held.release(); }
+}
+
+/** The pass tail: retry due settle tails (starci kernel settle-tail), then close leaked leases and overdue incidents (H12). */
+function retryAndSweep(ledger, out, { repo, workflowId, jobId, settings, env, now }) {
+  try { out.tails = retryDueTails({ repo, settings, env, now: now() }); } catch (error) { out.errors.push({ step: 'tail', error: String(error?.message ?? error).slice(0, 300) }); }
+  if (jobId) return;
+  try { out.leaks = sweepLedgerLeaks(ledger, { workflowId, now: now() }); } catch (error) { out.errors.push({ step: 'leaks', error: String(error?.message ?? error).slice(0, 300) }); }
 }
 
 /**
@@ -256,30 +303,11 @@ export async function reconcileJobSettle({ repo, workflowId = null, jobId = null
   const out = { ok: true, repo: abs, workflowId, jobId, settled: [], kernel: [], released: [], skipped: [], errors: [] };
   const ledger = openLedger({ file: ledgerFileFor(abs) });
   try {
-    for (const item of reportedJobs(ledger.db, { workflowId, jobId })) {
-      const held = locks && !dryRun ? claimManager(lockName(repo, item.jobId), { env }) : { ok: true, release: () => {} };
-      if (!held.ok) { out.skipped.push({ jobId: item.jobId, reason: 'in-progress' }); continue; }
-      try {
-        // Re-read under the lock: another pass (or the Kernel) may have settled it meanwhile.
-        const fresh = reportedJobs(ledger.db, { jobId: item.jobId })[0];
-        if (!fresh) { out.skipped.push({ jobId: item.jobId, reason: 'no-longer-reported' }); continue; }
-        const done = await settleReported(ledger, fresh, { repo: abs, settings, env, now, dryRun, verify, api });
-        out[done.target].push(done.row);
-      } catch (error) {
-        out.ok = false;
-        out.errors.push({ jobId: item.jobId, error: String(error?.stack ?? error).slice(0, 400) });
-      } finally { held.release(); }
-    }
+    await eachInOrder(reportedJobs(ledger.db, { workflowId, jobId }), (item) => settleItem(ledger, item, out,
+      { repo, abs, settings, env, now, dryRun, verify, api, locks }));
     try { out.released = await releaseSettled(ledger, { workflowId, jobId, now: now(), settings, dryRun }); }
     catch (error) { out.ok = false; out.errors.push({ step: 'release', error: String(error?.message ?? error).slice(0, 300) }); }
-    // The async settle tail (starci kernel settle-tail): a failed or never-started tail run is retried here.
-    if (!dryRun) {
-      try { out.tails = retryDueTails({ repo, settings, env, now: now() }); } catch (error) { out.errors.push({ step: 'tail', error: String(error?.message ?? error).slice(0, 300) }); }
-      // H12: leaked leases and overdue incidents are closed or escalated through their owner, every pass.
-      if (!jobId) {
-        try { out.leaks = sweepLedgerLeaks(ledger, { workflowId, now: now() }); } catch (error) { out.errors.push({ step: 'leaks', error: String(error?.message ?? error).slice(0, 300) }); }
-      }
-    }
+    if (!dryRun) retryAndSweep(ledger, out, { repo, workflowId, jobId, settings, env, now });
   } finally { ledger.close(); }
   return out;
 }
@@ -416,17 +444,19 @@ const resultLine = (r) => {
 // No top-level await: scripts/machine/decisions.mjs imports this module, and a dynamic import of it while this
 // module still evaluates would deadlock (exit 13).
 if (isMain(import.meta.url)) (async () => {
-  const argv = process.argv.slice(2);
-  const val = (n) => { const i = argv.indexOf(`--${n}`); return i >= 0 ? argv[i + 1] ?? null : null; };
-  const has = (n) => argv.includes(`--${n}`);
-  let repos = [];
-  if (val('repo')) repos = [path.resolve(val('repo'))];
-  else if (has('all') || has('invariant')) repos = await supervisedRepos();
-  if (!repos.length) { console.error('use: job-settle.mjs --repo <ledger-owner> [--workflow <id>] [--job <id>] [--dry-run] [--json] | --all | --invariant [--repo <r>]'); process.exit(2); }
-  const results = [];
-  for (const repo of repos) await runRepo(repo, { val, has, results });
-  const out = { ok: results.every((r) => r.ok !== false), results };
-  if (has('json')) console.log(JSON.stringify(out));
-  else for (const r of results) console.log(resultLine(r));
-  process.exitCode = out.ok ? 0 : 1;
-})().catch((error) => { console.error(error); process.exit(1); });
+  try {
+    const argv = process.argv.slice(2);
+    const val = (n) => { const i = argv.indexOf(`--${n}`); return i >= 0 ? argv[i + 1] ?? null : null; };
+    const has = (n) => argv.includes(`--${n}`);
+    let repos = [];
+    if (val('repo')) repos = [path.resolve(val('repo'))];
+    else if (has('all') || has('invariant')) repos = await supervisedRepos();
+    if (!repos.length) { console.error('use: job-settle.mjs --repo <ledger-owner> [--workflow <id>] [--job <id>] [--dry-run] [--json] | --all | --invariant [--repo <r>]'); process.exit(2); }
+    const results = [];
+    await eachInOrder(repos, (repo) => runRepo(repo, { val, has, results }));
+    const out = { ok: results.every((r) => r.ok !== false), results };
+    if (has('json')) console.log(JSON.stringify(out));
+    else for (const r of results) console.log(resultLine(r));
+    process.exitCode = out.ok ? 0 : 1;
+  } catch (error) { console.error(error); process.exit(1); }
+})();
