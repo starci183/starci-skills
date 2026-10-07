@@ -52,7 +52,7 @@ function workflowPipelineRoute(request, response, store, row, db, wf, helpers) {
   sendJson(request, response, { ...pipelineOf(db, row.name, wf), usage: usageDetail(db, { wf }) }, { sources: [...source(row.name, 'goals', 'work_units', 'v_op_history', 'op_attempts', 'check_runs', 'jobs', 'work_graph_versions', 'logs', 'events', 'llm_usage'), ...source('runtime', 'modules/ops/ops/*.yaml', 'modules/ops/_common.yaml', 'modules/ops/_labels.yaml')], stale: staleOf(store) });
   return true;
 }
-function workflowUnitsRoute(request, response, store, url, row, db, wf, extra, helpers) {
+function workflowUnitsRoute(request, response, store, url, { row, db, wf, extra }, helpers) {
   const { sendJson, sendError, unitDetail, source, staleOf, many, unitRow, pageData } = helpers;
   if (extra) {
     const item = unitDetail(db, row.name, wf, extra);
@@ -106,11 +106,11 @@ function workflowPathContext(request, response, store, match, helpers) {
 function workflowPathRoute(request, response, store, url, match, helpers) {
   const context = workflowPathContext(request, response, store, match, helpers);
   if (!context) return true;
-  const { wf, extra, row, db, route } = context;
+  const { wf, row, db, route } = context;
   if (route === 'detail') return workflowDetailRoute(request, response, store, row, db, wf, helpers);
   if (route === 'graph') return workflowGraphRoute(request, response, store, row, db, wf, helpers);
   if (route === 'pipeline') return workflowPipelineRoute(request, response, store, row, db, wf, helpers);
-  if (route === 'units') return workflowUnitsRoute(request, response, store, url, row, db, wf, extra, helpers);
+  if (route === 'units') return workflowUnitsRoute(request, response, store, url, context, helpers);
   if (route === 'worktrees') return workflowWorktreesRoute(request, response, store, url, row, wf, helpers);
   if (['rca', 'coverage', 'verify'].includes(route)) return workflowMetricRoute(request, response, store, row, wf, route, helpers);
   return false;
