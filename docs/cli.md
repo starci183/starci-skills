@@ -1669,6 +1669,14 @@ raise, resolve or attach typed release conditions to a workflow incident
 | `--detail` | string |  |
 | `--op` | string |  |
 | `--holds` | string |  |
+| `--cause` | string |  |
+| `--workaround` | string |  |
+| `--no-workaround` | string |  |
+| `--because` | string |  |
+| `--evidence` | string |  |
+| `--resolution` | enum fixed|workaround|not-runtime-fault |  |
+| `--commit` | string |  |
+| `--route` | string |  |
 | `--peer` | string |  |
 | `--refs` | string |  |
 | `--resolve` | string |  |
@@ -1685,6 +1693,9 @@ raise, resolve or attach typed release conditions to a workflow incident
 | `--until-incident` | list |  |
 | `--until-foundation` | list |  |
 | `--until-landed` | list |  |
+| `--until-runtime-has` | list |  |
+| `--until-admission` | list |  |
+| `--until-check` | list |  |
 
 exit: 0 raised, resolved or attached; 1 refused or failed (unknown or not-open incident, wrong kind combination); 2 bad usage: a required flag is missing or a flag has no value
 

@@ -6,7 +6,7 @@ import { clipLine } from '../lib/clip.mjs';
 const RESOLVE = 'starci kernel incident --repo <repo> --workflow';
 
 /** The three typed resolutions as commands the Supervisor runs (the DI's options). */
-export const gateOptions = (workflowId, incidentId) => {
+const gateOptions = (workflowId, incidentId) => {
   const base = `${RESOLVE} ${workflowId} --resolve ${incidentId} --by supervisor`;
   return [
     { key: 'fixed', verb: `${base} --resolution fixed --commit <sha> --detail <what landed>`, title: 'fixed: a runtime fix; the gate resolves once the live runtime contains the commit', tier: 'supervisor', recommended: false },

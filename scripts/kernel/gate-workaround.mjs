@@ -17,7 +17,7 @@ const text = (value) => (typeof value === 'string' ? value.trim() : '');
 const reasonList = (cause) => Object.entries(cause.noWorkaround ?? {}).map(([id, why]) => `${id} (${why})`).join('; ');
 
 /** The members of the job's last route decision that are neither its current pool nor rejected there: the agents a no-workaround claim overlooks. */
-export const untriedMembersOf = (db, jobId) => {
+const untriedMembersOf = (db, jobId) => {
   const row = db?.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(jobId);
   const payload = parseJson(row?.payload_json, {}) ?? {};
   const rejected = new Set(list(payload.routeRejected).map((entry) => entry?.target));

@@ -25,7 +25,7 @@ export const gateResolutions = () => gatePolicyOf().resolutions;
 export const gateCauseOf = (gate) => gate.workaround?.cause ?? UNCLASSIFIED;
 
 /** The scope of a gate: its holds, in a stable order. */
-export const gateScopeOf = (gate) => [...gate.holds].sort().join('+');
+const gateScopeOf = (gate) => [...gate.holds].sort().join('+');
 
 /** Gates raised earlier in the workflow with the same cause and scope: the episode number of this one. */
 const episodeOf = (db, workflowId, gate) => db.prepare("SELECT entity_id,payload_json FROM events WHERE workflow_id=? AND entity_type='incident' AND kind='incident-raised' ORDER BY seq").all(workflowId)
@@ -37,7 +37,7 @@ const episodeOf = (db, workflowId, gate) => db.prepare("SELECT entity_id,payload
 export const gateSubjectOf = (db, workflowId, gate) => `gate-${gateCauseOf(gate)}-${gateScopeOf(gate)}-${Math.max(0, episodeOf(db, workflowId, gate))}`;
 
 /** The newest Supervisor answer recorded on the gate, or null. */
-export const gateAnswerOf = (db, workflowId, incidentId) => {
+const gateAnswerOf = (db, workflowId, incidentId) => {
   const row = db.prepare(`SELECT created_at,payload_json FROM events WHERE workflow_id=? AND entity_type='incident' AND entity_id=? AND kind='${ANSWERED_EVENT}' ORDER BY seq DESC LIMIT 1`).get(workflowId, incidentId);
   return row ? { at: row.created_at, ...parseJson(row.payload_json, {}) } : null;
 };
