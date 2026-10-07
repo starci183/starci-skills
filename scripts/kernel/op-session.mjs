@@ -195,7 +195,8 @@ const terminalGate = ({ handle, env, show }) => {
   try { shown = show({ terminal: handle }); } catch { shown = null; }
   if (shown?.ok && shown.connected === true) return 'terminal-still-open';
   const gone = shown?.ok === true || (shown?.hostUnavailable !== true && TERMINAL_GONE_CODES.has(shown?.errorCode));
-  return gone ? null : (shown?.hostUnavailable ? 'orca-unavailable' : 'terminal-unreadable');
+  if (gone) return null;
+  return shown?.hostUnavailable ? 'orca-unavailable' : 'terminal-unreadable';
 };
 
 /** The attributed session files: identity matches plus the payload's learned list that still exists. */
