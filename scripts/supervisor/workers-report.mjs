@@ -11,7 +11,10 @@ export function resolveReportCommit(job, outcome, commit, root, git) {
   return { sha };
 }
 
-export function recordWorkerReport(m, job, jobId, outcome, report, sha, summary, needs, now, { attemptIdOf, releaseLeases, setJob, supervisorEvent }) {
+/** Record the filed `report` (outcome, commit, summary, needs, specs) of `job` on the ledger. */
+export function recordWorkerReport(m, job, report, now, { attemptIdOf, releaseLeases, setJob, supervisorEvent }) {
+  const { outcome, commit: sha, summary, needs } = report;
+  const jobId = job.job_id;
   m.transaction(() => {
     const attemptId = attemptIdOf(m, jobId);
     m.recordSupReport({ attemptId, jobId, outcome, report });

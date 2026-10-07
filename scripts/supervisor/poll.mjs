@@ -256,7 +256,10 @@ function appendCycleStatus(lines, db, wfs, names, repo, wanted) {
   for (const l of launchStreaks(db, wanted)) lines.push(`  LAUNCH-FAIL ${l.provider}: ${l.count} refused launches in the last hour (last ${l.lastStep}: ${l.lastError})`);
 }
 
-function appendProgressChecks(lines, db, repo, wanted, stall, stallMinutes, owed, verdicts) {
+// `scope` is what the stall and owed projections read ({ repo, wanted, stallMinutes, verdicts }); `projections` is the pair { stall, owed } that judges it.
+function appendProgressChecks(lines, db, scope, projections) {
+  const { repo, wanted, stallMinutes, verdicts } = scope;
+  const { stall, owed } = projections;
   let stalls = [];
   try { stalls = stall(db, { repo, wanted, stallMinutes, verdicts }); } catch (e) { lines.push(`  stall check failed: ${String(e?.message ?? e).slice(0, 160)}`); }
   for (const f of stalls) lines.push(`  ${f.line}`);
@@ -303,7 +306,7 @@ export const cycle = async (db, { repo, wanted = new Set(), state, timeoutMs = P
   // live watchdog idle-waiting on a gate whose reason is gone read healthy above.
   // The gate and peer-wait verdicts of this cycle, judged once and shared by the stall and owed projections.
   const verdicts = new Map();
-  const { stalls, owedItems } = appendProgressChecks(lines, db, repo, wanted, stall, stallMinutes, owed, verdicts);
+  const { stalls, owedItems } = appendProgressChecks(lines, db, { repo, wanted, stallMinutes, verdicts }, { stall, owed });
   const tree = orcaTree(db, { repo });
   // TASK_OUTSIDE_RUN is a leak count, not an action per job: one line per
   // workflow; workflows that already finished are summarized, not listed.

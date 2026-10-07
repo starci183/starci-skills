@@ -175,7 +175,7 @@ function valueProblems(schema, value, type, where, operation, used) {
 }
 
 function fragmentSelectionProblems(context, selection) {
-  const { schema, document, parentName, path, operation, used, visiting } = context;
+  const { schema, document, path, operation, used, visiting } = context;
   const fragment = document.fragments.get(selection.name);
   if (fragment === undefined) return [`${path} spreads ...${selection.name}, which the document does not define`];
   if (visiting.has(selection.name)) return [];

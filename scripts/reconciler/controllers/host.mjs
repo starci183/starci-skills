@@ -55,9 +55,9 @@ import { claimDue, finishDuty, listSchedules } from '../schedules.mjs';
 import { pathKey } from '../../lib/path-key.mjs';
 import os from 'node:os';
 import { seatStateOf, coreDebugSeatKey, reconcileCoreDebugSeat } from '../host-seats.mjs';
-import { createStaleTerminalStep, staleTerminalsOf, STALE_RETRY_MS, STALE_ESCALATE_TRIES, CLOSE_VERIFY } from '../host-stale.mjs';
-import { eachInOrder, mapInOrder } from '../../lib/in-order.mjs';
-export { seatStateOf, staleTerminalsOf, STALE_RETRY_MS, STALE_ESCALATE_TRIES, CLOSE_VERIFY };
+import { createStaleTerminalStep } from '../host-stale.mjs';
+import { eachInOrder } from '../../lib/in-order.mjs';
+export { staleTerminalsOf, STALE_RETRY_MS, STALE_ESCALATE_TRIES, CLOSE_VERIFY } from '../host-stale.mjs'; export { seatStateOf };
 
 /**
  * MB-01: the host's boot identity - the machine's boot minute. The boot order runs once per host boot (and when Orca
@@ -138,6 +138,39 @@ const brief = (probe) => {
 // The engine reads resyncMs/concurrency from modules/reconciler/host.yaml itself; the export mirrors them, and an
 // unreadable file never breaks discovery.
 const yamlNumber = (key, fallback) => { try { return hostSettings()[key]; } catch { return fallback; } };
+
+// A failed probe whose port still answers within aliveTimeoutMs is slow, not down: never restarted, the pass counts as degraded.
+async function degradeIfSlow(ctx, { name, entry, step, next, now }) {
+  if (step.act === 'start' && entry.answers && await entry.answers().catch(() => false)) {
+    next.restarts = next.restarts.slice(0, -1);
+    next.state = 'degraded'; next.since = now; next.nextAttemptAt = null;
+    step.act = null; step.to = 'degraded';
+    next.lastSlowAt = now;
+    await ctx.log('reconciler.host.service-slow', `${name}: probe failed ${next.failStreak}x but it still answers; not restarted`, { name, probe: next.lastProbe });
+  }
+}
+
+async function startService(ctx, { entry, step, next, now }) {
+  if (step.act !== 'start') return;
+  const a = entry.start();
+  if (a) { next.lastStart = { at: now, cmd: a.cmd, args: a.args }; next.lastStartResult = await ctx.run(a.cmd, a.args, { timeoutMs: entry.startTimeoutMs }); }
+}
+
+// The footprint scan, once per footprintEveryMs; true when it ran.
+async function scanFootprint(ctx, p, now) {
+  if (!claimDue(ctx, { controller: 'host', duty: 'footprint', intervalMs: p.footprintEveryMs, now }).due) return false;
+  const r = await ctx.run('node', [FOOTPRINT_SCAN, '--json'], { timeoutMs: 600_000 });
+  finishDuty(ctx, { controller: 'host', duty: 'footprint', result: (r?.shadow && 'skipped') || (r?.ok === false && 'failed') || 'done', actionId: r?.actionId ?? null, now: ctx.now() });
+  return true;
+}
+
+// The open op attempts of a ledger whose newest snapshot is at or before `cutoff`.
+async function dueAttempts(ctx, l, cutoff) {
+  try {
+    return (await ctx.read(l.ledgerId, (db) => db.prepare(`SELECT count(*) AS n FROM op_attempts a WHERE a.settled_at IS NULL AND a.end_state IS NULL AND a.terminal_handle IS NOT NULL
+        AND a.terminal_closed_at IS NULL AND COALESCE((SELECT max(at) FROM attempt_transcript_snapshots s WHERE s.attempt_id=a.attempt_id), 0) <= ?`).get(cutoff)))?.n ?? 0;
+  } catch { return 0; } // an old-schema ledger has no attempts to snapshot
+}
 
 export function createHostController(deps = {}) {
   const lazy = (fn) => { let v; let done = false; return () => { if (!done) { v = fn(); done = true; } return v; }; };
@@ -223,23 +256,6 @@ export function createHostController(deps = {}) {
     numbers: turnNumbers(), settings: settings(), save: (record) => store().put(record), clock, clear });
 
   /* -------------------------------------------------------- services */
-
-  // A failed probe whose port still answers within aliveTimeoutMs is slow, not down: never restarted, the pass counts as degraded.
-  async function degradeIfSlow(ctx, { name, entry, step, next, now }) {
-    if (step.act === 'start' && entry.answers && await entry.answers().catch(() => false)) {
-      next.restarts = next.restarts.slice(0, -1);
-      next.state = 'degraded'; next.since = now; next.nextAttemptAt = null;
-      step.act = null; step.to = 'degraded';
-      next.lastSlowAt = now;
-      await ctx.log('reconciler.host.service-slow', `${name}: probe failed ${next.failStreak}x but it still answers; not restarted`, { name, probe: next.lastProbe });
-    }
-  }
-
-  async function startService(ctx, { entry, step, next, now }) {
-    if (step.act !== 'start') return;
-    const a = entry.start();
-    if (a) { next.lastStart = { at: now, cmd: a.cmd, args: a.args }; next.lastStartResult = await ctx.run(a.cmd, a.args, { timeoutMs: entry.startTimeoutMs }); }
-  }
 
   async function openServiceDecisions(ctx, { name, entry, step, next, now, s }) {
     if (step.quarantined) {
@@ -462,14 +478,6 @@ export function createHostController(deps = {}) {
     state.orphanClocks = seen;
   }
 
-  // The footprint scan, once per footprintEveryMs; true when it ran.
-  async function scanFootprint(ctx, p, now) {
-    if (!claimDue(ctx, { controller: 'host', duty: 'footprint', intervalMs: p.footprintEveryMs, now }).due) return false;
-    const r = await ctx.run('node', [FOOTPRINT_SCAN, '--json'], { timeoutMs: 600_000 });
-    finishDuty(ctx, { controller: 'host', duty: 'footprint', result: (r?.shadow && 'skipped') || (r?.ok === false && 'failed') || 'done', actionId: r?.actionId ?? null, now: ctx.now() });
-    return true;
-  }
-
   // INV-H2: Orca's terminals against the workers Orca itself holds active (every seat, op and [Worker] is a
   // worker-start worker; worker-list is the one count). An Orca that does not answer for every Run proves nothing (null).
   async function terminalDrift(ctx, p) {
@@ -511,14 +519,6 @@ export function createHostController(deps = {}) {
    * open attempt due one) and of every live Kernel/Supervisor seat (transcripts.mjs snapshotSeats over machine.sqlite).
    * Snapshots write rows, so shadow records the runs (would-rows) and writes nothing.
    */
-  // The open op attempts of a ledger whose newest snapshot is at or before `cutoff`.
-  async function dueAttempts(ctx, l, cutoff) {
-    try {
-      return (await ctx.read(l.ledgerId, (db) => db.prepare(`SELECT count(*) AS n FROM op_attempts a WHERE a.settled_at IS NULL AND a.end_state IS NULL AND a.terminal_handle IS NOT NULL
-        AND a.terminal_closed_at IS NULL AND COALESCE((SELECT max(at) FROM attempt_transcript_snapshots s WHERE s.attempt_id=a.attempt_id), 0) <= ?`).get(cutoff)))?.n ?? 0;
-    } catch { return 0; } // an old-schema ledger has no attempts to snapshot
-  }
-
   async function transcripts(ctx) {
     const now = ctx.now();
     const everyMs = deps.transcriptEveryMs ?? 60_000;

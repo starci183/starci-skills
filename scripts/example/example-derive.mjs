@@ -253,7 +253,7 @@ const usedByOutput = (byKind) => {
   return usedByOut;
 };
 
-const derivedRecordOf = (record, evidenceByDir, appliesToSources, records, workspaceDoc, workRoot, canon, usedBy) => {
+const derivedRecordOf = (record, { evidenceByDir, appliesToSources, records, workspaceDoc, workRoot, canon, usedBy }) => {
   const {state: effectiveState, reason} = effectiveStateOf(record, evidenceByDir, appliesToSources, records, workspaceDoc, workRoot, canon);
   const blockedByEdges = Array.isArray(record.data.blockedBy) ? record.data.blockedBy : [];
   const byKind = usedBy.get(record.id);
@@ -281,7 +281,7 @@ export function computeDerived(workRoot) {
 
   const derivedRecords = new Map();
   for (const record of records.values()) {
-    const derived = derivedRecordOf(record, evidenceByDir, appliesToSources, records, workspaceDoc, workRoot, canon, usedBy);
+    const derived = derivedRecordOf(record, { evidenceByDir, appliesToSources, records, workspaceDoc, workRoot, canon, usedBy });
     derivedRecords.set(record.id, derived);
   }
 

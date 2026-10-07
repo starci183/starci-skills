@@ -1,4 +1,5 @@
-const retainChildManager = (name, env, read, retain, original, manager, current, sameConnectorOwner) => {
+const retainChildManager = (name, options, original, manager, current, sameConnectorOwner) => {
+  const { env, read, retain } = options;
   try {
     if (retain(current, { manager, child: current.stopReceipt?.child ?? null }) !== true)
       return { failure: { ok: false, effectState: 'unknown', reason: 'connector-stop-record-refused', custody: current, receipt: { manager } } };
@@ -9,7 +10,7 @@ const retainChildManager = (name, env, read, retain, original, manager, current,
 };
 
 const closeConnectorManager = (name, options, original, prior, identity, checks) => {
-  const { child, env, read, stop, retain } = options;
+  const { child, env, read, stop } = options;
   const { closedProcess, sameConnectorOwner } = checks;
   let manager;
   if (closedProcess(prior?.manager, identity)) manager = prior.manager;
@@ -19,7 +20,7 @@ const closeConnectorManager = (name, options, original, prior, identity, checks)
   try { current = read(name, env); } catch (error) { return { failure: { ok: false, effectState: 'unknown', reason: 'connector-state-unreadable', custody: original, receipt: { manager }, error: String(error?.message ?? error) } }; }
   if (!sameConnectorOwner(current, original)) return { failure: { ok: false, effectState: 'unknown', reason: 'connector-owner-changed', custody: original, receipt: { manager } } };
   if (child) {
-    const retained = retainChildManager(name, env, read, retain, original, manager, current, sameConnectorOwner);
+    const retained = retainChildManager(name, options, original, manager, current, sameConnectorOwner);
     if (retained.failure) return retained;
     current = retained.current;
   }
@@ -60,7 +61,7 @@ const commitConnectorStop = (name, options, original, current, manager, childRec
 };
 
 export function stopConnectorFlow(name, options, checks) {
-  const { source, child, env, read, stop, retain, commit } = options;
+  const { source, child, env, read, stop } = options;
   let original;
   try { original = read(name, env); } catch (error) { return { ok: false, effectState: 'unknown', reason: 'connector-state-unreadable', error: String(error?.message ?? error) }; }
   if (!original) return { ok: false, effectState: 'unknown', reason: 'connector-custody-missing' };

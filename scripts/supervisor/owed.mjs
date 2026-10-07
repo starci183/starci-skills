@@ -249,7 +249,7 @@ const typedClass = (t) => {
 const ownerAskClass = (cx, text) => {
   const peers = namedWorkflows(text).filter((id) => id !== cx.wf);
   const named = new Set(String(text).match(/\bctx_[0-9a-f]{12}\b/g) ?? []);
-  const openNamed = [...cx.ownAsks, ...peers.flatMap(cx.asksOf)].filter((d) => named.has(d));
+  const openNamed = [...cx.ownAsks, ...peers.flatMap((id) => cx.asksOf(id))].filter((d) => named.has(d));
   return openNamed.length ? [CLASSES.owner, `names open owner ask ${openNamed.join(', ')}`] : null;
 };
 

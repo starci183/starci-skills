@@ -40,7 +40,7 @@ const CODE = /\.(mjs|cjs|js|ts|tsx|ps1|sh|cmd)$/;
 const HOOK = /(^|\/)(?:\.husky|hooks\/husky)\/[^/]+$/;
 const GENERATED = /^packages\/[^/]+\/runtime\/|^packages\/eslint\/[^/]+\/runtime\//;
 const isTest = (rel) => rel.startsWith('tests/') || /\.(test|spec)\.mjs$/.test(rel);
-const HISTORY = /^modules\/kernel\/owner-rulings\.yaml/;
+const HISTORY = 'modules/kernel/owner-rulings.yaml';
 const COMMENT_LINE = /^\s*(\/\/|\/\*|\*|#)/;
 const EXEC_POSITION = /\b(run|check|script|executable|entry|command|exec|cmd|handler)\s*:/;
 const EXEC_KEY = /\b(?:run|check|script|executable|entry|command|exec|cmd|handler)\s*:\s*['"]?(?:(?:node|npm run)\s+)?[\w./-]+\.mjs/;
@@ -90,7 +90,7 @@ const scriptFinding = (rel, entries, reader) => {
 export function deadScriptFindings({ tracked, read }) {
   const scripts = tracked.filter((rel) => rel.endsWith('.mjs') && SCRIPT_ROOTS.some((r) => rel.startsWith(`${r}/`)) && !isTest(rel));
   const entries = parseEntries(tracked.includes(ALLOWLIST_FILE) ? read(ALLOWLIST_FILE) : '');
-  const readers = tracked.filter((rel) => !isTest(rel) && !GENERATED.test(rel) && !HISTORY.test(rel));
+  const readers = tracked.filter((rel) => !isTest(rel) && !GENERATED.test(rel) && !rel.startsWith(HISTORY));
   const texts = new Map();
   for (const rel of readers) {
     const text = executableText(rel, read(rel));

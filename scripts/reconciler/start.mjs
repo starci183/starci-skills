@@ -253,13 +253,13 @@ async function supervisorRow({ env, config, orca, seats, orcaProbe }) {
   return supervisorItem({ mode });
 }
 
-/** The Orca reachability row. */
+/** The Orca reachability rows: one row, or none when Orca was not probed. */
 function orcaRow(orcaProbe) {
   if (orcaProbe.ok === false) {
     const error = orcaProbe.error ? `: ${orcaProbe.error}` : '';
-    return red('preflight', 'orca', 'Orca reachable', `${orcaProbe.verdict}${error}`, 'open Orca yourself, then run start again');
+    return [red('preflight', 'orca', 'Orca reachable', `${orcaProbe.verdict}${error}`, 'open Orca yourself, then run start again')];
   }
-  return orcaProbe.ok ? green('preflight', 'orca', 'Orca reachable', `${orcaProbe.terminals ?? 0} terminal(s)`) : [];
+  return orcaProbe.ok ? [green('preflight', 'orca', 'Orca reachable', `${orcaProbe.terminals ?? 0} terminal(s)`)] : [];
 }
 
 /** The Core debug seat row. */

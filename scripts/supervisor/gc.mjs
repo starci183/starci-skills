@@ -73,7 +73,7 @@ import { readState, writeState, supervisorView, ledgerView } from './gc-registry
 import { LANE_DEFAULTS, collectLanes, readLaneCursor, writeLaneCursor } from './gc-lanes.mjs';
 export { readState, writeState, supervisorView, ledgerView, collectLanes, readLaneCursor, writeLaneCursor };
 import { acquireGcLock } from '../machine/gc-lock.mjs';
-import { LANE_IDLE_MS, laneOwnerOf } from '../machine/lane-owner.mjs';
+import { LANE_IDLE_MS } from '../machine/lane-owner.mjs';
 import { releasePlan, workerTerminalHandles, distinctRuns } from '../lib/worker-accounting.mjs';
 import { SETTLED_JOB_LIST } from '../../engine/admission.mjs';
 import { ownerLanguage, translator } from '../lib/i18n.mjs'; import { isMain } from '../lib/is-main.mjs';
@@ -117,7 +117,7 @@ export function gcSettings(allocation = allocationSettings()) {
 /* ------------------------------------------------------------ pure classification */
 
 // laneOwnerOf lives in scripts/machine/lane-owner.mjs (the one lane-removal rule, shared with hk-lanes.mjs).
-export { laneOwnerOf };
+export { laneOwnerOf } from '../machine/lane-owner.mjs';
 
 /** Tab titles by handle from terminal-list visualLayouts (the title Orca gave the tab, which agents never rewrite). */
 export function tabTitles(visualLayouts = []) {
