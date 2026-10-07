@@ -22,19 +22,7 @@ export const REGISTER_ONCE_RULE_IDS = ['BE_MODULE_SHAPE'];
 const RULE = 'BE_MODULE_SHAPE';
 const CAPABILITY_TIERS = new Set(['domain', 'platform', 'integrations']);
 
-export function checkRegisterOnce(input) {
-  const { config, graph } = input;
-  const kit = machineKit(input);
-  const { ts } = kit;
-  const violations = [];
-  const report = (file, node, message, extra = {}) => violations.push({ ruleId: RULE, path: file.rel, ...kit.at(file.rel, file.sourceFile, node), message, ...extra });
-  const isAppRoot = file => Boolean(file.slot?.startsWith('be.app.')) && path.posix.basename(file.rel) === 'app.module.ts';
-  // The test world (slot be.tests.world) is the test composition root: useTestWorld registers capability modules with
-  // `isGlobal: true` the way an app root does. A spec (integration, contract, e2e) is not a composition root.
-  const isWorld = file => isTestWorldSlot(file.slot);
-  const appOf = file => config.apps.find(app => file.rel === `apps/${app.name}/src/app.module.ts`)?.name ?? null;
-
-  // Every @Module class of the program.
+function moduleDeclarations(graph, kit, ts) {
   const modules = new Map(); // declaration -> {name, file, capability}
   for (const file of graph.files.values()) {
     const checker = kit.checkerOf(file.sourceFile);
@@ -48,15 +36,24 @@ export function checkRegisterOnce(input) {
       if (isModule) modules.set(statement, { name: statement.name.text, file, capability: CAPABILITY_TIERS.has(file.tier) });
     }
   }
-  const targetOf = (checker, node) => {
-    for (const declaration of kit.declarationsOf(checker, node)) if (modules.has(declaration)) return { declaration, ...modules.get(declaration) };
-    return null;
-  };
-  const enclosingModule = node => {
-    for (let current = node.parent; current; current = current.parent) if (ts.isClassDeclaration(current) && modules.has(current)) return current;
-    return null;
-  };
+  return modules;
+}
 
+function targetOf(kit, modules, checker, node) {
+  for (const declaration of kit.declarationsOf(checker, node)) {
+    if (modules.has(declaration)) return { declaration, ...modules.get(declaration) };
+  }
+  return null;
+}
+
+function enclosingModule(ts, modules, node) {
+  for (let current = node.parent; current; current = current.parent) {
+    if (ts.isClassDeclaration(current) && modules.has(current)) return current;
+  }
+  return null;
+}
+
+function moduleReferences(graph, kit, ts, modules, isWorld, isAppRoot, report) {
   // The references to modules: importer (the enclosing module class, else the file), target, node, whether it is a register call.
   const references = [];
   for (const file of graph.files.values()) {
@@ -66,10 +63,10 @@ export function checkRegisterOnce(input) {
     const note = (element, viaImports) => {
       const call = ts.isCallExpression(element) && ts.isPropertyAccessExpression(element.expression) && element.expression.name.text === 'register';
       if (ts.isCallExpression(element) && !call) return;
-      const target = targetOf(checker, call ? element.expression.expression : element);
+      const target = targetOf(kit, modules, checker, call ? element.expression.expression : element);
       if (!target) return;
       seen.add(element);
-      const owner = enclosingModule(element);
+      const owner = enclosingModule(ts, modules, element);
       references.push({ file, node: element, target, register: call, viaImports, importer: owner ?? file.rel, importerOwner: file.owner?.root ?? null,
         options: call ? element.arguments[0] : null, root: isAppRoot(file) });
     };
@@ -85,20 +82,26 @@ export function checkRegisterOnce(input) {
       return true;
     });
   }
+  return references;
+}
 
-  const trueGlobal = options => Boolean(options) && ts.isObjectLiteralExpression(options) && (() => {
-    const property = kit.propertyOf(options, 'isGlobal');
-    return Boolean(property) && ts.isPropertyAssignment(property) && property.initializer.kind === ts.SyntaxKind.TrueKeyword;
-  })();
+function isTrueGlobal(kit, ts, options) {
+  if (!Boolean(options) || !ts.isObjectLiteralExpression(options)) return false;
+  const property = kit.propertyOf(options, 'isGlobal');
+  return Boolean(property) && ts.isPropertyAssignment(property) && property.initializer.kind === ts.SyntaxKind.TrueKeyword;
+}
 
-  // App roots: each module is listed once, capability modules are registered with isGlobal true.
-  const rootReferences = references.filter(item => item.root);
+function appRegistrations(rootReferences, appOf) {
   const inApps = new Map(); // module declaration -> Set(app names)
   for (const item of rootReferences) {
     const app = appOf(item.file) ?? item.file.rel;
     if (!inApps.has(item.target.declaration)) inApps.set(item.target.declaration, new Set());
     inApps.get(item.target.declaration).add(app);
   }
+  return inApps;
+}
+
+function reportDuplicateAppModules(config, rootReferences, appOf, report) {
   for (const app of config.apps) {
     const seenInApp = new Map();
     for (const item of rootReferences.filter(entry => appOf(entry.file) === app.name)) {
@@ -107,12 +110,17 @@ export function checkRegisterOnce(input) {
       } else seenInApp.set(item.target.declaration, item.node);
     }
   }
+}
+
+function reportCapabilityRegistrations(rootReferences, kit, ts, report) {
   for (const item of rootReferences) {
     if (!item.target.capability || !item.viaImports && !item.register) continue;
     if (!item.register) report(item.file, item.node, `${item.target.name} is listed in imports as a bare class; the representative module of a capability is registered in the app root as ${item.target.name}.register({ isGlobal: true, ...options }).`, { module: item.target.name });
-    else if (!trueGlobal(item.options)) report(item.file, item.node, `${item.target.name} is registered in the app root without the literal \`isGlobal: true\`; write ${item.target.name}.register({ isGlobal: true, ...options }).`, { module: item.target.name });
+    else if (!isTrueGlobal(kit, ts, item.options)) report(item.file, item.node, `${item.target.name} is registered in the app root without the literal \`isGlobal: true\`; write ${item.target.name}.register({ isGlobal: true, ...options }).`, { module: item.target.name });
   }
+}
 
+function reportNonAppImporters(references, modules, inApps, report) {
   // Non-app importers: no importer of an app-registered module, exactly one importer otherwise (the feature case excepted).
   const importersOf = new Map(); // module declaration -> [reference]
   for (const item of references.filter(entry => !entry.root && entry.viaImports)) {
@@ -136,6 +144,28 @@ export function checkRegisterOnce(input) {
       }
     }
   }
+}
+
+export function checkRegisterOnce(input) {
+  const { config, graph } = input;
+  const kit = machineKit(input);
+  const { ts } = kit;
+  const violations = [];
+  const report = (file, node, message, extra = {}) => violations.push({ ruleId: RULE, path: file.rel, ...kit.at(file.rel, file.sourceFile, node), message, ...extra });
+  const isAppRoot = file => Boolean(file.slot?.startsWith('be.app.')) && path.posix.basename(file.rel) === 'app.module.ts';
+  // The test world (slot be.tests.world) is the test composition root: useTestWorld registers capability modules with
+  // `isGlobal: true` the way an app root does. A spec (integration, contract, e2e) is not a composition root.
+  const isWorld = file => isTestWorldSlot(file.slot);
+  const appOf = file => config.apps.find(app => file.rel === `apps/${app.name}/src/app.module.ts`)?.name ?? null;
+  const modules = moduleDeclarations(graph, kit, ts);
+  const references = moduleReferences(graph, kit, ts, modules, isWorld, isAppRoot, report);
+  const rootReferences = references.filter(item => item.root);
+  const inApps = appRegistrations(rootReferences, appOf);
+
+  // App roots: each module is listed once, capability modules are registered with isGlobal true.
+  reportDuplicateAppModules(config, rootReferences, appOf, report);
+  reportCapabilityRegistrations(rootReferences, kit, ts, report);
+  reportNonAppImporters(references, modules, inApps, report);
 
   return { violations, coverage: { status: 'checked', apps: config.apps.filter(app => kit.appRoot(app.name)).length, modules: modules.size,
     capabilityModules: [...modules.values()].filter(item => item.capability).length, registrations: references.filter(item => item.register).length,
