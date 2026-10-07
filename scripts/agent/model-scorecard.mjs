@@ -97,7 +97,11 @@ const addJob = (cell, job, outcome, duration) => {
   if (duration) cell.durations.push(duration.ms);
 };
 const pct = (n, d) => (d ? n / d : null);
-const byName = (a, b) => { if (a < b) return -1; if (a > b) return 1; return 0; };
+const byName = (a, b) => {
+  if (a < b) return -1;
+  if (a > b) return 1;
+  return 0;
+};
 const finish = (cell, total) => ({
   jobs: cell.jobs, share: pct(cell.jobs, total), settled: cell.settled,
   pass: cell.pass, fail: cell.fail, blocked: cell.blocked, cancelled: cell.cancelled, open: cell.open, rework: cell.rework,
@@ -191,7 +195,7 @@ function main(argv = process.argv.slice(2)) {
     else if (argv[i] === '--since-hours') sinceHours = Number(argv[++i]);
   }
   if (!repos.length) { console.error('usage: starci debug run model-scorecard --repo <repoRoot> [--repo <another>] [--since-hours N] [--json]'); process.exitCode = 2; return; }
-  if (sinceHours != null && !(sinceHours > 0)) { console.error('--since-hours needs a positive number'); process.exitCode = 2; return; }
+  if (sinceHours != null && (Number.isNaN(sinceHours) || sinceHours <= 0)) { console.error('--since-hours needs a positive number'); process.exitCode = 2; return; }
   const sc = scorecardFor({ repos, sinceHours });
   console.log(argv.includes('--json') ? JSON.stringify(sc) : formatTable(sc));
 }

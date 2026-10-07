@@ -143,6 +143,8 @@ export function codexKeyForms(dir, platform = process.platform) {
 
 /* ------------------------------------------------------ atomic rewriting */
 
+// A transform that wants its input as text: an absent file reads as the empty string.
+const asText = (transform) => (text) => transform(text ?? '');
 const readText = (file) => { try { return fs.readFileSync(file, 'utf8'); } catch (e) { if (e.code === 'ENOENT') { return null; } throw e; } };
 
 /**
@@ -296,10 +298,14 @@ const decodeKey = (seg) => {
 };
 const decodeValue = (v) => (v.startsWith("'") ? v.slice(1, -1) : decodeKey(v));
 
+const ESCAPED_QUOTE = String.raw`\"`;
+/** A TOML basic-string body: backslash and double quote escaped. */
+const tomlEscaped = (v) => String(v).replaceAll('\\', '\\\\').replaceAll('"', ESCAPED_QUOTE);
+
 /** The header Codex would write for `key`: a literal for its lowercase form, else a basic string. */
 export function codexHeader(key) {
   const literal = !/['\r\n]/.test(key) && key === key.toLowerCase() && key.includes('\\');
-  return literal ? `[projects.'${key}']` : String.raw`[projects."${key.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"]`;
+  return literal ? `[projects.'${key}']` : `[projects."${tomlEscaped(key)}"]`;
 }
 
 /** {key → {header line index, trust line index|null, trust value|null, end}} for every [projects.<key>] table. */
@@ -320,6 +326,42 @@ export function codexProjectTables(text) {
   return tables;
 }
 
+const ownerTrustSet = (table) => table?.trust !== null && table?.trust !== undefined;
+
+function trustExistingLine(lines, index) {
+  const cr = lines[index].endsWith('\r') ? '\r' : '';
+  const m = TRUST_LINE.exec(lines[index].replace(/\r$/, ''));
+  lines[index] = `${m[1]}"trusted"${m[3]}${cr}`;
+}
+
+function appendTrustTables(text, keys, eol) {
+  let next = text;
+  if (keys.length && next && !next.endsWith('\n')) next += eol;
+  for (const key of keys) next += `${next ? eol : ''}${codexHeader(key)}${eol}trust_level = "trusted"${eol}`;
+  return next;
+}
+
+/** The edit that trusts every key of a Codex config.toml: `{ text: next|null, result: { written, already } }`. */
+function codexTrustEdit(source, keys, file) {
+  const eol = source.includes('\r\n') ? '\r\n' : '\n';
+  const tables = codexProjectTables(source);
+  const lines = source.split('\n');
+  const written = [], already = [], append = [];
+  const inserts = [];
+  for (const key of keys) {
+    const table = tables.get(key);
+    if (table?.trust === 'trusted') { already.push(key); continue; }
+    if (ownerTrustSet(table)) throw new Error(`${file}: owner set ${key} trust_level=${table.trust}; refusing to override`);
+    written.push(key);
+    if (!table) append.push(key);
+    else if (table.trustLine === null) inserts.push(table.header);
+    else trustExistingLine(lines, table.trustLine);
+  }
+  if (!written.length) return { text: null, result: { written, already } };
+  for (const at of inserts.toSorted((a, b) => b - a)) lines.splice(at + 1, 0, `trust_level = "trusted"${eol === '\r\n' ? '\r' : ''}`);
+  return { text: appendTrustTables(lines.join('\n'), append, eol), result: { written, already } };
+}
+
 /** Ensure trust_level = "trusted" for every key in a Codex config.toml. Appends; edits only an untrusted table's own line. */
 export function writeCodexTrust({ file, keys, hooks }) {
   const verify = (text) => {
@@ -327,34 +369,7 @@ export function writeCodexTrust({ file, keys, hooks }) {
     return keys.every((k) => tables.get(k)?.trust === 'trusted');
   };
   const out = { file, written: [], already: [] };
-  const updated = atomicUpdate(file, (text) => {
-    const source = text ?? '';
-    const eol = source.includes('\r\n') ? '\r\n' : '\n';
-    const tables = codexProjectTables(source);
-    const lines = source.split('\n');
-    const written = [], already = [], append = [];
-    const inserts = [];
-    for (const key of keys) {
-      const table = tables.get(key);
-      if (table?.trust === 'trusted') { already.push(key); continue; }
-      if (table?.trust!==null && table?.trust!==undefined) throw new Error(`${file}: owner set ${key} trust_level=${table.trust}; refusing to override`);
-      written.push(key);
-      if (!table) { append.push(key); continue; }
-      if (table.trustLine !== null) {
-        const cr = lines[table.trustLine].endsWith('\r') ? '\r' : '';
-        const m = TRUST_LINE.exec(lines[table.trustLine].replace(/\r$/, ''));
-        lines[table.trustLine] = `${m[1]}"trusted"${m[3]}${cr}`;
-      } else inserts.push(table.header);
-    }
-    if (!written.length) return { text: null, result: { written, already } };
-    for (const at of inserts.toSorted((a, b) => b - a)) lines.splice(at + 1, 0, `trust_level = "trusted"${eol === '\r\n' ? '\r' : ''}`);
-    let next = lines.join('\n');
-    if (append.length) {
-      if (next && !next.endsWith('\n')) next += eol;
-      for (const key of append) next += `${next ? eol : ''}${codexHeader(key)}${eol}trust_level = "trusted"${eol}`;
-    }
-    return { text: next, result: { written, already } };
-  }, verify, { hooks });
+  const updated = atomicUpdate(file, asText((source) => codexTrustEdit(source, keys, file)), verify, { hooks });
   if (!updated.ok) return { ...out, ok: false, error: updated.error, trail: updated.trail };
   out.written = updated.result.written;
   out.already = updated.result.already;
@@ -371,8 +386,7 @@ const UPDATE_CHECK_LINE = /^[ \t]*check_for_update_on_startup[ \t]*=.*$/m;
 const topLevelOf = (text) => { const at = String(text ?? '').search(/^[ \t]*\[/m); return at < 0 ? String(text ?? '') : String(text ?? '').slice(0, at); };
 export function writeCodexNoUpdateCheck({ file, hooks }) {
   const verify = (text) => /^[ \t]*check_for_update_on_startup[ \t]*=[ \t]*false[ \t]*(?:#.*)?\r?$/m.test(topLevelOf(text));
-  const updated = atomicUpdate(file, (text) => {
-    const source = text ?? '';
+  const updated = atomicUpdate(file, asText((source) => {
     if (verify(source)) return { text: null, result: { written: false } };
     const eol = source.includes('\r\n') ? '\r\n' : '\n';
     const top = topLevelOf(source);
@@ -383,7 +397,7 @@ export function writeCodexNoUpdateCheck({ file, hooks }) {
       ? top.replace(UPDATE_CHECK_LINE, 'check_for_update_on_startup = false') + source.slice(top.length)
       : `${head}check_for_update_on_startup = false${eol}${source.slice(top.length)}`;
     return { text: next, result: { written: true } };
-  }, verify, { hooks });
+  }), verify, { hooks });
   if (!updated.ok) return { file, ok: false, error: updated.error };
   return { file, ok: true, written: updated.result.written };
 }
@@ -404,8 +418,7 @@ export function writeCodexNoModelNudge({ file, hooks }) {
     const table = noticeTable(String(text ?? ''));
     return Boolean(table) && /^[ \t]*hide_rate_limit_model_nudge[ \t]*=[ \t]*true[ \t]*(?:#.*)?\r?$/m.test(String(text).slice(table.bodyAt, table.end));
   };
-  const updated = atomicUpdate(file, (text) => {
-    const source = text ?? '';
+  const updated = atomicUpdate(file, asText((source) => {
     if (verify(source)) return { text: null, result: { written: false } };
     const eol = source.includes('\r\n') ? '\r\n' : '\n';
     const table = noticeTable(source);
@@ -419,7 +432,7 @@ export function writeCodexNoModelNudge({ file, hooks }) {
       next = `${base}${base ? eol : ''}[notice]${eol}hide_rate_limit_model_nudge = true${eol}`;
     }
     return { text: next, result: { written: true } };
-  }, verify, { hooks });
+  }), verify, { hooks });
   if (!updated.ok) return { file, ok: false, error: updated.error };
   return { file, ok: true, written: updated.result.written };
 }
@@ -469,15 +482,14 @@ export function writeDevinProfile({ file, command, hooks }) {
 // A Codex hook lives in the home's config.toml as an array-of-tables block the runtime owns, marked on its first line.
 const CODEX_GUARD_BEGIN = '# starci-command-guard (scripts/agent/trust.mjs): the op command guard, a PreToolUse hook';
 export function codexGuardBlock(command, eol = '\n') {
-  const q = (v) => String.raw`"${String(v).replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`;
+  const q = (v) => `"${tomlEscaped(v)}"`;
   return [CODEX_GUARD_BEGIN, '[[hooks.PreToolUse]]', 'matcher = "^Bash$"', '', '[[hooks.PreToolUse.hooks]]', 'type = "command"', `command = ${q(command)}`, 'timeout = 30', ''].join(eol);
 }
 /** Put the guard block in a Codex config.toml: appended, or an older block (another runtime path) replaced in place. */
 export function writeCodexToolGuard({ file, command, hooks }) {
   const eolOf = (text) => (String(text ?? '').includes('\r\n') ? '\r\n' : '\n');
   const verify = (text) => String(text ?? '').includes(codexGuardBlock(command, eolOf(text)));
-  const updated = atomicUpdate(file, (text) => {
-    const source = text ?? '';
+  const updated = atomicUpdate(file, asText((source) => {
     if (verify(source)) return { text: null, result: { written: false } };
     const eol = eolOf(source);
     const at = source.indexOf(CODEX_GUARD_BEGIN);
@@ -489,7 +501,7 @@ export function writeCodexToolGuard({ file, command, hooks }) {
     }
     const base = source && !source.endsWith('\n') ? `${source}${eol}` : source;
     return { text: `${base}${base ? eol : ''}${codexGuardBlock(command, eol)}`, result: { written: true } };
-  }, verify, { hooks });
+  }), verify, { hooks });
   return updated.ok ? { file, ok: true, written: updated.result.written } : { file, ok: false, error: updated.error };
 }
 
@@ -542,94 +554,156 @@ export function trustCodexToolGuard({ home, cwd, command, appServer = codexAppSe
  */
 export function ensureLaunchTrust({ agent, cwd, config, env = process.env, platform = process.platform, hooks, codexAppServer: appServer = null } = {}) {
   if (!TRUST_AGENTS.has(agent)) return null;
-  const authorization=launchTrustVerdict({cwd,config,platform});
-  if(!authorization.ok)return {agent,paths:[],status:'declined',reason:authorization.reason};
-  const {dir}=authorization;
+  const authorization = launchTrustVerdict({ cwd, config, platform });
+  if (!authorization.ok) return { agent, paths: [], status: 'declined', reason: authorization.reason };
+  const { dir } = authorization;
   const targets = trustTargets({ env, platform });
   if (targets.skipped) return { agent, paths: [dir], status: 'skipped', reason: targets.skipped };
   const project = projectTargets(dir);
-  const receipt = { agent, paths: [dir], approval:authorization.approval, written: [], already: [], errors: [] };
+  const receipt = { agent, paths: [dir], approval: authorization.approval, written: [], already: [], errors: [] };
   // Check explicit provider declines before writing any trust/settings/hook file.
-  try{
-    if(agent==='claude'){
-      const user=readText(targets.claudeJson),doc=user===null?{}:jsonOf(user);
-      const local=readText(project.claudeSettings),settings=local===null?{}:jsonOf(local);
-      if(!doc||!settings)throw new Error('Claude trust/settings file is unreadable');
-      if(claudeKeyForms(dir,platform).some(key=>doc.projects?.[key]?.hasTrustDialogAccepted===false)||settings.skipDangerousModePermissionPrompt===false)
-        return {...receipt,status:'declined',reason:'owner declined Claude project trust or bypass consent'};
-    }
-    if(agent==='codex'){
-      const keys=authorization.paths.flatMap(p=>codexKeyForms(p,platform));
-      for(const home of targets.codexHomes){const tables=codexProjectTables(readText(path.join(home.dir,'config.toml'))??'');
-        if(keys.some(key=>tables.get(key)?.trust!=null&&tables.get(key).trust!=='trusted'))return {...receipt,status:'declined',reason:'owner declined Codex project trust'};}
-    }
-  }catch(error){return {...receipt,status:'failed',errors:[{error:String(error.message)}]};}
-  const collect = (r) => {
-    for (const key of r.written ?? []) receipt.written.push({ file: r.file, key });
-    for (const key of r.already ?? []) receipt.already.push({ file: r.file, key });
-    if (!r.ok) receipt.errors.push({ file: r.file, error: r.error });
-  };
-  const guard = (file, fn) => { try { return fn(); } catch (e) { return { file, ok: false, error: String(e?.message ?? e) }; } };
-  // A project file the runtime wrote stays out of `git status` (the repository's own info/exclude).
-  const excluded = (file) => { const x = guard(file, () => excludeFromGit(dir, file)); if (x) { receipt.gitExclude ??= []; receipt.gitExclude.push(x); } if (x?.ok === false) receipt.errors.push({ file, error: x.error }); };
-  const command = toolGuardCommand();
-  if (agent === 'devin') {
-    // Devin's LOCAL project config (<dir>/.devin/config.local.json): the guard hook.
-    const file = project.devinConfig;
-    const profile = guard(file, () => writeDevinProfile({ file, command, hooks }));
-    receipt.toolGuard = [{ file, state: profile.state ?? 'failed' }];
-    if (!profile.ok) receipt.errors.push({ file, error: profile.error ?? profile.state });
-    else if (profile.state === 'written') receipt.written.push({ file, key: 'hooks.PreToolUse' });
-    else receipt.already.push({ file, key: 'hooks.PreToolUse' });
-    if (profile.ok) excluded(file);
-  } else if (agent === 'claude') {
-    // The directory trust record is Claude's own per-user state (~/.claude.json); everything else is the worktree's
-    // local project settings (<dir>/.claude/settings.local.json), which Claude reads for the bypass consent, env and hooks.
-    collect(guard(targets.claudeJson, () => writeClaudeTrust({ file: targets.claudeJson, keys: claudeKeyForms(dir, platform), hooks })));
-    if(receipt.errors.length)return {...receipt,status:'failed'};
-    const file = project.claudeSettings;
-    const consent = guard(file, () => assertClaudeBypassConsent({ file, hooks }));
-    receipt.bypassConsent = consent.state ?? 'failed';
-    if (!consent.ok) receipt.errors.push({ file, error: consent.error ?? consent.state });
-    if(receipt.errors.length)return {...receipt,status:'failed'};
-    const launchEnv = guard(file, () => assertClaudeSettingsEnv({ file, vars: claudeLaunchEnv(), hooks }));
-    receipt.launchEnv = launchEnv.state ?? 'failed';
-    if (!launchEnv.ok) receipt.errors.push({ file, error: launchEnv.error ?? launchEnv.state });
-    const toolGuard = guard(file, () => assertJsonToolGuard({ file, command, matcher: TOOL_GUARD_MATCHER, hooks }));
-    receipt.toolGuard = [{ file, state: toolGuard.state ?? 'failed' }];
-    if (!toolGuard.ok) receipt.errors.push({ file, error: toolGuard.error ?? toolGuard.state });
-    if (consent.ok || launchEnv.ok || toolGuard.ok) excluded(file);
-  } else {
-    // Codex: the directory trust and the notices live in each Codex home (Codex reads a project layer only for a
-    // trusted project); the guard hook lives in the worktree's project layer (<dir>/.codex/config.toml), and each home
-    // records only Codex's hash that trusts it (hooks.state, keyed by that project file).
-    receipt.paths = codexTrustPaths(dir);
-    const keys = [...new Set(receipt.paths.flatMap((p) => codexKeyForms(p, platform)))];
-    const homes = targets.codexHomes;
-    for (const home of homes) {
-      const file = path.join(home.dir, 'config.toml');
-      collect(guard(file, () => writeCodexTrust({ file, keys, hooks })));
-      if(receipt.errors.length)return {...receipt,status:'failed'};
-      const noUpdate = guard(file, () => writeCodexNoUpdateCheck({ file, hooks }));
-      receipt.updateCheck ??= []; receipt.updateCheck.push({ file, off: noUpdate.ok === true, ...(noUpdate.written ? { written: true } : {}), ...(noUpdate.ok ? {} : { error: noUpdate.error }) });
-      if (!noUpdate.ok) receipt.errors.push({ file, error: noUpdate.error });
-      const noNudge = guard(file, () => writeCodexNoModelNudge({ file, hooks }));
-      receipt.modelNudge ??= []; receipt.modelNudge.push({ file, off: noNudge.ok === true, ...(noNudge.written ? { written: true } : {}), ...(noNudge.ok ? {} : { error: noNudge.error }) });
-      if (!noNudge.ok) receipt.errors.push({ file, error: noNudge.error });
-    }
-    const file = project.codexConfig;
-    const hook = guard(file, () => writeCodexToolGuard({ file, command, hooks }));
-    if (!hook.ok) receipt.errors.push({ file, error: hook.error });
-    else { receipt[hook.written ? 'written' : 'already'].push({ file, key: 'hooks.PreToolUse' }); excluded(file); }
-    // A re-rooted trust home (specs) never starts the real Codex: its app-server is injected, else the hash step waits.
-    const server = appServer ?? (env.STARCI_AGENT_TRUST_HOME ? null : codexAppServer);
-    receipt.toolGuard = [{ file, ...(hook.written ? { written: true } : {}), trustedIn: homes.map((home) => {
-      const trusted = hook.ok && server ? guard(file, () => trustCodexToolGuard({ home: home.dir, cwd: dir, command, appServer: server })) : null;
-      if (trusted && !trusted.ok) receipt.errors.push({ file: path.join(home.dir, 'config.toml'), error: trusted.error });
-      return { home: home.dir, trusted: trusted ? ['failed', trusted.trusted][Number(Boolean(trusted.ok))] : 'not-checked' };
-    }) }];
-  }
+  let declined;
+  try { declined = ownerDeclineOf({ agent, platform, authorization, targets, project, receipt }); }
+  catch (error) { return { ...receipt, status: 'failed', errors: [{ error: String(error.message) }] }; }
+  if (declined) return declined;
+  const ctx = { dir, platform, hooks, env, appServer, targets, project, receipt, command: toolGuardCommand() };
+  const early = trustFlowOf(agent)(ctx);
+  if (early) return early;
   receipt.status = receipt.errors.length ? 'failed' : ['already', 'written'][Number(receipt.written.length > 0)];
   if (!receipt.errors.length) delete receipt.errors;
   return receipt;
+}
+
+function trustFlowOf(agent) {
+  if (agent === 'devin') return trustDevin;
+  return agent === 'claude' ? trustClaude : trustCodex;
+}
+
+// The provider's own explicit decline of the project: the receipt that refuses the launch, or null.
+function ownerDeclineOf({ agent, platform, authorization, targets, project, receipt }) {
+  if (agent === 'claude') return claudeDecline({ platform, authorization, targets, project, receipt });
+  if (agent === 'codex') return codexDecline({ platform, authorization, targets, receipt });
+  return null;
+}
+
+function claudeDecline({ platform, authorization, targets, project, receipt }) {
+  const user = readText(targets.claudeJson), doc = user === null ? {} : jsonOf(user);
+  const local = readText(project.claudeSettings), settings = local === null ? {} : jsonOf(local);
+  if (!doc || !settings) throw new Error('Claude trust/settings file is unreadable');
+  if (claudeKeyForms(authorization.dir, platform).some((key) => doc.projects?.[key]?.hasTrustDialogAccepted === false) || settings.skipDangerousModePermissionPrompt === false)
+    return { ...receipt, status: 'declined', reason: 'owner declined Claude project trust or bypass consent' };
+  return null;
+}
+
+function codexDecline({ platform, authorization, targets, receipt }) {
+  const keys = authorization.paths.flatMap((p) => codexKeyForms(p, platform));
+  for (const home of targets.codexHomes) {
+    const tables = codexProjectTables(readText(path.join(home.dir, 'config.toml')) ?? '');
+    if (keys.some((key) => tables.get(key)?.trust != null && tables.get(key).trust !== 'trusted'))
+      return { ...receipt, status: 'declined', reason: 'owner declined Codex project trust' };
+  }
+  return null;
+}
+
+function collectResult(receipt, r) {
+  for (const key of r.written ?? []) receipt.written.push({ file: r.file, key });
+  for (const key of r.already ?? []) receipt.already.push({ file: r.file, key });
+  if (!r.ok) receipt.errors.push({ file: r.file, error: r.error });
+}
+
+const guarded = (file, fn) => { try { return fn(); } catch (e) { return { file, ok: false, error: String(e?.message ?? e) }; } };
+
+// A step that failed names its file and error (or its state) in the receipt.
+const noteFailure = (receipt, file, result) => {
+  if (!result.ok) receipt.errors.push({ file, error: result.error ?? result.state });
+};
+
+// A project file the runtime wrote stays out of `git status` (the repository's own info/exclude).
+function excludeWritten({ receipt, dir }, file) {
+  const x = guarded(file, () => excludeFromGit(dir, file));
+  if (x) { receipt.gitExclude ??= []; receipt.gitExclude.push(x); }
+  if (x?.ok === false) receipt.errors.push({ file, error: x.error });
+}
+
+// Devin's LOCAL project config (<dir>/.devin/config.local.json): the guard hook.
+function trustDevin(ctx) {
+  const { receipt, project, command, hooks } = ctx;
+  const file = project.devinConfig;
+  const profile = guarded(file, () => writeDevinProfile({ file, command, hooks }));
+  receipt.toolGuard = [{ file, state: profile.state ?? 'failed' }];
+  noteFailure(receipt, file, profile);
+  if (profile.ok) {
+    receipt[profile.state === 'written' ? 'written' : 'already'].push({ file, key: 'hooks.PreToolUse' });
+    excludeWritten(ctx, file);
+  }
+  return null;
+}
+
+// The directory trust record is Claude's own per-user state (~/.claude.json); everything else is the worktree's
+// local project settings (<dir>/.claude/settings.local.json), which Claude reads for the bypass consent, env and hooks.
+function trustClaude(ctx) {
+  const { receipt, targets, project, dir, platform, command, hooks } = ctx;
+  collectResult(receipt, guarded(targets.claudeJson, () => writeClaudeTrust({ file: targets.claudeJson, keys: claudeKeyForms(dir, platform), hooks })));
+  if (receipt.errors.length) return { ...receipt, status: 'failed' };
+  const file = project.claudeSettings;
+  const consent = guarded(file, () => assertClaudeBypassConsent({ file, hooks }));
+  receipt.bypassConsent = consent.state ?? 'failed';
+  noteFailure(receipt, file, consent);
+  if (receipt.errors.length) return { ...receipt, status: 'failed' };
+  const launchEnv = guarded(file, () => assertClaudeSettingsEnv({ file, vars: claudeLaunchEnv(), hooks }));
+  receipt.launchEnv = launchEnv.state ?? 'failed';
+  noteFailure(receipt, file, launchEnv);
+  const toolGuard = guarded(file, () => assertJsonToolGuard({ file, command, matcher: TOOL_GUARD_MATCHER, hooks }));
+  receipt.toolGuard = [{ file, state: toolGuard.state ?? 'failed' }];
+  noteFailure(receipt, file, toolGuard);
+  if (consent.ok || launchEnv.ok || toolGuard.ok) excludeWritten(ctx, file);
+  return null;
+}
+
+// A Codex notice pinned off in one home: recorded under `field` with the verdict of its writer.
+function recordCodexNotice(receipt, field, file, result) {
+  receipt[field] ??= [];
+  receipt[field].push({ file, off: result.ok === true, ...(result.written ? { written: true } : {}), ...(result.ok ? {} : { error: result.error }) });
+  if (!result.ok) receipt.errors.push({ file, error: result.error });
+}
+
+// The trust, update-check and nudge records of one Codex home; the failed receipt when the trust itself failed.
+function trustCodexHome(ctx, home, keys) {
+  const { receipt, hooks } = ctx;
+  const file = path.join(home.dir, 'config.toml');
+  collectResult(receipt, guarded(file, () => writeCodexTrust({ file, keys, hooks })));
+  if (receipt.errors.length) return { ...receipt, status: 'failed' };
+  recordCodexNotice(receipt, 'updateCheck', file, guarded(file, () => writeCodexNoUpdateCheck({ file, hooks })));
+  recordCodexNotice(receipt, 'modelNudge', file, guarded(file, () => writeCodexNoModelNudge({ file, hooks })));
+  return null;
+}
+
+// Codex hash trust of the guard hook in one home: the home's verdict for the receipt.
+function codexHookTrustIn(ctx, { file, hook, server, home }) {
+  const { receipt, dir, command } = ctx;
+  const trusted = hook.ok && server ? guarded(file, () => trustCodexToolGuard({ home: home.dir, cwd: dir, command, appServer: server })) : null;
+  if (trusted && !trusted.ok) receipt.errors.push({ file: path.join(home.dir, 'config.toml'), error: trusted.error });
+  return { home: home.dir, trusted: trusted ? ['failed', trusted.trusted][Number(Boolean(trusted.ok))] : 'not-checked' };
+}
+
+// Codex: the directory trust and the notices live in each Codex home (Codex reads a project layer only for a
+// trusted project); the guard hook lives in the worktree's project layer (<dir>/.codex/config.toml), and each home
+// records only Codex's hash that trusts it (hooks.state, keyed by that project file).
+function trustCodex(ctx) {
+  const { receipt, targets, project, dir, platform, command, hooks, env, appServer } = ctx;
+  receipt.paths = codexTrustPaths(dir);
+  const keys = [...new Set(receipt.paths.flatMap((p) => codexKeyForms(p, platform)))];
+  const homes = targets.codexHomes;
+  for (const home of homes) {
+    const failed = trustCodexHome(ctx, home, keys);
+    if (failed) return failed;
+  }
+  const file = project.codexConfig;
+  const hook = guarded(file, () => writeCodexToolGuard({ file, command, hooks }));
+  if (!hook.ok) receipt.errors.push({ file, error: hook.error });
+  else { receipt[hook.written ? 'written' : 'already'].push({ file, key: 'hooks.PreToolUse' }); excludeWritten(ctx, file); }
+  // A re-rooted trust home (specs) never starts the real Codex: its app-server is injected, else the hash step waits.
+  const server = appServer ?? (env.STARCI_AGENT_TRUST_HOME ? null : codexAppServer);
+  receipt.toolGuard = [{ file, ...(hook.written ? { written: true } : {}), trustedIn: homes.map((home) => codexHookTrustIn(ctx, { file, hook, server, home })) }];
+  return null;
 }

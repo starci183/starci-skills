@@ -25,7 +25,10 @@ export function recordLaunchedTerminal({ terminal, dispatchId, env = process.env
   try {
     const file = fileOf(env);
     const rows = read(file);
-    for (const [handle, row] of Object.entries(rows)) if (!(now - Number(row?.at) < TTL_MS)) delete rows[handle];
+    for (const [handle, row] of Object.entries(rows)) {
+      const age = now - Number(row?.at);
+      if (Number.isNaN(age) || age >= TTL_MS) delete rows[handle];
+    }
     rows[terminal] = { dispatchId, at: now };
     fs.mkdirSync(path.dirname(file), { recursive: true });
     const tmp = `${file}.${process.pid}.tmp`;
