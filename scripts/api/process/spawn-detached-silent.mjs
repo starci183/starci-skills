@@ -2,7 +2,7 @@
 // whether it is gone (scripts/machine/self-reload.mjs hands over to its successor this way). Its sibling
 // spawn-detached.mjs starts any file detached and returns the ChildProcess.
 import { spawn } from 'node:child_process';
-import { withTempEnv } from '../fs/ensure-temp-root.mjs';
+import { withTempEnv } from '../fs/with-temp-env.mjs';
 
 /** spawn node <script> ...args detached and hidden, its stdio discarded; {pid, exited()}. */
 export function spawnDetachedSilent({ execPath = process.execPath, script, args = [], env, cwd }) {

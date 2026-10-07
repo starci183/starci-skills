@@ -3,7 +3,7 @@
 // run-node.mjs, spawn-node.mjs, exec-node.mjs) each name one use; nothing outside scripts/api/node imports this runner.
 import { assertMutationFence } from '../../lib/mutation-fence.mjs';
 import { execFile, spawn, spawnSync } from 'node:child_process';
-import { withTempEnv } from '../fs/ensure-temp-root.mjs';
+import { withTempEnv } from '../fs/with-temp-env.mjs';
 
 /** `node <args>` with this process's node binary, waited for; options pass through last (cwd, stdio, env, timeout, maxBuffer, input). */
 export const nodeSpawn = (args, options = {}) => { assertMutationFence({ kind: 'node-effect', args }); return spawnSync(process.execPath, args, withTempEnv({ encoding: 'utf8', windowsHide: true, ...options })); };

@@ -7,7 +7,8 @@ import { spawnSync } from 'node:child_process';
 import { osTempDir, tempRoot, TEMP_ROOT_ENV } from '../../engine/temp-root.mjs';
 import { makeTempDir } from '../../scripts/api/fs/make-temp-dir.mjs';
 import { tempPath } from '../../scripts/api/fs/temp-path.mjs';
-import { ensureTempRoot, withTempEnv, TEMP_ROOT_UNUSABLE } from '../../scripts/api/fs/ensure-temp-root.mjs';
+import { ensureTempRoot } from '../../scripts/api/fs/ensure-temp-root.mjs';
+import { withTempEnv } from '../../scripts/api/fs/with-temp-env.mjs';
 import { validateConfig } from '../../engine/config.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 
@@ -72,9 +73,9 @@ test('a root that cannot be created or written is refused with TEMP_ROOT_UNUSABL
   fs.writeFileSync(file, 'x');
   for (const root of [file, path.join(file, 'below')]) {
     const env = { [TEMP_ROOT_ENV]: root, TEMP: os.tmpdir() };
-    assert.throws(() => ensureTempRoot({ env }), (error) => error.code === TEMP_ROOT_UNUSABLE && error.message.includes('roots.temp') && error.message.includes(path.resolve(root)));
-    assert.throws(() => makeTempDir('x-', { env }), { code: TEMP_ROOT_UNUSABLE });
-    assert.throws(() => withTempEnv({ env }), { code: TEMP_ROOT_UNUSABLE });
+    assert.throws(() => ensureTempRoot({ env }), (error) => error.code === 'TEMP_ROOT_UNUSABLE' && error.message.includes('roots.temp') && error.message.includes(path.resolve(root)));
+    assert.throws(() => makeTempDir('x-', { env }), { code: 'TEMP_ROOT_UNUSABLE' });
+    assert.throws(() => withTempEnv({ env }), { code: 'TEMP_ROOT_UNUSABLE' });
   }
 });
 

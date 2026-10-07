@@ -2,7 +2,7 @@
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { readEnv } from '../../lib/env.mjs';
-import { withTempEnv } from '../fs/ensure-temp-root.mjs';
+import { withTempEnv } from '../fs/with-temp-env.mjs';
 
 const CMD_META = /([()\][%!^"`<>&|;, *?])/g;
 const escapeCommand = (value) => String(value).replace(CMD_META, '^$1');

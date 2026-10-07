@@ -12,7 +12,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { withoutGitLocalEnv } from '../../lib/git.mjs';
-import { withTempEnv } from '../fs/ensure-temp-root.mjs';
+import { withTempEnv } from '../fs/with-temp-env.mjs';
 
 /**
  * Spawn `file` (the git binary) once with `args`: utf8 text, a hidden window, never a shell.

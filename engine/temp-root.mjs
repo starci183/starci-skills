@@ -3,8 +3,8 @@
 // Every temp directory or file the runtime creates (spec fixtures, land scratch, gate staging, dispatch prompts, scan work
 // dirs) lives under tempRoot(): env STARCI_TEMP_ROOT (a spec, a one-off run), then the owner config `roots.temp`
 // (config.yaml, gitignored), else the OS temp directory of the process (TEMP / TMP / TMPDIR, then os.tmpdir()). The base tier
-// only resolves; the directory is made by scripts/api/fs/make-temp-dir.mjs, temp-path.mjs and ensure-temp-root.mjs. The
-// children the runtime starts get the same directory as TEMP / TMP / TMPDIR (tempChildEnv, applied by withTempEnv in scripts/api/fs/ensure-temp-root.mjs, which every scripts/api/ spawn wrapper calls).
+// only resolves; the directory is made by scripts/api/fs/make-temp-dir.mjs, temp-path.mjs, ensure-temp-root.mjs and with-temp-env.mjs. The
+// children the runtime starts get the same directory as TEMP / TMP / TMPDIR (tempChildEnv, applied by withTempEnv in scripts/api/fs/with-temp-env.mjs, which every scripts/api/ spawn wrapper calls).
 import os from 'node:os';
 import path from 'node:path';
 import { loadConfig } from './config.mjs';

@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { tempChildEnv, TEMP_ROOT_ENV } from '../../engine/temp-root.mjs';
-import { withTempEnv } from '../../scripts/api/fs/ensure-temp-root.mjs';
+import { withTempEnv } from '../../scripts/api/fs/with-temp-env.mjs';
 import { spawnCapture } from '../../scripts/api/process/spawn-capture.mjs';
 import { runProgram } from '../../scripts/api/process/run-program.mjs';
 import { nodeSpawn } from '../../scripts/api/node/lib.mjs';
