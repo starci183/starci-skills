@@ -6,6 +6,7 @@ import { stopAndRelease, workerClosureProven } from '../machine/worker-close.mjs
 import { releaseAgentAdmission } from '../agent/admission.mjs';
 import { workflowStartAuthority } from './workflow-startup.mjs';
 import { kernelLaunchNoEffect } from './workflow-launch-no-effect.mjs';
+import { settledLaunchTerminal } from './workflow-launch-settled.mjs';
 
 /** Close the caller-owned Dispatch through the existing terminal/process-tree proof owner. */
 export function releaseWorkflowWorker(dispatchId, handle = null, { env = process.env, close = stopAndRelease } = {}) {
@@ -19,7 +20,7 @@ export function releaseWorkflowWorker(dispatchId, handle = null, { env = process
 
 /** Reconcile only the original held launch; incomplete identity, closure or release retains its signal and capacity. */
 export function recoverWorkflowLaunch(ledger, { workflowId, signal, env = process.env },
-  { close = stopAndRelease, releaseAdmission = releaseAgentAdmission, now = Date.now, noEffect = kernelLaunchNoEffect } = {}) {
+  { close = stopAndRelease, releaseAdmission = releaseAgentAdmission, now = Date.now, noEffect = kernelLaunchNoEffect, settled = settledLaunchTerminal } = {}) {
   const value = parseJsonOr(signal?.value_json), admission = value?.admission, receipt = admission?.receipt;
   const held = (reason, extra = {}) => ({ ok: false, reason, effectState: 'unknown', signal, ...extra });
   const owned = signal?.scope === 'kernel' && signal.key === workflowId && signal.workflow_id === workflowId
@@ -43,24 +44,28 @@ export function recoverWorkflowLaunch(ledger, { workflowId, signal, env = proces
     return clearReconciled({ ledger, workflowId, signal, authority, current, expected, held, now }, { budget, evidence: proof.evidence },
       { dispatch: null, terminal: null });
   }
+  // A Dispatch without a bound terminal (the start failed before Orca's answer named one) is reconciled from Orca's own report of it.
+  const adopted = owned && value.dispatch && !value.terminal && receipt?.handle ? settled({ dispatch: value.dispatch, receipt }) : null;
+  if (adopted && !adopted.ok) return held(adopted.reason, adopted);
+  const terminal = adopted?.handle ?? value?.terminal;
   if (!owned
-      || typeof value.dispatch !== 'string' || !value.dispatch || typeof value.terminal !== 'string' || !value.terminal
-      || receipt?.role !== 'kernel' || receipt.handle !== value.terminal
+      || typeof value.dispatch !== 'string' || !value.dispatch || typeof terminal !== 'string' || !terminal
+      || receipt?.role !== 'kernel' || receipt.handle !== terminal
       || typeof receipt.id !== 'string' || !receipt.id || !Number.isInteger(receipt.fence)
       || typeof receipt.attemptId !== 'string' || !receipt.attemptId)
     return held('kernel-launch-custody-incomplete');
   if (!expected.ok || canonicalJSON(current()) !== canonicalJSON(signal))
     return held('kernel-launch-recovery-authority-lost');
-  const closure = releaseWorkflowWorker(value.dispatch, value.terminal, { env, close });
+  const closure = releaseWorkflowWorker(value.dispatch, terminal, { env, close });
   if (!closure.ok) return held('kernel-launch-closure-unverified', { closure });
   let budget;
   try {
-    budget = releaseAdmission(admission, { kind: 'closed', confirmed: true, handle: value.terminal,
+    budget = releaseAdmission(admission, { kind: 'closed', confirmed: true, handle: terminal,
       terminalProof: closure.closed.proof, processVerdict: closure.processes.verdict }, { env });
   } catch (error) { budget = { ok: false, error: String(error?.message ?? error) }; }
   if (budget?.ok !== true) return held('kernel-launch-capacity-retained', { closure, budget });
-  return clearReconciled({ ledger, workflowId, signal, authority, current, expected, held, now }, { closure, budget },
-    { dispatch: value.dispatch, terminal: value.terminal });
+  return clearReconciled({ ledger, workflowId, signal, authority, current, expected, held, now }, { closure, budget, evidence: adopted?.evidence },
+    { dispatch: value.dispatch, terminal });
 }
 
 /** Clear the held signal and record the reconciliation only while the same accepted goal and signal still own the ledger. */

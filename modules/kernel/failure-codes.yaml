@@ -16180,6 +16180,33 @@ kernel-launch-custody-incomplete:
   nextStep_vi: "Supervisor đối chiếu Run và worker trên Orca rồi xử lý sự cố; không sửa tay bảng tín hiệu."
   owner: supervisor
   kind: runtime-fault
+kernel-launch-host-unavailable:
+  title: "Orca did not answer for the held Kernel launch Dispatch"
+  title_vi: "Orca không trả lời về Dispatch của lần khởi động Kernel đang giữ"
+  meaning_vi: "Runtime không đọc được trạng thái Dispatch của lần khởi động bị giữ nên không giải phóng tín hiệu hay chỗ của nhà cung cấp."
+  causes_vi:
+    - "worker-show lỗi, không phản hồi hoặc Orca đang tắt"
+  nextStep_vi: "Đợi Orca phản hồi rồi chạy lại lệnh start."
+  owner: supervisor
+  kind: runtime-fault
+kernel-launch-dispatch-unsettled:
+  title: "The held Kernel launch Dispatch is not settled"
+  title_vi: "Dispatch của lần khởi động Kernel đang giữ chưa kết thúc"
+  meaning_vi: "Orca không báo Dispatch ở trạng thái failed, stopped hoặc released nên runtime không đóng và không giải phóng tín hiệu."
+  causes_vi:
+    - "Dispatch vẫn đang chạy hoặc đang sẵn sàng"
+  nextStep_vi: "Supervisor dừng đúng Dispatch đó rồi mới chạy lại lệnh start."
+  owner: supervisor
+  kind: runtime-fault
+kernel-launch-terminal-unproven:
+  title: "The terminal of the held Kernel launch is not proven gone"
+  title_vi: "Chưa chứng minh được cửa sổ của lần khởi động Kernel đang giữ đã đóng"
+  meaning_vi: "Cửa sổ Orca báo cho Dispatch khác với cửa sổ trong biên nhận admission, hoặc vẫn đang kết nối, hoặc Orca không trả lời về nó."
+  causes_vi:
+    - "Cửa sổ vẫn kết nối"
+  nextStep_vi: "Đóng đúng cửa sổ đó rồi chạy lại lệnh start."
+  owner: supervisor
+  kind: runtime-fault
 kernel-launch-runs-unreadable:
   title: "Orca Run list could not be read"
   title_vi: "Không đọc được danh sách Run của Orca"

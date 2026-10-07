@@ -255,6 +255,25 @@ test('a terminal Orca already showed disconnected, with no process carrying its 
   assert.equal(closeWorker({ dispatch: DISPATCH, deps: blind.deps, env: {} }).processes.verdict, 'unverifiable');
 });
 
+test('a pre-close process that could not be captured is settled by the census after a close of an already disconnected terminal', () => {
+  // The audited Kernel worker-start failure: the terminal is disconnected, a tagged process was listed but its native identity was unverifiable.
+  const uncaptured = (survivors, before) => {
+    const w = world({ survivors });
+    w.deps.close = (handle) => { w.calls.push(`close:${handle}`); w.setTable([OTHER_CODEX, ...survivors]); return { handle, ok: true, proof: 'disconnected', attempts: 1, before }; };
+    const capture = w.deps.capture;
+    w.deps.capture = (pid, options) => ({ ...capture(pid, options), ok: false, outcome: 'unknown' });
+    return { w, out: closeWorker({ dispatch: DISPATCH, deps: w.deps, env: {} }) };
+  };
+  const settled = uncaptured([], 'disconnected');
+  assert.equal(settled.out.processes.verdict, 'none');
+  assert.equal(workerClosureProven(settled.out, HANDLE), true);
+  assert.deepEqual(settled.w.calls.filter((c) => c.startsWith('stop-process:')), []);
+  for (const refused of [uncaptured([AGENT], 'disconnected'), uncaptured([], 'connected')]) {
+    assert.equal(refused.out.processes.verdict, 'unverifiable');
+    assert.equal(workerClosureProven(refused.out, HANDLE), false);
+  }
+});
+
 test('a caller inside the worker\'s own terminal releases it but does not close or verify it from there', () => {
   const w = world();
   const out = closeWorker({ dispatch: DISPATCH, deps: w.deps, env: { ORCA_TERMINAL_HANDLE: HANDLE } });
