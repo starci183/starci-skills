@@ -22,7 +22,6 @@ import { blockingJobs, blockingOthersOf, orderQueuedByBlocking } from '../../wai
 import { opMetrics, stuckOf } from '../../../machine/op-metrics.mjs';
 import { kernelNotesOf, whyOf } from '../../why.mjs';
 import { asksPhase } from './status-asks.mjs';
-import { launchRefusalViewOf } from './launch-refusal-step.mjs';
 import { settlePhase } from './status-settle.mjs';
 import { driftPhase, handoverPhase } from './status-drift.mjs';
 import { frontierOf, frontierStateOf } from './status-frontier.mjs';
@@ -101,7 +100,6 @@ const queuedView = (db, row, queuedBecauseOf, ctx) => {
   const foundation = jobPayloadOf(row).foundation;
   return { jobId: row.job_id, opId: row.op_id ?? null, attempt: row.attempt,
     ...queuedBecauseOf(db, row, ctx),
-    ...(row.status === 'ready' ? launchRefusalViewOf(db, row) : {}),
     ...(foundation ? { foundation } : {}) };
 };
 
@@ -123,8 +121,7 @@ const queuePhase = (s) => {
   const typedGates = tryOr(() => typedIncidents(db, { workflowId }), []);
   const leaseCanon = leaseCanonOf(db, repoRoot);
   const queueCtx = { planAncestors: s.planAncestors, jobsByOp: s.jobsByOp, slots, rtDoc, poolLoad: s.poolLoad, ownerGates: s.ownerGates, peerWaits: s.peerWaits, recordDeps, canon: leaseCanon, workGraph: s.workGraph, typedGates, now: s.now, hostHold: wf.phase === 'finished' ? null : hostHoldOf({ env: process.env, repo: repoRoot, workflowId, db, ledgerFile: s.ledger.path ?? null }) };
-  // A job a refused launch returned to ready (spent no try) is dispatchable work like a queued one.
-  s.queued = s.workflowJobs.filter((row) => row.status === 'queued' || row.status === 'ready').map((row) => queuedView(db, row, queuedBecauseOf, queueCtx));
+  s.queued = s.workflowJobs.filter((row) => row.status === 'queued').map((row) => queuedView(db, row, queuedBecauseOf, queueCtx));
   // Foundation legs run first (driver-loop.yaml foundations): they lead the queued list the Kernel routes from.
   if (s.queued.some((item) => item.foundation)) s.queued.sort((a, b) => Number(Boolean(b.foundation)) - Number(Boolean(a.foundation)));
   // Waiter priority (scripts/kernel/waiter-priority.mjs): queued jobs other work waits on come first,

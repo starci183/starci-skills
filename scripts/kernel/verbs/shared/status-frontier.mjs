@@ -1,6 +1,7 @@
 // The frontier's state word and reason text (verbs/status.mjs): the first state of the Kernel's priority
 // order that holds, then the prose that says what the Kernel does next.
 import path from 'node:path';
+import { launchRefusalViewOf } from './launch-refusal-step.mjs';
 import { runtimeProfile } from '../../../../engine/config.mjs';
 import { AUTOPILOT_RULING, SUPERVISOR_GATE } from '../../autopilot-run.mjs';
 import { typedIncidents } from '../../gate-conditions.mjs';
@@ -76,7 +77,7 @@ const admitReadyJobs = (s) => {
   for (const row of ready) {
     const foundation = jobPayloadOf(row).foundation;
     s.queued.push({ jobId: row.job_id, opId: row.op_id ?? null, attempt: row.attempt,
-      ...queuedBecauseOf(db, row, queueCtx), ...(foundation ? { foundation } : {}) });
+      ...queuedBecauseOf(db, row, queueCtx), ...launchRefusalViewOf(db, row), ...(foundation ? { foundation } : {}) });
   }
   // The ordering and counts the queue projection settled over the shorter list answer for the merged
   // rows too: waiters' weight first, then the parked-behind notes and the engaged test's wait-held count
