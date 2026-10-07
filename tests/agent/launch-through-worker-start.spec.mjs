@@ -9,6 +9,7 @@ import {openLedger,inspectLedger,ledgerFileFor} from '../../engine/db/ledger.mjs
 import {parseYaml} from '../../engine/yaml.mjs';
 import {findHostBoundaryViolations} from '../../scripts/checks/check-host-boundary.mjs';
 import {spawnAgent,startAgent} from '../../scripts/agent/lib.mjs';
+import {codexKeyForms,codexProjectTables} from '../../scripts/agent/trust.mjs';
 import {pathToFileURL} from 'node:url';
 import {fakeAdmission} from '../helpers/fake-admission.mjs';
 import {fakeDevinQuotaEnv} from '../helpers/fake-devin-quota.mjs';
@@ -329,10 +330,18 @@ for(const [model,agent,takesModel] of [['claude-agent','claude',true],['codex-ag
     assert.equal(start[start.indexOf('--agent')+1],agent);
     assert.equal(start.includes('--terminal'),false);
     assert.equal(start.includes('--model'),takesModel,`${agent} ${takesModel?'pins':'takes no'} --model`);
-    // The launch really ran project trust (STARCI_AGENT_TRUST_HOME is live in these children): the provider-local
-    // file lands in the fixture worktree, which is what keeps the checkout root clean in the hygiene test below.
-    const trusted={claude:'.claude/settings.local.json',codex:'.codex/config.toml',devin:'.devin/config.local.json'}[agent];
-    assert.equal(fs.existsSync(path.join(fx.repo,...trusted.split('/'))),true,`${agent} launch trusted its fixture worktree`);
+    // The launch really ran project trust (STARCI_AGENT_TRUST_HOME is live in these children): Claude and Devin
+    // drop their provider-local file in the fixture worktree, while Codex keys the worktree trusted in its managed
+    // home's config.toml — a linked worktree's own .codex/config.toml is never loaded (a0ae92c5a). Either way the
+    // trust lands under the fixture root, which is what keeps the checkout root clean in the hygiene test below.
+    if(agent==='codex'){
+      const toml=fs.readFileSync(path.join(fx.env.STARCI_AGENT_TRUST_HOME,'.codex','config.toml'),'utf8');
+      for(const k of codexKeyForms(fx.repo))assert.equal(codexProjectTables(toml).get(k)?.trust,'trusted','codex launch trusted its fixture worktree');
+      assert.equal(fs.existsSync(path.join(fx.repo,'.codex','config.toml')),false,'codex keeps no project layer in a linked worktree');
+    }else{
+      const trusted={claude:'.claude/settings.local.json',devin:'.devin/config.local.json'}[agent];
+      assert.equal(fs.existsSync(path.join(fx.repo,...trusted.split('/'))),true,`${agent} launch trusted its fixture worktree`);
+    }
     // The nested Run rule (Orca's sub-dispatch shape): the Kernel binds its OWN workflow Run, files the op Task there
     // with no --parent (Orca takes a parent only from the same Run) and starts the op from its terminal.
     const argvOf=(verb)=>fx.callArgv().filter(argv=>argv.slice(0,2).join(' ')===verb);
