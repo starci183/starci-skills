@@ -413,8 +413,9 @@ if (planOnly) {
   const cfg = out.config;
   const groupRoute = cfg.kernel?.group?.map(m => `${m.agent}/${m.model ?? '(pool model)'}`).join(' → '),
     kernelText = cfg.kernel?.group ? `kernel group ${groupRoute}` : `kernel pin agent=${cfg.kernel?.agent ?? '(none)'} model=${cfg.kernel?.model ?? '(none)'}`;
+  const budgetText = () => cfg.budgets && Object.values(cfg.budgets).some(v => v != null) ? ` budgets=${JSON.stringify(cfg.budgets)}` : '', errorText = () => cfg.error ? ` (${cfg.error})` : '';
   lines.push(cfg.file
-    ? `CONFIG: ${cfg.file} — ${kernelText} effort=${cfg.kernel?.effort ?? '(default)'}${cfg.budgets && Object.values(cfg.budgets).some(v => v != null) ? ` budgets=${JSON.stringify(cfg.budgets)}` : ''}${cfg.error ? ` (${cfg.error})` : ''}`
+    ? `CONFIG: ${cfg.file} — ${kernelText} effort=${cfg.kernel?.effort ?? '(default)'}${budgetText()}${errorText()}`
     : 'CONFIG: no config.yaml — kernel route falls to --agent flag or route-model', 'WILL WRITE:', ...willWrite.map(w => `  - ${w}`));
   if (revisionBase) {
     lines.push(`REVISION DIFF: remove [${preview.opChainDiff.removed.join(', ') || '-'}] add [${preview.opChainDiff.added.join(', ') || '-'}] reordered=${preview.opChainDiff.reordered}`,
@@ -459,7 +460,6 @@ if (revisionBase) {
     console.error(`cannot revise ${reviseWorkflowId}: ${unsafePreviewJobs.length} operation job(s) have possible effects (${unsafeList}); settle or reconcile them before revision checkpoint`);
     process.exit(2);
   }
-
   const ledger = openLedger({ file: revisionBase.file });
   try {
     const { alreadyApplied, supersededJobs } = acceptGoalRevision({ ledger, workflowId: reviseWorkflowId, preview, approveRevision,
