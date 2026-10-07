@@ -57,7 +57,7 @@ export default [canon.configs.recommended]
 
 ```bash
 npm install
-npm test          # both packages
+npm test          # both eslint canons, in place
 npm run test:fe
 npm run test:be
 ```

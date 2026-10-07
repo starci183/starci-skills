@@ -246,6 +246,10 @@ test('the runtime is measured by one scope: the codecov runtime flag (informatio
   assert.ok(skipped, 'missing settings are announced, never a silent pass');
   for (const setting of ['secrets.SONAR_TOKEN', 'vars.SONAR_ORGANIZATION', 'vars.SONAR_PROJECT_KEY']) assert.ok(String(skipped.run).includes(setting), `the notice can name ${setting}`);
   assert.ok(ci.steps.indexOf(skipped) > ci.steps.indexOf(scan));
+  const packages = ci.steps.find((step) => step.run === 'npm run starci --silent -- release clean-test');
+  assert.ok(packages, 'every package suite runs from a clean install in the job');
+  assert.equal(packages.if, '${{ !cancelled() }}', 'a red static check or coverage step does not hide a red package suite');
+  assert.ok(ci.steps.indexOf(packages) > ci.steps.indexOf(upload));
 });
 
 test('the root sonar-project.properties of the runtime is a render: a hand edit is refused and --write restores it', (t) => {
