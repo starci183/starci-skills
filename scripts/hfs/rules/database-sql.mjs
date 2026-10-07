@@ -268,34 +268,51 @@ function localPolicyFindings(file, facts) {
 
 const policyKey = (policy) => `${policy.schema}\0${policy.table}\0${policy.name}`;
 
-/** Anonymous table grants are covered by the final policy state across the ordered migration set. */
-export function migrationSetPolicyFindings(analyses) {
+function applyPolicyEvent(policies, event) {
+  const key = policyKey(event.kind === 'create' ? event.policy : event);
+  if (event.kind === 'create') policies.set(key, event.policy);
+  else if (event.kind === 'drop') policies.delete(key);
+  else if (policies.has(key)) policies.set(key, { ...policies.get(key), ...event });
+}
+
+function policiesAfterMigrations(analyses) {
   const policies = new Map();
   for (const { facts } of analyses) {
-    for (const event of [...facts.policyEvents].sort((left, right) => left.index - right.index)) {
-      const key = policyKey(event.kind === 'create' ? event.policy : event);
-      if (event.kind === 'create') policies.set(key, event.policy);
-      else if (event.kind === 'drop') policies.delete(key);
-      else if (policies.has(key)) policies.set(key, { ...policies.get(key), ...event });
-    }
+    for (const event of [...facts.policyEvents].sort((left, right) => left.index - right.index)) applyPolicyEvent(policies, event);
   }
-  const finalPolicies = [...policies.values()];
+  return [...policies.values()];
+}
+
+function anonymousTableGrant(grant) {
+  if (!grant.grant || grant.targtype !== 'ACL_TARGET_OBJECT' || grant.objtype !== 'OBJECT_TABLE') return false;
+  return grant.grantees.includes('anon') || grant.grantees.includes('public');
+}
+
+function publicReadPolicyCovers(finalPolicies, schema, table) {
+  return finalPolicies.some((policy) => policy.schema === schema && policy.table === table && policy.cmd === 'select'
+    && typeof policy.name === 'string' && policy.name.endsWith(PUBLIC_READ_SUFFIX)
+    && (policy.roles.includes('anon') || policy.roles.includes('public')));
+}
+
+function anonymousGrantFindings(file, grant, finalPolicies) {
+  if (!anonymousTableGrant(grant)) return [];
+  const findings = [];
+  for (const object of grant.objects) {
+    const relation = object?.RangeVar;
+    if (!relation) continue;
+    const schema = schemaOf(relation, grant.defaultSchema);
+    const table = relation.relname;
+    if (!publicReadPolicyCovers(finalPolicies, schema, table)) findings.push(found(DB_POLICY_SHAPE, file, `${file}:${grant.line} grants an anonymous role on ${schema}.${table} but the migration set ends without a *_public_read FOR SELECT policy`, { line: grant.line, table: `${schema}.${table}` }));
+  }
+  return findings;
+}
+
+/** Anonymous table grants are covered by the final policy state across the ordered migration set. */
+export function migrationSetPolicyFindings(analyses) {
+  const finalPolicies = policiesAfterMigrations(analyses);
   const findings = [];
   for (const { file, facts } of analyses) {
-    for (const grant of facts.grants) {
-      if (!grant.grant || grant.targtype !== 'ACL_TARGET_OBJECT' || grant.objtype !== 'OBJECT_TABLE') continue;
-      if (!grant.grantees.includes('anon') && !grant.grantees.includes('public')) continue;
-      for (const object of grant.objects) {
-        const relation = object?.RangeVar;
-        if (!relation) continue;
-        const schema = schemaOf(relation, grant.defaultSchema);
-        const table = relation.relname;
-        const covered = finalPolicies.some((policy) => policy.schema === schema && policy.table === table && policy.cmd === 'select'
-          && typeof policy.name === 'string' && policy.name.endsWith(PUBLIC_READ_SUFFIX)
-          && (policy.roles.includes('anon') || policy.roles.includes('public')));
-        if (!covered) findings.push(found(DB_POLICY_SHAPE, file, `${file}:${grant.line} grants an anonymous role on ${schema}.${table} but the migration set ends without a *_public_read FOR SELECT policy`, { line: grant.line, table: `${schema}.${table}` }));
-      }
-    }
+    for (const grant of facts.grants) findings.push(...anonymousGrantFindings(file, grant, finalPolicies));
   }
   return findings;
 }
