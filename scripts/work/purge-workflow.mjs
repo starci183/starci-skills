@@ -182,8 +182,8 @@ export function purgeWorkflow({ repo, workflowId, apply = false, approvedBy = nu
   } finally { ledger.close(); }
 }
 
-function main() {
-  const argv = process.argv.slice(2), a = {};
+function parseArgs(argv) {
+  const a = {};
   for (let i = 0; i < argv.length; i++) {
     const k = argv[i];
     if (!k.startsWith('--')) continue;
@@ -191,18 +191,25 @@ function main() {
     if (['apply', 'json'].includes(n)) { a[n] = true; }
     else { a[n] = argv[++i]; }
   }
+  return a;
+}
+
+const countsLine = (counts) => Object.entries(counts).filter(([, n]) => n).map(([t, n]) => `${t}:${n}`).join(' ');
+
+function reportLine(workflow, out) {
+  if (out.already) return `${workflow}: already purged; archive ${out.purge.archive_path} (sha256 ${out.purge.archive_sha256})`;
+  if (out.dryRun) {
+    const result = out.ok ? 'may be purged' : `REFUSED: ${out.blockers.join('; ')}`;
+    return `${workflow}: dry run - ${result}; ${countsLine(out.counts)}; ${out.files} file(s) ${out.fileBytes} bytes -> ${out.archive}`;
+  }
+  return `${workflow}: purged; archive ${out.purge.archive_path} sha256 ${out.purge.archive_sha256}; deleted ${countsLine(out.deleted)}`;
+}
+
+function main() {
+  const a = parseArgs(process.argv.slice(2));
   if (!a.repo || !a.workflow) { console.error(USAGE); process.exit(2); }
   const out = purgeWorkflow({ repo: a.repo, workflowId: a.workflow, apply: Boolean(a.apply), approvedBy: a['approved-by'] ?? null, approvalRef: a['approval-ref'] ?? null, archiveRoot: a['archive-root'] ?? archiveRootOf() });
-  if (a.json) console.log(JSON.stringify(out, null, 2));
-  else if (out.already) console.log(`${a.workflow}: already purged; archive ${out.purge.archive_path} (sha256 ${out.purge.archive_sha256})`);
-  else if (out.dryRun) {
-    const result = out.ok ? 'may be purged' : `REFUSED: ${out.blockers.join('; ')}`;
-    const counts = Object.entries(out.counts).filter(([, n]) => n).map(([t, n]) => `${t}:${n}`).join(' ');
-    console.log(`${a.workflow}: dry run - ${result}; ${counts}; ${out.files} file(s) ${out.fileBytes} bytes -> ${out.archive}`);
-  } else {
-    const deleted = Object.entries(out.deleted).filter(([, n]) => n).map(([t, n]) => `${t}:${n}`).join(' ');
-    console.log(`${a.workflow}: purged; archive ${out.purge.archive_path} sha256 ${out.purge.archive_sha256}; deleted ${deleted}`);
-  }
+  console.log(a.json ? JSON.stringify(out, null, 2) : reportLine(a.workflow, out));
   if (!out.ok) process.exitCode = 1;
 }
 
