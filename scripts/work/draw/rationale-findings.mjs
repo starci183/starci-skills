@@ -74,6 +74,16 @@ export function findRationaleIssues({ html, entries, errors, measures, resolve, 
     const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
     return entries.some((e) => new RegExp(`(^|[^A-Za-z0-9])${escaped}([^A-Za-z0-9]|$)`).test(`${str(e.decision)} ${str(e.value)} ${list(e.rules).map(str).join(' ')}`));
   };
+  const variantsOfElement = (el, spec) => {
+    const variants = [];
+    for (const [k, v] of Object.entries(el.attrs)) {
+      if (!k.startsWith('data-') || [COMPONENT_ATTR, PART_ATTR, whyAttr, 'data-grammar-proposal'].includes(k) || !v) continue;
+      const prop = k.replace(/^data-(grammar-)?/, '');
+      const closed = spec ? [...spec.closed.keys()].find((p) => kebab(p) === prop) : null;
+      if (closed || ['variant', 'size', 'tone', 'color'].includes(prop)) variants.push(`${prop}=${v}`);
+    }
+    return variants;
+  };
   const collectUsedVariants = () => {
     const used = new Map();
     for (const el of visible) {
@@ -81,12 +91,7 @@ export function findRationaleIssues({ html, entries, errors, measures, resolve, 
       if (!name) continue;
       if (!used.has(name)) used.set(name, new Set());
       const spec = dna?.components?.get(name);
-      for (const [k, v] of Object.entries(el.attrs)) {
-        if (!k.startsWith('data-') || [COMPONENT_ATTR, PART_ATTR, whyAttr, 'data-grammar-proposal'].includes(k) || !v) continue;
-        const prop = k.replace(/^data-(grammar-)?/, '');
-        const closed = spec ? [...spec.closed.keys()].find((p) => kebab(p) === prop) : null;
-        if (closed || ['variant', 'size', 'tone', 'color'].includes(prop)) used.get(name).add(`${prop}=${v}`);
-      }
+      for (const variant of variantsOfElement(el, spec)) used.get(name).add(variant);
     }
     return used;
   };

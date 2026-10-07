@@ -175,18 +175,25 @@ function evidenceEntryFindings(entries, rel) {
   for (const [where, e] of entries) {
     // An entry marked retired is kept proof of an earlier draw, never a drawing of this pass.
     if (!e || typeof e !== 'object' || e.retired) continue;
-    const id = e.id ?? e.state ?? '?';
-    const status = dataStatusOf(e.state);
-    if (status && !e.nonDerivable) findings.push({ code: DATA_STATUS_DRAWN, path: rel, detail: `${rel} ${where} ${id} draws "${e.state}", the data status ${status.status}; data statuses render by recipe` });
-    if (!e.shape && !e.base) {
-      const shape = e.screen ? `screen ${e.screen}` : 'no shape';
-      findings.push({ code: DRAW_NOT_SHAPES, path: rel, detail: `${rel} ${where} ${id} names ${shape}: each drawing is one XBase#state shape` });
-    }
+    findings.push(...evidenceShapeFindings(where, e, rel));
     const tool = e.provenance?.tool ?? e.generation?.tool ?? null;
     if (tool !== DRAW_TOOL) {
       const provenance = tool ? `provenance.tool ${tool}` : 'no provenance.tool';
-      findings.push({ code: DRAW_ASSET_NOT_TOKEN_RENDERED, path: rel, detail: `${rel} ${where} ${id} records ${provenance}, not draw-render` });
+      findings.push({ code: DRAW_ASSET_NOT_TOKEN_RENDERED, path: rel, detail: `${rel} ${where} ${e.id ?? e.state ?? '?'} records ${provenance}, not draw-render` });
     }
+  }
+  return findings;
+}
+
+/** The data-status and one-shape findings of one live evidence entry. */
+function evidenceShapeFindings(where, e, rel) {
+  const findings = [];
+  const id = e.id ?? e.state ?? '?';
+  const status = dataStatusOf(e.state);
+  if (status && !e.nonDerivable) findings.push({ code: DATA_STATUS_DRAWN, path: rel, detail: `${rel} ${where} ${id} draws "${e.state}", the data status ${status.status}; data statuses render by recipe` });
+  if (!e.shape && !e.base) {
+    const shape = e.screen ? `screen ${e.screen}` : 'no shape';
+    findings.push({ code: DRAW_NOT_SHAPES, path: rel, detail: `${rel} ${where} ${id} names ${shape}: each drawing is one XBase#state shape` });
   }
   return findings;
 }
