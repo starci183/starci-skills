@@ -134,9 +134,8 @@ export function measurePage({ generic, exemptSelector, layoutAttr = 'data-draw-l
     let layoutElements = 0;
     for (const el of rootEl.querySelectorAll('*')) {
       if (el.hasAttribute('data-component')) { components.add(el.getAttribute('data-component')); }
-      if (el.hasAttribute(layoutAttribute)) { layoutElements += 1; }
-      if (el.closest('svg') && el.tagName.toLowerCase() !== 'svg') { continue; }
-      if (!paints(el)) { continue; }
+      layoutElements += Number(el.hasAttribute(layoutAttribute));
+      if ((el.closest('svg') && el.tagName.toLowerCase() !== 'svg') || !paints(el)) { continue; }
       const owner = ownerOf(el, rootEl, layoutAttribute, marked);
       if (owner !== 'grammar') { unowned.push(ownershipLabel(el, owner)); }
     }

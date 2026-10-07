@@ -409,7 +409,7 @@ function measuredCapture(shellDir, capture) {
   return { ...capture, width: capture.width ?? image.width, height: capture.height ?? image.height, ...(!capture.slot && key && key.fill >= SLOT_FILL_MIN ? { slot: key.rect } : null) };
 }
 
-function destinationCaptureOf(picked, node, route, bp, theme, shellDir, ui, sameCapture) {
+function destinationCaptureOf(picked, node, { route, bp, theme, shellDir, ui }, sameCapture) {
   if (!picked) return { result: null, fallback: null };
   const hit = picked.destination.captures.find((capture) => capture?.breakpoint === bp && capture?.theme === theme);
   if (hit) {
@@ -456,7 +456,7 @@ export function baseLayoutFor(record, route, bp, theme, { shellDir, uiLoader = n
   const picked = destinationFor(record, node, { route: ui?.route ?? route, activeNav: ui?.shell?.activeNav ?? null, key: bound });
   if (picked?.unknown) return { missing: `shell.layouts binds ${node.id} destination ${picked.unknown}, which is not a destination of that layout (${destinationsOf(record, node).map((d) => d.key).join(', ') || 'none recorded'})` };
   const same = (sha) => capturesAt(record, node, bp, theme).filter((c) => c.sha256 === sha).map((c) => c.rel);
-  const destinationCapture = destinationCaptureOf(picked, node, route, bp, theme, shellDir, ui, same);
+  const destinationCapture = destinationCaptureOf(picked, node, { route, bp, theme, shellDir, ui }, same);
   if (destinationCapture.result) return destinationCapture.result;
   const capture = recordedLayoutCapture(node, bp, theme, destinationCapture.fallback, same);
   if (capture) return capture;

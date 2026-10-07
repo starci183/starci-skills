@@ -90,7 +90,7 @@ const LAYOUT_CLASS_RX = [
   /^(?:items|justify|content|self|place-items|place-content|place-self|justify-items|justify-self)-[a-z-]+$/,
   /^(?:relative|absolute|static|sticky)$/, /^z-(?:\d+|auto)$/,
   /^(?:w|h|size)-(?:full|auto|0|min|max|fit|screen|dvh|svh|\d+\/\d+|prose|none)$/,
-  /^(?:min|max)-(?:w|h)-(?:full|auto|0|min|max|fit|screen|dvh|svh|\d+\/\d+|prose|none)$/,
+  /^(?:min|max)-[wh]-(?:full|auto|0|min|max|fit|screen|dvh|svh|\d+\/\d+|prose|none)$/,
   /^max-w-(?:xs|sm|md|lg|xl|[2-7]xl)$/, /^overflow-(?:hidden|visible|clip|auto)$/, /^(?:mx|my|m|ms|me)-auto$/,
 ];
 
