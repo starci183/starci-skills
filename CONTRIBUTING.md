@@ -41,6 +41,12 @@ parses TOML. `devDependencies` support contributor specs and tooling:
 - Specs are flat: `tests/*.spec.mjs`, `node:test` + `node:assert`. No jest/vitest at root.
 - Fixtures are built in tmp dirs (`fs.mkdtempSync` / `tests/fixtures/` builders) — never write into
   the repo under test, never commit generated fixture output.
+- Temp files: the runtime creates every temporary file under `tempRoot()` (`engine/temp-root.mjs`: env
+  `STARCI_TEMP_ROOT`, then `config.yaml roots.temp`, else the OS temp directory); runtime code calls `makeTempDir`/`tempPath` (`scripts/api/fs/`) or `tempRoot`,
+  never `os.tmpdir()` or `fs.mkdtempSync(os.tmpdir())`, and its children get `TEMP`/`TMP`/`TMPDIR` from `tempChildEnv` (`engine/temp-root.mjs`), which the `scripts/api/` spawn wrappers apply. The suite
+  preload `tests/setup/isolated-temp.mjs` reads only the environment, never the owner's `config.yaml`: it makes a fresh per-spec root inside
+  `STARCI_TEMP_ROOT` (else the OS temp directory) and points `TEMP`, `TMP`, `TMPDIR` and `STARCI_TEMP_ROOT` at it, so
+  `STARCI_TEMP_ROOT=<dir on another drive> node --test ...` puts the whole suite's files there.
 - No real network. Provider CLIs (`orca`, `devin`, `claude`, `codex`) are stubbed or recorded; a
   spec that would spawn a real agent is wrong.
 - Specs may spawn `starci <group> <verb>` under test with `spawnSync` — that is the sanctioned

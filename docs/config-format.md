@@ -247,8 +247,31 @@ they then run their whole brief even while the switch is still off.
 
 ## Host roots (`roots`)
 
-`roots: {archive?, lanes?}` (config.yaml, gitignored) relocates the two host roots the runtime owns: the archive (session files, blob
-retention, ledger backups) and the lane worktrees. Each key is an absolute directory or `null`; a relative path, a non-string or an
-unknown key is refused with `Invalid config.yaml: roots...`. Resolution, in one place (`archiveRoot()` and `lanesRoot()` in
-`scripts/machine/home.mjs`): the environment variable (`STARCI_ARCHIVE_ROOT`, `STARCI_LANES_ROOT`), then the owner key, then
-`<starciLocalRoot>/archive` (`<runtime root>/.runtime/archive`) and, for lanes, a per-user profile directory kept out of the checkout (`<LOCALAPPDATA>/StarCi/lanes`, `<STARCI_LOCAL_ROOT>/lanes` when that seam is set). The tracked config declares no host location.
+`roots: {archive?, lanes?, temp?}` (config.yaml, gitignored) relocates the three host roots the runtime owns: the archive (session files, blob
+retention, ledger backups), the lane worktrees and the temp root (every temporary file the runtime creates). Each key is an absolute directory or `null`; a relative path, a non-string or an
+unknown key is refused with `Invalid config.yaml: roots...`. Resolution, in one place each (`archiveRoot()` and `lanesRoot()` in
+`scripts/machine/home.mjs`, `tempRoot()` in `engine/temp-root.mjs`): the environment variable (`STARCI_ARCHIVE_ROOT`, `STARCI_LANES_ROOT`, `STARCI_TEMP_ROOT`), then the owner key, then
+`<starciLocalRoot>/archive` (`<runtime root>/.runtime/archive`) and, for lanes, a per-user profile directory kept out of the checkout (`<LOCALAPPDATA>/StarCi/lanes`, `<STARCI_LOCAL_ROOT>/lanes` when that seam is set); an absent `temp` means the OS temp directory (`TEMP`, `TMP`, `TMPDIR`, else `os.tmpdir()`). The tracked config declares no host location.
+
+The temp root receives the runtime's own temp directories and files (land and release scratch, gate staging, dispatch prompts, op scratch,
+scan work dirs). The processes the runtime starts through `scripts/api/` (git, npm, node, docker, the sonar scanner, program and shell runners)
+get `TEMP`, `TMP` and `TMPDIR` set to it, so what npm, tsc, jest, Playwright and the scaffolds write follows it; the directory is created
+when missing. Processes the runtime does not start (the workers Orca launches, the owner's own shells) keep their own temp directory. The housekeeping
+tmp sweep removes prefixed entries older than `allocation.housekeeping.tmpMaxAgeMs` from the temp root and, when the OS temp directory is a
+different directory, from it as well, because tools the runtime does not control keep writing there.
+
+## Host resource floors (`resources`)
+
+`resources: {minFreeDiskGb?, minFreeDiskPct?, minFreeRamPct?}` (config.yaml, gitignored) sets the capacity floors the dispatch gate
+(`starci kernel dispatch --spawn`, `scripts/machine/host-resources.mjs`) enforces. Each key is a number above 0 or `null`
+(`minFreeDiskPct` and `minFreeRamPct` at most 100); an unknown key or another value is refused with `Invalid config.yaml: resources...`.
+
+- `minFreeDiskGb`: the free space, in GB, a drive must keep. `minFreeDiskPct`: the same floor as a percentage of the drive's size. When both are
+  set the larger requirement applies (`5 GB (1 % disk)` on a 500 GB drive requires 5 GB; on a 2 TB drive 20 GB).
+- `minFreeRamPct`: the free-RAM percentage below which no new heavy op starts (the RAM throttle's heavy floor).
+- Precedence: owner `config.yaml resources`, key by key, over the shipped policy `modules/models/runtimes.yaml allocation.resources`. The shipped file is
+  the only place that carries default numbers (`minFreeDiskGb`, `minFreeRamPct`, no percentage); code holds none, and a shipped policy without them is an error.
+- The disks measured are the drive holding the temp root (`tempRoot()`) and the drive of the repository; the worst margin binds. Moving
+  `roots.temp` to another drive moves the measured drive with it.
+
+A refused dispatch (`host-resources-low`) names the drive, the floor and the keys above, and the temp root in use.

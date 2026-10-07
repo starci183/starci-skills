@@ -1,6 +1,7 @@
 // scripts/reconciler/boot.mjs (crash-loop guard: only abnormal starts count) and start.mjs (operational profile,
 // ui build staleness, preflight rows). Every host effect is a seam; nothing here starts or stops a process.
 import test from 'node:test';
+import { tempRoot } from '../../engine/temp-root.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -134,7 +135,8 @@ test('a cold non-Git UI installs through the native npm API with its private env
     assert.ok(args.includes('ci'), 'the actual ci call file reaches the npm runner');
     assert.ok(args.includes('--prefer-offline') && args.includes('--no-audit') && args.includes('--no-fund'));
     assert.equal(options.cwd, fixture.ui);
-    assert.equal(options.env, env, 'the owning API forwards the host private environment to npmSpawn');
+    assert.equal(options.env.STARCI_UI_BOOTSTRAP_PROBE, 'private-fixture', 'the owning API forwards the host private environment to npmSpawn');
+    assert.equal(options.env.TMPDIR, tempRoot({ env }), 'and the npm child writes its temp files under the temp root');
     fixture.tools();
     return { status: 0, stdout: '', stderr: '' };
   });

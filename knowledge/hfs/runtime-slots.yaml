@@ -96,7 +96,7 @@ ruleParams:
         cmd: [api/fs, api/process]
     # RT_BASE_IMPURE: the base tier never writes the filesystem; it reads process.env only in these declared seams.
     baseWriteMembers: [writeFileSync, appendFileSync, rmSync, rmdirSync, renameSync, unlinkSync, mkdirSync, copyFileSync, cpSync, symlinkSync, linkSync, truncateSync, writeFile, appendFile, rm, rmdir, rename, unlink, mkdir, copyFile, cp, symlink, link, truncate, mkdtempSync, mkdtemp, createWriteStream]
-    baseEnvSeams: [scripts/lib/env.mjs, scripts/lib/sleep-sync.mjs, scripts/gates/runtime-host.mjs, engine/config.mjs, engine/runtime-root.mjs, engine/secrets.mjs]
+    baseEnvSeams: [scripts/lib/env.mjs, scripts/lib/sleep-sync.mjs, scripts/gates/runtime-host.mjs, engine/config.mjs, engine/runtime-root.mjs, engine/secrets.mjs, engine/temp-root.mjs]
     # RT_API_SHAPE: the systems that carry a calls contract; every call file of such a system is a calls id and vice versa.
     apiContracts:
       orca: modules/host/orca/calls.yaml
@@ -337,7 +337,7 @@ slots:
   # ----- engine ---------------------------------------------------------------------------------------------
   - id: runtime.foundation
     profiles: [runtime]
-    path: "engine/{runtime-root,config,secrets,invalid-config,orca-config,plain-object,canonical-json,by-code-unit,constants,digest,admission,refuse}.mjs"
+    path: "engine/{runtime-root,config,secrets,invalid-config,orca-config,resources-config,temp-root,plain-object,canonical-json,by-code-unit,constants,digest,admission,refuse}.mjs"
     presence: required
     tracked: tracked
     tier: base

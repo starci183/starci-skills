@@ -12,6 +12,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { withoutGitLocalEnv } from '../../lib/git.mjs';
+import { withTempEnv } from '../../../engine/temp-root.mjs';
 
 /**
  * Spawn `file` (the git binary) once with `args`: utf8 text, a hidden window, never a shell.
@@ -23,8 +24,8 @@ export const gitSpawn = (file, args, options = {}) => {
   assertMutationFence({ kind: 'git-effect', args });
   const spawn = { encoding: 'utf8', windowsHide: true, ...options };
   if (spawn.encoding === 'buffer') spawn.encoding = null;
-  if (spawn.env) spawn.env = { ...spawn.env }; // node adds NODE_V8_COVERAGE to the env object it is given: a frozen caller env must not throw under coverage
-  return spawnSync(file, args, spawn);
+  // tempChildEnv copies the env (node adds NODE_V8_COVERAGE to the env object it is given: a frozen caller env must not throw under coverage) and points TEMP/TMP/TMPDIR at the temp root
+  return spawnSync(file, args, withTempEnv(spawn));
 };
 
 /**

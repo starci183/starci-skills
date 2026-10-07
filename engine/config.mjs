@@ -5,7 +5,7 @@ import {skillRoot} from './runtime-root.mjs';
 import {parseYaml} from './yaml.mjs';
 import {isPlainObject as plain} from './plain-object.mjs';
 import {invalid,validateRoots} from './invalid-config.mjs';
-import {validateOrca} from './orca-config.mjs';
+import {validateOrca} from './orca-config.mjs';import {validateResources} from './resources-config.mjs';
 import {ENV_NAME,secretEnv,connectorSecret} from './secrets.mjs';
 import {byCodeUnit} from './by-code-unit.mjs';
 const knownNames=names=>[...names].sort(byCodeUnit).join(', ');
@@ -357,7 +357,7 @@ const validateBudgetsBlock=budgets=>{if(!plain(budgets)||Object.keys(budgets).so
 const validateCanonicalPool=(pool,members,runtimes)=>{if(!Array.isArray(members)||members.length!==2||new Set(members).size!==2||members.some(id=>typeof id!=='string'||!plain(runtimes[id]))||!(members.length===DEFAULT_MODEL_POOLS[pool].length&&members.every(id=>DEFAULT_MODEL_POOLS[pool].includes(id))))throw new Error(`Invalid config.yaml: models.pools.${pool} must contain its canonical pair of two unique known runtime ids.`);};
 const validateRolePool=(role,required,models,runtimes)=>{const pool=models.nonOperation[role],members=models.pools[pool];if(typeof pool!=='string'||!members||members.some(id=>!runtimes[id].roles?.includes(required)))throw new Error(`Invalid config.yaml: models.nonOperation.${role} must name a pool whose members carry the ${required} role.`);};
 const validateModelPools=(config,models,runtimes)=>{
-  const allowed=new Set(['language','model','effort','models','debug','allocation','kernel','budgets','supervisor','parallel','delegation','connectors','asks','uat','specs','reconciler','coreDebug','orca','roots','launchTrust','retention']);
+  const allowed=new Set(['language','model','effort','models','debug','allocation','kernel','budgets','supervisor','parallel','delegation','connectors','asks','uat','specs','reconciler','coreDebug','orca','roots','resources','launchTrust','retention']);
   if(!plain(config)||Object.keys(config).some(key=>!allowed.has(key))||typeof config.language!=='string'||!/^[a-z]{2,3}(?:-[A-Za-z0-9]+)*$/.test(config.language)||!(config.model===null||typeof config.model==='string'&&config.model.trim())||!EFFORT_LEVELS.has(config.effort)||!plain(models)||Object.keys(models).some(key=>!['pools','nonOperation','selection'].includes(key))||models.selection!=='quota-aware'||!plain(models.pools)||!plain(models.nonOperation)||Object.keys(models.pools).length!==Object.keys(DEFAULT_MODEL_POOLS).length||Object.keys(models.pools).some(key=>!Object.hasOwn(DEFAULT_MODEL_POOLS,key))||Object.keys(models.nonOperation).length!==Object.keys(NON_OPERATION_ROLES).length||Object.keys(models.nonOperation).some(key=>!Object.hasOwn(NON_OPERATION_ROLES,key)))throw new Error('Invalid config.yaml: expected language, model, effort and the closed quota-aware model pools/non-operation role map.');
   for(const [pool,members] of Object.entries(models.pools))validateCanonicalPool(pool,members,runtimes);
   for(const [role,required] of Object.entries(NON_OPERATION_ROLES))validateRolePool(role,required,models,runtimes);
@@ -366,7 +366,7 @@ const validateEarlyConfigBlocks=(config)=>{
   if(config?.launchTrust!==undefined){launchTrustSettings(config);} if(config?.retention!==undefined){workflowPurgeSettings(config);}
   if(config?.connectors!==undefined){validateConnectors(config.connectors);} if(config?.asks!==undefined){validateAsks(config.asks);}
   if(config?.uat!==undefined){validateUat(config.uat);} if(config?.coreDebug!==undefined){validateCoreDebug(config.coreDebug);}
-  if(config?.orca!==undefined){validateOrca(config.orca);} if(config?.roots!==undefined){validateRoots(config.roots);}
+  if(config?.orca!==undefined){validateOrca(config.orca);} if(config?.roots!==undefined){validateRoots(config.roots);} if(config?.resources!==undefined){validateResources(config.resources);}
 };
 const validateConfigBlocks=(config,knownProviders,runtimes,profile)=>{
   if(config?.debug!==undefined&&typeof config.debug!=='boolean')throw new Error('Invalid config.yaml: debug must be true or false.');

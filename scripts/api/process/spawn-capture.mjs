@@ -2,6 +2,7 @@
 // A deadline/transport failure is an unknown effect, never proof of process-tree closure. Never rejects.
 import { spawn } from 'node:child_process';
 import { StringDecoder } from 'node:string_decoder';
+import { withTempEnv } from '../../../engine/temp-root.mjs';
 
 const CAP = 4 * 1024 * 1024;
 const streamState = () => ({ chunks: [], seenBytes: 0, capturedBytes: 0, truncated: false });
@@ -26,7 +27,7 @@ export const spawnCapture = (cmd, args, { cwd, env = process.env, timeoutMs = 12
       processState: 'not-started', effectState: 'none', outputComplete: false }); return;
   }
   let child;
-  try { child = spawnChild(cmd, args, { cwd, env, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] }); }
+  try { child = spawnChild(cmd, args, withTempEnv({ cwd, env, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] })); }
   catch (error) {
     resolve({ code: null, stdout: '', stderr: '', timedOut: false, error: String(error?.message ?? error),
       processState: 'not-started', effectState: 'none', outputComplete: false }); return;

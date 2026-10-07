@@ -5,9 +5,10 @@
 import { spawnSync } from 'node:child_process';
 import { toolUnavailableResult } from './lib.mjs';
 import { systemTool } from './system-tool.mjs';
+import { withTempEnv } from '../../../engine/temp-root.mjs';
 
 /** Runs `script`; `timeout` (default 2 minutes) bounds it, `env` is the child's environment. */
 export const runPowershell = (script, { timeout = 120_000, env = process.env, spawn = spawnSync, tool = systemTool } = {}) => {
   const shell = tool('powershell');
-  return shell.ok ? spawn(shell.path, ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', script], { encoding: 'utf8', windowsHide: true, timeout, env }) : toolUnavailableResult(shell);
+  return shell.ok ? spawn(shell.path, ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', script], withTempEnv({ encoding: 'utf8', windowsHide: true, timeout, env })) : toolUnavailableResult(shell);
 };
