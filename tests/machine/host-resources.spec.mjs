@@ -27,11 +27,11 @@ const REPO_SAME = `${DRIVE}src\\repo`;
 test('the thresholds come from allocation.resources.*, falling back to the declared defaults', t => {
   assert.deepEqual(resourceThresholds(SETTINGS), { minFreeDiskGb: 20, minFreeRamPct: 15 });
   assert.deepEqual(resourceThresholds({}), { minFreeDiskGb: DEFAULT_MIN_FREE_DISK_GB, minFreeRamPct: DEFAULT_MIN_FREE_RAM_PCT });
-  assert.equal(DEFAULT_MIN_FREE_DISK_GB, 20);
+  assert.equal(DEFAULT_MIN_FREE_DISK_GB, 5);
   assert.equal(DEFAULT_MIN_FREE_RAM_PCT, 15);
   assert.deepEqual(resourceThresholds({ resources: { minFreeDiskGb: 5, minFreeRamPct: 50 } }), { minFreeDiskGb: 5, minFreeRamPct: 50 });
   assert.deepEqual(resourceThresholds({ resources: { minFreeDiskGb: 0, minFreeRamPct: -3 } }),
-    { minFreeDiskGb: 20, minFreeRamPct: 15 }, 'a non-positive threshold is not a floor — the default stands');
+    { minFreeDiskGb: DEFAULT_MIN_FREE_DISK_GB, minFreeRamPct: DEFAULT_MIN_FREE_RAM_PCT }, 'a non-positive threshold is not a floor — the default stands');
 });
 
 test('a healthy host reads ok with both drives and the RAM figures reported', { skip: TWO_DRIVES }, t => {

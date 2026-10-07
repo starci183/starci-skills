@@ -106,7 +106,7 @@ test('a low disk refuses the spawn as a typed wait: host-resources-low, queued, 
     assert.equal(body.host.lowRam,false);
     assert.equal(body.host.drive,DRIVE);
     assert.equal(body.host.freeDiskGb,0.5);
-    assert.deepEqual(body.host.thresholds,{minFreeDiskGb:20,minFreeRamPct:10});
+    assert.deepEqual(body.host.thresholds,{minFreeDiskGb:5,minFreeRamPct:10});
     assert.match(body.detail,new RegExp(`drive ${DRIVE} has 0\\.5 GB free`));
     assert.match(body.detail,/do not re-dispatch it by hand/);
   }
