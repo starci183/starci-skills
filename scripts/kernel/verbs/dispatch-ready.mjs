@@ -25,12 +25,32 @@ function spawnDetached({ args, emit, repo, wf, pushId, dir, resultFile }) {
   emit({ ok: true, workflowId: wf, pushId, detached: true, pid: child.pid, resultFile }, `dispatch-ready ${pushId} running in the background (pid ${child.pid}); result: ${resultFile}; the next starci kernel status shows the running count`, args.json);
 }
 
-function routeReadyJob(jobId, repo, job) {
+/**
+ * The typed refusal a child verb left — {code, reason, step?}, never a bare 'exit N'. A child's emit carries
+ * its typed keys in apiRun.json (a route refusal's reason/detail, a refuse()'s code/error); a dispatch-rejected
+ * child (`rejected: 'dispatch-rejected'`, which names no reason key itself) is read back from the fresh job
+ * result rejectDispatch just wrote: reason/step/detail of the refused launch (cli.mjs dispatchRejectedMessage).
+ */
+function childRefusal(child, { db = null, jobId = null } = {}) {
+  const j = child?.json ?? {};
+  const settled = j.rejected === 'dispatch-rejected' && db && jobId ? (jobRow(db, jobId)?.result ?? null) : null;
+  const rejected = settled?.reason === 'dispatch-rejected' ? settled : null;
+  const code = j.code ?? j.rejected ?? rejected?.reason ?? j.reason ?? j.refused ?? `exit-${child?.status ?? 'unknown'}`;
+  const reason = j.detail ?? j.error ?? j.reason ?? j.refused
+    ?? rejected?.detail ?? rejected?.signal ?? rejected?.message
+    ?? (j.managed?.step ? `managed dispatch failed at ${j.managed.step}` : null)
+    ?? (String(child?.err ?? child?.out ?? '').trim().slice(0, 300) || `exit ${child?.status}`);
+  const step = rejected?.step ?? j.managed?.step ?? null;
+  return { code, reason: String(reason).slice(0, 400), ...(step ? { step } : {}) };
+}
+
+function routeReadyJob(jobId, repo, job, db) {
   const model = job.payload.kernelModel ?? null;
   if (model) return { model, refusal: null };
   const route = apiRun(['route', '--job', jobId, ...(job.payload.difficulty ? ['--difficulty', job.payload.difficulty] : [])], { repo, timeoutMs: 300_000 });
-  const refusal = route.ok ? null : { result: { jobId, route: route.json?.reason ?? route.json?.error ?? `exit ${route.status}` }, launched: 0, stop: false };
-  return { model, refusal };
+  if (route.ok) return { model, refusal: null };
+  const refused = childRefusal(route, { db, jobId });
+  return { model, refusal: { result: { jobId, route: `${refused.code}: ${refused.reason}`, refusal: refused }, launched: 0, stop: false } };
 }
 
 function processReadyJob({ db, repo, wf, jobId, dryRun }) {
@@ -40,13 +60,15 @@ function processReadyJob({ db, repo, wf, jobId, dryRun }) {
   if (failed) return { result: { jobId, skipped: `same-failing-shape as ${failed.jobId} (${failed.causes.join(', ')}): change it with starci kernel graph-edit (widen/params/split) first` }, launched: 0, stop: false };
   if (dryRun) return { result: { jobId, would: job.payload.kernelModel ? `dispatch --model ${job.payload.kernelModel}` : 'route + dispatch --spawn' }, launched: 1, stop: false };
 
-  const { model, refusal } = routeReadyJob(jobId, repo, job);
+  const { model, refusal } = routeReadyJob(jobId, repo, job, db);
   if (refusal) return refusal;
   const dispatch = apiRun(['dispatch', '--job', jobId, '--spawn', ...(model ? ['--model', model] : [])], { repo, timeoutMs: 15 * 60_000 });
   const waiting = dispatch.json?.waiting === true;
+  const refused = dispatch.ok || waiting ? null : childRefusal(dispatch, { db, jobId });
   const result = { jobId, dispatched: dispatch.ok && !waiting,
     waiting: waiting ? (dispatch.json?.reason ?? dispatch.json?.throttle?.reason ?? 'waiting') : null,
-    error: dispatch.ok ? null : (dispatch.json?.reason ?? dispatch.json?.error ?? `exit ${dispatch.status}`) };
+    error: refused ? `${refused.code}: ${refused.reason}` : null,
+    ...(refused ? { refusal: refused } : {}) };
   const stop = waiting && /host-resources|workers-max|heavy-paused|does-not-fit|priority-reserved|worktree-cap/.test(JSON.stringify(dispatch.json ?? {}));
   return { result, launched: dispatch.ok && !waiting ? 1 : 0, stop };
 }
