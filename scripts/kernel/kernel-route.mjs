@@ -113,15 +113,16 @@ const memberSummary = (m) => ({ agent: m.agent, model: m.model ?? null, effort: 
   runtimePool: m.runtimePool ?? null, ...(m.availability ? { availability: m.availability.state } : {}) });
 const rejectedSummary = (rejected) => rejected.map((x) => `${x.target}: ${(x.reasons ?? [])[0] ?? 'rejected'}`).join('; ');
 
-async function routeKernel(db, owner) {
-  if (agentOverride) {
-    const probe = await probeAgent(agentOverride);
-    if (probe?.state === 'dead')
-      return { agent: agentOverride, routedBy: 'override', warnings: [],
-        errorStep: 'kernel-pin-unavailable',
-        error: `explicit kernel agent '${agentOverride}' probe is dead (${probe.detail ?? 'not authenticated'})` };
-    return single(await completeKernelRoute({ agent: agentOverride, routedBy: 'override', warnings: [] }));
-  }
+async function overrideRoute() {
+  const probe = await probeAgent(agentOverride);
+  if (probe?.state === 'dead')
+    return { agent: agentOverride, routedBy: 'override', warnings: [],
+      errorStep: 'kernel-pin-unavailable',
+      error: `explicit kernel agent '${agentOverride}' probe is dead (${probe.detail ?? 'not authenticated'})` };
+  return single(await completeKernelRoute({ agent: agentOverride, routedBy: 'override', warnings: [] }));
+}
+
+function routingConfigOf(owner) {
   const kc = owner.config?.kernel;
   const cfgGroup = Array.isArray(kc?.group) ? kc.group.filter(m => typeof m?.agent === 'string' && m.agent.trim())
     .map(m => ({ agent: m.agent.trim(), model: typeof m.model === 'string' && m.model.trim() ? m.model.trim() : null })) : null;
@@ -144,6 +145,10 @@ async function routeKernel(db, owner) {
   } : null;
   const warnings = [];
   const warn = (warning) => { warnings.push(warning); console.error(`start-workflow: warning: ${warning}`); };
+  return { cfgGroup, cfgAgent, cfgModel, cfgEffort, config, warnings, warn };
+}
+
+async function configuredGroupRoute(db, { cfgGroup, cfgEffort, config, warnings, warn }) {
   if (cfgGroup?.length) {
     const availability = new Map();
     for (const m of cfgGroup) if (!availability.has(m.agent)) availability.set(m.agent, await memberAvailability(m.agent, db));
@@ -163,6 +168,9 @@ async function routeKernel(db, owner) {
         error: `kernel group has no available member: ${warnings.join('; ')}` };
     return groupRoute(members);
   }
+}
+
+async function configuredPinRoute({ cfgAgent, cfgModel, cfgEffort, config, warnings }) {
   if (cfgAgent) {
     const modelAgent = cfgModel ? agentForModel(cfgModel) : null;
     if (modelAgent && modelAgent !== cfgAgent)
@@ -174,7 +182,8 @@ async function routeKernel(db, owner) {
         errorStep: 'kernel-pin-unavailable',
         error: `kernel pin failed closed: agent '${cfgAgent}' probe is dead (${probe.detail ?? 'not authenticated'})` };
     return single(await completeKernelRoute({ agent: cfgAgent, routedBy: 'config', model: cfgModel, effort: cfgEffort, config, warnings }));
-  } else if (cfgModel) {
+  }
+  if (cfgModel) {
     const agent = agentForModel(cfgModel);
     if (!agent)
       return { agent: null, routedBy: 'config', model: cfgModel, effort: cfgEffort, config, warnings,
@@ -186,6 +195,10 @@ async function routeKernel(db, owner) {
         error: `kernel model pin '${cfgModel}' failed closed: agent '${agent}' probe is dead (${probe.detail ?? 'not authenticated'})` };
     return single(await completeKernelRoute({ agent, routedBy: 'config', model: cfgModel, effort: cfgEffort, config, warnings }));
   }
+  return null;
+}
+
+async function routeModelGroup({ cfgEffort, config, warnings, warn }) {
   // Unpinned: route-model resolves the think group quota-aware (selection.yaml
   // decisionFlow kernel-function + kernel-availability) and reads this repo's
   // provider-health circuit; its pick and fallbackChain are the members.
@@ -223,6 +236,15 @@ async function routeKernel(db, owner) {
     return { agent: null, routedBy: 'route-model', effort: cfgEffort, config, warnings,
       error: `no routed kernel member is launchable (${warnings.join('; ')})` };
   return groupRoute(members);
+}
+
+async function routeKernel(db, owner) {
+  if (agentOverride) return overrideRoute();
+  const config = routingConfigOf(owner);
+  if (config.cfgGroup?.length) return configuredGroupRoute(db, config);
+  const pinned = await configuredPinRoute(config);
+  if (pinned) return pinned;
+  return routeModelGroup(config);
 }
 
   async function resolveKernelRoute(db) {
