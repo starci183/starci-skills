@@ -48,9 +48,9 @@ export const inSecretScope = (rel) => (WORK_PATH.test(slashed(rel)) || STACK_PAT
 
 // ---------------------------------------------------------------------------------------------- secret scan
 const STANDIN_PARTS = [String.raw`(?:^\.{2,})`, 'fixture', 'stub', 'fake', 'dummy', 'placeholder', 'example', 'sample', 'changeme', 'redacted', 'mock', 'todo', 'tbd', 'xxx', String.raw`n\/a`,
-  String.raw`not[-_ ]?set`, 'none', 'null', 'undefined', 'disposable', 'generated', String.raw`your[-_ ]`, String.raw`\*{3,}`];
+  'not[-_ ]?set', 'none', 'null', 'undefined', 'disposable', 'generated', 'your[-_ ]', String.raw`\*{3,}`];
 const STANDIN = new RegExp(STANDIN_PARTS.join('|'), 'i');
-const REFERENCE_PARTS = [String.raw`\$`, '<', String.raw`\{\{`, '%', '@', String.raw`secret[:.]`, String.raw`secrets[:.]`, String.raw`ref[:.]`, String.raw`env[:.]`, String.raw`sops[:.]`, String.raw`file[:.]`, String.raw`vault[:.]`, String.raw`kms[:.]`,
+const REFERENCE_PARTS = [String.raw`\$`, '<', String.raw`\{\{`, '%', '@', 'secret[:.]', 'secrets[:.]', 'ref[:.]', 'env[:.]', 'sops[:.]', 'file[:.]', 'vault[:.]', 'kms[:.]',
   String.raw`\/run\/secrets\/`, String.raw`identity\.`, String.raw`\[redacted`, String.raw`ENC\[`];
 const REFERENCE = new RegExp(`^(?:${REFERENCE_PARTS.join('|')})`, 'i');
 const CODE_OR_STYLE = /(?:^[-./@~])|[(){}[\]<>`$]|\.\.\./;
@@ -107,7 +107,7 @@ export function isLiteralCredential(value, kind, { quoted = false } = {}) {
   return entropy(v) >= 3.5 || (/[A-Za-z]/.test(v) && /\d/.test(v));
 }
 // `key: value`, `key=value`, `- key: value`, and every pair of an inline {a: b, c: d}.
-const PAIR = new RegExp([String.raw`(?<![\w.-])`, String.raw`(["']?)`, String.raw`([A-Za-z_][\w-]*)`, String.raw`\1\s*[:=]\s*`, String.raw`("[^"\n]*"|'[^'\n]*'|[^\s,}\]#]+)`].join(''), 'g');
+const PAIR = new RegExp([String.raw`(?<![\w.-])`, `(["']?)`, String.raw`([A-Za-z_][\w-]*)`, String.raw`\1\s*[:=]\s*`, String.raw`("[^"\n]*"|'[^'\n]*'|[^\s,}\]#]+)`].join(''), 'g');
 const isAccountsFile = (rel, text) => /(^|\/)accounts\.ya?ml$/i.test(rel) || /schema:\s*work\/disposable-accounts@/.test(text);
 
 /** The secret findings of one text file: [{code, file, line, detail}]. The value itself never appears in a finding. */

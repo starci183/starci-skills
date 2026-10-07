@@ -40,8 +40,8 @@ export const PROPOSED = 'proposed';
 /** Section headings inside a proposal, never a proposal's name. */
 const SECTION_WORDS = new Set(['gap', 'why', 'anatomy', 'tokens', 'claims', 'render', 'rules', 'values', 'summary', 'notes', 'rationale', 'a11y', 'accessibility', 'usage', 'example', 'examples']);
 const RULE_ID = /\b[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*-\d+\b/;
-const HEADING_DASH_DELIMITER = /\s+[\u2014\u2013-]\s+/;
-const HEADING_PAREN_DELIMITER = /\s*\(/;
+const HEADING_DASH_DELIMITER = /(?<!\s)\s+[\u2014\u2013-]\s+/;
+const HEADING_PAREN_DELIMITER = /(?<!\s)\s*\(/;
 const HTML_FENCE_OPENING = /```\s*html/i;
 const LINE_BREAK = /[\r\n\u2028\u2029]/;
 const WHITESPACE = /\s/;
@@ -108,6 +108,26 @@ function fencedHtml(body) {
   return body.slice(contentStart, closingIndex).trim();
 }
 
+const RENDER_EXTENSIONS = ['.png', '.html'];
+/** The first `<open>file.png|html<close>` span of a body, as {at, text}: a span ends at the first `close` after its `open`. */
+function markedRender(body, open, close) {
+  for (let at = body.indexOf(open); at >= 0;) {
+    const end = body.indexOf(close, at + 1);
+    if (end < 0) return null;
+    if (RENDER_EXTENSIONS.some((ext) => end - ext.length >= at + 2 && body.startsWith(ext, end - ext.length))) return { at, text: body.slice(at + 1, end) };
+    at = body.indexOf(open, open === close ? end : end + 1);
+  }
+  return null;
+}
+
+/** The render file a proposal body points at, in parentheses or backticks: the earlier of the two. */
+function renderReferenceOf(body) {
+  const paren = markedRender(body, '(', ')');
+  const tick = markedRender(body, '`', '`');
+  if (paren && tick) return (paren.at < tick.at ? paren : tick).text;
+  return (paren ?? tick)?.text ?? null;
+}
+
 /** The names a markdown heading declares for its proposal. */
 function headingNames(raw) {
   const names = new Set();
@@ -137,7 +157,7 @@ function markdownProposals(text, file) {
     if (missing.length === PROPOSAL_FIELDS.length) continue;
     const gap = /(?:^|\n)#{1,4}\s*gap[^\n]*\n+([^\n#]+)/i.exec(body)?.[1] ?? body.split('\n').find((l) => MD_FIELDS.gap.test(l)) ?? '';
     out.push({ name: names[0], names, file, format: 'md', gap: gap.trim().slice(0, 300), claims: [...new Set([...body.matchAll(new RegExp(RULE_ID.source, 'g'))].map((m) => m[0]))],
-      render: fencedHtml(body) ?? (/\(([^)]+\.(?:png|html))\)|`([^`]+\.(?:png|html))`/.exec(body)?.slice(1).find(Boolean) ?? null),
+      render: fencedHtml(body) ?? renderReferenceOf(body),
       status: PROPOSED, complete: missing.length === 0, missing });
   }
   return out;

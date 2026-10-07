@@ -20,10 +20,10 @@
 import { flag as argOf } from '../work-io.mjs';
 import { isMain } from '../../lib/is-main.mjs';
 import { GRAMMAR_FAMILIES } from '../../lib/example-refs.mjs';
-import { alphaOf, geometryFindings, geometryProbes, readSnapshot, sameColor } from './grammar-geometry-check.mjs';
+import { geometryFindings, geometryProbes } from './grammar-geometry-check.mjs';
 import { htmlTargets, snapshotFiles } from './grammar-geometry-page.mjs';
 import { geometryPrompt, shortFile } from './grammar-geometry-prompt.mjs';
-import { DEFAULT_VIEWPORT, firstFamily, normalizeShadowText, resolveGeometry } from './grammar-geometry-resolve.mjs';
+import { DEFAULT_VIEWPORT, resolveGeometry } from './grammar-geometry-resolve.mjs';
 
 // The modules beside this one split the work: grammar-geometry-css.mjs (parsing and loading sheets),
 // grammar-geometry-cascade.mjs (media, selectors, the cascade), grammar-geometry-values.mjs (lengths and var()),
@@ -34,7 +34,9 @@ export { mediaMatches, selectorMatch } from './grammar-geometry-cascade.mjs';
 export { evalLength } from './grammar-geometry-values.mjs';
 export { discoverSources } from './grammar-geometry-sources.mjs';
 export { loadChromium } from './grammar-geometry-page.mjs';
-export { DEFAULT_VIEWPORT, alphaOf, firstFamily, geometryFindings, geometryPrompt, geometryProbes, normalizeShadowText, readSnapshot, resolveGeometry, sameColor, snapshotFiles };
+export { alphaOf, readSnapshot, sameColor } from './grammar-geometry-check.mjs';
+export { firstFamily, normalizeShadowText } from './grammar-geometry-resolve.mjs';
+export { DEFAULT_VIEWPORT, geometryFindings, geometryPrompt, geometryProbes, resolveGeometry, snapshotFiles };
 export const FAMILIES = GRAMMAR_FAMILIES;
 
 export async function checkGeometry(target, { repo, family = null, viewport = DEFAULT_VIEWPORT, grammarDist = null, extraCss = [] } = {}) {

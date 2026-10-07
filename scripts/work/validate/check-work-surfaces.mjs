@@ -3,10 +3,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {walk} from './check-example-work.mjs';
 import {APP_SIDES, readWorkspace, resolveOwnedDirs, repoRootFor, loadRecords, indexInlineCriteria, resolveRecordRef} from '../record-ownership.mjs'; import { isMain } from '../../lib/is-main.mjs';
-import {declaredSubscriptions,wiredSubscriptions,reportWiredSubscriptionDiff,reportFeaturesWithoutSubscribers,appendSurfaceMap} from './work-surface-reporting.mjs';
+import {declaredSubscriptions,wiredSubscriptions,reportWiredSubscriptionDiff,reportFeaturesWithoutSubscribers,appendRepoSurfaceMap,appendSurfaceTotals} from './work-surface-reporting.mjs';
 import {fromRoot, repoRoot} from './work-consistency-shared.mjs';
 import {gqlOps, httpRoutes} from './work-surface-served.mjs';
-import {servedKey} from './work-surface-declared.mjs';
 import {contractDeclarations, matchDeclaredRoutes, reportUndeclaredRoutes} from './work-surface-http-diff.mjs';
 import {checkFeRoutes, claimGraphOps, reportDeclaredGraphOps, reportUnclaimedGraphOps} from './work-surface-ops-diff.mjs';
 import {eventIndexes, reportContractEvents, reportUnemittedEvents, reportUnrecordedEvents} from './work-surface-events-diff.mjs';
@@ -97,13 +96,12 @@ export function checkWorkSurfaces(workRoot, out) {
 
   // ---------- HTTP ----------
   const servedRoutes = beRoots.flatMap(r => httpRoutes(r).map(x => ({...x, repo: r})));
-  const servedKeys = new Map(servedRoutes.map(r => [servedKey(r), r]));
 
   const {declaredHttp,declaredGql,contractClaimedOps,declaredContractEvents,integrationEndpoints}=
     contractDeclarations(records,indexFile);
 
   const claimedRouteKeys=matchDeclaredRoutes([...declaredHttp,...integrationEndpoints],declaredHttp,
-    servedRoutes,servedKeys,provedIds,suspect,refuse,info);
+    servedRoutes,provedIds,suspect,refuse,info);
   reportUndeclaredRoutes(servedRoutes,claimedRouteKeys,ownerOf,suspect,info);
 
   // ---------- GraphQL ----------
@@ -133,8 +131,8 @@ export function checkWorkSurfaces(workRoot, out) {
   reportFeaturesWithoutSubscribers(records,wiredByFeature,featureOf,canon,indexFile,suspect);
 
   // ---------- SURFACE MAP ----------
-  appendSurfaceMap(out,repoRoots,servedRoutes,ops,feRoutesAll,claimedRouteKeys,claimedFe,codeByRepo,eventRecs,
-    emittedRecordIds,subscribesByFeature,records,declaredHttp,integrationEndpoints,declaredGql,claims,ownerOf,servedKey);
+  appendRepoSurfaceMap(out,repoRoots,{servedRoutes,ops,feRoutesAll,codeByRepo},{claimedRouteKeys,claimedFe},ownerOf);
+  appendSurfaceTotals(out,{eventRecs,emittedRecordIds,subscribesByFeature,records},{declaredHttp,integrationEndpoints,declaredGql,claims});
   return {records: records.size, routes: servedRoutes.length, ops: ops.length,
     feRoutes: feRoutesAll.length, events: eventRecs.length};
 }

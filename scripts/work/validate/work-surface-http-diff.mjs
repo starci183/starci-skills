@@ -58,7 +58,8 @@ function reportUnservedContractRoute(declaration,suspect,refuse){
 }
 
 /** Matches each declared route to a served one; returns the keys of the served routes some declaration claims. */
-export function matchDeclaredRoutes(declarations,declaredHttp,servedRoutes,servedKeys,provedIds,suspect,refuse,info){
+export function matchDeclaredRoutes(declarations,declaredHttp,servedRoutes,provedIds,suspect,refuse,info){
+  const servedKeys=new Map(servedRoutes.map(r=>[servedKey(r),r]));
   const claimedRouteKeys=new Set();
   for(const declaration of declarations){
     const key=declaredKey(declaration);

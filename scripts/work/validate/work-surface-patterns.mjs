@@ -4,7 +4,7 @@ const WORD_BOUNDARY = String.raw`\b`;
 const SPACE_RUN = String.raw`\s+`;
 const IDENTIFIER = String.raw`([a-zA-Z_]\w*)`;
 const GQL_KIND = '(query|mutation)';
-const CAMEL_NAME = String.raw`([a-z][a-zA-Z0-9]*[A-Z][a-zA-Z0-9]*)`;
+const CAMEL_NAME = '([a-z][a-zA-Z0-9]*[A-Z][a-zA-Z0-9]*)';
 const GQL_WORD = 'GraphQL';
 
 const pattern = (parts, flags = 'g') => new RegExp(parts.join(''), flags);

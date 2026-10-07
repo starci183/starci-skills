@@ -31,9 +31,9 @@ import {
   resolveGeometry, sameColor, snapshotFiles,
 } from './grammar-geometry.mjs';
 import { KIND_IDS, classifyCase, surfaceElements } from './ui-proof-elements.mjs';
-import { classValue, classesIn, describeClass, fmtPx, remPx, tokenScope, withPx } from './ui-proof-numbers.mjs';
+import { classesIn, describeClass, fmtPx, remPx, tokenScope, withPx } from './ui-proof-numbers.mjs';
 import { r1, scalePx, spacingChecks, tag } from './ui-proof-spacing.mjs';
-export { classValue, classifyCase, spacingChecks, surfaceElements };
+export { classifyCase, spacingChecks, surfaceElements }; export { classValue } from './ui-proof-numbers.mjs';
 import { contrastRatio as wcagRatio } from '../brand/brand.mjs';
 import { flag as argOf } from '../work-io.mjs';
 import { squash } from '../../lib/clip.mjs'; import { isMain } from '../../lib/is-main.mjs';
@@ -299,8 +299,8 @@ const WORDS = { one: 1, two: 2, three: 3, four: 4, five: 5 };
 const numberWord = (w) => (WORDS[String(w).toLowerCase()] ?? Number(w));
 
 const DECIMAL = String.raw`\d+(?:\.\d+)?`;
-const SIZE_IN_CASE = new RegExp(String.raw`(\d+)px\s*[x×]\s*(\d+)px`);
-const RATIO_IN_CASE = new RegExp(String.raw`(${DECIMAL}):1`);
+const SIZE_IN_CASE = /(?<!\d)(\d+)px\s*[x×]\s*(\d+)px/;
+const RATIO_IN_CASE = new RegExp(`(${DECIMAL}):1`);
 
 const PASS = (evidence) => ({ status: 'pass', evidence });
 const FAIL = (evidence) => ({ status: 'fail', evidence });

@@ -4,10 +4,10 @@
 const REM_PX = 16;
 const NUMBER = String.raw`\d+(?:\.\d+)?`;
 const SPACING_PREFIXES = 'p|px|py|pt|pb|ps|pe|pl|pr|m|mx|my|mt|mb|ms|me|ml|mr|gap|gap-x|gap-y|space-x|space-y|size|min-h|min-w|w|h';
-const SPACING = new RegExp(String.raw`^(-?)(${SPACING_PREFIXES})-(${NUMBER})$`);
+const SPACING = new RegExp(`^(-?)(${SPACING_PREFIXES})-(${NUMBER})$`);
 const RADIUS = /^rounded(?:-([trbl]{1,2}))?(?:-(none|xs|sm|md|lg|xl|2xl|3xl|4xl|full))?$/;
 const TEXT_SIZE = /^text-(xs|sm|base|lg|xl|2xl|3xl|4xl|5xl|6xl)$/;
-const LEADING = new RegExp(String.raw`^leading-(${NUMBER})$`);
+const LEADING = new RegExp(`^leading-(${NUMBER})$`);
 const FONT_WEIGHT = /^font-(normal|medium|semibold|bold)$/;
 const BORDER = /^border(?:-([trblxy]))?(?:-(\d+))?$/;
 const VARIANT_PREFIX = /^([a-z0-9-]+:)+/;
@@ -102,6 +102,10 @@ export function classesIn(text, scope) {
   return out;
 }
 
-export const describeClass = (v) => { let size; if (v.px === Infinity) { size = 'pill'; } else if (v.px != null) { size = fmtPx(v.px); } else { size = v.weight ?? '?'; } return v.cls + ' = ' + size + (v.lineHeight ? '/' + fmtPx(v.lineHeight) : '') + (v.variant ? ' (at ' + v.variant + ')' : ''); };
+export const describeClass = (v) => {
+  let size;
+  if (v.px === Infinity) { size = 'pill'; } else if (v.px != null) { size = fmtPx(v.px); } else { size = v.weight ?? '?'; }
+  return v.cls + ' = ' + size + (v.lineHeight ? '/' + fmtPx(v.lineHeight) : '') + (v.variant ? ' (at ' + v.variant + ')' : '');
+};
 
 export const withPx = (text) => String(text ?? '').replace(/(^|[^\w.])((?:\d+(?:\.\d+)?|\.\d+))rem\b/g, (all, pre, n) => pre + n + 'rem (' + fmtPx(Number(n) * REM_PX) + ')');

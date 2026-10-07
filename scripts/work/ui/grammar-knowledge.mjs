@@ -5,8 +5,8 @@ import { eachInOrder } from '../../lib/in-order.mjs';
 import {parseYaml} from '../../../engine/yaml.mjs';
 import {sha256File} from '../../../engine/digest.mjs';
 import {skillRoot} from '../../../engine/runtime-root.mjs'; import { byCodeUnit } from '../../lib/list.mjs';
-import {cssDeclarations,cssReads,lexSource,read,uniq} from './grammar-knowledge-lex.mjs';
-import {censusRenderers,registryNames,ruleCatalog} from './grammar-knowledge-renderers.mjs';
+import {read,uniq} from './grammar-knowledge-lex.mjs';
+import {censusRenderers} from './grammar-knowledge-renderers.mjs';
 import {censusCommonTokens,censusFamilyTokens,loadDnaModule,shippedCss} from './grammar-knowledge-tokens.mjs';
 
 /**
@@ -25,7 +25,9 @@ import {censusCommonTokens,censusFamilyTokens,loadDnaModule,shippedCss} from './
  * The source readers live in grammar-knowledge-lex.mjs, the renderer census in grammar-knowledge-renderers.mjs
  * and the token census with the DNA loader in grammar-knowledge-tokens.mjs.
  */
-export {cssDeclarations,cssReads,lexSource,loadDnaModule,registryNames,ruleCatalog};
+export {loadDnaModule};
+export {cssDeclarations,cssReads,lexSource} from './grammar-knowledge-lex.mjs';
+export {registryNames,ruleCatalog} from './grammar-knowledge-renderers.mjs';
 const GRAMMAR_KNOWLEDGE_CHECK='starci/grammar-knowledge-check@1';
 
 /** The families whose snapshot this check owns, and where each one's source and DNA module live. */
@@ -51,7 +53,7 @@ export async function censusGrammar({packageRoot=defaultPaths().packageRoot}={})
   const common=censusCommonTokens(packageRoot,renderers);
   const shipped=shippedCss(packageRoot);
   const emitted=uniq(renderers.flatMap(r=>r.classes)).sort(byCodeUnit);
-  const painted=emitted.filter(cls=>new RegExp('\\.'+cls.replaceAll('-','\\-')+'(?![\\w-])').test(shipped));
+  const painted=emitted.filter(cls=>new RegExp(String.raw`\.`+cls.replaceAll('-',String.raw`\-`)+String.raw`(?![\w-])`).test(shipped));
   const families={};
   // One family at a time: loadDnaModule swaps the shared process.emitWarning while it strips types.
   await eachInOrder(GRAMMAR_FAMILIES.filter(f=>f.dnaModule),async family=>{
@@ -123,8 +125,7 @@ function yamlClosedValues(closedValues){
   if(!closedValues.length)return ['    closedValues: []'];
   const lines=['    closedValues:'];
   for(const c of closedValues){
-    lines.push(`      - prop: ${q(c.prop)}`);
-    lines.push(c.values?`        values: ${flow(c.values)}`:`        type: ${q(c.type)}`);
+    lines.push(`      - prop: ${q(c.prop)}`,c.values?`        values: ${flow(c.values)}`:`        type: ${q(c.type)}`);
   }
   return lines;
 }

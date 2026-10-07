@@ -150,7 +150,7 @@ export async function loadDnaModule(file){
   process.emitWarning=(warning,...rest)=>{if(!String(warning?.message??warning).includes('stripTypeScriptTypes'))emit.call(process,warning,...rest);};
   let js;
   try{js=module.stripTypeScriptTypes(source,{mode:'strip'});}finally{process.emitWarning=emit;}
-  if(/^[^\S\r\n\u2028\u2029]*import\s/m.test(js))throw new Error(`${slash(file)} imports another module; the DNA module must stay self-contained`);
+  if(/^[\t\v\f \u00a0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]*import\s/m.test(js))throw new Error(`${slash(file)} imports another module; the DNA module must stay self-contained`);
   const exported=await import(`data:text/javascript;base64,${Buffer.from(js).toString('base64')}`);
   return Object.fromEntries(Object.entries(exported).filter(([,value])=>value&&typeof value==='object'));
 }

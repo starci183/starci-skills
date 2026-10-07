@@ -52,11 +52,10 @@ import {
 import { brandOf, brandPalette, paletteFindings } from '../brand/brand-palette.mjs';
 import { isPartName } from '../direction-part.mjs';
 import { assetsOf, indexFilesUnder, list, readYamlOrNull as readRecord, sha256File, slash, workRootOf as enclosingWorkRoot } from '../work-io.mjs'; import { isMain } from '../../lib/is-main.mjs';
-import { checkDrawGeometry } from './shell-conformance-geometry.mjs';
 import { checkUiRecord } from './shell-conformance-ui.mjs';
 import { finding, shown } from './shell-findings.mjs';
 
-export { checkDrawGeometry };
+export { checkDrawGeometry } from './shell-conformance-geometry.mjs';
 
 const UI_SCHEMA = 'work/ui-screen@1';
 const IMPL_SCHEMA = 'work/implementation@1';
@@ -115,23 +114,29 @@ function lockupAbsentFinding(lockupDeferredFor, at) {
   return finding('refuse', 'SHELL_LOCKUP_MISSING', at, 'no brand lockup: the rendered lockup is what every direction is handed instead of an invented logo');
 }
 
+/** The ui record `id`, loading the work tree's ui records into `state` on first use; null when it has none. */
+function cachedUiRecord(state, workRoot, id) {
+  state.uiRecords ??= loadUiRecords(workRoot);
+  return state.uiRecords.get(id) ?? null;
+}
+
 /** One lockup image: on disk with its digest, and (cropped from a layout drawing) from a drawing that has not moved. */
-function lockupImageFindings(workRoot, r, image, at, uiRecordsState) {
+function lockupImageFindings(workRoot, r, image, at, loader) {
   const out = [];
   const file = captureFileOf(image), named = image.name ?? '(no name)';
   if (!file || !fs.existsSync(file)) out.push(finding('refuse', 'SHELL_CAPTURE_MISSING', at, `lockup ${named} is not in the blob store`));
   else if (image.sha256 && sha256File(file) !== image.sha256) out.push(finding('refuse', 'SHELL_CAPTURE_DIGEST', at, `lockup ${named} no longer hashes to its recorded sha256`));
   if (image.source?.kind !== 'layout-drawing') return out;
-  const src = lockupSourceOf(r, workRoot, image.source.ref, (id) => (uiRecordsState.uiRecords ??= loadUiRecords(workRoot)).get(id) ?? null);
+  const src = lockupSourceOf(r, workRoot, image.source.ref, loader);
   if (src.error) out.push(finding('suspect', 'SHELL_LOCKUP_SOURCE_STALE', at, `lockup ${image.path} was cropped from ${image.source.ref}: ${src.error} - brand.decide re-crops it`));
   else if (src.sha256 !== image.source.sha256) out.push(finding('suspect', 'SHELL_LOCKUP_SOURCE_STALE', at, `lockup ${image.path} was cropped from ${image.source.ref}, which was redrawn since - brand.decide re-crops it`));
   if (r.origin === 'repository') out.push(finding('suspect', 'SHELL_LOCKUP_FROM_DRAWING', at, `lockup ${image.path} is cropped from the layout drawing ${image.source.ref}; the frontend exists now - re-crop it from a real render (layout-tree.mjs lockup --from shell/<capture>)`));
   return out;
 }
 
-function shellLockupFindings(workRoot, r, lockups, lockupDeferredFor, at, uiRecordsState, out) {
+function shellLockupFindings(workRoot, r, lockups, lockupDeferredFor, at, loader, out) {
   if (!lockups.length) out.push(lockupAbsentFinding(lockupDeferredFor, at));
-  for (const image of lockups) out.push(...lockupImageFindings(workRoot, r, image, at, uiRecordsState));
+  for (const image of lockups) out.push(...lockupImageFindings(workRoot, r, image, at, loader));
 }
 
 function shellMetadataFindings(r, at, out) {
@@ -180,7 +185,7 @@ function shellNavigationFindings(tree, nodes, node, locale, at, out) {
   }
 }
 
-function shellLayoutFindings(tree,nodes,node,shell,record,locale,at,requireAll,loader,out){
+function shellLayoutFindings({shell,locale,at,requireAll,loader,out},tree,nodes,node){
   if(requireAll){
     const {settled,reasons}=layoutSettlement(tree,node,{shellDir:shell.dir,uiLoader:loader});
     if(!settled)out.push(finding('refuse','LAYOUT_UNSETTLED',at,reasons.join('; ')));
@@ -189,7 +194,7 @@ function shellLayoutFindings(tree,nodes,node,shell,record,locale,at,requireAll,l
   shellNavigationFindings(tree,nodes,node,locale,at,out);
 }
 
-function shellSourceFindings(workRoot,r,tree,name,at,inApp,driftLevel,out){
+function shellSourceFindings({workRoot,r,at,inApp,driftLevel,out},tree,name){
   if(r.origin!=='repository'||!tree.source?.digest)return;
   const located=frontendOf(workRoot),appDirOf=tree.app?.appDir?path.join(located.repoRoot,tree.app.appDir):null;
   if(!appDirOf||!fs.existsSync(appDirOf))out.push(finding('info','SHELL_SOURCE_UNAVAILABLE',at,inApp(name,`${tree.app?.appDir??'app/'} is not readable here; the recorded digests could not be compared`)));
@@ -199,10 +204,12 @@ function shellSourceFindings(workRoot,r,tree,name,at,inApp,driftLevel,out){
   }
 }
 
-function shellAppFindings(workRoot,r,name,shell,locale,at,requireAll,loader,inApp,verifySource,driftLevel,out){
+/** One app of the shell record: its layouts, and (when `verifySource`) its scanned source. `scope` is the record's checking context. */
+function shellAppFindings(scope,name){
+  const {r,verifySource}=scope;
   const tree=treeOf(r,name),nodes=nodesOf(tree);
-  for(const node of nodes.filter(entry=>entry.layout))shellLayoutFindings(tree,nodes,node,shell,r,locale,at,requireAll,loader,out);
-  if(verifySource&&r.origin==='repository'&&tree.source?.digest)shellSourceFindings(workRoot,r,tree,name,at,inApp,driftLevel,out);
+  for(const node of nodes.filter(entry=>entry.layout))shellLayoutFindings(scope,tree,nodes,node);
+  if(verifySource&&r.origin==='repository'&&tree.source?.digest)shellSourceFindings(scope,tree,name);
 }
 
 /** Findings about the shell record itself. `verifySource` re-scans app/ and compares the recorded digest. */
@@ -216,12 +223,13 @@ function checkShellRecord(workRoot,shell,{verifySource=true,driftLevel='refuse',
   const appNames=appNamesOf(r),inApp=(name,text)=>appNames.length>1?`app ${name}: ${text}`:text;
   shellNodeFindings(r,appNames,at,inApp,out);
   const uiRecordsState={uiRecords},lockups=list(r.brand?.lockups);
-  shellLockupFindings(workRoot,r,lockups,lockupDeferredFor,at,uiRecordsState,out);
+  const loader=id=>cachedUiRecord(uiRecordsState,workRoot,id);
+  shellLockupFindings(workRoot,r,lockups,lockupDeferredFor,at,loader,out);
   shellMetadataFindings(r,at,out);
   const locale=r.productLocale??{};
   shellLocaleFindings(locale,at,out);
-  const loader=id=>(uiRecordsState.uiRecords??=loadUiRecords(workRoot)).get(id)??null;
-  for(const name of appNames)shellAppFindings(workRoot,r,name,shell,locale,at,requireAll,loader,inApp,verifySource,driftLevel,out);
+  const scope={workRoot,r,shell,locale,at,requireAll,loader,inApp,verifySource,driftLevel,out};
+  for(const name of appNames)shellAppFindings(scope,name);
   return out;
 }
 
