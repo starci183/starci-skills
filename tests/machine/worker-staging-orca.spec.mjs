@@ -91,6 +91,25 @@ test('a staging checkout with a package-lock gets its own npm ci (the install se
   assert.match(failed.error, /npm ci in the staging checkout failed \(exit 1\)/);
 });
 
+test('every staging install runs under the host lock (purpose npm-ci), so several spawns in one call each own the lock their install needs; a lock that stays held fails the staging with the holder named', (t) => {
+  const { root, env, orca } = fixture(t);
+  fs.writeFileSync(path.join(root, 'package-lock.json'), '{}\n');
+  git(root, 'add', '-A');
+  git(root, 'commit', '-q', '-m', 'lock');
+  const locked = [];
+  const hostLock = (options, work) => { locked.push(options.purpose); const out = work(); locked.push('released'); return out; };
+  const install = () => ({ ok: true, status: 0, stderr: '' });
+  const first = createStaging({ jobId: 'fix-l-1', root, env, orca, install, lockDeps: { hostLock } });
+  const second = createStaging({ jobId: 'fix-l-2', root, env, orca, install, lockDeps: { hostLock } });
+  assert.ok(first.ok && second.ok, first.error ?? second.error);
+  assert.deepEqual(locked, ['npm-ci', 'released', 'npm-ci', 'released']);
+  let t0 = 0;
+  const held = { ok: false, reason: 'held', owner: { role: 'coordinator', purpose: 'land', pid: 7 } };
+  const refused = createStaging({ jobId: 'fix-l-3', root, env, orca, install, lockDeps: { hostLock: () => held, now: () => t0, sleep: (ms) => { t0 += ms; }, hostLockWaitMs: 4000 } });
+  assert.deepEqual([refused.ok, refused.reason], [false, 'staging-install-failed']);
+  assert.match(refused.error, /held by coordinator \(land\) pid 7/);
+});
+
 test('removeStaging is the link-safe Orca removal: links first, orca rm, row closed; a branch with work is kept, a landed one deleted', (t) => {
   const { root, env, orca } = fixture(t);
   const s = createStaging({ jobId: 'fix-b-2', root, env, orca });

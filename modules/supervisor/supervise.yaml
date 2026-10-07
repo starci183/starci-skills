@@ -326,7 +326,7 @@ workers:
 landGate:
   purpose: |
     The ONE way a change reaches live .claude main (scripts/supervisor/land.mjs), serialized by a host lock
-    (supervisor-land) that waiters take in request order. Nothing half-lands.
+    (supervisor-land) that waiters take in request order; the gate itself holds no host lock, only the publish (step 3) does. A land runs up to 30 minutes: start it in the background, never under a shell timeout (that kills it and cancels its ticket), and read land.mjs --status. Nothing half-lands.
   steps: |
     1. Rebase-free apply: cherry-pick the commit(s) onto current main in a scratch worktree (a conflict lands nothing;
        a pick with no diff against main is already landed and moves nothing). A lock-free preflight (git merge-tree)
@@ -334,7 +334,7 @@ landGate:
        conflict hunks and the one fix (rebase onto main, resolve, land the new sha) - never a blind retry.
     2. Checks: node --check of every changed .mjs; YAML/JSON parse of changed files; check-module-yaml,
        check-contract-cites and check-cli-parity (red only when not already red the same way on main); the
-       specs the worker named plus every spec naming a changed file (--test-concurrency=2, timeout
+       specs the worker named plus the specs that can see the change (--test-concurrency=2, timeout
        runtimes.yaml allocation.landGate specsBaseMs + perSpecMs per spec). Current contract and native package/proof checks refuse red or unavailable evidence.
        Owner, 2026-09-29 (config.yaml specs.harness, default false = touching-only): the gate's spec mode is
        `touching` by default - the named specs plus every spec naming a changed file, red refuses; a land never
