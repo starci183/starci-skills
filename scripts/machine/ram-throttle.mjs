@@ -410,7 +410,11 @@ function throttleModeOf({ prev, host, override, cpuBusy, thresholds, now }) {
   return { published, m: { mode: prev.mode ?? 'normal', ramMode: prev.ramMode ?? 'normal', cpuHot: Boolean(prev.cpuHot), why: 'RAM unmeasured: mode unchanged' } };
 }
 
-const maxParallelOpsOf = () => { const n = Number(runtimeProfile()?.maxParallelOps); return Number.isInteger(n) && n > 0 ? n : null; };
+const maxParallelOpsOf = () => {
+  const configured = Number(runtimeProfile()?.maxParallelOps);
+  if (!Number.isInteger(configured) || configured <= 0) return null;
+  return configured;
+};
 
 /**
  * The throttle verdict for the host now: {host, cpuBusy, mode, ramMode, cpuHot, modeWhy, since, running,

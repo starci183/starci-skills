@@ -32,10 +32,10 @@ function attestedIdentity(fields, raw) {
 }
 
 // The provider a label hints at: ambiguous (more than one named), heuristic (one named) or null.
-function hintedIdentity(text, { source, raw, ambiguous, reason }) {
+function hintedIdentity(text, { source, raw }, { ambiguous, hinted: hintedAs }) {
   const hinted = namedProviders(text);
-  if (hinted.length > 1) return { provider: null, proof: 'unknown', source, raw, reason: ambiguous };
-  if (hinted.length === 1) return { provider: hinted[0], proof: 'heuristic', source, raw, reason };
+  if (hinted.length > 1) return { provider: null, proof: 'unknown', source, raw, ...ambiguous };
+  if (hinted.length === 1) return { provider: hinted[0], proof: 'heuristic', source, raw, ...hintedAs };
   return null;
 }
 
@@ -50,11 +50,11 @@ export function terminalIdentityOf(entry, { screen = '' } = {}) {
   const attested = attestedIdentity(fields, raw);
   if (attested) return attested;
   for (const field of fields) {
-    const hint = hintedIdentity(field.text, { source: field.source, raw, ambiguous: 'identity-ambiguous', reason: 'metadata-label' });
+    const hint = hintedIdentity(field.text, { source: field.source, raw }, { ambiguous: { reason: 'identity-ambiguous' }, hinted: { reason: 'metadata-label' } });
     if (hint) return hint;
   }
   const title = [entry?.title, entry?.tabTitle, entry?.paneTitle].map(identityText).filter(Boolean).join(' ');
-  const titled = hintedIdentity(title, { source: 'title', raw, ambiguous: 'title-ambiguous', reason: 'title-label' });
+  const titled = hintedIdentity(title, { source: 'title', raw }, { ambiguous: { reason: 'title-ambiguous' }, hinted: { reason: 'title-label' } });
   if (titled) return titled;
   if (/esc\s+twice\s+to\s+interrupt|Ask Devin\b/i.test(String(screen ?? ''))) {
     return { provider: 'devin', proof: 'heuristic', source: 'screen', raw, reason: 'frame-cue' };

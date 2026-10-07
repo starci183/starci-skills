@@ -138,8 +138,7 @@ function identityBefore(root, target, prior, env, force) {
 }
 
 function writeManifestBytes(io, fd, text) {
-  let offset = 0;
-  while (offset < text.length) {
+  for (let offset = 0; offset < text.length;) {
     const written = io.writeSync(fd, text, offset, text.length - offset, offset);
     if (!Number.isSafeInteger(written) || written <= 0) refuse('manifest-custody');
     offset += written;

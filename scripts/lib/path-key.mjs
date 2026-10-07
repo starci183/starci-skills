@@ -8,9 +8,7 @@ const WIN = process.platform === 'win32';
 export const slash = (p) => String(p ?? '').replaceAll('\\', '/');
 /** `text` without its trailing '/' run (a loop: a trailing-run pattern backtracks super-linearly). */
 export const trimTrailingSlashes = (text) => {
-  let end = text.length;
-  while (end > 0 && text[end - 1] === '/') end -= 1;
-  return text.slice(0, end);
+  for (let end = text.length; ; end -= 1) if (end === 0 || text[end - 1] !== '/') return text.slice(0, end);
 };
 // A trailing '*' run with the one '/' before it (the glob suffix of 'dir/**'); text without a trailing '*' is unchanged.
 const stripTrailingStars = (text) => {

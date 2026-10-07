@@ -4,9 +4,7 @@ const SENTENCE_TRAILING_CHAR = /[\s.?!:;,]/;
 
 /** `text` without its trailing run of characters that `chars` (a one-character pattern) matches; a loop, not a trailing-run regex. */
 export const trimTrailingChars = (text, chars) => {
-  let end = text.length;
-  while (end > 0 && chars.test(text[end - 1])) end -= 1;
-  return text.slice(0, end);
+  for (let end = text.length; ; end -= 1) if (end === 0 || !chars.test(text[end - 1])) return text.slice(0, end);
 };
 
 /** `text` without the run of `ch` (one character) at each end; loops, not an anchored-run regex. */
