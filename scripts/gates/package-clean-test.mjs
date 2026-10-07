@@ -2,7 +2,7 @@
 // package-clean-test.mjs - every published @starci package passes its own tests from a CLEAN install.
 //
 //   starci release clean-test                      every package of the publish set
-//   starci release clean-test --changed <file>...  only the packages those files belong to
+//   starci release clean-test --changed <file>...  only the packages those files belong to (a file inside one, or one its runtime copy bundles)
 //   starci release clean-test --base <rev>         only the packages the files changed in <rev>..HEAD belong to
 //
 // The publish set is read, never listed by hand: every `group: starci` pin of knowledge/hfs/canon-pins.yaml with a
@@ -51,6 +51,7 @@ import { diff } from '../api/git/diff.mjs';
 import { lsFiles } from '../api/git/ls-files.mjs';
 import { tailLines } from '../lib/clip.mjs';
 import { tarFiles } from '../lib/tar-files.mjs';
+import { BUNDLES, CATALOG } from '../hfs/sync-runtime.mjs';
 
 export const PROOF_EXIT = Object.freeze({ green: 0, red: 1, unrun: 2 });
 export const PROOF_CODES = Object.freeze({ install: 'PACKAGE_INSTALL_RED', test: 'PACKAGE_TEST_RED', noTest: 'PACKAGE_NO_TEST', unrun: 'PACKAGE_PROOF_UNRUN' });
@@ -122,11 +123,17 @@ export function installUnits(packages, root = runtimeRoot) {
   return [...units.values()];
 }
 
-/** The packages of the publish set that `changed` (runtime-relative files) touches: a file inside a package, or a workspace root's manifest or lockfile. */
+/** True when the generated runtime copy of `pkg` (sync-runtime BUNDLES) mirrors one of the runtime-relative `files`: the package ships and tests that source. */
+function mirrorsAny(pkg, files) {
+  const bundle = BUNDLES[`${pkg.dir}/runtime`];
+  return Boolean(bundle) && files.some((f) => bundle.files.includes(f) || (bundle.catalog && f === CATALOG));
+}
+
+/** The packages of the publish set that `changed` (runtime-relative files) touches: a file inside a package, a file its runtime copy mirrors, or a workspace root's manifest or lockfile. */
 export function packagesChanged(changed, packages, root = runtimeRoot) {
   const files = changed.map((f) => posixPath(path.isAbsolute(f) ? path.relative(root, f) : f));
   return packages.filter((pkg) => {
-    if (files.some((f) => f.startsWith(`${pkg.dir}/`))) return true;
+    if (files.some((f) => f.startsWith(`${pkg.dir}/`)) || mirrorsAny(pkg, files)) return true;
     const ws = workspaceRootOf(path.resolve(root, pkg.dir), root);
     if (!ws) return false;
     const wsRel = posixPath(path.relative(root, ws));

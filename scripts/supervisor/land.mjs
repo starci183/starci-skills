@@ -23,7 +23,7 @@
 //        check-contract-cites, check-cli-parity, check-db-openers, check-worktree-add (red only when red on the
 //        candidate and not the same on main, so a lane's pre-existing breakage never blocks an unrelated land);
 //      sync-runtime --check when the change touches a file a runtime mirror bundles (mirrorDriftCheck, same baseline);
-//      the clean-install proof of every published package the change touches (packageProofCheck: package-clean-test.mjs --base <base>; red or not run refuses, no baseline);
+//      the clean-install proof of every published package the change touches, a file its runtime copy bundles included (packageProofCheck: package-clean-test.mjs --base <base>; red or not run refuses, no baseline);
 //      the FULL `starci runtime check` of the candidate (land-full-check.mjs: packages/cli/bin/starci.mjs runtime check, not only the gate), a step of its own; red refuses, no baseline;
 //      the specs named by the worker/--specs plus every spec that names a changed file (node --test,
 //        --test-concurrency allocation.landGate.specConcurrency, timeout specsBaseMs + perSpecMs per spec; `--specs direct` keeps the
@@ -377,7 +377,7 @@ export function mirrorDriftCheck({ dir, changed, baseline = null }) {
 export const PACKAGE_PROOF = 'scripts/gates/package-clean-test.mjs';
 const PACKAGE_PROOF_TIMEOUT_MS = 3_600_000;
 /**
- * The clean-install proof of every published package the land changes: package-clean-test.mjs --base <base> in the scratch
+ * The clean-install proof of every published package the land changes (or whose bundled runtime copy mirrors a changed file): package-clean-test.mjs --base <base> in the scratch
  * (each changed package copied to a temp dir, installed from its own manifest and lock, its own tests run there). Red (1)
  * or not run (2) refuses; a land that changes no published package passes it without an install. null when the candidate
  * has no such script.

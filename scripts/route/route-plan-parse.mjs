@@ -6,6 +6,7 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { asList } from '../lib/list.mjs';
 import { normalizeText } from '../lib/normalize.mjs';
 import { phraseHits } from './phrase-match.mjs';
+import { asksFor } from './explicit-ask.mjs';
 
 const VAR_NAME = '[A-Za-z][A-Za-z0-9.]*';
 export const VAR_STATE_LINE = new RegExp('^(' + VAR_NAME + String.raw`)\s*:\s*(\S.*|[^\S\n\r\u2028\u2029])$`);
@@ -163,7 +164,7 @@ export function loadArchetypeSignals(goalDir) {
     return { ...entry, ...ARCHETYPE_STAR[id] };
   });
   // A refactor whose prompt hits $canonIntent is a canon-conformance cleanup (code.refactor params.canonFamilies).
-  return Object.assign(matchers, { canonIntent: expand(['$canonIntent']), e2eIntent: expand(['$e2eIntent']), uatIntent: expand(['$uatIntent']), proofNegation: expand(['$proofNegation']), integrationIntent: expand(['$integrationIntent']), integrationNegation: expand(['$integrationNegation']) });
+  return Object.assign(matchers, { canonIntent: expand(['$canonIntent']), e2eIntent: expand(['$e2eIntent']), uatIntent: expand(['$uatIntent']), proofNegation: expand(['$proofNegation']), proofStateCue: expand(['$proofStateCue']), integrationIntent: expand(['$integrationIntent']) });
 }
 
 function matchArchetypes(rawText, archetypes) {
@@ -180,10 +181,9 @@ const INTEGRATION_SCOPES = new Set([...PROOF_SCOPES, 'external-integration']);
 
 /** E2E runs manually only (owner ruling 2026-09-29): the e2e/UAT proof legs are explicit asks, never defaults. */
 function explicitProofAsk(text, archetypes) {
-  const hit = list => asList(list).some(p => phraseHits(text, p));
-  const negated = hit(archetypes.proofNegation);
-  const integrationNegated = hit(archetypes.integrationNegation);
-  return { e2e: hit(archetypes.e2eIntent) && !negated, uat: hit(archetypes.uatIntent) && !negated, integration: hit(archetypes.integrationIntent) && !integrationNegated };
+  const { proofNegation: negation, proofStateCue: state } = archetypes;
+  const asks = intent => asksFor(text, { intent, negation, state });
+  return { e2e: asks(archetypes.e2eIntent), uat: asks(archetypes.uatIntent), integration: asks(archetypes.integrationIntent) };
 }
 
 /** Without an explicit ask a backend build ends at impl done (backend) and an interface build at ui audited;
@@ -226,7 +226,7 @@ export function intentToStar(text, args, archetypes) {
   // Only a build or verify scope can carry a proof leg; a specification, scaffold, canonicalization or assisted
   // UAT prompt may name e2e/UAT as subject matter without asking for the leg.
   const proofScope = hints.archetypes.some(id => PROOF_SCOPES.has(id));
-  const asked = explicitProofAsk(normalizeText(text), archetypes);
+  const asked = explicitProofAsk(text, archetypes);
   const integrationScope = hints.archetypes.some(id => INTEGRATION_SCOPES.has(id));
   const proof = { e2e: proofScope && asked.e2e, uat: proofScope && asked.uat, integration: integrationScope && asked.integration };
   Object.assign(hints, { e2eAsked: proof.e2e, uatAsked: proof.uat, integrationAsked: proof.integration });

@@ -10,10 +10,18 @@ change that contradicts them is a bug in the code.
 npm ci
 npm run check   # starci runtime check
 npm test        # node --test tests/*.spec.mjs
+npm run test:packages   # starci release clean-test: the spec suite of every package under packages/
 ```
 
 `npm run check` is the repository wrapper for `starci runtime check`. During a focused
 change, run one check with `starci runtime check --only <name>`.
+
+`npm run check` and `npm test` do not run the spec suites of the packages under `packages/` (the eslint canons, stylelint,
+tsconfig, prettier-config, jest-preset, test-world, grammar, heroicons, cli, hfs). `npm run test:packages` runs all of them, each from a
+clean install of its own manifest and lockfile (about four minutes); `npm run test:packages -- --changed <file>...` or
+`-- --base <rev>` limits it to the packages those files belong to, a runtime file a package bundles into its generated
+`runtime/` copy (`scripts/hfs/**`, `scripts/lib/**`, `knowledge/**`) included. Run it after a change to such a file. CI runs it on
+every run and the land gate runs it for the packages a land touches.
 
 The supported Node.js 22/24 branches are declared in `package.json` `engines.node` and summarized in
 [README prerequisites](README.md). Unflagged `node:sqlite` and the runtime capability checks are

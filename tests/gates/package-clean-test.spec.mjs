@@ -40,6 +40,15 @@ test('--changed picks the packages holding a changed file, and every member of a
   assert.deepEqual(names(['packages/README.md', 'packages/fe-kit/x.ts']), []);
 });
 
+test('a runtime file a package bundles into its generated copy selects that package, so a scripts/hfs refactor reaches the canon specs', () => {
+  const set = publishSet(root);
+  const names = (files) => packagesChanged(files, set, root).map((p) => p.name).sort();
+  assert.deepEqual(names(['scripts/hfs/slots.mjs']), ['@starci/eslint-canon-be', '@starci/eslint-canon-fe', '@starci/hfs']);
+  assert.deepEqual(names(['scripts/hfs/project-rule.mjs']), ['@starci/eslint-canon-be', '@starci/eslint-canon-fe']);
+  assert.deepEqual(names(['modules/kernel/failure-codes.yaml']), ['@starci/hfs'], 'only a bundle carrying the failure-code slice');
+  assert.deepEqual(names(['scripts/gates/gate.mjs']), [], 'a runtime file no bundle mirrors selects nothing');
+});
+
 test('the clean environment drops what an enclosing npm run, NODE_PATH or a test runner would leak', () => {
   const env = cleanEnv({ PATH: 'p', NODE_PATH: 'x', INIT_CWD: 'y', npm_lifecycle_event: 'test', npm_package_name: 'n', npm_config_prefix: 'z', NODE_TEST_CONTEXT: 'child-v8', npm_config_cache: 'c' });
   assert.deepEqual(env, { PATH: 'p', npm_config_cache: 'c' });

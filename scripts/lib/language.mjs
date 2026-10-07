@@ -50,7 +50,7 @@ export const DECLARED_VIETNAMESE_FIELDS = Object.freeze({
   'modules/ops/_labels.yaml': Object.freeze({ flowFields: Object.freeze(['vi']) }),
   'modules/goal/archetypes.yaml': Object.freeze({
     fields: Object.freeze([
-      'buildIntent', 'canonIntent', 'e2eIntent', 'uatIntent', 'proofNegation', 'integrationIntent', 'integrationNegation', 'brandIntent',
+      'buildIntent', 'canonIntent', 'e2eIntent', 'uatIntent', 'proofNegation', 'proofStateCue', 'integrationIntent', 'brandIntent',
       'phrases', 'requires', 'excludes', 'backend', 'frontend', 'package',
     ]),
   }),

@@ -115,7 +115,11 @@ jobs:
       # Every published @starci package (the starci pins of knowledge/hfs/canon-pins.yaml) passes its own tests from a
       # clean install of its own manifest and lock in a temp dir: nothing hoisted in this checkout can hide an undeclared
       # dependency (test-world 1.0.0 shipped one). Exit 1 a red package, 2 a proof that could not run - never a pass.
+      # This is the CI run of every package suite under packages/ (heroicons, grammar, both eslint canons, stylelint, tsconfig,
+      # prettier-config, jest-preset, test-world, cli, hfs); `npm run test:packages` is the same proof on a developer machine.
+      # It runs after a red static check or coverage step too, so a red package suite is never hidden behind another red step.
       - name: Published packages from a clean install
+        if: ${{ !cancelled() }}
         run: npm run starci --silent -- release clean-test
 
       # The scaffolded app is proven against fresh registry installs: lint, typecheck and the api boot must RUN.
