@@ -479,3 +479,6 @@ export function formatRenderChecks(result){
   const header=`render ${result.brand.family??'(no family)'} rev ${result.brand.rev}: ${result.node.candidates} candidate${result.node.candidates===1?'':'s'}, ${result.ok?'no failing check':'failing checks'}`;
   return formatCheckLines(header,result.checks);
 }
+
+/** The kernel hook of a frontend operation's ui node lives in render-hook.mjs; this module hands it on. */
+export {renderChecksFor,uiDirOf} from './render-hook.mjs';
