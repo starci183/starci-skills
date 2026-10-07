@@ -29,7 +29,7 @@ import path from 'node:path';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { allocationSettings, loadConfig } from '../../engine/config.mjs';
 import { hostFloors } from '../../engine/resources-config.mjs';
-import { tempRoot } from '../../engine/temp-root.mjs';
+import { TEMP_ROOT_ENV, tempRoot } from '../../engine/temp-root.mjs';
 import { isSpecRun } from '../lib/env.mjs';
 
 /**
@@ -44,16 +44,28 @@ export function memoryProbe({ mem = os } = {}) {
 
 /** One machine-load sample: {cpuBusy, freeMem} as fractions; CPU over `sampleMs`. */
 export function machineLoad({ sampleMs = 400 } = {}) {
+  if (loadSample && loadSample.sampleMs === sampleMs && Date.now() - loadSample.at <= HOST_SAMPLE_MS) return loadSample.value;
   const snap = () => os.cpus().reduce((a, c) => { const t = c.times; const total = t.user + t.nice + t.sys + t.idle + t.irq; return { idle: a.idle + t.idle, total: a.total + total }; }, { idle: 0, total: 0 });
   const a = snap();
   sleepSync(sampleMs);
   const b = snap();
   const total = b.total - a.total;
-  return { cpuBusy: total > 0 ? Math.max(0, Math.min(1, 1 - (b.idle - a.idle) / total)) : 0, freeMem: memoryProbe().freeMem };
+  const value = { cpuBusy: total > 0 ? Math.max(0, Math.min(1, 1 - (b.idle - a.idle) / total)) : 0, freeMem: memoryProbe().freeMem };
+  loadSample = { at: Date.now(), sampleMs, value };
+  return value;
 }
 
 export const HOST_RESOURCES_LOW = 'host-resources-low';
 export const HOST_RESOURCES_ENV = 'STARCI_HOST_RESOURCES_JSON';
+
+// One host sample per caller pass: a status projection asks the same disk/RAM question for the queue's
+// host holds and again for the ramThrottle view, a dispatch once per gate — verdicts HOST_SAMPLE_MS
+// apart read the same machine anyway, so they share the sample (the status perf spec budgets one probe
+// a call). A STARCI_HOST_RESOURCES_JSON override, injected readers or explicit floors always measure
+// fresh: a spec's fake host must never leak into another caller's verdict.
+const HOST_SAMPLE_MS = 4000;
+const probeCache = new Map();
+let loadSample = null;
 
 const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
 const numOrNull = (v) => { const n = Number(v); return Number.isFinite(n) ? n : null; };
@@ -176,7 +188,21 @@ export function hostResourcesFor({ env = process.env, repo = null, settings = nu
       return { ...probeHostResources({ env, repo, settings, config, statfs, meminfo }), overrideError: String(error?.message ?? error) };
     }
   }
-  const probe = probeHostResources({ env, repo, settings, config, statfs, meminfo });
-  if (isSpecRun(env ?? {})) return { ...probe, ok: true, testContext: true };
-  return probe;
+  // The live probe is the one disk/RAM read of a caller's pass: every verdict HOST_SAMPLE_MS apart
+  // shares it (see the HOST_SAMPLE_MS note). Injected readers or explicit floors bypass the cache —
+  // a spec's fake host must not leak into another caller's verdict.
+  if (!statfs && !meminfo && settings == null && config === undefined) {
+    const key = `${repo ?? ''}${env?.[TEMP_ROOT_ENV] ?? ''}${isSpecRun(env ?? {})}`;
+    const hit = probeCache.get(key);
+    if (hit && Date.now() - hit.at <= HOST_SAMPLE_MS) return { ...hit.probe };
+    const probe = liveProbe({ env, repo, settings, config });
+    probeCache.set(key, { at: Date.now(), probe });
+    return { ...probe };
+  }
+  return liveProbe({ env, repo, settings, config, statfs, meminfo });
 }
+
+const liveProbe = ({ env, repo, settings, config, statfs, meminfo }) => {
+  const probe = probeHostResources({ env, repo, settings, config, statfs, meminfo });
+  return isSpecRun(env ?? {}) ? { ...probe, ok: true, testContext: true } : probe;
+};

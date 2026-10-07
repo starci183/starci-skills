@@ -1,7 +1,17 @@
 // The frontier's state word and reason text (verbs/status.mjs): the first state of the Kernel's priority
 // order that holds, then the prose that says what the Kernel does next.
+import path from 'node:path';
+import { runtimeProfile } from '../../../../engine/config.mjs';
 import { AUTOPILOT_RULING, SUPERVISOR_GATE } from '../../autopilot-run.mjs';
+import { typedIncidents } from '../../gate-conditions.mjs';
 import { handoverReason } from '../../handover.mjs';
+import { hostHoldOf } from '../../host-hold.mjs';
+import { parkedBehindWaits, waitHeldOperations, noteParkedBehind } from '../../frontier-parked.mjs';
+import { blockingJobs, blockingOthersOf, orderQueuedByBlocking } from '../../waiter-priority.mjs';
+import { PEER_WAIT, leaseCanonOf } from './peer-waits.mjs';
+import { jobPayloadOf } from './rows.mjs';
+
+const tryOr = (fn, fallback) => { try { return fn(); } catch { return fallback; } };
 
 const STATE_ORDER = [
   { when: (s) => s.wf.phase === 'finished', state: 'finished' },
@@ -34,8 +44,61 @@ const STATE_ORDER = [
   { when: (s) => s.wf.phase === 'running', state: 'orphaned-frontier' },
 ];
 
+// A dispatch rejection with no effect returns its job to jobs.status 'ready' — the same launch candidate
+// 'queued' is (dispatch-gates.mjs loadQueuedJob admits both). The queue projection took 'queued' rows
+// alone, so a reusable job vanished from frontier.queued and nextActions while its row sat ready:
+// engaged, actionable false, readyOperations 0, and no wake when the wait holding it lapsed
+// (kprop-8d86bcc70b). Each ready row merges into the queue here — after the settle projection, before
+// the graph and the actionable count read it — through the SAME admission verdict a queued row gets
+// (queuedBecauseOf: the gates, dependencies, slots, provider circuit, leases, pool load and host probe
+// dispatch-gates.mjs refuses on), so a job held only by host resources or an open provider circuit
+// reads its typed machine wait with the measured value or the expiry, never `ready` and actionable
+// (kprop-c0abd30d86), and reads ready the next status call after the machine wait clears.
+const admitReadyJobs = (s) => {
+  const { db, workflowId, wf, internals } = s;
+  const { QUEUED_BECAUSE, queuedBecauseOf, opSlotAdmission, recordDependencies } = internals ?? {};
+  if (!Array.isArray(s.workflowJobs) || !Array.isArray(s.queued) || !queuedBecauseOf || !opSlotAdmission) return;
+  const projected = new Set(s.queued.map((item) => item.jobId));
+  const ready = s.workflowJobs.filter((row) => row.status === 'ready' && !projected.has(row.job_id));
+  if (!ready.length) return;
+  const repoRoot = path.resolve(s.args?.repo ?? process.cwd());
+  let hostHold = null;
+  const queueCtx = {
+    planAncestors: s.planAncestors, jobsByOp: s.jobsByOp, slots: opSlotAdmission(db, workflowId),
+    rtDoc: runtimeProfile(), poolLoad: s.poolLoad, ownerGates: s.ownerGates, peerWaits: s.peerWaits,
+    recordDeps: recordDependencies ? tryOr(() => recordDependencies(repoRoot, s.workflowJobs), new Map()) : new Map(),
+    canon: tryOr(() => leaseCanonOf(db, repoRoot), null), workGraph: s.workGraph,
+    typedGates: tryOr(() => typedIncidents(db, { workflowId }), []), now: s.now,
+    // hostResourcesFor shares the one probe a status call takes (host-resources.mjs HOST_SAMPLE_MS), so
+    // judging the merged rows against the floor dispatch refuses on costs no extra sample.
+    hostHold: wf?.phase === 'finished' ? null : (op) => (hostHold ??= hostHoldOf({ env: process.env, repo: repoRoot, workflowId, db, ledgerFile: s.ledger?.path ?? null }))(op),
+  };
+  for (const row of ready) {
+    const foundation = jobPayloadOf(row).foundation;
+    s.queued.push({ jobId: row.job_id, opId: row.op_id ?? null, attempt: row.attempt,
+      ...queuedBecauseOf(db, row, queueCtx), ...(foundation ? { foundation } : {}) });
+  }
+  // The ordering and counts the queue projection settled over the shorter list answer for the merged
+  // rows too: waiters' weight first, then the parked-behind notes and the engaged test's wait-held count
+  // (a ready dependant of a wait-held job is parked, not engaged work).
+  try {
+    const blocking = blockingJobs(db, { now: s.now });
+    orderQueuedByBlocking(s.queued, blocking);
+    s.blockingOthers = blockingOthersOf(blocking, workflowId, { now: s.now });
+  } catch { /* ordering only */ }
+  s.readyOperations = (s.fencedOperations ?? 0) + s.queued.filter((item) => ['ready', 'dependency-failed'].includes(item.queuedBecause)).length;
+  s.queuedCauses = Object.fromEntries((QUEUED_BECAUSE ?? [])
+    .map((cause) => [cause, s.queued.filter((item) => item.queuedBecause === cause).length])
+    .filter(([, n]) => n > 0));
+  s.parkedBehind = parkedBehindWaits(s.queued, s.heldSettle ?? []);
+  for (const item of s.queued) { if (!item.parkedBehind) noteParkedBehind(item, s.parkedBehind.get(item.jobId)); }
+  s.waitHeld = waitHeldOperations(s.queued, s.heldSettle ?? [], s.parkedBehind);
+  s.parkedDependants = s.queued.filter((item) => item.parkedBehind && (item.parkedBehind.settle || item.parkedBehind.heldBecause === PEER_WAIT));
+};
+
 /** The frontier state word: the first state of the Kernel's priority order that holds. */
 export const frontierStateOf = (s) => {
+  admitReadyJobs(s);
   for (const { when, state } of STATE_ORDER) {
     if (when(s)) return state;
   }
