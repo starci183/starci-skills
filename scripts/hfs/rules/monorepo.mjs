@@ -67,6 +67,24 @@ function rootFindings(repoRoot) {
 }
 
 /** R144: the manifest of each fe workspace. */
+function appWorkspaceScriptFindings(file, project, name, pkg, scripts) {
+  const findings = [];
+  const expected = feAppPackageName(project, name);
+  if (pkg.name !== expected) findings.push(found(MONO_FE_WORKSPACE, file, `${file} is named ${JSON.stringify(pkg.name ?? null)}; the fe app ${name} is the workspace ${expected}.`, { expected }));
+  const want = Object.keys(FE_APP_SCRIPTS).sort(byCodeUnit);
+  const off = [...new Set([...want, ...Object.keys(scripts)])].sort(byCodeUnit).filter((key) => scripts[key] !== FE_APP_SCRIPTS[key]);
+  if (off.length) findings.push(found(MONO_FE_WORKSPACE, file, `${file} has scripts ${JSON.stringify(scripts)}; an fe app workspace has exactly ${JSON.stringify(FE_APP_SCRIPTS)} (turbo runs build, dev, lint and typecheck; differs at ${off.join(', ')}).`, { scripts: off }));
+  return findings;
+}
+
+function packageWorkspaceScriptFindings(file, scripts) {
+  const findings = [];
+  const missing = FE_PACKAGE_SCRIPTS.filter((key) => typeof scripts[key] !== 'string' || !scripts[key]);
+  if (missing.length) findings.push(found(MONO_FE_WORKSPACE, file, `${file} has no ${missing.join(', ')} script; an fe package workspace builds, type-checks and lints (turbo builds it before the apps that import it).`, { scripts: missing }));
+  else if (scripts.lint !== WORKSPACE_LINT) findings.push(found(MONO_FE_WORKSPACE, file, `${file} lints with ${JSON.stringify(scripts.lint)}; a workspace lints with ${JSON.stringify(WORKSPACE_LINT)}, the one lint of the app scoped to it.`, { scripts: ['lint'] }));
+  return findings;
+}
+
 function workspaceManifestFindings(repoRoot, project, workspaces) {
   const findings = [];
   for (const folder of workspaces) {
@@ -76,17 +94,8 @@ function workspaceManifestFindings(repoRoot, project, workspaces) {
     const name = folder.split('/')[2];
     if (pkg.private !== true) findings.push(found(MONO_FE_WORKSPACE, file, `${file} is not \`"private": true\`; a workspace of the app is never published.`));
     const scripts = pkg.scripts ?? {};
-    if (folder.startsWith('fe/apps/')) {
-      const expected = feAppPackageName(project, name);
-      if (pkg.name !== expected) findings.push(found(MONO_FE_WORKSPACE, file, `${file} is named ${JSON.stringify(pkg.name ?? null)}; the fe app ${name} is the workspace ${expected}.`, { expected }));
-      const want = Object.keys(FE_APP_SCRIPTS).sort(byCodeUnit);
-      const off = [...new Set([...want, ...Object.keys(scripts)])].sort(byCodeUnit).filter((key) => scripts[key] !== FE_APP_SCRIPTS[key]);
-      if (off.length) findings.push(found(MONO_FE_WORKSPACE, file, `${file} has scripts ${JSON.stringify(scripts)}; an fe app workspace has exactly ${JSON.stringify(FE_APP_SCRIPTS)} (turbo runs build, dev, lint and typecheck; differs at ${off.join(', ')}).`, { scripts: off }));
-    } else {
-      const missing = FE_PACKAGE_SCRIPTS.filter((key) => typeof scripts[key] !== 'string' || !scripts[key]);
-      if (missing.length) findings.push(found(MONO_FE_WORKSPACE, file, `${file} has no ${missing.join(', ')} script; an fe package workspace builds, type-checks and lints (turbo builds it before the apps that import it).`, { scripts: missing }));
-      else if (scripts.lint !== WORKSPACE_LINT) findings.push(found(MONO_FE_WORKSPACE, file, `${file} lints with ${JSON.stringify(scripts.lint)}; a workspace lints with ${JSON.stringify(WORKSPACE_LINT)}, the one lint of the app scoped to it.`, { scripts: ['lint'] }));
-    }
+    if (folder.startsWith('fe/apps/')) findings.push(...appWorkspaceScriptFindings(file, project, name, pkg, scripts));
+    else findings.push(...packageWorkspaceScriptFindings(file, scripts));
   }
   return findings;
 }
@@ -130,6 +139,34 @@ const packageOf = (specifier) => {
   return specifier.startsWith('@') ? parts.slice(0, 2).join('/') : parts[0];
 };
 
+function workspaceMissingDependencies(repoRoot, files, folder, names, ts) {
+  const findings = [];
+  const manifest = `${folder}/${MANIFEST}`;
+  const pkg = readJson(repoRoot, manifest);
+  if (!pkg) return findings;
+  const declared = declaredIn(pkg);
+  const aliases = aliasesOf(ts, path.join(repoRoot, folder));
+  const isAlias = (specifier) => aliases.some((alias) => (alias.exact ? specifier === alias.prefix : specifier.startsWith(alias.prefix)));
+  const missing = new Map();
+  for (const file of files) {
+    if (!file.startsWith(`${folder}/`) || !SOURCE.test(file) || file.endsWith('.d.ts')) continue;
+    const text = readText(repoRoot, file);
+    if (text === null) continue;
+    for (const { fileName: specifier } of ts.preProcessFile(text, true, true).importedFiles) {
+      if (specifier.startsWith('.') || specifier.startsWith('/') || isBuiltin(specifier) || isAlias(specifier)) continue;
+      const name = packageOf(specifier);
+      if (declared.has(name) || name === pkg.name) continue;
+      if (!missing.has(name)) missing.set(name, file);
+    }
+  }
+  for (const [name, file] of [...missing].sort(byCodeUnit)) {
+    const sibling = names.get(name);
+    const declaration = sibling ? `declare the workspace package ${name} as "*"` : `declare ${name} in the dependencies of ${manifest} (one version across the workspace, R14)`;
+    findings.push(found(MONO_WORKSPACE_DEP, manifest, `${file} imports ${name}, which ${manifest} does not declare; ${declaration}.`, { dependency: name, importedBy: file }));
+  }
+  return findings;
+}
+
 /** R146: what each fe workspace imports, it declares; the root declares no workspace package. */
 function workspaceDepFindings(repoRoot, files, workspaces) {
   const findings = [];
@@ -139,31 +176,7 @@ function workspaceDepFindings(repoRoot, files, workspaces) {
   if (!workspaces.length) return findings;
   const ts = typescriptFor(repoRoot);
   if (!ts) return [...findings, found(MONO_WORKSPACE_DEP, MANIFEST, 'the fe workspaces cannot be judged: no TypeScript resolves from the app; install the app\'s dependencies.', { missing: ['typescript'] })];
-  for (const folder of workspaces) {
-    const manifest = `${folder}/${MANIFEST}`;
-    const pkg = readJson(repoRoot, manifest);
-    if (!pkg) continue;
-    const declared = declaredIn(pkg);
-    const aliases = aliasesOf(ts, path.join(repoRoot, folder));
-    const isAlias = (specifier) => aliases.some((alias) => (alias.exact ? specifier === alias.prefix : specifier.startsWith(alias.prefix)));
-    const missing = new Map();
-    for (const file of files) {
-      if (!file.startsWith(`${folder}/`) || !SOURCE.test(file) || file.endsWith('.d.ts')) continue;
-      const text = readText(repoRoot, file);
-      if (text === null) continue;
-      for (const { fileName: specifier } of ts.preProcessFile(text, true, true).importedFiles) {
-        if (specifier.startsWith('.') || specifier.startsWith('/') || isBuiltin(specifier) || isAlias(specifier)) continue;
-        const name = packageOf(specifier);
-        if (declared.has(name) || name === pkg.name) continue;
-        if (!missing.has(name)) missing.set(name, file);
-      }
-    }
-    for (const [name, file] of [...missing].sort(byCodeUnit)) {
-      const sibling = names.get(name);
-      const declaration = sibling ? `declare the workspace package ${name} as "*"` : `declare ${name} in the dependencies of ${manifest} (one version across the workspace, R14)`;
-      findings.push(found(MONO_WORKSPACE_DEP, manifest, `${file} imports ${name}, which ${manifest} does not declare; ${declaration}.`, { dependency: name, importedBy: file }));
-    }
-  }
+  for (const folder of workspaces) findings.push(...workspaceMissingDependencies(repoRoot, files, folder, names, ts));
   return findings;
 }
 
