@@ -90,7 +90,11 @@ export function envConfig(env) {
 
 // A push names its remote, never a URL or a path, and no command-line config redirects that remote.
 const REMOTE_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
-const REMOTE_KEY = /^(remote\..+\.(url|pushurl|receivepack)|url\..+\.(insteadof|pushinsteadof))$/i;
+const REMOTE_KEY = new RegExp([
+  String.raw`^(remote\.`,
+  String.raw`.+\.(url|pushurl|receivepack)|url\.`,
+  String.raw`.+\.(insteadof|pushinsteadof))$`,
+].join(''), 'i');
 const redirectsRemote = (entry) => REMOTE_KEY.test(String(entry).split('=')[0]);
 const PUSH_VALUE_OPTIONS = new Set(['-o', '--push-option', '--repo', '--receive-pack', '--exec']);
 function pushTarget(rest) {
