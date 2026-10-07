@@ -224,7 +224,7 @@ export function runSelectedSops(bin, request, { selection, invocation, env, cwd,
   } catch { return held('selected-native-refused'); }
   finally {
     identity?.fill(0); input?.fill(0);
-    for (const result of captures) { if (Buffer.isBuffer(result?.stdout)) result.stdout.fill(0); if (Buffer.isBuffer(result?.stderr)) result.stderr.fill(0); }
+    for (const result of captures) { if (Buffer.isBuffer(result?.stdout)) { result.stdout.fill(0); } if (Buffer.isBuffer(result?.stderr)) { result.stderr.fill(0); } }
     if (selectedEnv) delete selectedEnv.SOPS_AGE_KEY;
   }
 }
