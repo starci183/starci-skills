@@ -100,8 +100,9 @@ const ownedByWorkspace = (commandLine, roots) => Boolean(commandLine) && roots.s
 const serverIdOf = (envId, service) => `${envId}__${service}`;
 const serverLogFile = (serverId) => path.join(os.tmpdir(), 'starci-env-servers', `${serverId.replace(/[^A-Za-z0-9._@-]/g, '_')}.log`);
 const commandOf = (text) => { try { const v = JSON.parse(text ?? 'null'); return Array.isArray(v) ? v.map(String) : null; } catch { return null; } };
+const isoOf = (ms) => (ms != null ? new Date(ms).toISOString() : null);
 const recordOf = (row) => (row ? { env: row.env, service: row.service, port: row.port ?? null, url: row.url ?? null, command: commandOf(row.command), cwd: row.cwd ?? null,
-  pid: row.pid ?? null, state: row.state, startedAt: row.started_at != null ? new Date(row.started_at).toISOString() : null, logSha: row.log_sha ?? null,
+  pid: row.pid ?? null, state: row.state, startedAt: isoOf(row.started_at), logSha: row.log_sha ?? null,
   log: serverLogFile(row.server_id) } : null);
 export function readRegistered(envId, service, env = process.env) {
   return readMachine((m) => recordOf(m.envServer(serverIdOf(envId, service))), null, { env });

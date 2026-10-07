@@ -248,6 +248,8 @@ function validateProofFreshness(record,proof,before,{changeAt,clause,broke,stale
     add('EVIDENCE_STALED_WITHOUT_BREAK',record,'only a breaking change expires evidence; prose and clarifications leave existing proof standing',{observed:proof.staleReason??null,computed:computed??declared});
 }
 
+const textOrNull=value=>(text(value)?value:null);
+
 const declaredRevOf=record=>{const change=record&&object(record.meta.change)?record.meta.change:null;return change&&positiveInteger(change.rev)?change.rev:null;};
 
 /**
@@ -266,10 +268,10 @@ function revisionMovedIds(current,baseline){
 function recordSummary(record,{declared,rev,digest,withdraws,computed}){
   const proof=record.evidence;
   const stale=proof?.stale===true;
-  return {id:record.id,path:record.path,schema:text(record.meta.schema)?record.meta.schema:null,
-    state:text(record.meta.state)?record.meta.state:null,rev:positiveInteger(rev)?rev:null,declaredKind:declared,computedKind:computed,
+  return {id:record.id,path:record.path,schema:textOrNull(record.meta.schema),
+    state:textOrNull(record.meta.state),rev:positiveInteger(rev)?rev:null,declaredKind:declared,computedKind:computed,
     normativeDigest:digest,withdraws,criteria:[...record.criteria.keys()].sort(byCodeUnit),
-    evidence:proof?{recordDigest:text(proof.recordDigest)?proof.recordDigest:null,outcome:text(proof.outcome)?proof.outcome:null,stale}:null};
+    evidence:proof?{recordDigest:textOrNull(proof.recordDigest),outcome:textOrNull(proof.outcome),stale}:null};
 }
 
 /**
