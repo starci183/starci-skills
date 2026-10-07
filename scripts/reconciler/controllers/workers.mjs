@@ -212,12 +212,15 @@ function planDirect({ commits = [], now, settings = DEFAULTS, language = ownerLa
   }));
 }
 
+/** What was tried, from the DI's evidence refs: one short line appended to the owner's notice. */
+const tried = (d) => ((d.evidence ?? []).length ? ` [${clipLine((d.evidence ?? []).map((e) => e.ref ?? e).join('; '), 240)}]` : '');
+
 /** Supervisor DIs escalated `min` times or more and past due: the urgent items (DESIGN §19). Pure. */
 export const overdueUrgent = (dis, { now, min = DEFAULTS.urgentOverdueEscalations, language = ownerLanguage() } = {}) => {
   const tr = translator(language);
   return dis
     .filter((d) => ['open', 'claimed', 'escalated'].includes(d.status) && (d.escalations ?? 0) >= min && d.dueAt != null && d.dueAt < now)
-    .map((d) => ({ class: 'supervisor-di-overdue', key: `di:${d.id}`, text: tr('Supervisor DI overdue x{count}: {summary}', { count: d.escalations, summary: clipLine(d.summary, 200) }) }));
+    .map((d) => ({ class: 'supervisor-di-overdue', key: `di:${d.id}`, text: tr('Supervisor DI overdue x{count}: {summary}', { count: d.escalations, summary: clipLine(d.summary, 200) }) + tried(d) }));
 };
 
 /* ------------------------------------------------------------ reads */
@@ -347,6 +350,11 @@ async function reconcileNotify(key, ctx, settings, now, force, language) {
     // Read-only: the Supervisor's DIs (machine.sqlite sup_decision_items, decisions.mjs supervisorDecisions).
     const [{ supervisorDecisions }, { readSupervisor }] = await Promise.all([import('../../machine/decisions.mjs'), import('../../machine/home.mjs')]);
     const dis = readSupervisor((m) => supervisorDecisions(m, { now }), [], { env: ctx.env ?? process.env });
+    if (ctx.mode === 'active') {
+      const { withSupervisor } = await import('../../machine/home.mjs');
+      const { escalateSupervisorDis, ladderOf } = await import('../../machine/supervisor-di-ladder.mjs');
+      withSupervisor((m) => escalateSupervisorDis(m, dis, { now, ...ladderOf() }), { env: ctx.env ?? process.env });
+    }
     urgentItems = overdueUrgent(dis, { now, min: settings.urgentOverdueEscalations, language });
   } catch { urgentItems = []; }
   const urgent = await mapInOrder(urgentItems, (u) => ctx.run('node', ['scripts/reconciler/notifier.mjs', 'urgent', '--class', u.class, '--key', u.key, '--text', u.text, '--send', '--json'], { timeoutMs: 60_000 }));

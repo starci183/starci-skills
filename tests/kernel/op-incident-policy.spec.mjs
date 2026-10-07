@@ -173,3 +173,28 @@ test('dispatch refuses a --model pin the job\'s history excluded unless the Kern
     assert.doesNotThrow(() => plan('claude-agent'), 'the recorded override decision is the legitimate path');
   });
 });
+
+test('the last step of every chain: an unresolved Supervisor DI climbs one level per step to the owner level, where the owner is told once with the evidence', async () => {
+  const { ladderOf, ladderDue, escalateSupervisorDis } = await import('../../scripts/machine/supervisor-di-ladder.mjs');
+  const { overdueUrgent } = await import('../../scripts/reconciler/controllers/workers.mjs');
+  const numbers = ladderOf();
+  assert.ok(numbers.stepMs > 0 && numbers.ownerAfter >= 1);
+  const T0 = 1_800_000_000_000;
+  const di = { id: 'sdi-1', status: 'open', dueAt: T0, escalations: 0, summary: 'every agent spent', evidence: [{ ref: 'claude-agent: excluded 2x' }] };
+  assert.equal(ladderDue(di, { now: T0 - 1, ...numbers }), false, 'not before its due time');
+  assert.equal(ladderDue({ ...di, status: 'claimed' }, { now: T0 + 10 * numbers.stepMs, ...numbers }), false, 'a claimed item is being worked');
+  const calls = [];
+  const m = { setSupDecision: (id, set) => calls.push(['set', id, set.status]), supEvent: (event) => calls.push(['event', event.kind, event.payload.level]) };
+  let state = di;
+  for (let level = 1; level <= numbers.ownerAfter; level += 1) {
+    const now = T0 + (level - 1) * numbers.stepMs;
+    assert.equal(escalateSupervisorDis(m, [state], { now, ...numbers }).length, 1, `level ${level} is due at due + ${level - 1} steps`);
+    state = { ...state, status: 'escalated', escalations: level };
+  }
+  assert.equal(ladderDue(state, { now: T0 + 99 * numbers.stepMs, ...numbers }), false, 'the owner level is the end of the ladder');
+  assert.equal(calls.filter((c) => c[0] === 'set').length, numbers.ownerAfter);
+  const urgent = overdueUrgent([state], { now: T0 + 1, min: numbers.ownerAfter });
+  assert.equal(urgent.length, 1);
+  assert.match(urgent[0].text, /every agent spent/);
+  assert.match(urgent[0].text, /claude-agent: excluded 2x/, 'the notice lists what was tried');
+});
