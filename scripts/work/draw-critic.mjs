@@ -29,8 +29,8 @@ import {sha256} from '../../engine/digest.mjs';
 import crypto from 'node:crypto';
 import { hashObject } from '../api/git/hash-object.mjs';
 import { commitTree } from '../api/git/commit-tree.mjs';
-import { revParseQuery } from '../api/git/rev-parse-query.mjs';
 import { gitResultOf } from '../lib/git.mjs';
+import { gitRootOf } from './git-root.mjs';
 import { createOrcaWorktree, removeOrcaWorktree } from '../machine/worktree-orca.mjs';
 import { opContextOf } from '../guards/op-context.mjs';
 import { slash } from '../lib/path-key.mjs';
@@ -249,7 +249,6 @@ export function removeCriticWorkspace({ dir, repoRoot, orcaId, branch = null, en
   return removeOrcaWorktree({ repoRoot, orcaId, dir, branch, deleteBranch: branch ? 'force' : null, env, ...(orca ? { orca } : {}) });
 }
 
-const gitRootOf = (cwd) => { const r = gitResultOf(revParseQuery(['--show-toplevel'], { cwd })); return r.ok && r.stdout.trim() ? path.resolve(r.stdout.trim()) : null; };
 
 /**
  * Start the critic worker on its placement `dir` through worker-start (startAgent: run-create --from `entry`,

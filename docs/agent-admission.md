@@ -23,6 +23,13 @@ bias that names the member, or an owner reserve grant for an exact scope, role, 
 Unknown, stale, exhausted or unauthenticated capacity cannot be overridden. Providers without window telemetry use a
 fresh explicit owner grant with scoped roles and finite slots; they receive no invented usage percentage.
 
+A headless call (`modules/models/tiers.yaml` `calls`, tier use `call`) is admitted by the same selector and the same reservation:
+`scripts/agent/call-admission.mjs` builds the candidates from the call tier's chain with `role` `op`, reserves one provider slot
+before the child starts, marks it `launching` and then `live` with the child's pid, and releases it on the proof that the
+child exited (`process-exited`), or `failed-before-launch` when nothing started. A refusal is one of three kinds: `quota`
+(every member at the reserve threshold or out of tokens), `capacity` (no free provider slot) or `unavailable` (the hard filter
+dropped every member: login, circuit, runtime). A call tier is never read as a seat: `tierMembers` throws for it without `use: 'call'`.
+
 Authorized launch and operation routing prepare the machine store through its writer before observing shared capacity.
 Read-only plans neither create nor upgrade the store and refuse unobserved capacity. A member's concurrency cap may
 lower the canonical pool ceiling. The runtime adapter revalidates the observed quota evidence and atomically reserves a shared provider/account slot before launching. A receipt includes an

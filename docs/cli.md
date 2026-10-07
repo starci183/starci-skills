@@ -4810,6 +4810,29 @@ starci work hygiene staged --repo <repo>
 starci work hygiene files --repo <repo> <file>
 ```
 
+### starci work imagegen
+
+generate images headlessly on the imagegen call tier and write them with a receipt
+
+| flag | type | |
+| --- | --- | --- |
+| `--prompt` | string | required |
+| `--out` | string | required |
+| `--reference` | list |  |
+| `--count` | string |  |
+| `--size` | string |  |
+| `--name` | string |  |
+| `--stage` | string |  |
+
+exit: 0 images and receipt written; 1 typed refusal: quota, capacity, unavailable, runner failed, timeout, no output, bad input or output outside the worktree; 2 bad usage
+
+json: flag
+
+```sh
+starci work imagegen --prompt <STARCI_JOB_SCRATCH>/mascot.prompt.txt --out .starciwork/brand/assets --name mascot --json
+starci work imagegen --prompt hero.prompt.txt --out ui/home/assets --reference ui/home/assets/hero-ref.png --count 2 --size 1536x1024
+```
+
 ### starci work layout-tree
 
 scan, capture, plan, lock, or inspect a product layout tree

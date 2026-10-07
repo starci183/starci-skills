@@ -152,6 +152,15 @@ test('an agent CLI spawned as a child process is red, through a literal, a const
   assert.match(hits.find(v=>v.where==='scripts/work/critic.mjs:5').detail,/agent CLI claude/);
 });
 
+test('the headless call api (scripts/api/codex) may spawn codex; the same spawn anywhere else is red',t=>{
+  const spawnCodex=["import { spawn } from 'node:child_process';","spawn('codex', ['exec', '--json']);"].join('\n');
+  const root=fixture(t,{'scripts/api/codex/exec.mjs':spawnCodex,'scripts/work/imagegen-copy.mjs':spawnCodex});
+  const r=run(root);
+  assert.equal(r.status,1);
+  const hits=r.report.violations.filter(v=>v.rule==='agent-cli-spawn');
+  assert.deepEqual(hits.map(v=>v.where),['scripts/work/imagegen-copy.mjs:2']);
+});
+
 test('a mention of an agent CLI is not a spawn; git, node and npm spawns pass',t=>{
   const root=fixture(t,{
     'scripts/work/ok.mjs':[

@@ -80,6 +80,7 @@ ruleParams:
         sonar: [api/sonar]
         sops: [api/sops]
         cloudflared: [api/cloudflared]
+        codex: [api/codex]                  # the headless imagegen call only (scripts/api/codex/exec.mjs)
         node: [api/node, api/npm]           # npm runs as node + its bundled npm-cli.js on Windows
         powershell: [api/process]
         pwsh: [api/process]

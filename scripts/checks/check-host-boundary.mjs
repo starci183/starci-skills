@@ -137,10 +137,14 @@ const launchScan=(root,flag)=>{
   }
 };
 
-// (d) agent-cli-spawn: no runtime script runs an agent CLI as its child process.
+// (d) agent-cli-spawn: no runtime script runs an agent CLI as its child process. The one exemption is the headless call api
+// (scripts/api/codex/, owner decision 2026-10-07): a one-shot `codex exec` for the imagegen call, reached only through
+// `starci work imagegen`, which holds a provider slot, meters it and refuses every other caller (command-policy.yaml calls).
+const HEADLESS_CALL_DIR='scripts/api/codex';
 const agentSpawnScan=(root,flag)=>{
   for(const dir of AGENT_SPAWN_ROOTS){
     for(const file of walk(path.join(root,dir),f=>AGENT_SPAWN_EXT.test(f))){
+      if(rel(root,file).startsWith(`${HEADLESS_CALL_DIR}/`))continue;
       for(const hit of agentCliSpawns(fs.readFileSync(file,'utf8'),file))
         flag(file,hit.line,'agent-cli-spawn',`${AGENT_CLI_SPAWN}: ${hit.callee}() runs the agent CLI ${hit.program} as a child process — launch it through ${WRAPPER_DIR}/worker-start.mjs (scripts/agent/lib.mjs startAgent) and supervise it with worker-show / worker-stop / worker-release`,AGENT_CLI_SPAWN);
     }

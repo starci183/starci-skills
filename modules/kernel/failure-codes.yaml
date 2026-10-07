@@ -3063,6 +3063,100 @@ ID_TYPE:
   owner: op-retry
   kind: check-finding
 
+IMAGEGEN_BAD_INPUT:
+  title: "imagegen call refused: bad input"
+  title_vi: "Lệnh tạo ảnh bị từ chối vì đầu vào sai"
+  meaning_vi: "starci work imagegen từ chối vì tệp prompt, ảnh tham chiếu, số lượng, kích thước hoặc tên không hợp lệ, hoặc tệp đích đã tồn tại."
+  causes_vi:
+    - "Tệp prompt trống, quá 64 KiB hoặc không tồn tại"
+    - "Ảnh tham chiếu không phải png, jpg hoặc webp thật, hoặc vượt giới hạn"
+    - "Số ảnh hoặc số ảnh tham chiếu vượt giới hạn của lệnh gọi imagegen"
+    - "Tệp đích đã có: một biến thể phải dùng tên mới"
+  nextStep_vi: "Op sửa đầu vào theo thông báo rồi gọi lại một lần; không có vòng thử lại."
+  owner: op-retry
+  kind: input-invalid
+
+IMAGEGEN_CAPACITY:
+  title: "imagegen call refused: no free provider slot"
+  title_vi: "Lệnh tạo ảnh bị từ chối vì nhà cung cấp hết chỗ"
+  meaning_vi: "Mọi chỗ chạy song song của nhà cung cấp Codex đang bận nên lệnh tạo ảnh không được cấp chỗ."
+  causes_vi:
+    - "Nhiều ghế và op đang dùng hết chỗ của pool Codex"
+    - "Một chỗ cũ chưa được trả lại"
+  nextStep_vi: "Op báo blocked kèm mã; chính sách sự cố của kernel quyết định thử lại sau khi có chỗ."
+  owner: op-retry
+  kind: verb-refusal
+
+IMAGEGEN_NO_OUTPUT:
+  title: "imagegen call produced no image"
+  title_vi: "Lệnh tạo ảnh chạy xong nhưng không có ảnh"
+  meaning_vi: "codex exec kết thúc bình thường nhưng không để lại ảnh PNG nào trong thư mục generated_images của phiên."
+  causes_vi:
+    - "Mô hình từ chối yêu cầu và trả lời refused"
+    - "Công cụ tạo ảnh không được gọi"
+    - "Codex lưu ảnh ở nơi khác với CODEX_HOME của lệnh gọi"
+  nextStep_vi: "Op đọc lý do trong thông báo, sửa prompt nếu cần và báo blocked; không thay bằng ảnh tự vẽ hay ảnh tái sử dụng."
+  owner: op-retry
+  kind: verb-refusal
+
+IMAGEGEN_OUT_OF_WORKTREE:
+  title: "imagegen output outside the worktree"
+  title_vi: "Thư mục đầu ra của lệnh tạo ảnh nằm ngoài worktree"
+  meaning_vi: "Thư mục --out hoặc một ảnh tham chiếu nằm ngoài worktree của op (hoặc trong .git, hoặc đi qua liên kết), nên lệnh không ghi và không đọc."
+  causes_vi:
+    - "--out trỏ ra ngoài kho mã của op hoặc vào .git"
+    - "Đường dẫn đi qua một junction hoặc symlink dẫn ra ngoài"
+    - "Ảnh tham chiếu để ở thư mục tạm thay vì trong bản ghi"
+  nextStep_vi: "Op dùng thư mục assets của bản ghi trong worktree, chép ảnh tham chiếu vào bản ghi trước rồi gọi lại."
+  owner: op-retry
+  kind: verb-refusal
+
+IMAGEGEN_QUOTA:
+  title: "imagegen call refused: quota"
+  title_vi: "Lệnh tạo ảnh bị từ chối vì hết hạn mức"
+  meaning_vi: "Thành viên của nhóm imagegen đã dùng từ 90 phần trăm hạn mức (hoặc Codex báo chạm giới hạn lúc chạy) nên lệnh không chạy."
+  causes_vi:
+    - "Hạn mức tuần hoặc phiên của Codex gần hết"
+    - "Codex trả lỗi usage limit hoặc rate limit giữa chừng"
+  nextStep_vi: "Op báo blocked kèm mã và giờ reset nếu có; chính sách sự cố của kernel quyết định thử lại."
+  owner: supervisor
+  kind: verb-refusal
+
+IMAGEGEN_RUNNER_FAILED:
+  title: "imagegen runner failed"
+  title_vi: "Trình chạy codex exec của lệnh tạo ảnh thất bại"
+  meaning_vi: "codex exec không chạy được hoặc thoát với mã lỗi, không có ảnh."
+  causes_vi:
+    - "Không tìm thấy codex trên PATH"
+    - "codex exec thoát với mã khác 0"
+    - "Codex báo lỗi mô hình hoặc mạng"
+  nextStep_vi: "Op báo blocked kèm mã và đoạn cuối stderr; supervisor kiểm tra Codex trên máy."
+  owner: runtime-core
+  kind: runtime-fault
+
+IMAGEGEN_TIMEOUT:
+  title: "imagegen call timed out"
+  title_vi: "Lệnh tạo ảnh quá thời hạn"
+  meaning_vi: "codex exec không kết thúc trong timeoutMs của lệnh gọi imagegen và đã bị dừng."
+  causes_vi:
+    - "Mô hình tạo ảnh chạy quá lâu"
+    - "Mạng hoặc dịch vụ ảnh bị treo"
+  nextStep_vi: "Op báo blocked kèm mã; chính sách sự cố của kernel quyết định thử lại."
+  owner: supervisor
+  kind: verb-refusal
+
+IMAGEGEN_UNAVAILABLE:
+  title: "imagegen call refused: no usable member"
+  title_vi: "Lệnh tạo ảnh bị từ chối vì không có thành viên dùng được"
+  meaning_vi: "Bộ lọc cứng loại hết thành viên của nhóm imagegen: Codex chưa đăng nhập, mạch nhà cung cấp đang mở, hoặc không có bằng chứng hạn mức."
+  causes_vi:
+    - "Codex chưa đăng nhập hoặc token hết hạn"
+    - "Mạch nhà cung cấp Codex đang mở sau lỗi"
+    - "Không đọc được hạn mức của Codex"
+  nextStep_vi: "Op báo blocked kèm mã; chủ máy đăng nhập lại Codex hoặc đợi mạch đóng."
+  owner: runtime-core
+  kind: verb-refusal
+
 IMPL_APP_DIR_UNREADABLE:
   title: "App folder cannot be read"
   title_vi: "Không đọc được thư mục app"
