@@ -17,8 +17,8 @@
 //              (set only when missing), each agents/claude.yaml launchEnv key under
 //              env (DISABLE_AUTOUPDATER: Orca composes a worker's command, so its
 //              launch env cannot carry it) and the guard hook.
-//     codex  → [projects."<path>"] trust_level = "trusted" in the active managed Codex home
-//              (CODEX_HOME or Orca's codex-runtime-home) for the launch
+//     codex  → [projects."<path>"] trust_level = "trusted" in each Codex home the worker can start in
+//              (CODEX_HOME, else Orca's codex-runtime-home and the system ~/.codex) for the launch
 //              cwd and the git root Codex keys trust by, in the key forms Codex
 //              writes (win32: a '<drive>:\lower\case' literal and a "<DRIVE>:\\exact" basic), plus the
 //              update-check and model-nudge notices; the guard hook as a block in
@@ -81,7 +81,7 @@ export function trustTargets({ env = process.env, platform = process.platform } 
     const key = path.resolve(dir).toLowerCase();
     if (!codexHomes.some((h) => path.resolve(h.dir).toLowerCase() === key)) codexHomes.push({ kind, dir: path.resolve(dir) });
   };
-  // One managed worker home. Do not rewrite unrelated personal Codex homes.
+  // The active worker home; the system home joins it in codexLaunchHomes (codex-mirror-source.mjs).
   addHome('active-codex-home', root ? path.join(root,'.codex') : (env.CODEX_HOME || orcaCodexHome({ env, platform, home })));
   return {
     claudeJson: claudeDir ? path.join(claudeDir, '.claude.json') : path.join(home, '.claude.json'),
