@@ -52,7 +52,7 @@ test('a request path never changes the host the request goes to', async (t) => {
 
 test('a request path outside the allowed characters is refused and an allowed one arrives byte for byte', async (t) => {
   const sink = () => {};
-  for (const path of ['/a b', '/a#frag', '/a"b', '/a<b>', '/a\r\nHost: evil.example', '/café', '/a\u0000b', '/x y', '']) {
+  for (const path of ['/a b', '/a#frag', '/a"b', '/a<b>', '/a\r\nHost: evil.example', '/caf' + String.fromCharCode(0xe9), '/a\u0000b', '/x' + String.fromCharCode(0x2028) + 'y', '']) {
     assert.throws(() => request({ host: '127.0.0.1', port: 80, path }, sink, 'loopback'), { code: 'URL_TARGET_REFUSED' }, JSON.stringify(path));
   }
   const seen = [];

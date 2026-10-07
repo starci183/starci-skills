@@ -9,7 +9,8 @@ import { containedPath } from '../../scripts/lib/path-key.mjs';
 import { logLine, textLine } from '../../scripts/lib/escape.mjs';
 import { verbCli } from '../../scripts/lib/cli-arg.mjs';
 import { renderReportBlock } from '../../scripts/kernel/report-render.mjs';
-import { hasFlag } from '../../scripts/lib/ts-ast.mjs';
+import { hasFlag, isConstVariable } from '../../scripts/lib/ts-ast.mjs';
+import { parseSource, ts } from '../../scripts/hfs/runtime-rules/source-ast.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const node = (args, options = {}) => spawnSync(process.execPath, args, { cwd: root, encoding: 'utf8', ...options });
@@ -58,9 +59,10 @@ test('verbCli print keeps legitimate output and never lets a value forge a log l
 });
 
 test('textLine writes every control character but the tab visibly and leaves ordinary text alone', () => {
-  assert.equal(textLine('a\r\nb c\u007fd\te'), 'a\\u000d\\u000ab\\u2028c\u007fd\te');
+  assert.equal(textLine('a\r\nb' + String.fromCharCode(0x2028) + 'c\u007fd\te'), 'a\\u000d\\u000ab\\u2028c\u007fd\te');
   assert.equal(textLine(null), '');
-  assert.equal(textLine('plain "q" \\ é \u{1F600}'), 'plain "q" \\ é \u{1F600}');
+  const accented = 'plain "q" \\ ' +String.fromCharCode(0xe9) + ' ' + String.fromCodePoint(0x1f600);
+  assert.equal(textLine(accented), accented);
 });
 
 test('the report block never carries a secret from the report', () => {
@@ -77,6 +79,14 @@ test('hasFlag reads one bit as arithmetic', () => {
   assert.equal(hasFlag(0b0110, 0b0001), false);
   assert.equal(hasFlag(0b0110, 0b1000), false);
   assert.equal(hasFlag(0, 2), false);
+});
+
+test('isConstVariable is true for a const declaration and false for let and var', () => {
+  const t = ts();
+  const declarations = [];
+  const visit = (n) => { if (t.isVariableDeclaration(n)) declarations.push(n); t.forEachChild(n, visit); };
+  visit(parseSource('const a = 1, b = 2; let c = 3; var d = 4; for (const e of []) { e; }', 'x.mjs'));
+  assert.deepEqual(declarations.map((d) => [d.name.text, isConstVariable(t, d)]), [['a', true], ['b', true], ['c', false], ['d', false], ['e', true]]);
 });
 
 test('render-proof refuses a --work outside the runtime tree and the working directory', (t) => {
