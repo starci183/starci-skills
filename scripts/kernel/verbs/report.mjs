@@ -175,6 +175,23 @@ function reaskOf(db, job, report) {
   return { dispatchId: repeated.dispatchId, reason };
 }
 
+/** Typed rows the op kept in <scratch>/log.jsonl go to the ledger's logs table before the scratch is deleted. */
+function ingestOpScratchLog(repo, job, scratch) {
+  const scratchLog = path.join(scratch, SCRATCH_LOG_FILE);
+  if (!fs.existsSync(scratchLog)) return;
+  let logs = null;
+  try { logs = openLogs(repo); ingestScratchLog(logs, { file: scratchLog, workflowId: job.workflow_id, jobId: job.job_id }); }
+  catch (error) { console.error(`starci kernel report WARNING: the op's ${SCRATCH_LOG_FILE} was not ingested: ${String(error?.message ?? error).slice(0, 200)}`); }
+  finally { try { logs?.close(); } catch { /* closing */ } }
+}
+
+/** The human note of a worker_done send ('' when none was sent). */
+function workerDoneNoteOf(workerDone) {
+  if (!workerDone) return '';
+  const sentNote = workerDone.ok ? 'sent' : `NOT sent (${workerDone.errorCode})`;
+  return `; worker_done ${workerDone.outcome} ${sentNote}`;
+}
+
 export default {
   verb: 'report',
   required: ['job', 'report'],
@@ -229,14 +246,7 @@ export default {
       artifacts: evidence.artifacts.map((a) => ({ id: a.artifactId, name: a.name, sha256: a.sha256 })), ...(evidence.audit ? { audit: evidence.audit } : {}) };
   }));
   const { reportId, attachments, artifacts = [], audit = null } = filed.result;
-  // Typed rows the op kept in <scratch>/log.jsonl go to the ledger's logs table before the scratch is deleted.
-  const scratchLog = path.join(scratch, SCRATCH_LOG_FILE);
-  if (fs.existsSync(scratchLog)) {
-    let logs = null;
-    try { logs = openLogs(repo); ingestScratchLog(logs, { file: scratchLog, workflowId: job.workflow_id, jobId: job.job_id }); }
-    catch (error) { console.error(`starci kernel report WARNING: the op's ${SCRATCH_LOG_FILE} was not ingested: ${String(error?.message ?? error).slice(0, 200)}`); }
-    finally { try { logs?.close(); } catch { /* closing */ } }
-  }
+  ingestOpScratchLog(repo, job, scratch);
   removeScratch(scratch);
   if (filed.replayed) {
     emit({ ok: true, replayed: true, jobId: job.job_id, workflowId: job.workflow_id, dispatchId, outcome: report.outcome, reportId, attachments },
@@ -255,11 +265,7 @@ export default {
   });
   const workerDone = sendOpWorkerDone(ledger, job, jobPayload, report, reportAbs, args['dispatch-capability'] ?? null);
   const out = { ok: true, jobId: job.job_id, workflowId: job.workflow_id, dispatchId, attemptId: attempt.attempt_id, outcome: report.outcome, reportId, attachments, artifacts, ...(audit ? { audit } : {}), kernelWake, ...(reask ? { reask } : {}), ...(workerDone ? { workerDone } : {}) };
-  let workerDoneNote = '';
-  if (workerDone) {
-    const sentNote = workerDone.ok ? 'sent' : `NOT sent (${workerDone.errorCode})`;
-    workerDoneNote = `; worker_done ${workerDone.outcome} ${sentNote}`;
-  }
+  const workerDoneNote = workerDoneNoteOf(workerDone);
   emit(out, `report filed for ${job.job_id} (dispatch ${dispatchId}, outcome ${report.outcome})${workerDoneNote}`, args.json);
   // The op terminal gets the canonical human rendering of the filed row — the
   // reports row is the truth, this block is its projection.
