@@ -2,6 +2,7 @@ import path from 'node:path';
 import { machineKit } from './machine-ast.mjs';
 import { treeOf } from './required-files.mjs';
 import { byCodeUnit } from '../../lib/list.mjs';
+import { trimTrailingSlashes } from '../trailing-slashes.mjs';
 
 /**
  * R45 `module-per-transport` (BE_MODULE_SHAPE, BE-CONVENTION 1.2 and 1.6). A feature has one Nest module for its
@@ -22,7 +23,6 @@ export const MODULE_PER_TRANSPORT_RULE_IDS = ['BE_MODULE_SHAPE'];
 
 const RULE = 'BE_MODULE_SHAPE';
 const APP_ROOT_FILE = 'app.module.ts';
-const TRAILING_SLASH = new RegExp('/+$', 'u');
 
 function featureOwnerOf(resolver, rel) {
   const owner = resolver.ownerOf(rel);
@@ -48,7 +48,7 @@ function composedByProtocol(resolver) {
   const composedBy = new Map();
   for (const slot of resolver.slots()) {
     if (!slot.composedBy || slot.owner) continue;
-    composedBy.set(path.posix.basename(slot.path.replace(TRAILING_SLASH, '')), slot.composedBy);
+    composedBy.set(path.posix.basename(trimTrailingSlashes(slot.path)), slot.composedBy);
   }
   return composedBy;
 }
@@ -101,7 +101,8 @@ function reportConfigurableModuleUses(file, checker, kit, ts, place, report) {
   });
 }
 
-function moduleClassesInFile(file, checker, place, modules, kit, ts, composedModuleOf, report) {
+function moduleClassesInFile(file, checker, place, modules, env) {
+  const { kit, ts, composedModuleOf, report } = env;
   for (const statement of file.sourceFile.statements) {
     if (!ts.isClassDeclaration(statement) || !statement.name) continue;
     if (!isNestModuleClass(ts, kit, checker, statement)) continue;
@@ -112,10 +113,11 @@ function moduleClassesInFile(file, checker, place, modules, kit, ts, composedMod
 
 function collectFeatureModules(graph, kit, ts, placeOf, composedModuleOf, report) {
   const modules = new Map(); // class declaration -> {name, file}
+  const env = { kit, ts, composedModuleOf, report };
   for (const file of graph.files.values()) {
     const checker = kit.checkerOf(file.sourceFile);
     const place = placeOf(file.rel);
-    moduleClassesInFile(file, checker, place, modules, kit, ts, composedModuleOf, report);
+    moduleClassesInFile(file, checker, place, modules, env);
     if (place) reportConfigurableModuleUses(file, checker, kit, ts, place, report);
   }
   return modules;
@@ -135,7 +137,8 @@ function reportModuleReference(root, node, app, module, place, composedBy, repor
   }
 }
 
-function inspectModuleDeclarations(checker, target, node, root, app, moduleMap, kit, placeOf, seen, composedBy, report) {
+function inspectModuleDeclarations(checker, target, node, root, app, scan, seen) {
+  const { moduleMap, kit, placeOf, composedBy, report } = scan;
   let references = 0;
   for (const declaration of kit.declarationsOf(checker, target)) {
     const module = moduleMap.get(declaration);
@@ -149,7 +152,8 @@ function inspectModuleDeclarations(checker, target, node, root, app, moduleMap, 
   return references;
 }
 
-function inspectAppRoot(app, graph, kit, ts, moduleMap, placeOf, composedBy, report) {
+function inspectAppRoot(app, scan) {
+  const { graph, kit, ts } = scan;
   const root = graph.files.get(`apps/${app.name}/src/${APP_ROOT_FILE}`);
   if (!root) return 0;
   const checker = kit.checkerOf(root.sourceFile);
@@ -159,7 +163,7 @@ function inspectAppRoot(app, graph, kit, ts, moduleMap, placeOf, composedBy, rep
     const call = ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'register';
     if (ts.isCallExpression(node) && !call) return;
     const target = call ? node.expression.expression : node;
-    references += inspectModuleDeclarations(checker, target, node, root, app, moduleMap, kit, placeOf, seen, composedBy, report);
+    references += inspectModuleDeclarations(checker, target, node, root, app, scan, seen);
   };
   kit.walk(root.sourceFile, node => {
     if (ts.isPropertyAssignment(node) && kit.propertyNameText(node.name) === 'imports' && ts.isArrayLiteralExpression(node.initializer)) {
@@ -170,9 +174,9 @@ function inspectAppRoot(app, graph, kit, ts, moduleMap, placeOf, composedBy, rep
   return references;
 }
 
-function appModuleReferences(apps, graph, kit, ts, moduleMap, placeOf, composedBy, report) {
+function appModuleReferences(apps, scan) {
   let references = 0;
-  for (const app of apps) references += inspectAppRoot(app, graph, kit, ts, moduleMap, placeOf, composedBy, report);
+  for (const app of apps) references += inspectAppRoot(app, scan);
   return references;
 }
 
@@ -194,6 +198,6 @@ export function checkModulePerTransport(input) {
 
   const modules = collectFeatureModules(graph, kit, ts, placeOf, composedModuleOf, report);
 
-  const references = appModuleReferences(resolver.repo.apps, graph, kit, ts, modules, placeOf, composedBy, report);
+  const references = appModuleReferences(resolver.repo.apps, { graph, kit, ts, moduleMap: modules, placeOf, composedBy, report });
   return { violations, coverage: { status: 'checked', modules: modules.size, transportModules, appReferences: references } };
 }

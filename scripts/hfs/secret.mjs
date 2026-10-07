@@ -26,12 +26,12 @@ class SecretError extends Error {}
 
 const SLUG = /^[a-z0-9][a-z0-9-]*$/u;
 const KEY = /^[A-Za-z_]\w*$/u;
-const WHITESPACE = '\\s';
+const WHITESPACE = String.raw`\s`;
 const REQUIRED_INDENT = `${WHITESPACE}+`;
 const OPTIONAL_DASH = '-?';
 const OPTIONAL_SPACING = `${WHITESPACE}*`;
 const RECIPIENT_NAME = 'recipient:';
-const RECIPIENT_VALUE = '(\\S+)';
+const RECIPIENT_VALUE = String.raw`(\S+)`;
 const RECIPIENT_LINE = new RegExp(`^${REQUIRED_INDENT}${OPTIONAL_DASH}${OPTIONAL_SPACING}${RECIPIENT_NAME}${OPTIONAL_SPACING}${RECIPIENT_VALUE}`, 'gmu');
 const DEFAULT_KEY = 'data';
 const VERBS = new Set(['list', 'show', 'set', 'gen']);

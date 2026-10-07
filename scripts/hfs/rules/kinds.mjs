@@ -113,7 +113,6 @@ export function kindFindings({ files, repo }) {
   const present = new Set([...instances.keys(), ...roots]);
   const declared = new Set(be.kinds ?? []);
   const patterns = new Set(be.patterns ?? []);
-  findings.push(...undeclaredKindFindings(present, declared));
-  findings.push(...declaredKindFindings({ declared, present, kindPatterns, patterns, platform, tracked }));
+  findings.push(...undeclaredKindFindings(present, declared), ...declaredKindFindings({ declared, present, kindPatterns, patterns, platform, tracked }));
   return findings;
 }

@@ -76,8 +76,7 @@ export function apiShapeFindings(ctx) {
   const contracts = apiContractsOf(ctx);
   for (const { path: file } of ctx.sources) {
     const owner = ownerIdOf(ctx.resolver, file);
-    found.push(...apiCallFileFindings(ctx, file, owner, contracts));
-    found.push(...apiImportFindings(ctx, file, owner));
+    found.push(...apiCallFileFindings(ctx, file, owner, contracts), ...apiImportFindings(ctx, file, owner));
   }
   return found;
 }

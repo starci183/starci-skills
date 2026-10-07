@@ -130,7 +130,8 @@ function grammarReferenceAllowed(reference, sourceFile, owner, edgesByStart, gra
   return !edge || expected.includes(canonical(edge.to));
 }
 
-function reportGrammarReference(config, sourceFile, reference, owner, edgesByStart, grammar, allowed, violations, makeViolation) {
+function reportGrammarReference(scan, sourceFile, reference, owner, edgesByStart) {
+  const { config, grammar, allowed, violations, makeViolation } = scan;
   if (!sameOrUnder(reference.specifier, grammar.package)) return;
   if (grammarReferenceAllowed(reference, sourceFile, owner, edgesByStart, grammar, allowed)) return;
   violations.push(makeViolation(config, sourceFile, reference.node, 'ARCH_GRAMMAR_EXPORT_BYPASS',
@@ -138,13 +139,14 @@ function reportGrammarReference(config, sourceFile, reference, owner, edgesBySta
     { specifier: reference.specifier, package: grammar.package }));
 }
 
-function inspectGrammarSource(config, context, sourceFile, grammar, consumers, installs, allowed, violations, makeViolation) {
+function inspectGrammarSource(scan, sourceFile) {
+  const { context, consumers, installs } = scan;
   if (installs.some(install => isInside(install.packageRoot, sourceFile.fileName))) return;
   const owner = grammarOwner(consumers, sourceFile.fileName);
   if (!owner) return;
   const edgesByStart = sourceEdges(context, sourceFile);
   const references = literalModules(context.ts, sourceFile, context.checkerFor(sourceFile.fileName));
-  for (const reference of references) reportGrammarReference(config, sourceFile, reference, owner, edgesByStart, grammar, allowed, violations, makeViolation);
+  for (const reference of references) reportGrammarReference(scan, sourceFile, reference, owner, edgesByStart);
 }
 
 function addGrammarContractFinding(config, grammar, manifestFile, problems, violations) {
@@ -182,6 +184,7 @@ export function checkGrammar(config, context, makeViolation) {
   addGrammarContractFinding(config, grammar, manifestFile, contractProblems, violations);
   const allowed = new Set([grammar.entry, grammar.styleEntry]);
   violations.push(...styleBypasses);
-  for (const sourceFile of context.files) inspectGrammarSource(config, context, sourceFile, grammar, consumers, installs, allowed, violations, makeViolation);
+  const scan = { config, context, grammar, consumers, installs, allowed, violations, makeViolation };
+  for (const sourceFile of context.files) inspectGrammarSource(scan, sourceFile);
   return violations;
 }

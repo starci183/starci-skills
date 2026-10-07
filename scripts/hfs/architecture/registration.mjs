@@ -196,13 +196,18 @@ function recordMutableDecoratorReasons(config, ts, checker, sourceFile, kinds, f
   }
 }
 
-function recordModuleDecorator(config, context, sourceFile, node, checker, localFiles, kinds, modules, reasons) {
+function recordModuleDecorator(site, node, kinds, found) {
+  const { config, context, sourceFile, checker, localFiles } = site;
+  const { modules, reasons } = found;
   const moduleDecorators = kinds.filter(item => item.kind === 'Module');
   if (moduleDecorators.length === 1) modules.push(moduleRecord(config, context, sourceFile, node, moduleDecorators[0].decorator, checker, localFiles));
   else if (moduleDecorators.length > 1) reasons.push(`${relativePath(config.root, sourceFile.fileName)} has multiple resolved @Module decorators`);
 }
 
-function recordHandlerDecorator(ts, config, sourceFile, node, checker, localFiles, kinds, handlers, reasons) {
+function recordHandlerDecorator(site, node, kinds, found) {
+  const { config, context, sourceFile, checker, localFiles } = site;
+  const { handlers, reasons } = found;
+  const { ts } = context;
   const handlerDecorators = kinds.filter(item => item.kind === 'CommandHandler' || item.kind === 'QueryHandler');
   if (handlerDecorators.length === 1) handlers.push({
     key: node.name ? localClassKey(ts, checker, node.name, localFiles) : null,
@@ -214,27 +219,30 @@ function recordHandlerDecorator(ts, config, sourceFile, node, checker, localFile
   else if (handlerDecorators.length > 1) reasons.push(`${relativePath(config.root, sourceFile.fileName)} has multiple resolved CQRS handler decorators`);
 }
 
-function inspectRegistrationClass(config, context, sourceFile, checker, localFiles, framework, node, modules, handlers, reasons) {
+function inspectRegistrationClass(site, node, found) {
+  const { config, context, sourceFile, checker, framework } = site;
   const { ts } = context;
   if (!ts.isClassDeclaration(node)) return;
   const kinds = decoratorKinds(ts, checker, node, framework);
-  recordMutableDecoratorReasons(config, ts, checker, sourceFile, kinds, framework, reasons);
-  recordModuleDecorator(config, context, sourceFile, node, checker, localFiles, kinds, modules, reasons);
-  recordHandlerDecorator(ts, config, sourceFile, node, checker, localFiles, kinds, handlers, reasons);
+  recordMutableDecoratorReasons(config, ts, checker, sourceFile, kinds, framework, found.reasons);
+  recordModuleDecorator(site, node, kinds, found);
+  recordHandlerDecorator(site, node, kinds, found);
 }
 
 function discoverRegistrations(config, context, localFiles) {
   const modules = [];
   const handlers = [];
   const reasons = [];
+  const found = { modules, handlers, reasons };
   const frameworkByChecker = new Map();
   for (const sourceFile of context.files) {
     const checker = context.checkerFor(sourceFile.fileName);
     if (!frameworkByChecker.has(checker)) frameworkByChecker.set(checker, frameworkTargets(config, context, checker, localFiles));
     const framework = frameworkByChecker.get(checker);
     reasons.push(...framework.reasons);
+    const site = { config, context, sourceFile, checker, localFiles, framework };
     const visit = node => {
-      inspectRegistrationClass(config, context, sourceFile, checker, localFiles, framework, node, modules, handlers, reasons);
+      inspectRegistrationClass(site, node, found);
       context.ts.forEachChild(node, visit);
     };
     visit(sourceFile);

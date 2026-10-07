@@ -113,7 +113,8 @@ const cloneBuckets = (entries, N, T) => {
   pow1[0] = 1; pow2[0] = 1;
   for (let i = 1; i <= maxTokens; i += 1) { pow1[i] = Math.imul(pow1[i - 1], B1); pow2[i] = Math.imul(pow2[i - 1], B2); }
   const buckets = new Map();
-  entries.forEach((file, fileIndex) => addFileWindows(buckets, file, fileIndex, N, T, pow1, pow2, B1, B2));
+  const hashing = { pow1, pow2, B1, B2 };
+  entries.forEach((file, fileIndex) => addFileWindows(buckets, file, fileIndex, N, T, hashing));
   return buckets;
 };
 
@@ -139,7 +140,8 @@ const addToBucket = (buckets, key, item) => {
   if (list) list.push(item); else buckets.set(key, [item]);
 };
 
-const addFileWindows = (buckets, file, fileIndex, N, T, pow1, pow2, B1, B2) => {
+const addFileWindows = (buckets, file, fileIndex, N, T, hashing) => {
+  const { pow1, pow2, B1, B2 } = hashing;
   const { kinds, lines } = file;
   const count = kinds.length;
   const { pre1, pre2 } = prefixHashes(kinds, B1, B2);

@@ -49,11 +49,7 @@ export function readTree(repoRoot, { isIgnored }) {
 const holdsNoFile = (node) => node.files === 0 && node.dirs.every(holdsNoFile);
 const countDirs = (node) => node.dirs.reduce((sum, child) => sum + 1 + countDirs(child), 0);
 
-function collectTreeFacts(node, empty, ghosts) {
-  for (const child of node.dirs) {
-    if (holdsNoFile(child)) empty.push({ path: child.rel, below: countDirs(child) });
-    else collectTreeFacts(child, empty, ghosts);
-  }
+function collectGhosts(node, ghosts) {
   for (const [i, a] of node.dirs.entries()) {
     for (const b of node.dirs.slice(i + 1)) {
       if (editDistance(a.name, b.name) > GHOST_DISTANCE) continue;
@@ -61,6 +57,14 @@ function collectTreeFacts(node, empty, ghosts) {
       if (holdsNoFile(b)) ghosts.push({ path: b.rel, of: a.rel, distance: editDistance(a.name, b.name) });
     }
   }
+}
+
+function collectTreeFacts(node, empty, ghosts) {
+  for (const child of node.dirs) {
+    if (holdsNoFile(child)) empty.push({ path: child.rel, below: countDirs(child) });
+    else collectTreeFacts(child, empty, ghosts);
+  }
+  collectGhosts(node, ghosts);
 }
 
 /**

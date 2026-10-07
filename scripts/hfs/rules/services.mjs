@@ -177,9 +177,7 @@ function eventContractFindings({ repoRoot, files }) {
   const findings = problems.map(({ service, file, problem }) => found(EVENT_CONTRACT, file, `${file} is not an event class the contract can be emitted from: ${problem}.`, { service }));
   const services = [...new Set(classes.map((event) => event.service))].sort(byCodeUnit);
   const declared = new Set(classes.map((event) => event.name));
-  findings.push(...snapshotDriftFindings(repoRoot, tracked, services, classes));
-  findings.push(...leftBehindSnapshotFindings(snapshots, services, problems));
-  findings.push(...undeclaredCompensationFindings(classes, declared));
+  findings.push(...snapshotDriftFindings(repoRoot, tracked, services, classes), ...leftBehindSnapshotFindings(snapshots, services, problems), ...undeclaredCompensationFindings(classes, declared));
   return findings;
 }
 

@@ -119,9 +119,8 @@ function inspectRequestClaims(kit, file, node, checker, violations) {
 }
 
 function inspectBackendNode(kit, checker, file, node, counters, violations) {
-  if (kit.ts.isCallExpression(node) && inspectJwtCall(kit, checker, file, node, counters, violations)) return true;
-  inspectRequestClaims(kit, file, node, checker, violations);
-  return true;
+  const handled = kit.ts.isCallExpression(node) && inspectJwtCall(kit, checker, file, node, counters, violations);
+  if (!handled) inspectRequestClaims(kit, file, node, checker, violations);
 }
 
 export function checkBackendJwt(input) {

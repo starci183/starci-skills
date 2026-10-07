@@ -171,7 +171,8 @@ function internalReference(reference, project, workspaceNames, helpers) {
   return reference.specifier.startsWith('.') || helpers.pathAliasMatches(reference.specifier, project.options.paths) || workspaceImport;
 }
 
-function appendBoundaryFinding(reference, sourceFile, project, actualTarget, internal, reviewable, config, errors, helpers) {
+function appendBoundaryFinding(state, reference, sourceFile, project, actualTarget, { internal, reviewable }) {
+  const { config, errors, helpers } = state;
   if (internal && helpers.crossesSide(config, actualTarget)) {
     errors.push({
       ruleId: 'ARCH_INTERNAL_IMPORT_OUTSIDE',
@@ -241,12 +242,12 @@ function processReference(from, sourceFile, project, owningWorkspace, reference,
     || (config.repository && helpers.isInside(config.repository, actualTarget) && !helpers.slash(actualTarget).includes('/node_modules/'));
   // A side of an app (config.root is be/ or fe/) imports nothing of the app outside itself: the root holds no source, the other
   // side is another program, and a declared read (sides.fe.reads, be/contracts/) is codegen input, never an import.
-  if (appendBoundaryFinding(reference, sourceFile, project, actualTarget, internal, reviewable, config, errors, helpers)) return;
+  if (appendBoundaryFinding(state, reference, sourceFile, project, actualTarget, { internal, reviewable })) return;
   appendEdge(from, sourceFile, project, owningWorkspace, reference, actualTarget, state);
 }
 
 function processSourceFile(from, sourceFile, state) {
-  const { config, ts, fileGraph, workspaces, ownerByFile, helpers } = state;
+  const { config, ts, workspaces, ownerByFile, helpers } = state;
   const owningWorkspace = helpers.workspaceOf(workspaces, from);
   const project = ownerByFile.get(from);
   if (!project) return;

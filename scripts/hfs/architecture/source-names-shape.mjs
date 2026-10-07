@@ -1,7 +1,8 @@
 import { relativePath, UNPROVEN_FRAMEWORK, unwrapExpression } from './typescript.mjs';
 import { constructedDecoratorKind, mutableDecoratorKind, nodeDecorators, tracedFrameworkKinds, violation } from './ast-walks.mjs';
 import { byCodeUnit } from '../../lib/list.mjs';
-function locateSource(h, config, context, sourceFile, featureRoots, moduleRoots, localFiles, state) {
+function locateSource(h, config, context, sourceFile, roots, state) {
+  const { featureRoots, moduleRoots, localFiles } = roots;
   const { canonical, frameworkTargets, locatedRoot, sourceRole, exportedDeclarations, SPECIAL_BASENAMES } = h;
   const fileName = canonical(sourceFile.fileName);
   const featureRoot = locatedRoot(featureRoots, fileName);
@@ -271,8 +272,8 @@ function visitSourceNode(h, info, node, state) {
   info.context.ts.forEachChild(node, child => visitSourceNode(h, info, child, state));
 }
 
-function inspectSourceFile(h, config, context, sourceFile, featureRoots, moduleRoots, localFiles, state) {
-  const info = locateSource(h, config, context, sourceFile, featureRoots, moduleRoots, localFiles, state);
+function inspectSourceFile(h, config, context, sourceFile, roots, state) {
+  const info = locateSource(h, config, context, sourceFile, roots, state);
   if (!info) return;
   reportSourceName(h, info, state);
   reportFeatureLayout(h, info, state);
@@ -310,7 +311,8 @@ export function createBackendSourceShapeChecker(helpers) {
     const moduleRoots = absoluteRoots(config.root, config.backend.modules);
     const localFiles = new Set(context.files.map(file => canonical(file.fileName)));
     const state = { frameworkByChecker: new Map(), violations: [], layoutReasons: [], namingReasons: [], checkedFiles: 0 };
-    for (const sourceFile of context.files) inspectSourceFile(helpers, config, context, sourceFile, featureRoots, moduleRoots, localFiles, state);
+    const roots = { featureRoots, moduleRoots, localFiles };
+    for (const sourceFile of context.files) inspectSourceFile(helpers, config, context, sourceFile, roots, state);
     return { violations: state.violations, coverage: coverageFor(state) };
   };
 }

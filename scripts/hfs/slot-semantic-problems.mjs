@@ -1,6 +1,5 @@
 // slot-semantic-problems.mjs - semantic checks for the HFS slot manifest.
 import { isPlainObject } from '../../engine/plain-object.mjs';
-import { braceVariants } from '../lib/glob.mjs';
 import { triggerProblems } from './declaration-slots.mjs';
 import { litePresenceOf, slotInEdition } from './edition-slots.mjs';
 import { manifestKind, RUNTIME_KIND, runtimeSemanticProblems } from './manifest-shape.mjs';
@@ -70,6 +69,14 @@ function checkSlotComposition(slot, manifest, bad) {
   if (slot.layers !== undefined && slot.tier !== 'none' && !slot.profiles.every((profile) => manifest.tiers[profile][slot.tier]?.lowerLayerOnly)) bad.push(`slot ${slot.id}: layers need a lowerLayerOnly tier`);
 }
 
+function checkLiteDeclaration(slot, manifest, bad) {
+  if (!slotInEdition(manifest, slot, 'lite') && (slot.litePresence !== undefined || slot.lite !== undefined)) bad.push(`slot ${slot.id}: litePresence/lite on a slot lite never sees (editions)`);
+  if (isPlainObject(slot.litePresence) && slot.profiles.includes(APP_SCOPE)) bad.push(`slot ${slot.id}: an app-root slot takes a bare litePresence, not a per-side map`);
+  for (const profile of slot.profiles) {
+    if (litePresenceOf(slot, profile) === 'forbidden' && typeof slot.goesTo !== 'string') bad.push(`slot ${slot.id}: forbidden in lite for ${profile}, so it says where the content goes (goesTo)`);
+  }
+}
+
 function checkSlotSemantics(slot, manifest, claimed, bad, helpers) {
   if (claimed.ids.has(slot.id)) bad.push(`slot id ${slot.id} appears twice`);
   claimed.ids.add(slot.id);
@@ -77,30 +84,29 @@ function checkSlotSemantics(slot, manifest, claimed, bad, helpers) {
   checkSlotProfiles(slot, manifest, claimed.patterns, bad, helpers.braceVariants);
   if (slot.appKind !== undefined && !pathVars.has('app')) bad.push(`slot ${slot.id}: an app-kind slot binds <app> in its path`);
   if (slot.requiredWhen !== undefined && slot.presence !== 'required') bad.push(`slot ${slot.id}: requiredWhen belongs to a required slot`);
-  if (!slotInEdition(manifest, slot, 'lite') && (slot.litePresence !== undefined || slot.lite !== undefined)) bad.push(`slot ${slot.id}: litePresence/lite on a slot lite never sees (editions)`);
-  if (isPlainObject(slot.litePresence) && slot.profiles.includes(APP_SCOPE)) bad.push(`slot ${slot.id}: an app-root slot takes a bare litePresence, not a per-side map`);
-  for (const profile of slot.profiles) {
-    if (litePresenceOf(slot, profile) === 'forbidden' && typeof slot.goesTo !== 'string') bad.push(`slot ${slot.id}: forbidden in lite for ${profile}, so it says where the content goes (goesTo)`);
-  }
+  checkLiteDeclaration(slot, manifest, bad);
   checkLitePath(slot, pathVars, helpers.varsOf, bad, helpers.braceVariants, helpers.compileVariant);
   checkNamedPathBindings(slot, pathVars, helpers.varsOf, bad);
   checkSlotPatternCompilation(slot, bad, helpers.braceVariants, helpers.compileVariant);
   checkSlotComposition(slot, manifest, bad);
 }
 
+/** The problem of one declared side read, or null when a slot of the side it names (or of the app root) owns the path. */
+function sideReadProblem(manifest, side, read, braceVariants) {
+  const [owner, ...rest] = read.split('/');
+  if (owner === side) return `sides.${side}.reads names ${read}, which is its own side`;
+  const ownedBySide = PROFILES.includes(owner);
+  const profile = ownedBySide ? owner : APP_SCOPE;
+  const prefix = ownedBySide ? rest.join('/') : read;
+  const owned = manifest.slots.some((slot) => slot.profiles.includes(profile) && slot.presence !== 'forbidden' && braceVariants(slot.path).some((variant) => variant.startsWith(prefix)));
+  return owned ? null : `sides.${side}.reads names ${read}, which no ${ownedBySide ? owner : 'app-root'} slot owns`;
+}
+
 function checkSideReads(manifest, bad, braceVariants) {
   for (const side of PROFILES) {
     for (const read of manifest.sides[side].reads) {
-      const [owner, ...rest] = read.split('/');
-      const below = rest.join('/');
-      if (owner === side) bad.push(`sides.${side}.reads names ${read}, which is its own side`);
-      else if (PROFILES.includes(owner)) {
-        const owned = manifest.slots.some((slot) => slot.profiles.includes(owner) && slot.presence !== 'forbidden' && braceVariants(slot.path).some((variant) => variant.startsWith(below)));
-        if (!owned) bad.push(`sides.${side}.reads names ${read}, which no ${owner} slot owns`);
-      } else {
-        const owned = manifest.slots.some((slot) => slot.profiles.includes(APP_SCOPE) && slot.presence !== 'forbidden' && braceVariants(slot.path).some((variant) => variant.startsWith(read)));
-        if (!owned) bad.push(`sides.${side}.reads names ${read}, which no app-root slot owns`);
-      }
+      const problem = sideReadProblem(manifest, side, read, braceVariants);
+      if (problem) bad.push(problem);
     }
   }
 }

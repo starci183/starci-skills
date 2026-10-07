@@ -6,23 +6,22 @@
 // a placeholder stands for any app; a `**` glob is a file set, not a path. Paths that name a file of the knowledge itself (`be/folder.yaml`, a topic of
 // knowledge/patterns/be) are topics, not product paths. Pure apart from ctx.read.
 import { braceVariants } from '../../lib/glob.mjs';
+import { replacePlaceholders, trimTrailingChars } from '../linear-text.mjs';
 import { createSlotResolver, loadSlotManifest, resolveRepoDeclaration } from '../slots.mjs';
+import { trimTrailingSlashes } from '../trailing-slashes.mjs';
 
 export const CODE = 'RT_PROSE_PATH_NO_SLOT';
-const KNOWLEDGE_PROSE = 'knowledge\\/(?!grammars\\/|hfs\\/slots\\.yaml$|hfs\\/runtime-slots\\.yaml$|hfs\\/canon-pins\\.yaml$).+\\.(?:ya?ml|md)';
-const DOC_PROSE = 'docs\\/.+\\.md';
-const README_PROSE = '(?:.+\\/)?README\\.md';
+const KNOWLEDGE_PROSE = String.raw`knowledge\/(?!grammars\/|hfs\/slots\.yaml$|hfs\/runtime-slots\.yaml$|hfs\/canon-pins\.yaml$).+\.(?:ya?ml|md)`;
+const DOC_PROSE = String.raw`docs\/.+\.md`;
+const README_PROSE = String.raw`(?:.+\/)?README\.md`;
 const PROSE = new RegExp(`^(?:${KNOWLEDGE_PROSE}|${DOC_PROSE}|${README_PROSE})$`);
-const TOKEN_BOUNDARY = '(?<![\\w/.<>-])';
+const TOKEN_BOUNDARY = String.raw`(?<![\w/.<>-])`;
 const TOKEN_ROOT = '((?:be|fe)/';
-const TOKEN_SEGMENT = '[\\w<>{}.,*@-]+';
-const TOKEN_CHILDREN = '(?:/[\\w<>{}.,*@-]*)*)';
+const TOKEN_SEGMENT = String.raw`[\w<>{}.,*@-]+`;
+const TOKEN_CHILDREN = String.raw`(?:/[\w<>{}.,*@-]*)*)`;
 const TOKEN = new RegExp(`${TOKEN_BOUNDARY}${TOKEN_ROOT}${TOKEN_SEGMENT}${TOKEN_CHILDREN}`, 'g');
 const TOPIC_FILE = /\.(?:ya?ml|md)$/;
-const PUNCTUATION = new RegExp('[.,;:)]+$');
-const SLASH = '/';
-const END = '$';
-const TRAILING_SLASHES = new RegExp(`${SLASH}+${END}`);
+const PUNCTUATION = '.,;:)';
 const FOLDERS_BELOW = ['x.ts', 'index.ts', 'main.ts', 'x/index.ts', 'x/x.ts', 'x/x/x.ts', 'x/src/main.ts', 'package.json'];
 
 /** The declaration the prose is judged against: every app the examples declare, every kind, every optional slot. */
@@ -42,12 +41,10 @@ function proseDeclaration(manifest, examples) {
 const PLACEHOLDER = '<[^>]+>';
 const BE_APP_PLACEHOLDER = new RegExp(`^(be/apps/)${PLACEHOLDER}`);
 const FE_APP_PLACEHOLDER = new RegExp(`^(fe/apps/)${PLACEHOLDER}`);
-const ANY_PLACEHOLDER = new RegExp(PLACEHOLDER, 'g');
-const STAR_RUN = new RegExp(String.raw`\*+`, 'g');
+const STAR_RUN = /\*+/g;
 
-export const sample = (token) => token
-  .replace(BE_APP_PLACEHOLDER, '$1identity').replace(FE_APP_PLACEHOLDER, '$1app')
-  .replace(ANY_PLACEHOLDER, 'x').replace(STAR_RUN, 'x');
+export const sample = (token) => replacePlaceholders(token
+  .replace(BE_APP_PLACEHOLDER, '$1identity').replace(FE_APP_PLACEHOLDER, '$1app'), 'x').replace(STAR_RUN, 'x');
 
 const segmentMatches = (a, b) => a === b || a === 'x' || b === 'x' || /[<*]/.test(b);
 
@@ -58,9 +55,9 @@ const aboveSlot = (segments, slotPaths) => slotPaths.some((slot) => segments.len
 export function pathTokens(line) {
   const out = [];
   for (const match of line.matchAll(TOKEN)) {
-    const token = match[1].replace(PUNCTUATION, '');
+    const token = trimTrailingChars(match[1], PUNCTUATION);
     if (token.includes('...') || token.includes('**')) continue;
-    out.push({ token, paths: braceVariants(token).map((variant) => sample(variant).replace(TRAILING_SLASHES, '')).filter((p) => /\/./.test(p) && !TOPIC_FILE.test(p)) });
+    out.push({ token, paths: braceVariants(token).map((variant) => trimTrailingSlashes(sample(variant))).filter((p) => /\/./.test(p) && !TOPIC_FILE.test(p)) });
   }
   return out;
 }

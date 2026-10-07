@@ -32,7 +32,8 @@ function selectedImportBindings(ts, statement, selected) {
   return count;
 }
 
-function addOfficialExports(config, context, installed, reasons, checker, statement, selected, targets) {
+function addOfficialExports(official, checker, statement, selected, targets) {
+  const { config, context, installed, reasons } = official;
   const moduleSymbol = checker.getSymbolAtLocation(statement.moduleSpecifier);
   if (!moduleSymbol) {
     reasons.push(`${relativePath(config.root, statement.getSourceFile().fileName)} cannot resolve ${statement.moduleSpecifier.text} through the target TypeScript program`);
@@ -51,13 +52,13 @@ function addOfficialExports(config, context, installed, reasons, checker, statem
   return true;
 }
 
-function addOfficialStatement(config, context, installed, reasons, wanted, checker, statement, targets) {
-  const ts = context.ts;
+function addOfficialStatement(official, wanted, checker, statement, targets) {
+  const ts = official.context.ts;
   if (!ts.isImportDeclaration(statement) && !ts.isExportDeclaration(statement)) return 0;
   if (!statement.moduleSpecifier || !ts.isStringLiteralLike(statement.moduleSpecifier)) return 0;
   const selected = wanted.get(statement.moduleSpecifier.text);
   if (!selected) return 0;
-  if (!addOfficialExports(config, context, installed, reasons, checker, statement, selected, targets)) return 0;
+  if (!addOfficialExports(official, checker, statement, selected, targets)) return 0;
   return selectedImportBindings(ts, statement, selected);
 }
 
@@ -68,10 +69,11 @@ function officialTargets(config, context, installed, reasons) {
     ['swr/mutation', new Map([['default', 'mutation'], ['useSWRMutation', 'mutation']])],
   ]);
   const targets = new Map();
+  const official = { config, context, installed, reasons };
   let selectedBindings = 0;
   for (const source of context.files) {
     const checker = context.checkerFor(source.fileName);
-    for (const statement of source.statements) selectedBindings += addOfficialStatement(config, context, installed, reasons, wanted, checker, statement, targets);
+    for (const statement of source.statements) selectedBindings += addOfficialStatement(official, wanted, checker, statement, targets);
   }
   return { targets, selectedBindings };
 }
@@ -317,7 +319,9 @@ function hookEntries(config, context, contract, reasons) {
   return { hookCache, entriesByHook };
 }
 
-function inspectLifecycleEntry(config, context, entry, entries, owned, hook, mapped, violations, reasons) {
+function inspectLifecycleEntry(scope, entry, hookCalls, mapped) {
+  const { config, context, violations, reasons } = scope;
+  const { entries, owned, hook } = hookCalls;
   let candidates;
   if (entry.resultBinding !== undefined) candidates = owned.filter(call => call.bindings.includes(entry.resultBinding));
   else candidates = owned.length === 1 && entries.length === 1 ? owned : [];
@@ -337,6 +341,7 @@ function inspectLifecycleEntry(config, context, entry, entries, owned, hook, map
 
 function inspectHookLifecycle(config, context, lifecycleCalls, hookCache, entriesByHook, violations, reasons) {
   const mapped = new Map();
+  const scope = { config, context, violations, reasons };
   for (const [key, entries] of entriesByHook) {
     const hook = hookCache.get(key);
     if (!hook) continue;
@@ -345,7 +350,7 @@ function inspectHookLifecycle(config, context, lifecycleCalls, hookCache, entrie
       reasons.push(`${entries[0].path}#${entries[0].export} contains no statically resolved SWR lifecycle call`);
       continue;
     }
-    for (const entry of entries) inspectLifecycleEntry(config, context, entry, entries, owned, hook, mapped, violations, reasons);
+    for (const entry of entries) inspectLifecycleEntry(scope, entry, { entries, owned, hook }, mapped);
     for (const call of owned) if ((mapped.get(call) ?? 0) !== 1) {
       reasons.push(`${relativePath(config.root, call.source.fileName)}:${sourceLocation(call.source, call.node).line} SWR call is not matched by exactly one declared lifecycle`);
     }

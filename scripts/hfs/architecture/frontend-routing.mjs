@@ -126,7 +126,8 @@ function mountedRoutePages(ts, context, sourceFile, featureRoots, bindings, jsx,
   });
 }
 
-function reportRouteComposition(config, context, sourceFile, route, scan, mountedPages, violations, violation) {
+function reportRouteComposition(at, route, scan, mountedPages) {
+  const { config, context, sourceFile, violations, violation } = at;
   const navigationOnly = scan.jsx.length === 0 && scan.adapterCalls.length === 1;
   if (!navigationOnly && (mountedPages.length !== 1 || scan.jsx.length !== 1)) {
     violations.push(violation(config, sourceFile, route.fn, 'FE_ROUTE_ONE_PAGE', 'A page.tsx route must mount exactly one pages-tier component, or be a zero-JSX redirect/notFound adapter.', { ts: context.ts }));
@@ -134,8 +135,9 @@ function reportRouteComposition(config, context, sourceFile, route, scan, mounte
   return navigationOnly;
 }
 
-function reportRouteDecisions(config, context, sourceFile, decisions, navigation, navigationOnly, violations, violation) {
+function reportRouteDecisions(at, decisions, navigation, navigationOnly) {
   if (navigationOnly) return;
+  const { config, context, sourceFile, violations, violation } = at;
   for (const decision of decisions) if (!routingGuard(context.ts, decision, navigation)) {
     violations.push(violation(config, sourceFile, decision, 'FE_ROUTE_DRAWING_DECISION', 'Visual route files may use terminal redirect/notFound guards but cannot select or omit visual composition.', { ts: context.ts }));
   }
@@ -175,8 +177,9 @@ export function checkRoute(config, context, sourceFile, roots, helpers) {
   const navigation = importedNames(ts, sourceFile, 'next/navigation');
   const scan = collectRouteNodes(ts, route.fn, navigation);
   const mountedPages = mountedRoutePages(ts, context, sourceFile, roots.features, bindings, scan.jsx, insideAny);
-  const navigationOnly = reportRouteComposition(config, context, sourceFile, route, scan, mountedPages, violations, violation);
-  reportRouteDecisions(config, context, sourceFile, scan.decisions, navigation, navigationOnly, violations, violation);
+  const at = { config, context, sourceFile, violations, violation };
+  const navigationOnly = reportRouteComposition(at, route, scan, mountedPages);
+  reportRouteDecisions(at, scan.decisions, navigation, navigationOnly);
   reportClientDirective(config, context, sourceFile, violations, violation);
   reportForbiddenRouteHooks(config, context, sourceFile, navigation, violations, violation);
   return violations;

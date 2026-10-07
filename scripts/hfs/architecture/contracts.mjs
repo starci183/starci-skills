@@ -1,11 +1,11 @@
 import path from 'node:path';
 import { isInside } from './config.mjs';
 import { referencedExports, relativePath, unwrapExpression } from './typescript.mjs';
-import { anyDescendant, commonJsRequireReasons, constructedDecoratorKind as sharedConstructedDecoratorKind, decoratorCallee, moduleExportsOf, nodeDecorators, normalizedSymbol, normalizedSymbolValue, programSourcesOf, selectedNode, valueSymbol, violation } from './ast-walks.mjs';
+import { commonJsRequireReasons, constructedDecoratorKind as sharedConstructedDecoratorKind, decoratorCallee, moduleExportsOf, nodeDecorators, normalizedSymbol, normalizedSymbolValue, programSourcesOf, selectedNode, valueSymbol, violation } from './ast-walks.mjs';
 import { byCodeUnit } from '../../lib/list.mjs';
-import { canonical, checkInjectedClass, checkMessageReadonly, hasModifier, isPublicMember, messageClass, modifiers, READONLY_BOUNDARY_RULE_ID } from './contracts-readonly.mjs';
+import { canonical, checkInjectedClass, checkMessageReadonly, isPublicMember, messageClass } from './contracts-readonly.mjs';
 export const PUBLIC_CONTRACT_RULE_ID = 'BE_PUBLIC_CONTRACT_FORM';
-export { READONLY_BOUNDARY_RULE_ID };
+export { READONLY_BOUNDARY_RULE_ID } from './contracts-readonly.mjs';
 
 const FRAMEWORK_EXPORTS = new Map([
   ['@nestjs/common', new Set(['Controller', 'Inject', 'Injectable', 'Module'])],

@@ -282,7 +282,8 @@ function keyContainerRisks(deps, ts, checker, key, owner) {
   return risks;
 }
 
-function inspectIdentityKey(deps, config, context, entry, call, identity, active, violations, reasons) {
+function inspectIdentityKey(deps, scope, entry, call, identity, active) {
+  const { config, context, violations, reasons } = scope;
   if (!active.length) {
     violations.push(deps.violation(config, call, entry.kind === 'mutation' && identity.resource ? deps.SWR_MUTATION_RULE_ID : deps.SWR_KEY_RULE_ID,
       `${entry.id} has no active key path carrying declared identity ${identity.id} (${identity.binding}).`,
@@ -308,7 +309,8 @@ function inspectIdentityKey(deps, config, context, entry, call, identity, active
   }
 }
 
-function inspectKey(deps, config, context, entry, call, identities, violations, reasons) {
+function inspectKey(deps, scope, entry, call, identities) {
+  const { config, context, violations, reasons } = scope;
   const key = call.node.arguments[0];
   if (!key) {
     reasons.push(`${entry.path}#${entry.export} has an SWR call without a key`);
@@ -328,9 +330,9 @@ function inspectKey(deps, config, context, entry, call, identities, violations, 
   const active = leaves.filter(leaf => leaf.kind === 'active');
   if (active.some(leaf => nonNullFalsy(deps, context.ts, leaf.expression))) violations.push(deps.violation(config, call, deps.SWR_KEY_RULE_ID,
     `${entry.id} uses explicit null, rather than another falsy value, for a disabled SWR key.`, { lifecycle: entry.id }));
-  for (const identity of identities) inspectIdentityKey(deps, config, context, entry, call, identity, active, violations, reasons);
+  for (const identity of identities) inspectIdentityKey(deps, scope, entry, call, identity, active);
 }
 
 export function createNextDataKeyInspector(deps) {
-  return (...args) => inspectKey(deps, ...args);
+  return (config, context, entry, call, identities, violations, reasons) => inspectKey(deps, { config, context, violations, reasons }, entry, call, identities);
 }

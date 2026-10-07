@@ -92,7 +92,8 @@ function declarationIndex(ts, graph) {
   return declarations;
 }
 
-function duplicateViolation(ts, checker, graph, declarations, seen, symbol, owner, entry) {
+function duplicateViolation(scan, symbol, owner, entry) {
+  const { ts, checker, graph, declarations, seen } = scan;
   const declaration = declaringFile(ts, checker, graph, symbol);
   if (!declaration || declaration.name === 'default') return null;
   const { rel: home, name } = declaration;
@@ -117,10 +118,11 @@ function inspectPublicOwner(ts, context, graph, config, declarations, seen, [key
   const moduleSymbol = checker?.getSymbolAtLocation(entryFile.sourceFile);
   if (!moduleSymbol) return { violations: [], surface: 0 };
   const violations = [];
+  const scan = { ts, checker, graph, declarations, seen };
   let surface = 0;
   for (const symbol of checker.getExportsOfModule(moduleSymbol)) {
     surface += 1;
-    const violation = duplicateViolation(ts, checker, graph, declarations, seen, symbol, owner, entry);
+    const violation = duplicateViolation(scan, symbol, owner, entry);
     if (violation) violations.push(violation);
   }
   return { violations, surface };
@@ -210,7 +212,8 @@ function isFrameworkName(node, name) {
   return node.slot === ROUTE_SLOT && NEXT_SEGMENT_EXPORTS.has(name);
 }
 
-function addDeclarationAliasViolations(ts, checker, graph, rel, node, statement, point, violations) {
+function addDeclarationAliasViolations(env, rel, node, statement, point, violations) {
+  const { ts, checker, graph } = env;
   for (const alias of declarationAliases(ts, checker, graph, statement)) {
     if (isFrameworkName(node, alias.name)) continue;
     const at = point(alias.node);
@@ -253,7 +256,7 @@ function addExportAliasViolations(ts, rel, node, statement, point, violations) {
 
 function addStatementAliasViolations(context, graph, rel, node, statement, checker, violations) {
   const point = target => node.sourceFile.getLineAndCharacterOfPosition(target.getStart(node.sourceFile));
-  addDeclarationAliasViolations(context.ts, checker, graph, rel, node, statement, point, violations);
+  addDeclarationAliasViolations({ ts: context.ts, checker, graph }, rel, node, statement, point, violations);
   addExportAliasViolations(context.ts, rel, node, statement, point, violations);
 }
 
