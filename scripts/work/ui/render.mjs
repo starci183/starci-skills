@@ -63,7 +63,7 @@ const OFFENDER_CAP=20;
 
 const round=(value,places=4)=>Number.parseFloat(Number(value).toFixed(places));
 const text=value=>typeof value==='string'?value:'';
-const check=(id,outcome,detail,evidence={})=>({id,outcome,detail,evidence});
+export const check=(id,outcome,detail,evidence={})=>({id,outcome,detail,evidence});
 
 /** PNG bytes as {width, height, data: RGBA} (scripts/work/png.mjs); throws `unsupported png: <why>`. */
 export {decodePng};
@@ -188,6 +188,14 @@ export function checkPalette({png,brand,buckets=DEFAULT_BUCKETS}={}){
 const VOID_TAGS=new Set(['area','base','br','col','embed','hr','img','input','link','meta','param','source','track','wbr']);
 const HEADING_TAGS=new Set(['h1','h2','h3','h4']);
 const SECTION_HEADER_CLASS=/(^|-)section-header$/;
+// One token of the scanner: a comment, a CDATA section or a declaration (skipped), an end tag (group 1), or a start
+// tag (group 2 its name, group 3 its attributes, group 4 the self-closing slash).
+const MARKUP_COMMENT=String.raw`<!--[\s\S]*?-->`;
+const MARKUP_CDATA=String.raw`<!\[CDATA\[[\s\S]*?\]\]>`;
+const MARKUP_DECLARATION=String.raw`<!\s*[^>]*>`;
+const MARKUP_END_TAG=String.raw`<\/\s*([A-Za-z][\w:-]*)\s*>`;
+const MARKUP_START_TAG=String.raw`<([A-Za-z][\w:-]*)((?:"[^"]*"|'[^']*'|[^>"'])*?)(\/?)>`;
+const MARKUP_TOKEN=new RegExp([MARKUP_COMMENT,MARKUP_CDATA,MARKUP_DECLARATION,MARKUP_END_TAG,MARKUP_START_TAG].join('|'),'g');
 /** Tags a repeated entity row is actually made of; a run of three siblings of any other tag is not a list. */
 const ROW_TAGS=new Set(['div','li','tr','article','section','a']);
 
@@ -203,9 +211,8 @@ export function scanMarkup(html){
   const source=String(html??'');
   const root={tag:'#root',classes:[],children:[],parent:null,depth:0};
   const stack=[root];
-  const pattern=/<!--[\s\S]*?-->|<!\[CDATA\[[\s\S]*?\]\]>|<!\s*[^>]*>|<\/\s*([A-Za-z][\w:-]*)\s*>|<([A-Za-z][\w:-]*)((?:"[^"]*"|'[^']*'|[^>"'])*?)(\/?)>/g;
   let nodes=0;
-  for(const match of source.matchAll(pattern)){
+  for(const match of source.matchAll(MARKUP_TOKEN)){
     const closing=match[1],opening=match[2];
     if(closing){
       const tag=closing.toLowerCase();
@@ -473,73 +480,5 @@ export function formatRenderChecks(result){
   return formatCheckLines(header,result.checks);
 }
 
-// ---------------------------------------------------------------------------
-// The kernel hook.
-// ---------------------------------------------------------------------------
-
-/**
- * The ui node an operation wrote, from the allowlist it was given or from the files its diff touched. An
- * allowlist names either the record (`.../ui/<node>/index.yaml`) or the folder (`.../ui/<node>/**`), and a
- * diff names the record; all three point at the same directory, which is what the checks read.
- */
-export function uiDirOf({op={},files=[]}={}){
-  const paths=[...(Array.isArray(op.references)?op.references:[]),...(Array.isArray(op.allowlist)?op.allowlist:[]),...(Array.isArray(files)?files:[])].map(slash).filter(Boolean);
-  for(const entry of paths){
-    const trimmed=entry.replace(/\/\*+$/,'').replace(/\/+$/,'');
-    // Only a canonical Work UI node is a design input. Grammar references can contain their own `ui/`
-    // segment and must never win merely because they appear earlier in an operation's reference list.
-    if(!/(^|\.starciwork\/)features\/[^/]+\/ui(\/|$)/.test(trimmed))continue;
-    return /\.[A-Za-z0-9]+$/.test(trimmed)?path.posix.dirname(trimmed):trimmed;
-  }
-  return null;
-}
-const renderWorkRoot=(at,repoRoot)=>{if(at.workRoot){return path.resolve(String(at.workRoot));}if(repoRoot){return path.join(repoRoot,'.starciwork');}return null;};
-const renderUiDirectory=(declared,normalized,repoRoot,workRoot)=>{if(path.isAbsolute(declared)){return path.resolve(declared);}if(normalized.startsWith('.starciwork/')){return path.resolve(repoRoot??path.dirname(workRoot),...normalized.split('/'));}return path.resolve(workRoot,...normalized.split('/'));};
-const renderCaptureOwner=(node,inferred)=>{if(node?.path){return path.posix.dirname(slash(node.path));}if(inferred){return inferred.replace(/\/assets(?:\/.*)?$/,'');}return null;};
-const renderCaptureDirectory=(captureDeclared,captureNormalized,repoRoot,workRoot)=>{if(!captureDeclared){return null;}if(path.isAbsolute(captureDeclared)){return path.resolve(captureDeclared);}if(captureNormalized.startsWith('.starciwork/')){return path.resolve(repoRoot??path.dirname(workRoot),...captureNormalized.split('/'));}return path.resolve(workRoot,...captureNormalized.split('/'));};
-
-/**
- * The render-proof hook of a frontend operation's ui node. Design-direction assets (ImageGen) return `null`:
- * their pixels are design input, not exact Grammar render/DOM proof. Implementation captures and browser UAT are
- * verified by their downstream operations.
- */
-export function renderChecksFor({op={},state=null,ctx={},files=[]}={}){
-  const implementation=['frontend.implement','interface.implement'].includes(op.kind),required=implementation;
-  const declared=uiDirOf({op,files});
-  if(!declared)return null;
-  const at=ctx?.work?.at??{};
-  const repoRoot=at.repoRoot?path.resolve(String(at.repoRoot)):null;
-  const workRoot=renderWorkRoot(at,repoRoot);
-  if(!workRoot)return required?{ok:false,checks:[check('implementation-render-proof-unavailable','fail',
-    'The frontend implementation names a UI design input but its canonical Work root is not bound.',{declared:slash(declared)})]}:null;
-  const normalized=slash(declared).replace(/^\.\//,'');
-  // Work references are normally relative to the Work root, while authored repository references retain their
-  // `.starciwork/` namespace. Both must resolve to the same node instead of nesting `.starciwork/.starciwork`.
-  const uiDir=renderUiDirectory(declared,normalized,repoRoot,workRoot);
-  if(!fs.existsSync(path.join(uiDir,'index.yaml')))return required?{ok:false,checks:[check('implementation-ui-input-missing','fail',
-    'The frontend implementation explicitly references a UI design input whose index.yaml is missing.',{declared:normalized,uiDir:slash(uiDir),workRoot:slash(workRoot)})]}:null;
-  try{
-    const node=implementation&&op.nodeId&&typeof ctx?.work?.node==='function'?ctx.work.node(op.nodeId):null;
-    const inferred=(Array.isArray(op.allowlist)?op.allowlist:[]).map(slash).find(item=>/(^|\/)implementation\/frontend(\/|$)/.test(item)&&/(^|\/)assets(\/|$)/.test(item));
-    const captureDeclared=renderCaptureOwner(node,inferred);
-    if(required&&!captureDeclared)return {ok:false,checks:[check('implementation-capture-owner-unbound','fail',
-      'The frontend implementation has a UI design reference but no bound implementation node to own its running-page captures.',{uiDir:slash(uiDir),nodeId:op.nodeId??null})]};
-    const captureNormalized=slash(captureDeclared??'').replace(/^\.\//,'');
-    const captureDir=renderCaptureDirectory(captureDeclared,captureNormalized,repoRoot,workRoot);
-    const result=runRenderChecks({uiDir,captureDir,brandTree:workRoot});
-    if(result.node.candidates===0){
-      if(!required)return null;
-      return {ok:false,checks:[check('implementation-capture-missing','fail',
-        'The frontend implementation references a UI design but declares no structural implementation capture; ImageGen direction pixels are not browser/Grammar proof.',{uiDir:slash(uiDir)})]};
-    }
-    const core=new Set(['palette-off-brand','primary-absent','entity-list-in-card']);
-    const incomplete=required?result.checks.filter(entry=>core.has(entry.id)&&entry.outcome==='skip'):[];
-    if(incomplete.length)result.checks.push(check('implementation-render-proof-incomplete','fail',
-      `The implementation capture left ${incomplete.map(entry=>entry.id).join(', ')} unproven; browser pixels and matching markup are required separately from ImageGen direction.`,{uiDir:slash(uiDir)}));
-    return {ok:result.ok&&!incomplete.length,checks:result.checks};
-  }catch(error){
-    // A tree with no brand record, or a node with no `ui:` spec, is a broken input rather than a failed
-    // drawing: it is reported as one unproven claim, never as a passing one and never as a defect.
-    return {ok:!required,checks:[check(required?'implementation-render-proof-unavailable':'render-checks-unavailable',required?'fail':'skip',`The render checks could not run: ${String(error.message??error)}`,{uiDir:slash(uiDir),workRoot:slash(workRoot)})]};
-  }
-}
+/** The kernel hook of a frontend operation's ui node lives in render-hook.mjs; this module hands it on. */
+export {renderChecksFor,uiDirOf} from './render-hook.mjs';

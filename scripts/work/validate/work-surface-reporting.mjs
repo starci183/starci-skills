@@ -12,22 +12,24 @@ export function declaredSubscriptions(records,featureOf,canon){
   return byFeature;
 }
 
+function noteSubscription(byFeature,sub,ownerOf,recordOfClass,suspect){
+  const owner=ownerOf(sub.file);
+  const feature=owner?.feature??null;
+  for(const className of sub.classes.filter(name=>!recordOfClass.has(name))){
+    suspect(sub.file,'SUBSCRIPTION_UNDECLARED',
+      `${path.basename(sub.file)} handles ${className}, which maps to no work/event@1 record`);
+  }
+  if(!feature)return;
+  if(!byFeature.has(feature))byFeature.set(feature,{files:[],ids:new Set()});
+  const entry=byFeature.get(feature);
+  entry.files.push(sub.file);
+  for(const className of sub.classes)if(recordOfClass.has(className))entry.ids.add(recordOfClass.get(className));
+}
+
 export function wiredSubscriptions(codeByRepo,ownerOf,recordOfClass,suspect){
   const byFeature=new Map();
   for(const {subscriptions} of codeByRepo){
-    for(const sub of subscriptions){
-      const owner=ownerOf(sub.file);
-      const feature=owner?.feature??null;
-      for(const className of sub.classes.filter(name=>!recordOfClass.has(name))){
-        suspect(sub.file,'SUBSCRIPTION_UNDECLARED',
-          `${path.basename(sub.file)} handles ${className}, which maps to no work/event@1 record`);
-      }
-      if(!feature)continue;
-      if(!byFeature.has(feature))byFeature.set(feature,{files:[],ids:new Set()});
-      const entry=byFeature.get(feature);
-      entry.files.push(sub.file);
-      for(const className of sub.classes)if(recordOfClass.has(className))entry.ids.add(recordOfClass.get(className));
-    }
+    for(const sub of subscriptions)noteSubscription(byFeature,sub,ownerOf,recordOfClass,suspect);
   }
   return byFeature;
 }

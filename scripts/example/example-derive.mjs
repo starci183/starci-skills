@@ -211,35 +211,38 @@ function effectiveStateOf(record, evidenceByDir, appliesToSources, records, work
  * for-task / fr.task.complete all cite each other) stops that branch and is reported with `cyclic: true`
  * rather than recursing forever.
  */
+const blockerRootKindOf = target => [
+  target.schema === 'work/gap@1' && 'gap',
+  target.schema === 'work/policy-decision@1' && target.data.outcome === 'open' && 'decision',
+].find(Boolean) ?? 'record';
+
+const noteBlockerRoot = (roots, id, rootKind, because, cyclic) => {
+  const existing = roots.get(id);
+  if (!existing) { roots.set(id, {id, rootKind, because: because ?? null, cyclic}); return; }
+  if (cyclic) existing.cyclic = true;
+};
+
+/** Follows one `blockedBy` edge: a missing target, a revisited one (cyclic) or a non-record root ends the
+ * branch and is noted in `roots`; a plain record continues through its own edges. */
+function walkBlockerEdge({ roots, records, canon }, rawId, because, visited) {
+  const targetId = canon(rawId);
+  const target = records.get(targetId);
+  if (!target) { noteBlockerRoot(roots, targetId, 'missing', because, false); return; }
+  if (visited.has(targetId)) { noteBlockerRoot(roots, targetId, blockerRootKindOf(target), because, true); return; }
+  const nextVisited = new Set(visited); nextVisited.add(targetId);
+  const kind = blockerRootKindOf(target);
+  const subEdges = Array.isArray(target.data.blockedBy) ? target.data.blockedBy : [];
+  if (kind !== 'record' || !subEdges.length) { noteBlockerRoot(roots, targetId, kind, because, false); return; }
+  for (const sub of subEdges) {
+    if (isPlainObject(sub) && typeof sub.record === 'string') walkBlockerEdge({ roots, records, canon }, sub.record, sub.because ?? because, nextVisited);
+  }
+}
+
 function resolveBlockers(record, records, canon = id => id) {
   const roots = new Map(); // id -> {id, rootKind, because, cyclic}
-  const rootKindOf = target => [
-    target.schema === 'work/gap@1' && 'gap',
-    target.schema === 'work/policy-decision@1' && target.data.outcome === 'open' && 'decision',
-  ].find(Boolean) ?? 'record';
-
-  function walkEdge(rawId, because, visited) {
-    const targetId = canon(rawId);
-    const target = records.get(targetId);
-    if (!target) { record_(targetId, 'missing', because, false); return; }
-    if (visited.has(targetId)) { record_(targetId, rootKindOf(target), because, true); return; }
-    const nextVisited = new Set(visited); nextVisited.add(targetId);
-    const kind = rootKindOf(target);
-    const subEdges = Array.isArray(target.data.blockedBy) ? target.data.blockedBy : [];
-    if (kind !== 'record' || !subEdges.length) { record_(targetId, kind, because, false); return; }
-    for (const sub of subEdges) {
-      if (isPlainObject(sub) && typeof sub.record === 'string') walkEdge(sub.record, sub.because ?? because, nextVisited);
-    }
-  }
-  function record_(id, rootKind, because, cyclic) {
-    const existing = roots.get(id);
-    if (!existing) { roots.set(id, {id, rootKind, because: because ?? null, cyclic}); return; }
-    if (cyclic) existing.cyclic = true;
-  }
-
   const topEdges = Array.isArray(record.data.blockedBy) ? record.data.blockedBy : [];
   for (const edge of topEdges) {
-    if (isPlainObject(edge) && typeof edge.record === 'string') walkEdge(edge.record, edge.because ?? null, new Set([record.id]));
+    if (isPlainObject(edge) && typeof edge.record === 'string') walkBlockerEdge({ roots, records, canon }, edge.record, edge.because ?? null, new Set([record.id]));
   }
   return [...roots.values()].sort((a, b) => a.id.localeCompare(b.id));
 }

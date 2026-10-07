@@ -57,8 +57,8 @@ import { assetsOf, flag, indexFilesUnder, list, readYaml, reviewMain, sha256File
 import { AUTO_ACCEPTED_BY } from '../machine/ask-recommendation.mjs';
 import { inspectLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
 import { ownerLanguage, translator } from '../lib/i18n.mjs';
-import { proposalFilesUnder, proposalImageOf, readProposals } from './grammar-proposal.mjs';
-import { rationaleFileOf, rationaleSummary } from './draw/draw-rationale.mjs';
+import { proposalFilesUnder, readProposals } from './grammar-proposal.mjs';
+import { askAssets, askLines, rationaleOf, redlinesOf } from './draw-review-ask.mjs';
 import { DRAW_FEEDBACK_UNADDRESSED, dnaNamesFor, feedbackFindings, feedbackOf, goldenMarkOf, notesOfReceipt, openNotesOf, withFeedbackRound } from './draw-feedback.mjs';
 import { learnIntoDirection, promoteGolden } from './brand-direction.mjs';
 import { DIRECTION_EXEMPT, archetypeOf } from './ui-archetype.mjs';
@@ -255,35 +255,22 @@ export function drawReviewQuestion(uiDir, { lang = ownerLanguage(), ownerRequest
   const tr = translator(lang);
   const bpLabel = (bp) => (bp === 'desktop' ? tr('desktop') : tr('mobile'));
   const digests = reviewed.map((p) => `${p.shape} ${p.breakpoint} ${p.sha256.slice(0, 8)}`).join(', ');
-  const roundLine = !priorRounds.length ? '' : tr(' Round {n}; this redraw addresses your notes: {notes}.',
-    { n: priorRounds.length + 1, notes: answered.map((n) => `[${n.id}] ${n.text}`).join(' | ') || tr('(none)') });
-  const title = String(record.title ?? record.id);
-  const retired = retiredStates(split);
-  const retiredLine = !retired.length ? '' : tr(' Data-status images ({states}) are retired and not for review.', { states: retired.join(', ') });
-  const text = tr('Please review the drawn shapes of "{title}" ({id}): desktop and mobile, light theme. They are a proposed design direction, not a running product. Accept them, or ask for a redraw and say in the note what to change.{retiredLine} [{digests}]',
-    { title, id: record.id, retiredLine, digests });
   const label = (p) => `${p.shape} - ${bpLabel(p.breakpoint)}`;
   // What the drawing needed that the Grammar's DNA lacks (grammar-proposal.mjs): the owner is asked, never the runtime.
   const proposals = readProposals(proposalFilesUnder(dir));
-  const proposalLine = !proposals.length ? '' : tr(' Grammar proposals (yours to decide, never auto-accepted): {names}.', { names: proposals.map((p) => p.name).join(', ') });
   // The evidence the owner critiques from (owner ruling 2026-09-27 draw-rationale-evidence): each part's annotated
   // redline render (<part>.redline.png) and its rationale.json - every decision with its value, rule ids and reason.
-  const redlines = reviewed.map((p) => ({ part: p.path, abs: path.join(dir, p.path.replace(/.png$/i, '.redline.png')), shape: p.shape, breakpoint: p.breakpoint }))
-    .filter((r) => fs.existsSync(r.abs)).map((r) => ({ part: r.part, path: slash(path.relative(dir, r.abs)), repoPath: slash(path.relative(repoRoot, r.abs)), shape: r.shape, breakpoint: r.breakpoint }));
-  const rationale = [...new Map(reviewed.map((p) => {
-    const file = rationaleFileOf(path.join(dir, p.path.replace(/.png$/i, '.html')));
-    return file ? [file, { shape: p.shape, file: slash(path.relative(repoRoot, file)), ...rationaleSummary(file) }] : null;
-  }).filter(Boolean)).values()];
-  const whyLine = !rationale.length ? '' : tr(' Evidence for every decision: the redline images (spacing, rule ids) and {list}.',
-    { list: rationale.map((r) => `${r.file} ${tr('({n} decisions)', { n: r.decisions })}`).join(', ') });
+  const redlines = redlinesOf(dir, repoRoot, reviewed);
+  const rationale = rationaleOf(dir, repoRoot, reviewed);
+  const { roundLine, retiredLine, proposalLine, whyLine } = askLines({ tr, priorRounds, answered, retired: retiredStates(split), proposals, rationale });
+  const text = tr('Please review the drawn shapes of "{title}" ({id}): desktop and mobile, light theme. They are a proposed design direction, not a running product. Accept them, or ask for a redraw and say in the note what to change.{retiredLine} [{digests}]',
+    { title: String(record.title ?? record.id), id: record.id, retiredLine, digests });
   return {
     kind: DRAW_REVIEW_KIND,
     text: `${text}${roundLine}${proposalLine}${whyLine}`,
     options: OPTIONS.map((o) => tr(o)),
     refs: [record.id],
-    assets: [...reviewed.map((p) => ({ path: slash(path.relative(repoRoot, path.join(dir, p.path))), label: label(p) })),
-      ...redlines.map((r) => ({ path: r.repoPath, label: `${r.shape} - redline ${bpLabel(r.breakpoint)}` })),
-      ...proposals.map((p) => [p, proposalImageOf(p)]).filter(([, img]) => img).map(([p, img]) => ({ path: slash(path.relative(repoRoot, img)), label: `${tr('proposal')} ${p.name}` }))],
+    assets: askAssets({ tr, dir, repoRoot, reviewed, redlines, proposals, label, bpLabel }),
     ...(rationale.length ? { rationale } : {}),
     ...(proposals.length ? { grammarProposals: proposals.map((p) => ({ name: p.name, file: slash(path.relative(repoRoot, p.file)), gap: p.gap, claims: p.claims, complete: p.complete, status: p.status })) } : {}),
     review: { schema: DRAW_REVIEW_SCHEMA, record: record.id, recordPath: slash(path.relative(repoRoot, path.join(dir, 'index.yaml'))), parts: reviewed,
@@ -326,17 +313,22 @@ function applyRedrawDecision({ decision, note, receipt, record, file, feedbackRo
     learned: learned.added.map((item) => item.id), ...(learned.skipped ? { learnSkipped: learned.skipped } : {}) };
 }
 
+/** What is wrong with one part the receipt names: missing on disk, no digest, redrawn since, no longer a drawn part. */
+function receiptPartProblems(dir, record, current, part) {
+  const file = path.join(dir, part.path ?? '');
+  if (!part.path || !fs.existsSync(file)) return [`${part.path ?? '(no path)'} is not on disk`];
+  const problems = [];
+  if (typeof part.sha256 !== 'string' || !part.sha256) problems.push(`the receipt names ${part.path} without the sha256 the owner saw`);
+  else if (sha256File(file) !== part.sha256) problems.push(`${part.path} was redrawn after the owner reviewed it`);
+  if (!current.has(slash(part.path))) problems.push(`${part.path} is no longer a drawn part of ${record.id}`);
+  return problems;
+}
+
 function validateAcceptedParts(dir, record, review, auto, receipt) {
   const current = new Map(reviewPartsOf(record).map((part) => [part.path, part]));
   const { parts: shapeParts, retired } = reviewShapesOf(record);
   const problems = [];
-  for (const part of list(review.parts)) {
-    const file = path.join(dir, part.path ?? '');
-    if (!part.path || !fs.existsSync(file)) { problems.push(`${part.path ?? '(no path)'} is not on disk`); continue; }
-    if (typeof part.sha256 !== 'string' || !part.sha256) problems.push(`the receipt names ${part.path} without the sha256 the owner saw`);
-    else if (sha256File(file) !== part.sha256) problems.push(`${part.path} was redrawn after the owner reviewed it`);
-    if (!current.has(slash(part.path))) problems.push(`${part.path} is no longer a drawn part of ${record.id}`);
-  }
+  for (const part of list(review.parts)) problems.push(...receiptPartProblems(dir, record, current, part));
   const seen = new Set(list(review.parts).map((part) => slash(part.path ?? '')));
   for (const part of shapeParts) if (!seen.has(part.path)) problems.push(`${part.path} (${part.shape} ${part.breakpoint}/${part.theme}) was not in the reviewed set`);
   // A ui record reaches done only with a generated asset and a coverage map naming every state it lists

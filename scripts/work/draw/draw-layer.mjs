@@ -24,6 +24,7 @@ import { artifactHoldReason } from '../../machine/artifact-hold.mjs';
 import {isFile} from '../../lib/fs-kind.mjs';
 import {ancestorsOf} from '../../lib/dom-tree.mjs';
 import { readEnv } from '../../lib/env.mjs';
+import { mapInOrder } from '../../lib/in-order.mjs';
 
 export const DRAW_NESTED_VARIANT = 'DRAW_NESTED_VARIANT';
 export const DRAW_MEASURE_UNCAPPED = 'DRAW_MEASURE_UNCAPPED';
@@ -211,50 +212,81 @@ function renderSourceOf({ png, record }) {
   return src && isFile(src) ? src : null;
 }
 
+/** The dom snapshot of a part: the record's, the one beside it, or the html beside it; null when none exists. */
+function domOfPart(part) {
+  const dom = part.record?.dom?.path && isFile(part.record.dom.path) ? part.record.dom.path : part.png.replace(/\.png$/i, '.dom.html');
+  if (isFile(dom)) return dom;
+  return isFile(part.png.replace(/\.png$/i, '.html')) ? part.png.replace(/\.png$/i, '.html') : null;
+}
+
+/** Re-renders `source` for a part with no record layer: {layer, measured, dom} (dom is the snapshot it found, else `dom`). */
+async function remeasuredLayer(source, viewport, { playwright, scratch, index }, dom) {
+  const found = { layer: null, measured: null, dom };
+  try {
+    const { captureHtml } = await import('../draw-render.mjs');
+    const [r] = await captureHtml({ html: source, out: path.join(scratch, `${index}`), viewports: [viewport], theme: 'light', fullPage: true, name: 'layer-remeasure', source: { mode: 'html' }, playwright, rationale: null });
+    if (r?.layer && !r.layer.error) { found.layer = r.layer; found.measured = `re-rendered ${path.relative(process.cwd(), source)}`; }
+    if (!dom && r?.dom?.path && isFile(r.dom.path)) found.dom = r.dom.path;
+  } catch (error) { found.measured = `re-render failed: ${String(error?.message ?? error).split(/\r?\n/)[0]}`; }
+  return found;
+}
+
+/** The layer result of one part: {part, viewport, dom, measured, forms, findings}. */
+async function layerResultOf(part, ctx, index) {
+  const label = path.basename(part.png).replace(/\.png$/i, '');
+  const viewport = part.record?.viewport ? { width: part.record.viewport.width, height: part.record.viewport.height } : null;
+  let dom = domOfPart(part);
+  let layer = part.record?.layer && !part.record.layer.error ? part.record.layer : null;
+  let measured = layer ? 'record' : null;
+  const source = !layer && ctx.playwright && viewport ? renderSourceOf(part) : null;
+  if (source) {
+    const found = await remeasuredLayer(source, viewport, { ...ctx, index }, dom);
+    layer = found.layer;
+    measured = found.measured ?? measured;
+    dom = found.dom;
+  }
+  const html = dom ? fs.readFileSync(dom, 'utf8') : null;
+  const findings = [...(html ? nestedVariantFindings(html, { label }) : []), ...measureFindings(layer, { label })];
+  return { part: part.png, viewport, dom, measured: measured ?? 'unmeasured (no record layer, no re-render source or Playwright)', forms: layer?.forms ?? null, findings };
+}
+
 /**
  * The layer findings of drawn parts: [{part, viewport, findings, measured, forms}]. `playwright` (loadPlaywright) re-measures
  * a part whose record has no `layer`; without it such a part is reported unmeasured.
  */
 export async function layerFindingsForParts(parts, { playwright = null } = {}) {
-  const results = [];
   const scratch = playwright ? fs.mkdtempSync(path.join(os.tmpdir(), 'draw-layer-')) : null;
   try {
-    for (const part of parts) {
-      const label = path.basename(part.png).replace(/\.png$/i, '');
-      const viewport = part.record?.viewport ? { width: part.record.viewport.width, height: part.record.viewport.height } : null;
-      let dom = part.record?.dom?.path && isFile(part.record.dom.path) ? part.record.dom.path : part.png.replace(/\.png$/i, '.dom.html');
-      if (!isFile(dom)) dom = isFile(part.png.replace(/\.png$/i, '.html')) ? part.png.replace(/\.png$/i, '.html') : null;
-      let layer = part.record?.layer && !part.record.layer.error ? part.record.layer : null;
-      let measured = layer ? 'record' : null;
-      if (!layer && playwright && viewport) {
-        const source = renderSourceOf(part);
-        if (source) {
-          try {
-            const { captureHtml } = await import('../draw-render.mjs');
-            const [r] = await captureHtml({ html: source, out: path.join(scratch, `${results.length}`), viewports: [viewport], theme: 'light', fullPage: true, name: 'layer-remeasure', source: { mode: 'html' }, playwright, rationale: null });
-            if (r?.layer && !r.layer.error) { layer = r.layer; measured = `re-rendered ${path.relative(process.cwd(), source)}`; }
-            if (!dom && r?.dom?.path && isFile(r.dom.path)) dom = r.dom.path;
-          } catch (error) { measured = `re-render failed: ${String(error?.message ?? error).split(/\r?\n/)[0]}`; }
-        }
-      }
-      const html = dom ? fs.readFileSync(dom, 'utf8') : null;
-      const findings = [...(html ? nestedVariantFindings(html, { label }) : []), ...measureFindings(layer, { label })];
-      results.push({ part: part.png, viewport, dom, measured: measured ?? 'unmeasured (no record layer, no re-render source or Playwright)', forms: layer?.forms ?? null, findings });
-    }
+    return await mapInOrder(parts, (part, index) => layerResultOf(part, { playwright, scratch }, index));
   } finally {
     if (scratch) safeRemove(scratch, { hold: artifactHoldReason });
   }
-  return results;
 }
 
-async function main(argv) {
+/** The draw-layer command line: {paths, opts} or {error} for an unknown flag. */
+function parseLayerArgs(argv) {
   const paths = [], opts = { playwright: null, json: false };
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--json') opts.json = true;
     else if (argv[i] === '--playwright') opts.playwright = argv[++i];
-    else if (argv[i].startsWith('--')) { process.stderr.write(`draw-layer: unknown flag ${argv[i]}\n`); return 2; }
+    else if (argv[i].startsWith('--')) return { error: `draw-layer: unknown flag ${argv[i]}\n` };
     else paths.push(argv[i]);
   }
+  return { paths, opts };
+}
+
+function printLayerResults(results, red) {
+  for (const r of results) {
+    const forms = r.forms ? `; forms ${r.forms.map((f) => String(Math.round(f.width)) + 'px').join(', ') || 'none'}` : '';
+    process.stdout.write(`${r.findings.length ? 'FAIL' : 'ok  '} ${r.part} [${r.measured}${forms}]\n`);
+    for (const f of r.findings) process.stdout.write(`       [${f.code}] ${f.detail}\n`);
+  }
+  process.stdout.write(`${results.length} part(s), ${red.length} red\n`);
+}
+
+async function main(argv) {
+  const { paths, opts, error } = parseLayerArgs(argv);
+  if (error) { process.stderr.write(error); return 2; }
   if (!paths.length) { process.stderr.write('use: starci work draw-layer <render dir | part png>... [--playwright <product dir>] [--json]\n'); return 2; }
   const parts = partsUnder(paths);
   let playwright = null;
@@ -262,14 +294,7 @@ async function main(argv) {
   const results = await layerFindingsForParts(parts, { playwright });
   const red = results.filter((r) => r.findings.length);
   if (opts.json) process.stdout.write(`${JSON.stringify({ schema: 'starci/draw-layer@1', parts: results.length, red: red.length, results }, null, 2)}\n`);
-  else {
-    for (const r of results) {
-      const forms = r.forms ? `; forms ${r.forms.map((f) => String(Math.round(f.width)) + 'px').join(', ') || 'none'}` : '';
-      process.stdout.write(`${r.findings.length ? 'FAIL' : 'ok  '} ${r.part} [${r.measured}${forms}]\n`);
-      for (const f of r.findings) process.stdout.write(`       [${f.code}] ${f.detail}\n`);
-    }
-    process.stdout.write(`${results.length} part(s), ${red.length} red\n`);
-  }
+  else printLayerResults(results, red);
   return red.length ? 1 : 0;
 }
 

@@ -12,6 +12,7 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { drawAcceptanceFindings } from './draw/draw-acceptance.mjs';
 import { verifyRecordParts } from './draw-loop.mjs';
 import { feedbackFindings } from './draw-feedback.mjs';
+import { eachInOrder } from '../lib/in-order.mjs';
 
 
 function addUniqueLoops(parts, loops) {
@@ -43,13 +44,13 @@ function addFeedbackFindings(findings, repo, recordDir, record) {
 export async function settleDrawMetricFindings({ repo, files, verify = verifyRecordParts }) {
   const { records } = drawAcceptanceFindings({ repo, files });
   const findings = [], loops = [];
-  for (const rel of records) {
+  await eachInOrder(records, async (rel) => {
     const context = settleRecordContext(repo, rel, loops);
-    if (!context) continue;
+    if (!context) return;
     const r = await verify({ ...context, repo });
     findings.push(...r.findings);
     // The owner's open notes (draw-feedback.mjs): a redraw that does not address one is DRAW_FEEDBACK_UNADDRESSED.
     addFeedbackFindings(findings, repo, context.recordDir, context.record);
-  }
+  });
   return { findings, records, loops };
 }

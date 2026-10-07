@@ -57,6 +57,7 @@ import { allocationMs } from '../../engine/config.mjs';
 import { findPackage, requirePackage } from '../lib/package-at.mjs';
 import { safeRemove } from '../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
+import { eachInOrder, mapInOrder } from '../lib/in-order.mjs';
 import { ACCENT_EXEMPT_SELECTOR } from './draw/draw-taste.mjs';
 import { LAYER_PROBE, measureLayer } from './draw/draw-layer.mjs';
 import { measurePage } from './draw-render-page.mjs';
@@ -106,16 +107,12 @@ export function parseArgs(argv) {
   return o;
 }
 
-function booleanOptionOf(arg) {
-  if (arg === '--full-page') { return 'fullPage'; }
-  if (arg === '--trace') { return 'trace'; }
-  return 'json';
-}
+const BOOLEAN_OPTIONS = new Map([['--full-page', 'fullPage'], ['--trace', 'trace']]);
 
 function assignArguments(argv, o) {
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
-    if (BOOL_FLAGS.has(a)) { o[booleanOptionOf(a)] = true; continue; }
+    if (BOOL_FLAGS.has(a)) { o[BOOLEAN_OPTIONS.get(a) ?? 'json'] = true; continue; }
     if (!VALUE_FLAGS.has(a)) throw new UsageError(`unknown argument ${a}`);
     const v = argv[++i];
     if (v == null || v.startsWith('--')) throw new UsageError(`${a} needs a value`);
@@ -124,16 +121,20 @@ function assignArguments(argv, o) {
   }
 }
 
-function normalizeCommonArgs(o) {
-  if (!o.out) throw new UsageError('--out <dir> is required');
-  if (!o.viewports) throw new UsageError('--viewports <WxH,...> is required');
-  o.viewports = parseViewports(o.viewports);
-  if (!THEMES.includes(o.theme)) throw new UsageError(`--theme must be one of ${THEMES.join('|')}`);
+function assertModeArgs(o) {
   const fixture = ['component', 'export', 'props'].filter((k) => o[k]);
   if (o.html && fixture.length) throw new UsageError('--html and --component are exclusive');
   if (!o.html && fixture.length !== 3) throw new UsageError('give --html <file>, or --component <module> --export <XBase> --props <fixture.json>');
   if (o.html && o.css.length) throw new UsageError('--css applies to --component only');
   if (o.html && (o.product || o.grammar || o['grammar-dist'] || o['harness-out'])) throw new UsageError('--product, --grammar, --grammar-dist and --harness-out apply to --component only');
+}
+
+function normalizeCommonArgs(o) {
+  if (!o.out) throw new UsageError('--out <dir> is required');
+  if (!o.viewports) throw new UsageError('--viewports <WxH,...> is required');
+  o.viewports = parseViewports(o.viewports);
+  if (!THEMES.includes(o.theme)) throw new UsageError(`--theme must be one of ${THEMES.join('|')}`);
+  assertModeArgs(o);
   if (o.grammar && !PREFERENCES.includes(o.grammar)) throw new UsageError(`--grammar must be one of ${PREFERENCES.join('|')}`);
   if (o['grammar-dist']) { o.grammarDist = path.resolve(o['grammar-dist']); delete o['grammar-dist']; }
   if (o['harness-out']) { o.harnessOut = path.resolve(o['harness-out']); delete o['harness-out']; }
@@ -247,7 +248,7 @@ async function httpImageDigest(src, page) {
 export async function artworkDigests(images, page = null) {
   const cache = new Map();
   const out = [];
-  for (const a of Array.isArray(images) ? images : []) {
+  await eachInOrder(Array.isArray(images) ? images : [], async (a) => {
     const src = String(a?.src ?? '');
     if (!cache.has(src)) {
       let digest = null;
@@ -259,7 +260,7 @@ export async function artworkDigests(images, page = null) {
       cache.set(src, digest);
     }
     out.push({ ...a, src: src.startsWith('data:') ? 'data:' : src, sha256: cache.get(src) });
-  }
+  });
   return out;
 }
 
@@ -367,7 +368,7 @@ export async function captureHtml({ html, out, viewports, theme, fullPage, name,
   const browser = await playwright.chromium.launch().catch((e) => { throw new UsageError(`chromium launch failed (${playwright.name} ${playwright.version}): ${e.message.split('\n')[0]}`); });
   const records = [];
   try {
-    for (const viewport of viewports) {
+    await eachInOrder(viewports, async (viewport) => {
       const base = captureBase(name, viewport, theme);
       const file = path.join(out, `${base}.png`);
       const traceFile = trace ? path.join(out, `${base}.trace.zip`) : null;
@@ -392,7 +393,7 @@ export async function captureHtml({ html, out, viewports, theme, fullPage, name,
       };
       fs.writeFileSync(path.join(out, `${base}.json`), `${JSON.stringify(record, null, 2)}\n`);
       records.push(record);
-    }
+    });
   } finally {
     await browser.close();
   }
@@ -535,8 +536,7 @@ export async function buildFixtureHarness({ component, exportName, props, css, t
   }
   const js = fs.readFileSync(path.join(workDir, 'harness.js'), 'utf8');
   const candidates = classCandidates(js);
-  const globals = [];
-  for (const [index, file] of css.entries()) globals.push(await compileStylesheet(file, { dirs, esbuild, candidates, workDir, index, aliases }));
+  const globals = await mapInOrder(css.entries(), ([index, file]) => compileStylesheet(file, { dirs, esbuild, candidates, workDir, index, aliases }));
   fs.writeFileSync(path.join(workDir, 'global.css'), globals.join('\n'));
   const links = ['global.css', ...(fs.existsSync(path.join(workDir, 'harness.css')) ? ['harness.css'] : [])].map((h) => `<link rel="stylesheet" href="${h}">`).join('');
   const html = path.join(workDir, 'index.html');

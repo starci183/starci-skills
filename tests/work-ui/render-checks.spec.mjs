@@ -11,8 +11,9 @@ import {encodePng,screen,crc32} from '../helpers/png.mjs';
 import {
   CHECK_IDS,MIN_BUCKET_SHARE,PALETTE_TOLERANCE,RENDER_CHECKS,
   cardClassesOf,checkEntityListInCard,checkMascotSlot,checkPalette,decodePng,dominantColours,
-  formatRenderChecks,renderChecksFor,runRenderChecks,scanMarkup,uiDirOf
+  formatRenderChecks,runRenderChecks,scanMarkup
 } from '../../scripts/work/ui/render.mjs';
+import {renderChecksFor,uiDirOf} from '../../scripts/work/ui/render-hook.mjs';
 import {decodePng as decodeWorkPng} from '../../scripts/work/png.mjs';
 
 const grammarRoot=fileURLToPath(new URL('../../knowledge/grammars',import.meta.url));

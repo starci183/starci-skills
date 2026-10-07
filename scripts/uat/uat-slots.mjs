@@ -17,6 +17,7 @@ import crypto from 'node:crypto';
 import path from 'node:path';
 import {startProgram} from '../api/process/start-program.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { repeatInOrder } from '../lib/in-order.mjs';
 import {machineFileFor, readMachine, withMachine} from '../../engine/db/machine.mjs';
 import {loadConfig, uatSettings, UAT_DEFAULTS} from '../../engine/config.mjs';
 import {recordAlive} from '../connectors/lib.mjs';
@@ -91,7 +92,7 @@ function claimFree(env,limit,record){
 const onExit=new Set();
 let exitHooked=false;
 const atExit=fn=>{
-  if(!exitHooked){exitHooked=true;process.on('exit',()=>{for(const fn of [...onExit])try{fn();}catch{/* best effort */}});}
+  if(!exitHooked){exitHooked=true;process.on('exit',()=>{const held=[...onExit];for(const fn of held)try{fn();}catch{/* best effort */}});}
   onExit.add(fn);return ()=>onExit.delete(fn);
 };
 
@@ -116,9 +117,11 @@ export async function acquireUatSlot({runId=null,env=process.env,limit=maxConcur
   takeTicket();
   const dropTicket=()=>{try{withMachine(m=>m.releaseHostLock({name:ticket}),{env});}catch{/* gone */}};
   const unhookTicket=atExit(dropTicket);
-  let lastPosition=null,waited=false;
+  let lastPosition=null,waited=false,ticketSettled=false;
+  // The ticket goes the moment a slot is claimed, so a claimant behind it counts only the waiters still queued.
+  const settleTicket=()=>{if(ticketSettled){return;}ticketSettled=true;dropTicket();unhookTicket();};
   try{
-    for(;;){
+    return await repeatInOrder(async()=>{
       if(signal?.aborted)throw Object.assign(new Error('UAT slot wait aborted'),{code:'uat-slot-aborted'});
       const holders=slotHolders({env});
       const tickets=slotQueue({env}).map(entry=>entry.ticket);
@@ -138,13 +141,14 @@ export async function acquireUatSlot({runId=null,env=process.env,limit=maxConcur
           }catch{/* the store is gone */}
         };
         unhook=atExit(release);
+        settleTicket();
         return {slot:claimed.slot,limit,waited,release};
       }
       waited=true;
       if(position!==lastPosition){lastPosition=position;try{await onQueued?.({position,limit,holders:holders.length});}catch{/* reporting never blocks the wait */}}
       await sleep(pollMs,signal);
-    }
-  }finally{dropTicket();unhookTicket();}
+    });
+  }finally{settleTicket();}
 }
 
 /** Holders, queue and ceiling, for `status`. */

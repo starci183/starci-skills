@@ -86,12 +86,16 @@ export function parseArgs(argv) {
     if (out.workRoot !== null) throw new EvidenceBindingInputError('Use --work exactly once');
     out.workRoot = path.resolve(value);
   }
-  if (out.workRoot === null) throw new EvidenceBindingInputError('--work is required');
-  if (!isDir(out.workRoot)) throw new EvidenceBindingInputError(`--work ${slash(out.workRoot)} is not a readable directory`);
-  if (!fs.existsSync(path.join(out.workRoot, 'index.yaml')) && !fs.existsSync(path.join(out.workRoot, 'workspace.yaml'))) {
-    throw new EvidenceBindingInputError(`--work ${slash(out.workRoot)} is not a .starciwork root (no index.yaml or workspace.yaml)`);
-  }
+  assertWorkRoot(out.workRoot);
   return out;
+}
+
+function assertWorkRoot(workRoot) {
+  if (workRoot === null) throw new EvidenceBindingInputError('--work is required');
+  if (!isDir(workRoot)) throw new EvidenceBindingInputError(`--work ${slash(workRoot)} is not a readable directory`);
+  if (!fs.existsSync(path.join(workRoot, 'index.yaml')) && !fs.existsSync(path.join(workRoot, 'workspace.yaml'))) {
+    throw new EvidenceBindingInputError(`--work ${slash(workRoot)} is not a .starciwork root (no index.yaml or workspace.yaml)`);
+  }
 }
 
 // ---------- source-change time, and which clock answered ----------

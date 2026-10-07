@@ -7,7 +7,7 @@ function readCallArgs(text, openIndex) {
   let depth = 0, quote = null;
   for (let i = openIndex; i < text.length; i++) {
     const c = text[i];
-    if (quote) { if (c === quote && text[i - 1] !== '\\') quote = null; continue; }
+    if (quote) { if (c === quote && text[i - 1] !== '\\') { quote = null; } continue; }
     if (c === "'" || c === '"' || c === '`') { quote = c; continue; }
     if (c === '(') depth++;
     if (c === ')' && --depth === 0) return text.slice(openIndex, i + 1);

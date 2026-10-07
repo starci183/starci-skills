@@ -96,6 +96,17 @@ const LAYOUT_CLASS_RX = [
 
 const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
+/** How a spacing class with `step` reads: {kind: layout|token|free, rule?}. */
+function classifySpacing(bare, step) {
+  if (step === 'auto' || step === 'full' || (step === 'px' && /^-?(?:top|right|bottom|left|inset)/.test(bare))) return { kind: 'layout' };
+  if (!GRAMMAR_SPACING_STEPS.includes(step)) return { kind: 'free' };
+  let family = 'INSET';
+  if (/^-?(?:gap|space)/.test(bare)) family = 'GAP';
+  else if (/^-?p/.test(bare)) family = 'PADDING';
+  else if (/^-?m/.test(bare)) family = 'MARGIN';
+  return { kind: 'token', rule: family === 'GAP' || family === 'PADDING' ? `${family}-${SPACING_RULE_OF_STEP[step]}` : null };
+}
+
 /** How one class reads: {kind: layout|token|free|paint, rule?}. */
 export function classifyClass(token) {
   const bare = String(token).replace(RESPONSIVE, '').replace(/^!/, '');
@@ -104,18 +115,7 @@ export function classifyClass(token) {
     spacing = pattern.exec(bare);
     if (spacing) break;
   }
-  if (spacing) {
-    const step = spacing[1];
-    if (step === 'auto' || step === 'full' || (step === 'px' && /^-?(?:top|right|bottom|left|inset)/.test(bare))) return { kind: 'layout' };
-    if (GRAMMAR_SPACING_STEPS.includes(step)) {
-      let family = 'INSET';
-      if (/^-?(?:gap|space)/.test(bare)) family = 'GAP';
-      else if (/^-?p/.test(bare)) family = 'PADDING';
-      else if (/^-?m/.test(bare)) family = 'MARGIN';
-      return { kind: 'token', rule: family === 'GAP' || family === 'PADDING' ? `${family}-${SPACING_RULE_OF_STEP[step]}` : null };
-    }
-    return { kind: 'free' };
-  }
+  if (spacing) return classifySpacing(bare, spacing[1]);
   if (LAYOUT_CLASS_RX.some((rx) => rx.test(bare))) return { kind: 'layout' };
   return { kind: 'paint' };
 }

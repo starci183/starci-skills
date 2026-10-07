@@ -130,20 +130,22 @@ function workRootAbove(file) {
   return null;
 }
 
+/** Calls `onFile(fullPath, name)` for every file under `dir`, `depth` directory levels down; `enter(name)` admits a directory. */
+function eachFileUnder(dir, depth, onFile, enter = () => true) {
+  let entries = [];
+  try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+  for (const e of entries) {
+    const full = path.join(dir, e.name);
+    if (!e.isDirectory()) onFile(full, e.name);
+    else if (depth > 0 && enter(e.name)) eachFileUnder(full, depth - 1, onFile, enter);
+  }
+}
+
 /** The sha256 of every brand master file (<work>/brand/assets/**): the landing's art, never a product slot's bytes. */
 function brandMasterShas(workRoot) {
   if (!workRoot) return new Set();
-  const root = path.join(workRoot, 'brand', 'assets');
   const out = new Set();
-  const walk = (d, left) => {
-    let entries = [];
-    try { entries = fs.readdirSync(d, { withFileTypes: true }); } catch { return; }
-    for (const e of entries) {
-      const full = path.join(d, e.name);
-      if (e.isDirectory()) { if (left > 0) walk(full, left - 1); } else { try { out.add(sha256File(full)); } catch { /* unreadable */ } }
-    }
-  };
-  walk(root, 6);
+  eachFileUnder(path.join(workRoot, 'brand', 'assets'), 6, (full) => { try { out.add(sha256File(full)); } catch { /* unreadable */ } });
   return out;
 }
 
@@ -160,6 +162,12 @@ export function slotsOfHtml(html, { htmlFile = null, masters = new Set() } = {})
   return out;
 }
 
+/** The prompt file a slot names (relative to its render source), else the `.prompt.txt` beside its filled asset. */
+function promptFileOf(promptAttr, htmlFile, actual, file) {
+  if (promptAttr && htmlFile) return path.resolve(path.dirname(htmlFile), promptAttr);
+  return actual ? file.replace(/\.[^.\\/]+$/, '.prompt.txt') : null;
+}
+
 function slotOfElement(el, htmlFile, masters) {
   const id = (el.attrs[ASSET_SLOT_ATTR] ?? '').trim();
   if (!id) return null;
@@ -168,14 +176,14 @@ function slotOfElement(el, htmlFile, masters) {
   const sha = (el.attrs[ASSET_SHA_ATTR] ?? img.attrs[ASSET_SHA_ATTR] ?? '').trim().toLowerCase() || null;
   const { file, actual } = actualAssetFile(src, htmlFile);
   const master = Boolean(actual && masters.has(actual));
-  const promptAttr = (el.attrs[ASSET_PROMPT_ATTR] ?? img.attrs[ASSET_PROMPT_ATTR] ?? '').trim();
-  let promptFile = null;
-  if (promptAttr && htmlFile) promptFile = path.resolve(path.dirname(htmlFile), promptAttr);
-  else if (actual) promptFile = file.replace(/\.[^.\\/]+$/, '.prompt.txt');
+  const promptFile = promptFileOf((el.attrs[ASSET_PROMPT_ATTR] ?? img.attrs[ASSET_PROMPT_ATTR] ?? '').trim(), htmlFile, actual, file);
   const prompt = promptFile && isFile(promptFile) ? promptFile : null;
   return { id, tag: el.tag, component: el.attrs[COMPONENT_ATTR] ?? null, src, sha256: sha, file: actual ? file : null, master, prompt,
-    filled: Boolean(sha && actual && sha === actual && !master && prompt) };
+    filled: slotIsFilled(sha, actual, master, prompt) };
 }
+
+// Filled: the declared sha256 is the asset's actual bytes, which are not a brand master, and a prompt file exists.
+const slotIsFilled = (sha, actual, master, prompt) => Boolean(sha && actual && sha === actual && !master && prompt);
 
 function actualAssetFile(src, htmlFile) {
   let file = null, actual = null;
@@ -189,18 +197,10 @@ function actualAssetFile(src, htmlFile) {
 /** The render sources among `targets` (files, or directories walked without draw-loop rounds). */
 function renderSourcesIn(targets, depth = 6) {
   const out = new Map();
-  const walk = (d, left) => {
-    let entries = [];
-    try { entries = fs.readdirSync(d, { withFileTypes: true }); } catch { return; }
-    for (const e of entries) {
-      const full = path.join(d, e.name);
-      if (e.isDirectory()) { if (left > 0 && !SKIP_DIRS.has(e.name)) walk(full, left - 1); }
-      else if (/\.html?$/i.test(e.name)) out.set(path.resolve(full).toLowerCase(), path.resolve(full));
-    }
-  };
+  const add = (file) => { if (/\.html?$/i.test(file)) out.set(path.resolve(file).toLowerCase(), path.resolve(file)); };
   for (const t of targets ?? []) {
-    if (isDir(t)) walk(t, depth);
-    else if (isFile(t) && /\.html?$/i.test(t)) out.set(path.resolve(t).toLowerCase(), path.resolve(t));
+    if (isDir(t)) eachFileUnder(t, depth, add, (name) => !SKIP_DIRS.has(name));
+    else if (isFile(t)) add(t);
   }
   return [...out.values()];
 }
