@@ -122,9 +122,9 @@ reads:
     path: modules/models/registry.yaml + selected runtime execution profile + actual host tools/model
     purpose:
       en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and
-        active profiles, and establish whether an image generator is actually available to this
-        runtime. Use current host model configuration; historical model names are not availability
-        proof. Capabilities are the intersection of actual tools, selected profile policy, op
+        active profiles. This op's agent runs no image model; an image it needs is made by the headless
+        `starci work imagegen` call, which can be refused (quota, capacity, unavailable). Use current host
+        model configuration; historical model names are not availability proof. Capabilities are the intersection of actual tools, selected profile policy, op
         permissions and existing task authority.
   - id: standard
     path: shared
@@ -169,9 +169,10 @@ writes:
       en: "Store reused or newly generated identity bytes under the brand record's own assets in their
         actual formats, each with its sha256 and its provenance recorded beside them. A mascot the
         product does not yet have may be produced once as an explicit placeholder from the owner's
-        description with the available image generator; it is recorded as a placeholder, never as
-        the final mascot and never as a capture of a shipped surface. When no generator is actually
-        available, record a concrete deferred brief instead and leave the slot empty: a missing file
+        description with `starci work imagegen` (--out the brand record's assets directory; its receipt
+        generation-receipts.yaml is the provenance); it is recorded as a placeholder, never as
+        the final mascot and never as a capture of a shipped surface. When the call is refused, record a
+        concrete deferred brief instead and leave the slot empty: a missing file
         is never described as generated."
   - id: shellNode
     path: .starciwork/shell/index.yaml
@@ -259,8 +260,8 @@ steps:
         match primary, the mascot and where it may never appear, typography, voice. Record the
         decisions as closed options with the ruling that selected them; an unruled taste decision is
         a question with the options, never a preference this op supplies. Resolve the execution
-        profile and whether an image generator is actually available before planning any asset work;
-        this selects no model and spawns no worker. An absent brand record is not a gap: this op writes
+        profile before planning any asset work; an image is made only by `starci work imagegen`,
+        so this selects no model and spawns no worker. An absent brand record is not a gap: this op writes
         the product's first one at .starciwork/brand/index.yaml. A brand record that exists anywhere
         else, or a second one, is the scope/graph gap to report; never create a second brand owner. Read the
         accepted requirement and decision records plus the owner's actual rulings about identity -
@@ -323,9 +324,10 @@ steps:
     action:
       en: Settle the mascot, the logo and the icon set. Reuse the assets the repository already has, with
         their real paths and provenance. Only when the product has no mascot asset at all, generate
-        one explicit placeholder from the owner's description with the available image generator,
-        store it under the record's own assets with its sha256, and record it as a placeholder
-        pending the owner's acceptance; if the runtime has no generator, write a concrete deferred
+        one explicit placeholder from the owner's description with `starci work imagegen` (the prompt
+        written to a file first, --out the brand record's assets directory),
+        keep it there with its sha256 and the receipt, and record it as a placeholder
+        pending the owner's acceptance; if the call is refused, write a concrete deferred
         brief instead and never claim a file exists. Write `mayAppearIn`, `neverIn` and the usage
         rules for each, and name the single icon set the product may use so no later screen
         introduces a second one.

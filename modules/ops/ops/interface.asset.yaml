@@ -58,11 +58,11 @@ reads:
   - id: profile
     path: modules/models/registry.yaml + selected runtime execution profile + actual host tools/model
     purpose:
-      en: "Resolve this operator's request-bound external-agent chain and confirm the actual host carries
-        an image generator before any slot is attempted. Historical model names are not availability
-        proof, and a profile without an image model cannot carry this operation: report the
-        limitation instead of substituting a hand-authored, scripted or placeholder image for a
-        generated one."
+      en: "Resolve how this operation gets images: its own agent runs no image model, it calls
+        `starci work imagegen`, which takes the imagegen call tier of modules/models/tiers.yaml (calls.imagegen)
+        headlessly and returns image files with a receipt. Historical model names are not availability
+        proof; a refused call (quota, capacity, unavailable) is reported as the limitation instead of
+        substituting a hand-authored, scripted or placeholder image for a generated one."
 writes:
   - id: source
     path: <app>/<asset-path>
@@ -128,7 +128,8 @@ steps:
       en: "Read the declared artwork slots of the design record and freeze the work before generating
         anything: per slot its id, screen, state, blueprint region, purpose, brief, pixel size and
         viewport, format, brand references and the crop of the chosen candidate it came from. Open
-        the candidate and locate every crop. Confirm the host actually carries an image generator.
+        the candidate and locate every crop. The image model is reached only through
+        `starci work imagegen`; its first refusal settles which slots cannot be produced.
         Compare each brief against the brand rules and the placements its referenced masters allow,
         and settle which slots are producible before the first image is requested; an embedded
         artwork visible in the candidate that the record never declared is reported rather than
@@ -142,9 +143,12 @@ steps:
       - repo
     writes: [source]
     action:
-      en: Generate each producible slot with the image model, passing the candidate crop and the brand
-        mascot or logo masters the slot references as actual input references, so the result is the
-        approved artwork rather than a new one matching the same words. Write every prompt from the
+      en: "Generate each producible slot with `starci work imagegen --prompt <the slot's prompt.txt> --out
+        <the owned asset path> --name <slot> --reference <crop> --reference <master>... --json`, the candidate crop
+        and the brand mascot or logo masters the slot references as actual input references, so the result
+        is the approved artwork rather than a new one matching the same words. The verb runs the image
+        model headlessly and writes <slot>-<n>.png, <slot>-<n>.prompt.txt and generation-receipts.yaml
+        beside it; the size passed is a request and the receipt records the real pixel size. Write every prompt from the
         slot's asset-request.md entry inside the brand record's imagery.style, imagery.forbidden and
         imagery.promptRules, retained verbatim in prompt.txt and beside the file as <file>.prompt.txt.
         Every product slot is a NEW generation (owner ruling 2026-09-27) - a new pose and composition
@@ -154,7 +158,7 @@ steps:
         owned asset path the allowlist names, reusing only this slot's own verified earlier generation
         instead of writing a second copy of it under another name. Do not drift the brief, do not restyle the candidate, do not add or remove
         content the region does not carry, and do not touch product code. Reading the surrounding
-        code is for placing the file only; this operation changes no product code.
+        code is for placing the file only; this operation changes no product code."
   - reads:
       - target
       - repo
@@ -162,8 +166,8 @@ steps:
     action:
       en: Open every produced file and inspect it as bytes and as an image against its slot - the crop it
         must reproduce, its declared size and format, and the brand rules and placement its
-        references allow. Then record each slot's file path, sha256, status and provenance back into
-        the design record and bind the path in its asset list. A file that differs from the approved
+        references allow. Then record each slot's file path, sha256, status and provenance (generation.tool
+        image_gen.imagegen with the receipt's toolOutputBasename and model) back into the design record and bind the path in its asset list. A file that differs from the approved
         crop, misses its declared size or breaks a brand rule is regenerated or reported; it is
         never recorded as the slot's asset. Then fill the drawing's placeholder - set the data-asset-slot element's src to
         the produced file and data-asset-sha256 to its sha256 in every render source that shows the slot, so
@@ -230,9 +234,10 @@ blockers:
         declare.
   - code: IMAGE_MODEL_UNAVAILABLE
     condition:
-      en: The resolved profile and actual host carry no image generator, so no slot can be produced.
-        Report the limitation; a scripted, hand-drawn or placeholder file is never a generated
-        asset.
+      en: "`starci work imagegen` refused (IMAGEGEN_QUOTA, IMAGEGEN_CAPACITY, IMAGEGEN_UNAVAILABLE,
+        IMAGEGEN_RUNNER_FAILED, IMAGEGEN_TIMEOUT or IMAGEGEN_NO_OUTPUT), so no slot can be produced.
+        Report the code and detail; a scripted, hand-drawn or placeholder file is never a generated
+        asset."
   - code: SCOPE_OUTSIDE_ALLOWLIST
     condition:
       en: A slot's destination lies outside the owned asset paths this operation may write. Report the
@@ -254,5 +259,4 @@ route:
   intent: [asset, image, artwork, imagegen]
   prerequisites:
     - interface.draw done (artworkSlots declared)
-  riskHints:
-    - host-tool-required:image_gen.imagegen
+  riskHints: [generates-assets]

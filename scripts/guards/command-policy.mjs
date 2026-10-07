@@ -67,6 +67,15 @@ const codeOf = (entry, fallback) => (RIGHTS_CODES.has(entry?.code) ? entry.code 
 const genericUse = 'use the starci verb of the action (modules/cli/commands) or ask the owner';
 const raw = (role, text, use = genericUse, what = 'raw tool command') => refusal('RIGHTS_RAW_TOOL', text, `the ${role} role does not run this ${what} directly because side effects go through a starci verb`, use);
 
+/** A headless-call verb (policy.calls) refuses every bound role but the ops the table names. */
+const callVerdict = ({ role, program, args, guard, policy, text }) => {
+  if (program !== 'starci') return null;
+  const words = args.filter((value) => !value.startsWith('-'));
+  const call = Object.values(policy.calls ?? {}).find((entry) => words[0] === entry.verb?.[0] && words[1] === entry.verb?.[1]);
+  if (!call || (role === 'op' && toSet(call.ops).has(String(guard?.op ?? '')))) return null;
+  return refusal('RIGHTS_ROLE_DENIED', text, `${guard?.op ?? role} does not run starci ${call.verb.join(' ')}: only ${[...toSet(call.ops)].join(', ')} call it`, useOf(call, genericUse));
+};
+
 const RELEASE_SCRIPTS = new Set(['release:cut', 'release:publish']);
 const releaseCall = (program, args, policy) => {
   if (program === 'starci' && args[0] === 'release' && toSet(policy.release?.verbs).has(String(args[1] ?? ''))) return true;
@@ -250,6 +259,8 @@ export function policyVerdict({ role, command, guard = null, handle = null, lock
     const use = useOf(policy.release, 'starci release cut');
     return refusal('RIGHTS_RELEASE_CUT', text, `the ${role} role does not cut or publish a release because the release cut is owner-approved and runs once per release`, use);
   }
+  const call = callVerdict({ role, program, args, guard, policy, text });
+  if (call) return call;
   if (p.runtime.has(program)) return null;
   if (program === 'node' && nodeEntry(args, p.nodeScripts)) return null;
 

@@ -26,9 +26,9 @@ guidance:
     requirement: |-
       For every large frontend task, choose the smallest representative set of critical screens that covers
       the highest-risk journeys, layout anatomy, interactions and brand moments. Generate those visual
-      directions with built-in `image_gen.imagegen` using accepted business/SDS, the current brand and masters,
-      relevant UI rules, and actual inspected Grammar anatomy/reference inputs. Retain each exact prompt,
-      generated asset and actual tool provenance; do not assert an image-model identity the tool did not expose.
+      directions through the headless imagegen call (`starci work imagegen`, receipt tool `image_gen.imagegen`) using accepted
+      business/SDS, the current brand and masters, relevant UI rules, and actual inspected Grammar anatomy/reference inputs.
+      Retain each exact prompt, generated asset and the call's generation receipt (model, toolOutputBasename, sha256).
       Map every remaining screen, state and responsive band to the representative direction and actual Grammar
       components in an explicit coverage/component/state map. A generated direction is proposed design input,
       not exact component/render/API proof and not a screenshot of a working product. Frontend implementation

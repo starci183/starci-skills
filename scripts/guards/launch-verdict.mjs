@@ -21,9 +21,11 @@ const printFlag = (args, flags) => {
   const options = args.includes('--') ? args.slice(0, args.indexOf('--')) : args;
   return options.find((a) => flags.includes(a)) ?? null;
 };
+// The one headless call the runtime makes for an op (tiers.yaml calls.imagegen; owner decision 2026-10-07).
+const IMAGE_CALL = ' An image is generated with `starci work imagegen` (interface.draw, interface.asset and brand.decide), never with a hand-run codex exec.';
 const launchRefusal = (program, args, how) => ({ command: [program, ...args].join(' ').slice(0, 200),
   reason: `${how} outside Orca's supervision: no liveness, no stop or release, and a dead worker goes unnoticed (owner rule 2026-10-01)`,
-  remedy: `launch every agent and worker through ${WORKER_START}` });
+  remedy: `launch every agent and worker through ${WORKER_START}${program === 'codex' ? IMAGE_CALL : ''}` });
 // The workspace and runtime rules (workspace.manage, runtime.operate; OPS2 3.1): an agent never creates or removes an Orca
 // worktree itself - the runtime's worktree API (scripts/machine/worktree-orca.mjs createOrcaWorktree / removeOrcaWorktree,
 // releaseWorkflowWorktree) runs the link check first and keeps the registry and its cap (git worktree writes are

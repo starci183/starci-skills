@@ -683,7 +683,7 @@ ops:
       prerequisites:
         - interface.draw done (artworkSlots declared)
       riskHints:
-        - host-tool-required:image_gen.imagegen
+        - generates-assets
     lifecyclePosition: implement | implementation
     kindInferred: asset
   - id: interface.audit

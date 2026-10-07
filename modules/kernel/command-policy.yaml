@@ -21,6 +21,13 @@ roles:
   backup-ref: '^refs/backup/\S+$'
 # The runtime's own verbs: the surface every other path is steered to.
 runtime: [starci]
+# Verbs that spend a provider model headlessly (a call tier of modules/models/tiers.yaml calls): a bound role runs one only as an op named
+# here, and a headless agent CLI by hand stays refused (AGENT_HEADLESS_LAUNCH).
+calls:
+  imagegen:
+    verb: [work, imagegen]
+    ops: [interface.draw, interface.asset, brand.decide]
+    use: starci work imagegen --prompt <file> --out <dir in the worktree> (interface.draw, interface.asset and brand.decide only)
 # Release path: refused to every bound role.
 release:
   verbs: [cut, publish]

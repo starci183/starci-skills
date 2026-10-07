@@ -123,7 +123,7 @@ reads:
       en: "Whether this host runs the Playwright capture of `scripts/work/draw-render.mjs` (node and the product's own
         Playwright install in the product checkout) and which tool was actually invoked. Owner ruling 2026-09-27
         (draw-devin-brand-claude): interface.draw walks the draw order - Devin first, Codex the fallback - and a
-        raster region is an artworkSlot interface.asset generates on the Codex image tool (the steps keep the drawer
+        raster region is an artworkSlot interface.asset generates through `starci work imagegen` (the steps keep the drawer
         off raster art)."
   - id: generatedDirection
     path: N/assets/**/<asset>
@@ -405,8 +405,9 @@ steps:
         the innermost visible layout's capture records for that breakpoint; for a modal or drawer the
         panel; for a layout its own chrome with its slot a flat #FF00FF rectangle. The part draws no
         sidebar, top bar, logo or navigation, because the real one surrounds it. ImageGen never draws chrome
-        or UI: built-in `image_gen.imagegen` paints only raster regions (mascots, illustrations), each
-        from its exact retained prompt, embedded in the render as an image. A part painted in a colour the
+        or UI: the imagegen call (`starci work imagegen --prompt <file> --out <the part's assets directory>`, receipt tool
+        image_gen.imagegen) paints only raster regions (mascots, illustrations), each from its exact retained prompt
+        file, embedded in the render as an image. A part painted in a colour the
         brand does not declare is refused (PALETTE_OFF_BRAND, naming the colour, its area share and the
         nearest brand token; PRIMARY_ABSENT when it stands in for the primary) and is re-rendered from the
         tokens, never recoloured by hand. Render each shape once per required breakpoint - desktop and
@@ -511,8 +512,8 @@ steps:
         modal or anchored to the drawer's direction edge) and prints the two asset entries to record
         verbatim. A routed overlay is composed in both presentations - over its dimmed host and as its
         full page inside its layout chain; a non-routed overlay only over its host. Open every composite,
-        review it, and record the actual tool provenance, naming an image model only when the tool
-        itself exposed one."
+        review it, and record the actual tool provenance (for an image, the model and toolOutputBasename of the
+        imagegen receipt generation-receipts.yaml)."
   - reads:
       - target
       - generatedDirection
@@ -840,7 +841,7 @@ blockers:
   - code: IMAGEGEN_TOOL_UNAVAILABLE
     condition:
       en: A raster region is required and it is not declared as an artworkSlots entry with its brief for
-        interface.asset (the drawer never paints raster art; interface.asset runs on the Codex image tool). Declare
+        interface.asset (the drawer never paints raster art; interface.asset generates it through `starci work imagegen`). Declare
         the slot; do not substitute another renderer for the raster region.
   - code: DRAW_LOOP_UNPASSED
     condition:
