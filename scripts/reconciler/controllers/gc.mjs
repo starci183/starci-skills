@@ -153,6 +153,13 @@ function sweepItem(i) {
     outcome, ...(failed ? { lastError: String(i.error ?? 'failed').slice(0, 300) } : {}) };
 }
 
+function housekeepingReason(claim, host) {
+  if (claim.reason === 'first-run') return 'first run';
+  if (claim.reason !== 'early') return 'daily';
+  const lowDisk = host.lowDisk ? `lowDisk ${Math.round(host.freeDiskGb ?? 0)} GB` : '', separator = host.lowDisk && host.lowRam ? ', ' : '', lowRam = host.lowRam ? `lowRam ${Math.round(host.freeRamPct ?? 0)}%` : '';
+  return `host ${lowDisk}${separator}${lowRam}`;
+}
+
 /* ------------------------------------------------------------ the controller */
 
 export function createGcController(overrides = {}) {
@@ -458,14 +465,7 @@ export function createGcController(overrides = {}) {
     // MB-01: the daily cadence is durable (schedules); a low-disk/low-RAM host pulls it in after lowResourceGapMs.
     const claim = claimDue(ctx, { controller: NAME, duty: 'housekeeping', intervalMs: settings.housekeepingEveryMs, now, earlyAfterMs: low ? settings.lowResourceGapMs : null });
     if (!claim.due) return { skipped: 'not due', low, nextAt: claim.nextAt };
-    let why = 'daily';
-    if (claim.reason === 'first-run') why = 'first run';
-    else if (claim.reason === 'early') {
-      const lowDisk = host.lowDisk ? `lowDisk ${Math.round(host.freeDiskGb ?? 0)} GB` : '';
-      const separator = host.lowDisk && host.lowRam ? ', ' : '';
-      const lowRam = host.lowRam ? `lowRam ${Math.round(host.freeRamPct ?? 0)}%` : '';
-      why = `host ${lowDisk}${separator}${lowRam}`;
-    }
+    const why = housekeepingReason(claim, host);
     const r = await ctx.run('node', ['scripts/housekeeping/housekeeping.mjs', '--apply'], { timeoutMs: 1_800_000 });
     let dutyResult = 'skipped';
     if (ctx.mode === 'active') dutyResult = r?.ok === true ? 'done' : 'failed';
