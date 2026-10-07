@@ -94,7 +94,7 @@ export const AGENTS = Object.freeze({ 'claude-agent': 'claude', 'codex-agent': '
 const PROMPT_FILE = path.join(SKILL_ROOT, 'modules', 'supervisor', 'worker-prompt.md');
 const parse = parseJsonOr;
 const csv = (v) => { if (typeof v === 'string') { return v.split(',').map((s) => s.trim()).filter(Boolean); } if (Array.isArray(v)) { return v.map(String); } return []; };
-export const normPath = (p) => posixPath(p).replace(/\/+$/, '');
+export const normPath = (p) => posixPath(p).replace(new RegExp(['/', '+', '$'].join('')), '');
 
 /** The supervisor's git runner (land, push-mains, push-git, direct-commits; their `run`/`git` seams take the same argv): `args[0]` names the scripts/api/git call file it runs, in `cwd`: {ok, status, stdout, stderr}. */
 export function git([verb, ...args], { cwd = SKILL_ROOT, input = undefined, env = undefined, timeoutMs = 300_000 } = {}) {
