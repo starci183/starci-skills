@@ -21,7 +21,7 @@ const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const API = path.join(ROOT, 'scripts', 'kernel', 'cli.mjs');
 const runtimes = parseYaml(fs.readFileSync(path.join(ROOT, 'modules', 'models', 'runtimes.yaml'), 'utf8'));
 const registry = parseYaml(fs.readFileSync(path.join(ROOT, 'modules', 'models', 'registry.yaml'), 'utf8'));
-const POOL = 'claude-agent';
+const POOL = 'codex-agent';
 const MAX = registry.pools[POOL].maxParallel;
 const HOLD = runtimes.allocation.routeHoldMs;
 const WF = 'wf-pool-hold', OTHER = 'wf-pool-hold-other';
@@ -81,7 +81,7 @@ const fixture = (t, occupants) => {
     route: (jobId = 'route-me') => runApi(env, 'route', '--repo', repo, '--job', jobId, '--json'),
   };
 };
-const fullOf = (route) => (route.value?.rejected ?? []).find((r) => r.target === POOL && /pool at capacity/.test(r.reason));
+const fullOf = (route) => (route.value?.rejected ?? []).find((r) => r.target === 'codex/gpt-6.1-sol' && r.reason === 'capacity-full');
 
 test('the route hold is a runtimes.yaml allocation key, 15 minutes by default', () => {
   assert.equal(HOLD, 900000);
