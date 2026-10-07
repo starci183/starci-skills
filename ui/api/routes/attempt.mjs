@@ -102,7 +102,7 @@ function groupOf(name, role) {
   if (name.startsWith('checks/') || role.startsWith('check-')) return 'check';
   if (role === 'patch' || role === 'diff') return 'diff';
   if (['screenshot', 'capture', 'render', 'video', 'uat-run', 'trace', 'dom', 'direction', 'redline'].includes(role)) return 'media';
-  if (/^attachments\//.test(name) || role === 'report-attachment') return 'op-run';
+  if (name.startsWith('attachments/') || role === 'report-attachment') return 'op-run';
   if (role === 'log') return 'log';
   return 'other';
 }

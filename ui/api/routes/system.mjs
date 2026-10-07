@@ -41,6 +41,20 @@ function blob(machine, sha) {
 function projectName(store, ledgerId) { return store.projects().find(row => row.ledgerId === ledgerId)?.name ?? null; }
 function allLedgers(store, fn) { return store.forEachLedger(({ row, db }) => fn(row, db)).flatMap(entry => entry.error ? [] : entry.result ?? []); }
 const aggregateUi = rows => ['bad', 'warn', 'unknown', 'running', 'waiting', 'ok', 'done'].find(ui => rows.some(row => row.ui === ui)) ?? 'unknown';
+function ramUiOf(throttle) {
+  if (!throttle) return 'unknown';
+  if (throttle.mode === 'critical') return 'bad';
+  return throttle.mode === 'heavy' ? 'warn' : 'ok';
+}
+function slaOf(bad, warn) {
+  if (bad) return { ui: 'bad', reason: 'SLA_CRITICAL' };
+  if (warn) return { ui: 'warn', reason: 'SLA_WARNING' };
+  return { ui: 'ok', reason: null };
+}
+function leakUiOf(leaks, store) {
+  if (leaks) return 'warn';
+  return store.stale.size ? 'unknown' : 'ok';
+}
 function health(store) {
   const m = store.machine.db;
   const engine = one(m, 'SELECT ui FROM v_engine_health');
@@ -55,28 +69,16 @@ function health(store) {
   const land = one(m, "SELECT count(*) AS n FROM land_queue WHERE state IN ('queued','running')")?.n ?? 0;
   const providerRows = store.machine.providerHealth().map(row => ({ ...row, ui: uiState(m, 'provider', row.status) }));
   const providers = providerRows.filter(row => row.ui === 'bad').length;
-  let ramUi = 'unknown';
-  if (throttle) {
-    if (throttle.mode === 'critical') ramUi = 'bad';
-    else if (throttle.mode === 'heavy') ramUi = 'warn';
-    else ramUi = 'ok';
-  }
-  let slaUi = 'ok';
-  if (slaBad) slaUi = 'bad';
-  else if (slaWarn) slaUi = 'warn';
-  let slaReason = null;
-  if (slaBad) slaReason = 'SLA_CRITICAL';
-  else if (slaWarn) slaReason = 'SLA_WARNING';
-  let leakUi = 'ok';
-  if (leaks) leakUi = 'warn';
-  else if (store.stale.size) leakUi = 'unknown';
+  const ramUi = ramUiOf(throttle);
+  const sla = slaOf(slaBad, slaWarn);
+  const leakUi = leakUiOf(leaks, store);
   const item = (key, ui, value, href, code = null) => ({ key, ui, value: value == null ? '—' : String(value), reason: code ? reason(code, { count: value }) : null, href });
   const items = [
     item('engine', engine?.ui ?? 'unknown', engine?.ui ?? 'unknown', '#/system/engine', engine?.ui === 'bad' ? 'ENGINE_BAD' : null),
     item('services', aggregateUi(serviceRows), serviceRows.length ? badServices : null, '#/system/services', badServices ? 'SERVICE_DOWN' : null),
     item('seats', aggregateUi(seatRows), seatRows.length ? badSeats : null, '#/system/services', badSeats ? 'SEAT_BAD' : null),
     item('ram', ramUi, throttle?.mode ?? 'unknown', '#/system/resources', throttle?.mode === 'critical' ? 'RAM_CRITICAL' : null),
-    item('sla', slaUi, slaBad + slaWarn, '#/system/sla', slaReason),
+    item('sla', sla.ui, slaBad + slaWarn, '#/system/sla', sla.reason),
     item('leaks', leakUi, leaks, '#/system/cleanup', leaks ? 'LEAKS_OPEN' : null),
     item('gc', gc ? gcRun(m, gc).ui : 'unknown', gc?.run_id ?? null, '#/system/cleanup'),
     item('land', land ? 'waiting' : 'ok', land, '#/system/land'),
@@ -266,100 +268,150 @@ function catalog() {
     warnMs: null, criticalMs: value.criticalMs, severity: value.severity, owner: value.owner, autoAction: value.autoAction }));
 }
 
+const failure = (status, code, message) => ({ failure: { status, code, message } });
+const pageOf = (rows, url, sources) => { const result = page(rows, url); return { data: result.rows, next: result.next, sources }; };
+const filterParams = (rows, url, pairs) => {
+  let out = rows;
+  for (const [param, field] of pairs) if (url.searchParams.has(param)) out = out.filter(row => row[field] === url.searchParams.get(param));
+  return out;
+};
+const byProject = (rows, store, url) => url.searchParams.has('project') ? rows.filter(row => projectName(store, row.ledger_id) === url.searchParams.get('project')) : rows;
+const since = (rows, url, field) => url.searchParams.has('since') ? rows.filter(row => row[field] >= Number(url.searchParams.get('since'))) : rows;
+const projectSources = (store, rel) => store.projects().flatMap(row => source(row.name, rel));
+
+function routeHealth({ store }) {
+  return { data: health(store), sources: [...source('machine', 'v_engine_health', 'v_services', 'v_seats', 'v_deaf_seats', 'throttle_state', 'provider_health', 'v_sla_open', 'invariant_violations', 'v_leaks', 'gc_runs', 'land_queue'), ...projectSources(store, 'v_ledger_leaks')] };
+}
+function routeReconciler({ store }) {
+  return { data: reconciler(store), sources: source('machine', 'v_engine_health', 'engine_leader', 'leader_history', 'v_engine_starts', 'process_runs', 'machine_logs', 'controller_modes', 'mode_changes', 'engine_queue', 'v_engine_actions', 'v_schedules') };
+}
+function routeReconcilerActions({ store, url, m }) {
+  const rows = since(byProject(filterParams(many(m, 'SELECT * FROM v_engine_actions ORDER BY started_at DESC LIMIT 1000'), url, [['controller', 'controller'], ['state', 'state'], ['wf', 'workflow_id'], ['job', 'job_id']]), store, url), url, 'started_at');
+  return pageOf(rows.map(row => actionRow(m, row, { project: projectName(store, row.ledger_id), ref, blob })), url, source('machine', 'v_engine_actions', 'action_steps', 'blobs'));
+}
+function routeReconcilerQueue({ url, m }) {
+  return { data: many(m, 'SELECT * FROM engine_queue ORDER BY due_at').filter(row => !url.searchParams.has('controller') || row.controller === url.searchParams.get('controller')).map(row => ({ controller: row.controller, key: row.key, dueAt: row.due_at, reason: row.reason, tries: row.tries, lastError: row.last_error })), sources: source('machine', 'engine_queue') };
+}
+function routeSlaViolations({ store, url, m }) {
+  let rows = many(m, 'SELECT * FROM invariant_violations ORDER BY violated_at DESC');
+  if (url.searchParams.get('open') === '1') rows = rows.filter(row => row.cleared_at == null);
+  rows = since(byProject(filterParams(rows, url, [['code', 'code']]), store, url), url, 'violated_at');
+  return pageOf(rows.map(row => ({ id: row.violation_id, code: row.code, severity: row.severity,
+    entity: { text: row.entity }, project: projectName(store, row.ledger_id), violatedAt: row.violated_at,
+    clearedAt: row.cleared_at, di: row.di_id ? ref('di', row.di_id) : null,
+    lesson: row.lesson_id ? ref('lesson', row.lesson_id) : null, detail: parse(row.detail_json) })), url, source('machine', 'invariant_violations', 'sla_episodes'));
+}
+function clockUi(row) {
+  if (row.ui != null) return row.ui;
+  if (row.cleared_at) return 'done';
+  if (row.violated_at) return row.severity === 'critical' ? 'bad' : 'warn';
+  return 'waiting';
+}
+function routeSlaClocks({ store, url, m }) {
+  const open = url.searchParams.get('open') !== '0';
+  let rows = filterParams(many(m, `SELECT * FROM ${open ? 'v_sla_open' : 'sla_episodes'} ORDER BY entered_at DESC LIMIT 1000`), url, [['state', 'state'], ['code', 'code']]);
+  if (url.searchParams.get('violated') === '1') rows = rows.filter(row => row.violated_at != null);
+  rows = byProject(rows, store, url);
+  return { data: rows.map(row => ({ id: row.episode_id, entity: row.entity, state: row.state, code: row.code,
+    severity: row.severity, project: projectName(store, row.ledger_id), wf: row.workflow_id,
+    enteredAt: row.entered_at, slaMs: row.sla_ms, dueAt: row.due_at ?? row.entered_at + row.sla_ms,
+    violatedAt: row.violated_at, clearedAt: row.cleared_at, clearReason: row.clear_reason,
+    di: row.di_id ? ref('di', row.di_id) : null, ui: clockUi(row) })), sources: source('machine', open ? 'v_sla_open' : 'sla_episodes') };
+}
+function routeSlaCatalog() {
+  try { return { data: catalog(), sources: [{ db: 'file', rel: 'modules/reconciler/sla.yaml', at: fs.statSync(SLA_FILE).mtimeMs }, { db: 'file', rel: 'modules/models/runtimes.yaml' }] }; }
+  catch { return failure(503, 'SLA_CATALOG_UNAVAILABLE', 'SLA catalog source could not be read'); }
+}
+function routeServices({ store }) { return { data: services(store.machine), sources: source('machine', 'v_services', 'service_probes', 'service_events') }; }
+function routeServiceTarget({ store, url }) {
+  return { data: serviceTarget(store, url), sources: source('machine', 'v_services', 'service_probes', 'v_seats', 'v_deaf_seats', 'seat_transcript_snapshots', 'terminals', 'blobs') };
+}
+function routeServiceProbes({ url, pathname, m }) {
+  const name = decodeURIComponent(pathname.split('/')[3]);
+  if (!one(m, 'SELECT name FROM services WHERE name=?', name)) return failure(404, 'NOT_FOUND', 'Service not found');
+  const from = Number(url.searchParams.get('since')) || 0, limit = limitOf(url);
+  return { data: { probes: many(m, 'SELECT * FROM service_probes WHERE name=? AND at>=? ORDER BY at DESC LIMIT ?', name, from, limit).map(row => ({ at: row.at, ok: Boolean(row.ok), latencyMs: row.latency_ms, detail: parse(row.detail_json) })),
+    events: many(m, 'SELECT * FROM service_events WHERE name=? AND at>=? ORDER BY at DESC LIMIT ?', name, from, limit).map(row => ({ at: row.at, from: row.from_state, to: row.to_state, probeMs: row.probe_ms, probeError: row.probe_error, action: row.action })) },
+  sources: source('machine', 'service_probes', 'service_events') };
+}
+function routeSeats({ store }) { return { data: seats(store), sources: source('machine', 'v_seats', 'v_deaf_seats', 'seat_transcript_snapshots', 'deliveries', 'seat_turns', 'blobs') }; }
+function routeTerminals({ store, url }) { return { data: terminals(store, url), sources: source('machine', 'terminals') }; }
+function routeResources({ store, m }) {
+  return { data: resources(store), sources: source('machine', 'throttle_state', 'throttle_events', 'throttle_decisions', 'pool_backoff', 'provider_health', 'quotas', 'host_resources', 'host_leases', 'budgets', ...(admissionObserved(m) ? ['provider_reservations'] : [])) };
+}
+function routeResourceSamples({ url, m }) {
+  const kind = url.searchParams.get('kind') ?? 'host', from = Number(url.searchParams.get('since')) || 0, step = Math.max(1, Number(url.searchParams.get('step')) || 1);
+  return { data: many(m, 'SELECT * FROM host_samples WHERE kind=? AND at>=? ORDER BY at', kind, from).filter((_row, index) => index % step === 0).map(row => ({ at: row.at, ramMb: row.ram_mb, cpuPct: row.cpu_pct, freeRamMb: row.free_ram_mb, freeRamPct: row.free_ram_pct, freeDiskGb: row.free_disk_gb, subject: row.subject })), sources: source('machine', 'host_samples') };
+}
+function routeGcRuns({ url, m }) { return pageOf(many(m, 'SELECT * FROM gc_runs ORDER BY run_id DESC').map(row => gcRun(m, row)), url, source('machine', 'gc_runs', 'blobs')); }
+function routeGcRun({ pathname, m }) {
+  const id = Number(pathname.split('/')[4]);
+  const row = one(m, 'SELECT * FROM gc_runs WHERE run_id=?', id);
+  if (!row) return failure(404, 'NOT_FOUND', 'GC run not found');
+  return { data: { run: gcRun(m, row), items: many(m, 'SELECT * FROM gc_items WHERE run_id=? ORDER BY item_id', id).map(item => ({ collector: item.collector, kind: item.kind, target: relative(item.target), owner: item.owner_ref ? ref('gc', item.owner_ref) : null,
+    ageMs: item.age_ms, action: item.action, reason: item.reason, bytes: item.bytes, tries: item.tries,
+    outcome: item.outcome, lastError: item.last_error, verifiedGoneAt: item.verified_gone_at, at: item.at })) }, sources: source('machine', 'gc_runs', 'gc_items', 'blobs') };
+}
+function routeLeaks({ store }) { return { data: leaks(store), sources: [...source('machine', 'v_leaks'), ...projectSources(store, 'v_ledger_leaks')] }; }
+function routeLand({ store }) { return { data: land(store), sources: source('machine', 'land_queue', 'land_runs', 'pushes', 'repositories', 'blobs') }; }
+function routeLandTarget({ store, url }) { return { data: landTarget(store, url), sources: source('machine', 'land_queue', 'land_runs', 'lanes', 'pushes', 'repositories', 'blobs') }; }
+function routeLandRuns({ url, m }) {
+  const rows = filterParams(many(m, 'SELECT * FROM land_runs ORDER BY run_id DESC'), url, [['lane', 'lane'], ['result', 'result']]);
+  return pageOf(rows.map(row => landRun(m, row)), url, source('machine', 'land_runs', 'blobs'));
+}
+function routeLanes({ url, m }) {
+  return { data: many(m, 'SELECT * FROM lanes ORDER BY created_at DESC').filter(row => !url.searchParams.has('state') || row.state === url.searchParams.get('state')).map(row => laneRow(m, row)), sources: source('machine', 'lanes', 'blobs') };
+}
+function routeSupervisor({ store }) { return { data: supervisor(store), sources: source('machine', 'v_seats', 'v_open_sup_decisions', 'sup_owed', 'sup_jobs', 'sup_attempts', 'notifications') }; }
+const RUNNING_JOB_STATES = ['spawning', 'running', 'reported', 'landing'];
+function routeSupervisorWorkers({ url, m }) {
+  let rows = many(m, 'SELECT j.*,a.* FROM sup_jobs j LEFT JOIN sup_attempts a ON a.attempt_id=(SELECT max(attempt_id) FROM sup_attempts WHERE job_id=j.job_id) ORDER BY j.created_at DESC');
+  if (url.searchParams.get('state') !== 'all') rows = rows.filter(row => RUNNING_JOB_STATES.includes(row.status));
+  return pageOf(rows.map(row => ({ job: row.job_id, lane: row.lane, kind: row.kind, title: row.title, status: row.status,
+    attempt: row.attempt_id == null ? null : { agent: row.agent, model: row.model, terminal: row.terminal_handle,
+      worktree: relative(row.worktree_path), branch: row.branch, spawnedAt: row.spawned_at, reportedAt: row.reported_at,
+      landedAt: row.landed_at, verdict: row.verdict, landedSha: row.landed_sha, tokensIn: row.tokens_in,
+      tokensOut: row.tokens_out, costUsd: row.cost_usd, transcript: blob(m, row.transcript_sha) },
+    ui: uiState(m, 'sup-job', row.status) })), url, source('machine', 'sup_jobs', 'sup_attempts', 'blobs'));
+}
+function routeSupervisorLessons({ url, m }) {
+  const rows = filterParams(many(m, 'SELECT * FROM sup_learning ORDER BY updated_at DESC'), url, [['kind', 'kind'], ['state', 'state']]);
+  return pageOf(rows.map(row => ({ id: row.item_id, kind: row.kind, parent: row.parent_id, title: row.title, state: row.state,
+    source: row.source_ref ? ref('workflow', row.source_ref) : null, lane: row.lane, landedSha: row.landed_sha,
+    createdAt: row.created_at, updatedAt: row.updated_at })), url, source('machine', 'sup_learning'));
+}
+function routeSupervisorRulings({ url, m }) {
+  return { data: many(m, 'SELECT * FROM sup_owner_rulings ORDER BY said_at DESC').filter(row => !url.searchParams.has('q') || `${row.verbatim} ${row.paraphrase}`.toLowerCase().includes(url.searchParams.get('q').toLowerCase())).map(row => ({ id: row.ruling_id, saidAt: row.said_at, channel: row.channel, verbatim: row.verbatim,
+    paraphrase: row.paraphrase, appliesTo: row.applies_to, contractRef: row.contract_ref })), sources: source('machine', 'sup_owner_rulings') };
+}
+function routeNotifications({ url, m }) {
+  const rows = many(m, 'SELECT * FROM notifications ORDER BY notif_id DESC').filter(row => !url.searchParams.has('kind') || row.kind === url.searchParams.get('kind'));
+  return pageOf(rows.map(row => ({ id: row.notif_id, channel: row.channel, kind: row.kind, text: row.text, sentAt: row.sent_at, delivery: row.delivery, media: blob(m, row.media_sha) })), url, source('machine', 'notifications', 'blobs'));
+}
+
+const SYSTEM_ROUTES = new Map([
+  ['/api/health', routeHealth], ['/api/reconciler', routeReconciler], ['/api/reconciler/actions', routeReconcilerActions],
+  ['/api/reconciler/queue', routeReconcilerQueue], ['/api/sla/violations', routeSlaViolations], ['/api/sla/clocks', routeSlaClocks],
+  ['/api/sla/catalog', routeSlaCatalog], ['/api/services', routeServices], ['/api/services/target', routeServiceTarget],
+  ['/api/seats', routeSeats], ['/api/terminals', routeTerminals], ['/api/resources', routeResources],
+  ['/api/resources/samples', routeResourceSamples], ['/api/gc/runs', routeGcRuns], ['/api/leaks', routeLeaks],
+  ['/api/land', routeLand], ['/api/land/target', routeLandTarget], ['/api/land/runs', routeLandRuns], ['/api/lanes', routeLanes],
+  ['/api/supervisor', routeSupervisor], ['/api/supervisor/workers', routeSupervisorWorkers],
+  ['/api/supervisor/lessons', routeSupervisorLessons], ['/api/supervisor/rulings', routeSupervisorRulings],
+  ['/api/notifications', routeNotifications],
+]);
+const SYSTEM_PATTERN_ROUTES = [[/^\/api\/services\/[^/]+\/probes$/, routeServiceProbes], [/^\/api\/gc\/runs\/\d+$/, routeGcRun]];
+const routeOf = pathname => SYSTEM_ROUTES.get(pathname) ?? SYSTEM_PATTERN_ROUTES.find(([pattern]) => pattern.test(pathname))?.[1];
+
 /** C3/C11/C13–C16 machine/system read projections. */
 export function handleSystem(request, response, store, url) {
   const pathname = url.pathname;
   if (!/^\/api\/(health|reconciler|sla|services|seats|terminals|resources|gc|leaks|land|lanes|supervisor|notifications)(\/|$)/.test(pathname)) return false;
   if (!store.machine) { sendError(request, response, 503, 'MACHINE_UNAVAILABLE', 'Machine database unavailable'); return true; }
-  const m = store.machine.db;
-  let data, sources = [], next = null;
-  if (pathname === '/api/health') { data = health(store); sources = [...source('machine', 'v_engine_health', 'v_services', 'v_seats', 'v_deaf_seats', 'throttle_state', 'provider_health', 'v_sla_open', 'invariant_violations', 'v_leaks', 'gc_runs', 'land_queue'), ...store.projects().flatMap(row => source(row.name, 'v_ledger_leaks'))]; }
-  else if (pathname === '/api/reconciler') { data = reconciler(store); sources = source('machine', 'v_engine_health', 'engine_leader', 'leader_history', 'v_engine_starts', 'process_runs', 'machine_logs', 'controller_modes', 'mode_changes', 'engine_queue', 'v_engine_actions', 'v_schedules'); }
-  else if (pathname === '/api/reconciler/actions') {
-    let rows = many(m, 'SELECT * FROM v_engine_actions ORDER BY started_at DESC LIMIT 1000');
-    for (const [param, field] of [['controller', 'controller'], ['state', 'state'], ['wf', 'workflow_id'], ['job', 'job_id']]) if (url.searchParams.has(param)) rows = rows.filter(row => row[field] === url.searchParams.get(param));
-    if (url.searchParams.has('project')) rows = rows.filter(row => projectName(store, row.ledger_id) === url.searchParams.get('project'));
-    if (url.searchParams.has('since')) rows = rows.filter(row => row.started_at >= Number(url.searchParams.get('since')));
-    const result = page(rows.map(row => actionRow(m, row, { project: projectName(store, row.ledger_id), ref, blob })), url); data = result.rows; next = result.next; sources = source('machine', 'v_engine_actions', 'action_steps', 'blobs');
-  }
-  else if (pathname === '/api/reconciler/queue') { data = many(m, 'SELECT * FROM engine_queue ORDER BY due_at').filter(row => !url.searchParams.has('controller') || row.controller === url.searchParams.get('controller')).map(row => ({ controller: row.controller, key: row.key, dueAt: row.due_at, reason: row.reason, tries: row.tries, lastError: row.last_error })); sources = source('machine', 'engine_queue'); }
-  else if (pathname === '/api/sla/violations') {
-    let rows = many(m, 'SELECT * FROM invariant_violations ORDER BY violated_at DESC');
-    if (url.searchParams.get('open') === '1') rows = rows.filter(row => row.cleared_at == null);
-    if (url.searchParams.has('code')) rows = rows.filter(row => row.code === url.searchParams.get('code'));
-    if (url.searchParams.has('project')) rows = rows.filter(row => projectName(store, row.ledger_id) === url.searchParams.get('project'));
-    if (url.searchParams.has('since')) rows = rows.filter(row => row.violated_at >= Number(url.searchParams.get('since')));
-    const result = page(rows.map(row => ({ id: row.violation_id, code: row.code, severity: row.severity,
-      entity: { text: row.entity }, project: projectName(store, row.ledger_id), violatedAt: row.violated_at,
-      clearedAt: row.cleared_at, di: row.di_id ? ref('di', row.di_id) : null,
-      lesson: row.lesson_id ? ref('lesson', row.lesson_id) : null, detail: parse(row.detail_json) })), url);
-    data = result.rows; next = result.next; sources = source('machine', 'invariant_violations', 'sla_episodes');
-  }
-  else if (pathname === '/api/sla/clocks') {
-    const open = url.searchParams.get('open') !== '0';
-    let rows = many(m, `SELECT * FROM ${open ? 'v_sla_open' : 'sla_episodes'} ORDER BY entered_at DESC LIMIT 1000`);
-    for (const [param, field] of [['state', 'state'], ['code', 'code']]) if (url.searchParams.has(param)) rows = rows.filter(row => row[field] === url.searchParams.get(param));
-    if (url.searchParams.get('violated') === '1') rows = rows.filter(row => row.violated_at != null);
-    if (url.searchParams.has('project')) rows = rows.filter(row => projectName(store, row.ledger_id) === url.searchParams.get('project'));
-    data = rows.map(row => {
-      let ui = row.ui;
-      if (ui == null) {
-        if (row.cleared_at) ui = 'done';
-        else if (row.violated_at) ui = row.severity === 'critical' ? 'bad' : 'warn';
-        else ui = 'waiting';
-      }
-      return { id: row.episode_id, entity: row.entity, state: row.state, code: row.code,
-        severity: row.severity, project: projectName(store, row.ledger_id), wf: row.workflow_id,
-        enteredAt: row.entered_at, slaMs: row.sla_ms, dueAt: row.due_at ?? row.entered_at + row.sla_ms,
-        violatedAt: row.violated_at, clearedAt: row.cleared_at, clearReason: row.clear_reason,
-        di: row.di_id ? ref('di', row.di_id) : null, ui };
-    });
-    sources = source('machine', open ? 'v_sla_open' : 'sla_episodes');
-  }
-  else if (pathname === '/api/sla/catalog') {
-    try { data = catalog(); sources = [{ db: 'file', rel: 'modules/reconciler/sla.yaml', at: fs.statSync(SLA_FILE).mtimeMs }, { db: 'file', rel: 'modules/models/runtimes.yaml' }]; }
-    catch { sendError(request, response, 503, 'SLA_CATALOG_UNAVAILABLE', 'SLA catalog source could not be read'); return true; }
-  }
-  else if (pathname === '/api/services') { data = services(store.machine); sources = source('machine', 'v_services', 'service_probes', 'service_events'); }
-  else if (pathname === '/api/services/target') { data = serviceTarget(store, url); sources = source('machine', 'v_services', 'service_probes', 'v_seats', 'v_deaf_seats', 'seat_transcript_snapshots', 'terminals', 'blobs'); }
-  else if (/^\/api\/services\/[^/]+\/probes$/.test(pathname)) {
-    const name = decodeURIComponent(pathname.split('/')[3]);
-    if (!one(m, 'SELECT name FROM services WHERE name=?', name)) { sendError(request, response, 404, 'NOT_FOUND', 'Service not found'); return true; }
-    const since = Number(url.searchParams.get('since')) || 0, limit = limitOf(url);
-    data = { probes: many(m, 'SELECT * FROM service_probes WHERE name=? AND at>=? ORDER BY at DESC LIMIT ?', name, since, limit).map(row => ({ at: row.at, ok: Boolean(row.ok), latencyMs: row.latency_ms, detail: parse(row.detail_json) })),
-      events: many(m, 'SELECT * FROM service_events WHERE name=? AND at>=? ORDER BY at DESC LIMIT ?', name, since, limit).map(row => ({ at: row.at, from: row.from_state, to: row.to_state, probeMs: row.probe_ms, probeError: row.probe_error, action: row.action })) }; sources = source('machine', 'service_probes', 'service_events');
-  }
-  else if (pathname === '/api/seats') { data = seats(store); sources = source('machine', 'v_seats', 'v_deaf_seats', 'seat_transcript_snapshots', 'deliveries', 'seat_turns', 'blobs'); }
-  else if (pathname === '/api/terminals') { data = terminals(store, url); sources = source('machine', 'terminals'); }
-  else if (pathname === '/api/resources') { data = resources(store); sources = source('machine', 'throttle_state', 'throttle_events', 'throttle_decisions', 'pool_backoff', 'provider_health', 'quotas', 'host_resources', 'host_leases', 'budgets', ...(admissionObserved(m) ? ['provider_reservations'] : [])); }
-  else if (pathname === '/api/resources/samples') { const kind = url.searchParams.get('kind') ?? 'host', since = Number(url.searchParams.get('since')) || 0, step = Math.max(1, Number(url.searchParams.get('step')) || 1);
-    data = many(m, 'SELECT * FROM host_samples WHERE kind=? AND at>=? ORDER BY at', kind, since).filter((_row, index) => index % step === 0).map(row => ({ at: row.at, ramMb: row.ram_mb, cpuPct: row.cpu_pct, freeRamMb: row.free_ram_mb, freeRamPct: row.free_ram_pct, freeDiskGb: row.free_disk_gb, subject: row.subject })); sources = source('machine', 'host_samples'); }
-  else if (pathname === '/api/gc/runs') { const result = page(many(m, 'SELECT * FROM gc_runs ORDER BY run_id DESC').map(row => gcRun(m, row)), url); data = result.rows; next = result.next; sources = source('machine', 'gc_runs', 'blobs'); }
-  else if (/^\/api\/gc\/runs\/\d+$/.test(pathname)) { const id = Number(pathname.split('/')[4]); const row = one(m, 'SELECT * FROM gc_runs WHERE run_id=?', id); if (!row) { sendError(request, response, 404, 'NOT_FOUND', 'GC run not found'); return true; }
-    data = { run: gcRun(m, row), items: many(m, 'SELECT * FROM gc_items WHERE run_id=? ORDER BY item_id', id).map(item => ({ collector: item.collector, kind: item.kind, target: relative(item.target), owner: item.owner_ref ? ref('gc', item.owner_ref) : null,
-      ageMs: item.age_ms, action: item.action, reason: item.reason, bytes: item.bytes, tries: item.tries,
-      outcome: item.outcome, lastError: item.last_error, verifiedGoneAt: item.verified_gone_at, at: item.at })) }; sources = source('machine', 'gc_runs', 'gc_items', 'blobs'); }
-  else if (pathname === '/api/leaks') { data = leaks(store); sources = [...source('machine', 'v_leaks'), ...store.projects().flatMap(row => source(row.name, 'v_ledger_leaks'))]; }
-  else if (pathname === '/api/land') { data = land(store); sources = source('machine', 'land_queue', 'land_runs', 'pushes', 'repositories', 'blobs'); }
-  else if (pathname === '/api/land/target') { data = landTarget(store, url); sources = source('machine', 'land_queue', 'land_runs', 'lanes', 'pushes', 'repositories', 'blobs'); }
-  else if (pathname === '/api/land/runs') { let rows = many(m, 'SELECT * FROM land_runs ORDER BY run_id DESC'); if (url.searchParams.has('lane')) { rows = rows.filter(row => row.lane === url.searchParams.get('lane')); } if (url.searchParams.has('result')) { rows = rows.filter(row => row.result === url.searchParams.get('result')); } const result = page(rows.map(row => landRun(m, row)), url); data = result.rows; next = result.next; sources = source('machine', 'land_runs', 'blobs'); }
-  else if (pathname === '/api/lanes') { data = many(m, 'SELECT * FROM lanes ORDER BY created_at DESC').filter(row => !url.searchParams.has('state') || row.state === url.searchParams.get('state')).map(row => laneRow(m, row)); sources = source('machine', 'lanes', 'blobs'); }
-  else if (pathname === '/api/supervisor') { data = supervisor(store); sources = source('machine', 'v_seats', 'v_open_sup_decisions', 'sup_owed', 'sup_jobs', 'sup_attempts', 'notifications'); }
-  else if (pathname === '/api/supervisor/workers') { let rows = many(m, 'SELECT j.*,a.* FROM sup_jobs j LEFT JOIN sup_attempts a ON a.attempt_id=(SELECT max(attempt_id) FROM sup_attempts WHERE job_id=j.job_id) ORDER BY j.created_at DESC');
-    if (url.searchParams.get('state') !== 'all') rows = rows.filter(row => ['spawning', 'running', 'reported', 'landing'].includes(row.status));
-    const result = page(rows.map(row => ({ job: row.job_id, lane: row.lane, kind: row.kind, title: row.title, status: row.status,
-      attempt: row.attempt_id == null ? null : { agent: row.agent, model: row.model, terminal: row.terminal_handle,
-        worktree: relative(row.worktree_path), branch: row.branch, spawnedAt: row.spawned_at, reportedAt: row.reported_at,
-        landedAt: row.landed_at, verdict: row.verdict, landedSha: row.landed_sha, tokensIn: row.tokens_in,
-        tokensOut: row.tokens_out, costUsd: row.cost_usd, transcript: blob(m, row.transcript_sha) },
-      ui: uiState(m, 'sup-job', row.status) })), url); data = result.rows; next = result.next; sources = source('machine', 'sup_jobs', 'sup_attempts', 'blobs'); }
-  else if (pathname === '/api/supervisor/lessons') { let rows = many(m, 'SELECT * FROM sup_learning ORDER BY updated_at DESC'); if (url.searchParams.has('kind')) { rows = rows.filter(row => row.kind === url.searchParams.get('kind')); } if (url.searchParams.has('state')) { rows = rows.filter(row => row.state === url.searchParams.get('state')); } const result = page(rows.map(row => ({ id: row.item_id, kind: row.kind, parent: row.parent_id, title: row.title, state: row.state,
-    source: row.source_ref ? ref('workflow', row.source_ref) : null, lane: row.lane, landedSha: row.landed_sha,
-    createdAt: row.created_at, updatedAt: row.updated_at })), url); data = result.rows; next = result.next; sources = source('machine', 'sup_learning'); }
-  else if (pathname === '/api/supervisor/rulings') { data = many(m, 'SELECT * FROM sup_owner_rulings ORDER BY said_at DESC').filter(row => !url.searchParams.has('q') || `${row.verbatim} ${row.paraphrase}`.toLowerCase().includes(url.searchParams.get('q').toLowerCase())).map(row => ({ id: row.ruling_id, saidAt: row.said_at, channel: row.channel, verbatim: row.verbatim,
-    paraphrase: row.paraphrase, appliesTo: row.applies_to, contractRef: row.contract_ref })); sources = source('machine', 'sup_owner_rulings'); }
-  else if (pathname === '/api/notifications') { const rows = many(m, 'SELECT * FROM notifications ORDER BY notif_id DESC').filter(row => !url.searchParams.has('kind') || row.kind === url.searchParams.get('kind')); const result = page(rows.map(row => ({ id: row.notif_id, channel: row.channel, kind: row.kind, text: row.text, sentAt: row.sent_at, delivery: row.delivery, media: blob(m, row.media_sha) })), url); data = result.rows; next = result.next; sources = source('machine', 'notifications', 'blobs'); }
-  else return false;
-  sendJson(request, response, data, { sources, stale: staleOf(store), next });
+  const route = routeOf(pathname);
+  if (!route) return false;
+  const result = route({ store, url, pathname, m: store.machine.db });
+  if (result.failure) { sendError(request, response, result.failure.status, result.failure.code, result.failure.message); return true; }
+  sendJson(request, response, result.data, { sources: result.sources ?? [], stale: staleOf(store), next: result.next ?? null });
   return true;
 }

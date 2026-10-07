@@ -104,6 +104,28 @@ function decisionCandidates(store, machine, id, requestedStore, requestedLedger)
   }, 'decision_items'));
   return candidates;
 }
+function deliveryAmbiguous(store, machine, { supervisor, ledgerId, id }) {
+  if (!supervisor) return Boolean(one(machine, 'SELECT di_id FROM sup_decision_items WHERE di_id=? AND ledger_id IS ?', id, ledgerId));
+  const counterpart = ledgerId ? store.ledger(ledgerId) : null;
+  return Boolean(ledgerId && (!counterpart || one(counterpart.db, 'SELECT di_id FROM decision_items WHERE di_id=?', id)));
+}
+function decisionEvents(machine, db, supervisor, id) {
+  if (supervisor) return many(machine, "SELECT kind,created_at AS at,payload_json FROM sup_events WHERE entity_id=? AND kind LIKE 'decision-%' ORDER BY seq", id);
+  return many(db, "SELECT kind,created_at AS at,payload_json FROM events WHERE entity_id=? AND kind LIKE 'decision-%' ORDER BY seq", id);
+}
+function latestResolution(machine, db, supervisor, id) {
+  if (supervisor) return one(machine, 'SELECT * FROM sup_decisions WHERE di_id=? ORDER BY decided_at DESC LIMIT 1', id);
+  return one(db, 'SELECT * FROM decisions WHERE di_id=? ORDER BY decided_at DESC LIMIT 1', id);
+}
+const optionsOf = options => Array.isArray(options) ? options.map(option => ({ key: option.key, verb: option.verb, recommended: Boolean(option.recommended) })) : [];
+function historyOf(events, deliveries, item) {
+  return [...events.map(event => {
+    const payload = parse(event.payload_json, {});
+    return { kind: event.kind, at: event.at, by: payload.decider ?? payload.from ?? item.opened_by,
+      from: payload.from ?? null, to: payload.to ?? null };
+  }), ...deliveries]
+    .sort((a, b) => a.at - b.at);
+}
 function detail(store, id, url) {
   const machine = store.machine.db;
   const requestedStore = url.searchParams.get('store'), requestedLedger = url.searchParams.get('ledger') ?? url.searchParams.get('project');
@@ -116,28 +138,17 @@ function detail(store, id, url) {
   if (!item || !db) return null;
   const namespace = { store: supervisor ? 'machine' : 'ledger', ledgerId };
   const row = decisionRow(machine, supervisor ? { ...item, ...one(machine, 'SELECT ui FROM v_open_sup_decisions WHERE di_id=?', id) } : { ...item, ...one(db, 'SELECT ui,overdue FROM v_decision_rows WHERE di_id=?', id) }, project, namespace);
-  const events = supervisor
-    ? many(machine, "SELECT kind,created_at AS at,payload_json FROM sup_events WHERE entity_id=? AND kind LIKE 'decision-%' ORDER BY seq", id)
-    : many(db, "SELECT kind,created_at AS at,payload_json FROM events WHERE entity_id=? AND kind LIKE 'decision-%' ORDER BY seq", id);
-  let counterpart = null;
-  if (supervisor && ledgerId) counterpart = store.ledger(ledgerId);
-  const deliveryAmbiguous = supervisor ? Boolean(ledgerId && (!counterpart || one(counterpart.db, 'SELECT di_id FROM decision_items WHERE di_id=?', id)))
-    : Boolean(one(machine, 'SELECT di_id FROM sup_decision_items WHERE di_id=? AND ledger_id IS ?', id, ledgerId));
-  if (deliveryAmbiguous) row.channel = null;
-  const deliveries = deliveryAmbiguous ? [] : many(machine, "SELECT message_kind AS kind,attempted_at AS at,COALESCE(seat_id,channel) AS by FROM deliveries WHERE message_kind='decision' AND message_ref=? AND ledger_id IS ? ORDER BY delivery_id", id, ledgerId);
-  const history = [...events.map(event => {
-    const payload = parse(event.payload_json, {});
-    return { kind: event.kind, at: event.at, by: payload.decider ?? payload.from ?? item.opened_by,
-      from: payload.from ?? null, to: payload.to ?? null };
-  }), ...deliveries]
-    .sort((a, b) => a.at - b.at);
-  const resolution = supervisor ? one(machine, 'SELECT * FROM sup_decisions WHERE di_id=? ORDER BY decided_at DESC LIMIT 1', id)
-    : one(db, 'SELECT * FROM decisions WHERE di_id=? ORDER BY decided_at DESC LIMIT 1', id);
+  const events = decisionEvents(machine, db, supervisor, id);
+  const ambiguous = deliveryAmbiguous(store, machine, { supervisor, ledgerId, id });
+  if (ambiguous) row.channel = null;
+  const deliveries = ambiguous ? [] : many(machine, "SELECT message_kind AS kind,attempted_at AS at,COALESCE(seat_id,channel) AS by FROM deliveries WHERE message_kind='decision' AND message_ref=? AND ledger_id IS ? ORDER BY delivery_id", id, ledgerId);
+  const history = historyOf(events, deliveries, item);
+  const resolution = latestResolution(machine, db, supervisor, id);
   const options = parse(item.options_json, []);
   const credential = item.kind === 'credential-missing';
   const resolutionResult = resolution && (credential ? null : parse(resolution.result_json));
   return { ...row, evidence: evidence(parse(item.evidence_json), project, namespace, item.workflow_id).map(entry => credential && 'text' in entry ? { text: 'Credential content hidden.' } : entry),
-    options: Array.isArray(options) ? options.map(option => ({ key: option.key, verb: option.verb, recommended: Boolean(option.recommended) })) : [],
+    options: optionsOf(options),
     allowedVerbs: parse(item.allowed_verbs_json, []), history,
     resolution: resolution ? { by: resolution.decider, verb: item.resolution_verb ?? resolution.choice,
       decision: ref('di', id, project, namespace), result: resolutionResult } : null,
@@ -179,34 +190,35 @@ function listedIncidents(store, url) {
     .sort((a, b) => b.updatedAt - a.updatedAt || `${a.ledgerId}:${a.id}`.localeCompare(`${b.ledgerId}:${b.id}`));
 }
 
+const LISTINGS = new Map([
+  ['/api/decisions', { list: listedDecisions, sources: ledgers => [...source('machine', 'sup_decision_items', 'v_open_sup_decisions', 'ask_requests', 'deliveries'),
+    ...ledgers.flatMap(ledger => source(ledger.name, 'v_decision_rows'))] }],
+  ['/api/asks', { list: listedAsks, sources: ledgers => [...source('machine', 'ask_requests', 'sup_decision_items'),
+    ...ledgers.flatMap(ledger => source(ledger.name, 'decision_items', 'incidents'))] }],
+  ['/api/incidents', { list: listedIncidents, sources: ledgers => ledgers.flatMap(ledger => source(ledger.name, 'incidents')) }],
+]);
+function sendDecision(request, response, store, url, pathname) {
+  let id;
+  try { id = decodeURIComponent(pathname.slice('/api/decisions/'.length)); } catch { sendError(request, response, 400, 'BAD_PATH', 'Invalid decision id'); return; }
+  if (url.searchParams.has('store') && !['machine', 'ledger'].includes(url.searchParams.get('store'))) { sendError(request, response, 400, 'BAD_SCOPE', 'Invalid decision namespace'); return; }
+  const item = detail(store, id, url);
+  if (item?.unavailable) { sendError(request, response, 503, 'READ_FAILED', 'Decision source is unavailable; exact identity cannot be established.'); return; }
+  if (item?.ambiguous) { sendError(request, response, 400, 'AMBIGUOUS_DECISION', 'Decision ID occurs in multiple stores. Specify store and ledger.'); return; }
+  if (!item) { sendError(request, response, 404, 'NOT_FOUND', 'Decision Item not found'); return; }
+  sendJson(request, response, item, { sources: [...source('machine', 'deliveries', 'ask_requests', ...(item.store === 'machine' ? ['sup_decision_items', 'v_open_sup_decisions', 'sup_events', 'sup_decisions'] : [])),
+    ...(item.store === 'ledger' ? source(item.project, 'decision_items', 'v_decision_rows', 'events', 'decisions') : [])], stale: staleOf(store) });
+}
+
 /** C12 read-only Decision Items, asks, and incidents. */
 export function handleDecisions(request, response, store, url) {
   const pathname = url.pathname;
   if (pathname === '/api/decisions/log') return false;
-  if (!['/api/decisions', '/api/asks', '/api/incidents'].includes(pathname) && !/^\/api\/decisions\/[^/]+$/.test(pathname)) return false;
+  if (!LISTINGS.has(pathname) && !/^\/api\/decisions\/[^/]+$/.test(pathname)) return false;
   if (!store.machine) { sendError(request, response, 503, 'MACHINE_UNAVAILABLE', 'Machine database unavailable'); return true; }
   if (url.searchParams.get('project') && !scopedLedgers(store, url.searchParams.get('project')).length) { sendError(request, response, 404, 'NOT_FOUND', 'Project not found'); return true; }
-  if (pathname === '/api/decisions') {
-    const result = page(listedDecisions(store, url), url);
-    sendJson(request, response, result.rows, { sources: [...source('machine', 'sup_decision_items', 'v_open_sup_decisions', 'ask_requests', 'deliveries'),
-      ...scopedLedgers(store, url.searchParams.get('project')).flatMap(ledger => source(ledger.name, 'v_decision_rows'))], stale: staleOf(store), next: result.next }); return true;
-  }
-  if (pathname === '/api/asks') {
-    const result = page(listedAsks(store, url), url);
-    sendJson(request, response, result.rows, { sources: [...source('machine', 'ask_requests', 'sup_decision_items'),
-      ...scopedLedgers(store, url.searchParams.get('project')).flatMap(ledger => source(ledger.name, 'decision_items', 'incidents'))], stale: staleOf(store), next: result.next }); return true;
-  }
-  if (pathname === '/api/incidents') {
-    const result = page(listedIncidents(store, url), url);
-    sendJson(request, response, result.rows, { sources: scopedLedgers(store, url.searchParams.get('project')).flatMap(ledger => source(ledger.name, 'incidents')), stale: staleOf(store), next: result.next }); return true;
-  }
-  let id;
-  try { id = decodeURIComponent(pathname.slice('/api/decisions/'.length)); } catch { sendError(request, response, 400, 'BAD_PATH', 'Invalid decision id'); return true; }
-  if (url.searchParams.has('store') && !['machine', 'ledger'].includes(url.searchParams.get('store'))) { sendError(request, response, 400, 'BAD_SCOPE', 'Invalid decision namespace'); return true; }
-  const item = detail(store, id, url);
-  if (item?.unavailable) { sendError(request, response, 503, 'READ_FAILED', 'Decision source is unavailable; exact identity cannot be established.'); return true; }
-  if (item?.ambiguous) { sendError(request, response, 400, 'AMBIGUOUS_DECISION', 'Decision ID occurs in multiple stores. Specify store and ledger.'); return true; }
-  if (!item) { sendError(request, response, 404, 'NOT_FOUND', 'Decision Item not found'); return true; }
-  sendJson(request, response, item, { sources: [...source('machine', 'deliveries', 'ask_requests', ...(item.store === 'machine' ? ['sup_decision_items', 'v_open_sup_decisions', 'sup_events', 'sup_decisions'] : [])),
-    ...(item.store === 'ledger' ? source(item.project, 'decision_items', 'v_decision_rows', 'events', 'decisions') : [])], stale: staleOf(store) }); return true;
+  const listing = LISTINGS.get(pathname);
+  if (!listing) { sendDecision(request, response, store, url, pathname); return true; }
+  const result = page(listing.list(store, url), url);
+  sendJson(request, response, result.rows, { sources: listing.sources(scopedLedgers(store, url.searchParams.get('project'))), stale: staleOf(store), next: result.next });
+  return true;
 }
