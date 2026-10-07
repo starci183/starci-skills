@@ -69,28 +69,41 @@ function machineRefSql(db, table, col) {
   return null;
 }
 
-/** One DB's marks: {marks: Set, pinned: Set, rows: Map sha -> row, refs: [{table, column, count}], error?}. */
-export function markSource(db, { kind, now = Date.now(), retention = RETENTION } = {}) {
-  const out = { marks: new Set(), pinned: new Set(), rows: new Map(), archiveIdentities:new Map(), refs: [], error: null };
-  if (!hasLedgerTable(db, 'blob_ref_columns')) { out.error = 'no blob_ref_columns table (an old-schema DB): nothing marked from it'; return out; }
+function markReferenceColumns(db, { kind, now, retention }, out) {
   const params = { now, pass: retention.passMs, fail: retention.failMs, seat: retention.seatMs };
   for (const { table_name: table, column_name: col } of db.prepare('SELECT table_name, column_name FROM blob_ref_columns ORDER BY 1,2').all()) {
     if (!has(db, table, col)) { out.refs.push({ table, column: col, count: null, missing: true }); out.error=`incomplete blob reference catalog: ${table}.${col} is missing`; continue; }
     const special = kind === 'machine' ? machineRefSql(db, table, col) : ledgerRefSql(db, table, col);
     const sql = special ?? `SELECT DISTINCT "${col}" AS sha FROM "${table}" WHERE "${col}" IS NOT NULL`;
-    const stmt = db.prepare(sql);
-    const bound = Object.fromEntries(Object.entries(params).filter(([k]) => sql.includes(`:${k}`)));
-    const rows = Object.keys(bound).length ? stmt.all(bound) : stmt.all();
-    for (const r of rows) if (SHA.test(String(r.sha))) out.marks.add(r.sha);
+    const statement = db.prepare(sql);
+    const bound = Object.fromEntries(Object.entries(params).filter(([key]) => sql.includes(`:${key}`)));
+    const rows = Object.keys(bound).length ? statement.all(bound) : statement.all();
+    for (const row of rows) if (SHA.test(String(row.sha))) out.marks.add(row.sha);
     out.refs.push({ table, column: col, count: rows.length, retention: Boolean(special) });
   }
-  if (has(db, 'blobs', 'sha256')) {
-    for (const r of db.prepare('SELECT sha256, bytes, created_at, pinned, archived_at, archive_ref FROM blobs').all()) {
-      out.rows.set(r.sha256, r);
-      if (Number(r.pinned) === 1) { out.pinned.add(r.sha256); out.marks.add(r.sha256); }
-    }
+}
+
+function markBlobRows(db, out) {
+  if (!has(db, 'blobs', 'sha256')) return;
+  for (const row of db.prepare('SELECT sha256, bytes, created_at, pinned, archived_at, archive_ref FROM blobs').all()) {
+    out.rows.set(row.sha256, row);
+    if (Number(row.pinned) === 1) { out.pinned.add(row.sha256); out.marks.add(row.sha256); }
   }
-  if(kind==='machine'&&has(db,'archives','sha256'))for(const row of db.prepare("SELECT archive_path,sha256 FROM archives WHERE kind='blob-retention'").all())out.archiveIdentities.set(row.archive_path,row.sha256);
+}
+
+function markArchiveIdentities(db, kind, out) {
+  if (kind === 'machine' && has(db, 'archives', 'sha256')) {
+    for (const row of db.prepare("SELECT archive_path,sha256 FROM archives WHERE kind='blob-retention'").all()) out.archiveIdentities.set(row.archive_path, row.sha256);
+  }
+}
+
+/** One DB's marks: {marks: Set, pinned: Set, rows: Map sha -> row, refs: [{table, column, count}], error?}. */
+export function markSource(db, { kind, now = Date.now(), retention = RETENTION } = {}) {
+  const out = { marks: new Set(), pinned: new Set(), rows: new Map(), archiveIdentities:new Map(), refs: [], error: null };
+  if (!hasLedgerTable(db, 'blob_ref_columns')) { out.error = 'no blob_ref_columns table (an old-schema DB): nothing marked from it'; return out; }
+  markReferenceColumns(db, { kind, now, retention }, out);
+  markBlobRows(db, out);
+  markArchiveIdentities(db, kind, out);
   return out;
 }
 
@@ -103,21 +116,23 @@ function enrolledLedgers(machineDb) {
 }
 
 /** Every blob file in the store: Map sha -> {file, size, createdAt}. */
+function addStoreBlob(root, shard, name, out) {
+  if (!SHA.test(name)) return;
+  const file = path.join(root, shard, name);
+  let stat;
+  try { stat = fs.lstatSync(file); } catch { return; }
+  if (!stat.isFile()) return;
+  let createdAt = stat.mtimeMs;
+  try { const meta = JSON.parse(fs.readFileSync(`${file}.json`, 'utf8')); if (meta.createdAt) createdAt = Date.parse(meta.createdAt) || createdAt; } catch { /* no sidecar */ }
+  out.set(name, { file, size: stat.size, createdAt });
+}
+
 function storeBlobs(root = artifactRoot()) {
   const out = new Map();
   let shards = [];
   try { shards = fs.readdirSync(root, { withFileTypes: true }).filter((e) => e.isDirectory() && /^[a-f0-9]{2}$/.test(e.name)); } catch { return out; }
   for (const shard of shards) {
-    for (const name of fs.readdirSync(path.join(root, shard.name))) {
-      if (!SHA.test(name)) continue;
-      const file = path.join(root, shard.name, name);
-      let st;
-      try { st = fs.lstatSync(file); } catch { continue; }
-      if (!st.isFile()) continue;
-      let createdAt = st.mtimeMs;
-      try { const meta = JSON.parse(fs.readFileSync(`${file}.json`, 'utf8')); if (meta.createdAt) createdAt = Date.parse(meta.createdAt) || createdAt; } catch { /* no sidecar */ }
-      out.set(name, { file, size: st.size, createdAt });
-    }
+    for (const name of fs.readdirSync(path.join(root, shard.name))) addStoreBlob(root, shard.name, name, out);
   }
   return out;
 }
@@ -125,38 +140,49 @@ function storeBlobs(root = artifactRoot()) {
 const readOnly = (file, fn) => { const db = openLedgerReader(file); try { return fn(db); } finally { db.close(); } };
 const readMachineDb = (file, fn) => { const m = openMachineReader({ file }); if (!m) { throw new Error('machine.sqlite does not exist'); } try { return fn(m.db); } finally { m.close(); } };
 
-/** The dry-run plan. Reads only. */
-export async function planBlobGc({ env = process.env, now = Date.now(), retention = RETENTION, machineFile = machineFileFor(env), root = artifactRoot(env) } = {}) {
+function emptySource(name, kind, file, error, ledgerId) {
+  const source = { name, kind, file };
+  if (ledgerId !== undefined) source.ledgerId = ledgerId;
+  return { ...source, marks: new Set(), pinned: new Set(), rows: new Map(), refs: [], error };
+}
+
+function collectMarkSources({ machineFile, now, retention }) {
   const sources = [];
   let ledgers = [];
   if (fs.existsSync(machineFile)) {
     try {
-      const m = readMachineDb(machineFile, (db) => { ledgers = enrolledLedgers(db); return markSource(db, { kind: 'machine', now, retention }); });
-      sources.push({ name: 'machine', kind: 'machine', file: machineFile, ...m });
-    } catch (error) { sources.push({ name: 'machine', kind: 'machine', file: machineFile, marks: new Set(), pinned: new Set(), rows: new Map(), refs: [], error: String(error?.message ?? error) }); }
-  } else sources.push({ name: 'machine', kind: 'machine', file: machineFile, marks: new Set(), pinned: new Set(), rows: new Map(), refs: [], error: 'machine.sqlite does not exist' });
-  for (const l of ledgers) {
-    if (!fs.existsSync(l.file)) { sources.push({ name: l.name, kind: 'ledger', file: l.file, ledgerId: l.ledgerId, marks: new Set(), pinned: new Set(), rows: new Map(), refs: [], error: 'ledger file missing: its blobs are not marked, so nothing is swept this run' }); continue; }
-    try { sources.push({ name: l.name, kind: 'ledger', file: l.file, ledgerId: l.ledgerId, ...readOnly(l.file, (db) => markSource(db, { kind: 'ledger', now, retention })) }); }
-    catch (error) { sources.push({ name: l.name, kind: 'ledger', file: l.file, ledgerId: l.ledgerId, marks: new Set(), pinned: new Set(), rows: new Map(), refs: [], error: String(error?.message ?? error) }); }
+      const machine = readMachineDb(machineFile, (db) => { ledgers = enrolledLedgers(db); return markSource(db, { kind: 'machine', now, retention }); });
+      sources.push({ name: 'machine', kind: 'machine', file: machineFile, ...machine });
+    } catch (error) { sources.push(emptySource('machine', 'machine', machineFile, String(error?.message ?? error))); }
+  } else sources.push(emptySource('machine', 'machine', machineFile, 'machine.sqlite does not exist'));
+  for (const ledger of ledgers) {
+    if (!fs.existsSync(ledger.file)) {
+      sources.push(emptySource(ledger.name, 'ledger', ledger.file, 'ledger file missing: its blobs are not marked, so nothing is swept this run', ledger.ledgerId));
+      continue;
+    }
+    try { sources.push({ name: ledger.name, kind: 'ledger', file: ledger.file, ledgerId: ledger.ledgerId, ...readOnly(ledger.file, (db) => markSource(db, { kind: 'ledger', now, retention })) }); }
+    catch (error) { sources.push(emptySource(ledger.name, 'ledger', ledger.file, String(error?.message ?? error), ledger.ledgerId)); }
   }
-  // A source that could not be read, or an old-schema DB without blob_ref_columns, may hold references nobody saw:
-  // fail closed, sweep nothing.
-  const unreadable = sources.filter((s) => s.error);
-  const marked = new Set(sources.flatMap((s) => [...s.marks]));
-  const store = storeBlobs(root);
+  return sources;
+}
+
+function classifyBlobs(store, sources, marked, now, retention) {
   const toArchive = [], toSweep = [], young = [], kept = [];
   for (const [sha, blob] of store) {
     if (marked.has(sha)) continue;
-    const rows = sources.map((s) => s.rows.get(sha)).filter(Boolean);
-    if (rows.some((r) => Number(r.pinned) === 1)) { kept.push({ sha, why: 'pinned' }); continue; }
-    const created = rows.length ? Math.min(...rows.map((r) => Number(r.created_at) || blob.createdAt)) : blob.createdAt;
+    const rows = sources.map((source) => source.rows.get(sha)).filter(Boolean);
+    if (rows.some((row) => Number(row.pinned) === 1)) { kept.push({ sha, why: 'pinned' }); continue; }
+    const created = rows.length ? Math.min(...rows.map((row) => Number(row.created_at) || blob.createdAt)) : blob.createdAt;
     if (created >= now - retention.graceMs) { young.push({ sha, bytes: blob.size }); continue; }
-    const item = { sha, bytes: blob.size, file: blob.file, rows: sources.filter((s) => s.rows.has(sha)).map((s) => s.name), ageMs: now - created };
-    const archived = rows.length > 0 && rows.every((r) => r.archived_at != null && r.archive_ref);
-    (archived ? toSweep : toArchive).push({ ...item, archiveRef: archived ? rows[0].archive_ref : null,archiveRefs:archived?[...new Set(rows.map(r=>r.archive_ref))]:[] });
+    const item = { sha, bytes: blob.size, file: blob.file, rows: sources.filter((source) => source.rows.has(sha)).map((source) => source.name), ageMs: now - created };
+    const archived = rows.length > 0 && rows.every((row) => row.archived_at != null && row.archive_ref);
+    (archived ? toSweep : toArchive).push({ ...item, archiveRef: archived ? rows[0].archive_ref : null,archiveRefs:archived?[...new Set(rows.map(row=>row.archive_ref))]:[] });
   }
-  const archiveErrors=[],archiveChecks=new Map(),identities=sources.find(s=>s.kind==='machine')?.archiveIdentities??new Map();
+  return { toArchive, toSweep, young, kept };
+}
+
+function verifySweepArchives(toSweep, sources) {
+  const archiveErrors = [], archiveChecks = new Map(), identities = sources.find((source) => source.kind === 'machine')?.archiveIdentities ?? new Map();
   const readArchive = (file) => {
     if (!archiveChecks.has(file)) {
       try { archiveChecks.set(file, zipVisit(file, () => {})); }
@@ -180,14 +206,28 @@ export async function planBlobGc({ env = process.env, now = Date.now(), retentio
       archiveErrors.push(`archive:${item.sha}: ${error.message}`);
     }
   }
-  const bytes = (xs) => xs.reduce((s, x) => s + (x.bytes || 0), 0);
+  return archiveErrors;
+}
+
+const byteTotal = (items) => items.reduce((sum, item) => sum + (item.bytes || 0), 0);
+
+/** The dry-run plan. Reads only. */
+export async function planBlobGc({ env = process.env, now = Date.now(), retention = RETENTION, machineFile = machineFileFor(env), root = artifactRoot(env) } = {}) {
+  const sources = collectMarkSources({ machineFile, now, retention });
+  // A source that could not be read, or an old-schema DB without blob_ref_columns, may hold references nobody saw:
+  // fail closed, sweep nothing.
+  const unreadable = sources.filter((s) => s.error);
+  const marked = new Set(sources.flatMap((s) => [...s.marks]));
+  const store = storeBlobs(root);
+  const { toArchive, toSweep, young, kept } = classifyBlobs(store, sources, marked, now, retention);
+  const archiveErrors = verifySweepArchives(toSweep, sources);
   return {
     schema: 'starci/blob-gc-plan@1', at: now, root, graceMs: retention.graceMs,
     sources: sources.map((s) => ({ name: s.name, kind: s.kind, file: s.file, marks: s.marks.size, pinned: s.pinned.size, rows: s.rows.size, refs: s.refs, error: s.error })),
-    marked: marked.size, stored: store.size, storedBytes: bytes([...store.values()].map((b) => ({ bytes: b.size }))),
+    marked: marked.size, stored: store.size, storedBytes: byteTotal([...store.values()].map((b) => ({ bytes: b.size }))),
     blocked: [...unreadable.map((s) => `${s.name}: ${s.error}`),...archiveErrors],
     toArchive, toSweep, young: young.length, kept: kept.length,
-    orphansPastGrace: [...toArchive, ...toSweep], archiveBytes: bytes(toArchive), sweepBytes: bytes(toSweep),
+    orphansPastGrace: [...toArchive, ...toSweep], archiveBytes: byteTotal(toArchive), sweepBytes: byteTotal(toSweep),
     marksBySource: Object.fromEntries(sources.map((s) => [s.name, [...s.marks]])),
   };
 }
