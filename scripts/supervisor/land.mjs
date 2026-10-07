@@ -41,7 +41,8 @@
 // 4. Fast-forward live main, under the host lock (land-lock.mjs, held for this step and the push only, waited for up to 10 minutes): main must still be the scratch's base (else the whole gate reruns on the new main,
 //    at most 3 times), the live checkout must be on main and clean for the changed paths; then
 //    `git update-ref refs/heads/main <new> <base>` (compare-and-swap) and a working-tree + index update of just
-//    those paths. A failed tree update rolls the ref and the paths back.
+//    those paths - each one swapped in by rename of a fully written temp (checkout-paths.mjs), so a runtime child
+//    spawned mid-update only ever reads the old or the new full file. A failed tree update rolls the ref and the paths back.
 // 5. Push main (secret scan of origin/main..main first, hooks on) unless --no-push or config
 //    supervisor.landGate.push is false. A push the remote refuses leaves the land in place and is reported.
 // A worker job lands as `succeeded` and its staging checkout and temp branch are removed - so does a self job
