@@ -6,9 +6,13 @@ import { npmCi } from '../machine/npm-ci.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 import crypto from 'node:crypto';
 import { clearSignal, updateSignal, openIncident } from '../../engine/db/ledger.mjs';
-import { withMachine } from '../../engine/db/machine.mjs';
+import { withMachine, readMachine } from '../../engine/db/machine.mjs';
 import { shortHash } from '../lib/hash.mjs';
 import { readEnv } from '../lib/env.mjs';
+import { terminalList } from '../api/orca/terminal-list.mjs';
+import { runShow } from '../api/orca/run-show.mjs';
+import { SKILL_ROOT, supervisedSeatHandles } from '../machine/home.mjs';
+import { entryTerminalsOf, recordedSeatTerminals } from '../machine/seat-sessions.mjs';
 
 async function workflowHost({ caller, env }, run = execNode) {
   const args = [path.join(skillRoot, 'scripts/reconciler/workflow-up.mjs'), '--json'];
@@ -26,11 +30,37 @@ async function workflowHost({ caller, env }, run = execNode) {
   return { ...data, ok: data.hostOk, native };
 }
 
-/** The terminal Orca takes as the sender of run-create and worker-start: the caller's own ORCA_TERMINAL_HANDLE. The Kernel's entry Run is coordinated by it, so no other terminal stands in. */
-export function workflowSender({ env = process.env } = {}) {
+const SENDER_MISSING = (detail) => ({ ok: false, reason: 'workflow-sender-terminal-missing',
+  error: `no_active_sender_terminal: a Kernel launch needs a live Orca terminal as its sender and coordinator; ${detail}` });
+
+/**
+ * The runtime-owned sender of a Kernel launch that has no caller terminal, from one terminal listing. The Run's coordinator
+ * is never a foreign terminal: first a plain terminal of the runtime's own worktree (the Run's current coordinator when it is
+ * one, so the entry Run stays reusable), else the live Supervisor seat, the runtime's own maintenance authority. Pure.
+ */
+export function headlessSenderOf({ listing, recorded = new Set(), seats = new Set(), coordinator = null, root } = {}) {
+  const entries = entryTerminalsOf({ listing, recorded, owned: seats, root });
+  const entry = entries.includes(coordinator) ? coordinator : entries[0];
+  if (entry) return { ok: true, handle: entry, source: 'runtime-worktree' };
+  const seat = (listing?.terminals ?? []).find((t) => t?.handle && seats.has(t.handle) && t.connected !== false && t.writable !== false);
+  return seat ? { ok: true, handle: seat.handle, source: 'supervisor-seat' }
+    : SENDER_MISSING("no runtime-owned terminal (a plain terminal of the runtime's own worktree, or the live Supervisor seat) is open for the unattended launch; open one and the next pass proceeds");
+}
+
+/**
+ * The terminal Orca takes as the sender of run-create and worker-start: the caller's own ORCA_TERMINAL_HANDLE. Only the
+ * unattended watchdog launch (`launchedBy` watchdog, no caller terminal) falls back to headlessSenderOf; an owner or
+ * Supervisor start is refused without a terminal. The workflow's entry Run (its Kernel job's managed.runId) names the coordinator to prefer.
+ */
+export function workflowSender({ env = process.env, launchedBy = 'supervisor', ledger = null, workflowId = null, root = SKILL_ROOT } = {}, { list = terminalList, show = runShow, machine = readMachine } = {}) {
   const handle = String(readEnv('ORCA_TERMINAL_HANDLE', env) ?? '').trim();
-  return handle ? { ok: true, handle } : { ok: false, reason: 'workflow-sender-terminal-missing',
-    error: 'no_active_sender_terminal: a Kernel launch needs a live Orca terminal as its sender and coordinator; run starci workflow start inside an Orca terminal (ORCA_TERMINAL_HANDLE is not set here)' };
+  if (handle) return { ok: true, handle, source: 'caller' };
+  if (launchedBy !== 'watchdog') return SENDER_MISSING('run starci workflow start inside an Orca terminal (ORCA_TERMINAL_HANDLE is not set here)');
+  const runId = parseJsonOr(ledger?.db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(`kernel-${workflowId}`)?.payload_json)?.managed?.runId ?? null;
+  const listing = list({});
+  if (!listing?.ok) return SENDER_MISSING(`the terminal listing is unavailable (${listing?.error ?? 'host-unavailable'})`);
+  const owners = machine((m) => ({ recorded: recordedSeatTerminals(m), seats: supervisedSeatHandles(m) }), { recorded: new Set(), seats: new Set() }, { env });
+  return headlessSenderOf({ listing, recorded: owners.recorded, seats: owners.seats, coordinator: runId ? show({ id: runId })?.coordinator ?? null : null, root });
 }
 
 /** Why a finished or archived goal never gets a Kernel again, or null while it is open. */
