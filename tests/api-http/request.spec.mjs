@@ -50,6 +50,36 @@ test('a request path never changes the host the request goes to', async (t) => {
   assert.deepEqual(seen, [[`127.0.0.1:${port}`, '//evil.example/x?a=b'], [`127.0.0.1:${port}`, '/@evil.example/x']]);
 });
 
+test('a request path outside the allowed characters is refused and an allowed one arrives byte for byte', async (t) => {
+  const sink = () => {};
+  for (const path of ['/a b', '/a#frag', '/a"b', '/a<b>', '/a\r\nHost: evil.example', '/caf' + String.fromCharCode(0xe9), '/a\u0000b', '/x' + String.fromCharCode(0x2028) + 'y', '']) {
+    assert.throws(() => request({ host: '127.0.0.1', port: 80, path }, sink, 'loopback'), { code: 'URL_TARGET_REFUSED' }, JSON.stringify(path));
+  }
+  const seen = [];
+  const server = http.createServer((req, res) => { seen.push(req.url); res.end('ok'); });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => server.close());
+  const path = '/ask/nonce-1/form%20x?a[]=1&b={c}|d&e=%E2%9C%93';
+  assert.equal(await get({ host: '127.0.0.1', port: String(server.address().port), path }, 'loopback'), 200);
+  assert.deepEqual(seen, [path]);
+});
+
+test('the host a request goes to is the policy constant, spelled from the policy rather than from the caller', () => {
+  const sent = [];
+  const make = (options, allow) => {
+    const req = request(options, () => {}, allow);
+    req.on('error', (error) => assert.equal(error.code, 'ECONNRESET'));
+    sent.push(`${req.host}:${req.getHeader('host')}`);
+    req.destroy();
+  };
+  make({ host: '127.0.0.1', port: 9, path: '/' }, 'loopback');
+  make({ host: 'LocalHost', port: 9, path: '/' }, 'loopback');
+  make({ host: '::1', port: 9, path: '/' }, 'loopback');
+  make({ host: '[::1]', port: 9, path: '/' }, 'loopback');
+  make({ host: 'Api.Example', path: '/x' }, { hosts: ['API.example'] });
+  assert.deepEqual(sent, ['127.0.0.1:127.0.0.1:9', 'localhost:localhost:9', '::1:[::1]:9', '::1:[::1]:9', 'api.example:api.example']);
+});
+
 test('the seat API runner sends only to a seat host over https or to a loopback server, and follows no redirect', async (t) => {
   for (const endpoint of ['https://evil.example/x', 'http://server.codeium.com/x', 'https://server.codeium.com.evil.example/x', 'https://user:pw@server.codeium.com/x', 'http://10.0.0.5/x', 'file:///etc/passwd', 'not a url', undefined]) {
     const r = await connectPost(endpoint, {}, 1000);

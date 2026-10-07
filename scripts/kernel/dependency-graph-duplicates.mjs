@@ -50,7 +50,7 @@ function addFoundationAliasFindings(aliasGroups, findings, live, shortWorkflow) 
     if (owners.length < 2) continue;
     findings.push({
       key: `duplicate-work|foundation:${k}`, kind: 'duplicate-work', workflows: owners,
-      summary: `foundation ${k} is claimed under ${group.map((f) => f.name).join(', ')} by ${owners.map(shortWorkflow).join(', ')}: two owners build one foundation`,
+      summary: `foundation ${k} is claimed under ${group.map((f) => f.name).join(', ')} by ${owners.map((w) => shortWorkflow(w)).join(', ')}: two owners build one foundation`,
       evidence: group.map((f) => ({ foundation: f.name, state: f.state, owner: f.owner?.workflowId ?? null })),
       proposal: { action: 'transfer', target: { foundation: owned.slice(1).map((f) => f.name)[0] }, to: owned[0].owner.workflowId, clearCut: false,
         why: 'one foundation, one owner: the older claim keeps it, the other claim transfers to it and its legs are revised' },

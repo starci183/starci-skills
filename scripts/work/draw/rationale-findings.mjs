@@ -72,7 +72,7 @@ export function findRationaleIssues({ html, entries, errors, measures, resolve, 
 
   const mentions = (needle) => {
     const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
-    return entries.some((e) => new RegExp(`(^|[^A-Za-z0-9])${escaped}([^A-Za-z0-9]|$)`).test(`${str(e.decision)} ${str(e.value)} ${list(e.rules).map(str).join(' ')}`));
+    return entries.some((e) => new RegExp(`(^|[^A-Za-z0-9])${escaped}([^A-Za-z0-9]|$)`).test(`${str(e.decision)} ${str(e.value)} ${list(e.rules).map((r) => str(r)).join(' ')}`));
   };
   const variantsOfElement = (el, spec) => {
     const variants = [];
@@ -101,7 +101,7 @@ export function findRationaleIssues({ html, entries, errors, measures, resolve, 
       for (const pv of variants) {
         const value = pv.split('=')[1];
         if (!entries.some((e) => {
-          const text = `${str(e.decision)} ${str(e.value)} ${list(e.rules).map(str).join(' ')}`;
+          const text = `${str(e.decision)} ${str(e.value)} ${list(e.rules).map((r) => str(r)).join(' ')}`;
           return new RegExp(`(^|[^A-Za-z0-9])${name}([^A-Za-z0-9]|$)`).test(text) && text.toLowerCase().includes(value.toLowerCase());
         })) add('DNA variant without a decision', `${name} ${pv}`);
       }

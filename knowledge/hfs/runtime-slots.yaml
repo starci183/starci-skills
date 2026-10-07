@@ -158,6 +158,7 @@ ruleParams:
       - {id: default-once, run: scripts/checks/check-default-once.mjs}
       - {id: version-pin-once, run: scripts/checks/check-version-pin-once.mjs}
       - {id: slot-id-shape, run: scripts/checks/check-slot-id-shape.mjs}
+      - {id: undeclared-identifiers, run: scripts/checks/check-undeclared-identifiers.mjs}
 
 slots:
 

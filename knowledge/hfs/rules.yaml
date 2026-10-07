@@ -2005,3 +2005,12 @@ rules:
     failureCodes: ["RT_SYNTAX_INVALID"]
     enforcers:
       - {kind: runtime, id: syntax, at: scripts/hfs/runtime-rules/syntax.mjs}
+  - id: R228
+    code: "RT_IDENTIFIER_UNDECLARED"
+    law: "Every identifier a runtime ES module (scripts/, engine/ without the vendored yaml bundle, ui/api/, packages/cli/bin and src) reads or writes resolves, by scope analysis over its TypeScript syntax tree, to a declaration, import, parameter or Node global of an enclosing scope. A re-export (export {x} from './y.mjs') binds x in no local scope; require, module, exports and __dirname are not globals of a module; browser globals resolve only inside a function that a module hands to page.evaluate, here or through an import. A name a refactor left behind is refused before the line that reads it runs."
+    scope: runtime
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RT_IDENTIFIER_UNDECLARED"]
+    enforcers:
+      - {kind: runtime, id: undeclared-identifiers, at: scripts/checks/check-undeclared-identifiers.mjs}

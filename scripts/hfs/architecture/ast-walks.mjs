@@ -1,6 +1,6 @@
 // ast-walks.mjs - AST walks the architecture checkers share (moved out of typescript.mjs, which keeps the program loading and module resolution).
 import { canonical, isInside } from './config.mjs';
-import { sourceLocation } from '../../lib/ts-ast.mjs';
+import { isConstVariable, sourceLocation } from '../../lib/ts-ast.mjs';
 import { UNPROVEN_FRAMEWORK, isUnshadowedCommonJsRequire, relativePath, unwrapExpression } from './typescript.mjs';
 
 /** `expression` unwrapped by the caller's own predicate set (a predicate absent on an older ts reads as never). */
@@ -49,7 +49,7 @@ export function valueSymbol(ts, checker, node, seen = new Set(), { unselected = 
   seen.add(symbol);
   const declarations = symbol.getDeclarations?.() ?? [];
   if (declarations.length === 1 && ts.isVariableDeclaration(declarations[0]) && declarations[0].initializer
-    && (ts.getCombinedNodeFlags(declarations[0].parent) & ts.NodeFlags.Const)) {
+    && isConstVariable(ts, declarations[0])) {
     return valueSymbol(ts, checker, declarations[0].initializer, seen, { unselected });
   }
   return symbol;
@@ -174,7 +174,7 @@ export function mutableDecoratorKind(ts, checker, decorator, targets) {
   const symbol = selected ? normalizedSymbol(ts, checker, selected) : null;
   const declarations = symbol?.getDeclarations?.() ?? [];
   if (declarations.length !== 1 || !ts.isVariableDeclaration(declarations[0]) || !declarations[0].initializer
-    || (ts.getCombinedNodeFlags(declarations[0].parent) & ts.NodeFlags.Const)) return null;
+    || isConstVariable(ts, declarations[0])) return null;
   return targets.get(valueSymbol(ts, checker, declarations[0].initializer)) ?? null;
 }
 

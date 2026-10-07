@@ -74,7 +74,7 @@ const addDirectionPrerequisites = ({ directionRead, bindings, payload, repo, unm
 };
 
 export function checkPrerequisites({ brief, payload, repo, params = payload?.params ?? {} }) {
-  const records = (Array.isArray(payload?.records) ? payload.records : []).map(normRel).filter(Boolean);
+  const records = (Array.isArray(payload?.records) ? payload.records : []).map((p) => normRel(p)).filter(Boolean);
   const bindings = [...(Array.isArray(payload?.owned_paths) ? payload.owned_paths : []), ...records];
   const reads = Array.isArray(brief?.reads) ? brief.reads : [];
   const { unmet, unknown } = readGaps({ reads, bindings, repo, params });

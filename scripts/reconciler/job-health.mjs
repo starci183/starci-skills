@@ -104,7 +104,7 @@ export async function reconcileHealth(ctx, settings, { list = null } = {}) {
   const probe = { ctx, settings, H: settings.health, now: ctx.now(), byHandle: new Map((listed.terminals ?? []).map((t) => [t.handle, t])), seen: new Set(),
     out: { ok: true, action: 'health', probed: 0, states: {}, sends: 0, decisions: 0 } };
   await eachInOrder(ctx.ledgers ?? [], (l) => (l.ledgerId === SUPERVISOR_LEDGER ? undefined : eachInOrder(liveJobsOf(ctx, l.ledgerId), (j) => probeJob(probe, l, j))));
-  for (const id of healthMem) if (!probe.seen.has(id)) healthMem.delete(id); // a job no longer live forgets its probe memory
+  for (const id of [...healthMem.keys()]) if (!probe.seen.has(id)) healthMem.delete(id); // a job no longer live forgets its probe memory
   return probe.out;
 }
 export const _health = { reset: () => { healthMem.clear(); lastSendAt = 0; }, mem: healthMem };

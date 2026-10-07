@@ -47,7 +47,7 @@ function hasProposal(proposals, proposal) {
 }
 
 function addUnknownPartFinding(el, part, dna, add, h) {
-  const owners = [el, ...h.ancestorsOf(el)].map(h.componentNameOf).filter(Boolean).map((n) => dna.components.get(n)).filter(Boolean);
+  const owners = [el, ...h.ancestorsOf(el)].map((a) => h.componentNameOf(a)).filter(Boolean).map((n) => dna.components.get(n)).filter(Boolean);
   const judged = owners.filter((c) => c.parts.size);
   if (judged.length && judged.length === owners.length && !judged.some((c) => c.parts.has(part))) {
     add(h.DRAW_OFF_GRAMMAR_COMPONENT, 'unknown anatomy part', el, `part "${part}" is none of ${[...new Set(judged.map((c) => c.name))].slice(0, 3).join('/')}'s anatomy`);
@@ -104,7 +104,7 @@ function noticeReasons(el, name, container, h) {
 function addOutcomeTileReason(el, reasons, h) {
   const tiles = h.walkElements(el).filter((d) => h.componentNameOf(d) === 'IconTile' && h.ancestorsOf(d).find((a) => h.CONTAINERS.has(h.componentNameOf(a))) === el);
   const outcomeTile = tiles.find((t) => h.OUTCOME_STATES.has(h.toneOf(t)?.tone));
-  if (outcomeTile && h.walkElements(el).some(h.isAction)) reasons.push(`an ${h.toneOf(outcomeTile).raw}-toned IconTile beside an action`);
+  if (outcomeTile && h.walkElements(el).some((d) => h.isAction(d))) reasons.push(`an ${h.toneOf(outcomeTile).raw}-toned IconTile beside an action`);
 }
 
 function ratioFindings(all, add, h) {

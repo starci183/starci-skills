@@ -140,6 +140,113 @@ test('waiting on the owner, blocked, refused launch, dead worker, passed',()=>{
   assert.equal(explainCode('NO_SUCH_CODE',catalog).known,false);
 });
 
+const runtimeCheck=(name,codes,over={})=>checkFacts({name,phase:'verify',runner:'settler',authority:'runtime',status:'fail',exit_code:1,declared_exit_code:null,summary_json:json({codes,evidence:`${name} failed`}),stdout_sha:null,output_sha:null,...over},()=>null);
+const catalogText=code=>`${catalog[code].title_vi}: ${catalog[code].meaning_vi}`;
+const failedReport=(outcome,summary)=>({report_id:21,report_json:json({outcome,summary})});
+
+test('a failed attempt with a red runtime check carrying a catalogued code explains itself with the catalog line',()=>{
+  const red=runtimeCheck('scope-record-valid',['TARGET_MISSING']);
+  assert.deepEqual(red.codes,['TARGET_MISSING']);
+  const why=buildWhy({attempt:attemptRow({report_outcome:'failed'}),checks:[red],report:failedReport('failed','broke the scope'),settle:{},unit:{tries:1,try_budget:5},catalog});
+  assert.equal(why.state,'failed');
+  assert.ok(why.cause.includes(catalogText('TARGET_MISSING')),'the cause carries the catalog title and meaning of the primary code');
+  assert.ok(why.headline.includes('scope-record-valid')&&why.headline.includes('(TARGET_MISSING)')&&why.headline.includes('broke the scope'),why.headline);
+  assert.equal(why.disagreement,null);
+  assert.equal(why.owner,catalog.TARGET_MISSING.owner);
+  assert.deepEqual(why.codes,['TARGET_MISSING']);
+  assert.ok(why.refs.some(r=>r.kind==='check'&&r.name==='scope-record-valid'));
+  assert.ok(why.refs.some(r=>r.kind==='report'&&r.reportId===21));
+  const second=buildWhy({attempt:attemptRow({report_outcome:'failed'}),checks:[red,runtimeCheck('other-check',['SHELL_LOCKUP_MISSING'])],report:failedReport('failed','x'),settle:{},catalog});
+  assert.deepEqual(second.codes,['TARGET_MISSING','SHELL_LOCKUP_MISSING'],'every red runtime check contributes its codes');
+});
+
+test('a failed attempt without a catalogued code, a partial one, and a failure class are each explained by their own branch', ()=>{
+  const uncatalogued=buildWhy({attempt:attemptRow({report_outcome:'failed'}),checks:[runtimeCheck('c',['NOT_IN_THE_CATALOG_AT_ALL'])],report:failedReport('failed','s'),settle:{},catalog});
+  assert.deepEqual(uncatalogued.codes,['NOT_IN_THE_CATALOG_AT_ALL']);
+  assert.ok(uncatalogued.cause.trim().length>0);
+  const partial=buildWhy({attempt:attemptRow({verdict:'partial',report_outcome:'partial'}),checks:[],report:failedReport('partial','half done'),settle:{failureClass:{class:'flaky-env',reason:'the host dropped the session'}},catalog});
+  assert.equal(partial.state,'failed');
+  assert.deepEqual(partial.codes,['failure-class:flaky-env']);
+  assert.ok(partial.cause.includes('flaky-env')&&partial.cause.includes('the host dropped the session'),partial.cause);
+  assert.ok(partial.headline.includes('half done'),partial.headline);
+  const bare=buildWhy({attempt:attemptRow({report_outcome:'failed'}),checks:[],report:failedReport('failed','nothing red'),settle:{},catalog});
+  assert.deepEqual(bare.codes,[]);
+  assert.ok(bare.cause.trim().length>0,'a failure with no red check still has a cause');
+});
+
+test('an overruled done claim names who declared red and who re-read it', ()=>{
+  const declaredRed=checkFacts({name:'own-check',phase:'after',runner:'op',authority:'declared',status:'fail',exit_code:null,declared_exit_code:1,summary_json:json({evidence:'own check failed'})},()=>null);
+  const why=buildWhy({attempt:attemptRow(),checks:[declaredRed],report:failedReport('done','claimed'),settle:{},catalog});
+  assert.equal(why.state,'failed');
+  assert.ok(why.disagreement.includes('own-check')&&why.disagreement.includes('1'),why.disagreement);
+  const rerun=runtimeCheck('own-check',['TARGET_MISSING'],{declared_exit_code:1});
+  const both=buildWhy({attempt:attemptRow(),checks:[declaredRed,rerun],report:failedReport('done','claimed'),settle:{claimOverruled:true},catalog});
+  assert.ok(both.cause.includes(catalogText('TARGET_MISSING')),both.cause);
+  assert.deepEqual(both.codes,['TARGET_MISSING']);
+  assert.notEqual(both.headline,why.headline,'a re-run and a re-read read differently');
+});
+
+test('a failure caused by another workflow names the red checks and the peers and spends no try', ()=>{
+  const why=buildWhy({attempt:attemptRow({report_outcome:'failed'}),checks:[],report:failedReport('failed','red'),settle:{peerBlocked:{checks:['lint','types'],peers:['wf-a','wf-b']}},catalog});
+  assert.equal(why.state,'failed');
+  assert.equal(why.owner,'runtime-core');
+  assert.ok(why.cause.includes('lint, types')&&why.cause.includes('wf-a, wf-b'),why.cause);
+  const anonymous=buildWhy({attempt:attemptRow({report_outcome:'failed'}),checks:[],report:failedReport('failed','red'),settle:{peerBlocked:{}},catalog});
+  assert.equal(anonymous.state,'failed');
+  assert.ok(anonymous.cause.trim().length>0);
+  assert.notEqual(anonymous.cause,why.cause);
+});
+
+test('an attempt that ended without a report is scored failed with the worker reason', ()=>{
+  const why=buildWhy({attempt:attemptRow({report_outcome:null}),checks:[],report:null,settle:{reason:'the terminal vanished'},catalog});
+  assert.equal(why.state,'failed');
+  assert.deepEqual(why.codes,['worker-died-no-report']);
+  assert.ok(why.cause.includes('the terminal vanished'),why.cause);
+  const silent=buildWhy({attempt:attemptRow({report_outcome:null}),checks:[],report:null,settle:{},catalog});
+  assert.deepEqual(silent.codes,['worker-died-no-report']);
+  assert.ok(silent.cause.trim().length>0);
+  assert.notEqual(silent.cause,why.cause);
+});
+
+test('cancelled and requeued runs, an unknown launch effect and a bare blocker each have their own explanation', ()=>{
+  const requeued=buildWhy({attempt:attemptRow({verdict:null,report_outcome:null,end_state:'requeued'}),settle:{reason:'worker-gone'},catalog});
+  assert.equal(requeued.state,'requeued');
+  assert.deepEqual(requeued.codes,['worker-gone']);
+  const cancelled=buildWhy({attempt:attemptRow({verdict:'cancelled',report_outcome:null,end_state:'cancelled'}),settle:{reason:'workflow-archived'},catalog});
+  assert.equal(cancelled.state,'cancelled');
+  assert.deepEqual(cancelled.codes,['workflow-archived']);
+  assert.equal(buildWhy({attempt:attemptRow({verdict:'dropped',report_outcome:null,end_state:'settled'}),settle:{},catalog}).state,'cancelled');
+  const unknownEffect=buildWhy({attempt:attemptRow({verdict:null,report_outcome:null,end_state:'effect-unknown',settled_at:null}),settle:{step:'submission',signal:'prompt-stuck'},catalog});
+  assert.equal(unknownEffect.state,'requeued','an op that may have run partway is reconciled, not refused');
+  assert.ok(unknownEffect.cause.includes(catalogText('prompt-stuck')),unknownEffect.cause);
+  const bare=buildWhy({attempt:attemptRow({verdict:'blocked',report_outcome:'blocked'}),report:{report_id:3,report_json:json({outcome:'blocked',summary:'cannot go on'})},catalog});
+  assert.equal(bare.state,'blocked');
+  assert.deepEqual(bare.codes,[]);
+  assert.ok(bare.headline.includes('cannot go on'),bare.headline);
+});
+
+test('the recorded next step decides who acts next, and an exhausted try budget goes to the owner', ()=>{
+  const failed=(settle,unit)=>buildWhy({attempt:attemptRow({report_outcome:'failed'}),checks:[],report:failedReport('failed','x'),settle,unit,catalog});
+  const owners=[
+    [{nextStep:{kind:'retry',route:'r',limit:3,firing:1}},'op-retry'],
+    [{nextStep:{kind:'repair',route:'r',jobs:['j'],owner:{op:'brand.decide'}}},'other-op:brand.decide'],
+    [{nextStep:{kind:'repair',route:'r'}},'runtime-core'],
+    [{nextStep:{kind:'owner-gate',reason:'pick one'}},'owner'],
+    [{nextStep:{kind:'supervisor-gate',incidentId:'inc-1',reason:'stuck'}},'supervisor'],
+    [{nextStep:{kind:'peer-blocked',rootCause:{wf:'a'}}},'runtime-core'],
+    [{nextStep:{kind:'root-elsewhere'}},'runtime-core'],
+    [{nextStep:{kind:'deferred',reason:'final review'}},'owner'],
+    [{nextStep:{kind:'none',reason:'nothing to do'}},'supervisor'],
+    [{},'runtime-core'],
+  ];
+  for(const [settle,owner] of owners)assert.equal(failed(settle).owner,owner,JSON.stringify(settle));
+  assert.ok(failed({nextStep:{kind:'owner-gate',reason:'pick one'}}).next.includes('pick one'));
+  assert.ok(failed({nextStep:{kind:'supervisor-gate',incidentId:'inc-1',reason:'stuck'}}).next.includes('inc-1'));
+  const used=failed({},{tries:5,try_budget:5});
+  assert.equal(used.owner,'owner');
+  assert.ok(used.next.includes('5'),used.next);
+});
+
 const seedWorld=(t)=>{
   const repo=tmp(t),wf='wf-why';
   const ledger=openLedger({file:ledgerFileFor(repo)});

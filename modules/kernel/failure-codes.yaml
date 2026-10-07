@@ -15195,6 +15195,17 @@ RT_SYNTAX_INVALID:
   nextStep_vi: "Người giám sát sửa cú pháp tại dòng được báo và chạy lại cổng runtime; không bỏ qua tệp hoặc thêm ngoại lệ."
   owner: supervisor
   kind: check-finding
+RT_IDENTIFIER_UNDECLARED:
+  title: "A runtime module reads a name nothing declares"
+  title_vi: "Một module runtime đọc một tên mà không nơi nào khai báo"
+  meaning_vi: "Một định danh trong module ES của runtime (scripts/, engine/ trừ gói yaml của bên thứ ba, ui/api/, packages/cli/bin và src) không khớp với khai báo, import, tham số hay biến toàn cục Node nào của các phạm vi bao quanh. Một re-export (export {x} from './y.mjs') không gắn x vào phạm vi cục bộ; require, module, exports và __dirname không phải biến toàn cục của module; biến toàn cục của trình duyệt chỉ hợp lệ trong hàm được truyền cho page.evaluate. Dòng đó sẽ ném ReferenceError khi chạy tới."
+  causes_vi:
+    - "Tách một hàm ra khỏi vòng lặp hay closure nhưng biến cũ không được truyền sang"
+    - "Xóa import cùng với hàm dùng nó trong khi còn một chỗ khác đọc tên đó"
+    - "Dùng tên đã re-export từ module khác như thể nó là tên cục bộ"
+  nextStep_vi: "Người giám sát khai báo hoặc import tên đó, truyền nó qua tham số, hoặc xóa chỗ đọc; không thêm ngoại lệ hay che bằng typeof."
+  owner: supervisor
+  kind: check-finding
 DOCKER_PORT_POLICY:
   title: "Docker ownership or published-port policy was refused"
   title_vi: "Chính sách sở hữu Docker hoặc cổng công bố đã từ chối thao tác"

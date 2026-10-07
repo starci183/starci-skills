@@ -139,7 +139,7 @@ export function loadTypescript(dirs = []) {
 export function rationaleFileFor(file) {
   const dir = path.dirname(file), base = path.basename(file);
   const stems = [base.replace(/\.tsx$/i, ''), base.replace(/\.draw\.tsx$/i, '')];
-  return [...stems.map((s) => path.join(dir, `${s}.rationale.json`)), path.join(dir, 'rationale.json')].find(isFile) ?? null;
+  return [...stems.map((s) => path.join(dir, `${s}.rationale.json`)), path.join(dir, 'rationale.json')].find((p) => isFile(p)) ?? null;
 }
 
 function loadRationaleEntries(file) {

@@ -510,7 +510,7 @@ export function openDecision(repo, di, { env = process.env, run = runDecisionsVe
 
 const doorbellText = (n, workflowId, top = null) => [`${RING_TAG} ${n} waiting: starci kernel decisions --workflow ${workflowId}`,
   ...(top ? [`oldest ${top.id}: ${String(top.what).slice(0, 220)}`, top.decide ? `log: ${top.decide}` : null,
-    `pick ONE: ${top.commands.map(doorbellOption).join(' || ')}`, `then: ${top.resolve}`] : [])].filter(Boolean).join(' | ');
+    `pick ONE: ${top.commands.map((command, index) => doorbellOption(command, index)).join(' || ')}`, `then: ${top.resolve}`] : [])].filter(Boolean).join(' | ');
 const RING_SCOPE = 'decision-doorbell';
 
 /**

@@ -66,7 +66,7 @@ const appendDeclaredFamilyCss = ({ brand, repo, binding, roots, add, missing }) 
   const declared = (Array.isArray(brand.brand.sources) ? brand.brand.sources : [])
     .filter((s) => typeof s?.path === 'string' && /\.css$/i.test(s.path) && s.kind !== 'reference');
   for (const source of declared) {
-    const file = sourceCandidates({ source, repo, binding, roots }).find(isFile);
+    const file = sourceCandidates({ source, repo, binding, roots }).find((p) => isFile(p));
     if (file) add(file);
     else {
       const declaredAt = source.repository ? `${source.repository}:` : '';
@@ -113,12 +113,12 @@ const knowledgeInputs = (skillRoot, sources, missing) => {
 // The real components a component-source draw compiles against, not their pictures: the installed dist
 // types, the runtime's packages/grammar/src, the HeroUI CSS.
 const componentSources = ({ skillRoot, roots, sources, missing }) => {
-  const installed = roots.map((r) => path.join(r, 'node_modules', ...GRAMMAR_PACKAGE.split('/'), 'dist')).filter(isDir);
+  const installed = roots.map((r) => path.join(r, 'node_modules', ...GRAMMAR_PACKAGE.split('/'), 'dist')).filter((p) => isDir(p));
   for (const dir of installed) sources.push({ role: 'grammar-source', path: slash(dir) });
   const src = path.join(skillRoot, 'packages', 'grammar', 'src');
   if (isDir(src)) sources.push({ role: 'grammar-source', path: slash(src) });
   if (!installed.length && !isDir(src)) missing.push({ role: 'grammar-source', detail: `no ${GRAMMAR_PACKAGE} dist in a bound repository and no ${slash(src)}` });
-  const heroui = roots.map((r) => path.join(r, 'node_modules', '@heroui', 'styles')).find(isDir);
+  const heroui = roots.map((r) => path.join(r, 'node_modules', '@heroui', 'styles')).find((p) => isDir(p));
   if (heroui) sources.push({ role: 'heroui-styles', path: slash(heroui) });
 };
 
@@ -136,7 +136,7 @@ export function resolveGrammarContext({ skillRoot, repo, binding = projectBindin
     componentSources({ skillRoot, roots, sources, missing });
     return { family, sources, missing, inputs };
   }
-  const captures = [path.join(workDir, CAPTURES_DIR), ...roots.map((r) => path.join(r, 'node_modules', ...GRAMMAR_PACKAGE.split('/'), 'captures'))].find(isDir);
+  const captures = [path.join(workDir, CAPTURES_DIR), ...roots.map((r) => path.join(r, 'node_modules', ...GRAMMAR_PACKAGE.split('/'), 'captures'))].find((p) => isDir(p));
   if (captures) sources.push({ role: 'grammar-captures', path: slash(captures) });
 
   return { family, sources, missing };

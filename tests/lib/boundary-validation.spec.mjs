@@ -6,9 +6,11 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { containedPath } from '../../scripts/lib/path-key.mjs';
-import { logLine } from '../../scripts/lib/escape.mjs';
+import { logLine, textLine } from '../../scripts/lib/escape.mjs';
+import { verbCli } from '../../scripts/lib/cli-arg.mjs';
 import { renderReportBlock } from '../../scripts/kernel/report-render.mjs';
-import { hasFlag } from '../../scripts/lib/ts-ast.mjs';
+import { hasFlag, isConstVariable } from '../../scripts/lib/ts-ast.mjs';
+import { parseSource, ts } from '../../scripts/hfs/runtime-rules/source-ast.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const node = (args, options = {}) => spawnSync(process.execPath, args, { cwd: root, encoding: 'utf8', ...options });
@@ -39,6 +41,30 @@ test('logLine prints well-formed data byte-identically to JSON.stringify and kee
   assert.equal(logLine(undefined), 'undefined');
 });
 
+test('verbCli print keeps legitimate output and never lets a value forge a log line', (t) => {
+  const printed = [];
+  t.mock.method(console, 'log', (text) => printed.push(text));
+  const { print } = verbCli(['list']);
+  print({ ok: true }, 'plain "quoted" back\\slash\ttab');
+  print({ ok: true }, ['first', 'second line']);
+  print({ ok: true }, []);
+  assert.deepEqual(printed, ['plain "quoted" back\\slash\ttab', 'first\nsecond line', '']);
+  printed.length = 0;
+  print({ ok: true }, `title \r\nFORGED line\u001b[2J`);
+  print({ ok: true }, ['row \r\nFORGED', 'next']);
+  assert.deepEqual(printed, ['title \\u000d\\u000aFORGED line\\u001b[2J', 'row \\u000d\\u000aFORGED\nnext']);
+  printed.length = 0;
+  verbCli(['list', '--json']).print({ ok: true, text: 'a\r\nb' }, 'ignored');
+  assert.deepEqual(printed, ['{"ok":true,"text":"a\\r\\nb"}']);
+});
+
+test('textLine writes every control character but the tab visibly and leaves ordinary text alone', () => {
+  assert.equal(textLine('a\r\nb' + String.fromCharCode(0x2028) + 'c\u007fd\te'), 'a\\u000d\\u000ab\\u2028c\u007fd\te');
+  assert.equal(textLine(null), '');
+  const accented = 'plain "q" \\ ' +String.fromCharCode(0xe9) + ' ' + String.fromCodePoint(0x1f600);
+  assert.equal(textLine(accented), accented);
+});
+
 test('the report block never carries a secret from the report', () => {
   const token = `ghp_${'a1B2c3D4e5'.repeat(4).slice(0, 36)}`;
   const block = renderReportBlock({ task: 't', dispatch: 'd', outcome: 'done', summary: `pushed with ${token}`, open: ['API_KEY=hunter2hunter2'], blocker: { kind: 'x', detail: `Bearer ${token}` } });
@@ -53,6 +79,14 @@ test('hasFlag reads one bit as arithmetic', () => {
   assert.equal(hasFlag(0b0110, 0b0001), false);
   assert.equal(hasFlag(0b0110, 0b1000), false);
   assert.equal(hasFlag(0, 2), false);
+});
+
+test('isConstVariable is true for a const declaration and false for let and var', () => {
+  const t = ts();
+  const declarations = [];
+  const visit = (n) => { if (t.isVariableDeclaration(n)) declarations.push(n); t.forEachChild(n, visit); };
+  visit(parseSource('const a = 1, b = 2; let c = 3; var d = 4; for (const e of []) { e; }', 'x.mjs'));
+  assert.deepEqual(declarations.map((d) => [d.name.text, isConstVariable(t, d)]), [['a', true], ['b', true], ['c', false], ['d', false], ['e', true]]);
 });
 
 test('render-proof refuses a --work outside the runtime tree and the working directory', (t) => {

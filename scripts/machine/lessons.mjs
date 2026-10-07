@@ -398,10 +398,10 @@ if (isMain(import.meta.url)) {
       print(s, [`hypotheses open: ${Object.entries(s.signatures).filter(([, x]) => x.status === 'open').map(([k]) => k).join(', ') || '-'}`,
         ...Object.values(s.experiments).map((e) => `experiment ${e.id} [${e.status}] ${e.signature} ${(e.commits ?? []).map((c) => c.slice(0, 9)).join(',')} lane ${e.lane}`),
         `lessons: ${s.lessons.length} (${s.lessons.filter((l) => l.source === 'owner').length} from the owner)`,
-        ...Object.values(s.proposals).map((p) => `proposal ${p.id} [${p.status}] ${p.title}`)].join('\n'));
+        ...Object.values(s.proposals).map((p) => `proposal ${p.id} [${p.status}] ${p.title}`)]);
     } else if (verb === 'match') {
       const r = matchLessons(readLearning().lessons, { signature: value('signature'), text: value('text') });
-      print(r, r.map((l) => `[${l.source} w${l.weight ?? 1} ${l.status}] ${l.signature ?? '-'}: ${l.text}`).join('\n') || 'no matching lesson');
+      print(r, r.length ? r.map((l) => `[${l.source} w${l.weight ?? 1} ${l.status}] ${l.signature ?? '-'}: ${l.text}`) : 'no matching lesson');
     } else if (verb === 'tier') {
       const r = tierOf(commitFiles(csv(value('commit'))));
       print(r, `${r.tier}${r.reasons.length ? ': ' + r.reasons.join('; ') : ''}`);
