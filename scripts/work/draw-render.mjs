@@ -60,7 +60,7 @@ import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 import { eachInOrder, mapInOrder } from '../lib/in-order.mjs';
 import { ACCENT_EXEMPT_SELECTOR } from './draw/draw-taste.mjs';
 import { LAYER_PROBE, measureLayer } from './draw/draw-layer.mjs';
-import { measurePage } from './draw-render-page.mjs';
+import { measureInPage } from './draw-render-page.mjs';
 import { MEASURE_SCHEMA, REDLINE_ATTR, REDLINE_LEAF_COMPONENTS, WHY_ATTR, drawRedlines, loadRationale, measureRationale, rationaleFileOf, redlineLabelsOf } from './draw/draw-rationale.mjs';
 import { DRAW_SOURCE_SUFFIX, GRAMMAR_PACKAGE, LAYOUT_ATTR, markLayoutElements, rationaleFileFor, typecheckFindings } from './draw/draw-source.mjs';
 import { grammarDistStatus, grammarDistMessage } from '../gates/grammar-dist.mjs';
@@ -295,15 +295,15 @@ async function captureViewport(browser, { url, viewport, theme, fullPage, file, 
       // The DNA name of every grammar root, for the html-reading gates, the redline and the snapshot: data-component
       // where the grammar emits it (every root since grammar 0.6.0), else - a 0.5.x install - the root hook of the
       // components that emitted none (PageContainer, SectionHeader, SurfaceCard, MediaFrame, ...).
-      for (const el of document.querySelectorAll('[data-component]')) if (!el.hasAttribute('data-grammar-component')) el.setAttribute('data-grammar-component', el.getAttribute('data-component'));
-      for (const [selector, name] of markers) for (const el of document.querySelectorAll(selector)) if (!el.hasAttribute('data-grammar-component')) el.setAttribute('data-grammar-component', name);
+      for (const el of document.querySelectorAll('[data-component]')) if (!('grammarComponent' in el.dataset)) el.dataset.grammarComponent = el.dataset.component;
+      for (const [selector, name] of markers) for (const el of document.querySelectorAll(selector)) if (!('grammarComponent' in el.dataset)) el.dataset.grammarComponent = name;
       for (const e of entries) {
         let els = [];
         try { els = [...document.querySelectorAll(e.selector)]; } catch { els = []; }
         for (const el of els) el.setAttribute(whyAttr, [...new Set([...(el.getAttribute(whyAttr) ?? '').split(/\s+/).filter(Boolean), e.id])].join(' '));
       }
     }, { entries: (rationale?.entries ?? []).filter((e) => typeof e?.selector === 'string' && typeof e?.id === 'string').map((e) => ({ id: e.id, selector: e.selector })), whyAttr: WHY_ATTR, markers: GRAMMAR_ROOT_MARKERS });
-    const raw = await page.evaluate(measurePage, { generic: GENERIC_FAMILIES, exemptSelector: ACCENT_EXEMPT_SELECTOR, layoutAttr: LAYOUT_ATTR });
+    const raw = await measureInPage(page, { generic: GENERIC_FAMILIES, exemptSelector: ACCENT_EXEMPT_SELECTOR, layoutAttr: LAYOUT_ATTR });
     const artwork = await artworkDigests(raw.artwork ?? [], page);
     // The form regions' rendered widths (draw-layer.mjs DRAW_MEASURE_UNCAPPED, MEASURE-4 case-3/case-4), before the
     // full-page unsticking below moves anything.

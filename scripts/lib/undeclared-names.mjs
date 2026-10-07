@@ -99,13 +99,20 @@ function isNameOnly(t, node) {
   return false;
 }
 
-/** The identifiers passed as an argument to a browser-page call (`page.evaluate(measure, arg)` names `measure`). */
+/**
+ * The identifiers passed as an argument to a browser-page call (`page.evaluate(measure, arg)` names `measure`). A function
+ * handed to a call that assembles the page script (`page.evaluate(pageScript(measure, [visible, tagOf]))`) runs in the page too,
+ * so the identifiers an argument call or array literal carries count as well.
+ */
 export function pageCallNames(t, source) {
   const names = new Set();
+  const collect = (argument) => {
+    if (t.isIdentifier(argument)) names.add(argument.text);
+    else if (t.isCallExpression(argument)) for (const inner of argument.arguments) collect(inner);
+    else if (t.isArrayLiteralExpression(argument)) for (const inner of argument.elements) collect(inner);
+  };
   const visit = (node) => {
-    if (t.isCallExpression(node) && t.isPropertyAccessExpression(node.expression) && PAGE_CALLS.has(node.expression.name.text)) {
-      for (const argument of node.arguments) if (t.isIdentifier(argument)) names.add(argument.text);
-    }
+    if (t.isCallExpression(node) && t.isPropertyAccessExpression(node.expression) && PAGE_CALLS.has(node.expression.name.text)) for (const argument of node.arguments) collect(argument);
     t.forEachChild(node, visit);
   };
   visit(source);
