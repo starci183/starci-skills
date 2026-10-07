@@ -194,6 +194,19 @@ const judgeCite = (root, cite, rel, readTarget, dead) => {
   return true;
 };
 
+const citesCheckedIn = (root, rel, prose, readTarget, dead) => {
+  const seen = new Set();
+  let checked = 0;
+  for (const cite of citesIn(dropGeneratedBlocks(prose))) {
+    const key = `${cite.line}:${cite.kind}:${cite.target}:${cite.symbol ?? ''}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    if (!judgeCite(root, cite, rel, readTarget, dead)) continue;
+    checked += 1;
+  }
+  return checked;
+};
+
 export function checkContractCites(root = DEFAULT_ROOT, scan = DEFAULT_SCAN) {
   const dead = [];
   const contents = new Map();
@@ -205,17 +218,10 @@ export function checkContractCites(root = DEFAULT_ROOT, scan = DEFAULT_SCAN) {
   let checked = 0;
   for (const file of files) {
     const rel = path.relative(root, file).replaceAll('\\', '/');
-    const seen = new Set();
     const text = fs.readFileSync(file, 'utf8');
     let prose = SOURCE_EXT.test(rel) ? commentsAsText(rel, text) : text;
     if (MANIFEST_SLOTS.has(rel)) prose = dropSlotPathValues(prose);
-    for (const cite of citesIn(dropGeneratedBlocks(prose))) {
-      const key = `${cite.line}:${cite.kind}:${cite.target}:${cite.symbol ?? ''}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      if (!judgeCite(root, cite, rel, readTarget, dead)) continue;
-      checked += 1;
-    }
+    checked += citesCheckedIn(root, rel, prose, readTarget, dead);
   }
   return { schema: 'starci/contract-cites@1', ok: dead.length === 0, filesScanned: files.length, citesChecked: checked, dead };
 }
