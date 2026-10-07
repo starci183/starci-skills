@@ -42,6 +42,36 @@ export function contractFindings({ repoRoot, files, repo, resolver }) {
 /** The first lines of an error, enough to act on. */
 const errorText = (error) => String(error?.message ?? error).split(/\r?\n/).filter(Boolean).slice(0, 4).join(' | ');
 
+function emitFailure(app, artifacts, error, apps, findings) {
+  for (const { artifact } of artifacts) apps.push({ app: app.name, artifact, status: 'emit-failed' });
+  const snapshot = `contracts/${app.name}/${SNAPSHOT_OF.graphql}`;
+  findings.push(found(CONTRACT_SNAPSHOT_DRIFT, snapshot, `contracts/${app.name} cannot be verified: \`starci app emit\` failed for ${app.name}: ${errorText(error)}`, { app: app.name, drift: 'emit-failed' }));
+}
+
+function artifactFindings({ repoRoot, tracked, scratch, app, artifact, what, emitted, apps, findings }) {
+  const snapshot = `contracts/${app.name}/${artifact}`;
+  const committed = tracked.has(snapshot) ? contractHash(path.join(repoRoot, snapshot)) : null;
+  if (!emitted.written.includes(snapshot)) {
+    if (committed === null) {
+      if (artifact === SNAPSHOT_OF.graphql) apps.push({ app: app.name, artifact, status: 'none' });
+      return;
+    }
+    apps.push({ app: app.name, artifact, status: 'left-behind' });
+    findings.push(found(CONTRACT_SNAPSHOT_DRIFT, snapshot, `${snapshot} is committed but ${app.name} ${what}; delete it`, { app: app.name, drift: 'left-behind' }));
+    return;
+  }
+  const fresh = contractHash(path.join(scratch, snapshot));
+  if (committed === null) {
+    // the uncommitted snapshot itself is reported by contractFindings above; here it only counts as not judged
+    apps.push({ app: app.name, artifact, status: 'not-committed' });
+  } else if (committed === fresh) {
+    apps.push({ app: app.name, artifact, status: 'fresh' });
+  } else {
+    apps.push({ app: app.name, artifact, status: 'stale' });
+    findings.push(found(CONTRACT_SNAPSHOT_DRIFT, snapshot, `${snapshot} (${committed.slice(0, 12)}) differs from what ${app.name} emits now (${String(fresh).slice(0, 12)}); run \`npm run contract:emit\` and commit the result`, { app: app.name, drift: 'stale' }));
+  }
+}
+
 /**
  * R23, full pass: each committed `contracts/<app>/schema.graphql` and `contracts/<app>/openapi.json` equals what `emit` writes for
  * the app now. `emit({ repoRoot, declaration, outDir })` is `emitContracts` of packages/hfs/emit and answers `{ written, skipped }`;
@@ -64,33 +94,11 @@ export function contractEmitFindings({ repoRoot, files, repo, emit }) {
       try {
         emitted = emit({ repoRoot, declaration: { apps: [app] }, outDir: scratch });
       } catch (error) {
-        for (const { artifact } of artifacts) apps.push({ app: app.name, artifact, status: 'emit-failed' });
-        const snapshot = `contracts/${app.name}/${SNAPSHOT_OF.graphql}`;
-        findings.push(found(CONTRACT_SNAPSHOT_DRIFT, snapshot, `contracts/${app.name} cannot be verified: \`starci app emit\` failed for ${app.name}: ${errorText(error)}`, { app: app.name, drift: 'emit-failed' }));
+        emitFailure(app, artifacts, error, apps, findings);
         continue;
       }
       for (const { artifact, what } of artifacts) {
-        const snapshot = `contracts/${app.name}/${artifact}`;
-        const committed = tracked.has(snapshot) ? contractHash(path.join(repoRoot, snapshot)) : null;
-        if (!emitted.written.includes(snapshot)) {
-          if (committed === null) {
-            if (artifact === SNAPSHOT_OF.graphql) apps.push({ app: app.name, artifact, status: 'none' });
-            continue;
-          }
-          apps.push({ app: app.name, artifact, status: 'left-behind' });
-          findings.push(found(CONTRACT_SNAPSHOT_DRIFT, snapshot, `${snapshot} is committed but ${app.name} ${what}; delete it`, { app: app.name, drift: 'left-behind' }));
-          continue;
-        }
-        const fresh = contractHash(path.join(scratch, snapshot));
-        if (committed === null) {
-          // the uncommitted snapshot itself is reported by contractFindings above; here it only counts as not judged
-          apps.push({ app: app.name, artifact, status: 'not-committed' });
-        } else if (committed === fresh) {
-          apps.push({ app: app.name, artifact, status: 'fresh' });
-        } else {
-          apps.push({ app: app.name, artifact, status: 'stale' });
-          findings.push(found(CONTRACT_SNAPSHOT_DRIFT, snapshot, `${snapshot} (${committed.slice(0, 12)}) differs from what ${app.name} emits now (${String(fresh).slice(0, 12)}); run \`npm run contract:emit\` and commit the result`, { app: app.name, drift: 'stale' }));
-        }
+        artifactFindings({ repoRoot, tracked, scratch, app, artifact, what, emitted, apps, findings });
       }
     }
   } finally {

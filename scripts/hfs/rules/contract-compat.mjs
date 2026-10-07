@@ -27,31 +27,48 @@ function sortKeys(value) {
 /** {type, optional} of a payload field spelling (`string`, `number?`, `string[]`). */
 const fieldOf = (spelling) => (typeof spelling === 'string' && spelling.endsWith('?') ? { type: spelling.slice(0, -1), optional: true } : { type: spelling, optional: false });
 
+function eventMetadataChanges(name, before, after) {
+  const problems = [];
+  for (const key of Object.keys(before)) {
+    if (key === 'payload') continue;
+    if (!same(before[key], after[key])) problems.push({ event: name, message: `event ${name} changed its ${key} from ${JSON.stringify(before[key])} to ${JSON.stringify(after[key] ?? null)}; a published event keeps its ${key}. Add ${name}.v2 for the new shape.` });
+  }
+  return problems;
+}
+
+function existingPayloadChanges(name, was, now) {
+  const problems = [];
+  for (const [field, spelling] of Object.entries(was)) {
+    if (!(field in now)) { problems.push({ event: name, message: `event ${name} lost payload field ${field}; fields are only ever added. Keep it, and add ${name}.v2 for the new shape.` }); continue; }
+    const a = fieldOf(spelling);
+    const b = fieldOf(now[field]);
+    if (a.type !== b.type) problems.push({ event: name, message: `event ${name} changed payload field ${field} from ${a.type} to ${b.type}; a field keeps its type. Add ${name}.v2 for the new shape.` });
+    else if (a.optional !== b.optional) problems.push({ event: name, message: `event ${name} changed payload field ${field} from ${a.optional ? 'optional' : 'required'} to ${b.optional ? 'optional' : 'required'}; a field keeps its optionality. Add ${name}.v2 for the new shape.` });
+  }
+  return problems;
+}
+
+function addedRequiredPayloadChanges(name, was, now) {
+  const problems = [];
+  for (const [field, spelling] of Object.entries(now)) {
+    if (!(field in was) && !fieldOf(spelling).optional) problems.push({ event: name, message: `event ${name} gained required payload field ${field}; events already on the wire do not carry it, so a new field is optional (${field}?). Make it optional, or add ${name}.v2.` });
+  }
+  return problems;
+}
+
+function eventChanges(name, before, after) {
+  if (!isPlainObject(after)) return [{ event: name, message: `event ${name} was removed; a published event is never deleted while it can still be on the wire. Keep it, and add ${name}.v2 for the new shape.` }];
+  const was = isPlainObject(before.payload) ? before.payload : {};
+  const now = isPlainObject(after.payload) ? after.payload : {};
+  return [...eventMetadataChanges(name, before, after), ...existingPayloadChanges(name, was, now), ...addedRequiredPayloadChanges(name, was, now)];
+}
+
 /** The breaking changes of `current` against `pinned`: [{event, message}]. */
 export function breakingChanges(pinned, current) {
   const problems = [];
   const pinnedEvents = isPlainObject(pinned?.events) ? pinned.events : {};
   const currentEvents = isPlainObject(current?.events) ? current.events : {};
-  for (const [name, before] of Object.entries(pinnedEvents)) {
-    const after = currentEvents[name];
-    if (!isPlainObject(after)) { problems.push({ event: name, message: `event ${name} was removed; a published event is never deleted while it can still be on the wire. Keep it, and add ${name}.v2 for the new shape.` }); continue; }
-    for (const key of Object.keys(before)) {
-      if (key === 'payload') continue;
-      if (!same(before[key], after[key])) problems.push({ event: name, message: `event ${name} changed its ${key} from ${JSON.stringify(before[key])} to ${JSON.stringify(after[key] ?? null)}; a published event keeps its ${key}. Add ${name}.v2 for the new shape.` });
-    }
-    const was = isPlainObject(before.payload) ? before.payload : {};
-    const now = isPlainObject(after.payload) ? after.payload : {};
-    for (const [field, spelling] of Object.entries(was)) {
-      if (!(field in now)) { problems.push({ event: name, message: `event ${name} lost payload field ${field}; fields are only ever added. Keep it, and add ${name}.v2 for the new shape.` }); continue; }
-      const a = fieldOf(spelling);
-      const b = fieldOf(now[field]);
-      if (a.type !== b.type) problems.push({ event: name, message: `event ${name} changed payload field ${field} from ${a.type} to ${b.type}; a field keeps its type. Add ${name}.v2 for the new shape.` });
-      else if (a.optional !== b.optional) problems.push({ event: name, message: `event ${name} changed payload field ${field} from ${a.optional ? 'optional' : 'required'} to ${b.optional ? 'optional' : 'required'}; a field keeps its optionality. Add ${name}.v2 for the new shape.` });
-    }
-    for (const [field, spelling] of Object.entries(now)) {
-      if (!(field in was) && !fieldOf(spelling).optional) problems.push({ event: name, message: `event ${name} gained required payload field ${field}; events already on the wire do not carry it, so a new field is optional (${field}?). Make it optional, or add ${name}.v2.` });
-    }
-  }
+  for (const [name, before] of Object.entries(pinnedEvents)) problems.push(...eventChanges(name, before, currentEvents[name]));
   return problems;
 }
 

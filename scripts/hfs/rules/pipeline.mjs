@@ -11,9 +11,14 @@ import { found, readJson, readText } from './read.mjs';
 const CI_MISSING_CANON = 'HFS_CI_MISSING_CANON';
 const CI_FILE = '.github/workflows/ci.yml';
 const hfsPackage = '@starci/cli';
-const RUN_LINE = /^\s*(?:-\s+)?run:\s*(.+?)\s*$/;
-const HFS_LINT = /^(?:npx\s+(?:--no-install\s+|-y\s+)?)?(?:@starci\/cli(?:@(\S+))?|starci)\s+app\s+lint(\s.*)?$/;
-const NPM_RUN = /^npm run ([\w:.-]+)(?:\s+--\s+(.*))?$/;
+const RUN_LINE_SOURCE = String.raw`^\s*(?:-\s+)?run:\s*(.+?)\s*$`;
+const RUN_LINE = new RegExp(RUN_LINE_SOURCE);
+const HFS_LINT_SOURCE = String.raw`^(?:npx\s+(?:--no-install\s+|-y\s+)?)?(?:@starci\/cli(?:@(\S+))?|starci)\s+app\s+lint(\s.*)?$`;
+const HFS_LINT = new RegExp(HFS_LINT_SOURCE);
+const NPM_RUN_SOURCE = String.raw`^npm run ([\w:.-]+)(?:\s+--\s+(.*))?$`;
+const NPM_RUN = new RegExp(NPM_RUN_SOURCE);
+const AND_SEPARATOR_SOURCE = String.raw`\s*&&\s*`;
+const AND_SEPARATOR = new RegExp(AND_SEPARATOR_SOURCE);
 
 const commandsOf = (text) => text.split(/\r?\n/).map((line) => RUN_LINE.exec(line)?.[1]).filter(Boolean).map((command) => command.replace(/^["']|["']$/g, ''));
 
@@ -31,7 +36,7 @@ export function pipelineFindings({ repoRoot, files, pins }) {
   const ci = files.includes(CI_FILE) ? readText(repoRoot, CI_FILE) : null;
   if (ci !== null) {
     const scripts = readJson(repoRoot, 'package.json')?.scripts ?? {};
-    const lints = commandsOf(ci).flatMap((command) => expanded(command, scripts).split(/\s*&&\s*/)).map((command) => HFS_LINT.exec(command)).filter(Boolean);
+    const lints = commandsOf(ci).flatMap((command) => expanded(command, scripts).split(AND_SEPARATOR)).map((command) => HFS_LINT.exec(command)).filter(Boolean);
     if (!lints.length) findings.push(found(CI_MISSING_CANON, CI_FILE, `${CI_FILE} has no step that runs \`starci app lint\` (directly or through \`npm run lint\`); CI runs the one lint entry, which includes the repository check`, { step: 'starci app lint' }));
     else if (pinned && !lints.some((match) => match[1] === undefined || match[1] === pinned)) {
       findings.push(found(CI_MISSING_CANON, CI_FILE, `${CI_FILE} runs starci app lint at ${lints[0][1]}, but ${hfsPackage} is pinned at ${pinned}; run the pinned version`, { step: 'starci app lint', pinned }));

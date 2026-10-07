@@ -32,36 +32,52 @@ export function callExportFinding(file, source) {
 /** The call ids of a calls contract text (the keys of its `calls:` map). */
 export const contractCallIds = (text) => new Set(Object.keys(parseYaml(String(text))?.calls ?? {}));
 
-/** RT_API_SHAPE over the runtime (ctx of scripts/hfs/runtime-check.mjs). */
-export function apiShapeFindings(ctx) {
-  const found = [];
+function apiContractsOf(ctx) {
   const contracts = new Map();
   for (const [system, file] of Object.entries(ctx.params.apiContracts)) {
     const text = ctx.read(file);
     contracts.set(`api/${system}`, { file, ids: text === null ? null : contractCallIds(text) });
   }
+  return contracts;
+}
+
+function apiCallFileFindings(ctx, file, owner, contracts) {
+  if (!owner || ctx.resolver.tierOf(file) !== 'api' || path.posix.basename(file) === RUNNER) return [];
+  const found = [];
+  const shape = callExportFinding(file, ctx.parsed(file));
+  if (shape) found.push(shape);
+  const contract = contracts.get(owner);
+  const stem = path.posix.basename(file).replace(/\.[cm]?js$/, '');
+  if (contract?.ids === null) found.push({ code: CODE, level: 'error', path: contract.file, line: 1, message: `${contract.file}, the calls contract of ${owner}, cannot be read` });
+  else if (contract && !contract.ids.has(stem)) found.push({ code: CODE, level: 'error', path: file, line: 1, message: `${file} is not a call of ${contract.file}: a call file of ${owner} is named after the call id it wraps (${stem} is no id under calls:)` });
+  return found;
+}
+
+function apiImportFindings(ctx, file, owner) {
+  const found = [];
+  for (const ref of relativeImportTargets(ctx, file)) {
+    const { to } = ref;
+    if (ref.missing) found.push({ code: CODE, level: 'error', path: file, line: ref.line, column: ref.column, message: `${file}:${ref.line} imports missing internal target ${to} (${ref.specifier}): its API custody cannot be judged` });
+    if (!ref.tracked) continue;
+    const target = ownerIdOf(ctx.resolver, to);
+    if (!target || ctx.resolver.tierOf(to) !== 'api' || target === owner) continue;
+    if (owner && ctx.resolver.tierOf(file) === 'api') {
+      found.push({ code: CODE, level: 'error', path: file, line: ref.line, message: `${file}:${ref.line} (${owner}) imports ${to} of ${target}: an api system never imports another; compose the two calls in the domain module that needs both` });
+    } else if (path.posix.basename(to) === RUNNER) {
+      found.push({ code: CODE, level: 'error', path: file, line: ref.line, message: `${file}:${ref.line} imports ${to}, the runner of ${target}: only ${target}'s own call files import it - call the call file instead` });
+    }
+  }
+  return found;
+}
+
+/** RT_API_SHAPE over the runtime (ctx of scripts/hfs/runtime-check.mjs). */
+export function apiShapeFindings(ctx) {
+  const found = [];
+  const contracts = apiContractsOf(ctx);
   for (const { path: file } of ctx.sources) {
     const owner = ownerIdOf(ctx.resolver, file);
-    if (owner && ctx.resolver.tierOf(file) === 'api' && path.posix.basename(file) !== RUNNER) {
-      const shape = callExportFinding(file, ctx.parsed(file));
-      if (shape) found.push(shape);
-      const contract = contracts.get(owner);
-      const stem = path.posix.basename(file).replace(/\.[cm]?js$/, '');
-      if (contract?.ids === null) found.push({ code: CODE, level: 'error', path: contract.file, line: 1, message: `${contract.file}, the calls contract of ${owner}, cannot be read` });
-      else if (contract && !contract.ids.has(stem)) found.push({ code: CODE, level: 'error', path: file, line: 1, message: `${file} is not a call of ${contract.file}: a call file of ${owner} is named after the call id it wraps (${stem} is no id under calls:)` });
-    }
-    for (const ref of relativeImportTargets(ctx, file)) {
-      const { to } = ref;
-      if (ref.missing) found.push({ code: CODE, level: 'error', path: file, line: ref.line, column: ref.column, message: `${file}:${ref.line} imports missing internal target ${to} (${ref.specifier}): its API custody cannot be judged` });
-      if (!ref.tracked) continue;
-      const target = ownerIdOf(ctx.resolver, to);
-      if (!target || ctx.resolver.tierOf(to) !== 'api' || target === owner) continue;
-      if (owner && ctx.resolver.tierOf(file) === 'api') {
-        found.push({ code: CODE, level: 'error', path: file, line: ref.line, message: `${file}:${ref.line} (${owner}) imports ${to} of ${target}: an api system never imports another; compose the two calls in the domain module that needs both` });
-      } else if (path.posix.basename(to) === RUNNER) {
-        found.push({ code: CODE, level: 'error', path: file, line: ref.line, message: `${file}:${ref.line} imports ${to}, the runner of ${target}: only ${target}'s own call files import it - call the call file instead` });
-      }
-    }
+    found.push(...apiCallFileFindings(ctx, file, owner, contracts));
+    found.push(...apiImportFindings(ctx, file, owner));
   }
   return found;
 }

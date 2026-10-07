@@ -32,23 +32,29 @@ const typescriptFor = (repoRoot) => loadTypescript(repoRoot, HERE);
 export const stemOfEvent = (name) => name.replaceAll('.', '-');
 
 /** The `eventName` and `version` literals a class declares as `static readonly` members, with the line of the class. */
+function eventClassInfo(ts, node) {
+  let name = null;
+  let version = null;
+  for (const member of node.members) {
+    if (!ts.isPropertyDeclaration(member) || !member.initializer || !member.name || !ts.isIdentifier(member.name)) continue;
+    const isStatic = member.modifiers?.some((m) => m.kind === ts.SyntaxKind.StaticKeyword);
+    if (!isStatic) continue;
+    let value = member.initializer;
+    while (ts.isAsExpression(value) || ts.isParenthesizedExpression(value)) value = value.expression;
+    if (member.name.text === 'eventName') name = literalText(ts, value);
+    if (member.name.text === 'version' && ts.isNumericLiteral(value)) version = Number(value.text);
+  }
+  if (name !== null || version !== null || node.name) return { className: node.name?.text ?? '<anonymous>', name, version };
+  return null;
+}
+
 function readEventClass(ts, text, file) {
   const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
   const classes = [];
   const visit = (node) => {
     if (ts.isClassDeclaration(node)) {
-      let name = null;
-      let version = null;
-      for (const member of node.members) {
-        if (!ts.isPropertyDeclaration(member) || !member.initializer || !member.name || !ts.isIdentifier(member.name)) continue;
-        const isStatic = member.modifiers?.some((m) => m.kind === ts.SyntaxKind.StaticKeyword);
-        if (!isStatic) continue;
-        let value = member.initializer;
-        while (ts.isAsExpression(value) || ts.isParenthesizedExpression(value)) value = value.expression;
-        if (member.name.text === 'eventName') name = literalText(ts, value);
-        if (member.name.text === 'version' && ts.isNumericLiteral(value)) version = Number(value.text);
-      }
-      if (name !== null || version !== null || node.name) classes.push({ className: node.name?.text ?? '<anonymous>', name, version });
+      const info = eventClassInfo(ts, node);
+      if (info) classes.push(info);
     }
     ts.forEachChild(node, visit);
   };
@@ -56,12 +62,7 @@ function readEventClass(ts, text, file) {
   return classes;
 }
 
-/** Findings of BE_EVENT_CLASS_CONTRACT. */
-export function eventClassContractFindings({ repoRoot, files, repo }) {
-  const patterns = repo.sides?.be?.patterns ?? [];
-  if (!patterns.includes('event-bus')) return [];
-  const ts = typescriptFor(repoRoot);
-  if (!ts) return [];
+function eventClassesOf(repoRoot, files, ts) {
   const findings = [];
   const classesByService = new Map();
   for (const file of files) {
@@ -79,12 +80,14 @@ export function eventClassContractFindings({ repoRoot, files, repo }) {
       continue;
     }
     const [event] = classes;
-    if (stemOfEvent(event.name) !== stem) {
-      findings.push(found(EVENT_CLASS_CONTRACT, file, `${file} declares the event \`${event.name}\`, so the file is \`${stemOfEvent(event.name)}${EVENT_SUFFIX}\`: a class file is named after its event.`, { service, event: event.name }));
-    }
+    if (stemOfEvent(event.name) !== stem) findings.push(found(EVENT_CLASS_CONTRACT, file, `${file} declares the event \`${event.name}\`, so the file is \`${stemOfEvent(event.name)}${EVENT_SUFFIX}\`: a class file is named after its event.`, { service, event: event.name }));
     if (!classesByService.has(service)) classesByService.set(service, new Map());
     classesByService.get(service).set(event.name, { file, version: event.version });
   }
+  return { findings, classesByService };
+}
+
+function eventContractsOf(repoRoot, files) {
   const contracts = new Map();
   for (const file of files) {
     if (!file.startsWith(CONTRACT_PREFIX) || !file.endsWith(`/${CONTRACT_NAME}`)) continue;
@@ -92,6 +95,11 @@ export function eventClassContractFindings({ repoRoot, files, repo }) {
     if (rest.length !== 2) continue;
     contracts.set(rest[0], { file, doc: readJson(repoRoot, file) });
   }
+  return contracts;
+}
+
+function classContractFindings(classesByService, contracts) {
+  const findings = [];
   for (const [service, byName] of classesByService) {
     const contract = contracts.get(service);
     for (const [name, { file, version }] of byName) {
@@ -101,6 +109,11 @@ export function eventClassContractFindings({ repoRoot, files, repo }) {
       else if (entry.version !== version) findings.push(found(EVENT_CLASS_CONTRACT, file, `${file} declares \`${name}\` at version ${version} but ${contract.file} lists version ${entry.version}; a version changes in the class and the contract together.`, { service, event: name }));
     }
   }
+  return findings;
+}
+
+function contractClassFindings(classesByService, contracts) {
+  const findings = [];
   for (const [service, contract] of contracts) {
     const events = contract.doc?.events;
     if (events === null || typeof events !== 'object') continue;
@@ -109,6 +122,17 @@ export function eventClassContractFindings({ repoRoot, files, repo }) {
     }
   }
   return findings;
+}
+
+/** Findings of BE_EVENT_CLASS_CONTRACT. */
+export function eventClassContractFindings({ repoRoot, files, repo }) {
+  const patterns = repo.sides?.be?.patterns ?? [];
+  if (!patterns.includes('event-bus')) return [];
+  const ts = typescriptFor(repoRoot);
+  if (!ts) return [];
+  const classes = eventClassesOf(repoRoot, files, ts);
+  const contracts = eventContractsOf(repoRoot, files);
+  return [...classes.findings, ...classContractFindings(classes.classesByService, contracts), ...contractClassFindings(classes.classesByService, contracts)];
 }
 
 /** The scenario ids a back end proves: every `<pattern>/<scenario>:` test title of an e2e or integration spec. */

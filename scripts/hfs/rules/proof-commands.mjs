@@ -39,6 +39,19 @@ function proofCommands(record) {
   return Object.entries(demands).flatMap(([kind, demand]) => (typeof demand?.command === 'string' ? [{ kind, command: demand.command }] : []));
 }
 
+function recordProofFindings({ repoRoot, file, record, tracked, resolver }) {
+  const findings = [];
+  for (const { kind, command } of proofCommands(record)) {
+    for (const target of commandFiles(command)) {
+      if (tracked.has(target) || fs.existsSync(path.join(repoRoot, target))) continue;
+      const classified = resolver.classifyPath(target);
+      if (classified.status === 'owned' && classified.tracking === 'ignored') continue;
+      findings.push(found(PROOF_COMMAND_FILE_MISSING, file, `${file} requiresProof.${kind}.command runs ${target}, which the repository does not hold; a proof command is runnable as written: create the file or rewrite the proof plan`, { kind, missing: target }));
+    }
+  }
+  return findings;
+}
+
 /**
  * The findings of R105 over the tracked paths `files` of the app at `repoRoot`; `resolver` names the ignored slots and `sides` the side
  * names of hfs.json (be, fe), the repositories a record of this app names.
@@ -54,14 +67,7 @@ export function proofCommandFindings({ repoRoot, files, resolver, sides }) {
     let record;
     try { record = parseYaml(text); } catch { continue; }
     if (typeof record?.repository === 'string' && !own.has(record.repository)) continue;
-    for (const { kind, command } of proofCommands(record)) {
-      for (const target of commandFiles(command)) {
-        if (tracked.has(target) || fs.existsSync(path.join(repoRoot, target))) continue;
-        const classified = resolver.classifyPath(target);
-        if (classified.status === 'owned' && classified.tracking === 'ignored') continue;
-        findings.push(found(PROOF_COMMAND_FILE_MISSING, file, `${file} requiresProof.${kind}.command runs ${target}, which the repository does not hold; a proof command is runnable as written: create the file or rewrite the proof plan`, { kind, missing: target }));
-      }
-    }
+    findings.push(...recordProofFindings({ repoRoot, file, record, tracked, resolver }));
   }
   return findings;
 }

@@ -22,6 +22,8 @@ export const WHY_FILES = Object.freeze([
   { file: 'packages/stylelint/lib/why.mjs', kind: 'stylelint' },
 ]);
 const RULE_NUMBER = (id) => Number(id.slice(1));
+const RULE_LIST_TAIL_SOURCE = String.raw`\].*$`;
+const RULE_LIST_TAIL = new RegExp(RULE_LIST_TAIL_SOURCE);
 
 /** The catalog lookups the derivations share: owner of a code, owner of an enforcer id, failure codes of a rule. */
 export function catalogIndex(catalog) {
@@ -53,7 +55,7 @@ function verifyPatternBlock(lines, starts, position, index, kinds, unowned) {
   let end = autoAt + 1;
   while (end < to && /^ {8}- /.test(lines[end])) end += 1;
   const typed = lines.slice(autoAt + 1, end).map((line) => line.replace(/^ {8}- /, ''));
-  const rules = lines[rulesAt].replace(/^ {4}hfsRules: \[/, '').replace(/\].*$/, '').split(',').map((r) => r.trim()).filter(Boolean);
+  const rules = lines[rulesAt].replace(/^ {4}hfsRules: \[/, '').replace(RULE_LIST_TAIL, '').split(',').map((r) => r.trim()).filter(Boolean);
   const added = [];
   for (const item of typed) {
     const owner = ownerOfItem(item, index, kinds);

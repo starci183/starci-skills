@@ -18,14 +18,18 @@ import { byCodeUnit } from '../lib/list.mjs';
 /** The component that holds the shared infrastructure: the platform tier and every capability more than one service app composes. */
 export const PLATFORM_COMPONENT = 'platform';
 const SERVICE_APP_KINDS = new Set(['api', 'worker']);
-const star = (text) => String(text).replace(/<[^>]+>/g, '*');
-const segments = (dir) => dir.replace(/\/+$/, '').split('/').filter(Boolean);
+const STAR_PLACEHOLDER_SOURCE = String.raw`<[^>]+>`;
+const STAR_PLACEHOLDER = new RegExp(STAR_PLACEHOLDER_SOURCE, 'g');
+const TRAILING_SLASHES_SOURCE = String.raw`\/+$`;
+const TRAILING_SLASHES = new RegExp(TRAILING_SLASHES_SOURCE);
+export const star = (text) => String(text).replace(STAR_PLACEHOLDER, '*');
+export const segments = (dir, trimTrailingSlashes = false) => (trimTrailingSlashes ? dir.replace(TRAILING_SLASHES, '') : dir).split('/').filter(Boolean);
 const isDir = (path) => path.endsWith('/');
 
 /** True when directory pattern `inner` lies inside `outer` (an outer `*` segment matches any one inner segment) or is the same. */
 export function nested(inner, outer) {
-  const a = segments(inner);
-  const b = segments(outer);
+  const a = segments(inner, true);
+  const b = segments(outer, true);
   return a.length >= b.length && b.every((segment, index) => segment === '*' ? true : segment === a[index]);
 }
 
@@ -39,15 +43,20 @@ const variantsOf = (slot) => braceVariants(slot.path).map(star);
 const beSlots = (manifest, providers) => manifest.slots.filter((slot) => slot.profiles.includes('be') && slot.tracked === 'tracked' && (slot.provider === undefined || providers.includes(slot.provider)));
 
 function addRequiredPatterns(sonar, required, suffixes) {
-  const isRole = new RegExp(String.raw`\.(?:${suffixes.map((s) => s.replaceAll('-', '\\-')).join('|')})\.ts$`);
+  const escapedSuffixes = suffixes.map((suffix) => suffix.replaceAll('-', String.raw`\-`)).join('|');
+  const isRole = new RegExp(String.raw`\.(?:${escapedSuffixes})\.ts$`);
   for (const slot of required) {
     for (const entry of [...(slot.requires ?? []), ...(slot.allows ?? [])]) {
-      if (!/\.ts$/.test(entry) || entry.includes('<role>')) continue;
-      for (const name of braceVariants(entry)) {
-        if (isRole.test(star(name).replaceAll('*', 'x'))) continue;
-        for (const dir of variantsOf(slot)) sonar.add(`be/${dir}${star(name)}`.replace(/\/\/+/g, '/'));
-      }
+      addEntryPatterns(sonar, slot, entry, isRole);
     }
+  }
+}
+
+function addEntryPatterns(sonar, slot, entry, isRole) {
+  if (!entry.endsWith('.ts') || entry.includes('<role>')) return;
+  for (const name of braceVariants(entry)) {
+    if (isRole.test(star(name).replaceAll('*', 'x'))) continue;
+    for (const dir of variantsOf(slot)) sonar.add(`be/${dir}${star(name)}`.replace(/\/\/+/g, '/'));
   }
 }
 
@@ -116,11 +125,15 @@ export const codecovPaths = (manifest, providers = []) => coverageScope(manifest
  * (`src/modules/domain/*\/` and `src/modules/domain/order/order.service.ts` give `order`).
  */
 function capabilityOf(root, file) {
-  const parts = segments(root);
+  const parts = segments(root, true);
   const at = parts.length - 1;
   if (parts[at] !== '*') return null;
   const own = file.split('/');
   return parts.slice(0, at).every((part, index) => part === own[index]) && own.length > at + 1 ? own[at] : null;
+}
+
+function escapeImportPart(part) {
+  return part.replace(/[/.]/g, String.raw`\$&`);
 }
 
 /**
@@ -148,7 +161,7 @@ export function coverageComponents(manifest, { files, read, apps, providers = []
       continue;
     }
     for (const capability of capabilities) {
-      const spec = new RegExp(String.raw`from\s+["']@modules/${module.replace(/[/.]/g, String.raw`\$&`)}/${capability.replace(/[/.]/g, String.raw`\$&`)}["']`);
+      const spec = new RegExp(String.raw`from\s+["']@modules/${escapeImportPart(module)}/${escapeImportPart(capability)}["']`);
       const importers = services.filter((app) => spec.test(imports.get(app.name)));
       const owners = importers.length === 1 ? importers : importers.filter((app) => app.name === capability);
       if (owners.length === 1) ownedBy.get(owners[0].name).push(`be/${base}${capability}/**`);

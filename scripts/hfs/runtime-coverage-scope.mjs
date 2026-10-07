@@ -14,7 +14,7 @@ import path from 'node:path';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { braceVariants } from '../lib/glob.mjs';
 import { byCodeUnit } from '../lib/list.mjs';
-import { nested } from './coverage-scope.mjs';
+import { nested, segments, star } from './coverage-scope.mjs';
 import { RUNTIME_MANIFEST_FILE, loadSlotManifest } from './slots.mjs';
 
 /** The Codecov flag of the runtime. */
@@ -28,10 +28,8 @@ const TESTS_SLOT = 'runtime.tests';
 const SOURCE_FILES = '*.mjs';
 const SPEC_FILES = '**/*.spec.mjs';
 
-const star = (value) => String(value).replace(/<[^>]+>/g, '*');
 const variantsOf = (slot) => braceVariants(slot.path).map(star);
 const isDir = (value) => value.endsWith('/');
-const segments = (value) => value.split('/').filter(Boolean);
 const dirOf = (value) => (isDir(value) ? value : value.slice(0, value.lastIndexOf('/') + 1));
 /** True when the directory of `inner` lies inside directory pattern `outer` (an outer `*` segment matches one inner segment). */
 const inside = (inner, outer) => nested(dirOf(inner), outer);

@@ -105,22 +105,19 @@ function contextFindings(file, parsed, side, app) {
 }
 
 /** R188: the stages and the install, the user and the build discipline of each. */
-function stageFindings(file, parsed, side, kind) {
+function stageInstallFindings(file, stages) {
   const findings = [];
-  const { stages } = parsed;
-  const names = stages.map((stage) => stage.name);
-  if (!names.includes(BUILD_STAGE) || stages.at(-1)?.name !== RUNTIME_STAGE || stages.length < 2) {
-    findings.push(found(DOCKER_STAGES, file, `${file} has stages ${JSON.stringify(names)}; an image is multi-stage: a stage named ${BUILD_STAGE} (installs and builds) and a last stage named ${RUNTIME_STAGE} (what ships).`, { stages: names }));
-    if (!stages.length) return findings;
-  }
   for (const stage of stages) {
     for (const command of commandsOf(stage)) {
       const call = npmCall(command.words);
       if (call && (call.verb === 'install' || call.verb === 'i') && !call.args.some((arg) => arg === '-g' || arg === '--global')) findings.push(found(DOCKER_STAGES, file, `${file}:${command.line} runs \`npm ${call.verb}\`; an image installs with \`npm ci\` from the lockfile.`, { line: command.line }));
     }
   }
-  const runtime = stages.at(-1);
-  if (runtime.name !== RUNTIME_STAGE) return findings;
+  return findings;
+}
+
+function runtimeStageFindings(file, runtime, side, kind) {
+  const findings = [];
   for (const command of commandsOf(runtime)) {
     if (isBuildCommand(command.words)) findings.push(found(DOCKER_STAGES, file, `${file}:${command.line} the ${RUNTIME_STAGE} stage runs the build (\`${command.words.join(' ')}\`); it only receives what the ${BUILD_STAGE} stage built.`, { line: command.line }));
   }
@@ -132,9 +129,53 @@ function stageFindings(file, parsed, side, kind) {
   return findings;
 }
 
+function stageFindings(file, parsed, side, kind) {
+  const findings = [];
+  const { stages } = parsed;
+  const names = stages.map((stage) => stage.name);
+  if (!names.includes(BUILD_STAGE) || stages.at(-1)?.name !== RUNTIME_STAGE || stages.length < 2) {
+    findings.push(found(DOCKER_STAGES, file, `${file} has stages ${JSON.stringify(names)}; an image is multi-stage: a stage named ${BUILD_STAGE} (installs and builds) and a last stage named ${RUNTIME_STAGE} (what ships).`, { stages: names }));
+    if (!stages.length) return findings;
+  }
+  findings.push(...stageInstallFindings(file, stages));
+  const runtime = stages.at(-1);
+  if (runtime.name !== RUNTIME_STAGE) return findings;
+  findings.push(...runtimeStageFindings(file, runtime, side, kind));
+  return findings;
+}
+
 /** The Next config's `output` property, read with TypeScript's parser: the string literal assigned to `output` in an object literal. */
 function nextOutput(ts, text) {
   return propertyText(ts, text, { file: 'next.config.ts', key: 'output' });
+}
+
+function entryHealthFindings(file, runtime, side, kind, exposes, health, none) {
+  const findings = [];
+  const listens = side === 'fe' || BE_KINDS_WITH_LISTENER.has(kind);
+  if (listens) {
+    const port = envOf(runtime).get('PORT');
+    if (!port || !exposes.includes(port)) findings.push(found(DOCKER_ENTRY, file, `${file} ${RUNTIME_STAGE} stage must set \`ENV PORT=<port>\` and \`EXPOSE\` the same port (found PORT ${JSON.stringify(port ?? null)}, EXPOSE ${JSON.stringify(exposes)}); a listening app declares the port it serves.`, { port: port ?? null, exposes }));
+    if (!health.length || none) findings.push(found(DOCKER_ENTRY, file, `${file} ${RUNTIME_STAGE} stage has no HEALTHCHECK; an api or Next app answers a health probe the platform can run.`, {}));
+  } else if (BE_KINDS_ONE_SHOT.has(kind)) {
+    if (!none) findings.push(found(DOCKER_ENTRY, file, `${file} ${RUNTIME_STAGE} stage must say \`HEALTHCHECK NONE\`; a ${kind} app is a one-shot command, not a service.`, { kind }));
+    if (exposes.length) findings.push(found(DOCKER_ENTRY, file, `${file} ${RUNTIME_STAGE} stage EXPOSEs ${exposes.join(', ')}; a ${kind} app listens on nothing.`, { exposes }));
+  } else {
+    if (!health.length || none) findings.push(found(DOCKER_ENTRY, file, `${file} ${RUNTIME_STAGE} stage has no process HEALTHCHECK; a ${kind} app serves nothing, so its healthcheck probes its process.`, { kind }));
+    if (exposes.length) findings.push(found(DOCKER_ENTRY, file, `${file} ${RUNTIME_STAGE} stage EXPOSEs ${exposes.join(', ')}; a ${kind} app listens on nothing.`, { exposes }));
+  }
+  return findings;
+}
+
+function nextEntryFindings({ repoRoot, file, parsed, app, project, ts }) {
+  const findings = [];
+  const build = parsed.stages.find((stage) => stage.name === BUILD_STAGE);
+  const filter = `--filter=@${project}/${app}`;
+  const builds = build && commandsOf(build).some((command) => command.words.some((word) => word === 'turbo' || word.endsWith('/turbo')) && command.words.includes('build') && command.words.includes(filter));
+  if (!builds) findings.push(found(DOCKER_ENTRY, file, `${file} ${BUILD_STAGE} stage does not run \`turbo run build ${filter}\`; a Next image builds its own workspace (and the packages it imports) through turbo.`, { expected: filter }));
+  const config = `fe/apps/${app}/next.config.ts`;
+  const text = readText(repoRoot, config);
+  if (text !== null && ts && nextOutput(ts, text) !== 'standalone') findings.push(found(DOCKER_ENTRY, config, `${config} does not set \`output: "standalone"\`; the runtime stage of ${file} ships the standalone output.`, { expected: 'standalone' }));
+  return findings;
 }
 
 /** R189: the entry, the port and the health of the runtime. */
@@ -148,27 +189,8 @@ function entryFindings({ repoRoot, file, parsed, side, app, kind, project, ts })
   const exposes = instructionsOf(runtime, 'EXPOSE').flatMap((item) => words(item.text).map((port) => port.replace(/\/(tcp|udp)$/i, '')));
   const health = instructionsOf(runtime, 'HEALTHCHECK').map((item) => words(item.text));
   const none = health.some((parts) => parts[0]?.toUpperCase() === 'NONE');
-  const listens = side === 'fe' || BE_KINDS_WITH_LISTENER.has(kind);
-  if (listens) {
-    const port = envOf(runtime).get('PORT');
-    if (!port || !exposes.includes(port)) findings.push(found(DOCKER_ENTRY, file, `${file} ${RUNTIME_STAGE} stage must set \`ENV PORT=<port>\` and \`EXPOSE\` the same port (found PORT ${JSON.stringify(port ?? null)}, EXPOSE ${JSON.stringify(exposes)}); a listening app declares the port it serves.`, { port: port ?? null, exposes }));
-    if (!health.length || none) findings.push(found(DOCKER_ENTRY, file, `${file} ${RUNTIME_STAGE} stage has no HEALTHCHECK; an api or Next app answers a health probe the platform can run.`, {}));
-  } else if (BE_KINDS_ONE_SHOT.has(kind)) {
-    if (!none) findings.push(found(DOCKER_ENTRY, file, `${file} ${RUNTIME_STAGE} stage must say \`HEALTHCHECK NONE\`; a ${kind} app is a one-shot command, not a service.`, { kind }));
-    if (exposes.length) findings.push(found(DOCKER_ENTRY, file, `${file} ${RUNTIME_STAGE} stage EXPOSEs ${exposes.join(', ')}; a ${kind} app listens on nothing.`, { exposes }));
-  } else {
-    if (!health.length || none) findings.push(found(DOCKER_ENTRY, file, `${file} ${RUNTIME_STAGE} stage has no process HEALTHCHECK; a ${kind} app serves nothing, so its healthcheck probes its process.`, { kind }));
-    if (exposes.length) findings.push(found(DOCKER_ENTRY, file, `${file} ${RUNTIME_STAGE} stage EXPOSEs ${exposes.join(', ')}; a ${kind} app listens on nothing.`, { exposes }));
-  }
-  if (side === 'fe') {
-    const build = parsed.stages.find((stage) => stage.name === BUILD_STAGE);
-    const filter = `--filter=@${project}/${app}`;
-    const builds = build && commandsOf(build).some((command) => command.words.some((word) => word === 'turbo' || word.endsWith('/turbo')) && command.words.includes('build') && command.words.includes(filter));
-    if (!builds) findings.push(found(DOCKER_ENTRY, file, `${file} ${BUILD_STAGE} stage does not run \`turbo run build ${filter}\`; a Next image builds its own workspace (and the packages it imports) through turbo.`, { expected: filter }));
-    const config = `fe/apps/${app}/next.config.ts`;
-    const text = readText(repoRoot, config);
-    if (text !== null && ts && nextOutput(ts, text) !== 'standalone') findings.push(found(DOCKER_ENTRY, config, `${config} does not set \`output: "standalone"\`; the runtime stage of ${file} ships the standalone output.`, { expected: 'standalone' }));
-  }
+  findings.push(...entryHealthFindings(file, runtime, side, kind, exposes, health, none));
+  if (side === 'fe') findings.push(...nextEntryFindings({ repoRoot, file, parsed, app, project, ts }));
   return findings;
 }
 
@@ -209,23 +231,32 @@ const isSecretPath = (source) => {
   return env || segments.some((segment) => SECRET_FOLDERS.has(segment)) || SECRET_SUFFIXES.some((suffix) => base.endsWith(suffix)) || base.startsWith('kubeconfig');
 };
 
+function copySecretFindings(file, item) {
+  const findings = [];
+  const parts = words(item.text);
+  if (parts.some((part) => part.startsWith('--from='))) return findings;
+  const sources = parts.filter((part) => !part.startsWith('--')).slice(0, -1);
+  for (const source of sources) {
+    if (/^https?:\/\//i.test(source)) findings.push(found(DOCKER_SECRETS, file, `${file}:${item.line} ADD of a URL (${source}); a download is a checksum-verified stage, never an ADD.`, { line: item.line, source }));
+    else if (isSecretPath(source)) findings.push(found(DOCKER_SECRETS, file, `${file}:${item.line} ${item.keyword} of ${source}, which holds secret material; credentials are mounted at run time, never copied into an image.`, { line: item.line, source }));
+  }
+  return findings;
+}
+
+function variableSecretFindings(file, item) {
+  const findings = [];
+  const parts = words(item.text);
+  const names = item.keyword === 'ENV' && parts.length >= 2 && !parts[0].includes('=') ? [parts[0]] : parts.map((part) => part.split('=')[0]);
+  for (const name of names) if (isCredentialName(name)) findings.push(found(DOCKER_SECRETS, file, `${file}:${item.line} ${item.keyword} ${name} names a credential; an image carries none (an ARG or ENV stays in the image history). Mount it at run time; only NEXT_PUBLIC_* values, which are published by design, are build arguments.`, { line: item.line, name }));
+  return findings;
+}
+
 /** R191: no secret enters an image. */
 function secretFindings(file, parsed) {
   const findings = [];
   for (const item of parsed.instructions) {
-    if (item.keyword === 'COPY' || item.keyword === 'ADD') {
-      const parts = words(item.text);
-      if (parts.some((part) => part.startsWith('--from='))) continue;
-      const sources = parts.filter((part) => !part.startsWith('--')).slice(0, -1);
-      for (const source of sources) {
-        if (/^https?:\/\//i.test(source)) findings.push(found(DOCKER_SECRETS, file, `${file}:${item.line} ADD of a URL (${source}); a download is a checksum-verified stage, never an ADD.`, { line: item.line, source }));
-        else if (isSecretPath(source)) findings.push(found(DOCKER_SECRETS, file, `${file}:${item.line} ${item.keyword} of ${source}, which holds secret material; credentials are mounted at run time, never copied into an image.`, { line: item.line, source }));
-      }
-    } else if (item.keyword === 'ARG' || item.keyword === 'ENV') {
-      const parts = words(item.text);
-      const names = item.keyword === 'ENV' && parts.length >= 2 && !parts[0].includes('=') ? [parts[0]] : parts.map((part) => part.split('=')[0]);
-      for (const name of names) if (isCredentialName(name)) findings.push(found(DOCKER_SECRETS, file, `${file}:${item.line} ${item.keyword} ${name} names a credential; an image carries none (an ARG or ENV stays in the image history). Mount it at run time; only NEXT_PUBLIC_* values, which are published by design, are build arguments.`, { line: item.line, name }));
-    }
+    if (item.keyword === 'COPY' || item.keyword === 'ADD') findings.push(...copySecretFindings(file, item));
+    else if (item.keyword === 'ARG' || item.keyword === 'ENV') findings.push(...variableSecretFindings(file, item));
   }
   return findings;
 }

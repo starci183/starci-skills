@@ -46,33 +46,42 @@ const liteSecretPatterns = line => {
 
 const inSecretFreeTree = (repo, file) => repo.profile === 'fe' || file.startsWith('fe/') || file.startsWith('supabase/');
 
+function custodyPathFinding(file, repo, findings) {
+  if (repo.profile === 'app') {
+    if (ROOT_ENV.test(file) || SECRETS_ENV.test(file) || SECRETS_DIRECTORY.test(file)) {
+      findings.push(found(LITE_SECRET_CUSTODY, file, `${file} is forbidden at the lite app root; lite keeps no .env*, secrets.env or .secrets/ custody path.`, { pattern: 'lite-forbidden-entry' }));
+      return true;
+    }
+    if (file.endsWith('.enc') && !SEALED_HOME.test(file)) {
+      findings.push(found(LITE_SECRET_CUSTODY, file, `${file} is a sealed file outside .starcistacks/<env>/secrets/; lite has exactly one encrypted custody path.`, { pattern: 'sealed-file-home' }));
+    }
+  } else if (file.endsWith('.enc')) {
+    findings.push(found(LITE_SECRET_CUSTODY, file, `${file} is a sealed file inside a side tree; lite keeps *.enc only at the app root under .starcistacks/<env>/secrets/.`, { pattern: 'sealed-file-home' }));
+  }
+  return false;
+}
+
+function providerSecretFindings(repoRoot, file, repo, findings) {
+  if (!inSecretFreeTree(repo, file) || LOCKFILE.test(file)) return;
+  const text = readText(repoRoot, file);
+  if (text === null) return;
+  const seen = new Set();
+  const lines = text.split(/\r?\n/u);
+  for (let index = 0; index < lines.length; index += 1) {
+    for (const pattern of liteSecretPatterns(lines[index])) {
+      if (seen.has(pattern)) continue;
+      seen.add(pattern);
+      findings.push(found(LITE_SECRET_CUSTODY, file, `${file}:${index + 1} holds a provider-shaped secret (${pattern}); lite keeps no secret literal under fe/ or supabase/.`, { line: index + 1, pattern }));
+    }
+  }
+}
+
 /** Raw L17 findings. The catalog-driven findings filter decides which editions judge them. */
 export function liteSecretCustodyFindings({ repoRoot, files, repo }) {
   const findings = [];
   for (const file of files) {
-    if (repo.profile === 'app') {
-      if (ROOT_ENV.test(file) || SECRETS_ENV.test(file) || SECRETS_DIRECTORY.test(file)) {
-        findings.push(found(LITE_SECRET_CUSTODY, file, `${file} is forbidden at the lite app root; lite keeps no .env*, secrets.env or .secrets/ custody path.`, { pattern: 'lite-forbidden-entry' }));
-        continue;
-      }
-      if (file.endsWith('.enc') && !SEALED_HOME.test(file)) {
-        findings.push(found(LITE_SECRET_CUSTODY, file, `${file} is a sealed file outside .starcistacks/<env>/secrets/; lite has exactly one encrypted custody path.`, { pattern: 'sealed-file-home' }));
-      }
-    } else if (file.endsWith('.enc')) {
-      findings.push(found(LITE_SECRET_CUSTODY, file, `${file} is a sealed file inside a side tree; lite keeps *.enc only at the app root under .starcistacks/<env>/secrets/.`, { pattern: 'sealed-file-home' }));
-    }
-    if (!inSecretFreeTree(repo, file) || LOCKFILE.test(file)) continue;
-    const text = readText(repoRoot, file);
-    if (text === null) continue;
-    const seen = new Set();
-    const lines = text.split(/\r?\n/u);
-    for (let index = 0; index < lines.length; index += 1) {
-      for (const pattern of liteSecretPatterns(lines[index])) {
-        if (seen.has(pattern)) continue;
-        seen.add(pattern);
-        findings.push(found(LITE_SECRET_CUSTODY, file, `${file}:${index + 1} holds a provider-shaped secret (${pattern}); lite keeps no secret literal under fe/ or supabase/.`, { line: index + 1, pattern }));
-      }
-    }
+    if (custodyPathFinding(file, repo, findings)) continue;
+    providerSecretFindings(repoRoot, file, repo, findings);
   }
   return findings;
 }

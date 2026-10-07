@@ -33,17 +33,11 @@ const facts = () => {
   return memo;
 };
 
-/** Findings of BE_KIND_DECLARATION and BE_KIND_EMPTY. */
-export function kindFindings({ files, repo }) {
-  const be = repo.sides?.be;
-  if (!be) return [];
-  const { triggerKinds, kindPatterns, platform } = facts();
-  const kindFolders = new Set(triggerKinds);
+function kindUsageOf(files, kindFolders) {
   const findings = [];
   const instances = new Map();
   const sources = new Map();
   const roots = new Set();
-  const tracked = new Set(files);
   for (const file of files) {
     if (!file.startsWith(FEATURES)) continue;
     const rest = file.slice(FEATURES.length).split('/');
@@ -60,15 +54,27 @@ export function kindFindings({ files, repo }) {
     const key = `${first}/${second}`;
     sources.set(key, (sources.get(key) ?? 0) + (/\.[cm]?tsx?$/.test(file) ? 1 : 0));
   }
+  return { findings, instances, sources, roots };
+}
+
+function emptyInstanceFindings(sources) {
+  const findings = [];
   for (const [key, count] of sources) {
     if (count === 0) findings.push(found(KIND_EMPTY, `${FEATURES}${key}/`, `${FEATURES}${key}/ holds no TypeScript source: a kind member without code is an empty folder; add its files with \`starci app add\` or remove the folder.`, { kind: key.split('/')[0] }));
   }
-  const present = new Set([...instances.keys(), ...roots]);
-  const declared = new Set(be.kinds ?? []);
-  const patterns = new Set(be.patterns ?? []);
+  return findings;
+}
+
+function undeclaredKindFindings(present, declared) {
+  const findings = [];
   for (const kind of [...present].sort(byCodeUnit)) {
     if (!declared.has(kind)) findings.push(found(KIND_DECLARATION, 'hfs.json', `hfs.json sides.be.kinds does not declare the kind \`${kind}\`, which ${FEATURES}${kind}/ uses; declare every kind in use (\`starci app add\` registers it).`, { kind }));
   }
+  return findings;
+}
+
+function declaredKindFindings({ declared, present, kindPatterns, patterns, platform, tracked }) {
+  const findings = [];
   for (const kind of [...declared].sort(byCodeUnit)) {
     if (!present.has(kind)) {
       findings.push(found(KIND_DECLARATION, 'hfs.json', `hfs.json sides.be.kinds declares \`${kind}\` but no feature of that kind exists; a kind is declared only when it is used, so remove it or add its first member with \`starci app add\`.`, { kind }));
@@ -81,5 +87,25 @@ export function kindFindings({ files, repo }) {
       }
     }
   }
+  return findings;
+}
+
+/** Findings of BE_KIND_DECLARATION and BE_KIND_EMPTY. */
+export function kindFindings({ files, repo }) {
+  const be = repo.sides?.be;
+  if (!be) return [];
+  const { triggerKinds, kindPatterns, platform } = facts();
+  const kindFolders = new Set(triggerKinds);
+  const tracked = new Set(files);
+  const usage = kindUsageOf(files, kindFolders);
+  const findings = usage.findings;
+  const instances = usage.instances;
+  const roots = usage.roots;
+  findings.push(...emptyInstanceFindings(usage.sources));
+  const present = new Set([...instances.keys(), ...roots]);
+  const declared = new Set(be.kinds ?? []);
+  const patterns = new Set(be.patterns ?? []);
+  findings.push(...undeclaredKindFindings(present, declared));
+  findings.push(...declaredKindFindings({ declared, present, kindPatterns, patterns, platform, tracked }));
   return findings;
 }

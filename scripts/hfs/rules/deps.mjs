@@ -18,29 +18,34 @@ const HOISTED = /^node_modules\/((?:@[^/]+\/)?[^/]+)$/;
 /** Every package.json a repository tracks: the root and each workspace's. */
 const manifestsOf = (files) => files.filter((file) => file === 'package.json' || (file.endsWith('/package.json') && !file.includes('node_modules/')));
 
-/** The findings of R14 over the tracked paths `files` of `repoRoot`. */
-export function depFindings({ repoRoot, files }) {
-  const findings = [];
-  const specs = new Map();
-  for (const file of manifestsOf(files)) {
-    const pkg = readJson(repoRoot, file);
-    if (!pkg) continue;
-    for (const section of SECTIONS) {
-      for (const [name, spec] of Object.entries(pkg[section] ?? {})) {
-        if (typeof spec !== 'string' || LINK.test(spec)) continue;
-        if (!specs.has(name)) specs.set(name, new Map());
-        const at = specs.get(name);
-        if (!at.has(spec)) at.set(spec, []);
-        at.get(spec).push(file);
-      }
-    }
+function recordDependencySpec(specs, file, name, spec) {
+  if (typeof spec !== 'string' || LINK.test(spec)) return;
+  if (!specs.has(name)) specs.set(name, new Map());
+  const at = specs.get(name);
+  if (!at.has(spec)) at.set(spec, []);
+  at.get(spec).push(file);
+}
+
+function collectManifestSpecs(repoRoot, file, specs) {
+  const pkg = readJson(repoRoot, file);
+  if (!pkg) return;
+  for (const section of SECTIONS) {
+    for (const [name, spec] of Object.entries(pkg[section] ?? {})) recordDependencySpec(specs, file, name, spec);
   }
+}
+
+function versionSkewFindings(specs) {
+  const findings = [];
   for (const [name, bySpec] of specs) {
     if (bySpec.size < 2) continue;
     const list = [...bySpec].map(([spec, where]) => `${spec} (${where.join(', ')})`);
     findings.push(found(DEP_VERSION_SKEW, [...bySpec.values()][0][0], `${name} is declared at ${bySpec.size} versions in the workspace: ${list.join('; ')}; keep one`, { dependency: name, versions: [...bySpec.keys()] }));
   }
-  const overrides = readJson(repoRoot, 'package.json')?.overrides;
+  return findings;
+}
+
+function overrideFindings(specs, overrides) {
+  const findings = [];
   for (const [name, pin] of Object.entries(overrides && typeof overrides === 'object' ? overrides : {})) {
     if (typeof pin !== 'string' || pin.startsWith('$') || !specs.has(name)) continue;
     const off = [...specs.get(name)].filter(([spec]) => spec !== pin);
@@ -49,7 +54,11 @@ export function depFindings({ repoRoot, files }) {
       findings.push(found(DEP_VERSION_SKEW, off[0][1][0], `${name} is pinned to ${pin} by the root overrides but declared at ${declarations}; declare the pinned version`, { dependency: name, versions: off.map(([spec]) => spec), pinned: pin }));
     }
   }
-  const lock = files.includes('package-lock.json') ? readJson(repoRoot, 'package-lock.json') : null;
+  return findings;
+}
+
+function nestedLockFindings(specs, lock) {
+  const findings = [];
   if (lock?.packages) {
     const declared = new Set(specs.keys());
     const hoisted = new Map();
@@ -66,5 +75,17 @@ export function depFindings({ repoRoot, files }) {
       findings.push(found(DEP_VERSION_SKEW, 'package-lock.json', `${key} is a nested copy of ${name}${versionNote}${hoistedNote}; the workspace keeps one copy (align the ranges or add a root override)`, { dependency: name, lockPath: key, version: entry.version }));
     }
   }
+  return findings;
+}
+
+/** The findings of R14 over the tracked paths `files` of `repoRoot`. */
+export function depFindings({ repoRoot, files }) {
+  const specs = new Map();
+  for (const file of manifestsOf(files)) collectManifestSpecs(repoRoot, file, specs);
+  const findings = versionSkewFindings(specs);
+  const overrides = readJson(repoRoot, 'package.json')?.overrides;
+  findings.push(...overrideFindings(specs, overrides));
+  const lock = files.includes('package-lock.json') ? readJson(repoRoot, 'package-lock.json') : null;
+  findings.push(...nestedLockFindings(specs, lock));
   return findings;
 }
