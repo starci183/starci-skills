@@ -49,29 +49,40 @@ function credentialConfigFindings(file, text, toml) {
   return findings;
 }
 
+// A finding for an auth setting of config.toml that differs from what hfs.json supabase.<field> declares; `shown` is the setting as read.
+const settingFinding = (file, key, field, shown, declaredValue, note = '') => found(DB_CONFIG_POLICY, file, `${file} ${key} is ${shown}; hfs.json supabase.${field} declares ${declaredValue}${note}`, { key, declared: declaredValue });
+
+const shownSetting = (value) => JSON.stringify(value ?? 'absent');
+
+function signupFindings(file, auth, declared) {
+  const findings = [];
+  if (declared.enableSignup === undefined) return findings;
+  if (auth.enable_signup !== declared.enableSignup) findings.push(settingFinding(file, 'auth.enable_signup', 'enableSignup', shownSetting(auth.enable_signup), declared.enableSignup, ' - the invite posture is a checked fact, not a doc claim'));
+  if (auth.email?.enable_signup !== undefined && auth.email.enable_signup !== declared.enableSignup) {
+    findings.push(settingFinding(file, 'auth.email.enable_signup', 'enableSignup', JSON.stringify(auth.email.enable_signup), declared.enableSignup));
+  }
+  return findings;
+}
+
+function redirectUrlFindings(file, auth, declared) {
+  const findings = [];
+  if (declared.redirectUrls === undefined) return findings;
+  const configured = Array.isArray(auth.additional_redirect_urls) ? auth.additional_redirect_urls : [];
+  for (const url of configured) {
+    if (!declared.redirectUrls.includes(url)) findings.push(found(DB_CONFIG_POLICY, file, `${file} auth.additional_redirect_urls holds ${url}, which hfs.json supabase.redirectUrls does not declare; the config states nothing the app did not declare`, { key: 'auth.additional_redirect_urls', url }));
+  }
+  for (const url of declared.redirectUrls) {
+    if (!configured.includes(url)) findings.push(found(DB_CONFIG_POLICY, file, `${file} auth.additional_redirect_urls omits ${url}, which hfs.json supabase.redirectUrls declares; the config and declaration must carry the same redirect set`, { key: 'auth.additional_redirect_urls', url }));
+  }
+  return findings;
+}
+
 function declarationConfigFindings(file, auth, declared) {
   const findings = [];
-  if (declared.jwtExpiry !== undefined && auth.jwt_expiry !== declared.jwtExpiry) {
-    findings.push(found(DB_CONFIG_POLICY, file, `${file} auth.jwt_expiry is ${JSON.stringify(auth.jwt_expiry ?? 'absent')}; hfs.json supabase.jwtExpiry declares ${declared.jwtExpiry}`, { key: 'auth.jwt_expiry', declared: declared.jwtExpiry }));
-  }
-  if (declared.enableSignup !== undefined) {
-    if (auth.enable_signup !== declared.enableSignup) findings.push(found(DB_CONFIG_POLICY, file, `${file} auth.enable_signup is ${JSON.stringify(auth.enable_signup ?? 'absent')}; hfs.json supabase.enableSignup declares ${declared.enableSignup} - the invite posture is a checked fact, not a doc claim`, { key: 'auth.enable_signup', declared: declared.enableSignup }));
-    if (auth.email?.enable_signup !== undefined && auth.email.enable_signup !== declared.enableSignup) {
-      findings.push(found(DB_CONFIG_POLICY, file, `${file} auth.email.enable_signup is ${JSON.stringify(auth.email.enable_signup)}; hfs.json supabase.enableSignup declares ${declared.enableSignup}`, { key: 'auth.email.enable_signup', declared: declared.enableSignup }));
-    }
-  }
-  if (declared.siteUrl !== undefined && auth.site_url !== declared.siteUrl) {
-    findings.push(found(DB_CONFIG_POLICY, file, `${file} auth.site_url is ${JSON.stringify(auth.site_url ?? 'absent')}; hfs.json supabase.siteUrl declares ${declared.siteUrl}`, { key: 'auth.site_url', declared: declared.siteUrl }));
-  }
-  if (declared.redirectUrls !== undefined) {
-    const configured = Array.isArray(auth.additional_redirect_urls) ? auth.additional_redirect_urls : [];
-    for (const url of configured) {
-      if (!declared.redirectUrls.includes(url)) findings.push(found(DB_CONFIG_POLICY, file, `${file} auth.additional_redirect_urls holds ${url}, which hfs.json supabase.redirectUrls does not declare; the config states nothing the app did not declare`, { key: 'auth.additional_redirect_urls', url }));
-    }
-    for (const url of declared.redirectUrls) {
-      if (!configured.includes(url)) findings.push(found(DB_CONFIG_POLICY, file, `${file} auth.additional_redirect_urls omits ${url}, which hfs.json supabase.redirectUrls declares; the config and declaration must carry the same redirect set`, { key: 'auth.additional_redirect_urls', url }));
-    }
-  }
+  if (declared.jwtExpiry !== undefined && auth.jwt_expiry !== declared.jwtExpiry) findings.push(settingFinding(file, 'auth.jwt_expiry', 'jwtExpiry', shownSetting(auth.jwt_expiry), declared.jwtExpiry));
+  findings.push(...signupFindings(file, auth, declared));
+  if (declared.siteUrl !== undefined && auth.site_url !== declared.siteUrl) findings.push(settingFinding(file, 'auth.site_url', 'siteUrl', shownSetting(auth.site_url), declared.siteUrl));
+  findings.push(...redirectUrlFindings(file, auth, declared));
   return findings;
 }
 

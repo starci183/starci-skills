@@ -100,23 +100,29 @@ function addEntityUniqueSets(kit, checker, statement, dbName, sets) {
   }
 }
 
+/** Records the entities one `.entity.ts` file declares into `tables`; returns how many of its entities have no readable table name. */
+function addFileEntities(kit, file, tables) {
+  const checker = kit.checkerOf(file.sourceFile);
+  let unreadable = 0;
+  for (const statement of file.sourceFile.statements) {
+    if (!kit.ts.isClassDeclaration(statement)) continue;
+    const entity = entityTableInfo(kit, checker, statement);
+    if (!entity) continue;
+    if (entity.table === null) { unreadable += 1; continue; }
+    const { dbName, sets } = entityColumnSets(kit, checker, statement);
+    addEntityUniqueSets(kit, checker, statement, dbName, sets);
+    const key = entity.table.toLowerCase();
+    if (!tables.has(key)) tables.set(key, { table: entity.table, owner: file.owner.root, rel: file.rel, uniqueSets: sets });
+  }
+  return unreadable;
+}
+
 export function entitiesOf(kit, graph) {
-  const { ts } = kit;
   const tables = new Map();
   let unreadable = 0;
   for (const file of graph.files.values()) {
     if (file.slot !== 'be.persistence' || !path.posix.basename(file.rel).endsWith('.entity.ts') || !file.owner) continue;
-    const checker = kit.checkerOf(file.sourceFile);
-    for (const statement of file.sourceFile.statements) {
-      if (!ts.isClassDeclaration(statement)) continue;
-      const entity = entityTableInfo(kit, checker, statement);
-      if (!entity) continue;
-      if (entity.table === null) { unreadable += 1; continue; }
-      const { dbName, sets } = entityColumnSets(kit, checker, statement);
-      addEntityUniqueSets(kit, checker, statement, dbName, sets);
-      const key = entity.table.toLowerCase();
-      if (!tables.has(key)) tables.set(key, { table: entity.table, owner: file.owner.root, rel: file.rel, uniqueSets: sets });
-    }
+    unreadable += addFileEntities(kit, file, tables);
   }
   return { tables, unreadable };
 }
@@ -136,20 +142,23 @@ function supabaseDeclarations(graph, appRoot, ts) {
   return tables;
 }
 
-function reportSqlWrites({ result, tables, supabase, file, ownTable, report }) {
-  for (const write of result.writes) {
-    const declaration = tables.get(write.table.toLowerCase());
-    if (!declaration) {
-      report(supabase
-        ? `SQL writes table ${write.table}, which Database['public']['Tables'] does not declare; regenerate supabase/types/database.types.ts from the migrations.`
-        : `SQL writes table ${write.table}, which no @Entity declares; declare the entity in the owning capability's persistence/entities.`, { table: write.table });
-    } else if (supabase && write.table.toLowerCase() !== ownTable) {
-      const ownerNote = declaration.owner ? `, owned by ${declaration.owner}` : '';
-      report(`SQL in ${file.owner.root} writes table ${write.table}${ownerNote}; under Supabase schema authority a capability writes only its own table (${ownTable}), named for that capability.`, { table: write.table, ...(declaration.owner ? { tableOwner: declaration.owner } : {}) });
-    } else if (!supabase && declaration.owner !== file.owner.root) {
-      report(`SQL in ${file.owner.root} writes table ${write.table}, owned by ${declaration.owner}; a capability writes only the tables of its own entities, call the owner's public API instead.`, { table: write.table, tableOwner: declaration.owner });
-    }
+function reportSqlWrite({ tables, supabase, file, ownTable, report }, write) {
+  const declaration = tables.get(write.table.toLowerCase());
+  if (!declaration) {
+    report(supabase
+      ? `SQL writes table ${write.table}, which Database['public']['Tables'] does not declare; regenerate supabase/types/database.types.ts from the migrations.`
+      : `SQL writes table ${write.table}, which no @Entity declares; declare the entity in the owning capability's persistence/entities.`, { table: write.table });
+  } else if (supabase) {
+    if (write.table.toLowerCase() === ownTable) return;
+    const ownerNote = declaration.owner ? `, owned by ${declaration.owner}` : '';
+    report(`SQL in ${file.owner.root} writes table ${write.table}${ownerNote}; under Supabase schema authority a capability writes only its own table (${ownTable}), named for that capability.`, { table: write.table, ...(declaration.owner ? { tableOwner: declaration.owner } : {}) });
+  } else if (declaration.owner !== file.owner.root) {
+    report(`SQL in ${file.owner.root} writes table ${write.table}, owned by ${declaration.owner}; a capability writes only the tables of its own entities, call the owner's public API instead.`, { table: write.table, tableOwner: declaration.owner });
   }
+}
+
+function reportSqlWrites(input) {
+  for (const write of input.result.writes) reportSqlWrite(input, write);
 }
 
 function reportSqlRead(tables, supabase, file, model, resolver, report, read) {

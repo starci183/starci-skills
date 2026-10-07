@@ -11,8 +11,8 @@ export function unwrapEach(ts, expression, predicates) {
 }
 
 /** `value` with every TS alias hop resolved (a re-exported import reads as its target symbol). */
-export function normalizedSymbolValue(ts, checker, value) {
-  let symbol = value ?? null;
+export function normalizedSymbolValue(ts, checker, value = null) {
+  let symbol = value;
   const seen = new Set();
   while (symbol && (symbol.flags & ts.SymbolFlags.Alias) && !seen.has(symbol)) {
     seen.add(symbol);
@@ -135,6 +135,8 @@ const kindsFromSymbol = (ts, checker, symbol, targets, seen, options) => {
   return kinds;
 };
 
+const defaultDirectOf = (ts, checker, { symbol, targets }) => targets.get(symbol) ?? null;
+
 export function tracedFrameworkKinds(ts, checker, expression, targets,
   { seen = new Set(), depth = 0, directOf = null, shorthandOf = null, newExpression = false } = {}) {
   if (!expression) return new Set();
@@ -142,7 +144,7 @@ export function tracedFrameworkKinds(ts, checker, expression, targets,
   const unwrapped = unwrapExpression(ts, expression);
   const selected = selectedNode(ts, unwrapped);
   const symbol = selected ? normalizedSymbol(ts, checker, selected) : null;
-  const direct = symbol ? (directOf ?? ((ts2, c, { symbol: s, targets: t }) => t.get(s) ?? null))(ts, checker, { symbol, selected, targets }) : null;
+  const direct = symbol ? (directOf ?? defaultDirectOf)(ts, checker, { symbol, selected, targets }) : null;
   if (direct) return new Set([direct]);
   const options = { depth: depth + 1, directOf, shorthandOf, newExpression };
   if (ts.isArrowFunction(unwrapped) || ts.isFunctionExpression(unwrapped)) return kindsFromReturns(ts, checker, unwrapped, targets, { ...options, seen });
