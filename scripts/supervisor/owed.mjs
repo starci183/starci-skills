@@ -53,43 +53,26 @@
 //            which re-opens it (ack-reopened);
 //   waiting  a retry-loop/repeat-check lineage whose newest job is queued behind an open owner gate or
 //            an open owner ask (on it or on a job its --after chain reaches) is the owner's, not OWED.
-import fs from 'node:fs';
 import path from 'node:path';
 import { logSince } from '../api/git/log-since.mjs'; import { revParse } from '../api/git/rev-parse.mjs';
 import { fileURLToPath } from 'node:url';
 import { loadConfig } from '../../engine/config.mjs';
-import { retryDisposition } from '../../engine/admission.mjs';
 import { inspectLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
 import { evaluateTypedIncidents } from '../kernel/gate-conditions.mjs';
-import { staleInputs, staleOperationsOf } from '../kernel/input-digests.mjs';
+import { staleInputs } from '../kernel/input-digests.mjs';
 import {
   GATE_GRACE_MS, ownerGates, peerWaits, judgeGate, judgePeerWait,
-  openAskDispatches, runningWorkflows, namedWorkflows, heldBy, ledgerLookup, peerBusyProbe, verdictKey, stallMinutesOf, apiFrontier,
+  openAskDispatches, runningWorkflows, namedWorkflows, ledgerLookup, peerBusyProbe, verdictKey, stallMinutesOf, apiFrontier,
 } from './stall.mjs';
 import { readSupervisor, supervisorEvent, withSupervisor } from '../machine/home.mjs';
-import { guardReceiptErrors } from '../guards/hook-install.mjs';
 import { clipLine } from '../lib/clip.mjs';
-import { parseJsonOr, withPayload } from '../lib/json.mjs';
+import { parseJsonOr } from '../lib/json.mjs';
 import { minutes } from '../lib/time.mjs'; import { isMain } from '../lib/is-main.mjs';
 import { DECISION_TEXT, CONTRACT_CONFLICT_TEXT, NOTE_KIND, OWNER_ONLY, SUPERVISOR_ADDRESSED, WORKER_DIED_TEXT } from './owed-text.mjs';
-import { shortHash } from '../lib/hash.mjs'; import { byCodeUnit } from '../lib/list.mjs';
+import { retryChainFindings, workerDiedFindings, repeatRejectFindings, guardFailedFindings, rerouteLoopFindings, staleInputFindings } from './owed-patterns.mjs';
+export { isLeaseOverlapRefusal } from './owed-patterns.mjs';
 export const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const CLASSES = Object.freeze({ owner: 'owner', peer: 'peer', kernel: 'kernel', progress: 'in-progress', supervisor: 'supervisor' });
-const RETRY_LOOP_MIN = 4;
-const REROUTE_MIN = 4;
-const WORKER_DIED_WINDOW_MS = 6 * 60 * 60_000;
-const REJECT_WINDOW_MS = 2 * 60 * 60_000;
-// A reserve refusal whose every reason is a path lease another job holds (the overlap itself, or the
-// capacity-1 path row it fills) is a wait, not a launcher failure; repeat-reject never counts it.
-const LEASE_OVERLAP_REASON = /^resource path:.+? (?:overlaps durable lease path:.+ held by \S+|capacity \d+ has \d+ used and needs \d+)$/;
-export const isLeaseOverlapRefusal = (payload) => {
-  if (payload?.step !== 'reserve') return false;
-  const reasons = String(payload.error ?? '').split('; ').map((r) => r.trim()).filter(Boolean);
-  return reasons.some((r) => /overlaps durable lease/.test(r)) && reasons.every((r) => LEASE_OVERLAP_REASON.test(r));
-};
-/** A failed retry chain older than this is history, not a pattern. */
-const CHAIN_WINDOW_MS = 24 * 60 * 60_000;
-const OPEN_JOB = new Set(['queued', 'leased', 'running', 'answering']);
 
 const parse = parseJsonOr;
 const kindOf = (lastProgress) => /^\[([^\]]+)\]/.exec(lastProgress ?? '')?.[1] ?? null;
@@ -241,6 +224,86 @@ function gitCommits({ root = SKILL_ROOT, since = 0, log = logSince, memoMs = 60_
 
 const raisedOf = (db, workflowId, incidentId) => db.prepare(
   "SELECT payload_json, created_at FROM events WHERE workflow_id=? AND entity_type='incident' AND entity_id=? AND kind='incident-raised' ORDER BY seq DESC LIMIT 1").get(workflowId, incidentId);
+const typedIncidentsOf = (db, repo, wf) => { try { return evaluateTypedIncidents(db, { repo, workflowId: wf }); } catch { return []; } };
+const openAskIds = (d, wf) => {
+  if (!d) return [];
+  try { return openAskDispatches(d, wf).map((a) => a.dispatch_id); } catch { return []; }
+};
+const hasRunningPeer = (dbOf, p) => {
+  const r = dbOf(p)?.prepare('SELECT phase, archived_at FROM workflows WHERE workflow_id=?').get(p);
+  return r?.phase === 'running' && r.archived_at == null;
+};
+
+/** The class and reason of an incident that is a typed wait (--until-*): [class, reason]. */
+const typedClass = (t) => {
+  if (t.met) return [CLASSES.progress, 'every typed condition holds: the runtime releases it on the next status'];
+  if (t.unmeetable?.length) return [CLASSES.kernel, `typed wait can no longer be met (${clipLine(t.unmeetable.join('; '), 120)}): its Kernel re-points or resolves it`];
+  return [CLASSES.peer, `typed wait the runtime re-checks: ${clipLine(t.results.filter((r) => !r.met).map((r) => r.condition).join(' AND '), 140)}`];
+};
+
+/** An open owner ask the incident text names (in its workflow or a peer it names) is the owner's: [class, reason] or null. */
+const ownerAskClass = (cx, text) => {
+  const peers = namedWorkflows(text).filter((id) => id !== cx.wf);
+  const named = new Set(String(text).match(/\bctx_[0-9a-f]{12}\b/g) ?? []);
+  const openNamed = [...cx.ownAsks, ...peers.flatMap(cx.asksOf)].filter((d) => named.has(d));
+  return openNamed.length ? [CLASSES.owner, `names open owner ask ${openNamed.join(', ')}`] : null;
+};
+
+/** The class and reason of an incident that is an owner gate: [class, reason]. */
+const gateClass = (cx, row, gate) => {
+  const { db, wf, repo, dbOf, now, graceMs } = cx;
+  const v = cx.verdictOf(wf, row.incident_id, () => judgeGate({ db, workflowId: wf, gate, repo, dbOf, now, graceMs }));
+  if (v.stale) return [CLASSES.kernel, `stale owner gate (stall wake): ${clipLine(v.reasons.join('; '), 140)}`];
+  if (v.asks.length) return [CLASSES.owner, `owner ask ${v.asks.map((a) => a.dispatchId).join(', ')} open`];
+  if (PEER_DEPENDENCY.test(gate.text)) return [CLASSES.kernel, 'an owner gate its own text calls a peer dependency: its Kernel re-records it as a peer-wait (stall wake)'];
+  if (OWNER_ONLY.test(gate.text)) return [CLASSES.owner, 'an owner-only condition (credentials, push/publish, handover, payment/legal)'];
+  if (v.waits.length && v.peers.some((p) => hasRunningPeer(dbOf, p))) return [CLASSES.peer, `waits on a record a running peer owes: ${clipLine(v.waits.join(', '), 140)}`];
+  return [CLASSES.supervisor, v.waits.length ? `owner gate waits on ${clipLine(v.waits.join(', '), 120)} and no running peer it names owes it` : 'owner gate with no owner ask and no owner-only condition'];
+};
+
+/** The class and reason of an incident that is a peer-wait: [class, reason]. */
+const waitClass = (cx, row, wait) => {
+  const { db, wf, dbOf, now, graceMs, stallMinutes, busyOf } = cx;
+  const v = cx.verdictOf(wf, row.incident_id, () => judgePeerWait({ db, workflowId: wf, wait, dbOf, now, thresholdMs: stallMinutes * 60_000, graceMs, busyOf }));
+  if (v.unknown) return [CLASSES.supervisor, `peer-wait on ${wait.peer ?? '?'}, which is in no ledger in view`];
+  if (v.stale) return [CLASSES.kernel, `stale peer-wait (stall wake): ${clipLine(v.reasons.join('; '), 140)}`];
+  return [CLASSES.peer, `peer ${wait.peer} is running and moving`];
+};
+
+/** The class and reason of one open incident, by elimination: [class, reason]. */
+const classifyIncident = (cx, row, kind, text, raisedAt) => {
+  const { now, graceMs } = cx;
+  if (now - raisedAt < graceMs) return [CLASSES.progress, `raised ${minutes(now - raisedAt)}m ago, inside the grace window`];
+  const t = cx.typedOf.get(row.incident_id);
+  if (t) return typedClass(t);
+  const ownerAsk = ownerAskClass(cx, text);
+  if (ownerAsk) return ownerAsk;
+  const gate = cx.gatesOf.get(row.incident_id);
+  if (gate) return gateClass(cx, row, gate);
+  const wait = cx.waitsOf.get(row.incident_id);
+  if (wait) return waitClass(cx, row, wait);
+  if (kind && NOTE_KIND.test(kind) && !SUPERVISOR_ADDRESSED.test(text)) return [CLASSES.kernel, 'informational note (holds nothing): its Kernel resolves it when done'];
+  return [CLASSES.supervisor, SUPERVISOR_ADDRESSED.test(text) ? 'addressed to the supervisor/runtime/Source, no typed release' : 'no typed release, no owner ask, no peer: nobody but the supervisor moves it'];
+};
+
+/** Every open incident of one running workflow, classified. */
+const classifyWorkflow = (env, wf) => {
+  const { db, repo, now } = env;
+  const typed = typedIncidentsOf(db, repo, wf);
+  const cx = { ...env, wf, typedOf: new Map(typed.map((t) => [t.incidentId, t])), gatesOf: new Map(ownerGates(db, wf).map((g) => [g.incidentId, g])),
+    waitsOf: new Map(peerWaits(db, wf).map((p) => [p.incidentId, p])), ownAsks: env.asksOf(wf) };
+  const rows = db.prepare("SELECT incident_id, op_id, last_progress, updated_at FROM incidents WHERE workflow_id=? AND status='open' ORDER BY updated_at, incident_id").all(wf);
+  return rows.map((row) => {
+    const kind = kindOf(row.last_progress);
+    const text = bodyOf(row.last_progress);
+    const raised = raisedOf(db, wf, row.incident_id);
+    const raisedAt = raised?.created_at ?? row.updated_at;
+    const base = { workflowId: wf, repo, incidentId: row.incident_id, opId: row.op_id ?? null, kind, labels: labelsOf(kind, text), raisedAt, updatedAt: row.updated_at,
+      ageMin: minutes(now - raisedAt), text, summary: clipLine(text, 200) };
+    const [cls, reason] = classifyIncident(cx, row, kind, text, raisedAt);
+    return { class: cls, reason, ...base };
+  });
+};
 
 /**
  * Every open incident of every running, unarchived workflow of one ledger, classified (CLASSES).
@@ -253,126 +316,19 @@ export function classifyIncidents(db, { repo = null, ledgers = [], now = Date.no
   verdicts = null, frontierOf = apiFrontier } = {}) {
   const find = ledgerLookup({ repo, db, ledgers });
   const dbOf = (wf) => find(wf)?.db ?? null;
-  const busyOf = peerBusyProbe({ repo, db, ledgers, frontierOf });
-  const verdictOf = (wf, incidentId, judge) => verdicts?.get(verdictKey(wf, incidentId)) ?? judge();
-  const asksOf = (wf) => { const d = dbOf(wf); if (!d) { return []; } try { return openAskDispatches(d, wf).map((a) => a.dispatch_id); } catch { return []; } };
+  const env = { db, repo, now, graceMs, stallMinutes, dbOf, busyOf: peerBusyProbe({ repo, db, ledgers, frontierOf }),
+    verdictOf: (wf, incidentId, judge) => verdicts?.get(verdictKey(wf, incidentId)) ?? judge(), asksOf: (wf) => openAskIds(dbOf(wf), wf) };
   const out = [];
   for (const w of runningWorkflows(db)) {
-    const wf = w.workflow_id;
-    if (wanted.size && !wanted.has(wf)) continue;
-    let typed = [];
-    try { typed = evaluateTypedIncidents(db, { repo, workflowId: wf }); } catch { typed = []; }
-    const typedOf = new Map(typed.map((t) => [t.incidentId, t]));
-    const gatesOf = new Map(ownerGates(db, wf).map((g) => [g.incidentId, g]));
-    const waitsOf = new Map(peerWaits(db, wf).map((p) => [p.incidentId, p]));
-    const ownAsks = asksOf(wf);
-    const rows = db.prepare("SELECT incident_id, op_id, last_progress, updated_at FROM incidents WHERE workflow_id=? AND status='open' ORDER BY updated_at, incident_id").all(wf);
-    for (const row of rows) {
-      const kind = kindOf(row.last_progress);
-      const text = bodyOf(row.last_progress);
-      const raised = raisedOf(db, wf, row.incident_id);
-      const raisedAt = raised?.created_at ?? row.updated_at;
-      const base = { workflowId: wf, repo, incidentId: row.incident_id, opId: row.op_id ?? null, kind, labels: labelsOf(kind, text), raisedAt, updatedAt: row.updated_at,
-        ageMin: minutes(now - raisedAt), text, summary: clipLine(text, 200) };
-      const put = (cls, reason) => out.push({ class: cls, reason, ...base });
-      if (now - raisedAt < graceMs) { put(CLASSES.progress, `raised ${minutes(now - raisedAt)}m ago, inside the grace window`); continue; }
-      const t = typedOf.get(row.incident_id);
-      if (t) {
-        if (t.met) put(CLASSES.progress, 'every typed condition holds: the runtime releases it on the next status');
-        else if (t.unmeetable?.length) put(CLASSES.kernel, `typed wait can no longer be met (${clipLine(t.unmeetable.join('; '), 120)}): its Kernel re-points or resolves it`);
-        else put(CLASSES.peer, `typed wait the runtime re-checks: ${clipLine(t.results.filter((r) => !r.met).map((r) => r.condition).join(' AND '), 140)}`);
-        continue;
-      }
-      // An open owner ask this incident names (in its workflow or a peer it names) is the owner's.
-      const peers = namedWorkflows(text).filter((id) => id !== wf);
-      const named = new Set(String(text).match(/\bctx_[0-9a-f]{12}\b/g) ?? []);
-      const openNamed = [...ownAsks, ...peers.flatMap(asksOf)].filter((d) => named.has(d));
-      if (openNamed.length) { put(CLASSES.owner, `names open owner ask ${openNamed.join(', ')}`); continue; }
-      const gate = gatesOf.get(row.incident_id);
-      if (gate) {
-        const v = verdictOf(wf, row.incident_id, () => judgeGate({ db, workflowId: wf, gate, repo, dbOf, now, graceMs }));
-        if (v.stale) put(CLASSES.kernel, `stale owner gate (stall wake): ${clipLine(v.reasons.join('; '), 140)}`);
-        else if (v.asks.length) put(CLASSES.owner, `owner ask ${v.asks.map((a) => a.dispatchId).join(', ')} open`);
-        else if (PEER_DEPENDENCY.test(gate.text)) put(CLASSES.kernel, 'an owner gate its own text calls a peer dependency: its Kernel re-records it as a peer-wait (stall wake)');
-        else if (OWNER_ONLY.test(gate.text)) put(CLASSES.owner, 'an owner-only condition (credentials, push/publish, handover, payment/legal)');
-        else if (v.waits.length && v.peers.some((p) => { const d = dbOf(p); const r = d?.prepare('SELECT phase, archived_at FROM workflows WHERE workflow_id=?').get(p); return r?.phase === 'running' && r.archived_at == null; })) {
-          put(CLASSES.peer, `waits on a record a running peer owes: ${clipLine(v.waits.join(', '), 140)}`);
-        } else put(CLASSES.supervisor, v.waits.length ? `owner gate waits on ${clipLine(v.waits.join(', '), 120)} and no running peer it names owes it` : 'owner gate with no owner ask and no owner-only condition');
-        continue;
-      }
-      const wait = waitsOf.get(row.incident_id);
-      if (wait) {
-        const v = verdictOf(wf, row.incident_id, () => judgePeerWait({ db, workflowId: wf, wait, dbOf, now, thresholdMs: stallMinutes * 60_000, graceMs, busyOf }));
-        if (v.unknown) put(CLASSES.supervisor, `peer-wait on ${wait.peer ?? '?'}, which is in no ledger in view`);
-        else if (v.stale) put(CLASSES.kernel, `stale peer-wait (stall wake): ${clipLine(v.reasons.join('; '), 140)}`);
-        else put(CLASSES.peer, `peer ${wait.peer} is running and moving`);
-        continue;
-      }
-      if (kind && NOTE_KIND.test(kind) && !SUPERVISOR_ADDRESSED.test(text)) { put(CLASSES.kernel, 'informational note (holds nothing): its Kernel resolves it when done'); continue; }
-      put(CLASSES.supervisor, SUPERVISOR_ADDRESSED.test(text) ? 'addressed to the supervisor/runtime/Source, no typed release' : 'no typed release, no owner ask, no peer: nobody but the supervisor moves it');
-    }
+    if (wanted.size && !wanted.has(w.workflow_id)) continue;
+    out.push(...classifyWorkflow(env, w.workflow_id));
   }
   return out;
 }
 
 /* ------------------------------------------------------------ patterns with no incident */
 
-const hash = (s) => shortHash(s, { algo: 'sha1', n: 8 }); const stalePathOf = (p, root, repo) => { if (path.isAbsolute(p)) return p; if (p.startsWith('.starciwork/') && repo) return path.join(repo, p); return path.join(root, p); };
-const ownedPaths = (payload) => (Array.isArray(payload?.owned_paths) ? payload.owned_paths : []).map(String);
-const pathsKey = (payload) => JSON.stringify([...ownedPaths(payload)].sort(byCodeUnit));
-const bare = (p) => p.replaceAll('\\', '/').replace(/(?:\/\*{1,2})+$/, '').replace(/\/+$/, '');
-// Every owned path of `tail` lies under (or is) a path some job in `jobs` owns: a cut set that re-sliced it.
-const pathsCovered = (tail, jobs) => {
-  const want = ownedPaths(tail.payload).map(bare);
-  const have = jobs.flatMap((j) => ownedPaths(j.payload).map(bare)).filter(Boolean);
-  return want.length > 0 && want.every((p) => have.some((q) => p === q || p.startsWith(`${q}/`)));
-};
-
-/** When the newest failure of jobs settled: its op-settled event, else the failed row's updated_at; null with none. */
-const lastFailureOf = (db, wf, jobs) => {
-  let at = null;
-  for (const j of jobs.filter((x) => x.status === 'failed')) {
-    let settled = null;
-    try { settled = db.prepare("SELECT MAX(created_at) at FROM events WHERE workflow_id=? AND entity_id=? AND kind='op-settled'").get(wf, j.job_id)?.at ?? null; } catch { settled = null; }
-    at = Math.max(at ?? 0, settled ?? j.updated_at ?? 0);
-  }
-  return at;
-};
-
-/**
- * What holds a lineage's newest job for the OWNER, or null: an open owner gate holding it (by job or
- * op), or an open owner ask filed by it or by a job its --after chain reaches (or a gate holding one of
- * those). Only a job still waiting to run counts (queued, or answering its own ask).
- */
-function ownerHoldOf(db, wf, tail, { byId = new Map(), gates = null, askJobs = null } = {}) {
-  if (!tail || !['queued', 'answering'].includes(tail.status)) return null;
-  const openGates = gates ?? ownerGates(db, wf);
-  const asks = askJobs ?? openAskJobs(db, wf);
-  const jobOf = (id) => byId.get(id) ?? (() => { try { const r = db.prepare('SELECT job_id, op_id, status, payload_json FROM jobs WHERE job_id=?').get(id); return withPayload(r); } catch { return null; } })();
-  const seen = new Set();
-  for (let queue = [tail]; queue.length;) {
-    const j = queue.shift();
-    if (!j || seen.has(j.job_id)) continue;
-    seen.add(j.job_id);
-    if (asks.has(j.job_id)) return { kind: 'owner-ask', jobId: tail.job_id, via: j.job_id, dispatchId: asks.get(j.job_id) };
-    const gate = openGates.find((g) => heldBy(g, j));
-    if (gate) return { kind: 'owner-gate', jobId: tail.job_id, via: j.job_id, incidentId: gate.incidentId };
-    for (const id of Array.isArray(j.payload?.after) ? j.payload.after : []) queue.push(jobOf(id));
-  }
-  return null;
-}
-
-/** Open owner asks of one workflow by the job that filed them: Map<jobId, dispatchId>. */
-function openAskJobs(db, wf) {
-  const out = new Map();
-  try {
-    for (const a of openAskDispatches(db, wf)) {
-      const r = db.prepare('SELECT job_id FROM reports WHERE workflow_id=? AND dispatch_id=?').get(wf, a.dispatch_id);
-      if(r)out.set(r.job_id,a.dispatch_id);
-    }
-  } catch { /* no reports */ }
-  return out;
-}
+const PATTERN_PROBES = [retryChainFindings, workerDiedFindings, repeatRejectFindings, guardFailedFindings, rerouteLoopFindings, staleInputFindings];
 
 /**
  * Systemic failures no incident names: [{class:'supervisor', pattern, key, workflowId, ...}].
@@ -387,161 +343,23 @@ export function patternFindings(db, { repo = null, now = Date.now(), wanted = ne
   for (const w of runningWorkflows(db)) {
     const wf = w.workflow_id;
     if (wanted.size && !wanted.has(wf)) continue;
-    // Retry chains (payload.retry.retryOf): a chain whose tail is still unfinished work.
-    try {
-      const jobs = db.prepare(`SELECT job_id, op_id, try_no AS attempt, status, payload_json,
-        (SELECT settle_json FROM op_attempts a WHERE a.job_id=jobs.job_id ORDER BY attempt_id DESC LIMIT 1) AS result_json,
-        created_at, updated_at FROM jobs WHERE workflow_id=? AND kind='op' ORDER BY created_at, job_id`).all(wf)
-        .map((j) => withPayload(j));
-      // An attempt settled peer-blocked (starci kernel settle: every red check was a peer's change) is not a failure of the chain,
-      // nor one whose settle spent no business retry (engine/admission.mjs retryDisposition: a host terminal wipe's
-      // retryClass environment, a proven no-effect launch, an owner answer).
-      const notAFailure = new Set(jobs.filter((j) => j.status === 'failed' && (parse(j.result_json)?.peerBlocked || !retryDisposition(j).consumesBusinessRetry)).map((j) => j.job_id));
-      // Nor one nobody ever tried to run: settled with no dispatch and no dispatch reject (a stranded --after chain
-      // the Kernel settled blocked; a launcher that kept refusing is repeat-reject's, and still counts here).
-      // a collab-group-chat workflow's a3 settled so on 2026-09-23; the Kernel's re-run of the same cut ordinal three
-      // days later chained to it (--retry-of) and a3 read as the loop's first failure.
-      const dispatched = new Set(db.prepare("SELECT DISTINCT entity_id FROM events WHERE workflow_id=? AND kind IN ('op-dispatched','dispatch-rejected')").all(wf).map((r) => r.entity_id));
-      for (const r of db.prepare("SELECT DISTINCT entity_id FROM events WHERE workflow_id=? AND kind='op-settled'").all(wf)) if (!dispatched.has(r.entity_id)) notAFailure.add(r.entity_id);
-      const byId = new Map(jobs.map((j) => [j.job_id, j]));
-      const retried = new Set(jobs.map((j) => j.payload?.retry?.retryOf).filter(Boolean));
-      const checks=new Map();
-      for(const c of db.prepare(`SELECT c.job_id,c.name,c.exit_code,c.status,c.attribution_json
-        FROM check_runs c JOIN op_attempts a ON a.attempt_id=c.attempt_id WHERE c.workflow_id=?`).all(wf)){
-        const key=c.job_id;
-        if(!checks.has(key))checks.set(key,{checks:[]});
-        checks.get(key).checks.push({name:c.name,exitCode:c.exit_code??(c.status==='fail'?1:null),
-          peerBlocked:parse(c.attribution_json)?.peerBlocked??false});
-      }
-      // An attempt that filed an ask waited on the owner; it is not a failure of the chain.
-      const askReports = new Set(db.prepare("SELECT job_id FROM reports WHERE workflow_id=? AND outcome='ask'").all(wf)
-        .map((r) => r.job_id));
-      // Chains branch (one job retried by several successors) and pass through successes (a redo of
-      // settled work): what counts is the failure streak since the chain's last success, reported
-      // once per streak however many tails share it.
-      const loops = new Map(), repeats = new Map();
-      const gates = ownerGates(db, wf), askJobs = openAskJobs(db, wf);
-      // The newest job of a lineage decides whether it waits on the owner (ownerHoldOf).
-      const waiting = (tails) => { const newest = [...tails].sort((a, b) => b.created_at - a.created_at || String(b.job_id).localeCompare(String(a.job_id)))[0]; const hold = ownerHoldOf(db, wf, newest, { byId, gates, askJobs }); if (!hold) { return {}; } const ownerItem = hold.kind === 'owner-gate' ? 'owner gate ' + hold.incidentId : 'owner ask ' + hold.dispatchId; const via = hold.via !== hold.jobId ? ' (via ' + hold.via + ')' : ''; return { class: CLASSES.owner, reason: 'waiting on the owner: newest job ' + hold.jobId + ' is ' + newest.status + ' behind ' + ownerItem + via, ownerHold: hold }; };
-      for (const tail of jobs.filter((j) => !retried.has(j.job_id))) {
-        if (tail.status === 'succeeded' || tail.status === 'cancelled') continue;
-        if (!OPEN_JOB.has(tail.status)) {
-          if (now - tail.updated_at > CHAIN_WINDOW_MS) continue;
-          // A later job of the same op over the same paths took the work over: this chain is history.
-          const later = jobs.filter((j) => j.op_id === tail.op_id && j.created_at > tail.created_at);
-          if (later.some((j) => pathsKey(j.payload) === pathsKey(tail.payload))) continue;
-          // The Kernel re-cut it into a cut set whose settled successes together cover every owned path: history too.
-          if (pathsCovered(tail, later.filter((j) => j.status === 'succeeded'))) continue;
-        }
-        const streak = [];
-        for (let j = tail, guard = 0; j && j.status !== 'succeeded' && guard < 200; j = byId.get(j.payload?.retry?.retryOf), guard++) {
-          if (j.status !== 'cancelled' && !askReports.has(j.job_id) && !notAFailure.has(j.job_id)) streak.unshift(j);
-        }
-        const failed = streak.filter((j) => j.status === 'failed');
-        if (failed.length >= RETRY_LOOP_MIN - 1 && streak.length >= RETRY_LOOP_MIN) {
-          const id = streak[0].job_id;
-          const loop = loops.get(id) ?? { streak, tails: [] };
-          loop.tails.push(tail);
-          if (streak.length > loop.streak.length) loop.streak = streak;
-          loops.set(id, loop);
-        }
-        for (const j of failed) {
-          for (const c of checks.get(j.job_id)?.checks ?? []) {
-            const code = c?.exitCode;
-            if (code === 0 || code === null || code === undefined || !c?.name || c.peerBlocked) continue;
-            const id = `${streak[0].job_id}:${c.name}`;
-            const r = repeats.get(id) ?? { name: c.name, op: tail.op_id, jobs: new Map(), tails: new Set(), tailJobs: new Map(), lineage: new Map() };
-            r.jobs.set(j.job_id, j); r.tails.add(`${tail.job_id} ${tail.status}`); r.tailJobs.set(tail.job_id, tail);
-            for (const x of streak) r.lineage.set(x.job_id, x);
-            repeats.set(id, r);
-          }
-        }
-      }
-      for (const [id, { streak, tails }] of loops) {
-        put(wf, 'retry-loop', id, streak[0].created_at, `${streak[0].op_id}: ${streak.filter((j) => j.status === 'failed').length} failed attempt(s) in a row since the last success (${streak.map((j) => 'a' + j.attempt + ' ' + j.status).join(', ')}); now ${tails.map((t) => t.job_id + ' ' + t.status).join(', ')}`,
-          { jobs: streak.map((j) => j.job_id), lastFailureAt: lastFailureOf(db, wf, streak), ...waiting(tails) });
-      }
-      for (const [id, r] of repeats) {
-        const list = [...r.jobs.values()].sort((a, b) => a.attempt - b.attempt);
-        if (list.length < 2) continue;
-        put(wf, 'repeat-check', id, list[0].updated_at, `check ${r.name} failed on ${list.length} attempts of ${r.op} (${list.map((j) => 'a' + j.attempt).join(', ')}); now ${[...r.tails].join(', ')}`,
-          { jobs: list.map((j) => j.job_id), lastFailureAt: lastFailureOf(db, wf, [...r.lineage.values()]), ...waiting(r.tailJobs.values()) });
-      }
-    } catch { /* a malformed chain is not a finding */ }
-    // Workers that died without a report, per provider, inside the window.
-    try {
-      const died = db.prepare(`SELECT entity_id job, created_at FROM events WHERE workflow_id=? AND created_at>? AND (
-          kind='dead-worker-fenced' OR (kind='op-settled' AND json_extract(payload_json,'$.reportFiled')=0))`).all(wf, now - WORKER_DIED_WINDOW_MS);
-      const byModel = new Map();
-      for (const d of died) {
-        const disp = db.prepare("SELECT payload_json FROM events WHERE workflow_id=? AND kind='op-dispatched' AND entity_id=? ORDER BY seq DESC LIMIT 1").get(wf, d.job);
-        const model = parse(disp?.payload_json).model ?? 'unknown';
-        if (!byModel.has(model)) byModel.set(model, new Map());
-        const m = byModel.get(model);
-        if (!m.has(d.job)) m.set(d.job, d.created_at);
-      }
-      for (const [model, m] of byModel) {
-        if (m.size < 2) continue;
-        put(wf, 'worker-died', `${wf}:${model}`, Math.min(...m.values()), `${m.size} ${model} worker(s) ended without a report in the last ${WORKER_DIED_WINDOW_MS / 3_600_000} h: ${[...m.keys()].join(', ')}`, { jobs: [...m.keys()], lastFailureAt: Math.max(...m.values()) });
-      }
-    } catch { /* no events */ }
-    // Identical dispatch rejects inside the window.
-    try {
-      const rejects = db.prepare("SELECT entity_id job, payload_json, created_at FROM events WHERE workflow_id=? AND kind='dispatch-rejected' AND created_at>? ORDER BY seq").all(wf, now - REJECT_WINDOW_MS);
-      const groups = new Map();
-      for (const r of rejects) {
-        const p = parse(r.payload_json);
-        // A write set another job's lease still owns is a wait, not a launcher failure: starci kernel dispatch
-        // now leaves such a job queued path-lease, and refusals recorded before that change do not
-        // count either. Real launcher/host failures (any other reserve reason) still do.
-        if (isLeaseOverlapRefusal(p)) continue;
-        const sig = `${p.step ?? '?'}\0${clipLine(p.error || p.signal || '', 80)}`;
-        if (!groups.has(sig)) groups.set(sig, { step: p.step ?? '?', error: clipLine(p.error || p.signal || '', 80), at: r.created_at, last: r.created_at, jobs: [], providers: new Set() });
-        const g = groups.get(sig); g.jobs.push(r.job); g.providers.add(p.provider ?? p.model ?? '?'); g.last = Math.max(g.last, r.created_at);
-      }
-      for (const [sig, g] of groups) {
-        if (g.jobs.length < 2) continue;
-        put(wf, 'repeat-reject', `${wf}:${hash(sig)}`, g.at, `${g.jobs.length} dispatch rejects at step ${g.step} (${[...g.providers].join(', ')})${g.error ? ': ' + g.error : ''}`, { jobs: [...new Set(g.jobs)], lastFailureAt: g.last });
-      }
-    } catch { /* no events */ }
-    // Dispatches whose guard receipt says a layer did not install: the worker ran without it.
-    try {
-      const unguarded = db.prepare("SELECT entity_id job, json_extract(payload_json,'$.guard') guard, created_at FROM events WHERE workflow_id=? AND kind='op-dispatched' AND created_at>? ORDER BY seq")
-        .all(wf, now - WORKER_DIED_WINDOW_MS).map((r) => ({ ...r, errors: guardReceiptErrors(parse(r.guard, null)) })).filter((r) => r.errors.length);
-      if (unguarded.length) {
-        const layers = [...new Set(unguarded.flatMap((r) => r.errors))];
-        put(wf, 'guard-failed', wf, unguarded[0].created_at, `${unguarded.length} dispatch(es) launched without their full guard: ${layers.join('; ')} (${[...new Set(unguarded.map((r) => r.job))].join(', ')})`,
-          { jobs: [...new Set(unguarded.map((r) => r.job))], lastFailureAt: unguarded.at(-1).created_at });
-      }
-    } catch { /* no events */ }
-    // A queued job routed again and again without dispatch.
-    try {
-      for (const r of db.prepare(`SELECT e.entity_id job, COUNT(*) n, MIN(e.created_at) since, MAX(e.created_at) last FROM events e JOIN jobs j ON j.job_id=e.entity_id
-          WHERE e.workflow_id=? AND e.kind='route-decided' AND j.status='queued' GROUP BY e.entity_id HAVING n>=?`).all(wf, REROUTE_MIN)) {
-        put(wf, 'reroute-loop', r.job, r.since, `queued job ${r.job} routed ${r.n} times without a dispatch`, { jobs: [r.job], lastFailureAt: r.last });
-      }
-    } catch { /* no events */ }
-    // Settled work that really owes work (starci kernel status staleOperations): an owner-declared breaking change or an
-    // unattributed edit of an owned record. A peer's rewrite of a shared record is advisory peerDrift and never
-    // counts (work-ownership.mjs).
-    try {
-      const ops = staleOperationsOf(staleOf(db, wf, { root, repo }));
-      if (ops.length) {
-        const paths = [...new Set(ops.flatMap((o) => o.paths))];
-        const since = Math.min(...paths.map((p) => { try { return fs.statSync(stalePathOf(p, root, repo)).mtimeMs; } catch { return now; } }));
-        const source = paths.some((p) => !p.startsWith('.starciwork/'));
-        const followUps = ops.filter((o) => o.followUp).length;
-        put(wf, 'stale-input', wf, since, `${ops.length} settled job(s) owe work for changed input(s) ${clipLine(paths.join(', '), 120)}${followUps ? ' (' + followUps + ' owner-declared breaking follow-up(s))' : ''} (e.g. ${ops.slice(0, 3).map((o) => o.jobId).join(', ')})`,
-          { jobs: ops.map((o) => o.jobId), paths, labels: [source ? 'knowledge-churn' : 'cross-workflow'] });
-      }
-    } catch { /* no contracts */ }
+    const cx = { db, wf, now, root, repo, staleOf, put, ownerClass: CLASSES.owner };
+    for (const probe of PATTERN_PROBES) {
+      try { probe(cx); } catch { /* a probe whose chains, events or contracts are absent or malformed finds nothing */ }
+    }
   }
   return out;
 }
 
 /* ------------------------------------------------------------ the whole projection */
 
-const owedLine = (i) => 'OWED ' + i.workflowId + ' ' + (i.incidentId ?? i.key) + ' [' + (i.kind ?? '-') + '] age=' + i.ageMin + 'm ' + (i.fixedBy ? 'fixed-by ' + i.fixedBy.sha.slice(0, 9) + '?' : 'open') + (i.ackReopened ? ' ack-reopened (acked ' + new Date(i.ackReopened.at).toISOString() + ')' : '') + ': ' + i.summary; const fixedByTextOf = (fixedBy) => { if (!fixedBy) return ''; const prefix = ' <- ' + fixedBy.how; const tokens = fixedBy.tokens ? ' (' + fixedBy.tokens.join(', ') + ')' : ''; return prefix + tokens + ' "' + fixedBy.subject + '"'; };
+const owedLine = (i) => 'OWED ' + i.workflowId + ' ' + (i.incidentId ?? i.key) + ' [' + (i.kind ?? '-') + '] age=' + i.ageMin + 'm ' + (i.fixedBy ? 'fixed-by ' + i.fixedBy.sha.slice(0, 9) + '?' : 'open') + (i.ackReopened ? ' ack-reopened (acked ' + new Date(i.ackReopened.at).toISOString() + ')' : '') + ': ' + i.summary;
+const fixedByTextOf = (fixedBy) => {
+  if (!fixedBy) return '';
+  const prefix = ' <- ' + fixedBy.how;
+  const tokens = fixedBy.tokens ? ' (' + fixedBy.tokens.join(', ') + ')' : '';
+  return prefix + tokens + ' "' + fixedBy.subject + '"';
+};
 
 /* ------------------------------------------------------------ the supervisor's disposition: ack */
 
@@ -652,42 +470,51 @@ function resolveCommits(list, { root = SKILL_ROOT, resolve = revParse } = {}) {
   return { commits: out };
 }
 
-function main() {
-  const argv = process.argv.slice(2);
+const cliArgsOf = (argv) => {
   const values = (name) => { const out = []; for (let i = 0; i < argv.length; i++) { if (argv[i] === `--${name}`) out.push(argv[++i]); } return out; };
-  const value = (name) => values(name)[0] ?? null;
-  const has = (name) => argv.includes(`--${name}`);
-  const verb = argv[0] && !argv[0].startsWith('--') ? argv[0] : null;
-  if (has('help')) { console.log(USAGE); return; }
-  let repos = values('repo');
-  if (!repos.length) {
-    try { repos = loadConfig()?.supervisor?.repos ?? []; } catch { repos = []; }
-  }
-  const now = Date.now();
-  const say = (out, text) => { console.log(has('json') ? JSON.stringify(out) : text); if (!out.ok) process.exitCode = 1; };
-  if (verb === 'ack') {
-    const key = value('item'), reason = value('reason');
-    const list = String(value('commits') ?? '').split(',').map((x) => x.trim()).filter(Boolean);
-    if (!key || !reason || !list.length) return say({ ok: false, error: 'ack needs --item <key>, --commits <sha,...> and --reason <text>' }, `owed ack REFUSED: needs --item, --commits and --reason\n${USAGE}`);
-    const resolved = resolveCommits(list);
-    if (resolved.bad) return say({ ok: false, error: `not a commit of ${SKILL_ROOT}: ${resolved.bad}` }, `owed ack REFUSED: '${resolved.bad}' is not a commit of ${SKILL_ROOT}`);
-    const item = collect(repos, { now, acks: new Map() }).items.find((i) => i.key === key && i.class === CLASSES.supervisor) ?? null;
-    if (!item && !has('force')) return say({ ok: false, error: `no OWED item ${key}` }, `owed ack REFUSED: no OWED item '${key}' in ${repos.length} ledger(s) (--force stores it anyway)`);
-    const ack = ackOwed({ key, commits: resolved.commits, reason, item, now });
-    return say({ ok: true, ack, item: item ? { key: item.key, workflowId: item.workflowId, summary: item.summary, lastFailureAt: lastWorseAt(item) } : null },
-      `owed ack ${key}: quiet until a failure newer than ${new Date(now).toISOString()} lands on its lineage (commits ${resolved.commits.map((c) => c.slice(0, 9)).join(', ')})`);
-  }
-  if (verb === 'unack') {
-    const key = value('item');
-    if (!key) return say({ ok: false, error: 'unack needs --item <key>' }, 'owed unack REFUSED: needs --item <key>');
-    const had = unackOwed({ key, now });
-    return say({ ok: true, key, removed: had }, had ? `owed unack ${key}: OWED again` : `owed unack ${key}: there was no ack`);
-  }
-  if (verb === 'acks') {
-    const acks = [...readOwedAcks().values()];
-    return say({ ok: true, acks }, acks.length ? acks.map((a) => `  ACK ${a.key} at ${new Date(a.at).toISOString()} commits ${(a.commits ?? []).map((c) => String(c).slice(0, 9)).join(', ')}: ${a.reason}`).join('\n') : '  no acks');
-  }
-  if (verb) return say({ ok: false, error: `unknown verb ${verb}` }, USAGE);
+  return { values, value: (name) => values(name)[0] ?? null, has: (name) => argv.includes(`--${name}`) };
+};
+const reposOf = (values) => {
+  const repos = values('repo');
+  if (repos.length) return repos;
+  try { return loadConfig()?.supervisor?.repos ?? []; } catch { return []; }
+};
+const say = (cli, out, text) => { console.log(cli.has('json') ? JSON.stringify(out) : text); if (!out.ok) process.exitCode = 1; };
+
+function ackVerb(cli) {
+  const { value, has, repos, now } = cli;
+  const key = value('item'), reason = value('reason');
+  const list = String(value('commits') ?? '').split(',').map((x) => x.trim()).filter(Boolean);
+  if (!key || !reason || !list.length) return say(cli, { ok: false, error: 'ack needs --item <key>, --commits <sha,...> and --reason <text>' }, `owed ack REFUSED: needs --item, --commits and --reason\n${USAGE}`);
+  const resolved = resolveCommits(list);
+  if (resolved.bad) return say(cli, { ok: false, error: `not a commit of ${SKILL_ROOT}: ${resolved.bad}` }, `owed ack REFUSED: '${resolved.bad}' is not a commit of ${SKILL_ROOT}`);
+  const item = collect(repos, { now, acks: new Map() }).items.find((i) => i.key === key && i.class === CLASSES.supervisor) ?? null;
+  if (!item && !has('force')) return say(cli, { ok: false, error: `no OWED item ${key}` }, `owed ack REFUSED: no OWED item '${key}' in ${repos.length} ledger(s) (--force stores it anyway)`);
+  const ack = ackOwed({ key, commits: resolved.commits, reason, item, now });
+  return say(cli, { ok: true, ack, item: item ? { key: item.key, workflowId: item.workflowId, summary: item.summary, lastFailureAt: lastWorseAt(item) } : null },
+    `owed ack ${key}: quiet until a failure newer than ${new Date(now).toISOString()} lands on its lineage (commits ${resolved.commits.map((c) => c.slice(0, 9)).join(', ')})`);
+}
+
+function unackVerb(cli) {
+  const key = cli.value('item');
+  if (!key) return say(cli, { ok: false, error: 'unack needs --item <key>' }, 'owed unack REFUSED: needs --item <key>');
+  const had = unackOwed({ key, now: cli.now });
+  return say(cli, { ok: true, key, removed: had }, had ? `owed unack ${key}: OWED again` : `owed unack ${key}: there was no ack`);
+}
+
+function acksVerb(cli) {
+  const acks = [...readOwedAcks().values()];
+  return say(cli, { ok: true, acks }, acks.length ? acks.map((a) => `  ACK ${a.key} at ${new Date(a.at).toISOString()} commits ${(a.commits ?? []).map((c) => String(c).slice(0, 9)).join(', ')}: ${a.reason}`).join('\n') : '  no acks');
+}
+
+/** The `--all` lines: acked items, then every item that is not the supervisor's. */
+function printNotOwed(items) {
+  for (const i of items.filter((x) => x.acked)) console.log(`  ACKED ${i.workflowId} ${i.key} at ${new Date(i.acked.at).toISOString()} (${(i.acked.commits ?? []).map((c) => String(c).slice(0, 9)).join(', ')}): ${i.acked.reason}`);
+  for (const i of items.filter((x) => x.class !== CLASSES.supervisor)) console.log(`  ${i.class.toUpperCase()} ${i.workflowId} ${i.incidentId ?? i.key} [${i.kind ?? '-'}] age=${i.ageMin}m: ${i.reason}`);
+}
+
+function reportOwed(cli) {
+  const { values, has, repos, now } = cli;
   const wanted = new Set(values('workflow'));
   const { repos: seen, items } = collect(repos, { wanted, now });
   const result = { ok: true, at: now, repos: seen, items };
@@ -698,10 +525,20 @@ function main() {
   if (has('json')) { console.log(JSON.stringify(has('all') ? result : { ...result, items: owed })); return; }
   console.log(`[owed] ${result.repos.length} ledger(s): ${owed.length} owed (${result.counts.fixedBy} likely fixed), ${Object.entries(result.counts).filter(([k]) => k !== CLASSES.supervisor && k !== 'fixedBy').map(([k, n]) => k + ' ' + n).join(', ')}`);
   for (const i of owed) console.log('  ' + i.line + fixedByTextOf(i.fixedBy));
-  if (has('all')) {
-    for (const i of result.items.filter((x) => x.acked)) console.log(`  ACKED ${i.workflowId} ${i.key} at ${new Date(i.acked.at).toISOString()} (${(i.acked.commits ?? []).map((c) => String(c).slice(0, 9)).join(', ')}): ${i.acked.reason}`);
-    for (const i of result.items.filter((x) => x.class !== CLASSES.supervisor)) console.log(`  ${i.class.toUpperCase()} ${i.workflowId} ${i.incidentId ?? i.key} [${i.kind ?? '-'}] age=${i.ageMin}m: ${i.reason}`);
-  }
+  if (has('all')) printNotOwed(result.items);
+}
+
+function main() {
+  const argv = process.argv.slice(2);
+  const args = cliArgsOf(argv);
+  const verb = argv[0] && !argv[0].startsWith('--') ? argv[0] : null;
+  if (args.has('help')) { console.log(USAGE); return; }
+  const cli = { ...args, repos: reposOf(args.values), now: Date.now() };
+  if (verb === 'ack') return ackVerb(cli);
+  if (verb === 'unack') return unackVerb(cli);
+  if (verb === 'acks') return acksVerb(cli);
+  if (verb) return say(cli, { ok: false, error: `unknown verb ${verb}` }, USAGE);
+  return reportOwed(cli);
 }
 
 if (isMain(import.meta.url)) main();

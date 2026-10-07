@@ -18,6 +18,7 @@ import { planFor, runStep } from './push-git.mjs';
 import { unlinkNodeModulesLink } from '../api/fs/unlink-node-modules-link.mjs';
 import { LINUX_SPECS_LABEL, runParity } from './release-linux-parity.mjs';
 import { sonarSupplier } from './release-l4-sonar.mjs';
+import { mapInOrder } from '../lib/in-order.mjs';
 import { resolveTestConcurrency } from '../machine/test-concurrency.mjs';
 import { byCodeUnit } from '../lib/list.mjs';
 
@@ -32,13 +33,22 @@ export const scriptsOf = (app) => (app.edition === 'lite' ? EXAMPLE_SCRIPTS.filt
 const L4_PROOFS = Object.freeze(['sonar']);
 const STEP_TIMEOUT_MS = 60 * 60_000;
 
+// Log line shapes, built from named parts: a spec-reporter skip, a TAP skip, a spec-reporter pass and a TAP pass.
+const LINE_START = String.raw`^\s*`;
+const TEST_NAME = '(.*?)';
+const DURATION = String.raw`\s+\([\d.]+m?s\)`;
+const SKIPPED_SPEC_LINE = new RegExp([LINE_START, '﹣', String.raw`\s+`, TEST_NAME, DURATION, String.raw`(?:\s+#\s*(.*))?`, '$'].join(''), 'u');
+const SKIPPED_TAP_LINE = new RegExp([LINE_START, String.raw`(?:not )?ok \d+ - `, TEST_NAME, String.raw`\s+#\s*SKIP\S*\s*(.*)`, '$'].join(''), 'i');
+const PASSED_SPEC_LINE = new RegExp([LINE_START, '✔', String.raw`\s+`, TEST_NAME, DURATION, String.raw`\s*`, '$'].join(''), 'u');
+const PASSED_TAP_LINE = new RegExp([LINE_START, String.raw`ok \d+ - `, TEST_NAME, String.raw`\s*`, '$'].join(''));
+
 /** The skipped tests of a node:test log, spec reporter (`﹣ name (1ms) # reason`) or TAP (`ok 3 - name # SKIP reason`): [{name, reason}]. Pure. */
 export function skipsOf(text) {
   const found = [];
   for (const line of String(text ?? '').split(/\r?\n/)) {
-    const m = /^\s*﹣\s+(.*?)\s+\([\d.]+m?s\)(?:\s+#\s*(.*))?$/u.exec(line);
+    const m = SKIPPED_SPEC_LINE.exec(line);
     if (m) { found.push({ name: m[1], reason: (m[2] ?? '').replace(/^SKIP\S*\s*/i, '').trim() }); continue; }
-    const tap = /^\s*(?:not )?ok \d+ - (.*?)\s+#\s*SKIP\S*\s*(.*)$/i.exec(line);
+    const tap = SKIPPED_TAP_LINE.exec(line);
     if (tap) found.push({ name: tap[1], reason: tap[2].trim() });
   }
   return found;
@@ -48,9 +58,9 @@ export function skipsOf(text) {
 export function passesOf(text) {
   const found = [];
   for (const line of String(text ?? '').split(/\r?\n/)) {
-    const m = /^\s*✔\s+(.*?)\s+\([\d.]+m?s\)\s*$/u.exec(line);
+    const m = PASSED_SPEC_LINE.exec(line);
     if (m) { found.push(m[1]); continue; }
-    const tap = /^\s*ok \d+ - (.*?)\s*$/.exec(line);
+    const tap = PASSED_TAP_LINE.exec(line);
     if (tap && !/#\s*(?:SKIP|TODO)/i.test(tap[1])) found.push(tap[1]);
   }
   return found;
@@ -210,11 +220,10 @@ export async function runL4(repo, { proofs, parity = runParity, step = runStep, 
       if (decision && r.log && fs.existsSync(r.log)) fs.appendFileSync(r.log, `\n[concurrency]\n${JSON.stringify(decision)}\n`);
       return { name: s.name, ok: r.ok, log: r.log, ms: r.ms, skips: skipsOf(r.text), ...(s.evidence ? { passes: passesOf(r.text), concurrency: decision, command: { cmd: actual.cmd, args: actual.args } } : {}) };
     });
-    const proved = [];
-    for (const name of plan.proofs) {
+    const proved = await mapInOrder(plan.proofs, async (name) => {
       const p = await sup.proofs[name]?.();
-      proved.push(p ? { name, ok: p.ok === true, log: p.log ?? null, ms: p.ms ?? 0, skips: [] } : { name, ok: false, absent: true, log: null, ms: 0, skips: [] });
-    }
+      return p ? { name, ok: p.ok === true, log: p.log ?? null, ms: p.ms ?? 0, skips: [] } : { name, ok: false, absent: true, log: null, ms: 0, skips: [] };
+    });
     const linux = plan.linux && parity ? [await linuxLeg(repo, { parity, apps, ran, parityDeps })] : [];
     return [...ran, ...proved, ...linux];
   } finally { sup.close?.(); }
