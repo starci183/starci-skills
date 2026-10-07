@@ -207,7 +207,11 @@ function findingFile(finding, { roots = [] } = {}) {
   }
   return null;
 }
-const keyOf = (p) => { const k = path.resolve(p).replaceAll('\\', '/').replace(/\/+$/, ''); return process.platform === 'win32' ? k.toLowerCase() : k; };
+const keyOf = (p) => {
+  let k = path.resolve(p).replaceAll('\\', '/');
+  while (k.endsWith('/')) k = k.slice(0, -1);
+  return process.platform === 'win32' ? k.toLowerCase() : k;
+};
 /** The target and every directory above it: a finding names its file relative to the .starciwork root, which is an
  * ancestor when the target is a feature or record dir (validate .starciwork/features/x --owned <file> scopes like the tree). */
 function ancestorsOf(target) {
