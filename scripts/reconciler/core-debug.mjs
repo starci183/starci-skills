@@ -84,6 +84,33 @@ export function coreDebugStatus({ env = process.env, now = Date.now(), deps = {}
   finally { m.close(); }
 }
 
+function coreHealthResult(seat, show) {
+  let health = seatHealth(seat, { show });
+  if (health.starting) return { result: { ok: true, action: 'starting' } };
+  if (health.hostUnavailable || health.unverified) return { result: { ok: false, action: 'host-unavailable', reason: health.reason } };
+  if (!health.live && seat?.value?.dispatch) {
+    health = seatHealth(seat, { show });
+    if (health.hostUnavailable || health.unverified || health.live) return { result: { ok: false, action: 'death-unconfirmed', reason: health.reason } };
+  }
+  return { health };
+}
+
+function wakeCoreDebugSeat(m, profile, seat, health, ctx, deps, now) {
+  const text = `[${profile.title}] Run one core maintenance pass; read ${profile.prompt}.`;
+  let wake;
+  try { wake = (deps.wake ?? ((terminal, message) => wakeKernel({ db: terminalSignalDb(terminal), workflowId: profile.seatId, text: message })))(health.terminal, text); }
+  catch (error) { wake = { delivered: false, action: 'wake-failed', error: String(error.message) }; }
+  const busy = wake?.action === 'kernel-busy';
+  const ok = wake?.delivered === true || busy;
+  supervisorEvent(m, { entityId: profile.id, kind: `${profile.eventPrefix}-wake`, now: now(), payload: {
+    dispatch: seat.value.dispatch, terminal: health.terminal, delivered: wake?.delivered === true, action: wake?.action ?? null } });
+  const recorded = finishDuty(ctx, { controller: 'host', duty: profile.id, result: ok ? 'done' : 'failed', now: now() });
+  let action = 'wake-failed';
+  if (busy) action = 'busy';
+  else if (ok) action = 'woken';
+  return { ok: ok && recorded, action, terminal: health.terminal, wake };
+}
+
 /** One mechanical Host-controller pass; the reconciler owns all recurrence. */
 export async function watchCoreDebug({ env = process.env, deps = {}, config = loadConfig(), now = Date.now } = {}) {
   const profile = coreDebugProfile();
@@ -100,13 +127,9 @@ export async function watchCoreDebug({ env = process.env, deps = {}, config = lo
     const route = seat?.value?.route ?? m.supSignal(profile.enabledScope, profile.id)?.value?.route;
     if (!route) return { ok: false, action: 'route-unverified', reason: 'maintenance has no persisted invoking route' };
     const show = deps.show ?? (dispatch => workerShow({ dispatch }));
-    let health = seatHealth(seat, { show });
-    if (health.starting) return { ok: true, action: 'starting' };
-    if (health.hostUnavailable || health.unverified) return { ok: false, action: 'host-unavailable', reason: health.reason };
-    if (!health.live && seat?.value?.dispatch) {
-      health = seatHealth(seat, { show });
-      if (health.hostUnavailable || health.unverified || health.live) return { ok: false, action: 'death-unconfirmed', reason: health.reason };
-    }
+    const checked = coreHealthResult(seat, show);
+    if (checked.result) return checked.result;
+    const { health } = checked;
     if (!health.live) {
       m.close();
       return ensureCoreDebug({ caller: route, env, config, deps, now });
@@ -115,19 +138,7 @@ export async function watchCoreDebug({ env = process.env, deps = {}, config = lo
     const ctx = { machineSchedules: true, env };
     const due = claimDue(ctx, { controller: 'host', duty: profile.id, intervalMs, now: now() });
     if (!due.due) return { ok: due.reason !== 'store-unavailable', action: 'fresh', terminal: health.terminal, schedule: due };
-    const text = `[${profile.title}] Run one core maintenance pass; read ${profile.prompt}.`;
-    let wake;
-    try { wake = (deps.wake ?? ((terminal, message) => wakeKernel({ db: terminalSignalDb(terminal), workflowId: profile.seatId, text: message })))(health.terminal, text); }
-    catch (error) { wake = { delivered: false, action: 'wake-failed', error: String(error.message) }; }
-    const busy = wake?.action === 'kernel-busy';
-    const ok = wake?.delivered === true || busy;
-    supervisorEvent(m, { entityId: profile.id, kind: `${profile.eventPrefix}-wake`, now: now(), payload: {
-      dispatch: seat.value.dispatch, terminal: health.terminal, delivered: wake?.delivered === true, action: wake?.action ?? null } });
-    const recorded = finishDuty(ctx, { controller: 'host', duty: profile.id, result: ok ? 'done' : 'failed', now: now() });
-    let action = 'wake-failed';
-    if (busy) action = 'busy';
-    else if (ok) action = 'woken';
-    return { ok: ok && recorded, action, terminal: health.terminal, wake };
+    return wakeCoreDebugSeat(m, profile, seat, health, ctx, deps, now);
   } finally { m.close(); }
 }
 
