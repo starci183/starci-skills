@@ -168,46 +168,52 @@ function runningWorkflows() {
 const short = (id) => String(id).replace(/^wf-/, '').replace(/-mu\w+$/, '');
 const count = (a) => (Array.isArray(a) ? a.length : 0);
 
+function workflowStatusFacts(facts, key, j) {
+  facts.set(`${key}:status`, null);
+  const f = j.frontier ?? {};
+  for (const leg of j.legs ?? []) {
+    const st = leg.status ?? leg.state;
+    const lk = `${key}:leg:${leg.op ?? leg.opId}:${leg.jobId ?? ''}`;
+    // The leg's why (scripts/kernel/why.mjs): the owner-facing headline after the raw state.
+    if (LEG_BAD.test(st ?? '')) {
+      const headline = leg.why?.headline ? ` - ${leg.why.headline}` : '';
+      facts.set(lk, `${leg.op ?? leg.opId} ${st}${headline}`);
+    } else facts.set(lk, null);
+  }
+  const counts = { wedged: count(f.wedgedJobs), dead: count(f.deadWorkerJobs), stale: count(f.staleOperations), stuck: count(j.stuck), owner: count(j.awaitingOwner), held: count(f.heldSettleJobs) + count(f.heldWorkerJobs) };
+  const idOf = (x, name) => {
+    if (typeof x === 'string') return x;
+    return x?.[name] ?? x?.jobId ?? x?.id ?? x?.opId ?? '?';
+  };
+  const ids = (a, name) => (Array.isArray(a) ? a.slice(0, 3).map((x) => idOf(x, name)).join(',') : '');
+  const detail = { wedged: ids(f.wedgedJobs, 'jobId'), dead: ids(f.deadWorkerJobs, 'jobId'), stale: ids(f.staleOperations, 'opId'), stuck: ids(j.stuck, 'jobId'), owner: ids(j.awaitingOwner, 'id'), held: '' };
+  for (const [name, n] of Object.entries(counts)) {
+    if (n) {
+      const detailText = detail[name] ? ` [${detail[name]}]` : '';
+      facts.set(`${key}:${name}`, `${name}=${n}${detailText}`);
+    } else facts.set(`${key}:${name}`, null);
+  }
+}
+
+async function workflowFactsFor(w, o, facts) {
+  if (!w.id) { facts.set(`wf:${w.ledger}`, w.error); return; }
+  const key = `wf:${w.ledger}:${short(w.id)}`;
+  if (w.phase !== 'running') { facts.set(`${key}:phase`, w.phase === 'paused' || w.phase === 'queued' ? null : `phase ${w.phase}`); return; }
+  // One failed call is noise; the snapshot asks twice and only two failures in a row are a fact.
+  const ask = () => child(['scripts/kernel/cli.mjs', 'status', '--repo', w.repo, '--workflow', w.id, '--json'], o);
+  const parse = (r) => (r.ok || r.stdout ? firstJson(r.stdout) : null);
+  let r = await ask();
+  let j = parse(r);
+  if (!j) { r = await ask(); j = parse(r); }
+  if (!j) { facts.set(`${key}:status`, `starci kernel status failed 2x (${r.error ?? 'no json'})`); return; }
+  workflowStatusFacts(facts, key, j);
+}
+
 async function workflowFacts(o) {
   const facts = new Map();
   let list;
   try { list = runningWorkflows(); } catch (e) { facts.set('workflows', `registry unreadable: ${String(e.message).slice(0, 120)}`); return facts; }
-  await Promise.all(list.map(async (w) => {
-    if (!w.id) { facts.set(`wf:${w.ledger}`, w.error); return; }
-    const k = `wf:${w.ledger}:${short(w.id)}`;
-    if (w.phase !== 'running') { facts.set(`${k}:phase`, w.phase === 'paused' || w.phase === 'queued' ? null : `phase ${w.phase}`); return; }
-    // One failed call is noise; the snapshot asks twice and only two failures in a row are a fact.
-    const ask = () => child(['scripts/kernel/cli.mjs', 'status', '--repo', w.repo, '--workflow', w.id, '--json'], o);
-    const parse = (r) => (r.ok || r.stdout ? firstJson(r.stdout) : null);
-    let r = await ask();
-    let j = parse(r);
-    if (!j) { r = await ask(); j = parse(r); }
-    if (!j) { facts.set(`${k}:status`, `starci kernel status failed 2x (${r.error ?? 'no json'})`); return; }
-    facts.set(`${k}:status`, null);
-    const f = j.frontier ?? {};
-    for (const leg of j.legs ?? []) {
-      const st = leg.status ?? leg.state;
-      const lk = `${k}:leg:${leg.op ?? leg.opId}:${leg.jobId ?? ''}`;
-      // The leg's why (scripts/kernel/why.mjs): the owner-facing headline after the raw state.
-      if (LEG_BAD.test(st ?? '')) {
-        const headline = leg.why?.headline ? ` - ${leg.why.headline}` : '';
-        facts.set(lk, `${leg.op ?? leg.opId} ${st}${headline}`);
-      } else facts.set(lk, null);
-    }
-    const counts = { wedged: count(f.wedgedJobs), dead: count(f.deadWorkerJobs), stale: count(f.staleOperations), stuck: count(j.stuck), owner: count(j.awaitingOwner), held: count(f.heldSettleJobs) + count(f.heldWorkerJobs) };
-    const idOf = (x, key) => {
-      if (typeof x === 'string') return x;
-      return x?.[key] ?? x?.jobId ?? x?.id ?? x?.opId ?? '?';
-    };
-    const ids = (a, key) => (Array.isArray(a) ? a.slice(0, 3).map((x) => idOf(x, key)).join(',') : '');
-    const detail = { wedged: ids(f.wedgedJobs, 'jobId'), dead: ids(f.deadWorkerJobs, 'jobId'), stale: ids(f.staleOperations, 'opId'), stuck: ids(j.stuck, 'jobId'), owner: ids(j.awaitingOwner, 'id'), held: '' };
-    for (const [name, n] of Object.entries(counts)) {
-      if (n) {
-        const detailText = detail[name] ? ` [${detail[name]}]` : '';
-        facts.set(`${k}:${name}`, `${name}=${n}${detailText}`);
-      } else facts.set(`${k}:${name}`, null);
-    }
-  }));
+  await Promise.all(list.map((w) => workflowFactsFor(w, o, facts)));
   return facts;
 }
 
