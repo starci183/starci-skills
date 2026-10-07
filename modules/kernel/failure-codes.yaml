@@ -6431,6 +6431,17 @@ TASK_OUTSIDE_RUN:
   owner: supervisor
   kind: runtime-fault
 
+TEMP_ROOT_UNUSABLE:
+  title: "Configured temp root cannot be used"
+  title_vi: "Không dùng được thư mục tạm đã cấu hình"
+  meaning_vi: "Thư mục tạm khai báo trong config.yaml (roots.temp) hoặc biến STARCI_TEMP_ROOT không tạo được hoặc không ghi được; runtime không tự chuyển sang thư mục tạm của hệ điều hành."
+  causes_vi:
+    - "Ổ đĩa hoặc đường dẫn khai báo không tồn tại hoặc bị khóa quyền ghi"
+    - "Ổ đĩa chứa thư mục tạm đã đầy hoặc chỉ đọc"
+  nextStep_vi: "Chủ máy sửa roots.temp trong config.yaml thành một thư mục tạo và ghi được, rồi chạy lại."
+  owner: owner
+  kind: runtime-fault
+
 TERMINAL_COUNT_DRIFT:
   title: "More terminals than expected"
   title_vi: "Số terminal nhiều hơn dự kiến"

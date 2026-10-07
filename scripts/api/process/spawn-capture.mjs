@@ -2,7 +2,7 @@
 // A deadline/transport failure is an unknown effect, never proof of process-tree closure. Never rejects.
 import { spawn } from 'node:child_process';
 import { StringDecoder } from 'node:string_decoder';
-import { withTempEnv } from '../../../engine/temp-root.mjs';
+import { withTempEnv } from '../fs/ensure-temp-root.mjs';
 
 const CAP = 4 * 1024 * 1024;
 const streamState = () => ({ chunks: [], seenBytes: 0, capturedBytes: 0, truncated: false });

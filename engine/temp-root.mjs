@@ -4,17 +4,15 @@
 // dirs) lives under tempRoot(): env STARCI_TEMP_ROOT (a spec, a one-off run), then the owner config `roots.temp`
 // (config.yaml, gitignored), else the OS temp directory of the process (TEMP / TMP / TMPDIR, then os.tmpdir()). The base tier
 // only resolves; the directory is made by scripts/api/fs/make-temp-dir.mjs, temp-path.mjs and ensure-temp-root.mjs. The
-// children the runtime starts get the same directory as TEMP / TMP / TMPDIR (tempChildEnv, applied by the scripts/api/ spawn wrappers).
+// children the runtime starts get the same directory as TEMP / TMP / TMPDIR (tempChildEnv, applied by withTempEnv in scripts/api/fs/ensure-temp-root.mjs, which every scripts/api/ spawn wrapper calls).
 import os from 'node:os';
 import path from 'node:path';
 import { loadConfig } from './config.mjs';
 
 export const TEMP_ROOT_ENV = 'STARCI_TEMP_ROOT';
 
-/** The owner's `roots.temp` (config.yaml, validated by engine/invalid-config.mjs), or null. `config` is the owner config (default: loadConfig()). */
-const ownerTemp = (config) => {
-  try { return (config === undefined ? loadConfig() : config)?.roots?.temp ?? null; } catch { return null; }
-};
+/** The owner's `roots.temp` (config.yaml, validated by engine/invalid-config.mjs), or null. `config` is the owner config (default: loadConfig(), whose error for an invalid config.yaml propagates: the OS directory never replaces a root the owner set wrongly). */
+const ownerTemp = (config) => (config === undefined ? loadConfig() : config)?.roots?.temp ?? null;
 
 /** The operating-system temp directory of `env`: TEMP, TMP, TMPDIR, else os.tmpdir(). */
 export const osTempDir = (env = process.env) => path.resolve(String(env?.TEMP || env?.TMP || env?.TMPDIR || os.tmpdir()));
@@ -29,6 +27,3 @@ export function tempChildEnv(env = process.env) {
   const root = tempRoot({ env });
   return { ...env, TEMP: root, TMP: root, TMPDIR: root };
 }
-
-/** The spawn options with `env` replaced by tempChildEnv of the options' own env (default: the process environment). */
-export const withTempEnv = (options = {}) => ({ ...options, env: tempChildEnv(options.env ?? process.env) });

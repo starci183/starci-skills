@@ -7,7 +7,7 @@ import { spawnSync } from 'node:child_process';
 import { osTempDir, tempRoot, TEMP_ROOT_ENV } from '../../engine/temp-root.mjs';
 import { makeTempDir } from '../../scripts/api/fs/make-temp-dir.mjs';
 import { tempPath } from '../../scripts/api/fs/temp-path.mjs';
-import { ensureTempRoot } from '../../scripts/api/fs/ensure-temp-root.mjs';
+import { ensureTempRoot, withTempEnv, TEMP_ROOT_UNUSABLE } from '../../scripts/api/fs/ensure-temp-root.mjs';
 import { validateConfig } from '../../engine/config.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 
@@ -63,6 +63,19 @@ test('ensureTempRoot makes the configured root and answers it', (t) => {
   const root = path.join(base, 'a', 'b');
   assert.equal(ensureTempRoot({ env: { [TEMP_ROOT_ENV]: root } }), path.resolve(root));
   assert.equal(fs.statSync(root).isDirectory(), true);
+});
+
+test('a root that cannot be created or written is refused with TEMP_ROOT_UNUSABLE, never replaced by the OS directory', (t) => {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-temp-root-spec-refuse-'));
+  t.after(() => fs.rmSync(base, { recursive: true, force: true }));
+  const file = path.join(base, 'a-file');
+  fs.writeFileSync(file, 'x');
+  for (const root of [file, path.join(file, 'below')]) {
+    const env = { [TEMP_ROOT_ENV]: root, TEMP: os.tmpdir() };
+    assert.throws(() => ensureTempRoot({ env }), (error) => error.code === TEMP_ROOT_UNUSABLE && error.message.includes('roots.temp') && error.message.includes(path.resolve(root)));
+    assert.throws(() => makeTempDir('x-', { env }), { code: TEMP_ROOT_UNUSABLE });
+    assert.throws(() => withTempEnv({ env }), { code: TEMP_ROOT_UNUSABLE });
+  }
 });
 
 test('config.yaml accepts roots.temp as an absolute directory and refuses anything else', () => {

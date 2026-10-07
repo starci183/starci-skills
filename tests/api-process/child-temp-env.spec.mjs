@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { tempChildEnv, withTempEnv, TEMP_ROOT_ENV } from '../../engine/temp-root.mjs';
+import { tempChildEnv, TEMP_ROOT_ENV } from '../../engine/temp-root.mjs';
+import { withTempEnv } from '../../scripts/api/fs/ensure-temp-root.mjs';
 import { spawnCapture } from '../../scripts/api/process/spawn-capture.mjs';
 import { runProgram } from '../../scripts/api/process/run-program.mjs';
 import { nodeSpawn } from '../../scripts/api/node/lib.mjs';
@@ -32,6 +33,7 @@ test('withTempEnv replaces only env; an absent env is the process environment', 
   assert.equal(opts.cwd, 'x');
   assert.equal(opts.timeout, 5);
   assert.equal(opts.env.TMPDIR, path.resolve(root));
+  assert.equal(fs.statSync(root).isDirectory(), true, 'the root is made before a child is started with it');
   assert.equal(withTempEnv().env.TEMP, path.resolve(process.env[TEMP_ROOT_ENV] || os.tmpdir()));
 });
 

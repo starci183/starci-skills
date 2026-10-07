@@ -14,7 +14,7 @@ import { releaseTypedWaits } from './peer-waits.mjs';
 import { queuedJobOp, refuseOwnerGate, refusePeerWait, opSlotsOrRefuse } from './job-gates.mjs';
 import { hostResourcesFor, HOST_RESOURCES_LOW } from '../../../machine/host-resources.mjs';
 import { tempRoot, TEMP_ROOT_ENV } from '../../../../engine/temp-root.mjs';
-import { ensureTempRoot } from '../../../api/fs/ensure-temp-root.mjs';
+import { ensureTempRoot, TEMP_ROOT_UNUSABLE } from '../../../api/fs/ensure-temp-root.mjs';
 import { hostThrottle, noteThrottled, releaseThrottled, DISPATCH_THROTTLED } from '../../../machine/ram-throttle.mjs';
 import { deferredQueueCause } from '../../autopilot-run.mjs';
 import { checkPrerequisites, prerequisiteDetail } from '../../prerequisites.mjs';
@@ -264,7 +264,9 @@ function recordThrottled(d, throttle, admission, throttled) {
  */
 export function refuseHostLimits(d) {
   const { ledger, repo, jobId, op } = d;
-  try { ensureTempRoot(); } catch { /* the probe below reports a drive it cannot read */ }
+  try { ensureTempRoot(); } catch (error) {
+    refuseVerb(d, { ok: false, jobId, op, reason: error.code ?? TEMP_ROOT_UNUSABLE, detail: error.message }, `dispatch REFUSED for ${jobId} (${op}): ${error.message}`);
+  }
   const host = hostResourcesFor({ env: process.env, repo });
   const throttle = hostThrottleOf(d, host);
   const admission = throttle?.admission ?? null;

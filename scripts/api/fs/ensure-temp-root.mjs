@@ -1,10 +1,34 @@
-// ensure-temp-root.mjs — the temp root exists before a child is started with TEMP/TMP/TMPDIR pointing at it.
+// ensure-temp-root.mjs — the temp root exists and takes writes before anything is placed in it or a child is started with TEMP/TMP/TMPDIR pointing at it.
 import fs from 'node:fs';
-import { tempRoot } from '../../../engine/temp-root.mjs';
+import path from 'node:path';
+import { tempRoot, tempChildEnv, TEMP_ROOT_ENV } from '../../../engine/temp-root.mjs';
 
-/** The temp root of `env`, created when it is missing. Throws the filesystem's error when it cannot be made. */
+export const TEMP_ROOT_UNUSABLE = 'TEMP_ROOT_UNUSABLE';
+const writable = new Set();
+
+const unusable = (root, reason) => Object.assign(new Error(`${TEMP_ROOT_UNUSABLE}: the temp root ${root} ${reason}; set roots.temp in config.yaml (or ${TEMP_ROOT_ENV}) to a directory the runtime can create and write - it is not replaced by the operating-system temp directory`), { code: TEMP_ROOT_UNUSABLE, root });
+
+/** Writes and removes one probe file in `root`: a directory that exists can still refuse writes. */
+function probeWritable(root) {
+  const probe = path.join(root, `.starci-write-probe-${process.pid}`);
+  fs.writeFileSync(probe, '');
+  fs.rmSync(probe, { force: true });
+}
+
+/** The temp root of `env`, created when it is missing. Throws an Error with code TEMP_ROOT_UNUSABLE when it cannot be created or written. */
 export function ensureTempRoot({ env = process.env } = {}) {
   const root = tempRoot({ env });
-  fs.mkdirSync(root, { recursive: true });
+  try {
+    fs.mkdirSync(root, { recursive: true });
+    if (!writable.has(root)) probeWritable(root);
+  } catch (error) { throw unusable(root, `cannot be created or written (${error.code ?? error.message})`); }
+  writable.add(root);
   return root;
+}
+
+/** The spawn options with `env` replaced by tempChildEnv of the options' own env (default: the process environment), the temp root ensured first. */
+export function withTempEnv(options = {}) {
+  const env = options.env ?? process.env;
+  ensureTempRoot({ env });
+  return { ...options, env: tempChildEnv(env) };
 }
