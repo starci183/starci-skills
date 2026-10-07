@@ -1,5 +1,5 @@
 // Normalize provider observations without inventing unobserved quota, spend or reset values.
-import { quotaTimestamp as timestamp, quotaPolicyValid, inspectQuotaEvidence } from '../../lib/quota-evidence.mjs';
+import { quotaTimestamp as timestamp, quotaPolicyValid, quotaMaxAgeMs, inspectQuotaEvidence } from '../../lib/quota-evidence.mjs';
 const observedOrParent = (value, parent) => value == null ? parent : timestamp(value) ?? value;
 /** All percentage windows supplied by one provider/account response, including short windows. */
 export function quotaWindows(entry, observedAt) {
@@ -18,11 +18,12 @@ export function quotaWindows(entry, observedAt) {
 }
 const seconds = (ms) => Math.round(ms / 1000);
 /** Names how old the observation is and the limit it failed, so a stale rejection explains itself. */
-const staleDetail = (observedAt, now, policy, by) => {
-  const source = by ? ` by ${by}` : '';
-  if (observedAt === null) return `quota has no observation time${source}; limit ${seconds(policy.maxAgeMs)} s`;
-  if (observedAt > now) return `quota observation is ${seconds(observedAt - now)} s in the future${source}; limit ${seconds(policy.maxAgeMs)} s`;
-  return `quota observed ${seconds(now - observedAt)} s ago${source}, limit ${seconds(policy.maxAgeMs)} s`;
+const staleDetail = (observedAt, now, limitMs, { by, hostPolled }) => {
+  const source = by ? ` by ${by}` : '', limit = `limit ${seconds(limitMs)} s`;
+  const remedy = hostPolled && by ? `; ${by} refreshes usage while its window is focused` : '';
+  if (observedAt === null) return `quota has no observation time${source}; ${limit}${remedy}`;
+  if (observedAt > now) return `quota observation is ${seconds(observedAt - now)} s in the future${source}; ${limit}${remedy}`;
+  return `quota observed ${seconds(now - observedAt)} s ago${source}, ${limit}${remedy}`;
 };
 /** The provider-window verdict chain: dead auth, stale evidence, exhaustion, admission blocks, then limited/ok. */
 const providerWindowVerdict = (input, auth, result, valid, inspected, stale) => {
@@ -62,7 +63,8 @@ export function normalizeQuotaSnapshot(input = {}, { policy, now = Date.now() } 
   const parsedExpiry = timestamp(input.expiresAt);
   const expiresAt = input.expiresAt != null && parsedExpiry === null ? input.expiresAt : parsedExpiry;
   const base = { schema: 'starci/quota-snapshot@1', policyVersion: policy?.version ?? null, provider: input.provider ?? null, account: input.account ?? 'default',
-    authority: input.authority ?? 'provider-windows', auth, failureKind: input.failureKind ?? null,
+    authority: input.authority ?? 'provider-windows', auth,
+    observation: input.observation === 'host-polled' && input.authority !== 'owner-grant' ? 'host-polled' : 'direct', failureKind: input.failureKind ?? null,
     observedAt, expiresAt, windows: [], fresh: false, normalAdmission: false, allowLaunchAttempt: false,
     usedPercent: null, resetsAt: null, state: 'unknown', detail: input.detail ?? 'quota observation unknown' };
   const windows = windowsOf(input, observedAt);
@@ -71,6 +73,6 @@ export function normalizeQuotaSnapshot(input = {}, { policy, now = Date.now() } 
   const valid = inspected.codes.length === 0;
   if (input.authority === 'owner-grant') return ownerGrantSnapshot(evidence, input, valid, inspected);
   const isStale = inspected.codes.some((code) => code === 'quota-stale' || code === 'quota-window-stale');
-  const stale = isStale && quotaPolicyValid(policy) ? staleDetail(observedAt, now, policy, input.observedBy) : null;
+  const stale = isStale && quotaPolicyValid(policy) ? staleDetail(observedAt, now, quotaMaxAgeMs(evidence, policy), { by: input.observedBy, hostPolled: evidence.observation === 'host-polled' }) : null;
   return providerWindowSnapshot(base, windows, input, auth, valid, inspected, stale);
 }

@@ -23,12 +23,12 @@ test('a fresh updatedAt admits the real Orca entry with normal headroom', () => 
   assert.ok(quota.windows.every((window) => window.observedAt === updatedAt), 'windows inherit the entry observation');
 });
 
-test('an updatedAt older than maxAgeMs is stale and the detail names its age and the limit', () => {
-  const quota = probe(updatedAt + policy.maxAgeMs + 1_000_000);
+test('an updatedAt older than hostPolledMaxAgeMs is stale and the detail names its age and the limit', () => {
+  const age = policy.hostPolledMaxAgeMs + 60_000, quota = probe(updatedAt + age);
   assert.equal(quota.fresh, false);
   assert.equal(quota.normalAdmission, false);
   assert.equal(quota.allowLaunchAttempt, false);
-  assert.equal(quota.detail, `quota observed ${Math.round((policy.maxAgeMs + 1_000_000) / 1000)} s ago by Orca, limit ${policy.maxAgeMs / 1000} s`);
+  assert.equal(quota.detail, `quota observed ${age / 1000} s ago by Orca, limit ${policy.hostPolledMaxAgeMs / 1000} s; Orca refreshes usage while its window is focused`);
 });
 
 test('a missing updatedAt is stale and says there is no observation time', () => {
@@ -36,7 +36,7 @@ test('a missing updatedAt is stale and says there is no observation time', () =>
   assert.equal(quota.observedAt, null);
   assert.equal(quota.fresh, false);
   assert.equal(quota.normalAdmission, false);
-  assert.match(quota.detail, /^quota has no observation time by Orca; limit 300 s$/);
+  assert.match(quota.detail, /^quota has no observation time by Orca; limit 86400 s; Orca refreshes usage while its window is focused$/);
 });
 
 test('a stale-token entry is refreshable, never admissible', () => {
@@ -48,7 +48,7 @@ test('a stale-token entry is refreshable, never admissible', () => {
 });
 
 test('the admission receipt carries the staleness detail of a rejected candidate', () => {
-  const at = updatedAt + policy.maxAgeMs + 1_000_000;
+  const at = updatedAt + policy.hostPolledMaxAgeMs + 60_000;
   const quota = probeOrcaAccount('claude', { policy, now: at, account: 'a',
     accountList: () => ({ ok: true, accounts: {}, rateLimits: { claude: { ...real.rateLimits.claude, accountId: 'a' } } }) });
   const receipt = selectAdmission({ request: { role: 'supervisor', scopeId: 'orca-real-shape', attemptId: 'orca-real-shape-1',
@@ -59,6 +59,6 @@ test('the admission receipt carries the staleness detail of a rejected candidate
   assert.equal(receipt.ok, false);
   assert.equal(receipt.reason, 'no-eligible-candidate');
   assert.ok(receipt.rejected[0].codes.includes('quota-stale'));
-  assert.match(receipt.rejected[0].detail, /^quota observed \d+ s ago by Orca, limit 300 s$/);
+  assert.match(receipt.rejected[0].detail, /^quota observed \d+ s ago by Orca, limit 86400 s; Orca refreshes usage/);
   assert.equal(rejectionSummary(receipt), `claude-opus: ${receipt.rejected[0].detail}`);
 });

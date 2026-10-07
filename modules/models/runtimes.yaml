@@ -9,7 +9,7 @@ purpose: |-
   not a provider fallback chain in a workflow. A runtime that fails is classified and parked for the cooldown of
   that failure kind, doubling per repeat. Auth health is provider-wide rather than pool-wide: a confirmed
   launch, worker-start or attestation auth rejection parks every runtime sharing that provider credential. A
-  stale-token preflight may make one real refresh attempt; a typed no-effect rejection falls through on the
+  stale provider token is not admitted (the owner re-authenticates in Orca); a typed no-effect rejection falls through on the
   same logical operation attempt, while partial or unknown effects require reconciliation before fallback.
 
   Models are pinned inside the pool per DIFFICULTY (`models`) and attested at launch - never inferred from the
@@ -28,7 +28,12 @@ allocation:
     version: 1
     reservePercent: 90
     exhaustedPercent: 100
+    # Age limit of evidence the runtime observes itself at admission time: owner grants and direct probes (Devin).
     maxAgeMs: 300000
+    # Age limit of provider windows the host polls (Orca account entries). Orca refreshes usage while its window is
+    # focused and after agent sessions end; the runtime cannot request a refresh. A launch against an exhausted window
+    # is refused by the provider and classified by the provider circuit. Never below maxAgeMs.
+    hostPolledMaxAgeMs: 86400000
     qualityOrder: [economy, standard, frontier]
     ownerBiasRoles: [op]
     eligibilityModes: [qualified, probation, kernel-function, scoped-control-plane, operation-policy]

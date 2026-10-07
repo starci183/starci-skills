@@ -11,7 +11,7 @@ import { poolCapsNow } from '../machine/pool-backoff.mjs';
 import { providerCircuitOf, kindOrder } from './models.mjs';
 import { inspectOwnerConfig, configuredAllocationPolicy, validateConfig } from '../../engine/config.mjs';
 import { normalizeQuotaSnapshot } from './quota/snapshot.mjs';
-import { quotaFreshAt } from '../lib/quota-evidence.mjs';
+import { quotaFreshAt, quotaMaxAgeMs } from '../lib/quota-evidence.mjs';
 
 export const launchScopeId = (role, request = {}) => `${role}:${sha256(JSON.stringify(request))}`;
 /** Authorization comes from the ledger row, never JSON that asserts its own author. */
@@ -46,7 +46,7 @@ const ownerQuotaGrant = ({ provider, pool, role, kind, difficulty, scopeId, runt
 /** A current owner config can declare slots when the provider proves auth but has no quota telemetry. */
 export function quotaForAdmission({ quota, provider, pool, role, kind, difficulty, scopeId, registry, runtimes, policy, now = Date.now(), io = null } = {}) {
   if (quota?.authority !== 'owner-grant' && Array.isArray(quota?.windows) && quota.windows.length) return quota;
-  if (quota?.auth !== 'ok' || !quotaFreshAt(quota.observedAt, now, policy?.maxAgeMs)) return quota;
+  if (quota?.auth !== 'ok' || !quotaFreshAt(quota.observedAt, now, quotaMaxAgeMs(quota, policy))) return quota;
   const poolEntry = registry?.pools?.[pool] ?? Object.values(registry?.pools ?? {}).find((entry) => entry.target === pool);
   if (poolEntry?.provider !== provider || poolEntry.capacityAuthority !== 'explicit-workflow-quota') return quota;
   const grant = ownerQuotaGrant({ provider, pool, role, kind, difficulty, scopeId, runtimes, policy, now, io });

@@ -1,4 +1,5 @@
 // Orca owns the observed account windows; runtime admission owns their normalized policy.
+// Every snapshot built here is host-polled: Orca, not the runtime, fetched the usage at entry.updatedAt.
 import { accountList } from '../../api/orca/account-list.mjs';
 import { allocationSettings } from '../../../engine/config.mjs';
 import { normalizeQuotaSnapshot } from './snapshot.mjs';
@@ -8,7 +9,7 @@ export function probeOrcaAccount(provider, options = {}) {
   const clock = typeof options.now === 'function' ? options.now : () => options.now ?? Date.now();
   const normalized = (input) => {
     const now = clock();
-    return normalizeQuotaSnapshot({ provider, account: options.account ?? 'default', observedAt: now, ...input }, { policy, now });
+    return normalizeQuotaSnapshot({ provider, account: options.account ?? 'default', observedAt: now, observation: 'host-polled', observedBy: 'Orca', ...input }, { policy, now });
   };
   let list;
   try { list = (options.accountList ?? accountList)(); }
@@ -23,5 +24,5 @@ export function probeOrcaAccount(provider, options = {}) {
   if (entry.status !== 'ok') return normalized({ account, observedAt, entry, state: 'unknown',
     auth: entry.usageMetadata?.failureKind === 'stale-token' ? 'refreshable' : 'unknown',
     failureKind: entry.usageMetadata?.failureKind ?? null, detail: entry.error ?? 'account quota status unknown' });
-  return normalized({ account, observedAt, entry, auth: 'ok', observedBy: 'Orca' });
+  return normalized({ account, observedAt, entry, auth: 'ok' });
 }

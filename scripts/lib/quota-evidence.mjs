@@ -28,10 +28,14 @@ export const quotaFreshAt = (value, now, maxAgeMs) => {
   const at = quotaTimestamp(value);
   return at !== null && Number.isFinite(now) && at <= now && now - at <= maxAgeMs;
 };
+/** The one age limit of a snapshot: host-polled provider windows use hostPolledMaxAgeMs, everything else (owner grants included) maxAgeMs. */
+export const quotaMaxAgeMs = (quota, policy) => quota?.observation === 'host-polled' && quota.authority !== 'owner-grant'
+  && Number.isFinite(policy?.hostPolledMaxAgeMs) ? policy.hostPolledMaxAgeMs : policy?.maxAgeMs;
 export const quotaPolicyValid = (policy) => isPlainObject(policy)
   && Number.isFinite(policy.reservePercent) && policy.reservePercent >= 0
   && Number.isFinite(policy.exhaustedPercent) && policy.exhaustedPercent > policy.reservePercent && policy.exhaustedPercent <= 100
-  && Number.isFinite(policy.maxAgeMs) && policy.maxAgeMs > 0;
+  && Number.isFinite(policy.maxAgeMs) && policy.maxAgeMs > 0
+  && (policy.hostPolledMaxAgeMs === undefined || (Number.isFinite(policy.hostPolledMaxAgeMs) && policy.hostPolledMaxAgeMs >= policy.maxAgeMs));
 const text = (value) => typeof value === 'string' && value.trim().length > 0;
 
 const quotaAuthReason = (auth) => ['dead', 'unavailable'].includes(auth) ? QUOTA_CODE.AUTH_UNAVAILABLE : QUOTA_CODE.AUTH_UNKNOWN;
@@ -40,7 +44,7 @@ function freshQuotaOf(quota, now, policy, codes) {
   const expiry = quotaTimestamp(quota.expiresAt);
   const expiryValid = quota.expiresAt == null || expiry !== null;
   if (!expiryValid) codes.push(QUOTA_CODE.QUOTA_EXPIRY_INVALID);
-  const fresh = quotaFreshAt(quota.observedAt, now, policy.maxAgeMs) && expiryValid && (expiry === null || expiry > now);
+  const fresh = quotaFreshAt(quota.observedAt, now, quotaMaxAgeMs(quota, policy)) && expiryValid && (expiry === null || expiry > now);
   if (!fresh) codes.push(QUOTA_CODE.QUOTA_STALE);
   return fresh;
 }
@@ -83,7 +87,7 @@ export function inspectQuotaEvidence(quota, { policy, now, role, scopeId } = {})
   const windows = quota.windows;
   if (!Array.isArray(windows) || windows.length === 0) { codes.push(QUOTA_CODE.QUOTA_WINDOWS_MISSING); return result(null, fresh); }
   if (new Set(windows.map((window) => window?.id)).size !== windows.length) codes.push(QUOTA_CODE.QUOTA_WINDOW_INVALID);
-  for (const window of windows) appendQuotaWindowCodes(window, now, policy.maxAgeMs, codes);
+  for (const window of windows) appendQuotaWindowCodes(window, now, quotaMaxAgeMs(quota, policy), codes);
   const pressure = pressureOf(windows);
   if (pressure !== null && pressure >= policy.exhaustedPercent) codes.push(QUOTA_CODE.QUOTA_EXHAUSTED);
   return result(pressure, fresh);
