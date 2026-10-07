@@ -3,12 +3,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {parseYaml} from '../../../engine/yaml.mjs';
-import {sha256File} from '../../../engine/digest.mjs';
 import {ID_RE, walk} from './check-example-work.mjs';
 import {appRootOf, loadRecords, indexInlineCriteria, resolveRecordRef} from '../record-ownership.mjs';
 import {slash} from '../../lib/path-key.mjs';
-import {resolveBlob, getBlob} from '../../../engine/db/blob.mjs';
 import {exampleArtifactReadOptions, exampleWorkRoots} from '../../lib/example-refs.mjs'; import { isMain } from '../../lib/is-main.mjs'; import { byCodeUnit } from '../../lib/list.mjs';
+import {verifyDeclaration,checkRunMedia,checkReceipt} from './work-artifact-verification.mjs';
 
 /**
  * Byte verification for Work declarations: file existence, size, media signatures
@@ -29,50 +28,6 @@ const relativeToRoot = file => slash(path.relative(root, file));
  * 10,186 bytes and the smallest committed webm recording 41,771 bytes, so both floors sit under every
  * genuine artifact and well above a stub, a truncation, or a file created only to satisfy a count.
  */
-const MIN_VIDEO_BYTES = 10_000;
-const MIN_SCREEN_BYTES = 5_000;
-
-// ---- concept 1: an extension is a claim about bytes, and the first bytes answer it ----
-// This is checked before size or digest because it is the cheapest thing that can prove an artifact is not
-// a placeholder, and because it is the only check that catches a file whose bytes were swapped for others
-// of the same length.
-const SIGNATURES = [
-  {ext: '.png', name: 'PNG', starts: Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])},
-  {ext: '.jpg', name: 'JPEG', starts: Buffer.from([0xff, 0xd8])},
-  {ext: '.jpeg', name: 'JPEG', starts: Buffer.from([0xff, 0xd8])},
-  {ext: '.webp', name: 'RIFF/WEBP', starts: Buffer.from('RIFF', 'ascii'), tagAt: 8, tag: 'WEBP'},
-  {ext: '.gif', name: 'GIF8', starts: Buffer.from('GIF8', 'latin1')},
-  {ext: '.webm', name: 'Matroska/WebM (EBML)', starts: Buffer.from([0x1a, 0x45, 0xdf, 0xa3])},
-  {ext: '.mp4', name: 'ISO base-media ftyp box', boxTag: 'ftyp'},
-];
-
-const HEAD_BYTES = 64;
-
-/** The first bytes of a file, without pulling a multi-megabyte raster into memory to look at them. */
-function headOf(file, size) {
-  const fd = fs.openSync(file, 'r');
-  try {
-    const head = Buffer.alloc(Math.min(HEAD_BYTES, size));
-    return head.subarray(0, fs.readSync(fd, head, 0, head.length, 0));
-  } finally { fs.closeSync(fd); }
-}
-
-/** Why the bytes do not answer the extension, in one clause; null when the signature holds or is unknown. */
-function signatureProblem(file, head) {
-  const ext = path.extname(file).toLowerCase();
-  const expected = SIGNATURES.find(entry => entry.ext === ext);
-  if (!expected) return null;
-  if (expected.boxTag) {
-    const seen = head.subarray(4, 8).toString('latin1');
-    if (seen === expected.boxTag) return null;
-    return `bytes 4-7 open an "${seen || '(too short)'}" box where a ${ext} file must carry ${expected.boxTag}`;
-  }
-  const prefix = head.subarray(0, expected.starts.length);
-  const tagOk = !expected.tag || head.subarray(expected.tagAt, expected.tagAt + 4).toString('ascii') === expected.tag;
-  if (prefix.equals(expected.starts) && tagOk) return null;
-  const asText = slash(head.subarray(0, 24).toString('utf8')).replace(/[^\x20-\x7e]/g, '.');
-  return `its first bytes are ${prefix.toString('hex')}${head.length ? ' ("' + asText + '")' : ' - the file is empty'}, not ${expected.name} (${expected.starts.toString('hex')})`;
-}
 
 // ---- concept 2: what counts as a declared path, and what it is declared relative to ----
 // A blanket "any string with a dot" sweep is wrong on this layout: `inputRefs` mixes in record ids
@@ -239,121 +194,13 @@ function declarationsOf(doc, table, ctx) {
   return found;
 }
 
-/** A blob citation against the local blob store: resolves by sha256, is not empty, and is the bytes it names. */
-function verifyCitation(found, docFile, ctx, sink, seen) {
-  const {text, entry} = found;
-  const named = `blob citation ${text}`;
-  const stamped = typeof entry.sha256 === 'string' ? entry.sha256.trim().toLowerCase() : '';
-  if (!/^[0-9a-f]{64}$/.test(stamped) || (ctx.blobOptions?.root != null && entry.sha256 !== stamped)) {
-    sink.refuse(docFile, 'ASSET_STAMP', `${found.trail} cites ${named} with sha256 ${JSON.stringify(entry.sha256)}, which is not a sha256 - the citation resolves nothing`);
-    return;
-  }
-  const blobOptions = ctx.blobOptions ?? {};
-  let hit, selectedBytes = null;
-  try {
-    hit = resolveBlob({sha256: stamped}, blobOptions);
-    if (hit && blobOptions.root != null) selectedBytes = getBlob(stamped, {...blobOptions, verifyBundle: true});
-  } catch (error) {
-    sink.refuse(docFile, error.code === 'EINVALBUNDLE' ? 'ASSET_BUNDLE' : 'ASSET_STORE', `${found.trail} cites ${named}, whose selected bytes cannot be verified: ${error.message}`);
-    return;
-  }
-  if (!hit || !fs.existsSync(hit.file)) {
-    sink.refuse(docFile, 'ASSET_MISSING', `${found.trail} cites ${named} (${stamped.slice(0, 12)}), which is not in its selected blob store - declared bytes are not there`);
-    return;
-  }
-  if (seen) { seen.filesOpened += 1; seen.digestsCompared += 1; }
-  const size = selectedBytes === null ? fs.statSync(hit.file).size : selectedBytes.length;
-  if (size === 0) {
-    sink.refuse(docFile, 'ASSET_EMPTY', `${found.trail} cites ${named}, which is a 0-byte blob`);
-    return;
-  }
-  const actual = selectedBytes === null ? sha256File(hit.file) : stamped; // getBlob verified these exact selected bytes
-  if (actual !== stamped) sink.refuse(docFile, 'ASSET_DIGEST', `${found.trail} cites ${named} as ${stamped}, but the stored blob hashes to ${actual}`);
-}
-
-/**
- * One declaration against the disk: exists, is a file, is not a placeholder, opens with the bytes its
- * extension claims, and hashes to what was stamped on it. Order is deliberate - each later test assumes
- * the one before it, and the first failure is the one worth reading.
- */
-function verifyDeclaration(found, docFile, ctx, sink, seen) {
-  const {rule, text, abs} = found;
-  const named = `${rule.what === 'asset' ? 'artifact' : rule.what} ${text}`;
-  if (seen) seen.declarations += 1;
-  if (found.citation) return verifyCitation(found, docFile, ctx, sink, seen);
-  if (!fs.existsSync(abs)) {
-    const message = `${rule.trail} names ${named}, which is not on disk under ${found.base}`;
-    if (rule.what === 'input') sink.suspect(docFile, 'EVIDENCE_ARTIFACT_GHOST', `${message} - a declared input the Work tree does not keep`);
-    else sink.refuse(docFile, 'ASSET_MISSING', `${message} - declared bytes are not there`);
-    return;
-  }
-  if (!fs.lstatSync(abs).isFile()) {
-    sink.refuse(docFile, 'ASSET_MISSING', `${rule.trail} names ${named}, which is not a regular file`);
-    return;
-  }
-  const size = fs.statSync(abs).size;
-  if (seen) seen.filesOpened += 1;
-  if (size === 0) {
-    sink.refuse(docFile, 'ASSET_EMPTY', `${rule.trail} names ${named}, which exists as a 0-byte placeholder`);
-    return;
-  }
-  const signature = signatureProblem(abs, headOf(abs, size));
-  if (signature) {
-    sink.refuse(docFile, 'ASSET_MAGIC', `${rule.trail} names ${named}, but ${signature}`);
-    return;
-  }
-  if (found.digest == null) return;
-  const stamped = typeof found.digest === 'string' ? found.digest.trim() : String(found.digest);
-  if (!/^[0-9a-f]{64}$/.test(stamped.toLowerCase())) {
-    sink.refuse(docFile, 'ASSET_STAMP', `${rule.trail} stamps ${named} as ${JSON.stringify(found.digest)}, which is not a sha256 - there is nothing to verify the bytes against`);
-    return;
-  }
-  if (seen) seen.digestsCompared += 1;
-  const actual = sha256File(abs);
-  if (actual === stamped.toLowerCase()) return;
-  const moved = `${rule.trail} stamps ${named} as ${stamped}, but the ${size} bytes on disk hash to ${actual}`;
-  if (rule.what === 'input') {
-    sink.suspect(docFile, 'INPUT_BYTES_MOVED', `${moved} - what this artifact was drawn from is not what its provenance says it was`);
-  } else {
-    sink.refuse(docFile, 'ASSET_DIGEST', `${moved} - the bytes on disk are not the bytes this declaration names`);
-  }
-}
-
-/**
- * concept 3: the run layer. A run folder is produced by the harness and then *settled on* by one evidence
- * file. Only the settled run carries the claim a done record rests on, so the size floor is refused there
- * and only suspected elsewhere; magic bytes and declared-asset existence hold in every run, because a
- * placeholder is a placeholder whatever attempt it sits under.
- */
-function checkRunMedia(runDir, settled, sink, seen) {
-  const filesIn = dir => fs.existsSync(dir) && fs.lstatSync(dir).isDirectory() ? walk(dir) : [];
-  const groups = [['videos', filesIn(path.join(runDir, 'videos')), MIN_VIDEO_BYTES, 'video'],
-    ['screens', filesIn(path.join(runDir, 'screens')), MIN_SCREEN_BYTES, 'screenshot']];
-  for (const [folder, files, floor, kind] of groups) {
-    for (const file of files) {
-      if (seen) seen.mediaFiles += 1;
-      const size = fs.statSync(file).size;
-      if (!size) {
-        sink.refuse(file, 'ASSET_EMPTY', `${folder}/ keeps a 0-byte ${kind} - a name in a list is not a ${kind}`);
-        continue;
-      }
-      const problem = signatureProblem(file, headOf(file, size));
-      if (problem) sink.refuse(file, 'ASSET_MAGIC', `${folder}/ keeps a ${kind} that is not one: ${problem}`);
-      if (size >= floor) continue;
-      const message = `${folder}/${path.basename(file)} is ${size}B, under the ${floor}B floor a real ${kind} clears`;
-      if (settled) sink.refuse(file, 'RUN_MEDIA_FAKE', `${message} - this is the run the evidence settled on, so its proof cannot hold`);
-      else sink.suspect(file, 'RUN_MEDIA_FAKE', `${message} - a stub kept in an unsettled run`);
-    }
-  }
-}
-
 // ---- concept 4: a prompt is the generation's input claim, kept beside the raster ----
 // Both trees keep `<asset>.prompt.txt` (or the `generation.promptPath` a record names) as the exact bytes
 // sent to the tool. An empty one is a generation nobody can re-read. The paths quoted inside it are
 // reported as SUSPECT, not REFUSE, because a prompt names files it tells the model not to copy as well as
 // the ones it was fed; only lines that claim an input are mined for paths.
 const PROMPT_INPUT_LINE = /(image\s*\d|reference image|anatomy source|edit target|brand authority|knowledge|input images)/i;
-const PROMPT_PATH = /(?:examples|knowledge)\/[\w./[\]-]*/g;
+const PROMPT_PATH = /(?:examples|knowledge)\/[\w./\[\]-]*/g;
 
 function checkPromptFile(file, sink) {
   const text = fs.readFileSync(file, 'utf8');
@@ -372,91 +219,9 @@ function checkPromptFile(file, sink) {
   }
 }
 
-// ---- concept 5: a receipt must bind the bytes it says it copied ----
-// `toolOutputBasename` is the name the image tool gave its own output (`exec-<uuid>.png`). Both trees copy
-// those bytes into `assets/<asset>.png` and record `postProcessing: None`, so the basename is provenance of
-// a rename and never a file the custody keeps - on the live trees, 0 of the 12 basenames exist anywhere
-// under examples/. Refusing that would be a wolf cry with a 100% false-positive rate, so what is refused is
-// the claim that can be checked: the artifact and prompt the receipt names must be on disk and must be the
-// bytes it hashed, and the basename's extension must agree with the artifact it was renamed into. A
-// receipt that says the tool wrote `.png` while the record keeps a `.webm` is the renamed-fake shape.
-function checkReceipt(receiptFile, ctx, sink, seen) {
-  const doc = parseYaml(fs.readFileSync(receiptFile, 'utf8'));
-  if (!doc || typeof doc !== 'object') return;
-  const receiptCtx = {...ctx, recordDir: ctx.ownerDirOf(receiptFile) ?? path.dirname(path.dirname(receiptFile))};
-  for (const found of declarationsOf(doc, RECEIPT_DECLARATIONS, receiptCtx)) {
-    if (found.digest && seen) seen.digests += 1;
-    verifyDeclaration(found, receiptFile, receiptCtx, sink, seen);
-  }
-  const calls = Array.isArray(doc.calls) ? doc.calls : [];
-  if (seen) seen.receiptCalls += calls.length;
-  for (const call of calls) {
-    const basename = typeof call?.toolOutputBasename === 'string' ? call.toolOutputBasename.trim() : '';
-    if (!basename) {
-      if (call?.artifact) sink.suspect(receiptFile, 'RECEIPT_ORPHAN', `a call names artifact ${call.artifact} with no toolOutputBasename - the copy step is unattributed`);
-      continue;
-    }
-    const from = path.extname(basename).toLowerCase();
-    const to = path.extname(String(call?.artifact ?? '')).toLowerCase();
-    if (to && from !== to) {
-      sink.refuse(receiptFile, 'RECEIPT_ORPHAN', `the tool produced ${basename} and the record kept ${call.artifact} - ${from} bytes renamed to ${to} are not the same artifact`);
-    }
-  }
-}
-
-/**
- * Every artifact declaration in one `.starciwork` tree, checked against the bytes under it. `out` is
- * `{refuse, suspect, info}` arrays of `file: message [CODE]`, the shape check-work-deep prints and the
- * CLI reads. Exported so the fixture test can point it at a throwaway tree instead of the real trees.
- */
-export function checkWorkArtifacts(workRoot, out, { runtimeRoot = root } = {}) { out ??= {refuse: [], suspect: [], info: []};
-  const emit = {
-    refuse: (file, code, msg) => out.refuse.push(`${relativeToRoot(file)}: ${msg} [${code}]`),
-    suspect: (file, code, msg) => out.suspect.push(`${relativeToRoot(file)}: ${msg} [${code}]`),
-    info: (file, code, msg) => out.info.push(`${relativeToRoot(file)}: ${msg} [${code}]`),
-  };
-
-  const custodyRoots = new Set(['kernel-evidence', 'kernel-strays', 'kernel-approvals', '_derived']);
-  const canonicalWalk = start => walk(start).filter(file => {
-    const relative = slash(path.relative(workRoot, file));
-    return !custodyRoots.has(relative.split('/')[0]);
-  });
-  const records = loadRecords(workRoot, canonicalWalk);
-  // Every path a record holds is app-relative (be/..., fe/..., a directory of the app root): the base `repo` is the app root.
-  const appRoot = appRootOf(workRoot);
-  // `counts` is what the script looked at, not only what it flagged: the CLI prints it so a clean code can
-  // say how many candidates were opened and found whole, the way scripts/work/validate/check-example-work.mjs's summary does.
-  const counts = {declarations: 0, digests: 0, digestsCompared: 0, filesOpened: 0, generatedAssets: 0,
-    prompts: 0, runs: 0, receipts: 0, mediaFiles: 0, receiptCalls: 0, accountsFiles: 0};
-
-  /** The record directory an artifact file under the tree belongs to (receipts sit one level deeper). */
-  const ownerDirOf = file => {
-    let deepest = null;
-    for (const rec of records.values()) {
-      if (!path.relative(rec.dir, file).startsWith('..') && (!deepest || rec.dir.length > deepest.length)) deepest = rec.dir;
-    }
-    return deepest;
-  };
-  /** A record's dirs share one failure set with its evidence/receipts, so a parent can see the member. */
-  const failedDirs = new Set();
-  const markFailure = file => { const dir = ownerDirOf(file); if (dir) failedDirs.add(dir); };
-  const wrapped = {
-    refuse: (file, code, msg) => { if (/ASSET|PROMPT|RECEIPT|RUN_MEDIA|RESOURCE_FILE|EVIDENCE_ARTIFACT/.test(code)) { markFailure(file); } emit.refuse(file, code, msg); },
-    suspect: (file, code, msg) => emit.suspect(file, code, msg),
-    info: (file, code, msg) => emit.info(file, code, msg),
-  };
-  const inline = indexInlineCriteria(records);
-  let blobOptions;
-  try { blobOptions = exampleArtifactReadOptions(runtimeRoot, workRoot); }
-  catch (error) {
-    emit.refuse(path.join(workRoot, 'index.yaml'), 'ASSET_ROOT', `artifact read context cannot be established: ${error.message}`);
-    return {...counts, records: records.size, evidence: 0};
-  }
-  const ctxFor = recordDir => ({workRoot, records, inline, recordDir, repoRoot: appRoot, ownerDirOf, blobOptions});
-
-  // evidence docs by the record directory beside them; the run each one settles on is a claim in bytes
+function readEvidenceDocuments(state) {
   const evidenceByDir = new Map();
-  for (const file of canonicalWalk(workRoot).filter(f => f.endsWith('evidence.yaml'))) {
+  for (const file of state.canonicalWalk(state.workRoot).filter(candidate => candidate.endsWith('evidence.yaml'))) {
     let doc;
     try { doc = parseYaml(fs.readFileSync(file, 'utf8')); } catch { continue; }
     if (doc && typeof doc === 'object') evidenceByDir.set(path.dirname(file), {doc, file});
@@ -465,155 +230,227 @@ export function checkWorkArtifacts(workRoot, out, { runtimeRoot = root } = {}) {
   for (const [dir, {doc}] of evidenceByDir) {
     if (typeof doc.run === 'string' && doc.run.trim()) settledRuns.add(path.resolve(dir, doc.run.trim()));
   }
-  /**
-   * Each run folder is opened for its media exactly once, and its settled-ness is read from the evidence set
-   * rather than from the pass that reached it first: the run a record settled on also carries a manifest.yaml,
-   * so an un-deduplicated sweep would report the same stub video twice, once refused and once suspected.
-   */
-  const sweptRuns = new Set();
-  const scanRun = runDir => {
+  state.evidenceByDir = evidenceByDir;
+  state.settledRuns = settledRuns;
+  state.sweptRuns = new Set();
+  state.scanRun = runDir => {
     const resolved = path.resolve(runDir);
-    if (sweptRuns.has(resolved)) return false;
-    sweptRuns.add(resolved);
-    checkRunMedia(runDir, settledRuns.has(resolved), wrapped, counts);
+    if (state.sweptRuns.has(resolved)) return false;
+    state.sweptRuns.add(resolved);
+    checkRunMedia(runDir, settledRuns.has(resolved), state.wrapped, state.counts, walk);
     return true;
   };
+}
 
-  // ---- no sealed file inside the Work tree: custody lives under the app root's .starcistacks, the Work tree only points at it ----
-  for (const file of canonicalWalk(workRoot)) {
+function reportSealedFiles(state) {
+  for (const file of state.canonicalWalk(state.workRoot)) {
     if (SEALED_FILE_RE.test(path.basename(file))) {
-      wrapped.refuse(file, 'SEALED_FILE_IN_WORK', `a sealed secret file is kept under the Work tree; move it to .starcistacks/<env>/secrets/<slug>.enc at the app root and point custody.sealed at it`);
+      state.wrapped.refuse(file, 'SEALED_FILE_IN_WORK', `a sealed secret file is kept under the Work tree; move it to .starcistacks/<env>/secrets/<slug>.enc at the app root and point custody.sealed at it`);
     }
   }
+}
 
-  // ---- records: their own declarations, plus the prompt beside every generated asset ----
-  // A run manifest and a payload that travels inside assets/ carry an `id`/`schema` of their own and are
-  // therefore picked up by loadRecords, but they are artifacts of the node beside them, not records (the
-  // same reading check-work-deep reports as PAYLOAD_AS_RECORD). Their declarations are verified once, below,
-  // with the run dir / record dir they are actually relative to - checking them here would double-report
-  // every line and resolve `videos/x.webm` against the wrong directory.
-  for (const rec of records.values()) {
-    const data = rec.data ?? {};
-    if (typeof data.schema === 'string' && !data.schema.startsWith('work/')) continue;
-    const indexFile = path.join(rec.dir, 'index.yaml');
-    const ctx = ctxFor(rec.dir);
-    const table = data.schema === 'work/resource@1' ? RESOURCE_DECLARATIONS : RECORD_DECLARATIONS;
-    const custody = data.schema === 'work/resource@1' && data.custody && typeof data.custody === 'object' ? data.custody : null;
-    const sealed = custody?.sealed;
-    // provider: none is the one "holds no secret" form and carries no sealed key; every other provider names its file.
-    const sealedMisplaced = Boolean(custody) && (custody.provider === 'none' ? sealed !== undefined : typeof sealed !== 'string' || !SEALED_LOCATION_RE.test(sealed.trim()));
-    if (sealedMisplaced) {
-      const why = custody.provider === 'none' || typeof sealed !== 'string' ? null : sealedLocationProblem(sealed);
-      wrapped.refuse(indexFile, 'SEALED_CUSTODY_LOCATION', `custody.sealed is ${sealed === undefined ? 'absent' : JSON.stringify(sealed)}${custody.provider === 'none' ? ' on a provider: none identity, which holds no secret and carries no sealed key;' : '; ' + (why && why + '; ' || '') + 'a sealed secret lives only at .starcistacks/<env>/secrets/<slug>.enc (app-relative) and'} the record here names it`);
+function reportRecordCustody(data, indexFile, wrapped) {
+  const custody = data.schema === 'work/resource@1' && data.custody && typeof data.custody === 'object' ? data.custody : null;
+  const sealed = custody?.sealed;
+  // provider: none is the one "holds no secret" form and carries no sealed key; every other provider names its file.
+  const misplaced = Boolean(custody) && (custody.provider === 'none' ? sealed !== undefined : typeof sealed !== 'string' || !SEALED_LOCATION_RE.test(sealed.trim()));
+  if (!misplaced) return false;
+  const why = custody.provider === 'none' || typeof sealed !== 'string' ? null : sealedLocationProblem(sealed);
+  wrapped.refuse(indexFile, 'SEALED_CUSTODY_LOCATION', `custody.sealed is ${sealed === undefined ? 'absent' : JSON.stringify(sealed)}${custody.provider === 'none' ? ' on a provider: none identity, which holds no secret and carries no sealed key;' : '; ' + (why && why + '; ' || '') + 'a sealed secret lives only at .starcistacks/<env>/secrets/<slug>.enc (app-relative) and'} the record here names it`);
+  return true;
+}
+
+function checkRecordDeclarations(data, table, ctx, indexFile, sealedMisplaced, state) {
+  for (const found of declarationsOf(data, table, ctx)) {
+    if (sealedMisplaced && found.trail === 'custody.sealed') continue;
+    if (found.digest) state.counts.digests += 1;
+    verifyDeclaration(found, indexFile, ctx, state.wrapped, state.counts);
+  }
+}
+
+function checkGeneratedAssets(data, ctx, indexFile, state) {
+  const entries = [...(Array.isArray(data.assets) ? data.assets : []), ...(Array.isArray(data.ui?.assets) ? data.ui.assets : [])]
+    .filter(entry => entry && typeof entry === 'object' && typeof entry.path === 'string');
+  for (const entry of entries) {
+    if (!entry.generation) continue;
+    state.counts.generatedAssets += 1;
+    const expected = typeof entry.generation.promptPath === 'string' && entry.generation.promptPath.trim()
+      ? entry.generation.promptPath.trim()
+      : `${entry.path.replace(/\.[^.]+$/, '')}.prompt.txt`;
+    if (!fs.existsSync(path.join(ctx.recordDir, expected))) {
+      state.wrapped.refuse(indexFile, 'PROMPT_MISSING', `${entry.path} carries a generation but ${expected} is not beside it - a direction with no prompt is not a re-runnable generation`);
     }
-    for (const found of declarationsOf(data, table, ctx)) {
-      if (sealedMisplaced && found.trail === 'custody.sealed') continue;
-      if (found.digest) counts.digests += 1;
-      verifyDeclaration(found, indexFile, ctx, wrapped, counts);
-    }
-    const assetEntries = [...(Array.isArray(data.assets) ? data.assets : []), ...(Array.isArray(data.ui?.assets) ? data.ui.assets : [])]
-      .filter(entry => entry && typeof entry === 'object' && typeof entry.path === 'string');
-    for (const entry of assetEntries) {
-      if (!entry.generation) continue;
-      counts.generatedAssets += 1;
-      const expected = typeof entry.generation.promptPath === 'string' && entry.generation.promptPath.trim()
-        ? entry.generation.promptPath.trim()
-        : `${entry.path.replace(/\.[^.]+$/, '')}.prompt.txt`;
-      if (!fs.existsSync(path.join(ctx.recordDir, expected))) {
-        wrapped.refuse(indexFile, 'PROMPT_MISSING', `${entry.path} carries a generation but ${expected} is not beside it - a direction with no prompt is not a re-runnable generation`);
-      }
-      // The tool's own output name is provenance of a rename (concept 5); the extension must still agree.
-      const kept = path.extname(entry.path).toLowerCase();
-      const produced = path.extname(String(entry.provenance?.toolOutputBasename ?? '')).toLowerCase();
-      if (produced && produced !== kept) {
-        wrapped.refuse(indexFile, 'ASSET_MAGIC', `${entry.path} is kept as ${kept} but its provenance says the tool produced ${entry.provenance.toolOutputBasename} - one of the two names is not this artifact's`);
-      }
-    }
-    if (data.schema === 'work/uat-flow@1' && data.accounts) {
-      counts.accountsFiles += 1;
-      if (!fs.existsSync(path.join(rec.dir, String(data.accounts).trim()))) {
-        wrapped.refuse(indexFile, 'RESOURCE_FILE_MISSING', `accounts: ${data.accounts} names a file that is not beside the flow - the base gate opens it only if existsSync, so its absence passes there`);
-      }
+    // The tool's own output name is provenance of a rename (concept 5); the extension must still agree.
+    const kept = path.extname(entry.path).toLowerCase();
+    const produced = path.extname(String(entry.provenance?.toolOutputBasename ?? '')).toLowerCase();
+    if (produced && produced !== kept) {
+      state.wrapped.refuse(indexFile, 'ASSET_MAGIC', `${entry.path} is kept as ${kept} but its provenance says the tool produced ${entry.provenance.toolOutputBasename} - one of the two names is not this artifact's`);
     }
   }
+}
 
-  // ---- concept 6: evidence ghosts (the run it settled on, the assets it names) ----
-  for (const [dir, {doc, file}] of evidenceByDir) {
-    const ctx = ctxFor(dir);
+function checkAccountsFile(rec, data, indexFile, state) {
+  if (data.schema !== 'work/uat-flow@1' || !data.accounts) return;
+  state.counts.accountsFiles += 1;
+  if (!fs.existsSync(path.join(rec.dir, String(data.accounts).trim()))) {
+    state.wrapped.refuse(indexFile, 'RESOURCE_FILE_MISSING', `accounts: ${data.accounts} names a file that is not beside the flow - the base gate opens it only if existsSync, so its absence passes there`);
+  }
+}
+
+function scanRecordArtifacts(state, rec) {
+  const data = rec.data ?? {};
+  if (typeof data.schema === 'string' && !data.schema.startsWith('work/')) return;
+  const indexFile = path.join(rec.dir, 'index.yaml');
+  const ctx = state.ctxFor(rec.dir);
+  const table = data.schema === 'work/resource@1' ? RESOURCE_DECLARATIONS : RECORD_DECLARATIONS;
+  const misplaced = reportRecordCustody(data, indexFile, state.wrapped);
+  checkRecordDeclarations(data, table, ctx, indexFile, misplaced, state);
+  checkGeneratedAssets(data, ctx, indexFile, state);
+  checkAccountsFile(rec, data, indexFile, state);
+}
+
+function scanEvidenceArtifacts(state) {
+  for (const [dir, {doc, file}] of state.evidenceByDir) {
+    const ctx = state.ctxFor(dir);
     for (const found of declarationsOf(doc, EVIDENCE_DECLARATIONS, ctx)) {
-      if (found.digest) counts.digests += 1;
-      verifyDeclaration(found, file, ctx, wrapped, counts);
+      if (found.digest) state.counts.digests += 1;
+      verifyDeclaration(found, file, ctx, state.wrapped, state.counts);
     }
     if (typeof doc.run !== 'string' || !doc.run.trim()) continue;
-    counts.runs += 1;
+    state.counts.runs += 1;
     const runDir = path.resolve(dir, doc.run.trim());
     if (!fs.existsSync(runDir) || !fs.lstatSync(runDir).isDirectory()) {
-      wrapped.refuse(file, 'EVIDENCE_ARTIFACT_GHOST', `run: ${doc.run} names a run directory that is not on disk - the run this evidence settled on does not exist`);
+      state.wrapped.refuse(file, 'EVIDENCE_ARTIFACT_GHOST', `run: ${doc.run} names a run directory that is not on disk - the run this evidence settled on does not exist`);
       continue;
     }
-    scanRun(runDir);
+    state.scanRun(runDir);
   }
+}
 
-  // ---- every other run under the tree: history is a byte claim too ----
-  for (const file of canonicalWalk(workRoot).filter(f => f.endsWith('manifest.yaml'))) {
+function scanManifestArtifacts(state) {
+  for (const file of state.canonicalWalk(state.workRoot).filter(candidate => candidate.endsWith('manifest.yaml'))) {
     const runDir = path.dirname(file);
-    counts.runs += 1;
+    state.counts.runs += 1;
     let doc;
     try { doc = parseYaml(fs.readFileSync(file, 'utf8')); } catch { continue; }
-    const ctx = {...ctxFor(ownerDirOf(file) ?? runDir), runDir};
+    const ctx = {...state.ctxFor(state.ownerDirOf(file) ?? runDir), runDir};
     for (const found of declarationsOf(doc, MANIFEST_DECLARATIONS, ctx)) {
-      if (found.digest) counts.digests += 1;
-      verifyDeclaration(found, file, ctx, wrapped, counts);
+      if (found.digest) state.counts.digests += 1;
+      verifyDeclaration(found, file, ctx, state.wrapped, state.counts);
     }
-    scanRun(runDir);
+    state.scanRun(runDir);
   }
+}
 
-  for (const file of canonicalWalk(workRoot).filter(f => f.endsWith('generation-receipts.yaml'))) {
-    counts.receipts += 1;
-    checkReceipt(file, ctxFor(path.dirname(path.dirname(file))), wrapped, counts);
+function scanReceiptAndPromptFiles(state) {
+  for (const file of state.canonicalWalk(state.workRoot).filter(candidate => candidate.endsWith('generation-receipts.yaml'))) {
+    state.counts.receipts += 1;
+    checkReceipt(file, state.ctxFor(path.dirname(path.dirname(file))), state.wrapped, state.counts,
+      {declarationsOf, receiptDeclarations: RECEIPT_DECLARATIONS});
   }
-
-  for (const file of canonicalWalk(workRoot).filter(f => f.endsWith('.prompt.txt'))) {
-    counts.prompts += 1;
-    checkPromptFile(file, wrapped);
+  for (const file of state.canonicalWalk(state.workRoot).filter(candidate => candidate.endsWith('.prompt.txt'))) {
+    state.counts.prompts += 1;
+    checkPromptFile(file, state.wrapped);
   }
+}
 
-  // ---- concept 7: a parent cannot be done on its members' unproven claims ----
+function reportParentArtifactState(state) {
   let doneParents = 0;
-  for (const [id, rec] of records) {
+  for (const [id, rec] of state.records) {
     if (!['work/feature@1', 'work/catalog@1'].includes(rec.schema) || rec.data?.state !== 'done') continue;
     doneParents += 1;
-    const members = [...records.entries()]
+    const members = [...state.records.entries()]
       .filter(([, other]) => other !== rec && !path.relative(rec.dir, other.dir).startsWith('..'));
     const notDone = members.filter(([, other]) => other.data?.state !== 'done');
     if (notDone.length) {
-      const named = notDone.slice(0, 3).map(([mid, m]) => `${mid}=${m.data?.state ?? '(no state)'}`).join(', ');
+      const named = notDone.slice(0, 3).map(([memberId, member]) => `${memberId}=${member.data?.state ?? '(no state)'}`).join(', ');
       const preview = `${named}${notDone.length > 3 ? ', ...' : ''}`;
-      wrapped.refuse(path.join(rec.dir, 'index.yaml'), 'FEATURE_DONE_INCOMPLETE',
+      state.wrapped.refuse(path.join(rec.dir, 'index.yaml'), 'FEATURE_DONE_INCOMPLETE',
         `${id} is done while ${notDone.length} member record(s) are not (${preview}) - a parent is done only once the records under it are`);
     }
     for (const [memberId, member] of members) {
-      if (failedDirs.has(member.dir)) {
-        wrapped.refuse(path.join(rec.dir, 'index.yaml'), 'FEATURE_DONE_INCOMPLETE',
+      if (state.failedDirs.has(member.dir)) {
+        state.wrapped.refuse(path.join(rec.dir, 'index.yaml'), 'FEATURE_DONE_INCOMPLETE',
           `${id} is done while ${memberId}'s declared artifacts are not the bytes on disk`);
       }
     }
   }
-  const parents = [...records.values()].filter(rec => ['work/feature@1', 'work/catalog@1'].includes(rec.schema)).length;
+  const parents = [...state.records.values()].filter(rec => ['work/feature@1', 'work/catalog@1'].includes(rec.schema)).length;
   const latent = parents && !doneParents ? ', so the rule is latent here today' : '';
-  emit.info(path.join(workRoot, 'index.yaml'), 'PARENT_STATE_UNUSED',
+  state.emit.info(path.join(state.workRoot, 'index.yaml'), 'PARENT_STATE_UNUSED',
     `${parents} feature/catalog record(s) in this tree, ${doneParents} claiming done - FEATURE_DONE_INCOMPLETE can only fire on a parent that claims done${latent}`);
-  const stampedCodeDigests = [...evidenceByDir.values()].filter(({doc}) => doc.codeDigest).length;
-  emit.info(path.join(workRoot, 'index.yaml'), 'BYTE_CENSUS',
-    `${counts.declarations} declared path(s) resolved, ${counts.filesOpened} of them opened on disk and ${counts.digestsCompared} hash-compared against a stamped sha256 (${counts.digests} declarations carried one);`
-    + ` ${sweptRuns.size} run folder(s) read for media magic and size (${counts.mediaFiles} files);`
-    + ` ${counts.prompts} prompt file(s) read; ${counts.generatedAssets} generated asset(s) owed a prompt;`
-    + ` ${counts.receipts} receipt file(s) binding ${counts.receiptCalls} generation call(s);`
-    + ` ${counts.accountsFiles} uat accounts file(s) looked for`);
-  emit.info(path.join(workRoot, 'index.yaml'), 'CODE_DIGEST_NOT_MINE',
-    `${stampedCodeDigests} of ${evidenceByDir.size} evidence file(s) here also stamp a codeDigest over code; those bytes are re-hashed by check-example-work.mjs (CODE_DIGEST_STALE), so this script does not repeat that measurement`);
+}
 
-  return {...counts, records: records.size, evidence: evidenceByDir.size};
+function reportArtifactCensus(state) {
+  const stampedCodeDigests = [...state.evidenceByDir.values()].filter(({doc}) => doc.codeDigest).length;
+  state.emit.info(path.join(state.workRoot, 'index.yaml'), 'BYTE_CENSUS',
+    `${state.counts.declarations} declared path(s) resolved, ${state.counts.filesOpened} of them opened on disk and ${state.counts.digestsCompared} hash-compared against a stamped sha256 (${state.counts.digests} declarations carried one);`
+    + ` ${state.sweptRuns.size} run folder(s) read for media magic and size (${state.counts.mediaFiles} files);`
+    + ` ${state.counts.prompts} prompt file(s) read; ${state.counts.generatedAssets} generated asset(s) owed a prompt;`
+    + ` ${state.counts.receipts} receipt file(s) binding ${state.counts.receiptCalls} generation call(s);`
+    + ` ${state.counts.accountsFiles} uat accounts file(s) looked for`);
+  state.emit.info(path.join(state.workRoot, 'index.yaml'), 'CODE_DIGEST_NOT_MINE',
+    `${stampedCodeDigests} of ${state.evidenceByDir.size} evidence file(s) here also stamp a codeDigest over code; those bytes are re-hashed by check-example-work.mjs (CODE_DIGEST_STALE), so this script does not repeat that measurement`);
+}
+
+/**
+ * Every artifact declaration in one `.starciwork` tree, checked against the bytes under it. `out` is
+ * `{refuse, suspect, info}` arrays of `file: message [CODE]`, the shape check-work-deep prints and the
+ * CLI reads. Exported so the fixture test can point it at a throwaway tree instead of the real trees.
+ */
+export function checkWorkArtifacts(workRoot, out, { runtimeRoot = root } = {}) {
+  out ??= {refuse: [], suspect: [], info: []};
+  const emit = {
+    refuse: (file, code, msg) => out.refuse.push(relativeToRoot(file) + ': ' + msg + ' [' + code + ']'),
+    suspect: (file, code, msg) => out.suspect.push(relativeToRoot(file) + ': ' + msg + ' [' + code + ']'),
+    info: (file, code, msg) => out.info.push(relativeToRoot(file) + ': ' + msg + ' [' + code + ']'),
+  };
+  const custodyRoots = new Set(['kernel-evidence', 'kernel-strays', 'kernel-approvals', '_derived']);
+  const canonicalWalk = start => walk(start).filter(file => {
+    const relative = slash(path.relative(workRoot, file));
+    return !custodyRoots.has(relative.split('/')[0]);
+  });
+  const records = loadRecords(workRoot, canonicalWalk);
+  const appRoot = appRootOf(workRoot);
+  const counts = {declarations: 0, digests: 0, digestsCompared: 0, filesOpened: 0, generatedAssets: 0,
+    prompts: 0, runs: 0, receipts: 0, mediaFiles: 0, receiptCalls: 0, accountsFiles: 0};
+  const ownerDirOf = file => {
+    let deepest = null;
+    for (const rec of records.values()) {
+      if (!path.relative(rec.dir, file).startsWith('..') && (!deepest || rec.dir.length > deepest.length)) deepest = rec.dir;
+    }
+    return deepest;
+  };
+  const failedDirs = new Set();
+  const markFailure = file => { const dir = ownerDirOf(file); if (dir) failedDirs.add(dir); };
+  const wrapped = {
+    refuse: (file, code, msg) => {
+      if (/ASSET|PROMPT|RECEIPT|RUN_MEDIA|RESOURCE_FILE|EVIDENCE_ARTIFACT/.test(code)) markFailure(file);
+      emit.refuse(file, code, msg);
+    },
+    suspect: (file, code, msg) => emit.suspect(file, code, msg),
+    info: (file, code, msg) => emit.info(file, code, msg),
+  };
+  const inline = indexInlineCriteria(records);
+  let blobOptions;
+  try {
+    blobOptions = exampleArtifactReadOptions(runtimeRoot, workRoot);
+  } catch (error) {
+    emit.refuse(path.join(workRoot, 'index.yaml'), 'ASSET_ROOT', 'artifact read context cannot be established: ' + error.message);
+    return {...counts, records: records.size, evidence: 0};
+  }
+  const ctxFor = recordDir => ({workRoot, records, inline, recordDir, repoRoot: appRoot, ownerDirOf, blobOptions});
+  const state = {workRoot, emit, canonicalWalk, records, appRoot, counts, ownerDirOf, failedDirs, wrapped, ctxFor};
+  readEvidenceDocuments(state);
+  reportSealedFiles(state);
+  for (const rec of records.values()) scanRecordArtifacts(state, rec);
+  scanEvidenceArtifacts(state);
+  scanManifestArtifacts(state);
+  scanReceiptAndPromptFiles(state);
+  reportParentArtifactState(state);
+  reportArtifactCensus(state);
+  return {...counts, records: records.size, evidence: state.evidenceByDir.size};
 }
 
 if (isMain(import.meta.url)) {

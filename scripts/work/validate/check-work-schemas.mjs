@@ -65,6 +65,25 @@ const listYaml = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((
   return entry.isFile() && entry.name.endsWith('.yaml') ? [full] : [];
 });
 
+const schemaFamily = (record, workspaceDoc) => {
+  const family = record?.schema;
+  return typeof family === 'string' && isWorkRecordSchema(family, workspaceDoc) ? family : null;
+};
+const isEvidencePayload = (rel, segments, family) => (family === 'work/evidence@1' && path.basename(rel) !== 'evidence.yaml')
+  || (path.basename(rel) === 'manifest.yaml' && segments.includes('evidence'));
+const validateNamedRecord = (family, record, shown, loaded, refused, counts) => {
+  const entry = loaded.validators.get(family);
+  if (!entry) {
+    refused.push(`${shown}: names schema ${family}, which no catalogued work-tree schema defines [SCHEMA_UNKNOWN]`);
+    counts.schemaRejected += 1;
+    return;
+  }
+  counts.schemaChecked += 1;
+  if (entry.validate(record)) return;
+  counts.schemaRejected += 1;
+  for (const error of entry.validate.errors ?? []) refused.push(`${shown}: ${describe(error)} under ${entry.file} [SCHEMA_VIOLATION]`);
+};
+
 /**
  * Validates every Work record under `root` against its named schema. Violations go to `refused` as
  * `<path>: <pointer> <message> [SCHEMA_VIOLATION]`; `workRoot` is the enclosing tree whose workspace.yaml may
@@ -85,21 +104,10 @@ export function checkWorkSchemas(root, refused, info = [], { workRoot = root } =
     let record;
     try { record = parseYaml(fs.readFileSync(file, 'utf8')); } catch { continue; } // structural owns the parse refusal
     if (!record || typeof record !== 'object' || Array.isArray(record)) continue;
-    const family = record.schema;
-    if (typeof family !== 'string' || !isWorkRecordSchema(family, workspaceDoc)) continue;
-    if ((family === 'work/evidence@1' && path.basename(rel) !== 'evidence.yaml')
-      || (path.basename(rel) === 'manifest.yaml' && segments.includes('evidence'))) continue;
+    const family = schemaFamily(record, workspaceDoc);
+    if (family === null || isEvidencePayload(rel, segments, family)) continue;
     const shown = path.relative(workRoot, file).split(path.sep).join('/') || rel;
-    const entry = loaded.validators.get(family);
-    if (!entry) {
-      refused.push(`${shown}: names schema ${family}, which no catalogued work-tree schema defines [SCHEMA_UNKNOWN]`);
-      counts.schemaRejected += 1;
-      continue;
-    }
-    counts.schemaChecked += 1;
-    if (entry.validate(record)) continue;
-    counts.schemaRejected += 1;
-    for (const error of entry.validate.errors ?? []) refused.push(`${shown}: ${describe(error)} under ${entry.file} [SCHEMA_VIOLATION]`);
+    validateNamedRecord(family, record, shown, loaded, refused, counts);
   }
   info.push(`${root}: strict schema validation compiled ${counts.schemaChecked} record(s) against their named schemas; ${counts.schemaRejected} rejected [STRICT_MODE]`);
   return counts;

@@ -4,12 +4,7 @@ import { uiState } from '../state.mjs';
 
 const DEFAULT_NAMESPACE = Object.freeze({ store: 'machine', ledgerId: null });
 
-function ref(kind, id, project = null, namespace = null, wf = null) {
-  const p = encodeURIComponent(project ?? '');
-  const key = encodeURIComponent(String(id));
-  const params = new URLSearchParams({ id: String(id) });
-  if (namespace) { params.set('store', namespace.store); if (namespace.ledgerId) params.set('ledger', namespace.ledgerId); }
-  if (project) params.set('project', project);
+function hrefForRef(kind, p, key, project, wf, params) {
   let href = null;
   if (kind === 'di') href = `#/decisions?${params}`;
   else if (kind === 'attempt' && project) href = `#/a/${p}/${key}`;
@@ -19,6 +14,15 @@ function ref(kind, id, project = null, namespace = null, wf = null) {
     const workflowParam = wf ? '&wf=' + encodeURIComponent(wf) : '';
     href = `#/decisions?tab=incidents&incident=${key}&project=${p}${workflowParam}`;
   }
+  return href;
+}
+function ref(kind, id, project = null, namespace = null, wf = null) {
+  const p = encodeURIComponent(project ?? '');
+  const key = encodeURIComponent(String(id));
+  const params = new URLSearchParams({ id: String(id) });
+  if (namespace) { params.set('store', namespace.store); if (namespace.ledgerId) params.set('ledger', namespace.ledgerId); }
+  if (project) params.set('project', project);
+  const href = hrefForRef(kind, p, key, project, wf, params);
   if (!href) return null;
   return { kind, ...(project ? { project } : {}), ...namespace, id: String(id), href };
 }
@@ -64,6 +68,15 @@ function allLedgers(store, project, fn, rel = 'meta') {
     try { return fn(row, opened.db) ?? []; } catch { store.failSource?.(row.name, rel); return []; }
   });
 }
+function filterDecisions(rows, url, project, wf, status, decider, kind) {
+  return rows.filter(item => (!project || item.project === project || item.ledgerId === project) && (!wf || item.wf === wf)
+    && (!decider || item.decider === decider) && (!kind || item.kind === kind)
+    && (status === 'all' || (status ? item.status === status : ['open', 'claimed', 'escalated'].includes(item.status)))
+    && (url.searchParams.get('overdue') !== '1' || item.overdue));
+}
+function suppressAmbiguousChannels(filtered, rows) {
+  for (const item of filtered) if (rows.some(other => other.id === item.id && other.ledgerId === item.ledgerId && other.store !== item.store)) item.channel = null;
+}
 function listedDecisions(store, url) {
   const machine = store.machine.db;
   const project = url.searchParams.get('project');
@@ -74,16 +87,11 @@ function listedDecisions(store, url) {
   rows.push(...many(machine, 'SELECT d.*,v.ui,v.overdue FROM sup_decision_items d LEFT JOIN (SELECT di_id,ui,(due_at IS NOT NULL AND due_at<?) AS overdue FROM v_open_sup_decisions) v ON v.di_id=d.di_id ORDER BY d.opened_at DESC', Date.now())
     .map(item => decisionRow(machine, item, projects.get(item.ledger_id) ?? null, { store: 'machine', ledgerId: item.ledger_id ?? null })));
   const decider = url.searchParams.get('decider'), kind = url.searchParams.get('kind');
-  const filtered = rows.filter(item => (!project || item.project === project || item.ledgerId === project) && (!wf || item.wf === wf)
-    && (!decider || item.decider === decider) && (!kind || item.kind === kind)
-    && (status === 'all' || (status ? item.status === status : ['open', 'claimed', 'escalated'].includes(item.status)))
-    && (url.searchParams.get('overdue') !== '1' || item.overdue));
-  for (const item of filtered) if (rows.some(other => other.id === item.id && other.ledgerId === item.ledgerId && other.store !== item.store)) item.channel = null;
+  const filtered = filterDecisions(rows, url, project, wf, status, decider, kind);
+  suppressAmbiguousChannels(filtered, rows);
   return filtered.sort((a, b) => Number(b.ui === 'bad') - Number(a.ui === 'bad') || a.openedAt - b.openedAt || `${a.store}:${a.ledgerId}:${a.id}`.localeCompare(`${b.store}:${b.ledgerId}:${b.id}`));
 }
-function detail(store, id, url) {
-  const machine = store.machine.db;
-  const requestedStore = url.searchParams.get('store'), requestedLedger = url.searchParams.get('ledger') ?? url.searchParams.get('project');
+function decisionCandidates(store, machine, id, requestedStore, requestedLedger) {
   const candidates = [];
   if (!requestedStore || requestedStore === 'machine') {
     const item = one(machine, 'SELECT * FROM sup_decision_items WHERE di_id=?', id);
@@ -94,6 +102,12 @@ function detail(store, id, url) {
     const item = one(ledgerDb, 'SELECT * FROM decision_items WHERE di_id=?', id);
     return item ? [{ item, project: row.name, ledgerId: row.ledgerId, supervisor: false }] : [];
   }, 'decision_items'));
+  return candidates;
+}
+function detail(store, id, url) {
+  const machine = store.machine.db;
+  const requestedStore = url.searchParams.get('store'), requestedLedger = url.searchParams.get('ledger') ?? url.searchParams.get('project');
+  const candidates = decisionCandidates(store, machine, id, requestedStore, requestedLedger);
   if (store.stale.size && requestedStore !== 'machine') return { unavailable: true };
   if (candidates.length > 1) return { ambiguous: true };
   if (!candidates.length) return null;
