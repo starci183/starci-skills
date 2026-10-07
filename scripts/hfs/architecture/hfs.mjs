@@ -1,13 +1,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { lsFiles } from '../../api/git/ls-files.mjs'; import { revParseQuery } from '../../api/git/rev-parse-query.mjs'; import { configGet } from '../../api/git/config-get.mjs'; import { gitOutputOf } from '../../lib/git.mjs';
-import { repositoryName } from '../repo-identity.mjs';
 import { braceVariants } from '../../lib/glob.mjs';
 import { createSlotResolver, loadSlotManifest, openHfs } from '../slots.mjs';
 import { isFeTestPath } from '../rules/fe-no-tests.mjs';
-import { readTextFile } from '../../lib/read-text.mjs';
-import { managedScriptNames } from './managed-scripts.mjs';
 import { byCodeUnit } from '../../lib/list.mjs';
+import { checkRepoPresentationImpl } from './presentation.mjs';
+import { e2eInAutomaticGate, testTreesOutOfDefaultProgram } from './automatic-gates.mjs';
 /**
  * HFS repository-tree check (knowledge/hfs/README.md): every StarCi repository is an
  * apps/<app>/ monorepo on npm with a fixed root-entry allowlist; backend composition lives in
@@ -43,9 +42,7 @@ export const HFS_RULE_IDS = [
 ];
 
 const NON_NPM_ENTRIES = new Set(['pnpm-lock.yaml', 'pnpm-workspace.yaml', 'yarn.lock', 'bun.lock', 'bun.lockb']);
-const RUNTIME_ROOT_MARKDOWN = new Set(['README.md', 'CONTEXT.md', 'CONTRIBUTING.md', 'CHANGELOG.md', 'THIRD_PARTY_NOTICES.md']);
-const PRODUCT_ROOT_MARKDOWN = new Set(['README.md']);
-const README_SECTIONS = ['Overview', 'Stack', 'Repository layout', 'Development'];
+const HUSKY_HOOKS_PATH = /^\.husky(?:\/_)?\/?$/u;
 const BACKEND_SRC_CHILDREN = new Set(['features', 'modules', 'tests']);
 const moduleTiersOf = resolver => new Set(resolver.slots().filter(slot => slot.profiles.includes('be')).flatMap(slot => braceVariants(slot.path)).map(variant => /^src\/modules\/([a-z][a-z-]*)\//.exec(variant)?.[1]).filter(Boolean)); // the folders of src/modules/ the slot manifest knows (domain, platform, integrations, events, queues, projections)
 // Owner test layout 2026-09-30: unit `<name>.spec.ts`, integration, e2e and contract by folder and suffix; int-spec and harness-spec stay banned.
@@ -107,6 +104,17 @@ function ownsGitTopLevel(root) {
   } catch {
     return false;
   }
+}
+
+/** A directory that is not the top level of its own work tree has no hooks of its own: the check is not applicable there. */
+function hooksPathNotRedirected({ root, finding }) {
+  if (!ownsGitTopLevel(root)) return { status: 'not-applicable', reason: 'the checked root is not the top level of its own Git work tree, so it has no hooks of its own' };
+  const set = configGet(root, 'core.hooksPath', { local: true });
+  if (!set.ok) return { status: 'checked' }; // key not set: nothing is redirected
+  const value = set.stdout;
+  if (value && !HUSKY_HOOKS_PATH.test(value.replaceAll('\\', '/')))
+    finding('HFS_HOOKS_PATH_REDIRECTED', '.git/config', `core.hooksPath is set to ${value} in this clone. Unset it (git config --local --unset core.hooksPath) and let husky own the hooks; a redirected path skips the pre-commit and pre-push gates.`);
+  return { status: 'checked' };
 }
 
 /** The tracked paths under the given root, relative to it: the pathspec keeps a nested directory from listing the paths of its enclosing clone. */
@@ -182,212 +190,93 @@ function treeView(root) {
   };
 }
 
-// `hostname` is a WHATWG URL hostname: a name never holds ':', so after the brackets go only an IPv6 literal does.
-function privateHost(hostname) {
-  const host = hostname.toLowerCase().replace(/^\[|\]$/g, '').replace(/\.$/, '');
-  if (host === 'localhost' || host === '::1' || host === '0.0.0.0' ||
-      /(?:\.localhost|\.local|\.internal|\.lan)$/u.test(host)) return true;
-  if (host.includes(':')) return /^(?:::|f[cd][0-9a-f]*:|fe[89ab][0-9a-f]*:)/iu.test(host);
-  if (!host.includes('.')) return true;
-  const octets = host.split('.');
-  if (octets.length !== 4 || !octets.every(part => /^\d{1,3}$/u.test(part) && Number(part) <= 255)) return false;
-  const [a, b] = octets.map(Number);
-  return a === 0 || a === 10 || a === 127 || a === 169 && b === 254 ||
-    a === 172 && b >= 16 && b <= 31 || a === 192 && b === 168 || a === 100 && b >= 64 && b <= 127;
-}
-
-// The scripts the README Development section shows; each is required only when the managed package-scripts template of the
-// profile (packages/hfs/templates/<profile>/package-scripts/package.json, the one source of the managed script names) has it.
-const DEVELOPMENT_SCRIPTS = ['typecheck', 'lint', 'build', 'test'];
-/** The README command that runs a managed script: `npm test` for test, `npm run <name>` for the others (never a longer script name that starts with it). */
-function scriptCommand(name) {
-  const escaped = name.replace(/[.*+?^${}()|[\]\\]/gu, String.raw`\$&`);
-  return new RegExp(name === 'test' ? String.raw`npm (?:run test|test)(?![\w:-])` : String.raw`npm run ${escaped}(?![\w:-])`, 'u');
-}
-
 /** Presentation checks shared by the product HFS gate and this runtime's own standalone gate. */
 export function checkRepoPresentation({ root, runtime = false, tree = treeView(root), profile = 'app', edition = 'full' }) {
-  const violations = [];
-  const finding = (ruleId, entry, message, line = 1) => violations.push({ ruleId, path: entry, line, column: 1, message });
-  for (const entry of tree.top) {
-    if (/\.md$/iu.test(entry) && !(runtime ? RUNTIME_ROOT_MARKDOWN : PRODUCT_ROOT_MARKDOWN).has(entry))
-      finding('HFS_ROOT_MARKDOWN_FORBIDDEN', entry, `Root Markdown ${entry} belongs under docs/ or the owning Work record.`);
-    if (NON_NPM_ENTRIES.has(entry))
-      finding('HFS_PACKAGE_MANAGER_MIXED', entry, `${entry} contradicts the npm package manager contract.`);
-  }
-  for (const entry of ['.gitattributes', 'README.md']) {
-    if (!tree.hasFile(entry)) finding('HFS_ROOT_ENTRY_MISSING', entry, `Repository presentation requires root ${entry}.`);
-  }
-  if (tree.hasFile('package.json')) {
-    try {
-      const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
-      if (pkg.packageManager && !/^npm@\d/u.test(pkg.packageManager))
-        finding('HFS_PACKAGE_MANAGER_MIXED', 'package.json', `packageManager ${pkg.packageManager} contradicts the npm package-lock.json contract.`);
-    } catch { /* The repository's package/config checks own unreadable or invalid JSON. */ }
-  }
-  if (!tree.hasFile('README.md')) return { violations, coverage: { status: 'checked', source: tree.source } };
-  let readme;
-  try { readme = fs.readFileSync(path.join(root, 'README.md'), 'utf8'); }
-  catch {
-    finding('HFS_ROOT_ENTRY_MISSING', 'README.md', 'Tracked README.md is not readable.');
-    return { violations, coverage: { status: 'checked', source: tree.source } };
-  }
-  const lines = readme.split(/\r?\n/u);
-  const name = runtime ? 'StarCi' : repositoryName(root);
-  if (lines[0].trim().toLowerCase() !== `# ${name}`.toLowerCase())
-    finding('HFS_README_TITLE_INVALID', 'README.md', `README.md must start with # ${name}.`);
-  const description = lines.slice(1).find(line => line.trim());
-  if (!description || /^\s*(?:#|!\[|\[!\[)/u.test(description) || description.trim().length > 240)
-    finding('HFS_README_DESCRIPTION_INVALID', 'README.md', 'Place one concise description line directly below the repository name.');
-  const headings = lines.map((line, index) => ({ name: /^## (.+?)\s*$/u.exec(line)?.[1], index })).filter(item => item.name);
-  const required = [...README_SECTIONS, ...(tree.hasDir('.starciwork') ? ['Work'] : [])];
-  let previous = -1;
-  for (const section of required) {
-    const found = headings.find(item => item.name === section);
-    if (!found) finding('HFS_README_SECTION_MISSING', 'README.md', `README.md requires a ## ${section} section.`);
-    else if (found.index <= previous) finding('HFS_README_SECTION_ORDER', 'README.md', `## ${section} must follow the preceding standard section.`, found.index + 1);
-    else previous = found.index;
-  }
-  const sectionBody = section => {
-    const start = headings.find(item => item.name === section)?.index;
-    if (start === undefined) return '';
-    const end = headings.find(item => item.index > start)?.index ?? lines.length;
-    return lines.slice(start + 1, end).join('\n');
-  };
-  if (!runtime && headings.some(item => item.name === 'Development')) {
-    const development = sectionBody('Development');
-    const scripts = DEVELOPMENT_SCRIPTS.filter(name => managedScriptNames(profile, edition).has(name));
-    const commands = [/npm (?:ci|install)/u, ...scripts.map(scriptCommand)];
-    if (commands.some(command => !command.test(development))) finding('HFS_README_DEVELOPMENT_INCOMPLETE', 'README.md', 'Development must show npm install and the managed script commands: ' + scripts.map(name => (name === 'test' ? 'npm test' : `npm run ${name}`)).join(', ') + '.');
-  }
-  if (tree.hasDir('.starciwork') && headings.some(item => item.name === 'Work') &&
-      !/\.starciwork\b/u.test(sectionBody('Work')))
-    finding('HFS_README_WORK_POINTER_MISSING', 'README.md', 'Work must point at the backend .starciwork tree.');
-  let fenced = false;
-  lines.forEach((line, index) => {
-    if (/^\s*```/u.test(line)) { fenced = !fenced; return; }
-    if (fenced) return;
-    const prose = line.replace(/`[^`]*`/gu, '');
-    for (const match of prose.matchAll(/https?:\/\/[^\s<>)"']+/giu)) {
-      const value = match[0].replace(/[.,;!?]+$/u, '');
-      try {
-        if (privateHost(new URL(value).hostname))
-          finding('HFS_README_PRIVATE_URL', 'README.md', `README URL ${value} points at a local or private host.`, index + 1);
-      } catch { /* Malformed URLs are outside this presentation rule. */ }
-    }
-    const badgeTargets = [
-      ...[...prose.matchAll(/!\[([^\]]*)\]\(([^)]+)\)/gu)].map(match => ({ alt: match[1], target: match[2] })),
-      ...[...prose.matchAll(/<img\b[^>]*>/giu)].map(match => ({
-        alt: /\balt=["']([^"']*)["']/iu.exec(match[0])?.[1] ?? '',
-        target: /\bsrc=["']([^"']*)["']/iu.exec(match[0])?.[1] ?? '',
-      })),
-    ];
-    for (const { alt, target: rawTarget } of badgeTargets) {
-      const target = rawTarget.trim().replace(/^<|>$/gu, '');
-      if (!/badge/iu.test(alt) && !/badge|shields\.io|badgen\.net/iu.test(target)) continue;
-      try {
-        const url = new URL(target);
-        if (url.protocol !== 'https:' || privateHost(url.hostname) ||
-            /^(?:img\.shields\.io|badgen\.net)$/iu.test(url.hostname) && url.pathname.startsWith('/badge/'))
-          finding('HFS_README_BADGE_NOT_LIVE', 'README.md', `Badge ${target} must represent a live external HTTPS service.`, index + 1);
-      } catch { finding('HFS_README_BADGE_NOT_LIVE', 'README.md', `Badge ${target} must use a live external HTTPS service.`, index + 1); }
-    }
-  });
-  return { violations, coverage: { status: 'checked', source: tree.source } };
+  return checkRepoPresentationImpl({ root, runtime, tree, profile, edition, nonNpmEntries: NON_NPM_ENTRIES });
 }
-
-// Owner ruling 2026-09-29 (layout 2026-09-30): integration, e2e and contract run MANUALLY only. No hook, default typecheck,
-// coverage run or automatic CI trigger may include those trees or run those projects. Linting the e2e files is not running them: ESLint reads them
-// as syntax in the one repository-wide lint run (the factory's e2e block), so no `lint:e2e` command exists to judge.
-const E2E_COMMAND = /\btest:(?:e2e|integration|contract)\b|\btypecheck:tests\b|--selectProjects\s+(?:e2e|integration|contract)\b|src\/tests\/(?:world|integration|e2e|contract)\b|jest[^\n|&;]*(?:e2e|integration|contract)/u;
-const UNIT_RUN_SCRIPTS = ['test', 'test:unit', 'test:ci', 'test:affected', 'test:coverage', 'test:cov'];
-// An --ignore-pattern names the e2e tree to keep it OUT of a command; it is not a run of e2e.
-const runsE2e = text => E2E_COMMAND.test(String(text).replace(/--ignore-pattern[= ]+(?:"[^"]*"|'[^']*'|\S+)/gu, ''));
-const withoutComments = text => text.split('\n').filter(line => !/^\s*#/u.test(line)).join('\n');
-
-const readText = readTextFile;
-
-// A repository-local core.hooksPath that points anywhere but husky's own directory switches the commit and push
-// hooks off for that clone (a lane once redirected it to skip husky), so the gate every other clone runs never ran.
-// Husky itself sets core.hooksPath to .husky/_ ; that value and .husky are the only ones allowed.
-const HUSKY_HOOKS_PATH = /^\.husky(?:\/_)?\/?$/u;
-
-/** A directory that is not the top level of its own work tree has no hooks of its own: the check is not applicable there. */
-function hooksPathNotRedirected({ root, finding }) {
-  if (!ownsGitTopLevel(root)) return { status: 'not-applicable', reason: 'the checked root is not the top level of its own Git work tree, so it has no hooks of its own' };
-  const set = configGet(root, 'core.hooksPath', { local: true });
-  if (!set.ok) return { status: 'checked' }; // key not set: nothing is redirected
-  const value = set.stdout;
-  if (value && !HUSKY_HOOKS_PATH.test(value.replaceAll('\\', '/')))
-    finding('HFS_HOOKS_PATH_REDIRECTED', '.git/config', `core.hooksPath is set to ${value} in this clone. Unset it (git config --local --unset core.hooksPath) and let husky own the hooks; a redirected path skips the pre-commit and pre-push gates.`);
-  return { status: 'checked' };
-}
-
-/**
- * The app root's automatic gates never run integration, e2e or contract: the husky hooks and the root scripts they call, the unit
- * scripts over the be side's jest configuration (`jestConfig`, app-relative), and the workflows that start on push or pull_request.
- */
-function e2eInAutomaticGate({ root, tree, jestConfig, finding }) {
-  const rule = 'HFS_E2E_IN_AUTOMATIC_GATE';
-  let pkg = null;
-  try { pkg = JSON.parse(readText(root, 'package.json') ?? ''); } catch { /* the package checks own invalid JSON */ }
-  const scripts = pkg?.scripts ?? {};
-  // 1. Husky hooks and the scripts they call (transitively through `npm run <script>`).
-  const pending = [];
-  for (const hook of ['.husky/pre-commit', '.husky/pre-push']) {
-    const text = readText(root, hook);
-    if (text === null) continue;
-    const body = withoutComments(text);
-    if (runsE2e(body)) finding(rule, hook, `${hook} runs integration, e2e or contract. They are manual only; hooks run unit, lint and typecheck.`);
-    for (const match of body.matchAll(/npm\s+run\s+([\w:.-]+)/gu)) pending.push(match[1]);
-  }
-  const lintStaged = pkg?.['lint-staged'];
-  if (lintStaged && runsE2e(Object.values(lintStaged).flat().join('\n'))) finding(rule, 'package.json', 'lint-staged runs an integration, e2e or contract command. They are manual only.');
-  const called = new Set();
-  for (const name of pending) {
-    if (called.has(name)) continue;
-    called.add(name);
-    const command = scripts[name];
-    if (typeof command !== 'string') continue;
-    if (runsE2e(command)) finding(rule, 'package.json', `Script ${name} is run by a husky hook and touches integration, e2e or contract. They are manual only.`);
-    for (const match of command.matchAll(/npm\s+run\s+([\w:.-]+)/gu)) pending.push(match[1]);
-  }
-  // 2. Unit and coverage scripts over the be side's jest configuration select the unit project only and exclude src/tests.
-  if (tree.hasFile(jestConfig)) {
-    for (const name of UNIT_RUN_SCRIPTS) {
-      const command = scripts[name];
-      if (typeof command === 'string' && /\bjest\b/u.test(command) && !/--selectProjects\s+unit\b/u.test(command))
-        finding(rule, 'package.json', `Script ${name} runs jest without --selectProjects unit and would run the integration, e2e or contract project.`);
+function checkSideRootEntries(state) {
+  const { tree, profile, frontend, backend, allowed, finding } = state;
+  // The README, the hooks, the workflows and the scripts are the app root's (checkAppRoot); a side folder is judged as the old
+  // repository root it stands for, less those.
+  for (const entry of [...tree.top].sort(byCodeUnit)) {
+    if (NON_NPM_ENTRIES.has(entry) || /\.md$/iu.test(entry)) continue;
+    if (entry === '.starcistacks') { finding('HFS_STACKS_IN_SIDE', entry, `The ${profile} side must not hold .starcistacks; stack declarations and sealed custody live in the app root .starcistacks.`); continue; }
+    if (frontend && !backend) {
+      if (entry === '.starciwork') { finding('HFS_WORK_IN_FE', entry, 'The fe side must not hold a .starciwork tree; Work records live in the app root .starciwork.'); continue; }
+      if (entry === 'src') { finding('HFS_ROOT_SRC_FORBIDDEN_FE', entry, 'The fe side keeps source only under apps/<app>/src; the fe/src/ tree must move.'); continue; }
     }
-    const jestText = readText(root, jestConfig) ?? '';
-    if (/collectCoverageFrom/u.test(jestText) && !/!src\/tests\/(?:\*\*|e2e)/u.test(jestText))
-      finding(rule, jestConfig, 'collectCoverageFrom must exclude src/tests/** so no integration, e2e or contract file counts toward coverage.');
-  }
-  // 3. A workflow that starts on push or pull_request never runs e2e.
-  for (const file of tree.files().filter(entry => /^\.github\/workflows\/[^/]+\.ya?ml$/u.test(entry))) {
-    const text = readText(root, file);
-    if (text === null) continue;
-    const trigger = /^on:.*(?:\n(?:[ \t].*)?$)*/mu.exec(text)?.[0] ?? '';
-    if (!/\b(?:push|pull_request)\b/u.test(trigger)) continue;
-    if (runsE2e(withoutComments(text)))
-      finding(rule, file, `${file} runs e2e on push or pull_request. Move the e2e job to its own workflow with on: workflow_dispatch only.`);
+    if (frontend && !backend && (isFeTestPath(entry) || isFeTestPath(`${entry}/x`))) continue;
+    if (!state.allowed.has(entry)) finding('HFS_ROOT_ENTRY_FORBIDDEN', entry, `Root entry ${entry} of the ${profile} side is not in the slots of the ${profile} side.`);
   }
 }
 
-/** The be side's default tsconfig excludes the world, integration, e2e and contract trees (they are checked by src/tests/tsconfig.json). */
-function testTreesOutOfDefaultProgram({ root, tree, finding }) {
-  const rule = 'HFS_E2E_IN_AUTOMATIC_GATE';
-  const tsconfigText = readText(root, 'tsconfig.json');
-  let tsconfig = null;
-  try { tsconfig = tsconfigText === null ? null : JSON.parse(tsconfigText); } catch { /* the typecheck itself owns parsing */ }
-  if (tsconfig) {
-    const excludedText = JSON.stringify(tsconfig.exclude ?? []);
-    const excludesTestTrees = ['world', 'integration', 'e2e', 'contract'].every(tree => excludedText.includes(`src/tests/${tree}`));
-    const defaultAll = tsconfig.include === undefined && tsconfig.files === undefined;
-    const files = tree.files();
-    if (files.some(file => /^src\/tests\/(?:world|integration|e2e|contract)\/.+\.[cm]?tsx?$/u.test(file)) && !excludesTestTrees &&
-        (defaultAll || JSON.stringify(tsconfig.include ?? []).includes('src')))
-      finding(rule, 'tsconfig.json', 'The default tsconfig includes src/tests/{world,integration,e2e,contract}/**. Exclude those trees and check them with src/tests/tsconfig.json (typecheck:tests).');
+function checkRequiredRootEntries(state) {
+  for (const entry of [...requiredRootEntries(state.resolver)].sort(byCodeUnit)) {
+    if (entry === 'apps') continue;
+    if (!state.tree.top.includes(entry)) state.finding('HFS_ROOT_ENTRY_MISSING', entry, `The ${state.profile} side requires root entry ${entry}.`);
+  }
+}
+
+function checkApplicationRequiredFiles(state, app) {
+  const { tree, backend, frontend, resolver, finding } = state;
+  const missing = [];
+  if (!tree.hasDir(`apps/${app}`)) {
+    finding('HFS_APP_LAYOUT_INVALID', `apps/${app}`, `Application entry apps/${app} must be a directory.`);
+    return;
+  }
+  if (!tree.hasDir(`apps/${app}/src`)) missing.push('src/');
+  // A back-end app must hold exactly what the slot of its kind requires (each kind's slot names its own requires).
+  if (backend) for (const required of resolver.requiredFiles(`apps/${app}/src/main.ts`)) {
+    const directory = required.endsWith('/');
+    if (!(directory ? tree.hasDir(required.slice(0, -1)) : tree.hasFile(required))) missing.push(required.slice(`apps/${app}/`.length));
+  }
+  // next-env.d.ts is generated by Next and commonly ignored by Git; it is not
+  // a reliable tracked-tree input.
+  // A front-end app holds the files its slot requires at its own root (next.config.ts, tsconfig.json, ...; it has no package.json).
+  if (frontend) for (const required of resolver.requiredFiles(`apps/${app}/next.config.ts`).filter(entry => !entry.slice(`apps/${app}/`.length).includes('/'))) {
+    if (!tree.hasFile(required)) missing.push(required.slice(`apps/${app}/`.length));
+  }
+  if (missing.length) finding('HFS_APP_LAYOUT_INVALID', `apps/${app}`, `Application apps/${app} lacks ${missing.join(', ')} required by the HFS app layout.`);
+}
+
+function checkApplications(state) {
+  const { tree, finding } = state;
+  const apps = tree.children('apps').sort(byCodeUnit);
+  if (!tree.hasDir('apps') || apps.length === 0)
+    finding('HFS_APPS_REQUIRED', 'apps', 'Every HFS repository is an apps/<app>/ monorepo; apps/ must hold at least one application.');
+  for (const app of apps) checkApplicationRequiredFiles(state, app);
+  return apps;
+}
+
+function checkBackendSourceLayout(state) {
+  if (!state.backend) return;
+  const { tree, resolver, finding } = state;
+  for (const child of tree.children('src').sort(byCodeUnit)) {
+    if (!BACKEND_SRC_CHILDREN.has(child))
+      finding('HFS_SRC_LAYOUT_INVALID', `src/${child}`, `Backend src/ holds only features/, modules/ and tests/; ${child} must move to its owner.`);
+  }
+  for (const tier of tree.children('src/modules').sort(byCodeUnit)) {
+    if (!moduleTiersOf(resolver).has(tier))
+      finding('HFS_MODULE_TIER_INVALID', `src/modules/${tier}`, `Module tier ${tier} is not one of ${[...moduleTiersOf(resolver)].sort(byCodeUnit).join(', ')}.`);
+  }
+  const testChildren = slotTestChildren(resolver);
+  for (const child of tree.children('src/tests').sort(byCodeUnit)) {
+    // A file directly below src/tests/ that a slot owns (src/tests/tsconfig.json, be.tool-config) is that slot's, not a stray folder.
+    if (!testChildren.has(child) && resolver.classifyPath(`src/tests/${child}`).status !== 'owned')
+      finding('HFS_SRC_LAYOUT_INVALID', `src/tests/${child}`, `Backend src/tests/ holds only ${[...testChildren].join(', ')} and the files a slot owns there; ${child} must move.`);
+  }
+}
+
+function checkTestTopology(state) {
+  // Test kinds and folders that do not exist: int-spec, harness-spec, src/tests/harness and live/;
+  // a backend spec sits by its kind (beside its subject, or under src/tests/{integration,e2e,contract}/).
+  for (const file of state.tree.files()) {
+    if (UNSUPPORTED_TEST_SUFFIX.test(file))
+      state.finding('BE_TEST_TOPOLOGY', file, `${file} uses an unsupported test kind. Only unit *.spec.ts, *.integration-spec.ts, *.e2e-spec.ts and *.contract-spec.ts exist, each in its own folder under src/tests/.`);
+    else if (state.backend && UNSUPPORTED_TEST_FOLDER.test(file))
+      state.finding('BE_TEST_TOPOLOGY', file, `${file} sits in an unsupported test folder. Unit specs sit beside their subject, flows go under src/tests/e2e/<area>/ and test infrastructure under src/tests/world/.`);
+    else if (state.backend && file.startsWith('src/tests/') && EXTRA_TEST_CONFIG.test(file))
+      state.finding('BE_TEST_TOPOLOGY', file, `${file} is a per-lane test config. One root jest.config.js declares exactly the unit, integration, e2e and contract projects.`);
   }
 }
 
@@ -401,94 +290,16 @@ export function checkHfs(config) {
   const finding = (ruleId, entry, message) => violations.push({ ruleId, path: entry, line: 1, column: 1, message });
   const profile = backend ? 'be' : 'fe';
   const resolver = resolverOf(config.root, profile, config.hfs);
-  // The README, the hooks, the workflows and the scripts are the app root's (checkAppRoot); a side folder is judged as the old
-  // repository root it stands for, less those.
-  const allowed = slotRootEntries(resolver, profile);
-  for (const entry of [...tree.top].sort(byCodeUnit)) {
-    if (NON_NPM_ENTRIES.has(entry) || /\.md$/iu.test(entry)) continue;
-    if (entry === '.starcistacks') { finding('HFS_STACKS_IN_SIDE', entry, `The ${profile} side must not hold .starcistacks; stack declarations and sealed custody live in the app root .starcistacks.`); continue; }
-    if (frontend && !backend) {
-      if (entry === '.starciwork') { finding('HFS_WORK_IN_FE', entry, 'The fe side must not hold a .starciwork tree; Work records live in the app root .starciwork.'); continue; }
-      if (entry === 'src') { finding('HFS_ROOT_SRC_FORBIDDEN_FE', entry, 'The fe side keeps source only under apps/<app>/src; the fe/src/ tree must move.'); continue; }
-    }
-    if (frontend && !backend && (isFeTestPath(entry) || isFeTestPath(`${entry}/x`))) continue;   // a test entry of a front end is FE_NO_TESTS's, the one finding of that path
-    if (!allowed.has(entry)) {
-      finding('HFS_ROOT_ENTRY_FORBIDDEN', entry, `Root entry ${entry} of the ${profile} side is not in the slots of the ${profile} side.`);
-    }
-  }
-
-  for (const entry of [...requiredRootEntries(resolver)].sort(byCodeUnit)) {
-    if (entry === 'apps') continue;
-    if (!tree.top.includes(entry)) finding('HFS_ROOT_ENTRY_MISSING', entry, `The ${profile} side requires root entry ${entry}.`);
-  }
-
-  const apps = tree.children('apps').sort(byCodeUnit);
-  if (!tree.hasDir('apps') || apps.length === 0) {
-    finding('HFS_APPS_REQUIRED', 'apps', 'Every HFS repository is an apps/<app>/ monorepo; apps/ must hold at least one application.');
-  }
-  for (const app of apps) {
-    const missing = [];
-    if (!tree.hasDir(`apps/${app}`)) {
-      finding('HFS_APP_LAYOUT_INVALID', `apps/${app}`, `Application entry apps/${app} must be a directory.`);
-      continue;
-    }
-    if (!tree.hasDir(`apps/${app}/src`)) missing.push('src/');
-    // A back-end app must hold exactly what the slot of its kind requires (each kind's slot names its own requires).
-    if (backend) for (const required of resolver.requiredFiles(`apps/${app}/src/main.ts`)) {
-      const directory = required.endsWith('/');
-      if (!(directory ? tree.hasDir(required.slice(0, -1)) : tree.hasFile(required))) missing.push(required.slice(`apps/${app}/`.length));
-    }
-    // next-env.d.ts is generated by Next and commonly ignored by Git; it is not
-    // a reliable tracked-tree input.
-    // A front-end app holds the files its slot requires at its own root (next.config.ts, tsconfig.json, ...; it has no package.json).
-    if (frontend) for (const required of resolver.requiredFiles(`apps/${app}/next.config.ts`).filter(entry => !entry.slice(`apps/${app}/`.length).includes('/'))) {
-      if (!tree.hasFile(required)) missing.push(required.slice(`apps/${app}/`.length));
-    }
-    if (missing.length) finding('HFS_APP_LAYOUT_INVALID', `apps/${app}`, `Application apps/${app} lacks ${missing.join(', ')} required by the HFS app layout.`);
-  }
-
-  if (backend) {
-    for (const child of tree.children('src').sort(byCodeUnit)) {
-      if (!BACKEND_SRC_CHILDREN.has(child)) {
-        finding('HFS_SRC_LAYOUT_INVALID', `src/${child}`, `Backend src/ holds only features/, modules/ and tests/; ${child} must move to its owner.`);
-      }
-    }
-    for (const tier of tree.children('src/modules').sort(byCodeUnit)) {
-      if (!moduleTiersOf(resolver).has(tier)) {
-        finding('HFS_MODULE_TIER_INVALID', `src/modules/${tier}`, `Module tier ${tier} is not one of ${[...moduleTiersOf(resolver)].sort(byCodeUnit).join(', ')}.`);
-      }
-    }
-    const testChildren = slotTestChildren(resolver);
-    for (const child of tree.children('src/tests').sort(byCodeUnit)) {
-      // A file directly below src/tests/ that a slot owns (src/tests/tsconfig.json, be.tool-config) is that slot's, not a stray folder.
-      if (!testChildren.has(child) && resolver.classifyPath(`src/tests/${child}`).status !== 'owned') {
-        finding('HFS_SRC_LAYOUT_INVALID', `src/tests/${child}`, `Backend src/tests/ holds only ${[...testChildren].join(', ')} and the files a slot owns there; ${child} must move.`);
-      }
-    }
-  }
-
-  // Test kinds and folders that do not exist: int-spec, harness-spec, src/tests/harness and live/;
-  // a backend spec sits by its kind (beside its subject, or under src/tests/{integration,e2e,contract}/).
-  for (const file of tree.files()) {
-    if (UNSUPPORTED_TEST_SUFFIX.test(file))
-      finding('BE_TEST_TOPOLOGY', file, `${file} uses an unsupported test kind. Only unit *.spec.ts, *.integration-spec.ts, *.e2e-spec.ts and *.contract-spec.ts exist, each in its own folder under src/tests/.`);
-    else if (backend && UNSUPPORTED_TEST_FOLDER.test(file))
-      finding('BE_TEST_TOPOLOGY', file, `${file} sits in an unsupported test folder. Unit specs sit beside their subject, flows go under src/tests/e2e/<area>/ and test infrastructure under src/tests/world/.`);
-    else if (backend && file.startsWith('src/tests/') && EXTRA_TEST_CONFIG.test(file))
-      finding('BE_TEST_TOPOLOGY', file, `${file} is a per-lane test config. One root jest.config.js declares exactly the unit, integration, e2e and contract projects.`);
-  }
-
+  const state = { config, tree, violations, finding, backend, frontend, profile, resolver, allowed: slotRootEntries(resolver, profile) };
+  checkSideRootEntries(state);
+  checkRequiredRootEntries(state);
+  const apps = checkApplications(state);
+  checkBackendSourceLayout(state);
+  checkTestTopology(state);
   if (backend) testTreesOutOfDefaultProgram({ root: config.root, tree, finding });
-
   return {
     violations,
-    coverage: {
-      status: 'checked',
-      source: tree.source,
-      rootEntries: tree.top.length,
-      apps,
-      ruleIds: [...HFS_RULE_IDS],
-    },
+    coverage: { status: 'checked', source: tree.source, rootEntries: tree.top.length, apps, ruleIds: [...HFS_RULE_IDS] },
   };
 }
 
