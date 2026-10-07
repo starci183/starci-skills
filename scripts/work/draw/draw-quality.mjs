@@ -118,11 +118,18 @@ export function internalCopyOf(lines) {
   return out;
 }
 
-const CONTROL_RX = /<(button)\b|<a\b[^>]*\bhref=|<select\b|<input\b[^>]*\btype=["']?(submit|button|checkbox|radio)|\brole=["'](button|link|tab|menuitem|switch|checkbox|radio)["']/gi;
+const CONTROL_RX = new RegExp([
+  String.raw`<(button)\b`,
+  String.raw`<a\b[^>]*\bhref=`,
+  String.raw`<select\b`,
+  String.raw`<input\b[^>]*\btype=["']?(submit|button|checkbox|radio)`,
+  String.raw`\brole=["'](button|link|tab|menuitem|switch|checkbox|radio)["']`
+].join('|'), 'gi');
 /** How many controls a render source draws. */
 export const controlCountOf = (html) => (String(html).match(CONTROL_RX) ?? []).length;
 
-const COMMAND_RX = /\b(activates?|selects?|clicks?|press(?:es)?|opens?|chooses?|submits?|taps?|confirms?|cancels?|retries|installs?|uninstalls?|configures?|toggles?|enters?|types?)\b/i;
+const COMMAND_WORDS = ['activates?', 'selects?', 'clicks?', 'press(?:es)?', 'opens?', 'chooses?', 'submits?', 'taps?', 'confirms?', 'cancels?', 'retries', 'installs?', 'uninstalls?', 'configures?', 'toggles?', 'enters?', 'types?'];
+const COMMAND_RX = new RegExp(String.raw`\b(${COMMAND_WORDS.join('|')})\b`, 'i');
 const ACTOR_RX = new RegExp(String.raw`^\s*(the\s+)?(owner|user|member|admin|administrator|actor|viewer|operator|person|customer|visitor|${altOf('drawCopy.actor')})\b`, 'i');
 /** The commands a person leaves `state` by: ui.flow transitions from it whose trigger is an actor's command. */
 export function commandsFrom(record, state) {
@@ -135,7 +142,8 @@ export function commandsFrom(record, state) {
 
 // A badge class is the whole token: `tag-group`, `tag-group__list` or `starci-core-badge-dot` (a real grammar render's
 // TagGroup root and Badge dot) are not badges; a vendor variant class is BEM (`chip--success`, `tag--default`).
-const BADGE_RX = /<([a-z][a-z0-9-]*)\b([^>]*\b(?:class|data-slot|data-component)=["'][^"']*\b(?:badge|chip|status-pill|pill|tag)(?![\w-])[^"']*["'][^>]*)>([\s\S]*?)<\/\1>/gi;
+const BADGE_OPEN_PATTERN = String.raw`<([a-z][a-z0-9-]*)\b([^>]*\b(?:class|data-slot|data-component)=["'][^"']*\b(?:badge|chip|status-pill|pill|tag)(?![\w-])[^"']*["'][^>]*)>`;
+const BADGE_RX = new RegExp(String.raw`${BADGE_OPEN_PATTERN}([\s\S]*?)<\/\1>`, 'gi');
 const TONES = ['success', 'warning', 'danger', 'error', 'info', 'accent', 'primary', 'secondary', 'neutral', 'default', 'muted'];
 const TONE_RX = new RegExp(String.raw`\b(?:data-tone|tone|color|variant)=["'](${TONES.join('|')})["']|\b(?:text|bg|border|badge|chip|tag|tone)--?(${TONES.join('|')})\b|var\(--[\w-]*(${TONES.join('|')})[\w-]*\)`, 'i');
 const SUCCESS_WORDS = new RegExp(String.raw`\b(installed|active|ready|confirmed|enabled|connected|healthy|succeeded|success)\b|${altOf('drawCopy.success')}`, 'i');
@@ -161,6 +169,35 @@ function rowHashes(img) {
   return out;
 }
 
+/** The index of the first row of `ha` and `hb` (the first `n` rows) that differ, or `n`. */
+function firstDifferingRow(ha, hb, n) {
+  let top = 0;
+  while (top < n && ha[top] === hb[top]) top += 1;
+  return top;
+}
+
+/** The rows of the differing band when `x` and `y` shifted by `d` agree over at least a fifth of the image, else null. */
+function shiftedBandRows(x, y, d, top, end, H) {
+  let k = end - 1;
+  while (k >= top && x[k] === y[k + d]) k -= 1;
+  const matched = end - 1 - k;
+  return matched < H / 5 ? null : (k - top + 1) + d;
+}
+
+/** The smallest differing band over both shift directions: {rows, shift} or null (rows above `top` agree). */
+function bestShiftedMatch(ha, hb, top, H, maxShift) {
+  let best = null;
+  for (const [x, y, sign] of [[ha, hb, 1], [hb, ha, -1]]) {
+    for (let d = 0; d <= maxShift; d += 1) {
+      const end = Math.min(x.length, y.length - d);
+      if (end - top < H / 5) break;
+      const rows = shiftedBandRows(x, y, d, top, end, H);
+      if (rows !== null && (!best || rows < best.rows)) best = { rows, shift: sign * d };
+    }
+  }
+  return best;
+}
+
 /**
  * Whether two decoded images of one width differ only in one horizontal band: the rows above the first difference
  * agree, and below the band the rest agrees at some vertical shift (a banner that pushes the list down; with a fixed
@@ -171,23 +208,9 @@ export function statusBandOf(a, b) {
   if (!a || !b || a.width !== b.width) return null;
   const ha = rowHashes(a), hb = rowHashes(b);
   const H = Math.max(a.height, b.height), n = Math.min(a.height, b.height);
-  let top = 0;
-  while (top < n && ha[top] === hb[top]) top += 1;
+  const top = firstDifferingRow(ha, hb, n);
   if (top === a.height && a.height === b.height) return { band: [top, top], share: 0, shift: 0 };
-  const maxShift = Math.floor(H * STATUS_BAND_MAX);
-  let best = null;
-  for (const [x, y, sign] of [[ha, hb, 1], [hb, ha, -1]]) {
-    for (let d = 0; d <= maxShift; d += 1) {
-      const end = Math.min(x.length, y.length - d);
-      if (end - top < H / 5) break;
-      let k = end - 1;
-      while (k >= top && x[k] === y[k + d]) k -= 1;
-      const matched = end - 1 - k;
-      if (matched < H / 5) continue;
-      const rows = (k - top + 1) + d;
-      if (!best || rows < best.rows) best = { rows, shift: sign * d };
-    }
-  }
+  const best = bestShiftedMatch(ha, hb, top, H, Math.floor(H * STATUS_BAND_MAX));
   if (!best) return null;
   const share = best.rows / H;
   return share <= STATUS_BAND_MAX ? { band: [top, top + best.rows], share, shift: best.shift } : null;
@@ -195,23 +218,18 @@ export function statusBandOf(a, b) {
 
 const decodeOrNull = (file) => { try { const img = decodePng(fs.readFileSync(file)); return img?.data ? img : null; } catch { return null; } };
 
-/** The quality findings of one ui record: [{code, path, detail}]. `recordDir` absolute, `repo` for shown paths. */
-export function drawQualityFindings(recordDir, record, repo) {
-  const out = [];
-  const at = (rel) => slash(path.join(path.relative(repo, recordDir), rel));
-  const shapes = list(record?.ui?.shapes);
-  const baseOf = new Map(shapes.map((s) => [String(s?.state), String(s?.base ?? '')]));
-  const nonDerivable = new Set(shapes.filter((s) => s?.nonDerivable).map((s) => String(s.state)));
-  const live = assetsOf(record).filter((a) => !a.retired && a.selected !== false && PART_ROLES.has(a.role) && a.generation?.tool === DRAW_TOOL);
+const readJsonOrNull = (file) => { try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return null; } };
+const pushFindings = (out, rel, findings) => { for (const f of findings) out.push({ code: f.code, path: rel, detail: f.detail }); };
+
+/** Scope: a full-page composite is never the drawing. */
+function fullPageFindings(live, record, baseOf, at, out) {
   const layoutRecord = [record?.surface, ...Object.values(record?.surface && typeof record.surface === 'object' ? record.surface : {})].includes('layout');
+  if (layoutRecord) return;
+  for (const a of live.filter(isComposite)) out.push({ code: DRAW_SCOPE_FULL_PAGE, path: at(a.path), detail: `${a.path} is a full-page composite bound as a drawing: interface.draw draws only the XBase content (${baseOf.get(assetStateOf(record, a)) || '<XBase>'}#${assetStateOf(record, a) ?? '<state>'}--<breakpoint>--<theme>.png); the layout chrome is the layout's` });
+}
 
-  // Scope: a full-page composite is never the drawing.
-  if (!layoutRecord) {
-    for (const a of live.filter(isComposite)) out.push({ code: DRAW_SCOPE_FULL_PAGE, path: at(a.path), detail: `${a.path} is a full-page composite bound as a drawing: interface.draw draws only the XBase content (${baseOf.get(assetStateOf(record, a)) || '<XBase>'}#${assetStateOf(record, a) ?? '<state>'}--<breakpoint>--<theme>.png); the layout chrome is the layout's` });
-  }
-  const parts = live.filter((a) => !isComposite(a));
-
-  // Duplicate shapes: same XBase, breakpoint and theme, one status band apart.
+/** The derivable parts grouped by XBase, breakpoint and theme: Map(key -> [{a, state}]). */
+function shapeGroupsOf(parts, record, baseOf, nonDerivable) {
   const groups = new Map();
   for (const a of parts) {
     const state = assetStateOf(record, a);
@@ -220,6 +238,12 @@ export function drawQualityFindings(recordDir, record, repo) {
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push({ a, state });
   }
+  return groups;
+}
+
+/** Duplicate shapes: same XBase, breakpoint and theme, one status band apart. */
+function duplicateShapeFindings(parts, { record, recordDir, baseOf, nonDerivable, at }, out) {
+  const groups = shapeGroupsOf(parts, record, baseOf, nonDerivable);
   for (const [key, members] of groups) {
     const [base, bp, theme] = key.split('|');
     const seen = new Set();
@@ -232,97 +256,134 @@ export function drawQualityFindings(recordDir, record, repo) {
       out.push({ code: SHAPE_DUPLICATE, path: at(imgs[j].a.path), detail: `${base}#${imgs[j].state} and ${base}#${imgs[i].state} at ${bp}/${theme} are one layout: they differ only in rows ${band.band[0]}-${band.band[1]} (${Math.round(band.share * 100)}% of the image, a status band) - that is a data status the slot renders through SlotView (ui.dataStatus), not a second shape` });
     }
   }
+}
 
-  // Per part: controls for the commands, copy, badges, score; the DNA gate and the taste metrics (draw-dna.mjs,
-  // draw-taste.mjs; owner rulings 2026-09-27), once per render source, the accent budget per part image.
-  const judgedStates = new Set();
-  const judgedSources = new Set();
-  const dna = parts.length ? loadDna() : null;
-  const settings = parts.length ? drawLoopSettings() : null;
-  const resolve = parts.length ? ruleResolver({ workRoot: workRootOf(recordDir), record, repoRoot: repo }) : null;
-  for (const a of parts) {
-    const state = assetStateOf(record, a);
-    const src = renderSourceOf(recordDir, a.path);
-    const rel = at(a.path);
-    if (!src) {
-      out.push({ code: DRAW_SCORE_BELOW, path: rel, detail: `${a.path} has no render source (.html) beside it: nothing can score, count its controls or read its copy` });
-      continue;
-    }
-    const html = fs.readFileSync(src, 'utf8');
-    if (state && !judgedStates.has(`${state}|${breakpointOf(a)}`)) {
-      judgedStates.add(`${state}|${breakpointOf(a)}`);
-      const commands = commandsFrom(record, state);
-      const controls = controlCountOf(html);
-      if (commands.length && controls < commands.length) out.push({ code: DRAW_ACTION_MISSING, path: rel, detail: `${state} is left by ${commands.length} command(s) (${commands.map((c) => c.id ?? c.trigger).join(', ')}) but its render draws ${controls} control(s): every FR command of the surface is a control` });
-    }
-    const leaks = internalCopyOf(visibleTextOf(html));
-    if (leaks.length) {
-      const examples = leaks.slice(0, 5).map((l) => `"${l.match}" (${l.why})`).join('; ');
-      const more = leaks.length > 5 ? ` (+${leaks.length - 5})` : '';
-      out.push({ code: DRAW_COPY_INTERNAL, path: rel, detail: `${a.path} shows internal copy: ${examples}${more}` });
-    }
-    for (const b of badgesOf(html)) {
-      if (!b.tone) out.push({ code: DRAW_BADGE_UNTONED, path: rel, detail: `${a.path} badge "${b.text}" binds no tone token (data-tone / color= / a tone class / var(--<tone>))` });
-      else if (SUCCESS_WORDS.test(b.text) && b.tone !== 'success') out.push({ code: DRAW_BADGE_UNTONED, path: rel, detail: `${a.path} badge "${b.text}" reads as success but binds tone ${b.tone}` });
-    }
-    if (!judgedSources.has(src)) {
-      judgedSources.add(src);
-      const loopFile = loopFileOfRef(a.generation?.loop);
-      const loopDir = loopFile ? path.dirname(loopFile) : null;
-      const proposals = proposalNamesIn(proposalFilesFor(src, [recordDir, ...(loopDir ? [loopDir] : [])]));
-      let rec0 = null;
-      try { rec0 = JSON.parse(fs.readFileSync(path.join(recordDir, a.path).replace(/.png$/i, '.json'), 'utf8')); } catch { rec0 = null; }
-      if (isComponentSource(src)) {
-        // A real-component part is judged as the draw loop judges it: rendered-DOM ownership from its draw-render record
-        // (every painting element belongs to a grammar component) and the measured anatomy - never the html DNA
-        // attribute gate, which reads every grammar-rendered <div> as unmapped (127 false findings on the reference).
-        const own = rec0?.ownership;
-        if (!own) out.push({ code: 'DRAW_OFF_GRAMMAR_COMPONENT', path: rel, detail: `${a.path} has no rendered-DOM ownership in its draw-render record: redraw it through the draw loop` });
-        else if (own.unownedCount) out.push({ code: 'DRAW_OFF_GRAMMAR_COMPONENT', path: rel, detail: `${path.basename(src)} rendered DOM: ${own.unownedCount} painting element(s) owned by a drawn layout element, not a grammar component - ${list(own.unowned).slice(0, 5).join('; ')}` });
-        for (const f of anatomyFindings(rec0?.anatomy, { label: path.basename(src) })) out.push({ code: f.code, path: rel, detail: f.detail });
-      } else {
-        for (const f of dnaFindings(html, { dna, proposals, label: path.basename(src), assetRequests: assetRequestIdsFor(src, [recordDir]) })) out.push({ code: f.code, path: rel, detail: f.detail });
-      }
-      for (const f of htmlTasteFindings(html, { settings, label: path.basename(src) })) out.push({ code: f.code, path: rel, detail: f.detail });
-      // A component part's decision evidence is <part>.rationale.json (draw-loop finish installs it beside the part).
-      const why = loadRationale(isComponentSource(src) && isFile(`${partStemOf(src)}.rationale.json`) ? `${partStemOf(src)}.rationale.json` : rationaleFileOf(src));
-      let rec = null;
-      try { rec = JSON.parse(fs.readFileSync(path.join(recordDir, a.path).replace(/.png$/i, '.json'), 'utf8')); } catch { rec = null; }
-      const redline = isFile(path.join(recordDir, a.path).replace(/.png$/i, '.redline.png'));
-      for (const f of rationaleFindings({ html, entries: why.entries, errors: why.errors, measures: measuresOf([rec]), resolve, record, dna, label: path.basename(src), redlines: [{ part: a.path, ok: redline }] })) out.push({ code: f.code, path: rel, detail: f.detail });
-    }
-    const accent = accentBudgetOf(path.join(recordDir, a.path), { html, settings, label: a.path });
-    if (accent.finding) out.push({ code: accent.finding.code, path: rel, detail: accent.finding.detail });
-    const component = isComponentSource(src);
-    const scoreFile = `${partStemOf(src)}.score.json`;
-    let score = null;
-    try { score = JSON.parse(fs.readFileSync(scoreFile, 'utf8')); } catch { score = null; }
-    const htmlSha = shaOf(src);
-    if (score?.schema !== SCORE_SCHEMA) {
-      const instruction = component ? 'draw it through the draw loop (starci work draw-loop round, then finish installs <part>.score.json)' : `run starci work ui-proof-brief --surface <record> --repo <product> --score ${path.basename(src)} --viewport <WxH> --json > ${path.basename(scoreFile)}`;
-      out.push({ code: DRAW_SCORE_BELOW, path: rel, detail: `${a.path} has no ui-proof score: ${instruction}` });
-    }
-    // A component part was scored on its bundled harness page, never on the DOM snapshot; its freshness is the settle
-    // re-measure from <part>.draw.tsx (draw-loop-settle.mjs), so only the score's verdict binds here.
-    else if (!component && score.htmlSha256 !== htmlSha) out.push({ code: DRAW_SCORE_BELOW, path: rel, detail: `${path.basename(scoreFile)} scored another version of ${path.basename(src)} (htmlSha256 ${String(score.htmlSha256 ?? 'absent').slice(0, 12)}, now ${String(htmlSha).slice(0, 12)}): score the current render` });
-    else if ((score.summary?.fail ?? 1) > 0) {
-      const failed = [...list(score.spacing), ...list(score.cases)].filter((c) => c?.status === 'fail').map((c) => c.id ?? `${c.rule} ${c.case}`);
-      const examples = failed.slice(0, 6).join('; ');
-      const more = failed.length > 6 ? ` (+${failed.length - 6})` : '';
-      out.push({ code: DRAW_SCORE_BELOW, path: rel, detail: `${a.path} scores ${score.summary.pass} pass / ${score.summary.fail} fail: address the critique (${examples}${more}) and re-score` });
-    }
+/** Every FR command of a state is a control of its render (once per state and breakpoint). */
+function commandControlFindings(a, rel, state, html, judgedStates, record, out) {
+  if (!state || judgedStates.has(`${state}|${breakpointOf(a)}`)) return;
+  judgedStates.add(`${state}|${breakpointOf(a)}`);
+  const commands = commandsFrom(record, state);
+  const controls = controlCountOf(html);
+  if (commands.length && controls < commands.length) out.push({ code: DRAW_ACTION_MISSING, path: rel, detail: `${state} is left by ${commands.length} command(s) (${commands.map((c) => c.id ?? c.trigger).join(', ')}) but its render draws ${controls} control(s): every FR command of the surface is a control` });
+}
+
+/** Internal copy and untoned or mistoned badges of a render. */
+function copyBadgeFindings(a, rel, html, out) {
+  const leaks = internalCopyOf(visibleTextOf(html));
+  if (leaks.length) {
+    const examples = leaks.slice(0, 5).map((l) => `"${l.match}" (${l.why})`).join('; ');
+    const more = leaks.length > 5 ? ` (+${leaks.length - 5})` : '';
+    out.push({ code: DRAW_COPY_INTERNAL, path: rel, detail: `${a.path} shows internal copy: ${examples}${more}` });
   }
+  for (const b of badgesOf(html)) {
+    if (!b.tone) out.push({ code: DRAW_BADGE_UNTONED, path: rel, detail: `${a.path} badge "${b.text}" binds no tone token (data-tone / color= / a tone class / var(--<tone>))` });
+    else if (SUCCESS_WORDS.test(b.text) && b.tone !== 'success') out.push({ code: DRAW_BADGE_UNTONED, path: rel, detail: `${a.path} badge "${b.text}" reads as success but binds tone ${b.tone}` });
+  }
+}
+
+/** A real-component part is judged as the draw loop judges it: rendered-DOM ownership from its draw-render record
+ * (every painting element belongs to a grammar component) and the measured anatomy - never the html DNA
+ * attribute gate, which reads every grammar-rendered <div> as unmapped (127 false findings on the reference). */
+function componentSourceFindings(a, rel, src, rec0, out) {
+  const own = rec0?.ownership;
+  if (!own) out.push({ code: 'DRAW_OFF_GRAMMAR_COMPONENT', path: rel, detail: `${a.path} has no rendered-DOM ownership in its draw-render record: redraw it through the draw loop` });
+  else if (own.unownedCount) out.push({ code: 'DRAW_OFF_GRAMMAR_COMPONENT', path: rel, detail: `${path.basename(src)} rendered DOM: ${own.unownedCount} painting element(s) owned by a drawn layout element, not a grammar component - ${list(own.unowned).slice(0, 5).join('; ')}` });
+  pushFindings(out, rel, anatomyFindings(rec0?.anatomy, { label: path.basename(src) }));
+}
+
+/** The DNA gate, taste metrics and rationale findings of one render source (once per source). */
+function renderSourceFindings(a, rel, src, html, ctx, out) {
+  const { recordDir, record, dna, settings, resolve } = ctx;
+  const loopFile = loopFileOfRef(a.generation?.loop);
+  const loopDir = loopFile ? path.dirname(loopFile) : null;
+  const proposals = proposalNamesIn(proposalFilesFor(src, [recordDir, ...(loopDir ? [loopDir] : [])]));
+  const rec0 = readJsonOrNull(path.join(recordDir, a.path).replace(/.png$/i, '.json'));
+  if (isComponentSource(src)) componentSourceFindings(a, rel, src, rec0, out);
+  else pushFindings(out, rel, dnaFindings(html, { dna, proposals, label: path.basename(src), assetRequests: assetRequestIdsFor(src, [recordDir]) }));
+  pushFindings(out, rel, htmlTasteFindings(html, { settings, label: path.basename(src) }));
+  // A component part's decision evidence is <part>.rationale.json (draw-loop finish installs it beside the part).
+  const why = loadRationale(isComponentSource(src) && isFile(`${partStemOf(src)}.rationale.json`) ? `${partStemOf(src)}.rationale.json` : rationaleFileOf(src));
+  const rec = readJsonOrNull(path.join(recordDir, a.path).replace(/.png$/i, '.json'));
+  const redline = isFile(path.join(recordDir, a.path).replace(/.png$/i, '.redline.png'));
+  pushFindings(out, rel, rationaleFindings({ html, entries: why.entries, errors: why.errors, measures: measuresOf([rec]), resolve, record, dna, label: path.basename(src), redlines: [{ part: a.path, ok: redline }] }));
+}
+
+/** The ui-proof score of a part: missing, stale (html parts) or failing. */
+function scoreFindings(a, rel, src, out) {
+  const component = isComponentSource(src);
+  const scoreFile = `${partStemOf(src)}.score.json`;
+  const score = readJsonOrNull(scoreFile);
+  const htmlSha = shaOf(src);
+  if (score?.schema !== SCORE_SCHEMA) {
+    const instruction = component ? 'draw it through the draw loop (starci work draw-loop round, then finish installs <part>.score.json)' : `run starci work ui-proof-brief --surface <record> --repo <product> --score ${path.basename(src)} --viewport <WxH> --json > ${path.basename(scoreFile)}`;
+    out.push({ code: DRAW_SCORE_BELOW, path: rel, detail: `${a.path} has no ui-proof score: ${instruction}` });
+  }
+  // A component part was scored on its bundled harness page, never on the DOM snapshot; its freshness is the settle
+  // re-measure from <part>.draw.tsx (draw-loop-settle.mjs), so only the score's verdict binds here.
+  else if (!component && score.htmlSha256 !== htmlSha) out.push({ code: DRAW_SCORE_BELOW, path: rel, detail: `${path.basename(scoreFile)} scored another version of ${path.basename(src)} (htmlSha256 ${String(score.htmlSha256 ?? 'absent').slice(0, 12)}, now ${String(htmlSha).slice(0, 12)}): score the current render` });
+  else if ((score.summary?.fail ?? 1) > 0) {
+    const failed = [...list(score.spacing), ...list(score.cases)].filter((c) => c?.status === 'fail').map((c) => c.id ?? `${c.rule} ${c.case}`);
+    const examples = failed.slice(0, 6).join('; ');
+    const more = failed.length > 6 ? ` (+${failed.length - 6})` : '';
+    out.push({ code: DRAW_SCORE_BELOW, path: rel, detail: `${a.path} scores ${score.summary.pass} pass / ${score.summary.fail} fail: address the critique (${examples}${more}) and re-score` });
+  }
+}
+
+/** One part: controls for the commands, copy, badges, the render source judged once, the accent budget, the score. */
+function partFindings(a, ctx, out) {
+  const { recordDir, record, settings, judgedStates, judgedSources, at } = ctx;
+  const state = assetStateOf(record, a);
+  const src = renderSourceOf(recordDir, a.path);
+  const rel = at(a.path);
+  if (!src) {
+    out.push({ code: DRAW_SCORE_BELOW, path: rel, detail: `${a.path} has no render source (.html) beside it: nothing can score, count its controls or read its copy` });
+    return;
+  }
+  const html = fs.readFileSync(src, 'utf8');
+  commandControlFindings(a, rel, state, html, judgedStates, record, out);
+  copyBadgeFindings(a, rel, html, out);
+  if (!judgedSources.has(src)) {
+    judgedSources.add(src);
+    renderSourceFindings(a, rel, src, html, ctx, out);
+  }
+  const accent = accentBudgetOf(path.join(recordDir, a.path), { html, settings, label: a.path });
+  if (accent.finding) out.push({ code: accent.finding.code, path: rel, detail: accent.finding.detail });
+  scoreFindings(a, rel, src, out);
+}
+
+/** Owner acceptance: only the owner's accept of the current parts. */
+function ownerAcceptanceFindings(record, recordDir, at, out) {
+  const acceptance = ownerAcceptanceOf(record, recordDir);
+  const by = acceptance?.answeredBy ?? null;
+  if (!acceptance) out.push({ code: DRAW_NOT_OWNER_ACCEPTED, path: at('index.yaml'), detail: `${record?.id ?? 'the record'} carries no owner acceptance: a draw goes to the owner as one draw-review ask (starci work draw-review question --job <id>) and only the owner's accept settles it` });
+  else if (!acceptance.current) out.push({ code: DRAW_NOT_OWNER_ACCEPTED, path: at('index.yaml'), detail: `the owner's acceptance no longer holds (${acceptance.reasons.join('; ')}): review it again` });
+  else if (by !== OWNER) out.push({ code: DRAW_NOT_OWNER_ACCEPTED, path: at('index.yaml'), detail: `the acceptance was answered by ${by ?? 'nobody named'}, not the owner: a drawing never turns green on checks or an automatic accept` });
+}
+
+/** The quality findings of one ui record: [{code, path, detail}]. `recordDir` absolute, `repo` for shown paths. */
+export function drawQualityFindings(recordDir, record, repo) {
+  const out = [];
+  const at = (rel) => slash(path.join(path.relative(repo, recordDir), rel));
+  const shapes = list(record?.ui?.shapes);
+  const baseOf = new Map(shapes.map((s) => [String(s?.state), String(s?.base ?? '')]));
+  const nonDerivable = new Set(shapes.filter((s) => s?.nonDerivable).map((s) => String(s.state)));
+  const live = assetsOf(record).filter((a) => !a.retired && a.selected !== false && PART_ROLES.has(a.role) && a.generation?.tool === DRAW_TOOL);
+  fullPageFindings(live, record, baseOf, at, out);
+  const parts = live.filter((a) => !isComposite(a));
+  duplicateShapeFindings(parts, { record, recordDir, baseOf, nonDerivable, at }, out);
+
+  // Per part: the DNA gate and the taste metrics (draw-dna.mjs, draw-taste.mjs; owner rulings 2026-09-27) once per
+  // render source, the accent budget per part image.
+  const ctx = {
+    recordDir, record, at, judgedStates: new Set(), judgedSources: new Set(),
+    dna: parts.length ? loadDna() : null,
+    settings: parts.length ? drawLoopSettings() : null,
+    resolve: parts.length ? ruleResolver({ workRoot: workRootOf(recordDir), record, repoRoot: repo }) : null
+  };
+  for (const a of parts) partFindings(a, ctx, out);
 
   // The loop: every live part came out of draw-loop.mjs, bytes unchanged since its finish installed them.
   if (parts.length) out.push(...loopCoverageFindings(recordDir, record, repo));
-
-  // Owner acceptance: only the owner's accept of the current parts.
-  if (parts.length || live.length) {
-    const acceptance = ownerAcceptanceOf(record, recordDir);
-    const by = acceptance?.answeredBy ?? null;
-    if (!acceptance) out.push({ code: DRAW_NOT_OWNER_ACCEPTED, path: at('index.yaml'), detail: `${record?.id ?? 'the record'} carries no owner acceptance: a draw goes to the owner as one draw-review ask (starci work draw-review question --job <id>) and only the owner's accept settles it` });
-    else if (!acceptance.current) out.push({ code: DRAW_NOT_OWNER_ACCEPTED, path: at('index.yaml'), detail: `the owner's acceptance no longer holds (${acceptance.reasons.join('; ')}): review it again` });
-    else if (by !== OWNER) out.push({ code: DRAW_NOT_OWNER_ACCEPTED, path: at('index.yaml'), detail: `the acceptance was answered by ${by ?? 'nobody named'}, not the owner: a drawing never turns green on checks or an automatic accept` });
-  }
+  if (parts.length || live.length) ownerAcceptanceFindings(record, recordDir, at, out);
   return out;
 }
