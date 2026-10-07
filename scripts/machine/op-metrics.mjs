@@ -46,7 +46,8 @@ import { allocationSettings } from '../../engine/config.mjs';
 import { ownerLanguage, translator } from '../lib/i18n.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 import { fmtMs } from '../lib/time.mjs';
-import { clipLine } from '../lib/clip.mjs'; import { isMain } from '../lib/is-main.mjs'; import { byCodeUnit } from '../lib/list.mjs';
+import { aggregate, inList, jobRecords } from './op-health.mjs';
+import { clipLine } from '../lib/clip.mjs'; import { isMain } from '../lib/is-main.mjs';
 
 export const SNAPSHOT_KIND = 'supervisor-op-metrics';
 /** metrics_snapshots.kind of these snapshots (DBTREE B6). */
@@ -55,9 +56,7 @@ export const WAIT_KINDS = Object.freeze(['owner-gate', 'peer-wait', 'dependency'
 export const SEVERITIES = Object.freeze(['ok', 'warn', 'critical']);
 /** queuedBecause values that are the runtime's capacity, not the workflow's own order. */
 const THROTTLE_CAUSES = Object.freeze(['pool-full', 'circuit-open', 'max-ops', 'path-lease']);
-const JOB_EVENT_KINDS = ['op-dispatched', 'report-filed', 'op-settled', 'dispatch-rejected', 'dead-worker-requeued', 'dead-worker-fenced', 'worker-failed-no-report'];
-const DEAD_KINDS = new Set(['dead-worker-requeued', 'dead-worker-fenced', 'worker-failed-no-report']);
-const OPEN_STATUSES = new Set(['queued', 'leased', 'running', 'answering', 'effect_unknown']);
+
 
 /* ------------------------------------------------------------ settings */
 
@@ -79,196 +78,14 @@ export function telemetrySettings(allocation = allocationSettings()) {
   return { windowMs: need(t?.windowMs, 'windowMs'), trendMs: need(t?.trendMs, 'trendMs'), stuckSla };
 }
 
-/* ------------------------------------------------------------ small pure pieces */
-
-/** Nearest-rank percentile of `values` (numbers), or null when empty. */
-export function percentile(values, p) {
-  const list = values.filter((v) => Number.isFinite(v)).sort((a, b) => a - b);
-  if (!list.length) return null;
-  return list[Math.min(list.length - 1, Math.max(0, Math.ceil((p / 100) * list.length) - 1))];
-}
-const dist = (values) => ({ n: values.filter(Number.isFinite).length, p50: percentile(values, 50), p90: percentile(values, 90) });
-const span = (from, to) => (Number.isFinite(from) && Number.isFinite(to) && to >= from ? to - from : null);
 
 export { fmtMs };
+export { aggregate, failureClassOf, failureSignature, jobRecords, percentile } from './op-health.mjs';
 const pct = (rate) => (rate == null ? '-' : `${Math.round(rate * 100)}%`);
-const settledClassOf = (result, report) => { if (typeof result?.failureClass?.class === 'string') return result.failureClass.class; if (typeof result?.failureClass === 'string') return result.failureClass; if (typeof report?.failureClass === 'string') return report.failureClass; return null; };
-const settledSuffix = (settled, category, red) => { if (category) return `${settled}:${category}`; if (red.length) return `${settled}:${red[0]}`; return settled; };
-const outcomeOf = (status, verdict) => { if (status === 'succeeded') return 'succeeded'; if (status === 'awaiting_owner') return 'owner'; if (status === 'failed') return ['dropped', 'superseded'].includes(verdict) ? 'dropped' : 'failed'; if (status === 'cancelled') return 'cancelled'; return 'open'; };
+
 
 /** severity of a wait of `ageMs` against {warnMs, criticalMs}. */
 export const severityOf = (ageMs, sla) => { if (ageMs >= sla.criticalMs) return 'critical'; if (ageMs >= sla.warnMs) return 'warn'; return 'ok'; };
-
-/**
- * The failure class of one failed op job (see the header), or null when it did not fail. `result` is the job's
- * result_json, `report` its filed report envelope (or null), `checks` its check rows ([{name, exitCode, ok?}]),
- * `dead` the liveness of a dead-worker event of the job (or null).
- */
-export function failureClassOf({ status, result = {}, report = null, checks = [], dead = null }) {
-  if (status !== 'failed') return null;
-  const verdict = result?.verdict ?? null;
-  if (verdict === 'dropped' || verdict === 'superseded') return null;
-  if (result?.environment === 'host-terminal-wipe') return 'environment:host-terminal-wipe';
-  const liveness = result?.worker?.liveness ?? (report ? null : dead);
-  if (liveness && !report) return `dead-worker:${liveness}`;
-  const category = typeof report?.rootCause?.category === 'string' && report.rootCause.category.trim() ? report.rootCause.category.trim().toLowerCase() : null;
-  const red = checks.filter((c) => c && (c.ok === false || (c.exitCode != null && Number(c.exitCode) !== 0))).map((c) => String(c.name ?? 'unnamed')).sort(byCodeUnit);
-  // The settle's own class (scripts/kernel/verify-failure.mjs: result_json.failureClass {class, reason}, or the
-  // report's failureClass) leads, narrowed by the root-cause category or the red check.
-  const settled = settledClassOf(result, report);
-  if (settled) return settledSuffix(settled, category, red);
-  if (category) return `root-cause:${category}`;
-  if (red.length) return `check:${red[0]}`;
-  if (Number(result?.checkEvidence?.failed) > 0) return 'check:unnamed';
-  if (report?.outcome === 'blocked' || verdict === 'blocked') return typeof report?.blocker?.kind === 'string' && report.blocker.kind.trim() ? `blocked:${report.blocker.kind.trim().toLowerCase()}` : 'blocked';
-  if (!report && result?.reportFiled === false) return 'no-report';
-  return `verdict:${verdict ?? 'unknown'}`;
-}
-
-/** One failed attempt's signature: its class plus every red check name, so two attempts failing alike compare equal. */
-export const failureSignature = (klass, checks = []) => [klass, ...checks.filter((c) => c && (c.ok === false || (c.exitCode != null && Number(c.exitCode) !== 0))).map((c) => String(c.name ?? '')).sort(byCodeUnit)].join('|');
-
-/* ------------------------------------------------------------ per-job records */
-
-const inList = (n) => Array.from({ length: n }, () => '?').join(',');
-
-/**
- * One normalized record per op job created or updated inside [since, now] (optionally of one workflow): {jobId,
- * workflowId, op, attempt, status, verdict, outcome (succeeded|failed|owner|dropped|cancelled|open), failureClass,
- * signature, retryOf, enqueuedAt, dispatchedAt, reportAt, settledAt, queueWaitMs, runMs, settleMs, throttleMs,
- * ownerWaitMs, dead}. Read-only.
- */
-export function jobRecords(db, { since, now = Date.now(), workflowId = null } = {}) {
-  const jobs = db.prepare(`SELECT job_id, workflow_id, op_id, attempt, status, payload_json, result_json, created_at, updated_at FROM jobs
-    WHERE kind='op' AND (created_at>=? OR updated_at>=?)${workflowId ? ' AND workflow_id=?' : ''}`).all(since, since, ...(workflowId ? [workflowId] : []));
-  if (!jobs.length) return [];
-  const from = Math.min(...jobs.map((j) => Number(j.created_at)));
-  const byJob = new Map();
-  const events = db.prepare(`SELECT entity_id, kind, payload_json, created_at FROM events WHERE entity_type='job' AND kind IN (${inList(JOB_EVENT_KINDS.length)}) AND created_at>=?${workflowId ? ' AND workflow_id=?' : ''} ORDER BY seq`)
-    .all(...JOB_EVENT_KINDS, from, ...(workflowId ? [workflowId] : []));
-  for (const e of events) {
-    if (!byJob.has(e.entity_id)) byJob.set(e.entity_id, []);
-    byJob.get(e.entity_id).push(e);
-  }
-  const reports = new Map();
-  for (const r of db.prepare(`SELECT workflow_id, op_id, attempt, outcome, report_json, created_at FROM reports WHERE created_at>=?${workflowId ? ' AND workflow_id=?' : ''} ORDER BY created_at`).all(from, ...(workflowId ? [workflowId] : []))) {
-    reports.set(`${r.workflow_id}|${r.op_id}|${r.attempt}`, { outcome: r.outcome, at: Number(r.created_at), ...parseJsonOr(r.report_json, {}) });
-  }
-  const checks = new Map();
-  for (const c of db.prepare(`SELECT workflow_id, op_id, attempt, checks_json FROM checks WHERE created_at>=?${workflowId ? ' AND workflow_id=?' : ''}`).all(from, ...(workflowId ? [workflowId] : []))) {
-    const list = parseJsonOr(c.checks_json, {})?.checks;
-    if (Array.isArray(list)) checks.set(`${c.workflow_id}|${c.op_id}|${c.attempt}`, [...(checks.get(`${c.workflow_id}|${c.op_id}|${c.attempt}`) ?? []), ...list]);
-  }
-  const asks = new Map();
-  for (const a of db.prepare(`SELECT entity_id, kind, created_at FROM events WHERE entity_type='report' AND kind IN ('ask-answered','ask-superseded') AND created_at>=?${workflowId ? ' AND workflow_id=?' : ''} ORDER BY seq`).all(from, ...(workflowId ? [workflowId] : []))) {
-    if (!asks.has(a.entity_id)) asks.set(a.entity_id, Number(a.created_at));
-  }
-
-  return jobs.map((job) => {
-    const payload = parseJsonOr(job.payload_json, {});
-    const result = parseJsonOr(job.result_json, {});
-    const evs = byJob.get(job.job_id) ?? [];
-    const first = (kind) => evs.find((e) => e.kind === kind) ?? null;
-    const dispatches = evs.filter((e) => e.kind === 'op-dispatched').map((e) => Number(e.created_at));
-    const key = `${job.workflow_id}|${job.op_id}|${job.attempt}`;
-    const report = reports.get(key) ?? null;
-    const reportAt = Number(first('report-filed')?.created_at ?? report?.at) || null;
-    const settledEv = first('op-settled');
-    const settledAt = Number(settledEv?.created_at ?? (OPEN_STATUSES.has(job.status) ? Number.NaN : result.at)) || null;
-    const verdict = result.verdict ?? parseJsonOr(settledEv?.payload_json, {})?.verdict ?? null;
-    const deadEv = evs.find((e) => DEAD_KINDS.has(e.kind));
-    const dead = deadEv ? (parseJsonOr(deadEv.payload_json, {})?.worker?.liveness ?? parseJsonOr(deadEv.payload_json, {})?.liveness ?? 'dead') : null;
-    const outcome = outcomeOf(job.status, verdict);
-    const jobChecks = checks.get(key) ?? [];
-    const failureClass = outcome === 'failed' ? failureClassOf({ status: job.status, result, report, checks: jobChecks, dead }) : null;
-    const dispatchedAt = dispatches[0] ?? null;
-    const runStart = [...dispatches].reverse().find((t) => t <= (reportAt ?? settledAt ?? Infinity)) ?? dispatchedAt;
-    const rejectAt = Number(first('dispatch-rejected')?.created_at) || null;
-    const askId = result.askDispatchId ?? (report?.outcome === 'ask' ? report?.dispatch ?? null : null);
-    const askStart = settledAt ?? reportAt;
-    return {
-      jobId: job.job_id, workflowId: job.workflow_id, op: job.op_id ?? payload.opId ?? '-', attempt: job.attempt, status: job.status, verdict, outcome,
-      failureClass, signature: failureClass ? failureSignature(failureClass, jobChecks) : null,
-      retryOf: payload.retry?.retryOf ?? null,
-      enqueuedAt: Number(job.created_at), dispatchedAt, reportAt, settledAt,
-      queueWaitMs: span(Number(job.created_at), dispatchedAt),
-      runMs: span(runStart, reportAt ?? settledAt),
-      settleMs: span(reportAt, settledAt),
-      throttleMs: rejectAt ? span(rejectAt, dispatches.find((t) => t > rejectAt) ?? (outcome === 'open' ? now : settledAt)) : null,
-      ownerWaitMs: askId && askStart ? span(askStart, asks.get(askId) ?? now) : null,
-      dead: Boolean(deadEv),
-    };
-  });
-}
-
-/* ------------------------------------------------------------ aggregation */
-
-/** The root job id of every record's retry chain (retryOf followed through `records`; an unknown parent is the root). */
-function chainRoots(records) {
-  const byId = new Map(records.map((r) => [r.jobId, r]));
-  const root = new Map();
-  const find = (r, seen = new Set()) => {
-    if (root.has(r.jobId)) return root.get(r.jobId);
-    if (!r.retryOf || seen.has(r.jobId)) return r.retryOf ?? r.jobId;
-    seen.add(r.jobId);
-    const parent = byId.get(r.retryOf);
-    const value = parent ? find(parent, seen) : r.retryOf;
-    root.set(r.jobId, value);
-    return value;
-  };
-  for (const r of records) root.set(r.jobId, find(r));
-  return root;
-}
-
-/** One health row over `records` (any grouping): see the header for each field. Pure. */
-function healthRow(key, records) {
-  const count = (o) => records.filter((r) => r.outcome === o).length;
-  const succeeded = count('succeeded'), failed = count('failed');
-  const classes = new Map();
-  for (const r of records) if (r.failureClass) classes.set(r.failureClass, (classes.get(r.failureClass) ?? 0) + 1);
-  const failureClasses = [...classes].map(([klass, n]) => ({ class: klass, n })).sort((a, b) => b.n - a.n || a.class.localeCompare(b.class));
-  const roots = chainRoots(records);
-  const chains = new Map();
-  for (const r of [...records].sort((a, b) => a.attempt - b.attempt || a.enqueuedAt - b.enqueuedAt)) {
-    const k = `${r.workflowId}|${roots.get(r.jobId)}`;
-    if (!chains.has(k)) chains.set(k, []);
-    chains.get(k).push(r);
-  }
-  let repeated = 0;
-  for (const list of chains.values()) {
-    let last = null;
-    for (const r of list) {
-      if (r.outcome !== 'failed') { if (r.outcome === 'succeeded') { last = null; } continue; }
-      if (last && r.signature === last) repeated++;
-      last = r.signature;
-    }
-  }
-  const sizes = [...chains.values()].map((l) => l.length);
-  const dispatched = records.filter((r) => r.dispatchedAt != null);
-  const owner = records.map((r) => r.ownerWaitMs).filter(Number.isFinite);
-  const throttle = records.map((r) => r.throttleMs).filter(Number.isFinite);
-  return {
-    key, jobs: records.length, succeeded, failed, owner: count('owner'), dropped: count('dropped') + count('cancelled'), open: count('open'),
-    successRate: succeeded + failed ? succeeded / (succeeded + failed) : null,
-    failureClasses, topFailureClass: failureClasses[0]?.class ?? null,
-    queueWait: dist(records.map((r) => r.queueWaitMs)), runTime: dist(records.map((r) => r.runMs)), settleTime: dist(records.map((r) => r.settleMs)),
-    attemptsPerNode: { nodes: sizes.length, mean: sizes.length ? Math.round((sizes.reduce((a, b) => a + b, 0) / sizes.length) * 100) / 100 : null, max: sizes.length ? Math.max(...sizes) : null },
-    repeatedIdentical: repeated,
-    deadWorkerRate: dispatched.length ? records.filter((r) => r.dead).length / dispatched.length : null,
-    ownerWait: { n: owner.length, totalMs: owner.reduce((a, b) => a + b, 0), p50: percentile(owner, 50) },
-    throttle: { n: throttle.length, totalMs: throttle.reduce((a, b) => a + b, 0), p50: percentile(throttle, 50) },
-  };
-}
-
-/** {schema, at, windowMs, totals, ops[], workflows[]} over `records` (one or several ledgers' jobRecords). Pure. */
-export function aggregate(records, { now = Date.now(), windowMs } = {}) {
-  const group = (by) => {
-    const m = new Map();
-    for (const r of records) { const k = r[by]; if (!m.has(k)) { m.set(k, []); } m.get(k).push(r); }
-    return [...m].map(([k, list]) => healthRow(k, list)).sort((a, b) => b.jobs - a.jobs || String(a.key).localeCompare(String(b.key)));
-  };
-  return { schema: 'starci/op-metrics@1', at: now, windowMs, totals: healthRow('all', records), ops: group('op'), workflows: group('workflowId') };
-}
 
 /** Op health of one ledger (or one workflow of it) over the window. */
 export function opMetrics(db, { now = Date.now(), windowMs = telemetrySettings().windowMs, workflowId = null } = {}) {
@@ -283,6 +100,126 @@ const firstJobEventAt = (db, jobId, kinds) => Number(db.prepare(
   `SELECT MAX(created_at) at FROM events WHERE entity_type='job' AND entity_id=? AND kind IN (${inList(kinds.length)})`).get(jobId, ...kinds)?.at) || null;
 const ASK_NAMED = /\bask\b|\bctx_[0-9a-f]{12}\b|\bserve-ask\b/i;
 
+// One wait item of the workflow: its age, severity and detail on top of the fields the caller names.
+function pushStuck({ workflowId, now, sla, out }, item) {
+  const since = Number(item.since) || now;
+  const ageMs = Math.max(0, now - since);
+  const id = item.kind === 'deferred-settle' ? item.jobId : item.incidentId ?? item.jobId;
+  out.push({ key: `stuck:${workflowId}:${item.kind}:${id}`, workflowId, cause: item.kind, jobId: null, opId: null, incidentId: null, blockedBy: null, count: 1, ...item,
+    since, ageMs, severity: severityOf(ageMs, sla[item.kind]), detail: clipLine(item.detail ?? '', 240) });
+}
+
+// Retry caps: a failed job whose retry route reached its limit and handed the next step to an owner gate, by incident id.
+function retryCapsOf(jobs) {
+  const capped = new Map();
+  for (const j of jobs) {
+    if (j.status !== 'failed') continue;
+    const step = parseJsonOr(j.result_json, {})?.nextStep;
+    if (step?.kind === 'owner-gate' && step.route && step.incidentId) capped.set(step.incidentId, { job: j, step });
+  }
+  return capped;
+}
+
+function pushOwnerGate(ctx, gate, cap, pendingAsks) {
+  const { db, workflowId } = ctx;
+  if (cap) {
+    pushStuck(ctx, { kind: 'retry-cap', incidentId: gate.incidentId, jobId: cap.job.job_id, opId: cap.job.op_id ?? null, since: Number(parseJsonOr(cap.job.result_json, {})?.at) || incidentRaisedAt(db, workflowId, gate.incidentId) || cap.job.updated_at,
+      owner: 'supervisor', detail: `route ${cap.step.route} fired ${cap.step.firing ?? '?'} of ${cap.step.limit ?? '?'}: diagnose the root cause before anything runs it again` });
+    return;
+  }
+  // Autopilot (scripts/kernel/autopilot-run.mjs): a supervisor-gate is the Supervisor's step, never the owner's.
+  if (gate.kind === 'supervisor-gate') {
+    pushStuck(ctx, { kind: 'owner-gate', cause: 'supervisor-gate', incidentId: gate.incidentId, opId: gate.opId ?? null, since: incidentRaisedAt(db, workflowId, gate.incidentId), owner: 'supervisor', detail: gate.detail ?? '' });
+    return;
+  }
+  const holds = Array.isArray(gate.holds) ? gate.holds : [];
+  const asked = ASK_NAMED.test(gate.detail ?? '') || pendingAsks.some((a) => holds.includes(a.jobId) || (a.opId && holds.includes(a.opId)));
+  pushStuck(ctx, { kind: 'owner-gate', incidentId: gate.incidentId, opId: gate.opId ?? null, since: incidentRaisedAt(db, workflowId, gate.incidentId), owner: asked ? 'owner' : 'supervisor',
+    detail: `${asked ? '' : 'no owner ask names it: '}${gate.detail ?? ''}` });
+}
+
+function pushPendingAsk(ctx, ask, jobRow) {
+  const job = jobRow.get(ask.jobId);
+  const since = Number(parseJsonOr(job?.result_json, {})?.at) || Number(job?.updated_at) || null;
+  pushStuck(ctx, { kind: 'owner-gate', cause: 'owner-ask', jobId: ask.jobId, opId: ask.opId ?? null, since, owner: 'owner', detail: `ask ${ask.dispatchId ?? '-'} unanswered` });
+}
+
+const peerWaitDetail = (wait) => `${wait.peerRunning === false ? 'peer ' + wait.peer + ' is ' + (wait.peerPhase ?? 'gone') + ', re-point the wait: ' : ''}${wait.detail ?? ''}`;
+
+function pushPeerWait(ctx, wait) {
+  pushStuck(ctx, { kind: 'peer-wait', incidentId: wait.incidentId, opId: wait.opId ?? null, since: wait.since ?? incidentRaisedAt(ctx.db, ctx.workflowId, wait.incidentId),
+    owner: wait.peerRunning === false ? 'kernel' : `peer:${wait.peer ?? '?'}`, blockedBy: wait.peer ? { workflow: wait.peer } : null, detail: peerWaitDetail(wait) });
+}
+
+function pushHeldSettle(ctx, item, jobRow) {
+  const { db, out } = ctx;
+  const since = firstJobEventAt(db, item.jobId, ['report-consumed', 'report-filed']) ?? Number(jobRow.get(item.jobId)?.updated_at);
+  const byGate = item.heldBecause === 'owner-gate' || item.heldBecause === 'supervisor-gate';
+  const gateOwnerOfItem = () => out.find((i) => i.incidentId === item.blockedBy?.incident && ['owner-gate', 'retry-cap'].includes(i.kind))?.owner ?? 'supervisor';
+  pushStuck(ctx, { kind: 'deferred-settle', cause: `held-${item.heldBecause}`, jobId: item.jobId, opId: item.opId ?? null, incidentId: item.blockedBy?.incident ?? null, since,
+    owner: byGate ? gateOwnerOfItem() : `peer:${item.blockedBy?.peer ?? '?'}`, blockedBy: item.blockedBy ?? null, detail: item.detail });
+}
+
+function pushSettleReady(ctx, jobId, jobRow) {
+  const job = jobRow.get(jobId);
+  pushStuck(ctx, { kind: 'deferred-settle', cause: 'settle-ready', jobId, opId: job?.op_id ?? null, since: firstJobEventAt(ctx.db, jobId, ['report-consumed', 'report-filed']) ?? Number(job?.updated_at),
+    owner: 'kernel', detail: 'report consumed, not settled: starci kernel record-checks + starci kernel settle' });
+}
+
+const GATE_CAUSES = new Set(['owner-gate', 'supervisor-gate', 'peer-wait']);
+
+// Who moves a queued job: a job a gate or wait holds is that item's owner; a dependency is whoever moves the job it waits on
+// (followed through the chain), so N dependants of one held job are ONE item naming that owner.
+function queueOwnersOf(out, queued) {
+  const gateOwner = new Map(out.filter((i) => i.incidentId).map((i) => [i.incidentId, i.owner]));
+  const byJob = new Map(queued.map((q) => [q.jobId, q]));
+  const gateHeldOwner = (q) => {
+    const owner = gateOwner.get(q.blockedBy?.incident);
+    if (owner != null) return owner;
+    if (q.queuedBecause === 'peer-wait') return `peer:${q.blockedBy?.peer ?? '?'}`;
+    return q.queuedBecause === 'supervisor-gate' ? 'supervisor' : 'owner';
+  };
+  const ownerOfJob = (jobId, seen = new Set()) => {
+    const q = byJob.get(jobId);
+    if (!q || seen.has(jobId)) return 'kernel';
+    seen.add(jobId);
+    if (GATE_CAUSES.has(q.queuedBecause)) return gateHeldOwner(q);
+    if (q.queuedBecause === 'dependency' && q.blockedBy?.job) return ownerOfJob(q.blockedBy.job, seen);
+    return THROTTLE_CAUSES.includes(q.queuedBecause) ? 'supervisor' : 'kernel';
+  };
+  const dependencyOwnerOf = (parked, blockedBy) => {
+    if (parked) return parked.heldBecause === 'peer-wait' ? `peer:${parked.peer ?? '?'}` : gateOwner.get(parked.incident) ?? 'owner';
+    return blockedBy?.job ? ownerOfJob(blockedBy.job) : 'kernel';
+  };
+  return { dependencyOwnerOf };
+}
+
+// A queued job that waits on a dependency joins the item of the job it waits on (one item per blocker, counting its dependants).
+function noteDependency(deps, q, { job, since, now, owners }) {
+  const blocker = q.blockedBy?.job ?? q.blockedBy?.op ?? q.jobId;
+  const at = Number(job?.created_at) || since || now;
+  const held = deps.get(blocker);
+  if (held) { held.count++; held.dependants.push(q.jobId); held.since = Math.min(held.since, at); return; }
+  deps.set(blocker, { kind: 'dependency', jobId: q.blockedBy?.job ?? q.jobId, opId: q.blockedBy?.op ?? q.opId ?? null, since: at, count: 1, dependants: [q.jobId],
+    owner: owners.dependencyOwnerOf(q.parkedBehind, q.blockedBy), blockedBy: q.blockedBy ?? null, detail: q.detail });
+}
+
+// One queued job as a stuck item (or none: a gate or wait is itself the item, and a deferred job waits by design).
+function pushQueued(ctx, q, { jobRow, deps, owners }) {
+  const job = jobRow.get(q.jobId);
+  const since = Number(job?.updated_at ?? job?.created_at) || null;
+  const because = q.queuedBecause;
+  if (GATE_CAUSES.has(because)) return; // the gate / wait itself is the item
+  // Parked for the owner's one review at handover by design (autopilot): not a wait anyone owes a move on now.
+  if (because === 'deferred' || because === 'deferred-to-handover') return;
+  if (because === 'dependency') noteDependency(deps, q, { job, since, now: ctx.now, owners });
+  else if (because === 'dependency-failed') pushStuck(ctx, { kind: 'queued-ready', cause: because, jobId: q.jobId, opId: q.opId ?? null, since, owner: 'kernel', blockedBy: q.blockedBy ?? null, detail: q.detail });
+  else if (THROTTLE_CAUSES.includes(because)) pushStuck(ctx, { kind: 'throttled', cause: because, jobId: q.jobId, opId: q.opId ?? null, since, owner: 'supervisor', blockedBy: q.blockedBy ?? null, detail: q.detail });
+  else pushStuck(ctx, { kind: 'queued-ready', cause: because ?? 'ready', jobId: q.jobId, opId: q.opId ?? null, since, owner: 'kernel', detail: q.detail ?? 'ready: route and dispatch it' });
+}
+
+const dependencyDetail = (d, dependants) => `${dependants.length} job(s) wait on ${d.jobId}${d.opId ? ' (' + d.opId + ')' : ''}: ${dependants.slice(0, 4).join(', ')}${dependants.length > 4 ? ', ...' : ''}; ${d.detail ?? ''}`;
+
 /**
  * Every wait of one workflow with its age, severity and the owner of the next action, from what `starci kernel status`
  * already projected: `ownerGates` / `peerWaits` (open incidents), `queued` (frontier.queued with queuedBecause and
@@ -296,93 +233,20 @@ export function stuckOf({ db, workflowId, now = Date.now(), sla = telemetrySetti
   const out = [];
   jobs ??= db.prepare("SELECT job_id, op_id, status, result_json, created_at, updated_at FROM jobs WHERE workflow_id=? AND kind<>'kernel'").all(workflowId);
   const jobRow = new Map(jobs.map((j) => [j.job_id, j]));
-  const push = (item) => {
-    const since = Number(item.since) || now;
-    const ageMs = Math.max(0, now - since);
-    const id = item.kind === 'deferred-settle' ? item.jobId : item.incidentId ?? item.jobId;
-    out.push({ key: `stuck:${workflowId}:${item.kind}:${id}`, workflowId, cause: item.kind, jobId: null, opId: null, incidentId: null, blockedBy: null, count: 1, ...item,
-      since, ageMs, severity: severityOf(ageMs, sla[item.kind]), detail: clipLine(item.detail ?? '', 240) });
-  };
-  // Retry caps: a failed job whose retry route reached its limit and handed the next step to an owner gate.
-  const capped = new Map();
-  for (const j of jobs) {
-    if (j.status !== 'failed') continue;
-    const step = parseJsonOr(j.result_json, {})?.nextStep;
-    if (step?.kind === 'owner-gate' && step.route && step.incidentId) capped.set(step.incidentId, { job: j, step });
-  }
+  const ctx = { db, workflowId, now, sla, out };
+  const capped = retryCapsOf(jobs);
   const pendingAsks = awaitingOwner.filter((a) => (a.answer ?? 'pending') === 'pending');
-  for (const gate of ownerGates) {
-    const cap = capped.get(gate.incidentId);
-    if (cap) {
-      push({ kind: 'retry-cap', incidentId: gate.incidentId, jobId: cap.job.job_id, opId: cap.job.op_id ?? null, since: Number(parseJsonOr(cap.job.result_json, {})?.at) || incidentRaisedAt(db, workflowId, gate.incidentId) || cap.job.updated_at,
-        owner: 'supervisor', detail: `route ${cap.step.route} fired ${cap.step.firing ?? '?'} of ${cap.step.limit ?? '?'}: diagnose the root cause before anything runs it again` });
-      continue;
-    }
-    // Autopilot (scripts/kernel/autopilot-run.mjs): a supervisor-gate is the Supervisor's step, never the owner's.
-    if (gate.kind === 'supervisor-gate') {
-      push({ kind: 'owner-gate', cause: 'supervisor-gate', incidentId: gate.incidentId, opId: gate.opId ?? null, since: incidentRaisedAt(db, workflowId, gate.incidentId), owner: 'supervisor', detail: gate.detail ?? '' });
-      continue;
-    }
-    const holds = Array.isArray(gate.holds) ? gate.holds : [];
-    const asked = ASK_NAMED.test(gate.detail ?? '') || pendingAsks.some((a) => holds.includes(a.jobId) || (a.opId && holds.includes(a.opId)));
-    push({ kind: 'owner-gate', incidentId: gate.incidentId, opId: gate.opId ?? null, since: incidentRaisedAt(db, workflowId, gate.incidentId), owner: asked ? 'owner' : 'supervisor',
-      detail: `${asked ? '' : 'no owner ask names it: '}${gate.detail ?? ''}` });
-  }
-  for (const ask of pendingAsks) {
-    const job = jobRow.get(ask.jobId);
-    const since = Number(parseJsonOr(job?.result_json, {})?.at) || Number(job?.updated_at) || null;
-    push({ kind: 'owner-gate', cause: 'owner-ask', jobId: ask.jobId, opId: ask.opId ?? null, since, owner: 'owner', detail: `ask ${ask.dispatchId ?? '-'} unanswered` });
-  }
-  for (const wait of peerWaits) {
-    push({ kind: 'peer-wait', incidentId: wait.incidentId, opId: wait.opId ?? null, since: wait.since ?? incidentRaisedAt(db, workflowId, wait.incidentId),
-      owner: wait.peerRunning === false ? 'kernel' : `peer:${wait.peer ?? '?'}`, blockedBy: wait.peer ? { workflow: wait.peer } : null,
-      detail: `${wait.peerRunning === false ? 'peer ' + wait.peer + ' is ' + (wait.peerPhase ?? 'gone') + ', re-point the wait: ' : ''}${wait.detail ?? ''}` });
-  }
-  for (const item of heldSettle) {
-    const since = firstJobEventAt(db, item.jobId, ['report-consumed', 'report-filed']) ?? Number(jobRow.get(item.jobId)?.updated_at);
-    const byGate = item.heldBecause === 'owner-gate' || item.heldBecause === 'supervisor-gate';
-    push({ kind: 'deferred-settle', cause: `held-${item.heldBecause}`, jobId: item.jobId, opId: item.opId ?? null, incidentId: item.blockedBy?.incident ?? null, since,
-      owner: byGate ? (out.find((i) => i.incidentId === item.blockedBy?.incident && ['owner-gate', 'retry-cap'].includes(i.kind))?.owner ?? 'supervisor') : `peer:${item.blockedBy?.peer ?? '?'}`, blockedBy: item.blockedBy ?? null, detail: item.detail });
-  }
-  for (const jobId of settleReady) {
-    const job = jobRow.get(jobId);
-    push({ kind: 'deferred-settle', cause: 'settle-ready', jobId, opId: job?.op_id ?? null, since: firstJobEventAt(db, jobId, ['report-consumed', 'report-filed']) ?? Number(job?.updated_at),
-      owner: 'kernel', detail: 'report consumed, not settled: starci kernel record-checks + starci kernel settle' });
-  }
-  // Who moves each queued job: a job a gate or wait holds is that item's owner; a dependency is whoever moves the
-  // job it waits on (followed through the chain), so N dependants of one held job are ONE item naming that owner.
-  const gateOwner = new Map(out.filter((i) => i.incidentId).map((i) => [i.incidentId, i.owner]));
-  const byJob = new Map(queued.map((q) => [q.jobId, q]));
-  const ownerOfJob = (jobId, seen = new Set()) => { const q = byJob.get(jobId); if (!q || seen.has(jobId)) return 'kernel'; seen.add(jobId); if (['owner-gate', 'supervisor-gate', 'peer-wait'].includes(q.queuedBecause)) { const owner = gateOwner.get(q.blockedBy?.incident); if (owner != null) return owner; if (q.queuedBecause === 'peer-wait') return `peer:${q.blockedBy?.peer ?? '?'}`; if (q.queuedBecause === 'supervisor-gate') return 'supervisor'; return 'owner'; } if (q.queuedBecause === 'dependency' && q.blockedBy?.job) return ownerOfJob(q.blockedBy.job, seen); if (THROTTLE_CAUSES.includes(q.queuedBecause)) return 'supervisor'; return 'kernel'; };
+  for (const gate of ownerGates) pushOwnerGate(ctx, gate, capped.get(gate.incidentId), pendingAsks);
+  for (const ask of pendingAsks) pushPendingAsk(ctx, ask, jobRow);
+  for (const wait of peerWaits) pushPeerWait(ctx, wait);
+  for (const item of heldSettle) pushHeldSettle(ctx, item, jobRow);
+  for (const jobId of settleReady) pushSettleReady(ctx, jobId, jobRow);
   const deps = new Map();
-  const dependencyOwnerOf = (parked, blockedBy) => { if (parked) { if (parked.heldBecause === 'peer-wait') return `peer:${parked.peer ?? '?'}`; return gateOwner.get(parked.incident) ?? 'owner'; } if (blockedBy?.job) return ownerOfJob(blockedBy.job); return 'kernel'; };
-  for (const q of queued) {
-    const job = jobRow.get(q.jobId);
-    const since = Number(job?.updated_at ?? job?.created_at) || null;
-    const because = q.queuedBecause;
-    if (['owner-gate', 'supervisor-gate', 'peer-wait'].includes(because)) continue; // the gate / wait itself is the item
-    // Parked for the owner's one review at handover by design (autopilot): not a wait anyone owes a move on now.
-    if (because === 'deferred' || because === 'deferred-to-handover') continue;
-    if (because === 'dependency') {
-      const blocker = q.blockedBy?.job ?? q.blockedBy?.op ?? q.jobId;
-      const at = Number(job?.created_at) || since || now;
-      const held = deps.get(blocker);
-      if (held) { held.count++; held.dependants.push(q.jobId); held.since = Math.min(held.since, at); continue; }
-      const parked = q.parkedBehind;
-      deps.set(blocker, { kind: 'dependency', jobId: q.blockedBy?.job ?? q.jobId, opId: q.blockedBy?.op ?? q.opId ?? null, since: at, count: 1, dependants: [q.jobId],
-        owner: dependencyOwnerOf(parked, q.blockedBy),
-        blockedBy: q.blockedBy ?? null, detail: q.detail });
-    } else if (because === 'dependency-failed') {
-      push({ kind: 'queued-ready', cause: because, jobId: q.jobId, opId: q.opId ?? null, since, owner: 'kernel', blockedBy: q.blockedBy ?? null, detail: q.detail });
-    } else if (THROTTLE_CAUSES.includes(because)) {
-      push({ kind: 'throttled', cause: because, jobId: q.jobId, opId: q.opId ?? null, since, owner: 'supervisor', blockedBy: q.blockedBy ?? null, detail: q.detail });
-    } else {
-      push({ kind: 'queued-ready', cause: because ?? 'ready', jobId: q.jobId, opId: q.opId ?? null, since, owner: 'kernel', detail: q.detail ?? 'ready: route and dispatch it' });
-    }
-  }
+  const owners = queueOwnersOf(out, queued);
+  for (const q of queued) pushQueued(ctx, q, { jobRow, deps, owners });
   for (const d of deps.values()) {
     const { dependants, ...item } = d;
-    push({ ...item, detail: `${dependants.length} job(s) wait on ${d.jobId}${d.opId ? ' (' + d.opId + ')' : ''}: ${dependants.slice(0, 4).join(', ')}${dependants.length > 4 ? ', ...' : ''}; ${d.detail ?? ''}` });
+    pushStuck(ctx, { ...item, detail: dependencyDetail(d, dependants) });
   }
   const rank = { critical: 2, warn: 1, ok: 0 };
   return out.sort((a, b) => rank[b.severity] - rank[a.severity] || b.ageMs - a.ageMs);
