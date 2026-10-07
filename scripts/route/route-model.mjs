@@ -53,6 +53,7 @@ import { inspectLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
 import { readEnv } from '../lib/env.mjs';
 import { admittedModelSet } from './admitted-model-set.mjs';
 import { parseArgs } from './route-model-args.mjs';
+import { probationAdmissionReasons, qualificationReasons } from './route-model-gates.mjs';
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const readYaml = p => (fs.existsSync(p) ? parseYaml(fs.readFileSync(p, 'utf8')) : null);
 
@@ -146,93 +147,6 @@ function deriveWorkload(args, rules, kindEntry, opChecks = []) {
   };
   w.probationEligible = !elevated && w.noExternalEffects && (modelFunction || (checksDeclared && reviewPlanned));
   return w;
-}
-
-// --- gates (selection.yaml §4-5) -------------------------------------------------
-
-const rank = (order, v) => order.indexOf(v);
-
-function qualificationIdentityReasons(runtime, evidence) {
-  const r = [];
-  const selModel = runtime.model ?? runtime.target;
-  if (!evidence.provider || !evidence.model || !evidence.version) r.push('model identity qualification is incomplete');
-  if (evidence.provider !== runtime.provider || evidence.model !== selModel || !runtime.version || evidence.version !== runtime.version)
-    r.push('qualification does not match selected runtime identity');
-  return r;
-}
-
-function qualificationRecordReasons(evidence) {
-  const r = [];
-  if (!evidence.suite || !evidence.measuredAt || typeof evidence.outcomes !== 'object' || !evidence.outcomes)
-    r.push('measurable qualification evidence is incomplete');
-  if (evidence.verified !== true || evidence.receipt?.schema !== 'starci/model-evaluation-receipt@1' || !evidence.receipt?.artifact?.sha256)
-    r.push('verified evaluator artifact receipt is missing');
-  return r;
-}
-
-function qualificationTimeReasons(evidence) {
-  const r = [];
-  const measured = Date.parse(evidence.measuredAt), expires = Date.parse(evidence.expiresAt ?? '');
-  if (!Number.isFinite(measured) || measured > Date.now()) r.push('qualification date is invalid');
-  if ((evidence.expiresAt && !Number.isFinite(expires)) || (Number.isFinite(expires) && expires <= Date.now())) r.push('qualification is stale');
-  return r;
-}
-
-function qualificationProvenanceReasons(evidence) {
-  const r = [];
-  if (!['independent-eval', 'verified-runtime-eval'].includes(evidence.source) || evidence.attestation === 'self-claimed')
-    r.push('qualification provenance is not trusted');
-  return r;
-}
-
-function qualificationWorkloadReasons(evidence, w, rules) {
-  const r = [];
-  if (!rules.riskOrder.includes(w.risk)) r.push(`unknown workload risk ${w.risk || '(empty)'}`);
-  if (!rules.floorOrder.includes(w.qualityFloor)) r.push(`unknown quality floor ${w.qualityFloor || '(empty)'}`);
-  if (!(evidence.workloads ?? []).some(x => x === w.kind || x === '*')) r.push(`workload ${w.kind || '(unknown)'} is not qualified`);
-  if (!(evidence.domains ?? []).some(x => x === w.domain || x === '*')) r.push(`domain ${w.domain} is not qualified`);
-  for (const t of w.tools) if (!(evidence.tools ?? []).includes(t)) r.push(`required tool ${t} is not qualified`);
-  if (w.contextTokens > Number(evidence.maxContextTokens ?? 0)) r.push('required context exceeds qualified context');
-  if (rank(rules.floorOrder, evidence.qualityFloor) < rank(rules.floorOrder, w.qualityFloor)) r.push(`quality floor ${w.qualityFloor} is not met`);
-  if (rank(rules.riskOrder, evidence.maxRisk) < rank(rules.riskOrder, w.risk)) r.push(`risk ${w.risk} is not qualified`);
-  return r;
-}
-
-function qualificationOutcomeReasons(evidence) {
-  const r = [];
-  if (evidence.outcomes?.status !== 'pass' || Number(evidence.outcomes?.cases ?? 0) < 1
-    || Number(evidence.outcomes?.passRate ?? 0) < Number(evidence.thresholds?.minPassRate ?? 1))
-    r.push('qualification outcomes do not pass');
-  return r;
-}
-
-function qualificationReasons(runtime, evidence, w, rules) {
-  if (evidence?.schema !== 'starci/model-qualification@1') return ['model qualification evidence is missing'];
-  return [
-    ...qualificationIdentityReasons(runtime, evidence),
-    ...qualificationRecordReasons(evidence),
-    ...qualificationTimeReasons(evidence),
-    ...qualificationProvenanceReasons(evidence),
-    ...qualificationWorkloadReasons(evidence, w, rules),
-    ...qualificationOutcomeReasons(evidence),
-  ];
-}
-
-function probationAdmissionReasons(w, rules) {
-  // localProbationAllowed + probation recordGates as they apply to a freshly
-  // created record (fresh scope: remainingAttempts 2, workloads [w.kind]).
-  const r = [];
-  if (w.approved !== true) r.push('probation requires an approved workflow');
-  if (w.scope !== 'local') r.push('probation requires local scope');
-  if (w.noExternalEffects !== true) r.push('probation forbids external effects');
-  if (w.strictMachineGates !== true) r.push('probation requires declared machine gates');
-  if (w.freshIndependentReview !== true) r.push('probation requires fresh independent review');
-  if (rules.highKinds.has(w.kind) || ['high', 'critical'].includes(w.risk) || rules.probationFloorBan.includes(w.qualityFloor))
-    r.push('probation cannot satisfy elevated quality or risk');
-  if (!rules.riskOrder.includes(w.risk)) r.push(`unknown workload risk ${w.risk || '(empty)'}`);
-  if (!rules.floorOrder.includes(w.qualityFloor)) r.push(`unknown quality floor ${w.qualityFloor || '(empty)'}`);
-  if (!w.probationEligible) r.push('workload shape is not probation-eligible (needs machine checks + fresh review, or a kernel function)');
-  return r;
 }
 
 // --- candidates ------------------------------------------------------------------
@@ -343,6 +257,71 @@ const planReasonFor = (candidate) => {
   return `what-if pick: ${candidate.note ?? 'no usable qualification evidence'} — launch still requires measured qualification (probation cannot satisfy this workload)`;
 };
 
+// The owner-config line a plan prints: the config file, its error, the effort and preferred provider, a kernel function's pool.
+function planConfigLine(w, owner) {
+  return {
+    file: owner.config ? path.relative(skillRoot, owner.file) : null,
+    ...(owner.error ? { error: owner.error } : {}),
+    ...(owner.configInvalid ? { configInvalid: owner.configInvalid } : {}),
+    effort: owner.effort ?? null,
+    preferredProvider: owner.preferredProvider ?? null,
+    ...(w.modelFunction ? { kernelRole: owner.cfgRole ?? null, pool: owner.cfgPoolName ?? null, members: owner.cfgMembers ?? null } : {}),
+  };
+}
+
+function printPlanJson({ args, w, configLine, source, chain, evaluated, primary, fallbacks, estimate }) {
+  console.log(JSON.stringify({
+    plan: true,
+    difficulty: args.difficulty,
+    workload: w,
+    config: configLine,
+    tier: { source, chain },
+    candidates: evaluated.map(c => ({
+      target: c.target, provider: c.provider, model: c.model,
+      maxParallel: c.maxParallel, status: c.status,
+      ...(c.effort ? { effort: c.effort } : {}),
+      preflight: c.preflight, ...(c.preflightDeclared ? { preflightDeclared: c.preflightDeclared } : {}),
+      ...(c.note ? { evidence: c.note } : {}), ...(c.reasons?.length ? { reasons: c.reasons } : {}),
+    })),
+    pick: primary
+      ? { primary: { target: primary.target, model: primary.model, status: primary.status, ...(primary.effort ? { effort: primary.effort } : {}) }, reason: planReasonFor(primary),
+          fallbacks: fallbacks.map(c => ({ target: c.target, model: c.model, status: c.status })) }
+      : null,
+    estimate,
+  }, null, 2));
+}
+
+function printPlanCandidate(c, i, verbose) {
+  const spec = c.provider !== undefined
+    ? `provider=${c.provider ?? '(none)'}  model=${c.model ?? '(none)'}  maxParallel=${c.maxParallel ?? '(none)'}  preflight=[${(c.preflight ?? []).join(',')}]`
+    : '';
+  console.log(`  ${i + 1}. ${c.target}  ${spec}  status=${c.status}` +
+    (c.note ? `  (${c.note})` : ''));
+  if (verbose && c.reasons?.length) console.log(`     reasons: ${c.reasons.join('; ')}`);
+}
+
+function printPlanText({ args, w, configLine, source, chain, evaluated, primary, fallbacks, estimate }) {
+  console.log(`plan what-if: kind=${w.kind} role=${w.role ?? '(none)'} difficulty=${args.difficulty}`);
+  console.log(`workload: risk=${w.risk} floor=${w.qualityFloor} tools=[${w.tools}] ctx=${w.contextTokens}` +
+    (w.elevated ? '  ELEVATED' : '') + (w.modelFunction ? '  KERNEL-FUNCTION' : ''));
+  console.log(`config: ${configLine.file ?? 'absent'}` +
+    (configLine.effort ? `  effort=${configLine.effort}` : '') +
+    (configLine.preferredProvider ? `  preferredProvider=${configLine.preferredProvider}` : '') +
+    (configLine.pool ? `  ${configLine.kernelRole} pool '${configLine.pool}' -> [${(configLine.members ?? []).join(', ')}]` : '') +
+    (configLine.error ? `  (${configLine.error})` : ''));
+  console.log(`chain: ${source}  ->  [${chain.join(', ') || '(empty)'}]`);
+  console.log('candidates:');
+  evaluated.forEach((c, i) => printPlanCandidate(c, i, args.verbose));
+  if (primary) {
+    console.log(`primary: ${primary.target} (${planReasonFor(primary)})`);
+    console.log(`fallbacks: [${fallbacks.map((c) => c.target + ' (' + c.status + ')').join(', ')}]`);
+  } else {
+    console.log(`primary: none — no pool on the ${args.difficulty} tier can preview this workload`);
+    for (const c of evaluated.filter(c => c.reasons?.length)) console.log(`  ${c.target}: ${c.reasons.join('; ')}`);
+  }
+  console.log(`estimate: cold ~${estimate.coldMinutes}m for ${/^[aeiou]/i.test(args.difficulty) ? 'an' : 'a'} ${args.difficulty} operation`);
+}
+
 function runPlan(args, rules, runtimes, w, evidenceByRuntime, owner = {}) {
   const { chain, source } = planChain(runtimes, args.difficulty, orderKeyOf({ work: w.work, order: w.order }, w.role));
   const evaluated = planCandidates(chain, runtimes, w, rules, evidenceByRuntime, args.difficulty);
@@ -359,63 +338,9 @@ function runPlan(args, rules, runtimes, w, evidenceByRuntime, owner = {}) {
   const primary = ordered[0] ?? null;
   const fallbacks = ordered.slice(1);
   const estimate = { difficulty: args.difficulty, coldMinutes: PLAN_COLD_MINUTES[args.difficulty] };
-
-  const configLine = {
-    file: owner.config ? path.relative(skillRoot, owner.file) : null,
-    ...(owner.error ? { error: owner.error } : {}),
-    ...(owner.configInvalid ? { configInvalid: owner.configInvalid } : {}),
-    effort: owner.effort ?? null,
-    preferredProvider: owner.preferredProvider ?? null,
-    ...(w.modelFunction ? { kernelRole: owner.cfgRole ?? null, pool: owner.cfgPoolName ?? null, members: owner.cfgMembers ?? null } : {}),
-  };
-  if (args.json) {
-    console.log(JSON.stringify({
-      plan: true,
-      difficulty: args.difficulty,
-      workload: w,
-      config: configLine,
-      tier: { source, chain },
-      candidates: evaluated.map(c => ({
-        target: c.target, provider: c.provider, model: c.model,
-        maxParallel: c.maxParallel, status: c.status,
-        ...(c.effort ? { effort: c.effort } : {}),
-        preflight: c.preflight, ...(c.preflightDeclared ? { preflightDeclared: c.preflightDeclared } : {}),
-        ...(c.note ? { evidence: c.note } : {}), ...(c.reasons?.length ? { reasons: c.reasons } : {}),
-      })),
-      pick: primary
-        ? { primary: { target: primary.target, model: primary.model, status: primary.status, ...(primary.effort ? { effort: primary.effort } : {}) }, reason: planReasonFor(primary),
-            fallbacks: fallbacks.map(c => ({ target: c.target, model: c.model, status: c.status })) }
-        : null,
-      estimate,
-    }, null, 2));
-  } else {
-    console.log(`plan what-if: kind=${w.kind} role=${w.role ?? '(none)'} difficulty=${args.difficulty}`);
-    console.log(`workload: risk=${w.risk} floor=${w.qualityFloor} tools=[${w.tools}] ctx=${w.contextTokens}` +
-      (w.elevated ? '  ELEVATED' : '') + (w.modelFunction ? '  KERNEL-FUNCTION' : ''));
-    console.log(`config: ${configLine.file ?? 'absent'}` +
-      (configLine.effort ? `  effort=${configLine.effort}` : '') +
-      (configLine.preferredProvider ? `  preferredProvider=${configLine.preferredProvider}` : '') +
-      (configLine.pool ? `  ${configLine.kernelRole} pool '${configLine.pool}' -> [${(configLine.members ?? []).join(', ')}]` : '') +
-      (configLine.error ? `  (${configLine.error})` : ''));
-    console.log(`chain: ${source}  ->  [${chain.join(', ') || '(empty)'}]`);
-    console.log('candidates:');
-    evaluated.forEach((c, i) => {
-      const spec = c.provider !== undefined
-        ? `provider=${c.provider ?? '(none)'}  model=${c.model ?? '(none)'}  maxParallel=${c.maxParallel ?? '(none)'}  preflight=[${(c.preflight ?? []).join(',')}]`
-        : '';
-      console.log(`  ${i + 1}. ${c.target}  ${spec}  status=${c.status}` +
-        (c.note ? `  (${c.note})` : ''));
-      if (args.verbose && c.reasons?.length) console.log(`     reasons: ${c.reasons.join('; ')}`);
-    });
-    if (primary) {
-      console.log(`primary: ${primary.target} (${planReasonFor(primary)})`);
-      console.log(`fallbacks: [${fallbacks.map((c) => c.target + ' (' + c.status + ')').join(', ')}]`);
-    } else {
-      console.log(`primary: none — no pool on the ${args.difficulty} tier can preview this workload`);
-      for (const c of evaluated.filter(c => c.reasons?.length)) console.log(`  ${c.target}: ${c.reasons.join('; ')}`);
-    }
-    console.log(`estimate: cold ~${estimate.coldMinutes}m for ${/^[aeiou]/i.test(args.difficulty) ? 'an' : 'a'} ${args.difficulty} operation`);
-  }
+  const shown = { args, w, configLine: planConfigLine(w, owner), source, chain, evaluated, primary, fallbacks, estimate };
+  if (args.json) printPlanJson(shown);
+  else printPlanText(shown);
   if (!primary) process.exit(1);
 }
 
@@ -453,9 +378,8 @@ async function availabilityReader(repo) {
 
 // --- main -------------------------------------------------------------------------
 
-async function main() {
-  const args = parseArgs(process.argv.slice(2), fileURLToPath(import.meta.url));
-  if (!args.kind) { console.error('--kind is required'); process.exit(2); }
+// The models directory's data and the workload of the requested kind, raised to its role's difficulty floor.
+function loadRoute(args) {
   const modelsDir = path.resolve(args.modelsDir ?? path.join(skillRoot, 'modules', 'models'));
   const rules = loadRules(modelsDir);
   const kinds = readYaml(path.join(modelsDir, 'kinds.yaml'));
@@ -484,11 +408,14 @@ async function main() {
   w.work = route.work;
   w.order = route.order;
   w.difficulty = { measured, floor: route.floor, effective: difficulty };
+  return { modelsDir, rules, registry, runtimes, evidenceByRuntime, route, measured, difficulty, w };
+}
 
-  // Owner config (config.yaml): models.nonOperation pools bind kernel-function
-  // kinds to a configured pool, allocation.preferredProvider is a bounded owner
-  // bias over order (never a fallback chain — it permutes, it does not shrink
-  // eligibility), effort is surfaced for the caller. Absent file → no effect.
+// Owner config (config.yaml): models.nonOperation pools bind kernel-function
+// kinds to a configured pool, allocation.preferredProvider is a bounded owner
+// bias over order (never a fallback chain — it permutes, it does not shrink
+// eligibility), effort is surfaced for the caller. Absent file → no effect.
+function ownerBindingOf(args, w) {
   const ownerFile = inspectOwnerConfig(ownerRoot);
   const ownerCfg = ownerFile.config;
   const cfgRole = KERNEL_FUNCTION_ROLE[args.kind] ?? null;
@@ -498,104 +425,105 @@ async function main() {
   const preferredProvider = typeof ownerCfg?.allocation?.preferredProvider === 'string'
     && ownerCfg.allocation.preferredProvider.trim() ? ownerCfg.allocation.preferredProvider.trim() : null;
   const effort = (w.modelFunction ? ownerCfg?.kernel?.effort ?? ownerCfg?.effort : ownerCfg?.effort) ?? null;
-  const owner = { file: ownerFile.file, config: ownerCfg, error: ownerFile.error,
+  return { file: ownerFile.file, config: ownerCfg, error: ownerFile.error,
     configInvalid: ownerFile.invalid ?? null,
     cfgRole, cfgPoolName, cfgMembers, preferredProvider, effort };
+}
 
-  const candidates = loadCandidates(modelsDir);
-  if (args.plan) {
-    if (!PLAN_COLD_MINUTES[args.difficulty]) { console.error('--plan requires --difficulty <easy|medium|hard|insane>'); process.exit(2); }
-    runPlan({ ...args, difficulty }, rules, runtimes, w, evidenceByRuntime, owner);
-    return;
-  }
+// Which think order the kind is held to: its declared order (review, ui, implement), a kernel function's sol-think order, else think.
+function thinkOrderOf(runtimes, route, w) {
+  const preference = runtimes?.allocation?.preference;
+  const frontier = preference?.think ?? [];
+  const solThink = Array.isArray(preference?.['sol-think']) ? preference['sol-think'] : null;
+  const hasRouteOrder = w.work === 'think' && route.order && !w.modelFunction && Array.isArray(preference?.[route.order]);
+  let thinkKey = 'think'; if (w.modelFunction && solThink) thinkKey = 'sol-think'; if (hasRouteOrder) thinkKey = route.order;
+  return { frontier, solThink, thinkKey, thinkPools: thinkKey === 'think' ? frontier : runtimes.allocation.preference[thinkKey] };
+}
 
-  // Kernel functions route inside the configured non-operation pool when the
-  // owner config declares one (models.nonOperation.<role> → pools.<name>) —
-  // the same binding engine/config.mjs resolves via nonOperationModels().
-  const think = w.work === 'think';
-  const frontier = runtimes?.allocation?.preference?.think ?? [];
+// The candidate order the kind walks and where it comes from: a configured non-operation pool, the kernel group, or the declared chain.
+function launchOrderOf({ args, ctx, owner, think }) {
+  const { runtimes, registry, route, w } = ctx;
   // The kernel's own calls walk the sol-think order (runtimes.yaml
   // allocation.preference.sol-think: Sol first, Opus as overflow — owner
   // routing 2026-09-26), falling back to the frontier think group when
   // sol-think is undeclared.
-  const solThink = Array.isArray(runtimes?.allocation?.preference?.['sol-think'])
-    ? runtimes.allocation.preference['sol-think'] : null;
-  const kernelGroup = solThink ?? runtimes?.allocation?.frontier ?? frontier;
-  const kernelGroupSource = solThink ? 'runtimes.yaml allocation.preference.sol-think' : 'runtimes.yaml allocation.frontier';
-  // A think kind with its own order (review, ui, implement — the kind's declared
-  // order) is held to that order; a kernel function to the sol-think order;
-  // every other think kind to the think order.
-  const hasRouteOrder = think && route.order && !w.modelFunction && Array.isArray(runtimes?.allocation?.preference?.[route.order]);
-  let thinkKey = 'think'; if (w.modelFunction && solThink) thinkKey = 'sol-think'; if (hasRouteOrder) thinkKey = route.order;
-  const thinkPools = thinkKey === 'think' ? frontier : runtimes.allocation.preference[thinkKey];
+  const kernelGroup = think.solThink ?? runtimes?.allocation?.frontier ?? think.frontier;
+  const kernelGroupSource = think.solThink ? 'runtimes.yaml allocation.preference.sol-think' : 'runtimes.yaml allocation.frontier';
   const orderKey = orderKeyOf(route, w.role);
   let { order, source: orderSource } = candidateOrder(args.kind, orderKey, registry, runtimes);
-  if (w.modelFunction && cfgMembers?.length) {
-    order = cfgMembers;
-    orderSource = `config.yaml models.nonOperation.${cfgRole} → pools.${cfgPoolName}`;
+  if (w.modelFunction && owner.cfgMembers?.length) {
+    order = owner.cfgMembers;
+    orderSource = `config.yaml models.nonOperation.${owner.cfgRole} → pools.${owner.cfgPoolName}`;
   } else if (w.modelFunction && !registry?.operators?.[args.kind]?.chain) {
     order = kernelGroup;
     orderSource = kernelGroupSource;
   }
-  const ordered = [...candidates].sort((a, b) => {
-    const pa = preferredProvider && a.provider === preferredProvider ? 0 : 1;
-    const pb = preferredProvider && b.provider === preferredProvider ? 0 : 1;
-    const ia = order.indexOf(a.id), ib = order.indexOf(b.id);
-    return pa - pb || (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.id.localeCompare(b.id);
-  });
+  return { orderKey, order, orderSource, kernelGroup };
+}
 
-  const chainDeclared = orderSource.startsWith('registry.yaml') || orderSource.startsWith('config.yaml') || orderSource.startsWith('runtimes.yaml allocation.');
-  const availability = w.modelFunction ? await availabilityReader(args.repo) : null;
-  const evaluated = ordered.map(c => {
-    // Think work runs only on its think-class order - the frontier pools for
-    // think, or the kind's own declared order (review, ui, implement) or the
-    // kernel functions' sol-think order; neither a declared chain
-    // nor preferredProvider can move it anywhere else.
-    if (think && !thinkPools.includes(c.id))
-      return { c, eligible: false, mode: null, reasons: [`think work runs only on runtimes.yaml allocation.preference.${thinkKey}`] };
-    // A declared operator chain — or a configured non-operation pool — is a
-    // closed set: pools absent from it are not on the launch path at all
-    // (interface.draw → [devin-agent, codex-agent] only; kernelManager → its pool only).
-    if (chainDeclared && !order.includes(c.id))
-      return { c, eligible: false, mode: null, reasons: [
-        `pool is not on the declared chain for ${args.kind} (${orderSource})`] };
-    // A pool serves the kind when it serves its role or the order the kind
-    // walks (scripts/agent/models.mjs::selectPool applies the same gate).
-    if (w.role && c.roles.length && !c.roles.includes(w.role) && !c.roles.includes(orderKey))
-      return { c, eligible: false, mode: null, reasons: [
-        `pool does not serve role '${w.role}'` + (orderKey !== w.role ? ` or order '${orderKey}'` : '')] };
-    const missingTools = missingHostTools({ pool: runtimes?.runtimes?.[c.id] ?? { provider: c.provider }, kind: args.kind });
-    if (missingTools.length)
-      return { c, eligible: false, mode: null, reasons: missingTools.map(tool => `pool agent '${c.provider}' lacks host tool '${tool}' required by kind '${args.kind}' (route.riskHints host-tool-required:${tool})`) };
-    const lm = resolveLaunchModel(c.id, difficulty, { runtimes });
-    if (lm.error) return { c, eligible: false, mode: null, reasons: [lm.error] };
-    const avail = availability?.read(c.provider) ?? null;
-    if (avail?.state === 'unavailable')
-      return { c, eligible: false, mode: null, availability: avail, reasons: [`provider ${c.provider} unavailable: ${avail.reason}`] };
-    const qr = qualificationReasons({ provider: c.provider, model: lm.modelId ?? c.target, target: c.target, version: null }, evidenceByRuntime[c.id], w, rules);
-    if (!qr.length) return { c, eligible: true, mode: 'qualified', reasons: [], availability: avail };
-    const pr = probationAdmissionReasons(w, rules);
-    if (!pr.length) return { c, eligible: true, mode: 'probation', reasons: [], qualifiedFailed: qr, availability: avail };
-    // selection.yaml decisionFlow kernel-function: the kernel's own calls on the
-    // sol-think order need no qualification record.
-    if (w.modelFunction && kernelGroup.includes(c.id))
-      return { c, eligible: true, mode: 'kernel-function', reasons: [], qualifiedFailed: qr, availability: avail };
-    return { c, eligible: false, mode: null, reasons: [...qr, ...pr], availability: avail };
-  });
-  availability?.close();
+// The candidates in launch order: the owner's preferred provider first, then the walked order, then the id.
+const orderedCandidates = (candidates, order, preferredProvider) => [...candidates].sort((a, b) => {
+  const pa = preferredProvider && a.provider === preferredProvider ? 0 : 1;
+  const pb = preferredProvider && b.provider === preferredProvider ? 0 : 1;
+  const ia = order.indexOf(a.id), ib = order.indexOf(b.id);
+  return pa - pb || (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.id.localeCompare(b.id);
+});
 
-  const { pickedSet, rule, admission } = admittedModelSet({ evaluated, w, args, difficulty, registry, runtimes, effort });
+// The structural reasons a pool is off the launch path for this workload (think order, declared chain, role, host tools), or [].
+function structuralReasons(c, e) {
+  const { args, w, think, order, orderSource, orderKey, runtimes, chainDeclared, thinkKey } = e;
+  // Think work runs only on its think-class order - the frontier pools for
+  // think, or the kind's own declared order (review, ui, implement) or the
+  // kernel functions' sol-think order; neither a declared chain
+  // nor preferredProvider can move it anywhere else.
+  if (think && !e.thinkPools.includes(c.id)) return [`think work runs only on runtimes.yaml allocation.preference.${thinkKey}`];
+  // A declared operator chain — or a configured non-operation pool — is a
+  // closed set: pools absent from it are not on the launch path at all
+  // (interface.draw → [devin-agent, codex-agent] only; kernelManager → its pool only).
+  if (chainDeclared && !order.includes(c.id)) return [`pool is not on the declared chain for ${args.kind} (${orderSource})`];
+  // A pool serves the kind when it serves its role or the order the kind
+  // walks (scripts/agent/models.mjs::selectPool applies the same gate).
+  if (w.role && c.roles.length && !c.roles.includes(w.role) && !c.roles.includes(orderKey))
+    return [`pool does not serve role '${w.role}'` + (orderKey !== w.role ? ` or order '${orderKey}'` : '')];
+  const missingTools = missingHostTools({ pool: runtimes?.runtimes?.[c.id] ?? { provider: c.provider }, kind: args.kind });
+  return missingTools.map(tool => `pool agent '${c.provider}' lacks host tool '${tool}' required by kind '${args.kind}' (route.riskHints host-tool-required:${tool})`);
+}
+
+// One candidate judged: eligible with a mode (qualified, probation, kernel-function) or rejected with reasons.
+function evaluateCandidate(c, e) {
+  const { w, rules, runtimes, evidenceByRuntime, difficulty, availability, kernelGroup } = e;
+  const reasons = structuralReasons(c, e);
+  if (reasons.length) return { c, eligible: false, mode: null, reasons };
+  const lm = resolveLaunchModel(c.id, difficulty, { runtimes });
+  if (lm.error) return { c, eligible: false, mode: null, reasons: [lm.error] };
+  const avail = availability?.read(c.provider) ?? null;
+  if (avail?.state === 'unavailable')
+    return { c, eligible: false, mode: null, availability: avail, reasons: [`provider ${c.provider} unavailable: ${avail.reason}`] };
+  const qr = qualificationReasons({ provider: c.provider, model: lm.modelId ?? c.target, target: c.target, version: null }, evidenceByRuntime[c.id], w, rules);
+  if (!qr.length) return { c, eligible: true, mode: 'qualified', reasons: [], availability: avail };
+  const pr = probationAdmissionReasons(w, rules);
+  if (!pr.length) return { c, eligible: true, mode: 'probation', reasons: [], qualifiedFailed: qr, availability: avail };
+  // selection.yaml decisionFlow kernel-function: the kernel's own calls on the
+  // sol-think order need no qualification record.
+  if (w.modelFunction && kernelGroup.includes(c.id))
+    return { c, eligible: true, mode: 'kernel-function', reasons: [], qualifiedFailed: qr, availability: avail };
+  return { c, eligible: false, mode: null, reasons: [...qr, ...pr], availability: avail };
+}
+
+// The result document of a routing: the pick, the fallback chain, why the others were rejected, the quota availability read.
+function routingResult({ args, ctx, owner, evaluated, availability, orderSource, pickedSet, rule, admission }) {
+  const { w, rules, runtimes, difficulty } = ctx;
   const pick = pickedSet[0] ?? null;
   const modelFor = c => resolveLaunchModel(c.id, difficulty, { runtimes }).modelId ?? c.target;
   const result = {
     workload: w,
     config: {
-      file: ownerCfg ? path.relative(skillRoot, owner.file) : null,
+      file: owner.config ? path.relative(skillRoot, owner.file) : null,
       ...(owner.error ? { error: owner.error } : {}),
       ...(owner.configInvalid ? { configInvalid: owner.configInvalid } : {}),
-      effort: effort ?? null,
-      preferredProvider,
-      ...(w.modelFunction ? { kernelRole: cfgRole, pool: cfgPoolName ?? null, members: cfgMembers ?? null } : {}),
+      effort: owner.effort ?? null,
+      preferredProvider: owner.preferredProvider,
+      ...(w.modelFunction ? { kernelRole: owner.cfgRole, pool: owner.cfgPoolName ?? null, members: owner.cfgMembers ?? null } : {}),
     },
     assumptions: {
       approved: w.approved, scope: w.scope, noExternalEffects: w.noExternalEffects,
@@ -614,35 +542,81 @@ async function main() {
   };
   if (pick && !w.modelFunction && pick.mode === 'probation')
     result.note = 'probation admits exactly one target for one durable job; fallbackChain lists order, not parallel admission';
+  return { result, pick, modelFor };
+}
 
-  if (args.json) console.log(JSON.stringify(result, null, 2));
-  else {
-    const floorNote = difficulty !== measured ? ` (raised from ${measured} to floor ${route.floor})` : '';
-    console.log(`workload: kind=${w.kind} role=${w.role ?? '(none)'} work=${w.work ?? '(unclassified)'} difficulty=${difficulty}${floorNote} risk=${w.risk} floor=${w.qualityFloor} tools=[${w.tools}] ctx=${w.contextTokens}` +
-      (w.elevated ? '  ELEVATED' : '') + (w.modelFunction ? '  KERNEL-FUNCTION' : ''));
-    console.log(`assumed: approved=${w.approved} local noExternalEffects=${w.noExternalEffects} strictMachineGates=${w.strictMachineGates} freshIndependentReview=${w.freshIndependentReview}`);
-    console.log(`config: ${result.config.file ?? 'absent'}` +
-      (result.config.effort ? `  effort=${result.config.effort}` : '') +
-      (preferredProvider ? `  preferredProvider=${preferredProvider} (bias, not a chain)` : '') +
-      (result.config.pool ? `  ${result.config.kernelRole} pool '${result.config.pool}' -> [${(result.config.members ?? []).join(', ')}]` : '') +
-      (owner.error ? `  (${owner.error})` : ''));
+function printRoutingHeader({ ctx, owner, result }) {
+  const { w, difficulty, measured, route } = ctx;
+  const floorNote = difficulty !== measured ? ` (raised from ${measured} to floor ${route.floor})` : '';
+  console.log(`workload: kind=${w.kind} role=${w.role ?? '(none)'} work=${w.work ?? '(unclassified)'} difficulty=${difficulty}${floorNote} risk=${w.risk} floor=${w.qualityFloor} tools=[${w.tools}] ctx=${w.contextTokens}` +
+    (w.elevated ? '  ELEVATED' : '') + (w.modelFunction ? '  KERNEL-FUNCTION' : ''));
+  console.log(`assumed: approved=${w.approved} local noExternalEffects=${w.noExternalEffects} strictMachineGates=${w.strictMachineGates} freshIndependentReview=${w.freshIndependentReview}`);
+  console.log(`config: ${result.config.file ?? 'absent'}` +
+    (result.config.effort ? `  effort=${result.config.effort}` : '') +
+    (owner.preferredProvider ? `  preferredProvider=${owner.preferredProvider} (bias, not a chain)` : '') +
+    (result.config.pool ? `  ${result.config.kernelRole} pool '${result.config.pool}' -> [${(result.config.members ?? []).join(', ')}]` : '') +
+    (owner.error ? `  (${owner.error})` : ''));
+}
 
-    if (pick) {
-      console.log(`PICK ${pick.c.target}  model=${modelFor(pick.c)}  mode=${pick.mode}`);
-      console.log(`  rule: ${rule}`);
-      console.log(`  order: ${orderSource}`);
-      if (result.availability) console.log(`  availability: ${Object.entries(result.availability).map(([t, a]) => t + '=' + a.state).join(' ')}`);
-      if (result.fallbackChain.length) {
-        console.log('fallback chain:');
-        for (const f of result.fallbackChain) console.log(`  -> ${f.target} (${f.model}) [${f.mode}]`);
-      }
-      if (result.note) console.log(`  note: ${result.note}`);
-      if (args.verbose) for (const r of result.rejected) console.log(`  rejected ${r.target}: ${r.reasons.join('; ')}`);
-    } else {
-      console.log(`REFUSAL — ${rule}`);
-      for (const r of result.rejected) console.log(`  ${r.target}: ${r.reasons.join('; ')}`);
-    }
+function printPick({ args, pick, modelFor, orderSource, rule, result }) {
+  console.log(`PICK ${pick.c.target}  model=${modelFor(pick.c)}  mode=${pick.mode}`);
+  console.log(`  rule: ${rule}`);
+  console.log(`  order: ${orderSource}`);
+  if (result.availability) console.log(`  availability: ${Object.entries(result.availability).map(([t, a]) => t + '=' + a.state).join(' ')}`);
+  if (result.fallbackChain.length) {
+    console.log('fallback chain:');
+    for (const f of result.fallbackChain) console.log(`  -> ${f.target} (${f.model}) [${f.mode}]`);
   }
+  if (result.note) console.log(`  note: ${result.note}`);
+  if (args.verbose) for (const r of result.rejected) console.log(`  rejected ${r.target}: ${r.reasons.join('; ')}`);
+}
+
+function printRefusal({ rule, result }) {
+  console.log(`REFUSAL — ${rule}`);
+  for (const r of result.rejected) console.log(`  ${r.target}: ${r.reasons.join('; ')}`);
+}
+
+function printRouting({ args, ctx, owner, result, pick, modelFor, orderSource, rule }) {
+  printRoutingHeader({ ctx, owner, result });
+  if (pick) printPick({ args, pick, modelFor, orderSource, rule, result });
+  else printRefusal({ rule, result });
+}
+
+// Every candidate judged for the workload, in launch order. Kernel functions route inside the configured non-operation pool
+// when the owner config declares one (models.nonOperation.<role> → pools.<name>) — the same binding engine/config.mjs
+// resolves via nonOperationModels().
+async function judgeCandidates({ args, ctx, owner, candidates }) {
+  const { rules, runtimes, evidenceByRuntime, route, difficulty, w } = ctx;
+  const thinkOrder = thinkOrderOf(runtimes, route, w);
+  const { orderKey, order, orderSource, kernelGroup } = launchOrderOf({ args, ctx, owner, think: thinkOrder });
+  const ordered = orderedCandidates(candidates, order, owner.preferredProvider);
+  const chainDeclared = orderSource.startsWith('registry.yaml') || orderSource.startsWith('config.yaml') || orderSource.startsWith('runtimes.yaml allocation.');
+  const availability = w.modelFunction ? await availabilityReader(args.repo) : null;
+  const judging = { args, w, rules, runtimes, evidenceByRuntime, difficulty, availability, kernelGroup, think: w.work === 'think', thinkKey: thinkOrder.thinkKey,
+    thinkPools: thinkOrder.thinkPools, order, orderSource, orderKey, chainDeclared };
+  const evaluated = ordered.map(c => evaluateCandidate(c, judging));
+  availability?.close();
+  return { evaluated, availability, orderSource };
+}
+
+async function main() {
+  const args = parseArgs(process.argv.slice(2), fileURLToPath(import.meta.url));
+  if (!args.kind) { console.error('--kind is required'); process.exit(2); }
+  const ctx = loadRoute(args);
+  const { modelsDir, rules, registry, runtimes, evidenceByRuntime, difficulty, w } = ctx;
+  const owner = ownerBindingOf(args, w);
+  const candidates = loadCandidates(modelsDir);
+  if (args.plan) {
+    if (!PLAN_COLD_MINUTES[args.difficulty]) { console.error('--plan requires --difficulty <easy|medium|hard|insane>'); process.exit(2); }
+    runPlan({ ...args, difficulty }, rules, runtimes, w, evidenceByRuntime, owner);
+    return;
+  }
+
+  const { evaluated, availability, orderSource } = await judgeCandidates({ args, ctx, owner, candidates });
+  const { pickedSet, rule, admission } = admittedModelSet({ evaluated, w, args, difficulty, registry, runtimes, effort: owner.effort });
+  const { result, pick, modelFor } = routingResult({ args, ctx, owner, evaluated, availability, orderSource, pickedSet, rule, admission });
+  if (args.json) console.log(JSON.stringify(result, null, 2));
+  else printRouting({ args, ctx, owner, result, pick, modelFor, orderSource, rule });
   if (!pick) process.exit(1);
 }
 
