@@ -105,11 +105,12 @@ export function pickOpModel(input = {}) {
 
 // With no live evidence the plan applies the structural gates and the bias only: no quota, history or reservation is read.
 function staticPick(members, { bias, settings, input }) {
-  const picked = pickFromTier({ tier: members[0]?.tier ?? null, members: members.map((member) => ({ ...member, pressure: 0 })), bias: { ...bias, trusted: false },
+  const tier = members[0]?.tier ?? null;
+  const picked = pickFromTier({ tier, members: members.map((member) => ({ ...member, pressure: 0 })), bias: { ...bias, trusted: false },
     history: input.historyOf?.(tier) ?? input.history ?? {}, balance: { maxStreak: settings.balance.maxStreak, maxSharePercent: settings.balance.maxSharePercent }, usage: settings.usage });
   const chosen = picked.selected;
   const rejected = picked.record.dropped.map((row) => ({ target: row.id, reason: row.reason, reasons: [row.reason] }));
-  if (!picked.ok || !chosen) return { error: `no eligible member of tier ${members[0]?.tier ?? '(none)'}`, rejected, pick: picked.record };
+  if (!picked.ok || !chosen) return { error: `no eligible member of tier ${tier ?? '(none)'}`, rejected, pick: picked.record };
   return { target: chosen.target, modelId: chosen.model, effort: chosen.effort, rejected, pick: picked.record, chosenBy: picked.chosenBy,
     admission: { ok: false, reason: 'live-evidence-required', planOnly: true } };
 }
