@@ -1,13 +1,19 @@
 group: reconciler
 verb: up
 owner: runtime
-summary: bring the runtime host services and live seats up and print one checklist
+summary: bring the host services and seats up, or check them read-only, and print the checklist
 impl:
   script: scripts/reconciler/start.mjs
 flags:
   - name: check
     type: boolean
     summary: run one read-only checklist pass
+  - name: services
+    type: boolean
+    summary: heal only the no-quota host services (launcher shim, the three Windows tasks, UI build, engine, harness UI and tunnel, ask gateway and tunnel) and never launch an agent seat
+  - name: brief
+    type: boolean
+    summary: print the compact status (one line per row that is not green, or one all-green line) instead of the full checklist
   - name: wait
     type: number
     summary: seconds to wait for the checklist to become green
@@ -32,12 +38,14 @@ flags:
     type: string
     summary: declared ingress effort for optional core maintenance
 exit:
-  "0": every required checklist row is green
+  "0": every required checklist row is green (a seat that is not running while no workflow needs it is idle and green)
   "1": one or more required checklist rows are red
-  "2": bad usage
+  "2": bad usage, or --services combined with --check, --set-profile or --retire-stale-ledgers
 json: flag
 examples:
   - starci reconciler up
   - starci reconciler up --check --json
+  - starci reconciler up --check --brief
+  - starci reconciler up --services
   - starci reconciler up --caller-agent codex --caller-model gpt-6.1-sol --caller-effort high --json
 editions: [full]

@@ -10,6 +10,9 @@ export const RECONCILER_SERVICE = `sched-task:${TASK_DEFINITIONS.reconciler.task
 /** The runtime task (a TASK_DEFINITIONS key) behind each service that runs through one. */
 export const SERVICE_TASKS = Object.freeze({ 'harness-ui': 'harness-app', 'harness-tunnel': 'harness-tunnel', [RECONCILER_SERVICE]: 'reconciler' });
 const START_POLL_MS = 3000;
+/** The no-quota heal that links the launcher, registers the tasks and starts the services that are down. */
+export const HEAL_SERVICES = 'starci reconciler up --services';
+const healFix = (manual) => `${HEAL_SERVICES} (or ${manual})`;
 
 /** The registry probe of the reconciler task: healthy when registered, enabled, on today's action with its shim present. */
 export async function reconcilerTaskProbe({ audit, allowTaskRepair, env }) {
@@ -25,8 +28,8 @@ export function reconcilerTaskItem(probe) {
   const name = `scheduled task ${TASK_DEFINITIONS.reconciler.taskName}`;
   const found = probe.detail?.audit;
   if (probe.ok) return green('services', probe.name, name, `registered, action current, shim present (${taskFacts(found)})`, { required: false });
-  if (probe.unmanaged && (!found || found.problem === 'missing')) return warn('services', probe.name, name, found ? 'missing (unmanaged)' : `unreadable (unmanaged): ${probe.detail?.error}`, 'starci task register reconciler --apply (the owner)');
-  if (found) return red('services', probe.name, name, found.reason, found.fix, { required: false });
+  if (probe.unmanaged && (!found || found.problem === 'missing')) return warn('services', probe.name, name, found ? 'missing (unmanaged)' : `unreadable (unmanaged): ${probe.detail?.error}`, healFix('starci task register reconciler --apply'));
+  if (found) return red('services', probe.name, name, found.reason, healFix(found.fix), { required: false });
   return warn('services', probe.name, name, `unreadable: ${probe.detail?.error ?? 'not healthy'}`, 'starci task list');
 }
 
@@ -37,15 +40,26 @@ export function taskItems(result) {
   return ['harness-app', 'harness-tunnel'].map((key) => {
     const found = result.audits[key];
     const name = `scheduled task ${found.taskName}`;
-    return found.ok ? green('services', `task:${key}`, name, `registered, action current, shim present (${taskFacts(found)})`) : red('services', `task:${key}`, name, found.reason, found.fix, { required: false });
+    return found.ok ? green('services', `task:${key}`, name, `registered, action current, shim present (${taskFacts(found)})`) : red('services', `task:${key}`, name, found.reason, healFix(found.fix), { required: false });
   });
+}
+
+/** Whether one task audit lists `problem` (the first problem, or any of its `problems`). */
+export const hasProblem = (found, problem) => (found.problems ?? [found.problem]).includes(problem);
+
+/** The launcher shim row from one audit (the input of `taskItems`): the per-user shim every task action calls; none when no audit was made. */
+export function launcherItem(result) {
+  if (!result?.ok) return [];
+  const found = Object.values(result.audits).find((audit) => hasProblem(audit, 'shim-missing'));
+  if (!found) return [green('services', 'launcher-shim', 'launcher shim', `present (${Object.values(result.audits)[0].shim})`)];
+  return [red('services', 'launcher-shim', 'launcher shim', `${found.shim} does not exist, so no task action can start starci`, healFix('starci runtime link'), { required: false })];
 }
 
 /** For a service that runs through a task: {note, fix} to add to its row (the task's problem, or its state and last result), else null. */
 export function serviceTaskNote(service, audits) {
   const found = audits?.[SERVICE_TASKS[service]];
   if (!found) return null;
-  return found.ok ? { note: `task '${found.taskName}' ${taskFacts(found)}`, fix: null } : { note: found.reason, fix: found.fix };
+  return found.ok ? { note: `task '${found.taskName}' ${taskFacts(found)}`, fix: null } : { note: found.reason, fix: healFix(found.fix) };
 }
 
 const notHealthyWhy = (last) => last.detail?.error ?? (last.detail?.status ? `HTTP ${last.detail.status}` : 'no answer');

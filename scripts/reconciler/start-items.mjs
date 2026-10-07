@@ -1,7 +1,7 @@
 import { CONNECTOR_DEFAULTS } from '../../engine/config.mjs';
 import { PROFILES, REQUIRED_ACTIVE, configuredMode } from './state.mjs';
 import { green, red, warn } from './checklist-items.mjs';
-import { reconcilerTaskItem, serviceTaskNote } from './task-health.mjs';
+import { HEAL_SERVICES, reconcilerTaskItem, serviceTaskNote } from './task-health.mjs';
 
 export const PROFILE = 'operational';
 
@@ -42,7 +42,7 @@ const leaderItem = (leader) => {
     const detail = leader.holder
       ? `stale: leader ${leader.holder} pid ${leader.pid} heartbeat ${heartbeat} old`
       : 'not running';
-    return red('engine', 'engine', 'reconciler engine', detail, 'starci reconciler up');
+    return red('engine', 'engine', 'reconciler engine', detail, HEAL_SERVICES);
   }
   const detail = `leader ${leader.holder} pid ${leader.pid} epoch ${leader.epoch} heartbeat ${Math.round(leader.ageMs / 1000)}s ago${leader.draining ? ' (draining a reload)' : ''}`;
   return green('engine', 'engine', 'reconciler engine', detail);
@@ -54,7 +54,7 @@ const safeModeItem = (s, safeIsCrashLoop, shadowed) => {
     ? 'running --safe: a real crash loop is on record (every controller is forced shadow)'
     : 'running --safe (every controller forced shadow) without a crash loop behind it';
   const shadowNote = shadowed.length ? `; configured active but running shadow: ${shadowed.join(', ')}` : '';
-  return red('engine', 'safe-mode', 'engine safe mode', detail + shadowNote, 'starci reconciler up (restarts it normally)');
+  return red('engine', 'safe-mode', 'engine safe mode', detail + shadowNote, `${HEAL_SERVICES} (restarts it normally)`);
 };
 
 const controllerItem = (name, mode) => {
@@ -63,7 +63,7 @@ const controllerItem = (name, mode) => {
   const shown = mode.effective + (mode.configured !== mode.effective ? ` (configured ${mode.configured})` : '');
   if (required) {
     if (mode.effective === 'active') return green('controllers', `mode:${name}`, `controller ${name}`, shown);
-    const fix = mode.configured === 'active' ? 'the engine is not running it yet: starci reconciler up' : 'starci reconciler up --set-profile operational';
+    const fix = mode.configured === 'active' ? `the engine is not running it yet: ${HEAL_SERVICES}` : 'starci reconciler up --set-profile operational';
     return red('controllers', `mode:${name}`, `controller ${name}`, `${shown}, start needs active`, fix);
   }
   if (mode.effective === 'off' && wanted !== 'off') return warn('controllers', `mode:${name}`, `controller ${name}`, `${shown}, profile expects ${wanted}`);
@@ -114,7 +114,7 @@ const serviceItem = (probe, { publicUrl, config, audits }) => {
   if (!serviceWanted(probe.name, config)) return green('services', probe.name, label, 'off in config.yaml connectors (not required)', { required: false });
   const fix = taskNote?.fix ?? (probe.name === 'orca'
     ? 'open Orca yourself, then run start again (start never launches a GUI app)'
-    : 'the reconciler Host controller manages this service; run starci reconciler start');
+    : HEAL_SERVICES);
   return red('services', probe.name, label, detail, fix);
 };
 

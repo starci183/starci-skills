@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { allocationSettings } from '../../engine/config.mjs';
+import { shortHash } from '../../scripts/lib/hash.mjs';
 import { hostSettings } from '../../scripts/reconciler/services.mjs';
 import { TASK_DEFINITIONS, taskRegister } from '../../scripts/machine/task-register.mjs';
 import { taskList, taskShow } from '../../scripts/machine/task-show.mjs';
@@ -37,6 +38,8 @@ test('task register --apply makes exactly one injected registration call', async
   assert.equal(calls.length, 1);
   assert.match(calls[0].script, /Register-ScheduledTask/);
   assert.deepEqual(calls[0].options, { env: {} });
+  assert.equal(result.data.scriptSha256, shortHash(calls[0].script, { n: 16 }), 'the receipt carries the hash of the exact script applied');
+  assert.equal((await taskRegister(ctx('reconciler'), {})).data.scriptSha256, result.data.scriptSha256, 'the printed review hashes to the same script');
 });
 
 test('task show maps a canned query payload to starci/task-show@1', async () => {

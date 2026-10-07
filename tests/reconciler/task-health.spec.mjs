@@ -38,9 +38,9 @@ test('the reconciler task row says why it is not healthy, with the exact fix', (
   const old = row({ audit: stale('reconciler') });
   assert.equal(old.status, 'red');
   assert.match(old.detail, /runs "old"/);
-  assert.equal(old.fix, 'starci task register reconciler --apply');
+  assert.equal(old.fix, 'starci reconciler up --services (or starci task register reconciler --apply)');
   const shim = row({ audit: audit('reconciler', { ok: false, problem: 'shim-missing', reason: 'the per-user shim X does not exist', fix: 'starci runtime link' }) });
-  assert.deepEqual([shim.status, shim.fix], ['red', 'starci runtime link']);
+  assert.deepEqual([shim.status, shim.fix], ['red', 'starci reconciler up --services (or starci runtime link)']);
   const missing = row({ audit: audit('reconciler', { ok: false, problem: 'missing' }) }, { unmanaged: true });
   assert.deepEqual([missing.status, missing.detail], ['warn', 'missing (unmanaged)']);
   const unreadable = row({ error: 'timeout' });
@@ -53,7 +53,7 @@ test('the harness app and tunnel tasks get a readiness row each; a task that can
   const rows = taskItems(result({ 'harness-app': stale('harness-app'), 'harness-tunnel': audit('harness-tunnel'), reconciler: audit('reconciler') }));
   assert.deepEqual(rows.map((r) => [r.id, r.status, r.required]), [['task:harness-app', 'red', false], ['task:harness-tunnel', 'green', true]]);
   assert.equal(rows[0].name, 'scheduled task StarCi Harness App');
-  assert.equal(rows[0].fix, 'starci task register harness-app --apply');
+  assert.equal(rows[0].fix, 'starci reconciler up --services (or starci task register harness-app --apply)');
   const unreadable = taskItems({ ok: false, error: 'x' });
   assert.deepEqual(unreadable.map((r) => [r.id, r.status]), [['task:scheduler', 'warn']]);
 });
@@ -63,10 +63,10 @@ test('a down harness UI row says why: the task problem and its fix, or the task 
   const [bad] = serviceItems([down], { audits: { 'harness-app': stale('harness-app') } });
   assert.equal(bad.status, 'red');
   assert.match(bad.detail, /^down: connect ECONNREFUSED 127\.0\.0\.1:4547; Windows task 'StarCi Harness App' runs "old"/);
-  assert.equal(bad.fix, 'starci task register harness-app --apply');
+  assert.equal(bad.fix, 'starci reconciler up --services (or starci task register harness-app --apply)');
   const [fine] = serviceItems([down], { audits: { 'harness-app': audit('harness-app', { lastResult: 267011 }) } });
   assert.match(fine.detail, /; task 'StarCi Harness App' state Ready, last result 0x41303$/);
-  assert.match(fine.fix, /reconciler Host controller/);
+  assert.equal(fine.fix, 'starci reconciler up --services');
   const [plain] = serviceItems([down]);
   assert.equal(plain.detail, 'down: connect ECONNREFUSED 127.0.0.1:4547');
   const [up] = serviceItems([{ name: 'harness-ui', ok: true, detail: { status: 200 } }], { audits: { 'harness-app': stale('harness-app') } });
