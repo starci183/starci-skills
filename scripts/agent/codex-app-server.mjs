@@ -9,8 +9,14 @@
 // the client's exit, never codex's. The failure names codex's exit/signal, the request it left unanswered, its
 // stderr tail, `codex --version` and the CODEX_HOME it ran with; its text starts with APP_SERVER_FAILURE, which
 // scripts/agent/provider-outage.mjs reads as a worker-start strike of the codex circuit.
+//
+// The probe is a runtime-owned child: it gets the caller's env without the seat identity or the seat's guard-shim
+// PATH (scripts/lib/seat-env.mjs). A launch-trust call made under a Kernel seat otherwise inherits both — and
+// `codex`'s own launcher resolves `node` through PATH, so the seat's tool wrapper bound the seat's role to it and
+// refused the probe as a raw tool call (RIGHTS_RAW_TOOL, exit 2; `codex --version` printed the same refusal).
 import { runNode } from '../api/node/run-node.mjs';
 import { parseJson } from '../lib/json.mjs';
+import { withoutSeatEnv, withoutSeatShim } from '../lib/seat-env.mjs';
 
 // Every launch-trust app-server failure starts with this text; provider-outage.mjs classifies it.
 export const APP_SERVER_FAILURE = 'codex app-server answered nothing';
@@ -63,9 +69,9 @@ function appServerFailure({ home, timeoutMs, r, failed }) {
  * The app-server calls of one Codex home, in order: `requests` [{method, params}] -> results[] (an error result is
  * {error}). No results throws the precise failure (appServerFailure).
  */
-export function codexAppServer({ home, requests, timeoutMs = 60_000 }) {
+export function codexAppServer({ home, requests, timeoutMs = 60_000, env = process.env }) {
   const r = runNode(['-e', APP_SERVER_CLIENT, JSON.stringify(requests)], { timeout: timeoutMs,
-    env: { ...process.env, CODEX_HOME: home } });
+    env: { ...withoutSeatShim(withoutSeatEnv(env)), CODEX_HOME: home } });
   const last = parseJson(String(r.stdout ?? '').trim().split(/\r?\n/).pop() ?? '', null);
   if (Array.isArray(last)) return last;
   throw new Error(appServerFailure({ home, timeoutMs, r, failed: last?.failed ?? null }));

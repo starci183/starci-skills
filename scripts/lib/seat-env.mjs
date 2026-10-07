@@ -9,6 +9,16 @@
 // the seat: a supervisor seat's `node install.js` reads as a raw supervisor tool call (RIGHTS_RAW_TOOL) and a spec's
 // kernel call resolves the seat's custody (kernel-caller-unknown). The seat's own agent tool calls keep the identity;
 // every other child of it gets this env.
+//
+// The seat's PATH can likewise carry the per-user guard-shim directory first (<home>/.starci/bin,
+// packages/cli/src/shim.mjs writeRuntimeShim — put there by scripts/agent/starci-shim.mjs addStarciShimToPath): its
+// wrappers judge `node`, `git`, `npm` and friends through shimDecision before reaching the real tool. Without the
+// seat identity a wrapper binds no role and passes through, but a runtime child that never answers to the seat —
+// the codex app-server probe, whose `codex` launcher resolves `node` through PATH — also gets PATH without the shim
+// directory, so nothing it spawns is ever re-judged.
+import os from 'node:os';
+import path from 'node:path';
+
 /** The variables that bind a process to the calling seat or claim a caller identity. */
 export const SEAT_ENV_VARS = Object.freeze(['ORCA_TERMINAL_HANDLE', 'ORCA_PANE_KEY', 'ORCA_TAB_ID', 'ORCA_WORKTREE_ID', 'STARCI_ROLE', 'STARCI_GUARD_FILE', 'STARCI_CALLER']);
 
@@ -16,5 +26,18 @@ export const SEAT_ENV_VARS = Object.freeze(['ORCA_TERMINAL_HANDLE', 'ORCA_PANE_K
 export function withoutSeatEnv(parent) {
   const env = { ...parent };
   for (const key of Object.keys(env)) if (SEAT_ENV_VARS.includes(key) || key.startsWith('ORCA_AGENT_')) delete env[key];
+  return env;
+}
+
+/** `parent` without the guard-shim directory on PATH (any casing of the PATH key, the one <home>/.starci/bin entry wherever it sits). Pure — the caller names the env; `home`/`platform` are injectable seams. */
+export function withoutSeatShim(parent, { home = os.homedir(), platform = process.platform } = {}) {
+  const env = { ...parent };
+  const key = Object.keys(env).find((name) => name.toLowerCase() === 'path');
+  if (!key) return env;
+  const shim = path.resolve(path.join(home, '.starci', 'bin'));
+  const resolved = (entry) => path.resolve(String(entry).replace(/^"(.*)"$/, '$1'));
+  const same = (entry) => platform === 'win32' ? resolved(entry).toLowerCase() === shim.toLowerCase() : resolved(entry) === shim;
+  const delimiter = platform === 'win32' ? ';' : ':';
+  env[key] = String(env[key]).split(delimiter).filter((entry) => entry && !same(entry)).join(delimiter);
   return env;
 }
