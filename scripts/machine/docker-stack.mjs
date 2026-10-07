@@ -147,6 +147,28 @@ export async function dockerUp(ctx, deps = {}) {
   });
 }
 
+const idsOf = (stdout) => String(stdout ?? '').split(/\s+/).filter(Boolean);
+
+// The owned containers, networks and (with --volumes) volumes a down removes, or the `failure` result of the listing that failed.
+async function downTargets(ctx, deps, filters, cwd) {
+  const dockerPs = deps.dockerPs ?? realDockerPs;
+  const resourceList = deps.resourceList ?? realResourceList;
+  const containersResult = await dockerPs({ all: true, filters }, { cwd });
+  if (!ok(containersResult)) return { failure: failed('down', containersResult) };
+  let containerRows;
+  try { containerRows = jsonRows(containersResult.stdout); } catch (error) { return { failure: { code: 1, stderr: `starci docker down: Docker ps returned invalid JSON (${error.message})` } }; }
+  const containers = containerRows.filter((row) => !isForeignContainer(row.Names ?? row.Name ?? row.name)).map((row) => String(row.ID ?? row.Id ?? row.id ?? '')).filter(Boolean);
+  const networkResult = await resourceList('network', filters, { cwd });
+  if (!ok(networkResult)) return { failure: failed('down', networkResult) };
+  let volumes = [];
+  if (ctx.args?.volumes === true) {
+    const volumeResult = await resourceList('volume', filters, { cwd });
+    if (!ok(volumeResult)) return { failure: failed('down', volumeResult) };
+    volumes = idsOf(volumeResult.stdout);
+  }
+  return { containers, networks: idsOf(networkResult.stdout), volumes };
+}
+
 /** Stop and remove only ids first selected by both exact ownership labels; optional volumes use the same selectors. */
 export async function dockerDown(ctx, deps = {}) {
   const cwd = path.resolve(ctx.cwd ?? process.cwd());
@@ -156,24 +178,10 @@ export async function dockerDown(ctx, deps = {}) {
   const projectName = dockerProjectName(identity.project, selected.stack);
   if (!projectName || isForeignContainer(projectName)) return refused(`project ${projectName ?? identity.project} is foreign`);
   return hostEffect(ctx, deps, 'docker-down', async () => {
-    const filters = ownershipFilters(identity.project, projectName);
-    const dockerPs = deps.dockerPs ?? realDockerPs;
-    const resourceList = deps.resourceList ?? realResourceList;
     const remove = deps.resourceRemove ?? realResourceRemove;
-    const containersResult = await dockerPs({ all: true, filters }, { cwd });
-    if (!ok(containersResult)) return failed('down', containersResult);
-    let containerRows;
-    try { containerRows = jsonRows(containersResult.stdout); } catch (error) { return { code: 1, stderr: `starci docker down: Docker ps returned invalid JSON (${error.message})` }; }
-    const containers = containerRows.filter((row) => !isForeignContainer(row.Names ?? row.Name ?? row.name)).map((row) => String(row.ID ?? row.Id ?? row.id ?? '')).filter(Boolean);
-    const networkResult = await resourceList('network', filters, { cwd });
-    if (!ok(networkResult)) return failed('down', networkResult);
-    const networks = String(networkResult.stdout ?? '').split(/\s+/).filter(Boolean);
-    let volumes = [];
-    if (ctx.args?.volumes === true) {
-      const volumeResult = await resourceList('volume', filters, { cwd });
-      if (!ok(volumeResult)) return failed('down', volumeResult);
-      volumes = String(volumeResult.stdout ?? '').split(/\s+/).filter(Boolean);
-    }
+    const targets = await downTargets(ctx, deps, ownershipFilters(identity.project, projectName), cwd);
+    if (targets.failure) return targets.failure;
+    const { containers, networks, volumes } = targets;
     if (containers.length) {
       const result = await (deps.composeDown ?? realComposeDown)(containers, { cwd });
       if (!ok(result)) return failed('down', result);

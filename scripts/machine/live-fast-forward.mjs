@@ -4,7 +4,7 @@
 // scripts/api/git/ call file.
 import fs from 'node:fs';
 import path from 'node:path';
-import { posixPath } from '../lib/path-key.mjs';
+import { posixPath, trimTrailingSlashes } from '../lib/path-key.mjs';
 import { withoutGitLocalEnv } from '../lib/git.mjs';
 import { configGet } from '../api/git/config-get.mjs';
 import { symbolicRef } from '../api/git/symbolic-ref.mjs';
@@ -14,7 +14,7 @@ import { updateRef } from '../api/git/update-ref.mjs';
 import { checkoutPaths } from '../api/git/checkout-paths.mjs';
 import { rmCached } from '../api/git/rm-cached.mjs';
 
-const normPath = (p) => posixPath(p).replace(/\/+$/, '');
+const normPath = (p) => trimTrailingSlashes(posixPath(p));
 
 // Windows limits a spawned command line to about 32K characters. A repository move can change hundreds
 // of paths, so every live-tree Git operation (including rollback) uses the same bounded argument batches.
@@ -43,12 +43,8 @@ function inBatches(paths, call) {
   return { ok: true, stdout: output.join('\n'), stderr: '' };
 }
 
-/**
- * Move live main from `base` to `head` and update the working tree and index of exactly `rows`
- * (name-status rows of base..head). Refuses when main moved, HEAD is not main, or a path is dirty.
- * Returns {ok, reason?, dirty?, moved?}.
- */
-export function fastForwardLive({ root, base, head, rows }) {
+// The refusal that stops a fast-forward before anything moves, or null.
+function liveRefusal(root, base) {
   // A live repo flipped to core.bare=true fails the status/checkout below with a generic error; name it and the fix.
   const bare = configGet(root, 'core.bare', { env: withoutGitLocalEnv(process.env) }).stdout.toLowerCase();
   if (bare === 'true') return { ok: false, reason: 'live-repo-bare', detail: `${root} has core.bare=true (a git fixture reached the live repo through a leaked GIT_DIR?) - find the writer, then run: git -C "${root}" config core.bare false` };
@@ -56,6 +52,48 @@ export function fastForwardLive({ root, base, head, rows }) {
   if (branch !== 'refs/heads/main') return { ok: false, reason: 'live-not-on-main', detail: branch || 'detached' };
   const live = revParse(root, 'refs/heads/main');
   if (live !== base) return { ok: false, reason: 'main-moved', moved: live };
+  return null;
+}
+
+// The working tree and index follow the moved ref: written paths checked out from head, gone paths removed; throws on a failed step.
+function updateTree(root, head, { written, gone }) {
+  if (written.length) { const co = inBatches(written, (batch) => checkoutPaths(root, head, batch)); if (!co.ok) throw new Error(co.stderr || 'checkout failed'); }
+  if (!gone.length) return;
+  const rm = inBatches(gone, (batch) => rmCached(root, batch));
+  if (!rm.ok) throw new Error(rm.stderr || 'git rm --cached failed');
+  for (const f of gone) { try { fs.rmSync(path.join(root, f), { force: true }); } catch { /* already gone */ } }
+}
+
+// Roll back: the ref first (compare-and-swap on our own head), then the paths to base.
+function rollBackTree(root, { base, head, rows }, error) {
+  const rollbackErrors = [];
+  const restoreRef = updateRef(root, 'refs/heads/main', base, { message: 'supervisor land gate rollback', old: head });
+  if (!restoreRef.ok) rollbackErrors.push(restoreRef.stderr || 'ref rollback failed');
+  const back = rows.flatMap((r) => (r[0].startsWith('A') ? [] : [normPath(r[1])]));
+  if (back.length) {
+    const restorePaths = inBatches(back, (batch) => checkoutPaths(root, base, batch));
+    if (!restorePaths.ok) rollbackErrors.push(restorePaths.stderr || 'path rollback failed');
+  }
+  const added = rows.filter((x) => x[0].startsWith('A') || x[0].startsWith('R')).map((r) => normPath(r[r.length - 1]));
+  if (added.length) {
+    const removeAdded = inBatches(added, (batch) => rmCached(root, batch));
+    if (!removeAdded.ok) rollbackErrors.push(removeAdded.stderr || 'added-path rollback failed');
+  }
+  for (const f of added) {
+    try { fs.rmSync(path.join(root, f), { force: true }); } catch { /* best effort */ }
+  }
+  return { ok: false, reason: 'tree-update-failed', detail: String(error?.message ?? error), rolledBack: rollbackErrors.length === 0,
+    ...(rollbackErrors.length ? { rollbackErrors } : {}) };
+}
+
+/**
+ * Move live main from `base` to `head` and update the working tree and index of exactly `rows`
+ * (name-status rows of base..head). Refuses when main moved, HEAD is not main, or a path is dirty.
+ * Returns {ok, reason?, dirty?, moved?}.
+ */
+export function fastForwardLive({ root, base, head, rows }) {
+  const refused = liveRefusal(root, base);
+  if (refused) return refused;
   const paths = [...new Set(rows.flatMap((r) => r.slice(1)).map(normPath))];
   // No paths, nothing to be dirty: `git status --` with an empty pathspec lists the whole tree.
   const status = inBatches(paths, (batch) => porcelainStatus(root, { pathspecs: batch, untracked: 'all', literal: true }));
@@ -69,32 +107,9 @@ export function fastForwardLive({ root, base, head, rows }) {
   const written = rows.filter((r) => !r[0].startsWith('D')).map((r) => normPath(r[r.length - 1]));
   const gone = [...deleted, ...renamedFrom];
   try {
-    if (written.length) { const co = inBatches(written, (batch) => checkoutPaths(root, head, batch)); if (!co.ok) throw new Error(co.stderr || 'checkout failed'); }
-    if (gone.length) {
-      const rm = inBatches(gone, (batch) => rmCached(root, batch));
-      if (!rm.ok) throw new Error(rm.stderr || 'git rm --cached failed');
-      for (const f of gone) { try { fs.rmSync(path.join(root, f), { force: true }); } catch { /* already gone */ } }
-    }
+    updateTree(root, head, { written, gone });
     return { ok: true, written, removed: gone };
   } catch (error) {
-    // Roll back: the ref first (compare-and-swap on our own head), then the paths to base.
-    const rollbackErrors = [];
-    const restoreRef = updateRef(root, 'refs/heads/main', base, { message: 'supervisor land gate rollback', old: head });
-    if (!restoreRef.ok) rollbackErrors.push(restoreRef.stderr || 'ref rollback failed');
-    const back = rows.flatMap((r) => (r[0].startsWith('A') ? [] : [normPath(r[1])]));
-    if (back.length) {
-      const restorePaths = inBatches(back, (batch) => checkoutPaths(root, base, batch));
-      if (!restorePaths.ok) rollbackErrors.push(restorePaths.stderr || 'path rollback failed');
-    }
-    const added = rows.filter((x) => x[0].startsWith('A') || x[0].startsWith('R')).map((r) => normPath(r[r.length - 1]));
-    if (added.length) {
-      const removeAdded = inBatches(added, (batch) => rmCached(root, batch));
-      if (!removeAdded.ok) rollbackErrors.push(removeAdded.stderr || 'added-path rollback failed');
-    }
-    for (const f of added) {
-      try { fs.rmSync(path.join(root, f), { force: true }); } catch { /* best effort */ }
-    }
-    return { ok: false, reason: 'tree-update-failed', detail: String(error?.message ?? error), rolledBack: rollbackErrors.length === 0,
-      ...(rollbackErrors.length ? { rollbackErrors } : {}) };
+    return rollBackTree(root, { base, head, rows }, error);
   }
 }

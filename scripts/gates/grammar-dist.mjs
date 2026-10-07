@@ -26,9 +26,9 @@ export const GRAMMAR_PACKAGE='@starci/grammar';
 export const GRAMMAR_DIST_FIX='run npm run build in packages/grammar';
 const GRAMMAR_DIST_CHECK='starci/grammar-dist-check@1';
 const TOKEN_DIFF_CAP=20;
-const CSS_TOKEN_NAME=String.raw`--[A-Za-z0-9_-]+`;
+const CSS_TOKEN_NAME = '--[A-Za-z0-9_-]+';
 const CSS_TOKEN_SPACE=String.raw`\s*`;
-const CSS_TOKEN_VALUE=String.raw`[^;{}]*`;
+const CSS_TOKEN_VALUE = '[^;{}]*';
 const CSS_TOKEN_DECLARATION=new RegExp(`(${CSS_TOKEN_NAME})${CSS_TOKEN_SPACE}:(${CSS_TOKEN_VALUE})`,'g');
 
 

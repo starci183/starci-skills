@@ -16,6 +16,7 @@ import { squash } from './clip.mjs';
 import { ownerLanguage, translator } from './i18n.mjs';
 import { list } from './list.mjs';
 import { parseJson } from './json.mjs';
+import { trimTrailingChars } from './normalize.mjs';
 import { readYamlFile } from './read-yaml.mjs';
 import { normRel, pathsOverlap } from './path-key.mjs';
 import { PRODUCT_NAME_SEGMENT } from './example-refs.mjs';
@@ -29,11 +30,6 @@ const LABELS_FILE = new URL('../../modules/ops/_labels.yaml', import.meta.url);
 const CLIP_TRAILING_CHAR = /[\s,;:.\u00b7\u2013\u2014-]/;
 const CLAUSE_TRAILING_CHAR = /[\s.!?;:,]/;
 const SLASH_TRAILING_CHAR = /\//;
-
-function trimTrailingCharacters(text, characters) {
-  const trailingCount = text.split('').reverse().findIndex((character) => !characters.test(character));
-  return text.slice(0, trailingCount < 0 ? 0 : text.length - trailingCount);
-}
 
 let labelsCache = null;
 /** {op: {vi, en}} from modules/ops/_labels.yaml; {} when the file is unreadable. */
@@ -58,7 +54,7 @@ function clipWords(text, max) {
   if (s.length <= max) return s;
   const room = s.slice(0, max - 1);
   const at = room.lastIndexOf(' ');
-  return trimTrailingCharacters(at >= max / 2 ? room.slice(0, at) : room, CLIP_TRAILING_CHAR) + '…';
+  return trimTrailingChars(at >= max / 2 ? room.slice(0, at) : room, CLIP_TRAILING_CHAR) + '…';
 }
 
 /**
@@ -110,7 +106,7 @@ export function productName(raw) {
 function firstClause(text) {
   const s = String(text ?? '').split(/\r?\n/).map(squash).find(Boolean) ?? '';
   const clause = s.split(/(?<=[.!?;:])\s|\s[—–-]\s|\s\(/)[0] ?? '';
-  return trimTrailingCharacters(clause, CLAUSE_TRAILING_CHAR).trim();
+  return trimTrailingChars(clause, CLAUSE_TRAILING_CHAR).trim();
 }
 /**
  * A readable name for a new goal (define-goal): `<Product> · <first clause of the goal text>`, at
@@ -147,10 +143,14 @@ function coveredNode(nodes, paths) {
 }
 
 const titleCache = new Map();
+const TITLE_LINE = new RegExp([
+  String.raw`^title:[ \t]*(.*)`,
+  '$',
+].join(''), 'm');
 /** The `title:` of the Work record at `<repo>/<p>` (a record folder or its index.yaml), else null. */
 function recordTitle(repo, p) {
   if (!repo || !p) return null;
-  const rel = trimTrailingCharacters(String(p).replaceAll('\\', '/'), SLASH_TRAILING_CHAR);
+  const rel = trimTrailingChars(String(p).replaceAll('\\', '/'), SLASH_TRAILING_CHAR);
   if (!rel.startsWith('.starciwork/') || BROAD.test(rel.toLowerCase())) return null;
   const file = path.join(repo, rel.endsWith('.yaml') ? rel : `${rel}/index.yaml`);
   if (!file.endsWith('index.yaml')) return null;
@@ -161,7 +161,7 @@ function recordTitle(repo, p) {
   let title = null;
   try {
     const head = fs.readFileSync(file, 'utf8').slice(0, 4096);
-    const m = /^title:[ \t]*(.*)$/m.exec(head);
+    const m = TITLE_LINE.exec(head);
     let value = m ? m[1] : '';
     // A folded or literal block scalar (title: >-) continues on the indented lines right below it.
     if (m && /^[>|][-+]?\s*$/.test(value)) {

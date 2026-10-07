@@ -12,6 +12,26 @@ function branchNames(value, current) {
   return [...new Set(requested.length ? requested : [current, 'main'].filter(Boolean))];
 }
 
+// The refspecs and destination refs that back `branches` up under refs/backup/<date>/, or the text that refuses the request.
+function backupRefspecs(api, cwd, branches, date) {
+  const refspecs = [];
+  const refs = [];
+  for (const branch of branches) {
+    if (branch.startsWith('+')) return { refused: `force refspecs are forbidden: ${branch}` };
+    if (branch.includes(':') || branch.startsWith('refs/') || branch.startsWith('/') || branch.endsWith('/')) {
+      return { refused: `invalid branch name: ${branch}` };
+    }
+    const source = `refs/heads/${branch}`;
+    if (!api.revParse(cwd, source)) return { refused: `local branch does not resolve: ${branch}` };
+    const destination = `refs/backup/${date}/${branch}`;
+    const refspec = `${source}:${destination}`;
+    if (refspec.startsWith('+')) return { refused: `force refspecs are forbidden: ${refspec}` };
+    refspecs.push(refspec);
+    refs.push(destination);
+  }
+  return { refspecs, refs };
+}
+
 /** Push selected local branches to refs/backup/<UTC date>/ and nowhere else. */
 export async function gitBackup(ctx, deps = {}) {
   const refusal = (text, code = 2, data = {}) => verbRefusal('starci git backup', text, code,
@@ -30,21 +50,9 @@ export async function gitBackup(ctx, deps = {}) {
   const instant = new Date(ctx?.now ?? Date.now());
   if (Number.isNaN(instant.getTime())) return refusal('ctx.now is not a valid date');
   const date = instant.toISOString().slice(0, 10);
-  const refspecs = [];
-  const refs = [];
-  for (const branch of branches) {
-    if (branch.startsWith('+')) return refusal(`force refspecs are forbidden: ${branch}`);
-    if (branch.includes(':') || branch.startsWith('refs/') || branch.startsWith('/') || branch.endsWith('/')) {
-      return refusal(`invalid branch name: ${branch}`);
-    }
-    const source = `refs/heads/${branch}`;
-    if (!api.revParse(cwd, source)) return refusal(`local branch does not resolve: ${branch}`);
-    const destination = `refs/backup/${date}/${branch}`;
-    const refspec = `${source}:${destination}`;
-    if (refspec.startsWith('+')) return refusal(`force refspecs are forbidden: ${refspec}`);
-    refspecs.push(refspec);
-    refs.push(destination);
-  }
+  const planned = backupRefspecs(api, cwd, branches, date);
+  if (planned.refused) return refusal(planned.refused);
+  const { refspecs, refs } = planned;
 
   if (ctx?.args?.['dry-run']) {
     return {

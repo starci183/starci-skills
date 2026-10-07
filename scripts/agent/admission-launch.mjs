@@ -1,5 +1,5 @@
 // The one semantic agent launch lifecycle: admission, immutable host replay and attested cleanup.
-import { ensureLaunchTrust } from './trust.mjs';
+import { ensureLaunchTrust } from './trust-launch.mjs';
 import { hostAgentVerdict } from './host-agents.mjs';
 import { workerStart } from '../api/orca/worker-start.mjs';
 import { requestShow } from '../api/orca/request-show.mjs';
@@ -20,6 +20,8 @@ import { loadModelRegistry, loadAdapter, adapterModelAuthority } from './model-r
 import { admitAgent, consumeAgentAdmission, observeAgentAdmission, releaseAgentAdmission, reconcileAdmissionNoEffect, launchScopeId } from './admission.mjs';
 
 // Only a card's declared pool default may resolve an omitted model; model-less cards still need a budget identity.
+const LIVE_STATES = new Set(['launching', 'live', 'unknown']);
+
 const launchModelOf = (provider, model, card) => model ?? (card?.start?.defaultModel === 'pool' || card?.start?.modelArgument === false
   ? Object.values(loadModelRegistry()?.pools ?? {}).find((pool) => pool?.provider === provider)?.defaultModel ?? null : null);
 
@@ -51,174 +53,257 @@ export function spawnAgent({ provider, model = null, effort = null, worktree, re
   const orca = { start: io?.start ?? workerStart, show: io?.show ?? workerShow,
     rename: io?.rename ?? terminalRename, stop: io?.stop ?? workerStop, release: io?.release ?? closeWorker,
     trust: io?.trust ?? ensureLaunchTrust };
-  const noEffect = (step, error, extra = {}) => {
-    const receipt = admission?.receipt;
-    const priorEffect = receipt && ['launching', 'live', 'unknown'].includes(receipt.state);
-    const owned = receipt && receipt.role === role && receipt.provider === admission.selected?.provider && receipt.model === admission.selected?.model;
-    return { ok: false, step, error, provider, effectState: priorEffect ? 'unknown' : 'none', ...extra,
-      ...(receipt ? { admission } : {}), ...(owned && !priorEffect ? { providerBudget: releaseAgentAdmission(admission,
-        { kind: 'failed-before-launch', confirmed: true }, { io: io?.admission, env }) } : {}) };
-  };
-  const { card, error: cardError } = loadAdapter(provider);
-  if (cardError) return noEffect('card', cardError);
-  model = launchModelOf(provider, model, card);
-  const host = (io?.hostAgent ?? hostAgentVerdict)({ provider, model, card });
-  if (!host.ok) return noEffect('host-agent', host.error, { code: host.code, errorCode: host.code, taskId: null, runId: run ?? null });
-  const { depth, limit, refusal } = preflight ?? depthPreflight({ parentDispatch, maxDepth, show: orca.show });
-  if (refusal) return noEffect(refusal.step, refusal.error, { ...refusal, taskId: null, runId: run ?? null });
-  const takesModel = card?.start?.modelArgument !== false;
-  // Resolve the card's declared default before the common gate evaluates this concrete model's role floor.
-  if (takesModel && !model) return noEffect('admission', 'a concrete model is required');
+  const noEffect = (step, error, extra = {}) => noEffectOf({ admission, role, provider, io, env }, step, error, extra);
+  const target = resolveLaunchTarget({ provider, model, orca, io, run, preflight, parentDispatch, maxDepth, noEffect });
+  if (target.refusal) return target.refusal;
+  const { card, depth, limit, takesModel } = target;
+  model = target.model;
   const budgetModel = model;
   admission ??= admitAgent({ role, scopeId: scopeId ?? launchScopeId(role, request), attemptId: launchScopeId(role, request), allowGroup: allowGroup ?? [{ provider, model: budgetModel, effort }],
     bias, ownerGrant, author, qualityFloor, kind, difficulty, scope: { jobId: request?.job ?? request?.workerJob ?? null, runId: run ?? null, seat: request?.seat ?? null } }, { io: io?.admission, env });
-  if (!admission.ok) return { ...admission, provider };
-  if (admission.selected.provider !== provider || admission.selected.model !== budgetModel)
-    return noEffect('admission', 'selected model differs from concrete launch request');
+  const unadmitted = unadmittedLaunch(admission, provider, budgetModel, noEffect);
+  if (unadmitted) return unadmitted;
   const agent = card?.start?.agentArgument ?? provider;
   const hostRequest = request ? { ...request, run, agent, model: takesModel ? model : null } : null;
   if (!hostRequest) return noEffect('admission', 'the launch requires its immutable host request');
   const hostRequestId = orcaRequestIdOf('worker-start', hostRequest);
   const launchIdentity = launchScopeId('host-launch', { run, request, spec, worktree, repo, baseBranch, name, setup, provider, model: budgetModel });
   // Invalid model, eligibility or request cannot authorize provider trust writes.
-  let trust = null;
-  try { trust = orca.trust({ agent: provider, cwd: worktree, config, env }); }
-  catch (e) { trust = {agent:provider,status:'failed',errors:[{error:String(e?.message??e)}]}; }
-  if(trust && !['written','already','ok'].includes(trust.status) && trust.ok!==true)
-    return noEffect('launch-trust',trust.reason??trust.errors?.[0]?.error??'launch trust was not verified',{trust});
+  const trust = launchTrustOf(orca, { agent: provider, cwd: worktree, config, env });
+  if (launchTrustRefused(trust)) return noEffect('launch-trust', trust.reason ?? trust.errors?.[0]?.error ?? 'launch trust was not verified', { trust });
   const consumed = consumeAgentAdmission(admission, { provider, model: budgetModel, role, launchIdentity, hostRequestId, io: io?.admission, env });
-  if (!consumed.ok) {
-    const receipt = consumed.reservation ?? admission.receipt;
-    if (receipt?.state === 'unknown' && receipt.launchIdentity === launchIdentity && receipt.hostRequestId === hostRequestId) {
-      admission.receipt = receipt;
-      const known = bestEffortCall(() => (io?.requestState ?? ((id) => requestShow({ request: id }).state))(hostRequestId));
-      if (known === 'completed') {
-        const replayed = bestEffortCall(() => orca.start({ spec, taskTitle: taskTitle ?? title, worktree, agent,
-          ...(repo ? { repo } : {}), ...(baseBranch ? { baseBranch } : {}), ...(name ? { name } : {}), ...(setup ? { setup } : {}),
-          ...(takesModel && model ? { model, ...(effort ? { effort } : {}) } : {}), displayName: title, run, from, request: hostRequest }));
-        const reconciled = reconcileAdmissionNoEffect(admission, { launchIdentity, started: replayed }, { io: io?.admission, env });
-        return { ok: false, step: 'admission-reconcile', error: replayed?.error ?? consumed.reason,
-          effectState: reconciled.ok ? 'none' : 'unknown', admission, providerBudget: reconciled, hostReplay: replayed ?? null };
-      }
-    }
-    return { ok: false, step: 'admission', error: consumed.reason,
-      effectState: consumed.effectState ?? (['launching', 'live', 'unknown'].includes(receipt?.state)
-        || ['state-regression', 'launch-identity-conflict', 'host-request-conflict'].includes(consumed.reason) ? 'unknown' : 'none'), admission };
-  }
+  const launch = { provider, model, takesModel, spec, taskTitle: taskTitle ?? title, title, worktree, repo, baseBranch, name, setup, agent, run, from, request: hostRequest };
+  if (!consumed.ok) return consumeRefusal({ admission, orca, io, env, launch, hostRequestId, launchIdentity }, consumed, effort);
   if (effort === 'none') effort = null;
-  // A new worktree (`worktree: 'new-child' | 'new-top-level'`) carries Orca's creation flags (--repo, --base-branch,
-  // --name, --setup); an existing worktree takes none (Orca refuses them there).
-  const creates = worktree === 'new-child' || worktree === 'new-top-level';
-  const creation = creates ? { ...(repo ? { repo } : {}), ...(baseBranch ? { baseBranch } : {}), ...(name ? { name } : {}), ...(setup ? { setup } : {}) } : {};
   let started;
-  try { started = orca.start({ spec, taskTitle: taskTitle ?? title, worktree, ...creation, agent,
-    ...(takesModel && model ? { model, ...(effort ? { effort } : {}) } : {}), displayName: title, run, from,
-    request: hostRequest }); }
+  try { started = orca.start(startPayloadOf(launch, effort)); }
   catch (error) { started = { ok: false, error: error.message, effectState: 'unknown' }; }
-  const dispatchId = started?.dispatchId ?? null;
-  const taskId = started?.taskId ?? null;
-  let boundHandle = null, handleBinding = null, handleConflict = false;
-  const bindHandle = (handle) => {
-    if (typeof handle !== 'string' || !handle.trim()) return null;
-    if (boundHandle === handle) return handleBinding;
-    if (boundHandle && boundHandle !== handle) {
-      handleConflict = true;
-      return { ok: false, reason: 'observed-terminal-conflict' };
+  const session = launchSession({ admission, orca, io, env, provider, run, trust, started });
+  return settleLaunch(session, launch, started, { effort, onCreated, depth, limit, card });
+}
+
+// The terminal each launched worker is known by: the start receipt first, worker-show second.
+const shownHandle = (shown) => shown?.ok ? shown.agentTerminalHandle ?? shown.dispatch?.assigneeHandle
+  ?? shown.result?.worker?.agentTerminalHandle ?? null : null;
+
+// A launch that left no effect: any receipt that proves a prior effect makes the effect `unknown`; an owned receipt is released.
+function noEffectOf({ admission, role, provider, io, env }, step, error, extra = {}) {
+  const receipt = admission?.receipt;
+  const priorEffect = receipt && LIVE_STATES.has(receipt.state);
+  const owned = receipt?.role === role && receipt.provider === admission.selected?.provider && receipt.model === admission.selected?.model;
+  return { ok: false, step, error, provider, effectState: priorEffect ? 'unknown' : 'none', ...extra,
+    ...(receipt ? { admission } : {}), ...(owned && !priorEffect ? { providerBudget: releaseAgentAdmission(admission,
+      { kind: 'failed-before-launch', confirmed: true }, { io: io?.admission, env }) } : {}) };
+}
+
+// The card, host agent, depth and concrete model checks that precede admission: `{ refusal }` or the resolved target.
+function resolveLaunchTarget({ provider, model, orca, io, run, preflight, parentDispatch, maxDepth, noEffect }) {
+  const { card, error: cardError } = loadAdapter(provider);
+  if (cardError) return { refusal: noEffect('card', cardError) };
+  const resolvedModel = launchModelOf(provider, model, card);
+  const host = (io?.hostAgent ?? hostAgentVerdict)({ provider, model: resolvedModel, card });
+  if (!host.ok) return { refusal: noEffect('host-agent', host.error, { code: host.code, errorCode: host.code, taskId: null, runId: run ?? null }) };
+  const { depth, limit, refusal } = preflight ?? depthPreflight({ parentDispatch, maxDepth, show: orca.show });
+  if (refusal) return { refusal: noEffect(refusal.step, refusal.error, { ...refusal, taskId: null, runId: run ?? null }) };
+  const takesModel = card?.start?.modelArgument !== false;
+  // Resolve the card's declared default before the common gate evaluates this concrete model's role floor.
+  if (takesModel && !resolvedModel) return { refusal: noEffect('admission', 'a concrete model is required') };
+  return { card, model: resolvedModel, depth, limit, takesModel };
+}
+
+// An admission verdict that refuses the launch, or one that selected another model than the concrete request.
+function unadmittedLaunch(admission, provider, model, noEffect) {
+  if (!admission.ok) return { ...admission, provider };
+  if (admission.selected.provider !== provider || admission.selected.model !== model)
+    return noEffect('admission', 'selected model differs from concrete launch request');
+  return null;
+}
+
+function launchTrustOf(orca, args) {
+  try { return orca.trust(args); }
+  catch (e) { return { agent: args.agent, status: 'failed', errors: [{ error: String(e?.message ?? e) }] }; }
+}
+
+const launchTrustRefused = (trust) => trust && !['written', 'already', 'ok'].includes(trust.status) && trust.ok !== true;
+
+const modelPartOf = (launch, effort) => launch.takesModel && launch.model ? { model: launch.model, ...(effort ? { effort } : {}) } : {};
+const creationOf = (launch) => ({ ...(launch.repo ? { repo: launch.repo } : {}), ...(launch.baseBranch ? { baseBranch: launch.baseBranch } : {}),
+  ...(launch.name ? { name: launch.name } : {}), ...(launch.setup ? { setup: launch.setup } : {}) });
+
+// A new worktree (`worktree: 'new-child' | 'new-top-level'`) carries Orca's creation flags (--repo, --base-branch,
+// --name, --setup); an existing worktree takes none (Orca refuses them there).
+function startPayloadOf(launch, effort) {
+  const creates = launch.worktree === 'new-child' || launch.worktree === 'new-top-level';
+  return { spec: launch.spec, taskTitle: launch.taskTitle, worktree: launch.worktree, ...(creates ? creationOf(launch) : {}), agent: launch.agent,
+    ...modelPartOf(launch, effort), displayName: launch.title, run: launch.run, from: launch.from, request: launch.request };
+}
+
+const replayPayloadOf = (launch, effort) => ({ spec: launch.spec, taskTitle: launch.taskTitle, worktree: launch.worktree, agent: launch.agent,
+  ...creationOf(launch), ...modelPartOf(launch, effort), displayName: launch.title, run: launch.run, from: launch.from, request: launch.request });
+
+const CONSUME_REFUSAL_REASONS = new Set(['state-regression', 'launch-identity-conflict', 'host-request-conflict']);
+
+// A refused consume replays a start Orca already completed, then reconciles it; any other refusal names its effect state.
+function consumeRefusal({ admission, orca, io, env, launch, hostRequestId, launchIdentity }, consumed, effort) {
+  const receipt = consumed.reservation ?? admission.receipt;
+  if (receipt?.state === 'unknown' && receipt.launchIdentity === launchIdentity && receipt.hostRequestId === hostRequestId) {
+    admission.receipt = receipt;
+    const known = bestEffortCall(() => (io?.requestState ?? ((id) => requestShow({ request: id }).state))(hostRequestId));
+    if (known === 'completed') {
+      const replayed = bestEffortCall(() => orca.start(replayPayloadOf(launch, effort)));
+      const reconciled = reconcileAdmissionNoEffect(admission, { launchIdentity, started: replayed }, { io: io?.admission, env });
+      return { ok: false, step: 'admission-reconcile', error: replayed?.error ?? consumed.reason,
+        effectState: reconciled.ok ? 'none' : 'unknown', admission, providerBudget: reconciled, hostReplay: replayed ?? null };
     }
-    const observed = observeAgentAdmission(admission, { state: 'unknown', handle }, { io: io?.admission, env });
-    if (observed.ok) boundHandle = handle;
-    else handleConflict = true;
-    handleBinding = observed;
-    return observed;
-  };
+  }
+  return { ok: false, step: 'admission', error: consumed.reason,
+    effectState: consumed.effectState ?? (LIVE_STATES.has(receipt?.state) || CONSUME_REFUSAL_REASONS.has(consumed.reason) ? 'unknown' : 'none'), admission };
+}
+
+// The launched worker's mutable terminal binding (the first terminal observed wins) and the facts a failure reports.
+function launchSession({ admission, orca, io, env, provider, run, trust, started }) {
+  const terminal = { handle: null, binding: null, conflict: false };
+  const session = { admission, orca, io, env, provider, run, trust, terminal, dispatchId: started?.dispatchId ?? null, taskId: started?.taskId ?? null };
   // A start receipt proves its terminal before Task/model attestation or any cleanup occurs.
-  bindHandle(started?.agentTerminalHandle);
-  const shownHandle = (shown) => shown?.ok ? shown.agentTerminalHandle ?? shown.dispatch?.assigneeHandle
-    ?? shown.result?.worker?.agentTerminalHandle ?? null : null;
-  // A failed start is reconciled before it returns (Orca's safety floor: only proof of exit authorizes a stop): no effect -> nothing; unknown
-  // -> worker-show first, cleaned only when Orca shows the worker ended; a partial effect -> cleaned. `io.cleanup(dispatchId)` -> {effectState, ...} replaces the default stop + release.
-  const cleanupOf = (id) => {
-    const observed = bestEffortCall(() => orca.show({ dispatch: id }));
-    bindHandle(shownHandle(observed));
-    if (!boundHandle || handleConflict) return { effectState: 'unknown', observation: observed,
-      providerBudget: handleBinding, error: 'cleanup terminal identity is unproven' };
-    if (io?.cleanup) {
-      const cleanup = io.cleanup(id);
-      return cleanup?.effectState !== 'none' || workerExitProven(cleanup.release, boundHandle)
-        ? cleanup : { ...cleanup, effectState: 'unknown' };
-    }
-    const stop = bestEffortCall(() => orca.stop({ dispatch: id }));
-    const release = bestEffortCall(() => orca.release({ dispatch: id, handle: boundHandle, env }));
-    const closed = workerClosureProven(release, boundHandle);
-    return { effectState: closed ? 'none' : 'partial', stop, release };
-  };
-  const reconcile = (effectState) => {
-    if (effectState === 'none' || !dispatchId) return { effectState, observation: null, cleanup: null };
-    if (effectState === 'unknown') {
-      const observation = bestEffortCall(() => orca.show({ dispatch: dispatchId }));
-      if (!observation?.ok || !['failed', 'stopped', 'released'].includes(observation.state)) return { effectState: 'unknown', observation, cleanup: null };
-      bindHandle(shownHandle(observation));
-      const cleanup = cleanupOf(dispatchId);
-      return { effectState: cleanup.effectState, observation, cleanup };
-    }
-    const cleanup = cleanupOf(dispatchId);
-    return { effectState: cleanup.effectState, observation: null, cleanup };
-  };
-  const fail = (step, error, { effectState = 'partial', ...extra } = {}) => {
-    bindHandle(extra.terminal);
-    const reconciled = reconcile(effectState);
-    const provedNone = reconciled.effectState === 'none' && !handleConflict;
-    const budget = provedNone
-      ? releaseAgentAdmission(admission, { kind: effectState === 'none' ? 'failed-before-launch' : 'closed', confirmed: true,
-        ...(boundHandle ? { handle: boundHandle } : {}),
-        ...(effectState === 'none' ? {} : { terminalProof: reconciled.cleanup?.release?.closed?.proof,
-          processVerdict: reconciled.cleanup?.release?.processes?.verdict }) }, { io: io?.admission, env })
-      : observeAgentAdmission(admission, { state: 'unknown', ...(boundHandle ? { handle: boundHandle } : {}) }, { io: io?.admission, env });
-    return { ok: false, step, error, provider, dispatchId, taskId, runId: run ?? null, ...extra, ...(trust ? { trust } : {}),
-      admission, providerBudget: budget,
-      effectState: provedNone && budget.ok ? 'none' : provedNone ? 'unknown' : reconciled.effectState === 'none' ? 'unknown' : reconciled.effectState,
-      ...(reconciled.observation ? { observation: reconciled.observation } : {}),
-      ...(reconciled.cleanup ? { cleanup: reconciled.cleanup } : {}) };
-  };
-  if (started?.ok !== true || (started.outcome != null && started.outcome !== 'ok') || !dispatchId) {
-    return fail('worker-start', started?.error ?? `worker-start outcome=${started?.outcome ?? 'none'} state=${started?.state ?? 'none'} effect=${started?.effectState ?? 'none'}`,
-      { effectState: started?.effectState ?? 'unknown', errorCode: started?.errorCode ?? null, details: started ?? null,
-        ...(started?.hostUnavailable ? { hostUnavailable: true } : {}) });
+  bindHandle(session, started?.agentTerminalHandle);
+  return session;
+}
+
+function bindHandle(session, handle) {
+  const { terminal } = session;
+  if (typeof handle !== 'string' || !handle.trim()) return null;
+  if (terminal.handle === handle) return terminal.binding;
+  if (terminal.handle && terminal.handle !== handle) {
+    terminal.conflict = true;
+    return { ok: false, reason: 'observed-terminal-conflict' };
   }
-  // --spec made the Task: a ready start that names none is a receipt the runtime cannot settle.
-  if (!taskId) return fail('worker-start', 'worker-start --spec answered ready without result.taskId', { code: 'worker-start-no-task', details: started });
+  const observed = observeAgentAdmission(session.admission, { state: 'unknown', handle }, { io: session.io?.admission, env: session.env });
+  if (observed.ok) terminal.handle = handle;
+  else terminal.conflict = true;
+  terminal.binding = observed;
+  return observed;
+}
+
+// A failed start is reconciled before it returns (Orca's safety floor: only proof of exit authorizes a stop): no effect -> nothing; unknown
+// -> worker-show first, cleaned only when Orca shows the worker ended; a partial effect -> cleaned. `io.cleanup(dispatchId)` -> {effectState, ...} replaces the default stop + release.
+function cleanupLaunch(session, id) {
+  const { orca, io, env, terminal } = session;
+  const observed = bestEffortCall(() => orca.show({ dispatch: id }));
+  bindHandle(session, shownHandle(observed));
+  if (!terminal.handle || terminal.conflict) return { effectState: 'unknown', observation: observed,
+    providerBudget: terminal.binding, error: 'cleanup terminal identity is unproven' };
+  if (io?.cleanup) {
+    const cleanup = io.cleanup(id);
+    return cleanup?.effectState !== 'none' || workerExitProven(cleanup.release, terminal.handle)
+      ? cleanup : { ...cleanup, effectState: 'unknown' };
+  }
+  const stop = bestEffortCall(() => orca.stop({ dispatch: id }));
+  const release = bestEffortCall(() => orca.release({ dispatch: id, handle: terminal.handle, env }));
+  const closed = workerClosureProven(release, terminal.handle);
+  return { effectState: closed ? 'none' : 'partial', stop, release };
+}
+
+function reconcileUnknownLaunch(session) {
+  const observation = bestEffortCall(() => session.orca.show({ dispatch: session.dispatchId }));
+  if (!observation?.ok || !['failed', 'stopped', 'released'].includes(observation.state)) return { effectState: 'unknown', observation, cleanup: null };
+  bindHandle(session, shownHandle(observation));
+  const cleanup = cleanupLaunch(session, session.dispatchId);
+  return { effectState: cleanup.effectState, observation, cleanup };
+}
+
+function reconcileLaunch(session, effectState) {
+  if (effectState === 'none' || !session.dispatchId) return { effectState, observation: null, cleanup: null };
+  if (effectState === 'unknown') return reconcileUnknownLaunch(session);
+  const cleanup = cleanupLaunch(session, session.dispatchId);
+  return { effectState: cleanup.effectState, observation: null, cleanup };
+}
+
+// The provider budget after a failed launch: released when the reconciliation proved no effect and no terminal conflict, else observed as unknown.
+function failureBudgetOf(session, effectState, reconciled, provedNone) {
+  const { admission, io, env, terminal } = session;
+  const handlePart = terminal.handle ? { handle: terminal.handle } : {};
+  if (!provedNone) return observeAgentAdmission(admission, { state: 'unknown', ...handlePart }, { io: io?.admission, env });
+  const closedProof = effectState === 'none' ? {} : { terminalProof: reconciled.cleanup?.release?.closed?.proof,
+    processVerdict: reconciled.cleanup?.release?.processes?.verdict };
+  return releaseAgentAdmission(admission, { kind: effectState === 'none' ? 'failed-before-launch' : 'closed', confirmed: true, ...handlePart, ...closedProof },
+    { io: io?.admission, env });
+}
+
+function failedEffectState(provedNone, budget, reconciled) {
+  if (provedNone) return budget.ok ? 'none' : 'unknown';
+  return reconciled.effectState === 'none' ? 'unknown' : reconciled.effectState;
+}
+
+function failLaunch(session, step, error, { effectState = 'partial', ...extra } = {}) {
+  bindHandle(session, extra.terminal);
+  const reconciled = reconcileLaunch(session, effectState);
+  const provedNone = reconciled.effectState === 'none' && !session.terminal.conflict;
+  const budget = failureBudgetOf(session, effectState, reconciled, provedNone);
+  return { ok: false, step, error, provider: session.provider, dispatchId: session.dispatchId, taskId: session.taskId, runId: session.run ?? null, ...extra,
+    ...(session.trust ? { trust: session.trust } : {}), admission: session.admission, providerBudget: budget,
+    effectState: failedEffectState(provedNone, budget, reconciled),
+    ...(reconciled.observation ? { observation: reconciled.observation } : {}),
+    ...(reconciled.cleanup ? { cleanup: reconciled.cleanup } : {}) };
+}
+
+const startRefused = (started, dispatchId) => started?.ok !== true || (started.outcome != null && started.outcome !== 'ok') || !dispatchId;
+
+function failStart(session, started) {
+  return failLaunch(session, 'worker-start', started?.error ?? `worker-start outcome=${started?.outcome ?? 'none'} state=${started?.state ?? 'none'} effect=${started?.effectState ?? 'none'}`,
+    { effectState: started?.effectState ?? 'unknown', errorCode: started?.errorCode ?? null, details: started ?? null,
+      ...(started?.hostUnavailable ? { hostUnavailable: true } : {}) });
+}
+
+function notifyCreated(onCreated, handle, dispatchId) {
+  if (!onCreated) return;
+  try { onCreated(handle, dispatchId); } catch { /* the receipt still names the handle */ }
+}
+
+// The agent terminal of a started worker, from the start receipt or worker-show: `{ terminal, attest }` or `{ failure }`.
+function attestedTerminal(session, started, onCreated) {
+  const { dispatchId } = session;
   let terminal = started.agentTerminalHandle ?? null;
-  const created = (handle) => { if (onCreated) { try { onCreated(handle, dispatchId); } catch { /* the receipt still names the handle */ } } };
-  if (terminal) created(terminal);
-  const attest = bestEffortCall(() => orca.show({ dispatch: dispatchId }));
-  bindHandle(shownHandle(attest));
-  if (handleConflict) return fail('admission-attestation', 'the observed terminal does not match its original fenced receipt',
-    { terminal, details: attest ?? null });
-  if (!terminal) {
-    terminal = shownHandle(attest);
-    if (!terminal) return fail('worker-show', attest?.error ?? 'neither the worker-start receipt nor worker-show names the agent terminal',
-      { code: 'worker-terminal-unknown', details: attest ?? null, ...(attest?.hostUnavailable ? { hostUnavailable: true } : {}) });
-    created(terminal);
-  }
+  if (terminal) notifyCreated(onCreated, terminal, dispatchId);
+  const attest = bestEffortCall(() => session.orca.show({ dispatch: dispatchId }));
+  bindHandle(session, shownHandle(attest));
+  if (session.terminal.conflict) return { failure: failLaunch(session, 'admission-attestation', 'the observed terminal does not match its original fenced receipt',
+    { terminal, details: attest ?? null }) };
+  if (terminal) return { terminal, attest };
+  terminal = shownHandle(attest);
+  if (!terminal) return { failure: failLaunch(session, 'worker-show', attest?.error ?? 'neither the worker-start receipt nor worker-show names the agent terminal',
+    { code: 'worker-terminal-unknown', details: attest ?? null, ...(attest?.hostUnavailable ? { hostUnavailable: true } : {}) }) };
+  notifyCreated(onCreated, terminal, dispatchId);
+  return { terminal, attest };
+}
+
+// The worker a settled start produced, attested against what was routed, or the failure that reconciled it.
+function settleLaunch(session, launch, started, { effort, onCreated, depth, limit, card }) {
+  if (startRefused(started, session.dispatchId)) return failStart(session, started);
+  // --spec made the Task: a ready start that names none is a receipt the runtime cannot settle.
+  if (!session.taskId) return failLaunch(session, 'worker-start', 'worker-start --spec answered ready without result.taskId', { code: 'worker-start-no-task', details: started });
+  const found = attestedTerminal(session, started, onCreated);
+  if (found.failure) return found.failure;
+  const { terminal, attest } = found;
   // A worker in an existing worktree gets Orca's default tab title; the semantic title is presentation only.
-  const renamed = title ? bestEffortCall(() => orca.rename({ terminal, title })) : null;
+  const renamed = launch.title ? bestEffortCall(() => session.orca.rename({ terminal, title: launch.title })) : null;
   const eff = attest?.effective ?? {};
   const effAgent = eff.agent ?? eff.provider ?? null;
   const effModel = eff.model ?? eff.modelId ?? null;
+  const { takesModel, model, agent, provider } = launch;
   const agentOk = effAgent === agent;
   const modelOk = !takesModel || !model || effModel === model;
   if (attest?.ok !== true || !agentOk || !modelOk) {
-    return fail('attestation', `worker attest failed: expected agent=${provider} model=${takesModel ? model : '(agent default)'}, got agent=${effAgent} model=${effModel} state=${attest?.state ?? 'none'}`,
+    return failLaunch(session, 'attestation', `worker attest failed: expected agent=${provider} model=${takesModel ? model : '(agent default)'}, got agent=${effAgent} model=${effModel} state=${attest?.state ?? 'none'}`,
       { terminal, incident: true, details: attest ?? null });
   }
-  (io?.recordLaunch ?? recordLaunchedTerminal)({ terminal, dispatchId });
-  const budget = observeAgentAdmission(admission, { state: 'live', handle: terminal }, { io: io?.admission, env });
-  if (!budget.ok) return fail('admission-attestation', budget.reason ?? 'provider receipt could not be bound to attested worker', { terminal });
-  return { ok: true, terminal, dispatchId, taskId, runId: run ?? null, provider, model: takesModel ? model : null,
-    admission, modelAuthority: adapterModelAuthority(card),
+  (session.io?.recordLaunch ?? recordLaunchedTerminal)({ terminal, dispatchId: session.dispatchId });
+  const budget = observeAgentAdmission(session.admission, { state: 'live', handle: terminal }, { io: session.io?.admission, env: session.env });
+  if (!budget.ok) return failLaunch(session, 'admission-attestation', budget.reason ?? 'provider receipt could not be bound to attested worker', { terminal });
+  return { ok: true, terminal, dispatchId: session.dispatchId, taskId: session.taskId, runId: launch.run ?? null, provider, model: takesModel ? model : null,
+    admission: session.admission, modelAuthority: adapterModelAuthority(card),
     effort: takesModel && model ? effort : null, effective: { agent: effAgent, model: takesModel ? effModel : null,
       modelAuthority: adapterModelAuthority(card) }, titleApplied: renamed?.ok === true,
-    depth: dispatchDepthOf(attest) ?? depth, maxDepth: limit, ...(trust ? { trust } : {}) };
+    depth: dispatchDepthOf(attest) ?? depth, maxDepth: limit, ...(session.trust ? { trust: session.trust } : {}) };
 }
 
 
@@ -253,7 +338,7 @@ export function startAgent({ provider, model = null, effort = null, worktree, re
     role, scopeId, allowGroup, admission, bias, ownerGrant, author, qualityFloor, kind, difficulty, config, env });
   if (priorRunId && orca.runShow({ id: priorRunId })?.ok) {
     const reused = launch(priorRunId);
-    if (reused.ok || reused.step !== 'worker-start' || reused.effectState !== 'none' || reused.hostUnavailable) return reused;
+    if (!coordinatorRefused(reused)) return reused;
     // A proved no-effect coordinator rejection consumed that candidate attempt. The fresh Run is a distinct attempt.
     admission = admitAgent({ role, scopeId: scopeId ?? launchScopeId(role, request), attemptId: `${launchScopeId(role, request)}:coordinator-retry`,
       allowGroup: allowGroup ?? [{ provider, model, effort }], bias, ownerGrant, author, qualityFloor, kind, difficulty },
@@ -261,14 +346,22 @@ export function startAgent({ provider, model = null, effort = null, worktree, re
     if (!admission.ok) return { ...admission, provider };
     provider = admission.selected.provider; model = admission.selected.model; effort = admission.selected.effort ?? effort;
   }
-  let created;
-  try { created = orca.runCreate({ objective, ...(entry ? { from: entry } : {}), request: { ...request, entry, replaces: priorRunId } }); }
-  catch (error) { created = { ok: false, error: error.message, effectState: 'unknown' }; }
-  if (!created?.ok || !created.runId) {
-    const released = releaseAgentAdmission(admission, { kind: 'failed-before-launch', confirmed: true }, { io: io?.admission ?? io?.spawn?.admission, env });
-    return { ok: false, step: 'run-create', error: created?.error ?? 'run-create returned no runId', provider,
-      effectState: created?.effectState === 'none' ? 'none' : 'unknown', admission, providerBudget: released,
-      ...(created?.hostUnavailable ? { hostUnavailable: true } : {}) };
-  }
+  const created = createRun(orca, { objective, entry, request, priorRunId });
+  if (!created?.ok || !created.runId) return runCreateFailure({ created, admission, provider, io, env });
   return launch(created.runId);
+}
+
+// A start the prior Run refused before any effect: only then does the launch move to a fresh Run.
+const coordinatorRefused = (reused) => !reused.ok && reused.step === 'worker-start' && reused.effectState === 'none' && !reused.hostUnavailable;
+
+function createRun(orca, { objective, entry, request, priorRunId }) {
+  try { return orca.runCreate({ objective, ...(entry ? { from: entry } : {}), request: { ...request, entry, replaces: priorRunId } }); }
+  catch (error) { return { ok: false, error: error.message, effectState: 'unknown' }; }
+}
+
+function runCreateFailure({ created, admission, provider, io, env }) {
+  const released = releaseAgentAdmission(admission, { kind: 'failed-before-launch', confirmed: true }, { io: io?.admission ?? io?.spawn?.admission, env });
+  return { ok: false, step: 'run-create', error: created?.error ?? 'run-create returned no runId', provider,
+    effectState: created?.effectState === 'none' ? 'none' : 'unknown', admission, providerBudget: released,
+    ...(created?.hostUnavailable ? { hostUnavailable: true } : {}) };
 }

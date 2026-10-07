@@ -178,3 +178,10 @@ test('this repo is clean',()=>{
   const report=JSON.parse(r.stdout.trim());
   assert.equal(r.status,0,`host boundary violations: ${JSON.stringify(report.violations,null,2)}`);
 });
+
+test('--help prints the usage, names the one file the check does not scan, and exits clean',()=>{
+  const r=spawnSync(process.execPath,[CHECK,'--help'],{cwd:ROOT,encoding:'utf8',timeout:60000,windowsHide:true});
+  assert.equal(r.status,0,r.stderr);
+  assert.match(r.stdout,/^Usage: starci runtime check --only host-boundary/);
+  assert.ok(r.stdout.includes('scripts/checks/check-host-boundary.mjs names the patterns it bans and is not scanned.'));
+});

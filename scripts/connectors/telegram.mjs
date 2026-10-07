@@ -56,8 +56,10 @@ import { parseJson } from '../lib/json.mjs';
 import { workflowNameOf } from '../lib/display-names.mjs';
 import { translatedPattern, translator } from '../lib/i18n.mjs';
 import { sleep } from '../lib/sleep.mjs';
+import { trimTrailingSlashes } from '../lib/path-key.mjs';
 import { attemptSend, botPolite, redact } from './telegram-polite.mjs';
 import { isSpecRun, readEnv } from '../lib/env.mjs';
+import { eachInOrder } from '../lib/in-order.mjs';
 
 export const DEFAULT_API_BASE = 'https://api.telegram.org';
 /** The longest text one sendMessage carries, under Telegram's 4096-character cap. */
@@ -103,7 +105,7 @@ export function linkFor(ask, { base, exposeCredentialAsks }) {
   if (ask.credential && !exposeCredentialAsks) return { href: ask.url, public: false, reason: 'credential' };
   if (!base) return { href: ask.url, public: false, reason: 'no-tunnel' };
   const u = new URL(ask.url);
-  return { href: `${base.replace(/\/+$/, '')}${u.pathname}${u.search}`, public: true, reason: null };
+  return { href: `${trimTrailingSlashes(base)}${u.pathname}${u.search}`, public: true, reason: null };
 }
 
 /**
@@ -147,7 +149,7 @@ function closedMessage({ reason, by = null, title, question, language, now = Dat
   return [head, `${t.workflow}: ${title}`, '', String(question?.text ?? '')].join('\n').slice(0, TEXT_MAX);
 }
 /* ------------------------------------------------------------ Bot API */
-export const endpoint = (apiBase, token, method) => `${apiBase.replace(/\/+$/, '')}/bot${token}/${method}`;
+export const endpoint = (apiBase, token, method) => `${trimTrailingSlashes(apiBase)}/bot${token}/${method}`;
 /**
  * One Bot API call with polite retries (botPolite): a JSON POST to `method` under the 15 s read timeout.
  */
@@ -463,10 +465,10 @@ export async function markAskClosed({ ledgerFile, workflowId, dispatchId, reason
       const closedAs = sent.closed ?? reason;
       const fallbackText = closedMessage({ reason: closedAs, by, title, question, language: settings.language, now });
       const out = { deleted: [], edited: [], failed: [] };
-      for (const messageId of ids) {
+      await eachInOrder(ids, async (messageId) => {
         const how = await removeAskMessage({ token: settings.token, chatId: settings.chatId, messageId, fallbackText, apiBase, fetchImpl, sleepImpl });
         out[['edited', 'failed'].includes(how) ? how : 'deleted'].push(messageId);
-      }
+      });
       if (out.failed.length) warn(`telegram: ${out.failed.length} message(s) of ask ${dispatchId} could not be removed; the bridge sweep retries`);
       store.asks[askKey] = { ...sent, messageIds: out.failed, url: null, closed: closedAs, closedAt: now,
         deleted: [...(sent.deleted ?? []), ...out.deleted], edited: [...(sent.edited ?? []), ...out.edited] };
@@ -496,10 +498,8 @@ const sweepAskEntry = async (entry, { deps, locate, result }) => {
   if (!entry.key || !entry.url || entry.url === view.serving?.url) return;
   // The form those messages link to is gone (expired, or its process died): back to the notice.
   const text = askMessage({ workflow: { id: workflowId, title: view.title, job: view.jobName ?? null }, question: view.question, language: settings.language });
-  for (const messageId of ids) {
-    await botCall({ token: settings.token, apiBase, fetchImpl, sleepImpl, method: 'editMessageText', attempts: 2,
-      payload: { chat_id: settings.chatId, message_id: messageId, text, link_preview_options: { is_disabled: true }, reply_markup: askButton(settings.language, entry.key) } });
-  }
+  await eachInOrder(ids, (messageId) => botCall({ token: settings.token, apiBase, fetchImpl, sleepImpl, method: 'editMessageText', attempts: 2,
+    payload: { chat_id: settings.chatId, message_id: messageId, text, link_preview_options: { is_disabled: true }, reply_markup: askButton(settings.language, entry.key) } }));
   await recordAskMessage({ workflowId, dispatchId, url: null }, { env, now });
   result.unlinked.push({ workflowId, dispatchId, messageIds: ids });
 };
@@ -528,9 +528,7 @@ export async function sweepAskMessages({ repos = () => [] } = {}, {
       const repo = listed.find((r) => withLedgerRead(r, (db) => Boolean(db.prepare('SELECT 1 FROM workflows WHERE workflow_id=?').get(workflowId)), false));
       return repo ? ledgerFileFor(repo) : null;
     };
-    for (const entry of Object.values(readSentStore(env).asks)) {
-      await sweepAskEntry(entry, { deps, locate, result });
-    }
+    await eachInOrder(Object.values(readSentStore(env).asks), (entry) => sweepAskEntry(entry, { deps, locate, result }));
   } catch (error) {
     try { warn(`telegram: sweep failed: ${redact(error?.message ?? error)}`); } catch { /* nothing left */ }
     result.error = 'sweep failed';

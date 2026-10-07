@@ -32,6 +32,10 @@ export const RELEASE_STEPS = Object.freeze(['app-installs', 'canon-pins', 'merge
 export const STEP_STATUS = Object.freeze({ pass: 'pass', red: 'red', skipped: 'skipped', toolFailed: 'tool-failed' });
 const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const USAGE = 'usage: release-proof.mjs --repo <released repository> --base <commit> [--main <ref>] [--out <file>]';
+const profilesUnbound = (result) => {
+  const profiles = Number(result.profiles);
+  return Number.isNaN(profiles) || profiles <= 0;
+};
 const tail = (text, n = 3) => tailLines(text, n, { join: ' | ', max: 600 });
 
 const isApp = (repo) => readJsonFile(path.join(repo, 'hfs.json'))?.kind === 'app';
@@ -77,7 +81,7 @@ export function canonPinsStep({ repo, runtime = runtimeRoot, node = defaultNode 
   const red = results.filter((r) => !r.ok || r.exit !== 0);
   const runtimeResult = results[0];
   // The runtime judgment must have bound at least one code-pattern profile to its published canon by the content digest.
-  const unbound = !broken && !(Number(runtimeResult.profiles) > 0);
+  const unbound = !broken && profilesUnbound(runtimeResult);
   let status = STEP_STATUS.pass;
   if (broken) status = STEP_STATUS.toolFailed;
   else if (red.length || unbound) status = STEP_STATUS.red;

@@ -27,6 +27,7 @@ import { spawnDetachedSilent } from '../api/process/spawn-detached-silent.mjs';
 import { machineLog } from '../../engine/db/machine.mjs';
 import { allocationMs } from '../../engine/config.mjs';
 import { sleep as sleepAsync } from '../lib/sleep.mjs';
+import { repeatInOrder } from '../lib/in-order.mjs';
 
 export const RELOAD_MIN_INTERVAL_MS = allocationMs('selfReload.minIntervalMs');
 export const HANDOVER_WAIT_MS = allocationMs('selfReload.handoverMs');
@@ -125,13 +126,14 @@ export async function reexecSelf({ script, args = [], lockName, env = process.en
     const pid = child?.pid ?? null;
     if (!pid) return { ok: false, pid: null, error: 'the replacement did not start' };
     const deadline = now() + waitMs;
-    for (;;) {
+    const taken = await repeatInOrder(async () => {
       const held = holder(lockName);
       if (held?.pid === pid) return { ok: true, pid };
-      if (child.exited?.()) break;
-      if (now() >= deadline) break;
+      if (child.exited?.() || now() >= deadline) return null;
       await sleep(pollMs);
-    }
+      return undefined;
+    });
+    if (taken) return taken;
     kill(pid);
     // The replacement may have taken the lock between the last read and the kill: take it back.
     const after = holder(lockName);

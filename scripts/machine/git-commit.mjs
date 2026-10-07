@@ -41,22 +41,60 @@ function resolvePaths(inputs, cwd, root, exists) {
   return { paths: [...new Set(resolved)] };
 }
 
+// The subject line the --type, --summary and --scope make, or the text that refuses them.
+function subjectFor(args) {
+  const type = String(args.type ?? '').trim();
+  const summary = String(args.summary ?? '').trim();
+  const scope = args.scope == null ? '' : String(args.scope).trim();
+  if (!TYPES.has(type)) return { error: `--type must be one of ${[...TYPES].join(', ')}` };
+  if (!summary) return { error: '--summary is required' };
+  if (!/^[a-z]/.test(summary)) return { error: '--summary must start with a lowercase letter' };
+  if (summary.endsWith('.')) return { error: '--summary must not end with a period' };
+  if (/[\r\n]/.test(summary) || /[\r\n]/.test(scope)) return { error: '--summary and --scope must be one line' };
+  const subject = scope ? `${type}(${scope}): ${summary}` : `${type}: ${summary}`;
+  if (subject.length > 100) return { error: `subject is ${subject.length} characters; maximum is 100` };
+  return { subject };
+}
+
+// The commit message (subject, body, trailers) and its trailers.
+function messageOf({ subject, args, ctx, branch }) {
+  const coAuthor = String(args['co-author'] ?? ctx?.env?.STARCI_CO_AUTHOR ?? '').trim();
+  const lane = String(args.lane ?? (branch.startsWith('lane/') ? branch : '')).trim();
+  const trailers = [...(coAuthor ? [`Co-Authored-By: ${coAuthor}`] : []), ...(lane ? [`Lane: ${lane}`] : [])];
+  const paragraphs = [subject];
+  const body = String(args.body ?? '').trim();
+  if (body) paragraphs.push(body);
+  if (trailers.length) paragraphs.push(trailers.join('\n'));
+  return { message: paragraphs.join('\n\n'), trailers };
+}
+
+// A dry run: the message and the files the commit would hold, nothing written.
+function dryRunPlan({ api, root, addPaths, message, subject, trailers }, refusal) {
+  const staged = stagedFiles(root, api.diff);
+  if (staged == null) return refusal('could not read the staged files', 1);
+  let preview = staged;
+  if (addPaths.length) {
+    const status = api.porcelainStatus(root, { pathspecs: addPaths, untracked: 'all', literal: true });
+    if (!status.ok) return refusal(`could not inspect --paths: ${status.stderr || 'git status failed'}`, 1);
+    preview = [...new Set([...staged, ...statusPaths(status.stdout)])].sort(byCodeUnit);
+  }
+  if (!preview.length) return refusal('nothing to commit', 1);
+  return {
+    code: 0,
+    text: `message:\n${message}\n\nstaged:\n${preview.join('\n')}`,
+    data: { schema: 'starci/git-commit@1', ok: true, sha: null, subject, trailers, paths: preview, dryRun: true }
+  };
+}
+
 /** Commit the requested paths or the existing index with the StarCi subject and trailers. */
 export async function gitCommit(ctx, deps = {}) {
   const refusal = (text, code = 2) => verbRefusal('starci git commit', text, code,
     { schema: 'starci/git-commit@1', ok: false });
   const api = { add, commit, diff, porcelainStatus, revParse, revParseQuery, symbolicRef, exists: fs.existsSync, ...deps };
   const args = ctx?.args ?? {};
-  const type = String(args.type ?? '').trim();
-  const summary = String(args.summary ?? '').trim();
-  const scope = args.scope == null ? '' : String(args.scope).trim();
-  if (!TYPES.has(type)) return refusal(`--type must be one of ${[...TYPES].join(', ')}`);
-  if (!summary) return refusal('--summary is required');
-  if (!/^[a-z]/.test(summary)) return refusal('--summary must start with a lowercase letter');
-  if (summary.endsWith('.')) return refusal('--summary must not end with a period');
-  if (/[\r\n]/.test(summary) || /[\r\n]/.test(scope)) return refusal('--summary and --scope must be one line');
-  const subject = scope ? `${type}(${scope}): ${summary}` : `${type}: ${summary}`;
-  if (subject.length > 100) return refusal(`subject is ${subject.length} characters; maximum is 100`);
+  const titled = subjectFor(args);
+  if (titled.error) return refusal(titled.error);
+  const { subject } = titled;
 
   const cwd = path.resolve(ctx?.cwd ?? process.cwd());
   const top = api.revParseQuery(['--show-toplevel'], { cwd });
@@ -73,31 +111,8 @@ export async function gitCommit(ctx, deps = {}) {
   const checked = resolvePaths(requested, cwd, root, api.exists);
   if (checked.error) return refusal(checked.error);
   const addPaths = checked.paths ?? [];
-  const coAuthor = String(args['co-author'] ?? ctx?.env?.STARCI_CO_AUTHOR ?? '').trim();
-  const lane = String(args.lane ?? (branch.startsWith('lane/') ? branch : '')).trim();
-  const trailers = [...(coAuthor ? [`Co-Authored-By: ${coAuthor}`] : []), ...(lane ? [`Lane: ${lane}`] : [])];
-  const paragraphs = [subject];
-  const body = String(args.body ?? '').trim();
-  if (body) paragraphs.push(body);
-  if (trailers.length) paragraphs.push(trailers.join('\n'));
-  const message = paragraphs.join('\n\n');
-
-  if (args['dry-run']) {
-    const staged = stagedFiles(root, api.diff);
-    if (staged == null) return refusal('could not read the staged files', 1);
-    let preview = staged;
-    if (addPaths.length) {
-      const status = api.porcelainStatus(root, { pathspecs: addPaths, untracked: 'all', literal: true });
-      if (!status.ok) return refusal(`could not inspect --paths: ${status.stderr || 'git status failed'}`, 1);
-      preview = [...new Set([...staged, ...statusPaths(status.stdout)])].sort(byCodeUnit);
-    }
-    if (!preview.length) return refusal('nothing to commit', 1);
-    return {
-      code: 0,
-      text: `message:\n${message}\n\nstaged:\n${preview.join('\n')}`,
-      data: { schema: 'starci/git-commit@1', ok: true, sha: null, subject, trailers, paths: preview, dryRun: true }
-    };
-  }
+  const { message, trailers } = messageOf({ subject, args, ctx, branch });
+  if (args['dry-run']) return dryRunPlan({ api, root, addPaths, message, subject, trailers }, refusal);
 
   if (addPaths.length) {
     const staged = api.add(['--', ...addPaths], { cwd: root });

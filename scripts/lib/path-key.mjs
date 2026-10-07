@@ -6,6 +6,17 @@ const WIN = process.platform === 'win32';
 
 /** `p` with every backslash turned into a forward slash; null and undefined read as ''. */
 export const slash = (p) => String(p ?? '').replaceAll('\\', '/');
+/** `text` without its trailing '/' run (a loop: a trailing-run pattern backtracks super-linearly). */
+export const trimTrailingSlashes = (text) => {
+  for (let end = text.length; ; end -= 1) if (end === 0 || text[end - 1] !== '/') return text.slice(0, end);
+};
+// A trailing '*' run with the one '/' before it (the glob suffix of 'dir/**'); text without a trailing '*' is unchanged.
+const stripTrailingStars = (text) => {
+  let end = text.length;
+  while (end > 0 && text[end - 1] === '*') end -= 1;
+  if (end === text.length) return text;
+  return text.slice(0, end > 0 && text[end - 1] === '/' ? end - 1 : end);
+};
 /** A relative path in git's spelling: forward slashes, no leading './'. */
 export const posixPath = (p) => slash(p).replace(/^\.\//, '');
 /** Whether posix `file` is `prefix` itself or under it (`file === prefix || file` starts with `prefix/`). */
@@ -19,7 +30,7 @@ export const samePath = (a, b) => foldCase(a) === foldCase(b);
  * `fold: true` folds case on every platform (a comparison against a lowercase-stored root needs it).
  */
 export const pathKey = (p, { fold = WIN } = {}) => {
-  const key = slash(path.resolve(p)).replace(/\/+$/, '');
+  const key = trimTrailingSlashes(slash(path.resolve(p)));
   return fold ? key.toLowerCase() : key;
 };
 /** `a` is `b` or under it, or the reverse: two path spellings whose trees touch. */
@@ -36,13 +47,13 @@ export const normPath = (p, { trim = false, collapse = false, dot = false, glob 
   s = slash(s);
   if (collapse) s = s.replace(/\/{2,}/g, '/');
   if (dot) s = s.replace(/^\.\//, '');
-  if (glob === 'star') s = s.replace(/\/?\*+$/, '');
+  if (glob === 'star') s = stripTrailingStars(s);
   else if (glob === 'double') s = s.replace(/\/\*\*$/, '');
-  s = s.replace(/\/+$/, '');
+  s = trimTrailingSlashes(s);
   return fold ? s.toLowerCase() : s;
 };
 /** A work-relative path in one spelling: forward slashes, no leading ./, no trailing slash. */
-export const normWork = (p) => String(p ?? '').trim().replaceAll('\\', '/').replace(/^\.\/+/, '').replace(/\/+$/, '');
+export const normWork = (p) => trimTrailingSlashes(String(p ?? '').trim().replaceAll('\\', '/').replace(/^\.\/+/, ''));
 
 /** `p` resolved and dereferenced (realpath where the path exists) — the canonical spelling of a checkout dir. */
 export const realPath = (p) => {
@@ -88,7 +99,7 @@ export const containedPath = (base, candidate, { label = 'path' } = {}) => {
  * no trailing '/**' glob or slashes, no leading './'; `fold` lowercases for a case-insensitive key.
  */
 export const normRel = (p, { fold = false } = {}) => {
-  const s = String(typeof p === 'string' ? p : p?.path ?? '').trim().replaceAll('\\', '/').replace(/\/\*\*$/, '').replace(/\/+$/, '').replace(/^\.\//, '');
+  const s = trimTrailingSlashes(String(typeof p === 'string' ? p : p?.path ?? '').trim().replaceAll('\\', '/').replace(/\/\*\*$/, '')).replace(/^\.\//, '');
   return fold ? s.toLowerCase() : s;
 };
 /** Whether `file` equals or sits under one of `prefixes` (posix spellings; `dot` counts a '.' prefix as covering all). */

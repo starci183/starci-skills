@@ -26,7 +26,7 @@ import { fileURLToPath } from 'node:url';
 import { parseJsonOr } from '../lib/json.mjs';
 import { refuse as refuseError } from '../../engine/refuse.mjs';
 import { kernelDecisionItems } from './reported-jobs.mjs';
-import { appendEvent, openDecisionItem, recordDecision, updateDecisionItem } from '../../engine/db/ledger.mjs'; import { isMain } from '../lib/is-main.mjs';
+import { appendEvent, openDecisionItem, recordDecision, updateDecisionItem } from '../../engine/db/ledger.mjs'; import { isMain } from '../lib/is-main.mjs'; import { eachInOrder } from '../lib/in-order.mjs';
 import { oneLine } from '../lib/clip.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
@@ -730,8 +730,22 @@ export function dueStep(di, now = Date.now()) {
   if (di.decider !== 'kernel' || di.status !== 'open' || di.kind === 'supervisor-ruling' || !Number.isFinite(di.dueAt)) return null;
   const span = Math.max(1, di.dueAt - (di.openedAt ?? di.dueAt));
   if (now >= di.dueAt + span) return { step: 'supervisor' };
-  if (now >= di.dueAt && !(di.escalations > 0)) return { step: 'remind' };
-  return null;
+  const reminded = di.escalations > 0;
+  return now >= di.dueAt && !reminded ? { step: 'remind' } : null;
+}
+
+async function escalateOne({ ledger, di, step, act, repo, env, now }) {
+  if (step.step === 'remind') escalateDecision(ledger, di.id, { to: 'kernel', by: 'reconciler/sla', reason: 'past dueAt', final: false, now });
+  else {
+    escalateDecision(ledger, di.id, { to: 'supervisor', by: 'reconciler/sla', reason: 'past dueAt x2', final: true, now });
+    const ledgerName = path.basename(repo);
+    const sup = await openSupervisorDecision({ kind: di.kind === 'supervisor-ruling' ? 'cross-workflow' : di.kind, idempotencyKey: `escalated:${ledgerName}:${di.id}`,
+      entity: di.entity, productWorkflowId: di.workflowId, productLedger: ledgerName, summary: `Kernel DI ${di.id} (${di.kind}) in ${di.workflowId} overdue x2: ${di.summary}`,
+      evidence: [{ ref: `decision:${ledgerName}/${di.workflowId}/${di.id}` }, ...(di.evidence ?? []).slice(0, 10)], by: 'reconciler/sla', item: `di|${ledgerName}|${di.id}`,
+      refs: [di.workflowId, di.id], severity: di.severity }, { env, now });
+    act.supervisorDi = sup.di.id;
+  }
+  act.applied = true;
 }
 
 /**
@@ -743,32 +757,18 @@ export async function escalateDue({ now = Date.now(), apply = false, repos = nul
   const fs = await import('node:fs');
   if (!repos) { const home = await import('./home.mjs'); repos = home.productRepos(); }
   const actions = [];
-  for (const repo of repos) {
-    const file = ledgerFileFor(repo);
-    if (!fs.existsSync(file)) continue;
-    const ledger = openLedger({ file });
+  await eachInOrder(repos, async (repo) => {
+    if (!fs.existsSync(ledgerFileFor(repo))) return;
+    const ledger = openLedger({ file: ledgerFileFor(repo) });
     try {
-      for (const di of listDecisions(ledger.db, { decider: 'kernel', now })) {
+      await eachInOrder(listDecisions(ledger.db, { decider: 'kernel', now }), async (di) => {
         const step = dueStep(di, now);
-        if (!step) continue;
-        const act = { repo, workflowId: di.workflowId, id: di.id, kind: di.kind, step: step.step, applied: false };
-        actions.push(act);
-        if (!apply) continue;
-        if (step.step === 'remind') {
-          escalateDecision(ledger, di.id, { to: 'kernel', by: 'reconciler/sla', reason: 'past dueAt', final: false, now });
-        } else {
-          escalateDecision(ledger, di.id, { to: 'supervisor', by: 'reconciler/sla', reason: 'past dueAt x2', final: true, now });
-          const ledgerName = path.basename(repo);
-          const sup = await openSupervisorDecision({ kind: di.kind === 'supervisor-ruling' ? 'cross-workflow' : di.kind, idempotencyKey: `escalated:${ledgerName}:${di.id}`,
-            entity: di.entity, productWorkflowId: di.workflowId, productLedger: ledgerName, summary: `Kernel DI ${di.id} (${di.kind}) in ${di.workflowId} overdue x2: ${di.summary}`,
-            evidence: [{ ref: `decision:${ledgerName}/${di.workflowId}/${di.id}` }, ...(di.evidence ?? []).slice(0, 10)], by: 'reconciler/sla',
-            item: `di|${ledgerName}|${di.id}`, refs: [di.workflowId, di.id], severity: di.severity }, { env, now });
-          act.supervisorDi = sup.di.id;
-        }
-        act.applied = true;
-      }
+        if (!step) return;
+        const act = { repo, workflowId: di.workflowId, id: di.id, kind: di.kind, step: step.step, applied: false }; actions.push(act);
+        if (apply) await escalateOne({ ledger, di, step, act, repo, env, now });
+      });
     } finally { ledger.close(); }
-  }
+  });
   return { ok: true, apply, actions };
 }
 

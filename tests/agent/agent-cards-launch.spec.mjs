@@ -4,7 +4,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnAgent, startAgent, loadAdapter } from '../../scripts/agent/lib.mjs';
-import { ensureLaunchTrust, projectTargets, claudeKeyForms } from '../../scripts/agent/trust.mjs';
+import { projectTargets, claudeKeyForms } from '../../scripts/agent/trust.mjs';
+import { ensureLaunchTrust } from '../../scripts/agent/trust-launch.mjs';
 import { fakeAdmission } from '../helpers/fake-admission.mjs';
 
 // Launch preconditions per provider card (owner order 2026-10-02: no first-run dialog, no approval prompt, the command guard

@@ -24,6 +24,7 @@ import { OWNED_PROCESS_SCHEMA } from '../lib/process-identity.mjs';
 import { stopOwnedProcess } from '../api/process/stop-owned-process.mjs';
 import { canonicalJSON } from '../../engine/canonical-json.mjs';
 import { stopConnectorFlow } from './stop.mjs';
+import { repeatInOrder } from '../lib/in-order.mjs';
 
 
 /** When this host last booted (ms). */
@@ -179,13 +180,15 @@ export function withHostMutex(name, fn, { env = process.env, waitMs = 10_000, st
   const prior = chains.get(name) ?? Promise.resolve();
   const run = prior.catch(() => {}).then(async () => {
     const end = Date.now() + waitMs;
-    for (;;) {
+    const refused = await repeatInOrder(async () => {
       let got;
       try { got = withMachine((m) => takeLock(m, name), { env }); } catch { got = { ok: false }; }
-      if (got.ok) break;
+      if (got.ok) return null;
       if (Date.now() > end) return { ok: false, skipped: `${name} is locked` };
       await sleep(stepMs);
-    }
+      return undefined;
+    });
+    if (refused) return refused;
     try { return await fn(); } finally { try { withMachine((m) => m.releaseHostLock({ name }), { env }); } catch { /* gone */ } }
   });
   chains.set(name, run);

@@ -67,7 +67,7 @@ const devinCredentialsFile = (env = process.env) =>
 
 const DOUBLE_QUOTED_KEY = '"([^"]*)"';
 const SINGLE_QUOTED_KEY = "'([^']*)'";
-const BARE_KEY = '[^\\s#]+';
+const BARE_KEY = String.raw`[^\s#]+`;
 const WINDSURF_API_KEY_LINE = new RegExp(String.raw`^\s*windsurf_api_key\s*=\s*(${DOUBLE_QUOTED_KEY}|${SINGLE_QUOTED_KEY}|${BARE_KEY})\s*$`, 'm');
 
 /**

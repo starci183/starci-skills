@@ -14,6 +14,7 @@ import path from 'node:path';
 import { FORBIDDEN_FILES, SECRET_PATTERNS } from './secret-patterns.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { altOf } from './source-phrases.mjs';
+import { trimEdgeChar } from './normalize.mjs';
 import { redactResolvedSecrets } from '../../engine/secrets.mjs';
 
 const REDACTION_VERSION = 'v1';
@@ -34,11 +35,17 @@ const RULES = [
   // ENV_STYLE_KEY=value / ENV_STYLE_KEY: value (shell exports, dotenv, compose, CLI echo).
   { name: 'env-secret', re: /\b((?:export\s+)?[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*)(\s*[:=]\s*["']?)((?!\[redacted)[^\s"'`]{3,})/g,
     to: (m, a, b, c) => (isSecretEnvName(a) && !c.startsWith('/run/secrets/') && !c.startsWith('$') ? `${a}${b}${MARK}` : m) },
-  { name: 'keyed-secret', re: /\b(password|passwd|pwd|secret|api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|auth[_-]?token|session[_-]?token|private[_-]?key|otp|pin[_-]?code|cookie|set-cookie)(["']?\s*[:=]\s*["']?)((?!\[redacted)[^\s"',;&}]{3,})/gi, to: (m, a, b) => `${a}${b}${MARK}` },
+  { name: 'keyed-secret', re: new RegExp([
+    String.raw`\b(password|passwd|pwd|secret|api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|auth[_-]?token|session[_-]?token|private[_-]?key|otp|pin[_-]?code|cookie|set-cookie)`,
+    String.raw`(["']?\s*[:=]\s*["']?)((?!\[redacted)[^\s"',;&}]{3,})`,
+  ].join(''), 'gi'), to: (m, a, b) => `${a}${b}${MARK}` },
 ];
 
 /** Keys whose value is a secret whatever it looks like; the key stays, the value goes. */
-export const SECRET_KEY = /^(?:password|passwd|pwd|pass|secret|otp|pin|pincode|pin_code|credential|credentials|authorization|cookie|cookies|set-cookie|private[_-]?key|client[_-]?secret|api[_-]?key|apikey|[a-z_-]*token|[a-z_-]*secret)$/i;
+export const SECRET_KEY = new RegExp([
+  '^(?:password|passwd|pwd|pass|secret|otp|pin|pincode|pin_code|credential|credentials|authorization|cookie|cookies|set-cookie|private[_-]?key|client[_-]?secret|api[_-]?key|apikey|[a-z_-]*token|[a-z_-]*secret)',
+  '$',
+].join(''), 'i');
 
 // ------------------------------------------------------------------------------ declared stack secrets
 // A product repo's .starcistacks/<stack>/stack.yaml `secrets:` block names each secret and the runtime file
@@ -46,7 +53,7 @@ export const SECRET_KEY = /^(?:password|passwd|pwd|pass|secret|otp|pin|pincode|p
 const STACK_DIRS = ['.starcistacks'];
 const secretValues = new Set();
 const secretNames = new Set();
-const envName = (name) => String(name).replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '').toUpperCase();
+const envName = (name) => trimEdgeChar(String(name).replace(/[^A-Za-z0-9]+/g, '_'), '_').toUpperCase();
 const readSafe = (file) => { try { return fs.readFileSync(file, 'utf8'); } catch { return null; } };
 const listSafe = (dir) => { try { return fs.readdirSync(dir, { withFileTypes: true }); } catch { return []; } };
 
@@ -134,9 +141,14 @@ export function redactData(value, key = null, depth = 0) {
 }
 
 // -------------------------------------------------------------------------------------------- bytes
+const TEXT_MEDIA = new RegExp([
+  String.raw`^text\/`,
+  String.raw`|[/+](?:json|xml|yaml|x-yaml|javascript|x-ndjson|x-diff|x-patch|csv|sql|x-sh)\b`,
+  String.raw`|^application\/(?:json|xml|yaml|javascript|x-ndjson|x-diff|x-patch|sql)$`,
+].join(''), 'i');
+
 /** True for media types whose bytes are text the filter can read. */
-export const isTextMedia = (mediaType) => /^text\/|[/+](?:json|xml|yaml|x-yaml|javascript|x-ndjson|x-diff|x-patch|csv|sql|x-sh)\b|^application\/(?:json|xml|yaml|javascript|x-ndjson|x-diff|x-patch|sql)$/i
-  .test(String(mediaType ?? ''));
+export const isTextMedia = (mediaType) => TEXT_MEDIA.test(String(mediaType ?? ''));
 
 /** The supported text encoding selected by a byte-order mark. */
 export function textEncodingOf(bytes) {

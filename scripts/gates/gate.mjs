@@ -44,7 +44,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { runNpm } from '../api/npm/run-npm.mjs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { show as gitShow } from '../api/git/show.mjs'; import { mergeTree } from '../api/git/merge-tree.mjs'; import { revParseQuery } from '../api/git/rev-parse-query.mjs'; import { diff as gitDiff } from '../api/git/diff.mjs'; import { lsTree } from '../api/git/ls-tree.mjs'; import { statusQuery as gitStatus } from '../api/git/status-query.mjs'; import { revList } from '../api/git/rev-list.mjs'; import { mergeBase as mergeBaseOf } from '../api/git/merge-base.mjs'; import { isAncestor } from '../api/git/is-ancestor.mjs';
+import { show as gitShow } from '../api/git/show.mjs'; import { mergeTree } from '../api/git/merge-tree.mjs'; import { revParseQuery } from '../api/git/rev-parse-query.mjs'; import { diff as gitDiff } from '../api/git/diff.mjs'; import { lsTree } from '../api/git/ls-tree.mjs'; import { statusQuery as gitStatus } from '../api/git/status-query.mjs'; import { revList } from '../api/git/rev-list.mjs'; import { mergeBase as mergeBaseOf } from '../api/git/merge-base.mjs'; import { isAncestor } from '../api/git/is-ancestor.mjs'; import { eachInOrder } from '../lib/in-order.mjs';
 import { pathKey, posixPath, sameResolvedPath } from '../lib/path-key.mjs';
 import { hfsEntry } from '../lib/package-at.mjs';
 import { readJsonFile } from '../lib/json.mjs';
@@ -211,7 +211,7 @@ export async function baseEslintFindings({ root, base, files }) {
   const sha = resolveGateBase(root, base);
   const atBase = baseEslint({ root, base: sha, readBase: baseBlobReader(root, sha), cache: cacheDirs(root) });
   const out = [];
-  for (const file of new Set(files.map(posixPath))) for (const ruleId of (await atBase(file, file)) ?? []) out.push({ file, ruleId });
+  await eachInOrder(new Set(files.map(posixPath)), async (file) => { for (const ruleId of (await atBase(file, file)) ?? []) out.push({ file, ruleId }); });
   return out;
 }
 /**
@@ -223,7 +223,7 @@ async function lintBaseCounts({ root, base, head, delta, hfs, readBase, cache })
   const add = (key, n = 1) => counts.set(key, (counts.get(key) ?? 0) + n);
   const eslintFiles = [...new Set(head.filter((f) => f.engine === 'eslint' && f.path && basePathOf(delta, f.path)).map((f) => f.path))];
   const atBase = baseEslint({ root, base, readBase, cache });
-  for (const file of eslintFiles) for (const rule of (await atBase(basePathOf(delta, file), file)) ?? []) add(`${file}|eslint/${rule}`);
+  await eachInOrder(eslintFiles, async (file) => { for (const rule of (await atBase(basePathOf(delta, file), file)) ?? []) add(`${file}|eslint/${rule}`); });
   // The repository checks judge paths: over the base listing (the declaration and file contents are the head's) a finding
   // on a file's base path, or on no file, is the base's. A content finding on a changed file does not reproduce there.
   const headPathOf = new Map(head.filter((f) => f.engine === 'hfs' && f.path && basePathOf(delta, f.path)).map((f) => [basePathOf(delta, f.path), f.path]));

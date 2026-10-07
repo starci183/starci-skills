@@ -106,6 +106,7 @@ const NO_WARNING = /\.deepEqual\([^\n]*,\s*\[\]\s*\)|\.equal\([^\n]*\.length,\s*
 const A_WARNING = /\.equal\([^\n]*\.length,\s*[1-9]|\.match\(|\.deepEqual\([^\n]*\.map\(|\.ok\([^\n]*\.(?:some|length)/;
 const SPEC_DECLARATION_HEADER = String.raw`^(?:export\s+)?const\s+([A-Za-z_$][\w$]*)\s*=`;
 const SPEC_DECLARATION_BOUNDARY = String.raw`^(?:export\s+)?(?:const|test\(|(?:async )?function)\b`;
+const DOLLAR_ESCAPE = String.raw`\$`;
 const SPEC_DECLARATION = new RegExp(`${SPEC_DECLARATION_HEADER}([^]*?)(?=${SPEC_DECLARATION_BOUNDARY}|(?![^]))`, 'gm');
 const stylelintProven = (files, id) => files.some((text) => {
   if (!new RegExp(`\\blintRule\\(\\s*(['"\`])${id}\\1`).test(text)) return false;
@@ -119,7 +120,7 @@ const specProven = (specs, code) => specs.some((text) => {
   // A top-level declaration runs until the next top-level `const`/`test(`/`function` line.
   const declarations = [...text.matchAll(SPEC_DECLARATION)];
   const names = [code, ...declarations.filter((m) => m[2].includes(code)).map((m) => m[1])];
-  return text.split(/\btest\(/).slice(1).filter((block) => names.some((name) => new RegExp(String.raw`\b${name.replaceAll('$', '\\$')}\b`).test(block))).length >= 2;
+  return text.split(/\btest\(/).slice(1).filter((block) => names.some((name) => new RegExp(String.raw`\b${name.replaceAll('$', DOLLAR_ESCAPE)}\b`).test(block))).length >= 2;
 });
 
 /** The knowledge files under `root` that may name a rule code, as [{rel, text}] (YAML only). */
@@ -140,7 +141,7 @@ export function readKnowledgeFiles(root) {
  */
 const STYLELINT_RULE_LINE_START = String.raw`(?<=^|[\n\r\u2028\u2029])`;
 const STYLELINT_RULE_ID = '[a-z0-9-]+';
-const STYLELINT_RULE_PATTERN = `${STYLELINT_RULE_LINE_START}[^\\S\\n]*"(${STYLELINT_RULE_ID})"\\s*:`;
+const STYLELINT_RULE_PATTERN = String.raw`${STYLELINT_RULE_LINE_START}[^\S\n]*"(${STYLELINT_RULE_ID})"\s*:`;
 
 export function stylelintRuleIds(root) {
   try {

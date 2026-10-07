@@ -23,6 +23,21 @@ export const DEFAULTS = Object.freeze({ floor: 2, decreaseCooldownMs: 120_000, i
 
 const int = (v, d) => positiveNumber(v, d, { int: true });
 
+// The halved cap after a new rate-limit signal; at the floor, `floorSince` marks when the pool arrived there.
+function decreasedEntry(base, prev, { cur, lo, now }) {
+  const cap = Math.max(lo, Math.floor(cur / 2));
+  let floorSince = null;
+  if (cap === lo) floorSince = prev?.cap === lo && prev?.floorSince ? prev.floorSince : now;
+  return { ...base, cap, floorSince, lastDecreaseAt: now, halvings: base.halvings + 1, reason: `rate limited: ${cur} -> ${cap}${cap === lo ? ' (floor)' : ''}` };
+}
+
+// One step back up after a quiet spell; null when the step reaches the pool's max.
+function increasedEntry(base, { cur, top, quietSince, now }) {
+  const cap = cur + 1;
+  if (cap >= top) return null;
+  return { ...base, cap, floorSince: null, lastIncreaseAt: now, reason: `quiet ${Math.round((now - quietSince) / 60000)} min: ${cur} -> ${cap}` };
+}
+
 /**
  * One AIMD step for one pool. `prev`: the published entry or null (= at max). `rateLimitAt`: the newest rate-limit
  * signal's time for this pool or null. Returns the next entry, or null when the pool is (back) at its max with no
@@ -38,19 +53,14 @@ export function aimdStep(prev, { max, rateLimitAt = null, now, floor = DEFAULTS.
   const base = { max: top, lastRateLimitAt: lastRl, lastDecreaseAt: prev?.lastDecreaseAt ?? null, lastIncreaseAt: prev?.lastIncreaseAt ?? null, halvings: prev?.halvings ?? 0 };
   // Multiplicative decrease: a new signal, and the last decrease is older than the cooldown.
   if (fresh && (base.lastDecreaseAt == null || now - base.lastDecreaseAt >= decreaseCooldownMs)) {
-    const cap = Math.max(lo, Math.floor(cur / 2));
-    let floorSince = null;
-    if (cap === lo) floorSince = prev?.cap === lo && prev?.floorSince ? prev.floorSince : now;
-    return { ...base, cap, floorSince, lastDecreaseAt: now, halvings: base.halvings + 1, reason: `rate limited: ${cur} -> ${cap}${cap === lo ? ' (floor)' : ''}` };
+    return decreasedEntry(base, prev, { cur, lo, now });
   }
   if (!prev) return null;
   // Additive increase: quiet for increaseAfterMs since the last signal, one step per increaseStepMs.
   const quietSince = lastRl ?? base.lastDecreaseAt ?? now;
   const lastStep = Math.max(Number(base.lastIncreaseAt) || 0, Number(base.lastDecreaseAt) || 0);
   if (now - quietSince >= increaseAfterMs && now - lastStep >= Math.min(increaseStepMs, increaseAfterMs) && cur < top) {
-    const cap = cur + 1;
-    if (cap >= top) return null;
-    return { ...base, cap, floorSince: null, lastIncreaseAt: now, reason: `quiet ${Math.round((now - quietSince) / 60000)} min: ${cur} -> ${cap}` };
+    return increasedEntry(base, { cur, top, quietSince, now });
   }
   return { ...base, cap: cur, floorSince: cur === lo ? (prev.floorSince ?? base.lastDecreaseAt ?? now) : null, reason: prev.reason ?? null };
 }
@@ -87,7 +97,8 @@ export const entriesOfRows = (rows) => Object.fromEntries((rows ?? []).map((r) =
 export function capsOf(rows, { now = Date.now() } = {}) {
   const out = {};
   for (const r of rows ?? []) {
-    if (!(Number(r?.until_at) > now)) continue;
+    const live = Number(r?.until_at) > now;
+    if (!live) continue;
     const e = entryOfRow(r);
     const cap = Number(e?.cap), max = Number(e?.max);
     if (Number.isInteger(cap) && cap > 0 && (!Number.isFinite(max) || cap < max)) out[r.pool] = cap;

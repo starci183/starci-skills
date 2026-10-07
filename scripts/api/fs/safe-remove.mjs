@@ -65,40 +65,57 @@ export function safeRemove(root, { retries = 5, checkoutsUnder = null, hold } = 
   // the root itself or strictly under the root's real path. A link is unlinked above (the link only); any other
   // entry that resolves outside the tree is refused, whatever made it look like a plain entry.
   const rootReal = realpathOr(target);
-  const insideRoot = (p) => { const real = realpathOr(p); if (!real || !rootReal) { return false; } if (same(real, rootReal)) { return true; }
-    const rel = path.relative(rootReal, real); return Boolean(rel) && !rel.startsWith('..') && !path.isAbsolute(rel); };
-  const walk = (dir, st, parentReal) => {
-    if (isLinkLike(dir, { parentReal, stat: st })) {
-      if (unlinkOnly(dir)) { out.removed.links += 1; return true; }
-      fail(dir, { code: 'LINK_STUCK', message: 'a link could not be unlinked; nothing above it is removed' });
-      return false;
-    }
-    if (!insideRoot(dir)) {
-      fail(dir, { code: 'OUTSIDE_ROOT', message: `refusing to delete ${dir}: its real path ${realpathOr(dir) ?? '?'} is outside ${rootReal ?? target}` });
-      return false;
-    }
-    if (!st.isDirectory()) {
-      const error = removeFile(dir, retries);
-      if (error) { fail(dir, error); return false; }
-      out.removed.files += 1; return true;
-    }
-    const real = realpathOr(dir);
-    if (!real) { fail(dir, { code: 'REALPATH', message: 'cannot resolve the directory' }); return false; }
-    let entries;
-    try { entries = fs.readdirSync(dir); } catch (error) { fail(dir, error); return false; }
-    let clear = true;
-    for (const name of entries) {
-      const child = path.join(dir, name);
-      let childStat;
-      try { childStat = fs.lstatSync(child); } catch (error) { if (error?.code !== 'ENOENT') { fail(child, error); clear = false; } continue; }
-      if (!walk(child, childStat, real)) clear = false;
-    }
-    if (!clear) return false;
-    const error = retrying(() => fs.rmdirSync(dir), retries);
-    if (error) { fail(dir, error); return false; }
-    out.removed.dirs += 1; return true;
-  };
-  walk(target, st, null);
+  const ctx = { out, fail, retries, rootReal, target };
+  walk(ctx, target, st, null);
   out.ok = !fs.existsSync(target) && (() => { try { fs.lstatSync(target); return false; } catch { return true; } })();
   return out;
+}
+
+function insideRoot({ rootReal }, p) {
+  const real = realpathOr(p);
+  if (!real || !rootReal) return false;
+  if (same(real, rootReal)) return true;
+  const rel = path.relative(rootReal, real);
+  return Boolean(rel) && !rel.startsWith('..') && !path.isAbsolute(rel);
+}
+
+// Removes each child of `dir` (real path `real`); false when any child stays.
+function removeChildren(ctx, dir, entries, real) {
+  let clear = true;
+  for (const name of entries) {
+    const child = path.join(dir, name);
+    let childStat;
+    try { childStat = fs.lstatSync(child); } catch (error) { if (error?.code !== 'ENOENT') { ctx.fail(child, error); clear = false; } continue; }
+    if (!walk(ctx, child, childStat, real)) clear = false;
+  }
+  return clear;
+}
+
+function walkDirectory(ctx, dir) {
+  const { out, fail, retries } = ctx;
+  const real = realpathOr(dir);
+  if (!real) { fail(dir, { code: 'REALPATH', message: 'cannot resolve the directory' }); return false; }
+  let entries;
+  try { entries = fs.readdirSync(dir); } catch (error) { fail(dir, error); return false; }
+  if (!removeChildren(ctx, dir, entries, real)) return false;
+  const error = retrying(() => fs.rmdirSync(dir), retries);
+  if (error) { fail(dir, error); return false; }
+  out.removed.dirs += 1; return true;
+}
+
+function walk(ctx, dir, st, parentReal) {
+  const { out, fail, retries, rootReal, target } = ctx;
+  if (isLinkLike(dir, { parentReal, stat: st })) {
+    if (unlinkOnly(dir)) { out.removed.links += 1; return true; }
+    fail(dir, { code: 'LINK_STUCK', message: 'a link could not be unlinked; nothing above it is removed' });
+    return false;
+  }
+  if (!insideRoot(ctx, dir)) {
+    fail(dir, { code: 'OUTSIDE_ROOT', message: `refusing to delete ${dir}: its real path ${realpathOr(dir) ?? '?'} is outside ${rootReal ?? target}` });
+    return false;
+  }
+  if (st.isDirectory()) return walkDirectory(ctx, dir);
+  const error = removeFile(dir, retries);
+  if (error) { fail(dir, error); return false; }
+  out.removed.files += 1; return true;
 }

@@ -183,9 +183,7 @@ const submissionTimeoutMs = (adapter) => Number(adapter?.submission?.timeoutMs) 
 export function awaitSubmission(handle, adapter, { sentText = null, onWait = null } = {}) {
   const spec = adapter?.submission && typeof adapter.submission === 'object' ? adapter.submission : {};
   const activity = regexp(spec.activityPattern, 'Thinking|Working|Running|esc to (?:cancel|interrupt)|tokens');
-  let staged = DEFAULT_STAGED_PATTERN;
-  if (typeof spec.stagedPattern === 'string' && spec.stagedPattern.trim())
-    staged = regexp(`${DEFAULT_STAGED_PATTERN.source}|${spec.stagedPattern}`, DEFAULT_STAGED_PATTERN.source);
+  const staged = stagedPatternOf(spec);
   const input = regexp(adapter?.readiness?.screenPattern, String.raw`(?:Ask|Message|Enter a prompt|(^|\n)\s*${INPUT_GLYPH_CLASS})`);
   const timeoutMs = submissionTimeoutMs(adapter);
   const settleMs = Math.max(250, Number(spec.settleMs) || 1000);
@@ -194,7 +192,7 @@ export function awaitSubmission(handle, adapter, { sentText = null, onWait = nul
   const state = { enters: 1, screen: '', stuckEnterAt: null };
   for (let elapsed = 0; elapsed <= timeoutMs; elapsed += settleMs) {
     if (elapsed > 0) {
-      if (typeof onWait === 'function') { try { onWait({ step: 'submission', elapsedMs: elapsed }); } catch { /* a heartbeat never fails the launch */ } }
+      heartbeat(onWait, elapsed);
       sleepSync(settleMs);
     }
     const result = submissionStep(handle, adapter, { sentText, staged, activity, input, maxEnter, stuckGraceMs }, state, elapsed);
@@ -203,6 +201,28 @@ export function awaitSubmission(handle, adapter, { sentText = null, onWait = nul
   return { ok: false, failureKind: 'submission-not-consumed', transient: true, reason: `prompt was not consumed within ${timeoutMs}ms`,
     screen: state.screen, lastOutput: lastOutputOf(state.screen), enters: state.enters };
 }
+
+const stagedPatternOf = (spec) => typeof spec.stagedPattern === 'string' && spec.stagedPattern.trim()
+  ? regexp(`${DEFAULT_STAGED_PATTERN.source}|${spec.stagedPattern}`, DEFAULT_STAGED_PATTERN.source) : DEFAULT_STAGED_PATTERN;
+
+const heartbeat = (onWait, elapsed) => {
+  if (typeof onWait !== 'function') return;
+  try { onWait({ step: 'submission', elapsedMs: elapsed }); } catch { /* a heartbeat never fails the launch */ }
+};
+
+// A paste that stays in the input box gets one extra Enter; past the grace it is stuck.
+const stuckStep = (handle, policy, state, elapsed, stuckRow) => {
+  if (state.stuckEnterAt === null) {
+    terminalSend({ terminal: handle, text: '', enter: true });
+    state.enters += 1;
+    state.stuckEnterAt = elapsed;
+    return null;
+  }
+  if (elapsed - state.stuckEnterAt < policy.stuckGraceMs) return null;
+  return { ok: false, failureKind: 'prompt-stuck', transient: true, signal: 'prompt-stuck', stuckRow,
+    screen: state.screen, lastOutput: lastOutputOf(state.screen), enters: state.enters,
+    reason: `dispatch paste stayed in the input box ('${stuckRow.slice(0, 80)}') ${elapsed - state.stuckEnterAt}ms after one extra Enter` };
+};
 
 const submissionStep = (handle, adapter, policy, state, elapsed) => {
   const read = terminalRead({ terminal: handle });
@@ -216,18 +236,7 @@ const submissionStep = (handle, adapter, policy, state, elapsed) => {
   const region = read.ok ? stagedInputRegion(state.screen, { stagedPattern: policy.staged, sentText: policy.sentText }) : null;
   const begun = read.ok && policy.activity.test(region ? region.above.join('\n') : state.screen);
   const stuckRow = region && !begun ? region.row : null;
-  if (stuckRow) {
-    if (state.stuckEnterAt === null) {
-      terminalSend({ terminal: handle, text: '', enter: true });
-      state.enters += 1;
-      state.stuckEnterAt = elapsed;
-    } else if (elapsed - state.stuckEnterAt >= policy.stuckGraceMs) {
-      return { ok: false, failureKind: 'prompt-stuck', transient: true, signal: 'prompt-stuck', stuckRow,
-        screen: state.screen, lastOutput: lastOutputOf(state.screen), enters: state.enters,
-        reason: `dispatch paste stayed in the input box ('${stuckRow.slice(0, 80)}') ${elapsed - state.stuckEnterAt}ms after one extra Enter` };
-    }
-    return null;
-  }
+  if (stuckRow) return stuckStep(handle, policy, state, elapsed, stuckRow);
   if (begun) return { ok: true, screen: state.screen, enters: state.enters,
     ...(state.stuckEnterAt !== null ? { unstuckByEnter: true } : {}) };
   if (read.ok && state.enters < policy.maxEnter && (policy.staged.test(state.screen) || policy.input.test(state.screen))) {

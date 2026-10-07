@@ -134,21 +134,21 @@ export async function sweepStarciLogs({ apply = false, now = Date.now(), env = p
 
   // One recursive walk: never into a link, never into .git/node_modules, never inside a git
   // checkout (a dir holding a .git entry — lane worktrees, supervisor staging/land).
+  const visitEntry = (dir, e, parentReal, onFile, dirs) => {
+    const p = path.join(dir, e.name);
+    let st;
+    try { st = fs.lstatSync(p); } catch (error) { if (error?.code !== 'ENOENT') { fail(p, error); } return; }
+    if (!st.isDirectory()) { onFile(p, st); return; }
+    if (isLinkLike(p, { parentReal, stat: st })) { skip(p, 'link'); return; }
+    if (SKIP_DIRS.has(e.name)) { skip(p, `excluded-dir:${e.name}`); return; }
+    dirs?.push(p);
+    walk(p, realpathOr(p) ?? parentReal, onFile, dirs);
+  };
   const walk = (dir, parentReal, onFile, dirs = null) => {
     let entries;
     try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch (error) { fail(dir, error); return; }
     if (entries.some((e) => e.name === '.git')) { skip(dir, 'git-checkout'); return; }
-    for (const e of entries) {
-      const p = path.join(dir, e.name);
-      let st;
-      try { st = fs.lstatSync(p); } catch (error) { if (error?.code !== 'ENOENT') { fail(p, error); } continue; }
-      if (st.isDirectory()) {
-        if (isLinkLike(p, { parentReal, stat: st })) { skip(p, 'link'); continue; }
-        if (SKIP_DIRS.has(e.name)) { skip(p, `excluded-dir:${e.name}`); continue; }
-        dirs?.push(p);
-        walk(p, realpathOr(p) ?? parentReal, onFile, dirs);
-      } else onFile(p, st);
-    }
+    for (const e of entries) visitEntry(dir, e, parentReal, onFile, dirs);
   };
   const sweepRoot = (root, onFile, dirs = null) => {
     const resolved = path.resolve(root);

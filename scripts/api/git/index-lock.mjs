@@ -20,6 +20,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { gitDirOf, lockStat, processOnRepo } from '../../lib/git-dir.mjs';
 
+// A lock younger than `staleMs` (or one with no usable threshold) is not stale yet.
+const notStale = (ageMs, staleMs) => {
+  const threshold = Number(staleMs);
+  return Number.isNaN(threshold) || threshold <= 0 || ageMs < threshold;
+};
+
 const initialLockState = (repo, staleMs, now) => {
   const gitDir = gitDirOf(repo);
   const lock = gitDir ? path.join(gitDir, 'index.lock') : null;
@@ -29,7 +35,7 @@ const initialLockState = (repo, staleMs, now) => {
   out.ageMs = Math.max(0, now - before.mtimeMs);
   out.bytes = before.size;
   if (before.isSymbolicLink() || !before.isFile()) return { out, before, result: { ...out, state: 'not-a-file' } };
-  if (!(Number(staleMs) > 0) || out.ageMs < Number(staleMs)) return { out, before, result: { ...out, state: 'fresh' } };
+  if (notStale(out.ageMs, staleMs)) return { out, before, result: { ...out, state: 'fresh' } };
   return { out, before, result: null };
 };
 

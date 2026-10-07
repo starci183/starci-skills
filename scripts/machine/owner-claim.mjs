@@ -28,10 +28,18 @@ export const foldText = (text) => String(text ?? '').normalize('NFD').replace(/[
 const SUBJECT_VI = '(?:owner|chu du an|chu so huu|thay)';
 const OWNER_CLAIM_PATTERNS = [
   // owner confirmed / Owner has approved / owner's answer ... (not "owner has not ...")
-  /\bowner(?:'s)?(?:\/supervisor)?\s+(?:(?:has|had|have|already|explicitly|then)\s+)*(?:confirmed|approved|accepted|agreed|ruled|answered|decided|signed off|authori[sz]ed|okayed|ok'?d|chose|picked|granted|allowed|relayed)\b/,
+  new RegExp([
+    String.raw`\bowner(?:'s)?(?:\/supervisor)?\s+(?:(?:has|had|have|already|explicitly|then)\s+)*`,
+    "(?:confirmed|approved|accepted|agreed|ruled|answered|decided|signed off|authori[sz]ed|okayed|ok'?d|chose|picked|granted|allowed|relayed)",
+    String.raw`\b`,
+  ].join('')),
   /\b(?:confirmed|approved|accepted|authori[sz]ed|signed off|ruled|answered|decided|granted)\s+by\s+(?:the\s+)?owner\b/,
   /\bowner[- ](?:approved|confirmed|accepted|authori[sz]ed|sanctioned|ruled)\b/,
-  /(?<!\bno )(?<!\bwithout )(?<!\bawaiting )(?<!\bpending )\bowner(?:'s)?\s+(?:ruling|approval|confirmation|sign-?off|consent|answer|go-ahead)\b(?!\s+(?:is\s+)?(?:pending|required|needed|missing|owed|outstanding))/,
+  new RegExp([
+    String.raw`(?<!\bno )(?<!\bwithout )(?<!\bawaiting )(?<!\bpending )\bow`,
+    String.raw`ner(?:'s)?\s+(?:ruling|approval|confirmation|sign-?off|consent|answer|go-ahead)`,
+    String.raw`\b(?!\s+(?:is\s+)?(?:pending|required|needed|missing|owed|outstanding))`,
+  ].join('')),
   // Vietnamese (folded, as matched): owner da / chu du an xac nhan / thay duyet / duoc owner duyet / xac nhan cua chu so huu
   /\bowner da\b/,
   new RegExp(String.raw`\b${SUBJECT_VI}(?:\/supervisor)?\s+(?:da\s+)?(?:xac nhan|duyet|phe duyet|dong y|chap nhan|tra loi|chon|quyet dinh|cho phep|phan quyet)\b`),
@@ -41,7 +49,10 @@ const OWNER_CLAIM_PATTERNS = [
 
 // A phrase just after a wait, a condition or a negation is not a claim: "cho chu so huu duyet", "until the
 // owner approved", "gate khong cho cau tra loi cua owner".
-const NOT_A_CLAIM_BEFORE = /\b(?:cho|chua|can|doi|neu|khi|de|khong|until|awaiting|await|waits?|waiting|pending|if|once|unless|needs?|before|no|not|without)\b[^.;:!?]{0,12}$/;
+const NOT_A_CLAIM_BEFORE = new RegExp([
+  String.raw`\b(?:cho|chua|can|doi|neu|khi|de|khong|until|awaiting|await|waits?|waiting|pending|if|once|unless|needs?|before|no|not|without)`,
+  String.raw`\b[^.;:!?]{0,12}$`,
+].join(''));
 
 /** The owner-claim phrase `text` makes (folded), or null. */
 export function ownerClaimOf(text) {
@@ -60,7 +71,19 @@ export function ownerClaimOf(text) {
 // An owner-gate whose own text says the wait is not the owner's: a runtime limit or defect, a settle the
 // Kernel defers, a supervisor's step (inc-1d6e73af51cc RUNTIME LIMIT, inc-c85f3b0c1603 "khong phai
 // viec owner thuc hien").
-const NOT_OWNER_WORK = /\bruntime limit\b|\bruntime[- ]defect\b|\bruntime fix\b|\bcho sua (?:source )?runtime\b|\bnot an? owner(?:'s)? (?:step|ask|action|work|task|wait)\b|\bnot owner work\b|\bkhong phai (?:la )?(?:viec|buoc)(?: cua)? (?:owner|chu)|\bkhong phai owner\b|\bdeferred settle\b|\bcho supervisor\b|\bwaits? (?:on|for) (?:the )?supervisor\b/;
+const NOT_OWNER_WORK = new RegExp([
+  String.raw`\bruntime limit\b`,
+  String.raw`|\bruntime[- ]defect\b`,
+  String.raw`|\bruntime fix\b`,
+  String.raw`|\bcho sua (?:source )?runtime\b`,
+  String.raw`|\bnot an? owner(?:'s)? (?:step|ask|action|work|task|wait)\b`,
+  String.raw`|\bnot owner work\b`,
+  String.raw`|\bkhong phai (?:la )?(?:viec|buoc)(?: cua)? (?:owner|chu)`,
+  String.raw`|\bkhong phai owner\b`,
+  String.raw`|\bdeferred settle\b`,
+  String.raw`|\bcho supervisor\b`,
+  String.raw`|\bwaits? (?:on|for) (?:the )?supervisor\b`,
+].join(''));
 
 /** The phrase that marks an owner-gate's text as not owner work, or null. */
 export function notOwnerWorkOf(text) {

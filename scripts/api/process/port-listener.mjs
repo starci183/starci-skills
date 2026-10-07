@@ -6,8 +6,8 @@ import fs from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { systemTool } from './system-tool.mjs';
 
-/** Linux without lsof: {pid, commandLine} of the process holding the LISTEN socket of `port` that /proc lets this user read, or null. */
-function procListener(port, fsx) {
+// The socket inodes of the LISTEN rows of `port` in the kernel's TCP tables.
+function listeningInodes(port, fsx) {
   const inodes = new Set();
   for (const table of ['/proc/net/tcp', '/proc/net/tcp6']) {
     let text;
@@ -17,19 +17,33 @@ function procListener(port, fsx) {
       if (f[3] === '0A' && Number.parseInt(String(f[1]).split(':')[1], 16) === port) inodes.add(f[9]);
     }
   }
+  return inodes;
+}
+
+function procCommandLine(fsx, pid) {
+  try { return fsx.readFileSync(`/proc/${pid}/cmdline`, 'utf8').replaceAll('\0', ' ').trim() || null; } catch { return null; /* the process ended or hides its command line */ }
+}
+
+// {pid, commandLine} when one fd of process `pid` is a socket of `inodes`, else null.
+function procHolder(fsx, pid, inodes) {
+  let fds;
+  try { fds = fsx.readdirSync(`/proc/${pid}/fd`); } catch { return null; }
+  for (const fd of fds) {
+    let target;
+    try { target = fsx.readlinkSync(`/proc/${pid}/fd/${fd}`); } catch { continue; }
+    const socket = /^socket:\[(\d+)\]$/.exec(target);
+    if (socket && inodes.has(socket[1])) return { pid: Number(pid), commandLine: procCommandLine(fsx, pid) };
+  }
+  return null;
+}
+
+/** Linux without lsof: {pid, commandLine} of the process holding the LISTEN socket of `port` that /proc lets this user read, or null. */
+function procListener(port, fsx) {
+  const inodes = listeningInodes(port, fsx);
   if (!inodes.size) return null;
   for (const pid of fsx.readdirSync('/proc').filter((name) => /^\d+$/.test(name))) {
-    let fds;
-    try { fds = fsx.readdirSync(`/proc/${pid}/fd`); } catch { continue; }
-    for (const fd of fds) {
-      let target;
-      try { target = fsx.readlinkSync(`/proc/${pid}/fd/${fd}`); } catch { continue; }
-      const socket = /^socket:\[(\d+)\]$/.exec(target);
-      if (!socket || !inodes.has(socket[1])) continue;
-      let commandLine = null;
-      try { commandLine = fsx.readFileSync(`/proc/${pid}/cmdline`, 'utf8').replaceAll('\0', ' ').trim() || null; } catch { /* the process ended or hides its command line */ }
-      return { pid: Number(pid), commandLine };
-    }
+    const holder = procHolder(fsx, pid, inodes);
+    if (holder) return holder;
   }
   return null;
 }

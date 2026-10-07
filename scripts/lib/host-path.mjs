@@ -7,7 +7,10 @@
 //                                             inside roots.worktree|runtime|tmp|home -> <worktree>|<runtime>|<tmp>|<home>; a host
 //                                             executable (a shell) -> its bare command name; any other host path -> <host>/<last segment>
 // `%LOCALAPPDATA%` as an unexpanded name is not a path and is never touched.
+import { trimTrailingChars } from './normalize.mjs';
+
 const SEP = String.raw`(?:\\\\|\\|/)`;
+const SLASH_CHAR = /[\\/]/;
 const DRIVE = /(?<![\p{L}\p{N}_])[A-Za-z]:(?:\\|\/(?!\/))/gu;
 const PROFILE = /(?<![\p{L}\p{N}_.:-])\/(?:Users|home)\/[A-Za-z0-9][A-Za-z0-9_.-]*\//gu;
 const APPDATA = /(?<![\p{L}\p{N}_])AppData[\\/](?:Local|LocalLow|Roaming)(?![\p{L}\p{N}_])/gu;
@@ -32,7 +35,7 @@ export function hostPathHits(text) {
 }
 
 const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
-const rootPattern = (root) => String(root).replace(/[\\/]+$/, '').split(/[\\/]+/).map(escape).join(SEP);
+const rootPattern = (root) => trimTrailingChars(String(root), SLASH_CHAR).split(/[\\/]+/).map(escape).join(SEP);
 const portable = (s) => s.replace(/\\{1,2}/g, '/');
 
 /** The text with each known root replaced: [{root, to}] longest root first; `to` '' makes the path relative to that root. */

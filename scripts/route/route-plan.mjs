@@ -36,15 +36,13 @@ import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { routeFields, stringItems } from './route-fields.mjs';
 import { asList } from '../lib/list.mjs';
-import {
-  loadRecords, readWorkspace, resolveOwnedDirs,
-} from '../work/record-ownership.mjs';
 import { ownerSpecs, planLegDeferral } from './spec-deferral.mjs';
-import { phraseHits } from './phrase-match.mjs';
-import { normalizeText } from '../lib/normalize.mjs';
-import { walkFiles } from '../lib/walk.mjs';
+import { applyExtend, impactOf, satisfiedByS0, surveyS0 } from './route-plan-survey.mjs';
+import { STATE_QUALIFIER, VAR_STATE_LINE, dedupeVars, intentToStar, loadArchetypeSignals, normalizeTargetVar, varKey } from './route-plan-parse.mjs';
+import { planChain } from './route-plan-chain.mjs';
+import { legalityCheck, topoSort } from './route-plan-validate.mjs';
 
-const VAR_NAME = '[A-Za-z][A-Za-z0-9.]*', VAR_STATE_LINE = new RegExp('^(' + VAR_NAME + ')\\s*:\\s*(.+)$'), QUALIFIER_CONTENT = '[^)]*', STATE_QUALIFIER = new RegExp('^(.*?)\\s*\\((' + QUALIFIER_CONTENT + ')\\)\\s*$'), skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
+const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 
 // ---------------------------------------------------------------- args -----
 
@@ -55,8 +53,6 @@ args: (--target "<var>: <state>" [--target ...] | --target-json '<json>' | --tex
     [--work <.starciwork dir>] [--opsDir <dir>] [--goalDir <dir>] [--json]`);
   process.exit(code);
 }
-
-function legIdFor(opId, instance) { return instance ? `${opId}#${instance}` : opId; }
 
 function parseArgs(argv) {
   const a = { targets: [] };
@@ -105,6 +101,23 @@ function loadOps(opsDir) {
   return ops;
 }
 
+// One opProduces entry as a structured variable, or null when it does not parse.
+function producesEntryOf(op, raw) {
+  const m = VAR_STATE_LINE.exec(String(raw).trim());
+  if (!m) return null;
+  const varPart = m[1];
+  let state = m[2].trim();
+  let qualifier = null;
+  const q = STATE_QUALIFIER.exec(state);
+  if (q) { state = q[1].trim(); qualifier = q[2].trim(); }
+  const dot = varPart.indexOf('.');
+  return {
+    family: dot < 0 ? varPart : varPart.slice(0, dot),
+    suffix: dot < 0 ? '' : varPart.slice(dot + 1),
+    state, qualifier, op, raw: String(raw),
+  };
+}
+
 /** Parse legality.yaml producesVocabulary.opProduces into structured entries.
  *  Entry form: "impl.X: done (frontend)" -> {family:'impl', suffix:'X',
  *  state:'done', qualifier:'frontend', op, raw}. */
@@ -116,19 +129,8 @@ function loadProducesTable(goalDir) {
   const byVar = []; // [{family, suffix, state, qualifier, op, raw}]
   for (const [op, vars] of Object.entries(table)) {
     for (const raw of stringItems(vars)) {
-      const m = VAR_STATE_LINE.exec(String(raw).trim());
-      if (!m) continue;
-      const varPart = m[1];
-      let state = m[2].trim();
-      let qualifier = null;
-      const q = STATE_QUALIFIER.exec(state);
-      if (q) { state = q[1].trim(); qualifier = q[2].trim(); }
-      const dot = varPart.indexOf('.');
-      byVar.push({
-        family: dot < 0 ? varPart : varPart.slice(0, dot),
-        suffix: dot < 0 ? '' : varPart.slice(dot + 1),
-        state, qualifier, op, raw: String(raw),
-      });
+      const entry = producesEntryOf(op, raw);
+      if (entry) byVar.push(entry);
     }
   }
   return { byVar, file: path.relative(skillRoot, file) };
@@ -155,987 +157,67 @@ function loadSettledOutOfBand(goalDir, workRoot) {
   return out;
 }
 
-// ------------------------------------------------------------ PARSE -> S* --
-
-// The intent->S* table for the archetypes in modules/goal/archetypes.yaml. The
-// signals (which prompt phrases select an archetype, in which order, which
-// archetypes a match supersedes) are data in that file's signalMatching and
-// per-archetype signals; this table holds only what a match contributes: target
-// state variables plus chain hints the backward chainer consumes (producer
-// preference, custody pre-mark, diagnostic-first). Archetypes COMPOSE: union
-// of matched vars.
-const ARCHETYPE_STAR = {
-  'workspace-canonicalization': {
-    vars: () => [
-      { family: 'impl', suffix: 'workspace-path-consumers', state: 'done' },
-      { family: 'workspace', suffix: '', state: 'managed' },
-    ],
-    hints: {
-      preferProducer: 'code.refactor',
-      needsCoverage: true,
-      workspaceCanonicalization: true,
-      scopeKind: 'workspace-canonicalization',
-    },
-  },
-  // Specification only: canonical Work from its source, SRS, SDS, stacks. The
-  // workspace.manage setup entry on the catalog is the scope and the reconstructed roots are
-  // the delivery review.verify reads. A brand-intent prompt adds brand.decide
-  // (archetypes.yaml conditionalLegs); a settled brand record drops it again.
-  'spec-foundation': {
-    vars: (a, arch, text) => [
-      { family: 'workspace', suffix: '', state: 'managed' },
-      { family: 'business', suffix: 'X', state: 'decided' },
-      { family: 'sds', suffix: 'X', state: 'decided' },
-      ...arch.conditional.filter(c => c.when.some(p => phraseHits(text, p))).map(c => ({ ...c.var })),
-    ],
-    hints: {
-      specFoundation: true,
-      scopeProducer: 'workspace.manage',
-      deliveryOps: ['workspace.manage'],
-      scopeKind: 'spec-foundation',
-    },
-  },
-  // Source setup: one scaffold leg per named surface (archetypes.yaml
-  // greenfield-scaffold surfaces/surfaceRule); no decide leg precedes it.
-  'greenfield-scaffold': {
-    vars: (a, arch, text) => {
-      const surfaces = arch.extra?.surfaces ?? {};
-      const hit = key => asList(surfaces[key]).some(p => phraseHits(text, p));
-      const named = ['backend', 'frontend', 'package'].filter(hit);
-      const picked = named.length ? named : ['backend', 'frontend'];
-      return picked.map(q => ({ family: 'impl', suffix: q, state: 'scaffolded', _qual: q, strictQualifier: true }));
-    },
-    hints: { scopeKind: 'greenfield-scaffold' },
-  },
-  // One feature through both lanes: the backend slice is a delivery of its
-  // own (strict qualifier, so the frontend build cannot stand in for it) and
-  // lands before the interface that consumes it.
-  'feature-build-fullstack': {
-    vars: a => [
-      { family: 'impl', suffix: 'X', state: 'done', _qual: 'backend', strictQualifier: true },
-      { family: 'ui', suffix: a.surfaceName, state: 'verified' },
-      { family: 'api', suffix: a.surfaceName, state: 'verified' },
-    ],
-    hints: { fullstack: true, implQualifier: 'frontend', scopeKind: 'feature-build-fullstack' },
-  },
-  'investigate-first': {
-    vars: () => [{ family: 'perf', suffix: 'X', state: 'verified' }],
-    hints: { diagnosticFirst: true },
-  },
-  refactor: {
-    vars: a => [{ family: 'impl', suffix: a.surfaceName, state: 'done' }],
-    hints: { preferProducer: 'code.refactor', needsCoverage: true, scopeProvided: true },
-  },
-  'external-integration': {
-    vars: a => [{ family: 'integration', suffix: a.surfaceName, state: 'verified' }],
-    hints: { custody: true, implQualifier: 'backend' },
-  },
-  'assisted-uat-prepare': {
-    vars: a => [{ family: 'uat', suffix: a.surfaceName, state: 'assisted-ready' }],
-    hints: { assistedUat: true, assistedMode: 'prepare' },
-  },
-  'assisted-uat-verify': {
-    vars: a => [{ family: 'uat', suffix: a.surfaceName, state: 'assisted-verified' }],
-    hints: { assistedUat: true, assistedMode: 'verify' },
-  },
-  // Only on an explicit ask (modules/goal/archetypes.yaml unit-verify phrases): the full unit run is never a default leg.
-  'unit-verify': {
-    vars: () => [{ family: 'unit', suffix: 'X', state: 'verified' }],
-    hints: {},
-  },
-  'verify-only': {
-    vars: a => [{ family: 'slice', suffix: a.surfaceName, state: 'reviewed' }],
-    hints: {},
-  },
-  'feature-build-with-ui': {
-    vars: a => [{ family: 'ui', suffix: a.surfaceName, state: 'verified' }],
-    hints: { implQualifier: 'frontend' },
-  },
-  'feature-build-backend': {
-    vars: a => [{ family: 'api', suffix: a.surfaceName, state: 'verified' }],
-    hints: { implQualifier: 'backend' },
-  },
-};
-
-function alternativeMatches(text, alt) {
-  const phrases = asList(alt?.phrases);
-  if (!phrases.length || !phrases.some(p => phraseHits(text, p))) return false;
-  if (!asList(alt.requires).every(group => asList(group).some(p => phraseHits(text, p)))) return false;
-  return !asList(alt.excludes).some(p => phraseHits(text, p));
-}
-
-/** Load archetypes.yaml signalMatching into ordered matchers. Every sequenced
- *  id must carry phrase signals here and an S* entry in ARCHETYPE_STAR. */
-function loadArchetypeSignals(goalDir) {
-  const file = path.join(goalDir, 'archetypes.yaml');
-  const doc = parseYaml(fs.readFileSync(file, 'utf8'));
-  const sets = doc?.signalMatching?.phraseSets ?? {};
-  const expand = list => asList(list).flatMap(p => {
-    if (typeof p !== 'string' || !p.startsWith('$')) return [p];
-    const set = sets[p.slice(1)];
-    if (!Array.isArray(set)) throw new Error(`${file}: phrase set '${p}' is not declared in signalMatching.phraseSets`);
-    return set;
-  });
-  const expandAlt = alt => (alt && typeof alt === 'object' ? {
-    ...alt,
-    phrases: expand(alt.phrases),
-    requires: asList(alt.requires).map(expand),
-    excludes: expand(alt.excludes),
-  } : alt);
-  // conditionalLegs.entries: a leg's variable joins S* only when a `when`
-  // phrase hits the prompt ("brand: settled" -> {family:'brand', state:'settled'}).
-  const conditionalOf = entry => asList(entry?.conditionalLegs?.entries).map(c => {
-    const m = /^([A-Za-z][A-Za-z0-9.]*)\s*:\s*(\S+)$/.exec(String(c?.var ?? '').trim());
-    if (!m) throw new Error(`${file}: archetype '${entry.id}' conditionalLegs entry for '${c?.op}' has no parseable var`);
-    const dot = m[1].indexOf('.');
-    return { op: String(c.op), when: expand(c.when), var: { family: dot < 0 ? m[1] : m[1].slice(0, dot), suffix: dot < 0 ? '' : m[1].slice(dot + 1), state: m[2] } };
-  });
-  const byId = new Map();
-  for (const arch of asList(doc?.archetypes)) {
-    for (const entry of arch?.variants ? asList(arch.variants) : [arch]) {
-      byId.set(String(entry.id), { id: String(entry.id), signals: asList(entry.signals).map(expandAlt), supersedes: asList(entry.supersedes ?? arch.supersedes), conditional: conditionalOf(entry), extra: entry });
-    }
-  }
-  const sequence = asList(doc?.signalMatching?.sequence).map(String);
-  if (!sequence.length) throw new Error(`${file}: signalMatching.sequence is empty`);
-  const matchers = sequence.map(id => {
-    const entry = byId.get(id);
-    if (!entry) throw new Error(`${file}: signalMatching.sequence names '${id}', which no archetype or variant declares`);
-    if (!entry.signals.some(alt => asList(alt?.phrases).length)) throw new Error(`${file}: archetype '${id}' is sequenced but has no signal phrases`);
-    if (!ARCHETYPE_STAR[id]) throw new Error(`${file}: archetype '${id}' has no S* entry in scripts/route/route-plan.mjs`);
-    return { ...entry, ...ARCHETYPE_STAR[id] };
-  });
-  // A refactor whose prompt hits $canonIntent is a canon-conformance cleanup (code.refactor params.canonFamilies).
-  return Object.assign(matchers, { canonIntent: expand(['$canonIntent']), e2eIntent: expand(['$e2eIntent']), uatIntent: expand(['$uatIntent']), proofNegation: expand(['$proofNegation']), integrationIntent: expand(['$integrationIntent']), integrationNegation: expand(['$integrationNegation']) });
-}
-
-function matchArchetypes(rawText, archetypes) {
-  const text = normalizeText(rawText);
-  const hits = archetypes.filter(arch => arch.signals.some(alt => alternativeMatches(text, alt)));
-  const superseded = new Set(hits.flatMap(arch => arch.supersedes));
-  return hits.filter(arch => !superseded.has(arch.id));
-}
-
-const PROOF_SCOPES = new Set(['feature-build-fullstack', 'feature-build-with-ui', 'feature-build-backend', 'verify-only']);
-// Live integration verification (integration.verify) is the same kind of manual-only proof (owner ruling 2026-09-29): it can
-// join an external-integration scope or any build scope, and only on an explicit ask.
-const INTEGRATION_SCOPES = new Set([...PROOF_SCOPES, 'external-integration']);
-
-/** E2E runs manually only (owner ruling 2026-09-29): the e2e/UAT proof legs are explicit asks, never defaults. */
-function explicitProofAsk(text, archetypes) {
-  const hit = list => asList(list).some(p => phraseHits(text, p));
-  const negated = hit(archetypes.proofNegation);
-  const integrationNegated = hit(archetypes.integrationNegation);
-  return { e2e: hit(archetypes.e2eIntent) && !negated, uat: hit(archetypes.uatIntent) && !negated, integration: hit(archetypes.integrationIntent) && !integrationNegated };
-}
-
-/** Without an explicit ask a backend build ends at impl done (backend) and an interface build at ui audited;
- *  with one, the proof variable (api / ui verified) joins whatever archetype matched. */
-function applyProofRule(vars, proof, a) {
-  const out = [];
-  for (const v of vars) {
-    if (v.family === 'api' && v.state === 'verified' && !proof.e2e) {
-      out.push({ family: 'impl', suffix: v.suffix, state: 'done', _qual: 'backend', strictQualifier: true });
-    } else if (v.family === 'ui' && v.state === 'verified' && !proof.uat) {
-      out.push({ family: 'ui', suffix: v.suffix, state: 'audited' });
-    } else if (v.family === 'integration' && v.state === 'verified' && !proof.integration) {
-      out.push({ family: 'impl', suffix: v.suffix, state: 'done', _qual: 'backend', strictQualifier: true });
-    } else out.push(v);
-  }
-  if (proof.e2e && !out.some(v => v.family === 'api' && v.state === 'verified')) out.push({ family: 'api', suffix: a.surfaceName, state: 'verified' });
-  if (proof.uat && !out.some(v => v.family === 'ui' && v.state === 'verified')) out.push({ family: 'ui', suffix: a.surfaceName, state: 'verified' });
-  if (proof.integration && !out.some(v => v.family === 'integration' && v.state === 'verified')) out.push({ family: 'integration', suffix: a.surfaceName, state: 'verified' });
-  return out;
-}
-
-// Words that fill the surface slot of the prompt pattern without naming a unit ("the backend API", "the existing feature").
-const GENERIC_SURFACE_WORDS = new Set(['backend', 'back-end', 'frontend', 'front-end', 'existing', 'new', 'whole', 'entire', 'full', 'main', 'current', 'api', 'app', 'ui']);
-
-function intentToStar(text, args, archetypes) {
-  const a = { surfaceName: 'X' };
-  const sm = /\b(?:the|for|of)\s+([a-z][a-z0-9-]{2,})\s+(?:screen|page|api|endpoint|service|feature|module)/i.exec(text);
-  if (sm && !GENERIC_SURFACE_WORDS.has(sm[1].toLowerCase())) a.surfaceName = sm[1];
-  const matched = matchArchetypes(text, archetypes);
-  if (!matched.length) return null;
-  const vars = [];
-  const hints = { archetypes: matched.map(m => m.id), surfaceName: a.surfaceName };
-  for (const arch of matched) {
-    vars.push(...arch.vars(a, arch, normalizeText(text)));
-    Object.assign(hints, arch.hints);
-  }
-  if (hints.archetypes.includes('refactor') && asList(archetypes.canonIntent).some(p => phraseHits(normalizeText(text), p))) {
-    Object.assign(hints, { canonConformance: true, scopeKind: 'canon-conformance' });
-  }
-  // Only a build or verify scope can carry a proof leg; a specification, scaffold, canonicalization or assisted
-  // UAT prompt may name e2e/UAT as subject matter without asking for the leg.
-  const proofScope = hints.archetypes.some(id => PROOF_SCOPES.has(id));
-  const asked = explicitProofAsk(normalizeText(text), archetypes);
-  const integrationScope = hints.archetypes.some(id => INTEGRATION_SCOPES.has(id));
-  const proof = { e2e: proofScope && asked.e2e, uat: proofScope && asked.uat, integration: integrationScope && asked.integration };
-  Object.assign(hints, { e2eAsked: proof.e2e, uatAsked: proof.uat, integrationAsked: proof.integration });
-  const starVars = applyProofRule(vars, proof, a);
-  // fanout: two or more disjoint verify surfaces in one prompt.
-  const surfaces = new Set(starVars.map(v => v.family));
-  if (surfaces.size >= 2) hints.fanout = true;
-  return { vars: dedupeVars(starVars), hints };
-}
-
-const varKey = v => `${v.family}${v.suffix ? '.' + v.suffix : ''}`;
-
-function dedupeVars(vars) {
-  const seen = new Map();
-  for (const v of vars) {
-    const k = `${varKey(v)}:${v.state}`;
-    if (!seen.has(k)) seen.set(k, v);
-  }
-  return [...seen.values()];
-}
-
-/** "feature.A: exists proven" -> [{impl.A: done}, {api.A: verified}].
- *  Explicit target vars normalize into the producesVocabulary state space. */
-function normalizeTargetVar(spec, args) {
-  const m = VAR_STATE_LINE.exec(String(spec).trim());
-  if (!m) return { error: `cannot parse target var '${spec}' — expected "<family>.<suffix>: <state>"` };
-  const varPart = m[1];
-  const states = m[2].trim().toLowerCase().split(/\s+/);
-  const dot = varPart.indexOf('.');
-  const family = dot < 0 ? varPart : varPart.slice(0, dot);
-  const suffix = (dot < 0 ? '' : varPart.slice(dot + 1)) || 'X';
-  const out = [];
-  const surface = args.surface ?? (family === 'ui' ? 'ui' : 'api');
-  for (const st of states) {
-    if (st === 'exists' || st === 'built' || st === 'implemented') {
-      out.push({ family: 'impl', suffix, state: 'done', raw: spec });
-    } else if (st === 'proven' || st === 'verified') {
-      const fam = ['ui', 'api', 'integration', 'perf', 'security', 'unit'].includes(family) ? family : surface;
-      out.push({ family: fam, suffix, state: 'verified', raw: spec });
-    } else if (family === 'feature') {
-      out.push({ family: 'impl', suffix, state: st, raw: spec });
-    } else {
-      out.push({ family, suffix: dot < 0 ? '' : suffix, state: st, raw: spec });
-    }
-  }
-  return { vars: dedupeVars(out) };
-}
-
-// ------------------------------------------------------------- SURVEY S0 ---
-
-// record schema -> state-variable family (producesVocabulary families).
-const SCHEMA_FAMILY = {
-  'work/business-rule@1': 'business', 'work/functional-requirement@1': 'business',
-  'work/non-functional-requirement@1': 'business', 'work/policy-decision@1': 'business',
-  'work/customer-journey@1': 'business', 'work/feature@1': 'business',
-  'work/sds-component@1': 'sds', 'work/contract@1': 'sds', 'work/data@1': 'sds', 'work/event@1': 'sds',
-  'work/implementation@1': 'impl',
-  'work/ui-screen@1': 'ui', 'work/uat-flow@1': 'ui',
-  'work/integration@1': 'integration',
-  'work/brand@1': 'brand', 'work/scope@1': 'scope',
-  'work/gap@1': 'gap',
-};
-const SETTLED = new Set(['done']);           // a record whose proof stands
-const UNSETTLED = new Set(['todo', 'inprogress', 'proposed', 'blocked']);
-
-const walk = dir => (fs.existsSync(dir) ? walkFiles(dir) : []);
-
-/** features/<feature>/... -> <feature>; null for a record outside a feature folder. */
-function featureOf(dir, stateDir) {
-  const parts = path.relative(stateDir, dir).split(path.sep);
-  return parts[0] === 'features' && parts[1] ? parts[1] : null;
-}
-
-/** An implementation record's lane: the workspace role of its repository (fe -> frontend), else backend. */
-function implQualifier(data, workspaceDoc) {
-  const repos = Array.isArray(workspaceDoc?.repositories) ? workspaceDoc.repositories : [];
-  return repos.find(r => r?.name === data?.repository)?.role === 'fe' ? 'frontend' : 'backend';
-}
-
-// Schemas whose records are backend-owned material: a goal whose feature holds one touches the backend.
-const BACKEND_RECORD_SCHEMAS = new Set(['work/sds-component@1', 'work/contract@1', 'work/data@1', 'work/event@1', 'work/business-rule@1']);
-const isBackendRecord = ent => (ent.family === 'impl' ? ent.qualifier === 'backend' : BACKEND_RECORD_SCHEMAS.has(ent.schema));
-
-function surveyS0(stateDir) {
-  const s0 = {
-    root: stateDir, records: [], vars: new Map(), gaps: [], // vars: key -> {recordId, state, settled}
-    recordsById: null, workspaceDoc: null,
-  };
-  if (!fs.existsSync(stateDir)) { s0.note = `state dir missing: ${stateDir}`; return s0; }
-  const recordsById = loadRecords(stateDir, walk);
-  const workspaceDoc = readWorkspace(stateDir);
-  s0.recordsById = recordsById; s0.workspaceDoc = workspaceDoc;
-  for (const [id, rec] of recordsById) {
-    const family = SCHEMA_FAMILY[rec.schema] ?? null;
-    const state = String(rec.data?.state ?? 'unknown');
-    const entry = { id, schema: rec.schema, family, state, dir: rec.dir, feature: featureOf(rec.dir, stateDir),
-      qualifier: family === 'impl' ? implQualifier(rec.data, workspaceDoc) : null };
-    s0.records.push(entry);
-    if (family === 'gap') { s0.gaps.push({ id, state }); continue; }
-    if (!family) continue;
-    // var key: family + record id tail (fr.audit.log.read -> business.audit.log.read)
-    const suffix = id.split('.').slice(1).join('.');
-    s0.vars.set(`${family}.${suffix}`, { recordId: id, state, settled: SETTLED.has(state), schema: rec.schema, feature: entry.feature, qualifier: entry.qualifier });
-  }
-  return s0;
-}
-
-/** Does S0 satisfy var {family,suffix,state}? A NAMED suffix needs a settled record whose id
- *  contains it. An unnamed one (X / '' / absent) is a family-level wildcard: it never settles a GOAL
- *  variable (the goal names no unit, so nothing on disk proves it done: settling it would drop the
- *  whole chain, backend.implement included, the moment any impl record was done), and for a prerequisite
- *  it counts only records of the goal's own features when the survey matched some, and never for the families
- *  an EXTEND changes (s0.extendFamilies: impl, ui). An impl variable
- *  carrying a lane (_qual) is satisfied only by a record of that lane: a done frontend record never
- *  stands in for the backend. An extend variable (the goal changes a unit that exists) is never satisfied.
- *  Returns {by, recordId?, recordState?}. */
-function satisfiedByS0(v, s0, { goal = false } = {}) {
-  if (!s0 || v.extend) return null;
-  const wantSuffix = v.suffix && v.suffix !== 'X' ? v.suffix : null;
-  if (!wantSuffix && (goal || s0.wildcardOff || s0.extendFamilies?.has(v.family))) return null;
-  const scope = s0.scopeFeatures?.size ? s0.scopeFeatures : null;
-  let fallback = null;
-  for (const [key, ent] of s0.vars) {
-    const fam = key.split('.')[0];
-    if (fam !== v.family) continue;
-    if (v.family === 'impl' && v._qual && ent.qualifier !== v._qual) continue;
-    if (wantSuffix && !key.slice(fam.length + 1).replaceAll('.', '-').includes(wantSuffix)
-      && !key.includes(wantSuffix)) continue;
-    if (!wantSuffix && scope && !scope.has(ent.feature)) continue;
-    if (ent.settled) return { by: 's0', recordId: ent.recordId, recordState: ent.state };
-    fallback ??= { by: 's0-unsettled', recordId: ent.recordId, recordState: ent.state };
-  }
-  return fallback; // record exists but not done -> still in delta, flagged
-}
-
-/** IMPACT ANALYSIS (modules/goal/existing.yaml survey): which features of S0 the goal text names, what
- *  exists there and in which state. A goal whose text names a surveyed feature EXTENDS it - its variables
- *  are delta even where a done record exists (the unit changes), and a feature that holds backend records
- *  or code brings the backend lane into a build scope that named only the interface. */
-function impactOf(text, s0, archetypeIds) {
-  if (!s0?.records?.length) return null;
-  const norm = normalizeText(text);
-  const features = [...new Set(s0.records.map(r => r.feature).filter(Boolean))]
-    .filter(f => phraseHits(norm, f) || phraseHits(norm, f.replaceAll('-', ' ')));
-  const inScope = s0.records.filter(r => r.family && r.family !== 'gap' && features.includes(r.feature));
-  const build = archetypeIds.some(id => BUILD_SCOPES.has(id));
-  const shape = (build && (features.length ? 'EXTEND' : 'BUILD')) || 'REFERENCE';
-  return {
-    shape, features,
-    settledOutOfScope: s0.records.filter(r => r.family && r.state === 'done' && !features.includes(r.feature)).length,
-    reusedDone: inScope.filter(r => SETTLED.has(r.state)).map(r => r.id),
-    open: inScope.filter(r => !SETTLED.has(r.state)).map(r => ({ id: r.id, state: r.state })),
-    backendRecords: inScope.filter(isBackendRecord).map(r => r.id),
-    frontendRecords: inScope.filter(r => r.family === 'impl' && r.qualifier === 'frontend').map(r => r.id),
-  };
-}
-
-const BUILD_SCOPES = new Set(['feature-build-fullstack', 'feature-build-with-ui', 'feature-build-backend']);
-
-/** An EXTEND goal: every S* variable of the touched features is delta, and a build scope whose features hold
- *  backend records or code plans the backend lane even when the prompt named only the interface. */
-function applyExtend(vars, impact, a) {
-  if (impact?.shape !== 'EXTEND') return vars;
-  const out = vars.map(v => ({ ...v, extend: true }));
-  const hasBackend = out.some(v => v.family === 'impl' && v._qual === 'backend');
-  if (impact.backendRecords.length && !hasBackend) {
-    out.push({ family: 'impl', suffix: a.surfaceName, state: 'done', _qual: 'backend', strictQualifier: true, extend: true });
-  }
-  return out;
-}
-
-// ------------------------------------------------------------- CHAIN -------
-
-const STAGE_RANK = { intake: 0, scope: 1, decide: 2, direct: 3, implement: 4, verify: 5, release: 6, operate: 7 };
-const stageRankOf = op => {
-  const p = op?.route?.phase?.[0] ?? 'operate';
-  return STAGE_RANK[p] ?? 7;
-};
-
-const EXTERNAL_OPS = new Set(['request.analyze']); // model/kinds.yaml external: true
-const HANDOVER_OP = 'handover.review'; // scripts/kernel/handover.mjs HANDOVER_OP
-
-// Prerequisite phrase -> requirement. route.prerequisites are English; this is
-// the fixed phrase table mapping each declared prerequisite to a chain edge, a
-// state-variable need, or a non-chain condition (recorded on the leg).
-function parsePrerequisite(text, ops) {
-  const t = String(text).trim();
-  // "<op.id> done ..." — an explicit op dependency
-  const opRef = /^([a-z]+(?:\.[a-z]+)+)\b/i.exec(t);
-  if (opRef && ops.has(opRef[1])) {
-    return { kind: 'op', op: opRef[1], note: t };
-  }
-  const table = [
-    [/^scope defined/i, { kind: 'var', family: 'scope', state: 'defined' }],
-    [/^request analyzed/i, { kind: 'op', op: 'request.analyze', note: t }],
-    [/^implementation done$/i, { kind: 'var', family: 'impl', state: 'done' }],
-    [/^implementation \+ verification evidence/i, { kind: 'compound', needs: [{ family: 'impl', state: 'done' }, { anyPhase: 'verify' }] }],
-    [/^decided records\/behavior exist/i, { kind: 'anyPhase', phase: 'decide' }],
-    [/^(a delivery to inspect|a delivered slice)/i, { kind: 'anyPhase', phase: 'implement', soft: true }],
-    [/^verified served build/i, { kind: 'condition', note: 'served build assumed — runtime.operate leg if the stack is not already up' }],
-    [/^delivered code \+ existing regression coverage/i, { kind: 'compound', needs: [{ family: 'impl', state: 'done', soft: true, conditional: 'delivered code is pre-existing — the refactor target, not a chain leg' }, { family: 'tests', state: 'authored', conditional: 'only when coverage is missing (test-gap route -> test.author)' }] }],
-    [/^a decidable question/i, { kind: 'condition' }],
-    [/^an owner-only input/i, { kind: 'condition', owner: true }],
-    [/^no preset workflow matched/i, { kind: 'condition' }],
-    [/^evidence challenging a rule/i, { kind: 'condition' }],
-    [/^a recorded failed composition/i, { kind: 'condition' }],
-    [/^test-gap blocker or code under test/i, { kind: 'condition', note: 'code under test is pre-existing delivered code (S0), not a chain leg' }],
-    [/^an approved goal exists/i, { kind: 'condition', owner: true }],
-    [/^the scope exists/i, { kind: 'condition' }],
-    [/^a declared stack\/environment/i, { kind: 'condition' }],
-    [/^repository bound/i, { kind: 'condition' }],
-    [/^grammar bound/i, { kind: 'condition' }],
-    [/^a settled SDS only when/i, { kind: 'condition' }],
-    [/^every other leg of the approved chain settled/i, { kind: 'condition' }],
-  ];
-  for (const [re, req] of table) if (re.test(t)) return { ...req, note: req.note ?? t };
-  return { kind: 'condition', note: `unparsed prerequisite treated as a condition: '${t}'` };
-}
-
-function planChain({ sstar, s0, ops, prodTable, hints, outOfBand = [] }) {
-  const settledOutOfBand = v => outOfBand.find(o => o.family === v.family && o.state === v.state) ?? null;
-  const legs = new Map();  // legId -> leg
-  const edges = [];        // [fromLegId, toLegId]  (from must run first)
-  const gaps = [];         // unproducible vars
-  const assumptions = [];
-  let seqCounter = 0;
-
-  const producersFor = v => prodTable.byVar.filter(p =>
-    p.state === v.state && p.family === v.family
-    && (p.suffix === 'X' || p.suffix === '' || p.suffix === v.suffix || v.suffix === 'X' || v.suffix === ''));
-
-  function pickProducer(v) {
-    let cands = producersFor(v);
-    if (!cands.length) return { pick: null, cands };
-    if (cands.length === 1) return { pick: cands[0], cands };
-    // disambiguation: explicit hint, then impl qualifier, then suffix match
-    if (hints.preferProducer) {
-      const h = cands.find(c => c.op === hints.preferProducer);
-      if (h) return { pick: h, cands };
-    }
-    if (v.family === 'impl' && (v._qual ?? hints.implQualifier)) {
-      const h = cands.find(c => c.qualifier === (v._qual ?? hints.implQualifier));
-      if (h) return { pick: h, cands };
-    }
-    const exact = cands.filter(c => c.suffix === v.suffix && c.suffix !== 'X');
-    if (exact.length === 1) return { pick: exact[0], cands };
-    // ORDER-tier ambiguity: the agent chooses; record the assumption.
-    // Default preference: unqualified, then the backend impl qualifier (the
-    // generic build lane), else first table entry.
-    const pick = cands.find(c => !c.qualifier) ?? cands.find(c => c.qualifier === 'backend') ?? cands[0];
-    assumptions.push(`producer for ${varKey(v)}: ${v.state} is ambiguous — picked ${pick.op}; alternatives: ${cands.map(c => c.op).join(', ')}`);
-    return { pick, cands, assumed: true };
-  }
-
-  function ensureLeg(opId, { forVar = null, instance = null, injected = null } = {}) {
-    const lid = legIdFor(opId, instance);
-    if (legs.has(lid)) {
-      const existing = legs.get(lid);
-      if (forVar) existing.producesCovered.push(varKey(forVar) + ': ' + forVar.state);
-      if (injected && !existing.injected) existing.injected = injected;
-      return existing;
-    }
-    const op = ops.get(opId);
-    const leg = {
-      legId: lid, op: opId, instance,
-      producesCovered: forVar ? [`${varKey(forVar)}: ${forVar.state}`] : [],
-      needsSatisfiedBy: [], conditions: [], assumed: [], extends: null,
-      external: EXTERNAL_OPS.has(opId) || undefined,
-      injected: injected ?? undefined,
-      yaml: op?.file ?? null,
-      missingOp: !op || !!op.error || undefined,
-    };
-    legs.set(lid, leg);
-    leg._seq = seqCounter++;
-    expandPrerequisites(leg, op);
-    return leg;
-  }
-
-  function satisfyVar(v, consumerLeg, { soft = false, conditional = null } = {}) {
-    // 1. already produced by an existing leg?
-    for (const leg of legs.values()) {
-      if (leg === consumerLeg) continue;
-      for (const pv of prodTable.byVar.filter(p => p.op === leg.op)) {
-        const sameFam = pv.family === v.family;
-        const sameState = pv.state === v.state;
-        const suffixOk = !v.suffix || v.suffix === 'X' || pv.suffix === 'X' || pv.suffix === '' || pv.suffix === v.suffix;
-        const qualifierOk = !v.strictQualifier || pv.qualifier === v._qual;
-        if (sameFam && sameState && suffixOk && qualifierOk) {
-          consumerLeg.needsSatisfiedBy.push(`${leg.legId} produces ${pv.raw}`);
-          edges.push([leg.legId, consumerLeg.legId]);
-          return true;
-        }
-      }
-    }
-    // 1b. settled by a Work record outside the chain (legality.yaml settledOutOfBand)?
-    const oob = settledOutOfBand(v);
-    if (oob) {
-      consumerLeg.assumed.push(oob.note);
-      consumerLeg.needsSatisfiedBy.push(`out-of-band: ${oob.record} (${oob.recordState})`);
-      return true;
-    }
-    // 2. satisfied by S0?
-    const s0hit = satisfiedByS0(v, s0, { goal: consumerLeg.legId === '(goal)' });
-    if (s0hit?.by === 's0') {
-      consumerLeg.needsSatisfiedBy.push(`S0:${s0hit.recordId} (${s0hit.recordState})`);
-      return true;
-    }
-    // 2b. soft needs are satisfiable out-of-band (e.g. "delivered code" for a
-    // refactor is the pre-existing target, not a chain leg); a named-target
-    // request IS its own scope.
-    if (hints.scopeProducer && v.family === 'scope') {
-      const producer = ensureLeg(hints.scopeProducer);
-      edges.push([producer.legId, consumerLeg.legId]);
-      consumerLeg.needsSatisfiedBy.push(`${producer.legId} (its setup entry on the catalog bounds the goal)`);
-      return true;
-    }
-    if (hints.scopeProvided && v.family === 'scope') {
-      consumerLeg.needsSatisfiedBy.push('named target IS the scope — scope.define excluded per archetype');
-      return true;
-    }
-    if (soft) {
-      consumerLeg.assumed.push(`needs ${varKey(v)}: ${v.state} — satisfied out-of-band (no chain leg)${conditional ? '; ' + conditional : ''}`);
-      return true;
-    }
-    // 3. backward-chain: produce it
-    const { pick, cands, assumed } = pickProducer(v);
-    if (!pick) {
-      if (soft) { consumerLeg.assumed.push(`needs ${varKey(v)}: ${v.state} — satisfied out-of-band (no chain leg)`); return true; }
-      // fallback inference: route.prerequisites + goal prose (brief: marked)
-      const fb = [...ops.values()].find(o => !o.error && o.route.intent.includes(v.family));
-      if (fb) {
-        const leg = ensureLeg(fb.id, { forVar: v });
-        leg.assumed.push(`produces-inferred: no producesVocabulary entry for ${varKey(v)} — matched by route.intent/goal (marked per brief)`);
-        edges.push([leg.legId, consumerLeg.legId]);
-        consumerLeg.needsSatisfiedBy.push(`${leg.legId} (produces-inferred)`);
-        return true;
-      }
-      gaps.push({ var: `${varKey(v)}: ${v.state}`, neededBy: consumerLeg.op, candidates: cands.map(c => c.op) });
-      return false;
-    }
-    const leg = ensureLeg(pick.op, { forVar: v });
-    if (assumed) leg.assumed.push(`producer ambiguity for ${varKey(v)} — chose ${pick.op} over [${cands.map(c => c.op).join(', ')}]`);
-    if (conditional) leg.conditions.push(conditional);
-    edges.push([leg.legId, consumerLeg.legId]);
-    consumerLeg.needsSatisfiedBy.push(`${leg.legId} produces ${pick.raw}`);
-    // extends: S0 has a not-settled/related record for this var
-    if (s0hit?.by === 's0-unsettled') leg.extends = s0hit.recordId;
-    return true;
-  }
-
-  function satisfyPhase(phase, consumerLeg, { soft = false } = {}) {
-    const hit = [...legs.values()].find(l => l !== consumerLeg && (ops.get(l.op)?.route.phase ?? []).includes(phase));
-    if (hit) {
-      consumerLeg.needsSatisfiedBy.push(`${hit.legId} (${phase} leg)`);
-      edges.push([hit.legId, consumerLeg.legId]);
-      return true;
-    }
-    const delivery = phase === 'implement' && hints.deliveryOps
-      ? [...legs.values()].findLast(l => l !== consumerLeg && hints.deliveryOps.includes(l.op)) : null;
-    if (delivery) {
-      consumerLeg.needsSatisfiedBy.push(`${delivery.legId} (delivery to inspect: the reconstructed Work and stack roots)`);
-      edges.push([delivery.legId, consumerLeg.legId]);
-      consumerLeg.deliveredBy = delivery.legId;
-      return true;
-    }
-    if (phase === 'decide') return satisfyVar({ family: 'business', suffix: 'X', state: 'decided' }, consumerLeg);
-    if (phase === 'implement') {
-      // pick implement op by consumer surface: uat->frontend, e2e/integration->backend
-      const qual = /uat/.test(consumerLeg.op) ? 'frontend' : 'backend';
-      return satisfyVar({ family: 'impl', suffix: 'X', state: 'done', _qual: qual }, consumerLeg, { soft });
-    }
-    if (soft) { consumerLeg.assumed.push(`needs a ${phase} leg — satisfied out-of-band`); return true; }
-    gaps.push({ var: `<${phase} leg>`, neededBy: consumerLeg.op, candidates: [] });
-    return false;
-  }
-
-  function expandPrerequisites(leg, op) {
-    for (const pre of op?.route?.prerequisites ?? []) {
-      const req = parsePrerequisite(pre, ops);
-      if (req.kind === 'op') {
-        // define-goal is itself the analyzed owner intake for this narrow
-        // lifecycle archetype. Do not manufacture a generic request.analyze
-        // leg ahead of the explicit canonicalization scope.
-        if (hints.workspaceCanonicalization && leg.op === 'scope.define' && req.op === 'request.analyze') {
-          leg.needsSatisfiedBy.push('owner goal entry (request analyzed for canonicalization scope)');
-          continue;
-        }
-        // satisfied by S0? else ensure the leg exists
-        const prodEntries = prodTable.byVar.filter(p => p.op === req.op);
-        const oob = prodEntries.length && prodEntries.every(pe => settledOutOfBand(pe)) ? settledOutOfBand(prodEntries[0]) : null;
-        if (oob) {
-          leg.assumed.push(oob.note);
-          leg.needsSatisfiedBy.push(`out-of-band: ${oob.record} (${oob.recordState})`);
-          continue;
-        }
-        const s0ok = prodEntries.length && prodEntries.every(pe => satisfiedByS0({ family: pe.family, suffix: pe.suffix, state: pe.state }, s0)?.by === 's0');
-        if (s0ok) { leg.needsSatisfiedBy.push(`S0 (${req.note})`); continue; }
-        const dep = ensureLeg(req.op);
-        edges.push([dep.legId, leg.legId]);
-        leg.needsSatisfiedBy.push(`${dep.legId} (${req.note})`);
-      } else if (req.kind === 'var') {
-        // which impl qualifier does this consumer want? uat proofs read the
-        // frontend slice; api/integration/perf proofs read the backend one.
-        let qual; if (req.family === 'impl') qual = /uat/.test(leg.op) ? 'frontend' : 'backend';
-        satisfyVar({ family: req.family, suffix: 'X', state: req.state, _qual: qual }, leg);
-      } else if (req.kind === 'compound') {
-        for (const n of req.needs) {
-          if (n.anyPhase) satisfyPhase(n.anyPhase, leg, { soft: n.soft });
-          else satisfyVar({ family: n.family, suffix: 'X', state: n.state }, leg, { conditional: n.conditional ?? null, soft: !!n.soft });
-        }
-      } else if (req.kind === 'anyPhase') {
-        satisfyPhase(req.phase, leg, { soft: req.soft });
-      } else {
-        leg.conditions.push(req.note);
-      }
-    }
-  }
-
-  // ---- drive the chain from delta vars ----
-  // The goal itself consumes S*; a goal variable settled out of band (a done
-  // brand record) has no leg to carry its note, so it is reported goal-level.
-  const goal = { op: '(goal)', legId: '(goal)', needsSatisfiedBy: [], conditions: [], assumed: [] };
-  for (const v of sstar) {
-    if (satisfiedByS0(v, s0, { goal: true })?.by === 's0') continue; // already true — delta excludes it
-    // when the produced leg extends a done-but-touched surface, the reverify
-    // rule (done-record-reverify) is applied in the legality pass below.
-    satisfyVar(v, goal);
-  }
-
-  // ---- injected legs (business rules that needs/produces alone miss) ----
-  const has = pred => [...legs.values()].some((leg) => pred(leg));
-  // Workspace canonicalization is a distinct lifecycle scope. It first bounds
-  // the migration/quiescence surface, pins behavior with migration tests,
-  // refactors path consumers, reconstructs the canonical Work/stack roots,
-  // then verifies. Sharing a project ledger with a product/landing workflow is
-  // not itself a conflict; actual owned-path overlap and live-workflow custody
-  // are evaluated later from the concrete scope.
-  if (hints.workspaceCanonicalization) {
-    const scope = ensureLeg('scope.define', {
-      forVar: { family: 'scope', suffix: 'workspace-canonicalization', state: 'defined' },
-      injected: 'canonicalization boundary and quiescence scope before migration effects',
-    });
-    const tests = ensureLeg('test.author', {
-      forVar: { family: 'tests', suffix: 'workspace-canonicalization', state: 'authored' },
-      injected: 'migration regression coverage before the behavior-invariant refactor',
-    });
-    const refactor = ensureLeg('code.refactor', {
-      forVar: { family: 'impl', suffix: 'workspace-path-consumers', state: 'done' },
-    });
-    const workspace = ensureLeg('workspace.manage', {
-      forVar: { family: 'workspace', suffix: '', state: 'managed' },
-      injected: 'canonical root reconstruction replaces generic Work record remapping',
-    });
-    edges.push([scope.legId, tests.legId], [tests.legId, refactor.legId], [refactor.legId, workspace.legId]);
-    tests.needsSatisfiedBy.push(`${scope.legId} (bounded canonicalization scope)`);
-    workspace.needsSatisfiedBy.push(`${refactor.legId} (path consumers migrated before canonical root reconstruction)`);
-  }
-  // spec-foundation: after the SDS settles, workspace.manage's stacks mode
-  // (the leg instance names the mode; the kernel enqueues params.mode=stacks)
-  // declares .starcistacks from its component inventory, then review.verify
-  // checks the reconstructed Work and stack roots.
-  if (hints.specFoundation) {
-    const stacks = ensureLeg('workspace.manage', {
-      instance: 'stacks',
-      forVar: { family: 'workspace', suffix: 'stacks', state: 'managed' },
-      injected: 'workspace.manage stacks mode (params.mode=stacks): .starcistacks from the settled SDS component inventory',
-    });
-    const arch = legs.get('architecture.decide');
-    if (arch) {
-      edges.push([arch.legId, stacks.legId]);
-      stacks.needsSatisfiedBy.push(`${arch.legId} (settled component inventory)`);
-    }
-    ensureLeg('review.verify', { forVar: { family: 'slice', suffix: 'X', state: 'reviewed' } });
-  }
-  // feature-build-fullstack: the interface walk runs on an API already proven
-  // through its public surface, so e2e.verify precedes uat.verify.
-  if (hints.fullstack && legs.has('e2e.verify') && legs.has('uat.verify')) {
-    edges.push(['e2e.verify', 'uat.verify']);
-    legs.get('uat.verify').needsSatisfiedBy.push('e2e.verify (the API the interface consumes is proven first)');
-  }
-  // investigate-first: a baseline perf.verify BEFORE scoping, then the closing
-  // one after the build: evidence before boundary.
-  if (hints.diagnosticFirst) {
-    const close = legs.get('perf.verify');
-    if (close) {
-      const baseline = { ...close, legId: 'perf.verify#baseline', instance: 'baseline', producesCovered: ['perf.X: baseline (diagnostic measurement)'], needsSatisfiedBy: [], conditions: ['diagnostic leg — measures before scoping; its finding IS the scope input'], assumed: ['baseline runs against the existing product — no implementation leg precedes it'], extends: null, injected: 'investigate-first: evidence before boundary', _seq: -1 };
-      legs.set('perf.verify#baseline', baseline);
-      // closing verify now depends on baseline
-      edges.push(['perf.verify#baseline', 'perf.verify']);
-      close.needsSatisfiedBy.push('perf.verify#baseline (baseline measurement)');
-      // scope.define (if present) depends on the baseline finding
-      if (legs.has('scope.define')) {
-        edges.push(['perf.verify#baseline', 'scope.define']);
-        legs.get('scope.define').needsSatisfiedBy.push('perf.verify#baseline (finding is the scope input)');
-      }
-    }
-  }
-  // integration custody: provision.ask is pre-marked before integration.verify
-  // (legality.yaml integration-after-custody).
-  if (hints.custody || legs.has('integration.verify')) {
-    if (legs.has('integration.verify')) {
-      const ask = ensureLeg('provision.ask', { injected: 'integration-after-custody: owner credential/account custody before the live proof' });
-      edges.push([ask.legId, 'integration.verify']);
-      legs.get('integration.verify').needsSatisfiedBy.push('provision.ask (custody)');
-    }
-  }
-  // work.author, two distinct roles:
-  //  a) on a scoped feature chain the lanes read authored Work records —
-  //     work.author runs BEFORE the implement legs (route prereq "scope defined");
-  //  b) after code.refactor it REMAPS the implementation record's source
-  //     mapping to the moved code (legality.yaml remap-after-refactor).
-  if (!hints.workspaceCanonicalization && legs.has('scope.define') && has(l => stageRankOf(ops.get(l.op)) === 4 && l.op !== 'code.refactor')) {
-    const wa = ensureLeg('work.author', { injected: 'lane reads authored Work records — scope.define produced the scope' });
-    for (const l of legs.values()) {
-      if (stageRankOf(ops.get(l.op)) === 4 && l.op !== 'code.refactor') {
-        edges.push([wa.legId, l.legId]);
-        l.needsSatisfiedBy.push('work.author (records authored)');
-      }
-    }
-  }
-  // canon-conformance: a review.verify lint leg measures the canon debt with canon-scan (the goal's
-  // canonFamilies) before test.author pins behaviour; canon-scan's slices are the code.refactor cut, and a
-  // canon fix moves no source mapping, so no work.author remap follows.
-  if (hints.canonConformance && legs.has('test.author') && legs.has('code.refactor')) {
-    const scan = { legId: 'review.verify#lint', op: 'review.verify', instance: 'lint', kernelParams: { mode: 'lint' },
-      producesCovered: ['canon.X: measured (canon-scan findings and slices)'], needsSatisfiedBy: [], conditions: [],
-      assumed: ['the scan reads the existing repository - no implementation leg precedes it'], extends: null,
-      injected: 'canon-conformance: canon-scan measures the findings and cuts the slices before behaviour is pinned',
-      yaml: ops.get('review.verify')?.file ?? null, _seq: -1 };
-    legs.set(scan.legId, scan);
-    edges.push([scan.legId, 'test.author']);
-    legs.get('test.author').needsSatisfiedBy.push(`${scan.legId} (canon-scan findings and slices)`);
-  }
-  if (legs.has('code.refactor') && !hints.workspaceCanonicalization && !hints.canonConformance) {
-    const wa = ensureLeg('work.author', { injected: 'remap-after-refactor: evidence pins sourceIdentity — a move without a remap invalidates it' });
-    edges.push(['code.refactor', wa.legId]);
-    wa.needsSatisfiedBy.push('code.refactor (moved code to remap)');
-  }
-  // review.verify: the kernel-planned module-tier read closing every build
-  // chain (review.verify is not a lane step; modules/models/kinds.yaml plans
-  // it at the module tier). Delta alone never produces it.
-  if (has(l => stageRankOf(ops.get(l.op)) === 4) && !legs.has('review.verify')) {
-    const rv = ensureLeg('review.verify', { injected: 'kernel-planned module-tier proof after the build legs (modules/models/kinds.yaml)' });
-    for (const l of legs.values()) {
-      if (stageRankOf(ops.get(l.op)) === 4) {
-        edges.push([l.legId, rv.legId]);
-        rv.needsSatisfiedBy.push(`${l.legId} (a delivery to inspect)`);
-      }
-    }
-  }
-  if (hints.workspaceCanonicalization && legs.has('workspace.manage') && legs.has('review.verify')) {
-    edges.push(['workspace.manage', 'review.verify']);
-    legs.get('review.verify').needsSatisfiedBy.push('workspace.manage (canonical roots reconstructed)');
-  }
-  // Owner MVP flow: draw the UX/UI first, then code the frontend AND the backend. The backend build waits behind
-  // the same draw gate the frontend build does (DESIGN_NOT_SETTLED), so the two lanes start from one settled design.
-  if (legs.has('interface.draw') && legs.has('backend.implement')) {
-    edges.push(['interface.draw', 'backend.implement']);
-    legs.get('backend.implement').needsSatisfiedBy.push('interface.draw (owner MVP flow: draw first, then code frontend and backend)');
-  }
-  // handover.review: the owner's acceptance closes every chain, after every
-  // other leg (modules/ops/ops/handover.review.yaml; legality.yaml
-  // producesVocabulary 'handover: approved'). starci kernel finish refuses a workflow
-  // the owner has not approved, so no chain is complete without it.
-  if (legs.size && !legs.has(HANDOVER_OP)) {
-    const others = [...legs.values()];
-    const handover = ensureLeg(HANDOVER_OP, {
-      forVar: { family: 'handover', suffix: '', state: 'approved' },
-      injected: 'owner handover: the final leg of every chain — the workflow is done only when the owner approves it',
-    });
-    for (const leg of others) edges.push([leg.legId, handover.legId]);
-    handover.needsSatisfiedBy.push('every other leg of the chain (the delivery the owner is handed)');
-  }
-
-  return { legs, edges, gaps, assumptions, goalAssumed: [...new Set(goal.assumed)] };
-}
-
-// ------------------------------------------------------------- VALIDATE ----
-
-function topoSort(legs, edges) {
-  const indeg = new Map([...legs.keys()].map(k => [k, 0]));
-  const adj = new Map([...legs.keys()].map(k => [k, []]));
-  for (const [f, t] of edges) {
-    if (!legs.has(f) || !legs.has(t) || f === t) continue;
-    if (!adj.get(f).includes(t)) { adj.get(f).push(t); indeg.set(t, indeg.get(t) + 1); }
-  }
-  const ready = () => [...legs.values()]
-    .filter(l => indeg.get(l.legId) === 0)
-    .sort((a, b) => (a._seq - b._seq) || a.legId.localeCompare(b.legId));
-  // stable pick: earliest insertion (delta order) wins; stage rank is a
-  // legality check afterwards, not a sort key — wrong order is a finding.
-  const order = [];
-  const seen = new Set();
-  const queue = [...ready()];
-  while (queue.length) {
-    const l = queue.shift();
-    if (seen.has(l.legId)) continue;
-    seen.add(l.legId);
-    order.push(l);
-    for (const t of adj.get(l.legId)) {
-      indeg.set(t, indeg.get(t) - 1);
-      if (indeg.get(t) === 0) {
-        const nl = legs.get(t);
-        queue.push(nl);
-        queue.sort((a, b) => (a._seq - b._seq) || a.legId.localeCompare(b.legId));
-      }
-    }
-  }
-  if (order.length !== legs.size) {
-    const remaining = [...legs.keys()].filter(k => !seen.has(k));
-    // find a cycle for the report
-    const cycle = [];
-    const dfs = (n, stack) => {
-      if (stack.includes(n)) { cycle.push(...stack.slice(stack.indexOf(n)), n); return true; }
-      for (const t of adj.get(n) ?? []) if (remaining.includes(t) && dfs(t, [...stack, n])) return true;
-      return false;
-    };
-    for (const r of remaining) if (dfs(r, [])) break;
-    return { order: null, cycle: cycle.length ? cycle : remaining };
-  }
-  return { order, cycle: null };
-}
-
-function legalityCheck(order, legs, ops, s0) {
-  const findings = [];
-  const pos = new Map(order.map((l, i) => [l.legId, i]));
-  // forward edge: verify-after-implement — a verify leg with no implement leg
-  // before it AND no S0/out-of-band satisfaction is illegal.
-  for (const leg of order) {
-    const phase = ops.get(leg.op)?.route.phase?.[0];
-    if (phase !== 'verify') continue;
-    const hasImplBefore = order.slice(0, pos.get(leg.legId))
-      .some(l => stageRankOf(ops.get(l.op)) === 4);
-    const consumesPreExistingDelivery = ['uat.assisted.prepare', 'uat.assisted.verify'].includes(leg.op)
-      && leg.conditions.some(c => /served build|controlled-run receipt/i.test(c));
-    const s0ok = leg.needsSatisfiedBy.some(n => n.startsWith('S0:')) || leg.assumed.length || consumesPreExistingDelivery || !!leg.deliveredBy;
-    if (!hasImplBefore && !s0ok && !legs.get(leg.legId)?.instance) {
-      findings.push({ rule: 'verify-after-implement', leg: leg.legId, note: 'proof leg with no delivered slice before it' });
-    }
-  }
-  // forward edge: designGate — interface.implement requires interface.draw before it.
-  const impl = order.find(l => l.op === 'interface.implement');
-  if (impl) {
-    const drawPos = pos.get('interface.draw');
-    if (drawPos === undefined || drawPos > pos.get(impl.legId)) {
-      const s0ok = impl.needsSatisfiedBy.some(n => /S0.*draw|interface\.draw/.test(n));
-      if (!s0ok) findings.push({ rule: 'draw-before-ui-build', leg: impl.legId, note: 'interface.implement without interface.draw (designGate)' });
-    }
-  }
-  // UI proof order: implementation captures first, then read-only audit,
-  // then business UAT. The op prerequisites normally produce these edges;
-  // retain an explicit legality finding so a hand-authored delta cannot skip
-  // the capture/audit boundary.
-  const audit = order.find(l => l.op === 'interface.audit');
-  const uat = order.find(l => l.op === 'uat.verify');
-  if (audit && (!impl || pos.get(impl.legId) > pos.get(audit.legId))) {
-    findings.push({ rule: 'capture-before-interface-audit', leg: audit.legId, note: 'interface.audit without a settled interface.implement before it' });
-  }
-  if (uat && (!audit || pos.get(audit.legId) > pos.get(uat.legId))) {
-    findings.push({ rule: 'interface-audit-before-uat', leg: uat.legId, note: 'uat.verify without interface.audit no-actionable-drift before it' });
-  }
-  // stage-order sanity: no decide/direct leg AFTER an implement leg it does not
-  // explicitly follow (registry coarse order — a warning-tier finding).
-  // Injected legs (work.author remap, kernel-planned review.verify) carry their
-  // own ordering rationale and are exempt.
-  for (const leg of order) {
-    if (leg.injected) continue;
-    const r = stageRankOf(ops.get(leg.op));
-    if (r < 4 && order.slice(0, pos.get(leg.legId)).some(l => stageRankOf(ops.get(l.op)) === 4)) {
-      findings.push({ rule: 'decide-before-build-general', leg: leg.legId, note: 'pre-implementation leg ordered after a build leg' });
-    }
-  }
-  // split rules: >=2 implement legs — disjointness needs allowlist data from S0.
-  const implLegs = order.filter(l => stageRankOf(ops.get(l.op)) === 4);
-  if (implLegs.length >= 2) {
-    for (const l of implLegs) {
-      const dirs = ownedDirsForLeg(l, s0, ops);
-      l.parallel = dirs === null ? 'undetermined — no owned-path data to prove disjointness; serial until proven disjoint (legality.yaml serialFallback)'
-        : dirs;
-    }
-  }
-  return findings;
-}
-
-/** Owned dirs for an implement leg, resolved from S0 records matching the leg's
- *  produced surface. null when no record/ownership data exists. */
-function ownedDirsForLeg(leg, s0, ops) {
-  if (!s0?.recordsById) return null;
-  const dirs = [];
-  for (const rec of s0.records) {
-    if (rec.schema !== 'work/implementation@1') continue;
-    for (const d of resolveOwnedDirs(rec.id, { data: s0.recordsById.get(rec.id).data }, s0.recordsById, s0.workspaceDoc, s0.root)) {
-      dirs.push(d.rel);
-    }
-  }
-  return dirs.length ? { ownedDirs: [...new Set(dirs)], note: 'disjointness check requires per-leg allowlists — listed dirs are the surfaces touched' } : null;
-}
-
 // ---------------------------------------------------------------- main -----
 
-function main() {
-  const args = parseArgs(process.argv.slice(2));
-  if (!args.targets.length && !args.targetJson && !args.text) usage(2);
-  const opsDir = path.resolve(args.opsDir ?? path.join(skillRoot, 'modules', 'ops'));
-  const goalDir = path.resolve(args.goalDir ?? path.join(skillRoot, 'modules', 'goal'));
-  const ops = loadOps(opsDir);
-  const prodTable = loadProducesTable(goalDir);
-  const outOfBand = args.work ? loadSettledOutOfBand(goalDir, path.resolve(args.work)) : [];
-
-  // PARSE -> S*
-  let sstar = [], hints = {}, parseNotes = [];
-  if (args.targetJson) {
-    let obj; try { obj = JSON.parse(args.targetJson); } catch (e) { console.error(`--target-json: ${e.message}`); process.exit(2); }
-    for (const [k, v] of Object.entries(obj)) {
-      const r = normalizeTargetVar(`${k}: ${v}`, args);
-      if (r.error) { console.error(r.error); process.exit(2); }
-      sstar.push(...r.vars);
-    }
-    parseNotes.push('explicit --target-json vars');
-  }
-  for (const t of args.targets) {
-    const r = normalizeTargetVar(t, args);
+// PARSE -> S*: the explicit targets, else the goal text read through the archetype table; a malformed target ends the run.
+function parseStar(args, goalDir) {
+  let sstar = [], hints = {};
+  const parseNotes = [];
+  const addTarget = (spec) => {
+    const r = normalizeTargetVar(spec, args);
     if (r.error) { console.error(r.error); process.exit(2); }
     sstar.push(...r.vars);
+  };
+  if (args.targetJson) {
+    let obj; try { obj = JSON.parse(args.targetJson); } catch (e) { console.error(`--target-json: ${e.message}`); process.exit(2); }
+    for (const [k, v] of Object.entries(obj)) addTarget(`${k}: ${v}`);
+    parseNotes.push('explicit --target-json vars');
   }
+  for (const t of args.targets) addTarget(t);
   if (args.targets.length) parseNotes.push('explicit --target vars');
   if (!sstar.length && args.text) {
     const hit = intentToStar(args.text, args, loadArchetypeSignals(goalDir));
     if (hit) { sstar = hit.vars; hints = hit.hints; parseNotes.push(`intent->S* via archetypes [${hints.archetypes.join(', ')}]`); }
   }
-  sstar = dedupeVars(sstar);
+  return { sstar: dedupeVars(sstar), hints, parseNotes };
+}
 
-  // SURVEY -> S0
-  let s0 = null;
-  if (args.simulate) s0 = { records: [], vars: new Map(), gaps: [], note: 'simulated: S0 = empty' };
-  else if (args.state) s0 = surveyS0(path.resolve(args.state));
+// SURVEY -> S0
+function surveyState(args) {
+  if (args.simulate) return { records: [], vars: new Map(), gaps: [], note: 'simulated: S0 = empty' };
+  return args.state ? surveyS0(path.resolve(args.state)) : null;
+}
 
-  // IMPACT ANALYSIS before planning (existing.yaml survey): a goal that names a surveyed feature EXTENDS it.
+// IMPACT ANALYSIS before planning (existing.yaml survey): a goal that names a surveyed feature EXTENDS it.
+function applyImpact(args, s0, hints, sstar) {
   const impact = args.text && !args.targets.length && !args.targetJson ? impactOf(args.text, s0, hints.archetypes ?? []) : null;
-  if (impact) {
-    s0.scopeFeatures = new Set(impact.features);
-    // The units an EXTEND changes are never "already delivered": their prerequisites (implement, draw) stay planned.
-    // A BUILD names no surveyed feature: nothing existing settles its prerequisites (never-treat-absent-as-clean).
-    if (impact.shape === 'BUILD') s0.wildcardOff = true;
-    if (impact.shape === 'EXTEND') s0.extendFamilies = new Set(['impl', 'ui']);
-    hints.extend = impact.shape === 'EXTEND' ? impact : undefined;
-    sstar = dedupeVars(applyExtend(sstar, impact, { surfaceName: hints.surfaceName ?? 'X' }));
-  }
+  if (!impact) return { impact, sstar };
+  s0.scopeFeatures = new Set(impact.features);
+  // The units an EXTEND changes are never "already delivered": their prerequisites (implement, draw) stay planned.
+  // A BUILD names no surveyed feature: nothing existing settles its prerequisites (never-treat-absent-as-clean).
+  if (impact.shape === 'BUILD') s0.wildcardOff = true;
+  if (impact.shape === 'EXTEND') s0.extendFamilies = new Set(['impl', 'ui']);
+  hints.extend = impact.shape === 'EXTEND' ? impact : undefined;
+  return { impact, sstar: dedupeVars(applyExtend(sstar, impact, { surfaceName: hints.surfaceName ?? 'X' })) };
+}
 
-  // INTENT-tier ambiguity: S* cannot be formed -> provision.ask, never guess.
-  if (!sstar.length) {
-    const result = {
-      status: 'needs-owner',
-      ambiguity: { tier: 'INTENT', note: 'S* cannot be formed from the input — legality.yaml ambiguity ladder: provision.ask, never guess intent' },
-      legs: [{ seq: 1, op: 'provision.ask', producesCovered: ['provision.intent: provided'], needsSatisfiedBy: [], assumed: [], conditions: ['owner question: what is the goal — build vs verify, which feature, which boundary'], yaml: ops.get('provision.ask')?.file ?? null }],
-      parseNotes, s0: s0 ? s0.records.length + ' records surveyed' : 'no state surveyed',
-    };
-    if (args.json) console.log(JSON.stringify(result, null, 2));
-    else {
-      console.log('INTENT ambiguity — S* cannot be formed. Legal chain: ask the owner.');
-      console.log('  1. provision.ask — what is the goal? (never guess intent; a wrong identity voids all downstream evidence)');
-    }
-    return; // legal chain exists (the ask); exit 0
+// INTENT-tier ambiguity: S* cannot be formed -> provision.ask, never guess.
+function printIntentAmbiguity({ args, ops, s0, parseNotes }) {
+  const result = {
+    status: 'needs-owner',
+    ambiguity: { tier: 'INTENT', note: 'S* cannot be formed from the input — legality.yaml ambiguity ladder: provision.ask, never guess intent' },
+    legs: [{ seq: 1, op: 'provision.ask', producesCovered: ['provision.intent: provided'], needsSatisfiedBy: [], assumed: [], conditions: ['owner question: what is the goal — build vs verify, which feature, which boundary'], yaml: ops.get('provision.ask')?.file ?? null }],
+    parseNotes, s0: s0 ? s0.records.length + ' records surveyed' : 'no state surveyed',
+  };
+  if (args.json) console.log(JSON.stringify(result, null, 2));
+  else {
+    console.log('INTENT ambiguity — S* cannot be formed. Legal chain: ask the owner.');
+    console.log('  1. provision.ask — what is the goal? (never guess intent; a wrong identity voids all downstream evidence)');
   }
+}
 
-  // GAP -> delta
+// GAP -> delta: what S0 already settles and what the plan still owes.
+function splitDelta(sstar, s0) {
   const delta = [];
   const alreadySatisfied = [];
   for (const v of sstar) {
@@ -1143,26 +225,31 @@ function main() {
     if (s0hit?.by === 's0') alreadySatisfied.push({ var: `${varKey(v)}: ${v.state}`, by: s0hit.recordId });
     else delta.push({ ...v, partial: s0hit?.by === 's0-unsettled' ? s0hit : undefined });
   }
+  return { delta, alreadySatisfied };
+}
 
-  // CHAIN
-  const { legs, edges, gaps, assumptions, goalAssumed } = planChain({ sstar: delta, s0, ops, prodTable, hints, outOfBand });
+const LEG_QUALIFIER = { 'backend.implement': 'backend', 'interface.implement': 'frontend' };
 
-  // done-record-reverify: a producing leg whose S0 counterpart record exists gets extends; a settled counterpart
-  // also keeps the re-verification of the touched surface. The counterpart is the record of the leg's own lane
-  // (impl) and, for an unnamed unit, of the goal's own features - never any record of the family.
-  const LEG_QUALIFIER = { 'backend.implement': 'backend', 'interface.implement': 'frontend' };
+// The S0 variables a produced variable of one leg stands for: its family, the leg's lane, and the named unit or the goal's own features.
+function counterpartsOf(leg, vk, s0) {
+  const fam = vk.split('.')[0];
+  const suffix = vk.split('.').slice(1).join('.');
+  const scope = s0?.scopeFeatures?.size ? s0.scopeFeatures : null;
+  return [...(s0?.vars ?? new Map())].filter(([key, ent]) => {
+    if (!key.startsWith(fam + '.')) return false;
+    if (fam === 'impl' && LEG_QUALIFIER[leg.op] && ent.qualifier !== LEG_QUALIFIER[leg.op]) return false;
+    if (suffix && suffix !== 'X') return key.includes(suffix);
+    return scope ? scope.has(ent.feature) : false;
+  }).map(([, ent]) => ent);
+}
+
+// done-record-reverify: a producing leg whose S0 counterpart record exists gets extends; a settled counterpart
+// also keeps the re-verification of the touched surface. The counterpart is the record of the leg's own lane
+// (impl) and, for an unnamed unit, of the goal's own features - never any record of the family.
+function markReverification(legs, s0) {
   for (const leg of legs.values()) {
     for (const cov of leg.producesCovered) {
-      const [vk] = cov.split(':');
-      const fam = vk.split('.')[0];
-      const suffix = vk.split('.').slice(1).join('.');
-      const scope = s0?.scopeFeatures?.size ? s0.scopeFeatures : null;
-      const hits = [...(s0?.vars ?? new Map())].filter(([key, ent]) => {
-        if (!key.startsWith(fam + '.')) return false;
-        if (fam === 'impl' && LEG_QUALIFIER[leg.op] && ent.qualifier !== LEG_QUALIFIER[leg.op]) return false;
-        if (suffix && suffix !== 'X') return key.includes(suffix);
-        return scope ? scope.has(ent.feature) : false;
-      }).map(([, ent]) => ent);
+      const hits = counterpartsOf(leg, cov.split(':')[0], s0);
       const pick = hits.find(e => e.settled) ?? hits[0];
       if (pick && !leg.extends) {
         leg.extends = pick.recordId;
@@ -1172,11 +259,14 @@ function main() {
       }
     }
   }
+}
 
-  // VALIDATE
+// VALIDATE: a cycle or a gap ends the run as infeasible; the legs come back in order.
+function orderedLegs({ args, legs, edges, gaps, sstar }) {
   const { order, cycle } = topoSort(legs, edges);
+  const starText = () => sstar.map(v => `${varKey(v)}: ${v.state}`);
   if (!order) {
-    const result = { status: 'infeasible', reason: 'cycle in needs/prerequisites', cycle, sstar: sstar.map(v => `${varKey(v)}: ${v.state}`) };
+    const result = { status: 'infeasible', reason: 'cycle in needs/prerequisites', cycle, sstar: starText() };
     if (args.json) console.log(JSON.stringify(result, null, 2));
     else { console.log('INFEASIBLE — dependency cycle:'); console.log('  ' + cycle.join(' -> ')); }
     process.exit(1);
@@ -1184,7 +274,7 @@ function main() {
   if (gaps.length) {
     const result = {
       status: 'infeasible', reason: 'no producer for required state variables', gaps,
-      sstar: sstar.map(v => `${varKey(v)}: ${v.state}`),
+      sstar: starText(),
       legs: order.map((l, i) => ({ seq: i + 1, ...l, _seq: undefined })),
     };
     if (args.json) console.log(JSON.stringify(result, null, 2));
@@ -1194,17 +284,33 @@ function main() {
     }
     process.exit(1);
   }
-  const findings = legalityCheck(order, legs, ops, s0);
+  return order;
+}
+
+// The plan's edges between its legs: each once, in leg order.
+function planEdgesOf(order, edges) {
   const pos = new Map(order.map((l, i) => [l.legId, i]));
-  const planEdges = [...new Map(edges
+  return [...new Map(edges
     .filter(([f, t]) => f !== t && pos.has(f) && pos.has(t))
     .map(([f, t]) => [`${f}\u0000${t}`, [f, t]])).values()]
     .sort((a, b) => (pos.get(a[0]) - pos.get(b[0])) || (pos.get(a[1]) - pos.get(b[1])));
+}
 
+const legRow = (l, i, { skillRoot, specs, args }) => ({
+  seq: i + 1, op: l.op, instance: l.instance ?? undefined, params: l.params, kernelParams: l.kernelParams, external: l.external,
+  producesCovered: [...new Set(l.producesCovered)],
+  needsSatisfiedBy: [...new Set(l.needsSatisfiedBy)],
+  extends: l.extends ?? undefined, assumed: l.assumed.length ? [...new Set(l.assumed)] : undefined,
+  conditions: l.conditions.length ? [...new Set(l.conditions)] : undefined,
+  injected: l.injected, parallel: l.parallel, yaml: l.yaml, missingOp: l.missingOp,
+  deferred: planLegDeferral({ skillRoot, op: l.op, settings: specs, goalText: args.text ?? null })?.reason,
+});
+
+function planResult({ args, hints, parseNotes, sstar, s0, impact, alreadySatisfied, delta, order, edges, findings, goalAssumed, assumptions }) {
   // The owner's config.yaml specs switches, read on every plan (no restart): a leg whose op only tests a class
   // that is off stays in the chain - so `starci kernel run-deferred-tests` can run it later - but is marked deferred.
   const specs = ownerSpecs(skillRoot);
-  const result = {
+  return {
     status: findings.some(f => f.rule === 'verify-after-implement') ? 'illegal' : 'ok',
     input: { text: args.text ?? null, targets: args.targets, targetJson: args.targetJson ?? null },
     sstar: sstar.map(v => `${varKey(v)}: ${v.state}`),
@@ -1215,44 +321,60 @@ function main() {
     } : 'not surveyed (no --state; use --simulate to pin S0=empty explicitly)',
     impact: impact ?? undefined,
     alreadySatisfied, delta: delta.map(v => `${varKey(v)}: ${v.state}`),
-    legs: order.map((l, i) => ({
-      seq: i + 1, op: l.op, instance: l.instance ?? undefined, params: l.params, kernelParams: l.kernelParams, external: l.external,
-      producesCovered: [...new Set(l.producesCovered)],
-      needsSatisfiedBy: [...new Set(l.needsSatisfiedBy)],
-      extends: l.extends ?? undefined, assumed: l.assumed.length ? [...new Set(l.assumed)] : undefined,
-      conditions: l.conditions.length ? [...new Set(l.conditions)] : undefined,
-      injected: l.injected, parallel: l.parallel, yaml: l.yaml, missingOp: l.missingOp,
-      deferred: planLegDeferral({ skillRoot, op: l.op, settings: specs, goalText: args.text ?? null })?.reason,
-    })),
-    edges: planEdges,
+    legs: order.map((l, i) => legRow(l, i, { skillRoot, specs, args })),
+    edges: planEdgesOf(order, edges),
     legalityFindings: findings.length ? findings : undefined,
     assumed: goalAssumed.length ? goalAssumed : undefined,
     assumptions: assumptions.length ? assumptions : undefined,
     parseNotes,
     scopeKind: hints.scopeKind ?? hints.archetypes?.[0] ?? null,
   };
+}
 
-  if (args.json) { console.log(JSON.stringify(result, null, 2)); }
-  else {
-    console.log(`S*: ${result.sstar.join('  |  ')}`);
-    console.log('S0: ' + (typeof result.s0 === 'string' ? result.s0 : String(result.s0.records) + ' records (' + String(result.s0.settled) + ' settled, ' + String(result.s0.openGaps.length) + ' open gaps)'));
-    if (alreadySatisfied.length) for (const s of alreadySatisfied) console.log(`  already true: ${s.var} (via ${s.by})`);
-    console.log(`delta: ${result.delta.join('  |  ') || '(none)'}`);
-    console.log('chain:');
-    for (const l of result.legs) {
-      const flags = [l.external && 'external', l.injected && 'injected', l.extends && `extends:${l.extends}`, l.missingOp && 'MISSING-OP', l.deferred && `deferred:${l.deferred}`].filter(Boolean).join(' ');
-      console.log(`  ${l.seq}. ${l.op}${l.instance ? '#' + l.instance : ''}${flags ? '  [' + flags + ']' : ''}`);
-      for (const p of l.producesCovered) console.log(`       produces: ${p}`);
-      for (const n of l.needsSatisfiedBy) console.log(`       needs <- ${n}`);
-      for (const a of l.assumed ?? []) console.log(`       assumed: ${a}`);
-      for (const c of l.conditions ?? []) console.log(`       condition: ${c}`);
-      if (l.parallel) console.log(`       parallel: ${typeof l.parallel === 'string' ? l.parallel : JSON.stringify(l.parallel)}`);
-    }
-    for (const a of goalAssumed) console.log(`  assumed (goal): ${a}`);
-    if (findings.length) { console.log('legality findings:'); for (const f of findings) console.log(`  ! ${f.rule} @ ${f.leg}: ${f.note}`); }
-    if (assumptions.length) { console.log('assumptions (ORDER-tier, recorded for revision):'); for (const a of assumptions) console.log(`  ~ ${a}`); }
-    if (parseNotes.length) console.log(`parse: ${parseNotes.join('; ')}`);
-  }
+function printPlanLeg(l) {
+  const flags = [l.external && 'external', l.injected && 'injected', l.extends && `extends:${l.extends}`, l.missingOp && 'MISSING-OP', l.deferred && `deferred:${l.deferred}`].filter(Boolean).join(' ');
+  console.log(`  ${l.seq}. ${l.op}${l.instance ? '#' + l.instance : ''}${flags ? '  [' + flags + ']' : ''}`);
+  for (const p of l.producesCovered) console.log(`       produces: ${p}`);
+  for (const n of l.needsSatisfiedBy) console.log(`       needs <- ${n}`);
+  for (const a of l.assumed ?? []) console.log(`       assumed: ${a}`);
+  for (const c of l.conditions ?? []) console.log(`       condition: ${c}`);
+  if (l.parallel) console.log(`       parallel: ${typeof l.parallel === 'string' ? l.parallel : JSON.stringify(l.parallel)}`);
+}
+
+function printPlanText({ result, alreadySatisfied, goalAssumed, findings, assumptions, parseNotes }) {
+  console.log(`S*: ${result.sstar.join('  |  ')}`);
+  console.log('S0: ' + (typeof result.s0 === 'string' ? result.s0 : String(result.s0.records) + ' records (' + String(result.s0.settled) + ' settled, ' + String(result.s0.openGaps.length) + ' open gaps)'));
+  if (alreadySatisfied.length) for (const s of alreadySatisfied) console.log(`  already true: ${s.var} (via ${s.by})`);
+  console.log(`delta: ${result.delta.join('  |  ') || '(none)'}`);
+  console.log('chain:');
+  for (const l of result.legs) printPlanLeg(l);
+  for (const a of goalAssumed) console.log(`  assumed (goal): ${a}`);
+  if (findings.length) { console.log('legality findings:'); for (const f of findings) console.log(`  ! ${f.rule} @ ${f.leg}: ${f.note}`); }
+  if (assumptions.length) { console.log('assumptions (ORDER-tier, recorded for revision):'); for (const a of assumptions) console.log(`  ~ ${a}`); }
+  if (parseNotes.length) console.log(`parse: ${parseNotes.join('; ')}`);
+}
+
+function main() {
+  const args = parseArgs(process.argv.slice(2));
+  if (!args.targets.length && !args.targetJson && !args.text) usage(2);
+  const opsDir = path.resolve(args.opsDir ?? path.join(skillRoot, 'modules', 'ops'));
+  const goalDir = path.resolve(args.goalDir ?? path.join(skillRoot, 'modules', 'goal'));
+  const ops = loadOps(opsDir);
+  const prodTable = loadProducesTable(goalDir);
+  const outOfBand = args.work ? loadSettledOutOfBand(goalDir, path.resolve(args.work)) : [];
+  const parsed = parseStar(args, goalDir);
+  const { hints, parseNotes } = parsed;
+  const s0 = surveyState(args);
+  const { impact, sstar } = applyImpact(args, s0, hints, parsed.sstar);
+  if (!sstar.length) { printIntentAmbiguity({ args, ops, s0, parseNotes }); return; } // legal chain exists (the ask); exit 0
+  const { delta, alreadySatisfied } = splitDelta(sstar, s0);
+  const { legs, edges, gaps, assumptions, goalAssumed } = planChain({ sstar: delta, s0, ops, prodTable, hints, outOfBand });
+  markReverification(legs, s0);
+  const order = orderedLegs({ args, legs, edges, gaps, sstar });
+  const findings = legalityCheck(order, legs, ops, s0);
+  const result = planResult({ args, hints, parseNotes, sstar, s0, impact, alreadySatisfied, delta, order, edges, findings, goalAssumed, assumptions });
+  if (args.json) console.log(JSON.stringify(result, null, 2));
+  else printPlanText({ result, alreadySatisfied, goalAssumed, findings, assumptions, parseNotes });
   if (result.status === 'illegal') process.exit(1);
 }
 

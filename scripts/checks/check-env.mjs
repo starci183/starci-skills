@@ -98,27 +98,40 @@ export function parseCatalog(text) {
   return { reader: doc.reader, variables: doc.variables ?? {} };
 }
 
-/**
- * The findings of a source set: [{code, path, line, message}]. files: [{rel, text}] (the runtime sources among them are
- * judged); catalog: parseCatalog(...); failureCodes: the names of modules/kernel/failure-codes.yaml (a STARCI_* refusal code is not a variable).
- */
-/** The findings one in-scope source's env facts yield (and the `seen` update every named name performs). */
-const fileEnvFindings = (rel, facts, owner, known, seen, failureCodes, catalog, findings) => {
-  for (const read of facts.reads) {
+/** The findings the environment reads of one in-scope source yield (every named name joins `seen`). */
+const readFindings = (reads, { rel, owner, known, seen, catalog, findings }) => {
+  for (const read of reads) {
     seen.add(read.name.toUpperCase());
     if (!known.has(read.name.toUpperCase())) findings.push({ code: 'RT_ENV_UNCATALOGUED', path: rel, line: read.line, message: `${read.name} is read from the environment and is not a variable of ${CATALOG_FILE}: add it with its purpose and kind` });
     if (read.name === TEST_RUNNER_VARIABLE && !owner) findings.push({ code: 'RT_TEST_ENV_IN_PRODUCTION', path: rel, line: read.line, message: `${rel} branches on the test runner (${TEST_RUNNER_VARIABLE}): use isSpecRun() of ${catalog.reader}, the one seam` });
     else if (read.direct && !owner) findings.push({ code: 'RT_ENV_READ_OUTSIDE_OWNER', path: rel, line: read.line, message: `${read.name} is read straight from process.env in ${rel}: read it through ${catalog.reader} (readEnv), or take an injected env parameter` });
   }
-  for (const d of facts.dynamic) if (d.direct && !owner) findings.push({ code: 'RT_ENV_READ_OUTSIDE_OWNER', path: rel, line: d.line, message: `a name computed at run time is read straight from process.env in ${rel}: read it through ${catalog.reader} (readEnv)` });
-  for (const l of facts.literals) seen.add(l.toUpperCase());
-  for (const m of facts.mentions) {
+};
+
+const dynamicFindings = (dynamic, { rel, owner, catalog, findings }) => {
+  for (const d of dynamic) if (d.direct && !owner) findings.push({ code: 'RT_ENV_READ_OUTSIDE_OWNER', path: rel, line: d.line, message: `a name computed at run time is read straight from process.env in ${rel}: read it through ${catalog.reader} (readEnv)` });
+};
+
+const mentionFindings = (mentions, { rel, known, seen, failureCodes, findings }) => {
+  for (const m of mentions) {
     if (failureCodes.has(m.name)) continue; // a refusal code spelled STARCI_*, owned by the failure-code catalog, not a variable
     seen.add(m.name.toUpperCase());
     if (!known.has(m.name.toUpperCase())) findings.push({ code: 'RT_ENV_UNCATALOGUED', path: rel, line: m.line, message: `${m.name} is an environment variable of the runtime and is not a variable of ${CATALOG_FILE}: add it with its purpose and kind` });
   }
 };
 
+/** The findings one in-scope source's env facts yield (and the `seen` update every named name performs). */
+const fileEnvFindings = (facts, ctx) => {
+  readFindings(facts.reads, ctx);
+  dynamicFindings(facts.dynamic, ctx);
+  for (const l of facts.literals) ctx.seen.add(l.toUpperCase());
+  mentionFindings(facts.mentions, ctx);
+};
+
+/**
+ * The findings of a source set: [{code, path, line, message}]. files: [{rel, text}] (the runtime sources among them are
+ * judged); catalog: parseCatalog(...); failureCodes: the names of modules/kernel/failure-codes.yaml (a STARCI_* refusal code is not a variable).
+ */
 export function envFindings(files, catalog, failureCodes = new Set()) {
   const findings = [];
   // Windows environment names are case-insensitive (ComSpec is COMSPEC), so names compare upper-cased.
@@ -126,7 +139,7 @@ export function envFindings(files, catalog, failureCodes = new Set()) {
   const seen = new Set();
   for (const { rel, text } of files) {
     if (!rel.endsWith('.mjs') || isSpec(rel) || !ENV_ROOTS.some((r) => rel.startsWith(`${r}/`))) continue;
-    fileEnvFindings(rel, envFacts(text, rel), rel === catalog.reader, known, seen, failureCodes, catalog, findings);
+    fileEnvFindings(envFacts(text, rel), { rel, owner: rel === catalog.reader, known, seen, failureCodes, catalog, findings });
   }
   for (const [name, entry] of Object.entries(catalog.variables)) {
     if (!seen.has(name.toUpperCase())) findings.push({ code: 'RT_ENV_STALE_ENTRY', path: CATALOG_FILE, line: 1, message: `${name} is in ${CATALOG_FILE} but no production source reads or names it: delete the entry` });

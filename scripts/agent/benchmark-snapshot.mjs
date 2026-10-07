@@ -108,7 +108,8 @@ export function formatDelta({ file, snapshot, previous, delta }) {
  */
 export function takeSnapshot({ repos = null, sinceHours, now = Date.now(), date = localDate(now), dir = SNAPSHOTS_DIR,
   sourceRoot = starciSourceRoot() } = {}) {
-  if (!(Number(sinceHours) > 0)) throw Object.assign(new Error('--since-hours needs a positive number'), { code: 'EUSAGE' });
+  const hours = Number(sinceHours);
+  if (Number.isNaN(hours) || hours <= 0) throw Object.assign(new Error('--since-hours needs a positive number'), { code: 'EUSAGE' });
   if (!DATE.test(date)) throw Object.assign(new Error(`--date needs YYYY-MM-DD, got ${date}`), { code: 'EUSAGE' });
   const name = snapshotName(date, Number(sinceHours));
   const file = path.join(dir, name);

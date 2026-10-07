@@ -15,7 +15,7 @@ import { supervisorLockRecorder, listGitProcesses } from '../machine/lock-recove
 export async function sweepGitLocks({ apply = false, now = Date.now(), env = process.env, allocation = null, repos = null, list = listGitProcesses } = {}) {
   const out = { ok: true, freedBytes: 0, deleted: [], skipped: [], errors: [], report: [] };
   const staleMs = Number(allocation?.housekeeping?.gitIndexLockStaleMs ?? allocation?.gitIndexLockStaleMs);
-  if (!(staleMs > 0)) { out.ok = false; out.errors.push('modules/models/runtimes.yaml allocation.housekeeping.gitIndexLockStaleMs must declare a positive number of milliseconds'); return out; }
+  if (Number.isNaN(staleMs) || staleMs <= 0) { out.ok = false; out.errors.push('modules/models/runtimes.yaml allocation.housekeeping.gitIndexLockStaleMs must declare a positive number of milliseconds'); return out; }
   let targets = repos;
   if (!targets) {
     const { productRepos, supervisorSettings } = await import('../machine/home.mjs');

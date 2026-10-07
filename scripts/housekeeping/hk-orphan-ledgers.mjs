@@ -59,6 +59,14 @@ export function sourceRootsOf(db, ledger) {
   return [...new Set([...rows, ledger.repoRoot].filter(Boolean))];
 }
 
+// The source roots one workflow row names: [] for an absent, unparsable or non-list column.
+const rootsOfRow = (row) => {
+  if (!row.source_roots_json) return [];
+  let parsed;
+  try { parsed = JSON.parse(row.source_roots_json); } catch { return []; }
+  return Array.isArray(parsed) ? parsed.filter((root) => typeof root === 'string' && root.trim()) : [];
+};
+
 /**
  * The source roots an ORPHANED ledger directory's own runtime.sqlite still names — the only place left to ask once
  * machine.sqlite no longer has a `ledgers` row for it at all (the registry forgot it, but the directory and its
@@ -73,10 +81,7 @@ export function sourceRootsFromLedgerFile(file) {
   try {
     const roots = new Set();
     for (const row of handle.db.prepare('SELECT source_roots_json FROM workflows').all()) {
-      if (!row.source_roots_json) continue;
-      let parsed;
-      try { parsed = JSON.parse(row.source_roots_json); } catch { continue; }
-      if (Array.isArray(parsed)) for (const root of parsed) if (typeof root === 'string' && root.trim()) roots.add(root);
+      for (const root of rootsOfRow(row)) roots.add(root);
     }
     return [...roots];
   } catch { return []; }

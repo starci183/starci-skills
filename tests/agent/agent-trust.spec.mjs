@@ -8,9 +8,10 @@ import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
 import {openLedger,inspectLedger,ledgerFileFor} from '../../engine/db/ledger.mjs';
 import {
   claudeKeyForms,codexKeyForms,codexHeader,codexProjectTables,writeClaudeTrust,writeCodexTrust,writeCodexNoUpdateCheck,writeCodexNoModelNudge,
-  assertClaudeBypassConsent,ensureLaunchTrust as ensureAdoptedLaunchTrust,trustTargets,orcaCodexHome,assertClaudeSettingsEnv,claudeLaunchEnv,
+  assertClaudeBypassConsent,trustTargets,orcaCodexHome,assertClaudeSettingsEnv,claudeLaunchEnv,
   toolGuardCommand,TOOL_GUARD_MATCHER,assertJsonToolGuard,writeDevinProfile,codexGuardBlock,writeCodexToolGuard,trustCodexToolGuard,projectTargets,excludeFromGit,
 } from '../../scripts/agent/trust.mjs';
+import {ensureLaunchTrust as ensureAdoptedLaunchTrust} from '../../scripts/agent/trust-launch.mjs';
 import {gateMenuPosition} from '../../scripts/agent/lib.mjs';
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
 import { proofRepo } from '../helpers/sonar-scan.mjs';

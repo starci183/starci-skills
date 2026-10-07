@@ -40,6 +40,33 @@ function isRemoteTracking(ref, cwd, gitRemote) {
   return ok(remotes) && lines(output(remotes)).some((name) => ref.startsWith(`${name}/`));
 }
 
+// A dry run: whether `head` and the local main merge cleanly, from the merge tree alone.
+function mergePreview({ api, cwd, head, mainSha, mainRef }, refusal) {
+  const trial = api.mergeTree(['--write-tree', head, mainSha], { cwd, config: { 'core.quotepath': 'off' } });
+  const conflicts = mergeTreeConflicts(`${String(trial.stdout ?? '')}\n${String(trial.stderr ?? '')}`);
+  if (!ok(trial)) {
+    return refusal(conflicts.length ? `would conflict:\n${conflicts.join('\n')}` : `merge preview failed: ${output(trial, 'stderr') || output(trial) || 'unknown error'}`,
+      1, { mainRef, conflicts, dryRun: true });
+  }
+  return { code: 0, text: `dry run: ${mainRef} merges cleanly`, data: { schema: 'starci/git-sync@1', ok: true, sha: head, mainRef, conflicts: [], dryRun: true } };
+}
+
+// The refusal of a merge that did not complete: a failure without conflicts, or the conflicts (aborted on request).
+function mergeFailure({ api, cwd, merged, mainRef, abortOnConflict }, refusal) {
+  const unresolved = api.diff(['--name-only', '--diff-filter=U', '--'], { cwd, config: { 'core.quotepath': 'off' } });
+  const conflicts = ok(unresolved) ? lines(output(unresolved)) : [];
+  if (!conflicts.length) return refusal(`merge failed: ${output(merged, 'stderr') || output(merged) || 'unknown error'}`, 1, { mainRef, conflicts: [] });
+  let aborted = false;
+  if (abortOnConflict) {
+    const stopped = api.merge(['--abort'], { cwd });
+    if (!ok(stopped)) return refusal(`merge conflicts:\n${conflicts.join('\n')}\ngit merge --abort failed: ${output(stopped, 'stderr') || 'unknown error'}`, 1,
+      { mainRef, conflicts, aborted: false });
+    aborted = true;
+  }
+  const next = aborted ? 'merge aborted' : 'resolve, then `starci git commit --type chore --summary ...`';
+  return refusal(`merge conflicts:\n${conflicts.join('\n')}\n${next}`, 1, { mainRef, conflicts, aborted });
+}
+
 /** Merge local main into the current clean lane, or inspect the merge without changing it. */
 export async function gitSync(ctx, deps = {}) {
   const refusal = (text, code = 2, data = {}) => verbRefusal('starci git sync', text, code,
@@ -65,34 +92,13 @@ export async function gitSync(ctx, deps = {}) {
     return { code: 0, text: 'up to date', data: { schema: 'starci/git-sync@1', ok: true, sha: head, mainRef, conflicts: [] } };
   }
 
-  if (ctx?.args?.['dry-run']) {
-    const trial = api.mergeTree(['--write-tree', head, mainSha], { cwd, config: { 'core.quotepath': 'off' } });
-    const conflicts = mergeTreeConflicts(`${String(trial.stdout ?? '')}\n${String(trial.stderr ?? '')}`);
-    if (!ok(trial)) {
-      return refusal(conflicts.length ? `would conflict:\n${conflicts.join('\n')}` : `merge preview failed: ${output(trial, 'stderr') || output(trial) || 'unknown error'}`,
-        1, { mainRef, conflicts, dryRun: true });
-    }
-    return { code: 0, text: `dry run: ${mainRef} merges cleanly`, data: { schema: 'starci/git-sync@1', ok: true, sha: head, mainRef, conflicts: [], dryRun: true } };
-  }
+  if (ctx?.args?.['dry-run']) return mergePreview({ api, cwd, head, mainSha, mainRef }, refusal);
 
   const merged = api.merge(['--no-edit', '--no-ff', mainRef], {
     cwd,
     config: { 'rerere.enabled': 'true', 'rerere.autoUpdate': 'true' }
   });
-  if (!ok(merged)) {
-    const unresolved = api.diff(['--name-only', '--diff-filter=U', '--'], { cwd, config: { 'core.quotepath': 'off' } });
-    const conflicts = ok(unresolved) ? lines(output(unresolved)) : [];
-    if (!conflicts.length) return refusal(`merge failed: ${output(merged, 'stderr') || output(merged) || 'unknown error'}`, 1, { mainRef, conflicts: [] });
-    let aborted = false;
-    if (ctx?.args?.['abort-on-conflict']) {
-      const stopped = api.merge(['--abort'], { cwd });
-      if (!ok(stopped)) return refusal(`merge conflicts:\n${conflicts.join('\n')}\ngit merge --abort failed: ${output(stopped, 'stderr') || 'unknown error'}`, 1,
-        { mainRef, conflicts, aborted: false });
-      aborted = true;
-    }
-    const next = aborted ? 'merge aborted' : 'resolve, then `starci git commit --type chore --summary ...`';
-    return refusal(`merge conflicts:\n${conflicts.join('\n')}\n${next}`, 1, { mainRef, conflicts, aborted });
-  }
+  if (!ok(merged)) return mergeFailure({ api, cwd, merged, mainRef, abortOnConflict: ctx?.args?.['abort-on-conflict'] }, refusal);
   const sha = api.revParse(cwd, 'HEAD');
   if (!sha) return refusal('merge succeeded but HEAD could not be resolved', 1, { mainRef });
   return { code: 0, text: `synced ${sha.slice(0, 7)} from ${mainRef}`, data: { schema: 'starci/git-sync@1', ok: true, sha, mainRef, conflicts: [] } };

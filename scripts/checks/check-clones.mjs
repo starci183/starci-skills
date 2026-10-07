@@ -29,7 +29,7 @@ const isTest = (rel) => /(^|\/)tests?\//.test(rel) || /\.(test|spec)\.[cm]?[jt]s
 const GENERATED = /^packages\/[^/]+(\/[^/]+)?\/runtime\//;
 const VENDORED = /(^|\/)(node_modules|dist|reference-renders)\//;
 // packages/grammar is a published React component library judged by its own Sonar duplication gate (its markup and Storybook files repeat by design); it is not runtime code.
-const OUT_OF_SCOPE = /^packages\/grammar\//;
+const OUT_OF_SCOPE_PREFIX = 'packages/grammar/';
 /** The unit a file belongs to: a package (packages/eslint/<be|fe> is one) or the runtime proper. Blocks are compared inside one unit: two packages are published apart and cannot import each other. */
 export const unitOf = (rel) => {
   if (rel.startsWith('packages/eslint/')) return rel.split('/').slice(0, 3).join('/');
@@ -143,7 +143,7 @@ export function cloneFindings(files, { lines: N = CLONE_LINES, tokens: T = CLONE
 /** Run the check on the runtime at `root`. */
 export function checkClones(root = skillRoot) {
   const files = trackedTextFiles(root,
-    (rel) => CLONE_ROOTS.some((r) => rel.startsWith(`${r}/`)) && SOURCE.test(rel) && !GENERATED.test(rel) && !VENDORED.test(rel) && !OUT_OF_SCOPE.test(rel));
+    (rel) => CLONE_ROOTS.some((r) => rel.startsWith(`${r}/`)) && SOURCE.test(rel) && !GENERATED.test(rel) && !VENDORED.test(rel) && !rel.startsWith(OUT_OF_SCOPE_PREFIX));
   return cloneFindings(files);
 }
 

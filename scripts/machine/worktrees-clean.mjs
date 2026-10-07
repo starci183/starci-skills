@@ -8,6 +8,7 @@ import { worktreePs as realOrcaPs } from '../api/orca/worktree-ps.mjs';
 import { samePath } from '../lib/path-key.mjs';
 import { removeOrcaWorktree as realRemoveOrca } from './worktree-orca.mjs';
 import { safeRemoveWorktree as realRemoveGit } from './worktree-git.mjs';
+import { findInOrder } from '../lib/in-order.mjs';
 
 const inside = (root, candidate) => {
   const relative = path.relative(root, candidate);
@@ -69,25 +70,56 @@ async function removeCleanLane(entry, target, { primary, orcaRows, ctx, deps }) 
   };
 }
 
-/** `starci machine worktrees clean`: select merged lanes and remove each without following any link in it. */
-export async function worktreesClean(ctx, deps = {}) {
+// The worktrees, primary checkout, lanes root and --only glob of one clean request, or the refusal that stops it.
+async function cleanScope(ctx, deps) {
+  const refusal = (code, stderr) => ({ refusal: { code, stderr } });
   const positionals = ctx.positionals ?? [];
-  if (positionals.length) return { code: 2, stderr: 'starci machine worktrees-clean: no positional arguments are accepted' };
+  if (positionals.length) return refusal(2, 'starci machine worktrees-clean: no positional arguments are accepted');
   let only = null;
   try { if (ctx.args?.only !== undefined) only = globExpression(ctx.args.only); }
-  catch (error) { return { code: 2, stderr: `starci machine worktrees-clean: invalid --only glob (${error.message})` }; }
+  catch (error) { return refusal(2, `starci machine worktrees-clean: invalid --only glob (${error.message})`); }
   const cwd = path.resolve(ctx.cwd ?? process.cwd());
   const list = deps.listWorktrees ?? realList;
   let worktrees;
   try { worktrees = await list(cwd); }
-  catch (error) { return { code: 1, stderr: `starci machine worktrees-clean: cannot list worktrees (${error.message})` }; }
-  if (!Array.isArray(worktrees) || !worktrees.length) return { code: 1, stderr: 'starci machine worktrees-clean: Git reported no primary worktree' };
+  catch (error) { return refusal(1, `starci machine worktrees-clean: cannot list worktrees (${error.message})`); }
+  if (!Array.isArray(worktrees) || !worktrees.length) return refusal(1, 'starci machine worktrees-clean: Git reported no primary worktree');
   const primary = path.resolve(worktrees[0].path);
   const configured = ctx.env?.STARCI_LANES_ROOT ? path.resolve(ctx.env.STARCI_LANES_ROOT) : null;
   const discovered = [cwd, ...worktrees.map((row) => row.path)].map((entry) => namedAncestor(entry, 'starci-lanes')).find(Boolean);
   const lanesRoot = configured ?? discovered;
-  if (!lanesRoot) return { code: 2, stderr: 'starci machine worktrees-clean: set STARCI_LANES_ROOT when no starci-lanes ancestor can be derived' };
+  if (!lanesRoot) return refusal(2, 'starci machine worktrees-clean: set STARCI_LANES_ROOT when no starci-lanes ancestor can be derived');
+  return { only, worktrees, primary, lanesRoot };
+}
 
+// One lane: skipped, refused or removed. Adds its row and line to `out`; true when the removal is fatal for the rest.
+async function cleanLane(entry, { primary, lanesRoot, only, lstat, status, isAncestor, orcaRows, ctx, deps }, out) {
+  const target = path.resolve(entry.path);
+  const preflight = cleanPreflight(entry, target, { primary, lanesRoot, only, lstat });
+  if (preflight) {
+    if (!preflight.skip) out.rows.push(preflight);
+    out.refused += preflight.refused ?? 0;
+    return false;
+  }
+  const checked = await checkCleanLane(entry, target, { primary, status, isAncestor, ctx });
+  if (checked) {
+    out.rows.push(checked.row);
+    if (checked.line) out.lines.push(checked.line);
+    out.refused += checked.refused ?? 0;
+    return false;
+  }
+  const removed = await removeCleanLane(entry, target, { primary, orcaRows, ctx, deps });
+  out.rows.push(removed.row);
+  out.lines.push(removed.line);
+  out.refused += removed.refused ?? 0;
+  return Boolean(removed.stop);
+}
+
+/** `starci machine worktrees clean`: select merged lanes and remove each without following any link in it. */
+export async function worktreesClean(ctx, deps = {}) {
+  const scope = await cleanScope(ctx, deps);
+  if (scope.refusal) return scope.refusal;
+  const { only, worktrees, primary, lanesRoot } = scope;
   const status = deps.status ?? realStatus;
   const isAncestor = deps.isAncestor ?? realIsAncestor;
   const lstat = deps.lstat ?? fs.lstatSync;
@@ -96,30 +128,10 @@ export async function worktreesClean(ctx, deps = {}) {
     const found = await (deps.orcaPs ?? realOrcaPs)();
     if (found?.ok && Array.isArray(found.worktrees)) orcaRows = found.worktrees;
   } catch { /* a Git-owned lane still has a safe removal path */ }
-  const rows = [];
-  const lines = [];
-  let refused = 0;
-  for (const entry of worktrees) {
-    const target = path.resolve(entry.path);
-    const preflight = cleanPreflight(entry, target, { primary, lanesRoot, only, lstat });
-    if (preflight) {
-      if (!preflight.skip) rows.push(preflight);
-      refused += preflight.refused ?? 0;
-      continue;
-    }
-    const checked = await checkCleanLane(entry, target, { primary, status, isAncestor, ctx });
-    if (checked) {
-      rows.push(checked.row);
-      if (checked.line) lines.push(checked.line);
-      refused += checked.refused ?? 0;
-      continue;
-    }
-    const removed = await removeCleanLane(entry, target, { primary, orcaRows, ctx, deps });
-    rows.push(removed.row);
-    lines.push(removed.line);
-    refused += removed.refused ?? 0;
-    if (removed.stop) break;
-  }
+  const out = { rows: [], lines: [], refused: 0 };
+  const lane = { primary, lanesRoot, only, lstat, status, isAncestor, orcaRows, ctx, deps };
+  await findInOrder(worktrees, (entry) => cleanLane(entry, lane, out));
+  const { rows, lines, refused } = out;
   const removed = rows.filter((row) => ['removed', 'would-remove'].includes(row.action)).length;
   return {
     code: refused ? 1 : 0,

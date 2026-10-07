@@ -35,7 +35,7 @@ import { list } from '../lib/list.mjs';
 import { isFile, isDir } from '../lib/fs-kind.mjs';
 import { loadSonarGate } from './sonar-gate.mjs';
 import { resolveCustodyFile, resolveDeclaredRepository, runtimeHostRoot } from './runtime-host.mjs';
-import { slash } from '../lib/path-key.mjs';
+import { slash, trimTrailingSlashes } from '../lib/path-key.mjs';
 import { DECLARATION, STACK_ROOT, declaredStack, findStackDeclaration, readDeclaration, readText, text } from '../lib/stack-declaration.mjs';
 import { readProperties } from '../lib/properties.mjs';
 import { escapeRegExp } from '../lib/regex.mjs';
@@ -139,9 +139,8 @@ const normalizeCredential = (credential, declaringRepo) => {
       encPresent: abs ? isFile(`${abs}.enc`) : null, plainPresent: abs ? isFile(abs) : null } };
 };
 const ownerActionOf = (s) => {
-  if (s.ownerAction === 'none') return 'none';
-  if (plain(s.ownerAction)) return { needed: text(s.ownerAction.needed), reason: text(s.ownerAction.reason) };
-  return null;
+  const noAction = s.ownerAction === 'none' ? 'none' : null;
+  return plain(s.ownerAction) ? { needed: text(s.ownerAction.needed), reason: text(s.ownerAction.reason) } : noAction;
 };
 /** One declared service with its custody resolved to presence (never a value). */
 export function normalizeService(id, entry, { declaringRepo } = {}) {
@@ -309,7 +308,7 @@ const checkSonarDrift = ({ repo, name, normalized, services, declFile, add }) =>
     const declared = sonar.projects.find((project) => project.repository === name)?.key;
     if (declared && props['sonar.projectKey'] && props['sonar.projectKey'] !== declared)
       add(normalized.sonar ? 'refuse' : 'suspect', 'STACKS_PROJECT_DRIFT', 'sonar-project.properties', `sonar.projectKey ${props['sonar.projectKey']} but the declaration names ${declared}`);
-    if (sonar.host.public && props['sonar.host.url'] && props['sonar.host.url'].replace(/\/+$/, '') !== sonar.host.public.replace(/\/+$/, ''))
+    if (sonar.host.public && props['sonar.host.url'] && trimTrailingSlashes(props['sonar.host.url']) !== trimTrailingSlashes(sonar.host.public))
       add('suspect', 'STACKS_HOST_DRIFT', 'sonar-project.properties', `sonar.host.url ${props['sonar.host.url']} but the declaration's public host is ${sonar.host.public}`);
   }
   // The one quality gate (knowledge/sonar-gate.yaml): a repository names it, never its own thresholds.

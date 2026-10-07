@@ -41,7 +41,7 @@ export const processRowsOfJson = (text) => {
 };
 
 /** The rows of `ps -eo pid=,ppid=,comm=,args=` (exe/created/ws are null there). */
-const PS_ROW_PARTS = ['^\\s*', '(\\d+)', '\\s+', '(\\d+)', '\\s+', '(\\S+)', '\\s+', '(.*)', '$'];
+const PS_ROW_PARTS = [String.raw`^\s*`, String.raw`(\d+)`, String.raw`\s+`, String.raw`(\d+)`, String.raw`\s+`, String.raw`(\S+)`, String.raw`\s+`, '(.*)', '$'];
 const PS_ROW = new RegExp(PS_ROW_PARTS.join(''));
 export const processRowsOfPs = (text, cmdMax = 4000) => String(text ?? '').split(/\r?\n/).map((line) => PS_ROW.exec(line)).filter(Boolean)
   .map((m) => ({ pid: Number(m[1]), ppid: Number(m[2]), name: m[3].split('/').pop(), exe: null, cmd: m[4].slice(0, cmdMax), created: null, ws: null }));

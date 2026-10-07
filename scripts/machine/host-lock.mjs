@@ -97,6 +97,30 @@ export function hostLockOwner({ dir, env = process.env, ...seams } = {}) {
   return viewOf(readRaw(dir ?? hostLockDir({ env }), s.fs), s);
 }
 
+// One attempt to create the lock directory: `{ created }`; a lock a live holder keeps is `{ held }`; a vanished lock or a stale one
+// moved aside is `{ retry, seen, tookOver }` (tookOver: the stale owner whose lock was replaced).
+function createLockDir(lockDir, s, { newToken, remove }) {
+  try {
+    s.fs.mkdirSync(lockDir);
+    return { created: true };
+  } catch (error) {
+    if (error?.code !== 'EEXIST') throw error;
+    const seen = viewOf(readRaw(lockDir, s.fs), s);
+    if (!seen) return { retry: true, seen: null };
+    if (!seen.stale) return { held: seen };
+    const moved = moveAside(lockDir, seen, { fs: s.fs, newToken });
+    if (moved.moved) removeTree(moved.aside, remove);
+    return { retry: true, seen, tookOver: moved.moved ? seen : null };
+  }
+}
+
+function writeOwnerFile(lockDir, owner, s, remove) {
+  try { s.fs.writeFileSync(path.join(lockDir, OWNER_FILE), `${JSON.stringify(owner, null, 2)}\n`, { flag: 'wx' }); } catch (error) {
+    try { remove(lockDir); } catch { /* a directory without an owner expires through ownerlessStaleMs */ }
+    throw error;
+  }
+}
+
 /**
  * Take the lock. {ok: true, token, owner} (plus tookOverFrom: <the stale owner> when a dead holder's lock was replaced) or
  * {ok: false, reason: 'held', owner} or {ok: false, reason: 'bad-role', role}. A role outside ROLES is refused.
@@ -112,21 +136,10 @@ export function acquireHostLock({ role, purpose = null, handle, pid = process.pi
   let tookOverFrom = null;
   let seen = null;
   for (let attempt = 0; attempt < 4; attempt += 1) {
-    try {
-      s.fs.mkdirSync(lockDir);
-    } catch (error) {
-      if (error?.code !== 'EEXIST') throw error;
-      seen = viewOf(readRaw(lockDir, s.fs), s);
-      if (!seen) continue;
-      if (!seen.stale) return { ok: false, reason: 'held', owner: seen };
-      const moved = moveAside(lockDir, seen, { fs: s.fs, newToken });
-      if (moved.moved) { tookOverFrom = seen; removeTree(moved.aside, remove); }
-      continue;
-    }
-    try { s.fs.writeFileSync(path.join(lockDir, OWNER_FILE), `${JSON.stringify(owner, null, 2)}\n`, { flag: 'wx' }); } catch (error) {
-      try { remove(lockDir); } catch { /* a directory without an owner expires through ownerlessStaleMs */ }
-      throw error;
-    }
+    const step = createLockDir(lockDir, s, { newToken, remove });
+    if (step.held) return { ok: false, reason: 'held', owner: step.held };
+    if (step.retry) { seen = step.seen; tookOverFrom = step.tookOver ?? tookOverFrom; continue; }
+    writeOwnerFile(lockDir, owner, s, remove);
     return { ok: true, token, owner, ...(tookOverFrom ? { tookOverFrom } : {}) };
   }
   return { ok: false, reason: 'held', owner: seen };

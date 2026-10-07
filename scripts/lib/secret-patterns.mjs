@@ -28,7 +28,11 @@ export const SECRET_PATTERNS = [
   // candidate; only this heuristic takes the exemption, never a provider-shaped token above.
   // A spec file's keyword-assigned values are test inputs (a spec's sign-in
   // form password and a mocked accessToken once refused a push): the heuristic skips spec files too.
-  { name: 'assigned-secret', re: /\b(?:password|passwd|secret|api[_-]?key|access[_-]?token|client[_-]?secret)\b\s*[:=]\s*['"](?!env\([A-Z_][A-Z0-9_]*\)['"])([^'"\s$<{]{12,})['"]/i, placeholder: /fixture|stub|fake|dummy|placeholder|example|sample|changeme|redacted|mock/i,
+  { name: 'assigned-secret', re: new RegExp([
+    String.raw`\b(?:password|passwd|secret|api[_-]?key|access[_-]?token|client[_-]?secret)`,
+    String.raw`\b\s*[:=]\s*['"](?!env\([A-Z_][A-Z0-9_]*\)['"])([^'"\s$<{]{12,})`,
+    `['"]`,
+  ].join(''), 'i'), placeholder: /fixture|stub|fake|dummy|placeholder|example|sample|changeme|redacted|mock/i,
     skipFile: /\.(?:spec|test|e2e-spec)\.[cm]?[jt]sx?$/ },
 ];
 

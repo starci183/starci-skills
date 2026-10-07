@@ -110,7 +110,10 @@ export function doctorInstallation(input, log = console.log, deps = {}) {
   return failed;
 }
 
-function integrityDetail({ target, repo, manifest, packageManifest, expectedFiles, checkProtocol, planEntries, excluded }) {
+const SHA256_DIGEST = /^[a-f0-9]{64}$/;
+
+// The installed tree is a physical directory whose manifest and package.json carry the invoking package's identity.
+function assertInstalledIdentity({ target, manifest, packageManifest, checkProtocol }) {
   if (isLinkLike(target) || !fs.lstatSync(target, {throwIfNoEntry: false})?.isDirectory()) throw new Error('installed runtime must be a physical directory');
   if (!manifest || manifest.name !== packageManifest.name || manifest.version !== packageManifest.version) throw new Error('install manifest is missing or does not match the invoking package identity');
   checkProtocol(manifest);
@@ -118,25 +121,41 @@ function integrityDetail({ target, repo, manifest, packageManifest, expectedFile
   const installed = JSON.parse(fs.readFileSync(ownedFile(target, 'package.json'), 'utf8'));
   if (installed.name !== manifest.name || installed.version !== manifest.version) throw new Error('installed package identity differs from its manifest');
   for (const relative of SOURCE_ENTRIES) ownedFile(target, relative);
+}
+
+function verifyPayloadCustody(target, manifest, excluded) {
   for (const [relative, digest] of Object.entries(manifest.files)) {
     if (excluded(relative) || excluded(relative.toLowerCase())) throw new Error(`manifest claims excluded local custody: ${relative}`);
-    if (!/^[a-f0-9]{64}$/.test(digest)) throw new Error(`invalid payload digest: ${relative}`);
+    if (!SHA256_DIGEST.test(digest)) throw new Error(`invalid payload digest: ${relative}`);
     const actual = installedPayloadDigest(fs.readFileSync(ownedFile(target, relative)), relative);
     if (actual !== digest) throw new Error(`payload changed since install: ${relative}`);
   }
+}
+
+function verifyInvokingInventory(manifest, expectedFiles) {
   if (!Object.keys(expectedFiles).length) throw new Error('invoking package has no payload inventory');
   for (const [relative, digest] of Object.entries(expectedFiles)) {
     if (manifest.files[relative] !== digest) throw new Error(`payload is absent or differs from the invoking package: ${relative}`);
   }
+}
+
+function verifyPublicEntries(repo, manifest, planEntries) {
   const entries = planEntries(repo, manifest);
   const custody = manifest.hostSkills;
   if (!Object.keys(entries.files).length || entries.write.length || custody?.hashMode !== 'sha256-bytes'
     || !custody?.files || Array.isArray(custody.files) || typeof custody.files !== 'object') throw new Error('public entry discovery is missing, changed or has no exact-byte custody');
   for (const [relative, digest] of Object.entries(custody.files)) {
-    if (!/^[a-f0-9]{64}$/.test(digest) || sha256(fs.readFileSync(ownedFile(repo, relative))) !== digest) throw new Error(`recorded public entry custody differs: ${relative}`);
+    if (!SHA256_DIGEST.test(digest) || sha256(fs.readFileSync(ownedFile(repo, relative))) !== digest) throw new Error(`recorded public entry custody differs: ${relative}`);
   }
   for (const [relative, digest] of Object.entries(entries.files)) {
     if (custody.files?.[relative] !== digest || sha256(fs.readFileSync(ownedFile(repo, relative))) !== digest) throw new Error(`public entry custody differs: ${relative}`);
   }
+}
+
+function integrityDetail({ target, repo, manifest, packageManifest, expectedFiles, checkProtocol, planEntries, excluded }) {
+  assertInstalledIdentity({ target, manifest, packageManifest, checkProtocol });
+  verifyPayloadCustody(target, manifest, excluded);
+  verifyInvokingInventory(manifest, expectedFiles);
+  verifyPublicEntries(repo, manifest, planEntries);
   return `${manifest.name}@${manifest.version}; ${Object.keys(manifest.files).length} payload files`;
 }

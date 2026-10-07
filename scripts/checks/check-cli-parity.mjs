@@ -171,14 +171,21 @@ const entryCandidate = (file) => ENTRY_EXT.test(file) && (ENTRY_ROOT.test(file) 
 
 const filesIn = (dir, rx) => { try { return fs.readdirSync(dir).filter((n) => rx.test(n) && !n.startsWith('_')).sort(); } catch { return []; } };
 
+const USAGE_PAREN_PARTS = [String.raw`\(`, '[^)]*', String.raw`\)`];
+const USAGE_PARENS = new RegExp(USAGE_PAREN_PARTS.join(''), 'g');
+const USAGE_FLAG = new RegExp(['--', '([a-z][a-z0-9-]*)'].join(''), 'g');
+const USAGE_TAIL_MARK = new RegExp([String.raw`\s--`, String.raw`(?=\s|$)`].join(''));
+
 /** --flag names of a usage string (the global five are the dispatcher's, never a verb's;
  * parenthesized prose and flag-family placeholders like --until-<type> are not flags). */
 export const flagsOfUsage = (text) => [...new Set(
-    [...String(text ?? '').split(/\s--(?=\s|$)/, 1)[0].replace(/\([^)]*\)/g, ' ').matchAll(/--([a-z][a-z0-9-]*)/g)].map((m) => m[1]))]
+    [...String(text ?? '').split(USAGE_TAIL_MARK, 1)[0].replace(USAGE_PARENS, ' ').matchAll(USAGE_FLAG)].map((m) => m[1]))]
   .filter((f) => !GLOBAL_FLAGS.has(f) && !f.endsWith('-'));
 
 /** The verbs cli.mjs's main() dispatch switch can run. */
-const verbsFromSwitch = (source) => [...source.matchAll(/^\s*case '([a-z][a-z0-9-]*)':\s*return\b/gm)].map((m) => m[1]);
+const SWITCH_CASE_PARTS = [String.raw`^\s*case '`, '([a-z][a-z0-9-]*)', String.raw`':\s*return\b`];
+const SWITCH_CASE = new RegExp(SWITCH_CASE_PARTS.join(''), 'gm');
+const verbsFromSwitch = (source) => [...source.matchAll(SWITCH_CASE)].map((m) => m[1]);
 
 /** Per-verb usage lines of the cli.mjs usage() heredoc: {verb: line + continuations}. */
 const usageLinesOf = (source) => {
