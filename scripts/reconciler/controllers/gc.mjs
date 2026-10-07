@@ -282,6 +282,16 @@ export function createGcController(overrides = {}) {
     return { entity: `job:${jobId}`, closes, leases };
   }
 
+  async function reconcileStaging(ctx, job, jobId) {
+    if (!(await deps.stagingExists(job))) return null;
+    if (ctx.mode !== 'active') { would(ctx, 'remove-staging', jobId, { klass: 'staging', status: job.status }); return { shadow: true }; }
+    const r = await deps.removeStaging({ jobId, staging: job.staging, landed: job.status === 'succeeded' });
+    const staging = { ok: r?.removed === true, error: r?.error ?? null };
+    ctx.log('reconciler.gc.staging', `${staging.ok ? 'removed' : 'could not remove'} staging of ${job.status} job ${jobId}`, { controller: NAME, jobId, ...staging });
+    if (staging.ok) await deps.lesson({ klass: 'staging', count: 1, examples: [`${job.staging.branch ?? jobId} (removeStaging did not run at report/land)`] });
+    return staging;
+  }
+
   async function reconcileSupJob(ctx, { jobId, sup, gc }) {
     const job = sup.jobs.find((j) => j.jobId === jobId);
     if (!job) return { skipped: 'supervisor job unknown' };
@@ -291,16 +301,7 @@ export function createGcController(overrides = {}) {
     const closes = [];
     if (job.handle && job.handle !== 'supervisor')
       for (const d of await decideTerminals(ctx, { handles: [job.handle], sup, ledgers: [], runs: [job.runId] })) closes.push(await settleLeftover(ctx, d, { entity: `[Worker] job ${jobId}` }));
-    let staging = null;
-    if (await deps.stagingExists(job)) {
-      if (ctx.mode !== 'active') { would(ctx, 'remove-staging', jobId, { klass: 'staging', status: job.status }); staging = { shadow: true }; }
-      else {
-        const r = await deps.removeStaging({ jobId, staging: job.staging, landed: job.status === 'succeeded' });
-        staging = { ok: r?.removed === true, error: r?.error ?? null };
-        ctx.log('reconciler.gc.staging', `${staging.ok ? 'removed' : 'could not remove'} staging of ${job.status} job ${jobId}`, { controller: NAME, jobId, ...staging });
-        if (staging.ok) await deps.lesson({ klass: 'staging', count: 1, examples: [`${job.staging.branch ?? jobId} (removeStaging did not run at report/land)`] });
-      }
-    }
+    const staging = await reconcileStaging(ctx, job, jobId);
     const leaks = gc.classifyLeases({ rows: (sup.leases ?? []).filter((l) => l.jobId === jobId).map((l) => ({ ...l, ledger: 'supervisor' })), now: ctx.now(), minAgeMs: 0 });
     const leases = await leaseDecision(ctx, leaks, { ledgerId: 'supervisor', entity: jobId });
     await recordEvent(ctx, landKey(jobId), { closes });
