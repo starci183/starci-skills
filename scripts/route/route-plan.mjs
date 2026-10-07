@@ -44,7 +44,7 @@ import { phraseHits } from './phrase-match.mjs';
 import { normalizeText } from '../lib/normalize.mjs';
 import { walkFiles } from '../lib/walk.mjs';
 
-const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
+const VAR_NAME = '[A-Za-z][A-Za-z0-9.]*', VAR_STATE_LINE = new RegExp('^(' + VAR_NAME + ')\\s*:\\s*(.+)$'), QUALIFIER_CONTENT = '[^)]*', STATE_QUALIFIER = new RegExp('^(.*?)\\s*\\((' + QUALIFIER_CONTENT + ')\\)\\s*$'), skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 
 // ---------------------------------------------------------------- args -----
 
@@ -116,12 +116,12 @@ function loadProducesTable(goalDir) {
   const byVar = []; // [{family, suffix, state, qualifier, op, raw}]
   for (const [op, vars] of Object.entries(table)) {
     for (const raw of stringItems(vars)) {
-      const m = /^([A-Za-z][A-Za-z0-9.]*)\s*:\s*(.+)$/.exec(String(raw).trim());
+      const m = VAR_STATE_LINE.exec(String(raw).trim());
       if (!m) continue;
       const varPart = m[1];
       let state = m[2].trim();
       let qualifier = null;
-      const q = /^(.*?)\s*\(([^)]*)\)\s*$/.exec(state);
+      const q = STATE_QUALIFIER.exec(state);
       if (q) { state = q[1].trim(); qualifier = q[2].trim(); }
       const dot = varPart.indexOf('.');
       byVar.push({
@@ -394,7 +394,7 @@ function dedupeVars(vars) {
 /** "feature.A: exists proven" -> [{impl.A: done}, {api.A: verified}].
  *  Explicit target vars normalize into the producesVocabulary state space. */
 function normalizeTargetVar(spec, args) {
-  const m = /^([A-Za-z][A-Za-z0-9.]*)\s*:\s*(.+)$/.exec(String(spec).trim());
+  const m = VAR_STATE_LINE.exec(String(spec).trim());
   if (!m) return { error: `cannot parse target var '${spec}' — expected "<family>.<suffix>: <state>"` };
   const varPart = m[1];
   const states = m[2].trim().toLowerCase().split(/\s+/);
