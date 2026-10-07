@@ -28,7 +28,7 @@ import { seedWorkflow } from '../helpers/ledger-fixture.mjs';
 // (desktop and mobile, light) for a drawing another leg waits on, and the owner's accept answer writes it done.
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const API = path.join(ROOT, 'scripts', 'kernel', 'cli.mjs');
-const SERVE = path.join(ROOT, 'scripts', 'kernel', 'ask-server.mjs');
+const SERVE = path.join(ROOT, 'scripts', 'kernel', 'ask-server-main.mjs');
 const APP = '/(app)';
 const DESIGN = 'ui.home.app-layout';
 const CHROME = [20, 40, 160, 255];
