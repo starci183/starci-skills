@@ -170,6 +170,38 @@ function finish(map) {
     .map(([file, items]) => ({ file, items: items.slice(0, MAX_ITEMS_PER_GROUP), ...(items.length > MAX_ITEMS_PER_GROUP ? { more: items.length - MAX_ITEMS_PER_GROUP } : {}) }));
 }
 
+function runPlannedSteps(out, repo, plan, stepRun) {
+  const failedNames = new Set();
+  for (const step of plan.steps) {
+    if (step.absent) { out.steps.push({ name: step.name, status: 'absent', note: 'the repository declares no such script' }); continue; }
+    if (step.after && failedNames.has(step.after)) { out.steps.push({ name: step.name, status: 'skipped', note: `${step.after} is red` }); continue; }
+    const r = stepRun(step, { cwd: repo, timeoutMs: STEP_TIMEOUT_MS[plan.kind], tag: path.basename(repo) });
+    const row = { name: step.name, status: r.ok ? 'green' : 'red', exit: r.exit, ms: r.ms, log: r.log };
+    if (!r.ok) {
+      failedNames.add(step.name);
+      row.failures = failuresOf(step.name, r.text, { repo });
+      if (r.timedOut) row.timedOut = true;
+      if (r.error) row.error = r.error;
+    }
+    out.steps.push(row);
+  }
+}
+
+function pushAfterChecks(repo, out, state, check, pushRun) {
+  if (!state.ahead) return { ...out, verdict: 'green', pushed: 0, why: 'green; nothing ahead of origin/main to push' };
+  const dry = pushRun({ repos: [repo], dryRun: true, record: false })[0];
+  out.dryRun = { wouldPush: Boolean(dry?.wouldPush), refused: dry?.refused ?? null, error: dry?.error ?? null };
+  if (dry?.refused || dry?.error) return { ...out, verdict: 'push-refused', why: dry.refused ?? dry.error, hint: dry.hint ?? null, scan: dry.scan ?? null };
+  const hooks = pushRun({ repos: [repo], hooksOnly: true, record: false })[0];
+  out.hooks = { result: hooks?.hooks ?? null, error: hooks?.error ?? null };
+  if (hooks?.hooks !== 'green') return { ...out, verdict: 'hooks-red', why: `pre-push hook ${hooks?.hooks ?? 'unavailable'}: ${String(hooks?.error ?? '').slice(0, 300)}` };
+  if (check) return { ...out, verdict: 'green', pushed: 0, checkOnly: true, why: `green; ${state.ahead} commit(s) would be pushed (--check)` };
+  const pushed = pushRun({ repos: [repo] })[0];
+  out.push = { pushed: Boolean(pushed?.pushed), head: pushed?.head ?? null, refused: pushed?.refused ?? null, error: pushed?.error ?? null, skipped: pushed?.skipped ?? null, line: describePush(pushed ?? { repo }) };
+  if (!pushed?.pushed) return { ...out, verdict: 'push-refused', why: pushed?.refused ?? pushed?.error ?? pushed?.skipped ?? 'the push did not go through', pushed: 0 };
+  return { ...out, verdict: 'green', pushed: state.ahead };
+}
+
 /* ------------------------------------------------------------ running */
 
 const logDir = () => { const dir = path.join(os.tmpdir(), 'starci-push-git'); fs.mkdirSync(dir, { recursive: true }); return dir; };
@@ -212,36 +244,11 @@ export function pushGitRepo(repo, { check = false, explicit = false, deps = {} }
   if (!state.ahead && !explicit) return { ...out, verdict: 'nothing-to-push', why: 'main has no commit ahead of origin/main' };
   const plan = (deps.plan ?? planFor)(repo);
   out.kind = plan.kind;
-  const failedNames = new Set();
-  for (const step of plan.steps) {
-    if (step.absent) { out.steps.push({ name: step.name, status: 'absent', note: 'the repository declares no such script' }); continue; }
-    if (step.after && failedNames.has(step.after)) { out.steps.push({ name: step.name, status: 'skipped', note: `${step.after} is red` }); continue; }
-    const r = stepRun(step, { cwd: repo, timeoutMs: STEP_TIMEOUT_MS[plan.kind], tag: path.basename(repo) });
-    const row = { name: step.name, status: r.ok ? 'green' : 'red', exit: r.exit, ms: r.ms, log: r.log };
-    if (!r.ok) {
-      failedNames.add(step.name);
-      row.failures = failuresOf(step.name, r.text, { repo });
-      if (r.timedOut) row.timedOut = true;
-      if (r.error) row.error = r.error;
-    }
-    out.steps.push(row);
-  }
+  runPlannedSteps(out, repo, plan, stepRun);
   if (out.steps.some((s) => s.status === 'red')) return { ...out, verdict: 'red', why: `${out.steps.filter((s) => s.status === 'red').map((s) => s.name).join(', ')} red` };
   const after = mainState(repo, { run: gitRun });
   if (after.head !== state.head || after.dirty.length) return { ...out, verdict: 'main-moved', why: after.head !== state.head ? `main moved during the run (${String(state.head).slice(0, 9)} -> ${String(after.head).slice(0, 9)}); run /starci release again` : 'the checkout became dirty during the run', dirty: after.dirty.slice(0, 40) };
-  if (!state.ahead) return { ...out, verdict: 'green', pushed: 0, why: 'green; nothing ahead of origin/main to push' };
-  // The push, in the order the native push contract promises: dry run (secret scan), hooks alone, then the push.
-  const dry = pushRun({ repos: [repo], dryRun: true, record: false })[0];
-  out.dryRun = { wouldPush: Boolean(dry?.wouldPush), refused: dry?.refused ?? null, error: dry?.error ?? null };
-  if (dry?.refused || dry?.error) return { ...out, verdict: 'push-refused', why: dry.refused ?? dry.error, hint: dry.hint ?? null, scan: dry.scan ?? null };
-  const hooks = pushRun({ repos: [repo], hooksOnly: true, record: false })[0];
-  out.hooks = { result: hooks?.hooks ?? null, error: hooks?.error ?? null };
-  if (hooks?.hooks !== 'green') return { ...out, verdict: 'hooks-red', why: `pre-push hook ${hooks?.hooks ?? 'unavailable'}: ${String(hooks?.error ?? '').slice(0, 300)}` };
-  if (check) return { ...out, verdict: 'green', pushed: 0, checkOnly: true, why: `green; ${state.ahead} commit(s) would be pushed (--check)` };
-  const pushed = pushRun({ repos: [repo] })[0];
-  out.push = { pushed: Boolean(pushed?.pushed), head: pushed?.head ?? null, refused: pushed?.refused ?? null, error: pushed?.error ?? null, skipped: pushed?.skipped ?? null, line: describePush(pushed ?? { repo }) };
-  if (!pushed?.pushed) return { ...out, verdict: 'push-refused', why: pushed?.refused ?? pushed?.error ?? pushed?.skipped ?? 'the push did not go through', pushed: 0 };
-  return { ...out, verdict: 'green', pushed: state.ahead };
+  return pushAfterChecks(repo, out, state, check, pushRun);
 }
 
 /** Which repositories: explicit --repo list, else the runtime plus every bound product repository (push-mains' set). */
@@ -284,7 +291,11 @@ export function describeRun(run) {
   const out = [];
   for (const r of run.repos) describeRepo(r, out);
   if (run.notRun?.length) out.push(`not run (stopped at the first red): ${run.notRun.join(', ')}`);
-  out.push(run.ok ? 'PUSH-GIT ' + (run.check ? 'CHECK ' : '') + 'GREEN' + (run.check ? '' : ': ' + run.pushed + ' commit(s) pushed') : 'PUSH-GIT RED: fix the failing groups, land the fixes (starci supervisor land --specs touching), then run starci supervisor push again');
+  if (run.ok) {
+    const check = run.check ? 'CHECK ' : '';
+    const pushed = run.check ? '' : ': ' + run.pushed + ' commit(s) pushed';
+    out.push('PUSH-GIT ' + check + 'GREEN' + pushed);
+  } else out.push('PUSH-GIT RED: fix the failing groups, land the fixes (starci supervisor land --specs touching), then run starci supervisor push again');
   return out.join('\n');
 }
 
