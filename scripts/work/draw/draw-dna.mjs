@@ -57,6 +57,7 @@ import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../../engine/yaml.mjs';
 import { PROPOSAL_FILE_NAMES, readProposals } from '../grammar-proposal.mjs'; import { isMain } from '../../lib/is-main.mjs';
 import { ancestorsOf } from '../../lib/dom-tree.mjs';
+import { list } from '../../lib/list.mjs';
 import { appendDnaFindings } from './draw-dna-findings.mjs';
 import { ALERT_INDICATOR_MAX_PX, DRAW_ALERT_ANATOMY, DRAW_METER_TRACK, METER_FULL_WIDTH_SHARE, METER_SEGMENTED_TRACK_PX, METER_SEGMENT_GAP_MAX_PX, METER_TRACK_PX, anatomyFindings } from './draw-dna-anatomy.mjs';
 export { DRAW_ALERT_ANATOMY, DRAW_METER_TRACK, anatomyFindings };
@@ -212,8 +213,6 @@ function dnaFileOf(family = DEFAULT_FAMILY, root = GRAMMARS) {
 
 const kebab = (s) => String(s).replace(/([a-z0-9])([A-Z])/g, '$1-$2').replace(/([A-Z])([A-Z][a-z])/g, '$1-$2').toLowerCase();
 
-const arrayOf = (value) => Array.isArray(value) ? value : [];
-
 function partsOfRenderer(slug, classes) {
   const parts = new Set();
   for (const cls of classes) {
@@ -228,7 +227,7 @@ function partsOfRenderer(slug, classes) {
 
 function closedValuesOfRenderer(closedValues) {
   const closed = new Map();
-  for (const c of arrayOf(closedValues)) {
+  for (const c of list(closedValues)) {
     if (!c?.prop) continue;
     closed.set(String(c.prop), { values: Array.isArray(c.values) ? c.values.map(String) : null, type: c.type ?? null });
   }
@@ -237,7 +236,7 @@ function closedValuesOfRenderer(closedValues) {
 
 function componentFromRenderer(r) {
   const slug = kebab(r.component);
-  const classes = arrayOf(r.classes);
+  const classes = list(r.classes);
   return { name: r.component, kind: r.kind ?? null, slug, parts: partsOfRenderer(slug, classes), closed: closedValuesOfRenderer(r.closedValues), classes };
 }
 
