@@ -28,26 +28,28 @@ async function retireWorkflowAsks(ledger, workflowId, reason, repo) {
   return retired;
 }
 
+function dropOpenWorkflowJob(db, ledger, workflowId, now, job) {
+  const path = DROP_PATH[job.status];
+  if (!path) throw Object.assign(new Error(`archive refused: job ${job.job_id} is ${job.status} and cannot be dropped (job_transitions)`), { code: 'archive-job-not-droppable', jobId: job.job_id, status: job.status });
+  const leasesReleased = db.prepare('SELECT count(*) n FROM leases WHERE job_id=?').get(job.job_id).n;
+  for (const to of path) setJobStatus(db, { jobId: job.job_id, to, reason: WORKFLOW_ARCHIVED, at: now, ...(to === path.at(-1) ? { leaseToken: null, deadline: null } : {}) });
+  recordJobResult(db, { jobId: job.job_id, result: { verdict: 'dropped', reason: WORKFLOW_ARCHIVED, priorStatus: job.status, at: now }, at: now });
+  const attempt = latestAttemptOf(db, job.job_id);
+  if (attempt && attempt.end_state == null && attempt.settled_at == null) { updateAttempt(db, { attemptId: attempt.attempt_id, endState: 'cancelled', at: now }); recordWhy(db, attempt.attempt_id, { at: now }); }
+  const unit = job.unit_id ? getUnit(db, workflowId, job.unit_id) : null;
+  if (unit && !['done', 'dropped'].includes(unit.state) && (unit.current_job_id == null || unit.current_job_id === job.job_id)) {
+    setUnitState(db, { workflowId, unitId: job.unit_id, to: 'dropped', reason: WORKFLOW_ARCHIVED, at: now });
+  }
+  ledger.appendEvent({ workflowId, entityType: 'job', entityId: job.job_id, kind: 'job-dropped',
+    payload: { op: jobOpOf(job), attempt: job.attempt, reason: WORKFLOW_ARCHIVED, priorStatus: job.status, leasesReleased } });
+  return { job, leasesReleased };
+}
+
 function dropOpenWorkflowJobs(db, ledger, { workflowId, now, finalSettled }) {
   const open = db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND status NOT IN (${finalSettled.map(() => '?').join(',')}) ORDER BY created_at,job_id`)
     .all(workflowId, ...finalSettled);
   const dropped = [];
-  for (const job of open) {
-    const path = DROP_PATH[job.status];
-    if (!path) throw Object.assign(new Error(`archive refused: job ${job.job_id} is ${job.status} and cannot be dropped (job_transitions)`), { code: 'archive-job-not-droppable', jobId: job.job_id, status: job.status });
-    const leasesReleased = db.prepare('SELECT count(*) n FROM leases WHERE job_id=?').get(job.job_id).n;
-    for (const to of path) setJobStatus(db, { jobId: job.job_id, to, reason: WORKFLOW_ARCHIVED, at: now, ...(to === path.at(-1) ? { leaseToken: null, deadline: null } : {}) });
-    recordJobResult(db, { jobId: job.job_id, result: { verdict: 'dropped', reason: WORKFLOW_ARCHIVED, priorStatus: job.status, at: now }, at: now });
-    const attempt = latestAttemptOf(db, job.job_id);
-    if (attempt && attempt.end_state == null && attempt.settled_at == null) { updateAttempt(db, { attemptId: attempt.attempt_id, endState: 'cancelled', at: now }); recordWhy(db, attempt.attempt_id, { at: now }); }
-    const unit = job.unit_id ? getUnit(db, workflowId, job.unit_id) : null;
-    if (unit && !['done', 'dropped'].includes(unit.state) && (unit.current_job_id == null || unit.current_job_id === job.job_id)) {
-      setUnitState(db, { workflowId, unitId: job.unit_id, to: 'dropped', reason: WORKFLOW_ARCHIVED, at: now });
-    }
-    ledger.appendEvent({ workflowId, entityType: 'job', entityId: job.job_id, kind: 'job-dropped',
-      payload: { op: jobOpOf(job), attempt: job.attempt, reason: WORKFLOW_ARCHIVED, priorStatus: job.status, leasesReleased } });
-    dropped.push({ job, leasesReleased });
-  }
+  for (const job of open) dropped.push(dropOpenWorkflowJob(db, ledger, workflowId, now, job));
   return dropped;
 }
 
