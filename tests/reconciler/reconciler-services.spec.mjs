@@ -296,7 +296,7 @@ test('portable connector registry probes and start commands remain available off
   for (const platform of ['darwin', 'linux']) {
     const calls = [];
     const registry = serviceRegistry({
-      platform, settings: S, ports,
+      platform, settings: S, ports, config: ON,
       run: async (_cmd, args) => {
         calls.push([path.basename(args[0]), ...args.slice(1)]);
         return { status: 0, stdout: JSON.stringify({ running: true, port: ports.gatewayPort, health: { problems: [] } }) };
@@ -312,6 +312,46 @@ test('portable connector registry probes and start commands remain available off
       assert.deepEqual(entry.start(), { cmd: 'node', args: ['scripts/reconciler/services.mjs', '--start', name, '--json'] });
     }
     assert.deepEqual(calls, [['ask-gateway.mjs', 'status'], ['tunnel.mjs', 'status', '--fast'], ['telegram-bridge.mjs', 'status']], platform);
+  }
+});
+
+const ON = { connectors: { gateway: { port: 7070 }, cloudflare: { mode: 'quick' }, telegram: { enabled: true } } };
+const OFF = { connectors: { gateway: { port: 7070 }, cloudflare: { mode: 'off' }, telegram: { enabled: false } } };
+
+test('a connector config.yaml turns off is not an outage: never restarted, no failStreak, no SERVICE_DOWN state', async () => {
+  const ports = servicePorts({ allocation: ALLOC, config: CONFIG, harnessYml: HARNESS_YML });
+  const down = async () => ({ status: 0, stdout: '{"running":false}' });
+  for (const name of ['telegram-bridge', 'ask-tunnel']) {
+    const off = serviceRegistry({ platform: 'win32', settings: S, ports, run: down, config: OFF }).find((e) => e.name === name);
+    const p = await off.probe();
+    assert.equal(p.ok, false, name);
+    assert.equal(p.unmanaged, true, `${name}: off in config.yaml is unmanaged, not down`);
+    let rec = newRecord(name, 0), t = 0;
+    for (let i = 0; i < 10; i += 1) {
+      const r = stepService(rec, { ok: p.ok, unmanaged: p.unmanaged }, opts(entryOf(name), t += 60_000));
+      assert.equal(r.act, null, `${name}: an owner-disabled connector is never restarted`);
+      rec = r.rec;
+    }
+    assert.equal(rec.state, 'unmanaged');
+    assert.equal(rec.failStreak, 0);
+    assert.ok(!OUTAGE_STATES.has(rec.state), `${name}: no SERVICE_DOWN clock`);
+    // A live connector the owner turned off still reads healthy (the probe answers first).
+    const up = serviceRegistry({ platform: 'win32', settings: S, ports, config: OFF, run: async () => ({ status: 0, stdout: '{"running":true,"health":{"problems":[]}}' }) });
+    assert.equal((await up.find((e) => e.name === name).probe()).ok, true, name);
+  }
+});
+
+test('an enabled connector that is down is still an outage: failed, then backoff and a restart', async () => {
+  const ports = servicePorts({ allocation: ALLOC, config: CONFIG, harnessYml: HARNESS_YML });
+  for (const name of ['telegram-bridge', 'ask-tunnel']) {
+    const on = serviceRegistry({ platform: 'win32', settings: S, ports, config: ON, run: async () => ({ status: 0, stdout: '{"running":false}' }) }).find((e) => e.name === name);
+    const p = await on.probe();
+    assert.equal(p.ok, false, name);
+    assert.notEqual(p.unmanaged, true, name);
+    const first = stepService(newRecord(name, 0), { ok: false }, opts(entryOf(name), 1));
+    assert.equal(first.to, 'backoff', name);
+    assert.ok(OUTAGE_STATES.has(first.to));
+    assert.equal(stepService(first.rec, { ok: false }, opts(entryOf(name), 1 + S.backoff.minMs)).act, 'start', name);
   }
 });
 

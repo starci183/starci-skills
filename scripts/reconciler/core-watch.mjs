@@ -31,7 +31,8 @@ import { fileURLToPath } from 'node:url';
 import { probe } from '../api/http/probe.mjs';
 import { readMachine } from '../../engine/db/machine.mjs';
 import { openLedgerReader } from '../../engine/db/ledger.mjs';
-import { coreDebugSettings } from '../../engine/config.mjs';
+import { coreDebugSettings, loadConfig } from '../../engine/config.mjs';
+import { serviceWanted } from './start-items.mjs';
 import { lsFiles } from '../api/git/ls-files.mjs';
 import { worktreeListQuery } from '../api/git/worktree-list-query.mjs';
 import { gitResultOf } from '../lib/git.mjs';
@@ -141,14 +142,20 @@ async function serviceFacts(o) {
   const r = await child(['scripts/reconciler/services.mjs', '--list', '--json'], o);
   const rows = r.ok ? firstJson(r.stdout)?.rows : null;
   if (!rows) { facts.set('service:list', `services --list failed (${r.error ?? 'no json'})`); return facts; }
-  for (const row of rows) serviceRowFact(facts, row);
+  let config = null;
+  try { config = loadConfig(); } catch { /* unreadable: every connector stays required */ }
+  for (const row of rows) serviceRowFact(facts, row, { config });
   return facts;
 }
 
-/** The fact of one `services --list` row: null while healthy (a seat: live), else its state with the probe error and fail streak. */
-function serviceRowFact(facts, row) {
+/**
+ * The fact of one `services --list` row: null while healthy (a seat: live) or while config.yaml connectors turn the
+ * connector off (serviceWanted: not required, so never an outage), else its state with the probe error and fail streak.
+ */
+export function serviceRowFact(facts, row, { config = null } = {}) {
   if (row.name.startsWith('ledger:') || row.name.startsWith('sched-task:')) return;
-  const okState = row.name.startsWith('seat:') ? row.state === 'live' : row.state === 'healthy';
+  const notRequired = config != null && !serviceWanted(row.name, config);
+  const okState = notRequired || (row.name.startsWith('seat:') ? row.state === 'live' : row.state === 'healthy');
   if (okState) { facts.set(`service:${row.name}`, null); return; }
   const probe = row.lastProbe ?? {};
   let details = '';
