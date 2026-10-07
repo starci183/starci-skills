@@ -32,25 +32,17 @@ import { positiveNumber } from '../../lib/number.mjs';
 import { productLedgers } from '../../lib/ledgers.mjs';
 import { stallFindings, peerWaits, ownerGates, namedWorkflows, lastProgress, apiFrontier } from '../../supervisor/stall.mjs';
 import { openAsks } from '../../supervisor/poll.mjs';
-import { progressSettings, stallNotice } from '../../kernel/progress-rca.mjs';
+import { progressSettings } from '../../kernel/progress-rca.mjs';
 import { telemetrySettings } from '../../machine/op-metrics.mjs';
 import { unresolvedPlaceholders } from '../../goal/goal-text.mjs';
-import { shortRev } from '../../kernel/runtime-rev.mjs';
 import { productRepos } from '../../machine/home.mjs';
-import { slaCatalog, clocksOf, setClock, clearClock, CRITICAL_SUFFIX } from '../sla.mjs'; import { isMain } from '../../lib/is-main.mjs';
+import { slaCatalog, clocksOf, setClock, clearClock } from '../sla.mjs'; import { isMain } from '../../lib/is-main.mjs';
+import { planWorkflow, stuckPrefix, workflowEntity, SUPERVISOR_LEDGER } from '../workflow-plan.mjs';
+import { eachInOrder, mapInOrder } from '../../lib/in-order.mjs';
+export { planWorkflow, SUPERVISOR_LEDGER };
 const selfFile = fileURLToPath(import.meta.url);
 const skillRoot = path.resolve(path.dirname(selfFile), '..', '..', '..');
 const WORKFLOW_FILE = path.join(skillRoot, 'modules', 'reconciler', 'workflow.yaml');
-export const DI_SCHEMA = 'starci/decision-item@1';
-export const OPENED_BY = 'workflow-controller';
-export const SUPERVISOR_LEDGER = 'supervisor';
-/** starci kernel status stuck[] kind -> violation code (DESIGN Appendix A; a supervisor-gate is SUPERVISOR_GATE_OVERDUE). */
-const STUCK_CODES = Object.freeze({
-  'owner-gate': 'WAIT_OVERDUE', 'peer-wait': 'PEER_WAIT_OVERDUE', dependency: 'WAIT_OVERDUE', 'retry-cap': 'WAIT_OVERDUE',
-  'deferred-settle': 'WAIT_OVERDUE', 'queued-ready': 'READY_UNDISPATCHED', throttled: 'WAIT_OVERDUE',
-});
-/** stall.mjs finding type -> DI kind. */
-export const FINDING_KINDS = Object.freeze({ 'STALE-GATE': 'stale-gate', 'STALE-WAIT': 'stale-wait', 'STALE-PEER-WAIT': 'stale-peer-wait', 'UNREAD-PEER': 'unread-peer' });
 const DEFAULT_ROUTES = ['incident-raised', 'incident-resolved', 'ask-serving', 'ask-serving-expired', 'ask-notified', 'ask-answered', 'ask-superseded',
   'peer-message-sent', 'peer-message-acked', 'op-settled', 'plan-derived', 'runtime-rev-acked', 'handover-approved', 'goal-defined'];
 
@@ -90,170 +82,8 @@ export function parseKey(key) {
   const m = /^workflow:([^:]+):(.+)$/.exec(String(key ?? ''));
   return m ? { ledgerId: m[1], workflowId: m[2] } : null;
 }
-const workflowEntity = (ledgerId, workflowId) => `workflow:${ledgerId}:${workflowId}`;
-const stuckPrefix = (ledgerId, workflowId) => `stuck:${ledgerId}:${workflowId}:`;
 const evWorkflow = (ev) => ev?.workflowId ?? ev?.workflow_id ?? null;
 const evLedger = (ev) => ev?.ledgerId ?? ev?.ledger_id ?? null;
-
-/* ------------------------------------------------------------------------------------------------ the planner */
-
-const iso = (ms) => (Number.isFinite(ms) ? new Date(ms).toISOString() : null);
-const firstUntried = (rca) => (rca?.actions ?? []).find((a) => !a.tried) ?? null;
-
-/** One DI (DESIGN §10.3), the ledger's own; lane rc-decisions assigns the id. Pure. */
-export function decisionOf({ kind, subject, decider = 'kernel', ledgerId, workflowId, entity, summary, evidence = [], top = null, now, dueMs, escalatedFrom = null, ledger = null }) {
-  return {
-    schema: DI_SCHEMA, idempotencyKey: `${kind}:${workflowId}:${subject}${escalatedFrom ? '@supervisor' : ''}`, kind, decider,
-    ledger: ledger ?? (decider === 'supervisor' && escalatedFrom ? SUPERVISOR_LEDGER : ledgerId), productLedger: ledgerId, workflowId,
-    entity: entity ?? { type: 'workflow', id: workflowId },
-    summary: clipLine(summary, 300),
-    evidence: evidence.filter(Boolean).map((line) => ({ ref: clipLine(line, 400) })),
-    options: top ? [{ key: top.key, verb: top.command, title: top.title, tier: top.tier, recommended: true }] : [],
-    openedBy: OPENED_BY, openedAt: now, dueAt: now + dueMs,
-    escalateTo: decider === 'kernel' ? 'supervisor' : 'owner', escalations: escalatedFrom ? 1 : 0,
-    ...(escalatedFrom ? { escalatedFrom } : {}), status: 'open',
-  };
-}
-
-/**
- * Everything one pass decides for one running workflow. Pure: no ledger, no clock, no spawn.
- *   status    the cached starci kernel status value (null when unreadable)
- *   findings  stallFindings of this workflow
- *   goal      {missing: bool, why}
- *   asks      [{dispatchId, liveness, lastServedAt}] (poll.mjs openAsks)
- *   clocks    the workflow's open clocks [{entity, state, enteredAt}] (to read an episode's age)
- *   unreadable  {misses, since, error, heldAt} when this pass could not read starci kernel status (holdStatus), else null
- * Returns {clocks: [{entity, state, slaMs, enteredAt}], decisions: [DI], reparks: [dispatchId], finish, stalled, lines}.
- */
-export function planWorkflow({ ledgerId, workflowId, status = null, findings = [], goal = { missing: false }, asks = [], clocks = [], unreadable = null, now, settings }) {
-  const s = settings;
-  const wfEntity = workflowEntity(ledgerId, workflowId);
-  const out = { clocks: [], decisions: [], reparks: [], finish: false, stalled: false, lines: [] };
-  const clock = (entity, state, slaMs, enteredAt) => { if (Number.isFinite(slaMs)) out.clocks.push({ entity, state, slaMs, enteredAt: Number.isFinite(enteredAt) ? enteredAt : now }); };
-  const openClock = (state) => clocks.find((c) => c.entity === wfEntity && c.state === state) ?? null;
-  const di = (args) => out.decisions.push(decisionOf({ ledgerId, workflowId, now, dueMs: s.decisionDueMs, ...args }));
-  const progress = status?.progress ?? null;
-  const rca = status?.rca ?? null;
-  const frontier = status?.frontier ?? null;
-  const top = firstUntried(rca);
-  const topLine = top ? `rca #${top.rank} [${top.tier}] ${top.title}: ${top.command}` : null;
-
-  // ---- goal text (INV-W4)
-  if (goal?.missing) {
-    clock(wfEntity, 'GOAL_TEXT_MISSING', s.goalMs, now);
-    out.lines.push(`GOAL_TEXT_MISSING ${workflowId}: ${goal.why}`);
-  }
-
-  // ---- stall: starci kernel status progress.stall and the STALLED finding are one episode
-  const stalledFinding = findings.find((f) => f.type === 'STALLED' && f.alert) ?? null;
-  const orphaned = frontier?.state === 'orphaned-frontier';
-  const progressStalled = progress?.stall?.stalled === true;
-  const progressSince = progressStalled && progress.stall.since ? Date.parse(progress.stall.since) : Number.NaN;
-  const episodeStarts = [progressSince, stalledFinding ? Number(stalledFinding.idleSince) : Number.NaN].filter(Number.isFinite);
-  const planned = episodeStarts.length ? Math.min(...episodeStarts) : now;
-  if (progressStalled || stalledFinding) {
-    out.stalled = true;
-    clock(wfEntity, 'STALL_UNOWNED', s.graceMs, planned);
-    clock(wfEntity, 'STALL_ESCALATED', s.supervisorGraceMs, planned);
-    const episode = Math.min(openClock('STALL_UNOWNED')?.enteredAt ?? planned, planned);
-    const ageMs = now - episode;
-    const progressDue = progressStalled && Number.isFinite(progressSince) && now - progressSince > s.graceMs;
-    const findingDue = Boolean(stalledFinding) && !orphaned;
-    if (progressDue || findingDue) {
-      const evidence = [
-        stalledFinding?.line,
-        progressStalled ? stallNotice({ workflowId, progress, rca }) : null,
-        topLine,
-      ];
-      const summary = `progress-stall ${Math.round(ageMs / 60_000)}m: ${progressStalled ? progress.stall.reasons.join('; ') : clipLine(stalledFinding.line, 200)}`;
-      di({ kind: 'progress-stall', subject: 'stall', summary, evidence, top });
-      if (ageMs >= s.supervisorGraceMs) {
-        di({ kind: 'progress-stall', subject: 'stall', decider: 'supervisor', escalatedFrom: `progress-stall:${workflowId}:stall`,
-          summary: `ESCALATED (${Math.round(ageMs / 60_000)}m >= supervisorGraceMs ${Math.round(s.supervisorGraceMs / 60_000)}m): ${summary}`, evidence, top });
-      }
-    }
-  }
-
-  // ---- orphaned frontier
-  if (orphaned) {
-    const since = openClock('ORPHANED_FRONTIER')?.enteredAt ?? (stalledFinding ? Number(stalledFinding.idleSince) : now);
-    clock(wfEntity, 'ORPHANED_FRONTIER', s.orphanedFrontierMs, since);
-    if (stalledFinding || now - since >= s.orphanedFrontierMs) {
-      di({ kind: 'orphaned-frontier', subject: 'frontier', summary: `orphaned-frontier for ${Math.round((now - since) / 60_000)}m: nothing open and no next step; set the next leg or revise`,
-        evidence: [stalledFinding?.line, frontier?.reason ? `frontier: ${clipLine(frontier.reason, 240)}` : null, topLine], top });
-    }
-  }
-
-  // ---- runtime rev not acked. Every runtime land makes every running Kernel's rev stale: that is no decision. The
-  // Kernel's next wake carries the new rev (scripts/kernel/runtime-rev.mjs revWakeLine), so the plan only asks for a
-  // re-wake (out.rewake, one doorbell per rev); ONE rev-ack DI per workflow (subject 'runtime-rev', whatever the rev)
-  // opens only once the ack is overdue past REV_ACK_OVERDUE (s.revAckMs), counted from the first stale read.
-  const rev = status?.kernelRev ?? null;
-  if (rev?.stale === true) {
-    const since = openClock('REV_ACK_OVERDUE')?.enteredAt ?? now;
-    clock(wfEntity, 'REV_ACK_OVERDUE', s.revAckMs, since);
-    const cur = shortRev(rev.current) ?? 'unknown';
-    if (now - since < s.revAckMs) {
-      out.rewake = cur;
-      out.lines.push(`rev-ack pending ${workflowId}: rev ${cur} rides the Kernel's next wake; a decision only after ${Math.round(s.revAckMs / 60_000)}m`);
-    } else di({ kind: 'rev-ack', subject: 'runtime-rev', summary: `runtime rev ${cur} not acked (acked ${shortRev(rev.acked) ?? 'none'}); re-read ${rev.full ? 'kernel-prompt.md and driver-loop.yaml in full' : (rev.files ?? []).slice(0, 6).join(', ')} then starci kernel kernel-ack-rev --workflow ${workflowId} --rev ${cur}`,
-      evidence: [`kernelRev acked ${rev.acked ?? 'none'} current ${rev.current ?? '-'}`, ...(rev.changes ?? []).slice(0, 3).map((c) => (typeof c === 'string' ? c : `change ${c.id ?? ''} ${c.summary ?? ''}`))] });
-  }
-
-  // ---- starci kernel status unreadable: never a progress-stall (the pass holds the last readable status, or judges nothing);
-  // statusUnreadablePasses consecutive misses are a runtime defect of the read itself, the Supervisor's, naming the error.
-  // It lands in the SUPERVISOR ledger (like cap-starved / service-quarantined): a product-ledger DI with decider supervisor
-  // never reaches `decisions.mjs supervisor --list`. productLedger/workflowId keep the refs.
-  if (unreadable) {
-    const held = unreadable.heldAt != null && status ? `holding the status read ${Math.round((now - unreadable.heldAt) / 60_000)}m ago` : 'no readable status held; stall not judged';
-    out.lines.push(`STATUS-UNREADABLE ${workflowId}: ${unreadable.misses} consecutive pass(es) since ${iso(unreadable.since)}: ${unreadable.error}; ${held}`);
-    if (unreadable.misses >= (s.statusUnreadablePasses ?? 3)) {
-      const f = unreadable.failure ?? null;
-      di({ kind: 'runtime-defect', subject: 'status-unreadable', decider: 'supervisor', ledger: SUPERVISOR_LEDGER, entity: { type: 'workflow', id: workflowId },
-        summary: `status-unreadable: starci kernel status --workflow ${workflowId} failed ${unreadable.misses} consecutive reconciler passes since ${iso(unreadable.since)} (${unreadable.error}); no stall is judged until it reads again`,
-        evidence: [`last error: ${unreadable.error}`, f ? `cause ${f.cause ?? '?'}; exit ${f.code ?? '-'}; timedOut ${Boolean(f.timedOut)}${(f.refusal && '; refusal ' + f.refusal) || ''}` : null,
-          f?.stderrHead ? `stderr: ${f.stderrHead}` : null, `ledger ${ledgerId} workflow ${workflowId}`, findings.find((x) => x.type === 'STATUS-UNREADABLE')?.line] });
-    }
-  }
-
-  // ---- STALE-* / UNREAD-PEER findings (this replaces the [stall] wake of stall-alert.mjs)
-  for (const f of findings) {
-    const kind = FINDING_KINDS[f.type];
-    if (!kind) continue;
-    let subject; if (f.type === 'STALE-WAIT') subject = f.jobId; else if (f.type === 'UNREAD-PEER') subject = f.peerMessage; else subject = f.incidentId;
-    const decider = f.type === 'STALE-GATE' && f.gateKind === 'supervisor-gate' ? 'supervisor' : 'kernel';
-    di({ kind, subject: subject ?? f.key, decider, summary: f.line, evidence: [f.line, topLine],
-      entity: (f.jobId && { type: 'job', id: f.jobId }) || (f.incidentId && { type: 'incident', id: f.incidentId }) || { type: 'workflow', id: workflowId }, top });
-  }
-
-  // ---- one clock per starci kernel status stuck[] wait (opTelemetry.stuckSla)
-  for (const item of status?.stuck ?? []) {
-    const id = String(item.key ?? '').split(':').slice(3).join(':') || item.incidentId || item.jobId;
-    if (!id || !item.kind) continue;
-    const entity = `${stuckPrefix(ledgerId, workflowId)}${item.kind}:${id}`;
-    const since = Number(item.since);
-    if (item.kind === 'owner-gate' && item.cause === 'supervisor-gate') { clock(entity, 'SUPERVISOR_GATE_OVERDUE', s.supervisorGateMs, since); continue; }
-    const code = STUCK_CODES[item.kind] ?? 'WAIT_OVERDUE';
-    const sla = s.stuckSla?.[item.kind];
-    if (!sla) continue;
-    clock(entity, code, sla.warnMs, since);
-    clock(entity, `${code}${CRITICAL_SUFFIX}`, sla.criticalMs, since);
-  }
-
-  // ---- asks: re-park a dead / stale / unserved one; on-demand is healthy
-  for (const a of asks) {
-    if (!s.askRepark.liveness.has(a.liveness)) continue;
-    if (a.lastServedAt && now - a.lastServedAt < s.askRepark.minIntervalMs) continue;
-    out.reparks.push(a.dispatchId);
-    out.lines.push(`ASK-REPARK ${workflowId} ${a.dispatchId} (${a.liveness})`);
-  }
-
-  // ---- finish: every job settled and the handover approved (starci kernel status frontier finish-ready)
-  if ((status?.phase ?? 'running') === 'running' && frontier?.state === 'finish-ready' && !(Number(frontier.openOperations) > 0)) out.finish = true;
-
-  for (const d of out.decisions) out.lines.push(`DI ${d.decider} ${d.idempotencyKey}: ${clipLine(d.summary, 160)}`);
-  return out;
-}
 
 /* ------------------------------------------------------------------------------------------------ reads */
 
@@ -354,7 +184,7 @@ async function ringKernelDoorbell(ctx, { ledgerId, workflowId, keys }) {
 async function clearWorkflowClocks(ctx, ledgerId, workflowId) {
   const wfEntity = workflowEntity(ledgerId, workflowId), prefix = stuckPrefix(ledgerId, workflowId);
   const open = clocksOf(ctx, { prefixes: [wfEntity, prefix] }).filter((c) => c.entity === wfEntity || c.entity.startsWith(prefix));
-  for (const c of open) await clearClock(ctx, c);
+  await eachInOrder(open, (c) => clearClock(ctx, c));
   return open.length;
 }
 
@@ -365,65 +195,86 @@ const settingsNow = () => workflowSettings();
 const UNJUDGED_KEEP = new Set(['STALL_UNOWNED', 'STALL_ESCALATED', 'ORPHANED_FRONTIER']);
 const defaults = settingsNow();
 
+/** The status of each peer workflow a gate or wait of `workflowId` names (never a second read of its own): Map(workflowId -> status). */
+async function peerStatuses(ctx, readers, own, workflowId, status) {
+  const peers = new Set([...peerWaits(own.db, workflowId).map((w) => w.peer), ...ownerGates(own.db, workflowId).flatMap((g) => namedWorkflows(g.text))]
+    .filter((p) => p && p !== workflowId));
+  const statuses = new Map([[workflowId, status]]);
+  await eachInOrder(peers, async (p) => {
+    const holder = [...readers.values()].find((r) => { try { return Boolean(r.db.prepare('SELECT 1 FROM workflows WHERE workflow_id=?').get(p)); } catch { return false; } });
+    if (holder) statuses.set(p, await safeStatus(ctx, holder.ledgerId, p));
+  });
+  return statuses;
+}
+
+/** What one pass reads of a running workflow: {base, findings, asks, status, unreadable}, or {early} for a workflow out of view or ended. */
+async function readFacts(ctx, readers, { key, ledgerId, workflowId, now, settings }) {
+  const own = readers.get(ledgerId);
+  if (!own) return { early: { ok: true, key, skipped: 'ledger-out-of-view', cleared: await clearWorkflowClocks(ctx, ledgerId, workflowId) } };
+  const row = own.db.prepare('SELECT workflow_id, phase, archived_at FROM workflows WHERE workflow_id=?').get(workflowId);
+  if (row?.phase !== 'running' || row?.archived_at != null) {
+    return { early: { ok: true, key, ended: row?.phase ?? 'unknown', cleared: await clearWorkflowClocks(ctx, ledgerId, workflowId) } };
+  }
+  const base = { goal: goalOf(own.db, workflowId), lastProgress: lastProgress(own.db, workflowId) };
+  const { status, unreadable } = holdStatus(ctx, key, await readStatus(ctx, ledgerId, workflowId), now, settings.statusUnreadablePasses ?? 3);
+  const statuses = await peerStatuses(ctx, readers, own, workflowId, status);
+  const findings = stallFindings(own.db, {
+    repo: own.repo, ledgers: [...readers.values()].map((r) => ({ repo: r.repo, db: r.db })), now, wanted: new Set([workflowId]),
+    frontierOf: (_repo, wf) => asFrontier(statuses.get(wf)),
+    ...(ctx.kernelTurnOf ? { kernelTurnOf: ctx.kernelTurnOf } : {}),
+  });
+  const open = await (ctx.openAsks ?? openAsks)(own.db, new Set([workflowId]));
+  const asks = open.map((a) => ({ dispatchId: a.dispatch_id, liveness: a.liveness, lastServedAt: lastServedAt(own.db, workflowId, a.dispatch_id) }));
+  return { base, findings, asks, status, unreadable };
+}
+
+/** Start / keep the plan's clocks and clear the rest of the workflow's; how many were cleared. */
+async function syncClocks(ctx, plan, existing, { ledgerId, workflowId, wfEntity, status }) {
+  const wanted = new Set(plan.clocks.map((c) => `${c.entity}\u0000${c.state}`));
+  await eachInOrder(plan.clocks, (c) => setClock(ctx, { ...c, ledgerId, meta: { controller: 'workflow', workflowId } }));
+  let cleared = 0;
+  // A pass that judged nothing (no status) neither starts nor ends a stall episode: its clocks stay as they were.
+  const unjudged = (c) => !status && c.entity === wfEntity && UNJUDGED_KEEP.has(c.state);
+  await eachInOrder(existing, async (c) => { if (!wanted.has(`${c.entity}\u0000${c.state}`) && !unjudged(c)) { await clearClock(ctx, c); cleared += 1; } });
+  return cleared;
+}
+
+/** Open the plan's Decision Items once per decision window; the ones opened. */
+async function openDecisions(ctx, plan, now, settings) {
+  const opened = [];
+  await eachInOrder(plan.decisions, async (d) => {
+    if (recentlyOpened(ctx, d.idempotencyKey, now, settings.decisionDueMs)) return;
+    try { await ctx.openDecision(d); opened.push(d); } catch (error) { plan.lines.push(`DI ${d.idempotencyKey} failed: ${String(error?.message ?? error).slice(0, 120)}`); }
+  });
+  return opened;
+}
+
 export async function reconcileWorkflow(key, ctx, { settings = workflowSettings() } = {}) {
   const k = parseKey(key);
   if (!k) return { ok: false, key, skipped: 'bad-key' };
   const { ledgerId, workflowId } = k;
   const now = ctx.now();
   const readers = openReaders(ctx);
-  let base = null, findings = [], asks = [], status = null, unreadable = null;
   const wfEntity = workflowEntity(ledgerId, workflowId), prefix = stuckPrefix(ledgerId, workflowId);
-  try {
-    const own = readers.get(ledgerId);
-    if (!own) return { ok: true, key, skipped: 'ledger-out-of-view', cleared: await clearWorkflowClocks(ctx, ledgerId, workflowId) };
-    const row = own.db.prepare('SELECT workflow_id, phase, archived_at FROM workflows WHERE workflow_id=?').get(workflowId);
-    if (row?.phase !== 'running' || row?.archived_at != null) {
-      return { ok: true, key, ended: row?.phase ?? 'unknown', cleared: await clearWorkflowClocks(ctx, ledgerId, workflowId) };
-    }
-    base = { goal: goalOf(own.db, workflowId), lastProgress: lastProgress(own.db, workflowId) };
-    ({ status, unreadable } = holdStatus(ctx, key, await readStatus(ctx, ledgerId, workflowId), now, settings.statusUnreadablePasses ?? 3));
-    // The peers a gate or wait of this workflow names: their status answers the peer-busy probe (never a second read).
-    const peers = new Set([...peerWaits(own.db, workflowId).map((w) => w.peer), ...ownerGates(own.db, workflowId).flatMap((g) => namedWorkflows(g.text))]
-      .filter((p) => p && p !== workflowId));
-    const statuses = new Map([[workflowId, status]]);
-    for (const p of peers) {
-      const holder = [...readers.values()].find((r) => { try { return Boolean(r.db.prepare('SELECT 1 FROM workflows WHERE workflow_id=?').get(p)); } catch { return false; } });
-      if (holder) statuses.set(p, await safeStatus(ctx, holder.ledgerId, p));
-    }
-    findings = stallFindings(own.db, {
-      repo: own.repo, ledgers: [...readers.values()].map((r) => ({ repo: r.repo, db: r.db })), now, wanted: new Set([workflowId]),
-      frontierOf: (_repo, wf) => asFrontier(statuses.get(wf)),
-      ...(ctx.kernelTurnOf ? { kernelTurnOf: ctx.kernelTurnOf } : {}),
-    });
-    const open = await (ctx.openAsks ?? openAsks)(own.db, new Set([workflowId]));
-    asks = open.map((a) => ({ dispatchId: a.dispatch_id, liveness: a.liveness, lastServedAt: lastServedAt(own.db, workflowId, a.dispatch_id) }));
-  } finally { closeAll(readers); }
+  let facts;
+  try { facts = await readFacts(ctx, readers, { key, ledgerId, workflowId, now, settings }); } finally { closeAll(readers); }
+  if (facts.early) return facts.early;
+  const { base, findings, asks, status, unreadable } = facts;
 
   const existing = clocksOf(ctx, { prefixes: [wfEntity, prefix] }).filter((c) => c.entity === wfEntity || c.entity.startsWith(prefix));
   const plan = planWorkflow({ ledgerId, workflowId, status, findings, goal: base.goal, asks, clocks: existing, unreadable, now, settings });
 
-  // clocks: start / keep the wanted ones, clear the rest of this workflow's
-  const wanted = new Set(plan.clocks.map((c) => `${c.entity}\u0000${c.state}`));
-  for (const c of plan.clocks) await setClock(ctx, { ...c, ledgerId, meta: { controller: 'workflow', workflowId } });
-  let cleared = 0;
-  // A pass that judged nothing (no status) neither starts nor ends a stall episode: its clocks stay as they were.
-  const unjudged = (c) => !status && c.entity === wfEntity && UNJUDGED_KEEP.has(c.state);
-  for (const c of existing) if (!wanted.has(`${c.entity}\u0000${c.state}`) && !unjudged(c)) { await clearClock(ctx, c); cleared += 1; }
+  const cleared = await syncClocks(ctx, plan, existing, { ledgerId, workflowId, wfEntity, status });
 
   // decisions, then one doorbell for the Kernel's
-  const opened = [];
-  for (const d of plan.decisions) {
-    if (recentlyOpened(ctx, d.idempotencyKey, now, settings.decisionDueMs)) continue;
-    try { await ctx.openDecision(d); opened.push(d); } catch (error) { plan.lines.push(`DI ${d.idempotencyKey} failed: ${String(error?.message ?? error).slice(0, 120)}`); }
-  }
+  const opened = await openDecisions(ctx, plan, now, settings);
   const kernelKeys = opened.filter((d) => d.decider === 'kernel').map((d) => d.idempotencyKey);
   // A stale runtime rev not yet overdue is a re-wake, not a decision: one doorbell per (workflow, rev).
   if (plan.rewake && !recentlyOpened(ctx, `rev-wake:${workflowId}:${plan.rewake}`, now, settings.revAckMs)) kernelKeys.push(`rev:${plan.rewake}`);
   const doorbell = kernelKeys.length ? await ringKernelDoorbell(ctx, { ledgerId, workflowId, keys: kernelKeys }) : null;
 
   // asks and finish: api verbs (ctx.api is the shadow gate)
-  const acted = [];
-  for (const dispatchId of plan.reparks) acted.push({ verb: 'serve-ask', dispatchId, result: await ctx.api(ledgerId, 'serve-ask', ['--workflow', workflowId, '--dispatch', dispatchId], { timeoutMs: 120_000 }) });
+  const acted = await mapInOrder(plan.reparks, async (dispatchId) => ({ verb: 'serve-ask', dispatchId, result: await ctx.api(ledgerId, 'serve-ask', ['--workflow', workflowId, '--dispatch', dispatchId], { timeoutMs: 120_000 }) }));
   if (plan.finish) acted.push({ verb: 'finish', result: await ctx.api(ledgerId, 'finish', ['--workflow', workflowId], { timeoutMs: 240_000 }) });
 
   return { ok: true, key, statusRead: !unreadable, ...(unreadable ? { statusUnreadable: unreadable } : {}), findings: findings.map((f) => f.type), clocks: plan.clocks.length, cleared,
@@ -499,11 +350,11 @@ if (isMain(import.meta.url)) {
     const ctx = dryCtx(repos.length ? { repos } : {});
     const keys = (await listWorkflows(ctx)).filter((k) => !only.length || only.includes(parseKey(k)?.workflowId));
     const results = [];
-    for (const key of keys) {
+    await eachInOrder(keys, async (key) => {
       const before = ctx.would.length;
       const r = await reconcileWorkflow(key, ctx);
       results.push({ ...r, would: ctx.would.slice(before).filter((w) => w.type !== 'clock' && w.type !== 'clear') , clockRows: ctx.would.slice(before).filter((w) => w.type === 'clock').map((w) => `${w.entity} ${w.state}`) });
-    }
+    });
     if (argv.includes('--json')) console.log(JSON.stringify(results, null, 2));
     else {
       for (const r of results) {
