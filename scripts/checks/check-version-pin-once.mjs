@@ -32,7 +32,11 @@ const EXT = /\.(?:mjs|cjs|js|ts|tsx|yaml|yml|md|json|cmd|ps1|sh|toml)$/;
 const OUT = /node_modules\/|(?:^|\/)package\.json$|(?:^|\/)package-lock\.json$|(?:^|\/)pnpm-lock\.yaml$|(?:^|\/)yarn\.lock$|CHANGELOG|packages\/[^/]+\/runtime\/|^tests\/|\.spec\.|\.starciwork\//;
 const inScope = (rel) => EXT.test(rel) && rel !== PINS_FILE && !OUT.test(rel);
 
-const SEMVER = /\d+\.\d+\.\d+/g;
+const SEMVER = new RegExp([
+  String.raw`\d+\.`,
+  String.raw`\d+\.`,
+  String.raw`\d+`,
+].join(''), 'g');
 const WINDOW = 4;
 
 /** pin name → version for every pin in the canon-pins document. */

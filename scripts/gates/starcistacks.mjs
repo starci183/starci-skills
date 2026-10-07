@@ -139,9 +139,8 @@ const normalizeCredential = (credential, declaringRepo) => {
       encPresent: abs ? isFile(`${abs}.enc`) : null, plainPresent: abs ? isFile(abs) : null } };
 };
 const ownerActionOf = (s) => {
-  if (s.ownerAction === 'none') return 'none';
-  if (plain(s.ownerAction)) return { needed: text(s.ownerAction.needed), reason: text(s.ownerAction.reason) };
-  return null;
+  const noAction = s.ownerAction === 'none' ? 'none' : null;
+  return plain(s.ownerAction) ? { needed: text(s.ownerAction.needed), reason: text(s.ownerAction.reason) } : noAction;
 };
 /** One declared service with its custody resolved to presence (never a value). */
 export function normalizeService(id, entry, { declaringRepo } = {}) {
