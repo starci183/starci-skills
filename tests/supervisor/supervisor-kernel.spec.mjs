@@ -28,6 +28,8 @@ import { replyToOwner, registrationRefusal } from '../../scripts/supervisor/chan
 import { registerSupervisor, createBridge } from '../../scripts/supervisor/telegram-bridge.mjs';
 import { appendInbox, readInbox, readOutbox } from '../../scripts/machine/sup-messages.mjs';
 import { planWake, busyScreen, watchdogPass, sweepWorkers } from '../../scripts/supervisor/supervisor-watchdog.mjs';
+import { closeWorker } from '../../scripts/machine/worker-close.mjs';
+import { OWNED_PROCESS_SCHEMA } from '../../scripts/lib/process-identity.mjs';
 import { orcaTreeFindings, readTerminals, supervisorWorkerHandles } from '../../scripts/supervisor/orca-tree.mjs';
 import { withLedger } from '../helpers/ledger-fixture.mjs';
 import { clusterOwed } from '../../scripts/supervisor/cluster.mjs';
@@ -1059,6 +1061,77 @@ test('a live [Worker] of an open job is owned: never a stray, orphan or [Supervi
   const out = await launch(env, host);
   assert.ok(!host.calls.close.includes('term_wk') && !host.calls.close.includes('term_w2'), JSON.stringify(host.calls.close));
   assert.equal(out.action, 'booted', out.action);
+});
+
+test('the sweep closes a reported [Worker] and releases its provider reservation; a host-down Dispatch is a logged skip, never an abort', async (t) => {
+  const env = envOf(t);
+  const sup = machineOf(t, env);
+  // The host-silent job sorts first (created_at): its worker-show answers hostUnavailable and the sweep must move on.
+  const silent = createJob(sup, { cluster: 'host-silent', files: ['scripts/h.mjs'] }).job;
+  sup.startSupAttempt({ jobId: silent.job_id, agent: 'claude', terminalHandle: 'term_hs' });
+  sup.setSupJobStatus(silent.job_id, 'reported', { payload: { ...silent.payload, dispatch: 'ctx_hs' } });
+  const reported = createJob(sup, { cluster: 'filed-report', files: ['scripts/f.mjs'] }).job;
+  sup.startSupAttempt({ jobId: reported.job_id, agent: 'claude', terminalHandle: 'term_fr' });
+  sup.setSupJobStatus(reported.job_id, 'reported', { payload: { ...reported.payload, dispatch: 'ctx_fr' } });
+  sup.db.prepare('UPDATE sup_jobs SET created_at=? WHERE job_id=?').run(1000, silent.job_id);
+  sup.db.prepare('UPDATE sup_jobs SET created_at=? WHERE job_id=?').run(2000, reported.job_id);
+  // Its launch's provider reservation is live, bound to the worker's terminal (markProviderReservation's handle).
+  const reserved = sup.reserveProvider({ provider: 'claude', account: 'default', attemptId: `res:${reported.job_id}`, role: 'worker', model: 'm', maxParallel: 6 }).reservation;
+  sup.markProviderReservation({ id: reserved.id, fence: reserved.fence, state: 'live', handle: 'term_fr' });
+  let live = true;
+  // The real closeWorker, its Orca/process seams faked: release the Dispatch, close the terminal, prove the
+  // captured process tree ended; releaseProviderBudgetByHandle (env -> the spec's machine) frees the slot.
+  const deps = {
+    show: () => ({ ok: true, result: { worker: { agentTerminalHandle: 'term_fr' } } }),
+    release: ({ dispatch }) => ({ ok: true, outcome: 'released', dispatch }),
+    close: () => { live = false; return { ok: true, proof: 'gone' }; },
+    tableOf: () => (live ? [{ pid: 4242, ppid: 1, name: 'claude', created: 1700000000000, exe: 'claude.exe' }] : []),
+    envOf: () => (live ? [{ pid: 4242, values: { ORCA_TERMINAL_HANDLE: 'term_fr' } }] : []),
+    capture: (pid) => ({ schema: OWNED_PROCESS_SCHEMA, ok: true, outcome: 'captured', proof: 'process-handle-live', pid,
+      identity: { pid, birth: '133444736000000000', exe: 'claude.exe' } }),
+    sleep: () => {},
+  };
+  const d = {
+    show: (dispatch) => (dispatch === 'ctx_hs' ? { ok: false, hostUnavailable: true, error: 'orca did not answer' } : { ok: true, state: 'ready' }),
+    stop: () => ({ ok: true }),
+    release: (dispatch) => closeWorker({ dispatch, env, deps }),
+  };
+  const out = sweepWorkers(sup, d);
+  assert.deepEqual(out.deaths, []);
+  assert.deepEqual(out.closed.map((c) => c.jobId), [reported.job_id]);
+  assert.deepEqual(out.skipped, [{ jobId: silent.job_id, reason: 'orca did not answer' }],
+    'the unreadable Dispatch is recorded as a skip and the reported job after it still closed');
+  assert.ok(jobOf(sup, reported.job_id).payload.terminalClosed);
+  assert.equal(sup.providerReservations().find((r) => r.id === reserved.id).state, 'released');
+});
+
+test('a cancelled [Worker] releases its provider reservation and records a proven terminal close', async (t) => {
+  const env = envOf(t);
+  const sup = machineOf(t, env);
+  const { job } = createJob(sup, { cluster: 'cancelled-worker', files: ['scripts/c.mjs'] });
+  sup.startSupAttempt({ jobId: job.job_id, agent: 'devin', terminalHandle: 'term_cx' });
+  sup.setSupJobStatus(job.job_id, 'running', { payload: { ...job.payload, dispatch: 'ctx_cx' } });
+  const reserved = sup.reserveProvider({ provider: 'devin', account: 'default', attemptId: `res:${job.job_id}`, role: 'worker', model: 'm', maxParallel: 2 }).reservation;
+  sup.markProviderReservation({ id: reserved.id, fence: reserved.fence, state: 'live', handle: 'term_cx' });
+  let live = true;
+  const r = cancelJob(sup, { jobId: job.job_id, env, closeDeps: {
+    // releaseSelfSafe's seam, with the real closeWorker inside so its proven closure frees the reservation.
+    release: (dispatch, handle) => closeWorker({ dispatch, handle, env, deps: {
+      show: () => ({ ok: true, result: { worker: { agentTerminalHandle: 'term_cx' } } }),
+      release: ({ dispatch: id }) => ({ ok: true, outcome: 'released', dispatch: id }),
+      close: () => { live = false; return { ok: true, proof: 'gone' }; },
+      tableOf: () => (live ? [{ pid: 4343, ppid: 1, name: 'devin', created: 1700000000000, exe: 'devin.exe' }] : []),
+      envOf: () => (live ? [{ pid: 4343, values: { ORCA_TERMINAL_HANDLE: 'term_cx' } }] : []),
+      capture: (pid) => ({ schema: OWNED_PROCESS_SCHEMA, ok: true, outcome: 'captured', proof: 'process-handle-live', pid,
+        identity: { pid, birth: '133444736000000000', exe: 'devin.exe' } }),
+      sleep: () => {},
+    } }),
+  } });
+  assert.equal(r.ok, true);
+  const fresh = jobOf(sup, job.job_id);
+  assert.equal(fresh.status, 'cancelled');
+  assert.equal(fresh.payload.terminalClosed?.ok, true, 'the proven close is recorded on the job');
+  assert.equal(sup.providerReservations().find((x) => x.id === reserved.id).state, 'released', 'its provider slot is freed');
 });
 
 test('the push scan reads a diff file in chunks and keeps line numbers across chunk seams', async () => {

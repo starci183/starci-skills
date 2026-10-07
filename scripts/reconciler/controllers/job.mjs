@@ -221,28 +221,28 @@ export function settleDecision(f, ledgerId, { now = Date.now(), settings = jobSe
 
 /* ------------------------------------------------------------------------------------------------ the [Worker] sweep */
 
-/** Host seams for sweepWorkers (the same primitives as scripts/supervisor/supervisor-watchdog.mjs hostDeps). */
-async function workerSweepDeps() {
-  const [{ terminalRead }, host, liveness, closeMod, quitMod, closeWorkers] = await Promise.all([
-    import('../../api/orca/terminal-read.mjs'), import('../../kernel/host-outage.mjs'), import('../../lib/terminal-liveness.mjs'),
-    import('../../kernel/close-op-terminal.mjs'), import('../../kernel/quit-agent.mjs'), import('../../supervisor/workers.mjs')]);
+/** Host seams for sweepWorkers (the same primitives as scripts/supervisor/supervisor-watchdog.mjs hostDeps):
+ * worker-show reads the Dispatch's worker state, worker-stop fences it and worker-release (closeWorker) releases
+ * the Dispatch, closes the terminal and proves the process tree ended - which also frees its provider reservation.
+ * closeLeftover is the finished-job close of scripts/supervisor/workers.mjs closeWorkerTerminal (its own retry budget). */
+export async function workerSweepDeps() {
+  const [{ workerShow }, { workerStop }, { closeWorker }, closeWorkers] = await Promise.all([
+    import('../../api/orca/worker-show.mjs'), import('../../api/orca/worker-stop.mjs'), import('../../machine/worker-close.mjs'),
+    import('../../supervisor/workers.mjs')]);
   return {
-    verdict: (h) => host.kernelTerminalVerdict(h),
-    screen: (h) => { try { const r = terminalRead({ terminal: h, screen: true }); return r?.ok ? String(r.screen ?? '') : null; } catch { return null; } },
-    exitedRow: liveness.exitedAgentPromptRow,
-    quit: (handle, agent) => quitMod.quitAgent({ handle, agent }),
-    close: (handle) => closeMod.closeOperationTerminal(handle),
-    closeExited: (handle) => closeMod.closeExitedTerminal(handle),
+    show: (dispatch) => workerShow({ dispatch }),
+    stop: (dispatch) => workerStop({ dispatch }),
+    release: (dispatch) => closeWorker({ dispatch }),
     closeLeftover: (m, args) => closeWorkers.closeWorkerTerminal(m, args),
   };
 }
-/** Shadow seams: the reads are real, every write is a recorded no-op. `would` collects them. */
+/** Shadow seams: worker-show stays a real read; worker-stop and worker-release are recorded no-ops answered as if
+ * done, so the would-be close is visible in the result. `would` collects them. */
 export function drySweep(deps, would) {
   return {
-    verdict: deps.verdict, screen: deps.screen, exitedRow: deps.exitedRow,
-    quit: (handle) => { would.push({ act: 'quit', handle }); return { exited: false, shadow: true }; },
-    close: (handle) => { would.push({ act: 'close', handle }); return { ok: false, shadow: true }; },
-    closeExited: (handle) => { would.push({ act: 'close-exited', handle }); return { ok: false, shadow: true }; },
+    show: deps.show,
+    stop: (dispatch) => { would.push({ act: 'stop', dispatch }); return { ok: true, shadow: true }; },
+    release: (dispatch) => { would.push({ act: 'release', dispatch }); return { ok: true, shadow: true }; },
     closeLeftover: (m, args) => { would.push({ act: 'close-leftover', jobId: args.jobId }); return { ok: true, shadow: true }; },
   };
 }
@@ -365,13 +365,13 @@ async function reconcileWorkers(ctx, settings) {
     const would = [];
     const { readSupervisor } = await import('../../machine/home.mjs');
     const out = readSupervisor((m) => sweepWorkers(dryLedger(m, would), drySweep(deps, would), { now: ctx.now() }), null, { env: ctx.env ?? process.env }) ?? { deaths: [], closed: [] };
-    if (out.deaths.length || would.some((w) => w.act !== 'ledger-write')) ctx.log('reconciler.would', `job would sweep [Worker] jobs: ${out.deaths.length} death(s), ${would.filter((w) => w.act !== 'ledger-write').length} close(s)`, { deaths: out.deaths, would: would.slice(0, 20) });
-    return { ok: true, action: 'workers', shadow: true, deaths: out.deaths.length };
+    if (out.deaths.length || out.closed.length || out.skipped?.length) ctx.log('reconciler.would', `job would sweep [Worker] jobs: ${out.deaths.length} death(s), ${out.closed.length} close(s), ${out.skipped?.length ?? 0} skipped`, { deaths: out.deaths, closed: out.closed, skipped: out.skipped ?? [], would: would.slice(0, 20) });
+    return { ok: true, action: 'workers', shadow: true, deaths: out.deaths.length, closed: out.closed.length, skipped: out.skipped?.length ?? 0 };
   }
   const { withSupervisor } = await import('../../machine/home.mjs');
   return withSupervisor((m) => {
     const out = sweepWorkers(m, deps, { now: ctx.now() });
-    if (out.deaths?.length || out.closed?.length) ctx.log('reconciler.act', `job swept [Worker] jobs: ${out.deaths.length} death(s), ${out.closed.length} closed`, out);
+    if (out.deaths?.length || out.closed?.length || out.skipped?.length) ctx.log('reconciler.act', `job swept [Worker] jobs: ${out.deaths.length} death(s), ${out.closed.length} closed, ${out.skipped?.length ?? 0} skipped`, out);
     return { ok: true, action: 'workers', ...out };
   }, { env: ctx.env ?? process.env });
 }

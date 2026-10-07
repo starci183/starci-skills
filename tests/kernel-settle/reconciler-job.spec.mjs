@@ -6,8 +6,10 @@ import crypto from 'node:crypto';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
-import job, { planJob, planWorkflow, parseKey, jobFacts, jobSettings, settleDecision, drySweep, dryLedger, listKeysOf, SETTLER_SCRIPT } from '../../scripts/reconciler/controllers/job.mjs';
-import { fakeCtx } from '../../scripts/reconciler/testing.mjs';
+import job, { planJob, planWorkflow, parseKey, jobFacts, jobSettings, settleDecision, drySweep, dryLedger, workerSweepDeps, listKeysOf, SETTLER_SCRIPT } from '../../scripts/reconciler/controllers/job.mjs';
+import { fakeCtx, tempState } from '../../scripts/reconciler/testing.mjs';
+import { sweepWorkers } from '../../scripts/supervisor/supervisor-watchdog.mjs';
+import { createJob, jobOf } from '../../scripts/supervisor/workers.mjs';
 import { openLedger } from '../../engine/db/ledger.mjs';
 import { EVENTS } from '../../scripts/kernel/settle/job-settle.mjs';
 
@@ -159,10 +161,29 @@ test('the workflow pass: dispatch-ready when below allowedParallel, at most once
 
 test('the [Worker] sweep in shadow writes nothing', () => {
   const would = [];
-  const d = drySweep({ verdict: () => ({ verdict: 'dead' }), screen: () => null, exitedRow: () => false }, would);
-  assert.equal(d.close('t').ok, false); d.quit('t'); d.closeExited('t');
+  const d = drySweep({ show: () => ({ ok: true, state: 'ready' }) }, would);
+  assert.equal(d.show('ctx_a').ok, true, 'worker-show stays a real read');
+  d.stop('ctx_a'); d.release('ctx_a');
   const l = dryLedger({}, would); l.transaction(() => { throw new Error('never runs'); });
-  assert.deepEqual(would.map((w) => w.act), ['close', 'quit', 'close-exited', 'ledger-write']);
+  assert.deepEqual(would.map((w) => w.act), ['stop', 'release', 'ledger-write']);
+});
+
+test('the live sweep seams answer worker-show/-stop/-release: drySweep drives sweepWorkers and closes a reported job on the would-ledger only', async (t) => {
+  const fx = tempState();
+  t.after(() => fx.close());
+  const { job: j } = createJob(fx.m, { cluster: 'sweep-shadow', files: ['scripts/s.mjs'] });
+  fx.m.startSupAttempt({ jobId: j.job_id, agent: 'claude', terminalHandle: 'term_sr' });
+  fx.m.setSupJobStatus(j.job_id, 'reported', { payload: { ...j.payload, dispatch: 'ctx_sr' } });
+  // The real host seam object carries exactly the seams the sweep calls: worker-show/-stop/-release plus the leftover close.
+  const deps = await workerSweepDeps();
+  assert.deepEqual(Object.keys(deps).sort(), ['closeLeftover', 'release', 'show', 'stop']);
+  const would = [];
+  const out = sweepWorkers(dryLedger(fx.m, would), drySweep({ ...deps, show: () => ({ ok: true, state: 'ready' }) }, would));
+  assert.deepEqual(out.closed.map((c) => c.jobId), [j.job_id]);
+  assert.deepEqual(would.map((w) => w.act), ['stop', 'release', 'ledger-write']);
+  const fresh = jobOf(fx.m, j.job_id);
+  assert.equal(fresh.status, 'reported');
+  assert.equal(fresh.payload.terminalClosed ?? null, null, 'a shadow sweep never marks the live row');
 });
 
 test('list: open jobs, recently settled ones and their workflows', () => {
