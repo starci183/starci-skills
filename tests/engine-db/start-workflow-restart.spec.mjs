@@ -10,6 +10,7 @@ import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
 import { readMachine } from '../../engine/db/machine.mjs';
 import { fakeOrcaWorktrees } from '../helpers/fake-orca-worktrees.mjs';
 import { ensureWorkflowWorktree } from '../../scripts/kernel/workflow-worktree.mjs';
+import { senderEnv } from '../helpers/sender-env.mjs';
 // Attestation/settle waits are counted logically; scaled down they cost milliseconds, not load-dependent seconds.
 process.env.STARCI_SLEEP_SCALE??='0.02';
 
@@ -43,7 +44,7 @@ const fixture=t=>{
     STARCI_FAKE_ORCA_STATE:state,STARCI_FAKE_ORCA_LOG:log,STARCI_FAKE_ORCA_UNIQUE_TERMINALS:'1',STARCI_OWNER_ROOT:ownerRoot,STARCI_AGENT_TRUST_HOME:trustHome,
     // The machine registry is worker-wide: fixture repos all basename to 'repo' and collide on ledgers.name.
     STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite')};
-  const run=(script,...args)=>spawnSync(process.execPath,['--loader',new URL('../helpers/worker-close-loader.mjs',import.meta.url).href,'--loader',new URL('../helpers/workflow-startup-loader.mjs',import.meta.url).href,script,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...env,...(f.closeFails?{STARCI_FAKE_ORCA_CLOSE_FAILS:f.closeFails}:{}),...(f.releaseFails?{STARCI_FAKE_ORCA_RELEASE_FAILS:'1'}:{}),...(f.unverifiedClosure?{STARCI_FAKE_CLOSURE_UNPROVEN:'1'}:{})}});
+  const run=(script,...args)=>spawnSync(process.execPath,['--loader',new URL('../helpers/worker-close-loader.mjs',import.meta.url).href,'--loader',new URL('../helpers/workflow-startup-loader.mjs',import.meta.url).href,script,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:senderEnv(script,{...env,...(f.closeFails?{STARCI_FAKE_ORCA_CLOSE_FAILS:f.closeFails}:{}),...(f.releaseFails?{STARCI_FAKE_ORCA_RELEASE_FAILS:'1'}:{}),...(f.unverifiedClosure?{STARCI_FAKE_CLOSURE_UNPROVEN:'1'}:{})})});
   const f={};
   const callArgv=()=>fs.existsSync(log)
     ?fs.readFileSync(log,'utf8').trim().split('\n').filter(Boolean).map(l=>JSON.parse(l).argv)

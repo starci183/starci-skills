@@ -9,6 +9,7 @@ internal:
   - {path: scripts/api/orca/reply.mjs, why: "Internal Orca API wrapper", usedBy: [scripts/kernel/verbs/reply.mjs]}
   - {path: scripts/api/orca/repo-add.mjs, why: "Internal Orca API wrapper", usedBy: [scripts/machine/worktree-orca.mjs]}
   - {path: scripts/api/orca/run-create.mjs, why: "Internal Orca API wrapper", usedBy: [scripts/agent/lib.mjs]}
+  - {path: scripts/api/orca/run-list.mjs, why: "Internal Orca API wrapper", usedBy: [scripts/kernel/workflow-launch-no-effect.mjs]}
   - {path: scripts/api/orca/run-show.mjs, why: "Internal Orca API wrapper", usedBy: [scripts/kernel/orca-runs.mjs]}
   - {path: scripts/api/orca/run-use.mjs, why: "Internal Orca API wrapper", usedBy: [scripts/kernel/orca-runs.mjs]}
   - {path: scripts/api/orca/send.mjs, why: "Internal Orca API wrapper", usedBy: [scripts/kernel/cli.mjs]}

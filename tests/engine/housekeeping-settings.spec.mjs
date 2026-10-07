@@ -54,7 +54,7 @@ test('allocation.housekeeping declares every retention window, prefix list and r
 
 test('allocation.resources declares the disk and RAM floors the admission guard reads', () => {
   assert.ok(RES && typeof RES === 'object' && !Array.isArray(RES), 'allocation.resources is declared');
-  assert.equal(RES.minFreeDiskGb, 20);
+  assert.equal(RES.minFreeDiskGb, 5);
   assert.equal(RES.minFreeRamPct, 10);
   assert.ok(Number.isFinite(RES.minFreeDiskGb) && RES.minFreeDiskGb > 0, 'minFreeDiskGb is a positive number');
   assert.ok(Number.isFinite(RES.minFreeRamPct) && RES.minFreeRamPct > 0 && RES.minFreeRamPct <= 100, 'minFreeRamPct is a percent');
@@ -65,7 +65,7 @@ test('engine/config.mjs allocationSettings exposes both blocks to the scripts th
   assert.deepEqual(Object.keys(allocation.housekeeping).sort(),
     ['archiveMaxAgeMs', 'claudeTranscriptArchiveAfterMs', 'gcLaneGraceMs', 'gcMinAgeMs', 'gitIndexLockStaleMs',
       'laneGraceMs', 'logMaxAgeMs', 'sessionArchiveAfterMs', 'tmpMaxAgeMs', 'tmpPrefixes']);
-  assert.equal(allocation.resources.minFreeDiskGb, 20);
+  assert.equal(allocation.resources.minFreeDiskGb, 5);
   assert.equal(allocation.resources.minFreeRamPct, 10);
   // The RAM-aware throttle's thresholds and per-op RAM table (scripts/machine/ram-throttle.mjs) live beside the floors.
   assert.deepEqual(Object.keys(allocation.resources).sort(), ['minFreeDiskGb', 'minFreeRamPct', 'opRam', 'ramThrottle']);

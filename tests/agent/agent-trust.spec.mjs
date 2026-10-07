@@ -17,6 +17,7 @@ import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
 import { proofRepo } from '../helpers/sonar-scan.mjs';
 import { fakeOrcaWorktrees } from '../helpers/fake-orca-worktrees.mjs';
 import { registerWorkflowWorktree } from '../../scripts/kernel/workflow-worktree.mjs';
+import { senderEnv } from '../helpers/sender-env.mjs';
 
 // Owner instruction 2026-09-23: the owner never approves a launch prompt; the runtime does. Layer 1 pre-trusts
 // the launch directory in ~/.claude.json and every Codex config.toml; layer 2 answers an allowlisted launch gate
@@ -458,7 +459,7 @@ const kernelFixture=(t,kernelLine,extra={})=>{
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([fake]),
     STARCI_FAKE_ORCA_STATE:state,STARCI_FAKE_ORCA_LOG:path.join(root,'calls.jsonl'),STARCI_FAKE_ORCA_UNIQUE_TERMINALS:'1',
     STARCI_OWNER_ROOT:ownerRoot,STARCI_AGENT_TRUST_HOME:trustHome,...extra};
-  const run=(script,args)=>spawnSync(process.execPath,['--loader',new URL('../helpers/workflow-startup-loader.mjs',import.meta.url).href,script,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env});
+  const run=(script,args)=>spawnSync(process.execPath,['--loader',new URL('../helpers/workflow-startup-loader.mjs',import.meta.url).href,script,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:senderEnv(script,env)});
   const defined=run(DEFINE_GOAL,['--repo',repo,'--text','boot the kernel','--json']);
   assert.equal(defined.status,0,defined.stderr);
   const workflowId=json(defined.stdout)?.workflowId;

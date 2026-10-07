@@ -539,7 +539,7 @@ allocation:
   # same way until it falls below cpuHeavyResumeBelow. Running ops are never stopped. Owner ruling 2026-09-28
   # ("15→10, 10→2.5"): the heavy floor 10% resuming at 15%, critical 2.5% resuming at 5%, the fit floor 2.5%.
   resources:
-    minFreeDiskGb: 20
+    minFreeDiskGb: 5
     minFreeRamPct: 10
     ramThrottle:
       heavyResumeAbovePct: 15

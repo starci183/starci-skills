@@ -19,7 +19,7 @@ export function runUse({ id, from }) {
   const r = orcaCall('run-use', { id, from }, { request: { run: id, from } });
   const run = r.result?.run ?? null;
   const errorCode = typeof r.receipt?.error?.code === 'string' ? r.receipt.error.code : null;
-  return { ok: r.exitCode === 0 && r.outcome !== 'failed', run, errorCode, error: r.error, request: r.request, hostUnavailable: r.hostUnavailable === true };
+  return { ok: r.exitCode === 0 && r.outcome !== 'failed', run, effectState: r.effectState, errorCode, error: r.error, request: r.request, hostUnavailable: r.hostUnavailable === true };
 }
 
 if (process.argv[1]?.endsWith('run-use.mjs')) {

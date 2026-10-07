@@ -16106,3 +16106,43 @@ URL_TARGET_REFUSED:
   nextStep_vi: "Dùng địa chỉ loopback của máy này hoặc máy chủ API đã định; sửa cấu hình trỏ sai thay vì mở rộng danh sách cho phép."
   owner: runtime-core
   kind: input-invalid
+# Proof: scripts/kernel/workflow-launch-no-effect.mjs and scripts/kernel/workflow-startup.mjs (workflowSender).
+workflow-sender-terminal-missing:
+  title: "Workflow start has no sender terminal"
+  title_vi: "Khởi động workflow không có cửa sổ gửi lệnh"
+  meaning_vi: "Kernel là worker của một Run mà cửa sổ khởi động làm điều phối; ORCA_TERMINAL_HANDLE không được đặt nên Orca không biết cửa sổ gửi lệnh. Runtime từ chối trước mọi tác động, không tạo worktree hay Kernel."
+  causes_vi:
+    - "Lệnh start chạy từ một shell thường, không nằm trong cửa sổ Orca"
+    - "Tiến trình nền (watchdog, reconciler) chạy không kế thừa ORCA_TERMINAL_HANDLE"
+  nextStep_vi: "Chạy lại starci workflow start bên trong một cửa sổ Orca; không dùng cửa sổ của người khác làm điều phối."
+  owner: owner
+  kind: verb-refusal
+kernel-launch-custody-incomplete:
+  title: "Held Kernel launch has no proof of what it left"
+  title_vi: "Lần khởi động Kernel đang giữ chưa có bằng chứng về hậu quả"
+  meaning_vi: "Tín hiệu launch-unknown không có cửa sổ lẫn Dispatch để đóng, và không có bản ghi lỗi run-create kèm mã Orca từ chối trước tác động; runtime không tự giải phóng chỗ của nhà cung cấp."
+  causes_vi:
+    - "Lần khởi động chết giữa chừng hoặc mất biên nhận"
+    - "Lỗi ghi nhận không phải mã Orca từ chối trước tác động"
+  nextStep_vi: "Supervisor đối chiếu Run và worker trên Orca rồi xử lý sự cố; không sửa tay bảng tín hiệu."
+  owner: supervisor
+  kind: runtime-fault
+kernel-launch-runs-unreadable:
+  title: "Orca Run list could not be read"
+  title_vi: "Không đọc được danh sách Run của Orca"
+  meaning_vi: "Runtime không đối chiếu được Run đã tạo kể từ lần khởi động bị giữ, nên không giải phóng tín hiệu."
+  causes_vi:
+    - "run-list lỗi hoặc không phản hồi"
+    - "Quá nhiều Run mới hơn lần khởi động để đọc hết"
+  nextStep_vi: "Đợi Orca phản hồi rồi chạy lại lệnh start."
+  owner: supervisor
+  kind: runtime-fault
+kernel-launch-run-exists:
+  title: "A Kernel Run of this workflow exists since the held launch"
+  title_vi: "Đã có Run Kernel của workflow này kể từ lần khởi động bị giữ"
+  meaning_vi: "Orca liệt kê một Run Kernel của workflow được tạo sau khi lần khởi động bị giữ bắt đầu, nên không thể coi là không có tác động."
+  causes_vi:
+    - "Run đã được tạo nhưng biên nhận bị mất"
+  nextStep_vi: "Supervisor kiểm tra Run đó và worker của nó, đóng đúng định danh rồi mới khởi động lại."
+  owner: supervisor
+  kind: runtime-fault
