@@ -495,19 +495,21 @@ test('a stage refuses to start a child from a terminal that is not the one launc
   assert.equal(fake.names().includes('worker-start'), false);
 });
 
-test('the no-op agent is the cheapest priced model meeting the real role floors, with that tier effort', () => {
+test('the no-op agent is the cheapest priced tier member meeting the real role floors, with that tier effort', () => {
   const runtimes = { ...runtimeProfile(), models: { big: { tier: 'frontier' }, mid: { tier: 'standard' }, small: { tier: 'economy' }, unpriced: { tier: 'standard' } }, runtimes: {
-    a: { provider: 'claude', models: { easy: 'big', hard: 'big' } },
-    b: { provider: 'codex', models: { easy: 'small', hard: 'mid' }, effort: { easy: 'low', hard: 'high' } },
-    c: { provider: 'devin', models: { medium: 'unpriced' } } } };
+    a: { provider: 'claude' }, b: { provider: 'codex' }, c: { provider: 'devin' } } };
+  const settings = { tierOrder: ['high', 'low'], tiers: {
+    high: [{ agent: 'claude', model: 'big' }, { agent: 'codex', model: 'mid', effort: 'high' }],
+    low: [{ agent: 'codex', model: 'small', effort: 'low' }, { agent: 'devin', model: 'unpriced' }] } };
   const prices = { models: { big: { input: 4, output: 20 }, mid: { input: 2, output: 10 }, small: { input: 0.1, output: 0.5 }, unpriced: { input: null, output: null } } };
-  assert.deepEqual(noopAgent({ runtimes, prices }), { provider: 'codex', model: 'mid', effort: 'high', pool: 'b', tier: 'hard', usdPerMTok: 12 });
-  assert.match(noopAgent({ runtimes: { ...runtimes, runtimes: { c: runtimes.runtimes.c } }, prices }).error, /no registry\.yaml pool pins a priced model/);
+  assert.deepEqual(noopAgent({ runtimes, prices, settings }), { provider: 'codex', model: 'mid', effort: 'high', pool: 'b', tier: 'high', usdPerMTok: 12 });
+  const onlyUnpriced = { ...settings, tiers: { low: [{ agent: 'devin', model: 'unpriced' }] } };
+  assert.match(noopAgent({ runtimes, prices, settings: onlyUnpriced }).error, /no tier member of modules\/models\/tiers\.yaml is priced/);
   const raised = structuredClone(runtimes);
   raised.allocation.admission.roles.worker.qualityFloor = 'frontier';
-  assert.equal(noopAgent({ runtimes: raised, prices }).model, 'big', 'the declared role floor controls the cheapest permitted model');
+  assert.equal(noopAgent({ runtimes: raised, prices, settings }).model, 'big', 'the declared role floor controls the cheapest permitted model');
   const live = noopAgent();
-  assert.ok(live.provider && live.model, 'the shipped registry.yaml has a priced no-op model');
+  assert.ok(live.provider && live.model, 'the shipped tiers.yaml has a priced no-op member');
   assert.notEqual(runtimeProfile().models[live.model].tier, 'economy', 'the default smoke cannot launch below its control-plane floor');
 });
 
