@@ -61,16 +61,22 @@ export function child(args, { timeoutMs, cwd = ROOT } = {}) {
 }
 
 /** The first balanced JSON object in text (a verb may print a banner before it), or null. */
-export function firstJson(text) {
-  const start = text.indexOf('{');
-  if (start < 0) return null;
+function jsonObjectEnd(text, start) {
   let depth = 0, inStr = false, esc = false;
   for (let i = start; i < text.length; i++) {
     const c = text[i];
     if (inStr) { if (esc) { esc = false; } else if (c === '\\') { esc = true; } else if (c === '"') { inStr = false; } continue; }
-    if (c === '"') inStr = true; else if (c === '{') depth++; else if (c === '}' && --depth === 0) { try { return JSON.parse(text.slice(start, i + 1)); } catch { return null; } }
+    if (c === '"') inStr = true; else if (c === '{') depth++; else if (c === '}' && --depth === 0) return i;
   }
-  return null;
+  return -1;
+}
+
+export function firstJson(text) {
+  const start = text.indexOf('{');
+  if (start < 0) return null;
+  const end = jsonObjectEnd(text, start);
+  if (end < 0) return null;
+  try { return JSON.parse(text.slice(start, end + 1)); } catch { return null; }
 }
 
 async function httpProbe(url, timeoutMs) {
