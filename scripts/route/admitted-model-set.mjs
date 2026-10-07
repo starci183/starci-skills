@@ -20,13 +20,13 @@ export function admittedModelSet({ evaluated, w, args, difficulty, registry, run
     rule = 'decisionFlow.probation-fallback: no qualification evidence; scoped probation admitted';
   } else if (kernelFunctionEligible.length) {
     pickedSet = kernelFunctionEligible;
-    rule = 'decisionFlow.kernel-function: kernel function on the sol-think order; no qualification record required';
+    rule = 'decisionFlow.kernel-function: kernel function on the tier of its seat; no qualification record required';
   } else { pickedSet = []; rule = 'decisionFlow.verdict: no eligible model'; }
 
   const admission = planAgentAdmission({ role: w.modelFunction ? 'kernel' : 'op', scopeId: `route-model:${args.kind}:${difficulty}`,
     kind: args.kind, difficulty, tier,
     registry, runtimes, allowGroup: pickedSet.map((entry) => ({ provider: entry.c.provider, model: entry.c.model,
-      pool: entry.c.id, target: entry.c.target, effort: entry.c.effort ?? effort, eligibility: { eligible: entry.eligible, mode: entry.mode, reasons: entry.reasons } })) });
+      id: entry.c.member, pool: entry.c.id, target: entry.c.target, effort: entry.c.effort ?? effort, eligibility: { eligible: entry.eligible, mode: entry.mode, reasons: entry.reasons } })) });
   const eligibleIds = admission.eligible.map((candidate) => candidate.pool);
   pickedSet = eligibleIds.map((id) => pickedSet.find((entry) => entry.c.id === id)).filter(Boolean);
   return { pickedSet, rule, admission };

@@ -43,6 +43,7 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { kindRoute, raiseToFloor, missingHostTools, providerAvailability, providerCircuitOf } from '../agent/models.mjs';
 import { tierMembers, tierOfOp, tierOfSeat, tierSettings } from '../agent/tiers.mjs';
 import { pickRecordText } from '../lib/pick-record.mjs';
+import { pickFromTier } from '../lib/tier-pick.mjs';
 import { inspectOwnerConfig } from '../../engine/config.mjs';
 import { inspectLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
 import { readEnv } from '../lib/env.mjs';
@@ -259,17 +260,18 @@ function printPlanText({ args, w, configLine, tier, chain, evaluated, primary, f
 }
 
 function runPlan(args, e, owner) {
-  const { w, tier, candidates } = e;
+  const { w, tier, candidates, settings } = e;
   const evaluated = planCandidates(candidates, e);
   // Pickable = not structurally off the chain, and any rejection rests only on absent/stale evidence (annotation,
   // not a real disqualification) — the point of plan mode is "who takes this once qualification exists".
   const pickable = evaluated.filter(c => !c.structural && (c.status !== 'rejected' || c.qr.every(r => PLAN_EVIDENCE_ABSENT.has(r))));
-  const statusRank = { qualified: 0, 'probation-only': 1, rejected: 2 };
-  const ordered = [...pickable].sort((a, b) => statusRank[a.status] - statusRank[b.status] || candidates.findIndex(c => c.id === a.id) - candidates.findIndex(c => c.id === b.id));
-  const primary = ordered[0] ?? null;
-  const chosen = primary ? [{ id: primary.member, by: 'chain-order' }][0] : null;
-  const record = { tier, chain: candidates.map(c => c.member), steps: [{ step: 'hard-filter', chain: evaluated.filter(c => !c.structural).map(c => c.member) },
-    { step: 'tokens', chain: ordered.map(c => c.member) }], dropped: evaluated.filter(c => c.structural).map(c => ({ id: c.member, step: 'hard-filter', reason: c.reasons[0] })), chosen };
+  // The record is the common picker's (scripts/lib/tier-pick.mjs) over the chain with no quota, history or bias: the same steps a live pick prints.
+  const members = candidates.map(c => ({ id: c.member, hard: pickable.some(p => p.id === c.id) ? [] : evaluated.find(p => p.id === c.id).reasons, pressure: 0 }));
+  const picked = pickFromTier({ tier, members, balance: settings.balance, usage: settings.usage });
+  const byMember = (id) => evaluated.find(c => c.member === id);
+  const ordered = picked.order.map(m => byMember(m.id));
+  const primary = picked.selected ? byMember(picked.selected.id) : null;
+  const record = picked.record;
   const estimate = { difficulty: args.difficulty, coldMinutes: PLAN_COLD_MINUTES[args.difficulty] };
   const shown = { args, w, configLine: planConfigLine(owner), tier, chain: candidates.map(c => c.member), evaluated, primary, fallbacks: ordered.slice(1), estimate, record };
   if (args.json) printPlanJson(shown);
@@ -334,7 +336,7 @@ function loadRoute(args) {
   const settings = tierSettings({ config: inspectOwnerConfig(ownerRoot).config, registry });
   const seat = settings.kindSeats?.[args.kind] ?? null;
   const tier = seat ? tierOfSeat(seat, settings) : tierOfOp({ kind: args.kind, difficulty }, settings);
-  return { modelsDir, rules, registry, runtimes, evidenceByRuntime, route, measured, difficulty, w, tier, seat, candidates: candidatesOf(tier, settings, registry) };
+  return { modelsDir, rules, registry, runtimes, evidenceByRuntime, route, measured, difficulty, w, tier, seat, settings, candidates: candidatesOf(tier, settings, registry) };
 }
 
 // Owner config (config.yaml): effort is surfaced for the caller. Absent file → no effect.
@@ -429,7 +431,7 @@ async function main() {
   const owner = ownerBindingOf(w);
   if (args.plan) {
     if (!PLAN_COLD_MINUTES[args.difficulty]) { console.error('--plan requires --difficulty <easy|medium|hard|insane>'); process.exit(2); }
-    runPlan({ ...args, difficulty }, { w, rules, runtimes, evidenceByRuntime, tier, candidates }, owner);
+    runPlan({ ...args, difficulty }, { w, rules, runtimes, evidenceByRuntime, tier, candidates, settings: ctx.settings }, owner);
     return;
   }
   const availability = w.modelFunction ? await availabilityReader(args.repo) : null;
