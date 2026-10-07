@@ -16278,3 +16278,36 @@ kernel-launch-run-exists:
   nextStep_vi: "Supervisor kiểm tra Run đó và worker của nó, đóng đúng định danh rồi mới khởi động lại."
   owner: supervisor
   kind: runtime-fault
+# Proof: scripts/kernel/verbs/route.mjs refuseIneligibleOverride — a recorded op-override pin never falls through to another pool.
+op-override-ineligible:
+  title: "Op-override pinned pool is ineligible"
+  title_vi: "Pool được ghim bởi op-override không đủ điều kiện"
+  meaning_vi: "Kernel đã ghi một op-override ghim job vào một pool cụ thể, nhưng pool đó không thể nhận job này: nằm ngoài thứ tự của op ở độ khó hiện tại, bị lineage loại trừ sau hai lỗi do pool gây ra, circuit đang mở hoặc thiếu công cụ host bắt buộc. Route từ chối có kiểu thay vì lặng lẽ chọn pool khác; job vẫn chờ."
+  causes_vi:
+    - "Pool được ghim nằm ngoài thứ tự của op ở độ khó hiện tại"
+    - "Pool bị lineage loại trừ, circuit mở hoặc thiếu công cụ host bắt buộc"
+  nextStep_vi: "Kernel đổi mục tiêu hoặc xoá override bằng starci kernel op-override --workflow <wf> --op <op> rồi route lại; route không tự chọn pool khác khi có ghim."
+  owner: supervisor
+  kind: dispatch-refusal
+# Proof: scripts/kernel/verbs/status.mjs — a status run that emitted nothing prints this refusal on stderr and exits 1.
+status-render-empty:
+  title: "Status run emitted nothing"
+  title_vi: "Lệnh status kết thúc mà không in gì"
+  meaning_vi: "Một lượt starci kernel status kết thúc mà không phát ra JSON nào — thường do module đầu vào được đọc giữa lúc runtime đang land nên chưa chạy tới phần render, hoặc đường render kết thúc trước khi emit. Lệnh in refusal có kiểu trên stderr và thoát 1; exit 0 luôn mang theo JSON."
+  causes_vi:
+    - "File đầu vào của status bị đọc giữa lúc land hoặc reload runtime"
+    - "Đường render status kết thúc trước khi emit"
+  nextStep_vi: "Chạy lại lệnh status: lỗi đọc giữa land tự hết ở lần đọc sau; nếu lặp lại thì là runtime-defect và Supervisor điều tra đường render."
+  owner: supervisor
+  kind: runtime-fault
+# Proof: scripts/kernel/verbs/reconcile.mjs releaseAttemptReservations — a refused no-effect release aborts the reconcile rather than leak the slot.
+provider-reservation-held:
+  title: "Provider reservation refused the no-effect release"
+  title_vi: "Biên nhận giữ chỗ provider từ chối giải phóng no-effect"
+  meaning_vi: "Reconcile đã chứng minh lần khởi động không có tác động và trả job về ready, nhưng một biên nhận provider_reservations của attempt đó từ chối chứng cứ giải phóng nên chỗ vẫn bị giữ. Reconcile huỷ bỏ thay vì để rò chỗ; job giữ fence của nó."
+  causes_vi:
+    - "Chứng cứ reconciled-no-effect không khớp danh tính dispatch hay phạm vi attempt của biên nhận"
+    - "Biên nhận không còn ở trạng thái reserved hay unknown"
+  nextStep_vi: "Supervisor đọc biên nhận đang giữ trong provider_reservations, đối chiếu scope attempt với job rồi giải phóng hoặc hòa giải tay; không ép job chạy lại khi chỗ chưa rõ."
+  owner: supervisor
+  kind: runtime-fault
