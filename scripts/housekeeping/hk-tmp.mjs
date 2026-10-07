@@ -1,11 +1,17 @@
-// hk-tmp.mjs — the %TEMP% sweep of the host-housekeeping run (STORAGE-PROMPT item 1.tmp).
+// hk-tmp.mjs — the temp sweep of the host-housekeeping run (STORAGE-PROMPT item 1.tmp).
+//
+// The swept roots: the configured temp root (engine/temp-root.mjs tempRoot: STARCI_TEMP_ROOT, config.yaml roots.temp, else
+// the OS temp directory) and, when the OS temp directory (TEMP / TMP of the process) is a different directory, that one too
+// with the same prefixes: the prefix list also names directories that tools the runtime does not control create
+// (codex-, orca-, hfs-, ...), and those keep landing in the OS temp directory wherever the runtime's own files go.
 //
 // On 2026-09-26 %TEMP% held 53k top-level entries, 45k of them older than a day — spec fixtures and runtime
 // temp dirs nobody removes (starci*, evidence*, sup-k*, si*, starci-w2*, work-v3*, w1*, orca*). The
 // sweep removes the top-level entries whose names start with a prefix the allocation declares and whose
 // mtime is older than the declared age. Both come from modules/models/runtimes.yaml
 // `allocation.housekeeping` (tmpPrefixes, tmpMaxAgeMs) via allocationSettings(); callers may inject the
-// block, so this module never reads the yaml itself past that one import.
+// block, so this module never reads the yaml itself past that one import. The age is declared there and nowhere else: a
+// policy without a positive tmpMaxAgeMs is an error, and an undeclared prefix list matches nothing (the sweep fails safe).
 //
 // Safety, same as everywhere the runtime deletes:
 //   - removal goes through safeRemove only, which never descends into a junction/symlink/reparse point;
@@ -25,18 +31,15 @@
 // A dry run (apply:false) removes nothing: would-be-deleted entries land in `skipped` with the 'dry run'
 // reason and their bytes in `freedBytes`, so the report reads "what --apply would free".
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { allocationSettings } from '../../engine/config.mjs';
 import { isLinkLike } from '../api/fs/is-link-like.mjs';
 import { safeRemove } from '../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 import { foldCase } from '../lib/path-key.mjs';
+import { osTempDir, tempRoot } from '../../engine/temp-root.mjs';
 
 
-// STORAGE-PROMPT 1.tmp declares the two-day age default. An undeclared prefix list matches nothing: the
-// sweep fails safe, never wide.
-const DEFAULT_TMP_MAX_AGE_MS = 2 * 24 * 60 * 60 * 1000;
 // `${TEMP}/claude` is the live Claude Code temp area.
 const PROTECTED_NAMES = new Set(['claude']);
 // Removal failures that mean "a live process holds this": skipped, not errors.
@@ -91,12 +94,16 @@ export async function sweepTmp({
   allocation = allocationSettings()?.housekeeping ?? {},
   remove = null,
 } = {}) {
-  const tempRoot = path.resolve(env.TEMP ?? env.TMP ?? os.tmpdir());
+  const configured = tempRoot({ env });
   const listOf = (v) => (Array.isArray(v) ? v : []).map((prefix) => foldCase(String(prefix))).filter(Boolean);
   const declaredAge = Number(allocation?.tmpMaxAgeMs);
-  const maxAgeMs = Number.isFinite(declaredAge) && declaredAge > 0 ? declaredAge : DEFAULT_TMP_MAX_AGE_MS;
+  if (!Number.isFinite(declaredAge) || declaredAge <= 0) throw new Error('modules/models/runtimes.yaml allocation.housekeeping.tmpMaxAgeMs must declare a positive number of milliseconds');
+  const maxAgeMs = declaredAge;
   const out = { ok: true, freedBytes: 0, deleted: [], skipped: [], errors: [] };
-  const roots = [{ root: tempRoot, prefixes: listOf(allocation?.tmpPrefixes) }];
+  const prefixes = listOf(allocation?.tmpPrefixes);
+  const osTemp = osTempDir(env);
+  const roots = [{ root: configured, prefixes }];
+  if (foldCase(osTemp) !== foldCase(configured)) roots.push({ root: osTemp, prefixes });
   for (const r of roots) sweepRoot(r, { apply, now, maxAgeMs, remove, out });
   if (out.errors.length) out.ok = false;
   return out;
@@ -158,19 +165,19 @@ function removeOrReport(entry, st, { parentReal, apply, removeEntry, out }) {
   else out.errors.push({ path: entry, error: describe(result?.errors) || 'removal failed' });
 }
 
-function sweepRoot({ root: tempRoot, prefixes }, { apply, now, maxAgeMs, remove, out }) {
-  const removeEntry = remove ?? ((target) => safeRemove(target, { hold: artifactHoldReason, checkoutsUnder: tempRoot }));
+function sweepRoot({ root: swept, prefixes }, { apply, now, maxAgeMs, remove, out }) {
+  const removeEntry = remove ?? ((target) => safeRemove(target, { hold: artifactHoldReason, checkoutsUnder: swept }));
 
   let parentReal = null;
-  try { parentReal = fs.realpathSync.native(tempRoot); } catch { /* isLinkLike resolves it per entry */ }
+  try { parentReal = fs.realpathSync.native(swept); } catch { /* isLinkLike resolves it per entry */ }
   let names;
-  try { names = fs.readdirSync(tempRoot); } catch (error) {
-    out.errors.push({ path: tempRoot, error: String(error?.message ?? error) });
+  try { names = fs.readdirSync(swept); } catch (error) {
+    out.errors.push({ path: swept, error: String(error?.message ?? error) });
     return;
   }
 
   for (const name of names) {
-    const entry = path.join(tempRoot, name);
+    const entry = path.join(swept, name);
     if (!eligibleEntry(name, entry, prefixes, out)) continue;
     const st = entryStat(entry, out);
     if (!st || skipUnsafeEntry(entry, st, { parentReal, now, maxAgeMs, out })) continue;

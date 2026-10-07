@@ -35,7 +35,6 @@
 // remedies[]}. It is never a product verdict: a red walk on a ready environment is.
 import '../api/process/hide-child-windows.mjs';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { probe as probeUrl } from '../api/http/probe.mjs';
 import { portListener } from '../api/process/port-listener.mjs';
@@ -48,6 +47,7 @@ import { isMain } from '../lib/is-main.mjs';
 import { readEnv } from '../lib/env.mjs';
 import { normPath } from '../lib/path-key.mjs';
 import { eachInOrder, mapInOrder, repeatInOrder } from '../lib/in-order.mjs';
+import { tempRoot } from '../../engine/temp-root.mjs';
 
 const ENV_HEALTH_SCHEMA = 'starci/env-health@1';
 const EXIT_READY = 0, EXIT_NOT_READY = 3;
@@ -98,7 +98,7 @@ const ownedByWorkspace = (commandLine, roots) => Boolean(commandLine) && roots.s
 // One env_servers row per <environment>__<service>. The server's output goes to a scratch file under the OS temp
 // directory while it runs; the registry keeps it as a blob (log_sha), captured when a start is judged.
 const serverIdOf = (envId, service) => `${envId}__${service}`;
-const serverLogFile = (serverId) => path.join(os.tmpdir(), 'starci-env-servers', `${serverId.replace(/[^A-Za-z0-9._@-]/g, '_')}.log`);
+const serverLogFile = (serverId) => path.join(tempRoot(), 'starci-env-servers', `${serverId.replace(/[^A-Za-z0-9._@-]/g, '_')}.log`);
 const commandOf = (text) => { try { const v = JSON.parse(text ?? 'null'); return Array.isArray(v) ? v.map(String) : null; } catch { return null; } };
 const isoOf = (ms) => (ms != null ? new Date(ms).toISOString() : null);
 const recordOf = (row) => (row ? { env: row.env, service: row.service, port: row.port ?? null, url: row.url ?? null, command: commandOf(row.command), cwd: row.cwd ?? null,

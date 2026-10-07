@@ -1,7 +1,6 @@
 // sonar-ext-custody.mjs — custody plumbing of sonar-local.mjs: launching a .mjs fake under node,
 // and sealing a minted analysis token into a runtime extension's ext/<service>/secrets directory (the example apps' tokens).
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import {skillRoot} from '../../engine/runtime-root.mjs';
 import {encrypt} from '../api/sops/encrypt.mjs';
@@ -10,6 +9,7 @@ import {sonarAnalysisEnvironment} from './sonar-credentials.mjs';
 import {resolveSops} from '../api/sops/resolve-sops.mjs';
 import {runProgram} from '../api/process/run-program.mjs';
 import {resolveRealTool} from '../api/process/resolve-real-tool.mjs';
+import { tempPath } from '../api/fs/temp-path.mjs';
 
 const sopsInvocation=Object.freeze({runProgram,resolveRealTool});
 
@@ -45,7 +45,7 @@ export function sealExtCustody(cfg,file,value,{scrub}){
   if(!recipient)return {ok:false,reason:`${path.basename(dir)} holds no sealed member with exactly one age recipient to seal to`};
   const env=sonarAnalysisEnvironment(cfg);
   const sops=cfg.sops??resolveSops(env,{pathext:true,wingetPackageTree:true});
-  const tmp=path.join(os.tmpdir(),`sonar-local-${process.pid}-${Date.now().toString(36)}`);
+  const tmp=tempPath(`sonar-local-${process.pid}-${Date.now().toString(36)}`);
   try{
     fs.writeFileSync(tmp,value,{mode:0o600});
     const command=['--encrypt','--age',recipient,'--input-type','binary','--output-type','json',tmp];

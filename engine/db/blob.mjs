@@ -14,13 +14,13 @@
 //   bundleDir(sha)           the bundle materialized as a directory under <artifact root>-views (cached by sha), or null
 // Each materialized view is verified against its cited digest before reuse.
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { starciLocalRoot, runtimeStateDir } from '../runtime-root.mjs';
 import { isSpecRun } from '../../scripts/lib/env.mjs';
 import { canonicalPath, insidePath, pathKey } from '../../scripts/lib/path-key.mjs';
 import { byCodeUnit } from '../by-code-unit.mjs';
+import { tempRoot } from '../temp-root.mjs';
 
 export const ARTIFACT_ROOT_ENV = 'STARCI_ARTIFACT_ROOT';
 /**
@@ -30,7 +30,7 @@ export const ARTIFACT_ROOT_ENV = 'STARCI_ARTIFACT_ROOT';
 export const artifactRoot = (env = process.env) => {
   if (env[ARTIFACT_ROOT_ENV]) return path.resolve(env[ARTIFACT_ROOT_ENV]);
   const root = path.resolve(path.join(starciLocalRoot(env), 'artifacts'));
-  return isSpecRun(env) && !insidePath(os.tmpdir(), root, { key: pathKey }) ? path.join(os.tmpdir(), 'starci-test-artifacts') : root;
+  return isSpecRun(env) && !insidePath(tempRoot({ env }), root, { key: pathKey }) ? path.join(tempRoot({ env }), 'starci-test-artifacts') : root;
 };
 const SHA = /^[a-f0-9]{64}$/;
 const assertSha = sha => {

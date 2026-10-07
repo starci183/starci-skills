@@ -39,7 +39,6 @@
 //     error, every declared red superseded by those owned-scope measurements (foreign residue). Any new finding -> Kernel.
 import '../../api/process/hide-child-windows.mjs';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { runNode } from '../../api/node/run-node.mjs';
@@ -51,6 +50,7 @@ import { SETTLED_JOB_LIST } from '../../../engine/admission.mjs';
 import { NEEDS_KERNEL_EVENT, KERNEL_ONLY_OPS, reportedJobs, kernelHandoverOf } from '../../machine/reported-jobs.mjs';
 import { eachInOrder } from '../../lib/in-order.mjs';
 import { settlerSettings, runtimeEnv, verifyReported, recordSettlerCheck, parse, slug, jsonOf } from './job-settle-verify.mjs';
+import { tempRoot } from '../../../engine/temp-root.mjs';
 export { classifyCheck, argvOf } from './check-command.mjs';
 export { settlerSettings, runtimeEnv, verifyReported, recordSettlerCheck, rerunCheck, isBaselineCheck, parityCacheFile } from './job-settle-verify.mjs';
 
@@ -95,7 +95,7 @@ export function runApi(args, { env = process.env, timeoutMs = 600_000 } = {}) {
     error: ok ? null : String(value?.error ?? value?.reason ?? err?.error ?? r.stderr ?? r.error?.message ?? '').slice(0, 600) };
 }
 
-const tmpDir = () => path.join(os.tmpdir(), 'starci-settler');
+const tmpDir = () => path.join(tempRoot(), 'starci-settler');
 /** Write the checks envelope to a file (never on a command line). */
 const checksFile = (item, envelope) => {
   fs.mkdirSync(tmpDir(), { recursive: true });

@@ -140,7 +140,7 @@ test('sweepTmp never touches ${TEMP}/claude even when a prefix would match it', 
 test('sweepTmp with no declared prefixes matches nothing, and reports a missing temp dir as an error', async (t) => {
   const { root, env } = sandbox(t);
   entry(root, 'starci-anything');
-  const out = await sweepTmp({ apply: true, now: NOW, env, allocation: {} });
+  const out = await sweepTmp({ apply: true, now: NOW, env, allocation: { tmpMaxAgeMs: ALLOCATION.tmpMaxAgeMs } });
   assert.equal(out.ok, true);
   assert.deepEqual(out.deleted, [], 'an undeclared prefix list fails safe, not wide');
   assert.equal(fs.readdirSync(root).length > 0, true);
@@ -200,4 +200,31 @@ test('the temp-root allowance never reaches a checkout outside the temp root or 
   fs.mkdirSync(path.join(temp, '.git'));
   assert.equal(forbiddenRoot(temp, { hold: artifactHoldReason, checkoutsUnder: temp }), 'a git checkout', 'the temp root itself is never a disposable fixture');
   assert.equal(fs.readFileSync(path.join(outside, 'live.txt'), 'utf8'), 'do-not-lose\n');
+});
+
+test('sweepTmp sweeps the configured temp root and, when it differs, the OS temp directory with the same prefixes', async (t) => {
+  const configured = sandbox(t).root;
+  const osTemp = sandbox(t).root;
+  const env = { TEMP: osTemp, STARCI_TEMP_ROOT: configured };
+  const here = entry(configured, 'starci-configured');
+  const there = entry(osTemp, 'evidence-foreign');
+  const unrelated = entry(osTemp, 'keep-me');
+  const out = await sweepTmp({ apply: true, now: NOW, env, allocation: ALLOCATION });
+  assert.deepEqual([...out.deleted].sort(), [here, there].sort());
+  assert.equal(fs.existsSync(unrelated), true, 'an unprefixed entry survives in either root');
+  assert.equal(out.ok, true);
+});
+
+test('sweepTmp sweeps one root once when the configured temp root is the OS temp directory', async (t) => {
+  const { root } = sandbox(t);
+  const only = entry(root, 'starci-once');
+  const out = await sweepTmp({ apply: true, now: NOW, env: { TEMP: root, STARCI_TEMP_ROOT: root }, allocation: ALLOCATION });
+  assert.deepEqual(out.deleted, [only]);
+  assert.equal(out.errors.length, 0);
+});
+
+test('sweepTmp refuses a policy without a positive tmpMaxAgeMs: the age is the shipped policy\'s, not a code default', async (t) => {
+  const { env } = sandbox(t);
+  await assert.rejects(() => sweepTmp({ apply: true, now: NOW, env, allocation: { tmpPrefixes: ['starci'] } }), /tmpMaxAgeMs must declare a positive number/);
+  await assert.rejects(() => sweepTmp({ apply: true, now: NOW, env, allocation: { tmpPrefixes: ['starci'], tmpMaxAgeMs: 0 } }), /tmpMaxAgeMs/);
 });

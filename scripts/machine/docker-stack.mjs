@@ -1,7 +1,6 @@
 // docker-stack.mjs - the function-backed `starci docker up|down|ps` lifecycle. Destructive selection is always the
 // intersection of starci.project and Compose project labels; names are presentation only and never removal selectors.
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { composeConfig as realComposeConfig } from '../api/docker/compose-config.mjs';
 import { composeDown as realComposeDown } from '../api/docker/compose-down.mjs';
@@ -13,6 +12,7 @@ import { resourceRemove as realResourceRemove } from '../api/docker/resource-rem
 import { safeRemove } from '../api/fs/safe-remove.mjs';
 import { resultDetail as detail, resultOk as ok } from '../lib/verb-call.mjs';
 import { underHostLock } from './verb-lock.mjs';
+import { makeTempDir } from '../api/fs/make-temp-dir.mjs';
 import {
   DOCKER_PORT_POLICY,
   PROJECT_LABEL_KEY,
@@ -103,7 +103,7 @@ function labelsOverride(model, project) {
 
 const withOverride = async (model, project, fn, deps) => {
   if (deps.withOverride) return deps.withOverride(labelsOverride(model, project), fn);
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-docker-'));
+  const dir = makeTempDir('starci-docker-');
   const file = path.join(dir, 'labels.compose.json');
   try {
     fs.writeFileSync(file, `${JSON.stringify(labelsOverride(model, project), null, 2)}\n`);

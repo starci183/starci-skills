@@ -21,6 +21,7 @@ import { runProgram } from '../api/process/run-program.mjs';
 import { DEFAULT_NODE } from '../lib/node-image.mjs';
 import { folded as lf } from '../lib/event-contract.mjs';
 import { readEnv } from '../lib/env.mjs'; import { byCodeUnit } from '../lib/list.mjs';
+import { makeTempDir } from '../api/fs/make-temp-dir.mjs';
 const HOST_IGNORES = ['.starciwork/', '.claude/config.yaml', '.claude/secret.env'];
 const REQUIRED_FILES = ['CONTEXT.md', 'skills/starci/SKILL.md', 'skills/starci/references/host-startup.md', 'config.example.yaml', 'init/AGENTS.md', '.starci-skills.json'];
 const HOST_MARKER = '<!-- starci:prompt-entry -->';
@@ -170,7 +171,7 @@ async function runInDocker({ tarball, tools = null }) {
   const { run } = await import('../api/docker/run.mjs');
   const tarballName = path.basename(tarball);
   if (!tarballVersion(tarballName) || !exists(tarball)) throw new CouldNotRun(`${tarball} is not an existing npm pack tarball`);
-  const stage = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'starci-sandbox-stage-')));
+  const stage = fs.realpathSync(makeTempDir('starci-sandbox-stage-'));
   try {
     fs.copyFileSync(tarball, path.join(stage, tarballName));
     for (const file of [SCRIPT, ...await containerFiles()]) {
@@ -239,7 +240,7 @@ async function runSandbox({ tarball, keep = false }) {
   const realNamesBefore = new Set(fs.readdirSync(realHome));
 
   // The root keeps the spelling the host gives (a Windows 8.3 short-named TEMP, as on a GitHub windows runner): the sandbox exists to catch a product that mistakes it for a link.
-  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'starci-sandbox-')));
+  const root = fs.realpathSync(makeTempDir('starci-sandbox-'));
   const home = path.join(root, 'home');
   const app = path.join(root, 'app');
   const store = path.join(root, 'store');

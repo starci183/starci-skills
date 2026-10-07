@@ -48,6 +48,7 @@ import { machineConnectionMethods, corruptDiagnostic, MACHINE_BUSY_TIMEOUT_MS, M
   waitForRetry, isCorruptError, isBusyError, errText } from './machine-connection.mjs';
 export { MACHINE_BUSY_CODE, isMachineBusy, isBusyError } from './machine-connection.mjs';
 import { providerReservationMethods } from './provider-reservations.mjs';
+import { tempRoot } from '../temp-root.mjs';
 
 const require = createRequire(import.meta.url);
 const ENGINE_DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -80,10 +81,9 @@ export const projectLedgerFile = (ledgerId, env = process.env) => {
 /** The explicit test registry: a machine.sqlite that replaces the host's for this process tree (tests/setup/isolated-registry.mjs). */
 export const TEST_REGISTRY_ENV = 'STARCI_TEST_MACHINE_FILE';
 const normDir = (file) => pathKey(file, { fold: true });
-const tempDirsOf = (env = process.env) => [...new Set([os.tmpdir(), env.TEMP, env.TMP].filter(Boolean)
-  .flatMap((dir) => { const out = [normDir(dir)]; try { out.push(normDir(fs.realpathSync.native(dir))); } catch { /* missing */ } return out; }))]
-  .filter((dir) => !/^(?:[a-z]:)?$/.test(dir));
-/** True when `file` sits under an OS temp directory, as written or as its realpath. */
+const tempDirsOf = (env = process.env) => [...new Set([os.tmpdir(), tempRoot({ env }), env.TEMP, env.TMP].filter(Boolean)
+  .flatMap((dir) => { const out = [normDir(dir)]; try { out.push(normDir(fs.realpathSync.native(dir))); } catch { /* missing */ } return out; }))].filter((dir) => !/^(?:[a-z]:)?$/.test(dir));
+/** True when `file` sits under the OS temp directory or the configured temp root, as written or as its realpath. */
 export function isUnderTempDir(file, { env = process.env, tempDirs = tempDirsOf(env) } = {}) {
   if (typeof file !== 'string' || !file) return false;
   const forms = [normDir(file)];
@@ -97,7 +97,7 @@ export function isUnderTempDir(file, { env = process.env, tempDirs = tempDirsOf(
 export const machineFileFor = (env = process.env) => {
   if (env[TEST_REGISTRY_ENV]) return path.resolve(env[TEST_REGISTRY_ENV]);
   const file = path.join(starciLocalRoot(env), 'machine.sqlite');
-  if (isSpecRun(env) && !isUnderTempDir(file, { env })) return path.join(os.tmpdir(), 'starci-test-registry', 'machine.sqlite');
+  if (isSpecRun(env) && !isUnderTempDir(file, { env })) return path.join(tempRoot({ env }), 'starci-test-registry', 'machine.sqlite');
   return file;
 };
 

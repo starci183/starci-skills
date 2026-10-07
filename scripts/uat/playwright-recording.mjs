@@ -5,8 +5,8 @@
 // is returned as it was. A leaf module (node builtins only): uat-slots.mjs and assisted-runner.mjs both use it.
 import { opContextOf } from '../guards/op-context.mjs';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
+import { tempRoot } from '../../engine/temp-root.mjs';
 
 const CONFIG_NAMES = ['playwright.config.ts', 'playwright.config.mts', 'playwright.config.cts', 'playwright.config.js', 'playwright.config.mjs', 'playwright.config.cjs'];
 const CONFIG_FLAGS = new Set(['--config', '-c']);
@@ -83,7 +83,7 @@ export const recordingDirUnder = (root, now = new Date()) => path.join(root, `pl
  * job's folder at settle and indexes its video, trace.zip and screenshots as the job's proof.
  */
 export const RECORDINGS_ROOT_ENV = 'STARCI_UAT_RECORDINGS_ROOT';
-const recordingsBaseOf = (env = process.env) => env[RECORDINGS_ROOT_ENV] || path.join(os.tmpdir(), 'starci-uat-recordings');
+const recordingsBaseOf = (env = process.env) => env[RECORDINGS_ROOT_ENV] || path.join(tempRoot(), 'starci-uat-recordings');
 export const recordingsRootOf = (jobId, env = process.env) => path.join(recordingsBaseOf(env), String(jobId).replace(/[^a-z0-9._-]/gi, '_'));
 /** The default record directory of a run: the op's own folder when an op runs it, else the shared root. */
 export const defaultRecordRoot = (env = process.env, context = opContextOf({ env })) => (context?.jobId ? recordingsRootOf(context.jobId, env) : recordingsBaseOf(env));

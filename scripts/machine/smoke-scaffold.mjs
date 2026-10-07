@@ -1,6 +1,5 @@
 // smoke-scaffold.mjs - scaffold one edition in an isolated scratch tree, prove it, and clean it unless retained.
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { safeRemove } from '../api/fs/safe-remove.mjs';
@@ -8,6 +7,7 @@ import { runNode } from '../api/node/run-node.mjs';
 import { runNpm } from '../api/npm/run-npm.mjs';
 import { resultDetail, resultOk } from '../lib/verb-call.mjs';
 import { underHostLock } from './verb-lock.mjs';
+import { tempRoot } from '../../engine/temp-root.mjs';
 
 const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const cliEntry = path.join(runtimeRoot, 'packages', 'cli', 'bin', 'starci.mjs');
@@ -19,7 +19,7 @@ export async function smokeScaffold(ctx, deps = {}) {
   const edition = String(ctx.global?.edition ?? ctx.args?.edition ?? '');
   if (!['full', 'lite'].includes(edition)) return { code: 2, stderr: 'starci smoke scaffold: --edition must be full or lite' };
   if ((ctx.positionals ?? []).length) return { code: 2, stderr: 'starci smoke scaffold: no positional arguments are accepted' };
-  const parent = path.resolve(ctx.cwd ?? process.cwd(), ctx.args?.into ?? os.tmpdir());
+  const parent = path.resolve(ctx.cwd ?? process.cwd(), ctx.args?.into ?? tempRoot());
   try {
     fs.mkdirSync(parent, { recursive: true });
     if (fs.lstatSync(parent).isSymbolicLink()) return { code: 2, stderr: 'starci smoke scaffold: --into may not be a symbolic link' };

@@ -35,7 +35,6 @@
 // cross volumes. A repository whose scratch cannot be prepared reports `deferred: in-flight tree` while `git status --porcelain --untracked-files=no`
 // shows tracked modifications — never FAILED, so a tick separates a red main from a busy tree.
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { safeRemove } from '../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
@@ -54,6 +53,7 @@ import { foldCase, realPath, slash } from '../lib/path-key.mjs';
 import { isSopsEnvelope, setCommand } from '../lib/sops-envelope.mjs';
 import { forEachFileLine } from '../lib/read-text.mjs';
 import { starciSourceRoot } from '../../engine/runtime-root.mjs'; import { isMain } from '../lib/is-main.mjs'; import { byCodeUnit } from '../lib/list.mjs'; import { describePush } from './push-description.mjs';
+import { makeTempDir } from '../api/fs/make-temp-dir.mjs';
 export { FORBIDDEN_FILES }; export { SECRET_PATTERNS } from '../lib/secret-patterns.mjs';
 
 /**
@@ -117,7 +117,7 @@ export function scanRange({ cwd, from, to }) {
   const names = git(['diff', '--name-only', '--diff-filter=ACMR', `${from}..${to}`], { cwd });
   if (!names.ok) return { ok: false, error: names.stderr || names.error || 'git diff failed', findings: [] };
   const files = names.stdout.split(/\r?\n/).filter(Boolean);
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-push-scan-'));
+  const dir = makeTempDir('starci-push-scan-');
   const out = path.join(dir, 'range.diff');
   try {
     const diff = git(['diff', '--no-color', '--unified=0', '--diff-filter=ACMR', `--output=${out}`, `${from}..${to}`], { cwd });

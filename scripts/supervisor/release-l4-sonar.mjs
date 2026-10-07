@@ -6,7 +6,6 @@
 // started is stopped again. Containers are started and stopped by exact name through the scripts/api/docker call files; no other container of this host is ever named.
 // Async because the gate is. Seams (deps): gate ({config, up, scan, dashboard}), docker ({inspect, start, stop}), sleep (ms -> Promise), now, readyMs, pollMs, logDir.
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { containerInspect } from '../api/docker/container-inspect.mjs';
 import { containerLifecycle } from '../api/docker/container-lifecycle.mjs';
@@ -14,6 +13,7 @@ import { sleep } from '../lib/sleep.mjs';
 import { findInOrder, repeatInOrder } from '../lib/in-order.mjs';
 import { dashboard, resolveConfig, scan, scrub } from '../gates/sonar-local.mjs';
 import { sonarUp } from '../gates/sonar-status.mjs';
+import { tempRoot } from '../../engine/temp-root.mjs';
 
 const READY_MS = 5 * 60_000;
 const READY_POLL_MS = 5_000;
@@ -51,7 +51,7 @@ export function sonarSupplier(apps, deps = {}) {
   const gate = deps.gate ?? GATE;
   const pause = deps.sleep ?? sleep;
   const now = deps.now ?? Date.now;
-  const logDir = deps.logDir ?? (() => { const dir = path.join(os.tmpdir(), 'starci-release-l4'); fs.mkdirSync(dir, { recursive: true }); return dir; });
+  const logDir = deps.logDir ?? (() => { const dir = path.join(tempRoot(), 'starci-release-l4'); fs.mkdirSync(dir, { recursive: true }); return dir; });
   const started = [];
   let stack = null;
 

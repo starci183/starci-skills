@@ -1,6 +1,5 @@
 // Cold proof of the root runtime archive through its shipped dispatcher and installer.
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { byCodeUnit } from '../lib/list.mjs';
@@ -14,6 +13,7 @@ import { pack } from '../api/npm/pack.mjs';
 import { runNpm } from '../api/npm/run-npm.mjs';
 import { runNode } from '../api/node/run-node.mjs';
 import { isLinkLike } from '../api/fs/is-link-like.mjs';
+import { makeTempDir } from '../api/fs/make-temp-dir.mjs';
 import { tarFiles } from '../lib/tar-files.mjs';
 import { cleanEnv, gitTrackedUnder, PROOF_CODES, verifyPackedDependencies } from './package-clean-test.mjs';
 
@@ -167,7 +167,7 @@ export function proveRuntimePackage({ root, sourceSha, expectedIntegrity, env = 
   };
   try {
     if (manifest.name !== 'starci' || manifest.private || !/^[0-9a-f]{40}$/.test(String(sourceSha ?? '')) || !isSriSha512(expectedIntegrity)) return finish('unrun', PROOF_CODES.unrun, 'public root identity, committed input SHA and an actual npm pack integrity are required');
-    attempt = fs.mkdtempSync(path.join(os.tmpdir(), 'release-runtime-'));
+    attempt = makeTempDir('release-runtime-');
     result.attempt = attempt;
     for (let cursor = attempt; ; cursor = path.dirname(cursor)) {
       if (isLinkLike(cursor) || fs.existsSync(path.join(cursor, 'node_modules'))) return finish('unrun', PROOF_CODES.unrun, 'scratch has a linked ancestor or an ambient node_modules');

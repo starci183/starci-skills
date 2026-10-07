@@ -49,7 +49,6 @@
 import { opContextOf } from '../guards/op-context.mjs';
 import fs from 'node:fs';
 import { putBundle } from '../../engine/db/blob.mjs';
-import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {sha256} from '../../engine/digest.mjs';
@@ -72,6 +71,7 @@ import { readProposals, proposalFilesUnder } from './grammar-proposal.mjs';
 import { LOOP_SCHEMA } from './draw/draw-loop-coverage.mjs';
 import { rationaleFileOf } from './draw/draw-rationale.mjs'; import { isMain } from '../lib/is-main.mjs';
 import { browserProbes, DRAW_BEAUTY_BELOW, DRAW_CRITIC_MISSING, DRAW_METRICS_FAILED, DRAW_METRICS_UNVERIFIED, machineMetrics, stemOf } from './draw-loop-metrics.mjs';
+import { tempRoot } from '../../engine/temp-root.mjs'; import { makeTempDir } from '../api/fs/make-temp-dir.mjs';
 
 export { DRAW_BEAUTY_BELOW, DRAW_CRITIC_MISSING, DRAW_METRICS_FAILED, DRAW_METRICS_UNVERIFIED, machineMetrics }; export { DRAW_RENDER_RED, GEOMETRY_OFF_GRAMMAR } from './draw-loop-metrics.mjs';
 
@@ -91,7 +91,7 @@ const loopFileOf = (out) => path.join(out, 'loop.json');
 // folder keyed by the ui record), never in .starciwork. finish puts the whole loop in the blob store as one bundle
 // (engine/db/blob.mjs putBundle) and generation.loop cites it {sha256: <bundle manifest>, round}.
 export const defaultOutOf = (uiDir, base, state, context = opContextOf()) => path.join(
-  context?.scratchDir ? path.resolve(context.scratchDir) : path.join(os.tmpdir(), 'starci-draw-loop', sha256(path.resolve(uiDir)).slice(0, 16)),
+  context?.scratchDir ? path.resolve(context.scratchDir) : path.join(tempRoot(), 'starci-draw-loop', sha256(path.resolve(uiDir)).slice(0, 16)),
   LOOP_DIR, `${base}--${state}`);
 /** The manifest file finish writes beside the loop dir (<out>.bundle.json), so starci kernel report --attach carries it too. */
 const bundleFileOf = (out) => `${path.resolve(out)}.bundle.json`;
@@ -159,7 +159,7 @@ async function defaultComponentRender({ source, fixtures, css = [], productDir, 
   }
   const records = [];
   await eachInOrder(groups, async ([props, vps]) => {
-    const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-draw-loop-'));
+    const workDir = makeTempDir('starci-draw-loop-');
     try {
       const built = await buildFixtureHarness({ component: source, exportName: name.split('#')[0], props, css, theme: 'light', workDir, productDir, grammar });
       records.push(...await captureHtml({ html: built.html, out, viewports: vps, theme: 'light', fullPage, name, source: built.source, playwright, rationale }));
@@ -402,7 +402,7 @@ function scratchRegexOf(forms) {
 function scratchRewriter({ out, env = process.env, context = opContextOf({ env }), installed = new Map() }) {
   const loopRoots = withReal(out);
   const jobRoots = context?.scratchDir ? withReal(context.scratchDir) : [];
-  const roots = [...new Set([...loopRoots, ...jobRoots, ...[os.tmpdir(), env.TEMP, env.TMP].filter(Boolean).flatMap(withReal)])]
+  const roots = [...new Set([...loopRoots, ...jobRoots, ...[tempRoot(), env.TEMP, env.TMP].filter(Boolean).flatMap(withReal)])]
     .filter((d) => path.parse(d).root !== d).sort((a, b) => b.length - a.length);
   // Each root as written with either separator, optionally as a file URL; the tail runs to the first quote or space.
   const forms = [...new Set(roots.flatMap((r) => [r, r.replaceAll('\\', '/'), r.replaceAll('/', '\\')]))].sort((a, b) => b.length - a.length);
@@ -571,7 +571,7 @@ async function verifyDrawGroup({ source, fixture, group, record, ui, repo, famil
   const rec0 = readJsonFile(group[0].png.replace(/\.png$/i, '.json'))?.source ?? {};
   const productDir = rec0.product ?? null;
   if (!fixture || !productDir) { findings.push({ code: DRAW_METRICS_UNVERIFIED, path: at, detail: `${path.basename(source)} has no ${fixture ? 'product app in its draw-render record (source.product)' : 'fixture (<part>.fixture.json) beside it'}: the runtime cannot re-measure it` }); return; }
-  const dir = fs.mkdtempSync(path.join(tmpRoot, 'starci-draw-verify-'));
+  const dir = makeTempDir('starci-draw-verify-', { parent: tmpRoot });
   try {
     const stem = path.basename(group[0].png).split('--')[0];
     const [base, state] = stem.includes('#') ? stem.split('#') : [stem, 'part'];
@@ -597,7 +597,7 @@ async function verifyDrawGroup({ source, fixture, group, record, ui, repo, famil
 }
 
 async function verifyHtmlGroup({ html, group, ui, record, repo, family, settings, render, probes, tmpRoot, findings, parts }) {
-  const dir = fs.mkdtempSync(path.join(tmpRoot, 'starci-draw-verify-'));
+  const dir = makeTempDir('starci-draw-verify-', { parent: tmpRoot });
   try {
     const state = String(group[0].asset.path.split('/').pop().split('--')[0]).split('#').pop();
     const base = String(group[0].asset.path.split('/').pop().split('--')[0]).split('#')[0] || 'part';
@@ -623,7 +623,7 @@ async function verifyHtmlGroup({ html, group, ui, record, repo, family, settings
  * Re-render every live part of a ui record from its render source and re-run every machine metric. Returns
  * {findings:[{code, path, detail, codes}], parts:[{part, failures, codes}]}. `render`/`probes` are injectable.
  */
-export async function verifyRecordParts({ recordDir, record = null, repo, family = null, settings = drawLoopSettings(), render = null, componentRender = null, sourceCheck = null, probes = browserProbes, tmpRoot = os.tmpdir() }) {
+export async function verifyRecordParts({ recordDir, record = null, repo, family = null, settings = drawLoopSettings(), render = null, componentRender = null, sourceCheck = null, probes = browserProbes, tmpRoot = tempRoot() }) {
   const ui = loadUi(recordDir);
   const rec = record ?? ui.record;
   const findings = [], parts = [];

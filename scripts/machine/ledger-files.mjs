@@ -1,18 +1,19 @@
 // ledger-files.mjs — which product ledgers the machine arbiter (machine.sqlite `ledgers`) registered and still counts:
-// present on disk and not a fixture (under the OS temp directory, or under a directory named `fixture`/`fixtures`; a spec
+// present on disk and not a fixture (under the OS temp directory or the configured temp root, or under a directory named `fixture`/`fixtures`; a spec
 // that once enrolled <fixture>/.starciwork/runtime.sqlite left a real-path fixture registered for good). Read by the
 // allocation balance (scripts/agent/balance.mjs) and the RAM throttle's worker census (ram-throttle.mjs).
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { machineFileFor, readMachine } from '../../engine/db/machine.mjs';
+import { tempRoot } from '../../engine/temp-root.mjs';
 
 const norm = (file) => path.resolve(String(file)).replaceAll('\\', '/').toLowerCase();
-const tempDirs = (env = process.env) => [...new Set([os.tmpdir(), env.TEMP, env.TMP].filter(Boolean).map(norm))];
+const tempDirs = (env = process.env) => [...new Set([os.tmpdir(), tempRoot({ env }), env.TEMP, env.TMP].filter(Boolean).map(norm))];
 const FIXTURE_SEGMENT = /^fixtures?$/i;
 
 /**
- * True when a ledger path is a test fixture, never a product ledger: under the OS temp directory, or with a
+ * True when a ledger path is a test fixture, never a product ledger: under the OS temp directory or the configured temp root, or with a
  * directory segment named `fixture` or `fixtures` anywhere above the file.
  */
 export function isFixtureLedgerPath(file, { env = process.env } = {}) {

@@ -1,6 +1,5 @@
 // ladder-test.mjs - `starci test run`: targeted/dependent/full spec execution with the release and host-lock policy.
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { isAncestor } from '../api/git/is-ancestor.mjs';
 import { revParse } from '../api/git/rev-parse.mjs';
@@ -12,6 +11,7 @@ import { cleanTree, committedChanges, tracked, workingChanges, runOutcome } from
 import { ladderRefusal, ladderResult, pathList, scopeFor } from './test-ladder.mjs';
 import { resolveTestConcurrency } from './test-concurrency.mjs';
 import { byCodeUnit } from '../lib/list.mjs';
+import { tempRoot } from '../../engine/temp-root.mjs';
 
 const SCHEMA = 'starci/test-run@1';
 const PRELOADS = Object.freeze(['tests/setup/low-priority.mjs', 'tests/setup/isolated-temp.mjs', 'tests/setup/isolated-registry.mjs']);
@@ -65,7 +65,7 @@ function tipOf(root, deps) {
 }
 
 function logFile(level, tip, deps) {
-  const dir = deps.tempDir ?? os.tmpdir();
+  const dir = deps.tempDir ?? tempRoot();
   return path.join(dir, level === 'L2' || level === 'L3' ? `preverify-${tip}.txt` : `test-${level}-${tip}.txt`);
 }
 

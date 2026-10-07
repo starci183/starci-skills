@@ -6,6 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { samePath } from '../../lib/path-key.mjs';
 import { realpathOr } from '../../lib/fs-kind.mjs';
+import { tempRoot } from '../../../engine/temp-root.mjs';
 
 const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
@@ -37,7 +38,7 @@ function strictlyInsideReal(p, root) {
 export function forbiddenRoot(p, { checkoutsUnder = null, hold } = {}) {
   const resolved = path.resolve(p);
   if (path.parse(resolved).root === resolved || samePath(path.dirname(resolved), resolved)) return 'a filesystem root';
-  for (const [name, dir] of [['the home directory', os.homedir()], ['the temp directory', os.tmpdir()], ['the runtime', SKILL_ROOT],
+  for (const [name, dir] of [['the home directory', os.homedir()], ['the temp directory', os.tmpdir()], ['the configured temp root', tempRoot()], ['the runtime', SKILL_ROOT],
     ['the repository hosting the runtime', path.dirname(SKILL_ROOT)], ['the repositories root', path.dirname(path.dirname(SKILL_ROOT))]]) {
     if (dir && samePath(path.resolve(dir), resolved)) return name;
   }

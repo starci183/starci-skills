@@ -1,6 +1,5 @@
 // status-memo.mjs - `starci kernel status` with its Orca reads prefetched in parallel and its git reads memoised.
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { spawnSyncOverride } from '../api/process/spawn-sync-override.mjs';
@@ -12,6 +11,7 @@ import { headShaOf } from '../lib/git-dir.mjs';
 import { repeatInOrder } from '../lib/in-order.mjs';
 import { jobPayloadOf, operationTerminalHandleOf } from './verbs/shared/rows.mjs';
 import { JOB_ROW } from '../machine/job-row.mjs';
+import { tempRoot } from '../../engine/temp-root.mjs';
 
 /* ------------------------------------------------------- status git memo */
 // starci kernel status took 26-31 s per workflow under load (8 s idle) on a product ledger, nearly all of it in
@@ -41,7 +41,7 @@ const GIT_PINNED_REV_RX = /^(HEAD|[0-9a-f]{40})(\^\{commit\}|:.*)?$/s;
 const GIT_MEMO_MAX_BYTES = 16 * 1024 * 1024;
 const GIT_MEMO_BUDGET_BYTES = 256 * 1024 * 1024;
 const GIT_MEMO_TTL_MS = 14 * 24 * 3600 * 1000;
-const gitMemoDirOf = (env = process.env) => (env.STARCI_GIT_MEMO_DIR ? path.resolve(env.STARCI_GIT_MEMO_DIR) : path.join(os.tmpdir(), 'starci-git-memo'));
+const gitMemoDirOf = (env = process.env) => (env.STARCI_GIT_MEMO_DIR ? path.resolve(env.STARCI_GIT_MEMO_DIR) : path.join(tempRoot(), 'starci-git-memo'));
 
 /**
  * The commit HEAD names in the checkout at `root` (its top level), read from the git files with no spawn; null

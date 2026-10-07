@@ -1,7 +1,7 @@
 // launch-smoke-state.mjs - the launch smoke's roles, its state directory layout and the files its op roles own.
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
+import { tempRoot } from '../../engine/temp-root.mjs';
 
 export const SMOKE_SCHEMA = 'starci/launch-smoke@2';
 export const slash = (p) => String(p).replaceAll('\\', '/');
@@ -35,7 +35,7 @@ export const ENDED_STATE = new Set(['done', 'completed', 'succeeded', 'failed', 
 export const GREEN_STATUS = new Set(['completed', 'succeeded']);
 // ------------------------------------------------------------------ state directory
 /** Where every smoke run keeps its state directory. */
-export const stateParentOf = (tmp = os.tmpdir()) => path.join(tmp, 'starci-launch-smoke');
+export const stateParentOf = (tmp = tempRoot()) => path.join(tmp, 'starci-launch-smoke');
 export const dirs = (state) => ({ agents: path.join(state, 'agents'), stages: path.join(state, 'stages'), results: path.join(state, 'results') });
 export const readJson = (file) => { try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return null; } };
 export const agentFile = (state, role) => path.join(dirs(state).agents, `${role}.json`);

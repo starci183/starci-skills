@@ -16,11 +16,12 @@
 //                        the directory.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { TEST_REGISTRY_ENV, openMachine } from '../../engine/db/machine.mjs';
 import { safeRemove } from '../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
+import { tempRoot } from '../../engine/temp-root.mjs';
+import { makeTempDir } from '../api/fs/make-temp-dir.mjs';
 
 /** The shared controller contract, asserted once per controller spec: the module names itself, owns its
  *  concerns, routes its declared event to its duty key, and ships a reconcile function. */
@@ -33,7 +34,7 @@ export function controllerContract(controller, { name, concerns, routeKey, route
 
 export function fakeCtx(overrides = {}) {
   const {
-    mode = 'shadow', controller = 'test', key = null, now = () => Date.now(), ledgers = [{ ledgerId: 'test', repo: os.tmpdir(), file: path.join(os.tmpdir(), 'none.sqlite') }],
+    mode = 'shadow', controller = 'test', key = null, now = () => Date.now(), ledgers = [{ ledgerId: 'test', repo: tempRoot(), file: path.join(tempRoot(), 'none.sqlite') }],
     status = {}, dbs = {}, apiResult = () => ({ ok: true, value: { ok: true } }), runResult = () => ({ ok: true, value: { ok: true } }),
     decisionResult = () => ({ ok: true }), owns = null, epoch = 1, env = process.env, machine = undefined, stateDb = undefined, stateFile = null, ...rest
   } = overrides;
@@ -87,7 +88,7 @@ export function fakeCtx(overrides = {}) {
 
 /** A machine.sqlite in a fresh temp directory; env names it (STARCI_TEST_MACHINE_FILE). `m` (also `db`) is a writer on it. */
 export function tempState({ prefix = 'starci-reconciler-' } = {}) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  const dir = makeTempDir(prefix);
   const file = path.join(dir, 'machine.sqlite');
   const env = { ...process.env, [TEST_REGISTRY_ENV]: file, STARCI_LOCAL_ROOT: dir, STARCI_LANES_ROOT: path.join(dir, 'lanes') };
   const m = openMachine({ env, file });

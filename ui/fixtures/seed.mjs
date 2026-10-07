@@ -1,5 +1,4 @@
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
@@ -15,6 +14,7 @@ import { add as gitAdd } from '../../scripts/api/git/add.mjs';
 import { commit as gitCommit } from '../../scripts/api/git/commit.mjs';
 import { revParse } from '../../scripts/api/git/rev-parse.mjs';
 import { gitOutputOf, withoutGitLocalEnv } from '../../scripts/lib/git.mjs';
+import { tempRoot } from '../../engine/temp-root.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const canonical = p => path.resolve(p).replaceAll('\\','/').toLowerCase();
@@ -33,10 +33,10 @@ fs.rmSync(root, { recursive: true, force: true });
 fs.mkdirSync(root, { recursive: true });
 const fixedNow = 1790550000000;
 const now = () => fixedNow;
-const artifactRoot = safeGeneratedTarget(os.tmpdir(), 'ui-seed-artifacts');
+const artifactRoot = safeGeneratedTarget(tempRoot(), 'ui-seed-artifacts');
 fs.rmSync(artifactRoot, { recursive:true, force:true });
 fs.mkdirSync(artifactRoot, { recursive:true });
-const productsRoot = safeGeneratedTarget(os.tmpdir(), 'ui-seed-products');
+const productsRoot = safeGeneratedTarget(tempRoot(), 'ui-seed-products');
 fs.rmSync(productsRoot, { recursive:true, force:true });
 fs.mkdirSync(productsRoot, { recursive:true });
 process.env.STARCI_ARTIFACT_ROOT = artifactRoot;

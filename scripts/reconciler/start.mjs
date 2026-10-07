@@ -3,7 +3,6 @@
 // skills/starci/references/host-startup.md describes its lifecycle; workflow ingress excludes Kernel watchdogs.
 import '../api/process/hide-child-windows.mjs';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { readMachine, withMachine } from '../../engine/db/machine.mjs';
@@ -23,6 +22,7 @@ import { auditTasks } from '../machine/task-audit.mjs';
 import { taskItems } from './task-health.mjs';
 import { applyEngine, applyUiBuild, startDownServices, startSeats, waitForLeader } from './start-apply.mjs';
 import { eachInOrder, repeatInOrder } from '../lib/in-order.mjs';
+import { tempRoot } from '../../engine/temp-root.mjs';
 export { PROFILE, engineItems, profileItems, safeShadowOf };
 export { engineIsSafe } from './start-items.mjs';
 
@@ -51,7 +51,7 @@ export function hostPlatformItem(platform = process.platform) {
 }
 
 /** A registered ledger that no product should live in: a temp or test path. Pure. */
-export function isTempLedger(file, { tmp = os.tmpdir() } = {}) {
+export function isTempLedger(file, { tmp = tempRoot() } = {}) {
   const p = String(file ?? '').replaceAll('\\', '/').toLowerCase();
   const t = String(tmp).replaceAll('\\', '/').toLowerCase().replace(/\/$/, '');
   return Boolean(p) && (p.startsWith(`${t}/`) || /\/(?:temp|tmp)\//.test(p) || /prereq|starci-test|\/scratch\//.test(p));
@@ -61,7 +61,7 @@ export function isTempLedger(file, { tmp = os.tmpdir() } = {}) {
  * The registered-ledger findings: [{ledgerId, name, file, repoRoot, problem: 'temp'|'missing-repo'|'missing-file'}]. A ledger
  * under a temp directory (its file or its repo_root) or whose repo_root no longer exists is stray. Seams: exists, tmp.
  */
-export function ledgerFindings(ledgers, { exists = (f) => fs.existsSync(f), tmp = os.tmpdir() } = {}) {
+export function ledgerFindings(ledgers, { exists = (f) => fs.existsSync(f), tmp = tempRoot() } = {}) {
   const out = [];
   for (const l of ledgers ?? []) {
     if (l.state === 'retired') continue;

@@ -69,6 +69,7 @@ import { readInput } from './hook-io.mjs';
 import { boundGuard, boundSeat, fileWriteVerdict, gitSubOf, redirectTargetsOf, rightsRoleOf, runtimeRootOf, writeTargetsOf } from './rights.mjs';
 import { intrinsicPolicyRead, loadCommandPolicy, policyVerdict } from './command-policy.mjs';
 import { commandsOf, programOf } from './shell-commands.mjs';
+import { tempPath } from '../api/fs/temp-path.mjs';
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export { boundGuard } from './rights.mjs';
 
@@ -184,7 +185,7 @@ function workflowHistoryVerdict({ args, cwd, guard, parseGitArgv }) {
 // names are compared with git ls-files. The remedy is the same command with :(literal) pathspecs.
 function appRouterGlob({ args, cwd, deps }) {
   const { literalAppRouterArgv, parseGitArgv } = deps.policy;
-  const listFile = path.join(os.tmpdir(), `starci-pathspec-${process.pid}-${Date.now()}.nul`);
+  const listFile = tempPath(`starci-pathspec-${process.pid}-${Date.now()}.nul`);
   try {
     const literal = literalAppRouterArgv(args, { cwd, stdin: null, listFile });
     if (!literal.changed) return null;

@@ -1,12 +1,12 @@
 // Ledger path identity and ownership resolution; connection policy and caches remain in ledger.mjs.
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import {sha256} from '../digest.mjs';
 import {isUnderTempDir,localProjectsRoot,readMachine} from './machine.mjs';
 import {isSpecRun} from '../../scripts/lib/env.mjs';
 import {pathKey} from '../../scripts/lib/path-key.mjs';
 import {byCodeUnit} from '../by-code-unit.mjs';
+import {tempRoot} from '../temp-root.mjs';
 /** Overrides the projects root (the directory holding <ledger_id>/runtime.sqlite) for this process tree; narrower than machine-db.mjs LOCAL_ROOT_ENV, which this still honors through starciLocalRoot when unset. */
 export const PROJECTS_ROOT_ENV='STARCI_PROJECTS_ROOT';
 const normDir=file=>pathKey(file);
@@ -14,7 +14,7 @@ const normDir=file=>pathKey(file);
 export const projectsRootFor=(env=process.env)=>{
   if(env[PROJECTS_ROOT_ENV])return path.resolve(env[PROJECTS_ROOT_ENV]);
   const root=localProjectsRoot(env);
-  if(isSpecRun(env)&&!isUnderTempDir(root,{env}))return path.join(os.tmpdir(),'starci-test-projects');
+  if(isSpecRun(env)&&!isUnderTempDir(root,{env}))return path.join(tempRoot({env}),'starci-test-projects');
   return root;
 };
 /** Repository identity: resolved/realpath, forward slashes, case-folded only on Windows. */
