@@ -62,6 +62,9 @@ import { recordWorkerReport, resolveReportCommit } from './workers-report.mjs';
 import { startWorkerAgent } from '../agent/start-worker.mjs'; import { isMain } from '../lib/is-main.mjs';
 import { slugify } from '../lib/slug.mjs';
 import { runWorkersCli } from './workers-cli.mjs';
+import { equalPoolShares, pickWorkerPool } from './worker-pool.mjs';
+import { eachInOrder } from '../lib/in-order.mjs';
+export { equalPoolShares, pickWorkerPool };
 
 /**
  * The guard layer of a [Worker] launch, the same one op workers get (scripts/guards/hook-install.mjs guardLaunch), bound to
@@ -90,7 +93,6 @@ const FINAL_STATUSES = Object.freeze(['succeeded', 'failed', 'cancelled']);
 /** sup_attempts.agent is one of these (runtime schema CHECK); any other provider is recorded as null. */
 const MAX_SPAWN_ATTEMPTS = 3;
 export const READINESS_FAILS_PER_HOUR = 2;
-export const AGENTS = Object.freeze({ 'claude-agent': 'claude', 'codex-agent': 'codex', 'devin-agent': 'devin' });
 const PROMPT_FILE = path.join(SKILL_ROOT, 'modules', 'supervisor', 'worker-prompt.md');
 const parse = parseJsonOr;
 const csv = (v) => { if (typeof v === 'string') { return v.split(',').map((s) => s.trim()).filter(Boolean); } if (Array.isArray(v)) { return v.map(String); } return []; };
@@ -246,39 +248,6 @@ export function removeStaging({ jobId, staging, root = SKILL_ROOT, env = process
 
 /* ------------------------------------------------------------ routing */
 
-/** Equal weight for every pool the model registry declares — the absent-shares meaning. */
-export const equalPoolShares = (runtimes) => Object.fromEntries(Object.keys(runtimes?.runtimes ?? {}).map((pool) => [pool, 1]));
-
-/**
- * Pick the worker's pool: among config allocation.shares pools with a hard-tier model and an available
- * provider, the one furthest below its share. `recent` = {pool: count}; `availabilityOf(provider)` ->
- * {state, reason}. Pure given its inputs. Returns {pool, agent, model, effort, deficits, skipped} or {error}.
- */
-export async function pickWorkerPool({ shares, runtimes, recent = {}, availabilityOf = () => ({ state: 'available' }), prefer = null, avoid = [] }) {
-  const { balanceDeficits, resolveLaunchModel } = await import('../agent/models.mjs');
-  const skipped = [];
-  const candidates = [];
-  for (const pool of Object.keys(shares ?? {})) {
-    const provider = runtimes?.runtimes?.[pool]?.provider ?? AGENTS[pool] ?? null;
-    if (!provider) { skipped.push({ pool, reason: 'no registry.yaml pool' }); continue; }
-    if (prefer && provider !== prefer) continue;
-    if (avoid.includes(provider)) { skipped.push({ pool, reason: `${provider} failed worker readiness` }); continue; }
-    const launch = resolveLaunchModel(pool, 'hard', { runtimes });
-    if (launch.error) { skipped.push({ pool, reason: launch.error }); continue; }
-    const availability = availabilityOf(provider);
-    if (availability?.state === 'unavailable') { skipped.push({ pool, reason: availability.reason }); continue; }
-    candidates.push({ pool, agent: provider, model: launch.modelId, effort: launch.effort ?? null, limited: availability?.state === 'limited' });
-  }
-  if (!candidates.length) return { error: prefer ? `agent '${prefer}' is not available for a worker` : 'no worker pool is available', skipped };
-  const deficits = balanceDeficits(candidates.map((c) => c.pool), { shares, recent });
-  const best = candidates.reduce((a, c) => {
-    if (!a) return c;
-    if (a.limited !== c.limited) return a.limited ? c : a;
-    return deficits[c.pool].deficit > deficits[a.pool].deficit + 1e-9 ? c : a;
-  }, null);
-  return { ...best, deficits, skipped, allowGroup: candidates.map(({ agent, model, pool, effort }) => ({ provider: agent, model, pool, effort })) };
-}
-
 /** The live inputs of pickWorkerPool: config shares, recent dispatches (machine + workers), provider health. */
 export async function routeWorker({ m, prefer = null, avoid = [], config = undefined, env = process.env } = {}) {
   let cfg = config;
@@ -330,6 +299,104 @@ function renderWorkerPrompt(job, staging, { template = null, skillRoot = SKILL_R
     .replaceAll('{brief}', String(p.brief ?? '').trim() || '(see the incidents)').replaceAll('{skillRoot}', skillRoot);
 }
 
+/** Why a queued job does not launch this pass (the cap, or files another job leases): a skipped entry, else null. */
+const skipOf = ({ m, cap, live }, job) => {
+  if (live >= cap.cap) return { jobId: job.job_id, reason: `cap ${cap.cap} reached (${cap.reason})` };
+  const conflicts = leaseConflicts(m, job.payload.files, job.job_id);
+  if (conflicts.length) return { jobId: job.job_id, reason: `files leased by ${[...new Set(conflicts.map((c) => c.jobId))].join(', ')}`, conflicts };
+  return null;
+};
+
+const routeJob = ({ m, deps, env, notReady }, job) => {
+  const avoid = [...new Set([...notReady, ...(job.payload.avoidAgents ?? [])])];
+  const prefer = job.payload.agent && !avoid.includes(job.payload.agent) ? job.payload.agent : null;
+  return (deps.route ?? ((opts) => routeWorker(opts)))({ m, prefer, avoid, env });
+};
+
+/** One sup_attempts row per spawn: who (agent/model), where (staging checkout, branch, base). Returns {ok, attemptId} or the lease conflicts. */
+const leaseJob = ({ m }, job, route, staging) => m.transaction(() => {
+  const held = takeLeases(m, job);
+  if (!held.ok) return held;
+  setJob(m, job.job_id, { status: 'spawning' });
+  const { attemptId } = m.startSupAttempt({ jobId: job.job_id, agent: workerAttemptAgent(route.agent), provider: route.agent ?? null,
+    model: route.model ?? null, effort: route.effort ?? null, worktreePath: staging.path, branch: staging.branch, baseSha: staging.base });
+  return { ok: true, attemptId };
+});
+
+/** Start the worker on its staging checkout: {spawned, guard}. */
+const startJobWorker = async ({ m, deps, env, root, now }, job, route, staging) => {
+  const prompt = renderWorkerPrompt(job, staging);
+  const title = `${WORKER_TITLE_PREFIX} ${job.payload.cluster}`.slice(0, 80);
+  const guard = (deps.guard ?? workerGuard)(job.job_id, { root, staging: staging.path, files: job.payload.files ?? [] });
+  if (typeof guard.receipt?.jobFile !== 'string') supervisorEvent(m, { entityType: 'job', entityId: job.job_id, kind: 'worker-guard-missing', payload: { receipt: guard.receipt }, now: now() });
+  const spawned = await startWorkerAgent({ route, worktree: staging.path, title, prompt,
+    specFile: path.join(starciLocalRoot(env), 'supervisor', 'workers', `${job.job_id}.prompt.md`), objective: `${title} — ${job.job_id}`, entry: env.ORCA_TERMINAL_HANDLE || null,
+    request: { workerJob: job.job_id, spawnAttempt: (job.payload.spawnAttempts ?? 0) + 1 }, onCreated: (handle) => { if (typeof guard.receipt?.jobFile === 'string') guard.receipt.terminal = (deps.bindGuard ?? bindGuardTerminal)({ skillRoot: root, handle, jobFile: guard.receipt.jobFile }); },
+    start: deps.start ?? null, env });
+  return { spawned, guard };
+};
+
+/** A failed spawn: release its leases, close its attempt, requeue (or fail) the job and remove its checkout. */
+const failSpawn = (pass, { job, route, staging, leased, spawned, payload, heldUnknown }) => {
+  const { m, deps, orca, env, root, now, result, notReady } = pass;
+  if (heldUnknown) {
+    pass.live += 1;
+    result.failed.push({ jobId: job.job_id, step: spawned?.step ?? 'spawn', error: spawned?.error ?? null, effectState: spawned?.effectState ?? 'unknown', requeued: false });
+    return;
+  }
+  const exhausted = payload.spawnAttempts >= MAX_SPAWN_ATTEMPTS;
+  // A requeued job keeps the agent it asked for (never the one routed to it) and never returns to a provider
+  // whose worker-start failed for it or whose failure shows its card's outage (quota/capacity
+  // exhausted); the rest of this pass skips that provider too.
+  const outage = route.agent ? outageInText(route.agent, [spawned?.error, JSON.stringify(spawned?.details ?? null)]) : null;
+  const notReadyHere = spawned?.step === 'worker-start' || Boolean(outage);
+  if (notReadyHere) notReady.add(route.agent);
+  const avoidAgents = notReadyHere ? [...new Set([...(job.payload.avoidAgents ?? []), route.agent])] : job.payload.avoidAgents;
+  m.transaction(() => {
+    releaseLeases(m, job.job_id);
+    m.updateSupAttempt(leased.attemptId, { cancelledAt: now(), failureClass: `spawn:${spawned?.step ?? 'spawn'}`, terminalHandle: spawned?.terminal ?? null });
+    setJob(m, job.job_id, { status: exhausted ? 'failed' : 'queued', payload: { ...payload, agent: job.payload.agent ?? null, lastAgent: route.agent,
+      ...(avoidAgents ? { avoidAgents } : {}), staging: null, lastSpawnError: spawned?.error ?? 'spawn failed',
+      result: exhausted ? { reason: 'spawn-failed', step: spawned?.step ?? null, error: spawned?.error ?? null } : null } });
+    supervisorEvent(m, { entityType: 'job', entityId: job.job_id, kind: 'worker-spawn-failed', payload: { agent: route.agent, step: spawned?.step ?? null, error: spawned?.error ?? null, exhausted, ...(outage ? { outage: outage.failureKind } : {}) }, now: now() });
+  });
+  (deps.unstage ?? removeStaging)({ jobId: job.job_id, staging: stagingRecord(staging), root, env, orca });
+  result.failed.push({ jobId: job.job_id, step: spawned?.step ?? 'spawn', error: spawned?.error ?? null, agent: route.agent, requeued: !exhausted });
+};
+
+const markRunning = (pass, { job, route, staging, leased, spawned, payload }) => {
+  const { m, now, result } = pass;
+  m.transaction(() => {
+    m.updateSupAttempt(leased.attemptId, { terminalHandle: spawned.terminal });
+    setJob(m, job.job_id, { status: 'running', payload: { ...payload, startedAt: new Date(now()).toISOString() } });
+    supervisorEvent(m, { entityType: 'job', entityId: job.job_id, kind: 'worker-spawned', payload: { terminal: spawned.terminal, dispatch: spawned.dispatchId, agent: route.agent, model: route.model, pool: route.pool, staging: staging.path }, now: now() });
+  });
+  pass.live += 1;
+  result.launched.push({ jobId: job.job_id, terminal: spawned.terminal, agent: route.agent, model: route.model, staging: staging.path });
+};
+
+/** One queued job's launch: lease check, route, staging checkout, leases, worker. Records into pass.result. */
+async function launchJob(pass, job) {
+  const { m, deps, orca, env, root, now, result } = pass;
+  const skip = skipOf(pass, job);
+  if (skip) { result.skipped.push(skip); return; }
+  const route = await routeJob(pass, job);
+  if (route.error) { result.skipped.push({ jobId: job.job_id, reason: route.error, routeSkipped: route.skipped }); return; }
+  if (pass.dryRun) { result.launched.push({ jobId: job.job_id, wouldLaunch: true, agent: route.agent, model: route.model, pool: route.pool }); pass.live += 1; return; }
+  const staging = (deps.staging ?? createStaging)({ jobId: job.job_id, root, env, orca });
+  if (!staging.ok) { result.failed.push({ jobId: job.job_id, step: 'staging', code: staging.code ?? 'WORKER_STAGING_CREATE_FAILED', error: staging.error }); return; }
+  const leased = leaseJob(pass, job, route, staging);
+  if (!leased.ok) {
+    (deps.unstage ?? removeStaging)({ jobId: job.job_id, staging: stagingRecord(staging), root, env, orca });
+    result.skipped.push({ jobId: job.job_id, reason: `files leased by ${[...new Set(leased.conflicts.map((c) => c.holder))].join(', ')}` });
+    return;
+  }
+  const { spawned, guard } = await startJobWorker(pass, job, route, staging);
+  const { payload, heldUnknown } = recordWorkerLaunch({ m, job, route, spawned, staging: stagingRecord(staging), attemptId: leased.attemptId, guard, now });
+  const run = { job, route, staging, leased, spawned, payload, heldUnknown };
+  if (spawned?.ok) markRunning(pass, run); else failSpawn(pass, run);
+}
+
 /**
  * Launch queued jobs while the adaptive cap has room. Each launch: lease check, route, staging checkout,
  * leases, [Worker] worker. The worker starts through worker-start ON its staging checkout (scripts/agent/lib.mjs
@@ -347,76 +414,8 @@ export async function spawnWorkers(m, { jobId = null, dryRun = false, settings =
   const result = { cap, launched: [], skipped: [], failed: [] };
   // Providers whose worker terminal failed readiness this pass, or READINESS_FAILS_PER_HOUR times in the hour.
   const notReady = new Set(readinessFailedProviders(m, { since: now() - 3_600_000 }));
-  let live = running;
-  for (const job of queuedJobs) {
-    if (live >= cap.cap) { result.skipped.push({ jobId: job.job_id, reason: `cap ${cap.cap} reached (${cap.reason})` }); continue; }
-    const conflicts = leaseConflicts(m, job.payload.files, job.job_id);
-    if (conflicts.length) { result.skipped.push({ jobId: job.job_id, reason: `files leased by ${[...new Set(conflicts.map((c) => c.jobId))].join(', ')}`, conflicts }); continue; }
-    const avoid = [...new Set([...notReady, ...(job.payload.avoidAgents ?? [])])];
-    const prefer = job.payload.agent && !avoid.includes(job.payload.agent) ? job.payload.agent : null;
-    const route = await (deps.route ?? ((opts) => routeWorker(opts)))({ m, prefer, avoid, env });
-    if (route.error) { result.skipped.push({ jobId: job.job_id, reason: route.error, routeSkipped: route.skipped }); continue; }
-    if (dryRun) { result.launched.push({ jobId: job.job_id, wouldLaunch: true, agent: route.agent, model: route.model, pool: route.pool }); live += 1; continue; }
-    const staging = (deps.staging ?? createStaging)({ jobId: job.job_id, root, env, orca });
-    if (!staging.ok) { result.failed.push({ jobId: job.job_id, step: 'staging', code: staging.code ?? 'WORKER_STAGING_CREATE_FAILED', error: staging.error }); continue; }
-    // One sup_attempts row per spawn: who (agent/model), where (staging checkout, branch, base).
-    const leased = m.transaction(() => {
-      const held = takeLeases(m, job);
-      if (!held.ok) return held;
-      setJob(m, job.job_id, { status: 'spawning' });
-      const { attemptId } = m.startSupAttempt({ jobId: job.job_id, agent: workerAttemptAgent(route.agent), provider: route.agent ?? null,
-        model: route.model ?? null, effort: route.effort ?? null, worktreePath: staging.path, branch: staging.branch, baseSha: staging.base });
-      return { ok: true, attemptId };
-    });
-    if (!leased.ok) {
-      (deps.unstage ?? removeStaging)({ jobId: job.job_id, staging: stagingRecord(staging), root, env, orca });
-      result.skipped.push({ jobId: job.job_id, reason: `files leased by ${[...new Set(leased.conflicts.map((c) => c.holder))].join(', ')}` });
-      continue;
-    }
-    const prompt = renderWorkerPrompt(job, staging);
-    const title = `${WORKER_TITLE_PREFIX} ${job.payload.cluster}`.slice(0, 80);
-    const guard = (deps.guard ?? workerGuard)(job.job_id, { root, staging: staging.path, files: job.payload.files ?? [] });
-    if (typeof guard.receipt?.jobFile !== 'string') supervisorEvent(m, { entityType: 'job', entityId: job.job_id, kind: 'worker-guard-missing', payload: { receipt: guard.receipt }, now: now() });
-    const spawned = await startWorkerAgent({ route, worktree: staging.path, title, prompt,
-      specFile: path.join(starciLocalRoot(env), 'supervisor', 'workers', `${job.job_id}.prompt.md`), objective: `${title} — ${job.job_id}`, entry: env.ORCA_TERMINAL_HANDLE || null,
-      request: { workerJob: job.job_id, spawnAttempt: (job.payload.spawnAttempts ?? 0) + 1 }, onCreated: (handle) => { if (typeof guard.receipt?.jobFile === 'string') guard.receipt.terminal = (deps.bindGuard ?? bindGuardTerminal)({ skillRoot: root, handle, jobFile: guard.receipt.jobFile }); },
-      start: deps.start ?? null, env });
-    const { payload, heldUnknown } = recordWorkerLaunch({ m, job, route, spawned, staging: stagingRecord(staging),
-      attemptId: leased.attemptId, guard, now });
-    if (!spawned?.ok) {
-      if (heldUnknown) {
-        live += 1;
-        result.failed.push({ jobId: job.job_id, step: spawned?.step ?? 'spawn', error: spawned?.error ?? null, effectState: spawned?.effectState ?? 'unknown', requeued: false });
-        continue;
-      }
-      const exhausted = payload.spawnAttempts >= MAX_SPAWN_ATTEMPTS;
-      // A requeued job keeps the agent it asked for (never the one routed to it) and never returns to a provider
-      // whose worker-start failed for it or whose failure shows its card's outage (quota/capacity
-      // exhausted); the rest of this pass skips that provider too.
-      const outage = route.agent ? outageInText(route.agent, [spawned?.error, JSON.stringify(spawned?.details ?? null)]) : null;
-      const notReadyHere = spawned?.step === 'worker-start' || Boolean(outage);
-      if (notReadyHere) notReady.add(route.agent);
-      const avoidAgents = notReadyHere ? [...new Set([...(job.payload.avoidAgents ?? []), route.agent])] : job.payload.avoidAgents;
-      m.transaction(() => {
-        releaseLeases(m, job.job_id);
-        m.updateSupAttempt(leased.attemptId, { cancelledAt: now(), failureClass: `spawn:${spawned?.step ?? 'spawn'}`, terminalHandle: spawned?.terminal ?? null });
-        setJob(m, job.job_id, { status: exhausted ? 'failed' : 'queued', payload: { ...payload, agent: job.payload.agent ?? null, lastAgent: route.agent,
-          ...(avoidAgents ? { avoidAgents } : {}), staging: null, lastSpawnError: spawned?.error ?? 'spawn failed',
-          result: exhausted ? { reason: 'spawn-failed', step: spawned?.step ?? null, error: spawned?.error ?? null } : null } });
-        supervisorEvent(m, { entityType: 'job', entityId: job.job_id, kind: 'worker-spawn-failed', payload: { agent: route.agent, step: spawned?.step ?? null, error: spawned?.error ?? null, exhausted, ...(outage ? { outage: outage.failureKind } : {}) }, now: now() });
-      });
-      (deps.unstage ?? removeStaging)({ jobId: job.job_id, staging: stagingRecord(staging), root, env, orca });
-      result.failed.push({ jobId: job.job_id, step: spawned?.step ?? 'spawn', error: spawned?.error ?? null, agent: route.agent, requeued: !exhausted });
-      continue;
-    }
-    m.transaction(() => {
-      m.updateSupAttempt(leased.attemptId, { terminalHandle: spawned.terminal });
-      setJob(m, job.job_id, { status: 'running', payload: { ...payload, startedAt: new Date(now()).toISOString() } });
-      supervisorEvent(m, { entityType: 'job', entityId: job.job_id, kind: 'worker-spawned', payload: { terminal: spawned.terminal, dispatch: spawned.dispatchId, agent: route.agent, model: route.model, pool: route.pool, staging: staging.path }, now: now() });
-    });
-    live += 1;
-    result.launched.push({ jobId: job.job_id, terminal: spawned.terminal, agent: route.agent, model: route.model, staging: staging.path });
-  }
+  const pass = { m, dryRun, deps, env, root, now, orca, cap, result, notReady, live: running };
+  await eachInOrder(queuedJobs, (job) => launchJob(pass, job));
   return result;
 }
 
