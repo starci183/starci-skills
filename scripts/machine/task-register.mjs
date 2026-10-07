@@ -44,7 +44,7 @@ export const taskOf = (name) => TASK_DEFINITIONS[String(name ?? '')] ?? null;
 
 /** The per-user launcher written by `starci runtime install`; retained for internal callers that need the resolved path. */
 export const starciShimPath = ({ home = os.homedir(), platform = process.platform } = {}) =>
-  path.join(home, '.starci', 'bin', platform === 'win32' ? 'starci.cmd' : 'starci');
+  (platform === 'win32' ? path.win32 : path.posix).join(home, '.starci', 'bin', platform === 'win32' ? 'starci.cmd' : 'starci');
 
 // The task action's argument line is these parts around the cmd.exe path, the shim path and the starci command; the
 // registration script concatenates them in PowerShell and registeredAction concatenates them here, so one table owns both.
