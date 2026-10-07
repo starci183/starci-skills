@@ -59,28 +59,33 @@ export function collectRegistrations({ kit, graph, persistenceOf }) {
     }
     return null;
   };
+  const nameFromCall = (checker, node, depth) => {
+    for (const declaration of kit.declarationsOf(checker, node.expression)) {
+      const body = returned(declaration);
+      const value = body ? nameOfExpression(kit.checkerOf(declaration.getSourceFile()), body, depth + 1) : null;
+      if (value) return value;
+    }
+    return null;
+  };
+  const nameFromIdentifier = (checker, node, depth) => {
+    const declaration = kit.declarationsOf(checker, node)[0];
+    return declaration && ts.isVariableDeclaration(declaration) && declaration.initializer
+      ? nameOfExpression(kit.checkerOf(declaration.getSourceFile()), declaration.initializer, depth + 1) : null;
+  };
+  const nameFromProperty = (checker, node, depth) => {
+    const target = kit.declarationsOf(checker, node.name)[0];
+    if (!target) return null;
+    const names = new Set(assignmentsOf(node.name.text).filter(item => item.declaration === target)
+      .map(item => nameOfExpression(item.checker, item.initializer, depth + 1)).filter(Boolean));
+    return names.size === 1 ? [...names][0] : null;
+  };
   const nameOfExpression = (checker, expression, depth) => {
     const node = unparen(expression);
     if (!node || depth > 5) return null;
     if (ts.isObjectLiteralExpression(node)) return nameOfLiteral(checker, node, depth);
-    if (ts.isCallExpression(node)) {
-      for (const declaration of kit.declarationsOf(checker, node.expression)) {
-        const body = returned(declaration);
-        const value = body ? nameOfExpression(kit.checkerOf(declaration.getSourceFile()), body, depth + 1) : null;
-        if (value) return value;
-      }
-      return null;
-    }
-    if (ts.isIdentifier(node)) {
-      const declaration = kit.declarationsOf(checker, node)[0];
-      return declaration && ts.isVariableDeclaration(declaration) && declaration.initializer ? nameOfExpression(kit.checkerOf(declaration.getSourceFile()), declaration.initializer, depth + 1) : null;
-    }
-    if (ts.isPropertyAccessExpression(node)) {
-      const target = kit.declarationsOf(checker, node.name)[0];
-      if (!target) return null;
-      const names = new Set(assignmentsOf(node.name.text).filter(item => item.declaration === target).map(item => nameOfExpression(item.checker, item.initializer, depth + 1)).filter(Boolean));
-      return names.size === 1 ? [...names][0] : null;
-    }
+    if (ts.isCallExpression(node)) return nameFromCall(checker, node, depth);
+    if (ts.isIdentifier(node)) return nameFromIdentifier(checker, node, depth);
+    if (ts.isPropertyAccessExpression(node)) return nameFromProperty(checker, node, depth);
     return null;
   };
   /** The capability arrays (`<c>Entities` / `<c>Migrations` of persistence/connection.ts) an expression lists. */
