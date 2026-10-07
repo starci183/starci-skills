@@ -164,7 +164,7 @@ function safeDefinerExpression(node) {
   const template = stringValue(node.FuncCall.args?.[0]);
   if (template === undefined) return false;
   const specs = formatSpecifiers(template);
-  return specs !== null && specs.every((spec) => ['I', 'L', '%'].includes(spec.type));
+  return specs?.every((spec) => ['I', 'L', '%'].includes(spec.type)) ?? false;
 }
 
 async function definerDynamicFindings(file, fn, queries, baseLine) {
