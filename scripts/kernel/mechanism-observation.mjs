@@ -8,9 +8,13 @@ import { admittedContractOf, latestContractOf } from '../machine/contract-versio
 import { inputStamp } from '../gates/type-impact.mjs';
 import { DIGEST_SCHEMA } from '../gates/read-digest.mjs';
 import { isLinkLike } from '../api/fs/is-link-like.mjs';
-import { insidePath, sameResolvedPath, normRel } from '../lib/path-key.mjs';
+import { insidePath, sameResolvedPath, normRel, normPath } from '../lib/path-key.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { filedRequiredReads } from '../lib/filed-reads.mjs';
+import { revParseQuery } from '../api/git/rev-parse-query.mjs';
+import { mergeBaseQuery } from '../api/git/merge-base-query.mjs';
+import { revList } from '../api/git/rev-list.mjs';
+import { show } from '../api/git/show.mjs';
 
 const independent = new Set(['kernel', 'settler', 'parity', 'integrate']);
 const unavailable = (detail) => ({ status: 'unavailable', code: 'op-gate-tool-failed', detail, findings: [] });
@@ -45,7 +49,8 @@ export function observationContextOf(db, job, { repo, skillRoot }) {
   if (!roots.length) throw new Error('current mechanism proof has no filed target root');
   const attempt = db.prepare('SELECT * FROM op_attempts WHERE attempt_id=? AND job_id=?').get(contract.attempt_id, job.job_id);
   if (!attempt || attempt.try_no !== job.try_no) throw new Error('current mechanism proof has no exact active attempt');
-  return { attemptId: attempt.attempt_id, admittedAt: admitted.at, skillRoot, selected, readRefs: context.readRefs,
+  return { attemptId: attempt.attempt_id, admittedAt: admitted.at, admittedRuntimeSha: admitted.version?.runtimeSha ?? null,
+    skillRoot, selected, readRefs: context.readRefs, ownedPaths: context.owned_paths ?? [],
     roots: [...new Set(roots)], primary: roots[0], reportAt: db.prepare('SELECT created_at FROM reports WHERE attempt_id=?').get(attempt.attempt_id)?.created_at ?? null };
 }
 
@@ -159,8 +164,29 @@ export function mechanismObservations(db, context) {
   return [...latest.values()].map(({ row, native }) => observationOf(db, context, row, native));
 }
 
-/** One READ-file's verdict detail (unusable), or null when the input is exact. */
-const digestFileVerdict = (file, named, context, digest) => {
+/** A later runtime-main commit carrying these exact Source bytes, never an
+ * unlanded branch, dirty file or an op-owned input. Admission evidence is immutable. */
+const sourceReadRevision = (file, captured, context) => {
+  const admitted = context.admittedRuntimeSha, root = path.resolve(context.skillRoot), absolute = plain(path.resolve(root, file.path));
+  if (!/^[a-f0-9]{40,64}$/.test(admitted ?? '') || !sameResolvedPath(captured.root, root)
+      || !sameResolvedPath(captured.absolute, absolute) || !insidePath(root, absolute)
+      || (context.ownedPaths ?? []).some((owned) => insidePath(path.resolve(owned.abs ?? path.resolve(owned.root ?? context.primary, normPath(owned.path, { glob: 'star' }))), absolute, { includeSelf: true }))) return null;
+  const options = { cwd: root, timeout: 10000, maxBuffer: 16 * 1024 * 1024 };
+  const main = revParseQuery(['--verify', 'refs/heads/main'], options);
+  const tip = main.status === 0 ? main.stdout.trim() : '';
+  if (!/^[a-f0-9]{40,64}$/.test(tip) || mergeBaseQuery(['--is-ancestor', admitted, tip], options).status !== 0) return null;
+  const later = revList(['--ancestry-path', `${admitted}..${tip}`, '--', file.path], options);
+  if (later.status !== 0) return null;
+  for (const revision of [...new Set([tip, ...later.stdout.trim().split(/\s+/)])]) {
+    if (revision === admitted || !/^[a-f0-9]{40,64}$/.test(revision)) continue;
+    const blob = show([`${revision}:${file.path}`], { ...options, encoding: 'buffer' });
+    if (blob.status === 0 && sha256(blob.stdout) === file.sha256) return revision;
+  }
+  return null;
+};
+
+/** One READ-file's verdict detail (unusable), or null with any proven drift retained. */
+const digestFileVerdict = (file, named, context, digest, sourceDrift) => {
   const rel = normRel(file?.path ?? '');
   if (!rel || path.isAbsolute(rel) || rel === '..' || rel.startsWith('../') || !/^[a-f0-9]{64}$/.test(String(file?.sha256 ?? '')) || named.has(rel)) return 'READ contains a malformed, foreign or duplicate input';
   const canonical = ['pattern', 'example', 'knowledge'].includes(file.role);
@@ -168,7 +194,11 @@ const digestFileVerdict = (file, named, context, digest) => {
   const captured = context.readRefs.find((row) => row.path === rel && (canonical ? row.rootKind === 'source' : row.rootKind !== 'source'));
   try {
     if (captured) {
-      if (captured.sha256 !== file.sha256) return `READ differs from its filed input: ${rel}`;
+      if (captured.sha256 !== file.sha256) {
+        const revision = canonical && captured.rootKind === 'source' ? sourceReadRevision({ ...file, path: rel }, captured, context) : null;
+        if (!revision) return `READ differs from its filed input: ${rel}`;
+        sourceDrift.push({ path: rel, admissionDigest: captured.sha256, readDigest: file.sha256, revision });
+      }
       // An admitted Source law can drift advisably; the target's bytes cannot.
       if (captured.rootKind !== 'source' && (!fs.lstatSync(plain(captured.absolute)).isFile() || sha256File(captured.absolute) !== file.sha256))
         return `READ target input changed or is missing: ${rel}`;
@@ -190,14 +220,14 @@ export function judgeFiledRead(digest, context, doc, observations) {
   const at = Date.parse(digest.at), firstCheck = observations.filter((row) => row.native.schema !== DIGEST_SCHEMA && !row.judged).reduce((earliest, row) => Math.min(earliest, row.startedAt), context.reportAt ?? Infinity);
   if (!Number.isFinite(at) || at < context.admittedAt || at > firstCheck) return bad('READ was not recorded after admission and before CHECK/REPORT');
   if (!context.roots.some((root) => sameResolvedPath(root, digest.root))) return bad('READ names a foreign target');
-  const named = new Map();
+  const named = new Map(), sourceDrift = [];
   for (const file of digest.files) {
-    const verdict = digestFileVerdict(file, named, context, digest);
+    const verdict = digestFileVerdict(file, named, context, digest, sourceDrift);
     if (verdict) return bad(verdict);
   }
   // Admission's concrete READ expansion owns these law identities. A later
   // Source law addition cannot retroactively enlarge this attempt's duties.
   const required = filedRequiredReads(context.readRefs, context.selected?.contract?.reads ?? []);
   if (!required.size || [...required].some((rel) => !named.has(rel) || named.get(rel).role === 'read')) return bad('READ omits required filed common law, knowledge or declared example inputs');
-  return null;
+  return sourceDrift.length ? { status: 'pass', code: null, detail: null, findings: [], sourceDrift } : null;
 }

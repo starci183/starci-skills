@@ -286,13 +286,15 @@ export function judgeJobProofs({ op, files, mode = null, doc = loadOpGate(), obs
   const entries = proofEntriesOf(op, { mode, doc });
   if (!entries.length) return null;
   const owed = entries.map((e) => e.proof);
+  const sourceDrift = [];
   const nativeRows = context && Array.isArray(observations) ? observations : [];
   for (const { proof, projects } of entries) {
     const judged = judgeCurrentProof(proof, files, doc, { op, projects, observations: nativeRows, context });
     if (judged.status !== 'pass') return { op, proofs: owed, proof, judged };
+    sourceDrift.push(...(judged.sourceDrift ?? []));
   }
   const used = nativeRows.filter((row) => entries.some(({ proof }) => proof !== 'review-defects' && matching(proof, [row], doc).length));
-  return { op, proofs: owed, proof: null, judged: pass(), nativeCheckIds: used.map((row) => row.checkId),
+  return { op, proofs: owed, proof: null, judged: pass(), ...(sourceDrift.length ? { sourceDrift } : {}), nativeCheckIds: used.map((row) => row.checkId),
     inspectionCheckIds: op === 'security.verify' ? used.filter((row) => row.native.schema === LINT_SCHEMA && row.exitCode === 1).map((row) => row.checkId) : [],
     bindings: used.filter((row) => !row.judged).map((row) => row.native) };
 }
@@ -305,6 +307,7 @@ export function recordProofJudgment(ledger, { attemptId, judgment, now = Date.no
   ledger.transaction(() => recordCheck(ledger.db, { attemptId, name: OP_PROOF_CHECK, phase: 'verify', runner: 'settler', authority: 'runtime',
     command: `op-proof settle over ${judgment.proofs.join(', ')} (knowledge/op-gate.yaml opProofs)`, exitCode: green ? 0 : 1,
     summary: { codes: judged.code ? [judged.code] : [], evidence, failing: judged.findings, status: judged.status,
+      ...(judgment.sourceDrift?.length ? { sourceDrift: judgment.sourceDrift } : {}),
       entry: { name: OP_PROOF_CHECK, exitCode: green ? 0 : 1, codes: judged.code ? [judged.code] : [], evidence } }, now }));
   return { checkName: OP_PROOF_CHECK, green, status: judged.status, code: judged.code, evidence };
 }
