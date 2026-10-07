@@ -86,7 +86,7 @@ CREATE TABLE IF NOT EXISTS agents(
 CREATE TABLE IF NOT EXISTS models(
   profile     TEXT PRIMARY KEY,
   agent       TEXT REFERENCES agents(agent),
-  model       TEXT, pool TEXT, max_parallel INTEGER, share_pct REAL,
+  model       TEXT, pool TEXT, max_parallel INTEGER,
   roles_json  TEXT CHECK(roles_json IS NULL OR json_valid(roles_json)),
   cost_json   TEXT CHECK(cost_json IS NULL OR json_valid(cost_json)),
   source_rev  TEXT NOT NULL, loaded_at INTEGER NOT NULL) STRICT;

@@ -1211,7 +1211,7 @@ function projectCatalog(m, { agents = [], models = [], sourceRev = runtimeRev() 
   return m.transaction((db) => {
     const at = m.now();
     for (const a of agents) upsertRow(db, 'agents', { agent: a.agent, provider: a.provider ?? null, spawn_card: a.spawnCard ?? null, cli_name: a.cliName ?? null, source_rev: sourceRev, loaded_at: at }, ['agent']);
-    for (const p of models) upsertRow(db, 'models', { profile: p.profile, agent: p.agent ?? null, model: p.model ?? null, pool: p.pool ?? null, max_parallel: int(p.maxParallel), share_pct: p.sharePct ?? null,
+    for (const p of models) upsertRow(db, 'models', { profile: p.profile, agent: p.agent ?? null, model: p.model ?? null, pool: p.pool ?? null, max_parallel: int(p.maxParallel),
       roles_json: p.roles ?? null, cost_json: p.cost ?? null, source_rev: sourceRev, loaded_at: at }, ['profile']);
     return { agents: agents.length, models: models.length };
   });

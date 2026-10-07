@@ -62,8 +62,7 @@ export function currentInputOf(payload, job) {
     cut: payload.cut ?? null, after: payload.after ?? null, risk: payload.risk ?? null,
     model: text(payload.modelId), profile: text(payload.model), effort: text(payload.effort), difficulty: text(payload.difficulty),
     route: { chain: strings(payload.routeChain), rejected: Array.isArray(payload.routeRejected) ? payload.routeRejected : [],
-      order: text(payload.routeOrder), policy: text(payload.routePolicy), balance: payload.routeBalance ?? null,
-      crossFamily: payload.routeCrossFamily ?? null, at: payload.routedAt ?? null } };
+      tier: text(payload.tier), pick: payload.pick ?? null, at: payload.routedAt ?? null } };
 }
 /** Dispatch-keyed capture. context.inputs is rebaselineable; packet/managed/hierarchy are not reconstructed. */
 export function dispatchCapture(db, attemptId) {
@@ -86,6 +85,6 @@ export function dispatchCapture(db, attemptId) {
     goal: capturedGoal ? { revision: capturedGoal.revision, identity: capturedGoal.identity } : null,
     cut: pc?.cut ?? null, after: pc?.after ?? null, risk: pc?.risk ?? null,
     model: text(pc?.modelId), profile: text(packet.constraints?.model), effort: text(packet.constraints?.effort), difficulty: text(pc?.difficulty),
-    route: { chain: [], rejected: [], order: null, policy: null, balance: null, crossFamily: null, at: null } } : null;
+    route: { chain: [], rejected: [], tier: null, pick: null, at: null } } : null;
   return { dispatchContext, input, capturedGoal, ownedPaths };
 }

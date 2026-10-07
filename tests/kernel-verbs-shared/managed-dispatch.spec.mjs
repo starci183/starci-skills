@@ -41,7 +41,7 @@ const json=text=>{try{return JSON.parse(text);}catch{return null;}};
 // use those orchestration wrappers: every Kernel is a dedicated Orca
 // terminal, while operation agents retain their routed managed lifecycle.
 
-const fixture=(t,{dead=[],stale=[],allocationPolicy=null}={})=>{
+const fixture=(t,{dead=[],stale=[]}={})=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-managed-'));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
   const mainRepo=path.join(root,'main');fs.mkdirSync(mainRepo,{recursive:true});
@@ -84,13 +84,8 @@ const fixture=(t,{dead=[],stale=[],allocationPolicy=null}={})=>{
   const example=fs.readFileSync(path.join(ROOT,'config.example.yaml'),'utf8');
   const writeConfig=(kernelLine)=>{
     const canonical=kernelLine??'kernel: {agent: codex, model: gpt-6.1-sol, effort: high}';
-    let body=example.replace(/^kernel:.*$/m,canonical)
+    const body=example.replace(/^kernel:.*$/m,canonical)
       .replace(/^launchTrust:.*$/m,`launchTrust: ${JSON.stringify({profile:'automatic',approvedBy:'owner',approvalRef:'private managed dispatch fixture adoption',roots:[mainRepo]})}`);
-    if(allocationPolicy){
-      // Provider circuit scenarios keep order while testing repeated launches; the common example stays balanced.
-      assert.ok(body.includes('\n  policy: balanced\n'),'fixture allocation policy anchor must exist');
-      body=body.replace('\n  policy: balanced\n',`\n  policy: ${allocationPolicy}\n`);
-    }
     assert.match(body,/^kernel:/m,'fixture config keeps the kernel: line');
     fs.writeFileSync(path.join(ownerRoot,'config.yaml'),body);
   };
@@ -195,12 +190,16 @@ test('kernel pin precedence: config selects the agent/model the Kernel worker st
 test('kernel pin precedence: --agent flag beats the config pin',async t=>{
   const fx=fixture(t);fx.writeConfig(); // example pins codex
   const workflowId=await defineGoal(fx);
-  const r=await fx.run(START_WORKFLOW,'--repo',fx.repo,'--goal',workflowId,'--agent','devin','--plan','--json');
+  const r=await fx.run(START_WORKFLOW,'--repo',fx.repo,'--goal',workflowId,'--agent','claude','--plan','--json');
   assert.equal(r.status,0,r.stderr);
   const plan=json(r.stdout);
-  assert.equal(plan.agent,'devin','an explicit --agent flag is the operator override');
+  assert.equal(plan.agent,'claude','an explicit --agent flag is the operator override');
+  assert.equal(plan.model,'claude-sonnet-5-5','the flag is the bias only: the Kernel keeps the high tier model of that agent');
   assert.equal(plan.routedBy,'override');
   assert.equal(plan.launch,'worker');
+  const outside=await fx.run(START_WORKFLOW,'--repo',fx.repo,'--goal',workflowId,'--agent','devin','--plan','--json');
+  assert.equal(outside.status,1,'an agent the high tier does not hold names no Kernel member');
+  assert.equal(json(outside.stdout)?.step,'kernel-pin-unavailable');
 });
 
 test('kernel pin precedence: an unavailable explicit pin fails closed instead of silently substituting Devin',async t=>{
@@ -228,7 +227,7 @@ test('managed dispatch: route persists the decision, spawn marks the job running
       payload:{route:{host:'orca',agent:'codex',model:'gpt-6.1-sol'},hierarchy:{schema:'starci/agent-hierarchy@1',nodeId:'agent:kernel:wf-managed',parentNodeId:'workflow:wf-managed',role:'kernel'}}});
     ledger.db.prepare("UPDATE jobs SET status='running',worker_id='fake-kernel-terminal' WHERE job_id='kernel-wf-managed'").run();
     enqueueFixtureJob(ledger,{jobId,workflowId:'wf-managed',opId:'code.refactor',kind:'op',
-      payload:{opId:'code.refactor',owned_paths:['docs/'],model:'claude-agent'}});
+      payload:{opId:'code.refactor',owned_paths:['docs/'],difficulty:'hard',model:'claude-agent'}});
   }finally{ledger.close();}
 
   const r=await fx.run(API,'dispatch','--repo',fx.repo,'--job',jobId,'--model','claude-agent','--spawn','--json');
@@ -349,7 +348,7 @@ test('starci kernel report without the op\'s Dispatch capability sends no worker
   try{
     enqueueFixtureJob(ledger,{jobId:'kernel-wf-nocap',workflowId:'wf-nocap',kind:'kernel',role:'kernel',payload:{}});
     ledger.db.prepare("UPDATE jobs SET status='running',worker_id='fake-kernel-terminal' WHERE job_id='kernel-wf-nocap'").run();
-    enqueueFixtureJob(ledger,{jobId,workflowId:'wf-nocap',opId:'code.refactor',kind:'op',payload:{opId:'code.refactor',owned_paths:['docs/'],model:'claude-agent'}});
+    enqueueFixtureJob(ledger,{jobId,workflowId:'wf-nocap',opId:'code.refactor',kind:'op',payload:{opId:'code.refactor',owned_paths:['docs/'],difficulty:'hard',model:'claude-agent'}});
   }finally{ledger.close();}
   const d=await fx.run(API,'dispatch','--repo',fx.repo,'--job',jobId,'--model','claude-agent','--spawn','--json');
   assert.equal(d.status,0,d.stderr||d.stdout);
@@ -371,7 +370,7 @@ test('managed settle: a Dispatch with no worker_done (the op filed no report) is
   try{
     enqueueFixtureJob(ledger,{jobId:'kernel-wf-nodone',workflowId:'wf-nodone',kind:'kernel',role:'kernel',payload:{}});
     ledger.db.prepare("UPDATE jobs SET status='running',worker_id='fake-kernel-terminal' WHERE job_id='kernel-wf-nodone'").run();
-    enqueueFixtureJob(ledger,{jobId,workflowId:'wf-nodone',opId:'code.refactor',kind:'op',payload:{opId:'code.refactor',owned_paths:['docs/'],model:'claude-agent'}});
+    enqueueFixtureJob(ledger,{jobId,workflowId:'wf-nodone',opId:'code.refactor',kind:'op',payload:{opId:'code.refactor',owned_paths:['docs/'],difficulty:'hard',model:'claude-agent'}});
   }finally{ledger.close();}
   const d=await fx.run(API,'dispatch','--repo',fx.repo,'--job',jobId,'--model','claude-agent','--spawn','--json');
   assert.equal(d.status,0,d.stderr||d.stdout);
@@ -396,7 +395,7 @@ for(const unknown of [1,2]) test(`managed settle: release_unknown ${unknown}x re
     enqueueFixtureJob(ledger,{jobId:'kernel-wf-release',workflowId:'wf-release',kind:'kernel',role:'kernel',
       payload:{route:{host:'orca',agent:'codex',model:'gpt-6.1-sol'},hierarchy:{schema:'starci/agent-hierarchy@1',nodeId:'agent:kernel:wf-release',parentNodeId:'workflow:wf-release',role:'kernel'}}});
     ledger.db.prepare("UPDATE jobs SET status='running',worker_id='fake-kernel-terminal' WHERE job_id='kernel-wf-release'").run();
-    enqueueFixtureJob(ledger,{jobId,workflowId:'wf-release',opId:'code.refactor',kind:'op',payload:{opId:'code.refactor',owned_paths:['docs/'],model:'claude-agent'}});
+    enqueueFixtureJob(ledger,{jobId,workflowId:'wf-release',opId:'code.refactor',kind:'op',payload:{opId:'code.refactor',owned_paths:['docs/'],difficulty:'hard',model:'claude-agent'}});
   }finally{ledger.close();}
   const d=await fx.run(API,'dispatch','--repo',fx.repo,'--job',jobId,'--model','claude-agent','--spawn','--json');
   assert.equal(d.status,0,d.stderr||d.stdout);
@@ -480,7 +479,7 @@ test('finish closes the kernel terminal and never issues task-update (the Task o
 });
 
 test('Claude auth rejection circuits the shared-auth provider for every job and reuses the logical operation attempt',async t=>{
-  const fx=fixture(t,{allocationPolicy:'prefer-then-overflow'});
+  const fx=fixture(t);
   fx.env.STARCI_FAKE_ORCA_MODE='auth';
   const jobId='job-claude-auth-circuit';
   const siblingJobId='job-claude-prerouted-sibling';
@@ -500,7 +499,7 @@ test('Claude auth rejection circuits the shared-auth provider for every job and 
   const firstRoute=await fx.run(API,'route','--repo',fx.repo,'--job',jobId,'--difficulty','hard',
     '--json');
   assert.equal(firstRoute.status,0,firstRoute.stderr||firstRoute.stdout);
-  assert.equal(json(firstRoute.stdout)?.decision?.routePolicy,'prefer-then-overflow','private owner fixture declares ordered routing');
+  assert.equal(json(firstRoute.stdout)?.decision?.tier,'high','a hard decision takes the high tier: Sonnet, then Sol');
   assert.equal(json(firstRoute.stdout)?.decision?.model,'claude-agent',
     'fresh authenticated quota permits the owner-preferred provider to reach launch attestation');
   const siblingRoute=await fx.run(API,'route','--repo',fx.repo,'--job',siblingJobId,'--difficulty','hard',
@@ -540,7 +539,7 @@ test('Claude auth rejection circuits the shared-auth provider for every job and 
   const decision=json(fallback.stdout)?.decision;
   assert.equal(decision?.model,'codex-agent','fallback must cross the failed auth provider boundary');
   const rejectedTargets=new Set((decision?.routeRejected??[]).map(item=>item.target));
-  assert.ok(rejectedTargets.has('claude-agent'),'the Claude pool is excluded by the provider circuit');
+  assert.ok(rejectedTargets.has('claude/claude-sonnet-5-5'),'the Claude pool is excluded by the provider circuit');
   assert.equal(ledgerRead(fx,db=>db.prepare('SELECT try_no AS attempt FROM jobs WHERE job_id=?').get(jobId)?.attempt),1);
 });
 
@@ -638,7 +637,7 @@ test('a dispatch refused after the worker exists closes that worker in the same 
     enqueueFixtureJob(ledger,{jobId:`kernel-${workflowId}`,workflowId,kind:'kernel',role:'kernel',payload:{}});
     ledger.db.prepare("UPDATE jobs SET status='running',worker_id='fake-kernel-terminal' WHERE job_id=?").run(`kernel-${workflowId}`);
     enqueueFixtureJob(ledger,{jobId,workflowId,opId:'code.refactor',kind:'op',
-      payload:{opId:'code.refactor',owned_paths:['docs/'],model:'claude-agent'}});
+      payload:{opId:'code.refactor',owned_paths:['docs/'],difficulty:'hard',model:'claude-agent'}});
   }finally{ledger.close();}
 
   const rejected=await fx.run(API,'dispatch','--repo',fx.repo,'--job',jobId,'--model','claude-agent','--spawn','--json');
@@ -839,7 +838,7 @@ test('kernel launch fails closed when the worker does not attest the requested m
 /* ------------------------------------------ worker-start feeds provider health */
 
 test('an unclassified worker-start refusal is a strike; the second one opens the provider circuit',async t=>{
-  const fx=fixture(t,{allocationPolicy:'prefer-then-overflow'});
+  const fx=fixture(t);
   fx.env.STARCI_FAKE_ORCA_MODE='worker-start-refused';
   const workflowId='wf-worker-start-strikes';
   const ledger=openLedger({file:fx.ledgerFile});
@@ -857,7 +856,7 @@ test('an unclassified worker-start refusal is a strike; the second one opens the
   const dispatchClaude=async jobId=>{
     const routed=await fx.run(API,'route','--repo',fx.repo,'--job',jobId,'--difficulty','hard','--json');
     assert.equal(routed.status,0,routed.stderr||routed.stdout);
-    assert.equal(json(routed.stdout)?.decision?.routePolicy,'prefer-then-overflow','the private circuit fixture preserves route order');
+    assert.equal(json(routed.stdout)?.decision?.tier,'high','the tier chain is the same on every route');
     return {routed:json(routed.stdout)?.decision?.model,
       dispatched:await fx.run(API,'dispatch','--repo',fx.repo,'--job',jobId,'--spawn','--json')};
   };
@@ -895,14 +894,14 @@ test('an unclassified worker-start refusal is a strike; the second one opens the
   assert.equal(third.status,0,third.stderr||third.stdout);
   const decision=json(third.stdout)?.decision;
   assert.notEqual(decision?.model,'claude-agent','route must skip the pool whose launch path is refusing');
-  assert.ok(new Set((decision?.routeRejected??[]).map(item=>item.target)).has('claude-agent'),
+  assert.ok(new Set((decision?.routeRejected??[]).map(item=>item.target)).has('claude/claude-sonnet-5-5'),
     'the skipped pool is named with its reason, not silently dropped');
   assert.equal(fx.calls().filter(call=>call==='orchestration worker-start').length,2,
     'no third launch is burned on the circuited pool');
 });
 
 test('a circuit that reopens for the same failure waits longer each time (circuitBackoff)',async t=>{
-  const fx=fixture(t,{allocationPolicy:'prefer-then-overflow'});
+  const fx=fixture(t);
   fx.env.STARCI_FAKE_ORCA_MODE='worker-start-refused';
   const workflowId='wf-worker-start-backoff';
   const ledger=openLedger({file:fx.ledgerFile});
@@ -919,7 +918,7 @@ test('a circuit that reopens for the same failure waits longer each time (circui
   const refuse=async jobId=>{
     const routed=await fx.run(API,'route','--repo',fx.repo,'--job',jobId,'--difficulty','hard','--json');
     assert.equal(routed.status,0,routed.stderr||routed.stdout);
-    assert.equal(json(routed.stdout)?.decision?.routePolicy,'prefer-then-overflow','the owner-selected fixture policy is retained across cooldowns');
+    assert.equal(json(routed.stdout)?.decision?.tier,'high','the tier chain is the same across cooldowns');
     assert.equal(json(routed.stdout)?.decision?.model,'claude-agent','each refused launch exercises the same provider before a circuit opens');
     const refused=await fx.run(API,'dispatch','--repo',fx.repo,'--job',jobId,'--spawn','--json');
     assert.notEqual(refused.status,0,'the fixture must reach the refused worker start');
@@ -1006,15 +1005,15 @@ test('route admits only agents that carry the op host tool; with every carrier e
   const fx=fixture(t);
   fx.writeConfig();
   const wf='wf-host-tools';
-  // interface.audit walks the ui order (codex, then devin; owner routing 2026-09-26); the devin and codex cards
-  // list browser-dom, and claude-agent is not on the order at all: a prefer for it never puts it there.
+  // interface.audit raised to its hard floor takes the high tier (Sonnet, then Sol): the codex card lists browser-dom and
+  // the claude card does not, so a prefer for claude-agent never puts it past the missing tool.
   seedGoalBias(fx,wf,{prefer:['claude-agent'],avoid:['devin-agent']});
   seedOp(fx,wf,'job-audit-medium','interface.audit');
   const audit=await fx.run(API,'route','--repo',fx.repo,'--job','job-audit-medium','--difficulty','medium','--json');
   assert.equal(audit.status,0,audit.stderr||audit.stdout);
   const decided=json(audit.stdout);
-  assert.equal(decided.decision.model,'codex-agent','the ui order leads with the pool that carries browser-dom');
-  assert.ok(!decided.rejected.some(r=>r.target==='claude-agent'),'claude-agent is off the ui order entirely');
+  assert.equal(decided.decision.model,'codex-agent','the tier leads with the member that carries browser-dom');
+  assert.match(decided.rejected.find(r=>r.target==='claude/claude-sonnet-5-5')?.reasons?.join(';')??'',/lacks host tool 'browser-dom'/,'claude is rejected by name for the missing tool');
 
   seedOp(fx,wf,'job-draw','interface.draw');
   const draw=await fx.run(API,'route','--repo',fx.repo,'--job','job-draw','--difficulty','medium','--json');
@@ -1027,11 +1026,11 @@ test('route admits only agents that carry the op host tool; with every carrier e
   assert.equal(avoid.status,1);
   const refusal=json(avoid.stdout);
   assert.equal(refusal.ok,false);
-  assert.match(String(refusal.error),/./,'the ui order [codex-agent, devin-agent] is fully excluded by the goal bias: no pool is left');
+  assert.match(String(refusal.error),/./,'the tier [claude, codex] is fully excluded: Claude lacks the tool and the goal bias avoids Codex');
   assert.equal(json(jobRow(fx,'job-audit-avoid').payload_json).model,undefined,'a refused route persists no decision');
 });
 
-test('dispatch --spawn refuses before any Orca call when the routed agent is outside the op order (claude-agent carries no browser-dom)',async t=>{
+test('dispatch --spawn refuses before any Orca call when the routed agent lacks the op host tool (claude-agent carries no browser-dom)',async t=>{
   const fx=fixture(t);
   fx.writeConfig();
   // Reach the route-order gate with the typed audit input this operation requires.
@@ -1044,11 +1043,12 @@ test('dispatch --spawn refuses before any Orca call when the routed agent is out
   assert.equal(r.status,1,r.stderr||r.stdout);
   const out=json(r.stdout);
   assert.ok(out,r.stderr||r.stdout||'dispatch returned no JSON');
-  assert.equal(out.reason,'model-outside-order');
+  assert.equal(out.reason,'tool-unavailable');
+  assert.deepEqual(out.lackingTools??out.tools,['browser-dom']);
   assert.deepEqual(fx.calls(),[],'nothing reached the host');
   assert.equal(jobRow(fx,'job-audit-codex').status,'queued');
   const dry=json((await fx.run(API,'dispatch','--repo',fx.repo,'--job','job-audit-codex','--json')).stdout);
-  assert.match(dry.modelOutsideOrder,/outside/,'the dry run warns instead of refusing');
+  assert.match(String(dry.toolUnavailable),/browser-dom/,'the dry run warns instead of refusing');
 });
 
 // Mia Mia inc-eb9a21769d69, inc-a253fdf2deda, inc-fbff1e65b60f, inc-d1c5a963c8bb: settle released the
@@ -1063,7 +1063,7 @@ test('a dead managed worker settles with custody released from its disconnected 
     enqueueFixtureJob(ledger,{jobId:'kernel-wf-custody',workflowId:'wf-custody',kind:'kernel',role:'kernel',
       payload:{route:{host:'orca',agent:'codex',model:'gpt-6.1-sol'},hierarchy:{schema:'starci/agent-hierarchy@1',nodeId:'agent:kernel:wf-custody',parentNodeId:'workflow:wf-custody',role:'kernel'}}});
     ledger.db.prepare("UPDATE jobs SET status='running',worker_id='fake-kernel-terminal' WHERE job_id='kernel-wf-custody'").run();
-    enqueueFixtureJob(ledger,{jobId,workflowId:'wf-custody',opId:'code.refactor',kind:'op',payload:{opId:'code.refactor',owned_paths:['docs/'],model:'claude-agent'}});
+    enqueueFixtureJob(ledger,{jobId,workflowId:'wf-custody',opId:'code.refactor',kind:'op',payload:{opId:'code.refactor',owned_paths:['docs/'],difficulty:'hard',model:'claude-agent'}});
   }finally{ledger.close();}
   const d=await fx.run(API,'dispatch','--repo',fx.repo,'--job',jobId,'--model','claude-agent','--spawn','--json');
   assert.equal(d.status,0,d.stderr||d.stdout);
