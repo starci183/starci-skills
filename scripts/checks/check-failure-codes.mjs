@@ -129,7 +129,7 @@ const sourceTexts = (base) => {
 };
 
 /** The codes one scanned source emits, pushed through `add`. */
-const fileEmittedCodes = (rel, text, { NOT_CODES, envNames, add }) => {
+const upperCodeFindings = (rel, text, NOT_CODES, envNames, add) => {
   for (const m of text.matchAll(UPPER_RE)) {
     const code = m[2];
     if (NOT_CODES.has(code) || NOT_CODE_PREFIX.test(code) || envNames.has(code)) continue;
@@ -142,12 +142,20 @@ const fileEmittedCodes = (rel, text, { NOT_CODES, envNames, add }) => {
     if (NOT_CODES.has(m[1]) || NOT_CODE_PREFIX.test(m[1]) || envNames.has(m[1])) continue;
     add(m[1], 'upper', rel, lineOf(text, m.index));
   }
+};
+
+const kebabCodeFindings = (rel, text, NOT_CODES, add) => {
   if (!rel.endsWith('.mjs')) return;
   const addKebab = (code, at) => { if (!NOT_CODES.has(code)) add(code, 'kebab', rel, lineOf(text, at)); };
   for (const m of text.matchAll(LIST_RE)) {
     for (const item of m[1].matchAll(new RegExp(`['"](${KEBAB})['"]`, 'g'))) addKebab(item[1], m.index);
   }
   for (const re of KEBAB_RES) for (const m of text.matchAll(re)) addKebab(m[m.length - 1], m.index);
+};
+
+const fileEmittedCodes = (rel, text, { NOT_CODES, envNames, add }) => {
+  upperCodeFindings(rel, text, NOT_CODES, envNames, add);
+  kebabCodeFindings(rel, text, NOT_CODES, add);
 };
 
 /** Every emitted code: {code, kind: 'upper'|'kebab', sites: [{file, line}]}. Sorted by code. */
