@@ -91,7 +91,7 @@ export function hostSettings(raw = parseYaml(fs.readFileSync(HOST_YAML, 'utf8'))
     checkers,
     allowTaskRepair: h.allowTaskRepair === true,
     seats: {
-      kernel: seat('kernel', ['maxReplacementsPerHour', 'holdMs', 'timeoutMs', 'vacantSlaMs', 'inputSlaMs', 'gatedSlaMs', 'hostOutageSlaMs', 'quarantinedSlaMs']),
+      kernel: seat('kernel', ['maxReplacementsPerHour', 'holdMs', 'timeoutMs', 'vacantSlaMs', 'inputSlaMs', 'gatedSlaMs', 'hostOutageSlaMs', 'quarantinedSlaMs', 'blockedRetryMs']),
       supervisor: seat('supervisor', ['timeoutMs']),
     },
     processes: section('processes', ['everyMs', 'orphanMinAgeMs', 'orphanSlaMs', 'footprintEveryMs', 'terminalSlack', 'terminalDriftSlaMs']),

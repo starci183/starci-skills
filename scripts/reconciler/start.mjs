@@ -12,22 +12,24 @@ import { loadConfig } from '../../engine/config.mjs';
 import { green, red, warn } from './checklist-items.mjs';
 import { depthItems } from './depth-items.mjs';
 import { ensure, crashLoopPlan, crashLoopRecord, leaderState, restartEngine, status } from './boot.mjs';
-import { PROFILES, REQUIRED_ACTIVE, SKILL_ROOT, reconcilerConfig, reconcilerNumbers } from './state.mjs'; import { DEFAULT_SUPERVISOR_MODE, supervisorMode } from '../machine/home.mjs';
-import { probeOrcaAsync, serviceRegistry, servicePorts, servicePlatformProblem, startService } from './services.mjs'; import { execNode } from '../api/node/exec-node.mjs';
+import { PROFILES, REQUIRED_ACTIVE, SKILL_ROOT, reconcilerConfig, reconcilerNumbers } from './state.mjs'; import { supervisorMode } from '../machine/home.mjs';
+import { probeOrcaAsync, serviceRegistry, servicePorts, servicePlatformProblem, startService } from './services.mjs';
 import { sleep } from '../lib/sleep.mjs'; import { isMain } from '../lib/is-main.mjs';
 import { buildUi, uiBuildState } from './ui-build.mjs';
 export { buildUi, uiBuildState };
 import { workflowCaller } from '../agent/caller-context.mjs';
 import { PROFILE, engineItems, profileItems, safeShadowOf, serviceItems } from './start-items.mjs';
 import { auditTasks } from '../machine/task-audit.mjs';
-import { taskItems } from './task-health.mjs';
+import { launcherItem, taskItems } from './task-health.mjs';
 import { applyEngine, applyUiBuild, startDownServices, startSeats, waitForLeader } from './start-apply.mjs';
-import { eachInOrder, repeatInOrder } from '../lib/in-order.mjs';
+import { repeatInOrder } from '../lib/in-order.mjs';
+import { coreDebugRow, json, kernelSeatItems, seatNeed, supervisorRow } from './seat-items.mjs';
+import { isLauncherOrTaskRow, healLauncherAndTasks, registerTask, runtimeLink } from './start-heal.mjs';
+import { renderBrief, renderText } from './start-render.mjs';
 export { PROFILE, engineItems, profileItems, safeShadowOf };
 export { engineIsSafe } from './start-items.mjs';
 
 const MIN_SQLITE = '3.51.3';
-const GROUPS = ['preflight', 'config', 'engine', 'controllers', 'services', 'seats', 'sla'];
 const START_WAIT_MS = 120_000;
 
 /* ------------------------------------------------------------ items */
@@ -160,46 +162,9 @@ async function probeServices({ registry = serviceRegistry(), names = null } = {}
   }));
 }
 
-/** The Supervisor seat row from `start-supervisor.mjs --status --json` (or the mode). Pure. */
-function supervisorItem({ mode, statusJson, startJson = null }) {
-  if (mode !== 'kernel') return green('seats', 'supervisor', 'Supervisor seat', 'chat mode: the owner\'s desktop chat is the Supervisor (nothing to start)');
-  const h = statusJson?.health;
-  if (startJson?.ok === false) {
-    const error = startJson.error || startJson.reason;
-    const detail = `start-supervisor: ${startJson.action ?? 'failed'}` + (error ? ` - ${String(startJson.error ?? startJson.reason).slice(0, 160)}${startJson.detail ? `: ${String(startJson.detail).slice(0, 240)}` : ''}` : '');
-    return red('seats', 'supervisor', 'Supervisor seat', detail, 'starci supervisor start --json');
-  }
-  if (h?.live) {
-    const terminal = h.terminal ? ` (${h.terminal})` : '';
-    const starting = h.starting ? ', starting' : '';
-    return green('seats', 'supervisor', 'Supervisor seat', `live${terminal}${starting}`);
-  }
-  return red('seats', 'supervisor', 'Supervisor seat', h ? `not live: ${h.reason ?? 'unknown'}` : 'status unreadable', 'starci supervisor start --json');
-}
-
-/** A Kernel seat row from a watchdog `--once --json` answer. Pure. */
-function kernelSeatItem({ ledger, workflowId, answer, seatState }) {
-  const name = `Kernel seat ${workflowId}`;
-  const id = `seat:kernel:${ledger}:${workflowId}`;
-  const action = answer?.action ?? null;
-  if (seatState === 'live' && answer?.ok !== false) return green('seats', id, name, `live (${action ?? 'ok'})`);
-  const state = seatState ?? 'unknown';
-  const actionText = action ? ` (${action})` : '';
-  const error = answer?.error ? `: ${String(answer.error).slice(0, 120)}` : '';
-  return red('seats', id, name, `${state}${actionText}${error}`,
-    `starci machine kernel-watchdog --repo <repo> --workflow ${workflowId} --once --repair --json`);
-}
-
 /* ------------------------------------------------------------ the read-only gather */
 
 function safeRun(fn, fallback) { try { return fn(); } catch { return fallback; } }
-
-async function json(args, { timeoutMs = 120_000 } = {}) {
-  const { error, stdout } = await execNode(args, { cwd: SKILL_ROOT, timeout: timeoutMs, maxBuffer: 256 * 1024 * 1024 });
-  const lines = String(stdout ?? '').trim().split(/\r?\n/).reverse();
-  for (const line of lines) { try { const v = JSON.parse(line); if (v && typeof v === 'object') return v; } catch { /* next */ } }
-  return error?.killed || error?.code === 'ETIMEDOUT' ? { ok: false, error: 'timeout' } : null;
-}
 
 /** The machine.sqlite preflight row, and the ledgers it registers: `{ ledgers, rows }`. */
 function machineDbRows(env) {
@@ -239,20 +204,9 @@ function engineRows(env, config) {
 async function serviceRows(config, platform) {
   const probes = await probeServices();
   const tasks = servicePlatformProblem('harness-ui', platform) ? null : await auditTasks();
-  const services = [...serviceItems(probes, { publicUrl: safeRun(() => servicePorts().harnessPublicUrl, null), config, audits: tasks?.audits }), ...taskItems(tasks)];
+  const services = [...serviceItems(probes, { publicUrl: safeRun(() => servicePorts().harnessPublicUrl, null), config, audits: tasks?.audits }), ...launcherItem(tasks), ...taskItems(tasks)];
   const ui = uiBuildState();
-  return [services, ui.stale ? red('services', 'ui-build', 'harness UI build (ui/dist)', ui.reason, 'starci reconciler up (rebuilds the harness UI)') : green('services', 'ui-build', 'harness UI build (ui/dist)', ui.reason)];
-}
-
-/** The Supervisor seat row (read through `start-supervisor --status` when its seat can be reached). */
-async function supervisorRow({ env, config, orca, seats, orcaProbe }) {
-  const mode = safeRun(() => supervisorMode({ env, config }), DEFAULT_SUPERVISOR_MODE);
-  if (mode === 'kernel' && seats && orcaProbe.ok) {
-    const st = await json([path.join(SKILL_ROOT, 'scripts', 'supervisor', 'start-supervisor.mjs'), '--status', '--json'], { timeoutMs: 90_000 });
-    return supervisorItem({ mode, statusJson: st });
-  }
-  if (mode === 'kernel') return red('seats', 'supervisor', 'Supervisor seat', orca ? 'Orca is not reachable' : 'not checked', 'open Orca, then run start again');
-  return supervisorItem({ mode });
+  return [services, ui.stale ? red('services', 'ui-build', 'harness UI build (ui/dist)', ui.reason, 'starci reconciler up --services (rebuilds the harness UI)') : green('services', 'ui-build', 'harness UI build (ui/dist)', ui.reason)];
 }
 
 /** The Orca reachability rows: one row, or none when Orca was not probed. */
@@ -264,20 +218,11 @@ function orcaRow(orcaProbe) {
   return orcaProbe.ok ? [green('preflight', 'orca', 'Orca reachable', `${orcaProbe.terminals ?? 0} terminal(s)`)] : [];
 }
 
-/** The Core debug seat row. */
-async function coreDebugRow(env) {
-  let health;
-  try { health = (await import('./core-debug.mjs')).coreDebugStatus({ env }); }
-  catch (error) { health = { ready: false, error: String(error?.message ?? error) }; }
-  return health.ready === true ? green('seats', 'core-debug', 'Core debug seat', 'native worker live on its bound caller route')
-    : red('seats', 'core-debug', 'Core debug seat', health.error ?? health.health?.reason ?? 'not ready', 'run the approved StarCi start with its declared caller route');
-}
-
 /**
  * Every checklist row, read-only: preflight, config, engine, controllers, services, seats, sla, ui build. Never throws
  * (a failing section is one red row). Seams (specs): env, config, machine reads, probes.
  */
-export async function gather({ env = process.env, config = safeRun(() => loadConfig(), null), orca = true, seats = true, workflowSeats = true, coreDebug = true, depthProbe = null, platform = process.platform } = {}) {
+export async function gather({ env = process.env, config = safeRun(() => loadConfig(), null), orca = true, seats = true, workflowSeats = true, coreDebug = true, seatsRequested = true, depthProbe = null, platform = process.platform } = {}) {
   const items = [];
   const push = (...rows) => items.push(...rows.flat());
   // preflight
@@ -292,9 +237,10 @@ export async function gather({ env = process.env, config = safeRun(() => loadCon
   // services
   push(await serviceRows(config, platform));
   // seats
-  push(await supervisorRow({ env, config, orca, seats, orcaProbe }), orcaRow(orcaProbe));
-  if (seats && workflowSeats) push(await kernelSeatItems({ orcaOk: orcaProbe.ok !== false, config }));
-  if (coreDebug && config?.debug === true) push(await coreDebugRow(env));
+  const need = await seatNeed({ config, seatsRequested });
+  push(await supervisorRow({ env, config, orca, seats, orcaProbe, needed: need.needed }), orcaRow(orcaProbe));
+  if (seats && workflowSeats) push(await kernelSeatItems({ orcaOk: orcaProbe.ok !== false, config, rows: need.rows }));
+  if (coreDebug && config?.debug === true) push(await coreDebugRow(env, { needed: need.needed }));
   push(await depthItems({ env, config, orcaOk: orcaProbe.ok === true, ...(depthProbe ? { probe: depthProbe } : {}) }));
   return items;
 }
@@ -320,49 +266,12 @@ async function worktreeItems({ env = process.env, repos = [], counts = null } = 
   });
 }
 
-/** Every running workflow of every managed repo, its Kernel seat read through the watchdog's read-only pass. */
-async function kernelSeatItems({ orcaOk = true, config = null, repair = false } = {}) {
-  const { resumeRepos, runningWorkflows } = await import('../kernel/managed-repos.mjs');
-  const { seatStateOf } = await import('./controllers/host.mjs');
-  const { repos } = resumeRepos({ config });
-  const rows = [];
-  for (const repo of repos) for (const wf of runningWorkflows(repo)) rows.push({ repo, workflowId: wf.workflowId });
-  if (!rows.length) return [green('seats', 'seat:kernel', 'Kernel seats', 'no running workflow', { required: false })];
-  const out = [];
-  await eachInOrder(rows, async ({ repo, workflowId }) => {
-    const ledger = path.basename(repo);
-    if (!orcaOk) { out.push(red('seats', `seat:kernel:${ledger}:${workflowId}`, `Kernel seat ${workflowId}`, 'Orca is not reachable', 'open Orca, then run start again')); return; }
-    const args = [path.join(SKILL_ROOT, 'scripts', 'kernel', 'kernel-watchdog.mjs'), '--repo', repo, '--workflow', workflowId, '--once', '--json', ...(repair ? ['--repair'] : [])];
-    const answer = await json(args, { timeoutMs: 300_000 });
-    out.push(kernelSeatItem({ ledger, workflowId, answer, seatState: answer?.action ? seatStateOf(answer.action) : null }));
-  });
-  return out;
-}
-
 /* ------------------------------------------------------------ render */
 
 export function summarize(items) {
   const redRequired = items.filter((i) => i.status === 'red' && i.required);
   const warns = items.filter((i) => i.status === 'warn');
   return { ok: redRequired.length === 0, red: redRequired.length, warn: warns.length, green: items.filter((i) => i.status === 'green').length };
-}
-
-function renderText(items, { applied = [] } = {}) {
-  const mark = { green: '[GREEN]', red: '[RED]  ', warn: '[WARN] ' };
-  const lines = [];
-  for (const group of GROUPS) {
-    const rows = items.filter((i) => i.group === group);
-    if (!rows.length) continue;
-    lines.push(`${group.toUpperCase()}`);
-    for (const r of rows) {
-      lines.push('  ' + mark[r.status] + ' ' + r.name + (r.detail ? ' - ' + r.detail : ''));
-      if (r.fix && r.status !== 'green') lines.push(`           fix: ${r.fix}`);
-    }
-  }
-  if (applied.length) lines.push('APPLIED', ...applied.map((a) => `  ${a}`));
-  const s = summarize(items);
-  lines.push(`START ${s.ok ? 'GREEN' : 'RED'}: ${s.green} green, ${s.red} red, ${s.warn} warn`);
-  return lines.join('\n');
 }
 
 /* ------------------------------------------------------------ apply */
@@ -396,13 +305,17 @@ function setProfileResult(setProfile) {
   return `config.yaml already on profile ${setProfile}`;
 }
 
+/**
+ * The host actions. Scope `services` is the no-quota heal (launcher, tasks, UI build, engine, services): it returns before any
+ * Orca probe and never reaches a seat launcher. Scope `full` adds the Supervisor seat and, without workflow ingress, the Kernel seats.
+ */
 export async function applyHost(opts, deps = {}) {
   const applied = [];
-  const { env = process.env, waitMs, setProfile, noBuild, retire, workflowSeats = true, platform = process.platform } = opts;
+  const { env = process.env, waitMs, setProfile, noBuild, retire, workflowSeats = true, scope = 'full', platform = process.platform } = opts;
   const unsupported = servicePlatformProblem('harness-ui', platform);
   if (unsupported) return [`host startup refused: ${unsupported}`];
   const api = { uiBuildState, buildUi, leaderState, reconcilerNumbers, crashLoopRecord, status, restartEngine, ensure,
-    sleep, probeServices, startService, auditTasks, loadConfig, probeOrcaAsync, supervisorMode, json, kernelSeatItems, ...deps };
+    sleep, probeServices, startService, auditTasks, runtimeLink, registerTask, loadConfig, probeOrcaAsync, supervisorMode, json, kernelSeatItems, ...deps };
   if (retire) applied.push(retireStaleLedgers(env));
   if (setProfile) applied.push(setProfileResult(setProfile));
   let rebuilt = false;
@@ -411,6 +324,7 @@ export async function applyHost(opts, deps = {}) {
     if (ui.failed) return applied;
     rebuilt = ui.rebuilt;
   }
+  await healLauncherAndTasks(api, { env }, applied);
   const leader = api.leaderState({ env });
   const numbers = api.reconcilerNumbers();
   const plan = crashLoopPlan(api.crashLoopRecord({ env, windowMs: numbers.crashLoop.windowMs }), { max: numbers.crashLoop.max, windowMs: numbers.crashLoop.windowMs });
@@ -419,6 +333,7 @@ export async function applyHost(opts, deps = {}) {
   await applyEngine(api, { env, leader, plan, shadowed }, applied);
   await waitForLeader(api, env, waitMs);
   await startDownServices(api, { loadConfig: () => safeRun(() => api.loadConfig(), null), rebuilt }, applied);
+  if (scope === 'services') return applied;
   const orcaUp = (await api.probeOrcaAsync({ timeoutMs: 30_000 })).ok;
   const config = safeRun(() => api.loadConfig(), null);
   await startSeats(api, { env, orcaUp, config, workflowSeats }, applied);
@@ -427,12 +342,13 @@ export async function applyHost(opts, deps = {}) {
 
 export async function ensureHostRuntime({ env = process.env, waitMs = START_WAIT_MS, workflowSeats = false, check = false, platform = process.platform, ...opts } = {}, deps = {}) {
   const read = deps.gather ?? gather, apply = deps.applyHost ?? applyHost, wait = deps.sleep ?? sleep, now = deps.now ?? Date.now;
-  const readOptions = { env, workflowSeats, coreDebug: check, platform };
+  const services = opts.scope === 'services';
+  const readOptions = { env, workflowSeats, coreDebug: check || services, seatsRequested: !check && !services, platform };
   let items = await read(readOptions);
   const blockers = items.filter((item) => item.required && item.status === 'red' && ['preflight', 'config'].includes(item.group)
     && !(opts.setProfile && item.group === 'config' && item.id === 'profile'));
   let applied = [];
-  if (!check && blockers.length === 0 && (!summarize(items).ok || opts.setProfile || opts.retire)) {
+  if (!check && blockers.length === 0 && (!summarize(items).ok || opts.setProfile || opts.retire || items.some(isLauncherOrTaskRow))) {
     try { applied = await apply({ env, waitMs, workflowSeats, platform, ...opts }); }
     catch (error) { return { ok: false, summary: summarize(items), applied, items, error: String(error?.message ?? error) }; }
     items = await read(readOptions);
@@ -446,32 +362,44 @@ export async function ensureHostRuntime({ env = process.env, waitMs = START_WAIT
   return { ok: summary.ok, summary, applied, items };
 }
 
-export async function main(argv = process.argv.slice(2), deps = {}) {
+/** The `up` flags: {opts} or {error} (a usage error exits 2). `--services` is the no-quota heal and takes no config write. */
+function upOptions(argv) {
   const has = (f) => argv.includes(f);
-  const workflowEntry = deps.workflowEntry === true;
   const wait = argv.indexOf('--wait');
   const waitMs = Math.max(0, (Number(wait >= 0 ? argv[wait + 1] : START_WAIT_MS / 1000) || START_WAIT_MS / 1000) * 1000);
   const sp = argv.indexOf('--set-profile');
   const setProfile = sp >= 0 ? argv[sp + 1] : null;
-  if (sp >= 0 && (!Object.hasOwn(PROFILES, setProfile) || has('--check'))) {
-    console.error(`start: --set-profile takes ${Object.keys(PROFILES).join(' | ')} and cannot be combined with --check`);
+  if (sp >= 0 && (!Object.hasOwn(PROFILES, setProfile) || has('--check'))) return { error: `--set-profile takes ${Object.keys(PROFILES).join(' | ')} and cannot be combined with --check` };
+  const scope = has('--services') ? 'services' : 'full';
+  if (scope === 'services' && (has('--check') || sp >= 0 || has('--retire-stale-ledgers'))) return { error: '--services only heals the no-quota host services and cannot be combined with --check, --set-profile or --retire-stale-ledgers' };
+  return { opts: { waitMs, setProfile, scope, noBuild: has('--no-build'), retire: has('--retire-stale-ledgers') } };
+}
+
+/** The core debug seat after a green full startup (an explicit start): launched through its declared caller route; never from the services heal. */
+async function ensureMaintenance(result, { argv, env, deps }) {
+  const ensureCoreDebug = deps.ensureDebug ?? (await import('./core-debug.mjs')).ensureCoreDebug;
+  result.maintenance = await ensureCoreDebug({ caller: workflowCaller(argv), env, plan: false });
+  const ready = result.maintenance?.ok === true && result.maintenance?.ready === true;
+  result.items.push(ready ? green('seats', 'core-debug', 'Core debug seat', result.maintenance.action ?? 'ready')
+    : red('seats', 'core-debug', 'Core debug seat', result.maintenance.reason ?? result.maintenance.action ?? 'not ready', 'supply the declared caller route and reconcile its native seat'));
+  result.summary = summarize(result.items);
+  result.ok = result.summary.ok;
+}
+
+export async function main(argv = process.argv.slice(2), deps = {}) {
+  const has = (f) => argv.includes(f);
+  const { opts, error } = upOptions(argv);
+  if (error) {
+    console.error(`start: ${error}`);
     process.exitCode = 2;
     return;
   }
-  const opts = { waitMs, setProfile, noBuild: has('--no-build'), retire: has('--retire-stale-ledgers') };
   const env = deps.env ?? process.env;
-  const result = await (deps.ensureHostRuntime ?? ensureHostRuntime)({ ...opts, env, workflowSeats: !workflowEntry, check: has('--check') });
-  if (workflowEntry) result.hostOk = result.ok;
-  if (result.ok && !has('--check') && safeRun(() => (deps.loadConfig ?? loadConfig)(), null)?.debug === true) {
-    const ensureCoreDebug = deps.ensureDebug ?? (await import('./core-debug.mjs')).ensureCoreDebug;
-    result.maintenance = await ensureCoreDebug({ caller: workflowCaller(argv), env, plan: false });
-    const ready = result.maintenance?.ok === true && result.maintenance?.ready === true;
-    result.items.push(ready ? green('seats', 'core-debug', 'Core debug seat', result.maintenance.action ?? 'ready')
-      : red('seats', 'core-debug', 'Core debug seat', result.maintenance.reason ?? result.maintenance.action ?? 'not ready', 'supply the declared caller route and reconcile its native seat'));
-    result.summary = summarize(result.items);
-    result.ok = result.summary.ok;
-  }
-  (deps.print ?? console.log)(has('--json') ? JSON.stringify(result) : renderText(result.items, { applied: result.applied }));
+  const result = await (deps.ensureHostRuntime ?? ensureHostRuntime)({ ...opts, env, workflowSeats: deps.workflowEntry !== true, check: has('--check') });
+  if (deps.workflowEntry === true) result.hostOk = result.ok;
+  if (result.ok && !has('--check') && opts.scope === 'full' && safeRun(() => (deps.loadConfig ?? loadConfig)(), null)?.debug === true) await ensureMaintenance(result, { argv, env, deps });
+  const render = has('--brief') ? renderBrief : renderText;
+  (deps.print ?? console.log)(has('--json') ? JSON.stringify(result) : render(result.items, { applied: result.applied, summary: result.summary }));
   process.exitCode = result.ok ? 0 : 1;
   return result;
 }

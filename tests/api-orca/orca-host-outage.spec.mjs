@@ -20,6 +20,8 @@ const DEFINE_GOAL=path.join(ROOT,'scripts','goal','define-goal.mjs');
 const START_WORKFLOW=path.join(ROOT,'scripts','kernel','start-workflow.mjs');
 const WATCHDOG=path.join(ROOT,'scripts','kernel','kernel-watchdog.mjs');
 const json=text=>{try{return JSON.parse(text);}catch{return null;}};
+// The sender terminal every launch needs (workflowSender): the caller's own Orca terminal, which the fake Orca accepts.
+const SENDER='fake-sender-terminal';
 const lastJson=text=>json(String(text??'').trim().split('\n').filter(Boolean).at(-1));
 
 /* ------------------------------------------------------------------ units */
@@ -71,10 +73,11 @@ test('settledKernelVerdict waits out an outage and re-verifies; a death must be 
 /* ------------------------------------------------------------ integration */
 
 let sharedFixture=null;
-after(()=>{if(sharedFixture)fs.rmSync(sharedFixture.root,{recursive:true,force:true,maxRetries:20,retryDelay:25});});
+after(()=>{if(sharedFixture)removeTree(sharedFixture.root);});
 
-const createFixture=()=>{
-  const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-host-outage-'));
+const removeTree=dir=>fs.rmSync(dir,{recursive:true,force:true,maxRetries:20,retryDelay:25});
+
+const buildFixture=root=>{
   const repo=path.join(root,'repo');fs.mkdirSync(repo);
   const fake=path.join(root,'fake-orca.mjs'),state=path.join(root,'orca-state.json'),log=path.join(root,'calls.jsonl');
   const ownerRoot=path.join(root,'owner');fs.mkdirSync(ownerRoot);
@@ -88,7 +91,7 @@ const createFixture=()=>{
   fs.writeFileSync(state,JSON.stringify({sends:0,counter:0,terminals:{},commands:[]}));
   fs.writeFileSync(fake,FAKE_ORCA);
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([fake]),
-    STARCI_FAKE_ORCA_STATE:state,STARCI_FAKE_ORCA_LOG:log,STARCI_FAKE_ORCA_UNIQUE_TERMINALS:'1',STARCI_OWNER_ROOT:ownerRoot,STARCI_AGENT_TRUST_HOME:trustHome,
+    STARCI_FAKE_ORCA_STATE:state,STARCI_FAKE_ORCA_LOG:log,STARCI_FAKE_ORCA_UNIQUE_TERMINALS:'1',STARCI_OWNER_ROOT:ownerRoot,STARCI_AGENT_TRUST_HOME:trustHome,ORCA_TERMINAL_HANDLE:SENDER,
     STARCI_HOST_WAIT_MS:'0',STARCI_KERNEL_DEATH_SETTLE_MS:'0',STARCI_LOCAL_ROOT:path.join(root,'localappdata'),
     STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite'),STARCI_PROJECTS_ROOT:path.join(root,'projects')};
   // Both external boundaries belong to every descendant, including watchdog -> start-workflow.
@@ -173,6 +176,12 @@ const createFixture=()=>{
     }finally{ledger.close();}
   };
   return {root,repo,run,calls,readState,writeState,workflowId,kernel,ledgerRows,loseSeat,reset};
+};
+
+// A fixture that fails part-way leaves no temp tree behind.
+const createFixture=()=>{
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-host-outage-'));
+  try{return buildFixture(root);}catch(error){removeTree(root);throw error;}
 };
 
 const fixture=()=>{

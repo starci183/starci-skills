@@ -117,7 +117,10 @@ claim:
   senderTerminal: >-
     A Kernel launch is the worker of an entry Run whose coordinator is the launching terminal, so start refuses with
     step workflow-sender-terminal-missing, before any host startup effect, when ORCA_TERMINAL_HANDLE is not set. --plan
-    reports the sender. No other terminal stands in as coordinator.
+    reports the sender. Only the unattended watchdog launch (--launched-by watchdog, run by the Host controller outside
+    any terminal) stands in a runtime-owned terminal: a plain terminal of the runtime's own worktree (the entry Run's
+    current coordinator when it is one), else the live Supervisor seat. A foreign terminal never coordinates a Run; with
+    none open the watchdog answers restart-blocked and the Host controller retries once per seats.kernel.blockedRetryMs.
   onHostOutage: >-
     Orca not answering - runtime_unavailable, orca.exe ENOENT while an update
     replaces it, a timed-out call - says nothing about any terminal. It is

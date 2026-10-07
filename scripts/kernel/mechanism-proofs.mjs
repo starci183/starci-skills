@@ -199,10 +199,20 @@ export function judgeInspectionRun(run, files, doc = loadOpGate()) {
   return judgeInspectionCarriage(run.output, readAttached(files, SECURITY_FINDINGS_SCHEMA)?.doc, securityRelevant(doc));
 }
 
-const mechanicalSchema = (proof, doc) => doc.proofs?.[proof]?.schema;
-const matching = (proof, observations, doc) => observations.filter((row) => row.native?.schema === mechanicalSchema(proof, doc)
-  && (proof !== 'doc-gate' || row.native.profile === DOC_PROFILE)
-  && (proof !== 'review-gate' || row.native.profile !== DOC_PROFILE));
+/** The schema of the document a proof's producer prints. */
+export const proofDocumentSchema = (proof, doc) => doc.proofs?.[proof]?.schema;
+/** Whether a native run binding ({schema, profile}) is the producer the proof names: its schema, the document profile for doc-gate, any other for review-gate. */
+export const producesProof = (proof, native, doc) => native?.schema === proofDocumentSchema(proof, doc)
+  && (proof !== 'doc-gate' || native.profile === DOC_PROFILE)
+  && (proof !== 'review-gate' || native.profile !== DOC_PROFILE);
+const matching = (proof, observations, doc) => observations.filter((row) => producesProof(proof, row.native, doc));
+
+/** The refusal of a proof document that is attached but has no observed native run behind it: the code of the absent case, a detail that says so and what satisfies it. */
+function unobservedProof(proof, attached, doc, projects) {
+  const absent = judgeProof(proof, [], doc, { projects });
+  return { ...absent, detail: `${attachedKindOf(proof)} ${attached.file} is attached but no observed native run of the ${proof} producer backs it; an attachment alone never stands in for the run. Satisfy it by listing the producer command in report.checks (the runtime re-runs it, so name only its flags; its --out is dropped) and filing again, or, after the report, by starci kernel record-checks with that command. The producer: ${absent.detail}` };
+}
+const attachedKindOf = (proof) => (proof === 'read-knowledge' ? 'the READ digest' : `the ${proof} document`);
 
 /** Judge the existing attachment obligations with native output deciding each
  * executable result. Manual defect/typed findings remain declared review inputs. */
@@ -211,8 +221,9 @@ function judgeCurrentProof(proof, files, doc, { op, projects, observations, cont
   const rows = matching(proof, observations, doc);
   // An attachment still has to be filed, but its green shape cannot replace a
   // missing, red, stale or unavailable native producer.
-  const attached = readAttached(files, mechanicalSchema(proof, doc), (value) => proof !== 'doc-gate' || isDocGate(value));
-  if (!attached || !rows.length) return judgeProof(proof, [], doc, { projects });
+  const attached = readAttached(files, proofDocumentSchema(proof, doc), (value) => proof !== 'doc-gate' || isDocGate(value));
+  if (!attached) return judgeProof(proof, [], doc, { projects });
+  if (!rows.length) return unobservedProof(proof, attached, doc, projects);
   const broken = rows.find((row) => row.judged);
   if (broken) return broken.judged;
   const failed = rows.find((row) => row.exitCode !== 0);
@@ -245,6 +256,9 @@ const judgedProofRow = (proof, row, files, doc) => {
     default: throw new Error(`unknown mechanical proof ${proof}`);
   }
 };
+
+/** The command line that produces a proof's document, as the absent-proof refusal names it. */
+export const proofProducerHint = (proof, doc, projects = []) => judgeProof(proof, [], doc, { projects }).detail;
 
 /** The judgment of one proof over a job's files. */
 function judgeProof(proof, files, doc = loadOpGate(), { projects = [] } = {}) {

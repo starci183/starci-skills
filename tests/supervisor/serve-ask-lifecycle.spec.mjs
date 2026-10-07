@@ -13,7 +13,7 @@ process.env.STARCI_AUTOPILOT ??= 'off';
 // ask-answered; every reader of open asks honours the terminal kinds.
 
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
-const SERVE_ASK=path.join(ROOT,'scripts','kernel','ask-server.mjs');
+const SERVE_ASK=path.join(ROOT,'scripts','kernel','ask-server-main.mjs');
 const WORKFLOW='wf-serve-ask';
 
 const seedAskReport=(ledger,{dispatchId,opId='provision.ask',workflowId=WORKFLOW,at=Date.now(),refs=null})=>{

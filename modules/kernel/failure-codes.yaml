@@ -8167,6 +8167,26 @@ draw-review-owed:
   nextStep_vi: "Báo cáo chưa được nhận; op gửi câu hỏi kết quả để chủ duyệt bản vẽ rồi báo lại."
   owner: op-retry
   kind: verb-refusal
+report-proof-producer-missing:
+  title: "Report lists no native producer of a mechanism proof"
+  title_vi: "Báo cáo không liệt kê lệnh sinh bằng chứng cơ chế"
+  meaning_vi: "Op của bạn nợ một bằng chứng cơ chế (knowledge/op-gate.yaml opProofs, ví dụ READ) nhưng report.checks không có lệnh starci canonical sinh ra nó. Runtime tự chạy lại lệnh đó để quan sát; tệp đính kèm một mình không thay được lần chạy."
+  causes_vi:
+    - "lệnh starci gate read (hoặc gate run, gate unit, app lint ...) chạy tay nhưng không nằm trong report.checks"
+    - "lệnh trong report.checks không phải argv canonical (có shell, placeholder hoặc cờ ghi)"
+  nextStep_vi: "Báo cáo chưa được nhận; thêm lệnh mà thông báo nêu vào report.checks (--out có thể trỏ vào scratch, runtime bỏ cờ này khi chạy lại) rồi báo lại trong cùng lượt."
+  owner: op-retry
+  kind: verb-refusal
+report-proof-document-missing:
+  title: "Report attaches no document of a mechanism proof"
+  title_vi: "Báo cáo không đính kèm tài liệu của bằng chứng cơ chế"
+  meaning_vi: "Lệnh sinh bằng chứng đã nằm trong report.checks nhưng tài liệu nó in ra (ví dụ read-digest.json) không có trong các tệp --attach."
+  causes_vi:
+    - "lệnh chạy không có --out hoặc --out không nằm trong scratch"
+    - "tệp không được truyền cho --attach"
+  nextStep_vi: "Báo cáo chưa được nhận; chạy lệnh với --out dưới scratch, đính kèm tệp đó rồi báo lại trong cùng lượt."
+  owner: op-retry
+  kind: verb-refusal
 draw-review-unjudged:
   title: "Draw review guard could not judge"
   title_vi: "Bộ canh duyệt bản vẽ không đọc được bản ghi"
@@ -9077,6 +9097,17 @@ lock-busy:
   nextStep_vi: "Thao tác thất bại tạm thời; thử lại sau khi khóa nhả."
   owner: op-retry
   kind: runtime-fault
+lock-held:
+  title: "Host lock is held"
+  title_vi: "Khóa của máy đang được giữ"
+  meaning_vi: "Một lệnh nặng (npm ci, npm install) không lấy được khóa của máy vì một lệnh khác đang giữ; runtime thử lại theo khoảng chờ của ngân sách thử lại (allocation.hostLock) và ghi từng lần thử kèm lý do này."
+  causes_vi:
+    - "Một lần land hoặc một lệnh nặng khác đang giữ khóa của máy"
+    - "Chủ khóa cũ chưa hết hạn"
+  nextStep_vi: "Runtime tự thử lại đến hết ngân sách; hết ngân sách thì lệnh bị từ chối kèm danh sách các lần thử và chủ khóa, và Kernel hoặc người giám sát chờ chủ khóa nhả."
+  owner: runtime-core
+  kind: runtime-fault
+
 log-actor-unknown:
   title: "Log actor is not allowed"
   title_vi: "Tác nhân ghi nhật ký không hợp lệ"
@@ -9398,6 +9429,17 @@ release-unknown:
   causes_vi:
     - "Cơ sở dữ liệu máy khóa hoặc lỗi lúc nhả"
   nextStep_vi: "Kiểm tra khóa máy chủ còn bị giữ không và nhả đúng token trước khi chạy lại cài đặt."
+  owner: supervisor
+  kind: runtime-fault
+
+retry-exhausted:
+  title: "Retry budget spent"
+  title_vi: "Đã hết ngân sách thử lại"
+  meaning_vi: "Một khóa công việc của bộ điều phối đã thất bại đủ số lần của ngân sách thử lại (allocation.reconciler.backoff.maxAttempts); hàng đợi giữ nó ở trạng thái đỗ cùng lý do của lần thất bại cuối, cho đến khi một sự kiện mới nhắc tới khóa đó."
+  causes_vi:
+    - "Lỗi vĩnh viễn mà thử lại không sửa được (ví dụ danh tính sổ cái sai)"
+    - "Một sự cố tạm thời kéo dài hơn toàn bộ ngân sách"
+  nextStep_vi: "Người giám sát đọc lý do và lỗi cuối trong hàng đợi, sửa nguyên nhân qua một lane đã land; một sự kiện mới cho khóa đó cấp lại ngân sách."
   owner: supervisor
   kind: runtime-fault
 
@@ -16093,8 +16135,8 @@ workflow-sender-terminal-missing:
   meaning_vi: "Kernel là worker của một Run mà cửa sổ khởi động làm điều phối; ORCA_TERMINAL_HANDLE không được đặt nên Orca không biết cửa sổ gửi lệnh. Runtime từ chối trước mọi tác động, không tạo worktree hay Kernel."
   causes_vi:
     - "Lệnh start chạy từ một shell thường, không nằm trong cửa sổ Orca"
-    - "Tiến trình nền (watchdog, reconciler) chạy không kế thừa ORCA_TERMINAL_HANDLE"
-  nextStep_vi: "Chạy lại starci workflow start bên trong một cửa sổ Orca; không dùng cửa sổ của người khác làm điều phối."
+    - "Tiến trình nền (watchdog, reconciler) chạy không kế thừa ORCA_TERMINAL_HANDLE và không có cửa sổ nào của worktree runtime (hoặc Supervisor đang sống) để thay thế"
+  nextStep_vi: "Mở một cửa sổ thường trong worktree của runtime (watchdog sẽ thử lại sau blockedRetryMs), hoặc chạy lại starci workflow start bên trong một cửa sổ Orca; không dùng cửa sổ của người khác làm điều phối."
   owner: owner
   kind: verb-refusal
 kernel-launch-custody-incomplete:

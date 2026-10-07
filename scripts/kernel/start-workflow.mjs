@@ -228,7 +228,7 @@ try {
       ...(route.warnings?.length ? { warnings: route.warnings } : {}),
       ...(route.members ? { group: route.members.map(memberSummary), fallThrough: route.fallThrough === true } : {}),
       sourceHost: sourceRoot, projectBinding: context?.file ?? null,
-      ledger: ledgerFileFor(repo), frontend: context?.fe ?? null, sender: workflowSender({ env: process.env }),
+      ledger: ledgerFileFor(repo), frontend: context?.fe ?? null, sender: workflowSender({ env: process.env, launchedBy, ledger, workflowId: target }),
       kernel: kernelLaunchStatus({ health, signal, route }),
     };
     console.log(launchPlanText({ asJson, out, wf, target, chain, route, memberLabel }));
@@ -245,7 +245,7 @@ try {
   const { workflow: startWorkflow, goal: startGoal } = startInput();
   const startAuthority = workflowStartAuthority({ workflow: startWorkflow, goal: startGoal });
   if (!startAuthority.ok) refuse(startAuthority.reason, { workflowId: target, authority: startAuthority });
-  const sender = workflowSender({ env: process.env }); if (!sender.ok) refuse(sender.reason, { workflowId: target, error: sender.error });
+  const sender = workflowSender({ env: process.env, launchedBy, ledger, workflowId: target }); if (!sender.ok) refuse(sender.reason, { workflowId: target, error: sender.error });
   const hostStartup = await ensureWorkflowHost({ workflow: startWorkflow, goal: startGoal, caller: workflowCaller(process.argv.slice(2)), env: process.env });
   if (hostStartup.ok !== true || hostStartup.ready !== true)
     refuse(hostStartup.reason ?? 'workflow-host-not-ready', { workflowId: target, startup: hostStartup },
@@ -463,7 +463,7 @@ try {
   // The Kernel is a worker of its own entry Run (scripts/agent/lib.mjs startAgent; the launching terminal is its
   // coordinator). worker-start blocks until the agent is ready, so the reservation is stretched past its timeout first.
   const priorManaged = parseJsonOr(priorKernelJob?.payload_json)?.managed ?? null;
-  const entry = readEnv('ORCA_TERMINAL_HANDLE') || null;
+  const entry = sender.handle;
   const specFile = path.join(path.dirname(ledgerFileFor(repo)), 'kernel', `${workflowId}.a${kernelAttemptOf(priorKernelJob) + 1}.prompt.md`);
   const beforeLaunchAuthority = currentStartAuthority();
   if (!beforeLaunchAuthority.ok) failStart(beforeLaunchAuthority.reason, 'the accepted goal changed before Kernel launch', null,

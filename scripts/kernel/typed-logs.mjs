@@ -196,10 +196,26 @@ export function insertLogRows(logs, rows, { perJobCap = logSettings().perJobCap,
   return { ...r, seqs: r.seqs.filter((seq) => seq != null) };
 }
 
+/**
+ * The runtime's own timing of an op's step.end row: a duration the op typed is never kept (a model has no clock). The
+ * runtime measures from the latest still-open step.start of the same job and name in the ledger; with none, or when
+ * `measure` is false (an ingested file whose times the op wrote), the row carries no duration.
+ */
+function timedStepEnd(db, row, measure) {
+  if (row.kind !== 'step.end' || row.actor !== 'op') return row;
+  const rest = { ...row.data };
+  delete rest.durationMs;
+  const open = measure && row.jobId ? db.prepare(`SELECT s.at FROM logs s WHERE s.job_id=? AND s.kind='step.start' AND json_extract(s.data_json,'$.name')=? AND s.at<=?
+    AND NOT EXISTS (SELECT 1 FROM logs e WHERE e.job_id=s.job_id AND e.kind='step.end' AND e.seq>s.seq AND json_extract(e.data_json,'$.name')=json_extract(s.data_json,'$.name'))
+    ORDER BY s.seq DESC LIMIT 1`).get(row.jobId, row.data.name, row.at) : null;
+  return { ...row, data: open ? { ...rest, durationMs: row.at - open.at } : rest };
+}
+
 /** Validate, redact and insert one row: {ok, seq?, dropped?} or throws {code}. */
 export function appendLog(logs, row, { clip = false, ...options } = {}) {
   const prepared = prepareLogRow(row, { clip, ...options });
   if (prepared.error) throw Object.assign(new Error(prepared.error), { code: prepared.code });
+  prepared.row = timedStepEnd(logs.db, prepared.row, true);
   const r = insertLogRows(logs, [prepared.row], options);
   if (r.rejected) throw Object.assign(new Error(`workflow ${prepared.row.workflowId} is not in the ledger`), { code: 'workflow-unknown' });
   return { ok: true, seq: r.seqs[0] ?? null, ...(r.dropped ? { dropped: true } : {}), ...(r.duplicate ? { duplicate: true } : {}), ...(r.deferred ? { deferred: true } : {}), row: prepared.row };
@@ -232,7 +248,7 @@ export function ingestScratchLog(logs, { file, workflowId, jobId, now = Date.now
     const prepared = prepareLogRow({ at: parsed.at, workflowId, jobId, actor: 'op', nodeId: parsed.node ?? parsed.nodeId ?? null, level: parsed.level, kind: parsed.kind,
       msg: parsed.msg, data: parsed.data, refs: parsed.refs, src: scratchLogSource(jobId, at, body) }, { now });
     if (prepared.error) { out.invalid += 1; continue; }
-    rows.push(prepared.row);
+    rows.push(timedStepEnd(logs.db, prepared.row, false));
   }
   const r = insertLogRows(logs, rows, { now });
   return { ...out, inserted: r.inserted, duplicate: r.duplicate };

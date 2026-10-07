@@ -32,7 +32,7 @@ import { orcaTreeFindings, readTerminals, supervisorWorkerHandles } from '../../
 import { withLedger } from '../helpers/ledger-fixture.mjs';
 import { clusterOwed } from '../../scripts/supervisor/cluster.mjs';
 import { renderSupervisorBlock, supervisorSnapshot } from '../../scripts/supervisor/status-block.mjs';
-import { recordedSeatTerminals, seatSessions, entryTerminalOf } from '../../scripts/supervisor/seat-sessions.mjs';
+import { recordedSeatTerminals, seatSessions, entryTerminalOf } from '../../scripts/machine/seat-sessions.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { tierMembers, tierOfSeat } from '../../scripts/agent/tiers.mjs';
 import { withMachine, openMachine } from '../../engine/db/machine.mjs';

@@ -57,8 +57,8 @@ const GENERATED_SET = new Set(GENERATED);
  */
 const BLOB_SIDECAR = /^examples\/\.runtimes\/[^/]+\/artifacts\/[0-9a-f]{2}\/[0-9a-f]{64}\.json$/;
 
-/** Local runtime preferences; gitignored; not skill-authored declarative source. */
-const LOCAL_ONLY = new Set(['config.json', 'settings.local.json']);
+/** Local runtime preferences and Claude Code's per-user project settings; gitignored; not skill-authored declarative source. */
+const LOCAL_ONLY = new Set(['config.json', 'settings.local.json', '.claude/settings.local.json']);
 
 /**
  * Runtime-owned storage at the skill root. These exact roots contain workflow state and sealed

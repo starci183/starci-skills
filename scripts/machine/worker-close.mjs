@@ -128,7 +128,7 @@ function readTerminalTree({ terminal, tableOf, envOf, capture, attempt }) {
   try { table = tableOf(); envRows = envOf(); } catch { table = null; envRows = null; }
   if (!Array.isArray(table) || !Array.isArray(envRows)) return { tree: null, treeWhy: 'the process table or the process environments could not be read' };
   const found = terminalTree(terminal, { table, envRows }).members;
-  if (!found.length) return { tree: null, treeWhy: 'no process carries the terminal handle: its tree cannot be proven' };
+  if (!found.length) return { tree: null, treeEmpty: true, treeWhy: 'no process carries the terminal handle: its tree cannot be proven' };
   return captureIdentities(found, terminal, { capture, attempt });
 }
 
@@ -155,9 +155,24 @@ function verifyStoppedWorkers(first, { stopProcess, stopVerifyMs, waitArgs, tree
   return { verdict: 'survived', ...proof, survivors: members(second.left) };
 }
 
-function verifyWorkerProcesses({ terminal, own, tree, treeWhy, tableOf, envOf, sleep, verifyMs, stopVerifyMs, pollMs, stopProcess, attempt }) {
+/**
+ * A terminal that Orca already showed gone or disconnected before the close, now proven closed, and that no process
+ * carried the handle of: the census read again after the close still finds none. A terminal that was connected when
+ * the close began (a live shell with no tagged process is a contradiction, not a closure) and an unreadable census
+ * prove nothing. Returns the 'none' verdict or null.
+ */
+function closedEmptyTerminal({ terminal, closed, tableOf, envOf }) {
+  if (closed?.ok !== true || !['gone', 'disconnected'].includes(closed.proof) || !['gone', 'disconnected'].includes(closed.before)) return null;
+  let table, envRows;
+  try { table = tableOf(); envRows = envOf(); } catch { return null; }
+  if (!Array.isArray(table) || !Array.isArray(envRows)) return null;
+  const census = terminalTree(terminal, { table, envRows }).members;
+  return census.length ? null : { verdict: 'none', members: [], census: [], reason: 'the terminal is closed and no process carries its handle' };
+}
+
+function verifyWorkerProcesses({ terminal, own, tree, treeWhy, treeEmpty, closed, tableOf, envOf, sleep, verifyMs, stopVerifyMs, pollMs, stopProcess, attempt }) {
   if (!terminal || own) return { verdict: 'not-checked', reason: treeWhy };
-  if (!tree) return { verdict: 'unverifiable', reason: treeWhy };
+  if (!tree) return (treeEmpty && closedEmptyTerminal({ terminal, closed, tableOf, envOf })) || { verdict: 'unverifiable', reason: treeWhy };
   const waitArgs = { read: tableOf, environments: envOf, terminal, sleep, pollMs };
   const first = waitGone(tree, { ...waitArgs, ms: verifyMs });
   if (first.unreadable) return { verdict: 'unverifiable', reason: first.reason ?? 'the process table could not be read while verifying', census: first.census ?? null };
@@ -206,7 +221,7 @@ export function closeWorker({ dispatch, handle = null, stopFirst = false, retryR
   try { shown = show({ dispatch }); } catch { shown = null; }
   const terminal = handle ?? shown?.result?.worker?.agentTerminalHandle ?? null;
   const own = Boolean(terminal) && env[HANDLE_ENV] === terminal;
-  const { tree, treeWhy } = captureWorkerTree({ terminal, own, deps, tableOf, envOf, capture, attempt });
+  const { tree, treeWhy, treeEmpty } = captureWorkerTree({ terminal, own, deps, tableOf, envOf, capture, attempt });
 
   // 2 and 3. stop only on the caller's proof, then release
   const stopped = stopFirst ? attempt(() => stop({ dispatch })) : null;
@@ -220,7 +235,7 @@ export function closeWorker({ dispatch, handle = null, stopFirst = false, retryR
   if (terminal && !own) closed = attempt(() => close(terminal));
 
   // 5. verify the processes
-  const processes = verifyWorkerProcesses({ terminal, own, tree, treeWhy, tableOf, envOf, sleep, verifyMs, stopVerifyMs, pollMs, stopProcess, attempt });
+  const processes = verifyWorkerProcesses({ terminal, own, tree, treeWhy, treeEmpty, closed, tableOf, envOf, sleep, verifyMs, stopVerifyMs, pollMs, stopProcess, attempt });
   processes.scope = 'captured-process-objects-and-terminal-census';
   const hygiene = processes.verdict === 'survived'
     ? { code: 'worker-process-survived', dispatch, handle: terminal, survivors: processes.survivors, stopped: processes.stopped }

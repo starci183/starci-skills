@@ -5,6 +5,7 @@ import { withMachine, readMachine } from '../../engine/db/machine.mjs';
 import { normalizeQuotaSnapshot } from './quota/snapshot.mjs';
 import { inspectQuotaEvidence } from '../lib/quota-evidence.mjs';
 import { providerBudgetClock as clockOf, providerBudgetOptions as optionsOf } from '../machine/provider-budget-release.mjs';
+import { reapProviderReservations } from '../machine/provider-reservation-reap.mjs';
 export { releaseProviderBudgetByHandle } from '../machine/provider-budget-release.mjs';
 
 const scopeOf = (input) => ({ scopeId: input.scopeId ?? input.scope?.scopeId ?? null,
@@ -19,12 +20,16 @@ const withinBand = (quota, policy) => Number.isFinite(quota.usedPercent) && quot
 const validGrant = (quota, role, scopeId, policy, now) => quota.authority !== 'owner-grant'
   || inspectQuotaEvidence(quota, { role, scopeId, policy, now }).codes.length === 0;
 
-/** Actual admission prepares the store through its writer; read-only plans never create or upgrade it. */
+/**
+ * Actual admission prepares the store through its writer; read-only plans never create or upgrade it. Receipts that hold no launch
+ * (an ended worker or seat terminal, a launch that died before worker-start) are released first, so capacity nobody uses never refuses it.
+ */
 export function prepareProviderBudget(options = {}) {
-  return withMachine((machine) => {
+  const prepared = withMachine((machine) => {
     machine.meta(); // Forces the owning connection's schema validation/create.
     return { ok: true, file: machine.file };
   }, optionsOf(options));
+  return { ...prepared, reaped: reapProviderReservations(options, options.io?.reap ?? {}) };
 }
 
 /** Revalidate evidence at admission, then reserve the last shared slot in BEGIN IMMEDIATE. */

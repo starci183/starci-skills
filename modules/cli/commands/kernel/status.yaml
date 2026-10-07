@@ -150,11 +150,11 @@ returns:
     its live colours and runnable nodes; null without one, when the leg skeleton alone drives the
     workflow. With a work graph a queued business.decide or architecture.decide is held by an
     ancestor of those two only when their owned paths share a domain"
-  legs: "[{op, label, color:green|yellow|red|gray, jobId, status}] (label: the op label) — every
+  legs: "[{op, label, color:green|yellow|red|gray|external, jobId, status}] (label: the op label) — every
     approved plan leg, then every other op with a job, with its latest job. yellow: a job leased,
     running, answering or effect_unknown; red: a failed job nothing follows, or a queued retry of a
     failed one; yellow: a queued first attempt or an owner wait; green: a succeeded job; gray: no
-    job yet"
+    job yet; external: an op the chat intake runs (request.analyze), never dispatched, not counted in the leg progress"
   frontier.peerMessageKeys: "[<key>] — pending peer-message inbox rows addressed to this workflow (api
     notify, the enqueue overlap heads-up). Any entry makes the frontier actionable, so the watchdog
     wakes a turn-idle Kernel; the state reads `peer-message` when no report, settle, worker

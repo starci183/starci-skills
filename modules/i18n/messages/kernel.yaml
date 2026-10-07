@@ -39,6 +39,8 @@ messages:
     vi: "sổ chờ thầy xem lại"
   - en: "deferred to the final review"
     vi: "hoãn tới buổi duyệt cuối"
+  - en: "run by the chat intake, not dispatched here"
+    vi: "do bước tiếp nhận chat chạy, không giao trong workflow"
   - en: "the op did not write the structured log rows it owed ({missing})"
     vi: "op không ghi đủ nhật ký có cấu trúc ({missing})"
   - en: "the op's scratch directory (starci-job-scratch) is deleted when the op files its report, so the path no longer exists when the runtime re-runs it"

@@ -301,6 +301,29 @@ test('recordWhy stores the why with the attempt; whyOf returns it; v_op_history 
   assert.equal(view().attempt_state,'rejected');
 });
 
+test('the why names the settled reason, not a red run that a later run of the same check superseded',t=>{
+  const {wf,ledger,jobId}=seedWorld(t);
+  const attemptId=ledger.transaction(db=>{
+    const at=Date.now();
+    for(const to of ['ready','leased'])setJobStatus(db,{jobId,to,reason:'seed',at});
+    const a=startAttempt(db,{workflowId:wf,jobId,dispatchId:'d1',at});
+    for(const to of ['running','reported'])setJobStatus(db,{jobId,to,reason:'seed',at});
+    const run=(status,exitCode,summary,runner='kernel')=>recordCheckRun(db,{attemptId:a.attempt_id,name:'starci-validate-strict',phase:'verify',runner,authority:'runtime',status,exitCode,createdAt:at,summary});
+    run('fail',1,{evidence:'target does not exist [TARGET_MISSING]',codes:['TARGET_MISSING']});
+    run('pass',0,{evidence:'ok'});
+    recordCheckRun(db,{attemptId:a.attempt_id,name:'op-proof',phase:'verify',runner:'settler',authority:'runtime',status:'fail',exitCode:1,createdAt:at,
+      summary:{evidence:'read-knowledge: op-read-digest-missing: no READ digest is attached to the report',codes:['op-read-digest-missing']}});
+    recordJobResult(db,{jobId,result:{verdict:'fail',claimOverruled:true,nextStep:{kind:'retry',route:'r',limit:2,firing:1}},at});
+    setJobStatus(db,{jobId,to:'failed',reason:'seed-settle',at});
+    updateAttempt(db,{attemptId:a.attempt_id,verdict:'fail',reportOutcome:'done',settledAt:at,endState:'settled',at});
+    return a.attempt_id;
+  });
+  const why=whyOf(ledger,attemptId);
+  assert.match(why.headline,/op-proof/);
+  assert.match(why.headline,/op-read-digest-missing/);
+  assert.doesNotMatch(JSON.stringify(why),/TARGET_MISSING/);
+});
+
 test('kernelNotesOf reads the Kernel decisions (opened, closed) and proposals of a workflow from the events table',t=>{
   const {wf,ledger}=seedWorld(t);
   ledger.transaction(()=>{

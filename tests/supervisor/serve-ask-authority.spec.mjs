@@ -10,7 +10,7 @@ const workflowId = 'wf-ask-authority', dispatchId = 'ctx-ask-authority';
 const start = async (t, repo, extra = []) => {
   const owner = path.join(path.dirname(repo), 'owner'); fs.mkdirSync(owner);
   fs.writeFileSync(path.join(owner, 'config.yaml'), 'language: en\nasks: {autoAcceptRecommended: false}\nconnectors: {telegram: {enabled: false}}\n');
-  const child = spawn(process.execPath, [path.resolve(import.meta.dirname, '../../scripts/kernel/ask-server.mjs'), '--repo', repo,
+  const child = spawn(process.execPath, [path.resolve(import.meta.dirname, '../../scripts/kernel/ask-server-main.mjs'), '--repo', repo,
     '--workflow', workflowId, '--on-demand', 'fixture', '--ttl', '1500', '--band', '0..0', ...extra],
   { env: { ...process.env, STARCI_LOCAL_ROOT: path.join(path.dirname(repo), 'private-machine'), STARCI_OWNER_ROOT: owner, STARCI_AUTOPILOT: 'off', STARCI_CONNECTORS_OFF: '1' }, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
   const exit = new Promise(resolve => child.once('close', (code, signal) => resolve({ code, signal })));

@@ -84,14 +84,30 @@ export function verifyKernelRead(submitted, required) {
   return required;
 }
 
-/** New-leg READ admission; boot receipts never acquire a current incarnation by assertion. */
-export function requireKernelRead(db, workflowId, { root, authority, op, status } = {}) {
-  const required = kernelReadManifest(db, workflowId, { root, authority, ops: op ? [op] : [], status });
+/** The latest attestation of this workflow when it is the current incarnation's and its digest holds; null otherwise. */
+function currentAttestation(db, workflowId, incarnation) {
   const row = db.prepare("SELECT payload_json FROM events WHERE workflow_id=? AND kind='runtime-rev-acked' ORDER BY seq DESC LIMIT 1").get(workflowId);
   const ack = parseJson(row?.payload_json)?.readManifest;
   const { digest, ...body } = ack ?? {};
-  if (ack?.schema !== KERNEL_READ_SCHEMA || ack.workflowId !== workflowId || ack.incarnation !== required.incarnation
-    || !Array.isArray(ack.files) || !Array.isArray(ack.ops) || !ack.revision || digest !== sha256(JSON.stringify(body))
-    || !required.ops.every(op => ack.ops.includes(op)) || !required.files.every(file => ack.files.some(read => sameRow(file,read)))) throw refuse('current Kernel has no complete READ attestation for this new leg');
+  const whole = ack?.schema === KERNEL_READ_SCHEMA && ack.workflowId === workflowId && ack.incarnation === incarnation
+    && Array.isArray(ack.files) && Array.isArray(ack.ops) && ack.revision && digest === sha256(JSON.stringify(body));
+  return whole ? ack : null;
+}
+
+/** The required rows this incarnation has not attested with these exact bytes: the whole set at boot, only the new or changed files after. */
+export function unreadFiles(db, workflowId, required) {
+  const ack = currentAttestation(db, workflowId, required.incarnation);
+  return required.files.filter((file) => !ack?.files.some((read) => sameRow(file, read))).map((file) => file.path);
+}
+
+const UNREAD_SHOWN = 20;
+const unreadNote = (unread) => `; read and attest ${unread.slice(0, UNREAD_SHOWN).join(', ')}${unread.length > UNREAD_SHOWN ? ` and ${unread.length - UNREAD_SHOWN} more` : ''}, the files this incarnation has not attested`;
+
+/** New-leg READ admission; boot receipts never acquire a current incarnation by assertion. */
+export function requireKernelRead(db, workflowId, { root, authority, op, status } = {}) {
+  const required = kernelReadManifest(db, workflowId, { root, authority, ops: op ? [op] : [], status });
+  const ack = currentAttestation(db, workflowId, required.incarnation);
+  if (!ack || !required.ops.every(name => ack.ops.includes(name)) || !required.files.every(file => ack.files.some(read => sameRow(file,read))))
+    throw refuse(`current Kernel has no complete READ attestation for this new leg${unreadNote(unreadFiles(db, workflowId, required))}`);
   return required;
 }

@@ -811,7 +811,7 @@ const ACTIONABLE_FRONTIER_STATES = ['transition-ready', 'settle-ready', 'worker-
 // 'dependency-failed' is a dependency that can no longer succeed on its own: the
 // seam or --after job it waits on settled failed (not an owner wait), so only
 // the Kernel can move it - retry the blocker, re-point the dependant, or drop it.
-const QUEUED_BECAUSE = ['owner-gate', 'supervisor-gate', 'deferred', 'deferred-to-handover', 'peer-wait', 'foundation-wait', 'dependency', 'dependency-failed', 'max-ops', 'circuit-open', 'path-lease', 'pool-full', 'ready'];
+const QUEUED_BECAUSE = ['owner-gate', 'supervisor-gate', 'deferred', 'deferred-to-handover', 'peer-wait', 'foundation-wait', 'dependency', 'dependency-failed', 'max-ops', 'circuit-open', 'path-lease', 'pool-full', 'host-resources-low', 'ready'];
 /**
  * Open owner-gate incidents of a workflow: a step only the owner can drive
  * (an assisted OAuth run, a consent screen) holds the jobs it names until the
@@ -1124,15 +1124,15 @@ const holdByFullPool = (cause) => {
   }
   return null;
 };
-function queuedBecauseInner(db, job, { planAncestors, jobsByOp, slots, rtDoc, poolLoad, ownerGates = [], peerWaits = [], recordDeps = new Map(), canon = null, workGraph = null, typedGates = [], seamHold = null }) {
+function queuedBecauseInner(db, job, { planAncestors, jobsByOp, slots, rtDoc, poolLoad, ownerGates = [], peerWaits = [], recordDeps = new Map(), canon = null, workGraph = null, typedGates = [], seamHold = null, hostHold = null }) {
   const payload = jobPayloadOf(job);
   const opId = job.op_id ?? payload.opId ?? null;
-  const cause = { db, job, payload, opId, planAncestors, jobsByOp, slots, rtDoc, poolLoad, ownerGates, peerWaits, recordDeps, canon, workGraph, typedGates, seamHold };
+  const cause = { db, job, payload, opId, planAncestors, jobsByOp, slots, rtDoc, poolLoad, ownerGates, peerWaits, recordDeps, canon, workGraph, typedGates, seamHold, hostHold };
   // The first hold wins, in this order: an incident gate, a deferral (autopilot: a deferred leg, or a live proof waiting for the
   // handover credential checklist), a peer wait, a shell foundation, an earlier plan leg, a declared job, the slot ceiling, a
   // provider circuit, a path lease, a full pool.
   return holdByIncidentGate(cause) || deferredQueueCause(db, job) || holdByPeerWait(cause) || holdByShellFoundation(cause) || holdByPlanDependency(cause)
-    || holdByDeclaredJob(cause) || holdByMaxOps(cause) || holdByCircuit(cause) || holdByPathLease(cause) || holdByFullPool(cause)
+    || holdByDeclaredJob(cause) || holdByMaxOps(cause) || holdByCircuit(cause) || holdByPathLease(cause) || holdByFullPool(cause) || hostHold?.(opId) /* host-hold.mjs: dispatch would refuse host-resources-low */
     || { queuedBecause: 'ready', blockedBy: null, detail: null };
 }
 // The Kernel seat as the ledger holds it: the attempt, its terminal, the launch that seated it and who

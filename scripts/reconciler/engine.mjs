@@ -51,7 +51,7 @@ import { CONCERN_OWNER } from './owns.mjs';
 import {
   CONTROLLER_NAMES, LEADER_NAME, MODES, SKILL_ROOT, START_REASON_ENV, configuredMode, controllerModule, reconcilerConfig, reconcilerNumbers,
 } from './state.mjs';
-import { WorkQueue, machineRows, memoryRows } from './workqueue.mjs'; import { isMain } from '../lib/is-main.mjs';
+import { WorkQueue, machineRows, memoryRows, failureLog } from './workqueue.mjs'; import { isMain } from '../lib/is-main.mjs';
 import { readEnv } from '../lib/env.mjs';
 import { eachInOrder, repeatInOrder } from '../lib/in-order.mjs';
 import { crashHandler, logSafeReevaluated, onceLine } from './engine-process.mjs';
@@ -389,11 +389,8 @@ export class Engine {
       return { ok: true, key: item.key, result: result ?? null, ms: this.now() - started, ...(overBudget ? { overBudget } : {}) };
     } catch (error) {
       const delay = this.queue.failed(c.name, item.key, error);
-      const attempts = (item.attempts ?? 0) + 1;
-      if ((attempts & (attempts - 1)) === 0) {
-        this.log('reconciler.error', `${c.name} ${item.key} failed (attempt ${attempts}, retry in ${delay}ms): ${String(error?.message ?? error).slice(0, 300)}`,
-          { kind: 'reconciler.reconcile-failed', name: c.name, key: item.key, attempts, detail: String(error?.stack ?? error).slice(0, 800) });
-      }
+      const note = failureLog({ controller: c.name, key: item.key, attempts: (item.attempts ?? 0) + 1, delayMs: delay, error });
+      if (note) this.log('reconciler.error', note.line, note.data);
       return { ok: false, key: item.key, error: String(error?.message ?? error), retryMs: delay, ...(error?.result ? { result: error.result } : {}) };
     } finally { clearTimeout(budget); this.runningLabels.delete(label); this.hb?.running(this.runningLabels); }
   }

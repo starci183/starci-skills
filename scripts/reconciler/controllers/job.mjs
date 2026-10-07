@@ -223,9 +223,9 @@ export function settleDecision(f, ledgerId, { now = Date.now(), settings = jobSe
 
 /** Host seams for sweepWorkers (the same primitives as scripts/supervisor/supervisor-watchdog.mjs hostDeps). */
 async function workerSweepDeps() {
-  const [{ terminalRead }, host, liveness, closeMod, quitMod] = await Promise.all([
+  const [{ terminalRead }, host, liveness, closeMod, quitMod, closeWorkers] = await Promise.all([
     import('../../api/orca/terminal-read.mjs'), import('../../kernel/host-outage.mjs'), import('../../lib/terminal-liveness.mjs'),
-    import('../../kernel/close-op-terminal.mjs'), import('../../kernel/quit-agent.mjs')]);
+    import('../../kernel/close-op-terminal.mjs'), import('../../kernel/quit-agent.mjs'), import('../../supervisor/workers.mjs')]);
   return {
     verdict: (h) => host.kernelTerminalVerdict(h),
     screen: (h) => { try { const r = terminalRead({ terminal: h, screen: true }); return r?.ok ? String(r.screen ?? '') : null; } catch { return null; } },
@@ -233,6 +233,7 @@ async function workerSweepDeps() {
     quit: (handle, agent) => quitMod.quitAgent({ handle, agent }),
     close: (handle) => closeMod.closeOperationTerminal(handle),
     closeExited: (handle) => closeMod.closeExitedTerminal(handle),
+    closeLeftover: (m, args) => closeWorkers.closeWorkerTerminal(m, args),
   };
 }
 /** Shadow seams: the reads are real, every write is a recorded no-op. `would` collects them. */
@@ -242,6 +243,7 @@ export function drySweep(deps, would) {
     quit: (handle) => { would.push({ act: 'quit', handle }); return { exited: false, shadow: true }; },
     close: (handle) => { would.push({ act: 'close', handle }); return { ok: false, shadow: true }; },
     closeExited: (handle) => { would.push({ act: 'close-exited', handle }); return { ok: false, shadow: true }; },
+    closeLeftover: (m, args) => { would.push({ act: 'close-leftover', jobId: args.jobId }); return { ok: true, shadow: true }; },
   };
 }
 /** A machine handle whose transactions record instead of writing (the shadow sweep reads the live rows). */

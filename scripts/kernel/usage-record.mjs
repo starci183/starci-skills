@@ -5,7 +5,8 @@
 // Claude Code JSONL, Codex rollout JSONL); an agent without an adapter is 'unavailable', never a guess.
 // A session file is found by CONTENT, the way scripts/kernel/op-session.mjs attributes a session to its job: the first
 // user message of an op worker names its dispatch id, task id and job id (the Orca worker preamble + the op prompt); a
-// Kernel session opens with `You are [Kernel] <workflow>`, the Supervisor's with `You are the [Supervisor]`. Both the
+// Kernel session's task opens with `You are [Kernel] <workflow>`, the Supervisor's with `You are the [Supervisor]` or `[Supervisor] <name>`; both
+// follow Orca's worker preamble (the `=== TASK ===` marker), never the start of the message. Both the
 // live session homes and the session archive root (settle moves a finished op's file there) are searched.
 //
 //   op attempt   one llm_usage row per model + op_attempts.tokens_in/out/cost_usd/usage_source, written once when the
@@ -83,13 +84,20 @@ function readSessionHead(agent, head) {
   return { startMs, firstUser };
 }
 
+const TASK_MARKER = '=== TASK ===';
+/** The seat prompt of a first user message: Orca prefixes every dispatched worker with its ~6 KB preamble and the prompt follows the TASK marker. */
+const taskBodyOf = (text) => {
+  const at = text.indexOf(TASK_MARKER);
+  return at < 0 ? text : text.slice(at + TASK_MARKER.length);
+};
+
 /** What a session is: {role:'kernel', workflowId} | {role:'supervisor'} | {role:'op', dispatchId, taskId} | {role:'other'}. */
 function classifySession(firstUser) {
   const text = String(firstUser ?? '');
-  const top = text.slice(0, 800);
+  const top = taskBodyOf(text).slice(0, 800);
   const kernel = /You are \[Kernel\]\s+(wf-[A-Za-z0-9_-]+)/.exec(top);
   if (kernel) return { role: 'kernel', workflowId: kernel[1] };
-  if (/You are the \[Supervisor\]/.test(top)) return { role: 'supervisor' };
+  if (/You are the \[Supervisor\]|^\s*\[Supervisor\]\s/.test(top)) return { role: 'supervisor' };
   const dispatchId = /--dispatch-id (ctx_[0-9a-f]+)/.exec(text)?.[1] ?? /\bctx_[0-9a-f]{12}\b/.exec(text)?.[0] ?? null;
   const taskId = /Your task ID is: (task_[0-9a-f]+)/.exec(text)?.[1] ?? null;
   return dispatchId || taskId ? { role: 'op', dispatchId, taskId } : { role: 'other' };

@@ -43,3 +43,19 @@ test('one bootstrap locates the runtime for supported host projections',()=>{
   assert.equal(fs.existsSync(path.join(root,'init','CLAUDE.md')),false,'the installer copies AGENTS.md at install time; no second template ships');
   assert.equal(fs.existsSync(path.join(root,'init','DEVIN.md')),false);
 });
+
+test('the entry runs the read-only host status on every invocation and heals only no-quota services', () => {
+  const entry = read('skills/starci/SKILL.md');
+  const status = entry.slice(entry.indexOf('## Host status on every invocation'), entry.indexOf('Load only the reference needed'));
+  assert.ok(status.length > 0, 'the entry has its per-invocation host status section ahead of the routing table');
+  const up = parseYaml(read('modules/cli/commands/reconciler/up.yaml'));
+  const declared = new Set([...up.flags.map(flag => `--${flag.name}`), ...(up.json === 'flag' ? ['--json'] : [])]);
+  const cited = [...new Set([entry, read('skills/starci/references/host-startup.md'), read('skills/starci/references/workflow-chat.md')]
+    .flatMap(text => [...text.matchAll(/starci reconciler up((?: --[a-z-]+)*)/g)].flatMap(match => match[1].split(' ').filter(Boolean))))];
+  assert.ok(cited.includes('--check') && cited.includes('--brief') && cited.includes('--services'), 'the skill cites the status and the heal');
+  for (const flag of cited) assert.ok(declared.has(flag), `${flag} is a flag of starci reconciler up`);
+  assert.match(status, /starci reconciler up --check --brief/);
+  assert.match(status, /starci reconciler up --services/);
+  assert.match(status, /Never start an agent seat from an action\s+other than start/);
+  for (const seatStart of ['starci workflow start', 'starci supervisor start']) assert.ok(status.includes(seatStart), `${seatStart} is the named way a seat starts`);
+});

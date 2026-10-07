@@ -17,7 +17,9 @@
 // closeAndVerify(handle): tab close when the terminal is alone in its tab (so Orca drops it from the sidebar and never
 // restores it), pane close otherwise; then terminal show is polled until the handle reads disconnected or unknown to a
 // running Orca. A terminal still connected gets one more pane close and one more poll. Returns
-//   {handle, ok, proof: 'gone'|'disconnected'|null, attempts, tab?, reason?, error?}
+//   {handle, ok, proof: 'gone'|'disconnected'|null, attempts, before?, tab?, reason?, error?}
+// `before` is what terminal show proved before any close was issued ('gone' | 'disconnected' | 'connected'): a terminal
+// that was already without a live process answers that, one the close had to end answers connected.
 // ok is true only on proof. An Orca that does not answer proves nothing (reason host-unavailable).
 //
 // A caller running INSIDE the terminal it closes (a Kernel finishing its workflow, a [Worker] filing its report) cannot
@@ -110,9 +112,9 @@ export function closeAndVerify(handle, { show = terminalShow, close = terminalCl
   verifyMs = VERIFY_MS, intervalMs = VERIFY_INTERVAL_MS, wait = terminalWait } = {}) {
   if (!handle) return null;
   const before = terminalState(handle, { show });
-  if (before === 'gone') return { handle, ok: true, proof: 'gone', attempts: 0 };
+  if (before === 'gone') return { handle, ok: true, proof: 'gone', attempts: 0, before };
   if (before === 'unknown') return { handle, ok: false, proof: null, attempts: 0, reason: 'host-unavailable' };
-  const out = { handle, ok: false, proof: null, attempts: 0 };
+  const out = { handle, ok: false, proof: null, attempts: 0, before };
   for (const byPane of [false, true]) {
     const r = closeOnce(handle, { list, close, byPane });
     out.attempts += 1;

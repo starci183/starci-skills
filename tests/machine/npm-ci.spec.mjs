@@ -4,6 +4,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { runGit } from '../../scripts/api/git/lib.mjs';
 import { npmCi } from '../../scripts/machine/npm-ci.mjs';
+import { hostLockRetryBudget } from '../../scripts/machine/verb-lock.mjs';
 import { mkdtemp } from '../helpers/tmpdir.mjs';
 
 function git(cwd, args) {
@@ -68,7 +69,7 @@ test('npm ci forwards workspaces and holds the npm-ci host lock', async (t) => {
   assert.equal(result.code, 0);
   assert.deepEqual(result.data, { schema: 'starci/npm-ci@1', ok: true, cwd, ms: 25 });
   assert.deepEqual(events, [
-    ['lock', { role: 'owner', purpose: 'npm-ci', env: { SPEC: '1' } }, true],
+    ['lock', { role: 'owner', purpose: 'npm-ci', env: { SPEC: '1' }, retry: hostLockRetryBudget() }, true],
     ['ci', cwd, { workspaces: ['a', 'b'] }]
   ]);
 });

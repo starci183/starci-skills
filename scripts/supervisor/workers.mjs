@@ -49,7 +49,7 @@ import {
 } from '../machine/home.mjs';
 import { openMachine, starciLocalRoot } from '../../engine/db/machine.mjs';
 import { createOrcaWorktree, removeOrcaWorktree, orcaWorktreeClient } from '../machine/worktree-orca.mjs';
-import { ci } from '../api/npm/ci.mjs';
+import { ci } from '../api/npm/ci.mjs'; import { underHostLockWaiting } from './land-lock.mjs';
 import { machineLoad } from '../machine/host-resources.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 import { catFile } from '../api/git/cat-file.mjs'; import { cherry as gitCherry } from '../api/git/cherry.mjs'; import { cherryPick } from '../api/git/cherry-pick.mjs'; import { commitTree } from '../api/git/commit-tree.mjs'; import { config as gitConfig } from '../api/git/config.mjs'; import { diff as gitDiff } from '../api/git/diff.mjs'; import { hook as gitHook } from '../api/git/hook.mjs'; import { log as gitLog } from '../api/git/log.mjs'; import { lsFiles } from '../api/git/ls-files.mjs'; import { mergeBaseQuery } from '../api/git/merge-base-query.mjs'; import { mergeTree } from '../api/git/merge-tree.mjs'; import { push as gitPush } from '../api/git/push.mjs'; import { remote as gitRemote } from '../api/git/remote.mjs'; import { revList } from '../api/git/rev-list.mjs'; import { revParseQuery } from '../api/git/rev-parse-query.mjs'; import { show as gitShow } from '../api/git/show.mjs'; import { statusQuery } from '../api/git/status-query.mjs'; import { symbolicRefQuery } from '../api/git/symbolic-ref-query.mjs'; const SUPERVISOR_GIT = { 'cat-file': catFile, cherry: gitCherry, 'cherry-pick': cherryPick, 'commit-tree': commitTree, config: gitConfig, diff: gitDiff, hook: gitHook, log: gitLog, 'ls-files': lsFiles, 'merge-base': mergeBaseQuery, 'merge-tree': mergeTree, push: gitPush, remote: gitRemote, 'rev-list': revList, 'rev-parse': revParseQuery, show: gitShow, status: statusQuery, 'symbolic-ref': symbolicRefQuery };
@@ -201,7 +201,7 @@ const branchDeleteMode = (branch, landed) => {
  * `starci:supervisor-staging:sup-<job>;sup=<job>`, the row bound to Orca's id), its own npm ci (never a node_modules junction, RT_NODE_MODULES_LINK) and a copy of the
  * owner config so specs run there as they do live. {ok, path, branch, base, orcaId} as Orca reported them | {ok:false, reason, code, error}
  */
-export function createStaging({ jobId, root = SKILL_ROOT, env = process.env, orca = orcaWorktreeClient, install = ci }) {
+export function createStaging({ jobId, root = SKILL_ROOT, env = process.env, orca = orcaWorktreeClient, install = ci, lockDeps = {} }) {
   const made = createOrcaWorktree({ repoRoot: root, kind: STAGING_KIND, name: stagingNameOf(jobId), base: 'main', owner: { lane: jobId }, env, orca });
   if (!made.ok) return { ok: false, reason: made.reason, code: 'WORKER_STAGING_CREATE_FAILED', error: `${made.reason}: ${made.detail ?? ''}`.trim() };
   if (!made.branch || !made.head) {
@@ -209,10 +209,10 @@ export function createStaging({ jobId, root = SKILL_ROOT, env = process.env, orc
     removeOrcaWorktree({ repoRoot: root, orcaId: made.id, dir: made.path, env, orca });
     return { ok: false, reason: 'orca-worktree-create-failed', code: 'WORKER_STAGING_CREATE_FAILED', error: `orca worktree create reported no ${made.branch ? 'head' : 'branch'} for ${made.path}` };
   }
-  const deps = fs.existsSync(path.join(made.path, 'package-lock.json')) ? install(made.path) : { ok: true };
+  const deps = fs.existsSync(path.join(made.path, 'package-lock.json')) ? underHostLockWaiting({ purpose: 'npm-ci', env, deps: lockDeps }, () => install(made.path)) : { ok: true }; // under the host lock like every dependency install (waited for, bounded): the caller then owns the lock its install policy asks for
   if (!deps.ok) {
     removeOrcaWorktree({ repoRoot: root, orcaId: made.id, dir: made.path, env, orca });
-    return { ok: false, reason: 'staging-install-failed', code: 'WORKER_STAGING_CREATE_FAILED', error: `npm ci in the staging checkout failed (exit ${deps.status ?? 'unknown'}): ${deps.stderr.slice(-400)}` };
+    return { ok: false, reason: 'staging-install-failed', code: 'WORKER_STAGING_CREATE_FAILED', error: `npm ci in the staging checkout failed (exit ${deps.status ?? 'unknown'}): ${String(deps.stderr ?? deps.detail ?? '').slice(-400)}` };
   }
   try { const cfg = path.join(root, 'config.yaml'); if (fs.existsSync(cfg)) fs.copyFileSync(cfg, path.join(made.path, 'config.yaml')); } catch { /* optional */ }
   return { ok: true, path: made.path, branch: made.branch, base: made.head, orcaId: made.id };

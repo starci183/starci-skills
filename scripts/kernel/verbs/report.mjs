@@ -23,7 +23,9 @@ import { renderReportBlock } from '../report-render.mjs';
 import { startSettlerFor } from '../settle/job-settle.mjs';
 import { appendEvent, fileReport, idempotent, setJobStatus, setUnitState, getUnit, updateJob } from '../../../engine/db/ledger.mjs';
 import { requireReportAttempt } from './shared/report-binding.mjs';
-import { attachedArgs, scratchOf, scratchFile, stageReportEvidence, storedReportOf, fileReportEvidence, removeScratch, readReportEnvelope } from './shared/report-evidence.mjs';
+import { attachedArgs, attachedFilesOf, scratchOf, scratchFile, stageReportEvidence, storedReportOf, fileReportEvidence, removeScratch, readReportEnvelope } from './shared/report-evidence.mjs';
+import { observationContextOf } from '../mechanism-observation.mjs';
+import { proofsOwedByReport } from '../proof-producers.mjs';
 import { finalizeAttemptTranscript } from '../transcripts.mjs';
 import { send } from '../../api/orca/send.mjs';
 import { isSpecRun } from '../../lib/env.mjs';
@@ -175,6 +177,18 @@ function reaskOf(db, job, report) {
   return { dispatchId: repeated.dispatchId, reason };
 }
 
+// A done report that cannot satisfy a mechanism proof its op owes (a native producer in report.checks, the document it prints
+// attached) is refused here with the command to run, so the op repairs it in this attempt; settle would only fail the attempt.
+// A job without a filed contract snapshot owes nothing here: settle reports that gap itself.
+function proofGuard(db, job, { repo, report, attach, scratch, skillRoot }) {
+  let context;
+  try { context = observationContextOf(db, job, { repo, skillRoot }); } catch { return; }
+  const mode = context.selected.mode ?? (typeof jobPayloadOf(job).params?.mode === 'string' ? jobPayloadOf(job).params.mode : null);
+  const files = attachedFilesOf(attach, scratch).map(({ abs, rel }) => ({ abs, name: rel }));
+  const owed = proofsOwedByReport({ op: jobOpOf(job), mode, report, files, skillRoot });
+  if (owed.length) throw Object.assign(new Error(`${owed[0].code}: ${owed.map((o) => o.detail).join(' | ')}`), { code: owed[0].code, owed });
+}
+
 /** Typed rows the op kept in <scratch>/log.jsonl go to the ledger's logs table before the scratch is deleted. */
 function ingestOpScratchLog(repo, job, scratch) {
   const scratchLog = path.join(scratch, SCRATCH_LOG_FILE);
@@ -222,6 +236,7 @@ export default {
   const reask = reaskOf(db, job, report);
   const dispatchId = report.dispatch, op = jobOpOf(job);
   const attach = attachedArgs();
+  proofGuard(db, job, { repo, report, attach, scratch, skillRoot });
   const repoRoots = [repo, attempt.worktree_path, attempt.repo_root].filter(Boolean);
   // Blobs are put before the transaction: a refused or rolled-back filing leaves only unreferenced blobs for GC.
   const staged = stageReportEvidence({ report, scratch, attach, opId: op, repoRoots });

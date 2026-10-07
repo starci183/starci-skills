@@ -90,7 +90,7 @@ routing:
 workqueue:
   dedupe: (controller, key), persisted in machine.sqlite engine_queue
   inFlight: one reconcile per key; an event during it runs the key once more after
-  backoff: allocation.reconciler.backoff (1 s doubling to 5 min)
+  backoff: allocation.reconciler.backoff (1 s doubling to 5 min, maxAttempts 24, the one retry budget of scripts/lib/retry-budget.mjs; a spent key parks with due_at NULL until a new event for it re-arms the budget)
   concurrency: per controller (DESIGN §7.4, job 4, workflow 2, others 1), from the module or modules/reconciler/<name>.yaml
   resync: per controller resyncMs (DESIGN §7.4)
 

@@ -38,7 +38,7 @@ import {
   DEFAULT_OWNER_LANGUAGE, SUPERVISOR_SEAT, supervisedSeatHandles,
 } from '../machine/home.mjs';
 import { openWorkerHandles } from './workers.mjs';
-import { recordedSeatTerminals, seatSessions, entryTerminalOf, NO_ENTRY_REMEDY } from './seat-sessions.mjs';
+import { recordedSeatTerminals, seatSessions, entryTerminalOf, NO_ENTRY_REMEDY } from '../machine/seat-sessions.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { bestEffortCall } from '../agent/best-effort-call.mjs';
 import { loadModelRegistry } from '../agent/model-registry.mjs';
