@@ -119,7 +119,7 @@ export async function acquireUatSlot({runId=null,env=process.env,limit=maxConcur
   const unhookTicket=atExit(dropTicket);
   let lastPosition=null,waited=false,ticketSettled=false;
   // The ticket goes the moment a slot is claimed, so a claimant behind it counts only the waiters still queued.
-  const settleTicket=()=>{if(ticketSettled)return;ticketSettled=true;dropTicket();unhookTicket();};
+  const settleTicket=()=>{if(ticketSettled){return;}ticketSettled=true;dropTicket();unhookTicket();};
   try{
     return await repeatInOrder(async()=>{
       if(signal?.aborted)throw Object.assign(new Error('UAT slot wait aborted'),{code:'uat-slot-aborted'});

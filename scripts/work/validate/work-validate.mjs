@@ -224,7 +224,7 @@ const keyOf = (p) => {
 function ancestorsOf(target) {
   const out = [];
   let dir = path.resolve(String(target ?? '.'));
-  for (let i = 0; i < 12; i++) { out.push(dir); const up = path.dirname(dir); if (up === dir) break; dir = up; }
+  for (let i = 0; i < 12; i++) { out.push(dir); const up = path.dirname(dir); if (up === dir) { break; } dir = up; }
   return out;
 }
 /** `result` judged for the slice `owned` (paths relative to cwd, or absolute): out-of-scope refusals move to outOfScope. */
