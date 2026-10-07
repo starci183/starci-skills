@@ -168,3 +168,148 @@ test('I3, Nivo inc-8682f80b8b34: the admission gate carries "no provider receipt
   assert.equal(auto.by, 'until-conditions');
   assert.match(auto.detail, /holds a slot/);
 });
+
+// I4 / I8: a gate is one Decision Item on the Supervisor ladder; the Supervisor answers with one of three typed resolutions.
+const openGate = (repo, extra = ['--cause', 'runtime-defect', '--no-workaround', 'defect-on-every-path'], holds = STARCI_JOB) => {
+  const raised = run(repo, 'incident', '--workflow', WF, '--kind', 'owner-gate', '--holds', holds, '--detail', 'settle held waiting for a runtime fix to record-checks cwd', ...extra);
+  assert.equal(raised.status, 0, raised.stderr);
+  return json(raised).incidentId;
+};
+const answer = (repo, incidentId, ...flags) => run(repo, 'incident', '--workflow', WF, '--resolve', incidentId, '--by', 'supervisor', ...flags);
+const gateStatus = (repo, db, incidentId) => db.prepare('SELECT status FROM incidents WHERE incident_id=?').get(incidentId).status;
+
+test('I4, the three typed resolutions: a Supervisor answer names fixed (commit), workaround (route) or not-runtime-fault (why)', (t) => {
+  const repo = world(t);
+  const id = openGate(repo);
+  assert.equal(json(answer(repo, id, '--detail', 'fixed by something')).code, 'gate-resolution-required');
+  assert.equal(json(answer(repo, id, '--resolution', 'fixed')).code, 'gate-resolution-incomplete');
+  assert.equal(json(answer(repo, id, '--resolution', 'fixed', '--commit', 'zzz')).code, 'until-invalid');
+  assert.equal(json(answer(repo, id, '--resolution', 'workaround')).code, 'gate-resolution-incomplete');
+  assert.equal(json(answer(repo, id, '--resolution', 'not-runtime-fault', '--detail', 'short')).code, 'gate-resolution-incomplete');
+  assert.equal(read(repo, (db) => gateStatus(repo, db, id)), 'open', 'no refused answer resolved the gate');
+  // fixed, the commit not in the live runtime yet: the gate stays open and the status pass resolves it when the land arrives.
+  const waiting = json(answer(repo, id, '--resolution', 'fixed', '--commit', NOT_LANDED, '--detail', 'fix landing'));
+  assert.deepEqual([waiting.status, waiting.answered.resolution], ['open', 'fixed']);
+  assert.equal(read(repo, (db) => gateStatus(repo, db, id)), 'open');
+  const answered = read(repo, (db) => db.prepare("SELECT payload_json FROM events WHERE kind='gate-answered'").all().map((row) => JSON.parse(row.payload_json)));
+  assert.deepEqual([answered[0].resolution, answered[0].cause, answered[0].holds], ['fixed', 'runtime-defect', [STARCI_JOB]]);
+  // The commit is in the live runtime: fixed resolves at once.
+  const landed = json(answer(repo, id, '--resolution', 'fixed', '--commit', headSha(), '--detail', 'fix is in main'));
+  assert.deepEqual([landed.status, landed.answered.resolution], ['resolved', 'fixed']);
+  assert.equal(read(repo, (db) => db.prepare("SELECT payload_json FROM events WHERE kind='incident-resolved' AND json_extract(payload_json,'$.by')='supervisor'").get().payload_json.includes('"resolution":"fixed"')), true);
+});
+
+test('I4, workaround: the gate resolves and the Kernel is told the route to dispatch with', (t) => {
+  const repo = world(t);
+  const id = openGate(repo, ['--cause', 'no-eligible-agent', '--workaround', 'dispatch --model codex-agent was refused at launch-trust'], NIVO_JOB);
+  const done = json(answer(repo, id, '--resolution', 'workaround', '--route', 'codex-agent', '--detail', 'codex runs the leg with the guard bypassed'));
+  assert.deepEqual([done.status, done.answered.route], ['resolved', 'codex-agent']);
+  const [event] = read(repo, (db) => db.prepare("SELECT payload_json FROM events WHERE kind='gate-answered'").all().map((row) => JSON.parse(row.payload_json)));
+  assert.deepEqual([event.resolution, event.route, event.cause], ['workaround', 'codex-agent', 'no-eligible-agent']);
+});
+
+test('I4, not-runtime-fault: back to the Kernel, and the same cause and scope is not raised again without new evidence', (t) => {
+  const repo = world(t);
+  const id = openGate(repo);
+  const back = json(answer(repo, id, '--resolution', 'not-runtime-fault', '--detail', 'the checks ran in the right worktree, the red is the leg\'s own'));
+  assert.equal(back.status, 'resolved');
+  const again = run(repo, 'incident', '--workflow', WF, '--kind', 'owner-gate', '--holds', STARCI_JOB, '--detail', 'settle held waiting for a runtime fix to record-checks cwd', '--cause', 'runtime-defect', '--no-workaround', 'defect-on-every-path');
+  assert.equal(json(again).code, 'gate-reraise-without-evidence');
+  const same = run(repo, 'incident', '--workflow', WF, '--kind', 'owner-gate', '--holds', STARCI_JOB, '--detail', 'settle held waiting for a runtime fix to record-checks cwd', '--cause', 'runtime-defect', '--no-workaround', 'defect-on-every-path', '--evidence', 'settle held waiting for a runtime fix to record-checks cwd');
+  assert.equal(json(same).code, 'gate-reraise-without-evidence', 'the old evidence repeated is not new');
+  const other = run(repo, 'incident', '--workflow', WF, '--kind', 'owner-gate', '--holds', NIVO_JOB, '--detail', 'x', '--cause', 'runtime-defect', '--no-workaround', 'defect-on-every-path');
+  assert.equal(other.status, 0, 'another scope is not refused');
+  const fresh = run(repo, 'incident', '--workflow', WF, '--kind', 'owner-gate', '--holds', STARCI_JOB, '--detail', 'x', '--cause', 'runtime-defect', '--no-workaround', 'defect-on-every-path', '--evidence', 'record-checks exit 2 with ENOENT in the leg worktree after your reply');
+  assert.equal(fresh.status, 0, fresh.stderr);
+});
+
+// The pieces of the ladder: the Decision Item a gate opens, the levels it climbs, the close with its gate, and the defer only after the owner was told.
+const T0 = 1_800_000_000_000;
+const gateRow = (extra = {}) => ({ incidentId: 'inc-gate0001', opId: null, holds: [NIVO_JOB], detail: 'admission answers no-eligible-candidate', since: T0,
+  workaround: { cause: 'no-eligible-agent', attempt: 'dispatch --model codex-agent was refused at launch-trust' }, ...extra });
+const noEvents = { prepare: () => ({ get: () => undefined }) };
+
+test('I4: an open gate in the status opens one Supervisor Decision Item that leads with what was tried and offers the three resolutions', async () => {
+  const { planWorkflow } = await import('../../scripts/reconciler/workflow-plan.mjs');
+  const { gateViewOf } = await import('../../scripts/kernel/gate-ladder.mjs');
+  const view = { ...gateViewOf(noEvents, WF, gateRow(), { now: T0 + 60_000, timeoutMs: 6 * 3_600_000 }), subject: 'gate-no-eligible-agent-op-x-0' };
+  const plan = planWorkflow({ ledgerId: 'ledger-a', workflowId: WF, status: { autopilot: { supervisorGates: [view] } }, now: T0 + 60_000, settings: { decisionDueMs: 900_000 } });
+  const [di] = plan.decisions.filter((entry) => entry.refs?.gateIncident === 'inc-gate0001');
+  assert.equal(di.decider, 'supervisor');
+  assert.equal(di.ledger, 'supervisor', 'the Supervisor ledger, where the ladder reads it');
+  assert.equal(di.idempotencyKey, `runtime-defect:${WF}:gate-no-eligible-agent-op-x-0`);
+  assert.equal(di.dueAt - di.openedAt, 900_000, 'the acknowledgement deadline is the ackMs of the table');
+  assert.match(di.evidence[0].ref, /^tried: dispatch --model codex-agent was refused/);
+  assert.match(di.evidence[1].ref, /^watching: /);
+  assert.deepEqual(di.options.map((option) => option.key), ['fixed', 'workaround', 'not-runtime-fault']);
+  assert.deepEqual(di.allowedVerbs, ['starci kernel incident']);
+});
+
+test('I7: the gate view names its handler, step, deadline and watched condition, and moves up the ladder with its age', async () => {
+  const { gateViewOf, gatePolicyOf } = await import('../../scripts/kernel/gate-ladder.mjs');
+  const { ladderOf } = await import('../../scripts/kernel/supervisor-di-ladder.mjs');
+  const { ackMs } = gatePolicyOf();
+  const { stepMs, ownerAfter } = ladderOf();
+  const timeoutMs = 6 * 3_600_000;
+  const at = (age, typed = []) => gateViewOf(noEvents, WF, gateRow(), { now: T0 + age, typed, timeoutMs });
+  const fresh = at(0);
+  assert.deepEqual([fresh.handler, fresh.step, fresh.steps, fresh.deadlineAt], ['supervisor', 1, ownerAfter + 1, T0 + ackMs]);
+  assert.equal(fresh.condition, null);
+  assert.match(fresh.conditionNote, /^none.*the ladder carries it/);
+  const second = at(ackMs);
+  assert.deepEqual([second.handler, second.step, second.deadlineAt], ['supervisor', 2, T0 + ackMs + stepMs]);
+  const owner = at(ackMs + ownerAfter * stepMs);
+  assert.deepEqual([owner.handler, owner.step, owner.deadlineAt], ['owner', ownerAfter + 1, T0 + timeoutMs]);
+  const results = [{ condition: 'admission holds no receipt for x', met: false, evidence: '1 receipt holds a slot' }];
+  const watched = at(0, [{ incidentId: 'inc-gate0001', results }]);
+  assert.deepEqual(watched.condition, results);
+  assert.equal(watched.conditionNote, null);
+});
+
+test('I4/I8: the gate item climbs one level per step to the owner level, where the owner is told once with what was tried; it closes with its gate', async () => {
+  const { escalateSupervisorDis, ladderOf } = await import('../../scripts/kernel/supervisor-di-ladder.mjs');
+  const { overdueUrgent } = await import('../../scripts/reconciler/controllers/workers.mjs');
+  const { closeResolvedGateDis, gateSightOf } = await import('../../scripts/reconciler/gate-close.mjs');
+  const numbers = ladderOf();
+  const calls = [];
+  const m = { setSupDecision: (id, set) => calls.push([id, set.status]), supEvent: () => {} };
+  let di = { id: 'sdi-gate', status: 'open', dueAt: T0, escalations: 0, summary: 'supervisor-gate inc-gate0001 (no-eligible-agent) holds x',
+    evidence: [{ ref: 'tried: dispatch --model codex-agent was refused' }, { ref: 'watching: admission' }], refs: { gateIncident: 'inc-gate0001', ledgerId: 'ledger-a', cause: 'no-eligible-agent' } };
+  for (let level = 1; level <= numbers.ownerAfter; level += 1) {
+    assert.deepEqual(escalateSupervisorDis(m, [di], { now: T0 + (level - 1) * numbers.stepMs, ...numbers }), ['sdi-gate']);
+    di = { ...di, status: 'escalated', escalations: level };
+  }
+  const [urgent] = overdueUrgent([di], { now: T0 + 1, min: numbers.ownerAfter });
+  assert.match(urgent.text, /tried: dispatch --model codex-agent was refused/);
+  assert.equal(urgent.key, 'di:sdi-gate', 'one notice per item');
+  // The item closes when its incident is no longer open in a ledger the pass read; an unread ledger closes nothing.
+  const reader = (ledgerId, open) => ({ ledgerId, db: { prepare: () => ({ all: () => open.map((incident_id) => ({ incident_id })) }) } });
+  assert.deepEqual(closeResolvedGateDis(m, [di], gateSightOf([reader('ledger-a', ['inc-gate0001'])])), [], 'still open: stays on the ladder');
+  assert.deepEqual(closeResolvedGateDis(m, [di], gateSightOf([reader('ledger-b', [])])), [], 'its ledger was not read');
+  assert.deepEqual(closeResolvedGateDis(m, [di], gateSightOf([reader('ledger-a', [])])), ['sdi-gate']);
+  assert.deepEqual(calls.at(-1), ['sdi-gate', 'resolved']);
+});
+
+test('I8: the silent defer-to-handover happens only after the owner was told: the gate item reached the owner level', async (t) => {
+  const { withMachine } = await import('../../engine/db/machine.mjs');
+  const { deferTimedOutGates } = await import('../../scripts/kernel/autopilot-state.mjs');
+  const { ladderOf } = await import('../../scripts/kernel/supervisor-di-ladder.mjs');
+  const { gateSubjectOf } = await import('../../scripts/kernel/gate-ladder.mjs');
+  const repo = world(t);
+  const timeoutMs = 6 * 3_600_000;
+  const id = openGate(repo, ['--cause', 'runtime-defect', '--no-workaround', 'defect-on-every-path'], NIVO_JOB);
+  const sweep = (now) => seed(repo, (l) => {
+    const out = { timedOut: [] };
+    l.transaction(() => deferTimedOutGates({ ledger: l, db: l.db, workflowId: WF, settings: { supervisorGateTimeoutMs: timeoutMs }, out, now }));
+    return out.timedOut;
+  });
+  const late = Date.now() + timeoutMs + 60_000;
+  assert.deepEqual(sweep(late), [], 'past the timeout but the owner was not told: nothing is deferred');
+  const subject = seed(repo, (l) => gateSubjectOf(l.db, WF, { incidentId: id, holds: [NIVO_JOB], workaround: { cause: 'runtime-defect' } }));
+  withMachine((m) => {
+    const opened = m.openSupDecision({ keyParts: { kind: 'runtime-defect', workflow: WF, subject }, kind: 'runtime-defect', summary: 'gate', workflowId: WF, openedBy: 'spec', dueAt: 1, payload: {} });
+    for (let level = 0; level < ladderOf().ownerAfter; level += 1) m.setSupDecision(opened.diId, { status: 'escalated', by: 'spec' });
+  });
+  assert.deepEqual(sweep(late).map((entry) => entry.incidentId), [id], 'the owner was told: the held job is deferred to the handover list');
+  assert.deepEqual(sweep(Date.now() + 60_000), [], 'a gate younger than the timeout never defers');
+});

@@ -349,11 +349,18 @@ async function reconcileNotify(key, ctx, settings, now, force, language) {
   try {
     // Read-only: the Supervisor's DIs (machine.sqlite sup_decision_items, decisions.mjs supervisorDecisions).
     const [{ supervisorDecisions }, { readSupervisor }] = await Promise.all([import('../../machine/decisions.mjs'), import('../../machine/home.mjs')]);
-    const dis = readSupervisor((m) => supervisorDecisions(m, { now }), [], { env: ctx.env ?? process.env });
+    const all = readSupervisor((m) => supervisorDecisions(m, { now }), [], { env: ctx.env ?? process.env });
+    let dis = all;
     if (ctx.mode === 'active') {
       const { withSupervisor } = await import('../../machine/home.mjs');
       const { escalateSupervisorDis, ladderOf } = await import('../../kernel/supervisor-di-ladder.mjs');
-      withSupervisor((m) => escalateSupervisorDis(m, dis, { now, ...ladderOf() }), { env: ctx.env ?? process.env });
+      const { closeResolvedGateDis, gateSightOf } = await import('../gate-close.mjs');
+      const sight = withReaders(ctx, gateSightOf);
+      withSupervisor((m) => {
+        const closed = new Set(closeResolvedGateDis(m, all, sight));
+        dis = all.filter((di) => !closed.has(di.id));
+        escalateSupervisorDis(m, dis, { now, ...ladderOf() });
+      }, { env: ctx.env ?? process.env });
     }
     urgentItems = overdueUrgent(dis, { now, min: settings.urgentOverdueEscalations, language });
   } catch { urgentItems = []; }

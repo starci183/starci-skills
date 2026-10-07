@@ -38,6 +38,17 @@ ladder:
   stepMs: {ref: "modules/reconciler/job.yaml#decisionDueMs"}
   ownerAfter: {ref: "modules/reconciler/workers.yaml#urgentOverdueEscalations"}
 
+# A supervisor-gate enters the ladder above through one Supervisor Decision Item (scripts/reconciler/gate-plan.mjs): the Supervisor acknowledges within
+# `ackMs`, then the item climbs one level per ladder step until the owner level, where the owner is told once per (workflow, cause, scope) with the
+# workaround tried and the watched condition. The Supervisor's answer is one `resolutions` entry (scripts/kernel/verbs/shared/gate-resolution.mjs):
+# `fixed` (a commit; the gate resolves when the live runtime contains it), `workaround` (a route for the Kernel to dispatch), `not-runtime-fault`
+# (back to the Kernel, which must act; the same cause and scope is not raised again without new evidence). `deferAfter: owner-told` is the only
+# way the held jobs go to the handover list on a gate's timeout: after the owner was told (scripts/kernel/autopilot-state.mjs deferTimedOutGates).
+gate:
+  ackMs: {ref: "modules/reconciler/workflow.yaml#decisionDueMs"}
+  resolutions: [fixed, workaround, not-runtime-fault]
+  deferAfter: owner-told
+
 # A worker question matching one of these (case-insensitive) is the owner's, not the Kernel's: credentials and secrets, spend, and irreversible
 # or production-data choices. The Job controller opens its Decision Item for the owner instead of the Kernel (scripts/reconciler/controllers/job.mjs).
 ownerOnlyQuestions:

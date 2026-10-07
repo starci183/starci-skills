@@ -5,6 +5,7 @@ import { clipLine } from '../lib/clip.mjs';
 import { stallNotice } from '../kernel/progress-rca.mjs';
 import { shortRev } from '../kernel/runtime-rev.mjs';
 import { CRITICAL_SUFFIX } from './sla.mjs';
+import { planSupervisorGates } from './gate-plan.mjs';
 
 const DI_SCHEMA = 'starci/decision-item@1';
 const OPENED_BY = 'workflow-controller';
@@ -23,14 +24,15 @@ const iso = (ms) => (Number.isFinite(ms) ? new Date(ms).toISOString() : null);
 const firstUntried = (rca) => (rca?.actions ?? []).find((a) => !a.tried) ?? null;
 
 /** One DI (DESIGN §10.3), the ledger's own; lane rc-decisions assigns the id. Pure. */
-function decisionOf({ kind, subject, decider = 'kernel', ledgerId, workflowId, entity, summary, evidence = [], top = null, now, dueMs, escalatedFrom = null, ledger = null }) {
+function decisionOf({ kind, subject, decider = 'kernel', ledgerId, workflowId, entity, summary, evidence = [], top = null, now, dueMs, escalatedFrom = null, ledger = null, options = null, allowedVerbs = null, refs = null }) {
   return {
     schema: DI_SCHEMA, idempotencyKey: `${kind}:${workflowId}:${subject}${escalatedFrom ? '@supervisor' : ''}`, kind, decider,
     ledger: ledger ?? (decider === 'supervisor' && escalatedFrom ? SUPERVISOR_LEDGER : ledgerId), productLedger: ledgerId, workflowId,
     entity: entity ?? { type: 'workflow', id: workflowId },
     summary: clipLine(summary, 300),
     evidence: evidence.filter(Boolean).map((line) => ({ ref: clipLine(line, 400) })),
-    options: top ? [{ key: top.key, verb: top.command, title: top.title, tier: top.tier, recommended: true }] : [],
+    options: options ?? (top ? [{ key: top.key, verb: top.command, title: top.title, tier: top.tier, recommended: true }] : []),
+    ...(allowedVerbs ? { allowedVerbs } : {}), ...(refs ? { refs } : {}),
     openedBy: OPENED_BY, openedAt: now, dueAt: now + dueMs,
     escalateTo: decider === 'kernel' ? 'supervisor' : 'owner', escalations: escalatedFrom ? 1 : 0,
     ...(escalatedFrom ? { escalatedFrom } : {}), status: 'open',
@@ -190,7 +192,7 @@ function planFinish(p) {
   if (!hasOpenOperations) p.out.finish = true;
 }
 
-const SECTIONS = [planGoal, planStall, planOrphaned, planRev, planUnreadable, planFindings, planStuckClocks, planAsks, planFinish];
+const SECTIONS = [planGoal, planStall, planOrphaned, planRev, planUnreadable, planFindings, planSupervisorGates, planStuckClocks, planAsks, planFinish];
 
 /**
  * Everything one pass decides for one running workflow. Pure: no ledger, no clock, no spawn.

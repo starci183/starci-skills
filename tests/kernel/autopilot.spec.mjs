@@ -17,6 +17,10 @@ import { inspectLedger, ledgerFileFor, openLedger } from '../../engine/db/ledger
 import {seedWorkflow, withLedger} from '../helpers/ledger-fixture.mjs';
 import { AUTOPILOT_BY, SUPERVISOR_GATE, autopilotAnswerAsk, autopilotAskClass, autopilotOf, autopilotSettings, drawGateEvidence, routeCapUnderAutopilot, budgetOf, autopilotSweep } from '../../scripts/kernel/autopilot-run.mjs';
 import { ownerAnswerProof } from '../../scripts/machine/owner-claim.mjs';
+import { withMachine } from '../../engine/db/machine.mjs';
+import { supervisorGatesOf } from '../../scripts/kernel/autopilot-budget.mjs';
+import { gateSubjectOf } from '../../scripts/kernel/gate-ladder.mjs';
+import { ladderOf } from '../../scripts/kernel/supervisor-di-ladder.mjs';
 import { applyDrawReview, drawReviewQuestion, drawReviewStatus } from '../../scripts/work/draw-review.mjs';
 import { repeatedAnswerOf } from '../../scripts/machine/owner-answers.mjs';
 import { buildProduct, layoutCapture, uiSkeleton } from '../fixtures/layout-tree.mjs';
@@ -180,7 +184,7 @@ test('an owner gate is the Supervisor\'s under autopilot: raised or older gates 
   const fake = run({}, 'incident', '--repo', repo, '--workflow', WF, '--resolve', 'inc-old', '--detail', 'Owner confirmed the retry', '--json');
   assert.equal(fake.status, 1);
   assert.equal(json(fake).code, 'owner-claim-unproven');
-  const ok = run({}, 'incident', '--repo', repo, '--workflow', WF, '--resolve', 'inc-old', '--by', 'supervisor', '--detail', 'fixed by .claude abc1234: checker defect', '--json');
+  const ok = run({}, 'incident', '--repo', repo, '--workflow', WF, '--resolve', 'inc-old', '--by', 'supervisor', '--resolution', 'not-runtime-fault', '--detail', 'the checker defect is a red the leg owns, abc1234', '--json');
   assert.equal(ok.status, 0, ok.stderr);
 });
 
@@ -392,7 +396,16 @@ test('the gate of an exceeded cap holding every job times out into the handover 
   const tight = { ...settings, budgets: { ...settings.budgets, tokens: 5 } };
   const start = Date.now();
   autopilotSweep({ ledger, repo: repoRoot, workflowId: WF, settings: tight, now: start });
-  const late = autopilotSweep({ ledger, repo: repoRoot, workflowId: WF, settings: tight, now: start + tight.supervisorGateTimeoutMs + 1000 });
+  const lateAt = start + tight.supervisorGateTimeoutMs + 1000;
+  assert.equal(autopilotSweep({ ledger, repo: repoRoot, workflowId: WF, settings: tight, now: lateAt }).timedOut.length, 0, 'the owner was not told yet: nothing is deferred silently');
+  // The gate's Supervisor item climbed to the owner level (the owner was told): now the declared deadline moves the held jobs on.
+  const [gate] = supervisorGatesOf(ledger.db, WF);
+  withMachine((m) => {
+    const subject = gateSubjectOf(ledger.db, WF, gate);
+    const opened = m.openSupDecision({ keyParts: { kind: 'runtime-defect', workflow: WF, subject }, kind: 'runtime-defect', summary: 'budget gate', workflowId: WF, openedBy: 'spec', dueAt: 1, payload: {} });
+    for (let level = 0; level < ladderOf().ownerAfter; level += 1) m.setSupDecision(opened.diId, { status: 'escalated', by: 'spec' });
+  });
+  const late = autopilotSweep({ ledger, repo: repoRoot, workflowId: WF, settings: tight, now: lateAt });
   assert.equal(late.timedOut.length, 1, 'the declared deadline moves the held jobs on');
   assert.ok(late.timedOut[0].jobIds.includes('meter-held'));
 }));

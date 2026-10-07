@@ -12,13 +12,13 @@ export const SUPERVISOR_GATE = 'supervisor-gate';
 export const openIncidents = (db, workflowId) => db.prepare("SELECT incident_id,op_id,last_progress,updated_at FROM incidents WHERE workflow_id=? AND status='open' ORDER BY updated_at").all(workflowId);
 export const kindOf = (lastProgress) => /^\[([^\]]+)\]/.exec(String(lastProgress ?? ''))?.[1] ?? null;
 
-/** Open supervisor-gate incidents: [{incidentId, opId, holds[], detail, since}]. */
+/** Open supervisor-gate incidents: [{incidentId, opId, holds[], detail, since, workaround}]; `workaround` is the raise's I6 record or null. */
 export function supervisorGatesOf(db, workflowId) {
   return openIncidents(db, workflowId).filter((row) => kindOf(row.last_progress) === SUPERVISOR_GATE).map((row) => {
     const raised = db.prepare("SELECT created_at,payload_json FROM events WHERE workflow_id=? AND entity_type='incident' AND entity_id=? AND kind='incident-raised' ORDER BY seq DESC LIMIT 1").get(workflowId, row.incident_id);
     const payload = parseJson(raised?.payload_json, {}) ?? {};
     return { incidentId: row.incident_id, opId: row.op_id ?? null, holds: list(payload.holds).length ? payload.holds : [row.op_id].filter(Boolean),
-      detail: String(row.last_progress ?? '').replace(/^\[[^\]]+\]\s*/, ''), since: raised?.created_at ?? row.updated_at };
+      detail: String(row.last_progress ?? '').replace(/^\[[^\]]+\]\s*/, ''), since: raised?.created_at ?? row.updated_at, workaround: payload.workaround ?? null };
   });
 }
 

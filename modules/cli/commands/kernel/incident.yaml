@@ -38,6 +38,22 @@ flags:
   - name: because
     type: string
     summary: "a supervisor-gate: the evidence behind --no-workaround"
+  - name: evidence
+    type: string
+    summary: "a supervisor-gate raised again for a cause the Supervisor answered not-runtime-fault: the new evidence"
+  - name: resolution
+    type: enum
+    summary: "the Supervisor's typed answer to a supervisor-gate with --resolve --by supervisor"
+    enum:
+      - fixed
+      - workaround
+      - not-runtime-fault
+  - name: commit
+    type: string
+    summary: "--resolution fixed: the runtime fix commit; the gate resolves when the live runtime contains it"
+  - name: route
+    type: string
+    summary: "--resolution workaround: the pool the Kernel dispatches the held job with"
   - name: peer
     type: string
     summary: workflow waited on (--kind peer-wait)
