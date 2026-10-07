@@ -60,6 +60,41 @@ export function* fileLines(file, { chunkBytes = 8 << 20 } = {}) {
 
 const parse = (line) => { try { return JSON.parse(line); } catch { return null; } };
 
+function recordClaudeAssistant(o, { byId, toolModel, rowOf }) {
+  const model = o.message.model;
+  if (!model || model === '<synthetic>') return;
+  const usage = o.message.usage;
+  const id = o.message.id ?? o.uuid;
+  const rec = byId.get(id) ?? { model, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, reasoningTokens: 0 };
+  rec.inputTokens = Math.max(rec.inputTokens, int(usage.input_tokens));
+  rec.outputTokens = Math.max(rec.outputTokens, int(usage.output_tokens));
+  rec.cacheReadTokens = Math.max(rec.cacheReadTokens, int(usage.cache_read_input_tokens));
+  rec.cacheWriteTokens = Math.max(rec.cacheWriteTokens, int(usage.cache_creation_input_tokens));
+  rec.reasoningTokens = Math.max(rec.reasoningTokens, int(usage.output_tokens_details?.thinking_tokens));
+  byId.set(id, rec);
+  if (Array.isArray(o.message.content)) for (const block of o.message.content) {
+    if (block?.type === 'tool_use' && block.id && !toolModel.has(block.id)) { toolModel.set(block.id, model); rowOf(model).toolCalls += 1; }
+  }
+}
+
+function recordClaudeToolErrors(o, { toolModel, errSeen, rowOf }) {
+  for (const block of o.message.content) {
+    if (block?.type === 'tool_result' && block.is_error === true && block.tool_use_id && !errSeen.has(block.tool_use_id)) {
+      errSeen.add(block.tool_use_id);
+      const model = toolModel.get(block.tool_use_id);
+      if (model) rowOf(model).toolErrors += 1;
+    }
+  }
+}
+
+function addClaudeTotals(byId, rowOf) {
+  for (const rec of byId.values()) {
+    const row = rowOf(rec.model);
+    for (const field of [...COUNT_FIELDS, 'reasoningTokens']) row[field] += rec[field];
+    row.turns += 1;
+  }
+}
+
 /** Claude Code session lines -> {agent, models:[row], turns, sessionId}. A message counts once; sub-agent (sidechain) messages count too. */
 function claudeUsage(lines) {
   const byId = new Map();
@@ -75,77 +110,67 @@ function claudeUsage(lines) {
     if (!o) continue;
     sessionId ??= o.sessionId ?? null;
     if (o.type === 'assistant' && o.message?.usage) {
-      const model = o.message.model;
-      if (!model || model === '<synthetic>') continue;
-      const u = o.message.usage;
-      const id = o.message.id ?? o.uuid;
-      const rec = byId.get(id) ?? { model, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, reasoningTokens: 0 };
-      rec.inputTokens = Math.max(rec.inputTokens, int(u.input_tokens));
-      rec.outputTokens = Math.max(rec.outputTokens, int(u.output_tokens));
-      rec.cacheReadTokens = Math.max(rec.cacheReadTokens, int(u.cache_read_input_tokens));
-      rec.cacheWriteTokens = Math.max(rec.cacheWriteTokens, int(u.cache_creation_input_tokens));
-      rec.reasoningTokens = Math.max(rec.reasoningTokens, int(u.output_tokens_details?.thinking_tokens));
-      byId.set(id, rec);
-      if (Array.isArray(o.message.content)) for (const block of o.message.content) {
-        if (block?.type === 'tool_use' && block.id && !toolModel.has(block.id)) { toolModel.set(block.id, model); rowOf(model).toolCalls += 1; }
-      }
+      recordClaudeAssistant(o, { byId, toolModel, rowOf });
     } else if (o.type === 'user' && Array.isArray(o.message?.content)) {
-      for (const block of o.message.content) {
-        if (block?.type === 'tool_result' && block.is_error === true && block.tool_use_id && !errSeen.has(block.tool_use_id)) {
-          errSeen.add(block.tool_use_id);
-          const model = toolModel.get(block.tool_use_id);
-          if (model) rowOf(model).toolErrors += 1;
-        }
-      }
+      recordClaudeToolErrors(o, { toolModel, errSeen, rowOf });
     }
   }
-  for (const rec of byId.values()) {
-    const row = rowOf(rec.model);
-    for (const f of [...COUNT_FIELDS, 'reasoningTokens']) row[f] += rec[f];
-    row.turns += 1;
-  }
+  addClaudeTotals(byId, rowOf);
   return { agent: 'claude', sessionId, models: [...rows.values()].filter(hasActivity), turns: byId.size };
 }
 
 const CODEX_TOOL_CALLS = new Set(['function_call', 'custom_tool_call', 'local_shell_call', 'tool_search_call']);
 
+const codexEventLine = (line) => {
+  const tokenCount = line.includes('"token_count"');
+  const turnContext = line.includes('"turn_context"');
+  const sessionMeta = line.includes('"session_meta"');
+  const toolCall = !tokenCount && !turnContext && line.includes('"response_item"');
+  return tokenCount || turnContext || sessionMeta || toolCall;
+};
+
+function applyCodexControlEvent(o, state, rowOf) {
+  if (o.type === 'session_meta') { state.sessionId ??= o.payload?.id ?? o.payload?.session_id ?? null; return true; }
+  if (o.type === 'turn_context') { state.model = o.payload?.model ?? o.payload?.collaboration_mode?.settings?.model ?? state.model; return true; }
+  if (o.type === 'response_item' && CODEX_TOOL_CALLS.has(o.payload?.type)) { rowOf(state.model).toolCalls += 1; return true; }
+  return false;
+}
+
+function addCodexUsage(total, state, rowOf) {
+  const cur = {
+    input: int(total.input_tokens), cached: int(total.cached_input_tokens), write: int(total.cache_write_input_tokens),
+    output: int(total.output_tokens), reasoning: int(total.reasoning_output_tokens),
+  };
+  // A cumulative total that shrank (a fresh baseline after compaction) is a new base, never a negative delta.
+  const base = state.prev && cur.input >= state.prev.input && cur.output >= state.prev.output ? state.prev : { input: 0, cached: 0, write: 0, output: 0, reasoning: 0 };
+  const d = { input: cur.input - base.input, cached: cur.cached - base.cached, write: cur.write - base.write, output: cur.output - base.output, reasoning: cur.reasoning - base.reasoning };
+  state.prev = cur;
+  if (!d.input && !d.output) return;
+  const row = rowOf(state.model);
+  row.cacheReadTokens += Math.max(0, d.cached);
+  row.cacheWriteTokens += Math.max(0, d.write);
+  row.inputTokens += Math.max(0, d.input - Math.max(0, d.cached) - Math.max(0, d.write));
+  row.outputTokens += Math.max(0, d.output);
+  row.reasoningTokens += Math.max(0, d.reasoning);
+  row.turns += 1;
+  state.turns += 1;
+}
+
 /** Codex rollout lines -> {agent, models:[row], turns, sessionId}: cumulative token_count deltas attributed to the model of the latest turn_context. */
 function codexUsage(lines) {
   const rows = new Map();
-  let model = 'unknown', sessionId = null, prev = null, turns = 0;
+  const state = { model: 'unknown', sessionId: null, prev: null, turns: 0 };
   const rowOf = (m) => { if (!rows.has(m)) { rows.set(m, emptyRow(m, { toolErrors: false })); } return rows.get(m); };
   for (const line of lines) {
-    const tokenCount = line.includes('"token_count"');
-    const turnContext = line.includes('"turn_context"');
-    const sessionMeta = line.includes('"session_meta"');
-    const toolCall = !tokenCount && !turnContext && line.includes('"response_item"');
-    if (!tokenCount && !turnContext && !sessionMeta && !toolCall) continue;
+    if (!codexEventLine(line)) continue;
     const o = parse(line);
     if (!o) continue;
-    if (o.type === 'session_meta') { sessionId ??= o.payload?.id ?? o.payload?.session_id ?? null; continue; }
-    if (o.type === 'turn_context') { model = o.payload?.model ?? o.payload?.collaboration_mode?.settings?.model ?? model; continue; }
-    if (o.type === 'response_item' && CODEX_TOOL_CALLS.has(o.payload?.type)) { rowOf(model).toolCalls += 1; continue; }
+    if (applyCodexControlEvent(o, state, rowOf)) continue;
     const total = o.payload?.type === 'token_count' ? o.payload.info?.total_token_usage : null;
     if (!total) continue;
-    const cur = {
-      input: int(total.input_tokens), cached: int(total.cached_input_tokens), write: int(total.cache_write_input_tokens),
-      output: int(total.output_tokens), reasoning: int(total.reasoning_output_tokens),
-    };
-    // A cumulative total that shrank (a fresh baseline after compaction) is a new base, never a negative delta.
-    const base = prev && cur.input >= prev.input && cur.output >= prev.output ? prev : { input: 0, cached: 0, write: 0, output: 0, reasoning: 0 };
-    const d = { input: cur.input - base.input, cached: cur.cached - base.cached, write: cur.write - base.write, output: cur.output - base.output, reasoning: cur.reasoning - base.reasoning };
-    prev = cur;
-    if (!d.input && !d.output) continue;
-    const row = rowOf(model);
-    row.cacheReadTokens += Math.max(0, d.cached);
-    row.cacheWriteTokens += Math.max(0, d.write);
-    row.inputTokens += Math.max(0, d.input - Math.max(0, d.cached) - Math.max(0, d.write));
-    row.outputTokens += Math.max(0, d.output);
-    row.reasoningTokens += Math.max(0, d.reasoning);
-    row.turns += 1;
-    turns += 1;
+    addCodexUsage(total, state, rowOf);
   }
-  return { agent: 'codex', sessionId, models: [...rows.values()].filter(hasActivity), turns };
+  return { agent: 'codex', sessionId: state.sessionId, models: [...rows.values()].filter(hasActivity), turns: state.turns };
 }
 
 const hasActivity = (row) => COUNT_FIELDS.some((f) => row[f] > 0) || row.turns > 0;
