@@ -166,7 +166,14 @@ export default {
   }
   if (!args.recover) {
     const openedBy = row?.jobId ? `; opened by ${row.jobId} at ${row.step ?? '-'}: ${row.detail ?? row.signal ?? '-'}` : '';
-    const clearWith = circuit ? `; clear with ${circuit.failureKind === QUOTA_FAILURE_KIND ? `${providerQuotaProbeCommand(key)} (runs by itself every watchdog tick, at most once per probe interval)` : providerRecoverCommand(key)}` : '';
+    let clearWith = '';
+    if (circuit) {
+      let clearCommand;
+      if (circuit.failureKind === QUOTA_FAILURE_KIND) {
+        clearCommand = `${providerQuotaProbeCommand(key)} (runs by itself every watchdog tick, at most once per probe interval)`;
+      } else clearCommand = providerRecoverCommand(key);
+      clearWith = `; clear with ${clearCommand}`;
+    }
     emit({ ok: true, provider: key, open: Boolean(circuit), row, credential },
       `provider-health ${key}: ${state}${openedBy}; credential ${credential.fingerprint ?? 'unresolved'} (${credential.source ?? 'no source'})${clearWith}`, args.json);
     return;
