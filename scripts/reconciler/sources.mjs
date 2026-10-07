@@ -40,7 +40,7 @@ export function ledgersOf({ env = process.env, repos = null, exists = fs.existsS
     let id = base || 'repo';
     if (taken.has(id)) {
       let suffix = 2;
-      for (; taken.has(`${base}-${suffix}`); suffix += 1) { }
+      while (taken.has(`${base}-${suffix}`)) suffix += 1;
       id = `${base}-${suffix}`;
     }
     taken.add(id);
