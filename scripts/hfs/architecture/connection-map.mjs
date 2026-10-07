@@ -64,18 +64,7 @@ function readEnvFiles(target) {
   return merged;
 }
 
-export function checkConnectionMap(input) {
-  const { config, graph } = input;
-  const kit = machineKit(input);
-  const { ts } = kit;
-  const declared = config.hfs.repo.connections ?? [];
-  const byName = new Map(declared.map(connection => [connection.name, connection]));
-  const violations = [];
-  const report = (rel, message, extra = {}) => violations.push({ ruleId: RULE, path: rel, message, ...extra });
-  const decoratorsFile = name => `${DATABASE_DIR}/${name}.decorators.ts`;
-  const databaseFiles = [...graph.files.values()].filter(file => file.rel.startsWith(`${DATABASE_DIR}/`));
-
-  // 1. The three files of each declared connection, and no file of an undeclared one.
+const checkDeclaredConnections = (declared, kit, ts, report, decoratorsFile) => {
   for (const connection of declared) {
     const connectionRel = `${DATABASE_DIR}/${connection.name}.connection.ts`;
     const constant = `${upperSnake(connection.name)}_CONNECTION`;
@@ -119,50 +108,58 @@ export function checkConnectionMap(input) {
     });
     if (connection.isolation === 'schema' && !readsSchema) report(configRel, `Connection ${connection.name} is isolated as a schema of a shared database (hfs.json isolation), so ${configRel} must read ${connection.envPrefix}_SCHEMA and hand it to the data source; splitting the context out into its own database is then an env change only.`, { connection: connection.name });
   }
+};
+
+const reportUndeclaredDatabaseFiles = (databaseFiles, byName, report) => {
   for (const file of databaseFiles) {
     const match = /^(.+)\.(connection|decorators|config)\.ts$/u.exec(path.posix.basename(file.rel));
     if (match && path.posix.dirname(file.rel) === DATABASE_DIR && !byName.has(match[1])) {
       report(file.rel, `${file.rel} belongs to connection ${match[1]}, which hfs.json does not declare; declare the database in hfs.json connections or delete the file.`, { connection: match[1] });
     }
   }
+};
 
-  // 2. Every entity manager token and injector in the program: one home per connection.
-  const perDecorators = new Map();
-  for (const file of graph.files.values()) {
-    const checker = kit.checkerOf(file.sourceFile);
-    const slotIs = id => file.slot === id;
-    kit.walk(file.sourceFile, node => {
-      if (ts.isCallExpression(node)) {
-        const binding = kit.importBinding(checker, node.expression);
-        if (binding?.module === TYPEORM && MANAGER_CALLS.has(binding.name)) {
-          const value = kit.stringValue(checker, node.arguments[0]);
-          const home = value === null ? null : decoratorsFile(value);
-          if (value === null || !byName.has(value)) {
-            const target = value === null ? 'a connection that cannot be resolved to a constant' : `connection ${value}, which hfs.json does not declare`;
-            report(file.rel, `${binding.name}() names ${target}; only the declared connections have an entity manager token.`, kit.at(file.rel, file.sourceFile, node));
-          } else if (file.rel !== home) {
-            report(file.rel, `${binding.name}(${value}) belongs in ${home} only; inject the shared manager with Inject${pascal(value)}EntityManager() instead of a second path to connection ${value}.`, { ...kit.at(file.rel, file.sourceFile, node), connection: value });
-          } else {
-            perDecorators.set(value, (perDecorators.get(value) ?? 0) + 1);
-            if (perDecorators.get(value) > 1) report(file.rel, `${home} resolves connection ${value} more than once; one connection has one injector.`, { ...kit.at(file.rel, file.sourceFile, node), connection: value });
-          }
-        } else if (binding?.module === TYPEORM && SOURCE_CALLS.has(binding.name)) {
-          const allowed = file.rel.startsWith(`${DATABASE_DIR}/`) || slotIs('be.app.cli') || slotIs('be.cli') || slotIs('be.tests.fixtures');
-          if (!allowed) report(file.rel, `${binding.name}() reaches the DataSource outside platform/database and the cli; inject the shared EntityManager of the connection instead.`, kit.at(file.rel, file.sourceFile, node));
-        }
+const inspectManagerNode = (file, checker, node, state) => {
+  const { ts, kit, byName, decoratorsFile, report, perDecorators } = state;
+  if (ts.isCallExpression(node)) {
+    const binding = kit.importBinding(checker, node.expression);
+    if (binding?.module === TYPEORM && MANAGER_CALLS.has(binding.name)) {
+      const value = kit.stringValue(checker, node.arguments[0]);
+      const home = value === null ? null : decoratorsFile(value);
+      if (value === null || !byName.has(value)) {
+        const target = value === null ? 'a connection that cannot be resolved to a constant' : `connection ${value}, which hfs.json does not declare`;
+        report(file.rel, `${binding.name}() names ${target}; only the declared connections have an entity manager token.`, kit.at(file.rel, file.sourceFile, node));
+      } else if (file.rel !== home) {
+        report(file.rel, `${binding.name}(${value}) belongs in ${home} only; inject the shared manager with Inject${pascal(value)}EntityManager() instead of a second path to connection ${value}.`, { ...kit.at(file.rel, file.sourceFile, node), connection: value });
+      } else {
+        perDecorators.set(value, (perDecorators.get(value) ?? 0) + 1);
+        if (perDecorators.get(value) > 1) report(file.rel, `${home} resolves connection ${value} more than once; one connection has one injector.`, { ...kit.at(file.rel, file.sourceFile, node), connection: value });
       }
-      const exportedName = exportedInjectorName(ts, kit, node);
-      if (exportedName && INJECTOR_NAME.test(exportedName)) {
-        const home = [...byName.keys()].find(name => `Inject${pascal(name)}EntityManager` === exportedName);
-        if (!home || file.rel !== decoratorsFile(home)) {
-          report(file.rel, `${exportedName} is exported here, but the only injector of an entity manager is Inject<Conn>EntityManager in src/modules/platform/database/<conn>.decorators.ts, one per declared connection.`, kit.at(file.rel, file.sourceFile, node));
-        }
-      }
-      return true;
-    });
+    } else if (binding?.module === TYPEORM && SOURCE_CALLS.has(binding.name)) {
+      const allowed = file.rel.startsWith(`${DATABASE_DIR}/`) || state.slotIs(file, 'be.app.cli') || state.slotIs(file, 'be.cli') || state.slotIs(file, 'be.tests.fixtures');
+      if (!allowed) report(file.rel, `${binding.name}() reaches the DataSource outside platform/database and the cli; inject the shared EntityManager of the connection instead.`, kit.at(file.rel, file.sourceFile, node));
+    }
   }
+  const exportedName = exportedInjectorName(ts, kit, node);
+  if (exportedName && INJECTOR_NAME.test(exportedName)) {
+    const home = [...byName.keys()].find(name => `Inject${pascal(name)}EntityManager` === exportedName);
+    if (!home || file.rel !== decoratorsFile(home)) {
+      report(file.rel, `${exportedName} is exported here, but the only injector of an entity manager is Inject<Conn>EntityManager in src/modules/platform/database/<conn>.decorators.ts, one per declared connection.`, kit.at(file.rel, file.sourceFile, node));
+    }
+  }
+  return true;
+};
 
-  // 3. Each connection is passed to the database module registration once per app.
+const checkManagerCalls = (graph, state) => {
+  const perDecorators = new Map();
+  const walkState = { ...state, perDecorators, slotIs: (file, id) => file.slot === id };
+  for (const file of graph.files.values()) {
+    const checker = state.kit.checkerOf(file.sourceFile);
+    state.kit.walk(file.sourceFile, node => inspectManagerNode(file, checker, node, walkState));
+  }
+};
+
+const checkAppRegistrations = (config, kit, ts, byName, report) => {
   let registrations = 0;
   for (const app of config.apps) {
     const root = kit.appRoot(app.name);
@@ -188,8 +185,10 @@ export function checkConnectionMap(input) {
       }
     });
   }
+  return registrations;
+};
 
-  // 4. Stacks: two connections that resolve to one host, port and database are one database.
+const checkStackConnections = (config, kit, declared, report) => {
   let stacksChecked = 0;
   let stacksSkipped = 0;
   // .starcistacks sits at the app root: the side folder the machine judges reads its app's tree (locateDeclaration).
@@ -225,6 +224,24 @@ export function checkConnectionMap(input) {
     }
     if (resolved) stacksChecked += 1; else stacksSkipped += 1;
   }
+  return { stacksChecked, stacksSkipped };
+};
 
+export function checkConnectionMap(input) {
+  const { config, graph } = input;
+  const kit = machineKit(input);
+  const { ts } = kit;
+  const declared = config.hfs.repo.connections ?? [];
+  const byName = new Map(declared.map(connection => [connection.name, connection]));
+  const violations = [];
+  const report = (rel, message, extra = {}) => violations.push({ ruleId: RULE, path: rel, message, ...extra });
+  const decoratorsFile = name => `${DATABASE_DIR}/${name}.decorators.ts`;
+  const databaseFiles = [...graph.files.values()].filter(file => file.rel.startsWith(`${DATABASE_DIR}/`));
+  const state = { config, graph, kit, ts, declared, byName, violations, report, decoratorsFile };
+  checkDeclaredConnections(declared, kit, ts, report, decoratorsFile);
+  reportUndeclaredDatabaseFiles(databaseFiles, byName, report);
+  checkManagerCalls(graph, state);
+  const registrations = checkAppRegistrations(config, kit, ts, byName, report);
+  const { stacksChecked, stacksSkipped } = checkStackConnections(config, kit, declared, report);
   return { violations, coverage: { status: 'checked', connections: declared.length, registrations, stacksChecked, stacksSkipped } };
 }
