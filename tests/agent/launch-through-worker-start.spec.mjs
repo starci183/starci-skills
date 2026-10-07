@@ -215,6 +215,12 @@ test('startAgent reuses the prior Run while Orca knows it and takes the start, e
 
 /* ------------------------------------------------------------ on the wire */
 
+// Land-scratch hygiene: the cli.mjs children below run with cwd=ROOT and STARCI_AGENT_TRUST_HOME set, so a launch
+// that trusted the process cwd instead of its own worktree would drop provider-local settings at the checkout root —
+// the authored-JSON file the land gate's json-exceptions check flags. The wire tests must leave this set unchanged.
+const PROVIDER_LOCAL=['.claude/settings.local.json','.devin/config.local.json','.codex/config.toml'].map(rel=>path.join(ROOT,...rel.split('/')));
+const providerLocalAtStart=PROVIDER_LOCAL.map(file=>fs.existsSync(file));
+
 const fixture=t=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-launch-'));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
@@ -323,6 +329,10 @@ for(const [model,agent,takesModel] of [['claude-agent','claude',true],['codex-ag
     assert.equal(start[start.indexOf('--agent')+1],agent);
     assert.equal(start.includes('--terminal'),false);
     assert.equal(start.includes('--model'),takesModel,`${agent} ${takesModel?'pins':'takes no'} --model`);
+    // The launch really ran project trust (STARCI_AGENT_TRUST_HOME is live in these children): the provider-local
+    // file lands in the fixture worktree, which is what keeps the checkout root clean in the hygiene test below.
+    const trusted={claude:'.claude/settings.local.json',codex:'.codex/config.toml',devin:'.devin/config.local.json'}[agent];
+    assert.equal(fs.existsSync(path.join(fx.repo,...trusted.split('/'))),true,`${agent} launch trusted its fixture worktree`);
     // The nested Run rule (Orca's sub-dispatch shape): the Kernel binds its OWN workflow Run, files the op Task there
     // with no --parent (Orca takes a parent only from the same Run) and starts the op from its terminal.
     const argvOf=(verb)=>fx.callArgv().filter(argv=>argv.slice(0,2).join(' ')===verb);
@@ -374,4 +384,9 @@ test('the Kernel boots as a worker of its own entry Run through worker-start, ne
   assert.equal(again.status,0,again.stderr);
   assert.equal(json(again.stdout).replaced,false);
   assert.equal(fx.calls().filter(c=>c==='orchestration worker-start').length,1);
+});
+
+test('the launches above leave provider trust files only inside their fixture worktrees, never the checkout root',()=>{
+  assert.deepEqual(PROVIDER_LOCAL.map(file=>fs.existsSync(file)),providerLocalAtStart,
+    'a launch wrote provider-local settings to the checkout root instead of its fixture worktree');
 });
