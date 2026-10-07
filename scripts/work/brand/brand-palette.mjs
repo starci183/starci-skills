@@ -225,9 +225,6 @@ export function measurePalette(image, palette, { exclude = null } = {}) {
   const { width, height, data } = image;
   const step = Math.max(1, Math.ceil(Math.sqrt((width * height) / SAMPLE_BUDGET)));
   const cache = new Map();
-  const groups = new Map();
-  const tokens = new Map();
-  let opaque = 0, vivid = 0, primaryPixels = 0, statusPixels = 0;
   const rects = (Array.isArray(exclude) ? exclude : [exclude]).filter(Boolean);
   const excluded = (x, y) => rects.some((r) => x >= r.x && y >= r.y && x < r.x + r.width && y < r.y + r.height);
   const classify = (r, g, b) => {
@@ -272,33 +269,7 @@ export function measurePalette(image, palette, { exclude = null } = {}) {
     if (nx < 0 || ny < 0) return true;
     return classAt(nx, y) === own && classAt(x, ny) === own && classAt(nx, ny) === own;
   };
-  for (let y = 0; y < height; y += step) {
-    for (let x = 0; x < width; x += step) {
-      if (excluded(x, y)) continue;
-      const at = (y * width + x) * 4;
-      if (data[at + 3] < ALPHA_FLOOR) continue;
-      const r = data[at], g = data[at + 1], b = data[at + 2];
-      // The page slot of a layout capture or drawing is keyed #FF00FF: the compositor's hole, never a colour.
-      // A measured slot is skipped whole (slotExclusion below); this keeps a pixel the key misses out of it.
-      if (r >= 247 && g <= 8 && b >= 247) continue;
-      opaque += 1;
-      const v = classify(r, g, b);
-      if (v.kind === 'ink') continue;
-      // A colour counts only where it fills a 2x2 block: a browser's subpixel text fringes (orange and blue
-      // beside every dark glyph), the antialiased rim of the keyed slot and model noise are one pixel wide.
-      if (!coherent(x, y, v)) continue;
-      vivid += 1;
-      if (v.kind === 'brand') {
-        tokens.set(v.entry.label, (tokens.get(v.entry.label) ?? 0) + 1);
-        if (v.entry.isPrimary) primaryPixels += 1;
-        else if (STATUS_ROLES.has(v.entry.role)) statusPixels += 1;
-        continue;
-      }
-      const group = groups.get(v.name) ?? { name: v.name, count: 0, L: 0, a: 0, b: 0 };
-      group.count += 1; group.L += v.oklab.L; group.a += v.oklab.a; group.b += v.oklab.b;
-      groups.set(v.name, group);
-    }
-  }
+  const { groups, tokens, opaque, vivid, primaryPixels, statusPixels } = collectPaletteSamples({ image, step, excluded, classify, coherent });
   const offenders = [...groups.values()].map((g) => {
     const oklab = { L: g.L / g.count, a: g.a / g.count, b: g.b / g.count };
     const hex = formatHex(oklabToRgb(oklab).rgb);
@@ -325,7 +296,32 @@ export function measurePalette(image, palette, { exclude = null } = {}) {
     tokens: Object.fromEntries([...tokens.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8)),
   };
 }
-
+function collectPaletteSamples({ image, step, excluded, classify, coherent }) {
+  const { width, height, data } = image;
+  const samples = { groups: new Map(), tokens: new Map(), opaque: 0, vivid: 0, primaryPixels: 0, statusPixels: 0 };
+  for (let y = 0; y < height; y += step) for (let x = 0; x < width; x += step) recordPaletteSample(samples, data, width, x, y, excluded, classify, coherent);
+  return samples;
+}
+function recordPaletteSample(samples, data, width, x, y, excluded, classify, coherent) {
+  if (excluded(x, y)) return;
+  const at = (y * width + x) * 4;
+  if (data[at + 3] < ALPHA_FLOOR) return;
+  const r = data[at], g = data[at + 1], b = data[at + 2];
+  if (r >= 247 && g <= 8 && b >= 247) return;
+  samples.opaque += 1;
+  const verdict = classify(r, g, b);
+  if (verdict.kind === 'ink' || !coherent(x, y, verdict)) return;
+  samples.vivid += 1;
+  if (verdict.kind === 'brand') {
+    samples.tokens.set(verdict.entry.label, (samples.tokens.get(verdict.entry.label) ?? 0) + 1);
+    if (verdict.entry.isPrimary) samples.primaryPixels += 1;
+    else if (STATUS_ROLES.has(verdict.entry.role)) samples.statusPixels += 1;
+    return;
+  }
+  const group = samples.groups.get(verdict.name) ?? { name: verdict.name, count: 0, L: 0, a: 0, b: 0 };
+  group.count += 1; group.L += verdict.oklab.L; group.a += verdict.oklab.a; group.b += verdict.oklab.b;
+  samples.groups.set(verdict.name, group);
+}
 /**
  * The keyed #FF00FF page slot an image carries, as the rectangle `measurePalette` must skip: the measured
  * bounding rectangle of its key pixels grown by `grow`, so the one-pixel rim an image model blends around the
@@ -401,85 +397,98 @@ const walkFiles = (dir, keep, skip = new Set(['node_modules', 'kernel-evidence',
 /** Every image the gate judges under `workRoot`, with what it is and the record that owns it. */
 export async function scanTargets(workRoot) {
   const targets = [];
-  for (const index of indexFilesUnder(path.join(workRoot, 'features'))) {
-    const record = readYamlOrNull(index);
-    const dir = path.dirname(index);
-    if (record?.schema === 'work/ui-screen@1') {
-      const seen = new Set();
-      for (const a of assetsOf(record)) {
-        let kind = null;
-        if (a.composite) kind = 'composite';
-        else if (a.role === 'direction-content' || isPartName(a.path)) kind = 'part';
-        if (!kind || seen.has(a.path)) continue;
-        seen.add(a.path);
-        targets.push({ record: record.id, recordFile: index, kind, file: path.join(dir, a.path), declared: true, ...(a.composite ? { composite: a.composite, uiDir: dir } : {}) });
-      }
-      // Parts on disk the record does not (or no longer) declares are still what an owner may have been shown.
-      for (const f of walkFiles(path.join(dir, 'assets'), isPartName)) {
-        const rel = slash(path.relative(dir, f));
-        if (!seen.has(rel)) { seen.add(rel); targets.push({ record: record.id, recordFile: index, kind: 'part', file: f, declared: false }); }
-      }
-    } else if (record?.schema === 'work/implementation@1') {
-      for (const c of capturesOf(dir, record)) if (c.png) targets.push({ record: record.id, recordFile: index, kind: 'implementation capture', file: c.png, declared: true });
-    }
+  for (const index of indexFilesUnder(path.join(workRoot, 'features'))) appendRecordTargets(index, targets);
+  appendShellTargets(workRoot, targets);
+  return targets;
+}
+function appendRecordTargets(index, targets) {
+  const record = readYamlOrNull(index);
+  const dir = path.dirname(index);
+  if (record?.schema === 'work/ui-screen@1') appendUiTargets(index, dir, record, targets);
+  else if (record?.schema === 'work/implementation@1') appendImplementationTargets(index, dir, record, targets);
+}
+function appendUiTargets(index, dir, record, targets) {
+  const seen = new Set();
+  for (const asset of assetsOf(record)) {
+    let kind = null;
+    if (asset.composite) kind = 'composite';
+    else if (asset.role === 'direction-content' || isPartName(asset.path)) kind = 'part';
+    if (!kind || seen.has(asset.path)) continue;
+    seen.add(asset.path);
+    targets.push({ record: record.id, recordFile: index, kind, file: path.join(dir, asset.path), declared: true, ...(asset.composite ? { composite: asset.composite, uiDir: dir } : {}) });
   }
+  for (const file of walkFiles(path.join(dir, 'assets'), isPartName)) {
+    const rel = slash(path.relative(dir, file));
+    if (!seen.has(rel)) { seen.add(rel); targets.push({ record: record.id, recordFile: index, kind: 'part', file, declared: false }); }
+  }
+}
+function appendImplementationTargets(index, dir, record, targets) {
+  for (const capture of capturesOf(dir, record)) if (capture.png) targets.push({ record: record.id, recordFile: index, kind: 'implementation capture', file: capture.png, declared: true });
+}
+function appendShellTargets(workRoot, targets) {
   const shellFile = path.join(workRoot, 'shell', 'index.yaml');
   const shell = readYamlOrNull(shellFile);
   if (shell?.schema === 'work/layout-tree@1') {
     const { breakpoints, themes } = matrixOf(shell);
     const seen = new Set();
-    for (const node of appNamesOf(shell).flatMap((name) => nodesOf(treeOf(shell, name)))) for (const bp of breakpoints) for (const th of themes) for (const c of capturesAt(shell, node, bp, th)) {
-      if (seen.has(c.rel)) continue;
-      seen.add(c.rel);
-      targets.push({ record: 'shell ' + node.id + (c.destination ? ' (' + c.destination + ')' : ''), recordFile: shellFile, kind: 'layout capture', file: captureFileOf(path.join(workRoot, 'shell'), c), declared: true });
+    for (const node of appNamesOf(shell).flatMap((name) => nodesOf(treeOf(shell, name)))) for (const bp of breakpoints) for (const th of themes) for (const capture of capturesAt(shell, node, bp, th)) {
+      addShellCapture(workRoot, shellFile, node, capture, seen, targets);
     }
   }
-  return targets;
 }
-
+function addShellCapture(workRoot, shellFile, node, capture, seen, targets) {
+  if (seen.has(capture.rel)) return;
+  seen.add(capture.rel);
+  targets.push({ record: 'shell ' + node.id + (capture.destination ? ' (' + capture.destination + ')' : ''), recordFile: shellFile, kind: 'layout capture', file: captureFileOf(path.join(workRoot, 'shell'), capture), declared: true });
+}
 async function scanWork(workRoot) {
   const b = brandOf(workRoot);
   if (!b.brand) return { workRoot: slash(workRoot), brand: null, error: b.error, results: [] };
   const palette = brandPalette(b.brand, { brandDir: b.dir });
   const results = [];
-  for (const { composite = null, uiDir = null, ...t } of await scanTargets(workRoot)) {
-    if (!fs.existsSync(t.file)) { results.push({ ...t, file: slash(path.relative(workRoot, t.file)), missing: true, findings: [] }); continue; }
-    const shownAs = slash(path.relative(workRoot, t.file));
-    const findings = paletteFindings({ file: t.file, shownAs, brand: b.brand, palette, subject: t.kind, at: slash(path.relative(workRoot, t.recordFile)), composite, uiDir });
-    let measure = null;
-    try { measure = measureImage(readImage(t.file), palette, artworkExclusions({ file: t.file, palette, composite, uiDir })); } catch { /* reported as a finding */ }
-    results.push({ ...t, file: shownAs, recordFile: slash(path.relative(workRoot, t.recordFile)), findings, refused: measure?.refused ?? [], primary: measure?.primary ?? null });
-  }
+  for (const target of await scanTargets(workRoot)) results.push(scanTarget(workRoot, b.brand, palette, target));
   return { workRoot: slash(workRoot), brand: { file: slash(b.file), rev: b.rev, primary: palette.primary ? { token: palette.primary.label, hex: palette.primary.hex } : null }, results };
 }
-
+function scanTarget(workRoot, brand, palette, target) {
+  const { composite = null, uiDir = null, ...record } = target;
+  if (!fs.existsSync(record.file)) return { ...record, file: slash(path.relative(workRoot, record.file)), missing: true, findings: [] };
+  const shownAs = slash(path.relative(workRoot, record.file));
+  const findings = paletteFindings({ file: record.file, shownAs, brand, palette, subject: record.kind, at: slash(path.relative(workRoot, record.recordFile)), composite, uiDir });
+  let measure = null;
+  try { measure = measureImage(readImage(record.file), palette, artworkExclusions({ file: record.file, palette, composite, uiDir })); } catch { /* reported as a finding */ }
+  return { ...record, file: shownAs, recordFile: slash(path.relative(workRoot, record.recordFile)), findings, refused: measure?.refused ?? [], primary: measure?.primary ?? null };
+}
 async function main(argv) {
   const json = argv.includes('--json');
   const arg = (name) => { const i = argv.indexOf(name); return i >= 0 ? argv[i + 1] : null; };
-  if (arg('--prompt')) {
-    const b = brandOf(path.resolve(arg('--prompt')));
-    if (!b.brand) return { exitCode: 2, text: `${b.error}\n` };
-    return { exitCode: 0, text: `${promptPaletteBlock(b.brand, { name: b.brand?.identity?.name ?? b.brand?.identity?.product ?? null })}\n` };
-  }
-  if (arg('--check')) {
-    const b = brandOf(path.resolve(arg('--brand') ?? '.'));
-    if (!b.brand) return { exitCode: 2, text: `${b.error}\n` };
-    const file = path.resolve(arg('--check'));
-    const palette = brandPalette(b.brand, { brandDir: b.dir });
-    const findings = paletteFindings({ file, shownAs: slash(file), brand: b.brand, palette, subject: 'image', at: slash(file) });
-    const refused = findings.filter((f) => f.level === 'refuse');
-    if (json) return { exitCode: refused.length ? 1 : 0, text: `${JSON.stringify({ file: slash(file), findings, measure: measureImage(readImage(file), palette, artworkExclusions({ file, palette })) }, null, 2)}\n` };
-  return { exitCode: refused.length ? 1 : 0, text: `${findings.map((f) => '  ' + f.level.toUpperCase() + ' ' + f.message + ' [' + f.code + ']').join('\n')}${findings.length ? '\n' : ''}${refused.length ? 'FAIL' : 'OK'}: brand palette\n` };
-  }
-  if (arg('--scan')) {
-    const result = await scanWork(path.resolve(arg('--scan')));
-    if (json) return { exitCode: 0, text: `${JSON.stringify(result, null, 2)}\n` };
-    if (!result.brand) return { exitCode: 2, text: `${result.error}\n` };
-    const bad = result.results.filter((r) => r.findings.some((f) => f.level === 'refuse'));
-    const lines = bad.map((r) => `${r.record}  ${r.file}  [${r.kind}${r.declared ? '' : ', undeclared'}]\n    ${r.refused.map(describeOffender).join('\n    ')}${r.findings.some((f) => f.code === PALETTE_CODES.primaryAbsent) ? '\n    primary ' + r.primary.token + ' ' + r.primary.hex + ' absent' : ''}`);
-    return { exitCode: 0, text: `${lines.join('\n')}${lines.length ? '\n' : ''}${bad.length} of ${result.results.length} images off-brand (brand ${result.brand.file} rev ${result.brand.rev}, primary ${result.brand.primary?.hex ?? 'none'})\n` };
-  }
+  if (arg('--prompt')) return promptResult(arg('--prompt'));
+  if (arg('--check')) return checkResult(arg, json);
+  if (arg('--scan')) return scanResult(arg('--scan'), json);
   return { exitCode: 2, text: 'Usage: starci work brand-palette --prompt <work-root> | --check <png> --brand <work-root> [--json] | --scan <work-root> [--json]\n' };
+}
+function promptResult(promptPath) {
+  const b = brandOf(path.resolve(promptPath));
+  if (!b.brand) return { exitCode: 2, text: `${b.error}\n` };
+  return { exitCode: 0, text: `${promptPaletteBlock(b.brand, { name: b.brand?.identity?.name ?? b.brand?.identity?.product ?? null })}\n` };
+}
+
+function checkResult(arg, json) {
+  const b = brandOf(path.resolve(arg('--brand') ?? '.'));
+  if (!b.brand) return { exitCode: 2, text: `${b.error}\n` };
+  const file = path.resolve(arg('--check'));
+  const palette = brandPalette(b.brand, { brandDir: b.dir });
+  const findings = paletteFindings({ file, shownAs: slash(file), brand: b.brand, palette, subject: 'image', at: slash(file) });
+  const refused = findings.filter((f) => f.level === 'refuse');
+  if (json) return { exitCode: refused.length ? 1 : 0, text: `${JSON.stringify({ file: slash(file), findings, measure: measureImage(readImage(file), palette, artworkExclusions({ file, palette })) }, null, 2)}\n` };
+  return { exitCode: refused.length ? 1 : 0, text: `${findings.map((f) => '  ' + f.level.toUpperCase() + ' ' + f.message + ' [' + f.code + ']').join('\n')}${findings.length ? '\n' : ''}${refused.length ? 'FAIL' : 'OK'}: brand palette\n` };
+}
+async function scanResult(scanPath, json) {
+  const result = await scanWork(path.resolve(scanPath));
+  if (json) return { exitCode: 0, text: `${JSON.stringify(result, null, 2)}\n` };
+  if (!result.brand) return { exitCode: 2, text: `${result.error}\n` };
+  const bad = result.results.filter((r) => r.findings.some((f) => f.level === 'refuse'));
+  const lines = bad.map((r) => `${r.record}  ${r.file}  [${r.kind}${r.declared ? '' : ', undeclared'}]\n    ${r.refused.map(describeOffender).join('\n    ')}${r.findings.some((f) => f.code === PALETTE_CODES.primaryAbsent) ? '\n    primary ' + r.primary.token + ' ' + r.primary.hex + ' absent' : ''}`);
+  return { exitCode: 0, text: `${lines.join('\n')}${lines.length ? '\n' : ''}${bad.length} of ${result.results.length} images off-brand (brand ${result.brand.file} rev ${result.brand.rev}, primary ${result.brand.primary?.hex ?? 'none'})\n` };
 }
 
 if (isMain(import.meta.url)) {
