@@ -6,6 +6,7 @@ import path from 'node:path';
 import { allocationSettings } from '../../engine/config.mjs';
 import { scheduleRegister as registerScheduledTask } from '../api/schtasks/schedule-register.mjs';
 import { resultDetail, resultOk, resultOutput } from '../lib/verb-call.mjs';
+import { shortHash } from '../lib/hash.mjs';
 
 /** The Windows task that runs the harness UI: modules/models/runtimes.yaml statusApp.task, the one declaration the reconciler restarts by too. */
 const harnessAppTaskName = () => {
@@ -120,11 +121,12 @@ export async function taskRegister(ctx, deps = {}) {
   const script = deps.taskRegistrationScript
     ? deps.taskRegistrationScript(name)
     : taskRegistrationScript(name);
+  const scriptSha256 = shortHash(script, { n: 16 });
   if (ctx?.args?.apply !== true) {
     return {
       code: 0,
       text: script,
-      data: { schema: 'starci/task-register@1', ok: true, applied: false, name, taskName: definition.taskName, action: definition.action, script },
+      data: { schema: 'starci/task-register@1', ok: true, applied: false, name, taskName: definition.taskName, action: definition.action, scriptSha256, script },
     };
   }
   if ((deps.platform ?? process.platform) !== 'win32') return { code: 1, stderr: 'starci task register: not-windows: scheduled tasks can only be registered on Windows; print the script without --apply and register it by hand',
@@ -137,6 +139,6 @@ export async function taskRegister(ctx, deps = {}) {
     code: ok ? 0 : 1,
     ...(ok ? { text: detail || `registered ${definition.taskName}: ${definition.action}` }
       : { stderr: `starci task register: failed to register ${definition.taskName}${failureDetail}` }),
-    data: { schema: 'starci/task-register@1', ok, applied: true, name, taskName: definition.taskName, action: definition.action },
+    data: { schema: 'starci/task-register@1', ok, applied: true, name, taskName: definition.taskName, action: definition.action, scriptSha256 },
   };
 }

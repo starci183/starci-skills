@@ -19,6 +19,19 @@ Resolve `<Source>`, the host that owns `.claude/CONTEXT.md`, then read that entr
 from `.workspaces/projects/<project>/work.json`. Carry these absolute locations when delegating or changing directories.
 Read local config through its existing owner; never rewrite unrelated model or authority settings.
 
+## Host status on every invocation
+
+Before the requested action, run `starci reconciler up --check --brief` from `<Source>` (read-only, a few seconds, no
+effects) and show its output as the host status: engine, harness UI, harness tunnel, ask gateway and tunnel, launcher
+shim, the three Windows tasks with whether their action is current, the Supervisor seat, the core-debug seat when
+`debug: true`, and the Kernel seat of every running workflow. Then continue with the requested action.
+
+- When a no-quota service, the launcher shim or a task registration is down, run `starci reconciler up --services`,
+  show each applied line, and continue. It never launches an agent seat.
+- A seat shown as `not running (starts with a workflow)` is idle, not a fault. Never start an agent seat from an action
+  other than start: only `starci workflow start`, `starci supervisor start` or an explicit owner request starts one.
+- Orca is opened by the owner. A red row the services heal does not repair is reported with its fix.
+
 Load only the reference needed for the requested action:
 
 | Request | Instructions |
@@ -41,5 +54,6 @@ plan with its identity and intended actions, and obtain the owner's OK before qu
 generic instruction to handle matters do not accept an unclear goal. Reuse approval only while the accepted goal,
 plan and authority remain the same.
 
-Workflow startup owns host readiness and configuration-selected maintenance through the native lifecycle. Follow
-its actual receipt; do not create an additional host loop, maintenance agent or scheduler from this entry.
+Workflow startup runs the full host path (the services heal, the Supervisor seat and configuration-selected maintenance)
+through the native lifecycle. Follow its actual receipt; do not create an additional host loop, maintenance agent or
+scheduler from this entry.

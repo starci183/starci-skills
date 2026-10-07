@@ -69,7 +69,7 @@ not death. After reboot, the `StarCi-Reconciler` task invokes
 `scripts/reconciler/boot.mjs ensure` and the Host controller restores the seat.
 `starci reconciler restart` restarts the engine and runs the
 Host boot phase; `starci reconciler up` (the internal host startup procedure) does that plus the services, the UI build and the
-seats, calls `start-supervisor.mjs` in `supervisor.mode: kernel`, and prints one checklist. The GC controller runs `scripts/housekeeping/housekeeping.mjs`
+seats (`--services` stops before the seats: a seat consumes provider quota and starts only with a workflow, `supervisor start` or an explicit owner request), calls `start-supervisor.mjs` in `supervisor.mode: kernel`, and prints one checklist. The GC controller runs `scripts/housekeeping/housekeeping.mjs`
 on its declared cadence; its report is `starci/housekeeping-report@1`.
 Product worktrees are counted and collected per workflow: each Kernel workflow has exactly one worktree, which Orca
 created at Kernel start (registry kind `workflow`, keyed by Orca's worktree id, a real `starci npm ci` and no junctions); a

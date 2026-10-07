@@ -158,7 +158,7 @@ Register-ArgumentCompleter -Native -CommandName starci -ScriptBlock {
         'reconciler start' = @('--json','--cwd','--quiet','--help','--edition')
         'reconciler status' = @('--json','--cwd','--quiet','--help','--edition')
         'reconciler stop' = @('--json','--cwd','--quiet','--help','--edition')
-        'reconciler up' = @('--check','--wait','--no-build','--retire-stale-ledgers','--set-profile','--caller-agent','--caller-model','--caller-effort','--json','--cwd','--quiet','--help','--edition')
+        'reconciler up' = @('--check','--services','--brief','--wait','--no-build','--retire-stale-ledgers','--set-profile','--caller-agent','--caller-model','--caller-effort','--json','--cwd','--quiet','--help','--edition')
         'release app-installs' = @('--keep','--json','--cwd','--quiet','--help','--edition')
         'release check' = @('--final','--only','--json','--cwd','--quiet','--help','--edition')
         'release clean-test' = @('--changed','--base','--json','--cwd','--quiet','--help','--edition')

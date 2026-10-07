@@ -31,6 +31,8 @@ meanings `start-workflow.md` gives them — never collapse them into “provider
 
   The scripts call the host CLI themselves; you run them straight from the tree and never
   invoke `orca` directly.
+- Open every monitoring turn with the host status of `SKILL.md`: `starci reconciler up --check --brief`, and
+  `starci reconciler up --services` when a no-quota service is down. A monitor starts no agent seat.
 - Keep the `workflowId` from goal intake and the `[Kernel]` terminal handle from boot; every later
   step names one of them.
 - A Codex/Claude/Devin chat task and an Orca terminal are different control

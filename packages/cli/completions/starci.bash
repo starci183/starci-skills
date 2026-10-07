@@ -1028,7 +1028,7 @@ _starci() {
         reconciler:start) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
         reconciler:status) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
         reconciler:stop) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
-        reconciler:up) COMPREPLY=( $(compgen -W "--check --wait --no-build --retire-stale-ledgers --set-profile --caller-agent --caller-model --caller-effort --json --cwd --quiet --help --edition" -- "$cur") );;
+        reconciler:up) COMPREPLY=( $(compgen -W "--check --services --brief --wait --no-build --retire-stale-ledgers --set-profile --caller-agent --caller-model --caller-effort --json --cwd --quiet --help --edition" -- "$cur") );;
         release:app-installs) COMPREPLY=( $(compgen -W "--keep --json --cwd --quiet --help --edition" -- "$cur") );;
         release:check) COMPREPLY=( $(compgen -W "--final --only --json --cwd --quiet --help --edition" -- "$cur") );;
         release:clean-test) COMPREPLY=( $(compgen -W "--changed --base --json --cwd --quiet --help --edition" -- "$cur") );;
