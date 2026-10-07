@@ -93,13 +93,8 @@ const LITE_OVERLAY_KEYS = ['path', 'requires', 'allows', 'forbids', 'minInstance
 const RUNTIME_SLOT_KEYS = ['id', 'profiles', 'path', 'presence', 'tracked', 'tier', 'tests', 'owner', 'minInstances', 'requires', 'allows', 'forbids', 'budget', 'rules', 'goesTo', 'why', 'since', 'generatedBy', 'parent', 'coverage'];
 
 /** Shape problems of one slot of a manifest of `kind` (app or runtime). */
-export function slotProblems(slot, index, kind, { appScope = 'app', scopes = [] } = {}) {
+function slotIdentityProblems(slot, runtime, slotKeys, tracked, at, appScope, scopes) {
   const bad = [];
-  const runtime = kind === RUNTIME_KIND;
-  const slotKeys = new Set(runtime ? RUNTIME_SLOT_KEYS : APP_SLOT_KEYS);
-  const tracked = runtime ? RUNTIME_TRACKED : TRACKED;
-  const at = isPlainObject(slot) && typeof slot.id === 'string' ? `slot ${slot.id}` : `slots[${index}]`;
-  if (!isPlainObject(slot)) return [`${at} is not a map`];
   for (const key of Object.keys(slot)) if (!slotKeys.has(key)) bad.push(`${at}: unknown field ${key}`);
   if (runtime) {
     if (!RUNTIME_SLOT_ID.test(String(slot.id))) bad.push(`${at}: id must look like runtime.<name>`);
@@ -111,6 +106,11 @@ export function slotProblems(slot, index, kind, { appScope = 'app', scopes = [] 
     if (!Array.isArray(slot.profiles) || !slot.profiles.length || !slot.profiles.every((p) => scopes.includes(p)) || new Set(slot.profiles).size !== slot.profiles.length || (slot.profiles.includes(appScope) && slot.profiles.length !== 1)) bad.push(`${at}: profiles must be [app] or a unique non-empty subset of be, fe`);
     else if ((slot.profiles[0] === appScope) !== String(slot.id).startsWith(`${appScope}.`)) bad.push(`${at}: an app-root slot has profiles [app] and an id app.<name>, and only it`);
   }
+  return bad;
+}
+
+function slotLocationProblems(slot, at, runtime, tracked) {
+  const bad = [];
   if (typeof slot.path !== 'string' || !slot.path) bad.push(`${at}: path is required`);
   if (slot.parent !== undefined && !/^[a-z][a-z0-9-]*(\.[a-z0-9-]+)+$/.test(String(slot.parent))) bad.push(`${at}: parent must be a slot id`);
   if (!PRESENCE.includes(slot.presence)) bad.push(`${at}: presence must be one of ${PRESENCE.join(', ')}`);
@@ -121,6 +121,11 @@ export function slotProblems(slot, index, kind, { appScope = 'app', scopes = [] 
   const measured = slot.tracked === 'tracked' && (runtime || (Array.isArray(slot.profiles) && slot.profiles.includes('be')));
   if (measured && !COVERAGE.includes(slot.coverage)) bad.push(`${at}: coverage must be one of ${COVERAGE.join(', ')} (every tracked slot of ${runtime ? 'a runtime manifest' : 'the be profile'} declares it)`);
   if (!measured && slot.coverage !== undefined) bad.push(`${at}: coverage belongs to a tracked slot of ${runtime ? 'a runtime manifest' : 'the be profile'} only`);
+  return bad;
+}
+
+function slotPatternProblems(slot, at) {
+  const bad = [];
   if (slot.appKind !== undefined && !NAME.test(String(slot.appKind))) bad.push(`${at}: appKind must be a name`);
   if (slot.trigger !== undefined && !NAME.test(String(slot.trigger))) bad.push(`${at}: trigger must be a trigger kind name`);
   if (slot.pattern !== undefined && !NAME.test(String(slot.pattern))) bad.push(`${at}: pattern must be a pattern name`);
@@ -128,6 +133,11 @@ export function slotProblems(slot, index, kind, { appScope = 'app', scopes = [] 
   if (slot.requiredWhen !== undefined && slot.requiredWhen !== 'connections') bad.push(`${at}: requiredWhen may only be connections`);
   if (slot.pattern !== undefined && !/^[a-z][a-z0-9-]*$/.test(String(slot.pattern))) bad.push(`${at}: pattern must be a kebab-case pattern name`);
   if (slot.requiredInstances !== undefined && !(isPlainObject(slot.requiredInstances) && Object.values(slot.requiredInstances).every((v) => strList(v) && v.length))) bad.push(`${at}: requiredInstances must map a variable to a non-empty list of names`);
+  return bad;
+}
+
+function slotListProblems(slot, at) {
+  const bad = [];
   for (const key of ['requires', 'allows', 'forbids', 'layers', 'kinds']) if (slot[key] !== undefined && !strList(slot[key])) bad.push(`${at}: ${key} must be a list of strings`);
   if (slot.kinds !== undefined && strList(slot.kinds) && (!slot.kinds.length || new Set(slot.kinds).size !== slot.kinds.length || slot.kinds.some((k) => !NAME.test(k) || (slot.layers ?? []).includes(k)))) bad.push(`${at}: kinds must be a non-empty list of unique folder names that are not layers`);
   if (slot.roles !== undefined && !(isPlainObject(slot.roles) && Object.keys(slot.roles).length && Object.entries(slot.roles).every(([role, file]) => NAME.test(role) && typeof file === 'string' && file && !file.includes('/')))) bad.push(`${at}: roles must map a role name to a file name`);
@@ -135,22 +145,32 @@ export function slotProblems(slot, index, kind, { appScope = 'app', scopes = [] 
   if (slot.budget !== undefined && !(isPlainObject(slot.budget) && Object.keys(slot.budget).length && Object.values(slot.budget).every((v) => Number.isInteger(v) && v >= 1))) bad.push(`${at}: budget must map names to positive integers`);
   if (slot.managedBy !== undefined && !NAME.test(String(slot.managedBy))) bad.push(`${at}: managedBy must be a template id`);
   if (slot.liteManagedBy !== undefined && !NAME.test(String(slot.liteManagedBy))) bad.push(`${at}: liteManagedBy must be a template id`);
-  if (!runtime) {
-    if (slot.editions !== undefined && !(Array.isArray(slot.editions) && slot.editions.length && slot.editions.every((e) => EDITIONS.includes(e)) && new Set(slot.editions).size === slot.editions.length)) bad.push(`${at}: editions must be a non-empty subset of ${EDITIONS.join(', ')}`);
-    if (slot.litePresence !== undefined && !(PRESENCE.includes(slot.litePresence) || (isPlainObject(slot.litePresence) && Object.keys(slot.litePresence).length && Object.entries(slot.litePresence).every(([side, value]) => ['be', 'fe'].includes(side) && PRESENCE.includes(value))))) bad.push(`${at}: litePresence must be a presence value or map sides to presence values`);
-    if (slot.provider !== undefined) {
-      if (!CONNECTION_PROVIDERS.includes(slot.provider)) bad.push(`${at}: provider must be one of ${CONNECTION_PROVIDERS.join(' | ')}`);
-      else if (slot.presence !== 'opt-in' || slot.appKind !== undefined) bad.push(`${at}: provider belongs to an opt-in slot that is not an app kind (a connection with that provider enables it)`);
-    }
-    if (slot.lite !== undefined) {
-      const ok = isPlainObject(slot.lite) && Object.keys(slot.lite).length && Object.keys(slot.lite).every((key) => LITE_OVERLAY_KEYS.includes(key))
-        && (slot.lite.path === undefined || (typeof slot.lite.path === 'string' && slot.lite.path))
-        && ['requires', 'allows', 'forbids'].every((key) => slot.lite[key] === undefined || strList(slot.lite[key]))
-        && (slot.lite.minInstances === undefined || (Number.isInteger(slot.lite.minInstances) && slot.lite.minInstances >= 1))
-        && (slot.lite.requiredInstances === undefined || (isPlainObject(slot.lite.requiredInstances) && Object.values(slot.lite.requiredInstances).every((v) => strList(v) && v.length)));
-      if (!ok) bad.push(`${at}: lite may hold only ${LITE_OVERLAY_KEYS.join(', ')}, each shaped as in the slot body`);
-    }
+  return bad;
+}
+
+function slotAppOptionProblems(slot, at) {
+  const bad = [];
+  if (slot.editions !== undefined && !(Array.isArray(slot.editions) && slot.editions.length && slot.editions.every((e) => EDITIONS.includes(e)) && new Set(slot.editions).size === slot.editions.length)) bad.push(`${at}: editions must be a non-empty subset of ${EDITIONS.join(', ')}`);
+  if (slot.litePresence !== undefined && !(PRESENCE.includes(slot.litePresence) || (isPlainObject(slot.litePresence) && Object.keys(slot.litePresence).length && Object.entries(slot.litePresence).every(([side, value]) => ['be', 'fe'].includes(side) && PRESENCE.includes(value))))) bad.push(`${at}: litePresence must be a presence value or map sides to presence values`);
+  if (slot.provider !== undefined) {
+    if (!CONNECTION_PROVIDERS.includes(slot.provider)) bad.push(`${at}: provider must be one of ${CONNECTION_PROVIDERS.join(' | ')}`);
+    else if (slot.presence !== 'opt-in' || slot.appKind !== undefined) bad.push(`${at}: provider belongs to an opt-in slot that is not an app kind (a connection with that provider enables it)`);
   }
+  return bad;
+}
+
+function slotLiteOverlayProblems(slot, at) {
+  if (slot.lite === undefined) return [];
+  const ok = isPlainObject(slot.lite) && Object.keys(slot.lite).length && Object.keys(slot.lite).every((key) => LITE_OVERLAY_KEYS.includes(key))
+    && (slot.lite.path === undefined || (typeof slot.lite.path === 'string' && slot.lite.path))
+    && ['requires', 'allows', 'forbids'].every((key) => slot.lite[key] === undefined || strList(slot.lite[key]))
+    && (slot.lite.minInstances === undefined || (Number.isInteger(slot.lite.minInstances) && slot.lite.minInstances >= 1))
+    && (slot.lite.requiredInstances === undefined || (isPlainObject(slot.lite.requiredInstances) && Object.values(slot.lite.requiredInstances).every((v) => strList(v) && v.length)));
+  return ok ? [] : [`${at}: lite may hold only ${LITE_OVERLAY_KEYS.join(', ')}, each shaped as in the slot body`];
+}
+
+function slotEntryProblems(slot, at) {
+  const bad = [];
   if (slot.entries !== undefined) {
     const listed = strList(slot.entries) && slot.entries.length > 0 && new Set(slot.entries).size === slot.entries.length && slot.entries.every(relPath);
     if (!listed) bad.push(`${at}: entries must be a non-empty list of unique relative file paths`);
@@ -159,6 +179,11 @@ export function slotProblems(slot, index, kind, { appScope = 'app', scopes = [] 
   }
   if (slot.anonymousActions !== undefined && !(strList(slot.anonymousActions) && slot.anonymousActions.length > 0 && new Set(slot.anonymousActions).size === slot.anonymousActions.length && slot.anonymousActions.every(relPath) && typeof slot.path === 'string' && slot.path.endsWith('/'))) bad.push(`${at}: anonymousActions must be a non-empty list of unique relative file paths of a directory slot`);
   if (slot.outcomeHome !== undefined && !(slot.outcomeHome === true && typeof slot.path === 'string' && slot.path && !slot.path.endsWith('/'))) bad.push(`${at}: outcomeHome is true and belongs to a file slot (the one file that declares the repository's Outcome union)`);
+  return bad;
+}
+
+function slotPolicyProblems(slot, at) {
+  const bad = [];
   if (slot.rules !== undefined && !(Array.isArray(slot.rules) && slot.rules.every((r) => /^[A-Z][A-Z0-9_]*\*?$/.test(String(r))) && new Set(slot.rules).size === slot.rules.length)) bad.push(`${at}: rules must be unique rule ids`);
   if (slot.perConnection !== undefined && !(slot.id === 'be.persistence' && strList(slot.perConnection) && slot.perConnection.length && new Set(slot.perConnection).size === slot.perConnection.length && slot.perConnection.every((name) => NAME.test(name)))) bad.push(`${at}: perConnection is a unique list of capability names, only on be.persistence (the platform capabilities whose tables exist on every connection that uses them)`);
   if (slot.since !== undefined && !SEMVER.test(String(slot.since))) bad.push(`${at}: since must be a version`);
@@ -167,13 +192,25 @@ export function slotProblems(slot, index, kind, { appScope = 'app', scopes = [] 
   return bad;
 }
 
+export function slotProblems(slot, index, kind, { appScope = 'app', scopes = [] } = {}) {
+  const runtime = kind === RUNTIME_KIND;
+  const slotKeys = new Set(runtime ? RUNTIME_SLOT_KEYS : APP_SLOT_KEYS);
+  const tracked = runtime ? RUNTIME_TRACKED : TRACKED;
+  const at = isPlainObject(slot) && typeof slot.id === 'string' ? `slot ${slot.id}` : `slots[${index}]`;
+  if (!isPlainObject(slot)) return [`${at} is not a map`];
+  const bad = slotIdentityProblems(slot, runtime, slotKeys, tracked, at, appScope, scopes);
+  bad.push(...slotLocationProblems(slot, at, runtime, tracked), ...slotPatternProblems(slot, at), ...slotListProblems(slot, at));
+  if (!runtime) bad.push(...slotAppOptionProblems(slot, at), ...slotLiteOverlayProblems(slot, at));
+  bad.push(...slotEntryProblems(slot, at), ...slotPolicyProblems(slot, at));
+  return bad;
+}
+
 /** The owners of an external call in a runtime manifest: an api system folder (`api/<system>`, `api/*` any system) or the DB tier. */
 const INFRA_OWNER = /^(?:api\/(?:\*|[a-z][a-z0-9-]*)|engine\/db)$/;
 const RUNTIME_PARAM_KEYS = new Set(['fileLines', 'sourceRoots', 'infraOwners', 'baseWriteMembers', 'baseEnvSeams', 'apiContracts', 'sourceName', 'oneOffNames', 'sharedBasenames', 'generated', 'pinned', 'selfChecks']);
 const relPath = (v) => typeof v === 'string' && v.length > 0 && !v.startsWith('/') && !v.includes('..') && !v.includes('\\');
 
-/** Shape problems of a parsed manifest of kind runtime (knowledge/hfs/runtime-slots.yaml), in the words of modules/schemas/hfs-slots.schema.yaml. */
-export function runtimeShapeProblems(m) {
+function runtimeHeaderProblems(m) {
   const bad = [];
   const allowed = new Set(['schema', 'kind', 'version', 'versioning', 'presenceValues', 'trackedValues', 'testValues', 'profiles', 'tiers', 'ruleParams', 'crossOwner', 'crossSystem', 'slots', 'consumers']);
   for (const key of Object.keys(m)) if (!allowed.has(key)) bad.push(`unknown top-level key ${key}`);
@@ -184,6 +221,11 @@ export function runtimeShapeProblems(m) {
   if (JSON.stringify(m.trackedValues) !== JSON.stringify(RUNTIME_TRACKED)) bad.push(`trackedValues must be ${RUNTIME_TRACKED.join(', ')}`);
   if (JSON.stringify(m.testValues) !== JSON.stringify(TESTS)) bad.push(`testValues must be ${TESTS.join(', ')}`);
   if (JSON.stringify(m.profiles) !== JSON.stringify([RUNTIME_KIND])) bad.push('profiles must be [runtime]');
+  return bad;
+}
+
+function runtimeSectionsProblems(m) {
+  const bad = [];
   for (const key of ['crossOwner', 'crossSystem']) if (m[key] !== undefined && typeof m[key] !== 'string') bad.push(`${key} must be text`);
   if (!isPlainObject(m.tiers) || Object.keys(m.tiers).join() !== RUNTIME_KIND) bad.push('tiers must be a map with exactly runtime');
   else bad.push(...tierMapProblems(RUNTIME_KIND, m.tiers.runtime));
@@ -196,19 +238,39 @@ export function runtimeShapeProblems(m) {
   return bad;
 }
 
+/** Shape problems of a parsed manifest of kind runtime (knowledge/hfs/runtime-slots.yaml), in the words of modules/schemas/hfs-slots.schema.yaml. */
+export function runtimeShapeProblems(m) {
+  return [...runtimeHeaderProblems(m), ...runtimeSectionsProblems(m)];
+}
+
 /** Shape problems of ruleParams.runtime. */
-function runtimeParamProblems(rp) {
+function runtimeParamKeyProblems(rp) {
   const bad = [];
   for (const key of Object.keys(rp)) if (!RUNTIME_PARAM_KEYS.has(key)) bad.push(`ruleParams.runtime.${key} is not a runtime parameter`);
   for (const key of RUNTIME_PARAM_KEYS) if (!(key in rp)) bad.push(`ruleParams.runtime.${key} is missing`);
+  return bad;
+}
+
+function runtimeParamFoundationProblems(rp) {
+  const bad = [];
   const fl = rp.fileLines;
   if (!(isPlainObject(fl) && Number.isInteger(fl.soft) && fl.soft >= 1 && typeof fl.hardGrowth === 'boolean' && Object.keys(fl).length === 2)) bad.push('ruleParams.runtime.fileLines must be {soft, hardGrowth}');
   const owners = rp.infraOwners;
   const ownerMap = (v) => isPlainObject(v) && Object.entries(v).every(([key, list]) => key && Array.isArray(list) && list.every((o) => INFRA_OWNER.test(String(o))) && new Set(list).size === list.length);
   if (!isPlainObject(owners) || Object.keys(owners).sort(byCodeUnit).join() !== 'globals,modules,programs' || !['globals', 'modules', 'programs'].every((k) => ownerMap(owners[k]))) bad.push('ruleParams.runtime.infraOwners must be {modules, globals, programs}, each mapping a name to unique owners api/<system>, api/* or engine/db ([] means nowhere)');
+  return bad;
+}
+
+function runtimeParamListProblems(rp) {
+  const bad = [];
   for (const key of ['sourceRoots', 'baseWriteMembers', 'oneOffNames', 'sharedBasenames']) if (!(strList(rp[key]) && rp[key].length && new Set(rp[key]).size === rp[key].length)) bad.push(`ruleParams.runtime.${key} must be a non-empty list of unique strings`);
   if (!(Array.isArray(rp.baseEnvSeams) && rp.baseEnvSeams.every(relPath))) bad.push('ruleParams.runtime.baseEnvSeams must be a list of repository-relative paths');
   if (!(isPlainObject(rp.apiContracts) && Object.entries(rp.apiContracts).every(([system, file]) => NAME.test(system) && relPath(file)))) bad.push('ruleParams.runtime.apiContracts must map an api system to its calls contract path');
+  return bad;
+}
+
+function runtimeParamArtifactProblems(rp) {
+  const bad = [];
   let sourceNameOk = typeof rp.sourceName === 'string';
   try { if (sourceNameOk) new RegExp(rp.sourceName); } catch { sourceNameOk = false; }
   if (!sourceNameOk) bad.push('ruleParams.runtime.sourceName must be a regular expression');
@@ -216,6 +278,15 @@ function runtimeParamProblems(rp) {
   if (!(Array.isArray(rp.pinned) && rp.pinned.length && rp.pinned.every((p) => isPlainObject(p) && relPath(p.path) && typeof p.why === 'string' && p.why && Object.keys(p).length === 2))) bad.push('ruleParams.runtime.pinned must be a non-empty list of {path, why}');
   if (!(Array.isArray(rp.selfChecks) && rp.selfChecks.length && rp.selfChecks.every((c) => isPlainObject(c) && NAME.test(String(c.id)) && relPath(c.run) && (c.args === undefined || strList(c.args)) && Object.keys(c).every((k) => ['id', 'run', 'args'].includes(k))))) bad.push('ruleParams.runtime.selfChecks must be a non-empty list of {id, run, args?}');
   return bad;
+}
+
+function runtimeParamProblems(rp) {
+  return [
+    ...runtimeParamKeyProblems(rp),
+    ...runtimeParamFoundationProblems(rp),
+    ...runtimeParamListProblems(rp),
+    ...runtimeParamArtifactProblems(rp),
+  ];
 }
 
 /** Shape problems of the tier map of one profile. */
