@@ -5,7 +5,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { withTempEnv } from '../fs/with-temp-env.mjs';
+import { withTempEnv } from '../../../engine/temp-root.mjs';
 
 /** The `<tool>-cli.js` (npm or npx) of this node install (Windows: beside node; elsewhere: <prefix>/lib/node_modules) run by node, else the `<tool>` executable beside the node binary: an absolute spawn target fixed by the node install, never a PATH lookup; null when the node has neither. */
 const bundledCli = (tool = 'npm', platform = process.platform, execPath = process.execPath, exists = fs.existsSync) => {

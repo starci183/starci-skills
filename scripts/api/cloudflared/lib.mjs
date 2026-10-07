@@ -1,7 +1,7 @@
 // scripts/api/cloudflared/lib.mjs — the runner of cloudflared: one long-running tunnel process, hidden, never a shell. The
 // call file beside it (tunnel-run.mjs) names its one use; nothing outside scripts/api/cloudflared imports this runner.
 import { spawn } from 'node:child_process';
-import { withTempEnv } from '../fs/with-temp-env.mjs';
+import { withTempEnv } from '../../../engine/temp-root.mjs';
 
 /**
  * Start `<command> <args>` (command: the cloudflared binary on PATH, or a stand-in a spec names) and return the

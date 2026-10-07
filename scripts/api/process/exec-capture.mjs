@@ -2,7 +2,7 @@
 // (up to 256 MiB): the reconciler's read-only probes (scripts/reconciler/services.mjs runChild) - a scheduled task's
 // state, a connector's status, a runtime script's JSON answer. Never throws.
 import { execFile } from 'node:child_process';
-import { withTempEnv } from '../fs/with-temp-env.mjs';
+import { withTempEnv } from '../../../engine/temp-root.mjs';
 
 /** Promise<{status, stdout, stderr, timedOut}>; status is null when the child did not exit with a code. */
 export const execCapture = (cmd, args, { timeoutMs = 60_000, env = process.env, cwd } = {}) => new Promise((resolve) => {

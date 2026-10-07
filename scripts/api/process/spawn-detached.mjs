@@ -1,7 +1,7 @@
 // spawn-detached.mjs — start a hidden, detached child of the runtime (a node script handing over to its successor, a
 // verifier that outlives its caller's terminal). The runtime's own lib modules never start a process themselves.
 import { spawn } from 'node:child_process';
-import { withTempEnv } from '../fs/with-temp-env.mjs';
+import { withTempEnv } from '../../../engine/temp-root.mjs';
 
 /**
  * spawn(file, args, options) detached and hidden, stdio discarded unless the options say otherwise: the seam signature
