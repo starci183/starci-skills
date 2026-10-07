@@ -1,5 +1,4 @@
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import {runCommand} from '../api/process/run-command.mjs';
 import {safeRemove} from '../api/fs/safe-remove.mjs';
@@ -7,6 +6,7 @@ import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 import {safeRemoveWorktree,createScratchWorktree} from '../machine/worktree-git.mjs';
 import { markRemoved } from '../machine/worktree-registry.mjs';
 import {posixPath,slash} from '../lib/path-key.mjs';
+import { tempRoot } from '../../engine/temp-root.mjs';import { makeTempDir } from '../api/fs/make-temp-dir.mjs';
 
 /**
  * Proof by contrast for machine verification. `machineVerify` re-runs the checks an operation declares,
@@ -100,12 +100,12 @@ const empty=(mode,baseHead,opHead,commands,reason)=>({schema:VERIFY_PROOF,mode,s
  * `weak` means the spec passes at base too (a finding, not a hard failure); `contradiction` means the head is red.
  */
 export function runAtBase({worktree,baseHead,opHead=null,specs=[],commands=[],git=null,exec=runCommand,
-  timeoutMs=PROOF_TIMEOUT_MS,tmpRoot=os.tmpdir()}={}){
+  timeoutMs=PROOF_TIMEOUT_MS,tmpRoot=tempRoot()}={}){
   const plan=unique((specs??[]).map(normalize)).filter(Boolean);
   if(!plan.length||!commands.length)
     return empty('checks-only',baseHead,opHead,commands,!plan.length?'no changed spec to contrast':'no check command runs the changed spec');
   if(!worktree||!baseHead)return empty('checks-only',baseHead,opHead,commands,'the proof needs both a worktree and a base head');
-  const parent=fs.mkdtempSync(path.join(tmpRoot,'starci-proof-'));
+  const parent=makeTempDir('starci-proof-',{parent:tmpRoot});
   const scratch=path.join(parent,'base');
   const cleanup=()=>{
     // Never `git worktree remove --force` or a recursive rmSync: a junction a proof command made in the scratch

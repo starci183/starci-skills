@@ -49,7 +49,6 @@
 // is run by hand once per runtime release, never by a check or a spec (tests/kernel/launch-smoke.spec.mjs fakes the client).
 import crypto from 'node:crypto';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { noopAgent, smokeCriticOf } from './launch-smoke-models.mjs';
@@ -66,6 +65,7 @@ import { SMOKE_SCHEMA, ROLES, PATHS, CHILDREN, CLEANUP_ORDER, SETTLED_STATUS, EN
   ownedFileOf, feAppOf, ownedTextOf, opRecordOf } from './launch-smoke-state.mjs';
 import { pathVerdict } from './launch-smoke-verdict.mjs';
 import { eachInOrder, repeatInOrder } from '../lib/in-order.mjs';
+import { tempRoot } from '../../engine/temp-root.mjs';
 export { SMOKE_SCHEMA, ROLES, CHILDREN, stateParentOf, agentOf, ownedFileOf, feAppOf, ownedTextOf } from './launch-smoke-state.mjs';
 const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SCRIPT = path.join(SKILL_ROOT, 'scripts', 'kernel', 'launch-smoke.mjs');
@@ -522,7 +522,7 @@ const finishLeg = async ({ wf, orca, workflowId, appRepo, feApp, before, now, sl
  * starci/launch-smoke@2 result; never throws.
  */
 export async function runSmoke({ entry = readEnv('ORCA_TERMINAL_HANDLE') || null, orca, appRepo = null, root = SKILL_ROOT, script = SCRIPT, noop = noopAgent(),
-  timeoutMs = 1200000, releaseTimeoutMs = 600000, pollMs = 5000, sleep = defaultSleep, now = Date.now, stateRoot = os.tmpdir(), workflowId = `smoke-${Date.now().toString(36)}` }) {
+  timeoutMs = 1200000, releaseTimeoutMs = 600000, pollMs = 5000, sleep = defaultSleep, now = Date.now, stateRoot = tempRoot(), workflowId = `smoke-${Date.now().toString(36)}` }) {
   const startedAt = now();
   const out = { schema: SMOKE_SCHEMA, ok: false, entry, noop: noop?.error ? null : { provider: noop.provider, model: noop.model, effort: noop.effort },
     paths: {}, agents: {}, workflow: null, cleanup: [], error: null };

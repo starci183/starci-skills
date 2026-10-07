@@ -24,12 +24,12 @@ import { sha256 } from '../../../engine/digest.mjs';
 import path from 'node:path';
 import { runNode } from '../../api/node/run-node.mjs';
 import { createRequire } from 'node:module';
-import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { catFile } from '../../api/git/cat-file.mjs'; import { revParseQuery } from '../../api/git/rev-parse-query.mjs'; import { lsTree } from '../../api/git/ls-tree.mjs';
 import { containedPath, slash } from '../../lib/path-key.mjs';
 import { isMain } from '../../lib/is-main.mjs';
 import { byCodeUnit } from '../../lib/list.mjs';
+import { tempRoot } from '../../../engine/temp-root.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 const PARITY_OPS = Object.freeze(['code.refactor']);
@@ -294,7 +294,7 @@ export async function lintParity({ root, files, base, checker = null, timeoutMs 
  * file (never a command line). Resolves to runLintGate's {exit, findings, preexisting, errors}.
  */
 function lintInChild(root, files, { base, timeoutMs = 1_200_000, env = process.env } = {}) {
-  const dir = path.join(os.tmpdir(), 'starci-settler');
+  const dir = path.join(tempRoot(), 'starci-settler');
   fs.mkdirSync(dir, { recursive: true });
   const file = path.join(dir, `parity-lint-${process.pid}-${Date.now()}.json`);
   fs.writeFileSync(file, JSON.stringify({ root, files, base }));
@@ -344,7 +344,7 @@ export async function parityFingerprint(item, { repo, resolveRoot = resolveOwned
 // The lint child: node canon-parity.mjs --lint-child <job.json> -> one JSON line, runLintGate's result.
 if (isMain(import.meta.url) && process.argv[2] === '--lint-child') {
   // The parent wrote the job file under the OS temp dir; a path anywhere else is not its job.
-  const job = JSON.parse(fs.readFileSync(containedPath(os.tmpdir(), process.argv[3], { label: '--lint-child job file' }), 'utf8'));
+  const job = JSON.parse(fs.readFileSync(containedPath(tempRoot(), process.argv[3], { label: '--lint-child job file' }), 'utf8'));
   const { runLintGate } = await import('../../gates/gate.mjs');
   const out = await runLintGate({ root: job.root, base: job.base, files: job.files });
   process.stdout.write(`${JSON.stringify({ exit: out.exit, findings: out.findings.slice(0, 500), preexisting: out.preexisting, errors: out.errors })}\n`);

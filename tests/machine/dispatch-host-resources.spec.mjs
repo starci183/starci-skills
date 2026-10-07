@@ -6,6 +6,7 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
 import {fakeDevinQuotaEnv} from '../helpers/fake-devin-quota.mjs';
+import {allocationSettings} from '../../engine/config.mjs';
 import {inspectLedger,ledgerFileFor,openLedger} from '../../engine/db/ledger.mjs';
 import {withMachine} from '../../engine/db/machine.mjs';
 import {publishThrottle} from '../../scripts/machine/ram-throttle.mjs';
@@ -106,8 +107,12 @@ test('a low disk refuses the spawn as a typed wait: host-resources-low, queued, 
     assert.equal(body.host.lowRam,false);
     assert.equal(body.host.drive,DRIVE);
     assert.equal(body.host.freeDiskGb,0.5);
-    assert.deepEqual(body.host.thresholds,{minFreeDiskGb:5,minFreeRamPct:10});
+    const shipped=allocationSettings().resources;
+    assert.deepEqual(body.host.thresholds,{minFreeDiskGb:shipped.minFreeDiskGb,minFreeDiskPct:null,minFreeRamPct:shipped.minFreeRamPct});
     assert.match(body.detail,new RegExp(`drive ${DRIVE} has 0\\.5 GB free`));
+    assert.ok(body.detail.includes('config.yaml resources.minFreeDiskGb'),'the refusal names the config key the owner changes');
+    assert.ok(body.detail.includes('roots.temp')&&body.detail.includes('STARCI_TEMP_ROOT'),'and the keys that move the temp root');
+    assert.ok(body.detail.includes(`the temp root in use is ${path.resolve(process.env.STARCI_TEMP_ROOT)}`),'and the temp root in use');
     assert.match(body.detail,/do not re-dispatch it by hand/);
   }
   assert.deepEqual(events(),[],'no dispatch-rejected or op-dispatched event for the waiting job');
@@ -212,4 +217,23 @@ test('under 10% free RAM a heavy op waits with a dispatch-throttled event; a lig
   assert.equal(decisions.length,1,'one row per held job, however often it re-probed');
   assert.ok(decisions[0].released_at!=null&&decisions[0].waited_ms>=0,'admitted: released with its wait');
   assert.deepEqual(fx.machine(m=>m.db.prepare('SELECT from_mode,to_mode FROM throttle_events ORDER BY seq').all().map(e=>[e.from_mode,e.to_mode])),[[null,'heavy'],['heavy','normal']]);
+});
+
+test('dispatch refuses with TEMP_ROOT_UNUSABLE when the configured temp root cannot be written, before any probe',async t=>{
+  const {refuseHostLimits}=await import('../../scripts/kernel/verbs/shared/dispatch-gates.mjs');
+  const {VerbExit}=await import('../../scripts/kernel/verbs/shared/verb-exit.mjs');
+  const base=fs.mkdtempSync(path.join(os.tmpdir(),'starci-host-res-root-'));
+  const previous=process.env.STARCI_TEMP_ROOT;
+  t.after(()=>{
+    if(previous===undefined)delete process.env.STARCI_TEMP_ROOT;else process.env.STARCI_TEMP_ROOT=previous;
+    fs.rmSync(base,{recursive:true,force:true});
+  });
+  const file=path.join(base,'a-file');
+  fs.writeFileSync(file,'x');
+  process.env.STARCI_TEMP_ROOT=path.join(file,'below');
+  const emitted=[];
+  const d={ledger:{},repo:base,jobId:'job-1',op:OP,args:{json:true},emit:(out,text)=>emitted.push({out,text})};
+  assert.throws(()=>refuseHostLimits(d),error=>error instanceof VerbExit);
+  assert.equal(emitted[0].out.reason,'TEMP_ROOT_UNUSABLE');
+  assert.match(emitted[0].out.detail,/roots\.temp/);
 });

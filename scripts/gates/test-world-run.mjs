@@ -18,7 +18,6 @@
 // Our own stack runs real and only third-party SaaS is faked at the network edge: the library owns that, a spec never does.
 // Exit 0 green, 1 a finding or a red run, 2 the summary could not be built.
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { runNpm } from '../api/npm/run-npm.mjs';
 import { fileURLToPath } from 'node:url';
@@ -26,6 +25,7 @@ import { posixPath } from '../lib/path-key.mjs';
 import { valueFlags } from '../lib/cli-arg.mjs';
 import { isMain } from '../lib/is-main.mjs'; import { walkFiles } from '../lib/walk.mjs';
 import { opGateRules } from '../lib/op-gate.mjs';
+import { makeTempDir } from '../api/fs/make-temp-dir.mjs';
 
 export const TEST_WORLD_RUN_SCHEMA = 'starci/test-world-run@1';
 const WORLD_PROJECTS = Object.freeze({
@@ -186,7 +186,7 @@ export function reduceJest(report) {
 
 /** Run the managed `npm run test:<project>` with jest's JSON report; {command, exit, ...reduceJest, error}. */
 function runWorldProject(root, project, tests = null, { npm = runNpm } = {}) {
-  const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-test-world-run-'));
+  const outDir = makeTempDir('starci-test-world-run-');
   const outFile = path.join(outDir, 'jest.json');
   const args = ['run', `test:${project}`, '--', '--json', `--outputFile=${outFile}`, ...(tests ? ['--testPathPattern', tests] : [])];
   const run = npm(args, { cwd: root, maxBuffer: 512 * 1024 * 1024 });

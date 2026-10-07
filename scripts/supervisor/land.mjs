@@ -49,7 +49,6 @@
 // `land-failed` and, with --notify, tells the Supervisor through its inbox. Nothing half-lands.
 import '../api/process/hide-child-windows.mjs';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { setPriority } from '../api/process/set-priority.mjs';
@@ -77,6 +76,7 @@ import { withoutGitLocalEnv } from '../lib/git.mjs'; import { isMain } from '../
 import { tailLines } from '../lib/clip.mjs'; import { underHostLockWaiting } from './land-lock.mjs'; import { selfUpgradeBranchContaining, selfUpgradeIdOf, withSelfUpgradeRef, writeSelfUpgradeRef } from './self-upgrade-ref.mjs'; import { describe, failList, specsRedOnMainOf } from './land-format.mjs'; export { describe };
 import { failKey, pushOwedOf, landOutcomeOf, recordLand } from './land-record.mjs';
 import { conflictHint, conflictPreflight, pickConflicts } from './land-conflicts.mjs';
+import { makeTempDir } from '../api/fs/make-temp-dir.mjs';
 export { specsTouching, invariantRootsOf } from './land-specs.mjs'; export { conflictHunks } from './land-conflicts.mjs'; export { conflictPreflight };
 export { specsRedOnMainDecision } from './land-record.mjs';
 export const TREE_CHECKS = Object.freeze(['scripts/hfs/sync-runtime.mjs', 'scripts/checks/check-module-yaml.mjs', 'scripts/checks/check-contract-cites.mjs', 'scripts/checks/check-cli-parity.mjs', 'scripts/checks/check-worktree-add.mjs']);
@@ -252,7 +252,7 @@ const uniqFailures = (list) => [...new Map(list.map((f) => [failKey(f), f])).val
  * nothing readable (the run crashed before reporting).
  */
 export function runSpecFiles({ dir, files, concurrency, timeout = specTimeoutMs(files.length) }) {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'land-specs-'));
+  const tmpDir = makeTempDir('land-specs-');
   try {
     const reporter = path.join(tmpDir, 'failures.mjs');
     const out = path.join(tmpDir, 'failures.jsonl');

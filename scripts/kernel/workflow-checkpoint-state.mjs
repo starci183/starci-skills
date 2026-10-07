@@ -1,6 +1,5 @@
 // The workflow checkpoint's serialization and durable, attempt-bound effect receipts.
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 export { withLock, withWorkflowLock } from '../goal/workflow-lock.mjs';
@@ -14,6 +13,7 @@ import { lsFiles } from '../api/git/ls-files.mjs';
 import { getBlob } from '../../engine/db/blob.mjs';
 import { redactData } from '../lib/redact.mjs';
 import { jsonClone } from '../lib/json-clone.mjs';
+import { tempPath } from '../api/fs/temp-path.mjs';
 
 const SHA = /^[0-9a-f]{40,64}$/;
 const fail = ({ code }, message) => Object.assign(new Error(message), { code });
@@ -60,7 +60,7 @@ export const acceptedDecision = (ctx) => ctx?.settlement ? { settlement: jsonClo
 
 /** A private index observes exact worktree bytes without changing the real index or creating another commit. */
 export function snapshotTree(dir, parent, files, git) {
-  const index = path.join(os.tmpdir(), `starci-wf-${process.pid}-${crypto.randomBytes(4).toString('hex')}.index`);
+  const index = tempPath(`starci-wf-${process.pid}-${crypto.randomBytes(4).toString('hex')}.index`);
   const env = { GIT_INDEX_FILE: index };
   try {
     const seeded = git(readTree, dir, [parent], { env });

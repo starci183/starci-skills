@@ -49,7 +49,6 @@
 // the HTML's or the component's directory, then the working directory; the runtime ships none of them.
 import '../api/process/hide-child-windows.mjs';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import {sha256} from '../../engine/digest.mjs';
@@ -65,6 +64,7 @@ import { MEASURE_SCHEMA, REDLINE_ATTR, REDLINE_LEAF_COMPONENTS, WHY_ATTR, drawRe
 import { DRAW_SOURCE_SUFFIX, GRAMMAR_PACKAGE, LAYOUT_ATTR, markLayoutElements, rationaleFileFor, typecheckFindings } from './draw/draw-source.mjs';
 import { grammarDistStatus, grammarDistMessage } from '../gates/grammar-dist.mjs';
 import { PREFERENCES, grammarEntry, resolveDrawGrammar } from './draw-grammar.mjs'; import { isMain } from '../lib/is-main.mjs';
+import { makeTempDir } from '../api/fs/make-temp-dir.mjs';
 
 const RECORD_SCHEMA = 'starci/draw-render@1';
 const DEVICE_SCALE_FACTOR = 2;
@@ -579,7 +579,7 @@ async function captureComponent(options, { cwd, inferred, playwright }) {
     if (grammar.pick?.source === 'claude-dist') preflightDrawGrammarDist(grammar.pick.root);
     if (!grammar.ok) throw new RedError(typecheckFindings(grammar.attempts.at(-1) ?? { ok: false, errors: [{ message: grammar.error }] }, { label: path.basename(options.component) })[0]?.detail ?? grammar.error, 'DRAW_TYPECHECK_FAILED');
   }
-  const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-draw-render-'));
+  const workDir = makeTempDir('starci-draw-render-');
   try {
     const { html, source } = await buildFixtureHarness({ component: options.component, exportName: options.export, props: options.props, css: options.css, theme: options.theme, workDir, cwd, productDir, grammar });
     // A drawing's rationale sits beside its draw source (draw-source.mjs rationaleFileFor), never beside the harness.

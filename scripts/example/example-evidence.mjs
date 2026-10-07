@@ -12,6 +12,7 @@ import { isMain } from '../lib/is-main.mjs';
 import { walkFiles } from '../lib/walk.mjs';
 import { findRecordFile } from '../lib/work-tree.mjs';
 import { argThrow, needArgs, parseOpts, workRecordSpec } from '../lib/cli-arg.mjs';
+import { tempRoot } from '../../engine/temp-root.mjs';
 
 /**
  * Generates an evidence.yaml for one example .starciwork record by actually running the given assertion
@@ -86,7 +87,7 @@ function runAssertion({id, command}, cwd) {
   const exit = typeof status === 'number' ? status : 1;
   const outcome = exit === 0 ? 'pass' : 'fail';
   // The record is portable: the command is written with repo-relative paths and without the host location of its shell (scripts/lib/host-path.mjs).
-  const recorded = normalizeHostPaths(command, {repo: cwd, runtime: skillRoot, tmp: os.tmpdir(), home: os.homedir()});
+  const recorded = normalizeHostPaths(command, {repo: cwd, runtime: skillRoot, tmp: tempRoot(), home: os.homedir()});
   return {id, command: recorded, exit, outcome, observation: `${recorded} exited ${exit}`};
 }
 

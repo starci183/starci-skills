@@ -15,7 +15,6 @@
 //                          run by draw-render; the record's `layer`). A chat composer (inside a ChatWorkspace, a
 //                          composer part or a role=log conversation) is not a form and is skipped.
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { isMain } from '../../lib/is-main.mjs';
 import { classesOf, parseHtml, walkElements } from './draw-dna.mjs';
@@ -25,6 +24,7 @@ import {isFile} from '../../lib/fs-kind.mjs';
 import {ancestorsOf} from '../../lib/dom-tree.mjs';
 import { readEnv } from '../../lib/env.mjs';
 import { mapInOrder } from '../../lib/in-order.mjs';
+import { makeTempDir } from '../../api/fs/make-temp-dir.mjs';
 
 export const DRAW_NESTED_VARIANT = 'DRAW_NESTED_VARIANT';
 export const DRAW_MEASURE_UNCAPPED = 'DRAW_MEASURE_UNCAPPED';
@@ -255,7 +255,7 @@ async function layerResultOf(part, ctx, index) {
  * a part whose record has no `layer`; without it such a part is reported unmeasured.
  */
 export async function layerFindingsForParts(parts, { playwright = null } = {}) {
-  const scratch = playwright ? fs.mkdtempSync(path.join(os.tmpdir(), 'draw-layer-')) : null;
+  const scratch = playwright ? makeTempDir('draw-layer-') : null;
   try {
     return await mapInOrder(parts, (part, index) => layerResultOf(part, { playwright, scratch }, index));
   } finally {

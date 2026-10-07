@@ -18,7 +18,6 @@
 //             `new <Service>(` of the subject forbidden).
 // `starci kernel settle` re-reads it (scripts/kernel/gate-settle.mjs). Exit 0 green, 1 a finding or a red run, 2 it could not be built.
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { runNpm } from '../api/npm/run-npm.mjs';
 import { fileURLToPath } from 'node:url';
@@ -30,6 +29,7 @@ import { unitRolesOf } from '../hfs/manifest-shape.mjs';
 import { globExpression, braceVariants } from '../lib/glob.mjs';
 import { isMeasured } from '../hfs/coverage-scope.mjs';
 import { opGateRules } from '../lib/op-gate.mjs';
+import { makeTempDir } from '../api/fs/make-temp-dir.mjs';
 
 export const UNIT_RUN_SCHEMA = 'starci/unit-run@1';
 const COVERAGE_METRICS = Object.freeze(['lines', 'branches', 'functions', 'statements']);
@@ -136,7 +136,7 @@ export function unitFindings(summary) {
 
 /** Run the managed `npm test` with jest's JSON report and a json-summary coverage report: {command, exit, ...totals, coverage, error}. */
 function runUnit(root, { npm = runNpm } = {}) {
-  const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-unit-run-'));
+  const outDir = makeTempDir('starci-unit-run-');
   const outFile = path.join(outDir, 'jest.json');
   const covDir = path.join(outDir, 'coverage');
   const args = ['test', '--', '--json', `--outputFile=${outFile}`, '--coverageReporters=json-summary', '--coverageReporters=text-summary', `--coverageDirectory=${covDir}`];

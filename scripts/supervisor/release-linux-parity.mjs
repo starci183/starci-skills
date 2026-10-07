@@ -11,7 +11,6 @@
 // A red step, or no docker daemon, is a red L4 step: it blocks the cut.
 // Seams (deps): docker ({version, run, rm}), archive (repo, file -> {ok, error}), workflows (repo -> [{file, doc}]), apps (repo -> [names]; runL4 hands over its example apps), logDir, now.
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { archive } from '../api/git/archive.mjs';
@@ -22,6 +21,8 @@ import { safeRemove } from '../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 import { DEFAULT_NODE } from '../lib/node-image.mjs';
 import { byCodeUnit } from '../lib/list.mjs';
+import { tempRoot } from '../../engine/temp-root.mjs';
+import { makeTempDir } from '../api/fs/make-temp-dir.mjs';
 
 const STEP_NAME = 'linux-parity';
 /** The label of the spec step the container runs for the tests the host run skipped (read back by release-l4.mjs through the `##STEP` marker). */
@@ -157,7 +158,7 @@ const tail = (text, max = 600) => String(text ?? '').trim().slice(-max);
 export function runParity(repo, deps = {}) {
   const now = deps.now ?? Date.now;
   const t0 = now();
-  const logDir = (deps.logDir ?? (() => { const dir = path.join(os.tmpdir(), 'starci-release-l4'); fs.mkdirSync(dir, { recursive: true }); return dir; }))();
+  const logDir = (deps.logDir ?? (() => { const dir = path.join(tempRoot(), 'starci-release-l4'); fs.mkdirSync(dir, { recursive: true }); return dir; }))();
   const log = path.join(logDir, `${STEP_NAME}-${t0}.log`);
   const docker = deps.docker ?? { version: dockerVersion, run: dockerRun, rm: containerRm };
   const plan = { ...parityPlan({ workflows: (deps.workflows ?? readWorkflows)(repo), apps: (deps.apps ?? (() => []))(repo) }), specs: [...(deps.specs ?? [])] };
@@ -171,7 +172,7 @@ export function runParity(repo, deps = {}) {
     return refuse(`no docker daemon answers (${daemonOutput}): start Docker, the parity step cannot run`);
   }
 
-  const work = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-l4-parity-'));
+  const work = makeTempDir('starci-l4-parity-');
   const name = `starci-l4-parity-${process.pid}-${t0}`;
   try {
     const tar = path.join(work, 'src.tar');

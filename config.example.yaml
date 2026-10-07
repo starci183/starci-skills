@@ -204,8 +204,16 @@ reconciler:
 #   A leg that is not dispatched settles `deferred: specs.<class>=false` with no attempt spent and the workflow
 #   proceeds past it; starci kernel status lists testsDeferred and `starci kernel run-deferred-tests --workflow <id> [--kind unit|e2e]`
 #   runs them later. Read on every wake: flipping a switch needs no restart.
-# roots — where this host keeps the archive and the lane worktrees, when the owner moves them off the state root.
-# Both keys are optional absolute directories; env STARCI_ARCHIVE_ROOT / STARCI_LANES_ROOT win over them, and an
-# absent key means <starciLocalRoot>/archive (<runtime root>/.runtime/archive) and the per-user profile lanes directory, kept out of the checkout (scripts/machine/home.mjs lanesRoot). No host location lives in
+# roots — where this host keeps the archive, the lane worktrees and its temporary files, when the owner moves them off the defaults.
+# All keys are optional absolute directories; env STARCI_ARCHIVE_ROOT / STARCI_LANES_ROOT / STARCI_TEMP_ROOT win over them, and an
+# absent key means <starciLocalRoot>/archive (<runtime root>/.runtime/archive), the per-user profile lanes directory, kept out of the checkout (scripts/machine/home.mjs lanesRoot),
+# and the OS temp directory (engine/temp-root.mjs tempRoot; the processes the runtime starts get it as TEMP/TMP/TMPDIR). No host location lives in
 # a tracked file: set the real directories only in the gitignored config.yaml copy, e.g.
-#   roots: {archive: <absolute directory>, lanes: <absolute directory>}
+#   roots: {archive: <absolute directory>, lanes: <absolute directory>, temp: <absolute directory>}
+# resources — the host capacity floors the dispatch gate enforces, over the shipped numbers of modules/models/runtimes.yaml allocation.resources
+# (scripts/machine/host-resources.mjs; docs/config-format.md "Host resource floors"). Every key is optional (a number above 0, or null):
+#   minFreeDiskGb  free GB a drive holding the temp root or the repository must keep
+#   minFreeDiskPct the same floor as a percentage of the drive's size; with minFreeDiskGb the larger requirement applies
+#   minFreeRamPct  free-RAM percentage below which no new heavy op starts
+# set them only in the gitignored config.yaml copy, e.g.
+#   resources: {minFreeDiskGb: 5, minFreeDiskPct: 1, minFreeRamPct: 10}

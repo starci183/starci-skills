@@ -6,7 +6,6 @@
 // them as job_artifacts keyed (attempt_id, name) + report_attachments + check_runs(runner='op'), and then deletes the
 // scratch. Nothing reads a report back from a file after that: the reports row is the only copy.
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import { paramValueError } from '../../../lib/op-shared.mjs';
@@ -17,6 +16,7 @@ import { safeRemove } from '../../../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../../../machine/artifact-hold.mjs';
 import { refuse } from '../../../../engine/refuse.mjs';
 import { resolvedKey } from '../../../lib/path-key.mjs';
+import { tempRoot } from '../../../../engine/temp-root.mjs';
 
 
 const slash = (s) => String(s).replaceAll('\\', '/');
@@ -30,13 +30,13 @@ const CHECK_FILE_FIELDS = Object.freeze([['stdoutPath', 'check-stdout', 'stdout'
 
 /**
  * The attempt's scratch directory: op_attempts.scratch_dir. It must be an existing directory
- * under the OS temp directory, never the temp directory itself, so the delete after filing can never widen.
+ * under the temp root (engine/temp-root.mjs), never the temp root itself, so the delete after filing can never widen.
  */
 export function scratchOf(attempt) {
   const raw = attempt?.scratch_dir || null;
   if (!raw) throw refuse('this attempt has no scratch directory (op_attempts.scratch_dir); write the report under the job scratch your contract names', 'report-scratch-unbound');
   const dir = real(raw);
-  if (!inside(real(os.tmpdir()), dir)) throw refuse(`scratch ${slash(dir)} is not under the OS temp directory`, 'report-scratch-invalid');
+  if (!inside(real(tempRoot()), dir)) throw refuse(`scratch ${slash(dir)} is not under the temp root ${slash(real(tempRoot()))}`, 'report-scratch-invalid');
   let st = null;
   try { st = fs.statSync(dir); } catch { st = null; }
   if (!st?.isDirectory()) throw refuse(`scratch ${slash(dir)} does not exist`, 'report-scratch-missing');
@@ -283,8 +283,8 @@ function interfaceAuditOf(db, { attempt, staged, report, now }) {
   return { auditId: doc.id, verdict };
 }
 
-/** Delete the scratch once the report is durable. Only a directory strictly inside the OS temp directory. */
+/** Delete the scratch once the report is durable. Only a directory strictly inside the temp root. */
 export function removeScratch(scratch) {
-  if (!scratch || !inside(real(os.tmpdir()), scratch)) return false;
+  if (!scratch || !inside(real(tempRoot()), scratch)) return false;
   return safeRemove(scratch, { hold: artifactHoldReason }).ok;
 }

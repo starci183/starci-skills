@@ -5,6 +5,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { withTempEnv } from '../../../engine/temp-root.mjs';
 
 /** The `<tool>-cli.js` (npm or npx) of this node install (Windows: beside node; elsewhere: <prefix>/lib/node_modules) run by node, else the `<tool>` executable beside the node binary: an absolute spawn target fixed by the node install, never a PATH lookup; null when the node has neither. */
 const bundledCli = (tool = 'npm', platform = process.platform, execPath = process.execPath, exists = fs.existsSync) => {
@@ -16,7 +17,7 @@ const bundledCli = (tool = 'npm', platform = process.platform, execPath = proces
 };
 
 const toolSpawn = (tool, args, options) => {
-  const spawn = { encoding: 'utf8', windowsHide: true, maxBuffer: 64 * 1024 * 1024, ...options };
+  const spawn = withTempEnv({ encoding: 'utf8', windowsHide: true, maxBuffer: 64 * 1024 * 1024, ...options });
   const run = bundledCli(tool);
   return run ? spawnSync(run.file, [...run.args, ...args], spawn)
     : { status: null, stdout: '', stderr: '', signal: null, error: Object.assign(new Error(`${tool} was not found beside this node binary`), { code: 'ENOENT' }) };

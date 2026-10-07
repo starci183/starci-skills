@@ -1,6 +1,5 @@
 // git-land-gate.mjs — the changed-code import, eslint and scoped-tsc gate.
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { builtinModules, createRequire } from 'node:module';
 import { diff as diffCall } from '../api/git/diff.mjs';
@@ -9,6 +8,7 @@ import { runNode as runNodeCall } from '../api/node/run-node.mjs';
 import { readEnv } from '../lib/env.mjs';
 import { primaryWorktreeOf as primaryWorktreeOfCall } from './git-land-repo.mjs';
 import { compareTypeErrors, projectOf } from './git-land-gate-tsc.mjs';
+import { tempRoot } from '../../engine/temp-root.mjs';
 
 const CODE = /\.(ts|tsx|mts|mjs|js)$/;
 const BUILTINS = new Set([...builtinModules, ...builtinModules.map((name) => `node:${name}`)]);
@@ -201,7 +201,7 @@ export function runLandGate({ worktree, ref, baseRef = 'main' }, deps = {}) {
   const primaryResult = (deps.primaryWorktreeOf ?? primaryWorktreeOfCall)(worktree, deps);
   if (!primaryResult.ok) return { ok: false, problems: [`git: ${primaryResult.detail}`], changed, code, projects: [], base };
   const sourceEnv = deps.env ?? process.env;
-  const env = { ...sourceEnv, SWC_NATIVE_BINDING_CACHE: readEnv('SWC_NATIVE_BINDING_CACHE', sourceEnv) ?? path.join(os.tmpdir(), 'starci-swc-cache') };
+  const env = { ...sourceEnv, SWC_NATIVE_BINDING_CACHE: readEnv('SWC_NATIVE_BINDING_CACHE', sourceEnv) ?? path.join(tempRoot(), 'starci-swc-cache') };
   fs.mkdirSync(env.SWC_NATIVE_BINDING_CACHE, { recursive: true });
   const imports = importProblems(worktree, code);
   const eslint = eslintProblems({ worktree, primary: primaryResult.primary, code, runNode: deps.runNode ?? runNodeCall, env });

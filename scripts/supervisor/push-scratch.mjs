@@ -1,6 +1,5 @@
 // push-scratch.mjs — `git push origin main` from a scratch detached worktree of committed main (see push-mains.mjs).
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { safeRemove } from '../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
@@ -10,6 +9,8 @@ import { markRemoved } from '../machine/worktree-registry.mjs';
 import { git } from './workers.mjs';
 import { FORBIDDEN_FILES } from '../lib/secret-patterns.mjs';
 import { failureOf, PUSH_TIMEOUT_MS } from './push-failure.mjs';
+import { tempRoot } from '../../engine/temp-root.mjs';
+import { makeTempDir } from '../api/fs/make-temp-dir.mjs';
 
 const headOf = (repo, run) => run(['rev-parse', '--short', 'main'], { cwd: repo }).stdout;
 const TRAILING_SLASHES = new RegExp([String.raw`\/+`, '$'].join(''));
@@ -99,11 +100,11 @@ const linkLocalState = (repo, worktree, { rel, dir }) => {
   }
 };
 
-/** Where a repository's scratch goes: the system temp dir when it shares the checkout's volume, else
+/** Where a repository's scratch goes: the temp root when it shares the checkout's volume, else
  *  `.starci-tmp` at that volume's root — a hard link cannot cross volumes. Never under the git dir: jest's
  *  haste map ignores every path with a `.git` segment and finds no tests there. */
 const scratchBaseOf = (repo) => {
-  const tmp = os.tmpdir();
+  const tmp = tempRoot();
   const volume = (p) => path.parse(path.resolve(p)).root.toLowerCase();
   if (volume(repo) !== volume(tmp)) {
     try {
@@ -112,7 +113,7 @@ const scratchBaseOf = (repo) => {
       return fs.mkdtempSync(path.join(parent, 'starci-push-'));
     } catch { /* the temp dir below; files then fall back to copy, secrets to nothing */ }
   }
-  return fs.mkdtempSync(path.join(tmp, 'starci-push-'));
+  return makeTempDir('starci-push-');
 };
 
 /** The runner the worktree helpers get: a spec's runner, else null so they use their own. */

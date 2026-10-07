@@ -1,12 +1,16 @@
 // snapshot-commit.mjs — one commit holding everything a worktree has, written through a temporary index.
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { gitRunner } from './lib.mjs';
 import { WORKTREES_REL } from '../../lib/worktree-exclude.mjs';
+import { tempRoot } from '../../../engine/temp-root.mjs';
 
-const tmpIndex = () => path.join(os.tmpdir(), `starci-preserve-${process.pid}-${crypto.randomBytes(4).toString('hex')}.index`);
+const tmpIndex = () => {
+  const root = tempRoot();
+  fs.mkdirSync(root, { recursive: true });
+  return path.join(root, `starci-preserve-${process.pid}-${crypto.randomBytes(4).toString('hex')}.index`);
+};
 const UNSTAGED = [':(exclude,glob)**/node_modules', ':(exclude,glob)**/node_modules/**', `:(exclude)${WORKTREES_REL}`];
 
 /**

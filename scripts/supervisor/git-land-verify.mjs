@@ -1,6 +1,5 @@
 // git-land-verify.mjs — full runtime check, dependency-selected specs, one serial red-file rerun, and durable land logs.
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { runNode as runNodeCall } from '../api/node/run-node.mjs';
 import { fullCheck as fullCheckCall } from './land-full-check.mjs';
@@ -8,6 +7,7 @@ import { specsDependingOn as specsDependingOnCall } from '../lib/spec-deps.mjs';
 import { walkFiles } from '../lib/walk.mjs';
 import { specRunEnv, specTimeoutMs } from './land.mjs';
 import { byCodeUnit } from '../lib/list.mjs';
+import { tempPath } from '../api/fs/temp-path.mjs';
 
 const posix = (p) => p.replaceAll(String.fromCodePoint(92), '/');
 const outputOf = (r) => `${String(r?.stdout ?? '')}${String(r?.stderr ?? r?.error?.message ?? '')}`;
@@ -94,7 +94,7 @@ const argsFor = (files, concurrency) => [
 /** Run selected files, rerunning only mapped red files once with concurrency one. */
 export function runLandSpecs({ worktree, tip, files, concurrency = 4 }, deps = {}) {
   const runNode = deps.runNode ?? runNodeCall;
-  const log = path.join(os.tmpdir(), `land-specs-${String(tip).slice(0, 7)}.txt`);
+  const log = tempPath(`land-specs-${String(tip).slice(0, 7)}.txt`);
   const env = deps.specEnv ?? specRunEnv(deps.env ?? process.env);
   const first = runNode(argsFor(files, concurrency), { cwd: worktree, encoding: 'utf8', env, timeout: deps.timeout ?? specTimeoutMs(files.length), maxBuffer: 256 * 1024 * 1024 });
   const firstOutput = outputOf(first);

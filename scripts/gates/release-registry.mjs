@@ -3,7 +3,6 @@
 // same five functions, so the gate is judged without a network. Reads never write; `publish` is called only by
 // release-publish.mjs when --publish was given.
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { packDryRun } from '../api/npm/pack-dry-run.mjs';
 import { pack } from '../api/npm/pack.mjs';
@@ -13,6 +12,7 @@ import { whoami } from '../api/npm/whoami.mjs';
 import { safeRemove } from '../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 import { tarFiles } from '../lib/tar-files.mjs';
+import { makeTempDir } from '../api/fs/make-temp-dir.mjs';
 
 const norm = (buffer) => buffer.toString('latin1').replaceAll('\r\n', '\n');
 
@@ -58,7 +58,7 @@ export function npmRegistry({ root, pack: packArchive = pack }) {
     },
     /** `same | crlf | dist <n> | drift <n>: ... | unknown <why>`: the registry tarball against the folder's own pack. */
     contentClass(name, version, dir) {
-      const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'release-pack-'));
+      const tmp = makeTempDir('release-pack-');
       try {
         const reg = packArchive(`${name}@${version}`, tmp, { cwd: root });
         if (!reg.ok) return `unknown registry pack failed: ${reg.detail}`;

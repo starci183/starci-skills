@@ -2,6 +2,7 @@
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { readEnv } from '../../lib/env.mjs';
+import { tempChildEnv } from '../../../engine/temp-root.mjs';
 
 const CMD_META = /([()\][%!^"`<>&|;, *?])/g;
 const escapeCommand = (value) => String(value).replace(CMD_META, '^$1');
@@ -24,7 +25,7 @@ export function runRealTool(target, args = [], { cwd = process.cwd(), env = proc
   const argv = commandScript ? cmdInvocation(target, args.map(String)) : args.map(String);
   const result = spawn(command, argv, {
     cwd,
-    env,
+    env: tempChildEnv(env ?? process.env),
     stdio: 'inherit',
     shell: false,
     windowsHide: true,

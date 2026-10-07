@@ -5,11 +5,11 @@
 // caller that names another root (a fixture's skill root) keeps <root>/runtime/guards. The node --test preload
 // (tests/setup/isolated-temp.mjs) gives every spec process its own STARCI_GUARDS_ROOT, so two spec files that bind the
 // same fake Orca handle (fake-terminal-1) never read each other's binding, and no spec writes the live runtime's guards.
-import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { starciLocalRoot } from '../../engine/db/machine.mjs';
 import { isSpecRun } from '../lib/env.mjs';
+import { tempRoot } from '../../engine/temp-root.mjs';
 
 export const GUARDS_ROOT_ENV = 'STARCI_GUARDS_ROOT';
 export const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -22,6 +22,6 @@ const key = (p) => { const r = path.resolve(p); return process.platform === 'win
 export function guardsRoot(skillRoot = SKILL_ROOT, env = process.env) {
   if (key(skillRoot) !== key(SKILL_ROOT)) return path.join(skillRoot, 'runtime', 'guards');
   if (env[GUARDS_ROOT_ENV]) return path.resolve(env[GUARDS_ROOT_ENV]);
-  if (isSpecRun(env) && !env.STARCI_LOCAL_ROOT) return path.join(os.tmpdir(), 'starci-test-guards');
+  if (isSpecRun(env) && !env.STARCI_LOCAL_ROOT) return path.join(tempRoot({ env }), 'starci-test-guards');
   return path.join(starciLocalRoot(env), 'guards');
 }

@@ -7,7 +7,6 @@
 //     → the agent terminal (start receipt, else worker-show) → terminal rename → worker-show attestation → receipt.
 //   deliverPrompt / awaitSubmission / awaitAttestation: follow-up input to a LIVE agent (agent/send.mjs, nudge).
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { terminalSend } from '../api/orca/terminal-send.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
@@ -16,6 +15,7 @@ import { classifyAgentScreen, stagedInputRegion, DEFAULT_STAGED_PATTERN, frameWi
   WAKE_PROOF_READS, WAKE_PROOF_INTERVAL_MS } from '../lib/terminal-liveness.mjs';
 import { squash } from '../lib/clip.mjs';
 import { INPUT_GLYPH_CHARS, INPUT_GLYPH_CLASS } from '../lib/input-glyph.mjs';
+import { makeTempDir } from '../api/fs/make-temp-dir.mjs';
 export { loadAdapter } from './model-registry.mjs';
 
 const regexp = (source, fallback) => {
@@ -293,7 +293,7 @@ export function deliverPrompt({ handle, adapter, prompt, worktree, dispatchId = 
   if (d.mode === 'file-reference-above-inline-limit' && limit && prompt.length > limit && worktree && fs.existsSync(worktree)) {
     const transient = !(typeof d.fileDirectory === 'string' && d.fileDirectory.trim());
     let dir;
-    if (transient) dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-dispatch-'));
+    if (transient) dir = makeTempDir('starci-dispatch-');
     else if (path.isAbsolute(d.fileDirectory)) dir = d.fileDirectory;
     else dir = path.join(worktree, d.fileDirectory);
     fs.mkdirSync(dir, { recursive: true });

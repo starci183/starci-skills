@@ -24,7 +24,7 @@ for (const key of Object.keys(process.env)) {
 }
 
 if (!process.env[TEST_REGISTRY_ENV] || !process.env[ARTIFACT_ROOT_ENV]) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-test-registry-'));
+  const dir = fs.mkdtempSync(path.join(process.env.STARCI_TEMP_ROOT || os.tmpdir(), 'starci-test-registry-'));
   if (!process.env[TEST_REGISTRY_ENV]) process.env[TEST_REGISTRY_ENV] = path.join(dir, 'machine.sqlite');
   if (!process.env[ARTIFACT_ROOT_ENV]) process.env[ARTIFACT_ROOT_ENV] = path.join(dir, 'artifacts');
   if (!process.env.STARCI_PROJECTS_ROOT) process.env.STARCI_PROJECTS_ROOT = path.join(dir, 'projects');

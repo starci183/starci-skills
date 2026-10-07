@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path'; import { byCodeUnit } from '../lib/list.mjs'; import { repeatInOrder } from '../lib/in-order.mjs';
 import {containerInspect} from '../api/docker/container-inspect.mjs';import {scanRun} from '../api/sonar/scan-run.mjs';import {runShell} from '../api/process/run-shell.mjs';
 import {createHash} from 'node:crypto';
@@ -27,6 +26,7 @@ import {inspectOwnerConfig,specsSettings} from '../../engine/config.mjs';
 import {createRequire} from 'node:module';
 import { isSpecRun } from '../lib/env.mjs';
 import { readProperties } from '../lib/properties.mjs';
+import { makeTempDir } from '../api/fs/make-temp-dir.mjs'; import { tempPath } from '../api/fs/temp-path.mjs';
 
 /**
  * Sonar analysis reads the selected server from explicit options, the shared runtime environment or
@@ -311,7 +311,7 @@ function writeCustody(cfg,ref,value,{env}){
     return {ok:false,reason:`the custody member ${ref} is neither under a .starcistacks tree a stack-secret tool manages nor in a runtime extension's secrets directory`};
   if(!fs.existsSync(tool))return {ok:false,reason:`no stack-secret tool at ${tool}`};
   const target=path.relative(stacksRoot,file).replaceAll('\\','/');
-  const tmp=path.join(os.tmpdir(),`sonar-local-${process.pid}-${Date.now().toString(36)}`);
+  const tmp=tempPath(`sonar-local-${process.pid}-${Date.now().toString(36)}`);
   try{
     fs.writeFileSync(tmp,value,{mode:0o600});
     const result=runNode([tool,'set',target,'--from-file',tmp],{cwd:path.dirname(stacksRoot),env,stdio:['ignore','pipe','pipe']});
@@ -907,7 +907,7 @@ const prepareScanExecution=async(cfg,options,inputs,summary,finish)=>{
   if(coverageRun?.ownerMode==='specs.unit=false')summary.ownerMode={specs:{unit:false},coverage:'not-measured',note:coverageRun.note};
   const analysisToken=token.value;
   const childEnv={...sonarAnalysisEnvironment(cfg),SONAR_HOST_URL:cfg.host,SONAR_TOKEN:analysisToken};
-  const workDir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-sonar-'));
+  const workDir=makeTempDir('starci-sonar-');
   return {cwd,props,pkg,gateDoc,slice,projectGateMode:inputs.projectGateMode,key:isolation.key,admin,isolated:isolation.isolated,extra:isolation.extra,
     coverageRun,analysisToken,tokenName:token.name,childEnv,workDir};
 };

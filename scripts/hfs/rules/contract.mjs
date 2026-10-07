@@ -8,10 +8,10 @@
 // api app into a temp directory through the injected `emit` (packages/hfs/emit) and compares hashes; an emit that cannot run is a finding.
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { found, readText } from './read.mjs';
 import { safeRemove } from '../../api/fs/safe-remove.mjs';
+import { makeTempDir } from '../../api/fs/make-temp-dir.mjs';
 
 export const CONTRACT_SNAPSHOT_DRIFT = 'HFS_CONTRACT_SNAPSHOT_DRIFT';
 const GRAPHQL_TRANSPORT_SLOT = 'be.transport.graphql';
@@ -86,7 +86,7 @@ export function contractEmitFindings({ repoRoot, files, repo, emit }) {
   const apps = [];
   if (repo.profile !== 'be') return { findings, apps };
   const tracked = new Set(files);
-  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-contracts-'));
+  const scratch = makeTempDir('hfs-contracts-');
   try {
     for (const app of repo.apps.filter((a) => a.kind === 'api')) {
       const artifacts = [{ artifact: SNAPSHOT_OF.graphql, what: 'serves no GraphQL any more' }, { artifact: SNAPSHOT_OF.json, what: 'declares no operations any more' }];

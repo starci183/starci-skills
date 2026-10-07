@@ -23,7 +23,6 @@
 // The sentence is the unit, never the file: a "never" one sentence away does not excuse an instruction.
 // Exit 0 clean, 1 findings, 2 bad arguments.
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
@@ -35,6 +34,7 @@ import { CATALOG_FILE } from './check-failure-codes.mjs';
 import { lsFiles } from '../api/git/ls-files.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { altOf } from '../lib/source-phrases.mjs';
+import { tempRoot } from '../../engine/temp-root.mjs';
 
 export const GUIDANCE_CODE = 'RT_GUIDANCE_REFUSED_COMMAND';
 
@@ -109,7 +109,7 @@ const STATIC_DEPS = Object.freeze({
   indexLock: { preflightIndexLock: async () => {} },
   say: () => {},
 });
-const STATIC_CWD = path.join(os.tmpdir(), 'starci-guidance-check-no-repo');
+const STATIC_CWD = path.join(tempRoot(), 'starci-guidance-check-no-repo');
 
 /** The guard's refusal of one command text, or null. */
 export async function refusalOf(command) {

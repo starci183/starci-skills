@@ -533,9 +533,11 @@ allocation:
   # backoff.minMs doubling to backoff.maxMs; more than crashLoop.max engine starts in crashLoop.windowMs start it
   # --safe (read-only) and push the owner one urgent Telegram (boot.mjs).
   reconciler: {pollMs: 2000, leaseMs: 30000, renewMs: 10000, heartbeatStaleMs: 60000, statusCacheMs: 20000, backoff: {minMs: 1000, maxMs: 300000, maxAttempts: 24}, crashLoop: {max: 3, windowMs: 1800000}}
-  # resources: the host-floor guards the provider-health / admission path reads. Below minFreeDiskGb
+  # resources: the host-floor guards the provider-health / admission path reads. These are the shipped defaults; the owner's
+  # config.yaml `resources` (minFreeDiskGb, minFreeDiskPct, minFreeRamPct) overrides them key by key and code holds no number of its own.
+  # Below the disk floor (minFreeDiskGb, or minFreeDiskPct of the drive's size when the owner sets it - the larger applies)
   # `starci kernel dispatch --spawn` refuses host-resources-low until there is room again - measured on the
-  # drive that holds %TEMP% and the repos. RAM goes through the RAM-aware, priority-aware throttle
+  # drives that hold the configured temp root (config.yaml roots.temp, else the OS temp directory) and the repos. RAM goes through the RAM-aware, priority-aware throttle
   # (scripts/machine/ram-throttle.mjs; owner ruling 2026-09-28 "Parallelism ceiling follows real RAM: free RAM below 15%
   # then reduce the number of parallel ops, avoid freezing the machine and killing ops mid-run"): at every dispatch the effective cap
   # is min(maxParallelOps, running + the ops that fit in free RAM above hardFloorPct of total), counted across

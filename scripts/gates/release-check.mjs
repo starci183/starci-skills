@@ -18,7 +18,6 @@
 // PARTIAL, never GREEN. Exit 0 GREEN, 1 a proof is red, 2 a proof could not run. Every external call goes through a seam
 // (`deps`), so specs judge the gate on fakes at the npm and process edge.
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runNode } from '../api/node/run-node.mjs';
@@ -33,6 +32,7 @@ import { buildPlan } from './release-plan.mjs';
 import { npmRegistry } from './release-registry.mjs';
 import { appInstallsStep, canonPinsStep, checkStep, STEP_STATUS } from './release-proof.mjs';
 import { tailLines } from '../lib/clip.mjs';
+import { makeTempDir } from '../api/fs/make-temp-dir.mjs';
 
 const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const PROOFS = Object.freeze(['publish-plan', 'canon-pins', 'app-installs', 'package-clean', 'check', 'specs', 'checkout']);
@@ -62,7 +62,7 @@ function packageCleanProof({ root, node }) {
 
 /** C3: the full spec run; a failing or cancelled test, or a run that printed no summary, is red. */
 function specsProof({ root, node }) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'release-specs-'));
+  const dir = makeTempDir('release-specs-');
   const tapFile = path.join(dir, 'specs.tap');
   try {
     const args = [...SPEC_SETUP.flatMap((file) => ['--import', `./${file}`]), '--test', '--test-concurrency=2',

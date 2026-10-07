@@ -9,7 +9,6 @@
 //     {id, name, sha256} of each, so the events digest chain covers them.
 // A Work record cites an artifact by id + sha256 (docs/ledger-db.md, work-citations.mjs), never by a path.
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { appendEvent } from '../../engine/db/ledger.mjs';
 import { subkindOf } from './artifact-subkind.mjs';
@@ -33,6 +32,7 @@ import { kindOf, mediaTypeOf, roleOf, stageBlob, putArtifact, attemptOf, ARTIFAC
 import { jobScratchDirOf } from './op-prompt.mjs';
 import { safeRemove } from '../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
+import { makeTempDir } from '../api/fs/make-temp-dir.mjs';
 
 /** One git call (a scripts/api/git call file) as {ok, stdout, error}. */
 const gitResult = (call, args, options) => gitResultOf(call(args, options));
@@ -369,7 +369,7 @@ export function indexJobArtifacts(ledger, { repo, jobId, dispatchId = null, plac
     staged.push({ name, role, kind, subkind: subkind !== undefined ? subkind : subkindOf({ kind, path: slashed(name), opId: job.op_id }), label, extra, blob: stageBlob(abs, { mediaType, repoRoots }) });
   };
   // The patch is written to a private temp directory, put in the blob store and the directory removed.
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-patch-'));
+  const tmp = makeTempDir('starci-patch-');
   let patch = null, patchJson = null;
   try {
     const contract = db.prepare('SELECT created_at FROM contracts WHERE attempt_id=?').get(attempt.attempt_id);

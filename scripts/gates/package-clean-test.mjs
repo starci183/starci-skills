@@ -33,7 +33,6 @@
 // (never a pass). The land gate runs it for the packages a land changes (scripts/supervisor/land.mjs), CI and the
 // release checklist (packages/README.md) for every package.
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { byCodeUnit } from '../lib/list.mjs';
 import { runNpm } from '../api/npm/run-npm.mjs';
@@ -52,6 +51,7 @@ import { lsFiles } from '../api/git/ls-files.mjs';
 import { tailLines } from '../lib/clip.mjs';
 import { tarFiles } from '../lib/tar-files.mjs';
 import { BUNDLES, CATALOG } from '../hfs/sync-runtime.mjs';
+import { makeTempDir } from '../api/fs/make-temp-dir.mjs';
 
 export const PROOF_EXIT = Object.freeze({ green: 0, red: 1, unrun: 2 });
 export const PROOF_CODES = Object.freeze({ install: 'PACKAGE_INSTALL_RED', test: 'PACKAGE_TEST_RED', noTest: 'PACKAGE_NO_TEST', unrun: 'PACKAGE_PROOF_UNRUN' });
@@ -345,7 +345,7 @@ function proveUnit(unit, { root = runtimeRoot, env = process.env, npm = npmRun, 
   const result = (pkg, status, code, extra = {}) => ({ name: pkg.name, dir: pkg.dir, status, code, ms: Date.now() - started, ...extra });
   const every = (status, code, extra) => unit.packages.map((pkg) => result(pkg, status, code, extra));
   let temp;
-  try { temp = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'starci-pkg-proof-'))); } catch (error) { return every('unrun', PROOF_CODES.unrun, { output: `no temp directory: ${error.message}` }); }
+  try { temp = fs.realpathSync.native(makeTempDir('starci-pkg-proof-')); } catch (error) { return every('unrun', PROOF_CODES.unrun, { output: `no temp directory: ${error.message}` }); }
   try {
     const above = nodeModulesAbove(temp);
     if (above) return every('unrun', PROOF_CODES.unrun, { output: `${above} holds a node_modules above the temp directory ${temp}: an install there would not be clean` });

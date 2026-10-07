@@ -28,7 +28,6 @@
 // Exit 0 = every selected repository green (and pushed unless --check); 1 = red, dirty, refused or main moved; 2 = usage.
 import '../api/process/hide-child-windows.mjs';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { runNpm } from '../api/npm/run-npm.mjs';
 import { runNode } from '../api/node/run-node.mjs';
@@ -39,6 +38,7 @@ import { isMain } from '../lib/is-main.mjs';
 import { readJsonFile } from '../lib/json.mjs';
 import { foldCase, realPath } from '../lib/path-key.mjs';
 import { byCodeUnit } from '../lib/list.mjs';
+import { tempRoot } from '../../engine/temp-root.mjs';
 
 const key = (p) => foldCase(realPath(p));
 const samePath = (a, b) => key(a) === key(b);
@@ -241,7 +241,7 @@ function pushAfterChecks(repo, out, state, check, pushRun) {
 
 /* ------------------------------------------------------------ running */
 
-const logDir = () => { const dir = path.join(os.tmpdir(), 'starci-push-git'); fs.mkdirSync(dir, { recursive: true }); return dir; };
+const logDir = () => { const dir = path.join(tempRoot(), 'starci-push-git'); fs.mkdirSync(dir, { recursive: true }); return dir; };
 const readTail = (file, maxBytes = 24 * 1024 * 1024) => {
   const fd = fs.openSync(file, 'r');
   try { const { size } = fs.fstatSync(fd); const len = Math.min(size, maxBytes); const buf = Buffer.alloc(len); fs.readSync(fd, buf, 0, len, size - len); return buf.toString('utf8'); }

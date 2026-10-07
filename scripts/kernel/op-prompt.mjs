@@ -4,7 +4,6 @@
 // worker receives (shared-checkout rules, report filing and questions).
 
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { sha256 } from '../../engine/digest.mjs';
 import { safeRemove } from '../api/fs/safe-remove.mjs';
@@ -17,6 +16,7 @@ import { cutManifestPromptLines, seamPromptLines } from './seam-policy.mjs';
 import { resumePromptLines } from './resume-context.mjs';
 import { specsBriefLines, specsOf, verificationScopeLines } from '../route/spec-deferral.mjs';
 import { ownerLanguage, translator } from '../lib/i18n.mjs';
+import { tempRoot } from '../../engine/temp-root.mjs';
 
 const VERDICT_CONTRACT = 'modules/kernel/verdict-contract.yaml';
 
@@ -57,7 +57,7 @@ const OWNED_INLINE_CHARS = 6000;
 // op_attempts.scratch_dir and writes its path into the prompt (worker-start owns the agent's environment); the op writes its report, raw check output, screenshots, videos, traces and patches
 // there; starci kernel report stores what it carries as blobs and deletes the directory (api-lib/report-evidence.mjs).
 export const JOB_SCRATCH_ROOT = 'starci-job-scratch';
-export const jobScratchDirOf = (repo, workflowId, jobId) => path.join(os.tmpdir(), JOB_SCRATCH_ROOT, sha256(`${path.resolve(repo)}\0${workflowId}\0${jobId}`));
+export const jobScratchDirOf = (repo, workflowId, jobId) => path.join(tempRoot(), JOB_SCRATCH_ROOT, sha256(`${path.resolve(repo)}\0${workflowId}\0${jobId}`));
 /** The job's scratch, created empty for a new dispatch: what an earlier attempt left there is removed first. */
 export function ensureJobScratch({ repo, workflowId, jobId, fresh = true }) {
   const dir = jobScratchDirOf(repo, workflowId, jobId);
@@ -67,7 +67,7 @@ export function ensureJobScratch({ repo, workflowId, jobId, fresh = true }) {
 }
 /** The Kernel's own transient working directory for one workflow (background push results, scan output): OS temp,
  * outside every repository; never agent data in .starciwork. */
-export const kernelScratchDirOf = (repo, workflowId, kind) => path.join(os.tmpdir(), 'starci-kernel-scratch', sha256(`${path.resolve(repo)}\0${workflowId}`).slice(0, 16), kind);
+export const kernelScratchDirOf = (repo, workflowId, kind) => path.join(tempRoot(), 'starci-kernel-scratch', sha256(`${path.resolve(repo)}\0${workflowId}`).slice(0, 16), kind);
 export const ownedPathsFileOf = (repo, workflowId, jobId, scratchDir = null) => path.join(scratchDir ?? jobScratchDirOf(repo, workflowId, jobId), 'owned-paths.txt');
 export function ownedPathsLine({ paths, repo = null, workflowId = null, jobId = null, scratchDir = null }) {
   if (!paths.length) return 'owned_paths: (per brief write-ceiling)';
