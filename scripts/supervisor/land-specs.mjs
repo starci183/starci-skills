@@ -68,6 +68,34 @@ function closeChangedDependencies(blocks, hit) {
   }
 }
 
+function addNamedSpecs(file, specs, files) {
+  const stem = stemOf(file);
+  if (stem.length < 4) return;
+  for (const spec of specs) {
+    if (spec.file === `tests/${stem}.spec.mjs` || spec.file.startsWith(`tests/${stem}-`)) files.add(spec.file);
+  }
+}
+
+function changedImporterSpecs(users, others, symbols, code) {
+  return users.filter((spec) => others.some((needle) => code.get(spec).includes(needle)) || symbols.some((name) => uses(code.get(spec), name)));
+}
+
+function addImporterSpecs(file, { source, specs, symbolsOf, hub, code, files, narrowed }) {
+  const needle = needleOf(file);
+  const users = specs.filter((spec) => code.get(spec.file).includes(needle)).map((spec) => spec.file);
+  if (users.length <= hub) { for (const spec of users) files.add(spec); return; }
+  const result = symbolsOf(file);
+  if (!result || !Array.isArray(result.symbols)) {
+    for (const spec of users) files.add(spec);
+    narrowed.push({ file, importers: users.length, kept: users.length, symbols: null, why: result?.why ?? 'not mapped' });
+    return;
+  }
+  const others = source.filter((other) => other !== file).map(needleOf);
+  const keep = changedImporterSpecs(users, others, result.symbols, code);
+  for (const spec of keep) files.add(spec);
+  narrowed.push({ file, importers: users.length, kept: keep.length, symbols: result.symbols });
+}
+
 /**
  * The exports a change can reach: the declarations holding a changed line of the head file, then every declaration that
  * uses one of them (transitively). `ranges` = [[startLine, count]] of the head side of the diff. Returns
@@ -99,18 +127,9 @@ export function specsDirect(changed, { specs, symbolsOf = () => null, hub = HUB_
   const source = norm.filter((f) => !f.startsWith('tests/'));
   const code = new Map(specs.map((s) => [s.file, codeOf(s.text)]));
   const files = new Set(own), narrowed = [];
-  const named = (f) => { const stem = stemOf(f); return stem.length < 4 ? [] : specs.filter((s) => s.file === `tests/${stem}.spec.mjs` || s.file.startsWith(`tests/${stem}-`)).map((s) => s.file); };
   for (const f of source) {
-    for (const s of named(f)) files.add(s);
-    const needle = needleOf(f);
-    const users = specs.filter((s) => code.get(s.file).includes(needle)).map((s) => s.file);
-    if (users.length <= hub) { for (const s of users) { files.add(s); } continue; }
-    const r = symbolsOf(f);
-    if (!r || !Array.isArray(r.symbols)) { for (const s of users) { files.add(s); } narrowed.push({ file: f, importers: users.length, kept: users.length, symbols: null, why: r?.why ?? 'not mapped' }); continue; }
-    const others = source.filter((g) => g !== f).map(needleOf);
-    const keep = users.filter((s) => others.some((n) => code.get(s).includes(n)) || r.symbols.some((name) => uses(code.get(s), name)));
-    for (const s of keep) files.add(s);
-    narrowed.push({ file: f, importers: users.length, kept: keep.length, symbols: r.symbols });
+    addNamedSpecs(f, specs, files);
+    addImporterSpecs(f, { source, specs, symbolsOf, hub, code, files, narrowed });
   }
   return { files: [...files], narrowed };
 }
