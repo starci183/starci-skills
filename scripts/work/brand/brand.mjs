@@ -6,14 +6,16 @@ import {sha256} from '../../../engine/digest.mjs';
 import { isMain } from '../../lib/is-main.mjs';
 import {parseYaml} from '../../../engine/yaml.mjs';
 import {skillRoot} from '../../../engine/runtime-root.mjs';
-import {grammarDistRefusal} from '../../gates/grammar-dist.mjs';
 import {slash, sameOrUnder} from '../../lib/path-key.mjs';
 import {objectList} from '../../lib/list.mjs';
 import {formatCheckLines} from '../../lib/check-format.mjs';
 import { isInside as inside } from '../../lib/walk.mjs';
 import {readJsonFile as readJson} from '../../lib/json.mjs';
-import {stripImportant,parseColor,contrastRatio,deltaEOk} from './brand-colour.mjs';
+import {parseColor,contrastRatio,deltaEOk} from './brand-colour.mjs';
+import {readText,readSourceTokens,lookupToken} from './brand-tokens.mjs';
+import {text as trimmedText} from '../../lib/stack-declaration.mjs';
 export {parseColor,contrastRatio,deltaEOk,rgbToOklab,oklabToRgb,oklabToOklch,oklchToOklab,formatHex} from './brand-colour.mjs';
+export {parseCssCustomProperties,parseTokenData,readSourceTokens} from './brand-tokens.mjs';
 
 /**
  * The brand is proven, not stated. A brand record says what the product's colour, mascot and icon law is;
@@ -55,168 +57,11 @@ export const OFFENDER_CAP=20;
 const SCAN_EXCLUDED=new Set(['node_modules','dist','.next','.git','.dist','coverage','build','out','.turbo','.cache']);
 const SCAN_FILE_LIMIT=5000;
 const SCAN_BYTES_LIMIT=512*1024;
-const SOURCE_BYTES_LIMIT=4*1024*1024;
 /** Packages whose name advertises icons; used only to decide what counts as an icon import to judge. */
 const ICON_HINT=/icon|lucide|phosphor|feather|font-?awesome|material-symbols|tabler|remixicon|boxicons|ionicons|bootstrap-icons/i;
 
 const round=(value,places=4)=>Number.parseFloat(Number(value).toFixed(places));
-const digest=sha256,REGEX=Object.freeze({declaration:new RegExp(['^(--[A-Za-z0-9_-]+)',String.raw`\s*:\s*`,String.raw`([\s\S]+)$`].join('')),semicolons:new RegExp([';+','$'].join(''))});
-
-// ---------------------------------------------------------------------------
-// Reading the real tokens out of the real source.
-// ---------------------------------------------------------------------------
-
-/**
- * Every `--name: value` declaration of a stylesheet, with the selector that carries it. Declarations are
- * split by scope because a brand's `color.tokens[].value` is the default (light) value: a dark override is
- * reported as context, never accepted as a match for it.
- */
-export function parseCssCustomProperties(text){
-  const source=String(text??'').replace(/\/\*[\s\S]*?\*\//g,' ');
-  const base=new Map(),dark=new Map(),all=[];
-  const stack=[];
-  let buffer='';
-  const flush=()=>{
-    const declaration=buffer.trim();
-    buffer='';
-    const match=REGEX.declaration.exec(declaration);
-    if(!match)return;
-    const selector=stack.filter(Boolean).join(' ');
-    const value=stripImportant(match[2].trim()).replace(REGEX.semicolons,'').trim();
-    // `:root:not([data-theme="light"])` inside a dark media query is a dark scope: a negated light theme is not a light one.
-    const asserted=selector.replace(/:not\([^)]*\)/g,' ');
-    const isDark=/dark/i.test(selector)&&!/data-theme\s*=\s*["']?light/i.test(asserted);
-    const entry={name:match[1],value,selector,scope:isDark?'dark':'base'};
-    all.push(entry);
-    const target=isDark?dark:base;
-    if(!target.has(entry.name))target.set(entry.name,entry);
-  };
-  for(const character of source){
-    if(character==='{'){stack.push(buffer.trim());buffer='';continue;}
-    if(character==='}'){flush();stack.pop();continue;}
-    if(character===';'){flush();continue;}
-    buffer+=character;
-  }
-  flush();
-  return {base,dark,all};
-}
-
-/**
- * A JSON/YAML token file, flattened by key. Three authored shapes are accepted: a `tokens: [{name,value}]`
- * list (the shape the grammar DNA uses), flat `--token: value` keys, and a nested object whose key path
- * spells the token (`starci.core.primary` is `--starci-core-primary`).
- */
-export function parseTokenData(data){
-  const maps={exact:new Map(),derived:new Map()};
-  walkTokens(data,[],maps);
-  return maps;
-}
-
-const putToken=(map,name,value)=>{if(typeof name==='string'&&name&&!map.has(name))map.set(name,String(value));};
-const isTokenLeaf=value=>typeof value==='string'||typeof value==='number';
-
-function walkTokens(node,trail,maps){
-  if(Array.isArray(node)){
-    for(const item of node){
-      if(item&&typeof item==='object')walkTokenItem(item,trail,maps);
-    }
-    return;
-  }
-  if(node&&typeof node==='object')walkTokenEntries(node,trail,maps);
-}
-
-function walkTokenEntries(node,trail,maps){
-  for(const [key,value] of Object.entries(node)){
-    const next=[...trail,key];
-    if(!isTokenLeaf(value)){walkTokens(value,key.startsWith('--')?trail:next,maps);continue;}
-    if(key.startsWith('--'))putToken(maps.exact,key,value);
-    else {putToken(maps.derived,key,value);putToken(maps.derived,`--${next.join('-')}`,value);}
-  }
-}
-
-/** One object of a `tokens: [{name,value}]` list: a named leaf, else a nested structure. */
-function walkTokenItem(item,trail,maps){
-  if(!isTokenLeaf(item.value)){walkTokens(item,trail,maps);return;}
-  const name=item.name??item.token;
-  if(typeof name==='string')putToken(name.startsWith('--')?maps.exact:maps.derived,name,item.value);
-}
-
-const readText=file=>{
-  const stat=fs.lstatSync(file);
-  if(stat.isSymbolicLink()||!stat.isFile()||stat.size>SOURCE_BYTES_LIMIT)throw new Error('A brand source must be a bounded real file.');
-  return fs.readFileSync(file,'utf8');
-};
-
-const PATH_ESCAPES='the declared path escapes its repository root';
-/** Why a declared source path cannot be read inside `sourceRoot`, or null. */
-function sourcePathError(sourceRoot,declared){
-  if(!declared||path.isAbsolute(declared)||declared.split('/').includes('..'))return PATH_ESCAPES;
-  const file=path.resolve(sourceRoot,declared);
-  if(path.relative(path.resolve(sourceRoot),file).startsWith('..'))return PATH_ESCAPES;
-  return fs.existsSync(file)?null:'this repository does not carry the declared file';
-}
-
-/** The token lookup of a read source file: css custom properties, or a JSON/YAML token file. */
-function parseSourceText(file,source,text,entry){
-  if(source.kind==='css'||path.extname(file).toLowerCase()==='.css'){
-    const parsed=parseCssCustomProperties(text);
-    return {...entry,found:true,declarations:parsed.all.length,lookup:{css:parsed}};
-  }
-  try{
-    const data=path.extname(file).toLowerCase()==='.json'?JSON.parse(text):parseYaml(text);
-    const parsed=parseTokenData(data);
-    return {...entry,found:true,declarations:parsed.exact.size+parsed.derived.size,lookup:{tokens:parsed}};
-  }catch(error){return {...entry,found:true,error:`unreadable token file: ${String(error.message??error)}`};}
-}
-
-/** One declared source file, read into a token lookup. Never throws: an unreadable source is reported. */
-export function readSourceTokens(sourceRoot,source){
-  const declared=slash(source?.path??'');
-  const entry={repository:source?.repository??null,path:declared,kind:source?.kind??null,found:false,declarations:0,scope:null};
-  const pathError=sourcePathError(sourceRoot,declared);
-  if(pathError)return {...entry,error:pathError};
-  const file=path.resolve(sourceRoot,declared);
-  // A source inside a built @starci/grammar dist is read only when that dist is the build of its source:
-  // a stale dist would bind the brand to tokens the package no longer ships.
-  const refusal=grammarDistRefusal(file);
-  if(refusal)return {...entry,found:true,error:refusal.message,staleGrammarDist:{state:refusal.state,root:refusal.root,fix:refusal.fix}};
-  let text;
-  try{text=readText(file);}catch(error){return {...entry,found:true,error:String(error.message??error)};}
-  return parseSourceText(file,source,text,entry);
-}
-
-/** The first declaration of this token across the declared sources, preferring the default scope. */
-function lookupToken(sources,token,seen=new Set()){
-  if(seen.has(token))return null;
-  const nextSeen=new Set(seen).add(token);
-  for(const scope of ['base','dark']){
-    for(const source of sources){
-      const hit=lookupInSource(sources,source,token,scope,nextSeen);
-      if(hit)return hit;
-    }
-  }
-  return null;
-}
-
-/** A css declaration of the token in `scope`, its `var(--other)` followed through the declared sources. */
-function resolveCssDeclaration(sources,source,found,scope,seen){
-  const reference=/^var\(\s*(--[A-Za-z0-9_-]+)\s*\)$/.exec(String(found.value).trim())?.[1]??null;
-  if(reference){
-    const resolved=lookupToken(sources,reference,seen);
-    if(resolved)return {...resolved,file:source.path,selector:found.selector,scope,declaredValue:found.value,resolvedFrom:reference};
-  }
-  return {value:found.value,file:source.path,selector:found.selector,scope};
-}
-
-/** The token as one source declares it in `scope` (a token file only answers the base scope), or null. */
-function lookupInSource(sources,source,token,scope,seen){
-  const found=source.lookup?.css?.[scope].get(token);
-  if(found)return resolveCssDeclaration(sources,source,found,scope,seen);
-  const tokens=scope==='base'?source.lookup?.tokens:null;
-  if(!tokens)return null;
-  const value=tokens.exact.get(token)??tokens.derived.get(token)??tokens.derived.get(token.replace(/^--/,''));
-  return value===undefined?null:{value,file:source.path,selector:null,scope:'base'};
-}
+const digest=sha256;
 
 // ---------------------------------------------------------------------------
 // The brand record and the grammar canon.
@@ -448,8 +293,6 @@ export function findOwnerReceipt({acceptedBy,receipt=null,brandDir=null,answerer
   if(found.length)return judge(found[0].file,found[0].receipt);
   return {ok:false,why:`no receipt answers ${acceptedBy} in the project ledger`};
 }
-
-const trimmedText=value=>typeof value==='string'&&value.trim()?value.trim():null;
 
 /** Why an exception entry is refused (its two tokens, pair, ratio, reason, answer and measured ratio checked in order), or null. */
 function exceptionRefusal(fields,{foregroundToken,backgroundToken,measured,seen}){
@@ -695,6 +538,39 @@ export function importSpecifiers(text){
 
 const covers=(entry,specifier)=>sameOrUnder(specifier,entry);
 
+const isScannableSource=(entry,file)=>entry.isFile()&&/\.tsx?$/i.test(entry.name)&&!/\.d\.ts$/i.test(entry.name)&&fs.statSync(file).size<=SCAN_BYTES_LIMIT;
+
+/** Collects the TypeScript sources under `directory` into `files`, up to SCAN_FILE_LIMIT, skipping dot and build directories. */
+function collectSourceFiles(directory,files){
+  if(files.length>=SCAN_FILE_LIMIT)return;
+  let entries;
+  try{entries=fs.readdirSync(directory,{withFileTypes:true});}catch{return;}
+  for(const entry of entries){
+    if(files.length>=SCAN_FILE_LIMIT)return;
+    if(entry.isSymbolicLink())continue;
+    const file=path.join(directory,entry.name);
+    if(entry.isDirectory()){if(!SCAN_EXCLUDED.has(entry.name)&&!entry.name.startsWith('.')){collectSourceFiles(file,files);}continue;}
+    if(isScannableSource(entry,file))files.push(file);
+  }
+}
+
+/** The icon imports of `files` the brand does not allow: [{file, line, specifier, reason}]. */
+function iconOffendersOf(files,root,allowed,forbidden){
+  const offenders=[];
+  for(const file of files){
+    let text;
+    try{text=fs.readFileSync(file,'utf8');}catch{continue;}
+    for(const {specifier,line} of importSpecifiers(text)){
+      if(specifier.startsWith('.')||specifier.startsWith('/')||specifier.startsWith('~'))continue;
+      const banned=forbidden.find(entry=>covers(entry,specifier)||specifier.includes(entry));
+      const permitted=allowed.some(entry=>covers(entry,specifier));
+      if(banned)offenders.push({file:slash(path.relative(root,file)),line,specifier,reason:`forbidden by the brand (${banned})`});
+      else if(!permitted&&ICON_HINT.test(specifier))offenders.push({file:slash(path.relative(root,file)),line,specifier,reason:'an icon package outside iconography.set and custom'});
+    }
+  }
+  return offenders;
+}
+
 /**
  * 5. The glyph set is closed. A forbidden package is an offender wherever it appears; any other icon-looking
  * package is an offender unless `iconography.set` or `custom` names it. Relative imports are the product's
@@ -709,31 +585,8 @@ export function checkIconSetOnly({brand,sourceRoot}){
   if(!allowed.length&&!forbidden.length)return check(id,'skip','The brand declares no iconography set and nothing forbidden, so no icon law exists to enforce.',{sourceRoot:slash(sourceRoot)});
   const root=path.resolve(sourceRoot);
   const files=[];
-  const walk=directory=>{
-    if(files.length>=SCAN_FILE_LIMIT)return;
-    let entries;
-    try{entries=fs.readdirSync(directory,{withFileTypes:true});}catch{return;}
-    for(const entry of entries){
-      if(files.length>=SCAN_FILE_LIMIT)return;
-      if(entry.isSymbolicLink())continue;
-      const file=path.join(directory,entry.name);
-      if(entry.isDirectory()){if(!SCAN_EXCLUDED.has(entry.name)&&!entry.name.startsWith('.')){walk(file);}continue;}
-      if(entry.isFile()&&/\.tsx?$/i.test(entry.name)&&!/\.d\.ts$/i.test(entry.name)&&fs.statSync(file).size<=SCAN_BYTES_LIMIT)files.push(file);
-    }
-  };
-  walk(root);
-  const offenders=[];
-  for(const file of files){
-    let text;
-    try{text=fs.readFileSync(file,'utf8');}catch{continue;}
-    for(const {specifier,line} of importSpecifiers(text)){
-      if(specifier.startsWith('.')||specifier.startsWith('/')||specifier.startsWith('~'))continue;
-      const banned=forbidden.find(entry=>covers(entry,specifier)||specifier.includes(entry));
-      const permitted=allowed.some(entry=>covers(entry,specifier));
-      if(banned)offenders.push({file:slash(path.relative(root,file)),line,specifier,reason:`forbidden by the brand (${banned})`});
-      else if(!permitted&&ICON_HINT.test(specifier))offenders.push({file:slash(path.relative(root,file)),line,specifier,reason:'an icon package outside iconography.set and custom'});
-    }
-  }
+  collectSourceFiles(root,files);
+  const offenders=iconOffendersOf(files,root,allowed,forbidden);
   const evidence={sourceRoot:slash(root),allowed,forbidden,filesScanned:files.length,
     offenderCount:offenders.length,offenders:offenders.slice(0,OFFENDER_CAP),capped:offenders.length>OFFENDER_CAP};
   if(!files.length)return check(id,'skip','No TypeScript source file was found under the given repository root, so no icon import was scanned.',evidence);
@@ -792,6 +645,25 @@ export function grammarComponentNames({family,grammarRoot=defaultGrammarRoot()})
   }catch(error){return {file,names:[],error:`unreadable DNA snapshot: ${String(error.message??error)}`};}
 }
 
+/** The accept of a golden by the owner's draw-review receipt: the very parts the golden holds, option accept. */
+function judgeDrawReviewAcceptance(receipt,review,golden){
+  const seen=new Set(objectList(review.parts).map(entry=>entry?.sha256).filter(Boolean));
+  const unseen=golden.filter(entry=>!seen.has(entry.sha256));
+  if(!golden.length||unseen.length)return {ok:false,why:`golden ${unseen.map(entry=>entry.png).join(', ')||'(none)'} is not a drawing the owner accepted in ${receipt.file}`};
+  if(receipt.optionIndex!==DIRECTION_ACCEPT_OPTION)return {ok:false,why:`${receipt.file} chose option ${receipt.optionIndex}, not accept`};
+  return {ok:true,receipt:receipt.file};
+}
+
+/** Why a direction review receipt does not back the archetype (schema, archetype, golden bytes), or null. */
+function directionReviewRefusal(receipt,review,archetype,golden){
+  if(review.schema!==DIRECTION_REVIEW_SCHEMA)return {ok:false,why:`${receipt.file} answers a ${review.schema??'non-direction'} review, not a ${DIRECTION_REVIEW_SCHEMA}`};
+  if(archetype&&review.archetype!==archetype)return {ok:false,why:`${receipt.file} reviews archetype ${review.archetype??'(none)'}, not ${archetype}`};
+  const seen=new Set(objectList(review.golden).map(entry=>entry.sha256));
+  const unseen=golden.filter(entry=>!seen.has(entry.sha256));
+  if(archetype&&unseen.length)return {ok:false,why:`golden ${unseen.map(entry=>entry.png).join(', ')} changed after the owner reviewed it`};
+  return null;
+}
+
 /** Whether an acceptance block is the owner's answer to the direction rev it names: {ok, why?, receipt?}. */
 function judgeAcceptance({acceptance,rev,brandDir,archetype=null,golden=[]}){
   if(!acceptance||typeof acceptance!=='object')return {ok:false,why:'no acceptance names the owner answer'};
@@ -800,22 +672,12 @@ function judgeAcceptance({acceptance,rev,brandDir,archetype=null,golden=[]}){
   const receipt=findOwnerReceipt({acceptedBy:acceptance.acceptedBy,receipt:acceptance.receipt??null,brandDir});
   if(!receipt.ok)return {ok:false,why:receipt.why};
   const review=receipt.review;
+  const reviewed=review&&typeof review==='object';
   // An owner-accepted drawing promoted to the archetype's golden (draw-feedback.mjs, brand-direction.mjs promoteGolden):
   // the owner's draw-review accept of the very parts the golden holds accepts the archetype.
-  if(archetype&&review&&typeof review==='object'&&review.schema===DRAW_REVIEW_RECEIPT_SCHEMA){
-    const seen=new Set(objectList(review.parts).map(entry=>entry?.sha256).filter(Boolean));
-    const unseen=golden.filter(entry=>!seen.has(entry.sha256));
-    if(!golden.length||unseen.length)return {ok:false,why:`golden ${unseen.map(entry=>entry.png).join(', ')||'(none)'} is not a drawing the owner accepted in ${receipt.file}`};
-    if(receipt.optionIndex!==DIRECTION_ACCEPT_OPTION)return {ok:false,why:`${receipt.file} chose option ${receipt.optionIndex}, not accept`};
-    return {ok:true,receipt:receipt.file};
-  }
-  if(review&&typeof review==='object'){
-    if(review.schema!==DIRECTION_REVIEW_SCHEMA)return {ok:false,why:`${receipt.file} answers a ${review.schema??'non-direction'} review, not a ${DIRECTION_REVIEW_SCHEMA}`};
-    if(archetype&&review.archetype!==archetype)return {ok:false,why:`${receipt.file} reviews archetype ${review.archetype??'(none)'}, not ${archetype}`};
-    const seen=new Set(objectList(review.golden).map(entry=>entry.sha256));
-    const unseen=golden.filter(entry=>!seen.has(entry.sha256));
-    if(archetype&&unseen.length)return {ok:false,why:`golden ${unseen.map(entry=>entry.png).join(', ')} changed after the owner reviewed it`};
-  }
+  if(archetype&&reviewed&&review.schema===DRAW_REVIEW_RECEIPT_SCHEMA)return judgeDrawReviewAcceptance(receipt,review,golden);
+  const refusal=reviewed?directionReviewRefusal(receipt,review,archetype,golden):null;
+  if(refusal)return refusal;
   if(receipt.optionIndex!==null&&receipt.optionIndex!==DIRECTION_ACCEPT_OPTION)return {ok:false,why:`${receipt.file} chose option ${receipt.optionIndex}, not accept`};
   return {ok:true,receipt:receipt.file};
 }
@@ -843,6 +705,144 @@ function judgeProvisional({provisional,rev,brandDir,archetype,golden=[]}){
   return {ok:true,receipt:receipt.file};
 }
 
+/** The shape problems of a direction record: rev, status and principles. */
+function directionShapeProblems(direction,problems){
+  const rev=direction.rev;
+  if(!Number.isInteger(rev)||rev<1)problems.push('rev must be a positive integer');
+  if(!DIRECTION_STATUSES.includes(direction.status))problems.push(`status ${JSON.stringify(direction.status)} is not one of ${DIRECTION_STATUSES.join(', ')}`);
+  if(!objectList(direction.principles).length)problems.push('principles is empty');
+  for(const principle of objectList(direction.principles))if(!Array.isArray(principle.cites)||!principle.cites.length)problems.push(`principle ${principle.id??'?'} cites nothing`);
+}
+
+/** The file a golden entry's `png` or `html` names inside the brand directory, or null (the problem is pushed). */
+function goldenFileOf(relative,key,brandDir,problems){
+  if(!relative||path.isAbsolute(relative)||relative.split('/').includes('..')){problems.push(`golden ${key} ${relative||'(none)'} is not a path inside the brand record's directory`);return null;}
+  const file=path.resolve(brandDir,relative);
+  if(fs.existsSync(file))return file;
+  problems.push(`golden ${key} ${relative} is not on disk`);
+  return null;
+}
+
+/** One path of a golden entry (`png` or `html`) checked on disk against its recorded digest; records its computed digest on `finding`. */
+function goldenFileProblems(entry,key,brandDir,problems,finding){
+  const relative=slash(String(entry[key]??''));
+  const file=goldenFileOf(relative,key,brandDir,problems);
+  if(file===null)return;
+  const computed=digest(fs.readFileSync(file));
+  const declared=key==='png'?entry.sha256:entry.htmlSha256;
+  if(key==='png'&&!declared)problems.push(`golden ${relative} declares no sha256`);
+  if(declared&&String(declared).toLowerCase()!==computed)problems.push(`golden ${relative} no longer hashes to its recorded sha256`);
+  finding[`${key}Sha256`]=computed;
+}
+
+/** One golden render entry judged: its finding, with the problems it raises pushed in order. */
+function goldenFindingOf(entry,archetypes,brandDir,problems){
+  const finding={archetype:entry.archetype??null,png:entry.png??null,html:entry.html??null};
+  for(const key of ['png','html'])goldenFileProblems(entry,key,brandDir,problems,finding);
+  if(!Object.hasOwn(archetypes,entry.archetype))problems.push(`golden ${entry.png??'?'} names archetype ${entry.archetype??'(none)'}, which the direction does not declare`);
+  return finding;
+}
+
+/** The shape problems of one archetype; returns its missing fields, or null when it is not an archetype to judge further. */
+function archetypeShapeProblems(name,archetype,problems){
+  if(!DIRECTION_ARCHETYPES.includes(name)){problems.push(`archetype ${name} is not one of ${DIRECTION_ARCHETYPES.join(', ')}`);return null;}
+  if(!archetype||typeof archetype!=='object'){problems.push(`archetype ${name} is not an object`);return null;}
+  const missing=ARCHETYPE_FIELDS.filter(field=>archetype[field]===undefined||archetype[field]===null||archetype[field]===''||(Array.isArray(archetype[field])&&!archetype[field].length));
+  if(missing.length)problems.push(`archetype ${name} lacks ${missing.join(', ')}`);
+  if(!DIRECTION_STATUSES.includes(archetype.status))problems.push(`archetype ${name} status ${JSON.stringify(archetype.status)} is not one of ${DIRECTION_STATUSES.join(', ')}`);
+  return missing;
+}
+
+/** One archetype judged: its status into `ctx.summary`, `ctx.provisional` or `ctx.ready` when drawable, problems in order. */
+function judgeArchetype(name,archetype,ctx){
+  const {problems,golden,rev,brandDir}=ctx;
+  const missing=archetypeShapeProblems(name,archetype,problems);
+  if(missing===null)return;
+  ctx.summary[name]=archetype.status??null;
+  const own=golden.filter(entry=>entry.archetype===name);
+  // Autopilot: a provisional block backed by its receipt makes the archetype drawable (evidence.provisional); a
+  // stale one is dropped silently - the next brand.decide direction review asks again.
+  if(archetype.status!=='accepted'){
+    if(archetype.provisional&&judgeProvisional({provisional:archetype.provisional,rev,brandDir,archetype:name,golden:own}).ok&&!missing.length)ctx.provisional.push(name);
+    return;
+  }
+  if(!own.length)problems.push(`archetype ${name} is accepted with no golden render the owner saw`);
+  const verdict=judgeAcceptance({acceptance:archetype.acceptance,rev,brandDir,archetype:name,golden:own});
+  if(!verdict.ok)problems.push(`archetype ${name} is accepted but ${verdict.why}`);
+  else if(!missing.length&&own.length)ctx.ready.push(name);
+}
+
+/** The rubric problems (checks, anchors, duplicate ids, missing group, test or cites); returns the rubric checks. */
+function rubricProblems(direction,problems){
+  const checks=objectList(direction.rubric?.checks);
+  if(!checks.length)problems.push('rubric.checks is empty');
+  if(!objectList(direction.rubric?.beautyAnchors).length)problems.push('rubric.beautyAnchors is empty');
+  const seenChecks=new Set();
+  for(const entry of checks){
+    if(seenChecks.has(entry.id))problems.push(`rubric check ${entry.id} is declared twice`);
+    seenChecks.add(entry.id);
+    for(const field of ['group','test'])if(typeof entry[field]!=='string'||!entry[field].trim())problems.push(`rubric check ${entry.id??'?'} has no ${field}`);
+    if(!Array.isArray(entry.cites)||!entry.cites.length)problems.push(`rubric check ${entry.id??'?'} cites nothing`);
+  }
+  return checks;
+}
+
+/** Every vocabulary recipe mapped onto components the DNA renders; returns the recipes' grammar proposals. */
+function vocabularyProposals(vocabulary,canon,family,problems){
+  const components=new Set(canon.names);
+  const unmapped=[];
+  const proposals=[];
+  for(const [name,recipe] of Object.entries(vocabulary)){
+    const dna=Array.isArray(recipe?.dna)?recipe.dna:[];
+    if(!dna.length)problems.push(`recipe ${name} maps onto no DNA component`);
+    if(canon.names.length)unmapped.push(...dna.filter(component=>!components.has(component)).map(component=>`${name}: ${component}`));
+    proposals.push(...objectList(recipe?.proposals).map(proposal=>({recipe:name,component:proposal.component??null,variant:proposal.variant??null,status:proposal.status??null})));
+  }
+  if(unmapped.length)problems.push(`recipes name components the \`${family}\` DNA does not render (record a grammar proposal instead): ${unmapped.join(', ')}`);
+  return proposals;
+}
+
+/** The components an archetype names must be components the DNA renders (when the DNA could be read). */
+function archetypeComponentProblems(archetypes,canon,family,problems){
+  const components=new Set(canon.names);
+  for(const archetypeName of Object.keys(archetypes))for(const component of Array.isArray(archetypes[archetypeName]?.components)?archetypes[archetypeName].components:[])
+    if(canon.names.length&&!components.has(component))problems.push(`archetype ${archetypeName} names ${component}, which the \`${family}\` DNA does not render`);
+}
+
+/**
+ * Rulings learned from the owner's draw feedback (scripts/work/draw-feedback.mjs): proposed until the owner accepts
+ * the direction; an accepted one is backed by that owner answer. Returns {proposed, accepted} ids.
+ */
+function learnedRulings(direction,brandDir,problems){
+  const learned={proposed:[],accepted:[]};
+  const learnedIds=new Set();
+  for(const entry of objectList(direction.learned)){
+    if(!entry||typeof entry!=='object'||!entry.id){problems.push('a learned ruling has no id');continue;}
+    if(learnedIds.has(entry.id))problems.push(`learned ruling ${entry.id} is declared twice`);
+    learnedIds.add(entry.id);
+    if(!LEARNED_STATUSES.includes(entry.status)){problems.push(`learned ruling ${entry.id} status ${JSON.stringify(entry.status)} is not one of ${LEARNED_STATUSES.join(', ')}`);continue;}
+    if(entry.status==='accepted'){
+      const verdict=judgeAcceptance({acceptance:entry.acceptance,rev:entry.acceptance?.rev,brandDir});
+      if(!verdict.ok)problems.push(`learned ruling ${entry.id} is accepted but ${verdict.why}`);
+    }
+    learned[entry.status].push(entry.id);
+  }
+  return learned;
+}
+
+const directionArchetypesOf=direction=>direction.archetypes&&typeof direction.archetypes==='object'&&!Array.isArray(direction.archetypes)?direction.archetypes:{};
+const directionVocabularyOf=direction=>direction.vocabulary&&typeof direction.vocabulary==='object'?direction.vocabulary:{};
+
+/** An accepted direction is backed by the owner's answer; archetypes may be ready only under an accepted direction. */
+function directionAcceptanceProblems(direction,ready,brandDir,problems){
+  if(direction.status!=='accepted'){
+    if(ready.length)problems.push(`archetypes ${ready.join(', ')} are accepted while the direction itself is ${direction.status}`);
+    return;
+  }
+  const verdict=judgeAcceptance({acceptance:direction.acceptance,rev:direction.rev,brandDir});
+  if(!verdict.ok)problems.push(`the direction is accepted but ${verdict.why}`);
+}
+
 /**
  * 7. `brand.direction`, when the record carries one: its shape, every vocabulary recipe mapped onto components the
  * grammar DNA renders (a missing one is a pending grammar proposal, never an invented element), unique rubric
@@ -858,97 +858,21 @@ export function checkDirection({brand,family,grammarRoot,brandDir}){
   const problems=[];
   if(typeof direction!=='object'||Array.isArray(direction))return check(id,'fail','brand.direction is not an object.',{problems:['not an object']});
   const rev=direction.rev;
-  if(!Number.isInteger(rev)||rev<1)problems.push('rev must be a positive integer');
-  if(!DIRECTION_STATUSES.includes(direction.status))problems.push(`status ${JSON.stringify(direction.status)} is not one of ${DIRECTION_STATUSES.join(', ')}`);
-  if(!objectList(direction.principles).length)problems.push('principles is empty');
-  for(const principle of objectList(direction.principles))if(!Array.isArray(principle.cites)||!principle.cites.length)problems.push(`principle ${principle.id??'?'} cites nothing`);
-  const archetypes=direction.archetypes&&typeof direction.archetypes==='object'&&!Array.isArray(direction.archetypes)?direction.archetypes:{};
+  directionShapeProblems(direction,problems);
+  const archetypes=directionArchetypesOf(direction);
   if(!Object.keys(archetypes).length)problems.push('archetypes is empty');
   const golden=objectList(direction.golden);
-  const goldenFindings=golden.map(entry=>{
-    const finding={archetype:entry.archetype??null,png:entry.png??null,html:entry.html??null};
-    for(const key of ['png','html']){
-      const relative=slash(String(entry[key]??''));
-      if(!relative||path.isAbsolute(relative)||relative.split('/').includes('..')){problems.push(`golden ${key} ${relative||'(none)'} is not a path inside the brand record's directory`);continue;}
-      const file=path.resolve(brandDir,relative);
-      if(!fs.existsSync(file)){problems.push(`golden ${key} ${relative} is not on disk`);continue;}
-      const computed=digest(fs.readFileSync(file));
-      const declared=key==='png'?entry.sha256:entry.htmlSha256;
-      if(key==='png'&&!declared)problems.push(`golden ${relative} declares no sha256`);
-      if(declared&&String(declared).toLowerCase()!==computed)problems.push(`golden ${relative} no longer hashes to its recorded sha256`);
-      finding[`${key}Sha256`]=computed;
-    }
-    if(!Object.hasOwn(archetypes,entry.archetype))problems.push(`golden ${entry.png??'?'} names archetype ${entry.archetype??'(none)'}, which the direction does not declare`);
-    return finding;
-  });
-  const summary={};
-  const ready=[];
-  const provisional=[];
-  for(const [name,archetype] of Object.entries(archetypes)){
-    if(!DIRECTION_ARCHETYPES.includes(name)){problems.push(`archetype ${name} is not one of ${DIRECTION_ARCHETYPES.join(', ')}`);continue;}
-    if(!archetype||typeof archetype!=='object'){problems.push(`archetype ${name} is not an object`);continue;}
-    const missing=ARCHETYPE_FIELDS.filter(field=>archetype[field]===undefined||archetype[field]===null||archetype[field]===''||(Array.isArray(archetype[field])&&!archetype[field].length));
-    if(missing.length)problems.push(`archetype ${name} lacks ${missing.join(', ')}`);
-    if(!DIRECTION_STATUSES.includes(archetype.status))problems.push(`archetype ${name} status ${JSON.stringify(archetype.status)} is not one of ${DIRECTION_STATUSES.join(', ')}`);
-    summary[name]=archetype.status??null;
-    // Autopilot: a provisional block backed by its receipt makes the archetype drawable (evidence.provisional); a
-    // stale one is dropped silently - the next brand.decide direction review asks again.
-    if(archetype.status!=='accepted'&&archetype.provisional){
-      const own=golden.filter(entry=>entry.archetype===name);
-      const verdict=judgeProvisional({provisional:archetype.provisional,rev,brandDir,archetype:name,golden:own});
-      if(verdict.ok&&!missing.length)provisional.push(name);
-    }
-    if(archetype.status!=='accepted')continue;
-    const own=golden.filter(entry=>entry.archetype===name);
-    if(!own.length)problems.push(`archetype ${name} is accepted with no golden render the owner saw`);
-    const verdict=judgeAcceptance({acceptance:archetype.acceptance,rev,brandDir,archetype:name,golden:own});
-    if(!verdict.ok)problems.push(`archetype ${name} is accepted but ${verdict.why}`);
-    else if(!missing.length&&own.length)ready.push(name);
-  }
-  if(direction.status==='accepted'){
-    const verdict=judgeAcceptance({acceptance:direction.acceptance,rev,brandDir});
-    if(!verdict.ok)problems.push(`the direction is accepted but ${verdict.why}`);
-  }else if(ready.length)problems.push(`archetypes ${ready.join(', ')} are accepted while the direction itself is ${direction.status}`);
-  const checks=objectList(direction.rubric?.checks);
-  if(!checks.length)problems.push('rubric.checks is empty');
-  if(!objectList(direction.rubric?.beautyAnchors).length)problems.push('rubric.beautyAnchors is empty');
-  const seenChecks=new Set();
-  for(const entry of checks){
-    if(seenChecks.has(entry.id))problems.push(`rubric check ${entry.id} is declared twice`);
-    seenChecks.add(entry.id);
-    for(const field of ['group','test'])if(typeof entry[field]!=='string'||!entry[field].trim())problems.push(`rubric check ${entry.id??'?'} has no ${field}`);
-    if(!Array.isArray(entry.cites)||!entry.cites.length)problems.push(`rubric check ${entry.id??'?'} cites nothing`);
-  }
-  const vocabulary=direction.vocabulary&&typeof direction.vocabulary==='object'?direction.vocabulary:{};
+  const goldenFindings=golden.map(entry=>goldenFindingOf(entry,archetypes,brandDir,problems));
+  const ctx={problems,golden,rev,brandDir,summary:{},ready:[],provisional:[]};
+  for(const [name,archetype] of Object.entries(archetypes))judgeArchetype(name,archetype,ctx);
+  const {summary,ready,provisional}=ctx;
+  directionAcceptanceProblems(direction,ready,brandDir,problems);
+  const checks=rubricProblems(direction,problems);
   const canon=grammarComponentNames({family,grammarRoot});
-  const components=new Set(canon.names);
-  const unmapped=[];
-  const proposals=[];
-  for(const [name,recipe] of Object.entries(vocabulary)){
-    const dna=Array.isArray(recipe?.dna)?recipe.dna:[];
-    if(!dna.length)problems.push(`recipe ${name} maps onto no DNA component`);
-    if(canon.names.length)for(const component of dna)if(!components.has(component))unmapped.push(`${name}: ${component}`);
-    for(const proposal of objectList(recipe?.proposals))proposals.push({recipe:name,component:proposal.component??null,variant:proposal.variant??null,status:proposal.status??null});
-  }
-  if(unmapped.length)problems.push(`recipes name components the \`${family}\` DNA does not render (record a grammar proposal instead): ${unmapped.join(', ')}`);
-  for(const archetypeName of Object.keys(archetypes))for(const component of Array.isArray(archetypes[archetypeName]?.components)?archetypes[archetypeName].components:[])
-    if(canon.names.length&&!components.has(component))problems.push(`archetype ${archetypeName} names ${component}, which the \`${family}\` DNA does not render`);
+  const proposals=vocabularyProposals(directionVocabularyOf(direction),canon,family,problems);
+  archetypeComponentProblems(archetypes,canon,family,problems);
   const pending=objectList(direction.pendingRulings).filter(entry=>entry.status!=='ruled').map(entry=>entry.id??'?');
-  // Rulings learned from the owner's draw feedback (scripts/work/draw-feedback.mjs): proposed until the owner accepts
-  // the direction; an accepted one is backed by that owner answer.
-  const learned={proposed:[],accepted:[]};
-  const learnedIds=new Set();
-  for(const entry of objectList(direction.learned)){
-    if(!entry||typeof entry!=='object'||!entry.id){problems.push('a learned ruling has no id');continue;}
-    if(learnedIds.has(entry.id))problems.push(`learned ruling ${entry.id} is declared twice`);
-    learnedIds.add(entry.id);
-    if(!LEARNED_STATUSES.includes(entry.status)){problems.push(`learned ruling ${entry.id} status ${JSON.stringify(entry.status)} is not one of ${LEARNED_STATUSES.join(', ')}`);continue;}
-    if(entry.status==='accepted'){
-      const verdict=judgeAcceptance({acceptance:entry.acceptance,rev:entry.acceptance?.rev,brandDir});
-      if(!verdict.ok)problems.push(`learned ruling ${entry.id} is accepted but ${verdict.why}`);
-    }
-    learned[entry.status].push(entry.id);
-  }
+  const learned=learnedRulings(direction,brandDir,problems);
   const evidence={rev:rev??null,status:direction.status??null,archetypes:summary,ready,provisional,golden:goldenFindings,dna:canon.file?slash(canon.file):null,
     dnaNote:canon.error,proposals,pendingRulings:pending,rubricChecks:checks.length,learned};
   if(problems.length)return check(id,'fail',`brand.direction rev ${rev??'?'} has ${problems.length} problem(s): ${problems.slice(0,OFFENDER_CAP).join('; ')}.`,{...evidence,problems});
