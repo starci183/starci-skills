@@ -37,6 +37,21 @@ const modulesChain = (root, project) => {
 };
 
 /** Generate ignored front-end inputs before measuring the candidate, as the external gate did. */
+function prepareFrontendProject(project, appRoot, deps, runNpm, runNpx) {
+  let pkg = {};
+  try { pkg = JSON.parse(fs.readFileSync(path.join(appRoot, 'package.json'), 'utf8')); } catch { /* tsc reports unreadable projects */ }
+  const options = { cwd: appRoot, encoding: 'utf8', timeout: 900_000, maxBuffer: 256 * 1024 * 1024, env: deps.env ?? process.env };
+  if (pkg.scripts?.codegen) {
+    const r = runNpm(['run', 'codegen', '--silent'], options);
+    if (r?.error || r?.status !== 0) return { ok: false, project, step: 'npm run codegen', detail: String(r?.stderr ?? r?.stdout ?? r?.error?.message ?? '').trim().slice(-400) };
+  }
+  if (fs.existsSync(path.join(appRoot, 'fe', 'packages')) && fs.existsSync(path.join(appRoot, 'turbo.json'))) {
+    const r = runNpx(['turbo', 'run', 'build', '--filter=./fe/packages/*'], options);
+    if (r?.error || r?.status !== 0) return { ok: false, project, step: 'npx turbo run build', detail: String(r?.stderr ?? r?.stdout ?? r?.error?.message ?? '').trim().slice(-400) };
+  }
+  return { ok: true };
+}
+
 function prepareFrontendProjects(root, projects, deps = {}) {
   const runNpm = deps.runNpm ?? runNpmCall, runNpx = deps.runNpx ?? runNpxCall;
   const prepared = new Set();
@@ -44,17 +59,8 @@ function prepareFrontendProjects(root, projects, deps = {}) {
     const appRoot = appRootOf(root, project);
     if (prepared.has(appRoot) || !path.relative(appRoot, path.join(root, project)).replaceAll(String.fromCodePoint(92), '/').startsWith('fe/')) continue;
     prepared.add(appRoot);
-    let pkg = {};
-    try { pkg = JSON.parse(fs.readFileSync(path.join(appRoot, 'package.json'), 'utf8')); } catch { /* tsc reports unreadable projects */ }
-    const options = { cwd: appRoot, encoding: 'utf8', timeout: 900_000, maxBuffer: 256 * 1024 * 1024, env: deps.env ?? process.env };
-    if (pkg.scripts?.codegen) {
-      const r = runNpm(['run', 'codegen', '--silent'], options);
-      if (r?.error || r?.status !== 0) return { ok: false, project, step: 'npm run codegen', detail: String(r?.stderr ?? r?.stdout ?? r?.error?.message ?? '').trim().slice(-400) };
-    }
-    if (fs.existsSync(path.join(appRoot, 'fe', 'packages')) && fs.existsSync(path.join(appRoot, 'turbo.json'))) {
-      const r = runNpx(['turbo', 'run', 'build', '--filter=./fe/packages/*'], options);
-      if (r?.error || r?.status !== 0) return { ok: false, project, step: 'npx turbo run build', detail: String(r?.stderr ?? r?.stdout ?? r?.error?.message ?? '').trim().slice(-400) };
-    }
+    const result = prepareFrontendProject(project, appRoot, deps, runNpm, runNpx);
+    if (!result.ok) return result;
   }
   return { ok: true };
 }

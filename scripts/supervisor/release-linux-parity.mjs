@@ -113,7 +113,7 @@ export function parityPlan({ workflows, apps }) {
   return { image: `node:${state.node ?? DEFAULT_NODE}`, steps, skipped };
 }
 
-const quote = (v) => "'" + String(v).replaceAll(/'/g, String.raw`'\''`) + "'";
+const quote = (v) => "'" + String(v).replaceAll("'", String.raw`'\''`) + "'";
 
 /** The bash script the container runs: extract HEAD, snapshot it as a git repository, then each step in order, `##STEP`/`##FAILED` markers in the log. Pure. */
 export function parityScript(plan) {

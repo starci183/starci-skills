@@ -92,17 +92,7 @@ export const supervisorWorkerHandles = supervisorRead((m) => new Set([...openWor
 // and settled workers linger; TITLE_DRIFT and STRAY_TERMINAL make both visible
 // to the supervisor (modules/supervisor/supervise.yaml form checks).
 const underRepo = pathUnder;
-export function orcaTreeFindings(db, terminals, { repo = null, owned = null, workers: workerRows = [] } = {}) {
-  const workers = owned ?? supervisorWorkerHandles();
-  // The terminals Orca accounts for as workers of this ledger's Runs (the caller lists those Runs).
-  const orcaWorkers = workerTerminalHandles(workerRows ?? []);
-  const listing = terminals ?? [];
-  const live = listing.filter((t) => t.live);
-  const byHandle = new Map(listing.map((t) => [t.handle, t]));
-  const { jobs, boundHandles, knownHandles, workflows } = projectLedger(db);
-  const findings = [];
-  const kernelSignals = new Set(workflows.filter((w) => !w.finished && w.signalTerminal).map((w) => w.signalTerminal));
-
+function addKernelFindings(workflows, live, byHandle, findings) {
   for (const wf of workflows) {
     if (wf.finished) continue;
     // A live terminal is this workflow's kernel when the ledger says so: its
@@ -123,10 +113,11 @@ export function orcaTreeFindings(db, terminals, { repo = null, owned = null, wor
           : `kernel signal terminal ${wf.signalTerminal} is not in the terminal listing` });
     }
   }
+}
 
+function addOrphanFindings({ live, knownHandles, orcaWorkers, workers, named, boundHandles, kernelSignals, jobs, byHandle, findings }) {
   // A terminal a DUPLICATE_KERNEL already names is that finding, not a second
   // one: the answer is to close the loser, and it is already on the report.
-  const named = new Set(findings.flatMap((f) => f.terminals ?? []));
   for (const terminal of live) {
     // Ours: a handle this ledger names, or a worker Orca accounts for in one of
     // this ledger's Runs. Several ledgers share one Orca host: another
@@ -138,16 +129,17 @@ export function orcaTreeFindings(db, terminals, { repo = null, owned = null, wor
       ...(owner ? { jobId: owner.job_id } : {}),
       detail: owner
         ? `terminal ${terminal.handle} is live but its job ${owner.job_id} is ${owner.status}`
-        : `terminal ${terminal.handle} (${terminal.title ?? 'untitled'}) is a live Orca worker of this ledger's Run that no job holds` });
+      : `terminal ${terminal.handle} (${terminal.title ?? 'untitled'}) is a live Orca worker of this ledger's Run that no job holds` });
   }
+}
 
+function addTitleDriftFindings(jobs, byHandle, findings) {
   // Names: the sidebar shows the tab title Orca set at creation (--title) or
   // by terminal rename; `terminal list`'s `title` is the pane title the agent
   // CLI rewrites on every turn, so it is never compared. A managed worker gets
   // its [Op] tab title only through the rename once its start names the agent terminal, whose
   // receipt the job keeps (payload.managed.terminalTitle): a live job whose
   // rename did not apply is the unnamed worker-task_<id> row the owner saw.
-  const liveJobHandles = new Set(jobs.filter((job) => job.kind !== 'kernel' && ['running', 'answering', 'leased'].includes(job.status)).flatMap((job) => jobTerminalHandles(job, job.payload)));
   for (const job of jobs) {
     if (job.kind === 'kernel' || !['running', 'answering'].includes(job.status)) continue;
     const rename = job.payload?.managed?.terminalTitle;
@@ -159,20 +151,22 @@ export function orcaTreeFindings(db, terminals, { repo = null, owned = null, wor
       expected: rename.title ?? `[Op] ${job.op_id}`,
       detail: `op worker ${handle} of ${job.job_id} never got its tab title "${rename.title ?? ''}"${renameError}` });
   }
+}
+
+function addStrayFindings({ live, repo, kernelsLive, liveJobHandles, workers, reported, findings }) {
   // Placement: a live terminal in this project's worktree that is neither a
   // live kernel nor a live job's worker is stray (a settled worker, a leftover
   // shell, an old kernel) and does not belong in the sidebar. An open job's
   // [Worker] belongs there.
-  const reported = new Set(findings.map((f) => f.terminal).filter(Boolean));
-  const kernelsLive = new Set(workflows.filter((w) => !w.finished).flatMap((w) => [w.signalTerminal, w.kernelTerminal]).filter(Boolean));
   for (const t of live) {
     if (!underRepo(t.worktreePath, repo) || kernelsLive.has(t.handle) || liveJobHandles.has(t.handle) || workers.has(t.handle)) continue;
     if (reported.has(t.handle) && findings.some((f) => f.terminal === t.handle && f.code === 'ORPHAN_TERMINAL')) continue;
     findings.push({ code: 'STRAY_TERMINAL', workflowId: null, terminal: t.handle,
       detail: `terminal ${t.handle} ("${t.title ?? 'untitled'}") is live in this project but is no live kernel or op worker` });
   }
+}
 
-  const currentRun = new Map(workflows.map((w) => [w.workflowId, w.runId]));
+function addOutsideRunFindings(jobs, currentRun, findings) {
   for (const job of jobs) {
     if (job.kind === 'kernel') continue;
     const payload = job.payload;
@@ -184,6 +178,28 @@ export function orcaTreeFindings(db, terminals, { repo = null, owned = null, wor
       taskId: payload?.orca?.taskId ?? payload?.managed?.taskId ?? null, runId, expectedRunId: expected,
       detail: `job ${job.job_id} holds an open Task in run ${runId}; the workflow's run is ${expected}` });
   }
+}
+
+export function orcaTreeFindings(db, terminals, { repo = null, owned = null, workers: workerRows = [] } = {}) {
+  const workers = owned ?? supervisorWorkerHandles();
+  // The terminals Orca accounts for as workers of this ledger's Runs (the caller lists those Runs).
+  const orcaWorkers = workerTerminalHandles(workerRows ?? []);
+  const listing = terminals ?? [];
+  const live = listing.filter((t) => t.live);
+  const byHandle = new Map(listing.map((t) => [t.handle, t]));
+  const { jobs, boundHandles, knownHandles, workflows } = projectLedger(db);
+  const findings = [];
+  const kernelSignals = new Set(workflows.filter((w) => !w.finished && w.signalTerminal).map((w) => w.signalTerminal));
+  addKernelFindings(workflows, live, byHandle, findings);
+  const named = new Set(findings.flatMap((f) => f.terminals ?? []));
+  addOrphanFindings({ live, knownHandles, orcaWorkers, workers, named, boundHandles, kernelSignals, jobs, byHandle, findings });
+  const liveJobHandles = new Set(jobs.filter((job) => job.kind !== 'kernel' && ['running', 'answering', 'leased'].includes(job.status)).flatMap((job) => jobTerminalHandles(job, job.payload)));
+  addTitleDriftFindings(jobs, byHandle, findings);
+  const reported = new Set(findings.map((f) => f.terminal).filter(Boolean));
+  const kernelsLive = new Set(workflows.filter((w) => !w.finished).flatMap((w) => [w.signalTerminal, w.kernelTerminal]).filter(Boolean));
+  addStrayFindings({ live, repo, kernelsLive, liveJobHandles, workers, reported, findings });
+  const currentRun = new Map(workflows.map((w) => [w.workflowId, w.runId]));
+  addOutsideRunFindings(jobs, currentRun, findings);
 
   return findings.sort((a, b) => FINDING_CODES.indexOf(a.code) - FINDING_CODES.indexOf(b.code)
     || String(a.workflowId).localeCompare(String(b.workflowId)));

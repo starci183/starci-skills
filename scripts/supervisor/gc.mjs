@@ -500,7 +500,7 @@ export function collectLanes({ apply = false, env = process.env, now = Date.now(
     freedBytes += bytes;
   };
   const lanes = worktrees.filter((w) => { const k = pathKey(w.path); return k !== mainKey && k !== selfKey && k.startsWith(baseKey); })
-    .sort((a, b) => { if (pathKey(a.path) < pathKey(b.path)) return -1; if (pathKey(a.path) > pathKey(b.path)) return 1; return 0; });
+    .sort((a, b) => { if (pathKey(a.path) < pathKey(b.path)) { return -1; } if (pathKey(a.path) > pathKey(b.path)) { return 1; } return 0; });
   // Resume at the cursor and run to the end of the path order; a pass that reaches the end is complete (the next one
   // starts from the beginning again).
   const at = cursor ? lanes.findIndex((w) => pathKey(w.path) >= cursor) : 0;
@@ -512,7 +512,7 @@ export function collectLanes({ apply = false, env = process.env, now = Date.now(
     if (clock() - started > progress.budgetMs) { progress.complete = false; progress.next = pathKey(w.path); break; }
     progress.done += 1;
     if (w.locked) { item('keep', w.path, 'locked'); continue; }
-    if (!fs.existsSync(w.path)) { if (apply) run(['worktree', 'prune'], { cwd: root }); item('collect', w.path, 'registration of a missing directory (pruned)'); continue; }
+    if (!fs.existsSync(w.path)) { if (apply) { run(['worktree', 'prune'], { cwd: root }); } item('collect', w.path, 'registration of a missing directory (pruned)'); continue; }
     const branch = branchOf(w.branch);
     if (w.detached || !branch) {
       if (!key.startsWith(landKey)) { item('keep', w.path, 'detached checkout outside the land root'); continue; }
@@ -659,7 +659,7 @@ export async function runGc({ apply = false, only = null, env = process.env, now
         }
         const it = { class: d.klass, action: 'close-terminal', target: d.handle, title: d.title, reason: d.reason, owner: d.owner ?? null, verdict: d.verdict, leftover: !isShell,
           ...(isShell ? { firstSeenAt: seenNow[d.handle]?.at ?? now } : {}) };
-        if (d.verdict === 'refuse') { report.items.push(it); if (!d.pendingAge) report.counts.refused += 1; continue; }
+        if (d.verdict === 'refuse') { report.items.push(it); if (!d.pendingAge) { report.counts.refused += 1; } continue; }
         if (!apply) { report.items.push({ ...it, ok: null }); }
         else {
           const r = (deps.close ?? closeAndVerify)(d.handle);

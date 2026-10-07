@@ -255,7 +255,7 @@ export function classifyIncidents(db, { repo = null, ledgers = [], now = Date.no
   const dbOf = (wf) => find(wf)?.db ?? null;
   const busyOf = peerBusyProbe({ repo, db, ledgers, frontierOf });
   const verdictOf = (wf, incidentId, judge) => verdicts?.get(verdictKey(wf, incidentId)) ?? judge();
-  const asksOf = (wf) => { const d = dbOf(wf); if (!d) return []; try { return openAskDispatches(d, wf).map((a) => a.dispatch_id); } catch { return []; } };
+  const asksOf = (wf) => { const d = dbOf(wf); if (!d) { return []; } try { return openAskDispatches(d, wf).map((a) => a.dispatch_id); } catch { return []; } };
   const out = [];
   for (const w of runningWorkflows(db)) {
     const wf = w.workflow_id;
@@ -317,10 +317,10 @@ export function classifyIncidents(db, { repo = null, ledgers = [], now = Date.no
 
 /* ------------------------------------------------------------ patterns with no incident */
 
-const hash = (s) => shortHash(s, { algo: 'sha1', n: 8 });
+const hash = (s) => shortHash(s, { algo: 'sha1', n: 8 }); const stalePathOf = (p, root, repo) => { if (path.isAbsolute(p)) return p; if (p.startsWith('.starciwork/') && repo) return path.join(repo, p); return path.join(root, p); };
 const ownedPaths = (payload) => (Array.isArray(payload?.owned_paths) ? payload.owned_paths : []).map(String);
 const pathsKey = (payload) => JSON.stringify([...ownedPaths(payload)].sort(byCodeUnit));
-const bare = (p) => p.replaceAll(/\\/g, '/').replace(/(?:\/\*{1,2})+$/, '').replace(/\/+$/, '');
+const bare = (p) => p.replaceAll('\\', '/').replace(/(?:\/\*{1,2})+$/, '').replace(/\/+$/, '');
 // Every owned path of `tail` lies under (or is) a path some job in `jobs` owns: a cut set that re-sliced it.
 const pathsCovered = (tail, jobs) => {
   const want = ownedPaths(tail.payload).map(bare);
@@ -422,7 +422,7 @@ export function patternFindings(db, { repo = null, now = Date.now(), wanted = ne
       const loops = new Map(), repeats = new Map();
       const gates = ownerGates(db, wf), askJobs = openAskJobs(db, wf);
       // The newest job of a lineage decides whether it waits on the owner (ownerHoldOf).
-      const waiting = (tails) => { const newest = [...tails].sort((a, b) => b.created_at - a.created_at || String(b.job_id).localeCompare(String(a.job_id)))[0]; const hold = ownerHoldOf(db, wf, newest, { byId, gates, askJobs }); if (!hold) return {}; const ownerItem = hold.kind === 'owner-gate' ? 'owner gate ' + hold.incidentId : 'owner ask ' + hold.dispatchId; const via = hold.via !== hold.jobId ? ' (via ' + hold.via + ')' : ''; return { class: CLASSES.owner, reason: 'waiting on the owner: newest job ' + hold.jobId + ' is ' + newest.status + ' behind ' + ownerItem + via, ownerHold: hold }; };
+      const waiting = (tails) => { const newest = [...tails].sort((a, b) => b.created_at - a.created_at || String(b.job_id).localeCompare(String(a.job_id)))[0]; const hold = ownerHoldOf(db, wf, newest, { byId, gates, askJobs }); if (!hold) { return {}; } const ownerItem = hold.kind === 'owner-gate' ? 'owner gate ' + hold.incidentId : 'owner ask ' + hold.dispatchId; const via = hold.via !== hold.jobId ? ' (via ' + hold.via + ')' : ''; return { class: CLASSES.owner, reason: 'waiting on the owner: newest job ' + hold.jobId + ' is ' + newest.status + ' behind ' + ownerItem + via, ownerHold: hold }; };
       for (const tail of jobs.filter((j) => !retried.has(j.job_id))) {
         if (tail.status === 'succeeded' || tail.status === 'cancelled') continue;
         if (!OPEN_JOB.has(tail.status)) {
@@ -528,7 +528,7 @@ export function patternFindings(db, { repo = null, now = Date.now(), wanted = ne
       const ops = staleOperationsOf(staleOf(db, wf, { root, repo }));
       if (ops.length) {
         const paths = [...new Set(ops.flatMap((o) => o.paths))];
-        const since = Math.min(...paths.map((p) => { try { return fs.statSync(path.isAbsolute(p) ? p : p.startsWith('.starciwork/') && repo ? path.join(repo, p) : path.join(root, p)).mtimeMs; } catch { return now; } }));
+        const since = Math.min(...paths.map((p) => { try { return fs.statSync(stalePathOf(p, root, repo)).mtimeMs; } catch { return now; } }));
         const source = paths.some((p) => !p.startsWith('.starciwork/'));
         const followUps = ops.filter((o) => o.followUp).length;
         put(wf, 'stale-input', wf, since, `${ops.length} settled job(s) owe work for changed input(s) ${clipLine(paths.join(', '), 120)}${followUps ? ' (' + followUps + ' owner-declared breaking follow-up(s))' : ''} (e.g. ${ops.slice(0, 3).map((o) => o.jobId).join(', ')})`,
@@ -541,7 +541,7 @@ export function patternFindings(db, { repo = null, now = Date.now(), wanted = ne
 
 /* ------------------------------------------------------------ the whole projection */
 
-const owedLine = (i) => 'OWED ' + i.workflowId + ' ' + (i.incidentId ?? i.key) + ' [' + (i.kind ?? '-') + '] age=' + i.ageMin + 'm ' + (i.fixedBy ? 'fixed-by ' + i.fixedBy.sha.slice(0, 9) + '?' : 'open') + (i.ackReopened ? ' ack-reopened (acked ' + new Date(i.ackReopened.at).toISOString() + ')' : '') + ': ' + i.summary;
+const owedLine = (i) => 'OWED ' + i.workflowId + ' ' + (i.incidentId ?? i.key) + ' [' + (i.kind ?? '-') + '] age=' + i.ageMin + 'm ' + (i.fixedBy ? 'fixed-by ' + i.fixedBy.sha.slice(0, 9) + '?' : 'open') + (i.ackReopened ? ' ack-reopened (acked ' + new Date(i.ackReopened.at).toISOString() + ')' : '') + ': ' + i.summary; const fixedByTextOf = (fixedBy) => { if (!fixedBy) return ''; const prefix = ' <- ' + fixedBy.how; const tokens = fixedBy.tokens ? ' (' + fixedBy.tokens.join(', ') + ')' : ''; return prefix + tokens + ' "' + fixedBy.subject + '"'; };
 
 /* ------------------------------------------------------------ the supervisor's disposition: ack */
 
@@ -592,6 +592,15 @@ export function unackOwed({ key, now = Date.now(), env = process.env }) {
  * supervisor acked (readOwedAcks) and nothing newer failed on is status 'acked' and left out of `owed`.
  * `commitsOf(since)` replaces `git log` (specs); `acks` (a Map) replaces the stored ones (machine.sqlite sup_owed).
  */
+function decorateOwedItem(item, commits, ackBook) {
+  if (item.class !== CLASSES.supervisor) return;
+  item.fixedBy = item.incidentId ? linkFix(item, commits) : null; item.status = item.fixedBy ? 'fixed-by' : 'open';
+  item.action = actionOf(item); const ack = ackBook.get(item.key);
+  if (ack && ackHolds(item, ack)) { item.acked = ack; item.status = 'acked'; }
+  else if (ack) item.ackReopened = { at: ack.at, commits: ack.commits };
+  item.line = owedLine(item);
+}
+
 export function owedFindings(db, { repo = null, ledgers = [], now = Date.now(), wanted = new Set(), graceMs = GATE_GRACE_MS, root = SKILL_ROOT,
   commitsOf = (since) => gitCommits({ root, since, now }), staleOf = staleInputs, patterns = true, acks = undefined,
   stallMinutes = undefined, verdicts = null, frontierOf = undefined } = {}) {
@@ -604,16 +613,7 @@ export function owedFindings(db, { repo = null, ledgers = [], now = Date.now(), 
   const items = [...incidents.map((i) => ({ ...i, key: i.key ?? `incident:${i.workflowId}:${i.incidentId}` })), ...found];
   let ackBook = acks instanceof Map ? acks : null;
   if (!ackBook) { try { ackBook = readOwedAcks(); } catch { ackBook = new Map(); } }
-  for (const i of items) {
-    if (i.class !== CLASSES.supervisor) continue;
-    i.fixedBy = i.incidentId ? linkFix(i, commits) : null;
-    i.status = i.fixedBy ? 'fixed-by' : 'open';
-    i.action = actionOf(i);
-    const ack = ackBook.get(i.key);
-    if (ack && ackHolds(i, ack)) { i.acked = ack; i.status = 'acked'; }
-    else if (ack) i.ackReopened = { at: ack.at, commits: ack.commits };
-    i.line = owedLine(i);
-  }
+  for (const i of items) decorateOwedItem(i, commits, ackBook);
   return { items, owed: items.filter((i) => i.class === CLASSES.supervisor && !i.acked) };
 }
 
@@ -697,7 +697,7 @@ function main() {
   result.counts.acked = result.items.filter((i) => i.acked).length;
   if (has('json')) { console.log(JSON.stringify(has('all') ? result : { ...result, items: owed })); return; }
   console.log(`[owed] ${result.repos.length} ledger(s): ${owed.length} owed (${result.counts.fixedBy} likely fixed), ${Object.entries(result.counts).filter(([k]) => k !== CLASSES.supervisor && k !== 'fixedBy').map(([k, n]) => k + ' ' + n).join(', ')}`);
-  for (const i of owed) console.log('  ' + i.line + (i.fixedBy ? ' <- ' + i.fixedBy.how + (i.fixedBy.tokens ? ' (' + i.fixedBy.tokens.join(', ') + ')' : '') + ' "' + i.fixedBy.subject + '"' : ''));
+  for (const i of owed) console.log('  ' + i.line + fixedByTextOf(i.fixedBy));
   if (has('all')) {
     for (const i of result.items.filter((x) => x.acked)) console.log(`  ACKED ${i.workflowId} ${i.key} at ${new Date(i.acked.at).toISOString()} (${(i.acked.commits ?? []).map((c) => String(c).slice(0, 9)).join(', ')}): ${i.acked.reason}`);
     for (const i of result.items.filter((x) => x.class !== CLASSES.supervisor)) console.log(`  ${i.class.toUpperCase()} ${i.workflowId} ${i.incidentId ?? i.key} [${i.kind ?? '-'}] age=${i.ageMin}m: ${i.reason}`);
