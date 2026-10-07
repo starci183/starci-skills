@@ -34,7 +34,7 @@ import path from 'node:path';
 import { execCapture } from '../api/process/exec-capture.mjs'; import { runPowershell } from '../api/process/run-powershell.mjs'; import { schtasks } from '../api/process/schtasks.mjs';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { openMachine } from '../../engine/db/machine.mjs'; import { runNode } from '../api/node/run-node.mjs';
+import { openMachine } from '../../engine/db/machine.mjs'; import { runNode } from '../api/node/run-node.mjs'; import { serviceScript } from './service-scripts.mjs';
 import { allocationSettings, loadConfig } from '../../engine/config.mjs'; import { isMain } from '../lib/is-main.mjs';
 import { archiveRoot as archiveRootOf } from '../machine/home.mjs';
 import { httpUp } from '../api/http/http-up.mjs';
@@ -171,8 +171,8 @@ export async function probeOrcaAsync({ timeoutMs, run = runChild } = {}) {
 }
 
 /** A connector's internal status probe answers running (and, for the tunnel, no health problems). */
-async function connectorUp(script, { timeoutMs, tries = 1, run = runChild, extraArgs = [], judge = (v) => v?.running === true } = {}) {
-  const [cmd, args] = node(`scripts/connectors/${script}`, ['status', ...extraArgs]);
+async function connectorUp(service, { timeoutMs, tries = 1, run = runChild, extraArgs = [], judge = (v) => v?.running === true } = {}) {
+  const [cmd, args] = node(serviceScript(service), ['status', ...extraArgs]);
   let last = null;
   for (let i = 1; i <= Math.max(1, tries); i += 1) {
     const r = await run(cmd, args, { timeoutMs });
@@ -228,15 +228,15 @@ export function serviceRegistry({ settings = hostSettings(), ports = servicePort
       if (!ports.harnessPublicUrl || portProblem()) return false;
       return (await http(`${ports.harnessPublicUrl}${s['harness-tunnel'].probePath ?? '/healthz'}`, { timeoutMs: s['harness-tunnel'].aliveTimeoutMs ?? 45_000, health: true })).ok === true;
     } }),
-    entry('ask-gateway', { ownerPath: true, probe: () => connectorUp('ask-gateway.mjs', { timeoutMs: s['ask-gateway'].probeTimeoutMs, tries: s['ask-gateway'].probeTries ?? 1, run,
+    entry('ask-gateway', { ownerPath: true, probe: () => connectorUp('ask-gateway', { timeoutMs: s['ask-gateway'].probeTimeoutMs, tries: s['ask-gateway'].probeTries ?? 1, run,
       judge: (v) => v.running === true && (ports.gatewayPort == null || v.port == null || Number(v.port) === ports.gatewayPort) }),
     // The gateway answers 404 for anything but a form: any HTTP answer on its port is a live gateway.
     answers: async () => (ports.gatewayPort ? (await http(`http://127.0.0.1:${ports.gatewayPort}/`, { timeoutMs: s['ask-gateway'].aliveTimeoutMs ?? 30_000 })).status != null : false) }),
-    entry('ask-tunnel', { ownerPath: true, probe: () => connectorUp('tunnel.mjs', { timeoutMs: s['ask-tunnel'].probeTimeoutMs, tries: s['ask-tunnel'].probeTries ?? 1, run, extraArgs: ['--fast'],
+    entry('ask-tunnel', { ownerPath: true, probe: () => connectorUp('ask-tunnel', { timeoutMs: s['ask-tunnel'].probeTimeoutMs, tries: s['ask-tunnel'].probeTries ?? 1, run, extraArgs: ['--fast'],
       judge: (v) => v.running === true && !(v.health?.problems ?? []).length }) }),
     // The bridge long-polls: its offset advances only when an update arrives, so liveness is the recorded pid
     // alive (status.running); the offset is kept in the probe detail for the digest.
-    entry('telegram-bridge', { ownerPath: true, probe: () => connectorUp('telegram-bridge.mjs', { timeoutMs: s['telegram-bridge'].probeTimeoutMs, tries: s['telegram-bridge'].probeTries ?? 1, run }) }),
+    entry('telegram-bridge', { ownerPath: true, probe: () => connectorUp('telegram-bridge', { timeoutMs: s['telegram-bridge'].probeTimeoutMs, tries: s['telegram-bridge'].probeTries ?? 1, run }) }),
     entry(`sched-task:${RECONCILER_TASK}`, { restart: settings.allowTaskRepair,
       probe: async () => {
         const t = await taskState(RECONCILER_TASK, { timeoutMs: s[`sched-task:${RECONCILER_TASK}`].probeTimeoutMs, run, platform });
@@ -427,8 +427,8 @@ export function orcaRestartScript({ app, closeWaitMs }) {
   ].join('\n');
 }
 
-const connectorStart = (script, env) => {
-  const r = runNode([path.join(SKILL_ROOT, 'scripts', 'connectors', script), 'start'], { timeout: 120_000, cwd: SKILL_ROOT, env });
+const connectorStart = (service, env) => {
+  const r = runNode([path.join(SKILL_ROOT, serviceScript(service)), 'start'], { timeout: 120_000, cwd: SKILL_ROOT, env });
   return { ok: r.status === 0, answer: lastJson(r.stdout), stderr: String(r.stderr ?? '').trim().slice(0, 300) };
 };
 
@@ -457,9 +457,9 @@ export async function startService(name, { settings = hostSettings(), ports = se
       const r = tasks(['/Run', '/TN', task]);
       return { ok: r.status === 0, task, output: String(r.stdout || r.stderr || '').trim().slice(0, 300) };
     }
-    case 'ask-gateway': return connectorStart('ask-gateway.mjs', clean);
-    case 'ask-tunnel': return connectorStart('tunnel.mjs', clean);
-    case 'telegram-bridge': return connectorStart('telegram-bridge.mjs', clean);
+    case 'ask-gateway': return connectorStart('ask-gateway', clean);
+    case 'ask-tunnel': return connectorStart('ask-tunnel', clean);
+    case 'telegram-bridge': return connectorStart('telegram-bridge', clean);
     default: return { ok: false, error: `no actuator for ${name}` };
   }
 }
