@@ -43,13 +43,21 @@ function ledgerDb({ workflows = [], jobs = [], ledgerId = SHOP_BE_REAL_ID } = {}
   return db;
 }
 
-function hostCtx({ mode = 'shadow', now = T0, ledgers, dbs, runAnswer = null } = {}) {
+// The machine registry (machine.sqlite ledgers, engine/db/machine.mjs resolveLedger by name or repoRoot). By default
+// every ctx.ledgers entry is registered under its label with SHOP_BE_REAL_ID at its own file.
+function registryOf(rows) {
+  return { resolveLedger: ({ name = null, repoRoot = null } = {}) => rows.find((r) => (name && r.name === name) || (repoRoot && r.repoRoot === repoRoot)) ?? null };
+}
+
+function hostCtx({ mode = 'shadow', now = T0, ledgers, dbs, runAnswer = null, registry } = {}) {
   const calls = { run: [], api: [], clock: [], clear: [], decisions: [], log: [] };
   let t = now;
+  const list = ledgers ?? [{ ledgerId: 'shop-be', repo: fixtureRepo('shop-be'), file: fixtureLedger('shop-be') }];
+  const rows = registry ?? list.filter((l) => l.file).map((l) => ({ ledgerId: SHOP_BE_REAL_ID, name: l.ledgerId, repoRoot: l.repo, file: l.file }));
   const ctx = fakeCtx({
-    mode, calls,
+    mode, calls, machine: registryOf(rows),
     now: () => t, advance: (ms) => { t += ms; },
-    ledgers: ledgers ?? [{ ledgerId: 'shop-be', repo: fixtureRepo('shop-be'), file: fixtureLedger('shop-be') }],
+    ledgers: list,
     read: (id, fn) => fn(dbs[id]),
     run: async (cmd, args, o) => { calls.run.push({ cmd, args, o }); return mode === 'shadow' ? { ok: true, shadow: true } : (runAnswer?.(cmd, args) ?? { ok: true, stdout: '{}' }); },
     api: async (id, verb, argv) => { calls.api.push({ id, verb, argv }); return { ok: true, shadow: mode === 'shadow' }; },
@@ -366,6 +374,69 @@ test('the backup binds meta.ledger_id (never the basename label) and a failed on
   ctx.advance(60_000);
   await c.reconcile('ledger:shop-be', ctx);
   assert.equal(ctx.calls.run.filter((x) => x.args[0] === 'scripts/reconciler/ledger-health.mjs').length, 2, 'a verified snapshot suppresses the rest of the day');
+});
+
+test('the backup identity comes from the machine registry: a label that is not the meta UUID binds the registered UUID', async () => {
+  const ledgers = [{ ledgerId: 'nivo-monorepo', repo: fixtureRepo('nivo'), file: fixtureLedger('nivo') }];
+  const registry = [{ ledgerId: SHOP_BE_REAL_ID, name: 'nivo-monorepo', repoRoot: fixtureRepo('nivo'), file: fixtureLedger('nivo') }];
+  const store = memoryStore(), c = controller({ store: () => store, backupDue: () => true });
+  const ctx = hostCtx({ mode: 'active', ledgers, registry, dbs: { 'nivo-monorepo': ledgerDb() },
+    runAnswer: () => ({ ok: true, stdout: JSON.stringify({ ok: true, verified: true, ledgerId: SHOP_BE_REAL_ID }) }) });
+  const r = await c.reconcile('ledger:nivo-monorepo', ctx);
+  assert.equal(r.backup, true);
+  const backups = ctx.calls.run.filter((x) => x.args[0] === 'scripts/reconciler/ledger-health.mjs');
+  assert.deepEqual(backups[0].args, ['scripts/reconciler/ledger-health.mjs', '--backup', '--ledger-id', SHOP_BE_REAL_ID, '--file', fixtureLedger('nivo'), '--json']);
+  assert.equal(store.get('ledger:nivo-monorepo').lastBackup.ledgerId, SHOP_BE_REAL_ID);
+  assert.equal(ctx.calls.decisions.length, 0);
+});
+
+test('a registry row whose UUID differs from the file meta refuses the backup and opens one identity-mismatch Supervisor DI', async () => {
+  const ledgers = [{ ledgerId: 'nivo-monorepo', repo: fixtureRepo('nivo'), file: fixtureLedger('nivo') }];
+  const registry = [{ ledgerId: '00000000-1111-4222-8333-444444444444', name: 'nivo-monorepo', repoRoot: fixtureRepo('nivo'), file: fixtureLedger('nivo') }];
+  const store = memoryStore(), c = controller({ store: () => store, backupDue: () => true });
+  const ctx = hostCtx({ mode: 'active', ledgers, registry, dbs: { 'nivo-monorepo': ledgerDb() },
+    runAnswer: () => ({ ok: true, stdout: JSON.stringify({ ok: true, verified: true, ledgerId: SHOP_BE_REAL_ID }) }) });
+  const r = await c.reconcile('ledger:nivo-monorepo', ctx);
+  assert.equal(r.backup, false);
+  assert.equal(r.identity.reason, 'identity-mismatch');
+  assert.equal(ctx.calls.run.length, 0, 'a wrong file at a registered path is never snapshotted as that ledger');
+  assert.ok(ctx.calls.log.some((x) => x.kind === 'reconciler.host.ledger-identity' && x.data.reason === 'identity-mismatch'));
+  assert.equal(ctx.calls.decisions.length, 1);
+  assert.equal(ctx.calls.decisions[0].kind, 'runtime-defect');
+  assert.equal(ctx.calls.decisions[0].ledger, 'supervisor');
+  assert.equal(ctx.calls.decisions[0].productLedger, 'nivo-monorepo');
+  assert.ok(ctx.calls.decisions[0].summary.includes('identity-mismatch'));
+  ctx.advance(60_000);
+  await c.reconcile('ledger:nivo-monorepo', ctx);
+  assert.equal(ctx.calls.run.length, 0);
+  assert.equal(ctx.calls.decisions.length, 1, 'the DI opens once, on the edge');
+  registry[0].file = fixtureLedger('elsewhere');
+  ctx.advance(60_000);
+  const moved = await c.reconcile('ledger:nivo-monorepo', ctx);
+  assert.equal(moved.identity.reason, 'registry-file-mismatch', 'a row registering another file is no expectation for this one');
+  assert.equal(ctx.calls.run.length, 0);
+});
+
+test('a ledger with no registry row is never backed up: a typed log row and one unregistered Supervisor DI', async () => {
+  const ledgers = [{ ledgerId: 'nivo-monorepo', repo: fixtureRepo('nivo'), file: fixtureLedger('nivo') }];
+  const store = memoryStore(), c = controller({ store: () => store, backupDue: () => true });
+  const ctx = hostCtx({ mode: 'active', ledgers, registry: [], dbs: { 'nivo-monorepo': ledgerDb() },
+    runAnswer: () => ({ ok: true, stdout: JSON.stringify({ ok: true, verified: true, ledgerId: SHOP_BE_REAL_ID }) }) });
+  const r = await c.reconcile('ledger:nivo-monorepo', ctx);
+  assert.equal(r.backup, false);
+  assert.equal(ctx.calls.run.length, 0, 'the file meta alone is never the expected identity');
+  assert.ok(ctx.calls.log.some((x) => x.kind === 'reconciler.host.ledger-identity' && x.data.reason === 'unregistered'));
+  assert.equal(ctx.calls.decisions.length, 1);
+  assert.equal(ctx.calls.decisions[0].ledger, 'supervisor');
+  assert.equal(ctx.calls.decisions[0].productLedger, 'nivo-monorepo');
+  ctx.advance(60_000);
+  await c.reconcile('ledger:nivo-monorepo', ctx);
+  assert.equal(ctx.calls.decisions.length, 1, 'the DI opens once, on the edge');
+  const bare = hostCtx({ mode: 'active', ledgers, registry: [], dbs: { 'nivo-monorepo': ledgerDb() } });
+  delete bare.machine;
+  const none = await controller({ store: () => memoryStore(), backupDue: () => true }).reconcile('ledger:nivo-monorepo', bare);
+  assert.equal(none.identity.reason, 'registry-unavailable', 'no registry handle is a refusal, never a silent null');
+  assert.equal(bare.calls.run.length, 0);
 });
 
 test('the supervisor seat runs its watchdog pass through ctx.run; chat mode runs nothing', async () => {
