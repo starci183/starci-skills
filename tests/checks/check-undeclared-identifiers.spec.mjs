@@ -88,6 +88,19 @@ test('browser globals are known only inside a function that runs in a page', () 
   ].join('\n')), ['document', 'window']);
 });
 
+test('the functions a module assembles into a page script run in the page', () => {
+  assert.deepEqual(namesIn([
+    'export function measureInPage(page, arg) {',
+    '  return page.evaluate(pageScript(measure, [visible, tagOf]), arg);',
+    '}',
+    'function measure(arg) { return tagOf(document.body) + visible(arg); }',
+    'function visible(el) { return getComputedStyle(el).display; }',
+    'function tagOf(el) { return el.tagName + innerWidth; }',
+    'function node(el) { return document.title; }',
+    'function pageScript(entry, functions, arg) { return `${entry.name}${functions.length}${arg}`; }',
+  ].join('\n')), ['document']);
+});
+
 test('a function a module passes to page.evaluate through an import and a re-export runs in the page', (t) => {
   const root = mkdtemp(t, 'starci-undeclared-ids-');
   const write = (rel, text) => { fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true }); fs.writeFileSync(path.join(root, rel), text); };
