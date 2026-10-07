@@ -140,11 +140,11 @@ const scratchNote = tr("the op's scratch directory (starci-job-scratch) is delet
 // A trailing " [code-tag]" stripped off a line without a backtracking regex.
 const stripTrailTag = (text) => {
   const s = String(text);
-  const end = s.replace(/\s+$/, '');
+  const end = s.trimEnd();
   if (!end.endsWith(']')) return s;
   const open = end.lastIndexOf('[');
   if (open < 0 || !/^[A-Z][A-Z0-9_]+$/.test(end.slice(open + 1, -1))) return s;
-  return end.slice(0, open).replace(/\s+$/, '');
+  return end.slice(0, open).trimEnd();
 };
 
 /** The one-line human reading of a red check: its first refused line without absolute paths, else its evidence. */
@@ -292,12 +292,14 @@ const saidOf = (outcome) => {
   return tr('The runtime scored it failed (the op reported {outcome})', { outcome: outcome ?? tr('unknown') });
 };
 
+const failureClassCodes = (failureClass) => failureClass?.class ? [`failure-class:${failureClass.class}`] : [];
+
 const scoredWhy = ({ rep, outcome, red, detail, primary, next, codes, settle, done }) => {
   const redNote = red ? tr('; check {name} is red{tag}', { name: red.name, tag: primary ? ` (${primary})` : '' }) : '';
   const headline = `${saidOf(outcome)}${redNote}: ${clip(shortPaths(rep.summary ?? detail ?? ''), 200)}`.replace(/: $/, '.');
   const classNote = settle.failureClass?.reason ? tr('Class: {class} — {reason}', { class: settle.failureClass.class, reason: clip(settle.failureClass.reason, 160) }) : null;
   const cause = [detailClause(detail), primary ? catalogLine(primary, catalog) : null, classNote].filter(Boolean).join(' ') || tr('The runtime found no passing check for this run.');
-  const codeList = codes.length ? codes : (settle.failureClass?.class ? [`failure-class:${settle.failureClass.class}`] : []);
+  const codeList = codes.length ? codes : failureClassCodes(settle.failureClass);
   return done('failed', { headline, cause, next: next.text, owner: next.owner, codes: codeList });
 };
 

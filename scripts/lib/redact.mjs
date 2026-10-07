@@ -50,6 +50,20 @@ const envName = (name) => String(name).replace(/[^A-Za-z0-9]+/g, '_').replace(/^
 const readSafe = (file) => { try { return fs.readFileSync(file, 'utf8'); } catch { return null; } };
 const listSafe = (dir) => { try { return fs.readdirSync(dir, { withFileTypes: true }); } catch { return []; } };
 
+function learnStackDirectory(root, stackDir, entry) {
+  const dir = path.join(root, stackDir, entry.name);
+  const text = readSafe(path.join(dir, 'stack.yaml'));
+  let doc = null;
+  try { doc = text ? parseYaml(text) : null; } catch { doc = null; }
+  const secrets = doc && typeof doc.secrets === 'object' && doc.secrets ? doc.secrets : {};
+  for (const [name, spec] of Object.entries(secrets)) {
+    secretNames.add(envName(name));
+    if (spec && typeof spec.file === 'string') addSecretValue(readSafe(path.resolve(dir, spec.file)));
+  }
+  // Plaintext runtime copies of the secrets (git-ignored): their values are secrets too.
+  for (const file of listSafe(path.join(dir, 'runtime', 'files'))) if (file.isFile()) addSecretValue(readSafe(path.join(dir, 'runtime', 'files', file.name)));
+}
+
 /** A value this process must never write out (a secret it resolved itself). Values under 6 chars are ignored. */
 function addSecretValue(value) {
   const v = typeof value === 'string' ? value.trim() : '';
@@ -63,17 +77,7 @@ export function learnStackSecrets(repoRoot) {
   for (const stackDir of STACK_DIRS) {
     for (const entry of listSafe(path.join(root, stackDir))) {
       if (!entry.isDirectory()) continue;
-      const dir = path.join(root, stackDir, entry.name);
-      const text = readSafe(path.join(dir, 'stack.yaml'));
-      let doc = null;
-      try { doc = text ? parseYaml(text) : null; } catch { doc = null; }
-      const secrets = doc && typeof doc.secrets === 'object' && doc.secrets ? doc.secrets : {};
-      for (const [name, spec] of Object.entries(secrets)) {
-        secretNames.add(envName(name));
-        if (spec && typeof spec.file === 'string') addSecretValue(readSafe(path.resolve(dir, spec.file)));
-      }
-      // Plaintext runtime copies of the secrets (git-ignored): their values are secrets too.
-      for (const file of listSafe(path.join(dir, 'runtime', 'files'))) if (file.isFile()) addSecretValue(readSafe(path.join(dir, 'runtime', 'files', file.name)));
+      learnStackDirectory(root, stackDir, entry);
     }
   }
 }

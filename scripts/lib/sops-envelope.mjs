@@ -63,55 +63,97 @@ export function isSopsEnvelope(text) {
 }
 
 /** Admit one flat age envelope for the native selected-identity invocation; this is shape admission, never cryptographic proof. */
-export function selectedAgeEnvelope(text, format, recipient) {
-  const refuse = reason => ({ ok: false, reason });
-  if (!['binary', 'json', 'yaml', 'dotenv'].includes(format)) return refuse('unsupported-format');
-  let meta;
+const refusal = (reason) => ({ ok: false, reason });
+
+function dotenvMetadataValue(meta, age, key, value) {
+  if (key === 'age__list_0__map_recipient') age.recipient = value;
+  else if (key === 'age__list_0__map_enc') age.enc = value;
+  else if (key === 'mac_only_encrypted') {
+    if (value !== 'false') return 'partial-mac';
+    meta[key] = false;
+  } else if (key.includes('__')) return 'unsupported-key-group';
+  else meta[key] = value;
+  return null;
+}
+
+function readDotenvMetadata(text) {
+  const pairs = new Map();
+  for (const line of String(text).split('\n')) {
+    if (!line || line.startsWith('#')) continue;
+    if (line.includes('\r')) return { refusal: 'unsupported-dotenv' };
+    const at = line.indexOf('=');
+    if (at < 1) return { refusal: 'unsupported-dotenv' };
+    const name = line.slice(0, at);
+    if (pairs.has(name)) return { refusal: 'duplicate-key' };
+    pairs.set(name, line.slice(at + 1).replaceAll(String.raw`\n`, '\n'));
+  }
+  const meta = {};
+  const age = {};
+  for (const [name, value] of pairs) {
+    if (!name.startsWith('sops_')) continue;
+    const reason = dotenvMetadataValue(meta, age, name.slice('sops_'.length), value);
+    if (reason) return { refusal: reason };
+  }
+  meta.age = [age];
+  return { meta };
+}
+
+function readStructuredMetadata(text, format) {
+  const doc = parseYaml(String(text));
+  if (format !== 'yaml') JSON.parse(String(text));
+  if (format === 'binary' && (!doc || Object.keys(doc).length !== 2 || !Object.hasOwn(doc, 'data') || !Object.hasOwn(doc, 'sops') || typeof doc.data !== 'string'))
+    return { refusal: 'unsupported-binary-shape' };
+  return { meta: doc?.sops };
+}
+
+function readAgeMetadata(text, format) {
   try {
-    if (format === 'dotenv') {
-      const pairs = new Map();
-      for (const line of String(text).split('\n')) {
-        if (!line || line.startsWith('#')) continue;
-        if (line.includes('\r')) return refuse('unsupported-dotenv');
-        const at = line.indexOf('=');
-        if (at < 1) return refuse('unsupported-dotenv');
-        const name = line.slice(0, at);
-        if (pairs.has(name)) return refuse('duplicate-key');
-        pairs.set(name, line.slice(at + 1).replaceAll('\\n', '\n'));
-      }
-      meta = {};
-      const age = {};
-      for (const [name, value] of pairs) {
-        if (!name.startsWith('sops_')) continue;
-        const key = name.slice('sops_'.length);
-        if (key === 'age__list_0__map_recipient') age.recipient = value;
-        else if (key === 'age__list_0__map_enc') age.enc = value;
-        else if (key === 'mac_only_encrypted') {
-          if (value !== 'false') return refuse('partial-mac');
-          meta[key] = false;
-        } else if (key.includes('__')) return refuse('unsupported-key-group');
-        else meta[key] = value;
-      }
-      meta.age = [age];
-    } else {
-      const doc = parseYaml(String(text));
-      if (format !== 'yaml') JSON.parse(String(text));
-      if (format === 'binary' && (!doc || Object.keys(doc).length !== 2 || !Object.hasOwn(doc, 'data') || !Object.hasOwn(doc, 'sops') || typeof doc.data !== 'string')) return refuse('unsupported-binary-shape');
-      meta = doc?.sops;
-    }
-  } catch { return refuse('invalid-envelope'); }
-  if (!meta || typeof meta !== 'object' || Array.isArray(meta) || !isSopsEnvelope(text)) return refuse('invalid-envelope');
-  if (Object.hasOwn(meta, 'key_groups') || Object.hasOwn(meta, 'shamir_threshold')) return refuse('unsupported-key-group');
+    return format === 'dotenv' ? readDotenvMetadata(text) : readStructuredMetadata(text, format);
+  } catch { return { refusal: 'invalid-envelope' }; }
+}
+
+function hasNonAgeProvider(meta, providers) {
+  for (const name of providers) {
+    if (Object.hasOwn(meta, name) && (!Array.isArray(meta[name]) || meta[name].length)) return true;
+  }
+  return false;
+}
+
+function isAgeEntry(entry) {
+  return !!entry && typeof entry === 'object' && !Array.isArray(entry)
+    && !Object.keys(entry).some(name => !['recipient', 'enc'].includes(name));
+}
+
+function hasValidAgePayload(entry) {
+  return typeof entry.enc === 'string' && entry.enc.startsWith('-----BEGIN AGE ENCRYPTED FILE-----\n')
+    && entry.enc.includes('\n-----END AGE ENCRYPTED FILE-----');
+}
+
+function hasValidEnvelopeVersion(meta) {
+  return typeof meta.version === 'string' && /^\d+\.\d+\.\d+$/.test(meta.version)
+    && typeof meta.lastmodified === 'string' && Number.isFinite(Date.parse(meta.lastmodified));
+}
+
+function validateAgeMetadata(meta, text, recipient) {
+  if (!meta || typeof meta !== 'object' || Array.isArray(meta) || !isSopsEnvelope(text)) return refusal('invalid-envelope');
+  if (Object.hasOwn(meta, 'key_groups') || Object.hasOwn(meta, 'shamir_threshold')) return refusal('unsupported-key-group');
   const providers = ['kms', 'gcp_kms', 'hckms', 'azure_kv', 'hc_vault', 'pgp'];
-  for (const name of providers) if (Object.hasOwn(meta, name) && (!Array.isArray(meta[name]) || meta[name].length)) return refuse('non-age-provider');
+  if (hasNonAgeProvider(meta, providers)) return refusal('non-age-provider');
   const fields = new Set([...providers, 'age', 'lastmodified', 'mac', 'version', 'unencrypted_suffix', 'encrypted_suffix', 'unencrypted_regex', 'encrypted_regex', 'unencrypted_comment_regex', 'encrypted_comment_regex', 'mac_only_encrypted']);
-  if (Object.keys(meta).some(name => !fields.has(name))) return refuse('unknown-metadata');
-  if (Object.hasOwn(meta, 'mac_only_encrypted') && meta.mac_only_encrypted !== false) return refuse('partial-mac');
-  if (!Array.isArray(meta.age) || meta.age.length !== 1) return refuse('unsupported-age-set');
+  if (Object.keys(meta).some(name => !fields.has(name))) return refusal('unknown-metadata');
+  if (Object.hasOwn(meta, 'mac_only_encrypted') && meta.mac_only_encrypted !== false) return refusal('partial-mac');
+  if (!Array.isArray(meta.age) || meta.age.length !== 1) return refusal('unsupported-age-set');
   const entry = meta.age[0];
-  if (!entry || typeof entry !== 'object' || Array.isArray(entry) || Object.keys(entry).some(name => !['recipient', 'enc'].includes(name))) return refuse('invalid-age-entry');
-  if (typeof entry.recipient !== 'string' || entry.recipient !== recipient) return refuse('recipient-mismatch');
-  if (typeof entry.enc !== 'string' || !entry.enc.startsWith('-----BEGIN AGE ENCRYPTED FILE-----\n') || !entry.enc.includes('\n-----END AGE ENCRYPTED FILE-----')) return refuse('invalid-age-entry');
-  if (typeof meta.version !== 'string' || !/^\d+\.\d+\.\d+$/.test(meta.version) || typeof meta.lastmodified !== 'string' || !Number.isFinite(Date.parse(meta.lastmodified))) return refuse('invalid-envelope');
+  if (!isAgeEntry(entry)) return refusal('invalid-age-entry');
+  if (typeof entry.recipient !== 'string' || entry.recipient !== recipient) return refusal('recipient-mismatch');
+  if (!hasValidAgePayload(entry)) return refusal('invalid-age-entry');
+  if (!hasValidEnvelopeVersion(meta)) return refusal('invalid-envelope');
   return { ok: true };
+}
+
+export function selectedAgeEnvelope(text, format, recipient) {
+  if (!['binary', 'json', 'yaml', 'dotenv'].includes(format)) return refusal('unsupported-format');
+  const parsed = readAgeMetadata(text, format);
+  if (parsed.refusal) return refusal(parsed.refusal);
+  return validateAgeMetadata(parsed.meta, text, recipient);
 }

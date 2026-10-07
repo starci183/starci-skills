@@ -75,7 +75,7 @@ const SHA = /^[0-9a-f]{40,64}$/;
 /* ------------------------------------------------------------ plumbing */
 
 /** The per-repository land lock: one workflow lands into a repository's main at a time. */
-const landLockName = (repoRoot) => `product-land-${crypto.createHash('sha1').update(String(path.resolve(repoRoot)).replaceAll(/\\/g, '/').toLowerCase()).digest('hex').slice(0, 10)}`;
+const landLockName = (repoRoot) => `product-land-${crypto.createHash('sha1').update(String(path.resolve(repoRoot)).replaceAll('\\', '/').toLowerCase()).digest('hex').slice(0, 10)}`;
 
 const fail = ({ code }, message) => Object.assign(new Error(message), { code });
 /** One git call (a scripts/api/git call file) in `cwd`: {ok, status, stdout, stderr}. */

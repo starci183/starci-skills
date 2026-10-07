@@ -79,29 +79,56 @@ export function loadExampleCatalog(root, { file = EXAMPLE_CATALOG_FILE } = {}) {
   const schema = parseYaml(fs.readFileSync(referenceFile(root, 'modules/schemas/code-example-catalog.schema.yaml'), 'utf8'));
   const errors = validateAgainstSchema(catalog, schema);
   if (errors.length) throw new Error(`invalid example catalog: ${errors.join('; ')}`);
+  assertUniqueExampleIds(catalog.examples);
+  for (const row of catalog.examples) assertExampleRow(root, row);
+  return catalog;
+}
+
+function assertUniqueExampleIds(examples) {
   const ids = new Set();
-  for (const row of catalog.examples) {
+  for (const row of examples) {
     if (ids.has(row.id)) throw new Error(`duplicate example id: ${row.id}`);
     ids.add(row.id);
   }
-  for (const row of catalog.examples) {
-    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(row.path)) throw new Error(`invalid example app: ${row.path}`);
-    const app = path.join(root, EXAMPLES_ROOT, row.path);
-    const declaration = JSON.parse(fs.readFileSync(referenceFile(root, `${EXAMPLES_ROOT}/${row.path}/hfs.json`), 'utf8'));
-    if (declaration.kind !== 'app') throw new Error(`example has no HFS app declaration: ${row.id}`);
-    if (!row.files.includes(row.entrypoint) || !/\.tsx?$/.test(row.entrypoint)) throw new Error(`example entrypoint is not a listed source: ${row.id}`);
-    if (new Set(row.relatedRules).size !== row.relatedRules.length) throw new Error(`duplicate example relatedRules: ${row.id}`);
-    for (const key of ['files', 'projects', 'tests']) {
-      if (new Set(row[key]).size !== row[key].length) throw new Error(`duplicate example ${key}: ${row.id}`);
-      for (const relative of row[key]) {
-        if (relative.split('/').some((part) => ['node_modules', 'dist', '.next', '_derived', '.git'].includes(part)))
-          throw new Error(`derived or installed example input: ${relative}`);
-        referenceFile(app, relative);
-      }
-    }
-    if (row.files.some((relative) => !/\.(?:tsx?|json)$/.test(relative))) throw new Error(`unsupported example source: ${row.id}`);
-  }
-  return catalog;
+}
+
+function assertExampleRow(root, row) {
+  const app = exampleAppRoot(root, row);
+  assertExampleEntrypoint(row);
+  assertUniqueRowValues(row, 'relatedRules');
+  for (const key of ['files', 'projects', 'tests']) assertExampleInputs(app, row, key);
+  assertSupportedExampleSources(row);
+}
+
+function exampleAppRoot(root, row) {
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(row.path)) throw new Error(`invalid example app: ${row.path}`);
+  const app = path.join(root, EXAMPLES_ROOT, row.path);
+  const declaration = JSON.parse(fs.readFileSync(referenceFile(root, `${EXAMPLES_ROOT}/${row.path}/hfs.json`), 'utf8'));
+  if (declaration.kind !== 'app') throw new Error(`example has no HFS app declaration: ${row.id}`);
+  return app;
+}
+
+function assertExampleEntrypoint(row) {
+  if (!row.files.includes(row.entrypoint) || !/\.tsx?$/.test(row.entrypoint)) throw new Error(`example entrypoint is not a listed source: ${row.id}`);
+}
+
+function assertUniqueRowValues(row, key) {
+  if (new Set(row[key]).size !== row[key].length) throw new Error(`duplicate example ${key}: ${row.id}`);
+}
+
+function assertExampleInputs(app, row, key) {
+  assertUniqueRowValues(row, key);
+  for (const relative of row[key]) assertAuthoredExampleInput(app, relative);
+}
+
+function assertAuthoredExampleInput(app, relative) {
+  if (relative.split('/').some((part) => ['node_modules', 'dist', '.next', '_derived', '.git'].includes(part)))
+    throw new Error(`derived or installed example input: ${relative}`);
+  referenceFile(app, relative);
+}
+
+function assertSupportedExampleSources(row) {
+  if (row.files.some((relative) => !/\.(?:tsx?|json)$/.test(relative))) throw new Error(`unsupported example source: ${row.id}`);
 }
 
 /** Source, compiler and test inputs of selected stable IDs, relative to the runtime.
