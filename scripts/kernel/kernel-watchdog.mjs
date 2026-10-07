@@ -43,6 +43,7 @@ import { openDecisionRow } from '../machine/decisions.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { arg as argvValue } from '../lib/cli-arg.mjs';
 import { createKernelTick } from './kernel-watchdog-tick.mjs';
+import { workflowSender } from './workflow-startup.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const apiFile = path.join(skillRoot, 'scripts', 'kernel', 'cli.mjs');
@@ -271,10 +272,16 @@ const escalateIdleStall = ({ phase, terminal, idle, outputAgeMs }) => {
 // replacement is recorded only once its terminal closed.
 const closeFailed = (base, terminalClosed, what) => ({ ...base, terminalClosed, ok: false, action: 'kernel-terminal-close-failed',
   error: terminalClosed.error ?? `the ${what} kernel terminal could not be closed` });
+// A replacement that cannot launch must not close the seat it replaces: the unattended start needs a sender terminal
+// (workflowSender), and a live Kernel left in place is better than a vacant seat no restart can fill.
+const launchableSender = () => withKernelLedger((ledger) => workflowSender({ env: process.env, launchedBy: 'watchdog', ledger, workflowId }))
+  ?? { ok: false, reason: 'workflow-sender-terminal-missing', error: 'the ledger could not be read to prove the replacement launchable' };
 export const replaceIdleKernel = ({ phase, terminal, dispatch = null, stale, outputAgeMs, idle }, deps = {}) => {
   const close = deps.closeKernelTerminal ?? closeKernelTerminal;
   const openLedger = deps.withKernelLedger ?? withKernelLedger;
   const replace = deps.replaceKernel ?? replaceKernel;
+  const sender = (deps.launchableSender ?? launchableSender)();
+  if (!sender.ok) return { ok: true, workflowId, phase, terminal, ...stale, outputAgeMs, idle, action: 'replacement-unlaunchable', reason: sender.reason, error: sender.error };
   const terminalClosed = close(terminal, dispatch);
   if (!terminalClosed.ok) return closeFailed({ workflowId, phase, terminal, ...stale, outputAgeMs, idle }, terminalClosed, 'idle');
   openLedger((ledger) => ledger.transaction(() => ledger.appendEvent({ workflowId, entityType: 'kernel', entityId: workflowId, kind: KERNEL_IDLE_REPLACED_EVENT, payload: { terminal, wakes: idle.wakes } })));
