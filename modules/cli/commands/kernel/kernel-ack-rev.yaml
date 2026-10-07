@@ -40,10 +40,10 @@ editions:
   - full
 reads: current workflow, job, singleton signal and actual required runtime contract bytes
 writes: one runtime-rev-acked event bound to the exact current incarnation and complete required READ hashes
-returns: '{ok:true, workflowId, readManifest, rev?, attempt?}'
+returns: '{ok:true, workflowId, readManifest, unread? (--plan: the paths this incarnation has not attested with these bytes), rev?, attempt?}'
 refuses:
   - workflow-unknown
   - kernel-rev-unknown
   - kernel-caller-stale
   - kernel-read-unverified
-usedBy: the current Kernel after reading every path returned by --plan
+usedBy: the current Kernel after reading every path --plan lists under unread

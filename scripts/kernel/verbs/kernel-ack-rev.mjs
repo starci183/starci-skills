@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import { getWorkflow } from './shared/rows.mjs';
 import { kernelAuthorityOf, kernelCustodyOf } from './shared/kernel-seat.mjs';
-import { kernelReadManifest, verifyKernelRead } from '../required-read.mjs';
+import { kernelReadManifest, unreadFiles, verifyKernelRead } from '../required-read.mjs';
 import { KERNEL_REV_ACKED_EVENT, KERNEL_REV_UNKNOWN, resolveRev, revRootOf } from '../runtime-rev.mjs';
 
 export default {
@@ -22,7 +22,7 @@ export default {
       throw Object.assign(new Error('only the current Kernel may attest its READ'), { code: 'kernel-caller-stale' });
     const options = { root,authority,ops: args.op ? [String(args.op)] : [] };
     const required = kernelReadManifest(db,workflowId,options);
-    if (args.plan) return emit({ ok: true, workflowId, readManifest: required }, JSON.stringify(required), args.json);
+    if (args.plan) return emit({ ok: true, workflowId, readManifest: required, unread: unreadFiles(db, workflowId, required) }, JSON.stringify(required), args.json);
     const rev = required.revision.kind === 'git' ? resolveRev(root,String(args.rev)) : String(args.rev);
     if (!rev || rev !== required.rev) throw Object.assign(new Error('READ revision is not the current deployed commit'), { code: KERNEL_REV_UNKNOWN });
     const file = String(args['read-manifest']), stat = fs.lstatSync(file);
