@@ -71,3 +71,10 @@ export function ladderRefusal({ schema, level, message, scope = [] }) {
   const finding = { kind: 'refusal', message };
   return { code: 2, text: message, data: { schema, level: level ?? null, scope: [...scope], ok: false, findings: [finding] } };
 }
+
+/** The refusal of a level a local ladder verb does not run (L5 is CI only; a level outside L0-L4 is unsupported), or null. */
+export function unrunnableLevel({ schema, level, verb }) {
+  if (level === 'L5') return ladderRefusal({ schema, level, message: `${verb}: L5 is CI only and never runs locally` });
+  if (!['L0', 'L1', 'L2', 'L3', 'L4'].includes(level)) return ladderRefusal({ schema, level, message: `${verb}: unsupported local level ${level}` });
+  return null;
+}

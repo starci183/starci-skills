@@ -37,6 +37,12 @@ export function workingChanges(root, deps = {}) {
 }
 
 /** Committed changes between the local-main reference and HEAD: the L2/L3 change set. */
+/** The changed paths a ladder verb judges: its --changed list, else the working tree's changes. */
+export function changedPathsOf(args, root, deps = {}) {
+  const named = pathList(args.changed);
+  return named.length ? named : workingChanges(root, deps);
+}
+
 export function committedChanges(root, against, deps = {}) {
   if (deps.changedAgainst) return pathList(deps.changedAgainst(root, against));
   const selected = (deps.diffNames ?? diffNames)(root, against, 'HEAD');
