@@ -11,6 +11,7 @@ import path from 'node:path';
 import { containerInspect } from '../api/docker/container-inspect.mjs';
 import { containerLifecycle } from '../api/docker/container-lifecycle.mjs';
 import { sleep } from '../lib/sleep.mjs';
+import { repeatInOrder } from '../lib/in-order.mjs';
 import { dashboard, resolveConfig, scan, scrub } from '../gates/sonar-local.mjs';
 import { sonarUp } from '../gates/sonar-status.mjs';
 
@@ -73,10 +74,11 @@ export function sonarSupplier(apps, deps = {}) {
     }
     const deadline = now() + (deps.readyMs ?? READY_MS);
     let up = await gate.up(cfg);
-    while (!up && now() < deadline) {
+    await repeatInOrder(async () => {
+      if (up || now() >= deadline) return true;
       await pause(deps.pollMs ?? READY_POLL_MS);
       up = await gate.up(cfg);
-    }
+    });
     stack = up ? { ok: true, docker: d } : { ok: false, reason: 'SonarQube did not report UP in time after its containers started', docker: d };
     return stack;
   };

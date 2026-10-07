@@ -2,6 +2,7 @@ import path from 'node:path';
 import { readOnly } from '../../scripts/api/git/read-only.mjs';
 import { existsSync, statSync } from 'node:fs';
 import { decodeText, publicText, publicJson } from './redact-read.mjs';
+import { repeatInOrder } from '../../scripts/lib/in-order.mjs';
 
 /** Products of an attempt at its commit head: repo files the op wrote (content + diff), read-only git. */
 const MAX_CONTENT = 1024 * 1024;
@@ -92,9 +93,11 @@ async function productOf(repo, head, info, file) {
 async function pool(items, worker) {
   const results = new Array(items.length);
   let next = 0;
-  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, items.length) }, async () => {
-    while (next < items.length) { const index = next++; results[index] = await worker(items[index]); }
-  }));
+  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, items.length) }, () => repeatInOrder(async () => {
+    if (next >= items.length) return true;
+    const index = next++;
+    results[index] = await worker(items[index]);
+  })));
   return results;
 }
 

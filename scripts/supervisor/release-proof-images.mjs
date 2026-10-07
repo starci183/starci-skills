@@ -8,6 +8,7 @@ import { resourceRemove } from '../api/docker/resource-remove.mjs';
 import { proofRun as realRun } from '../api/docker/proof-run.mjs';
 import { containerInspect as realContainerInspect } from '../api/docker/container-inspect.mjs';
 import { asList } from '../lib/list.mjs';
+import { repeatInOrder } from '../lib/in-order.mjs';
 import { protectedPortsInText } from '../lib/protected-installations.mjs';
 import { resultDetail, resultOk } from '../lib/verb-call.mjs';
 import { isForeignContainer } from '../machine/docker-policy.mjs';
@@ -72,14 +73,15 @@ export async function releaseProofImages(ctx, deps = {}) {
       if (!success(started) || !container || isForeignContainer(container)) { row.error = `run failed: ${failure(started) || 'no container id'}`; results.push(row); continue; }
       try {
         const attempts = Math.max(2, Math.ceil(waitSeconds / 5));
-        for (let attempt = 0; attempt <= attempts; attempt += 1) {
+        await repeatInOrder(async (attempt) => {
+          if (attempt > attempts) return true;
           const health = await inspect(container, '{{if .State.Health}}{{.State.Health.Status}}{{else}}nohealthcheck{{end}}');
           const running = await inspect(container, '{{.State.Running}}');
           row.health = text(health); row.running = text(running) === 'true';
-          if (row.health === 'healthy' || (row.health === 'nohealthcheck' && row.running && attempt >= 2)) { row.ok = true; break; }
-          if (row.health === 'unhealthy' || !row.running || attempt === attempts) break;
+          if (row.health === 'healthy' || (row.health === 'nohealthcheck' && row.running && attempt >= 2)) { row.ok = true; return true; }
+          if (row.health === 'unhealthy' || !row.running || attempt === attempts) return true;
           await sleep(5_000);
-        }
+        });
         if (!row.ok) row.error = `container not healthy (${row.health ?? 'unknown'}, running=${row.running})`;
       } finally {
         const removed = await removeContainer(container);

@@ -15,6 +15,7 @@ import { machineFileFor, readMachine } from '../../engine/db/machine.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { asList } from '../lib/list.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { eachInOrder } from '../lib/in-order.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 const SELF_ROOT = path.resolve(path.dirname(selfFile), '..', '..');
@@ -73,13 +74,13 @@ export async function gateSide({ tree = SELF_ROOT, family, ledgers = registeredL
   if (!Array.isArray(spec) || !spec.length || spec.some((g) => !g?.module || !g?.export)) throw new Error('an explicit nonempty current --gate module#export set is required');
   const fns = await loadGateFns(tree, spec);
   const legs = [];
-  for (const ledger of ledgers) {
+  await eachInOrder(ledgers, (ledger) => {
     const repo = path.dirname(path.dirname(path.resolve(ledger)));
-    for (const leg of acceptedLegsOf(ledger, family)) {
+    return eachInOrder(acceptedLegsOf(ledger, family), async (leg) => {
       const result = await findingsForLeg(repo, leg, fns);
       legs.push({ ledger, repo, workflowId: leg.workflowId, jobId: leg.jobId, attempt: leg.attempt, ...result });
-    }
-  }
+    });
+  });
   return { tree, family, gates: spec, legs, errors: fns.filter((g) => g.error).map(({ gate, error }) => `${gate.module}#${gate.export}: ${error}`) };
 }
 
