@@ -135,18 +135,24 @@ function registersIntegration(ts, judge, element, folder) {
 }
 
 /** Whether `name`, exported by the module `rel`, is declared as an enum there or in the file it is re-exported from. */
+function enumExportResult(ts, judge, rel, name, depth, statement) {
+  if (ts.isEnumDeclaration(statement) && statement.name.text === name) return true;
+  if (!ts.isExportDeclaration(statement) || !statement.exportClause || !ts.isNamedExports(statement.exportClause)) return null;
+  for (const element of statement.exportClause.elements) {
+    if (element.name.text !== name) continue;
+    const original = (element.propertyName ?? element.name).text;
+    if (statement.moduleSpecifier && ts.isStringLiteral(statement.moduleSpecifier)) return exportsEnum(ts, judge, judge.resolve(rel, statement.moduleSpecifier.text), original, depth + 1);
+    return exportsEnum(ts, judge, rel, original, depth + 1);
+  }
+  return null;
+}
+
 function exportsEnum(ts, judge, rel, name, depth = 0) {
   const file = rel ? judge.parsed(rel) : null;
   if (!file || depth > 4) return false;
   for (const statement of file.sourceFile.statements) {
-    if (ts.isEnumDeclaration(statement) && statement.name.text === name) return true;
-    if (!ts.isExportDeclaration(statement) || !statement.exportClause || !ts.isNamedExports(statement.exportClause)) continue;
-    for (const element of statement.exportClause.elements) {
-      if (element.name.text !== name) continue;
-      const original = (element.propertyName ?? element.name).text;
-      if (statement.moduleSpecifier && ts.isStringLiteral(statement.moduleSpecifier)) return exportsEnum(ts, judge, judge.resolve(rel, statement.moduleSpecifier.text), original, depth + 1);
-      return exportsEnum(ts, judge, rel, original, depth + 1);
-    }
+    const result = enumExportResult(ts, judge, rel, name, depth, statement);
+    if (result !== null) return result;
   }
   return false;
 }
