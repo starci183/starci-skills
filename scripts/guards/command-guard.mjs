@@ -56,7 +56,6 @@
 // Before an allowed git command, a stale shared .git/index.lock is recovered (scripts/machine/lock-recovery.mjs preflightIndexLock).
 // Fail-open on the guard's OWN faults: a bug here must never take the shell away from a worker.
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { pathKey } from '../lib/path-key.mjs';

@@ -9,7 +9,7 @@ const refuse = (reason) => Object.assign(new Error(`request target refused: ${re
 const hostPartOf = (host) => (host.includes(':') && !host.startsWith('[') ? `[${host}]` : host);
 
 /** The printable ASCII characters a request path may carry (everything but space and the URL delimiters " # < >): a table, so every outgoing character is looked up, never copied from the caller. */
-const PATH_CHARS = new Map(Array.from({ length: 0x5e }, (_, i) => String.fromCharCode(0x21 + i)).filter((c) => !'"#<>'.includes(c)).map((c) => [c, c]));
+const PATH_CHARS = new Map(Array.from({ length: 0x5e }, (_, i) => String.fromCodePoint(0x21 + i)).filter((c) => !'"#<>'.includes(c)).map((c) => [c, c]));
 
 /** The request path rebuilt character by character from PATH_CHARS (the first `?` opens the query), or null for a path that is not absolute or holds any other character. */
 const pathOf = (value) => {
@@ -61,7 +61,8 @@ export const request = (options, onResponse, allow) => {
   const target = pathOf(options.path);
   if (target === null) throw refuse('a request path starts with / and holds only printable ASCII without " # < >');
   let url;
-  try { url = new URL(`http://${hostPartOf(host)}${port === null ? '' : `:${port}`}${target}`); }
+  const portPart = port === null ? '' : ':' + port;
+  try { url = new URL(`http://${hostPartOf(host)}${portPart}${target}`); }
   catch { throw refuse('the request target is not a URL'); }
   // Only the checked URL object reaches node:http: its protocol and hostname are judged again after parsing.
   if (url.protocol !== 'http:' || url.username || url.password || allowedHostOf(allow, url.hostname) === null) throw refuse(`host ${url.hostname} is outside the allowed hosts`);

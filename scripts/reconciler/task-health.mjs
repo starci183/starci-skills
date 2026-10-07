@@ -89,6 +89,7 @@ export async function startOutcome(api, probe) {
   if (last.ok) return `start requested, healthy after ${seconds}s`;
   const after = await api.auditTasks();
   const now = after.audits?.[key] ?? found;
-  const task = now ? `task '${now.taskName}' ${taskFacts(now)}${now.state === 'Running' ? '' : ', so its process is not running'}` : `Task Scheduler unreadable: ${after.error ?? result.error}`;
+  const notRunning = now?.state === 'Running' ? '' : ', so its process is not running';
+  const task = now ? `task '${now.taskName}' ${taskFacts(now)}${notRunning}` : `Task Scheduler unreadable: ${after.error ?? result.error}`;
   return `start requested, NOT healthy after ${seconds}s (${notHealthyWhy(last)}); ${task}`;
 }

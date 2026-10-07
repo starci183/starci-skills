@@ -15,7 +15,6 @@
 //                        names it (STARCI_TEST_MACHINE_FILE); close() closes every own()ed handle first, then removes
 //                        the directory.
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
 import path from 'node:path';
 import { TEST_REGISTRY_ENV, openMachine } from '../../engine/db/machine.mjs';
 import { safeRemove } from '../api/fs/safe-remove.mjs';

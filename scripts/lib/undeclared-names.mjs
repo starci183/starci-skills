@@ -78,9 +78,11 @@ class Scope {
 
   declare(names) { for (const name of names) this.names.add(name); }
 
+  /** Whether this scope or an enclosing one declares `name`. */
+  declares(name) { return this.names.has(name) || Boolean(this.parent?.declares(name)); }
+
   has(name) {
-    for (let scope = this; scope; scope = scope.parent) if (scope.names.has(name)) return true;
-    return MODULE_GLOBALS.has(name) || (this.page && BROWSER_GLOBALS.has(name));
+    return this.declares(name) || MODULE_GLOBALS.has(name) || (this.page && BROWSER_GLOBALS.has(name));
   }
 }
 

@@ -99,7 +99,8 @@ function sideReadProblem(manifest, side, read, braceVariants) {
   const profile = ownedBySide ? owner : APP_SCOPE;
   const prefix = ownedBySide ? rest.join('/') : read;
   const owned = manifest.slots.some((slot) => slot.profiles.includes(profile) && slot.presence !== 'forbidden' && braceVariants(slot.path).some((variant) => variant.startsWith(prefix)));
-  return owned ? null : `sides.${side}.reads names ${read}, which no ${ownedBySide ? owner : 'app-root'} slot owns`;
+  const ownerName = ownedBySide ? owner : 'app-root';
+  return owned ? null : `sides.${side}.reads names ${read}, which no ${ownerName} slot owns`;
 }
 
 function checkSideReads(manifest, bad, braceVariants) {
