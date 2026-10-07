@@ -20,7 +20,7 @@ import { JOB_ROW } from '../machine/job-row.mjs';
 import { custodyPresent, questionFields } from './ask-server.mjs';
 import { checkDirection, defaultGrammarRoot, readBrandRecord } from '../work/brand/brand.mjs';
 import { sha256File } from '../work/work-io.mjs';
-import { AUTOPILOT_BY, AUTOPILOT_RULING, SUPERVISOR_GATE, openIncidents, kindOf, supervisorGatesOf, openSupervisorGate } from './autopilot-budget.mjs';
+import { AUTOPILOT_BY, AUTOPILOT_RULING, SUPERVISOR_GATE, openIncidents, kindOf, supervisorGatesOf } from './autopilot-budget.mjs';
 
 export const HANDOVER_CREDENTIALS_SUBJECT = 'handover-credentials';
 export const PROVISIONAL_LABEL = 'self-accepted provisional';
@@ -366,17 +366,6 @@ export const deferTimedOutGates = ({ ledger, db, workflowId, settings, out, now 
       payload: { jobIds, opId: gate.opId, incidentId: gate.incidentId, by: AUTOPILOT_BY, reason: `supervisor-gate ${gate.incidentId} unresolved past ${Math.round(settings.supervisorGateTimeoutMs / 60000)} min` } });
     out.timedOut.push({ incidentId: gate.incidentId, jobIds });
   }
-};
-
-// A spent (or unverifiable) workflow budget opens one supervisor-gate holding new dispatch.
-export const gateExceededBudget = ({ ledger, db, workflowId, budget }) => {
-  if (!(budget.exceeded.length || budget.unverified.length)) return;
-  if (supervisorGatesOf(db, workflowId).some((g) => g.holds.includes('*'))) return;
-  const exceeded = budget.exceeded.map((k) => `${k} ${k === 'tokens' ? budget.measured.tokens : budget.used[k]} > ${budget.caps[k]}`);
-  const unverified = budget.unverified.map((k) => `${k} unknown: ${budget.coverage.unknown} completed attempts lack usage`);
-  const detail = `autopilot budget requires review (${[...exceeded, ...unverified].join(', ')}): Supervisor review - record missing usage or extend with starci kernel autopilot --extend-budget, then resolve --by supervisor`;
-  const incidentId = openSupervisorGate(ledger, { workflowId, holds: ['*'], detail, evidence: budget });
-  ledger.appendEvent({ workflowId, entityType: 'incident', entityId: incidentId, kind: AUTOPILOT_EVENTS.budget, payload: { ...budget, incidentId, by: AUTOPILOT_BY } });
 };
 
 // The checklist receipt lists writes as `field (how)`; the field name is what a deferred ask's fields match.

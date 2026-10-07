@@ -33,7 +33,7 @@
 //
 // Every runtime decision is an `autopilot-*` event `by: autopilot`; nothing here ever writes answeredBy owner.
 import { commitAskAnswer } from '../machine/ask-receipts.mjs';
-import { allocationSettings } from '../../engine/config.mjs';
+import { allocationMs, allocationSettings } from '../../engine/config.mjs';
 import { ownerLanguage, translator } from '../lib/i18n.mjs';
 import { parseJson, readJsonFile } from '../lib/json.mjs';
 import { list } from '../lib/list.mjs';
@@ -51,8 +51,9 @@ import {
   latestEvent, eventsOf, jobOfAsk, reportOpOf, subjectOf, askClosed, deferralOf,
   pendingAsksOf, deferredToHandoverOf, deferredLegsOf, provisionalOf, credentialsOwed,
   writeAnswer, planReview, planRecommended, planDeferred,
-  rerouteOwnerGates, deferTimedOutGates, gateExceededBudget, supersedeSupplied,
+  rerouteOwnerGates, deferTimedOutGates, supersedeSupplied,
 } from './autopilot-state.mjs';
+import { gateExceededBudget } from './autopilot-budget-gate.mjs';
 export { openSupervisorGate, AUTOPILOT_BY, AUTOPILOT_RULING, SUPERVISOR_GATE } from './autopilot-budget.mjs';
 export {
   AUTOPILOT_EVENTS, HANDOVER_CREDENTIALS_SUBJECT, PROVISIONAL_LABEL,
@@ -218,7 +219,7 @@ export function routeCapUnderAutopilot(db, job, { lineage, routeId, settings = a
 
 /** Budget use of one workflow against allocation.autopilot.budgets: {used, caps, exceeded[]}. */
 export function budgetOf(db, workflowId, settings = autopilotSettings(), { now = Date.now() } = {}) {
-  return workflowBudget(db, workflowId, { settings, extensionKind: AUTOPILOT_EVENTS.budgetExtended, now });
+  return workflowBudget(db, workflowId, { settings, extensionKind: AUTOPILOT_EVENTS.budgetExtended, now, meteringWindowMs: allocationMs('usageEveryMs') });
 }
 
 /**
@@ -250,7 +251,7 @@ export function autopilotSweep({ ledger, repo, workflowId, settings = autopilotS
     deferTimedOutGates({ ledger, db, workflowId, settings, out, now });
     const budget = budgetOf(db, workflowId, settings, { now });
     out.budget = budget;
-    gateExceededBudget({ ledger, db, workflowId, budget });
+    gateExceededBudget({ ledger, db, workflowId, budget, now });
     // 5. The owner's checklist answer supplies credentials; each deferred credential ask it covers is superseded.
     supersedeSupplied({ ledger, db, workflowId, repo, out });
   });
