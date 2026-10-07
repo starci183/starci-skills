@@ -68,6 +68,24 @@ export function coverageOf(graph, jobs) {
   return new Map(nodes.map((n) => [n.id, scoped.filter((j) => hits(j.paths, keysOf.get(n.id)))]));
 }
 
+/** A childless node's colour from the jobs covering it; `rework` drops the jobs at or before `since`. */
+const ownColorOf = (covered, rework, since) => {
+  const mine = covered.filter((j) => !rework || (j.at ?? 0) > since);
+  if (mine.some((j) => RUNNING.has(j.status))) return YELLOW;
+  // The newest covering try asked the owner: the node waits (yellow), it did not fail.
+  if (mine.at(-1)?.status === AWAITING_OWNER_STATUS) return YELLOW;
+  const last = mine.findLast((j) => j.status === 'succeeded' || j.status === 'failed');
+  if (last) return last.status === 'succeeded' ? GREEN : RED;
+  return rework ? RED : GRAY;
+};
+
+/** A node's colour together with its children's: any red is red, any yellow is yellow, all green is green. */
+const combinedColor = (all) => {
+  if (all.includes(RED)) return RED;
+  if (all.includes(YELLOW)) return YELLOW;
+  return all.every((c) => c === GREEN) ? GREEN : GRAY;
+};
+
 /**
  * The one colour rule for a graph against the workflow's jobs, over coverageOf. A node without children is yellow
  * while a covering job runs (leased, running, answering; a queued job is not running), red when `recorded` marks it
@@ -80,25 +98,12 @@ export function colorsFromJobs(graph, jobs, { recorded = {}, since = 0 } = {}) {
   const nodes = list(graph?.nodes);
   const { kids } = upLinks(nodes);
   const covering = coverageOf(graph, jobs);
-  const own = (n) => {
-    const rework = recorded[n.id] === RED;
-    const mine = covering.get(n.id).filter((j) => !rework || (j.at ?? 0) > since);
-    if (mine.some((j) => RUNNING.has(j.status))) return YELLOW;
-    // The newest covering try asked the owner: the node waits (yellow), it did not fail.
-    if (mine.at(-1)?.status === AWAITING_OWNER_STATUS) return YELLOW;
-    const last = mine.findLast((j) => j.status === 'succeeded' || j.status === 'failed');
-    if (last) return last.status === 'succeeded' ? GREEN : RED;
-    return rework ? RED : GRAY;
-  };
+  const own = (n) => ownColorOf(covering.get(n.id), recorded[n.id] === RED, since);
   const out = {};
   const color = (id) => {
     if (out[id]) return out[id];
     const n = nodes.find((x) => x.id === id);
-    const all = [own(n), ...(kids.get(id) ?? []).map(color)];
-    if (all.includes(RED)) out[id] = RED;
-    else if (all.includes(YELLOW)) out[id] = YELLOW;
-    else if (all.every((c) => c === GREEN)) out[id] = GREEN;
-    else out[id] = GRAY;
+    out[id] = combinedColor([own(n), ...(kids.get(id) ?? []).map(color)]);
     return out[id];
   };
   for (const n of nodes) color(n.id);
@@ -130,6 +135,15 @@ const insertVersion = (ledger, { workflowId, version, event, graph, diff, colors
     eventPayload: { version, event, reason, authorOp, authorJob, digest, added: diff.added, removed: diff.removed, changed: diff.changed.map((c) => c.id), red: diff.red ?? [] } });
 };
 
+/** What a diff touches outside the slice `scope`: node ids, edges `from->to`, and domains. */
+const outsideScope = (diff, candidate, prevGraph, scope) => {
+  const inScope = (g, id) => list(g?.nodes).find((n) => n.id === id)?.slice === scope;
+  return [...diff.added.filter((id) => !inScope(candidate, id)), ...diff.removed.filter((id) => !inScope(prevGraph, id)),
+    ...diff.changed.map((c) => c.id).filter((id) => !inScope(candidate, id)), ...(diff.removed.includes(scope) ? [scope] : []),
+    ...[...diff.edgesAdded, ...diff.edgesRemoved].filter((e) => !inScope(candidate, e.to) && !inScope(prevGraph, e.to)).map((e) => `${e.from}->${e.to}`),
+    ...diff.domainsAdded, ...diff.domainsRemoved];
+};
+
 /**
  * Validate `graph` and record it as the next version. Refuses work-graph-invalid with the validator's findings;
  * a graph equal to the latest version records nothing and returns {unchanged:true}. `scope` (a slice id) confines a
@@ -140,28 +154,29 @@ export function recordVersion(ledger, { workflowId, graph, event, reason, author
   const candidate = canonicalGraph({ ...graph, schema: graph?.schema ?? WORK_GRAPH_ID });
   const verdict = validateGraph(candidate, { workflowId, context });
   if (!verdict.ok) throw refuse(`work graph refused: ${verdict.findings.map((f) => f.code).join(', ')}`, 'work-graph-invalid', { findings: verdict.findings });
-  return ledger.transaction(() => {
-    const prev = latestVersion(ledger.db, workflowId);
-    const digest = graphDigest(candidate);
-    if (prev && prev.digest === digest) return { ok: true, unchanged: true, version: prev.version, digest };
-    const diff = diffGraphs(prev?.graph ?? null, candidate);
-    if (prev && diffIsEmpty(diff)) return { ok: true, unchanged: true, version: prev.version, digest: prev.digest };
-    if (scope) {
-      const inScope = (g, id) => list(g?.nodes).find((n) => n.id === id)?.slice === scope;
-      const outside = [...diff.added.filter((id) => !inScope(candidate, id)), ...diff.removed.filter((id) => !inScope(prev?.graph, id)),
-        ...diff.changed.map((c) => c.id).filter((id) => !inScope(candidate, id)), ...(diff.removed.includes(scope) ? [scope] : []),
-        ...[...diff.edgesAdded, ...diff.edgesRemoved].filter((e) => !inScope(candidate, e.to) && !inScope(prev?.graph, e.to)).map((e) => `${e.from}->${e.to}`),
-        ...diff.domainsAdded, ...diff.domainsRemoved];
-      if (outside.length) throw refuse(`a cut changes only its own slice ${scope}; it touches ${[...new Set(outside)].join(', ')}`, 'work-graph-cut-outside-slice');
-    }
-    // v0 starts from what the ledger already shows: every job the workflow ran so far counts.
-    const { colors, red } = prev ? recolor(liveColors(ledger.db, prev), prev.graph, candidate, diff)
-      : { colors: liveColors(ledger.db, { workflowId, graph: candidate, colors: {}, createdAt: 0 }), red: [] };
-    const version = prev ? prev.version + 1 : 0;
-    insertVersion(ledger, { workflowId, version, event, graph: candidate, diff: { ...diff, red }, colors, reason, authorOp, authorJob, digest, now });
-    return { ok: true, version, event, digest, diff: { ...diff, red }, colors };
-  });
+  return ledger.transaction(() => insertNextVersion(ledger, { workflowId, candidate, event, reason, authorOp, authorJob, scope, now }));
 }
+
+function insertNextVersion(ledger, { workflowId, candidate, event, reason, authorOp, authorJob, scope, now }) {
+  const prev = latestVersion(ledger.db, workflowId);
+  const digest = graphDigest(candidate);
+  if (prev && prev.digest === digest) return { ok: true, unchanged: true, version: prev.version, digest };
+  const diff = diffGraphs(prev?.graph ?? null, candidate);
+  if (prev && diffIsEmpty(diff)) return { ok: true, unchanged: true, version: prev.version, digest: prev.digest };
+  if (scope) {
+    const outside = outsideScope(diff, candidate, prev?.graph, scope);
+    if (outside.length) throw refuse(`a cut changes only its own slice ${scope}; it touches ${[...new Set(outside)].join(', ')}`, 'work-graph-cut-outside-slice');
+  }
+  const { colors, red } = nextVersionColors(ledger.db, { workflowId, prev, candidate, diff });
+  const version = prev ? prev.version + 1 : 0;
+  insertVersion(ledger, { workflowId, version, event, graph: candidate, diff: { ...diff, red }, colors, reason, authorOp, authorJob, digest, now });
+  return { ok: true, version, event, digest, diff: { ...diff, red }, colors };
+}
+
+// v0 starts from what the ledger already shows: every job the workflow ran so far counts.
+const nextVersionColors = (db, { workflowId, prev, candidate, diff }) => (prev
+  ? recolor(liveColors(db, prev), prev.graph, candidate, diff)
+  : { colors: liveColors(db, { workflowId, graph: candidate, colors: {}, createdAt: 0 }), red: [] });
 
 /** The domains of `graph` a job's owned paths reach: a node's owned path they touch, or a domain's feature record tree. */
 export function domainsOfPaths(graph, paths) {
