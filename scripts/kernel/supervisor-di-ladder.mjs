@@ -2,7 +2,7 @@
 // nobody resolved is escalated one level per step interval past its due time until it reaches the owner level, where the Workers controller's
 // urgent notice (scripts/reconciler/controllers/workers.mjs overdueUrgent) tells the owner once per DI with what was tried.
 // A claimed item is the Supervisor working on it and is left alone.
-import { boundValue, incidentPolicy } from '../kernel/op-incident-policy.mjs';
+import { boundValue, incidentPolicy } from './op-incident-policy.mjs';
 
 /** The ladder numbers from the table: {stepMs, ownerAfter}. */
 export const ladderOf = () => {

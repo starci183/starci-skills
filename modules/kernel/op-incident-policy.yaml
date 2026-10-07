@@ -33,7 +33,7 @@ codes:
   escalateOwner: {code: 'op-incident-escalate-owner'}
 
 # The last step of every chain: a Supervisor Decision Item past its due time is escalated one level per stepMs until ownerAfter, where the
-# owner is notified once per item with its evidence (scripts/machine/supervisor-di-ladder.mjs, scripts/reconciler/controllers/workers.mjs).
+# owner is notified once per item with its evidence (scripts/kernel/supervisor-di-ladder.mjs, scripts/reconciler/controllers/workers.mjs).
 ladder:
   stepMs: {ref: "modules/reconciler/job.yaml#decisionDueMs"}
   ownerAfter: {ref: "modules/reconciler/workers.yaml#urgentOverdueEscalations"}

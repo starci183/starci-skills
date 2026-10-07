@@ -175,7 +175,7 @@ test('dispatch refuses a --model pin the job\'s history excluded unless the Kern
 });
 
 test('the last step of every chain: an unresolved Supervisor DI climbs one level per step to the owner level, where the owner is told once with the evidence', async () => {
-  const { ladderOf, ladderDue, escalateSupervisorDis } = await import('../../scripts/machine/supervisor-di-ladder.mjs');
+  const { ladderOf, ladderDue, escalateSupervisorDis } = await import('../../scripts/kernel/supervisor-di-ladder.mjs');
   const { overdueUrgent } = await import('../../scripts/reconciler/controllers/workers.mjs');
   const numbers = ladderOf();
   assert.ok(numbers.stepMs > 0 && numbers.ownerAfter >= 1);

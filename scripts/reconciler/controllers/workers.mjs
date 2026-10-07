@@ -352,7 +352,7 @@ async function reconcileNotify(key, ctx, settings, now, force, language) {
     const dis = readSupervisor((m) => supervisorDecisions(m, { now }), [], { env: ctx.env ?? process.env });
     if (ctx.mode === 'active') {
       const { withSupervisor } = await import('../../machine/home.mjs');
-      const { escalateSupervisorDis, ladderOf } = await import('../../machine/supervisor-di-ladder.mjs');
+      const { escalateSupervisorDis, ladderOf } = await import('../../kernel/supervisor-di-ladder.mjs');
       withSupervisor((m) => escalateSupervisorDis(m, dis, { now, ...ladderOf() }), { env: ctx.env ?? process.env });
     }
     urgentItems = overdueUrgent(dis, { now, min: settings.urgentOverdueEscalations, language });
