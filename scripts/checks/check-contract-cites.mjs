@@ -31,6 +31,7 @@ import { lsFiles } from '../api/git/ls-files.mjs';
 import { gitOutputOf } from '../lib/git.mjs';
 import { checkReportResult } from '../lib/check-cli.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { trimTrailingChars } from '../lib/normalize.mjs';
 
 const HELP = `Usage: starci runtime check --only contract-cites -- [--root <tree>] [--scan <rel-path> ...] [--json]
 
@@ -124,13 +125,15 @@ function commentsAsText(file, text) {
   return lines.join('\n');
 }
 
+const CITE_TRAILING_CHAR = /[.,;)]/;
+
 /** Every path and symbol reference one contract file makes, with line numbers. */
 export function citesIn(text) {
   const cites = [];
   const lines = text.split('\n');
   const addPath = (line, token, form) => {
     for (const raw of expandBraces(token)) {
-      const candidate = detemplate(raw.replace(/[.,;)]+$/, ''));
+      const candidate = detemplate(trimTrailingChars(raw, CITE_TRAILING_CHAR));
       if (isUnverifiable(candidate)) continue;
       if (!candidate.includes('/')) {
         // A citation key names one authority, so a bare filename there is

@@ -56,6 +56,7 @@ import { parseJson } from '../lib/json.mjs';
 import { workflowNameOf } from '../lib/display-names.mjs';
 import { translatedPattern, translator } from '../lib/i18n.mjs';
 import { sleep } from '../lib/sleep.mjs';
+import { trimTrailingSlashes } from '../lib/path-key.mjs';
 import { attemptSend, botPolite, redact } from './telegram-polite.mjs';
 import { isSpecRun, readEnv } from '../lib/env.mjs';
 
@@ -103,7 +104,7 @@ export function linkFor(ask, { base, exposeCredentialAsks }) {
   if (ask.credential && !exposeCredentialAsks) return { href: ask.url, public: false, reason: 'credential' };
   if (!base) return { href: ask.url, public: false, reason: 'no-tunnel' };
   const u = new URL(ask.url);
-  return { href: `${base.replace(/\/+$/, '')}${u.pathname}${u.search}`, public: true, reason: null };
+  return { href: `${trimTrailingSlashes(base)}${u.pathname}${u.search}`, public: true, reason: null };
 }
 
 /**
@@ -147,7 +148,7 @@ function closedMessage({ reason, by = null, title, question, language, now = Dat
   return [head, `${t.workflow}: ${title}`, '', String(question?.text ?? '')].join('\n').slice(0, TEXT_MAX);
 }
 /* ------------------------------------------------------------ Bot API */
-export const endpoint = (apiBase, token, method) => `${apiBase.replace(/\/+$/, '')}/bot${token}/${method}`;
+export const endpoint = (apiBase, token, method) => `${trimTrailingSlashes(apiBase)}/bot${token}/${method}`;
 /**
  * One Bot API call with polite retries (botPolite): a JSON POST to `method` under the 15 s read timeout.
  */

@@ -15,7 +15,7 @@ import {repositoryName,repositoryHome} from '../hfs/repo-identity.mjs';
 import {resolveCustodyFile,resolveDeclaredRepository,runtimeHostRoot,runtimeSecretEnv} from './runtime-host.mjs';
 import {bindSonarCredentials,sonarCredentialRequirements,suppliedSonarToken,sonarAnalysisEnvironment,safeSonarHost,sonarAnalysisAction,sonarAdministrativeConfig,sonarAdminForAnalysis} from './sonar-credentials.mjs';
 import {braceVariants,globExpression} from '../lib/glob.mjs';
-import {posixPath} from '../lib/path-key.mjs';
+import {posixPath,trimTrailingSlashes} from '../lib/path-key.mjs';
 import { log as gitLog } from '../api/git/log.mjs'; import { statusQuery as gitStatus } from '../api/git/status-query.mjs'; import { revParseQuery } from '../api/git/rev-parse-query.mjs'; import { diff as gitDiff } from '../api/git/diff.mjs'; import { lsFiles } from '../api/git/ls-files.mjs'; import { mergeBase as mergeBaseOf } from '../api/git/merge-base.mjs';
 import { unquoteDiffPath } from '../lib/git.mjs';
 import {emitCheckOutput} from './output.mjs';
@@ -245,7 +245,7 @@ export function resolveConfig(options={},env=process.env){
   else if(declarationError)declaration={error:declarationError};
   return bindSonarCredentials({
     host:safeSonarHost(host)??'',
-    publicHost:String(decl?.hostPublic??PUBLIC_HOST).replace(/\/+$/,''),
+    publicHost:trimTrailingSlashes(String(decl?.hostPublic??PUBLIC_HOST)),
     stackDir,
     composeFile:decl?.composeFile??path.join(stackDir,'infra','compose','sonarqube.yaml'),
     container:options.container??decl?.container??env.STARCI_SONAR_CONTAINER??CONTAINER,
@@ -757,7 +757,7 @@ async function readAll(cfg,tokens,pathname,listKey){
 function fileQualifier(props={},pkg=null){
   const defined=Object.fromEntries(String(pkg?.scripts?.['sonar:check']??'').matchAll(/-D([\w.]+)=([^\s"']+)/g).map(m=>[m[1],m[2]]));
   const setting=name=>splitList(defined[name]??props[name]);
-  const roots=setting('sonar.tests').map(root=>posixPath(root).replace(/\/+$/,'')).filter(Boolean);
+  const roots=setting('sonar.tests').map(root=>trimTrailingSlashes(posixPath(root))).filter(Boolean);
   if(!roots.length)return ()=>'FIL';
   const inclusions=setting('sonar.test.inclusions').flatMap(braceVariants).map(globExpression);
   const exclusions=setting('sonar.test.exclusions').flatMap(braceVariants).map(globExpression);

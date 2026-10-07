@@ -12,6 +12,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { braceVariants, globExpression } from '../lib/glob.mjs';
+import { trimTrailingSlashes } from '../lib/path-key.mjs';
 import { declarationEdition } from '../hfs/edition-slots.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -116,7 +117,7 @@ export function coverageTargetOf(scope) {
   const patterns = (globs) => (globs ?? []).flatMap(braceVariants).map(globExpression);
   const excluded = patterns([...(scope.exclusions ?? []), ...(scope.excluded ?? [])]);
   const tests = patterns(scope.tests);
-  const roots = (scope.sources ?? []).map((dir) => `${String(dir).replace(/\/+$/, '')}/`);
+  const roots = (scope.sources ?? []).map((dir) => `${trimTrailingSlashes(String(dir))}/`);
   return (file) => {
     const rel = String(file).replaceAll('\\', '/');
     return SOURCE_FILE.test(rel) && (!roots.length || roots.some((dir) => rel.startsWith(dir)))

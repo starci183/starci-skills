@@ -1,4 +1,5 @@
 import {credentialPresent} from '../../engine/secrets.mjs';
+import {trimTrailingSlashes} from '../lib/path-key.mjs';
 
 const contexts=new WeakMap();
 const TOKEN_NAME='SONAR_TOKEN';
@@ -18,7 +19,7 @@ const validHost=value=>{
 };
 
 /** Keep invalid or credential-bearing URL inputs out of configuration and reports. */
-export const safeSonarHost=value=>validHost(value)?String(value).replace(/\/+$/,''):null;
+export const safeSonarHost=value=>validHost(value)?trimTrailingSlashes(String(value)):null;
 
 /** Identify the analysis actions whose credentials are supplied independently from administrative custody. */
 export const sonarAnalysisAction=action=>ACTIONS.has(action);

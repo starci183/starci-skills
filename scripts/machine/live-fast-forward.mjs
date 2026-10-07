@@ -4,7 +4,7 @@
 // scripts/api/git/ call file.
 import fs from 'node:fs';
 import path from 'node:path';
-import { posixPath } from '../lib/path-key.mjs';
+import { posixPath, trimTrailingSlashes } from '../lib/path-key.mjs';
 import { withoutGitLocalEnv } from '../lib/git.mjs';
 import { configGet } from '../api/git/config-get.mjs';
 import { symbolicRef } from '../api/git/symbolic-ref.mjs';
@@ -14,7 +14,7 @@ import { updateRef } from '../api/git/update-ref.mjs';
 import { checkoutPaths } from '../api/git/checkout-paths.mjs';
 import { rmCached } from '../api/git/rm-cached.mjs';
 
-const normPath = (p) => posixPath(p).replace(/\/+$/, '');
+const normPath = (p) => trimTrailingSlashes(posixPath(p));
 
 // Windows limits a spawned command line to about 32K characters. A repository move can change hundreds
 // of paths, so every live-tree Git operation (including rollback) uses the same bounded argument batches.

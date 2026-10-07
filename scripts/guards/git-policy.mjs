@@ -18,6 +18,7 @@
 // The argv/pathspec machinery (parseGitArgv, literalPathspec, pathspecsWithinOwned,
 // --pathspec-from-file handling, literalAppRouterArgv) lives in ./git-pathspec.mjs;
 // it is re-exported here so existing importers keep working.
+import { trimTrailingSlashes } from '../lib/path-key.mjs';
 import {
   parseGitArgv, pathspecsWithinOwned, parsePathspecList, takePathspecFile,
   readPathspecFile, PATHSPEC_FILE, PATHSPEC_FILE_SUBS, VALUE_OPTIONS,
@@ -114,7 +115,7 @@ function pushTarget(rest) {
 const CONFIG_VALUE_OPTIONS = new Set(['-f', '--file', '--blob', '--type', '--default', '--comment', '--value']);
 const CONFIG_READS = new Set(['--get', '--get-all', '--get-regexp', '--get-urlmatch', '--get-color', '--get-colorbool', '--list', '-l']);
 const GUARDED_SECTION = /^(core|remote|url)(\.|$)/i;
-const hooksPathOf = (v) => (v == null ? null : String(v).trim().replaceAll('\\', '/').replace(/\/+$/, ''));
+const hooksPathOf = (v) => (v == null ? null : trimTrailingSlashes(String(v).trim().replaceAll('\\', '/')));
 // The write a `git config` argv performs: {key, value?} | {section} | {edit}, or null for a read.
 const configWriteOf = (sub, words, options) => {
   if (['set', 'unset', 'edit', 'rename-section', 'remove-section'].includes(sub)) {
