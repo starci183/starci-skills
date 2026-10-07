@@ -112,31 +112,134 @@ export function classifyChange(previous,current){
  * Every record of one Work tree, read once, keyed by its stable id. Evidence is the kernel-written
  * `evidence` block inside the record it proves - one record, one proof, in the file it belongs to.
  */
+function addReadableRecord(target,resolved,records,unreadable){
+  if(!isFile(target,{followLinks:false,maxBytes:MAX_INPUT_BYTES})){
+    unreadable.push(slash(path.relative(resolved,target)));
+    return;
+  }
+  let meta=null;
+  try{meta=parseYaml(fs.readFileSync(target,'utf8'));}
+  catch{unreadable.push(slash(path.relative(resolved,target)));return;}
+  if(!object(meta))return;
+  const at=slash(path.relative(resolved,target));
+  const id=text(meta.id)?meta.id.trim():`path:${at}`;
+  records.set(id,{id,path:at,meta,criteria:new Map(),evidence:object(meta.evidence)?meta.evidence:null});
+}
+
+function collectWorkRecords(dir,resolved,records,unreadable){
+  for(const entry of fs.readdirSync(dir,{withFileTypes:true}).sort((a,b)=>a.name.localeCompare(b.name))){
+    const target=path.join(dir,entry.name);
+    if(entry.isDirectory()){
+      if(!SKIP_DIRECTORY.test(entry.name)&&isDir(target,{followLinks:false}))collectWorkRecords(target,resolved,records,unreadable);
+      continue;
+    }
+    if(entry.name!=='index.yaml')continue;
+    addReadableRecord(target,resolved,records,unreadable);
+  }
+}
+
+function attachAcceptanceCriteria(records){
+  for(const record of records.values()){
+    if(record.meta.schema!=='work/acceptance-criterion@1'||!text(record.meta.rule))continue;
+    const rule=records.get(record.meta.rule.trim());
+    if(rule)rule.criteria.set(record.id,normativeDigest(record.meta));
+  }
+}
+
 export function readWorkTree(root){
   const resolved=path.resolve(root);
   if(!isDir(resolved,{followLinks:false}))throw new WorkChangeInputError(`Not a readable Work root: ${slash(root)}`);
   const records=new Map(),unreadable=[];
-  const walk=dir=>{
-    for(const entry of fs.readdirSync(dir,{withFileTypes:true}).sort((a,b)=>a.name.localeCompare(b.name))){
-      const target=path.join(dir,entry.name);
-      if(entry.isDirectory()){if(!SKIP_DIRECTORY.test(entry.name)&&isDir(target,{followLinks:false}))walk(target);continue;}
-      if(entry.name!=='index.yaml')continue;
-      if(!isFile(target,{followLinks:false,maxBytes:MAX_INPUT_BYTES})){unreadable.push(slash(path.relative(resolved,target)));continue;}
-      let meta=null;
-      try{meta=parseYaml(fs.readFileSync(target,'utf8'));}catch{unreadable.push(slash(path.relative(resolved,target)));continue;}
-      if(!object(meta))continue;
-      const at=slash(path.relative(resolved,target));
-      const id=text(meta.id)?meta.id.trim():`path:${at}`;
-      records.set(id,{id,path:at,meta,criteria:new Map(),evidence:object(meta.evidence)?meta.evidence:null});
-    }
-  };
-  walk(resolved);
-  for(const record of records.values())
-    if(record.meta.schema==='work/acceptance-criterion@1'&&text(record.meta.rule)){
-      const rule=records.get(record.meta.rule.trim());
-      if(rule)rule.criteria.set(record.id,normativeDigest(record.meta));
-    }
+  collectWorkRecords(resolved,resolved,records,unreadable);
+  attachAcceptanceCriteria(records);
   return {root:resolved,records,unreadable};
+}
+
+function changeInfo(record,previous,baseline){
+  const change=object(record.meta.change)?record.meta.change:null;
+  const declared=change&&text(change.kind)?change.kind.trim():null;
+  const rev=change?change.rev:null;
+  const digest=normativeDigest(record.meta);
+  const statements=new Set(list(record.meta.statements).filter(text).map(item=>item.trim()));
+  const withdraws=change?list(change.withdraws).filter(text).map(item=>item.trim()):[];
+  const computed=baseline?classifyChange(previous,record):null;
+  return {change,declared,rev,digest,statements,withdraws,computed};
+}
+
+function validateChangeDeclaration(record,{change,declared,rev,statements,withdraws},add){
+  for(const name of Object.keys(change))if(!CHANGE_FIELDS.includes(name))
+    add('CHANGE_INVALID',record,`change.${name} is not a field of the change record`,{expected:CHANGE_FIELDS});
+  if(!positiveInteger(rev))add('CHANGE_INVALID',record,'change.rev must be a positive integer',{observed:rev??null});
+  if(!CHANGE_KINDS.includes(declared))add('CHANGE_INVALID',record,'change.kind must be one of the four change kinds',{expected:CHANGE_KINDS,observed:declared});
+  if(moment(change.at)===null)add('CHANGE_INVALID',record,'change.at must be a parseable timestamp',{observed:change.at??null});
+  if(change.withdraws!==undefined&&(!Array.isArray(change.withdraws)||change.withdraws.length!==withdraws.length))
+    add('CHANGE_INVALID',record,'change.withdraws must be a list of non-empty statements');
+  if(withdraws.length&&declared!=='breaking')
+    add('WITHDRAWS_WITHOUT_BREAKING',record,'withdrawing a statement is a breaking change; a withdrawal that is not declared as one is indistinguishable from a clarification',{observed:declared});
+  for(const clause of withdraws)if(statements.has(clause))
+    add('WITHDRAWS_STILL_PRESENT',record,'a withdrawn statement is still one of the record statements',{observed:clause});
+  // A first revision has no predecessor, so its kind is decidable without a baseline.
+  if(rev===1&&declared!==null&&CHANGE_KINDS.includes(declared)&&declared!=='initial')
+    add('CHANGE_KIND_MISMATCH',record,'rev 1 has no previous revision to travel from',{expected:'initial',observed:declared});
+  if(declared==='initial'&&positiveInteger(rev)&&rev!==1)
+    add('CHANGE_INVALID',record,'an initial change record is rev 1',{observed:rev});
+}
+
+function validateBaselineChange(record,previous,{change,declared,rev,withdraws,computed},coveredByOwner,add){
+  const previousRev=previous&&object(previous.meta.change)&&positiveInteger(previous.meta.change.rev)?previous.meta.change.rev:null;
+  const moved=computed!=='initial'&&computed!=='editorial';
+  if(previous&&positiveInteger(rev)&&previousRev!==null&&rev<previousRev)
+    add('REV_NOT_MONOTONIC',record,'a revision never goes backwards',{expected:`> ${previousRev}`,observed:rev});
+  if(previous&&moved&&!coveredByOwner(record)&&(rev===null||previousRev===null||rev===previousRev))
+    add('CHANGE_UNRECORDED',record,'normative content moved and no revision declared it',{expected:previousRev===null?'a change record':`rev > ${previousRev}`,observed:rev,computed});
+  else if(previous&&change&&CHANGE_KINDS.includes(declared)&&positiveInteger(rev)&&previousRev!==null&&rev>previousRev&&declared!==computed)
+    add('CHANGE_KIND_MISMATCH',record,'the declared kind is not the kind this edit actually is',{expected:computed,observed:declared});
+  if(previous&&withdraws.length){
+    const held=new Set(list(previous.meta.statements).filter(text).map(item=>item.trim()));
+    for(const clause of withdraws)if(!held.has(clause))
+      add('WITHDRAWS_UNKNOWN_STATEMENT',record,'a withdrawal names a statement the previous revision did not carry',{observed:clause});
+  }
+  if(previous?.evidence&&!record.evidence)
+    add('EVIDENCE_DELETED',record,'expired evidence is marked, never deleted; history is what lets somebody later ask whether this was ever proven',{observed:previous.evidence.recordDigest??'the evidence block'});
+}
+
+function changedClauseStems(withdraws,baseline,previous,statements){
+  return new Set([...withdraws.flatMap(item=>[...stems(item)]),
+    ...(baseline&&previous?list(previous.meta.statements).filter(text).filter(item=>!statements.has(item.trim())).flatMap(item=>[...stems(item)]):[])]);
+}
+
+function validateEvidenceFreshness(record,previous,{change,declared,statements,withdraws,computed},baseline,add){
+  const proof=record.evidence;
+  const changeAt=change?moment(change.at):null;
+  const clause=changedClauseStems(withdraws,baseline,previous,statements);
+  const broke=declared==='breaking'||computed==='breaking';
+  const stale=proof?.stale===true;
+  if(proof){
+    const capturedAt=moment(proof.provenance?.capturedAt);
+    const before=previous?.evidence??null;
+    // `recordDigest` is the kernel's capture token; compare it with the previous token rather than recomputing it here.
+    const recaptured=before!==null&&text(proof.recordDigest)&&proof.recordDigest!==before.recordDigest;
+    const predates=before!==null?!recaptured:capturedAt===null||changeAt===null||capturedAt<changeAt;
+    if(!text(proof.recordDigest))
+      add('EVIDENCE_DIGEST_MISSING',record,'proof that does not say what it was captured against cannot be judged expired later',{observed:'evidence.recordDigest'});
+    if(broke&&predates&&!stale)
+      add('EVIDENCE_STALE_UNMARKED',record,'a breaking change expires the evidence bound to the content it changed',{observed:proof.recordDigest??null,expected:'stale: true with a staleReason'});
+    if(stale&&!(namesRevision(proof.staleReason)&&(clause.size===0||[...stems(proof.staleReason)].filter(word=>clause.has(word)).length>=2)))
+      add('STALE_REASON_UNNAMED',record,'stale evidence names the revision that expired it and the clause that went',{observed:proof.staleReason??null});
+    if(before&&before.stale!==true&&stale&&!broke)
+      add('EVIDENCE_STALED_WITHOUT_BREAK',record,'only a breaking change expires evidence; prose and clarifications leave existing proof standing',{observed:proof.staleReason??null,computed:computed??declared});
+  }
+  if(record.meta.state==='done'&&stale)
+    add('STATE_RESTS_ON_STALE_EVIDENCE',record,'the evidence of this record is history; a rule whose proof expired returns to todo',{observed:'state: done'});
+}
+
+function recordSummary(record,{declared,rev,digest,withdraws,computed}){
+  const proof=record.evidence;
+  const stale=proof?.stale===true;
+  return {id:record.id,path:record.path,schema:text(record.meta.schema)?record.meta.schema:null,
+    state:text(record.meta.state)?record.meta.state:null,rev:positiveInteger(rev)?rev:null,declaredKind:declared,computedKind:computed,
+    normativeDigest:digest,withdraws,criteria:[...record.criteria.keys()].sort(byCodeUnit),
+    evidence:proof?{recordDigest:text(proof.recordDigest)?proof.recordDigest:null,outcome:text(proof.outcome)?proof.outcome:null,stale}:null};
 }
 
 /**
@@ -164,88 +267,11 @@ export function checkWorkChange({workRoot,baselineRoot=null}={}){
 
   for(const record of [...current.records.values()].sort((a,b)=>a.id.localeCompare(b.id))){
     const previous=baseline?.records.get(record.id)??null;
-    const change=object(record.meta.change)?record.meta.change:null;
-    const declared=change&&text(change.kind)?change.kind.trim():null;
-    const rev=change?change.rev:null;
-    const digest=normativeDigest(record.meta);
-    const statements=new Set(list(record.meta.statements).filter(text).map(item=>item.trim()));
-    const withdraws=change?list(change.withdraws).filter(text).map(item=>item.trim()):[];
-    const computed=baseline?classifyChange(previous,record):null;
-
-    if(change){
-      for(const name of Object.keys(change))if(!CHANGE_FIELDS.includes(name))
-        add('CHANGE_INVALID',record,`change.${name} is not a field of the change record`,{expected:CHANGE_FIELDS});
-      if(!positiveInteger(rev))add('CHANGE_INVALID',record,'change.rev must be a positive integer',{observed:rev??null});
-      if(!CHANGE_KINDS.includes(declared))add('CHANGE_INVALID',record,'change.kind must be one of the four change kinds',{expected:CHANGE_KINDS,observed:declared});
-      if(moment(change.at)===null)add('CHANGE_INVALID',record,'change.at must be a parseable timestamp',{observed:change.at??null});
-      if(change.withdraws!==undefined&&(!Array.isArray(change.withdraws)||change.withdraws.length!==withdraws.length))
-        add('CHANGE_INVALID',record,'change.withdraws must be a list of non-empty statements');
-      if(withdraws.length&&declared!=='breaking')
-        add('WITHDRAWS_WITHOUT_BREAKING',record,'withdrawing a statement is a breaking change; a withdrawal that is not declared as one is indistinguishable from a clarification',{observed:declared});
-      for(const clause of withdraws)if(statements.has(clause))
-        add('WITHDRAWS_STILL_PRESENT',record,'a withdrawn statement is still one of the record statements',{observed:clause});
-      // A first revision has no predecessor, so its kind is decidable without a baseline.
-      if(rev===1&&declared!==null&&CHANGE_KINDS.includes(declared)&&declared!=='initial')
-        add('CHANGE_KIND_MISMATCH',record,'rev 1 has no previous revision to travel from',{expected:'initial',observed:declared});
-      if(declared==='initial'&&positiveInteger(rev)&&rev!==1)
-        add('CHANGE_INVALID',record,'an initial change record is rev 1',{observed:rev});
-    }
-
-    if(baseline){
-      const previousRev=previous&&object(previous.meta.change)&&positiveInteger(previous.meta.change.rev)?previous.meta.change.rev:null;
-      const moved=computed!=='initial'&&computed!=='editorial';
-      if(previous&&positiveInteger(rev)&&previousRev!==null&&rev<previousRev)
-        add('REV_NOT_MONOTONIC',record,'a revision never goes backwards',{expected:`> ${previousRev}`,observed:rev});
-      if(previous&&moved&&!coveredByOwner(record)&&(rev===null||previousRev===null||rev===previousRev))
-        add('CHANGE_UNRECORDED',record,'normative content moved and no revision declared it',{expected:previousRev===null?'a change record':`rev > ${previousRev}`,observed:rev,computed});
-      else if(previous&&change&&CHANGE_KINDS.includes(declared)&&positiveInteger(rev)&&previousRev!==null&&rev>previousRev&&declared!==computed)
-        add('CHANGE_KIND_MISMATCH',record,'the declared kind is not the kind this edit actually is',{expected:computed,observed:declared});
-      if(previous&&withdraws.length){
-        const held=new Set(list(previous.meta.statements).filter(text).map(item=>item.trim()));
-        for(const clause of withdraws)if(!held.has(clause))
-          add('WITHDRAWS_UNKNOWN_STATEMENT',record,'a withdrawal names a statement the previous revision did not carry',{observed:clause});
-      }
-      if(previous?.evidence&&!record.evidence)
-        add('EVIDENCE_DELETED',record,'expired evidence is marked, never deleted; history is what lets somebody later ask whether this was ever proven',{observed:previous.evidence.recordDigest??'the evidence block'});
-    }
-
-    const proof=record.evidence;
-    const changeAt=change?moment(change.at):null;
-    // A break stales the evidence it expired; the clause words are what the reason must name.
-    const clause=new Set([...withdraws.flatMap(item=>[...stems(item)]),
-      ...(baseline&&previous?list(previous.meta.statements).filter(text).filter(item=>!statements.has(item.trim())).flatMap(item=>[...stems(item)]):[])]);
-    const broke=declared==='breaking'||computed==='breaking';
-    const stale=proof?.stale===true;
-    if(proof){
-      const capturedAt=moment(proof.provenance?.capturedAt);
-      const before=previous?.evidence??null;
-      /**
-       * What the record says its proof was captured against. `recordDigest` is written by the
-       * capturing kernel, and this check does not recompute it - see the limitation below - so it is
-       * used the one way that needs no agreement about the function: a proof still carrying the token
-       * it carried before a break was not re-captured against what replaced the broken content.
-       * Capture time is the fallback where there is no baseline to compare the token against.
-       */
-      const recaptured=before!==null&&text(proof.recordDigest)&&proof.recordDigest!==before.recordDigest;
-      const predates=before!==null?!recaptured:capturedAt===null||changeAt===null||capturedAt<changeAt;
-      if(!text(proof.recordDigest))
-        add('EVIDENCE_DIGEST_MISSING',record,'proof that does not say what it was captured against cannot be judged expired later',{observed:'evidence.recordDigest'});
-      // Only a break expires evidence. A clarification adds a criterion the old proof never covered;
-      // marking healthy proof expired for that makes people re-run what never broke.
-      if(broke&&predates&&!stale)
-        add('EVIDENCE_STALE_UNMARKED',record,'a breaking change expires the evidence bound to the content it changed',{observed:proof.recordDigest??null,expected:'stale: true with a staleReason'});
-      if(stale&&!(namesRevision(proof.staleReason)&&(clause.size===0||[...stems(proof.staleReason)].filter(word=>clause.has(word)).length>=2)))
-        add('STALE_REASON_UNNAMED',record,'stale evidence names the revision that expired it and the clause that went',{observed:proof.staleReason??null});
-      if(before&&before.stale!==true&&stale&&!broke)
-        add('EVIDENCE_STALED_WITHOUT_BREAK',record,'only a breaking change expires evidence; prose and clarifications leave existing proof standing',{observed:proof.staleReason??null,computed:computed??declared});
-    }
-    if(record.meta.state==='done'&&stale)
-      add('STATE_RESTS_ON_STALE_EVIDENCE',record,'the evidence of this record is history; a rule whose proof expired returns to todo',{observed:'state: done'});
-
-    summaries.push({id:record.id,path:record.path,schema:text(record.meta.schema)?record.meta.schema:null,
-      state:text(record.meta.state)?record.meta.state:null,rev:positiveInteger(rev)?rev:null,declaredKind:declared,computedKind:computed,
-      normativeDigest:digest,withdraws,criteria:[...record.criteria.keys()].sort(byCodeUnit),
-      evidence:proof?{recordDigest:text(proof.recordDigest)?proof.recordDigest:null,outcome:text(proof.outcome)?proof.outcome:null,stale}:null});
+    const info=changeInfo(record,previous,baseline);
+    if(info.change)validateChangeDeclaration(record,info,add);
+    if(baseline)validateBaselineChange(record,previous,info,coveredByOwner,add);
+    validateEvidenceFreshness(record,previous,info,Boolean(baseline),add);
+    summaries.push(recordSummary(record,info));
   }
 
   // A record the check cannot read is not a clean record: it is a record nothing was decided about.
