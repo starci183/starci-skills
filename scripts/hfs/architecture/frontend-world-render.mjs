@@ -229,14 +229,17 @@ export class WorldRenderAnalysis {
     const ts = this.world.ts;
     if (!props || props.kind === ts.SyntaxKind.NullKeyword) return true;
     if (!ts.isObjectLiteralExpression(props) || props.properties.some(property => ts.isSpreadAssignment(property))) return false;
-    for (const property of props.properties) {
-      if (!ts.isPropertyAssignment(property)) continue;
-      const value = unwrapExpression(ts, property.initializer);
-      if (!this.expressionSuppliesRender(value, checker)) continue;
-      if (!this.pureRenderTarget(value, checker, expectedFile) && !this.renderBoundary(value, checker, seen, true, expectedFile)) return false;
-      const name = property.name && (ts.isIdentifier(property.name) || ts.isStringLiteralLike(property.name)) ? property.name.text : null;
-      if (['children', 'component', 'content', 'render', 'view'].includes(name)) boundary.hasBoundary = true;
-    }
+    return props.properties.every(property => this.propsPropertyBoundary(property, checker, seen, expectedFile, boundary));
+  }
+
+  propsPropertyBoundary(property, checker, seen, expectedFile, boundary) {
+    const ts = this.world.ts;
+    if (!ts.isPropertyAssignment(property)) return true;
+    const value = unwrapExpression(ts, property.initializer);
+    if (!this.expressionSuppliesRender(value, checker)) return true;
+    if (!this.pureRenderTarget(value, checker, expectedFile) && !this.renderBoundary(value, checker, seen, true, expectedFile)) return false;
+    const name = property.name && (ts.isIdentifier(property.name) || ts.isStringLiteralLike(property.name)) ? property.name.text : null;
+    if (['children', 'component', 'content', 'render', 'view'].includes(name)) boundary.hasBoundary = true;
     return true;
   }
 
@@ -285,20 +288,23 @@ export class WorldRenderAnalysis {
 
   jsxAttributesBoundary(opening, checker, seen, expectedFile, boundary) {
     const ts = this.world.ts;
-    for (const attribute of opening.attributes.properties) {
-      if (!ts.isJsxAttribute(attribute) || !attribute.initializer) continue;
-      const name = attribute.name.text;
-      if (['fallback', 'errorElement'].includes(name)) {
-        if (ts.isStringLiteral(attribute.initializer)) return false;
-        if (ts.isJsxExpression(attribute.initializer)
-          && !this.renderBoundary(attribute.initializer.expression, checker, seen, true, expectedFile)) return false;
-      }
-      if (ts.isJsxExpression(attribute.initializer) && attribute.initializer.expression
-        && this.expressionSuppliesRender(attribute.initializer.expression, checker)) {
-        if (!this.pureRenderTarget(attribute.initializer.expression, checker, expectedFile)
-          && !this.renderBoundary(attribute.initializer.expression, checker, seen, true, expectedFile)) return false;
-        if (['component', 'content', 'render', 'view'].includes(name)) boundary.hasBoundary = true;
-      }
+    return opening.attributes.properties.every(attribute => !ts.isJsxAttribute(attribute) || !attribute.initializer
+      || this.jsxAttributeBoundary(attribute, checker, seen, expectedFile, boundary));
+  }
+
+  jsxAttributeBoundary(attribute, checker, seen, expectedFile, boundary) {
+    const ts = this.world.ts;
+    const name = attribute.name.text;
+    if (['fallback', 'errorElement'].includes(name)) {
+      if (ts.isStringLiteral(attribute.initializer)) return false;
+      if (ts.isJsxExpression(attribute.initializer)
+        && !this.renderBoundary(attribute.initializer.expression, checker, seen, true, expectedFile)) return false;
+    }
+    if (ts.isJsxExpression(attribute.initializer) && attribute.initializer.expression
+      && this.expressionSuppliesRender(attribute.initializer.expression, checker)) {
+      if (!this.pureRenderTarget(attribute.initializer.expression, checker, expectedFile)
+        && !this.renderBoundary(attribute.initializer.expression, checker, seen, true, expectedFile)) return false;
+      if (['component', 'content', 'render', 'view'].includes(name)) boundary.hasBoundary = true;
     }
     return true;
   }
