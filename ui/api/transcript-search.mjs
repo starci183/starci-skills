@@ -43,9 +43,20 @@ function searchPattern(value) {
   const regex = value.length >= 2 && value.startsWith('/') && value.endsWith('/');
   const pattern = regex ? value.slice(1, -1) : value;
   if (regex && pattern.length > MAX_PATTERN) throw Object.assign(new Error('Regex exceeds 200 characters'), { code: 'BAD_REGEX' });
-  if (regex && /\([^)]*[+*][^)]*\)[+*{]/.test(pattern)) throw Object.assign(new Error('Nested regex quantifiers are not supported'), { code: 'BAD_REGEX' });
+  if (regex && hasNestedQuantifier(pattern)) throw Object.assign(new Error('Nested regex quantifiers are not supported'), { code: 'BAD_REGEX' });
   if (!pattern) throw Object.assign(new Error('Search query is empty'), { code: 'BAD_QUERY' });
   return { regex, pattern };
+}
+
+function hasNestedQuantifier(pattern) {
+  for (let open = pattern.indexOf('('); open >= 0; open = pattern.indexOf('(', open + 1)) {
+    const close = pattern.indexOf(')', open + 1);
+    if (close < 0) continue;
+    const body = pattern.slice(open + 1, close);
+    const suffix = pattern[close + 1];
+    if ((body.includes('+') || body.includes('*')) && ['+', '*', '{'].includes(suffix)) return true;
+  }
+  return false;
 }
 
 async function findHits(lines, pattern, regex) {
