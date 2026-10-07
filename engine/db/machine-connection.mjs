@@ -113,19 +113,23 @@ function resilientConnection(openRaw, { file, inTransaction, onRecovered, onCorr
 export function machineConnectionMethods({ reportIncident }) {
   function openWithRetry(openRaw, { file, onCorrupt = reportIncident }) {
     let lastError, busyOpens = 0, failures = 0;
+    const retryOpenFailure = (error) => {
+      lastError = error;
+      const kind = openFailureKind(error);
+      if (kind === null) throw error;
+      if (kind === 'busy') {
+        if (busyOpens >= BUSY_RETRY_DELAYS_MS.length) throw busyError(path.resolve(file), error, { retries: busyOpens, where: 'open' });
+        scaledSleepSync(BUSY_RETRY_DELAYS_MS[busyOpens]);
+        busyOpens += 1;
+        return true;
+      }
+      failures += 1;
+      return failures < OPEN_RETRY_DELAYS_MS.length;
+    };
     for (;;) {
       if (failures && OPEN_RETRY_DELAYS_MS[failures]) waitForRetry(OPEN_RETRY_DELAYS_MS[failures]);
       try { return openRaw(); }
-      catch (error) {
-        lastError = error;
-        const kind = openFailureKind(error);
-        if (kind === null) throw error;
-        if (kind === 'busy') {
-          if (busyOpens >= BUSY_RETRY_DELAYS_MS.length) throw busyError(path.resolve(file), error, { retries: busyOpens, where: 'open' });
-          scaledSleepSync(BUSY_RETRY_DELAYS_MS[busyOpens]);
-          busyOpens += 1;
-        } else if ((failures += 1) >= OPEN_RETRY_DELAYS_MS.length) break;
-      }
+      catch (error) { if (!retryOpenFailure(error)) break; }
     }
     if (isCorruptError(lastError)) throw onCorrupt(path.resolve(file), lastError, { retries: OPEN_RETRY_DELAYS_MS.length - 1, where: 'open' });
     throw lastError;
