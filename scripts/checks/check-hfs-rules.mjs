@@ -104,6 +104,9 @@ const lintProven = (text, id) => {
  */
 const NO_WARNING = /\.deepEqual\([^\n]*,\s*\[\]\s*\)|\.equal\([^\n]*\.length,\s*0\s*\)/;
 const A_WARNING = /\.equal\([^\n]*\.length,\s*[1-9]|\.match\(|\.deepEqual\([^\n]*\.map\(|\.ok\([^\n]*\.(?:some|length)/;
+const SPEC_DECLARATION_HEADER = String.raw`^(?:export\s+)?const\s+([A-Za-z_$][\w$]*)\s*=`;
+const SPEC_DECLARATION_BOUNDARY = String.raw`^(?:export\s+)?(?:const|test\(|(?:async )?function)\b`;
+const SPEC_DECLARATION = new RegExp(`${SPEC_DECLARATION_HEADER}([^]*?)(?=${SPEC_DECLARATION_BOUNDARY}|(?![^]))`, 'gm');
 const stylelintProven = (files, id) => files.some((text) => {
   if (!new RegExp(`\\blintRule\\(\\s*(['"\`])${id}\\1`).test(text)) return false;
   const blocks = text.split(/\btest\(/).slice(1);
@@ -114,7 +117,7 @@ const stylelintProven = (files, id) => files.some((text) => {
 const specProven = (specs, code) => specs.some((text) => {
   // A spec may bind the code once (`const hits = (report) => findings(report, 'CODE')`) and use that name in its tests.
   // A top-level declaration runs until the next top-level `const`/`test(`/`function` line.
-  const declarations = [...text.matchAll(/^(?:export\s+)?const\s+([A-Za-z_$][\w$]*)\s*=([^]*?)(?=^(?:export\s+)?(?:const|test\(|(?:async )?function)\b|(?![^]))/gm)];
+  const declarations = [...text.matchAll(SPEC_DECLARATION)];
   const names = [code, ...declarations.filter((m) => m[2].includes(code)).map((m) => m[1])];
   return text.split(/\btest\(/).slice(1).filter((block) => names.some((name) => new RegExp(String.raw`\b${name.replaceAll('$', '\\$')}\b`).test(block))).length >= 2;
 });
@@ -135,12 +138,16 @@ export function readKnowledgeFiles(root) {
  * installed only inside packages/stylelint, so importing the entry would make this check depend on that install.
  * {ids, why} like an eslint plugin, or {error}.
  */
+const STYLELINT_RULE_LINE_START = String.raw`(?<=^|[\n\r\u2028\u2029])`;
+const STYLELINT_RULE_ID = '[a-z0-9-]+';
+const STYLELINT_RULE_PATTERN = `${STYLELINT_RULE_LINE_START}[^\\S\\n]*"(${STYLELINT_RULE_ID})"\\s*:`;
+
 export function stylelintRuleIds(root) {
   try {
     const source = fs.readFileSync(path.join(root, PLUGIN_ENTRY.stylelint), 'utf8');
     const body = /export const rules = \{([\s\S]*?)\n\}/.exec(source)?.[1];
     if (body === undefined) return { error: `${PLUGIN_ENTRY.stylelint} exports no rules` };
-    const ids = new Set([...body.matchAll(/(?<=^|[\n\r\u2028\u2029])[^\S\n]*"([a-z0-9-]+)"\s*:/gm)].map((m) => m[1]));
+    const ids = new Set([...body.matchAll(new RegExp(STYLELINT_RULE_PATTERN, 'gm'))].map((m) => m[1]));
     const reported = fs.readFileSync(path.join(root, STYLELINT_WHY), 'utf8');
     const why = new Map([...reported.matchAll(/^ {2}"([a-z0-9-]+)":\s*\{\s*code:\s*"([A-Z0-9_]+)"/gm)].map((m) => [m[1], m[2]]));
     return { ids, why };
