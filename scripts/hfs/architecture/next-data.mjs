@@ -3,7 +3,7 @@ import { canonical, isInside } from './config.mjs';
 import { parseContract, installedSWR } from './next-data-contract.mjs';
 import { relativePath, unwrapExpression } from './typescript.mjs';
 import { anyDescendant, normalizedSymbol, normalizedSymbolValue, valueSymbol as sharedValueSymbol } from './ast-walks.mjs';
-import { sourceLocation } from '../../lib/ts-ast.mjs';
+import { isConstVariable, sourceLocation } from '../../lib/ts-ast.mjs';
 import { byCodeUnit } from '../../lib/list.mjs';
 import { createNextDataKeyInspector } from './next-data-key.mjs';
 export const SWR_KEY_RULE_ID = 'FE_SWR_KEY_IDENTITY';
@@ -224,7 +224,7 @@ function resolvedIdentities(ts, checker, fn, entry, reasons) {
 function constInitializer(ts, symbol) {
   const declarations = symbol?.getDeclarations?.() ?? [];
   if (declarations.length !== 1 || !ts.isVariableDeclaration(declarations[0]) || !declarations[0].initializer
-    || !(ts.getCombinedNodeFlags(declarations[0].parent) & ts.NodeFlags.Const)) return null;
+    || !isConstVariable(ts, declarations[0])) return null;
   return declarations[0].initializer;
 }
 

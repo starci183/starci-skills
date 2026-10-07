@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { relativePath, unwrapExpression } from './typescript.mjs';
 import { anyDescendant, nodeDecorators, normalizedSymbol, normalizedSymbolValue, valueSymbol, violation } from './ast-walks.mjs';
-import { sourceLocation } from '../../lib/ts-ast.mjs';
+import { isConstVariable, sourceLocation } from '../../lib/ts-ast.mjs';
 
 export const READONLY_BOUNDARY_RULE_ID = 'BE_READONLY_BOUNDARY';
 
@@ -41,7 +41,7 @@ function thisOriginStatus(ts, checker, expression, seen = new Set(), depth = 0) 
   if (declarations.length !== 1 || !ts.isVariableDeclaration(declarations[0]) || !declarations[0].initializer) return 'no';
   const origin = thisOriginStatus(ts, checker, declarations[0].initializer, new Set(seen).add(symbol), depth + 1);
   if (origin === 'no') return 'no';
-  return (ts.getCombinedNodeFlags(declarations[0].parent) & ts.NodeFlags.Const) ? origin : 'unavailable';
+  return isConstVariable(ts, declarations[0]) ? origin : 'unavailable';
 }
 
 function instanceAssignmentTarget(ts, checker, expression) {
@@ -63,7 +63,7 @@ function expressionOrigin(ts, checker, expression, seen = new Set(), depth = 0) 
   if (!symbol || seen.has(symbol)) return symbol;
   const declarations = symbol.getDeclarations?.() ?? [];
   if (declarations.length === 1 && ts.isVariableDeclaration(declarations[0]) && declarations[0].initializer
-    && (ts.getCombinedNodeFlags(declarations[0].parent) & ts.NodeFlags.Const)) {
+    && isConstVariable(ts, declarations[0])) {
     return expressionOrigin(ts, checker, declarations[0].initializer, new Set(seen).add(symbol), depth + 1);
   }
   return symbol;

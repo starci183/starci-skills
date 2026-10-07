@@ -5,6 +5,9 @@
 /** Whether the single-bit `flag` (a ts.NodeFlags member) is set in `flags`: the bit read as arithmetic, no bitwise operator in the condition. */
 export const hasFlag = (flags, flag) => Math.floor(flags / flag) % 2 === 1;
 
+/** Whether the variable `declaration` belongs to a `const` list: the TypeScript node-flag test, an explicit comparison of the masked flags. */
+export const isConstVariable = (ts, declaration) => (ts.getCombinedNodeFlags(declaration.parent) & ts.NodeFlags.Const) !== 0;
+
 /** The text of an identifier or a string-literal-like `node`, or null (property names, literal specifiers). */
 export const nameText = (ts, node) => (node && (ts.isIdentifier(node) || ts.isStringLiteralLike(node)) ? node.text : null);
 
