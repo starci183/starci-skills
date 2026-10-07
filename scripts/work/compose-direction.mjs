@@ -155,45 +155,45 @@ function resolveComposeContext({ uiDir, content, breakpoint, theme, state, prese
   return { ok: true, uiAbs, ui, workRoot, repoRoot, breakpoint, theme, state, pres, surface, contentAbs, contentBytes, contentImage, uiRecords, composite, bpEntry, shell, tree };
 }
 
-function resolveCompositionTarget({ ui, tree, breakpoint, theme, surface, shell, uiRecords, bpEntry, composite, pres, hostState, contentImage, scrim, fit }) {
-  let base, rect, scrimUsed = null, fitUsed = fit;
-  if (pres === 'page') {
-    const parent = ui.routeParent;
-    const underParent = typeof parent === 'string' && nodeById(tree, parent) && (ui.route === parent || ui.route.startsWith(parent === '/' ? '/' : `${parent}/`));
-    if (!nodeById(tree, ui.route) && !underParent) return { ok: false, error: `${ui.route} is not a node of the layout tree and routeParent ${parent ?? '(none)'} names no existing ancestor of it - declare routeParent (UI_ROUTE_UNKNOWN)` };
-    const anchor = nodeById(tree, ui.route) ? ui.route : parent;
-    // The capture is the one with the ui record's active destination (its route, a bound destination or
-    // shell.activeNav) when the layout records destinations - never the default render of another tab.
-    const layout = baseLayoutFor(tree, anchor, breakpoint, theme, { shellDir: shell.dir, uiLoader: (id) => uiRecords.get(id) ?? null, self: !(surface === 'layout' && anchor === ui.route), ui });
-    if (layout?.missing) return { ok: false, error: `no layout capture to compose into: ${layout.missing}` };
-    if (layout) {
-      if (!fs.existsSync(layout.file)) return { ok: false, error: `layout capture ${layout.rel} is not on disk` };
-      base = decodePng(fs.readFileSync(layout.file));
-      rect = layout.slot;
-      composite.layout = { node: layout.node, capture: layout.rel, sha256: layout.sha256, ...(layout.destination ? { destination: layout.destination } : {}) };
-    } else {
-      base = blankImage(bpEntry.width, bpEntry.height, CANVAS[theme]);
-      rect = { x: 0, y: 0, width: bpEntry.width, height: bpEntry.height };
-      composite.layout = null;
-      composite.canvas = { width: bpEntry.width, height: bpEntry.height, theme };
-    }
-  } else {
-    const host = resolveHost(uiRecords, ui.host);
-    if (!host) return { ok: false, error: `${ui.id} opens over ${ui.host ?? '(no host)'}, which resolves to no ui record` };
-    const hostAsset = hostCompositeOf(host, breakpoint, theme, hostState);
-    if (!hostAsset) return { ok: false, error: `host ${host.id} has no page composite at ${breakpoint}/${theme} - compose the host first` };
-    const hostFile = path.join(path.dirname(host.file), hostAsset.path);
-    if (!fs.existsSync(hostFile)) return { ok: false, error: `host composite ${host.id}:${hostAsset.path} is not on disk - compose the host first` };
-    base = decodePng(fs.readFileSync(hostFile));
-    const direction = surface === 'drawer' ? directionAt(ui, breakpoint) : null;
-    if (surface === 'drawer' && !direction) return { ok: false, error: `${ui.id} is a drawer at ${breakpoint} with no direction` };
-    rect = panelRect(base.width, base.height, contentImage, surface, direction);
-    scrimUsed = scrim;
-    fitUsed = 'stretch';
-    if (direction) composite.direction = direction;
-    composite.host = { ui: host.id, asset: `${host.id}:${hostAsset.path}`, sha256: hostAsset.sha256, flowState: hostAsset.composite.flowState };
+function pageCompositionTarget({ ui, tree, breakpoint, theme, surface, shell, uiRecords, bpEntry, composite, fit }) {
+  const parent = ui.routeParent;
+  const underParent = typeof parent === 'string' && nodeById(tree, parent) && (ui.route === parent || ui.route.startsWith(parent === '/' ? '/' : `${parent}/`));
+  if (!nodeById(tree, ui.route) && !underParent) return { ok: false, error: `${ui.route} is not a node of the layout tree and routeParent ${parent ?? '(none)'} names no existing ancestor of it - declare routeParent (UI_ROUTE_UNKNOWN)` };
+  const anchor = nodeById(tree, ui.route) ? ui.route : parent;
+  // The capture is the one with the ui record's active destination (its route, a bound destination or
+  // shell.activeNav) when the layout records destinations - never the default render of another tab.
+  const layout = baseLayoutFor(tree, anchor, breakpoint, theme, { shellDir: shell.dir, uiLoader: (id) => uiRecords.get(id) ?? null, self: !(surface === 'layout' && anchor === ui.route), ui });
+  if (layout?.missing) return { ok: false, error: `no layout capture to compose into: ${layout.missing}` };
+  if (!layout) {
+    const base = blankImage(bpEntry.width, bpEntry.height, CANVAS[theme]);
+    composite.layout = null;
+    composite.canvas = { width: bpEntry.width, height: bpEntry.height, theme };
+    return { ok: true, base, rect: { x: 0, y: 0, width: bpEntry.width, height: bpEntry.height }, scrimUsed: null, fitUsed: fit };
   }
-  return { ok: true, base, rect, scrimUsed, fitUsed };
+  if (!fs.existsSync(layout.file)) return { ok: false, error: `layout capture ${layout.rel} is not on disk` };
+  const base = decodePng(fs.readFileSync(layout.file));
+  composite.layout = { node: layout.node, capture: layout.rel, sha256: layout.sha256, ...(layout.destination ? { destination: layout.destination } : {}) };
+  return { ok: true, base, rect: layout.slot, scrimUsed: null, fitUsed: fit };
+}
+
+function overlayCompositionTarget({ ui, breakpoint, theme, surface, uiRecords, composite, hostState, contentImage, scrim }) {
+  const host = resolveHost(uiRecords, ui.host);
+  if (!host) return { ok: false, error: `${ui.id} opens over ${ui.host ?? '(no host)'}, which resolves to no ui record` };
+  const hostAsset = hostCompositeOf(host, breakpoint, theme, hostState);
+  if (!hostAsset) return { ok: false, error: `host ${host.id} has no page composite at ${breakpoint}/${theme} - compose the host first` };
+  const hostFile = path.join(path.dirname(host.file), hostAsset.path);
+  if (!fs.existsSync(hostFile)) return { ok: false, error: `host composite ${host.id}:${hostAsset.path} is not on disk - compose the host first` };
+  const base = decodePng(fs.readFileSync(hostFile));
+  const direction = surface === 'drawer' ? directionAt(ui, breakpoint) : null;
+  if (surface === 'drawer' && !direction) return { ok: false, error: `${ui.id} is a drawer at ${breakpoint} with no direction` };
+  const rect = panelRect(base.width, base.height, contentImage, surface, direction);
+  if (direction) composite.direction = direction;
+  composite.host = { ui: host.id, asset: `${host.id}:${hostAsset.path}`, sha256: hostAsset.sha256, flowState: hostAsset.composite.flowState };
+  return { ok: true, base, rect, scrimUsed: scrim, fitUsed: 'stretch' };
+}
+
+function resolveCompositionTarget(context) {
+  return context.pres === 'page' ? pageCompositionTarget(context) : overlayCompositionTarget(context);
 }
 
 function finishComposition({ uiAbs, workRoot, repoRoot, state, pres, surface, breakpoint, theme, contentAbs, contentBytes, contentImage, uiRecords, composite, base, rect, scrimUsed, fitUsed, tool, prompt, out, write }) {
