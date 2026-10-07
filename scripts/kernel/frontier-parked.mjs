@@ -60,6 +60,14 @@ export function parkedBehindWaits(queued = [], heldSettle = []) {
   return out;
 }
 
+/** A queued job parked behind a recorded wait names the wait in its detail; a job outside any wait is left as it is. */
+export const noteParkedBehind = (item, root) => {
+  if (!root) return;
+  item.parkedBehind = root;
+  const deferred = root.settle ? ' (its settle is deferred)' : '';
+  item.detail = `${item.detail ?? ''}; parked behind ${root.heldBecause} ${root.incident} through ${root.via}${deferred}`;
+};
+
 /**
  * Open operations a recorded wait holds, as the frontier's engaged test counts them: every queued job a
  * peer-wait holds, every settle a wait defers, and every dependant parked behind either (a dependant
