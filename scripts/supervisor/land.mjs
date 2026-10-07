@@ -50,14 +50,14 @@ import '../api/process/hide-child-windows.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { randomBytes, createHash } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import { setPriority } from '../api/process/set-priority.mjs';
 import { runNode } from '../api/node/run-node.mjs';
 import { pathToFileURL } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { allocationMs, allocationSettings, harnessSpecsEnabled } from '../../engine/config.mjs';
-import { git, normPath, finishLanded, selfJobsLandedBy, recordLandFailed } from './workers.mjs';
-import { withMachine, readMachine, writeOrDefer, newSpanId, isMachineBusy } from '../../engine/db/machine.mjs';
+import { git, normPath } from './workers.mjs';
+import { withMachine, readMachine, writeOrDefer, isMachineBusy } from '../../engine/db/machine.mjs';
 import { scanRange, scanHint } from './push-mains.mjs';
 import { safeRemove } from '../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
@@ -71,11 +71,14 @@ import { buildGrammar } from '../gates/grammar-build.mjs';
 import { specsDependingOn } from '../lib/spec-deps.mjs';
 import { SKILL_ROOT, lanesRoot, landRoot, supervisorSettings } from '../machine/home.mjs';
 import { specsDirect, changedExports, headRanges } from './land-specs.mjs';
-import { DEFAULT_DUE_MS } from '../machine/decisions.mjs';
 import { fullCheckStep } from './land-full-check.mjs';
 import { fastForwardLive } from '../machine/live-fast-forward.mjs';
 import { withoutGitLocalEnv } from '../lib/git.mjs'; import { isMain } from '../lib/is-main.mjs';
 import { tailLines } from '../lib/clip.mjs'; import { landUnderHostLock } from './land-lock.mjs'; import { selfUpgradeBranchContaining, selfUpgradeIdOf, withSelfUpgradeRef, writeSelfUpgradeRef } from './self-upgrade-ref.mjs'; import { describe, failList, specsRedOnMainOf } from './land-format.mjs'; export { describe };
+import { failKey, pushOwedOf, landOutcomeOf, recordLand } from './land-record.mjs';
+import { conflictHint, conflictHunks, conflictPreflight, pickConflicts } from './land-conflicts.mjs';
+export { conflictHunks, conflictPreflight };
+export { specsRedOnMainDecision } from './land-record.mjs';
 export const TREE_CHECKS = Object.freeze(['scripts/hfs/sync-runtime.mjs', 'scripts/checks/check-module-yaml.mjs', 'scripts/checks/check-contract-cites.mjs', 'scripts/checks/check-cli-parity.mjs', 'scripts/checks/check-worktree-add.mjs']);
 const MAX_MAIN_RETRIES = 3;
 export const LAND_WAIT_MS = allocationMs('landGate.waitMs');
@@ -108,7 +111,7 @@ export function specRunGate({ concurrency = specConcurrency(), waitMs = LAND_WAI
  */
 export const invariantRootsOf = (text) => {
   const m = /^export const INVARIANT_ROOTS = \[([^\]]*)\]/m.exec(String(text ?? ''));
-  return m ? [...m[1].matchAll(/'([^']+)'/g)].map((x) => normPath(x[1]).replace(/\/+$/, '')) : [];
+  return m ? [...m[1].matchAll(/'([^']+)'/g)].map((x) => normPath(x[1])) : [];
 };
 /** Invariant specs (invariantRootsOf) scanning a root that holds a changed file. */
 const specsInvariant = (changed, { specs }) => {
@@ -149,64 +152,6 @@ export function specPlan({ fullAllowed = false, fullByPushGit = false, asked = [
   return { mode: 'touching', named: files };
 }
 
-/* ------------------------------------------------------------ conflicts */
-
-const HUNK_LINES = 40, HUNKS_PER_FILE = 4, CONFLICT_FILES = 20;
-/** The conflict-marker regions of a merged text, each with 2 lines of context, capped. */
-export function conflictHunks(text) {
-  const lines = String(text ?? '').split(/\r?\n/);
-  const hunks = [];
-  let i = 0;
-  while (i < lines.length && hunks.length < HUNKS_PER_FILE) {
-    if (!lines[i].startsWith('<<<<<<< ')) { i += 1; continue; }
-    let end = i + 1;
-    while (end < lines.length && !lines[end].startsWith('>>>>>>> ')) end += 1;
-    const body = lines.slice(Math.max(0, i - 2), Math.min(lines.length, end + 3)).map((l) => (l.length > 300 ? `${l.slice(0, 300)}...` : l));
-    hunks.push({ line: i + 1, text: (body.length > HUNK_LINES ? [...body.slice(0, HUNK_LINES), `... (${body.length - HUNK_LINES} more lines)`] : body).join('\n') });
-    i = end + 1;
-  }
-  return hunks;
-}
-
-/** What a lane does about a conflict: one instruction, never a blind retry. */
-const conflictHint = (conflicts, commit = null) => 'rebase the lane onto current main (git rebase main in its worktree), resolve ' + (conflicts.map((c) => c.file).join(', ') || 'the conflicting files') + (commit ? ' in ' + String(commit).slice(0, 9) : '') + ', run its specs, then land the new sha; the same sha on the same main conflicts again';
-
-/**
- * Lock-free preflight: apply `commits` in order onto `onto` with `git merge-tree --write-tree` (no worktree, no
- * lock), chaining through throwaway commit objects. {ok, conflicts:[{commit, file, hunks[]}], onto}. A git that
- * cannot run merge-tree reads as ok (the gate's own cherry-pick still decides).
- */
-export function conflictPreflight({ root = SKILL_ROOT, commits, onto = 'refs/heads/main' }) {
-  let head = git(['rev-parse', onto], { cwd: root }).stdout;
-  if (!head) return { ok: true, conflicts: [], skipped: 'no main' };
-  for (const c of commits) {
-    const parent = git(['rev-parse', '--verify', '--quiet', `${c}^`], { cwd: root }).stdout;
-    if (!parent) return { ok: true, conflicts: [], skipped: `no parent of ${c}` };
-    const r = git(['merge-tree', '--write-tree', '--merge-base', parent, head, c], { cwd: root });
-    const tree = r.stdout.split(/\r?\n/)[0]?.trim();
-    if (r.status === 1 && /^[0-9a-f]{40,64}$/.test(tree ?? '')) {
-      const files = [...new Set(r.stdout.split(/\r?\n\r?\n/)[0].split(/\r?\n/).slice(1).map((l) => l.split('\t')[1]).filter(Boolean))].slice(0, CONFLICT_FILES);
-      const conflicts = files.map((file) => ({ commit: c, file, hunks: conflictHunks(git(['cat-file', '-p', `${tree}:${file}`], { cwd: root }).stdout) }));
-      return { ok: false, conflicts, onto: head };
-    }
-    if (!r.ok || !/^[0-9a-f]{40,64}$/.test(tree ?? '')) return { ok: true, conflicts: [], skipped: (r.stderr || 'merge-tree failed').slice(0, 200) };
-    const next = git(['commit-tree', tree, '-p', head, '-m', `land preflight ${c}`], { cwd: root }).stdout;
-    if (!next) return { ok: true, conflicts: [], skipped: 'commit-tree failed' };
-    head = next;
-  }
-  return { ok: true, conflicts: [], onto: head };
-}
-
-/** The conflicts of a stopped cherry-pick in worktree `dir`: every unmerged file with its marker hunks. */
-function pickConflicts(dir, commit = null) {
-  const files = git(['diff', '--name-only', '--diff-filter=U'], { cwd: dir }).stdout.split(/\r?\n/).filter(Boolean).slice(0, CONFLICT_FILES);
-  return files.map((file) => {
-    let text = '';
-    try { text = fs.readFileSync(path.join(dir, file), 'utf8'); } catch { /* deleted on one side */ }
-    return { commit, file, hunks: conflictHunks(text) };
-  });
-}
-
 /* ------------------------------------------------------------ scratch */
 
 const outcome = (r) => ({ ok: r.status === 0, status: r.status, stdout: String(r.stdout ?? ''), stderr: String(r.stderr ?? ''), error: r.error?.message ?? null });
@@ -245,10 +190,12 @@ export function gitHealth({ root = SKILL_ROOT } = {}) {
   const inside = git(['rev-parse', '--is-inside-work-tree'], { cwd: root });
   if (inside.ok && inside.stdout === 'true') return { ok: true };
   const bare = git(['config', '--show-origin', '--get', 'core.bare'], { cwd: root }).stdout;
-  const why = /\btrue$/.test(bare) ? `core.bare=true (${bare.replace(/\s+true$/, '')})` : (inside.stderr || inside.error || `is-inside-work-tree: ${inside.stdout || 'unreadable'}`).slice(0, 200);
+  const why = /\btrue$/.test(bare) ? `core.bare=true (${bare.replace(BARE_VALUE, '')})` : (inside.stderr || inside.error || `is-inside-work-tree: ${inside.stdout || 'unreadable'}`).slice(0, 200);
   return { ok: false, detail: why, bare: /\btrue$/.test(bare), hint: /\btrue$/.test(bare) ? `something set core.bare=true on ${root}; run \`git -C ${root} config core.bare false\` (the gate never edits the live repo config), then land again` : `git cannot run a work-tree operation in ${root}; fix that first, then land again` };
 }
 const GIT_HEALTH_WAIT_MS = 20_000;
+// The `true` value (and the whitespace before it) at the end of a `git config --show-origin --get core.bare` line.
+const BARE_VALUE = new RegExp([String.raw`\s+`, 'true', '$'].join(''));
 /** gitHealth, retried for a transient value: {ok} or {ok:false, detail, hint, waitedMs}. Seams: check, sleep, now. */
 export function waitGitHealthy({ root = SKILL_ROOT, waitMs = GIT_HEALTH_WAIT_MS, pollMs = 1000, check = gitHealth, sleep = sleepSync, now = Date.now } = {}) {
   const start = now();
@@ -321,7 +268,6 @@ const FAIL_REPORTER = `export default async function* failures(source) {
   for (const [file, list] of pending) for (const f of list) yield line(file, f);
 }
 `;
-const failKey = (f) => `${f.file}\u0000${f.name}`;
 const uniqFailures = (list) => [...new Map(list.map((f) => [failKey(f), f])).values()];
 
 /**
@@ -449,68 +395,97 @@ const readSpecs = (dir) => {
   return names.map((n) => ({ file: `tests/${n}`, text: (() => { try { return fs.readFileSync(path.join(tests, n), 'utf8'); } catch { return ''; } })() }));
 };
 
+const syntaxChecks = (dir, present) => present.filter((x) => x.endsWith('.mjs')).map((f) => {
+  const r = node(['--check', f], { cwd: dir, timeout: 60_000 });
+  return { name: `node --check ${f}`, ok: r.ok, ...(r.ok ? {} : { output: tailLines(r.stderr, 10) }) };
+});
+
+const parseChecks = (dir, present) => present.filter((x) => /\.(ya?ml|json)$/i.test(x)).map((f) => {
+  let ok = true, error = null;
+  try { const text = fs.readFileSync(path.join(dir, f), 'utf8'); if (/\.json$/i.test(f)) JSON.parse(text); else parseYaml(text); } catch (e) { ok = false; error = String(e?.message ?? e).slice(0, 300); }
+  return { name: `parse ${f}`, ok, ...(error ? { output: error } : {}) };
+});
+
+const treeChecks = (dir, baseline) => TREE_CHECKS.flatMap((script) => {
+  const r = treeCheck(dir, script);
+  if (r.skipped) return [];
+  const { ok, newFindings } = baselineVerdict(script, baseline?.[script], r);
+  return [{ name: path.basename(script), ok, ...(r.ok ? {} : { output: r.output, ...(ok ? { note: 'red on main too, unchanged by this land' } : { newFindings }) }) }];
+});
+
+/** The exports a changed .mjs file's diff reaches ({symbols, why}); `symbols` null when the file cannot be narrowed. */
+const symbolsOfChange = ({ dir, base, head, rows }, file) => {
+  const row = rows.find((r) => normPath(r.at(-1)) === file);
+  if (row?.[0] !== 'M' || !/.mjs$/.test(file)) return { symbols: null, why: row?.[0] !== 'M' ? `status ${row?.[0] ?? '?'}` : 'not a .mjs file' };
+  const diff = git(['diff', '-U0', '--no-color', `${base}..${head}`, '--', file], { cwd: dir });
+  const source = git(['show', `${head}:${file}`], { cwd: dir });
+  return diff.ok && source.ok ? changedExports({ source: source.stdout, ranges: headRanges(diff.stdout) }) : { symbols: null, why: 'diff unreadable' };
+};
+
+/** The spec files the gate runs for `specMode` ({allSpecs}) and the hub files `direct` narrowed ({narrowed}). */
+function chooseSpecs({ dir, base, head, rows, changed, specs, specMode }) {
+  const pool = ['touching', 'direct', 'all'].includes(specMode) ? readSpecs(dir) : [];
+  let extra = [], narrowed = [];
+  if (specMode === 'all') extra = pool.map((s) => s.file);
+  else if (specMode === 'touching') extra = specsTouching(changed, { specs: pool, root: dir });
+  else if (specMode === 'direct') { const d = specsDirect(changed, { specs: pool, symbolsOf: (file) => symbolsOfChange({ dir, base, head, rows }, file) }); extra = [...d.files, ...specsInvariant(changed, { specs: pool })]; narrowed = d.narrowed; }
+  const allSpecs = specMode === 'none' ? [] : [...new Set([...specs.map(normPath), ...extra])].filter((f) => fs.existsSync(path.join(dir, f)));
+  return { allSpecs, narrowed };
+}
+
+/** The refusal text appended to a red spec run's output. */
+const refusedText = (v) => '\nrefused: ' + String(v.why) + (v.changedSpecFailures.length ? '\n  in a changed spec: ' + String(failList(v.changedSpecFailures)) : '') + (v.newFailures.length ? '\n  new versus main: ' + String(failList(v.newFailures)) : '');
+
+/** The checks of a red spec run: the failing spec files the change did not add or modify run once more at base (red-on-main baseline). A
+ *  failure main has too is inherited and reported; any other failure, or a base run that cannot run, refuses. */
+function redSpecChecks(specCheck, r, { base, changed, concurrency, baseTree, env, specBaseRun }) {
+  const candidate = r.error ? null : r.failures;
+  const rerun = [...new Set((candidate ?? []).map((f) => f.file).filter((f) => !changed.includes(f)))];
+  const baseRun = rerun.length ? specBaseRun({ root: baseTree, base, files: rerun, concurrency, env }) : null;
+  const v = specBaselineVerdict({ candidate, base: baseRun, changed });
+  Object.assign(specCheck, { ok: v.ok, newFailures: v.newFailures, changedSpecFailures: v.changedSpecFailures, inherited: v.inherited, ...(baseRun ? { baseRun: { ok: baseRun.ok, files: rerun, ...(baseRun.error ? { error: baseRun.error } : {}) } } : {}) });
+  if (v.ok) specCheck.note = 'red on main too: every failure is inherited from main (see specs red on main)';
+  else specCheck.output = String(specCheck.output) + refusedText(v);
+  const checks = [specCheck];
+  if (v.ok && v.inherited.length) checks.push({ name: `specs red on main (${v.inherited.length})`, ok: true, advisory: true, specsRedOnMain: true, base, inherited: v.inherited,
+    output: `red on main ${String(base).slice(0, 9)} too, not this change's fault - fix main: ${failList(v.inherited)}` });
+  return checks;
+}
+
+/** The checks of one spec run: the run and its red-on-main verdict. */
+function ranSpecChecks({ dir, base, changed, allSpecs, baseTree, env, specBaseRun }, concurrency) {
+  const r = runSpecFiles({ dir, files: allSpecs, concurrency });
+  const specCheck = { name: `specs (${allSpecs.length})`, ok: r.ok, specs: allSpecs, output: tailLines(r.stdout + r.stderr, r.ok ? 6 : 40) };
+  if (r.ok) return [specCheck];
+  return redSpecChecks(specCheck, r, { base, changed, concurrency, baseTree, env, specBaseRun });
+}
+
+/** The spec run of the gate under the RAM throttle: its checks (a paused run, and/or the run itself). */
+function specRunChecks(o) {
+  const { allSpecs, runSpecs, ramGate } = o;
+  const gate = runSpecs && allSpecs.length ? ramGate() : null;
+  const checks = [];
+  if (gate && !gate.ok) checks.push({ name: `specs (${allSpecs.length})`, ok: false, specs: allSpecs, output: `spec run paused: host RAM critical after waiting ${Math.round(gate.waitedMs / 1000)}s - ${gate.why}; land again once free RAM is back above allocation.resources.ramThrottle.landSpecResumeAbovePct` });
+  if (runSpecs && allSpecs.length && gate?.ok !== false) checks.push(...ranSpecChecks(o, gate?.concurrency || specConcurrency()));
+  return checks;
+}
+
+const narrowedCheck = (narrowed) => ({ name: 'specs direct: hub files', ok: true, advisory: true, narrowed, output: narrowed.map((n) => String(n.file) + ': ' + String(n.importers) + ' importing specs, kept ' + String(n.kept) + (n.symbols ? ' (exports reached: ' + (n.symbols.join(', ') || 'none') + ')' : ' (' + String(n.why) + ': every importer kept)')).join('; ') });
+
 /** Every required check over the candidate scratch; red or unavailable proof refuses. */
 export function runChecks({ dir, base, head, specs = [], specMode = 'touching', baseline = null, runSpecs = true, baseTree = null, ramGate = specRunGate, env = process.env, specBaseRun = specBaseRunAt }) {
-  const checks = [];
   const changedOut = git(['diff', '--name-status', `${base}..${head}`], { cwd: dir });
   const rows = changedOut.stdout.split(/\r?\n/).filter(Boolean).map((l) => l.split('\t'));
   const changed = rows.map((r) => normPath(r.at(-1)));
   const present = changed.filter((f) => fs.existsSync(path.join(dir, f)));
-  for (const f of present.filter((x) => x.endsWith('.mjs'))) {
-    const r = node(['--check', f], { cwd: dir, timeout: 60_000 });
-    checks.push({ name: `node --check ${f}`, ok: r.ok, ...(r.ok ? {} : { output: tailLines(r.stderr, 10) }) });
-  }
-  for (const f of present.filter((x) => /\.(ya?ml|json)$/i.test(x))) {
-    let ok = true, error = null;
-    try { const text = fs.readFileSync(path.join(dir, f), 'utf8'); if (/\.json$/i.test(f)) JSON.parse(text); else parseYaml(text); } catch (e) { ok = false; error = String(e?.message ?? e).slice(0, 300); }
-    checks.push({ name: `parse ${f}`, ok, ...(error ? { output: error } : {}) });
-  }
-  for (const script of TREE_CHECKS) {
-    const r = treeCheck(dir, script);
-    if (r.skipped) continue;
-    const { ok, newFindings } = baselineVerdict(script, baseline?.[script], r);
-    checks.push({ name: path.basename(script), ok, ...(r.ok ? {} : { output: r.output, ...(ok ? { note: 'red on main too, unchanged by this land' } : { newFindings }) }) });
-  }
+  const checks = [...syntaxChecks(dir, present), ...parseChecks(dir, present), ...treeChecks(dir, baseline)];
   for (const step of [mirrorDriftCheck({ dir, changed, baseline }), packageProofCheck({ dir, base }), fullCheckStep(dir)]) if (step) checks.push(step);
-  const pool = ['touching', 'direct', 'all'].includes(specMode) ? readSpecs(dir) : [];
-  let narrowed = [];
-  const symbolsOf = (file) => {
-    const row = rows.find((r) => normPath(r.at(-1)) === file);
-    if (row?.[0] !== 'M' || !/.mjs$/.test(file)) return { symbols: null, why: row?.[0] !== 'M' ? `status ${row?.[0] ?? '?'}` : 'not a .mjs file' };
-    const diff = git(['diff', '-U0', '--no-color', `${base}..${head}`, '--', file], { cwd: dir });
-    const source = git(['show', `${head}:${file}`], { cwd: dir });
-    return diff.ok && source.ok ? changedExports({ source: source.stdout, ranges: headRanges(diff.stdout) }) : { symbols: null, why: 'diff unreadable' };
-  };
-  let extra = [];
-  if (specMode === 'all') extra = pool.map((s) => s.file);
-  else if (specMode === 'touching') extra = specsTouching(changed, { specs: pool, root: dir });
-  else if (specMode === 'direct') { const d = specsDirect(changed, { specs: pool, symbolsOf }); extra = [...d.files, ...specsInvariant(changed, { specs: pool })]; narrowed = d.narrowed; }
-  const allSpecs = specMode === 'none' ? [] : [...new Set([...specs.map(normPath), ...extra])].filter((f) => fs.existsSync(path.join(dir, f)));
+  const { allSpecs, narrowed } = chooseSpecs({ dir, base, head, rows, changed, specs, specMode });
   if (specMode === 'none') checks.push({ name: 'specs skipped', ok: true, advisory: true, output: '--specs none with an explicit --reason: no spec ran (the reason is recorded as specReason on the land run)' });
   const missing = specs.map(normPath).filter((f) => !fs.existsSync(path.join(dir, f)));
   if (missing.length) checks.push({ name: 'named specs exist', ok: false, output: `missing: ${missing.join(', ')}` });
-  const gate = runSpecs && allSpecs.length ? ramGate() : null;
-  if (gate && !gate.ok) checks.push({ name: `specs (${allSpecs.length})`, ok: false, specs: allSpecs, output: `spec run paused: host RAM critical after waiting ${Math.round(gate.waitedMs / 1000)}s - ${gate.why}; land again once free RAM is back above allocation.resources.ramThrottle.landSpecResumeAbovePct` });
-  if (runSpecs && allSpecs.length && gate?.ok !== false) {
-    const concurrency = gate?.concurrency || specConcurrency();
-    const r = runSpecFiles({ dir, files: allSpecs, concurrency });
-    const specCheck = { name: `specs (${allSpecs.length})`, ok: r.ok, specs: allSpecs, output: tailLines(r.stdout + r.stderr, r.ok ? 6 : 40) };
-    // Red: the failing spec files the change did not add or modify run once more at base (red-on-main baseline). A
-    // failure main has too is inherited and reported; any other failure, or a base run that cannot run, refuses.
-    if (!r.ok) {
-      const candidate = r.error ? null : r.failures;
-      const rerun = [...new Set((candidate ?? []).map((f) => f.file).filter((f) => !changed.includes(f)))];
-      const baseRun = rerun.length ? specBaseRun({ root: baseTree, base, files: rerun, concurrency, env }) : null;
-      const v = specBaselineVerdict({ candidate, base: baseRun, changed });
-      Object.assign(specCheck, { ok: v.ok, newFailures: v.newFailures, changedSpecFailures: v.changedSpecFailures, inherited: v.inherited, ...(baseRun ? { baseRun: { ok: baseRun.ok, files: rerun, ...(baseRun.error ? { error: baseRun.error } : {}) } } : {}) });
-      if (v.ok) specCheck.note = 'red on main too: every failure is inherited from main (see specs red on main)';
-      else specCheck.output = String(specCheck.output) + '\nrefused: ' + String(v.why) + (v.changedSpecFailures.length ? '\n  in a changed spec: ' + String(failList(v.changedSpecFailures)) : '') + (v.newFailures.length ? '\n  new versus main: ' + String(failList(v.newFailures)) : '');
-      checks.push(specCheck);
-      if (v.ok && v.inherited.length) checks.push({ name: `specs red on main (${v.inherited.length})`, ok: true, advisory: true, specsRedOnMain: true, base, inherited: v.inherited,
-        output: `red on main ${String(base).slice(0, 9)} too, not this change's fault - fix main: ${failList(v.inherited)}` });
-    } else checks.push(specCheck);
-  }
-  if (narrowed.length) checks.push({ name: 'specs direct: hub files', ok: true, advisory: true, narrowed, output: narrowed.map((n) => String(n.file) + ': ' + String(n.importers) + ' importing specs, kept ' + String(n.kept) + (n.symbols ? ' (exports reached: ' + (n.symbols.join(', ') || 'none') + ')' : ' (' + String(n.why) + ': every importer kept)')).join('; ') });
+  checks.push(...specRunChecks({ dir, base, changed, allSpecs, runSpecs, baseTree, ramGate, env, specBaseRun }));
+  if (narrowed.length) checks.push(narrowedCheck(narrowed));
   return { ok: checks.every((c) => c.ok), checks, changed, rows, specs: allSpecs };
 }
 
@@ -532,6 +507,90 @@ export function liveDepsState(root = SKILL_ROOT) {
 const depsMissing = (s) => s.declared > 0 && !s.entries;
 const depsHint = (root) => `the live runtime's node_modules is missing or emptied; restore it (\`npm ci\` in ${root}), find what emptied it (a recursive delete or an npm reify through a scratch/staging node_modules junction), then land again`;
 
+/** A cherry-pick that did not apply, with the scratch's pick aborted: the refusal result (conflict, git-failed or git-unusable). */
+function pickRefusal({ root, deps, result }, { scratch, step, base, pick }) {
+  const said = pick.stderr || pick.stdout || pick.error || '';
+  const stopped = /could not apply ([0-9a-f]{7,40})/.exec(said)?.[1] ?? null;
+  const conflicts = pickConflicts(scratch.dir, stopped);
+  git(['cherry-pick', '--abort'], { cwd: scratch.dir });
+  // A conflict is unmerged files (or git saying so). Anything else is git failing, and it is reported as that: a
+  // broken repo (core.bare) must never read as "rebase your lane" (runs 21 and 22, 2026-09-29).
+  if (!conflicts.length && !/\bCONFLICT\b|could not apply|after resolving the conflicts/i.test(said)) {
+    const again = (deps.gitHealth ?? gitHealth)({ root });
+    if (!again.ok) { result.attempts.push({ ...step, reason: 'git-unusable' }); return { ...result, base, reason: 'git-unusable', detail: again.detail, hint: again.hint }; }
+    result.attempts.push({ ...step, reason: 'git-failed' });
+    return { ...result, base, reason: 'git-failed', detail: tailLines(said, 12), hint: 'git itself failed applying the commit(s); this is not a content conflict, so do not rebase: land again, and if it repeats read the detail' };
+  }
+  result.attempts.push({ ...step, reason: 'conflict' });
+  return { ...result, base, reason: 'conflict', detail: tailLines(said, 12), conflicts, hint: conflictHint(conflicts, stopped) };
+}
+
+/** The landed result: main moved to `head`; the grammar rebuild when the change touched it, then the push. */
+function landedResult({ root, env, push, deps, result }, { checked, base, head }) {
+  const landed = { ...result, ok: true, landed: head, base, head, checks: checked.checks, changed: checked.changed };
+  const grammarPaths = [...(checked.changed ?? []), ...(checked.rows ?? []).flatMap((row) => row.slice(1))].map(normPath);
+  if (grammarPaths.some((file) => file.startsWith('packages/grammar/src/') || file === 'packages/grammar/package.json')) {
+    try { landed.grammarRebuild = (deps.rebuildGrammar ?? buildGrammar)({ root, changed: grammarPaths, env }); }
+    catch (error) { landed.grammarRebuild = { ok: false, step: 'exception', detail: String(error?.message ?? error), owed: ['grammar-dist-rebuild'] }; }
+  }
+  if (push) landed.push = (deps.push ?? pushLive)({ root });
+  return landed;
+}
+
+/** One attempt's work inside its scratch: the pick, the checks, the fast-forward. The result, or null when main moved under it (the gate reruns). */
+function landInScratch(run, scratch, step) {
+  const { commits, specs, specMode, root, env, deps, result, check, liveDeps } = run;
+  const { base } = step;
+  const baseline = {};
+  if (!deps.runChecks) {
+    for (const script of TREE_CHECKS) baseline[script] = treeCheck(scratch.dir, script);
+    baseline[MIRROR_CHECK] = mirrorRun(scratch.dir);
+  }
+  const pick = git(['cherry-pick', '--allow-empty', '--keep-redundant-commits', ...commits], { cwd: scratch.dir });
+  if (!pick.ok) return pickRefusal(run, { scratch, step, base, pick });
+  const head = git(['rev-parse', 'HEAD'], { cwd: scratch.dir }).stdout;
+  // The pick changes nothing: main already carries the change (a re-land of a landed commit).
+  if (git(['diff', '--quiet', base, head], { cwd: scratch.dir }).ok) {
+    result.attempts.push({ ...step, reason: 'already-landed' });
+    return { ...result, ok: true, alreadyLanded: base, landed: null, base, head: base, checks: [], changed: [] };
+  }
+  const checked = check({ dir: scratch.dir, base, head, specs, specMode, baseline, baseTree: root, env });
+  step.head = head;
+  step.checks = checked.checks;
+  const depsAfter = liveDepsState(root);
+  if ((depsAfter.entries ?? 0) < (liveDeps.entries ?? 0)) {
+    result.attempts.push({ ...step, reason: 'live-deps-missing' });
+    return { ...result, base, head, reason: 'live-deps-missing', detail: `${path.join(root, 'node_modules')} went from ${liveDeps.entries} to ${depsAfter.entries ?? 'no'} entries while this land's checks ran in ${scratch.dir}`, hint: depsHint(root), checks: checked.checks };
+  }
+  if (!checked.ok) {
+    result.attempts.push({ ...step, reason: 'checks-red' });
+    return { ...result, base, head, reason: 'checks-red', checks: checked.checks, changed: checked.changed };
+  }
+  const ff = fastForwardLive({ root, base, head, rows: checked.rows });
+  if (ff.ok) return landedResult(run, { checked, base, head });
+  result.attempts.push({ ...step, reason: ff.reason });
+  if (ff.reason === 'main-moved') return null;
+  return { ...result, base, head, reason: ff.reason, detail: ff.detail ?? null, dirty: ff.dirty ?? null, checks: checked.checks };
+}
+
+/** One attempt of the gate on the current main: its own scratch, removed afterwards. The result, or null when main moved (rerun). */
+function landAttempt(run, attempt) {
+  const { root, env, deps, result } = run;
+  const base = git(['rev-parse', 'refs/heads/main'], { cwd: root }).stdout;
+  const health = (deps.gitHealth ?? waitGitHealthy)({ root });
+  if (!health.ok) return { ...result, base, reason: 'git-unusable', detail: health.detail, hint: health.hint };
+  const scratch = makeScratch({ root, base, env });
+  if (!scratch.ok) return { ...result, reason: 'scratch-failed', detail: scratch.error };
+  try {
+    return landInScratch(run, scratch, { attempt, base });
+  } finally {
+    const before = liveDepsState(root).entries ?? 0;
+    if (!removeScratch(scratch.dir, { root })) result.cleanup.left.push(scratch.dir);
+    const after = liveDepsState(root).entries ?? 0;
+    if (after < before) result.cleanup.liveDepsLost = { scratch: scratch.dir, before, after };
+  }
+}
+
 /**
  * Land `commits` (in order) on live main of `root`. `deps.runChecks` / `deps.push` replace the checks and the
  * push in specs. Returns {ok, landed?, base, head?, checks, reason?, push?}. A live runtime without its installed
@@ -545,72 +604,10 @@ export function landCommits({ commits, specs = [], specMode = 'touching', root =
   const result = { ok: false, commits, attempts: [], cleanup: { left: [] } };
   const liveDeps = liveDepsState(root);
   if (depsMissing(liveDeps)) return { ...result, reason: 'live-deps-missing', detail: `${path.join(root, 'node_modules')}: ${liveDeps.entries ?? 'no'} entries, package.json declares ${liveDeps.declared}`, hint: depsHint(root) };
+  const run = { commits, specs, specMode, root, env, push, deps, check, result, liveDeps };
   for (let attempt = 1; attempt <= MAX_MAIN_RETRIES; attempt += 1) {
-    const base = git(['rev-parse', 'refs/heads/main'], { cwd: root }).stdout;
-    const health = (deps.gitHealth ?? waitGitHealthy)({ root });
-    if (!health.ok) return { ...result, base, reason: 'git-unusable', detail: health.detail, hint: health.hint };
-    const scratch = makeScratch({ root, base, env });
-    if (!scratch.ok) return { ...result, reason: 'scratch-failed', detail: scratch.error };
-    const step = { attempt, base };
-    try {
-      const baseline = {};
-      if (!deps.runChecks) for (const script of TREE_CHECKS) baseline[script] = treeCheck(scratch.dir, script);
-      if (!deps.runChecks) baseline[MIRROR_CHECK] = mirrorRun(scratch.dir);
-      const pick = git(['cherry-pick', '--allow-empty', '--keep-redundant-commits', ...commits], { cwd: scratch.dir });
-      if (!pick.ok) {
-        const said = pick.stderr || pick.stdout || pick.error || '';
-        const stopped = /could not apply ([0-9a-f]{7,40})/.exec(said)?.[1] ?? null;
-        const conflicts = pickConflicts(scratch.dir, stopped);
-        git(['cherry-pick', '--abort'], { cwd: scratch.dir });
-        // A conflict is unmerged files (or git saying so). Anything else is git failing, and it is reported as that: a
-        // broken repo (core.bare) must never read as "rebase your lane" (runs 21 and 22, 2026-09-29).
-        if (!conflicts.length && !/\bCONFLICT\b|could not apply|after resolving the conflicts/i.test(said)) {
-          const again = (deps.gitHealth ?? gitHealth)({ root });
-          if (!again.ok) { result.attempts.push({ ...step, reason: 'git-unusable' }); return { ...result, base, reason: 'git-unusable', detail: again.detail, hint: again.hint }; }
-          result.attempts.push({ ...step, reason: 'git-failed' });
-          return { ...result, base, reason: 'git-failed', detail: tailLines(said, 12), hint: 'git itself failed applying the commit(s); this is not a content conflict, so do not rebase: land again, and if it repeats read the detail' };
-        }
-        result.attempts.push({ ...step, reason: 'conflict' });
-        return { ...result, base, reason: 'conflict', detail: tailLines(said, 12), conflicts, hint: conflictHint(conflicts, stopped) };
-      }
-      const head = git(['rev-parse', 'HEAD'], { cwd: scratch.dir }).stdout;
-      // The pick changes nothing: main already carries the change (a re-land of a landed commit).
-      if (git(['diff', '--quiet', base, head], { cwd: scratch.dir }).ok) {
-        result.attempts.push({ ...step, reason: 'already-landed' });
-        return { ...result, ok: true, alreadyLanded: base, landed: null, base, head: base, checks: [], changed: [] };
-      }
-      const checked = check({ dir: scratch.dir, base, head, specs, specMode, baseline, baseTree: root, env });
-      step.head = head;
-      step.checks = checked.checks;
-      const depsAfter = liveDepsState(root);
-      if ((depsAfter.entries ?? 0) < (liveDeps.entries ?? 0)) {
-        result.attempts.push({ ...step, reason: 'live-deps-missing' });
-        return { ...result, base, head, reason: 'live-deps-missing', detail: `${path.join(root, 'node_modules')} went from ${liveDeps.entries} to ${depsAfter.entries ?? 'no'} entries while this land's checks ran in ${scratch.dir}`, hint: depsHint(root), checks: checked.checks };
-      }
-      if (!checked.ok) {
-        result.attempts.push({ ...step, reason: 'checks-red' });
-        return { ...result, base, head, reason: 'checks-red', checks: checked.checks, changed: checked.changed };
-      }
-      const ff = fastForwardLive({ root, base, head, rows: checked.rows });
-      if (!ff.ok) {
-        result.attempts.push({ ...step, reason: ff.reason });
-        if (ff.reason === 'main-moved') continue;
-        return { ...result, base, head, reason: ff.reason, detail: ff.detail ?? null, dirty: ff.dirty ?? null, checks: checked.checks };
-      }
-      const landed = { ...result, ok: true, landed: head, base, head, checks: checked.checks, changed: checked.changed };
-      const grammarPaths = [...(checked.changed ?? []), ...(checked.rows ?? []).flatMap((row) => row.slice(1))].map(normPath);
-      if (grammarPaths.some((file) => file.startsWith('packages/grammar/src/') || file === 'packages/grammar/package.json')) {
-        try { landed.grammarRebuild = (deps.rebuildGrammar ?? buildGrammar)({ root, changed: grammarPaths, env }); }
-        catch (error) { landed.grammarRebuild = { ok: false, step: 'exception', detail: String(error?.message ?? error), owed: ['grammar-dist-rebuild'] }; }
-      }
-      if (push) landed.push = (deps.push ?? pushLive)({ root });
-      return landed;
-    } finally {
-      const before = liveDepsState(root).entries ?? 0;
-      if (!removeScratch(scratch.dir, { root })) result.cleanup.left.push(scratch.dir);
-      const after = liveDepsState(root).entries ?? 0;
-      if (after < before) result.cleanup.liveDepsLost = { scratch: scratch.dir, before, after };
-    }
+    const landed = landAttempt(run, attempt);
+    if (landed) return landed;
   }
   return { ...result, reason: 'main-moving', detail: `main moved under the gate ${MAX_MAIN_RETRIES} times` };
 }
@@ -630,6 +627,12 @@ export function landQueue({ env = process.env } = {}) {
   return readMachine((m) => m.landQueue().map((t) => ({ ticketId: t.ticket_id, lane: t.lane, commit: t.commit_sha, state: t.state, requestedBy: t.requested_by, enqueuedAt: t.enqueued_at })), [], { env });
 }
 
+const claimGate = (env, ticketId) => {
+  try { return withMachine((m) => m.claimLandGate({ ticketId }), { env }); }
+  catch (error) { if (!isMachineBusy(error)) { throw error; } return { ok: false, dbBusy: error.message }; }
+};
+const gateRefusal = (queue, ticketId, got) => ({ ok: false, holder: queue.find((t) => t.state === 'running') ?? null, ahead: queue.findIndex((t) => t.ticketId === ticketId), why: got.dbBusy ? 'db-busy' : 'gate-held', ...(got.dbBusy ? { detail: got.dbBusy } : {}) });
+
 /**
  * Wait for the gate in request order: a land_queue ticket joins the queue and only the oldest live ticket enters.
  * {ok, ticketId, release(state)} or {ok:false, holder, ahead, why} (the ticket is cancelled then). A machine.sqlite that stays
@@ -646,81 +649,105 @@ export function acquireLand({ env = process.env, waitMs = LAND_WAIT_MS, pollMs =
   const end = Date.now() + waitMs;
   try {
     for (;;) {
-      let got;
-      try { got = withMachine((m) => m.claimLandGate({ ticketId }), { env }); }
-      catch (error) { if (!isMachineBusy(error)) { throw error; } got = { ok: false, dbBusy: error.message }; }
+      const got = claimGate(env, ticketId);
       if (got.ok) return { ok: true, ticketId, release: (state = 'cancelled') => { process.removeListener('exit', drop); finish(state); } };
       if (Date.now() >= end) {
         const queue = landQueue({ env });
         process.removeListener('exit', drop); drop();
-        return { ok: false, holder: queue.find((t) => t.state === 'running') ?? null, ahead: queue.findIndex((t) => t.ticketId === ticketId), why: got.dbBusy ? 'db-busy' : 'gate-held', ...(got.dbBusy ? { detail: got.dbBusy } : {}) };
+        return gateRefusal(queue, ticketId, got);
       }
       sleep(pollMs);
     }
   } catch (error) { process.removeListener('exit', drop); drop(); throw error; }
 }
 
-const landResultOf = (r) => { if (r.ok) { return 'passed'; } if (r.reason === 'conflict') { return 'conflict'; } if (['dirty', 'not-on-main', 'live-not-on-main', 'main-moved', 'gate-busy', 'git-unusable', 'host-lock-held'].includes(r.reason)) { return 'refused'; } return 'failed'; };
-/** MB-12: a land that moved main but whose push did not happen (refused or failed, not skipped). */
-const pushOwedOf = (r) => Boolean(r?.ok && r.landed && r.push && !r.push.pushed && !r.push.skipped);
-/**
- * The core record of one land as ONE idempotent write (machine-db recordLandOutcome, keyed on spanId): the push row, the
- * land_runs row (full result as the stdout blob), the lane head and the log line. Plain data, so a refused write can wait
- * in the machine-db outbox and be replayed by the next land.
- */
-function landOutcomeOf(result, { root = SKILL_ROOT, ticketId = null, lane = null, commits, jobId = null, specMode = null, startedAt, spanId = newSpanId() }) {
-  const p = result.push;
-  const push = p ? { repoRoot: root, branch: 'main', head: result.landed ?? commits[commits.length - 1], result: (p.pushed && 'pushed') || (p.skipped && 'skipped') || (p.refused && 'refused') || 'failed',
-    reason: p.refused ?? p.skipped ?? p.error ?? null,
-    failureSignature: p.pushed || p.skipped ? null : (p.refused && `secret-scan:${(p.findings ?? []).map((x) => x.rule ?? x.id ?? 'finding')[0] ?? 'finding'}`) || 'push:error',
-    scan: p.findings ? { findings: p.findings } : null, stderr: p.error ?? null } : null;
-  const run = { ticketId, commitSha: commits[commits.length - 1], commits, landedSha: result.landed ?? null, result: landResultOf(result),
-    // an already-landed pick moved nothing: no landed_sha (direct-commit detection keys on the mains the gate produced)
-    reason: result.reason ?? (result.alreadyLanded ? `already-landed ${result.alreadyLanded}` : null), specs: { mode: specMode, ...(result.specReason ? { reason: result.specReason } : {}), failed: (result.checks ?? []).filter((c) => !c.ok).map((c) => c.name) },
-    stdout: JSON.stringify(result, null, 2), stderr: (result.checks ?? []).filter((c) => !c.ok).map((c) => `## ${c.name}\n${c.output ?? ''}`).join('\n') || null, startedAt, finishedAt: Date.now() };
-  const log = { actor: 'land', kind: (result.ok && (pushOwedOf(result) && 'land.push-owed' || 'land.passed')) || (!result.ok && result.reason === 'gate-busy' && 'land.gate-busy') || 'land.failed', level: result.ok ? 'info' : 'warn', msg: describe(result, { jobId }).slice(0, 2000),
-    data: { ticketId, lane, jobId, commits, landed: result.landed ?? null, reason: result.reason ?? null }, refs: [...(lane ? [`lane:${lane}`] : []), ...commits.map((c) => `commit:${c}`)] };
-  return { spanId, lane, push, run, laneHead: result.ok && lane ? (result.landed ?? result.alreadyLanded ?? null) : null, log };
+/** What a land of a job carries: its commits, the specs it names and its source branch, or {refused} (no job, no done report). */
+const jobLandTarget = ({ jobId, commits, root, env }) => {
+  const found = readMachine((m) => ({ job: m.supJob(jobId), report: m.supReports({ jobId }).pop()?.report ?? null }), null, { env });
+  if (!found?.job) return { refused: { ok: false, reason: 'no-job', detail: jobId } };
+  const { job, report } = found;
+  const revList = (range) => git(['rev-list', '--reverse', range], { cwd: root }).stdout.split(/\r?\n/).filter(Boolean);
+  let list = commits;
+  if (job.payload?.self && !list) {
+    const staging = job.payload.staging;
+    list = staging ? revList(`${staging.base}..${staging.branch}`) : [];
+  } else if (!list) {
+    if (report?.outcome !== 'done' || !report.commit) return { refused: { ok: false, reason: 'no-done-report', detail: `${jobId} has no done report with a commit` } };
+    const range = report.base ? revList(`${report.base}..${report.commit}`) : [report.commit];
+    list = range.length ? range : [report.commit];
+  }
+  return { commits: list, named: [...new Set([...(report?.specs ?? []), ...(job.payload?.specs ?? [])])], sourceBranch: report?.branch ?? job.payload?.staging?.branch ?? null, supervisorJob: true };
+};
+
+/** Record a land refused before it ran and answer with it. `swallow` keeps a failed record from replacing the answer. */
+const refuseLand = (c, result, { swallow = true } = {}) => {
+  const record = () => withMachine((m) => recordLand(m, { result, root: c.root, env: c.env, lane: c.lane, commits: c.commits, jobId: c.jobId, startedAt: c.startedAt, orca: c.deps.orca }), { env: c.env });
+  if (!swallow) record();
+  else { try { record(); } catch { /* the answer carries it */ } }
+  return result;
+};
+
+/** The refusals that need no queue and no scratch: git health, a pick that cannot apply, a live checkout off main. The refusal result or null. */
+function refusalBeforeQueue(c) {
+  const { root, env, lane, commits, jobId, deps } = c;
+  // A repo git cannot run a work-tree operation in fails every step after the queue: refuse it up front with its own reason.
+  const health = (deps.gitHealth ?? waitGitHealthy)({ root });
+  if (!health.ok) return refuseLand(c, { ok: false, commits, reason: 'git-unusable', preflight: true, detail: health.detail, hint: health.hint });
+  if (lane) withMachine((m) => { if (!m.laneOf(lane)) m.upsertLane({ name: lane, worktreePath: path.join(lanesRoot({ env }), lane), branch: `lane/${lane}`, owner: jobId ? `worker:${jobId}` : 'owner-chat' }); }, { env });
+  // A pick that cannot apply is refused before the queue: the lane learns its exact hunks in seconds, not after
+  // waiting its turn (ledger 2026-09-28: 15 of 16 failed lands were conflicts, most retried blind).
+  if (!deps.skipPreflight) {
+    const pre = (deps.conflictPreflight ?? conflictPreflight)({ root, commits });
+    if (!pre.ok) {
+      return refuseLand(c, { ok: false, commits, reason: 'conflict', preflight: true, base: pre.onto ?? null, conflicts: pre.conflicts, hint: conflictHint(pre.conflicts, pre.conflicts[0]?.commit),
+        detail: `does not apply on main ${String(pre.onto ?? '').slice(0, 9)}: ${pre.conflicts.map((x) => x.file).join(', ')}` }, { swallow: false });
+    }
+  }
+  // MB-12: the cheap live condition before the queue and the checks: a live checkout off main fails at the fast-forward
+  // after every check has run (10 lands, 46 min on 2026-09-25).
+  const branch = (deps.liveBranch ?? (() => git(['symbolic-ref', '-q', 'HEAD'], { cwd: root }).stdout))();
+  if (branch === 'refs/heads/main') return null;
+  return refuseLand(c, { ok: false, commits, reason: 'live-not-on-main', preflight: true, detail: branch || 'detached' });
 }
-/** The openSupDecision args of the specs-red-on-main DI: ONE per set of failing tests, due like any Supervisor-decided DI. */
-export function specsRedOnMainDecision({ redOnMain, root, commits, now }) {
-  const signature = createHash('sha1').update(redOnMain.inherited.map(failKey).sort().join('/')).digest('hex').slice(0, 12);
-  return { keyParts: { kind: 'specs-red-on-main', repo: path.basename(root).replace(/[^\w.-]/g, '_') || 'runtime', signature }, kind: 'runtime-defect',
-    summary: `${redOnMain.name} at ${String(redOnMain.base).slice(0, 9)}: the land gate tolerated them as inherited; fix main: ${failList(redOnMain.inherited)}`.slice(0, 1000), entityType: 'repo', entityId: root, openedBy: 'land-gate',
-    dueAt: now + DEFAULT_DUE_MS.supervisor, escalateTo: 'owner',
-    evidence: redOnMain.inherited.slice(0, 20).map((f) => ({ ref: `spec:${f.file}`, why: f.name.slice(0, 300) })), payload: { base: redOnMain.base, inherited: redOnMain.inherited, commits } };
-}
-/** The machine records of one land: the core outcome (landOutcomeOf), then the job, self-job and push-owed follow-ups. */
-function recordLand(m, { result, root = SKILL_ROOT, env = process.env, ticketId = null, lane = null, commits, jobId = null, specMode = null, startedAt, outcome = null, orca = undefined }) {
-  const { runId } = m.recordLandOutcome(outcome ?? landOutcomeOf(result, { root, ticketId, lane, commits, jobId, specMode, startedAt }));
-  // A landed job is succeeded, its leases released, its checkout, branch and [Worker] terminal gone (finishLanded).
-  // --commit of a self checkout's commits closes that self job as --job would: left open, it kept its file leases
-  // and blocked every worker needing them. A red gate keeps the failure on the job.
-  const landedSha = result.landed ?? result.alreadyLanded ?? null;
-  if (result.ok && jobId && m.supJob(jobId)) result.finished = finishLanded(m, { jobId, landedSha, root, env, ...(orca ? { orca } : {}) });
-  if (result.ok && !jobId) {
-    const self = selfJobsLandedBy(m, commits, { root });
-    if (self.done.length) result.finished = self.done.map((id) => finishLanded(m, { jobId: id, landedSha, root, env, ...(orca ? { orca } : {}) }));
-    if (self.partial.length) result.selfPending = self.partial;
+
+/** MB-10: a busy gate is a visible, recorded outcome that names the lane, its commits, the wait and the holder. */
+const gateBusyResult = (c, lock) => ({ ok: false, commits: c.commits, lane: c.lane, reason: 'gate-busy', why: lock.why ?? 'gate-held', holder: lock.holder ?? null, ahead: lock.ahead ?? 0, waitedMs: Date.now() - c.startedAt,
+  detail: (lock.why === 'db-busy' ? 'machine.sqlite locked; ' : '') + 'waited ' + Math.round((Date.now() - c.startedAt) / 1000) + 's' + (lock.holder ? ' behind ' + String(lock.holder.lane ?? lock.holder.ticketId ?? 'a land') + ' (' + String(lock.holder.commit ?? '').slice(0, 9) + ')' : '') });
+
+/** Write the core record of a landed result; main already moved, so a failed write never turns it into a failed land. */
+const persistLand = (c, result, { ticketId, specMode }) => {
+  const { root, env, lane, commits, jobId, startedAt, deps } = c;
+  // A failed record is reported (recordError) and the core record is written again, or queued in the outbox for the next land (recordDeferred).
+  const outcome = landOutcomeOf(result, { root, ticketId, lane, commits, jobId, specMode, startedAt });
+  try { result.landRun = withMachine((m) => recordLand(m, { result, root, env, ticketId, lane, commits, jobId, specMode, startedAt, outcome, orca: deps.orca }), { env }); }
+  catch (error) {
+    result.recordError = String(error?.message ?? error);
+    const again = writeOrDefer('recordLandOutcome', [outcome], { env });
+    if (again.ok) result.landRun = again.value.runId;
+    else result.recordDeferred = again.deferred;
   }
-  if (!result.ok && jobId) recordLandFailed(m, { jobId, reason: result.reason ?? null, startedAt });
-  // Specs red on main (inherited, not this land's fault): ONE Supervisor DI per set of failing tests, so main gets fixed.
-  const redOnMain = specsRedOnMainOf(result);
-  if (redOnMain) {
-    try {
-      m.openSupDecision(specsRedOnMainDecision({ redOnMain, root, commits, now: Date.now() }));
-    } catch { /* the land_runs row carries the advisory */ }
+};
+
+const upgradeIdOf = (c, { sourceBranch, supervisorJob }) => selfUpgradeIdOf({
+  branch: sourceBranch ?? (supervisorJob ? null : (c.deps.selfUpgradeBranchContaining ?? selfUpgradeBranchContaining)({ root: c.root, commit: c.commits[c.commits.length - 1] })),
+  lane: c.lane, jobId: supervisorJob ? c.jobId : null });
+
+/** The land itself, inside the gate: the outbox, the checks and the fast-forward, the records. `gate.state` is what the ticket is released as. */
+function landInsideGate(c, { lock, plan, doPush, reason, notify, target, gate }) {
+  const { root, env, commits, jobId, deps } = c;
+  // Records an earlier land could not write (machine-db outbox) are applied first, inside the gate.
+  let outbox = null;
+  try { outbox = withMachine((m) => m.flushOutbox(), { env }); } catch (error) { outbox = { error: String(error?.message ?? error) }; }
+  const landed = { ...landUnderHostLock({ commits, specs: plan.named, specMode: plan.mode, root, env, push: doPush, deps }, landCommits), specMode: plan.mode, ...(plan.mode === 'none' ? { specReason: String(reason).trim() } : {}) };
+  const result = withSelfUpgradeRef(landed, { root, id: upgradeIdOf(c, target), write: deps.writeSelfUpgradeRef ?? writeSelfUpgradeRef });
+  if (outbox && (outbox.flushed || outbox.failed || outbox.error || outbox.busy)) result.outbox = outbox;
+  if (pushOwedOf(result)) result.outcome = 'landed-push-owed';
+  gate.state = result.ok ? 'passed' : 'failed';
+  persistLand(c, result, { ticketId: lock.ticketId, specMode: plan.mode });
+  if (notify || result.grammarRebuild?.ok === false || specsRedOnMainOf(result)) {
+    try { withMachine((m) => m.recordSupMessage({ direction: 'in', channel: 'tell', from: 'land-gate', text: describe(result, { jobId }) }), { env }); } catch { /* the land_runs row is the record */ }
   }
-  // MB-12: main moved but GitHub did not: its own outcome and ONE Supervisor DI per landed head (the workers:push duty retries).
-  if (pushOwedOf(result)) {
-    const why = result.push.refused ?? result.push.error ?? 'push failed';
-    try {
-      m.openSupDecision({ keyParts: { kind: 'push-owed', repo: path.basename(root).replace(/[^\w.-]/g, '_') || 'runtime', head: String(result.landed).slice(0, 12) }, kind: 'push-refused',
-        summary: `Land passed ${String(result.landed).slice(0, 9)} but its push did not: ${String(why).slice(0, 300)}`, entityType: 'repo', entityId: root, openedBy: 'land-gate', dueAt: Date.now() + DEFAULT_DUE_MS.supervisor, escalateTo: 'owner',
-        evidence: [{ ref: `commit:${result.landed}`, why: String(why).slice(0, 500) }], options: [{ key: 'push', verb: 'starci supervisor push-mains --repo <runtime root> --json', recommended: true }] });
-    } catch { /* the land_runs row and its push row are the record */ }
-  }
-  return runId;
+  return result;
 }
 
 /** The full gate for one job or commit list, with the queue, the machine records and the optional inbox notice. */
@@ -728,86 +755,21 @@ export async function land({ jobId = null, commits = null, specs = [], reason = 
   const settings = supervisorSettings();
   const doPush = push ?? settings.landGate.push;
   const asked = specs.map((s) => String(s).trim()).filter(Boolean);
-  let named = [], sourceBranch = null, supervisorJob = false;
-  if (jobId) {
-    const found = readMachine((m) => ({ job: m.supJob(jobId), report: m.supReports({ jobId }).pop()?.report ?? null }), null, { env });
-    if (!found?.job) return { ok: false, reason: 'no-job', detail: jobId };
-    const { job, report } = found; supervisorJob = true; sourceBranch = report?.branch ?? job.payload?.staging?.branch ?? null;
-    if (job.payload?.self && !commits) {
-      const staging = job.payload.staging;
-      commits = staging ? git(['rev-list', '--reverse', `${staging.base}..${staging.branch}`], { cwd: root }).stdout.split(/\r?\n/).filter(Boolean) : [];
-    } else if (!commits) {
-      if (report?.outcome !== 'done' || !report.commit) return { ok: false, reason: 'no-done-report', detail: `${jobId} has no done report with a commit` };
-      const list = report.base ? git(['rev-list', '--reverse', `${report.base}..${report.commit}`], { cwd: root }).stdout.split(/\r?\n/).filter(Boolean) : [report.commit];
-      commits = list.length ? list : [report.commit];
-    }
-    named = [...new Set([...(report?.specs ?? []), ...(job.payload?.specs ?? [])])];
-  }
-  if (!commits?.length) return { ok: false, reason: 'nothing-to-land' };
-  const startedAt = Date.now();
-  // A repo git cannot run a work-tree operation in fails every step after the queue: refuse it up front with its own reason.
-  const health = (deps.gitHealth ?? waitGitHealthy)({ root });
-  if (!health.ok) {
-    const result = { ok: false, commits, reason: 'git-unusable', preflight: true, detail: health.detail, hint: health.hint };
-    try { withMachine((m) => recordLand(m, { result, root, env, lane, commits, jobId, startedAt, orca: deps.orca }), { env }); } catch { /* the answer carries it */ }
-    return result;
-  }
-  if (lane) withMachine((m) => { if (!m.laneOf(lane)) m.upsertLane({ name: lane, worktreePath: path.join(lanesRoot({ env }), lane), branch: `lane/${lane}`, owner: jobId ? `worker:${jobId}` : 'owner-chat' }); }, { env });
-  // A pick that cannot apply is refused before the queue: the lane learns its exact hunks in seconds, not after
-  // waiting its turn (ledger 2026-09-28: 15 of 16 failed lands were conflicts, most retried blind).
-  if (!deps.skipPreflight) {
-    const pre = (deps.conflictPreflight ?? conflictPreflight)({ root, commits });
-    if (!pre.ok) {
-      const result = { ok: false, commits, reason: 'conflict', preflight: true, base: pre.onto ?? null, conflicts: pre.conflicts, hint: conflictHint(pre.conflicts, pre.conflicts[0]?.commit),
-        detail: `does not apply on main ${String(pre.onto ?? '').slice(0, 9)}: ${pre.conflicts.map((c) => c.file).join(', ')}` };
-      withMachine((m) => recordLand(m, { result, root, env, lane, commits, jobId, startedAt, orca: deps.orca }), { env });
-      return result;
-    }
-  }
-  // MB-12: the cheap live condition before the queue and the checks: a live checkout off main fails at the fast-forward
-  // after every check has run (10 lands, 46 min on 2026-09-25).
-  const branch = (deps.liveBranch ?? (() => git(['symbolic-ref', '-q', 'HEAD'], { cwd: root }).stdout))();
-  if (branch !== 'refs/heads/main') {
-    const result = { ok: false, commits, reason: 'live-not-on-main', preflight: true, detail: branch || 'detached' };
-    try { withMachine((m) => recordLand(m, { result, root, lane, commits, jobId, startedAt, orca: deps.orca }), { env }); } catch { /* the answer carries it */ }
-    return result;
-  }
+  let target = { commits, named: [], sourceBranch: null, supervisorJob: false };
+  if (jobId) target = jobLandTarget({ jobId, commits, root, env });
+  if (target.refused) return target.refused;
+  if (!target.commits?.length) return { ok: false, reason: 'nothing-to-land' };
+  const c = { root, env, lane, commits: target.commits, jobId, startedAt: Date.now(), deps };
+  const refused = refusalBeforeQueue(c);
+  if (refused) return refused;
   let fullAllowed = false;
   try { fullAllowed = (deps.specsEnabled ?? harnessSpecsEnabled)(); } catch { /* an unreadable owner file keeps the default: touching-only */ }
-  const plan = specPlan({ fullAllowed, fullByPushGit, asked, named, reason });
-  if (plan.refused) return { ok: false, commits, lane, reason: plan.refused, preflight: true, detail: plan.detail };
-  const lock = (deps.acquireLand ?? acquireLand)({ env, waitMs, lane, commits });
-  if (!lock.ok) {
-    // MB-10: a busy gate is a visible, recorded outcome that names the lane, its commits, the wait and the holder.
-    const result = { ok: false, commits, lane, reason: 'gate-busy', why: lock.why ?? 'gate-held', holder: lock.holder ?? null, ahead: lock.ahead ?? 0, waitedMs: Date.now() - startedAt,
-      detail: (lock.why === 'db-busy' ? 'machine.sqlite locked; ' : '') + 'waited ' + Math.round((Date.now() - startedAt) / 1000) + 's' + (lock.holder ? ' behind ' + String(lock.holder.lane ?? lock.holder.ticketId ?? 'a land') + ' (' + String(lock.holder.commit ?? '').slice(0, 9) + ')' : '') };
-    try { withMachine((m) => recordLand(m, { result, root, lane, commits, jobId, startedAt, orca: deps.orca }), { env }); } catch { /* the answer carries it */ }
-    return result;
-  }
-  let state = 'cancelled';
-  try {
-    // Records an earlier land could not write (machine-db outbox) are applied first, inside the gate.
-    let outbox = null;
-    try { outbox = withMachine((m) => m.flushOutbox(), { env }); } catch (error) { outbox = { error: String(error?.message ?? error) }; }
-    const result = withSelfUpgradeRef({ ...landUnderHostLock({ commits, specs: plan.named, specMode: plan.mode, root, env, push: doPush, deps }, landCommits), specMode: plan.mode, ...(plan.mode === 'none' ? { specReason: String(reason).trim() } : {}) }, { root, id: selfUpgradeIdOf({ branch: sourceBranch ?? (supervisorJob ? null : (deps.selfUpgradeBranchContaining ?? selfUpgradeBranchContaining)({ root, commit: commits[commits.length - 1] })), lane, jobId: supervisorJob ? jobId : null }), write: deps.writeSelfUpgradeRef ?? writeSelfUpgradeRef });
-    if (outbox && (outbox.flushed || outbox.failed || outbox.error || outbox.busy)) result.outbox = outbox;
-    if (pushOwedOf(result)) result.outcome = 'landed-push-owed';
-    state = result.ok ? 'passed' : 'failed';
-    // main already moved: a failed record never turns a landed change into a failed land; it is reported instead
-    // (recordError) and the core record is written again, or queued in the outbox for the next land (recordDeferred).
-    const outcome = landOutcomeOf(result, { root, ticketId: lock.ticketId, lane, commits, jobId, specMode: plan.mode, startedAt });
-    try { result.landRun = withMachine((m) => recordLand(m, { result, root, env, ticketId: lock.ticketId, lane, commits, jobId, specMode: plan.mode, startedAt, outcome, orca: deps.orca }), { env }); }
-    catch (error) {
-      result.recordError = String(error?.message ?? error);
-      const again = writeOrDefer('recordLandOutcome', [outcome], { env });
-      if (again.ok) result.landRun = again.value.runId;
-      else result.recordDeferred = again.deferred;
-    }
-    if (notify || result.grammarRebuild?.ok === false || specsRedOnMainOf(result)) {
-      try { withMachine((m) => m.recordSupMessage({ direction: 'in', channel: 'tell', from: 'land-gate', text: describe(result, { jobId }) }), { env }); } catch { /* the land_runs row is the record */ }
-    }
-    return result;
-  } finally { lock.release(state); }
+  const plan = specPlan({ fullAllowed, fullByPushGit, asked, named: target.named, reason });
+  if (plan.refused) return { ok: false, commits: c.commits, lane, reason: plan.refused, preflight: true, detail: plan.detail };
+  const lock = (deps.acquireLand ?? acquireLand)({ env, waitMs, lane, commits: c.commits });
+  if (!lock.ok) return refuseLand(c, gateBusyResult(c, lock));
+  const gate = { state: 'cancelled' };
+  try { return landInsideGate(c, { lock, plan, doPush, reason, notify, target, gate }); } finally { lock.release(gate.state); }
 }
 
 /** The gate for /status: {busy, current, queued}. */
