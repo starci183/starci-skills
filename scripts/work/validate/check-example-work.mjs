@@ -659,7 +659,7 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
         problems.push(`${rec.shown}: state is done but there is no sibling evidence.yaml naming the run it settled on`);
       } else {
         const ev = parseYaml(fs.readFileSync(evidenceFile, 'utf8'));
-        const cited = (v) => [].concat(v || []).filter((c) => c && typeof c === 'object' && /^[a-f0-9]{64}$/.test(String(c.sha256 ?? '')));
+          const cited = (v) => [v || []].flat().filter((c) => c && typeof c === 'object' && /^[a-f0-9]{64}$/.test(String(c.sha256 ?? '')));
         if (ev?.run && typeof ev.run === 'object') {
           // The run is agent data in the blob store; evidence.yaml cites its files by sha256 (+ artifact id).
           const run = ev.run;
@@ -685,8 +685,8 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
           const videosDir = path.join(runDir, 'videos');
           const resultFile = path.join(runDir, 'result.md');
           const hasFiles = dir => fs.existsSync(dir) && fs.readdirSync(dir).length > 0;
-          if (!hasFiles(screensDir)) problems.push(`${rec.shown}: run ${ev.run} has no screens/ with at least one screenshot`);
-          if (!hasFiles(videosDir)) problems.push(`${rec.shown}: run ${ev.run} has no videos/ with at least one playable recording`);
+          if (!hasFiles(screensDir)) { problems.push(`${rec.shown}: run ${ev.run} has no screens/ with at least one screenshot`); }
+          if (!hasFiles(videosDir)) { problems.push(`${rec.shown}: run ${ev.run} has no videos/ with at least one playable recording`); }
           if (!fs.existsSync(resultFile)) {
             problems.push(`${rec.shown}: run ${ev.run} has no result.md`);
           } else if (!/outcome:\s*pass/i.test(fs.readFileSync(resultFile, 'utf8'))) {
