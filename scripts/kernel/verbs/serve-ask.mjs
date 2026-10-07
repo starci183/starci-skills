@@ -86,7 +86,7 @@ async function serveOwnerAsk({ ledger, args, repo, emit, workflowId, dispatchId,
   }
   // Served now: --now (local use), or Telegram is off / unreachable so nothing else could serve it.
   const connectors = parked?.notified ? null : ensureAskConnectors();
-  const script = path.join(skillRoot, 'scripts', 'kernel', 'ask-server.mjs');
+  const script = path.join(skillRoot, 'scripts', 'kernel', 'ask-server-main.mjs');
   const argv = [script, '--repo', repo, '--workflow', workflowId, ...(dispatchId ? ['--dispatch', dispatchId] : []), ...(args.ttl ? ['--ttl', String(args.ttl)] : [])];
   const child = spawnNode(argv, { detached: true, stdio: 'ignore', cwd: skillRoot });
   child.unref();

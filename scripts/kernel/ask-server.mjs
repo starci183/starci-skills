@@ -49,7 +49,6 @@ import fs from 'node:fs';
 import { serve } from '../api/http/serve.mjs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { isMain } from '../lib/is-main.mjs';
 import { openLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
 import { wakeKernelForTransition } from './wake-delivery.mjs';
 import { loadConfig, activeDelegation, allocationMs, askAutoAcceptPolicy, ASK_PORT_BAND } from '../../engine/config.mjs';
@@ -729,7 +728,8 @@ const formImages = (question, rj, repo) => {
   return toOwnerImages(images, repo);
 };
 
-const main = async () => {
+/** The serve-ask process (`ask-server-main.mjs` runs it): serves one pending owner ask until it is answered or its ttl ends. */
+export const main = async () => {
   const args = parseArgs(process.argv.slice(2));
   if (!args.repo || !args.workflow) { console.error('serve-ask needs --repo <path> --workflow <id>'); process.exit(2); }
   const repo = path.resolve(args.repo);
@@ -809,5 +809,3 @@ const main = async () => {
     process.exit(0);
   }, ttl).unref();
 };
-
-if (isMain(import.meta.url)) main().catch((error) => { console.error(error); process.exit(1); });
