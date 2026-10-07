@@ -3,7 +3,10 @@
 const GROUPS = ['preflight', 'config', 'engine', 'controllers', 'services', 'seats', 'sla'];
 const MARK = { green: '[GREEN]', red: '[RED]  ', warn: '[WARN] ', idle: '[IDLE] ' };
 
-const rowLine = (mark, row) => `  ${mark} ${row.name}${row.detail ? ` - ${row.detail}` : ''}`;
+const rowLine = (mark, row) => {
+  const detail = row.detail ? ` - ${row.detail}` : '';
+  return `  ${mark} ${row.name}${detail}`;
+};
 const fixLine = (row) => (row.fix && row.status !== 'green' ? [`           fix: ${row.fix}`] : []);
 
 /** The full listing: every row under its group, then APPLIED and the verdict line (`summary` from summarize). */
@@ -26,7 +29,8 @@ const briefHeader = (items) => {
   const red = countOf(items, 'red'), warn = countOf(items, 'warn'), green = countOf(items, 'green');
   if (!red && !warn) return `HOST all green: ${green} rows`;
   const idle = items.filter((i) => i.idle).length;
-  return `HOST ${red ? 'RED' : 'WARN'}: ${red} red, ${warn} warn, ${green} green${idle ? ` (${idle} idle)` : ''}`;
+  const idleNote = idle ? ` (${idle} idle)` : '';
+  return `HOST ${red ? 'RED' : 'WARN'}: ${red} red, ${warn} warn, ${green} green${idleNote}`;
 };
 
 /**

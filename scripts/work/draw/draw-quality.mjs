@@ -90,13 +90,16 @@ const partStemOf = (src) => String(src).replace(/(?:\.dom)?\.html$/i, '');
 function tagsToLineBreaks(html) {
   let out = '';
   let at = 0;
-  for (let open = html.indexOf('<'); open >= 0; open = html.indexOf('<', open + 1)) {
+  let open = html.indexOf('<');
+  while (open >= 0) {
     const close = html.indexOf('>', open + 1);
     if (close < 0) break;
-    if (close === open + 1) continue;
-    out += `${html.slice(at, open)}\n`;
-    at = close + 1;
-    open = at - 1;
+    const empty = close === open + 1;
+    if (!empty) {
+      out += `${html.slice(at, open)}\n`;
+      at = close + 1;
+    }
+    open = html.indexOf('<', empty ? open + 1 : at);
   }
   return out + html.slice(at);
 }

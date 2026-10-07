@@ -27,8 +27,9 @@ export function proofsOwedByReport({ op, mode = null, report, files, skillRoot, 
   for (const { proof, projects } of proofEntriesOf(op, { mode, doc })) {
     if (MANUAL_PROOFS.has(proof)) continue;
     const unrun = (projects.length ? projects : [null]).filter((project) => !producers.some((native) => producesProof(proof, native, doc) && (!project || native.project === project)));
+    const forProject = projects.length ? ` for project ${unrun.join(', ')}` : '';
     if (unrun.length) owed.push({ proof, code: 'report-proof-producer-missing',
-      detail: `${proof}: no check of report.checks runs its native producer${projects.length ? ` for project ${unrun.join(', ')}` : ''}; the runtime observes the producer itself and an attached document alone never counts. ${proofProducerHint(proof, doc, unrun.filter(Boolean))}. List that command as a report check (the runtime re-runs it, so its --out file may sit in the scratch) in the order READ, then authoring, then checks` });
+      detail: `${proof}: no check of report.checks runs its native producer${forProject}; the runtime observes the producer itself and an attached document alone never counts. ${proofProducerHint(proof, doc, unrun.filter(Boolean))}. List that command as a report check (the runtime re-runs it, so its --out file may sit in the scratch) in the order READ, then authoring, then checks` });
     else if (!readAttached(files, proofDocumentSchema(proof, doc))) owed.push({ proof, code: 'report-proof-document-missing',
       detail: `${proof}: its producer is listed but the document it prints (schema ${proofDocumentSchema(proof, doc)}) is not among the --attach files; run the producer with --out under the job scratch and attach that file` });
   }

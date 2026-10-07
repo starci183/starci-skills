@@ -3,15 +3,26 @@
 // what JSON drops (undefined members, Dates, Maps, sparse holes) and refuses what JSON accepts (functions,
 // `toJSON` objects), so it is not a substitute; this walks the value once under the JSON.stringify rules.
 
+/** The boxed primitives JSON.stringify unwraps: recognised by the internal slot a valueOf call reads, as JSON does. */
+const BOXED = [
+  { slot: Number.prototype.valueOf, read: (box) => Number(box) },
+  { slot: String.prototype.valueOf, read: (box) => String(box) },
+  { slot: Boolean.prototype.valueOf, read: (box) => Boolean.prototype.valueOf.call(box) },
+  { slot: BigInt.prototype.valueOf, read: (box) => BigInt.prototype.valueOf.call(box) },
+];
+
+/** Whether `value` carries the internal slot `slot` reads (a valueOf of that boxed type does not throw on it). */
+const hasSlot = (slot, value) => {
+  try { slot.call(value); return true; } catch { return false; }
+};
+
 /** What JSON.stringify takes of `holder[key]`: the toJSON result when there is one, a boxed primitive unwrapped. */
 const serialized = (holder, key) => {
   let value = holder[key];
   if (value !== null && (typeof value === 'object' || typeof value === 'bigint') && typeof value.toJSON === 'function') value = value.toJSON(key);
-  if (value instanceof Number) return Number(value);
-  if (value instanceof String) return String(value);
-  if (value instanceof Boolean) return Boolean.prototype.valueOf.call(value);
-  if (value instanceof BigInt) return BigInt.prototype.valueOf.call(value);
-  return value;
+  if (value === null || typeof value !== 'object') return value;
+  const box = BOXED.find((candidate) => hasSlot(candidate.slot, value));
+  return box ? box.read(value) : value;
 };
 
 /** A member JSON leaves out of an object (and writes as null in an array). */

@@ -297,7 +297,8 @@ function closeLeftover(job, { m, d, now, out, budget }) {
   const step = retryAfterFailure(budget, job.payload.closeRetry, { now, reason: closed.reason ?? 'worker-closure-unproven' });
   const closeRetry = { attempts: step.attempts, firstAt: step.firstAt, nextAt: step.dueAt, reason: step.reason, ...(step.exhausted ? { exhausted: step.exhausted } : {}) };
   m.transaction(() => m.update('sup_jobs', { payload_json: { ...job.payload, closeRetry }, updated_at: now }, { job_id: job.job_id }));
-  (out.unclosed ??= []).push({ jobId: job.job_id, handle: job.worker_id, ...closeRetry });
+  out.unclosed ??= [];
+  out.unclosed.push({ jobId: job.job_id, handle: job.worker_id, ...closeRetry });
 }
 
 /**
@@ -332,7 +333,9 @@ export function sweepWorkers(m, d, { now = Date.now() } = {}) {
   if (typeof d.show === 'function') {
     for (const job of jobsOf(m, ['running', 'reported'])) {
       const skipped = sweepJob(job, { m, d, now, out, markClosed, fail });
-      if (skipped) (out.skipped ??= []).push({ jobId: job.job_id, reason: skipped });
+      if (!skipped) continue;
+      out.skipped ??= [];
+      out.skipped.push({ jobId: job.job_id, reason: skipped });
     }
   }
   sweepLeftovers(m, d, { now, out });

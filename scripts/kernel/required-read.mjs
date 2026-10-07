@@ -101,7 +101,10 @@ export function unreadFiles(db, workflowId, required) {
 }
 
 const UNREAD_SHOWN = 20;
-const unreadNote = (unread) => `; read and attest ${unread.slice(0, UNREAD_SHOWN).join(', ')}${unread.length > UNREAD_SHOWN ? ` and ${unread.length - UNREAD_SHOWN} more` : ''}, the files this incarnation has not attested`;
+const unreadNote = (unread) => {
+  const more = unread.length > UNREAD_SHOWN ? ` and ${unread.length - UNREAD_SHOWN} more` : '';
+  return `; read and attest ${unread.slice(0, UNREAD_SHOWN).join(', ')}${more}, the files this incarnation has not attested`;
+};
 
 /** New-leg READ admission; boot receipts never acquire a current incarnation by assertion. */
 export function requireKernelRead(db, workflowId, { root, authority, op, status } = {}) {

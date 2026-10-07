@@ -16,7 +16,7 @@ export function providerReservationMethods({ need, parse, toJson, hex }) {
     if (account !== null) { where.push('account=?'); args.push(account); }
     if (activeOnly) where.push("state<>'released'");
     const clause = where.length ? ` WHERE ${where.join(' AND ')}` : '';
-    const order = limit === null ? 'ORDER BY fence' : `ORDER BY fence DESC LIMIT ${Number(limit) | 0}`;
+    const order = limit === null ? 'ORDER BY fence' : `ORDER BY fence DESC LIMIT ${Math.trunc(Number(limit)) || 0}`;
     return m.db.prepare(`SELECT * FROM provider_reservations${clause} ${order}`).all(...args).map(providerReservationRow);
   }
   function providerReservationUsage(m, { provider, account = 'default' } = {}) {

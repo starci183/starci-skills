@@ -33,7 +33,8 @@ const hasPath=(root,dotted)=>dotted.split('.').reduce((node,key)=>(plain(node)&&
 export function refuseRemovedKeys(config){
   const found=REMOVED_KEYS.filter(([key])=>hasPath(config,key));
   if(!found.length)return;
-  throw new Error(`Invalid config.yaml: ${found.map(([key,place])=>`${key} is removed (${place})`).join('; ')}.`);
+  const removed=found.map(([key,place])=>`${key} is removed (${place})`).join('; ');
+  throw new Error(`Invalid config.yaml: ${removed}.`);
 }
 
 let shippedCache=null;
@@ -73,11 +74,11 @@ function validateUse(bad,{doc,names,refs}){
 export function effectiveTiers(config,profile){
   const doc=shippedTiers(),models=plain(config?.models)?config.models:{};
   const bad=invalid('models');
-  const tiers={...doc.tiers,...(models.tiers??{})};
+  const tiers={...doc.tiers,...models.tiers};
   validateChains(bad,tiers,profile);
-  const seats={...doc.seats,...(models.seats??{})};
-  const balance={...doc.balance,...(models.balance??{})};
-  const usage={...doc.usage,...(models.usage??{})};
+  const seats={...doc.seats,...models.seats};
+  const balance={...doc.balance,...models.balance};
+  const usage={...doc.usage,...models.usage};
   const names=new Set(Object.keys(tiers));
   const refs=[...Object.entries(seats).map(([seat,tier])=>[`.seats.${seat}`,tier]),...DIFFICULTIES.map(level=>[`difficulty.${level}`,doc.difficulty[level]]),
     ...Object.entries(doc.kindTiers).map(([kind,tier])=>[`kindTiers.${kind}`,tier]),...doc.tierOrder.map(tier=>['tierOrder',tier])];

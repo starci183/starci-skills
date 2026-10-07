@@ -29,9 +29,8 @@ function routeHumanOf({ jobId, kind, difficulty, decided, lineageAdjust, blockin
   if (lineageAdjust && (lineageAdjust.demoted.length || lineageAdjust.excluded.length)) {
     const changedPools = [...lineageAdjust.demoted.map((pool) => `${pool} demoted`), ...lineageAdjust.excluded.map((pool) => `${pool} excluded`)].join(', ');
     const causes = Object.entries(lineageAdjust.pools).map(([pool, item]) => `${pool}: ${item.causes.join(', ')}`).join('; ');
-    const takenNote = lineageAdjust.demotedTaken
-      ? (overrideModel ? '; taken anyway — the recorded op-override pins it' : '; no other pool was eligible')
-      : '';
+    const takenReason = overrideModel ? '; taken anyway — the recorded op-override pins it' : '; no other pool was eligible';
+    const takenNote = lineageAdjust.demotedTaken ? takenReason : '';
     lines.push(`  retry lineage: ${changedPools} (${causes})${takenNote}`);
   }
   lines.push(...pickRecordText(decided.pick).map((line) => `  ${line}`));

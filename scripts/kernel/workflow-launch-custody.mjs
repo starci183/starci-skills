@@ -18,6 +18,22 @@ export function releaseWorkflowWorker(dispatchId, handle = null, { env = process
     ...(proven ? {} : { error: released?.release?.error ?? released?.stop?.error ?? released?.error ?? 'worker terminal or process exit is unproven' }) };
 }
 
+const filled = (value) => typeof value === 'string' && value !== '';
+
+/** The admission released under the event `eventOf` builds; a throwing build or release is a refused one carrying its message. */
+function releasing(releaseAdmission, admission, eventOf, env) {
+  try { return releaseAdmission(admission, eventOf(), { env }); }
+  catch (error) { return { ok: false, error: String(error?.message ?? error) }; }
+}
+
+/** An owned launch whose Orca start never named a terminal or Dispatch: the receipt alone is custody. */
+const isUnboundLaunch = (owned, value, receipt) => owned && !value.terminal && !value.dispatch && receipt?.role === 'kernel'
+  && !receipt.handle && filled(receipt.id) && Number.isInteger(receipt.fence);
+
+/** An owned launch whose Dispatch, terminal and receipt all name the same worker. */
+const isBoundLaunch = (owned, value, terminal, receipt) => owned && filled(value.dispatch) && filled(terminal)
+  && receipt?.role === 'kernel' && receipt.handle === terminal && filled(receipt.id) && Number.isInteger(receipt.fence) && filled(receipt.attemptId);
+
 /** Reconcile only the original held launch; incomplete identity, closure or release retains its signal and capacity. */
 export function recoverWorkflowLaunch(ledger, { workflowId, signal, env = process.env },
   { close = stopAndRelease, releaseAdmission = releaseAgentAdmission, now = Date.now, noEffect = kernelLaunchNoEffect, settled = settledLaunchTerminal } = {}) {
@@ -31,15 +47,12 @@ export function recoverWorkflowLaunch(ledger, { workflowId, signal, env = proces
   });
   const current = () => ledger.db.prepare("SELECT * FROM signals WHERE scope='kernel' AND key=?").get(workflowId);
   const expected = authority();
-  if (owned && !value.terminal && !value.dispatch && receipt?.role === 'kernel' && !receipt.handle
-      && typeof receipt.id === 'string' && receipt.id && Number.isInteger(receipt.fence)) {
+  if (isUnboundLaunch(owned, value, receipt)) {
     // No terminal and no Dispatch exist to close: only recorded Orca refusal evidence releases the attempt.
     if (!expected.ok || canonicalJSON(current()) !== canonicalJSON(signal)) return held('kernel-launch-recovery-authority-lost');
     const proof = noEffect(ledger, { workflowId, signal, value });
     if (!proof.ok) return held(proof.reason, proof);
-    let budget;
-    try { budget = releaseAdmission(admission, { kind: 'failed-before-launch', confirmed: true }, { env }); }
-    catch (error) { budget = { ok: false, error: String(error?.message ?? error) }; }
+    const budget = releasing(releaseAdmission, admission, () => ({ kind: 'failed-before-launch', confirmed: true }), env);
     if (budget?.ok !== true) return held('kernel-launch-capacity-retained', { budget, evidence: proof.evidence });
     return clearReconciled({ ledger, workflowId, signal, authority, current, expected, held, now }, { budget, evidence: proof.evidence },
       { dispatch: null, terminal: null });
@@ -48,21 +61,13 @@ export function recoverWorkflowLaunch(ledger, { workflowId, signal, env = proces
   const adopted = owned && value.dispatch && !value.terminal && receipt?.handle ? settled({ dispatch: value.dispatch, receipt }) : null;
   if (adopted && !adopted.ok) return held(adopted.reason, adopted);
   const terminal = adopted?.handle ?? value?.terminal;
-  if (!owned
-      || typeof value.dispatch !== 'string' || !value.dispatch || typeof terminal !== 'string' || !terminal
-      || receipt?.role !== 'kernel' || receipt.handle !== terminal
-      || typeof receipt.id !== 'string' || !receipt.id || !Number.isInteger(receipt.fence)
-      || typeof receipt.attemptId !== 'string' || !receipt.attemptId)
-    return held('kernel-launch-custody-incomplete');
+  if (!isBoundLaunch(owned, value, terminal, receipt)) return held('kernel-launch-custody-incomplete');
   if (!expected.ok || canonicalJSON(current()) !== canonicalJSON(signal))
     return held('kernel-launch-recovery-authority-lost');
   const closure = releaseWorkflowWorker(value.dispatch, terminal, { env, close });
   if (!closure.ok) return held('kernel-launch-closure-unverified', { closure });
-  let budget;
-  try {
-    budget = releaseAdmission(admission, { kind: 'closed', confirmed: true, handle: terminal,
-      terminalProof: closure.closed.proof, processVerdict: closure.processes.verdict }, { env });
-  } catch (error) { budget = { ok: false, error: String(error?.message ?? error) }; }
+  const budget = releasing(releaseAdmission, admission, () => ({ kind: 'closed', confirmed: true, handle: terminal,
+    terminalProof: closure.closed.proof, processVerdict: closure.processes.verdict }), env);
   if (budget?.ok !== true) return held('kernel-launch-capacity-retained', { closure, budget });
   return clearReconciled({ ledger, workflowId, signal, authority, current, expected, held, now }, { closure, budget, evidence: adopted?.evidence },
     { dispatch: value.dispatch, terminal });

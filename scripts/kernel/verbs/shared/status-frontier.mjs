@@ -64,6 +64,10 @@ const admitReadyJobs = (s) => {
   if (!ready.length) return;
   const repoRoot = path.resolve(s.args?.repo ?? process.cwd());
   let hostHold = null;
+  const hostHoldFor = (op) => {
+    hostHold ??= hostHoldOf({ env: process.env, repo: repoRoot, workflowId, db, ledgerFile: s.ledger?.path ?? null });
+    return hostHold(op);
+  };
   const queueCtx = {
     planAncestors: s.planAncestors, jobsByOp: s.jobsByOp, slots: opSlotAdmission(db, workflowId),
     rtDoc: runtimeProfile(), poolLoad: s.poolLoad, ownerGates: s.ownerGates, peerWaits: s.peerWaits,
@@ -72,7 +76,7 @@ const admitReadyJobs = (s) => {
     typedGates: tryOr(() => typedIncidents(db, { workflowId }), []), now: s.now,
     // hostResourcesFor shares the one probe a status call takes (host-resources.mjs HOST_SAMPLE_MS), so
     // judging the merged rows against the floor dispatch refuses on costs no extra sample.
-    hostHold: wf?.phase === 'finished' ? null : (op) => (hostHold ??= hostHoldOf({ env: process.env, repo: repoRoot, workflowId, db, ledgerFile: s.ledger?.path ?? null }))(op),
+    hostHold: wf?.phase === 'finished' ? null : hostHoldFor,
   };
   for (const row of ready) {
     const foundation = jobPayloadOf(row).foundation;

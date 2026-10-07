@@ -18,7 +18,7 @@ import { normalizeText } from '../lib/normalize.mjs';
 
 const HERE = path.resolve(import.meta.dirname, '..', '..');
 const cache = new Map();
-const SENTENCE_BREAK = /[.!?;]+(?=\s|$)|[\r\n]+/;
+const SENTENCE_BREAK = /(?<![.!?;])[.!?;]+(?=\s|$)|[\r\n]+/;
 const CLAUSE_BREAK = /[,:()]/;
 
 function phraseSetsOf(skillRoot) {

@@ -9,7 +9,7 @@ import { phraseHits } from './phrase-match.mjs';
 import { asksFor } from './explicit-ask.mjs';
 
 const VAR_NAME = '[A-Za-z][A-Za-z0-9.]*';
-export const VAR_STATE_LINE = new RegExp('^(' + VAR_NAME + String.raw`)\s*:\s*(\S.*|[^\S\n\r\u2028\u2029])$`);
+export const VAR_STATE_LINE = new RegExp('^(' + VAR_NAME + String.raw`)\s*:\s*(\S.*|(?![\n\r\u2028\u2029])\s)$`);
 const QUALIFIER_CONTENT = '[^)]*';
 // The text before the qualifier: it runs to the last `)` that precedes the qualifier's own `(`, then to its last non-space character, and holds no line terminator.
 const BEFORE_QUALIFIER = String.raw`(?:.*\))?(?:[^()\n\r\u2028\u2029]*[^()\s])?`;

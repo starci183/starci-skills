@@ -103,7 +103,8 @@ export function resolveReadReference(token, { sourceRoot, stateDir = null, appRo
   // binding, never a file literally named '<x>': the refusal names the binding.
   if (rel.includes('<') || !root) {
     const unbound = [...rel.matchAll(/<([A-Za-z0-9_-]+)>/g)].map((match) => `unbound <${match[1]}> binding`);
-    const missing = rootKind === 'source' ? (unbound.length ? unbound : [original]) : [];
+    const unresolved = unbound.length ? unbound : [original];
+    const missing = rootKind === 'source' ? unresolved : [];
     return { token: original, kind: 'template', rootKind, resolved: [], missing, truncated: false };
   }
   root = path.resolve(root);

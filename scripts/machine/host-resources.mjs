@@ -44,7 +44,7 @@ export function memoryProbe({ mem = os } = {}) {
 
 /** One machine-load sample: {cpuBusy, freeMem} as fractions; CPU over `sampleMs`. */
 export function machineLoad({ sampleMs = 400 } = {}) {
-  if (loadSample && loadSample.sampleMs === sampleMs && Date.now() - loadSample.at <= HOST_SAMPLE_MS) return loadSample.value;
+  if (loadSample?.sampleMs === sampleMs && Date.now() - loadSample.at <= HOST_SAMPLE_MS) return loadSample.value;
   const snap = () => os.cpus().reduce((a, c) => { const t = c.times; const total = t.user + t.nice + t.sys + t.idle + t.irq; return { idle: a.idle + t.idle, total: a.total + total }; }, { idle: 0, total: 0 });
   const a = snap();
   sleepSync(sampleMs);

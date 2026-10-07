@@ -20,16 +20,19 @@ export function withoutAttributeBlocks(text) {
 /** The attribute selectors of a compound selector, left to right: [{name, value}] with value null when none is given. */
 export function attributeSelectorsOf(compound) {
   const found = [];
-  for (let open = compound.indexOf('['); open >= 0; open = compound.indexOf('[', open + 1)) {
+  const openAfter = (from) => compound.indexOf('[', from + 1);
+  let open = compound.indexOf('[');
+  while (open >= 0) {
     ATTRIBUTE_NAME_RX.lastIndex = open + 1;
     const name = ATTRIBUTE_NAME_RX.exec(compound)?.[0];
-    if (name === undefined) continue;
     const afterName = ATTRIBUTE_NAME_RX.lastIndex;
     ATTRIBUTE_VALUE_RX.lastIndex = afterName;
-    const valued = ATTRIBUTE_VALUE_RX.exec(compound);
-    if (!valued && compound[afterName] !== ']') continue;
-    found.push({ name, value: valued ? valued[1] : null });
-    open = valued ? ATTRIBUTE_VALUE_RX.lastIndex - 1 : afterName;
+    const valued = name === undefined ? null : ATTRIBUTE_VALUE_RX.exec(compound);
+    const closed = name !== undefined && (valued || compound[afterName] === ']');
+    if (closed) found.push({ name, value: valued ? valued[1] : null });
+    let resume = open;
+    if (closed) resume = valued ? ATTRIBUTE_VALUE_RX.lastIndex - 1 : afterName;
+    open = openAfter(resume);
   }
   return found;
 }

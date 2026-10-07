@@ -31,10 +31,12 @@ function attemptStatus(row) {
 
 function levelsOf(ops, edges) {
   const level = Object.fromEntries(ops.map(op => [op, 0]));
-  for (let pass = 0; pass < ops.length; pass++) {
-    let changed = false;
+  let changed = true;
+  let passes = ops.length;
+  while (changed && passes > 0) {
+    changed = false;
+    passes -= 1;
     for (const [from, to] of edges) if (level[from] != null && level[to] != null && level[to] < level[from] + 1) { level[to] = level[from] + 1; changed = true; }
-    if (!changed) break;
   }
   return level;
 }

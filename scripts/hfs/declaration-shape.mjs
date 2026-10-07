@@ -58,7 +58,7 @@ function connectionProblems(side, value) {
 }
 
 /** Whether a declared list is present but not a list of distinct entries that all satisfy `valid`. */
-const isBadUniqueList = (list, valid) => list !== undefined && (!Array.isArray(list) || !list.every(valid) || new Set(list).size !== list.length);
+const isBadUniqueList = (list, valid) => list !== undefined && (!Array.isArray(list) || !list.every((entry) => valid(entry)) || new Set(list).size !== list.length);
 
 function declarationSideProblems(side, value, names) {
   const bad = [];

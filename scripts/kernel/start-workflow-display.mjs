@@ -83,5 +83,6 @@ export function launchPlanText({ asJson, out, wf, target, chain, route, memberLa
   const warningLine = (route.warnings ?? []).map((warning) => `\n  warning: ${warning}`).join('');
   const effortLabel = out.effort ? `  effort=${out.effort}` : '';
   const configFile = out.config.file ?? 'absent — the shipped tiers apply';
-  return `PLAN — start workflow ${target}\n  title: ${out.title}${slugLabel}\n  phase: ${wf?.phase} | goal rev ${out.goalRevision} (${out.goalIdentity}) | inbox: ${out.inbox}\n  op chain: ${opChain}\n  kernel: ${out.kernel}\n  sender: ${out.sender?.ok ? out.sender.handle : `none - ${out.sender?.error ?? 'unknown'}`}\n${routeLine}${groupLine}\n  launch: ${out.launch}\n  config: ${configFile}${effortLabel}${budgetLine}${warningLine}\n  command: ${out.command ?? '(unavailable)'}\n  command source: ${out.commandSource ?? '(unavailable)'}`;
+  const senderLabel = out.sender?.ok ? out.sender.handle : 'none - ' + (out.sender?.error ?? 'unknown');
+  return `PLAN — start workflow ${target}\n  title: ${out.title}${slugLabel}\n  phase: ${wf?.phase} | goal rev ${out.goalRevision} (${out.goalIdentity}) | inbox: ${out.inbox}\n  op chain: ${opChain}\n  kernel: ${out.kernel}\n  sender: ${senderLabel}\n${routeLine}${groupLine}\n  launch: ${out.launch}\n  config: ${configFile}${effortLabel}${budgetLine}${warningLine}\n  command: ${out.command ?? '(unavailable)'}\n  command source: ${out.commandSource ?? '(unavailable)'}`;
 }
