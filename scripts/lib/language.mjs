@@ -56,7 +56,7 @@ export const DECLARED_VIETNAMESE_FIELDS = Object.freeze({
   }),
   'modules/goal/source-phrases.yaml': Object.freeze({
     fields: Object.freeze([
-      'prefer', 'avoid', 'negation', 'refused', 'accept', 'golden',
+      'prefer', 'avoid', 'only', 'negation', 'refused', 'accept', 'golden',
       'missingPaths', 'grantTooNarrow', 'toolTimeout', 'testGap', 'checkerUnavailable',
       'supervisorVerbs', 'ownerWord', 'orWord', 'beyondAuthority', 'ownerOnly', 'workerDied', 'contractConflict', 'decision',
       'product', 'grammar', 'knowledge', 'sourceLabel', 'internalVocabulary', 'actor', 'success',
