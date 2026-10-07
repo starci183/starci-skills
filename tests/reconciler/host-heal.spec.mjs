@@ -10,8 +10,8 @@ import { launcherItem, taskItems } from '../../scripts/reconciler/task-health.mj
 import { auditTask } from '../../scripts/machine/task-audit.mjs';
 import { TASK_DEFINITIONS, registeredAction } from '../../scripts/machine/task-register.mjs';
 
-const SHIM = 'C:\\Users\\fixture\\.starci\\bin\\starci.cmd';
-const ROOT = 'C:\\Windows';
+const SHIM = path.win32.join('fixture-home', '.starci', 'bin', 'starci.cmd');
+const ROOT = 'fixture-windows';
 const KEYS = Object.keys(TASK_DEFINITIONS);
 const NUMBERS = { pollMs: 2000, leaseMs: 30000, renewMs: 10000, heartbeatStaleMs: 60000, statusCacheMs: 20000, backoff: { minMs: 1000, maxMs: 300000 }, crashLoop: { max: 3, windowMs: 1800000 } };
 
