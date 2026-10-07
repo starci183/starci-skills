@@ -119,3 +119,21 @@ test('the status projection values of a held job are the table\'s queuedBecause 
   assert.ok(kinds.includes('ready') && kinds.includes('supervisor-gate') && kinds.includes('host-resources-low'));
   assert.equal(new Set(kinds).size, kinds.length);
 });
+
+test('the tier chain takes the switch: one refusal moves the member last in its tier, two drop it, and the pick says so', async (t) => {
+  const { fakePoolSelection } = await import('../helpers/fake-admission.mjs');
+  const { loadRuntimes } = await import('../../scripts/agent/models.mjs');
+  const runtimes = loadRuntimes(path.join(path.resolve(import.meta.dirname, '..', '..'), 'modules', 'models'));
+  const pick = (lineage) => fakePoolSelection({ runtimes, capacity: {}, scopeId: 'policy-tier', kind: 'backend.scaffold', difficulty: 'hard', lineage });
+  const refusals = (n) => adjustOf(t, Array.from({ length: n }, () => ({ step: 'admission', error: 'no-eligible-candidate', model: 'claude-agent' })));
+  const first = pick(null).target;
+  assert.equal(first, 'claude-agent', 'the hard tier opens on claude');
+  const one = refusals(1), two = refusals(2);
+  assert.deepEqual(one.demote, ['claude-agent']);
+  const demoted = pick(one);
+  assert.notEqual(demoted.target, 'claude-agent', 'the next eligible member of the tier takes the job');
+  assert.equal(demoted.chain.at(-1).startsWith('claude/'), true, 'the demoted member is tried last');
+  const excluded = pick(two);
+  assert.notEqual(excluded.target, 'claude-agent');
+  assert.match(JSON.stringify(excluded.rejected), /excluded for this retry lineage: failed 2x on it/);
+});
