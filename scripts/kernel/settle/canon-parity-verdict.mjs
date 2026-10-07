@@ -8,6 +8,7 @@ import { runNode } from '../../api/node/run-node.mjs';
 import { catFile } from '../../api/git/cat-file.mjs';
 import { diff as gitDiff } from '../../api/git/diff.mjs';
 import { sameOrUnder, slash } from '../../lib/path-key.mjs';
+import { findInOrder } from '../../lib/in-order.mjs';
 import { git, baseBlobsOf, ownedFilesOf, sliceBaseOf, checkFamilyOf, withoutNodePath, declaredProjectsOf,
   tscParity, lintParity, PARITY_CHECKS, stripSlashes } from './canon-parity.mjs';
 
@@ -50,32 +51,36 @@ function splitDeclared(declared, classify, baseline) {
 
 /** Re-runs of the declared runtime checks (each recorded); the first red or unrunnable one ends the verdict. */
 async function rerunDeclared(reruns, { rerun, repo, settings, env, now, started, record, checks }) {
-  for (const c of reruns) {
-    if (now() - started > settings.itemBudgetMs) return hand('verify-budget-exceeded', 'parity re-runs');
+  let stop = null;
+  await findInOrder(reruns, async (c) => {
+    if (now() - started > settings.itemBudgetMs) { stop = hand('verify-budget-exceeded', 'parity re-runs'); return true; }
     const r = rerun(c, { repo, timeoutMs: settings.rerunTimeoutMs, env });
     await record({ name: String(c.check.name ?? c.rel), command: String(c.check.command), cwd: repo, phase: 'parity', runner: 'parity', ...r });
     const v = checkVerdictOf(r);
-    if (v.verdict === 'unavailable') return unavailable('parity-checker-unavailable', `${c.check.name}:${r.exitCode} ${r.tail ?? ''}`);
-    if (v.verdict === 'red') return hand('parity-rerun-red', `${c.check.name}:${r.exitCode} ${r.tail ?? ''}`);
+    if (v.verdict === 'unavailable') { stop = unavailable('parity-checker-unavailable', `${c.check.name}:${r.exitCode} ${r.tail ?? ''}`); return true; }
+    if (v.verdict === 'red') { stop = hand('parity-rerun-red', `${c.check.name}:${r.exitCode} ${r.tail ?? ''}`); return true; }
     checks.push({ name: String(c.check.name ?? c.rel), exitCode: 0, command: String(c.check.command).slice(0, 2000),
       evidence: `runtime settler re-run: exit 0 in ${Math.round(r.ms / 100) / 10}s (worker declared exit ${c.check.exitCode})` });
-  }
-  return null;
+    return false;
+  });
+  return stop;
 }
 
 /** node --check <file>: re-run as argv (no shell) in the checkout; the file must parse. */
 async function syntaxDeclared(list, { root, now, record, checks }) {
-  for (const c of list) {
+  let stop = null;
+  await findInOrder(list, async (c) => {
     const argv = String(c.command).trim().split(/\s+/).slice(1);
     const syntaxStarted = now();
     const r = runNode(argv, { cwd: root, timeout: 60_000 });
     await record({ name: String(c.name), command: String(c.command), cwd: root, phase: 'parity', runner: 'parity',
       exitCode: r.status ?? (r.error?.code === 'ETIMEDOUT' ? 124 : 127), startedAt: syntaxStarted, finishedAt: now(), stdout: r.stdout, stderr: r.stderr ?? r.error?.message });
-    if (r.status == null || r.error) return unavailable('parity-checker-unavailable', `${c.name}: ${r.error?.message ?? 'no exit'}`);
-    if (r.status !== 0) return hand('parity-rerun-red', `${c.name}:${r.status} ${String(r.stderr ?? '').trim().split(/\r?\n/)[0] ?? ''}`);
+    if (r.status == null || r.error) { stop = unavailable('parity-checker-unavailable', `${c.name}: ${r.error?.message ?? 'no exit'}`); return true; }
+    if (r.status !== 0) { stop = hand('parity-rerun-red', `${c.name}:${r.status} ${String(r.stderr ?? '').trim().split(/\r?\n/)[0] ?? ''}`); return true; }
     checks.push({ name: String(c.name), exitCode: 0, command: String(c.command).slice(0, 2000), evidence: `runtime settler re-run in ${root}: exit 0 (worker declared exit ${c.exitCode})` });
-  }
-  return null;
+    return false;
+  });
+  return stop;
 }
 
 /** (a): canon-scan over the owned paths; findings left there pass only through owedToWire acceptance. */
