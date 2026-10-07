@@ -21,6 +21,7 @@ import { allocationSettings } from '../../../engine/config.mjs';
 import { canonParityVerdict, parityEligible, parityFingerprint, PARITY_REASONS, resolveOwnedRoot, stripSlashes } from './canon-parity.mjs';
 import { checkRunStatusOf, checkVerdictOf } from './check-verdict.mjs';
 import { KERNEL_ONLY_OPS } from '../../machine/reported-jobs.mjs';
+import { checkRerunRootOf } from '../verbs/shared/check-evidence.mjs';
 
 const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const CUT_SLICE_CHECKS = ['cut-slice-postcondition', 'cut-regression-inventory'];
@@ -117,7 +118,7 @@ async function checksFromStore(db, item, { store = null } = {}) {
 
 const BASELINE_NAME = /(?:^|[-_.\s])(?:before|baseline)(?:$|[-_.\s])/i;
 
-/** Re-run one runtime check: argv, no shell, cwd = the ledger repo. {exitCode, ms, tail} */
+/** Re-run one runtime check: argv, no shell, cwd = `repo` (the job's re-run root, checkRerunRootOf). {exitCode, ms, tail} */
 export function rerunCheck(c, { repo, timeoutMs, env = process.env, run = runNode }) {
   const t0 = Date.now();
   const r = run([c.script, ...c.argv], { cwd: repo, timeout: timeoutMs, env: { ...runtimeEnv(env), ...(c.mechanical ? { STARCI_RUNTIME: c.runtimeRoot } : {}) }, maxBuffer: 64 * 1024 * 1024 });
@@ -209,10 +210,10 @@ const parityEnabled = (env = process.env) => String(env.STARCI_SETTLER_PARITY ??
 export const isBaselineCheck = (c) => BASELINE_NAME.test(String(c?.name ?? ''));
 
 /** One declared runtime check's re-run and verdict; pushes its evidence entry. null when green, the stop verdict else. */
-async function rerunDeclaredCheck(db, c, { item, repo, settings, env, observation, record, rerun, checks, started }) {
+async function rerunDeclaredCheck(db, c, { item, repo, root, settings, env, observation, record, rerun, checks, started }) {
   if (Date.now() - started > settings.itemBudgetMs) return { green: false, reason: 'verify-budget-exceeded', unavailable: true };
   const invoke = (target) => rerun(c, { repo: target, timeoutMs: settings.rerunTimeoutMs, env });
-  const r = c.mechanical && observation ? observeCheck(c, observation, invoke) : invoke(repo);
+  const r = c.mechanical && observation ? observeCheck(c, observation, invoke) : invoke(root);
   await record({ name: String(c.check.name ?? c.rel), command: String(c.check.command), phase: 'verify', runner: 'settler',
     declaredExitCode: Number.isInteger(c.check.exitCode) ? c.check.exitCode : null, ...r });
   const v = checkVerdictOf(r);
@@ -283,11 +284,19 @@ async function verifyDeclared(db, item, { repo, settings, rerun, canon, env, rec
   if (foreign.length) return { green: false, reason: 'check-not-reverifiable', detail: foreign.slice(0, 8).map((c) => `${c.check.name}:${c.why}`) };
   const runtime = classed.filter((c) => c.kind === 'runtime');
   if (!runtime.length) return { green: false, reason: 'nothing-reverifiable' };
+  // The re-runs execute in the workflow's registered worktree, where the op worked - never the main checkout. A Git
+  // workflow whose tree cannot be resolved is unavailable (H7), never red and never a vacuous green.
+  // An observed mechanical check binds its own subject inside the filed roots (observeCheck) and needs no tree here.
+  let root = null;
+  if (runtime.some((c) => !(c.mechanical && observation))) {
+    try { root = checkRerunRootOf(db, db.prepare('SELECT * FROM jobs WHERE job_id=?').get(item.jobId), { repo, env }); }
+    catch (error) { return { green: false, unavailable: true, reason: 'checker-unavailable', code: error.code ?? null, detail: [String(error.message).slice(0, 300)] }; }
+  }
   const started = Date.now();
   const checks = [];
   let rerunStop = null;
   await findInOrder(runtime, async (c) => {
-    rerunStop = await rerunDeclaredCheck(db, c, { item, repo, settings, env, observation, record, rerun, checks, started });
+    rerunStop = await rerunDeclaredCheck(db, c, { item, repo, root, settings, env, observation, record, rerun, checks, started });
     return Boolean(rerunStop);
   });
   if (rerunStop) return rerunStop;
