@@ -84,7 +84,8 @@ function serviceClassFor(ts, rel, serviceRel, serviceFile, imports, list, report
   return serviceClass ? { serviceClass, serviceName } : null;
 }
 
-function checkDependencies(kit, rel, serviceName, serviceFile, serviceClass, list, provided, report) {
+function checkDependencies(kit, rel, service, serviceFile, list, provided, report) {
+  const { serviceName, serviceClass } = service;
   const dependencies = constructorDependencies(kit, serviceFile, serviceClass);
   const expected = [];
   for (const dependency of dependencies) {
@@ -111,7 +112,7 @@ function checkTestingModule({ ts, kit, rel, serviceRel, serviceFile, imports, ca
   if (!readable) return;
   const service = serviceClassFor(ts, rel, serviceRel, serviceFile, imports, list, report);
   if (!service) return;
-  checkDependencies(kit, rel, service.serviceName, serviceFile, service.serviceClass, list, provided, report);
+  checkDependencies(kit, rel, service, serviceFile, list, provided, report);
 }
 
 function checkServiceSpec({ config, graph, kit, ts, rel, violations }) {

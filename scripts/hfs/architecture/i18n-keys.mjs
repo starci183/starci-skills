@@ -114,7 +114,8 @@ function keysOf(ts, argument) {
   return ts.isStringLiteralLike(argument) ? [argument] : [];
 }
 
-function reportCallKeys(ts, file, checker, namespaces, loaded, app, report, node) {
+function reportCallKeys(reads, node) {
+  const { ts, file, checker, namespaces, loaded, app, report } = reads;
   const callee = node.expression;
   let owner = ts.isIdentifier(callee) ? callee : null;
   if (ts.isPropertyAccessExpression(callee) && READERS.has(callee.name.text) && ts.isIdentifier(callee.expression)) owner = callee.expression;
@@ -130,8 +131,9 @@ function reportCallKeys(ts, file, checker, namespaces, loaded, app, report, node
 }
 
 function reportTranslationReads(ts, file, checker, namespaces, loaded, app, report) {
+  const reads = { ts, file, checker, namespaces, loaded, app, report };
   const read = node => {
-    if (ts.isCallExpression(node)) reportCallKeys(ts, file, checker, namespaces, loaded, app, report, node);
+    if (ts.isCallExpression(node)) reportCallKeys(reads, node);
     ts.forEachChild(node, read);
   };
   read(file.sourceFile);

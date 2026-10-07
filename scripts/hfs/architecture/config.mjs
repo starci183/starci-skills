@@ -104,7 +104,8 @@ function workspaceCandidates(packageRoot, normalized) {
   return { candidates, wildcard: segments.includes('*') };
 }
 
-const admitFileDependency = (root, appPackageRoot, packageRoot, sideRoot, repository, state, section, name, value) => {
+const admitFileDependency = (walk, section, name, value) => {
+  const { root, appPackageRoot, packageRoot, sideRoot, repository, state } = walk;
   if (typeof value !== 'string' || !value.startsWith('file:')) return;
   const absolute = path.resolve(sideRoot ? appPackageRoot : packageRoot, value.slice('file:'.length));
   if (sideRoot && !isInside(root, absolute) && isInside(appPackageRoot, absolute)) return;
@@ -115,14 +116,15 @@ const admitFileDependency = (root, appPackageRoot, packageRoot, sideRoot, reposi
   }
 };
 
-function admitFileDependencies(root, appPackageRoot, packageRoot, sideRoot, repository, pkg, state) {
+function admitFileDependencies(walk, pkg) {
   for (const section of ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies']) {
     for (const [name, value] of Object.entries(pkg?.[section] ?? {}))
-      admitFileDependency(root, appPackageRoot, packageRoot, sideRoot, repository, state, section, name, value);
+      admitFileDependency(walk, section, name, value);
   }
 }
 
-const admitPackageWorkspaces = (root, appPackageRoot, packageRoot, sideRoot, side, pkg, state) => {
+const admitPackageWorkspaces = (walk, pkg) => {
+  const { root, packageRoot, sideRoot, side, state } = walk;
   const patterns = Array.isArray(pkg?.workspaces) ? pkg.workspaces : pkg?.workspaces?.packages;
   for (const pattern of Array.isArray(patterns) ? patterns : []) {
     if (typeof pattern !== 'string' || !pattern.trim()) throw new Error('package.json workspace entries must be non-empty paths.');
@@ -154,8 +156,9 @@ function workspaceDirectories(root, { packageRoot: appPackageRoot = root, side =
     visited.add(packageRoot);
     const sideRoot = side !== null && packageRoot === root;
     const pkg = readJson(path.join(sideRoot ? appPackageRoot : packageRoot, 'package.json'));
-    admitPackageWorkspaces(root, appPackageRoot, packageRoot, sideRoot, side, pkg, { directories, queue });
-    admitFileDependencies(root, appPackageRoot, packageRoot, sideRoot, repository, pkg, { directories, queue });
+    const walk = { root, appPackageRoot, packageRoot, sideRoot, side, repository, state: { directories, queue } };
+    admitPackageWorkspaces(walk, pkg);
+    admitFileDependencies(walk, pkg);
   }
   return [...directories].sort(byCodeUnit);
 }

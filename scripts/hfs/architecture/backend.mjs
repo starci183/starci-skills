@@ -402,7 +402,8 @@ function checkFeatureTransportEdges(config, context, sourceFiles, featureRoots, 
   }
 }
 
-function checkBackendSource(config, context, sourceFiles, moduleRoots, featureRoots, nonAppRoots, sourceFile, violations) {
+function checkBackendSource(config, context, sourceFiles, roots, sourceFile, violations) {
+  const { moduleRoots, featureRoots, nonAppRoots } = roots;
   const fileName = path.resolve(sourceFile.fileName);
   const fromModules = insideAny(moduleRoots, fileName);
   const fromFeatures = insideAny(featureRoots, fileName);
@@ -419,10 +420,10 @@ export function checkBackend(config, context) {
   const violations = [];
   const moduleRoots = roots(config.root, config.backend.modules);
   const featureRoots = roots(config.root, config.backend.features);
-  const nonAppRoots = [...moduleRoots, ...featureRoots];
+  const sourceRoots = { moduleRoots, featureRoots, nonAppRoots: [...moduleRoots, ...featureRoots] };
   const sourceFiles = new Map(context.files.map(file => [path.resolve(file.fileName), file]));
   for (const sourceFile of context.files) {
-    checkBackendSource(config, context, sourceFiles, moduleRoots, featureRoots, nonAppRoots, sourceFile, violations);
+    checkBackendSource(config, context, sourceFiles, sourceRoots, sourceFile, violations);
   }
   return violations;
 }

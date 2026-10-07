@@ -104,7 +104,8 @@ function collectDeclaredRequirements(declared, requirements, instances, judged) 
   }
 }
 
-function addInstanceRequirements(resolver, slotId, root, representative, requirements, instances, seenInstances, judged) {
+function addInstanceRequirements(resolver, classified, representative, requirements, instances, seenInstances, judged) {
+  const { slot: slotId, root } = classified;
   const key = `${slotId}|${root}`;
   if (seenInstances.has(key) || !judged(slotId)) return;
   seenInstances.add(key);
@@ -136,7 +137,7 @@ function collectTreeRequirements(tree, resolver, requirements, instances, judged
     const classified = resolver.classifyPath(file);
     if (classified.status === 'owned' && classified.slot) {
       noteInstance(found, classified.slot, classified.root);
-      addInstanceRequirements(resolver, classified.slot, classified.root, file, requirements, instances, seenInstances, judged);
+      addInstanceRequirements(resolver, classified, file, requirements, instances, seenInstances, judged);
     }
     const owner = resolver.ownerOf(file);
     if (owner) {

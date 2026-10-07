@@ -88,7 +88,9 @@ function inspectMigrationDeclaration(kit, file, statement, persistence, checker,
   if (nameValue !== statement.name.text) report(file, nameProperty ?? statement.name, `Migration ${statement.name.text} must declare \`name = "${statement.name.text}"\`, equal to its class name; TypeORM records that value in its migrations table.`, { class: statement.name.text });
 }
 
-function inspectSchemaClass(kit, file, statement, persistence, checker, found, counts, report) {
+function inspectSchemaClass(scan, site, statement) {
+  const { kit, found, counts, report } = scan;
+  const { file, persistence, checker } = site;
   if (!kit.ts.isClassDeclaration(statement) || !statement.name) return;
   const isEntity = isEntityDeclaration(kit, checker, statement);
   const isMigration = isMigrationDeclaration(kit, checker, statement);
@@ -104,10 +106,11 @@ function inspectSchemaClass(kit, file, statement, persistence, checker, found, c
 function inspectSchemaFiles(input, kit, persistenceOf, found, report) {
   const { graph } = input;
   const counts = { entities: 0, migrations: 0 };
+  const scan = { kit, found, counts, report };
   for (const file of graph.files.values()) {
     const persistence = persistenceOf(file.rel);
     const checker = kit.checkerOf(file.sourceFile);
-    for (const statement of file.sourceFile.statements) inspectSchemaClass(kit, file, statement, persistence, checker, found, counts, report);
+    for (const statement of file.sourceFile.statements) inspectSchemaClass(scan, { file, persistence, checker }, statement);
   }
   return counts;
 }
@@ -133,7 +136,8 @@ function reportDeclaredPersistenceArrays(key, kinds, registered, graph, ts, plai
   }
 }
 
-function reportEntityManagerUse(kit, kinds, only, home, connections, file, checker, report) {
+function reportEntityManagerUse(kit, capability, file, checker, report) {
+  const { kinds, only, home, connections } = capability;
   kit.walk(file.sourceFile, node => {
     if (!kit.ts.isCallExpression(node)) return;
     const declaration = kit.declarationsOf(checker, node.expression)[0];
@@ -145,14 +149,15 @@ function reportEntityManagerUse(kit, kinds, only, home, connections, file, check
 }
 
 function reportEntityManagerUses(input, kit, key, kinds, only, connections, report) {
-  const home = [...only.keys()][0];
+  const capability = { kinds, only, home: [...only.keys()][0], connections };
   for (const file of input.graph.files.values()) {
     if (!file.rel.startsWith(`${key}/`)) continue;
-    reportEntityManagerUse(kit, kinds, only, home, connections, file, kit.checkerOf(file.sourceFile), report);
+    reportEntityManagerUse(kit, capability, file, kit.checkerOf(file.sourceFile), report);
   }
 }
 
-function reportFoundCapability(input, kit, key, kinds, registered, connections, plain, report) {
+function reportFoundCapability(input, kit, key, kinds, view) {
+  const { registered, connections, plain, report } = view;
   const { graph } = input;
   const { resolver } = kit;
   reportDeclaredPersistenceArrays(key, kinds, registered, graph, kit.ts, plain);
@@ -165,7 +170,8 @@ function reportFoundCapability(input, kit, key, kinds, registered, connections, 
 }
 
 function reportFoundCapabilities(input, kit, found, registered, connections, plain, report) {
-  for (const [key, kinds] of found) reportFoundCapability(input, kit, key, kinds, registered, connections, plain, report);
+  const view = { registered, connections, plain, report };
+  for (const [key, kinds] of found) reportFoundCapability(input, kit, key, kinds, view);
 }
 
 function reportPersistenceExport(capabilityRoot, index, statement, element, wanted, report) {
@@ -213,7 +219,7 @@ function reportCapabilityIndexes(input, kit, found, report) {
 export function checkSchemaOwner(input) {
   const { config, graph } = input;
   const kit = machineKit(input);
-  const { ts, resolver } = kit;
+  const { resolver } = kit;
   const connections = new Set(resolver.repo.connections.map(item => item.name));
   const violations = [];
   const report = (file, node, message, extra = {}) => violations.push({ ruleId: RULE, path: file.rel, ...kit.at(file.rel, file.sourceFile, node), message, ...extra });
