@@ -123,7 +123,7 @@ test('a Devin worker screen showing the capacity error opens the devin capacity 
   const route = await fx.run('route', '--repo', fx.repo, '--job', 'op-impl-a2', '--json');
   assert.equal(route.status, 0, route.stderr || route.stdout);
   assert.notEqual(route.value.decision.model, 'devin-agent', 'the open capacity circuit skips Devin');
-  assert.match(route.value.rejected.find((r) => r.target === 'devin-agent')?.reason ?? '', /out of capacity/);
+  assert.match(route.value.rejected.find((r) => r.target === 'devin/swe-2-max')?.reason ?? '', /out of capacity/);
 
   // The lineage counts the outage against Devin, so the retry keeps it last once the circuit expires.
   const cause = fx.db((d) => attemptCauseOf(d, d.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE job_id='op-impl-a1'`).get()));
