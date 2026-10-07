@@ -43,7 +43,7 @@ const specFiles = (worktree) => {
     .map((file) => posix(path.relative(worktree, file)));
 };
 
-const FAILED_TITLE_LINE = new RegExp(['^✖\\s+', '(.+?)', '(?:\\s+\\([0-9.]+m?s\\))?', '$'].join(''));
+const FAILED_TITLE_LINE = new RegExp([String.raw`^✖\s+`, '(.+?)', String.raw`(?:\s+\([0-9.]+m?s\))?`, '$'].join(''));
 
 /** Failed test titles from node's spec reporter, with the duration suffix removed exactly as land-to-main.sh did. */
 function failedTitles(text) {
