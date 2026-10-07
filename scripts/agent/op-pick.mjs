@@ -83,7 +83,7 @@ export function pickOpModel(input = {}) {
   if (!difficulty) return { error: `unknown difficulty '${measured}'` };
   if (!route.role) return { error: `no role resolves for kind '${kind}'` };
   const tier = tierOfOp({ kind, difficulty }, settings);
-  const ctx = { kind, role: route.role, runtimes, grants, lineage, capacity, modelsDir, opsDir, registry, backoff: capacity ? poolCapsNow() : {} };
+  const ctx = { kind, role: route.role, runtimes, grants, lineage, capacity, modelsDir, opsDir, registry, backoff: input.backoff ?? (capacity ? poolCapsNow() : {}) };
   const members = tierMembers(tier, { settings, registry }).map((member) => ({ ...member, hard: structuralReasons(member, ctx) }));
   const base = { tier, role: route.role, work: route.work, difficulty, measuredDifficulty: measured, floor: route.floor, chain: members.map((member) => member.id) };
   const tools = noToolHolder(members, ctx, hostToolsRequired(kind, { opsDir }));

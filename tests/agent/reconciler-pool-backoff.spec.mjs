@@ -63,7 +63,7 @@ test('route: a pool at its backed-off cap is rejected and the next eligible pool
   if (free.error) { assert.fail(`fixture route failed: ${free.error}`); }
   assert.equal(free.target, 'devin-agent');
   assert.equal(backed.target, 'codex-agent', 'devin at 5/5 backed off: codex takes it');
-  assert.ok((backed.rejected ?? []).some((r) => r.target === 'devin-agent' && /backed off/.test(r.reason)));
+  assert.ok((backed.rejected ?? []).some((r) => r.target === 'devin/swe-2-max' && r.reasons.includes('capacity-full')), 'the backed-off cap is the pool capacity the hard filter reads');
 });
 
 function ledgerDb({ events = [], health = [], logs = [] }) {
