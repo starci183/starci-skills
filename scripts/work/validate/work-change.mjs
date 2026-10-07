@@ -61,7 +61,7 @@ const positiveInteger=value=>Number.isInteger(value)&&value>0;
 const key=value=>canonicalJSON(value??null);
 /** A word a person would recognize in both a clause and the sentence that explains why it went. */
 const stems=value=>new Set(String(value??'').toLowerCase().match(/[a-z]{4,}/g)?.map(word=>word.replace(/(?:ed|ing|es|s)$/,''))??[]);
-const namesRevision=value=>/\brev(?:ision)?\s*\.?\s*\d+/i.test(String(value??''));
+const namesRevision=value=>/\brev(?:ision)?\s*(?:\.\s*)?\d+/i.test(String(value??''));
 const moment=value=>{const at=Date.parse(String(value??''));return Number.isFinite(at)?at:null;};
 
 /** The normative projection: the record with every prose and lifecycle key removed, at every depth. */
