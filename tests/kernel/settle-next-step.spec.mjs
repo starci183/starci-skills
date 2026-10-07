@@ -209,7 +209,7 @@ test('with nothing open, the next plan leg whose ancestors succeeded is a dispat
   const s=w.status();
   assert.equal(s.frontier.state,'next-ready');
   assert.deepEqual(s.nextActions.map(a=>[a.kind,a.op,a.jobId]),[['dispatch','test.author',undefined]]);
-  assert.deepEqual(s.legs.map(l=>[l.op,l.color]),[['request.analyze','gray'],['docs.author','green'],['test.author','gray']]);
+  assert.deepEqual(s.legs.map(l=>[l.op,l.color]),[['request.analyze','external'],['docs.author','green'],['test.author','gray']]);
 });
 
 test("the Kernel's own enqueue is refused while the runtime's retry is open, never doubles it",t=>{
