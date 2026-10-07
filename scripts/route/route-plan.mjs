@@ -56,6 +56,8 @@ args: (--target "<var>: <state>" [--target ...] | --target-json '<json>' | --tex
   process.exit(code);
 }
 
+function legIdFor(opId, instance) { return instance ? `${opId}#${instance}` : opId; }
+
 function parseArgs(argv) {
   const a = { targets: [] };
   const take = () => {
@@ -621,8 +623,6 @@ function planChain({ sstar, s0, ops, prodTable, hints, outOfBand = [] }) {
     assumptions.push(`producer for ${varKey(v)}: ${v.state} is ambiguous — picked ${pick.op}; alternatives: ${cands.map(c => c.op).join(', ')}`);
     return { pick, cands, assumed: true };
   }
-
-  function legIdFor(opId, instance) { return instance ? `${opId}#${instance}` : opId; }
 
   function ensureLeg(opId, { forVar = null, instance = null, injected = null } = {}) {
     const lid = legIdFor(opId, instance);
