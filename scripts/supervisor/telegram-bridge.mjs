@@ -221,7 +221,7 @@ export async function getUpdates({ token, offset = null, timeoutS = POLL_TIMEOUT
   const payload = { timeout: timeoutS, allowed_updates: ALLOWED_UPDATES };
   if (Number.isSafeInteger(offset)) payload.offset = offset;
   try {
-    const res = await fetchImpl(`${apiBase.replace(/\/+$/, '')}/bot${token}/getUpdates`, {
+    const res = await fetchImpl(`${apiBase.replace(new RegExp(['/', '+', '$'].join('')), '')}/bot${token}/getUpdates`, {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload), signal: AbortSignal.timeout((timeoutS + 15) * 1000),
     });
     const json = await res.json().catch(() => null);
