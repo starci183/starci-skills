@@ -18,7 +18,7 @@ test('a fresh worktree path gets its trust and the command guard hook before lau
   for (const agent of ['claude', 'codex', 'devin']) {
     const fx = withTrust(t);
     const dir = tmp(t, `starci-card-${agent}-`);
-    const r = ensureLaunchTrust({ agent, cwd: dir, config:{launchTrust:{profile:'automatic',approvedBy:'owner',approvalRef:'private card fixture adoption',roots:[dir]}}, env: { STARCI_AGENT_TRUST_HOME: fx.STARCI_AGENT_TRUST_HOME }, platform: 'win32' });
+    const r = ensureLaunchTrust({ agent, cwd: dir, config:{launchTrust:{profile:'automatic',approvedBy:'owner',approvalRef:'private card fixture adoption',roots:[dir]}}, env: { STARCI_AGENT_TRUST_HOME: fx.STARCI_AGENT_TRUST_HOME }, platform: process.platform });
     assert.notEqual(r?.status, 'failed', `${agent}: ${JSON.stringify(r?.errors)}`);
     assert.deepEqual(r.errors ?? [], [], `${agent}: no write error`);
     const project = projectTargets(path.resolve(dir));
@@ -27,7 +27,7 @@ test('a fresh worktree path gets its trust and the command guard hook before lau
     assert.match(fs.readFileSync(guardFile, 'utf8'), /command-guard|PreToolUse/i, `${agent}: the PreToolUse command guard is registered next to the launch settings`);
     if (agent === 'claude') {
       const json = JSON.parse(fs.readFileSync(path.join(fx.home, '.claude.json'), 'utf8'));
-      for (const key of claudeKeyForms(dir, 'win32')) assert.equal(json.projects?.[key]?.hasTrustDialogAccepted, true, `claude: workspace trust for ${key}`);
+      for (const key of claudeKeyForms(dir, process.platform)) assert.equal(json.projects?.[key]?.hasTrustDialogAccepted, true, `claude: workspace trust for ${key}`);
       assert.equal(r.bypassConsent !== undefined, true, 'claude: the bypass-permissions consent is asserted');
     }
   }
