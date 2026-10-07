@@ -29,15 +29,7 @@ const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '
 
 const uniqueSorted = (items) => [...new Set(items.map(String))].sort(byCodeUnit);
 
-export function validateWork(target, { strict = false } = {}) {
-  const requested = path.resolve(target ?? '.');
-  if (!fs.existsSync(requested)) {
-    return {
-      schema: 'starci/work-validate-report@1', ok: false, target: requested,
-      refused: [`${requested}: target does not exist [TARGET_MISSING]`], suspect: [], info: [],
-      counts: { records: 0, refs: 0, evidence: 0, payloads: 0, yamlFiles: 0 },
-    };
-  }
+function workContextFor(requested) {
   const root = fs.statSync(requested).isDirectory() ? requested : path.dirname(requested);
   const yamlFiles = walk(root).filter((file) => /\.ya?ml$/i.test(file));
   const indexFile = path.join(root, 'index.yaml');
@@ -46,14 +38,6 @@ export function validateWork(target, { strict = false } = {}) {
   catch { /* structural validation below owns the parse refusal */ }
   const mode = fs.existsSync(path.join(root, 'workspace.yaml')) || rootSchema === 'work/catalog@1'
     ? 'tree' : 'record';
-  const refused = [];
-  const suspect = [];
-  const info = [];
-  if (!yamlFiles.length) refused.push(`${root}: no YAML Work record found [WORK_RECORD_MISSING]`);
-
-  // Record-scoped validation still resolves refs against the enclosing work
-  // tree: a uat-flow's `environment:` names a _resources record above the
-  // record dir, and resolving it against the dir alone refuses every such ref.
   const enclosingWorkRoot = (() => {
     if (mode === 'tree') return root;
     let dir = root;
@@ -64,53 +48,51 @@ export function validateWork(target, { strict = false } = {}) {
       dir = parent;
     }
   })();
+  return {root, yamlFiles, mode, enclosingWorkRoot};
+}
 
-  let counts = { records: 0, refs: 0, evidence: 0, payloads: 0 };
+function checkStructure(root, enclosingWorkRoot, refused, suspect, info) {
   try {
     checkFamiliesDrift(refused, path.join(runtimeRoot, 'modules', 'schemas', 'work-layout.yaml'));
-    counts = checkWorkTree(root, refused, suspect, info, enclosingWorkRoot);
+    return checkWorkTree(root, refused, suspect, info, enclosingWorkRoot);
   } catch (error) {
     refused.push(`${root}: structural validation crashed closed (${String(error?.message ?? error)}) [VALIDATOR_ERROR]`);
+    return {records: 0, refs: 0, evidence: 0, payloads: 0};
   }
+}
 
-  // A repository's .starciwork holds product records only (R07): known agent data - evidence, runs, captures, kernel
-  // custody, ledgers - is refused [HFS_AGENT_DATA_TRACKED] and a path off the product list is a suspect [STARCIWORK_DRIFT].
-  if (mode === 'tree' && path.basename(root) === '.starciwork') {
-    try {
-      checkStarciworkBoundary(root, refused, suspect);
-    } catch (error) {
-      refused.push(`${root}: product boundary validation crashed closed (${String(error?.message ?? error)}) [VALIDATOR_ERROR]`);
-    }
+function checkProductBoundary(root, refused, suspect) {
+  try {
+    checkStarciworkBoundary(root, refused, suspect);
+  } catch (error) {
+    refused.push(`${root}: product boundary validation crashed closed (${String(error?.message ?? error)}) [VALIDATOR_ERROR]`);
   }
+}
 
-  if (mode === 'tree') {
-    try {
-      const consistency = checkWorkConsistencyTree(root);
-      refused.push(...consistency.refuse);
-      suspect.push(...consistency.suspect);
-      info.push(...consistency.info);
-    } catch (error) {
-      refused.push(`${root}: consistency validation crashed closed (${String(error?.message ?? error)}) [VALIDATOR_ERROR]`);
-    }
+function checkConsistency(root, refused, suspect, info) {
+  try {
+    const consistency = checkWorkConsistencyTree(root);
+    refused.push(...consistency.refuse);
+    suspect.push(...consistency.suspect);
+    info.push(...consistency.info);
+  } catch (error) {
+    refused.push(`${root}: consistency validation crashed closed (${String(error?.message ?? error)}) [VALIDATOR_ERROR]`);
   }
+}
 
-  if (mode === 'tree') {
-    try {
-      const artifacts = { refuse: [], suspect: [], info: [] };
-      checkWorkArtifacts(root, artifacts);
-      refused.push(...artifacts.refuse);
-      suspect.push(...artifacts.suspect);
-      info.push(...artifacts.info);
-    } catch (error) {
-      refused.push(`${root}: artifact validation crashed closed (${String(error?.message ?? error)}) [VALIDATOR_ERROR]`);
-    }
-  } else {
-    info.push(`${root}: standalone record validation; whole-tree artifact reconciliation is deferred to the owning catalog [RECORD_MODE]`);
+function checkArtifacts(root, refused, suspect, info) {
+  try {
+    const artifacts = {refuse: [], suspect: [], info: []};
+    checkWorkArtifacts(root, artifacts);
+    refused.push(...artifacts.refuse);
+    suspect.push(...artifacts.suspect);
+    info.push(...artifacts.info);
+  } catch (error) {
+    refused.push(`${root}: artifact validation crashed closed (${String(error?.message ?? error)}) [VALIDATOR_ERROR]`);
   }
+}
 
-  // A ui record's shell binding (scripts/work/ui/shell-conformance.mjs): one drawn before the shell record
-  // existed, or bound to an older shell rev, stays valid and is listed as a suspect for a redraw; a binding
-  // that resolves to nothing is refused. Prompts and captures are the op proof's, not the validator's.
+function checkShellBindings(root, enclosingWorkRoot, refused, suspect, info) {
   try {
     for (const item of shellBindingFindings(root, enclosingWorkRoot)) {
       let findings = info;
@@ -121,28 +103,80 @@ export function validateWork(target, { strict = false } = {}) {
   } catch (error) {
     refused.push(`${root}: shell binding validation crashed closed (${String(error?.message ?? error)}) [VALIDATOR_ERROR]`);
   }
+}
+
+function checkStackServices(root, suspect, refused) {
+  try {
+    for (const item of checkStarciStacks(path.dirname(root)).findings) {
+      (item.code === 'STACKS_PLAINTEXT_TRACKED' && item.level === 'refuse' ? refused : suspect).push(`${item.file}: ${item.message} [${item.code}]`);
+    }
+  } catch (error) {
+    suspect.push(`${root}: the starcistacks services check could not run (${String(error?.message ?? error)}) [VALIDATOR_ERROR]`);
+  }
+}
+
+function checkStrictSchemas(root, enclosingWorkRoot, refused, info) {
+  try {
+    return checkWorkSchemas(root, refused, info, {workRoot: enclosingWorkRoot});
+  } catch (error) {
+    refused.push(`${root}: strict schema validation crashed closed (${String(error?.message ?? error)}) [VALIDATOR_ERROR]`);
+    return null;
+  }
+}
+
+export function validateWork(target, { strict = false } = {}) {
+  const requested = path.resolve(target ?? '.');
+  if (!fs.existsSync(requested)) {
+    return {
+      schema: 'starci/work-validate-report@1', ok: false, target: requested,
+      refused: [`${requested}: target does not exist [TARGET_MISSING]`], suspect: [], info: [],
+      counts: { records: 0, refs: 0, evidence: 0, payloads: 0, yamlFiles: 0 },
+    };
+  }
+  const {root, yamlFiles, mode, enclosingWorkRoot} = workContextFor(requested);
+  const refused = [];
+  const suspect = [];
+  const info = [];
+  if (!yamlFiles.length) refused.push(`${root}: no YAML Work record found [WORK_RECORD_MISSING]`);
+
+  // Record-scoped validation still resolves refs against the enclosing work
+  // tree: a uat-flow's `environment:` names a _resources record above the
+  // record dir, and resolving it against the dir alone refuses every such ref.
+  let counts = { records: 0, refs: 0, evidence: 0, payloads: 0 };
+  counts = checkStructure(root, enclosingWorkRoot, refused, suspect, info);
+
+  // A repository's .starciwork holds product records only (R07): known agent data - evidence, runs, captures, kernel
+  // custody, ledgers - is refused [HFS_AGENT_DATA_TRACKED] and a path off the product list is a suspect [STARCIWORK_DRIFT].
+  if (mode === 'tree' && path.basename(root) === '.starciwork') {
+    checkProductBoundary(root, refused, suspect);
+  }
+
+  if (mode === 'tree') {
+    checkConsistency(root, refused, suspect, info);
+  }
+
+  if (mode === 'tree') {
+    checkArtifacts(root, refused, suspect, info);
+  } else {
+    info.push(`${root}: standalone record validation; whole-tree artifact reconciliation is deferred to the owning catalog [RECORD_MODE]`);
+  }
+
+  // A ui record's shell binding (scripts/work/ui/shell-conformance.mjs): one drawn before the shell record
+  // existed, or bound to an older shell rev, stays valid and is listed as a suspect for a redraw; a binding
+  // that resolves to nothing is refused. Prompts and captures are the op proof's, not the validator's.
+  checkShellBindings(root, enclosingWorkRoot, refused, suspect, info);
 
   // The owning repository's stack declaration services block (scripts/gates/starcistacks.mjs, contract
   // change starcistacks-services): the validator reports what it finds as suspects so no running leg is held
   // by it - refusals belong to the dedicated starci-starcistacks-check an op proof runs - except a tracked
   // plaintext custody member, which is a leak already.
   if (mode === 'tree' && path.basename(root) === '.starciwork') {
-    try {
-      for (const item of checkStarciStacks(path.dirname(root)).findings) {
-        (item.code === 'STACKS_PLAINTEXT_TRACKED' && item.level === 'refuse' ? refused : suspect).push(`${item.file}: ${item.message} [${item.code}]`);
-      }
-    } catch (error) {
-      suspect.push(`${root}: the starcistacks services check could not run (${String(error?.message ?? error)}) [VALIDATOR_ERROR]`);
-    }
+    checkStackServices(root, suspect, refused);
   }
 
   let schemaCounts = null;
   if (strict) {
-    try {
-      schemaCounts = checkWorkSchemas(root, refused, info, { workRoot: enclosingWorkRoot });
-    } catch (error) {
-      refused.push(`${root}: strict schema validation crashed closed (${String(error?.message ?? error)}) [VALIDATOR_ERROR]`);
-    }
+    schemaCounts = checkStrictSchemas(root, enclosingWorkRoot, refused, info);
   }
 
   const result = {
@@ -173,7 +207,11 @@ function findingFile(finding, { roots = [] } = {}) {
   }
   return null;
 }
-const keyOf = (p) => { const k = path.resolve(p).replaceAll('\\', '/').replace(/\/+$/, ''); return process.platform === 'win32' ? k.toLowerCase() : k; };
+const keyOf = (p) => {
+  let k = path.resolve(p).replaceAll('\\', '/');
+  while (k.endsWith('/')) k = k.slice(0, -1);
+  return process.platform === 'win32' ? k.toLowerCase() : k;
+};
 /** The target and every directory above it: a finding names its file relative to the .starciwork root, which is an
  * ancestor when the target is a feature or record dir (validate .starciwork/features/x --owned <file> scopes like the tree). */
 function ancestorsOf(target) {

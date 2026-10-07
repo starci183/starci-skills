@@ -23,15 +23,25 @@ const ref = (kind, id, project = null, namespace = null) => {
   return { kind, ...(project ? { project } : {}), ...namespace, id: String(id), href };
 };
 
-function wantedDatabases(store, url) {
+function requestedScope(url) {
   const exactSource = url.searchParams.get('source');
   let scope;
   if (exactSource === 'machine') scope = 'machine';
   else if (exactSource === 'ledger') scope = 'project';
   else scope = url.searchParams.get('scope') ?? 'all';
   const project = url.searchParams.get('project');
-  if (project && !store.projects().some(row => row.name === project || row.ledgerId === project)) return null;
-  if (!['all', 'machine', 'project'].includes(scope) || exactSource && !['machine', 'ledger'].includes(exactSource) || exactSource === 'ledger' && !project || url.searchParams.has('id') && !exactSource) return null;
+  return { exactSource, scope, project };
+}
+
+function validScope(store, url, exactSource, scope, project) {
+  if (project && !store.projects().some(row => row.name === project || row.ledgerId === project)) return false;
+  return ['all', 'machine', 'project'].includes(scope) && (!exactSource || ['machine', 'ledger'].includes(exactSource))
+    && (exactSource !== 'ledger' || project) && (!url.searchParams.has('id') || exactSource);
+}
+
+function wantedDatabases(store, url) {
+  const { exactSource, scope, project } = requestedScope(url);
+  if (!validScope(store, url, exactSource, scope, project)) return null;
   const databases = [];
   if (scope !== 'project' && store.machine) databases.push({ name: 'machine', ledgerId: null, db: store.machine.db, table: 'machine_logs', fts: 'machine_logs_fts' });
   if (scope !== 'machine') for (const row of store.projects()) {
@@ -42,14 +52,7 @@ function wantedDatabases(store, url) {
   return databases;
 }
 
-function queryRows(dbInfo, url, position = null, afterSeq = null, snapshot = null) {
-  const { db, name, table, fts } = dbInfo;
-  const terms = [], args = [];
-  const add = (sql, value) => { terms.push(sql); args.push(value); };
-  if (position) { terms.push('(l.at < ? OR (l.at = ? AND l.seq < ?))'); args.push(position.at, position.at, position.seq); }
-  if (afterSeq != null) add('l.seq > ?', afterSeq);
-  if (snapshot != null) add('l.seq <= ?', snapshot);
-  if (url.searchParams.has('id')) add('l.seq = ?', Number(url.searchParams.get('id')));
+function addFieldFilters(url, add, terms, args) {
   for (const [param, column] of [['wf', 'workflow_id'], ['job', 'job_id'], ['actor', 'actor'], ['level', 'level']]) {
     if (url.searchParams.has(param)) add(`l.${column} = ?`, url.searchParams.get(param));
   }
@@ -58,8 +61,12 @@ function queryRows(dbInfo, url, position = null, afterSeq = null, snapshot = nul
     terms.push(`l.level IN (${levels.map(() => '?').join(',')})`);
     args.push(...levels);
   }
+}
+
+function addOptionalFilters(dbInfo, url, add, terms, args) {
+  const { name, fts } = dbInfo;
   if (url.searchParams.has('controller')) {
-    if (name !== 'machine') return [];
+    if (name !== 'machine') return false;
     add('l.controller = ?', url.searchParams.get('controller'));
   }
   if (url.searchParams.has('kind')) {
@@ -71,13 +78,26 @@ function queryRows(dbInfo, url, position = null, afterSeq = null, snapshot = nul
   if (name === 'machine' && url.searchParams.has('project')) {
     const project = url.searchParams.get('project');
     const ledgerId = dbInfo.projects?.find(row => row.name === project || row.ledgerId === project)?.ledgerId;
-    if (!ledgerId) return [];
+    if (!ledgerId) return false;
     add('l.ledger_id = ?', ledgerId);
   }
   if (url.searchParams.has('q')) {
     const q = url.searchParams.get('q')?.trim();
     if (q) { terms.push(`l.seq IN (SELECT rowid FROM ${fts} WHERE ${fts} MATCH ?)`); args.push(`"${q.replaceAll('"', '""')}"`); }
   }
+  return true;
+}
+
+function queryRows(dbInfo, url, position = null, afterSeq = null, snapshot = null) {
+  const { db, table } = dbInfo;
+  const terms = [], args = [];
+  const add = (sql, value) => { terms.push(sql); args.push(value); };
+  if (position) { terms.push('(l.at < ? OR (l.at = ? AND l.seq < ?))'); args.push(position.at, position.at, position.seq); }
+  if (afterSeq != null) add('l.seq > ?', afterSeq);
+  if (snapshot != null) add('l.seq <= ?', snapshot);
+  if (url.searchParams.has('id')) add('l.seq = ?', Number(url.searchParams.get('id')));
+  addFieldFilters(url, add, terms, args);
+  if (!addOptionalFilters(dbInfo, url, add, terms, args)) return [];
   const where = terms.length ? ` WHERE ${terms.join(' AND ')}` : '';
   return many(db, `SELECT l.* FROM ${table} l${where} ORDER BY l.at DESC,l.seq DESC`, ...args);
 }

@@ -303,6 +303,7 @@ const pickRowsOf = (pickGroups, nonce, disabled) => pickGroups.map((p) => {
   return `<fieldset class="pick"><legend>${esc(p.label ?? p.id)}</legend><div class="cells">${cells}</div></fieldset>`;
 }).join('\n');
 
+const pickedImageIndexes = (pickGroups) => { const pickedImages = new Set(); for (const p of pickGroups) for (const c of p.choices) if (c.image) pickedImages.add(c.image.idx); return pickedImages; };
 /** One artifact figure, with its part-note field on a draw-review ask. */
 const imgRowOf = ({ img, i, pickedImages, drawReview, question, drawText, nonce, repo, disabled }) => {
   if (pickedImages.has(i)) return '';
@@ -325,8 +326,7 @@ const renderForm = ({ nonce, question, fields, images, repo, workflowId, readonl
   // convention (<screen>-<choice>[-round-N] / -candidate-<choice>) so the
   // owner still clicks a radio under each candidate image.
   const pickGroups = pickGroupsOf(question, images);
-  const pickedImages = new Set();
-  for (const p of pickGroups) for (const c of p.choices) if (c.image) pickedImages.add(c.image.idx);
+  const pickedImages = pickedImageIndexes(pickGroups);
   const pickRows = pickRowsOf(pickGroups, nonce, disabled);
   // A draw-review ask takes a note per image (draw-feedback.mjs: each is an owner ruling bound to that shape) and the
   // owner's golden mark on an accept.
@@ -595,32 +595,28 @@ const declaredOnly = ({ question, images, fields }, res, params, optionIdx) => {
 
 // Credential fields into sealed custody/env, verified writes reported back; a failed write ends the
 // submission (502) with what landed so the owner can reconcile — the ask stays open.
-const writeCredentialFields = ({ repo, fields }, res, params) => {
-  const custodyWritten = [], envWritten = [], errors = [];
+const writeCustodyFields = (repo, fields, params, result) => {
   for (const name of fields.files) {
-    const pairedVar = fields.paired[name];
-    const v = params.get(`file:${name}`);
+    const pairedVar = fields.paired[name], v = params.get(`file:${name}`);
     if (v == null || v === '') continue;
     const r = writeCustody(repo, name, v);
-    if (!r.ok) { errors.push(`${name}: ${r.error}`); continue; }
-    custodyWritten.push(`${name} (${r.via})`);
-    if (pairedVar) {
-      const paired = writeEnv(repo, pairedVar, v);
-      if (paired.ok) envWritten.push(pairedVar); else errors.push(`${pairedVar}: ${paired.error}`);
-    }
+    if (!r.ok) { result.errors.push(`${name}: ${r.error}`); continue; }
+    result.custodyWritten.push(`${name} (${r.via})`);
+    if (pairedVar) { const paired = writeEnv(repo, pairedVar, v); if (paired.ok) result.envWritten.push(pairedVar); else result.errors.push(`${pairedVar}: ${paired.error}`); }
   }
+};
+const writeEnvFields = (repo, fields, params, result) => {
   for (const v of fields.vars) {
-    const val = params.get(`env:${v}`);
-    if (val == null || val === '') continue;
-    const r = writeEnv(repo, v, val);
-    if (r.ok) envWritten.push(v); else errors.push(`${v}: ${r.error}`);
+    const val = params.get(`env:${v}`); if (val == null || val === '') continue;
+    const r = writeEnv(repo, v, val); if (r.ok) result.envWritten.push(v); else result.errors.push(`${v}: ${r.error}`);
   }
-  if (errors.length) {
-    res.writeHead(502, { 'content-type': 'text/plain; charset=utf-8' });
-    res.end(`Credential update failed. Verified writes: ${custodyWritten.concat(envWritten).join(', ') || 'none'}. ${errors.join('; ')}. The ask remains open.`);
-    return null;
-  }
-  return { custodyWritten, envWritten, pointersWritten: [], bridge: null, errors };
+};
+const writeCredentialFields = ({ repo, fields }, res, params) => {
+  const result = { custodyWritten: [], envWritten: [], errors: [] };
+  writeCustodyFields(repo, fields, params, result);
+  writeEnvFields(repo, fields, params, result);
+  if (result.errors.length) { res.writeHead(502, { 'content-type': 'text/plain; charset=utf-8' }); res.end(`Credential update failed. Verified writes: ${result.custodyWritten.concat(result.envWritten).join(', ') || 'none'}. ${result.errors.join('; ')}. The ask remains open.`); return null; }
+  return { custodyWritten: result.custodyWritten, envWritten: result.envWritten, pointersWritten: [], bridge: null, errors: result.errors };
 };
 
 /** The starci/ask-answer@1 receipt of one submission (draw-review extras keep per-part notes and golden). */

@@ -57,6 +57,30 @@ async function commitInfo(repo, head) {
   return remember(key, { error: null, parent, changed });
 }
 
+async function addFileContent(base, repo, spec, size, listed) {
+  if (size.ok) {
+    const measured = Number(size.out.toString().trim());
+    base.bytes = Number.isFinite(measured) && measured >= 0 ? measured : null;
+    const shown = await git(repo, ['show', spec], { max: MAX_CONTENT });
+    if (!shown.ok && !shown.overflow) { base.error = 'git show failed'; return; }
+    const buffer = shown.overflow ? shown.out.subarray(0, MAX_CONTENT) : shown.out;
+    if (buffer.subarray(0, 8000).includes(0)) base.kind = 'binary';
+    else { base.content = bodyOf(buffer); base.truncated = shown.overflow || (base.bytes != null && base.bytes > MAX_CONTENT); }
+    return;
+  }
+  if (listed !== 'deleted') base.error = 'file not found or unreadable at selected commit';
+}
+
+async function addFileDiff(base, repo, head, info, rel, listed) {
+  if (!listed) return;
+  const diff = info.parent ? await git(repo, ['diff', '--no-color', '--no-renames', info.parent, head, '--', rel], { max: MAX_DIFF })
+    : await git(repo, ['show', '--no-color', '--no-renames', '--format=', head, '--', rel], { max: MAX_DIFF });
+  if (diff.ok || diff.overflow) {
+    base.diff = bodyOf(diff.overflow ? diff.out.subarray(0, MAX_DIFF) : diff.out);
+    base.diffTruncated = diff.overflow;
+  } else base.error ??= 'commit diff unavailable';
+}
+
 async function productOf(repo, head, info, file) {
   const key = `file:${repo}:${head}:${file}`;
   if (cache.has(key)) return cache.get(key);
@@ -67,25 +91,8 @@ async function productOf(repo, head, info, file) {
   const size = await git(repo, ['cat-file', '-s', spec]);
   const listed = info.changed.get(rel);
   base.status = listed ?? (size.ok ? 'unchanged' : 'missing');
-  if (size.ok) {
-    const measured = Number(size.out.toString().trim());
-    base.bytes = Number.isFinite(measured) && measured >= 0 ? measured : null;
-    const shown = await git(repo, ['show', spec], { max: MAX_CONTENT });
-    if (!shown.ok && !shown.overflow) base.error = 'git show failed';
-    else {
-      const buffer = shown.overflow ? shown.out.subarray(0, MAX_CONTENT) : shown.out;
-      if (buffer.subarray(0, 8000).includes(0)) base.kind = 'binary';
-      else { base.content = bodyOf(buffer); base.truncated = shown.overflow || (base.bytes != null && base.bytes > MAX_CONTENT); }
-    }
-  } else if (listed !== 'deleted') base.error = 'file not found or unreadable at selected commit';
-  if (listed) {
-    const diff = info.parent ? await git(repo, ['diff', '--no-color', '--no-renames', info.parent, head, '--', rel], { max: MAX_DIFF })
-      : await git(repo, ['show', '--no-color', '--no-renames', '--format=', head, '--', rel], { max: MAX_DIFF });
-    if (diff.ok || diff.overflow) {
-      base.diff = bodyOf(diff.overflow ? diff.out.subarray(0, MAX_DIFF) : diff.out);
-      base.diffTruncated = diff.overflow;
-    } else base.error ??= 'commit diff unavailable';
-  }
+  await addFileContent(base, repo, spec, size, listed);
+  await addFileDiff(base, repo, head, info, rel, listed);
   return remember(key, base);
 }
 
@@ -98,10 +105,24 @@ async function pool(items, worker) {
   return results;
 }
 
+const checkedHead = value => typeof value === 'string' && HEX.test(value) ? value.toLowerCase() : null;
+const declaredFilesOf = (report, claims) => [...new Set([...(Array.isArray(report?.files) ? report.files : []),
+  ...claims.flatMap(claim => Array.isArray(claim?.paths) ? claim.paths : [])].filter(item => typeof item === 'string'))];
+const otherChangesOf = (info, files) => {
+  const listed = new Set(files.map(file => file.path));
+  return [...info.changed].filter(([file]) => !listed.has(file)).map(([file, status]) => ({ path: file, status }));
+};
+async function productAtPath(repo, head, info, file) {
+  const refusal = refusePath(repo, file);
+  if (refusal) return { path: String(file).slice(0, 300), status: 'missing', kind: 'text', bytes: null, hostPath: null,
+    content: null, truncated: false, diff: null, diffTruncated: false, error: refusal };
+  return productOf(repo, head, info, file);
+}
+
 /** AttemptProducts for one attempt. `report` is the parsed report.json (or null), `repo` the attempt's repo root. */
 export async function attemptProducts(repo, report, { checkpoint = null } = {}) {
-  const reportHead = typeof report?.head === 'string' && HEX.test(report.head) ? report.head.toLowerCase() : null;
-  const checkpointHead = typeof checkpoint?.sha === 'string' && HEX.test(checkpoint.sha) ? checkpoint.sha.toLowerCase() : null;
+  const reportHead = checkedHead(report?.head);
+  const checkpointHead = checkedHead(checkpoint?.sha);
   const head = checkpointHead ?? reportHead;
   const headSource = (checkpointHead && 'runtime-checkpoint') || (reportHead && 'report-tested') || null;
   const empty = { head, headSource, headAt: checkpointHead ? checkpoint.at ?? null : null, reportHead,
@@ -114,17 +135,11 @@ export async function attemptProducts(repo, report, { checkpoint = null } = {}) 
   if (!directory) return { ...empty, claims, error: 'repository not found on this host', errorCode: 'PRODUCT_REPOSITORY_UNAVAILABLE' };
   const info = await commitInfo(repo, head);
   if (info.error) return { ...empty, claims, error: info.error, errorCode: 'PRODUCT_COMMIT_UNAVAILABLE' };
-  const declared = [...new Set([...(Array.isArray(report?.files) ? report.files : []),
-    ...claims.flatMap(claim => Array.isArray(claim?.paths) ? claim.paths : [])].filter(item => typeof item === 'string'))];
+  const declared = declaredFilesOf(report, claims);
   const wanted = ((declared.length && declared) || (checkpointHead && [...info.changed.keys()]) || []).slice(0, MAX_FILES);
   const listedCount = declared.length || (checkpointHead ? info.changed.size : 0);
-  const files = await pool(wanted, async file => {
-    const refusal = refusePath(repo, file);
-    if (refusal) return { path: String(file).slice(0, 300), status: 'missing', kind: 'text', bytes: null, hostPath: null, content: null, truncated: false, diff: null, diffTruncated: false, error: refusal };
-    return productOf(repo, head, info, file);
-  });
-  const listed = new Set(files.map(file => file.path));
-  const otherChanged = [...info.changed].filter(([file]) => !listed.has(file)).map(([file, status]) => ({ path: file, status }));
+  const files = await pool(wanted, file => productAtPath(repo, head, info, file));
+  const otherChanged = otherChangesOf(info, files);
   return { ...empty, parent: info.parent, repo, files, otherChanged: otherChanged.slice(0, MAX_FILES), claims,
     scope: { listed: listedCount, returned: files.length, truncated: listedCount > MAX_FILES || otherChanged.length > MAX_FILES } };
 }

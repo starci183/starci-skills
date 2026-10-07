@@ -27,6 +27,13 @@ function rebindCodePatterns(root, write, deps) {
   const original = fs.readFileSync(file, 'utf8');
   const profiles = parseYaml(original)?.profiles ?? {};
   const pins = (deps.loadPins ?? loadPins)(root)?.pins ?? {};
+  const rows = canonRows(root, profiles, pins, deps);
+  const changed = rows.filter((row) => row.from.version !== row.to.version || row.from.value !== row.to.value || row.from.files !== row.to.files);
+  if (write && changed.length) writeCanonChanges(file, original, changed);
+  return { changed: changed.length, rows };
+}
+
+function canonRows(root, profiles, pins, deps) {
   const rows = [];
   for (const [profile, value] of Object.entries(profiles)) {
     const canon = value?.canon, pin = pins[canon?.package];
@@ -36,21 +43,21 @@ function rebindCodePatterns(root, write, deps) {
     const digest = canonContentDigest(directory, canon.contentDigest, (deps.packedFiles ?? packedFiles)(directory));
     rows.push({ profile, package: canon.package, from: { version: canon.version, value: canon.contentDigest.value, files: canon.contentDigest.files }, to: { version: manifest.version, ...digest } });
   }
-  const changed = rows.filter((row) => row.from.version !== row.to.version || row.from.value !== row.to.value || row.from.files !== row.to.files);
-  if (write && changed.length) {
-    let output = original;
-    for (const row of changed) {
-      const at = output.indexOf(`package: '${row.package}'`), end = output.indexOf('sourceRuleRoots:', at);
-      if (at < 0) throw new Error(`cannot find the canon block of ${row.package}`);
-      const block = output.slice(at, end < 0 ? undefined : end)
-        .replace(/(version: )\S+/, `$1${row.to.version}`)
-        .replace(/(value: )[0-9a-f]{64}/, `$1${row.to.value}`)
-        .replace(/(files: )\d+/, `$1${row.to.files}`);
-      output = output.slice(0, at) + block + (end < 0 ? '' : output.slice(end));
-    }
-    fs.writeFileSync(file, output);
+  return rows;
+}
+
+function writeCanonChanges(file, original, changed) {
+  let output = original;
+  for (const row of changed) {
+    const at = output.indexOf(`package: '${row.package}'`), end = output.indexOf('sourceRuleRoots:', at);
+    if (at < 0) throw new Error(`cannot find the canon block of ${row.package}`);
+    const block = output.slice(at, end < 0 ? undefined : end)
+      .replace(/(version: )\S+/, `$1${row.to.version}`)
+      .replace(/(value: )[0-9a-f]{64}/, `$1${row.to.value}`)
+      .replace(/(files: )\d+/, `$1${row.to.files}`);
+    output = output.slice(0, at) + block + (end < 0 ? '' : output.slice(end));
   }
-  return { changed: changed.length, rows };
+  fs.writeFileSync(file, output);
 }
 
 /** `starci release publish`: existing registry publication plus the final binding and example refresh flow. */
@@ -78,47 +85,17 @@ export async function releasePublishFlow(ctx, deps = {}) {
     if (ctx.args?.['expect-sha']) {
       if (data.head !== String(ctx.args['expect-sha']).trim()) return { code: 2, stderr: 'starci release publish: --expect-sha is not HEAD' };
     }
-    let publishCode;
-    try {
-      publishCode = await (deps.releasePublish ?? releasePublish)({
-        root, publish: ctx.args?.publish === true, runtimePackage, env: ctx.env, npmUser: ctx.args?.['npm-user'] ?? null,
-        pollMinutes: Number(ctx.args?.['poll-minutes'] ?? 15), preLandRef: ctx.args?.['pre-land-ref'] ?? null,
-        deps: { ...deps.releaseDeps, out: (line) => lines.push(line) },
-      });
-    } catch (error) { return { code: 1, stderr: `starci release publish: plan failed (${error.message})` }; }
-    if (publishCode === 2) return { code: 2, stderr: lines.at(-1) ?? 'starci release publish: bad usage' };
-    if (![0, 3].includes(publishCode)) return { code: 1, stderr: lines.at(-1) ?? 'starci release publish: publication plan is blocked' };
-    if (runtimePackage) return publishCode === 0 ? { code: 0 } : { code: 1, stderr: 'starci release publish: runtime phase must finish without an unbound canon' };
+    const publishCode = await runPublicationPlan(ctx, deps, root, runtimePackage, lines);
+    if (publishCode.error) return publishCode.error;
+    if (runtimePackage) return publishCode.value === 0 ? { code: 0 } : { code: 1, stderr: 'starci release publish: runtime phase must finish without an unbound canon' };
     if (!lines.some((line) => /@starci\/cli@/.test(line)) || !lines.some((line) => /@starci\/hfs@/.test(line))) {
       return { code: 1, stderr: 'starci release publish: publish set must contain @starci/cli and @starci/hfs' };
     }
     try { data.rebind = rebindCodePatterns(root, ctx.args?.publish === true, deps); }
     catch (error) { return { code: 1, stderr: `starci release publish: code-pattern rebind failed (${error.message})` }; }
-    lines.push(`code-pattern rebind: ${data.rebind.changed} profile(s) ${ctx.args?.publish ? 'written' : 'would change'}`);
-    const pins = (deps.loadPins ?? loadPins)(root)?.pins ?? {};
-    for (const name of examples) {
-      const example = repinExample(root, name, pins, ctx.args?.publish === true);
-      data.examples.push(example);
-      let status;
-      if (example.present) {
-        const action = ctx.args?.publish ? 'written' : 'would change';
-        status = `${example.changed} pin(s) ${action}`;
-      } else status = 'not present, skipped';
-      lines.push(`example ${name}: ${status}`);
-    }
+    appendExampleRepins(root, ctx, deps, examples, data, lines);
     if (ctx.args?.publish !== true) return { code: 0 };
-    for (const example of data.examples.filter((entry) => entry.present)) {
-      const install = await npm(['install', '--no-audit', '--no-fund'], { cwd: example.directory, timeout: 900_000, env: ctx.env });
-      if (!ok(install)) return { code: 1, stderr: `starci release publish: ${example.name} npm install failed (${message(install)})` };
-      const ci = await npm(['ci', '--no-audit', '--no-fund'], { cwd: example.directory, timeout: 900_000, env: ctx.env });
-      if (!ok(ci)) return { code: 1, stderr: `starci release publish: ${example.name} npm ci failed (${message(ci)})` };
-      const sync = await node([path.join(root, 'packages', 'cli', 'bin', 'starci.mjs'), 'app', 'sync', '--write', '--cwd', example.directory], { cwd: root, timeout: 900_000, env: ctx.env });
-      if (!ok(sync)) return { code: 1, stderr: `starci release publish: ${example.name} sync failed (${message(sync)})` };
-      const checked = await node([path.join(root, 'scripts', 'checks', 'check-canon-pins.mjs'), '--repo', example.directory], { cwd: root, timeout: 900_000, env: ctx.env });
-      if (!ok(checked)) return { code: 1, stderr: `starci release publish: ${example.name} binding check failed (${message(checked)})` };
-    }
-    const final = await node([path.join(root, 'scripts', 'checks', 'check-canon-pins.mjs')], { cwd: root, timeout: 900_000, env: ctx.env });
-    return ok(final) ? { code: 0 } : { code: 1, stderr: `starci release publish: final binding check failed (${message(final)})` };
+    return publishExampleBindings(root, ctx, data, node, npm, ok, message);
   };
   let result;
   try {
@@ -128,4 +105,49 @@ export async function releasePublishFlow(ctx, deps = {}) {
     else result = locked;
   } catch (error) { result = { code: 1, stderr: `starci release publish: ${error.message}` }; }
   return { ...result, text: [...lines, `starci release publish: ${ctx.args?.publish ? 'flow completed' : 'plan only'}`].join('\n'), data };
+}
+
+async function runPublicationPlan(ctx, deps, root, runtimePackage, lines) {
+  try {
+    const value = await (deps.releasePublish ?? releasePublish)({
+      root, publish: ctx.args?.publish === true, runtimePackage, env: ctx.env, npmUser: ctx.args?.['npm-user'] ?? null,
+      pollMinutes: Number(ctx.args?.['poll-minutes'] ?? 15), preLandRef: ctx.args?.['pre-land-ref'] ?? null,
+      deps: { ...deps.releaseDeps, out: (line) => lines.push(line) },
+    });
+    if (value === 2) return { error: { code: 2, stderr: lines.at(-1) ?? 'starci release publish: bad usage' } };
+    if (![0, 3].includes(value)) return { error: { code: 1, stderr: lines.at(-1) ?? 'starci release publish: publication plan is blocked' } };
+    return { value };
+  } catch (error) {
+    return { error: { code: 1, stderr: `starci release publish: plan failed (${error.message})` } };
+  }
+}
+
+function appendExampleRepins(root, ctx, deps, examples, data, lines) {
+  lines.push(`code-pattern rebind: ${data.rebind.changed} profile(s) ${ctx.args?.publish ? 'written' : 'would change'}`);
+  const pins = (deps.loadPins ?? loadPins)(root)?.pins ?? {};
+  for (const name of examples) {
+    const example = repinExample(root, name, pins, ctx.args?.publish === true);
+    data.examples.push(example);
+    let status;
+    if (example.present) {
+      const action = ctx.args?.publish ? 'written' : 'would change';
+      status = `${example.changed} pin(s) ${action}`;
+    } else status = 'not present, skipped';
+    lines.push(`example ${name}: ${status}`);
+  }
+}
+
+async function publishExampleBindings(root, ctx, data, node, npm, ok, message) {
+  for (const example of data.examples.filter((entry) => entry.present)) {
+    const install = await npm(['install', '--no-audit', '--no-fund'], { cwd: example.directory, timeout: 900_000, env: ctx.env });
+    if (!ok(install)) return { code: 1, stderr: `starci release publish: ${example.name} npm install failed (${message(install)})` };
+    const ci = await npm(['ci', '--no-audit', '--no-fund'], { cwd: example.directory, timeout: 900_000, env: ctx.env });
+    if (!ok(ci)) return { code: 1, stderr: `starci release publish: ${example.name} npm ci failed (${message(ci)})` };
+    const sync = await node([path.join(root, 'packages', 'cli', 'bin', 'starci.mjs'), 'app', 'sync', '--write', '--cwd', example.directory], { cwd: root, timeout: 900_000, env: ctx.env });
+    if (!ok(sync)) return { code: 1, stderr: `starci release publish: ${example.name} sync failed (${message(sync)})` };
+    const checked = await node([path.join(root, 'scripts', 'checks', 'check-canon-pins.mjs'), '--repo', example.directory], { cwd: root, timeout: 900_000, env: ctx.env });
+    if (!ok(checked)) return { code: 1, stderr: `starci release publish: ${example.name} binding check failed (${message(checked)})` };
+  }
+  const final = await node([path.join(root, 'scripts', 'checks', 'check-canon-pins.mjs')], { cwd: root, timeout: 900_000, env: ctx.env });
+  return ok(final) ? { code: 0 } : { code: 1, stderr: `starci release publish: final binding check failed (${message(final)})` };
 }

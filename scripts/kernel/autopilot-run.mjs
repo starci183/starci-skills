@@ -46,11 +46,11 @@ import { readEnv } from '../lib/env.mjs';
 import { positiveNumber } from '../lib/number.mjs';
 import { workflowBudget, supervisorGatesOf, AUTOPILOT_BY, AUTOPILOT_RULING, SUPERVISOR_GATE } from './autopilot-budget.mjs';
 import {
-  AUTOPILOT_EVENTS, HANDOVER_CREDENTIALS_SUBJECT, PROVISIONAL_LABEL,
+  AUTOPILOT_EVENTS, HANDOVER_CREDENTIALS_SUBJECT,
   DRAW_REVIEW_SCHEMA, DRAW_REVIEW_KIND, DIRECTION_REVIEW_KIND,
   latestEvent, eventsOf, jobOfAsk, reportOpOf, subjectOf, askClosed, deferralOf,
   pendingAsksOf, deferredToHandoverOf, deferredLegsOf, provisionalOf, credentialsOwed,
-  drawGateEvidence, writeAnswer, planReview, planRecommended, planDeferred,
+  writeAnswer, planReview, planRecommended, planDeferred,
   rerouteOwnerGates, deferTimedOutGates, gateExceededBudget, supersedeSupplied,
 } from './autopilot-state.mjs';
 export { openSupervisorGate, AUTOPILOT_BY, AUTOPILOT_RULING, SUPERVISOR_GATE } from './autopilot-budget.mjs';
@@ -62,6 +62,12 @@ export {
 const DEFERRED_CLASSES = Object.freeze(['credential', 'real-money', 'shared-system', 'owner-decision']);
 const DAY = 86_400_000;
 const num = (value, fallback) => positiveNumber(value, fallback, { orZero: true });
+
+const planAskAnswer = (ctx) => {
+  if (ctx.cls.class === 'draw-review' || ctx.cls.class === 'direction-review') return planReview(ctx);
+  if (ctx.cls.class === 'recommended') return planRecommended(ctx);
+  return planDeferred(ctx);
+};
 
 /* ------------------------------------------------------------------ settings */
 
@@ -157,9 +163,7 @@ export function autopilotAnswerAsk({ ledger, repo, workflowId, report, settings 
   const planAnswer = params => { prepared = writeAnswer(ledger, params); return prepared.receiptPath; };
   const planEvent = event => plannedEvents.push(event);
   const ctx = { db, repo, workflowId, report, question, cls, base, settings, job, planAnswer, planEvent, now };
-  if (cls.class === 'draw-review' || cls.class === 'direction-review') out = planReview(ctx);
-  else if (cls.class === 'recommended') out = planRecommended(ctx);
-  else out = planDeferred(ctx);
+  out = planAskAnswer(ctx);
   if (prepared) {
     const committed = commitAskAnswer(ledger, { workflowId, dispatchId: report.dispatch_id, receipt: prepared.receipt,
       blob: prepared.blob, at: now, events: plannedEvents,

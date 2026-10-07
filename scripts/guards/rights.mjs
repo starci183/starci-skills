@@ -171,7 +171,7 @@ export function nodeWholeSuite(args) {
   const targets = [];
   for (let i = 0; i < list.length; i += 1) {
     if (NODE_VALUE_FLAGS.has(list[i])) { i += 1; continue; }
-    if (!list[i].startsWith('-')) targets.push(list[i].replaceAll(/\\/g, '/'));
+    if (!list[i].startsWith('-')) targets.push(list[i].replaceAll('\\', '/'));
   }
   return !targets.length || targets.some((x) => WHOLE_TREE.some((re) => re.test(x)));
 }

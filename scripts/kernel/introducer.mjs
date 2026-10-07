@@ -139,8 +139,9 @@ export function commitOwnerJobs(db, { workflowId, commits = [], roots = [] }) {
 /** The typed follow-up message a shared blocker becomes for its introducing workflow. */
 export function followUpMessage({ incidentId, reporter, detail, commit, via, fix = null }) {
   const subject = `shared blocker ${incidentId}: fix the code your workflow introduced`;
+  const commitDetails = commit ? `(commit ${commit.slice(0, 12)}, resolved via ${via})` : `(named via ${via})`;
   const body = [
-    `${reporter} is blocked by code this workflow introduced${commit ? ` (commit ${commit.slice(0, 12)}, resolved via ${via})` : ` (named via ${via})`}.`,
+    `${reporter} is blocked by code this workflow introduced ${commitDetails}.`,
     `Blocker: ${detail}`,
     ...(fix ? [`Fix: ${fix}`] : []),
     'Treat it as your own defect: enqueue the repair on the owning code, land it, then notify the reporter so it resolves its incident (starci kernel notify --kind reply).',

@@ -1072,7 +1072,7 @@ export async function scan(cfg,options={}){
 
 /** The dashboard metrics of a project: the issue types, the hotspots and the coverage of knowledge/sonar-gate.yaml `overall`. */
 const dashboardMetrics=gate=>[...Object.keys(gate.overall.issues.types),'security_hotspots',gate.overall.hotspots.metric,gate.overall.duplication.metric,...(gate.overall.coverage?[gate.overall.coverage.metric]:[])];
-
+const httpStatusLabel=response=>`HTTP ${response.status}`;
 /**
  * The dashboard of a project as its last analysis left it, judged by judgeDashboard: bugs, code smells and
  * vulnerabilities 0, every hotspot reviewed, coverage at the threshold on every file inside the repository's
@@ -1092,14 +1092,14 @@ export async function dashboard(cfg,options={}){
   if(missing.length)return finish('blocked',`missing credential inputs: ${missing.join(', ')}`,{missing});
   if(!key)return finish('blocked','no project key: pass --key or set sonar.projectKey');
   const server=await call(cfg,'GET','/api/system/status');
-  if(!(server.reachable&&server.json?.status==='UP'))return finish('blocked',server.reachable?`SonarQube at ${cfg.host} reports ${server.json?.status??`HTTP ${server.status}`}`:downMessage(cfg,server,containerState(cfg)));
+   if(!(server.reachable&&server.json?.status==='UP'))return finish('blocked',server.reachable?`SonarQube at ${cfg.host} reports ${server.json?.status??httpStatusLabel(server)}`:downMessage(cfg,server,containerState(cfg)));
   const token=await suppliedSonarToken(cfg,{validate:value=>tokenAccepted(cfg,value),remember});
   if(!token.present)return finish('blocked',token.reason);
   const tokens=[token.value];
   const component=encodeURIComponent(key);
   const project=await read(cfg,tokens,`/api/measures/component?component=${component}&metricKeys=${dashboardMetrics(gate).join(',')}`);
   if(project.status===404)return finish('blocked',`${key} has no analysis on ${cfg.host}: run scan --project-gate --wait first`);
-  if(!project.reachable||project.status!==200)return finish('blocked',`the measures of ${key} could not be read: ${project.error??`HTTP ${project.status}`}`);
+   if(!project.reachable||project.status!==200)return finish('blocked',`the measures of ${key} could not be read: ${project.error??httpStatusLabel(project)}`);
   const measures=Object.fromEntries((project.json?.component?.measures??[]).map(m=>[m.metric,m.value]));
   const tree=gate.overall.coverage?await readAll(cfg,tokens,`/api/measures/component_tree?component=${component}&metricKeys=${gate.overall.coverage.metric}&qualifiers=FIL`,'components'):{items:[]};
   if(tree.error)return finish('blocked',`the per-file coverage of ${key} could not be read: ${tree.error}`);
@@ -1141,7 +1141,7 @@ const parseArgument=(out,argv,index)=>{
   const arg=argv[index];
   if(arg==='--'){out.rest=argv.slice(index+1);return argv.length;}
   const boolean=BOOLEAN_FLAGS.get(arg);
-  if(boolean){out[boolean]=arg==='--no-ensure'?false:true;return index;}
+  if(boolean){out[boolean]=arg!=='--no-ensure';return index;}
   if(!arg.startsWith('--')){out._.push(arg);return index;}
   const [flag,inline]=arg.slice(2).split(/=(.*)/s),name=flag.replace(/-([a-z])/g,(_,letter)=>letter.toUpperCase());
   const value=inline??argv[index+1];
@@ -1150,8 +1150,8 @@ const parseArgument=(out,argv,index)=>{
 };
 function parseArgs(argv){
   const out={_:[],rest:null};
-  for(let index=0;index<argv.length;index+=1){
-    index=parseArgument(out,argv,index);
+  for(let index=0,nextIndex=0;index<argv.length;index=nextIndex){
+    nextIndex=parseArgument(out,argv,index)+1;
     if(out.rest!==null)break;
   }
   return out;

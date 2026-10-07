@@ -45,7 +45,10 @@ const COMMENT_LINE = /^\s*(\/\/|\/\*|\*|#)/;
 const EXEC_POSITION = /\b(run|check|script|executable|entry|command|exec|cmd|handler)\s*:/;
 const EXEC_KEY = /\b(?:run|check|script|executable|entry|command|exec|cmd|handler)\s*:\s*['"]?(?:(?:node|npm run)\s+)?[\w./-]+\.mjs/;
 const NODE_COMMAND = /(^|[\s`'"(])node\s+[\w./-]+\.mjs/;
-const runtimeCheckNames = (text) => new Set([...String(text).matchAll(/\b(?:(?:npx\s+)?starci|npm\s+run(?:\s+--silent)?\s+starci(?:\s+--silent)?\s+--)\s+runtime\s+check\s+--only(?:=|\s+)([a-z0-9-]+)/gi)].map((match) => match[1]));
+const DIRECT_STARCI_COMMAND = String.raw`(?:npx\s+)?starci`;
+const NPM_STARCI_COMMAND = String.raw`npm\s+run(?:\s+--silent)?\s+starci(?:\s+--silent)?\s+--`;
+const RUNTIME_CHECK_NAME = new RegExp(String.raw`\b(?:${DIRECT_STARCI_COMMAND}|${NPM_STARCI_COMMAND})\s+runtime\s+check\s+--only(?:=|\s+)([a-z0-9-]+)`, 'gi');
+const runtimeCheckNames = (text) => new Set([...String(text).matchAll(RUNTIME_CHECK_NAME)].map((match) => match[1]));
 
 /** The part of a reader's text that counts: code without comment lines; YAML and skills only where executable. */
 function executableText(rel, text) {

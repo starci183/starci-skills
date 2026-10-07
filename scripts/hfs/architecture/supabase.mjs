@@ -40,43 +40,42 @@ const supabaseSlotEnabled = (input, slotId) => {
   return Boolean(slot && input.graph.resolver.slotEnabled(slot));
 };
 
+function inspectOwnershipNode(kit, checker, file, slots, ruleId, violations, counters, node) {
+  const { ts } = kit;
+  const moduleName = moduleNameOf(ts, node);
+  if (moduleName && SUPABASE_MODULES.has(moduleName)) {
+    counters.imports += 1;
+    if (!slots.has(file.slot)) reportAt(violations, kit, ruleId, file, node, `${moduleName} is imported by ${file.rel}, whose slot is ${file.slot ?? 'unowned'}; Supabase imports belong only to ${[...slots].join(' or ')}.`, { module: moduleName, slot: file.slot ?? null });
+  }
+  if (ts.isTypeReferenceNode(node) && supabaseClientType(kit, checker, node)) {
+    counters.clients += 1;
+    if (!isDatabaseType(ts, node.typeArguments?.[0])) reportAt(violations, kit, ruleId, file, node, 'SupabaseClient must carry the committed Database type as SupabaseClient<Database>.');
+  }
+  if (!ts.isCallExpression(node)) return;
+  const binding = kit.importBinding(checker, node.expression);
+  if (binding && SUPABASE_MODULES.has(binding.module) && /^create(?:Client|ServerClient|BrowserClient)$/u.test(binding.name)) {
+    counters.clients += 1;
+    if (!isDatabaseType(ts, node.typeArguments?.[0]) && !contextTypesClient(kit, checker, node)) {
+      reportAt(violations, kit, ruleId, file, node, `${binding.name} creates an untyped Supabase client; create it as ${binding.name}<Database>(...) (or give it the contextual type SupabaseClient<Database>).`);
+    }
+  }
+  if (!isSupabaseCall(kit, checker, node)) return;
+  const properties = chainParts(ts, node);
+  const method = callName(ts, node);
+  if (!SUPABASE_CALLS.has(method) && !properties.includes('auth') && !properties.includes('storage')) return;
+  counters.calls += 1;
+  if (!slots.has(file.slot)) reportAt(violations, kit, ruleId, file, node, `A Supabase ${method ?? 'client'} call is made from ${file.slot ?? 'an unowned path'}; database, auth and storage calls belong only to ${[...slots].join(' or ')}.`, { method, slot: file.slot ?? null });
+}
+
 function checkClientOwnership(input, { slots, ruleId }) {
   const kit = machineKit(input);
-  const { ts } = kit;
   const violations = [];
-  let imports = 0;
-  let clients = 0;
-  let calls = 0;
+  const counters = { imports: 0, clients: 0, calls: 0 };
   for (const file of input.graph.files.values()) {
     const checker = kit.checkerOf(file.sourceFile);
-    const owned = slots.has(file.slot);
-    kit.walk(file.sourceFile, node => {
-      const moduleName = moduleNameOf(ts, node);
-      if (moduleName && SUPABASE_MODULES.has(moduleName)) {
-        imports += 1;
-        if (!owned) reportAt(violations, kit, ruleId, file, node, `${moduleName} is imported by ${file.rel}, whose slot is ${file.slot ?? 'unowned'}; Supabase imports belong only to ${[...slots].join(' or ')}.`, { module: moduleName, slot: file.slot ?? null });
-      }
-      if (ts.isTypeReferenceNode(node) && supabaseClientType(kit, checker, node)) {
-        clients += 1;
-        if (!isDatabaseType(ts, node.typeArguments?.[0])) reportAt(violations, kit, ruleId, file, node, 'SupabaseClient must carry the committed Database type as SupabaseClient<Database>.');
-      }
-      if (!ts.isCallExpression(node)) return;
-      const binding = kit.importBinding(checker, node.expression);
-      if (binding && SUPABASE_MODULES.has(binding.module) && /^create(?:Client|ServerClient|BrowserClient)$/u.test(binding.name)) {
-        clients += 1;
-        if (!isDatabaseType(ts, node.typeArguments?.[0]) && !contextTypesClient(kit, checker, node)) {
-          reportAt(violations, kit, ruleId, file, node, `${binding.name} creates an untyped Supabase client; create it as ${binding.name}<Database>(...) (or give it the contextual type SupabaseClient<Database>).`);
-        }
-      }
-      if (!isSupabaseCall(kit, checker, node)) return;
-      const properties = chainParts(ts, node);
-      const method = callName(ts, node);
-      if (!SUPABASE_CALLS.has(method) && !properties.includes('auth') && !properties.includes('storage')) return;
-      calls += 1;
-      if (!owned) reportAt(violations, kit, ruleId, file, node, `A Supabase ${method ?? 'client'} call is made from ${file.slot ?? 'an unowned path'}; database, auth and storage calls belong only to ${[...slots].join(' or ')}.`, { method, slot: file.slot ?? null });
-    });
+    kit.walk(file.sourceFile, node => inspectOwnershipNode(kit, checker, file, slots, ruleId, violations, counters, node));
   }
-  return { violations, coverage: { status: 'checked', imports, clients, calls, ownerSlots: [...slots] } };
+  return { violations, coverage: { status: 'checked', ...counters, ownerSlots: [...slots] } };
 }
 
 const symbolOf = (kit, checker, node) => kit.aliased(checker, kit.symbolAt(checker, node)) ?? kit.symbolAt(checker, node);
@@ -162,12 +161,43 @@ const dataSymbolFromAwait = (kit, checker, identifier) => {
   return null;
 };
 
+function inspectQueryResultNode(kit, input, file, checker, report, counters, node) {
+  const { ts } = kit;
+  if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) && QUERY_TERMINALS.has(node.expression.name.text)
+    && node.typeArguments?.length && isSupabaseValue(kit, checker, node.expression.expression)) {
+    report(FE_RESULT_TYPED, node, `${node.expression.name.text}<T>() supplies a result generic; derive the row type from Database and let the Supabase chain infer it.`);
+  }
+  if ((ts.isAsExpression(node) || ts.isTypeAssertionExpression(node) || ts.isNonNullExpression(node)) && fromAwaitedSupabase(kit, checker, node.expression)) {
+    report(FE_RESULT_TYPED, node, 'A Supabase query result is cast or non-null asserted; narrow its typed data/error outcome instead.');
+  }
+  if (ts.isAwaitExpression(node) && isSupabaseValue(kit, checker, node.expression)) {
+    const expression = unwrap(ts, node.expression);
+    if (!ts.isCallExpression(expression)) return true;
+    counters.awaited += 1;
+    const methods = chainParts(ts, expression);
+    if (methods.includes('select') && !methods.some(method => QUERY_WRITES.has(method)) && !methods.includes('single') && !methods.includes('maybeSingle')) {
+      counters.listReads += 1;
+      if (!methods.includes('limit') && !methods.some(method => LIST_BOUNDS.has(method))) {
+        report(FE_RESULT_TYPED, node, 'A Supabase list read has no .limit(), .range(), or keyset bound (.gt/.gte/.lt/.lte); bound every multi-row read.');
+      }
+    }
+    if (!handledAwait(kit, checker, input.graph, node)) {
+      report(FE_ERROR_HANDLED, node, 'The awaited Supabase result does not read its error and is not passed whole to toOutcome(result).');
+    }
+  }
+  if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken && ts.isArrayLiteralExpression(node.right) && node.right.elements.length === 0) {
+    const left = unwrap(ts, node.left);
+    const swallowed = ts.isIdentifier(left) ? Boolean(dataSymbolFromAwait(kit, checker, left))
+      : ts.isPropertyAccessExpression(left) && left.name.text === 'data' && fromAwaitedSupabase(kit, checker, left.expression);
+    if (swallowed) report(FE_ERROR_HANDLED, node, 'Supabase data is collapsed with ?? []; refused or unavailable is not empty data. Pass the whole result to toOutcome.');
+  }
+  return true;
+}
+
 function checkFrontendQueryResults(input) {
   const kit = machineKit(input);
-  const { ts } = kit;
   const violations = [];
-  let awaited = 0;
-  let listReads = 0;
+  const counters = { awaited: 0, listReads: 0 };
   for (const file of input.graph.files.values()) {
     const checker = kit.checkerOf(file.sourceFile);
     const seen = new Set();
@@ -177,39 +207,9 @@ function checkFrontendQueryResults(input) {
       seen.add(key);
       reportAt(violations, kit, ruleId, file, node, message);
     };
-    kit.walk(file.sourceFile, node => {
-      if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) && QUERY_TERMINALS.has(node.expression.name.text)
-        && node.typeArguments?.length && isSupabaseValue(kit, checker, node.expression.expression)) {
-        report(FE_RESULT_TYPED, node, `${node.expression.name.text}<T>() supplies a result generic; derive the row type from Database and let the Supabase chain infer it.`);
-      }
-      if ((ts.isAsExpression(node) || ts.isTypeAssertionExpression(node) || ts.isNonNullExpression(node)) && fromAwaitedSupabase(kit, checker, node.expression)) {
-        report(FE_RESULT_TYPED, node, 'A Supabase query result is cast or non-null asserted; narrow its typed data/error outcome instead.');
-      }
-      if (ts.isAwaitExpression(node) && isSupabaseValue(kit, checker, node.expression)) {
-        const expression = unwrap(ts, node.expression);
-        if (!ts.isCallExpression(expression)) return true;
-        awaited += 1;
-        const methods = chainParts(ts, expression);
-        if (methods.includes('select') && !methods.some(method => QUERY_WRITES.has(method)) && !methods.includes('single') && !methods.includes('maybeSingle')) {
-          listReads += 1;
-          if (!methods.includes('limit') && !methods.some(method => LIST_BOUNDS.has(method))) {
-            report(FE_RESULT_TYPED, node, 'A Supabase list read has no .limit(), .range(), or keyset bound (.gt/.gte/.lt/.lte); bound every multi-row read.');
-          }
-        }
-        if (!handledAwait(kit, checker, input.graph, node)) {
-          report(FE_ERROR_HANDLED, node, 'The awaited Supabase result does not read its error and is not passed whole to toOutcome(result).');
-        }
-      }
-      if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken && ts.isArrayLiteralExpression(node.right) && node.right.elements.length === 0) {
-        const left = unwrap(ts, node.left);
-        const swallowed = ts.isIdentifier(left) ? Boolean(dataSymbolFromAwait(kit, checker, left))
-          : ts.isPropertyAccessExpression(left) && left.name.text === 'data' && fromAwaitedSupabase(kit, checker, left.expression);
-        if (swallowed) report(FE_ERROR_HANDLED, node, 'Supabase data is collapsed with ?? []; refused or unavailable is not empty data. Pass the whole result to toOutcome.');
-      }
-      return true;
-    });
+    kit.walk(file.sourceFile, node => inspectQueryResultNode(kit, input, file, checker, report, counters, node));
   }
-  return { violations, coverage: { status: 'checked', awaited, listReads } };
+  return { violations, coverage: { status: 'checked', awaited: counters.awaited, listReads: counters.listReads } };
 }
 
 const words = text => String(text).replace(/([a-z0-9])([A-Z])/gu, '$1_$2').toUpperCase();
@@ -333,83 +333,119 @@ const parameterBindings = (ts, name) => {
   return [];
 };
 
+function inspectServerSessionCalls(kit, file, checker, violations) {
+  const { ts } = kit;
+  if (isClientModule(ts, file.sourceFile)) return;
+  kit.walk(file.sourceFile, node => {
+    if (ts.isCallExpression(node) && callName(ts, node) === 'getSession' && signatureFromSupabase(checker, node)) {
+      reportAt(violations, kit, FE_SESSION_TRUST, file, node, 'auth.getSession() trusts cookie-backed session data in server code; call getPrincipal() (getClaims), and getUser() for sensitive mutations.');
+    }
+    return true;
+  });
+}
+
+function inspectPrincipalProvider(kit, file, checker, violations) {
+  const { ts } = kit;
+  if (!FE_DB_SLOTS.has(file.slot)) return;
+  for (const implementation of exportedImplementations(ts, file.sourceFile, 'getPrincipal')) {
+    const readsClaims = contains(kit, implementation, node => ts.isCallExpression(node) && callName(ts, node) === 'getClaims'
+      && signatureFromSupabase(checker, node));
+    if (!readsClaims) reportAt(violations, kit, FE_SESSION_TRUST, file, implementation,
+      'getPrincipal() must establish the server principal through Supabase auth.getClaims().');
+  }
+}
+
+function inspectActionDirective(kit, file, action, violations) {
+  const { ts } = kit;
+  const first = action.body.statements[0];
+  const functionLevel = first?.expression?.text === 'use server' && isDirectiveStatement(ts, first);
+  if (!isServerActionModule(ts, file.sourceFile) && !functionLevel) {
+    reportAt(violations, kit, FE_WRITE_SHAPE, file, action, 'An exported write function must be a Server Action through a file-level or function-level `use server` directive.');
+  }
+}
+
+function inspectActionPrincipal(input, kit, file, checker, action, authenticatesAnonymous, violations) {
+  const { ts } = kit;
+  // Function directives are the prologue, not work: the principal is the first non-directive statement.
+  const work = action.body.statements.slice(action.body.statements.findIndex(statement => !isDirectiveStatement(ts, statement)) >>> 0);
+  const first = work[0];
+  const principal = first ? firstPrincipal(kit, checker, input.graph, first) : { call: null, symbol: null };
+  if (!principal.call || !principal.symbol) {
+    reportAt(violations, kit, FE_SESSION_TRUST, file, first ?? action, 'A write Server Action must begin with `const principal = await getPrincipal()` from the db owner.');
+  } else if (!authenticatesAnonymous) {
+    const refuses = work.slice(1).some(statement => ts.isIfStatement(statement)
+      && contains(kit, statement.expression, node => ts.isIdentifier(node) && sameSymbol(kit, checker, node, principal.symbol))
+      && typedRefusal(kit, statement.thenStatement));
+    if (!refuses) reportAt(violations, kit, FE_SESSION_TRUST, file, action, 'A write Server Action must refuse an anonymous principal with a typed `refused` Outcome before doing work.');
+  }
+}
+
+function inspectActionInputs(kit, file, action, checker, violations) {
+  const { ts } = kit;
+  for (const parameter of action.parameters.flatMap(item => parameterBindings(ts, item.name))) {
+    const symbol = symbolOf(kit, checker, parameter);
+    const references = [];
+    kit.walk(action.body, node => {
+      if (ts.isIdentifier(node) && sameSymbol(kit, checker, node, symbol)) references.push(node);
+      return true;
+    });
+    references.sort((a, b) => a.getStart() - b.getStart());
+    const firstUse = references[0];
+    if (firstUse && !parseUse(ts, firstUse)) reportAt(violations, kit, FE_WRITE_SHAPE, file, firstUse,
+      `Server Action input ${parameter.text} is used before schema.parse(...) or schema.safeParse(...).`, { parameter: parameter.text });
+  }
+}
+
+function inspectSensitiveAction(kit, file, checker, action, violations) {
+  const { ts } = kit;
+  const sensitive = /(?:^|\/)(?:billing|payment|payout|refund|charge|subscription|password|credential|role|permission|membership)[/.-]/iu.test(file.rel);
+  if (sensitive && !contains(kit, action.body, node => ts.isCallExpression(node) && callName(ts, node) === 'getUser' && signatureFromSupabase(checker, node))) {
+    reportAt(violations, kit, FE_SESSION_TRUST, file, action, 'A money, account-security or role-changing Server Action must call auth.getUser() before the mutation.');
+  }
+}
+
+function inspectWriteAction(input, kit, file, checker, action, authenticatesAnonymous, violations) {
+  inspectActionDirective(kit, file, action, violations);
+  inspectActionPrincipal(input, kit, file, checker, action, authenticatesAnonymous, violations);
+  inspectActionInputs(kit, file, action, checker, violations);
+  inspectSensitiveAction(kit, file, checker, action, violations);
+}
+
+function inspectWriteModule(input, kit, file, checker, state) {
+  const { ts } = kit;
+  if (!FE_DB_SLOTS.has(file.slot) || !path.posix.basename(file.rel).startsWith('write-')) return;
+  const classified = input.graph.resolver.classifyPath(file.rel);
+  const belowSlot = classified.root && file.rel.startsWith(`${classified.root}/`) ? file.rel.slice(classified.root.length + 1) : '';
+  const authenticatesAnonymous = (input.graph.resolver.slot(file.slot)?.anonymousActions ?? []).includes(belowSlot);
+  const declared = exportedActions(ts, file.sourceFile);
+  if (!declared.length) reportAt(state.violations, kit, FE_WRITE_SHAPE, file, file.sourceFile, `${file.rel} is a write module but exports no Server Action function.`);
+  for (const action of declared) {
+    state.actions += 1;
+    inspectWriteAction(input, kit, file, checker, action, authenticatesAnonymous, state.violations);
+  }
+}
+
+function inspectRouteHandler(input, kit, file, state) {
+  if (!file.rel.endsWith('/route.ts')) return;
+  state.routes += 1;
+  const classified = input.graph.resolver.classifyPath(file.rel);
+  const app = classified.bindings?.app;
+  const live = app !== undefined && file.rel === `apps/${app}/src/app/health/live/route.ts`;
+  if (!live && file.slot !== 'fe.route.callback') reportAt(state.violations, kit, FE_ROUTE_HANDLER, file, file.sourceFile,
+    `${file.rel} is a front-end route handler outside health/live and the fe.route.callback slot; webhooks, cron, public APIs and third-party callbacks belong to be features.`);
+}
+
 function checkFrontendAuthAndRoutes(input) {
   const kit = machineKit(input);
-  const { ts } = kit;
-  const violations = [];
-  let actions = 0;
-  let routes = 0;
+  const state = { violations: [], actions: 0, routes: 0 };
   for (const file of input.graph.files.values()) {
     const checker = kit.checkerOf(file.sourceFile);
-    if (!isClientModule(ts, file.sourceFile)) {
-      kit.walk(file.sourceFile, node => {
-        if (ts.isCallExpression(node) && callName(ts, node) === 'getSession' && signatureFromSupabase(checker, node)) {
-          reportAt(violations, kit, FE_SESSION_TRUST, file, node, 'auth.getSession() trusts cookie-backed session data in server code; call getPrincipal() (getClaims), and getUser() for sensitive mutations.');
-        }
-        return true;
-      });
-    }
-    if (FE_DB_SLOTS.has(file.slot)) {
-      for (const implementation of exportedImplementations(ts, file.sourceFile, 'getPrincipal')) {
-        const readsClaims = contains(kit, implementation, node => ts.isCallExpression(node) && callName(ts, node) === 'getClaims'
-          && signatureFromSupabase(checker, node));
-        if (!readsClaims) {
-          reportAt(violations, kit, FE_SESSION_TRUST, file, implementation, 'getPrincipal() must establish the server principal through Supabase auth.getClaims().');
-        }
-      }
-    }
-    if (FE_DB_SLOTS.has(file.slot) && path.posix.basename(file.rel).startsWith('write-')) {
-      const classified = input.graph.resolver.classifyPath(file.rel);
-      const belowSlot = classified.root && file.rel.startsWith(`${classified.root}/`) ? file.rel.slice(classified.root.length + 1) : '';
-      const authenticatesAnonymous = (input.graph.resolver.slot(file.slot)?.anonymousActions ?? []).includes(belowSlot);
-      const declared = exportedActions(ts, file.sourceFile);
-      if (!declared.length) reportAt(violations, kit, FE_WRITE_SHAPE, file, file.sourceFile, `${file.rel} is a write module but exports no Server Action function.`);
-      for (const action of declared) {
-        actions += 1;
-        const functionLevel = action.body.statements[0]?.expression?.text === 'use server' && isDirectiveStatement(ts, action.body.statements[0]);
-        if (!isServerActionModule(ts, file.sourceFile) && !functionLevel) {
-          reportAt(violations, kit, FE_WRITE_SHAPE, file, action, 'An exported write function must be a Server Action through a file-level or function-level `use server` directive.');
-        }
-        // Function directives are the prologue, not work: the principal is the first non-directive statement.
-        const work = action.body.statements.slice(action.body.statements.findIndex(statement => !isDirectiveStatement(ts, statement)) >>> 0);
-        const first = work[0];
-        const principal = first ? firstPrincipal(kit, checker, input.graph, first) : { call: null, symbol: null };
-        if (!principal.call || !principal.symbol) {
-          reportAt(violations, kit, FE_SESSION_TRUST, file, first ?? action, 'A write Server Action must begin with `const principal = await getPrincipal()` from the db owner.');
-        } else if (!authenticatesAnonymous) {
-          const refuses = work.slice(1).some(statement => ts.isIfStatement(statement)
-            && contains(kit, statement.expression, node => ts.isIdentifier(node) && sameSymbol(kit, checker, node, principal.symbol))
-            && typedRefusal(kit, statement.thenStatement));
-          if (!refuses) reportAt(violations, kit, FE_SESSION_TRUST, file, action, 'A write Server Action must refuse an anonymous principal with a typed `refused` Outcome before doing work.');
-        }
-        for (const parameter of action.parameters.flatMap(item => parameterBindings(ts, item.name))) {
-          const symbol = symbolOf(kit, checker, parameter);
-          const references = [];
-          kit.walk(action.body, node => {
-            if (ts.isIdentifier(node) && sameSymbol(kit, checker, node, symbol)) references.push(node);
-            return true;
-          });
-          references.sort((a, b) => a.getStart() - b.getStart());
-          const firstUse = references[0];
-          if (firstUse && !parseUse(ts, firstUse)) reportAt(violations, kit, FE_WRITE_SHAPE, file, firstUse, `Server Action input ${parameter.text} is used before schema.parse(...) or schema.safeParse(...).`, { parameter: parameter.text });
-        }
-        const sensitive = /(?:^|\/)(?:billing|payment|payout|refund|charge|subscription|password|credential|role|permission|membership)[/.-]/iu.test(file.rel);
-        if (sensitive && !contains(kit, action.body, node => ts.isCallExpression(node) && callName(ts, node) === 'getUser' && signatureFromSupabase(checker, node))) {
-          reportAt(violations, kit, FE_SESSION_TRUST, file, action, 'A money, account-security or role-changing Server Action must call auth.getUser() before the mutation.');
-        }
-      }
-    }
-    if (file.rel.endsWith('/route.ts')) {
-      routes += 1;
-      const classified = input.graph.resolver.classifyPath(file.rel);
-      const app = classified.bindings?.app;
-      const live = app !== undefined && file.rel === `apps/${app}/src/app/health/live/route.ts`;
-      if (!live && file.slot !== 'fe.route.callback') {
-        reportAt(violations, kit, FE_ROUTE_HANDLER, file, file.sourceFile, `${file.rel} is a front-end route handler outside health/live and the fe.route.callback slot; webhooks, cron, public APIs and third-party callbacks belong to be features.`);
-      }
-    }
+    inspectServerSessionCalls(kit, file, checker, state.violations);
+    inspectPrincipalProvider(kit, file, checker, state.violations);
+    inspectWriteModule(input, kit, file, checker, state);
+    inspectRouteHandler(input, kit, file, state);
   }
-  return { violations, coverage: { status: 'checked', actions, routes } };
+  return { violations: state.violations, coverage: { status: 'checked', actions: state.actions, routes: state.routes } };
 }
 
 export function checkFrontendSupabase(input) {

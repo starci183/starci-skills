@@ -170,6 +170,25 @@ ${componentsYaml(components)}
 const read = readTextFile;
 
 /** The workflow findings: the derived matrix contract, the dispatch-only stack layers, and no hard-coded example path. */
+const matrixJobFindings = (matrixJobs, add) => {
+  for (const [id, job] of matrixJobs) {
+    if (String(job.strategy.matrix.app ?? '') !== MATRIX_EXPRESSION || Object.keys(job.strategy.matrix).length !== 1)
+      add('EXAMPLES_CI_MATRIX_NOT_DERIVED', `${WORKFLOW}#jobs.${id}`, `the matrix must be exactly app: ${MATRIX_EXPRESSION} (never a hand-written list)`);
+    if (![job.needs].flat().includes(MATRIX_JOB)) add('EXAMPLES_CI_MATRIX_NOT_DERIVED', `${WORKFLOW}#jobs.${id}`, `needs must include ${MATRIX_JOB}`);
+  }
+};
+
+const stackLayerFindings = (jobs, add) => {
+  for (const [id, job] of Object.entries(jobs)) for (const step of job?.steps ?? []) {
+    if (/\btest:(integration|e2e|contract)\b/.test(String(step.run ?? '')) && !/github\.event_name\s*==\s*'workflow_dispatch'/.test(String(step.if ?? '')))
+      add('EXAMPLES_CI_STACK_LAYER_AUTOMATIC', `${WORKFLOW}#jobs.${id}`, `the step "${step.name ?? step.run}" starts the docker stack and must run on workflow_dispatch only (if: github.event_name == 'workflow_dispatch' ...)`);
+  }
+};
+
+const hardcodedAppFindings = (apps, text, add) => {
+  for (const app of apps) if (new RegExp(String.raw`examples/${app}\b`).test(text)) add('EXAMPLES_CI_HARDCODED', WORKFLOW, `the workflow names examples/${app}: every app is reached through the matrix only`);
+};
+
 const workflowFindings = (doc, text, apps, add) => {
   const jobs = doc.jobs ?? {};
   const lister = jobs[MATRIX_JOB];
@@ -177,18 +196,11 @@ const workflowFindings = (doc, text, apps, add) => {
     add('EXAMPLES_CI_MATRIX_NOT_DERIVED', WORKFLOW, `job ${MATRIX_JOB} must run \`${MATRIX_COMMAND}\` and expose its output as outputs.apps`);
   const matrixJobs = Object.entries(jobs).filter(([id, job]) => id !== IMAGES_JOB && job?.strategy?.matrix);
   if (!matrixJobs.length) add('EXAMPLES_CI_MATRIX_NOT_DERIVED', WORKFLOW, 'no job runs the example apps as a matrix');
-  for (const [id, job] of matrixJobs) {
-    if (String(job.strategy.matrix.app ?? '') !== MATRIX_EXPRESSION || Object.keys(job.strategy.matrix).length !== 1)
-      add('EXAMPLES_CI_MATRIX_NOT_DERIVED', `${WORKFLOW}#jobs.${id}`, `the matrix must be exactly app: ${MATRIX_EXPRESSION} (never a hand-written list)`);
-    if (![job.needs].flat().includes(MATRIX_JOB)) add('EXAMPLES_CI_MATRIX_NOT_DERIVED', `${WORKFLOW}#jobs.${id}`, `needs must include ${MATRIX_JOB}`);
-  }
+  matrixJobFindings(matrixJobs, add);
   // Owner ruling: integration, e2e and contract (the docker-stack layers) run on workflow_dispatch only.
-  for (const [id, job] of Object.entries(jobs)) for (const step of job?.steps ?? []) {
-    if (/\btest:(integration|e2e|contract)\b/.test(String(step.run ?? '')) && !/github\.event_name\s*==\s*'workflow_dispatch'/.test(String(step.if ?? '')))
-      add('EXAMPLES_CI_STACK_LAYER_AUTOMATIC', `${WORKFLOW}#jobs.${id}`, `the step "${step.name ?? step.run}" starts the docker stack and must run on workflow_dispatch only (if: github.event_name == 'workflow_dispatch' ...)`);
-  }
+  stackLayerFindings(jobs, add);
   if (!doc.on?.workflow_dispatch) add('EXAMPLES_CI_NO_MANUAL_TRIGGER', WORKFLOW, 'the workflow needs a workflow_dispatch trigger for the manual integration and e2e layers');
-  for (const app of apps) if (new RegExp(String.raw`examples/${app}\b`).test(text)) add('EXAMPLES_CI_HARDCODED', WORKFLOW, `the workflow names examples/${app}: every app is reached through the matrix only`);
+  hardcodedAppFindings(apps, text, add);
 };
 
 /** The stray-workflow findings: no other root workflow runs an example app by itself (the folded per-example workflows are gone, and stay gone). */

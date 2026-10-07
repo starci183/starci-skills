@@ -65,20 +65,32 @@ async function main() {
   const has = (n) => argv.includes(`--${n}`);
   const value = (n) => { const i = argv.indexOf(`--${n}`); if (i < 0) return null; return argv[i + 1] ?? null; };
   const asJson = has('json');
-  if (has('help') || !argv.length) { console.log('use: starci supervisor tell "<text>" [--wait] [--timeout-ms <n>] | starci supervisor tell --read [--since <ISO|30m|2h>] [--limit <n>] [--json]'); return; }
+  if (has('help') || !argv.length) { printHelp(); return; }
   if (has('read')) {
-    const list = replies({ since: sinceMs(value('since')), limit: Number(value('limit')) || 20 });
-    let output = list.length ? list.map(show).join('\n\n') : 'no replies in that window';
-    if (asJson) output = JSON.stringify(list);
-    console.log(output);
+    printReplies(value, asJson);
     return;
   }
+  return sendTell(argv, { has, value, asJson });
+}
+
+function printHelp() {
+  console.log('use: starci supervisor tell "<text>" [--wait] [--timeout-ms <n>] | starci supervisor tell --read [--since <ISO|30m|2h>] [--limit <n>] [--json]');
+}
+
+function printReplies(value, asJson) {
+  const list = replies({ since: sinceMs(value('since')), limit: Number(value('limit')) || 20 });
+  let output = list.length ? list.map(show).join('\n\n') : 'no replies in that window';
+  if (asJson) output = JSON.stringify(list);
+  console.log(output);
+}
+
+async function sendTell(argv, { has, value, asJson }) {
   const valued = new Set(['--timeout-ms', '--since', '--limit']);
   const text = argv.filter((a, i) => !a.startsWith('--') && !valued.has(argv[i - 1])).join(' ');
   const r = tell(text);
   if (!r.ok) { console.error(r.error); process.exitCode = 2; return; }
   if (!has('wait')) {
-    console.log(asJson ? JSON.stringify(r) : `sent ${r.id} to the Supervisor${r.online ? '' : ' (it is offline: it reads the inbox when it is back)'}`);
+    console.log(sentText(r, asJson));
     return;
   }
   const reply = await waitReply(r.id, { timeoutMs: Number(value('timeout-ms')) || DEFAULT_WAIT_MS });
@@ -86,6 +98,12 @@ async function main() {
   else if (reply) console.log(show(reply));
   else console.log(`sent ${r.id}; no reply yet (starci supervisor tell --read later)`);
   if (!reply) process.exitCode = 124;
+}
+
+function sentText(result, asJson) {
+  if (asJson) return JSON.stringify(result);
+  const availability = result.online ? '' : ' (it is offline: it reads the inbox when it is back)';
+  return `sent ${result.id} to the Supervisor${availability}`;
 }
 
 if (isMain(import.meta.url)) {

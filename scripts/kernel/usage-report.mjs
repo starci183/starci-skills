@@ -28,7 +28,7 @@ const finish = (t) => ({
 });
 const fold = (rows, key) => {
   const by = new Map();
-  for (const r of rows) { const k = key(r); if (!by.has(k)) by.set(k, { key: k, ...blank(), attempts: new Set() }); add(by.get(k), r); if (r.attemptId != null) by.get(k).attempts.add(r.attemptId); }
+  for (const r of rows) { const k = key(r); if (!by.has(k)) { by.set(k, { key: k, ...blank(), attempts: new Set() }); } add(by.get(k), r); if (r.attemptId != null) by.get(k).attempts.add(r.attemptId); }
   return [...by.values()];
 };
 const tally = (t) => ({ ...finish(t), ...(t.attempts ? { attempts: t.attempts.size } : {}) });

@@ -55,6 +55,17 @@ const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '.
 /** Registered linked worktrees under the runtime's git worktrees root of `repoRoot`. */
 const runtimeTreesOf = (repoRoot, opts) => { const root = worktreesRootOf(repoRoot); return worktreeListPorcelain(repoRoot, opts).filter((w) => insideTree(w.path, root)); };
 
+function countRepoWorktrees(repoRoot, rows, settings, now, git) {
+  const mine = rows.filter((row) => sameTree(row.repo_root, repoRoot));
+  const orphans = mine.filter((row) => (isPendingRow(row) ? stalePending(row, now, settings.ownerGoneMs) : !fs.existsSync(row.path)))
+    .map((row) => ({ path: row.path, why: isPendingRow(row) ? 'Orca slot reserved, never bound' : 'registered, directory gone' }));
+  for (const tree of runtimeTreesOf(repoRoot, { git })) {
+    if (!mine.some((row) => sameTree(row.path, tree.path))) orphans.push({ path: tree.path, why: tree.prunable ? 'prunable registration' : 'no live registry row' });
+  }
+  const linked = Math.max(0, worktreeListPorcelain(repoRoot, { git }).length - 1);
+  return { repoRoot, live: mine.length, linked, cap: settings.capPerRepo, orphans, over: Math.max(mine.length, linked) > settings.capPerRepo };
+}
+
 /**
  * Each repo's live worktree count against its cap, with its orphans: a live row whose directory is gone (a pending Orca
  * slot only once it is stale), or a git worktree under <repo>/.starciwork/worktrees no live row owns. `linked` counts
@@ -67,14 +78,7 @@ export function worktreeCounts({ repos = [], env = process.env, settings = workt
   const all = new Map();
   for (const r of [...known, ...repos.filter(Boolean)]) { if (!fs.existsSync(r)) { continue; } const home = mainRootOf(r, { git }); const k = treeKey(home); if (!all.has(k)) all.set(k, home); }
   const out = [];
-  for (const repoRoot of all.values()) {
-    const mine = rows.filter((r) => sameTree(r.repo_root, repoRoot));
-    const orphans = mine.filter((r) => (isPendingRow(r) ? stalePending(r, now, settings.ownerGoneMs) : !fs.existsSync(r.path)))
-      .map((r) => ({ path: r.path, why: isPendingRow(r) ? 'Orca slot reserved, never bound' : 'registered, directory gone' }));
-    for (const w of runtimeTreesOf(repoRoot, { git })) if (!mine.some((r) => sameTree(r.path, w.path))) orphans.push({ path: w.path, why: w.prunable ? 'prunable registration' : 'no live registry row' });
-    const linked = Math.max(0, worktreeListPorcelain(repoRoot, { git }).length - 1);
-    out.push({ repoRoot, live: mine.length, linked, cap: settings.capPerRepo, orphans, over: Math.max(mine.length, linked) > settings.capPerRepo });
-  }
+  for (const repoRoot of all.values()) out.push(countRepoWorktrees(repoRoot, rows, settings, now, git));
   return out;
 }
 
@@ -152,11 +156,21 @@ export function gcWorktrees({ env = process.env, now = Date.now(), apply = true,
   try { ps = orca.ps(); } catch (error) { ps = { ok: false, error: String(error?.message ?? error) }; }
   const cover = psCoverage(ps);
   const byId = new Map(), byPath = new Map();
-  if (cover.ok) { for (const w of ps.worktrees) { if (w.id) byId.set(w.id, w); if (w.path) byPath.set(treeKey(w.path), w); } }
+  if (cover.ok) {
+    for (const w of ps.worktrees) {
+      if (w.id) { byId.set(w.id, w); }
+      if (w.path) { byPath.set(treeKey(w.path), w); }
+    }
+  }
   const orcaTreeOf = (row) => (cover.ok ? byId.get(row.orca_id) ?? byPath.get(treeKey(row.path)) ?? null : null);
   // A workflow tree's live terminals are Orca's count; a tree a complete page does not list holds none; otherwise unknown
   // (Infinity: kept).
-  const liveTerminalsOf = (row) => { const w = orcaTreeOf(row); return w ? w.liveTerminalCount : cover.complete ? 0 : Infinity; };
+  const liveTerminalsOf = (row) => {
+    const w = orcaTreeOf(row);
+    if (w) return w.liveTerminalCount;
+    if (cover.complete) return 0;
+    return Infinity;
+  };
   try {
     let rows = [];
     try { rows = withRegistry((m) => m.liveWorktrees(), env); } catch (error) { return [{ action: 'error', ok: false, error: String(error?.message ?? error).slice(0, 200) }]; }
@@ -263,6 +277,11 @@ function unlisted({ row, repoRoot, reason, apply, env }) {
   return { path: row.path, repoRoot, reason: 'orca-tree-unlisted', action: 'keep', home: 'orca', ok: false, error: 'orca-tree-unlisted' };
 }
 
+const orphanJobStatus = (staging, owner, supOf, lookup) => {
+  if (staging) return owner.lane ? supOf(owner.lane) : null;
+  return owner.jobId ? lookup(owner.ledgerId, owner.jobId) : null;
+};
+
 /**
  * The orphan pass over Orca's `worktree ps` page: every STAMPED tree on this host with no registry row (a crash between
  * Orca's create and the bind, or a slot the GC gave back as slot-never-bound). An unstamped tree is foreign and never
@@ -298,7 +317,7 @@ function collectOrcaOrphans({ ps, items, halt, lookup, phaseOf, supOf, now, appl
     const v = orphanVerdict({ stamp, inFlight, liveTerminals: w.liveTerminalCount, ageMs, ownerGoneMs: settings.ownerGoneMs, endedPhases: ENDED,
       settledStatuses: SETTLED_JOBS,
       workflowPhase: stamp.kind === 'workflow' && owner.workflowId ? phaseOf(owner.ledgerId, owner.workflowId) : null,
-      jobStatus: staging ? (owner.lane ? supOf(owner.lane) : null) : owner.jobId ? lookup(owner.ledgerId, owner.jobId) : null });
+      jobStatus: orphanJobStatus(staging, owner, supOf, lookup) });
     if (v.verdict !== 'adopt' && v.verdict !== 'collect') continue;
     const repoRoot = mains.get(w.repoId) ?? (fs.existsSync(w.path) ? mainRootOf(w.path, { git }) : null);
     if (!repoRoot) continue;
@@ -337,6 +356,12 @@ function collect({ row, repoRoot, dir, branch, name, reason, merged, apply, env,
 
 /* ------------------------------------------------------------ cli */
 
+const worktreeItemLine = (item) => {
+  const failure = item.ok === false ? ` FAILED ${item.error}` : '';
+  const preserved = item.preserved ? ` preserved ${item.preserved}` : '';
+  return `${item.action} ${item.path} (${item.reason})${failure}${preserved}`;
+};
+
 function main(argv) {
   const [verb, ...rest] = argv;
   const json = rest.includes('--json');
@@ -347,7 +372,7 @@ function main(argv) {
   }
   if (verb === 'gc') {
     const items = gcWorktrees({ apply: !rest.includes('--plan') });
-    console.log(json ? JSON.stringify(items, null, 2) : items.map((i) => `${i.action} ${i.path} (${i.reason})${i.ok === false ? ` FAILED ${i.error}` : ''}${i.preserved ? ` preserved ${i.preserved}` : ''}`).join('\n') || 'nothing to collect');
+    console.log(json ? JSON.stringify(items, null, 2) : items.map(worktreeItemLine).join('\n') || 'nothing to collect');
     return items.some((i) => i.ok === false) ? 1 : 0;
   }
   if (verb === 'resume') {

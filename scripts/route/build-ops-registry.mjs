@@ -135,6 +135,19 @@ function entriesFrom(files) {
   return { entries, problems };
 }
 
+function checkRegistry(out, next, count) {
+  const current = fs.existsSync(out) ? fs.readFileSync(out, 'utf8') : null;
+  if (current === next) { console.log(`registry.yaml is current (${count} ops)`); return; }
+  console.error(`registry.yaml is STALE — rerun build-ops-registry.mjs (${count} ops in sources)`);
+  if (current) {
+    const before = current.split('\n'), after = next.split('\n');
+    for (let i = 0; i < Math.max(before.length, after.length); i += 1) {
+      if (before[i] !== after[i]) { console.error(`first diff at line ${i + 1}:\n  old: ${before[i]}\n  new: ${after[i]}`); break; }
+    }
+  }
+  process.exitCode = 1;
+}
+
 function main() {
   const args = parseArgs(process.argv.slice(2));
   const opsDir = path.resolve(args.opsDir ?? path.join(skillRoot, 'modules', 'ops'));
@@ -168,20 +181,8 @@ function main() {
   ].join('\n');
   const next = header + body;
 
-  if (args.check) {
-    const cur = fs.existsSync(out) ? fs.readFileSync(out, 'utf8') : null;
-    if (cur === next) { console.log(`registry.yaml is current (${entries.length} ops)`); }
-    else {
-      console.error(`registry.yaml is STALE — rerun build-ops-registry.mjs (${entries.length} ops in sources)`);
-      if (cur) {
-        const a = cur.split('\n'), b = next.split('\n');
-        for (let i = 0; i < Math.max(a.length, b.length); i++) {
-          if (a[i] !== b[i]) { console.error(`first diff at line ${i + 1}:\n  old: ${a[i]}\n  new: ${b[i]}`); break; }
-        }
-      }
-      process.exitCode = 1;
-    }
-  } else {
+  if (args.check) checkRegistry(out, next, entries.length);
+  else {
     fs.writeFileSync(out, next);
     console.log(`wrote ${path.relative(skillRoot, out)} (${entries.length} ops)`);
   }

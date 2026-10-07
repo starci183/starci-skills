@@ -11,6 +11,102 @@ const isSpace = char => /\s/u.test(char);
 const isWordStart = char => /[\p{L}_]/u.test(char);
 const isWordPart = char => /[\p{L}\p{N}_$]/u.test(char);
 
+const commentEnd = (text, index) => {
+  if (text[index] === '-' && text[index + 1] === '-') {
+    while (index < text.length && text[index] !== '\n') index += 1;
+    return index;
+  }
+  if (text[index] !== '/' || text[index + 1] !== '*') return null;
+  const end = text.indexOf('*/', index + 2);
+  return end === -1 ? text.length : end + 2;
+};
+
+const singleQuotedEnd = (text, index, push) => {
+  if (text[index] !== "'") return null;
+  index += 1;
+  while (index < text.length) {
+    if (text[index] === "'" && text[index + 1] === "'") { index += 2; continue; }
+    if (text[index] === "'") break;
+    index += 1;
+  }
+  push('string', '');
+  return index + 1;
+};
+
+const quotedIdentifierEnd = (text, index, push) => {
+  if (text[index] !== '"') return null;
+  let value = '';
+  index += 1;
+  while (index < text.length) {
+    if (text[index] === '"' && text[index + 1] === '"') { value += '"'; index += 2; continue; }
+    if (text[index] === '"') break;
+    value += text[index];
+    index += 1;
+  }
+  push('ident', value);
+  return index + 1;
+};
+
+const dollarTokenEnd = (text, index, push) => {
+  if (text[index] !== '$') return null;
+  const param = /^\$(\d+)/u.exec(text.slice(index, index + 12));
+  if (param) { push('param', param[0]); return index + param[0].length; }
+  const tag = /^\$([\p{L}_][\p{L}\p{N}_]*)?\$/u.exec(text.slice(index));
+  if (!tag) return null;
+  const end = text.indexOf(tag[0], index + tag[0].length);
+  push('string', '');
+  return end === -1 ? text.length : end + tag[0].length;
+};
+
+const numberEnd = (text, index, push) => {
+  if (!/\d/u.test(text[index])) return null;
+  let end = index;
+  while (end < text.length && /[\d.]/u.test(text[end])) end += 1;
+  push('number', text.slice(index, end));
+  return end;
+};
+
+const wordEnd = (text, index, push) => {
+  if (!isWordStart(text[index])) return null;
+  let end = index;
+  while (end < text.length && isWordPart(text[end])) end += 1;
+  const word = text.slice(index, end);
+  if (text[end] !== "'" || !/^[EeBbXxNn]$/u.test(word)) { push('word', word); return end; }
+  const escaped = /^[Ee]$/u.test(word);
+  end += 1;
+  while (end < text.length) {
+    if (escaped && text[end] === '\\') { end += 2; continue; }
+    if (text[end] === "'" && text[end + 1] === "'") { end += 2; continue; }
+    if (text[end] === "'") break;
+    end += 1;
+  }
+  push('string', '');
+  return end + 1;
+};
+
+const punctuationEnd = (text, index, push) => {
+  const two = text.slice(index, index + 2);
+  if (['::', '<=', '>=', '<>', '!=', '||', '->'].includes(two)) { push('punct', two); return index + 2; }
+  push('punct', text[index]);
+  return index + 1;
+};
+
+function consumeToken(text, index, push) {
+  const comment = commentEnd(text, index);
+  if (comment !== null) return comment;
+  if (text[index] === HOLE) { push('hole', HOLE); return index + 1; }
+  const singleQuoted = singleQuotedEnd(text, index, push);
+  if (singleQuoted !== null) return singleQuoted;
+  const identifier = quotedIdentifierEnd(text, index, push);
+  if (identifier !== null) return identifier;
+  const dollarToken = dollarTokenEnd(text, index, push);
+  if (dollarToken !== null) return dollarToken;
+  const number = numberEnd(text, index, push);
+  if (number !== null) return number;
+  const word = wordEnd(text, index, push);
+  return word ?? punctuationEnd(text, index, push);
+}
+
 /** Tokens: {t: 'word'|'ident'|'string'|'number'|'param'|'hole'|'punct', v, up?} (`up` is the uppercase word). */
 export function tokenizeSql(text) {
   const tokens = [];
@@ -19,80 +115,7 @@ export function tokenizeSql(text) {
   while (i < text.length) {
     const char = text[i];
     if (isSpace(char)) { i += 1; continue; }
-    if (char === '-' && text[i + 1] === '-') { while (i < text.length && text[i] !== '\n') { i += 1; } continue; }
-    if (char === '/' && text[i + 1] === '*') {
-      const end = text.indexOf('*/', i + 2);
-      i = end === -1 ? text.length : end + 2;
-      continue;
-    }
-    if (char === HOLE) { push('hole', HOLE); i += 1; continue; }
-    if (char === "'") {
-      i += 1;
-      while (i < text.length) {
-        if (text[i] === "'" && text[i + 1] === "'") { i += 2; continue; }
-        if (text[i] === "'") break;
-        i += 1;
-      }
-      i += 1;
-      push('string', '');
-      continue;
-    }
-    if (char === '"') {
-      let value = '';
-      i += 1;
-      while (i < text.length) {
-        if (text[i] === '"' && text[i + 1] === '"') { value += '"'; i += 2; continue; }
-        if (text[i] === '"') break;
-        value += text[i];
-        i += 1;
-      }
-      i += 1;
-      push('ident', value);
-      continue;
-    }
-    if (char === '$') {
-      const param = /^\$(\d+)/u.exec(text.slice(i, i + 12));
-      if (param) { push('param', param[0]); i += param[0].length; continue; }
-      const tag = /^\$([\p{L}_][\p{L}\p{N}_]*)?\$/u.exec(text.slice(i));
-      if (tag) {
-        const end = text.indexOf(tag[0], i + tag[0].length);
-        i = end === -1 ? text.length : end + tag[0].length;
-        push('string', '');
-        continue;
-      }
-    }
-    if (/\d/u.test(char)) {
-      let j = i;
-      while (j < text.length && /[\d.]/u.test(text[j])) j += 1;
-      push('number', text.slice(i, j));
-      i = j;
-      continue;
-    }
-    if (isWordStart(char)) {
-      let j = i;
-      while (j < text.length && isWordPart(text[j])) j += 1;
-      const word = text.slice(i, j);
-      if (text[j] === "'" && /^[EeBbXxNn]$/u.test(word)) {
-        const escaped = /^[Ee]$/u.test(word);
-        j += 1;
-        while (j < text.length) {
-          if (escaped && text[j] === '\\') { j += 2; continue; }
-          if (text[j] === "'" && text[j + 1] === "'") { j += 2; continue; }
-          if (text[j] === "'") break;
-          j += 1;
-        }
-        i = j + 1;
-        push('string', '');
-        continue;
-      }
-      push('word', word);
-      i = j;
-      continue;
-    }
-    const two = text.slice(i, i + 2);
-    if (['::', '<=', '>=', '<>', '!=', '||', '->'].includes(two)) { push('punct', two); i += 2; continue; }
-    push('punct', char);
-    i += 1;
+    i = consumeToken(text, i, push);
   }
   return tokens;
 }
@@ -114,7 +137,7 @@ const isWord = (token, up) => token?.t === 'word' && token.up === up;
  * The table reference at `start`: {parts, table, alias, next}, {dynamic: true}, or null (a subquery, a function, nothing).
  * `next` is the index after the reference and its alias.
  */
-function tableRef(tokens, start, { columns = false } = {}) {
+function tableNameAt(tokens, start) {
   let i = start;
   while (isWord(tokens[i], 'ONLY') || isWord(tokens[i], 'LATERAL')) i += 1;
   const first = tokens[i];
@@ -123,11 +146,36 @@ function tableRef(tokens, start, { columns = false } = {}) {
   const parts = [nameOf(first)];
   i += 1;
   while (tokens[i]?.v === '.' && isName(tokens[i + 1])) { parts.push(nameOf(tokens[i + 1])); i += 2; }
+  return { parts, next: i };
+}
+
+function tableAliasAt(tokens, index) {
+  if (isWord(tokens[index], 'AS') && isName(tokens[index + 1])) return { alias: nameOf(tokens[index + 1]), next: index + 2 };
+  if (isName(tokens[index]) && !(tokens[index].t === 'word' && CLAUSE_WORDS.has(tokens[index].up))) return { alias: nameOf(tokens[index]), next: index + 1 };
+  return { alias: null, next: index };
+}
+
+function columnListEnd(tokens, start) {
+  let i = start;
+  let depth = 0;
+  do {
+    if (tokens[i].v === '(') depth += 1;
+    else if (tokens[i].v === ')') depth -= 1;
+    i += 1;
+  } while (i < tokens.length && depth > 0);
+  return i;
+}
+
+function tableRef(tokens, start, { columns = false } = {}) {
+  const reference = tableNameAt(tokens, start);
+  if (!reference) return null;
+  if (reference.dynamic) return reference;
+  const { parts } = reference;
+  let i = reference.next;
   if (tokens[i]?.v === '(' && !columns) return null;
-  let alias = null;
-  if (isWord(tokens[i], 'AS') && isName(tokens[i + 1])) { alias = nameOf(tokens[i + 1]); i += 2; }
-  else if (isName(tokens[i]) && !(tokens[i].t === 'word' && CLAUSE_WORDS.has(tokens[i].up))) { alias = nameOf(tokens[i]); i += 1; }
-  if (alias && tokens[i]?.v === '(') { let depth = 0; do { if (tokens[i].v === '(') depth += 1; else if (tokens[i].v === ')') depth -= 1; i += 1; } while (i < tokens.length && depth > 0); }
+  const { alias, next } = tableAliasAt(tokens, i);
+  i = next;
+  if (alias && tokens[i]?.v === '(') i = columnListEnd(tokens, i);
   return { parts, table: parts.at(-1), schema: parts.length > 1 ? parts.at(-2) : null, alias, next: i };
 }
 
@@ -145,19 +193,32 @@ function statementsOf(tokens) {
   return statements;
 }
 
+function cteNameBefore(tokens, index) {
+  let afterAs = index + 1;
+  if (isWord(tokens[afterAs], 'NOT')) afterAs += 1;
+  if (isWord(tokens[afterAs], 'MATERIALIZED')) afterAs += 1;
+  if (tokens[afterAs]?.v !== '(') return null;
+  let nameIndex = index - 1;
+  if (tokens[nameIndex]?.v === ')') {
+    let depth = 0;
+    do {
+      if (tokens[nameIndex].v === ')') depth += 1;
+      else if (tokens[nameIndex].v === '(') depth -= 1;
+      nameIndex -= 1;
+    } while (nameIndex >= 0 && depth > 0);
+  }
+  const before = tokens[nameIndex - 1];
+  if (isName(tokens[nameIndex]) && (isWord(before, 'WITH') || isWord(before, 'RECURSIVE') || before?.v === ',')) return nameOf(tokens[nameIndex]);
+  return null;
+}
+
 /** The CTE names a statement declares: `name [(cols)] AS [NOT] [MATERIALIZED] (`. */
 function cteNames(tokens) {
   const names = new Set();
   for (let i = 1; i < tokens.length; i += 1) {
     if (!isWord(tokens[i], 'AS')) continue;
-    let j = i + 1;
-    if (isWord(tokens[j], 'NOT')) j += 1;
-    if (isWord(tokens[j], 'MATERIALIZED')) j += 1;
-    if (tokens[j]?.v !== '(') continue;
-    let k = i - 1;
-    if (tokens[k]?.v === ')') { let depth = 0; do { if (tokens[k].v === ')') { depth += 1; } else if (tokens[k].v === '(') { depth -= 1; } k -= 1; } while (k >= 0 && depth > 0); }
-    const before = tokens[k - 1];
-    if (isName(tokens[k]) && (isWord(before, 'WITH') || isWord(before, 'RECURSIVE') || before?.v === ',')) names.add(nameOf(tokens[k]));
+    const name = cteNameBefore(tokens, i);
+    if (name !== null) names.add(name);
   }
   return names;
 }
@@ -219,6 +280,43 @@ function equalityColumns(conjunct, qualifiers) {
  * a LIMIT/FETCH at the statement depth, no FROM at all (one row), only aggregates without GROUP BY, or an equality on
  * every column of the primary key or of one unique key of the first table of FROM.
  */
+function aggregateSelectItems(tokens, select, from, at0) {
+  const items = [];
+  let item = [];
+  for (let i = select + 1; i < from; i += 1) {
+    if (at0(i) && tokens[i].v === ',' && tokens[i].t === 'punct') { items.push(item); item = []; continue; }
+    if (!(items.length === 0 && item.length === 0 && (isWord(tokens[i], 'DISTINCT') || isWord(tokens[i], 'ALL')))) item.push(tokens[i]);
+  }
+  items.push(item);
+  return items;
+}
+
+function whereRegion(tokens, level, where, at0) {
+  const region = [];
+  for (let i = where + 1; i < tokens.length; i += 1) {
+    if (at0(i) && tokens[i].t === 'word' && WHERE_END.has(tokens[i].up)) break;
+    region.push({ token: tokens[i], level: level[i] });
+  }
+  return region;
+}
+
+function uniqueWhereColumns(region, primary) {
+  if (region.some(entry => entry.level === 0 && isWord(entry.token, 'OR'))) return null;
+  const conjuncts = [[]];
+  let between = false;
+  for (const entry of region) {
+    if (entry.level === 0 && isWord(entry.token, 'BETWEEN')) between = true;
+    if (entry.level === 0 && isWord(entry.token, 'AND')) {
+      if (between) { between = false; } else { conjuncts.push([]); continue; }
+    }
+    conjuncts.at(-1).push(entry.token);
+  }
+  const qualifiers = new Set([primary.table, primary.alias].filter(Boolean));
+  const columns = new Set();
+  for (const conjunct of conjuncts) for (const column of equalityColumns(conjunct, qualifiers)) columns.add(column);
+  return columns;
+}
+
 function selectBound(tokens, level, uniqueSetsOf, cte) {
   const at0 = index => level[index] === 0;
   const find = (up, from = 0) => { for (let i = from; i < tokens.length; i += 1) { if (at0(i) && isWord(tokens[i], up)) return i; } return -1; };
@@ -227,43 +325,103 @@ function selectBound(tokens, level, uniqueSetsOf, cte) {
   const from = find('FROM', select);
   if (from < 0) return { bounded: true, basis: 'no from' };
   const groupBy = tokens.findIndex((token, i) => at0(i) && isWord(token, 'GROUP') && isWord(tokens[i + 1], 'BY'));
-  if (groupBy < 0) {
-    const items = [];
-    let item = [];
-    for (let i = select + 1; i < from; i += 1) {
-      if (at0(i) && tokens[i].v === ',' && tokens[i].t === 'punct') { items.push(item); item = []; continue; }
-      if (!(items.length === 0 && item.length === 0 && (isWord(tokens[i], 'DISTINCT') || isWord(tokens[i], 'ALL')))) item.push(tokens[i]);
-    }
-    items.push(item);
-    if (items.length && items.every(isAggregateItem)) return { bounded: true, basis: 'aggregate' };
-  }
+  if (groupBy < 0 && aggregateSelectItems(tokens, select, from, at0).every(isAggregateItem)) return { bounded: true, basis: 'aggregate' };
   const primary = tableRef(tokens, from + 1);
   if (!primary || primary.dynamic || cte.has(primary.table)) return { bounded: false, basis: 'unbounded', table: primary?.table ?? null };
   const uniqueSets = uniqueSetsOf(primary.table);
   const where = find('WHERE', from);
   if (uniqueSets?.length && where >= 0) {
-    const region = [];
-    for (let i = where + 1; i < tokens.length; i += 1) {
-      if (at0(i) && tokens[i].t === 'word' && WHERE_END.has(tokens[i].up)) break;
-      region.push({ token: tokens[i], level: level[i] });
-    }
-    if (!region.some(entry => entry.level === 0 && isWord(entry.token, 'OR'))) {
-      const conjuncts = [[]];
-      let between = false;
-      for (const entry of region) {
-        if (entry.level === 0 && isWord(entry.token, 'BETWEEN')) between = true;
-        if (entry.level === 0 && isWord(entry.token, 'AND')) {
-          if (between) { between = false; } else { conjuncts.push([]); continue; }
-        }
-        conjuncts.at(-1).push(entry.token);
-      }
-      const qualifiers = new Set([primary.table, primary.alias].filter(Boolean));
-      const columns = new Set();
-      for (const conjunct of conjuncts) for (const column of equalityColumns(conjunct, qualifiers)) columns.add(column);
-      if (covers(uniqueSets, columns)) return { bounded: true, basis: 'unique' };
-    }
+    const region = whereRegion(tokens, level, where, at0);
+    const columns = uniqueWhereColumns(region, primary);
+    if (columns && covers(uniqueSets, columns)) return { bounded: true, basis: 'unique' };
   }
   return { bounded: false, basis: 'unbounded', table: primary.table };
+}
+
+function recordSqlReference(list, ref, reads, cte, state) {
+  if (!ref) return;
+  if (ref.dynamic) { state.dynamic += 1; return; }
+  if (ref.schema && SYSTEM_SCHEMAS.has(ref.schema)) return;
+  if (ref.table.startsWith('pg_')) return;
+  if (list === reads && !ref.schema && cte.has(ref.table)) return;
+  list.push({ table: ref.table, schema: ref.schema });
+}
+
+function recordTableList(tokens, start, list, record, commaIsPunctuation) {
+  let i = start;
+  for (;;) {
+    const ref = tableRef(tokens, i);
+    record(list, ref);
+    if (ref && tokens[ref.next]?.v === ',' && (!commaIsPunctuation || tokens[ref.next].t === 'punct')) { i = ref.next + 1; continue; }
+    break;
+  }
+}
+
+function processWriteToken(tokens, level, index, token, record, state) {
+  const next = tokens[index + 1];
+  if (token.up === 'INSERT' && isWord(next, 'INTO')) {
+    if (level[index] === 0) state.hasWriteVerb = true;
+    record(state.writes, tableRef(tokens, index + 2, { columns: true }));
+    return true;
+  }
+  if (token.up === 'UPDATE' && !(state.previous?.t === 'word' && NOT_A_WRITE_BEFORE_UPDATE.has(state.previous.up))) {
+    if (level[index] === 0) state.hasWriteVerb = true;
+    record(state.writes, tableRef(tokens, index + 1));
+    return true;
+  }
+  if (token.up === 'DELETE' && isWord(next, 'FROM')) {
+    if (level[index] === 0) state.hasWriteVerb = true;
+    record(state.writes, tableRef(tokens, index + 2));
+    return true;
+  }
+  if (token.up === 'MERGE' && isWord(next, 'INTO')) {
+    if (level[index] === 0) state.hasWriteVerb = true;
+    record(state.writes, tableRef(tokens, index + 2));
+    return true;
+  }
+  if (token.up !== 'TRUNCATE') return false;
+  let start = index + 1;
+  if (isWord(tokens[start], 'TABLE')) start += 1;
+  recordTableList(tokens, start, state.writes, record, false);
+  return true;
+}
+
+function processReadToken(tokens, index, token, record, state, mergeOrDelete) {
+  if (token.up === 'FROM' && !isWord(state.previous, 'DISTINCT') && !isWord(state.previous, 'DELETE') && state.parens.at(-1) !== true) {
+    recordTableList(tokens, index + 1, state.reads, record, true);
+    return;
+  }
+  if (token.up === 'JOIN') { record(state.reads, tableRef(tokens, index + 1)); return; }
+  if (token.up === 'USING' && mergeOrDelete && tokens[index + 1]?.v !== '(') record(state.reads, tableRef(tokens, index + 1));
+}
+
+function statementReferences(tokens, level, cte) {
+  const state = { writes: [], reads: [], parens: [], dynamic: 0, hasWriteVerb: false };
+  const record = (list, ref) => recordSqlReference(list, ref, state.reads, cte, state);
+  const mergeOrDelete = tokens.some(token => isWord(token, 'MERGE')) || tokens.some(token => isWord(token, 'DELETE'));
+  for (let i = 0; i < tokens.length; i += 1) {
+    const token = tokens[i];
+    if (token.t === 'punct' && token.v === '(') { state.parens.push(i > 0 && tokens[i - 1].t === 'word' && FROM_INSIDE.has(tokens[i - 1].up)); continue; }
+    if (token.t === 'punct' && token.v === ')') { state.parens.pop(); continue; }
+    if (token.t !== 'word') continue;
+    state.previous = tokens[i - 1];
+    if (processWriteToken(tokens, level, i, token, record, state)) {
+      if (token.up === 'DELETE') i += 1;
+      continue;
+    }
+    processReadToken(tokens, i, token, record, state, mergeOrDelete);
+  }
+  return state;
+}
+
+function statementAnalysis(tokens, uniqueSetsOf) {
+  const cte = cteNames(tokens);
+  const level = depths(tokens);
+  const references = statementReferences(tokens, level, cte);
+  const selects = [];
+  const hasSelect = tokens.some((candidate, i) => level[i] === 0 && isWord(candidate, 'SELECT'));
+  if (hasSelect && !references.hasWriteVerb) selects.push(selectBound(tokens, level, uniqueSetsOf, cte));
+  return { ...references, selects };
 }
 
 /**
@@ -277,51 +435,11 @@ export function analyzeSql(text, { uniqueSetsOf = () => null } = {}) {
   const selects = [];
   let dynamic = 0;
   for (const tokens of statementsOf(tokenizeSql(text))) {
-    const cte = cteNames(tokens);
-    const level = depths(tokens);
-    const parens = [];
-    const record = (list, ref) => {
-      if (!ref) return;
-      if (ref.dynamic) { dynamic += 1; return; }
-      if (ref.schema && SYSTEM_SCHEMAS.has(ref.schema)) return;
-      if (ref.table.startsWith('pg_')) return;
-      if (list === reads && !ref.schema && cte.has(ref.table)) return;
-      list.push({ table: ref.table, schema: ref.schema });
-    };
-    const mergeOrDelete = tokens.some(token => isWord(token, 'MERGE')) || tokens.some(token => isWord(token, 'DELETE'));
-    let hasWriteVerb = false;
-    for (let i = 0; i < tokens.length; i += 1) {
-      const token = tokens[i];
-      if (token.t === 'punct' && token.v === '(') { parens.push(i > 0 && tokens[i - 1].t === 'word' && FROM_INSIDE.has(tokens[i - 1].up)); continue; }
-      if (token.t === 'punct' && token.v === ')') { parens.pop(); continue; }
-      if (token.t !== 'word') continue;
-      const previous = tokens[i - 1];
-      if (token.up === 'INSERT' && isWord(tokens[i + 1], 'INTO')) { if (level[i] === 0) { hasWriteVerb = true; } record(writes, tableRef(tokens, i + 2, { columns: true })); }
-      else if (token.up === 'UPDATE' && !(previous?.t === 'word' && NOT_A_WRITE_BEFORE_UPDATE.has(previous.up))) { if (level[i] === 0) { hasWriteVerb = true; } record(writes, tableRef(tokens, i + 1)); }
-      else if (token.up === 'DELETE' && isWord(tokens[i + 1], 'FROM')) { if (level[i] === 0) { hasWriteVerb = true; } record(writes, tableRef(tokens, i + 2)); i += 1; }
-      else if (token.up === 'MERGE' && isWord(tokens[i + 1], 'INTO')) { if (level[i] === 0) { hasWriteVerb = true; } record(writes, tableRef(tokens, i + 2)); }
-      else if (token.up === 'TRUNCATE') {
-        let j = i + 1;
-        if (isWord(tokens[j], 'TABLE')) j += 1;
-        for (;;) {
-          const ref = tableRef(tokens, j);
-          record(writes, ref);
-          if (ref && tokens[ref.next]?.v === ',') { j = ref.next + 1; continue; }
-          break;
-        }
-      } else if (token.up === 'FROM' && !isWord(previous, 'DISTINCT') && !isWord(previous, 'DELETE') && parens.at(-1) !== true) {
-        let j = i + 1;
-        for (;;) {
-          const ref = tableRef(tokens, j);
-          record(reads, ref);
-          if (ref && tokens[ref.next]?.v === ',' && tokens[ref.next].t === 'punct') { j = ref.next + 1; continue; }
-          break;
-        }
-      } else if (token.up === 'JOIN') record(reads, tableRef(tokens, i + 1));
-      else if (token.up === 'USING' && mergeOrDelete && tokens[i + 1]?.v !== '(') record(reads, tableRef(tokens, i + 1));
-    }
-    const hasSelect = tokens.some((candidate, i) => level[i] === 0 && isWord(candidate, 'SELECT'));
-    if (hasSelect && !hasWriteVerb) selects.push(selectBound(tokens, level, uniqueSetsOf, cte));
+    const statement = statementAnalysis(tokens, uniqueSetsOf);
+    for (const write of statement.writes) writes.push(write);
+    for (const read of statement.reads) reads.push(read);
+    for (const select of statement.selects) selects.push(select);
+    dynamic += statement.dynamic;
   }
   return { writes, reads, selects, dynamic };
 }

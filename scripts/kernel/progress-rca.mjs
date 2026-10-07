@@ -161,7 +161,7 @@ const stallOf = ({ core, queuedReady, running, allowed, now, remaining, minRate,
 
 /** The ETA of the remaining units: {etaHours, eta} (0/now when nothing remains, null when the rate is dead). */
 const etaOf = (remaining, etaRate, now) => {
-  if (remaining === 0) return { etaHours: 0, eta: new Date(now).toISOString() }; if (etaRate <= 0) return { etaHours: null, eta: null };
+  if (remaining === 0) { return { etaHours: 0, eta: new Date(now).toISOString() }; } if (etaRate <= 0) { return { etaHours: null, eta: null }; }
   return { etaHours: Math.round(remaining / etaRate * 10) / 10, eta: new Date(now + remaining / etaRate * HOUR).toISOString() };
 };
 
@@ -250,7 +250,7 @@ export function causesOf({ status = 'failed', result = {}, report = null }) {
   const blocker = report?.blocker ?? {}, kind = String(blocker.kind ?? '').toLowerCase();
   const text = [report?.summary, blocker.detail, report?.rootCause?.claim, JSON.stringify(report?.openItems ?? ''), ...(report?.checks ?? []).map((c) => `${c.name} ${c.evidence ?? ''} exit=${c.exitCode ?? ''}`)].join(' \n ');
   const causes = [], add = (c) => { if (!causes.includes(c)) causes.push(c); };
-  if (!report && (result?.worker?.liveness || result?.reportFiled === false)) add('dead-worker'); textCauses({ text, kind, causes, add });
+  if (!report && (result?.worker?.liveness || result?.reportFiled === false)) { add('dead-worker'); } textCauses({ text, kind, causes, add });
   if (report?.rootCause?.self === false && String(report?.rootCause?.node ?? '').startsWith('wf-')) add('upstream');
   if (report && preservedOf(result) && (report.outcome === 'blocked' || status === 'failed')) add('partial-work');
   if (!causes.length && report && (result?.verdict === 'fail' || report.outcome === 'failed')) add('product-defect');
@@ -338,13 +338,14 @@ export function decisionsOf(db, workflowId) {
 
 /* ------------------------------------------------------------ ranked actions */
 
-const q = (s) => (/[\s,;"'[\]()]/.test(String(s)) ? `"${String(s).replaceAll('"', String.raw`\"`)}"` : String(s));
-const actionKey = (...parts) => parts.join(':');
+const q = (s) => (/[\s,;"'[\]()]/.test(String(s)) ? `"${String(s).replaceAll('"', '\\"')}"` : String(s));
+const actionKey = (...parts) => parts.join(':'), reasonSuffixOf = (item) => item.reason ? ` [${item.reason}]` : '', openCountSuffixOf = (cluster) => cluster.open !== cluster.count ? ` (${cluster.open} open)` : '';
 const act = (key, tier, cause, unblocks, title, command, expected) => ({ key, tier, cause, unblocks, title, command, expected });
+const repointCommandOf = (files, nextUnits, api, base) => { if (!files.length) return `${api} status ${base} --json   (read importsBroken.brokenFiles, then: ${api} graph-edit ${base} --edit wire --op code.refactor --paths <them> --before <the next queued units> --decision <id>)`; const paths = q(files.slice(0, 60).join(',')); let before = ''; if (nextUnits.length) before = ` --before ${nextUnits.join(',')}`; return `${api} graph-edit ${base} --edit wire --op code.refactor --paths ${paths}${before} --decision <id>`; };
 
 /** The settle verdict an unsettled report's outcome maps to for starci kernel settle --verdict. */
 const settleVerdictOf = (it) => {
-  if (it.outcome === 'done') return 'pass'; if (it.outcome === 'blocked' || it.outcome === 'ask') return 'blocked';
+  if (it.outcome === 'done') { return 'pass'; } if (it.outcome === 'blocked' || it.outcome === 'ask') { return 'blocked'; }
   return it.outcome ? 'fail' : '<pass|fail|blocked from its report>';
 };
 // 0. NEEDS-KERNEL-DECISION first (owner ruling settle-runtime-service): the runtime settled every green report; what is left
@@ -353,7 +354,7 @@ const settleBacklogAct = (progress, { api, repo }) => {
   if (!progress?.unsettledReports?.length) return null;
   const ids = progress.unsettledReports.filter(Boolean); const items = progress.settleDecisions ?? ids.map((id) => ({ jobId: id, outcome: null, reason: null }));
   return act(actionKey('settle-backlog', ids.length), 'light', 'needs-kernel-decision', 1000 + ids.length,
-    `decide ${ids.length} needs-kernel-decision settle(s) BEFORE any route or dispatch (starci kernel route/dispatch refuse settle-backlog meanwhile): ${items.slice(0, 8).map((it) => it.jobId + (it.reason ? ` [${it.reason}]` : '')).join(', ')}`,
+    `decide ${ids.length} needs-kernel-decision settle(s) BEFORE any route or dispatch (starci kernel route/dispatch refuse settle-backlog meanwhile): ${items.slice(0, 8).map((it) => it.jobId + reasonSuffixOf(it)).join(', ')}`,
     items.slice(0, 20).map((it) => (it.outcome === 'done' ? `${api} check --repo ${q(repo)} --job ${it.jobId} --checks-file <your re-run> && ` : '') + `${api} settle --repo ${q(repo)} --job ${it.jobId} --verdict ${settleVerdictOf(it)}`).join(' ; '),
     'each settle closes its [Op] terminal (verified close), frees its slot and lets the unit count or route its repair');
 };
@@ -366,9 +367,7 @@ const repointAct = ({ importsBroken, brokenCluster, units, queuedOf, N, api, bas
     importsBroken
       ? `enqueue ONE repoint unit owning the ${importsBroken.files} file(s) whose ${importsBroken.count} import(s) resolve to nothing (IMPORTS_BROKEN_AFTER_MOVE): repoint imports to the new locations; no other change`
       : `${brokenCluster.open} unit(s) failed on an unresolved import: enqueue ONE repoint unit owning the importers of the moved paths`,
-    files.length
-      ? `${api} graph-edit ${base} --edit wire --op code.refactor --paths ${q(files.slice(0, 60).join(','))}${nextUnits.length ? ' --before ' + nextUnits.join(',') : ''} --decision <id>`
-      : `${api} status ${base} --json   (read importsBroken.brokenFiles, then: ${api} graph-edit ${base} --edit wire --op code.refactor --paths <them> --before <the next queued units> --decision <id>)`,
+    repointCommandOf(files, nextUnits, api, base),
     'the importers point at the moved code; importsBroken clears and later checkers stop failing on the old paths');
 };
 // 1. parallelism: the cheapest, most certain win.
@@ -519,7 +518,7 @@ export function actionsOf({ progress, rca, units = [], workflowId, repo = '<repo
 /** The `why slow` line (Vietnamese owner digest / English lines). */
 export function whyLine(rca, { language = ownerLanguage(), limit = 5 } = {}) {
   const cls = (rca?.clusters ?? []).filter((c) => c.open || c.cause === 'dead-worker').slice(0, limit); if (!cls.length) return null;
-  return `${translator(language)('Why slow')}: ${cls.map((c) => c.cause + ' x' + c.count + (c.open !== c.count ? ` (${c.open} open)` : '')).join(', ')}`;
+  return `${translator(language)('Why slow')}: ${cls.map((c) => c.cause + ' x' + c.count + openCountSuffixOf(c)).join(', ')}`;
 }
 
 /** A stable id for one RCA snapshot (clusters + counts). */

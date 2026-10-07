@@ -31,6 +31,44 @@ const globExpression = (glob) => {
   return new RegExp(`${source}$`, process.platform === 'win32' ? 'i' : '');
 };
 
+function cleanPreflight(entry, target, { primary, lanesRoot, only, lstat }) {
+  if (samePath(target, primary)) return { path: target, branch: entry.branch, action: 'primary' };
+  const relative = path.relative(lanesRoot, target).split(path.sep).join('/');
+  const selected = !only || [entry.branch ?? '', path.basename(target), relative].some((value) => only.test(value));
+  if (!selected) return { skip: true };
+  if (!inside(lanesRoot, target)) return { path: target, branch: entry.branch, action: 'outside-lanes-root' };
+  try { lstat(target); }
+  catch (error) {
+    return { path: target, branch: entry.branch, action: error?.code === 'ENOENT' ? 'missing' : 'lstat-refused', refused: error?.code === 'ENOENT' ? 0 : 1 };
+  }
+  if (!entry.branch || entry.branch === 'main') return { path: target, branch: entry.branch, action: 'not-a-lane' };
+  return null;
+}
+
+async function checkCleanLane(entry, target, { primary, status, isAncestor, ctx }) {
+  const state = await status(target, { untracked: 'no' });
+  if (!state?.ok || String(state.stdout ?? '').trim()) return {
+    row: { path: target, branch: entry.branch, action: 'refused-dirty-tracked' }, line: `refused ${target}: uncommitted tracked changes`, refused: 1,
+  };
+  if (!(await isAncestor(primary, entry.head, 'refs/heads/main'))) return {
+    row: { path: target, branch: entry.branch, action: 'refused-unmerged' }, line: `refused ${target}: ${entry.branch} is not merged into local main`, refused: 1,
+  };
+  if (ctx.args?.['dry-run'] === true) return { row: { path: target, branch: entry.branch, action: 'would-remove' }, line: `would remove ${target}` };
+  return null;
+}
+
+async function removeCleanLane(entry, target, { primary, orcaRows, ctx, deps }) {
+  const orca = orcaRows.find((row) => row.id && row.path && samePath(row.path, target));
+  const result = orca
+    ? await (deps.removeOrca ?? realRemoveOrca)({ repoRoot: primary, orcaId: orca.id, dir: target, branch: entry.branch, deleteBranch: 'merged', main: 'main', env: ctx.env })
+    : await (deps.removeGit ?? realRemoveGit)(target, { repo: primary });
+  if (result?.ok) return { row: { path: target, branch: entry.branch, action: 'removed', links: result.links ?? 0 }, line: `removed ${target}` };
+  return {
+    row: { path: target, branch: entry.branch, action: 'remove-failed', reason: result?.reason ?? 'unknown' },
+    line: `refused ${target}: ${result?.reason ?? 'removal failed'}`, refused: 1, stop: result?.fatal,
+  };
+}
+
 /** `starci machine worktrees clean`: select merged lanes and remove each without following any link in it. */
 export async function worktreesClean(ctx, deps = {}) {
   const positionals = ctx.positionals ?? [];
@@ -63,42 +101,24 @@ export async function worktreesClean(ctx, deps = {}) {
   let refused = 0;
   for (const entry of worktrees) {
     const target = path.resolve(entry.path);
-    if (samePath(target, primary)) { rows.push({ path: target, branch: entry.branch, action: 'primary' }); continue; }
-    const relative = path.relative(lanesRoot, target).split(path.sep).join('/');
-    const selected = !only || [entry.branch ?? '', path.basename(target), relative].some((value) => only.test(value));
-    if (!selected) continue;
-    if (!inside(lanesRoot, target)) { rows.push({ path: target, branch: entry.branch, action: 'outside-lanes-root' }); continue; }
-    try { lstat(target); } catch (error) {
-      rows.push({ path: target, branch: entry.branch, action: error?.code === 'ENOENT' ? 'missing' : 'lstat-refused' });
-      if (error?.code !== 'ENOENT') refused += 1;
+    const preflight = cleanPreflight(entry, target, { primary, lanesRoot, only, lstat });
+    if (preflight) {
+      if (!preflight.skip) rows.push(preflight);
+      refused += preflight.refused ?? 0;
       continue;
     }
-    if (!entry.branch || entry.branch === 'main') { rows.push({ path: target, branch: entry.branch, action: 'not-a-lane' }); continue; }
-    const state = await status(target, { untracked: 'no' });
-    if (!state?.ok || String(state.stdout ?? '').trim()) {
-      rows.push({ path: target, branch: entry.branch, action: 'refused-dirty-tracked' });
-      lines.push(`refused ${target}: uncommitted tracked changes`); refused += 1; continue;
+    const checked = await checkCleanLane(entry, target, { primary, status, isAncestor, ctx });
+    if (checked) {
+      rows.push(checked.row);
+      if (checked.line) lines.push(checked.line);
+      refused += checked.refused ?? 0;
+      continue;
     }
-    if (!(await isAncestor(primary, entry.head, 'refs/heads/main'))) {
-      rows.push({ path: target, branch: entry.branch, action: 'refused-unmerged' });
-      lines.push(`refused ${target}: ${entry.branch} is not merged into local main`); refused += 1; continue;
-    }
-    if (ctx.args?.['dry-run'] === true) {
-      rows.push({ path: target, branch: entry.branch, action: 'would-remove' });
-      lines.push(`would remove ${target}`); continue;
-    }
-    const orca = orcaRows.find((row) => row.id && row.path && samePath(row.path, target));
-    const result = orca
-      ? await (deps.removeOrca ?? realRemoveOrca)({ repoRoot: primary, orcaId: orca.id, dir: target, branch: entry.branch, deleteBranch: 'merged', main: 'main', env: ctx.env })
-      : await (deps.removeGit ?? realRemoveGit)(target, { repo: primary });
-    if (result?.ok) {
-      rows.push({ path: target, branch: entry.branch, action: 'removed', links: result.links ?? 0 });
-      lines.push(`removed ${target}`);
-    } else {
-      rows.push({ path: target, branch: entry.branch, action: 'remove-failed', reason: result?.reason ?? 'unknown' });
-      lines.push(`refused ${target}: ${result?.reason ?? 'removal failed'}`); refused += 1;
-      if (result?.fatal) break;
-    }
+    const removed = await removeCleanLane(entry, target, { primary, orcaRows, ctx, deps });
+    rows.push(removed.row);
+    lines.push(removed.line);
+    refused += removed.refused ?? 0;
+    if (removed.stop) break;
   }
   const removed = rows.filter((row) => ['removed', 'would-remove'].includes(row.action)).length;
   return {

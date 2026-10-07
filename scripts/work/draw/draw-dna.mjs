@@ -57,6 +57,7 @@ import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../../engine/yaml.mjs';
 import { PROPOSAL_FILE_NAMES, readProposals } from '../grammar-proposal.mjs'; import { isMain } from '../../lib/is-main.mjs';
 import { ancestorsOf } from '../../lib/dom-tree.mjs';
+import { appendDnaFindings } from './draw-dna-findings.mjs';
 
 export const DRAW_OFF_GRAMMAR_COMPONENT = 'DRAW_OFF_GRAMMAR_COMPONENT';
 export const DRAW_NOTICE_NOT_ALERT = 'DRAW_NOTICE_NOT_ALERT';
@@ -123,9 +124,14 @@ const OUTCOME_STATES = new Set(['affirmative', 'cautionary', 'negative']);
 
 const VOID = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'param', 'source', 'track', 'wbr']);
 const RAW = new Set(['script', 'style', 'template', 'textarea', 'title', 'noscript', 'xmp']);
-const TAG_RX = /<!--[\s\S]*?-->|<!\[CDATA\[[\s\S]*?\]\]>|<![^>]*>|<\?[^>]*>|<\/([a-zA-Z][\w:-]*)\s*>|<([a-zA-Z][\w:-]*)((?:\s+[^\s"'>/=]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'=<>`]+))?)*)\s*(\/?)>/g;
-const ATTR_RX = /([^\s"'>/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/g;
-const decode = (s) => String(s).replaceAll(/&nbsp;/g, ' ').replaceAll(/&amp;/g, '&').replaceAll(/&lt;/g, '<').replaceAll(/&gt;/g, '>').replaceAll(/&quot;/g, '"').replaceAll(/&#39;|&apos;/g, "'");
+const MARKUP_TAG_PATTERN = '<!--[\\s\\S]*?-->|<!\\[CDATA\\[[\\s\\S]*?\\]\\]>|<![^>]*>|<\\?[^>]*>';
+const END_TAG_PATTERN = '<\\/([a-zA-Z][\\w:-]*)\\s*>';
+const START_TAG_NAME_PATTERN = '<([a-zA-Z][\\w:-]*)';
+const START_TAG_ATTRIBUTES_PATTERN = "((?:\\s+[^\\s\"'>/=]+(?:\\s*=\\s*(?:\"[^\"]*\"|'[^']*'|[^\\s\"'=<>`]+))?)*)\\s*(\\/?)>";
+const TAG_RX = new RegExp(`${MARKUP_TAG_PATTERN}|${END_TAG_PATTERN}|${START_TAG_NAME_PATTERN}${START_TAG_ATTRIBUTES_PATTERN}`, 'g');
+const ATTR_PATTERN = "([^\\s\"'>/=]+)(?:\\s*=\\s*(?:\"([^\"]*)\"|'([^']*)'|([^\\s\"'=<>`]+)))?";
+const ATTR_RX = new RegExp(ATTR_PATTERN, 'g');
+const decode = (s) => String(s).replaceAll('&nbsp;', ' ').replaceAll('&amp;', '&').replaceAll('&lt;', '<').replaceAll('&gt;', '>').replaceAll('&quot;', '"').replaceAll(/&#39;|&apos;/g, "'");
 
 function parseAttrs(text) {
   const out = {};
@@ -136,6 +142,32 @@ function parseAttrs(text) {
   return out;
 }
 
+const appendParsedText = (node, text) => { if (text.trim()) node.children.push({ text: decode(text) }); };
+
+function closeHtmlTag(current, tag) {
+  let at = current;
+  while (at && at.tag !== tag) at = at.parent;
+  return at?.parent ? at.parent : current;
+}
+
+function appendHtmlTag(s, match, current, index) {
+  if (match[1]) return { current: closeHtmlTag(current, match[1].toLowerCase()), index: null };
+  if (!match[2]) return { current, index: null };
+  const tag = match[2].toLowerCase();
+  const el = { tag, attrs: parseAttrs(match[3]), children: [], parent: current };
+  current.children.push(el);
+  if (RAW.has(tag)) {
+    const close = s.toLowerCase().indexOf(`</${tag}`, index);
+    const end = close < 0 ? s.length : close;
+    el.raw = s.slice(index, end);
+    const gt = close < 0 ? s.length : s.indexOf('>', close);
+    const nextIndex = gt < 0 ? s.length : gt + 1;
+    TAG_RX.lastIndex = nextIndex;
+    return { current, index: nextIndex };
+  }
+  return { current: !VOID.has(tag) && !match[4] ? el : current, index: null };
+}
+
 /** Parse html into {tag:'#root', children:[...]}; an element is {tag, attrs, children, parent, raw?}, a text {text}. */
 export function parseHtml(html) {
   const s = String(html ?? '');
@@ -143,33 +175,13 @@ export function parseHtml(html) {
   let cur = root, i = 0;
   TAG_RX.lastIndex = 0;
   for (let m = TAG_RX.exec(s); m; m = TAG_RX.exec(s)) {
-    const text = s.slice(i, m.index);
-    if (text.trim()) cur.children.push({ text: decode(text) });
+    appendParsedText(cur, s.slice(i, m.index));
     i = TAG_RX.lastIndex;
-    if (m[1]) {
-      const tag = m[1].toLowerCase();
-      let at = cur;
-      while (at && at.tag !== tag) at = at.parent;
-      if (at?.parent) cur = at.parent;
-      continue;
-    }
-    if (!m[2]) continue;
-    const tag = m[2].toLowerCase();
-    const el = { tag, attrs: parseAttrs(m[3]), children: [], parent: cur };
-    cur.children.push(el);
-    if (RAW.has(tag)) {
-      const close = s.toLowerCase().indexOf(`</${tag}`, i);
-      const end = close < 0 ? s.length : close;
-      el.raw = s.slice(i, end);
-      const gt = close < 0 ? s.length : s.indexOf('>', close);
-      i = gt < 0 ? s.length : gt + 1;
-      TAG_RX.lastIndex = i;
-      continue;
-    }
-    if (!VOID.has(tag) && !m[4]) cur = el;
+    const result = appendHtmlTag(s, m, cur, i);
+    cur = result.current;
+    if (result.index !== null) { i = result.index; continue; }
   }
-  const tail = s.slice(i);
-  if (tail.trim()) cur.children.push({ text: decode(tail) });
+  appendParsedText(cur, s.slice(i));
   return root;
 }
 
@@ -209,6 +221,24 @@ function dnaFileOf(family = DEFAULT_FAMILY, root = GRAMMARS) {
 
 const kebab = (s) => String(s).replace(/([a-z0-9])([A-Z])/g, '$1-$2').replace(/([A-Z])([A-Z][a-z])/g, '$1-$2').toLowerCase();
 
+function componentFromRenderer(r) {
+  const slug = kebab(r.component);
+  const parts = new Set();
+  for (const cls of Array.isArray(r.classes) ? r.classes : []) {
+    const bare = String(cls).replace(/^starci-core-/, '');
+    const plain = bare.replace(/^generic-/, '');
+    for (const p of [bare, plain, plain.startsWith(`${slug}-`) ? plain.slice(slug.length + 1) : null]) if (p) parts.add(p);
+  }
+  // The root spelled as a part (<slug>, <slug>-root, root) is the component itself.
+  if (parts.size) for (const p of [slug, `${slug}-root`, 'root']) parts.add(p);
+  const closed = new Map();
+  for (const c of Array.isArray(r.closedValues) ? r.closedValues : []) {
+    if (!c?.prop) continue;
+    closed.set(String(c.prop), { values: Array.isArray(c.values) ? c.values.map(String) : null, type: c.type ?? null });
+  }
+  return { name: r.component, kind: r.kind ?? null, slug, parts, closed, classes: Array.isArray(r.classes) ? r.classes : [] };
+}
+
 /**
  * The DNA as the gate reads it: Map(component -> {name, kind, parts:Set, closed:Map(prop -> {values|null, type})}).
  * Parts are the component's anatomy classes minus `starci-core-` (alert-actions), also minus a leading `generic-`
@@ -224,21 +254,7 @@ export function loadDna({ family = DEFAULT_FAMILY, file = null } = {}) {
   const components = new Map();
   for (const r of doc.renderers) {
     if (!r?.component) continue;
-    const slug = kebab(r.component);
-    const parts = new Set();
-    for (const cls of Array.isArray(r.classes) ? r.classes : []) {
-      const bare = String(cls).replace(/^starci-core-/, '');
-      const plain = bare.replace(/^generic-/, '');
-      for (const p of [bare, plain, plain.startsWith(`${slug}-`) ? plain.slice(slug.length + 1) : null]) if (p) parts.add(p);
-    }
-    // The root spelled as a part (<slug>, <slug>-root, root) is the component itself.
-    if (parts.size) for (const p of [slug, `${slug}-root`, 'root']) parts.add(p);
-    const closed = new Map();
-    for (const c of Array.isArray(r.closedValues) ? r.closedValues : []) {
-      if (!c?.prop) continue;
-      closed.set(String(c.prop), { values: Array.isArray(c.values) ? c.values.map(String) : null, type: c.type ?? null });
-    }
-    components.set(r.component, { name: r.component, kind: r.kind ?? null, slug, parts, closed, classes: Array.isArray(r.classes) ? r.classes : [] });
+    components.set(r.component, componentFromRenderer(r));
   }
   const dna = { file: at, family: doc.family ?? family, components };
   dnaCache.set(at, dna);
@@ -318,13 +334,21 @@ const declsOf = (text) => {
   }
   return out;
 };
+const STYLE_RULE_PATTERN = '([^{}]+)\\{([^{}]*)\\}';
+const STYLE_RULE_RX = new RegExp(STYLE_RULE_PATTERN, 'g');
+const SELECTOR_COMBINATOR_PATTERN = '\\s*[>+~]\\s*|\\s+';
+const SELECTOR_COMBINATOR_RX = new RegExp(SELECTOR_COMBINATOR_PATTERN);
+const ATTRIBUTE_BLOCK_PATTERN = '\\[[^\\]]*\\]';
+const ATTRIBUTE_BLOCK_RX = new RegExp(ATTRIBUTE_BLOCK_PATTERN, 'g');
+const ATTRIBUTE_SELECTOR_PATTERN = "\\[([\\w:-]+)(?:\\s*[~|^$*]?=\\s*[\"']?([^\"'\\]]*)[\"']?)?\\]";
+const ATTRIBUTE_SELECTOR_RX = new RegExp(ATTRIBUTE_SELECTOR_PATTERN, 'g');
 
 /** The flat rules of the render's <style> blocks: [{selector, decls}] (innermost blocks of an @media included). */
 function styleRulesOf(tree) {
   const out = [];
   for (const el of walkElements(tree).filter((e) => e.tag === 'style')) {
     const css = String(el.raw ?? '').replace(/\/\*[\s\S]*?\*\//g, '');
-    for (const m of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    for (const m of css.matchAll(STYLE_RULE_RX)) {
       const decls = declsOf(m[2]);
       for (const selector of m[1].split(',').map((s) => s.trim()).filter((s) => s && !s.startsWith('@'))) out.push({ selector, decls });
     }
@@ -334,8 +358,8 @@ function styleRulesOf(tree) {
 
 /** Whether a selector's last compound (no pseudo-class) matches `el` by tag, id, classes and attributes. */
 function selectorMatches(selector, el) {
-  const last = selector.split(/\s*[>+~]\s*|\s+/).findLast(Boolean) ?? '';
-  if (!last || /:/.test(last.replace(/\[[^\]]*\]/g, ''))) return false;
+  const last = selector.split(SELECTOR_COMBINATOR_RX).findLast(Boolean) ?? '';
+  if (!last || /:/.test(last.replace(ATTRIBUTE_BLOCK_RX, ''))) return false;
   const tag = /^[a-zA-Z][\w-]*/.exec(last)?.[0];
   if (tag && tag.toLowerCase() !== el.tag) return false;
   const classes = [...last.matchAll(/\.([\w-]+)/g)].map((m) => m[1]);
@@ -343,7 +367,7 @@ function selectorMatches(selector, el) {
   if (classes.some((c) => !classesOf(el).includes(c))) return false;
   const id = /#([\w-]+)/.exec(last)?.[1];
   if (id && el.attrs.id !== id) return false;
-  for (const m of last.matchAll(/\[([\w:-]+)(?:\s*[~|^$*]?=\s*["']?([^"'\]]*)["']?)?\]/g)) {
+  for (const m of last.matchAll(ATTRIBUTE_SELECTOR_RX)) {
     const v = el.attrs[m[1].toLowerCase()];
     if (v == null || (m[2] != null && v !== m[2])) return false;
   }
@@ -376,7 +400,8 @@ export function surfaceBackground(value) {
 function declaredPx(el, prop, rules = []) {
   const read = (v) => {
     const m = /^(-?\d+(?:\.\d+)?)(px|rem)$/.exec(String(v ?? '').trim());
-    if (!m) return null; return Number(m[1]) * (m[2] === 'rem' ? 16 : 1);
+    if (!m) { return null; }
+    return Number(m[1]) * (m[2] === 'rem' ? 16 : 1);
   };
   const inline = read(declsOf(el.attrs.style)[prop]);
   if (inline != null) return inline;
@@ -402,7 +427,13 @@ export function anatomyFindings(anatomy, { label = 'the capture' } = {}) {
   const out = [];
   const same = (a, b) => String(a ?? '').replace(/\s+/g, '') === String(b ?? '').replace(/\s+/g, '');
   const clear = (c) => /^rgba\([^)]*,\s*0\)$/.test(String(c ?? '').replace(/\s+/g, '')) || c === 'transparent';
-  for (const a of Array.isArray(anatomy?.alerts) ? anatomy.alerts : []) {
+  alertAnatomyFindings(Array.isArray(anatomy?.alerts) ? anatomy.alerts : [], label, out, same, clear);
+  meterAnatomyFindings(Array.isArray(anatomy?.meters) ? anatomy.meters : [], label, out);
+  return out;
+}
+
+function alertAnatomyFindings(alerts, label, out, same, clear) {
+  for (const a of alerts) {
     const surface = a.surface && !clear(a.surface) ? a.surface : 'rgb(255, 255, 255)';
     if (a.background && !clear(a.background) && !same(a.background, surface)) out.push({ code: DRAW_ALERT_ANATOMY, kind: 'tone-filled Alert', detail: `${label}: ${a.desc ?? 'an Alert'} renders background ${a.background}, not the surface ${surface}` });
     const size = Math.max(Number(a.indicator?.width) || 0, Number(a.indicator?.height) || 0);
@@ -410,7 +441,10 @@ export function anatomyFindings(anatomy, { label = 'the capture' } = {}) {
     if (a.tile) out.push({ code: DRAW_ALERT_ANATOMY, kind: 'IconTile in an Alert', detail: `${label}: ${a.desc ?? 'an Alert'} renders an IconTile` });
     if (a.indicatorColor && a.titleColor && !same(a.indicatorColor, a.titleColor)) out.push({ code: DRAW_ALERT_ANATOMY, kind: 'indicator and title in different tones', detail: `${label}: ${a.desc ?? 'an Alert'} indicator ${a.indicatorColor} vs title ${a.titleColor} - both are the tone's soft-foreground` });
   }
-  for (const m of Array.isArray(anatomy?.meters) ? anatomy.meters : []) {
+}
+
+function meterAnatomyFindings(meters, label, out) {
+  for (const m of meters) {
     const t = m.track;
     if (!t) continue;
     const want = m.segmented || (Array.isArray(m.segments) && m.segments.length > 1) ? METER_SEGMENTED_TRACK_PX : METER_TRACK_PX;
@@ -426,8 +460,22 @@ export function anatomyFindings(anatomy, { label = 'the capture' } = {}) {
       if (Math.max(...gaps) > METER_SEGMENT_GAP_MAX_PX || covered < Number(t.width) * METER_FULL_WIDTH_SHARE) out.push({ code: DRAW_METER_TRACK, kind: 'Meter segments do not fill the track', detail: `${label}: ${m.desc ?? 'a Meter'} segments cover ${Math.round(covered)}px of ${Math.round(t.width)}px with gaps up to ${Math.round(Math.max(...gaps))}px - small gaps, the full width` });
     }
   }
-  return out;
 }
+
+/**
+ * The DNA findings of one render source: [{code, detail, count, examples}]. `proposals` is the Set of proposal names
+ * the drawing's grammar-proposal file(s) declare; `dna` the loaded DNA (loadDna); `assetRequests` the Set of slot ids
+ * its asset-request.md requests (null: not judged).
+ */
+const DNA_FINDING_HELPERS = {
+  ACTION_COMPONENTS, ALERT_INDICATOR_MAX_PX, ASSET_SLOT_ATTR, BADGE_DOT_CLASS, BADGE_DOT_PX, BAR_CLASS, CONTAINERS,
+  DOT_CLASS, DRAW_ALERT_ANATOMY, DRAW_ASSET_SLOT_UNDECLARED, DRAW_METER_TRACK, DRAW_NOTICE_NOT_ALERT, DRAW_OFF_GRAMMAR_COMPONENT, DRAW_RATIO_NOT_METER,
+  METER_FULL_WIDTH_SHARE, METER_SEGMENTED_TRACK_PX, METER_SEGMENTS_PROPOSAL, METER_TRACK_PX, METER_SEGMENT_GAP_MAX_PX, NOTICE_CLASS, OUTCOME_STATES,
+  PART_ATTR, PROPOSAL_ATTR, RATIO_RX, alertActionVariantFor, ancestorsOf, classesOf, componentNameOf, componentRootOf,
+  declaredBackgroundsOf, declaredPx, declsOf, describe, dnaSegment, inComponent, insideSvg, isAction, isArtwork, kebab,
+  mappedSelf, plainPhrasing, presentationStateOf, proposalOf, selectorMatches, segmentedMeter, styleRulesOf,
+  surfaceBackground, textOf, toneOf, walkElements
+};
 
 /**
  * The DNA findings of one render source: [{code, detail, count, examples}]. `proposals` is the Set of proposal names
@@ -439,190 +487,9 @@ export function dnaFindings(html, { dna = loadDna(), proposals = new Set(), labe
   if (!dna) return [{ code: DRAW_OFF_GRAMMAR_COMPONENT, detail: `${label}: no Grammar DNA (knowledge/grammars/<family>/DNA.yaml) to judge it against`, count: 1, examples: [] }];
   const tree = parseHtml(html);
   const all = walkElements(tree).filter(visibleElement);
-  const groups = new Map();
-  const add = (code, kind, el, why) => {
-    const key = `${code}|${kind}`;
-    if (!groups.has(key)) groups.set(key, { code, kind, items: [] });
-    groups.get(key).items.push(describe(el) + (why ? ' (' + why + ')' : ''));
-  };
-
-  // 1. Mapping, names, parts, closed values, proposals.
-  for (const el of all) {
-    if (insideSvg(el)) continue;
-    const name = componentNameOf(el);
-    const part = (el.attrs[PART_ATTR] ?? '').trim();
-    const proposal = (el.attrs[PROPOSAL_ATTR] ?? '').trim();
-    if (!mappedSelf(el)) {
-      if (plainPhrasing(el) && el.parent && el.parent.tag !== '#root') continue;
-      add(DRAW_OFF_GRAMMAR_COMPONENT, 'unmapped element', el, 'no data-grammar-component, data-grammar-part or data-grammar-proposal');
-      continue;
-    }
-    if (name && !dna.components.has(name)) add(DRAW_OFF_GRAMMAR_COMPONENT, 'unknown DNA component', el, `"${name}" is not one of the ${dna.components.size} DNA components`);
-    if (proposal && !proposals.has(proposal) && !proposals.has(proposal.split('.')[0]) && ![...proposals].some((p) => p.toLowerCase() === proposal.toLowerCase())) {
-      add(DRAW_OFF_GRAMMAR_COMPONENT, 'proposal without an entry', el, `data-grammar-proposal="${proposal}" has no complete entry (name, gap, anatomy, tokens, claims, isolated render) in grammar-proposal.md/.yaml`);
-    }
-    if (part && !proposalOf(el)) {
-      const owners = [el, ...ancestorsOf(el)].map(componentNameOf).filter(Boolean).map((n) => dna.components.get(n)).filter(Boolean);
-      const judged = owners.filter((c) => c.parts.size);
-      if (judged.length && judged.length === owners.length && !judged.some((c) => c.parts.has(part))) {
-        add(DRAW_OFF_GRAMMAR_COMPONENT, 'unknown anatomy part', el, `part "${part}" is none of ${[...new Set(judged.map((c) => c.name))].slice(0, 3).join('/')}'s anatomy`);
-      }
-    }
-    const spec = name ? dna.components.get(name) : null;
-    if (spec) {
-      for (const [prop, c] of spec.closed) {
-        const raw = el.attrs[`data-${kebab(prop)}`] ?? el.attrs[`data-grammar-${kebab(prop)}`];
-        if (raw == null || raw === '') continue;
-        const ok = c.values ? c.values.includes(raw) : (() => { if (c.type === 'PresentationState') return Boolean(presentationStateOf(raw)); return true; })();
-        if (!ok) add(DRAW_OFF_GRAMMAR_COMPONENT, 'closed value off DNA', el, `${name} ${prop}="${raw}" is not one of ${c.values ? c.values.join('|') : 'the PresentationState values'}`);
-      }
-    }
-  }
-
-  // 2. Alert: every notice is an Alert with a tone.
-  for (const el of all.filter((e) => componentRootOf(e) === 'Alert')) {
-    const tone = toneOf(el);
-    if (!tone) add(DRAW_NOTICE_NOT_ALERT, 'Alert without a tone', el, 'DNA Alert carries tone (PresentationState): data-tone="warning|success|danger|info|neutral"');
-  }
-  for (const el of all) {
-    if (insideSvg(el)) continue;
-    const name = componentNameOf(el);
-    if (inComponent(el, ['Alert', 'AlertDialog', 'Toast', 'Toaster'])) continue;
-    // A leaf component (Text, Badge, Button ...) is never a notice; a container or a bare box can pose as one.
-    const container = CONTAINERS.has(name);
-    if (!container && !(!name && ['div', 'section', 'aside', 'article'].includes(el.tag))) continue;
-    // A grid or section that holds real Alerts is their wrapper, not a notice of its own.
-    if (walkElements(el).some((d) => componentRootOf(d) === 'Alert')) continue;
-    const role = String(el.attrs.role ?? '').toLowerCase();
-    const reasons = [];
-    if (['alert', 'status', 'alertdialog'].includes(role)) reasons.push(`role=${role}`);
-    if (el.attrs['aria-live'] && el.attrs['aria-live'] !== 'off') reasons.push(`aria-live=${el.attrs['aria-live']}`);
-    const noticeClass = classesOf(el).find((c) => NOTICE_CLASS.test(c));
-    if (noticeClass) reasons.push(`class ${noticeClass}`);
-    const tone = container ? toneOf(el) : null;
-    if (tone && tone.tone !== 'neutral') reasons.push(`a ${tone.raw}-toned ${name}`);
-    if (container) {
-      const tiles = walkElements(el).filter((d) => componentNameOf(d) === 'IconTile' && ancestorsOf(d).find((a) => CONTAINERS.has(componentNameOf(a))) === el);
-      const outcomeTile = tiles.find((t) => OUTCOME_STATES.has(toneOf(t)?.tone));
-      if (outcomeTile && walkElements(el).some(isAction)) reasons.push(`an ${toneOf(outcomeTile).raw}-toned IconTile beside an action`);
-    }
-    if (reasons.length) add(DRAW_NOTICE_NOT_ALERT, 'notice posing as another component', el, `${reasons.join(', ')}: a notice is DNA Alert with tone + alert-actions, never ${name || 'a hand-built box'}`);
-  }
-
-  // 3. Meter: every ratio is one Meter.
-  for (const el of all) {
-    if (insideSvg(el)) continue;
-    const name = componentNameOf(el);
-    const role = String(el.attrs.role ?? '').toLowerCase();
-    const inMeter = inComponent(el, ['Meter']);
-    if ((el.tag === 'meter' || role === 'meter') && !inMeter) add(DRAW_RATIO_NOT_METER, 'meter outside Meter', el, 'a measured ratio renders through DNA Meter');
-    if ((el.tag === 'progress' || role === 'progressbar') && !inMeter && !inComponent(el, ['Progress', 'ProgressCircle', 'Slider'])) add(DRAW_RATIO_NOT_METER, 'hand-made progress', el, 'a hand-built progress bar; a ratio is DNA Meter');
-    if (name === 'Progress' || name === 'ProgressCircle') {
-      const scope = el.parent ?? el;
-      if (RATIO_RX.test(textOf(scope))) add(DRAW_RATIO_NOT_METER, 'ratio as Progress', el, `"${RATIO_RX.exec(textOf(scope))[0]}" is a ratio: Meter, never Progress`);
-    }
-    if (!name && !inMeter && !inComponent(el, ['Progress', 'ProgressCircle', 'Slider', 'Rating']) && classesOf(el).some((c) => BAR_CLASS.test(c))) {
-      const scope = el.parent?.parent ?? el.parent ?? el;
-      if (RATIO_RX.test(textOf(scope))) add(DRAW_RATIO_NOT_METER, 'hand-made bar', el, `a bar beside the ratio "${RATIO_RX.exec(textOf(scope))[0]}": one DNA Meter`);
-    }
-    if (componentRootOf(el) === 'Meter') {
-      // Grammar 0.5.2: a segmented Meter is DNA `Meter segments` - valid when its segments carry the DNA anatomy
-      // (meter-segment part, starci-core-meter-segment class or the data-grammar-meter-segment hook); a hand-cut one fails.
-      const segments = walkElements(el).filter((d) => /segment/i.test(`${d.attrs[PART_ATTR] ?? ''} ${classesOf(d).join(' ')}`));
-      const handCut = segments.filter((d) => !dnaSegment(d) && (d.attrs[PROPOSAL_ATTR] ?? '').trim() !== METER_SEGMENTS_PROPOSAL);
-      if (handCut.length) add(DRAW_RATIO_NOT_METER, 'hand-segmented Meter', el, 'a segmented Meter is DNA Meter segments (2..12): its segments carry data-grammar-part="meter-segment", never hand-cut bars');
-      const meterEl = [el, ...walkElements(el)].find((d) => d.tag === 'meter' || String(d.attrs.role ?? '').toLowerCase() === 'meter');
-      if (!meterEl) add(DRAW_RATIO_NOT_METER, 'Meter without role=meter', el, 'one role=meter (or <meter>) carries the value (DNA claims A11Y-3)');
-      else if (meterEl.tag !== 'meter' && (meterEl.attrs['aria-valuenow'] == null || meterEl.attrs['aria-valuemax'] == null)) add(DRAW_RATIO_NOT_METER, 'Meter without its value', meterEl, 'role=meter needs aria-valuenow and aria-valuemax');
-    }
-  }
-
-  // 4. The real HeroUI Alert: white surface, small toned glyph left of the title, DNA actions only.
-  const rules = styleRulesOf(tree);
-  for (const el of all.filter((e) => componentRootOf(e) === 'Alert')) {
-    const bg = declaredBackgroundsOf(el, rules).find((b) => !surfaceBackground(b.value));
-    if (bg) add(DRAW_ALERT_ANATOMY, 'tone-filled Alert', el, `${bg.via} sets background ${bg.value}: the HeroUI Alert is bg-surface (white) with shadow-surface - its tone lives in the indicator glyph and the title, never a fill`);
-    const inside = walkElements(el).filter((d) => !ancestorsOf(d).slice(0, ancestorsOf(d).indexOf(el)).some((a) => componentRootOf(a) === 'Alert'));
-    const tone = toneOf(el);
-    const wanted = tone ? alertActionVariantFor(tone.tone) : null;
-    for (const tile of inside.filter((d) => componentNameOf(d) === 'IconTile')) add(DRAW_ALERT_ANATOMY, 'IconTile in an Alert', tile, 'an Alert carries no IconTile: its indicator is the HeroUI size-4 glyph (alert__indicator)');
-    const partOf = (d) => (d.attrs[PART_ATTR] ?? '').trim();
-    const indicator = inside.find((d) => ['alert-indicator', 'indicator'].includes(partOf(d)));
-    const title = inside.find((d) => ['alert-title', 'title', 'alert-content', 'content'].includes(partOf(d)));
-    if (indicator) {
-      const px = Math.max(declaredPx(indicator, 'width') ?? 0, declaredPx(indicator, 'height') ?? 0, ...walkElements(indicator).map((d) => Math.max(declaredPx(d, 'width') ?? 0, declaredPx(d, 'height') ?? 0)));
-      if (px >= ALERT_INDICATOR_MAX_PX) add(DRAW_ALERT_ANATOMY, 'Alert indicator as a tile', indicator, `the indicator declares ${px}px: the HeroUI indicator is a size-4 glyph with p-1, under ${ALERT_INDICATOR_MAX_PX}px`);
-    }
-    if (title && !indicator) add(DRAW_ALERT_ANATOMY, 'Alert without its indicator', el, 'the HeroUI Alert shows its tone glyph (alert-indicator) on the left of the title');
-    if (title && indicator && (inside.indexOf(indicator) > inside.indexOf(title) || walkElements(title).includes(indicator))) add(DRAW_ALERT_ANATOMY, 'Alert indicator not left of the title', indicator, 'the indicator is the first item of the Alert row, left of the content (title, description)');
-    for (const d of inside) {
-      const name = componentNameOf(d);
-      const interactive = d.tag === 'button' || (d.tag === 'a' && d.attrs.href != null) || String(d.attrs.role ?? '').toLowerCase() === 'button';
-      if (interactive && !ACTION_COMPONENTS.has(name) && !inComponent(d, [...ACTION_COMPONENTS])) add(DRAW_ALERT_ANATOMY, 'hand-made Alert action', d, `an Alert action is the grammar Button (variant="${wanted ?? 'secondary'}" for this tone, as the grammar Alert renders it), never a hand-built control`);
-      if (name === 'Button') {
-        const allowed = dna.components.get('Button')?.closed.get('variant')?.values;
-        const vendor = classesOf(d).map((c) => /^button--([a-z-]+)$/.exec(c)?.[1]).find((v) => v && (!allowed || allowed.includes(v)));
-        const variant = d.attrs['data-variant'] ?? d.attrs['data-grammar-variant'] ?? vendor;
-        const toneWord = tone ? `${tone.raw} (${tone.tone})` : '';
-        if (variant != null && allowed && !allowed.includes(variant)) add(DRAW_ALERT_ANATOMY, 'Alert action variant off DNA', d, `Button variant="${variant}" is not one of ${allowed.join('|')}; the Alert action is variant="${wanted ?? 'secondary'}"`);
-        else if (variant != null && wanted && variant !== wanted) add(DRAW_ALERT_ANATOMY, 'Alert action variant off its tone', d, `a ${toneWord} Alert's action is Button variant="${wanted}" (grammar Alert 0.5.3, after HeroUI: informative -> primary, negative -> danger, else secondary), not "${variant}"`);
-      }
-    }
-  }
-
-  // 5. Meter track: HeroUI h-2 (segmented: h-1), the full width of its band, never a stub.
-  for (const el of all.filter((e) => componentRootOf(e) === 'Meter')) {
-    const tracks = walkElements(el).filter((d) => /(^|-)track$/.test((d.attrs[PART_ATTR] ?? '').trim()) || classesOf(d).some((c) => /(^|[-_])track$/.test(c)));
-    const want = segmentedMeter(el) ? METER_SEGMENTED_TRACK_PX : METER_TRACK_PX;
-    for (const t of tracks) {
-      const h = declaredPx(t, 'height', rules);
-      if (h != null && Math.abs(h - want) > 0.5) add(DRAW_METER_TRACK, 'Meter track off its height', t, 'the track declares ' + h + 'px: the ' + (want === METER_TRACK_PX ? 'HeroUI Meter track is h-2 (' + METER_TRACK_PX + 'px)' : 'segmented Meter track is h-1 (' + METER_SEGMENTED_TRACK_PX + 'px)'));
-    }
-    for (const d of [el, ...tracks]) {
-      const w = declaredPx(d, 'width', rules) ?? declaredPx(d, 'max-width', rules);
-      if (w != null) add(DRAW_METER_TRACK, 'Meter as a stub', d, `a fixed ${w}px width: the Meter track spans the full width of its band (w-full), its segments dividing that width equally`);
-    }
-  }
-
-  // 6. Artwork is an interface.asset slot, never reused ad hoc.
-  for (const el of all) {
-    if (insideSvg(el) || !isArtwork(el)) continue;
-    const slotEl = [el, ...ancestorsOf(el)].find((a) => (a.attrs?.[ASSET_SLOT_ATTR] ?? '').trim());
-    if (!slotEl) { add(DRAW_ASSET_SLOT_UNDECLARED, 'artwork without an asset slot', el, `mark it ${ASSET_SLOT_ATTR}="<id>" (a placeholder is fine) and request it in asset-request.md: interface.asset owes the artwork, never a reused file`); continue; }
-    const id = slotEl.attrs[ASSET_SLOT_ATTR].trim();
-    if (assetRequests && !assetRequests.has(id)) add(DRAW_ASSET_SLOT_UNDECLARED, 'asset slot without a request', slotEl, `${ASSET_SLOT_ATTR}="${id}" has no entry in the drawing's asset-request.md`);
-  }
-
-  // 7. A status dot is the Badge's own DNA dot (grammar 0.5.3 Badge isDot: HeroUI's <CircleFill width={6} />, a 6px
-  // solid circle in the tone colour, class starci-core-badge-dot) - never a hand-made dot span, never a halo or ring.
-  for (const el of all) {
-    if (insideSvg(el)) continue;
-    const part = (el.attrs[PART_ATTR] ?? '').trim();
-    const cls = classesOf(el);
-    const dotLike = /(^|-)dot$/.test(part) || cls.some((c) => DOT_CLASS.test(c));
-    if (!dotLike) continue;
-    const dnaDot = ['badge-dot', 'dot'].includes(part) || cls.includes(BADGE_DOT_CLASS);
-    const inBadge = inComponent(el, ['Badge']);
-    if (!dnaDot || !inBadge) {
-      add(DRAW_OFF_GRAMMAR_COMPONENT, 'hand-made status dot', el, `a status dot is DNA Badge isDot (data-grammar-part="badge-dot" / ${BADGE_DOT_CLASS} inside a Badge), never a hand-drawn dot`);
-      continue;
-    }
-    const inline = declsOf(el.attrs.style);
-    const ruled = rules.filter((r) => selectorMatches(r.selector, el)).map((r) => r.decls);
-    const ring = [inline, ...ruled].some((d) => ['box-shadow', 'outline', 'border'].some((k) => d[k] && !/^(none|0|0px)$/i.test(d[k].trim())))
-      || cls.some((c) => /^(ring|shadow|outline)(-|$)/.test(c) && !/^(ring|shadow|outline)-none$/.test(c));
-    if (ring) add(DRAW_OFF_GRAMMAR_COMPONENT, 'Badge dot with a halo', el, 'the Badge dot is a plain 6px solid circle in the tone colour: no box-shadow, ring, outline or border halo');
-    const px = Math.max(declaredPx(el, 'width', rules) ?? 0, declaredPx(el, 'height', rules) ?? 0, Number(el.attrs.width) || 0, Number(el.attrs.height) || 0);
-    if (px && Math.abs(px - BADGE_DOT_PX) > 0.5) add(DRAW_OFF_GRAMMAR_COMPONENT, 'Badge dot off its size', el, `the dot declares ${px}px: the Badge dot is ${BADGE_DOT_PX}px (<CircleFill width={6} />), no size variants`);
-  }
-
-  for (const g of groups.values()) {
-    out.push({ code: g.code, kind: g.kind, count: g.items.length, examples: g.items.slice(0, 8),
-      detail: label + ': ' + g.items.length + ' ' + g.kind + (g.items.length > 1 ? 's' : '') + ' - ' + g.items.slice(0, 4).join('; ') + (g.items.length > 4 ? ' (+' + (g.items.length - 4) + ')' : '') });
-  }
+  out.push(...appendDnaFindings({ all, dna, proposals, label, assetRequests, tree, helpers: DNA_FINDING_HELPERS }));
   return out;
 }
-
 /** The grammar-proposal files that belong to a render source: grammar-proposal.{md,yaml,yml} beside it and in `dirs`. */
 export function proposalFilesFor(htmlFile, dirs = []) {
   const out = [];

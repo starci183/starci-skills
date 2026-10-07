@@ -122,19 +122,32 @@ const reportShapeError = (report, run) => {
 };
 
 /** The assertion and suite tallies of a valid report: {totals, suites}, or {error}. */
+const suiteShapeError = (suite) => !suite || !['passed', 'failed', 'skipped', 'focused'].includes(suite.status) || !Array.isArray(suite.assertionResults)
+  ? 'jest wrote an invalid suite result' : null;
+
+const focusedSuiteError = (suite, report) => suite.status === 'focused'
+  && (report.numPendingTests === 0 || !suite.assertionResults.some(a => ['pending', 'skipped', 'disabled'].includes(a?.status)))
+  ? 'jest focused suite reports no pending assertion' : null;
+
+const tallyAssertion = (assertion, totals) => {
+  if (assertion?.status === 'passed') totals.passed += 1;
+  else if (assertion?.status === 'failed') totals.failed += 1;
+  else if (['pending', 'todo', 'skipped', 'disabled'].includes(assertion?.status)) totals.skipped += 1;
+  else return 'jest wrote an invalid assertion result';
+  return null;
+};
+
 const tallySuites = (report) => {
   const totals = { passed: 0, failed: 0, skipped: 0 }, suites = { passed: 0, failed: 0, skipped: 0 };
   for (const suite of report.testResults) {
-    if (!suite || !['passed', 'failed', 'skipped', 'focused'].includes(suite.status) || !Array.isArray(suite.assertionResults))
-      return { error: 'jest wrote an invalid suite result' };
-    if (suite.status === 'focused' && (report.numPendingTests === 0 || !suite.assertionResults.some(a => ['pending', 'skipped', 'disabled'].includes(a?.status))))
-      return { error: 'jest focused suite reports no pending assertion' };
+    const shapeError = suiteShapeError(suite);
+    if (shapeError) return { error: shapeError };
+    const focusedError = focusedSuiteError(suite, report);
+    if (focusedError) return { error: focusedError };
     suites[suite.status === 'focused' ? 'passed' : suite.status] += 1;
     for (const assertion of suite.assertionResults) {
-      if (assertion?.status === 'passed') totals.passed += 1;
-      else if (assertion?.status === 'failed') totals.failed += 1;
-      else if (['pending', 'todo', 'skipped', 'disabled'].includes(assertion?.status)) totals.skipped += 1;
-      else return { error: 'jest wrote an invalid assertion result' };
+      const assertionError = tallyAssertion(assertion, totals);
+      if (assertionError) return { error: assertionError };
     }
   }
   return { totals, suites };

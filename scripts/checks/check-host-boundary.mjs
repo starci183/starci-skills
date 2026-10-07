@@ -100,20 +100,25 @@ const IMPORTS_RUNNER=/import\s*\{[^}]*\b(?:ORCA|orcaRun|orcaCall)\b[^}]*\}\s*fro
 // (a) code: one place builds orca's argv. Who may spawn orca in the runtime's production source is RT_EXTERNAL_OWNER's
 // rule (ruleParams.runtime.sourceRoots of knowledge/hfs/runtime-slots.yaml); the roots it does not read (tests/, packages/,
 // modules/, init/) are read here with the same AST reading. A tree without a runtime manifest is read whole.
+const spawnFileScan = (root, file, layerScan, flag) => {
+  const relative = rel(root, file);
+  if (relative.startsWith(`${WRAPPER_DIR}/`)) return;
+  const text = fs.readFileSync(file, 'utf8');
+  if (!layerScan.some((dir) => relative === dir || relative.startsWith(`${dir}/`))) {
+    for (const call of spawnCalls(text, file).calls) {
+      if (call.programs.includes('orca')) flag(file, call.line, 'spawns-orca', `spawns orca outside ${WRAPPER_DIR}/ — call the verb's wrapper`);
+    }
+  }
+  const lines = text.split(/\r?\n/);
+  lines.forEach((line, i) => {
+    if (IMPORTS_RUNNER.test(line)) flag(file, i + 1, 'imports-runner', `imports the Orca runner outside ${WRAPPER_DIR}/ — call the verb's wrapper`);
+  });
+};
+
 const spawnScan=(root,layerScan,flag)=>{
   for(const dir of CODE_ROOTS){
     for(const file of walk(path.join(root,dir),f=>f.endsWith('.mjs'))){
-      const relative=rel(root,file);
-      if(relative.startsWith(`${WRAPPER_DIR}/`))continue;
-      const text=fs.readFileSync(file,'utf8');
-      if(!layerScan.some(d=>relative===d||relative.startsWith(`${d}/`)))
-        for(const call of spawnCalls(text,file).calls)
-          if(call.programs.includes('orca'))flag(file,call.line,'spawns-orca',`spawns orca outside ${WRAPPER_DIR}/ — call the verb's wrapper`);
-      const lines=text.split(/\r?\n/);
-      lines.forEach((line,i)=>{
-        if(IMPORTS_RUNNER.test(line))
-          flag(file,i+1,'imports-runner',`imports the Orca runner outside ${WRAPPER_DIR}/ — call the verb's wrapper`);
-      });
+      spawnFileScan(root,file,layerScan,flag);
     }
   }
 };

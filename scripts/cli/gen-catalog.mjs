@@ -75,15 +75,15 @@ const renderCompletions = (cat) => {
   const topLevel = [...groups, 'help', 'completion', ...globalCommands];
   const flagsOf = (verb) => [...(verb.flags ?? []), ...cat.global.flags];
   const flagNamesOf = (verb) => flagsOf(verb).map((flag) => `--${flag.name}`);
-  const SHELL_ESCAPED_QUOTE = String.fromCharCode(39, 92, 39, 39);
+  const SHELL_ESCAPED_QUOTE = String.fromCodePoint(39, 92, 39, 39);
   const shellQuote = (value) => `'${String(value).replaceAll("'", SHELL_ESCAPED_QUOTE)}'`;
   const psQuote = (value) => `'${String(value).replaceAll("'", "''")}'`;
   const psArray = (values) => `@(${values.map(psQuote).join(',')})`;
-  const BACKSLASH = String.fromCharCode(92);
+  const BACKSLASH = String.fromCodePoint(92);
   const DOUBLE_BACKSLASH = BACKSLASH + BACKSLASH;
   const ESCAPED_DOUBLE_QUOTE = BACKSLASH + '"';
   const ESCAPED_DOLLAR = BACKSLASH + '$';
-  const ESCAPED_BACKTICK = String.fromCharCode(92, 96);
+  const ESCAPED_BACKTICK = String.fromCodePoint(92, 96);
   const bashWords = (values) => String(values.join(' ')).replaceAll(BACKSLASH, DOUBLE_BACKSLASH).replaceAll('"', ESCAPED_DOUBLE_QUOTE).replaceAll('$', ESCAPED_DOLLAR).replaceAll('`', ESCAPED_BACKTICK);
   const zshDescription = (value) => String(value ?? '').replaceAll('[', '').replaceAll(']', '').replace(/[\r\n]+/g, ' ');
   const groupVerbs = cat.groups.map((group) => [group.group, group.verbs.map((verb) => verb.verb)]);
@@ -101,7 +101,7 @@ const renderCompletions = (cat) => {
   const bashLocalValueCases = commands.flatMap(({ group, verb }) => (verb.flags ?? []).filter((flag) => flag.type !== 'boolean').map((flag) => flag.type === 'enum'
     ? `        ${group}:${verb.verb}:--${flag.name}) COMPREPLY=( $(compgen -W "${bashWords(flag.enum ?? [])}" -- "$cur") ); return 0;;`
     : `        ${group}:${verb.verb}:--${flag.name}) return 0;;`)).join('\n');
-  const bash = String.raw`# ${GENERATED}
+  const bash = `# ${GENERATED}
 _starci() {
     local cur prev group verb
     COMPREPLY=()
@@ -203,7 +203,6 @@ _starci "$@"
 `;
   return zsh;
   })();
-  const fish = (() => {
   const fishLines = [`# ${GENERATED}`, `function __starci_needs_group
     set -l words (commandline -opc)
     test (count $words) -eq 1
@@ -216,32 +215,28 @@ end`, `function __starci_using_command --argument-names group verb
     test (count $words) -ge 3
     and test "$words[2]" = "$group"
     and test "$words[3]" = "$verb"
-end`];
-  for (const group of cat.groups) fishLines.push(`complete -c starci -n '__starci_needs_group' -a ${shellQuote(group.group)} -d ${shellQuote(group.summary ?? '')}`);
-  fishLines.push(`complete -c starci -n '__starci_needs_group' -a 'help' -d 'show top-level help'`, `complete -c starci -n '__starci_needs_group' -a 'completion' -d 'print a shell completion script'`);
-  if (globalCommands.includes('explain')) fishLines.push(`complete -c starci -n '__starci_needs_group' -a 'explain' -d 'show a verb contract'`);
-  for (const group of cat.groups) for (const verb of group.verbs) fishLines.push(`complete -c starci -n '__starci_needs_verb ${group.group}' -a ${shellQuote(verb.verb)} -d ${shellQuote(verb.summary ?? '')}`);
-  for (const shell of completionShells) fishLines.push(`complete -c starci -n '__starci_needs_verb completion' -a ${shellQuote(shell)}`);
-  if (globalCommands.includes('explain')) {
-    for (const group of cat.groups) {
-      fishLines.push(`complete -c starci -n '__starci_needs_verb explain' -a ${shellQuote(group.group)} -d ${shellQuote(group.summary ?? '')}`);
-    }
-  }
-  for (const { group, verb } of commands) for (const flag of verb.flags ?? []) {
-    const required = flag.type === 'boolean' ? '' : ' -r';
-    const choices = flag.type === 'enum' ? ` -a ${shellQuote((flag.enum ?? []).join(' '))}` : '';
-    const description = flag.summary ? ` -d ${shellQuote(flag.summary)}` : '';
-    fishLines.push(`complete -c starci -n '__starci_using_command ${group} ${verb.verb}' -l ${flag.name}${required}${choices}${description}`);
-  }
-  for (const flag of cat.global.flags) {
-    const required = flag.type === 'boolean' ? '' : ' -r';
-    const choices = flag.type === 'enum' ? ` -a ${shellQuote((flag.enum ?? []).join(' '))}` : '';
-    const description = flag.summary ? ` -d ${shellQuote(flag.summary)}` : '';
-    fishLines.push(`complete -c starci -l ${flag.name}${required}${choices}${description}`);
-  }
+end`,
+    ...cat.groups.map((group) => `complete -c starci -n '__starci_needs_group' -a ${shellQuote(group.group)} -d ${shellQuote(group.summary ?? '')}`),
+    `complete -c starci -n '__starci_needs_group' -a 'help' -d 'show top-level help'`,
+    `complete -c starci -n '__starci_needs_group' -a 'completion' -d 'print a shell completion script'`,
+    ...(globalCommands.includes('explain') ? [`complete -c starci -n '__starci_needs_group' -a 'explain' -d 'show a verb contract'`] : []),
+    ...cat.groups.flatMap((group) => group.verbs.map((verb) => `complete -c starci -n '__starci_needs_verb ${group.group}' -a ${shellQuote(verb.verb)} -d ${shellQuote(verb.summary ?? '')}`)),
+    ...completionShells.map((shell) => `complete -c starci -n '__starci_needs_verb completion' -a ${shellQuote(shell)}`),
+    ...(globalCommands.includes('explain') ? cat.groups.map((group) => `complete -c starci -n '__starci_needs_verb explain' -a ${shellQuote(group.group)} -d ${shellQuote(group.summary ?? '')}`) : []),
+    ...commands.flatMap(({ group, verb }) => (verb.flags ?? []).map((flag) => {
+      const required = flag.type === 'boolean' ? '' : ' -r';
+      const choices = flag.type === 'enum' ? ` -a ${shellQuote((flag.enum ?? []).join(' '))}` : '';
+      const description = flag.summary ? ` -d ${shellQuote(flag.summary)}` : '';
+      return `complete -c starci -n '__starci_using_command ${group} ${verb.verb}' -l ${flag.name}${required}${choices}${description}`;
+    })),
+    ...cat.global.flags.map((flag) => {
+      const required = flag.type === 'boolean' ? '' : ' -r';
+      const choices = flag.type === 'enum' ? ` -a ${shellQuote((flag.enum ?? []).join(' '))}` : '';
+      const description = flag.summary ? ` -d ${shellQuote(flag.summary)}` : '';
+      return `complete -c starci -l ${flag.name}${required}${choices}${description}`;
+    }),
+  ];
   const fish = fishLines.join('\n') + '\n';
-  return fish;
-  })();
   const ps = (() => {
   const psVerbs = [
     ...groupVerbs.map(([group, verbs]) => `        ${psQuote(group)} = ${psArray(verbs)}`),

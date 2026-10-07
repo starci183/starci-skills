@@ -192,6 +192,28 @@ function holdLine(h, { now = Date.now(), language = ownerLanguage() } = {}) {
     + (h.workerReleased ? tr(', worker released') : '');
 }
 
+function appendActiveLines(line, active, now, language, tr) {
+  for (const l of active) line.push(`${tr('🔄 In progress: <b>{op}</b>', { op: escapeHtml(legLabel(l.op, language)) })}${l.rework ? tr(' (rework)') : ''}${l.count > 1 ? tr(' — {count} ops in parallel', { count: l.count }) : ''}${l.since ? tr(', running for {ago}', { ago: escapeHtml(dur(now - l.since, tr)) }) : ''}`);
+}
+
+function appendAskLines(line, asks, language, tr) {
+  for (const a of asks.filter((ask) => ask.askClass !== 'credential')) {
+    const answer = tr('❓ Waiting on your answer ({op}): {text}', { op: escapeHtml(legLabel(a.op, language)), text: escapeHtml(a.text) });
+    const link = a.link ? `\n   ${escapeHtml(a.link)}` : `\n   ${tr('(press /asks for an answer link)')}`;
+    line.push(`${answer}${link}`);
+  }
+}
+
+function appendBlockingLines(line, blocking, now, language, tr) {
+  for (const b of blocking ?? []) line.push(`${tr('⛓ Blocking other workflows: <b>{op}</b> ({jobId}) — {count} workflow(s) waiting ({workflows}), for {ago}', { op: escapeHtml(legLabel(b.op, language)), jobId: escapeHtml(b.jobId), count: b.workflows.length, workflows: escapeHtml(b.workflows.join(', ')), ago: escapeHtml(dur(now - b.since, tr)) })}${b.status === 'queued' ? tr(', not yet dispatched') : ''}`);
+}
+
+function etaLine(r, tr) {
+  if (r.etaAt == null) return tr('🕒 ETA: cannot estimate yet (no leg done)');
+  if (r.etaMs <= 0) return tr('🕒 All legs done, waiting for handover');
+  return tr('🕒 ETA: ~{dur} more (around {etaAt}), at the pace since it started ({startedAt})', { dur: escapeHtml(dur(r.etaMs, tr)), etaAt: escapeHtml(clock(r.etaAt)), startedAt: escapeHtml(clock(r.startedAt)) });
+}
+
 /** One readable section for one workflow (HTML). */
 export function workflowSection(r, { now = Date.now(), language = ownerLanguage() } = {}) {
   const tr = translator(language);
@@ -204,25 +226,17 @@ export function workflowSection(r, { now = Date.now(), language = ownerLanguage(
   const failed = r.legs.filter((l) => l.state === 'failed').map((l) => legLabel(l.op, language));
   const todo = r.legs.filter((l) => l.state === 'todo').map((l) => legLabel(l.op, language));
   if (doneLegs.length) line.push(tr('✅ Done: {legs}', { legs: escapeHtml(doneLegs.join(', ')) }));
-  for (const l of active) line.push(`${tr('🔄 In progress: <b>{op}</b>', { op: escapeHtml(legLabel(l.op, language)) })}${l.rework ? tr(' (rework)') : ''}${l.count > 1 ? tr(' — {count} ops in parallel', { count: l.count }) : ''}${l.since ? tr(', running for {ago}', { ago: escapeHtml(dur(now - l.since, tr)) }) : ''}`);
+  appendActiveLines(line, active, now, language, tr);
   if (queued.length) line.push(tr('⏳ Waiting its turn: {legs}', { legs: escapeHtml(queued.join(', ')) }));
   if (failed.length) line.push(tr('⚠️ The last run failed; the kernel will retry: {legs}', { legs: escapeHtml(failed.join(', ')) }));
   if (todo.length) line.push(tr('⬜ Remaining: {legs}', { legs: escapeHtml(todo.join(' → ')) }));
   if (r.lastReport) line.push(tr('📝 Latest report ({op}, {outcome}, {at}): {summary}', { op: escapeHtml(legLabel(r.lastReport.op, language)), outcome: escapeHtml(outcomeText(r.lastReport.outcome, tr)), at: escapeHtml(clock(r.lastReport.at)), summary: escapeHtml(r.lastReport.summary) }));
-  for (const a of r.asks.filter((ask) => ask.askClass !== 'credential')) {
-    const answer = tr('❓ Waiting on your answer ({op}): {text}', { op: escapeHtml(legLabel(a.op, language)), text: escapeHtml(a.text) });
-    const link = a.link ? `\n   ${escapeHtml(a.link)}` : `\n   ${tr('(press /asks for an answer link)')}`;
-    line.push(`${answer}${link}`);
-  }
+  appendAskLines(line, r.asks, language, tr);
   for (const h of r.holds ?? []) line.push(holdLine(h, { now, language }));
   for (const g of r.ownerGates) line.push(tr('🔒 Waiting on you: {gate}', { gate: escapeHtml(g) }));
-  for (const b of r.blocking ?? []) line.push(`${tr('⛓ Blocking other workflows: <b>{op}</b> ({jobId}) — {count} workflow(s) waiting ({workflows}), for {ago}', { op: escapeHtml(legLabel(b.op, language)), jobId: escapeHtml(b.jobId), count: b.workflows.length, workflows: escapeHtml(b.workflows.join(', ')), ago: escapeHtml(dur(now - b.since, tr)) })}${b.status === 'queued' ? tr(', not yet dispatched') : ''}`);
+  appendBlockingLines(line, r.blocking, now, language, tr);
   if (r.runtime.length) line.push(tr('🐞 Open runtime defects: {count} (the supervisor is on them)', { count: r.runtime.length }));
-  let eta;
-  if (r.etaAt == null) eta = tr('🕒 ETA: cannot estimate yet (no leg done)');
-  else if (r.etaMs <= 0) eta = tr('🕒 All legs done, waiting for handover');
-  else eta = tr('🕒 ETA: ~{dur} more (around {etaAt}), at the pace since it started ({startedAt})', { dur: escapeHtml(dur(r.etaMs, tr)), etaAt: escapeHtml(clock(r.etaAt)), startedAt: escapeHtml(clock(r.startedAt)) });
-  line.push(eta);
+  line.push(etaLine(r, tr));
   return line.join('\n');
 }
 

@@ -544,9 +544,9 @@ export function wakeDeliveryOf({ before = '', after = '', text = '', stagedPatte
     && occurrences(screenProse(after), probe) > occurrences(screenProse(before), probe);
   const queuedMarker = QUEUED_MESSAGE_MARKER.test(String(after ?? ''));
   const screenState = classifyAgentScreen(after, { stagedPattern, sentText: text || null }).state;
-  const delivery = screenState === 'staged-input' ? 'staged'
-    : queuedMarker && (wakeVisible || !QUEUED_MESSAGE_MARKER.test(String(before ?? ''))) ? 'queued'
-    : wakeVisible ? 'delivered'
-    : 'unproven';
+  let delivery = 'unproven';
+  if (screenState === 'staged-input') delivery = 'staged';
+  else if (queuedMarker && (wakeVisible || !QUEUED_MESSAGE_MARKER.test(String(before ?? '')))) delivery = 'queued';
+  else if (wakeVisible) delivery = 'delivered';
   return { delivery, wakeVisible, queuedMarker, screenState };
 }

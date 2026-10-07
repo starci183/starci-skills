@@ -108,6 +108,32 @@ function renderReceiptsNear(files) {
   return out;
 }
 
+function liveAssetFindings(a, { recordDir, repo, drawRendered, shapes, shapeStates, record }) {
+  const findings = [];
+  if (!DRAWING_ROLES.has(a.role)) {
+    // A raster region is legal only beside a live token-rendered drawing.
+    if (a.generation?.tool === RASTER_TOOL && !drawRendered.length) {
+      findings.push({ code: DRAW_ASSET_NOT_TOKEN_RENDERED, path: slash(path.join(path.relative(repo, recordDir), a.path)), detail: `${a.path} is an image_gen.imagegen image in a record with no draw-render drawing: nothing token-rendered embeds it` });
+    }
+    return findings;
+  }
+  const at = slash(path.join(path.relative(repo, recordDir), a.path));
+  if (a.generation?.tool !== DRAW_TOOL) {
+    const receipt = a.generation?.tool ? `generation.tool ${a.generation.tool}` : 'no generation receipt';
+    findings.push({ code: DRAW_ASSET_NOT_TOKEN_RENDERED, path: at, detail: `${a.path} (${a.role}) is a live drawing with ${receipt}: a drawing is token-rendered by draw-render; redraw the shape through draw-render and retire this file (retired: ${RETIRED_IMAGE_GEN}); it is kept, never deleted` });
+  }
+  const state = assetStateOf(record, a);
+  if (shapes.length && state && !shapeStates.has(state) && !dataStatusOf(state)) {
+    findings.push({ code: DRAW_NOT_SHAPES, path: at, detail: `${a.path} draws "${state}", which is none of the record's ui.shapes states` });
+  }
+  return findings;
+}
+
+function coverageDrawingFindings(d, { recordDir, repo, tokenRendered, live }) {
+  if (d.via !== 'coverage.map' || tokenRendered.has(slash(path.resolve(recordDir, d.path))) || live.some((a) => slash(a.path) === d.path)) return [];
+  return [{ code: DRAW_ASSET_NOT_TOKEN_RENDERED, path: slash(path.join(path.relative(repo, recordDir), d.path)), detail: `coverage.map names ${d.path} as the drawing of "${d.state}" but the record carries no draw-render receipt for it` }];
+}
+
 /** Findings for one ui record: [{code, path, detail}] and whether it holds a token-rendered drawing or is recipe-rendered. */
 function judgeRecord(recordDir, repo) {
   const index = path.join(recordDir, 'index.yaml');
@@ -123,29 +149,10 @@ function judgeRecord(recordDir, repo) {
   const live = assetsOf(record).filter((a) => !a.retired && a.selected !== false);
   const drawRendered = live.filter((a) => a.generation?.tool === DRAW_TOOL);
   const tokenRendered = new Set(drawRendered.map((a) => slash(path.resolve(recordDir, a.path))));
-  for (const a of live) {
-    if (!DRAWING_ROLES.has(a.role)) {
-      // A raster region is legal only beside a live token-rendered drawing.
-      if (a.generation?.tool === RASTER_TOOL && !drawRendered.length) {
-        findings.push({ code: DRAW_ASSET_NOT_TOKEN_RENDERED, path: slash(path.join(path.relative(repo, recordDir), a.path)), detail: `${a.path} is an image_gen.imagegen image in a record with no draw-render drawing: nothing token-rendered embeds it` });
-      }
-      continue;
-    }
-    const at = slash(path.join(path.relative(repo, recordDir), a.path));
-    if (a.generation?.tool !== DRAW_TOOL) {
-      const receipt = a.generation?.tool ? `generation.tool ${a.generation.tool}` : 'no generation receipt';
-      findings.push({ code: DRAW_ASSET_NOT_TOKEN_RENDERED, path: at, detail: `${a.path} (${a.role}) is a live drawing with ${receipt}: a drawing is token-rendered by draw-render; redraw the shape through draw-render and retire this file (retired: ${RETIRED_IMAGE_GEN}); it is kept, never deleted` });
-    }
-    const state = assetStateOf(record, a);
-    if (shapes.length && state && !shapeStates.has(state) && !dataStatusOf(state)) {
-      findings.push({ code: DRAW_NOT_SHAPES, path: at, detail: `${a.path} draws "${state}", which is none of the record's ui.shapes states` });
-    }
-  }
-  for (const d of drawingsOf(record)) {
-    if (d.via === 'coverage.map' && !tokenRendered.has(slash(path.resolve(recordDir, d.path))) && !live.some((a) => slash(a.path) === d.path)) {
-      findings.push({ code: DRAW_ASSET_NOT_TOKEN_RENDERED, path: slash(path.join(path.relative(repo, recordDir), d.path)), detail: `coverage.map names ${d.path} as the drawing of "${d.state}" but the record carries no draw-render receipt for it` });
-    }
-  }
+  const assetContext = { recordDir, repo, drawRendered, shapes, shapeStates, record };
+  for (const a of live) findings.push(...liveAssetFindings(a, assetContext));
+  const drawingContext = { recordDir, repo, tokenRendered, live };
+  for (const d of drawingsOf(record)) findings.push(...coverageDrawingFindings(d, drawingContext));
   findings.push(...drawQualityFindings(recordDir, record, repo));
   return { record, findings, drawn: drawRendered.some((a) => DRAWING_ROLES.has(a.role)), recipe: false, tokenRendered };
 }
@@ -159,6 +166,12 @@ function judgeEvidence(abs, doc, repo) {
     findings.push({ code: DRAW_ASSET_NOT_TOKEN_RENDERED, path: rel, detail: `${rel} asserts ${IMAGEGEN_ASSERTION}: the drawing proof is render-provenance (a draw-render capture), never an image-gen invocation` });
   }
   const entries = [...list(doc?.draws).map((e) => ['draws', e]), ...list(doc?.selectedMatrix?.cells).map((e) => ['selectedMatrix.cells', e])];
+  findings.push(...evidenceEntryFindings(entries, rel));
+  return findings;
+}
+
+function evidenceEntryFindings(entries, rel) {
+  const findings = [];
   for (const [where, e] of entries) {
     // An entry marked retired is kept proof of an earlier draw, never a drawing of this pass.
     if (!e || typeof e !== 'object' || e.retired) continue;
@@ -203,7 +216,10 @@ export function ownerOf(judged, abs) {
   const p = slash(path.resolve(abs)).toLowerCase();
   let best = null;
   for (const r of judged) {
-    const dir = slash(path.resolve(r.dir)).toLowerCase().replace(/\/+$/, '');
+    const rawDir = slash(path.resolve(r.dir)).toLowerCase();
+    let end = rawDir.length;
+    while (end > 0 && rawDir[end - 1] === '/') end -= 1;
+    const dir = rawDir.slice(0, end);
     if (p.startsWith(`${dir}/`) && (!best || dir.length > best.len)) best = { r, len: dir.length };
   }
   return best?.r ?? null;
@@ -225,6 +241,29 @@ const walkImages = (dir, out, depth = 0) => {
  * Returns {ok, findings:[{code, path, detail}], records:[repo-relative index paths], drawn:boolean}.
  */
 export function drawAcceptanceFindings({ repo, files }) {
+  const { unique, named } = acceptanceInputs(repo, files);
+  const findings = [];
+  const judged = judgedRecords(unique, repo);
+  for (const r of judged) findings.push(...r.findings);
+  const receipts = renderReceiptsNear(unique.filter((p) => IMAGE.test(p)));
+  const state = { drawn: judged.some((r) => r.drawn || r.recipe) };
+  const recordFound = new Set(findings.filter((f) => f.code === DRAW_ASSET_NOT_TOKEN_RENDERED && f.path).map((f) => f.path.toLowerCase()));
+  const context = { repo, named, judged, receipts, findings, recordFound, state };
+  for (const p of unique) {
+    const rel = slash(path.relative(repo, p));
+    if (IMAGE.test(p)) {
+      judgeAcceptanceImage(p, rel, context);
+      continue;
+    }
+    findings.push(...acceptanceEvidenceFindings(p, context));
+  }
+  if (!state.drawn) findings.push({ code: DRAW_NOT_REDRAWN, path: null, detail: 'the pass binds no token-rendered drawing (draw-render receipt) and no recipe-rendered record: adopting or reusing prior evidence without drawing under the current contract does not satisfy interface.draw' });
+  const seen = new Set();
+  const deduped = findings.filter((f) => isFirstFinding(f, seen));
+  return { ok: deduped.length === 0, findings: deduped, records: judged.map((r) => slash(path.relative(repo, path.join(r.dir, 'index.yaml')))), drawn: state.drawn };
+}
+
+function acceptanceInputs(repo, files) {
   const abs = [];
   // Files the pass names itself (a report file, an explicit --files entry) are judged whatever they are; a file
   // reached only by walking an owned directory is judged as what the live records bind.
@@ -235,64 +274,76 @@ export function drawAcceptanceFindings({ repo, files }) {
     else if (isFile(p)) { abs.push(p); named.add(slash(path.resolve(p)).toLowerCase()); }
   }
   const unique = [...new Map(abs.map((p) => [slash(path.resolve(p)).toLowerCase(), path.resolve(p)])).values()];
-  const findings = [];
+  return { unique, named };
+}
+
+function judgedRecords(unique, repo) {
   const recordDirs = new Map();
   for (const p of unique) {
     const dir = uiRecordDirOf(p);
     if (dir && !recordDirs.has(slash(dir).toLowerCase())) recordDirs.set(slash(dir).toLowerCase(), dir);
   }
-  const judged = [...recordDirs.values()].map((dir) => ({ dir, ...judgeRecord(dir, repo) }));
-  for (const r of judged) findings.push(...r.findings);
-  const receipts = renderReceiptsNear(unique.filter((p) => IMAGE.test(p)));
-  let drawn = judged.some((r) => r.drawn || r.recipe);
-  const recordFound = new Set(findings.filter((f) => f.code === DRAW_ASSET_NOT_TOKEN_RENDERED && f.path).map((f) => f.path.toLowerCase()));
-  for (const p of unique) {
-    const rel = slash(path.relative(repo, p));
-    if (IMAGE.test(p)) {
-      const owner = ownerOf(judged, p);
-      if (!owner || !inAssets(slash(path.relative(owner.dir, p)))) continue;
-      const assetRel = slash(path.relative(owner.dir, p));
-      const asset = assetsOf(owner.record).find((a) => slash(a.path) === assetRel);
-      // A retired asset or a rejected candidate (role rejected-*) is a kept proof, never a drawing.
-      if (asset?.retired || String(asset?.role ?? '').startsWith('rejected-')) continue;
-      if (!named.has(slash(path.resolve(p)).toLowerCase()) && !asset && !boundByRecord(owner.record, owner.dir, p, repo)) {
-        // A loose draw-render capture still proves the pass drew; it is not a live asset to judge.
-        const sha = shaOf(p);
-        if (sha && receipts.has(sha)) drawn = true;
-        continue;
-      }
-      const layoutRecord = [owner.record?.surface, ...Object.values(owner.record?.surface && typeof owner.record.surface === 'object' ? owner.record.surface : {})].includes('layout');
-      if (!asset && !layoutRecord && /--page--/.test(path.basename(p)) && !/\.content\.[a-z]+$/i.test(p)) {
-        findings.push({ code: DRAW_SCOPE_FULL_PAGE, path: rel, detail: `${rel} is a full-page composite bound by the draw: interface.draw draws only the XBase content (<XBase>#<state>--<breakpoint>--<theme>.png)` });
-      }
-      if (owner.tokenRendered.has(slash(p))) continue;
-      const sha = shaOf(p);
-      if (sha && receipts.has(sha)) { drawn = true; continue; }
-      if (asset && !DRAWING_ROLES.has(asset.role) && asset.generation?.tool === RASTER_TOOL && owner.drawn) continue;
-      // What draw-loop finish installs beside a token-rendered part is evidence, not a drawing: the annotated redline
-      // and the art placeholder the draw source imports (reference draw <tmp>/draw-components was refused on both).
-      if (asset && EVIDENCE_ROLES.has(asset.role) && owner.drawn) continue;
-      if (asset && DRAWING_ROLES.has(asset.role)) continue; // judged with its record above
-      if (recordFound.has(rel.toLowerCase())) continue; // its record already refused this file (coverage.map)
-      const why = asset?.generation?.tool === RASTER_TOOL ? 'generation.tool image_gen.imagegen' : imageProvenanceOf(p) ?? 'no draw-render receipt';
-      findings.push({ code: DRAW_ASSET_NOT_TOKEN_RENDERED, path: rel, detail: `${rel} is bound by the draw with ${why}: a drawing is a draw-render capture of one XBase#state, never an image-gen whole screen; adopt a prior drawing only when it meets the current contract` });
-      continue;
-    }
-    if (/\.(ya?ml|json)$/i.test(p)) {
-      const doc = readDoc(p);
-      if (!doc || typeof doc !== 'object' || doc.schema === UI_SCHEMA || !(doc.draws || doc.selectedMatrix || doc.assertions || doc.proofs)) continue;
-      if (!named.has(slash(path.resolve(p)).toLowerCase())) {
-        // Walked from an owned directory: live only when the owning record binds it; kept historical evidence is not re-judged.
-        const owner = ownerOf(judged, p);
-        if (!owner || !boundByRecord(owner.record, owner.dir, p, repo)) continue;
-      }
-      findings.push(...judgeEvidence(p, doc, repo));
-    }
+  return [...recordDirs.values()].map((dir) => ({ dir, ...judgeRecord(dir, repo) }));
+}
+
+function judgeAcceptanceImage(p, rel, { repo, named, judged, receipts, findings, recordFound, state }) {
+  const owner = ownerOf(judged, p);
+  if (!owner || !inAssets(slash(path.relative(owner.dir, p)))) return;
+  const assetRel = slash(path.relative(owner.dir, p));
+  const asset = assetsOf(owner.record).find((a) => slash(a.path) === assetRel);
+  // A retired asset or a rejected candidate (role rejected-*) is a kept proof, never a drawing.
+  if (asset?.retired || String(asset?.role ?? '').startsWith('rejected-')) return;
+  if (!named.has(slash(path.resolve(p)).toLowerCase()) && !asset && !boundByRecord(owner.record, owner.dir, p, repo)) {
+    // A loose draw-render capture still proves the pass drew; it is not a live asset to judge.
+    const sha = shaOf(p);
+    if (sha && receipts.has(sha)) state.drawn = true;
+    return;
   }
-  if (!drawn) findings.push({ code: DRAW_NOT_REDRAWN, path: null, detail: 'the pass binds no token-rendered drawing (draw-render receipt) and no recipe-rendered record: adopting or reusing prior evidence without drawing under the current contract does not satisfy interface.draw' });
-  const seen = new Set();
-  const deduped = findings.filter((f) => { const k = `${f.code}|${f.path}|${f.detail}`; if (seen.has(k)) return false; seen.add(k); return true; });
-  return { ok: deduped.length === 0, findings: deduped, records: judged.map((r) => slash(path.relative(repo, path.join(r.dir, 'index.yaml')))), drawn };
+  const layoutRecord = [owner.record?.surface, ...Object.values(owner.record?.surface && typeof owner.record.surface === 'object' ? owner.record.surface : {})].includes('layout');
+  if (!asset && !layoutRecord && /--page--/.test(path.basename(p)) && !/\.content\.[a-z]+$/i.test(p)) {
+    findings.push({ code: DRAW_SCOPE_FULL_PAGE, path: rel, detail: `${rel} is a full-page composite bound by the draw: interface.draw draws only the XBase content (<XBase>#<state>--<breakpoint>--<theme>.png)` });
+  }
+  if (owner.tokenRendered.has(slash(p))) return;
+  if (acceptedByReceipt(p, receipts, state)) return;
+  if (imageAlreadyJudged(asset, owner, rel, recordFound)) return;
+  const why = asset?.generation?.tool === RASTER_TOOL ? 'generation.tool image_gen.imagegen' : imageProvenanceOf(p) ?? 'no draw-render receipt';
+  findings.push({ code: DRAW_ASSET_NOT_TOKEN_RENDERED, path: rel, detail: `${rel} is bound by the draw with ${why}: a drawing is a draw-render capture of one XBase#state, never an image-gen whole screen; adopt a prior drawing only when it meets the current contract` });
+}
+
+function imageAlreadyJudged(asset, owner, rel, recordFound) {
+  const rasterBesideDrawing = asset && !DRAWING_ROLES.has(asset.role) && asset.generation?.tool === RASTER_TOOL && owner.drawn;
+  const installedEvidence = asset && EVIDENCE_ROLES.has(asset.role) && owner.drawn;
+  const recordDrawing = asset && DRAWING_ROLES.has(asset.role);
+  const recordRefusal = recordFound.has(rel.toLowerCase());
+  // What draw-loop finish installs beside a token-rendered part is evidence, not a drawing: the annotated redline
+  // and the art placeholder the draw source imports (reference draw <tmp>/draw-components was refused on both).
+  return rasterBesideDrawing || installedEvidence || recordDrawing || recordRefusal;
+}
+
+function acceptedByReceipt(p, receipts, state) {
+  const sha = shaOf(p);
+  if (!sha || !receipts.has(sha)) return false;
+  state.drawn = true;
+  return true;
+}
+
+function acceptanceEvidenceFindings(p, { repo, named, judged }) {
+  if (!/\.(ya?ml|json)$/i.test(p)) return [];
+  const doc = readDoc(p);
+  if (!doc || typeof doc !== 'object' || doc.schema === UI_SCHEMA || !(doc.draws || doc.selectedMatrix || doc.assertions || doc.proofs)) return [];
+  if (!named.has(slash(path.resolve(p)).toLowerCase())) {
+    // Walked from an owned directory: live only when the owning record binds it; kept historical evidence is not re-judged.
+    const owner = ownerOf(judged, p);
+    if (!owner || !boundByRecord(owner.record, owner.dir, p, repo)) return [];
+  }
+  return judgeEvidence(p, doc, repo);
+}
+
+function isFirstFinding(f, seen) {
+  const key = `${f.code}|${f.path}|${f.detail}`;
+  if (seen.has(key)) { return false; }
+  seen.add(key);
+  return true;
 }
 
 /** The files a settled or settling job binds: its report files and its owned paths (read-only on `db`). */
@@ -319,27 +370,44 @@ async function main(argv) {
   let files = filesArg ? filesArg.split(',').map((s) => s.trim()).filter(Boolean) : [];
   let job = null;
   if (jobId) {
-    const { openLedgerReader, ledgerFileFor } = await import('../../../engine/db/ledger.mjs');
-    // The repo's runtime ledger is the one file ledgerFileFor resolves (machine.ledgers names it).
-    const resolved = ledgerFileFor(path.resolve(repo));
-    const file = fs.existsSync(resolved) ? resolved : null;
-    if (!file) { process.stderr.write(`no runtime ledger for ${repo}\n`); return 2; }
-    const db = openLedgerReader(file);
-    try {
-      const bound = jobBoundFiles(db, jobId);
-      if (!bound) { process.stderr.write(`unknown job ${jobId}\n`); return 2; }
-      job = { jobId, op: bound.job.op_id, status: bound.job.status };
-      files = bound.files;
-    } finally { db.close(); }
+    const bound = await resolveJob(repo, jobId);
+    if (bound.error) return 2;
+    job = bound.job;
+    files = bound.files;
   }
   const out = { ...drawAcceptanceFindings({ repo: path.resolve(repo), files }), ...(job ? { job } : {}) };
-  if (json) process.stdout.write(`${JSON.stringify(out, null, 2)}\n`);
-  else {
-    const jobId = job ? ` ${job.jobId}` : '';
-    const findings = out.findings.map((f) => `  [${f.code}] ${f.detail}`).join('\n');
-    process.stdout.write(`${out.ok ? 'accepted' : 'REFUSED'}${jobId}: ${out.findings.length} finding(s)\n${findings}\n`);
-  }
+  writeAcceptanceOutput(out, job, json);
   return out.ok ? 0 : 1;
+}
+
+async function resolveJob(repo, jobId) {
+  const { openLedgerReader, ledgerFileFor } = await import('../../../engine/db/ledger.mjs');
+  // The repo's runtime ledger is the one file ledgerFileFor resolves (machine.ledgers names it).
+  const resolved = ledgerFileFor(path.resolve(repo));
+  const file = fs.existsSync(resolved) ? resolved : null;
+  if (!file) {
+    process.stderr.write(`no runtime ledger for ${repo}\n`);
+    return { error: true };
+  }
+  const db = openLedgerReader(file);
+  try {
+    const bound = jobBoundFiles(db, jobId);
+    if (!bound) {
+      process.stderr.write(`unknown job ${jobId}\n`);
+      return { error: true };
+    }
+    return { job: { jobId, op: bound.job.op_id, status: bound.job.status }, files: bound.files };
+  } finally { db.close(); }
+}
+
+function writeAcceptanceOutput(out, job, json) {
+  if (json) {
+    process.stdout.write(`${JSON.stringify(out, null, 2)}\n`);
+    return;
+  }
+  const jobId = job ? ` ${job.jobId}` : '';
+  const findings = out.findings.map((f) => `  [${f.code}] ${f.detail}`).join('\n');
+  process.stdout.write(`${out.ok ? 'accepted' : 'REFUSED'}${jobId}: ${out.findings.length} finding(s)\n${findings}\n`);
 }
 
 if (isMain(import.meta.url)) {

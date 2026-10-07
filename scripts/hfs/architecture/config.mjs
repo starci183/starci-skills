@@ -107,20 +107,39 @@ function workspaceCandidates(packageRoot, normalized) {
   return { candidates, wildcard: segments.includes('*') };
 }
 
+const admitFileDependency = (root, appPackageRoot, packageRoot, sideRoot, repository, state, section, name, value) => {
+  if (typeof value !== 'string' || !value.startsWith('file:')) return;
+  const absolute = path.resolve(sideRoot ? appPackageRoot : packageRoot, value.slice('file:'.length));
+  if (sideRoot && !isInside(root, absolute) && isInside(appPackageRoot, absolute)) return;
+  const label = `${section}.${name} file dependency`;
+  if (isInside(root, absolute)) { admitWorkspace(root, state.directories, state.queue, absolute, label, true); return; }
+  if (!repository || !isInside(repository, absolute) || !existingPackageDirectory(absolute)) {
+    throw new Error(`${label} must resolve to a package directory inside the repository.`);
+  }
+};
+
 function admitFileDependencies(root, appPackageRoot, packageRoot, sideRoot, repository, pkg, state) {
   for (const section of ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies']) {
-    for (const [name, value] of Object.entries(pkg?.[section] ?? {})) {
-      if (typeof value !== 'string' || !value.startsWith('file:')) continue;
-      const absolute = path.resolve(sideRoot ? appPackageRoot : packageRoot, value.slice('file:'.length));
-      if (sideRoot && !isInside(root, absolute) && isInside(appPackageRoot, absolute)) continue;
-      const label = `${section}.${name} file dependency`;
-      if (isInside(root, absolute)) { admitWorkspace(root, state.directories, state.queue, absolute, label, true); continue; }
-      if (!repository || !isInside(repository, absolute) || !existingPackageDirectory(absolute)) {
-        throw new Error(`${label} must resolve to a package directory inside the repository.`);
-      }
-    }
+    for (const [name, value] of Object.entries(pkg?.[section] ?? {}))
+      admitFileDependency(root, appPackageRoot, packageRoot, sideRoot, repository, state, section, name, value);
   }
 }
+
+const admitPackageWorkspaces = (root, appPackageRoot, packageRoot, sideRoot, side, pkg, state) => {
+  const patterns = Array.isArray(pkg?.workspaces) ? pkg.workspaces : pkg?.workspaces?.packages;
+  for (const pattern of Array.isArray(patterns) ? patterns : []) {
+    if (typeof pattern !== 'string' || !pattern.trim()) throw new Error('package.json workspace entries must be non-empty paths.');
+    const written = slash(pattern.trim()).replace(/^\.\//, '');
+    if (sideRoot && !written.startsWith(`${side}/`)) continue;
+    const normalized = sideRoot ? written.slice(side.length + 1) : written;
+    const { candidates, wildcard } = workspaceCandidates(packageRoot, normalized);
+    // npm expands a `*` segment to the directories that hold a package.json and skips the rest (an empty or untracked folder is
+    // HFS_EMPTY_DIR / HFS_SLOT_UNDECLARED, never a reason to analyse nothing); a literal workspace path must resolve. A `*`
+    // pattern may match nothing: every app declares the same workspaces (fe/apps/*, fe/packages/*, HFS_MONO_WORKSPACES) whether
+    // or not it has a package yet, and the root patterns are held to that fixed list by the rule, not here.
+    for (const candidate of candidates) admitWorkspace(root, state.directories, state.queue, candidate, `workspace ${normalized}`, !wildcard);
+  }
+};
 
 /**
  * The npm workspaces below `root`. The one package.json of an app is at `packageRoot` (the app root; `root` is its side folder):
@@ -138,19 +157,7 @@ function workspaceDirectories(root, { packageRoot: appPackageRoot = root, side =
     visited.add(packageRoot);
     const sideRoot = side !== null && packageRoot === root;
     const pkg = readJson(path.join(sideRoot ? appPackageRoot : packageRoot, 'package.json'));
-    const patterns = Array.isArray(pkg?.workspaces) ? pkg.workspaces : pkg?.workspaces?.packages;
-    for (const pattern of Array.isArray(patterns) ? patterns : []) {
-      if (typeof pattern !== 'string' || !pattern.trim()) throw new Error('package.json workspace entries must be non-empty paths.');
-      const written = slash(pattern.trim()).replace(/^\.\//, '');
-      if (sideRoot && !written.startsWith(`${side}/`)) continue;
-      const normalized = sideRoot ? written.slice(side.length + 1) : written;
-      const { candidates, wildcard } = workspaceCandidates(packageRoot, normalized);
-      // npm expands a `*` segment to the directories that hold a package.json and skips the rest (an empty or untracked folder is
-      // HFS_EMPTY_DIR / HFS_SLOT_UNDECLARED, never a reason to analyse nothing); a literal workspace path must resolve. A `*`
-      // pattern may match nothing: every app declares the same workspaces (fe/apps/*, fe/packages/*, HFS_MONO_WORKSPACES) whether
-      // or not it has a package yet, and the root patterns are held to that fixed list by the rule, not here.
-      for (const candidate of candidates) admitWorkspace(root, directories, queue, candidate, `workspace ${normalized}`, !wildcard);
-    }
+    admitPackageWorkspaces(root, appPackageRoot, packageRoot, sideRoot, side, pkg, { directories, queue });
     admitFileDependencies(root, appPackageRoot, packageRoot, sideRoot, repository, pkg, { directories, queue });
   }
   return [...directories].sort(byCodeUnit);

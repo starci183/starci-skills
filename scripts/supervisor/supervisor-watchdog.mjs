@@ -67,7 +67,7 @@ const filedReports = (m, now) => m.db.prepare("SELECT DISTINCT job_id FROM sup_r
  * split-send path (Escape first when the input row targets a subagent), and a frame still frozen after
  * the wake restarts the seat through the replace path.
  */
-const SUBAGENT_ROW = /^\s*(?:❯\s*)?[●◯◐◑◒◓]\s+(?!main\s*$)[\w.@-]+\s{2,}\S.*?\b\d+m(?:\s*\d+s)?\s*·/mu;
+const SUBAGENT_ROW = new RegExp(['^\\s*(?:❯\\s*)?', '[●◯◐◑◒◓]', '\\s+', '(?!main\\s*$)', '[\\w.@-]+', '\\s{2,}', '\\S.*?', '\\b\\d+m', '(?:\\s*\\d+s)?', '\\s*·'].join(''), 'mu');
 export const busyScreen = (screen) => SUBAGENT_ROW.test(String(screen ?? ''));
 
 /**
@@ -122,17 +122,41 @@ const shortId = (id) => String(id).slice(0, 8);
  * attempted is never sent again: `duplicate` is then true and `text` null. An unread message is announced
  * once, then reminded at most every INBOX_REWAKE_MS.
  */
+function announcedAt(wakes, key) {
+  const announced = new Map();
+  for (const w of [...wakes].reverse()) for (const id of w.payload[key] ?? []) announced.set(id, w.at);
+  return announced;
+}
+
+function inboxWakePart(unread, fresh, remind) {
+  return '[inbox] ' + unread.length + ' unread message(s)' + (fresh.length ? ' (new ' + fresh.map(shortId).join(',') + ')' : '') + (remind.length ? ' (still unread ' + remind.map(shortId).join(',') + ')' : '') + `: starci supervisor channel inbox --id ${SUPERVISOR_ID}, then reply to each (--to <inboxId>).`;
+}
+
+function decisionWakePart(openDis, diFresh, diRemind) {
+  return '[decide] ' + openDis.length + ' open Supervisor decision(s)' + (diFresh.length ? ' (new ' + diFresh.join(',') + ')' : '') + (diRemind.length ? ' (still open ' + diRemind.join(',') + ')' : '') + ': starci machine decisions supervisor --list, then claim and resolve each.';
+}
+
+function wakeText({ tags, unread, fresh, remind, openDis, diFresh, diRemind, land, report, workerDeaths }) {
+  const parts = [];
+  if (tags.includes('register')) parts.push(`[register] channel '${SUPERVISOR_ID}' is not registered from this terminal: starci supervisor channel register --id ${SUPERVISOR_ID} --label "Supervisor".`);
+  if (tags.includes('inbox')) parts.push(inboxWakePart(unread, fresh, remind));
+  if (tags.includes('decide')) parts.push(decisionWakePart(openDis, diFresh, diRemind));
+  if (tags.includes('land')) parts.push(`[land] report(s) filed by ${land.join(', ')}: starci supervisor workers list, then land (starci supervisor land --job <id>) or redirect.`);
+  if (tags.includes('report')) parts.push(`[report] ${report.join(', ')} filed a diagnosis or a blocked/failed report: starci supervisor workers show --job <id>, then decide.`);
+  if (tags.includes('worker')) parts.push(`[worker] ${workerDeaths.map((d) => d.jobId + ' (' + d.reason + ')').join(', ')}: respawn, reassign or take it yourself.`);
+  const text = parts.length ? `${WAKE_TAG} ${parts.join(' ')} Act until nothing is executable, then yield; never sleep or poll in a turn.` : null;
+  return text;
+}
+
 export function planWake({ now = Date.now(), wakes = [], unread = [], reported = [], filed = [], workerDeaths = [], registered = true, decisions = [] }) {
   const tags = [];
-  const announced = new Map();
-  for (const w of [...wakes].reverse()) for (const id of w.payload.inbox ?? []) announced.set(id, w.at);
+  const announced = announcedAt(wakes, 'inbox');
   const fresh = unread.filter((m) => !announced.has(m.id)).map((m) => m.id);
   const remind = unread.filter((m) => announced.has(m.id) && now - announced.get(m.id) >= INBOX_REWAKE_MS).map((m) => m.id);
   const inbox = [...fresh, ...remind];
   if (inbox.length) tags.push('inbox');
   // MB-02: an open Supervisor Decision Item is work: announced once, then reminded every INBOX_REWAKE_MS while open.
-  const diAnnounced = new Map();
-  for (const w of [...wakes].reverse()) for (const id of w.payload.decisions ?? []) diAnnounced.set(id, w.at);
+  const diAnnounced = announcedAt(wakes, 'decisions');
   const openDis = decisions.filter((di) => di?.id && di.status === 'open');
   const diFresh = openDis.filter((di) => !diAnnounced.has(di.id)).map((di) => di.id);
   const diRemind = openDis.filter((di) => diAnnounced.has(di.id) && now - diAnnounced.get(di.id) >= INBOX_REWAKE_MS).map((di) => di.id);
@@ -146,14 +170,7 @@ export function planWake({ now = Date.now(), wakes = [], unread = [], reported =
   if (report.length) tags.push('report');
   if (workerDeaths.length) tags.push('worker');
   if (!registered) tags.push('register');
-  const parts = [];
-  if (tags.includes('register')) parts.push(`[register] channel '${SUPERVISOR_ID}' is not registered from this terminal: starci supervisor channel register --id ${SUPERVISOR_ID} --label "Supervisor".`);
-  if (tags.includes('inbox')) parts.push('[inbox] ' + unread.length + ' unread message(s)' + (fresh.length ? ' (new ' + fresh.map(shortId).join(',') + ')' : '') + (remind.length ? ' (still unread ' + remind.map(shortId).join(',') + ')' : '') + `: starci supervisor channel inbox --id ${SUPERVISOR_ID}, then reply to each (--to <inboxId>).`);
-  if (tags.includes('decide')) parts.push('[decide] ' + openDis.length + ' open Supervisor decision(s)' + (diFresh.length ? ' (new ' + diFresh.join(',') + ')' : '') + (diRemind.length ? ' (still open ' + diRemind.join(',') + ')' : '') + ': starci machine decisions supervisor --list, then claim and resolve each.');
-  if (tags.includes('land')) parts.push(`[land] report(s) filed by ${land.join(', ')}: starci supervisor workers list, then land (starci supervisor land --job <id>) or redirect.`);
-  if (tags.includes('report')) parts.push(`[report] ${report.join(', ')} filed a diagnosis or a blocked/failed report: starci supervisor workers show --job <id>, then decide.`);
-  if (tags.includes('worker')) parts.push(`[worker] ${workerDeaths.map((d) => d.jobId + ' (' + d.reason + ')').join(', ')}: respawn, reassign or take it yourself.`);
-  const text = parts.length ? `${WAKE_TAG} ${parts.join(' ')} Act until nothing is executable, then yield; never sleep or poll in a turn.` : null;
+  const text = wakeText({ tags, unread, fresh, remind, openDis, diFresh, diRemind, land, report, workerDeaths });
   if (text && wakes.some((w) => w.payload.text === text)) return { tags: [], inbox: [], land: [], report: [], decisions: [], text: null, duplicate: true };
   return { tags, inbox, land, report, decisions: decide, text };
 }
@@ -196,24 +213,35 @@ async function hostDeps() {
 }
 
 /** Restore runtime names in Orca's sidebar from the tab titles, never from agent-controlled pane titles. */
+function expectedSupervisorTitles(seatTerminal, workers) {
+  return [
+    { terminal: seatTerminal, title: SUPERVISOR_TITLE },
+    ...workers.filter((job) => job.worker_id && !job.payload?.self && !job.payload?.terminalClosed)
+      .map((job) => ({ terminal: job.worker_id, title: `${WORKER_TITLE_PREFIX} ${job.payload.cluster}`.slice(0, 80) })),
+  ];
+}
+
+function titleNeedsRepair(terminal, title, titles, listed) {
+  return terminal && titles.get(terminal) !== title && (listed.terminals ?? []).some((t) => t.handle === terminal && t.connected !== false);
+}
+
+function renameTitle(d, terminal, title) {
+  try {
+    const r = d.rename(terminal, title);
+    return { terminal, title, ok: r?.ok === true, ...(r?.ok ? {} : { error: r?.error ?? 'terminal rename failed' }) };
+  } catch (error) { return { terminal, title, ok: false, error: String(error?.message ?? error) }; }
+}
+
 export function repairSupervisorTabTitles(seatTerminal, workers, d) {
   if (!d?.list || !d?.rename) return [];
   let listed;
   try { listed = d.list(); } catch { return []; }
   if (!listed?.ok) return [];
   const titles = (d.tabTitles ?? tabTitlesOf)(listed.visualLayouts ?? [], listed.terminals ?? []);
-  const expected = [
-    { terminal: seatTerminal, title: SUPERVISOR_TITLE },
-    ...workers.filter((job) => job.worker_id && !job.payload?.self && !job.payload?.terminalClosed)
-      .map((job) => ({ terminal: job.worker_id, title: `${WORKER_TITLE_PREFIX} ${job.payload.cluster}`.slice(0, 80) })),
-  ];
   const repairs = [];
-  for (const { terminal, title } of expected) {
-    if (!terminal || titles.get(terminal) === title || !(listed.terminals ?? []).some((t) => t.handle === terminal && t.connected !== false)) continue;
-    try {
-      const r = d.rename(terminal, title);
-      repairs.push({ terminal, title, ok: r?.ok === true, ...(r?.ok ? {} : { error: r?.error ?? 'terminal rename failed' }) });
-    } catch (error) { repairs.push({ terminal, title, ok: false, error: String(error?.message ?? error) }); }
+  for (const { terminal, title } of expectedSupervisorTitles(seatTerminal, workers)) {
+    if (!titleNeedsRepair(terminal, title, titles, listed)) continue;
+    repairs.push(renameTitle(d, terminal, title));
   }
   return repairs;
 }

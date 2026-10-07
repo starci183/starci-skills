@@ -49,27 +49,33 @@ const reportSharedFileViolations = (shared, violations) => {
   }
 };
 
+const helperDeclarationsOf = (statement, ts) => {
+  const found = [];
+  if (ts.isFunctionDeclaration(statement) && statement.name) found.push([statement.name.text, statement.name]);
+  if (ts.isVariableStatement(statement)) {
+    for (const declaration of statement.declarationList.declarations) {
+      const init = declaration.initializer;
+      if (ts.isIdentifier(declaration.name) && init && (ts.isArrowFunction(init) || ts.isFunctionExpression(init))) found.push([declaration.name.text, declaration.name]);
+    }
+  }
+  return found;
+};
+
+const recordDeclaredHelper = (declared, root, name, file, node) => {
+  if (HOOK_NAME.test(name)) return;
+  if (!declared.has(root)) declared.set(root, new Map());
+  const byName = declared.get(root);
+  if (!byName.has(name)) byName.set(name, []);
+  byName.get(name).push({ file, node });
+};
+
 const declaredHelpersOf = (graph, resolver, ts) => {
   const declared = new Map(); // domain root -> name -> [{file, node}]
   for (const file of graph.files.values()) {
     if (file.slot !== HOOKS_SLOT) continue;
     const root = resolver.classifyPath(file.rel).root;
     for (const statement of file.sourceFile.statements) {
-      const found = [];
-      if (ts.isFunctionDeclaration(statement) && statement.name) found.push([statement.name.text, statement.name]);
-      if (ts.isVariableStatement(statement)) {
-        for (const declaration of statement.declarationList.declarations) {
-          const init = declaration.initializer;
-          if (ts.isIdentifier(declaration.name) && init && (ts.isArrowFunction(init) || ts.isFunctionExpression(init))) found.push([declaration.name.text, declaration.name]);
-        }
-      }
-      for (const [name, node] of found) {
-        if (HOOK_NAME.test(name)) continue;
-        if (!declared.has(root)) declared.set(root, new Map());
-        const byName = declared.get(root);
-        if (!byName.has(name)) byName.set(name, []);
-        byName.get(name).push({ file, node });
-      }
+      for (const [name, node] of helperDeclarationsOf(statement, ts)) recordDeclaredHelper(declared, root, name, file, node);
     }
   }
   return declared;

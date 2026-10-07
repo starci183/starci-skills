@@ -262,6 +262,21 @@ export const backoffDelay = (n, { minMs, maxMs, factor }) => Math.min(maxMs, min
 
 export const newRecord = (name, now) => ({ name, state: 'declared', since: now, restarts: [], failStreak: 0, nextAttemptAt: null, downSince: null, lastProbe: null });
 
+const moveFailureState = (r, now, entry, to) => { switch (r.state) {
+  case 'declared': case 'unmanaged': to('failed'); break;
+  case 'healthy': to(r.failStreak >= entry.failAfter ? 'failed' : 'degraded'); break; case 'degraded': if (r.failStreak >= entry.failAfter) to('failed'); break;
+  case 'starting': if (now - r.since >= entry.startTimeoutMs) to('failed'); break;
+  default: break;
+} };
+
+function restartAction(r, now, entry, backoff, quarantine, from, to) {
+  let act = null, quarantined = false;
+  r.restarts = r.restarts.filter((t) => now - t < quarantine.windowMs);
+  if (r.state === 'failed' && entry.restart !== false) { if (r.restarts.length >= quarantine.maxRestarts) { to('quarantined'); quarantined = true; } else { to('backoff'); r.nextAttemptAt = now + backoffDelay(r.restarts.length, backoff); } }
+  if (r.state === 'backoff' && now >= (r.nextAttemptAt ?? 0) && from === 'backoff') { to('starting'); r.restarts.push(now); r.nextAttemptAt = null; act = 'start'; } else if (r.state === 'quarantined' && !quarantined && now - r.since >= quarantine.retryMs && entry.restart !== false) { to('starting'); r.restarts = [now]; act = 'start'; }
+  return { act, quarantined };
+}
+
 /**
  * One step of a service over one probe: {rec, act: 'start'|null, quarantined: bool, from, to}. Pure: `rec` is not
  * mutated. `entry.restart` false never starts (and never quarantines: nothing restarted it).
@@ -278,23 +293,8 @@ export function stepService(rec, probe, { now, entry, backoff, quarantine }) {
   if (probe?.unmanaged) { to('unmanaged'); r.failStreak = 0; r.downSince = null; return { rec: r, act, quarantined, from, to: r.state }; }
   r.downSince ??= now;
   r.failStreak = (r.failStreak ?? 0) + 1;
-  switch (r.state) {
-    case 'declared': case 'unmanaged': to('failed'); break;
-    case 'healthy': to(r.failStreak >= entry.failAfter ? 'failed' : 'degraded'); break;
-    case 'degraded': if (r.failStreak >= entry.failAfter) to('failed'); break;
-    case 'starting': if (now - r.since >= entry.startTimeoutMs) to('failed'); break;
-    default: break;
-  }
-  r.restarts = r.restarts.filter((t) => now - t < quarantine.windowMs);
-  if (r.state === 'failed' && entry.restart !== false) {
-    if (r.restarts.length >= quarantine.maxRestarts) { to('quarantined'); quarantined = true; }
-    else { to('backoff'); r.nextAttemptAt = now + backoffDelay(r.restarts.length, backoff); }
-  }
-  if (r.state === 'backoff' && now >= (r.nextAttemptAt ?? 0) && from === 'backoff') {
-    to('starting'); r.restarts.push(now); r.nextAttemptAt = null; act = 'start';
-  } else if (r.state === 'quarantined' && !quarantined && now - r.since >= quarantine.retryMs && entry.restart !== false) {
-    to('starting'); r.restarts = [now]; act = 'start';
-  }
+  moveFailureState(r, now, entry, to);
+  ({ act, quarantined } = restartAction(r, now, entry, backoff, quarantine, from, to));
   return { rec: r, act, quarantined, from, to: r.state };
 }
 

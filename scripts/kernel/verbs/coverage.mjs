@@ -30,7 +30,9 @@ export default {
       const active = jobs.filter(job => !JOB_STATUSES.settled.includes(job.status));
       if (active.length > 1) throw new Error('more than one active handover job has a coverage policy');
       const gate = handoverGateOf(ledger.db, args.workflow), approval = handoverApprovalOf(ledger.db, args.workflow);
-      const approvedId = gate.ok && gate.via === 'handover-approved' ? gate.approval?.jobId : approval.approved ? approval.ask?.jobId : null;
+      let approvedId = null;
+      if (gate.ok && gate.via === 'handover-approved') approvedId = gate.approval?.jobId;
+      else if (approval.approved) approvedId = approval.ask?.jobId;
       const job = active[0] ?? jobs.find(row => row.job_id === approvedId);
       if (!job) throw new Error('no active or approved handover job determines coverage policy');
       policy = proofAcceptanceOf(ledger.db, job, internals.skillRoot);

@@ -53,41 +53,52 @@ const visitDir = (state, dir, regex) => {
   }
 };
 
-/** Expand one concrete pattern list under `state.root` into absolute file hits; returns true on an escaping pattern. */
-const expandPatterns = (patterns, state, missing) => {
+/** Expand one pattern under `state.root`; returns true on an escaping pattern. */
+const expandPattern = (pattern, state, missing) => {
   const { root } = state;
-  for (const pattern of patterns) {
-    if (!insidePath(root, path.resolve(root, pattern), { includeSelf: true })) return true;
-    if (/[*?]/.test(pattern)) {
-      const prefix = pattern.slice(0, pattern.search(/[*?]/)).replace(/\/[^/]*$/, '');
-      const base = path.resolve(root, prefix);
-      if (fs.existsSync(base)) visitDir(state, base, globExpression(pattern));
-    } else {
-      const file = path.resolve(root, pattern);
-      if (fs.existsSync(file)) { if (fs.lstatSync(file).isDirectory()) visitDir(state, file, globExpression(`${pattern.replace(/\/$/, '')}/**`)); else addHit(state, file); }
-    }
-    const matches = /[*?]/.test(pattern) ? globExpression(pattern) : globExpression(`${pattern.replace(/\/$/, '')}/**`);
-    if (![...state.hits].some((file) => file === path.resolve(root, pattern) || matches.test(path.relative(root, file).replaceAll('\\', '/')))) missing.push(pattern);
+  if (!insidePath(root, path.resolve(root, pattern), { includeSelf: true })) return true;
+  if (/[*?]/.test(pattern)) {
+    const prefix = pattern.slice(0, pattern.search(/[*?]/)).replace(/\/[^/]*$/, '');
+    const base = path.resolve(root, prefix);
+    if (fs.existsSync(base)) visitDir(state, base, globExpression(pattern));
+  } else {
+    const file = path.resolve(root, pattern);
+    if (fs.existsSync(file)) { if (fs.lstatSync(file).isDirectory()) visitDir(state, file, globExpression(`${pattern.replace(/\/$/, '')}/**`)); else addHit(state, file); }
   }
+  const matches = /[*?]/.test(pattern) ? globExpression(pattern) : globExpression(`${pattern.replace(/\/$/, '')}/**`);
+  if (![...state.hits].some((file) => file === path.resolve(root, pattern) || matches.test(path.relative(root, file).replaceAll('\\', '/')))) missing.push(pattern);
   return false;
+};
+
+/** Expand a concrete pattern list under `state.root` into absolute file hits; returns true on an escaping pattern. */
+const expandPatterns = (patterns, state, missing) => {
+  for (const pattern of patterns) if (expandPattern(pattern, state, missing)) return true;
+  return false;
+};
+
+const referenceLocationOf = (token, { sourceRoot, stateDir, appRoot, params }) => {
+  const original = token;
+  let rel = token.replaceAll('\\', '/');
+  if (readParamName(rel) !== null) return { result: { token: original, kind: 'instance', resolved: [], missing: [], truncated: false } };
+  const first = rel.split(/\s/)[0];
+  if (/^(?:knowledge|docs|modules|scripts|engine|\.starciwork|\.starcistacks)\//.test(first)) rel = first;
+  else if (/\s/.test(rel)) return { result: { token: original, kind: 'prose', resolved: [], missing: [], truncated: false } };
+  let rootKind = 'source', root = sourceRoot;
+  if (rel.startsWith('<app>/')) { rootKind = 'app'; root = appRoot; rel = rel.slice(6); }
+  else if (/^\.starcistacks(?:\/|$)/.test(rel)) { rootKind = 'app'; root = appRoot; }
+  else if (/^\.starciwork(?:\/|$)/.test(rel)) { rootKind = 'work'; root = stateDir; rel = rel.replace(/^\.starciwork\/?/, ''); }
+  if (/^(?:N|evidence|STARCI_JOB_SCRATCH)\//.test(rel)) return { result: { token: original, kind: 'instance', resolved: [], missing: [], truncated: false } };
+  return { original, rel: bindOpPath(rel, params), rootKind, root };
 };
 
 /** Resolve one READ reference with an explicit Source, Work or app root. Values
  * of params.* are instance inputs, not runtime filenames. New record templates
  * may remain unresolved; they are never reported as missing Source law files. */
 export function resolveReadReference(token, { sourceRoot, stateDir = null, appRoot = null, params = {} } = {}) {
-  const original = token;
-  let rel = token.replaceAll('\\', '/');
-  if (readParamName(rel) !== null) return { token: original, kind: 'instance', resolved: [], missing: [], truncated: false };
-  const first = rel.split(/\s/)[0];
-  if (/^(?:knowledge|docs|modules|scripts|engine|\.starciwork|\.starcistacks)\//.test(first)) rel = first;
-  else if (/\s/.test(rel)) return { token: original, kind: 'prose', resolved: [], missing: [], truncated: false };
-  let rootKind = 'source', root = sourceRoot;
-  if (rel.startsWith('<app>/')) { rootKind = 'app'; root = appRoot; rel = rel.slice(6); }
-  else if (/^\.starcistacks(?:\/|$)/.test(rel)) { rootKind = 'app'; root = appRoot; }
-  else if (/^\.starciwork(?:\/|$)/.test(rel)) { rootKind = 'work'; root = stateDir; rel = rel.replace(/^\.starciwork\/?/, ''); }
-  if (/^(?:N|evidence|STARCI_JOB_SCRATCH)\//.test(rel)) return { token: original, kind: 'instance', resolved: [], missing: [], truncated: false };
-  rel = bindOpPath(rel, params);
+  const location = referenceLocationOf(token, { sourceRoot, stateDir, appRoot, params });
+  if (location.result) return location.result;
+  const { original, rootKind } = location;
+  let { rel, root } = location;
   if (rel.includes('<') || !root) return { token: original, kind: 'template', rootKind, resolved: [], missing: rootKind === 'source' ? [original] : [], truncated: false };
   root = path.resolve(root);
   if (!insidePath(root, path.resolve(root, rel), { includeSelf: true })) return { token: original, kind: 'invalid', rootKind, resolved: [], missing: [original], truncated: false };

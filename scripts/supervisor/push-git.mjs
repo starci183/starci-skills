@@ -97,7 +97,7 @@ export function planFor(repo, { runtimeRoot = SKILL_ROOT, pkg = readPackage(repo
 }
 
 const rel = (file, repo) => {
-  const flat = (p) => String(p ?? '').replace(/^file:\/+/, '').replaceAll(/\\/g, '/').replace(/^\/+/, '').replace(/\/+$/, '');
+  const flat = (p) => String(p ?? '').replace(/^file:\/+/, '').replaceAll('\\', '/').replace(/^\/+/, '').replace(/\/+$/, '');
   const f = flat(file), base = flat(repo);
   return base && f.toLowerCase().startsWith(`${base.toLowerCase()}/`) ? f.slice(base.length + 1) : f;
 };
@@ -108,6 +108,60 @@ const rel = (file, repo) => {
  * a canon-scan JSON record (findings[].file). Anything else is one `(unparsed)` group with the last lines.
  * Returns [{file, items: [string]}] sorted by file, at most MAX_GROUPS groups of MAX_ITEMS_PER_GROUP items.
  */
+function addCanonFailures(name, text, add, groups) {
+  if (name !== 'canon-scan') return false;
+  try {
+    const doc = JSON.parse(text);
+    for (const f of doc?.findings ?? []) add(f.file, `${f.family ?? 'canon'}${f.rule ? ':' + f.rule : ''}${f.line ? ' @' + f.line : ''}${f.message ? ' ' + String(f.message).slice(0, 120) : ''}`.trim());
+    return groups.size > 0;
+  } catch { /* not JSON: the generic parse below */ }
+  return false;
+}
+
+function consumeNodeReporterLine(line, state, add) {
+  let match = /^\s*test at (.+?):\d+:\d+\s*$/.exec(line);
+  // node:test spec reporter: "test at <file>:l:c" then "✖ <name> (12ms)"
+  if (match) { state.pendingFile = match[1]; return true; }
+  if (state.pendingFile) {
+    match = /^\s*[✖x]\s+(.*?)(?:\s+\([\d.]+m?s\))?\s*$/.exec(line);
+    if (match) { add(state.pendingFile, match[1]); state.pendingFile = null; return true; }
+  }
+  // node:test tap reporter: "not ok N - name" ... "location: '<file>:l:c'"
+  match = /^\s*not ok \d+ - (.*?)(?:\s+#.*)?$/.exec(line);
+  if (match) { state.pendingTap = match[1]; return true; }
+  if (state.pendingTap) {
+    match = /^\s*location:\s*'?(.+?):\d+:\d+'?\s*$/.exec(line);
+    if (match) { add(match[1], state.pendingTap); state.pendingTap = null; return true; }
+  }
+  return false;
+}
+
+function consumeJestLine(line, state, add) {
+  let match = /^\s*FAIL\s+(?:\S+\s+)?(\S+\.(?:spec|test)\.[cm]?[jt]sx?)\b.*?(?:>\s*(.*))?$/.exec(line);
+  if (match) { state.jestFile = match[1]; add(match[1], match[2] ?? null); return true; }
+  if (state.jestFile) {
+    match = /^\s*●\s+(.*\S)\s*$/.exec(line);
+    if (match) { add(state.jestFile, match[1]); return true; }
+  }
+  return false;
+}
+
+function consumeTypeScriptLine(line, add) {
+  let match = /^(.+?)\((\d+),(\d+)\):\s+error\s+(TS\d+):\s+(.*)$/.exec(line);
+  if (!match) match = /^(.+?):(\d+):(\d+)\s+-\s+error\s+(TS\d+):\s+(.*)$/.exec(line);
+  if (!match) return false;
+  add(match[1], `${match[4]} @${match[2]} ${match[5].slice(0, 120)}`);
+  return true;
+}
+
+function consumeEslintLine(line, state, add) {
+  if (/^(?:[A-Za-z]:)?[\w./\\@()[\]-]+\.[cm]?[jt]sx?$/.test(line.trim()) && !line.startsWith(' ')) { state.eslintFile = line.trim(); return true; }
+  if (!state.eslintFile) return false;
+  const match = /^\s+(\d+):(\d+)\s+error\s+(.*?)\s{2,}(\S+)\s*$/.exec(line);
+  if (match) add(state.eslintFile, `${match[4]} @${match[1]} ${match[3].slice(0, 100)}`);
+  return false;
+}
+
 export function failuresOf(name, text, { repo = null } = {}) {
   const groups = new Map();
   const add = (file, item) => {
@@ -117,46 +171,13 @@ export function failuresOf(name, text, { repo = null } = {}) {
     if (item && !list.includes(item)) list.push(item);
   };
   const lines = String(text ?? '').split(/\r?\n/);
-  if (name === 'canon-scan') {
-    try {
-      const doc = JSON.parse(text);
-      for (const f of doc?.findings ?? []) add(f.file, `${f.family ?? 'canon'}${f.rule ? ':' + f.rule : ''}${f.line ? ' @' + f.line : ''}${f.message ? ' ' + String(f.message).slice(0, 120) : ''}`.trim());
-      if (groups.size) return finish(groups);
-    } catch { /* not JSON: the generic parse below */ }
-  }
-  let pendingFile = null, pendingTap = null, eslintFile = null, jestFile = null;
+  if (addCanonFailures(name, text, add, groups)) return finish(groups);
+  const state = { pendingFile: null, pendingTap: null, eslintFile: null, jestFile: null };
   for (const line of lines) {
-    let m = /^\s*test at (.+?):\d+:\d+\s*$/.exec(line);
-    // node:test spec reporter: "test at <file>:l:c" then "✖ <name> (12ms)"
-    if (m) { pendingFile = m[1]; continue; }
-    if (pendingFile) {
-      m = /^\s*[✖x]\s+(.*?)(?:\s+\([\d.]+m?s\))?\s*$/.exec(line);
-      if (m) { add(pendingFile, m[1]); pendingFile = null; continue; }
-    }
-    // node:test tap reporter: "not ok N - name" ... "location: '<file>:l:c'"
-    m = /^\s*not ok \d+ - (.*?)(?:\s+#.*)?$/.exec(line);
-    if (m) { pendingTap = m[1]; continue; }
-    if (pendingTap) {
-      m = /^\s*location:\s*'?(.+?):\d+:\d+'?\s*$/.exec(line);
-      if (m) { add(m[1], pendingTap); pendingTap = null; continue; }
-    }
-    // jest / vitest
-    m = /^\s*FAIL\s+(?:\S+\s+)?(\S+\.(?:spec|test)\.[cm]?[jt]sx?)\b.*?(?:>\s*(.*))?$/.exec(line);
-    if (m) { jestFile = m[1]; add(m[1], m[2] ?? null); continue; }
-    if (jestFile) {
-      m = /^\s*●\s+(.*\S)\s*$/.exec(line);
-      if (m) { add(jestFile, m[1]); continue; }
-    }
-    // tsc
-    m = /^(.+?)\((\d+),(\d+)\):\s+error\s+(TS\d+):\s+(.*)$/.exec(line);
-    if (!m) m = /^(.+?):(\d+):(\d+)\s+-\s+error\s+(TS\d+):\s+(.*)$/.exec(line);
-    if (m) { add(m[1], `${m[4]} @${m[2]} ${m[5].slice(0, 120)}`); continue; }
-    // eslint stylish
-    if (/^(?:[A-Za-z]:)?[\w./\\@()[\]-]+\.[cm]?[jt]sx?$/.test(line.trim()) && !line.startsWith(' ')) { eslintFile = line.trim(); continue; }
-    if (eslintFile) {
-      m = /^\s+(\d+):(\d+)\s+error\s+(.*?)\s{2,}(\S+)\s*$/.exec(line);
-      if (m) add(eslintFile, `${m[4]} @${m[1]} ${m[3].slice(0, 100)}`);
-    }
+    if (consumeNodeReporterLine(line, state, add)) continue;
+    if (consumeJestLine(line, state, add)) continue;
+    if (consumeTypeScriptLine(line, add)) continue;
+    consumeEslintLine(line, state, add);
   }
   if (!groups.size) {
     const tail = lines.map((l) => l.trimEnd()).filter(Boolean).slice(-20);
@@ -168,6 +189,38 @@ export function failuresOf(name, text, { repo = null } = {}) {
 function finish(map) {
   return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0])).slice(0, MAX_GROUPS)
     .map(([file, items]) => ({ file, items: items.slice(0, MAX_ITEMS_PER_GROUP), ...(items.length > MAX_ITEMS_PER_GROUP ? { more: items.length - MAX_ITEMS_PER_GROUP } : {}) }));
+}
+
+function runPlannedSteps(out, repo, plan, stepRun) {
+  const failedNames = new Set();
+  for (const step of plan.steps) {
+    if (step.absent) { out.steps.push({ name: step.name, status: 'absent', note: 'the repository declares no such script' }); continue; }
+    if (step.after && failedNames.has(step.after)) { out.steps.push({ name: step.name, status: 'skipped', note: `${step.after} is red` }); continue; }
+    const r = stepRun(step, { cwd: repo, timeoutMs: STEP_TIMEOUT_MS[plan.kind], tag: path.basename(repo) });
+    const row = { name: step.name, status: r.ok ? 'green' : 'red', exit: r.exit, ms: r.ms, log: r.log };
+    if (!r.ok) {
+      failedNames.add(step.name);
+      row.failures = failuresOf(step.name, r.text, { repo });
+      if (r.timedOut) row.timedOut = true;
+      if (r.error) row.error = r.error;
+    }
+    out.steps.push(row);
+  }
+}
+
+function pushAfterChecks(repo, out, state, check, pushRun) {
+  if (!state.ahead) return { ...out, verdict: 'green', pushed: 0, why: 'green; nothing ahead of origin/main to push' };
+  const dry = pushRun({ repos: [repo], dryRun: true, record: false })[0];
+  out.dryRun = { wouldPush: Boolean(dry?.wouldPush), refused: dry?.refused ?? null, error: dry?.error ?? null };
+  if (dry?.refused || dry?.error) return { ...out, verdict: 'push-refused', why: dry.refused ?? dry.error, hint: dry.hint ?? null, scan: dry.scan ?? null };
+  const hooks = pushRun({ repos: [repo], hooksOnly: true, record: false })[0];
+  out.hooks = { result: hooks?.hooks ?? null, error: hooks?.error ?? null };
+  if (hooks?.hooks !== 'green') return { ...out, verdict: 'hooks-red', why: `pre-push hook ${hooks?.hooks ?? 'unavailable'}: ${String(hooks?.error ?? '').slice(0, 300)}` };
+  if (check) return { ...out, verdict: 'green', pushed: 0, checkOnly: true, why: `green; ${state.ahead} commit(s) would be pushed (--check)` };
+  const pushed = pushRun({ repos: [repo] })[0];
+  out.push = { pushed: Boolean(pushed?.pushed), head: pushed?.head ?? null, refused: pushed?.refused ?? null, error: pushed?.error ?? null, skipped: pushed?.skipped ?? null, line: describePush(pushed ?? { repo }) };
+  if (!pushed?.pushed) return { ...out, verdict: 'push-refused', why: pushed?.refused ?? pushed?.error ?? pushed?.skipped ?? 'the push did not go through', pushed: 0 };
+  return { ...out, verdict: 'green', pushed: state.ahead };
 }
 
 /* ------------------------------------------------------------ running */
@@ -212,36 +265,11 @@ export function pushGitRepo(repo, { check = false, explicit = false, deps = {} }
   if (!state.ahead && !explicit) return { ...out, verdict: 'nothing-to-push', why: 'main has no commit ahead of origin/main' };
   const plan = (deps.plan ?? planFor)(repo);
   out.kind = plan.kind;
-  const failedNames = new Set();
-  for (const step of plan.steps) {
-    if (step.absent) { out.steps.push({ name: step.name, status: 'absent', note: 'the repository declares no such script' }); continue; }
-    if (step.after && failedNames.has(step.after)) { out.steps.push({ name: step.name, status: 'skipped', note: `${step.after} is red` }); continue; }
-    const r = stepRun(step, { cwd: repo, timeoutMs: STEP_TIMEOUT_MS[plan.kind], tag: path.basename(repo) });
-    const row = { name: step.name, status: r.ok ? 'green' : 'red', exit: r.exit, ms: r.ms, log: r.log };
-    if (!r.ok) {
-      failedNames.add(step.name);
-      row.failures = failuresOf(step.name, r.text, { repo });
-      if (r.timedOut) row.timedOut = true;
-      if (r.error) row.error = r.error;
-    }
-    out.steps.push(row);
-  }
+  runPlannedSteps(out, repo, plan, stepRun);
   if (out.steps.some((s) => s.status === 'red')) return { ...out, verdict: 'red', why: `${out.steps.filter((s) => s.status === 'red').map((s) => s.name).join(', ')} red` };
   const after = mainState(repo, { run: gitRun });
   if (after.head !== state.head || after.dirty.length) return { ...out, verdict: 'main-moved', why: after.head !== state.head ? `main moved during the run (${String(state.head).slice(0, 9)} -> ${String(after.head).slice(0, 9)}); run /starci release again` : 'the checkout became dirty during the run', dirty: after.dirty.slice(0, 40) };
-  if (!state.ahead) return { ...out, verdict: 'green', pushed: 0, why: 'green; nothing ahead of origin/main to push' };
-  // The push, in the order the native push contract promises: dry run (secret scan), hooks alone, then the push.
-  const dry = pushRun({ repos: [repo], dryRun: true, record: false })[0];
-  out.dryRun = { wouldPush: Boolean(dry?.wouldPush), refused: dry?.refused ?? null, error: dry?.error ?? null };
-  if (dry?.refused || dry?.error) return { ...out, verdict: 'push-refused', why: dry.refused ?? dry.error, hint: dry.hint ?? null, scan: dry.scan ?? null };
-  const hooks = pushRun({ repos: [repo], hooksOnly: true, record: false })[0];
-  out.hooks = { result: hooks?.hooks ?? null, error: hooks?.error ?? null };
-  if (hooks?.hooks !== 'green') return { ...out, verdict: 'hooks-red', why: `pre-push hook ${hooks?.hooks ?? 'unavailable'}: ${String(hooks?.error ?? '').slice(0, 300)}` };
-  if (check) return { ...out, verdict: 'green', pushed: 0, checkOnly: true, why: `green; ${state.ahead} commit(s) would be pushed (--check)` };
-  const pushed = pushRun({ repos: [repo] })[0];
-  out.push = { pushed: Boolean(pushed?.pushed), head: pushed?.head ?? null, refused: pushed?.refused ?? null, error: pushed?.error ?? null, skipped: pushed?.skipped ?? null, line: describePush(pushed ?? { repo }) };
-  if (!pushed?.pushed) return { ...out, verdict: 'push-refused', why: pushed?.refused ?? pushed?.error ?? pushed?.skipped ?? 'the push did not go through', pushed: 0 };
-  return { ...out, verdict: 'green', pushed: state.ahead };
+  return pushAfterChecks(repo, out, state, check, pushRun);
 }
 
 /** Which repositories: explicit --repo list, else the runtime plus every bound product repository (push-mains' set). */
@@ -284,7 +312,11 @@ export function describeRun(run) {
   const out = [];
   for (const r of run.repos) describeRepo(r, out);
   if (run.notRun?.length) out.push(`not run (stopped at the first red): ${run.notRun.join(', ')}`);
-  out.push(run.ok ? 'PUSH-GIT ' + (run.check ? 'CHECK ' : '') + 'GREEN' + (run.check ? '' : ': ' + run.pushed + ' commit(s) pushed') : 'PUSH-GIT RED: fix the failing groups, land the fixes (starci supervisor land --specs touching), then run starci supervisor push again');
+  if (run.ok) {
+    const check = run.check ? 'CHECK ' : '';
+    const pushed = run.check ? '' : ': ' + run.pushed + ' commit(s) pushed';
+    out.push('PUSH-GIT ' + check + 'GREEN' + pushed);
+  } else out.push('PUSH-GIT RED: fix the failing groups, land the fixes (starci supervisor land --specs touching), then run starci supervisor push again');
   return out.join('\n');
 }
 

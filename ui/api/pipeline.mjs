@@ -31,7 +31,7 @@ function attemptStatus(row) {
 
 function levelsOf(ops, edges) {
   const level = Object.fromEntries(ops.map(op => [op, 0]));
-  for (let pass = 0; pass < ops.length; pass++) {
+  for (const _ of ops) {
     let changed = false;
     for (const [from, to] of edges) if (level[from] != null && level[to] != null && level[to] < level[from] + 1) { level[to] = level[from] + 1; changed = true; }
     if (!changed) break;
@@ -89,7 +89,7 @@ function legStatus(leg, units, attempts) {
   if (open.length) return 'settling';
   // A unit whose latest try asked the owner waits for the answer; it did not fail.
   const latest = attempts[attempts.length - 1];
-  if (latest && latest.ui === 'awaiting-owner') return 'awaiting-owner';
+  if (latest?.ui === 'awaiting-owner') return 'awaiting-owner';
   if (units.some(u => u.state === 'failed')) return 'failed';
   if (units.some(u => ['running', 'reported', 'deciding'].includes(u.state))) return 'running';
   if (attempts.some(a => a.verdict && a.verdict !== 'pass')) return 'retry';

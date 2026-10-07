@@ -21,10 +21,18 @@ function walkYaml(stack, out) {
   let seen = 0;
   while (stack.length && seen < WORK_WALK_MAX) {
     const at = stack.pop();
-    let st; try { st = fs.statSync(at); } catch { continue; }
-    if (st.isFile()) { if (/\.ya?ml$/i.test(at)) { out.add(at); seen += 1; } continue; }
-    if (!st.isDirectory()) continue;
-    let names = []; try { names = fs.readdirSync(at); } catch { continue; }
-    for (const n of names) if (n !== 'node_modules' && !n.startsWith('.git')) stack.push(path.join(at, n));
+    seen += visitYamlPath(at, stack, out);
   }
+}
+
+function visitYamlPath(at, stack, out) {
+  let st; try { st = fs.statSync(at); } catch { return 0; }
+  if (st.isFile()) {
+    if (/\.ya?ml$/i.test(at)) { out.add(at); return 1; }
+    return 0;
+  }
+  if (!st.isDirectory()) return 0;
+  let names = []; try { names = fs.readdirSync(at); } catch { return 0; }
+  for (const n of names) if (n !== 'node_modules' && !n.startsWith('.git')) stack.push(path.join(at, n));
+  return 0;
 }

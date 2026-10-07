@@ -14,37 +14,40 @@ const PUNCTUATORS = new Set(['{', '}', '(', ')', '[', ']', ':', '!', '=', '$', '
 const BUILT_IN_SCALARS = new Set(['String', 'Int', 'Float', 'Boolean', 'ID']);
 
 /** The tokens of a GraphQL source: names, punctuators, `...`, strings and numbers; comments and commas are insignificant. */
+function commentEnd(source, index) { while (index < source.length && source[index] !== '\n') index += 1; return index; }
+function blockStringAt(source, index) { const end = source.indexOf('"""', index + 3); if (end === -1) throw new SyntaxError('unterminated block string'); return { token: { kind: 'string', value: source.slice(index + 3, end) }, next: end + 3 }; }
+function quotedStringAt(source, index) { let end = index + 1; while (end < source.length && source[end] !== '"') end += source[end] === '\\' ? 2 : 1; return { token: { kind: 'string', value: source.slice(index + 1, end) }, next: end + 1 }; }
+function nameAt(source, index) { const match = /^[_A-Za-z]\w*/.exec(source.slice(index)); return { token: { kind: 'name', value: match[0] }, next: index + match[0].length }; }
+function numberAt(source, index) { return /^-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/.exec(source.slice(index)); }
 export function tokenize(source) {
   const tokens = [];
   let index = 0;
   while (index < source.length) {
     const char = source[index];
     if (char === '#') {
-      while (index < source.length && source[index] !== '\n') index += 1;
+      index = commentEnd(source, index);
     } else if (/[\s,﻿]/.test(char)) {
       index += 1;
     } else if (source.startsWith('...', index)) {
       tokens.push({ kind: 'spread', value: '...' });
       index += 3;
     } else if (source.startsWith('"""', index)) {
-      const end = source.indexOf('"""', index + 3);
-      if (end === -1) throw new SyntaxError('unterminated block string');
-      tokens.push({ kind: 'string', value: source.slice(index + 3, end) });
-      index = end + 3;
+      const parsed = blockStringAt(source, index);
+      tokens.push(parsed.token);
+      index = parsed.next;
     } else if (char === '"') {
-      let end = index + 1;
-      while (end < source.length && source[end] !== '"') end += source[end] === '\\' ? 2 : 1;
-      tokens.push({ kind: 'string', value: source.slice(index + 1, end) });
-      index = end + 1;
+      const parsed = quotedStringAt(source, index);
+      tokens.push(parsed.token);
+      index = parsed.next;
     } else if (PUNCTUATORS.has(char)) {
       tokens.push({ kind: 'punct', value: char });
       index += 1;
     } else if (/[_A-Za-z]/.test(char)) {
-      const match = /^[_A-Za-z]\w*/.exec(source.slice(index));
-      tokens.push({ kind: 'name', value: match[0] });
-      index += match[0].length;
+      const parsed = nameAt(source, index);
+      tokens.push(parsed.token);
+      index = parsed.next;
     } else if (/[-0-9]/.test(char)) {
-      const match = /^-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/.exec(source.slice(index));
+      const match = numberAt(source, index);
       if (!match) throw new SyntaxError(`unexpected character "${char}"`);
       tokens.push({ kind: 'number', value: match[0] });
       index += match[0].length;
@@ -268,48 +271,85 @@ function parseValue(cursor) {
 }
 
 /** A selection set: [{ kind: 'field', name, alias, args: Map, selections } | { kind: 'inline', on, selections } | { kind: 'spread', name }]. */
+function parseSpreadSelection(cursor) {
+  cursor.next();
+  if (cursor.is('on')) {
+    cursor.name();
+    const on = cursor.name();
+    skipDirectives(cursor);
+    return { kind: 'inline', on, selections: parseSelectionSet(cursor) };
+  }
+  if (cursor.is('{') || cursor.is('@')) {
+    skipDirectives(cursor);
+    return { kind: 'inline', on: null, selections: parseSelectionSet(cursor) };
+  }
+  const selection = { kind: 'spread', name: cursor.name() };
+  skipDirectives(cursor);
+  return selection;
+}
+
+function parseFieldSelection(cursor) {
+  let name = cursor.name();
+  let alias = null;
+  if (cursor.take(':')) {
+    alias = name;
+    name = cursor.name();
+  }
+  const args = new Map();
+  if (cursor.take('(')) {
+    while (!cursor.take(')')) {
+      const argName = cursor.name();
+      cursor.expect(':');
+      args.set(argName, parseValue(cursor));
+    }
+  }
+  skipDirectives(cursor);
+  const subSelections = cursor.is('{') ? parseSelectionSet(cursor) : null;
+  return { kind: 'field', name, alias, args, selections: subSelections };
+}
+
 function parseSelectionSet(cursor) {
   const selections = [];
   cursor.expect('{');
   while (!cursor.take('}')) {
-    if (cursor.peek()?.kind === 'spread') {
-      cursor.next();
-      if (cursor.is('on')) {
-        cursor.name();
-        const on = cursor.name();
-        skipDirectives(cursor);
-        selections.push({ kind: 'inline', on, selections: parseSelectionSet(cursor) });
-      } else if (cursor.is('{') || cursor.is('@')) {
-        skipDirectives(cursor);
-        selections.push({ kind: 'inline', on: null, selections: parseSelectionSet(cursor) });
-      } else {
-        selections.push({ kind: 'spread', name: cursor.name() });
-        skipDirectives(cursor);
-      }
-      continue;
-    }
-    let name = cursor.name();
-    let alias = null;
-    if (cursor.take(':')) {
-      alias = name;
-      name = cursor.name();
-    }
-    const args = new Map();
-    if (cursor.take('(')) {
-      while (!cursor.take(')')) {
-        const argName = cursor.name();
-        cursor.expect(':');
-        args.set(argName, parseValue(cursor));
-      }
-    }
-    skipDirectives(cursor);
-    const subSelections = cursor.is('{') ? parseSelectionSet(cursor) : null;
-    selections.push({ kind: 'field', name, alias, args, selections: subSelections });
+    if (cursor.peek()?.kind === 'spread') selections.push(parseSpreadSelection(cursor));
+    else selections.push(parseFieldSelection(cursor));
   }
   return selections;
 }
 
 /** The operations and fragments of an executable document. */
+function parseDocumentVariables(cursor) {
+  const variables = new Map();
+  if (cursor.take('(')) {
+    while (!cursor.take(')')) {
+      cursor.expect('$');
+      const variable = cursor.name();
+      cursor.expect(':');
+      const type = parseTypeRef(cursor);
+      if (cursor.take('=')) skipValue(cursor);
+      skipDirectives(cursor);
+      variables.set(variable, type);
+    }
+  }
+  return variables;
+}
+
+function parseFragmentDefinition(cursor) {
+  const name = cursor.name();
+  if (!cursor.take('on')) throw new SyntaxError(`fragment ${name} names no type condition`);
+  const on = cursor.name();
+  skipDirectives(cursor);
+  return { name, fragment: { on, selections: parseSelectionSet(cursor) } };
+}
+
+function parseOperationDefinition(cursor, keyword) {
+  const name = cursor.peek()?.kind === 'name' ? cursor.name() : null;
+  const variables = parseDocumentVariables(cursor);
+  skipDirectives(cursor);
+  return { operation: keyword, name, variables, selections: parseSelectionSet(cursor) };
+}
+
 export function parseDocument(source) {
   const cursor = cursorOf(tokenize(source));
   const operations = [];
@@ -321,97 +361,123 @@ export function parseDocument(source) {
     }
     const keyword = cursor.name();
     if (keyword === 'fragment') {
-      const name = cursor.name();
-      if (!cursor.take('on')) throw new SyntaxError(`fragment ${name} names no type condition`);
-      const on = cursor.name();
-      skipDirectives(cursor);
-      fragments.set(name, { on, selections: parseSelectionSet(cursor) });
+      const definition = parseFragmentDefinition(cursor);
+      fragments.set(definition.name, definition.fragment);
       continue;
     }
     if (keyword !== 'query' && keyword !== 'mutation' && keyword !== 'subscription') throw new SyntaxError(`unexpected "${keyword}" in a document`);
-    const name = cursor.peek()?.kind === 'name' ? cursor.name() : null;
-    const variables = new Map();
-    if (cursor.take('(')) {
-      while (!cursor.take(')')) {
-        cursor.expect('$');
-        const variable = cursor.name();
-        cursor.expect(':');
-        const type = parseTypeRef(cursor);
-        if (cursor.take('=')) skipValue(cursor);
-        skipDirectives(cursor);
-        variables.set(variable, type);
-      }
-    }
-    skipDirectives(cursor);
-    operations.push({ operation: keyword, name, variables, selections: parseSelectionSet(cursor) });
+    operations.push(parseOperationDefinition(cursor, keyword));
   }
   return { operations, fragments };
 }
 
 const typeText = (type) => (type.list ? `[${typeText(type.item)}]` : type.name) + (type.nonNull ? '!' : '');
 
-/** The problems of one value against the input type it is passed as. */
-function valueProblems(schema, value, type, where, operation, used) {
+function variableProblems(value, type, where, operation, used) {
   if (value.kind === 'variable') {
     used.add(value.name);
     const declared = operation.variables.get(value.name);
     if (declared === undefined) return [`${where} uses $${value.name}, which the operation does not declare`];
     return declared.name === type.name ? [] : [`${where} takes ${typeText(type)}, but $${value.name} is ${typeText(declared)}`];
   }
+  return null;
+}
+
+function objectValueProblems(schema, value, type, where, operation, used, named) {
+  if (named?.kind !== 'input') return [`${where} is an object, but ${type.name} is not an input type`];
+  const problems = [];
+  for (const [field, inner] of value.fields) {
+    const declared = named.fields.get(field);
+    if (declared === undefined) problems.push(`${where} names ${field}, which the input ${type.name} does not declare (it declares ${[...named.fields.keys()].join(', ') || 'nothing'})`);
+    else problems.push(...valueProblems(schema, inner, declared.type, `${where}.${field}`, operation, used));
+  }
+  for (const [field, declared] of named.fields) {
+    if (declared.type.nonNull && !declared.hasDefault && !value.fields.has(field)) problems.push(`${where} omits ${field}, which the input ${type.name} requires`);
+  }
+  return problems;
+}
+
+/** The problems of one value against the input type it is passed as. */
+function valueProblems(schema, value, type, where, operation, used) {
+  const variable = variableProblems(value, type, where, operation, used);
+  if (variable !== null) return variable;
   if (type.list && value.kind === 'list') return value.items.flatMap((item, i) => valueProblems(schema, item, type.item, `${where}[${i}]`, operation, used));
   const named = schema.types.get(type.name);
-  if (value.kind === 'object') {
-    if (named?.kind !== 'input') return [`${where} is an object, but ${type.name} is not an input type`];
-    const problems = [];
-    for (const [field, inner] of value.fields) {
-      const declared = named.fields.get(field);
-      if (declared === undefined) problems.push(`${where} names ${field}, which the input ${type.name} does not declare (it declares ${[...named.fields.keys()].join(', ') || 'nothing'})`);
-      else problems.push(...valueProblems(schema, inner, declared.type, `${where}.${field}`, operation, used));
-    }
-    for (const [field, declared] of named.fields) {
-      if (declared.type.nonNull && !declared.hasDefault && !value.fields.has(field)) problems.push(`${where} omits ${field}, which the input ${type.name} requires`);
-    }
-    return problems;
-  }
+  if (value.kind === 'object') return objectValueProblems(schema, value, type, where, operation, used, named);
   return [];
+}
+
+function fragmentSelectionProblems(context, selection) {
+  const { schema, document, parentName, path, operation, used, visiting } = context;
+  const fragment = document.fragments.get(selection.name);
+  if (fragment === undefined) return [`${path} spreads ...${selection.name}, which the document does not define`];
+  if (visiting.has(selection.name)) return [];
+  return selectionProblems({ schema, document, parentName: fragment.on, selections: fragment.selections, path, operation, used, visiting: new Set([...visiting, selection.name]) });
+}
+
+function inlineSelectionProblems(context, selection) {
+  const { schema, document, parentName, path, operation, used, visiting } = context;
+  return selectionProblems({ schema, document, parentName: selection.on ?? parentName, selections: selection.selections, path, operation, used, visiting });
+}
+
+function fieldArgumentProblems({ schema, parentName, operation, used }, selection, where, field) {
+  const problems = [];
+  for (const [arg, value] of selection.args) {
+    const declared = field.args.get(arg);
+    if (declared === undefined) problems.push(`${where} passes ${arg}, which ${parentName}.${selection.name} does not take (it takes ${[...field.args.keys()].join(', ') || 'no argument'})`);
+    else problems.push(...valueProblems(schema, value, declared.type, `${where}(${arg})`, operation, used));
+  }
+  return problems;
+}
+
+function requiredFieldArgumentProblems(parentName, selection, where, field) {
+  const problems = [];
+  for (const [arg, declared] of field.args) {
+    if (declared.type.nonNull && !declared.hasDefault && !selection.args.has(arg)) problems.push(`${where} omits ${arg}, which ${parentName}.${selection.name} requires`);
+  }
+  return problems;
+}
+
+function fieldSelectionShapeProblems(context, selection, where, field) {
+  const { schema, document, operation, used, visiting } = context;
+  const target = schema.types.get(field.type.name);
+  const leaf = BUILT_IN_SCALARS.has(field.type.name) || target?.kind === 'scalar' || target?.kind === 'enum';
+  if (leaf && selection.selections !== null) return [`${where} is a ${field.type.name}, which selects no fields`];
+  if (!leaf && selection.selections === null) return [`${where} is a ${field.type.name}, which needs a selection of its fields`];
+  if (!leaf) return selectionProblems({ schema, document, parentName: field.type.name, selections: selection.selections, path: where, operation, used, visiting });
+  return [];
+}
+
+function fieldSelectionProblems(context, parent, selection) {
+  const { parentName } = context;
+  const where = `${context.path}.${selection.name}`;
+  const field = parent?.fields?.get(selection.name);
+  if (field === undefined) {
+    const known = parent?.fields ? [...parent.fields.keys()].join(', ') : 'nothing';
+    return [`${where} is not a field of ${parentName} (it has ${known})`];
+  }
+  const problems = fieldArgumentProblems(context, selection, where, field);
+  problems.push(...requiredFieldArgumentProblems(parentName, selection, where, field));
+  problems.push(...fieldSelectionShapeProblems(context, selection, where, field));
+  return problems;
 }
 
 /** The problems of one selection set against its parent type. */
 function selectionProblems({ schema, document, parentName, selections, path, operation, used, visiting = new Set() }) {
+  const context = { schema, document, parentName, path, operation, used, visiting };
   const parent = schema.types.get(parentName);
   const problems = [];
   for (const selection of selections) {
     if (selection.kind === 'spread') {
-      const fragment = document.fragments.get(selection.name);
-      if (fragment === undefined) problems.push(`${path} spreads ...${selection.name}, which the document does not define`);
-      else if (!visiting.has(selection.name)) problems.push(...selectionProblems({ schema, document, parentName: fragment.on, selections: fragment.selections, path, operation, used, visiting: new Set([...visiting, selection.name]) }));
+      problems.push(...fragmentSelectionProblems(context, selection));
       continue;
     }
     if (selection.kind === 'inline') {
-      problems.push(...selectionProblems({ schema, document, parentName: selection.on ?? parentName, selections: selection.selections, path, operation, used, visiting }));
+      problems.push(...inlineSelectionProblems(context, selection));
       continue;
     }
     if (selection.name === '__typename') continue;
-    const where = `${path}.${selection.name}`;
-    const field = parent?.fields?.get(selection.name);
-    if (field === undefined) {
-      const known = parent?.fields ? [...parent.fields.keys()].join(', ') : 'nothing';
-      problems.push(`${where} is not a field of ${parentName} (it has ${known})`);
-      continue;
-    }
-    for (const [arg, value] of selection.args) {
-      const declared = field.args.get(arg);
-      if (declared === undefined) problems.push(`${where} passes ${arg}, which ${parentName}.${selection.name} does not take (it takes ${[...field.args.keys()].join(', ') || 'no argument'})`);
-      else problems.push(...valueProblems(schema, value, declared.type, `${where}(${arg})`, operation, used));
-    }
-    for (const [arg, declared] of field.args) {
-      if (declared.type.nonNull && !declared.hasDefault && !selection.args.has(arg)) problems.push(`${where} omits ${arg}, which ${parentName}.${selection.name} requires`);
-    }
-    const target = schema.types.get(field.type.name);
-    const leaf = BUILT_IN_SCALARS.has(field.type.name) || target?.kind === 'scalar' || target?.kind === 'enum';
-    if (leaf && selection.selections !== null) problems.push(`${where} is a ${field.type.name}, which selects no fields`);
-    else if (!leaf && selection.selections === null) problems.push(`${where} is a ${field.type.name}, which needs a selection of its fields`);
-    else if (!leaf) problems.push(...selectionProblems({ schema, document, parentName: field.type.name, selections: selection.selections, path: where, operation, used, visiting }));
+    problems.push(...fieldSelectionProblems(context, parent, selection));
   }
   return problems;
 }

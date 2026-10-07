@@ -40,23 +40,26 @@ function stampOf(text) {
 }
 
 // `id` may carry a trailing parenthetical note; the const is the first token.
+const cataloguedSchemaId = (entry) => String(entry?.id ?? '').trim().split(/\s+/)[0];
+const addCataloguedSchema = (entry, catalogued, errors) => {
+  const id = cataloguedSchemaId(entry);
+  if (catalogued.has(id)) errors.push(`${id} is listed twice under schemas[].id`);
+  if (id) catalogued.set(id, 'schemas[].id');
+};
+const addModuleLocalKind = (entry, catalogued, moduleLocal, errors) => {
+  const id = String(entry?.id ?? '').trim();
+  if (!id) { errors.push('moduleLocalDocumentKinds holds an entry with no id'); return; }
+  if (catalogued.has(id)) errors.push(`${id} is listed both as a catalogued schema and a module-local document kind — one place only`);
+  if (moduleLocal.has(id)) errors.push(`${id} is listed twice under moduleLocalDocumentKinds`);
+  const declared = Array.isArray(entry?.files) ? entry.files.map(String) : [];
+  if (!declared.length) errors.push(`moduleLocalDocumentKinds entry ${id} declares no files[]`);
+  moduleLocal.set(id, declared);
+};
 const catalogMaps = (catalog, errors) => {
   const catalogued = new Map();
-  for (const entry of catalog?.schemas ?? []) {
-    const id = String(entry?.id ?? '').trim().split(/\s+/)[0];
-    if (catalogued.has(id)) errors.push(`${id} is listed twice under schemas[].id`);
-    if (id) catalogued.set(id, 'schemas[].id');
-  }
+  for (const entry of catalog?.schemas ?? []) addCataloguedSchema(entry, catalogued, errors);
   const moduleLocal = new Map();
-  for (const entry of catalog?.moduleLocalDocumentKinds ?? []) {
-    const id = String(entry?.id ?? '').trim();
-    if (!id) { errors.push('moduleLocalDocumentKinds holds an entry with no id'); continue; }
-    if (catalogued.has(id)) errors.push(`${id} is listed both as a catalogued schema and a module-local document kind — one place only`);
-    if (moduleLocal.has(id)) errors.push(`${id} is listed twice under moduleLocalDocumentKinds`);
-    const declared = Array.isArray(entry?.files) ? entry.files.map(String) : [];
-    if (!declared.length) errors.push(`moduleLocalDocumentKinds entry ${id} declares no files[]`);
-    moduleLocal.set(id, declared);
-  }
+  for (const entry of catalog?.moduleLocalDocumentKinds ?? []) addModuleLocalKind(entry, catalogued, moduleLocal, errors);
   return { catalogued, moduleLocal };
 };
 

@@ -59,6 +59,7 @@ import { safeRemove } from '../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 import { ACCENT_EXEMPT_SELECTOR } from './draw/draw-taste.mjs';
 import { LAYER_PROBE, measureLayer } from './draw/draw-layer.mjs';
+import { measurePage } from './draw-render-page.mjs';
 import { MEASURE_SCHEMA, REDLINE_ATTR, REDLINE_LEAF_COMPONENTS, WHY_ATTR, drawRedlines, loadRationale, measureRationale, rationaleFileOf, redlineLabelsOf } from './draw/draw-rationale.mjs';
 import { DRAW_SOURCE_SUFFIX, GRAMMAR_PACKAGE, LAYOUT_ATTR, markLayoutElements, rationaleFileFor, typecheckFindings } from './draw/draw-source.mjs';
 import { grammarDistStatus, grammarDistMessage } from '../gates/grammar-dist.mjs';
@@ -99,15 +100,31 @@ const BOOL_FLAGS = new Set(['--full-page', '--json', '--trace']);
 /** argv -> options; throws UsageError. */
 export function parseArgs(argv) {
   const o = { css: [], fullPage: false, json: false, theme: 'light' };
+  assignArguments(argv, o);
+  normalizeCommonArgs(o);
+  normalizeDrawName(o);
+  return o;
+}
+
+function booleanOptionOf(arg) {
+  if (arg === '--full-page') { return 'fullPage'; }
+  if (arg === '--trace') { return 'trace'; }
+  return 'json';
+}
+
+function assignArguments(argv, o) {
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
-    if (BOOL_FLAGS.has(a)) { o[(() => { if (a === '--full-page') return 'fullPage'; if (a === '--trace') return 'trace'; return 'json'; })()] = true; continue; }
+    if (BOOL_FLAGS.has(a)) { o[booleanOptionOf(a)] = true; continue; }
     if (!VALUE_FLAGS.has(a)) throw new UsageError(`unknown argument ${a}`);
     const v = argv[++i];
     if (v == null || v.startsWith('--')) throw new UsageError(`${a} needs a value`);
-    if (a === '--css') o.css.push(path.resolve(v));
-    else o[a.slice(2)] = v;
+    if (a === '--css') { o.css.push(path.resolve(v)); }
+    else { o[a.slice(2)] = v; }
   }
+}
+
+function normalizeCommonArgs(o) {
   if (!o.out) throw new UsageError('--out <dir> is required');
   if (!o.viewports) throw new UsageError('--viewports <WxH,...> is required');
   o.viewports = parseViewports(o.viewports);
@@ -122,7 +139,12 @@ export function parseArgs(argv) {
   if (o['harness-out']) { o.harnessOut = path.resolve(o['harness-out']); delete o['harness-out']; }
   if (o.export && !/^[A-Za-z_$][\w$]*$/.test(o.export)) throw new UsageError(`--export ${o.export} is not an identifier`);
   o.mode = o.html ? 'html' : 'component';
-  for (const k of ['html', 'component', 'props', 'out', 'rationale', 'product']) if (o[k]) o[k] = path.resolve(o[k]);
+  for (const k of ['html', 'component', 'props', 'out', 'rationale', 'product']) {
+    if (o[k]) { o[k] = path.resolve(o[k]); }
+  }
+}
+
+function normalizeDrawName(o) {
   // Owner ruling 2026-09-27: a drawing is the XBase content only, one per XBase#state - `--state <state>` names the
   // capture <XBase>#<state>--<w>x<h>--<theme> (the XBase is --export, or --base for an html render of it).
   if (o.state != null && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(o.state)) throw new UsageError(`--state ${o.state} must be a lowercase slug`);
@@ -187,137 +209,34 @@ export function judgeCapture(m) {
 }
 
 /** Fixture JSON -> props: every "[Function]" becomes a no-op. */
-export const fixtureProps = (value) => (() => { if (value === FUNCTION_FIXTURE) return '__DRAW_NOOP__'; if (Array.isArray(value)) return value.map(fixtureProps); if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, fixtureProps(v)])); return value; })();
+export const fixtureProps = (value) => {
+  if (value === FUNCTION_FIXTURE) { return '__DRAW_NOOP__'; }
+  if (Array.isArray(value)) { return value.map(fixtureProps); }
+  if (value && typeof value === 'object') { return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, fixtureProps(v)])); }
+  return value;
+};
 
 /** Candidate class tokens of a bundle for tailwind's build(): everything between quotes and whitespace. */
 export const classCandidates = (text) => [...new Set(String(text).split(/[\s"'`\\]+/).filter((t) => t.length > 0 && t.length <= 200))];
 
+function rationalePathOf(value) {
+  if (typeof value === 'string') { return value; }
+  return value?.file ?? null;
+}
+
+function dataImageDigest(src) {
+  const match = /^data:[^,]*;base64,(.*)$/s.exec(src);
+  return match ? sha256(Buffer.from(match[1], 'base64')) : null;
+}
+
+async function httpImageDigest(src, page) {
+  const response = await page.request.get(src);
+  return response.ok() ? sha256(await response.body()) : null;
+}
+
 /* --------------------------------------------------------------- the page */
 
-function measurePage({ generic, exemptSelector, layoutAttr = 'data-draw-layout' }) {
-  const faces = [...document.fonts].map((f) => ({ family: f.family.replace(/^(["'])(.*)\1$/, '$2'), weight: f.weight, style: f.style, status: f.status }));
-  const stacks = new Set();
-  const visible = (el) => { const cs = getComputedStyle(el); return cs.display !== 'none' && cs.visibility !== 'hidden'; };
-  const walker = document.createTreeWalker(document.body ?? document.documentElement, NodeFilter.SHOW_TEXT);
-  for (let n = walker.nextNode(); n; n = walker.nextNode()) {
-    const el = n.parentElement;
-    if (el && n.textContent.trim() && !['SCRIPT', 'STYLE', 'NOSCRIPT', 'TEMPLATE'].includes(el.tagName) && visible(el)) stacks.add(getComputedStyle(el).fontFamily);
-  }
-  for (const el of document.querySelectorAll('input,textarea,select,button')) if (visible(el)) stacks.add(getComputedStyle(el).fontFamily);
-  const ctx = document.createElement('canvas').getContext('2d');
-  const sample = 'mmmmmmmmmmlli10WQ@#';
-  const width = (font) => { ctx.font = `72px ${font}`; return ctx.measureText(sample).width; };
-  const families = new Set([...stacks].flatMap((s) => s.split(',').map((f) => f.trim().replace(/^(["'])(.*)\1$/, '$2'))).filter((f) => f && !generic.includes(f.toLowerCase())));
-  const local = [...families].filter((f) => ['monospace', 'serif', 'sans-serif'].some((b) => width(`"${f}", ${b}`) !== width(b)));
-  const de = document.documentElement;
-  const pageWidth = de.clientWidth;
-  const scrollWidth = Math.max(de.scrollWidth, document.body?.scrollWidth ?? 0);
-  const overflowing = scrollWidth > pageWidth ? [...document.querySelectorAll('body *')].filter((el) => el.getBoundingClientRect().right > pageWidth + 0.5)
-    .slice(0, 10).map((el) => el.tagName.toLowerCase() + (el.id ? '#' + el.id : '') + (typeof el.className === 'string' && el.className ? '.' + el.className.trim().split(/\s+/).slice(0, 3).join('.') : '')) : [];
-  const root = document.getElementById('root');
-  // The brand art band a drawing marks (draw-taste.mjs ACCENT_EXEMPT_SELECTOR): its rects, in document CSS px, are
-  // exempt from the accent budget.
-  let accentExempt = [];
-  try {
-    accentExempt = [...document.querySelectorAll(exemptSelector)].map((el) => el.getBoundingClientRect())
-      .filter((r) => r.width > 0 && r.height > 0).map((r) => ({ x: r.left + scrollX, y: r.top + scrollY, width: r.width, height: r.height }));
-  } catch { accentExempt = []; }
-  // Every visible <img> with its source and its painted box (document CSS px, clipped by every overflow-clipping
-  // ancestor): brand-palette.mjs exempts exactly the box of an image whose bytes are a registered brand artwork
-  // master (brand.artworkSlots), never a colour.
-  let artwork = [];
-  try {
-    artwork = [...document.querySelectorAll('img')].filter((el) => visible(el) && (el.currentSrc || el.src)).map((el) => {
-      const r = el.getBoundingClientRect();
-      let x0 = r.left, y0 = r.top, x1 = r.right, y1 = r.bottom;
-      for (let a = el.parentElement; a; a = a.parentElement) {
-        const cs = getComputedStyle(a);
-        if (cs.overflowX !== 'visible' || cs.overflowY !== 'visible') {
-          const c = a.getBoundingClientRect();
-          x0 = Math.max(x0, c.left); y0 = Math.max(y0, c.top); x1 = Math.min(x1, c.right); y1 = Math.min(y1, c.bottom);
-        }
-      }
-      return { src: el.currentSrc || el.src, slot: el.closest('[data-artwork-slot]')?.getAttribute('data-artwork-slot') ?? null,
-        x: x0 + scrollX, y: y0 + scrollY, width: Math.max(0, x1 - x0), height: Math.max(0, y1 - y0) };
-    }).filter((a) => a.width > 0 && a.height > 0);
-  } catch { artwork = []; }
-  // The anatomy draw-dna.mjs anatomyFindings judges (owner rulings 2026-09-27): each Alert's computed background
-  // against the --surface token, its indicator box and colours; each Meter's track box against its band's content box,
-  // and its segments.
-  const anatomy = { alerts: [], meters: [] };
-  try {
-    const tag = (el) => el.tagName.toLowerCase() + (el.id ? '#' + el.id : '');
-    const probe = document.createElement('div');
-    probe.style.cssText = 'position:absolute;visibility:hidden;background-color:var(--surface)';
-    document.body.appendChild(probe);
-    const surface = getComputedStyle(probe).backgroundColor;
-    probe.remove();
-    const partIn = (root, names) => [...root.querySelectorAll('[data-grammar-part]')].find((d) => names.includes(d.getAttribute('data-grammar-part').trim()));
-    // A real grammar render marks its roots data-component (a hand-drawn html one data-grammar-component).
-    for (const el of document.querySelectorAll('[data-grammar-component="Alert"],[data-component="Alert"]')) {
-      if (el.hasAttribute('data-grammar-part')) continue;
-      const indicator = partIn(el, ['alert-indicator', 'indicator']) ?? el.querySelector('.alert__indicator');
-      const title = partIn(el, ['alert-title', 'title']) ?? el.querySelector('.alert__title');
-      const box = indicator?.getBoundingClientRect();
-      anatomy.alerts.push({ desc: tag(el), background: getComputedStyle(el).backgroundColor, surface,
-        indicator: box ? { width: box.width, height: box.height } : null, tile: Boolean(el.querySelector('[data-grammar-component="IconTile"],[data-component="IconTile"]')),
-        indicatorColor: indicator ? getComputedStyle(indicator.querySelector('svg') ?? indicator).color : null, titleColor: title ? getComputedStyle(title).color : null });
-    }
-    for (const el of document.querySelectorAll('[data-grammar-component="Meter"],[data-component="Meter"]')) {
-      if (el.hasAttribute('data-grammar-part')) continue;
-      const track = partIn(el, ['meter-track', 'track']) ?? el.querySelector('.meter__track');
-      const band = el.parentElement;
-      if (!track || !band) continue;
-      const cs = getComputedStyle(band);
-      const t = track.getBoundingClientRect();
-      const segments = [...el.querySelectorAll('[data-grammar-part*="segment"]:not([data-grammar-part$="segments"]), .starci-core-meter-segment, [data-grammar-meter-segment]')]
-        .map((d) => d.getBoundingClientRect()).map((r) => ({ x: r.left, width: r.width }));
-      const segmented = el.hasAttribute('data-grammar-meter-segments') || el.hasAttribute('data-segments') || segments.length > 1;
-      anatomy.meters.push({ desc: tag(el), segmented, track: { width: t.width, height: t.height },
-        band: { width: band.clientWidth - Number.parseFloat(cs.paddingLeft || '0') - Number.parseFloat(cs.paddingRight || '0') }, segments });
-    }
-  } catch { /* the anatomy is advisory measurement; the static gate still runs */ }
-  // A real grammar drawing (fixture mode of a .draw.tsx): who owns every element that PAINTS - the nearest grammar
-  // marker (data-component, a data-grammar-* hook, a starci-core-* class) or a drawn layout element (layoutAttr, stamped
-  // by the bundle). Paint owned by layout is raw HTML imitating a component. Plus the DOM snapshot the html metrics read.
-  let ownership = null, dom = null;
-  if (document.documentElement.dataset.drawHarness === 'component' && root) {
-    const marked = (a) => a.hasAttribute('data-component') || [...a.attributes].some((n) => n.name.startsWith('data-grammar-')) || [...a.classList].some((c) => c.startsWith('starci-core-'));
-    const paints = (el) => {
-      const cs = getComputedStyle(el);
-      if (cs.display === 'none' || cs.visibility === 'hidden') return false;
-      if (['img', 'svg', 'canvas', 'video', 'picture'].includes(el.tagName.toLowerCase())) return true;
-      if ([...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())) return true;
-      if (cs.backgroundColor && !/^(?:transparent|rgba\(0, 0, 0, 0\))$/.test(cs.backgroundColor)) return true;
-      if (cs.backgroundImage && cs.backgroundImage !== 'none') return true;
-      if (['Top', 'Right', 'Bottom', 'Left'].some((side) => Number.parseFloat(cs[`border${side}Width`]) > 0 && cs[`border${side}Style`] !== 'none' && !/rgba\(0, 0, 0, 0\)/.test(cs[`border${side}Color`]))) return true;
-      return Boolean(cs.boxShadow && cs.boxShadow !== 'none');
-    };
-    const components = new Set();
-    const unowned = [];
-    let layoutElements = 0;
-    for (const el of root.querySelectorAll('*')) {
-      if (el.hasAttribute('data-component')) components.add(el.getAttribute('data-component'));
-      if (el.hasAttribute(layoutAttr)) layoutElements += 1;
-      if (el.closest('svg') && el.tagName.toLowerCase() !== 'svg') continue;
-      if (!paints(el)) continue;
-      let owner = null;
-      for (let a = el; a && a !== root; a = a.parentElement) {
-        if (marked(a)) { owner = 'grammar'; break; }
-        if (a.hasAttribute(layoutAttr)) { owner = 'layout'; break; }
-      }
-      if (owner !== 'grammar') unowned.push(el.tagName.toLowerCase() + (typeof el.className === 'string' && el.className ? '.' + el.className.trim().split(/\s+/).slice(0, 3).join('.') : '') + (el.textContent.trim() ? ' "' + el.textContent.trim().slice(0, 40) + '"' : '') + ` (${owner ?? 'no owner'})`);
-    }
-    ownership = { components: [...components].sort((left, right) => { if (left < right) return -1; if (left > right) return 1; return 0; }), layoutElements, unownedCount: unowned.length, unowned: unowned.slice(0, 20) };
-    const clone = document.documentElement.cloneNode(true);
-    for (const el of clone.querySelectorAll('[data-component]')) if (!el.hasAttribute('data-grammar-component')) el.setAttribute('data-grammar-component', el.getAttribute('data-component'));
-    for (const el of clone.querySelectorAll('script')) el.remove();
-    dom = `<!doctype html>
-${clone.outerHTML}`;
-  }
-  return { ownership, dom, anatomy, accentExempt, artwork, faces, stacks: [...stacks], local, pageWidth, innerWidth, scrollWidth, overflowing, documentHeight: de.scrollHeight,
-    rendered: document.documentElement.dataset.drawHarness === 'component' ? Boolean(root && root.childElementCount) : null };
-}
+
 
 /* -------------------------------------------------------------- capture */
 
@@ -334,8 +253,8 @@ export async function artworkDigests(images, page = null) {
       let digest = null;
       try {
         if (src.startsWith('file:')) digest = sha256(fs.readFileSync(fileURLToPath(src)));
-        else if (src.startsWith('data:')) { const m = /^data:[^,]*;base64,(.*)$/s.exec(src); if (m) digest = sha256(Buffer.from(m[1], 'base64')); }
-        else if (/^https?:/i.test(src) && page?.request) { const r = await page.request.get(src); if (r.ok()) digest = sha256(await r.body()); }
+        else if (src.startsWith('data:')) digest = dataImageDigest(src);
+        else if (/^https?:/i.test(src) && page?.request) digest = await httpImageDigest(src, page);
       } catch { digest = null; }
       cache.set(src, digest);
     }
@@ -443,7 +362,7 @@ async function captureViewport(browser, { url, viewport, theme, fullPage, file, 
 export async function captureHtml({ html, out, viewports, theme, fullPage, name, source, playwright, trace = false, rationale = undefined }) {
   fs.mkdirSync(out, { recursive: true });
   // The rationale beside the source (draw-rationale.mjs rationaleFileOf) labels the redline; an explicit one wins.
-  const rationaleFile = rationale === undefined ? rationaleFileOf(html) : (() => { if (typeof rationale === 'string') return rationale; return rationale?.file ?? null; })();
+  const rationaleFile = rationale === undefined ? rationaleFileOf(html) : rationalePathOf(rationale);
   const why = rationaleFile ? { file: rationaleFile, entries: loadRationale(rationaleFile).entries } : null;
   const browser = await playwright.chromium.launch().catch((e) => { throw new UsageError(`chromium launch failed (${playwright.name} ${playwright.version}): ${e.message.split('\n')[0]}`); });
   const records = [];
@@ -531,7 +450,7 @@ async function compileStylesheet(file, { dirs, esbuild, candidates, workDir, ind
 const ASSET_LOADERS = Object.freeze({ '.png': 'file', '.jpg': 'file', '.jpeg': 'file', '.gif': 'file', '.webp': 'file', '.svg': 'file',
   '.woff': 'file', '.woff2': 'file', '.ttf': 'file', '.otf': 'file' });
 
-const inside = (file, dir) => { if (!file || !dir) return false; const rel = path.relative(dir, file); return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel)); };
+const inside = (file, dir) => { if (!file || !dir) { return false; } const rel = path.relative(dir, file); return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel)); };
 
 /**
  * The esbuild plugin of a real grammar drawing: @starci/grammar[/<sub>] resolves into `grammarRoot` (the chosen
@@ -638,46 +557,69 @@ export async function run(argv, { cwd = process.cwd() } = {}) {
   const inferred = o.component ? (o.product ?? productDirOf(o.component) ?? (o.css ?? []).flat().map(productDirOf).find(Boolean) ?? null) : null;
   const playwright = loadPlaywright([anchor, ...(inferred ? [inferred] : []), cwd]);
   if (o.mode === 'html') {
-    const source = { mode: 'html', html: { path: o.html, sha256: sha256(fs.readFileSync(o.html)) } };
-    return captureHtml({ ...o, source, playwright, rationale: o.rationale ?? undefined });
+    return captureHtmlPage(o, playwright);
   }
+  return captureComponent(o, { cwd, inferred, playwright });
+}
+
+function captureHtmlPage(options, playwright) {
+  const source = { mode: 'html', html: { path: options.html, sha256: sha256(fs.readFileSync(options.html)) } };
+  return captureHtml({ ...options, source, playwright, rationale: options.rationale ?? undefined });
+}
+
+async function captureComponent(options, { cwd, inferred, playwright }) {
   // A real grammar drawing: the product app it renders in, and the grammar it type-checks against (draw-grammar.mjs).
-  const drawing = o.component.endsWith(DRAW_SOURCE_SUFFIX) || Boolean(o.product || o.grammar || o.grammarDist);
+  const drawing = options.component.endsWith(DRAW_SOURCE_SUFFIX) || Boolean(options.product || options.grammar || options.grammarDist);
   const productDir = drawing ? inferred : null;
-  if (drawing && !productDir) throw new UsageError(`${o.component}: give --product <app dir> (no package.json depending on ${GRAMMAR_PACKAGE} above it or above a --css file)`);
+  if (drawing && !productDir) throw new UsageError(`${options.component}: give --product <app dir> (no package.json depending on ${GRAMMAR_PACKAGE} above it or above a --css file)`);
   let grammar = null;
   if (drawing) {
-    if (o.grammarDist) preflightDrawGrammarDist(o.grammarDist);
-    grammar = resolveDrawGrammar({ file: o.component, productDir, prefer: o.grammar ?? 'auto', grammarDist: o.grammarDist ?? null });
+    if (options.grammarDist) preflightDrawGrammarDist(options.grammarDist);
+    grammar = resolveDrawGrammar({ file: options.component, productDir, prefer: options.grammar ?? 'auto', grammarDist: options.grammarDist ?? null });
     if (grammar.pick?.source === 'claude-dist') preflightDrawGrammarDist(grammar.pick.root);
-    if (!grammar.ok) throw new RedError(typecheckFindings(grammar.attempts.at(-1) ?? { ok: false, errors: [{ message: grammar.error }] }, { label: path.basename(o.component) })[0]?.detail ?? grammar.error, 'DRAW_TYPECHECK_FAILED');
+    if (!grammar.ok) throw new RedError(typecheckFindings(grammar.attempts.at(-1) ?? { ok: false, errors: [{ message: grammar.error }] }, { label: path.basename(options.component) })[0]?.detail ?? grammar.error, 'DRAW_TYPECHECK_FAILED');
   }
   const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-draw-render-'));
   try {
-    const { html, source } = await buildFixtureHarness({ component: o.component, exportName: o.export, props: o.props, css: o.css, theme: o.theme, workDir, cwd, productDir, grammar });
+    const { html, source } = await buildFixtureHarness({ component: options.component, exportName: options.export, props: options.props, css: options.css, theme: options.theme, workDir, cwd, productDir, grammar });
     // A drawing's rationale sits beside its draw source (draw-source.mjs rationaleFileFor), never beside the harness.
-    const records = await captureHtml({ ...o, html, source, playwright, rationale: o.rationale ?? (drawing ? rationaleFileFor(o.component) : null) });
-    if (o.harnessOut) { fs.mkdirSync(o.harnessOut, { recursive: true }); fs.cpSync(workDir, o.harnessOut, { recursive: true }); }
+    const records = await captureHtml({ ...options, html, source, playwright, rationale: options.rationale ?? (drawing ? rationaleFileFor(options.component) : null) });
+    if (options.harnessOut) { fs.mkdirSync(options.harnessOut, { recursive: true }); fs.cpSync(workDir, options.harnessOut, { recursive: true }); }
     return records;
   } finally {
     safeRemove(workDir, { hold: artifactHoldReason });
   }
 }
 
+function renderErrorMessage(error, usage) {
+  if (!(usage || error instanceof RedError)) { return error.stack; }
+  if (error.code) { return '[' + error.code + '] ' + error.message; }
+  return error.message;
+}
+
+function reportRecords(records, json) {
+  const ok = records.every((record) => record.ok);
+  if (json) { process.stdout.write(`${JSON.stringify({ ok, records }, null, 2)}\n`); }
+  else {
+    for (const record of records) { process.stdout.write(`${record.ok ? 'ok  ' : 'RED '} ${record.image.path}${record.failures.length ? '  ' + record.failures.join(', ') : ''}\n`); }
+  }
+  process.exitCode = ok ? EXIT.ok : EXIT.red;
+}
+
+function reportError(error, json) {
+  const usage = error instanceof UsageError;
+  if (json) { process.stdout.write(`${JSON.stringify({ ok: false, error: error.message, ...(error.code ? { code: error.code } : {}) }, null, 2)}\n`); }
+  process.stderr.write('draw-render: ' + renderErrorMessage(error, usage) + '\n');
+  process.exitCode = usage ? EXIT.usage : EXIT.red;
+}
+
 async function main() {
   const argv = process.argv.slice(2);
   const json = argv.includes('--json');
   try {
-    const records = await run(argv);
-    const ok = records.every((r) => r.ok);
-    if (json) process.stdout.write(`${JSON.stringify({ ok, records }, null, 2)}\n`);
-    else for (const r of records) process.stdout.write(`${r.ok ? 'ok  ' : 'RED '} ${r.image.path}${r.failures.length ? '  ' + r.failures.join(', ') : ''}\n`);
-    process.exitCode = ok ? EXIT.ok : EXIT.red;
-  } catch (e) {
-    const usage = e instanceof UsageError;
-    if (json) process.stdout.write(`${JSON.stringify({ ok: false, error: e.message, ...(e.code ? { code: e.code } : {}) }, null, 2)}\n`);
-    process.stderr.write('draw-render: ' + (() => { if (!(usage || e instanceof RedError)) return e.stack; if (e.code) return '[' + e.code + '] ' + e.message; return e.message; })() + '\n');
-    process.exitCode = usage ? EXIT.usage : EXIT.red;
+    reportRecords(await run(argv), json);
+  } catch (error) {
+    reportError(error, json);
   }
 }
 

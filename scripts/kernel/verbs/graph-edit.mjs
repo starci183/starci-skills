@@ -126,6 +126,16 @@ function editContinue({ db, wf, args, repo, ledger, rec, tag, editId, now }) {
   return `continuation ${created} of ${job.job_id} from ${preserved}`;
 }
 
+function retryShapeOf({ db, wf, args, repo, job }) {
+  const add = args['add-paths'] ? checkPaths(db, { repo, workflowId: wf, op: job.op_id, payload: job.payload, current: job.payload.owned_paths ?? [], add: csv(args['add-paths']) }) : [];
+  const override = args.set ? validateOverride(parseJson(args.set, '--set')) : null;
+  const next = { ...job.payload, owned_paths: [...new Set([...(job.payload.owned_paths ?? []), ...add])], kernelOverride: { ...job.payload.kernelOverride, ...override }, ...(override?.model ? { kernelModel: override.model } : {}) };
+  const failedShapes = failedShapesOf(db, wf, { job_id: '__new__', op_id: job.op_id, payload: next });
+  const same = shapeOf(job.op_id, next) === shapeOf(job.op_id, job.payload) || failedShapes.has(shapeOf(job.op_id, next));
+  if (same) throw refuse(`the retry has the same shape as a failed attempt of this unit: widen its paths (--add-paths) or change its override (--set) - never the same failing shape`, 'shape-already-failed');
+  return { add, override, next };
+}
+
 function editRetry({ db, wf, args, repo, ledger, rec, tag, now }) {
   const job = jobRow(db, args.job);
   if (!job || job.workflow_id !== wf || job.kind !== 'op') throw refuse(`${args.job} is not an op job of ${wf}`, 'job-foreign');
@@ -133,12 +143,7 @@ function editRetry({ db, wf, args, repo, ledger, rec, tag, now }) {
   unitDone(db, wf, job);
   const open = db.prepare(`SELECT job_id FROM jobs WHERE workflow_id=? AND status IN (${OPEN_JOB.map(() => '?').join(',')}) AND (json_extract(payload_json,'$.retry.retryOf')=? OR json_extract(payload_json,'$.kernelEdit.unitOf')=?)`).get(wf, ...OPEN_JOB, job.job_id, job.job_id);
   if (open) throw refuse(`${open.job_id} already retries ${job.job_id}: edit that queued unit (widen/params) instead`, 'retry-exists');
-  const add = args['add-paths'] ? checkPaths(db, { repo, workflowId: wf, op: job.op_id, payload: job.payload, current: job.payload.owned_paths ?? [], add: csv(args['add-paths']) }) : [];
-  const o = args.set ? validateOverride(parseJson(args.set, '--set')) : null;
-  const next = { ...job.payload, owned_paths: [...new Set([...(job.payload.owned_paths ?? []), ...add])], kernelOverride: { ...job.payload.kernelOverride, ...o }, ...(o?.model ? { kernelModel: o.model } : {}) };
-  const failedShapes = failedShapesOf(db, wf, { job_id: '__new__', op_id: job.op_id, payload: next });
-  const same = shapeOf(job.op_id, next) === shapeOf(job.op_id, job.payload) || failedShapes.has(shapeOf(job.op_id, next));
-  if (same) throw refuse(`the retry has the same shape as a failed attempt of this unit: widen its paths (--add-paths) or change its override (--set) - never the same failing shape`, 'shape-already-failed');
+  const { add, override: o, next } = retryShapeOf({ db, wf, args, repo, job });
   const cut = job.payload.cut;
   const after = csv(args.after);
   const created = enqueueUnit({ repo, wf, op: job.op_id, paths: next.owned_paths, what: `retry ${job.payload.displayWhat ?? ''}`.trim(),
@@ -358,4 +363,3 @@ export default {
     emit({ ok: true, workflowId: wf, editId, ...rec }, `${editId}: ${human}\n  undo: starci kernel graph-edit --workflow ${wf} --edit undo --undo ${editId}`, args.json);
   },
 };
-

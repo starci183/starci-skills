@@ -46,9 +46,9 @@ const capacityRejectionReasons = ({ pool, target, capacity, backoff = {} }) => {
 const poolRejectionReasons = (input, helpers) => {
   const { pool, target, role, kind, order = null, difficulty, capacity, grants, runtimes, modelsDir, opsDir, backoff } = input;
   if (!pool) return [`no registry.yaml pool '${target}'`];
-  const reasons = roleRejectionReasons({ pool, role, order });
-  reasons.push(...grantRejectionReasons({ pool, target, role, order, grants, capacity }));
-  reasons.push(...toolRejectionReasons({ pool, kind, modelsDir, opsDir }, helpers));
+  const reasons = [...roleRejectionReasons({ pool, role, order }),
+    ...grantRejectionReasons({ pool, target, role, order, grants, capacity }),
+    ...toolRejectionReasons({ pool, kind, modelsDir, opsDir }, helpers)];
   const launch = helpers.resolveLaunchModel(target, difficulty, { runtimes });
   if (launch.error) reasons.push(launch.error);
   reasons.push(...capacityRejectionReasons({ pool, target, capacity, backoff }));
@@ -141,37 +141,42 @@ const balancedTargetOf = (candidates, context, helpers) => {
   return { candidates, target, balance: { candidates, deficits, rule: underShare ? 'first-under-share' : 'least-over' } };
 };
 
-const rankCandidates = (context, admission, helpers) => {
-  const { input, rt, route, measured, difficulty, role, orderKey, tierSource, chain, overflow, demote, balanced } = context;
-  const { auditOf, lineage, bias } = input;
-  if (!admission.eligible.length) return null;
-  let candidates = admission.eligible;
-  let crossFamily = null;
+const crossFamilyCandidates = (candidates, rt, auditOf, role) => {
   const authorFamily = auditOf && role === 'verify' && rt?.allocation?.thinkAuditCrossFamily !== false
     ? auditFamilyOf(rt, auditOf) : null;
-  if (authorFamily) {
-    const other = candidates.filter((target) => {
-      const family = auditFamilyOf(rt, target);
-      return family && family !== authorFamily;
-    });
-    crossFamily = { author: auditOf, authorFamily, applied: other.length > 0 };
-    if (other.length) candidates = other;
-  }
+  if (!authorFamily) return { candidates, crossFamily: null };
+  const other = candidates.filter((target) => {
+    const family = auditFamilyOf(rt, target);
+    return family && family !== authorFamily;
+  });
+  return { candidates: other.length ? other : candidates,
+    crossFamily: { author: auditOf, authorFamily, applied: other.length > 0 } };
+};
+
+const primaryCandidatesOf = (candidates, excluded) => {
+  const primary = candidates.filter((target) => !excluded.includes(target));
+  return primary.length ? primary : candidates;
+};
+
+const rankCandidates = (context, admission, helpers) => {
+  const { input, rt, route, measured, difficulty, role, orderKey, tierSource, chain, overflow, demote, balanced } = context;
+  const { auditOf, lineage } = input;
+  if (!admission.eligible.length) return null;
+  let candidates = admission.eligible;
+  const family = crossFamilyCandidates(candidates, rt, auditOf, role);
+  candidates = family.candidates;
+  const crossFamily = family.crossFamily;
   let overflowUsed = false;
   if (overflow.length) {
-    const primary = candidates.filter((target) => !overflow.includes(target));
-    if (primary.length) candidates = primary;
-    else overflowUsed = true;
+    const primary = primaryCandidatesOf(candidates, overflow);
+    if (primary === candidates) overflowUsed = true;
+    else candidates = primary;
   }
-  if (demote.length) {
-    const primary = candidates.filter((target) => !demote.includes(target));
-    if (primary.length) candidates = primary;
-  }
+  if (demote.length) candidates = primaryCandidatesOf(candidates, demote);
   let balance = null;
   let target;
   if (balanced) {
     const picked = balancedTargetOf(candidates, context, helpers);
-    candidates = picked.candidates;
     target = picked.target;
     balance = picked.balance;
   } else target = candidates[0];

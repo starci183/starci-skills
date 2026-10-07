@@ -50,7 +50,7 @@ const settlePathOf = (status, to, reportFiled) => {
 };
 
 const owedPathOf = (value) => {
-  let normalized = String(value).replaceAll(/\\/g, '/');
+  let normalized = String(value).replaceAll('\\', '/');
   while (normalized.endsWith('/')) normalized = normalized.slice(0, -1);
   return normalized;
 };

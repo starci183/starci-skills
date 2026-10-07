@@ -111,6 +111,6 @@ export function biasForRole(value,requestedRole,scopeId){
   const reserveOverride=bias.reserveOverride;
   const scoped={prefer:bias.prefer,avoid:bias.avoid};
   if(bias.require)scoped.require=bias.require;
-  if(reserveOverride && reserveOverride.role===actor && reserveOverride.scopeId===scopeId)scoped.reserveOverride=reserveOverride;
+  if(reserveOverride?.role===actor && reserveOverride.scopeId===scopeId)scoped.reserveOverride=reserveOverride;
   return scoped;
 }

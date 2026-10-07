@@ -39,6 +39,7 @@ import { readJsonFile } from '../lib/json.mjs';
 import { DRAW_REVIEW_DECISIONS, DRAW_REVIEW_KIND, reviewShapesOf } from './draw-review.mjs';
 import { defaultGrammarRoot, grammarComponentNames, readBrandRecord } from './brand/brand.mjs';
 import { text } from '../lib/stack-declaration.mjs'; import { isMain } from '../lib/is-main.mjs'; import { altOf } from '../lib/source-phrases.mjs';
+import { appendReviewRow, completeReviewEntry } from './draw-feedback-board.mjs';
 
 const DRAW_FEEDBACK_SCHEMA = 'starci/draw-feedback@1';
 export const DRAW_FEEDBACK_UNADDRESSED = 'DRAW_FEEDBACK_UNADDRESSED';
@@ -57,6 +58,10 @@ const OWNER_LEARNED_GROUP = 'owner-learned';
 /** The owner marks an accepted drawing golden in the note (or the form's golden box: receipt.golden). The Vietnamese alternatives of every word class below are lexicon data (modules/goal/source-phrases.yaml drawNote). */
 const GOLDEN_WORDS = new RegExp(String.raw`\bgolden\b|${altOf('drawNote.golden')}`, 'i');
 const RULE_ID = /\b[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*-\d+\b/;
+const BOUND_NOTE_SHAPE = String.raw`[A-Za-z][\w-]*(?:#[\w-]+)?`;
+const BOUND_NOTE_SPACE = String.raw`\s*`;
+const BOUND_NOTE_TEXT = String.raw`(.+)`;
+const BOUND_NOTE = new RegExp(`^(${BOUND_NOTE_SHAPE})${BOUND_NOTE_SPACE}:${BOUND_NOTE_SPACE}${BOUND_NOTE_TEXT}$`);
 const PRODUCT_WORDS = new RegExp(String.raw`\b(always|never|every|everywhere|all (pages|screens|cards)|from now on|brand|colou?rs?|palette|accent|tones?|fonts?|typography|style|spacing|density|radius|shadow|icons?)\b|${altOf('drawNote.product')}`, 'i');
 const GRAMMAR_WORDS = new RegExp(String.raw`\b(grammar|DNA|variant|new component|missing component|anatomy|slot)\b|${altOf('drawNote.grammar')}`, 'i');
 const KNOWLEDGE_WORDS = new RegExp(String.raw`\bknowledge\b|\bguideline\b|${altOf('drawNote.knowledge')}`, 'i');
@@ -123,22 +128,8 @@ export function notesOfReceipt(receipt, { dnaNames = [] } = {}) {
     const k = stateKey(label);
     return shapes.find((s) => stateKey(s) === k) ?? shapes.find((s) => stateKey(String(s).split('#').pop()) === k) ?? null;
   };
-  const raw = [];
+  const raw = receipt.answeredBy === OWNER ? receiptNotes(receipt, parts, shapeNamed) : [];
   // Auto-accepted receipts carry the runtime's own note, never the owner's words.
-  if (receipt.answeredBy === OWNER) {
-    for (const line of String(receipt.note ?? '').split(/\r?\n/)) {
-      const cleaned = line.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, '').trim();
-      if (!cleaned || (GOLDEN_WORDS.test(cleaned) && cleaned.replace(GOLDEN_WORDS, '').replace(/[\s.,!:;-]/g, '').length < 3)) continue;
-      const bound = /^([A-Za-z][\w-]*(?:#[\w-]+)?)\s*:\s*(.+)$/.exec(cleaned);
-      const shape = bound ? shapeNamed(bound[1]) : null;
-      raw.push({ words: shape ? bound[2].trim() : cleaned, shape, part: null });
-    }
-    for (const pn of list(receipt.partNotes)) {
-      const words = text(pn?.note);
-      const part = parts.find((p) => slash(p.path) === slash(String(pn?.path ?? '')));
-      if (words && part) raw.push({ words, shape: part.shape ?? null, part: slash(part.path) });
-    }
-  }
   return raw.map((r, i) => {
     const c = classifyNote(r.words, { dnaNames });
     return {
@@ -151,6 +142,23 @@ export function notesOfReceipt(receipt, { dnaNames = [] } = {}) {
 }
 
 /** Whether a receipt accepts the drawing AND marks it golden (the form's golden box, or the golden word in the note). */
+function receiptNotes(receipt, parts, shapeNamed) {
+  const raw = [];
+  for (const line of String(receipt.note ?? '').split(/\r?\n/)) {
+    const cleaned = line.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, '').trim();
+    if (!cleaned || (GOLDEN_WORDS.test(cleaned) && cleaned.replace(GOLDEN_WORDS, '').replace(/[\s.,!:;-]/g, '').length < 3)) continue;
+    const bound = BOUND_NOTE.exec(cleaned);
+    const shape = bound ? shapeNamed(bound[1]) : null;
+    raw.push({ words: shape ? bound[2].trim() : cleaned, shape, part: null });
+  }
+  for (const pn of list(receipt.partNotes)) {
+    const words = text(pn?.note);
+    const part = parts.find((p) => slash(p.path) === slash(String(pn?.path ?? '')));
+    if (words && part) raw.push({ words, shape: part.shape ?? null, part: slash(part.path) });
+  }
+  return raw;
+}
+
 export const goldenMarkOf = (receipt) => receipt?.golden === true || GOLDEN_WORDS.test(String(receipt?.note ?? ''));
 
 // ---------------------------------------------------------------------------------------------------------
@@ -243,25 +251,29 @@ function noteAddressed(dir, record, note) {
   if (!want.length) return { addressed: false, reasons: [`no current part draws ${note.shape ?? 'any shape'}`] };
   const rejected = new Set(list(note.seen ?? note.parts).map((p) => p.sha256).filter(Boolean));
   const assets = new Map(assetsOf(record).map((a) => [slash(a.path ?? ''), a]));
-  for (const p of want) {
-    const file = path.join(dir, p.path);
-    const now = fs.existsSync(file) ? sha256File(file) : null;
-    if (!now) { reasons.push(`${p.path} is not on disk`); continue; }
-    if (rejected.has(now)) { reasons.push(`${p.path} is still the image the owner rejected (not redrawn)`); continue; }
-    const asset = assets.get(p.path);
-    const prompt = asset?.generation?.promptPath ? path.resolve(dir, asset.generation.promptPath) : null;
-    const brief = prompt && fs.existsSync(prompt) ? fs.readFileSync(prompt, 'utf8') : null;
-    if (brief == null) reasons.push(`${p.path} has no brief on disk (generation.promptPath) to carry ${note.id}`);
-    else if (!brief.includes(note.id)) reasons.push(`the brief of ${p.path} does not carry ${note.id} (draw-feedback.mjs brief prints it)`);
-    const loopRef = loopLabelOf(asset?.generation?.loop);
-    const loopFile = loopFileOfRef(asset?.generation?.loop);
-    const critique = loopFile ? bestCritiqueOf(loopFile) : null;
-    const check = list(critique?.verdict?.checks).find((c) => c.id === note.id);
-    if (!critique?.verdict) reasons.push(`${p.path} has no draw-loop critique${loopRef ? ' (' + loopRef + ')' : ''} to judge ${note.id}`);
-    else if (!check) reasons.push(`the critic of ${p.path} did not judge ${note.id} (the rubric lacked the owner's note)`);
-    else if (check.pass !== true) reasons.push(`the critic fails ${note.id} on ${p.path}: ${String(check.evidence ?? '').slice(0, 200)}`);
-  }
+  for (const part of want) reasons.push(...partAddressReasons(dir, part, note, rejected, assets));
   return { addressed: reasons.length === 0, reasons: [...new Set(reasons)] };
+}
+
+function partAddressReasons(dir, part, note, rejected, assets) {
+  const reasons = [];
+  const file = path.join(dir, part.path);
+  const now = fs.existsSync(file) ? sha256File(file) : null;
+  if (!now) return [`${part.path} is not on disk`];
+  if (rejected.has(now)) return [`${part.path} is still the image the owner rejected (not redrawn)`];
+  const asset = assets.get(part.path);
+  const prompt = asset?.generation?.promptPath ? path.resolve(dir, asset.generation.promptPath) : null;
+  const brief = prompt && fs.existsSync(prompt) ? fs.readFileSync(prompt, 'utf8') : null;
+  if (brief == null) reasons.push(`${part.path} has no brief on disk (generation.promptPath) to carry ${note.id}`);
+  else if (!brief.includes(note.id)) reasons.push(`the brief of ${part.path} does not carry ${note.id} (draw-feedback.mjs brief prints it)`);
+  const loopRef = loopLabelOf(asset?.generation?.loop);
+  const loopFile = loopFileOfRef(asset?.generation?.loop);
+  const critique = loopFile ? bestCritiqueOf(loopFile) : null;
+  const check = list(critique?.verdict?.checks).find((item) => item.id === note.id);
+  if (!critique?.verdict) reasons.push(`${part.path} has no draw-loop critique${loopRef ? ' (' + loopRef + ')' : ''} to judge ${note.id}`);
+  else if (!check) reasons.push(`the critic of ${part.path} did not judge ${note.id} (the rubric lacked the owner's note)`);
+  else if (check.pass !== true) reasons.push(`the critic fails ${note.id} on ${part.path}: ${String(check.evidence ?? '').slice(0, 200)}`);
+  return reasons;
 }
 
 /** DRAW_FEEDBACK_UNADDRESSED findings of a ui record: [{code, record, path, note, round, detail}]. */
@@ -397,73 +409,35 @@ export function drawReviewBoard(db, { workflowId, repo }) {
   } catch { return []; }
   const classified = classificationsOf(db, workflowId);
   const byRecord = new Map();
-  for (const row of rows) {
-    let rj = {};
-    try { rj = JSON.parse(row.report_json ?? '{}') ?? {}; } catch { rj = {}; }
-    const review = rj.question?.review;
-    if (!review?.record) continue;
-    const closed = db.prepare(`SELECT kind, payload_json, created_at FROM events WHERE workflow_id=? AND kind IN ('ask-answered','ask-superseded')
-      AND json_extract(payload_json,'$.dispatchId')=? ORDER BY seq DESC LIMIT 1`).get(workflowId, row.dispatch_id);
-    let answer = null;
-    if (closed?.kind === 'ask-answered') {
-      const payload = (() => { try { return JSON.parse(closed.payload_json ?? '{}'); } catch { return {}; } })();
-      answer = (payload.receiptPath ? readJsonFile(path.resolve(repo ?? '.', payload.receiptPath)) : null) ?? { ...payload, review };
-      answer.review ??= review;
-      answer.at ??= new Date(Number(closed.created_at)).toISOString();
-    }
-    const entry = byRecord.get(review.record) ?? { record: review.record, recordPath: review.recordPath ?? null, rounds: [] };
-    const notes = answer ? notesOfReceipt(answer).map((n) => {
-      const c = classified.get(n.id);
-      return { id: n.id, text: n.text, shape: n.shape, part: n.part, owed: n.owed, class: c?.class ?? n.class, target: c?.target ?? n.target, classifiedBy: c?.by ?? n.classifiedBy };
-    }) : [];
-    entry.rounds.push({ round: entry.rounds.length + 1, dispatchId: row.dispatch_id, jobId: rj.from ?? null, askedAt: row.created_at,
-      state: ({ true: 'answered', false: closed ? 'superseded' : 'open' })[closed?.kind === 'ask-answered'],
-      decision: answer ? DRAW_REVIEW_DECISIONS[Number(answer.optionIndex)] ?? null : null, answeredBy: answer?.answeredBy ?? null, answeredAt: answer?.at ?? null,
-      golden: Boolean(answer && goldenMarkOf(answer)), parts: list(review.parts).map((p) => ({ path: slash(p.path), sha256: p.sha256 ?? null, shape: p.shape ?? null, breakpoint: p.breakpoint ?? null })), notes });
-    byRecord.set(review.record, entry);
-  }
+  const rowDependencies = { decisions: DRAW_REVIEW_DECISIONS, notesOfReceipt, goldenMarkOf, list, slash, readJsonFile };
+  for (const row of rows) appendReviewRow(db, row, workflowId, repo, classified, byRecord, rowDependencies);
   const out = [];
-  for (const entry of byRecord.values()) {
-    const dir = entry.recordPath && repo ? path.dirname(path.resolve(repo, entry.recordPath)) : null;
-    let record = null;
-    try { record = dir ? readYaml(path.join(dir, 'index.yaml')) : null; } catch { record = null; }
-    const lastAccept = Math.max(0, ...entry.rounds.filter((r) => r.decision === 'accept' && r.answeredBy === OWNER).map((r) => r.round));
-    const open = entry.rounds.filter((r) => r.round > lastAccept && r.decision === 'redraw').flatMap((r) => r.notes.filter((n) => n.owed).map((n) => ({ ...n, round: r.round, dispatchId: r.dispatchId, seen: r.parts })));
-    const judged = open.map((n) => ({ ...n, ...(record && dir ? noteAddressed(dir, record, n) : { addressed: false, reasons: ['the ui record is not readable'] }) }));
-    const latest = entry.rounds[entry.rounds.length - 1];
-    const shapeNames = [...new Set([...(record ? reviewShapesOf(record).shapes.map((s) => s.shape) : []), ...entry.rounds.flatMap((r) => r.parts.map((p) => p.shape)).filter(Boolean)])];
-    const goldenMark = record?.ui?.review?.golden ?? null;
-    entry.shapes = shapeNames.map((shape) => {
-      const mine = judged.filter((n) => !n.shape || stateKey(n.shape) === stateKey(shape));
-      const lastRound = [...entry.rounds].reverse().find((r) => r.parts.some((p) => p.shape === shape));
-      return { shape, round: lastRound?.round ?? null, parts: lastRound?.parts.filter((p) => p.shape === shape) ?? [],
-        openNotes: mine.map(({ id, text: t, round, class: cls, addressed, reasons }) => ({ id, text: t, round, class: cls, addressed, reasons })),
-        addressed: mine.filter((n) => n.addressed).length, unaddressed: mine.filter((n) => !n.addressed).length,
-        golden: ({ 0: lastAccept ? 'accepted' : 'none', 1: 'golden' })[Number(Boolean(goldenMark && list(goldenMark.shapes).includes(shape)))] };
-    });
-    entry.awaitingOwner = latest?.state === 'open';
-    entry.redrawOwed = latest?.state === 'answered' && latest.decision === 'redraw' ? { dispatchId: latest.dispatchId, jobId: latest.jobId, notes: latest.notes.map((n) => n.id) } : null;
-    entry.state = [[entry.awaitingOwner, 'awaiting-owner'], [entry.redrawOwed, 'redraw-owed'], [lastAccept && lastAccept === latest?.round, 'accepted'], [true, 'idle']].find(([condition]) => condition)[1];
-    out.push(entry);
-  }
+  const entryDependencies = { owner: OWNER, noteAddressed, reviewShapesOf, stateKey, list, slash, readYaml };
+  for (const entry of byRecord.values()) out.push(completeReviewEntry(entry, repo, entryDependencies));
   return out;
 }
 
 /** The ui record directories (work/ui-screen@1) a report's files sit in (the nearest index.yaml above each). */
+function uiRecordDirOfSpec(repo, spec) {
+  const rel = slash(String(spec ?? ''));
+  const staticPart = /[*{[?]/.test(rel) ? rel.slice(0, rel.search(/[*{[?]/)).replace(/\/[^/]*$/, '') : rel;
+  if (!/(^|\/)\.starciwork\//.test(staticPart) || !/(^|\/)ui(\/|$)/.test(staticPart)) return null;
+  let dir = path.resolve(repo, staticPart);
+  if (fs.existsSync(dir) && !fs.statSync(dir).isDirectory()) dir = path.dirname(dir);
+  for (; dir.startsWith(path.resolve(repo)) && path.basename(dir) !== '.starciwork'; dir = path.dirname(dir)) {
+    const index = path.join(dir, 'index.yaml');
+    if (!fs.existsSync(index)) continue;
+    try { if (readYaml(index)?.schema === 'work/ui-screen@1') return dir; } catch { /* the owner-review guard names it */ }
+    break;
+  }
+  return null;
+}
+
 function uiRecordDirsOf(repo, files) {
   const dirs = new Set();
   for (const spec of list(files)) {
-    const rel = slash(String(spec ?? ''));
-    const staticPart = /[*{[?]/.test(rel) ? rel.slice(0, rel.search(/[*{[?]/)).replace(/\/[^/]*$/, '') : rel;
-    if (!/(^|\/)\.starciwork\//.test(staticPart) || !/(^|\/)ui(\/|$)/.test(staticPart)) continue;
-    let dir = path.resolve(repo, staticPart);
-    if (fs.existsSync(dir) && !fs.statSync(dir).isDirectory()) dir = path.dirname(dir);
-    for (; dir.startsWith(path.resolve(repo)) && path.basename(dir) !== '.starciwork'; dir = path.dirname(dir)) {
-      const index = path.join(dir, 'index.yaml');
-      if (!fs.existsSync(index)) continue;
-      try { if (readYaml(index)?.schema === 'work/ui-screen@1') dirs.add(dir); } catch { /* the owner-review guard names it */ }
-      break;
-    }
+    const dir = uiRecordDirOfSpec(repo, spec);
+    if (dir) dirs.add(dir);
   }
   return [...dirs];
 }
@@ -532,26 +506,52 @@ function drawFeedbackMain(argv = []) {
   if (!['brief', 'status', 'check', 'classify'].includes(command) || !ui) return { exitCode: 2, text: usage };
   try {
     const dir = path.resolve(ui);
-    if (command === 'brief') {
-      const b = briefBlock(dir, { shape: flag(args, '--shape') });
-      return { exitCode: 0, text: json ? `${JSON.stringify(b, null, 2)}\n` : `${b.text || '(no owner notes or product rulings)'}\n` };
-    }
-    if (command === 'status') {
-      const s = feedbackStatus(dir);
-      return { exitCode: 0, text: json ? `${JSON.stringify(s, null, 2)}\n` : `${s.id}: ${s.rounds.length} review round(s); ${s.open.length} open note(s), ${s.unaddressed} unaddressed${s.golden ? '; golden' : ''}\n${s.open.map((n) => '  [' + n.id + '] ' + (n.addressed ? 'addressed' : 'UNADDRESSED') + ': ' + n.text + (n.addressed ? '' : ' - ' + n.reasons.join('; '))).join('\n')}\n` };
-    }
-    if (command === 'check') {
-      const f = feedbackFindings(dir);
-      return { exitCode: f.length ? 1 : 0, text: json ? `${JSON.stringify({ ok: !f.length, findings: f }, null, 2)}\n` : `${f.length ? f.map((x) => `[${x.code}] ${x.detail}`).join('\n') : 'every owner note is addressed'}\n` };
-    }
-    const noteId = flag(args, '--note'), cls = flag(args, '--class');
-    if (!noteId || !cls) return { exitCode: 2, text: usage };
-    const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-    const r = classifyNoteInRecord(dir, { noteId, cls, target: flag(args, '--target'), as: flag(args, '--as'), by: flag(args, '--by') ?? 'kernel', write: args.includes('--write'), knowledgeRoot: root });
-    return { exitCode: 0, text: json ? `${JSON.stringify(r, null, 2)}\n` : `${r.written ? 'wrote' : 'would write (pass --write)'} ${noteId} as ${r.note.class} (${r.note.classifiedBy})\n` };
+    return ({
+      brief: () => briefCommandResult(dir, args, json),
+      status: () => statusCommandResult(dir, json),
+      check: () => checkCommandResult(dir, json),
+      classify: () => classifyCommandResult(dir, args, json, usage),
+    })[command]();
   } catch (error) {
     return { exitCode: 1, text: `draw-feedback: ${error.message}\n` };
   }
+}
+
+function briefCommandResult(dir, args, json) {
+  const brief = briefBlock(dir, { shape: flag(args, '--shape') });
+  return { exitCode: 0, text: json ? `${JSON.stringify(brief, null, 2)}\n` : `${brief.text || '(no owner notes or product rulings)'}\n` };
+}
+
+function feedbackStatusText(status) {
+  const golden = status.golden ? '; golden' : '';
+  const open = status.open.map((note) => '  [' + note.id + '] ' + (note.addressed ? 'addressed' : 'UNADDRESSED') + ': ' + note.text + (note.addressed ? '' : ' - ' + note.reasons.join('; '))).join('\n');
+  return `${status.id}: ${status.rounds.length} review round(s); ${status.open.length} open note(s), ${status.unaddressed} unaddressed${golden}\n${open}\n`;
+}
+
+function statusCommandResult(dir, json) {
+  const status = feedbackStatus(dir);
+  return { exitCode: 0, text: json ? `${JSON.stringify(status, null, 2)}\n` : feedbackStatusText(status) };
+}
+
+function feedbackCheckText(findings, json) {
+  if (json) return `${JSON.stringify({ ok: !findings.length, findings }, null, 2)}\n`;
+  const detail = findings.length ? findings.map((item) => '[' + item.code + '] ' + item.detail).join('\n') : 'every owner note is addressed';
+  return `${detail}\n`;
+}
+
+function checkCommandResult(dir, json) {
+  const findings = feedbackFindings(dir);
+  return { exitCode: findings.length ? 1 : 0, text: feedbackCheckText(findings, json) };
+}
+
+function classifyCommandResult(dir, args, json, usage) {
+  const noteId = flag(args, '--note'), cls = flag(args, '--class');
+  if (!noteId || !cls) return { exitCode: 2, text: usage };
+  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+  const result = classifyNoteInRecord(dir, { noteId, cls, target: flag(args, '--target'), as: flag(args, '--as'), by: flag(args, '--by') ?? 'kernel', write: args.includes('--write'), knowledgeRoot: root });
+  const action = result.written ? 'wrote' : 'would write (pass --write)';
+  const text = json ? `${JSON.stringify(result, null, 2)}\n` : `${action} ${noteId} as ${result.note.class} (${result.note.classifiedBy})\n`;
+  return { exitCode: 0, text };
 }
 
 if (isMain(import.meta.url)) {

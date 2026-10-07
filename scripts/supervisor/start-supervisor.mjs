@@ -144,12 +144,18 @@ export function seatHealth(seat, deps) {
   if (seat.starting) return { live: true, starting: true, reason: 'startup reservation active', terminal: null };
   const terminal = seat.value?.terminal ?? null;
   const dispatch = seat.value?.dispatch ?? null;
-  if (!dispatch) {
-    if (!terminal) return { live: false, dead: true, reason: seat.expired ? 'startup reservation expired' : 'seat has no worker', terminal: null };
-    return { live: false, unverified: true, reason: 'the terminal has no immutable worker Dispatch identity', terminal };
-  }
+  if (!dispatch) return healthWithoutDispatch(seat, terminal);
   let shown;
   try { shown = deps.show(dispatch); } catch (e) { shown = { ok: false, error: String(e?.message ?? e) }; }
+  return shownWorkerHealth(shown, terminal, dispatch);
+}
+
+function healthWithoutDispatch(seat, terminal) {
+  if (!terminal) return { live: false, dead: true, reason: seat.expired ? 'startup reservation expired' : 'seat has no worker', terminal: null };
+  return { live: false, unverified: true, reason: 'the terminal has no immutable worker Dispatch identity', terminal };
+}
+
+function shownWorkerHealth(shown, terminal, dispatch) {
   if (shown?.hostUnavailable) return { live: false, hostUnavailable: true, reason: shown.error ?? 'worker-show did not answer', terminal, dispatch };
   const state = shown?.state ?? null;
   if (shown?.ok !== true) return { live: false, unverified: true, reason: shown?.error || 'worker-show refusal does not prove worker death', terminal, dispatch };

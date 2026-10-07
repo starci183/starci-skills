@@ -59,171 +59,26 @@ import { readJsonFile } from '../lib/json.mjs';
 import { insidePath } from '../lib/path-key.mjs';
 import { writeJsonFile } from '../api/fs/write-json-file.mjs';
 import { buildFixtureHarness, captureHtml, loadPlaywright, parseViewports } from './draw-render.mjs';
-import { DRAW_OFF_GRAMMAR_COMPONENT as DOM_OFF_GRAMMAR, DRAW_SOURCE_SUFFIX, checkDrawSource, rationaleFileFor } from './draw/draw-source.mjs';
+import { DRAW_SOURCE_SUFFIX, checkDrawSource, rationaleFileFor } from './draw/draw-source.mjs';
 import { safeRemove } from '../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
-import { anatomyFindings, dnaFindings, loadDna, proposalFilesFor, proposalNamesIn } from './draw/draw-dna.mjs';
-import { measureFindings, nestedVariantFindings } from './draw/draw-layer.mjs';
-import { assetRequestIdsFor } from './asset-slot.mjs';
-import { accentBudgetOf, drawLoopSettings, htmlTasteFindings } from './draw/draw-taste.mjs';
-import { badgesOf, commandsFrom, controlCountOf, internalCopyOf, visibleTextOf, DRAW_ACTION_MISSING, DRAW_BADGE_UNTONED, DRAW_COPY_INTERNAL, DRAW_SCORE_BELOW } from './draw/draw-quality.mjs';
-import { brandOf, brandPalette, paletteFindings } from './brand/brand-palette.mjs';
-import { parseColor } from './brand/brand.mjs';
+import { proposalFilesFor } from './draw/draw-dna.mjs';
+import { drawLoopSettings } from './draw/draw-taste.mjs';
 import { contextualCriticFor, runCritic, rubricFor } from './draw-critic.mjs';
 import { archetypeOf } from './ui-archetype.mjs';
 import { readProposals, proposalFilesUnder } from './grammar-proposal.mjs';
 import { LOOP_SCHEMA, livePartsOf } from './draw/draw-loop-coverage.mjs';
-import { loadRationale, measuresOf, rationaleFileOf, rationaleFindings, ruleResolver } from './draw/draw-rationale.mjs'; import { isMain } from '../lib/is-main.mjs'; import { byCodeUnit } from '../lib/list.mjs';
+import { rationaleFileOf } from './draw/draw-rationale.mjs'; import { isMain } from '../lib/is-main.mjs';
+import { browserProbes, DRAW_BEAUTY_BELOW, DRAW_CRITIC_MISSING, DRAW_METRICS_FAILED, DRAW_METRICS_UNVERIFIED, DRAW_RENDER_RED, GEOMETRY_OFF_GRAMMAR, machineMetrics, stemOf } from './draw-loop-metrics.mjs';
+
+export { DRAW_BEAUTY_BELOW, DRAW_CRITIC_MISSING, DRAW_METRICS_FAILED, DRAW_METRICS_UNVERIFIED, DRAW_RENDER_RED, GEOMETRY_OFF_GRAMMAR, machineMetrics };
 
 export { DRAW_LOOP_MISSING, LOOP_SCHEMA, livePartsOf, loopCoverageFindings } from './draw/draw-loop-coverage.mjs';
 
-const METRICS_SCHEMA = 'starci/draw-metrics@1';
-export const DRAW_RENDER_RED = 'DRAW_RENDER_RED';
-export const DRAW_METRICS_UNVERIFIED = 'DRAW_METRICS_UNVERIFIED';
-export const DRAW_METRICS_FAILED = 'DRAW_METRICS_FAILED';
-export const GEOMETRY_OFF_GRAMMAR = 'GEOMETRY_OFF_GRAMMAR';
-export const DRAW_BEAUTY_BELOW = 'DRAW_BEAUTY_BELOW';
-/** The best round carries no beauty: no critic ran (--no-critic) or the critic could not answer - never a low score. */
-export const DRAW_CRITIC_MISSING = 'DRAW_CRITIC_MISSING';
+const DESKTOP_MIN_WIDTH = 768;
 const LOOP_DIR = 'draw-loop';
 export const STOP = Object.freeze({ passed: 'passed', maxRounds: 'max-rounds', noProgress: 'no-progress' });
-const DESKTOP_MIN_WIDTH = 768;
-
-
 export const breakpointOf = (viewport) => (Number(viewport?.width) >= DESKTOP_MIN_WIDTH ? 'desktop' : 'mobile');
-const stemOf = (png) => path.basename(png).replace(/\.png$/i, '');
-
-// ---------------------------------------------------------------------------------------------------------
-// Machine metrics
-// ---------------------------------------------------------------------------------------------------------
-
-/** The real browser-backed metrics; tests replace them. */
-const browserProbes = {
-  async geometry(html, viewport, { repo, family, drawCss = {} }) {
-    const { checkGeometry } = await import('./ui/grammar-geometry.mjs');
-    return checkGeometry(html, { repo, family, viewport, ...drawCss });
-  },
-  async score(html, viewport, { repo, family, record, recordFile, drawCss = {} }) {
-    const { buildBrief, scoreRender } = await import('./ui/ui-proof-brief.mjs');
-    const brief = buildBrief({ record: record ?? {}, recordFile, repo, family, ...drawCss });
-    if (!brief.geometry.ok) return { error: `the product CSS did not resolve (${list(brief.geometry.errors).join('; ')})` };
-    return scoreRender(brief, html, { repo, viewport });
-  },
-};
-
-const finding = (metric, code, detail, extra = {}) => ({ metric, code, detail, ...extra });
-
-/**
- * Every machine metric of one render: `html` (the source file), `captures` [{png, record (starci/draw-render@1),
- * viewport}], `ui` {dir, record, file, state} or null. Returns the metrics document (METRICS_SCHEMA) and the ui-proof
- * scores per capture (scores: Map(png -> score)). Nothing is green by default: a metric that cannot run fails.
- */
-export async function machineMetrics({ html, captures, ui = null, repo, family = null, settings = drawLoopSettings(), probes = browserProbes, proposalDirs = [], rationaleFile = undefined, sourceGate = null, domHtml = null, probeRepo = null, drawCss = {} }) {
-  // A real-component drawing (sourceGate set) is judged on its RENDERED DOM (draw-render's snapshot), never on the
-  // harness page that only loads the bundle.
-  const text = domHtml ?? fs.readFileSync(html, 'utf8');
-  const component = sourceGate != null;
-  const label = path.basename(html);
-  const metrics = [];
-  const scores = new Map();
-  const push = (id, findings, measured = undefined) => metrics.push({ id, ok: findings.length === 0, findings, ...(measured !== undefined ? { measured } : {}) });
-
-  // 0. The source gate of a real-component drawing: the type-check against the grammar it renders with and the AST gate.
-  if (component) push('source', list(sourceGate.findings).map((f) => finding('source', f.code, f.detail)), sourceGate.grammar ? { grammarSource: sourceGate.grammar.grammarSource ?? null, upgradeOwed: sourceGate.grammar.upgradeOwed ?? null } : undefined);
-
-  // 1. The capture itself (rendered-DOM ownership is judged by the DNA metric).
-  const redOf = (c) => list(c.record?.failures).filter((f) => f !== 'off-grammar-dom');
-  push('render', captures.flatMap((c) => (c.record && (c.record.ok !== false || !redOf(c).length) ? [] : [finding('render', DRAW_RENDER_RED, `${stemOf(c.png)}: ${c.record ? 'red capture (' + redOf(c).join(', ') + ')' : 'no draw-render record'}`)])));
-
-  // 2. DNA: every element a DNA component, notices Alert, ratios Meter.
-  const proposalFiles = proposalFilesFor(html, [...proposalDirs, ...(ui?.dir ? [ui.dir] : [])]);
-  const proposals = proposalNamesIn(proposalFiles);
-  // The anatomy each capture measured (draw-render record `anatomy`): the real HeroUI Alert and the full-width h-2 Meter track.
-  const measuredAnatomy = captures.flatMap((c) => anatomyFindings(c.record?.anatomy, { label: stemOf(c.png) })).map((f) => finding('dna', f.code, f.detail));
-  const assetRequests = assetRequestIdsFor(html, [...proposalDirs, ...(ui?.dir ? [ui.dir] : [])]);
-  // A real-component drawing: every painting element of the rendered DOM belongs to a grammar component (draw-render
-  // record `ownership`); a hand-drawn html one: every element carries its DNA attribute.
-  const ownership = captures.flatMap((c) => { if (c.record?.ownership) return c.record.ownership.unownedCount ? [finding('dna', DOM_OFF_GRAMMAR, `${stemOf(c.png)} rendered DOM: ${c.record.ownership.unownedCount} painting element(s) owned by a drawn layout element, not a grammar component - ${list(c.record.ownership.unowned).slice(0, 5).join('; ')}`)] : []; if (component) return [finding('dna', DRAW_METRICS_UNVERIFIED, `${stemOf(c.png)}: the capture measured no rendered-DOM ownership`)]; return []; });
-  push('dna', [...(component ? ownership : dnaFindings(text, { dna: loadDna({ family: family ?? undefined }), proposals, label, assetRequests }).map((f) => finding('dna', f.code, f.detail, { count: f.count }))), ...measuredAnatomy],
-    { proposals: readProposals(proposalFiles).map((p) => ({ name: p.name, complete: p.complete, missing: p.missing })) });
-
-  // 2b. Layer and measure (draw-layer.mjs, owner 2026-09-28): every form control on a surface in the nested
-  // `secondary` variant and no form region on the bare page Background (ANATOMY-2, the rendered DOM), and no form
-  // region wider than the W-3xl cap at any viewport (MEASURE-4 case-3/case-4, each capture's measured `layer`).
-  const layerMeasured = captures.map((c) => ({ part: stemOf(c.png), forms: list(c.record?.layer?.forms).map((f) => ({ desc: f.desc, width: Math.round(Number(f.width)) })) }));
-  push('layer', [
-    ...nestedVariantFindings(text, { label }).map((f) => finding('layer', f.code, f.detail, { count: f.count })),
-    ...captures.flatMap((c) => (c.record?.layer?.error ? [finding('layer', DRAW_METRICS_UNVERIFIED, `${stemOf(c.png)}: the form measure could not be read (${c.record.layer.error})`)]
-      : measureFindings(c.record?.layer, { label: stemOf(c.png) }).map((f) => finding('layer', f.code, f.detail, { count: f.count })))),
-  ], layerMeasured);
-
-  // 3. Taste: bands per card, badges per entity (html), accent share (every capture).
-  push('taste', htmlTasteFindings(text, { settings, label }).map((f) => finding('taste', f.code, f.detail, { count: f.count })));
-  const workRoot = ui?.dir ? workRootOf(ui.dir) : null;
-  const brand = workRoot ? brandOf(workRoot) : { brand: null };
-  const palette = brand.brand ? brandPalette(brand.brand, { brandDir: brand.dir }) : null;
-  const primary = palette?.primary?.hex ? parseColor(palette.primary.hex) : null;
-  const accentMeasured = [];
-  const accentFindings = [];
-  for (const c of captures) {
-    const r = accentBudgetOf(c.png, { html: text, accent: null, settings, label: stemOf(c.png) });
-    const fallback = r.accent == null && primary ? accentBudgetOf(c.png, { accent: primary, settings, label: stemOf(c.png) }) : null;
-    const got = fallback ?? r;
-    accentMeasured.push({ part: stemOf(c.png), accent: got.accent, share: got.share });
-    if (got.finding) accentFindings.push(finding('accent', got.finding.code, got.finding.detail));
-  }
-  push('accent', accentFindings, accentMeasured);
-
-  // 4. Copy, badges, commands (draw-quality.mjs).
-  const quality = [];
-  const leaks = internalCopyOf(visibleTextOf(text));
-  if (leaks.length) quality.push(finding('quality', DRAW_COPY_INTERNAL, `${label} shows internal copy: ${leaks.slice(0, 5).map((l) => '"' + l.match + '" (' + l.why + ')').join('; ')}`));
-  for (const b of badgesOf(text)) if (!b.tone) quality.push(finding('quality', DRAW_BADGE_UNTONED, `${label} badge "${b.text}" binds no tone token`));
-  if (ui?.record && ui.state) {
-    const commands = commandsFrom(ui.record, ui.state);
-    const controls = controlCountOf(text);
-    if (commands.length && controls < commands.length) quality.push(finding('quality', DRAW_ACTION_MISSING, `${ui.state} is left by ${commands.length} command(s) (${commands.map((c) => c.id ?? c.trigger).join(', ')}) but the render draws ${controls} control(s)`));
-  }
-  push('quality', quality);
-
-  // 5. Brand palette on every capture.
-  push('palette', brand.brand ? captures.flatMap((c) => paletteFindings({ file: c.png, shownAs: stemOf(c.png), brand: brand.brand, palette, subject: 'drawn part', at: c.png, record: c.record ?? undefined })
-    .filter((f) => f.level === 'refuse').map((f) => finding('palette', f.code, f.message))) : []);
-
-  // 6 + 7. Grammar geometry and the ui-proof score at every viewport (browser-backed; unavailable is a failure).
-  const geometry = [], score = [];
-  for (const c of captures) {
-    const viewport = { width: c.viewport.width, height: c.viewport.height };
-    let g = null, s = null;
-    try { g = await probes.geometry(html, viewport, { repo: probeRepo ?? repo, family, drawCss }); } catch (error) { g = { error: String(error?.message ?? error) }; }
-    if (!g || g.error) geometry.push(finding('geometry', DRAW_METRICS_UNVERIFIED, `grammar-geometry could not run at ${viewport.width}x${viewport.height}: ${g?.error ?? 'no result'}`));
-    else for (const f of list(g.findings)) geometry.push(finding('geometry', f.code ?? GEOMETRY_OFF_GRAMMAR, `${viewport.width}x${viewport.height} ${f.element ?? ''} ${f.at ?? ''} ${f.property ?? ''} is ${f.got ?? '?'}, the grammar renders ${f.expected ?? '?'}`.replace(/\s+/g, ' ').trim()));
-    try { s = await probes.score(html, viewport, { repo: probeRepo ?? repo, family, drawCss, record: ui?.record ?? null, recordFile: ui?.file ?? null }); } catch (error) { s = { error: String(error?.message ?? error) }; }
-    if (!s || s.error) score.push(finding('score', DRAW_METRICS_UNVERIFIED, `ui-proof-brief --score could not run at ${viewport.width}x${viewport.height}: ${s?.error ?? 'no result'}`));
-    else {
-      scores.set(c.png, s);
-      const failed = [...list(s.spacing), ...list(s.cases)].filter((x) => x?.status === 'fail').map((x) => x.id ?? `${x.rule} ${x.case}`);
-      if ((s.summary?.fail ?? failed.length) > 0) score.push(finding('score', DRAW_SCORE_BELOW, `${viewport.width}x${viewport.height} scores ${s.summary?.pass ?? '?'} pass / ${s.summary?.fail ?? failed.length} fail: ${failed.slice(0, 8).join('; ')}`, { count: failed.length }));
-    }
-  }
-  push('geometry', geometry);
-  push('score', score);
-
-  // 8. Evidence for every decision (owner ruling 2026-09-27): rationale.json, data-why, measured values, rule ids, redlines.
-  const whyFile = rationaleFile === undefined ? rationaleFileOf(html) : rationaleFile;
-  const why = loadRationale(whyFile);
-  const whyRoot = ui?.dir ? workRootOf(ui.dir) : null;
-  const redlines = captures.map((c) => ({ part: stemOf(c.png), ok: Boolean(c.record?.redline?.path && isFile(c.record.redline.path)) }));
-  push('rationale', rationaleFindings({ html: text, entries: why.entries, errors: why.errors, measures: measuresOf(captures.map((c) => c.record)), resolve: ruleResolver({ workRoot: whyRoot, record: ui?.record ?? null, repoRoot: repo ?? null }),
-    record: ui?.record ?? null, label, redlines }).map((f) => finding('rationale', f.code, f.detail, { count: f.count })), whyFile ? { file: path.basename(whyFile), decisions: why.entries.length } : { file: null });
-
-  const failures = metrics.flatMap((m) => m.findings);
-  return {
-    doc: { schema: METRICS_SCHEMA, html: path.basename(html), htmlSha256: sha256(text), ...(component ? { mode: 'component', source: sourceGate.file ? path.basename(sourceGate.file) : null, sourceSha256: sourceGate.sha256 ?? null } : {}), viewports: captures.map((c) => ({ width: c.viewport.width, height: c.viewport.height, part: stemOf(c.png) })),
-      metrics, failures: failures.length, codes: [...new Set(failures.map((f) => f.code))].sort(byCodeUnit), allPass: failures.length === 0 },
-    scores,
-  };
-}
 
 // ---------------------------------------------------------------------------------------------------------
 // The loop record
@@ -442,6 +297,14 @@ export async function critiqueBest({ out, settings = drawLoopSettings(), drawer 
  * draw source, fixtures, grammar resolution and rationale into `out` (a loop round). Shared by a loop round and the
  * settle re-measure (verifyRecordParts), so the runtime judges an installed part exactly as the loop did.
  */
+function keepComponentInputs({ source, fixtures, fixtureFiles, out, grammar, whyFile }) {
+  fs.copyFileSync(source, path.join(out, 'source.tsx'));
+  for (const f of fixtureFiles) fs.copyFileSync(f, path.join(out, f === fixtures.default ? 'fixture.json' : `fixture.${Object.keys(fixtures.byWidth).find((w) => fixtures.byWidth[w] === f)}.json`));
+  writeJsonFile(path.join(out, 'grammar.json'), { schema: 'starci/draw-grammar@1', grammarSource: grammar.grammarSource ?? null, pick: grammar.pick ?? null,
+    productVersion: grammar.productVersion ?? null, productRange: grammar.productRange ?? null, upgradeOwed: grammar.upgradeOwed ?? null, attempts: grammar.attempts ?? [] });
+  if (whyFile) fs.copyFileSync(whyFile, path.join(out, 'rationale.json'));
+}
+
 async function componentMeasure({ source, fixtures, fixtureFiles, productDir, css = [], prefer = 'auto', grammarDist = null, ui = null, repo, family = null, settings = drawLoopSettings(),
   probes = browserProbes, out, proposalDirs = [], viewports, name, fullPage = true, render = defaultComponentRender, sourceCheck = checkDrawSource, keep = false, rationaleFile = undefined }) {
   // The source gate first: TypeScript against the grammar the draw will ship with, then the AST.
@@ -449,13 +312,7 @@ async function componentMeasure({ source, fixtures, fixtureFiles, productDir, cs
   gate.file = source;
   gate.sha256 = sha256File(source);
   const whyFile = rationaleFile === undefined ? rationaleFileFor(source) : rationaleFile;
-  if (keep) {
-    fs.copyFileSync(source, path.join(out, 'source.tsx'));
-    for (const f of fixtureFiles) fs.copyFileSync(f, path.join(out, f === fixtures.default ? 'fixture.json' : `fixture.${Object.keys(fixtures.byWidth).find((w) => fixtures.byWidth[w] === f)}.json`));
-    writeJsonFile(path.join(out, 'grammar.json'), { schema: 'starci/draw-grammar@1', grammarSource: gate.grammar.grammarSource ?? null, pick: gate.grammar.pick ?? null,
-      productVersion: gate.grammar.productVersion ?? null, productRange: gate.grammar.productRange ?? null, upgradeOwed: gate.grammar.upgradeOwed ?? null, attempts: gate.grammar.attempts ?? [] });
-    if (whyFile) fs.copyFileSync(whyFile, path.join(out, 'rationale.json'));
-  }
+  if (keep) keepComponentInputs({ source, fixtures, fixtureFiles, out, grammar: gate.grammar, whyFile });
   // A draw that type-checks nowhere still renders (against the last candidate) so the round shows it - and fails.
   const grammar = gate.grammar.ok ? gate.grammar : { ...gate.grammar, pick: gate.grammar.attempts?.length ? { source: gate.grammar.attempts.at(-1).source, version: gate.grammar.attempts.at(-1).version, root: gate.grammar.attempts.at(-1).root } : null };
   const harnessDir = path.join(out, 'harness');
@@ -534,6 +391,11 @@ const pathKey = (p) => { const r = path.resolve(p); return WIN ? r.toLowerCase()
 const withReal = (d) => { const out = [path.resolve(d)]; try { out.push(fs.realpathSync.native(d)); } catch { /* missing */ } return out; };
 const reEscape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
 
+function scratchRegexOf(forms) {
+  const flags = WIN ? 'gi' : 'g';
+  return new RegExp(String.raw`(file:\/\/\/?)?(?:${forms.map(reEscape).join('|')})(?:[\\/][^\s"'<>|*?]*)?(?![^\\/\s"'<>|*?])`, flags);
+}
+
 /** The scratch roots of a loop (the loop dir, the job scratch, the OS temp dirs), with a mapper of a path under them. */
 function scratchRewriter({ out, env = process.env, context = opContextOf({ env }), installed = new Map() }) {
   const loopRoots = withReal(out);
@@ -542,7 +404,7 @@ function scratchRewriter({ out, env = process.env, context = opContextOf({ env }
     .filter((d) => path.parse(d).root !== d).sort((a, b) => b.length - a.length);
   // Each root as written with either separator, optionally as a file URL; the tail runs to the first quote or space.
   const forms = [...new Set(roots.flatMap((r) => [r, r.replaceAll('\\', '/'), r.replaceAll('/', '\\')]))].sort((a, b) => b.length - a.length);
-  const re = forms.length ? new RegExp(String.raw`(file:\/\/\/?)?(?:${forms.map(reEscape).join('|')})(?:[\\/][^\s"'<>|*?]*)?(?![^\\/\s"'<>|*?])`, WIN ? 'gi' : 'g') : null;
+  const re = forms.length ? scratchRegexOf(forms) : null;
   const map = (abs) => {
     const hit = installed.get(pathKey(abs));
     if (hit) return hit;
@@ -560,7 +422,12 @@ function scratchRewriter({ out, env = process.env, context = opContextOf({ env }
     if (url) { try { p = fileURLToPath(m); } catch { p = decodeURIComponent(m.slice(url.length)); } }
     return map(p) ?? m;
   }) : s);
-  const value = (v) => { if (typeof v === 'string') return text(v); if (Array.isArray(v)) return v.map(value); if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, value(x)])); return v; };
+  const value = (v) => {
+    if (typeof v === 'string') { return text(v); }
+    if (Array.isArray(v)) { return v.map(value); }
+    if (v && typeof v === 'object') { return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, value(x)])); }
+    return v;
+  };
   return { roots, map, text, value };
 }
 
@@ -573,6 +440,81 @@ function installJson(from, to, { out, installed }) {
   try { doc = JSON.parse(fs.readFileSync(from, 'utf8')); } catch { fs.copyFileSync(from, to); return; }
   const rel = new Map([...installed].map(([k, abs]) => [k, slash(path.relative(path.dirname(to), abs))]));
   writeJsonFile(to, scratchRewriter({ out, installed: rel }).value(doc));
+}
+
+function copiesForPart(part, { roundDir, partsDir, component, from, to, tsx, fx, perWidth }) {
+  return { from, to, tsx, fx, perWidth, copies: [[from, to], ...['.json', '.score.json'].map((ext) => [path.join(roundDir, `${part.part}${ext}`), path.join(partsDir, `${part.part}${ext}`), true]),
+    [path.join(roundDir, 'rationale.json'), path.join(partsDir, `${part.part}.rationale.json`), true], [path.join(roundDir, `${part.part}.redline.png`), path.join(partsDir, `${part.part}.redline.png`)],
+    ...(component ? [[path.join(roundDir, 'source.tsx'), tsx], [isFile(perWidth) ? perWidth : path.join(roundDir, 'fixture.json'), fx, true],
+      [path.join(roundDir, `${part.part}.dom.html`), path.join(partsDir, `${part.part}.dom.html`)]] : [[path.join(roundDir, 'source.html'), path.join(partsDir, `${part.part}.html`)]])].filter(([file]) => isFile(file)) };
+}
+
+function copyPartFiles(copies, { out, installedAs }) {
+  for (const [from, to, json] of copies) {
+    if (json) installJson(from, to, { out, installed: installedAs });
+    else fs.copyFileSync(from, to);
+  }
+}
+
+function copyComponentAssets({ tsx, source, partsDir, relTo, assets }) {
+  for (const match of fs.readFileSync(tsx, 'utf8').matchAll(/from\s+["'](\.{1,2}\/[^"']+\.(?:png|jpe?g|webp|gif|avif))["']/gi)) {
+    const from = path.resolve(path.dirname(source), match[1]), to = path.resolve(partsDir, match[1]);
+    if (!isFile(from) || path.resolve(from) === to) continue;
+    fs.mkdirSync(path.dirname(to), { recursive: true });
+    fs.copyFileSync(from, to);
+    if (!assets.some((asset) => asset.path === slash(path.relative(relTo, to)))) assets.push({ path: slash(path.relative(relTo, to)), role: 'render-asset', sha256: sha256File(to) });
+  }
+}
+
+function appendEvidenceAssets(part, { partsDir, relTo, assets }) {
+  for (const [ext, role] of [['.rationale.json', 'rationale'], ['.redline.png', 'direction-redline']]) {
+    const file = path.join(partsDir, `${part.part}${ext}`);
+    if (isFile(file)) assets.push({ path: slash(path.relative(relTo, file)), role, breakpoint: breakpointOf(part), theme: 'light', sha256: sha256File(file) });
+  }
+}
+
+function installBestPart(part, context) {
+  const { out, roundDir, source, partsDir, relTo, promptPath, loopRef, installed, assets } = context;
+  const from = path.join(roundDir, `${part.part}.png`);
+  const to = path.join(partsDir, `${part.part}.png`);
+  const component = isFile(path.join(roundDir, 'source.tsx'));
+  const tsx = path.join(partsDir, `${part.part}.draw.tsx`), fx = path.join(partsDir, `${part.part}.fixture.json`);
+  const perWidth = path.join(roundDir, `fixture.${part.width}.json`);
+  const { copies } = copiesForPart(part, { roundDir, partsDir, component, from, to, tsx, fx, perWidth });
+  const installedAs = new Map(copies.map(([file, target]) => [pathKey(file), target]));
+  installedAs.set(pathKey(source), component ? tsx : path.join(partsDir, `${part.part}.html`));
+  const sourceWhy = component ? rationaleFileFor(source) : rationaleFileOf(source);
+  if (sourceWhy && isFile(path.join(roundDir, 'rationale.json'))) installedAs.set(pathKey(sourceWhy), path.join(partsDir, `${part.part}.rationale.json`));
+  copyPartFiles(copies, { out, installedAs });
+  const sha = sha256File(to);
+  if (component) {
+    copyComponentAssets({ tsx, source, partsDir, relTo, assets });
+    installed.push({ path: slash(path.relative(relTo, to)), sha256: sha, source: slash(path.relative(relTo, tsx)), fixture: slash(path.relative(relTo, fx)) });
+    assets.push({ path: slash(path.relative(relTo, to)), role: 'direction-content', breakpoint: breakpointOf(part), theme: 'light', sha256: sha,
+      generation: { tool: 'draw-render', mode: 'draw-loop-component', promptPath, loop: loopRef, grammarSource: context.best.grammarSource ?? null,
+        ...(context.best.grammarUpgradeOwed ? { grammarUpgradeOwed: context.best.grammarUpgradeOwed } : {}) } },
+      { path: slash(path.relative(relTo, tsx)), role: 'render-source', sha256: sha256File(tsx) },
+      { path: slash(path.relative(relTo, fx)), role: 'render-fixture', sha256: sha256File(fx) });
+    appendEvidenceAssets(part, { partsDir, relTo, assets });
+    return;
+  }
+  const html = path.join(partsDir, `${part.part}.html`);
+  installed.push({ path: slash(path.relative(relTo, to)), sha256: sha, html: slash(path.relative(relTo, html)) });
+  assets.push({ path: slash(path.relative(relTo, to)), role: 'direction-content', breakpoint: breakpointOf(part), theme: 'light', sha256: sha,
+    generation: { tool: 'draw-render', promptPath, mode: 'draw-loop', loop: loopRef } },
+    { path: slash(path.relative(relTo, html)), role: 'render-source' });
+  appendEvidenceAssets(part, { partsDir, relTo, assets });
+}
+
+function beautyFindings(best, settings) {
+  if (Number.isFinite(best.beauty) && best.beauty >= Number(settings.beautyMin)) return [];
+  if (Number.isFinite(best.beauty)) return [{ code: DRAW_BEAUTY_BELOW, detail: `the critic scored beauty ${best.beauty} (at least ${settings.beautyMin} is the bar)${best.criticFailed?.length ? '; failed ' + best.criticFailed.join(', ') : ''}` }];
+  const error = best.critic?.error ? ': ' + String(best.critic.error).slice(0, 300) : ' (drawn with --no-critic)';
+  return [{ code: DRAW_CRITIC_MISSING, detail: `no critic scored round ${best.n}${error} - run finish without --no-critic (it critiques the best round) or fix the critic (runtimes.yaml allocation.drawLoop.critic)` }];
+}
+
+function ownerFeedbackFindings(best) {
+  return best.ownerFailed?.length ? [{ code: 'DRAW_FEEDBACK_UNADDRESSED', detail: `the critic fails the owner's note(s) ${best.ownerFailed.join(', ')} (draw-feedback.mjs brief lists them)` }] : [];
 }
 
 /**
@@ -597,67 +539,12 @@ export function finishLoop({ out, parts = null, prompt = null, repo = null, sett
   const promptPath = prompt ? slash(path.relative(relTo, path.resolve(prompt))) : slash(path.relative(relTo, source.replace(/(?:\.draw\.tsx|\.html?)$/i, '.prompt.txt')));
   const assets = [];
   const loopRef = { round: best.n };
-  for (const p of best.parts) {
-    const from = path.join(roundDir, `${p.part}.png`);
-    const to = path.join(partsDir, `${p.part}.png`);
-    const component = isFile(path.join(roundDir, 'source.tsx'));
-    const tsx = path.join(partsDir, `${p.part}.draw.tsx`), fx = path.join(partsDir, `${p.part}.fixture.json`);
-    const perWidth = path.join(roundDir, `fixture.${p.width}.json`);
-    // Every file of the round this part installs, [from, to, json]: the JSON ones are installed through
-    // installJson, so a scratch path they cite becomes the installed sibling it names (or a loop-bundle member).
-    // The decision evidence travels with the part: <part>.rationale.json and the annotated <part>.redline.png. A
-    // real-component drawing: the accepted draw source (<part>.draw.tsx) and its fixture are what interface.implement
-    // starts the XBase from; the rendered DOM rides along for the html-reading checks.
-    const copies = [[from, to], ...['.json', '.score.json'].map((ext) => [path.join(roundDir, `${p.part}${ext}`), path.join(partsDir, `${p.part}${ext}`), true]),
-      [path.join(roundDir, 'rationale.json'), path.join(partsDir, `${p.part}.rationale.json`), true], [path.join(roundDir, `${p.part}.redline.png`), path.join(partsDir, `${p.part}.redline.png`)],
-      ...(component ? [[path.join(roundDir, 'source.tsx'), tsx], [isFile(perWidth) ? perWidth : path.join(roundDir, 'fixture.json'), fx, true],
-        [path.join(roundDir, `${p.part}.dom.html`), path.join(partsDir, `${p.part}.dom.html`)]] : [[path.join(roundDir, 'source.html'), path.join(partsDir, `${p.part}.html`)]])].filter(([f]) => isFile(f));
-    const installedAs = new Map(copies.map(([f, t]) => [pathKey(f), t]));
-    // The files the round was measured from, as the render record cites them: the draw source and its rationale.
-    installedAs.set(pathKey(source), component ? tsx : path.join(partsDir, `${p.part}.html`));
-    const sourceWhy = component ? rationaleFileFor(source) : rationaleFileOf(source);
-    if (sourceWhy && isFile(path.join(roundDir, 'rationale.json'))) installedAs.set(pathKey(sourceWhy), path.join(partsDir, `${p.part}.rationale.json`));
-    for (const [f, t, json] of copies) {
-      if (json) installJson(f, t, { out, installed: installedAs });
-      else fs.copyFileSync(f, t);
-    }
-    const sha = sha256File(to);
-    if (component) {
-      // The art placeholders the draw source imports (./assets/x.png) travel with it, so the installed source renders.
-      for (const m of fs.readFileSync(tsx, 'utf8').matchAll(/from\s+["'](\.{1,2}\/[^"']+\.(?:png|jpe?g|webp|gif|avif))["']/gi)) {
-        const from3 = path.resolve(path.dirname(source), m[1]), to3 = path.resolve(partsDir, m[1]);
-        if (!isFile(from3) || path.resolve(from3) === to3) continue;
-        fs.mkdirSync(path.dirname(to3), { recursive: true });
-        fs.copyFileSync(from3, to3);
-        if (!assets.some((a) => a.path === slash(path.relative(relTo, to3)))) assets.push({ path: slash(path.relative(relTo, to3)), role: 'render-asset', sha256: sha256File(to3) });
-      }
-      installed.push({ path: slash(path.relative(relTo, to)), sha256: sha, source: slash(path.relative(relTo, tsx)), fixture: slash(path.relative(relTo, fx)) });
-      assets.push({ path: slash(path.relative(relTo, to)), role: 'direction-content', breakpoint: breakpointOf(p), theme: 'light', sha256: sha,
-        generation: { tool: 'draw-render', mode: 'draw-loop-component', promptPath, loop: loopRef, grammarSource: best.grammarSource ?? null,
-          ...(best.grammarUpgradeOwed ? { grammarUpgradeOwed: best.grammarUpgradeOwed } : {}) } },
-        { path: slash(path.relative(relTo, tsx)), role: 'render-source', sha256: sha256File(tsx) },
-        { path: slash(path.relative(relTo, fx)), role: 'render-fixture', sha256: sha256File(fx) });
-      for (const [ext, role] of [['.rationale.json', 'rationale'], ['.redline.png', 'direction-redline']]) {
-        const f = path.join(partsDir, `${p.part}${ext}`);
-        if (isFile(f)) assets.push({ path: slash(path.relative(relTo, f)), role, breakpoint: breakpointOf(p), theme: 'light', sha256: sha256File(f) });
-      }
-      continue;
-    }
-    installed.push({ path: slash(path.relative(relTo, to)), sha256: sha, html: slash(path.relative(relTo, path.join(partsDir, `${p.part}.html`))) });
-    assets.push({ path: slash(path.relative(relTo, to)), role: 'direction-content', breakpoint: breakpointOf(p), theme: 'light', sha256: sha,
-      generation: { tool: 'draw-render', promptPath, mode: 'draw-loop', loop: loopRef } },
-      { path: slash(path.relative(relTo, path.join(partsDir, `${p.part}.html`))), role: 'render-source' });
-    for (const [ext, role] of [['.rationale.json', 'rationale'], ['.redline.png', 'direction-redline']]) {
-      const f = path.join(partsDir, `${p.part}${ext}`);
-      if (isFile(f)) assets.push({ path: slash(path.relative(relTo, f)), role, breakpoint: breakpointOf(p), theme: 'light', sha256: sha256File(f) });
-    }
-  }
+  const installContext = { out, roundDir, source, partsDir, relTo, promptPath, loopRef, installed, assets, best };
+  for (const part of best.parts) installBestPart(part, installContext);
   const remaining = passed ? [] : [
     ...list(metrics?.metrics).flatMap((m) => m.findings.map((f) => ({ code: f.code, detail: f.detail }))),
-    ...(Number.isFinite(best.beauty) && best.beauty >= Number(settings.beautyMin) ? []
-      : Number.isFinite(best.beauty) ? [{ code: DRAW_BEAUTY_BELOW, detail: `the critic scored beauty ${best.beauty} (at least ${settings.beautyMin} is the bar)${best.criticFailed?.length ? '; failed ' + best.criticFailed.join(', ') : ''}` }]
-        : [{ code: DRAW_CRITIC_MISSING, detail: `no critic scored round ${best.n}${best.critic?.error ? ': ' + String(best.critic.error).slice(0, 300) : ' (drawn with --no-critic)'} - run finish without --no-critic (it critiques the best round) or fix the critic (runtimes.yaml allocation.drawLoop.critic)` }]),
-    ...(best.ownerFailed?.length ? [{ code: 'DRAW_FEEDBACK_UNADDRESSED', detail: `the critic fails the owner's note(s) ${best.ownerFailed.join(', ')} (draw-feedback.mjs brief lists them)` }] : []),
+    ...beautyFindings(best, settings),
+    ...ownerFeedbackFindings(best),
   ];
   loop.outcome = passed ? 'passed' : 'blocked';
   loop.remaining = remaining.slice(0, 50);
@@ -676,6 +563,59 @@ export function finishLoop({ out, parts = null, prompt = null, repo = null, sett
 // ---------------------------------------------------------------------------------------------------------
 // Settle: every live part re-rendered and re-measured by the runtime
 // ---------------------------------------------------------------------------------------------------------
+
+async function verifyDrawGroup({ source, fixture, group, record, ui, repo, family, settings, probes, componentRender, sourceCheck, tmpRoot, findings, parts }) {
+  const at = slash(path.relative(repo, source));
+  const rec0 = readJsonFile(group[0].png.replace(/\.png$/i, '.json'))?.source ?? {};
+  const productDir = rec0.product ?? null;
+  if (!fixture || !productDir) { findings.push({ code: DRAW_METRICS_UNVERIFIED, path: at, detail: `${path.basename(source)} has no ${fixture ? 'product app in its draw-render record (source.product)' : 'fixture (<part>.fixture.json) beside it'}: the runtime cannot re-measure it` }); return; }
+  const dir = fs.mkdtempSync(path.join(tmpRoot, 'starci-draw-verify-'));
+  try {
+    const stem = path.basename(group[0].png).split('--')[0];
+    const [base, state] = stem.includes('#') ? stem.split('#') : [stem, 'part'];
+    const viewports = [...new Map(group.map((part) => [`${part.viewport.width}x${part.viewport.height}`, part.viewport])).values()];
+    const grammar = rec0.grammar ?? {};
+    const fixtures = { default: fixture, byWidth: {} };
+    let result;
+    try {
+      result = await componentMeasure({ source, fixtures, fixtureFiles: [fixture], productDir, css: list(rec0.css).map((css) => css.path).filter(Boolean), grammarDist: grammar.source === 'claude-dist' ? grammar.root : null,
+        prefer: grammar.source === 'claude-dist' ? 'claude-dist' : 'auto', ui: { ...ui, record, state }, repo, family, settings, probes, out: dir, viewports, name: `${base}#${state}`, fullPage: true,
+        ...(componentRender ? { render: componentRender } : {}), ...(sourceCheck ? { sourceCheck } : {}) });
+    } catch (error) { findings.push({ code: DRAW_METRICS_UNVERIFIED, path: at, detail: `the runtime could not re-render ${path.basename(source)}: ${String(error?.message ?? error).split('\n')[0]}` }); return; }
+    const doc = result.metrics;
+    parts.push({ html: at, failures: doc.failures, codes: doc.codes });
+    if (!doc.allPass) {
+      const all = doc.metrics.flatMap((metric) => metric.findings);
+      findings.push({ code: all.every((finding) => finding.code === DRAW_METRICS_UNVERIFIED) ? DRAW_METRICS_UNVERIFIED : DRAW_METRICS_FAILED, path: at, codes: doc.codes,
+        detail: `re-measured by the runtime, ${path.basename(source)} fails ${doc.failures} machine metric finding(s) (${doc.codes.join(', ')}): ${all.slice(0, 4).map((finding) => finding.detail).join(' | ').slice(0, 900)}` });
+    }
+  } finally {
+    safeRemove(dir, { hold: artifactHoldReason });
+  }
+}
+
+async function verifyHtmlGroup({ html, group, ui, record, repo, family, settings, render, probes, tmpRoot, findings, parts }) {
+  const dir = fs.mkdtempSync(path.join(tmpRoot, 'starci-draw-verify-'));
+  try {
+    const state = String(group[0].asset.path.split('/').pop().split('--')[0]).split('#').pop();
+    const base = String(group[0].asset.path.split('/').pop().split('--')[0]).split('#')[0] || 'part';
+    // The source is rendered where it lives (its relative assets resolve), into a temp dir.
+    const viewports = [...new Map(group.map((part) => [`${part.viewport.width}x${part.viewport.height}`, part.viewport])).values()];
+    let records;
+    try { records = await (render ?? defaultRender)({ html, out: dir, viewports, name: `${base}#${state}`.replace(/[^\w.#-]/g, '-'), fullPage: true, repo }); }
+    catch (error) { findings.push({ code: DRAW_METRICS_UNVERIFIED, path: slash(path.relative(repo, html)), detail: `the runtime could not re-render ${path.basename(html)}: ${String(error?.message ?? error).split('\n')[0]}` }); return; }
+    const captures = records.map((result) => ({ png: result.image.path, record: result, viewport: { width: result.viewport.width, height: result.viewport.height } }));
+    const { doc } = await machineMetrics({ html, captures, ui: { ...ui, record, state }, repo, family, settings, probes });
+    parts.push({ html: slash(path.relative(repo, html)), failures: doc.failures, codes: doc.codes });
+    if (!doc.allPass) {
+      const all = doc.metrics.flatMap((metric) => metric.findings);
+      findings.push({ code: all.every((finding) => finding.code === DRAW_METRICS_UNVERIFIED) ? DRAW_METRICS_UNVERIFIED : DRAW_METRICS_FAILED, path: slash(path.relative(repo, html)), codes: doc.codes,
+        detail: `re-measured by the runtime, ${path.basename(html)} fails ${doc.failures} machine metric finding(s) (${doc.codes.join(', ')}): ${all.slice(0, 4).map((finding) => finding.detail).join(' | ').slice(0, 900)}` });
+    }
+  } finally {
+    safeRemove(dir, { hold: artifactHoldReason });
+  }
+}
 
 /**
  * Re-render every live part of a ui record from its render source and re-run every machine metric. Returns
@@ -702,55 +642,10 @@ export async function verifyRecordParts({ recordDir, record = null, repo, family
     byHtml.get(key).parts.push(p);
   }
   for (const { source, fixture, parts: group } of byDraw.values()) {
-    const at = slash(path.relative(repo, source));
-    const rec0 = readJsonFile(group[0].png.replace(/\.png$/i, '.json'))?.source ?? {};
-    const productDir = rec0.product ?? null;
-    if (!fixture || !productDir) { findings.push({ code: DRAW_METRICS_UNVERIFIED, path: at, detail: `${path.basename(source)} has no ${fixture ? 'product app in its draw-render record (source.product)' : 'fixture (<part>.fixture.json) beside it'}: the runtime cannot re-measure it` }); continue; }
-    const dir = fs.mkdtempSync(path.join(tmpRoot, 'starci-draw-verify-'));
-    try {
-      const stem = path.basename(group[0].png).split('--')[0];
-      const [base, state] = stem.includes('#') ? stem.split('#') : [stem, 'part'];
-      const viewports = [...new Map(group.map((p) => [`${p.viewport.width}x${p.viewport.height}`, p.viewport])).values()];
-      const g = rec0.grammar ?? {};
-      const fixtures = { default: fixture, byWidth: {} };
-      let r;
-      try {
-        r = await componentMeasure({ source, fixtures, fixtureFiles: [fixture], productDir, css: list(rec0.css).map((c) => c.path).filter(Boolean), grammarDist: g.source === 'claude-dist' ? g.root : null,
-          prefer: g.source === 'claude-dist' ? 'claude-dist' : 'auto', ui: { ...ui, record: rec, state }, repo, family, settings, probes, out: dir, viewports, name: `${base}#${state}`, fullPage: true,
-          ...(componentRender ? { render: componentRender } : {}), ...(sourceCheck ? { sourceCheck } : {}) });
-      } catch (error) { findings.push({ code: DRAW_METRICS_UNVERIFIED, path: at, detail: `the runtime could not re-render ${path.basename(source)}: ${String(error?.message ?? error).split('\n')[0]}` }); continue; }
-      const doc = r.metrics;
-      parts.push({ html: at, failures: doc.failures, codes: doc.codes });
-      if (!doc.allPass) {
-        const all = doc.metrics.flatMap((m) => m.findings);
-        findings.push({ code: all.every((f) => f.code === DRAW_METRICS_UNVERIFIED) ? DRAW_METRICS_UNVERIFIED : DRAW_METRICS_FAILED, path: at, codes: doc.codes,
-          detail: `re-measured by the runtime, ${path.basename(source)} fails ${doc.failures} machine metric finding(s) (${doc.codes.join(', ')}): ${all.slice(0, 4).map((f) => f.detail).join(' | ').slice(0, 900)}` });
-      }
-    } finally {
-      safeRemove(dir, { hold: artifactHoldReason });
-    }
+    await verifyDrawGroup({ source, fixture, group, ui, record: rec, repo, family, settings, probes, componentRender, sourceCheck, tmpRoot, findings, parts });
   }
   for (const { html, parts: group } of byHtml.values()) {
-    const dir = fs.mkdtempSync(path.join(tmpRoot, 'starci-draw-verify-'));
-    try {
-      const state = String(group[0].asset.path.split('/').pop().split('--')[0]).split('#').pop();
-      const base = String(group[0].asset.path.split('/').pop().split('--')[0]).split('#')[0] || 'part';
-      // The source is rendered where it lives (its relative assets resolve), into a temp dir.
-      const viewports = [...new Map(group.map((p) => [`${p.viewport.width}x${p.viewport.height}`, p.viewport])).values()];
-      let records;
-      try { records = await (render ?? defaultRender)({ html, out: dir, viewports, name: `${base}#${state}`.replace(/[^\w.#-]/g, '-'), fullPage: true, repo }); }
-      catch (error) { findings.push({ code: DRAW_METRICS_UNVERIFIED, path: slash(path.relative(repo, html)), detail: `the runtime could not re-render ${path.basename(html)}: ${String(error?.message ?? error).split('\n')[0]}` }); continue; }
-      const captures = records.map((r) => ({ png: r.image.path, record: r, viewport: { width: r.viewport.width, height: r.viewport.height } }));
-      const { doc } = await machineMetrics({ html, captures, ui: { ...ui, record: rec, state }, repo, family, settings, probes });
-      parts.push({ html: slash(path.relative(repo, html)), failures: doc.failures, codes: doc.codes });
-      if (!doc.allPass) {
-        const all = doc.metrics.flatMap((m) => m.findings);
-        findings.push({ code: all.every((f) => f.code === DRAW_METRICS_UNVERIFIED) ? DRAW_METRICS_UNVERIFIED : DRAW_METRICS_FAILED, path: slash(path.relative(repo, html)), codes: doc.codes,
-          detail: `re-measured by the runtime, ${path.basename(html)} fails ${doc.failures} machine metric finding(s) (${doc.codes.join(', ')}): ${all.slice(0, 4).map((f) => f.detail).join(' | ').slice(0, 900)}` });
-      }
-    } finally {
-      safeRemove(dir, { hold: artifactHoldReason });
-    }
+    await verifyHtmlGroup({ html, group, ui, record: rec, repo, family, settings, render, probes, tmpRoot, findings, parts });
   }
   return { findings, parts };
 }
@@ -767,50 +662,58 @@ const USAGE = `use:
   starci work draw-loop verify --ui <ui-record-dir> --repo <product repo> [--json]
 `;
 
+async function roundCommand(rest, say) {
+  const component = Boolean(flag(rest, '--source'));
+  for (const key of [component ? '--source' : '--html', ...(component ? ['--fixture', '--product'] : []), '--base', '--state', '--viewports', '--repo']) if (!flag(rest, key)) return { code: 2, text: `${key} is required\n${USAGE}` };
+  const all = (key) => rest.flatMap((arg, index) => (rest[index - 1] === key ? [arg] : []));
+  const result = await runRound({ ui: flag(rest, '--ui'), html: flag(rest, '--html'),
+    ...(component ? { source: flag(rest, '--source'), fixtures: fixturesByWidth(all('--fixture')), product: flag(rest, '--product'), css: all('--css'), grammar: flag(rest, '--grammar') ?? 'auto', grammarDist: flag(rest, '--grammar-dist') } : {}), base: flag(rest, '--base'), state: flag(rest, '--state'), viewports: parseViewports(flag(rest, '--viewports')),
+    repo: path.resolve(flag(rest, '--repo')), out: flag(rest, '--out'), family: flag(rest, '--family'), fullPage: !rest.includes('--no-full-page'), critic: rest.includes('--no-critic') ? false : undefined, drawer: flag(rest, '--drawer') ?? undefined });
+  const next = result.stop ? `the loop stopped (${result.stop.reason}): starci work draw-loop finish --out ${result.out}` : 'fix the source against metrics.json and critique.json, then run round again';
+  const lines = [`round ${result.round.n}: ${result.round.failures} machine failure(s)${result.round.codes.length ? ' [' + result.round.codes.join(', ') + ']' : ''}; beauty ${result.round.beauty ?? '-'}${result.critique?.error ? ' (critic: ' + result.critique.error.slice(0, 160) + ')' : ''}; ${result.round.progress ? 'progress' : 'NO progress'}; best round ${result.loop.best}`,
+    ...result.metrics.metrics.filter((metric) => !metric.ok).flatMap((metric) => metric.findings.slice(0, 3).map((finding) => `  [${finding.code}] ${finding.detail.slice(0, 300)}`)),
+    ...(result.critique?.verdict ? result.critique.verdict.checks.filter((check) => !check.pass).slice(0, 8).map((check) => `  critic ${check.id}: ${check.evidence}${check.fix ? ' -> ' + check.fix : ''}`) : []),
+    `next: ${next}`];
+  return { code: 0, text: say({ out: result.out, round: result.round, stop: result.stop, best: result.loop.best, next }, lines.join('\n')) };
+}
+
+function statusCommand(rest, say) {
+  const out = flag(rest, '--out');
+  const loop = out ? readLoop(path.resolve(out)) : null;
+  if (!loop) return { code: 2, text: `no draw loop at ${out}\n${USAGE}` };
+  return { code: 0, text: say(loop, [`${loop.base}#${loop.state}: ${loop.rounds.length} round(s), best ${loop.best}, stop ${loop.stop ? loop.stop.reason : '-'}, outcome ${loop.outcome ?? '-'}`,
+    ...loop.rounds.map((round) => `  round ${round.n}: failures ${round.failures}, beauty ${round.beauty ?? '-'}${round.progress ? '' : ' (no progress)'}`)].join('\n')) };
+}
+
+async function finishCommand(rest, say) {
+  const out = flag(rest, '--out');
+  if (!out) return { code: 2, text: USAGE };
+  // A best round nobody critiqued (drawn with --no-critic, or its critic errored) is critiqued now, before the verdict.
+  const late = rest.includes('--no-critic') ? null : await critiqueBest({ out: path.resolve(out), drawer: flag(rest, '--drawer') ?? undefined });
+  const result = finishLoop({ out: path.resolve(out), parts: flag(rest, '--parts'), prompt: flag(rest, '--prompt'), repo: flag(rest, '--repo') ? path.resolve(flag(rest, '--repo')) : null, force: rest.includes('--force') });
+  if (late?.ran) result.lateCritique = { round: late.round, beauty: late.critique?.verdict?.beauty ?? null, error: late.critique?.error ?? null };
+  return { code: result.outcome === 'passed' ? 0 : 1, text: say(result, [`outcome ${result.outcome}: best round ${result.best.n} (failures ${result.best.failures}, beauty ${result.best.beauty ?? '-'})`,
+    ...result.remaining.slice(0, 12).map((finding) => `  remaining [${finding.code}] ${String(finding.detail).slice(0, 240)}`),
+    ...result.grammarProposals.map((proposal) => `  grammar proposal ${proposal.name}${proposal.complete ? '' : ' (INCOMPLETE)'} - the owner is asked through the draw-review ask`),
+    'record these ui.assets entries verbatim:', ...result.assets.map((asset) => `  - ${JSON.stringify(asset)}`),
+    result.outcome === 'passed' ? 'then file the draw-review ask (draw-review.mjs question)' : 'report outcome blocked naming these remaining failures and the best round - never pass'].join('\n')) };
+}
+
+async function verifyCommand(rest, say) {
+  const ui = flag(rest, '--ui'), repo = flag(rest, '--repo');
+  if (!ui || !repo) return { code: 2, text: USAGE };
+  const result = await verifyRecordParts({ recordDir: path.resolve(ui), repo: path.resolve(repo) });
+  return { code: result.findings.length ? 1 : 0, text: say(result, `${result.findings.length ? 'REFUSED' : 'ok'}: ${result.parts.length} render source(s) re-measured\n${result.findings.map((finding) => '  [' + finding.code + '] ' + finding.detail).join('\n')}`) };
+}
+
 async function drawLoopMain(argv) {
   const [cmd, ...rest] = argv;
   const json = rest.includes('--json');
   const say = (obj, text) => (json ? `${JSON.stringify(obj, null, 2)}\n` : `${text}\n`);
-  if (cmd === 'round') {
-    const component = Boolean(flag(rest, '--source'));
-    for (const k of [component ? '--source' : '--html', ...(component ? ['--fixture', '--product'] : []), '--base', '--state', '--viewports', '--repo']) if (!flag(rest, k)) return { code: 2, text: `${k} is required\n${USAGE}` };
-    const all = (k) => rest.flatMap((a, i) => (rest[i - 1] === k ? [a] : []));
-    const r = await runRound({ ui: flag(rest, '--ui'), html: flag(rest, '--html'),
-      ...(component ? { source: flag(rest, '--source'), fixtures: fixturesByWidth(all('--fixture')), product: flag(rest, '--product'), css: all('--css'), grammar: flag(rest, '--grammar') ?? 'auto', grammarDist: flag(rest, '--grammar-dist') } : {}), base: flag(rest, '--base'), state: flag(rest, '--state'), viewports: parseViewports(flag(rest, '--viewports')),
-      repo: path.resolve(flag(rest, '--repo')), out: flag(rest, '--out'), family: flag(rest, '--family'), fullPage: !rest.includes('--no-full-page'), critic: rest.includes('--no-critic') ? false : undefined, drawer: flag(rest, '--drawer') ?? undefined });
-    const next = r.stop ? `the loop stopped (${r.stop.reason}): starci work draw-loop finish --out ${r.out}` : 'fix the source against metrics.json and critique.json, then run round again';
-    const lines = [`round ${r.round.n}: ${r.round.failures} machine failure(s)${r.round.codes.length ? ' [' + r.round.codes.join(', ') + ']' : ''}; beauty ${r.round.beauty ?? '-'}${r.critique?.error ? ' (critic: ' + r.critique.error.slice(0, 160) + ')' : ''}; ${r.round.progress ? 'progress' : 'NO progress'}; best round ${r.loop.best}`,
-      ...r.metrics.metrics.filter((m) => !m.ok).flatMap((m) => m.findings.slice(0, 3).map((f) => `  [${f.code}] ${f.detail.slice(0, 300)}`)),
-      ...(r.critique?.verdict ? r.critique.verdict.checks.filter((c) => !c.pass).slice(0, 8).map((c) => `  critic ${c.id}: ${c.evidence}${c.fix ? ' -> ' + c.fix : ''}`) : []),
-      `next: ${next}`];
-    return { code: 0, text: say({ out: r.out, round: r.round, stop: r.stop, best: r.loop.best, next }, lines.join('\n')) };
-  }
-  if (cmd === 'status') {
-    const out = flag(rest, '--out');
-    const loop = out ? readLoop(path.resolve(out)) : null;
-    if (!loop) return { code: 2, text: `no draw loop at ${out}\n${USAGE}` };
-    return { code: 0, text: say(loop, [`${loop.base}#${loop.state}: ${loop.rounds.length} round(s), best ${loop.best}, stop ${loop.stop ? loop.stop.reason : '-'}, outcome ${loop.outcome ?? '-'}`,
-      ...loop.rounds.map((r) => `  round ${r.n}: failures ${r.failures}, beauty ${r.beauty ?? '-'}${r.progress ? '' : ' (no progress)'}`)].join('\n')) };
-  }
-  if (cmd === 'finish') {
-    const out = flag(rest, '--out');
-    if (!out) return { code: 2, text: USAGE };
-    // A best round nobody critiqued (drawn with --no-critic, or its critic errored) is critiqued now, before the verdict.
-    const late = rest.includes('--no-critic') ? null : await critiqueBest({ out: path.resolve(out), drawer: flag(rest, '--drawer') ?? undefined });
-    const r = finishLoop({ out: path.resolve(out), parts: flag(rest, '--parts'), prompt: flag(rest, '--prompt'), repo: flag(rest, '--repo') ? path.resolve(flag(rest, '--repo')) : null, force: rest.includes('--force') });
-    if (late?.ran) r.lateCritique = { round: late.round, beauty: late.critique?.verdict?.beauty ?? null, error: late.critique?.error ?? null };
-    return { code: r.outcome === 'passed' ? 0 : 1, text: say(r, [`outcome ${r.outcome}: best round ${r.best.n} (failures ${r.best.failures}, beauty ${r.best.beauty ?? '-'})`,
-      ...r.remaining.slice(0, 12).map((f) => `  remaining [${f.code}] ${String(f.detail).slice(0, 240)}`),
-      ...r.grammarProposals.map((p) => `  grammar proposal ${p.name}${p.complete ? '' : ' (INCOMPLETE)'} - the owner is asked through the draw-review ask`),
-      'record these ui.assets entries verbatim:', ...r.assets.map((a) => `  - ${JSON.stringify(a)}`),
-      r.outcome === 'passed' ? 'then file the draw-review ask (draw-review.mjs question)' : 'report outcome blocked naming these remaining failures and the best round - never pass'].join('\n')) };
-  }
-  if (cmd === 'verify') {
-    const ui = flag(rest, '--ui'), repo = flag(rest, '--repo');
-    if (!ui || !repo) return { code: 2, text: USAGE };
-    const r = await verifyRecordParts({ recordDir: path.resolve(ui), repo: path.resolve(repo) });
-    return { code: r.findings.length ? 1 : 0, text: say(r, `${r.findings.length ? 'REFUSED' : 'ok'}: ${r.parts.length} render source(s) re-measured\n${r.findings.map((f) => '  [' + f.code + '] ' + f.detail).join('\n')}`) };
-  }
+  if (cmd === 'round') return roundCommand(rest, say);
+  if (cmd === 'status') return statusCommand(rest, say);
+  if (cmd === 'finish') return finishCommand(rest, say);
+  if (cmd === 'verify') return verifyCommand(rest, say);
   return { code: 2, text: USAGE };
 }
 

@@ -100,7 +100,7 @@ const jsonlIn = (dir, sinceMs, out, where, agent, depth = 0) => {
   try { names = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
   for (const d of names) {
     const file = path.join(dir, d.name);
-    if (d.isDirectory()) { if (depth < 4 && d.name !== 'subagents') jsonlIn(file, sinceMs, out, where, agent, depth + 1); continue; }
+    if (d.isDirectory()) { if (depth < 4 && d.name !== 'subagents') { jsonlIn(file, sinceMs, out, where, agent, depth + 1); } continue; }
     if (!d.name.endsWith('.jsonl')) continue;
     let stat = null;
     try { stat = fs.statSync(file); } catch { continue; }
@@ -316,6 +316,57 @@ const ledgerUsagePlan = (l, { since, out, openLedgerReader }) => {
   } finally { try { db?.close(); } catch { /* closed */ } }
 };
 
+function kernelUsagePlans(ledger, entries, openLedgerReader) {
+  if (!entries.length) return [];
+  const db = openLedgerReader(ledger.file);
+  try { return entries.map((entry) => ({ entry, plan: planSeatUsage(db, { role: 'kernel', workflowId: entry.workflowId, entry }) })); }
+  finally { db.close(); }
+}
+
+function addLedgerUsageDetails(ledger, plans, seatPlans, out, detail) {
+  if (!detail) return;
+  for (const plan of plans) out.detail.attempts.push({ ledger: ledger.name, ...plan });
+  for (const seat of seatPlans) out.detail.kernels.push({ ledger: ledger.name, workflowId: seat.entry.workflowId, ...seat.plan });
+}
+
+function recordUnavailableAttempts(ledger, plans, out) {
+  for (const plan of plans) {
+    if (!plan.ok) {
+      out.attempts.unavailable += 1;
+      if (out.unavailable.length < 50) out.unavailable.push({ ledger: ledger.name, attemptId: plan.attemptId, agent: plan.agent, reason: plan.reason });
+    }
+  }
+}
+
+function countDryRunUsage(work, seatWork, out) {
+  out.attempts.recorded += work.filter((plan) => plan.ok).length;
+  out.kernels.recorded += seatWork.length;
+  out.kernels.rows += seatWork.reduce((total, seat) => total + seat.plan.rows.length, 0);
+}
+
+function recordAttemptUsagePlans(handle, work, ledger, out, now) {
+  for (const plan of work) {
+    try {
+      if (applyAttemptUsage(handle, plan, { at: now }).recorded) out.attempts.recorded += 1;
+    } catch (error) {
+      if (archivedRefusal(error)) out.attempts.skippedEnded += 1;
+      else out.errors.push(`${ledger.name} attempt ${plan.attemptId}: ${message(error).slice(0, 160)}`);
+    }
+  }
+}
+
+function recordKernelUsagePlans(handle, seatWork, ledger, out, now) {
+  for (const { entry, plan } of seatWork) {
+    try {
+      const result = handle.write.recordKernelUsage({ workflowId: entry.workflowId, turnRef: plan.turnRef, rows: plan.rows, provider: entry.agent, at: now });
+      if (result.recorded) { out.kernels.recorded += 1; out.kernels.rows += result.rows; }
+    } catch (error) {
+      if (archivedRefusal(error)) out.kernels.skippedEnded += 1;
+      else out.errors.push(`${ledger.name} kernel ${entry.workflowId}: ${message(error).slice(0, 160)}`);
+    }
+  }
+}
+
 function recordLedgerUsage(plan, { index, out, detail, dryRun, now, openLedger, openLedgerReader }) {
   const { ledger: l, pending, skippedAttempts, workflows, writableWorkflows } = plan;
   out.attempts.pending += pending.length;
@@ -325,42 +376,20 @@ function recordLedgerUsage(plan, { index, out, detail, dryRun, now, openLedger, 
   let handle = null;
   try {
     const plans = pending.map((a) => planAttemptUsage(a, entriesOfAttempt(index, a)));
-    const seatPlans = [];
-    if (kernelEntries.length) {
-      const dbr = openLedgerReader(l.file);
-      try { for (const e of kernelEntries) seatPlans.push({ e, plan: planSeatUsage(dbr, { role: 'kernel', workflowId: e.workflowId, entry: e }) }); } finally { dbr.close(); }
-    }
+    const seatPlans = kernelUsagePlans(l, kernelEntries, openLedgerReader);
     out.kernels.sessions += kernelEntries.length;
-    if (detail) for (const p of plans) out.detail.attempts.push({ ledger: l.name, ...p });
-    if (detail) for (const s of seatPlans) out.detail.kernels.push({ ledger: l.name, workflowId: s.e.workflowId, ...s.plan });
-    for (const p of plans) if (!p.ok) { out.attempts.unavailable += 1; if (out.unavailable.length < 50) out.unavailable.push({ ledger: l.name, attemptId: p.attemptId, agent: p.agent, reason: p.reason }); }
+    addLedgerUsageDetails(l, plans, seatPlans, out, detail);
+    recordUnavailableAttempts(l, plans, out);
     const work = plans;
     const seatWork = seatPlans.filter((s) => s.plan.ok && s.plan.rows.length);
     if (dryRun) {
-      out.attempts.recorded += work.filter((p) => p.ok).length;
-      out.kernels.recorded += seatWork.length;
-      out.kernels.rows += seatWork.reduce((n, s) => n + s.plan.rows.length, 0);
+      countDryRunUsage(work, seatWork, out);
       return;
     }
     if (!work.length && !seatWork.length) return;
     handle = openLedger({ file: l.file, repoRoot: l.repoRoot ?? null });
-    for (const p of work) {
-      try {
-        if (applyAttemptUsage(handle, p, { at: now }).recorded) out.attempts.recorded += 1;
-      } catch (error) {
-        if (archivedRefusal(error)) out.attempts.skippedEnded += 1;
-        else out.errors.push(`${l.name} attempt ${p.attemptId}: ${message(error).slice(0, 160)}`);
-      }
-    }
-    for (const { e, plan: seatPlan } of seatWork) {
-      try {
-        const r = handle.write.recordKernelUsage({ workflowId: e.workflowId, turnRef: seatPlan.turnRef, rows: seatPlan.rows, provider: e.agent, at: now });
-        if (r.recorded) { out.kernels.recorded += 1; out.kernels.rows += r.rows; }
-      } catch (error) {
-        if (archivedRefusal(error)) out.kernels.skippedEnded += 1;
-        else out.errors.push(`${l.name} kernel ${e.workflowId}: ${message(error).slice(0, 160)}`);
-      }
-    }
+    recordAttemptUsagePlans(handle, work, l, out, now);
+    recordKernelUsagePlans(handle, seatWork, l, out, now);
   } catch (error) { out.errors.push(`${l.name}: ${message(error).slice(0, 160)}`); } finally { try { handle?.close(); } catch { /* closed */ } }
 }
 

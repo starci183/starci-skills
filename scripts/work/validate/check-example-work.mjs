@@ -9,9 +9,33 @@ import {DRAW_TOOL, RASTER_TOOL, generatedDrawingsOf, recipeRenderedOf, uiShapeFi
 import {ASSET_SLOT_UNFILLED, assetSlotsOf} from '../asset-slot.mjs';
 import { walkFiles } from '../../lib/walk.mjs'; import { exampleWorkRoots, exampleArtifactReadOptions } from '../../lib/example-refs.mjs';
 import {blobPath, getBlob} from '../../../engine/db/blob.mjs';
-import {isProductPath, agentDataCategory} from '../../lib/starciwork-boundary.mjs';
-import { lsFiles } from '../../api/git/ls-files.mjs';
 import {sealedLocationProblem} from './check-work-artifacts.mjs'; import { isMain } from '../../lib/is-main.mjs';
+// The exported boundary checker delegates HFS_AGENT_DATA_TRACKED findings to this sibling module.
+export {checkStarciworkBoundary} from './work-boundary-check.mjs';
+
+function collectStringReference(value,file,trail,refs){
+  const text=value.trim();
+  if(ID_RE.test(text)){refs.push({id:text,frag:null,file,trail});return;}
+  // `parent#frag` is the compact format's way of addressing an inlined acceptance criterion -
+  // the parent half must still be a well-formed record id for the ref to mean anything.
+  const {id,frag}=splitRef(text);
+  if(frag!==null&&frag&&ID_RE.test(id))refs.push({id,frag,file,trail});
+  else if(frag!==null&&id&&!/[\s/\\:]/.test(text)&&!SHAPE_NAME_RE.test(text)){
+    // `something#` or `something#with space` - someone reached for the compact-ref syntax and
+    // produced a token that is neither a record id nor a resolvable fragment. Flag it rather
+    // than letting it pass silently as an ordinary string. An `XBase#state` shape name is the
+    // shapes model's own spelling, not a ref attempt, so it is exempt.
+    refs.push({id:text,malformedRef:true,file,trail});
+  }
+}
+
+function collectReferences(node,file,trail,refs){
+  if(typeof node==='string')return collectStringReference(node,file,trail,refs);
+  if(Array.isArray(node))return node.forEach(item=>collectReferences(item,file,trail,refs));
+  if(node&&typeof node==='object'){
+    for(const [key,value] of Object.entries(node))collectReferences(value,file,trail?`${trail}.${key}`:key,refs);
+  }
+}
 
 /**
  * The layout says an id mirrors its directory while remaining the identity. That sentence is only true if
@@ -127,47 +151,6 @@ const collectRecordMap = (scopeRoot) => {
   return map;
 };
 
-// Agent-data categories still written in place while their op moves to blobs: a WARN, not a refusal.
-const BOUNDARY_TRANSITIONAL = Object.freeze([]);
-/**
- * The .starciwork boundary (docs/ledger-db.md, scripts/lib/starciwork-boundary.mjs): every file under the tree is
- * product content (isProductPath) or it is refused. Known agent data - evidence/ and impl captures, uat runs, evidence
- * bundles, operations/ audits, kernel custody, stray report copies, caches, ledgers - is REFUSED
- * [HFS_AGENT_DATA_TRACKED], one line per agent-data directory (draw-loop rounds included: the loop is a blob bundle); its home is the project ledger and the blob store
- * (starci kernel report --attach). A path that is neither (a record off the product path list) is WARNED [STARCIWORK_DRIFT].
- * Paths are judged relative to the tree root (`resolveRoot`). The gate below runs it over every example tree.
- * Only TRACKED files are judged (`git ls-files`; supervisor decision 2026-09-30): ignored local agent data on disk is the
- * ledger/housekeeping hygiene check's business, never a validation refusal. A tree outside a git work tree has none.
- */
-function trackedFilesUnder(dir) {
-  const r = lsFiles(['-z', '--', '.'], {cwd: dir, maxBuffer: 256 * 1024 * 1024});
-  if (r.error || r.status !== 0) return [];
-  return r.stdout.split('\0').filter(Boolean).map((rel) => path.join(dir, rel));
-}
-
-export function checkStarciworkBoundary(workRoot, problems, warnings = [], resolveRoot = workRoot) {
-  const groups = new Map();
-  for (const file of trackedFilesUnder(workRoot)) {
-    const rel = path.relative(resolveRoot, file).replaceAll('\\', '/');
-    if (!rel || rel.startsWith('../') || isProductPath(rel)) continue;
-    const category = agentDataCategory(rel);
-    const parts = rel.split('/');
-    // Group a directory of agent data under its first denied segment (runs/<id>, evidence, assets, draw-loop, operations/<name>).
-    const at = category ? parts.findIndex((seg, i) => i < parts.length - 1 && /^(evidence|runs|draw-loop|operations|assets|kernel-evidence|kernel-strays|kernel-approvals|worktrees|settle-parity|settle-tail|runtime|canon-seams)$/.test(seg)) : -1;
-    const cut = at < 0 ? parts.length : at + 1 + Number(['runs', 'operations', 'evidence'].includes(parts[at]));
-    const key = `${category ?? 'drift'}|${parts.slice(0, Math.min(cut, parts.length)).join('/')}`;
-    groups.set(key, (groups.get(key) ?? 0) + 1);
-  }
-  for (const [key, count] of groups) {
-    const [category, where] = key.split('|');
-    const shown = path.relative(root, path.join(resolveRoot, where)).replaceAll('\\', '/');
-    const files = count > 1 ? ` (${count} files)` : '';
-    if (category === 'drift') warnings.push(`${shown}${files}: not on the .starciwork product path list (work-layout.yaml shape.productPaths) - a record in a retired layout or a stray file [STARCIWORK_DRIFT]`);
-    else if (BOUNDARY_TRANSITIONAL.includes(category)) warnings.push(`${shown}${files}: ${category} is agent data still written in place; it moves to blobs + job_artifacts [HFS_AGENT_DATA_TRACKED]`);
-    else problems.push(`${shown}${files}: ${category} is agent data, not product content - it belongs in the project ledger and the blob store (starci kernel report --attach from STARCI_JOB_SCRATCH), cited by artifact id + sha256 [HFS_AGENT_DATA_TRACKED]`);
-  }
-}
-
 /**
  * Runs every check in this file against one .starciwork tree rooted at `workRoot`, appending human-readable
  * refusal strings to `problems`. Exported so the fixture test can point it at a throwaway tree instead of
@@ -193,27 +176,6 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
   const workspaceDoc = readWorkspace(resolveRoot);
   // Resolution scope is the whole enclosing tree; validation scope stays `records`.
   const resolveRecords = resolveRoot === workRoot ? null : collectRecordMap(resolveRoot);
-
-  const collect = (node, file, trail) => {
-    if (typeof node === 'string') {
-      const text = node.trim();
-      if (ID_RE.test(text)) { refs.push({id: text, frag: null, file, trail}); return; }
-      // `parent#frag` is the compact format's way of addressing an inlined acceptance criterion -
-      // the parent half must still be a well-formed record id for the ref to mean anything.
-      const {id, frag} = splitRef(text);
-      if (frag !== null && frag && ID_RE.test(id)) refs.push({id, frag, file, trail});
-      else if (frag !== null && id && !/[\s/\\:]/.test(text) && !SHAPE_NAME_RE.test(text)) {
-        // `something#` or `something#with space` - someone reached for the compact-ref syntax and
-        // produced a token that is neither a record id nor a resolvable fragment. Flag it rather
-        // than letting it pass silently as an ordinary string. An `XBase#state` shape name is the
-        // shapes model's own spelling, not a ref attempt, so it is exempt.
-        refs.push({id: text, malformedRef: true, file, trail});
-      }
-      return;
-    }
-    if (Array.isArray(node)) return node.forEach(item => collect(item, file, trail));
-    if (node && typeof node === 'object') for (const [key, value] of Object.entries(node)) collect(value, file, trail ? `${trail}.${key}` : key);
-  };
 
   for (const file of walk(workRoot).filter(f => f.endsWith('.yaml'))) {
     const rel = path.relative(workRoot, file).replaceAll('\\', '/');
@@ -269,7 +231,7 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
       if (shallow) warnings.push(shallow);
     }
     for (const id of plannedDesignPointers(record)) plannedDesigns.add(`${shown}|${id}`);
-    collect(record, shown, '');
+    collectReferences(record,shown,'',refs);
   }
 
   // Resolution scope: the whole enclosing tree when validate was pointed at a
@@ -659,7 +621,7 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
         problems.push(`${rec.shown}: state is done but there is no sibling evidence.yaml naming the run it settled on`);
       } else {
         const ev = parseYaml(fs.readFileSync(evidenceFile, 'utf8'));
-        const cited = (v) => [].concat(v || []).filter((c) => c && typeof c === 'object' && /^[a-f0-9]{64}$/.test(String(c.sha256 ?? '')));
+          const cited = (v) => [v || []].flat().filter((c) => c && typeof c === 'object' && /^[a-f0-9]{64}$/.test(String(c.sha256 ?? '')));
         if (ev?.run && typeof ev.run === 'object') {
           // The run is agent data in the blob store; evidence.yaml cites its files by sha256 (+ artifact id).
           const run = ev.run;
@@ -685,8 +647,8 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
           const videosDir = path.join(runDir, 'videos');
           const resultFile = path.join(runDir, 'result.md');
           const hasFiles = dir => fs.existsSync(dir) && fs.readdirSync(dir).length > 0;
-          if (!hasFiles(screensDir)) problems.push(`${rec.shown}: run ${ev.run} has no screens/ with at least one screenshot`);
-          if (!hasFiles(videosDir)) problems.push(`${rec.shown}: run ${ev.run} has no videos/ with at least one playable recording`);
+          if (!hasFiles(screensDir)) { problems.push(`${rec.shown}: run ${ev.run} has no screens/ with at least one screenshot`); }
+          if (!hasFiles(videosDir)) { problems.push(`${rec.shown}: run ${ev.run} has no videos/ with at least one playable recording`); }
           if (!fs.existsSync(resultFile)) {
             problems.push(`${rec.shown}: run ${ev.run} has no result.md`);
           } else if (!/outcome:\s*pass/i.test(fs.readFileSync(resultFile, 'utf8'))) {

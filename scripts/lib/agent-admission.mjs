@@ -84,21 +84,15 @@ function overrideValid(override, request) {
     && (override.account === undefined || text(override.account));
 }
 
-function quotaReasons(candidate, request, policy, now, override) {
-  const quota = candidate.quota;
-  const evidence = inspectQuotaEvidence(quota, { policy, now, role: request.role, scopeId: request.scopeId });
-  const codes = [...evidence.codes];
-  if (!isPlainObject(quota)) return { codes, pressure: null, overrideApplied: false };
-  if (quota.provider !== candidate.provider || accountOf(quota.account) !== accountOf(candidate.account)) codes.push(ADMISSION_REASON.QUOTA_IDENTITY_MISMATCH);
-  if (quota.fresh !== true) codes.push(ADMISSION_REASON.QUOTA_STALE);
-  if (!['ok', 'limited'].includes(quota.state)) codes.push(quota.state === 'dead' ? ADMISSION_REASON.QUOTA_EXHAUSTED : ADMISSION_REASON.QUOTA_UNKNOWN);
-  if (quota.authority === 'owner-grant') {
-    const grant = quota.grant;
-    if (Number.isInteger(grant?.slots) && candidate.capacity?.running >= grant.slots) codes.push(ADMISSION_REASON.OWNER_GRANT_FULL);
-    if (quota.normalAdmission === false) codes.push(ADMISSION_REASON.QUOTA_NORMAL_BLOCKED);
-    if (quota.allowLaunchAttempt === false) codes.push(ADMISSION_REASON.QUOTA_LAUNCH_BLOCKED);
-    return { codes, pressure: null, overrideApplied: false };
-  }
+function ownerGrantQuotaReasons(candidate, quota, codes) {
+  const grant = quota.grant;
+  if (Number.isInteger(grant?.slots) && candidate.capacity?.running >= grant.slots) codes.push(ADMISSION_REASON.OWNER_GRANT_FULL);
+  if (quota.normalAdmission === false) codes.push(ADMISSION_REASON.QUOTA_NORMAL_BLOCKED);
+  if (quota.allowLaunchAttempt === false) codes.push(ADMISSION_REASON.QUOTA_LAUNCH_BLOCKED);
+  return { codes, pressure: null, overrideApplied: false };
+}
+
+function regularQuotaReasons(candidate, quota, evidence, override, codes) {
   const { pressure, limited: inReserve } = evidence;
   const scopedOverride = override && override.provider === candidate.provider && override.model === candidate.model
     && (override.account === undefined || accountOf(override.account) === accountOf(candidate.account));
@@ -109,9 +103,124 @@ function quotaReasons(candidate, request, policy, now, override) {
   return { codes, pressure, overrideApplied };
 }
 
+function quotaReasons(candidate, request, policy, now, override) {
+  const quota = candidate.quota;
+  const evidence = inspectQuotaEvidence(quota, { policy, now, role: request.role, scopeId: request.scopeId });
+  const codes = [...evidence.codes];
+  if (!isPlainObject(quota)) return { codes, pressure: null, overrideApplied: false };
+  if (quota.provider !== candidate.provider || accountOf(quota.account) !== accountOf(candidate.account)) codes.push(ADMISSION_REASON.QUOTA_IDENTITY_MISMATCH);
+  if (quota.fresh !== true) codes.push(ADMISSION_REASON.QUOTA_STALE);
+  if (!['ok', 'limited'].includes(quota.state)) codes.push(quota.state === 'dead' ? ADMISSION_REASON.QUOTA_EXHAUSTED : ADMISSION_REASON.QUOTA_UNKNOWN);
+  if (quota.authority === 'owner-grant') return ownerGrantQuotaReasons(candidate, quota, codes);
+  return regularQuotaReasons(candidate, quota, evidence, override, codes);
+}
+
 function concrete(candidate) {
   return Object.fromEntries(['id', 'pool', 'target', 'agent', 'provider', 'account', 'model', 'modelAuthority', 'effort', 'qualityFloor', 'eligibility', 'quota', 'capacity']
     .filter((key) => candidate[key] !== undefined).map((key) => [key, candidate[key]]));
+}
+
+function requestReason(request, policy, now) {
+  if (!isPlainObject(request) || !admissionRoles(policy).includes(request.role) || !text(request.scopeId) || !text(request.attemptId)
+    || !Number.isFinite(now)) return ADMISSION_REASON.REQUEST_INVALID;
+  if (!policyValid(policy, request.role)) return ADMISSION_REASON.POLICY_INVALID;
+  return null;
+}
+
+function qualitySelection(request, policy, receipt) {
+  const rolePolicy = policy.roles[request.role];
+  const minimum = admissionQualityFloor(request.role, request.difficulty, policy);
+  const floor = request.qualityFloor ?? minimum;
+  const minimumRank = policy.qualityOrder.indexOf(minimum);
+  const floorRank = policy.qualityOrder.indexOf(floor);
+  if (minimumRank < 0 || floorRank < minimumRank) return { reason: ADMISSION_REASON.QUALITY_FLOOR_INVALID };
+  receipt.request.qualityFloor = floor;
+  return { rolePolicy, floor, floorRank };
+}
+
+function selectionConstraints(request) {
+  if (!Array.isArray(request.allowGroup) || request.allowGroup.length === 0
+    || request.allowGroup.some((pair) => !isPlainObject(pair) || !text(pair.provider) || !text(pair.model)))
+    return { reason: ADMISSION_REASON.ALLOW_GROUP_INVALID };
+  const prefer = request.prefer ?? [], avoid = request.avoid ?? [], required = request.require ?? null;
+  if (!Array.isArray(prefer) || !prefer.every(selectorValid) || !Array.isArray(avoid) || !avoid.every(selectorValid)
+    || (required !== null && !selectorValid(required))) return { reason: ADMISSION_REASON.CONSTRAINT_INVALID };
+  if (required && avoid.some((selector) => selectorsOverlap(required, selector)
+    && Object.keys(selector).every((key) => required[key] === selector[key]))) return { reason: ADMISSION_REASON.REQUIRE_AVOID_CONFLICT };
+  const override = request.reserveOverride ?? null;
+  if (override !== null && !overrideValid(override, request)) return { reason: ADMISSION_REASON.RESERVE_OVERRIDE_INVALID };
+  return { prefer, avoid, required, override };
+}
+
+const validIndependence = (value) => ['provider', 'model', 'both'].includes(value);
+const criticIndependenceValid = (mandated, independence, request) => validIndependence(mandated) && validIndependence(independence)
+  && !(mandated === 'provider' && independence === 'model') && !(mandated === 'both' && independence !== 'both')
+  && text(request.author?.provider) && (independence === 'provider' || text(request.author?.model));
+
+function independenceSelection(request, rolePolicy) {
+  let independence = request.independence ?? rolePolicy.independence ?? null;
+  if (request.role === 'critic') {
+    if (!criticIndependenceValid(rolePolicy.independence, independence, request)) return { reason: ADMISSION_REASON.CRITIC_INDEPENDENCE_INVALID };
+  } else if (independence !== null && !validIndependence(independence)) return { reason: ADMISSION_REASON.INDEPENDENCE_INVALID };
+  if (independence !== null && ((independence !== 'model' && !text(request.author?.provider))
+    || (independence !== 'provider' && !text(request.author?.model)))) return { reason: ADMISSION_REASON.AUTHOR_INVALID };
+  if ((independence === 'model' || independence === 'both') && !selectableModel(request.author?.modelAuthority))
+    return { reason: request.role === 'critic' ? ADMISSION_REASON.CRITIC_MODEL_UNVERIFIABLE : ADMISSION_REASON.AUTHOR_MODEL_UNVERIFIABLE };
+  return { independence };
+}
+
+function candidateIdentityCodes(candidate, request, ids) {
+  const codes = [];
+  if (!text(candidate.id) || !text(candidate.provider) || !text(candidate.model)
+    || (candidate.account !== undefined && !text(candidate.account))) codes.push(ADMISSION_REASON.CANDIDATE_INVALID);
+  if (ids.has(candidate.id)) codes.push(ADMISSION_REASON.CANDIDATE_DUPLICATE);
+  ids.add(candidate.id);
+  if (!request.allowGroup.some((pair) => candidate.provider === pair.provider && candidate.model === pair.model)) codes.push(ADMISSION_REASON.OUTSIDE_ALLOW_GROUP);
+  return codes;
+}
+
+function candidateQualityCodes(candidate, policy, floorRank, required, avoid) {
+  const codes = [];
+  const rank = policy.qualityOrder.indexOf(candidate.qualityFloor);
+  if (rank < floorRank) codes.push(ADMISSION_REASON.QUALITY_FLOOR_NOT_MET);
+  if (candidate.eligibility?.eligible !== true || !policy.eligibilityModes.includes(candidate.eligibility?.mode)) codes.push(ADMISSION_REASON.ELIGIBILITY_NOT_PROVEN);
+  if (required && !matches(candidate, required)) codes.push(ADMISSION_REASON.REQUIRED_IDENTITY_MISMATCH);
+  if (required?.model && !selectableModel(candidate.modelAuthority)) codes.push(ADMISSION_REASON.REQUIRED_MODEL_UNVERIFIABLE);
+  if (avoid.some((selector) => matches(candidate, selector))) codes.push(ADMISSION_REASON.OWNER_AVOIDED);
+  return codes;
+}
+
+function candidateIndependenceCodes(candidate, request, independence) {
+  const codes = [];
+  if ((independence === 'provider' || independence === 'both') && candidate.provider === request.author?.provider) codes.push(ADMISSION_REASON.CRITIC_PROVIDER_CONFLICT);
+  if ((independence === 'model' || independence === 'both') && candidate.model === request.author?.model) codes.push(ADMISSION_REASON.CRITIC_MODEL_CONFLICT);
+  if ((independence === 'model' || independence === 'both') && !selectableModel(candidate.modelAuthority)) codes.push(ADMISSION_REASON.CRITIC_MODEL_UNVERIFIABLE);
+  return codes;
+}
+
+function candidateCapacityCodes(candidate, now) {
+  const codes = [];
+  const capacity = candidate.capacity;
+  if (!isPlainObject(capacity) || !Number.isInteger(capacity.running) || capacity.running < 0
+    || !Number.isInteger(capacity.maxParallel) || capacity.maxParallel < 0) codes.push(ADMISSION_REASON.CAPACITY_UNKNOWN);
+  else if (capacity.maxParallel === 0 || capacity.running >= capacity.maxParallel) codes.push(ADMISSION_REASON.CAPACITY_FULL);
+  if (capacity?.openIncident === true) codes.push(ADMISSION_REASON.INCIDENT_OPEN);
+  if (capacity?.blockedUntil !== undefined && (quotaTimestamp(capacity.blockedUntil) === null
+    || quotaTimestamp(capacity.blockedUntil) > now)) codes.push(ADMISSION_REASON.PROVIDER_BLOCKED);
+  return codes;
+}
+
+function candidateAssessment(candidate, state, ids, now) {
+  const { request, policy, floorRank, required, avoid, independence, override } = state;
+  const codes = [
+    ...candidateIdentityCodes(candidate, request, ids),
+    ...candidateQualityCodes(candidate, policy, floorRank, required, avoid),
+    ...candidateIndependenceCodes(candidate, request, independence),
+    ...candidateCapacityCodes(candidate, now),
+  ];
+  const quota = quotaReasons(candidate, request, policy, now, override);
+  codes.push(...quota.codes);
+  return { codes, quota };
 }
 
 /** A deterministic plan. The runtime adapter must reserve before launch. Inputs are never mutated. */
@@ -121,65 +230,23 @@ export function selectAdmission({ request, candidates, policy, now } = {}) {
       kind: request?.kind ?? null, difficulty: request?.difficulty ?? null, qualityFloor: request?.qualityFloor ?? null },
     selected: null, eligible: [], rejected: [], overrideApplied: false };
   const refuse = (reason) => ({ ...receipt, reason });
-  if (!isPlainObject(request) || !admissionRoles(policy).includes(request.role) || !text(request.scopeId) || !text(request.attemptId)
-    || !Number.isFinite(now)) return refuse(ADMISSION_REASON.REQUEST_INVALID);
-  if (!policyValid(policy, request.role)) return refuse(ADMISSION_REASON.POLICY_INVALID);
-  const rolePolicy = policy.roles[request.role];
-  const minimum = admissionQualityFloor(request.role, request.difficulty, policy);
-  const floor = request.qualityFloor ?? minimum;
-  const minimumRank = policy.qualityOrder.indexOf(minimum);
-  const floorRank = policy.qualityOrder.indexOf(floor);
-  if (minimumRank < 0 || floorRank < minimumRank) return refuse(ADMISSION_REASON.QUALITY_FLOOR_INVALID);
-  receipt.request.qualityFloor = floor;
-  if (!Array.isArray(request.allowGroup) || request.allowGroup.length === 0
-    || request.allowGroup.some((pair) => !isPlainObject(pair) || !text(pair.provider) || !text(pair.model))) return refuse(ADMISSION_REASON.ALLOW_GROUP_INVALID);
-  const prefer = request.prefer ?? [], avoid = request.avoid ?? [], required = request.require ?? null;
-  if (!Array.isArray(prefer) || !prefer.every(selectorValid) || !Array.isArray(avoid) || !avoid.every(selectorValid)
-    || (required !== null && !selectorValid(required))) return refuse(ADMISSION_REASON.CONSTRAINT_INVALID);
-  // An avoid that covers every match of require is a contradictory hard constraint.
-  if (required && avoid.some((selector) => selectorsOverlap(required, selector)
-    && Object.keys(selector).every((key) => required[key] === selector[key]))) return refuse(ADMISSION_REASON.REQUIRE_AVOID_CONFLICT);
-  const override = request.reserveOverride ?? null;
-  if (override !== null && !overrideValid(override, request)) return refuse(ADMISSION_REASON.RESERVE_OVERRIDE_INVALID);
-  let independence = request.independence ?? rolePolicy.independence ?? null;
-  if (request.role === 'critic') {
-    const mandated = rolePolicy.independence;
-    if (!['provider', 'model', 'both'].includes(mandated) || !['provider', 'model', 'both'].includes(independence)
-      || (mandated === 'provider' && independence === 'model') || (mandated === 'both' && independence !== 'both')
-      || !text(request.author?.provider) || (independence !== 'provider' && !text(request.author?.model))) return refuse(ADMISSION_REASON.CRITIC_INDEPENDENCE_INVALID);
-  } else if (independence !== null && !['provider', 'model', 'both'].includes(independence)) return refuse(ADMISSION_REASON.INDEPENDENCE_INVALID);
-  if (independence !== null && ((independence !== 'model' && !text(request.author?.provider))
-    || (independence !== 'provider' && !text(request.author?.model)))) return refuse(ADMISSION_REASON.AUTHOR_INVALID);
-  if ((independence === 'model' || independence === 'both') && !selectableModel(request.author?.modelAuthority))
-    return refuse(request.role === 'critic' ? ADMISSION_REASON.CRITIC_MODEL_UNVERIFIABLE : ADMISSION_REASON.AUTHOR_MODEL_UNVERIFIABLE);
+  const invalidRequest = requestReason(request, policy, now);
+  if (invalidRequest) return refuse(invalidRequest);
+  const quality = qualitySelection(request, policy, receipt);
+  if (quality.reason) return refuse(quality.reason);
+  const constraints = selectionConstraints(request);
+  if (constraints.reason) return refuse(constraints.reason);
+  const independenceResult = independenceSelection(request, quality.rolePolicy);
+  if (independenceResult.reason) return refuse(independenceResult.reason);
+  const { floorRank } = quality;
+  const { prefer, avoid, required, override } = constraints;
+  const { independence } = independenceResult;
   if (!Array.isArray(candidates)) return refuse(ADMISSION_REASON.CANDIDATES_INVALID);
   const ids = new Set(), eligible = [];
+  const state = { request, policy, floorRank, prefer, avoid, required, override, independence };
   for (const [index, candidate] of candidates.entries()) {
-    const codes = [];
     if (!isPlainObject(candidate)) { receipt.rejected.push({ id: null, provider: null, model: null, codes: [ADMISSION_REASON.CANDIDATE_INVALID] }); continue; }
-    if (!text(candidate.id) || !text(candidate.provider) || !text(candidate.model)
-      || (candidate.account !== undefined && !text(candidate.account))) codes.push(ADMISSION_REASON.CANDIDATE_INVALID);
-    if (ids.has(candidate.id)) codes.push(ADMISSION_REASON.CANDIDATE_DUPLICATE);
-    ids.add(candidate.id);
-    if (!request.allowGroup.some((pair) => candidate.provider === pair.provider && candidate.model === pair.model)) codes.push(ADMISSION_REASON.OUTSIDE_ALLOW_GROUP);
-    const rank = policy.qualityOrder.indexOf(candidate.qualityFloor);
-    if (rank < floorRank) codes.push(ADMISSION_REASON.QUALITY_FLOOR_NOT_MET);
-    if (candidate.eligibility?.eligible !== true || !policy.eligibilityModes.includes(candidate.eligibility?.mode)) codes.push(ADMISSION_REASON.ELIGIBILITY_NOT_PROVEN);
-    if (required && !matches(candidate, required)) codes.push(ADMISSION_REASON.REQUIRED_IDENTITY_MISMATCH);
-    if (required?.model && !selectableModel(candidate.modelAuthority)) codes.push(ADMISSION_REASON.REQUIRED_MODEL_UNVERIFIABLE);
-    if (avoid.some((selector) => matches(candidate, selector))) codes.push(ADMISSION_REASON.OWNER_AVOIDED);
-    if ((independence === 'provider' || independence === 'both') && candidate.provider === request.author?.provider) codes.push(ADMISSION_REASON.CRITIC_PROVIDER_CONFLICT);
-    if ((independence === 'model' || independence === 'both') && candidate.model === request.author?.model) codes.push(ADMISSION_REASON.CRITIC_MODEL_CONFLICT);
-    if ((independence === 'model' || independence === 'both') && !selectableModel(candidate.modelAuthority)) codes.push(ADMISSION_REASON.CRITIC_MODEL_UNVERIFIABLE);
-    const capacity = candidate.capacity;
-    if (!isPlainObject(capacity) || !Number.isInteger(capacity.running) || capacity.running < 0
-      || !Number.isInteger(capacity.maxParallel) || capacity.maxParallel < 0) codes.push(ADMISSION_REASON.CAPACITY_UNKNOWN);
-    else if (capacity.maxParallel === 0 || capacity.running >= capacity.maxParallel) codes.push(ADMISSION_REASON.CAPACITY_FULL);
-    if (capacity?.openIncident === true) codes.push(ADMISSION_REASON.INCIDENT_OPEN);
-    if (capacity?.blockedUntil !== undefined && (quotaTimestamp(capacity.blockedUntil) === null
-      || quotaTimestamp(capacity.blockedUntil) > now)) codes.push(ADMISSION_REASON.PROVIDER_BLOCKED);
-    const quota = quotaReasons(candidate, request, policy, now, override);
-    codes.push(...quota.codes);
+    const { codes, quota } = candidateAssessment(candidate, state, ids, now);
     if (codes.length) receipt.rejected.push({ id: candidate.id ?? null, provider: candidate.provider ?? null,
       model: candidate.model ?? null, codes: [...new Set(codes)] });
     else {

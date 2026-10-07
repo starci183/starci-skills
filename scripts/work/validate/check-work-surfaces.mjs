@@ -6,6 +6,8 @@ import {walk} from './check-example-work.mjs';
 import {isLocaleSegment} from '../layout-tree.mjs';
 import {createRequire} from 'node:module';
 import {APP_SIDES, readWorkspace, resolveOwnedDirs, repoRootFor, loadRecords, indexInlineCriteria, resolveRecordRef} from '../record-ownership.mjs'; import { isMain } from '../../lib/is-main.mjs';
+import {gqlOps as buildGqlOps, camelOf} from './work-surface-gql.mjs';
+import {declaredSubscriptions,wiredSubscriptions,reportWiredSubscriptionDiff,reportFeaturesWithoutSubscribers,appendSurfaceMap} from './work-surface-reporting.mjs';
 
 /**
  * The audits' sharpest surface complaint was the `/buyers` vs `/internal/buyers` class: a done contract
@@ -92,70 +94,10 @@ function httpRoutes(repoRoot) {
 
 const joinRoute = (prefix, sub) => `/${[prefix, sub].filter(Boolean).join('/')}`.replace(/\/+/g, '/');
 
-/** GraphQL operations: graphql/{queries,mutations}/<cap>/<op>/ directories nested per-feature
- * (src/features/<f>/graphql/...), plus @Query/@Mutation decorated methods. The decorator regex must
- * survive the `() => ResponseType` argument the codebase uses, so the arguments are consumed by
- * balanced-paren scanning, not by a `[^)]*` that dies on the first inner `)`. */
+/** GraphQL operation directories and resolver decorators (see work-surface-gql.mjs). */
 export function gqlOps(repoRoot) {
-  const ops = [];
-  const decorated = [];
-  for (const srcRoot of srcRootsOf(repoRoot)) {
-    const findOpDirs = dir => {
-      for (const entry of fs.readdirSync(dir, {withFileTypes: true})) {
-        if (!entry.isDirectory() || SKIP_DIRS.has(entry.name)) continue;
-        const abs = path.join(dir, entry.name);
-        if ((entry.name === 'queries' || entry.name === 'mutations') && path.basename(dir) === 'graphql') {
-          // queries -> query, mutations -> mutation (never slice(0,-1): 'queries' trims to 'querie')
-          const kind = entry.name === 'queries' ? 'query' : 'mutation';
-          const caps = fs.readdirSync(abs).filter(d => fs.statSync(path.join(abs, d)).isDirectory());
-          for (const cap of caps) {
-            const dirs = fs.readdirSync(path.join(abs, cap))
-              .filter(d => fs.statSync(path.join(abs, cap, d)).isDirectory());
-            for (const op of dirs) ops.push({kind, cap, dir: op, name: camelOf(op), file: path.join(abs, cap, op)});
-          }
-        } else {
-          findOpDirs(abs);
-        }
-      }
-    };
-    findOpDirs(srcRoot);
-    for (const file of prodFiles(srcRoot)) {
-      const text = fs.readFileSync(file, 'utf8');
-      for (const m of text.matchAll(/@(Query|Mutation)\s*\(/g)) {
-        const args = readCallArgs(text, m.index + m[0].length - 1);
-        const after = text.slice(m.index + m[0].length - 1 + args.length);
-        const name = /name:\s*['"](\w+)['"]/.exec(args)?.[1]
-          ?? /^\s*(?:async\s+)?(\w+)\s*\(/.exec(after)?.[1];
-        if (name) decorated.push({kind: m[1].toLowerCase(), cap: null, dir: null, name, file});
-      }
-    }
-  }
-  // a decorated method and an op dir are the same operation when the resolver file sits inside the
-  // dir (the wire `name:` wins over the dir's camel - `tasks` is the truth, `list-tasks` the folder),
-  // or when kind+name already agree
-  for (const d of decorated) {
-    const host = ops.find(o => o.kind === d.kind && (d.file.startsWith(o.file + path.sep) || o.name === d.name));
-    if (host) { host.name = d.name; host.resolver = d.file; }
-    else ops.push(d);
-  }
-  return ops;
+  return buildGqlOps(repoRoot, {srcRootsOf, prodFiles, skipDirs: SKIP_DIRS});
 }
-
-/** The argument list starting at the `(` at `openIndex`, balanced - quotes skipped so a paren inside
- * a string literal cannot fake the close. */
-function readCallArgs(text, openIndex) {
-  let depth = 0, quote = null;
-  for (let i = openIndex; i < text.length; i++) {
-    const c = text[i];
-    if (quote) { if (c === quote && text[i - 1] !== '\\') quote = null; continue; }
-    if (c === "'" || c === '"' || c === '`') { quote = c; continue; }
-    if (c === '(') depth++;
-    if (c === ')' && --depth === 0) return text.slice(openIndex, i + 1);
-  }
-  return text.slice(openIndex);
-}
-
-const camelOf = kebab => kebab.replace(/-([a-z0-9])/g, (_, c) => c.toUpperCase());
 
 /** FE routes: every directory holding a page.tsx under each app's src/app. The leading locale segment
  * (layout-tree isLocaleSegment: next-intl's `[locale]`) is transparent and dropped; other `[param]` segments become positional `:_` so they compare equal to a
@@ -241,6 +183,39 @@ function outboxEmittedIds(files, enumValues) {
 /** The event vocabulary the code knows: `class XxxEvent` declarations paired with the `kind =
  * "event.<id>"` discriminant they carry, `new XxxEvent(` construction sites and outbox enqueues in the write
  * transaction (outboxEmittedIds) in production files (emission), and `instanceof`/@EventsHandler subscriptions per file. */
+function registerEventClasses(file,text,kinds,classes){
+  const declarations=[...text.matchAll(/class\s+(\w+Event)\b/g)];
+  for(const [i,match] of declarations.entries()){
+    // a class's kind discriminant sits in its own body - never borrow the next class's literal
+    const nextClassAt=declarations[i+1]?.index??text.length;
+    const kind=kinds.find(item=>item.at>match.index&&item.at<nextClassAt)?.id??null;
+    if(!classes.has(match[1]))classes.set(match[1],{file,kind});
+  }
+}
+
+function registerEventEmissions(file,text,kinds,emitted,emittedIds){
+  for(const match of text.matchAll(/new\s+(\w+Event)\b/g))if(!emitted.has(match[1]))emitted.set(match[1],file);
+  if(/\.(publish|emit|dispatch)\s*\(/.test(text))for(const kind of kinds)emittedIds.add(kind.id);
+}
+
+function registerEventSubscriptions(file,text,subscriptions){
+  const handled=[...text.matchAll(/instanceof\s+(\w+Event)\b/g)].map(match=>match[1])
+    .concat([...text.matchAll(/@EventsHandler\(\s*(\w+)/g)].map(match=>match[1]));
+  if(handled.length||/^\s*@EventsHandler/m.test(text)||/\.subscribe\s*\(/.test(text)){
+    if(handled.length)subscriptions.push({file,classes:[...new Set(handled)]});
+  }
+}
+
+function inspectEventFile(file,classes,emitted,emittedIds,subscriptions,texts){
+  const text=fs.readFileSync(file,'utf8');
+  texts.push({file,text});
+  const kinds=[...text.matchAll(/['"](event\.[a-z0-9-]+(?:\.[a-z0-9-]+)+)['"]/g)]
+    .map(match=>({id:match[1],at:match.index}));
+  registerEventClasses(file,text,kinds,classes);
+  registerEventEmissions(file,text,kinds,emitted,emittedIds);
+  registerEventSubscriptions(file,text,subscriptions);
+}
+
 function eventSurface(repoRoot) {
   const classes = new Map();   // className -> {file, kind}
   const emitted = new Map();   // className -> file (production construction site)
@@ -248,26 +223,7 @@ function eventSurface(repoRoot) {
   const subscriptions = [];    // {file, classes: [className]}
   const texts = [];
   for (const srcRoot of srcRootsOf(repoRoot)) {
-    for (const file of prodFiles(srcRoot)) {
-      const text = fs.readFileSync(file, 'utf8');
-      texts.push({file, text});
-      const kinds = [...text.matchAll(/['"](event\.[a-z0-9-]+(?:\.[a-z0-9-]+)+)['"]/g)]
-        .map(m => ({id: m[1], at: m.index}));
-      const classDecls = [...text.matchAll(/class\s+(\w+Event)\b/g)];
-      for (const [i, m] of classDecls.entries()) {
-        // a class's kind discriminant sits in its own body - never borrow the next class's literal
-        const nextClassAt = classDecls[i + 1]?.index ?? text.length;
-        const kind = kinds.find(k => k.at > m.index && k.at < nextClassAt)?.id ?? null;
-        if (!classes.has(m[1])) classes.set(m[1], {file, kind});
-      }
-      for (const m of text.matchAll(/new\s+(\w+Event)\b/g)) if (!emitted.has(m[1])) emitted.set(m[1], file);
-      if (/\.(publish|emit|dispatch)\s*\(/.test(text)) for (const k of kinds) emittedIds.add(k.id);
-      const handled = [...text.matchAll(/instanceof\s+(\w+Event)\b/g)].map(m => m[1])
-        .concat([...text.matchAll(/@EventsHandler\(\s*(\w+)/g)].map(m => m[1]));
-      if (handled.length || /^\s*@EventsHandler/m.test(text) || /\.subscribe\s*\(/.test(text)) {
-        if (handled.length) subscriptions.push({file, classes: [...new Set(handled)]});
-      }
-    }
+    for (const file of prodFiles(srcRoot)) inspectEventFile(file,classes,emitted,emittedIds,subscriptions,texts);
   }
   for (const id of outboxEmittedIds(texts, enumStringValues(texts))) emittedIds.add(id);
   return {classes, emitted, emittedIds, subscriptions};
@@ -333,18 +289,22 @@ function declaredHttpOf(data) {
 /** GraphQL operation names a contract surface declares. `strict` selects only the patterns whose
  * capture position is provably a name - loose shapes ("GraphQL query composes ..." -> 'composes')
  * are claim material, never ghost evidence. */
+function appendGqlMatches(text,res,out){
+  for(const re of res){
+    for(const match of text.matchAll(re)){
+      const [a,b]=[match[1],match[2]];
+      const name=/^(query|mutation)$/i.test(a)?b:a;
+      if(name&&!/^(query|mutation)$/i.test(name)&&!GQL_STOPWORDS.has(name.toLowerCase()))out.push(name);
+    }
+  }
+}
+
 function declaredGqlOf(data, strict) {
   const out = [];
   const res = strict ? GQL_STRICT_RES : [...GQL_STRICT_RES, ...GQL_LOOSE_RES];
   for (const entry of surfaceEntriesOf(data)) {
     const text = `${entry.name ?? ''}\n${entry.text ?? ''}`;
-    for (const re of res) {
-      for (const m of text.matchAll(re)) {
-        const [a, b] = [m[1], m[2]];
-        const name = /^(query|mutation)$/i.test(a) ? b : a;
-        if (name && !/^(query|mutation)$/i.test(name) && !GQL_STOPWORDS.has(name.toLowerCase())) out.push(name);
-      }
-    }
+    appendGqlMatches(text,res,out);
   }
   return [...new Set(out)];
 }
@@ -419,7 +379,7 @@ function portAppMap(workRoot, feRoot) {
 
 const normRoute = p => ('/' + String(p).split('/')
   .filter(Boolean)
-  .map(s => (/^[:[]/.test(s) ? ':_' : s))
+  .map(s => (s.startsWith(':') || s.startsWith('[') ? ':_' : s))
   .join('/')).replace(/\/+$/, '') || '/';
 
 const normMethod = m => String(m).toUpperCase();
@@ -434,6 +394,242 @@ const eventClassNamesOf = id => {
   const segments = id.replace(/^event\./, '').split('.');
   return [pascal(segments.join('-')) + 'Event', pascal(segments.slice(1).join('-')) + 'Event'];
 };
+
+function ownershipClaims(records,workspaceDoc,workRoot,canon,featureOf){
+  const ownedDirs=[];
+  const provedIds=new Set();
+  for(const [id,rec] of records){
+    if(rec.schema==='work/implementation@1'){
+      for(const target of rec.data?.proves??[])if(typeof target==='string')provedIds.add(canon(target));
+    }
+    for(const dir of resolveOwnedDirs(id,rec,records,workspaceDoc,workRoot)){
+      if(fs.existsSync(dir.abs))ownedDirs.push({id,abs:dir.abs,feature:featureOf(rec)});
+    }
+  }
+  const ownerOf=file=>ownedDirs.filter(dir=>file.startsWith(dir.abs))
+    .sort((a,b)=>b.abs.length-a.abs.length)[0]??null;
+  const implIds=new Set([...records].filter(([,rec])=>rec.schema==='work/implementation@1').map(([id])=>id));
+  const implNamed=name=>[...implIds].find(id=>id.split('.').pop()===name)??null;
+  return {provedIds,ownerOf,implNamed};
+}
+
+function contractDeclarations(records,indexFile){
+  const declaredHttp=[];
+  const declaredGql=[];
+  const contractClaimedOps=new Set();
+  const declaredContractEvents=[];
+  const integrationEndpoints=[];
+  for(const [id,rec] of records){
+    const file=indexFile(rec);
+    if(rec.schema==='work/contract@1'){
+      for(const item of declaredHttpOf(rec.data))declaredHttp.push({...item,id,state:rec.data?.state,file});
+      for(const name of declaredGqlOf(rec.data,true))declaredGql.push({name,id,state:rec.data?.state,file});
+      for(const name of declaredGqlOf(rec.data,false))contractClaimedOps.add(name);
+      for(const eventId of declaredEventIdsOf(rec.data))declaredContractEvents.push({id:eventId,by:id,file});
+    }
+    if(rec.schema==='work/integration@1'){
+      for(const endpoint of Array.isArray(rec.data?.endpoints)?rec.data.endpoints:[]){
+        const method=String(endpoint?.method??'').toUpperCase();
+        if(HTTP_METHODS.has(method)&&typeof endpoint?.path==='string'&&endpoint.path.startsWith('/')){
+          integrationEndpoints.push({method,path:endpoint.path,id,state:rec.data?.state,file});
+        }
+      }
+    }
+  }
+  return {declaredHttp,declaredGql,contractClaimedOps,declaredContractEvents,integrationEndpoints};
+}
+
+function matchDeclaredRoutes(declarations,declaredHttp,servedRoutes,servedKeys,provedIds,suspect,refuse,info){
+  const claimedRouteKeys=new Set();
+  for(const declaration of declarations){
+    const key=declaredKey(declaration);
+    const served=servedKeys.get(key)
+      ??servedRoutes.find(route=>route.method==='ALL'&&normRoute(route.path)===normRoute(declaration.path));
+    if(served){
+      claimedRouteKeys.add(servedKey(served));
+      if(declaredHttp.includes(declaration)&&!provedIds.has(declaration.id)){
+        suspect(declaration.file,'CONTRACT_ROUTE_UNPROVEN',
+          `${declaration.id}'s declared route ${declaration.method} ${declaration.path} is served by ${path.basename(served.file)} but no `+
+          `impl record's proves names ${declaration.id} - the wire exists in contract and code, yet no implementation claims it`);
+      }
+    }else if(declaredHttp.includes(declaration)){
+      // a contract's declared wire with no serving route is the /buyers-vs-/internal/buyers class -
+      // deterministically wrong once the contract is done; a todo contract may describe a wire not
+      // yet built, so it is suspected, not refused
+      const msg=`${declaration.id} declares "${declaration.method} ${declaration.path}" but no controller in any bound repository `+
+        'serves it - a done contract describing a wire that does not exist';
+      if(declaration.state==='done')refuse(declaration.file,'CONTRACT_GHOST_ROUTE',msg);
+      else suspect(declaration.file,'CONTRACT_GHOST_ROUTE',
+        `${msg} (record is ${declaration.state??'(no state)'}, not done - the door may still be unbuilt)`);
+    }else{
+      // an integration endpoint is the provider's wire, not ours: unserved usually means outbound
+      // (SePay's /userapi/..., Keycloak's /realms/...), which no controller could ever serve - INFO,
+      // with the one question a reader has to answer themselves
+      info(declaration.file,'INTEGRATION_ENDPOINT_REMOTE',
+        `${declaration.id} endpoint "${declaration.method} ${declaration.path}" is not served by any bound repository - expected for the `+
+        "provider's own API; check this entry if the endpoint was meant as an inbound door (webhook/callback)");
+    }
+  }
+  return claimedRouteKeys;
+}
+
+function reportUndeclaredRoutes(servedRoutes,claimedRouteKeys,ownerOf,suspect,info){
+  for(const route of servedRoutes){
+    if(claimedRouteKeys.has(servedKey(route)))continue;
+    if(OPS_ROUTE_RE.test(normRoute(route.path))){
+      info(route.file,'OPS_ROUTE',`${route.method} ${route.path} is an ops/probe door - real, but no contract could ever own it`);
+      continue;
+    }
+    const owner=ownerOf(route.file);
+    const msg=`${route.method} ${route.path} served by ${path.basename(route.file)} `+
+      (owner?`is owned by ${owner.id} but declared by no contract or integration endpoint `+
+        '- a wire between features with no record of its shape'
+        :"sits under no record's owners and is declared nowhere - a shipped surface the tree cannot explain");
+    suspect(route.file,'UNDECLARED_ROUTE',msg);
+  }
+}
+
+function claimGraphOps(ops,records,ownerOf,implNamed,contractClaimedOps){
+  const opNames=new Set(ops.map(op=>op.name));
+  const sdsNamedOps=new Set();
+  for(const [,rec] of records){
+    if(rec.schema==='work/sds-component@1'){
+      for(const name of gqlNamesMentioned(rec.data))sdsNamedOps.add(name);
+    }
+  }
+  const unclaimed=new Map();
+  for(const op of ops){
+    const owner=op.file?ownerOf(op.file):null;
+    const namedImpl=op.dir?implNamed(op.dir):null;
+    const names=[op.name,op.dir,op.dir&&camelOf(op.dir)].filter(Boolean);
+    const named=set=>names.some(name=>set.has(name));
+    op.claim=owner?.id??namedImpl
+      ??((named(contractClaimedOps)&&'contract-surface')||(named(sdsNamedOps)&&'sds-flow')||null);
+    if(!op.claim){
+      const group=op.cap?`${(op.kind==='query'&&'queries')||'mutations'}/${op.cap}`:`decorated ${op.kind}`;
+      if(!unclaimed.has(group))unclaimed.set(group,[]);
+      unclaimed.get(group).push(op);
+    }
+  }
+  return {opNames,unclaimed};
+}
+
+function reportUnclaimedGraphOps(unclaimed,workRoot,suspect){
+  for(const [group,groupOps] of unclaimed){
+    const names=groupOps.map(op=>op.name).join(', ');
+    suspect(groupOps[0].file??workRoot,'UNDECLARED_OPERATION',
+      `graphql ${group} serves ${groupOps.length} op(s) no record owns or names: ${names} `+
+      '- protocol adaptation is thin, but a shipped door should still be explained');
+  }
+}
+
+function reportDeclaredGraphOps(declaredGql,opNames,provedIds,suspect,refuse){
+  for(const declaration of declaredGql){
+    if(opNames.has(declaration.name)||opNames.has(camelOf(declaration.name))){
+      if(!provedIds.has(declaration.id)){
+        suspect(declaration.file,'CONTRACT_OP_UNPROVEN',
+          `${declaration.id}'s surface names GraphQL ${declaration.name}, which is served, but no impl record's proves names `+
+          `${declaration.id} - the op exists in contract and code, yet no implementation claims it`);
+      }
+      continue;
+    }
+    const msg=`${declaration.id}'s surface names GraphQL ${declaration.name} but no resolver serves an op of that name `+
+      '- the record describes a door that does not exist';
+    if(declaration.state==='done')refuse(declaration.file,'CONTRACT_GHOST_OP',msg);
+    else suspect(declaration.file,'CONTRACT_GHOST_OP',`${msg} (record is ${declaration.state??'(no state)'}, not done)`);
+  }
+}
+
+function checkFeRoutes(workRoot,feRoots,records,suspect,refuse){
+  const feRoutesAll=feRoots.flatMap(repo=>feRoutes(repo).map(route=>({...route,repo})));
+  const claims=uiRouteClaims(records);
+  const portToApp=new Map();
+  for(const repo of feRoots)for(const [port,app] of portAppMap(workRoot,repo))portToApp.set(port,app);
+  const claimedFe=new Set();
+  for(const claim of claims){
+    // a URL claim's port pins the app through metadata.json's ports projection; an unmapped port
+    // degrades to a path match across every app rather than an automatic ghost
+    const expectedApp=claim.port?portToApp.get(claim.port)??null:null;
+    const hit=feRoutesAll.filter(route=>route.norm===claim.norm&&(!expectedApp||route.app===expectedApp));
+    if(hit.length){
+      for(const route of hit)claimedFe.add(`${route.repo}#${route.app??''}#${route.norm}`);
+      continue;
+    }
+    const where=expectedApp?` on apps/${expectedApp}`:'';
+    const msg=`${claim.id} claims route ${claim.raw} (as ${claim.norm}${where}) but no page.tsx serves it in any `+
+      'bound fe repository - a screen the record says exists that no route reaches';
+    if(claim.state==='done')refuse(claim.file,'UI_ROUTE_GHOST',msg);
+    else suspect(claim.file,'UI_ROUTE_GHOST',`${msg} (record is ${claim.state??'(no state)'}, not done)`);
+  }
+  for(const route of feRoutesAll){
+    if(!claimedFe.has(`${route.repo}#${route.app??''}#${route.norm}`)){
+      suspect(route.file,'UI_ROUTE_UNDECLARED',
+        `${route.app?'apps/'+route.app+' ':''}route ${route.route} is served but no ui-screen's surfaces[].route claims it`);
+    }
+  }
+  return {feRoutesAll,claims,claimedFe};
+}
+
+function eventIndexes(records,beRoots){
+  const eventRecs=[...records].filter(([,record])=>record.schema==='work/event@1');
+  const codeByRepo=beRoots.map(repo=>({repo,...eventSurface(repo)}));
+  const allClasses=new Map();
+  const allEmitted=new Map();
+  const allEmittedIds=new Set();
+  for(const {repo,classes,emitted,emittedIds} of codeByRepo){
+    for(const [name,value] of classes)allClasses.set(name,{...value,repo});
+    for(const [name,file] of emitted)allEmitted.set(name,{file,repo});
+    for(const id of emittedIds)allEmittedIds.add(id);
+  }
+  const recordOfClass=new Map();
+  for(const [id] of eventRecs){
+    for(const [className,value] of allClasses){
+      if(value.kind===id||eventClassNamesOf(id).includes(className))recordOfClass.set(className,id);
+    }
+  }
+  const emittedRecordIds=new Set([...allEmittedIds].filter(id=>records.has(id)));
+  for(const [className] of allEmitted){
+    if(recordOfClass.has(className))emittedRecordIds.add(recordOfClass.get(className));
+  }
+  return {eventRecs,codeByRepo,allClasses,allEmitted,recordOfClass,emittedRecordIds};
+}
+
+function reportUnemittedEvents(eventRecs,emittedRecordIds,recordOfClass,indexFile,refuse,suspect,info){
+  for(const [id,record] of eventRecs){
+    if(emittedRecordIds.has(id))continue;
+    const names=eventClassNamesOf(id).join('/');
+    const blocked=Array.isArray(record.data?.blockedBy)&&record.data.blockedBy.length;
+    const msg=`${id} maps to event class ${names}, but nothing under src/ publishes it `+
+      '- the record describes an event nothing emits';
+    if(record.data?.state==='done')refuse(indexFile(record),'EVENT_UNEMITTED',msg);
+    else if(blocked){
+      const gaps=record.data.blockedBy.map(item=>item?.record).filter(Boolean).join(', ');
+      info(indexFile(record),'EVENT_UNEMITTED',`${msg}; the record itself says so (todo, blockedBy ${gaps})`);
+    }else suspect(indexFile(record),'EVENT_UNEMITTED',`${msg} (record is ${record.data?.state??'(no state)'})`);
+  }
+}
+
+function reportUnrecordedEvents(allEmitted,allClasses,recordOfClass,suspect){
+  for(const [className,site] of allEmitted){
+    if(recordOfClass.has(className))continue;
+    suspect(site.file,'EVENT_UNDECLARED',
+      `${className} is constructed under src/ but no work/event@1 record maps to it `+
+      '- an emitted signal the tree does not name');
+  }
+  for(const [className,value] of allClasses){
+    if(allEmitted.has(className)||recordOfClass.has(className))continue;
+    suspect(value.file,'EVENT_CLASS_ORPHAN',
+      `${className} is declared under src/ but is neither published nor claimed by a work/event@1 record - dead vocabulary`);
+  }
+}
+
+function reportContractEvents(declaredContractEvents,records,canon,suspect){
+  for(const event of declaredContractEvents){
+    if(!records.has(canon(event.id))){
+      suspect(event.file,'CONTRACT_EVENT_GHOST',`${event.by}'s surface names ${event.id}, which no work/event@1 record owns`);
+    }
+  }
+}
 
 // ---------- the check ----------
 
@@ -462,297 +658,48 @@ export function checkWorkSurfaces(workRoot, out) {
   const feRoots = [sideRoot('fe')].filter(Boolean);
 
   // owned dirs once, for "the tree explains this file" tests
-  const ownedDirs = [];
-  const provedIds = new Set(); // record ids some impl's `proves` claims to implement
-  for (const [id, rec] of records) {
-    if (rec.schema === 'work/implementation@1') {
-      for (const t of rec.data?.proves ?? []) if (typeof t === 'string') provedIds.add(canon(t));
-    }
-    for (const d of resolveOwnedDirs(id, rec, records, workspaceDoc, workRoot)) {
-      if (fs.existsSync(d.abs)) ownedDirs.push({id, abs: d.abs, feature: featureOf(rec)});
-    }
-  }
-  const ownerOf = file => ownedDirs.filter(d => file.startsWith(d.abs))
-    .sort((a, b) => b.abs.length - a.abs.length)[0] ?? null;
-  const implIds = new Set([...records].filter(([, r]) => r.schema === 'work/implementation@1').map(([id]) => id));
-  const implNamed = name => [...implIds].find(id => id.split('.').pop() === name) ?? null;
+  const {provedIds,ownerOf,implNamed}=ownershipClaims(records,workspaceDoc,workRoot,canon,featureOf);
 
   // ---------- HTTP ----------
   const servedRoutes = beRoots.flatMap(r => httpRoutes(r).map(x => ({...x, repo: r})));
   const servedKeys = new Map(servedRoutes.map(r => [servedKey(r), r]));
 
-  const declaredHttp = [];   // {method, path, id, state, file}
-  const declaredGql = [];    // strict-pattern names only - ghost-eligible {name, id, state, file}
-  const contractClaimedOps = new Set(); // strict + loose names - claims a served op can hold
-  const declaredContractEvents = []; // {id: event record id, by: contract id}
-  const integrationEndpoints = [];   // {method, path, id, state, file}
-  for (const [id, rec] of records) {
-    const file = indexFile(rec);
-    if (rec.schema === 'work/contract@1') {
-      for (const d of declaredHttpOf(rec.data)) declaredHttp.push({...d, id, state: rec.data?.state, file});
-      for (const name of declaredGqlOf(rec.data, true)) {
-        declaredGql.push({name, id, state: rec.data?.state, file});
-      }
-      for (const name of declaredGqlOf(rec.data, false)) contractClaimedOps.add(name);
-      for (const eid of declaredEventIdsOf(rec.data)) declaredContractEvents.push({id: eid, by: id, file});
-    }
-    if (rec.schema === 'work/integration@1') {
-      for (const e of Array.isArray(rec.data?.endpoints) ? rec.data.endpoints : []) {
-        const method = String(e?.method ?? '').toUpperCase();
-        if (HTTP_METHODS.has(method) && typeof e?.path === 'string' && e.path.startsWith('/')) {
-          integrationEndpoints.push({method, path: e.path, id, state: rec.data?.state, file});
-        }
-      }
-    }
-  }
+  const {declaredHttp,declaredGql,contractClaimedOps,declaredContractEvents,integrationEndpoints}=
+    contractDeclarations(records,indexFile);
 
-  const claimedRouteKeys = new Set();
-  for (const d of [...declaredHttp, ...integrationEndpoints]) {
-    const key = declaredKey(d);
-    const served = servedKeys.get(key)
-      ?? servedRoutes.find(r => r.method === 'ALL' && normRoute(r.path) === normRoute(d.path));
-    if (served) {
-      claimedRouteKeys.add(servedKey(served));
-      if (declaredHttp.includes(d) && !provedIds.has(d.id)) {
-        suspect(d.file, 'CONTRACT_ROUTE_UNPROVEN',
-          `${d.id}'s declared route ${d.method} ${d.path} is served by ${path.basename(served.file)} but no ` +
-          `impl record's proves names ${d.id} - the wire exists in contract and code, yet no implementation claims it`);
-      }
-    } else if (declaredHttp.includes(d)) {
-      // a contract's declared wire with no serving route is the /buyers-vs-/internal/buyers class -
-      // deterministically wrong once the contract is done; a todo contract may describe a wire not
-      // yet built, so it is suspected, not refused
-      const msg = `${d.id} declares "${d.method} ${d.path}" but no controller in any bound repository ` +
-        'serves it - a done contract describing a wire that does not exist';
-      if (d.state === 'done') refuse(d.file, 'CONTRACT_GHOST_ROUTE', msg);
-      else suspect(d.file, 'CONTRACT_GHOST_ROUTE',
-        `${msg} (record is ${d.state ?? '(no state)'}, not done - the door may still be unbuilt)`);
-    } else {
-      // an integration endpoint is the provider's wire, not ours: unserved usually means outbound
-      // (SePay's /userapi/..., Keycloak's /realms/...), which no controller could ever serve - INFO,
-      // with the one question a reader has to answer themselves
-      info(d.file, 'INTEGRATION_ENDPOINT_REMOTE',
-        `${d.id} endpoint "${d.method} ${d.path}" is not served by any bound repository - expected for the ` +
-        "provider's own API; check this entry if the endpoint was meant as an inbound door (webhook/callback)");
-    }
-  }
-  for (const r of servedRoutes) {
-    if (claimedRouteKeys.has(servedKey(r))) continue;
-    if (OPS_ROUTE_RE.test(normRoute(r.path))) {
-      info(r.file, 'OPS_ROUTE', `${r.method} ${r.path} is an ops/probe door - real, but no contract could ever own it`);
-      continue;
-    }
-    const owner = ownerOf(r.file);
-    const msg = `${r.method} ${r.path} served by ${path.basename(r.file)} ` +
-      (owner ? `is owned by ${owner.id} but declared by no contract or integration endpoint ` +
-               '- a wire between features with no record of its shape'
-             : "sits under no record's owners and is declared nowhere - a shipped surface the tree cannot explain");
-    suspect(r.file, 'UNDECLARED_ROUTE', msg);
-  }
+  const claimedRouteKeys=matchDeclaredRoutes([...declaredHttp,...integrationEndpoints],declaredHttp,
+    servedRoutes,servedKeys,provedIds,suspect,refuse,info);
+  reportUndeclaredRoutes(servedRoutes,claimedRouteKeys,ownerOf,suspect,info);
 
   // ---------- GraphQL ----------
   const ops = beRoots.flatMap(r => gqlOps(r).map(o => ({...o, repo: r})));
-  const opNames = new Set(ops.map(o => o.name));
-  const sdsNamedOps = new Set();
-  for (const [, rec] of records) {
-    if (rec.schema === 'work/sds-component@1') for (const n of gqlNamesMentioned(rec.data)) sdsNamedOps.add(n);
-  }
-  const contractNamedOps = contractClaimedOps;
-
-  const unclaimed = new Map(); // cap group -> [op names]
-  for (const o of ops) {
-    const owner = o.file ? ownerOf(o.file) : null;
-    const namedImpl = o.dir ? implNamed(o.dir) : null;
-    const names = [o.name, o.dir, o.dir && camelOf(o.dir)].filter(Boolean);
-    const named = set => names.some(n => set.has(n));
-    o.claim = owner?.id ?? namedImpl
-      ?? ((named(contractNamedOps) && 'contract-surface') || (named(sdsNamedOps) && 'sds-flow') || null);
-    if (!o.claim) {
-      const group = o.cap ? `${(o.kind === 'query' && 'queries') || 'mutations'}/${o.cap}` : `decorated ${o.kind}`;
-      if (!unclaimed.has(group)) unclaimed.set(group, []);
-      unclaimed.get(group).push(o);
-    }
-  }
-  for (const [group, groupOps] of unclaimed) {
-    const names = groupOps.map(o => o.name).join(', ');
-    suspect(groupOps[0].file ?? workRoot, 'UNDECLARED_OPERATION',
-      `graphql ${group} serves ${groupOps.length} op(s) no record owns or names: ${names} ` +
-      '- protocol adaptation is thin, but a shipped door should still be explained');
-  }
-  for (const d of declaredGql) {
-    if (opNames.has(d.name) || opNames.has(camelOf(d.name))) {
-      if (!provedIds.has(d.id)) {
-        suspect(d.file, 'CONTRACT_OP_UNPROVEN',
-          `${d.id}'s surface names GraphQL ${d.name}, which is served, but no impl record's proves names ` +
-          `${d.id} - the op exists in contract and code, yet no implementation claims it`);
-      }
-      continue;
-    }
-    const msg = `${d.id}'s surface names GraphQL ${d.name} but no resolver serves an op of that name ` +
-      '- the record describes a door that does not exist';
-    if (d.state === 'done') refuse(d.file, 'CONTRACT_GHOST_OP', msg);
-    else suspect(d.file, 'CONTRACT_GHOST_OP', `${msg} (record is ${d.state ?? '(no state)'}, not done)`);
-  }
+  const {opNames,unclaimed}=claimGraphOps(ops,records,ownerOf,implNamed,contractClaimedOps);
+  reportUnclaimedGraphOps(unclaimed,workRoot,suspect);
+  reportDeclaredGraphOps(declaredGql,opNames,provedIds,suspect,refuse);
 
   // ---------- FE routes ----------
-  const feRoutesAll = feRoots.flatMap(r => feRoutes(r).map(x => ({...x, repo: r})));
-  const claims = uiRouteClaims(records);
-  const portToApp = new Map();
-  for (const r of feRoots) for (const [p, a] of portAppMap(workRoot, r)) portToApp.set(p, a);
-  const claimedFe = new Set();
-  for (const c of claims) {
-    // a URL claim's port pins the app through metadata.json's ports projection; an unmapped port
-    // degrades to a path match across every app rather than an automatic ghost
-    const expectedApp = c.port ? portToApp.get(c.port) ?? null : null;
-    const hit = feRoutesAll.filter(r => r.norm === c.norm && (!expectedApp || r.app === expectedApp));
-    if (hit.length) { for (const r of hit) claimedFe.add(`${r.repo}#${r.app ?? ''}#${r.norm}`); continue; }
-    const where = expectedApp ? ` on apps/${expectedApp}` : '';
-    const msg = `${c.id} claims route ${c.raw} (as ${c.norm}${where}) but no page.tsx serves it in any ` +
-      'bound fe repository - a screen the record says exists that no route reaches';
-    if (c.state === 'done') refuse(c.file, 'UI_ROUTE_GHOST', msg);
-    else suspect(c.file, 'UI_ROUTE_GHOST', `${msg} (record is ${c.state ?? '(no state)'}, not done)`);
-  }
-  for (const r of feRoutesAll) {
-    if (!claimedFe.has(`${r.repo}#${r.app ?? ''}#${r.norm}`)) {
-      suspect(r.file, 'UI_ROUTE_UNDECLARED',
-        `${r.app ? 'apps/' + r.app + ' ' : ''}route ${r.route} is served but no ui-screen's surfaces[].route claims it`);
-    }
-  }
+  const {feRoutesAll,claims,claimedFe}=checkFeRoutes(workRoot,feRoots,records,suspect,refuse);
 
   // ---------- events ----------
-  const eventRecs = [...records].filter(([, r]) => r.schema === 'work/event@1');
-  const codeByRepo = beRoots.map(r => ({repo: r, ...eventSurface(r)}));
-  const allClasses = new Map();   // className -> {file, kind, repo}
-  const allEmitted = new Map();   // className -> {file, repo}
-  const allEmittedIds = new Set();
-  for (const {repo, classes, emitted, emittedIds} of codeByRepo) {
-    for (const [n, v] of classes) allClasses.set(n, {...v, repo});
-    for (const [n, f] of emitted) allEmitted.set(n, {file: f, repo});
-    for (const id of emittedIds) allEmittedIds.add(id);
-  }
-  const recordOfClass = new Map(); // className -> event record id
-  for (const [id] of eventRecs) {
-    for (const [cls, v] of allClasses) {
-      if (v.kind === id || eventClassNamesOf(id).includes(cls)) recordOfClass.set(cls, id);
-    }
-  }
-  const emittedRecordIds = new Set([...allEmittedIds].filter(id => records.has(id)));
-  for (const [cls] of allEmitted) if (recordOfClass.has(cls)) emittedRecordIds.add(recordOfClass.get(cls));
-
-  for (const [id, rec] of eventRecs) {
-    if (emittedRecordIds.has(id)) continue;
-    const names = eventClassNamesOf(id).join('/');
-    const blocked = Array.isArray(rec.data?.blockedBy) && rec.data.blockedBy.length;
-    const msg = `${id} maps to event class ${names}, but nothing under src/ publishes it ` +
-      '- the record describes an event nothing emits';
-    if (rec.data?.state === 'done') refuse(indexFile(rec), 'EVENT_UNEMITTED', msg);
-    else if (blocked) {
-      const gaps = rec.data.blockedBy.map(b => b?.record).filter(Boolean).join(', ');
-      info(indexFile(rec), 'EVENT_UNEMITTED', `${msg}; the record itself says so (todo, blockedBy ${gaps})`);
-    } else suspect(indexFile(rec), 'EVENT_UNEMITTED', `${msg} (record is ${rec.data?.state ?? '(no state)'})`);
-  }
-  for (const [cls, site] of allEmitted) {
-    if (recordOfClass.has(cls)) continue;
-    suspect(site.file, 'EVENT_UNDECLARED',
-      `${cls} is constructed under src/ but no work/event@1 record maps to it ` +
-      '- an emitted signal the tree does not name');
-  }
-  for (const [cls, v] of allClasses) {
-    if (allEmitted.has(cls) || recordOfClass.has(cls)) continue;
-    suspect(v.file, 'EVENT_CLASS_ORPHAN',
-      `${cls} is declared under src/ but is neither published nor claimed by a work/event@1 record - dead vocabulary`);
-  }
-  for (const e of declaredContractEvents) {
-    if (!records.has(canon(e.id))) {
-      suspect(e.file, 'CONTRACT_EVENT_GHOST', `${e.by}'s surface names ${e.id}, which no work/event@1 record owns`);
-    }
-  }
+  const {eventRecs,codeByRepo,allClasses,allEmitted,recordOfClass,emittedRecordIds}=
+    eventIndexes(records,beRoots);
+  reportUnemittedEvents(eventRecs,emittedRecordIds,recordOfClass,indexFile,refuse,suspect,info);
+  reportUnrecordedEvents(allEmitted,allClasses,recordOfClass,suspect);
+  reportContractEvents(declaredContractEvents,records,canon,suspect);
 
   // subscriptions, paired feature-wise: each subscriber file answers to the union of `subscribes`
   // declared by the feature that owns the file's directory
-  const subscribesByFeature = new Map();
-  for (const [, rec] of records) {
-    for (const eid of Array.isArray(rec.data?.subscribes) ? rec.data.subscribes : []) {
-      const f = featureOf(rec);
-      if (!subscribesByFeature.has(f)) subscribesByFeature.set(f, new Set());
-      subscribesByFeature.get(f).add(canon(eid));
-    }
-  }
+  const subscribesByFeature=declaredSubscriptions(records,featureOf,canon);
   // subscription handling is aggregated per feature before diffing - two subscriber files in one
   // feature would otherwise each report the other's declared events as never wired
-  const wiredByFeature = new Map(); // feature -> {files: [file], ids: Set(eventId), classes: Set}
-  for (const {subscriptions} of codeByRepo) {
-    for (const sub of subscriptions) {
-      const owner = ownerOf(sub.file);
-      const feature = owner?.feature ?? null;
-      for (const cls of sub.classes.filter(c => !recordOfClass.has(c))) {
-        suspect(sub.file, 'SUBSCRIPTION_UNDECLARED',
-          `${path.basename(sub.file)} handles ${cls}, which maps to no work/event@1 record`);
-      }
-      if (!feature) continue;
-      if (!wiredByFeature.has(feature)) wiredByFeature.set(feature, {files: [], ids: new Set()});
-      const entry = wiredByFeature.get(feature);
-      entry.files.push(sub.file);
-      for (const cls of sub.classes) if (recordOfClass.has(cls)) entry.ids.add(recordOfClass.get(cls));
-    }
-  }
-  for (const [feature, wired] of wiredByFeature) {
-    const declared = subscribesByFeature.get(feature) ?? new Set();
-    const subs = wired.files.map(f => path.basename(f)).join(', ');
-    for (const eid of wired.ids) {
-      if (!declared.has(eid)) {
-        suspect(wired.files[0], 'SUBSCRIPTION_UNDECLARED',
-          `${feature}'s subscribers (${subs}) handle ${eid}, but no ${feature} record's subscribes names it`);
-      }
-    }
-    for (const eid of declared) {
-      if (wired.ids.has(eid) || !records.has(canon(eid))) continue;
-      suspect(wired.files[0], 'SUBSCRIPTION_NOT_WIRED',
-        `${feature}'s records subscribe to ${eid}, but its subscribers (${subs}) never handle it ` +
-        '- a declared subscription with no code behind it');
-    }
-  }
+  const wiredByFeature=wiredSubscriptions(codeByRepo,ownerOf,recordOfClass,suspect);
+  reportWiredSubscriptionDiff(wiredByFeature,subscribesByFeature,records,canon,suspect);
   // a feature declaring subscribes with no subscriber file at all is the same absence, feature-wide
-  for (const [id, rec] of records) {
-    const feature = featureOf(rec);
-    if (wiredByFeature.has(feature)) continue;
-    for (const eid of Array.isArray(rec.data?.subscribes) ? rec.data.subscribes : []) {
-      if (!records.has(canon(eid))) continue;
-      suspect(indexFile(rec), 'SUBSCRIPTION_NOT_WIRED',
-        `${id} subscribes to ${eid}, but feature ${feature} has no subscriber under any bound ` +
-        "repository's src/ - a declared subscription with no code behind it");
-    }
-  }
+  reportFeaturesWithoutSubscribers(records,wiredByFeature,featureOf,canon,indexFile,suspect);
 
   // ---------- SURFACE MAP ----------
-  for (const r of repoRoots) {
-    const repoName = path.basename(r);
-    const routes = servedRoutes.filter(x => x.repo === r);
-    const repoOps = ops.filter(x => x.repo === r);
-    const fe = feRoutesAll.filter(x => x.repo === r);
-    const ev = codeByRepo.find(x => x.repo === r);
-    const declared = routes.filter(x => claimedRouteKeys.has(servedKey(x))).length;
-    const ownedOnly = routes.filter(x => !claimedRouteKeys.has(servedKey(x)) && ownerOf(x.file)).length;
-    const lines = [`${repoName}: ${routes.length} http route(s) (${declared} declared, ${ownedOnly} owned-only)`];
-    if (repoOps.length) lines.push(`${repoOps.length} graphql op(s), ${repoOps.filter(x => x.claim).length} claimed`);
-    if (fe.length) {
-      const uiClaimed = fe.filter(x => claimedFe.has(`${x.repo}#${x.app ?? ''}#${x.norm}`)).length;
-      lines.push(`${fe.length} fe route(s), ${uiClaimed} ui-claimed`);
-    }
-    if (ev && (ev.classes.size || ev.emitted.size)) {
-      lines.push(`${ev.classes.size} event class(es), ${ev.emitted.size} emitted, ` +
-        `${ev.subscriptions.length} subscriber file(s)`);
-    }
-    out.map.push(lines.join('; '));
-  }
-  const doneRecs = eventRecs.filter(([, r]) => r.data?.state === 'done').length;
-  if (eventRecs.length) {
-    out.map.push(`${eventRecs.length} work/event@1 record(s) (${doneRecs} done), ${emittedRecordIds.size} ` +
-      `emitted, ${subscribesByFeature.size} feature(s) declaring subscribes`);
-  }
-  out.map.push(`${records.size} record(s) total; ${declaredHttp.length} contract http declaration(s), ` +
-    `${integrationEndpoints.length} integration endpoint(s), ${declaredGql.length} contract graphql ` +
-    `declaration(s), ${claims.length} ui route claim(s)`);
+  appendSurfaceMap(out,repoRoots,servedRoutes,ops,feRoutesAll,claimedRouteKeys,claimedFe,codeByRepo,eventRecs,
+    emittedRecordIds,subscribesByFeature,records,declaredHttp,integrationEndpoints,declaredGql,claims,ownerOf,servedKey);
   return {records: records.size, routes: servedRoutes.length, ops: ops.length,
     feRoutes: feRoutesAll.length, events: eventRecs.length};
 }

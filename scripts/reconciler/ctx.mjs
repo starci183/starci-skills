@@ -53,17 +53,18 @@ export const digestOf = (value) => crypto.createHash('sha256').update(JSON.strin
 /** Node's own warning lines ("(node:123) ExperimentalWarning: ...", "(Use `node --trace-warnings ...`"). */
 const isNodeWarningLine = (line) => /^\(node:\d+\) \w*Warning:|^\(Use `node --trace-warnings/.test(String(line).trim());
 
+function firstRealErrorLine(text) {
+  const lines = String(text ?? '').split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !isNodeWarningLine(l));
+  // A thrown error's own line first (ReferenceError: ...), else the first line that is not a stack frame or source excerpt.
+  return lines.find((l) => /^[A-Z]\w*(?:Error|Exception)\b/.test(l)) ?? lines.find((l) => !/^(?:file:\/\/|at |\^+$|Node\.js v)/.test(l)) ?? null;
+}
+
 /**
  * The one line that says why a child failed: the JSON answer's error / reason / code (its `error` text itself
  * cleaned of node warnings), else the first stderr line that is not a node warning, else the exit. Pure.
  */
 function errorLineOf(r) {
   if (!r || r.ok === true) return null;
-  const firstReal = (text) => {
-    const lines = String(text ?? '').split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !isNodeWarningLine(l));
-    // A thrown error's own line first (ReferenceError: ...), else the first line that is not a stack frame or source excerpt.
-    return lines.find((l) => /^[A-Z]\w*(?:Error|Exception)\b/.test(l)) ?? lines.find((l) => !/^(?:file:\/\/|at |\^+$|Node\.js v)/.test(l)) ?? null;
-  };
   // A list answer (push-mains: one entry per repository): its first failing entry.
   const item = Array.isArray(r.value) ? r.value.find((x) => x && typeof x === 'object' && (x.ok === false || x.error || x.refused || x.scan?.ok === false)) : null;
   let v = null;
@@ -73,8 +74,8 @@ function errorLineOf(r) {
     v = { error: item.error, reason: [repo, item.refused ?? scan].filter(Boolean).join(': ') || null };
   } else if (r.value && typeof r.value === 'object' && !Array.isArray(r.value)) v = r.value;
   let fromJson = null;
-  if (v) fromJson = firstReal(v.error) ?? (typeof v.reason === 'string' ? v.reason : null) ?? (typeof v.code === 'string' ? v.code : null) ?? (v.action ? `action ${v.action}` : null);
-  let message = fromJson ?? firstReal(r.error) ?? firstReal(r.stderr) ?? `exit ${r.code ?? '?'}`;
+  if (v) fromJson = firstRealErrorLine(v.error) ?? (typeof v.reason === 'string' ? v.reason : null) ?? (typeof v.code === 'string' ? v.code : null) ?? (v.action ? `action ${v.action}` : null);
+  let message = fromJson ?? firstRealErrorLine(r.error) ?? firstRealErrorLine(r.stderr) ?? `exit ${r.code ?? '?'}`;
   if (r.fenced) message = 'epoch-fenced: this engine is no longer the leader';
   else if (r.timedOut) message = 'timed out';
   return clip(message, 300);
@@ -114,6 +115,13 @@ function lastJsonLine(stdout) {
   return null;
 }
 
+function refusalOf(value, stderr) {
+  if (value?.ok === false) return value;
+  const stderrJson = lastJsonLine(stderr);
+  if (stderrJson && typeof stderrJson === 'object' && stderrJson.ok === false) return stderrJson;
+  return null;
+}
+
 /**
  * Run `cmd args` as a child with a timeout; resolves {ok, code, value, stdout, stderr, timedOut, error?}. Never rejects.
  * ok = exit 0 and (no JSON, or JSON whose ok is not false).
@@ -135,12 +143,7 @@ export function statusFailureOf(r, { timeoutMs = null } = {}) {
   if (r?.ok && value) return null;
   const stderr = String(r?.stderr ?? '');
   const stderrHead = clip(stderr.split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !isNodeWarningLine(l)).join(' | '), 300) || null;
-  let refusal = null;
-  if (value?.ok === false) refusal = value;
-  else {
-    const stderrJson = lastJsonLine(stderr);
-    if (stderrJson && typeof stderrJson === 'object' && stderrJson.ok === false) refusal = stderrJson;
-  }
+  const refusal = refusalOf(value, stderr);
   const base = { code: Number.isInteger(r?.code) ? r.code : null, timedOut: Boolean(r?.timedOut), stderrHead };
   if (r?.timedOut) return { cause: 'timeout', error: `starci kernel status timed out after ${timeoutMs ?? '?'}ms`, ...base };
   if (r?.error) return { cause: 'spawn', error: clip(`starci kernel status did not spawn: ${r.error}`, 300), ...base };

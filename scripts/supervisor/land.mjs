@@ -80,7 +80,7 @@ export const TREE_CHECKS = Object.freeze(['scripts/hfs/sync-runtime.mjs', 'scrip
 const MAX_MAIN_RETRIES = 3;
 export const LAND_WAIT_MS = allocationMs('landGate.waitMs');
 /** The spec run's timeout: a base plus a share per spec, so a 70-spec engine change is not cut off under load. */
-export const specConcurrency = () => { const n = Number(allocationSettings()?.landGate?.specConcurrency); if (!Number.isInteger(n) || n < 1) throw new Error('modules/models/runtimes.yaml allocation.landGate.specConcurrency must be a positive integer'); return n; };
+export const specConcurrency = () => { const n = Number(allocationSettings()?.landGate?.specConcurrency); if (!Number.isInteger(n) || n < 1) { throw new Error('modules/models/runtimes.yaml allocation.landGate.specConcurrency must be a positive integer'); } return n; };
 export const specTimeoutMs = (count) => allocationMs('landGate.specsBaseMs') + count * allocationMs('landGate.perSpecMs');
 
 /**
@@ -639,7 +639,7 @@ export function landQueue({ env = process.env } = {}) {
 export function acquireLand({ env = process.env, waitMs = LAND_WAIT_MS, pollMs = 5000, lane = null, commits = [], sleep = sleepSync } = {}) {
   let ticketId;
   try { ticketId = withMachine((m) => m.enqueueLand({ lane, commitSha: commits.at(-1) ?? 'unknown', commits: commits.length }), { env }); }
-  catch (error) { if (isMachineBusy(error)) return { ok: false, holder: null, ahead: -1, why: 'db-busy', detail: error.message }; throw error; }
+  catch (error) { if (isMachineBusy(error)) { return { ok: false, holder: null, ahead: -1, why: 'db-busy', detail: error.message }; } throw error; }
   const finish = (state) => { try { withMachine((m) => m.finishLandTicket(ticketId, state), { env }); } catch { /* the reaper cancels it */ } };
   const drop = () => finish('cancelled');
   process.on('exit', drop);
@@ -648,7 +648,7 @@ export function acquireLand({ env = process.env, waitMs = LAND_WAIT_MS, pollMs =
     for (;;) {
       let got;
       try { got = withMachine((m) => m.claimLandGate({ ticketId }), { env }); }
-      catch (error) { if (!isMachineBusy(error)) throw error; got = { ok: false, dbBusy: error.message }; }
+      catch (error) { if (!isMachineBusy(error)) { throw error; } got = { ok: false, dbBusy: error.message }; }
       if (got.ok) return { ok: true, ticketId, release: (state = 'cancelled') => { process.removeListener('exit', drop); finish(state); } };
       if (Date.now() >= end) {
         const queue = landQueue({ env });
@@ -660,7 +660,7 @@ export function acquireLand({ env = process.env, waitMs = LAND_WAIT_MS, pollMs =
   } catch (error) { process.removeListener('exit', drop); drop(); throw error; }
 }
 
-const landResultOf = (r) => { if (r.ok) return 'passed'; if (r.reason === 'conflict') return 'conflict'; if (['dirty', 'not-on-main', 'live-not-on-main', 'main-moved', 'gate-busy', 'git-unusable', 'host-lock-held'].includes(r.reason)) return 'refused'; return 'failed'; };
+const landResultOf = (r) => { if (r.ok) { return 'passed'; } if (r.reason === 'conflict') { return 'conflict'; } if (['dirty', 'not-on-main', 'live-not-on-main', 'main-moved', 'gate-busy', 'git-unusable', 'host-lock-held'].includes(r.reason)) { return 'refused'; } return 'failed'; };
 /** MB-12: a land that moved main but whose push did not happen (refused or failed, not skipped). */
 const pushOwedOf = (r) => Boolean(r?.ok && r.landed && r.push && !r.push.pushed && !r.push.skipped);
 /**

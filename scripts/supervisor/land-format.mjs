@@ -31,5 +31,11 @@ export function describe(r, { jobId = null } = {}) {
   }
   const red = (r.checks ?? []).filter((c) => !c.ok).map(checkText);
   const conflicts = (r.conflicts ?? []).map(conflictText);
-  return `LAND FAILED ${who}: ${r.reason}${r.preflight ? ' (preflight, before the queue)' : ''}${r.detail ? ` (${String(r.detail).slice(0, 300)})` : ''}${r.dirty ? ` dirty: ${r.dirty.join(', ')}` : ''}${red.length ? `\n  ${red.join('\n  ')}` : ''}${conflicts.length ? `\n  ${conflicts.join('\n  ')}` : ''}${r.hint ? `\n  next: ${r.hint}` : ''}`;
+  const preflight = r.preflight ? ' (preflight, before the queue)' : '';
+  const detail = r.detail ? ` (${String(r.detail).slice(0, 300)})` : '';
+  const dirty = r.dirty ? ` dirty: ${r.dirty.join(', ')}` : '';
+  const redText = red.length ? `\n  ${red.join('\n  ')}` : '';
+  const conflictsText = conflicts.length ? `\n  ${conflicts.join('\n  ')}` : '';
+  const hint = r.hint ? `\n  next: ${r.hint}` : '';
+  return `LAND FAILED ${who}: ${r.reason}${preflight}${detail}${dirty}${redText}${conflictsText}${hint}`;
 }

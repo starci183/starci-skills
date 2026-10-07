@@ -1,8 +1,8 @@
 import path from 'node:path';
 import { isInside } from './config.mjs';
-import { relativePath, UNPROVEN_FRAMEWORK, unwrapExpression } from './typescript.mjs';
-import { commonJsRequireReasons, constructedDecoratorKind, decoratorCallee, moduleExportsOf, mutableDecoratorKind, nodeDecorators, normalizedSymbol, normalizedSymbolValue, programSourcesOf, returnedExpressions, selectedNode, tracedFrameworkKinds, valueSymbol, violation } from './ast-walks.mjs';
-import { byCodeUnit } from '../../lib/list.mjs';
+import { relativePath, unwrapExpression } from './typescript.mjs';
+import { commonJsRequireReasons, decoratorCallee, moduleExportsOf, nodeDecorators, normalizedSymbol, normalizedSymbolValue, programSourcesOf, returnedExpressions, selectedNode, valueSymbol, violation } from './ast-walks.mjs';
+import { createBackendSourceShapeChecker } from './source-names-shape.mjs';
 
 const SOURCE_LAYOUT_RULE_ID = 'BE_FEATURE_LAYOUT_INVALID';
 const SOURCE_NAME_RULE_ID = 'BE_SOURCE_FORM';
@@ -33,6 +33,7 @@ const PORT_DECLARATION_ROLES = new Set(['contracts', 'port']);
 const NON_CLASS_ROLES = new Set(['constants', 'contracts', 'decorators', 'enum', 'providers', 'types']);
 const KNOWN_HYPHEN_ROLES = [...CLASS_ROLE_SUFFIX.keys()].sort((a, b) => b.length - a.length);
 const SPECIAL_BASENAMES = new Set(['config', 'configuration', 'constants', 'decorators', 'env', 'environment', 'index', 'main', 'types']);
+const NO_PROGRAM_CHECKER = 'a TypeScript program checker could not be associated with its source';
 const SOURCE_EXTENSION = /\.[cm]?[jt]sx?$/i;
 
 function absoluteRoots(root, relatives) {
@@ -43,20 +44,25 @@ function canonical(file) {
   return path.resolve(file);
 }
 
-
+function addFrameworkTargets(config, context, checker, sourceFile, statement, bySymbol, reasons) {
+  const bound = moduleExportsOf(context.ts, checker, statement);
+  if (!bound || !FRAMEWORK_EXPORTS.has(bound.specifier)) return;
+  if (!bound.symbol) {
+    reasons.push(`${relativePath(config.root, sourceFile.fileName)} cannot resolve ${bound.specifier}`);
+    return;
+  }
+  const selected = FRAMEWORK_EXPORTS.get(bound.specifier);
+  for (const [name, target] of bound.exports) if (selected.has(name) && target) bySymbol.set(target, name);
+}
 
 function frameworkTargets(config, context, checker, localFiles) {
   const reasons = [];
   const bySymbol = new Map();
   const files = programSourcesOf(context, checker, localFiles);
-  if (!files) return { bySymbol, reasons: ['a TypeScript program checker could not be associated with its source'] };
+  if (!files) return { bySymbol, reasons: [NO_PROGRAM_CHECKER] };
   for (const sourceFile of files) {
     for (const statement of sourceFile.statements) {
-      const bound = moduleExportsOf(context.ts, checker, statement);
-      if (!bound || !FRAMEWORK_EXPORTS.has(bound.specifier)) continue;
-      if (!bound.symbol) { reasons.push(`${relativePath(config.root, sourceFile.fileName)} cannot resolve ${bound.specifier}`); continue; }
-      const selected = FRAMEWORK_EXPORTS.get(bound.specifier);
-      for (const [name, target] of bound.exports) if (selected.has(name) && target) bySymbol.set(target, name);
+      addFrameworkTargets(config, context, checker, sourceFile, statement, bySymbol, reasons);
     }
     commonJsRequireReasons(context.ts, checker, sourceFile, (specifier) => FRAMEWORK_EXPORTS.has(specifier),
       reasons, relativePath(config.root, sourceFile.fileName), 'binding whose source role cannot be proved');
@@ -113,6 +119,31 @@ function combineClassValue(results) {
   return { status: 'class', names: [...new Set(classes.flatMap(result => result.names))] };
 }
 
+function classDeclarationResults(ts, checker, expression, declaration, nextSeen, depth) {
+  const results = [];
+  if (ts.isClassDeclaration(declaration)) results.push({ status: 'class', names: declaration.name ? [declaration.name.text] : [] });
+  if (ts.isVariableDeclaration(declaration) && declaration.initializer) {
+    if (ts.isCallExpression(expression)
+      && (ts.isArrowFunction(declaration.initializer) || ts.isFunctionExpression(declaration.initializer))) {
+      for (const returned of returnedExpressions(ts, declaration.initializer)) results.push(classValueStatus(ts, checker, returned, nextSeen, depth + 1));
+    } else results.push(classValueStatus(ts, checker, declaration.initializer, nextSeen, depth + 1));
+  }
+  if (ts.isCallExpression(expression)) for (const returned of returnedExpressions(ts, declaration)) {
+    results.push(classValueStatus(ts, checker, returned, nextSeen, depth + 1));
+  }
+  return results;
+}
+
+function classSymbolStatus(ts, checker, expression, seen, depth) {
+  const selected = selectedNode(ts, ts.isCallExpression(expression) ? expression.expression : expression);
+  const symbol = selected ? normalizedSymbol(ts, checker, selected) : null;
+  if (!symbol || seen.has(symbol)) return { status: 'not-class', names: [] };
+  const nextSeen = new Set(seen).add(symbol);
+  const results = [];
+  for (const declaration of symbol.getDeclarations?.() ?? []) results.push(...classDeclarationResults(ts, checker, expression, declaration, nextSeen, depth));
+  return results.length ? combineClassValue(results) : { status: 'not-class', names: [] };
+}
+
 function classValueStatus(ts, checker, expression, seen = new Set(), depth = 0) {
   if (!expression) return { status: 'not-class', names: [] };
   if (depth > 10) return { status: 'unavailable', names: [] };
@@ -122,26 +153,7 @@ function classValueStatus(ts, checker, expression, seen = new Set(), depth = 0) 
     classValueStatus(ts, checker, expression.whenTrue, seen, depth + 1),
     classValueStatus(ts, checker, expression.whenFalse, seen, depth + 1),
   ]);
-  const selected = selectedNode(ts, ts.isCallExpression(expression) ? expression.expression : expression);
-  const symbol = selected ? normalizedSymbol(ts, checker, selected) : null;
-  if (!symbol || seen.has(symbol)) return { status: 'not-class', names: [] };
-  const nextSeen = new Set(seen).add(symbol);
-  const results = [];
-  for (const declaration of symbol.getDeclarations?.() ?? []) {
-    if (ts.isClassDeclaration(declaration)) results.push({ status: 'class', names: declaration.name ? [declaration.name.text] : [] });
-    if (ts.isVariableDeclaration(declaration) && declaration.initializer) {
-      if (ts.isCallExpression(expression)
-        && (ts.isArrowFunction(declaration.initializer) || ts.isFunctionExpression(declaration.initializer))) {
-        for (const returned of returnedExpressions(ts, declaration.initializer)) {
-          results.push(classValueStatus(ts, checker, returned, nextSeen, depth + 1));
-        }
-      } else results.push(classValueStatus(ts, checker, declaration.initializer, nextSeen, depth + 1));
-    }
-    if (ts.isCallExpression(expression)) for (const returned of returnedExpressions(ts, declaration)) {
-      results.push(classValueStatus(ts, checker, returned, nextSeen, depth + 1));
-    }
-  }
-  return results.length ? combineClassValue(results) : { status: 'not-class', names: [] };
+  return classSymbolStatus(ts, checker, expression, seen, depth);
 }
 
 function combineObjectStatus(statuses) {
@@ -269,19 +281,20 @@ function implementsFramework(ts, checker, declaration, targets, name) {
 }
 
 /** Names of the interfaces a class implements that are declared in a *.port.ts or *.contracts.ts file (resolved by the type checker). */
-function implementedPortNames(ts, checker, declaration) {
+function portNamesForImplementedType(ts, checker, type) {
   const names = [];
-  for (const clause of declaration.heritageClauses ?? []) if (clause.token === ts.SyntaxKind.ImplementsKeyword) {
-    for (const type of clause.types) {
-      const symbol = normalizedSymbol(ts, checker, type.expression);
-      for (const target of symbol?.getDeclarations?.() ?? []) {
-        if (!ts.isInterfaceDeclaration(target) && !ts.isTypeAliasDeclaration(target)) continue;
-        const declaredRole = path.basename(target.getSourceFile().fileName).replace(SOURCE_EXTENSION, '').split('.').at(-1);
-        if (PORT_DECLARATION_ROLES.has(declaredRole)) names.push(target.name.text);
-      }
-    }
+  const symbol = normalizedSymbol(ts, checker, type.expression);
+  for (const target of symbol?.getDeclarations?.() ?? []) {
+    if (!ts.isInterfaceDeclaration(target) && !ts.isTypeAliasDeclaration(target)) continue;
+    const declaredRole = path.basename(target.getSourceFile().fileName).replace(SOURCE_EXTENSION, '').split('.').at(-1);
+    if (PORT_DECLARATION_ROLES.has(declaredRole)) names.push(target.name.text);
   }
   return names;
+}
+
+function implementedPortNames(ts, checker, declaration) {
+  return (declaration.heritageClauses ?? []).filter(clause => clause.token === ts.SyntaxKind.ImplementsKeyword)
+    .flatMap(clause => clause.types.flatMap(type => portNamesForImplementedType(ts, checker, type)));
 }
 
 function locatedRoot(roots, fileName) {
@@ -289,199 +302,16 @@ function locatedRoot(roots, fileName) {
 }
 
 /** Check the adopted domain-first backend source layout without inferring semantic ownership from folder names alone. */
+const checkBackendSourceShapeImpl = createBackendSourceShapeChecker({
+  absoluteRoots, canonical, frameworkTargets, locatedRoot, sourceRole, kebabSourceBase, exportedDeclarations,
+  classValueStatus, objectContractStatus, companionInterfaceAllowed, hasModifier, graphqlField, graphqlArgument,
+  graphqlEnumRegistration, selectedCallKind, callsNamedHelper, implementsFramework, implementedPortNames, decoratorKind,
+  SOURCE_LAYOUT_RULE_ID, SOURCE_NAME_RULE_ID, APPLICATION_ROLES, TRANSPORT_ROLES, APPLICATION_LAYER_ROLES,
+  TRANSPORT_LAYER_ROLES, CLASS_ROLE_SUFFIX, TRANSPORT_OBJECT_SUFFIX, NON_CLASS_ROLES, SPECIAL_BASENAMES,
+  TRACE_NEW,
+});
+
 export function checkBackendSourceShape(config, context) {
-  const ts = context.ts;
-  const featureRoots = absoluteRoots(config.root, config.backend.features);
-  const moduleRoots = absoluteRoots(config.root, config.backend.modules);
-  const localFiles = new Set(context.files.map(file => canonical(file.fileName)));
-  const frameworkByChecker = new Map();
-  const violations = [];
-  const layoutReasons = [];
-  const namingReasons = [];
-  let checkedFiles = 0;
-
-  for (const sourceFile of context.files) {
-    const fileName = canonical(sourceFile.fileName);
-    const featureRoot = locatedRoot(featureRoots, fileName);
-    const moduleRoot = locatedRoot(moduleRoots, fileName);
-    if (!featureRoot && !moduleRoot) continue;
-    checkedFiles += 1;
-    const checker = context.checkerFor(fileName);
-    if (!frameworkByChecker.has(checker)) frameworkByChecker.set(checker, frameworkTargets(config, context, checker, localFiles));
-    const framework = frameworkByChecker.get(checker);
-    const relativeToOwner = relativePath(featureRoot ?? moduleRoot, fileName);
-    const parts = relativeToOwner.split('/');
-    const directories = parts.slice(0, -1).map(part => part.toLowerCase());
-    const applicationIndex = directories.indexOf('application');
-    const transportIndex = directories.indexOf('transport');
-    const inApplication = applicationIndex >= 0;
-    const inTransport = transportIndex >= 0;
-    const role = sourceRole(ts, sourceFile);
-    const relative = relativePath(config.root, fileName);
-    const migrationName = /^\d{10,}-[A-Z][A-Za-z0-9]*$/.test(role.base);
-    const persistencePath = !role.spec && (migrationName || directories.includes('migrations'));
-    const special = SPECIAL_BASENAMES.has(role.base.toLowerCase()) || migrationName
-      || ['constants', 'enums', 'errors', 'migrations'].some(folder => directories.includes(folder));
-    const publicDeclarations = exportedDeclarations(ts, checker, sourceFile);
-
-    if (!migrationName && !kebabSourceBase(role.base)) violations.push(violation(config, sourceFile, sourceFile, SOURCE_NAME_RULE_ID,
-      `Source basename ${role.base} must use kebab-case segments plus an explicit role suffix.`));
-    if (!role.role && !special) namingReasons.push(`${relative} has no statically identifiable source role`);
-
-    if (featureRoot) {
-      if (inApplication && inTransport) violations.push(violation(config, sourceFile, sourceFile, SOURCE_LAYOUT_RULE_ID,
-        'A feature source cannot belong to both application and transport layers.'));
-      if (role.role && APPLICATION_ROLES.has(role.role) && !inApplication) violations.push(violation(config, sourceFile, sourceFile,
-        SOURCE_LAYOUT_RULE_ID, `${role.role} source belongs under the feature application/ layer.`));
-      if (role.role && TRANSPORT_ROLES.has(role.role) && !inTransport) violations.push(violation(config, sourceFile, sourceFile,
-        SOURCE_LAYOUT_RULE_ID, `${role.role} source belongs under the feature transport/<protocol>/ layer.`));
-      if (inApplication && role.role && TRANSPORT_ROLES.has(role.role)) violations.push(violation(config, sourceFile, sourceFile,
-        SOURCE_LAYOUT_RULE_ID, `Transport role ${role.role} cannot live in application/.`));
-      if (inTransport && role.role && APPLICATION_ROLES.has(role.role)) violations.push(violation(config, sourceFile, sourceFile,
-        SOURCE_LAYOUT_RULE_ID, `Application role ${role.role} cannot live in transport/.`));
-      if (inTransport && transportIndex >= directories.length - 1) violations.push(violation(config, sourceFile, sourceFile,
-        SOURCE_LAYOUT_RULE_ID, 'Feature transport source must name a protocol below transport/.'));
-      const topLevelFeatureFile = directories.length === 1 && (role.base === 'index' || role.role === 'module' || role.spec);
-      if (inApplication && role.base !== 'index' && (!role.role || !APPLICATION_LAYER_ROLES.has(role.role))
-        && !(role.role && (TRANSPORT_ROLES.has(role.role) || role.role === 'entity'))) {
-        layoutReasons.push(`${relative} role ${role.role ?? '(unclassified)'} is not a selected application-layer role`);
-      }
-      if (inTransport && role.base !== 'index' && (!role.role || !TRANSPORT_LAYER_ROLES.has(role.role))
-        && !(role.role && (APPLICATION_ROLES.has(role.role) || role.role === 'entity'))) {
-        layoutReasons.push(`${relative} role ${role.role ?? '(unclassified)'} is not a selected transport-layer role`);
-      }
-      if (!inApplication && !inTransport && !topLevelFeatureFile && role.role && role.role !== 'entity'
-        && !APPLICATION_ROLES.has(role.role) && !TRANSPORT_ROLES.has(role.role)) {
-        layoutReasons.push(`${relative} role ${role.role} has no statically selected feature layer`);
-      }
-      if (!inApplication && !inTransport && !topLevelFeatureFile && !role.role && !persistencePath) {
-        layoutReasons.push(`${relative} has no statically selected feature layer`);
-      }
-      if (persistencePath) violations.push(violation(config, sourceFile, sourceFile, SOURCE_LAYOUT_RULE_ID,
-        'Migration source cannot be owned by a feature; place it under the declared persistence module.'));
-      if (role.role === 'entity') violations.push(violation(config, sourceFile, sourceFile, SOURCE_LAYOUT_RULE_ID,
-        'Entity source cannot be owned by a feature; place schema under the declared persistence module.'));
-    }
-
-    const classDeclarations = sourceFile.statements.filter(statement => ts.isClassDeclaration(statement));
-    for (const declaration of classDeclarations) {
-      const declarationDecorators = nodeDecorators(ts, declaration);
-      const kinds = declarationDecorators.map(decorator => decoratorKind(ts, checker, decorator, framework.bySymbol)).filter(Boolean);
-      const graphQlDto = kinds.some(kind => kind === 'ArgsType' || kind === 'InputType' || kind === 'ObjectType');
-      if (graphQlDto && (!featureRoot || !inTransport || directories[transportIndex + 1] !== 'graphql')) {
-        violations.push(violation(config, sourceFile, declaration.name ?? declaration, SOURCE_LAYOUT_RULE_ID,
-          'GraphQL DTO classes belong under a feature transport/graphql/ boundary.'));
-      }
-      const persistenceSchema = kinds.includes('Entity') || kinds.includes('ViewEntity')
-        || implementsFramework(ts, checker, declaration, framework.bySymbol, 'MigrationInterface');
-      if (persistenceSchema && featureRoot) violations.push(violation(config, sourceFile, declaration.name ?? declaration, SOURCE_LAYOUT_RULE_ID,
-        'TypeORM entities and migrations cannot be owned by a feature; place schema under its declared persistence module.'));
-      const classSuffix = role.role && !NON_CLASS_ROLES.has(role.role) ? CLASS_ROLE_SUFFIX.get(role.role) : null;
-      if (publicDeclarations.has(declaration) && !declaration.name) namingReasons.push(`${relative} exports an anonymous class whose role name cannot be proved`);
-      else if (publicDeclarations.has(declaration) && declaration.name && classSuffix && !declaration.name.text.endsWith(classSuffix)
-        && !implementedPortNames(ts, checker, declaration).some(port => declaration.name.text.endsWith(port))) {
-        violations.push(violation(config, sourceFile, declaration.name, SOURCE_NAME_RULE_ID,
-          `Exported class ${declaration.name.text} must end in ${classSuffix} for a ${role.role} source file, or in the name of the port it implements.`));
-      } else if (publicDeclarations.has(declaration) && declaration.name && role.role && !NON_CLASS_ROLES.has(role.role) && !classSuffix) {
-        namingReasons.push(`${relative} declares exported class ${declaration.name.text} with unclassified file role ${role.role}`);
-      }
-    }
-
-    for (const statement of sourceFile.statements) if (ts.isVariableStatement(statement)) for (const declaration of statement.declarationList.declarations) {
-      if (!publicDeclarations.has(declaration) || !declaration.initializer) continue;
-      const classValue = classValueStatus(ts, checker, declaration.initializer);
-      if (classValue.status === 'unavailable') {
-        namingReasons.push(`${relative} exports a class-valued declaration whose role identity is not statically proved`);
-        continue;
-      }
-      if (classValue.status !== 'class') continue;
-      const classSuffix = role.role && !NON_CLASS_ROLES.has(role.role) ? CLASS_ROLE_SUFFIX.get(role.role) : null;
-      if (!classSuffix || !ts.isIdentifier(declaration.name)) {
-        namingReasons.push(`${relative} exports a class-valued declaration without a statically selected class role`);
-        continue;
-      }
-      const names = [declaration.name.text, ...classValue.names];
-      const invalid = names.find(name => !name.endsWith(classSuffix));
-      if (invalid) violations.push(violation(config, sourceFile, declaration.name, SOURCE_NAME_RULE_ID,
-        `Exported class value ${invalid} must end in ${classSuffix} for a ${role.role} source file.`));
-    }
-
-    for (const statement of sourceFile.statements) {
-      if (ts.isEnumDeclaration(statement)) {
-        if (hasModifier(ts, statement, ts.SyntaxKind.ConstKeyword) || !/^[A-Z][A-Za-z0-9]*$/.test(statement.name.text)) {
-          violations.push(violation(config, sourceFile, statement.name, SOURCE_NAME_RULE_ID,
-            'Enums must be non-const declarations with PascalCase names.'));
-        }
-        for (const member of statement.members) {
-          const name = ts.isIdentifier(member.name) || ts.isStringLiteralLike(member.name) ? member.name.text : null;
-          const initializer = member.initializer && unwrapExpression(ts, member.initializer);
-          if (!name || !/^[A-Z][A-Za-z0-9]*$/.test(name) || !initializer || !ts.isStringLiteralLike(initializer)) {
-            violations.push(violation(config, sourceFile, member.name, SOURCE_NAME_RULE_ID,
-              'Enum members must use PascalCase names with explicit static string values.'));
-          }
-        }
-      }
-      const contractStatus = objectContractStatus(ts, checker, statement);
-      const transportSuffix = TRANSPORT_OBJECT_SUFFIX.get(role.role);
-      if (contractStatus === 'object' && publicDeclarations.has(statement) && transportSuffix && !role.spec
-        && !statement.name.text.endsWith(transportSuffix) && !companionInterfaceAllowed(ts, sourceFile, statement.name.text)) {
-        violations.push(violation(config, sourceFile, statement.name, SOURCE_NAME_RULE_ID,
-          `Public object contract ${statement.name.text} in a ${role.role} source file must end in ${transportSuffix}.`));
-      }
-    }
-
-    const visit = node => {
-      for (const decorator of nodeDecorators(ts, node)) {
-        const kind = decoratorKind(ts, checker, decorator, framework.bySymbol);
-        if (!kind) {
-          const dynamic = mutableDecoratorKind(ts, checker, decorator, framework.bySymbol)
-            ?? constructedDecoratorKind(ts, checker, decorator, framework.bySymbol, TRACE_NEW);
-          if (dynamic) {
-            const detail = `${relative} uses a mutable or constructed ${dynamic} decorator identity`;
-            if (['Entity', 'ViewEntity', 'ArgsType', 'InputType', 'ObjectType', 'multiple framework', 'unproven framework'].includes(dynamic)) layoutReasons.push(detail);
-            if (!['Entity', 'ViewEntity'].includes(dynamic)) namingReasons.push(detail);
-          }
-        }
-        if (kind === 'Mutation' || kind === 'Query') graphqlField({ config, context, sourceFile, node, decorator, kind, namingReasons, violations });
-        if (kind === 'Args') graphqlArgument(config, context, sourceFile, node, decorator, namingReasons, violations);
-      }
-      if (ts.isCallExpression(node)) {
-        if (selectedCallKind(ts, checker, node, framework.bySymbol) === 'registerEnumType') {
-          graphqlEnumRegistration(config, context, sourceFile, node, namingReasons, violations);
-        } else if (callsNamedHelper(ts, checker, node, 'createEnumType')) {
-          namingReasons.push(`${relative} calls a project GraphQL enum adapter whose emitted type name is not statically proved`);
-        }
-      }
-      const exportedFactoryCall = ts.isCallExpression(node) && ts.isVariableDeclaration(node.parent) && publicDeclarations.has(node.parent);
-      if ((ts.isNewExpression(node) || exportedFactoryCall) && featureRoot) {
-        const constructed = tracedFrameworkKinds(ts, checker, node, framework.bySymbol, TRACE_NEW);
-        if (constructed.has('EntitySchema')) violations.push(violation(config, sourceFile, node.expression, SOURCE_LAYOUT_RULE_ID,
-          'TypeORM EntitySchema cannot be owned by a feature; place schema under its declared persistence module.'));
-        if (constructed.has(UNPROVEN_FRAMEWORK)) layoutReasons.push(`${relative} has a constructed provider identity beyond the bounded static trace`);
-      }
-      ts.forEachChild(node, visit);
-    };
-    visit(sourceFile);
-  }
-
-  for (const framework of frameworkByChecker.values()) {
-    layoutReasons.push(...framework.reasons);
-    namingReasons.push(...framework.reasons.filter(reason => reason.includes('@nestjs/graphql')));
-  }
-  if (checkedFiles === 0) {
-    layoutReasons.push('the checked TypeScript program contains no configured backend feature or module source');
-    namingReasons.push('the checked TypeScript program contains no configured backend feature or module source');
-  }
-  const coverage = {
-    files: checkedFiles,
-    layout: layoutReasons.length
-      ? { status: 'unavailable', reason: 'one or more backend source placement relations are not statically proved', details: [...new Set(layoutReasons)].sort(byCodeUnit) }
-      : { status: 'checked' },
-    naming: namingReasons.length
-      ? { status: 'unavailable', reason: 'one or more backend source naming relations are not statically proved', details: [...new Set(namingReasons)].sort(byCodeUnit) }
-      : { status: 'checked' },
-  };
-  return { violations, coverage };
+  return checkBackendSourceShapeImpl(config, context);
 }
-
 export { SOURCE_LAYOUT_RULE_ID, SOURCE_NAME_RULE_ID };

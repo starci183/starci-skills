@@ -38,8 +38,7 @@ function walk(ts, root, visit) {
   step(root);
 }
 
-/** Facts one contract spec establishes: the providers whose fixtures it references and whether it compares shapes. */
-function readSpec(ts, sourceFile, helper, providers) {
+const importsOfSpec = (ts, sourceFile, helper, providers) => {
   const shapeNames = new Set();
   const referenced = new Set();
   for (const statement of sourceFile.statements) {
@@ -50,36 +49,42 @@ function readSpec(ts, sourceFile, helper, providers) {
     if (!named || !ts.isNamedImports(named)) continue;
     for (const element of named.elements) if ((element.propertyName ?? element.name).text === helper) shapeNames.add(element.name.text);
   }
-  const callsShape = node => {
-    let found = false;
-    walk(ts, node, inner => { if (ts.isCallExpression(inner) && ts.isIdentifier(inner.expression) && shapeNames.has(inner.expression.text)) found = true; });
-    return found;
-  };
+  return { shapeNames, referenced };
+};
+
+const callsShape = (ts, node, shapeNames) => {
+  let found = false;
+  walk(ts, node, inner => { if (ts.isCallExpression(inner) && ts.isIdentifier(inner.expression) && shapeNames.has(inner.expression.text)) found = true; });
+  return found;
+};
+
+const referenceAndCompare = (ts, node, providers, referenced, shapeNames) => {
+  if (ts.isStringLiteralLike(node)) for (const provider of providers) if (node.text.includes(`${FAKES_DIRECTORY}${provider}/`)) referenced.add(provider);
+  if (!ts.isCallExpression(node)) return false;
+  const named = ts.isIdentifier(node.expression) ? node.expression.text : null;
+  for (const argument of node.arguments) {
+    const value = unwrap(ts, argument);
+    if (value && ts.isStringLiteralLike(value) && providers.has(value.text) && named !== 'describe' && named !== 'it' && named !== 'test') referenced.add(value.text);
+  }
+  const callee = node.expression;
+  if (!ts.isPropertyAccessExpression(callee) || !SHAPE_MATCHERS.has(callee.name.text)) return false;
+  let receiver = unwrap(ts, callee.expression);
+  while (receiver && ts.isPropertyAccessExpression(receiver)) receiver = unwrap(ts, receiver.expression); // .not / .resolves
+  if (!receiver || !ts.isCallExpression(receiver) || !ts.isIdentifier(receiver.expression) || receiver.expression.text !== 'expect') return false;
+  const [actual] = receiver.arguments;
+  const [expected] = node.arguments;
+  return Boolean(actual && expected && callsShape(ts, actual, shapeNames) && callsShape(ts, expected, shapeNames));
+};
+
+/** Facts one contract spec establishes: the providers whose fixtures it references and whether it compares shapes. */
+function readSpec(ts, sourceFile, helper, providers) {
+  const { shapeNames, referenced } = importsOfSpec(ts, sourceFile, helper, providers);
   let compares = false;
-  walk(ts, sourceFile, node => {
-    if (ts.isStringLiteralLike(node)) for (const provider of providers) if (node.text.includes(`${FAKES_DIRECTORY}${provider}/`)) referenced.add(provider);
-    if (!ts.isCallExpression(node)) return;
-    const named = ts.isIdentifier(node.expression) ? node.expression.text : null;
-    for (const argument of node.arguments) {
-      const value = unwrap(ts, argument);
-      if (value && ts.isStringLiteralLike(value) && providers.has(value.text) && named !== 'describe' && named !== 'it' && named !== 'test') referenced.add(value.text);
-    }
-    const callee = node.expression;
-    if (!ts.isPropertyAccessExpression(callee) || !SHAPE_MATCHERS.has(callee.name.text)) return;
-    let receiver = unwrap(ts, callee.expression);
-    while (receiver && ts.isPropertyAccessExpression(receiver)) receiver = unwrap(ts, receiver.expression); // .not / .resolves
-    if (!receiver || !ts.isCallExpression(receiver) || !ts.isIdentifier(receiver.expression) || receiver.expression.text !== 'expect') return;
-    const [actual] = receiver.arguments;
-    const [expected] = node.arguments;
-    if (actual && expected && callsShape(actual) && callsShape(expected)) compares = true;
-  });
+  walk(ts, sourceFile, node => { if (referenceAndCompare(ts, node, providers, referenced, shapeNames)) compares = true; });
   return { referenced, compares };
 }
 
-export function checkContractFixtureGuard(input) {
-  const { config, ts, resolver, tree } = checkerScope(input);
-  const { contractShape } = resolver.ruleParams();
-  const violations = [];
+const fixtureFilesOf = (tree, resolver) => {
   const fixtures = new Map(); // provider -> first payload fixture file
   const specs = new Map(); // provider -> [contract spec file]
   for (const file of [...tree.files].sort(byCodeUnit)) {
@@ -91,13 +96,14 @@ export function checkContractFixtureGuard(input) {
       continue;
     }
     const verdict = classified.slot === WORLD_SLOT ? allowsFile(resolver, file) : null;
-    if (verdict?.slot === WORLD_SLOT) {
-      if (!verdict.relative.startsWith(FAKES_DIRECTORY)) continue;
-      const match = PAYLOADS.exec(verdict.relative.slice(FAKES_DIRECTORY.length));
-      if (match && !fixtures.has(match[1])) fixtures.set(match[1], file);
-    }
+    if (verdict?.slot !== WORLD_SLOT || !verdict.relative.startsWith(FAKES_DIRECTORY)) continue;
+    const match = PAYLOADS.exec(verdict.relative.slice(FAKES_DIRECTORY.length));
+    if (match && !fixtures.has(match[1])) fixtures.set(match[1], file);
   }
-  const providers = new Set(fixtures.keys());
+  return { fixtures, specs };
+};
+
+const guardedProvidersOf = (config, ts, contractShape, providers, specs) => {
   const guarded = new Set();
   for (const [provider, files] of specs) {
     for (const file of files) {
@@ -108,6 +114,16 @@ export function checkContractFixtureGuard(input) {
       if (facts.compares && facts.referenced.has(provider)) guarded.add(provider);
     }
   }
+  return guarded;
+};
+
+export function checkContractFixtureGuard(input) {
+  const { config, ts, resolver, tree } = checkerScope(input);
+  const { contractShape } = resolver.ruleParams();
+  const violations = [];
+  const { fixtures, specs } = fixtureFilesOf(tree, resolver);
+  const providers = new Set(fixtures.keys());
+  const guarded = guardedProvidersOf(config, ts, contractShape, providers, specs);
   for (const [provider, file] of [...fixtures].sort(([a], [b]) => a.localeCompare(b))) {
     if (guarded.has(provider)) continue;
     const has = specs.get(provider)?.length ?? 0;

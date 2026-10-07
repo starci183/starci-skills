@@ -48,6 +48,19 @@ export const gitRunner = (git = null) => (args, opts = {}) => {
 };
 
 let cachedGit;
+const gitPathOf = ({ env, platform, home, exists }) => {
+  const p = platform === 'win32' ? path.win32 : path.posix;
+  const pathKey = Object.keys(env).find((name) => name.toLowerCase() === 'path');
+  const shim = p.join(home, '.starci', 'bin');
+  const same = (a, b) => (platform === 'win32' ? p.resolve(a).toLowerCase() === p.resolve(b).toLowerCase() : p.resolve(a) === p.resolve(b));
+  const binary = platform === 'win32' ? 'git.exe' : 'git';
+  for (const raw of String(pathKey ? env[pathKey] : '').split(platform === 'win32' ? ';' : ':')) {
+    const dir = raw.replace(/^"(.*)"$/, '$1');
+    const file = dir && p.isAbsolute(dir) && !same(dir, shim) ? p.join(dir, binary) : null;
+    if (file && exists(file)) return file;
+  }
+  return null;
+};
 /**
  * The absolute path of the real git binary, or null: the first PATH directory holding git (git.exe on Windows) that is not
  * the StarCi shim directory <home>/.starci/bin (a seat's guard shim is never the git the runtime itself runs). A bare name is never
@@ -57,16 +70,7 @@ let cachedGit;
 export const gitExecutable = (options = null) => {
   if (!options && cachedGit !== undefined) return cachedGit;
   const { env = process.env, platform = process.platform, home = os.homedir(), exists = (file) => fs.statSync(file, { throwIfNoEntry: false })?.isFile() === true } = options ?? {};
-  const p = platform === 'win32' ? path.win32 : path.posix;
-  const pathKey = Object.keys(env).find((name) => name.toLowerCase() === 'path');
-  const shim = p.join(home, '.starci', 'bin');
-  const same = (a, b) => (platform === 'win32' ? p.resolve(a).toLowerCase() === p.resolve(b).toLowerCase() : p.resolve(a) === p.resolve(b));
-  let found = null;
-  for (const raw of String(pathKey ? env[pathKey] : '').split(platform === 'win32' ? ';' : ':')) {
-    const dir = raw.replace(/^"(.*)"$/, '$1');
-    const file = dir && p.isAbsolute(dir) && !same(dir, shim) ? p.join(dir, platform === 'win32' ? 'git.exe' : 'git') : null;
-    if (file && exists(file)) { found = file; break; }
-  }
+  const found = gitPathOf({ env, platform, home, exists });
   if (!options) cachedGit = found;
   return found;
 };

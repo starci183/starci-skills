@@ -68,7 +68,8 @@ export function checkerScope({ config, graph, context }) {
   return { config, graph, context, ts: context.ts, resolver: graph.resolver, tree: treeOf(config.root) };
 }
 
-const strip = entry => entry.replace(/\/+$/u, '');
+const TRAILING_SLASH = new RegExp('/+$', 'u');
+const strip = entry => entry.replace(TRAILING_SLASH, '');
 const rootOfTarget = target => {
   if (target.endsWith('/')) return strip(target);
   const parent = path.posix.dirname(target);
@@ -80,20 +81,16 @@ function ruleFor(slotId, target, rootExists) {
   return 'HFS_REQUIRED_FILE_MISSING';
 }
 
-export function checkRequiredFiles({ config, graph }) {
-  const resolver = graph?.resolver ?? config.hfs;
-  const tree = treeOf(config.root);
-  const judged = slotId => {
-    const slot = resolver.slot(slotId);
-    return Boolean(slot) && (slot.tier !== 'none' || ALSO_JUDGED_TIER_NONE.has(slotId));
-  };
+function slotIsJudged(resolver, slotId) {
+  const slot = resolver.slot(slotId);
+  return Boolean(slot) && (slot.tier !== 'none' || ALSO_JUDGED_TIER_NONE.has(slotId));
+}
 
-  const requirements = new Map(); // repository-relative target (as written, dirs end with /) -> {slot, target, root}
-  const instances = new Set();
-  const addRequirement = (slot, target, root) => { if (!requirements.has(target)) requirements.set(target, { slot, target, root }); };
+function addRequirement(requirements, slot, target, root) {
+  if (!requirements.has(target)) requirements.set(target, { slot, target, root });
+}
 
-  // 1. What the repository must hold whatever it contains: fixed instances (requiredInstances, one per declared app).
-  const declared = resolver.requiredPaths();
+function collectDeclaredRequirements(declared, requirements, instances, judged) {
   const currentRoot = new Map();
   for (const item of declared.paths) {
     if (!judged(item.slot)) continue;
@@ -101,77 +98,81 @@ export function checkRequiredFiles({ config, graph }) {
       const root = rootOfTarget(item.path);
       currentRoot.set(item.slot, root);
       instances.add(`${item.slot}|${root}`);
-      addRequirement(item.slot, item.path, root);
+      addRequirement(requirements, item.slot, item.path, root);
     } else {
-      addRequirement(item.slot, item.path, currentRoot.get(item.slot) ?? '');
+      addRequirement(requirements, item.slot, item.path, currentRoot.get(item.slot) ?? '');
     }
   }
+}
 
-  // 2. What each instance found by walking the tree requires (features, domains, integrations, packages, transports, ...).
+function addInstanceRequirements(resolver, slotId, root, representative, requirements, instances, seenInstances, judged) {
+  const key = `${slotId}|${root}`;
+  if (seenInstances.has(key) || !judged(slotId)) return;
+  seenInstances.add(key);
+  instances.add(key);
+  for (const target of resolver.requiredFiles(representative)) addRequirement(requirements, slotId, target, root);
+}
+
+function addOwnerRequirements(resolver, owner, requirements, instances, seenInstances, judged) {
+  const key = `${owner.slot}|${owner.root}`;
+  if (seenInstances.has(key) || !judged(owner.slot) || !resolver.slotEnabled(resolver.slot(owner.slot))) return;
+  seenInstances.add(key);
+  instances.add(key);
+  for (const entry of resolver.slot(owner.slot).requires ?? []) {
+    const rooted = entry.startsWith('/');
+    const filled = (rooted ? entry.slice(1) : entry).replace(/<([A-Za-z][A-Za-z0-9-]*)>/g, (whole, name) => owner.bindings[name] ?? whole);
+    addRequirement(requirements, owner.slot, rooted || !owner.root ? filled : `${owner.root}/${filled}`, owner.root);
+  }
+}
+
+function noteInstance(found, slotId, root) {
+  if (!found.has(slotId)) found.set(slotId, new Set());
+  found.get(slotId).add(root);
+}
+
+function collectTreeRequirements(tree, resolver, requirements, instances, judged) {
   const seenInstances = new Set();
-  const instanceRequires = (slotId, root, representative) => {
-    const key = `${slotId}|${root}`;
-    if (seenInstances.has(key) || !judged(slotId)) return;
-    seenInstances.add(key);
-    instances.add(key);
-    for (const target of resolver.requiredFiles(representative)) addRequirement(slotId, target, root);
-  };
-  const ownerRequires = owner => {
-    const key = `${owner.slot}|${owner.root}`;
-    if (seenInstances.has(key) || !judged(owner.slot) || !resolver.slotEnabled(resolver.slot(owner.slot))) return;
-    seenInstances.add(key);
-    instances.add(key);
-    for (const entry of resolver.slot(owner.slot).requires ?? []) {
-      const rooted = entry.startsWith('/');
-      const filled = (rooted ? entry.slice(1) : entry).replace(/<([A-Za-z][A-Za-z0-9-]*)>/g, (whole, name) => owner.bindings[name] ?? whole);
-      addRequirement(owner.slot, rooted || !owner.root ? filled : `${owner.root}/${filled}`, owner.root);
-    }
-  };
   const found = new Map(); // slot -> Set(root) of instances seen while walking
-  const note = (slotId, root) => {
-    if (!found.has(slotId)) found.set(slotId, new Set());
-    found.get(slotId).add(root);
-  };
   for (const file of tree.files) {
     const classified = resolver.classifyPath(file);
     if (classified.status === 'owned' && classified.slot) {
-      note(classified.slot, classified.root);
-      instanceRequires(classified.slot, classified.root, file);
+      noteInstance(found, classified.slot, classified.root);
+      addInstanceRequirements(resolver, classified.slot, classified.root, file, requirements, instances, seenInstances, judged);
     }
     const owner = resolver.ownerOf(file);
     if (owner) {
-      note(owner.slot, owner.root);
+      noteInstance(found, owner.slot, owner.root);
       // an owner root may classify to a more specific slot (modules/i18n) or a nested one, so expand the owner slot's own requires
-      ownerRequires(owner);
+      addOwnerRequirements(resolver, owner, requirements, instances, seenInstances, judged);
     }
   }
+  return found;
+}
 
-  const violations = [];
-  const reported = new Set();
-  const report = (ruleId, target, slotId, root, extra, message) => {
-    const key = `${ruleId}|${target}`;
-    if (reported.has(key)) return;
-    reported.add(key);
-    violations.push({ ruleId, path: target, slot: slotId, ...(root ? { root } : {}), ...extra, message });
-  };
-  const exists = target => (target.endsWith('/') ? tree.directories.has(strip(target)) : tree.files.has(target));
+function requirementExists(tree, target) {
+  return target.endsWith('/') ? tree.directories.has(strip(target)) : tree.files.has(target);
+}
 
-  for (const requirement of requirements.values()) {
-    if (exists(requirement.target)) continue;
-    const rootExists = !requirement.root || tree.directories.has(requirement.root);
-    if (!rootExists) {
-      report(ruleFor(requirement.slot, requirement.target, false), requirement.root, requirement.slot, requirement.root, { kind: 'directory' },
-        `Required directory ${requirement.root} (slot ${requirement.slot}) does not exist; the slot manifest requires it, along with what it holds.`);
-      continue;
-    }
-    const kind = requirement.target.endsWith('/') ? 'directory' : 'file';
-    const rootNote = requirement.root ? ` (${requirement.root})` : '';
-    report(ruleFor(requirement.slot, requirement.target, true), strip(requirement.target), requirement.slot, requirement.root, { kind },
-      `Required ${kind} ${strip(requirement.target)} is missing; slot ${requirement.slot} requires it in every instance${rootNote}.`);
+function reportMissingRequirement(requirement, tree, report) {
+  if (requirementExists(tree, requirement.target)) return;
+  const rootExists = !requirement.root || tree.directories.has(requirement.root);
+  if (!rootExists) {
+    report(ruleFor(requirement.slot, requirement.target, false), requirement.root, requirement.slot, requirement.root, { kind: 'directory' },
+      `Required directory ${requirement.root} (slot ${requirement.slot}) does not exist; the slot manifest requires it, along with what it holds.`);
+    return;
   }
+  const kind = requirement.target.endsWith('/') ? 'directory' : 'file';
+  const rootNote = requirement.root ? ` (${requirement.root})` : '';
+  report(ruleFor(requirement.slot, requirement.target, true), strip(requirement.target), requirement.slot, requirement.root, { kind },
+    `Required ${kind} ${strip(requirement.target)} is missing; slot ${requirement.slot} requires it in every instance${rootNote}.`);
+}
 
-  // 3. Minimums: at least minInstances instances of a required slot.
-  for (const minimum of declared.minimums) {
+function reportMissingRequirements(requirements, tree, report) {
+  for (const requirement of requirements.values()) reportMissingRequirement(requirement, tree, report);
+}
+
+function reportMinimumRequirements(minimums, resolver, judged, found, report) {
+  for (const minimum of minimums) {
     if (!judged(minimum.slot)) continue;
     const count = minimum.appKind !== undefined
       ? resolver.repo.apps.filter(app => app.kind === minimum.appKind).length
@@ -181,6 +182,31 @@ export function checkRequiredFiles({ config, graph }) {
     report('HFS_REQUIRED_FILE_MISSING', 'hfs.json', minimum.slot, '', { minimum: minimum.min, found: count },
       `Slot ${minimum.slot} needs at least ${minimum.min} instance${minimum.min === 1 ? '' : 's'}${appKindNote}; the repository has ${count}.`);
   }
+}
+
+export function checkRequiredFiles({ config, graph }) {
+  const resolver = graph?.resolver ?? config.hfs;
+  const tree = treeOf(config.root);
+  const judged = slotId => slotIsJudged(resolver, slotId);
+
+  const requirements = new Map(); // repository-relative target (as written, dirs end with /) -> {slot, target, root}
+  const instances = new Set();
+  const declared = resolver.requiredPaths();
+  collectDeclaredRequirements(declared, requirements, instances, judged);
+
+  const found = collectTreeRequirements(tree, resolver, requirements, instances, judged);
+
+  const violations = [];
+  const reported = new Set();
+  const report = (ruleId, target, slotId, root, extra, message) => {
+    const key = `${ruleId}|${target}`;
+    if (reported.has(key)) return;
+    reported.add(key);
+    violations.push({ ruleId, path: target, slot: slotId, ...(root ? { root } : {}), ...extra, message });
+  };
+  reportMissingRequirements(requirements, tree, report);
+
+  reportMinimumRequirements(declared.minimums, resolver, judged, found, report);
 
   return { violations, coverage: { status: 'checked', instances: instances.size, requirements: requirements.size, missing: violations.length } };
 }

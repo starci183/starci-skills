@@ -59,23 +59,35 @@ export function simpleCommands(text, { dialect = 'bash', env = process.env } = {
     if (v) { st.word = (st.word ?? '') + v[0]; return v[1] - 1; }
     return -1;
   };
+  const isQuotedEscape = (j) => (s[j] === '\\' && dialect !== 'powershell' && (s[j + 1] === '"' || s[j + 1] === '$' || s[j + 1] === '\\'))
+    || (s[j] === '`' && dialect === 'powershell');
+  const queueQuotedSubstitution = (j) => {
+    const end = closingParen(j + 2);
+    st.nested.push(s.slice(j + 2, end));
+    return end;
+  };
+  const doubleQuotedText = (i) => {
+    let j = i + 1;
+    let v = '';
+    while (j < s.length && s[j] !== '"') {
+      if (isQuotedEscape(j)) { v += s[j + 1] ?? ''; j += 2; continue; }
+      if (s[j] === '$' && s[j + 1] === '(') { const end = queueQuotedSubstitution(j); v += '$()'; j = end + 1; continue; }
+      const expanded = s[j] === '$' ? variable(j) : null;
+      if (expanded) { v += expanded[0]; j = expanded[1]; continue; }
+      v += s[j];
+      j += 1;
+    }
+    return { value: v, end: j };
+  };
   const takeQuote = (i) => {
     if (s[i] === "'") {
       const end = s.indexOf("'", i + 1);
       st.word = (st.word ?? '') + s.slice(i + 1, end < 0 ? s.length : end);
       return end < 0 ? s.length : end;
     }
-    let j = i + 1;
-    let v = '';
-    while (j < s.length && s[j] !== '"') {
-      if ((s[j] === '\\' && dialect !== 'powershell' && (s[j + 1] === '"' || s[j + 1] === '$' || s[j + 1] === '\\')) || (s[j] === '`' && dialect === 'powershell')) { v += s[j + 1] ?? ''; j += 2; continue; }
-      if (s[j] === '$' && s[j + 1] === '(') { const end = closingParen(j + 2); st.nested.push(s.slice(j + 2, end)); v += '$()'; j = end + 1; continue; }
-      if (s[j] === '$') { const r = variable(j); if (r) { v += r[0]; j = r[1]; continue; } }
-      v += s[j];
-      j += 1;
-    }
-    st.word = (st.word ?? '') + v;
-    return j;
+    const quoted = doubleQuotedText(i);
+    st.word = (st.word ?? '') + quoted.value;
+    return quoted.end;
   };
   const takeBacktick = (i) => {
     if (dialect === 'powershell') { st.word = (st.word ?? '') + (s[i + 1] ?? ''); return i + 1; }
@@ -97,19 +109,24 @@ export function simpleCommands(text, { dialect = 'bash', env = process.env } = {
     return i + heredoc[0].length - 1;
   };
   // At a newline, each queued heredoc body is skipped to its delimiter; an unquoted body still runs its $(...) substitutions.
+  const queueHeredocSubstitutions = (line) => {
+    for (const m of line.matchAll(/\$\(/g)) st.nested.push(line.slice(m.index + 2, closingParenIn(line, m.index + 2)));
+  };
+  const skipHeredocBody = (doc, at) => {
+    while (at < s.length) {
+      const nl = s.indexOf('\n', at);
+      const line = s.slice(at, nl < 0 ? s.length : nl).replace(/\r$/, '');
+      at = nl < 0 ? s.length : nl + 1;
+      if ((doc.strip ? line.replace(/^\t+/, '') : line) === doc.delimiter) break;
+      if (doc.expands) queueHeredocSubstitutions(line);
+    }
+    return at;
+  };
   const takeHeredocBody = (i) => {
     if (!st.heredocs.length) return -1;
     endCommand();
     let at = i + 1;
-    for (const doc of st.heredocs.splice(0)) {
-      while (at < s.length) {
-        const nl = s.indexOf('\n', at);
-        const line = s.slice(at, nl < 0 ? s.length : nl).replace(/\r$/, '');
-        at = nl < 0 ? s.length : nl + 1;
-        if ((doc.strip ? line.replace(/^\t+/, '') : line) === doc.delimiter) break;
-        if (doc.expands) for (const m of line.matchAll(/\$\(/g)) st.nested.push(line.slice(m.index + 2, closingParenIn(line, m.index + 2)));
-      }
-    }
+    for (const doc of st.heredocs.splice(0)) at = skipHeredocBody(doc, at);
     return at - 1;
   };
   // A redirection and its target are not arguments: `2>&1`, `>> log`, `*> $null`, `< in`.
@@ -142,9 +159,10 @@ export function simpleCommands(text, { dialect = 'bash', env = process.env } = {
     if (c === '~') return takeTilde(i);
     return -1;
   };
-  for (let i = 0; i < s.length; i += 1) {
+  for (let i = 0, step = 1; i < s.length; i += step) {
+    step = 1;
     const n = takeSpecial(i);
-    if (n >= 0) { i = n; continue; }
+    if (n >= 0) { step = n - i + 1; continue; }
     const c = s[i];
     if (c === '\r') continue;
     if (SEPARATORS.has(c)) { endCommand(); continue; }
@@ -201,31 +219,34 @@ const unRun = (w) => {
 };
 // The inner command a wrapper program runs: {text, dialect} to recurse on, {} for a wrapper that runs
 // nothing visible (powershell -File with an unreadable body), null when the program is no open wrapper.
+const shellInner = (args) => {
+  const at = args.findIndex((a) => /^-[a-z]+$/.test(a) && a.includes('c'));
+  return at >= 0 && args[at + 1] != null ? { text: args[at + 1], dialect: 'bash' } : null;
+};
+const powershellInner = (args, dir) => {
+  const flagAt = (re) => args.findIndex((a) => re.test(a));
+  const enc = flagAt(/^-(?:e|ec|enc|encodedcommand)$/i);
+  if (enc >= 0 && args[enc + 1]) return { text: Buffer.from(args[enc + 1], 'base64').toString('utf16le'), dialect: 'powershell' };
+  const file = flagAt(/^-(?:f|file)$/i);
+  if (file >= 0 && args[file + 1]) {
+    let body = null;
+    try { body = fs.readFileSync(path.resolve(dir, args[file + 1]), 'utf8'); } catch { /* an unreadable script runs nothing we can see */ }
+    return body == null ? {} : { text: body, dialect: 'powershell' };
+  }
+  const command = flagAt(/^-(?:c|command)$/i);
+  if (command >= 0) return { text: args.slice(command + 1).join(' '), dialect: 'powershell' };
+  const bare = args.filter((a) => !a.startsWith('-'));
+  return bare.length ? { text: bare.join(' '), dialect: 'powershell' } : null;
+};
+const cmdInner = (args) => {
+  // Git Bash spells cmd's switch //c (MSYS would rewrite a single /c as a path).
+  const at = args.findIndex((a) => /^\/\/?[ck]$/i.test(a));
+  return at >= 0 ? { text: args.slice(at + 1).join(' '), dialect: 'cmd' } : null;
+};
 const wrappedInner = (program, args, dir) => {
-  if (SHELLS.has(program)) {
-    const at = args.findIndex((a) => /^-[a-z]+$/.test(a) && a.includes('c'));
-    return at >= 0 && args[at + 1] != null ? { text: args[at + 1], dialect: 'bash' } : null;
-  }
-  if (POWERSHELLS.has(program)) {
-    const flagAt = (re) => args.findIndex((a) => re.test(a));
-    const enc = flagAt(/^-(?:e|ec|enc|encodedcommand)$/i);
-    if (enc >= 0 && args[enc + 1]) return { text: Buffer.from(args[enc + 1], 'base64').toString('utf16le'), dialect: 'powershell' };
-    const file = flagAt(/^-(?:f|file)$/i);
-    if (file >= 0 && args[file + 1]) {
-      let body = null;
-      try { body = fs.readFileSync(path.resolve(dir, args[file + 1]), 'utf8'); } catch { /* an unreadable script runs nothing we can see */ }
-      return body == null ? {} : { text: body, dialect: 'powershell' };
-    }
-    const c = flagAt(/^-(?:c|command)$/i);
-    if (c >= 0) return { text: args.slice(c + 1).join(' '), dialect: 'powershell' };
-    const bare = args.filter((a) => !a.startsWith('-'));
-    return bare.length ? { text: bare.join(' '), dialect: 'powershell' } : null;
-  }
-  if (program === 'cmd') {
-    // Git Bash spells cmd's switch //c (MSYS would rewrite a single /c as a path).
-    const at = args.findIndex((a) => /^\/\/?[ck]$/i.test(a));
-    return at >= 0 ? { text: args.slice(at + 1).join(' '), dialect: 'cmd' } : null;
-  }
+  if (SHELLS.has(program)) return shellInner(args);
+  if (POWERSHELLS.has(program)) return powershellInner(args, dir);
+  if (program === 'cmd') return cmdInner(args);
   return null;
 };
 
@@ -234,50 +255,74 @@ const wrappedInner = (program, args, dir) => {
  * (bash -c, powershell -Command/-EncodedCommand/-File, cmd /c, env, xargs, npx/bunx, command/exec/...), leading VAR=value and
  * export/$env: assignments applied to the commands after them, and cd/Set-Location/pushd moving the cwd.
  */
+const leadingAssignments = (words) => {
+  const local = {};
+  while (words.length && ASSIGNMENT.test(words[0])) { const [, key, value] = ASSIGNMENT.exec(words[0]); local[key] = value; words.shift(); }
+  return local;
+};
+
+const recordEnvironmentCommand = (program, words, state) => {
+  if (program !== 'export' && program !== 'set') return false;
+  if (words.length === 1 || (words.length === 2 && words[1] === '-p'))
+    state.out.push({ program, args: words.slice(1), cwd: state.dir, env: state.scopeEnv, word: words[0], dialect: state.dialect });
+  for (const argument of words.slice(1)) {
+    const assignment = ASSIGNMENT.exec(argument);
+    if (assignment) state.scopeEnv[assignment[1]] = assignment[2];
+  }
+  return true;
+};
+
+const unwrapCommandWrappers = (words, program, cmdEnv, state) => {
+  for (let guard = 0; guard < 6; guard += 1) {
+    if (PREFIX_PROGRAMS.has(program)) words = unPrefix(words);
+    else if (program === 'env') {
+      const envWord = words[0];
+      words = unEnv(words, cmdEnv);
+      // `env` and `env -u NAME` with no command to run print the whole environment: they stay a command for ENV_DUMP.
+      if (!words.length) state.out.push({ program: 'env', args: [], cwd: state.dir, env: cmdEnv, word: envWord, dialect: state.dialect });
+    } else if (program === 'xargs') words = unXargs(words);
+    else if (program === 'npx' || program === 'bunx' || program === 'corepack') words = unRun(words);
+    else break;
+    if (!words.length) break;
+    program = programOf(words[0]);
+  }
+  return { words, program };
+};
+
+const changeDirectory = (program, args, state) => {
+  if (!CD_PROGRAMS.has(program)) return false;
+  // cmd's `cd /d <dir>` switches the drive too: /d is a switch there, not the target.
+  const target = args.find((a) => !a.startsWith('-') && !(state.dialect === 'cmd' && /^\/d$/i.test(a)));
+  if (target) state.dir = path.resolve(state.dir, target);
+  return true;
+};
+
+const openWrapper = (program, args, cmdEnv, state) => {
+  const inner = wrappedInner(program, args, state.dir);
+  if (!inner) return false;
+  if (inner.text != null) state.out.push(...commandsOf(inner.text, { cwd: state.dir, env: cmdEnv, dialect: inner.dialect, depth: state.depth + 1 }));
+  return true;
+};
+
+const processWords = (sourceWords, state) => {
+  let words = [...sourceWords];
+  const local = leadingAssignments(words);
+  if (!words.length) { Object.assign(state.scopeEnv, local); return; }
+  let program = programOf(words[0]);
+  if (recordEnvironmentCommand(program, words, state)) return;
+  const cmdEnv = { ...state.scopeEnv, ...local };
+  ({ words, program } = unwrapCommandWrappers(words, program, cmdEnv, state));
+  if (!words.length) return;
+  const args = words.slice(1);
+  if (changeDirectory(program, args, state)) return;
+  if (openWrapper(program, args, cmdEnv, state)) return;
+  state.out.push({ program, args, cwd: state.dir, env: cmdEnv, word: words[0], dialect: state.dialect });
+};
+
 export function commandsOf(text, { cwd, env = process.env, dialect = 'bash', depth = 0 } = {}) {
   const out = [];
   if (depth > 4) return out;
-  let dir = cwd;
-  const scopeEnv = { ...env };
-  for (const words of simpleCommands(text, { dialect, env: scopeEnv })) {
-    let w = [...words];
-    const local = {};
-    while (w.length && ASSIGNMENT.test(w[0])) { const [, k, v] = ASSIGNMENT.exec(w[0]); local[k] = v; w.shift(); }
-    if (!w.length) { Object.assign(scopeEnv, local); continue; }
-    let program = programOf(w[0]);
-    if (program === 'export' || program === 'set') {
-      if (w.length === 1 || (w.length === 2 && w[1] === '-p')) out.push({ program, args: w.slice(1), cwd: dir, env: scopeEnv, word: w[0], dialect });
-      for (const a of w.slice(1)) { const m = ASSIGNMENT.exec(a); if (m) { scopeEnv[m[1]] = m[2]; } }
-      continue;
-    }
-    const cmdEnv = { ...scopeEnv, ...local };
-    for (let guard = 0; guard < 6; guard += 1) {
-      if (PREFIX_PROGRAMS.has(program)) w = unPrefix(w);
-      else if (program === 'env') {
-        const envWord = w[0];
-        w = unEnv(w, cmdEnv);
-        // `env` and `env -u NAME` with no command to run print the whole environment: they stay a command for ENV_DUMP.
-        if (!w.length) out.push({ program: 'env', args: [], cwd: dir, env: cmdEnv, word: envWord, dialect });
-      } else if (program === 'xargs') w = unXargs(w);
-      else if (program === 'npx' || program === 'bunx' || program === 'corepack') w = unRun(w);
-      else break;
-      if (!w.length) break;
-      program = programOf(w[0]);
-    }
-    if (!w.length) continue;
-    const args = w.slice(1);
-    if (CD_PROGRAMS.has(program)) {
-      // cmd's `cd /d <dir>` switches the drive too: /d is a switch there, not the target.
-      const target = args.find((a) => !a.startsWith('-') && !(dialect === 'cmd' && /^\/d$/i.test(a)));
-      if (target) dir = path.resolve(dir, target);
-      continue;
-    }
-    const inner = wrappedInner(program, args, dir);
-    if (inner) {
-      if (inner.text != null) out.push(...commandsOf(inner.text, { cwd: dir, env: cmdEnv, dialect: inner.dialect, depth: depth + 1 }));
-      continue;
-    }
-    out.push({ program, args, cwd: dir, env: cmdEnv, word: w[0], dialect });
-  }
+  const state = { dir: cwd, scopeEnv: { ...env }, out, dialect, depth };
+  for (const words of simpleCommands(text, { dialect, env: state.scopeEnv })) processWords(words, state);
   return out;
 }

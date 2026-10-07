@@ -2,10 +2,10 @@ import path from 'node:path';
 import { isInside } from './config.mjs';
 import { referencedExports, relativePath, unwrapExpression } from './typescript.mjs';
 import { anyDescendant, commonJsRequireReasons, constructedDecoratorKind as sharedConstructedDecoratorKind, decoratorCallee, moduleExportsOf, nodeDecorators, normalizedSymbol, normalizedSymbolValue, programSourcesOf, selectedNode, valueSymbol, violation } from './ast-walks.mjs';
-import { sourceLocation } from '../../lib/ts-ast.mjs';
 import { byCodeUnit } from '../../lib/list.mjs';
+import { canonical, checkInjectedClass, checkMessageReadonly, hasModifier, isPublicMember, messageClass, modifiers, READONLY_BOUNDARY_RULE_ID } from './contracts-readonly.mjs';
 export const PUBLIC_CONTRACT_RULE_ID = 'BE_PUBLIC_CONTRACT_FORM';
-export const READONLY_BOUNDARY_RULE_ID = 'BE_READONLY_BOUNDARY';
+export { READONLY_BOUNDARY_RULE_ID };
 
 const FRAMEWORK_EXPORTS = new Map([
   ['@nestjs/common', new Set(['Controller', 'Inject', 'Injectable', 'Module'])],
@@ -16,12 +16,6 @@ const NEST_CREATED = new Set(['CommandHandler', 'Controller', 'Injectable', 'Que
 const MESSAGE_HANDLERS = new Set(['CommandHandler', 'QueryHandler']);
 const NON_API_SOURCE_ROLES = new Set(['config', 'configuration', 'constants', 'main', 'module', 'module-definition', 'providers']);
 const SOURCE_EXTENSION = /\.[cm]?[jt]sx?$/i;
-
-function canonical(file) {
-  return path.resolve(file);
-}
-
-
 
 function frameworkKindForSymbol(symbol, targets) {
   const selected = targets.get(symbol);
@@ -43,23 +37,28 @@ const FRAMEWORK_TRACE = {
   shorthandOf: (ts, checker, target, targets) => frameworkKindForSymbol(target, targets),
 };
 
+function addFrameworkTargets(config, context, checker, sourceFile, statement, bySymbol, reasons) {
+  const bound = moduleExportsOf(context.ts, checker, statement);
+  if (!bound || !FRAMEWORK_EXPORTS.has(bound.specifier)) return;
+  if (!bound.symbol) {
+    reasons.push(`${relativePath(config.root, sourceFile.fileName)} cannot resolve ${bound.specifier}`);
+    return;
+  }
+  for (const name of referencedExports(context.ts, statement, FRAMEWORK_EXPORTS.get(bound.specifier))) {
+    const target = bound.exports.get(name);
+    if (target) bySymbol.set(target, name);
+    else reasons.push(`${relativePath(config.root, sourceFile.fileName)} cannot resolve ${name} from ${bound.specifier}`);
+  }
+}
+
 function frameworkTargets(config, context, checker, localFiles) {
   const bySymbol = new Map();
   const reasons = [];
   const files = programSourcesOf(context, checker, localFiles, { root: config.root });
   if (!files) return { bySymbol, reasons: ['a TypeScript program checker could not be associated with its source'] };
   for (const sourceFile of files) {
-    for (const statement of sourceFile.statements) {
-      const bound = moduleExportsOf(context.ts, checker, statement);
-      if (!bound || !FRAMEWORK_EXPORTS.has(bound.specifier)) continue;
-      if (!bound.symbol) { reasons.push(`${relativePath(config.root, sourceFile.fileName)} cannot resolve ${bound.specifier}`); continue; }
-      for (const name of referencedExports(context.ts, statement, FRAMEWORK_EXPORTS.get(bound.specifier))) {
-        const target = bound.exports.get(name);
-        if (target) bySymbol.set(target, name);
-        else reasons.push(`${relativePath(config.root, sourceFile.fileName)} cannot resolve ${name} from ${bound.specifier}`);
-      }
-    }
-    commonJsRequireReasons(context.ts, checker, sourceFile, (specifier) => FRAMEWORK_EXPORTS.has(specifier),
+    for (const statement of sourceFile.statements) addFrameworkTargets(config, context, checker, sourceFile, statement, bySymbol, reasons);
+    commonJsRequireReasons(context.ts, checker, sourceFile, specifier => FRAMEWORK_EXPORTS.has(specifier),
       reasons, relativePath(config.root, sourceFile.fileName), 'binding whose contract role cannot be proved');
   }
   return { bySymbol, reasons };
@@ -73,24 +72,6 @@ function decoratorKind(ts, checker, decorator, targets) {
 const constructedDecoratorKind = (ts, checker, decorator, targets) =>
   sharedConstructedDecoratorKind(ts, checker, decorator, targets, FRAMEWORK_TRACE);
 
-function modifiers(ts, node) {
-  return ts.canHaveModifiers(node) ? ts.getModifiers(node) ?? [] : node.modifiers ?? [];
-}
-
-function hasModifier(ts, node, kind) {
-  return modifiers(ts, node).some(modifier => modifier.kind === kind);
-}
-
-function isPublicMember(ts, node) {
-  return !hasModifier(ts, node, ts.SyntaxKind.PrivateKeyword) && !hasModifier(ts, node, ts.SyntaxKind.ProtectedKeyword);
-}
-
-function readonlyMember(ts, node) {
-  return hasModifier(ts, node, ts.SyntaxKind.ReadonlyKeyword);
-}
-
-
-
 function sourceRole(sourceFile) {
   const normalized = sourceFile.fileName.replaceAll('\\', '/');
   const base = path.basename(sourceFile.fileName).replace(SOURCE_EXTENSION, '').toLowerCase();
@@ -102,7 +83,7 @@ function sourceRole(sourceFile) {
 function isFrameworkHelper(sourceFile, declaration, framework) {
   const role = sourceRole(sourceFile);
   if (role.transport || NON_API_SOURCE_ROLES.has(role.role) || NON_API_SOURCE_ROLES.has(role.base)) return true;
-  if (declaration?.name && /Module$/.test(declaration.name.text ?? '')) {
+  if (declaration?.name && (declaration.name.text ?? '').endsWith('Module')) {
     return nodeDecorators(framework.ts, declaration).some(decorator => decoratorKind(framework.ts, framework.checker, decorator, framework.targets) === 'Module');
   }
   return false;
@@ -115,35 +96,65 @@ function builtinSymbol(ts, symbol, name) {
     && /(?:^|[/\\])lib\.[^/\\]+\.d\.ts$/i.test(declaration.getSourceFile().fileName));
 }
 
+function typeReferenceStatus(ts, checker, node, seen, depth) {
+  const symbol = normalizedSymbol(ts, checker, node.typeName);
+  if (!symbol) return 'unavailable';
+  if (builtinSymbol(ts, symbol, 'Promise') || builtinSymbol(ts, symbol, 'Readonly') || builtinSymbol(ts, symbol, 'Awaited')
+    || builtinSymbol(ts, symbol, 'Array') || builtinSymbol(ts, symbol, 'ReadonlyArray')) {
+    return node.typeArguments?.length === 1 ? contractTypeStatus(ts, checker, node.typeArguments[0], seen, depth + 1) : 'unavailable';
+  }
+  if (builtinSymbol(ts, symbol, 'Record') || builtinSymbol(ts, symbol, 'Partial') || builtinSymbol(ts, symbol, 'Pick')
+    || builtinSymbol(ts, symbol, 'Omit') || builtinSymbol(ts, symbol, 'Required')) return 'inline';
+  const declarations = symbol.getDeclarations?.() ?? [];
+  if (!declarations.length) return 'unavailable';
+  return declarations.every(declaration => ts.isTypeParameterDeclaration(declaration)
+    || ts.isInterfaceDeclaration(declaration) || ts.isTypeAliasDeclaration(declaration)
+    || ts.isClassDeclaration(declaration) || ts.isEnumDeclaration(declaration)) ? 'named' : 'unavailable';
+}
+
+function isInlineContractType(ts, node) {
+  return ts.isTypeLiteralNode(node) || ts.isMappedTypeNode(node) || ts.isUnionTypeNode(node)
+    || ts.isIntersectionTypeNode(node) || ts.isTupleTypeNode(node) || ts.isFunctionTypeNode(node);
+}
+
+function isUnavailableContractType(ts, node) {
+  return ts.isConditionalTypeNode(node) || ts.isIndexedAccessTypeNode(node) || ts.isInferTypeNode(node)
+    || ts.isTypeQueryNode(node) || ts.isImportTypeNode(node);
+}
+
 function contractTypeStatus(ts, checker, node, seen = new Set(), depth = 0) {
   if (!node || depth > 12) return 'unavailable';
   if (ts.isParenthesizedTypeNode(node)) return contractTypeStatus(ts, checker, node.type, seen, depth + 1);
   if (ts.isTypeOperatorNode(node) && node.operator === ts.SyntaxKind.ReadonlyKeyword) {
     return contractTypeStatus(ts, checker, node.type, seen, depth + 1);
   }
-  if (ts.isTypeReferenceNode(node)) {
-    const symbol = normalizedSymbol(ts, checker, node.typeName);
-    if (!symbol) return 'unavailable';
-    if (builtinSymbol(ts, symbol, 'Promise') || builtinSymbol(ts, symbol, 'Readonly') || builtinSymbol(ts, symbol, 'Awaited')) {
-      return node.typeArguments?.length === 1 ? contractTypeStatus(ts, checker, node.typeArguments[0], seen, depth + 1) : 'unavailable';
-    }
-    if (builtinSymbol(ts, symbol, 'Array') || builtinSymbol(ts, symbol, 'ReadonlyArray')) {
-      return node.typeArguments?.length === 1 ? contractTypeStatus(ts, checker, node.typeArguments[0], seen, depth + 1) : 'unavailable';
-    }
-    if (builtinSymbol(ts, symbol, 'Record') || builtinSymbol(ts, symbol, 'Partial') || builtinSymbol(ts, symbol, 'Pick')
-      || builtinSymbol(ts, symbol, 'Omit') || builtinSymbol(ts, symbol, 'Required')) return 'inline';
-    const declarations = symbol.getDeclarations?.() ?? [];
-    if (!declarations.length) return 'unavailable';
-    return declarations.every(declaration => ts.isTypeParameterDeclaration(declaration)
-      || ts.isInterfaceDeclaration(declaration) || ts.isTypeAliasDeclaration(declaration)
-      || ts.isClassDeclaration(declaration) || ts.isEnumDeclaration(declaration)) ? 'named' : 'unavailable';
-  }
+  if (ts.isTypeReferenceNode(node)) return typeReferenceStatus(ts, checker, node, seen, depth);
   if (ts.isArrayTypeNode(node)) return contractTypeStatus(ts, checker, node.elementType, seen, depth + 1);
-  if (ts.isTypeLiteralNode(node) || ts.isMappedTypeNode(node) || ts.isUnionTypeNode(node)
-    || ts.isIntersectionTypeNode(node) || ts.isTupleTypeNode(node) || ts.isFunctionTypeNode(node)) return 'inline';
-  if (ts.isConditionalTypeNode(node) || ts.isIndexedAccessTypeNode(node) || ts.isInferTypeNode(node)
-    || ts.isTypeQueryNode(node) || ts.isImportTypeNode(node)) return 'unavailable';
+  if (isInlineContractType(ts, node)) return 'inline';
+  if (isUnavailableContractType(ts, node)) return 'unavailable';
   return 'scalar';
+}
+
+function wrappedTypeStatus(ts, checker, type, named, nextSeen, depth) {
+  for (const wrapper of ['Promise', 'Readonly', 'Awaited', 'Array', 'ReadonlyArray']) if (builtinSymbol(ts, named, wrapper)) {
+    const argumentsList = type.aliasTypeArguments ?? (checker.getTypeArguments && (type.objectFlags & ts.ObjectFlags.Reference)
+      ? checker.getTypeArguments(type) : type.typeArguments) ?? [];
+    return argumentsList.length === 1 ? contractTypeStatusFromType(ts, checker, argumentsList[0], nextSeen, depth + 1) : 'unavailable';
+  }
+  for (const anonymous of ['Record', 'Partial', 'Pick', 'Omit', 'Required']) if (builtinSymbol(ts, named, anonymous)) return 'inline';
+  return null;
+}
+
+function objectContractTypeStatus(ts, checker, type, nextSeen, depth) {
+  if (checker.isTupleType?.(type)) return 'inline';
+  if (checker.isArrayType?.(type)) {
+    const argumentsList = checker.getTypeArguments?.(type) ?? [];
+    return argumentsList.length === 1 ? contractTypeStatusFromType(ts, checker, argumentsList[0], nextSeen, depth + 1) : 'unavailable';
+  }
+  const declarations = type.symbol?.getDeclarations?.() ?? [];
+  if (type.symbol && !type.symbol.getName().startsWith('__') && declarations.some(declaration => ts.isInterfaceDeclaration(declaration)
+    || ts.isClassDeclaration(declaration) || ts.isTypeAliasDeclaration(declaration) || ts.isEnumDeclaration(declaration))) return 'named';
+  return 'inline';
 }
 
 function contractTypeStatusFromType(ts, checker, type, seen = new Set(), depth = 0) {
@@ -151,28 +162,14 @@ function contractTypeStatusFromType(ts, checker, type, seen = new Set(), depth =
   if (type.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) return 'unavailable';
   const nextSeen = new Set(seen).add(type);
   const named = type.aliasSymbol ?? type.symbol ?? null;
-  for (const wrapper of ['Promise', 'Readonly', 'Awaited', 'Array', 'ReadonlyArray']) if (builtinSymbol(ts, named, wrapper)) {
-    const argumentsList = type.aliasTypeArguments ?? (checker.getTypeArguments && (type.objectFlags & ts.ObjectFlags.Reference)
-      ? checker.getTypeArguments(type) : type.typeArguments) ?? [];
-    return argumentsList.length === 1 ? contractTypeStatusFromType(ts, checker, argumentsList[0], nextSeen, depth + 1) : 'unavailable';
-  }
-  for (const anonymous of ['Record', 'Partial', 'Pick', 'Omit', 'Required']) if (builtinSymbol(ts, named, anonymous)) return 'inline';
+  const wrapperStatus = wrappedTypeStatus(ts, checker, type, named, nextSeen, depth);
+  if (wrapperStatus !== null) return wrapperStatus;
   if (type.aliasSymbol) return 'named';
   if ((type.symbol?.getDeclarations?.() ?? []).some(declaration => ts.isEnumDeclaration(declaration))) return 'named';
   if (type.flags & ts.TypeFlags.TypeParameter) return 'named';
   if (type.flags & ts.TypeFlags.Boolean) return 'scalar';
   if (type.flags & (ts.TypeFlags.Union | ts.TypeFlags.Intersection)) return 'inline';
-  if (type.flags & ts.TypeFlags.Object) {
-    if (checker.isTupleType?.(type)) return 'inline';
-    if (checker.isArrayType?.(type)) {
-      const argumentsList = checker.getTypeArguments?.(type) ?? [];
-      return argumentsList.length === 1 ? contractTypeStatusFromType(ts, checker, argumentsList[0], nextSeen, depth + 1) : 'unavailable';
-    }
-    const declarations = type.symbol?.getDeclarations?.() ?? [];
-    if (type.symbol && !type.symbol.getName().startsWith('__') && declarations.some(declaration => ts.isInterfaceDeclaration(declaration)
-      || ts.isClassDeclaration(declaration) || ts.isTypeAliasDeclaration(declaration) || ts.isEnumDeclaration(declaration))) return 'named';
-    return 'inline';
-  }
+  if (type.flags & ts.TypeFlags.Object) return objectContractTypeStatus(ts, checker, type, nextSeen, depth);
   if (type.flags & (ts.TypeFlags.Conditional | ts.TypeFlags.IndexedAccess | ts.TypeFlags.Substitution)) return 'unavailable';
   return 'scalar';
 }
@@ -184,9 +181,19 @@ function callableSignatures(ts, symbol, checker, location) {
   return bodyless.length ? bodyless : signatures.filter(signature => signature.getDeclaration());
 }
 
-function checkSignature(config, context, checker, signature, location, reportSource, reportNode, displayName, violations, reasons) {
+function signatureParameterStatus(ts, checker, signature, location, parameter, signatureIndex) {
+  const parameterSymbol = signature.getParameters()[signatureIndex];
+  const actual = parameterSymbol ? checker.getTypeOfSymbolAtLocation(parameterSymbol, location) : null;
+  if (actual && parameter.questionToken && !ts.isUnionTypeNode(parameter.type) && (actual.flags & ts.TypeFlags.Union)) {
+    const selected = actual.types.filter(type => !(type.flags & ts.TypeFlags.Undefined));
+    return selected.length === 1 ? contractTypeStatusFromType(ts, checker, selected[0]) : 'inline';
+  }
+  return actual ? contractTypeStatusFromType(ts, checker, actual) : contractTypeStatus(ts, checker, parameter.type);
+}
+
+function checkSignatureInputs(state, declaration) {
+  const { config, context, checker, signature, location, reportSource, reportNode, displayName, violations, reasons } = state;
   const ts = context.ts;
-  const declaration = signature.getDeclaration();
   let signatureIndex = 0;
   for (let index = 0; index < (declaration.parameters?.length ?? 0); index += 1) {
     const parameter = declaration.parameters[index];
@@ -197,18 +204,17 @@ function checkSignature(config, context, checker, signature, location, reportSou
       signatureIndex += 1;
       continue;
     }
-    const parameterSymbol = signature.getParameters()[signatureIndex];
+    const status = signatureParameterStatus(ts, checker, signature, location, parameter, signatureIndex);
     signatureIndex += 1;
-    const actual = parameterSymbol ? checker.getTypeOfSymbolAtLocation(parameterSymbol, location) : null;
-    let status;
-    if (actual && parameter.questionToken && !ts.isUnionTypeNode(parameter.type) && (actual.flags & ts.TypeFlags.Union)) {
-      const selected = actual.types.filter(type => !(type.flags & ts.TypeFlags.Undefined));
-      status = selected.length === 1 ? contractTypeStatusFromType(ts, checker, selected[0]) : 'inline';
-    } else status = actual ? contractTypeStatusFromType(ts, checker, actual) : contractTypeStatus(ts, checker, parameter.type);
     if (status === 'inline') violations.push(violation(config, reportSource, reportNode ?? parameter.type, PUBLIC_CONTRACT_RULE_ID,
       `${displayName} uses an inline object/union input; expose a named contract or a positional primitive.`));
     else if (status === 'unavailable') reasons.push(`${relativePath(config.root, reportSource.fileName)} cannot prove the public input type of ${displayName}`);
   }
+}
+
+function checkSignatureOutput(state, declaration) {
+  const { config, context, checker, signature, reportSource, reportNode, displayName, violations, reasons } = state;
+  const ts = context.ts;
   if (!declaration.type) {
     violations.push(violation(config, reportSource, reportNode ?? declaration, PUBLIC_CONTRACT_RULE_ID,
       `${displayName} must declare an explicit public output type.`));
@@ -219,6 +225,12 @@ function checkSignature(config, context, checker, signature, location, reportSou
   if (status === 'inline') violations.push(violation(config, reportSource, reportNode ?? declaration.type, PUBLIC_CONTRACT_RULE_ID,
     `${displayName} uses an inline object/union output; expose a named result contract or a primitive.`));
   else if (status === 'unavailable') reasons.push(`${relativePath(config.root, reportSource.fileName)} cannot prove the public output type of ${displayName}`);
+}
+
+function checkSignature(state) {
+  const declaration = state.signature.getDeclaration();
+  checkSignatureInputs(state, declaration);
+  checkSignatureOutput(state, declaration);
 }
 
 function symbolName(symbol) {
@@ -258,7 +270,7 @@ function exportedSymbols(ts, checker, sourceFile) {
   return moduleSymbol ? checker.getExportsOfModule(moduleSymbol).map(symbol => normalizedSymbolValue(ts, checker, symbol)).filter(Boolean) : [];
 }
 
-function checkCallableSymbol(config, context, checker, symbol, location, reportSource, reportNode, violations, reasons, seen, localFiles) {
+function checkCallableSymbol({ config, context, checker, symbol, location, reportSource, reportNode, violations, reasons, seen, localFiles }) {
   if (seen.has(symbol)) return 0;
   seen.add(symbol);
   let checked = 0;
@@ -272,295 +284,25 @@ function checkCallableSymbol(config, context, checker, symbol, location, reportS
     }
     for (const signature of signatures) {
       checked += 1;
-      checkSignature(config, context, checker, signature, location, reportSource, reportNode,
-        callable === symbol ? symbolName(symbol) : `${symbolName(symbol)}.${symbolName(callable)}`,
-        violations, reasons);
+      checkSignature({ config, context, checker, signature, location, reportSource, reportNode,
+        displayName: callable === symbol ? symbolName(symbol) : `${symbolName(symbol)}.${symbolName(callable)}`,
+        violations, reasons });
     }
   }
   return checked;
 }
 
-function propertyName(ts, node) {
-  const name = node.name;
-  if (ts.isIdentifier(name) || ts.isStringLiteralLike(name) || ts.isPrivateIdentifier(name)) return name.text;
-  return null;
-}
-
-function thisOriginStatus(ts, checker, expression, seen = new Set(), depth = 0) {
-  if (!expression || depth > 8) return 'no';
-  expression = unwrapExpression(ts, expression);
-  if (expression.kind === ts.SyntaxKind.ThisKeyword) return 'yes';
-  const symbol = normalizedSymbol(ts, checker, expression);
-  if (!symbol || seen.has(symbol)) return 'no';
-  const declarations = symbol.getDeclarations?.() ?? [];
-  if (declarations.length !== 1 || !ts.isVariableDeclaration(declarations[0]) || !declarations[0].initializer) return 'no';
-  const origin = thisOriginStatus(ts, checker, declarations[0].initializer, new Set(seen).add(symbol), depth + 1);
-  if (origin === 'no') return 'no';
-  return (ts.getCombinedNodeFlags(declarations[0].parent) & ts.NodeFlags.Const) ? origin : 'unavailable';
-}
-
-function instanceAssignmentTarget(ts, checker, expression) {
-  expression = unwrapExpression(ts, expression);
-  if (!ts.isPropertyAccessExpression(expression) && !ts.isElementAccessExpression(expression)) return { instance: false };
-  const owner = thisOriginStatus(ts, checker, expression.expression);
-  if (owner === 'no') return { instance: false };
-  if (owner === 'unavailable') return { instance: true, name: null, supported: false };
-  if (ts.isPropertyAccessExpression(expression)) return { instance: true, name: expression.name.text, supported: true };
-  if (ts.isStringLiteralLike(expression.argumentExpression)) return { instance: true, name: expression.argumentExpression.text, supported: true };
-  return { instance: true, name: null, supported: false };
-}
-
-function expressionOrigin(ts, checker, expression, seen = new Set(), depth = 0) {
-  if (!expression || depth > 8) return null;
-  expression = unwrapExpression(ts, expression);
-  const shorthand = ts.isShorthandPropertyAssignment(expression) ? checker.getShorthandAssignmentValueSymbol?.(expression) : null;
-  const symbol = normalizedSymbolValue(ts, checker, shorthand) ?? normalizedSymbol(ts, checker, expression);
-  if (!symbol || seen.has(symbol)) return symbol;
-  const declarations = symbol.getDeclarations?.() ?? [];
-  if (declarations.length === 1 && ts.isVariableDeclaration(declarations[0]) && declarations[0].initializer
-    && (ts.getCombinedNodeFlags(declarations[0].parent) & ts.NodeFlags.Const)) {
-    return expressionOrigin(ts, checker, declarations[0].initializer, new Set(seen).add(symbol), depth + 1);
+function frameworkFor(state, checker) {
+  if (!state.frameworkByChecker.has(checker)) {
+    const selected = frameworkTargets(state.config, state.context, checker, state.localFiles);
+    state.frameworkByChecker.set(checker, { ...selected, ts: state.ts, checker, targets: selected.bySymbol });
+    state.readonlyReasons.push(...selected.reasons);
   }
-  return symbol;
+  return state.frameworkByChecker.get(checker);
 }
 
-const expressionReferencesOrigin = (ts, checker, expression, expected) =>
-  anyDescendant(ts, expression, (node) => expressionOrigin(ts, checker, node) === expected);
-
-function isSafePrimitiveProjection(ts, checker, expression, expected) {
-  expression = unwrapExpression(ts, expression);
-  if (!ts.isPropertyAccessExpression(expression) && !ts.isElementAccessExpression(expression)) return false;
-  if (expressionOrigin(ts, checker, expression.expression) !== expected) return false;
-  const type = checker.getTypeAtLocation(expression);
-  const primitive = ts.TypeFlags.StringLike | ts.TypeFlags.NumberLike | ts.TypeFlags.BooleanLike
-    | ts.TypeFlags.BigIntLike | ts.TypeFlags.ESSymbolLike | ts.TypeFlags.Null | ts.TypeFlags.Undefined
-    | ts.TypeFlags.Void | ts.TypeFlags.Never;
-  return Boolean(type.flags & primitive) && !(type.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown));
-}
-
-function assignmentPatternHasInstanceTarget(ts, checker, expression) {
-  let found = false;
-  const visit = node => {
-    if (found) return;
-    const target = instanceAssignmentTarget(ts, checker, node);
-    if (target.instance) {
-      found = true;
-      return;
-    }
-    ts.forEachChild(node, visit);
-  };
-  visit(expression);
-  return found;
-}
-
-function globalLibraryIdentifier(ts, checker, node, expected) {
-  if (!ts.isIdentifier(node) || node.text !== expected) return false;
-  const symbol = normalizedSymbol(ts, checker, node);
-  const declarations = symbol?.getDeclarations?.() ?? [];
-  return declarations.length > 0 && declarations.every(declaration => declaration.getSourceFile().isDeclarationFile
-    && /(?:^|[/\\])lib\.[^/\\]+\.d\.ts$/i.test(declaration.getSourceFile().fileName));
-}
-
-function instanceMutationCall(ts, checker, node) {
-  if (!ts.isCallExpression(node) || !ts.isPropertyAccessExpression(node.expression)) return null;
-  const owner = node.expression.expression;
-  const method = node.expression.name.text;
-  const known = (method === 'assign' || method === 'defineProperty') && globalLibraryIdentifier(ts, checker, owner, 'Object')
-    || method === 'set' && globalLibraryIdentifier(ts, checker, owner, 'Reflect');
-  if (!known || thisOriginStatus(ts, checker, node.arguments[0]) === 'no') return null;
-  return { node, values: node.arguments.slice(method === 'assign' ? 1 : 2) };
-}
-
-function constructorAssignments(ts, checker, constructor, parameter) {
-  if (!constructor.body) return [];
-  const parameterSymbol = normalizedSymbol(ts, checker, parameter.name);
-  const assignments = [];
-  const visit = node => {
-    if (node !== constructor.body && (ts.isFunctionDeclaration(node) || ts.isFunctionExpression(node)
-      || ts.isArrowFunction(node) || ts.isMethodDeclaration(node))) return;
-    if (ts.isBinaryExpression(node) && expressionReferencesOrigin(ts, checker, node.right, parameterSymbol)
-      && !isSafePrimitiveProjection(ts, checker, node.right, parameterSymbol)) {
-      const target = instanceAssignmentTarget(ts, checker, node.left);
-      if (target.instance) assignments.push({ node, name: target.name,
-        supported: target.supported && node.operatorToken.kind === ts.SyntaxKind.EqualsToken });
-      else if (assignmentPatternHasInstanceTarget(ts, checker, node.left)) assignments.push({ node, name: null, supported: false });
-      else ts.forEachChild(node, visit);
-    } else {
-      const mutation = instanceMutationCall(ts, checker, node);
-      if (mutation?.values.some(argument => expressionReferencesOrigin(ts, checker, argument, parameterSymbol))) {
-        assignments.push({ node, name: null, supported: false });
-      } else ts.forEachChild(node, visit);
-    }
-  };
-  visit(constructor.body);
-  return assignments;
-}
-
-function checkReadonlyProperty(config, context, sourceFile, node, label, violations) {
-  if (!readonlyMember(context.ts, node)) violations.push(violation(config, sourceFile, node.name ?? node, READONLY_BOUNDARY_RULE_ID,
-    `${label} must be readonly; execution state must not mutate an injected dependency or received message.`));
-}
-
-function classValuesForSymbol(ts, symbol, localFiles) {
-  return (symbol?.getDeclarations?.() ?? []).flatMap(declaration => {
-    if (ts.isClassDeclaration(declaration)) return [declaration];
-    if (ts.isVariableDeclaration(declaration) && declaration.initializer) {
-      const initializer = unwrapExpression(ts, declaration.initializer);
-      if (ts.isClassExpression(initializer)) return [initializer];
-    }
-    return [];
-  }).filter(declaration => localFiles.has(canonical(declaration.getSourceFile().fileName)));
-}
-
-function messageClass(config, context, checker, decorator, localFiles, reasons) {
-  const expression = decorator.expression;
-  if (!context.ts.isCallExpression(expression) || expression.arguments.length < 1) {
-    reasons.push(`${relativePath(config.root, decorator.getSourceFile().fileName)} has a handler decorator without a static message class`);
-    return null;
-  }
-  const symbol = valueSymbol(context.ts, checker, expression.arguments[0]);
-  const declarations = classValuesForSymbol(context.ts, symbol, localFiles);
-  if (declarations.length !== 1) {
-    reasons.push(`${relativePath(config.root, decorator.getSourceFile().fileName)} cannot resolve one local message class from its handler decorator`);
-    return null;
-  }
-  return declarations[0];
-}
-
-function checkMessageReadonly(config, context, checker, declaration, localFiles, violations, reasons) {
-  const ts = context.ts;
-  const visited = new Set();
-  const visitClass = selected => {
-    const key = `${canonical(selected.getSourceFile().fileName)}:${selected.pos}`;
-    if (visited.has(key)) return;
-    visited.add(key);
-    const sourceFile = selected.getSourceFile();
-    for (const member of selected.members) {
-      if (ts.isPropertyDeclaration(member) && !hasModifier(ts, member, ts.SyntaxKind.StaticKeyword)) {
-        checkReadonlyProperty(config, context, sourceFile, member, `Message field ${propertyName(ts, member) ?? '(computed)'}`, violations);
-      }
-      if (ts.isSetAccessorDeclaration(member)) violations.push(violation(config, sourceFile, member.name, READONLY_BOUNDARY_RULE_ID,
-        `Message field ${propertyName(ts, member) ?? '(computed)'} cannot expose a setter.`));
-      if (ts.isIndexSignatureDeclaration(member)) reasons.push(`${relativePath(config.root, sourceFile.fileName)} has a message index signature whose mutation boundary cannot be proved`);
-      if (ts.isConstructorDeclaration(member)) {
-        for (const parameter of member.parameters) if (modifiers(ts, parameter).some(modifier => [ts.SyntaxKind.PublicKeyword,
-          ts.SyntaxKind.PrivateKeyword, ts.SyntaxKind.ProtectedKeyword, ts.SyntaxKind.ReadonlyKeyword].includes(modifier.kind))) {
-          checkReadonlyProperty(config, context, sourceFile, parameter, `Message field ${propertyName(ts, parameter) ?? '(computed)'}`, violations);
-        }
-        const inspectAssign = node => {
-          if (node !== member.body && (ts.isFunctionDeclaration(node) || ts.isFunctionExpression(node) || ts.isArrowFunction(node))) return;
-          if (instanceMutationCall(ts, checker, node)) {
-            reasons.push(`${relativePath(config.root, sourceFile.fileName)} constructs message fields through an unsupported instance mutation`);
-          } else if (ts.isBinaryExpression(node) && assignmentPatternHasInstanceTarget(ts, checker, node.left)
-            && !instanceAssignmentTarget(ts, checker, node.left).supported) {
-            reasons.push(`${relativePath(config.root, sourceFile.fileName)} constructs message fields through an unsupported instance assignment`);
-          } else ts.forEachChild(node, inspectAssign);
-        };
-        if (member.body) inspectAssign(member.body);
-      }
-    }
-    const type = classInstanceType(ts, checker, selected);
-    for (const base of type && checker.getBaseTypes ? checker.getBaseTypes(type) : []) {
-      const declarations = (base.symbol?.getDeclarations?.() ?? []).filter(item => ts.isClassDeclaration(item)) ?? [];
-      if (declarations.length !== 1) {
-        reasons.push(`${relativePath(config.root, sourceFile.fileName)} inherits message fields from a class outside the checked production program`);
-      } else if (localFiles.has(canonical(declarations[0].getSourceFile().fileName))) visitClass(declarations[0]);
-      else if (classCarriesState(ts, declarations[0])) {
-        reasons.push(`${relativePath(config.root, sourceFile.fileName)} inherits message state from a class outside the checked production program`);
-      }
-    }
-  };
-  visitClass(declaration);
-}
-
-function classCarriesState(ts, declaration) {
-  return declaration.members.some(member => (ts.isPropertyDeclaration(member) && !hasModifier(ts, member, ts.SyntaxKind.StaticKeyword))
-    || ts.isSetAccessorDeclaration(member) || ts.isIndexSignatureDeclaration(member)
-    || (ts.isConstructorDeclaration(member) && member.parameters.length > 0));
-}
-
-function classInstanceType(ts, checker, declaration) {
-  const symbol = declaration.name ? normalizedSymbol(ts, checker, declaration.name) : null;
-  if (symbol && ts.isClassDeclaration(declaration)) return checker.getDeclaredTypeOfSymbol(symbol);
-  const value = checker.getTypeAtLocation(declaration);
-  const constructor = checker.getSignaturesOfType(value, ts.SignatureKind.Construct)[0];
-  return constructor ? checker.getReturnTypeOfSignature(constructor) : value;
-}
-
-function checkInjectedClass(config, context, checker, declaration, classKind, targets, localFiles, violations, reasons, visited = new Set()) {
-  const ts = context.ts;
-  const classKey = `${canonical(declaration.getSourceFile().fileName)}:${declaration.pos}`;
-  if (visited.has(classKey)) return;
-  visited.add(classKey);
-  const sourceFile = declaration.getSourceFile();
-  const properties = new Map(declaration.members.filter(member => ts.isPropertyDeclaration(member))
-    .map(member => [propertyName(ts, member), member]).filter(([name]) => name));
-  for (const member of declaration.members) {
-    if (ts.isPropertyDeclaration(member)) {
-      const injected = nodeDecorators(ts, member).some(decorator => decoratorKind(ts, checker, decorator, targets) === 'Inject');
-      if (injected) checkReadonlyProperty(config, context, sourceFile, member, `Injected property ${propertyName(ts, member) ?? '(computed)'}`, violations);
-      continue;
-    }
-    if (!ts.isConstructorDeclaration(member)) continue;
-    for (const parameter of member.parameters) {
-      const explicitInject = nodeDecorators(ts, parameter).some(decorator => decoratorKind(ts, checker, decorator, targets) === 'Inject');
-      if (!classKind && !explicitInject) continue;
-      const parameterProperty = modifiers(ts, parameter).some(modifier => [ts.SyntaxKind.PublicKeyword, ts.SyntaxKind.PrivateKeyword,
-        ts.SyntaxKind.ProtectedKeyword, ts.SyntaxKind.ReadonlyKeyword].includes(modifier.kind));
-      if (parameterProperty) {
-        checkReadonlyProperty(config, context, sourceFile, parameter, `Injected dependency ${propertyName(ts, parameter) ?? '(computed)'}`, violations);
-        continue;
-      }
-      for (const assignment of constructorAssignments(ts, checker, member, parameter)) {
-        if (!assignment.supported || !assignment.name) {
-          reasons.push(`${relativePath(config.root, sourceFile.fileName)}:${sourceLocation(sourceFile, assignment.node).line} stores an injected dependency through an unsupported instance assignment`);
-          continue;
-        }
-        const property = properties.get(assignment.name);
-        if (!property) reasons.push(`${relativePath(config.root, sourceFile.fileName)} assigns injected dependency ${assignment.name} without a declared field`);
-        else checkReadonlyProperty(config, context, sourceFile, property, `Injected dependency ${assignment.name}`, violations);
-      }
-    }
-  }
-  if (classKind) {
-    const type = classInstanceType(ts, checker, declaration);
-    for (const base of type && checker.getBaseTypes ? checker.getBaseTypes(type) : []) {
-      const declarations = (base.symbol?.getDeclarations?.() ?? []).filter(item => ts.isClassDeclaration(item)) ?? [];
-      if (declarations.length !== 1) {
-        reasons.push(`${relativePath(config.root, sourceFile.fileName)} inherits an injected constructor from a class outside the checked production program`);
-      } else if (localFiles.has(canonical(declarations[0].getSourceFile().fileName))) {
-        checkInjectedClass(config, context, checker, declarations[0], classKind, targets, localFiles, violations, reasons, visited);
-      } else if (classCarriesState(ts, declarations[0])) {
-        reasons.push(`${relativePath(config.root, sourceFile.fileName)} inherits an injected constructor from a class outside the checked production program`);
-      }
-    }
-  }
-}
-
-/** Enforce mechanically selected public contract and readonly boundaries without treating DTOs or arbitrary interfaces as APIs. */
-export function checkBackendContracts(config, context) {
-  const ts = context.ts;
-  const localFiles = new Set(context.files.map(file => canonical(file.fileName)));
-  const sourceFiles = new Map(context.files.map(file => [canonical(file.fileName), file]));
-  const frameworkByChecker = new Map();
-  const violations = [];
-  const publicReasons = [];
-  const readonlyReasons = [];
-  const publicSeen = new Set();
-  const messageSeen = new Set();
-  let callableSignatures = 0;
-  let injectedClasses = 0;
-  let messages = 0;
-
-  const frameworkFor = checker => {
-    if (!frameworkByChecker.has(checker)) {
-      const selected = frameworkTargets(config, context, checker, localFiles);
-      frameworkByChecker.set(checker, { ...selected, ts, checker, targets: selected.bySymbol });
-      readonlyReasons.push(...selected.reasons);
-    }
-    return frameworkByChecker.get(checker);
-  };
-
+function checkOwnerCoverage(state) {
+  const { config, context, publicReasons } = state;
   if (!config.owners?.length) publicReasons.push('no slot owner with an entry file exists, so capability API discovery has no owners to list');
   const ownerRoots = (config.owners ?? []).map(owner => path.resolve(config.root, ...owner.root.split('/')));
   const publicSourceRoots = [...config.backend.features, ...config.backend.modules].map(root => path.resolve(config.root, ...root.split('/')));
@@ -568,6 +310,10 @@ export function checkBackendContracts(config, context) {
     && !ownerRoots.some(root => isInside(root, sourceFile.fileName))) {
     publicReasons.push(`${relativePath(config.root, sourceFile.fileName)} is outside every declared owner root`);
   }
+}
+
+function checkPublicOwners(state) {
+  const { config, context, ts, sourceFiles, localFiles, publicReasons, violations, publicSeen } = state;
   if (config.owners) for (const owner of config.owners) {
     const entry = sourceFiles.get(canonical(path.resolve(config.root, ...owner.entry.split('/'))));
     if (!entry) {
@@ -575,7 +321,7 @@ export function checkBackendContracts(config, context) {
       continue;
     }
     const checker = context.checkerFor(entry.fileName);
-    const framework = frameworkFor(checker);
+    const framework = frameworkFor(state, checker);
     if (entry.statements.some(statement => ts.isExportAssignment(statement) && statement.isExportEquals)) {
       publicReasons.push(`${owner.entry} uses export =, so named capability API discovery is unavailable`);
     }
@@ -584,80 +330,128 @@ export function checkBackendContracts(config, context) {
       if (!declarations.length) continue;
       const representative = declarations[0];
       if (isFrameworkHelper(representative.getSourceFile(), representative, framework)) continue;
-      callableSignatures += checkCallableSymbol(config, context, checker, symbol, representative, representative.getSourceFile(), representative.name ?? representative,
-        violations, publicReasons, publicSeen, localFiles);
+      state.callableSignatures += checkCallableSymbol({ config, context, checker, symbol, location: representative,
+        reportSource: representative.getSourceFile(), reportNode: representative.name ?? representative,
+        violations, reasons: publicReasons, seen: publicSeen, localFiles });
     }
   }
+}
 
-  for (const sourceFile of context.files) {
-    const checker = context.checkerFor(sourceFile.fileName);
-    const framework = frameworkFor(checker);
-    const role = sourceRole(sourceFile);
-    const classes = [];
-    const collectClasses = node => {
-      if (ts.isClassDeclaration(node) || ts.isClassExpression(node)) classes.push(node);
-      ts.forEachChild(node, collectClasses);
-    };
-    collectClasses(sourceFile);
-    for (const statement of classes) {
-      const classDecorators = nodeDecorators(ts, statement);
-      const kindsByDecorator = classDecorators.map(decorator => decoratorKind(ts, checker, decorator, framework.targets));
-      const directKinds = kindsByDecorator.filter(Boolean);
-      for (const [index, decorator] of classDecorators.entries()) if (!kindsByDecorator[index]) {
-        const constructed = constructedDecoratorKind(ts, checker, decorator, framework.targets);
-        if (constructed && (NEST_CREATED.has(constructed) || MESSAGE_HANDLERS.has(constructed) || constructed.includes('framework'))) {
-          readonlyReasons.push(`${relativePath(config.root, sourceFile.fileName)} has a constructed ${constructed} decorator identity`);
-        }
-      }
-      const classKind = directKinds.find(kind => NEST_CREATED.has(kind)) ?? null;
-      for (const member of statement.members) for (const decorated of [member, ...(ts.isConstructorDeclaration(member) ? member.parameters : [])]) {
-        for (const decorator of nodeDecorators(ts, decorated)) if (!decoratorKind(ts, checker, decorator, framework.targets)) {
-          const constructed = constructedDecoratorKind(ts, checker, decorator, framework.targets);
-          if (constructed === 'Inject' || constructed === 'unproven framework') {
-            readonlyReasons.push(`${relativePath(config.root, sourceFile.fileName)} has a constructed ${constructed} injection decorator identity`);
-          }
-        }
-      }
-      const hasInjectedMember = statement.members.some(member => nodeDecorators(ts, member).some(decorator => decoratorKind(ts, checker, decorator, framework.targets) === 'Inject')
-        || (ts.isConstructorDeclaration(member) && member.parameters.some(parameter => nodeDecorators(ts, parameter)
-          .some(decorator => decoratorKind(ts, checker, decorator, framework.targets) === 'Inject'))));
-      if (classKind || hasInjectedMember) {
-        injectedClasses += 1;
-        checkInjectedClass(config, context, checker, statement, classKind, framework.targets, localFiles, violations, readonlyReasons);
-      }
-      for (let index = 0; index < classDecorators.length; index += 1) {
-        const kind = kindsByDecorator[index];
-        if (!MESSAGE_HANDLERS.has(kind)) continue;
-        const message = messageClass(config, context, checker, classDecorators[index], localFiles, readonlyReasons);
-        if (!message) continue;
-        const key = `${message.getSourceFile().fileName}:${message.pos}`;
-        if (messageSeen.has(key)) continue;
-        messageSeen.add(key);
-        messages += 1;
-        checkMessageReadonly(config, context, context.checkerFor(message.getSourceFile().fileName), message, localFiles, violations, readonlyReasons);
-      }
-      if (role.role === 'use-case' && !role.transport && ts.isClassDeclaration(statement) && statement.name) {
-        const exported = exportedSymbols(ts, checker, sourceFile).some(symbol => (symbol.getDeclarations?.() ?? []).includes(statement));
-        if (!exported) continue;
-        const classSymbol = normalizedSymbol(ts, checker, statement.name);
-        const instanceType = classSymbol ? checker.getDeclaredTypeOfSymbol(classSymbol) : null;
-        const execute = instanceType ? checker.getPropertyOfType(instanceType, 'execute') : null;
-        if (!execute) publicReasons.push(`${relativePath(config.root, sourceFile.fileName)} exports a use-case class without a statically resolved execute contract`);
-        else callableSignatures += checkCallableSymbol(config, context, checker, execute, statement, sourceFile, statement.name,
-          violations, publicReasons, publicSeen, localFiles);
+function classesInSource(ts, sourceFile) {
+  const classes = [];
+  const collect = node => {
+    if (ts.isClassDeclaration(node) || ts.isClassExpression(node)) classes.push(node);
+    ts.forEachChild(node, collect);
+  };
+  collect(sourceFile);
+  return classes;
+}
+
+function checkConstructedClassDecorators(state, sourceFile, checker, decorators, kinds, targets) {
+  for (const [index, decorator] of decorators.entries()) if (!kinds[index]) {
+    const constructed = constructedDecoratorKind(state.ts, checker, decorator, targets);
+    if (constructed && (NEST_CREATED.has(constructed) || MESSAGE_HANDLERS.has(constructed) || constructed.includes('framework'))) {
+      state.readonlyReasons.push(`${relativePath(state.config.root, sourceFile.fileName)} has a constructed ${constructed} decorator identity`);
+    }
+  }
+}
+
+function checkConstructedMemberDecorators(state, sourceFile, declaration, checker, targets) {
+  const { ts, config, readonlyReasons } = state;
+  for (const member of declaration.members) for (const decorated of [member, ...(ts.isConstructorDeclaration(member) ? member.parameters : [])]) {
+    for (const decorator of nodeDecorators(ts, decorated)) if (!decoratorKind(ts, checker, decorator, targets)) {
+      const constructed = constructedDecoratorKind(ts, checker, decorator, targets);
+      if (constructed === 'Inject' || constructed === 'unproven framework') {
+        readonlyReasons.push(`${relativePath(config.root, sourceFile.fileName)} has a constructed ${constructed} injection decorator identity`);
       }
     }
   }
+}
 
-  const publicDetails = [...new Set(publicReasons)].sort(byCodeUnit);
-  const readonlyDetails = [...new Set(readonlyReasons)].sort(byCodeUnit);
+function hasInjectedMember(ts, checker, declaration, targets) {
+  return declaration.members.some(member => nodeDecorators(ts, member).some(decorator => decoratorKind(ts, checker, decorator, targets) === 'Inject')
+    || (ts.isConstructorDeclaration(member) && member.parameters.some(parameter => nodeDecorators(ts, parameter)
+      .some(decorator => decoratorKind(ts, checker, decorator, targets) === 'Inject'))));
+}
+
+function checkMessageHandlers(state, sourceFile, checker, decorators, kinds) {
+  for (let index = 0; index < decorators.length; index += 1) {
+    const kind = kinds[index];
+    if (!MESSAGE_HANDLERS.has(kind)) continue;
+    const message = messageClass(state.config, state.context, checker, decorators[index], state.localFiles, state.readonlyReasons);
+    if (!message) continue;
+    const key = `${message.getSourceFile().fileName}:${message.pos}`;
+    if (state.messageSeen.has(key)) continue;
+    state.messageSeen.add(key);
+    state.messages += 1;
+    checkMessageReadonly(state.config, state.context, state.context.checkerFor(message.getSourceFile().fileName), message,
+      state.localFiles, state.violations, state.readonlyReasons);
+  }
+}
+
+function checkUseCase(state, role, sourceFile, checker, declaration) {
+  const { ts, config, context, publicReasons, publicSeen, localFiles, violations } = state;
+  if (!(role.role === 'use-case' && !role.transport && ts.isClassDeclaration(declaration) && declaration.name)) return;
+  const exported = exportedSymbols(ts, checker, sourceFile).some(symbol => (symbol.getDeclarations?.() ?? []).includes(declaration));
+  if (!exported) return;
+  const classSymbol = normalizedSymbol(ts, checker, declaration.name);
+  const instanceType = classSymbol ? checker.getDeclaredTypeOfSymbol(classSymbol) : null;
+  const execute = instanceType ? checker.getPropertyOfType(instanceType, 'execute') : null;
+  if (!execute) publicReasons.push(`${relativePath(config.root, sourceFile.fileName)} exports a use-case class without a statically resolved execute contract`);
+  else state.callableSignatures += checkCallableSymbol({ config, context, checker, symbol: execute, location: declaration,
+    reportSource: sourceFile, reportNode: declaration.name, violations, reasons: publicReasons, seen: publicSeen, localFiles });
+}
+
+function checkClassContracts(state, sourceFile, checker, role, declaration, framework) {
+  const { ts, config, context, violations, readonlyReasons, localFiles } = state;
+  const decorators = nodeDecorators(ts, declaration);
+  const kinds = decorators.map(decorator => decoratorKind(ts, checker, decorator, framework.targets));
+  const directKinds = kinds.filter(Boolean);
+  checkConstructedClassDecorators(state, sourceFile, checker, decorators, kinds, framework.targets);
+  const classKind = directKinds.find(kind => NEST_CREATED.has(kind)) ?? null;
+  const targets = framework.targets;
+  checkConstructedMemberDecorators(state, sourceFile, declaration, checker, targets);
+  if (classKind || hasInjectedMember(ts, checker, declaration, targets)) {
+    state.injectedClasses += 1;
+    checkInjectedClass({ config, context, checker, declaration, classKind, targets, decoratorKind,
+      localFiles, violations, reasons: readonlyReasons });
+  }
+  checkMessageHandlers(state, sourceFile, checker, decorators, kinds);
+  checkUseCase(state, role, sourceFile, checker, declaration);
+}
+
+function checkSourceFile(state, sourceFile) {
+  const checker = state.context.checkerFor(sourceFile.fileName);
+  const framework = frameworkFor(state, checker);
+  const role = sourceRole(sourceFile);
+  for (const declaration of classesInSource(state.ts, sourceFile)) checkClassContracts(state, sourceFile, checker, role, declaration, framework);
+}
+
+function contractCoverage(state) {
+  const publicDetails = [...new Set(state.publicReasons)].sort(byCodeUnit);
+  const readonlyDetails = [...new Set(state.readonlyReasons)].sort(byCodeUnit);
   return {
-    violations,
+    violations: state.violations,
     coverage: {
-      publicContracts: publicDetails.length ? { status: 'unavailable', callableSignatures, details: publicDetails }
-        : { status: 'checked', callableSignatures },
-      readonlyBoundaries: readonlyDetails.length ? { status: 'unavailable', injectedClasses, messages, details: readonlyDetails }
-        : { status: 'checked', injectedClasses, messages },
+      publicContracts: publicDetails.length ? { status: 'unavailable', callableSignatures: state.callableSignatures, details: publicDetails }
+        : { status: 'checked', callableSignatures: state.callableSignatures },
+      readonlyBoundaries: readonlyDetails.length ? { status: 'unavailable', injectedClasses: state.injectedClasses, messages: state.messages, details: readonlyDetails }
+        : { status: 'checked', injectedClasses: state.injectedClasses, messages: state.messages },
     },
   };
+}
+
+/** Enforce mechanically selected public contract and readonly boundaries without treating DTOs or arbitrary interfaces as APIs. */
+export function checkBackendContracts(config, context) {
+  const state = {
+    config, context, ts: context.ts,
+    localFiles: new Set(context.files.map(file => canonical(file.fileName))),
+    sourceFiles: new Map(context.files.map(file => [canonical(file.fileName), file])),
+    frameworkByChecker: new Map(), violations: [], publicReasons: [], readonlyReasons: [],
+    publicSeen: new Set(), messageSeen: new Set(), callableSignatures: 0, injectedClasses: 0, messages: 0,
+  };
+  checkOwnerCoverage(state);
+  checkPublicOwners(state);
+  for (const sourceFile of context.files) checkSourceFile(state, sourceFile);
+  return contractCoverage(state);
 }

@@ -8,7 +8,16 @@ import { byCodeUnit } from '../../lib/list.mjs';
 const FORBIDDEN_APP_ROLE = /(?:^|\.)(?:service|provider|providers|resolver|controller|handler|repository|entity|use-case|command|query|listener|consumer|processor)\.[cm]?[jt]sx?$/i;
 const FORBIDDEN_DECLARATION = /(?:Service|Provider|Resolver|Controller|Handler|Repository|Entity|UseCase|Command|Query|Listener|Consumer|Processor)$/;
 const FORBIDDEN_DECORATORS = new Set(['Controller', 'Resolver', 'Injectable', 'Processor', 'WebSocketGateway']);
-const TRANSPORT_PACKAGES = /^(?:@nestjs\/(?:graphql|microservices|platform-[^/]+|websockets)(?:\/|$)|@apollo\/|apollo-server(?:\/|$)|express(?:\/|$)|fastify(?:\/|$)|graphql(?:\/|$)|class-validator(?:\/|$)|class-transformer(?:\/|$))/;
+const TRANSPORT_PACKAGES = new RegExp(`^(?:${[
+  '@nestjs/(?:graphql|microservices|platform-[^/]+|websockets)(?:/|$)',
+  '@apollo/',
+  'apollo-server(?:/|$)',
+  'express(?:/|$)',
+  'fastify(?:/|$)',
+  'graphql(?:/|$)',
+  'class-validator(?:/|$)',
+  'class-transformer(?:/|$)',
+].join('|')})`);
 const NEST_COMMON_TRANSPORT = new Set(['Controller', 'Get', 'Post', 'Put', 'Patch', 'Delete', 'Options', 'Head', 'Body', 'Param', 'Query', 'Req', 'Request', 'Res', 'Response', 'Headers', 'Header', 'HttpCode', 'Redirect', 'Render', 'Sse', 'UploadedFile', 'UploadedFiles', 'UseGuards', 'UseInterceptors', 'UsePipes']);
 
 function absolute(root, relative) {
@@ -73,11 +82,10 @@ function roleEvidence(ts, sourceFile) {
   return found;
 }
 
-function transportFrameworkEvidence(ts, sourceFile, checker) {
-  const found = [];
-  // The destructured binding elements naming a transport export (or a computed binding, which cannot be
-  // proved to exclude one): `const { Controller, [x]: y } = ...`. `rest` elements are always opaque.
-  const destructuredBindings = (elements, detail) => elements.flatMap(element => {
+// The destructured binding elements naming a transport export (or a computed binding, which cannot be
+// proved to exclude one): `const { Controller, [x]: y } = ...`. `rest` elements are always opaque.
+function destructuredTransportBindings(ts, elements, detail) {
+  return elements.flatMap(element => {
     let selected = null;
     if (!element.dotDotDotToken) {
       const imported = element.propertyName ?? element.name;
@@ -85,96 +93,123 @@ function transportFrameworkEvidence(ts, sourceFile, checker) {
     }
     return selected === null || NEST_COMMON_TRANSPORT.has(selected) ? [{ node: element, detail: selected ?? detail }] : [];
   });
-  const namespaceUsages = binding => {
-    const usages = [];
-    const alias = binding.text;
-    const bindingSymbol = checker?.getSymbolAtLocation(binding);
-    const isAlias = node => ts.isIdentifier(node) && node.text === alias
-      && (!bindingSymbol || checker?.getSymbolAtLocation(node) === bindingSymbol);
-    const visit = node => {
-      if (ts.isPropertyAccessExpression(node) && isAlias(node.expression)
-        && NEST_COMMON_TRANSPORT.has(node.name.text)) usages.push({ node: node.name, detail: node.name.text });
-      if (ts.isElementAccessExpression(node) && isAlias(node.expression)) {
-        const selected = ts.isStringLiteralLike(node.argumentExpression) ? node.argumentExpression.text : null;
-        if (selected === null || NEST_COMMON_TRANSPORT.has(selected)) usages.push({ node: node.argumentExpression, detail: selected ?? 'computed @nestjs/common namespace access' });
+}
+
+function namespaceTransportUsages(ts, sourceFile, checker, binding) {
+  const usages = [];
+  const alias = binding.text;
+  const bindingSymbol = checker?.getSymbolAtLocation(binding);
+  const isAlias = node => ts.isIdentifier(node) && node.text === alias
+    && (!bindingSymbol || checker?.getSymbolAtLocation(node) === bindingSymbol);
+  const visit = node => {
+    if (ts.isPropertyAccessExpression(node) && isAlias(node.expression)
+      && NEST_COMMON_TRANSPORT.has(node.name.text)) usages.push({ node: node.name, detail: node.name.text });
+    if (ts.isElementAccessExpression(node) && isAlias(node.expression)) {
+      const selected = ts.isStringLiteralLike(node.argumentExpression) ? node.argumentExpression.text : null;
+      if (selected === null || NEST_COMMON_TRANSPORT.has(selected)) usages.push({ node: node.argumentExpression, detail: selected ?? 'computed @nestjs/common namespace access' });
+    }
+    if (ts.isVariableDeclaration(node) && isAlias(node.initializer)) {
+      if (!ts.isObjectBindingPattern(node.name)) {
+        usages.push({ node: node.name, detail: 'escaped @nestjs/common namespace access' });
+      } else {
+        usages.push(...destructuredTransportBindings(ts, node.name.elements, 'computed @nestjs/common namespace destructuring'));
       }
-      if (ts.isVariableDeclaration(node) && isAlias(node.initializer)) {
-        if (!ts.isObjectBindingPattern(node.name)) {
-          usages.push({ node: node.name, detail: 'escaped @nestjs/common namespace access' });
-        } else {
-          usages.push(...destructuredBindings(node.name.elements, 'computed @nestjs/common namespace destructuring'));
-        }
-      }
-      ts.forEachChild(node, visit);
-    };
-    visit(sourceFile);
-    return usages;
+    }
+    ts.forEachChild(node, visit);
   };
+  visit(sourceFile);
+  return usages;
+}
+
+function importSpecifierOf(ts, statement) {
+  const importEqualsSpecifier = ts.isImportEqualsDeclaration(statement)
+    && ts.isExternalModuleReference(statement.moduleReference)
+    && statement.moduleReference.expression
+    && ts.isStringLiteralLike(statement.moduleReference.expression)
+    ? statement.moduleReference.expression
+    : null;
+  let importSpecifier = importEqualsSpecifier;
+  if (ts.isImportDeclaration(statement) && ts.isStringLiteralLike(statement.moduleSpecifier)) importSpecifier = statement.moduleSpecifier;
+  return importSpecifier;
+}
+
+function addCommonImportEvidence(ts, statement, importSpecifier, sourceFile, checker, found) {
+  if (ts.isImportEqualsDeclaration(statement)) {
+    found.push(...namespaceTransportUsages(ts, sourceFile, checker, statement.name).map(item => ({ ...item, specifier: importSpecifier.text })));
+    return;
+  }
+  if (!statement.importClause) return;
+  const bindings = statement.importClause.namedBindings;
+  if (bindings && ts.isNamespaceImport(bindings)) {
+    found.push(...namespaceTransportUsages(ts, sourceFile, checker, bindings.name).map(item => ({ ...item, specifier: importSpecifier.text })));
+    return;
+  }
+  if (!bindings || !ts.isNamedImports(bindings)) return;
+  for (const element of bindings.elements) {
+    const imported = element.propertyName?.text ?? element.name.text;
+    if (NEST_COMMON_TRANSPORT.has(imported)) found.push({ node: element, specifier: importSpecifier.text, detail: imported });
+  }
+}
+
+function importTransportEvidence(ts, sourceFile, checker, found) {
   for (const statement of sourceFile.statements) {
-    const importEqualsSpecifier = ts.isImportEqualsDeclaration(statement)
-      && ts.isExternalModuleReference(statement.moduleReference)
-      && statement.moduleReference.expression
-      && ts.isStringLiteralLike(statement.moduleReference.expression)
-      ? statement.moduleReference.expression
-      : null;
-    let importSpecifier = importEqualsSpecifier;
-    if (ts.isImportDeclaration(statement) && ts.isStringLiteralLike(statement.moduleSpecifier)) importSpecifier = statement.moduleSpecifier;
+    const importSpecifier = importSpecifierOf(ts, statement);
     if (!importSpecifier) continue;
     const specifier = importSpecifier.text;
     if (TRANSPORT_PACKAGES.test(specifier)) {
       found.push({ node: importSpecifier, specifier, detail: specifier });
       continue;
     }
-    if (specifier !== '@nestjs/common') continue;
-    if (ts.isImportEqualsDeclaration(statement)) {
-      found.push(...namespaceUsages(statement.name).map(item => ({ ...item, specifier })));
-      continue;
-    }
-    if (!statement.importClause) continue;
-    const bindings = statement.importClause.namedBindings;
-    if (bindings && ts.isNamespaceImport(bindings)) {
-      found.push(...namespaceUsages(bindings.name).map(item => ({ ...item, specifier })));
-      continue;
-    }
-    if (!bindings || !ts.isNamedImports(bindings)) continue;
-    for (const element of bindings.elements) {
-      const imported = element.propertyName?.text ?? element.name.text;
-      if (NEST_COMMON_TRANSPORT.has(imported)) found.push({ node: element, specifier, detail: imported });
+    if (specifier === '@nestjs/common') addCommonImportEvidence(ts, statement, importSpecifier, sourceFile, checker, found);
+  }
+}
+
+function requiredSpecifier(ts, call) {
+  return ts.isCallExpression(call)
+    && ts.isIdentifier(call.expression) && call.expression.text === 'require'
+    && call.arguments.length === 1 && ts.isStringLiteralLike(call.arguments[0])
+    ? call.arguments[0].text
+    : null;
+}
+
+function requiredMemberEvidence(ts, node, found) {
+  if (!(ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) || !ts.isCallExpression(node.expression)) return;
+  const specifier = requiredSpecifier(ts, node.expression);
+  let selected = null;
+  if (ts.isPropertyAccessExpression(node)) selected = node.name.text;
+  else if (ts.isStringLiteralLike(node.argumentExpression)) selected = node.argumentExpression.text;
+  if (specifier && TRANSPORT_PACKAGES.test(specifier)) {
+    found.push({ node: ts.isPropertyAccessExpression(node) ? node.name : node.argumentExpression, specifier, detail: `${selected ?? 'computed member'} from ${specifier}` });
+  } else if (specifier === '@nestjs/common' && (selected === null || NEST_COMMON_TRANSPORT.has(selected))) {
+    found.push({ node: ts.isPropertyAccessExpression(node) ? node.name : node.argumentExpression, specifier, detail: selected ?? 'computed @nestjs/common require access' });
+  }
+}
+
+function requiredVariableEvidence(ts, node, sourceFile, checker, found) {
+  if (!ts.isVariableDeclaration(node) || !node.initializer || !ts.isCallExpression(node.initializer)
+    || !requiredSpecifier(ts, node.initializer)) return;
+  const specifier = requiredSpecifier(ts, node.initializer);
+  if (TRANSPORT_PACKAGES.test(specifier)) {
+    found.push({ node: node.initializer.arguments[0], specifier, detail: specifier });
+  } else if (specifier === '@nestjs/common') {
+    if (ts.isIdentifier(node.name)) {
+      found.push(...namespaceTransportUsages(ts, sourceFile, checker, node.name).map(item => ({ ...item, specifier })));
+    } else if (ts.isObjectBindingPattern(node.name)) {
+      found.push(...destructuredTransportBindings(ts, node.name.elements, 'computed @nestjs/common require destructuring').map(item => ({ ...item, specifier })));
     }
   }
-  const visitRequire = node => {
-    const requiredSpecifier = call => ts.isCallExpression(call)
-      && ts.isIdentifier(call.expression) && call.expression.text === 'require'
-      && call.arguments.length === 1 && ts.isStringLiteralLike(call.arguments[0])
-      ? call.arguments[0].text
-      : null;
-    if ((ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) && ts.isCallExpression(node.expression)) {
-      const specifier = requiredSpecifier(node.expression);
-      let selected = null;
-      if (ts.isPropertyAccessExpression(node)) selected = node.name.text;
-      else if (ts.isStringLiteralLike(node.argumentExpression)) selected = node.argumentExpression.text;
-      if (specifier && TRANSPORT_PACKAGES.test(specifier)) {
-        found.push({ node: ts.isPropertyAccessExpression(node) ? node.name : node.argumentExpression, specifier, detail: `${selected ?? 'computed member'} from ${specifier}` });
-      } else if (specifier === '@nestjs/common' && (selected === null || NEST_COMMON_TRANSPORT.has(selected))) {
-        found.push({ node: ts.isPropertyAccessExpression(node) ? node.name : node.argumentExpression, specifier, detail: selected ?? 'computed @nestjs/common require access' });
-      }
-    }
-    if (ts.isVariableDeclaration(node) && node.initializer && ts.isCallExpression(node.initializer)
-      && requiredSpecifier(node.initializer)) {
-      const specifier = requiredSpecifier(node.initializer);
-      if (TRANSPORT_PACKAGES.test(specifier)) {
-        found.push({ node: node.initializer.arguments[0], specifier, detail: specifier });
-      } else if (specifier === '@nestjs/common') {
-        if (ts.isIdentifier(node.name)) {
-          found.push(...namespaceUsages(node.name).map(item => ({ ...item, specifier })));
-        } else if (ts.isObjectBindingPattern(node.name)) {
-          found.push(...destructuredBindings(node.name.elements, 'computed @nestjs/common require destructuring').map(item => ({ ...item, specifier })));
-        }
-      }
-    }
-    ts.forEachChild(node, visitRequire);
-  };
-  visitRequire(sourceFile);
+}
+
+function requiredTransportEvidence(ts, node, sourceFile, checker, found) {
+  requiredMemberEvidence(ts, node, found);
+  requiredVariableEvidence(ts, node, sourceFile, checker, found);
+  ts.forEachChild(node, child => requiredTransportEvidence(ts, child, sourceFile, checker, found));
+}
+
+function transportFrameworkEvidence(ts, sourceFile, checker) {
+  const found = [];
+  importTransportEvidence(ts, sourceFile, checker, found);
+  requiredTransportEvidence(ts, sourceFile, sourceFile, checker, found);
   return found;
 }
 
@@ -205,7 +240,7 @@ function selectedReexportSurface(ts, declaration, selected) {
   return next.size ? next : undefined;
 }
 
-function externalTransportReexport(ts, sourceFile, selected) {
+function importedTransportBindings(ts, sourceFile) {
   const imported = new Map();
   for (const statement of sourceFile.statements) {
     if (!ts.isImportDeclaration(statement) || !ts.isStringLiteralLike(statement.moduleSpecifier) || !statement.importClause) continue;
@@ -215,41 +250,72 @@ function externalTransportReexport(ts, sourceFile, selected) {
       for (const element of bindings.elements) imported.set(element.name.text, { specifier, imported: element.propertyName?.text ?? element.name.text });
     } else if (bindings && ts.isNamespaceImport(bindings)) imported.set(bindings.name.text, { specifier, imported: null });
   }
+  return imported;
+}
+
+function directTransportReexport(ts, statement, specifier, selected) {
+  const clause = statement.exportClause;
+  if (!clause) {
+    if (specifier !== '@nestjs/common' || selected === null || [...selected].some(name => NEST_COMMON_TRANSPORT.has(name))) {
+      return { node: statement.moduleSpecifier, specifier, detail: selected === null ? `unbounded ${specifier} re-export` : `re-exported ${[...selected].join(', ')}` };
+    }
+    return null;
+  }
+  if (ts.isNamespaceExport(clause)) {
+    return selected === null || selected.has(clause.name.text) ? { node: clause.name, specifier, detail: `namespace re-export from ${specifier}` } : null;
+  }
+  if (!ts.isNamedExports(clause)) return null;
+  for (const element of clause.elements) {
+    if (selected !== null && !selected.has(element.name.text)) continue;
+    const original = element.propertyName?.text ?? element.name.text;
+    if (specifier !== '@nestjs/common' || NEST_COMMON_TRANSPORT.has(original)) return { node: element, specifier, detail: `${element.name.text} re-exported from ${specifier}` };
+  }
+  return null;
+}
+
+function localTransportReexport(ts, statement, selected, imported) {
+  const clause = statement.exportClause;
+  if (!clause || !ts.isNamedExports(clause)) return null;
+  for (const element of clause.elements) {
+    if (selected !== null && !selected.has(element.name.text)) continue;
+    const local = element.propertyName?.text ?? element.name.text;
+    const binding = imported.get(local);
+    if (!binding) continue;
+    if (binding.specifier !== '@nestjs/common' && !TRANSPORT_PACKAGES.test(binding.specifier)) continue;
+    if (binding.specifier === '@nestjs/common' && (binding.imported === null || !NEST_COMMON_TRANSPORT.has(binding.imported))) continue;
+    return { node: element, specifier: binding.specifier, detail: `${element.name.text} re-exported from ${binding.specifier}` };
+  }
+  return null;
+}
+
+function externalTransportReexport(ts, sourceFile, selected) {
+  const imported = importedTransportBindings(ts, sourceFile);
   for (const statement of sourceFile.statements) {
     if (!ts.isExportDeclaration(statement)) continue;
-    const clause = statement.exportClause;
     const specifier = statement.moduleSpecifier && ts.isStringLiteralLike(statement.moduleSpecifier) ? statement.moduleSpecifier.text : null;
     if (specifier && (specifier === '@nestjs/common' || TRANSPORT_PACKAGES.test(specifier))) {
-      if (!clause) {
-        if (specifier !== '@nestjs/common' || selected === null || [...selected].some(name => NEST_COMMON_TRANSPORT.has(name))) {
-          return { node: statement.moduleSpecifier, specifier, detail: selected === null ? `unbounded ${specifier} re-export` : `re-exported ${[...selected].join(', ')}` };
-        }
-        continue;
-      }
-      if (ts.isNamespaceExport(clause)) {
-        if (selected === null || selected.has(clause.name.text)) return { node: clause.name, specifier, detail: `namespace re-export from ${specifier}` };
-        continue;
-      }
-      if (!ts.isNamedExports(clause)) continue;
-      for (const element of clause.elements) {
-        if (selected !== null && !selected.has(element.name.text)) continue;
-        const original = element.propertyName?.text ?? element.name.text;
-        if (specifier !== '@nestjs/common' || NEST_COMMON_TRANSPORT.has(original)) return { node: element, specifier, detail: `${element.name.text} re-exported from ${specifier}` };
-      }
+      const evidence = directTransportReexport(ts, statement, specifier, selected);
+      if (evidence) return evidence;
       continue;
     }
-    if (specifier || !clause || !ts.isNamedExports(clause)) continue;
-    for (const element of clause.elements) {
-      if (selected !== null && !selected.has(element.name.text)) continue;
-      const local = element.propertyName?.text ?? element.name.text;
-      const binding = imported.get(local);
-      if (!binding) continue;
-      if (binding.specifier !== '@nestjs/common' && !TRANSPORT_PACKAGES.test(binding.specifier)) continue;
-      if (binding.specifier === '@nestjs/common' && (binding.imported === null || !NEST_COMMON_TRANSPORT.has(binding.imported))) continue;
-      return { node: element, specifier: binding.specifier, detail: `${element.name.text} re-exported from ${binding.specifier}` };
+    if (!specifier) {
+      const evidence = localTransportReexport(ts, statement, selected, imported);
+      if (evidence) return evidence;
     }
   }
   return null;
+}
+
+function reexportQueueKey(current) {
+  return `${current.file}\0${current.selected === null ? '*' : [...current.selected].sort(byCodeUnit).join(',')}`;
+}
+
+function addReexportEdges(ts, context, current, queue) {
+  for (const edge of context.edges.get(current.file) ?? []) {
+    if (!edge.reexport) continue;
+    const selected = selectedReexportSurface(ts, edge.declaration, current.selected);
+    if (selected !== undefined) queue.push({ file: edge.to, selected, chain: [...current.chain, edge.to] });
+  }
 }
 
 function reexportedTransportEvidence(ts, context, sourceFiles, firstEdge) {
@@ -257,18 +323,14 @@ function reexportedTransportEvidence(ts, context, sourceFiles, firstEdge) {
   const visited = new Set();
   while (queue.length) {
     const current = queue.shift();
-    const key = `${current.file}\0${current.selected === null ? '*' : [...current.selected].sort(byCodeUnit).join(',')}`;
+    const key = reexportQueueKey(current);
     if (visited.has(key)) continue;
     visited.add(key);
     const sourceFile = sourceFiles.get(path.resolve(current.file));
     if (!sourceFile) continue;
     const evidence = externalTransportReexport(ts, sourceFile, current.selected);
     if (evidence) return { evidence, chain: current.chain };
-    for (const edge of context.edges.get(current.file) ?? []) {
-      if (!edge.reexport) continue;
-      const selected = selectedReexportSurface(ts, edge.declaration, current.selected);
-      if (selected !== undefined) queue.push({ file: edge.to, selected, chain: [...current.chain, edge.to] });
-    }
+    addReexportEdges(ts, context, current, queue);
   }
   return null;
 }
@@ -286,6 +348,59 @@ function finding(config, edge, ruleId, message, chain) {
   };
 }
 
+function checkApplicationComposition(config, ts, sourceFile, fileName, app, violations) {
+  const evidence = roleEvidence(ts, sourceFile);
+  if (evidence) {
+    violations.push({
+      ruleId: 'BE_APP_BUSINESS_ROLE',
+      path: relativePath(config.root, fileName),
+      ...sourceLocation(sourceFile, evidence.node),
+      message: `Application composition source contains measurable business/provider role ${evidence.detail}. Move that role under src/features or src/modules.`,
+    });
+  } else if (slotAdmitsFile(config.hfs, relativePath(config.root, fileName)) !== true) {
+    violations.push({
+      ruleId: FORBIDDEN_APP_ROLE.test(path.posix.basename(app.relative)) ? 'BE_APP_BUSINESS_ROLE' : 'BE_APP_COMPOSITION_ONLY',
+      path: relativePath(config.root, fileName),
+      line: 1,
+      column: 1,
+      message: `Application source ${app.relative} is not a file its app slot requires or allows (main.ts, app.module.ts, <app>.options.ts).`,
+    });
+  }
+}
+
+function checkApplicationTransport(config, context, sourceFile, fileName, violations) {
+  for (const evidence of transportFrameworkEvidence(context.ts, sourceFile, context.checkerFor(fileName))) {
+    violations.push({
+      ruleId: 'BE_APPLICATION_TRANSPORT_FRAMEWORK',
+      path: relativePath(config.root, fileName),
+      ...sourceLocation(sourceFile, evidence.node),
+      specifier: evidence.specifier,
+      message: `Feature application code imports transport framework surface ${evidence.detail}. Keep protocol decorators, request/response types, validation DTOs, and generated transport types under transport/.`,
+    });
+  }
+}
+
+function checkFeatureTransportEdges(config, context, sourceFiles, featureRoots, fileName, violations) {
+  for (const edge of context.edges.get(fileName) ?? []) {
+    const reexported = reexportedTransportEvidence(context.ts, context, sourceFiles, edge);
+    if (reexported) violations.push(finding(config, edge, 'BE_APPLICATION_TRANSPORT_FRAMEWORK', `Feature application code imports protocol surface ${reexported.evidence.detail} through an internal re-export. Keep protocol decorators and types under transport/.`, reexported.chain));
+    const transportChain = reachableViolation(context.edges, edge, target => insideFeatureLayer(featureRoots, target, 'transport'));
+    if (transportChain) violations.push(finding(config, edge, 'BE_APPLICATION_IMPORTS_TRANSPORT', 'Feature application code cannot depend on transport adapters or DTOs, including through a type import or barrel.', transportChain));
+  }
+}
+
+function checkBackendSource(config, context, sourceFiles, moduleRoots, featureRoots, nonAppRoots, sourceFile, violations) {
+  const fileName = path.resolve(sourceFile.fileName);
+  const fromModules = insideAny(moduleRoots, fileName);
+  const fromFeatures = insideAny(featureRoots, fileName);
+  const fromApplication = fromFeatures && insideFeatureLayer(featureRoots, fileName, 'application');
+  const app = !fromModules && !fromFeatures ? appSource(config, fileName, nonAppRoots) : null;
+  if (app) checkApplicationComposition(config, context.ts, sourceFile, fileName, app, violations);
+  if (!fromModules && !fromFeatures) return;
+  if (fromApplication) checkApplicationTransport(config, context, sourceFile, fileName, violations);
+  if (fromApplication) checkFeatureTransportEdges(config, context, sourceFiles, featureRoots, fileName, violations);
+}
+
 /** Enforce backend direction and keep executable apps as measurable composition roots. */
 export function checkBackend(config, context) {
   const violations = [];
@@ -294,48 +409,7 @@ export function checkBackend(config, context) {
   const nonAppRoots = [...moduleRoots, ...featureRoots];
   const sourceFiles = new Map(context.files.map(file => [path.resolve(file.fileName), file]));
   for (const sourceFile of context.files) {
-    const fileName = path.resolve(sourceFile.fileName);
-    const fromModules = insideAny(moduleRoots, fileName);
-    const fromFeatures = insideAny(featureRoots, fileName);
-    const fromApplication = fromFeatures && insideFeatureLayer(featureRoots, fileName, 'application');
-    const app = !fromModules && !fromFeatures ? appSource(config, fileName, nonAppRoots) : null;
-    if (app) {
-      const evidence = roleEvidence(context.ts, sourceFile);
-      if (evidence) {
-        violations.push({
-          ruleId: 'BE_APP_BUSINESS_ROLE',
-          path: relativePath(config.root, fileName),
-          ...sourceLocation(sourceFile, evidence.node),
-          message: `Application composition source contains measurable business/provider role ${evidence.detail}. Move that role under src/features or src/modules.`,
-        });
-      } else if (slotAdmitsFile(config.hfs, relativePath(config.root, fileName)) !== true) {
-        violations.push({
-          ruleId: FORBIDDEN_APP_ROLE.test(path.posix.basename(app.relative)) ? 'BE_APP_BUSINESS_ROLE' : 'BE_APP_COMPOSITION_ONLY',
-          path: relativePath(config.root, fileName),
-          line: 1,
-          column: 1,
-          message: `Application source ${app.relative} is not a file its app slot requires or allows (main.ts, app.module.ts, <app>.options.ts).`,
-        });
-      }
-    }
-    if (!fromModules && !fromFeatures) continue;
-    if (fromApplication) {
-      for (const evidence of transportFrameworkEvidence(context.ts, sourceFile, context.checkerFor(fileName))) violations.push({
-        ruleId: 'BE_APPLICATION_TRANSPORT_FRAMEWORK',
-        path: relativePath(config.root, fileName),
-        ...sourceLocation(sourceFile, evidence.node),
-        specifier: evidence.specifier,
-        message: `Feature application code imports transport framework surface ${evidence.detail}. Keep protocol decorators, request/response types, validation DTOs, and generated transport types under transport/.`,
-      });
-    }
-    for (const edge of context.edges.get(fileName) ?? []) {
-      if (fromApplication) {
-        const reexported = reexportedTransportEvidence(context.ts, context, sourceFiles, edge);
-        if (reexported) violations.push(finding(config, edge, 'BE_APPLICATION_TRANSPORT_FRAMEWORK', `Feature application code imports protocol surface ${reexported.evidence.detail} through an internal re-export. Keep protocol decorators and types under transport/.`, reexported.chain));
-        const transportChain = reachableViolation(context.edges, edge, target => insideFeatureLayer(featureRoots, target, 'transport'));
-        if (transportChain) violations.push(finding(config, edge, 'BE_APPLICATION_IMPORTS_TRANSPORT', 'Feature application code cannot depend on transport adapters or DTOs, including through a type import or barrel.', transportChain));
-      }
-    }
+    checkBackendSource(config, context, sourceFiles, moduleRoots, featureRoots, nonAppRoots, sourceFile, violations);
   }
   return violations;
 }

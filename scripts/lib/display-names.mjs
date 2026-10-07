@@ -26,6 +26,15 @@ export const JOB_WHAT_MAX = 40;
 const NAME_SEPARATOR = ' · ';
 
 const LABELS_FILE = new URL('../../modules/ops/_labels.yaml', import.meta.url);
+const CLIP_TRAILING_CHAR = /[\s,;:.\u00b7\u2013\u2014-]/;
+const CLAUSE_TRAILING_CHAR = /[\s.!?;:,]/;
+const SLASH_TRAILING_CHAR = /\//;
+
+function trimTrailingCharacters(text, characters) {
+  const trailingCount = text.split('').reverse().findIndex((character) => !characters.test(character));
+  return text.slice(0, trailingCount < 0 ? 0 : text.length - trailingCount);
+}
+
 let labelsCache = null;
 /** {op: {vi, en}} from modules/ops/_labels.yaml; {} when the file is unreadable. */
 export function opLabelMap() {
@@ -49,7 +58,7 @@ function clipWords(text, max) {
   if (s.length <= max) return s;
   const room = s.slice(0, max - 1);
   const at = room.lastIndexOf(' ');
-  return `${(at >= max / 2 ? room.slice(0, at) : room).replace(/[\s,;:.·–—-]+$/, '')}…`;
+  return trimTrailingCharacters(at >= max / 2 ? room.slice(0, at) : room, CLIP_TRAILING_CHAR) + '…';
 }
 
 /**
@@ -101,7 +110,7 @@ export function productName(raw) {
 function firstClause(text) {
   const s = String(text ?? '').split(/\r?\n/).map(squash).find(Boolean) ?? '';
   const clause = s.split(/(?<=[.!?;:])\s|\s[—–-]\s|\s\(/)[0] ?? '';
-  return clause.replace(/[\s.!?;:,]+$/, '').trim();
+  return trimTrailingCharacters(clause, CLAUSE_TRAILING_CHAR).trim();
 }
 /**
  * A readable name for a new goal (define-goal): `<Product> · <first clause of the goal text>`, at
@@ -141,7 +150,7 @@ const titleCache = new Map();
 /** The `title:` of the Work record at `<repo>/<p>` (a record folder or its index.yaml), else null. */
 function recordTitle(repo, p) {
   if (!repo || !p) return null;
-  const rel = String(p).replaceAll('\\', '/').replace(/\/+$/, '');
+  const rel = trimTrailingCharacters(String(p).replaceAll('\\', '/'), SLASH_TRAILING_CHAR);
   if (!rel.startsWith('.starciwork/') || BROAD.test(rel.toLowerCase())) return null;
   const file = path.join(repo, rel.endsWith('.yaml') ? rel : `${rel}/index.yaml`);
   if (!file.endsWith('index.yaml')) return null;

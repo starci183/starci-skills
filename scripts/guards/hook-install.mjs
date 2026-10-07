@@ -245,10 +245,10 @@ export function ensureHistoryHook(repoRoot, { skillRoot = path.resolve(here, '..
 /** The work-record check shared by the dispatch hook and the runtime's generated pre-commit hook. */
 export function workHookCheck({ root, nodePath = process.execPath }) {
   const q = shellQuote;
-  return `# ${WORK_HOOK_MARKER} v${WORK_HOOK_VERSION} - installed by the StarCi runtime (scripts/guards/hook-install.mjs); rewritten on every op dispatch.
+  return String.raw`# ${WORK_HOOK_MARKER} v${WORK_HOOK_VERSION} - installed by the StarCi runtime (scripts/guards/hook-install.mjs); rewritten on every op dispatch.
 # Staged Work and stack files are checked before the commit exists: YAML that parses, records that pass their scoped
 # strict validation, and no secret outside an .enc file (starci work hygiene). e2e never runs here.
-if git diff --cached --name-only --diff-filter=ACMR | grep -Eq '(^|/)\\.(starciwork|starcistacks)/'; then
+if git diff --cached --name-only --diff-filter=ACMR | grep -Eq '(^|/)\.(starciwork|starcistacks)/'; then
   STARCI_RUNTIME=${q(root)} ${q(nodePath)} ${q(path.join(root, 'packages', 'cli', 'bin', 'starci.mjs'))} work hygiene staged --repo "$(git rev-parse --show-toplevel)" || exit 1
 fi
 `;

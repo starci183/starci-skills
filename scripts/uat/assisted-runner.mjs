@@ -336,7 +336,7 @@ const runSession=async(prepared,state,slot)=>{
       const event=normalizeProtocolEvent(prepared,JSON.parse(line.slice(PROTOCOL_PREFIX.length)),sanitize);
       if(event.type==='checkpoint'){
         const gate=prepared.request.humanGates[data.gates.length];
-        need(gate&&gate.id===event.gateId,`checkpoint ${event.gateId} is not the next frozen gate`,'assisted-uat-protocol-invalid');
+        need(gate?.id===event.gateId,`checkpoint ${event.gateId} is not the next frozen gate`,'assisted-uat-protocol-invalid');
         updateState(prepared,state,'waiting',{type:'checkpoint',gate:{id:gate.id,class:gate.class,instruction:gate.prompt,accepted:['ok','fail','cancel'],secretNotice:'Enter credentials or OTP only in the visible browser, never in chat.'}},{pendingGate:gate.id});
         let signal;
         try{signal=await waitForSignal(prepared,gate.id,prepared.request.limits.timeoutMs);}catch(error){signal={value:'cancel',actor:'runner-timeout',recordedAt:iso()};protocolError=error;}
@@ -442,25 +442,27 @@ async function main(){
   const [command,...rest]=process.argv.slice(2),args=parseArgs(rest);
   if(!command||!args.request||!args.receipt)use();
   try{
-    if(command==='inspect'){const prepared=inspectPreparedRequest({requestPath:args.request,receiptPath:args.receipt,allowExistingReceipt:true});validateLockedPlaywright(prepared);return print({ok:true,requestId:prepared.request.requestId,runId:prepared.runId,requestDigest:prepared.requestDigest,sessionDigest:prepared.sessionDigest,bindings:prepared.session.bindings,runDir:prepared.runDir,receipt:prepared.receiptFile,humanGates:prepared.request.humanGates.map(({id,class:kind,prompt})=>({id,class:kind,instruction:prompt}))});}
-    if(command==='start')return print({ok:true,...startSession({requestPath:args.request,receiptPath:args.receipt})});
-    if(command==='wait')return print({ok:true,...await waitSession({requestPath:args.request,receiptPath:args.receipt,after:Number(args.after??0)})});
-    if(command==='signal')return print({ok:true,...signalSession({requestPath:args.request,receiptPath:args.receipt,value:args.value,actor:args.actor??'user'})});
-    if(command==='run')return interactive(args);
-    if(command==='status'){
-      const prepared=inspectPreparedRequest({requestPath:args.request,receiptPath:args.receipt,allowExistingReceipt:true});
-      if(fs.existsSync(prepared.receiptFile))return print({ok:true,runId:prepared.runId,phase:'finished',revision:null,receipt:prepared.receiptFile});
-      need(fs.existsSync(stateFileOf(prepared.runDir)),'assisted UAT session has not been started');
-      const state=readState(prepared.runDir);validateFreshState(prepared,state);
-      return print({ok:true,...publicState(state),...(!TERMINAL_PHASES.has(state.phase)&&!pidAlive(state.pid)?{staleProcess:true}:{})});
-    }
-    if(command==='_worker'){
-      // A terminating signal exits through process 'exit', so the held UAT slot is released.
-      for(const sig of ['SIGINT','SIGTERM','SIGBREAK','SIGHUP'])process.on(sig,()=>process.exit(143));
-      const prepared=inspectPreparedRequest({requestPath:args.request,receiptPath:args.receipt,allowExistingReceipt:true});
-      try{return await workerMain(prepared);}catch(error){
-        try{const state=readState(prepared.runDir);updateState(prepared,state,'failed',{type:'runner-failed',code:error?.code??'assisted-uat-error'},{pendingGate:null});}catch{}
-        throw error;
+    switch(command){
+      case 'inspect':{const prepared=inspectPreparedRequest({requestPath:args.request,receiptPath:args.receipt,allowExistingReceipt:true});validateLockedPlaywright(prepared);return print({ok:true,requestId:prepared.request.requestId,runId:prepared.runId,requestDigest:prepared.requestDigest,sessionDigest:prepared.sessionDigest,bindings:prepared.session.bindings,runDir:prepared.runDir,receipt:prepared.receiptFile,humanGates:prepared.request.humanGates.map(({id,class:kind,prompt})=>({id,class:kind,instruction:prompt}))});}
+      case 'start':return print({ok:true,...startSession({requestPath:args.request,receiptPath:args.receipt})});
+      case 'wait':return print({ok:true,...await waitSession({requestPath:args.request,receiptPath:args.receipt,after:Number(args.after??0)})});
+      case 'signal':return print({ok:true,...signalSession({requestPath:args.request,receiptPath:args.receipt,value:args.value,actor:args.actor??'user'})});
+      case 'run':return interactive(args);
+      case 'status':{
+        const prepared=inspectPreparedRequest({requestPath:args.request,receiptPath:args.receipt,allowExistingReceipt:true});
+        if(fs.existsSync(prepared.receiptFile))return print({ok:true,runId:prepared.runId,phase:'finished',revision:null,receipt:prepared.receiptFile});
+        need(fs.existsSync(stateFileOf(prepared.runDir)),'assisted UAT session has not been started');
+        const state=readState(prepared.runDir);validateFreshState(prepared,state);
+        return print({ok:true,...publicState(state),...(!TERMINAL_PHASES.has(state.phase)&&!pidAlive(state.pid)?{staleProcess:true}:{})});
+      }
+      case '_worker':{
+        // A terminating signal exits through process 'exit', so the held UAT slot is released.
+        for(const sig of ['SIGINT','SIGTERM','SIGBREAK','SIGHUP'])process.on(sig,()=>process.exit(143));
+        const prepared=inspectPreparedRequest({requestPath:args.request,receiptPath:args.receipt,allowExistingReceipt:true});
+        try{return await workerMain(prepared);}catch(error){
+          try{const state=readState(prepared.runDir);updateState(prepared,state,'failed',{type:'runner-failed',code:error?.code??'assisted-uat-error'},{pendingGate:null});}catch{}
+          throw error;
+        }
       }
     }
     use();

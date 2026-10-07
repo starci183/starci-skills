@@ -72,7 +72,14 @@ const GRAMMAR_SPACING_STEPS = Object.freeze(['0', '1', '2', '3', '4', '6', '8'])
 const SPACING_RULE_OF_STEP = Object.freeze({ 0: 0, 1: 1, 2: 2, 3: 3, 4: 4, 6: 5, 8: 6 });
 
 const RESPONSIVE = /^(?:(?:sm|md|lg|xl|2xl|max-sm|max-md|max-lg|max-xl|@[a-z0-9]+|motion-reduce|print):)*/;
-const SPACING_RX = /^-?(?:gap(?:-[xy])?|p[xytblrse]?|m[xytblrse]?|space-[xy]|inset(?:-[xy])?|top|right|bottom|left|start|end)-(.+)$/;
+const SPACING_RX = Object.freeze([
+  /^-?gap(?:-[xy])?-(.+)$/,
+  /^-?p[xytblrse]?-(.+)$/,
+  /^-?m[xytblrse]?-(.+)$/,
+  /^-?space-[xy]-(.+)$/,
+  /^-?inset(?:-[xy])?-(.+)$/,
+  /^-?(?:top|right|bottom|left|start|end)-(.+)$/,
+]);
 /** Pure layout utilities (no paint): display, flex/grid structure, placement, position, sizing to the track. */
 const LAYOUT_CLASS_RX = [
   /^(?:flex|inline-flex|grid|inline-grid|block|inline-block|hidden|contents|isolate|sr-only|not-sr-only)$/,
@@ -82,7 +89,8 @@ const LAYOUT_CLASS_RX = [
   /^(?:col|row)-(?:span-(?:\d+|full)|start-\d+|end-\d+|auto)$/, /^order-(?:\d+|first|last|none)$/,
   /^(?:items|justify|content|self|place-items|place-content|place-self|justify-items|justify-self)-[a-z-]+$/,
   /^(?:relative|absolute|static|sticky)$/, /^z-(?:\d+|auto)$/,
-  /^(?:w|h|min-w|min-h|max-w|max-h|size)-(?:full|auto|0|min|max|fit|screen|dvh|svh|\d+\/\d+|prose|none)$/,
+  /^(?:w|h|size)-(?:full|auto|0|min|max|fit|screen|dvh|svh|\d+\/\d+|prose|none)$/,
+  /^(?:min|max)-(?:w|h)-(?:full|auto|0|min|max|fit|screen|dvh|svh|\d+\/\d+|prose|none)$/,
   /^max-w-(?:xs|sm|md|lg|xl|[2-7]xl)$/, /^overflow-(?:hidden|visible|clip|auto)$/, /^(?:mx|my|m|ms|me)-auto$/,
 ];
 
@@ -91,7 +99,11 @@ const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '.
 /** How one class reads: {kind: layout|token|free|paint, rule?}. */
 export function classifyClass(token) {
   const bare = String(token).replace(RESPONSIVE, '').replace(/^!/, '');
-  const spacing = SPACING_RX.exec(bare);
+  let spacing = null;
+  for (const pattern of SPACING_RX) {
+    spacing = pattern.exec(bare);
+    if (spacing) break;
+  }
   if (spacing) {
     const step = spacing[1];
     if (step === 'auto' || step === 'full' || (step === 'px' && /^-?(?:top|right|bottom|left|inset)/.test(bare))) return { kind: 'layout' };
@@ -138,6 +150,149 @@ function loadRationaleEntries(file) {
   } catch { return []; }
 }
 
+function importedNamesOf(clause, ts, mod, namespaces) {
+  const names = [];
+  if (clause.name) names.push(clause.name.text);
+  const bindings = clause.namedBindings;
+  if (bindings && ts.isNamespaceImport(bindings)) {
+    names.push(bindings.name.text);
+    if (GRAMMAR_MODULE_RX.test(mod)) namespaces.add(bindings.name.text);
+  }
+  if (bindings && ts.isNamedImports(bindings)) {
+    for (const element of bindings.elements) if (!element.isTypeOnly) names.push(element.name.text);
+  }
+  return { names, bindings };
+}
+
+function recordDrawImport(mod, names, clause, bindings, ctx) {
+  if (!names.length) return;
+  if (GRAMMAR_MODULE_RX.test(mod)) for (const name of names) ctx.grammarImports.set(name, mod);
+  else if (REACT_MODULES.includes(mod)) for (const name of names) ctx.reactNames.add(name);
+  else if (ICON_MODULE_RX.test(mod)) for (const name of names) ctx.iconImports.add(name);
+  else if (ASSET_MODULE_RX.test(mod) && clause.name && !bindings) ctx.assetImports.add(clause.name.text);
+  else ctx.add(DRAW_IMPORT_OFF_GRAMMAR, ctx.statement, `imports ${names.join(', ')} from ${mod}: a drawing composes only ${GRAMMAR_PACKAGE} (icons from an icon module as a source prop, art as a relative raster import)`);
+}
+
+function inspectDrawImport(statement, ts, ctx) {
+  if (!ts.isImportDeclaration(statement)) return;
+  const mod = statement.moduleSpecifier.text;
+  const clause = statement.importClause;
+  if (!clause) {
+    ctx.add(DRAW_IMPORT_OFF_GRAMMAR, statement, `imports ${mod} for its side effects: a drawing styles nothing itself (the product CSS is draw-render's --css)`);
+    return;
+  }
+  if (clause.isTypeOnly) return;
+  const { names, bindings } = importedNamesOf(clause, ts, mod, ctx.namespaces);
+  recordDrawImport(mod, names, clause, bindings, { ...ctx, statement });
+}
+
+function collectDrawImports(sf, ts, add) {
+  const context = { add, grammarImports: new Map(), namespaces: new Set(), iconImports: new Set(), assetImports: new Set(), reactNames: new Set() };
+  for (const statement of sf.statements) inspectDrawImport(statement, ts, context);
+  return context;
+}
+
+function drawIsExported(node, ts) {
+  return list(ts.getModifiers?.(node) ?? node.modifiers).some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword);
+}
+
+function inspectFunctionDeclaration(statement, ts, context) {
+  if (ts.isFunctionDeclaration(statement) && statement.name) {
+    if (/^[A-Z]/.test(statement.name.text)) context.local.add(statement.name.text);
+    if (drawIsExported(statement, ts)) context.exported.push(statement.name.text);
+  }
+}
+
+function inspectVariableDeclaration(statement, ts, context) {
+  if (!ts.isVariableStatement(statement)) return;
+  for (const declaration of statement.declarationList.declarations) {
+    if (!ts.isIdentifier(declaration.name)) continue;
+    if (/^[A-Z]/.test(declaration.name.text) && declaration.initializer && (ts.isArrowFunction(declaration.initializer) || ts.isFunctionExpression(declaration.initializer))) context.local.add(declaration.name.text);
+    if (drawIsExported(statement, ts)) context.exported.push(declaration.name.text);
+  }
+}
+
+function inspectExportDeclaration(statement, ts, context) {
+  if (ts.isExportDeclaration(statement) && statement.exportClause && ts.isNamedExports(statement.exportClause)) {
+    for (const element of statement.exportClause.elements) context.exported.push(element.name.text);
+  }
+}
+
+function collectDrawDeclarations(sf, ts) {
+  const context = { local: new Set(), exported: [] };
+  for (const statement of sf.statements) {
+    inspectFunctionDeclaration(statement, ts, context);
+    inspectVariableDeclaration(statement, ts, context);
+    inspectExportDeclaration(statement, ts, context);
+  }
+  return context;
+}
+
+function checkDrawClassName(attr, owner, ctx) {
+  const init = attr.initializer;
+  let value = null;
+  if (init && ctx.ts.isStringLiteral(init)) value = init.text;
+  else if (init && ctx.ts.isJsxExpression(init) && init.expression && (ctx.ts.isStringLiteral(init.expression) || ctx.ts.isNoSubstitutionTemplateLiteral(init.expression))) value = init.expression.text;
+  if (value == null) {
+    ctx.add(DRAW_RAW_STYLED_HTML, attr, `<${owner}> className is not a string literal: a drawing's classes must be readable to the gate`);
+    return;
+  }
+  for (const token of value.split(/\s+/).filter(Boolean)) {
+    const classification = classifyClass(token);
+    if (classification.kind === 'paint') {
+      ctx.classes.paint.push(token);
+      ctx.add(DRAW_RAW_STYLED_HTML, attr, `<${owner} className="${token}"> paints (colour, type, radius, border or shadow) or is not a layout utility: that is a grammar component's job, never raw HTML`);
+    } else if (classification.kind === 'free') {
+      ctx.classes.free.push(token);
+      if (!justifiedBy(token, ctx.rationale)) ctx.add(DRAW_LAYOUT_VALUE_UNJUSTIFIED, attr, `<${owner} className="${token}"> is a free spacing value outside the grammar GAP/PADDING scale (${GRAMMAR_SPACING_STEPS.join(' ')}): justify it in rationale.json (a spacing|layout decision naming ${token} with its rule id) or use a grammar step`);
+    } else if (classification.kind === 'token') ctx.classes.token.push(token);
+  }
+}
+
+function drawTagName(tag, ts, sf) {
+  if (ts.isIdentifier(tag)) return tag.text;
+  if (ts.isPropertyAccessExpression(tag)) return `${tag.expression.getText(sf)}.${tag.name.text}`;
+  return tag.getText(sf);
+}
+
+function inspectDrawTag(node, tagNode, ctx) {
+  const tag = drawTagName(tagNode, ctx.ts, ctx.sf);
+  const intrinsic = ctx.ts.isIdentifier(tagNode) && /^[a-z]/.test(tag);
+  if (intrinsic) {
+    if (!LAYOUT_ELEMENTS.includes(tag)) ctx.add(DRAW_RAW_STYLED_HTML, node, `<${tag}> is raw HTML: text is Text/Heading, media is Image/MediaFrame, icons are Icon - HTML is for layout only (${LAYOUT_ELEMENTS.join(', ')})`);
+    else ctx.layout.push({ tag, line: ctx.lineOf(node) });
+  } else if (ctx.ts.isPropertyAccessExpression(tagNode)) {
+    const root = tagNode.expression.getText(ctx.sf);
+    if (!ctx.namespaces.has(root) && !(ctx.reactNames.has(root) && tagNode.name.text === 'Fragment')) ctx.add(DRAW_OFF_GRAMMAR_COMPONENT, node, `<${tag}> is not a ${GRAMMAR_PACKAGE} export`);
+  } else if (ctx.iconImports.has(tag)) {
+    ctx.add(DRAW_OFF_GRAMMAR_COMPONENT, node, `<${tag}> renders an icon module raw: pass it as the source of Icon, IconTile or IconButton`);
+  } else if (!ctx.grammarImports.has(tag) && !ctx.local.has(tag) && !(ctx.reactNames.has(tag) && tag === 'Fragment')) {
+    ctx.add(DRAW_OFF_GRAMMAR_COMPONENT, node, `<${tag}> is neither a ${GRAMMAR_PACKAGE} export nor a component of this file`);
+  }
+  return tag;
+}
+
+function inspectDrawAttributes(attributes, tag, ctx) {
+  for (const attr of attributes.properties) {
+    if (!ctx.ts.isJsxAttribute(attr)) continue;
+    const name = attr.name.getText(ctx.sf);
+    if (name === 'style') ctx.add(DRAW_RAW_STYLED_HTML, attr, `<${tag} style> hand-styles: layout uses classes on the grammar spacing scale, paint belongs to grammar components`);
+    else if (name === 'dangerouslySetInnerHTML') ctx.add(DRAW_RAW_STYLED_HTML, attr, `<${tag} dangerouslySetInnerHTML> injects raw markup`);
+    else if (name === 'className') checkDrawClassName(attr, tag, ctx);
+  }
+}
+
+function visitDrawElement(node, tagNode, attributes, ctx) {
+  const tag = inspectDrawTag(node, tagNode, ctx);
+  inspectDrawAttributes(attributes, tag, ctx);
+}
+
+function walkDrawSource(node, ctx) {
+  if (ctx.ts.isJsxElement(node)) visitDrawElement(node.openingElement, node.openingElement.tagName, node.openingElement.attributes, ctx);
+  else if (ctx.ts.isJsxSelfClosingElement(node)) visitDrawElement(node, node.tagName, node.attributes, ctx);
+  ctx.ts.forEachChild(node, (child) => { walkDrawSource(child, ctx); });
+}
+
 /**
  * The AST gate of one draw file's text. Returns {findings:[{code, detail, line}], exports:[names], grammarImports,
  * layout:[{tag, line}], classes:{token, free, paint}}.
@@ -154,91 +309,16 @@ export function sourceFindings(text, { file = 'source.draw.tsx', rationale = [],
   };
 
   // Imports: grammar, react, icon sources, a raster art placeholder; a type-only import is free.
-  const grammarImports = new Map(); // local name -> module
-  const namespaces = new Set();
-  const iconImports = new Set();
-  const assetImports = new Set();
-  const reactNames = new Set();
-  for (const st of sf.statements) {
-    if (!ts.isImportDeclaration(st)) continue;
-    const mod = st.moduleSpecifier.text;
-    const clause = st.importClause;
-    if (!clause) { add(DRAW_IMPORT_OFF_GRAMMAR, st, `imports ${mod} for its side effects: a drawing styles nothing itself (the product CSS is draw-render's --css)`); continue; }
-    if (clause.isTypeOnly) continue;
-    const names = [];
-    if (clause.name) names.push(clause.name.text);
-    const nb = clause.namedBindings;
-    if (nb && ts.isNamespaceImport(nb)) { names.push(nb.name.text); if (GRAMMAR_MODULE_RX.test(mod)) namespaces.add(nb.name.text); }
-    if (nb && ts.isNamedImports(nb)) for (const el of nb.elements) if (!el.isTypeOnly) names.push(el.name.text);
-    if (!names.length) continue;
-    if (GRAMMAR_MODULE_RX.test(mod)) for (const n of names) grammarImports.set(n, mod);
-    else if (REACT_MODULES.includes(mod)) for (const n of names) reactNames.add(n);
-    else if (ICON_MODULE_RX.test(mod)) for (const n of names) iconImports.add(n);
-    else if (ASSET_MODULE_RX.test(mod) && clause.name && !nb) assetImports.add(clause.name.text);
-    else add(DRAW_IMPORT_OFF_GRAMMAR, st, `imports ${names.join(', ')} from ${mod}: a drawing composes only ${GRAMMAR_PACKAGE} (icons from an icon module as a source prop, art as a relative raster import)`);
-  }
+  const { grammarImports, namespaces, iconImports, assetImports, reactNames } = collectDrawImports(sf, ts, add);
 
   // Components declared in this file (each is walked like the XBase itself) and the exports.
-  const local = new Set();
-  const exported = [];
-  const isExported = (node) => list(ts.getModifiers?.(node) ?? node.modifiers).some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
-  for (const st of sf.statements) {
-    if (ts.isFunctionDeclaration(st) && st.name) { if (/^[A-Z]/.test(st.name.text)) local.add(st.name.text); if (isExported(st)) exported.push(st.name.text); }
-    if (ts.isVariableStatement(st)) for (const d of st.declarationList.declarations) {
-      if (!ts.isIdentifier(d.name)) continue;
-      if (/^[A-Z]/.test(d.name.text) && d.initializer && (ts.isArrowFunction(d.initializer) || ts.isFunctionExpression(d.initializer))) local.add(d.name.text);
-      if (isExported(st)) exported.push(d.name.text);
-    }
-    if (ts.isExportDeclaration(st) && st.exportClause && ts.isNamedExports(st.exportClause)) for (const el of st.exportClause.elements) exported.push(el.name.text);
-  }
+  const { local, exported } = collectDrawDeclarations(sf, ts);
   if (!exported.some((n) => /^[A-Z]\w*Base$/.test(n))) add(DRAW_BASE_SIGNATURE, null, 'exports no <X>Base: the drawn shape is the XBase of the drawing law');
 
   const layout = [];
   const classes = { token: [], free: [], paint: [] };
-  const checkClassName = (attr, owner) => {
-    const init = attr.initializer;
-    let value = null;
-    if (init && ts.isStringLiteral(init)) value = init.text;
-    else if (init && ts.isJsxExpression(init) && init.expression && (ts.isStringLiteral(init.expression) || ts.isNoSubstitutionTemplateLiteral(init.expression))) value = init.expression.text;
-    if (value == null) { add(DRAW_RAW_STYLED_HTML, attr, `<${owner}> className is not a string literal: a drawing's classes must be readable to the gate`); return; }
-    for (const token of value.split(/\s+/).filter(Boolean)) {
-      const c = classifyClass(token);
-      if (c.kind === 'paint') { classes.paint.push(token); add(DRAW_RAW_STYLED_HTML, attr, `<${owner} className="${token}"> paints (colour, type, radius, border or shadow) or is not a layout utility: that is a grammar component's job, never raw HTML`); }
-      else if (c.kind === 'free') {
-        classes.free.push(token);
-        if (!justifiedBy(token, rationale)) add(DRAW_LAYOUT_VALUE_UNJUSTIFIED, attr, `<${owner} className="${token}"> is a free spacing value outside the grammar GAP/PADDING scale (${GRAMMAR_SPACING_STEPS.join(' ')}): justify it in rationale.json (a spacing|layout decision naming ${token} with its rule id) or use a grammar step`);
-      } else if (c.kind === 'token') classes.token.push(token);
-    }
-  };
-  const tagName = (t) => (ts.isIdentifier(t) ? t.text : ts.isPropertyAccessExpression(t) ? `${t.expression.getText(sf)}.${t.name.text}` : t.getText(sf));
-  const visitElement = (node, tagNode, attributes) => {
-    const tag = tagName(tagNode);
-    const intrinsic = ts.isIdentifier(tagNode) && /^[a-z]/.test(tag);
-    if (intrinsic) {
-      if (!LAYOUT_ELEMENTS.includes(tag)) add(DRAW_RAW_STYLED_HTML, node, `<${tag}> is raw HTML: text is Text/Heading, media is Image/MediaFrame, icons are Icon - HTML is for layout only (${LAYOUT_ELEMENTS.join(', ')})`);
-      else layout.push({ tag, line: lineOf(node) });
-    } else if (ts.isPropertyAccessExpression(tagNode)) {
-      const root = tagNode.expression.getText(sf);
-      if (!namespaces.has(root) && !(reactNames.has(root) && tagNode.name.text === 'Fragment')) add(DRAW_OFF_GRAMMAR_COMPONENT, node, `<${tag}> is not a ${GRAMMAR_PACKAGE} export`);
-    } else if (iconImports.has(tag)) {
-      add(DRAW_OFF_GRAMMAR_COMPONENT, node, `<${tag}> renders an icon module raw: pass it as the source of Icon, IconTile or IconButton`);
-    } else if (!grammarImports.has(tag) && !local.has(tag) && !(reactNames.has(tag) && tag === 'Fragment')) {
-      add(DRAW_OFF_GRAMMAR_COMPONENT, node, `<${tag}> is neither a ${GRAMMAR_PACKAGE} export nor a component of this file`);
-    }
-    for (const attr of attributes.properties) {
-      if (!ts.isJsxAttribute(attr)) continue;
-      const name = attr.name.getText(sf);
-      if (name === 'style') add(DRAW_RAW_STYLED_HTML, attr, `<${tag} style> hand-styles: layout uses classes on the grammar spacing scale, paint belongs to grammar components`);
-      else if (name === 'dangerouslySetInnerHTML') add(DRAW_RAW_STYLED_HTML, attr, `<${tag} dangerouslySetInnerHTML> injects raw markup`);
-      else if (name === 'className') checkClassName(attr, tag);
-    }
-  };
-  const walk = (node) => {
-    if (ts.isJsxElement(node)) visitElement(node.openingElement, node.openingElement.tagName, node.openingElement.attributes);
-    else if (ts.isJsxSelfClosingElement(node)) visitElement(node, node.tagName, node.attributes);
-    ts.forEachChild(node, walk);
-  };
-  walk(sf);
+  const context = { ts, sf, add, lineOf, grammarImports, namespaces, iconImports, reactNames, local, rationale, layout, classes };
+  walkDrawSource(sf, context);
   return { findings, exports: exported, grammarImports, layout, classes, assetImports: [...assetImports] };
 }
 
@@ -261,7 +341,9 @@ export function markLayoutElements(text, { ts = loadTypescript()?.ts, file = 'so
   const sf = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
   const at = [];
   const walk = (node) => {
-    const opening = ts.isJsxElement(node) ? node.openingElement : ts.isJsxSelfClosingElement(node) ? node : null;
+    let opening = null;
+    if (ts.isJsxElement(node)) { opening = node.openingElement; }
+    else if (ts.isJsxSelfClosingElement(node)) { opening = node; }
     if (opening && ts.isIdentifier(opening.tagName) && /^[a-z]/.test(opening.tagName.text)) at.push(opening.tagName.getEnd());
     ts.forEachChild(node, walk);
   };

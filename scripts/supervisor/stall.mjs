@@ -190,7 +190,7 @@ export const openAskDispatches = (db, workflowId) => db.prepare(
 
 /** `.starciwork/...` paths an incident names, trailing punctuation dropped. */
 export const namedPaths = (text) => [...new Set((String(text ?? '').match(/\.starciwork\/[A-Za-z0-9._@\-/]+/g) ?? [])
-  .map((p) => p.replace(/[./-]+$/, '')).filter((p) => p.length > '.starciwork/'.length))];
+  .map((p) => p.replace(new RegExp(['[./-', ']+$'].join('')), '')).filter((p) => p.length > '.starciwork/'.length))];
 /** A gate that waits on an owner ask or decision (only such a gate is released by the ask closing). */
 const ASK_GATE = /\bask\b|\bowner(?:'s)? (?:decision|answer|choice|approval|ruling)\b|\bdecision pending\b/i;
 /** Workflow ids an incident names. */
@@ -199,7 +199,7 @@ export const namedWorkflows = (text) => [...new Set(String(text ?? '').match(/\b
 const namedJobs = (text) => [...new Set(String(text ?? '').match(/\bop-[a-z0-9.-]+-[0-9a-f]{10}\b/gi) ?? [])];
 
 /** Record states that mean the thing a gate waited for has landed. */
-const LANDED_STATES = new Set(['done', 'settled', 'decided', 'approved', 'accepted', 'final', 'complete', 'completed', 'passed', 'ready']);
+const LANDED_STATES = new Set(['done', 'settled', 'decided', 'approved', 'accepted', 'final', 'complete', 'completed', 'passed', 'ready']); const landedPathReason=(ev,raisedAt)=>{const state=ev.state?' ('+ev.state+')':'';let when;if(ev.created){when='created '+clock(ev.born);if(ev.written-ev.born>60_000)when+=', written '+clock(ev.written);}else when='written '+clock(ev.written);return `${ev.path} exists${state}, ${when} after the gate (${clock(raisedAt)})`;};
 
 /**
  * What a path an incident names looks like now, against the time the gate was raised:
@@ -268,7 +268,7 @@ export function judgeGate({ db, workflowId, gate, repo, dbOf = () => null, now =
   const paths = namedPaths(gate.text);
   for (const rel of paths) {
     const ev = pathEvidence(repo, rel, gate.raisedAt);
-    if (ev.landed) reasons.push(ev.path + ' exists' + (ev.state ? ' (' + ev.state + ')' : '') + ', ' + (ev.created ? 'created ' + clock(ev.born) + (ev.written - ev.born > 60_000 ? ', written ' + clock(ev.written) : '') : 'written ' + clock(ev.written)) + ' after the gate (' + clock(gate.raisedAt) + ')');
+    if (ev.landed) reasons.push(landedPathReason(ev, gate.raisedAt));
     else if (ev.waiting) waits.push(ev.path + ' ' + (ev.exists ? 'is ' + ev.state : 'is absent'));
   }
   const messageReleases = !paths.length && MESSAGE_GATE.test(gate.text);

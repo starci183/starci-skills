@@ -58,7 +58,10 @@ function* walk(dir) {
 const UPPER_RE = /(['"`])([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)\1/g;
 const KEBAB = '[a-z][a-z0-9]*(?:-[a-z0-9]+)+';
 // A constant naming environment variables (ARTIFACT_ROOT_ENV = 'STARCI_ARTIFACT_ROOT', CONTROLLED_ENV = new Set(['SOPS_AGE_KEY', ...])): its literals are env names, not codes.
-const ENV_LIST_RE = /\b[A-Z][A-Z0-9_]*_ENV[A-Z0-9_]*\s*=\s*(?:(?:new Set|Object\.freeze)\()?(?:\[([^\]]*)\]|('[^']*'|"[^"]*"))/g;
+const ENV_LIST_NAME_PART = String.raw`\b[A-Z][A-Z0-9_]*_ENV[A-Z0-9_]*`;
+const ENV_LIST_ASSIGNMENT_PART = String.raw`\s*=\s*`;
+const ENV_LIST_VALUE_PART = String.raw`(?:(?:new Set|Object\.freeze)\()?(?:\[([^\]]*)\]|('[^']*'|"[^"]*"))`;
+const ENV_LIST_RE = new RegExp(`${ENV_LIST_NAME_PART}${ENV_LIST_ASSIGNMENT_PART}${ENV_LIST_VALUE_PART}`, 'g');
 // A bracketed code in text: a message prefix ('[TARGET_MISSING] ...'), a comment or a YAML flow list. In JavaScript a
 // bracket around one identifier is code, not text: an element access (`baseline[KEY]`), an array literal (`[ROOT]`)
 // or a computed key (`{ [KEY]: v }`) reads a constant and emits nothing; `codeBrackets` finds those by parsing.
@@ -126,7 +129,7 @@ const sourceTexts = (base) => {
 };
 
 /** The codes one scanned source emits, pushed through `add`. */
-const fileEmittedCodes = (rel, text, { NOT_CODES, envNames, add }) => {
+const upperCodeFindings = (rel, text, NOT_CODES, envNames, add) => {
   for (const m of text.matchAll(UPPER_RE)) {
     const code = m[2];
     if (NOT_CODES.has(code) || NOT_CODE_PREFIX.test(code) || envNames.has(code)) continue;
@@ -139,12 +142,20 @@ const fileEmittedCodes = (rel, text, { NOT_CODES, envNames, add }) => {
     if (NOT_CODES.has(m[1]) || NOT_CODE_PREFIX.test(m[1]) || envNames.has(m[1])) continue;
     add(m[1], 'upper', rel, lineOf(text, m.index));
   }
+};
+
+const kebabCodeFindings = (rel, text, NOT_CODES, add) => {
   if (!rel.endsWith('.mjs')) return;
   const addKebab = (code, at) => { if (!NOT_CODES.has(code)) add(code, 'kebab', rel, lineOf(text, at)); };
   for (const m of text.matchAll(LIST_RE)) {
     for (const item of m[1].matchAll(new RegExp(`['"](${KEBAB})['"]`, 'g'))) addKebab(item[1], m.index);
   }
   for (const re of KEBAB_RES) for (const m of text.matchAll(re)) addKebab(m[m.length - 1], m.index);
+};
+
+const fileEmittedCodes = (rel, text, { NOT_CODES, envNames, add }) => {
+  upperCodeFindings(rel, text, NOT_CODES, envNames, add);
+  kebabCodeFindings(rel, text, NOT_CODES, add);
 };
 
 /** Every emitted code: {code, kind: 'upper'|'kebab', sites: [{file, line}]}. Sorted by code. */

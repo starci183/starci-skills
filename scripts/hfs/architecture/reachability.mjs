@@ -55,8 +55,7 @@ function entryOf(root, files) {
   return files.find(rel => new RegExp(String.raw`^${base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/index\.[tj]sx?$`).test(rel)) ?? [...files].sort(byCodeUnit)[0];
 }
 
-function checkBackend(graph) {
-  const byUnit = ownerFiles(graph);
+function backendAppRoots(byUnit) {
   const rootFiles = [];
   const appRoots = new Set();
   for (const [key, files] of byUnit) {
@@ -65,11 +64,10 @@ function checkBackend(graph) {
     appRoots.add(key.slice(key.indexOf(':') + 1));
     for (const rel of files) if (!TEST_FILE.test(rel)) rootFiles.push(rel);
   }
-  const roots = [...appRoots].sort(byCodeUnit);
-  const counts = { features: 0, modules: 0, appRoots: roots.length, notComposed: 0 };
-  if (!roots.length) return { violations: [], coverage: { status: 'unavailable', reason: 'no be.app.* owner instance holds a source file, so there is no app root to compose into', ...counts } };
-  const reached = reachFrom(graph, rootFiles);
-  const violations = [];
+  return { rootFiles, roots: [...appRoots].sort(byCodeUnit) };
+}
+
+function reportUncomposedBackendOwners(byUnit, reached, roots, counts, violations) {
   for (const [key, files] of [...byUnit].sort(([a], [b]) => a.localeCompare(b))) {
     const slot = key.slice(0, key.indexOf(':'));
     const root = key.slice(key.indexOf(':') + 1);
@@ -85,10 +83,41 @@ function checkBackend(graph) {
       message: `${feature ? 'Feature' : 'Module'} ${label} is not composed into any app: no runtime import path leads from ${roots.join(', ')} to it (a type-only import composes nothing), so it is dead code that no process serves.`,
     });
   }
+}
+
+function checkBackend(graph) {
+  const byUnit = ownerFiles(graph);
+  const { rootFiles, roots } = backendAppRoots(byUnit);
+  const counts = { features: 0, modules: 0, appRoots: roots.length, notComposed: 0 };
+  if (!roots.length) return { violations: [], coverage: { status: 'unavailable', reason: 'no be.app.* owner instance holds a source file, so there is no app root to compose into', ...counts } };
+  const reached = reachFrom(graph, rootFiles);
+  const violations = [];
+  reportUncomposedBackendOwners(byUnit, reached, roots, counts, violations);
   return { violations, coverage: { status: 'checked', ...counts } };
 }
 
 /** Route table of one app: arrays of segments, each {kind:'static'|'dyn'|'catch'|'optcatch', text}. */
+function routeSegmentsOf(parts) {
+  const segments = [];
+  let usable = true;
+  for (const part of parts) {
+    if (/^\([^.)][^)]*\)$/.test(part)) continue;            // route group
+    if (part.startsWith('@')) continue;                      // parallel slot: no URL segment
+    if (part.startsWith('_') || /^\(\.+\)/.test(part)) { usable = false; break; } // private folder, intercepting route
+    segments.push(part);
+  }
+  if (!usable) return null;
+  if (segments[0] === '[locale]') segments.shift();
+  return segments;
+}
+
+function routeSegmentOf(part) {
+  if (/^\[\[\.\.\..+\]\]$/.test(part)) return { kind: 'optcatch', text: part };
+  if (/^\[\.\.\..+\]$/.test(part)) return { kind: 'catch', text: part };
+  if (/^\[.+\]$/.test(part)) return { kind: 'dyn', text: part };
+  return { kind: 'static', text: part };
+}
+
 function routeTable(graph, app) {
   const prefix = `apps/${app}/src/app/`;
   const routes = [];
@@ -96,22 +125,9 @@ function routeTable(graph, app) {
     if (!rel.startsWith(prefix)) continue;
     const parts = rel.slice(prefix.length).split('/');
     if (!ROUTE_FILE.test(parts.at(-1))) continue;
-    const segments = [];
-    let usable = true;
-    for (const part of parts.slice(0, -1)) {
-      if (/^\([^.)][^)]*\)$/.test(part)) continue;            // route group
-      if (part.startsWith('@')) continue;                      // parallel slot: no URL segment
-      if (part.startsWith('_') || /^\(\.+\)/.test(part)) { usable = false; break; } // private folder, intercepting route
-      segments.push(part);
-    }
-    if (!usable) continue;
-    if (segments[0] === '[locale]') segments.shift();
-    routes.push(segments.map(part => {
-      if (/^\[\[\.\.\..+\]\]$/.test(part)) return { kind: 'optcatch', text: part };
-      if (/^\[\.\.\..+\]$/.test(part)) return { kind: 'catch', text: part };
-      if (/^\[.+\]$/.test(part)) return { kind: 'dyn', text: part };
-      return { kind: 'static', text: part };
-    }));
+    const segments = routeSegmentsOf(parts.slice(0, -1));
+    if (segments === null) continue;
+    routes.push(segments.map(routeSegmentOf));
   }
   return routes;
 }
@@ -159,30 +175,47 @@ const NAVIGATION_CALLS = new Set(['redirect', 'permanentRedirect']);
 const ROUTER_METHODS = new Set(['push', 'replace', 'prefetch']);
 
 /** Every href-like target in a source file: {node, text|null (null = computed)}. */
+function jsxHrefTarget(ts, node) {
+  if (!ts.isJsxAttribute(node) || !ts.isIdentifier(node.name) || node.name.text !== 'href' || !node.initializer) return null;
+  const value = ts.isJsxExpression(node.initializer) ? node.initializer.expression : node.initializer;
+  return { node: value ?? node, text: value ? literalText(ts, value) : null };
+}
+
+function routerNameOf(ts, callee) {
+  if (ts.isPropertyAccessExpression(callee) && ts.isIdentifier(callee.expression)) return callee.expression.text;
+  if (ts.isPropertyAccessExpression(callee) && ts.isPropertyAccessExpression(callee.expression)) return callee.expression.name.text;
+  return '';
+}
+
+function isNavigationTarget(ts, callee) {
+  const routerName = routerNameOf(ts, callee);
+  return (ts.isIdentifier(callee) && NAVIGATION_CALLS.has(callee.text))
+    || (ts.isPropertyAccessExpression(callee) && ROUTER_METHODS.has(callee.name.text) && /router$/i.test(routerName));
+}
+
+function callHrefTarget(ts, node) {
+  if (!ts.isCallExpression(node) || !node.arguments.length) return null;
+  const callee = node.expression;
+  if (!isNavigationTarget(ts, callee)) return null;
+  return { node: node.arguments[0], text: literalText(ts, node.arguments[0]) };
+}
+
+function hrefTargetOf(ts, node) {
+  return jsxHrefTarget(ts, node) ?? callHrefTarget(ts, node);
+}
+
 function hrefTargets(ts, sourceFile) {
   const found = [];
   const visit = node => {
-    if (ts.isJsxAttribute(node) && ts.isIdentifier(node.name) && node.name.text === 'href' && node.initializer) {
-      const value = ts.isJsxExpression(node.initializer) ? node.initializer.expression : node.initializer;
-      found.push({ node: value ?? node, text: value ? literalText(ts, value) : null });
-    } else if (ts.isCallExpression(node) && node.arguments.length) {
-      const callee = node.expression;
-      let routerName = '';
-      if (ts.isPropertyAccessExpression(callee) && ts.isIdentifier(callee.expression)) routerName = callee.expression.text;
-      else if (ts.isPropertyAccessExpression(callee) && ts.isPropertyAccessExpression(callee.expression)) routerName = callee.expression.name.text;
-      const navigates = (ts.isIdentifier(callee) && NAVIGATION_CALLS.has(callee.text))
-        || (ts.isPropertyAccessExpression(callee) && ROUTER_METHODS.has(callee.name.text) && /router$/i.test(routerName));
-      if (navigates) found.push({ node: node.arguments[0], text: literalText(ts, node.arguments[0]) });
-    }
+    const target = hrefTargetOf(ts, node);
+    if (target) found.push(target);
     ts.forEachChild(node, visit);
   };
   visit(sourceFile);
   return found;
 }
 
-function checkFrontend(config, context, graph) {
-  const ts = context.ts ?? context.loaded.ts;
-  const byUnit = ownerFiles(graph);
+function appRouteRoots(graph) {
   const apps = new Map();
   for (const [rel, node] of graph.files) {
     if (node.slot !== 'fe.route') continue;
@@ -191,9 +224,10 @@ function checkFrontend(config, context, graph) {
     if (!apps.has(app)) apps.set(app, []);
     apps.get(app).push(rel);
   }
-  const counts = { pages: 0, mounted: 0, hrefs: 0, hrefsResolved: 0, hrefsSkipped: 0, routes: 0 };
-  const violations = [];
-  const reachedByApp = new Map([...apps].map(([app, roots]) => [app, reachFrom(graph, roots)]));
+  return apps;
+}
+
+function reportUnreachableFrontendFeatures(byUnit, reachedByApp, counts, violations) {
   for (const [key, files] of [...byUnit].sort(([a], [b]) => a.localeCompare(b))) {
     if (!key.startsWith('fe.feature:')) continue;
     const root = key.slice('fe.feature:'.length);
@@ -207,27 +241,52 @@ function checkFrontend(config, context, graph) {
       message: `${label} is not mounted: no runtime import path leads from a route file under apps/${app}/src/app to it (a type-only import mounts nothing), so the page is never shown.`,
     });
   }
-  for (const app of [...new Set([...apps.keys(), ...[...graph.files.keys()].map(rel => /^apps\/([^/]+)\/src\//.exec(rel)?.[1]).filter(Boolean)])].sort(byCodeUnit)) {
+}
+
+function routeApps(graph, apps) {
+  return [...new Set([...apps.keys(), ...[...graph.files.keys()].map(rel => /^apps\/([^/]+)\/src\//.exec(rel)?.[1]).filter(Boolean)])].sort(byCodeUnit);
+}
+
+function hrefNeedsSkipping(text, routes) {
+  if (text === null || !text.startsWith('/') || text.startsWith('//') || !routes.length) return true;
+  const hrefPath = text.split(/[?#]/)[0];
+  return /\.[A-Za-z0-9]{1,6}$/.test(hrefPath.split('/').at(-1)); // static asset
+}
+
+function reportUnresolvedHref(app, rel, node, target, prefix, violations) {
+  const point = node.sourceFile.getLineAndCharacterOfPosition(target.node.getStart(node.sourceFile));
+  const shown = target.text.split(PLACEHOLDER).join('${…}');
+  violations.push({
+    ruleId: 'FE_HREF_RESOLVES', path: rel, line: point.line + 1, column: point.character + 1, app, href: shown,
+    message: `href "${shown}" matches no route of app ${app}: no page.tsx or route.ts under ${prefix}app serves that path.`,
+  });
+}
+
+function inspectAppHrefTargets(app, graph, ts, routes, counts, violations) {
+  const prefix = `apps/${app}/src/`;
+  for (const [rel, node] of graph.files) {
+    if (!rel.startsWith(prefix) || TEST_FILE.test(rel)) continue;
+    for (const target of hrefTargets(ts, node.sourceFile)) {
+      counts.hrefs += 1;
+      if (hrefNeedsSkipping(target.text, routes)) { counts.hrefsSkipped += 1; continue; }
+      if (hrefResolves(target.text, routes)) { counts.hrefsResolved += 1; continue; }
+      reportUnresolvedHref(app, rel, node, target, prefix, violations);
+    }
+  }
+}
+
+function checkFrontend(config, context, graph) {
+  const ts = context.ts ?? context.loaded.ts;
+  const byUnit = ownerFiles(graph);
+  const apps = appRouteRoots(graph);
+  const counts = { pages: 0, mounted: 0, hrefs: 0, hrefsResolved: 0, hrefsSkipped: 0, routes: 0 };
+  const violations = [];
+  const reachedByApp = new Map([...apps].map(([app, roots]) => [app, reachFrom(graph, roots)]));
+  reportUnreachableFrontendFeatures(byUnit, reachedByApp, counts, violations);
+  for (const app of routeApps(graph, apps)) {
     const routes = routeTable(graph, app);
     counts.routes += routes.length;
-    const prefix = `apps/${app}/src/`;
-    for (const [rel, node] of graph.files) {
-      if (!rel.startsWith(prefix) || TEST_FILE.test(rel)) continue;
-      for (const target of hrefTargets(ts, node.sourceFile)) {
-        counts.hrefs += 1;
-        const text = target.text;
-        if (text === null || !text.startsWith('/') || text.startsWith('//') || !routes.length) { counts.hrefsSkipped += 1; continue; }
-        const hrefPath = text.split(/[?#]/)[0];
-        if (/\.[A-Za-z0-9]{1,6}$/.test(hrefPath.split('/').at(-1))) { counts.hrefsSkipped += 1; continue; } // static asset
-        if (hrefResolves(text, routes)) { counts.hrefsResolved += 1; continue; }
-        const point = node.sourceFile.getLineAndCharacterOfPosition(target.node.getStart(node.sourceFile));
-        const shown = text.split(PLACEHOLDER).join('${…}');
-        violations.push({
-          ruleId: 'FE_HREF_RESOLVES', path: rel, line: point.line + 1, column: point.character + 1, app, href: shown,
-          message: `href "${shown}" matches no route of app ${app}: no page.tsx or route.ts under ${prefix}app serves that path.`,
-        });
-      }
-    }
+    inspectAppHrefTargets(app, graph, ts, routes, counts, violations);
   }
   return { violations, coverage: { status: 'checked', ...counts } };
 }

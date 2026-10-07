@@ -77,6 +77,7 @@ export const DOC_PROFILE = 'docs';
 const GATE_PROFILES = Object.freeze(['code', DOC_PROFILE]);
 
 const GATE_VALUE_FLAGS = new Set(['--root', '--base', '--main', '--tests', '--out', '--tree', '--scope']);
+const changedFilesOf = (argv, opts, index) => { opts.changed = []; while (index + 1 < argv.length && !argv[index + 1].startsWith('--')) opts.changed.push(argv[++index]); return index; };
 
 /** The flags; `--changed` adds named files to the actual base-to-working-tree delta and never narrows it. */
 export function parseGateArgs(argv) {
@@ -84,8 +85,7 @@ export function parseGateArgs(argv) {
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--changed') {
-      opts.changed = [];
-      while (i + 1 < argv.length && !argv[i + 1].startsWith('--')) opts.changed.push(argv[++i]);
+      i = changedFilesOf(argv, opts, i);
       continue;
     }
     if (!GATE_VALUE_FLAGS.has(arg)) throw new Error(`unknown argument ${arg}; ${USAGE}`);

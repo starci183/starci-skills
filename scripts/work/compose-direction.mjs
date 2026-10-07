@@ -123,7 +123,7 @@ export function composeDirection(options) {
   try { return composeOne(options); } catch (error) { return { ok: false, error: String(error?.message ?? error) }; }
 }
 
-function composeOne({ uiDir, content, breakpoint, theme, state = 'default', presentation = null, hostState = null, fit = 'cover', scrim = DEFAULT_SCRIM, tool = DRAW_TOOL, prompt = null, out = null, write = true }) {
+function resolveComposeContext({ uiDir, content, breakpoint, theme, state, presentation }) {
   const uiAbs = path.resolve(uiDir);
   const uiFile = path.join(uiAbs, 'index.yaml');
   const ui = readYamlOrNull(uiFile);
@@ -152,6 +152,10 @@ function composeOne({ uiDir, content, breakpoint, theme, state = 'default', pres
   const repoRoot = path.dirname(workRoot);
   const uiRecords = loadUiRecords(workRoot);
   const composite = { route: ui.route, surface, presentation: pres, breakpoint, theme, flowState: state };
+  return { ok: true, uiAbs, ui, workRoot, repoRoot, breakpoint, theme, state, pres, surface, contentAbs, contentBytes, contentImage, uiRecords, composite, bpEntry, shell, tree };
+}
+
+function resolveCompositionTarget({ ui, tree, breakpoint, theme, surface, shell, uiRecords, bpEntry, composite, pres, hostState, contentImage, scrim, fit }) {
   let base, rect, scrimUsed = null, fitUsed = fit;
   if (pres === 'page') {
     const parent = ui.routeParent;
@@ -189,6 +193,10 @@ function composeOne({ uiDir, content, breakpoint, theme, state = 'default', pres
     if (direction) composite.direction = direction;
     composite.host = { ui: host.id, asset: `${host.id}:${hostAsset.path}`, sha256: hostAsset.sha256, flowState: hostAsset.composite.flowState };
   }
+  return { ok: true, base, rect, scrimUsed, fitUsed };
+}
+
+function finishComposition({ uiAbs, workRoot, repoRoot, state, pres, surface, breakpoint, theme, contentAbs, contentBytes, contentImage, uiRecords, composite, base, rect, scrimUsed, fitUsed, tool, prompt, out, write }) {
   const image = composeImages({ base, content: contentImage, rect, fit: fitUsed, scrim: scrimUsed, clear: pres === 'page' ? CANVAS[theme] : null });
   const name = `${state}--${pres}--${breakpoint}--${theme}`;
   const outFile = path.resolve(out ?? path.join(uiAbs, 'assets', 'directions', `${name}.png`));
@@ -221,6 +229,14 @@ function composeOne({ uiDir, content, breakpoint, theme, state = 'default', pres
   };
   if (write) { fs.mkdirSync(path.dirname(outFile), { recursive: true }); fs.writeFileSync(outFile, bytes); }
   return { ok: true, outFile, image, contentAsset, asset, promptExists: fs.existsSync(path.resolve(promptPath)) };
+}
+
+function composeOne({ uiDir, content, breakpoint, theme, state = 'default', presentation = null, hostState = null, fit = 'cover', scrim = DEFAULT_SCRIM, tool = DRAW_TOOL, prompt = null, out = null, write = true }) {
+  const context = resolveComposeContext({ uiDir, content, breakpoint, theme, state, presentation });
+  if (!context.ok) return context;
+  const target = resolveCompositionTarget({ ...context, hostState, contentImage: context.contentImage, scrim, fit });
+  if (!target.ok) return target;
+  return finishComposition({ ...context, ...target, tool, prompt, out, write });
 }
 
 /**

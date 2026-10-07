@@ -53,7 +53,7 @@ export function fitPreparedLogData(data, maxBytes, clip, bytesOf, fitData) {
   return null;
 }
 
-export function numericExitCode(value) {
+function numericExitCode(value) {
   if (Number.isInteger(value)) return value;
   if (Number.isInteger(Number(value)) && value !== null && value !== '') return Number(value);
   return -1;
@@ -249,22 +249,30 @@ export function scratchLogSource(jobId, at, body) {
   return `jl:${hash}`;
 }
 
+function prepareEventRows(events, ctx, rowsOfEvent, prepareLogRow) {
+  const rows = [];
+  let invalid = 0;
+  for (const event of events) {
+    for (const raw of rowsOfEvent(event, ctx)) {
+      const prepared = prepareLogRow(raw);
+      if (prepared.error) { invalid += 1; continue; }
+      rows.push(prepared.row);
+    }
+  }
+  return { rows, invalid };
+}
+
 export function syncDerivedLogBatches({ logs, eventsAfter, batch, maxBatches, dryRun, cursorName, cursor, eventKinds, ctx, rowsOfEvent, prepareLogRow, insertLogRows }) {
   const out = { events: 0, rows: 0, inserted: 0, duplicate: 0, invalid: 0, cursor };
   let nextCursor = cursor;
   for (let n = 0; n < maxBatches; n++) {
     const events = eventsAfter.all(nextCursor, ...eventKinds, batch);
     if (!events.length) break;
-    const rows = [];
-    for (const event of events) {
-      for (const raw of rowsOfEvent(event, ctx)) {
-        const prepared = prepareLogRow(raw);
-        if (prepared.error) { out.invalid += 1; continue; }
-        rows.push(prepared.row);
-      }
-    }
+    const prepared = prepareEventRows(events, ctx, rowsOfEvent, prepareLogRow);
+    const rows = prepared.rows;
     out.events += events.length;
     out.rows += rows.length;
+    out.invalid += prepared.invalid;
     const last = events.at(-1).seq;
     if (dryRun) {
       out.inserted += rows.filter((row) => !logs.db.prepare('SELECT 1 FROM logs WHERE src=?').get(row.src)).length;

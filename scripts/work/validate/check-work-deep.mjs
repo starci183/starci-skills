@@ -30,6 +30,9 @@ import { isMain } from '../../lib/is-main.mjs';
  */
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+const PROOF_SPEC_PATH_PART = '[\\w./-]+';
+const PROOF_SPEC_KIND_PART = '(?:spec|e2e-spec|test)';
+const proofSpecExpression = () => new RegExp(PROOF_SPEC_PATH_PART + '\\.' + PROOF_SPEC_KIND_PART + '\\.ts', 'g');
 
 /** The instant a work/evidence@1 run object was minted, from its id (`20260919T155312Z-5c10a673`); null when there is none. */
 export function runTimeOf(run) {
@@ -130,7 +133,7 @@ function gqlOps(repoRoot) {
   findOpDirs(srcRoot);
   for (const file of srcFiles(repoRoot, '.resolver.ts')) {
     const text = fs.readFileSync(file, 'utf8');
-    for (const m of text.matchAll(/@(Query|Mutation)\b[^)]*\)\s*\n?\s*(?:async\s+)?(\w+)\s*\(/g)) {
+    for (const m of text.matchAll(/@(Query|Mutation)\b[^)]*\)\s*(?:async\s+)?(\w+)\s*\(/g)) {
       ops.push({kind: m[1].toLowerCase(), op: m[2], file});
     }
   }
@@ -262,7 +265,7 @@ function checkTree(workRoot, out, baseline) {
       if (npmRun && appScripts?.[npmRun[1]] == null) {
         refuse(file, 'PROOF_COMMAND_DEAD', `${label}: npm script "${npmRun[1]}" does not exist in the app root package.json`);
       }
-      for (const token of command.match(/[\w./-]+\.(?:spec|e2e-spec|test)\.ts/g) ?? []) {
+      for (const token of command.match(proofSpecExpression()) ?? []) {
         const p = token.replace(/^--\S+\s+/, '');
         if (!specExists(p)) {
           refuse(file, 'PROOF_COMMAND_DEAD', `${label}: spec "${p}" matches no file of the app`);

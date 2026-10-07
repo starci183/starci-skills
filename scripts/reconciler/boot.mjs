@@ -133,32 +133,13 @@ export async function ensure({ env = process.env, now = Date.now(), numbers = re
   const pending = starting();
   if (pending) return { ok: true, action: 'starting', pid: pending.pid };
   const out = { ok: true, action: 'started', stale: l.ageMs, previous: l.pid };
-  // A live lock holder with a stale heartbeat is a hung engine: stop its tree first (the lock names the reconciler).
-  const held = lock();
-  if (held?.pid && alive(held.pid)) {
-    out.stopped = { pid: held.pid, ...stop(held.pid) };
-    // G1/G2: the hung engine's process run ends `killed` by boot-ensure with its heartbeat age; its epoch is released `killed`.
-    const heartbeat = l.ageMs == null ? 'never' : `${Math.round(l.ageMs / 1000)}s old`;
-    record((m) => m.transaction(() => {
-      for (const run of m.openProcessRuns({ role: 'engine' }).filter((r) => r.pid === held.pid)) m.endProcessRun(run.run_id, { exitReason: 'killed', killedBy: 'boot-ensure' });
-      const row = m.leaderOf(LEADER_NAME);
-      if (row && row.pid === held.pid) m.releaseLeader({ name: LEADER_NAME, epoch: row.epoch, reason: 'killed' });
-      m.log({ actor: 'reconciler', kind: 'reconciler.engine-killed', level: 'warn', msg: `boot ensure stopped the hung engine pid ${held.pid} (heartbeat ${heartbeat})`,
-        data: { pid: held.pid, epoch: l.epoch, heartbeatAgeMs: l.ageMs, stopped: out.stopped } });
-    }));
-  }
+  stopHungEngine({ l, lock, alive, stop, record, now, out });
   const plan = crashLoopPlan(starts(), { now, max: numbers.crashLoop.max, windowMs: numbers.crashLoop.windowMs });
   const safe = plan.looping;
-  if (plan.alertDue) {
-    const minutes = Math.round(numbers.crashLoop.windowMs / 60_000);
-    out.alert = await push((language) => translator(language)('URGENT: the StarCi reconciler restarted {count} times in {minutes} minutes; running in safe mode (read-only). See machine_logs actor reconciler (boot.mjs --status).', { count: plan.starts.length + 1, minutes }));
-    record((m) => m.log({ actor: 'reconciler', kind: CRASH_ALERT_KIND, level: 'error', msg: `crash loop: ${plan.starts.length + 1} starts in ${minutes} min; safe mode`, data: { starts: plan.starts, alert: out.alert ?? null }, at: now }));
-  }
+  if (plan.alertDue) out.alert = await recordCrashAlert(plan, numbers, push, record, now);
   // A caller-named reason (owner-restart, start) or a previous engine that ended on purpose is a planned start: never a crash.
   const planned = reason ?? (PLANNED_EXIT_REASONS.includes(l.exitReason) || l.killedBy === 'owner' ? 'planned-restart' : null);
-  let startReason;
-  if (safe) startReason = 'crash-restart';
-  else startReason = planned ?? (l.holder ? 'ensure-stale-heartbeat' : 'boot');
+  const startReason = startReasonOf(safe, planned, l);
   const pid = spawnOne({ safe, startReason });
   if (pid) markStarting('reconciler', pid, env);
   const startLabel = pid ? `started the engine pid ${pid}` : 'could not start the engine';
@@ -167,6 +148,29 @@ export async function ensure({ env = process.env, now = Date.now(), numbers = re
     data: { pid, safe, startReason, previous: l.pid ?? null, staleMs: l.ageMs ?? null }, at: now }));
   return { ...out, ok: Boolean(pid), pid, safe, startReason, ...(pid ? {} : { action: 'start-failed' }) };
 }
+
+function stopHungEngine({ l, lock, alive, stop, record, now, out }) {
+  const held = lock();
+  if (!held?.pid || !alive(held.pid)) return;
+  out.stopped = { pid: held.pid, ...stop(held.pid) };
+  const heartbeat = l.ageMs == null ? 'never' : `${Math.round(l.ageMs / 1000)}s old`;
+  record((m) => m.transaction(() => {
+    for (const run of m.openProcessRuns({ role: 'engine' }).filter((row) => row.pid === held.pid)) m.endProcessRun(run.run_id, { exitReason: 'killed', killedBy: 'boot-ensure' });
+    const row = m.leaderOf(LEADER_NAME);
+    if (row && row.pid === held.pid) m.releaseLeader({ name: LEADER_NAME, epoch: row.epoch, reason: 'killed' });
+    m.log({ actor: 'reconciler', kind: 'reconciler.engine-killed', level: 'warn', msg: `boot ensure stopped the hung engine pid ${held.pid} (heartbeat ${heartbeat})`,
+      data: { pid: held.pid, epoch: l.epoch, heartbeatAgeMs: l.ageMs, stopped: out.stopped } });
+  }));
+}
+
+async function recordCrashAlert(plan, numbers, push, record, now) {
+  const minutes = Math.round(numbers.crashLoop.windowMs / 60_000);
+  const alert = await push((language) => translator(language)('URGENT: the StarCi reconciler restarted {count} times in {minutes} minutes; running in safe mode (read-only). See machine_logs actor reconciler (boot.mjs --status).', { count: plan.starts.length + 1, minutes }));
+  record((m) => m.log({ actor: 'reconciler', kind: CRASH_ALERT_KIND, level: 'error', msg: `crash loop: ${plan.starts.length + 1} starts in ${minutes} min; safe mode`, data: { starts: plan.starts, alert: alert ?? null }, at: now }));
+  return alert;
+}
+
+const startReasonOf = (safe, planned, leader) => safe ? 'crash-restart' : planned ?? (leader.holder ? 'ensure-stale-heartbeat' : 'boot');
 
 /**
  * Owner restart: stop the engine (if any), then ensure. The stop ends the engine's run `killed` by the owner and releases
@@ -272,34 +276,55 @@ export function taskScript({ starci, workdir = SKILL_ROOT, every = 5 } = {}) {
   return reconcilerTaskScript({ starci, workdir, everyMinutes: every });
 }
 
+function printBootStatus(json) {
+  const value = status();
+  console.log(json ? JSON.stringify(value) : describeStatus(value));
+}
+
+async function startReconcilerUp(argv) {
+  const { main: start } = await import('./start.mjs');
+  await start(argv.filter((argument) => argument !== '--up' && argument !== 'up'));
+}
+
+function stopReconciler(json) {
+  const result = stopEngine();
+  const stopped = result.stopped.length ? ` pid ${result.stopped.map((item) => item.pid).join(', ')}` : '';
+  console.log(json ? JSON.stringify(result) : `[reconciler boot] ${result.action}${stopped}`);
+  process.exitCode = result.ok ? 0 : 1;
+}
+
+async function restartReconciler(json) {
+  const result = await restartEngine();
+  const safe = result.safe ? ' SAFE' : '';
+  console.log(json ? JSON.stringify(result) : `[reconciler boot] restart: ${result.action} pid ${result.pid ?? '-'}${safe}`);
+  process.exitCode = result.ok ? 0 : 1;
+}
+
+async function ensureReconciler(json) {
+  const result = await ensure();
+  const pid = result.pid ? ` pid ${result.pid}` : '';
+  const safe = result.safe ? ' SAFE MODE' : '';
+  const heartbeat = result.ageMs != null ? ` heartbeat ${Math.round(result.ageMs / 1000)}s` : '';
+  console.log(json ? JSON.stringify(result) : `[reconciler boot] ${result.action}${pid}${safe}${heartbeat}`);
+  process.exitCode = result.ok ? 0 : 1;
+}
+
 export async function main(argv = process.argv.slice(2)) {
   const json = argv.includes('--json');
   if (argv.includes('--status')) {
-    const s = status();
-    console.log(json ? JSON.stringify(s) : describeStatus(s));
+    printBootStatus(json);
     return;
   }
-  if (argv.includes('--up') || argv[0] === 'up') { const { main: start } = await import('./start.mjs'); await start(argv.filter((a) => a !== '--up' && a !== 'up')); return; }
+  if (argv.includes('--up') || argv[0] === 'up') { await startReconcilerUp(argv); return; }
   if (argv.includes('--stop')) {
-    const r = stopEngine();
-    const stopped = r.stopped.length ? ` pid ${r.stopped.map((item) => item.pid).join(', ')}` : '';
-    console.log(json ? JSON.stringify(r) : `[reconciler boot] ${r.action}${stopped}`);
-    process.exitCode = r.ok ? 0 : 1;
+    stopReconciler(json);
     return;
   }
   if (argv.includes('--restart')) {
-    const r = await restartEngine();
-    const safe = r.safe ? ' SAFE' : '';
-    console.log(json ? JSON.stringify(r) : `[reconciler boot] restart: ${r.action} pid ${r.pid ?? '-'}${safe}`);
-    process.exitCode = r.ok ? 0 : 1;
+    await restartReconciler(json);
     return;
   }
-  const r = await ensure();
-  const pid = r.pid ? ` pid ${r.pid}` : '';
-  const safe = r.safe ? ' SAFE MODE' : '';
-  const heartbeat = r.ageMs != null ? ` heartbeat ${Math.round(r.ageMs / 1000)}s` : '';
-  console.log(json ? JSON.stringify(r) : `[reconciler boot] ${r.action}${pid}${safe}${heartbeat}`);
-  process.exitCode = r.ok ? 0 : 1;
+  await ensureReconciler(json);
 }
 
 if (isMain(import.meta.url)) await main();

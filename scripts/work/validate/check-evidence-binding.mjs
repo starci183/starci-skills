@@ -12,7 +12,7 @@ import { revParseQuery } from '../../api/git/rev-parse-query.mjs';
 import { log as gitLog } from '../../api/git/log.mjs';
 import { catFile } from '../../api/git/cat-file.mjs';
 import {isDir} from '../../lib/fs-kind.mjs';
-import {list} from '../../lib/list.mjs';
+import {list, byCodeUnit} from '../../lib/list.mjs';
 import {sha256File} from '../../../engine/digest.mjs';
 
 /**
@@ -130,20 +130,15 @@ function newestCommit(gitRoot, relPaths, since) {
  * where a checkout's mtime is only the moment somebody cloned - so mtime answers last, and only where git
  * cannot.
  */
-function newestSourceChange(repoRoot, relPaths, gitCache, revision) {
-  if (!relPaths.length) return null;
-  const gitRoot = gitRootOf(repoRoot, gitCache);
-  if (gitRoot && revision) {
-    const known = catFile(['-e', `${revision}^{commit}`], {cwd: gitRoot});
-    if (!known.error && known.status === 0) {
-      const after = newestCommit(gitRoot, relPaths, revision);
-      // A commit after the revision the record pins IS the drift, whatever the capture clock says: the
-      // revision is what the rest of the record was true at.
-      return after ? {...after, afterRevision: true, method: `git commit time, after the record's own revision ${revision.slice(0, 12)}`} : null;
-    }
-  }
-  const committed = gitRoot ? newestCommit(gitRoot, relPaths, null) : null;
-  if (committed) return {...committed, method: 'git commit time'};
+function changeAfterRevision(gitRoot, relPaths, revision) {
+  const known = catFile(['-e', `${revision}^{commit}`], {cwd: gitRoot});
+  if (known.error || known.status !== 0) return null;
+  const after = newestCommit(gitRoot, relPaths, revision);
+  // A commit after the revision the record pins IS the drift, whatever the capture clock says: the
+  // revision is what the rest of the record was true at.
+  return {change: after ? {...after, afterRevision: true, method: `git commit time, after the record's own revision ${revision.slice(0, 12)}`} : null};
+}
+function newestFileMtime(repoRoot, relPaths) {
   let best = null;
   for (const rel of relPaths) {
     let stat;
@@ -151,6 +146,18 @@ function newestSourceChange(repoRoot, relPaths, gitCache, revision) {
     if (!best || stat.mtimeMs > best.at) best = {at: stat.mtimeMs, path: rel, method: 'file mtime'};
   }
   return best;
+}
+
+function newestSourceChange(repoRoot, relPaths, gitCache, revision) {
+  if (!relPaths.length) return null;
+  const gitRoot = gitRootOf(repoRoot, gitCache);
+  if (gitRoot && revision) {
+    const pinned = changeAfterRevision(gitRoot, relPaths, revision);
+    if (pinned) return pinned.change;
+  }
+  const committed = gitRoot ? newestCommit(gitRoot, relPaths, null) : null;
+  if (committed) return {...committed, method: 'git commit time'};
+  return newestFileMtime(repoRoot, relPaths);
 }
 
 /**
@@ -196,6 +203,95 @@ function resolveCodeDigestPath(rel, dirs, appRoot) {
 
 // ---------- the four bindings ----------
 
+function evidenceForRecord(workRoot, record) {
+  const evidenceFile = path.join(record.dir, 'evidence.yaml');
+  if (!fs.existsSync(evidenceFile)) return null;
+  let evidence;
+  try { evidence = parseYaml(fs.readFileSync(evidenceFile, 'utf8')); }
+  catch { throw new EvidenceBindingInputError(`Cannot parse ${slash(path.relative(workRoot, evidenceFile))}`); }
+  if (!evidence || typeof evidence !== 'object' || evidence.stale === true) return null;
+  return {evidence, evidenceShown: slash(path.relative(workRoot, evidenceFile))};
+}
+
+function checkDigestRows({id, evidenceShown, rows, owned, dirs, appRoot, add}) {
+  const proven = new Set();
+  for (const row of rows) {
+    const rel = slash(row.path);
+    proven.add(rel);
+    const found = owned.get(rel) ?? resolveCodeDigestPath(rel, dirs, appRoot);
+    let stat;
+    try { stat = fs.statSync(found.abs); } catch { stat = null; }
+    if (!stat?.isFile()) {
+      add('EVIDENCE_PATH_MISSING', id, `${evidenceShown}#codeDigest.files`,
+        `the proof hashes ${rel}, and nothing is at ${slash(found.abs)} now`);
+      continue;
+    }
+    if (typeof row.sha256 !== 'string' || !/^[a-f0-9]{64}$/.test(row.sha256)) continue;
+    const current = sha256File(found.abs);
+    if (current !== row.sha256) {
+      add('EVIDENCE_DIGEST_MISMATCH', id, `${evidenceShown}#codeDigest.files`,
+        `${rel} was hashed ${row.sha256} when this was proven and hashes ${current} now`);
+    }
+  }
+  return proven;
+}
+
+function unprovenFilesByRepo(owned, proven) {
+  const byRepo = new Map();
+  for (const [key, entry] of owned) {
+    if (proven.has(key)) continue;
+    if (!byRepo.has(entry.repoRoot)) byRepo.set(entry.repoRoot, []);
+    byRepo.get(entry.repoRoot).push(entry.repoRel);
+  }
+  return byRepo;
+}
+
+function newestUnprovenSource(byRepo, gitCache, revision) {
+  let newest = null, unproven = 0;
+  for (const [repoRoot, relPaths] of byRepo) {
+    unproven += relPaths.length;
+    const candidate = newestSourceChange(repoRoot, relPaths.sort(byCodeUnit), gitCache, revision);
+    if (candidate && (!newest || candidate.at > newest.at)) newest = candidate;
+  }
+  return {newest, unproven};
+}
+
+function checkSourceFreshness({id, record, data, evidence, evidenceShown, owned, proven, gitCache, add}) {
+  // Freshness. A file the evidence pinned by digest and that still matches has not moved since the
+  // capture, whatever its timestamps say; the question is only open for source this record claims and
+  // the proof never hashed.
+  if (record.schema !== 'work/implementation@1') return;
+  const capturedAt = Date.parse(evidence.provenance?.capturedAt ?? '');
+  if (!Number.isFinite(capturedAt)) return;
+  const {newest, unproven} = newestUnprovenSource(
+    unprovenFilesByRepo(owned, proven), gitCache, typeof data.revision === 'string' ? data.revision : null);
+  if (newest && (newest.afterRevision || newest.at > capturedAt)) {
+    add('EVIDENCE_OLDER_THAN_SOURCE', id, `${evidenceShown}#provenance.capturedAt`,
+      `captured ${new Date(capturedAt).toISOString()}, but ${newest.path} - one of ${unproven} owned file(s) this proof never hashed - last changed ${new Date(newest.at).toISOString()} by ${newest.method}`);
+  }
+}
+
+function checkRecordEvidence({workRoot, id, record, records, workspaceDoc, appRoot, gitCache, add}) {
+  const data = record.data;
+  if (data?.state !== 'done') return;
+  const shown = slash(path.relative(workRoot, path.join(record.dir, 'index.yaml')));
+  // Bullet: proof, not assertion. The implementation schema's own vocabulary - kernel-observed against
+  // authored-claim - is the only place the tree distinguishes a run from a sentence, so it is what is
+  // read here, on every family that carries it.
+  if (data.verificationSource === 'authored-claim' && !AUTHORED_BY_NATURE.has(record.schema)) {
+    add('EVIDENCE_ASSERTED_NOT_OBSERVED', id, shown,
+      `state: done rests on verificationSource: authored-claim, so nothing observed this record; ${record.schema} is not one of the authored-by-nature schemas (work/data@1, work/brand@1, work/policy-decision@1)`);
+  }
+  const loaded = evidenceForRecord(workRoot, record);
+  if (!loaded) return;
+  const {evidence, evidenceShown} = loaded;
+  const dirs = resolveOwnedDirs(id, record, records, workspaceDoc, workRoot);
+  const owned = ownedIndex(dirs);
+  const rows = list(evidence.codeDigest?.files).filter(row => row && typeof row.path === 'string');
+  const proven = checkDigestRows({id, evidenceShown, rows, owned, dirs, appRoot, add});
+  checkSourceFreshness({id, record, data, evidence, evidenceShown, owned, proven, gitCache, add});
+}
+
 function checkEvidenceBinding({workRoot}) {
   const findings = [];
   const add = (code, node, file, detail) => findings.push({code, node, path: slash(file), detail});
@@ -206,76 +302,7 @@ function checkEvidenceBinding({workRoot}) {
   const appRoot = appRootOf(workRoot);
 
   for (const [id, record] of [...records].sort((a, b) => a[0].localeCompare(b[0]))) {
-    const data = record.data;
-    if (data?.state !== 'done') continue;
-    const shown = slash(path.relative(workRoot, path.join(record.dir, 'index.yaml')));
-
-    // Bullet: proof, not assertion. The implementation schema's own vocabulary - kernel-observed against
-    // authored-claim - is the only place the tree distinguishes a run from a sentence, so it is what is
-    // read here, on every family that carries it.
-    if (data.verificationSource === 'authored-claim' && !AUTHORED_BY_NATURE.has(record.schema)) {
-      add('EVIDENCE_ASSERTED_NOT_OBSERVED', id, shown,
-        `state: done rests on verificationSource: authored-claim, so nothing observed this record; ${record.schema} is not one of the authored-by-nature schemas (work/data@1, work/brand@1, work/policy-decision@1)`);
-    }
-
-    const evidenceFile = path.join(record.dir, 'evidence.yaml');
-    if (!fs.existsSync(evidenceFile)) continue;
-    let evidence;
-    try { evidence = parseYaml(fs.readFileSync(evidenceFile, 'utf8')); }
-    catch { throw new EvidenceBindingInputError(`Cannot parse ${slash(path.relative(workRoot, evidenceFile))}`); }
-    if (!evidence || typeof evidence !== 'object') continue;
-    // Evidence marked stale has already said it no longer describes the current product
-    // (work-evidence.schema.yaml: expiry is a one-way door, and the manifest stays as history). Refusing
-    // it for pointing at the past would punish the tree for being honest about it.
-    if (evidence.stale === true) continue;
-
-    const evidenceShown = slash(path.relative(workRoot, evidenceFile));
-    const dirs = resolveOwnedDirs(id, record, records, workspaceDoc, workRoot);
-    const owned = ownedIndex(dirs);
-    const rows = list(evidence.codeDigest?.files).filter(row => row && typeof row.path === 'string');
-    const proven = new Set();
-
-    for (const row of rows) {
-      const rel = slash(row.path);
-      proven.add(rel);
-      const found = owned.get(rel) ?? resolveCodeDigestPath(rel, dirs, appRoot);
-      let stat;
-      try { stat = fs.statSync(found.abs); } catch { stat = null; }
-      if (!stat?.isFile()) {
-        add('EVIDENCE_PATH_MISSING', id, `${evidenceShown}#codeDigest.files`,
-          `the proof hashes ${rel}, and nothing is at ${slash(found.abs)} now`);
-        continue;
-      }
-      if (typeof row.sha256 !== 'string' || !/^[a-f0-9]{64}$/.test(row.sha256)) continue;
-      const current = sha256File(found.abs);
-      if (current !== row.sha256) {
-        add('EVIDENCE_DIGEST_MISMATCH', id, `${evidenceShown}#codeDigest.files`,
-          `${rel} was hashed ${row.sha256} when this was proven and hashes ${current} now`);
-      }
-    }
-
-    // Freshness. A file the evidence pinned by digest and that still matches has not moved since the
-    // capture, whatever its timestamps say; the question is only open for source this record claims and
-    // the proof never hashed.
-    if (record.schema !== 'work/implementation@1') continue;
-    const capturedAt = Date.parse(evidence.provenance?.capturedAt ?? '');
-    if (!Number.isFinite(capturedAt)) continue;
-    const byRepo = new Map();
-    for (const [key, entry] of owned) {
-      if (proven.has(key)) continue;
-      if (!byRepo.has(entry.repoRoot)) byRepo.set(entry.repoRoot, []);
-      byRepo.get(entry.repoRoot).push(entry.repoRel);
-    }
-    let newest = null, unproven = 0;
-    for (const [repoRoot, relPaths] of byRepo) {
-      unproven += relPaths.length;
-      const candidate = newestSourceChange(repoRoot, relPaths.sort(), gitCache, typeof data.revision === 'string' ? data.revision : null);
-      if (candidate && (!newest || candidate.at > newest.at)) newest = candidate;
-    }
-    if (newest && (newest.afterRevision || newest.at > capturedAt)) {
-      add('EVIDENCE_OLDER_THAN_SOURCE', id, `${evidenceShown}#provenance.capturedAt`,
-        `captured ${new Date(capturedAt).toISOString()}, but ${newest.path} - one of ${unproven} owned file(s) this proof never hashed - last changed ${new Date(newest.at).toISOString()} by ${newest.method}`);
-    }
+    checkRecordEvidence({workRoot, id, record, records, workspaceDoc, appRoot, gitCache, add});
   }
 
   findings.sort((a, b) => a.code.localeCompare(b.code) || a.node.localeCompare(b.node) || a.path.localeCompare(b.path));

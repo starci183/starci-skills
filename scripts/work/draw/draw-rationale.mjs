@@ -34,9 +34,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../../engine/yaml.mjs';
-import { COMPONENT_ATTR, PART_ATTR, componentRootOf, loadDna, parseHtml, visibleElement, walkElements, classesOf } from './draw-dna.mjs';
+import { COMPONENT_ATTR, loadDna, walkElements } from './draw-dna.mjs';
+import { findRationaleIssues } from './rationale-findings.mjs';
 import { list } from '../../lib/list.mjs';
-import { ancestorsOf } from '../../lib/dom-tree.mjs';
 import { isFile } from '../../lib/fs-kind.mjs'; import { isMain } from '../../lib/is-main.mjs';
 
 export const DRAW_RATIONALE_MISSING = 'DRAW_RATIONALE_MISSING';
@@ -45,9 +45,6 @@ export const WHY_ATTR = 'data-why';
 export const REDLINE_ATTR = 'data-draw-redline';
 export const MEASURE_SCHEMA = 'starci/draw-rationale-measure@1';
 const REQUIRED_FIELDS = Object.freeze(['id', 'selector', 'kind', 'decision', 'value', 'because', 'rules', 'alternativesRejected', 'source']);
-/** Which decision kinds may state a measured value of each property class. */
-const KINDS_OF_CLASS = Object.freeze({ spacing: ['spacing', 'layout'], radius: ['radius'], fontSize: ['type'], fontWeight: ['type'], lineHeight: ['type'] });
-const CLASS_LABEL = Object.freeze({ spacing: 'gap/padding/inset', radius: 'radius', fontSize: 'font-size', fontWeight: 'font-weight', lineHeight: 'line-height' });
 /** Components too small to label in the redline (they are named by their region's label). */
 export const REDLINE_LEAF_COMPONENTS = Object.freeze(['Text', 'Heading', 'Icon', 'Label', 'Description', 'Kbd', 'Badge', 'Chip', 'IconTile', 'TagGroup', 'Tag', 'StateMark', 'MediaFrame', 'Avatar']);
 
@@ -56,7 +53,7 @@ const KNOWLEDGE = path.join(ROOT, 'knowledge');
 const OWNER_RULINGS = path.join(ROOT, 'modules', 'kernel', 'owner-rulings.yaml');
 const readJson = (f) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return undefined; } };
 const readYamlOr = (f) => { try { return parseYaml(fs.readFileSync(f, 'utf8')); } catch { return null; } };
-const str = (v) => { if (v == null) return ''; if (typeof v === 'string') return v; if (typeof v === 'number') return String(v); return JSON.stringify(v); };
+const str = (v) => { if (v == null) { return ''; } if (typeof v === 'string') { return v; } if (typeof v === 'number') { return String(v); } return JSON.stringify(v); };
 
 // ---------------------------------------------------------------------------------------------------------
 // The rationale file
@@ -122,23 +119,27 @@ function ruleTokenOf(ref) {
 
 let knowledgeCache = null;
 /** Every id knowledge/** declares: {ids:Set, cases:Map(ruleId -> Set(case ids))}. */
+function addKnowledgeRecord(node, ids, cases) {
+  if (typeof node.id !== 'string' || !node.id.trim()) return;
+  const id = node.id.trim();
+  if (!/^case-\d+$/i.test(id)) ids.add(id);
+  if (!Array.isArray(node.cases)) return;
+  const set = cases.get(id) ?? new Set();
+  for (const item of node.cases) if (typeof item?.id === 'string') set.add(item.id.trim());
+  cases.set(id, set);
+}
+function visitKnowledgeNode(node, ids, cases) {
+  if (Array.isArray(node)) {
+    for (const item of node) visitKnowledgeNode(item, ids, cases);
+    return;
+  }
+  if (!node || typeof node !== 'object') return;
+  addKnowledgeRecord(node, ids, cases);
+  for (const value of Object.values(node)) if (value && typeof value === 'object') visitKnowledgeNode(value, ids, cases);
+}
 function knowledgeIndex(root = KNOWLEDGE) {
   if (knowledgeCache?.root === root) return knowledgeCache;
   const ids = new Set(), cases = new Map();
-  const visit = (node) => {
-    if (Array.isArray(node)) { for (const n of node) { visit(n); } return; }
-    if (!node || typeof node !== 'object') return;
-    if (typeof node.id === 'string' && node.id.trim()) {
-      const id = node.id.trim();
-      if (!/^case-\d+$/i.test(id)) ids.add(id);
-      if (Array.isArray(node.cases)) {
-        const set = cases.get(id) ?? new Set();
-        for (const c of node.cases) if (typeof c?.id === 'string') set.add(c.id.trim());
-        cases.set(id, set);
-      }
-    }
-    for (const v of Object.values(node)) if (v && typeof v === 'object') visit(v);
-  };
   const walk = (dir) => {
     let names = [];
     try { names = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
@@ -146,7 +147,7 @@ function knowledgeIndex(root = KNOWLEDGE) {
       if (d.name.startsWith('.')) continue;
       const p = path.join(dir, d.name);
       if (d.isDirectory()) walk(p);
-      else if (/\.ya?ml$/i.test(d.name)) visit(readYamlOr(p));
+      else if (/\.ya?ml$/i.test(d.name)) visitKnowledgeNode(readYamlOr(p), ids, cases);
     }
   };
   walk(root);
@@ -219,10 +220,21 @@ export function ruleResolver({ workRoot = null, record = null, dna = loadDna(), 
     if (kase && !(knowledge.cases.get(id)?.has(kase))) return { ok: false, why: `${id} has no ${kase}` };
     return { ok: true };
   };
+  const resolveNamespace = (namespace, token, kase) => {
+    if (namespace === 'knowledge') {
+      const result = inKnowledge(token, kase);
+      return result.ok ? { ok: true, via: 'knowledge', id: token } : { via: 'knowledge', why: result.why };
+    }
+    if (namespace === 'dna' && dnaResolves(dna, token)) return { ok: true, via: 'dna', id: token };
+    if (namespace === 'direction' && direction.all.has(token)) return { ok: true, via: 'direction', id: token };
+    if (namespace === 'rubric' && direction.rubric.has(token)) return { ok: true, via: 'rubric', id: token };
+    if (namespace === 'owner' && (owner.has(token) || receiptOk(token))) return { ok: true, via: 'owner', id: token };
+    return null;
+  };
   return (ref) => {
     const text = str(ref);
     const m = REF_RX.exec(text);
-    if (!m || !m[2]) return { ok: false, id: text, why: 'empty rule reference' };
+    if (!m?.[2]) return { ok: false, id: text, why: 'empty rule reference' };
     const ns = m[1] ? m[1].toLowerCase() : null;
     const token = m[2].replace(/[.:]+$/, '');
     const kase = m[3] ?? null;
@@ -230,11 +242,9 @@ export function ruleResolver({ workRoot = null, record = null, dna = loadDna(), 
     const tries = ns ? [ns === 'grammar' ? 'dna' : ns] : ['knowledge', 'dna', 'direction', 'owner'];
     let why = null;
     for (const t of tries) {
-      if (t === 'knowledge') { const r = inKnowledge(token, kase); if (r.ok) { return { ok: true, via: 'knowledge', id: token }; } why ??= r.why; }
-      if (t === 'dna' && dnaResolves(dna, token)) return { ok: true, via: 'dna', id: token };
-      if (t === 'direction' && direction.all.has(token)) return { ok: true, via: 'direction', id: token };
-      if (t === 'rubric' && direction.rubric.has(token)) return { ok: true, via: 'rubric', id: token };
-      if (t === 'owner' && (owner.has(token) || receiptOk(token))) return { ok: true, via: 'owner', id: token };
+      const result = resolveNamespace(t, token, kase);
+      if (result?.ok) return result;
+      if (result?.via === 'knowledge') why ??= result.why;
     }
     return { ok: false, id: token, why: ns ? `${ns}:${token} resolves to nothing` : (why ?? `${token} resolves to no knowledge id, DNA name, brand.direction id or owner ruling`) };
   };
@@ -274,22 +284,16 @@ export function becauseCites(because, refs = []) {
   const s = str(because);
   if (!s.trim()) return false;
   if (refs.some((r) => r && s.includes(r))) return true;
-  return /\b(?:N?FR|BR|UJ|JTBD|US)[-.]?[A-Za-z0-9]*\d|\bfr\.[a-z0-9][\w.-]*|\b\d{2}-CONTENT\b|\bcontent\b|\buser(?:'s)? job\b|\bjob[- ]to[- ]be[- ]done\b|\bjob:/i.test(s);
+  return [
+    /\b(?:N?FR|BR|UJ|JTBD|US)[-.]?[a-z0-9]*\d/i,
+    /\bfr\.[a-z0-9][\w.-]*/i,
+    /\b\d{2}-CONTENT\b/i,
+    /\bcontent\b/i,
+    /\buser(?:'s)? job\b/i,
+    /\bjob[- ]to[- ]be[- ]done\b/i,
+    /\bjob:/i,
+  ].some((pattern) => pattern.test(s));
 }
-
-const refsOf = (record) => list(record?.refs).map((r) => (typeof r === 'string' ? r : r?.id ?? r?.ref ?? null)).filter(Boolean).map(String);
-
-// ---------------------------------------------------------------------------------------------------------
-// The findings
-// ---------------------------------------------------------------------------------------------------------
-
-const PHRASING = new Set(['strong', 'em', 'b', 'i', 'u', 's', 'small', 'sub', 'sup', 'abbr', 'mark', 'time', 'code', 'bdi', 'bdo', 'q', 'cite', 'dfn', 'var', 'data', 'kbd', 'br', 'wbr', 'span']);
-const describe = (el) => {
-  const cls = classesOf(el).slice(0, 2).join('.');
-  return '<' + el.tag + (el.attrs.id ? '#' + el.attrs.id : '') + (cls ? '.' + cls : '') + '>';
-};
-const whysOf = (el) => str(el?.attrs?.[WHY_ATTR]).split(/\s+/).filter(Boolean);
-const inRedline = (el) => [el, ...ancestorsOf(el)].some((a) => a.attrs?.[REDLINE_ATTR] != null || a.attrs?.id === 'redlines');
 
 /** The region container of a render: the PageContainer root, else <main>, else <body>. */
 export function regionContainerOf(tree) {
@@ -303,141 +307,12 @@ export function regionContainerOf(tree) {
  * ruleResolver; `record` the ui record (its refs); `redlines` [{viewport, ok}] when the caller checks the redline
  * renders. Returns [{code, kind, detail, count, examples}].
  */
-export function rationaleFindings({ html, entries = [], errors = [], measures = [], resolve = ruleResolver(), record = null, dna = loadDna(), label = 'the render', redlines = null }) {
-  const groups = new Map();
-  const add = (kind, item) => {
-    if (!groups.has(kind)) groups.set(kind, []);
-    groups.get(kind).push(item);
-  };
-  for (const e of errors) add('rationale file', e);
-  const byId = new Map(entries.filter((e) => e?.id != null).map((e) => [String(e.id), e]));
-
-  // 1. Decisions: rules resolve, because cites the job.
-  const refs = refsOf(record);
-  for (const e of entries) {
-    for (const r of list(e.rules)) {
-      const got = resolve(r);
-      if (!got.ok) add('unresolvable rule id', `${e.id}: "${str(r).slice(0, 60)}" (${got.why})`);
-    }
-    if (!str(e.because).trim()) add('empty because', `${e.id}`);
-    else if (!becauseCites(e.because, refs)) add('because cites no FR, content or user job', `${e.id}: "${str(e.because).slice(0, 60)}"`);
-  }
-
-  // 2. Every visible element and region says why.
-  const tree = parseHtml(html);
-  const visible = walkElements(tree).filter((el) => visibleElement(el) && !inRedline(el));
-  for (const el of visible) {
-    if (ancestorsOf(el).some((a) => a.tag === 'svg')) continue;
-    const ids = whysOf(el);
-    if (!ids.length) {
-      if (PHRASING.has(el.tag) && (el.tag === 'br' || el.tag === 'wbr' || (!el.attrs.class && !el.attrs.style && !el.attrs.id)) && el.parent?.tag !== '#root') continue;
-      add('element without data-why', describe(el));
-      continue;
-    }
-    for (const id of ids) if (!byId.has(id)) add('data-why naming no decision', `${describe(el)} data-why="${id}"`);
-  }
-  const container = regionContainerOf(tree);
-  const regions = (container.children ?? []).filter((c) => c.tag && visibleElement(c) && !inRedline(c) && !['script', 'style', 'template'].includes(c.tag));
-  for (const r of regions) {
-    const kinds = whysOf(r).map((id) => byId.get(id)?.kind).filter(Boolean);
-    if (kinds.length && !kinds.includes('layout')) add('region without a layout decision', `${describe(r)} (${whysOf(r).join(' ')} is ${kinds.join('/')})`);
-  }
-  const orderEntries = entries.filter((e) => e.kind === 'layout' && /order/i.test(`${e.id} ${e.selector} ${e.decision}`));
-  const counts = new Set([regions.length, ...measures.map((m) => m?.regions?.count).filter(Number.isFinite)]);
-  if (regions.length > 1 && !orderEntries.length) add('no region order decision', `${regions.length} regions and no layout decision states their order (id, selector or decision naming "order")`);
-  else if (regions.length > 1 && !orderEntries.some((e) => [...counts].some((n) => statedValues(`${e.value} ${e.decision}`).nums.has(n)))) {
-    add('region order without its count', `${orderEntries.map((e) => e.id).join(', ')} names no region count (${[...counts].join(' or ')})`);
-  }
-
-  // 3. DNA components and closed variants the render uses.
-  const mentions = (needle) => entries.some((e) => new RegExp(`(^|[^A-Za-z0-9])${needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^A-Za-z0-9]|$)`).test(`${str(e.decision)} ${str(e.value)} ${list(e.rules).map(str).join(' ')}`));
-  const used = new Map();
-  for (const el of visible) {
-    const name = componentRootOf(el);
-    if (!name) continue;
-    if (!used.has(name)) used.set(name, new Set());
-    const spec = dna?.components?.get(name);
-    for (const [k, v] of Object.entries(el.attrs)) {
-      if (!k.startsWith('data-') || [COMPONENT_ATTR, PART_ATTR, WHY_ATTR, 'data-grammar-proposal'].includes(k) || !v) continue;
-      const prop = k.replace(/^data-(grammar-)?/, '');
-      const closed = spec ? [...spec.closed.keys()].find((p) => kebab(p) === prop) : null;
-      if (closed || ['variant', 'size', 'tone', 'color'].includes(prop)) used.get(name).add(`${prop}=${v}`);
-    }
-  }
-  for (const [name, variants] of used) {
-    if (!mentions(name)) { add('DNA component without a decision', name); continue; }
-    for (const pv of variants) {
-      const value = pv.split('=')[1];
-      if (!entries.some((e) => {
-        const text = `${str(e.decision)} ${str(e.value)} ${list(e.rules).map(str).join(' ')}`;
-        return new RegExp(`(^|[^A-Za-z0-9])${name}([^A-Za-z0-9]|$)`).test(text) && text.toLowerCase().includes(value.toLowerCase());
-      })) add('DNA variant without a decision', `${name} ${pv}`);
-    }
-  }
-
-  // 4. Art slots.
-  const artOf = (el) => whysOf(el).some((id) => byId.get(id)?.kind === 'art');
-  for (const el of visible) {
-    const slot = el.tag === 'img' || el.tag === 'picture' || el.attrs['data-asset-slot'] != null || el.attrs['data-artwork-slot'] != null;
-    if (slot && whysOf(el).length && !artOf(el)) add('art slot without an art decision', describe(el));
-  }
-
-  // 5. What the render measured, at every viewport.
-  if (!measures.length || measures.some((m) => m?.schema !== MEASURE_SCHEMA)) {
-    add('render not measured', `${label} has no measured render (draw-render records carry rationale measures): re-render it with starci work draw-render`);
-  }
-  const need = { spacing: new Map(), radius: new Map(), fontSize: new Map(), fontWeight: new Map(), lineHeight: new Map() };
-  for (const m of measures.filter((x) => x?.schema === MEASURE_SCHEMA)) {
-    for (const cls of Object.keys(need)) for (const v of list(m.values?.[cls])) {
-      const key = typeof v.value === 'number' ? round(v.value) : String(v.value);
-      if (!need[cls].has(key)) need[cls].set(key, { value: key, at: new Set() });
-      need[cls].get(key).at.add(`${m.viewport?.width ?? '?'}px ${list(v.at)[0] ?? ''}`.trim());
-    }
-    const gridsSeen = new Set();
-    for (const g of list(m.grids)) {
-      const gk = `${g.selector}|${g.columns}|${list(g.why).join(' ')}`;
-      if (gridsSeen.has(gk)) continue;
-      gridsSeen.add(gk);
-      const own = list(g.why).map((id) => byId.get(id)).filter(Boolean);
-      if (!own.some((e) => e.kind === 'layout' && statedValues(`${e.value} ${e.decision}`).nums.has(g.columns))) {
-        add('grid without its column count', `${g.selector} at ${m.viewport?.width ?? '?'}px renders ${g.columns} column(s); its layout decision (${list(g.why).join(' ') || 'none'}) does not state ${g.columns}`);
-      }
-    }
-    const tokens = m.tokenColours ?? {};
-    const colourEntries = entries.filter((e) => e.kind === 'colour');
-    const named = (hex) => colourEntries.some((e) => {
-      const text = `${str(e.decision)} ${str(e.value)}`.toLowerCase();
-      if (text.includes(hex.toLowerCase())) return true;
-      for (const t of text.match(/--[a-z0-9-]+/g) ?? []) if (tokens[t] && colourClose(tokens[t], hex)) return true;
-      return false;
-    });
-    for (const c of list(m.colours)) if (!named(c.hex)) add('colour without a decision', `${c.hex} (${c.use} at ${m.viewport?.width ?? '?'}px, ${list(c.at)[0] ?? ''})`);
-    for (const a of list(m.art)) {
-      const own = list(a.why).map((id) => byId.get(id)).filter(Boolean);
-      if (!own.some((e) => e.kind === 'art')) add('art slot without an art decision', `${a.selector} at ${m.viewport?.width ?? '?'}px (a background image)`);
-    }
-  }
-  for (const [cls, values] of Object.entries(need)) {
-    const kinds = KINDS_OF_CLASS[cls];
-    for (const { value, at } of values.values()) {
-      if (!entries.some((e) => kinds.includes(e.kind) && statesValue(e, value))) {
-        add(`uncovered ${CLASS_LABEL[cls]} value`, `${typeof value === 'number' ? String(value) + (cls === 'fontWeight' ? '' : 'px') : value} (${[...at].slice(0, 2).join('; ')}) - no ${kinds.join('/')} decision states it in its value`);
-      }
-    }
-  }
-  if (Array.isArray(redlines)) for (const r of redlines) if (!r.ok) add('no redline render', `${r.part ?? label}: no annotated redline (<part>.redline.png) - draw-render captures it with the rationale beside the source`);
-
-  const out = [];
-  for (const [kind, items] of groups) {
-    out.push({ code: DRAW_RATIONALE_MISSING, kind, count: items.length, examples: items.slice(0, 8),
-      detail: `${label}: ${kind} (${items.length}) - ${items.slice(0, 4).join('; ')}${items.length > 4 ? ' (+' + (items.length - 4) + ')' : ''}` });
-  }
-  return out;
+export function rationaleFindings({ html, entries = [], errors = [], measures = [], resolve = ruleResolver(), record = null, dna = loadDna(), label = 'the render', redlines = null } = {}) {
+  return findRationaleIssues({ html, entries, errors, measures, resolve, record, dna, label, redlines }, {
+    str, statesValue, round, statedValues, becauseCites, kebab, regionContainerOf,
+    code: DRAW_RATIONALE_MISSING, measureSchema: MEASURE_SCHEMA, whyAttr: WHY_ATTR, redlineAttr: REDLINE_ATTR,
+  });
 }
-
-const hexRgb = (hex) => { const h = String(hex).replace('#', ''); return [0, 2, 4].map((i) => Number.parseInt(h.slice(i, i + 2), 16)); };
-const colourClose = (a, b) => { const x = hexRgb(a), y = hexRgb(b); return x.every((v, i) => Math.abs(v - y[i]) <= 2); };
-
 /** The measures of a render source's parts: the rationale block of each starci/draw-render@1 record given. */
 export const measuresOf = (records) => list(records).map((r) => r?.rationale ?? null).filter(Boolean);
 
@@ -514,17 +389,22 @@ export function measureRationale(arg) {
   const colour = (hex, use, el) => { if (!hex) { return; } const k = `${hex}|${use}`; if (!colours.has(k)) { colours.set(k, { hex, use, at: [] }); } const c = colours.get(k); if (c.at.length < 3) { c.at.push(sel(el)); } };
   const grids = [], art = [];
   const all = [...document.querySelectorAll('body *')].filter((el) => !excluded(el) && !(el instanceof SVGElement && el.tagName.toLowerCase() !== 'svg') && !['SCRIPT', 'STYLE', 'TEMPLATE', 'NOSCRIPT'].includes(el.tagName) && visible(el));
-  for (const el of all) {
-    const cs = getComputedStyle(el);
+  const collectSpacing = (el, cs) => {
     for (const side of ['Top', 'Right', 'Bottom', 'Left']) put('spacing', px(cs[`padding${side}`]), el);
     if (/flex|grid/.test(cs.display)) { put('spacing', px(cs.rowGap), el); put('spacing', px(cs.columnGap), el); }
-    if (cs.position !== 'static') for (const side of insetSides(el)) { const v = px(cs[side]); if (v != null) put('spacing', Math.abs(v), el); }
+    if (cs.position !== 'static') {
+      for (const side of insetSides(el)) { const v = px(cs[side]); if (v != null) put('spacing', Math.abs(v), el); }
+    }
+  };
+  const collectRadii = (el, cs) => {
     for (const corner of ['borderTopLeftRadius', 'borderTopRightRadius', 'borderBottomRightRadius', 'borderBottomLeftRadius']) {
       const raw = String(cs[corner]).split(' ')[0];
       if (!raw || raw === '0px') continue;
       if (raw.endsWith('%')) put('radius', Number.parseFloat(raw) >= 50 ? 'circle' : raw, el);
       else { const v = px(raw); const r = el.getBoundingClientRect(); put('radius', v != null && (v >= 999 || v >= Math.min(r.width, r.height) / 2 - 0.5) && v > 8 ? 'pill' : v, el); }
     }
+  };
+  const collectText = (el, cs) => {
     const text = [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim());
     if (text) {
       put('fontSize', px(cs.fontSize), el);
@@ -532,13 +412,28 @@ export function measureRationale(arg) {
       if (cs.lineHeight !== 'normal') put('lineHeight', px(cs.lineHeight), el);
       colour(hexOf(cs.color), 'text', el);
     }
-    colour(hexOf(cs.backgroundColor), 'background', el);
+  };
+  const collectBorders = (el, cs) => {
     for (const side of ['Top', 'Right', 'Bottom', 'Left']) if (Number.parseFloat(cs[`border${side}Width`]) > 0 && cs[`border${side}Style`] !== 'none') colour(hexOf(cs[`border${side}Color`]), 'border', el);
+  };
+  const collectGrid = (el, cs) => {
     if (cs.display === 'grid') {
       const kids = [...el.children].filter((k) => visible(k) && !excluded(k));
       if (kids.length >= 2) grids.push({ selector: sel(el), why: whyOf(el), columns: cs.gridTemplateColumns.split(/\s+(?![^(]*\))/).filter(Boolean).length });
     }
+  };
+  const measureElement = (el) => {
+    const cs = getComputedStyle(el);
+    collectSpacing(el, cs);
+    collectRadii(el, cs);
+    collectText(el, cs);
+    colour(hexOf(cs.backgroundColor), 'background', el);
+    collectBorders(el, cs);
+    collectGrid(el, cs);
     if (/url\(/.test(cs.backgroundImage)) art.push({ selector: sel(el), why: whyOf(el) });
+  };
+  for (const el of all) {
+    measureElement(el);
   }
   const pick = (m) => [...m.entries()].map(([value, at]) => ({ value, at })).sort((a, b) => String(a.value).localeCompare(String(b.value), 'en', { numeric: true }));
   const probe = document.createElement('i');
@@ -600,53 +495,61 @@ export function drawRedlines(arg) {
   const box = (n) => { const b = n.getBoundingClientRect(); return { x: b.left + scrollX, y: b.top + scrollY, w: b.width, h: b.height }; };
   const visible = (n) => { const b = n.getBoundingClientRect(); const cs = getComputedStyle(n); return b.width > 1 && b.height > 1 && cs.visibility !== 'hidden' && cs.display !== 'none'; };
   const whys = (n) => (n.getAttribute(whyAttr) ?? '').split(/\s+/).filter(Boolean);
-  const labelOf = (n) => whys(n).map((id) => labels[id]).find((l) => l) ?? null;
+  const labelOf = (n) => whys(n).map((id) => labels[id]).find(Boolean) ?? null;
   const round = (v) => Math.round(v * 10) / 10;
   const vtick = (x, y1, y2) => { line(x, y1, x, y2, RED); line(x - 3, y1, x + 3, y1, RED); line(x - 3, y2, x + 3, y2, RED); };
   const htick = (x1, x2, y) => { line(x1, y, x2, y, RED); line(x1, y - 3, x1, y + 3, RED); line(x2, y - 3, x2, y + 3, RED); };
   const all = [...document.querySelectorAll(`[${whyAttr}]`)].filter((n) => !n.closest(`[${redlineAttr}],#redlines`) && !(n instanceof SVGElement) && visible(n));
   // Spacing brackets: the gaps between the children of a layout/spacing decision's element, and its padding.
-  for (const n of all) {
-    const l = labelOf(n);
-    if (!l || !['layout', 'spacing'].includes(l.kind)) continue;
-    const tag = (v) => `${v}${l.rule ? ' · ' + l.rule : ''}`;
-    const kids = [...n.children].filter((k) => !(k instanceof SVGElement) && visible(k));
-    const shown = new Set();
-    // A decided gap is the container's gap (or a small margin); the free space of space-between is no decision.
-    const ncs = getComputedStyle(n);
-    const decided = (g) => g <= 48 || [Number.parseFloat(ncs.rowGap), Number.parseFloat(ncs.columnGap)].some((d) => Number.isFinite(d) && Math.abs(d - g) < 1);
-    for (let i = 0; i < kids.length - 1; i += 1) {
-      const a = box(kids[i]), b = box(kids[i + 1]);
-      const vgap = round(b.y - (a.y + a.h)), hgap = round(b.x - (a.x + a.w));
-      if (vgap > 0.5 && decided(vgap) && b.y >= a.y + a.h - 1) {
-        const x = Math.max(2, a.x - 5);
-        vtick(x, a.y + a.h, b.y);
-        if (!shown.has(`v${vgap}`)) { shown.add(`v${vgap}`); label(x + 4, a.y + a.h + vgap / 2 + 6, tag(vgap), RED); }
-      } else if (hgap > 0.5 && decided(hgap) && Math.abs(a.y - b.y) < Math.max(a.h, b.h)) {
-        const y = a.y + Math.min(a.h, b.h) / 2;
-        htick(a.x + a.w, b.x, y);
-        if (!shown.has(`h${hgap}`)) { shown.add(`h${hgap}`); label(a.x + a.w, y - 4, tag(hgap), RED); }
-      }
+  const gapIsDecided = (ncs, gap) => gap <= 48 || [Number.parseFloat(ncs.rowGap), Number.parseFloat(ncs.columnGap)].some((d) => Number.isFinite(d) && Math.abs(d - gap) < 1);
+  const drawGapForPair = (first, second, shown, ncs, tag) => {
+    const a = box(first), b = box(second);
+    const vgap = round(b.y - (a.y + a.h)), hgap = round(b.x - (a.x + a.w));
+    if (vgap > 0.5 && gapIsDecided(ncs, vgap) && b.y >= a.y + a.h - 1) {
+      const x = Math.max(2, a.x - 5);
+      vtick(x, a.y + a.h, b.y);
+      if (!shown.has(`v${vgap}`)) { shown.add(`v${vgap}`); label(x + 4, a.y + a.h + vgap / 2 + 6, tag(vgap), RED); }
+    } else if (hgap > 0.5 && gapIsDecided(ncs, hgap) && Math.abs(a.y - b.y) < Math.max(a.h, b.h)) {
+      const y = a.y + Math.min(a.h, b.h) / 2;
+      htick(a.x + a.w, b.x, y);
+      if (!shown.has(`h${hgap}`)) { shown.add(`h${hgap}`); label(a.x + a.w, y - 4, tag(hgap), RED); }
     }
+  };
+  const drawPadding = (n, tag) => {
     const cs = getComputedStyle(n), b = box(n);
     const pt = round(Number.parseFloat(cs.paddingTop) || 0), pl = round(Number.parseFloat(cs.paddingLeft) || 0);
     if (pl > 0.5 && b.h > 24) htick(b.x, b.x + pl, b.y + Math.min(b.h - 4, 12));
     if (pt > 0.5 && b.w > 24) vtick(b.x + Math.min(b.w - 4, 12), b.y, b.y + pt);
     if (pt > 0.5 || pl > 0.5) label(b.x + pl + 2, b.y + pt + 11, tag(pt === pl || !pt || !pl ? `p ${pt || pl}` : `p ${pt}/${pl}`), RED);
-  }
-  // DNA labels at component roots, regions outlined.
-  for (const n of document.querySelectorAll('[data-grammar-component]')) {
-    if (n.closest(`[${redlineAttr}],#redlines`) || !visible(n)) continue;
-    const name = n.getAttribute('data-grammar-component');
-    const upName = n.parentElement?.closest('[data-grammar-component]')?.getAttribute('data-grammar-component');
-    if (leaf.includes(name) || (upName === name && n.hasAttribute('data-grammar-part'))) continue;
-    const b = box(n);
-    if (b.w < 48 || b.h < 24) continue;
+  };
+  const drawSpacingForElement = (n) => {
     const l = labelOf(n);
-    if (l?.kind === 'layout') el('rect', { x: b.x, y: b.y, width: b.w, height: b.h, fill: 'none', stroke: BLUE, 'stroke-width': 1, 'stroke-dasharray': '3 2' });
-    const variant = n.getAttribute('data-variant') ?? n.getAttribute('data-tone');
-    label(b.x + 2, b.y + 12, `${name}${variant ? ' ' + variant : ''}`, BLUE);
-  }
+    if (!l || !['layout', 'spacing'].includes(l.kind)) return;
+    const tag = (v) => `${v}${l.rule ? ' · ' + l.rule : ''}`;
+    const kids = [...n.children].filter((k) => !(k instanceof SVGElement) && visible(k));
+    const shown = new Set();
+    // A decided gap is the container's gap (or a small margin); the free space of space-between is no decision.
+    const ncs = getComputedStyle(n);
+    for (let i = 0; i < kids.length - 1; i += 1) drawGapForPair(kids[i], kids[i + 1], shown, ncs, tag);
+    drawPadding(n, tag);
+  };
+  for (const n of all) drawSpacingForElement(n);
+  // DNA labels at component roots, regions outlined.
+  const drawComponentLabels = () => {
+    for (const n of document.querySelectorAll('[data-grammar-component]')) {
+      if (n.closest(`[${redlineAttr}],#redlines`) || !visible(n)) continue;
+      const name = n.getAttribute('data-grammar-component');
+      const upName = n.parentElement?.closest('[data-grammar-component]')?.getAttribute('data-grammar-component');
+      if (leaf.includes(name) || (upName === name && n.hasAttribute('data-grammar-part'))) continue;
+      const b = box(n);
+      if (b.w < 48 || b.h < 24) continue;
+      const l = labelOf(n);
+      if (l?.kind === 'layout') el('rect', { x: b.x, y: b.y, width: b.w, height: b.h, fill: 'none', stroke: BLUE, 'stroke-width': 1, 'stroke-dasharray': '3 2' });
+      const variant = n.getAttribute('data-variant') ?? n.getAttribute('data-tone');
+      label(b.x + 2, b.y + 12, `${name}${variant ? ' ' + variant : ''}`, BLUE);
+    }
+  };
+  drawComponentLabels();
   return { labels: placed.length };
 }
 

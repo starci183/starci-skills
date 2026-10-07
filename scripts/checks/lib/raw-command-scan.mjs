@@ -21,7 +21,7 @@ const programName = (value) => {
 };
 const lineAt = (text, at) => text.slice(0, at).split('\n').length;
 
-const LINE_TERMINATOR = new Set(['\n', '\r', ' ', ' ']);
+const LINE_TERMINATOR = new Set(['\n', '\r', '\u2028', '\u2029']);
 
 /**
  * Each /.*(?:\n|$)/g match of `text`, with its offset: [{index, line}] — a run of

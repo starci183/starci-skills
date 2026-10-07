@@ -58,18 +58,23 @@ const LANGUAGE_TERNARY = new RegExp(String.raw`\b${LANG_RE}\b[^;\n]{0,40}?===\s*
 const LANGUAGE_CHAIN = new RegExp(String.raw`\b${LANG_RE}\b(?:[^;\n]*?(?:\?\?|\|\||${ASSIGN}))+\s*['"](en|vi)['"]`, 'g');
 
 /** The leaf name → documented scalar values of a parsed config document (objects/arrays/null contribute none). */
+const recordDocumentedLeaf = (leaves, key, value) => {
+  if (typeof value === 'string' || typeof value === 'number') (leaves.get(key) ?? leaves.set(key, new Set()).get(key)).add(String(value));
+  else leaves.set(key, leaves.get(key) ?? new Set()); // null/false leaves: documented key, no literal vocabulary
+};
+
+const walkDocumentedLeaves = (node, leaves) => {
+  if (!node || typeof node !== 'object') return;
+  if (Array.isArray(node)) { for (const value of node) { walkDocumentedLeaves(value, leaves); } return; } // element indices are not key names
+  for (const [key, value] of Object.entries(node)) {
+    if (value && typeof value === 'object') walkDocumentedLeaves(value, leaves);
+    else recordDocumentedLeaf(leaves, key, value);
+  }
+};
+
 export function documentedLeaves(doc) {
   const leaves = new Map();
-  const walk = (node) => {
-    if (!node || typeof node !== 'object') return;
-    if (Array.isArray(node)) { for (const v of node) { walk(v); } return; } // element indices are not key names
-    for (const [k, v] of Object.entries(node)) {
-      if (v && typeof v === 'object') walk(v);
-      else if (typeof v === 'string' || typeof v === 'number') (leaves.get(k) ?? leaves.set(k, new Set()).get(k)).add(String(v));
-      else leaves.set(k, leaves.get(k) ?? new Set()); // null/false leaves: documented key, no literal vocabulary
-    }
-  };
-  walk(doc);
+  walkDocumentedLeaves(doc, leaves);
   return leaves;
 }
 

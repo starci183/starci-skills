@@ -21,6 +21,7 @@ import { lineageHeadById, typedIncidents } from './gate-conditions.mjs';
 import { allocationMs } from '../../engine/config.mjs';
 import { posixPath, sameOrUnder } from '../lib/path-key.mjs';
 import { parseJson, parseJsonOr, withPayload } from '../lib/json.mjs';
+import { escapeRegExp } from '../lib/regex.mjs';
 import { recordPathsOf } from './verbs/shared/rows.mjs';
 import { SETTLED_JOB_LIST } from '../../engine/admission.mjs';
 
@@ -31,12 +32,16 @@ export const BLOCKING_HEADS_UP_AUTO = 'blocking-waiters';
 const SETTLED = SETTLED_JOB_LIST;
 const GATE_KINDS = new Set(['owner-gate', 'owner-gate-pending', 'peer-wait']);
 const PEER_MESSAGE = 'peer-message';
-// Job ids are op-<op>-<10 hex> (starci kernel enqueue). The tempered middle keeps the scan linear:
-// a middle character may never open the -<10 hex> tail (the same matches the lazy form found).
-const JOB_ID = /\bop-[a-z](?:(?!-[0-9a-f]{10}\b)[a-z0-9.-])*-[0-9a-f]{10}\b/gi;
+// Job ids are op-<op>-<10 hex> (starci kernel enqueue). The cursor tests the fixed-length tail before consuming a middle character.
+const JOB_PREFIX = /op-/gi;
+const JOB_FIRST = /[a-z]/i;
+const JOB_MIDDLE = /[a-z0-9.-]/i;
+const JOB_TAIL = /^[0-9a-f]{10}$/i;
+const WORD_CHARACTER = /^\w$/;
 
 const norm = (p) => posixPath(p).replace(/\/+$/, '');
 const round2 = (n) => Math.round(n * 100) / 100;
+const isWordCharacter = (char) => char !== undefined && WORD_CHARACTER.test(char);
 
 /**
  * Every open job some waiter waits on: Map jobId -> {jobId, workflowId, opId, status, waiters[],
@@ -74,23 +79,47 @@ const addWaiter = (ctx, job, waiter) => {
 };
 // A named job is waited on through its retry lineage: a failed job's open retry is what blocks.
 const openHeadOf = (db, byId, jobId) => byId.get(jobId) ?? byId.get(lineageHeadById(db, jobId)?.row.job_id);
-const jobsNamed = (byId, text) => [...new Set(String(text ?? '').match(JOB_ID) ?? [])].map((id) => byId.get(id)).filter(Boolean);
+function jobIdsIn(text) {
+  const ids = [], prefix = new RegExp(JOB_PREFIX.source, JOB_PREFIX.flags);
+  let start;
+  while ((start = prefix.exec(text))) {
+    const at = start.index;
+    if (isWordCharacter(text[at - 1]) || !JOB_FIRST.test(text[at + 3] ?? '')) continue;
+    let cursor = at + 4;
+    while (cursor <= text.length) {
+      if (text[cursor] === '-' && JOB_TAIL.test(text.slice(cursor + 1, cursor + 11)) && !isWordCharacter(text[cursor + 11])) {
+        const end = cursor + 11;
+        ids.push(text.slice(at, end));
+        prefix.lastIndex = end;
+        break;
+      }
+      if (text[cursor] !== undefined && JOB_MIDDLE.test(text[cursor])) { cursor += 1; continue; }
+      break;
+    }
+  }
+  return ids;
+}
+const jobsNamed = (byId, text) => [...new Set(jobIdsIn(String(text ?? '')))].map((id) => byId.get(id)).filter(Boolean);
 
 // Typed conditions: the strongest signal, the wait is machine-checked.
 function addTypedWaits(ctx) {
   let typed = [];
   try { typed = typedIncidents(ctx.db); } catch { typed = []; }
   for (const incident of typed) {
-    for (const cond of incident.until) {
-      if (cond.type === 'job') addWaiter(ctx, openHeadOf(ctx.db, ctx.byId, cond.jobId), { workflowId: incident.workflowId, via: 'until-job', ref: incident.incidentId, since: incident.since });
-      if (cond.type === 'record') {
-        const want = norm(cond.path);
-        for (const job of ctx.open) {
-          if (recordPathsOf(job.payload, norm).some((owned) => sameOrUnder(want, owned) || sameOrUnder(owned, want))) {
-            addWaiter(ctx, job, { workflowId: incident.workflowId, via: 'until-record', ref: incident.incidentId, since: incident.since });
-          }
-        }
-      }
+    for (const cond of incident.until) addTypedConditionWait(ctx, incident, cond);
+  }
+}
+
+function addTypedConditionWait(ctx, incident, cond) {
+  if (cond.type === 'job') addWaiter(ctx, openHeadOf(ctx.db, ctx.byId, cond.jobId), { workflowId: incident.workflowId, via: 'until-job', ref: incident.incidentId, since: incident.since });
+  if (cond.type === 'record') addTypedRecordWait(ctx, incident, cond);
+}
+
+function addTypedRecordWait(ctx, incident, cond) {
+  const want = norm(cond.path);
+  for (const job of ctx.open) {
+    if (recordPathsOf(job.payload, norm).some((owned) => sameOrUnder(want, owned) || sameOrUnder(owned, want))) {
+      addWaiter(ctx, job, { workflowId: incident.workflowId, via: 'until-record', ref: incident.incidentId, since: incident.since });
     }
   }
 }
@@ -123,7 +152,7 @@ function addPeerRequestWaits(ctx) {
     for (const job of jobsNamed(ctx.byId, text)) if (job.workflow_id === request.workflow_id) addWaiter(ctx, job, waiter);
     for (const job of ctx.open.filter((row) => row.workflow_id === request.workflow_id)) {
       const op = job.op_id ?? job.payload.opId;
-      const opNamed = op && new RegExp(`(^|[^A-Za-z0-9.-])${op.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)}([^A-Za-z0-9-]|$)`).test(text);
+      const opNamed = op && new RegExp(`(^|[^A-Za-z0-9.-])${escapeRegExp(op)}([^A-Za-z0-9-]|$)`).test(text);
       const recordNamed = recordPathsOf(job.payload, norm).some((owned) => normText.includes(owned));
       if (opNamed || recordNamed) addWaiter(ctx, job, waiter);
     }

@@ -98,9 +98,8 @@ const POWERSHELL_RECURSE = /^-(?:r|re|rec|recu|recur|recurs|recurse)(?::(?!\$?fa
 const cmdSwitches = (arg) => (/^\/\/?[a-z](?:\/[a-z])*$/i.test(arg) ? arg.toLowerCase().split('/').filter(Boolean) : []);
 const hasCmdSwitch = (args, letter) => args.some((a) => cmdSwitches(a).includes(letter));
 // The recursive-delete form of one program, or null: `${program} -Recurse`, 'rm -r', 'cmd /s' or the robocopy flag.
-const recursiveHow = (program, options, dialect) => {
-  if (dialect === 'powershell' && REMOVE_ITEM.has(program))
-    return options.some((a) => POWERSHELL_RECURSE.test(a) || /^-(?:rf|fr)$/i.test(a)) ? `${program} -Recurse` : null;
+const powershellRecursiveHow = (program, options) => options.some((a) => POWERSHELL_RECURSE.test(a) || /^-(?:rf|fr)$/i.test(a)) ? `${program} -Recurse` : null;
+const recursiveHowForProgram = (program, options) => {
   if (program === 'remove-item' || program === 'ri')
     return options.some((a) => POWERSHELL_RECURSE.test(a)) ? `${program} -Recurse` : null;
   if (program === 'rm')
@@ -113,6 +112,8 @@ const recursiveHow = (program, options, dialect) => {
   }
   return null;
 };
+const recursiveHow = (program, options, dialect) => dialect === 'powershell' && REMOVE_ITEM.has(program)
+  ? powershellRecursiveHow(program, options) : recursiveHowForProgram(program, options);
 const recursiveDeleteVerdict = (program, args, dialect) => {
   const options = args.includes('--') ? args.slice(0, args.indexOf('--')) : args;
   const how = recursiveHow(program, options, dialect);
@@ -309,6 +310,25 @@ const pushTagRoleVerdict = (c, ctx, guard) => {
   return byPolicy ? policyToolVerdict(c, byPolicy) : null;
 };
 
+const gitCommandVerdict = async (command, ctx, guard, fullDeps) => {
+  if (command.program !== 'git') return null;
+  if (['push', 'tag'].includes(gitSubOf(command.args).sub)) {
+    const byPolicy = pushTagRoleVerdict(command, ctx, guard);
+    if (byPolicy) return byPolicy;
+  }
+  const loaded = await fullDeps();
+  const history = workflowHistoryVerdict({ args: command.args, cwd: command.cwd, guard, parseGitArgv: loaded.policy.parseGitArgv });
+  if (history) return history;
+  return gitVerdict({ args: command.args, cwd: command.cwd, env: command.env, guard, deps: loaded });
+};
+
+const packageManagerCommandVerdict = async (command, guard, fullDeps) => {
+  if (!['npm', 'pnpm', 'yarn', 'bun'].includes(command.program)) return null;
+  const loaded = await fullDeps();
+  if (!loaded.npm.PACKAGE_MANAGERS.includes(command.program)) return null;
+  return installVerdict({ program: command.program, args: command.args, cwd: command.cwd, guard, deps: loaded });
+};
+
 export async function commandVerdict({ command, cwd, guard, env = process.env, dialect = 'bash', deps = null, rights = null }) {
   let d = deps;
   const fullDeps = async () => { d ??= await loadDeps(); return d; };
@@ -320,26 +340,12 @@ export async function commandVerdict({ command, cwd, guard, env = process.env, d
   for (const c of commands) {
     const sync = syncCommandVerdict(c, guard);
     if (sync) return { tool: c.program, ...sync };
-    if (c.program === 'git' && ['push', 'tag'].includes(gitSubOf(c.args).sub)) {
-      const byPolicy = pushTagRoleVerdict(c, ctx, guard);
-      if (byPolicy) return byPolicy;
-    }
-    if (c.program === 'git') {
-      const loaded = await fullDeps();
-      const h = workflowHistoryVerdict({ args: c.args, cwd: c.cwd, guard, parseGitArgv: loaded.policy.parseGitArgv });
-      if (h) return h;
-      const v = await gitVerdict({ args: c.args, cwd: c.cwd, env: c.env, guard, deps: loaded });
-      if (v) return v;
-    }
+    const gitResult = await gitCommandVerdict(c, ctx, guard, fullDeps);
+    if (gitResult) return gitResult;
     const mailbox = kernelMailboxVerdict(c.program, c.args, guard);
     if (mailbox) return { tool: c.program, ...mailbox };
-    if (['npm', 'pnpm', 'yarn', 'bun'].includes(c.program)) {
-      const loaded = await fullDeps();
-      if (loaded.npm.PACKAGE_MANAGERS.includes(c.program)) {
-        const v = await installVerdict({ program: c.program, args: c.args, cwd: c.cwd, guard, deps: loaded });
-        if (v) return v;
-      }
-    }
+    const packageResult = await packageManagerCommandVerdict(c, guard, fullDeps);
+    if (packageResult) return packageResult;
   }
   return rightsOfCall({ commands, command, cwd, ctx, guard });
 }
@@ -390,6 +396,16 @@ async function rightsOnlyVerdict({ command, cwd, env, dialect, ctx }) {
   return rightsOfCall({ commands, command, cwd, ctx, guard: null });
 }
 
+const unguardedHookVerdict = async (call, { env, deps, ctx }) => {
+  if (NAMES_PACKAGE_MANAGER.test(call.command)) {
+    const verdict = await unguardedVerdict({ ...call, env, npm: deps?.npm ?? null });
+    if (verdict) return { verdict, guard: null, cwd: call.cwd };
+  }
+  if (!ctx.role) return null;
+  const verdict = await rightsOnlyVerdict({ ...call, env, ctx });
+  return verdict ? { verdict, guard: null, cwd: call.cwd } : null;
+};
+
 /** The hook's decision for one input: {verdict, guard} to refuse (guard null for an unguarded session), else null. */
 export async function hookDecision(input, { env = process.env, root = skillRoot, deps = null, bindings = null } = {}) {
   const handle = env.ORCA_TERMINAL_HANDLE;
@@ -408,15 +424,7 @@ export async function hookDecision(input, { env = process.env, root = skillRoot,
   const call = shellCallOf(input);
   if (!call) return null;
   const ctx = await rightsContext({ guard, seat, env, text: call.command });
-  if (!guard) {
-    if (NAMES_PACKAGE_MANAGER.test(call.command)) {
-      const verdict = await unguardedVerdict({ ...call, env, npm: deps?.npm ?? null });
-      if (verdict) return { verdict, guard: null, cwd: call.cwd };
-    }
-    if (!ctx.role) return null;
-    const verdict = await rightsOnlyVerdict({ ...call, env, ctx });
-    return verdict ? { verdict, guard: null, cwd: call.cwd } : null;
-  }
+  if (!guard) return unguardedHookVerdict(call, { env, deps, ctx });
   const verdict = await commandVerdict({ ...call, guard, env, deps, rights: ctx });
   return verdict ? { verdict, guard, cwd: call.cwd } : null;
 }

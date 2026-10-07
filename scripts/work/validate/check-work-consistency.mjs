@@ -102,7 +102,11 @@ const fieldOf = (record, dottedPath) => String(dottedPath).split('.').reduce((ho
   holder && typeof holder === 'object' ? holder[key] : undefined, record);
 
 const isList = value => (Array.isArray(value) && value) || (value == null || value === '' ? [] : [value]);
-const normaliseSentence = value => String(value ?? '').trim().replace(/[.!?]+$/, '').replace(/\s+/g, ' ');
+const normaliseSentence = value => {
+  let text = String(value ?? '').trim();
+  while (text.endsWith('.') || text.endsWith('!') || text.endsWith('?')) text = text.slice(0, -1);
+  return text.replace(/\s+/g, ' ');
+};
 const shownFile = rec => path.relative(root, path.join(rec.dir, 'index.yaml')).replaceAll('\\', '/');
 
 /**

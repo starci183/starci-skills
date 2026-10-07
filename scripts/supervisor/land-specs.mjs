@@ -42,6 +42,59 @@ function topLevelBlocks(source) {
 
 const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
 const uses = (text, name) => new RegExp(String.raw`(^|[^\w$.])${escapeRe(name)}(?![\w$])`).test(text);
+const hasIndirectExport = (source) => /^export\s+\*|^export\s+default\s+(?!(async\s+)?(function|class))/m.test(source);
+const listedExports = (source) => new Set([...source.matchAll(/^export\s*\{([^}]*)\}(?!\s*from)/gm)].flatMap((m) => m[1].split(',').map((x) => x.trim().split(/\s+as\s+/)[0]).filter(Boolean)));
+
+function changedBlocks(blocks, ranges) {
+  const hit = new Set();
+  for (const [start, count] of ranges) {
+    const last = start + Math.max(count, 1) - 1;
+    for (let line = start; line <= last; line += 1) {
+      const block = blocks.find((entry) => line >= entry.start && line <= entry.end);
+      if (!block) return { hit, why: `line ${line} is outside every top-level declaration` };
+      hit.add(block.name);
+    }
+  }
+  return { hit, why: null };
+}
+
+function closeChangedDependencies(blocks, hit) {
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const block of blocks) {
+      if (!hit.has(block.name) && [...hit].some((name) => name !== block.name && uses(block.text, name))) { hit.add(block.name); grew = true; }
+    }
+  }
+}
+
+function addNamedSpecs(file, specs, files) {
+  const stem = stemOf(file);
+  if (stem.length < 4) return;
+  for (const spec of specs) {
+    if (spec.file === `tests/${stem}.spec.mjs` || spec.file.startsWith(`tests/${stem}-`)) files.add(spec.file);
+  }
+}
+
+function changedImporterSpecs(users, others, symbols, code) {
+  return users.filter((spec) => others.some((needle) => code.get(spec).includes(needle)) || symbols.some((name) => uses(code.get(spec), name)));
+}
+
+function addImporterSpecs(file, { source, specs, symbolsOf, hub, code, files, narrowed }) {
+  const needle = needleOf(file);
+  const users = specs.filter((spec) => code.get(spec.file).includes(needle)).map((spec) => spec.file);
+  if (users.length <= hub) { for (const spec of users) files.add(spec); return; }
+  const result = symbolsOf(file);
+  if (!result || !Array.isArray(result.symbols)) {
+    for (const spec of users) files.add(spec);
+    narrowed.push({ file, importers: users.length, kept: users.length, symbols: null, why: result?.why ?? 'not mapped' });
+    return;
+  }
+  const others = source.filter((other) => other !== file).map(needleOf);
+  const keep = changedImporterSpecs(users, others, result.symbols, code);
+  for (const spec of keep) files.add(spec);
+  narrowed.push({ file, importers: users.length, kept: keep.length, symbols: result.symbols });
+}
 
 /**
  * The exports a change can reach: the declarations holding a changed line of the head file, then every declaration that
@@ -51,25 +104,15 @@ const uses = (text, name) => new RegExp(String.raw`(^|[^\w$.])${escapeRe(name)}(
 export function changedExports({ source, ranges }) {
   const blocks = topLevelBlocks(source);
   if (!blocks.length) return { symbols: null, why: 'no top-level declarations' };
-  if (/^export\s+\*|^export\s+default\s+(?!(async\s+)?(function|class))/m.test(source)) return { symbols: null, why: 'indirect export form' };
+  if (hasIndirectExport(source)) return { symbols: null, why: 'indirect export form' };
   // `export { a, b as c }` (local names): a listed declaration is exported under its local name.
-  const listed = new Set([...source.matchAll(/^export\s*\{([^}]*)\}(?!\s*from)/gm)].flatMap((m) => m[1].split(',').map((x) => x.trim().split(/\s+as\s+/)[0]).filter(Boolean)));
+  const listed = listedExports(source);
   for (const b of blocks) if (listed.has(b.name)) b.exported = true;
-  const hit = new Set();
-  for (const [start, count] of ranges) {
-    const last = start + Math.max(count, 1) - 1;
-    for (let line = start; line <= last; line += 1) {
-      const b = blocks.find((x) => line >= x.start && line <= x.end);
-      if (!b) return { symbols: null, why: `line ${line} is outside every top-level declaration` };
-      hit.add(b.name);
-    }
-  }
+  const changed = changedBlocks(blocks, ranges);
+  if (changed.why) return { symbols: null, why: changed.why };
+  const hit = changed.hit;
   if (!hit.size) return { symbols: null, why: 'no changed line on the head side' };
-  let grew = true;
-  while (grew) {
-    grew = false;
-    for (const b of blocks) if (!hit.has(b.name) && [...hit].some((n) => n !== b.name && uses(b.text, n))) { hit.add(b.name); grew = true; }
-  }
+  closeChangedDependencies(blocks, hit);
   return { symbols: blocks.filter((b) => b.exported && hit.has(b.name)).map((b) => b.name) };
 }
 
@@ -79,23 +122,14 @@ export function changedExports({ source, ranges }) {
  * kept, symbols}]}.
  */
 export function specsDirect(changed, { specs, symbolsOf = () => null, hub = HUB_IMPORTERS }) {
-  const norm = changed.map((f) => String(f).replaceAll(/\\/g, '/'));
+  const norm = changed.map((f) => String(f).replaceAll('\\', '/'));
   const own = norm.filter((f) => /^tests\/[^/]+\.spec\.mjs$/.test(f));
   const source = norm.filter((f) => !f.startsWith('tests/'));
   const code = new Map(specs.map((s) => [s.file, codeOf(s.text)]));
   const files = new Set(own), narrowed = [];
-  const named = (f) => { const stem = stemOf(f); return stem.length < 4 ? [] : specs.filter((s) => s.file === `tests/${stem}.spec.mjs` || s.file.startsWith(`tests/${stem}-`)).map((s) => s.file); };
   for (const f of source) {
-    for (const s of named(f)) files.add(s);
-    const needle = needleOf(f);
-    const users = specs.filter((s) => code.get(s.file).includes(needle)).map((s) => s.file);
-    if (users.length <= hub) { for (const s of users) { files.add(s); } continue; }
-    const r = symbolsOf(f);
-    if (!r || !Array.isArray(r.symbols)) { for (const s of users) { files.add(s); } narrowed.push({ file: f, importers: users.length, kept: users.length, symbols: null, why: r?.why ?? 'not mapped' }); continue; }
-    const others = source.filter((g) => g !== f).map(needleOf);
-    const keep = users.filter((s) => others.some((n) => code.get(s).includes(n)) || r.symbols.some((name) => uses(code.get(s), name)));
-    for (const s of keep) files.add(s);
-    narrowed.push({ file: f, importers: users.length, kept: keep.length, symbols: r.symbols });
+    addNamedSpecs(f, specs, files);
+    addImporterSpecs(f, { source, specs, symbolsOf, hub, code, files, narrowed });
   }
   return { files: [...files], narrowed };
 }

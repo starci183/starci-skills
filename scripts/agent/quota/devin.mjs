@@ -65,6 +65,11 @@ const SEAT_QUOTA_FILE = fileURLToPath(new URL('../../api/windsurf/seat-quota.mjs
 const devinCredentialsFile = (env = process.env) =>
   path.join(env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'), 'devin', 'credentials.toml');
 
+const DOUBLE_QUOTED_KEY = '"([^"]*)"';
+const SINGLE_QUOTED_KEY = "'([^']*)'";
+const BARE_KEY = '[^\\s#]+';
+const WINDSURF_API_KEY_LINE = new RegExp(String.raw`^\s*windsurf_api_key\s*=\s*(${DOUBLE_QUOTED_KEY}|${SINGLE_QUOTED_KEY}|${BARE_KEY})\s*$`, 'm');
+
 /**
  * `windsurf_api_key` from a credentials.toml, or null. TOML string or bare
  * value; anything else in the file is ignored. The value is returned, never
@@ -73,7 +78,7 @@ const devinCredentialsFile = (env = process.env) =>
 export function readWindsurfApiKey(file = devinCredentialsFile()) {
   let text;
   try { text = fs.readFileSync(file, 'utf8'); } catch { return null; }
-  const m = /^\s*windsurf_api_key\s*=\s*("([^"]*)"|'([^']*)'|[^\s#]+)\s*$/m.exec(text);
+  const m = WINDSURF_API_KEY_LINE.exec(text);
   const key = (m?.[2] ?? m?.[3] ?? m?.[1] ?? '').trim();
   return key || null;
 }

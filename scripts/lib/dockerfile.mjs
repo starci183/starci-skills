@@ -58,8 +58,8 @@ export function shellCommands(body) {
     } else if (char === '"' || char === "'") {
       quote = char;
       current += char;
-    } else if (char === ';' || char === '|' || (char === '&' && body[i + 1] === '&')) {
-      if (char !== ';' && body[i + 1] === char) i += 1;
+    } else if (isCommandSeparator(body, i, char)) {
+      i += commandSeparatorAdvance(body, i, char);
       flush();
     } else if (char === '\\' && body[i + 1] === '\n') {
       i += 1;
@@ -71,6 +71,9 @@ export function shellCommands(body) {
   return commands;
 }
 
+const isCommandSeparator = (body, index, char) => char === ';' || char === '|' || (char === '&' && body[index + 1] === '&');
+const commandSeparatorAdvance = (body, index, char) => char !== ';' && body[index + 1] === char ? 1 : 0;
+
 /**
  * Parse a Dockerfile: { instructions: [{ keyword, text, line, stage }], stages: [{ index, name, image, line, instructions }],
  * comments: [{ text, line }], preamble: [instruction before the first FROM (ARG)] }. `keyword` is upper-case; `text` is the
@@ -78,36 +81,7 @@ export function shellCommands(body) {
  */
 export function parseDockerfile(source) {
   const lines = String(source).replaceAll('\r\n', '\n').split('\n');
-  const instructions = [];
-  const comments = [];
-  let escape = '\\';
-  let directives = true;
-  for (let i = 0; i < lines.length; i += 1) {
-    const raw = lines[i];
-    const trimmed = raw.trim();
-    if (trimmed === '') { directives = false; continue; }
-    if (trimmed.startsWith('#')) {
-      const body = trimmed.slice(1).trim();
-      const directive = directives ? /^(syntax|escape|check)\s*=\s*(\S+)$/i.exec(body) : null;
-      if (directive) { if (directive[1].toLowerCase() === 'escape') { escape = directive[2]; } continue; }
-      directives = false;
-      comments.push({ text: body, line: i + 1 });
-      continue;
-    }
-    directives = false;
-    const start = i + 1;
-    let logical = trimmed;
-    while (logical.endsWith(escape) && i + 1 < lines.length) {
-      logical = logical.slice(0, -1).trimEnd();
-      i += 1;
-      while (i < lines.length && lines[i].trim().startsWith('#')) i += 1;
-      if (i >= lines.length) break;
-      logical = `${logical} ${lines[i].trim()}`;
-    }
-    const split = logical.search(/\s/);
-    const keyword = (split < 0 ? logical : logical.slice(0, split)).toUpperCase();
-    instructions.push({ keyword, text: split < 0 ? '' : logical.slice(split).trim(), line: start, stage: -1 });
-  }
+  const { instructions, comments } = parseInstructions(lines);
   const stages = [];
   const preamble = [];
   for (const instruction of instructions) {
@@ -121,4 +95,52 @@ export function parseDockerfile(source) {
     else preamble.push(instruction);
   }
   return { instructions, stages, comments, preamble };
+}
+
+function parseInstructions(lines) {
+  const instructions = [];
+  const comments = [];
+  const state = { escape: '\\', directives: true };
+  for (let i = 0; i < lines.length; i += 1) {
+    const parsed = parseInstructionLine(lines, i, state);
+    if (parsed.comment) comments.push(parsed.comment);
+    if (parsed.instruction) instructions.push(parsed.instruction);
+    i = parsed.nextLine;
+  }
+  return { instructions, comments };
+}
+
+function parseInstructionLine(lines, index, state) {
+  const trimmed = lines[index].trim();
+  if (trimmed === '') { state.directives = false; return { nextLine: index }; }
+  if (trimmed.startsWith('#')) return parseCommentLine(trimmed, index, state);
+  state.directives = false;
+  const { logical, nextLine } = logicalInstructionOf(lines, index, state.escape);
+  const split = logical.search(/\s/);
+  const keyword = (split < 0 ? logical : logical.slice(0, split)).toUpperCase();
+  return { nextLine, instruction: { keyword, text: split < 0 ? '' : logical.slice(split).trim(), line: index + 1, stage: -1 } };
+}
+
+function parseCommentLine(trimmed, index, state) {
+  const body = trimmed.slice(1).trim();
+  const directive = state.directives ? /^(syntax|escape|check)\s*=\s*(\S+)$/i.exec(body) : null;
+  if (directive) {
+    if (directive[1].toLowerCase() === 'escape') state.escape = directive[2];
+    return { nextLine: index };
+  }
+  state.directives = false;
+  return { nextLine: index, comment: { text: body, line: index + 1 } };
+}
+
+function logicalInstructionOf(lines, index, escape) {
+  let logical = lines[index].trim();
+  let nextLine = index;
+  while (logical.endsWith(escape) && nextLine + 1 < lines.length) {
+    logical = logical.slice(0, -1).trimEnd();
+    nextLine += 1;
+    while (nextLine < lines.length && lines[nextLine].trim().startsWith('#')) nextLine += 1;
+    if (nextLine >= lines.length) break;
+    logical = `${logical} ${lines[nextLine].trim()}`;
+  }
+  return { logical, nextLine };
 }

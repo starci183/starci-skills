@@ -10,6 +10,58 @@ const LIKE_ESCAPE_UNDERSCORE = String.raw`\_`;
 const unique = values => [...new Set(values.filter(value => value != null))].sort(byCodeUnit);
 const safeQuery = value => typeof value === 'string' ? value.trim().slice(0, 128) : '';
 
+function hitCollector() {
+  const hits = [], seen = new Set();
+  let truncated = false;
+  const push = hit => {
+    const key = JSON.stringify(hit.matched);
+    if (seen.has(key)) return;
+    seen.add(key);
+    if (hits.length >= maxHits) { truncated = true; return; }
+    hits.push(hit);
+  };
+  return { hits, push, truncated: () => truncated };
+}
+
+function addMachineIdHits(machine, like, push) {
+  const rows = machine.prepare(String.raw`SELECT kind,id,title FROM v_search_ids WHERE id IS NOT NULL AND (id LIKE ? ESCAPE '\' OR title LIKE ? ESCAPE '\') ORDER BY kind,id LIMIT ?`).all(like, like, maxHits + 1);
+  for (const row of rows) push(machineSearchHit(machine, row.kind === 'ledger' || row.kind === 'worktree' ? { ...row, title: row.id } : row));
+}
+
+function addLedgerIdHits(store, like, push) {
+  const results = store.forEachLedger(({ row, db }) => {
+    const records = db.prepare(String.raw`SELECT kind,id,workflow_id,title FROM v_search_ids WHERE id IS NOT NULL AND (id LIKE ? ESCAPE '\' OR title LIKE ? ESCAPE '\') ORDER BY kind,id,workflow_id LIMIT ?`).all(like, like, maxHits + 1);
+    return { row, records: records.map(hit => ledgerSearchHit(db, row, hit)), mark: dbMark(db) };
+  });
+  for (const result of results) if (result.result) for (const hit of result.result.records) push(hit);
+  return results;
+}
+
+function addMachineLogHits(machine, store, phrase, push) {
+  try {
+    const logs = machine.prepare('SELECT m.seq,m.kind,m.workflow_id,m.ledger_id FROM machine_logs_fts f JOIN machine_logs m ON m.seq=f.rowid WHERE machine_logs_fts MATCH ? ORDER BY m.seq DESC LIMIT ?').all(phrase, maxHits + 1);
+    for (const row of logs) push(logSearchHit(row));
+  } catch { store.failSource?.('machine', 'machine_logs_fts'); }
+}
+
+function addLedgerLogHits(store, phrase, push) {
+  const results = store.forEachLedger(({ row, db }) => ({ row,
+    records: db.prepare('SELECT l.seq,l.kind,l.workflow_id FROM logs_fts f JOIN logs l ON l.seq=f.rowid WHERE logs_fts MATCH ? ORDER BY l.seq DESC LIMIT ?').all(phrase, maxHits + 1) }));
+  for (const result of results) {
+    if (result.result) for (const row of result.result.records) push(logSearchHit(row, result.result.row));
+  }
+}
+
+function searchHits(store, machine, like, q) {
+  const collector = hitCollector();
+  addMachineIdHits(machine, like, collector.push);
+  const results = addLedgerIdHits(store, like, collector.push);
+  const phrase = `"${q.replaceAll('"', '""')}"`;
+  addMachineLogHits(machine, store, phrase, collector.push);
+  addLedgerLogHits(store, phrase, collector.push);
+  return { ...collector, results };
+}
+
 export function healthz(request, response, store) {
   const machineAvailable = Boolean(store.machine) && (store.availability?.('machine') ?? 'available') === 'available';
   const ledgers = Object.fromEntries(store.projects().map(row => [row.name, Boolean(store.ledger(row.name))]));
@@ -56,31 +108,8 @@ export function search(request, response, store, url) {
   const q = safeQuery(url.searchParams.get('q'));
   if (!q) return sendError(request,response,400,'QUERY_REQUIRED','Search query required');
   const like = `%${q.replaceAll('%', LIKE_ESCAPE_PERCENT).replaceAll('_', LIKE_ESCAPE_UNDERSCORE)}%`;
-  const hits = [], seen = new Set();
-  let truncated = false;
-  const push = hit => {
-    const key = JSON.stringify(hit.matched);
-    if (seen.has(key)) return;
-    seen.add(key);
-    if (hits.length >= maxHits) { truncated = true; return; }
-    hits.push(hit);
-  };
   const machine = store.machine.db;
-  const machineRows = machine.prepare(String.raw`SELECT kind,id,title FROM v_search_ids WHERE id IS NOT NULL AND (id LIKE ? ESCAPE '\' OR title LIKE ? ESCAPE '\') ORDER BY kind,id LIMIT ?`).all(like,like,maxHits + 1);
-  for (const row of machineRows) push(machineSearchHit(machine,row.kind === 'ledger' || row.kind === 'worktree' ? { ...row, title: row.id } : row));
-  const results = store.forEachLedger(({row,db}) => {
-    const records = db.prepare(String.raw`SELECT kind,id,workflow_id,title FROM v_search_ids WHERE id IS NOT NULL AND (id LIKE ? ESCAPE '\' OR title LIKE ? ESCAPE '\') ORDER BY kind,id,workflow_id LIMIT ?`).all(like,like,maxHits + 1);
-    return {row,records: records.map(hit => ledgerSearchHit(db,row,hit)),mark:dbMark(db)};
-  });
-  for (const result of results) if (result.result) for (const hit of result.result.records) push(hit);
-  const phrase = `"${q.replaceAll('"','""')}"`;
-  try {
-    const logs = machine.prepare('SELECT m.seq,m.kind,m.workflow_id,m.ledger_id FROM machine_logs_fts f JOIN machine_logs m ON m.seq=f.rowid WHERE machine_logs_fts MATCH ? ORDER BY m.seq DESC LIMIT ?').all(phrase,maxHits + 1);
-    for (const row of logs) push(logSearchHit(row));
-  } catch { store.failSource?.('machine', 'machine_logs_fts'); }
-  for (const result of store.forEachLedger(({row,db})=>({row,records:db.prepare('SELECT l.seq,l.kind,l.workflow_id FROM logs_fts f JOIN logs l ON l.seq=f.rowid WHERE logs_fts MATCH ? ORDER BY l.seq DESC LIMIT ?').all(phrase,maxHits + 1)}))) {
-    if (result.result) for (const row of result.result.records) push(logSearchHit(row,result.result.row));
-  }
-  sendJson(request,response,{hits,limit:maxHits,truncated},{sources:[{db:'machine',rel:'v_search_ids'},{db:'machine',rel:'machine_logs_fts'},
-    ...store.projects().flatMap(row=>['v_search_ids','logs_fts'].map(rel=>({db:row.name,ledgerId:row.ledgerId,rel})))],stale:[...store.stale],marks:[dbMark(machine),...results.map(result=>result.result?.mark)]});
+  const result = searchHits(store, machine, like, q);
+  sendJson(request, response, { hits: result.hits, limit: maxHits, truncated: result.truncated() }, { sources: [{ db: 'machine', rel: 'v_search_ids' }, { db: 'machine', rel: 'machine_logs_fts' },
+    ...store.projects().flatMap(row => ['v_search_ids', 'logs_fts'].map(rel => ({ db: row.name, ledgerId: row.ledgerId, rel })))], stale: [...store.stale], marks: [dbMark(machine), ...result.results.map(item => item.result?.mark)] });
 }

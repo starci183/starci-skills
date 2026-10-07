@@ -305,7 +305,7 @@ function drawAlbumCaption(question, language) {
   const review = question.review ?? {};
   const shapes = [...new Set((review.parts ?? []).map((p) => p?.shape).filter(Boolean))];
   const round = Number.isInteger(review.round) ? review.round : 1;
-  const answers = new RegExp(String.raw`${translatedPattern('Round {round}', 'round', String.raw`\d+`)};[^\[]*(.*?)(?:\.\s|$)`).exec(String(question.text ?? ''))?.[1] ?? '';
+  const roundPattern = translatedPattern('Round {round}', 'round', String.raw`\d+`), answers = new RegExp(String.raw`${roundPattern};[^\[]*(.*?)(?:\.\s|$)`).exec(String(question.text ?? ''))?.[1] ?? '';
   const head = tr('[StarCi] Please review: {record}', { record: review.record ?? '' });
   const lines = [head, `${tr('Shapes')}: ${shapes.join(', ') || '-'}`, tr('Round {round}', { round })];
   if (round > 1 && answers) lines.push(`${tr('Notes addressed')}: ${answers}`);
@@ -607,7 +607,7 @@ const runReadOnlyVerb = async (verb, { config, apiBase, out }) => {
   out(result); if (!result.ok) process.exitCode = 1;
 };
 
-if (isMain(import.meta.url)) main().catch((error) => { console.error(error); process.exit(1); });
+if (isMain(import.meta.url)) try { await main(); } catch (error) { console.error(error); process.exit(1); }
 
 /**
  * The owner push. One message to the owner's Telegram chat: {ok, skipped?, messageId?, status?, error?}. `text` is a string or

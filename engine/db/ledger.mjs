@@ -8,7 +8,7 @@ import {sha256} from '../digest.mjs';
 import {putBlob,blobPath,artifactRoot} from './blob.mjs';
 import {redactData,redactText} from '../../scripts/lib/redact.mjs';
 import {isBusyError,newSpanId,newTraceId,withMachine} from './machine.mjs';
-import {PROJECTS_ROOT_ENV,projectsRootFor,ledgerIdForRepo,repoRootKey,resolveLedgerFile,ledgerFixtureInit,assertOperationalLedger} from './ledger-paths.mjs';
+import {projectsRootFor,repoRootKey,resolveLedgerFile,ledgerFixtureInit,assertOperationalLedger} from './ledger-paths.mjs';
 import { hasTable, insertRowWith } from '../../scripts/lib/sqlite.mjs';
 // The machine-side path helpers have one definition (engine/db/machine.mjs); re-exported for the ledger's callers.
 export {isUnderTempDir,machineFileFor,starciLocalRoot,TEST_REGISTRY_ENV} from './machine.mjs';
@@ -837,16 +837,16 @@ const INCIDENT_KINDS=Object.freeze(['infra-provider','config-defect','owner-ask'
  */
 function incidentClassOf(freeKind){
   const k=String(freeKind??'').toLowerCase();
-  if(INCIDENT_KINDS.includes(k)){let owner='kernel';if(['owner-ask','credential-missing','safety-block','scope-change','partial-effect'].includes(k))owner='owner';else if(['runtime-defect','config-defect'].includes(k))owner='supervisor';return {kind:k,owner};}
-  if(/owner|handover|approval/.test(k))return {kind:'owner-ask',owner:'owner'};
-  if(/credential|secret|provision/.test(k))return {kind:'credential-missing',owner:'owner'};
-  if(/safety/.test(k))return {kind:'safety-block',owner:'owner'};
-  if(/scope|goal/.test(k))return {kind:'scope-change',owner:'owner'};
-  if(/partial|effect/.test(k))return {kind:'partial-effect',owner:'owner'};
-  if(/infra|provider|quota|environment|network/.test(k))return {kind:'infra-provider',owner:'kernel'};
-  if(/config/.test(k))return {kind:'config-defect',owner:'supervisor'};
-  if(/supervisor|runtime|orca|settler|tree|kernel/.test(k))return {kind:'runtime-defect',owner:'supervisor'};
-  if(/evidence|proof|capture/.test(k))return {kind:'evidence-missing',owner:'kernel'};
+  if(INCIDENT_KINDS.includes(k)){let owner='kernel';if(['owner-ask','credential-missing','safety-block','scope-change','partial-effect'].includes(k)){owner='owner';}else if(['runtime-defect','config-defect'].includes(k)){owner='supervisor';}return {kind:k,owner};}
+  if(/owner|handover|approval/.test(k)){return {kind:'owner-ask',owner:'owner'};}
+  if(/credential|secret|provision/.test(k)){return {kind:'credential-missing',owner:'owner'};}
+  if(/safety/.test(k)){return {kind:'safety-block',owner:'owner'};}
+  if(/scope|goal/.test(k)){return {kind:'scope-change',owner:'owner'};}
+  if(/partial|effect/.test(k)){return {kind:'partial-effect',owner:'owner'};}
+  if(/infra|provider|quota|environment|network/.test(k)){return {kind:'infra-provider',owner:'kernel'};}
+  if(/config/.test(k)){return {kind:'config-defect',owner:'supervisor'};}
+  if(/supervisor|runtime|orca|settler|tree|kernel/.test(k)){return {kind:'runtime-defect',owner:'supervisor'};}
+  if(/evidence|proof|capture/.test(k)){return {kind:'evidence-missing',owner:'kernel'};}
   return {kind:'other',owner:'kernel'};
 }
 /** Open one incident. A free `kind` (peer-wait, owner-gate, ...) is classed by incidentClassOf; `owner` defaults to the class's. */
@@ -1027,7 +1027,7 @@ const registerNewLedger=(db,created,{file,resolved,ledgerId})=>{if(!created)retu
  */
 export function openLedger({file,now=Date.now,busyTimeoutMs=LEDGER_BUSY_TIMEOUT_MS,repoRoot=null,product=null,checkpointer=false,machine=null,fixture=null}={}){
   fixture=ledgerFixtureInit(fixture,{file,repoRoot,product,machine,mapped:typeof file==='string'&&repoRootOfFile.has(path.resolve(file)),checkpointer,now});
-  if(fixture){fs.closeSync(fs.openSync(file,'wx'));now=()=>fixture.createdAt;}else if(typeof file==='string'&&fs.existsSync(file))assertWritableFile(file,busyTimeoutMs);
+  if(fixture){fs.closeSync(fs.openSync(file,'wx'));now=()=>fixture.createdAt;}else if(typeof file==='string'&&fs.existsSync(file)){assertWritableFile(file,busyTimeoutMs);}
   const pragmas=checkpointer?{...LEDGER_PRAGMAS,wal_autocheckpoint:CHECKPOINTER_AUTOCHECKPOINT}:LEDGER_PRAGMAS;
   const {db,sqliteVersion,journalMode}=openDb({file,busyTimeoutMs,journalMode:'WAL',autoVacuum:true,label:'openLedger',pragmas});
   const resolved=path.resolve(file);

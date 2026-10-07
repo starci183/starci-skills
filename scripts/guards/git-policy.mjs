@@ -90,7 +90,11 @@ export function envConfig(env) {
 
 // A push names its remote, never a URL or a path, and no command-line config redirects that remote.
 const REMOTE_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
-const REMOTE_KEY = /^(remote\..+\.(url|pushurl|receivepack)|url\..+\.(insteadof|pushinsteadof))$/i;
+const REMOTE_KEY = new RegExp([
+  String.raw`^(remote\.`,
+  String.raw`.+\.(url|pushurl|receivepack)|url\.`,
+  String.raw`.+\.(insteadof|pushinsteadof))$`,
+].join(''), 'i');
 const redirectsRemote = (entry) => REMOTE_KEY.test(String(entry).split('=')[0]);
 const PUSH_VALUE_OPTIONS = new Set(['-o', '--push-option', '--repo', '--receive-pack', '--exec']);
 function pushTarget(rest) {
@@ -127,6 +131,11 @@ const configWriteOf = (sub, words, options) => {
   return null;
 };
 function classifyConfig(rest, currentConfig) {
+  const { words, options } = configWordsAndOptions(rest);
+  const write = configWriteOf(words[0], words, options);
+  return configWriteVerdict(write, currentConfig);
+}
+const configWordsAndOptions = (rest) => {
   const words = [], options = [];
   for (let i = 0; i < rest.length; i += 1) {
     const a = rest[i];
@@ -134,7 +143,9 @@ function classifyConfig(rest, currentConfig) {
     if (a.startsWith('-')) { options.push(a); if (CONFIG_VALUE_OPTIONS.has(a)) { i += 1; } continue; }
     words.push(a);
   }
-  const write = configWriteOf(words[0], words, options);
+  return { words, options };
+};
+const configWriteVerdict = (write, currentConfig) => {
   if (!write) return ALLOW;
   const refused = (what) => refusal('CONFIG_GUARDED', `git config ${what} changes the hooks or the remotes of the checkout every workflow shares`,
     'leave git config alone; report a need for a different hook or remote');
@@ -147,7 +158,7 @@ function classifyConfig(rest, currentConfig) {
     return unchanged ? ALLOW : refused(key);
   }
   return REMOTE_KEY.test(key) ? refused(key) : ALLOW;
-}
+};
 
 const REVERT = 'undo a wrong commit with `git revert <sha>` (a new commit); never move the shared branch back';
 const OWNED_DISCARD = 'discard only your own files: `git restore --source=HEAD --staged --worktree -- <owned paths>`';
@@ -180,9 +191,11 @@ const commitVerdict = ({ options, dashDash, fileSpecs, words, paths, scoped, res
     return refusal('COMMIT_NOT_SCOPED', 'git commit -a/--include commits whatever is staged or modified, including other workflows\' files',
       'commit with explicit owned pathspecs: `git commit -m "<msg>" -- <owned paths>`');
   const specs = [...paths, ...(dashDash ? [] : words.filter((w, i) => !optionValue(rest, w, i))), ...(fileSpecs ?? [])];
-  if (!specs.length)
-    return refusal('COMMIT_NOT_SCOPED', `git commit without pathspecs${fileSpecs ? ` (its ${PATHSPEC_FILE} list is empty)` : ''} commits the whole shared index, including files other workflows staged`,
+  if (!specs.length) {
+    const pathspecDetails = fileSpecs ? ` (its ${PATHSPEC_FILE} list is empty)` : '';
+    return refusal('COMMIT_NOT_SCOPED', `git commit without pathspecs${pathspecDetails} commits the whole shared index, including files other workflows staged`,
       `commit with explicit owned pathspecs: \`git commit -m "<msg>" -- <owned paths>\` (a long list: \`git commit -m "<msg>" ${PATHSPEC_FILE}=<list>\`)`);
+  }
   return scoped(specs, 'git commit');
 };
 const stashVerdict = ({ words }) => {
@@ -243,8 +256,10 @@ const pushVerdict = ({ options, words, rest, config }) => {
     return refusal('HISTORY_REWRITE', 'a forced or deleting push rewrites the shared remote branch', 'push fast-forward only; integrate with a merge, never a force');
   if (has(options, '--no-verify')) return refusal('HOOKS_BYPASS', 'git push --no-verify skips the pre-push gate', 'fix what the gate reports and push again');
   const target = pushTarget(rest);
-  if ((target != null && !REMOTE_NAME.test(target)) || config.some(redirectsRemote))
-    return refusal('PUSH_REMOTE_NOT_CONFIGURED', `git push${target ? ` ${target}` : ''} names a URL, a path or a remote redirected on the command line`, 'push to the configured remote by name (`git push origin <branch>`)');
+  if ((target != null && !REMOTE_NAME.test(target)) || config.some(redirectsRemote)) {
+    const targetDetails = target ? ` ${target}` : '';
+    return refusal('PUSH_REMOTE_NOT_CONFIGURED', `git push${targetDetails} names a URL, a path or a remote redirected on the command line`, 'push to the configured remote by name (`git push origin <branch>`)');
+  }
   return ALLOW;
 };
 const remoteVerdict = ({ words }) => {

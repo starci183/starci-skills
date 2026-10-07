@@ -78,20 +78,24 @@ export function engineItems(s, { safeIsCrashLoop = false } = {}) {
 const SERVICE_LABEL = { orca: 'Orca', 'harness-ui': 'harness UI (local /healthz)', 'harness-tunnel': 'harness tunnel (public /healthz)', 'ask-gateway': 'ask gateway', 'ask-tunnel': 'ask tunnel', 'telegram-bridge': 'Telegram bridge' };
 
 /** Whether config.yaml wants a connector service at all (an `off` one is not required). Pure. */
-export const serviceWanted = (name, config) => (name === 'ask-tunnel' ? (config?.connectors?.cloudflare?.mode ?? CONNECTOR_DEFAULTS.cloudflare.mode) !== 'off' : name === 'telegram-bridge' ? config?.connectors?.telegram?.enabled === true : true);
+export const serviceWanted = (name, config) => {
+  if (name === 'ask-tunnel') return (config?.connectors?.cloudflare?.mode ?? CONNECTOR_DEFAULTS.cloudflare.mode) !== 'off';
+  if (name === 'telegram-bridge') return config?.connectors?.telegram?.enabled === true;
+  return true;
+};
+
+const serviceDownReason = (detail) => {
+  let reason = detail.error ?? detail.status ?? detail.verdict;
+  if (reason != null) return reason;
+  if (!detail.value) return 'no answer';
+  reason = detail.value.health?.problems?.[0];
+  if (reason != null) return reason;
+  return detail.value.running === false ? 'not running' : JSON.stringify(detail.value).slice(0, 120);
+};
 
 const serviceDetail = (probe, publicUrl) => {
   const detail = probe.detail ?? {};
-  if (!probe.ok) {
-    let reason = detail.error ?? detail.status ?? detail.verdict;
-    if (reason == null) {
-      if (detail.value) {
-        reason = detail.value.health?.problems?.[0];
-        if (reason == null) reason = detail.value.running === false ? 'not running' : JSON.stringify(detail.value).slice(0, 120);
-      } else reason = 'no answer';
-    }
-    return `down: ${reason}`;
-  }
+  if (!probe.ok) return `down: ${serviceDownReason(detail)}`;
   let message = 'up';
   if (detail.status) message += ` (HTTP ${detail.status}`;
   if (detail.ms != null) message += (detail.status ? ', ' : ' (') + `${detail.ms}ms`;
