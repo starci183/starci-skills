@@ -21,9 +21,12 @@ import { byCodeUnit } from '../lib/list.mjs';
 export const SOURCE_EXT = Object.freeze(['.ts', '.tsx', '.mts', '.cts', '.js', '.jsx', '.mjs', '.cjs']);
 const RESOLVE_EXT = [...SOURCE_EXT, '.d.ts', '.json'];
 const posix = (p) => String(p).replaceAll('\\', '/');
+const IMPORT_FROM_BODY = String.raw`(?:(?!\bfrom\s*['"])[^'"\x60;])*\bfrom\s*['"]([^'"]+)['"]`;
+const IMPORT_FROM_RE = new RegExp(`${String.raw`\bimport\s+(?:type\s+)?`}${IMPORT_FROM_BODY}`, 'g');
+const EXPORT_FROM_RE = new RegExp(`${String.raw`\bexport\s+(?:type\s+)?`}${IMPORT_FROM_BODY}`, 'g');
 const SPEC_RE = [
-  /\bimport\s+(?:type\s+)?(?:(?!\bfrom\s*['"])[^'"`;])*\bfrom\s*['"]([^'"]+)['"]/g,
-  /\bexport\s+(?:type\s+)?(?:(?!\bfrom\s*['"])[^'"`;])*\bfrom\s*['"]([^'"]+)['"]/g,
+  IMPORT_FROM_RE,
+  EXPORT_FROM_RE,
   /\bimport\s*['"]([^'"]+)['"]/g,
   /\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g,
   /\brequire\s*\(\s*['"]([^'"]+)['"]\s*\)/g,
@@ -191,6 +194,10 @@ const specifierEdge = (from, spec, resolution) => {
   return r.kind === 'external' ? null : { from, spec, kind: r.kind, ...(r.file ? { file: r.file } : {}) };
 };
 
+const DOUBLE_STAR_SUFFIX = new RegExp(String.raw`\/\*\*$`);
+const TRAILING_SLASHES = new RegExp(String.raw`\/+$`);
+const FILE_EXTENSION = new RegExp(String.raw`\.[^./]+$`);
+
 function scanImports(root, { only = null, list = trackedList, readFile = null } = {}) {
   const files = trackedSources(root, { list });
   const onDisk = (rel) => { try { return fs.statSync(path.join(root, rel)).isFile(); } catch { return false; } };
@@ -218,9 +225,9 @@ function scanImports(root, { only = null, list = trackedList, readFile = null } 
  * the moved paths themselves excluded.
  */
 export function importersOf(root, moved, opts = {}) {
-  const targets = [...new Set(moved.map((p) => posix(p).replace(/\/\*\*$/, '').replace(/\/+$/, '')).filter(Boolean))];
+  const targets = [...new Set(moved.map((p) => posix(p).replace(DOUBLE_STAR_SUFFIX, '').replace(TRAILING_SLASHES, '')).filter(Boolean))];
   if (!targets.length) return [];
-  const hit = (file) => targets.some((t) => within(file, t) || file.replace(/\.[^./]+$/, '') === t);
+  const hit = (file) => targets.some((t) => within(file, t) || file.replace(FILE_EXTENSION, '') === t);
   const { edges } = scanImports(root, opts);
   return [...new Set(edges.filter((e) => e.kind === 'file' && hit(e.file) && !hit(e.from)).map((e) => e.from))].sort(byCodeUnit);
 }
