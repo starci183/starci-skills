@@ -25,6 +25,14 @@ function spawnDetached({ args, emit, repo, wf, pushId, dir, resultFile }) {
   emit({ ok: true, workflowId: wf, pushId, detached: true, pid: child.pid, resultFile }, `dispatch-ready ${pushId} running in the background (pid ${child.pid}); result: ${resultFile}; the next starci kernel status shows the running count`, args.json);
 }
 
+function routeReadyJob(jobId, repo, job) {
+  const model = job.payload.kernelModel ?? null;
+  if (model) return { model, refusal: null };
+  const route = apiRun(['route', '--job', jobId, ...(job.payload.difficulty ? ['--difficulty', job.payload.difficulty] : [])], { repo, timeoutMs: 300_000 });
+  const refusal = route.ok ? null : { result: { jobId, route: route.json?.reason ?? route.json?.error ?? `exit ${route.status}` }, launched: 0, stop: false };
+  return { model, refusal };
+}
+
 function processReadyJob({ db, repo, wf, jobId, dryRun }) {
   const job = jobRow(db, jobId);
   if (job?.status !== 'queued') return { result: { jobId, skipped: `status ${job?.status ?? 'gone'}` }, launched: 0, stop: false };
@@ -32,11 +40,8 @@ function processReadyJob({ db, repo, wf, jobId, dryRun }) {
   if (failed) return { result: { jobId, skipped: `same-failing-shape as ${failed.jobId} (${failed.causes.join(', ')}): change it with starci kernel graph-edit (widen/params/split) first` }, launched: 0, stop: false };
   if (dryRun) return { result: { jobId, would: job.payload.kernelModel ? `dispatch --model ${job.payload.kernelModel}` : 'route + dispatch --spawn' }, launched: 1, stop: false };
 
-  const model = job.payload.kernelModel ?? null;
-  if (!model) {
-    const route = apiRun(['route', '--job', jobId, ...(job.payload.difficulty ? ['--difficulty', job.payload.difficulty] : [])], { repo, timeoutMs: 300_000 });
-    if (!route.ok) return { result: { jobId, route: route.json?.reason ?? route.json?.error ?? `exit ${route.status}` }, launched: 0, stop: false };
-  }
+  const { model, refusal } = routeReadyJob(jobId, repo, job);
+  if (refusal) return refusal;
   const dispatch = apiRun(['dispatch', '--job', jobId, '--spawn', ...(model ? ['--model', model] : [])], { repo, timeoutMs: 15 * 60_000 });
   const waiting = dispatch.json?.waiting === true;
   const result = { jobId, dispatched: dispatch.ok && !waiting,
