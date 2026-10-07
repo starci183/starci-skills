@@ -50,18 +50,18 @@ test('all five roles refuse reserve-window Claude and select the allowed concret
   }
 });
 
-test('hard require does not widen and a raw override cannot grant access to the reserve', () => {
+test('an only bias does not widen and a raw override cannot grant access to the reserve band', () => {
   const scopeId = 'unit:op:attempt:3';
   const grant = { authorized: true, scopeId, role: 'op', provider: 'claude', model: 'claude-sonnet-5-5', reason: 'owner-approved repair' };
-  const biased = input('op', { scopeId, bias: { require: { provider: 'claude' }, reserveOverride: grant } });
-  const noGrant = admitAgent(biased, { io: fakeAdmission({ used: { claude: 96 } }) });
+  const biased = input('op', { scopeId, bias: { roles: ['op'], only: [{ provider: 'claude' }], reserveOverride: grant } });
+  const noGrant = admitAgent(biased, { io: fakeAdmission({ used: { claude: 93 } }) });
   assert.equal(noGrant.ok, false);
-  assert.equal(noGrant.error, 'required-unavailable');
-  const trusted = admitAgent({ ...biased, ownerGrant: grant }, { io: fakeAdmission({ used: { claude: 96 } }) });
+  assert.equal(noGrant.error, 'tokens-out');
+  const trusted = admitAgent({ ...biased, ownerGrant: grant }, { io: fakeAdmission({ used: { claude: 93 } }) });
   assert.equal(trusted.ok, true, JSON.stringify(trusted));
   assert.equal(trusted.selected.provider, 'claude');
-  const otherRole = admitAgent(input('kernel', { scopeId, bias: biased.bias, ownerGrant: grant }), { io: fakeAdmission({ used: { claude: 96 } }) });
-  assert.equal(otherRole.selected.provider, 'codex', 'Op constraints and grant never leak into Kernel');
+  const otherRole = admitAgent(input('kernel', { scopeId, bias: biased.bias, ownerGrant: grant }), { io: fakeAdmission({ used: { claude: 93 } }) });
+  assert.equal(otherRole.selected.provider, 'codex', 'Op bias and grant never leak into Kernel');
 });
 
 test('worker economy model and unknown critic author are rejected before any reservation', () => {
@@ -84,7 +84,7 @@ test('capacity race can retry only admitted group members; consume rejects a dif
 });
 
 test('unknown launch effects retain the fenced slot and produce no second worker', () => {
-  const admission = fakeAdmission({ used: { claude: 96 } });
+  const admission = fakeAdmission({ used: { claude: 93 } });
   const calls = [];
   const result = startAgent({ provider: 'claude', model: 'claude-sonnet-5-5', role: 'kernel', allowGroup: group,
     worktree: 'fixture', title: '[Kernel] unit', prompt: 'fixture', objective: 'fixture', request: { attempt: 1 },
@@ -274,12 +274,12 @@ test('opaque Devin default mode reports unknown actual model and refuses concret
         show: () => ({ ok: true, state: 'ready', effective: { agent: 'devin', model: 'opaque-host-value' } }),
       } };
     const result = startAgent({ provider: 'devin', role: 'worker', env,
-      bias: { roles: ['worker'], require: { provider: 'devin', ...(concrete ? { model } : {}) } },
+      bias: { roles: ['worker'], only: [{ provider: 'devin', ...(concrete ? { model } : {}) }] },
       worktree: 'fixture', title: '[Worker] Devin fixture', prompt: 'fixture', objective: 'fixture', request: { attempt: 1 }, io });
     assert.equal(result.ok, !concrete, JSON.stringify(result));
     assert.equal(runs, concrete ? 0 : 1); assert.equal(starts, concrete ? 0 : 1);
     assert.equal(providerBudgetUsage('devin', 'default', { env }).running, concrete ? 0 : 1);
-    if (concrete) assert.ok(result.decision.rejected[0].codes.includes('required-model-unverifiable'));
+    if (concrete) assert.ok(result.decision.rejected[0].codes.includes('only-model-unverifiable'));
     else {
       assert.equal(result.model, null); assert.equal(result.effective.model, null);
       assert.equal(result.modelAuthority, 'configured-logical-runtime');
