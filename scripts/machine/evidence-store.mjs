@@ -158,6 +158,14 @@ function checkStatusOf({ exitCode = null, declaredExitCode = null, unavailable =
   return exit === 0 && status !== 'fail' ? 'pass' : 'fail';
 }
 
+const integerOrNull = (value) => (Number.isInteger(value) ? value : null);
+
+// The raw exit the runtime observed and the exit an op declared: an op's own exit is only its claim.
+function exitCodesOf(runner, exitCode, declaredExitCode) {
+  if (runner !== 'op') return { raw: integerOrNull(exitCode), declared: integerOrNull(declaredExitCode) };
+  return { raw: null, declared: Number.isInteger(exitCode) ? exitCode : integerOrNull(declaredExitCode) };
+}
+
 /**
  * One check_runs row (engine/db/ledger.mjs recordCheckRun). `runner` 'op' is always authority 'declared' (the op's own claim: exitCode is stored as
  * declared_exit_code, exit_code stays NULL — the runtime did not observe it); the runtime's own runners store the
@@ -172,13 +180,7 @@ export function recordCheck(db, { attemptId, name, phase, runner, authority = nu
   if (!CHECK_PHASES.includes(phase)) throw refuse(`check phase must be ${CHECK_PHASES.join('|')}, got '${phase}'`, 'check-phase-unknown');
   if (attemptId == null) throw refuse(`check '${name}' has no attempt`, 'check-attempt-missing');
   const auth = runner === 'op' ? 'declared' : authority ?? 'runtime';
-  let raw = null;
-  if (runner !== 'op' && Number.isInteger(exitCode)) raw = exitCode;
-  let declared = null;
-  if (runner === 'op') {
-    if (Number.isInteger(exitCode)) declared = exitCode;
-    else if (Number.isInteger(declaredExitCode)) declared = declaredExitCode;
-  } else if (Number.isInteger(declaredExitCode)) declared = declaredExitCode;
+  const { raw, declared } = exitCodesOf(runner, exitCode, declaredExitCode);
   const st = checkStatusOf({ exitCode: raw, declaredExitCode: declared, unavailable, error, skipped, status });
   for (const b of [stdout, stderr, output]) if (b) registerBlob(db, b, { now });
   const wall = wallMs ?? (Number.isFinite(startedAt) && Number.isFinite(finishedAt) ? finishedAt - startedAt : null);

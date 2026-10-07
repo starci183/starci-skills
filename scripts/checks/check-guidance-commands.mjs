@@ -79,7 +79,10 @@ const RUN_COMMAND_PREFIX = '\\brun\\s+(?!`)';
 const RUN_COMMAND_TEXT = '([^,;:`]+?)';
 const RUN_COMMAND_BOUNDARY = String.raw`(?=\s+-\s|[,;:]|\.(?:\s|$)|$)`;
 const RUN_COMMAND = new RegExp(`${RUN_COMMAND_PREFIX}${RUN_COMMAND_TEXT}${RUN_COMMAND_BOUNDARY}`, 'gi');
-const RUNTIME_ACTOR = /(?:\b(?:the runtime|runtime's|[a-z]+[A-Z]\w*)\b|[\w/.-]+\.mjs\b)(?:\s+\w+){0,3}\s+(?:[\w-]+s|is the only)\b[^,;:]*$/;
+const RUNTIME_ACTOR_NAME = String.raw`(?:\b(?:the runtime|runtime's|[a-z]+[A-Z]\w*)\b|[\w/.-]+\.mjs\b)`;
+const RUNTIME_ACTOR_GAP = String.raw`(?:\s+\w+){0,3}\s+`;
+const RUNTIME_ACTOR_VERB = String.raw`(?:[\w-]+s|is the only)\b[^,;:]*$`;
+const RUNTIME_ACTOR = new RegExp(`${RUNTIME_ACTOR_NAME}${RUNTIME_ACTOR_GAP}${RUNTIME_ACTOR_VERB}`);
 // A clause whose SUBJECT is a runtime actor (the runtime, the host-side controller, the reconciler, the GC, the finish, a script
 // file) describes what the runtime itself does, whatever punctuation follows: the clause is the text after the last . ; | or
 // table cell break before the command.

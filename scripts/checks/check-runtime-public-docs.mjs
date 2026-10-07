@@ -23,22 +23,53 @@ const inputError = (detail) => { throw new Error(`${INPUT}: ${detail}`); };
 const exported = (t, node) => node.modifiers?.some((m) => m.kind === t.SyntaxKind.ExportKeyword);
 const defaulted = (t, node) => node.modifiers?.some((m) => m.kind === t.SyntaxKind.DefaultKeyword);
 
+const isCallableDeclaration = (t, node) => t.isFunctionDeclaration(node) || t.isClassDeclaration(node);
+const declaresVariable = (t, node, name) => t.isVariableStatement(node) && node.declarationList.declarations.some((d) => t.isIdentifier(d.name) && d.name.text === name);
+const declares = (t, node, name) => (isCallableDeclaration(t, node) && node.name?.text === name) || declaresVariable(t, node, name);
+
+// The definition an import binding of `selected` leads to, or undefined when `node` imports no such binding.
+const importedDefinition = ({ t, node, through, selected }) => {
+  if (!t.isImportDeclaration(node) || !t.isStringLiteral(node.moduleSpecifier)) return undefined;
+  const clause = node.importClause;
+  if (clause?.name?.text === selected) return through(node.moduleSpecifier.text, 'default');
+  const bindings = clause?.namedBindings;
+  if (!bindings || !t.isNamedImports(bindings)) return undefined;
+  const binding = bindings.elements.find((el) => el.name.text === selected);
+  return binding ? through(node.moduleSpecifier.text, (binding.propertyName ?? binding.name).text) : undefined;
+};
+
 /** The authored definition a local name resolves to inside `source` (a declaration or an import binding). */
 const localDefinition = ({ t, source, result, through, key, selected }) => {
   for (const node of source.statements) {
-    if ((t.isFunctionDeclaration(node) || t.isClassDeclaration(node)) && node.name?.text === selected) return result(node);
-    if (t.isVariableStatement(node) && node.declarationList.declarations.some((d) => t.isIdentifier(d.name) && d.name.text === selected)) return result(node);
-    if (t.isImportDeclaration(node) && t.isStringLiteral(node.moduleSpecifier)) {
-      const clause = node.importClause;
-      if (clause?.name?.text === selected) return through(node.moduleSpecifier.text, 'default');
-      const bindings = clause?.namedBindings;
-      if (bindings && t.isNamedImports(bindings)) {
-        const binding = bindings.elements.find((el) => el.name.text === selected);
-        if (binding) return through(node.moduleSpecifier.text, (binding.propertyName ?? binding.name).text);
-      }
-    }
+    if (declares(t, node, selected)) return result(node);
+    const imported = importedDefinition({ t, node, through, selected });
+    if (imported) return imported;
   }
   return inputError(`${key} has no authored definition for ${selected}`);
+};
+
+// The exported declaration of `name` `node` is, or undefined.
+const exportedDefinition = ({ t, node, name, result }) => {
+  if (!exported(t, node)) return undefined;
+  if (isCallableDeclaration(t, node) && (defaulted(t, node) ? name === 'default' : node.name?.text === name)) return result(node);
+  return declaresVariable(t, node, name) ? result(node) : undefined;
+};
+
+// The definition a named `export { ... }` list of `node` leads `name` to, or undefined.
+const listedDefinition = ({ t, node, name, through, local }) => {
+  if (!t.isExportDeclaration(node) || !node.exportClause || !t.isNamedExports(node.exportClause)) return undefined;
+  const binding = node.exportClause.elements.find((el) => el.name.text === name);
+  if (!binding) return undefined;
+  const selected = (binding.propertyName ?? binding.name).text;
+  if (node.moduleSpecifier && t.isStringLiteral(node.moduleSpecifier)) return through(node.moduleSpecifier.text, selected);
+  return local(selected);
+};
+
+// The definition `export default <expression>` of `node` leads the name 'default' to, or undefined.
+const assignedDefinition = ({ t, node, name, result, local }) => {
+  if (name !== 'default' || !t.isExportAssignment(node) || node.isExportEquals) return undefined;
+  if (t.isIdentifier(node.expression)) return local(node.expression.text);
+  return result(node);
 };
 
 /** Resolve a contract-named export to its authored definition without loading executable modules. */
@@ -57,20 +88,9 @@ function publicDefinition(file, name, context, chain = new Set()) {
   };
   const local = (selected) => localDefinition({ t, source, result, through, key, selected });
   for (const node of source.statements) {
-    if (exported(t, node)) {
-      if ((t.isFunctionDeclaration(node) || t.isClassDeclaration(node)) && (defaulted(t, node) ? name === 'default' : node.name?.text === name)) return result(node);
-      if (t.isVariableStatement(node) && node.declarationList.declarations.some((d) => t.isIdentifier(d.name) && d.name.text === name)) return result(node);
-    }
-    if (t.isExportDeclaration(node) && node.exportClause && t.isNamedExports(node.exportClause)) {
-      const binding = node.exportClause.elements.find((el) => el.name.text === name);
-      if (!binding) continue;
-      const selected = (binding.propertyName ?? binding.name).text;
-      if (node.moduleSpecifier && t.isStringLiteral(node.moduleSpecifier)) return through(node.moduleSpecifier.text, selected);
-      return local(selected);
-    }
-    if (name === 'default' && t.isExportAssignment(node) && !node.isExportEquals) {
-      return t.isIdentifier(node.expression) ? local(node.expression.text) : result(node);
-    }
+    const found = exportedDefinition({ t, node, name, result }) ?? listedDefinition({ t, node, name, through, local })
+      ?? assignedDefinition({ t, node, name, result, local });
+    if (found) return found;
   }
   // Star exports do not establish a unique named owner; report the unresolved contract instead of guessing.
   return inputError(`${key} is not an explicit exported definition`);

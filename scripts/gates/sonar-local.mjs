@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
 import os from 'node:os';
-import path from 'node:path'; import { byCodeUnit } from '../lib/list.mjs';
+import path from 'node:path'; import { byCodeUnit } from '../lib/list.mjs'; import { repeatInOrder } from '../lib/in-order.mjs';
 import {containerInspect} from '../api/docker/container-inspect.mjs';import {scanRun} from '../api/sonar/scan-run.mjs';import {runShell} from '../api/process/run-shell.mjs';
 import {createHash} from 'node:crypto';
 import { isMain } from '../lib/is-main.mjs';
@@ -992,17 +992,17 @@ const submitScan=async(cfg,options,setup,summary,finish)=>{
 const waitForScan=async(cfg,options,setup,report,summary,finish)=>{
   const tokens=[setup.analysisToken],deadline=Date.now()+Number(options.waitSec??600)*1000;
   let task;
-  for(;;){
+  const stopped=await repeatInOrder(async()=>{
     const polled=await read(cfg,tokens,`/api/ce/task?id=${encodeURIComponent(report.ceTaskId)}`);
     task=polled.json?.task;
     if(!polled.reachable||polled.status!==200){
       const detail=polled.error??`HTTP ${polled.status}`;
       return {result:finish('blocked',`compute-engine task ${report.ceTaskId} could not be read: ${detail}`)};
     }
-    if(['SUCCESS','FAILED','CANCELED'].includes(task?.status))break;
+    if(['SUCCESS','FAILED','CANCELED'].includes(task?.status))return null;
     if(Date.now()>deadline)return {result:finish('blocked',`compute-engine task ${report.ceTaskId} still ${task?.status} after the wait`)};
-    await new Promise(r=>setTimeout(r,cfg.pollMs));
-  }
+    await new Promise(r=>setTimeout(r,cfg.pollMs));return undefined;
+  });if(stopped)return stopped;
   summary.ceTask.status=task.status;
   summary.analysisId=task.analysisId??null;
   if(task.status!=='SUCCESS'){

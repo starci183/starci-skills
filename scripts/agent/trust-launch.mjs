@@ -1,0 +1,172 @@
+// scripts/agent/trust-launch.mjs — the launch-time trust flow: pre-trust the directory an agent starts in (see trust.mjs for the
+// writers and the scope rules), per provider, and report the receipt the launch event records.
+import path from 'node:path';
+import { codexTrustPaths, launchTrustVerdict } from './launch-trust-policy.mjs';
+import {
+  TOOL_GUARD_MATCHER, assertClaudeBypassConsent, assertClaudeSettingsEnv, assertJsonToolGuard, claudeKeyForms, claudeLaunchEnv,
+  codexAppServer, codexKeyForms, codexProjectTables, excludeFromGit, jsonOf, projectTargets, readText, toolGuardCommand, trustCodexToolGuard,
+  trustTargets, writeClaudeTrust, writeCodexNoModelNudge, writeCodexNoUpdateCheck, writeCodexToolGuard, writeCodexTrust, writeDevinProfile,
+} from './trust.mjs';
+
+const TRUST_AGENTS = new Set(['claude', 'codex', 'devin']);
+
+/**
+ * Pre-trust `cwd` for `agent` before launch. Never throws; a failure is
+ * recorded without a screen-only consent fallback. Returns null for
+ * an agent with no trust prompt.
+ */
+export function ensureLaunchTrust({ agent, cwd, config, env = process.env, platform = process.platform, hooks, codexAppServer: appServer = null } = {}) {
+  if (!TRUST_AGENTS.has(agent)) return null;
+  const authorization = launchTrustVerdict({ cwd, config, platform });
+  if (!authorization.ok) return { agent, paths: [], status: 'declined', reason: authorization.reason };
+  const { dir } = authorization;
+  const targets = trustTargets({ env, platform });
+  if (targets.skipped) return { agent, paths: [dir], status: 'skipped', reason: targets.skipped };
+  const project = projectTargets(dir);
+  const receipt = { agent, paths: [dir], approval: authorization.approval, written: [], already: [], errors: [] };
+  // Check explicit provider declines before writing any trust/settings/hook file.
+  let declined;
+  try { declined = ownerDeclineOf({ agent, platform, authorization, targets, project, receipt }); }
+  catch (error) { return { ...receipt, status: 'failed', errors: [{ error: String(error.message) }] }; }
+  if (declined) return declined;
+  const ctx = { dir, platform, hooks, env, appServer, targets, project, receipt, command: toolGuardCommand() };
+  const early = trustFlowOf(agent)(ctx);
+  if (early) return early;
+  receipt.status = receipt.errors.length ? 'failed' : ['already', 'written'][Number(receipt.written.length > 0)];
+  if (!receipt.errors.length) delete receipt.errors;
+  return receipt;
+}
+
+function trustFlowOf(agent) {
+  if (agent === 'devin') return trustDevin;
+  return agent === 'claude' ? trustClaude : trustCodex;
+}
+
+// The provider's own explicit decline of the project: the receipt that refuses the launch, or null.
+function ownerDeclineOf({ agent, platform, authorization, targets, project, receipt }) {
+  if (agent === 'claude') return claudeDecline({ platform, authorization, targets, project, receipt });
+  if (agent === 'codex') return codexDecline({ platform, authorization, targets, receipt });
+  return null;
+}
+
+function claudeDecline({ platform, authorization, targets, project, receipt }) {
+  const user = readText(targets.claudeJson), doc = user === null ? {} : jsonOf(user);
+  const local = readText(project.claudeSettings), settings = local === null ? {} : jsonOf(local);
+  if (!doc || !settings) throw new Error('Claude trust/settings file is unreadable');
+  if (claudeKeyForms(authorization.dir, platform).some((key) => doc.projects?.[key]?.hasTrustDialogAccepted === false) || settings.skipDangerousModePermissionPrompt === false)
+    return { ...receipt, status: 'declined', reason: 'owner declined Claude project trust or bypass consent' };
+  return null;
+}
+
+function codexDecline({ platform, authorization, targets, receipt }) {
+  const keys = authorization.paths.flatMap((p) => codexKeyForms(p, platform));
+  for (const home of targets.codexHomes) {
+    const tables = codexProjectTables(readText(path.join(home.dir, 'config.toml')) ?? '');
+    if (keys.some((key) => tables.get(key)?.trust != null && tables.get(key).trust !== 'trusted'))
+      return { ...receipt, status: 'declined', reason: 'owner declined Codex project trust' };
+  }
+  return null;
+}
+
+function collectResult(receipt, r) {
+  for (const key of r.written ?? []) receipt.written.push({ file: r.file, key });
+  for (const key of r.already ?? []) receipt.already.push({ file: r.file, key });
+  if (!r.ok) receipt.errors.push({ file: r.file, error: r.error });
+}
+
+const guarded = (file, fn) => { try { return fn(); } catch (e) { return { file, ok: false, error: String(e?.message ?? e) }; } };
+
+// A step that failed names its file and error (or its state) in the receipt.
+const noteFailure = (receipt, file, result) => {
+  if (!result.ok) receipt.errors.push({ file, error: result.error ?? result.state });
+};
+
+// A project file the runtime wrote stays out of `git status` (the repository's own info/exclude).
+function excludeWritten({ receipt, dir }, file) {
+  const x = guarded(file, () => excludeFromGit(dir, file));
+  if (x) { receipt.gitExclude ??= []; receipt.gitExclude.push(x); }
+  if (x?.ok === false) receipt.errors.push({ file, error: x.error });
+}
+
+// Devin's LOCAL project config (<dir>/.devin/config.local.json): the guard hook.
+function trustDevin(ctx) {
+  const { receipt, project, command, hooks } = ctx;
+  const file = project.devinConfig;
+  const profile = guarded(file, () => writeDevinProfile({ file, command, hooks }));
+  receipt.toolGuard = [{ file, state: profile.state ?? 'failed' }];
+  noteFailure(receipt, file, profile);
+  if (profile.ok) {
+    receipt[profile.state === 'written' ? 'written' : 'already'].push({ file, key: 'hooks.PreToolUse' });
+    excludeWritten(ctx, file);
+  }
+  return null;
+}
+
+// The directory trust record is Claude's own per-user state (~/.claude.json); everything else is the worktree's
+// local project settings (<dir>/.claude/settings.local.json), which Claude reads for the bypass consent, env and hooks.
+function trustClaude(ctx) {
+  const { receipt, targets, project, dir, platform, command, hooks } = ctx;
+  collectResult(receipt, guarded(targets.claudeJson, () => writeClaudeTrust({ file: targets.claudeJson, keys: claudeKeyForms(dir, platform), hooks })));
+  if (receipt.errors.length) return { ...receipt, status: 'failed' };
+  const file = project.claudeSettings;
+  const consent = guarded(file, () => assertClaudeBypassConsent({ file, hooks }));
+  receipt.bypassConsent = consent.state ?? 'failed';
+  noteFailure(receipt, file, consent);
+  if (receipt.errors.length) return { ...receipt, status: 'failed' };
+  const launchEnv = guarded(file, () => assertClaudeSettingsEnv({ file, vars: claudeLaunchEnv(), hooks }));
+  receipt.launchEnv = launchEnv.state ?? 'failed';
+  noteFailure(receipt, file, launchEnv);
+  const toolGuard = guarded(file, () => assertJsonToolGuard({ file, command, matcher: TOOL_GUARD_MATCHER, hooks }));
+  receipt.toolGuard = [{ file, state: toolGuard.state ?? 'failed' }];
+  noteFailure(receipt, file, toolGuard);
+  if (consent.ok || launchEnv.ok || toolGuard.ok) excludeWritten(ctx, file);
+  return null;
+}
+
+// A Codex notice pinned off in one home: recorded under `field` with the verdict of its writer.
+function recordCodexNotice(receipt, field, file, result) {
+  receipt[field] ??= [];
+  receipt[field].push({ file, off: result.ok === true, ...(result.written ? { written: true } : {}), ...(result.ok ? {} : { error: result.error }) });
+  if (!result.ok) receipt.errors.push({ file, error: result.error });
+}
+
+// The trust, update-check and nudge records of one Codex home; the failed receipt when the trust itself failed.
+function trustCodexHome(ctx, home, keys) {
+  const { receipt, hooks } = ctx;
+  const file = path.join(home.dir, 'config.toml');
+  collectResult(receipt, guarded(file, () => writeCodexTrust({ file, keys, hooks })));
+  if (receipt.errors.length) return { ...receipt, status: 'failed' };
+  recordCodexNotice(receipt, 'updateCheck', file, guarded(file, () => writeCodexNoUpdateCheck({ file, hooks })));
+  recordCodexNotice(receipt, 'modelNudge', file, guarded(file, () => writeCodexNoModelNudge({ file, hooks })));
+  return null;
+}
+
+// Codex hash trust of the guard hook in one home: the home's verdict for the receipt.
+function codexHookTrustIn(ctx, { file, hook, server, home }) {
+  const { receipt, dir, command } = ctx;
+  const trusted = hook.ok && server ? guarded(file, () => trustCodexToolGuard({ home: home.dir, cwd: dir, command, appServer: server })) : null;
+  if (trusted && !trusted.ok) receipt.errors.push({ file: path.join(home.dir, 'config.toml'), error: trusted.error });
+  return { home: home.dir, trusted: trusted ? ['failed', trusted.trusted][Number(Boolean(trusted.ok))] : 'not-checked' };
+}
+
+// Codex: the directory trust and the notices live in each Codex home (Codex reads a project layer only for a
+// trusted project); the guard hook lives in the worktree's project layer (<dir>/.codex/config.toml), and each home
+// records only Codex's hash that trusts it (hooks.state, keyed by that project file).
+function trustCodex(ctx) {
+  const { receipt, targets, project, dir, platform, command, hooks, env, appServer } = ctx;
+  receipt.paths = codexTrustPaths(dir);
+  const keys = [...new Set(receipt.paths.flatMap((p) => codexKeyForms(p, platform)))];
+  const homes = targets.codexHomes;
+  for (const home of homes) {
+    const failed = trustCodexHome(ctx, home, keys);
+    if (failed) return failed;
+  }
+  const file = project.codexConfig;
+  const hook = guarded(file, () => writeCodexToolGuard({ file, command, hooks }));
+  if (!hook.ok) receipt.errors.push({ file, error: hook.error });
+  else { receipt[hook.written ? 'written' : 'already'].push({ file, key: 'hooks.PreToolUse' }); excludeWritten(ctx, file); }
+  // A re-rooted trust home (specs) never starts the real Codex: its app-server is injected, else the hash step waits.
+  const server = appServer ?? (env.STARCI_AGENT_TRUST_HOME ? null : codexAppServer);
+  receipt.toolGuard = [{ file, ...(hook.written ? { written: true } : {}), trustedIn: homes.map((home) => codexHookTrustIn(ctx, { file, hook, server, home })) }];
+  return null;
+}

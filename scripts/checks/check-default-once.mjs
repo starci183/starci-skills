@@ -78,18 +78,29 @@ export function documentedLeaves(doc) {
   return leaves;
 }
 
+const addLeafValue = (leaves, name, value) => (leaves.get(name) ?? leaves.set(name, new Set()).get(name)).add(value);
+
+// The names a `{base, max}` group on one comment line lists.
+function braceNames(line) {
+  const names = [];
+  for (let i = 0, j; (i = line.indexOf('{', i)) >= 0 && (j = line.indexOf('}', i + 1)) >= 0; i = j + 1)
+    names.push(...line.slice(i + 1, j).split(',').map((s) => s.trim()).filter((s) => /^[a-zA-Z]\w*$/.test(s)));
+  return names;
+}
+
+function addCommentedLeaves(line, leaves) {
+  for (const m of line.matchAll(/\b([a-z]\w*)\s*:\s*([a-z]\w*(?:\|[a-z]\w*)*)/g))
+    for (const v of m[2].split('|')) addLeafValue(leaves, m[1], v);
+  for (const name of braceNames(line)) leaves.set(name, leaves.get(name) ?? new Set()); // `{base, max}` names leaves with no literal
+  const keyed = /^[\s#]*([a-z]\w*)\s*:/.exec(line)?.[1];
+  if (keyed) leaves.set(keyed, leaves.get(keyed) ?? new Set()); // `# frozenMinutes: <n>` documents the key
+}
+
 /** Leaf names the example documents only in comments (`# mode: chat`, `# workers: {base, max}`, `# frozenMinutes: <n>`). */
 export function commentedLeaves(exampleText) {
   const leaves = new Map();
   for (const line of exampleText.split('\n')) {
-    if (!/^\s*#/.test(line)) continue;
-    for (const m of line.matchAll(/\b([a-z]\w*)\s*:\s*([a-z]\w*(?:\|[a-z]\w*)*)/g))
-      for (const v of m[2].split('|')) (leaves.get(m[1]) ?? leaves.set(m[1], new Set()).get(m[1])).add(v);
-    for (let i = 0, j; (i = line.indexOf('{', i)) >= 0 && (j = line.indexOf('}', i + 1)) >= 0; i = j + 1)
-      for (const name of line.slice(i + 1, j).split(',').map((s) => s.trim()).filter((s) => /^[a-zA-Z]\w*$/.test(s)))
-        leaves.set(name, leaves.get(name) ?? new Set()); // `{base, max}` names leaves with no literal
-    const keyed = /^[\s#]*([a-z]\w*)\s*:/.exec(line)?.[1];
-    if (keyed) leaves.set(keyed, leaves.get(keyed) ?? new Set()); // `# frozenMinutes: <n>` documents the key
+    if (/^\s*#/.test(line)) addCommentedLeaves(line, leaves);
   }
   return leaves;
 }
@@ -99,7 +110,7 @@ export function ownerDefaults(homeText, configText = '') {
   const defaults = /DEFAULTS\s*=\s*Object\.freeze\(\{([\s\S]*?)\}\)\)/.exec(homeText)?.[1] ?? '';
   const values = new Map();
   for (const m of defaults.matchAll(/\b([a-zA-Z]\w*)\s*:\s*([\d_]+|'[^']*')/g))
-    (values.get(m[1]) ?? values.set(m[1], new Set()).get(m[1])).add(m[2].replaceAll("'", '').replaceAll('_', ''));
+    addLeafValue(values, m[1], m[2].replaceAll("'", '').replaceAll('_', ''));
   const lang = /DEFAULT_OWNER_LANGUAGE\s*=\s*'([^']+)'/.exec(configText)?.[1];
   return { values, language: lang ?? null };
 }
