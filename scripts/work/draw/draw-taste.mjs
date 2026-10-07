@@ -52,6 +52,8 @@ const ENTITY_PARTS = /(^|-)(surface-fact|list-box-item|list-box-row|data-table-r
 const SEPARATOR_CLASS = /(^|[-_])(separator|divider|hairline|rule)($|[-_])/i;
 const BAND_CLASS = /(^|[-_])band($|[-_]|s$)/i;
 const BADGE_CLASS = /(^|[-_])(badge|chip|pill|status-pill)($|[-_]{2}|$)/i;
+const CSS_VAR_WITH_FALLBACK = /^var\(\s*(--[\w-]+)\s*,\s*([^)]*)\)$/;
+const CSS_VAR_WITHOUT_FALLBACK = /^var\(\s*(--[\w-]+)\s*\)$/;
 const nameOf = (el) => String(el?.attrs?.[COMPONENT_ATTR] ?? '').trim();
 const partOf = (el) => String(el?.attrs?.[PART_ATTR] ?? '').trim();
 /** A component root (not one of its own parts that repeats the component attribute). */
@@ -93,7 +95,8 @@ const describe = (el) => {
   const classes = classesOf(el);
   const className = classes.length ? `.${classes.slice(0, 2).join('.')}` : '';
   const name = nameOf(el);
-  return `<${el.tag}${className}>${name ? ` ${name}` : ''}`;
+  const namePart = name ? ` ${name}` : '';
+  return `<${el.tag}${className}>${namePart}`;
 };
 
 /** The html taste findings (bands, badges) of one render source: [{code, detail, count, examples}]. */
@@ -121,11 +124,83 @@ export function accentOf(html, { name = '--accent' } = {}) {
   const { base } = parseCssCustomProperties(css);
   let value = base.get(name)?.value ?? null;
   for (let hop = 0; value && hop < 8; hop += 1) {
-    const ref = /^var\(\s*(--[\w-]+)\s*(?:,\s*([^)]*))?\)$/.exec(value.trim());
+    const trimmed = value.trim();
+    const ref = CSS_VAR_WITH_FALLBACK.exec(trimmed) ?? CSS_VAR_WITHOUT_FALLBACK.exec(trimmed);
     if (!ref) break;
     value = base.get(ref[1])?.value ?? ref[2] ?? null;
   }
   return value ? parseColor(value) : null;
+}
+
+const accentColorMatches = (color, accent, tolerance) => color ? 100 * Math.hypot(color.oklab.L - accent.L, color.oklab.a - accent.a, color.oklab.b - accent.b) <= tolerance : false;
+function accentMaskOf(data, width, height, accent, tolerance) {
+  const mask = new Uint8Array(width * height);
+  const cache = new Map();
+  for (let y = 0, i = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1, i += 1) {
+      const offset = i * 4;
+      if (data[offset + 3] < 128) continue;
+      const key = (data[offset] << 16) | (data[offset + 1] << 8) | data[offset + 2];
+      let hit = cache.get(key);
+      if (hit === undefined) {
+        const color = parseColor(`rgb(${data[offset]} ${data[offset + 1]} ${data[offset + 2]})`);
+        hit = accentColorMatches(color, accent, tolerance);
+        cache.set(key, hit);
+      }
+      if (hit) mask[i] = 1;
+    }
+  }
+  return mask;
+}
+
+function excludeAccentRects(mask, width, height, exempt) {
+  const excluded = new Uint8Array(width * height);
+  let excludedCount = 0;
+  for (const rect of exempt) {
+    const x0 = Math.max(0, Math.floor(rect.x)), y0 = Math.max(0, Math.floor(rect.y)), x1 = Math.min(width, Math.ceil(rect.x + rect.width)), y1 = Math.min(height, Math.ceil(rect.y + rect.height));
+    for (let y = y0; y < y1; y += 1) {
+      for (let x = x0; x < x1; x += 1) {
+        const i = y * width + x;
+        if (!excluded[i]) { excluded[i] = 1; excludedCount += 1; }
+        mask[i] = 0;
+      }
+    }
+  }
+  return excludedCount;
+}
+
+function summedAreaTable(mask, width, height) {
+  const table = new Uint32Array((width + 1) * (height + 1));
+  for (let y = 1; y <= height; y += 1) {
+    let row = 0;
+    for (let x = 1; x <= width; x += 1) {
+      row += mask[(y - 1) * width + (x - 1)];
+      table[y * (width + 1) + x] = table[(y - 1) * (width + 1) + x] + row;
+    }
+  }
+  return table;
+}
+
+const tableRectSum = (table, stride, x0, y0, x1, y1) => table[y1 * stride + x1] - table[y0 * stride + x1] - table[y1 * stride + x0] + table[y0 * stride + x0];
+function erodedAccentMask(mask, width, height, block, sum, full) {
+  const eroded = new Uint8Array(width * height);
+  for (let y = 0; y + block <= height; y += 1) {
+    for (let x = 0; x + block <= width; x += 1) {
+      if (sum(x, y, x + block, y + block) === full) eroded[y * width + x] = 1;
+    }
+  }
+  return eroded;
+}
+
+function countSolidAccentPixels(mask, width, height, block, sum) {
+  let count = 0;
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      if (!mask[y * width + x]) continue;
+      if (sum(Math.max(0, x - block + 1), Math.max(0, y - block + 1), x + 1, y + 1) > 0) count += 1;
+    }
+  }
+  return count;
 }
 
 /**
@@ -134,53 +209,18 @@ export function accentOf(html, { name = '--accent' } = {}) {
  */
 export function accentShareOf(img, accent, { exempt = [], tolerance = ACCENT_TOLERANCE, block = ACCENT_BLOCK } = {}) {
   const { width: W, height: H, data } = img;
-  const mask = new Uint8Array(W * H);
-  const cache = new Map();
   const L = accent.oklab;
-  for (let y = 0, i = 0; y < H; y += 1) {
-    for (let x = 0; x < W; x += 1, i += 1) {
-      const o = i * 4;
-      if (data[o + 3] < 128) continue;
-      const key = (data[o] << 16) | (data[o + 1] << 8) | data[o + 2];
-      let hit = cache.get(key);
-      if (hit === undefined) {
-        const c = parseColor(`rgb(${data[o]} ${data[o + 1]} ${data[o + 2]})`);
-        hit = c ? 100 * Math.hypot(c.oklab.L - L.L, c.oklab.a - L.a, c.oklab.b - L.b) <= tolerance : false;
-        cache.set(key, hit);
-      }
-      if (hit) mask[i] = 1;
-    }
-  }
-  const excluded = new Uint8Array(W * H);
-  let excludedCount = 0;
-  for (const r of exempt) {
-    const x0 = Math.max(0, Math.floor(r.x)), y0 = Math.max(0, Math.floor(r.y)), x1 = Math.min(W, Math.ceil(r.x + r.width)), y1 = Math.min(H, Math.ceil(r.y + r.height));
-    for (let y = y0; y < y1; y += 1) for (let x = x0; x < x1; x += 1) { const i = y * W + x; if (!excluded[i]) { excluded[i] = 1; excludedCount += 1; } mask[i] = 0; }
-  }
+  const mask = accentMaskOf(data, W, H, L, tolerance);
+  const excludedCount = excludeAccentRects(mask, W, H, exempt);
   // Summed-area table of the mask: a block is solid when its sum is block*block.
-  const S = new Uint32Array((W + 1) * (H + 1));
-  for (let y = 1; y <= H; y += 1) {
-    let row = 0;
-    for (let x = 1; x <= W; x += 1) { row += mask[(y - 1) * W + (x - 1)]; S[y * (W + 1) + x] = S[(y - 1) * (W + 1) + x] + row; }
-  }
-  const sum = (x0, y0, x1, y1) => S[y1 * (W + 1) + x1] - S[y0 * (W + 1) + x1] - S[y1 * (W + 1) + x0] + S[y0 * (W + 1) + x0];
+  const S = summedAreaTable(mask, W, H);
+  const sum = (x0, y0, x1, y1) => tableRectSum(S, W + 1, x0, y0, x1, y1);
   const full = block * block;
   // eroded[i] = the block whose top-left is i is solid; a pixel counts when any solid block covers it.
-  const eroded = new Uint8Array(W * H);
-  for (let y = 0; y + block <= H; y += 1) for (let x = 0; x + block <= W; x += 1) if (sum(x, y, x + block, y + block) === full) eroded[y * W + x] = 1;
-  const E = new Uint32Array((W + 1) * (H + 1));
-  for (let y = 1; y <= H; y += 1) {
-    let row = 0;
-    for (let x = 1; x <= W; x += 1) { row += eroded[(y - 1) * W + (x - 1)]; E[y * (W + 1) + x] = E[(y - 1) * (W + 1) + x] + row; }
-  }
-  const esum = (x0, y0, x1, y1) => E[y1 * (W + 1) + x1] - E[y0 * (W + 1) + x1] - E[y1 * (W + 1) + x0] + E[y0 * (W + 1) + x0];
-  let count = 0;
-  for (let y = 0; y < H; y += 1) {
-    for (let x = 0; x < W; x += 1) {
-      if (!mask[y * W + x]) continue;
-      if (esum(Math.max(0, x - block + 1), Math.max(0, y - block + 1), x + 1, y + 1) > 0) count += 1;
-    }
-  }
+  const eroded = erodedAccentMask(mask, W, H, block, sum, full);
+  const E = summedAreaTable(eroded, W, H);
+  const esum = (x0, y0, x1, y1) => tableRectSum(E, W + 1, x0, y0, x1, y1);
+  const count = countSolidAccentPixels(mask, W, H, block, esum);
   const measured = W * H - excludedCount;
   return { share: measured > 0 ? count / measured : 0, accentPixels: count, measuredPixels: measured };
 }
