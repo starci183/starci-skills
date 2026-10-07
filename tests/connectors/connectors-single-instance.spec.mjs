@@ -24,11 +24,17 @@ const GATEWAY=path.join(ROOT,'scripts','connectors','ask-gateway.mjs');
 const tmp=(t,prefix)=>{const dir=fs.mkdtempSync(path.join(os.tmpdir(),prefix));t.after(()=>fs.rmSync(dir,{recursive:true,force:true,maxRetries:20,retryDelay:25}));return dir;};
 const kill=pid=>{if(!pid)return;try{process.kill(pid);}catch{/* gone */}};
 
-// Start `argv` as a node process and resolve with its first JSON stdout line (and the child).
+// Start `argv` as a node process and resolve with its first JSON stdout line (and the child). Every child is
+// registered in `spawned` the moment it exists, so a case that never receives it (the first line is late under
+// load and firstLine rejects, or the body throws before it names the child) still has it killed by reap().
+const spawned=new Set();
+const gone=child=>child.exitCode!==null||child.signalCode!==null;
+const FIRST_LINE_MS=60000;
 const firstLine=(argv,env)=>new Promise((resolve,reject)=>{
   const child=spawn(process.execPath,argv,{env,cwd:ROOT,windowsHide:true,stdio:['ignore','pipe','pipe']});
+  spawned.add(child);
   let out='';
-  const timer=setTimeout(()=>reject(Error(`no output from ${argv.join(' ')}`)),20000);
+  const timer=setTimeout(()=>{kill(child.pid);reject(Error(`no output from ${argv.join(' ')}`));},FIRST_LINE_MS);
   child.stdout.on('data',chunk=>{
     out+=chunk;
     const line=out.split(/\r?\n/).find(l=>l.trim().startsWith('{'));
@@ -36,6 +42,14 @@ const firstLine=(argv,env)=>new Promise((resolve,reject)=>{
   });
   child.on('exit',code=>{if(!out.trim()){clearTimeout(timer);resolve({child,answer:null,code});}});
 });
+// Kill every child this file spawned and wait until each has exited: a manager that outlives its case holds the
+// spec process open on its stdio pipes, and the whole suite waits behind it.
+const reap=async()=>{
+  const live=[...spawned];
+  for(const child of live)kill(child.pid);
+  await Promise.all(live.map(child=>new Promise(done=>{if(gone(child))done();else child.once('exit',()=>done());})));
+  spawned.clear();
+};
 const deadPid=()=>spawnSync(process.execPath,['-e','0']).pid;
 const storeOf=home=>({STARCI_TEST_MACHINE_FILE:path.join(home,'machine.sqlite')});
 // Write the host lock row `name` as another process would have left it.
@@ -46,7 +60,7 @@ const lockRow=(env,name)=>withMachine(m=>m.hostLock(name),{env});
 test('two tunnel managers started at once leave exactly one manager and one cloudflared',async t=>{
   // Kills run inside the same after-callback ahead of the rm: the children write under home, so an rm
   // registered before them either EPERMs on a held file or the losers recreate the tree it just removed.
-  const home=mkdtemp(t,'starci-tunnel-single-',()=>{for(const r of runs)kill(r.child.pid);kill(tunnelState(env)?.childPid);});
+  const home=mkdtemp(t,'starci-tunnel-single-',async()=>{try{kill(tunnelState(env)?.childPid);}finally{await reap();}});
   const fake=path.join(home,'fake-cloudflared.cjs');
   const launched=path.join(home,'cloudflared-pids.txt');
   fs.writeFileSync(fake,`require('fs').appendFileSync(${JSON.stringify(launched)},process.pid+'\\n');process.stderr.write('Registered tunnel connection connIndex=0\\n');setTimeout(()=>process.exit(0),60000);`);
@@ -76,8 +90,8 @@ setInterval(()=>{},1000);`);
 });
 
 test('two ask gateways started at once leave exactly one serving',async t=>{
-  // The gateways are awaited gone before the rm: a gateway that outlives it writes its last rows into the removed directory (a POSIX rm does not wait for a handle).
-  const home=mkdtemp(t,'starci-gateway-single-',async()=>{for(const r of runs)kill(r.child.pid);await Promise.all(runs.map(r=>new Promise(done=>{if(r.child.exitCode!==null||r.child.signalCode)done();else r.child.once('exit',done);})));});
+  // reap() awaits the gateways gone before the rm: a gateway that outlives it writes its last rows into the removed directory (a POSIX rm does not wait for a handle).
+  const home=mkdtemp(t,'starci-gateway-single-',reap);
   const env={...process.env,STARCI_LOCAL_ROOT:home,...storeOf(home)};
   const config=parseYaml(fs.readFileSync(path.join(ROOT,'config.example.yaml'),'utf8'));
   const entry="import {main} from "+JSON.stringify(pathToFileURL(GATEWAY).href)+"; await main(['run','--port','0'],{env:process.env,root:"+JSON.stringify(home)+",config:"+JSON.stringify(config)+"});";
@@ -92,7 +106,7 @@ test('two ask gateways started at once leave exactly one serving',async t=>{
 // 18 `tunnel.mjs run --port 7070` managers once ran at once, and response.<domain> answered 502 after
 // the supervisor killed 17 of them.
 test('a tunnel manager that loses its host lock to another live process stops its cloudflared and exits',async t=>{
-  const home=mkdtemp(t,'starci-tunnel-lost-',()=>{kill(child.pid);kill(cloudflared);});
+  const home=mkdtemp(t,'starci-tunnel-lost-',async()=>{try{kill(cloudflared);}finally{await reap();}});
   const fake=path.join(home,'fake-cloudflared.cjs');
   const launched=path.join(home,'cloudflared-pids.txt');
   fs.writeFileSync(fake,`require('fs').appendFileSync(${JSON.stringify(launched)},process.pid+'\\n');process.stderr.write('Registered tunnel connection connIndex=0\\n');setTimeout(()=>process.exit(0),60000);`);
