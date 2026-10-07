@@ -730,7 +730,8 @@ export function dueStep(di, now = Date.now()) {
   if (di.decider !== 'kernel' || di.status !== 'open' || di.kind === 'supervisor-ruling' || !Number.isFinite(di.dueAt)) return null;
   const span = Math.max(1, di.dueAt - (di.openedAt ?? di.dueAt));
   if (now >= di.dueAt + span) return { step: 'supervisor' };
-  if (now >= di.dueAt && !(di.escalations > 0)) return { step: 'remind' };
+  const escalated = di.escalations > 0;
+  if (now >= di.dueAt && !escalated) return { step: 'remind' };
   return null;
 }
 

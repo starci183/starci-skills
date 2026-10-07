@@ -166,19 +166,26 @@ function collectMarkSources({ machineFile, now, retention }) {
   return sources;
 }
 
+// The bucket and entry of one blob no ledger marks.
+function classifyBlob(sha, blob, sources, now, retention) {
+  const rows = sources.map((source) => source.rows.get(sha)).filter(Boolean);
+  if (rows.some((row) => Number(row.pinned) === 1)) return { bucket: 'kept', entry: { sha, why: 'pinned' } };
+  const created = rows.length ? Math.min(...rows.map((row) => Number(row.created_at) || blob.createdAt)) : blob.createdAt;
+  if (created >= now - retention.graceMs) return { bucket: 'young', entry: { sha, bytes: blob.size } };
+  const item = { sha, bytes: blob.size, file: blob.file, rows: sources.filter((source) => source.rows.has(sha)).map((source) => source.name), ageMs: now - created };
+  const archived = rows.length > 0 && rows.every((row) => row.archived_at != null && row.archive_ref);
+  return { bucket: archived ? 'toSweep' : 'toArchive',
+    entry: { ...item, archiveRef: archived ? rows[0].archive_ref : null, archiveRefs: archived ? [...new Set(rows.map((row) => row.archive_ref))] : [] } };
+}
+
 function classifyBlobs(store, sources, marked, now, retention) {
-  const toArchive = [], toSweep = [], young = [], kept = [];
+  const buckets = { toArchive: [], toSweep: [], young: [], kept: [] };
   for (const [sha, blob] of store) {
     if (marked.has(sha)) continue;
-    const rows = sources.map((source) => source.rows.get(sha)).filter(Boolean);
-    if (rows.some((row) => Number(row.pinned) === 1)) { kept.push({ sha, why: 'pinned' }); continue; }
-    const created = rows.length ? Math.min(...rows.map((row) => Number(row.created_at) || blob.createdAt)) : blob.createdAt;
-    if (created >= now - retention.graceMs) { young.push({ sha, bytes: blob.size }); continue; }
-    const item = { sha, bytes: blob.size, file: blob.file, rows: sources.filter((source) => source.rows.has(sha)).map((source) => source.name), ageMs: now - created };
-    const archived = rows.length > 0 && rows.every((row) => row.archived_at != null && row.archive_ref);
-    (archived ? toSweep : toArchive).push({ ...item, archiveRef: archived ? rows[0].archive_ref : null,archiveRefs:archived?[...new Set(rows.map(row=>row.archive_ref))]:[] });
+    const { bucket, entry } = classifyBlob(sha, blob, sources, now, retention);
+    buckets[bucket].push(entry);
   }
-  return { toArchive, toSweep, young, kept };
+  return buckets;
 }
 
 function verifySweepArchives(toSweep, sources) {

@@ -55,6 +55,8 @@ function samePhysicalTarget(expected, current) {
 
 const isCiphertextName = name => /\.(?:enc|age|key|pem)$/i.test(name) || name === 'master.identity';
 
+const isUnsafeChild = (file, child) => child.isSymbolicLink() || (child.isDirectory() && isLinkLike(file, { stat: child }));
+
 function visitCiphertextDirectory(directory, state) {
   const stat = fs.lstatSync(directory, { throwIfNoEntry: false });
   if (!stat) return false;
@@ -62,10 +64,10 @@ function visitCiphertextDirectory(directory, state) {
   for (const name of fs.readdirSync(directory)) {
     if (++state.entries > 4096) refuse('old-ciphertext');
     const file = path.join(directory, name), child = fs.lstatSync(file);
-    if (child.isSymbolicLink() || (child.isDirectory() && isLinkLike(file, { stat: child }))) refuse('old-ciphertext');
+    if (isUnsafeChild(file, child)) refuse('old-ciphertext');
     if (isCiphertextName(name)) return true;
-    if (child.isDirectory() && visitCiphertextDirectory(file, state)) return true;
-    if (!child.isDirectory() && !child.isFile()) refuse('old-ciphertext');
+    if (child.isDirectory()) { if (visitCiphertextDirectory(file, state)) return true; }
+    else if (!child.isFile()) refuse('old-ciphertext');
   }
   return false;
 }
@@ -135,6 +137,25 @@ function identityBefore(root, target, prior, env, force) {
   } catch (error) { state.before?.fill(0); throw error; }
 }
 
+function writeManifestBytes(io, fd, text) {
+  let offset = 0;
+  while (offset < text.length) {
+    const written = io.writeSync(fd, text, offset, text.length - offset, offset);
+    if (!Number.isSafeInteger(written) || written <= 0) refuse('manifest-custody');
+    offset += written;
+  }
+}
+
+// A handle that will not close refuses the reservation.
+function closeManifestHandles(io, handles) {
+  let failed = false;
+  for (const retained of handles) {
+    if (retained === undefined) continue;
+    try { io.closeSync(retained); } catch { failed = true; }
+  }
+  if (failed) refuse('manifest-custody');
+}
+
 function reserve(target, marker, assertLease, io = fs, expected = null) {
   if (!assertLease()) refuse('lease-lost');
   const file = path.join(target, INSTALL_MANIFEST_FILE), stat = io.lstatSync(file), doc = manifestOf(target);
@@ -148,26 +169,14 @@ function reserve(target, marker, assertLease, io = fs, expected = null) {
     if (text.length > CREDENTIAL_FILE_MAX_BYTES * 16) refuse('manifest-custody');
     if (!assertLease()) refuse('lease-lost');
     io.ftruncateSync(fd, 0);
-    let offset = 0;
-    while (offset < text.length) {
-      const written = io.writeSync(fd, text, offset, text.length - offset, offset);
-      if (!Number.isSafeInteger(written) || written <= 0) refuse('manifest-custody');
-      offset += written;
-    }
+    writeManifestBytes(io, fd, text);
     io.fsyncSync(fd);
     if (process.platform !== 'win32') {
       parent = io.openSync(target, io.constants.O_RDONLY | (io.constants.O_DIRECTORY ?? 0) | (io.constants.O_NOFOLLOW ?? 0));
       io.fsyncSync(parent);
     }
     if (!assertLease() || !sameNode(stat, io.lstatSync(file))) refuse('lease-lost');
-  } finally {
-    let failed = false;
-    for (const retained of [fd, parent]) {
-      if (retained === undefined) continue;
-      try { io.closeSync(retained); } catch { failed = true; }
-    }
-    if (failed) refuse('manifest-custody');
-  }
+  } finally { closeManifestHandles(io, [fd, parent]); }
   return { node: stat, bytes: text, marker };
 }
 

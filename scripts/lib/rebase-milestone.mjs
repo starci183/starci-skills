@@ -14,7 +14,8 @@
 /** {due, why} for the facts {idle, behind, overlap, onto, conflictedOnto, behindLimit}. */
 export function rebaseMilestone({ idle, behind, overlap, onto, conflictedOnto = null, behindLimit }) {
   if (!idle) return { due: false, why: 'not-idle' };
-  if (!(behind > 0)) return { due: false, why: 'up-to-date' };
+  const isBehind = behind > 0;
+  if (!isBehind) return { due: false, why: 'up-to-date' };
   if (conflictedOnto && conflictedOnto === onto) return { due: false, why: 'conflict-known' };
   if (overlap > 0) return { due: true, why: 'overlap' };
   if (behind >= behindLimit) return { due: true, why: 'behind' };

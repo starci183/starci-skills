@@ -12,6 +12,11 @@ export const isGitImage = (name) => GIT_IMAGE.test(String(name ?? ''));
 /** `file`'s lstat, or null when it cannot be read. */
 export const lockStat = (file) => { try { return fs.lstatSync(file); } catch { return null; } };
 
+const GITDIR_LINE = new RegExp([
+  '^gitdir:',
+  String.raw`\s*(.+)$`,
+].join(''), 'm');
+
 /** The git dir of the checkout at `repo`: `.git` itself, or the `gitdir:` a worktree's `.git` file names. Null when none. */
 export function gitDirOf(repo) {
   const dotGit = path.join(path.resolve(repo), '.git');
@@ -20,7 +25,7 @@ export function gitDirOf(repo) {
   if (st.isDirectory()) return dotGit;
   if (!st.isFile()) return null;
   try {
-    const m = /^gitdir:\s*(.+)$/m.exec(fs.readFileSync(dotGit, 'utf8'));
+    const m = GITDIR_LINE.exec(fs.readFileSync(dotGit, 'utf8'));
     return m ? path.resolve(path.dirname(dotGit), m[1].trim()) : null;
   } catch { return null; }
 }
@@ -53,6 +58,14 @@ function packedHeadRef(common, ref) {
   return null;
 }
 
+const HEADS_REF_LINE = new RegExp([
+  String.raw`^ref:\s*(refs\/heads\/\S+)`,
+  '$',
+].join(''));
+const ANY_REF_LINE = new RegExp([
+  String.raw`^ref:\s*(.+)`,
+  '$',
+].join(''));
 /**
  * The commit the HEAD of the checkout at `root` names, read from .git with no spawn; null when it cannot be told that
  * way (not a top level, reftable, an unreadable ref) and the read then runs live. `headsOnly` accepts only
@@ -63,13 +76,13 @@ export function headShaOf(root, { headsOnly = false, commonOnly = false } = {}) 
   try {
     let gitDir = path.join(root, '.git');
     if (fs.statSync(gitDir).isFile()) {
-      const pointer = /^gitdir:\s*(.+)$/m.exec(fs.readFileSync(gitDir, 'utf8'))?.[1];
+      const pointer = GITDIR_LINE.exec(fs.readFileSync(gitDir, 'utf8'))?.[1];
       if (!pointer) return null;
       gitDir = path.resolve(root, pointer.trim());
     }
     const head = fs.readFileSync(path.join(gitDir, 'HEAD'), 'utf8').trim();
     if (FULL_SHA.test(head)) return head;
-    const ref = headsOnly ? /^ref:\s*(refs\/heads\/\S+)$/.exec(head)?.[1] : /^ref:\s*(.+)$/.exec(head)?.[1]?.trim();
+    const ref = headsOnly ? HEADS_REF_LINE.exec(head)?.[1] : ANY_REF_LINE.exec(head)?.[1]?.trim();
     if (!ref) return null;
     let common = gitDir;
     try { common = path.resolve(gitDir, fs.readFileSync(path.join(gitDir, 'commondir'), 'utf8').trim()); } catch { /* not a linked worktree */ }

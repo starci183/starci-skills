@@ -92,24 +92,29 @@ function walk(root, rel, exampleInputs) {
   return walkDirectory(root, rel, exampleInputs, abs);
 }
 export const payloadHash = (file, relative = '') => installedPayloadDigest(readFileSync(file), relative);
+function addExampleInputs(root, exampleInputs) {
+  const references = exampleSourcePaths(root);
+  exampleInputs.add(EXAMPLE_CATALOG_FILE);
+  for (const relative of references) exampleInputs.add(relative);
+  const apps = new Set([...discoverExampleApps(root), ...references.map(relative => relative.split('/')[1])]);
+  for (const app of apps) exampleInputs.add(`${EXAMPLES_ROOT}/${app}/hfs.json`);
+}
+
+// A required example input is in the payload, a regular file and (for JSON) parsable.
+function checkExampleInput(root, relative, exampleInputs) {
+  const file = path.join(root, relative);
+  if (isNegated(relative) || !payloadFileAllowed(root, relative, exampleInputs))
+    throw new Error(`required example input is excluded from the payload: ${relative}`);
+  if (isLinkLike(file) || !lstatSync(file).isFile()) throw new Error(`required example input is not a regular file: ${relative}`);
+  if (!relative.endsWith('.json')) return;
+  try { JSON.parse(readFileSync(file, 'utf8')); } catch { throw new Error(`invalid example JSON input: ${relative}`); }
+}
+
 function exampleInputsFor(root, runtime) {
   const exampleInputs = new Set();
-  if (runtime || existsSync(path.join(root, EXAMPLE_CATALOG_FILE))) {
-    const references = exampleSourcePaths(root);
-    exampleInputs.add(EXAMPLE_CATALOG_FILE);
-    for (const relative of references) exampleInputs.add(relative);
-    const apps = new Set([...discoverExampleApps(root), ...references.map(relative => relative.split('/')[1])]);
-    for (const app of apps) exampleInputs.add(`${EXAMPLES_ROOT}/${app}/hfs.json`);
-    for (const relative of exampleInputs) {
-      const file = path.join(root, relative);
-      if (isNegated(relative) || !payloadFileAllowed(root, relative, exampleInputs))
-        throw new Error(`required example input is excluded from the payload: ${relative}`);
-      if (isLinkLike(file) || !lstatSync(file).isFile()) throw new Error(`required example input is not a regular file: ${relative}`);
-      if (relative.endsWith('.json')) {
-        try { JSON.parse(readFileSync(file, 'utf8')); } catch { throw new Error(`invalid example JSON input: ${relative}`); }
-      }
-    }
-  }
+  if (!runtime && !existsSync(path.join(root, EXAMPLE_CATALOG_FILE))) return exampleInputs;
+  addExampleInputs(root, exampleInputs);
+  for (const relative of exampleInputs) checkExampleInput(root, relative, exampleInputs);
   return exampleInputs;
 }
 

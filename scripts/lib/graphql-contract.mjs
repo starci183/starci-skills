@@ -457,8 +457,7 @@ function fieldSelectionProblems(context, parent, selection) {
     return [`${where} is not a field of ${parentName} (it has ${known})`];
   }
   const problems = fieldArgumentProblems(context, selection, where, field);
-  problems.push(...requiredFieldArgumentProblems(parentName, selection, where, field));
-  problems.push(...fieldSelectionShapeProblems(context, selection, where, field));
+  problems.push(...requiredFieldArgumentProblems(parentName, selection, where, field), ...fieldSelectionShapeProblems(context, selection, where, field));
   return problems;
 }
 

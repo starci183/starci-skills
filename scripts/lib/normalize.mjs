@@ -9,6 +9,14 @@ export const trimTrailingChars = (text, chars) => {
   return text.slice(0, end);
 };
 
+/** `text` without the run of `ch` (one character) at each end; loops, not an anchored-run regex. */
+export const trimEdgeChar = (text, ch) => {
+  let start = 0, end = text.length;
+  while (start < end && text[start] === ch) start += 1;
+  while (end > start && text[end - 1] === ch) end -= 1;
+  return text.slice(start, end);
+};
+
 /**
  * `s` normalized for a literal compare: Unicode `form`-normalized, lowercased, whitespace runs to a
  * single space, ends trimmed; `punct: true` also drops trailing sentence punctuation.

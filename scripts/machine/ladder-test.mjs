@@ -17,7 +17,10 @@ const SCHEMA = 'starci/test-run@1';
 const PRELOADS = Object.freeze(['tests/setup/low-priority.mjs', 'tests/setup/isolated-temp.mjs', 'tests/setup/isolated-registry.mjs']);
 const CODE_FILE = /\.(?:[cm]?[jt]sx?|json)$/i;
 const BOUNDARY_SPEC = /(?:(?:^|\/)(?:integration|contract|e2e)(?:\/|[-.])|[.-](?:integration|contract|e2e)[.-])/i;
-const IO_PATH = /(?:^|\/)(?:db|database|queue|kafka|webhooks?|sagas?|jobs?|events?|contracts?)(?:\/|[-.])/i;
+const IO_PATH = new RegExp([
+  String.raw`(?:^|\/)(?:db|database|queue|kafka|webhooks?|sagas?|jobs?|events?|contracts?)`,
+  String.raw`(?:\/|[-.])`,
+].join(''), 'i');
 
 const sameSelection = (left, right) => left.length === right.length && left.every((item) => new Set(right).has(item));
 const allSpecGlob = (files) => files.some((file) => /(?:^|\/)(?:\*\*\/)?\*\.spec\.mjs$/i.test(file));

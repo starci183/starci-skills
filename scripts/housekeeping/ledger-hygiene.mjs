@@ -43,7 +43,8 @@ async function main(argv) {
   const report = await ledgerHygieneReport({ apply });
   if (json) process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
   else {
-    process.stdout.write(`ledger-hygiene: ${report.orphans.length} orphan ledger(s)${apply ? `, ${report.applied.length} archived` : ''}\n`);
+    const archived = apply ? `, ${report.applied.length} archived` : '';
+    process.stdout.write(`ledger-hygiene: ${report.orphans.length} orphan ledger(s)${archived}\n`);
     const body = formatReport(report);
     if (body) process.stdout.write(`${body}\n`);
   }

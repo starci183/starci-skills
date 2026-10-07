@@ -14,8 +14,8 @@ export function phraseHits(text, phrase) {
   const needStart = isWordChar(chars[0]);
   const needEnd = !prefix && isWordChar(chars.at(-1));
   for (let i = text.indexOf(p); i >= 0; i = text.indexOf(p, i + 1)) {
-    const before = [...text.slice(Math.max(0, i - 2), i)].at(-1);
-    const after = [...text.slice(i + p.length, i + p.length + 2)][0];
+    const before = Array.from(text.slice(Math.max(0, i - 2), i)).at(-1);
+    const after = Array.from(text.slice(i + p.length, i + p.length + 2))[0];
     if ((!needStart || !isWordChar(before)) && (!needEnd || !isWordChar(after))) return true;
   }
   return false;

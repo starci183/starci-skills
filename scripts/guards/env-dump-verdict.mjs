@@ -32,18 +32,29 @@ const refusal = (c, how) => ({ code: 'ENV_DUMP', command: [c.program, ...c.args]
 const namesNothing = (args) => !args.some((a) => !a.startsWith('-'));
 const scriptAfter = (args, flag) => { const at = args.findIndex((a) => flag.test(a)); return at >= 0 ? args[at + 1] ?? '' : null; };
 
+// A relative path such as runtime/env is a file of that name, not the env program (an absolute path still is).
+const isRelativeProgramPath = (word) => /[\\/]/.test(String(word ?? '')) && !/^(?:[a-z]:)?[\\/]/i.test(String(word));
+
+// `declare`/`typeset` with no name lists every variable (no option, or -x / -p).
+const declareListsAll = (args) => {
+  const options = args.filter((a) => /^-[a-zA-Z]+$/.test(a)).join('');
+  return namesNothing(args) && (!options || /[xp]/.test(options));
+};
+
+const declareDump = (c) => (declareListsAll(c.args) ? refusal(c, `${c.program} with no name`) : null);
+const BUILTIN_DUMPS = new Map([
+  ['set', (c) => (c.args.length === 0 && c.dialect !== 'powershell' ? refusal(c, 'set') : null)],
+  ['export', (c) => (c.args.length === 0 || (c.args.length === 1 && c.args[0] === '-p') ? refusal(c, 'export -p') : null)],
+  ['declare', declareDump],
+  ['typeset', declareDump],
+]);
+
 /** The shell-form dumpers (env/printenv/set/export/declare, PowerShell env: listers, GetEnvironmentVariables). */
 const shellDumpVerdict = (c) => {
-  const { program, args, dialect } = c;
-  // A relative path such as runtime/env is a file of that name, not the env program (an absolute path still is).
-  const relative = /[\\/]/.test(String(c.word ?? '')) && !/^(?:[a-z]:)?[\\/]/i.test(String(c.word));
-  if ((program === 'env' || program === 'printenv') && !relative) return namesNothing(args) ? refusal(c, program) : null;
-  if (program === 'set') return args.length === 0 && dialect !== 'powershell' ? refusal(c, 'set') : null;
-  if (program === 'export') return args.length === 0 || (args.length === 1 && args[0] === '-p') ? refusal(c, 'export -p') : null;
-  if (program === 'declare' || program === 'typeset') {
-    const options = args.filter((a) => /^-[a-zA-Z]+$/.test(a)).join('');
-    return namesNothing(args) && (!options || /[xp]/.test(options)) ? refusal(c, `${program} with no name`) : null;
-  }
+  const { program, args } = c;
+  if ((program === 'env' || program === 'printenv') && !isRelativeProgramPath(c.word)) return namesNothing(args) ? refusal(c, program) : null;
+  const builtin = BUILTIN_DUMPS.get(program);
+  if (builtin) return builtin(c);
   if (LISTERS.has(program) && args.some((a) => ENV_DRIVE.test(a))) return refusal(c, `${program} env:`);
   if (GET_ENV.test(program)) return refusal(c, '[Environment]::GetEnvironmentVariables()');
   return null;

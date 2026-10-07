@@ -131,14 +131,40 @@ function scanHistoryTree(dir,parentReal,context){
   }
 }
 
+const archiveAfterMsOf=hk=>{
+  const ms=Number(hk.sessionArchiveAfterMs);
+  return Number.isFinite(ms)&&ms>0?ms:DEFAULT_ARCHIVE_AFTER_MS;
+};
+
+// `target` itself, or the first free `<target>.hk<n>`.
+const freeArchiveName=target=>{
+  if(!fs.existsSync(target))return target;
+  let n=1,next;
+  do{next=`${target}.hk${n}`;n+=1;}while(fs.existsSync(next));
+  return next;
+};
+
+// Moves one aged history file into the archive root (or only plans it); a move that fails leaves its bytes counted out.
+function archiveHistoryFile(file,{root,archiveDevin,archiveKey,apply,skipped,errors,out}){
+  const wanted=path.join(archiveDevin,path.relative(root,file.path));
+  if(!inside(wanted,archiveKey)){skipped.push({path:file.path,reason:'archive target escaped the archive root'});return;}
+  const target=freeArchiveName(wanted);
+  out.freedBytes+=file.bytes;
+  out.movedBytes+=file.bytes;
+  if(!apply){skipped.push({path:file.path,reason:`dry run: would archive ${file.bytes} bytes to ${target}`});return;}
+  try{moveFile(file.path,target);}catch(error){
+    out.freedBytes-=file.bytes;out.movedBytes-=file.bytes;
+    errors.push({path:file.path,code:error?.code??'ERROR',message:String(error?.message??error)});
+  }
+}
+
 /**
  * Sweep the Devin CLI data root. See the header comment for the contract; `processes` is an
  * injectable async () => string[] of running image names so specs never depend on this host.
  */
 export async function sweepDevinData({apply=false,now=Date.now(),env=process.env,allocation,processes}={}){
   const hk=(allocation??allocationSettings())?.housekeeping??allocation??{};
-  const archiveAfterMs=Number.isFinite(Number(hk.sessionArchiveAfterMs))&&Number(hk.sessionArchiveAfterMs)>0
-    ?Number(hk.sessionArchiveAfterMs):DEFAULT_ARCHIVE_AFTER_MS;
+  const archiveAfterMs=archiveAfterMsOf(hk);
   const archiveRoot=archiveRootOf({env});
   const root=devinRoot(env),rootKey=pathKey(root);
   const archiveDevin=path.join(archiveRoot,'devin'),archiveKey=pathKey(archiveDevin);
@@ -171,23 +197,7 @@ export async function sweepDevinData({apply=false,now=Date.now(),env=process.env
   const plan=[];
   scanHistoryTree(root,null,{rootKey,now,archiveAfterMs,skipped,errors,plan});
   report.candidateFiles=plan.length;
-  for(const file of plan){
-    const rel=path.relative(root,file.path);
-    let target=path.join(archiveDevin,rel);
-    if(!inside(target,archiveKey)){skipped.push({path:file.path,reason:'archive target escaped the archive root'});continue;}
-    if(fs.existsSync(target)){
-      let n=1,next;
-      do{next=`${target}.hk${n}`;n+=1;}while(fs.existsSync(next));
-      target=next;
-    }
-    out.freedBytes+=file.bytes;
-    out.movedBytes+=file.bytes;
-    if(!apply){skipped.push({path:file.path,reason:`dry run: would archive ${file.bytes} bytes to ${target}`});continue;}
-    try{moveFile(file.path,target);}catch(error){
-      out.freedBytes-=file.bytes;out.movedBytes-=file.bytes;
-      errors.push({path:file.path,code:error?.code??'ERROR',message:String(error?.message??error)});
-    }
-  }
+  for(const file of plan)archiveHistoryFile(file,{root,archiveDevin,archiveKey,apply,skipped,errors,out});
   out.ok=errors.length===0;
   return out;
 }

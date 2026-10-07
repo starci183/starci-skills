@@ -87,7 +87,8 @@ export const entriesOfRows = (rows) => Object.fromEntries((rows ?? []).map((r) =
 export function capsOf(rows, { now = Date.now() } = {}) {
   const out = {};
   for (const r of rows ?? []) {
-    if (!(Number(r?.until_at) > now)) continue;
+    const live = Number(r?.until_at) > now;
+    if (!live) continue;
     const e = entryOfRow(r);
     const cap = Number(e?.cap), max = Number(e?.max);
     if (Number.isInteger(cap) && cap > 0 && (!Number.isFinite(max) || cap < max)) out[r.pool] = cap;

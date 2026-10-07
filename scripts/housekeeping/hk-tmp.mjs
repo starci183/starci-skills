@@ -123,12 +123,14 @@ function skipUnsafeEntry(entry, st, { parentReal, now, maxAgeMs, out }) {
     return true;
   }
   const ageMs = now - st.mtimeMs;
-  if (!(ageMs > maxAgeMs)) {
+  const pastAge = ageMs > maxAgeMs;
+  if (!pastAge) {
     out.skipped.push({ path: entry, reason: `mtime age ${Math.round(ageMs)}ms is within tmpMaxAgeMs ${maxAgeMs}ms` });
     return true;
   }
   const gitAgeMs = st.isDirectory() ? gitActivityAgeMs(entry, now) : null;
-  if (gitAgeMs !== null && !(gitAgeMs > maxAgeMs)) {
+  const gitPastAge = gitAgeMs > maxAgeMs;
+  if (gitAgeMs !== null && !gitPastAge) {
     out.skipped.push({ path: entry, reason: `a git checkout whose git metadata changed ${Math.round(gitAgeMs)}ms ago, within tmpMaxAgeMs ${maxAgeMs}ms: live` });
     return true;
   }

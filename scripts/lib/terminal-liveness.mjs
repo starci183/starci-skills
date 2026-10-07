@@ -263,13 +263,19 @@ const SHELL_PROMPT_ROWS = [
   /^PS(?:\s+\S[^>]*)?>$/,                    // PowerShell: "PS D:\Repositories\x>"
   /^[A-Za-z]:\\[^<>|*?"\r\n]*>$/,           // cmd.exe: "D:\Repositories\x>"
   // POSIX: "$", "#", "%", "user@host:~/x$", "user@host ~ %", "bash-5.2$", "(venv) user@host:~$"
-  /^(?:\([^)]*\)\s*)?(?:[\w.-]+@[\w.-]+(?:[:\s]\S*)?\s*|[\w.-]+-\d+(?:\.\d+)*)?[$#%]$/,
+  new RegExp([
+    String.raw`^(?:\([^)]*\)\s*)?(?:[\w.-]+@[\w.-]+(?:[:\s]\S*)?\s*|[\w.-]+-\d+(?:\.\d+)*)?`,
+    '[$#%]$',
+  ].join('')),
 ];
 // A shell prompt at the START of a row, whatever follows it on that row.
 const SHELL_PROMPT_PREFIXES = [
   /^PS\s+(?:[A-Za-z]:|\\\\|[\w.]+::)[^>]*>(?=\s|$)/,                     // PowerShell: "PS D:\x> ..."
   /^[A-Za-z]:\\[^<>|*?"\r\n]*>(?=\s|$)/,                                   // cmd.exe: "D:\x> ..."
-  /^(?:\([^)]*\)\s*)?[\w.-]+@[\w.-]+(?::\S*|\s+\S+)?\s*[$#%](?=\s|$)/,     // POSIX: "user@host:~/x$ ..."
+  new RegExp([
+    String.raw`^(?:\([^)]*\)\s*)?[\w.-]+@[\w.-]+`,
+    String.raw`(?::\S*|\s+\S+)?\s*[$#%](?=\s|$)`,
+  ].join('')),     // POSIX: "user@host:~/x$ ..."
 ];
 /** The shell prompt a row starts with, or null. */
 export function shellPromptPrefix(row) {
@@ -342,7 +348,16 @@ export const WEDGE_MINUTES = 30;
 // inc-b261cf2c56c5, inc-c2793e212c63).
 // Claude folds a long todo list into "… +3 pending" (inc-a579fa590ed8); Devin's model/context
 // footer ("SWE-2 Max  Context: 70k / 262k") may sit above its input row.
-const SPINNER_COMPANION = /^\s*$|^\s*[─━═╌┄_-]{3,}|^\s*[⎿↳└├☐☒◻◼□■✓✔]|^\s*(?:\d+\s+)?(?:queued|messages? queued)\b|^\s*(?:tip|hint)\b|^\s*[•*]?\s*messages? to be submitted\b|^\s*…\s*\+\d+\s+\w|^\s*(?:SWE-[\w.-]+(?:\s+\w+)?\s+)?Context:?\s*\d/iu;
+const SPINNER_COMPANION = new RegExp([
+  String.raw`^\s*$`,
+  String.raw`|^\s*[─━═╌┄_-]{3,}`,
+  String.raw`|^\s*[⎿↳└├☐☒◻◼□■✓✔]`,
+  String.raw`|^\s*(?:\d+\s+)?(?:queued|messages? queued)\b`,
+  String.raw`|^\s*(?:tip|hint)\b`,
+  String.raw`|^\s*[•*]?\s*messages? to be submitted\b`,
+  String.raw`|^\s*…\s*\+\d+\s+\w`,
+  String.raw`|^\s*(?:SWE-[\w.-]+(?:\s+\w+)?\s+)?Context:?\s*\d`,
+].join(''), 'iu');
 // A todo list of nine rows or more pushes a live Claude spinner out of the last 14 rows
 // (inc-a579fa590ed8). A spinner up to WIDE_ROWS back still counts when only companion or
 // wrapped rows sit between it and the input row below it.
@@ -379,6 +394,22 @@ const noOutputToolBlock = (lines) => {
   return lines.slice(Math.max(0, top - 1), at + 1);
 };
 
+const ELAPSED_HOURS = new RegExp([
+  String.raw`(\d+)`,
+  'h',
+].join(''));
+const ELAPSED_MINUTES = new RegExp([
+  String.raw`(\d+)m`,
+  String.raw`\b`,
+].join(''));
+const FRAME_RAIL_PREFIX = new RegExp([
+  String.raw`^\s*[│┃]`,
+  String.raw`\s?`,
+].join(''), 'u');
+const FRAME_RAIL_SUFFIX = new RegExp([
+  String.raw`\s*[│┃]`,
+  String.raw`\s*$`,
+].join(''), 'u');
 export function classifyAgentScreen(screen, { stagedPattern = DEFAULT_STAGED_PATTERN, sentText = null, provider = null, draft = null } = {}) {
   // The input box's draft (Orca `terminal read` draft) is read where the agent shows it: a wake or a
   // contract left unsubmitted there is staged input, not an empty prompt (frameWithDraft).
@@ -418,7 +449,10 @@ export function classifyAgentScreen(screen, { stagedPattern = DEFAULT_STAGED_PAT
   // Status words are matched case-sensitively: a spinner writes "Working",
   // "Thinking", "Running"; a wrapped prose line that starts with "running."
   // (a Collab Kernel yield summary) is not one.
-  const statusWord = /(?:^|\n)\s*[•*○◦]?\s*(?:Working|Thinking|Running)\b(?!\s*:|\s+now\b|[^\n]*:[ \t]*(?:\n|$))/;
+  const statusWord = new RegExp([
+    String.raw`(?:^|\n)\s*[•*○◦]?\s*(?:Working|Thinking|Running)`,
+    String.raw`\b(?!\s*:|\s+now\b|[^\n]*:[ \t]*(?:\n|$))`,
+  ].join(''));
   // Claude Code 2.1.280 spins with a star glyph and a random gerund plus a
   // timer ("✶ Osmosing… (1m 0s · ↓ 2.7k tokens)") and no "esc to interrupt";
   // without this marker a working Claude kernel read turn-idle and every
@@ -431,7 +465,15 @@ export function classifyAgentScreen(screen, { stagedPattern = DEFAULT_STAGED_PAT
   // turn, has none); "·" and "*" double as bullets, so they also need "(".
   // A tool call still executing ("⎿  Running…", a Bash row offering
   // "(ctrl+b to run in background)") is active too (inc-a579fa590ed8).
-  const activeMarker = /esc (?:twice )?to (?:interrupt|cancel)|background terminal running|\(ctrl\+b to run in background\)|(?:^|\n)[^\n]*[⠀-⣿][^\n]*\d|(?:^|\n)\s*[✶✻✳✢✽✺]\s+\S[^\n]*?…|(?:^|\n)\s*[·*]\s+\S[^\n]*?…\s*\(|(?:^|\n)\s*⎿\s+Running\b[^\n]*…/i;
+  const activeMarker = new RegExp([
+    'esc (?:twice )?to (?:interrupt|cancel)',
+    '|background terminal running',
+    String.raw`|\(ctrl\+b to run in background\)`,
+    String.raw`|(?:^|\n)[^\n]*[⠀-⣿][^\n]*\d`,
+    String.raw`|(?:^|\n)\s*[✶✻✳✢✽✺]\s+\S[^\n]*?…`,
+    String.raw`|(?:^|\n)\s*[·*]\s+\S[^\n]*?…\s*\(`,
+    String.raw`|(?:^|\n)\s*⎿\s+Running\b[^\n]*…`,
+  ].join(''), 'i');
   // A card's busyPatterns and chromePatterns read one row at a time.
   const active = { test: (text) => statusWord.test(text) || activeMarker.test(text) || card.busy.some((pattern) => pattern.test(text)) };
   const companion = (line) => SPINNER_COMPANION.test(line) || card.chrome.some((pattern) => pattern.test(line));
@@ -445,7 +487,7 @@ export function classifyAgentScreen(screen, { stagedPattern = DEFAULT_STAGED_PAT
   // A boxed dialog (a `framed` gate) is drawn behind the same rail a quoted child transcript uses, so it is
   // matched on the recent rows with the box's rails stripped. Its wrapped note rows can outnumber the
   // 14-row window at a narrow width, so it is read over FRAMED_GATE_ROWS.
-  const framedRecent = lines.slice(-FRAMED_GATE_ROWS).map((line) => line.replace(/^\s*[│┃]\s?/u, '').replace(/\s*[│┃]\s*$/u, '')).join('\n');
+  const framedRecent = lines.slice(-FRAMED_GATE_ROWS).map((line) => line.replace(FRAME_RAIL_PREFIX, '').replace(FRAME_RAIL_SUFFIX, '')).join('\n');
   const gate = INTERACTIVE_GATES.find(({ pattern, framed }) => pattern.test(framed ? framedRecent : topLevelRecent));
   if (gate) return { state: 'interactive-gate', gate: gate.gate, recent };
   if (failure.test(topLevelRecent)) return { state: 'failed', recent };
@@ -472,7 +514,7 @@ export function classifyAgentScreen(screen, { stagedPattern = DEFAULT_STAGED_PAT
     // 60 minutes on `... | xargs grep` reading stdin, and "active" hid it.
     // A command carrying its own bound is a tool still running (BOUNDED_TOOL above).
     const spinner = /(?:Working|Thinking|Running tools)\b[^\n]*/.exec(topLevelRecent)?.[0] ?? '';
-    const minutes = Number(/(\d+)h/.exec(spinner)?.[1] ?? 0) * 60 + Number(/(\d+)m\b/.exec(spinner)?.[1] ?? 0);
+    const minutes = Number(ELAPSED_HOURS.exec(spinner)?.[1] ?? 0) * 60 + Number(ELAPSED_MINUTES.exec(spinner)?.[1] ?? 0);
     const block = minutes >= WEDGE_MINUTES ? noOutputToolBlock(recentLines) : null;
     if (block && !block.some((line) => BOUNDED_TOOL.test(line))) return { state: 'wedged', minutes, recent };
     return { state: 'active', recent };

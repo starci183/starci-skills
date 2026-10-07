@@ -2,11 +2,15 @@
 // (modules/host/orca/calls.yaml liveSchema): scripts/api/orca/lib.mjs refuses a mutation the live host does not offer,
 // scripts/api/orca/agent-context.mjs answers the listing, scripts/checks/check-providers.mjs --live compares every entry. Pure.
 
+const USAGE_FLAG_BREAK = new RegExp([
+  String.raw`\s+-`,
+  '-?',
+].join(''));
 const commandName = (c) => {
   if (typeof c === 'string') return c;
   if (typeof c?.command === 'string') return c.command;
   if (typeof c?.name === 'string') return c.name;
-  if (typeof c?.usage === 'string') return c.usage.split(/\s+--?/)[0].trim();
+  if (typeof c?.usage === 'string') return c.usage.split(USAGE_FLAG_BREAK)[0].trim();
   return null;
 };
 

@@ -143,6 +143,10 @@ function coveredNode(nodes, paths) {
 }
 
 const titleCache = new Map();
+const TITLE_LINE = new RegExp([
+  String.raw`^title:[ \t]*(.*)`,
+  '$',
+].join(''), 'm');
 /** The `title:` of the Work record at `<repo>/<p>` (a record folder or its index.yaml), else null. */
 function recordTitle(repo, p) {
   if (!repo || !p) return null;
@@ -157,7 +161,7 @@ function recordTitle(repo, p) {
   let title = null;
   try {
     const head = fs.readFileSync(file, 'utf8').slice(0, 4096);
-    const m = /^title:[ \t]*(.*)$/m.exec(head);
+    const m = TITLE_LINE.exec(head);
     let value = m ? m[1] : '';
     // A folded or literal block scalar (title: >-) continues on the indented lines right below it.
     if (m && /^[>|][-+]?\s*$/.test(value)) {
