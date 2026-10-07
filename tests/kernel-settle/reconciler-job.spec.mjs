@@ -60,7 +60,7 @@ test('keys parse and route', () => {
   assert.equal(parseKey('workers:supervisor').type, 'workers');
   assert.equal(parseKey('nonsense'), null);
   assert.deepEqual(job.routes['op-reported']({ ledgerId: 'n', entityType: 'job', entityId: 'op-a', workflowId: 'wf-x' }), ['job:n:op-a', 'wf:n:wf-x']);
-  assert.equal(job.routes['worker-*']({ ledgerId: 'supervisor', entityType: 'job', entityId: 'sup-1' }), 'workers:supervisor');
+  assert.deepEqual(job.routes['worker-*']({ ledgerId: 'supervisor', entityType: 'job', entityId: 'sup-1' }), ['workers:supervisor']);
   assert.equal(parseKey('overlap:n:42'), null, 'no workflow branch, no overlap key');
   assert.deepEqual(job.concerns, ['job.settle', 'job.worker', 'job.dispatch', 'job.consume-check', 'job.close-verify']);
 });

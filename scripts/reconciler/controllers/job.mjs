@@ -34,7 +34,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../../engine/yaml.mjs';
 import { allocationSettings } from '../../../engine/config.mjs';
-import { classifyWorker, planHealth, HEALTH_DEFAULTS } from '../worker-health.mjs';
+import { HEALTH_DEFAULTS } from '../worker-health.mjs';
+import { reconcileHealth } from '../job-health.mjs';
+import { OPENED_BY, SUPERVISOR_LEDGER, jobKey } from '../job-keys.mjs';
+import { mapInOrder } from '../../lib/in-order.mjs';
 import { clocksOf } from '../sla.mjs';
 import { settlerSettings, releaseProofOf, EVENTS as SETTLE_EVENTS } from '../../kernel/settle/job-settle.mjs';
 import { reportedJobs, kernelHandoverOf, KERNEL_ONLY_OPS } from '../../machine/reported-jobs.mjs';
@@ -44,8 +47,6 @@ const selfFile = fileURLToPath(import.meta.url);
 const skillRoot = path.resolve(path.dirname(selfFile), '..', '..', '..');
 const JOB_FILE = path.join(skillRoot, 'modules', 'reconciler', 'job.yaml');
 export const SETTLER_SCRIPT = 'scripts/kernel/settle/job-settle.mjs';
-export const OPENED_BY = 'job-controller';
-export const SUPERVISOR_LEDGER = 'supervisor';
 const WORKERS_KEY = 'workers:supervisor';
 const HEALTH_KEY = 'health:all';
 const OPEN = ['queued', 'leased', 'running', 'answering', 'effect_unknown'];
@@ -89,7 +90,6 @@ const CLOCK_CODES = Object.freeze(['READY_UNDISPATCHED', 'LEASE_STUCK', 'WORKER_
 
 /* ------------------------------------------------------------------------------------------------ keys */
 
-export const jobKey = (ledgerId, jobId) => `job:${ledgerId}:${jobId}`;
 const wfKey = (ledgerId, workflowId) => `wf:${ledgerId}:${workflowId}`;
 /** {type: 'job'|'wf'|'workers', ledgerId, id} of a key, or null. Pure. */
 export function parseKey(key) {
@@ -100,7 +100,7 @@ export function parseKey(key) {
   return m ? { type: m[1], ledgerId: m[2], id: m[3] } : null;
 }
 const jobRoute = (ev) => {
-  if (ev?.ledgerId === SUPERVISOR_LEDGER) return WORKERS_KEY;
+  if (ev?.ledgerId === SUPERVISOR_LEDGER) return [WORKERS_KEY];
   const keys = [];
   if (ev?.entityType === 'job' && ev.entityId) keys.push(jobKey(ev.ledgerId, ev.entityId));
   if (ev?.workflowId) keys.push(wfKey(ev.ledgerId, ev.workflowId));
@@ -161,21 +161,7 @@ export function planJob(f, { frontier = {}, questions = [], settings = jobSettin
     set({ kind: 'dead-worker', concern: 'job.worker', verb: 'reconcile', argv: ['--job', f.jobId, '--dead-worker', '--settle-failed'] });
   }
   if (live && (frontier.heldWorkerJobs ?? []).includes(f.jobId)) set({ kind: 'release-worker', concern: 'job.worker', verb: 'reconcile', argv: ['--job', f.jobId, '--release-worker'] });
-  if (live && f.report) {
-    // Consume is part of settle (settle-runtime-service): SETTLE_OVERDUE / DECISION_OVERDUE time the report, no
-    // separate CONSUME_OVERDUE clock.
-    if (f.handover) {
-      clock('DECISION_OVERDUE', f.handover.at);
-      set({ kind: 'settle-nongreen', concern: 'job.consume-check', reason: f.handover.reason });
-    } else if (f.report.outcome !== 'done' || KERNEL_ONLY_OPS.includes(f.op)) {
-      // The settler never settles these; its handover is the Kernel's item (starci kernel status settleDecisions).
-      clock('DECISION_OVERDUE', f.report.filedAt);
-      set({ kind: 'settle-nongreen', concern: 'job.consume-check', reason: KERNEL_ONLY_OPS.includes(f.op) ? 'owner-act' : `outcome-${f.report.outcome}` });
-    } else {
-      clock('SETTLE_OVERDUE', f.report.filedAt);
-      set({ kind: 'settle', concern: 'job.settle' });
-    }
-  }
+  if (live && f.report) planReport(f, clock, set);
   if (f.status === 'answering') {
     clock('QUESTION_OVERDUE', f.questionAt ?? f.updatedAt);
     set({ kind: 'questions', concern: 'job.consume-check', questions: questions.filter((q) => q?.jobId === f.jobId) });
@@ -184,14 +170,31 @@ export function planJob(f, { frontier = {}, questions = [], settings = jobSettin
     clock('EFFECT_UNKNOWN_STUCK', f.updatedAt);
     if (f.now - f.updatedAt > settings.effectUnknownMs) set({ kind: 'effect-unknown', concern: 'job.worker', verb: 'reconcile', argv: ['--job', f.jobId] });
   }
-  if (SETTLED.includes(f.status) && !f.released && f.now - f.updatedAt <= f.windowMs) {
-    const handle = f.payload.managed ? null : (f.workerId ?? f.payload.orca?.agentTerminalHandle ?? f.payload.launchTerminal?.handle ?? null);
-    if (handle || f.payload.managed) {
-      if (!f.releaseProof) clock('WORKER_RELEASE_LEAK', f.settledAt ?? f.updatedAt);
-      set({ kind: 'close-verify', concern: 'job.close-verify', proven: Boolean(f.releaseProof), handle });
-    }
-  }
+  if (SETTLED.includes(f.status) && !f.released && f.now - f.updatedAt <= f.windowMs) planCloseVerify(f, clock, set);
   return { step, clocks };
+}
+
+/** The clock and step of a live job with a report. Consume is part of settle (settle-runtime-service): SETTLE_OVERDUE / DECISION_OVERDUE time the report, no separate CONSUME_OVERDUE clock. */
+function planReport(f, clock, set) {
+  if (f.handover) {
+    clock('DECISION_OVERDUE', f.handover.at);
+    set({ kind: 'settle-nongreen', concern: 'job.consume-check', reason: f.handover.reason });
+  } else if (f.report.outcome !== 'done' || KERNEL_ONLY_OPS.includes(f.op)) {
+    // The settler never settles these; its handover is the Kernel's item (starci kernel status settleDecisions).
+    clock('DECISION_OVERDUE', f.report.filedAt);
+    set({ kind: 'settle-nongreen', concern: 'job.consume-check', reason: KERNEL_ONLY_OPS.includes(f.op) ? 'owner-act' : `outcome-${f.report.outcome}` });
+  } else {
+    clock('SETTLE_OVERDUE', f.report.filedAt);
+    set({ kind: 'settle', concern: 'job.settle' });
+  }
+}
+
+/** The clock and step of a settled job whose worker release is not proven. */
+function planCloseVerify(f, clock, set) {
+  const handle = f.payload.managed ? null : (f.workerId ?? f.payload.orca?.agentTerminalHandle ?? f.payload.launchTerminal?.handle ?? null);
+  if (!handle && !f.payload.managed) return;
+  if (!f.releaseProof) clock('WORKER_RELEASE_LEAK', f.settledAt ?? f.updatedAt);
+  set({ kind: 'close-verify', concern: 'job.close-verify', proven: Boolean(f.releaseProof), handle });
 }
 
 /** The per-workflow dispatch plan from starci kernel status progress. Pure. */
@@ -301,14 +304,13 @@ async function actJob(ctx, ledgerId, jobId, f, s, settings) {
       return { action: 'settle-nongreen', ...(await ctx.openDecision(settleDecision(f, ledgerId, { now: ctx.now(), settings }))) };
     case 'questions': {
       const bridged = await ctx.api(ledgerId, 'questions', ['--workflow', f.workflowId]);
-      const opened = [];
-      for (const q of s.questions) {
+      const opened = await mapInOrder(s.questions, (q) => {
         const id = q.questionId ?? q.id ?? q.dispatchId ?? q.at ?? 'q';
-        opened.push(await ctx.openDecision({ schema: 'starci/decision-item@1', kind: 'worker-question', idempotencyKey: `worker-question:${jobId}:${id}`,
+        return ctx.openDecision({ schema: 'starci/decision-item@1', kind: 'worker-question', idempotencyKey: `worker-question:${jobId}:${id}`,
           decider: 'kernel', ledger: ledgerId, workflowId: f.workflowId, entity: { type: 'job', id: jobId },
           summary: `${f.op} ${jobId} asks: ${String(q.text ?? q.question ?? '').slice(0, 300)}`, evidence: [{ ref: `worker-question:${id}` }],
-          allowedVerbs: ['reply', 'nudge', 'reconcile'], dueAt: ctx.now() + settings.sla.QUESTION_OVERDUE, escalateTo: 'supervisor', openedBy: OPENED_BY, openedAt: ctx.now() }));
-      }
+          allowedVerbs: ['reply', 'nudge', 'reconcile'], dueAt: ctx.now() + settings.sla.QUESTION_OVERDUE, escalateTo: 'supervisor', openedBy: OPENED_BY, openedAt: ctx.now() });
+      });
       return { action: 'questions', ok: bridged.ok !== false, decisions: opened.length };
     }
     case 'close-verify': {
@@ -372,87 +374,7 @@ async function reconcileWorkers(ctx, settings) {
   }, { env: ctx.env ?? process.env });
 }
 
-/* ------------------------------------------------------------------------------------------------ worker health */
-
-const healthMem = new Map(); // jobId -> probe memory (worker-health.mjs planHealth), per engine process
-/** H14/H12: the settler's lease sweep marked the job's lease dead (conditions LeaseLive=False). */
-const leaseLostOf = (db, jobId) => {
-  try { return Boolean(db.prepare("SELECT 1 FROM conditions WHERE entity_type='job' AND entity_id=? AND type='LeaseLive' AND status='False'").get(jobId)); } catch { return false; }
-};
-let lastSendAt = 0;          // the stagger across every worker of the host
-const LIVE_WORKER = ['leased', 'running', 'answering'];
-const TERMINAL_SEND = 'scripts/api/orca/terminal-send.mjs';
-
-/** One probe: every live op job's worker, classified from ONE orca terminal list. */
-async function showTerminal(handle, ctx) {
-  try {
-    if (ctx.terminalShow) return (await ctx.terminalShow(handle)) ?? null;
-    const r = (await import('../../api/orca/terminal-show.mjs')).terminalShow({ terminal: handle });
-    return r?.ok ? r.terminal ?? null : null;
-  } catch { return null; }
-}
-async function reconcileHealth(ctx, settings, { list = null } = {}) {
-  const H = settings.health;
-  let listed;
-  try { listed = list ? await list() : (await import('../../api/orca/terminal-list.mjs')).terminalList({}); } catch (error) { listed = { ok: false, error: String(error?.message ?? error) }; }
-  if (!listed?.ok || listed.hostUnavailable) return { ok: true, action: 'host-unavailable', error: listed?.error ?? null };
-  const byHandle = new Map((listed.terminals ?? []).map((t) => [t.handle, t]));
-  const now = ctx.now();
-  const out = { ok: true, action: 'health', probed: 0, states: {}, sends: 0, decisions: 0 };
-  const seen = new Set();
-  for (const l of ctx.ledgers ?? []) {
-    if (l.ledgerId === SUPERVISOR_LEDGER) continue;
-    const jobs = ctx.read(l.ledgerId, (db) => db.prepare(`SELECT job_id, workflow_id, op_id, status, worker_id, payload_json FROM jobs WHERE kind='op' AND worker_id IS NOT NULL
-      AND status IN (${LIVE_WORKER.map(() => '?').join(',')})`).all(...LIVE_WORKER).map((r) => ({ ...r, reportFiled: reportedJobs(db, { jobId: r.job_id }).length > 0, leaseLost: leaseLostOf(db, r.job_id) }))) ?? [];
-    for (const j of jobs) {
-      out.probed += 1;
-      seen.add(j.job_id);
-      // A workflow-worktree terminal is not in the default list: read it by handle.
-      if (!byHandle.has(j.worker_id)) byHandle.set(j.worker_id, await showTerminal(j.worker_id, ctx));
-      const term = byHandle.get(j.worker_id) ?? null;
-      const mem = healthMem.get(j.job_id) ?? {};
-      const c = classifyWorker(term, { mem, reportFiled: j.reportFiled, leaseLost: j.leaseLost, now, settings: H });
-      out.states[c.state] = (out.states[c.state] ?? 0) + 1;
-      const planned = planHealth(c, { mem, now, settings: H });
-      const entity = jobKey(l.ledgerId, j.job_id);
-      if (['rate-limited', 'idle-at-prompt', 'done-without-report'].includes(c.state)) ctx.clock(entity, 'WORKER_STALLED', H.idleMs, { ledgerId: l.ledgerId, enteredAt: planned.mem.since ?? now });
-      else ctx.clear(entity, 'WORKER_STALLED');
-      const payload = parse(j.payload_json) ?? {};
-      const who = { jobId: j.job_id, workflowId: j.workflow_id, op: j.op_id, terminal: j.worker_id, provider: term?.agentIdentity ?? payload.provider ?? null, pool: payload.agent ?? payload.provider ?? null, model: payload.model ?? null };
-      if (c.state !== mem.state && c.state !== 'working') {
-        ctx.log('reconciler.worker-health', j.job_id + ' ' + c.state + (c.resetMs != null ? ' (reset in ' + Math.round(c.resetMs / 1000) + 's)' : ''), { ...who, state: c.state, preview: String(term?.preview ?? '').slice(0, 200) });
-        if (c.state === 'rate-limited') ctx.log('reconciler.provider-rate-limited', `provider ${who.provider ?? '?'} rate-limited (${j.job_id})`, { ...who, resetMs: c.resetMs ?? null });
-      }
-      let next = planned.mem;
-      const a = planned.action;
-      if (a && ctx.mode === 'active' && !ctx.owns('job.worker')) { healthMem.set(j.job_id, mem); continue; }
-      if (a?.kind === 'send') {
-        if (now - lastSendAt < H.staggerMs) { healthMem.set(j.job_id, { ...mem, state: c.state, since: planned.mem.since, seenAt: planned.mem.seenAt }); continue; }
-        lastSendAt = now;
-        await ctx.run('node', [TERMINAL_SEND, '--terminal', j.worker_id, '--text', a.text], { timeoutMs: 60_000 });
-        out.sends += 1;
-      } else if (a?.kind === 'dead-worker') {
-        // H14: a gone/exited worker, or one whose lease the settler found expired (LeaseLive=False), is settled now.
-        ctx.log('reconciler.worker-health', `${j.job_id} dead (${a.why}): starci kernel reconcile --dead-worker --settle-failed`, { ...who, state: 'dead', why: a.why });
-        await ctx.api(l.ledgerId, 'reconcile', ['--job', j.job_id, '--dead-worker', '--settle-failed']);
-      } else if (a?.kind === 'fail-no-report') {
-        // done-without-report past doneFailAfterMs: the failed-no-report path (its salvage continues from the commits).
-        await ctx.api(l.ledgerId, 'reconcile', ['--job', j.job_id, '--dead-worker', '--settle-failed']);
-      } else if (a?.kind === 'decision') {
-        await ctx.openDecision({ schema: 'starci/decision-item@1', kind: 'worker-stalled', idempotencyKey: `worker-stalled:${j.job_id}:${c.state}:${planned.mem.since ?? now}`,
-          decider: 'kernel', ledger: l.ledgerId, workflowId: j.workflow_id, entity: { type: 'job', id: j.job_id },
-          summary: `${j.op_id} ${j.job_id} (${who.provider ?? 'worker'}) is ${c.state}: ${a.why}; the automatic nudges did not move it`,
-          evidence: [{ ref: `terminal:${j.worker_id}` }, { ref: String(term?.preview ?? '').slice(0, 200) }], allowedVerbs: ['nudge', 'reconcile', 'route', 'enqueue'],
-          dueAt: now + settings.decisionDueMs, escalateTo: 'supervisor', openedBy: OPENED_BY, openedAt: now });
-        out.decisions += 1;
-      }
-      healthMem.set(j.job_id, next);
-    }
-  }
-  for (const id of healthMem) if (!seen.has(id)) healthMem.delete(id); // a job no longer live forgets its probe memory
-  return out;
-}
-export const _health = { reset: () => { healthMem.clear(); lastSendAt = 0; }, mem: healthMem };
+export { _health } from '../job-health.mjs';
 
 export default {
   name: 'job',
