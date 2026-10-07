@@ -296,7 +296,7 @@ const saidOf = (outcome) => {
 
 const failureClassCodes = (failureClass) => failureClass?.class ? [`failure-class:${failureClass.class}`] : [];
 
-const scoredWhy = ({ rep, outcome, red, detail, primary, next, codes, settle, done }) => {
+const scoredWhy = ({ rep, outcome, red, detail, primary, next, codes, settle, catalog, done }) => {
   const redNote = red ? tr('; check {name} is red{tag}', { name: red.name, tag: primary ? ` (${primary})` : '' }) : '';
   const headline = `${saidOf(outcome)}${redNote}: ${clip(shortPaths(rep.summary ?? detail ?? ''), 200)}`.replace(/: $/, '.');
   const classNote = settle.failureClass?.reason ? tr('Class: {class} — {reason}', { class: settle.failureClass.class, reason: clip(settle.failureClass.reason, 160) }) : null;
