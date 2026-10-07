@@ -31,6 +31,10 @@ import { claimDue, finishDuty } from '../schedules.mjs';
 import { readSupervisor, withSupervisor } from '../../machine/home.mjs';
 import { normalizeProvider } from '../../lib/provider.mjs';
 import { byCodeUnit } from '../../lib/list.mjs';
+import { eachInOrder, findInOrder } from '../../lib/in-order.mjs';
+import { fairShare, starvedWorkflows, quotaExhausted } from '../resource-share.mjs';
+
+export { fairShare, starvedWorkflows, quotaExhausted };
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const NAME = 'resource';
@@ -60,90 +64,6 @@ function resourceControllerSettings(file = path.join(ROOT, 'modules', 'reconcile
 /** {pool: cap} of the backed-off entries. */
 const poolCapsOf = (entries) => Object.fromEntries(Object.entries(entries ?? {}).filter(([, e]) => e && e.cap < e.max).map(([k, e]) => [k, e.cap]));
 
-/* ------------------------------------------------------------ fair share (pure) */
-
-/**
- * Per-workflow slot targets. `ops`: the worker census [{workflowId, status}] (queued rows included); `priorities`:
- * priorityTable(); `maxParallelOps`: the owner's ceiling (null: the total demand). Only workflows with ready (queued)
- * work get a target; the slots that workflows without ready work already hold are taken off the top. Reserve first
- * (weight order), then one slot at a time to the unsaturated workflow with the lowest target/weight (ties: higher
- * weight, then id), never above a workflow's demand (queued + running). Σ targets ≤ maxParallelOps.
- * {capacity, free, targets: {<workflowId>: {target, weight, reserve, running, queued, demand}}}.
- */
-export function fairShare({ ops = [], priorities = {}, maxParallelOps = null }) {
-  const by = new Map();
-  for (const o of ops) {
-    const id = o.workflowId ?? '(none)';
-    const w = by.get(id) ?? { running: 0, queued: 0 };
-    if (o.status === 'queued') w.queued += 1; else w.running += 1;
-    by.set(id, w);
-  }
-  const demandTotal = [...by.values()].reduce((n, w) => n + w.running + w.queued, 0);
-  const capacity = Number.isInteger(Number(maxParallelOps)) && Number(maxParallelOps) > 0 ? Number(maxParallelOps) : demandTotal;
-  const heldElsewhere = [...by.values()].filter((w) => w.queued === 0).reduce((n, w) => n + w.running, 0);
-  let free = Math.max(0, capacity - heldElsewhere);
-  const ready = [...by.entries()].filter(([, w]) => w.queued > 0).map(([id, w]) => ({ id, ...w, demand: w.running + w.queued,
-    weight: priorities?.[id]?.weight ?? 1, reserve: priorities?.[id]?.reserve ?? 0, target: 0 }));
-  const order = (a, b) => b.weight - a.weight || a.id.localeCompare(b.id);
-  for (const w of [...ready].sort(order)) {
-    const r = Math.min(w.reserve, w.demand, free);
-    w.target = r; free -= r;
-  }
-  while (free > 0) {
-    const open = ready.filter((w) => w.target < w.demand);
-    if (!open.length) break;
-    open.sort((a, b) => a.target / a.weight - b.target / b.weight || order(a, b));
-    open[0].target += 1; free -= 1;
-  }
-  const targets = {};
-  for (const w of ready) targets[w.id] = { target: w.target, weight: w.weight, reserve: w.reserve, running: w.running, queued: w.queued, demand: w.demand };
-  return { capacity, free, targets };
-}
-
-/**
- * The priority workflows starving now. Pure. Demand is running + queued-READY (starci kernel status progress.queuedReady: the
- * queued jobs whose queuedBecause is 'ready'); a job waiting on a live file lease, a dependency, a decision or any
- * other wait is not demand the slots could serve. `ready`: {<workflowId>: queuedReady}; a workflow with no reading
- * counts no ready work (never starved on a guess). Starved: reserve > 0, queuedReady > 0, running <
- * min(reserve, running + queuedReady).
- */
-export function starvedWorkflows({ ops = [], priorities = {}, ready = {} }) {
-  const out = [];
-  for (const [id, p] of Object.entries(priorities ?? {})) {
-    if (!(p?.reserve > 0)) continue;
-    const mine = ops.filter((o) => o.workflowId === id);
-    const running = mine.filter((o) => o.status !== 'queued').length;
-    const queued = mine.length - running;
-    const queuedReady = Math.max(0, Math.floor(Number(ready?.[id]) || 0));
-    const want = Math.min(p.reserve, running + queuedReady);
-    if (queuedReady > 0 && running < want) out.push({ workflowId: id, running, queued, queuedReady, want, reserve: p.reserve, weight: p.weight });
-  }
-  return out;
-}
-
-/**
- * quota-exhausted over one ledger. Pure. `jobs`: [{op, status, pool}] (queued and slot-holding ops); `openProviders`:
- * the providers whose circuit is open; `providerOf(pool)`. An op kind is exhausted when it has queued work, none of
- * it runs, and every pool its queued jobs name maps to an open provider (a kind whose queued jobs name no pool yet
- * is never judged: the router picks at dispatch). [{op, queued, pools, providers}].
- */
-export function quotaExhausted({ jobs = [], openProviders = [], providerOf = () => null }) {
-  const open = new Set(openProviders);
-  const kinds = new Map();
-  for (const j of jobs) { const k = kinds.get(j.op) ?? []; k.push(j); kinds.set(j.op, k); }
-  const out = [];
-  for (const [op, list] of kinds) {
-    const queued = list.filter((j) => j.status === 'queued');
-    if (!queued.length || list.some((j) => j.status !== 'queued')) continue;
-    if (queued.some((j) => !j.pool)) continue;
-    const pools = [...new Set(queued.map((j) => j.pool))];
-    const providers = pools.map((p) => providerOf(p));
-    if (providers.some((p) => !p || !open.has(p))) continue;
-    out.push({ op, queued: queued.length, pools, providers: [...new Set(providers)] });
-  }
-  return out;
-}
-
 /* ------------------------------------------------------------ live deps */
 
 const liveDeps = {
@@ -160,12 +80,13 @@ const liveDeps = {
     const key = (f) => String(f ?? '').replaceAll('\\', '/').toLowerCase();
     const l = (ctx.ledgers ?? []).find((x) => x.ledgerId !== 'supervisor' && x.file && key(x.file) === key(ledgerFile));
     const ids = l ? [l.ledgerId] : (ctx.ledgers ?? []).filter((x) => x.ledgerId !== 'supervisor').map((x) => x.ledgerId);
-    for (const id of ids) {
-      const st = await ctx.status(id, workflowId);
-      const n = Number(st?.progress?.queuedReady);
-      if (Number.isFinite(n)) return n;
-    }
-    return null;
+    let ready = null;
+    await findInOrder(ids, async (id) => {
+      const n = Number((await ctx.status(id, workflowId))?.progress?.queuedReady);
+      if (Number.isFinite(n)) ready = n;
+      return ready !== null;
+    });
+    return ready;
   },
   poolBackoff: () => import('../../machine/pool-backoff.mjs'),
   pools: async () => Object.entries((await import('../../../engine/config.mjs')).runtimeProfile()?.runtimes ?? {})
@@ -183,6 +104,47 @@ const liveDeps = {
   env: null,
 };
 const MB = 1048576;
+const EVENTS_SQL = `SELECT e.seq, e.created_at at, e.payload_json p, json_extract(j.payload_json,'$.model') jobPool
+  FROM events e LEFT JOIN jobs j ON j.job_id=e.entity_id WHERE e.kind=? AND `;
+const productLedgers = (ctx) => (ctx.ledgers ?? []).filter((x) => x.ledgerId !== 'supervisor');
+const jsonOr = (text) => { try { return JSON.parse(text || '{}'); } catch { return {}; } };
+
+/** The mode after one pass: the hysteresis step when RAM is measured, else the previous mode unchanged. */
+function modeOf(t, { prev, host, cpuBusy, thresholds }) {
+  const ramKnown = Number(host?.totalRamBytes) > 0 || host?.freeRamPct != null && host?.override;
+  if (ramKnown) return t.nextMode(prev, { freeRamPct: host.freeRamPct, cpuBusy }, thresholds);
+  return { mode: prev.mode ?? 'normal', ramMode: prev.ramMode ?? 'normal', cpuHot: Boolean(prev.cpuHot), why: 'RAM unmeasured: mode unchanged' };
+}
+
+/**
+ * The rate-limit signal sink of one pools pass: `hit(target, at)` keeps the newest signal time per pool target in `hits`;
+ * `hitSignal(p, at)` names one signal's pool (a pool target: model / pool / target / the job's routed pool), else every
+ * pool of its provider (provider / pool naming a provider, e.g. the worker's agent identity).
+ */
+function poolSignals(pools, now) {
+  const byTarget = new Map(pools.map((p) => [p.target, p]));
+  const byProvider = new Map();
+  for (const p of pools) if (p.provider) { const l = byProvider.get(p.provider) ?? []; l.push(p.target); byProvider.set(p.provider, l); }
+  const hits = {};
+  const hit = (target, at) => { if (target && byTarget.has(target)) hits[target] = Math.max(hits[target] ?? 0, Number(at) || now); };
+  const hitSignal = (p, at) => {
+    const named = [p.model, p.pool, p.target, p.jobPool].find((v) => v && byTarget.has(v));
+    if (named) return hit(named, at);
+    const prov = [p.provider, p.pool].map(normalizeProvider).find((v) => v && byProvider.has(v));
+    for (const target of byProvider.get(prov) ?? []) hit(target, at);
+  };
+  return { byProvider, hits, hit, hitSignal };
+}
+
+/** The providers whose pool is held at its floor while the rate limit persists: Map provider -> {target, e, since}. */
+function persistingProviders(pb, next, { now, settings }) {
+  const byProv = new Map();
+  for (const [target, e] of Object.entries(next)) {
+    const per = pb.backoffPersists(e, { now, persistMs: settings.backoffPersistMs, floor: Math.min(settings.backoffFloor, e.max) });
+    if (per.persists && e.provider && !byProv.has(e.provider)) byProv.set(e.provider, { target, e, since: per.since });
+  }
+  return byProv;
+}
 
 /* ------------------------------------------------------------ the controller */
 
@@ -202,6 +164,90 @@ export function createResourceController(overrides = {}) {
     else if (!on && memory.clocks[k]) { delete memory.clocks[k]; ctx.clear(entity, state); }
   };
 
+  // The active pass: throttle_state + one host_samples row in one transaction; true when written.
+  function publishHost(ctx, t, { m, cap, host, patch, running }) {
+    try {
+      const freeRamMb = host?.freeRamBytes == null ? null : Math.round(Number(host.freeRamBytes) / MB);
+      writeMachine((mm) => mm.transaction(() => {
+        t.publishThrottle(mm, { mode: m.mode, cpuHot: m.cpuHot, why: m.why, effectiveCap: cap.effectiveCap, heavyCap: cap.heavyCap, running,
+          freeRamPct: patch.freeRamPct, freeRamMb, cpuBusy: patch.cpuBusy, slotTargets: patch.slotTargets, writer: WRITER,
+          sample: { freeRamPct: patch.freeRamPct, cpuBusy: patch.cpuBusy, ramMode: m.ramMode, cpuHot: m.cpuHot, why: m.why } });
+        mm.recordHostSample({ kind: 'host', freeRamPct: patch.freeRamPct, freeRamMb, cpuPct: patch.cpuBusy == null ? null : Math.round(patch.cpuBusy * 1000) / 10,
+          freeDiskGb: host?.freeDiskGb ?? null, mode: t.dbMode(m.mode), effectiveCap: cap.effectiveCap, running });
+      }));
+      return true;
+    } catch (error) {
+      ctx.log('reconciler.resource.error', `throttle_state: ${String(error?.message ?? error).slice(0, 200)}`, { controller: NAME });
+      return false;
+    }
+  }
+
+  // The shadow pass: its own hysteresis in memory and a would-row when the mode or a slot target changes.
+  function recordShadowHost(ctx, { m, share, since, patch, live }) {
+    memory.shadowPrev = { mode: m.mode, ramMode: m.ramMode, cpuHot: m.cpuHot, since };
+    const sig = JSON.stringify({ mode: m.mode, targets: Object.fromEntries(Object.entries(share.targets).map(([k, v]) => [k, v.target])) });
+    if (sig === memory.lastWould) return;
+    memory.lastWould = sig;
+    const targets = Object.entries(share.targets).map(([k, v]) => k + '=' + v.target).join(', ') || '-';
+    ctx.log(WOULD, `throttle state: mode ${m.mode} (published: ${live.mode ?? '-'}), slot targets ${targets}`,
+      { controller: NAME, action: 'setThrottle', patch, liveMode: live.mode ?? null, liveWriter: live.writer ?? null, diff: (live.mode ?? 'normal') !== m.mode });
+  }
+
+  // op-ram-footprint every footprintEveryMs (as tick.mjs recorded it); MB-01: the cadence is durable (schedules), not per engine process.
+  async function footprintDuty(ctx, t, { active, ops, census, patch, now }) {
+    if (!claimDue(ctx, { controller: NAME, duty: 'footprint', intervalMs: settings.footprintEveryMs, now }).due) return null;
+    finishDuty(ctx, { controller: NAME, duty: 'footprint', result: active ? 'done' : 'skipped', now });
+    let footprint = null;
+    try {
+      const owners = await deps.owners();
+      footprint = t.footprintSample({ owners, ops, kernels: census?.kernels ?? 0, freeRamPct: patch.freeRamPct });
+      if (active) await deps.recordFootprint(footprint, env());
+      else ctx.log(WOULD, `op-ram-footprint: op agents ${footprint.opAgentRamMb} MB`, { controller: NAME, action: 'recordHostSample', kind: t.FOOTPRINT_SAMPLE_KIND, payload: footprint });
+    } catch (error) { ctx.log('reconciler.resource.error', `footprint: ${String(error?.message ?? error).slice(0, 200)}`, { controller: NAME }); }
+    return footprint;
+  }
+
+  // queuedReady of every priority workflow that has queued ops; a workflow with no reading counts no ready work (not starved on a guess).
+  async function readyCounts(ctx, priorities, ops) {
+    const ready = {};
+    const queuing = Object.entries(priorities ?? {}).filter(([id, p]) => p?.reserve > 0 && ops.some((o) => o.workflowId === id && o.status === 'queued'));
+    await eachInOrder(queuing, async ([id]) => {
+      try { const n = await deps.queuedReady(ctx, id, ops.find((o) => o.workflowId === id)?.ledger ?? null); if (Number.isFinite(n)) ready[id] = n; } catch { /* no reading: not starved */ }
+    });
+    return ready;
+  }
+
+  // Clocks of workflows that stopped starving close; once per engine life a CAP_STARVED clock a previous run left open for a
+  // workflow that is not starving now closes (the memory that would clear it on the transition did not survive the restart).
+  function clearStarving(ctx, priorities, nowStarving) {
+    for (const id of Object.keys(memory.starving)) if (!nowStarving.has(id)) { delete memory.starving[id]; clock(ctx, `workflow:${id}`, 'CAP_STARVED', false); }
+    if (memory.starvedSwept) return;
+    memory.starvedSwept = true;
+    for (const [id, p] of Object.entries(priorities ?? {})) if (p?.reserve > 0 && !nowStarving.has(id)) ctx.clear(`workflow:${id}`, 'CAP_STARVED');
+  }
+
+  // cap-starved: the priority workflow below its reserve for capStarvedMs → a Decision Item to the Supervisor.
+  async function starvationDecisions(ctx, { priorities, ops, m, cap, maxParallelOps, now }) {
+    const starved = starvedWorkflows({ ops, priorities, ready: await readyCounts(ctx, priorities, ops) });
+    clearStarving(ctx, priorities, new Set(starved.map((w) => w.workflowId)));
+    const decisions = [];
+    await eachInOrder(starved, async (w) => {
+      memory.starving[w.workflowId] ??= { since: now, opened: false };
+      clock(ctx, `workflow:${w.workflowId}`, 'CAP_STARVED', true, settings.capStarvedMs, w);
+      const st = memory.starving[w.workflowId];
+      if (!st.opened && now - st.since >= settings.capStarvedMs) {
+        st.opened = true;
+        await ctx.openDecision({ schema: 'starci/decision-item@1', kind: 'cap-starved', decider: 'supervisor', ledger: 'supervisor', workflowId: w.workflowId,
+          idempotencyKey: `cap-starved:${w.workflowId}:${new Date(st.since).toISOString()}`, entity: { type: 'workflow', id: w.workflowId },
+          summary: `priority workflow ${w.workflowId} held ${w.running} of its reserve ${w.reserve} slot(s) for ${Math.round((now - st.since) / 60000)} min with ${w.queued} op(s) ready (mode ${m.mode}, cap ${cap.effectiveCap ?? '-'}/${maxParallelOps ?? '-'})`,
+          evidence: [{ ref: `throttle:${m.why}` }, { ref: `cap:${cap.why}` }], options: [{ key: 'ram-cap-prioritize', verb: `starci supervisor ram-cap prioritize --workflow ${w.workflowId} --weight <n> --reserve <slots>`, recommended: true }],
+          allowedVerbs: ['ram-cap prioritize', 'ram-cap unprioritize'], openedBy: 'resource-controller', escalateTo: 'owner' });
+        decisions.push(`cap-starved:${w.workflowId}`);
+      }
+    });
+    return decisions;
+  }
+
   async function reconcileHost(ctx) {
     const t = await deps.throttle();
     const s = await deps.settings();
@@ -214,9 +260,7 @@ export function createResourceController(overrides = {}) {
     const live = t.readThrottleState({ env: env() });
     const active = ctx.mode === 'active';
     const prev = active ? live : (memory.shadowPrev ?? { ramMode: live.ramMode, cpuHot: live.cpuHot, mode: live.mode, since: live.since });
-    const ramKnown = Number(host?.totalRamBytes) > 0 || host?.freeRamPct != null && host?.override;
-    const m = ramKnown ? t.nextMode(prev, { freeRamPct: host.freeRamPct, cpuBusy }, thresholds)
-      : { mode: prev.mode ?? 'normal', ramMode: prev.ramMode ?? 'normal', cpuHot: Boolean(prev.cpuHot), why: 'RAM unmeasured: mode unchanged' };
+    const m = modeOf(t, { prev, host, cpuBusy, thresholds });
     const maxParallelOps = await deps.maxParallelOps();
     const estimates = t.opRamEstimates(t.opRamTable(s), await deps.footprints(thresholds.historySamples, env()), thresholds);
     const running = ops.filter((o) => o.status !== 'queued');
@@ -231,77 +275,96 @@ export function createResourceController(overrides = {}) {
       writer: WRITER, slotTargets: { at: new Date(now).toISOString(), maxParallelOps, capacity: share.capacity, targets: share.targets, poolCaps: poolCapsOf(memory.pools) } };
 
     let wrote = false;
-    if (active) {
-      try {
-        const freeRamMb = host?.freeRamBytes == null ? null : Math.round(Number(host.freeRamBytes) / MB);
-        writeMachine((mm) => mm.transaction(() => {
-          t.publishThrottle(mm, { mode: m.mode, cpuHot: m.cpuHot, why: m.why, effectiveCap: cap.effectiveCap, heavyCap: cap.heavyCap, running: running.length,
-            freeRamPct: patch.freeRamPct, freeRamMb, cpuBusy: patch.cpuBusy, slotTargets: patch.slotTargets, writer: WRITER,
-            sample: { freeRamPct: patch.freeRamPct, cpuBusy: patch.cpuBusy, ramMode: m.ramMode, cpuHot: m.cpuHot, why: m.why } });
-          mm.recordHostSample({ kind: 'host', freeRamPct: patch.freeRamPct, freeRamMb, cpuPct: patch.cpuBusy == null ? null : Math.round(patch.cpuBusy * 1000) / 10,
-            freeDiskGb: host?.freeDiskGb ?? null, mode: t.dbMode(m.mode), effectiveCap: cap.effectiveCap, running: running.length });
-        }));
-        wrote = true;
-      } catch (error) { ctx.log('reconciler.resource.error', `throttle_state: ${String(error?.message ?? error).slice(0, 200)}`, { controller: NAME }); }
-    } else {
-      memory.shadowPrev = { mode: m.mode, ramMode: m.ramMode, cpuHot: m.cpuHot, since };
-      const sig = JSON.stringify({ mode: m.mode, targets: Object.fromEntries(Object.entries(share.targets).map(([k, v]) => [k, v.target])) });
-      if (sig !== memory.lastWould) {
-        memory.lastWould = sig;
-        const targets = Object.entries(share.targets).map(([k, v]) => k + '=' + v.target).join(', ') || '-';
-        ctx.log(WOULD, `throttle state: mode ${m.mode} (published: ${live.mode ?? '-'}), slot targets ${targets}`,
-          { controller: NAME, action: 'setThrottle', patch, liveMode: live.mode ?? null, liveWriter: live.writer ?? null, diff: (live.mode ?? 'normal') !== m.mode });
-      }
-    }
-
-    // op-ram-footprint every footprintEveryMs (as tick.mjs recorded it).
-    let footprint = null;
-    // MB-01: the cadence is durable (schedules), not per engine process.
-    if (claimDue(ctx, { controller: NAME, duty: 'footprint', intervalMs: settings.footprintEveryMs, now }).due) {
-      finishDuty(ctx, { controller: NAME, duty: 'footprint', result: active ? 'done' : 'skipped', now });
-      try {
-        const owners = await deps.owners();
-        footprint = t.footprintSample({ owners, ops, kernels: census?.kernels ?? 0, freeRamPct: patch.freeRamPct });
-        if (active) await deps.recordFootprint(footprint, env());
-        else ctx.log(WOULD, `op-ram-footprint: op agents ${footprint.opAgentRamMb} MB`, { controller: NAME, action: 'recordHostSample', kind: t.FOOTPRINT_SAMPLE_KIND, payload: footprint });
-      } catch (error) { ctx.log('reconciler.resource.error', `footprint: ${String(error?.message ?? error).slice(0, 200)}`, { controller: NAME }); }
-    }
+    if (active) wrote = publishHost(ctx, t, { m, cap, host, patch, running: running.length });
+    else recordShadowHost(ctx, { m, share, since, patch, live });
+    const footprint = await footprintDuty(ctx, t, { active, ops, census, patch, now });
 
     // Clocks: RAM_CRITICAL, DISK_LOW (lane F reads them).
     clock(ctx, 'host:local', 'RAM_CRITICAL', m.mode === 'critical', settings.ramCriticalSlaMs, { freeRamPct: patch.freeRamPct, why: m.why });
     clock(ctx, 'host:local', 'DISK_LOW', Boolean(host?.lowDisk), settings.diskLowSlaMs, { drive: host?.drive ?? null, freeDiskGb: host?.freeDiskGb ?? null });
 
-    // cap-starved: the priority workflow below its reserve for capStarvedMs → a Decision Item to the Supervisor.
-    const ready = {};
-    for (const [id, p] of Object.entries(priorities ?? {})) {
-      if (!(p?.reserve > 0) || !ops.some((o) => o.workflowId === id && o.status === 'queued')) continue;
-      try { const n = await deps.queuedReady(ctx, id, ops.find((o) => o.workflowId === id)?.ledger ?? null); if (Number.isFinite(n)) ready[id] = n; } catch { /* no reading: not starved */ }
-    }
-    const starved = starvedWorkflows({ ops, priorities, ready });
-    const nowStarving = new Set(starved.map((w) => w.workflowId));
-    for (const id of Object.keys(memory.starving)) if (!nowStarving.has(id)) { delete memory.starving[id]; clock(ctx, `workflow:${id}`, 'CAP_STARVED', false); }
-    // Once per engine life: clear a CAP_STARVED clock a previous run left open for a workflow that is not starving now
-    // (the memory that would clear it on the transition did not survive the restart).
-    if (!memory.starvedSwept) {
-      memory.starvedSwept = true;
-      for (const [id, p] of Object.entries(priorities ?? {})) if (p?.reserve > 0 && !nowStarving.has(id)) ctx.clear(`workflow:${id}`, 'CAP_STARVED');
-    }
-    const decisions = [];
-    for (const w of starved) {
-      memory.starving[w.workflowId] ??= { since: now, opened: false };
-      clock(ctx, `workflow:${w.workflowId}`, 'CAP_STARVED', true, settings.capStarvedMs, w);
-      const st = memory.starving[w.workflowId];
-      if (!st.opened && now - st.since >= settings.capStarvedMs) {
-        st.opened = true;
-        await ctx.openDecision({ schema: 'starci/decision-item@1', kind: 'cap-starved', decider: 'supervisor', ledger: 'supervisor', workflowId: w.workflowId,
-          idempotencyKey: `cap-starved:${w.workflowId}:${new Date(st.since).toISOString()}`, entity: { type: 'workflow', id: w.workflowId },
-          summary: `priority workflow ${w.workflowId} held ${w.running} of its reserve ${w.reserve} slot(s) for ${Math.round((now - st.since) / 60000)} min with ${w.queued} op(s) ready (mode ${m.mode}, cap ${cap.effectiveCap ?? '-'}/${maxParallelOps ?? '-'})`,
-          evidence: [{ ref: `throttle:${m.why}` }, { ref: `cap:${cap.why}` }], options: [{ key: 'ram-cap-prioritize', verb: `starci supervisor ram-cap prioritize --workflow ${w.workflowId} --weight <n> --reserve <slots>`, recommended: true }],
-          allowedVerbs: ['ram-cap prioritize', 'ram-cap unprioritize'], openedBy: 'resource-controller', escalateTo: 'owner' });
-        decisions.push(`cap-starved:${w.workflowId}`);
-      }
-    }
+    const decisions = await starvationDecisions(ctx, { priorities, ops, m, cap, maxParallelOps, now });
     return { mode: m.mode, changed, wrote, shadow: !active, targets: share.targets, footprint: footprint != null, decisions };
+  }
+
+  // The machine_logs rows the Job controller's worker-health probe wrote (reconciler.provider-rate-limited typed rows,
+  // ctx.log, lane B): {jobId, workflowId, provider, pool, model, resetMs}.
+  function machineSignals(hitSignal, seedSince) {
+    try {
+      const since = memory.poolCursor.machine ?? null;
+      const rows = readMachineOr((mm) => ({
+        logs: mm.db.prepare(`SELECT seq, at, data_json d FROM machine_logs WHERE kind IN ('reconciler.provider-rate-limited','provider-rate-limited') AND ${since == null ? 'at>=?' : 'seq>?'} ORDER BY seq`).all(since == null ? seedSince : since),
+        maxSeq: mm.db.prepare('SELECT COALESCE(MAX(seq),0) s FROM machine_logs').get()?.s ?? 0,
+      }), null);
+      if (rows) {
+        memory.poolCursor.machine = Math.max(Number(since) || 0, Number(rows.maxSeq) || 0);
+        for (const r of rows.logs ?? []) hitSignal(jsonOr(r.d), r.at);
+      }
+    } catch { /* an unreadable machine.sqlite adds no signal */ }
+  }
+
+  async function ledgerSignals(ctx, hitSignal, seedSince) {
+    await eachInOrder(productLedgers(ctx), async (l) => {
+      const since = memory.poolCursor[l.ledgerId] ?? null;
+      let rows = null;
+      try {
+        rows = await ctx.read(l.ledgerId, (db) => ({
+          events: db.prepare(EVENTS_SQL + (since == null ? 'e.created_at>=? ORDER BY e.seq' : 'e.seq>? ORDER BY e.seq')).all(RATE_LIMITED_EVENT, since == null ? seedSince : since),
+          maxSeq: db.prepare('SELECT COALESCE(MAX(seq),0) s FROM events').get()?.s ?? 0,
+        }));
+      } catch { rows = null; }
+      if (!rows) return;
+      memory.poolCursor[l.ledgerId] = Math.max(Number(since) || 0, Number(rows.maxSeq) || 0);
+      for (const e of rows.events ?? []) hitSignal({ ...jsonOr(e.p), jobPool: e.jobPool }, e.at);
+    });
+  }
+
+  // The provider circuits: one worker-wide row per provider in machine.sqlite provider_health (provider-circuit.mjs).
+  function circuitSignals(hit, byProvider, seedSince) {
+    for (const c of (deps.providerCircuits ?? providerCircuits)()) {
+      const v = c.value ?? {};
+      const at = Number(v.observedAt) || Number(c.at) || 0;
+      const k = normalizeProvider(v.provider ?? c.provider);
+      if (v.failureKind !== 'rate-limited' || at < seedSince || at <= (memory.providerSeen[k] ?? 0)) continue;
+      memory.providerSeen[k] = at;
+      for (const target of byProvider.get(k) ?? []) hit(target, at);
+    }
+  }
+
+  // Active: machine.sqlite pool_backoff rows; shadow: a would-row when the caps change.
+  function publishPools(ctx, pb, { next, liveRows, now, active }) {
+    const caps = poolCapsOf(next);
+    if (!active) {
+      const sig = JSON.stringify(caps);
+      if (sig === memory.poolWould) return caps;
+      memory.poolWould = sig;
+      const text = Object.entries(next).map(([k, e]) => k + ' ' + e.cap + '/' + e.max + (e.reason ? ' (' + e.reason + ')' : '')).join(', ') || 'every pool at its maxParallel';
+      ctx.log(WOULD, `pool backoff: ${text}`, { controller: NAME, action: 'setPoolBackoff', patch: { poolBackoff: next }, caps });
+      return caps;
+    }
+    if (Object.keys(next).length || liveRows.length) {
+      try {
+        writeMachine((mm) => mm.transaction(() => {
+          for (const [pool, e] of Object.entries(next)) mm.setPoolBackoff(pb.poolRowOf(pool, e, { now, staleMs: settings.backoffStaleMs }));
+          for (const r of liveRows) if (!next[r.pool]) mm.clearPoolBackoff(r.pool);
+        }));
+      } catch (error) { ctx.log('reconciler.resource.error', `pool_backoff: ${String(error?.message ?? error).slice(0, 200)}`, { controller: NAME }); }
+    }
+    return caps;
+  }
+
+  // A rate limit that persists at the floor: the provider circuit, once per floor episode, on every product ledger.
+  async function openFloorCircuits(ctx, pb, next, now) {
+    const circuits = [];
+    await eachInOrder(persistingProviders(pb, next, { now, settings }), async ([provider, { target, e, since }]) => {
+      const episode = `${provider}|${since}`;
+      if (memory.circuits[provider] === episode) return;
+      memory.circuits[provider] = episode;
+      const reason = `pool ${target} held at ${e.cap}/${e.max} since ${new Date(since).toISOString()} and still rate limited (last ${new Date(e.lastRateLimitAt).toISOString()})`;
+      await eachInOrder(productLedgers(ctx), (l) => ctx.api(l.ledgerId, 'provider-backoff', ['--provider', provider, '--open-circuit', '--kind', settings.backoffCircuitKind, '--reason', reason, '--by', WRITER], { timeoutMs: 60_000 }));
+      circuits.push(provider);
+    });
+    return circuits;
   }
 
   /**
@@ -319,60 +382,11 @@ export function createResourceController(overrides = {}) {
     await deps.throttle();
     const now = ctx.now();
     const pools = await deps.pools(); // [{target, provider, maxParallel}]
-    const byTarget = new Map(pools.map((p) => [p.target, p]));
-    const byProvider = new Map();
-    for (const p of pools) if (p.provider) { const l = byProvider.get(p.provider) ?? []; l.push(p.target); byProvider.set(p.provider, l); }
-    const hits = {}; // pool target -> newest signal time
-    const hit = (target, at) => { if (target && byTarget.has(target)) hits[target] = Math.max(hits[target] ?? 0, Number(at) || now); };
+    const { byProvider, hits, hit, hitSignal } = poolSignals(pools, now);
     const seedSince = now - settings.backoffIncreaseAfterMs;
-    // One signal's pool: a named pool target (model / pool / target / the job's routed pool), else every pool of its
-    // provider (provider / pool naming a provider, e.g. the worker's agent identity).
-    const hitSignal = (p, at) => {
-      const named = [p.model, p.pool, p.target, p.jobPool].find((v) => v && byTarget.has(v));
-      if (named) return hit(named, at);
-      const prov = [p.provider, p.pool].map(normalizeProvider).find((v) => v && byProvider.has(v));
-      for (const target of byProvider.get(prov) ?? []) hit(target, at);
-    };
-    // The Job controller's worker-health probe logs reconciler.provider-rate-limited typed rows (ctx.log, lane B) in
-    // machine.sqlite machine_logs: {jobId, workflowId, provider, pool, model, resetMs}.
-    try {
-      const since = memory.poolCursor.machine ?? null;
-      const rows = readMachineOr((mm) => ({
-        logs: mm.db.prepare(`SELECT seq, at, data_json d FROM machine_logs WHERE kind IN ('reconciler.provider-rate-limited','provider-rate-limited') AND ${since == null ? 'at>=?' : 'seq>?'} ORDER BY seq`).all(since == null ? seedSince : since),
-        maxSeq: mm.db.prepare('SELECT COALESCE(MAX(seq),0) s FROM machine_logs').get()?.s ?? 0,
-      }), null);
-      if (rows) {
-        memory.poolCursor.machine = Math.max(Number(since) || 0, Number(rows.maxSeq) || 0);
-        for (const r of rows.logs ?? []) { let d = {}; try { d = JSON.parse(r.d || '{}'); } catch { d = {}; } hitSignal(d, r.at); }
-      }
-    } catch { /* an unreadable machine.sqlite adds no signal */ }
-    const EVENTS_SQL = `SELECT e.seq, e.created_at at, e.payload_json p, json_extract(j.payload_json,'$.model') jobPool
-      FROM events e LEFT JOIN jobs j ON j.job_id=e.entity_id WHERE e.kind=? AND `;
-    for (const l of (ctx.ledgers ?? []).filter((x) => x.ledgerId !== 'supervisor')) {
-      const since = memory.poolCursor[l.ledgerId] ?? null;
-      let rows = null;
-      try {
-        rows = await ctx.read(l.ledgerId, (db) => ({
-          events: db.prepare(EVENTS_SQL + (since == null ? 'e.created_at>=? ORDER BY e.seq' : 'e.seq>? ORDER BY e.seq')).all(RATE_LIMITED_EVENT, since == null ? seedSince : since),
-          maxSeq: db.prepare('SELECT COALESCE(MAX(seq),0) s FROM events').get()?.s ?? 0,
-        }));
-      } catch { rows = null; }
-      if (!rows) continue;
-      memory.poolCursor[l.ledgerId] = Math.max(Number(since) || 0, Number(rows.maxSeq) || 0);
-      for (const e of rows.events ?? []) {
-        let p = {}; try { p = JSON.parse(e.p || '{}'); } catch { p = {}; }
-        hitSignal({ ...p, jobPool: e.jobPool }, e.at);
-      }
-    }
-    // The provider circuits: one worker-wide row per provider in machine.sqlite provider_health (provider-circuit.mjs).
-    for (const c of (deps.providerCircuits ?? providerCircuits)()) {
-      const v = c.value ?? {};
-      const at = Number(v.observedAt) || Number(c.at) || 0;
-      const k = normalizeProvider(v.provider ?? c.provider);
-      if (v.failureKind !== 'rate-limited' || at < seedSince || at <= (memory.providerSeen[k] ?? 0)) continue;
-      memory.providerSeen[k] = at;
-      for (const target of byProvider.get(k) ?? []) hit(target, at);
-    }
+    machineSignals(hitSignal, seedSince);
+    await ledgerSignals(ctx, hitSignal, seedSince);
+    circuitSignals(hit, byProvider, seedSince);
     const liveRows = readMachineOr((mm) => mm.poolBackoff(), []);
     const active = ctx.mode === 'active';
     const prevAll = memory.pools ?? (active ? pb.entriesOfRows(liveRows) : {});
@@ -385,40 +399,8 @@ export function createResourceController(overrides = {}) {
       if (e) next[p.target] = { ...e, provider: p.provider ?? null };
     }
     memory.pools = next;
-    const caps = poolCapsOf(next);
-    if (active) {
-      if (Object.keys(next).length || liveRows.length) {
-        try {
-          writeMachine((mm) => mm.transaction(() => {
-            for (const [pool, e] of Object.entries(next)) mm.setPoolBackoff(pb.poolRowOf(pool, e, { now, staleMs: settings.backoffStaleMs }));
-            for (const r of liveRows) if (!next[r.pool]) mm.clearPoolBackoff(r.pool);
-          }));
-        } catch (error) { ctx.log('reconciler.resource.error', `pool_backoff: ${String(error?.message ?? error).slice(0, 200)}`, { controller: NAME }); }
-      }
-    } else {
-      const sig = JSON.stringify(caps);
-      if (sig !== memory.poolWould) {
-        memory.poolWould = sig;
-        const text = Object.entries(next).map(([k, e]) => k + ' ' + e.cap + '/' + e.max + (e.reason ? ' (' + e.reason + ')' : '')).join(', ') || 'every pool at its maxParallel';
-        ctx.log(WOULD, `pool backoff: ${text}`, { controller: NAME, action: 'setPoolBackoff', patch: { poolBackoff: next }, caps });
-      }
-    }
-    // A rate limit that persists at the floor: the provider circuit, once per floor episode, on every product ledger.
-    const circuits = [];
-    const byProv = new Map();
-    for (const [target, e] of Object.entries(next)) {
-      const per = pb.backoffPersists(e, { now, persistMs: settings.backoffPersistMs, floor: Math.min(settings.backoffFloor, e.max) });
-      if (per.persists && e.provider && !byProv.has(e.provider)) byProv.set(e.provider, { target, e, since: per.since });
-    }
-    for (const [provider, { target, e, since }] of byProv) {
-      const episode = `${provider}|${since}`;
-      if (memory.circuits[provider] === episode) continue;
-      memory.circuits[provider] = episode;
-      const reason = `pool ${target} held at ${e.cap}/${e.max} since ${new Date(since).toISOString()} and still rate limited (last ${new Date(e.lastRateLimitAt).toISOString()})`;
-      for (const l of (ctx.ledgers ?? []).filter((x) => x.ledgerId !== 'supervisor'))
-        await ctx.api(l.ledgerId, 'provider-backoff', ['--provider', provider, '--open-circuit', '--kind', settings.backoffCircuitKind, '--reason', reason, '--by', WRITER], { timeoutMs: 60_000 });
-      circuits.push(provider);
-    }
+    const caps = publishPools(ctx, pb, { next, liveRows, now, active });
+    const circuits = await openFloorCircuits(ctx, pb, next, now);
     return { caps, hits: Object.keys(hits), circuits, shadow: !active };
   }
 
@@ -442,14 +424,14 @@ export function createResourceController(overrides = {}) {
       probed = true;
     }
     const exhausted = open.length ? quotaExhausted({ jobs, openProviders: open.map((c) => c.provider), providerOf: await deps.providerOf() }) : [];
-    for (const e of exhausted) {
+    await eachInOrder(exhausted, async (e) => {
       await ctx.openDecision({ schema: 'starci/decision-item@1', kind: 'quota-exhausted', decider: 'supervisor', ledger: ledgerId,
         idempotencyKey: `quota-exhausted:${ledgerId}:${e.op}:${e.providers.slice().sort(byCodeUnit).join('+')}`, entity: { type: 'job', id: `${ledgerId}:${e.op}` },
         summary: `${e.queued} ready ${e.op} op(s) on ${ledgerId} wait and every pool they name (${e.pools.join(', ')}) has an open circuit (${e.providers.join(', ')})`,
         evidence: open.filter((c) => e.providers.includes(c.provider)).map((c) => ({ ref: `circuit:${c.provider} ${c.failureKind} until ${c.expiresAt ? new Date(c.expiresAt).toISOString() : '?'}` })),
         options: [{ key: 'reroute', verb: 'starci kernel graph-edit / reroute the kind to a pool with quota', recommended: true }, { key: 'wait', verb: 'wait for the circuit to clear (quota probe every 5 min)' }],
         allowedVerbs: ['graph-edit', 'provider-health'], openedBy: 'resource-controller', escalateTo: 'owner' });
-    }
+    });
     return { ledgerId, open: open.length, quotaOpen: quotaOpen.length, probed, exhausted: exhausted.map((e) => e.op) };
   }
 
