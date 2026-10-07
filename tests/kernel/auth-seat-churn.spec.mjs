@@ -54,6 +54,21 @@ test('B: a start answer that replaced nothing is not counted as a restart', () =
   assert.equal(startAnswerOf({ ok: false, value: null, stderr: 'boom' }).action, 'restart-failed');
 });
 
+test('B2: an idle replacement no restart could launch leaves the live seat in place', () => {
+  const calls = [];
+  const kept = replaceIdleKernel({ phase: 'running', terminal: 'term-k', stale: {}, outputAgeMs: 120_000, idle: { wakes: 3 } }, {
+    launchableSender: () => ({ ok: false, reason: 'workflow-sender-terminal-missing', error: 'no_active_sender_terminal' }),
+    closeKernelTerminal: () => { calls.push('close'); return { ok: true }; },
+    withKernelLedger: () => { calls.push('event'); },
+    replaceKernel: () => { calls.push('replace'); return { ok: true }; },
+  });
+  assert.equal(kept.action, 'replacement-unlaunchable');
+  assert.equal(kept.reason, 'workflow-sender-terminal-missing');
+  assert.deepEqual(calls, [], 'the seat is not closed, no replaced-idle event, no start');
+  assert.equal(REPLACED.has(kept.action), false);
+  assert.equal(seatStateOf(kept.action), 'live');
+});
+
 test('B: an idle or wake-dead replace whose terminal close failed answers kernel-terminal-close-failed before start-workflow', () => {
   for (const [name, fn, input] of [
     ['replaceIdleKernel', replaceIdleKernel, { idle: { wakes: 3 } }],
@@ -61,6 +76,7 @@ test('B: an idle or wake-dead replace whose terminal close failed answers kernel
   ]) {
     const calls = [];
     const result = fn({ phase: 'running', terminal: 'term-k', stale: {}, outputAgeMs: 120_000, ...input }, {
+      launchableSender: () => ({ ok: true }),
       closeKernelTerminal: () => { calls.push('close'); return { ok: false, error: 'tab close timed out' }; },
       replaceKernel: () => { calls.push('replace'); return { ok: true }; },
       withKernelLedger: () => { calls.push('event'); },
@@ -70,6 +86,7 @@ test('B: an idle or wake-dead replace whose terminal close failed answers kernel
   }
   const calls = [];
   const replaced = replaceIdleKernel({ phase: 'running', terminal: 'term-k', stale: {}, outputAgeMs: 120_000, idle: { wakes: 3 } }, {
+    launchableSender: () => ({ ok: true }),
     closeKernelTerminal: () => { calls.push('close'); return { ok: true }; },
     withKernelLedger: (fn) => fn({ transaction: (work) => work(), appendEvent: ({ kind }) => calls.push(kind) }),
     replaceKernel: () => { calls.push('replace'); return { ok: true, action: 'restarted' }; },

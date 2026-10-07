@@ -28,7 +28,7 @@
 // STUCK SLA. Every wait a running workflow holds gets an age (`stuckOf`, called by `starci kernel status`, which owns the
 // frontier it reads): owner-gate (an open owner gate, a pending owner ask, or an autopilot supervisor-gate), peer-wait, dependency, retry-cap (a
 // retry route fired its limit and handed the job to an owner gate), deferred-settle (a consumed report not settled,
-// or a settle held behind a wait), queued-ready (a queued job nothing holds), throttled (pool-full, circuit-open,
+// or a settle held behind a wait), queued-ready (a queued job nothing holds), throttled (pool-full, circuit-open, host-resources-low,
 // max-ops, path-lease). Past runtimes.yaml allocation.opTelemetry.stuckSla.<kind>.warnMs it is severity warn, past
 // criticalMs severity critical; either is a Supervisor owed action (`stuckOwedItems`), the tick lists each and
 // alerts the critical ones. Each item names the owner of the next action: owner | kernel | peer:<workflow> |
@@ -55,7 +55,7 @@ const METRICS_KIND = 'op-health';
 export const WAIT_KINDS = Object.freeze(['owner-gate', 'peer-wait', 'dependency', 'retry-cap', 'deferred-settle', 'queued-ready', 'throttled']);
 export const SEVERITIES = Object.freeze(['ok', 'warn', 'critical']);
 /** queuedBecause values that are the runtime's capacity, not the workflow's own order. */
-const THROTTLE_CAUSES = Object.freeze(['pool-full', 'circuit-open', 'max-ops', 'path-lease']);
+const THROTTLE_CAUSES = Object.freeze(['pool-full', 'circuit-open', 'max-ops', 'path-lease', 'host-resources-low']);
 
 
 /* ------------------------------------------------------------ settings */

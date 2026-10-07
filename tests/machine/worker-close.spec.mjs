@@ -233,6 +233,28 @@ test('verify cannot run: nothing is killed and the answer is unverifiable', () =
   assert.deepEqual(w.calls.filter((c) => c.startsWith('stop-process:')), []);
 });
 
+test('a terminal Orca already showed disconnected, with no process carrying its handle, is proven closed; a connected one is not', () => {
+  // The audited Kernel seat: its terminal reads disconnected, nothing carries the handle, the close answers disconnected.
+  const gone = world({ initialTable: [OTHER_CODEX] });
+  gone.deps.close = (handle) => { gone.calls.push(`close:${handle}`); return { handle, ok: true, proof: 'disconnected', attempts: 1, before: 'disconnected' }; };
+  const out = closeWorker({ dispatch: DISPATCH, deps: gone.deps, env: {} });
+  assert.equal(out.processes.verdict, 'none');
+  assert.equal(workerClosureProven(out, HANDLE), true);
+  assert.deepEqual(gone.calls.filter((c) => c.startsWith('stop-process:')), []);
+  // The same census while the terminal was connected when the close began is a contradiction, not a closure.
+  const live = world({ initialTable: [OTHER_CODEX] });
+  live.deps.close = (handle) => ({ handle, ok: true, proof: 'disconnected', attempts: 1, before: 'connected' });
+  const refused = closeWorker({ dispatch: DISPATCH, deps: live.deps, env: {} });
+  assert.equal(refused.processes.verdict, 'unverifiable');
+  assert.equal(workerClosureProven(refused, HANDLE), false);
+  // An unreadable census after the close proves nothing either.
+  const blind = world({ initialTable: [OTHER_CODEX] });
+  let reads = 0;
+  blind.deps.tableOf = () => (reads++ === 0 ? [OTHER_CODEX] : null);
+  blind.deps.close = (handle) => ({ handle, ok: true, proof: 'gone', attempts: 0, before: 'gone' });
+  assert.equal(closeWorker({ dispatch: DISPATCH, deps: blind.deps, env: {} }).processes.verdict, 'unverifiable');
+});
+
 test('a caller inside the worker\'s own terminal releases it but does not close or verify it from there', () => {
   const w = world();
   const out = closeWorker({ dispatch: DISPATCH, deps: w.deps, env: { ORCA_TERMINAL_HANDLE: HANDLE } });

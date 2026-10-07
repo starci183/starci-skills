@@ -121,6 +121,24 @@ test('a low disk refuses the spawn as a typed wait: host-resources-low, queued, 
   assert.deepEqual(events().filter(k=>k==='dispatch-rejected'),[]);
 });
 
+// The audited stall: status read `actionable` (a ready job) while every dispatch refused host-resources-low, so the watchdog
+// kept waking a Kernel that could do nothing. Status asks dispatch's own question, so the job reads queued by the host.
+test('status reads a job dispatch would refuse host-resources-low as queued by the host, not ready or actionable',t=>{
+  const fx=fixture(t);
+  const job=leading(fx.run({},'enqueue','--workflow',WORKFLOW,'--op',OP,'--paths','apps/app/src/messages').stdout).job_id;
+  const frontier=(probe)=>leading(fx.run({[HOST_ENV]:probe},'status','--workflow',WORKFLOW).stdout).frontier;
+  for(const probe of [LOW_DISK,LOW_RAM]){
+    const f=frontier(probe);
+    assert.equal(f.queued.find(q=>q.jobId===job).queuedBecause,'host-resources-low');
+    assert.equal(f.queuedCauses['host-resources-low'],1);
+    assert.equal(f.readyOperations,0);
+    assert.equal(f.actionable,false,'nothing a Kernel move can change');
+  }
+  const room=frontier(ROOMY);
+  assert.equal(room.queued.find(q=>q.jobId===job).queuedBecause,'ready');
+  assert.equal(room.actionable,true,'room again: the job reads ready and wakes the Kernel');
+});
+
 test('a low RAM refuses with lowRam in the probe numbers',t=>{
   const fx=fixture(t);
   const job=leading(fx.run({},'enqueue','--workflow',WORKFLOW,'--op',OP,'--paths','apps/app/src/messages').stdout).job_id;

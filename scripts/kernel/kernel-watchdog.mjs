@@ -43,6 +43,7 @@ import { openDecisionRow } from '../machine/decisions.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { arg as argvValue } from '../lib/cli-arg.mjs';
 import { createKernelTick } from './kernel-watchdog-tick.mjs';
+import { workflowSender } from './workflow-startup.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const apiFile = path.join(skillRoot, 'scripts', 'kernel', 'cli.mjs');
@@ -80,11 +81,14 @@ const runNodeJson = (file, args) => {
 
 const classifyKernelScreen = classifyAgentScreen;
 
+// A wake is typed into the Kernel's input box as one paste. Claude Code folds a paste of about 800 characters or more into a
+// pasted_content block, which the Kernel model reads as untrusted pasted data and refused three times on 2026-10-07; the
+// whole typed wake (this text, the rev line, the seat identity) stays well under that, so it arrives as the user's message.
 export const buildWakePrompt = (workflow, attempt = null, revLine = null) => withWakeIdentity([
-  `Watchdog liveness wake for ${workflow}: phase=running and the prior model turn returned to the input prompt; act on it now.`,
-  'Re-read canonical starci kernel status and survey. The runtime settles green reports itself; decide every needs-kernel-decision item first (starci kernel status settleDecisions: settle it fail/blocked, route its retry or incident, or check+settle what the settler could not verify), then work the ranked actions and the frontier until nothing is immediately executable.',
-  `If it is then waiting on an active Op, a lease, a not-before time or a report/message, record the exact wait and yield the model turn immediately; the runtime (the reconciler Host controller) owns the ~${Math.round(intervalMs / 60_000)}-minute cadence and wakes this same Kernel.`,
-  'Never run Start-Sleep, shell sleep, a timer or an in-turn polling loop.',
+  `Watchdog liveness wake for ${workflow}: phase=running, your last turn ended at the prompt; act on it now.`,
+  'Read starci kernel status; settle each needs-kernel-decision item, then work the ranked actions.',
+  'If only a recorded wait remains, yield the model turn immediately: the runtime wakes this Kernel again.',
+  'Never run Start-Sleep, shell sleep or a polling loop.',
   WAKE_BOUNDS,
 ].join(' '), workflow, attempt, revLine);
 /** The liveness wake this tick would type, from one starci kernel status read: its seat attempt and its kernelRev (runtime-rev.mjs). */
@@ -134,6 +138,9 @@ const replaceKernel = (base) => {
   const started = runNodeJson(startFile, ['--repo', path.resolve(repo), '--goal', workflowId, '--launched-by', 'watchdog', '--json']);
   const step = started.value?.step ?? null;
   if (step === 'host-unavailable') return { ...base, ok: true, action: 'host-unavailable', reason: started.value?.error ?? null };
+  // No sender terminal to launch from is a refusal retrying cannot change: answered once as restart-blocked, which the Host
+  // controller holds for blockedRetryMs (modules/reconciler/host.yaml) instead of repeating it every pass.
+  if (step === 'workflow-sender-terminal-missing') return { ...base, ok: false, action: 'restart-blocked', reason: step, error: started.value?.error ?? null, detail: started.value };
   if (step === 'kernel-worker-alive') return { ...base, ok: true, action: 'already-live', note: started.value?.error ?? null,
     replacementTerminal: null, detail: started.value };
   return startAnswerOf(started, base);
@@ -271,10 +278,16 @@ const escalateIdleStall = ({ phase, terminal, idle, outputAgeMs }) => {
 // replacement is recorded only once its terminal closed.
 const closeFailed = (base, terminalClosed, what) => ({ ...base, terminalClosed, ok: false, action: 'kernel-terminal-close-failed',
   error: terminalClosed.error ?? `the ${what} kernel terminal could not be closed` });
+// A replacement that cannot launch must not close the seat it replaces: the unattended start needs a sender terminal
+// (workflowSender), and a live Kernel left in place is better than a vacant seat no restart can fill.
+const launchableSender = () => withKernelLedger((ledger) => workflowSender({ env: process.env, launchedBy: 'watchdog', ledger, workflowId }))
+  ?? { ok: false, reason: 'workflow-sender-terminal-missing', error: 'the ledger could not be read to prove the replacement launchable' };
 export const replaceIdleKernel = ({ phase, terminal, dispatch = null, stale, outputAgeMs, idle }, deps = {}) => {
   const close = deps.closeKernelTerminal ?? closeKernelTerminal;
   const openLedger = deps.withKernelLedger ?? withKernelLedger;
   const replace = deps.replaceKernel ?? replaceKernel;
+  const sender = (deps.launchableSender ?? launchableSender)();
+  if (!sender.ok) return { ok: true, workflowId, phase, terminal, ...stale, outputAgeMs, idle, action: 'replacement-unlaunchable', reason: sender.reason, error: sender.error };
   const terminalClosed = close(terminal, dispatch);
   if (!terminalClosed.ok) return closeFailed({ workflowId, phase, terminal, ...stale, outputAgeMs, idle }, terminalClosed, 'idle');
   openLedger((ledger) => ledger.transaction(() => ledger.appendEvent({ workflowId, entityType: 'kernel', entityId: workflowId, kind: KERNEL_IDLE_REPLACED_EVENT, payload: { terminal, wakes: idle.wakes } })));

@@ -169,6 +169,28 @@ test('active: watchdog --once --repair runs through ctx.run and its action=resta
   assert.equal(repairRuns(ctx).length, before, 'a quarantined seat is left alone');
 });
 
+// The audited seat: 50 restarts in 47 minutes, every one refused no_active_sender_terminal. A restart the watchdog answers
+// restart-blocked is a refusal only an opened terminal changes: tried once, then not again until blockedRetryMs has passed.
+test('active: a restart-blocked pass is held, not repeated every pass; it is tried again after blockedRetryMs', async () => {
+  const dbs = { 'shop-be': ledgerDb({ workflows: [{ id: 'wf-shop-fe-canon', goal: GOAL }] }) };
+  const store = memoryStore();
+  const c = booted(controller({ store: () => store, probeSeat: async () => assert.fail('active mode does not probe first') }));
+  const ctx = hostCtx({ dbs, mode: 'active', runAnswer: () => ({ ok: false, code: 1, stdout: '{"ok":false,"action":"restart-blocked","reason":"workflow-sender-terminal-missing"}' }) });
+  const first = await c.reconcile(SEAT, ctx);
+  assert.equal(first.action, 'restart-blocked');
+  assert.equal(first.seat, 'replacing', 'the vacant-seat clock keeps running');
+  assert.equal(first.replaced, false, 'a refused launch is no replacement');
+  for (let i = 0; i < 4; i += 1) {
+    ctx.advance(60_000);
+    const held = await c.reconcile(SEAT, ctx);
+    assert.equal(held.held, 'restart-blocked');
+  }
+  assert.equal(repairRuns(ctx).length, 1, 'five passes, one watchdog run');
+  ctx.advance(S.seats.kernel.blockedRetryMs);
+  await c.reconcile(SEAT, ctx);
+  assert.equal(repairRuns(ctx).length, 2, 'tried again once the retry window passed');
+});
+
 test('null goal -> no seat, one DI goal-text-missing for the Supervisor', async () => {
   const dbs = { 'shop-be': ledgerDb({ workflows: [{ id: 'wf-shop-fe-canon', goal: 'Kh\u1edfi \u0111\u1ed9ng l\u1ea1i tr\u00ean runtime m\u1edbi\nGoal g\u1ed1c:\n\nnull' }] }) };
   let probed = 0;
