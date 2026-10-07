@@ -13,7 +13,7 @@ import { lsTree } from '../api/git/ls-tree.mjs';
 import { lsFiles } from '../api/git/ls-files.mjs';
 import { getBlob } from '../../engine/db/blob.mjs';
 import { redactData } from '../lib/redact.mjs';
-import { jsonCopy } from '../lib/json-copy.mjs';
+import { jsonClone } from '../lib/json-clone.mjs';
 
 const SHA = /^[0-9a-f]{40,64}$/;
 const fail = ({ code }, message) => Object.assign(new Error(message), { code });
@@ -56,7 +56,7 @@ export function saveReceipt(ctx, kind, phase, receipt) {
 }
 export const phaseOf = (ctx, phase, receipt) => ctx?.checkpointPhase?.(phase, receipt);
 export const publicReceipt = ({ settlement: _settlement, ...receipt }) => receipt;
-export const acceptedDecision = (ctx) => ctx?.settlement ? { settlement: jsonCopy(ctx.settlement) } : {};
+export const acceptedDecision = (ctx) => ctx?.settlement ? { settlement: jsonClone(ctx.settlement) } : {};
 
 /** A private index observes exact worktree bytes without changing the real index or creating another commit. */
 export function snapshotTree(dir, parent, files, git) {
