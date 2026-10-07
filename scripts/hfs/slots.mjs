@@ -22,20 +22,21 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { braceVariants, globExpression } from '../lib/glob.mjs';
-import { cleanSlotPath } from './slot-path.mjs';
-import { captureNames } from '../lib/i18n.mjs';
+import { braceVariants } from '../lib/glob.mjs';
 import { isPlainObject } from '../../engine/plain-object.mjs';
 import { APP_KIND, RUNTIME_KIND, manifestKind } from './manifest-shape.mjs';
 import { APP_SCOPE, manifestShapeProblems, PROFILES } from './slot-manifest-shape.mjs';
 import { manifestSemanticProblems } from './slot-semantic-problems.mjs';
-import { declaredSlotEnabled } from './declaration-slots.mjs';
+import { classifyIn, ownerIn, slotEnabled, tierIn } from './slot-classify.mjs';
+import { compileVariant, varsOf, variantsOf } from './slot-match.mjs';
+import { importAllowedIn } from './slot-imports.mjs';
+import { requiredFilesIn, requiredPathsIn } from './slot-required.mjs';
+import { appResolver } from './slot-app-view.mjs';
 import { sideProblems } from './slot-side-problems.mjs';
 import { declarationShapeProblems } from './declaration-shape.mjs';
 import { declarationEdition, editionRuleParams, effectiveSlot, slotInEdition } from './edition-slots.mjs';
 import { HfsSlotsError, fail } from './slot-errors.mjs';
 import { loadRuleCatalog } from './rule-catalog.mjs';
-import { byCodeUnit } from '../lib/list.mjs';
 export { litePresenceOf, slotInEdition } from './edition-slots.mjs';
 export { HfsSlotsError, loadRuleCatalog };
 export { rules } from './rule-catalog.mjs';
@@ -64,79 +65,6 @@ export function appRelativeMessages(side, sideRoot) {
     : message);
 }
 
-// ------------------------------------------------------------------------------------------------ patterns
-
-const VAR = /<([A-Za-z][A-Za-z0-9-]*)>/g;
-const varsOf = (text) => captureNames(text, VAR);
-const hasWildcard = (segment) => /[*?]/.test(segment);
-
-/** Weight of one pattern segment: literal 4, literal mixed with a variable 3, a bare variable 2, a wildcard 1, `**` 0. */
-function segmentWeight(segment) {
-  if (segment === '**') return 0;
-  if (hasWildcard(segment)) return 1;
-  if (/^<[^>]+>$/.test(segment)) return 2;
-  if (segment.includes('<')) return 3;
-  return 4;
-}
-
-/** The RegExp source of one pattern segment (no separators); variables capture, and are listed in `names`. */
-function segmentSource(segment, names) {
-  let source = '', variableEnd = -1;
-  for (let i = 0; i < segment.length; i += 1) {
-    const c = segment[i];
-    if (i <= variableEnd) continue;
-    if (c === '<') {
-      variableEnd = segment.indexOf('>', i);
-      names.push(segment.slice(i + 1, variableEnd));
-      source += '([^/]+?)';
-    } else if (c === '*') source += '[^/]*';
-    else if (c === '?') source += '[^/]';
-    else source += /[.+^${}()|[\]\\]/.test(c) ? `\\${c}` : c;
-  }
-  return source;
-}
-
-/** One brace-free pattern compiled: `dir` patterns (trailing /) own everything below their root. */
-function compileVariant(slot, pattern) {
-  const dir = pattern.endsWith('/');
-  const body = dir ? pattern.slice(0, -1) : pattern;
-  const segments = body.split('/');
-  const names = [];
-  let source = '';
-  segments.forEach((segment, index) => {
-    const last = index === segments.length - 1;
-    if (segment === '**') source += last ? '.*' : '(?:.*/)?';
-    else source += segmentSource(segment, names) + (last ? '' : '/');
-  });
-  return {
-    slot,
-    pattern,
-    dir,
-    segments,
-    names,
-    score: segments.reduce((sum, s) => sum + segmentWeight(s), 0),
-    wildcards: segments.filter(hasWildcard).length,
-    regex: new RegExp(`^(${source})${dir ? '(?:/.*)?' : ''}$`),
-    segmentRegexes: segments.map((s) => (s === '**' ? null : new RegExp(`^${segmentSource(s, [])}$`))),
-  };
-}
-
-const variantsOf = (slot) => braceVariants(slot.path).map((pattern) => compileVariant(slot, pattern));
-
-const levenshtein = (a, b) => {
-  const row = Array.from({ length: b.length + 1 }, (_, i) => i);
-  for (let i = 1; i <= a.length; i += 1) {
-    let prev = row[0];
-    row[0] = i;
-    for (let j = 1; j <= b.length; j += 1) {
-      const held = row[j];
-      row[j] = Math.min(row[j] + 1, row[j - 1] + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1));
-      prev = held;
-    }
-  }
-  return row[b.length];
-};
-
 // ------------------------------------------------------------------------------------------- manifest
 
 /**
@@ -157,6 +85,44 @@ export function loadSlotManifest({ root = skillRoot, file = path.join(root, HFS_
 
 const declarationInvalid = (problems, file) => fail('HFS_DECLARATION_INVALID', `hfs.json is refused: ${problems.slice(0, 5).join('; ')}${problems.length > 5 ? '; and ' + (problems.length - 5) + ' more' : ''}`, { file, problems });
 
+function runtimeDeclaration(manifest, declaration, file, side) {
+  if (side !== null) fail('HFS_DECLARATION_INVALID', 'a runtime repository has no sides', { file, side });
+  return Object.freeze({
+    hfs: declaration.hfs,
+    kind: RUNTIME_KIND,
+    project: declaration.project,
+    side: null,
+    profile: RUNTIME_KIND,
+    apps: Object.freeze([]),
+    optionalSlots: Object.freeze([]),
+    connections: Object.freeze([]),
+    reads: Object.freeze([]),
+    manifestVersion: manifest.version,
+  });
+}
+
+const connectionView = (c) => Object.freeze({ name: c.name, envPrefix: c.envPrefix, owner: c.owner, isolation: c.isolation, ...(c.provider !== undefined ? { provider: c.provider } : {}) });
+
+/** The declaration of one side of an app, frozen: the view a check of that side folder runs under. */
+function sideDeclaration(manifest, declaration, name, edition, providers) {
+  const s = declaration.sides[name];
+  return Object.freeze({
+    hfs: declaration.hfs,
+    kind: APP_KIND,
+    project: declaration.project,
+    edition,
+    side: name,
+    profile: name,
+    apps: Object.freeze(s.apps.map((a) => Object.freeze({ name: a.name, kind: a.kind }))),
+    optionalSlots: Object.freeze([...(s.optionalSlots ?? [])]),
+    patterns: Object.freeze([...(s.patterns ?? [])]), kinds: Object.freeze([...(s.kinds ?? [])]),
+    connections: Object.freeze((s.connections ?? []).map(connectionView)),
+    providers,
+    reads: Object.freeze([...(s.reads ?? [])]),
+    manifestVersion: manifest.version,
+  });
+}
+
 /**
  * A declaration checked against the manifest: kind app, the pinned major the manifest's (HFS_MANIFEST_MAJOR_MISMATCH otherwise,
  * and there is no compatibility window), and per side: app kinds of that profile, optionalSlots naming only opt-in slots of the
@@ -169,21 +135,7 @@ export function resolveRepoDeclaration(manifest, declaration, { file = HFS_DECLA
   if (declaration.kind !== manifestKind(manifest)) declarationInvalid([`hfs.json is of kind ${declaration.kind}, but the manifest it is judged by is of kind ${manifestKind(manifest)}`], file);
   if (declaration.hfs !== manifest.major)
     fail('HFS_MANIFEST_MAJOR_MISMATCH', `hfs.json pins manifest major ${declaration.hfs} but the manifest is ${manifest.version}`, { pinned: declaration.hfs, manifest: manifest.version, manifestMajor: manifest.major, file });
-  if (declaration.kind === RUNTIME_KIND) {
-    if (side !== null) fail('HFS_DECLARATION_INVALID', 'a runtime repository has no sides', { file, side });
-    return Object.freeze({
-      hfs: declaration.hfs,
-      kind: RUNTIME_KIND,
-      project: declaration.project,
-      side: null,
-      profile: RUNTIME_KIND,
-      apps: Object.freeze([]),
-      optionalSlots: Object.freeze([]),
-      connections: Object.freeze([]),
-      reads: Object.freeze([]),
-      manifestVersion: manifest.version,
-    });
-  }
+  if (declaration.kind === RUNTIME_KIND) return runtimeDeclaration(manifest, declaration, file, side);
   const { edition, known, valid } = declarationEdition(manifest, declaration);
   if (!valid) fail('HFS_EDITION_INVALID', `hfs.json edition is ${JSON.stringify(declaration.edition)}; the editions this manifest knows are ${known.join(', ')} (absent means full)`, { file, edition: declaration.edition });
   const bad = PROFILES.flatMap((name) => sideProblems(manifest, name, declaration.sides[name]));
@@ -191,24 +143,7 @@ export function resolveRepoDeclaration(manifest, declaration, { file = HFS_DECLA
   if (side !== null && !PROFILES.includes(side)) fail('HFS_DECLARATION_INVALID', `${side} is not a side of an app (be, fe)`, { file, side });
   // A provider declared on any connection enables the provider slots of every profile (a fe side declares none): each view carries the union.
   const providers = Object.freeze([...new Set(PROFILES.flatMap((name) => (declaration.sides[name].connections ?? []).map((c) => c.provider).filter((p) => p !== undefined)))]);
-  const sides = Object.fromEntries(PROFILES.map((name) => {
-    const s = declaration.sides[name];
-    return [name, Object.freeze({
-      hfs: declaration.hfs,
-      kind: APP_KIND,
-      project: declaration.project,
-      edition,
-      side: name,
-      profile: name,
-      apps: Object.freeze(s.apps.map((a) => Object.freeze({ name: a.name, kind: a.kind }))),
-      optionalSlots: Object.freeze([...(s.optionalSlots ?? [])]),
-      patterns: Object.freeze([...(s.patterns ?? [])]), kinds: Object.freeze([...(s.kinds ?? [])]),
-      connections: Object.freeze((s.connections ?? []).map((c) => Object.freeze({ name: c.name, envPrefix: c.envPrefix, owner: c.owner, isolation: c.isolation, ...(c.provider !== undefined ? { provider: c.provider } : {}) }))),
-      providers,
-      reads: Object.freeze([...(s.reads ?? [])]),
-      manifestVersion: manifest.version,
-    })];
-  }));
+  const sides = Object.fromEntries(PROFILES.map((name) => [name, sideDeclaration(manifest, declaration, name, edition, providers)]));
   if (side !== null) return sides[side];
   return Object.freeze({
     hfs: declaration.hfs,
@@ -255,18 +190,6 @@ export function readRepoDeclaration(manifest, repoRoot) {
 
 // ------------------------------------------------------------------------------------------- resolver
 
-const isEntryFile = (name) => name === 'index.ts' || name === 'index.tsx';
-
-/** The folder kind of a file in its slot, from a named layer or kind folder. */
-function kindOf({ variant, slot, root }, p) {
-  const names = [...(slot.layers ?? []), ...(slot.kinds ?? [])];
-  if (!names.length) return null;
-  const literal = variant.segments.find((segment) => names.includes(segment));
-  if (literal) return literal;
-  const below = root ? p.slice(root.length + 1) : p;
-  return below.split('/').slice(0, -1).find((segment) => names.includes(segment)) ?? null;
-}
-
 /**
  * The four questions for one scope: the app root (profile app, root paths) or one side (profile be or fe, paths relative to the
  * side folder). createSlotResolver composes them; nothing else calls this.
@@ -275,271 +198,25 @@ function createScopeResolver(manifest, repo) {
   const profile = repo.profile;
   const edition = repo.edition ?? 'full';
   const slots = manifest.slots.filter((s) => s.profiles.includes(profile) && slotInEdition(manifest, s, edition)).map((s) => effectiveSlot(s, profile, edition));
-  const byId = new Map(slots.map((s) => [s.id, s]));
-  const variants = slots.flatMap(variantsOf);
-  const appKind = new Map(repo.apps.map((a) => [a.name, a.kind]));
-
-  const slotEnabled = (slot) => {
-    // A provider slot is gated by its provider in every edition: litePresence may lift it to required, but it still
-    // exists for this repository only while a connection declares the provider.
-    if (slot.provider !== undefined) return declaredSlotEnabled(slot, repo);
-    if (slot.presence !== 'opt-in') return true;
-    return declaredSlotEnabled(slot, repo);
-  };
-  const clean = cleanSlotPath;
-
-  /** Every variant matching `p`, with its root and bindings, minus app-kind slots of another kind. */
-  function matches(p, only) {
-    const found = [];
-    for (const variant of variants) {
-      if (only && !only(variant.slot)) continue;
-      const m = variant.regex.exec(p);
-      if (!m) continue;
-      const bindings = {};
-      variant.names.forEach((name, i) => { bindings[name] = m[i + 2]; });
-      if (variant.slot.appKind !== undefined && appKind.get(bindings.app) !== variant.slot.appKind) continue;
-      const root = variant.dir ? m[1] : path.posix.dirname(m[1]);
-      found.push({ variant, slot: variant.slot, root: root === '.' ? '' : root, bindings });
-    }
-    return found.sort((a, b) => b.variant.score - a.variant.score || a.variant.wildcards - b.variant.wildcards);
-  }
-  const best = (found) => {
-    if (!found.length) return { hit: null, ambiguous: [] };
-    const top = found.filter((f) => f.variant.score === found[0].variant.score && f.variant.wildcards === found[0].variant.wildcards);
-    const distinct = [...new Set(top.map((f) => f.slot.id))];
-    return distinct.length > 1 ? { hit: null, ambiguous: distinct } : { hit: top[0], ambiguous: [] };
-  };
-
-  /** The leading segments of `p` a variant accepts, and how far it got; how the nearest slot of an unknown path is found. */
-  function nearest(p) {
-    const parts = p.split('/');
-    let winner = null;
-    for (const variant of variants) {
-      let depth = 0;
-      while (depth < parts.length && depth < variant.segments.length) {
-        const rx = variant.segmentRegexes[depth];
-        if (rx === null || !rx.test(parts[depth])) break;
-        depth += 1;
-      }
-      const expected = variant.segments[depth] ?? '';
-      const distance = levenshtein(parts[depth] ?? '', expected.replace(VAR, ''));
-      const shape = Math.abs(variant.segments.length - parts.length);
-      const cand = { variant, depth, shape, distance };
-      const better = !winner || depth > winner.depth || (depth === winner.depth && (shape < winner.shape || (shape === winner.shape && (distance < winner.distance || (distance === winner.distance && variant.score > winner.variant.score)))));
-      if (better) winner = cand;
-    }
-    if (!winner) return null;
-    return {
-      slot: winner.variant.slot.id,
-      pattern: winner.variant.pattern,
-      matchedDepth: winner.depth,
-      matchedPrefix: parts.slice(0, winner.depth).join('/'),
-      expectedNext: winner.variant.segments[winner.depth] ?? null,
-    };
-  }
-
-  /** The role of a file in its slot: the entry of `roles` whose file name (variables filled from the path, `*` a wildcard inside the name) matches the file's name. */
-  function roleOf(slot, bindings, p) {
-    const name = p.split('/').pop();
-    for (const [role, file] of Object.entries(slot.roles ?? {})) if (globExpression(fillVars(file, bindings)).test(name)) return role;
-    return null;
-  }
-
-  /**
-   * status: owned | forbidden (external slot) | not-enabled (opt-in slot the repository did not declare) | ambiguous
-   * (two slots of equal specificity; a manifest gap) | no-slot (code HFS_SLOT_UNDECLARED, with the nearest slot).
-   */
-  function classifyPath(input) {
-    const p = clean(input);
-    const { hit, ambiguous } = best(matches(p));
-    if (ambiguous.length) return { path: p, status: 'ambiguous', candidates: ambiguous };
-    if (!hit) return { path: p, status: 'no-slot', code: 'HFS_SLOT_UNDECLARED', nearest: nearest(p) };
-    const { slot, root, bindings } = hit;
-    const status = (slot.presence === 'forbidden' && 'forbidden') || (slotEnabled(slot) ? 'owned' : 'not-enabled');
-    const kind = kindOf(hit, p);
-    const role = roleOf(slot, bindings, p);
-    return { path: p, status, slot: slot.id, root, bindings, ...(kind ? { kind } : {}), ...(role ? { role } : {}), presence: slot.presence, tracking: slot.tracked, ...(status === 'forbidden' ? { goesTo: slot.goesTo } : {}) };
-  }
-
-  const slotOf = (p) => { const c = classifyPath(p); return c.slot ? byId.get(c.slot) : null; };
-
-  /** The owner unit of `p`: the most specific owner slot instance containing it (a slot's own root when it owns nothing). */
-  function ownerOf(input) {
-    const p = clean(input);
-    const { hit } = best(matches(p, (s) => s.owner === true));
-    return hit ? { slot: hit.slot.id, root: hit.root, bindings: hit.bindings } : null;
-  }
-
-  /** The tier of `p` in the direction matrix: its slot's tier, the owner's for an inheriting slot, none for an untiered one; null when no slot owns it. */
-  function tierOf(input) {
-    const c = classifyPath(input);
-    if (!c.slot) return null;
-    const tier = byId.get(c.slot).tier;
-    if (tier !== 'inherit') return tier;
-    const owner = ownerOf(input);
-    return owner ? byId.get(owner.slot).tier : 'none';
-  }
-
-  const layerIndex = (slot, root) => (slot.layers ? slot.layers.findIndex((layer) => root.split('/').includes(layer)) : -1);
-
-  function unownedPathProblem(from, to) {
-    for (const side of [from, to]) {
-      if (side.status === 'no-slot') return { allowed: false, reason: 'unowned', code: side.code, path: side.path, nearest: side.nearest };
-    }
-    return null;
-  }
-
-  function unavailableSlotProblem(from, to) {
-    for (const side of [from, to]) {
-      if (side.status !== 'owned') return { allowed: false, reason: `slot${side.status[0].toUpperCase()}${side.status.slice(1).replace(/-(.)/g, (_, c) => c.toUpperCase())}`, path: side.path, slot: side.slot };
-    }
-    return null;
-  }
-
-  function sameOwnerUnit(side, owner) {
-    return owner ? `${owner.slot}:${owner.root}` : `${side.slot}:${side.root}`;
-  }
-
-  function lowerLayerProblem(from, to, fromTier, toTier, fromOwner, toOwner) {
-    if (manifest.tiers[profile][fromTier].lowerLayerOnly && fromTier === toTier) {
-      const fromSlot = byId.get((fromOwner ?? from).slot);
-      const a = layerIndex(fromSlot, fromOwner?.root ?? from.root);
-      const b = layerIndex(byId.get((toOwner ?? to).slot), toOwner?.root ?? to.root);
-      if (a >= 0 && b >= 0 && b <= a) return { allowed: false, reason: 'layerOrder', fromLayer: fromSlot.layers[a], toLayer: fromSlot.layers[b] };
-    }
-    return null;
-  }
-
-  function privateEntryProblem(to, toOwner) {
-    if (toOwner && repo.kind !== RUNTIME_KIND) {
-      const relative = to.path === toOwner.root ? '' : to.path.slice(toOwner.root.length + 1);
-      const ownerSlot = byId.get(toOwner.slot);
-      const entry = isEntryFile(relative) || (byId.get(to.slot).entries ?? []).includes(to.path.slice(to.root.length + 1)) || (ownerSlot.tier === 'package' && relative === 'src/index.ts') || (ownerSlot.tier === 'app' && relative === 'app.module.ts');
-      if (!entry) return { allowed: false, reason: 'notPublicEntry', owner: toOwner.root, path: to.path };
-    }
-    return null;
-  }
-
-  /**
-   * Whether `fromPath` may import `toPath`: {allowed, reason, ...}. Reasons: sameOwner, untiered, crossApp,
-   * tierDirection, layerOrder, notPublicEntry, allowed, slotForbidden, slotNotEnabled, slotAmbiguous, and unowned (HFS_SLOT_UNDECLARED for the path no slot owns).
-   * Cycles are a graph property and belong to the architecture check, not to one edge.
-   */
-  function importAllowed(fromPath, toPath) {
-    const from = classifyPath(fromPath);
-    const to = classifyPath(toPath);
-    const unowned = unownedPathProblem(from, to);
-    if (unowned) return unowned;
-    const unavailable = unavailableSlotProblem(from, to);
-    if (unavailable) return unavailable;
-    const fromTier = tierOf(from.path);
-    const toTier = tierOf(to.path);
-    if (fromTier === 'none' || toTier === 'none') return { allowed: true, reason: 'untiered' };
-    if (from.bindings.app !== undefined && to.bindings.app !== undefined && from.bindings.app !== to.bindings.app)
-      return { allowed: false, reason: 'crossApp', from: from.bindings.app, to: to.bindings.app };
-    const fromOwner = ownerOf(from.path);
-    const toOwner = ownerOf(to.path);
-    if (sameOwnerUnit(from, fromOwner) === sameOwnerUnit(to, toOwner)) return { allowed: true, reason: 'sameOwner' };
-    if (!manifest.tiers[profile][fromTier]?.mayImport.includes(toTier)) return { allowed: false, reason: 'tierDirection', fromTier, toTier, mayImport: manifest.tiers[profile][fromTier]?.mayImport ?? [] };
-    const layerProblem = lowerLayerProblem(from, to, fromTier, toTier, fromOwner, toOwner);
-    if (layerProblem) return layerProblem;
-    // A runtime owner is imported file by file (crossOwner of knowledge/hfs/runtime-slots.yaml): no public entry.
-    const privateEntry = privateEntryProblem(to, toOwner);
-    if (privateEntry) return privateEntry;
-    return { allowed: true, reason: 'allowed', fromTier, toTier };
-  }
-
-  const fillVars = (text, bindings) => String(text).replace(VAR, (whole, name) => bindings[name] ?? whole);
-
-  /** The files and directories the instance holding `p` must contain (directories end with /); {path} entries are repo-relative. */
-  function requiredFiles(input) {
-    const c = classifyPath(input);
-    if (!c.slot) return [];
-    const slot = byId.get(c.slot);
-    return (slot.requires ?? []).map((entry) => {
-      const rooted = entry.startsWith('/');
-      const filled = fillVars(rooted ? entry.slice(1) : entry, c.bindings);
-      return rooted || !c.root ? filled : `${c.root}/${filled}`;
-    });
-  }
-
-  function growBindings(combos, name, values) {
-    const next = [];
-    for (const combo of combos) {
-      for (const value of values) next.push({ ...combo, [name]: value });
-    }
-    combos.splice(0, combos.length, ...next);
-  }
-
-  function appendRequiredVariantPaths(slot, variant, paths, expandApps) {
-    const names = [...new Set(varsOf(variant))];
-    const fixed = { ...slot.requiredInstances };
-    const open = names.filter((name) => name !== 'app' && !(name in fixed));
-    if (open.length) return;
-    const combos = [{}];
-    if (names.includes('app')) growBindings(combos, 'app', expandApps(slot).map((app) => app.name));
-    for (const [name, values] of Object.entries(fixed)) growBindings(combos, name, values);
-    const isInstance = names.length > 0;
-    for (const bindings of combos) {
-      const target = fillVars(variant, bindings);
-      paths.push({ slot: slot.id, path: target, via: isInstance ? 'instance' : 'slot' });
-      const root = target.endsWith('/') ? target.slice(0, -1) : path.posix.dirname(target);
-      for (const entry of slot.requires ?? []) {
-        const rooted = entry.startsWith('/');
-        const filled = fillVars(rooted ? entry.slice(1) : entry, bindings);
-        paths.push({ slot: slot.id, path: rooted || !root || root === '.' ? filled : `${root}/${filled}`, via: 'requires' });
-      }
-    }
-  }
-
-  function appendRequiredSlotPaths(slot, paths, minimums, expandApps) {
-    if (slot.presence !== 'required' || !slotEnabled(slot)) return;
-    if (slot.requiredWhen === 'connections' && !repo.connections.length) return;
-    if (slot.minInstances) minimums.push({ slot: slot.id, min: slot.minInstances, ...(slot.appKind ? { appKind: slot.appKind } : {}) });
-    for (const variant of braceVariants(slot.path)) appendRequiredVariantPaths(slot, variant, paths, expandApps);
-  }
-
-  function uniqueRequiredPaths(paths) {
-    const seen = new Set();
-    return paths.filter((entry) => {
-      const key = `${entry.slot}|${entry.path}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-  }
-
-  /**
-   * What the repository must contain, without walking it: {paths: [{slot, path, via}], minimums: [{slot, min}]}.
-   * via is slot (a fixed path), instance (a requiredInstances or app-kind root) or requires (a file an instance needs).
-   */
-  function requiredPaths() {
-    const paths = [];
-    const minimums = [];
-    const expandApps = (slot) => repo.apps.filter((a) => slot.appKind === undefined || a.kind === slot.appKind);
-    for (const slot of slots) appendRequiredSlotPaths(slot, paths, minimums, expandApps);
-    return { paths: uniqueRequiredPaths(paths), minimums };
-  }
-
+  const scope = { manifest, repo, profile, slots, byId: new Map(slots.map((s) => [s.id, s])), variants: slots.flatMap(variantsOf), appKind: new Map(repo.apps.map((a) => [a.name, a.kind])) };
+  const classifyPath = (input) => classifyIn(scope, input);
   /** tracked | ignored | external for the slot owning `p`, or null when no slot owns it. */
   const trackingOf = (p) => classifyPath(p).tracking ?? null;
-  /** True only for a path a slot owns and requires to be committed. */
-  const isTracked = (p) => trackingOf(p) === 'tracked';
-
   return Object.freeze({
     repo,
-    slot: (id) => byId.get(id) ?? null,
+    slot: (id) => scope.byId.get(id) ?? null,
     slots: () => slots,
-    slotEnabled,
+    slotEnabled: (slot) => slotEnabled(scope, slot),
     classifyPath,
-    slotOf,
-    ownerOf,
-    tierOf,
-    importAllowed,
-    requiredFiles,
-    requiredPaths,
+    slotOf: (p) => { const c = classifyPath(p); return c.slot ? scope.byId.get(c.slot) : null; },
+    ownerOf: (input) => ownerIn(scope, input),
+    tierOf: (input) => tierIn(scope, input),
+    importAllowed: (fromPath, toPath) => importAllowedIn(scope, fromPath, toPath),
+    requiredFiles: (input) => requiredFilesIn(scope, input),
+    requiredPaths: () => requiredPathsIn(scope),
     trackingOf,
-    isTracked,
+    /** True only for a path a slot owns and requires to be committed. */
+    isTracked: (p) => trackingOf(p) === 'tracked',
     ruleParams: () => ruleParams(manifest, profile, edition),
     allowedImports: (tier) => manifest.tiers[profile]?.[tier]?.mayImport ?? null,
   });
@@ -558,76 +235,7 @@ export function createSlotResolver(manifest, repo) {
   // side's connection with that provider: the root scope reads the union of the sides' connections.
   const root = createScopeResolver(manifest, { ...repo, connections: SIDES.flatMap((side) => repo.sides[side].connections) });
   const sides = Object.fromEntries(PROFILES.map((side) => [side, createScopeResolver(manifest, repo.sides[side])]));
-  const clean = cleanSlotPath;
-  /** { side, rest } when `p` lies below a side folder, else null. */
-  const split = (input) => {
-    const p = clean(input);
-    const slash = p.indexOf('/');
-    const head = slash < 0 ? p : p.slice(0, slash);
-    return PROFILES.includes(head) && slash > 0 ? { side: head, rest: p.slice(slash + 1) } : null;
-  };
-  const under = (side, rel) => (rel ? `${side}/${rel}` : side);
-  const prefixed = (side, c) => ({
-    ...c,
-    path: under(side, c.path),
-    side,
-    ...(c.root !== undefined ? { root: under(side, c.root) } : {}),
-    ...(c.nearest ? { nearest: { ...c.nearest, matchedPrefix: under(side, c.nearest.matchedPrefix), matchedDepth: c.nearest.matchedDepth + 1 } } : {}),
-  });
-  const classifyPath = (input) => { const at = split(input); return at ? prefixed(at.side, sides[at.side].classifyPath(at.rest)) : root.classifyPath(input); };
-  const ownerOf = (input) => {
-    const at = split(input);
-    if (!at) return root.ownerOf(input);
-    const owner = sides[at.side].ownerOf(at.rest);
-    return owner ? { ...owner, root: under(at.side, owner.root), side: at.side } : null;
-  };
-  const allSlots = [...new Map([...root.slots(), ...PROFILES.flatMap((side) => sides[side].slots())].map((s) => [s.id, s])).values()];
-  const byId = new Map(allSlots.map((s) => [s.id, s]));
-  /** Whether `toPath`, of the other side, lies below a path `fromSide` declares it reads. */
-  const reads = (fromSide, toPath) => repo.sides[fromSide].reads.some((read) => `${clean(toPath)}/`.startsWith(read));
-  return Object.freeze({
-    repo,
-    sides: Object.freeze(sides),
-    /** The side of a path (be, fe) or null for a root path. */
-    sideOf: (input) => split(input)?.side ?? null,
-    slot: (id) => byId.get(id) ?? null,
-    slots: () => allSlots,
-    slotEnabled: (slot) => (slot.profiles.includes(APP_SCOPE) ? root.slotEnabled(slot) : PROFILES.some((side) => slot.profiles.includes(side) && sides[side].slotEnabled(slot))),
-    classifyPath,
-    slotOf: (p) => { const c = classifyPath(p); return c.slot ? byId.get(c.slot) : null; },
-    ownerOf,
-    tierOf: (input) => { const at = split(input); return at ? sides[at.side].tierOf(at.rest) : root.tierOf(input); },
-    importAllowed(fromPath, toPath) {
-      const from = split(fromPath);
-      const to = split(toPath);
-      if (from && to && from.side !== to.side) {
-        return reads(from.side, toPath) ? { allowed: true, reason: 'sideRead', fromSide: from.side, toSide: to.side } : { allowed: false, reason: 'crossSide', fromSide: from.side, toSide: to.side, reads: repo.sides[from.side].reads };
-      }
-      // A side file may read an app-root path (supabase/types/) only through a declared read, exactly as it reads the other side.
-      if (from && !to) {
-        return reads(from.side, toPath) ? { allowed: true, reason: 'sideRead', fromSide: from.side, toSide: null } : { allowed: false, reason: 'crossSide', fromSide: from.side, toSide: null, reads: repo.sides[from.side].reads };
-      }
-      if (from && to) return sides[from.side].importAllowed(from.rest, to.rest);
-      return root.importAllowed(fromPath, toPath);
-    },
-    requiredFiles: (input) => { const at = split(input); return at ? sides[at.side].requiredFiles(at.rest).map((p) => under(at.side, p)) : root.requiredFiles(input); },
-    requiredPaths() {
-      const own = root.requiredPaths();
-      const paths = [...own.paths];
-      const minimums = [...own.minimums];
-      for (const side of PROFILES) {
-        const required = sides[side].requiredPaths();
-        paths.push(...required.paths.map((entry) => ({ ...entry, path: under(side, entry.path), side })));
-        minimums.push(...required.minimums.map((entry) => ({ ...entry, side })));
-      }
-      return { paths, minimums };
-    },
-    trackingOf: (p) => classifyPath(p).tracking ?? null,
-    isTracked: (p) => classifyPath(p).tracking === 'tracked',
-    // The root has no tier and no rule parameters of its own; each side has them (sides.<side>.ruleParams()).
-    ruleParams: () => null,
-    allowedImports: () => null,
-  });
+  return appResolver(repo, root, sides);
 }
 
 /** The rule parameters of one profile (be: infraOwners, suffixes, bannedSuffixes and the rest over the shared ruleParams.common fileLines and duplicateBlock; fe: common alone or with its overrides; runtime: ruleParams.runtime of a runtime manifest), as a frozen deep copy. Under `edition` lite the `lite` overrides of ruleParams.<profile> merge over the base (the `lite` key itself is never returned). */
