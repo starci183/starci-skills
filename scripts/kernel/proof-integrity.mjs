@@ -73,7 +73,7 @@ const UI_DIR = /^(\.starciwork\/features\/[^/]+\/ui\/[^/]+)\//;
 const CHECK_OP = /\.(?:verify|audit)$/;
 const PROVEN_OUTCOMES = new Set(['done', 'partial']);
 
-const slashed = (p) => String(p).replaceAll('\\', '/').replace(/^\.\//, '').replace(/\/+$/, '');
+const slashed = (p) => String(p).replaceAll('\\', '/').replace(/^\.\//, '').replace(/(?<!\/)\/+$/, '');
 const uniq = (values) => [...new Set(values.filter((v) => typeof v === 'string' && v))].sort(byCodeUnit);
 const emptyClaims = () => Object.fromEntries(CLAIM_KINDS.map((k) => [k, []]));
 const mergeClaims = (...all) => Object.fromEntries(CLAIM_KINDS.map((k) => [k, uniq(all.flatMap((c) => list(c?.[k])))]));
@@ -347,6 +347,48 @@ function provesDemand(artifact, demand, kind) {
     && !check.unavailable && !check.advisory && !check.peerBlocked && (!check.measured || kind === 'measurement'));
 }
 
+/** One evidence row as the coverage report shows it. */
+const evidenceView = (a) => ({ artifactId: a.artifactId, jobId: a.jobId, op: a.op, attempt: a.attempt, name: a.name, kind: a.kind, sha256: a.sha256, codeSha: a.codeSha, state: a.state, ...(a.changed.length ? { changed: a.changed } : undefined) });
+const obligationStatus = (backed) => {
+  if (!backed.length) return 'missing';
+  return backed.some((a) => a.state === 'fresh') ? 'proven' : 'stale';
+};
+const frStatus = (obligations, evidence) => {
+  if (obligations.some((o) => o.status === 'missing')) return 'missing';
+  if (obligations.some((o) => o.status === 'stale')) return 'stale';
+  if (obligations.length) return 'proven';
+  if (evidence.some((a) => a.state === 'fresh')) return 'proven';
+  return evidence.length ? 'stale' : 'missing';
+};
+/** One FR's coverage item: its record, the proof kinds it requires and the status of its evidence. */
+const frItemOf = ({ index, qualified }, id, fr, waived, counted) => {
+  if (qualified && !fr) throw new Error(`scoped FR ${id} has no readable canonical record`);
+  const evidence = index.get(itemKey('fr', id)) ?? [];
+  if (!qualified) return { kind: 'fr', id, must: Boolean(counted.length), ...(fr ? { requires: counted, record: fr.dir } : { record: null }),
+    ...(waived.length ? { notCounted: waived } : {}), status: statusOf(evidence), evidence: evidence.map(evidenceView) };
+  const obligations = counted.map((kind) => {
+    const backed = evidence.filter((a) => provesDemand(a, fr.demands[kind], kind));
+    return { kind, status: obligationStatus(backed), evidence: backed.map(evidenceView) };
+  });
+  return { kind: 'fr', id, must: Boolean(counted.length), requires: counted, record: fr.dir, status: frStatus(obligations, evidence), obligations,
+    evidence: evidence.map(evidenceView), ...(waived.length ? { notCounted: waived } : {}) };
+};
+
+/** Adds the applicable proof cases one ui record's brief names to `cases` (a failing brief is an entry of `errors`). */
+const collectBriefCases = ({ doc, dir, briefCases, cases, errors }) => {
+  try { for (const id of briefCases(doc, dir)) { if (!cases.has(id)) { cases.set(id, []); } cases.get(id).push(doc.id ?? dir); } }
+  catch (error) { errors.push({ record: dir, error: String(error?.message ?? error).slice(0, 200) }); }
+};
+
+/** Adds the shapes and applicable proof cases of every ui record directory to `shapes` and `cases` (a failing brief is an entry of `errors`). */
+const collectUiCoverage = ({ repo, uiDirs, briefCases, shapes, cases, errors }) => {
+  for (const dir of uiDirs) {
+    const doc = recordAt(repo, dir);
+    for (const s of list(doc?.ui?.shapes)) { if (s?.base && s?.state && SHAPE_ID.test(`${s.base}#${s.state}`)) shapes.add(`${s.base}#${s.state}`); }
+    if (doc && briefCases) collectBriefCases({ doc, dir, briefCases, cases, errors });
+  }
+};
+
 /**
  * starci kernel coverage: every FR, shape and applicable proof case of the workflow's scope with its evidence and status.
  * `briefCases(record)` returns the applicable "RULE-N case-N" ids of one ui record (scripts/work/ui/ui-proof-brief.mjs
@@ -362,39 +404,9 @@ export function coverageOf(db, workflowId, { repo, briefCases = null, artifacts 
   const shapes = new Set(scope.shapes);
   const cases = new Map();
   const errors = [];
-  for (const dir of scope.uiDirs) {
-    const doc = recordAt(repo, dir);
-    for (const s of list(doc?.ui?.shapes)) { if (s?.base && s?.state && SHAPE_ID.test(`${s.base}#${s.state}`)) shapes.add(`${s.base}#${s.state}`); }
-    if (doc && briefCases) {
-      try { for (const id of briefCases(doc, dir)) { if (!cases.has(id)) { cases.set(id, []); } cases.get(id).push(doc.id ?? dir); } }
-      catch (error) { errors.push({ record: dir, error: String(error?.message ?? error).slice(0, 200) }); }
-    }
-  }
-  const evidenceView = (a) => ({ artifactId: a.artifactId, jobId: a.jobId, op: a.op, attempt: a.attempt, name: a.name, kind: a.kind, sha256: a.sha256, codeSha: a.codeSha, state: a.state, ...(a.changed.length ? { changed: a.changed } : undefined) });
+  collectUiCoverage({ repo, uiDirs: scope.uiDirs, briefCases, shapes, cases, errors });
   const push = (kind, id, extra) => { const evidence = index.get(itemKey(kind, id)) ?? []; items.push({ kind, id, ...extra, status: statusOf(evidence), evidence: evidence.map(evidenceView) }); };
-  const obligationStatus = (backed) => {
-    if (!backed.length) return 'missing';
-    return backed.some((a) => a.state === 'fresh') ? 'proven' : 'stale';
-  };
-  const frStatus = (obligations, evidence) => {
-    if (obligations.some((o) => o.status === 'missing')) return 'missing';
-    if (obligations.some((o) => o.status === 'stale')) return 'stale';
-    if (obligations.length) return 'proven';
-    if (evidence.some((a) => a.state === 'fresh')) return 'proven';
-    return evidence.length ? 'stale' : 'missing';
-  };
-  const frItem = (id, fr, waived, counted) => {
-    if (qualified && !fr) throw new Error(`scoped FR ${id} has no readable canonical record`);
-    const evidence = index.get(itemKey('fr', id)) ?? [];
-    if (!qualified) return { kind: 'fr', id, must: Boolean(counted.length), ...(fr ? { requires: counted, record: fr.dir } : { record: null }),
-      ...(waived.length ? { notCounted: waived } : {}), status: statusOf(evidence), evidence: evidence.map(evidenceView) };
-    const obligations = counted.map((kind) => {
-      const backed = evidence.filter((a) => provesDemand(a, fr.demands[kind], kind));
-      return { kind, status: obligationStatus(backed), evidence: backed.map(evidenceView) };
-    });
-    return { kind: 'fr', id, must: Boolean(counted.length), requires: counted, record: fr.dir, status: frStatus(obligations, evidence), obligations,
-      evidence: evidence.map(evidenceView), ...(waived.length ? { notCounted: waived } : {}) };
-  };
+  const frItem = (id, fr, waived, counted) => frItemOf({ index, qualified }, id, fr, waived, counted);
   for (const id of scope.frs) {
     const fr = frRecords.get(id), waived = (fr?.required ?? []).filter((kind) => notCounted.includes(kind)), counted = (fr?.required ?? []).filter((kind) => !notCounted.includes(kind));
     items.push(frItem(id, fr, waived, counted));

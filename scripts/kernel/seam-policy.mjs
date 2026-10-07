@@ -42,7 +42,7 @@ const FINAL = SETTLED_JOB_LIST;
 const payloadOf = (row) => parseJson(row?.payload_json ?? '', {}) ?? {};
 const ownedOf = (payload) => (Array.isArray(payload?.owned_paths) ? payload.owned_paths : [])
   .map((p) => (typeof p === 'string' ? p : p?.path)).filter((p) => typeof p === 'string' && p.trim())
-  .map((p) => p.replaceAll('\\', '/').replace(/\/\*\*$/, '').replace(/\/+$/, ''));
+  .map((p) => p.replaceAll('\\', '/').replace(/\/\*\*$/, '').replace(/(?<!\/)\/+$/, ''));
 
 /**
  * modules/models/runtimes.yaml allocation.cutSeam: maxSiblingWaitMs (the longest a sibling ordinal waits on
@@ -95,8 +95,8 @@ export function seamStateOf(db, { workflowId, op, cutId, isOwnerWait = () => fal
  *   {hold: false, stub: {mode, seamJobId, seamStatus, since, interface?, reason}} - it runs now on a stub.
  */
 export function siblingSeamHold(db, job, { now = Date.now(), settings = null, isOwnerWait = () => false } = {}) {
-  const payload = payloadOf(job), cut = payload.cut;
-  if (cut?.id == null || !(Number(cut.ordinal) > 1)) return null;
+  const payload = payloadOf(job), cut = payload.cut, nonFirstCut = Number(cut?.ordinal) > 1;
+  if (cut?.id == null || !nonFirstCut) return null;
   const op = job.op_id ?? payload.opId;
   const workflowId = job.workflow_id ?? payload.hierarchy?.workflowId;
   const seam = seamStateOf(db, { workflowId, op, cutId: cut.id, isOwnerWait });
@@ -269,7 +269,7 @@ export function relocationOf(finding, relocations) {
   if (!Array.isArray(into) || !into.length) return null;
   const owner = rest[2].replace(/\.[^.]+$/, '');
   const home = rest.length > 3 ? `${src}/${rest.slice(0, 3).join('/')}` : moving;
-  const destinations = into.map((dest) => `${src}/${String(dest).replace(/\/+$/, '')}/${owner}`).filter((dest) => !pathsOverlap(dest, home));
+  const destinations = into.map((dest) => `${src}/${String(dest).replace(/(?<!\/)\/+$/, '')}/${owner}`).filter((dest) => !pathsOverlap(dest, home));
   return { ruleId: finding.ruleId, file: finding.file, moving, home, owner, destinations };
 }
 
@@ -454,7 +454,7 @@ export function canonSettleFollowUpOf({ payload, report, manifest = null, destin
   if (!report || !['blocked', 'failed'].includes(String(report.outcome))) return null;
   const owned = ownedOf(payload);
   const prefix = (owned.find((p) => /^[^/]+\/(?:apps|packages)\//.test(p)) ?? '').replace(/^([^/]+\/)(?:apps|packages)\/.*$/, '$1');
-  const norm = (p) => { const clean = String(p).replaceAll('\\', '/').replace(/\/+$/, ''); return prefix && !clean.startsWith(prefix) ? `${prefix}${clean}` : clean; };
+  const norm = (p) => { const clean = String(p).replaceAll('\\', '/').replace(/(?<!\/)\/+$/, ''); return prefix && !clean.startsWith(prefix) ? `${prefix}${clean}` : clean; };
   const siblings = (manifest?.ordinals ?? []).filter((o) => o.ordinal !== Number(payload.cut.ordinal) && o.status !== 'succeeded').flatMap((o) => o.paths);
   const grants = [], wire = [];
   const text = [report.summary, report.blocker?.detail, ...(report.checks ?? []).map((c) => c?.evidence)].join(' ');

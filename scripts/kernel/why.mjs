@@ -41,7 +41,9 @@ export function explainCode(code, catalog = loadCatalog()) {
 
 const clip = (s, n = 220) => clipLine(s, n);
 /** A Windows or POSIX absolute path shortened to its last three segments (the owner reads names, not temp roots). */
-const shortPaths = (s) => String(s ?? '').replaceAll(/(?:[A-Za-z]:)?[\\/](?:[^\s"'\\/:*?<>|]+[\\/])+([^\s"'\\/:*?<>|]+[\\/][^\s"'\\/:*?<>|]+[\\/][^\s"'\\/:*?<>|]+|[^\s"'\\/:*?<>|]+)/g, '…/$1').replaceAll('\\', '/');
+const PATH_SEGMENT = String.raw`[^\s"'\\/:*?<>|]+`;
+const SHORT_PATH = new RegExp(String.raw`(?:[A-Za-z]:)?[\\/](?:${PATH_SEGMENT}[\\/])+(${PATH_SEGMENT}[\\/]${PATH_SEGMENT}[\\/]${PATH_SEGMENT}|${PATH_SEGMENT})`, 'g');
+const shortPaths = (s) => String(s ?? '').replaceAll(SHORT_PATH, '…/$1').replaceAll('\\', '/');
 const BRACKET = /\[([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)\]/g;
 const BARE_CODE = /\b([A-Z][A-Z0-9]*_[A-Z0-9]+(?:_[A-Z0-9]+)*)\b/g;
 const uniq = (list) => [...new Set(list.filter((x) => typeof x === 'string' && x))];

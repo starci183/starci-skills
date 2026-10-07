@@ -60,7 +60,7 @@ const stripSide = (p) => { const u = unquoteGitPath(p.trim()); return u === '/de
 export function pathsOfDiffLine(line) {
   const rest = line.slice('diff --git '.length);
   if (rest.startsWith('"')) {
-    const m = /^("(?:[^"\\]|\\.)*")\s+(.*)$/.exec(rest);
+    const m = /^("(?:[^"\\]|\\.)*")\s+(?!\s)(.*)$/.exec(rest);
     if (m) return [stripSide(m[1]), stripSide(m[2])];
   }
   const half = (rest.length - 1) / 2;
@@ -185,7 +185,12 @@ function patchParser({ caps = diffCaps(), onLiteral = null } = {}) {
     if (onPendingNameLine(l)) return true;
     if (l.startsWith('index ')) { const m = /^index ([0-9a-f]+)\.\.([0-9a-f]+)/.exec(l); if (m) { blobs = [m[1], m[2]]; } return true; }
     if (l.startsWith('--- ')) { const a = stripSide(l.slice(4)); if (a) { pending.a = a; } return true; }
-    if (l.startsWith('+++ ')) { const b = stripSide(l.slice(4)); if (b) { pending.b = b; } else if (pending.status === 'D') { pending.b = null; } startFile(); return true; }
+    if (l.startsWith('+++ ')) {
+      const b = stripSide(l.slice(4));
+      if (b) { pending.b = b; } else if (pending.status === 'D') { pending.b = null; }
+      startFile();
+      return true;
+    }
     if (onPendingBinaryLine(l)) return true;
     if (/^(old|new) mode |^similarity index |^dissimilarity index /.test(l)) return true;
     if (!l.startsWith('@@')) return true;

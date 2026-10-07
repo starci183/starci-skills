@@ -43,7 +43,7 @@ import { jobResultSql } from '../machine/job-row.mjs';
 const UNTIL_TYPES = Object.freeze(['record', 'job', 'message', 'commit', 'incident', 'foundation', 'landed']);
 const repoMatches = (repoRoot, want) => {
   if (!repoRoot || !want) return false;
-  const norm = (p) => path.resolve(String(p)).replace(/[\\/]+$/, '').toLowerCase();
+  const norm = (p) => path.resolve(String(p)).replace(/(?<![\\/])[\\/]+$/, '').toLowerCase();
   return path.isAbsolute(want) ? norm(repoRoot) === norm(want) : path.basename(norm(repoRoot)) === String(want).toLowerCase();
 };
 export const UNTIL_FLAGS = Object.freeze(UNTIL_TYPES.map((type) => `until-${type}`));

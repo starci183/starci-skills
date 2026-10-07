@@ -32,6 +32,7 @@ import { kernelDecisionItems } from '../machine/reported-jobs.mjs';
 import { importsBrokenOf } from './status/imports.mjs';
 import { blockingDecisions, resolutionOf } from '../machine/decisions.mjs';
 import { ownerLanguage, translator } from '../lib/i18n.mjs';
+import { HOUR, etaOf, stallOf } from './progress-stall.mjs';
 import { MISSING_PATHS_RE, GRANT_NARROW_RE, TOOL_TIMEOUT_RE, TEST_GAP_RE, CHECKER_UNAVAILABLE_RE } from './rca-matchers.mjs';
 
 const unitSpecsOff = () => { try { return specsOf({ skillRoot }).unit === false; } catch { return false; } };
@@ -40,7 +41,6 @@ export const OPEN_JOB = Object.freeze(['queued', 'leased', 'running', 'reported'
 export const DECISION_KIND = 'kernel-decision';
 export const DECISION_RESULT_KIND = 'kernel-decision-result';
 export const GRAPH_EDIT_KIND = 'kernel-graph-edit';
-const HOUR = 3_600_000;
 const one = (s, n = 240) => clipLine(s, n);
 const parse = (s, d = {}) => parseJsonOr(s, d) ?? d;
 
@@ -137,33 +137,6 @@ function isPriority(workflowId, prio = priorities()) {
   if (w <= 1) return false;
   return Object.values(prio).every((p) => (p.weight ?? 1) <= w);
 }
-
-/** The stall reasons of one workflow and the earliest `since` they implicate. */
-const stallOf = ({ core, queuedReady, running, allowed, now, remaining, minRate, unitsPerHour, priority, lastDoneAt, quietSince, graceMs, unsettled, failedUnits, doneCount }) => {
-  const reasons = []; let since = null;
-  const readySince = (core.stuck ?? []).filter((s) => s.kind === 'queued-ready').map((s) => Number(s.since)).filter(Number.isFinite);
-  if (queuedReady > 0 && running < allowed) {
-    reasons.push(`under-dispatched: ${running} running of ${allowed} allowed with ${queuedReady} queued-ready`);
-    since = readySince.length ? Math.min(...readySince) : now;
-  }
-  if (remaining > 0 && minRate > 0 && unitsPerHour < minRate && now - quietSince >= graceMs) {
-    const lastAgo = lastDoneAt ? Math.round((now - lastDoneAt) / 60_000) + 'm ago' : 'never';
-    reasons.push(`slow: ${unitsPerHour} units/h < ${minRate}/h${priority ? ' (priority workflow)' : ''}, last unit ${lastAgo}`);
-    since = since == null ? quietSince : Math.min(since, quietSince);
-  }
-  if (unsettled.length) {
-    reasons.push(`needs-kernel-decision: ${unsettled.length} reported job(s) wait on the Kernel's settle decision (their slots stay held)`);
-    const oldest = Math.min(...unsettled.map((r) => Number(r.created_at))); since = since == null ? oldest : Math.min(since, oldest);
-  }
-  if (failedUnits > 0 && failedUnits >= doneCount && remaining > 0) reasons.push(`failing: ${failedUnits} unit(s) parked failed vs ${doneCount} done`);
-  return { reasons, since };
-};
-
-/** The ETA of the remaining units: {etaHours, eta} (0/now when nothing remains, null when the rate is dead). */
-const etaOf = (remaining, etaRate, now) => {
-  if (remaining === 0) { return { etaHours: 0, eta: new Date(now).toISOString() }; } if (etaRate <= 0) { return { etaHours: null, eta: null }; }
-  return { etaHours: Math.round(remaining / etaRate * 10) / 10, eta: new Date(now + remaining / etaRate * HOUR).toISOString() };
-};
 
 /**
  * The progress block of `starci kernel status`. Pure over its inputs: `jobs` (opJobsOf), `core` (the starci kernel status out: legs,
@@ -267,7 +240,7 @@ export function destinationsOf(report, ownedPaths = []) {
   const text = [report?.summary, report?.blocker?.detail, report?.rootCause?.claim].join(' ');
   const owned = ownedPaths.map((p) => String(p).replaceAll('\\', '/').replace(/^[^/]*\/(?=(?:apps|packages)\/)/, '')), out = new Set();
   for (const m of text.matchAll(PATH_RE)) {
-    const p = m[1].replace(/[.,)]+$/, '').replace(/\/+$/, '');
+    const p = m[1].replace(/(?<![.,)])[.,)]+$/, '').replace(/(?<!\/)\/+$/, '');
     if (p.includes('<') || p.includes('*') || owned.some((o) => p === o || p.startsWith(`${o}/`) || o.startsWith(`${p}/`))) continue;
     out.add(p);
   }
@@ -341,7 +314,12 @@ export function decisionsOf(db, workflowId) {
 const q = (s) => (/[\s,;"'[\]()]/.test(String(s)) ? `"${String(s).replaceAll('"', '\\"')}"` : String(s));
 const actionKey = (...parts) => parts.join(':'), reasonSuffixOf = (item) => item.reason ? ` [${item.reason}]` : '', openCountSuffixOf = (cluster) => cluster.open !== cluster.count ? ` (${cluster.open} open)` : '';
 const act = (key, tier, cause, unblocks, title, command, expected) => ({ key, tier, cause, unblocks, title, command, expected });
-const repointCommandOf = (files, nextUnits, api, base) => { if (!files.length) return `${api} status ${base} --json   (read importsBroken.brokenFiles, then: ${api} graph-edit ${base} --edit wire --op code.refactor --paths <them> --before <the next queued units> --decision <id>)`; const paths = q(files.slice(0, 60).join(',')); let before = ''; if (nextUnits.length) before = ` --before ${nextUnits.join(',')}`; return `${api} graph-edit ${base} --edit wire --op code.refactor --paths ${paths}${before} --decision <id>`; };
+const repointCommandOf = (files, nextUnits, api, base) => {
+  if (!files.length) return `${api} status ${base} --json   (read importsBroken.brokenFiles, then: ${api} graph-edit ${base} --edit wire --op code.refactor --paths <them> --before <the next queued units> --decision <id>)`;
+  const paths = q(files.slice(0, 60).join(','));
+  const before = nextUnits.length ? ` --before ${nextUnits.join(',')}` : '';
+  return `${api} graph-edit ${base} --edit wire --op code.refactor --paths ${paths}${before} --decision <id>`;
+};
 
 /** The settle verdict an unsettled report's outcome maps to for starci kernel settle --verdict. */
 const settleVerdictOf = (it) => {
@@ -408,6 +386,19 @@ const partialWorkActs = ({ c, us, lastFailedOf, N, api, base }) => {
     targets.map((u) => `${api} graph-edit ${base} --edit continue --job ${lastFailedOf(u).job_id}${c.destinations.length ? ' --add-paths ' + q(c.destinations.slice(0, 4).join(',')) : ''} --decision <id>`).join(' && '),
     'the preserved in-ceiling work counts toward the unit, the continuation starts from it')];
 };
+/** One continue/retry act for each settled failed unit whose report names destinations beyond the shared ones, or preserved work. */
+const failedUnitActs = ({ c, us, rows, shared, lastFailedOf, N, api, base }) => {
+  const acts = [];
+  for (const u of us.filter((u) => !u.open.length && lastFailedOf(u)).slice(0, N)) {
+    const r = rows.find((x) => x.unit === u.key); const kept = Boolean(r?.preserved);
+    const dest = (r?.destinations ?? []).filter((d) => !shared.includes(d)).slice(0, 4); if (!dest.length && !kept) continue;
+    acts.push(act(actionKey(kept ? 'continue' : 'retry', u.key), 'light', c.cause, 1,
+      `${kept ? 'continue' : 'retry'} ${u.key} with the destinations its report names${dest.length ? ' (' + dest.join(', ') + ')' : ''}`,
+      `${api} graph-edit ${base} --edit ${kept ? 'continue' : 'retry'} --job ${lastFailedOf(u).job_id}${dest.length ? ' --add-paths ' + q(dest.join(',')) : ''} --decision <id>`,
+      'the unit owns what its fix must touch; the api refuses the same failing shape and the paths of other workflows'));
+  }
+  return acts;
+};
 /** grant-too-narrow: ONE wire unit for the shared destinations, widen the queued units, retry or continue the failed. */
 const narrowActs = ({ c, us, rows, queuedOf, lastFailedOf, N, api, base }) => {
   const acts = [];
@@ -422,14 +413,7 @@ const narrowActs = ({ c, us, rows, queuedOf, lastFailedOf, N, api, base }) => {
     `widen ${widen.length} queued unit(s) to the destinations their reports name`,
     widen.map((u) => `${api} graph-edit ${base} --edit widen --job ${queuedOf(u)[0].job_id} --add-paths ${q(c.destinations.slice(0, 4).join(','))} --decision <id>`).join(' && '),
     'the unit may move its files into their canonical home (leases of other workflows are refused by the api)'));
-  for (const u of us.filter((u) => !u.open.length && lastFailedOf(u)).slice(0, N)) {
-    const r = rows.find((x) => x.unit === u.key); const kept = Boolean(r?.preserved);
-    const dest = (r?.destinations ?? []).filter((d) => !shared.includes(d)).slice(0, 4); if (!dest.length && !kept) continue;
-    acts.push(act(actionKey(kept ? 'continue' : 'retry', u.key), 'light', c.cause, 1,
-      `${kept ? 'continue' : 'retry'} ${u.key} with the destinations its report names${dest.length ? ' (' + dest.join(', ') + ')' : ''}`,
-      `${api} graph-edit ${base} --edit ${kept ? 'continue' : 'retry'} --job ${lastFailedOf(u).job_id}${dest.length ? ' --add-paths ' + q(dest.join(',')) : ''} --decision <id>`,
-      'the unit owns what its fix must touch; the api refuses the same failing shape and the paths of other workflows'));
-  }
+  acts.push(...failedUnitActs({ c, us, rows, shared, lastFailedOf, N, api, base }));
   return acts;
 };
 /** tool-timeout, or test-gap while unit specs are deferred: an op-override params edit covers either. */

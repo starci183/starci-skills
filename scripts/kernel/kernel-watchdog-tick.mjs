@@ -69,6 +69,14 @@ const queuedInputResult = (ctx) => {
     ...deliveryFieldsOf(proof), error: proof.ok ? null : (proof.sent?.error || proof.sendErrorCode || null) };
 };
 
+/** The tick result of one wake send: its proof, the action it implies and the delivery fields. */
+const wakeResultOf = ({ proof, workflowId, phase, terminal, stale, outputAgeMs, wakeActionOf, deliveryFieldsOf }) => ({
+  ok: proof.ok, workflowId, phase, terminal,
+  action: wakeActionOf(proof), ...stale, outputAgeMs, ...deliveryFieldsOf(proof),
+  ...(proof.shellPrompt ? { shellPrompt: proof.shellPrompt } : {}),
+  receipt: proof.sent?.receipt ?? null, error: proof.ok ? null : (proof.sent?.error || proof.sendErrorCode || null),
+});
+
 const idleTurnResult = (ctx) => {
   const { classified, status, repair, workflowId, phase, terminal, stale, outputAgeMs, liveness, lastOutputAt,
     dispatch, kernelWakeRefusedAt, replaceUnwritableKernel, kernelWakeFailures, wakeFailuresProveDead, replaceWakeDeadKernel,
@@ -89,12 +97,7 @@ const idleTurnResult = (ctx) => {
   if (proof.ok) recordKernelWoken(terminal, { delivery: proof.delivery ?? null, idleWakes: idle.wakes + 1 });
   if (!proof.ok && liveness.staleActive && wakeSendRefused(proof))
     return replaceUnwritableKernel({ phase, terminal, dispatch, stale, outputAgeMs, proof });
-  return {
-    ok: proof.ok, workflowId, phase, terminal,
-    action: wakeActionOf(proof), ...stale, outputAgeMs, ...deliveryFieldsOf(proof),
-    ...(proof.shellPrompt ? { shellPrompt: proof.shellPrompt } : {}),
-    receipt: proof.sent?.receipt ?? null, error: proof.ok ? null : (proof.sent?.error || proof.sendErrorCode || null),
-  };
+  return wakeResultOf({ proof, workflowId, phase, terminal, stale, outputAgeMs, wakeActionOf, deliveryFieldsOf });
 };
 
 export function createKernelTick(deps) {

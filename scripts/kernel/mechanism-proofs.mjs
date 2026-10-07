@@ -22,6 +22,8 @@ const refused = ({ status, code }, detail, findings = []) => ({ status, code, de
 const listed = (rows) => rows.map((f) => `${f.path ?? '-'}${f.line ? ':' + f.line : ''} ${f.rule ?? f.engine ?? ''} ${oneLine(f.message, 200)}`.trim());
 /** Whether the shared gate document measures the document profile. */
 export const isDocGate = (doc) => doc?.profile === DOC_PROFILE;
+/** Whether the run recorded no test or no file: a count that is absent or not above zero (a missing count counts as none). */
+const lacksRunCounts = (run) => { const hasTests = run.total > 0; const hasFiles = run.files > 0; return !hasTests || !hasFiles; };
 const nameOfDefect = (d) => oneLine(d?.id ?? d?.title ?? JSON.stringify(d), 160);
 
 /** The proof entries an op owes for this dispatch ([{proof, projects}]): op-gate.yaml opProofs, a `modes` entry kept only for its modes. */
@@ -72,7 +74,7 @@ export function judgeTestWorld(summary) {
   const run = summary.run;
   const runError = run?.error ? ` (${oneLine(run.error, 200)})` : '';
   const runDetail = run ? `the ${summary.project} run is not green: exit ${run.exit}, ${run.total} test(s), ${run.failed} failed, ${run.skipped} skipped${runError}` : 'the summary records no run';
-  if (!run || run.error || testRunCountsError(run) || run.exit !== 0 || !(run.total > 0) || !(run.files > 0) || run.failed > 0 || run.failedFiles > 0 || run.skipped > 0)
+  if (!run || run.error || testRunCountsError(run) || run.exit !== 0 || lacksRunCounts(run) || run.failed > 0 || run.failedFiles > 0 || run.skipped > 0)
     return refused({ status: 'red', code: 'op-test-world-run-red' }, runDetail,
       (run?.failures ?? []).map((f) => `${f.file} ${f.test}: ${oneLine(f.message, 160)}`));
   return pass();
@@ -83,7 +85,7 @@ export function judgeUnitRun(summary) {
   const run = summary.run;
   const runError = run?.error ? ` (${oneLine(run.error, 200)})` : '';
   const runDetail = run ? `the unit run is not green: exit ${run.exit}, ${run.total} test(s), ${run.failed} failed, ${run.skipped} skipped${runError}` : 'the summary records no run';
-  if (!run || run.error || testRunCountsError(run) || run.failed > 0 || run.failedFiles > 0 || run.skipped > 0 || !(run.total > 0) || !(run.files > 0))
+  if (!run || run.error || testRunCountsError(run) || run.failed > 0 || run.failedFiles > 0 || run.skipped > 0 || lacksRunCounts(run))
     return refused({ status: 'red', code: 'op-unit-run-red' }, runDetail,
       (run?.failures ?? []).map((f) => `${f.file} ${f.test}: ${oneLine(f.message, 160)}`));
   const findings = unitFindings(summary);

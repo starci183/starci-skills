@@ -8,6 +8,7 @@ import { inspectOwnerConfig } from '../../engine/config.mjs';
 import { loadAdapter } from '../agent/lib.mjs';
 import { resolveLaunchModel, providerAvailability, providerCircuitOf, orderByAvailability, loadModelRegistry } from '../agent/models.mjs';
 import { parseJson } from '../lib/json.mjs';
+import { eachInOrder } from '../lib/in-order.mjs';
 
 // The pool target a provider pin launches on: the registry.yaml pool owned by
 // that provider that carries the kernel-manager role (decide) first, else the
@@ -122,19 +123,23 @@ async function overrideRoute() {
   return single(await completeKernelRoute({ agent: agentOverride, routedBy: 'override', warnings: [] }));
 }
 
+/** The trimmed text of a non-blank string, else null. */
+const trimmedOrNull = (value) => (typeof value === 'string' && value.trim() ? value.trim() : null);
+
 function routingConfigOf(owner) {
   const kc = owner.config?.kernel;
   const cfgGroup = Array.isArray(kc?.group) ? kc.group.filter(m => typeof m?.agent === 'string' && m.agent.trim())
-    .map(m => ({ agent: m.agent.trim(), model: typeof m.model === 'string' && m.model.trim() ? m.model.trim() : null })) : null;
-  const cfgAgent = !cfgGroup && typeof kc?.agent === 'string' && kc.agent.trim() ? kc.agent.trim() : null;
-  const cfgModel = !cfgGroup && typeof kc?.model === 'string' && kc.model.trim() ? kc.model.trim() : null;
+    .map(m => ({ agent: m.agent.trim(), model: trimmedOrNull(m.model) })) : null;
+  const kernelAgent = trimmedOrNull(kc?.agent);
+  const cfgAgent = cfgGroup ? null : kernelAgent;
+  const cfgModel = cfgGroup ? null : trimmedOrNull(kc?.model);
   // The kernel's own effort pins; the global config effort is inherited only by a kernel agent whose card can pin one
   // (start.modelArgument: worker-start takes --effort only with --model) - Devin takes neither, so an inherited effort
   // must not refuse its launch.
   const pinsEffort = (agent) => { try { return loadAdapter(agent)?.card?.start?.modelArgument !== false; } catch { return true; } };
-  const kernelEffort = typeof kc?.effort === 'string' && kc.effort.trim() ? kc.effort.trim() : null;
-  const globalEffort = typeof owner.config?.effort === 'string' && owner.config.effort.trim() ? owner.config.effort.trim() : null;
-  const cfgEffort = kernelEffort ?? (typeof kc?.agent === 'string' && kc.agent.trim() && !pinsEffort(kc.agent.trim()) ? null : globalEffort);
+  const kernelEffort = trimmedOrNull(kc?.effort);
+  const globalEffort = trimmedOrNull(owner.config?.effort);
+  const cfgEffort = kernelEffort ?? (kernelAgent && !pinsEffort(kernelAgent) ? null : globalEffort);
   const config = owner.config || owner.error ? {
     file: owner.config ? ownerFileLabel(owner.file) : null,
     agent: cfgAgent, model: cfgModel, effort: cfgEffort,
@@ -151,17 +156,17 @@ function routingConfigOf(owner) {
 async function configuredGroupRoute(db, { cfgGroup, cfgEffort, config, warnings, warn }) {
   if (cfgGroup?.length) {
     const availability = new Map();
-    for (const m of cfgGroup) if (!availability.has(m.agent)) availability.set(m.agent, await memberAvailability(m.agent, db));
+    await eachInOrder(cfgGroup, async (m) => { if (!availability.has(m.agent)) availability.set(m.agent, await memberAvailability(m.agent, db)); });
     const { ordered, unavailable } = orderByAvailability(cfgGroup, m => availability.get(m.agent));
     for (const u of unavailable) warn(`kernel group member ${memberLabel(u)} skipped — ${u.availability.reason}`);
     const members = [];
-    for (const m of ordered) {
+    await eachInOrder(ordered, async (m) => {
       const modelAgent = m.model ? agentForModel(m.model) : null;
-      if (modelAgent && modelAgent !== m.agent) { warn(`kernel group member ${memberLabel(m)} skipped — model is owned by agent '${modelAgent}'`); continue; }
+      if (modelAgent && modelAgent !== m.agent) { warn(`kernel group member ${memberLabel(m)} skipped — model is owned by agent '${modelAgent}'`); return; }
       const completed = await completeKernelRoute({ agent: m.agent, routedBy: 'config', model: m.model, effort: cfgEffort, config, warnings, availability: m.availability });
-      if (completed.error) { warn(`kernel group member ${memberLabel(m)} skipped — ${completed.error}`); continue; }
+      if (completed.error) { warn(`kernel group member ${memberLabel(m)} skipped — ${completed.error}`); return; }
       members.push(completed);
-    }
+    });
     if (!members.length)
       return { agent: cfgGroup[0].agent, routedBy: 'config', model: cfgGroup[0].model, effort: cfgEffort, config, warnings,
         members: [], fallThrough: true, errorStep: 'kernel-group-unavailable',
@@ -216,22 +221,22 @@ async function routeModelGroup({ cfgEffort, config, warnings, warn }) {
     };
   }
   const members = [];
-  for (const c of [pick, ...(result.fallbackChain ?? [])]) {
+  await eachInOrder([pick, ...(result.fallbackChain ?? [])], async (c) => {
     const agent = agentForTarget(c.target);
-    if (!agent) { warn(`profile for runtimePool '${c.target}' declares no execution agent`); continue; }
+    if (!agent) { warn(`profile for runtimePool '${c.target}' declares no execution agent`); return; }
     // Unpinned routing never invents a hard-coded Devin fallback: only
     // route-model's own members, re-probed so a dead agent is never launched.
     const probe = await probeAgent(agent);
-    if (probe?.state === 'dead') { warn(`routed agent '${agent}' (${c.target}) probe is dead (${probe.detail ?? 'not authenticated'}) — taking the next member`); continue; }
+    if (probe?.state === 'dead') { warn(`routed agent '${agent}' (${c.target}) probe is dead (${probe.detail ?? 'not authenticated'}) — taking the next member`); return; }
     const completed = await completeKernelRoute({
       agent, routedBy: 'route-model', effort: cfgEffort, config, warnings,
       ...(result.availability?.[c.target] ? { availability: result.availability[c.target] } : {}),
       route: { kind: KERNEL_ROUTE.kind, risk: KERNEL_ROUTE.risk, target: c.target, model: c.model ?? null,
         profile: 'modules/models/registry.yaml', mode: c.mode ?? null, rule: result.rule ?? null },
     });
-    if (completed.error) { warn(completed.error); continue; }
+    if (completed.error) { warn(completed.error); return; }
     members.push(completed);
-  }
+  });
   if (!members.length)
     return { agent: null, routedBy: 'route-model', effort: cfgEffort, config, warnings,
       error: `no routed kernel member is launchable (${warnings.join('; ')})` };

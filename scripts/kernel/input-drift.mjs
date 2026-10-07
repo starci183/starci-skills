@@ -46,9 +46,14 @@ const lineageStateOf = (jobs, groupOf) => {
   return { newest, heldBy };
 };
 
+const settledAtOf = (row, payload) => {
+  if (!JOB_STATUSES.settled.includes(row.status)) return null;
+  return Number.isFinite(payload.settledAt) ? payload.settledAt : row.updated_at;
+};
+
 const writerOf = (row) => {
   const payload = parseJson(row.payload_json) ?? {};
-  const settledAt = JOB_STATUSES.settled.includes(row.status) ? (Number.isFinite(payload.settledAt) ? payload.settledAt : row.updated_at) : null;
+  const settledAt = settledAtOf(row, payload);
   return { jobId: row.job_id, workflowId: row.workflow_id, status: row.status, owned: ownedOf(payload), settledAt };
 };
 
@@ -77,6 +82,16 @@ const workChangeOf = (row, entry, cut, workDigest, attributed) => {
   return { row, cut, entry, base, thenFiles: recordedFiles, at, current, unexplained };
 };
 
+/** The source-law drift of one recorded entry (its current digest differs from the recorded one), or null. */
+const sourceDriftOf = ({ row, entry, cut, digest, admittedOf }) => {
+  if (inputKindOf(entry) !== 'source' || !isSourceLaw(entry.path)) return null;
+  const current = digest(entry.path);
+  if (current === entry.digest) return null;
+  const admitted = admittedOf();
+  return { jobId: row.job_id, op: row.op_id, attempt: row.attempt, ...(cut ? { cut } : {}), path: entry.path, kind: 'source',
+    recorded: entry.digest, current, admittedAt: Number.isFinite(admitted.at) ? admitted.at : null };
+};
+
 const measureCandidateInputs = ({ row, newest, groupOf, db, digest, workDigest, attributed }) => {
   if (!row.inputs || newest.get(groupOf(row)) !== row.job_id) return { sourceDrift: [], workChanged: [] };
   const record = parseJson(row.inputs);
@@ -86,18 +101,36 @@ const measureCandidateInputs = ({ row, newest, groupOf, db, digest, workDigest, 
   const admittedOf = () => (admitted ??= admittedContractOf(db, row));
   for (const entry of record.digests) {
     if (typeof entry?.path !== 'string' || typeof entry.digest !== 'string' || entry.path.includes('..')) continue;
-    if (inputKindOf(entry) === 'source' && isSourceLaw(entry.path)) {
-      const current = digest(entry.path);
-      if (current !== entry.digest) {
-        const admitted = admittedOf();
-        sourceDrift.push({ jobId: row.job_id, op: row.op_id, attempt: row.attempt, ...(cut ? { cut } : {}), path: entry.path, kind: 'source',
-          recorded: entry.digest, current, admittedAt: Number.isFinite(admitted.at) ? admitted.at : null });
-      }
-    }
+    const source = sourceDriftOf({ row, entry, cut, digest, admittedOf });
+    if (source) sourceDrift.push(source);
     const work = workChangeOf(row, entry, cut, workDigest, attributed);
     if (work) workChanged.push(work);
   }
   return { sourceDrift, workChanged };
+};
+
+/** Whether the change note is breaking for a reader of `readRev` (or, unversioned, written after `at`). */
+const noteBreaksReader = (note, readRev, at) => note?.kind === 'breaking'
+  && (readRev != null ? note.rev != null && note.rev > readRev : Number.isFinite(note.at) && note.at > at);
+
+/** Whether the owner's advisory declaration waives the change note. */
+const declarationWaivesNote = (declared, note) => declared?.reach === 'advisory'
+  && (declared.rev == null || note?.rev == null || note.rev <= declared.rev);
+
+/** The disposition of a file another workflow owns: a breaking declaration or note, or peer drift. */
+const foreignOwnedDisposition = ({ file, owner, note, readRev, view, writersAfter, recordedFiles, at, declarationsOf }) => {
+  const declared = ownerDeclarationFor(declarationsOf(), file, { owner: owner.workflowId, after: at });
+  const noteBreaking = noteBreaksReader(note, readRev, at);
+  const byNonOwner = writersAfter.length > 0 && !writersAfter.includes(owner.workflowId);
+  const alreadyRead = declared?.digests?.[file] != null && declared.digests[file] === recordedFiles[file];
+  const noteWaived = declarationWaivesNote(declared, note);
+  if (declared?.reach === 'follow-up' && !alreadyRead)
+    return { breaking: { file, owner: owner.workflowId, via: 'declaration', ...(declared.rev != null ? { rev: declared.rev } : {}), reason: declared.reason, at: declared.at } };
+  if (noteBreaking && !byNonOwner && !noteWaived && !alreadyRead)
+    return { breaking: { file, owner: owner.workflowId, via: 'change-note', rev: note.rev } };
+  let ignored = null;
+  if (noteBreaking && !alreadyRead) ignored = noteWaived ? 'owner-declared-advisory' : 'written-by-non-owner';
+  return { drift: { ...view, ...(ignored ? { breakingIgnored: ignored } : {}) } };
 };
 
 const workFileDisposition = ({ file, recordedFiles, at, base, workflowId, heads, ownerOf, peerWritersOf, textOf, declarationsOf }) => {
@@ -107,21 +140,38 @@ const workFileDisposition = ({ file, recordedFiles, at, base, workflowId, heads,
   const note = changeNoteOf(textOf(file));
   const readRev = base.revs?.[file] ?? null;
   const view = { file, owner: owner.workflowId, ownerBy: owner.by, writers: writersAfter, readRev, currentRev: note?.rev ?? null };
-  if (owner.workflowId && owner.workflowId !== workflowId) {
-    const declared = ownerDeclarationFor(declarationsOf(), file, { owner: owner.workflowId, after: at });
-    const noteBreaking = note?.kind === 'breaking' && (readRev != null ? note.rev != null && note.rev > readRev : Number.isFinite(note.at) && note.at > at);
-    const byNonOwner = writersAfter.length > 0 && !writersAfter.includes(owner.workflowId);
-    const alreadyRead = declared?.digests?.[file] != null && declared.digests[file] === recordedFiles[file];
-    const noteWaived = declared?.reach === 'advisory' && (declared.rev == null || note?.rev == null || note.rev <= declared.rev);
-    if (declared?.reach === 'follow-up' && !alreadyRead)
-      return { breaking: { file, owner: owner.workflowId, via: 'declaration', ...(declared.rev != null ? { rev: declared.rev } : {}), reason: declared.reason, at: declared.at } };
-    if (noteBreaking && !byNonOwner && !noteWaived && !alreadyRead)
-      return { breaking: { file, owner: owner.workflowId, via: 'change-note', rev: note.rev } };
-    let ignored = null;
-    if (noteBreaking && !alreadyRead) ignored = noteWaived ? 'owner-declared-advisory' : 'written-by-non-owner';
-    return { drift: { ...view, ...(ignored ? { breakingIgnored: ignored } : {}) } };
-  }
+  if (owner.workflowId && owner.workflowId !== workflowId)
+    return foreignOwnedDisposition({ file, owner, note, readRev, view, writersAfter, recordedFiles, at, declarationsOf });
   return writersAfter.length ? { drift: { ...view, foreignWrite: true } } : { owed: file };
+};
+
+/** The files' dispositions split into the owed files, the breaking entries and the peer-drift entries. */
+const partitionDispositions = (files, dispositionOf) => {
+  const owed = [], breaking = [], drift = [];
+  for (const file of files) {
+    const disposition = dispositionOf(file);
+    if (disposition?.owed) owed.push(disposition.owed);
+    if (disposition?.breaking) breaking.push(disposition.breaking);
+    if (disposition?.drift) drift.push(disposition.drift);
+  }
+  return { owed, breaking, drift };
+};
+
+/** The stale entry and peer-drift entry (each or null) one changed Work input yields. */
+const classifyWorkChange = (change, { heldBy, dispositionOf }) => {
+  const { row, cut, entry, base, thenFiles: recordedFiles, at, current, unexplained } = change;
+  const item = { jobId: row.job_id, op: row.op_id, attempt: row.attempt, ...(cut ? { cut } : {}), path: entry.path, kind: 'work' };
+  if (!recordedFiles) {
+    const held = heldBy(row.op_id, cut);
+    return { stale: { ...item, recorded: base.digest, current, changed: unexplained.slice(0, 10), ...(held ? { heldBy: held } : {}) }, peerDrift: null };
+  }
+  const { owed, breaking, drift } = partitionDispositions(unexplained, (file) => dispositionOf({ file, recordedFiles, at, base }));
+  const peerDrift = drift.length ? { ...item, files: drift } : null;
+  const changed = [...owed, ...breaking.map((b) => b.file)].toSorted(byCodeUnit);
+  if (!changed.length) return { stale: null, peerDrift };
+  const followUp = owed.length === 0;
+  const held = followUp ? null : heldBy(row.op_id, cut);
+  return { stale: { ...item, recorded: base.digest, current, changed: changed.slice(0, 10), ...(breaking.length ? { breaking } : {}), ...(followUp ? { followUp: true } : {}), ...(held ? { heldBy: held } : {}) }, peerDrift };
 };
 
 const classifyWorkChanges = ({ workChanged, db, repo, workDir, workflowId, ownership, committed, recordChanges, heldBy, peerWritersOf }) => {
@@ -139,29 +189,19 @@ const classifyWorkChanges = ({ workChanged, db, repo, workDir, workflowId, owner
     if (heads) return heads.get(file)?.toString('utf8') ?? null;
     try { return fs.readFileSync(path.join(repo, workDir, file.slice(WORK_PREFIX.length)), 'utf8'); } catch { return null; }
   };
+  const dispositionOf = (args) => workFileDisposition({ ...args, workflowId, heads, ownerOf, peerWritersOf, textOf, declarationsOf });
   for (const change of workChanged) {
-    const { row, cut, entry, base, thenFiles: recordedFiles, at, current, unexplained } = change;
-    const item = { jobId: row.job_id, op: row.op_id, attempt: row.attempt, ...(cut ? { cut } : {}), path: entry.path, kind: 'work' };
-    if (!recordedFiles) {
-      const held = heldBy(row.op_id, cut);
-      stale.push({ ...item, recorded: base.digest, current, changed: unexplained.slice(0, 10), ...(held ? { heldBy: held } : {}) });
-      continue;
-    }
-    const owed = [], breaking = [], drift = [];
-    for (const file of unexplained) {
-      const disposition = workFileDisposition({ file, recordedFiles, at, base, workflowId, heads, ownerOf, peerWritersOf, textOf, declarationsOf });
-      if (disposition?.owed) owed.push(disposition.owed);
-      if (disposition?.breaking) breaking.push(disposition.breaking);
-      if (disposition?.drift) drift.push(disposition.drift);
-    }
-    if (drift.length) peerDrift.push({ ...item, files: drift });
-    const changed = [...owed, ...breaking.map((b) => b.file)].toSorted(byCodeUnit);
-    if (!changed.length) continue;
-    const followUp = owed.length === 0;
-    const held = followUp ? null : heldBy(row.op_id, cut);
-    stale.push({ ...item, recorded: base.digest, current, changed: changed.slice(0, 10), ...(breaking.length ? { breaking } : {}), ...(followUp ? { followUp: true } : {}), ...(held ? { heldBy: held } : {}) });
+    const classified = classifyWorkChange(change, { heldBy, dispositionOf });
+    if (classified.peerDrift) peerDrift.push(classified.peerDrift);
+    if (classified.stale) stale.push(classified.stale);
   }
   return { stale, peerDrift };
+};
+
+/** -1, 1 or 0 by `<` and `>` (0 when the values are equal or unordered). */
+const compareValues = (a, b) => {
+  if (a < b) return -1;
+  return a > b ? 1 : 0;
 };
 
 export function inputDrift(db, workflowId, { root, repo = null, workDir = '.starciwork', digest, workDigest,
@@ -190,7 +230,7 @@ export function inputDrift(db, workflowId, { root, repo = null, workDir = '.star
     workChanged.push(...measured.workChanged);
   }
   const { stale, peerDrift } = classifyWorkChanges({ workChanged, db, repo, workDir, workflowId, ownership, committed, recordChanges, heldBy, peerWritersOf });
-  const order = (a, b) => (a.op < b.op ? -1 : a.op > b.op ? 1 : 0)
-    || (a.cut?.ordinal ?? 0) - (b.cut?.ordinal ?? 0) || a.attempt - b.attempt || (a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
+  const order = (a, b) => compareValues(a.op, b.op)
+    || (a.cut?.ordinal ?? 0) - (b.cut?.ordinal ?? 0) || a.attempt - b.attempt || compareValues(a.path, b.path);
   return { stale: stale.toSorted(order), sourceDrift: sourceDrift.toSorted(order), peerDrift: peerDrift.toSorted(order) };
 }

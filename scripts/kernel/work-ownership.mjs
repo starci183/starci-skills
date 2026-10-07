@@ -316,7 +316,9 @@ export function ownerDeclarationFor(changes, file, { owner, after }) {
   for (const row of changes) {
     if (!inside(file, normWork(row.record))) continue;
     for (const entry of row.history ?? []) {
-      if (entry?.by !== owner || !(Number(entry.at) > after)) continue;
+      if (entry?.by !== owner) continue;
+      const declaredLater = Number(entry.at) > after;
+      if (!declaredLater) continue;
       if (!best || entry.at > best.at) best = { ...entry, record: row.record };
     }
   }

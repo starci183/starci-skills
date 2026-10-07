@@ -20,6 +20,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { eachInOrder } from '../lib/in-order.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const VERBS_DIR = 'scripts/kernel/verbs';
@@ -78,8 +79,8 @@ async function loadStatus(root, name, out) {
 export async function loadApiExtensions({ root = path.resolve(HERE, '..', '..') } = {}) {
   const out = { verbs: new Map(), flags: new Set(readFlagsFile(path.join(root, FLAGS_FILE))), kernelOnly: new Set(), status: [], problems: [] };
   // Sequential on purpose: a later module's import sees the earlier modules' side effects in order.
-  for (const name of modulesIn(path.join(root, VERBS_DIR))) await loadVerb(root, name, out);
-  for (const name of modulesIn(path.join(root, STATUS_DIR))) await loadStatus(root, name, out);
+  await eachInOrder(modulesIn(path.join(root, VERBS_DIR)), (name) => loadVerb(root, name, out));
+  await eachInOrder(modulesIn(path.join(root, STATUS_DIR)), (name) => loadStatus(root, name, out));
   return out;
 }
 

@@ -59,7 +59,8 @@ function routeLineOf(route) {
 }
 
 function groupLineOf(route, memberLabel) {
-  if (!(route.members?.length > 1)) return '';
+  const grouped = route.members?.length > 1;
+  if (!grouped) return '';
   const members = route.members.map((member) => {
     const state = member.availability?.state;
     const stateLabel = state && state !== 'available' ? ` (${state})` : '';
