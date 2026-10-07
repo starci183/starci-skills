@@ -75,6 +75,16 @@ function declarationSchema() {
   if (!schemaCache) schemaCache = parseYaml(fs.readFileSync(path.join(skillRoot, 'modules', 'schemas', 'application-stacks.schema.yaml'), 'utf8'));
   return schemaCache;
 }
+const appendSchemaArrayErrors = (out, node, s, where, run) => { node.forEach((item, index) => { if (s.items) out.push(...run(item, s.items, `${where}[${index}]`)); }); };
+const appendSchemaObjectErrors = (out, node, s, where, run) => {
+  if (s.minProperties && Object.keys(node).length < s.minProperties) out.push({ path: where, message: 'object has too few properties' });
+  for (const key of s.required ?? []) if (!Object.hasOwn(node, key)) out.push({ path: where, message: `missing ${key}` });
+  for (const [key, child] of Object.entries(node)) {
+    if (Object.hasOwn(s.properties ?? {}, key)) out.push(...run(child, s.properties[key], `${where}.${key}`));
+    else if (s.additionalProperties === false) out.push({ path: `${where}.${key}`, message: 'unknown field' });
+    else if (plain(s.additionalProperties)) out.push(...run(child, s.additionalProperties, `${where}.${key}`));
+  }
+};
 /** The subset of JSON Schema the declaration schema uses: type, const, enum, pattern, minLength, required, properties, additionalProperties, items, minProperties, $ref, anyOf. */
 export function schemaErrors(value, shape, at = '$', root = declarationSchema()) {
   const resolve = (ref) => ref.slice(2).split('/').reduce((node, key) => node?.[key], root);
@@ -89,15 +99,9 @@ export function schemaErrors(value, shape, at = '$', root = declarationSchema())
     if (Object.hasOwn(s, 'const') && node !== s.const) out.push({ path: where, message: `must be ${JSON.stringify(s.const)}` });
     if (Array.isArray(s.enum) && !s.enum.includes(node)) out.push({ path: where, message: `must be one of ${s.enum.join(', ')}` });
     if (typeof node === 'string') out.push(...stringErrors(node, s, where));
-    if (Array.isArray(node)) { node.forEach((item, index) => { if (s.items) out.push(...run(item, s.items, `${where}[${index}]`)); }); return out; }
+    if (Array.isArray(node)) { appendSchemaArrayErrors(out, node, s, where, run); return out; }
     if (!plain(node)) return out;
-    if (s.minProperties && Object.keys(node).length < s.minProperties) out.push({ path: where, message: 'object has too few properties' });
-    for (const key of s.required ?? []) if (!Object.hasOwn(node, key)) out.push({ path: where, message: `missing ${key}` });
-    for (const [key, child] of Object.entries(node)) {
-      if (Object.hasOwn(s.properties ?? {}, key)) out.push(...run(child, s.properties[key], `${where}.${key}`));
-      else if (s.additionalProperties === false) out.push({ path: `${where}.${key}`, message: 'unknown field' });
-      else if (plain(s.additionalProperties)) out.push(...run(child, s.additionalProperties, `${where}.${key}`));
-    }
+    appendSchemaObjectErrors(out, node, s, where, run);
     return out;
   };
   const stringErrors = (node, s, where) => {
@@ -241,6 +245,7 @@ const checkServiceCredentials = (service, at, add, ambiguous) => {
   }
   return ids;
 };
+const checkCiNames = (service, id, at, ciUses, ciText, add) => { if (['required', 'optional-follow-up'].includes(service.ci.wiring) && ciUses[id].length) for (const item of [...service.ci.secrets, ...service.ci.vars]) if (item.name && !new RegExp(String.raw`\b${escapeRegExp(item.name)}\b`).test(ciText)) add('suspect', 'STACKS_CI_NAME_UNREFERENCED', `${at}.ci`, `${item.name} is declared for CI but no workflow reads it`); };
 const checkServiceCi = (service, id, at, { governing, name, ciUses, ciText, add, ambiguous }) => {
   const ids = checkServiceCredentials(service, at, add, ambiguous);
   for (const secret of service.ci.secrets)
@@ -254,12 +259,20 @@ const checkServiceCi = (service, id, at, { governing, name, ciUses, ciText, add,
   const servesThisRepository = !governing || service.projects.some((project) => project.repository === name);
   if (service.ci.wiring === 'required' && !ciUses[id].length && SERVICE_CATALOG[id].ci.length && servesThisRepository)
     add('suspect', 'STACKS_CI_UNUSED', `${at}.ci`, 'ci.wiring required, but no workflow calls the service');
-  if (['required', 'optional-follow-up'].includes(service.ci.wiring) && ciUses[id].length)
-    for (const item of [...service.ci.secrets, ...service.ci.vars])
-      if (item.name && !new RegExp(String.raw`\b${escapeRegExp(item.name)}\b`).test(ciText))
-        add('suspect', 'STACKS_CI_NAME_UNREFERENCED', `${at}.ci`, `${item.name} is declared for CI but no workflow reads it`);
+  checkCiNames(service, id, at, ciUses, ciText, add);
   if (ciUses[id].length && service.projects.length && !service.projects.some((project) => project.repository === name) && !governing)
     add('refuse', 'STACKS_PROJECT_MISSING', `${at}.projects`, `the workflows call ${id} but no project entry names repository ${name}`);
+};
+const checkDisabledService = (service, id, at, ciUses, ambiguous, add) => { if (service.mode !== 'disabled') return false; if (!service.reason) ambiguous('a disabled service states its reason'); if (ciUses[id].length) add('refuse', 'STACKS_CI_CONTRADICTION', at, `declared disabled, but ${ciUses[id].join(', ')} call it`); return true; };
+const checkEnabledService = (service, id, at, { governing, name, ciUses, ciText, add }, ambiguous) => {
+  if (service.mode === 'local') checkLocalStack(service, at, add, ambiguous);
+  if (service.mode === 'hosted' && !service.host.public && !service.host.fromCredential) ambiguous('a hosted service names host.public, or host.fromCredential when the endpoint travels inside a credential');
+  if (ciUses[id].length && service.ci.wiring !== 'not-used' && !service.host.public) ambiguous('GitHub CI reaches a service only through host.public; name it');
+  if (!service.auth) ambiguous('auth is token, oidc, github-token or none');
+  if (service.auth === 'token' && !service.credentials.length) ambiguous('auth token names at least one credential in custody');
+  if (service.host.fromCredential && !service.credentials.some((credential) => credential.id === service.host.fromCredential)) ambiguous(`host.fromCredential names ${service.host.fromCredential}, which is not one of its credentials`);
+  if (!service.projects.length) ambiguous('an enabled service lists the project key of every repository it serves');
+  checkServiceCi(service, id, at, { governing, name, ciUses, ciText, add, ambiguous });
 };
 const checkService = (id, entry, { schema, declFile, declaration, governing, name, ciUses, ciText, normalized, add }) => {
   if (!Object.hasOwn(SERVICE_CATALOG, id)) {
@@ -274,22 +287,8 @@ const checkService = (id, entry, { schema, declFile, declaration, governing, nam
   const ambiguous = (message) => add('refuse', 'STACKS_SERVICE_AMBIGUOUS', at, message);
   if (service.provider && !SERVICE_CATALOG[id].providers.includes(service.provider))
     add('refuse', 'STACKS_PROVIDER_UNKNOWN', `${at}.provider`, `${service.provider} is not a ${id} provider (${SERVICE_CATALOG[id].providers.join(', ')})`);
-  if (service.mode === 'disabled') {
-    if (!service.reason) ambiguous('a disabled service states its reason');
-    if (ciUses[id].length) add('refuse', 'STACKS_CI_CONTRADICTION', at, `declared disabled, but ${ciUses[id].join(', ')} call it`);
-    return;
-  }
-  if (service.mode === 'local') checkLocalStack(service, at, add, ambiguous);
-  if (service.mode === 'hosted' && !service.host.public && !service.host.fromCredential)
-    ambiguous('a hosted service names host.public, or host.fromCredential when the endpoint travels inside a credential');
-  if (ciUses[id].length && service.ci.wiring !== 'not-used' && !service.host.public)
-    ambiguous('GitHub CI reaches a service only through host.public; name it');
-  if (!service.auth) ambiguous('auth is token, oidc, github-token or none');
-  if (service.auth === 'token' && !service.credentials.length) ambiguous('auth token names at least one credential in custody');
-  if (service.host.fromCredential && !service.credentials.some((credential) => credential.id === service.host.fromCredential))
-    ambiguous(`host.fromCredential names ${service.host.fromCredential}, which is not one of its credentials`);
-  if (!service.projects.length) ambiguous('an enabled service lists the project key of every repository it serves');
-  checkServiceCi(service, id, at, { governing, name, ciUses, ciText, add, ambiguous });
+  if (checkDisabledService(service, id, at, ciUses, ambiguous, add)) return;
+  checkEnabledService(service, id, at, { governing, name, ciUses, ciText, add }, ambiguous);
 };
 const checkUndeclared = ({ repo, ciUses, normalized, services, declFile, add }) => {
   for (const [id, files] of Object.entries(ciUses)) {
@@ -301,6 +300,7 @@ const checkUndeclared = ({ repo, ciUses, normalized, services, declFile, add }) 
       `${files.join(', ')} call ${id}, which the declaration does not state${followUp}`);
   }
 };
+const checkQualityGate = (sonar, normalized, declFile, add) => { if (!sonar || sonar.mode === 'disabled') return; const gateName = loadSonarGate().gate.name; if (sonar.qualityGate !== gateName) add(normalized.sonar ? 'refuse' : 'suspect', 'STACKS_QUALITY_GATE_DRIFT', `${declFile}#services.sonar.qualityGate`, `services.sonar.qualityGate is ${sonar.qualityGate ?? 'absent'}; every product names the one gate ${gateName} (knowledge/sonar-gate.yaml owns its thresholds)`); };
 // Sonar settings the repository carries must agree with the declaration, and every repository names the one quality gate.
 const checkSonarDrift = ({ repo, name, normalized, services, declFile, add }) => {
   const sonar = normalized.sonar ?? (services ? null : resolveStackService(repo, 'sonar'));
@@ -313,11 +313,7 @@ const checkSonarDrift = ({ repo, name, normalized, services, declFile, add }) =>
       add('suspect', 'STACKS_HOST_DRIFT', 'sonar-project.properties', `sonar.host.url ${props['sonar.host.url']} but the declaration's public host is ${sonar.host.public}`);
   }
   // The one quality gate (knowledge/sonar-gate.yaml): a repository names it, never its own thresholds.
-  if (sonar && sonar.mode !== 'disabled') {
-    const gateName = loadSonarGate().gate.name;
-    if (sonar.qualityGate !== gateName)
-      add(normalized.sonar ? 'refuse' : 'suspect', 'STACKS_QUALITY_GATE_DRIFT', `${declFile}#services.sonar.qualityGate`, `services.sonar.qualityGate is ${sonar.qualityGate ?? 'absent'}; every product names the one gate ${gateName} (knowledge/sonar-gate.yaml owns its thresholds)`);
-  }
+  checkQualityGate(sonar, normalized, declFile, add);
 };
 const checkTrackedCustody = ({ repo, root, add }) => {
   const tracked = git(lsFiles, repo, ['--', root]);
@@ -387,6 +383,27 @@ const buildResult = ({ repo, name, newRepo, declaration, governing, normalized, 
     ...(needsFollowUp ? { followUp: { ...FOLLOW_UP, ...(isFile(path.join(skillRoot, STACK_DECLARATION_TEMPLATE)) ? { fixture: STACK_DECLARATION_TEMPLATE } : {}) } } : {}),
   };
 };
+const declarationView = (own, governing, missingLevel, shown, add) => {
+  const declaration = own.missing ? governing : own;
+  if (own.missing && !governing) add(missingLevel, 'STACKS_DECLARATION_MISSING', `.starcistacks/${DECLARATION}`, `no stack declaration (.starcistacks/${DECLARATION}); the services this repository's CI uses are undeclared - follow-up: ${FOLLOW_UP.op} mode stacks`);
+  if (declaration?.error) add('refuse', 'STACKS_DECLARATION_INVALID', shown(declaration.file), declaration.error);
+  if (declaration?.doc && declaration.doc.schema !== DECLARATION_SCHEMA) add('refuse', 'STACKS_DECLARATION_INVALID', shown(declaration.file), `schema must be ${DECLARATION_SCHEMA}`);
+  const doc = declaration?.doc ?? null, services = plain(doc?.services) ? doc.services : null;
+  const declFile = declaration?.file ? shown(declaration.file) : `.starcistacks/${DECLARATION}`;
+  if (doc && !Object.hasOwn(doc, 'services')) add(missingLevel, 'STACKS_SERVICES_MISSING', declFile, `the declaration has no services block; declare sonar and every other delivery/quality service the repository uses - follow-up: ${FOLLOW_UP.op} mode stacks`);
+  return { declaration, services, declFile };
+};
+const checkDeclaredServices = ({ services, declaration, governing, name, ciUses, ciText, declFile, normalized, add }) => {
+  if (!services) return;
+  const schema = declarationSchema(), ctx = { schema, declFile, declaration, governing, name, ciUses, ciText, normalized, add };
+  for (const [id, entry] of Object.entries(services)) checkService(id, entry, ctx);
+};
+const checkDeclarationIgnore = (own, repo, shown, add) => {
+  if (!own.missing && own.file) {
+    const ignored = git(checkIgnore, repo, ['-q', '--', slash(path.relative(repo, own.file))]);
+    if (ignored?.status === 0) add('suspect', 'STACKS_DECLARATION_IGNORED', shown(own.file), `the ignore rules hide the declaration; re-include it (!${slash(path.relative(repo, own.file))}) so every machine reads the same services`);
+  }
+};
 /**
  * The whole check for one repository. `newRepo`: the leg creates this repository, so what it lacks is
  * refused under the current declaration and custody rules.
@@ -397,37 +414,19 @@ export function checkStarciStacks(repoRoot, { newRepo = false } = {}) {
   const findings = [];
   const add = (level, code, file, message) => findings.push({ level, code, file: slash(file), message });
   const missingLevel = newRepo ? 'refuse' : 'suspect', own = findStackDeclaration(repo);
-  const governing = own.missing ? governingDeclaration(repo) : null, declaration = own.missing ? governing : own;
+  const governing = own.missing ? governingDeclaration(repo) : null;
   const shown = (file) => slash(path.relative(repo, file)) || '.';
-  if (own.missing && !governing) {
-    add(missingLevel, 'STACKS_DECLARATION_MISSING', `.starcistacks/${DECLARATION}`,
-      `no stack declaration (.starcistacks/${DECLARATION}); the services this repository's CI uses are undeclared - follow-up: ${FOLLOW_UP.op} mode stacks`);
-  }
-  if (declaration?.error) add('refuse', 'STACKS_DECLARATION_INVALID', shown(declaration.file), declaration.error);
-  if (declaration?.doc && declaration.doc.schema !== DECLARATION_SCHEMA)
-    add('refuse', 'STACKS_DECLARATION_INVALID', shown(declaration.file), `schema must be ${DECLARATION_SCHEMA}`);
-  const doc = declaration?.doc ?? null, services = plain(doc?.services) ? doc.services : null;
-  const declFile = declaration?.file ? shown(declaration.file) : `.starcistacks/${DECLARATION}`;
-  if (doc && !Object.hasOwn(doc, 'services'))
-    add(missingLevel, 'STACKS_SERVICES_MISSING', declFile, `the declaration has no services block; declare sonar and every other delivery/quality service the repository uses - follow-up: ${FOLLOW_UP.op} mode stacks`);
+  const { declaration, services, declFile } = declarationView(own, governing, missingLevel, shown, add);
   // CI evidence: which services the workflows call, and which secret/variable names they read.
   const workflows = workflowTexts(repo);
   const ciText = workflows.map((workflow) => workflow.text).join('\n');
   const ciUses = Object.fromEntries(Object.entries(SERVICE_CATALOG).map(([id, entry]) => [id, workflows.filter((workflow) => entry.ci.some((re) => re.test(workflow.text))).map((workflow) => workflow.file)]));
   const normalized = {};
-  if (services) {
-    const schema = declarationSchema();
-    const ctx = { schema, declFile, declaration, governing, name, ciUses, ciText, normalized, add };
-    for (const [id, entry] of Object.entries(services)) checkService(id, entry, ctx);
-  }
+  checkDeclaredServices({ services, declaration, governing, name, ciUses, ciText, declFile, normalized, add });
   checkUndeclared({ repo, ciUses, normalized, services, declFile, add });
   checkSonarDrift({ repo, name, normalized, services, declFile, add });
   checkCustodyLayout({ repo, own, add });
-  if (!own.missing && own.file) {
-    const ignored = git(checkIgnore, repo, ['-q', '--', slash(path.relative(repo, own.file))]);
-    if (ignored?.status === 0)
-      add('suspect', 'STACKS_DECLARATION_IGNORED', shown(own.file), `the ignore rules hide the declaration; re-include it (!${slash(path.relative(repo, own.file))}) so every machine reads the same services`);
-  }
+  checkDeclarationIgnore(own, repo, shown, add);
   return buildResult({ repo, name, newRepo, declaration, governing, normalized, findings });
 }
 /** A report-safe view: custody as presence, never a value. */
