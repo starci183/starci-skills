@@ -57,6 +57,24 @@ export function moduleStamps(files, { stat = fs.statSync } = {}) {
   return out;
 }
 
+function changedHead(baseline, current, headPaths, diff) {
+  if (baseline.head == null) { baseline.head = current; return []; }
+  if (current == null || current === baseline.head) return [];
+  const touched = headPaths ? diff(baseline.head, current) : null;
+  if (headPaths && Array.isArray(touched) && !touched.length) { baseline.head = current; return []; }
+  return [{ kind: 'head', from: baseline.head, to: current, ...(touched ? { files: touched.length } : {}) }];
+}
+
+function changedStamps(baseline, seen) {
+  const changes = [];
+  for (const [file, mtime] of Object.entries(seen)) {
+    const before = baseline[file];
+    if (before === undefined) { baseline[file] = mtime; continue; }
+    if (mtime !== before) changes.push({ kind: 'mtime', file, from: before, to: mtime });
+  }
+  return changes;
+}
+
 /**
  * The per-tick reload check. `head` and `stamps` are the seams (a spec passes a fake git and fake mtimes),
  * `now` the clock, `lastReloadAt` the time of the reload that started this process (RELOAD_ENV.reloadedAt), if any.
@@ -70,22 +88,11 @@ export function createReloadWatch({ root = null, files = [], head = () => runtim
   const baseline = { head: head(), stamps: stamps() };
   let last = Number.isFinite(lastReloadAt) ? lastReloadAt : null;
   const check = () => {
-    const changes = [];
     const current = head();
-    if (baseline.head == null) baseline.head = current;
-    else if (current != null && current !== baseline.head) {
-      // MB-01: with headPaths, a new HEAD that touches none of them is no change (a land of docs or product contracts
-      // never re-execs the loop); the baseline moves on so the next check diffs from here.
-      const touched = headPaths ? diff(baseline.head, current) : null;
-      if (headPaths && Array.isArray(touched) && !touched.length) baseline.head = current;
-      else changes.push({ kind: 'head', from: baseline.head, to: current, ...(touched ? { files: touched.length } : {}) });
-    }
+    const headChange = changedHead(baseline, current, headPaths, diff);
     const seen = stamps();
-    for (const [file, mtime] of Object.entries(seen)) {
-      const before = baseline.stamps[file];
-      if (before === undefined) { baseline.stamps[file] = mtime; continue; }
-      if (mtime !== before) changes.push({ kind: 'mtime', file, from: before, to: mtime });
-    }
+    // MB-01: with headPaths, a new HEAD that touches none of them moves the baseline without re-execing the loop.
+    const changes = [...headChange, ...changedStamps(baseline.stamps, seen)];
     if (!changes.length) return { reload: false, reason: null, changes };
     const reason = changes.map((c) => (c.kind === 'head' ? `runtime HEAD ${String(c.from).slice(0, 9)} -> ${String(c.to).slice(0, 9)}` : `${c.file} changed`)).join('; ');
     const at = now();

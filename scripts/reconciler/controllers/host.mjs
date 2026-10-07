@@ -103,14 +103,13 @@ export function goalProblem(markdown, refusal) {
   if (markdown == null || !String(markdown).trim()) return 'goal-text-missing';
   return refusal(markdown) ? 'goal-text-unresolved' : null;
 }
-
 const normRepo = (p) => pathKey(p, { fold: true });
 const argOf = (cmd, name) => {
   const m = new RegExp(String.raw`(?:^|\s)--${name}(?:=|\s+)(?:"([^"]*)"|'([^']*)'|(\S+))`).exec(String(cmd ?? ''));
   return m ? (m[1] ?? m[2] ?? m[3]) : null;
 };
-const RUNTIME_LOOP = /(?:[\\/](watchdog|start-workflow|serve-ask)\.mjs["']?(?=\s|$)|(?:^|\s)starci\s+workflow\s+(start)(?=\s|$))/i;
-
+const RUNTIME_SCRIPT = /[\\/](watchdog|start-workflow|serve-ask)\.mjs["']?(?=\s|$)/i, RUNTIME_COMMAND = /(?:^|\s)starci\s+workflow\s+(start)(?=\s|$)/i;
+const runtimeLoopOf = (commandLine) => { const script = RUNTIME_SCRIPT.exec(commandLine), command = RUNTIME_COMMAND.exec(commandLine); if (!script && !command) return null; if (script && (!command || script.index <= command.index)) return { script: script[1], command: null }; return { script: null, command: command[1] }; };
 /**
  * Orphan runtime loops: watchdog.mjs / start-workflow.mjs / serve-ask.mjs or `starci workflow start`, whose --repo no managed ledger owns and whose workflow no managed ledger runs, older than
  * minAgeMs. A process with no --repo (the
@@ -121,15 +120,15 @@ export function findOrphans(procs, { knownRepos, runningWorkflows, now, minAgeMs
   const out = [];
   for (const p of procs ?? []) {
     const cmd = String(p?.cmd ?? '');
-    const m = RUNTIME_LOOP.exec(cmd);
-    if (!m || exclude.includes(p.pid)) continue;
+    const loop = runtimeLoopOf(cmd);
+    if (!loop || exclude.includes(p.pid)) continue;
     const repo = argOf(cmd, 'repo');
     if (!repo || known.has(normRepo(repo))) continue;
     const workflowId = argOf(cmd, 'workflow') ?? argOf(cmd, 'goal');
     if (workflowId && runningWorkflows.has(workflowId)) continue;
     const ageMs = p.created ? now - p.created : 0;
     if (!p.created || ageMs < minAgeMs) continue;
-    out.push({ pid: p.pid, script: m[1] ? `${m[1]}.mjs` : `starci workflow ${m[2]}`, repo, workflowId, ageMs, cmd: cmd.slice(0, 200) });
+    out.push({ pid: p.pid, script: loop.script ? `${loop.script}.mjs` : `starci workflow ${loop.command}`, repo, workflowId, ageMs, cmd: cmd.slice(0, 200) });
   }
   return out;
 }

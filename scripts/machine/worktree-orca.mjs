@@ -16,14 +16,12 @@ import { ORCA_KINDS } from '../lib/worktree-kinds.mjs';
 import { runtimeStampOf } from '../lib/orca-orphans.mjs';
 import { posixPath } from '../lib/path-key.mjs';
 import { worktreeSettings, withRegistry, claimWorktree, pendingPathOf, releaseOrcaSlot, sameTree, isGone, markRemoved } from './worktree-registry.mjs';
-import { mainRootOf, registeredAt, preserveWork, mainCheckoutGuard, mainCheckoutDamage } from './worktree-git.mjs';
+import { mainRootOf, registeredAt, preserveWork, mainCheckoutGuard, mainCheckoutDamage, deleteScratchBranch } from './worktree-git.mjs';
 import { worktreeCreate } from '../api/orca/worktree-create.mjs';
 import { worktreeRm } from '../api/orca/worktree-rm.mjs';
 import { worktreePs } from '../api/orca/worktree-ps.mjs';
 import { repoAdd } from '../api/orca/repo-add.mjs';
 import { removeLinksUnder } from '../api/fs/remove-links-under.mjs';
-import { revParse } from '../api/git/rev-parse.mjs';
-import { branchDelete } from '../api/git/branch-delete.mjs';
 
 /**
  * The Orca worktree calls the runtime makes, as one client object: createOrcaWorktree and removeOrcaWorktree take it as
@@ -112,25 +110,18 @@ export function createOrcaWorktree({ repoRoot, kind, name, base, setup = 'skip',
   return { ok: true, id: w.id, path: path.resolve(w.path), branch: w.branch ?? null, head: w.head ?? null };
 }
 
-/**
- * Remove a worktree Orca made (scripts/kernel/workflow-worktree.mjs releaseWorkflowWorktree, the critic, the GC).
- * preserve: {name} -> preserveWork first (a failure keeps the tree). Then every link in the tree removed as a link and
- * ZERO asserted (a stuck link keeps the tree: link-stuck), `orca worktree rm --worktree id:<orcaId> --force`, the main
- * checkout asserted untouched (a violation is fatal: main-checkout-damaged, and the GC stops), the directory and its git
- * registration verified gone, the row marked removed. Orca deletes the branch itself when it can prove it merged;
- * `deleteBranch` 'merged' (`git branch -d`) or 'force' (`-D`, only after a preserve) handles a branch it kept.
- * {ok, path, links, preserved, branch} | {ok:false, reason, fatal?, ...}
- */
-export function removeOrcaWorktree({ repoRoot, orcaId, dir, branch = null, deleteBranch: mode = null, preserve = null, main = 'main', env = process.env, git = null, orca = orcaWorktreeClient }) {
-  const target = path.resolve(dir);
-  const out = { ok: false, path: target, orcaId, links: 0, preserved: null, branch: branch ? { name: branch, deleted: false } : null };
-  const home = fs.existsSync(repoRoot) ? mainRootOf(repoRoot, { git }) : path.resolve(repoRoot);
-  if (sameTree(home, target)) return { ...out, reason: 'remove-failed', errors: [{ path: target, code: 'REFUSED', message: 'refusing to remove the main checkout' }] };
-  if (preserve && fs.existsSync(target)) {
-    const p = preserveWork({ repoRoot: home, dir: target, name: preserve.name, main });
-    if (!p.ok) { markRemoved(target, { error: `preserve: ${p.step ?? p.reason}`, env }); return { ...out, reason: 'preserve-failed', detail: p }; }
-    out.preserved = p.ref ? { ref: p.ref, sha: p.sha, dirty: p.dirty } : null;
+function preserveOrcaTree(out, target, home, preserve, main, env) {
+  if (!preserve || !fs.existsSync(target)) return null;
+  const saved = preserveWork({ repoRoot: home, dir: target, name: preserve.name, main });
+  if (!saved.ok) {
+    markRemoved(target, { error: `preserve: ${saved.step ?? saved.reason}`, env });
+    return { ...out, reason: 'preserve-failed', detail: saved };
   }
+  out.preserved = saved.ref ? { ref: saved.ref, sha: saved.sha, dirty: saved.dirty } : null;
+  return null;
+}
+
+function removeOrcaTree(out, target, { home, orcaId, git, orca, env }) {
   const before = fs.existsSync(home) ? mainCheckoutGuard(home, { git }) : null;
   const unlinked = removeLinksUnder(target);
   out.links = unlinked.links;
@@ -150,18 +141,40 @@ export function removeOrcaWorktree({ repoRoot, orcaId, dir, branch = null, delet
     markRemoved(target, { error: `orca worktree rm: ${String(rm?.error ?? rm?.errorCode ?? 'refused').slice(0, 200)}`, env });
     return { ...out, reason: 'orca-worktree-rm-failed', detail: String(rm?.error ?? rm?.errorCode ?? '').slice(0, 300), hostUnavailable: rm?.hostUnavailable === true };
   }
+  return null;
+}
+
+function verifyOrcaTreeRemoval(out, target, home, git, env) {
   const dirGone = isGone(target);
   const pruned = !(fs.existsSync(home) && registeredAt(home, target, { git }));
-  if (!dirGone || !pruned) {
-    const reason = dirGone ? 'prune-unverified' : 'dir-remains';
-    markRemoved(target, { error: reason, env });
-    return { ...out, reason };
-  }
-  if (branch && mode && revParse(home, `refs/heads/${branch}`)) {
-    const deleted = branchDelete({ repoRoot: home, branch, mode, main, git });
-    out.branch.deleted = deleted.ok;
-    if (!deleted.ok) { markRemoved(target, { preservedRef: out.preserved?.ref ?? null, env }); return { ...out, reason: 'branch-delete-failed', detail: deleted.detail }; }
-  } else if (out.branch) out.branch.deleted = !revParse(home, `refs/heads/${branch}`);
+  if (dirGone && pruned) return null;
+  const reason = dirGone ? 'prune-unverified' : 'dir-remains';
+  markRemoved(target, { error: reason, env });
+  return { ...out, reason };
+}
+
+/**
+ * Remove a worktree Orca made (scripts/kernel/workflow-worktree.mjs releaseWorkflowWorktree, the critic, the GC).
+ * preserve: {name} -> preserveWork first (a failure keeps the tree). Then every link in the tree removed as a link and
+ * ZERO asserted (a stuck link keeps the tree: link-stuck), `orca worktree rm --worktree id:<orcaId> --force`, the main
+ * checkout asserted untouched (a violation is fatal: main-checkout-damaged, and the GC stops), the directory and its git
+ * registration verified gone, the row marked removed. Orca deletes the branch itself when it can prove it merged;
+ * `deleteBranch` 'merged' (`git branch -d`) or 'force' (`-D`, only after a preserve) handles a branch it kept.
+ * {ok, path, links, preserved, branch} | {ok:false, reason, fatal?, ...}
+ */
+export function removeOrcaWorktree({ repoRoot, orcaId, dir, branch = null, deleteBranch: mode = null, preserve = null, main = 'main', env = process.env, git = null, orca = orcaWorktreeClient }) {
+  const target = path.resolve(dir);
+  const out = { ok: false, path: target, orcaId, links: 0, preserved: null, branch: branch ? { name: branch, deleted: false } : null };
+  const home = fs.existsSync(repoRoot) ? mainRootOf(repoRoot, { git }) : path.resolve(repoRoot);
+  if (sameTree(home, target)) return { ...out, reason: 'remove-failed', errors: [{ path: target, code: 'REFUSED', message: 'refusing to remove the main checkout' }] };
+  const preserveFailure = preserveOrcaTree(out, target, home, preserve, main, env);
+  if (preserveFailure) return preserveFailure;
+  const removalFailure = removeOrcaTree(out, target, { home, orcaId, git, orca, env });
+  if (removalFailure) return removalFailure;
+  const verificationFailure = verifyOrcaTreeRemoval(out, target, home, git, env);
+  if (verificationFailure) return verificationFailure;
+  const branchFailure = deleteScratchBranch(out, { repoRoot: home, branch, mode, main, git, target, env });
+  if (branchFailure) return branchFailure;
   markRemoved(target, { preservedRef: out.preserved?.ref ?? null, env });
   out.ok = true;
   return out;

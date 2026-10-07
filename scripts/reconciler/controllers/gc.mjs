@@ -153,6 +153,13 @@ function sweepItem(i) {
     outcome, ...(failed ? { lastError: String(i.error ?? 'failed').slice(0, 300) } : {}) };
 }
 
+function housekeepingReason(claim, host) {
+  if (claim.reason === 'first-run') return 'first run';
+  if (claim.reason !== 'early') return 'daily';
+  const lowDisk = host.lowDisk ? `lowDisk ${Math.round(host.freeDiskGb ?? 0)} GB` : '', separator = host.lowDisk && host.lowRam ? ', ' : '', lowRam = host.lowRam ? `lowRam ${Math.round(host.freeRamPct ?? 0)}%` : '';
+  return `host ${lowDisk}${separator}${lowRam}`;
+}
+
 /* ------------------------------------------------------------ the controller */
 
 export function createGcController(overrides = {}) {
@@ -282,6 +289,16 @@ export function createGcController(overrides = {}) {
     return { entity: `job:${jobId}`, closes, leases };
   }
 
+  async function reconcileStaging(ctx, job, jobId) {
+    if (!(await deps.stagingExists(job))) return null;
+    if (ctx.mode !== 'active') { would(ctx, 'remove-staging', jobId, { klass: 'staging', status: job.status }); return { shadow: true }; }
+    const r = await deps.removeStaging({ jobId, staging: job.staging, landed: job.status === 'succeeded' });
+    const staging = { ok: r?.removed === true, error: r?.error ?? null };
+    ctx.log('reconciler.gc.staging', `${staging.ok ? 'removed' : 'could not remove'} staging of ${job.status} job ${jobId}`, { controller: NAME, jobId, ...staging });
+    if (staging.ok) await deps.lesson({ klass: 'staging', count: 1, examples: [`${job.staging.branch ?? jobId} (removeStaging did not run at report/land)`] });
+    return staging;
+  }
+
   async function reconcileSupJob(ctx, { jobId, sup, gc }) {
     const job = sup.jobs.find((j) => j.jobId === jobId);
     if (!job) return { skipped: 'supervisor job unknown' };
@@ -291,16 +308,7 @@ export function createGcController(overrides = {}) {
     const closes = [];
     if (job.handle && job.handle !== 'supervisor')
       for (const d of await decideTerminals(ctx, { handles: [job.handle], sup, ledgers: [], runs: [job.runId] })) closes.push(await settleLeftover(ctx, d, { entity: `[Worker] job ${jobId}` }));
-    let staging = null;
-    if (await deps.stagingExists(job)) {
-      if (ctx.mode !== 'active') { would(ctx, 'remove-staging', jobId, { klass: 'staging', status: job.status }); staging = { shadow: true }; }
-      else {
-        const r = await deps.removeStaging({ jobId, staging: job.staging, landed: job.status === 'succeeded' });
-        staging = { ok: r?.removed === true, error: r?.error ?? null };
-        ctx.log('reconciler.gc.staging', `${staging.ok ? 'removed' : 'could not remove'} staging of ${job.status} job ${jobId}`, { controller: NAME, jobId, ...staging });
-        if (staging.ok) await deps.lesson({ klass: 'staging', count: 1, examples: [`${job.staging.branch ?? jobId} (removeStaging did not run at report/land)`] });
-      }
-    }
+    const staging = await reconcileStaging(ctx, job, jobId);
     const leaks = gc.classifyLeases({ rows: (sup.leases ?? []).filter((l) => l.jobId === jobId).map((l) => ({ ...l, ledger: 'supervisor' })), now: ctx.now(), minAgeMs: 0 });
     const leases = await leaseDecision(ctx, leaks, { ledgerId: 'supervisor', entity: jobId });
     await recordEvent(ctx, landKey(jobId), { closes });
@@ -367,6 +375,11 @@ export function createGcController(overrides = {}) {
     for (const g of byJob.values()) await leaseDecision(ctx, g.rows, { ledgerId: g.ledgerId, entity: g.jobId });
   }
 
+  async function previewBlobSweep(ctx, now) {
+    let plan = null; try { plan = await (deps.planBlobGc ?? (async () => (await import('../../housekeeping/blob-gc.mjs')).planBlobGc({ env: ctx.env ?? process.env, now })))(); } catch (error) { plan = { error: String(error?.message ?? error).slice(0, 200) }; }
+    const blocked = plan?.blocked?.length ? `, blocked: ${plan.blocked.join('; ')}` : '', summary = plan?.error ? `plan failed: ${plan.error}` : `${plan.marked} marked, ${plan.toArchive?.length ?? 0} to archive, ${plan.toSweep?.length ?? 0} to sweep (${Math.round(((plan.archiveBytes ?? 0) + (plan.sweepBytes ?? 0)) / 1e6)} MB)${blocked}`;
+    ctx.log(WOULD, `blob-sweep: ${summary}`, { controller: NAME, action: 'blob-sweep', sources: plan?.sources?.map((s) => ({ name: s.name, kind: s.kind, marks: s.marks, error: s.error ?? null })) ?? null });
+    return plan; }
   /**
    * key gc:blob-sweep, every blobSweepEveryMs (24 h, schedules gc/blob-sweep): the blob store's mark-and-sweep
    * (scripts/housekeeping/blob-gc.mjs). It marks each enrolled ledger read-only, one at a time, then machine.sqlite,
@@ -378,14 +391,7 @@ export function createGcController(overrides = {}) {
     const claim = claimDue(ctx, { controller: NAME, duty: 'blob-sweep', intervalMs: settings.blobSweepEveryMs, now });
     if (!claim.due) return { skipped: 'not due', nextAt: claim.nextAt ?? null };
     let plan = null;
-    if (ctx.mode !== 'active') {
-      try { plan = await (deps.planBlobGc ?? (async () => (await import('../../housekeeping/blob-gc.mjs')).planBlobGc({ env: ctx.env ?? process.env, now })))(); }
-      catch (error) { plan = { error: String(error?.message ?? error).slice(0, 200) }; }
-      const blocked = plan?.blocked?.length ? `, blocked: ${plan.blocked.join('; ')}` : '';
-      const summary = plan?.error ? `plan failed: ${plan.error}` : `${plan.marked} marked, ${plan.toArchive?.length ?? 0} to archive, ${plan.toSweep?.length ?? 0} to sweep (${Math.round(((plan.archiveBytes ?? 0) + (plan.sweepBytes ?? 0)) / 1e6)} MB)${blocked}`;
-      ctx.log(WOULD, `blob-sweep: ${summary}`,
-        { controller: NAME, action: 'blob-sweep', sources: plan?.sources?.map((s) => ({ name: s.name, kind: s.kind, marks: s.marks, error: s.error ?? null })) ?? null });
-    }
+    if (ctx.mode !== 'active') plan = await previewBlobSweep(ctx, now);
     const r = await ctx.run('node', ['scripts/housekeeping/blob-gc.mjs', '--apply', '--json'], { timeoutMs: 3_600_000 });
     const result = r?.value ? r.value.refused ?? `${r.value.items?.length ?? 0} item(s), ${Math.round((r.value.freedBytes ?? 0) / 1e6)} MB freed` : r?.error ?? '';
     const outcome = r?.ok ? 'done' : 'FAILED';
@@ -457,14 +463,7 @@ export function createGcController(overrides = {}) {
     // MB-01: the daily cadence is durable (schedules); a low-disk/low-RAM host pulls it in after lowResourceGapMs.
     const claim = claimDue(ctx, { controller: NAME, duty: 'housekeeping', intervalMs: settings.housekeepingEveryMs, now, earlyAfterMs: low ? settings.lowResourceGapMs : null });
     if (!claim.due) return { skipped: 'not due', low, nextAt: claim.nextAt };
-    let why = 'daily';
-    if (claim.reason === 'first-run') why = 'first run';
-    else if (claim.reason === 'early') {
-      const lowDisk = host.lowDisk ? `lowDisk ${Math.round(host.freeDiskGb ?? 0)} GB` : '';
-      const separator = host.lowDisk && host.lowRam ? ', ' : '';
-      const lowRam = host.lowRam ? `lowRam ${Math.round(host.freeRamPct ?? 0)}%` : '';
-      why = `host ${lowDisk}${separator}${lowRam}`;
-    }
+    const why = housekeepingReason(claim, host);
     const r = await ctx.run('node', ['scripts/housekeeping/housekeeping.mjs', '--apply'], { timeoutMs: 1_800_000 });
     let dutyResult = 'skipped';
     if (ctx.mode === 'active') dutyResult = r?.ok === true ? 'done' : 'failed';

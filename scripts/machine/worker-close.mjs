@@ -83,6 +83,15 @@ export const workerExitProven = (receipt, handle) => Boolean(handle)
 export const workerClosureProven = (receipt, handle) => receipt?.ok === true && workerExitProven(receipt, handle);
 
 /** Wait for every process of `tree` to end: {gone, table, left[]} or {unreadable}. */
+function processCensusProblem(tree, table) {
+  for (const row of table.filter((process) => tree.some((member) => member.pid === process.pid))) {
+    if (!createdKnown(row.created) || typeof row.exe !== 'string' || !row.exe
+        || tree.some((member) => member.pid === row.pid && member.created === row.created && member.identity.exe.toLowerCase() !== row.exe.toLowerCase()))
+      return 'post-closure process identity is unreadable or contradictory';
+  }
+  return null;
+}
+
 function waitGone(tree, { read, environments, terminal, sleep, ms, pollMs }) {
   let table = null, left = tree;
   for (let waited = 0; ; waited += pollMs) {
@@ -90,10 +99,8 @@ function waitGone(tree, { read, environments, terminal, sleep, ms, pollMs }) {
     try { table = read(); envRows = environments(); }
     catch { return { unreadable: true, reason: 'post-closure process census failed' }; }
     if (!Array.isArray(table) || !Array.isArray(envRows)) return { unreadable: true, reason: 'post-closure terminal census is unreadable' };
-    for (const row of table.filter(p => tree.some(m => m.pid === p.pid)))
-      if (!createdKnown(row.created) || typeof row.exe !== 'string' || !row.exe
-          || tree.some(m => m.pid === row.pid && m.created === row.created && m.identity.exe.toLowerCase() !== row.exe.toLowerCase()))
-        return { unreadable: true, reason: 'post-closure process identity is unreadable or contradictory' };
+    const processProblem = processCensusProblem(tree, table);
+    if (processProblem) return { unreadable: true, reason: processProblem };
     const census = terminalTree(terminal, { table, envRows }).members;
     if (census.some(row => !tree.some(m => m.pid === row.pid && m.created === row.created)))
       return { unreadable: true, reason: 'post-closure census contains an uncaptured terminal process', census: members(census) };
@@ -104,32 +111,8 @@ function waitGone(tree, { read, environments, terminal, sleep, ms, pollMs }) {
   }
 }
 
-/**
- * Release worker `dispatch`, close its terminal and verify its captured process objects.
- * Seams (deps): show, stop, release, close, tableOf, envOf, capture, stopProcess, sleep, log.
- * Returns the release receipt ({ok, outcome, state, ...}) plus {handle, closed, processes, hygiene, stop?, retryRelease?}.
- * processes.verdict: 'none' (captured objects ended and the terminal census is empty), 'stopped' (exact native stops plus the census prove closure),
- * 'survived' (a captured object stays: hygiene is set), 'unverifiable' (closure remains unknown) or 'not-checked'.
- */
-export function closeWorker({ dispatch, handle = null, stopFirst = false, retryRelease = false, env = process.env, deps = {} } = {}) {
-  const show = deps.show ?? workerShow, stop = deps.stop ?? workerStop, release = deps.release ?? workerRelease;
-  const close = deps.close ?? closeAndVerify, sleep = deps.sleep ?? sleepSync;
-  const capture = deps.capture ?? captureProcessIdentity, stopProcess = deps.stopProcess ?? stopOwnedProcess;
-  const tableOf = deps.tableOf ?? (() => processList({ cmdMax: 200 }));
-  const envOf = deps.envOf ?? (() => processEnv({ names: [HANDLE_ENV] }));
-  const verifyMs = deps.verifyMs ?? allocationMs('workerClose.verifyMs'), pollMs = deps.pollMs ?? allocationMs('workerClose.pollMs');
-  const stopVerifyMs = deps.stopVerifyMs ?? allocationMs('workerClose.stopVerifyMs');
-  const unknown = (error) => ({ ok: false, outcome: 'unknown', error: String(error?.message ?? error) });
-  const attempt = (fn) => { try { return fn(); } catch (error) { return unknown(error); } };
-
-  let shown = null;
-  try { shown = show({ dispatch }); } catch { shown = null; }
-  const terminal = handle ?? shown?.result?.worker?.agentTerminalHandle ?? null;
-  const own = Boolean(terminal) && env[HANDLE_ENV] === terminal;
-
-  // 1. capture actual object identity and terminal custody while the measured processes are alive
+function captureWorkerTree({ terminal, own, deps, tableOf, envOf, capture, attempt }) {
   let tree = null, treeWhy = null;
-  // A stubbed Orca (a spec's fake, STARCI_ORCA_COMMAND) has no real process tree: the host's processes prove nothing about its terminals.
   const stubbed = !deps.tableOf && !deps.envOf && Boolean(readEnv('STARCI_ORCA_COMMAND'));
   if (!terminal) treeWhy = 'the worker has no terminal of its own';
   else if (stubbed) treeWhy = 'Orca is stubbed: its terminals have no real process tree to prove';
@@ -155,6 +138,76 @@ export function closeWorker({ dispatch, handle = null, stopFirst = false, retryR
       }
     }
   }
+  return { tree, treeWhy };
+}
+
+function verifyStoppedWorkers(first, { stopProcess, stopVerifyMs, waitArgs, tree, attempt }) {
+  const stoppedPids = [], stopReceipts = [];
+  for (const object of first.left) {
+    const receipt = attempt(() => stopProcess(object.identity, { waitMs: stopVerifyMs }));
+    stopReceipts.push(receipt);
+    if (stoppedIdentity(receipt, object.identity)) stoppedPids.push(object.pid);
+  }
+  const second = waitGone(tree, { ...waitArgs, ms: stopVerifyMs });
+  const proof = { members: members(tree), stopped: stoppedPids, stopReceipts, census: second.census ?? null };
+  if (second.unreadable) return { verdict: 'unverifiable', reason: second.reason ?? 'the process table could not be read after the stop', ...proof };
+  if (stoppedPids.length !== first.left.length) return { verdict: 'unverifiable', reason: 'an exact native process stop was refused or unverified', ...proof, survivors: members(second.left) };
+  if (second.gone) return { verdict: 'stopped', ...proof };
+  return { verdict: 'survived', ...proof, survivors: members(second.left) };
+}
+
+function verifyWorkerProcesses({ terminal, own, tree, treeWhy, tableOf, envOf, sleep, verifyMs, stopVerifyMs, pollMs, stopProcess, attempt }) {
+  if (!terminal || own) return { verdict: 'not-checked', reason: treeWhy };
+  if (!tree) return { verdict: 'unverifiable', reason: treeWhy };
+  const waitArgs = { read: tableOf, environments: envOf, terminal, sleep, pollMs };
+  const first = waitGone(tree, { ...waitArgs, ms: verifyMs });
+  if (first.unreadable) return { verdict: 'unverifiable', reason: first.reason ?? 'the process table could not be read while verifying', census: first.census ?? null };
+  if (first.gone) return { verdict: 'none', members: members(tree), census: first.census };
+  return verifyStoppedWorkers(first, { stopProcess, stopVerifyMs, waitArgs, tree, attempt });
+}
+
+function logWorkerHygiene({ hygiene, processes, terminal, dispatch, deps }) {
+  if (!hygiene && processes.verdict !== 'stopped') return;
+  try {
+    (deps.log ?? supLog)({ kind: 'gc.collect', level: hygiene ? 'warn' : 'info',
+      msg: hygiene ? `worker-process-survived: ${hygiene.survivors.map((s) => s.pid).join(',')} of terminal ${terminal} outlived release and close (dispatch ${dispatch})`
+        : `a process of terminal ${terminal} outlived release and close and was stopped: ${processes.stopped.join(',')} (dispatch ${dispatch})`,
+      data: { class: 'worker-close', action: 'worker-process', target: terminal, dispatch, verdict: processes.verdict, ...(hygiene ? { code: 'worker-process-survived' } : {}) } });
+  } catch { /* the log is best effort; the finding is in the result */ }
+}
+
+function releaseClosedWorkerBudget(last, terminal, closed, processes, { env, deps }) {
+  if (!workerClosureProven({ ...last, handle: terminal, closed, processes }, terminal)) return null;
+  try {
+    const result = (deps.releaseBudget ?? releaseProviderBudgetByHandle)(terminal,
+      { kind: 'closed', confirmed: true, handle: terminal, source: 'worker-close', terminalProof: closed.proof ?? null, processVerdict: processes.verdict }, { env: { ...process.env, ...env } });
+    return !result.ok || result.released > 0 ? result : null;
+  } catch (error) { return { ok: false, reason: 'store-unavailable', error: String(error?.message ?? error) }; }
+}
+
+/**
+ * Release worker `dispatch`, close its terminal and verify its captured process objects.
+ * Seams (deps): show, stop, release, close, tableOf, envOf, capture, stopProcess, sleep, log.
+ * Returns the release receipt ({ok, outcome, state, ...}) plus {handle, closed, processes, hygiene, stop?, retryRelease?}.
+ * processes.verdict: 'none' (captured objects ended and the terminal census is empty), 'stopped' (exact native stops plus the census prove closure),
+ * 'survived' (a captured object stays: hygiene is set), 'unverifiable' (closure remains unknown) or 'not-checked'.
+ */
+export function closeWorker({ dispatch, handle = null, stopFirst = false, retryRelease = false, env = process.env, deps = {} } = {}) {
+  const show = deps.show ?? workerShow, stop = deps.stop ?? workerStop, release = deps.release ?? workerRelease;
+  const close = deps.close ?? closeAndVerify, sleep = deps.sleep ?? sleepSync;
+  const capture = deps.capture ?? captureProcessIdentity, stopProcess = deps.stopProcess ?? stopOwnedProcess;
+  const tableOf = deps.tableOf ?? (() => processList({ cmdMax: 200 }));
+  const envOf = deps.envOf ?? (() => processEnv({ names: [HANDLE_ENV] }));
+  const verifyMs = deps.verifyMs ?? allocationMs('workerClose.verifyMs'), pollMs = deps.pollMs ?? allocationMs('workerClose.pollMs');
+  const stopVerifyMs = deps.stopVerifyMs ?? allocationMs('workerClose.stopVerifyMs');
+  const unknown = (error) => ({ ok: false, outcome: 'unknown', error: String(error?.message ?? error) });
+  const attempt = (fn) => { try { return fn(); } catch (error) { return unknown(error); } };
+
+  let shown = null;
+  try { shown = show({ dispatch }); } catch { shown = null; }
+  const terminal = handle ?? shown?.result?.worker?.agentTerminalHandle ?? null;
+  const own = Boolean(terminal) && env[HANDLE_ENV] === terminal;
+  const { tree, treeWhy } = captureWorkerTree({ terminal, own, deps, tableOf, envOf, capture, attempt });
 
   // 2 and 3. stop only on the caller's proof, then release
   const stopped = stopFirst ? attempt(() => stop({ dispatch })) : null;
@@ -168,50 +221,13 @@ export function closeWorker({ dispatch, handle = null, stopFirst = false, retryR
   if (terminal && !own) closed = attempt(() => close(terminal));
 
   // 5. verify the processes
-  let processes;
-  if (!terminal || own) processes = { verdict: 'not-checked', reason: treeWhy };
-  else if (!tree) processes = { verdict: 'unverifiable', reason: treeWhy };
-  else {
-    const census = { read: tableOf, environments: envOf, terminal, sleep, pollMs };
-    const first = waitGone(tree, { ...census, ms: verifyMs });
-    if (first.unreadable) processes = { verdict: 'unverifiable', reason: first.reason ?? 'the process table could not be read while verifying', census: first.census ?? null };
-    else if (first.gone) processes = { verdict: 'none', members: members(tree), census: first.census };
-    else {
-      // Each stop reopens and compares the original birth/executable on the same handle that is terminated. Never taskkill a PID subtree.
-      const stoppedPids = [], stopReceipts = [];
-      for (const object of first.left) {
-        const receipt = attempt(() => stopProcess(object.identity, { waitMs: stopVerifyMs }));
-        stopReceipts.push(receipt);
-        if (stoppedIdentity(receipt, object.identity)) stoppedPids.push(object.pid);
-      }
-      const second = waitGone(tree, { ...census, ms: stopVerifyMs });
-      const proof = { members: members(tree), stopped: stoppedPids, stopReceipts, census: second.census ?? null };
-      if (second.unreadable) processes = { verdict: 'unverifiable', reason: second.reason ?? 'the process table could not be read after the stop', ...proof };
-      else if (stoppedPids.length !== first.left.length) processes = { verdict: 'unverifiable', reason: 'an exact native process stop was refused or unverified', ...proof, survivors: members(second.left) };
-      else if (second.gone) processes = { verdict: 'stopped', ...proof };
-      else processes = { verdict: 'survived', ...proof, survivors: members(second.left) };
-    }
-  }
+  const processes = verifyWorkerProcesses({ terminal, own, tree, treeWhy, tableOf, envOf, sleep, verifyMs, stopVerifyMs, pollMs, stopProcess, attempt });
   processes.scope = 'captured-process-objects-and-terminal-census';
   const hygiene = processes.verdict === 'survived'
     ? { code: 'worker-process-survived', dispatch, handle: terminal, survivors: processes.survivors, stopped: processes.stopped }
     : null;
-  if (hygiene || processes.verdict === 'stopped') {
-    try {
-      (deps.log ?? supLog)({ kind: 'gc.collect', level: hygiene ? 'warn' : 'info',
-        msg: hygiene ? `worker-process-survived: ${hygiene.survivors.map((s) => s.pid).join(',')} of terminal ${terminal} outlived release and close (dispatch ${dispatch})`
-          : `a process of terminal ${terminal} outlived release and close and was stopped: ${processes.stopped.join(',')} (dispatch ${dispatch})`,
-        data: { class: 'worker-close', action: 'worker-process', target: terminal, dispatch, verdict: processes.verdict, ...(hygiene ? { code: 'worker-process-survived' } : {}) } });
-    } catch { /* the log is best effort; the finding is in the result */ }
-  }
-  let providerBudget = null;
-  if (workerClosureProven({ ...last, handle: terminal, closed, processes }, terminal)) {
-    try {
-      const result = (deps.releaseBudget ?? releaseProviderBudgetByHandle)(terminal,
-        { kind: 'closed', confirmed: true, handle: terminal, source: 'worker-close', terminalProof: closed.proof ?? null, processVerdict: processes.verdict }, { env: { ...process.env, ...env } });
-      if (!result.ok || result.released > 0) providerBudget = result;
-    } catch (error) { providerBudget = { ok: false, reason: 'store-unavailable', error: String(error?.message ?? error) }; }
-  }
+  logWorkerHygiene({ hygiene, processes, terminal, dispatch, deps });
+  const providerBudget = releaseClosedWorkerBudget(last, terminal, closed, processes, { env, deps });
   return { ...last, ok: last?.ok === true, handle: terminal, closed, processes, hygiene, ...(providerBudget ? { providerBudget } : {}), ...(stopped ? { stop: stopped } : {}), ...(retry ? { retryRelease: retry } : {}) };
 }
 
