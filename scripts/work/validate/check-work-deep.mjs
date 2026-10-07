@@ -130,7 +130,7 @@ function gqlOps(repoRoot) {
   findOpDirs(srcRoot);
   for (const file of srcFiles(repoRoot, '.resolver.ts')) {
     const text = fs.readFileSync(file, 'utf8');
-    for (const m of text.matchAll(/@(Query|Mutation)\b[^)]*\)\s*\n?\s*(?:async\s+)?(\w+)\s*\(/g)) {
+    for (const m of text.matchAll(/@(Query|Mutation)\b[^)]*\)\s*(?:async\s+)?(\w+)\s*\(/g)) {
       ops.push({kind: m[1].toLowerCase(), op: m[2], file});
     }
   }
