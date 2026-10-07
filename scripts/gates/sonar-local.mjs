@@ -141,26 +141,33 @@ export function findDeclaration(cwd){
   return null;
 }
 
+// The host form lives in this runtime tree (.claude/ext/<service>), not in the declaring
+// repository (check-starcistacks.mjs normalizeService resolves it the same way).
+const hostStackOf=stack=>{
+  const compose=text(stack.compose);
+  const root=text(stack.root)?.replaceAll('\\','/');
+  const stackDir=root&&/^\.claude\/ext\/[a-z][a-z0-9-]*$/.test(root)?path.join(skillRoot,root.slice('.claude/'.length)):null;
+  return {stackDir,composeFile:compose&&stackDir?path.join(stackDir,compose):null};
+};
+
+// The project form: <repository>/<root>/<environment>; a compose path under .starcistacks/ is the repository's, any other the stack's.
+const composeFileIn=(dir,stackDir,compose)=>/^\.starcistacks[\\/]/.test(compose)?path.join(dir,compose):path.resolve(stackDir,compose);
+const projectStackOf=(stack,repoDir)=>{
+  const compose=text(stack.compose);
+  const dir=repoDir(text(stack.repository));
+  const stackDir=path.join(dir,text(stack.root)??'.starcistacks',text(stack.environment)??'dev');
+  return {stackDir,composeFile:compose?composeFileIn(dir,stackDir,compose):null};
+};
+
 /** The stack block of a Sonar service declaration resolved to {stackDir, composeFile, container}. */
 const declaredStackOf=(sonar,repoDir,repoRoot)=>{
-  let stackDir=null,composeFile=null,container=null;
   if(plain(sonar.stack)){
     const stack=sonar.stack;
-    const compose=text(stack.compose);
-    if(text(stack.owner)==='host'){
-      // The host form lives in this runtime tree (.claude/ext/<service>), not in the declaring
-      // repository (check-starcistacks.mjs normalizeService resolves it the same way).
-      const root=text(stack.root)?.replaceAll('\\','/');
-      stackDir=root&&/^\.claude\/ext\/[a-z][a-z0-9-]*$/.test(root)?path.join(skillRoot,root.slice('.claude/'.length)):null;
-      if(compose&&stackDir)composeFile=path.join(stackDir,compose);
-    }else{
-      const dir=repoDir(text(stack.repository));
-      stackDir=path.join(dir,text(stack.root)??'.starcistacks',text(stack.environment)??'dev');
-      if(compose)composeFile=/^\.starcistacks[\\/]/.test(compose)?path.join(dir,compose):path.resolve(stackDir,compose);
-    }
-    container=text(stack.container);
-  }else if(text(sonar.stack)&&sonar.stack!=='source-host')stackDir=path.join(repoRoot,'.starcistacks',sonar.stack);
-  return {stackDir,composeFile,container};
+    const placed=text(stack.owner)==='host'?hostStackOf(stack):projectStackOf(stack,repoDir);
+    return {...placed,container:text(stack.container)};
+  }
+  const stackDir=text(sonar.stack)&&sonar.stack!=='source-host'?path.join(repoRoot,'.starcistacks',sonar.stack):null;
+  return {stackDir,composeFile:null,container:null};
 };
 
 /** The declared projects, both forms (a list of {repository,key,name}, or a map repository -> key|{key,name}). */
@@ -425,21 +432,28 @@ const projectMintRef=(cfg,key,stale)=>{
  * sonar-token-reminted event) or at projectTokenRef(key) when none existed. The source stack's generic
  * analysis token is the last resort - on this server it is itself scoped to one project.
  */
+// Mints the project's analysis token with the admin token: {token} to return, or {miss} (why it failed) when the generic token is next.
+async function mintProjectToken(cfg,{key,admin,stale}){
+  const ref=projectMintRef(cfg,key,stale);
+  const minted=await mintToken(cfg,{admin,ref,type:'PROJECT_ANALYSIS_TOKEN',projectKey:key,label:key});
+  if(minted.present){
+    if(!stale)return {token:minted};
+    await recordRemint(cfg,{role:'project',projectKey:key,ref,minted:minted.minted,type:'PROJECT_ANALYSIS_TOKEN'});
+    return {token:{...minted,reminted:true}};
+  }
+  if(minted.identityRefusal)return {token:minted};
+  return {miss:minted.reason};
+}
+
 async function projectToken(cfg,{key,admin,tokenRef,mint=true}={}){
   const refs=[tokenRef,cfg.declaredTokenRef,key?projectTokenRef(key):null].filter(Boolean);
   const {entry,misses,stale,identityRefusal}=await firstAccepted(cfg,refs);
   if(identityRefusal)return {present:false,name:refs.at(-1)??cfg.analysisToken,identityRefusal,reason:misses.join('; ')};
   if(entry)return entry;
   if(key&&mint&&admin?.present){
-    const ref=projectMintRef(cfg,key,stale);
-    const minted=await mintToken(cfg,{admin,ref,type:'PROJECT_ANALYSIS_TOKEN',projectKey:key,label:key});
-    if(minted.present){
-      if(!stale)return minted;
-      await recordRemint(cfg,{role:'project',projectKey:key,ref,minted:minted.minted,type:'PROJECT_ANALYSIS_TOKEN'});
-      return {...minted,reminted:true};
-    }
-    if(minted.identityRefusal)return minted;
-    misses.push(minted.reason);
+    const attempt=await mintProjectToken(cfg,{key,admin,stale});
+    if(attempt.token)return attempt.token;
+    misses.push(attempt.miss);
   }
   const fallback=await genericToken(cfg,{admin:mint?admin:null});
   if(fallback.present)return {...fallback,note:'generic analysis token (project-scoped on this server)'};
@@ -806,6 +820,16 @@ export function isolationDefines(cwd,props,scope){
   return [...tsconfig,`-Dsonar.inclusions=${main.join(',')}`,...(patterns.length||props['sonar.tests']?[`-Dsonar.test.inclusions=${tests.length?[...new Set(tests)].join(','):'__starci_no_tests__/**'}`]:[])];
 }
 
+// The slice a scan covers (outside project gate mode): the changed lines, or the result that refuses the scan.
+const prepareSlice=(cwd,options,summary,finish)=>{
+  const slice=sliceChanges(cwd,{base:options.base,paths:options.paths});
+  if(!slice.ok)return {result:finish(slice.code==='SLICE_NOT_GIT'?'blocked':'refused',slice.reason,{code:slice.code})};
+  summary.slice={base:slice.base,baseCommit:slice.baseCommit,...(slice.baseFallback?{baseFallback:slice.baseFallback}:{}),paths:slice.paths,changedFiles:slice.files.map(f=>f.path)};
+  const sliceScope=slice.paths.length?` inside ${slice.paths.join(', ')}`:'';
+  if(!slice.files.length)return {result:finish('refused',`the slice changes no file against ${slice.base}${sliceScope}: pass --base <the commit before this slice's first edit> and --paths <its owned paths>`,{code:'SLICE_EMPTY'})};
+  return {slice};
+};
+
 const prepareScanInputs=(cfg,options,cwd,summary,finish)=>{
   if(!fs.existsSync(path.join(cwd,'package.json'))&&!fs.existsSync(path.join(cwd,'sonar-project.properties')))
     return {result:finish('blocked',`${cwd} has neither package.json nor sonar-project.properties`)};
@@ -826,11 +850,9 @@ const prepareScanInputs=(cfg,options,cwd,summary,finish)=>{
   summary.scope=projectGateMode?'project':'slice';
   let slice=null;
   if(!projectGateMode){
-    slice=sliceChanges(cwd,{base:options.base,paths:options.paths});
-    if(!slice.ok)return {result:finish(slice.code==='SLICE_NOT_GIT'?'blocked':'refused',slice.reason,{code:slice.code})};
-    summary.slice={base:slice.base,baseCommit:slice.baseCommit,...(slice.baseFallback?{baseFallback:slice.baseFallback}:{}),paths:slice.paths,changedFiles:slice.files.map(f=>f.path)};
-    const sliceScope=slice.paths.length?` inside ${slice.paths.join(', ')}`:'';
-    if(!slice.files.length)return {result:finish('refused',`the slice changes no file against ${slice.base}${sliceScope}: pass --base <the commit before this slice's first edit> and --paths <its owned paths>`,{code:'SLICE_EMPTY'})};
+    const staged=prepareSlice(cwd,options,summary,finish);
+    if(staged.result)return staged;
+    slice=staged.slice;
   }
   return {cwd,props,pkg,key,gateDoc,slice,projectGateMode};
 };
@@ -856,14 +878,19 @@ const prepareIsolatedProject=async(cfg,options,{cwd,props,key,slice,admin,gateDo
   return state;
 };
 
+// The refusal when the Sonar server is not UP (with its container's state), else null.
+const serverDownResult=(cfg,server,finish)=>{
+  if(server.reachable&&server.json?.status==='UP')return null;
+  const docker=containerState(cfg),serverStatus=server.json?.status??`HTTP ${server.status}`;
+  const reason=server.reachable?`SonarQube at ${cfg.host} reports ${serverStatus}`:downMessage(cfg,server,docker);
+  return {result:finish('blocked',reason,{docker})};
+};
+
 const prepareScanExecution=async(cfg,options,inputs,summary,finish)=>{
   const {cwd,props,pkg,key,gateDoc,slice}=inputs;
   const server=await call(cfg,'GET','/api/system/status');
-  if(!(server.reachable&&server.json?.status==='UP')){
-    const docker=containerState(cfg),serverStatus=server.json?.status??`HTTP ${server.status}`;
-    const reason=server.reachable?`SonarQube at ${cfg.host} reports ${serverStatus}`:downMessage(cfg,server,docker);
-    return {result:finish('blocked',reason,{docker})};
-  }
+  const down=serverDownResult(cfg,server,finish);
+  if(down)return down;
   summary.serverVersion=server.json.version;
   const token=await suppliedSonarToken(cfg,{validate:value=>tokenAccepted(cfg,value),remember});
   summary.custody={analysis:custodyView(token)};
@@ -1110,15 +1137,26 @@ const runSonarCommand=async(args,cfg,key,env,put)=>{
   return {direct:{exitCode:2,text:`sonar-local: unknown command ${command}\n\n${HELP}`}};
 };
 
+// The text result of a command line the CLI does not run (help, no command, a token reference on an analysis), or null.
+const commandRefusal=(args,command)=>{
+  if(args.help||!command)return {exitCode:args.help?0:2,text:HELP};
+  if(sonarAnalysisAction(command)&&args.tokenRef!==undefined)return {exitCode:2,text:'sonar-local: --token-ref belongs to administrative provisioning; analysis uses the supplied SONAR_TOKEN'};
+  return null;
+};
+
+const commandConfig=(args,config,env,command)=>{
+  const cfg=resolveConfig({...config,...(args.host?{host:args.host}:{}),...(args.stack?{stack:args.stack}:{}),...(args.cwd?{cwd:args.cwd}:{}),...(args.declaration?{declaration:args.declaration}:{})},env);
+  return command==='status'||command==='ensure-project'?sonarAdministrativeConfig(cfg):cfg;
+};
+
 export async function sonarLocalMain(argv=[],{env=process.env,config,put=null}={}){
   const args=parseArgs(argv);
   if(args.out&&args.blob)return {exitCode:2,text:'sonar-local: --out and --blob are mutually exclusive'};
   if(args.cwd)args.cwd=resolveScanCwd(args.cwd);
   const command=args._[0];
-  if(args.help||!command)return {exitCode:args.help?0:2,text:HELP};
-  if(sonarAnalysisAction(command)&&args.tokenRef!==undefined)return {exitCode:2,text:'sonar-local: --token-ref belongs to administrative provisioning; analysis uses the supplied SONAR_TOKEN'};
-  let cfg=resolveConfig({...config,...(args.host?{host:args.host}:{}),...(args.stack?{stack:args.stack}:{}),...(args.cwd?{cwd:args.cwd}:{}),...(args.declaration?{declaration:args.declaration}:{})},env);
-  if(command==='status'||command==='ensure-project')cfg=sonarAdministrativeConfig(cfg);
+  const refused=commandRefusal(args,command);
+  if(refused)return refused;
+  const cfg=commandConfig(args,config,env,command);
   const key=args.key??cfg.declaredKey??undefined;
   const result=await runSonarCommand(args,cfg,key,env,put);
   if(result.direct)return result.direct;
