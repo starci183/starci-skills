@@ -49,7 +49,8 @@ const textSizeClass = (bare, { cls, variant, scope }) => {
   const size = scope?.variable(`--text-${m[1]}`);
   const lh = scope?.variable(`--text-${m[1]}--line-height`);
   const ratio = lh?.value != null ? Number(evalRatio(lh.value)) : null;
-  return size?.px != null ? { cls, variant, px: size.px, lineHeight: ratio ? Math.round(size.px * ratio * 10) / 10 : null, how: `--text-${m[1]}: ${size.value}` } : null;
+  if (size?.px == null) return null;
+  return { cls, variant, px: size.px, lineHeight: ratio ? Math.round(size.px * ratio * 10) / 10 : null, how: `--text-${m[1]}: ${size.value}` };
 };
 
 const leadingClass = (bare, { cls, variant, spacing }) => {
@@ -67,7 +68,8 @@ const fontWeightClass = (bare, { cls, variant, scope }) => {
 
 const borderClass = (bare, { cls, variant }) => {
   const m = bare.match(BORDER);
-  return m ? { cls, variant, px: m[2] ? Number(m[2]) : 1, how: 'border width' } : undefined;
+  if (!m) return undefined;
+  return { cls, variant, px: m[2] ? Number(m[2]) : 1, how: 'border width' };
 };
 
 const CLASS_PARSERS = [spacingClass, radiusClass, textSizeClass, leadingClass, fontWeightClass, borderClass];

@@ -80,7 +80,12 @@ const OWNED_CSS = (chains) => [
 // ---------------------------------------------------------------------------------------------------------
 
 /** The report line for a presentation rule's scale step (its value, its px, its token). */
-const stepScaleNumber = (rule, step, stepPx) => (step?.value != null ? [{ what: `${rule.id} scale step`, text: String(step.value) + (stepPx != null ? ' = ' + fmtPx(stepPx) : '') + (step.token ? ' (' + step.token + ')' : '') }] : []);
+function stepScaleNumber(rule, step, stepPx) {
+  if (step?.value == null) return [];
+  const px = stepPx != null ? ' = ' + fmtPx(stepPx) : '';
+  const token = step.token ? ' (' + step.token + ')' : '';
+  return [{ what: `${rule.id} scale step`, text: String(step.value) + px + token }];
+}
 
 /** The step token resolved at every width; a conflict is named when the CSS binds another px than the knowledge. */
 function tokenNumber(k, rule, step, stepPx, scopes, conflicts) {
