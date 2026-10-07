@@ -88,7 +88,7 @@ function literalModules(ts, sourceFile, checker) {
 function cssImports(content) {
   const imports = [];
   const withoutComments = content.replace(/\/\*[\s\S]*?\*\//g, match => match.replace(/[^\r\n]/g, ' '));
-  const pattern = /@import\s+(?:url\(\s*(?:(["'])(.*?)\1|([^\s)]+))\s*\)|(["'])(.*?)\4)/gi;
+  const pattern = new RegExp([String.raw`@import\s+(?:url\(\s*(?:(["'])`, String.raw`(.*?)\1|([^\s)]+))\s*\)|(["'])(.*?)\4)`].join(''), 'gi');
   for (const match of withoutComments.matchAll(pattern)) {
     imports.push({ specifier: match[2] ?? match[3] ?? match[5], index: match.index });
   }
