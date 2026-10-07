@@ -57,6 +57,7 @@ import { eachInOrder, repeatInOrder } from '../lib/in-order.mjs';
 import { crashHandler, logSafeReevaluated, onceLine } from './engine-process.mjs';
 import { runOnce } from './engine-once.mjs';
 import { readModes, writeModes } from './engine-modes.mjs';
+import { releasePinnedTemp, reloadEnv, startTempRoot } from './reload-env.mjs';
 import { positiveNumber } from '../lib/number.mjs';
 import { valueAfter } from '../lib/cli-arg.mjs';
 const CONTROLLERS_DIR = path.join(SKILL_ROOT, 'scripts', 'reconciler', 'controllers');
@@ -526,7 +527,8 @@ export class Engine {
     watch.markAttempt();
     await this.drain();
     const handed = await reload(check);
-    this.log('reconciler.event', (handed.ok ? 'reloaded: pid ' + `${handed.pid}` + ' took over' : 'reload failed: ' + `${handed.error}`) + ' (' + `${check.reason}` + ')', { kind: 'reconciler.reload', ok: handed.ok === true });
+    const outcome = handed.ok ? `reloaded: pid ${handed.pid} took over` : `reload failed: ${handed.error}`;
+    this.log(handed.ok ? 'reconciler.event' : 'reconciler.error', `${outcome} (${check.reason})`, { kind: 'reconciler.reload', ok: handed.ok === true });
     return handed.ok ? { exitCode: 0, reloaded: handed.pid } : undefined;
   }
 
@@ -604,6 +606,7 @@ async function main(argv = process.argv.slice(2)) {
   const reloadedAt = Number(readEnv(RELOAD_ENV.reloadedAt)) || null;
   delete process.env[RELOAD_ENV.handoverFrom];
   delete process.env[RELOAD_ENV.reloadedAt];
+  releasePinnedTemp();
   const safeStart = safeForStart({ argv, reloaded: Boolean(handoverFrom) });
   const safe = safeStart.safe;
   const startReason = handoverFrom ? 'self-reload' : readEnv(START_REASON_ENV) || 'manual';
@@ -629,7 +632,8 @@ async function main(argv = process.argv.slice(2)) {
   for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, onSignal);
   const watch = createReloadWatch({ root: SKILL_ROOT, files: reloadWatchedFiles(), lastReloadAt: reloadedAt, headPaths: RELOAD_HEAD_PATHS });
   // --safe is not inherited: the new process re-evaluates the crash-loop plan itself (safeForStart).
-  const reload = () => reexecSelf({ script: selfFile, args: argv.filter((a) => a !== '--safe'), logFile: null, lockName: LOCK_NAME, cwd: SKILL_ROOT, env: { ...process.env, [START_REASON_ENV]: 'self-reload' }, holder: lockHolder, reclaim: reassertManager });
+  const startRoot = startTempRoot();
+  const reload = () => reexecSelf({ script: selfFile, args: argv.filter((a) => a !== '--safe'), logFile: null, lockName: LOCK_NAME, cwd: SKILL_ROOT, env: reloadEnv({ ...process.env, [START_REASON_ENV]: 'self-reload' }, startRoot), holder: lockHolder, reclaim: reassertManager });
   const r = await engine.run({ watch, reload });
   endRun({ exitCode: r.exitCode ?? 0, exitReason: (r.reloaded && 'reload-handover') || (r.lost && 'lost-lease') || (stopSignal && 'stopped') || 'clean', killedBy: stopSignal ? `signal:${stopSignal}` : null });
   engine.close({ releaseLead: !r.reloaded && !r.lost, reason: 'stop' });
