@@ -226,7 +226,7 @@ test('ensureLaunchTrust writes Claude and the active managed Codex home, then re
   for(const k of claudeKeyForms(cwd))assert.equal(doc.projects[k].hasTrustDialogAccepted,true);
   const codex=ensureLaunchTrust({agent:'codex',cwd,env});
   assert.equal(codex.status,'written');
-  assert.deepEqual([...new Set(codex.written.map(w=>w.file))].sort(),[path.join(home,'.codex','config.toml'),path.join(cwd,'.codex','config.toml')].sort());
+  assert.deepEqual([...new Set(codex.written.map(w=>w.file))].sort(),[path.join(home,'.codex','config.toml')].sort());
   assert.match(fs.readFileSync(path.join(orcaHome,'config.toml'),'utf8'),/^approval_policy = "never"\n/,'the owner\'s approval policy is untouched');
   assert.equal(ensureLaunchTrust({agent:'codex',cwd,env}).status,'already');
   assert.equal(ensureLaunchTrust({agent:'claude',cwd,env}).status,'already');
@@ -271,9 +271,11 @@ test('launch trust registers the command guard hook in the worktree\'s project s
   assert.equal(assertJsonToolGuard({file:devinFile,command}).ok,false,'a hooks value that is not an object is never rewritten');
 });
 
-// Lead ruling 2026-10-01: launch trust writes only under the launch worktree (and its repository's own
-// info/exclude), never a user-global settings file: ~/.claude/settings.json, Devin's user config.json and each Codex
-// home keep no guard hook and no launch setting from the runtime. The home is injected (STARCI_AGENT_TRUST_HOME).
+// Lead ruling 2026-10-01: launch trust writes Claude's and Devin's guard hook and launch settings only under the launch
+// worktree (and its repository's own info/exclude), never a user-global settings file: ~/.claude/settings.json and
+// Devin's user config.json keep no guard hook and no launch setting from the runtime. Codex lists no hook of a linked
+// worktree's project layer, so its guard hook is the block in the managed Codex home's config.toml. The home is
+// injected (STARCI_AGENT_TRUST_HOME).
 test('launch trust writes only under the op worktree and never touches a user-global settings file',t=>{
   const home=tmp(t,'starci-trust-scope-home-');const cwd=tmp(t,'starci-trust-scope-cwd-');
   const env={NODE_TEST_CONTEXT:'child-v8',STARCI_AGENT_TRUST_HOME:home};
@@ -292,27 +294,30 @@ test('launch trust writes only under the op worktree and never touches a user-gl
   for(const agent of ['claude','codex','devin']){
     const r=ensureLaunchTrust({agent,cwd,env,codexAppServer:codexServer});
     assert.notEqual(r.status,'failed',JSON.stringify(r));
-    for(const g of r.toolGuard)assert.ok(path.resolve(g.file).startsWith(path.resolve(cwd)+path.sep),`${agent}: the guard hook lives under the worktree, not ${g.file}`);
+    const guardRoot=agent==='codex'?path.join(home,'.codex'):cwd;
+    for(const g of r.toolGuard)assert.ok(path.resolve(g.file).startsWith(path.resolve(guardRoot)+path.sep),`${agent}: the guard hook lives under ${guardRoot}, not ${g.file}`);
   }
-  // Under the home only the per-user trust records change: ~/.claude.json and each Codex home's project trust and
-  // notices - never a hook or a launch setting, and never ~/.claude/settings.json or Devin's user config.
+  // Under the home only the per-user records change: ~/.claude.json and the managed Codex home's project trust,
+  // notices and guard hook - never ~/.claude/settings.json or Devin's user config.
   const homeAfter=snapshot(home);
   const changed=[...homeAfter].filter(([f,text])=>homeBefore.get(f)!==text).map(([f])=>f).sort();
   assert.deepEqual(changed,[path.join(home,'.claude.json'),codexUsers[0]].sort());
   assert.equal(homeAfter.get(userSettings),homeBefore.get(userSettings),'~/.claude/settings.json is untouched');
   assert.equal(homeAfter.get(devinUser),homeBefore.get(devinUser),'Devin\'s user config is untouched');
-  for(const f of codexUsers)assert.doesNotMatch(homeAfter.get(f),/command-guard|hooks\.PreToolUse/,`${f} carries no guard hook`);
-  // Under the worktree: the three project files, each kept out of git status by the repository's own info/exclude.
+  assert.ok(homeAfter.get(codexUsers[0]).includes(codexGuardBlock(toolGuardCommand())),'the managed Codex home carries the guard hook');
+  assert.doesNotMatch(homeAfter.get(codexUsers[1]),/hooks\.PreToolUse/,'a Codex home the launch does not manage carries no guard hook');
+  // Under the worktree: the Claude and Devin project files, each kept out of git status by the repository's own info/exclude.
   const p=projectTargets(cwd);
-  for(const f of [p.claudeSettings,p.codexConfig,p.devinConfig])assert.ok(fs.existsSync(f),f);
+  for(const f of [p.claudeSettings,p.devinConfig])assert.ok(fs.existsSync(f),f);
+  assert.equal(fs.existsSync(path.join(cwd,'.codex')),false,'no Codex project layer is written');
   assert.equal(JSON.parse(fs.readFileSync(p.claudeSettings,'utf8')).skipDangerousModePermissionPrompt,true);
   assert.equal(git('status','--porcelain','--untracked-files=all').stdout.trim(),'','the project files never dirty the checkout');
   const excludeFile=path.join(cwd,'.git','info','exclude');
   const exclude=fs.readFileSync(excludeFile,'utf8');
-  for(const line of ['/.claude/settings.local.json','/.codex/config.toml','/.devin/config.local.json'])assert.ok(exclude.split(/\r?\n/).includes(line),line);
+  for(const line of ['/.claude/settings.local.json','/.devin/config.local.json'])assert.ok(exclude.split(/\r?\n/).includes(line),line);
   ensureLaunchTrust({agent:'codex',cwd,env,codexAppServer:codexServer});
   assert.equal(fs.readFileSync(excludeFile,'utf8'),exclude,'a second launch adds nothing');
-  assert.deepEqual(excludeFromGit(cwd,p.codexConfig),{file:'.codex/config.toml',state:'already'});
+  assert.deepEqual(excludeFromGit(cwd,p.devinConfig),{file:'.devin/config.local.json',state:'already'});
   // A file the repository tracks is never excluded, and a directory that is no checkout is left alone.
   fs.writeFileSync(path.join(cwd,'tracked.json'),'{}');
   assert.equal(git('add','tracked.json').status,0);
@@ -349,11 +354,38 @@ test('a Codex home gets the guard block in config.toml and Codex\'s own hash for
   const env={NODE_TEST_CONTEXT:'child-v8',STARCI_AGENT_TRUST_HOME:trustHome};
   fs.mkdirSync(path.join(trustHome,'.codex'),{recursive:true});
   const r=ensureLaunchTrust({agent:'codex',cwd,env,codexAppServer:({requests})=>requests.map(q=>q.method==='config/batchWrite'?{}:{data:[{hooks:[{key:'k',eventName:'preToolUse',command,currentHash:'h',trustStatus:'trusted'}]}]})});
-  const projectFile=path.join(cwd,'.codex','config.toml');
-  assert.deepEqual(r.toolGuard,[{file:projectFile,written:true,trustedIn:[{home:path.join(trustHome,'.codex'),trusted:'already'}]}],'the hook lives in the worktree\'s project layer; the home only trusts it');
-  assert.ok(fs.readFileSync(projectFile,'utf8').includes(codexGuardBlock(command)));
-  assert.doesNotMatch(fs.readFileSync(path.join(trustHome,'.codex','config.toml'),'utf8'),/command-guard/,'no guard hook in the Codex home');
-  assert.deepEqual(ensureLaunchTrust({agent:'codex',cwd,env}).toolGuard,[{file:projectFile,trustedIn:[{home:path.join(trustHome,'.codex'),trusted:'not-checked'}]}],'no app-server injected under a trust home: the hash step waits');
+  const homeFile=path.join(trustHome,'.codex','config.toml');
+  assert.deepEqual(r.toolGuard,[{file:homeFile,written:true,trustedIn:[{home:path.join(trustHome,'.codex'),trusted:'already'}]}],'the hook lives in the Codex home\'s config.toml');
+  assert.ok(fs.readFileSync(homeFile,'utf8').includes(codexGuardBlock(command)));
+  assert.equal(fs.existsSync(path.join(cwd,'.codex')),false,'no project layer is written');
+  assert.deepEqual(ensureLaunchTrust({agent:'codex',cwd,env}).toolGuard,[{file:homeFile,trustedIn:[{home:path.join(trustHome,'.codex'),trusted:'not-checked'}]}],'no app-server injected under a trust home: the hash step waits');
+});
+
+// Codex 0.160.0 on Windows (observed 2026-10-07): hooks/list answers {data:[{cwd,hooks:[],warnings:[],errors:[]}]} for a
+// linked worktree whose <worktree>/.codex/config.toml holds the guard block, in a home that trusts the worktree, while
+// the same block in the home's own config.toml is listed with source "user" and trustStatus "untrusted". This fake
+// answers that way: a project layer file is never read, only the home's config.toml.
+test('a Codex launch in a linked worktree is trusted: the guard hook is listed from the home\'s config.toml',t=>{
+  const trustHome=tmp(t,'starci-trust-codex-worktree-');const cwd=tmp(t,'starci-trust-codex-linked-');
+  fs.writeFileSync(path.join(cwd,'.git'),'gitdir: ../main/.git/worktrees/linked\n');
+  const command=toolGuardCommand();const homeDir=path.join(trustHome,'.codex');
+  const homeFile=path.join(homeDir,'config.toml');
+  const hookOf=(trust)=>({key:`${homeFile}:pre_tool_use:0:0`,eventName:'preToolUse',handlerType:'command',command,matcher:'^Bash$',sourcePath:homeFile,source:'user',currentHash:'sha256:abc',trustStatus:trust});
+  const written=[];
+  const appServer=({requests})=>requests.map(q=>{
+    const text=fs.existsSync(homeFile)?fs.readFileSync(homeFile,'utf8'):'';
+    if(q.method==='config/batchWrite'){written.push(q.params.edits[0].value);fs.appendFileSync(homeFile,'\n[hooks.state]\n');return {};}
+    const hooks=text.includes(codexGuardBlock(command))?[hookOf(text.includes('[hooks.state]')?'trusted':'untrusted')]:[];
+    return {data:[{cwd:q.params.cwds[0],hooks,warnings:[],errors:[]}]};
+  });
+  fs.mkdirSync(homeDir,{recursive:true});
+  const env={NODE_TEST_CONTEXT:'child-v8',STARCI_AGENT_TRUST_HOME:trustHome};
+  const r=ensureLaunchTrust({agent:'codex',cwd,env,codexAppServer:appServer});
+  assert.notEqual(r.status,'failed',JSON.stringify(r));
+  assert.deepEqual(r.errors??[],[]);
+  assert.deepEqual(r.toolGuard,[{file:homeFile,written:true,trustedIn:[{home:homeDir,trusted:'written'}]}]);
+  assert.deepEqual(written,[{[`${homeFile}:pre_tool_use:0:0`]:{trusted_hash:'sha256:abc'}}]);
+  assert.equal(fs.existsSync(path.join(cwd,'.codex')),false,'the worktree keeps no project layer');
 });
 
 /* -------------------------------------------------- gate menu reading */
@@ -438,7 +470,7 @@ test('a dispatch consumes the current private owner decline and writes no provid
   assert.equal(json(refused.stdout)?.managed?.step,'launch-trust');
   assert.equal(fx.job()?.status,'ready');
   assert.equal(fs.existsSync(path.join(fx.trustHome,'.codex','config.toml')),false);
-  assert.equal(fs.existsSync(projectTargets(fx.repo).codexConfig),false);
+  assert.equal(fs.existsSync(path.join(fx.repo,'.codex','config.toml')),false);
   const calls=fs.readFileSync(fx.callsFile,'utf8').trim().split('\n').filter(Boolean).map(line=>JSON.parse(line).argv);
   assert.equal(calls.some(argv=>argv.slice(0,2).join(' ')==='orchestration worker-start'),false);
 });

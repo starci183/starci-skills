@@ -141,19 +141,26 @@ function trustCodexHome(ctx, home, keys) {
   return null;
 }
 
-// Codex hash trust of the guard hook in one home: the home's verdict for the receipt.
-function codexHookTrustIn(ctx, { file, hook, server, home }) {
-  const { receipt, dir, command } = ctx;
+// The guard hook of one Codex home: the block in the home's config.toml, then the hash Codex trusts it by. The
+// receipt entry names the home's file, whether the block was written and the home's verdict.
+function codexGuardIn(ctx, home, server) {
+  const { receipt, dir, command, hooks } = ctx;
+  const file = path.join(home.dir, 'config.toml');
+  const hook = guarded(file, () => writeCodexToolGuard({ file, command, hooks }));
+  if (!hook.ok) receipt.errors.push({ file, error: hook.error });
+  else receipt[hook.written ? 'written' : 'already'].push({ file, key: 'hooks.PreToolUse' });
   const trusted = hook.ok && server ? guarded(file, () => trustCodexToolGuard({ home: home.dir, cwd: dir, command, appServer: server })) : null;
-  if (trusted && !trusted.ok) receipt.errors.push({ file: path.join(home.dir, 'config.toml'), error: trusted.error });
-  return { home: home.dir, trusted: trusted ? ['failed', trusted.trusted][Number(Boolean(trusted.ok))] : 'not-checked' };
+  if (trusted && !trusted.ok) receipt.errors.push({ file, error: trusted.error });
+  const verdict = trusted ? ['failed', trusted.trusted][Number(Boolean(trusted.ok))] : 'not-checked';
+  return { file, ...(hook.written ? { written: true } : {}), trustedIn: [{ home: home.dir, trusted: verdict }] };
 }
 
-// Codex: the directory trust and the notices live in each Codex home (Codex reads a project layer only for a
-// trusted project); the guard hook lives in the worktree's project layer (<dir>/.codex/config.toml), and each home
-// records only Codex's hash that trusts it (hooks.state, keyed by that project file).
+// Codex: the directory trust, the notices and the guard hook live in each Codex home. Codex 0.160.0 loads a project
+// layer's hooks only from the main checkout of a repository, never from a linked worktree (every workflow launch
+// directory), so a hook written to <dir>/.codex is never listed; the home's own config.toml is the layer it lists
+// for every directory, and `starci guard command` acts only for a terminal the launch bound a guard to.
 function trustCodex(ctx) {
-  const { receipt, targets, project, dir, platform, command, hooks, env, appServer } = ctx;
+  const { receipt, targets, dir, platform, env, appServer } = ctx;
   receipt.paths = codexTrustPaths(dir);
   const keys = [...new Set(receipt.paths.flatMap((p) => codexKeyForms(p, platform)))];
   const homes = targets.codexHomes;
@@ -161,12 +168,8 @@ function trustCodex(ctx) {
     const failed = trustCodexHome(ctx, home, keys);
     if (failed) return failed;
   }
-  const file = project.codexConfig;
-  const hook = guarded(file, () => writeCodexToolGuard({ file, command, hooks }));
-  if (!hook.ok) receipt.errors.push({ file, error: hook.error });
-  else { receipt[hook.written ? 'written' : 'already'].push({ file, key: 'hooks.PreToolUse' }); excludeWritten(ctx, file); }
   // A re-rooted trust home (specs) never starts the real Codex: its app-server is injected, else the hash step waits.
   const server = appServer ?? (env.STARCI_AGENT_TRUST_HOME ? null : codexAppServer);
-  receipt.toolGuard = [{ file, ...(hook.written ? { written: true } : {}), trustedIn: homes.map((home) => codexHookTrustIn(ctx, { file, hook, server, home })) }];
+  receipt.toolGuard = homes.map((home) => codexGuardIn(ctx, home, server));
   return null;
 }

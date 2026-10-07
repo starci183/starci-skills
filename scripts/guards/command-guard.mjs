@@ -6,8 +6,9 @@
 // Every agent launches through Orca worker-start, which owns the agent's environment, so a guard can no longer ride
 // on the agent's PATH. The launch binds the op's guard to its Orca terminal instead (scripts/guards/hook-install.mjs
 // bindGuardTerminal -> <guards root>/terminals/<handle>.json) and launch trust registers this hook in the launch
-// worktree's PROJECT settings only (scripts/agent/trust.mjs projectTargets: .claude/settings.local.json,
-// .codex/config.toml, .devin/config.local.json), never a user-global settings file. The Kernel's launch binds a guard
+// worktree's PROJECT settings (scripts/agent/trust.mjs projectTargets: .claude/settings.local.json,
+// .devin/config.local.json) and, for Codex, in the config.toml of the managed Codex home (Codex lists no hook of a
+// linked worktree's project layer), never a user-global settings file of the owner's own tools. The Kernel's launch binds a guard
 // of role 'kernel' the same way (scripts/kernel/start-workflow.mjs, contract change kernel-guard-file): its raw shell
 // commands meet every rule below, and its `node cli.mjs <verb>` calls pass. A session with no Orca terminal, or whose
 // terminal has no guard bound (the [Supervisor], a lane, the owner's own sessions), meets ONE rule only, wherever this

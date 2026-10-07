@@ -21,7 +21,7 @@ test('a fresh worktree path gets its trust and the command guard hook before lau
     assert.notEqual(r?.status, 'failed', `${agent}: ${JSON.stringify(r?.errors)}`);
     assert.deepEqual(r.errors ?? [], [], `${agent}: no write error`);
     const project = projectTargets(path.resolve(dir));
-    const guardFile = agent === 'claude' ? project.claudeSettings : agent === 'codex' ? project.codexConfig : project.devinConfig;
+    const guardFile = { claude: project.claudeSettings, codex: path.join(fx.STARCI_AGENT_TRUST_HOME, '.codex', 'config.toml'), devin: project.devinConfig }[agent];
     assert.ok(fs.existsSync(guardFile), `${agent}: the project file that registers the command guard exists before launch`);
     assert.match(fs.readFileSync(guardFile, 'utf8'), /command-guard|PreToolUse/i, `${agent}: the PreToolUse command guard is registered next to the launch settings`);
     if (agent === 'claude') {

@@ -6,11 +6,11 @@
 // refuses the launch. Existing provider declines are preserved.
 //
 //   ensureLaunchTrust({ agent, cwd })
-//   SCOPE (lead ruling 2026-10-01): the command guard hook and every launch setting are written to the launch
-//   worktree's PROJECT files (projectTargets), never to a user-global settings file, so they reach only the agents
-//   the runtime starts in that worktree; each such file is kept out of git status through the repository's own
-//   info/exclude (excludeFromGit). The only per-user records are the ones a host keeps nowhere else: its trust of
-//   the directory, and Codex's trusted hash of the project hook.
+//   SCOPE (lead ruling 2026-10-01): the command guard hook and every launch setting of Claude and Devin are written
+//   to the launch worktree's PROJECT files (projectTargets), never to a user-global settings file, so they reach only
+//   the agents the runtime starts in that worktree; each such file is kept out of git status through the repository's
+//   own info/exclude (excludeFromGit). The per-user records are the ones a host keeps nowhere else: its trust of the
+//   directory, and Codex's guard hook with its trusted hash (the guard acts only for a terminal bound to a guard).
 //     claude → ~/.claude.json projects[<cwd>].hasTrustDialogAccepted = true, in
 //              every key form Claude writes (win32: `<drive>:/…` and `<drive>:\…`); in
 //              <cwd>/.claude/settings.local.json: skipDangerousModePermissionPrompt
@@ -21,10 +21,11 @@
 //              (CODEX_HOME or Orca's codex-runtime-home) for the launch
 //              cwd and the git root Codex keys trust by, in the key forms Codex
 //              writes (win32: a '<drive>:\lower\case' literal and a "<DRIVE>:\\exact" basic), plus the
-//              update-check and model-nudge notices; the guard hook in the project
-//              layer <cwd>/.codex/config.toml, and in each home only the hash Codex
-//              trusts it by (codex app-server hooks/list, then config/batchWrite
-//              hooks.state - the way Orca trusts its own hooks).
+//              update-check and model-nudge notices; the guard hook as a block in
+//              each home's own config.toml (Codex 0.160.0 lists a project
+//              layer's hooks only for a repository's main checkout, never for a linked
+//              worktree) and the hash Codex trusts it by (codex app-server hooks/list,
+//              then config/batchWrite hooks.state - the way Orca trusts its own hooks).
 //     devin  → <cwd>/.devin/config.local.json (Devin's local project config): the
 //              guard hook only: Devin has no per-worker model pin through Orca.
 //   Returns the receipt the launch event records:
@@ -88,13 +89,12 @@ export function trustTargets({ env = process.env, platform = process.platform } 
 }
 
 /**
- * The PROJECT-scoped files of the launch directory `dir` (never a user-global file): Claude's local project settings,
- * Codex's project config layer and Devin's local project config. They carry the command guard hook and each host's
- * launch settings, so they apply only to agents started in that worktree.
+ * The PROJECT-scoped files of the launch directory `dir` (never a user-global file): Claude's local project settings
+ * and Devin's local project config. They carry the command guard hook and each host's launch settings, so they
+ * apply only to agents started in that worktree.
  */
 export const projectTargets = (dir) => ({
   claudeSettings: path.join(dir, '.claude', 'settings.local.json'),
-  codexConfig: path.join(dir, '.codex', 'config.toml'),
   devinConfig: path.join(dir, '.devin', 'config.local.json'),
 });
 
