@@ -303,6 +303,20 @@ function checkedRuleIdsFor(config, hfs, hfsChecks, frontendChecked, coverage) {
     .sort(byCodeUnit);
 }
 
+/** The errors and the violations a surface reports: findings under the requested paths, on the requested surface, in stable order. */
+function scopeFindings({ config, context, violations, paths, surface }) {
+  const inScope = item => !paths.length || (item.path && paths.some(prefix => sameOrUnder(item.path, prefix.replace(/\/$/, ''))));
+  // Two findings travel as context errors (package boundary edges); they are obligations of the lint surface like any other finding.
+  const asViolation = item => LINT_CODES.has(item.ruleId);
+  const allErrors = context.errors.filter(item => item.ruleId.startsWith('ARCH_TSCONFIG_') || !item.path || inScope(item));
+  const obligations = surface === 'all' ? violations : [...violations, ...context.errors.filter(asViolation).filter(inScope)];
+  // The lint surface is what an editor can show on a line of a TypeScript file; `starci app check` keeps every other finding of the machine.
+  const onSurface = item => surface === 'all' || onLintSurface(config.root, item) === (surface === 'lint');
+  const errors = stable(surface === 'all' ? allErrors : allErrors.filter(item => !asViolation(item)));
+  const scopedViolations = stable(obligations.filter(inScope).filter(onSurface));
+  return { errors, scopedViolations };
+}
+
 /**
  * Check a target repository. injectedTypeScript exists only for hermetic rule fixtures. `fast` leaves out the checks
  * that read the whole repository to answer (clones, dead exports, repository-wide symbols); the pre-push check of the changed owners uses it.
@@ -345,15 +359,7 @@ export function checkArchitecture({ repositoryRoot, injectedTypeScript, paths = 
     frontendDataLifecycle = frontend.frontendDataLifecycle;
   }
   const hfsChecks = runHfsMachine(config, context, paths, injectedTypeScript, base, fast, violations);
-  const inScope = item => !paths.length || (item.path && paths.some(prefix => sameOrUnder(item.path, prefix.replace(/\/$/, ''))));
-  // Two findings travel as context errors (package boundary edges); they are obligations of the lint surface like any other finding.
-  const asViolation = item => LINT_CODES.has(item.ruleId);
-  const allErrors = context.errors.filter(item => item.ruleId.startsWith('ARCH_TSCONFIG_') || !item.path || inScope(item));
-  const obligations = surface === 'all' ? violations : [...violations, ...context.errors.filter(asViolation).filter(inScope)];
-  // The lint surface is what an editor can show on a line of a TypeScript file; `starci app check` keeps every other finding of the machine.
-  const onSurface = item => surface === 'all' || onLintSurface(config.root, item) === (surface === 'lint');
-  const errors = stable(surface === 'all' ? allErrors : allErrors.filter(item => !asViolation(item)));
-  const scopedViolations = stable(obligations.filter(inScope).filter(onSurface));
+  const { errors, scopedViolations } = scopeFindings({ config, context, violations, paths, surface });
   const sourceFiles = new Set(context.files.map(file => canonical(file.fileName)));
   const missingOwnerEntries = config.owners?.filter(owner => !sourceFiles.has(canonical(path.resolve(config.root, ...owner.entry.split('/'))))) ?? [];
   const coverage = {

@@ -32,42 +32,54 @@ const APP_ENTRY = 'main.ts';
 const ID = -1;
 const LIT = -2;
 
+const literalKindSet = (SyntaxKind) => new Set([SyntaxKind.StringLiteral, SyntaxKind.NumericLiteral, SyntaxKind.BigIntLiteral, SyntaxKind.RegularExpressionLiteral,
+  SyntaxKind.NoSubstitutionTemplateLiteral, SyntaxKind.TemplateHead, SyntaxKind.TemplateMiddle, SyntaxKind.TemplateTail, SyntaxKind.JsxText]);
+
+function lineOfPosition(lineStarts, position) {
+  let low = 0;
+  let high = lineStarts.length - 1;
+  while (low < high) {
+    const mid = (low + high + 1) >> 1;
+    if (lineStarts[mid] <= position) low = mid; else high = mid - 1;
+  }
+  return low + 1;
+}
+
+/** True for the nodes that carry no token: documentation comments and whitespace-only JSX text. */
+function isTriviaNode(SyntaxKind, node) {
+  const kind = node.kind;
+  if (kind >= SyntaxKind.FirstJSDocNode && kind <= SyntaxKind.LastJSDocNode) return true;
+  return kind === SyntaxKind.JsxText && Boolean(node.containsOnlyTriviaWhiteSpaces);
+}
+
+function normalizedKindOf(SyntaxKind, literalKinds, kind) {
+  if (kind === SyntaxKind.Identifier || kind === SyntaxKind.PrivateIdentifier) return ID;
+  return literalKinds.has(kind) ? LIT : kind;
+}
+
+function visitToken(walk, node, inType) {
+  const { ts, sourceFile, kinds, lines, types, lineStarts, literalKinds } = walk;
+  const { SyntaxKind } = ts;
+  if (isTriviaNode(SyntaxKind, node)) return;
+  const kind = node.kind;
+  const typeScope = inType || kind === SyntaxKind.InterfaceDeclaration || kind === SyntaxKind.TypeAliasDeclaration;
+  kinds.push(normalizedKindOf(SyntaxKind, literalKinds, kind));
+  lines.push(lineOfPosition(lineStarts, node.getStart(sourceFile)));
+  types.push(typeScope ? 1 : 0);
+  ts.forEachChild(node, (child) => { visitToken(walk, child, typeScope); });
+}
+
+/** Leading import and export-from statements repeat legitimately and are not tokenised. */
+const isDroppedStatement = (SyntaxKind, statement) => statement.kind === SyntaxKind.ImportDeclaration || statement.kind === SyntaxKind.ImportEqualsDeclaration
+  || (statement.kind === SyntaxKind.ExportDeclaration && statement.moduleSpecifier);
+
 export function tokenize(ts, sourceFile) {
   const { SyntaxKind } = ts;
-  const literalKinds = new Set([SyntaxKind.StringLiteral, SyntaxKind.NumericLiteral, SyntaxKind.BigIntLiteral, SyntaxKind.RegularExpressionLiteral,
-    SyntaxKind.NoSubstitutionTemplateLiteral, SyntaxKind.TemplateHead, SyntaxKind.TemplateMiddle, SyntaxKind.TemplateTail, SyntaxKind.JsxText]);
-  const kinds = [];
-  const lines = [];
-  const types = [];
-  const lineStarts = sourceFile.getLineStarts();
-  const lineOf = (position) => {
-    let low = 0;
-    let high = lineStarts.length - 1;
-    while (low < high) {
-      const mid = (low + high + 1) >> 1;
-      if (lineStarts[mid] <= position) low = mid; else high = mid - 1;
-    }
-    return low + 1;
-  };
-  const visit = (node, inType) => {
-    const kind = node.kind;
-    if (kind >= SyntaxKind.FirstJSDocNode && kind <= SyntaxKind.LastJSDocNode) return;
-    if (kind === SyntaxKind.JsxText && node.containsOnlyTriviaWhiteSpaces) return;
-    const typeScope = inType || kind === SyntaxKind.InterfaceDeclaration || kind === SyntaxKind.TypeAliasDeclaration;
-    let normalizedKind = kind;
-    if (kind === SyntaxKind.Identifier || kind === SyntaxKind.PrivateIdentifier) normalizedKind = ID;
-    else if (literalKinds.has(kind)) normalizedKind = LIT;
-    kinds.push(normalizedKind);
-    lines.push(lineOf(node.getStart(sourceFile)));
-    types.push(typeScope ? 1 : 0);
-    ts.forEachChild(node, (child) => { visit(child, typeScope); });
-  };
+  const walk = { ts, sourceFile, kinds: [], lines: [], types: [], lineStarts: sourceFile.getLineStarts(), literalKinds: literalKindSet(SyntaxKind) };
   for (const statement of sourceFile.statements) {
-    if (statement.kind === SyntaxKind.ImportDeclaration || statement.kind === SyntaxKind.ImportEqualsDeclaration
-      || (statement.kind === SyntaxKind.ExportDeclaration && statement.moduleSpecifier)) continue;
-    visit(statement, false);
+    if (!isDroppedStatement(SyntaxKind, statement)) visitToken(walk, statement, false);
   }
-  return { kinds: Int32Array.from(kinds), lines: Int32Array.from(lines), types: Uint8Array.from(types) };
+  return { kinds: Int32Array.from(walk.kinds), lines: Int32Array.from(walk.lines), types: Uint8Array.from(walk.types) };
 }
 
 /** The app a file belongs to, by the slot binding of the manifest; null for a file of no app. */
@@ -109,8 +121,7 @@ function signedInt32(value) {
   return Math.imul(value, 1);
 }
 
-const addFileWindows = (buckets, file, fileIndex, N, T, pow1, pow2, B1, B2) => {
-  const { kinds, lines } = file;
+const prefixHashes = (kinds, B1, B2) => {
   const count = kinds.length;
   const pre1 = new Int32Array(count + 1);
   const pre2 = new Int32Array(count + 1);
@@ -118,6 +129,20 @@ const addFileWindows = (buckets, file, fileIndex, N, T, pow1, pow2, B1, B2) => {
     pre1[i + 1] = Math.imul(pre1[i], B1) + kinds[i] + 3;
     pre2[i + 1] = Math.imul(pre2[i], B2) + kinds[i] + 7;
   }
+  return { pre1, pre2 };
+};
+
+const windowKey = (pre, pow, start, end) => signedInt32(pre[end] - Math.imul(pre[start], pow[end - start]));
+
+const addToBucket = (buckets, key, item) => {
+  const list = buckets.get(key);
+  if (list) list.push(item); else buckets.set(key, [item]);
+};
+
+const addFileWindows = (buckets, file, fileIndex, N, T, pow1, pow2, B1, B2) => {
+  const { kinds, lines } = file;
+  const count = kinds.length;
+  const { pre1, pre2 } = prefixHashes(kinds, B1, B2);
   let end = 0;
   for (let start = 0; start < count; start += 1) {
     if (start > 0 && lines[start] === lines[start - 1]) continue;
@@ -127,10 +152,8 @@ const addFileWindows = (buckets, file, fileIndex, N, T, pow1, pow2, B1, B2) => {
     if (end === start || lines[end - 1] - lines[start] + 1 < N) continue;
     const length = end - start;
     if (length < T) continue;
-    const key = `${signedInt32(pre1[end] - Math.imul(pre1[start], pow1[length]))}:${signedInt32(pre2[end] - Math.imul(pre2[start], pow2[length]))}:${length}`;
-    const list = buckets.get(key);
-    const item = [fileIndex, start, end];
-    if (list) list.push(item); else buckets.set(key, [item]);
+    const key = `${windowKey(pre1, pow1, start, end)}:${windowKey(pre2, pow2, start, end)}:${length}`;
+    addToBucket(buckets, key, [fileIndex, start, end]);
   }
 };
 
@@ -141,19 +164,30 @@ const sameTokens = (entries, a, b) => {
   return true;
 };
 
+/** The first other occurrence is the partner; overlapping windows of one file are one occurrence, not a copy. */
+const partnerOf = (list, item) => list.find((other) => other !== item && (other[0] !== item[0] || other[1] >= item[2] || item[1] >= other[2]));
+
+const orderedPair = (entries, item, partner) => {
+  const sameFile = entries[item[0]].rel === entries[partner[0]].rel;
+  const itemFirst = sameFile ? item[1] < partner[1] : entries[item[0]].rel < entries[partner[0]].rel;
+  return itemFirst ? [item, partner] : [partner, item];
+};
+
+const addHit = (hits, a, b) => {
+  const key = `${a[0]}|${b[0]}|${b[1] - a[1]}`;
+  const group = hits.get(key);
+  if (group) group.push([a[1], a[2]]); else hits.set(key, [[a[1], a[2]]]);
+};
+
 const cloneHits = (entries, buckets) => {
   const hits = new Map();
   for (const list of buckets.values()) {
     if (list.length < 2) continue;
     for (const item of list) {
-      // The first other occurrence is the partner; overlapping windows of one file are one occurrence, not a copy.
-      const partner = list.find((other) => other !== item && (other[0] !== item[0] || other[1] >= item[2] || item[1] >= other[2]));
+      const partner = partnerOf(list, item);
       if (!partner || !sameTokens(entries, item, partner)) continue;
-      const order = entries[item[0]].rel === entries[partner[0]].rel ? item[1] < partner[1] : entries[item[0]].rel < entries[partner[0]].rel;
-      const [a, b] = order ? [item, partner] : [partner, item];
-      const key = `${a[0]}|${b[0]}|${b[1] - a[1]}`;
-      const group = hits.get(key);
-      if (group) group.push([a[1], a[2]]); else hits.set(key, [[a[1], a[2]]]);
+      const [a, b] = orderedPair(entries, item, partner);
+      addHit(hits, a, b);
     }
   }
   return hits;
