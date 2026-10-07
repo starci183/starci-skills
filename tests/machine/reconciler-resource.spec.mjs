@@ -16,7 +16,7 @@ const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-rc-resource-spec-'));
 after(() => fs.rmSync(TMP, { recursive: true, force: true }));
 const T = 2_000_000_000_000;
 const GB = 1024 ** 3;
-const SETTINGS = { resources: { minFreeRamPct: 10, ramThrottle: { heavyResumeAbovePct: 15, landSpecPauseBelowPct: 2.5, landSpecResumeAbovePct: 5, hardFloorPct: 2.5 },
+const SETTINGS = { resources: { minFreeDiskGb: 5, minFreeRamPct: 10, ramThrottle: { heavyResumeAbovePct: 15, landSpecPauseBelowPct: 2.5, landSpecResumeAbovePct: 5, hardFloorPct: 2.5 },
   opRam: { default: { mb: 1200, class: 'light' } } } };
 
 function ctxOf(mode, extra = {}) {

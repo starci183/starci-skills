@@ -13,6 +13,8 @@ import { ownedPathsOf, getWorkflow } from './rows.mjs';
 import { releaseTypedWaits } from './peer-waits.mjs';
 import { queuedJobOp, refuseOwnerGate, refusePeerWait, opSlotsOrRefuse } from './job-gates.mjs';
 import { hostResourcesFor, HOST_RESOURCES_LOW } from '../../../machine/host-resources.mjs';
+import { tempRoot, TEMP_ROOT_ENV } from '../../../../engine/temp-root.mjs';
+import { ensureTempRoot } from '../../../api/fs/ensure-temp-root.mjs';
 import { hostThrottle, noteThrottled, releaseThrottled, DISPATCH_THROTTLED } from '../../../machine/ram-throttle.mjs';
 import { deferredQueueCause } from '../../autopilot-run.mjs';
 import { checkPrerequisites, prerequisiteDetail } from '../../prerequisites.mjs';
@@ -228,10 +230,18 @@ function throttledOf(d, host, throttle, admission) {
   };
 }
 
+/** The disk half of a host limit: the drive, what it keeps free, the config.yaml keys that move the floor and the temp root in use. */
+function diskLimitDetail(host) {
+  const floors = host.thresholds ?? {};
+  const required = fmtNum(host.requiredDiskGb ?? floors.minFreeDiskGb);
+  const pct = floors.minFreeDiskPct == null ? '' : ` / minFreeDiskPct ${floors.minFreeDiskPct}%`;
+  return `drive ${host.drive ?? '?'} has ${fmtNum(host.freeDiskGb)} GB free (below the ${required} GB floor; change it in config.yaml resources.minFreeDiskGb${pct}, or move the temp root with roots.temp / ${TEMP_ROOT_ENV} - the temp root in use is ${tempRoot()})`;
+}
+
 /** The sentence of a host limit: the disk floor and the RAM admission, each when it holds the job. */
 function hostLimitDetail(host, admission) {
   const parts = [];
-  if (host.lowDisk) parts.push(`drive ${host.drive ?? '?'} has ${fmtNum(host.freeDiskGb)} GB free (below allocation.resources.minFreeDiskGb ${host.thresholds?.minFreeDiskGb ?? '?'} GB)`);
+  if (host.lowDisk) parts.push(diskLimitDetail(host));
   if (admission && !admission.ok) parts.push(`RAM ${fmtNum(host.freeRamPct)}% free, effective cap ${admission.effectiveCap ?? '-'}/${admission.maxParallelOps ?? '-'} (${admission.running} running): ${admission.reason} - ${admission.detail}`);
   return `${parts.join('; ')}; the job stays queued and reads ready once there is room again - do not re-dispatch it by hand`;
 }
@@ -245,7 +255,7 @@ function recordThrottled(d, throttle, admission, throttled) {
 
 /**
  * Host resources are a launch gate on the same admission path as the provider circuit, checked before it, the leases and
- * any Orca call. Disk below allocation.resources.minFreeDiskGb never spawns another worker (scripts/machine/host-resources.mjs).
+ * any Orca call. Disk below the config.yaml resources floor (minFreeDiskGb / minFreeDiskPct, shipped default allocation.resources.minFreeDiskGb) never spawns another worker (scripts/machine/host-resources.mjs).
  * RAM and CPU go through the RAM-aware, priority-aware throttle (scripts/machine/ram-throttle.mjs, owner ruling
  * 2026-09-28): the effective cap min(maxParallelOps, what fits in free RAM) across every ledger of the host, heavy ops
  * paused below minFreeRamPct (the top-priority workflow's still start while they fit, until critical), every op sized by
@@ -254,6 +264,7 @@ function recordThrottled(d, throttle, admission, throttled) {
  */
 export function refuseHostLimits(d) {
   const { ledger, repo, jobId, op } = d;
+  try { ensureTempRoot(); } catch { /* the probe below reports a drive it cannot read */ }
   const host = hostResourcesFor({ env: process.env, repo });
   const throttle = hostThrottleOf(d, host);
   const admission = throttle?.admission ?? null;
