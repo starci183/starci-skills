@@ -288,3 +288,13 @@ test('the default registration is task register --apply with no review step, and
   assert.equal(calls[0].args[0].endsWith('starci.mjs'), true);
   assert.deepEqual(await runtimeLink({}, { run: async () => ({ error: new Error('exit 1'), stdout: '', stderr: 'no runtime root' }) }), { ok: false, error: 'no runtime root' });
 });
+
+test('both entry points are quiet and effect-free on a healthy host, so an interval can call them', async () => {
+  const healthy = [green('engine', 'engine', 'reconciler engine', 'up'), green('services', 'task:harness-app', 'scheduled task', 'ok'), idleSeat];
+  let effects = 0;
+  const deps = { gather: async () => healthy, applyHost: async () => { effects += 1; return ['x']; } };
+  const heal = await ensureHostRuntime({ waitMs: 0, scope: 'services' }, deps);
+  const check = await ensureHostRuntime({ waitMs: 0, check: true }, deps);
+  assert.deepEqual([effects, heal.applied, check.applied], [0, [], []]);
+  assert.equal(renderBrief(heal.items, { applied: heal.applied }), renderBrief(check.items, { applied: check.applied }), 'the same state renders the same text');
+});

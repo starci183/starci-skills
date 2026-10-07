@@ -59,6 +59,10 @@ harness tunnel, ask gateway and ask tunnel, and launches no agent seat. Each app
 (`linked launcher`, `registered task`, `service harness-ui`); a registration line carries the hash of the
 script it applied. `starci task register <name>` without `--apply` stays the manual review path.
 
+The two entry points, `starci reconciler up --check --brief` (status) and `starci reconciler up --services` (heal), are
+idempotent, start no agent seat, use no provider quota and print the same text for the same state, so a poller may run
+either on an interval; the heal applies nothing, and prints no APPLIED line, on a healthy host.
+
 Use `starci reconciler up --check --json` for the machine-readable checklist. A
 plain apply preserves local config. Profile changes, stale-ledger retirement and
 other wider effects require their existing owner authority and explicit native

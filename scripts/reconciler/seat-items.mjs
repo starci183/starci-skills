@@ -72,7 +72,7 @@ export async function coreDebugRow(env, { needed = true, status = null } = {}) {
 }
 
 /** Every running workflow of every managed repo: [{repo, workflowId}]. Read-only. */
-export async function runningWorkflowRows({ config = null } = {}) {
+async function runningWorkflowRows({ config = null } = {}) {
   const { resumeRepos, runningWorkflows } = await import('../kernel/managed-repos.mjs');
   const { repos } = resumeRepos({ config });
   return repos.flatMap((repo) => runningWorkflows(repo).map((wf) => ({ repo, workflowId: wf.workflowId })));
