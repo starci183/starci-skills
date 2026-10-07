@@ -439,6 +439,15 @@ test('a ledger with no registry row is never backed up: a typed log row and one 
   assert.equal(bare.calls.run.length, 0);
 });
 
+// The land gate's catalogue check (scripts/checks/check-failure-codes.mjs) refuses an emitted code with no entry:
+// every kebab-case reason the identity gate emits must be catalogued ('unregistered' is one word, so the scanner
+// never treats it as a code and it holds no entry).
+test('every refusal reason the ledger-backup identity gate emits is catalogued', () => {
+  const catalog = parseYaml(fs.readFileSync(new URL('../../modules/kernel/failure-codes.yaml', import.meta.url), 'utf8'));
+  for (const reason of ['registry-unavailable', 'registry-file-mismatch', 'identity-unreadable', 'identity-mismatch'])
+    assert.ok(catalog?.[reason]?.title && catalog[reason].owner && catalog[reason].kind, `${reason}: no catalogue entry`);
+});
+
 test('the supervisor seat runs its watchdog pass through ctx.run; chat mode runs nothing', async () => {
   const ctx = hostCtx({ dbs: { 'shop-be': ledgerDb() } });
   await booted(controller()).reconcile('seat:supervisor', ctx);

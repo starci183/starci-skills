@@ -8635,6 +8635,17 @@ identity-mismatch:
   owner: supervisor
   kind: runtime-fault
 
+identity-unreadable:
+  title: "Ledger file identity cannot be read"
+  title_vi: "Không đọc được danh tính của tệp sổ cái"
+  meaning_vi: "Tệp sổ cái không đọc được meta.ledger_id - truy vấn meta lỗi hoặc tệp không mang khóa đó - nên danh tính của nó không đối chiếu được với đăng ký máy và không có bản sao lưu nào được chụp."
+  causes_vi:
+    - "Tệp không phải là cơ sở dữ liệu ledger của runtime"
+    - "Bảng meta thiếu hoặc hỏng, hoặc tệp đang bị khoá"
+  nextStep_vi: "Giữ nguyên tệp và WAL; xác định đây có phải tệp sổ cái đúng không - nếu đúng thì khôi phục meta.ledger_id theo đăng ký, nếu sai thì đặt lại đúng tệp mà đăng ký trỏ tới."
+  owner: supervisor
+  kind: runtime-fault
+
 in-flight:
   title: "Repair job already in flight"
   title_vi: "Việc sửa đang được chạy sẵn"
@@ -10351,6 +10362,26 @@ recut-empty:
   nextStep_vi: "Không thêm job. Kernel chờ việc đang chạy xong hoặc cắt lại phạm vi rồi thử lại."
   owner: supervisor
   kind: verb-refusal
+registry-file-mismatch:
+  title: "Registry names another file for this ledger"
+  title_vi: "Đăng ký trỏ tới tệp khác cho sổ cái này"
+  meaning_vi: "Sổ đăng ký máy có dòng cho sổ cái này nhưng dòng đó đăng ký một tệp khác (hoặc không có tệp) chứ không phải tệp mà reconciler đang xét, nên đăng ký không xác nhận được danh tính của tệp này và không có bản sao lưu nào được chụp."
+  causes_vi:
+    - "Đăng ký trỏ tới đường dẫn tệp cũ hoặc sai"
+    - "Tệp sổ cái đã bị di chuyển mà đăng ký chưa cập nhật"
+  nextStep_vi: "Không sao lưu tệp này. Đối chiếu dòng ledgers trong machine.sqlite với đường dẫn thực tế cùng owner: sửa đăng ký về đúng tệp, hoặc đặt lại tệp mà đăng ký trỏ tới."
+  owner: supervisor
+  kind: runtime-fault
+registry-unavailable:
+  title: "Machine registry cannot name the ledger identity"
+  title_vi: "Không đọc được sổ đăng ký máy để định danh sổ cái"
+  meaning_vi: "Reconciler không đọc được sổ đăng ký máy (machine.sqlite) - handle ctx.machine.resolveLedger vắng mặt hoặc lượt đọc ném lỗi - nên không có danh tính kỳ vọng nào để đối chiếu và sao lưu bị từ chối thay vì suy ra là không có dòng đăng ký."
+  causes_vi:
+    - "Engine chưa mở machine.sqlite hoặc đang khởi động lại"
+    - "machine.sqlite bị khoá hoặc hỏng"
+  nextStep_vi: "Khôi phục handle machine.sqlite của engine rồi để lượt sau xác minh lại; không có bản sao lưu nào được chụp cho tới khi đăng ký đọc được."
+  owner: supervisor
+  kind: runtime-fault
 release-from-inside:
   title: "A workflow worktree release was asked from inside it"
   title_vi: "Yêu cầu gỡ cây làm việc của workflow từ bên trong chính nó"
