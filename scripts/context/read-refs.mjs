@@ -99,7 +99,13 @@ export function resolveReadReference(token, { sourceRoot, stateDir = null, appRo
   if (location.result) return location.result;
   const { original, rootKind } = location;
   let { rel, root } = location;
-  if (rel.includes('<') || !root) return { token: original, kind: 'template', rootKind, resolved: [], missing: rootKind === 'source' ? [original] : [], truncated: false };
+  // An unresolvable placeholder in a required (Source-law) read is a missing
+  // binding, never a file literally named '<x>': the refusal names the binding.
+  if (rel.includes('<') || !root) {
+    const unbound = [...rel.matchAll(/<([A-Za-z0-9_-]+)>/g)].map((match) => `unbound <${match[1]}> binding`);
+    const missing = rootKind === 'source' ? (unbound.length ? unbound : [original]) : [];
+    return { token: original, kind: 'template', rootKind, resolved: [], missing, truncated: false };
+  }
   root = path.resolve(root);
   if (!insidePath(root, path.resolve(root, rel), { includeSelf: true })) return { token: original, kind: 'invalid', rootKind, resolved: [], missing: [original], truncated: false };
   const patterns = braceVariants(rel), missing = [];
