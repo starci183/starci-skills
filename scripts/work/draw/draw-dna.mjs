@@ -129,8 +129,9 @@ const END_TAG_PATTERN = '<\\/([a-zA-Z][\\w:-]*)\\s*>';
 const START_TAG_NAME_PATTERN = '<([a-zA-Z][\\w:-]*)';
 const START_TAG_ATTRIBUTES_PATTERN = "((?:\\s+[^\\s\"'>/=]+(?:\\s*=\\s*(?:\"[^\"]*\"|'[^']*'|[^\\s\"'=<>`]+))?)*)\\s*(\\/?)>";
 const TAG_RX = new RegExp(`${MARKUP_TAG_PATTERN}|${END_TAG_PATTERN}|${START_TAG_NAME_PATTERN}${START_TAG_ATTRIBUTES_PATTERN}`, 'g');
-const ATTR_PATTERN = "([^\\s\"'>/=]+)(?:\\s*=\\s*(?:\"([^\"]*)\"|'([^']*)'|([^\\s\"'=<>`]+)))?";
-const ATTR_RX = new RegExp(ATTR_PATTERN, 'g');
+const ATTR_NAME_PATTERN = "([^\\s\"'>/=]+)";
+const ATTR_VALUE_PATTERN = "(?:\\s*=\\s*(?:\"([^\"]*)\"|'([^']*)'|([^\\s\"'=<>`]+)))?";
+const ATTR_RX = new RegExp(`${ATTR_NAME_PATTERN}${ATTR_VALUE_PATTERN}`, 'g');
 const decode = (s) => String(s).replaceAll('&nbsp;', ' ').replaceAll('&amp;', '&').replaceAll('&lt;', '<').replaceAll('&gt;', '>').replaceAll('&quot;', '"').replaceAll(/&#39;|&apos;/g, "'");
 
 function parseAttrs(text) {
@@ -179,7 +180,7 @@ export function parseHtml(html) {
     i = TAG_RX.lastIndex;
     const result = appendHtmlTag(s, m, cur, i);
     cur = result.current;
-    if (result.index !== null) { i = result.index; continue; }
+    if (result.index !== null) i = result.index;
   }
   appendParsedText(cur, s.slice(i));
   return root;
@@ -221,22 +222,33 @@ function dnaFileOf(family = DEFAULT_FAMILY, root = GRAMMARS) {
 
 const kebab = (s) => String(s).replace(/([a-z0-9])([A-Z])/g, '$1-$2').replace(/([A-Z])([A-Z][a-z])/g, '$1-$2').toLowerCase();
 
-function componentFromRenderer(r) {
-  const slug = kebab(r.component);
+const arrayOf = (value) => Array.isArray(value) ? value : [];
+
+function partsOfRenderer(slug, classes) {
   const parts = new Set();
-  for (const cls of Array.isArray(r.classes) ? r.classes : []) {
+  for (const cls of classes) {
     const bare = String(cls).replace(/^starci-core-/, '');
     const plain = bare.replace(/^generic-/, '');
     for (const p of [bare, plain, plain.startsWith(`${slug}-`) ? plain.slice(slug.length + 1) : null]) if (p) parts.add(p);
   }
   // The root spelled as a part (<slug>, <slug>-root, root) is the component itself.
   if (parts.size) for (const p of [slug, `${slug}-root`, 'root']) parts.add(p);
+  return parts;
+}
+
+function closedValuesOfRenderer(closedValues) {
   const closed = new Map();
-  for (const c of Array.isArray(r.closedValues) ? r.closedValues : []) {
+  for (const c of arrayOf(closedValues)) {
     if (!c?.prop) continue;
     closed.set(String(c.prop), { values: Array.isArray(c.values) ? c.values.map(String) : null, type: c.type ?? null });
   }
-  return { name: r.component, kind: r.kind ?? null, slug, parts, closed, classes: Array.isArray(r.classes) ? r.classes : [] };
+  return closed;
+}
+
+function componentFromRenderer(r) {
+  const slug = kebab(r.component);
+  const classes = arrayOf(r.classes);
+  return { name: r.component, kind: r.kind ?? null, slug, parts: partsOfRenderer(slug, classes), closed: closedValuesOfRenderer(r.closedValues), classes };
 }
 
 /**
@@ -443,6 +455,16 @@ function alertAnatomyFindings(alerts, label, out, same, clear) {
   }
 }
 
+function meterSegmentFindings(m, t, label, out) {
+  const segs = Array.isArray(m.segments) ? m.segments.filter((s) => Number(s.width) > 0).sort((x, y) => x.x - y.x) : [];
+  if (segs.length <= 1) return;
+  const widths = segs.map((s) => Number(s.width));
+  const gaps = segs.slice(1).map((s, i) => s.x - (segs[i].x + segs[i].width));
+  const covered = segs.at(-1).x + segs.at(-1).width - segs[0].x;
+  if (Math.max(...widths) - Math.min(...widths) > 2) out.push({ code: DRAW_METER_TRACK, kind: 'unequal Meter segments', detail: `${label}: ${m.desc ?? 'a Meter'} segments are ${widths.map(Math.round).join('/')}px - they divide the track equally` });
+  if (Math.max(...gaps) > METER_SEGMENT_GAP_MAX_PX || covered < Number(t.width) * METER_FULL_WIDTH_SHARE) out.push({ code: DRAW_METER_TRACK, kind: 'Meter segments do not fill the track', detail: `${label}: ${m.desc ?? 'a Meter'} segments cover ${Math.round(covered)}px of ${Math.round(t.width)}px with gaps up to ${Math.round(Math.max(...gaps))}px - small gaps, the full width` });
+}
+
 function meterAnatomyFindings(meters, label, out) {
   for (const m of meters) {
     const t = m.track;
@@ -451,14 +473,7 @@ function meterAnatomyFindings(meters, label, out) {
     if (Math.abs(Number(t.height) - want) > 0.5) out.push({ code: DRAW_METER_TRACK, kind: 'Meter track off its height', detail: label + ': ' + (m.desc ?? 'a Meter') + ' track renders ' + t.height + 'px tall (' + (want === METER_TRACK_PX ? 'HeroUI h-2 = ' + METER_TRACK_PX + 'px' : 'segmented h-1 = ' + METER_SEGMENTED_TRACK_PX + 'px') + ')' });
     const band = Number(m.band?.width) || 0;
     if (band > 0 && Number(t.width) < band * METER_FULL_WIDTH_SHARE) out.push({ code: DRAW_METER_TRACK, kind: 'Meter as a stub', detail: `${label}: ${m.desc ?? 'a Meter'} track is ${Math.round(t.width)}px of its band's ${Math.round(band)}px - it spans the full width` });
-    const segs = Array.isArray(m.segments) ? m.segments.filter((s) => Number(s.width) > 0).sort((x, y) => x.x - y.x) : [];
-    if (segs.length > 1) {
-      const widths = segs.map((s) => Number(s.width));
-      const gaps = segs.slice(1).map((s, i) => s.x - (segs[i].x + segs[i].width));
-      const covered = segs.at(-1).x + segs.at(-1).width - segs[0].x;
-      if (Math.max(...widths) - Math.min(...widths) > 2) out.push({ code: DRAW_METER_TRACK, kind: 'unequal Meter segments', detail: `${label}: ${m.desc ?? 'a Meter'} segments are ${widths.map(Math.round).join('/')}px - they divide the track equally` });
-      if (Math.max(...gaps) > METER_SEGMENT_GAP_MAX_PX || covered < Number(t.width) * METER_FULL_WIDTH_SHARE) out.push({ code: DRAW_METER_TRACK, kind: 'Meter segments do not fill the track', detail: `${label}: ${m.desc ?? 'a Meter'} segments cover ${Math.round(covered)}px of ${Math.round(t.width)}px with gaps up to ${Math.round(Math.max(...gaps))}px - small gaps, the full width` });
-    }
+    meterSegmentFindings(m, t, label, out);
   }
 }
 
