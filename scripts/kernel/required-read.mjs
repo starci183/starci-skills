@@ -71,7 +71,7 @@ export function kernelReadManifest(db, workflowId, { root, authority, ops = [], 
     }
     const manifest = { schema: KERNEL_READ_SCHEMA, workflowId, rev, revision, incarnation: authority.digest, ops: requiredOps, files: rows };
     return { ...manifest, digest: sha256(JSON.stringify(manifest)) };
-  } catch (error) { if (error.code === 'kernel-read-unverified') throw error; throw refuse(`required read unavailable: ${String(error?.message ?? error)}`); }
+  } catch (error) { if (error.code === 'kernel-read-unverified') { throw error; } throw refuse(`required read unavailable: ${String(error?.message ?? error)}`); }
 }
 
 /** A complete explicit attestation equals the current server-derived plan, including its exact hash rows. */

@@ -81,7 +81,7 @@ export function decodeBase85Line(line) {
   const out = [];
   for (let i = 1; i + 5 <= line.length; i += 5) {
     let acc = 0;
-    for (let j = 0; j < 5; j++) { const v = B85_INDEX.get(line[i + j]); if (v == null) throw new Error('bad base85 char'); acc = acc * 85 + v; }
+    for (let j = 0; j < 5; j++) { const v = B85_INDEX.get(line[i + j]); if (v == null) { throw new Error('bad base85 char'); } acc = acc * 85 + v; }
     out.push((acc >>> 24) & 255, (acc >>> 16) & 255, (acc >>> 8) & 255, acc & 255);
   }
   return Buffer.from(out.slice(0, len));
@@ -100,7 +100,7 @@ function patchParser({ caps = diffCaps(), onLiteral = null } = {}) {
   let mode = 'mail', subject = null, blobs = null;
   let binary = null; // {side, kind, size, lines:[]}
   const fileFor = (p, oldPath, status) => {
-    if (files.has(p)) { const f = files.get(p); f.touches += 1; if (status === 'D') f.status = f.status === 'A' ? 'A' : 'D'; return f; }
+    if (files.has(p)) { const f = files.get(p); f.touches += 1; if (status === 'D') { f.status = f.status === 'A' ? 'A' : 'D'; } return f; }
     if (files.size >= caps.files) { omitted.add(p); anyTruncated = true; return { path: p, omitted: true, added: 0, removed: 0, hunks: [], touches: 1 }; }
     const f = { path: p, oldPath: oldPath && oldPath !== p ? oldPath : null, status, added: 0, removed: 0, language: languageOf(p), binary: false, image: isImagePath(p), touches: 1, hunks: [], truncated: false, lineCount: 0 };
     files.set(p, f);
@@ -164,55 +164,71 @@ function patchParser({ caps = diffCaps(), onLiteral = null } = {}) {
     if (subject != null && commits.length && commits.at(-1).subject == null && l === '') { commits.at(-1).subject = redactText(subject.trim()).slice(0, 300); return true; }
     return false;
   };
-  /** A diff file-header line; false only for the @@ hunk header, which starts the file and falls through. */
-  const onPendingLine = (l) => {
+  const onPendingNameLine = (l) => {
     if (l.startsWith('new file mode')) { pending.status = 'A'; return true; }
     if (l.startsWith('deleted file mode')) { pending.status = 'D'; return true; }
     if (l.startsWith('rename from ')) { pending.a = unquoteGitPath(l.slice(12)); pending.status = 'R'; return true; }
     if (l.startsWith('rename to ')) { pending.b = unquoteGitPath(l.slice(10)); pending.status = 'R'; return true; }
     if (l.startsWith('copy from ')) { pending.a = unquoteGitPath(l.slice(10)); pending.status = 'A'; return true; }
     if (l.startsWith('copy to ')) { pending.b = unquoteGitPath(l.slice(8)); return true; }
-    if (l.startsWith('index ')) { const m = /^index ([0-9a-f]+)\.\.([0-9a-f]+)/.exec(l); if (m) blobs = [m[1], m[2]]; return true; }
-    if (l.startsWith('--- ')) { const a = stripSide(l.slice(4)); if (a) pending.a = a; return true; }
-    if (l.startsWith('+++ ')) { const b = stripSide(l.slice(4)); if (b) pending.b = b; else if (pending.status === 'D') pending.b = null; startFile(); return true; }
-    if (l.startsWith('GIT binary patch') || (l.startsWith('Binary files ') && l.endsWith(' differ'))) {
-      startFile();
-      if (!file.omitted) file.binary = true;
-      if (l.startsWith('GIT binary patch')) binary = { side: 'wait-forward' };
-      return true;
-    }
+    return false;
+  };
+  const onPendingBinaryLine = (l) => {
+    if (!l.startsWith('GIT binary patch') && !(l.startsWith('Binary files ') && l.endsWith(' differ'))) return false;
+    startFile();
+    if (!file.omitted) file.binary = true;
+    if (l.startsWith('GIT binary patch')) binary = { side: 'wait-forward' };
+    return true;
+  };
+  /** A diff file-header line; false only for the @@ hunk header, which starts the file and falls through. */
+  const onPendingLine = (l) => {
+    if (onPendingNameLine(l)) return true;
+    if (l.startsWith('index ')) { const m = /^index ([0-9a-f]+)\.\.([0-9a-f]+)/.exec(l); if (m) { blobs = [m[1], m[2]]; } return true; }
+    if (l.startsWith('--- ')) { const a = stripSide(l.slice(4)); if (a) { pending.a = a; } return true; }
+    if (l.startsWith('+++ ')) { const b = stripSide(l.slice(4)); if (b) { pending.b = b; } else if (pending.status === 'D') { pending.b = null; } startFile(); return true; }
+    if (onPendingBinaryLine(l)) return true;
     if (/^(old|new) mode |^similarity index |^dissimilarity index /.test(l)) return true;
     if (!l.startsWith('@@')) return true;
     startFile();
     return false;
+  };
+  const startCommit = (l) => {
+    if (!l.startsWith('From ') || !/^From [0-9a-f]{40} /.test(l)) return false;
+    commits.push({ sha: l.slice(5, 45), subject: null }); mode = 'mail'; subject = null; file = null; hunk = null;
+    return true;
+  };
+  const startDiff = (l) => {
+    if (!l.startsWith('diff --git ')) return false;
+    startFile();
+    mode = 'diff'; hunk = null; blobs = null;
+    const [a, b] = pathsOfDiffLine(l);
+    pending = { a, b, status: 'M' };
+    file = null;
+    return true;
+  };
+  const onDiffLine = (l) => {
+    if (mode !== 'diff') return;
+    if (pending && onPendingLine(l)) return;
+    const h = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@(.*)$/.exec(l);
+    if (h && file) {
+      oldNo = Number(h[1]); newNo = Number(h[3]);
+      oldLeft = h[2] == null ? 1 : Number(h[2]); newLeft = h[4] == null ? 1 : Number(h[4]);
+      hunk = { header: redactText(l).slice(0, 400), oldStart: oldNo, newStart: newNo, lines: [] };
+      if (!file.omitted && file.lineCount < caps.fileLines && totalLines < caps.totalLines) file.hunks.push(hunk);
+      else { file.truncated = !file.omitted; anyTruncated = true; }
+      return;
+    }
+    if (l === '-- ') { mode = 'sig'; file = null; hunk = null; }
   };
   return {
     line(raw) {
       const l = raw.endsWith('\r') ? raw.slice(0, -1) : raw;
       if (hunk && (oldLeft > 0 || newLeft > 0)) { onHunkLine(l); return; }
       if (binary && onBinaryLine(l)) return;
-      if (l.startsWith('From ') && /^From [0-9a-f]{40} /.test(l)) { commits.push({ sha: l.slice(5, 45), subject: null }); mode = 'mail'; subject = null; file = null; hunk = null; return; }
+      if (startCommit(l)) return;
       if (onMailLine(l)) return;
-      if (l.startsWith('diff --git ')) {
-        startFile();
-        mode = 'diff'; hunk = null; blobs = null;
-        const [a, b] = pathsOfDiffLine(l);
-        pending = { a, b, status: 'M' };
-        file = null;
-        return;
-      }
-      if (mode !== 'diff') return;
-      if (pending && onPendingLine(l)) return;
-      const h = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@(.*)$/.exec(l);
-      if (h && file) {
-        oldNo = Number(h[1]); newNo = Number(h[3]);
-        oldLeft = h[2] == null ? 1 : Number(h[2]); newLeft = h[4] == null ? 1 : Number(h[4]);
-        hunk = { header: redactText(l).slice(0, 400), oldStart: oldNo, newStart: newNo, lines: [] };
-        if (!file.omitted && file.lineCount < caps.fileLines && totalLines < caps.totalLines) file.hunks.push(hunk);
-        else { file.truncated = !file.omitted; anyTruncated = true; }
-        return;
-      }
-      if (l === '-- ') { mode = 'sig'; file = null; hunk = null; }
+      if (startDiff(l)) return;
+      onDiffLine(l);
     },
     finish() {
       startFile();

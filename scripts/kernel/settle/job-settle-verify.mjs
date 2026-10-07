@@ -72,6 +72,19 @@ async function checkRowBlobs(row, blobs) {
   return { raw };
 }
 
+const storedCheckOf = async (row, byName, blobs) => {
+  const got = await checkRowBlobs(row, blobs);
+  if (got.reason) return got;
+  const raw = got.raw;
+  const claim = byName.get(row.name) ?? {};
+  const output = raw.output ? parse(raw.output.toString('utf8')) : null;
+  if (raw.output && output === null) return { reason: 'check-output-invalid', detail: [`${row.name}:output is not JSON`] };
+  return { check: { ...claim, name: row.name, command: row.command ?? claim.command ?? '', exitCode: row.exit_code ?? row.declared_exit_code,
+    status: row.status, phase: row.phase, summary: parse(row.summary_json), ...(output !== null ? { output } : {}),
+    ...(raw.stdout ? { stdoutTail: raw.stdout.toString('utf8').slice(-300) } : {}),
+    ...(raw.stderr ? { stderrTail: raw.stderr.toString('utf8').slice(-300) } : {}) } };
+};
+
 /** Blob references are read and verified before a recorded check is trusted. */
 async function checksFromStore(db, item, { store = null } = {}) {
   const rows = checkRunsOf(db, item);
@@ -80,16 +93,9 @@ async function checksFromStore(db, item, { store = null } = {}) {
   const byName = new Map(declared.map((c) => [String(c.name), c]));
   const checks = [];
   for (const row of rows) {
-    const got = await checkRowBlobs(row, blobs);
-    if (got.reason) return { reason: got.reason, detail: got.detail };
-    const raw = got.raw;
-    const claim = byName.get(row.name) ?? {};
-    const output = raw.output ? parse(raw.output.toString('utf8')) : null;
-    if (raw.output && output === null) return { reason: 'check-output-invalid', detail: [`${row.name}:output is not JSON`] };
-    checks.push({ ...claim, name: row.name, command: row.command ?? claim.command ?? '', exitCode: row.exit_code ?? row.declared_exit_code,
-      status: row.status, phase: row.phase, summary: parse(row.summary_json), ...(output !== null ? { output } : {}),
-      ...(raw.stdout ? { stdoutTail: raw.stdout.toString('utf8').slice(-300) } : {}),
-      ...(raw.stderr ? { stderrTail: raw.stderr.toString('utf8').slice(-300) } : {}) });
+    const stored = await storedCheckOf(row, byName, blobs);
+    if (stored.reason) return stored;
+    checks.push(stored.check);
   }
   if (declared.length !== checks.length || declared.some((c) => !checks.some((r) => r.name === c.name)))
     return { reason: 'check-run-missing', detail: [
