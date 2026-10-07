@@ -182,6 +182,16 @@ const npmRun = (args, { cwd, env, timeout }) => {
 };
 
 /** The candidate-tarball substitutions the unit's manifests request: {requested, changes}, or a {status, output} refusal. */
+const recordPackageRequest = ({ manifest, dir, section, name, version, candidates, own, locked, requested, changes }) => {
+  const candidate = candidates.get(name);
+  if (!name.startsWith('@starci/') || !candidate || own.includes(candidate.dir)) return null;
+  if (version !== candidate.manifest.version) return { status: 'red', output: `${manifest.name} declares ${name}@${version}, but the candidate is ${candidate.manifest.version}: no tarball substitution` };
+  if (locked || section === 'peerDependencies') return { status: 'unrun', output: `${manifest.name} needs local ${name}@${version}, but ${locked ? 'a locked install' : 'a peer dependency'} cannot substitute a candidate tarball without changing its dependency contract` };
+  requested.set(name, candidate);
+  changes.push({ dir, section, name });
+  return null;
+};
+
 const collectRequests = ({ own, candidates, locked }) => {
   const requested = new Map();
   const changes = [];
@@ -189,12 +199,8 @@ const collectRequests = ({ own, candidates, locked }) => {
   for (const dir of own) {
     const manifest = readJson(path.join(dir, 'package.json'));
     for (const section of [...sections, 'peerDependencies']) for (const [name, version] of Object.entries(manifest[section] ?? {})) {
-      const candidate = candidates.get(name);
-      if (!name.startsWith('@starci/') || !candidate || own.includes(candidate.dir)) continue;
-      if (version !== candidate.manifest.version) return { status: 'red', output: `${manifest.name} declares ${name}@${version}, but the candidate is ${candidate.manifest.version}: no tarball substitution` };
-      if (locked || section === 'peerDependencies') return { status: 'unrun', output: `${manifest.name} needs local ${name}@${version}, but ${locked ? 'a locked install' : 'a peer dependency'} cannot substitute a candidate tarball without changing its dependency contract` };
-      requested.set(name, candidate);
-      changes.push({ dir, section, name });
+      const outcome = recordPackageRequest({ manifest, dir, section, name, version, candidates, own, locked, requested, changes });
+      if (outcome !== null) return outcome;
     }
   }
   return { requested, changes };
@@ -314,6 +320,15 @@ const testPackage = (pkg, { placed, install, localDependencies, childEnv, npm, r
   return result(pkg, 'green', null, { install, ...(localDependencies.length ? { localDependencies } : {}) });
 };
 
+const installationResults = (installed, install, every) => {
+  if (installed.error && !installed.timedOut) return every('unrun', PROOF_CODES.unrun, { install, output: `npm could not start: ${installed.error.message}` });
+  if (installed.status !== 0) {
+    const unrun = installed.timedOut || NETWORK.test(installed.output);
+    return every(unrun ? 'unrun' : 'red', unrun ? PROOF_CODES.unrun : PROOF_CODES.install, { install, output: tail(installed.output) });
+  }
+  return null;
+};
+
 /**
  * Prove one install unit in a fresh temp directory. Returns one result per published package:
  * {name, dir, status: 'green'|'red'|'unrun', code, install, ms, output}.
@@ -336,11 +351,8 @@ function proveUnit(unit, { root = runtimeRoot, env = process.env, npm = npmRun, 
     if (prepared.status) return every(prepared.status, prepared.status === 'red' ? PROOF_CODES.install : PROOF_CODES.unrun, { install, output: prepared.output });
     const localDependencies = prepared.payloads.map(({ name, version, files }) => ({ name, version, packedFiles: [...files.keys()].sort(byCodeUnit) }));
     const installed = npm([locked ? 'ci' : 'install', '--no-audit', '--no-fund'], { cwd: installRoot, env: childEnv, timeout: INSTALL_TIMEOUT_MS });
-    if (installed.error && !installed.timedOut) return every('unrun', PROOF_CODES.unrun, { install, output: `npm could not start: ${installed.error.message}` });
-    if (installed.status !== 0) {
-      const unrun = installed.timedOut || NETWORK.test(installed.output);
-      return every(unrun ? 'unrun' : 'red', unrun ? PROOF_CODES.unrun : PROOF_CODES.install, { install, output: tail(installed.output) });
-    }
+    const installResults = installationResults(installed, install, every);
+    if (installResults !== null) return installResults;
     const dependencyFailure = verifyPackedDependencies(prepared.payloads, installRoot);
     if (dependencyFailure) return every('red', PROOF_CODES.install, { install, localDependencies, output: dependencyFailure });
     return unit.packages.map((pkg) => testPackage(pkg, { placed, install, localDependencies, childEnv, npm, result }));
