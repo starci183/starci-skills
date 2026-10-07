@@ -1103,9 +1103,9 @@ function main() {
   sstar = dedupeVars(sstar);
 
   // SURVEY -> S0
-  const s0 = args.simulate ? { records: [], vars: new Map(), gaps: [], note: 'simulated: S0 = empty' }
-    : args.state ? surveyS0(path.resolve(args.state))
-    : null;
+  let s0 = null;
+  if (args.simulate) s0 = { records: [], vars: new Map(), gaps: [], note: 'simulated: S0 = empty' };
+  else if (args.state) s0 = surveyS0(path.resolve(args.state));
 
   // IMPACT ANALYSIS before planning (existing.yaml survey): a goal that names a surveyed feature EXTENDS it.
   const impact = args.text && !args.targets.length && !args.targetJson ? impactOf(args.text, s0, hints.archetypes ?? []) : null;
