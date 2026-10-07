@@ -12,6 +12,8 @@ import { slash } from '../lib/path-key.mjs';
 import { SKILL_ROOT } from './guards-root.mjs';
 import { boundGuard, boundSeat, gitListFormRead, gitSubOf, nodeWholeSuite, pushTargets, refusal as baseRefusal, rightsRoleOf } from './rights.mjs';
 import { refusalLines } from './refusals.mjs';
+import { kernelMailboxVerdict } from './install-verdict.mjs';
+import { orcaSelfLifecycleAllowed } from './orca-self-lifecycle.mjs';
 
 const policyCache = new Map();
 const compiledCache = new WeakMap();
@@ -211,9 +213,14 @@ const nodePolicyVerdict = ({ role, args, p, guard, text }) => {
   return raw(role, text, genericUse, 'Node.js script');
 };
 
-const orcaPolicyVerdict = ({ role, args, p, policy, text }) => {
+const orcaPolicyVerdict = ({ role, args, p, policy, guard, handle, text }) => {
   const [group, verb] = args;
-  if (p.orcaGroups.has(group) && p.orcaRead.has(verb)) return null;
+  const mailbox = kernelMailboxVerdict('orca', args, guard);
+  if (mailbox) return mailbox;
+  if (orcaSelfLifecycleAllowed({ role, args, handle, policy })) return null;
+  // Implicit current-terminal checks retain their existing read admission; an explicit target must prove self.
+  const targetedCheck = group === 'orchestration' && verb === 'check' && hasOption(args.slice(2), '--terminal');
+  if (!targetedCheck && p.orcaGroups.has(group) && p.orcaRead.has(verb)) return null;
   return raw(role, text, useOf(policy.orca, genericUse), 'Orca mutation');
 };
 
@@ -222,7 +229,7 @@ const specificCommandVerdict = (context) => {
   if (program === 'git') return gitPolicyVerdict({ role, args, p, policy, text });
   if (p.npmPrograms.has(program)) return npmPolicyVerdict({ role, args, p, policy, guard, handle, lockOwner, text });
   if (program === 'node') return nodePolicyVerdict({ role, args, p, guard, text });
-  if (program === 'orca') return orcaPolicyVerdict({ role, args, p, policy, text });
+  if (program === 'orca') return orcaPolicyVerdict({ role, args, p, policy, guard, handle, text });
   return undefined;
 };
 

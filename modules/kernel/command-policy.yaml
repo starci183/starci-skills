@@ -151,8 +151,28 @@ raw-tools:
   wget: {use: 'ask the owner or use the service catalog command'}
   ssh: {use: 'ask the owner'}
   scp: {use: 'ask the owner'}
-# Orca: reads pass; every mutation goes through the runtime verbs.
+# Orca: reads pass; only the caller's own worker protocol bypasses the runtime mutation verbs.
 orca:
   read: [check, worker-show, worker-list, worker-read, inbox, run-show, run-list, task-show, task-list, status, list, read, show, tail, get, wait-none]
   groups-read: [terminal, worktree, repo, orchestration]
+  # Kernel guards resolve to lead. Supervisor workers resolve to supervisor; app workers resolve to op.
+  # The Kernel mailbox refusal (install-verdict.mjs KERNEL_ORCA_CHECK) still precedes admission.
+  self-lifecycle:
+    group: orchestration
+    roles: [op, lead, supervisor, coordinator]
+    verbs:
+      send:
+        identity: --from
+        types: [heartbeat, worker_done, escalation]
+        values: [--from, --type, --subject, --body, --to, --run, --priority, --thread-id, --payload, --task-id, --dispatch-id,
+          --outcome, --files-modified, --report-path, --phase, --dispatch-capability, --retry-request]
+        flags: [--json, --help]
+      ask:
+        identity: --from
+        values: [--from, --question, --resume, --to, --run, --options, --timeout-ms, --dispatch-capability, --retry-request]
+        flags: [--json, --help]
+      check:
+        identity: --terminal
+        values: [--terminal, --run, --ack, --types, --timeout-ms, --retry-request]
+        flags: [--json, --help, --unread, --peek, --all, --format, --wait]
   use: starci worker start, starci worker show, starci worker read, starci worker list, starci worker stop, starci worker release, or starci worker close
