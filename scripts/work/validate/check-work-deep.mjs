@@ -4,11 +4,13 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {parseYaml} from '../../../engine/yaml.mjs';
 import {sha256} from '../../../engine/digest.mjs';
-import { log as gitLog } from '../../api/git/log.mjs';
-import { gitOutputOf } from '../../lib/git.mjs';
 import {ID_RE, walk} from './check-example-work.mjs';
-import {APP_SIDES, appRootOf, readWorkspace, resolveOwnedDirs, repoRootFor, moduleRootOf, loadRecords, indexInlineCriteria, splitRef, resolveRecordRef} from '../record-ownership.mjs';
+import {APP_SIDES, appRootOf, readWorkspace, loadRecords, indexInlineCriteria, splitRef, resolveRecordRef} from '../record-ownership.mjs';
 import { isMain } from '../../lib/is-main.mjs';
+import { fromRoot } from './work-consistency-shared.mjs';
+import { recordRules } from './work-deep-records.mjs';
+import { checkSurfaces } from './work-deep-surfaces.mjs';
+export { runTimeOf } from './work-deep-records.mjs';
 
 /**
  * Deep/semantic staleness checks layered on top of check-example-work.mjs, which only sees local shape:
@@ -30,22 +32,6 @@ import { isMain } from '../../lib/is-main.mjs';
  */
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
-const PROOF_SPEC_PATH_PART = '[\\w./-]+';
-const PROOF_SPEC_KIND_PART = '(?:spec|e2e-spec|test)';
-const proofSpecExpression = () => new RegExp(PROOF_SPEC_PATH_PART + '\\.' + PROOF_SPEC_KIND_PART + '\\.ts', 'g');
-
-/** The instant a work/evidence@1 run object was minted, from its id (`20260919T155312Z-5c10a673`); null when there is none. */
-export function runTimeOf(run) {
-  const m = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z-/.exec(run && typeof run === 'object' ? String(run.id ?? '') : '');
-  return m ? new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6])) : null;
-}
-
-/** The files under `dirs` that a commit after `since` touched (repository-relative, unique); [] outside a Git work tree. */
-function committedSince(cwd, since, dirs) {
-  let out = '';
-  try { out = gitOutputOf(gitLog([`--since=${since.toISOString()}`, '--format=', '--name-only', '--', ...dirs], { cwd })); } catch { return []; }
-  return [...new Set(out.split(/\r?\n/).filter(Boolean))];
-}
 
 /** Canonical JSON with sorted keys - stable hashing regardless of yaml field order. */
 const canon = value => JSON.stringify(value, (_, v) =>
@@ -82,85 +68,83 @@ function depsOf(data) {
   return deps;
 }
 
-// ---------- code surface extraction (SUSPECT-tier heuristics) ----------
-const SKIP = new Set(['node_modules', 'dist', '.next', '.starciwork']);
-const srcFiles = (dir, ext) => {
-  if (!fs.existsSync(dir)) return [];
-  return walk(dir).filter(f => f.endsWith(ext) && !f.split(path.sep).some(s => SKIP.has(s)));
-};
-
-/** HTTP routes from NestJS controllers: @Controller prefix + method decorators in the same file. */
-function httpRoutes(repoRoot) {
-  const routes = [];
-  for (const file of srcFiles(path.join(repoRoot, 'src'), '.controller.ts')) {
-    const text = fs.readFileSync(file, 'utf8');
-    const prefix = /@Controller\(\s*['"]([^'"]*)/.exec(text)?.[1] ?? '';
-    for (const m of text.matchAll(/@(Get|Post|Put|Patch|Delete|Head|Options)\(\s*['"]([^'"]*)['"]?\s*\)/g)) {
-      routes.push({method: m[1].toUpperCase(), path: `/${[prefix, m[2]].filter(Boolean).join('/')}`.replace(/\/+/g, '/'), file});
-    }
-    // bare @Get() with no arg
-    for (const m of text.matchAll(/@(Get|Post|Put|Patch|Delete)\(\s*\)/g)) {
-      routes.push({method: m[1].toUpperCase(), path: `/${prefix}`.replace(/\/+/g, '/'), file});
-    }
-  }
-  return routes;
-}
-
-/** GraphQL operations: `graphql/{queries,mutations}/<cap>/<op>/` dirs anywhere under src (this codebase
- * nests them per-feature: src/features/<feature>/graphql/...), plus @Query/@Mutation decorated methods. */
-function gqlOps(repoRoot) {
-  const ops = [];
-  const srcRoot = path.join(repoRoot, 'src');
-  const findOpDirs = dir => {
-    if (!fs.existsSync(dir)) return;
-    for (const entry of fs.readdirSync(dir, {withFileTypes: true})) {
-      if (!entry.isDirectory() || SKIP.has(entry.name)) continue;
-      const abs = path.join(dir, entry.name);
-      const parent = path.basename(dir);
-      if ((entry.name === 'queries' || entry.name === 'mutations') && parent === 'graphql') {
-        const kind = entry.name.slice(0, -1);
-        for (const cap of fs.readdirSync(abs).filter(d => fs.statSync(path.join(abs, d)).isDirectory())) {
-          const capDir = path.join(abs, cap);
-          for (const op of fs.readdirSync(capDir).filter(d => fs.statSync(path.join(capDir, d)).isDirectory())) {
-            ops.push({kind, cap, op, file: path.join(capDir, op)});
-          }
-        }
-      } else {
-        findOpDirs(abs);
-      }
-    }
-  };
-  findOpDirs(srcRoot);
-  for (const file of srcFiles(repoRoot, '.resolver.ts')) {
-    const text = fs.readFileSync(file, 'utf8');
-    for (const m of text.matchAll(/@(Query|Mutation)\b[^)]*\)\s*(?:async\s+)?(\w+)\s*\(/g)) {
-      ops.push({kind: m[1].toLowerCase(), op: m[2], file});
-    }
-  }
-  return ops;
-}
-
-/** FE routes: every dir under src/app that holds a page.tsx, normalised ([lang] stripped). */
-function feRoutes(repoRoot) {
-  const appDir = path.join(repoRoot, 'src', 'app');
-  return srcFiles(appDir, 'page.tsx').map(f => {
-    const rel = path.relative(appDir, path.dirname(f)).replaceAll('\\', '/');
-    return '/' + rel.split('/').filter(s => s && !/^\[.*\]$/.test(s)).join('/');
-  }).map(p => ({route: p.replace(/\/+/g, '/') || '/', file: null}));
-}
-
-/** Domain events: `class XxxEvent` declarations (this codebase uses class-based events, not string emits). */
-function eventClasses(repoRoot) {
-  const names = new Set();
-  for (const file of srcFiles(path.join(repoRoot, 'src'), '.ts')) {
-    for (const m of fs.readFileSync(file, 'utf8').matchAll(/class\s+(\w+Event)\b/g)) names.add(m[1]);
-  }
-  return names;
-}
-
-const eventClassOf = id => id.replace(/^event\./, '').split('.').map(s => s.replace(/(^|-)(\w)/g, (_, __, c) => c.toUpperCase())).join('') + 'Event';
-
 // ---------- the checks ----------
+
+/** The evidence.yaml files of the tree indexed by the record they belong to. */
+function evidenceIndex(workRoot) {
+  const evidenceByRecord = new Map();
+  for (const file of walk(workRoot).filter(f => f.endsWith('evidence.yaml'))) {
+    let ev;
+    try { ev = parseYaml(fs.readFileSync(file, 'utf8')); } catch { continue; } // the gate refuses the malformed file itself
+    if (ev?.record) evidenceByRecord.set(ev.record, {ev, file, dir: path.dirname(file)});
+  }
+  return evidenceByRecord;
+}
+
+// NORM_UNRECORDED: normative text moved, rev did not
+function checkNormUnrecorded({ workRoot, refuse }, id, rec, was, normNow) {
+  if (!was.norm || was.norm === normNow.get(id)) return;
+  const revNow = rec.data?.change?.rev, revThen = was.rev;
+  if (revThen != null && revNow === revThen) {
+    refuse(rec.data ? path.join(rec.dir, 'index.yaml') : workRoot, 'NORM_UNRECORDED',
+      `${id}'s normative content changed since baseline but change.rev is still ${revNow} - a silent edit`);
+  }
+}
+
+// DEP_STALE: a done/proven record whose referenced deps moved since baseline
+function checkDepStale({ records, refuse }, id, rec, was, { normNow, inline }) {
+  if (rec.data?.state !== 'done' || !was.deps) return;
+  const moved = Object.entries(was.deps)
+    .map(([depId, depNorm]) => [resolveRecordRef(records, depId, inline), depNorm, depId])
+    .filter(([canonical, depNorm]) => canonical && normNow.get(canonical) !== depNorm)
+    .map(([, , depId]) => depId);
+  if (moved.length) {
+    refuse(path.join(rec.dir, 'index.yaml'), 'DEP_STALE',
+      `${id} is done but dep(s) changed since last verification: ${moved.join(', ')} - its proof was captured against older premises`);
+  }
+}
+
+// ---- baseline-backed checks ----
+function checkAgainstBaseline(ctx, out, baseline, { normNow, inline }) {
+  if (!baseline) {
+    out.info.push(`${fromRoot(ctx.workRoot)}: no _derived/deep-baseline.json - DEP_STALE and NORM_UNRECORDED skipped; run --write-baseline after a verified-clean pass [NO_BASELINE]`);
+    return;
+  }
+  const prior = baseline.records ?? {};
+  for (const [id, rec] of ctx.records) {
+    const was = prior[id];
+    if (!was) continue;
+    checkNormUnrecorded(ctx, id, rec, was, normNow);
+    checkDepStale(ctx, id, rec, was, { normNow, inline });
+  }
+}
+
+// ---- EVIDENCE_CONTEXT_MISSING: evidence with no cwd/repository stamp can't say what it ran against ----
+function reportUnstampedEvidence({ workRoot, evidenceByRecord, info }) {
+  let unstamped = 0;
+  for (const [, {ev}] of evidenceByRecord) {
+    if (!ev.cwd && !ev.repository && !ev.commit) unstamped++;
+  }
+  if (unstamped) info(workRoot, 'EVIDENCE_CONTEXT_MISSING', `${unstamped} evidence file(s) carry no cwd/repository/commit stamp - a stale verdict cannot say which input moved`);
+}
+
+// ---- PAYLOAD_AS_RECORD: asset payloads the base gate walks as records ----
+function reportPayloadsAsRecords({ workRoot, info }) {
+  const payloads = walk(workRoot).filter(f => f.replaceAll('\\', '/').includes('/assets/') && f.endsWith('.yaml'))
+    .map(f => parseYaml(fs.readFileSync(f, 'utf8'))).filter(d => d?.schema && !String(d.schema).startsWith('work/'));
+  if (payloads.length) info(workRoot, 'PAYLOAD_AS_RECORD', `${payloads.length} asset payload(s) carry non-work schemas - they are artifacts of their parent record, not records; the base gate should not walk them as such`);
+}
+
+// ---- CATALOG_DRIFT ----
+function checkCatalogDrift({ workRoot, refuse }) {
+  const catalogFile = path.join(workRoot, 'index.yaml');
+  const catalog = fs.existsSync(catalogFile) ? parseYaml(fs.readFileSync(catalogFile, 'utf8')) : null;
+  const featureDirs = fs.existsSync(path.join(workRoot, 'features'))
+    ? fs.readdirSync(path.join(workRoot, 'features')).filter(d => fs.statSync(path.join(workRoot, 'features', d)).isDirectory()) : [];
+  const catalogDirs = (catalog?.features ?? []).map(f => String(f.directory ?? '').replace(/^features\//, ''));
+  for (const d of featureDirs.filter(d => !catalogDirs.includes(d))) refuse(catalogFile, 'CATALOG_DRIFT', `features/${d} exists on disk but the catalog does not list it`);
+  for (const d of catalogDirs.filter(d => !featureDirs.includes(d))) refuse(catalogFile, 'CATALOG_DRIFT', `catalog lists features/${d} but no such directory exists`);
+}
 
 function checkTree(workRoot, out, baseline) {
   const records = loadRecords(workRoot, walk);
@@ -171,20 +155,11 @@ function checkTree(workRoot, out, baseline) {
   const sideRoots = APP_SIDES.map(side => path.join(appRoot, side));
   let appScripts = null;
   try { appScripts = JSON.parse(fs.readFileSync(path.join(appRoot, 'package.json'), 'utf8'))?.scripts ?? {}; } catch { appScripts = {}; }
-  const rel = f => path.relative(root, f).replaceAll('\\', '/');
-  const refuse = (file, code, msg) => out.refuse.push(`${rel(file)}: ${msg} [${code}]`);
-  const suspect = (file, code, msg) => out.suspect.push(`${rel(file)}: ${msg} [${code}]`);
-  const info = (file, code, msg) => out.info.push(`${rel(file)}: ${msg} [${code}]`);
-
+  const refuse = (file, code, msg) => out.refuse.push(`${fromRoot(file)}: ${msg} [${code}]`);
+  const suspect = (file, code, msg) => out.suspect.push(`${fromRoot(file)}: ${msg} [${code}]`);
+  const info = (file, code, msg) => out.info.push(`${fromRoot(file)}: ${msg} [${code}]`);
   // evidence files indexed by owning record id
-  let emittedEvents; // lazy per-tree cache for the event-class scan
-  const evidenceByRecord = new Map();
-  for (const file of walk(workRoot).filter(f => f.endsWith('evidence.yaml'))) {
-    let ev;
-    try { ev = parseYaml(fs.readFileSync(file, 'utf8')); } catch { continue; } // the gate refuses the malformed file itself
-    if (ev?.record) evidenceByRecord.set(ev.record, {ev, file, dir: path.dirname(file)});
-  }
-
+  const evidenceByRecord = evidenceIndex(workRoot);
   const normNow = new Map(); // id -> normDigest
   for (const [id, rec] of records) normNow.set(id, normDigestOf(rec.data));
   // Compact format: a reference written as `P#frag` names a real dependency - the record carrying the
@@ -194,238 +169,15 @@ function checkTree(workRoot, out, baseline) {
     const rid = resolveRecordRef(records, ref, inline);
     return rid ? records.get(rid) : undefined;
   };
-
-  // ---- baseline-backed checks ----
-  if (!baseline) {
-    out.info.push(`${rel(workRoot)}: no _derived/deep-baseline.json - DEP_STALE and NORM_UNRECORDED skipped; run --write-baseline after a verified-clean pass [NO_BASELINE]`);
-  } else {
-    const prior = baseline.records ?? {};
-    for (const [id, rec] of records) {
-      const was = prior[id];
-      if (!was) continue;
-      // NORM_UNRECORDED: normative text moved, rev did not
-      if (was.norm && was.norm !== normNow.get(id)) {
-        const revNow = rec.data?.change?.rev, revThen = was.rev;
-        if (revThen != null && revNow === revThen) {
-          refuse(rec.data ? path.join(rec.dir, 'index.yaml') : workRoot, 'NORM_UNRECORDED',
-            `${id}'s normative content changed since baseline but change.rev is still ${revNow} - a silent edit`);
-        }
-      }
-      // DEP_STALE: a done/proven record whose referenced deps moved since baseline
-      if (rec.data?.state === 'done' && was.deps) {
-        const moved = Object.entries(was.deps)
-          .map(([depId, depNorm]) => [resolveRecordRef(records, depId, inline), depNorm, depId])
-          .filter(([canonical, depNorm]) => canonical && normNow.get(canonical) !== depNorm)
-          .map(([, , depId]) => depId);
-        if (moved.length) {
-          refuse(path.join(rec.dir, 'index.yaml'), 'DEP_STALE',
-            `${id} is done but dep(s) changed since last verification: ${moved.join(', ')} - its proof was captured against older premises`);
-        }
-      }
-    }
-  }
-
-  // ---- per-record checks ----
+  const ctx = { workRoot, records, workspaceDoc, appRoot, beRoot, sideRoots, appScripts, evidenceByRecord, recOf, refuse, suspect, info, emittedEvents: undefined };
+  checkAgainstBaseline(ctx, out, baseline, { normNow, inline });
   for (const [id, rec] of records) {
-    const data = rec.data ?? {};
-    const indexFile = path.join(rec.dir, 'index.yaml');
-
-    // PROVENBY_AUTHORED: provenBy is a derived field; an authored one is a claim speaking for another record
-    if (data.provenBy) {
-      refuse(indexFile, 'PROVENBY_AUTHORED', `${id} carries a hand-authored provenBy - provenance is derived from done records' proves edges, never written down by hand`);
-      const targets = Object.values(data.provenBy).flat().filter(t => typeof t === 'string');
-      for (const t of targets) {
-        const target = recOf(t);
-        if (target && target.data?.state !== 'done') {
-          refuse(indexFile, 'PROVENBY_TARGET_NOT_DONE', `${id} claims proof by ${t}, which is ${target.data?.state ?? '(no state)'} - a false proof claim`);
-        }
-      }
-    }
-
-    // COMPOSES_PATH_DANGLING: composes[].module is a path field the base gate never checks
-    for (const c of Array.isArray(data.composes) ? data.composes : []) {
-      if (!c || typeof c !== 'object' || !c.module) continue;
-      // composes[].module is an owner path: app-relative, under the app root (OWNER_PATH_NOT_APP_RELATIVE otherwise).
-      const abs = path.join(path.dirname(path.resolve(workRoot)), moduleRootOf(c.module));
-      if (!fs.existsSync(abs)) {
-        const msg = `${id} composes[].module names ${c.module}, which does not exist on disk`;
-        if (data.state === 'done') refuse(indexFile, 'COMPOSES_PATH_DANGLING', msg); else suspect(indexFile, 'COMPOSES_PATH_DANGLING', msg);
-      }
-    }
-
-    // PROOF_COMMAND_DEAD: requiresProof + evidence assertion commands must name real specs/scripts. A proof command runs
-    // from the app root: its npm script is the app root package.json's, a spec path is app-relative (be/src/tests/...), and
-    // a bare spec basename is a jest pattern, not a path - searched over the sides, not resolved literally.
-    const specExists = p => p.includes('/')
-      ? fs.existsSync(path.join(appRoot, p))
-      : sideRoots.some(r => srcFiles(r, '.ts').some(f => path.basename(f) === p));
-    const checkCommand = (command, file, label) => {
-      if (typeof command !== 'string') return;
-      const npmRun = /npm run ([\w:-]+)/.exec(command);
-      if (npmRun && appScripts?.[npmRun[1]] == null) {
-        refuse(file, 'PROOF_COMMAND_DEAD', `${label}: npm script "${npmRun[1]}" does not exist in the app root package.json`);
-      }
-      for (const token of command.match(proofSpecExpression()) ?? []) {
-        const p = token.replace(/^--\S+\s+/, '');
-        if (!specExists(p)) {
-          refuse(file, 'PROOF_COMMAND_DEAD', `${label}: spec "${p}" matches no file of the app`);
-        }
-      }
-      // jest-style filter args like `-- tasks/complete` should match a real spec dir/file prefix;
-      // separators vary (`tasks/complete` vs `task/task-lifecycle.e2e-spec.ts`), so normalise both to
-      // word sequences before comparing - still heuristic, which is why it is SUSPECT not REFUSE
-      const filter = /--\s+([\w/-]+)$/.exec(command)?.[1];
-      if (filter && !filter.includes('*')) {
-        const testsRoot = path.join(beRoot, 'src', 'tests');
-        const words = filter.toLowerCase().split(/[\s/.\\_-]+/).filter(Boolean);
-        const hit = fs.existsSync(testsRoot) && walk(testsRoot).some(f => {
-          const fwords = new Set(f.toLowerCase().replaceAll('\\', '/').split(/[\s/.\\_-]+/).filter(Boolean));
-          return words.every(w => fwords.has(w));
-        });
-        if (!hit) suspect(indexFile, 'PROOF_FILTER_EMPTY', `${label}: filter "-- ${filter}" matches no spec under be/src/tests`);
-      }
-    };
-    // Only the commands that must run now are judged: every requiresProof.<kind>.command, and the assertion commands of
-    // evidence that is not `stale: true`. Stale evidence is a true statement about a past moment (work/evidence@1): its
-    // commands are history, never rewritten, and a fresh run replaces them.
-    const proofKinds = data.requiresProof && typeof data.requiresProof === 'object' ? Object.entries(data.requiresProof) : [];
-    for (const [kind, proof] of proofKinds) checkCommand(proof?.command, indexFile, `requiresProof.${kind}`);
-    const evEntry = evidenceByRecord.get(id);
-    const liveAssertions = evEntry?.ev?.stale === true ? [] : evEntry?.ev?.assertions;
-    for (const a of Array.isArray(liveAssertions) ? liveAssertions : []) {
-      checkCommand(a?.command, evEntry.file, `assertion ${a?.id ?? '(unnamed)'}`);
-    }
-
-    // REPO_UNBOUND: a repository that is not a side workspace.yaml declares, or whose side folder is not there = evidence that will false-stale
-    if (data.repository) {
-      const repoRoot = repoRootFor(workRoot, data.repository, workspaceDoc);
-      if (!repoRoot) refuse(indexFile, 'REPO_UNBOUND', `${id} names repository "${data.repository}", which is not a side (be, fe) workspace.yaml declares - evidence under it will report (no files found), not the truth`);
-      else if (!fs.existsSync(repoRoot)) refuse(indexFile, 'REPO_UNBOUND', `${id} names repository "${data.repository}" which resolves to ${rel(repoRoot)} - nothing there; evidence under it will report (no files found), not the truth`);
-    }
-
-    // EVENT_PRODUCER_KIND + EVENT_UNPRODUCED
-    if (data.schema === 'work/event@1') {
-      const producer = recOf(data.producer);
-      if (producer?.schema === 'work/business-rule@1') {
-        suspect(indexFile, 'EVENT_PRODUCER_IS_RULE', `${id} producer is ${data.producer}, a business-rule - rules do not emit events; the real producer (handler/impl) has no record`);
-      }
-      const emitted = emittedEvents ??= eventClasses(beRoot);
-      // the codebase names classes inconsistently (TaskDeletedEvent keeps the feature segment,
-      // SignedInEvent drops it) - try the id's full class name and the feature-stripped one
-      const withFeature = eventClassOf(id);
-      const withoutFeature = eventClassOf(id.split('.').filter((s, i) => i !== 1).join('.'));
-      if (!emitted.has(withFeature) && !emitted.has(withoutFeature)) {
-        suspect(indexFile, 'EVENT_UNPRODUCED', `${id} maps to event class ${withFeature}/${withoutFeature}, neither declared under src/ - record may describe an event nothing emits`);
-      }
-    }
-
-    // UAT_RUN_AGING: settled run older than the code it proves. The run is the work/evidence@1 run object (its files
-    // are blobs, never a runs/ directory); its time is the one its id was minted at, and the code's is its commit time.
-    if (data.schema === 'work/uat-flow@1' && data.state === 'done') {
-      const runAt = runTimeOf(evEntry?.ev?.run);
-      if (runAt) {
-        const dirs = resolveOwnedDirs(id, rec, records, workspaceDoc, workRoot).filter(d => fs.existsSync(d.abs));
-        const newer = dirs.length ? committedSince(appRoot, runAt, dirs.map(d => d.abs)) : [];
-        if (newer.length) suspect(indexFile, 'UAT_RUN_AGING', `${id}'s settled run predates ${newer.length} code file(s) committed since (e.g. ${newer[0]}) - the pass may no longer describe the code`);
-      }
-    }
+    for (const rule of recordRules) rule(ctx, id, rec);
   }
-
-  // ---- EVIDENCE_CONTEXT_MISSING: evidence with no cwd/repository stamp can't say what it ran against ----
-  let unstamped = 0;
-  for (const [, {ev}] of evidenceByRecord) {
-    if (!ev.cwd && !ev.repository && !ev.commit) unstamped++;
-  }
-  if (unstamped) info(workRoot, 'EVIDENCE_CONTEXT_MISSING', `${unstamped} evidence file(s) carry no cwd/repository/commit stamp - a stale verdict cannot say which input moved`);
-
-  // ---- PAYLOAD_AS_RECORD: asset payloads the base gate walks as records ----
-  const payloads = walk(workRoot).filter(f => f.replaceAll('\\', '/').includes('/assets/') && f.endsWith('.yaml'))
-    .map(f => parseYaml(fs.readFileSync(f, 'utf8'))).filter(d => d?.schema && !String(d.schema).startsWith('work/'));
-  if (payloads.length) info(workRoot, 'PAYLOAD_AS_RECORD', `${payloads.length} asset payload(s) carry non-work schemas - they are artifacts of their parent record, not records; the base gate should not walk them as such`);
-
-  // ---- CATALOG_DRIFT ----
-  const catalogFile = path.join(workRoot, 'index.yaml');
-  const catalog = fs.existsSync(catalogFile) ? parseYaml(fs.readFileSync(catalogFile, 'utf8')) : null;
-  const featureDirs = fs.existsSync(path.join(workRoot, 'features'))
-    ? fs.readdirSync(path.join(workRoot, 'features')).filter(d => fs.statSync(path.join(workRoot, 'features', d)).isDirectory()) : [];
-  const catalogDirs = (catalog?.features ?? []).map(f => String(f.directory ?? '').replace(/^features\//, ''));
-  for (const d of featureDirs.filter(d => !catalogDirs.includes(d))) refuse(catalogFile, 'CATALOG_DRIFT', `features/${d} exists on disk but the catalog does not list it`);
-  for (const d of catalogDirs.filter(d => !featureDirs.includes(d))) refuse(catalogFile, 'CATALOG_DRIFT', `catalog lists features/${d} but no such directory exists`);
-
-  // ---- surface coverage (SUSPECT tier) ----
-  const ownedDirs = [];
-  for (const [id, rec] of records) {
-    for (const d of resolveOwnedDirs(id, rec, records, workspaceDoc, workRoot)) {
-      if (fs.existsSync(d.abs)) ownedDirs.push({id, abs: d.abs});
-    }
-  }
-  const ownerOf = file => ownedDirs.find(d => file.startsWith(d.abs))?.id ?? null;
-
-  const routes = httpRoutes(beRoot);
-  const ops = gqlOps(beRoot);
-  for (const r of routes) {
-    if (!ownerOf(r.file)) suspect(r.file, 'UNCLAIMED_SURFACE', `${r.method} ${r.path} served by ${path.basename(r.file)} sits under no record's owners - a shipped surface with no claimant`);
-  }
-  for (const o of ops) {
-    if (o.file && !ownerOf(o.file)) suspect(o.file, 'UNCLAIMED_SURFACE', `graphql ${o.kind} ${o.cap}/${o.op} sits under no record's owners`);
-  }
-
-  // CAPABILITY coverage: owning the module is necessary but not sufficient - an impl owning
-  // `src/modules/domain/cart` does not mean any record describes what cart DOES. A capability
-  // (graphql cap dir, controller prefix) is "specified" when a spec record's id carries it as a full
-  // `.`-segment or its owned path carries it as a path segment - hyphenated lookalikes
-  // (empty-cart-is-refused) do not count. Two levels: no spec record at all -> WITHOUT_SPEC; only
-  // impl/sds claim it (designed, never specified functionally) -> WITHOUT_FR.
-  const segSet = data => {
-    const segs = new Set(String(data?.id ?? '').split('.'));
-    const paths = (data?.owners ?? []).map(o => String(o?.path ?? '')).concat(
-      (Array.isArray(data?.module) ? data.module : [data?.module]).filter(Boolean),
-      (data?.composes ?? []).map(c => String(c?.module ?? '')));
-    for (const p of paths) for (const s of p.split('/')) segs.add(s);
-    return segs;
-  };
-  const claimsAny = new Set();   // fr|br|contract|sds|uat
-  const claimsFunc = new Set();  // fr|br|contract only
-  for (const [, rec] of records) {
-    if (!/^(fr|br|contract|sds|uat)\./.test(rec.id)) continue;
-    for (const s of segSet(rec.data)) claimsAny.add(s);
-    if (/^(fr|br|contract)\./.test(rec.id)) for (const s of segSet(rec.data)) claimsFunc.add(s);
-  }
-  const capLevel = cap => (claimsFunc.has(cap) && 'fr') || (claimsAny.has(cap) && 'design') || null;
-  for (const o of ops) {
-    const level = capLevel(o.cap) ?? capLevel(o.op);
-    if (level === null) suspect(o.file ?? workRoot, 'CAPABILITY_WITHOUT_SPEC', `graphql ${o.kind} ${o.cap}/${o.op} ships but no spec record names "${o.cap}" - capability with no record at all`);
-    else if (level === 'design') suspect(o.file ?? workRoot, 'CAPABILITY_WITHOUT_FR', `graphql ${o.kind} ${o.cap}/${o.op} ships; only impl/sds records touch "${o.cap}" - designed but no fr/br/contract describes the operation`);
-  }
-  const routeCaps = new Set(routes.map(r => r.path.split('/').find(Boolean)).filter(Boolean));
-  for (const cap of routeCaps) {
-    const level = capLevel(cap);
-    if (level === null) suspect(workRoot, 'CAPABILITY_WITHOUT_SPEC', `http routes under /${cap} serve but no spec record names it`);
-    else if (level === 'design') suspect(workRoot, 'CAPABILITY_WITHOUT_FR', `http routes under /${cap} serve; only impl/sds records touch it`);
-  }
-
-  // GHOST_SURFACE: contract-declared http path that no controller serves
-  const servedPaths = new Set(routes.map(r => `${r.method} ${r.path.replace(/\/:[^/]+/g, '/:_')}`));
-  for (const [id, rec] of records) {
-    if (rec.schema !== 'work/contract@1') continue;
-    const shapes = [];
-    const surf = rec.data?.surface;
-    for (const item of (Array.isArray(surf?.http) && surf.http) || (surf?.http && [surf.http]) || []) {
-      if (item?.method && item?.path) shapes.push(`${item.method.toUpperCase()} ${item.path}`);
-    }
-    for (const entry of Array.isArray(surf?.shape) ? surf.shape : surf?.requests ?? []) {
-      const m = /(GET|POST|PUT|PATCH|DELETE)\s+(\/\S+)/.exec(String(entry?.shape ?? entry));
-      if (m) shapes.push(`${m[1]} ${m[2]}`);
-    }
-    for (const s of shapes) {
-      const [method, p] = s.split(' ');
-      const norm = `${method} ${p.replace(/\/:[^/]+/g, '/:_').replace(/\/$/, '') || '/'}`;
-      if (servedPaths.size && !servedPaths.has(norm)) {
-        suspect(path.join(rec.dir, 'index.yaml'), 'GHOST_SURFACE', `${id} declares "${s}" but no controller under be/src serves it - contract describes a wire that does not exist`);
-      }
-    }
-  }
-  return {records: records.size, surfaces: routes.length + ops.length};
+  reportUnstampedEvidence(ctx);
+  reportPayloadsAsRecords(ctx);
+  checkCatalogDrift(ctx);
+  return {records: records.size, surfaces: checkSurfaces(ctx)};
 }
 
 // ---------- baseline ----------
