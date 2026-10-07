@@ -32,7 +32,8 @@ Use the native lifecycle's caller identity and model contract. Never infer a cal
 routing pool or from another actor's configured model. Workflow ingress validates the accepted
 persisted goal before host readiness, maintenance, inbox claim, dependency installation, worktree
 creation or Kernel launch. Host readiness and configuration-selected maintenance belong to that
-lifecycle; this entry creates no extra loop or maintenance agent.
+lifecycle: it heals a missing launcher shim or a missing or stale task registration itself and lists
+that action in its receipt. This entry creates no extra loop or maintenance agent.
 
 `--caller-agent`, `--caller-model` and optional `--caller-effort` describe this ingress caller and are
 separate from the Kernel's explicit `--agent`/`--model` pin. If the caller's effective concrete model

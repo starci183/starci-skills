@@ -13,8 +13,9 @@ definition or launch. Preserve an existing accepted goal's identity, revision an
 authority. Plain normal-context workflow wording creates no StarCi effects.
 
 After acceptance, `starci workflow start` verifies the persisted goal before
-host effects, ensures engine, configured services, public harness and Supervisor
-without calling Kernel watchdogs recursively, then ensures caller-bound native
+host effects, heals the launcher shim and the Windows task registrations when they
+are the only thing missing, ensures engine, configured services, public harness and
+Supervisor without calling Kernel watchdogs recursively, then ensures caller-bound native
 maintenance when `config.yaml` has `debug: true`. Missing caller context may reuse
 an existing attested maintenance route; it cannot create or guess a route.
 The Kernel's `--agent` remains its own override. Follow [Host credentials](../../../docs/host-secrets.md)
@@ -33,7 +34,32 @@ For an explicitly authorized host-only bring-up, run:
 starci reconciler up --caller-agent <agent> --caller-model <model> --caller-effort <effort> --json
 ```
 
-Use `starci reconciler up --check --json` for an actual read-only checklist. A
+## Status and heal on every invocation
+
+Every `/starci` invocation runs `starci reconciler up --check --brief` first: the read-only checklist
+in one screen, grouped, one line per row that is not green, each red row with its fix, one all-green
+line otherwise. `--json` returns the same rows with a stable shape; a seat that is not running while
+nothing needs it is a green row with `idle: true`.
+
+A seat consumes provider quota. The Supervisor, core-debug and Kernel seats start only through
+`starci workflow start`, `starci supervisor start` or an explicit owner request, so they read
+`not running (starts with a workflow)` while no workflow runs and turn red only when a running
+workflow needs them.
+
+No-quota host services heal without the owner:
+
+```text
+starci reconciler up --services
+```
+
+It links the per-user launcher shim (`starci runtime link`), registers or refreshes the three Windows
+tasks when one is missing or its action is stale (the script `starci task register <name>` prints, applied
+non-interactively, per-user and limited-privilege), rebuilds a stale UI, starts the engine, harness UI,
+harness tunnel, ask gateway and ask tunnel, and launches no agent seat. Each applied action is one line
+(`linked launcher`, `registered task`, `service harness-ui`); a registration line carries the hash of the
+script it applied. `starci task register <name>` without `--apply` stays the manual review path.
+
+Use `starci reconciler up --check --json` for the machine-readable checklist. A
 plain apply preserves local config. Profile changes, stale-ledger retirement and
 other wider effects require their existing owner authority and explicit native
 arguments. Orca remains owner-opened; do not launch or restart it from this entry.
