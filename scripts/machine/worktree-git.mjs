@@ -210,7 +210,7 @@ function removeScratchContents(out, target, repoRoot, git, env) {
   return { ...out, reason };
 }
 
-function deleteScratchBranch(out, { repoRoot, branch, mode, main, git, target, env }) {
+export function deleteScratchBranch(out, { repoRoot, branch, mode, main, git, target, env }) {
   if (branch && mode && revParse(repoRoot, `refs/heads/${branch}`)) {
     const deleted = branchDelete({ repoRoot, branch, mode, main, git });
     out.branch.deleted = deleted.ok;
