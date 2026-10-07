@@ -41,6 +41,20 @@ const timed = async (label, action) => {
 
 /** The checkout's @starci/test-world, built (dist is build output, never committed; the build runs once when it is absent). */
 const TEST_WORLD = path.join(RUNTIME, 'packages', 'test-world');
+
+/** The runtime packages of `dir`'s package.json (dependencies and devDependencies, no @types) that its own node_modules lacks. */
+function missingOwnDependencies(dir) {
+  const manifest = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
+  return Object.keys({ ...manifest.dependencies, ...manifest.devDependencies })
+    .filter((name) => !name.startsWith('@types/') && !fs.existsSync(path.join(dir, 'node_modules', name, 'package.json')));
+}
+
+/** Fails at once, naming the command, when the test-world package has no install of its own (CI installs it in a separate step). */
+function assertTestWorldInstalled(dir = TEST_WORLD) {
+  const missing = missingOwnDependencies(dir);
+  assert.deepEqual(missing, [], `@starci/test-world has no install of its own (missing in packages/test-world/node_modules: ${missing.join(', ')}). Run \`npm ci --ignore-scripts\` in packages/test-world, then run this spec again.`);
+}
+
 function testWorldRequire() {
   if (!fs.existsSync(path.join(TEST_WORLD, 'dist', 'stack', 'index.js'))) {
     const build = runNpm(['run', 'build'], { cwd: TEST_WORLD, timeout: 300_000 });
@@ -55,6 +69,19 @@ test('the example app stack declaration pins a postgres image', () => {
   assert.ok(typeof POSTGRES_IMAGE === 'string' && POSTGRES_IMAGE.length > 0, 'the example app stack declaration pins a postgres image');
 });
 
+test('a test-world package without its own install fails at once with the command that installs it', (t) => {
+  const dir = mkdtemp(t, 'test-world-install-');
+  fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ dependencies: { yaml: '^2' }, devDependencies: { pg: '^8', typescript: '^5', '@types/pg': '^8' } }));
+  assert.deepEqual(missingOwnDependencies(dir), ['yaml', 'pg', 'typescript']);
+  assert.throws(() => assertTestWorldInstalled(dir), /no install of its own \(missing in packages\/test-world\/node_modules: yaml, pg, typescript\)\. Run `npm ci --ignore-scripts` in packages\/test-world/);
+  for (const name of ['yaml', 'pg', 'typescript']) {
+    fs.mkdirSync(path.join(dir, 'node_modules', name), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'node_modules', name, 'package.json'), '{}');
+  }
+  assert.deepEqual(missingOwnDependencies(dir), []);
+  assert.doesNotThrow(() => assertTestWorldInstalled(dir));
+});
+
 /** The last lines of a run's output, for failure messages. */
 const tail = (run, lines = 30) => `${run.stdout ?? ''}\n${run.stderr ?? ''}`.trim().split(/\r?\n/).slice(-lines).join('\n');
 
@@ -64,6 +91,7 @@ const skipReason = dockerProbe.status === 0 ? false
   : `docker is unavailable: ${dockerProbe.error?.message ?? `${dockerProbe.stderr ?? dockerProbe.stdout ?? ''}`.trim().split(/\r?\n/)[0] ?? 'docker info failed'}`;
 
 test('starci app scaffold end to end: npm ci, codegen + typecheck, starci app lint clean, the be unit run and cli migrate run over a real Postgres', { skip: skipReason, timeout: 1_800_000 }, async (t) => {
+  assertTestWorldInstalled();
   const into = mkdtemp(t, 'hfs-scaffold-e2e-');
   const app = path.join(into, 'demo');
   const registry = await timed('source registry', () => startSourceCanonRegistry());
