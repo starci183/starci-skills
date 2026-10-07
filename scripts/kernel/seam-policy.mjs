@@ -347,7 +347,7 @@ export function canonCutPlanOf(scan, { cutId, op = CANON_OP, policy = null, impo
   const slices = (scan?.slices ?? []).map((slice) => ({ ordinal: Number(slice.ordinal), wave: String(slice.wave), paths: [...slice.paths], grants: [] }));
   const holderOf = (file) => slices.find((slice) => slice.paths.some((root) => sameOrUnder(file, root))) ?? null;
   const wireByWave = new Map();
-  const wireOf = (wave) => { if (!wireByWave.has(wave)) wireByWave.set(wave, { paths: new Set(), reasons: [] }); return wireByWave.get(wave); };
+  const wireOf = (wave) => { if (!wireByWave.has(wave)) { wireByWave.set(wave, { paths: new Set(), reasons: [] }); } return wireByWave.get(wave); };
   grantSlices({ slices, findings, relocations, holderOf, wireOf });
   sharedRootWires({ slices, findings, sharedRoots, wireOf });
   const repointByWave = repointWaves({ findings, relocations, holderOf, wireOf, importersOf });
