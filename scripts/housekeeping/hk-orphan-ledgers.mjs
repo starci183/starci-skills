@@ -92,6 +92,34 @@ export function orphanReason(roots, { env = process.env, unreachable = (root) =>
   return roots.every((root) => unreachable(root)) ? 'source-roots-unreachable' : null;
 }
 
+function registeredLedgerFindings(machine, ledgers, env) {
+  const findings = [];
+  for (const ledger of ledgers) {
+    if (ledger.state === 'retired') continue;
+    const dir = path.dirname(ledger.file);
+    if (!exists(dir)) { findings.push({ code: ORPHAN_LEDGER_CODE, ledgerId: ledger.ledgerId, name: ledger.name, file: ledger.file, sourceRoots: [], reason: REGISTERED_DIR_MISSING_REASON, registered: true }); continue; }
+    const roots = sourceRootsOf(machine.db, ledger);
+    const reason = orphanReason(roots, { env });
+    if (reason) findings.push({ code: ORPHAN_LEDGER_CODE, ledgerId: ledger.ledgerId, name: ledger.name, file: ledger.file, sourceRoots: roots, reason, registered: true });
+  }
+  return findings;
+}
+
+function unregisteredLedgerFindings(projectsDir, knownDirs, env) {
+  let dirNames = [];
+  try { dirNames = fs.readdirSync(projectsDir, { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => entry.name); } catch { /* no projects/ yet */ }
+  const findings = [];
+  for (const name of dirNames) {
+    const dir = path.join(projectsDir, name);
+    if (knownDirs.has(dirKey(dir))) continue; // registered under some state already handled (or intentionally retired) above
+    const ledgerFile = path.join(dir, 'runtime.sqlite');
+    const roots = sourceRootsFromLedgerFile(ledgerFile);
+    const reason = orphanReason(roots, { env });
+    if (reason) findings.push({ code: ORPHAN_LEDGER_CODE, ledgerId: name, name: null, file: ledgerFile, sourceRoots: roots, reason, registered: false });
+  }
+  return findings;
+}
+
 /**
  * Orphan findings over EVERY directory under <stateRoot>/projects/, registered or not (follow-up fix 2026-09-30: a
  * ledger the registry no longer names at all — 6 of the incident's directories — was invisible to a registry-only
@@ -108,32 +136,12 @@ export function orphanLedgerFindings({ env = process.env, machineFile = null } =
   // one readMachine call; `registered` itself is plain data and outlives the (closed) handle for the directory walk below.
   const { findings: registeredFindings, registered } = readMachine((m) => {
     const list = m.listLedgers({ includeRetired: true });
-    const findings = [];
-    for (const ledger of list) {
-      if (ledger.state === 'retired') continue;
-      const dir = path.dirname(ledger.file);
-      if (!exists(dir)) { findings.push({ code: ORPHAN_LEDGER_CODE, ledgerId: ledger.ledgerId, name: ledger.name, file: ledger.file, sourceRoots: [], reason: REGISTERED_DIR_MISSING_REASON, registered: true }); continue; }
-      const roots = sourceRootsOf(m.db, ledger);
-      const reason = orphanReason(roots, { env });
-      if (reason) findings.push({ code: ORPHAN_LEDGER_CODE, ledgerId: ledger.ledgerId, name: ledger.name, file: ledger.file, sourceRoots: roots, reason, registered: true });
-    }
-    return { findings, registered: list };
+    return { findings: registeredLedgerFindings(m, list, env), registered: list };
   }, { findings: [], registered: [] }, { file, env });
 
   const knownDirs = new Set(registered.map((l) => dirKey(path.dirname(l.file))));
-  const out = [...registeredFindings];
   const projectsDir = projectsRootFor(env);
-  let dirNames = [];
-  try { dirNames = fs.readdirSync(projectsDir, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name); } catch { /* no projects/ yet */ }
-  for (const name of dirNames) {
-    const dir = path.join(projectsDir, name);
-    if (knownDirs.has(dirKey(dir))) continue; // registered under some state already handled (or intentionally retired) above
-    const ledgerFile = path.join(dir, 'runtime.sqlite');
-    const roots = sourceRootsFromLedgerFile(ledgerFile);
-    const reason = orphanReason(roots, { env });
-    if (reason) out.push({ code: ORPHAN_LEDGER_CODE, ledgerId: name, name: null, file: ledgerFile, sourceRoots: roots, reason, registered: false });
-  }
-  return out;
+  return [...registeredFindings, ...unregisteredLedgerFindings(projectsDir, knownDirs, env)];
 }
 
 /**

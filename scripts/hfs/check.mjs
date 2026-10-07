@@ -78,6 +78,7 @@ import { testTopologyFindings } from './rules/test-topology.mjs';
 import { feNoTestsFindings } from './rules/fe-no-tests.mjs';
 import { editionFindings } from './rules/edition.mjs';
 import { byCodeUnit } from '../lib/list.mjs';
+import { pinFindings } from './pin-findings.mjs';
 // The database rules (R213-R216) read SQL through a WASM parser, so they are async: `starci app check` calls them beside the other emitters and passes the findings in as `extraFindings`.
 export { checkDatabase } from './rules/database.mjs';
 
@@ -108,7 +109,6 @@ export const CHECK_CODES = Object.freeze([
 export const ALL_CHECK_CODES = Object.freeze([...new Set([...CHECK_CODES, ...ARCHITECTURE_RULE_IDS])].sort(byCodeUnit));
 const SOURCE_EXT = /\.(?:[cm]?[jt]sx?)$/;
 const VAR = /<([a-z][a-z0-9-]*)>/g;
-const DEP_SECTIONS = ['dependencies', 'devDependencies'];
 
 const refuse = (code, message, details = {}) => { throw new HfsSlotsError(code, message, details); };
 
@@ -137,29 +137,8 @@ export function trackedFiles(repoRoot) {
 
 const fill = (text, bindings) => String(text).replace(VAR, (whole, name) => bindings[name] ?? whole);
 
-const pinnedSpec = (spec, pin) => (spec === pin.version ? null : `declared ${spec}, pinned ${pin.version}`);
-
 /** The pin map of knowledge/hfs/canon-pins.yaml under `root`. */
 const readPins = (root) => parseYaml(fs.readFileSync(path.join(root, CANON_PINS_FILE), 'utf8'))?.pins ?? {};
-
-function pinFindings({ repoRoot, files, profile, pins, only }) {
-  const findings = [];
-  for (const file of files.filter((f) => (f === 'package.json' || f.endsWith('/package.json')) && (!only || only.has(f)))) {
-    let pkg;
-    try { pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, file), 'utf8')); } catch { continue; }
-    for (const [name, pin] of Object.entries(pins)) {
-      // The app root's one package.json carries the pins of both sides.
-      if (profile !== APP_SCOPE && pin.side !== 'both' && pin.side !== profile) continue;
-      for (const section of DEP_SECTIONS) {
-        const spec = pkg[section]?.[name];
-        if (spec === undefined) continue;
-        const drift = pinnedSpec(spec, pin);
-        if (drift) findings.push({ code: 'HFS_CANON_PIN_DRIFT', level: 'error', path: file, dependency: name, section, pinned: pin.version, declared: spec, message: `${name} in ${file} ${section}: ${drift}` });
-      }
-    }
-  }
-  return findings;
-}
 
 /** Instances (slot, root, bindings) present in the tracked tree, for every slot that names required files or a minimum. */
 function instancesOf(resolver, files) {
@@ -236,6 +215,65 @@ function treeFindings({ repoRoot, resolver }) {
 /** A side-relative path (or null) as an app-relative one. */
 const onSide = (side, p) => (p ? path.posix.normalize(`${side}/${p}`) : p);
 
+function appendRequiredPathFindings(findings, resolver, files, required, present) {
+  const missing = new Set();
+  const missingFile = (slot, p, via) => {
+    const key = `${slot}|${p}`;
+    if (missing.has(key) || present(p)) return;
+    missing.add(key);
+    const app = appOf(p);
+    const appNote = app ? ` (app ${app})` : '';
+    findings.push({ code: 'HFS_SLOT_REQUIRED_MISSING', level: 'error', path: p, slot, via, ...(app ? { app } : {}), message: `${slot} requires ${p}${appNote}, which is not tracked` });
+  };
+  for (const entry of required.paths) if (!entry.side) missingFile(entry.slot, entry.path, entry.via);
+  const instances = instancesOf(resolver, files);
+  for (const instance of instances) for (const p of requiredOf(resolver.slot(instance.slot), instance)) missingFile(instance.slot, p, 'requires');
+  return instances;
+}
+
+function minimumInstanceFindings(resolver, required, instances) {
+  const findings = [];
+  for (const { slot, min, appKind, side } of required.minimums) {
+    if (appKind !== undefined || side) continue;     // an app-kind minimum is checked by requiredPaths (one path set per declared app)
+    const count = instances.filter((instance) => instance.slot === slot).length;
+    if (count < min) findings.push({ code: 'HFS_MIN_INSTANCES', level: 'error', path: resolver.slot(slot).path, slot, min, count, message: `${slot} needs at least ${min} instance${min === 1 ? '' : 's'} (${resolver.slot(slot).path}), found ${count}` });
+  }
+  return findings;
+}
+
+function contentRuleFindings({ repoRoot, repo, resolver, files, all, scoped, pins, inScope, isRoot, editionDeclaration }) {
+  const findings = [
+    ...pinFindings({ repoRoot, files, profile: repo.profile, pins, only: scoped }),
+    ...supabaseSecretFindings({ repoRoot, files: files.filter(inScope), resolver, repo }),
+    ...editionFindings({ repoRoot, files: files.filter(inScope), repo, resolver, withDeclaration: editionDeclaration }),
+    ...repoLocalCheckFindings({ repoRoot, files }),
+    ...lintSuppressionFindings({ repoRoot, files }),
+  ];
+  if (isRoot) {
+    findings.push(
+      ...appRootFindings({ repoRoot, files, all, repo, resolver, pins }),
+      ...checkAppRoot({ root: repoRoot, resolver, tree: trackedTreeView(all) }).violations.map((item) => ({ code: item.ruleId, level: 'error', path: item.path, line: item.line, column: item.column, source: 'machine', message: `${item.path}: ${item.message}` })),
+    );
+  } else if (repo.profile === 'be') {
+    findings.push(...contractFindings({ repoRoot, files, repo, resolver }), ...testTopologyFindings({ repoRoot, files }));
+  } else {
+    findings.push(...frontendFindings({ repoRoot, files, repo }), ...feNoTestsFindings({ repoRoot, files: files.filter(inScope) }));
+  }
+  return findings;
+}
+
+function sizeSoftFindings({ repoRoot, resolver, files, inScope }) {
+  const findings = [];
+  const soft = resolver.ruleParams().fileLines.soft;
+  for (const file of files) {
+    if (!inScope(file) || !SOURCE_EXT.test(file) || resolver.classifyPath(file).status !== 'owned') continue;
+    let lines;
+    try { lines = fs.readFileSync(path.join(repoRoot, file), 'utf8').split('\n').length; } catch { continue; }
+    if (lines > soft) findings.push({ code: 'HFS_SIZE_SOFT_BACKLOG', level: 'info', path: file, lines, soft, message: `${file} has ${lines} lines, above the soft size ${soft}; report only` });
+  }
+  return findings;
+}
+
 /**
  * The findings of one scope: the app root (profile app; its own files, and the rules of the files only the root holds: the one
  * package.json and lockfile, CI, hooks, .starciwork, .starcistacks) or one side (profile be or fe; the side folder is `repoRoot` and every path is
@@ -247,64 +285,17 @@ function scopeFindings({ repoRoot, root, repo, resolver, files, all = files, sco
   // A required directory of the root (be/, fe/) is present through the files below it, which are the sides' own.
   const trackedSet = new Set(all);
   const present = (p) => (p.endsWith('/') ? all.some((f) => f.startsWith(p)) : trackedSet.has(p));
-  const findings = [];
   const isRoot = repo.profile === APP_SCOPE;
-
-  findings.push(...pathFindings({ files: files.filter(inScope), resolver, profile: repo.profile }));
-
+  const findings = pathFindings({ files: files.filter(inScope), resolver, profile: repo.profile });
   const required = resolver.requiredPaths();
-  const missing = new Set();
-  const missingFile = (slot, p, via) => {
-    const key = `${slot}|${p}`;
-    if (missing.has(key) || present(p)) return;
-    missing.add(key);
-    const app = appOf(p);
-    const appNote = app ? ` (app ${app})` : '';
-    findings.push({ code: 'HFS_SLOT_REQUIRED_MISSING', level: 'error', path: p, slot, via, ...(app ? { app } : {}), message: `${slot} requires ${p}${appNote}, which is not tracked` });
-  };
-  // The app's own required paths; each side reports its own (the resolver of the app lists them too, with their side).
-  for (const entry of required.paths) if (!entry.side) missingFile(entry.slot, entry.path, entry.via);
-  const instances = instancesOf(resolver, files);
-  for (const instance of instances) for (const p of requiredOf(resolver.slot(instance.slot), instance)) missingFile(instance.slot, p, 'requires');
-  for (const { slot, min, appKind, side } of required.minimums) {
-    if (appKind !== undefined || side) continue;     // an app-kind minimum is checked by requiredPaths (one path set per declared app)
-    const count = instances.filter((i) => i.slot === slot).length;
-    if (count < min) findings.push({ code: 'HFS_MIN_INSTANCES', level: 'error', path: resolver.slot(slot).path, slot, min, count, message: `${slot} needs at least ${min} instance${min === 1 ? '' : 's'} (${resolver.slot(slot).path}), found ${count}` });
-  }
+  const instances = appendRequiredPathFindings(findings, resolver, files, required, present);
+  findings.push(...minimumInstanceFindings(resolver, required, instances));
   // The runtime repository (kind runtime) is judged here by its tree law only; its own rules run in scripts/hfs/runtime-check.mjs.
   if (repo.kind === RUNTIME_KIND) return findings;
 
   const pins = readPins(root);
-
-  // The tree checks of the rules that read file content or configuration (rules/*): whole-scope, cheap, no tool run.
-  findings.push(
-    ...pinFindings({ repoRoot, files, profile: repo.profile, pins, only: scoped }),
-    ...supabaseSecretFindings({ repoRoot, files: files.filter(inScope), resolver, repo }),
-    ...editionFindings({ repoRoot, files: files.filter(inScope), repo, resolver, withDeclaration: editionDeclaration }),
-    ...repoLocalCheckFindings({ repoRoot, files }),
-    ...lintSuppressionFindings({ repoRoot, files }),
-  );
-  if (isRoot) {
-    findings.push(
-      ...appRootFindings({ repoRoot, files, all, repo, resolver, pins }),
-      // The tree check of the app root the machine runs per side for a side folder: README, root entries, automatic gates, hooks path.
-      ...checkAppRoot({ root: repoRoot, resolver, tree: trackedTreeView(all) }).violations.map((item) => ({ code: item.ruleId, level: 'error', path: item.path, line: item.line, column: item.column, source: 'machine', message: `${item.path}: ${item.message}` })),
-    );
-  } else if (repo.profile === 'be') {
-    findings.push(...contractFindings({ repoRoot, files, repo, resolver }), ...testTopologyFindings({ repoRoot, files }));
-  } else {
-    findings.push(...frontendFindings({ repoRoot, files, repo }), ...feNoTestsFindings({ repoRoot, files: files.filter(inScope) }));
-  }
-
-  if (!isRoot) {
-    const soft = resolver.ruleParams().fileLines.soft;
-    for (const file of files) {
-      if (!inScope(file) || !SOURCE_EXT.test(file) || resolver.classifyPath(file).status !== 'owned') continue;
-      let lines;
-      try { lines = fs.readFileSync(path.join(repoRoot, file), 'utf8').split('\n').length; } catch { continue; }
-      if (lines > soft) findings.push({ code: 'HFS_SIZE_SOFT_BACKLOG', level: 'info', path: file, lines, soft, message: `${file} has ${lines} lines, above the soft size ${soft}; report only` });
-    }
-  }
+  findings.push(...contentRuleFindings({ repoRoot, repo, resolver, files, all, scoped, pins, inScope, isRoot, editionDeclaration }));
+  if (!isRoot) findings.push(...sizeSoftFindings({ repoRoot, resolver, files, inScope }));
   return findings;
 }
 

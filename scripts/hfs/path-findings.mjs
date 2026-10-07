@@ -21,6 +21,37 @@ const PLAIN_ENTRY = /^<[a-z][a-z0-9-]*>.ts$/;
 const DATA_ACCESS_HOME = 'SQL text is a constant in <name>.sql.ts of the capability persistence/ folder, and data access is the capability *.service.ts (or the application *.handler.ts) calling the shared EntityManager through its Inject<Conn>EntityManager()';
 const BANNED_SUFFIX_HOME = Object.freeze({ repository: DATA_ACCESS_HOME, store: DATA_ACCESS_HOME });
 
+function sourceFormContext(file, resolver, suffixes, bannedSuffixes) {
+  if (!file.endsWith('.ts') || !SOURCE_ROOT.test(file)) return null;
+  const c = resolver.classifyPath(file);
+  if (c.status !== 'owned' || c.tracking === 'ignored') return null;
+  const base = path.posix.basename(file);
+  if (FREE_NAMES.has(base)) return null;
+  const slot = resolver.slot(c.slot);
+  if ([...(slot?.requires ?? []), ...(slot?.allows ?? [])].includes(base)) return null;
+  const admitted = allowsFile(resolver, file);
+  if (admitted?.allowed && admitted.entry?.includes('/') && path.posix.basename(admitted.entry) === base) return null;
+  if (admitted?.allowed && PLAIN_ENTRY.test(admitted.entry ?? '') && KEBAB.test(base.slice(0, -'.ts'.length))) return null;
+  if (c.slot === 'be.persistence' && path.posix.basename(path.posix.dirname(file)) === 'migrations') return null;
+  return { c, base, suffixes, bannedSuffixes };
+}
+
+function sourceFormFinding(file, { c, base, suffixes, bannedSuffixes }, boundSuffixes) {
+  const parts = base.slice(0, -'.ts'.length).split('.');
+  const banned = parts.slice(1).find((part) => bannedSuffixes.includes(part));
+  if (banned) {
+    const homeNote = BANNED_SUFFIX_HOME[banned] ? `. ${BANNED_SUFFIX_HOME[banned]}` : '';
+    return { code: 'BE_SOURCE_FORM', level: 'error', path: file, suffix: banned, message: `${file}: the suffix .${banned} is banned; use a role from the closed suffix list (${suffixes.join(', ')})${homeNote}` };
+  }
+  if (boundSuffixes.has(parts.at(-1)) && parts.length >= 2 && boundSuffixes.get(parts.at(-1)).id !== c.slot) {
+    return { code: 'BE_SOURCE_FORM', level: 'error', path: file, suffix: parts.at(-1), message: `${file}: the suffix .${parts.at(-1)}.ts belongs to ${boundSuffixes.get(parts.at(-1)).path} only; move the file there` };
+  }
+  if (parts.length < 2 || !parts.every((part) => KEBAB.test(part)) || !suffixes.includes(parts.at(-1))) {
+    return { code: 'BE_SOURCE_FORM', level: 'error', path: file, message: `${file}: the name must be <kebab-name>.<suffix>.ts with a suffix from the closed list (${suffixes.join(', ')}), or index.ts, main.ts or a migration` };
+  }
+  return null;
+}
+
 /**
  * BE_SOURCE_FORM (R89): every tracked src/ or apps/ TypeScript file of a back end is index.ts, main.ts, a migration of
  * be.persistence, or <kebab-name>.<suffix>.ts with <suffix> in the closed vocabulary ruleParams.be.suffixes (a name such
@@ -38,32 +69,33 @@ function sourceFormFindings({ files, resolver }) {
   }
   const findings = [];
   for (const file of files) {
-    if (!file.endsWith('.ts') || !SOURCE_ROOT.test(file)) continue;
-    const c = resolver.classifyPath(file);
-    if (c.status !== 'owned' || c.tracking === 'ignored') continue;
-    const base = path.posix.basename(file);
-    if (FREE_NAMES.has(base)) continue;
-    // A literal file name the owning slot itself requires or allows (persistence/connection.ts, world/global-setup.ts) is its role.
-    const slot = resolver.slot(c.slot);
-    if ([...(slot?.requires ?? []), ...(slot?.allows ?? [])].includes(base)) continue;
-    // So is an allows entry below the slot root whose last segment is that literal name (be.tests.world fakes/<provider>/server.ts).
-    const admitted = allowsFile(resolver, file);
-    if (admitted?.allowed && admitted.entry?.includes('/') && path.posix.basename(admitted.entry) === base) continue;
-    // A slot whose `allows` holds a bare <name>.ts entry (be.tests.world.kit) names its files plainly, as platform/primitives does: kebab-case is the whole form.
-    if (admitted?.allowed && PLAIN_ENTRY.test(admitted.entry ?? '') && KEBAB.test(base.slice(0, -'.ts'.length))) continue;
-    if (c.slot === 'be.persistence' && path.posix.basename(path.posix.dirname(file)) === 'migrations') continue;
-    const parts = base.slice(0, -'.ts'.length).split('.');
-    const banned = parts.slice(1).find((part) => bannedSuffixes.includes(part));
-    if (banned) {
-      const homeNote = BANNED_SUFFIX_HOME[banned] ? `. ${BANNED_SUFFIX_HOME[banned]}` : '';
-      findings.push({ code: 'BE_SOURCE_FORM', level: 'error', path: file, suffix: banned, message: `${file}: the suffix .${banned} is banned; use a role from the closed suffix list (${suffixes.join(', ')})${homeNote}` });
-    } else if (boundSuffixes.has(parts.at(-1)) && parts.length >= 2 && boundSuffixes.get(parts.at(-1)).id !== c.slot) {
-      findings.push({ code: 'BE_SOURCE_FORM', level: 'error', path: file, suffix: parts.at(-1), message: `${file}: the suffix .${parts.at(-1)}.ts belongs to ${boundSuffixes.get(parts.at(-1)).path} only; move the file there` });
-    } else if (parts.length < 2 || !parts.every((part) => KEBAB.test(part)) || !suffixes.includes(parts.at(-1))) {
-      findings.push({ code: 'BE_SOURCE_FORM', level: 'error', path: file, message: `${file}: the name must be <kebab-name>.<suffix>.ts with a suffix from the closed list (${suffixes.join(', ')}), or index.ts, main.ts or a migration` });
-    }
+    const context = sourceFormContext(file, resolver, suffixes, bannedSuffixes);
+    if (!context) continue;
+    const finding = sourceFormFinding(file, context, boundSuffixes);
+    if (finding) findings.push(finding);
   }
   return findings;
+}
+
+function forbiddenPathFinding(file, c, resolver) {
+  const slot = resolver.slot(c.slot);
+  if (slotOwnsSecrets(slot)) return null;
+  const own = slot.rules?.includes('HFS_TOOL_CONFIG_LOCAL') ? 'HFS_TOOL_CONFIG_LOCAL' : 'HFS_FORBIDDEN_PRESENT';
+  const goesToNote = c.goesTo ? `; it belongs at ${c.goesTo}` : '';
+  return { code: own, level: 'error', path: file, slot: c.slot, goesTo: c.goesTo, message: `${file} is tracked but ${c.slot} is forbidden in the tree${goesToNote}` };
+}
+
+function pathStatusFinding(file, resolver) {
+  const c = resolver.classifyPath(file);
+  if (c.status === 'no-slot') {
+    const nearestNote = c.nearest ? `; nearest slot ${c.nearest.slot} (${c.nearest.pattern}), matched ${c.nearest.matchedPrefix || '.'} then expected ${c.nearest.expectedNext ?? 'nothing'}` : '';
+    return { code: 'HFS_SLOT_UNDECLARED', level: 'error', path: file, nearest: c.nearest, message: `${file} matches no slot${nearestNote}` };
+  }
+  if (c.status === 'ambiguous') return { code: 'HFS_SLOT_AMBIGUOUS', level: 'error', path: file, candidates: c.candidates, message: `${file} is owned equally by ${c.candidates.map((x) => x.slot ?? x).join(', ')}` };
+  if (c.status === 'not-enabled') return { code: 'HFS_SLOT_NOT_ENABLED', level: 'error', path: file, slot: c.slot, message: `${file} belongs to ${c.slot}, an opt-in slot hfs.json neither lists in optionalSlots nor implies through an app kind` };
+  if (c.status === 'forbidden') return forbiddenPathFinding(file, c, resolver);
+  if (c.tracking === 'ignored') return { code: 'HFS_TRACKED_MUST_BE_IGNORED', level: 'error', path: file, slot: c.slot, message: `${file} is tracked but ${c.slot} must be gitignored` };
+  return null;
 }
 
 /** The findings of the slot manifest over `files` (repository-relative tracked paths) of a repository of `profile`. */
@@ -71,23 +103,8 @@ export function pathFindings({ files, resolver, profile }) {
   const findings = [];
   for (const file of files) {
     if (profile === 'fe' && isFeTestPath(file)) continue;   // a test path of a front end is FE_NO_TESTS's, the one finding of that file
-    const c = resolver.classifyPath(file);
-    if (c.status === 'no-slot') {
-      const nearestNote = c.nearest ? `; nearest slot ${c.nearest.slot} (${c.nearest.pattern}), matched ${c.nearest.matchedPrefix || '.'} then expected ${c.nearest.expectedNext ?? 'nothing'}` : '';
-      findings.push({ code: 'HFS_SLOT_UNDECLARED', level: 'error', path: file, nearest: c.nearest, message: `${file} matches no slot${nearestNote}` });
-    } else if (c.status === 'ambiguous') {
-      findings.push({ code: 'HFS_SLOT_AMBIGUOUS', level: 'error', path: file, candidates: c.candidates, message: `${file} is owned equally by ${c.candidates.map((x) => x.slot ?? x).join(', ')}` });
-    } else if (c.status === 'not-enabled') {
-      findings.push({ code: 'HFS_SLOT_NOT_ENABLED', level: 'error', path: file, slot: c.slot, message: `${file} belongs to ${c.slot}, an opt-in slot hfs.json neither lists in optionalSlots nor implies through an app kind` });
-    } else if (c.status === 'forbidden') {
-      const slot = resolver.slot(c.slot);
-      if (slotOwnsSecrets(slot)) continue;   // the secret scan reports the file (R06): one finding per file
-      const own = slot.rules?.includes('HFS_TOOL_CONFIG_LOCAL') ? 'HFS_TOOL_CONFIG_LOCAL' : 'HFS_FORBIDDEN_PRESENT';
-      const goesToNote = c.goesTo ? `; it belongs at ${c.goesTo}` : '';
-      findings.push({ code: own, level: 'error', path: file, slot: c.slot, goesTo: c.goesTo, message: `${file} is tracked but ${c.slot} is forbidden in the tree${goesToNote}` });
-    } else if (c.tracking === 'ignored') {
-      findings.push({ code: 'HFS_TRACKED_MUST_BE_IGNORED', level: 'error', path: file, slot: c.slot, message: `${file} is tracked but ${c.slot} must be gitignored` });
-    }
+    const finding = pathStatusFinding(file, resolver);
+    if (finding) findings.push(finding);
   }
 
   if (profile === 'be') findings.push(...sourceFormFindings({ files, resolver }), ...specPlacementFindings({ files, resolver }));

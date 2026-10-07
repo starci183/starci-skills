@@ -11,6 +11,8 @@ import { found, readJson } from './read.mjs';
 const PEER_INTEGRATION_MISSING = 'HFS_PEER_INTEGRATION_MISSING';
 const MANIFEST = 'package.json';
 const CATALOG_FILE = new URL('../../../knowledge/hfs/peer-integrations.yaml', import.meta.url);
+const MAJOR_OF_SOURCE = String.raw`^\s*(?:[\^~]|>=?|=)?\s*v?(\d+)(?:\.|\s|$)`;
+const MAJOR_OF = new RegExp(MAJOR_OF_SOURCE);
 
 /** The pairs of the catalog: [{ id, when: [{ package, major? }], requires, why }]. */
 function peerIntegrationPairs() {
@@ -21,7 +23,7 @@ function peerIntegrationPairs() {
 
 /** The major a dependency spec allows (`11.2.5`, `^11.0.0`, `~11.1`, `>=11 <12`), or null when the spec names none (a tag, a link, `*`). */
 function majorOf(spec) {
-  const match = /^\s*(?:[\^~]|>=?|=)?\s*v?(\d+)(?:\.|\s|$)/.exec(String(spec));
+  const match = MAJOR_OF.exec(String(spec));
   return match ? Number(match[1]) : null;
 }
 

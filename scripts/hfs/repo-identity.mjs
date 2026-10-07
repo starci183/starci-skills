@@ -10,6 +10,10 @@ import { gitOutputOf } from '../lib/git.mjs';
 /** One git call (a scripts/api/git call file) in `root`: its trimmed stdout; throws unless git exits 0. */
 const git = (call, root, args) => gitOutputOf(call(args, { cwd: root })).trim();
 const real = (p) => { try { return fs.realpathSync(p); } catch { return path.resolve(p); } };
+const TRAILING_SLASH_SOURCE = String.raw`\/+$`;
+const TRAILING_SLASH = new RegExp(TRAILING_SLASH_SOURCE, 'u');
+const GIT_SUFFIX_SOURCE = String.raw`\.git$`;
+const GIT_SUFFIX = new RegExp(GIT_SUFFIX_SOURCE, 'iu');
 
 /** { repositoryRoot, inWorkTree, home } for `root`: home is the main checkout folder when root is a repository top level. */
 function identityOf(root) {
@@ -34,7 +38,7 @@ export function repositoryName(root) {
   if (home) return path.basename(home);
   if (repositoryRoot) {
     try {
-      const remote = git(gitRemote, root, ['get-url', 'origin']).replace(/\/+$/u, '').replace(/\.git$/iu, '');
+      const remote = git(gitRemote, root, ['get-url', 'origin']).replace(TRAILING_SLASH, '').replace(GIT_SUFFIX, '');
       const name = remote.split(/[/:]/u).pop();
       if (name) return name;
     } catch { /* No origin remote. */ }

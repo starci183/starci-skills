@@ -45,6 +45,32 @@ export function claudeProjectsRoots(env = process.env) {
 export const claudeProjectSlug = (cwd) => String(cwd).replace(/[^a-zA-Z0-9]/g, '-');
 
 /** The project directories under `roots`: [{slug, dir, files:[{name, path, stat}]}], links skipped. */
+function transcriptFiles(dir, out) {
+  let listing;
+  try { listing = fs.readdirSync(dir); } catch (error) { out.errors.push({ path: dir, error: String(error?.message ?? error) }); return null; }
+  const files = [];
+  for (const name of listing) {
+    if (!name.endsWith('.jsonl')) continue;
+    const file = path.join(dir, name);
+    let stat;
+    try { stat = fs.lstatSync(file); } catch (error) { if (error?.code !== 'ENOENT') out.errors.push({ path: file, error: String(error?.message ?? error) }); continue; }
+    files.push({ name, path: file, stat });
+  }
+  return files;
+}
+
+function projectDir(root, entry, out) {
+  const dir = path.join(root, entry.name);
+  let stat;
+  try { stat = fs.lstatSync(dir); } catch (error) { if (error?.code !== 'ENOENT') out.errors.push({ path: dir, error: String(error?.message ?? error) }); return null; }
+  // links first: lstat spells a junction/dir-symlink as not-a-directory, so the directory
+  // test alone would silently pass a link by instead of reporting it.
+  if (isLinkLike(dir, { stat })) { out.skipped.push({ path: dir, reason: 'link' }); return null; }
+  if (!stat.isDirectory()) return null;
+  const files = transcriptFiles(dir, out);
+  return files ? { slug: entry.name, dir, files } : null;
+}
+
 function projectDirs(roots, out) {
   const dirs = [];
   for (const root of roots) {
@@ -54,24 +80,8 @@ function projectDirs(roots, out) {
       continue;
     }
     for (const entry of entries) {
-      const dir = path.join(root, entry.name);
-      let stat;
-      try { stat = fs.lstatSync(dir); } catch (error) { if (error?.code !== 'ENOENT') { out.errors.push({ path: dir, error: String(error?.message ?? error) }); } continue; }
-      // links first: lstat spells a junction/dir-symlink as not-a-directory, so the directory
-      // test alone would silently pass a link by instead of reporting it.
-      if (isLinkLike(dir, { stat })) { out.skipped.push({ path: dir, reason: 'link' }); continue; }
-      if (!stat.isDirectory()) continue;
-      const files = [];
-      let listing;
-      try { listing = fs.readdirSync(dir); } catch (error) { out.errors.push({ path: dir, error: String(error?.message ?? error) }); continue; }
-      for (const name of listing) {
-        if (!name.endsWith('.jsonl')) continue;
-        const file = path.join(dir, name);
-        let st;
-        try { st = fs.lstatSync(file); } catch (error) { if (error?.code !== 'ENOENT') { out.errors.push({ path: file, error: String(error?.message ?? error) }); } continue; }
-        files.push({ name, path: file, stat: st });
-      }
-      dirs.push({ slug: entry.name, dir, files });
+      const dir = projectDir(root, entry, out);
+      if (dir) dirs.push(dir);
     }
   }
   return dirs;
@@ -118,6 +128,20 @@ function moveFile(from, to, stat) {
   }
 }
 
+function archiveTranscript({ slug, name, file, stat, apply, archiveRoot, keep, out }) {
+  if (isLinkLike(file, { stat })) { out.skipped.push({ path: file, reason: 'link' }); return; }
+  if (!stat.isFile()) return;
+  const reason = keep(file, stat);
+  if (reason) { out.skipped.push({ path: file, reason }); return; }
+  const to = path.join(archiveRoot, 'claude', slug, name);
+  if (apply) {
+    try { moveFile(file, to, stat); } catch (error) { out.errors.push({ path: file, error: String(error?.message ?? error) }); return; }
+  }
+  out.moved.push({ from: file, to });
+  out.movedBytes += stat.size;
+  out.freedBytes += stat.size;
+}
+
 /**
  * Archive aged Claude Code transcripts. `apply` performs the moves; without it the same report is a
  * dry-run projection (moved/movedBytes name what WOULD move). Returns
@@ -139,19 +163,7 @@ export async function sweepClaudeTranscripts({ apply = false, now = Date.now(), 
     return null;
   };
   for (const { slug, files } of dirs) {
-    for (const { name, path: file, stat } of files) {
-      if (isLinkLike(file, { stat })) { out.skipped.push({ path: file, reason: 'link' }); continue; }
-      if (!stat.isFile()) continue;
-      const reason = keep(file, stat);
-      if (reason) { out.skipped.push({ path: file, reason }); continue; }
-      const to = path.join(archiveRoot, 'claude', slug, name);
-      if (apply) {
-        try { moveFile(file, to, stat); } catch (error) { out.errors.push({ path: file, error: String(error?.message ?? error) }); continue; }
-      }
-      out.moved.push({ from: file, to });
-      out.movedBytes += stat.size;
-      out.freedBytes += stat.size;
-    }
+    for (const { name, path: file, stat } of files) archiveTranscript({ slug, name, file, stat, apply, archiveRoot, keep, out });
   }
   out.ok = out.errors.length === 0;
   return out;

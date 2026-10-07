@@ -26,14 +26,22 @@ const sameNode = (a, b) => a.dev === b.dev && a.ino === b.ino;
 // Whether `file` is its own canonical entry: the spelling of the parents above it (8.3 short name, symlinked prefix) is not a link.
 const ownSpelling = file => samePath(fs.realpathSync(file), path.join(fs.realpathSync(path.dirname(file)), path.basename(file)));
 
+function physicalDirectory(entry, required) {
+  const stat = fs.lstatSync(entry, { throwIfNoEntry: false });
+  if (!stat) {
+    if (required) refuse('canonical-target');
+    return null;
+  }
+  if (!stat.isDirectory() || isLinkLike(entry, { stat }) || !ownSpelling(entry)) refuse('canonical-target');
+  return stat;
+}
+
 function physicalTarget(repo) {
   if (typeof repo !== 'string' || !path.isAbsolute(repo)) refuse('canonical-target');
   const root = path.resolve(repo), target = path.join(root, '.claude'), nodes = {};
   for (const entry of [root, target]) {
-    const stat = fs.lstatSync(entry, { throwIfNoEntry: false });
-    if (!stat) { if (entry === root) { refuse('canonical-target'); } continue; }
-    if (!stat.isDirectory() || isLinkLike(entry, { stat }) || !ownSpelling(entry)) refuse('canonical-target');
-    nodes[entry] = stat;
+    const stat = physicalDirectory(entry, entry === root);
+    if (stat) nodes[entry] = stat;
   }
   return { root, target, nodes };
 }
@@ -45,28 +53,31 @@ function samePhysicalTarget(expected, current) {
   return current;
 }
 
+const isCiphertextName = name => /\.(?:enc|age|key|pem)$/i.test(name) || name === 'master.identity';
+
+function visitCiphertextDirectory(directory, state) {
+  const stat = fs.lstatSync(directory, { throwIfNoEntry: false });
+  if (!stat) return false;
+  if (!stat.isDirectory() || isLinkLike(directory, { stat })) refuse('old-ciphertext');
+  for (const name of fs.readdirSync(directory)) {
+    if (++state.entries > 4096) refuse('old-ciphertext');
+    const file = path.join(directory, name), child = fs.lstatSync(file);
+    if (child.isSymbolicLink() || (child.isDirectory() && isLinkLike(file, { stat: child }))) refuse('old-ciphertext');
+    if (isCiphertextName(name)) return true;
+    if (child.isDirectory() && visitCiphertextDirectory(file, state)) return true;
+    if (!child.isDirectory() && !child.isFile()) refuse('old-ciphertext');
+  }
+  return false;
+}
+
 // Inspect custody names only: encrypted and private payloads are never read here.
 function originalCiphertext(root, target) {
-  let entries = 0;
-  const visit = directory => {
-    const stat = fs.lstatSync(directory, { throwIfNoEntry: false });
-    if (!stat) return false;
-    if (!stat.isDirectory() || isLinkLike(directory, { stat })) refuse('old-ciphertext');
-    for (const name of fs.readdirSync(directory)) {
-      if (++entries > 4096) refuse('old-ciphertext');
-      const file = path.join(directory, name), child = fs.lstatSync(file);
-      if (child.isSymbolicLink() || (child.isDirectory() && isLinkLike(file, { stat: child }))) refuse('old-ciphertext');
-      if (/\.(?:enc|age|key|pem)$/i.test(name) || name === 'master.identity') return true;
-      if (child.isDirectory() && visit(file)) return true;
-      if (!child.isDirectory() && !child.isFile()) refuse('old-ciphertext');
-    }
-    return false;
-  };
   for (const file of [path.join(target, 'master.identity'), path.join(target, '.secrets'),
     path.join(root, '.sops.yaml'), path.join(target, '.sops.yaml')]) {
     if (fs.lstatSync(file, { throwIfNoEntry: false })) return true;
   }
-  return visit(path.join(target, 'ext')) || visit(path.join(root, '.starcistacks'));
+  const state = { entries: 0 };
+  return visitCiphertextDirectory(path.join(target, 'ext'), state) || visitCiphertextDirectory(path.join(root, '.starcistacks'), state);
 }
 
 function manifestOf(target) {
@@ -80,39 +91,48 @@ function manifestOf(target) {
   return doc;
 }
 
-function identityBefore(root, target, prior, env, force) {
-  const marker = prior?.initialAgeSetup;
+function validatePriorSetupMarker(marker) {
   if (marker !== undefined && (marker?.schema !== SETUP_SCHEMA || marker.state !== 'complete'
     || marker.release?.state !== 'released' || marker.release.ok !== true || marker.release.released !== true
     || marker.release.leftover !== null || !['reserved', 'reuse'].includes(marker.attempt)
     || !['none', 'complete'].includes(marker.publication))) refuse('prior-attempt');
-  const file = path.join(target, SECRET_ENV_FILE);
-  let before = null;
+}
+
+function readPriorIdentity(file, state) {
+  const stat = fs.lstatSync(file, { throwIfNoEntry: false });
+  if (!stat) return;
+  if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1 || !ownSpelling(file)) refuse('private-file-custody');
+  state.before = readSecretBytes(file);
+  const names = state.before.toString('utf8').split(/\r?\n/).flatMap(line => {
+    const name = /^\s*(?:export\s+)?([A-Za-z_]\w*)\s*=/.exec(line)?.[1];
+    return name?.toUpperCase().startsWith('SOPS_AGE_') ? [process.platform === 'win32' ? name.toUpperCase() : name] : [];
+  });
+  if (new Set(names).size !== names.length) refuse('ambiguous-identity');
+}
+
+function validateNewIdentity(root, target, prior, marker, selectedEnv) {
+  if (marker !== undefined) refuse('prior-attempt');
+  if (prior !== null || [path.join(root, '.agents/skills/starci'), path.join(root, '.devin/skills/starci')]
+    .some(entry => fs.lstatSync(entry, { throwIfNoEntry: false }))) refuse('prior-install');
+  if (Object.keys(selectedEnv).some(name => name.toUpperCase().startsWith('SOPS_AGE_'))) refuse('old-ciphertext');
+  if (originalCiphertext(root, target)) refuse('old-ciphertext');
+  if (fs.existsSync(target) && fs.readdirSync(target).some(name => name !== SECRET_ENV_FILE)) refuse('foreign-target');
+}
+
+function identityBefore(root, target, prior, env, force) {
+  const marker = prior?.initialAgeSetup, state = { before: null };
   try {
-    const stat = fs.lstatSync(file, { throwIfNoEntry: false });
-    if (stat) {
-      if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1 || !ownSpelling(file)) refuse('private-file-custody');
-      before = readSecretBytes(file);
-      const names = before.toString('utf8').split(/\r?\n/).flatMap(line => {
-        const name = /^\s*(?:export\s+)?([A-Za-z_]\w*)\s*=/.exec(line)?.[1];
-        return name?.toUpperCase().startsWith('SOPS_AGE_') ? [process.platform === 'win32' ? name.toUpperCase() : name] : [];
-      });
-      if (new Set(names).size !== names.length) refuse('ambiguous-identity');
-    }
+    validatePriorSetupMarker(marker);
+    readPriorIdentity(path.join(target, SECRET_ENV_FILE), state);
     const selectedEnv = fs.existsSync(target) ? secretEnv(target, env) : { ...env };
     const selection = sopsIdentityEnv(selectedEnv);
     if (selection.mode === 'file' || selection.error?.identityRefusal === 'inline-context-unqualified') {
-      return { before, selectedEnv, reuse: true, priorMarker: marker };
+      return { before: state.before, selectedEnv, reuse: true, priorMarker: marker };
     }
     if (selection.mode === 'refused') refuse(selection.error?.identityRefusal?.startsWith('disabled-') ? 'disabled-identity' : 'ambiguous-identity');
-    if (marker !== undefined) refuse('prior-attempt');
-    if (prior !== null || [path.join(root, '.agents/skills/starci'), path.join(root, '.devin/skills/starci')]
-      .some(entry => fs.lstatSync(entry, { throwIfNoEntry: false }))) refuse('prior-install');
-    if (Object.keys(selectedEnv).some(name => name.toUpperCase().startsWith('SOPS_AGE_'))) refuse('old-ciphertext');
-    if (originalCiphertext(root, target)) refuse('old-ciphertext');
-    if (fs.existsSync(target) && fs.readdirSync(target).some(name => name !== SECRET_ENV_FILE)) refuse('foreign-target');
-    return { before, selectedEnv, reuse: false };
-  } catch (error) { before?.fill(0); throw error; }
+    validateNewIdentity(root, target, prior, marker, selectedEnv);
+    return { before: state.before, selectedEnv, reuse: false };
+  } catch (error) { state.before?.fill(0); throw error; }
 }
 
 function reserve(target, marker, assertLease, io = fs, expected = null) {
@@ -155,10 +175,76 @@ const publicRelease = result => ({ ok: result?.ok === true, released: result?.re
   ...(result?.reason === 'not-owner' ? { reason: 'not-owner', ownerPresent: Boolean(result.owner) } : {}),
   leftover: typeof result?.leftover === 'string' ? result.leftover : null });
 
+function finishInitialAgeRelease({ got, locks, lockOptions, env, io, outcome, reservation, physical, repo, target }) {
+  let result;
+  try {
+    result = publicRelease((locks.release ?? releaseHostLock)({ token: got.token, ...lockOptions }));
+  } catch { result = { ok: false, released: false, leftover: null, reason: 'release-unknown' }; }
+  outcome.release = result;
+  const released = result.ok && result.released && !result.leftover;
+  if (!released) { outcome.ok = false; outcome.releaseCustody = 'held'; }
+  if (!reservation) return;
+  const complete = released && outcome.ok === true;
+  const marker = { ...reservation.marker, state: complete ? 'complete' : 'held',
+    publication: reservation.marker.publication === 'complete' ? 'complete' : outcome.publication ?? reservation.marker.publication,
+    capture: reservation.marker.capture === 'generated' ? 'generated' : outcome.capture ?? reservation.marker.capture,
+    release: { state: released ? 'released' : 'held', ...result } };
+  try {
+    // One guarded public preimage write after release; never reacquire the host lock.
+    // This records observed release facts, not an atomic cross-process CAS or crash qualification.
+    const assertFinalization = () => {
+      const current = samePhysicalTarget(physical, physicalTarget(repo));
+      if (!current.nodes[target] || !sameNode(physical.nodes[target], current.nodes[target])) return false;
+      const owner = (locks.owner ?? hostLockOwner)({ env, fs: lockOptions.fs });
+      return owner === null || (!released && owner?.token === got.token && owner.pid === process.pid
+        && owner.host === os.hostname() && owner.stale === false && owner.ttlMs === null);
+    };
+    reserve(target, marker, assertFinalization, io, reservation);
+    outcome.finalization = complete ? 'complete' : 'held';
+  } catch {
+    outcome.ok = false; outcome.finalization = 'unknown'; outcome.releaseCustody = 'held';
+  }
+}
+
+function completeInitialAgeIdentity({ snapshot, root, target, env, assertLease, io, deps, privateBefore, setReservation }) {
+  if (snapshot.reuse) {
+    setReservation(reserve(target, { ...snapshot.priorMarker, schema: SETUP_SCHEMA, state: 'reusing',
+      producer: 'runtime-install-init', attempt: snapshot.priorMarker?.attempt ?? 'reuse',
+      publication: snapshot.priorMarker?.publication ?? 'none',
+      capture: snapshot.priorMarker?.capture ?? 'none', release: { state: 'pending' } }, assertLease, io));
+    return { ok: true, outcome: 'reused', publication: 'none', selectedIdentityQualified: false };
+  }
+  const attempted = { schema: SETUP_SCHEMA, state: 'attempted', producer: 'runtime-install-init', attempt: 'reserved',
+    publication: 'none', capture: 'pending', release: { state: 'pending' } };
+  setReservation(reserve(target, attempted, assertLease, io));
+  const result = (deps.capture ?? withGeneratedAgeIdentity)({ env: snapshot.selectedEnv, cwd: root, assertLease,
+    invocation: { runProgram: deps.runProgram ?? runProgram, resolveRealTool: deps.resolveRealTool ?? resolveRealTool },
+    consume: (identity, recipient) => {
+      let addition;
+      try {
+        const separator = privateBefore?.length && privateBefore.at(-1) !== 10 ? '\n' : '';
+        addition = Buffer.concat([Buffer.from(`${separator}SOPS_AGE_KEY=`), identity, Buffer.from('\n')]);
+        const published = (deps.publish ?? publishSecret)({ root: target, name: SECRET_ENV_FILE, before: privateBefore,
+          addition, maxBytes: CREDENTIAL_FILE_MAX_BYTES, assertLease });
+        if (!published?.ok || published.effectState !== 'complete') return published;
+        const loaded = secretEnv(target, env), selected = sopsIdentityEnv(loaded);
+        if (selected.error?.identityRefusal !== 'inline-context-unqualified'
+          || loaded[selected.inlineName]?.trim() !== identity.toString('utf8')) refuse('identity-reload');
+        setReservation(reserve(target, { ...attempted, state: 'published', publication: 'complete',
+          capture: 'generated', publicRecipient: recipient }, assertLease, io));
+        return published;
+      } finally { addition?.fill(0); }
+    } });
+  if (!result?.ok) return { ...no('capture-or-publication-held'), ...(AGE_TOOL_REASONS[result?.reason] ? { toolReason: result.reason } : {}), capture: result?.captureState ?? 'unknown',
+    publication: result?.effectState ?? 'unknown' };
+  return { ok: true, outcome: 'created', publication: result.effectState, publicRecipient: result.publicRecipient,
+    durability: result.durability, reservationDurability: process.platform === 'win32' ? 'file-fsync-namespace-unqualified' : 'file-and-parent-fsync' };
+}
+
 /** Original init intent is the producer; projection, update and diagnostics never request this operation. */
 export function runInitialAgeInstall({ repo, force = false, project } = {}, deps = {}) {
   const env = deps.env ?? process.env, locks = deps.locks ?? {}, io = deps.fs ?? fs;
-  let got, privateBefore, result, lockOptions, outcome, reservation, physical, target;
+  let got, privateBefore, lockOptions, outcome, reservation, physical, target;
   const finish = value => { outcome = value; return outcome; };
   try {
     if (typeof project !== 'function') return finish(no('invalid-request'));
@@ -192,71 +278,13 @@ export function runInitialAgeInstall({ repo, force = false, project } = {}, deps
     physical = samePhysicalTarget(physical, physicalTarget(repo));
     if (!physical.nodes[target] || !projected.targetNode || !sameNode(projected.targetNode, physical.nodes[target])) refuse('canonical-target');
     if (!assertLease()) refuse('lease-lost');
-    if (snapshot.reuse) {
-      reservation = reserve(target, { ...snapshot.priorMarker, schema: SETUP_SCHEMA, state: 'reusing',
-        producer: 'runtime-install-init', attempt: snapshot.priorMarker?.attempt ?? 'reuse',
-        publication: snapshot.priorMarker?.publication ?? 'none',
-        capture: snapshot.priorMarker?.capture ?? 'none', release: { state: 'pending' } }, assertLease, io);
-      return finish({ ok: true, outcome: 'reused', publication: 'none', selectedIdentityQualified: false });
-    }
-    const attempted = { schema: SETUP_SCHEMA, state: 'attempted', producer: 'runtime-install-init', attempt: 'reserved',
-      publication: 'none', capture: 'pending', release: { state: 'pending' } };
-    reservation = reserve(target, attempted, assertLease, io);
-    result = (deps.capture ?? withGeneratedAgeIdentity)({ env: snapshot.selectedEnv, cwd: root, assertLease,
-      invocation: { runProgram: deps.runProgram ?? runProgram, resolveRealTool: deps.resolveRealTool ?? resolveRealTool },
-      consume: (identity, recipient) => {
-        let addition;
-        try {
-          const separator = privateBefore?.length && privateBefore.at(-1) !== 10 ? '\n' : '';
-          addition = Buffer.concat([Buffer.from(`${separator}SOPS_AGE_KEY=`), identity, Buffer.from('\n')]);
-          const published = (deps.publish ?? publishSecret)({ root: target, name: SECRET_ENV_FILE, before: privateBefore,
-            addition, maxBytes: CREDENTIAL_FILE_MAX_BYTES, assertLease });
-          if (!published?.ok || published.effectState !== 'complete') return published;
-          const loaded = secretEnv(target, env), selected = sopsIdentityEnv(loaded);
-          if (selected.error?.identityRefusal !== 'inline-context-unqualified'
-            || loaded[selected.inlineName]?.trim() !== identity.toString('utf8')) refuse('identity-reload');
-          reservation = reserve(target, { ...attempted, state: 'published', publication: 'complete',
-            capture: 'generated', publicRecipient: recipient }, assertLease, io);
-          return published;
-        } finally { addition?.fill(0); }
-      } });
-    if (!result?.ok) return finish({ ...no('capture-or-publication-held'), ...(AGE_TOOL_REASONS[result?.reason] ? { toolReason: result.reason } : {}), capture: result?.captureState ?? 'unknown',
-      publication: result?.effectState ?? 'unknown' });
-    return finish({ ok: true, outcome: 'created', publication: result.effectState, publicRecipient: result.publicRecipient,
-      durability: result.durability, reservationDurability: process.platform === 'win32' ? 'file-fsync-namespace-unqualified' : 'file-and-parent-fsync' });
+    return finish(completeInitialAgeIdentity({ snapshot, root, target, env, assertLease, io, deps, privateBefore, setReservation: value => { reservation = value; } }));
   } catch (error) {
     return finish(setupReasons.has(error?.setupReason) ? no(error.setupReason) : { ...no('setup-unknown'), detail: causeOf(error) });
   } finally {
     privateBefore?.fill(0);
     if (got?.ok) {
-      try {
-        result = publicRelease((locks.release ?? releaseHostLock)({ token: got.token, ...lockOptions }));
-      } catch { result = { ok: false, released: false, leftover: null, reason: 'release-unknown' }; }
-      outcome.release = result;
-      const released = result.ok && result.released && !result.leftover;
-      if (!released) { outcome.ok = false; outcome.releaseCustody = 'held'; }
-      if (reservation) {
-        const complete = released && outcome.ok === true;
-        const marker = { ...reservation.marker, state: complete ? 'complete' : 'held',
-          publication: reservation.marker.publication === 'complete' ? 'complete' : outcome.publication ?? reservation.marker.publication,
-          capture: reservation.marker.capture === 'generated' ? 'generated' : outcome.capture ?? reservation.marker.capture,
-          release: { state: released ? 'released' : 'held', ...result } };
-        try {
-          // One guarded public preimage write after release; never reacquire the host lock.
-          // This records observed release facts, not an atomic cross-process CAS or crash qualification.
-          const assertFinalization = () => {
-            const current = samePhysicalTarget(physical, physicalTarget(repo));
-            if (!current.nodes[target] || !sameNode(physical.nodes[target], current.nodes[target])) return false;
-            const owner = (locks.owner ?? hostLockOwner)({ env, fs: lockOptions.fs });
-            return owner === null || (!released && owner?.token === got.token && owner.pid === process.pid
-              && owner.host === os.hostname() && owner.stale === false && owner.ttlMs === null);
-          };
-          reserve(target, marker, assertFinalization, io, reservation);
-          outcome.finalization = complete ? 'complete' : 'held';
-        } catch {
-          outcome.ok = false; outcome.finalization = 'unknown'; outcome.releaseCustody = 'held';
-        }
-      }
+      finishInitialAgeRelease({ got, locks, lockOptions, env, io, outcome, reservation, physical, repo, target });
     }
   }
 }

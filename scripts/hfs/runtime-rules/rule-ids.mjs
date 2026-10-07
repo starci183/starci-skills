@@ -16,11 +16,7 @@ const RULE_ID = /\bR\d{2,3}\b/g;
 const PATTERN_FILE = /^knowledge\/patterns\/.*\.yaml$/;
 const HFS_RULES = /hfsRules:\s*\[([^\]]*)\]/g;
 
-/** RT_RULE_ID_UNKNOWN and RT_RULE_UNCITED over the catalog and every tracked text file (ctx of scripts/hfs/runtime-check.mjs). */
-export function ruleIdFindings(ctx) {
-  const catalog = loadRuleCatalog({ root: ctx.root });
-  const rules = new Set(catalog.rules.map((r) => r.id));
-  const generated = (ctx.params.generated ?? []).map((entry) => `${entry.root}/`);
+function unknownRuleFindings(ctx, rules, generated) {
   const found = [];
   for (const file of ctx.files) {
     if (!READ.test(file) || SKIPPED.test(file) || isHistoryPath(file) || generated.some((root) => file.startsWith(root))) continue;
@@ -34,8 +30,10 @@ export function ruleIdFindings(ctx) {
       }
     });
   }
-  // The other direction: every product rule is taught by a pattern topic that names it in `hfsRules:`; a rule that governs
-  // this repository itself carries `scope: runtime` instead. Not judged when the patterns are not in view.
+  return found;
+}
+
+function patternCitations(ctx) {
   const cited = new Set();
   let patterns = 0;
   for (const file of ctx.files) {
@@ -45,9 +43,28 @@ export function ruleIdFindings(ctx) {
     patterns += 1;
     for (const match of text.matchAll(HFS_RULES)) for (const id of match[1].matchAll(RULE_ID)) cited.add(id[0]);
   }
-  if (patterns) for (const rule of catalog.rules) {
+  return { cited, patterns };
+}
+
+function uncitedRuleFindings(catalog, cited, patterns) {
+  const found = [];
+  if (!patterns) return found;
+  for (const rule of catalog.rules) {
     if (rule.scope === 'runtime' || cited.has(rule.id)) continue;
     found.push({ code: UNCITED, level: 'error', path: 'knowledge/hfs/rules.yaml', message: `${UNCITED} knowledge/hfs/rules.yaml: ${rule.id} (${rule.code}) is named by no hfsRules of a knowledge/patterns/** topic and carries no scope: runtime; cite it from the topic that teaches it, or mark it scope: runtime` });
   }
+  return found;
+}
+
+/** RT_RULE_ID_UNKNOWN and RT_RULE_UNCITED over the catalog and every tracked text file (ctx of scripts/hfs/runtime-check.mjs). */
+export function ruleIdFindings(ctx) {
+  const catalog = loadRuleCatalog({ root: ctx.root });
+  const rules = new Set(catalog.rules.map((r) => r.id));
+  const generated = (ctx.params.generated ?? []).map((entry) => `${entry.root}/`);
+  const found = unknownRuleFindings(ctx, rules, generated);
+  // The other direction: every product rule is taught by a pattern topic that names it in `hfsRules:`; a rule that governs
+  // this repository itself carries `scope: runtime` instead. Not judged when the patterns are not in view.
+  const { cited, patterns } = patternCitations(ctx);
+  found.push(...uncitedRuleFindings(catalog, cited, patterns));
   return found;
 }

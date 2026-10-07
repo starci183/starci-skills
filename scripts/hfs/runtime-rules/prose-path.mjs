@@ -9,9 +9,20 @@ import { braceVariants } from '../../lib/glob.mjs';
 import { createSlotResolver, loadSlotManifest, resolveRepoDeclaration } from '../slots.mjs';
 
 export const CODE = 'RT_PROSE_PATH_NO_SLOT';
-const PROSE = /^(?:knowledge\/(?!grammars\/|hfs\/slots\.yaml$|hfs\/runtime-slots\.yaml$|hfs\/canon-pins\.yaml$).+\.(?:ya?ml|md)|docs\/.+\.md|(?:.+\/)?README\.md)$/;
-const TOKEN = /(?<![\w/.<>-])((?:be|fe)\/[\w<>{}.,*@-]+(?:\/[\w<>{}.,*@-]*)*)/g;
+const KNOWLEDGE_PROSE = 'knowledge\\/(?!grammars\\/|hfs\\/slots\\.yaml$|hfs\\/runtime-slots\\.yaml$|hfs\\/canon-pins\\.yaml$).+\\.(?:ya?ml|md)';
+const DOC_PROSE = 'docs\\/.+\\.md';
+const README_PROSE = '(?:.+\\/)?README\\.md';
+const PROSE = new RegExp(`^(?:${KNOWLEDGE_PROSE}|${DOC_PROSE}|${README_PROSE})$`);
+const TOKEN_BOUNDARY = '(?<![\\w/.<>-])';
+const TOKEN_ROOT = '((?:be|fe)/';
+const TOKEN_SEGMENT = '[\\w<>{}.,*@-]+';
+const TOKEN_CHILDREN = '(?:/[\\w<>{}.,*@-]*)*)';
+const TOKEN = new RegExp(`${TOKEN_BOUNDARY}${TOKEN_ROOT}${TOKEN_SEGMENT}${TOKEN_CHILDREN}`, 'g');
 const TOPIC_FILE = /\.(?:ya?ml|md)$/;
+const PUNCTUATION = new RegExp('[.,;:)]+$');
+const SLASH = '/';
+const END = '$';
+const TRAILING_SLASHES = new RegExp(`${SLASH}+${END}`);
 const FOLDERS_BELOW = ['x.ts', 'index.ts', 'main.ts', 'x/index.ts', 'x/x.ts', 'x/x/x.ts', 'x/src/main.ts', 'package.json'];
 
 /** The declaration the prose is judged against: every app the examples declare, every kind, every optional slot. */
@@ -41,9 +52,9 @@ const aboveSlot = (segments, slotPaths) => slotPaths.some((slot) => segments.len
 export function pathTokens(line) {
   const out = [];
   for (const match of line.matchAll(TOKEN)) {
-    const token = match[1].replace(/[.,;:)]+$/, '');
+    const token = match[1].replace(PUNCTUATION, '');
     if (token.includes('...') || token.includes('**')) continue;
-    out.push({ token, paths: braceVariants(token).map((variant) => sample(variant).replace(/\/+$/, '')).filter((p) => /\/./.test(p) && !TOPIC_FILE.test(p)) });
+    out.push({ token, paths: braceVariants(token).map((variant) => sample(variant).replace(TRAILING_SLASHES, '')).filter((p) => /\/./.test(p) && !TOPIC_FILE.test(p)) });
   }
   return out;
 }

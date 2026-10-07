@@ -20,6 +20,34 @@ const fsSpecifier = (t, node) => Boolean(node && t.isStringLiteralLike(node) && 
 /** `node` is a `require('fs' | 'node:fs' | 'fs/promises' | 'node:fs/promises')` call. */
 const fsRequireCall = (t, node) => node && t.isCallExpression(node) && t.isIdentifier(node.expression) && node.expression.text === 'require' && fsSpecifier(t, node.arguments[0]);
 
+function bindImport(t, node, wanted, namespaces, members) {
+  if (!t.isImportDeclaration(node) || !fsSpecifier(t, node.moduleSpecifier)) return;
+  const clause = node.importClause;
+  if (clause?.name) namespaces.add(clause.name.text);
+  const bindings = clause?.namedBindings;
+  if (bindings && t.isNamespaceImport(bindings)) namespaces.add(bindings.name.text);
+  if (bindings && t.isNamedImports(bindings)) for (const element of bindings.elements) {
+    const imported = (element.propertyName ?? element.name).text;
+    if (imported === 'promises') namespaces.add(element.name.text);
+    else if (wanted(imported)) members.set(element.name.text, imported);
+  }
+}
+
+function requiredName(t, element) {
+  if (element.propertyName && t.isIdentifier(element.propertyName)) return element.propertyName.text;
+  if (t.isIdentifier(element.name)) return element.name.text;
+  return null;
+}
+
+function bindRequire(t, node, wanted, namespaces, members, destructuredRequires) {
+  if (!t.isVariableDeclaration(node) || !node.initializer || !fsRequireCall(t, node.initializer)) return;
+  if (t.isIdentifier(node.name)) namespaces.add(node.name.text);
+  else if (destructuredRequires && t.isObjectBindingPattern(node.name)) for (const element of node.name.elements) {
+    const imported = requiredName(t, element);
+    if (imported && wanted(imported) && t.isIdentifier(element.name)) members.set(element.name.text, imported);
+  }
+}
+
 /**
  * The fs bindings a parsed source declares: `{ namespaces, members }`. `namespaces` holds the local names bound to
  * a whole fs module - a default or namespace import, a `promises` named import, `const fs = require('fs')`.
@@ -31,26 +59,8 @@ export function fsBindings(source, wanted, { destructuredRequires = true } = {})
   const namespaces = new Set();
   const members = new Map();
   const bind = (node) => {
-    if (t.isImportDeclaration(node) && fsSpecifier(t, node.moduleSpecifier)) {
-      const c = node.importClause;
-      if (c?.name) namespaces.add(c.name.text);
-      const b = c?.namedBindings;
-      if (b && t.isNamespaceImport(b)) namespaces.add(b.name.text);
-      if (b && t.isNamedImports(b)) for (const el of b.elements) {
-        const imported = (el.propertyName ?? el.name).text;
-        if (imported === 'promises') namespaces.add(el.name.text);
-        else if (wanted(imported)) members.set(el.name.text, imported);
-      }
-    }
-    if (t.isVariableDeclaration(node) && node.initializer && fsRequireCall(t, node.initializer)) {
-      if (t.isIdentifier(node.name)) namespaces.add(node.name.text);
-      else if (destructuredRequires && t.isObjectBindingPattern(node.name)) for (const el of node.name.elements) {
-        let imported = null;
-        if (el.propertyName && t.isIdentifier(el.propertyName)) imported = el.propertyName.text;
-        else if (t.isIdentifier(el.name)) imported = el.name.text;
-        if (imported && wanted(imported) && t.isIdentifier(el.name)) members.set(el.name.text, imported);
-      }
-    }
+    bindImport(t, node, wanted, namespaces, members);
+    bindRequire(t, node, wanted, namespaces, members, destructuredRequires);
     t.forEachChild(node, bind);
   };
   bind(source);
@@ -130,26 +140,37 @@ export function localBindings(source) {
   return names;
 }
 
+function variableExports(t, node, source) {
+  const out = [];
+  for (const declaration of node.declarationList.declarations) {
+    if (!t.isIdentifier(declaration.name)) { out.push({ name: '<pattern>', fn: false, line: lineOf(source, declaration) }); continue; }
+    const initializer = declaration.initializer;
+    out.push({ name: declaration.name.text, fn: Boolean(initializer && (t.isArrowFunction(initializer) || t.isFunctionExpression(initializer))), line: lineOf(source, declaration) });
+  }
+  return out;
+}
+
+function exportClauseNames(t, node, source) {
+  if (!node.exportClause) return [{ name: '*', fn: false, line: lineOf(source, node) }];
+  if (t.isNamedExports(node.exportClause)) return node.exportClause.elements.map((element) => ({ name: element.name.text, fn: false, line: lineOf(source, element), reexport: true }));
+  return [{ name: node.exportClause.name.text, fn: false, line: lineOf(source, node) }];
+}
+
+function statementExports(t, node, source, exported, isDefault) {
+  if (t.isFunctionDeclaration(node) && exported(node)) return [{ name: isDefault(node) ? 'default' : node.name?.text ?? 'default', fn: true, line: lineOf(source, node) }];
+  if (t.isClassDeclaration(node) && exported(node)) return [{ name: isDefault(node) ? 'default' : node.name?.text ?? 'default', fn: false, line: lineOf(source, node) }];
+  if (t.isVariableStatement(node) && exported(node)) return variableExports(t, node, source);
+  if (t.isExportDeclaration(node)) return exportClauseNames(t, node, source);
+  if (t.isExportAssignment(node)) return [{ name: 'default', fn: false, line: lineOf(source, node) }];
+  return [];
+}
+
 /** The names a parsed module exports, each with whether it is a function (declaration or an arrow/function initializer). */
 export function exportedNames(source) {
   const t = ts();
   const out = [];
   const exported = (node) => (t.canHaveModifiers?.(node) ? t.getModifiers(node) : node.modifiers)?.some((m) => m.kind === t.SyntaxKind.ExportKeyword);
   const isDefault = (node) => (t.canHaveModifiers?.(node) ? t.getModifiers(node) : node.modifiers)?.some((m) => m.kind === t.SyntaxKind.DefaultKeyword);
-  for (const node of source.statements) {
-    if (t.isFunctionDeclaration(node) && exported(node)) out.push({ name: isDefault(node) ? 'default' : node.name?.text ?? 'default', fn: true, line: lineOf(source, node) });
-    else if (t.isClassDeclaration(node) && exported(node)) out.push({ name: isDefault(node) ? 'default' : node.name?.text ?? 'default', fn: false, line: lineOf(source, node) });
-    else if (t.isVariableStatement(node) && exported(node)) {
-      for (const d of node.declarationList.declarations) {
-        if (!t.isIdentifier(d.name)) { out.push({ name: '<pattern>', fn: false, line: lineOf(source, d) }); continue; }
-        const init = d.initializer;
-        out.push({ name: d.name.text, fn: Boolean(init && (t.isArrowFunction(init) || t.isFunctionExpression(init))), line: lineOf(source, d) });
-      }
-    } else if (t.isExportDeclaration(node)) {
-      if (!node.exportClause) out.push({ name: '*', fn: false, line: lineOf(source, node) });
-      else if (t.isNamedExports(node.exportClause)) for (const el of node.exportClause.elements) out.push({ name: el.name.text, fn: false, line: lineOf(source, el), reexport: true });
-      else out.push({ name: node.exportClause.name.text, fn: false, line: lineOf(source, node) });
-    } else if (t.isExportAssignment(node)) out.push({ name: 'default', fn: false, line: lineOf(source, node) });
-  }
+  for (const node of source.statements) out.push(...statementExports(t, node, source, exported, isDefault));
   return out;
 }

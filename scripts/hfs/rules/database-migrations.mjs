@@ -61,15 +61,8 @@ async function migrationTimeLimit(git, repoRoot, file, now) {
   return { at: now(), tracked: false };
 }
 
-
-/** L02 findings for names, stamps, ordering and immutability of supabase/migrations/*.sql. */
-export async function migrationShapeFindings({ repoRoot, migrations, git, base, now }) {
+async function localMigrationFindings(local, repoRoot, git, now) {
   const findings = [];
-  const prefix = `${MIGRATIONS_DIR}/`;
-  const local = migrations.map((file) => {
-    const name = file.startsWith(prefix) ? file.slice(prefix.length) : file;
-    return { file, name, match: MIGRATION_NAME.exec(name) };
-  });
   const stamps = new Map();
   for (const entry of local) {
     if (!entry.match) {
@@ -89,25 +82,45 @@ export async function migrationShapeFindings({ repoRoot, migrations, git, base, 
     if (stamps.has(stamp)) findings.push(found(DB_MIGRATION_SHAPE, entry.file, `${entry.file} shares stamp ${entry.match[1]} with ${stamps.get(stamp)}; stamps are strictly increasing`, { stamp: entry.match[1], other: stamps.get(stamp) }));
     stamps.set(stamp, entry.file);
   }
+  return findings;
+}
+
+async function baseMigrationEntryFindings(entry, repoRoot, git, baseSha, onBase, baseMax) {
+  if (!entry.match) return [];
+  const stamp = migrationStamp(entry.match[1]);
+  if (onBase.has(entry.name)) {
+    const committed = await baseFileText(git, repoRoot, baseSha.sha, entry.file);
+    const current = readText(repoRoot, entry.file);
+    if (!sameText(current, committed)) return [found(DB_MIGRATION_SHAPE, entry.file, `${entry.file} differs from its content on ${baseSha.ref}; a migration on the base branch is immutable - write a new migration`, { base: baseSha.ref })];
+  } else if (baseMax !== null && stamp !== null && stamp <= baseMax) {
+    return [found(DB_MIGRATION_SHAPE, entry.file, `${entry.file} is stamped ${entry.match[1]}, not after every migration on ${baseSha.ref} (latest ${String(new Date(baseMax).toISOString())}); a new migration sorts after the base ones`, { stamp: entry.match[1], base: baseSha.ref })];
+  }
+  return [];
+}
+
+function removedMigrationFindings(local, baseNames, baseSha) {
+  const findings = [];
+  for (const name of baseNames) {
+    if (!local.some((entry) => entry.name === name)) findings.push(found(DB_MIGRATION_SHAPE, `${MIGRATIONS_DIR}/${name}`, `${MIGRATIONS_DIR}/${name} exists on ${baseSha.ref} but is gone here; a migration on the base branch is immutable - restore it`, { base: baseSha.ref }));
+  }
+  return findings;
+}
+
+/** L02 findings for names, stamps, ordering and immutability of supabase/migrations/*.sql. */
+export async function migrationShapeFindings({ repoRoot, migrations, git, base, now }) {
+  const prefix = `${MIGRATIONS_DIR}/`;
+  const local = migrations.map((file) => {
+    const name = file.startsWith(prefix) ? file.slice(prefix.length) : file;
+    return { file, name, match: MIGRATION_NAME.exec(name) };
+  });
+  const findings = await localMigrationFindings(local, repoRoot, git, now);
   const baseSha = await baseShaOf(git, repoRoot, base);
   if (!baseSha) return findings;
   const baseNames = await baseMigrationNames(git, repoRoot, baseSha.sha);
   const onBase = new Set(baseNames);
   const baseStamps = baseNames.map((name) => MIGRATION_NAME.exec(name)?.[1]).filter(Boolean).map(migrationStamp).filter((stamp) => stamp !== null);
   const baseMax = baseStamps.length ? Math.max(...baseStamps) : null;
-  for (const entry of local) {
-    if (!entry.match) continue;
-    const stamp = migrationStamp(entry.match[1]);
-    if (onBase.has(entry.name)) {
-      const committed = await baseFileText(git, repoRoot, baseSha.sha, entry.file);
-      const current = readText(repoRoot, entry.file);
-      if (!sameText(current, committed)) findings.push(found(DB_MIGRATION_SHAPE, entry.file, `${entry.file} differs from its content on ${baseSha.ref}; a migration on the base branch is immutable - write a new migration`, { base: baseSha.ref }));
-    } else if (baseMax !== null && stamp !== null && stamp <= baseMax) {
-      findings.push(found(DB_MIGRATION_SHAPE, entry.file, `${entry.file} is stamped ${entry.match[1]}, not after every migration on ${baseSha.ref} (latest ${String(new Date(baseMax).toISOString())}); a new migration sorts after the base ones`, { stamp: entry.match[1], base: baseSha.ref }));
-    }
-  }
-  for (const name of baseNames) {
-    if (!local.some((entry) => entry.name === name)) findings.push(found(DB_MIGRATION_SHAPE, `${MIGRATIONS_DIR}/${name}`, `${MIGRATIONS_DIR}/${name} exists on ${baseSha.ref} but is gone here; a migration on the base branch is immutable - restore it`, { base: baseSha.ref }));
-  }
+  for (const entry of local) findings.push(...await baseMigrationEntryFindings(entry, repoRoot, git, baseSha, onBase, baseMax));
+  findings.push(...removedMigrationFindings(local, baseNames, baseSha));
   return findings;
 }

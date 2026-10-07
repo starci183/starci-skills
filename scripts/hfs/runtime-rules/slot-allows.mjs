@@ -21,24 +21,34 @@ function forbiddenBy(slot, relative, bindings) {
   return null;
 }
 
+function allowedFinding(ctx, file, slot) {
+  const verdict = allowsFile(ctx.resolver, file);
+  if (!verdict || verdict.allowed) return null;
+  const reason = verdict.forbiddenBy ? `: its forbids names ${verdict.forbiddenBy}` : `: it admits only ${[...(slot.requires ?? []), ...slot.allows].join(', ')}`;
+  return { code: CODE, level: 'error', path: file, slot: slot.id, message: `${file} is not admitted by ${slot.id} (${slot.path})${reason}` };
+}
+
+function forbiddenFinding(ctx, file, classification, slot) {
+  const entry = forbiddenBy(slot, relativeToRoot(classification.path, classification.root), classification.bindings ?? {});
+  if (!entry) return null;
+  return { code: CODE, level: 'error', path: file, slot: slot.id, message: `${file} is forbidden by ${slot.id} (${slot.path}): its forbids names ${entry}` };
+}
+
+function slotFinding(ctx, file) {
+  const classification = ctx.resolver.classifyPath(file);
+  if (classification.status !== 'owned') return null;
+  const slot = ctx.resolver.slot(classification.slot);
+  if (!slot.allows?.length && !slot.forbids?.length) return null;
+  if (slot.allows?.length) return allowedFinding(ctx, file, slot);
+  return forbiddenFinding(ctx, file, classification, slot);
+}
+
 /** HFS_FORBIDDEN_PRESENT for the tracked files their own slot's allows/forbids refuse. */
 export function slotAllowsFindings(ctx) {
   const found = [];
   for (const file of ctx.files) {
-    const c = ctx.resolver.classifyPath(file);
-    if (c.status !== 'owned') continue;
-    const slot = ctx.resolver.slot(c.slot);
-    if (!slot.allows?.length && !slot.forbids?.length) continue;
-    if (slot.allows?.length) {
-      const verdict = allowsFile(ctx.resolver, file);
-      if (verdict && !verdict.allowed) {
-        const reason = verdict.forbiddenBy ? `: its forbids names ${verdict.forbiddenBy}` : `: it admits only ${[...(slot.requires ?? []), ...slot.allows].join(', ')}`;
-        found.push({ code: CODE, level: 'error', path: file, slot: slot.id, message: `${file} is not admitted by ${slot.id} (${slot.path})${reason}` });
-      }
-      continue;
-    }
-    const entry = forbiddenBy(slot, relativeToRoot(c.path, c.root), c.bindings ?? {});
-    if (entry) found.push({ code: CODE, level: 'error', path: file, slot: slot.id, message: `${file} is forbidden by ${slot.id} (${slot.path}): its forbids names ${entry}` });
+    const finding = slotFinding(ctx, file);
+    if (finding) found.push(finding);
   }
   return found;
 }

@@ -85,35 +85,51 @@ const dirEntries=(dir,parentReal,errors)=>{
  * Files worth archiving under `dir`: regular files with a history extension, at any depth, links skipped.
  * `report` collects skipped entries; `now`/`archiveAfterMs` gate the age.
  */
-const collectHistoryFiles=(dir,{rootKey,now,archiveAfterMs,skipped,errors})=>{
-  const out=[];
-  const walk=(dir,st,parentReal)=>{
-    const listed=dirEntries(dir,parentReal,errors);
-    if(!listed)return;
-    const real=listed.real;
-    for(const entry of listed.entries){
-      const p=path.join(dir,entry.name);
-      let st;
-      try{st=fs.lstatSync(p);}catch{continue;}
-      if(entry.isDirectory()){
-        if(isLinkLike(p,{parentReal:real,stat:st})){skipped.push({path:p,reason:'link: never descend or move through it'});continue;}
-        walk(p,st,real);
-        continue;
-      }
-      if(isLinkLike(p,{parentReal:real,stat:st})){skipped.push({path:p,reason:'link: never descend or move through it'});continue;}
-      if(!st.isFile()){skipped.push({path:p,reason:'not a regular file'});continue;}
-      if(!HISTORY_EXT.has(path.extname(entry.name).toLowerCase()))continue;
-      if(!(inside(p,rootKey))){skipped.push({path:p,reason:'outside the devin root'});continue;}
-      if(now-st.mtimeMs<=archiveAfterMs)continue; // young enough to keep
-      out.push({path:p,bytes:st.size,mtimeMs:st.mtimeMs});
-    }
-  };
+function historyEntry(entry, dir, real, context) {
+  const p=path.join(dir,entry.name);
   let st;
-  try{st=fs.lstatSync(dir);}catch{return out;}
-  if(!st.isDirectory()||isLinkLike(dir,{stat:st}))return out;
-  walk(dir,st,null);
-  return out;
+  try{st=fs.lstatSync(p);}catch{return;}
+  if(entry.isDirectory()){
+    if(isLinkLike(p,{parentReal:real,stat:st})){context.skipped.push({path:p,reason:'link: never descend or move through it'});return;}
+    collectHistoryDirectory(p,real,context);
+    return;
+  }
+  if(isLinkLike(p,{parentReal:real,stat:st})){context.skipped.push({path:p,reason:'link: never descend or move through it'});return;}
+  if(!st.isFile()){context.skipped.push({path:p,reason:'not a regular file'});return;}
+  if(!HISTORY_EXT.has(path.extname(entry.name).toLowerCase()))return;
+  if(!inside(p,context.rootKey)){context.skipped.push({path:p,reason:'outside the devin root'});return;}
+  if(context.now-st.mtimeMs<=context.archiveAfterMs)return;
+  context.files.push({path:p,bytes:st.size,mtimeMs:st.mtimeMs});
+}
+
+function collectHistoryDirectory(dir, parentReal, context) {
+  const listed=dirEntries(dir,parentReal,context.errors);
+  if(!listed)return;
+  for(const entry of listed.entries)historyEntry(entry,dir,listed.real,context);
+}
+
+const collectHistoryFiles=(dir,context)=>{
+  const files=[];
+  let st;
+  try{st=fs.lstatSync(dir);}catch{return files;}
+  if(!st.isDirectory()||isLinkLike(dir,{stat:st}))return files;
+  collectHistoryDirectory(dir,null,{...context,files});
+  return files;
 };
+
+function scanHistoryTree(dir,parentReal,context){
+  const listed=dirEntries(dir,parentReal,context.errors);
+  if(!listed)return;
+  const real=listed.real;
+  for(const entry of listed.entries){
+    const p=path.join(dir,entry.name);
+    let st;try{st=fs.lstatSync(p);}catch{continue;}
+    if(isLinkLike(p,{parentReal:real,stat:st})){context.skipped.push({path:p,reason:'link: never descend or move through it'});continue;}
+    if(!entry.isDirectory())continue;
+    if(HISTORY_DIRS.has(entry.name.toLowerCase()))context.plan.push(...collectHistoryFiles(p,context));
+    else scanHistoryTree(p,real,context);
+  }
+}
 
 /**
  * Sweep the Devin CLI data root. See the header comment for the contract; `processes` is an
@@ -153,21 +169,7 @@ export async function sweepDevinData({apply=false,now=Date.now(),env=process.env
   // History directories anywhere under the devin root (cli/summaries, cli/transcripts, summaries,
   // User/History, …); files in them older than the window move to the archive root.
   const plan=[];
-  const scan=(dir,parentReal)=>{
-    const listed=dirEntries(dir,parentReal,errors);
-    if(!listed)return;
-    const real=listed.real;
-    for(const entry of listed.entries){
-      const p=path.join(dir,entry.name);
-      let st;try{st=fs.lstatSync(p);}catch{continue;}
-      if(isLinkLike(p,{parentReal:real,stat:st})){skipped.push({path:p,reason:'link: never descend or move through it'});continue;}
-      if(!entry.isDirectory())continue;
-      if(HISTORY_DIRS.has(entry.name.toLowerCase()))
-        plan.push(...collectHistoryFiles(p,{rootKey,now,archiveAfterMs,skipped,errors}));
-      else scan(p,real);
-    }
-  };
-  scan(root,null);
+  scanHistoryTree(root,null,{rootKey,now,archiveAfterMs,skipped,errors,plan});
   report.candidateFiles=plan.length;
   for(const file of plan){
     const rel=path.relative(root,file.path);

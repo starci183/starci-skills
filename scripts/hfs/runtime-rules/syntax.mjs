@@ -9,10 +9,13 @@ const JAVASCRIPT = /\.(?:mjs|cjs|js)$/;
 // A managed template carries render tokens ({{name}}) that are not JavaScript until `starci app sync` renders them: not authored source.
 const RENDER_TOKEN = /\{\{[A-Za-z][A-Za-z0-9.]*\}\}/;
 const VENDORED_BUILD = /(?:^|\/)(?:node_modules|dist|reference-renders)\//;
+const SLASH = '/';
+const END = '$';
+const TRAILING_SLASHES = new RegExp(`${SLASH}+${END}`);
 
 /** The tracked JavaScript paths in scope, with generated roots and vendored build trees excluded. */
 function syntaxSourceFiles(files, params) {
-  const generated = (params.generated ?? []).map((entry) => `${String(entry.root).replace(/\/+$/, '')}/`);
+  const generated = (params.generated ?? []).map((entry) => `${String(entry.root).replace(TRAILING_SLASHES, '')}/`);
   return files.filter((file) => JAVASCRIPT.test(file)
     && !VENDORED_BUILD.test(file)
     && !generated.some((root) => file.startsWith(root)));

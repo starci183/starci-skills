@@ -102,6 +102,60 @@ export async function sweepTmp({
   return out;
 }
 
+function eligibleEntry(name, entry, prefixes, out) {
+  if (PROTECTED_NAMES.has(foldCase(name))) {
+    out.skipped.push({ path: entry, reason: 'protected: housekeeping never touches ${TEMP}/claude' });
+    return false;
+  }
+  return prefixes.some((prefix) => foldCase(name).startsWith(prefix));
+}
+
+function entryStat(entry, out) {
+  try { return fs.lstatSync(entry); } catch (error) {
+    if (error?.code !== 'ENOENT') out.errors.push({ path: entry, error: String(error?.message ?? error) });
+    return null;
+  }
+}
+
+function skipUnsafeEntry(entry, st, { parentReal, now, maxAgeMs, out }) {
+  if (isLinkLike(entry, { parentReal, stat: st })) {
+    out.skipped.push({ path: entry, reason: 'a link (junction/symlink/reparse point): never removed, never deleted through' });
+    return true;
+  }
+  const ageMs = now - st.mtimeMs;
+  if (!(ageMs > maxAgeMs)) {
+    out.skipped.push({ path: entry, reason: `mtime age ${Math.round(ageMs)}ms is within tmpMaxAgeMs ${maxAgeMs}ms` });
+    return true;
+  }
+  const gitAgeMs = st.isDirectory() ? gitActivityAgeMs(entry, now) : null;
+  if (gitAgeMs !== null && !(gitAgeMs > maxAgeMs)) {
+    out.skipped.push({ path: entry, reason: `a git checkout whose git metadata changed ${Math.round(gitAgeMs)}ms ago, within tmpMaxAgeMs ${maxAgeMs}ms: live` });
+    return true;
+  }
+  return false;
+}
+
+function removeOrReport(entry, st, { parentReal, apply, removeEntry, out }) {
+  const bytes = treeSize(entry, parentReal);
+  if (!apply) {
+    out.skipped.push({ path: entry, reason: 'dry run: would be removed under --apply' });
+    out.freedBytes += bytes;
+    return;
+  }
+  let result;
+  try { result = removeEntry(entry); } catch (error) {
+    result = { ok: false, errors: [{ code: error?.code ?? 'ERROR', message: String(error?.message ?? error) }] };
+  }
+  if (result?.ok) {
+    out.deleted.push(entry);
+    out.freedBytes += bytes;
+    return;
+  }
+  const codes = (result?.errors ?? []).map((error) => error?.code).filter(Boolean);
+  if (codes.some((code) => BUSY_CODES.has(code))) out.skipped.push({ path: entry, reason: `held open by a live process (${codes.join(', ')})` });
+  else out.errors.push({ path: entry, error: describe(result?.errors) || 'removal failed' });
+}
+
 function sweepRoot({ root: tempRoot, prefixes }, { apply, now, maxAgeMs, remove, out }) {
   const removeEntry = remove ?? ((target) => safeRemove(target, { hold: artifactHoldReason, checkoutsUnder: tempRoot }));
 
@@ -115,51 +169,9 @@ function sweepRoot({ root: tempRoot, prefixes }, { apply, now, maxAgeMs, remove,
 
   for (const name of names) {
     const entry = path.join(tempRoot, name);
-    if (PROTECTED_NAMES.has(foldCase(name))) {
-      out.skipped.push({ path: entry, reason: 'protected: housekeeping never touches ${TEMP}/claude' });
-      continue;
-    }
-    if (!prefixes.some((prefix) => foldCase(name).startsWith(prefix))) continue;
-    let st;
-    try { st = fs.lstatSync(entry); } catch (error) {
-      if (error?.code === 'ENOENT') continue; // vanished between readdir and lstat
-      out.errors.push({ path: entry, error: String(error?.message ?? error) });
-      continue;
-    }
-    if (isLinkLike(entry, { parentReal, stat: st })) {
-      out.skipped.push({ path: entry, reason: 'a link (junction/symlink/reparse point): never removed, never deleted through' });
-      continue;
-    }
-    const ageMs = now - st.mtimeMs;
-    if (!(ageMs > maxAgeMs)) {
-      out.skipped.push({ path: entry, reason: `mtime age ${Math.round(ageMs)}ms is within tmpMaxAgeMs ${maxAgeMs}ms` });
-      continue;
-    }
-    const gitAgeMs = st.isDirectory() ? gitActivityAgeMs(entry, now) : null;
-    if (gitAgeMs !== null && !(gitAgeMs > maxAgeMs)) {
-      out.skipped.push({ path: entry, reason: `a git checkout whose git metadata changed ${Math.round(gitAgeMs)}ms ago, within tmpMaxAgeMs ${maxAgeMs}ms: live` });
-      continue;
-    }
-    const bytes = treeSize(entry, parentReal);
-    if (!apply) {
-      out.skipped.push({ path: entry, reason: 'dry run: would be removed under --apply' });
-      out.freedBytes += bytes;
-      continue;
-    }
-    let result;
-    try { result = removeEntry(entry); } catch (error) {
-      result = { ok: false, errors: [{ code: error?.code ?? 'ERROR', message: String(error?.message ?? error) }] };
-    }
-    if (result?.ok) {
-      out.deleted.push(entry);
-      out.freedBytes += bytes;
-      continue;
-    }
-    const codes = (result?.errors ?? []).map((e) => e?.code).filter(Boolean);
-    if (codes.some((code) => BUSY_CODES.has(code))) {
-      out.skipped.push({ path: entry, reason: `held open by a live process (${codes.join(', ')})` });
-    } else {
-      out.errors.push({ path: entry, error: describe(result?.errors) || 'removal failed' });
-    }
+    if (!eligibleEntry(name, entry, prefixes, out)) continue;
+    const st = entryStat(entry, out);
+    if (!st || skipUnsafeEntry(entry, st, { parentReal, now, maxAgeMs, out })) continue;
+    removeOrReport(entry, st, { parentReal, apply, removeEntry, out });
   }
 }

@@ -11,6 +11,35 @@ import { lineOf, localBindings, moduleRefs, ts } from './source-ast.mjs';
 
 export const CODE = 'RT_EXTERNAL_OWNER';
 
+function globalFindings({ text, source, owner, infraOwners, add }) {
+  const t = ts();
+  const globals = Object.keys(infraOwners.globals);
+  if (!globals.length || !globals.some((name) => text.includes(name))) return;
+  const bound = localBindings(source);
+  const visit = (node) => {
+    if (t.isCallExpression(node) || t.isNewExpression(node)) {
+      const callee = node.expression;
+      let name = null;
+      if (t.isIdentifier(callee) && !bound.has(callee.text)) name = callee.text;
+      else if (t.isPropertyAccessExpression(callee) && t.isIdentifier(callee.expression)
+        && ['globalThis', 'window', 'global'].includes(callee.expression.text)) name = callee.name.text;
+      const owners = name && Object.hasOwn(infraOwners.globals, name) ? infraOwners.globals[name] : null;
+      if (owners && !ownedBy(owners, owner)) add(lineOf(source, node), `calls the global ${name}`, owners);
+    }
+    t.forEachChild(node, visit);
+  };
+  visit(source);
+}
+
+function programFindings({ text, file, owner, infraOwners, add }) {
+  for (const call of spawnCalls(text, file).calls) {
+    for (const program of call.programs) {
+      const owners = Object.hasOwn(infraOwners.programs, program) ? infraOwners.programs[program] : null;
+      if (owners && !ownedBy(owners, owner)) add(call.line, `${call.callee}() starts ${program}`, owners);
+    }
+  }
+}
+
 /** The owner id of `file` under `resolver` (api/<system>, engine/db) or null. */
 export function ownerIdOf(resolver, file) {
   const tier = resolver.tierOf(file);
@@ -27,7 +56,6 @@ const describe = (owners) => (owners.length ? owners.join(', ') : 'nowhere in ru
 
 /** The RT_EXTERNAL_OWNER findings of one source file. */
 export function fileExternalFindings({ path: file, text, source, owner, infraOwners }) {
-  const t = ts();
   const found = [];
   const ownership = owner ? `this file is ${owner}` : 'this file owns no external system';
   const add = (line, what, owners) => found.push({ code: CODE, level: 'error', path: file, line, message: `${file}:${line} ${what}; only ${describe(owners)} may (${ownership}) - move the call into its scripts/api/<system>/ call file and import that` });
@@ -35,29 +63,8 @@ export function fileExternalFindings({ path: file, text, source, owner, infraOwn
     const owners = infraOwners.modules[ref.module];
     if (owners && !ownedBy(owners, owner)) add(ref.line, `imports ${ref.module}`, owners);
   }
-  const globals = Object.keys(infraOwners.globals);
-  if (globals.length && globals.some((name) => text.includes(name))) {
-    const bound = localBindings(source);
-    const visit = (node) => {
-      if (t.isCallExpression(node) || t.isNewExpression(node)) {
-        const callee = node.expression;
-        let name = null;
-        if (t.isIdentifier(callee) && !bound.has(callee.text)) name = callee.text;
-        else if (t.isPropertyAccessExpression(callee) && t.isIdentifier(callee.expression)
-          && ['globalThis', 'window', 'global'].includes(callee.expression.text)) name = callee.name.text;
-        const owners = name && Object.hasOwn(infraOwners.globals, name) ? infraOwners.globals[name] : null;
-        if (owners && !ownedBy(owners, owner)) add(lineOf(source, node), `calls the global ${name}`, owners);
-      }
-      t.forEachChild(node, visit);
-    };
-    visit(source);
-  }
-  for (const call of spawnCalls(text, file).calls) {
-    for (const program of call.programs) {
-      const owners = Object.hasOwn(infraOwners.programs, program) ? infraOwners.programs[program] : null;
-      if (owners && !ownedBy(owners, owner)) add(call.line, `${call.callee}() starts ${program}`, owners);
-    }
-  }
+  globalFindings({ text, source, owner, infraOwners, add });
+  programFindings({ text, file, owner, infraOwners, add });
   return found;
 }
 

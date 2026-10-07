@@ -22,8 +22,11 @@ const rootGlob = (entry) => {
   return readdirSync(packageRoot, { withFileTypes: true }).filter((e) => e.isFile() && e.name.endsWith(`.${m[1]}`)).map((e) => e.name);
 };
 // One shared glob matcher interprets the manifest's directory and capture-file exclusions.
+const SLASH = '/';
+const END = '$';
+const TRAILING_SLASHES = new RegExp(`${SLASH}+${END}`);
 const PAYLOAD_NEGATIONS = pkg.files.filter((f) => f.startsWith('!')).flatMap((f) => {
-  const pattern = f.slice(1).replace(/\/+$/, '');
+  const pattern = f.slice(1).replace(TRAILING_SLASHES, '');
   return [globExpression(pattern), ...(f.endsWith('/') ? [globExpression(`${pattern}/**`)] : [])];
 });
 // npm treats existing literal files as strict inclusions; directory/glob negations still prune siblings.
@@ -54,22 +57,20 @@ const payloadDocAllowed = (root, relative, exampleInputs) => {
 const PAYLOAD_DOC_ROOT = /^(examples|docs)\//;
 const payloadFileAllowed = (root, relative, exampleInputs) => !PAYLOAD_DOC_ROOT.test(relative) || payloadDocAllowed(root, relative, exampleInputs);
 
-function walk(root, rel, exampleInputs) {
-  if (isNegated(rel)) return [];
-  const abs = path.join(root, rel);
-  if (EXAMPLE_FILE_INCLUSIONS.has(rel)) {
-    let at = path.resolve(root);
-    const parts = rel.split('/');
-    for (const [index, part] of parts.entries()) {
-      at = path.join(at, part);
-      const stat = lstatSync(at, {throwIfNoEntry: false});
-      if (!stat) return []; // Missing target members retain the existing update repair behavior.
-      if (isLinkLike(at, {stat}) || (index === parts.length - 1 ? !stat.isFile() : !stat.isDirectory()))
-        throw new Error(`declared example payload is linked or not regular: ${rel}`);
-    }
+function validateExampleInclusion(root, rel) {
+  let at = path.resolve(root);
+  const parts = rel.split('/');
+  for (const [index, part] of parts.entries()) {
+    at = path.join(at, part);
+    const stat = lstatSync(at, {throwIfNoEntry: false});
+    if (!stat) return false; // Missing target members retain the existing update repair behavior.
+    if (isLinkLike(at, {stat}) || (index === parts.length - 1 ? !stat.isFile() : !stat.isDirectory()))
+      throw new Error(`declared example payload is linked or not regular: ${rel}`);
   }
-  if (!existsSync(abs)) return [];
-  if (statSync(abs).isFile()) return payloadFileAllowed(root, rel, exampleInputs) ? [rel] : [];
+  return true;
+}
+
+function walkDirectory(root, rel, exampleInputs, abs) {
   const out = [];
   for (const e of readdirSync(abs, { withFileTypes: true })) {
     const next = rel ? `${rel}/${e.name}` : e.name;
@@ -81,10 +82,17 @@ function walk(root, rel, exampleInputs) {
   }
   return out;
 }
+
+function walk(root, rel, exampleInputs) {
+  if (isNegated(rel)) return [];
+  const abs = path.join(root, rel);
+  if (EXAMPLE_FILE_INCLUSIONS.has(rel) && !validateExampleInclusion(root, rel)) return [];
+  if (!existsSync(abs)) return [];
+  if (statSync(abs).isFile()) return payloadFileAllowed(root, rel, exampleInputs) ? [rel] : [];
+  return walkDirectory(root, rel, exampleInputs, abs);
+}
 export const payloadHash = (file, relative = '') => installedPayloadDigest(readFileSync(file), relative);
-export const payloadFiles = (root) => {
-  const manifest = path.join(root, 'package.json'), stat = lstatSync(manifest, {throwIfNoEntry: false});
-  const runtime = stat?.isFile() && !isLinkLike(manifest) && JSON.parse(readFileSync(manifest, 'utf8')).name === pkg.name;
+function exampleInputsFor(root, runtime) {
   const exampleInputs = new Set();
   if (runtime || existsSync(path.join(root, EXAMPLE_CATALOG_FILE))) {
     const references = exampleSourcePaths(root);
@@ -102,29 +110,46 @@ export const payloadFiles = (root) => {
       }
     }
   }
+  return exampleInputs;
+}
+
+export const payloadFiles = (root) => {
+  const manifest = path.join(root, 'package.json'), stat = lstatSync(manifest, {throwIfNoEntry: false});
+  const runtime = stat?.isFile() && !isLinkLike(manifest) && JSON.parse(readFileSync(manifest, 'utf8')).name === pkg.name;
+  const exampleInputs = exampleInputsFor(root, runtime);
   const files = [...new Set(PAYLOAD.flatMap((relative) => walk(root, relative, exampleInputs)))].sort(byCodeUnit);
   for (const relative of exampleInputs) if (!files.includes(relative))
     throw new Error(`required example input is missing from the payload: ${relative}`);
   return files;
 };
-export const hashTree = (root, priorManifest = null, repair = false) => {
-  if (!priorManifest) return Object.fromEntries(payloadFiles(root).map((rel) => [rel, payloadHash(path.join(root, rel), rel)]));
-  // update has checked the protocol and stale path guards. Only its existing owner descriptor
-  // can admit prior target JSON custody; this never changes the source package's strict gate.
+
+function validatePriorManifest(priorManifest) {
   if (priorManifest.name !== pkg.name || typeof priorManifest.version !== 'string'
     || !priorManifest.files || typeof priorManifest.files !== 'object' || Array.isArray(priorManifest.files)
     || !Object.hasOwn(priorManifest.files, 'package.json')
     || Object.values(priorManifest.files).some(hash => typeof hash !== 'string' || !/^[a-f0-9]{64}$/.test(hash)))
     throw new Error('invalid installed payload custody; refusing target inventory before writes');
-  const exampleInputs = new Set([...Object.keys(priorManifest.files), ...payloadFiles(packageRoot)]
-    .filter(relative => relative === EXAMPLE_CATALOG_FILE || (relative.startsWith(`${EXAMPLES_ROOT}/`) && relative.endsWith('.json'))));
-  const files = [...new Set(PAYLOAD.flatMap(relative => walk(root, relative, exampleInputs)))].sort(byCodeUnit);
-  if (!repair) for (const relative of files) if (exampleInputs.has(relative) && relative.endsWith('.json')) {
+}
+
+function validateInstalledExamples(files, root, exampleInputs, repair) {
+  if (repair) return;
+  for (const relative of files) if (exampleInputs.has(relative) && relative.endsWith('.json')) {
     let value;
     try { value = JSON.parse(readFileSync(path.join(root, relative), 'utf8')); }
     catch { throw new Error(`invalid installed example JSON input: ${relative}`); }
     if (relative.endsWith('/hfs.json') && value?.kind !== 'app') throw new Error(`installed example has no HFS app declaration: ${relative}`);
   }
+}
+
+export const hashTree = (root, priorManifest = null, repair = false) => {
+  if (!priorManifest) return Object.fromEntries(payloadFiles(root).map((rel) => [rel, payloadHash(path.join(root, rel), rel)]));
+  // update has checked the protocol and stale path guards. Only its existing owner descriptor
+  // can admit prior target JSON custody; this never changes the source package's strict gate.
+  validatePriorManifest(priorManifest);
+  const exampleInputs = new Set([...Object.keys(priorManifest.files), ...payloadFiles(packageRoot)]
+    .filter(relative => relative === EXAMPLE_CATALOG_FILE || (relative.startsWith(`${EXAMPLES_ROOT}/`) && relative.endsWith('.json'))));
+  const files = [...new Set(PAYLOAD.flatMap(relative => walk(root, relative, exampleInputs)))].sort(byCodeUnit);
+  validateInstalledExamples(files, root, exampleInputs, repair);
   return Object.fromEntries(files.map(relative => [relative, payloadHash(path.join(root, relative), relative)]));
 };
 

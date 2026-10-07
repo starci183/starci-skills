@@ -28,24 +28,15 @@ const isCredentialKey = (key) => {
     || (leaf.endsWith('_key') && !PUBLIC_KEYS.has(leaf));
 };
 
+const escapeRegexPart = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
+
 const tomlLine = (text, key) => {
-  const expression = new RegExp(String.raw`^\s*["']?${key.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)}["']?\s*=`, 'm');
+  const expression = new RegExp(String.raw`^\s*["']?${escapeRegexPart(key)}["']?\s*=`, 'm');
   const match = expression.exec(text);
   return match ? text.slice(0, match.index).split('\n').length : undefined;
 };
 
-/** The parsed TOML of `text`, or null when it does not parse. */
-export async function parseToml(text) {
-  try {
-    const module = await import('smol-toml');
-    return module.parse(text);
-  } catch {
-    return null;
-  }
-}
-
-/** L08 policy findings in one already-parsed supabase/config.toml. */
-export function configFindings({ file, text, toml, supabase }) {
+function credentialConfigFindings(file, text, toml) {
   const findings = [];
   for (const [at, key, value] of tomlEntries(toml)) {
     if (!isCredentialKey(key)) continue;
@@ -55,15 +46,11 @@ export function configFindings({ file, text, toml, supabase }) {
       findings.push(found(DB_CONFIG_POLICY, file, `${file}${lineNote} ${at} holds a literal credential; a secret in config.toml is written env(NAME), never a value`, { ...(line ? { line } : {}), key: at }));
     }
   }
-  const auth = toml?.auth ?? {};
-  if (auth.jwt_expiry !== undefined && (typeof auth.jwt_expiry !== 'number' || auth.jwt_expiry > 3600)) {
-    findings.push(found(DB_CONFIG_POLICY, file, `${file} auth.jwt_expiry is ${JSON.stringify(auth.jwt_expiry)}; the access token lives at most 3600 seconds`, { key: 'auth.jwt_expiry' }));
-  }
-  if (!supabase) return findings;
-  const declared = {
-    enableSignup: supabase.enableSignup, jwtExpiry: supabase.jwtExpiry, siteUrl: supabase.siteUrl,
-    redirectUrls: Array.isArray(supabase.redirectUrls) ? supabase.redirectUrls : undefined,
-  };
+  return findings;
+}
+
+function declarationConfigFindings(file, auth, declared) {
+  const findings = [];
   if (declared.jwtExpiry !== undefined && auth.jwt_expiry !== declared.jwtExpiry) {
     findings.push(found(DB_CONFIG_POLICY, file, `${file} auth.jwt_expiry is ${JSON.stringify(auth.jwt_expiry ?? 'absent')}; hfs.json supabase.jwtExpiry declares ${declared.jwtExpiry}`, { key: 'auth.jwt_expiry', declared: declared.jwtExpiry }));
   }
@@ -85,6 +72,32 @@ export function configFindings({ file, text, toml, supabase }) {
       if (!configured.includes(url)) findings.push(found(DB_CONFIG_POLICY, file, `${file} auth.additional_redirect_urls omits ${url}, which hfs.json supabase.redirectUrls declares; the config and declaration must carry the same redirect set`, { key: 'auth.additional_redirect_urls', url }));
     }
   }
+  return findings;
+}
+
+/** The parsed TOML of `text`, or null when it does not parse. */
+export async function parseToml(text) {
+  try {
+    const module = await import('smol-toml');
+    return module.parse(text);
+  } catch {
+    return null;
+  }
+}
+
+/** L08 policy findings in one already-parsed supabase/config.toml. */
+export function configFindings({ file, text, toml, supabase }) {
+  const findings = credentialConfigFindings(file, text, toml);
+  const auth = toml?.auth ?? {};
+  if (auth.jwt_expiry !== undefined && (typeof auth.jwt_expiry !== 'number' || auth.jwt_expiry > 3600)) {
+    findings.push(found(DB_CONFIG_POLICY, file, `${file} auth.jwt_expiry is ${JSON.stringify(auth.jwt_expiry)}; the access token lives at most 3600 seconds`, { key: 'auth.jwt_expiry' }));
+  }
+  if (!supabase) return findings;
+  const declared = {
+    enableSignup: supabase.enableSignup, jwtExpiry: supabase.jwtExpiry, siteUrl: supabase.siteUrl,
+    redirectUrls: Array.isArray(supabase.redirectUrls) ? supabase.redirectUrls : undefined,
+  };
+  findings.push(...declarationConfigFindings(file, auth, declared));
   return findings;
 }
 

@@ -73,9 +73,50 @@ function expiredWorkflows(db, { now = Date.now(), retentionMs = WORKFLOW_RETENTI
   return rows.filter((r) => !purged.has(r.workflow_id)).map((r) => {
     const live = db.prepare('SELECT status FROM jobs WHERE workflow_id=?').all(r.workflow_id).filter((j) => !SETTLED.has(j.status)).length;
     const cited = cites ? Number(db.prepare('SELECT count(*) n FROM work_citations c JOIN job_artifacts a ON a.artifact_id=c.artifact_id WHERE a.workflow_id=?').get(r.workflow_id).n) : 0;
-    const why = live ? `${live} job(s) not settled` : cited ? `${cited} Work citation(s) pin its evidence` : null;
+    let why = null;
+    if (live) why = `${live} job(s) not settled`;
+    else if (cited) why = `${cited} Work citation(s) pin its evidence`;
     return { workflowId: r.workflow_id, endedAt: r.ended_at, ok: !why, ...(why ? { why } : {}) };
   });
+}
+
+function reviewLedger({ raw, repoRoot, apply, now, retentionMs, out }) {
+  const file = path.resolve(String(raw));
+  if (!fs.existsSync(file)) { out.skipped.push({ path: file, reason: 'ledger-file-missing' }); return null; }
+  let ledger = null;
+  let expired = [];
+  try {
+    const before = familySize(file);
+    if (apply) ledger = openLedger({ file });
+    else { const db = openLedgerReader(file); ledger = { db, close: () => db.close() }; }
+    const repo = repoRoot ?? ledger.db.prepare("SELECT value FROM meta WHERE key='repo_root'").get()?.value ?? null;
+    if (apply) {
+      const r = retainLedgerDb(ledger.db, { now });
+      out.deleted += r.debugLogsDeleted;
+      out.retained.push({ path: file, debugLogsDeleted: r.debugLogsDeleted, vacuumed: r.vacuumed, freedBytes: Math.max(0, before - familySize(file)) });
+    } else {
+      const n = has(ledger.db, 'logs') ? Number(ledger.db.prepare("SELECT count(*) n FROM logs WHERE level='debug' AND at < ?").get(now - DEBUG_LOG_RETENTION_MS).n) : 0;
+      out.deleted += n;
+      out.retained.push({ path: file, dryRun: true, debugLogsDeletable: n });
+    }
+    expired = expiredWorkflows(ledger.db, { now, retentionMs }).map((workflow) => ({ ...workflow, repo }));
+  } catch (error) { out.errors.push({ path: file, error: String(error?.message ?? error) }); return null; }
+  finally { try { ledger?.close(); } catch { /* closed */ } }
+  return { file, expired };
+}
+
+function purgeExpiredWorkflows({ file, expired, purgeFn, apply, archiveRoot, now, config, out }) {
+  for (const workflow of expired) {
+    if (!workflow.ok) { out.skipped.push({ path: file, workflowId: workflow.workflowId, reason: 'kept', detail: workflow.why }); continue; }
+    if (!workflow.repo) { out.errors.push({ path: file, workflowId: workflow.workflowId, error: 'the ledger names no repo_root: purge-workflow cannot resolve it' }); continue; }
+    try {
+      const approval = workflowPurgeApproval(workflow.repo, config);
+      if (!approval) { out.skipped.push({ path: file, workflowId: workflow.workflowId, reason: 'workflow-purge-policy-not-adopted' }); continue; }
+      const result = purgeFn({ repo: workflow.repo, workflowId: workflow.workflowId, apply, approvedBy: approval.by, approvalRef: approval.ref,
+        ...(archiveRoot ? { archiveRoot } : {}), now: () => now });
+      out.purged.push({ path: file, workflowId: workflow.workflowId, endedAt: workflow.endedAt, dryRun: !apply, archive: result.archive ?? result.purge?.archive_path ?? null, counts: result.counts ?? null, state: result.purge?.state ?? null });
+    } catch (error) { out.errors.push({ path: file, workflowId: workflow.workflowId, error: String(error?.message ?? error) }); }
+  }
 }
 
 /**
@@ -93,38 +134,9 @@ export async function sweepLedgers({ apply = false, now = Date.now(), env = proc
   }
   const purgeFn = purge ?? (await import('../work/purge-workflow.mjs')).purgeWorkflow;
   for (const { file: raw, repoRoot } of list) {
-    const file = path.resolve(String(raw));
-    if (!fs.existsSync(file)) { out.skipped.push({ path: file, reason: 'ledger-file-missing' }); continue; }
-    let ledger = null;
-    let expired = [];
-    try {
-      const before = familySize(file);
-      if(apply)ledger = openLedger({ file });
-      else {const db=openLedgerReader(file);ledger={db,close:()=>db.close()};}
-      const repo = repoRoot ?? ledger.db.prepare("SELECT value FROM meta WHERE key='repo_root'").get()?.value ?? null;
-      if (apply) {
-        const r = retainLedgerDb(ledger.db, { now });
-        out.deleted += r.debugLogsDeleted;
-        out.retained.push({ path: file, debugLogsDeleted: r.debugLogsDeleted, vacuumed: r.vacuumed, freedBytes: Math.max(0, before - familySize(file)) });
-      } else {
-        const n = has(ledger.db, 'logs') ? Number(ledger.db.prepare("SELECT count(*) n FROM logs WHERE level='debug' AND at < ?").get(now - DEBUG_LOG_RETENTION_MS).n) : 0;
-        out.deleted += n;
-        out.retained.push({ path: file, dryRun: true, debugLogsDeletable: n });
-      }
-      expired = expiredWorkflows(ledger.db, { now, retentionMs }).map((w) => ({ ...w, repo }));
-    } catch (error) { out.errors.push({ path: file, error: String(error?.message ?? error) }); continue; }
-    finally { try { ledger?.close(); } catch { /* closed */ } }
-    for (const w of expired) {
-      if (!w.ok) { out.skipped.push({ path: file, workflowId: w.workflowId, reason: 'kept', detail: w.why }); continue; }
-      if (!w.repo) { out.errors.push({ path: file, workflowId: w.workflowId, error: 'the ledger names no repo_root: purge-workflow cannot resolve it' }); continue; }
-      try {
-        const approval=workflowPurgeApproval(w.repo,config);
-        if(!approval){out.skipped.push({path:file,workflowId:w.workflowId,reason:'workflow-purge-policy-not-adopted'});continue;}
-        const r = purgeFn({ repo: w.repo, workflowId: w.workflowId, apply, approvedBy: approval.by, approvalRef: approval.ref,
-          ...(archiveRoot ? { archiveRoot } : {}), now: () => now });
-        out.purged.push({ path: file, workflowId: w.workflowId, endedAt: w.endedAt, dryRun: !apply, archive: r.archive ?? r.purge?.archive_path ?? null, counts: r.counts ?? null, state: r.purge?.state ?? null });
-      } catch (error) { out.errors.push({ path: file, workflowId: w.workflowId, error: String(error?.message ?? error) }); }
-    }
+    const reviewed = reviewLedger({ raw, repoRoot, apply, now, retentionMs, out });
+    if (!reviewed) continue;
+    purgeExpiredWorkflows({ ...reviewed, purgeFn, apply, archiveRoot, now, config, out });
   }
   out.ok = out.errors.length === 0;
   return out;

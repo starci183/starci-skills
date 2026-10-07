@@ -164,7 +164,7 @@ function safeDefinerExpression(node) {
   const template = stringValue(node.FuncCall.args?.[0]);
   if (template === undefined) return false;
   const specs = formatSpecifiers(template);
-  return specs !== null && specs.every((spec) => ['I', 'L', '%'].includes(spec.type));
+  return specs?.every((spec) => ['I', 'L', '%'].includes(spec.type)) ?? false;
 }
 
 async function definerDynamicFindings(file, fn, queries, baseLine) {
@@ -190,46 +190,55 @@ function revokedRolesFor(fn, grants) {
   return roles;
 }
 
+async function doBlockFindings(file, block) {
+  if (block.body === undefined || block.language !== 'plpgsql') {
+    return [found(DB_DYNAMIC_DDL, file, `${file}:${block.line} DO block in ${block.language} cannot be inspected; a DO block is plpgsql so a static pass sees its statements`, { line: block.line })];
+  }
+  const ast = await plpgsqlOf(block.body);
+  if (ast === null) return [found(DB_DYNAMIC_DDL, file, `${file}:${block.line} DO block body is not valid plpgsql; the pass must see every statement a migration runs`, { line: block.line })];
+  return dynamicDdlFindings(file, dynamicQueries(ast), 'DO block', block.line);
+}
+
+function definerDeclarationFindings(file, fn, facts, exposed, definer) {
+  if (!definer) return [];
+  const findings = [];
+  const pathSet = functionOption(fn.node, 'set').some((option) => facts.isSearchPathSet(option))
+    || facts.alterFunctions.some((alter) => alter.name === fn.name && alter.setsPath && alter.index > fn.index);
+  if (!pathSet) findings.push(found(DB_DEFINER_SAFE, file, `${file}:${fn.line} security definer function ${fn.name} sets no search_path; add \`set search_path = ''\` (or a pinned schema list) on the create, or an alter function in the same migration`, { line: fn.line, function: fn.name }));
+  if (exposed.has(fn.schema)) {
+    const revoked = revokedRolesFor(fn, facts.grants);
+    if (!revoked.has('public') || !revoked.has('anon')) findings.push(found(DB_DEFINER_SAFE, file, `${file}:${fn.line} security definer function ${fn.name} lives in the exposed schema ${fn.schema}; keep it in a non-exposed schema or revoke execute from public and anon in the same migration`, { line: fn.line, function: fn.name }));
+  }
+  if (!fn.node.is_procedure && !fn.node.returnType) findings.push(found(DB_DEFINER_SAFE, file, `${file}:${fn.line} security definer function ${fn.name} declares no return type`, { line: fn.line, function: fn.name }));
+  return findings;
+}
+
+async function functionBodyFindings(file, fn, definer) {
+  if (functionLanguage(fn.node) !== 'plpgsql') return [];
+  const body = functionBody(fn.node);
+  if (body === null) return [];
+  const ast = await plpgsqlOf(body, fn.node.parameters, functionReturnKind(fn.node));
+  if (ast === null) {
+    if (definer) return [found(DB_DEFINER_SAFE, file, `${file}:${fn.line} security definer function ${fn.name} has a body the pass cannot read; a definer body must be plain plpgsql`, { line: fn.line, function: fn.name })];
+    return [];
+  }
+  const queries = dynamicQueries(ast);
+  const findings = await dynamicDdlFindings(file, queries, `function ${fn.name}`, fn.line);
+  if (definer) findings.push(...await definerDynamicFindings(file, fn, queries, fn.line));
+  return findings;
+}
+
+async function functionFindings(file, fn, facts, exposed) {
+  const definer = securityDefiner(fn.node);
+  const findings = definerDeclarationFindings(file, fn, facts, exposed, definer);
+  findings.push(...await functionBodyFindings(file, fn, definer));
+  return findings;
+}
+
 /** All PL/pgSQL-backed L04/L06 findings for one migration's extracted facts. */
 export async function plpgsqlFindings(file, facts, exposed) {
   const findings = [];
-  for (const block of facts.doBlocks) {
-    if (block.body === undefined || block.language !== 'plpgsql') {
-      findings.push(found(DB_DYNAMIC_DDL, file, `${file}:${block.line} DO block in ${block.language} cannot be inspected; a DO block is plpgsql so a static pass sees its statements`, { line: block.line }));
-      continue;
-    }
-    const ast = await plpgsqlOf(block.body);
-    if (ast === null) {
-      findings.push(found(DB_DYNAMIC_DDL, file, `${file}:${block.line} DO block body is not valid plpgsql; the pass must see every statement a migration runs`, { line: block.line }));
-      continue;
-    }
-    findings.push(...await dynamicDdlFindings(file, dynamicQueries(ast), 'DO block', block.line));
-  }
-
-  for (const fn of facts.functions) {
-    const definer = securityDefiner(fn.node);
-    if (definer) {
-      const pathSet = functionOption(fn.node, 'set').some((option) => facts.isSearchPathSet(option))
-        || facts.alterFunctions.some((alter) => alter.name === fn.name && alter.setsPath && alter.index > fn.index);
-      if (!pathSet) findings.push(found(DB_DEFINER_SAFE, file, `${file}:${fn.line} security definer function ${fn.name} sets no search_path; add \`set search_path = ''\` (or a pinned schema list) on the create, or an alter function in the same migration`, { line: fn.line, function: fn.name }));
-      if (exposed.has(fn.schema)) {
-        const revoked = revokedRolesFor(fn, facts.grants);
-        if (!revoked.has('public') || !revoked.has('anon')) findings.push(found(DB_DEFINER_SAFE, file, `${file}:${fn.line} security definer function ${fn.name} lives in the exposed schema ${fn.schema}; keep it in a non-exposed schema or revoke execute from public and anon in the same migration`, { line: fn.line, function: fn.name }));
-      }
-      if (!fn.node.is_procedure && !fn.node.returnType) findings.push(found(DB_DEFINER_SAFE, file, `${file}:${fn.line} security definer function ${fn.name} declares no return type`, { line: fn.line, function: fn.name }));
-    }
-
-    if (functionLanguage(fn.node) !== 'plpgsql') continue;
-    const body = functionBody(fn.node);
-    if (body === null) continue;
-    const ast = await plpgsqlOf(body, fn.node.parameters, functionReturnKind(fn.node));
-    if (ast === null) {
-      if (definer) findings.push(found(DB_DEFINER_SAFE, file, `${file}:${fn.line} security definer function ${fn.name} has a body the pass cannot read; a definer body must be plain plpgsql`, { line: fn.line, function: fn.name }));
-      continue;
-    }
-    const queries = dynamicQueries(ast);
-    findings.push(...await dynamicDdlFindings(file, queries, `function ${fn.name}`, fn.line));
-    if (definer) findings.push(...await definerDynamicFindings(file, fn, queries, fn.line));
-  }
+  for (const block of facts.doBlocks) findings.push(...await doBlockFindings(file, block));
+  for (const fn of facts.functions) findings.push(...await functionFindings(file, fn, facts, exposed));
   return findings;
 }
