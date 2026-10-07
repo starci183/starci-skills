@@ -149,30 +149,15 @@ export function learnIntoDirection(work, notes, { record = null, receipt = null,
 export function promoteGolden(work, { uiDir, archetype, parts, receiptFile, htmlOf, write = false }) {
   const loaded = loadDirection(work);
   const { direction, record, file, dir, repoRoot } = loaded;
-  const receiptAbs = path.resolve(receiptFile);
-  let receipt;
-  try { receipt = JSON.parse(fs.readFileSync(receiptAbs, 'utf8')); } catch (error) { throw new Error(`receipt ${slash(receiptFile)} is unreadable: ${error.message}`); }
-  if (receipt?.schema !== OWNER_ANSWER_SCHEMA) throw new Error(`${slash(receiptFile)} is not a ${OWNER_ANSWER_SCHEMA} receipt`);
-  if (receipt.answeredBy !== OWNER) throw new Error(`the drawing was accepted by ${receipt.answeredBy ?? '(unknown)'}; only the owner's own accept promotes a golden - never an automatic answer`);
-  if (Number(receipt.optionIndex) !== 0) throw new Error(`the receipt chose option ${receipt.optionIndex}, not accept`);
+  const { receipt, receiptAbs } = acceptedDrawingReceipt(receiptFile);
   const entry = archetypesOf(direction)[archetype];
   if (!entry) return { promoted: false, archetype, why: `brand.direction declares no ${archetype} archetype - brand.decide writes it first` };
   const seen = new Map((receipt.review?.parts ?? []).map((p) => [slash(p.path), p.sha256]));
   const golden = [];
   for (const p of parts) {
-    const png = path.resolve(uiDir, p.path);
-    if (!fs.existsSync(png) || sha256File(png) !== seen.get(slash(p.path))) throw new Error(`${p.path} is not the image the owner accepted`);
-    const html = htmlOf(p);
-    if (!html || !fs.existsSync(html)) return { promoted: false, archetype, why: `${p.path} has no render source (.html) to keep as the golden` };
-    const stem = path.basename(png).replace(/\.png$/i, '');
-    const relPng = slash(path.join('golden', archetype, `${stem}.png`));
-    const relHtml = slash(path.join('golden', archetype, `${stem}.html`));
-    if (write) {
-      fs.mkdirSync(path.join(dir, 'golden', archetype), { recursive: true });
-      fs.copyFileSync(png, path.join(dir, relPng));
-      fs.copyFileSync(html, path.join(dir, relHtml));
-    }
-    golden.push({ archetype, html: relHtml, png: relPng, sha256: seen.get(slash(p.path)), htmlSha256: sha256File(html), ...(p.breakpoint ? { breakpoint: p.breakpoint } : {}) });
+    const promoted = promotedGoldenPart(p, { uiDir, archetype, dir, seen, htmlOf, write });
+    if (promoted.why) return { promoted: false, archetype, why: promoted.why };
+    golden.push(promoted.golden);
   }
   const receiptRel = slash(path.relative(repoRoot, receiptAbs));
   const accepted = direction.status === 'accepted' && direction.acceptance?.rev === direction.rev;
@@ -188,14 +173,37 @@ export function promoteGolden(work, { uiDir, archetype, parts, receiptFile, html
     why: accepted ? `the ${archetype} golden is the owner-accepted drawing; the archetype is accepted with ask ${receipt.dispatchId}` : `the ${archetype} golden is recorded; the archetype stays ${nextDirection.archetypes[archetype].status} until the owner accepts the direction (brand-direction.mjs question)` };
 }
 
+function acceptedDrawingReceipt(receiptFile) {
+  const receiptAbs = path.resolve(receiptFile);
+  let receipt;
+  try { receipt = JSON.parse(fs.readFileSync(receiptAbs, 'utf8')); } catch (error) { throw new Error(`receipt ${slash(receiptFile)} is unreadable: ${error.message}`); }
+  if (receipt?.schema !== OWNER_ANSWER_SCHEMA) throw new Error(`${slash(receiptFile)} is not a ${OWNER_ANSWER_SCHEMA} receipt`);
+  if (receipt.answeredBy !== OWNER) throw new Error(`the drawing was accepted by ${receipt.answeredBy ?? '(unknown)'}; only the owner's own accept promotes a golden - never an automatic answer`);
+  if (Number(receipt.optionIndex) !== 0) throw new Error(`the receipt chose option ${receipt.optionIndex}, not accept`);
+  return { receipt, receiptAbs };
+}
+
+function promotedGoldenPart(part, { uiDir, archetype, dir, seen, htmlOf, write }) {
+  const png = path.resolve(uiDir, part.path);
+  if (!fs.existsSync(png) || sha256File(png) !== seen.get(slash(part.path))) throw new Error(`${part.path} is not the image the owner accepted`);
+  const html = htmlOf(part);
+  if (!html || !fs.existsSync(html)) return { why: `${part.path} has no render source (.html) to keep as the golden` };
+  const stem = path.basename(png).replace(/\.png$/i, '');
+  const relPng = slash(path.join('golden', archetype, `${stem}.png`));
+  const relHtml = slash(path.join('golden', archetype, `${stem}.html`));
+  if (write) {
+    fs.mkdirSync(path.join(dir, 'golden', archetype), { recursive: true });
+    fs.copyFileSync(png, path.join(dir, relPng));
+    fs.copyFileSync(html, path.join(dir, relHtml));
+  }
+  return { golden: { archetype, html: relHtml, png: relPng, sha256: seen.get(slash(part.path)), htmlSha256: sha256File(html), ...(part.breakpoint ? { breakpoint: part.breakpoint } : {}) } };
+}
+
 /**
  * Apply the owner's answer to a brand-direction-review ask. Returns {decision, written, archetype, acceptance?, note?}
  * and throws for a receipt that is not the owner's answer to this direction rev and these golden bytes.
  */
-export function applyDirectionReview(work, receiptFile, { write = false } = {}) {
-  const loaded = loadDirection(work);
-  const { direction, repoRoot, record, file } = loaded;
-  const { receipt, receiptRel } = readAnswerReceipt(receiptFile, { repoRoot, schema: OWNER_ANSWER_SCHEMA });
+function directionReviewState(direction, receipt) {
   const review = receipt.review;
   if (review?.schema !== DIRECTION_REVIEW_SCHEMA) throw new Error(`the receipt of ask ${receipt.dispatchId ?? '?'} carries no direction review (question.review): park the brand-direction-review ask (brand-direction.mjs question) and apply its answer`);
   const archetype = review.archetype;
@@ -205,16 +213,34 @@ export function applyDirectionReview(work, receiptFile, { write = false } = {}) 
   const decision = DIRECTION_DECISIONS[Number(receipt.optionIndex)];
   if (!decision) throw new Error(`the receipt chose option ${receipt.optionIndex ?? '(none)'}; a direction review is answered 1 (accept) or 2 (revise)`);
   const note = typeof receipt.note === 'string' && receipt.note.trim() ? receipt.note.trim() : null;
+  return { review, archetype, entry, decision, note };
+}
+
+function revisionNotes(receipt, note, archetype) {
+  return receipt.answeredBy === OWNER ? String(note ?? '').split(/\r?\n/).map((l) => l.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, '').trim()).filter(Boolean)
+    .map((words, i) => {
+      const seed = `${receipt.dispatchId ?? '-'}|${i}|${words}`;
+      const id = `ON-${sha256(seed).slice(0, 10)}`;
+      return { id, text: words, class: 'product-direction', as: 'rubric', dispatchId: receipt.dispatchId ?? null, at: receipt.at ?? null, shape: archetype };
+    }) : [];
+}
+
+function reviewedGoldenProblems(loaded, review, archetype, phrase) {
+  const current = new Map(reviewedGolden(loaded, archetype).map((g) => [g.png, g.sha256]));
+  const seen = new Map((Array.isArray(review.golden) ? review.golden : []).map((g) => [slash(String(g?.png ?? '')), g?.sha256]));
+  return [...current].filter(([png, sha]) => seen.get(png) !== sha).map(([png]) => `${png} ${phrase}`);
+}
+
+export function applyDirectionReview(work, receiptFile, { write = false } = {}) {
+  const loaded = loadDirection(work);
+  const { direction, repoRoot, record, file } = loaded;
+  const { receipt, receiptRel } = readAnswerReceipt(receiptFile, { repoRoot, schema: OWNER_ANSWER_SCHEMA });
+  const { review, archetype, entry, decision, note } = directionReviewState(direction, receipt);
   if (decision === 'revise') {
     // The owner's revise notes are rulings too (the same feedback loop as a drawing, draw-feedback.mjs): each line is
     // learned into brand.direction.learned (kind rubric, proposed), so the revision and every later draw read it,
     // and the next direction review lists it for acceptance.
-    const notes = receipt.answeredBy === OWNER ? String(note ?? '').split(/\r?\n/).map((l) => l.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, '').trim()).filter(Boolean)
-      .map((words, i) => {
-        const seed = `${receipt.dispatchId ?? '-'}|${i}|${words}`;
-        const id = `ON-${sha256(seed).slice(0, 10)}`;
-        return { id, text: words, class: 'product-direction', as: 'rubric', dispatchId: receipt.dispatchId ?? null, at: receipt.at ?? null, shape: archetype };
-      }) : [];
+    const notes = revisionNotes(receipt, note, archetype);
     const learned = notes.length ? learnIntoDirection(work, notes, { record: 'brand', receipt: receiptRel, write }) : { added: [] };
     return { decision, written: false, archetype, dispatchId: receipt.dispatchId ?? null, note, learned: learned.added.map((l) => l.id), brief: note ?? 'the owner asked for a revision without a note: revise against the rubric and ask again' };
   }
@@ -222,21 +248,23 @@ export function applyDirectionReview(work, receiptFile, { write = false } = {}) 
   // writes archetypes.<name>.provisional - the status stays proposed, nothing is accepted for the owner, no learned
   // ruling is accepted, and brand.mjs checkDirection re-checks the autopilot receipt. interface.draw may draw from a
   // provisional archetype (ui-archetype.mjs directionReadiness); the owner reviews it once at handover.
-  if (receipt.answeredBy === AUTOPILOT_BY) {
-    if (receipt.provisional !== true || receipt.acceptance?.receipt?.ok !== true) throw new Error(`an autopilot answer accepts ${archetype} only provisionally, with passing gate evidence (receipt provisional:true, acceptance.receipt.ok); ${receipt.dispatchId ?? '?'} is not one`);
-    const current = new Map(reviewedGolden(loaded, archetype).map((g) => [g.png, g.sha256]));
-    const seen = new Map((Array.isArray(review.golden) ? review.golden : []).map((g) => [slash(String(g?.png ?? '')), g?.sha256]));
-    const problems = [...current].filter(([png, sha]) => seen.get(png) !== sha).map(([png]) => `${png} changed or was not in the reviewed set`);
-    if (problems.length) throw new Error(`the provisional acceptance in ask ${receipt.dispatchId ?? '?'} cannot settle ${archetype}: ${problems.join('; ')} - ask again`);
-    const provisional = { by: AUTOPILOT_BY, acceptedBy: receipt.dispatchId, receipt: receiptRel, acceptedAt: typeof receipt.at === 'string' ? receipt.at : new Date().toISOString(), rev: direction.rev };
-    const nextDirection = { ...direction, archetypes: { ...archetypesOf(direction), [archetype]: { ...entry, provisional } } };
-    if (write) writeRecordFile(file, stringifyYaml({ ...record, brand: { ...record.brand, direction: nextDirection } }, { lineWidth: 110 }));
-    return { decision, written: write, archetype, file: slash(file), provisional };
-  }
+  if (receipt.answeredBy === AUTOPILOT_BY) return acceptProvisionalDirection({ loaded, receipt, receiptRel, review, archetype, entry, file, record, direction, write, decision });
   if (receipt.answeredBy !== OWNER) throw new Error(`the direction was accepted by ${receipt.answeredBy ?? '(unknown)'}; only the owner accepts a brand direction - never an auto-recommended answer or a delegate`);
-  const current = new Map(reviewedGolden(loaded, archetype).map((g) => [g.png, g.sha256]));
-  const seen = new Map((Array.isArray(review.golden) ? review.golden : []).map((g) => [slash(String(g?.png ?? '')), g?.sha256]));
-  const problems = [...current].filter(([png, sha]) => seen.get(png) !== sha).map(([png]) => `${png} changed or was not shown to the owner`);
+  return acceptOwnerDirection({ loaded, receipt, receiptRel, review, archetype, entry, file, record, direction, write, decision });
+}
+
+function acceptProvisionalDirection({ loaded, receipt, receiptRel, review, archetype, entry, file, record, direction, write, decision }) {
+  if (receipt.provisional !== true || receipt.acceptance?.receipt?.ok !== true) throw new Error(`an autopilot answer accepts ${archetype} only provisionally, with passing gate evidence (receipt provisional:true, acceptance.receipt.ok); ${receipt.dispatchId ?? '?'} is not one`);
+  const problems = reviewedGoldenProblems(loaded, review, archetype, 'changed or was not in the reviewed set');
+  if (problems.length) throw new Error(`the provisional acceptance in ask ${receipt.dispatchId ?? '?'} cannot settle ${archetype}: ${problems.join('; ')} - ask again`);
+  const provisional = { by: AUTOPILOT_BY, acceptedBy: receipt.dispatchId, receipt: receiptRel, acceptedAt: typeof receipt.at === 'string' ? receipt.at : new Date().toISOString(), rev: direction.rev };
+  const nextDirection = { ...direction, archetypes: { ...archetypesOf(direction), [archetype]: { ...entry, provisional } } };
+  if (write) writeRecordFile(file, stringifyYaml({ ...record, brand: { ...record.brand, direction: nextDirection } }, { lineWidth: 110 }));
+  return { decision, written: write, archetype, file: slash(file), provisional };
+}
+
+function acceptOwnerDirection({ loaded, receipt, receiptRel, review, archetype, entry, file, record, direction, write, decision }) {
+  const problems = reviewedGoldenProblems(loaded, review, archetype, 'changed or was not shown to the owner');
   if (problems.length) throw new Error(`the owner's acceptance in ask ${receipt.dispatchId ?? '?'} cannot settle ${archetype}: ${problems.join('; ')} - ask again`);
   const acceptedAt = typeof receipt.at === 'string' && receipt.at.endsWith('Z') ? receipt.at : new Date().toISOString();
   const acceptance = { acceptedBy: receipt.dispatchId, receipt: receiptRel, acceptedAt, rev: direction.rev };
