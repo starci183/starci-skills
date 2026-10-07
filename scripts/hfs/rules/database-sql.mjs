@@ -59,6 +59,125 @@ function searchPathSchema(node, current) {
   return schemas.find((schema) => schema && schema !== '$user') ?? 'public';
 }
 
+function addTableFacts(statement, node, facts, defaultSchema) {
+  const relation = statement.type === 'CreateStmt' ? node.relation : node.into?.rel;
+  if (!relation || node.partbound || relation.relpersistence === 't') return;
+  facts.tables.push({ schema: schemaOf(relation, defaultSchema), name: relation.relname, index: statement.index, line: statement.line });
+}
+
+function addAlterTableFacts(statement, node, facts, defaultSchema) {
+  for (const command of node.cmds ?? []) {
+    const subtype = command?.AlterTableCmd?.subtype;
+    const item = { schema: schemaOf(node.relation, defaultSchema), name: node.relation?.relname, index: statement.index };
+    if (subtype === 'AT_EnableRowSecurity') facts.enables.push(item);
+    else if (subtype === 'AT_ForceRowSecurity') facts.forces.push(item);
+  }
+}
+
+function addCreatePolicyFacts(statement, node, facts, defaultSchema) {
+  const policy = {
+    name: node.policy_name,
+    schema: schemaOf(node.table, defaultSchema),
+    table: node.table?.relname,
+    cmd: String(node.cmd_name ?? 'all').toLowerCase(),
+    roles: node.roles?.length ? node.roles.map(roleOf) : ['public'],
+    implicitPublic: (node.roles ?? []).some((role) => role?.RoleSpec?.roletype === 'ROLESPEC_PUBLIC' && role.RoleSpec.location === -1),
+    qual: node.qual,
+    withCheck: node.with_check,
+    index: statement.index,
+    line: statement.line,
+  };
+  facts.policies.push(policy);
+  facts.policyEvents.push({ kind: 'create', policy, index: statement.index });
+}
+
+function addAlterPolicyFacts(statement, node, facts, defaultSchema) {
+  facts.policyEvents.push({
+    kind: 'alter',
+    schema: schemaOf(node.table, defaultSchema),
+    table: node.table?.relname,
+    name: node.policy_name,
+    ...(node.roles !== undefined ? {
+      roles: node.roles.map(roleOf),
+      implicitPublic: node.roles.some((role) => role?.RoleSpec?.roletype === 'ROLESPEC_PUBLIC' && role.RoleSpec.location === -1),
+    } : {}),
+    ...(node.qual !== undefined ? { qual: node.qual } : {}),
+    ...(node.with_check !== undefined ? { withCheck: node.with_check } : {}),
+    index: statement.index,
+  });
+}
+
+function addDropPolicyFacts(statement, node, facts, defaultSchema) {
+  if (node.removeType !== 'OBJECT_POLICY') return;
+  for (const object of node.objects ?? []) {
+    const parts = object?.List?.items?.map(sval).filter(Boolean) ?? [];
+    const [schema, table, name] = parts.length === 3 ? parts : [defaultSchema, ...parts];
+    facts.policyEvents.push({ kind: 'drop', schema, table, name, index: statement.index });
+  }
+}
+
+function addGrantFacts(statement, node, facts, defaultSchema) {
+  facts.grants.push({
+    grant: node.is_grant === true,
+    targtype: node.targtype,
+    objtype: node.objtype,
+    objects: node.objects ?? [],
+    privileges: (node.privileges ?? []).map((privilege) => String(privilege?.AccessPriv?.priv_name ?? '').toLowerCase()),
+    grantees: (node.grantees ?? []).map(roleOf),
+    defaultSchema,
+    index: statement.index,
+    line: statement.line,
+  });
+}
+
+function addDefaultPrivilegeFacts(statement, node, facts) {
+  const action = node.action ?? {};
+  facts.defaultPrivileges.push({
+    grant: action.is_grant === true,
+    objtype: action.objtype,
+    privileges: (action.privileges ?? []).map((privilege) => String(privilege?.AccessPriv?.priv_name ?? '').toLowerCase()),
+    grantees: (action.grantees ?? []).map(roleOf),
+    index: statement.index,
+    line: statement.line,
+  });
+}
+
+function addCreateFunctionFacts(statement, node, facts, defaultSchema) {
+  const parts = (node.funcname ?? []).map(sval).filter(Boolean);
+  const schema = parts.length > 1 ? parts[0] : defaultSchema;
+  facts.functions.push({ node, name: parts.length > 1 ? parts.join('.') : `${schema}.${parts[0]}`, schema, index: statement.index, line: statement.line });
+}
+
+function addAlterFunctionFacts(statement, node, facts, defaultSchema) {
+  const rawName = nameOf(node.func?.objname);
+  const name = rawName.includes('.') ? rawName : `${defaultSchema}.${rawName}`;
+  facts.alterFunctions.push({ name, setsPath: (node.actions ?? []).some((action) => isSearchPathSet(action?.DefElem)), index: statement.index, line: statement.line });
+}
+
+function addDoBlockFacts(statement, node, facts) {
+  const option = (key) => (node.args ?? []).find((argument) => argument?.DefElem?.defname === key)?.DefElem?.arg;
+  facts.doBlocks.push({ body: option('as')?.String?.sval, language: option('language')?.String?.sval ?? 'plpgsql', index: statement.index, line: statement.line });
+}
+
+function addBucketInsertFacts(statement, node, facts) {
+  if (node.relation?.schemaname === 'storage' && node.relation?.relname === 'buckets') facts.buckets.push({ node, index: statement.index, line: statement.line });
+}
+
+function addBucketCallFacts(statement, node, facts) {
+  for (const target of node.targetList ?? []) {
+    const call = target?.ResTarget?.val?.FuncCall;
+    if (call && nameOf(call.funcname).toLowerCase() === 'storage.create_bucket') facts.bucketCalls.push({ node: call, index: statement.index, line: statement.line });
+  }
+}
+
+const statementFactHandlers = new Map([
+  ['VariableSetStmt', (statement, node, facts, defaultSchema) => searchPathSchema(node, defaultSchema)],
+  ['CreateStmt', addTableFacts], ['CreateTableAsStmt', addTableFacts], ['AlterTableStmt', addAlterTableFacts],
+  ['CreatePolicyStmt', addCreatePolicyFacts], ['AlterPolicyStmt', addAlterPolicyFacts], ['DropStmt', addDropPolicyFacts],
+  ['GrantStmt', addGrantFacts], ['AlterDefaultPrivilegesStmt', addDefaultPrivilegeFacts], ['CreateFunctionStmt', addCreateFunctionFacts],
+  ['AlterFunctionStmt', addAlterFunctionFacts], ['DoStmt', addDoBlockFacts], ['InsertStmt', addBucketInsertFacts], ['SelectStmt', addBucketCallFacts],
+]);
+
 /** Fold each statement to the facts consumed by the rule checks. */
 function factsOf(statements) {
   const facts = {
@@ -68,95 +187,8 @@ function factsOf(statements) {
   let defaultSchema = 'public';
   for (const statement of statements) {
     const { node } = statement;
-    if (statement.type === 'VariableSetStmt') {
-      defaultSchema = searchPathSchema(node, defaultSchema);
-    } else if (statement.type === 'CreateStmt' || statement.type === 'CreateTableAsStmt') {
-      const relation = statement.type === 'CreateStmt' ? node.relation : node.into?.rel;
-      if (!relation || node.partbound || relation.relpersistence === 't') continue;
-      facts.tables.push({ schema: schemaOf(relation, defaultSchema), name: relation.relname, index: statement.index, line: statement.line });
-    } else if (statement.type === 'AlterTableStmt') {
-      for (const command of node.cmds ?? []) {
-        const subtype = command?.AlterTableCmd?.subtype;
-        const item = { schema: schemaOf(node.relation, defaultSchema), name: node.relation?.relname, index: statement.index };
-        if (subtype === 'AT_EnableRowSecurity') facts.enables.push(item);
-        else if (subtype === 'AT_ForceRowSecurity') facts.forces.push(item);
-      }
-    } else if (statement.type === 'CreatePolicyStmt') {
-      const policy = {
-        name: node.policy_name,
-        schema: schemaOf(node.table, defaultSchema),
-        table: node.table?.relname,
-        cmd: String(node.cmd_name ?? 'all').toLowerCase(),
-        roles: node.roles?.length ? node.roles.map(roleOf) : ['public'],
-        implicitPublic: (node.roles ?? []).some((role) => role?.RoleSpec?.roletype === 'ROLESPEC_PUBLIC' && role.RoleSpec.location === -1),
-        qual: node.qual,
-        withCheck: node.with_check,
-        index: statement.index,
-        line: statement.line,
-      };
-      facts.policies.push(policy);
-      facts.policyEvents.push({ kind: 'create', policy, index: statement.index });
-    } else if (statement.type === 'AlterPolicyStmt') {
-      facts.policyEvents.push({
-        kind: 'alter',
-        schema: schemaOf(node.table, defaultSchema),
-        table: node.table?.relname,
-        name: node.policy_name,
-        ...(node.roles !== undefined ? {
-          roles: node.roles.map(roleOf),
-          implicitPublic: node.roles.some((role) => role?.RoleSpec?.roletype === 'ROLESPEC_PUBLIC' && role.RoleSpec.location === -1),
-        } : {}),
-        ...(node.qual !== undefined ? { qual: node.qual } : {}),
-        ...(node.with_check !== undefined ? { withCheck: node.with_check } : {}),
-        index: statement.index,
-      });
-    } else if (statement.type === 'DropStmt' && node.removeType === 'OBJECT_POLICY') {
-      for (const object of node.objects ?? []) {
-        const parts = object?.List?.items?.map(sval).filter(Boolean) ?? [];
-        const [schema, table, name] = parts.length === 3 ? parts : [defaultSchema, ...parts];
-        facts.policyEvents.push({ kind: 'drop', schema, table, name, index: statement.index });
-      }
-    } else if (statement.type === 'GrantStmt') {
-      facts.grants.push({
-        grant: node.is_grant === true,
-        targtype: node.targtype,
-        objtype: node.objtype,
-        objects: node.objects ?? [],
-        privileges: (node.privileges ?? []).map((privilege) => String(privilege?.AccessPriv?.priv_name ?? '').toLowerCase()),
-        grantees: (node.grantees ?? []).map(roleOf),
-        defaultSchema,
-        index: statement.index,
-        line: statement.line,
-      });
-    } else if (statement.type === 'AlterDefaultPrivilegesStmt') {
-      const action = node.action ?? {};
-      facts.defaultPrivileges.push({
-        grant: action.is_grant === true,
-        objtype: action.objtype,
-        privileges: (action.privileges ?? []).map((privilege) => String(privilege?.AccessPriv?.priv_name ?? '').toLowerCase()),
-        grantees: (action.grantees ?? []).map(roleOf),
-        index: statement.index,
-        line: statement.line,
-      });
-    } else if (statement.type === 'CreateFunctionStmt') {
-      const parts = (node.funcname ?? []).map(sval).filter(Boolean);
-      const schema = parts.length > 1 ? parts[0] : defaultSchema;
-      facts.functions.push({ node, name: parts.length > 1 ? parts.join('.') : `${schema}.${parts[0]}`, schema, index: statement.index, line: statement.line });
-    } else if (statement.type === 'AlterFunctionStmt') {
-      const rawName = nameOf(node.func?.objname);
-      const name = rawName.includes('.') ? rawName : `${defaultSchema}.${rawName}`;
-      facts.alterFunctions.push({ name, setsPath: (node.actions ?? []).some((action) => isSearchPathSet(action?.DefElem)), index: statement.index, line: statement.line });
-    } else if (statement.type === 'DoStmt') {
-      const option = (key) => (node.args ?? []).find((argument) => argument?.DefElem?.defname === key)?.DefElem?.arg;
-      facts.doBlocks.push({ body: option('as')?.String?.sval, language: option('language')?.String?.sval ?? 'plpgsql', index: statement.index, line: statement.line });
-    } else if (statement.type === 'InsertStmt' && node.relation?.schemaname === 'storage' && node.relation?.relname === 'buckets') {
-      facts.buckets.push({ node, index: statement.index, line: statement.line });
-    } else if (statement.type === 'SelectStmt') {
-      for (const target of node.targetList ?? []) {
-        const call = target?.ResTarget?.val?.FuncCall;
-        if (call && nameOf(call.funcname).toLowerCase() === 'storage.create_bucket') facts.bucketCalls.push({ node: call, index: statement.index, line: statement.line });
-      }
-    }
+    const handler = statementFactHandlers.get(statement.type);
+    if (handler) defaultSchema = handler(statement, node, facts, defaultSchema) ?? defaultSchema;
   }
   return facts;
 }
