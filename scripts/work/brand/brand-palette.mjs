@@ -365,7 +365,7 @@ export function paletteFindings({ file, shownAs, brand, palette = null, subject 
     const colours = m.refused.length === 1 ? 'a colour' : `${m.refused.length} colours`;
     out.push(finding(level, PALETTE_CODES.offBrand, `${shownAs}: the ${subject} is painted in ${colours} the brand does not declare - ${m.refused.map(describeOffender).join('; ')}.${primary}`));
   }
-  if (pal.primary && pal.primary.color.oklch.C >= CHROMATIC_TOKEN && !m.primary.present && m.refused.length) {
+  if (pal.primary?.color.oklch.C >= CHROMATIC_TOKEN && !m.primary.present && m.refused.length) {
     out.push(finding(level, PALETTE_CODES.primaryAbsent, `${shownAs}: the brand primary ${pal.primary.label} ${pal.primary.hex} appears nowhere in the ${subject}, while ${m.refused[0].name} ${m.refused[0].hex} covers ${pct(m.refused[0].share)} of its coloured area - the off-brand colour stands in for the primary action`));
   }
   return out;
