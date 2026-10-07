@@ -195,19 +195,20 @@ export function drainWorkflowMessages(ledger, workflowId, { check = orcaCheck, r
   return out;
 }
 
+/** A refused check of one Run: a Run Orca lost (bindWorkflowRun replaces it) has nothing left to deliver and fails nothing. */
+function failedCheck(r, runId, fail) {
+  if (r.errorCode === 'run_not_found') return;
+  fail(r.fenced ? { runId, code: 'orchestration-consumer-fenced', error: r.error }
+    : { runId, code: 'orchestration-check-failed', error: r.error ?? r.errorCode });
+}
+
 /** One Run drained into the ledger (check → bridge every Delivery in a transaction → ack). */
 function drainRun(ledger, { workflowId, runId, terminal, kernelRunId, rebind, check, maxDeliveries, out, fail }) {
   const call = (ack = null) => { try { return check({ run: runId, terminal, ...(ack ? { ack } : {}) }); } catch (e) { return { ok: false, error: String(e?.message ?? e) }; } };
   let r = call();
   if (r.fenced && rebind && runId === kernelRunId && rebind(runId)?.ok) r = call();
   for (let n = 0; ; n += 1) {
-    if (!r.ok) {
-      // A Run Orca lost has nothing left to deliver (bindWorkflowRun replaces it).
-      if (r.errorCode === 'run_not_found') break;
-      fail(r.fenced ? { runId, code: 'orchestration-consumer-fenced', error: r.error }
-        : { runId, code: 'orchestration-check-failed', error: r.error ?? r.errorCode });
-      break;
-    }
+    if (!r.ok) { failedCheck(r, runId, fail); break; }
     if (!r.deliveryId || !r.messages.length || n >= maxDeliveries) break;
     const { deliveryId, messages } = r;
     let counts;
