@@ -9,7 +9,7 @@
 // reports both and the WORST one binds (drive/freeDiskGb name it). RAM reuses the worker cap's probe
 // (memoryProbe below — `workers.mjs cap` reads the same machine) rather than
 // a second memory sample. Thresholds come from modules/models/runtimes.yaml
-// `allocation.resources.minFreeDiskGb` (default 20) and `minFreeRamPct` (default 15) via
+// `allocation.resources.minFreeDiskGb` (default 5) and `minFreeRamPct` (default 15) via
 // engine/config.mjs allocationSettings().
 //
 // Seams: `statfs` and `meminfo` inject the raw reads in specs; STARCI_HOST_RESOURCES_JSON is the
@@ -49,7 +49,7 @@ export function machineLoad({ sampleMs = 400 } = {}) {
 
 export const HOST_RESOURCES_LOW = 'host-resources-low';
 export const HOST_RESOURCES_ENV = 'STARCI_HOST_RESOURCES_JSON';
-export const DEFAULT_MIN_FREE_DISK_GB = 20;
+export const DEFAULT_MIN_FREE_DISK_GB = 5;
 export const DEFAULT_MIN_FREE_RAM_PCT = 15;
 
 const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };

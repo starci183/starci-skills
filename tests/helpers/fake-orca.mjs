@@ -22,6 +22,8 @@
 //                          'prompt-stalled': worker-start created an exact
 //                          worker whose prompt injection stalled; its process
 //                          exited and release retains only terminal bookkeeping.
+//                          'run-create-no-sender': run-create is refused locally with
+//                          no_active_sender_terminal (id local), before any mutation.
 //                          'dead-terminal': terminal show reports the exact
 //                          terminal disconnected/unwritable and terminal read
 //                          fails — the observe spec's disconnected/unreadable
@@ -548,6 +550,8 @@ else if (verb === 'terminal rename')
 // 2026-09-24 reboot: JSON error on stdout, empty stderr, exit 1. A Run marked lost:true
 // answers run_not_found. A Run the state does not hold keeps the old permissive answers.
 else if (verb === 'orchestration run-create') {
+  if (mode === 'run-create-no-sender')
+    fail({ id: 'local', ok: false, error: { code: 'no_active_sender_terminal', message: 'Could not determine the sender terminal for this orchestration command. Pass --from with your own terminal handle or run the command inside a live Orca terminal with ORCA_TERMINAL_HANDLE set.' }, _meta: { runtimeId: null } });
   if (mode === 'run-create-error')
     fail({ ok: false, error: { code: 'run_context_missing', message: 'No launcher context is bound' } });
   state.runs = state.runs || {};

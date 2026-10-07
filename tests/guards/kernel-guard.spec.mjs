@@ -9,6 +9,7 @@ import { guardsRoot, guardLaunch, bindGuardTerminal, ensureHistoryHook, writeJob
 import { inspectLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
 import { FAKE_ORCA } from '../helpers/fake-orca.mjs';
 import { adoptLaunchTrust } from '../helpers/launch-trust.mjs';
+import { senderEnv } from '../helpers/sender-env.mjs';
 
 // Contract change kernel-guard-file (lane C0-KGUARD): the Kernel had no job guard, so the PreToolUse command guard let
 // every Kernel shell command through. Its launch now writes a guard of role kernel (no owned path, its workflow
@@ -123,7 +124,7 @@ test('start-workflow binds the Kernel guard to the terminal worker-start names a
   const env = { ...process.env, STARCI_ORCA_COMMAND: process.execPath, STARCI_ORCA_ARGS: JSON.stringify([fake]), STARCI_FAKE_ORCA_STATE: state,
     STARCI_FAKE_ORCA_LOG: path.join(root, 'calls.jsonl'), STARCI_FAKE_ORCA_UNIQUE_TERMINALS: '1', ...adoptLaunchTrust(root, { roots: [repo], ref: 'private kernel-guard fixture adoption', kernel: 'kernel: {agent: codex, model: gpt-6.1-sol, effort: high}' }),
     STARCI_TEST_MACHINE_FILE: path.join(root, 'machine.sqlite'), ORCA_TERMINAL_HANDLE: '' };
-  const run = (script, ...args) => spawnSync(process.execPath, ['--loader', new URL('../helpers/workflow-startup-loader.mjs', import.meta.url).href, path.join(ROOT, 'scripts', ...script), ...args], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 120000, env });
+  const run = (script, ...args) => spawnSync(process.execPath, ['--loader', new URL('../helpers/workflow-startup-loader.mjs', import.meta.url).href, path.join(ROOT, 'scripts', ...script), ...args], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 120000, env: senderEnv(script.at(-1), env) });
   const defined = run(['goal', 'define-goal.mjs'], '--repo', repo, '--text', 'guard the kernel', '--json');
   assert.equal(defined.status, 0, defined.stderr);
   const workflowId = JSON.parse(defined.stdout).workflowId;

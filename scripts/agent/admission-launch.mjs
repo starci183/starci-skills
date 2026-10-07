@@ -363,5 +363,6 @@ function runCreateFailure({ created, admission, provider, io, env }) {
   const released = releaseAgentAdmission(admission, { kind: 'failed-before-launch', confirmed: true }, { io: io?.admission ?? io?.spawn?.admission, env });
   return { ok: false, step: 'run-create', error: created?.error ?? 'run-create returned no runId', provider,
     effectState: created?.effectState === 'none' ? 'none' : 'unknown', admission, providerBudget: released,
+    ...(created?.request?.id ? { hostRequestId: created.request.id } : {}),
     ...(created?.hostUnavailable ? { hostUnavailable: true } : {}) };
 }
