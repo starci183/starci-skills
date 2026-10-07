@@ -21,6 +21,7 @@ import { lineageHeadById, typedIncidents } from './gate-conditions.mjs';
 import { allocationMs } from '../../engine/config.mjs';
 import { posixPath, sameOrUnder } from '../lib/path-key.mjs';
 import { parseJson, parseJsonOr, withPayload } from '../lib/json.mjs';
+import { escapeRegExp } from '../lib/regex.mjs';
 import { recordPathsOf } from './verbs/shared/rows.mjs';
 import { SETTLED_JOB_LIST } from '../../engine/admission.mjs';
 
@@ -81,16 +82,20 @@ function addTypedWaits(ctx) {
   let typed = [];
   try { typed = typedIncidents(ctx.db); } catch { typed = []; }
   for (const incident of typed) {
-    for (const cond of incident.until) {
-      if (cond.type === 'job') addWaiter(ctx, openHeadOf(ctx.db, ctx.byId, cond.jobId), { workflowId: incident.workflowId, via: 'until-job', ref: incident.incidentId, since: incident.since });
-      if (cond.type === 'record') {
-        const want = norm(cond.path);
-        for (const job of ctx.open) {
-          if (recordPathsOf(job.payload, norm).some((owned) => sameOrUnder(want, owned) || sameOrUnder(owned, want))) {
-            addWaiter(ctx, job, { workflowId: incident.workflowId, via: 'until-record', ref: incident.incidentId, since: incident.since });
-          }
-        }
-      }
+    for (const cond of incident.until) addTypedConditionWait(ctx, incident, cond);
+  }
+}
+
+function addTypedConditionWait(ctx, incident, cond) {
+  if (cond.type === 'job') addWaiter(ctx, openHeadOf(ctx.db, ctx.byId, cond.jobId), { workflowId: incident.workflowId, via: 'until-job', ref: incident.incidentId, since: incident.since });
+  if (cond.type === 'record') addTypedRecordWait(ctx, incident, cond);
+}
+
+function addTypedRecordWait(ctx, incident, cond) {
+  const want = norm(cond.path);
+  for (const job of ctx.open) {
+    if (recordPathsOf(job.payload, norm).some((owned) => sameOrUnder(want, owned) || sameOrUnder(owned, want))) {
+      addWaiter(ctx, job, { workflowId: incident.workflowId, via: 'until-record', ref: incident.incidentId, since: incident.since });
     }
   }
 }
@@ -123,7 +128,7 @@ function addPeerRequestWaits(ctx) {
     for (const job of jobsNamed(ctx.byId, text)) if (job.workflow_id === request.workflow_id) addWaiter(ctx, job, waiter);
     for (const job of ctx.open.filter((row) => row.workflow_id === request.workflow_id)) {
       const op = job.op_id ?? job.payload.opId;
-      const opNamed = op && new RegExp(`(^|[^A-Za-z0-9.-])${op.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)}([^A-Za-z0-9-]|$)`).test(text);
+      const opNamed = op && new RegExp(`(^|[^A-Za-z0-9.-])${escapeRegExp(op)}([^A-Za-z0-9-]|$)`).test(text);
       const recordNamed = recordPathsOf(job.payload, norm).some((owned) => normText.includes(owned));
       if (opNamed || recordNamed) addWaiter(ctx, job, waiter);
     }
