@@ -21,7 +21,7 @@ function tree(t, file, body) {
 test('the package proof child gets STARCI_RUNTIME = the scratch tree, whatever the parent had', (t) => {
   const dir = tree(t, PACKAGE_PROOF, SHOW_RUNTIME);
   const before = process.env.STARCI_RUNTIME;
-  process.env.STARCI_RUNTIME = 'D:/live/checkout';
+  process.env.STARCI_RUNTIME = path.join(os.tmpdir(), 'live-checkout');
   t.after(() => { if (before === undefined) delete process.env.STARCI_RUNTIME; else process.env.STARCI_RUNTIME = before; });
   const step = packageProofCheck({ dir, base: 'HEAD' });
   assert.equal(step.ok, true);
