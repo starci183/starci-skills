@@ -28,7 +28,8 @@ import { captureNames } from '../lib/i18n.mjs';
 import { isPlainObject } from '../../engine/plain-object.mjs';
 import { APP_KIND, ENV_PREFIX, RUNTIME_KIND, SEMVER, manifestKind, runtimeSemanticProblems } from './manifest-shape.mjs';
 import { APP_SCOPE, manifestShapeProblems, PROFILES, SCOPES } from './slot-manifest-shape.mjs';
-import { declaredSlotEnabled, optionalSlotProblems, triggerProblems } from './declaration-slots.mjs';
+import { declaredSlotEnabled, triggerProblems } from './declaration-slots.mjs';
+import { sideProblems } from './slot-side-problems.mjs';
 import { declarationShapeProblems } from './declaration-shape.mjs';
 import { declarationEdition, editionRuleParams, effectiveSlot, enforcerJudgedInEdition, judgedInEdition, litePresenceOf, ruleEditionProblems, slotInEdition } from './edition-slots.mjs';
 import { byCodeUnit } from '../lib/list.mjs';
@@ -234,21 +235,6 @@ export function loadSlotManifest({ root = skillRoot, file = path.join(root, HFS_
 // ------------------------------------------------------------------------------------- declaration
 
 const declarationInvalid = (problems, file) => fail('HFS_DECLARATION_INVALID', `hfs.json is refused: ${problems.slice(0, 5).join('; ')}${problems.length > 5 ? '; and ' + (problems.length - 5) + ' more' : ''}`, { file, problems });
-
-/** One side of a declaration checked against the manifest: app kinds of the profile, opt-in slots, required app kinds, reads. */
-function sideProblems(manifest, side, s) {
-  const bad = [];
-  for (const app of s.apps) if (!manifest.appKinds[side].includes(app.kind)) bad.push(`${side} app ${app.name} has kind ${app.kind}, which is not a ${side} kind (${manifest.appKinds[side].join(', ')})`);
-  bad.push(...optionalSlotProblems(manifest, side, s));
-  for (const read of s.reads ?? []) if (!manifest.sides[side].reads.includes(read)) bad.push(`sides.${side}.reads names ${read}; ${side} may read only ${manifest.sides[side].reads.join(', ') || 'nothing of the other side'}`);
-  const connections = s.connections ?? [];
-  for (const slot of manifest.slots) {
-    if (slot.appKind === undefined || !slot.profiles.includes(side) || slot.presence !== 'required') continue;
-    if (slot.requiredWhen === 'connections' && !connections.length) continue;
-    if (!s.apps.some((a) => a.kind === slot.appKind)) bad.push(`no ${side} app of kind ${slot.appKind} is declared (${slot.id} is required${slot.requiredWhen ? ' once a connection is declared' : ''})`);
-  }
-  return bad;
-}
 
 /**
  * A declaration checked against the manifest: kind app, the pinned major the manifest's (HFS_MANIFEST_MAJOR_MISMATCH otherwise,
