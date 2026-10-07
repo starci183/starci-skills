@@ -235,6 +235,15 @@ function runtimeDraft(s, probeMs, draftDeps) {
 // A confirmed send the frame agrees with (proven, or no longer idle) needs
 // one look; an unconfirmed one, or a confirmed one the frame calls lost,
 // gets a few, because a TUI repaints the typed text a beat later.
+function proofLoopContinues(s) {
+  if (PROVEN.has(s.proof.delivery) && !WAITING_FOR_ENTER.has(s.proof.screenState)) return false;
+  if (WAITING_FOR_ENTER.has(s.proof.screenState)) {
+    if (!s.enterRetried) { s.enterRetried = true; s.send({ terminal: s.terminal, text: '', enter: true }); }
+    return true;
+  }
+  return !s.sent?.ok || isLost(s.proof);
+}
+
 function proofLoop(s, before, staleNote) {
   for (let i = 0; i < Math.max(1, s.reads) + (s.enterRetried ? 1 : 0); i += 1) {
     if (i > 0) s.sleep(s.intervalMs);
@@ -243,12 +252,7 @@ function proofLoop(s, before, staleNote) {
     const shell = shellRefusal(after, s.text, before, { sent: s.sent, sendErrorCode: sendCodeOf(s.sent), ...staleNote });
     if (shell) return shell;
     s.proof = wakeDeliveryOf({ before, after, text: s.text, stagedPattern: s.stagedPattern });
-    if (PROVEN.has(s.proof.delivery) && !WAITING_FOR_ENTER.has(s.proof.screenState)) break;
-    if (WAITING_FOR_ENTER.has(s.proof.screenState)) {
-      if (!s.enterRetried) { s.enterRetried = true; s.send({ terminal: s.terminal, text: '', enter: true }); }
-      continue;
-    }
-    if (s.sent?.ok && !isLost(s.proof)) break;
+    if (!proofLoopContinues(s)) break;
   }
   return null;
 }
