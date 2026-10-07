@@ -1125,8 +1125,6 @@ const holdByFullPool = (cause) => {
   }
   return null;
 };
-/** The host itself is too short to admit the job's op (scripts/kernel/host-hold.mjs): dispatch refuses it host-resources-low. */
-const holdByHostResources = (cause) => cause.hostHold?.(cause.opId) ?? null;
 function queuedBecauseInner(db, job, { planAncestors, jobsByOp, slots, rtDoc, poolLoad, ownerGates = [], peerWaits = [], recordDeps = new Map(), canon = null, workGraph = null, typedGates = [], seamHold = null, hostHold = null }) {
   const payload = jobPayloadOf(job);
   const opId = job.op_id ?? payload.opId ?? null;
@@ -1135,7 +1133,7 @@ function queuedBecauseInner(db, job, { planAncestors, jobsByOp, slots, rtDoc, po
   // handover credential checklist), a peer wait, a shell foundation, an earlier plan leg, a declared job, the slot ceiling, a
   // provider circuit, a path lease, a full pool.
   return holdByIncidentGate(cause) || deferredQueueCause(db, job) || holdByPeerWait(cause) || holdByShellFoundation(cause) || holdByPlanDependency(cause)
-    || holdByDeclaredJob(cause) || holdByMaxOps(cause) || holdByCircuit(cause) || holdByPathLease(cause) || holdByFullPool(cause) || holdByHostResources(cause)
+    || holdByDeclaredJob(cause) || holdByMaxOps(cause) || holdByCircuit(cause) || holdByPathLease(cause) || holdByFullPool(cause) || hostHold?.(opId) /* host-hold.mjs: dispatch would refuse host-resources-low */
     || { queuedBecause: 'ready', blockedBy: null, detail: null };
 }
 // The Kernel seat as the ledger holds it: the attempt, its terminal, the launch that seated it and who

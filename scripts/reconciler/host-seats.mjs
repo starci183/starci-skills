@@ -18,6 +18,16 @@ export function seatStateOf(action) {
 }
 
 /**
+ * Why the Host leaves a Kernel seat alone this pass, or null: a quarantined seat for holdMs, a restart the watchdog answered
+ * restart-blocked (no sender terminal to launch from) for blockedRetryMs. Pure.
+ */
+export function seatHold(rec, now, s) {
+  if (rec.state === 'quarantined' && now - rec.since < s.holdMs) return { ok: true, quarantined: true };
+  if (rec.lastAction === 'restart-blocked' && now - rec.lastAt < s.blockedRetryMs) return { ok: true, held: 'restart-blocked', retryInMs: s.blockedRetryMs - (now - rec.lastAt) };
+  return null;
+}
+
+/**
  * Run one native core-maintenance tick through the Host controller's ctx.run seam.
  * Shadow returns {ok:true,action:'shadow',result} without running the watchdog.
  * Active success needs no explicit run failure and result.ok === true; run/decode errors propagate.

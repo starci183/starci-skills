@@ -54,7 +54,7 @@ import { allocationSettings } from '../../../engine/config.mjs';
 import { claimDue, finishDuty, listSchedules } from '../schedules.mjs';
 import { pathKey } from '../../lib/path-key.mjs';
 import os from 'node:os';
-import { seatStateOf, coreDebugSeatKey, reconcileCoreDebugSeat } from '../host-seats.mjs';
+import { seatStateOf, seatHold, coreDebugSeatKey, reconcileCoreDebugSeat } from '../host-seats.mjs';
 import { createStaleTerminalStep } from '../host-stale.mjs';
 import { eachInOrder } from '../../lib/in-order.mjs';
 export { staleTerminalsOf, STALE_RETRY_MS, STALE_ESCALATE_TRIES, CLOSE_VERIFY } from '../host-stale.mjs'; export { seatStateOf };
@@ -372,8 +372,7 @@ export function createHostController(deps = {}) {
     const rec = rowOf(key, now);
     const problem = goalProblem(wf.goal, goalRefusal);
     if (problem) return refuseGoal(ctx, { ledgerId, workflowId, wf, rec, problem, now });
-    if (rec.state === 'quarantined' && now - rec.since < s.holdMs) return { ok: true, quarantined: true };
-    if (rec.lastAction === 'restart-blocked' && now - rec.lastAt < s.blockedRetryMs) return { ok: true, held: 'restart-blocked', retryInMs: s.blockedRetryMs - (now - rec.lastAt) };
+    const hold = seatHold(rec, now, s); if (hold) return hold;
     const { seatOut, action, acted } = await runSeatPass(ctx, { ledger, workflowId, s });
     const replaced = ctx.mode === 'active' ? REPLACED.has(action) : acted && action === 'restart-needed';
     const next = { ...rec, restarts: [...(rec.restarts ?? []).filter((t) => now - t < 3_600_000), ...(replaced ? [now] : [])], lastAction: action, lastAt: now, mode: ctx.mode };
