@@ -472,7 +472,7 @@ const kernelFixture=(t,kernelLine,extra={})=>{
   return {repo,trustHome,boot,events,orcaState};
 };
 
-const CLAUDE_KERNEL='kernel: {agent: claude, model: claude-opus-5-5, effort: high}';
+const CLAUDE_KERNEL='kernel: {agent: claude, model: claude-sonnet-5-5, effort: high}';
 
 test('an explicit Kernel agent override still consumes the current private owner trust profile',t=>{
   const f=kernelFixture(t,CLAUDE_KERNEL);
