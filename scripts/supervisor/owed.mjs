@@ -592,6 +592,15 @@ export function unackOwed({ key, now = Date.now(), env = process.env }) {
  * supervisor acked (readOwedAcks) and nothing newer failed on is status 'acked' and left out of `owed`.
  * `commitsOf(since)` replaces `git log` (specs); `acks` (a Map) replaces the stored ones (machine.sqlite sup_owed).
  */
+function decorateOwedItem(item, commits, ackBook) {
+  if (item.class !== CLASSES.supervisor) return;
+  item.fixedBy = item.incidentId ? linkFix(item, commits) : null; item.status = item.fixedBy ? 'fixed-by' : 'open';
+  item.action = actionOf(item); const ack = ackBook.get(item.key);
+  if (ack && ackHolds(item, ack)) { item.acked = ack; item.status = 'acked'; }
+  else if (ack) item.ackReopened = { at: ack.at, commits: ack.commits };
+  item.line = owedLine(item);
+}
+
 export function owedFindings(db, { repo = null, ledgers = [], now = Date.now(), wanted = new Set(), graceMs = GATE_GRACE_MS, root = SKILL_ROOT,
   commitsOf = (since) => gitCommits({ root, since, now }), staleOf = staleInputs, patterns = true, acks = undefined,
   stallMinutes = undefined, verdicts = null, frontierOf = undefined } = {}) {
@@ -604,16 +613,7 @@ export function owedFindings(db, { repo = null, ledgers = [], now = Date.now(), 
   const items = [...incidents.map((i) => ({ ...i, key: i.key ?? `incident:${i.workflowId}:${i.incidentId}` })), ...found];
   let ackBook = acks instanceof Map ? acks : null;
   if (!ackBook) { try { ackBook = readOwedAcks(); } catch { ackBook = new Map(); } }
-  for (const i of items) {
-    if (i.class !== CLASSES.supervisor) continue;
-    i.fixedBy = i.incidentId ? linkFix(i, commits) : null;
-    i.status = i.fixedBy ? 'fixed-by' : 'open';
-    i.action = actionOf(i);
-    const ack = ackBook.get(i.key);
-    if (ack && ackHolds(i, ack)) { i.acked = ack; i.status = 'acked'; }
-    else if (ack) i.ackReopened = { at: ack.at, commits: ack.commits };
-    i.line = owedLine(i);
-  }
+  for (const i of items) decorateOwedItem(i, commits, ackBook);
   return { items, owed: items.filter((i) => i.class === CLASSES.supervisor && !i.acked) };
 }
 
