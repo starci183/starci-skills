@@ -54,9 +54,11 @@ allowTaskRepair: false
 checkers: []
 
 # Kernel seats (DESIGN 9.4): more than maxReplacementsPerHour replacements -> quarantined + DI seat-unrecoverable;
-# a quarantined seat is left alone for holdMs (or until `services.mjs --reopen <seat>`).
+# a quarantined seat is left alone for holdMs (or until `services.mjs --reopen <seat>`). A restart the watchdog answers
+# restart-blocked (no sender terminal to launch from: a refusal only a human opening a terminal changes) is tried again
+# once per blockedRetryMs, not every pass.
 seats:
-  kernel: {maxReplacementsPerHour: 3, holdMs: 3600000, timeoutMs: 900000, vacantSlaMs: 180000, inputSlaMs: 60000, gatedSlaMs: 600000, hostOutageSlaMs: 600000, quarantinedSlaMs: 1800000}
+  kernel: {maxReplacementsPerHour: 3, holdMs: 3600000, timeoutMs: 900000, vacantSlaMs: 180000, inputSlaMs: 60000, gatedSlaMs: 600000, hostOutageSlaMs: 600000, quarantinedSlaMs: 1800000, blockedRetryMs: 300000}
   supervisor: {timeoutMs: 900000}
 
 # Turn budget (the numbers are modules/models/runtimes.yaml allocation.liveness kernelTurnBudgetMs,

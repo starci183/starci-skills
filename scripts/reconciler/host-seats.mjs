@@ -10,7 +10,7 @@ export function seatStateOf(action) {
   if (['finished', 'archived'].includes(action)) return 'vacant';
   if (['restart-needed', 'agent-exit-unconfirmed', 'terminal-unverified', 'terminal-unreadable'].includes(action)) return 'suspect';
   if (action === 'restarted') return 'reserving';
-  if (['restart-failed', 'kernel-terminal-close-failed'].includes(action)) return 'replacing';
+  if (['restart-failed', 'restart-blocked', 'kernel-terminal-close-failed'].includes(action)) return 'replacing';
   if (action === 'host-unavailable') return 'hostOutage';
   if (['queued-input', 'staged-input'].includes(action)) return 'inputPending';
   if (action === 'interactive-gate') return 'gated';

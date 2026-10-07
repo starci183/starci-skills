@@ -162,13 +162,21 @@ test('any Claude spinner row and a still-executing tool call are active; finishe
 
 test('watchdog wake transfers cadence ownership outside the Kernel model turn',()=>{
   const prompt=buildWakePrompt('wf-example');
-  assert.match(prompt,/Host controller\) owns the ~5-minute cadence/i);
+  assert.match(prompt,/the runtime wakes this Kernel again/i);
+  assert.doesNotMatch(prompt,/minute cadence/i,'no cadence number the runtime does not keep');
   assert.match(prompt,/yield the model turn immediately/i);
   assert.match(prompt,/Never run Start-Sleep/i);
   assert.doesNotMatch(prompt,/poll canonical status again/i);
   assert.doesNotMatch(prompt,/Do not yield/i);
   assert.doesNotMatch(prompt,/grants no new approval/);
   assert.doesNotMatch(prompt,/Runtime wake for Kernel attempt/,'no seat attempt known, no identity');
+});
+
+test('the whole typed wake stays under the size Claude Code folds into a pasted_content block',()=>{
+  const rev='Runtime rev c98cbc727 -> 1a5452b00 changed: 3 file(s); re-read them and ack before anything else.';
+  const prompt=buildWakePrompt('wf-starci-auth-test-workflow-muxq4oyr',12,rev);
+  assert.ok(prompt.length<800,`the wake is ${prompt.length} characters`);
+  assert.match(prompt,/needs-kernel-decision/);
 });
 
 test('watchdog wake names the Kernel seat it is for, checkable with starci kernel status, and claims no approval',()=>{
@@ -254,6 +262,8 @@ const json = (text) => { try { return JSON.parse(text); } catch { return null; }
 const KERNEL_IDLE = [' Yielding — waiting on the code.refactor report.', '✻ Brewed for 3m 2s', '─────', '❯', '─────',
   '  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents'].join('\n');
 
+// The sender terminal a launch needs (workflowSender); the fixture's own Kernel terminal stands in for the runtime-owned one.
+const SENDER = 'fake-sender-terminal';
 const watchdogWorld = async (t, { jobs = [], events = [], tabTitle = null, signalValue = null } = {}) => {
   const { seedWorkflow } = await import('../helpers/ledger-fixture.mjs');
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-watchdog-e2e-'));
@@ -347,7 +357,7 @@ test('a repair retains a seat whose missing worker Dispatch leaves its execution
   const fx = await watchdogWorld(t, { signalValue: { terminal: KERNEL, host: 'orca', agent: 'claude', launch: 'worker' } });
   // The repair re-enters start-workflow: its host readiness is the fixture boundary, so the verdict reached is the worker identity.
   const startup = `data:text/javascript,${encodeURIComponent(`import{register}from'node:module';register(${JSON.stringify(new URL('../helpers/workflow-startup-loader.mjs', import.meta.url).href)});`)}`;
-  const { status, result, stderr, stdout } = fx.tick({ NODE_OPTIONS: `--import=${startup}` });
+  const { status, result, stderr, stdout } = fx.tick({ NODE_OPTIONS: `--import=${startup}`, ORCA_TERMINAL_HANDLE: SENDER });
   t.diagnostic(JSON.stringify({ status, result, stderr, stdout }));
   assert.equal(status, 1, JSON.stringify({ status, result, stderr, stdout }));
   assert.equal(result.action, 'restart-failed', JSON.stringify(result));
@@ -370,7 +380,7 @@ test('an idle Kernel whose release is refused is close-failed, not replaced', as
     { kind: 'kernel-woken', entityType: 'kernel', created_at: now - 11.5 * minute, payload: { terminal: KERNEL } },
     { kind: 'kernel-woken', entityType: 'kernel', created_at: now - 11 * minute, payload: { terminal: KERNEL } },
   ] });
-  const { result } = fx.tick({ STARCI_FAKE_ORCA_RELEASE_FAILS: '1' });
+  const { result } = fx.tick({ STARCI_FAKE_ORCA_RELEASE_FAILS: '1', ORCA_TERMINAL_HANDLE: SENDER });
   assert.equal(result.action, 'kernel-terminal-close-failed', JSON.stringify(result));
   assert.equal(result.ok, false);
   assert.equal(fx.eventsOf('kernel-replaced-idle').length, 0, 'a close that failed counted no replacement');
