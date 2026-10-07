@@ -49,7 +49,7 @@ function addRequiredPatterns(sonar, required, suffixes) {
 }
 
 function addEntryPatterns(sonar, slot, entry, isRole) {
-  if (!/\.ts$/.test(entry) || entry.includes('<role>')) return;
+  if (!entry.endsWith('.ts') || entry.includes('<role>')) return;
   for (const name of braceVariants(entry)) {
     if (isRole.test(star(name).replaceAll('*', 'x'))) continue;
     for (const dir of variantsOf(slot)) sonar.add(`be/${dir}${star(name)}`.replace(/\/\/+/g, '/'));
