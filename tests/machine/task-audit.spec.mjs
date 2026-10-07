@@ -1,17 +1,20 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { auditTask, auditTasks, resultCodeText, taskFacts } from '../../scripts/machine/task-audit.mjs';
+import { winPath } from '../fixtures/win-path.mjs';
 import { TASK_DEFINITIONS, registeredAction } from '../../scripts/machine/task-register.mjs';
 
-const SYSTEM_ROOT = 'C:\\WINDOWS';
-const HOME = 'C:\\Users\\Owner';
-const SHIM = 'C:\\Users\\Owner\\.starci\\bin\\starci.cmd';
+const SYSTEM_ROOT = winPath('C', 'WINDOWS');
+const HOME = winPath('C', 'Users', 'Owner');
+const SHIM = winPath('C', 'Users', 'Owner', '.starci', 'bin', 'starci.cmd');
 const current = (name) => registeredAction(name, { systemRoot: SYSTEM_ROOT, starci: SHIM });
 const row = (name, over = {}) => ({ name, taskName: TASK_DEFINITIONS[name].taskName, state: 'Ready', nextRun: null, lastRun: null, lastResult: 0, action: current(name), ...over });
 const audit = (name, taskRow, shimExists = true) => auditTask(name, taskRow, { shim: SHIM, shimExists, systemRoot: SYSTEM_ROOT });
 
 test('the registered action is conhost, headless cmd and the shim with the task command, exactly as Task Scheduler prints it', () => {
-  assert.equal(current('harness-app'), 'C:\\WINDOWS\\System32\\conhost.exe --headless "C:\\WINDOWS\\System32\\cmd.exe" /d /s /c ""C:\\Users\\Owner\\.starci\\bin\\starci.cmd" harness start"');
+  const conhost = winPath('C', 'WINDOWS', 'System32', 'conhost.exe');
+  const cmd = winPath('C', 'WINDOWS', 'System32', 'cmd.exe');
+  assert.equal(current('harness-app'), `${conhost} --headless "${cmd}" /d /s /c ""${SHIM}" harness start"`);
   assert.match(current('harness-tunnel'), /" harness start --tunnel"$/);
   assert.match(current('reconciler'), /" reconciler start"$/);
 });
@@ -25,11 +28,11 @@ test('a task on today\'s action with its shim present is ok, ignoring case and s
 });
 
 test('the stale hand-made harness app action is red and names the register command', () => {
-  const stale = 'C:\\Program Files\\nodejs\\node.exe server.mjs --serve-static';
+  const stale = `${winPath('C', 'Program Files', 'nodejs', 'node.exe')} server.mjs --serve-static`;
   const found = audit('harness-app', row('harness-app', { action: stale }));
   assert.equal(found.ok, false);
   assert.equal(found.problem, 'action-stale');
-  assert.match(found.reason, /Windows task 'StarCi Harness App' runs "C:\\Program Files\\nodejs\\node\.exe server\.mjs --serve-static" but a registration today writes "C:\\WINDOWS\\System32\\conhost\.exe/);
+  assert.ok(found.reason.includes(`Windows task 'StarCi Harness App' runs "${stale}" but a registration today writes "${winPath('C', 'WINDOWS', 'System32', 'conhost.exe')}`), found.reason);
   assert.equal(found.fix, 'starci task register harness-app --apply');
 });
 
@@ -42,7 +45,7 @@ test('a missing shim is red even when the action is the declared one, and the fi
   const found = audit('reconciler', row('reconciler'), false);
   assert.equal(found.ok, false);
   assert.equal(found.problem, 'shim-missing');
-  assert.match(found.reason, /per-user shim C:\\Users\\Owner\\\.starci\\bin\\starci\.cmd does not exist/);
+  assert.ok(found.reason.includes(`per-user shim ${SHIM} does not exist`), found.reason);
   assert.equal(found.fix, 'starci runtime link');
 });
 
