@@ -108,6 +108,22 @@ export function newHypotheses(items, state, { minRepeats }) {
 const EMPTY_STATE = () => ({ signatures: {}, experiments: {}, lessons: [], proposals: {} });
 const LESSON_KINDS = new Set(['lesson', 'owner-feedback', 'leftover']);
 
+const parseLearningRow = (r) => {
+  let d = null;
+  try { d = JSON.parse(r.detail_json ?? 'null'); } catch { d = null; }
+  return { kind: r.kind, id: r.item_id, p: d ?? {} };
+};
+
+// The signature status an experiment verdict leaves behind; an outcome not listed reverts the signature.
+const SIGNATURE_STATUS_OF_OUTCOME = new Map([['kept', 'kept'], ['revert-due', 'measuring']]);
+
+// An experiment's result row (its newest verdict) replays at the verdict's own seq.
+function replayExperimentResult(p, experiments, sig) {
+  experiments[p.id] = { ...experiments[p.id], status: p.outcome, result: p };
+  sig(experiments[p.id].signature).status = SIGNATURE_STATUS_OF_OUTCOME.get(p.outcome) ?? 'reverted';
+  if (p.outcome === 'revert-due') experiments[p.id].status = 'revert-due';
+}
+
 /**
  * The learning state from the sup_learning rows over the machine handle `m`: {signatures: {sig: {status, hypothesis,
  * experiments}}, experiments, lessons, proposals}. Each record carries `seq` (its audit event), so the rows replay in the
@@ -115,7 +131,7 @@ const LESSON_KINDS = new Set(['lesson', 'owner-feedback', 'leftover']);
  */
 export function learningState(m) {
   const rows = m.db.prepare('SELECT kind, item_id, detail_json FROM sup_learning').all()
-    .map((r) => { let d = null; try { d = JSON.parse(r.detail_json ?? 'null'); } catch { d = null; } return { kind: r.kind, id: r.item_id, p: d ?? {} }; })
+    .map(parseLearningRow)
     .sort((a, b) => (a.p.seq ?? 0) - (b.p.seq ?? 0) || (a.p.at ?? 0) - (b.p.at ?? 0));
   const { signatures, experiments, lessons, proposals } = EMPTY_STATE();
   const sig = (s) => (signatures[s] ??= { status: null, hypothesis: null, experiments: [] });
@@ -126,14 +142,8 @@ export function learningState(m) {
     else if (r.kind === 'experiment') {
       experiments[p.id] = { ...p, status: 'measuring' };
       sig(p.signature).experiments.push(p.id); sig(p.signature).status = 'measuring';
-    } else if (r.kind === 'experiment-result' && experiments[p.id]) {
-      experiments[p.id] = { ...experiments[p.id], status: p.outcome, result: p };
-      const s = sig(experiments[p.id].signature);
-      if (p.outcome === 'kept') s.status = 'kept';
-      else if (p.outcome === 'revert-due') s.status = 'measuring';
-      else s.status = 'reverted';
-      if (p.outcome === 'revert-due') experiments[p.id].status = 'revert-due';
-    } else if (LESSON_KINDS.has(r.kind)) lessons.push(p);
+    } else if (r.kind === 'experiment-result' && experiments[p.id]) replayExperimentResult(p, experiments, sig);
+    else if (LESSON_KINDS.has(r.kind)) lessons.push(p);
     else if (r.kind === 'proposal') proposals[p.id] = p;
   }
   return { signatures, experiments, lessons, proposals };
@@ -261,6 +271,13 @@ export const landedWithin = (state, { now, ms = 24 * 3_600_000 }) => Object.valu
 
 /* ------------------------------------------------------------ measure */
 
+// The reasons a measured experiment is due to revert, joined: a recurrence, a regression, a success-rate drop.
+function revertReason(e, { recurred, regressions, drop, successRate }) {
+  return [recurred.length ? `signature ${e.signature} recurred after the land (${recurred.map((i) => i.key).join(', ')})` : null,
+    regressions.length ? `new signature(s) naming a changed file: ${regressions.map((i) => i.key).join(', ')}` : null,
+    drop ? `success rate ${e.baseline.successRate} -> ${successRate}` : null].filter(Boolean).join('; ');
+}
+
 /**
  * The experiments' verdicts this tick. Pure. `items` are the owed actions now (each with signatureOf, lastAt, evidence);
  * `successRate` the op-health success rate now (op-metrics, when the tick has it). Returns
@@ -276,9 +293,7 @@ export function measureExperiments(state, { items = [], now = Date.now(), measur
     const regressions = items.filter((i) => signatureOf(i) !== e.signature && (i.firstSeenAt ?? now) > since && touched.some((b) => String(i.evidence ?? '').includes(b)));
     const drop = successRate != null && e.baseline?.successRate != null && e.baseline.successRate - successRate >= successDrop;
     if (recurred.length || regressions.length || drop) {
-      out.push({ id: e.id, outcome: 'revert-due', reason: [recurred.length ? `signature ${e.signature} recurred after the land (${recurred.map((i) => i.key).join(', ')})` : null,
-        regressions.length ? `new signature(s) naming a changed file: ${regressions.map((i) => i.key).join(', ')}` : null,
-        drop ? `success rate ${e.baseline.successRate} -> ${successRate}` : null].filter(Boolean).join('; ') });
+      out.push({ id: e.id, outcome: 'revert-due', reason: revertReason(e, { recurred, regressions, drop, successRate }) });
     } else if (now - since >= measureMs) out.push({ id: e.id, outcome: 'kept', reason: `no recurrence of ${e.signature} and no regression for ${Math.round((now - since) / 3_600_000)} h` });
   }
   return out;

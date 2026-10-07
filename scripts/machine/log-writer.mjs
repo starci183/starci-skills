@@ -30,6 +30,53 @@ const TRUNCATED = 'log.truncated';
 const writers = new Map();
 const keyOf = (file) => { const p = path.resolve(file); return process.platform === 'win32' ? p.toLowerCase() : p; };
 
+// How many of a job's own rows count against its cap: cheap bound first (every row of the job, counted on the job index alone
+// up to the cap); only a job that could reach the cap with this batch gets the exact count of its own (capped) rows.
+function jobFill(row, perJobCap, { stmts, batchOf }) {
+  const all = Number(stmts.upTo.get(row.jobId, perJobCap).n);
+  return all + batchOf.get(row.jobId) <= perJobCap ? 0 : Number(stmts.capped.get(row.jobId).n);
+}
+
+// A row past its job's cap is dropped; the first drop of a job also carries the one log.truncated row.
+function dropPlan(row, perJobCap, now, { stmts, truncated }) {
+  if (!truncated.has(row.jobId)) truncated.set(row.jobId, Boolean(stmts.truncated.get(row.jobId)));
+  const decision = { act: 'drop', truncate: !truncated.get(row.jobId) ? { now, perJobCap, row } : null };
+  truncated.set(row.jobId, true);
+  return decision;
+}
+
+// The plan of one queued row: reject, insert, duplicate or drop (`c` carries the batch's read-only lookups and counters).
+function planItem({ row, perJobCap, now }, c) {
+  const { stmts, known, counts } = c;
+  if (!known.has(row.workflowId)) known.set(row.workflowId, Boolean(stmts.workflow.get(row.workflowId)));
+  if (!known.get(row.workflowId) || !LOG_ACTORS.includes(row.actor) || !LOG_LEVELS.includes(row.level)) return { act: 'reject' };
+  const capped = row.jobId && row.kind !== TRUNCATED && !String(row.src ?? '').startsWith('ev:');
+  if (!capped) return { act: 'insert', row };
+  if (row.src && stmts.bySrc.get(row.src)) return { act: 'duplicate' };
+  if (!counts.has(row.jobId)) counts.set(row.jobId, jobFill(row, perJobCap, c));
+  if (counts.get(row.jobId) >= perJobCap) return dropPlan(row, perJobCap, now, c);
+  counts.set(row.jobId, counts.get(row.jobId) + 1);
+  return { act: 'insert', row };
+}
+
+// One planned row written inside the transaction; `out` counts it and keeps its seq (null when nothing was stored).
+function applyDecision(db, d, out) {
+  if (d.act === 'reject') { out.rejected += 1; out.seqs.push(null); return; }
+  if (d.act === 'duplicate') { out.duplicate += 1; out.seqs.push(null); return; }
+  if (d.act === 'drop') {
+    out.dropped += 1; out.seqs.push(null);
+    if (d.truncate) appendLog(db, { at: d.truncate.now, workflowId: d.truncate.row.workflowId, jobId: d.truncate.row.jobId, attemptId: d.truncate.row.attemptId ?? null,
+      actor: 'runtime', level: 'warn', kind: TRUNCATED, msg: `the job log hit its ${d.truncate.perJobCap}-line cap; later lines are dropped`, data: { cap: d.truncate.perJobCap }, refs: [] });
+    return;
+  }
+  const { row } = d;
+  const r = appendLog(db, { at: row.at, workflowId: row.workflowId, jobId: row.jobId ?? null, attemptId: row.attemptId ?? null, traceId: row.traceId ?? null,
+    spanId: row.spanId ?? null, actor: row.actor, nodeId: row.nodeId ?? null, level: row.level, kind: row.kind, msg: row.msg, data: row.data ?? {}, refs: row.refs ?? [],
+    src: row.src ?? null, orIgnore: true });
+  if (r.changes) { out.inserted += 1; out.seqs.push(Number(r.lastInsertRowid)); }
+  else { out.duplicate += 1; out.seqs.push(null); }
+}
+
 function createWriter(file, { flushMs = LOG_FLUSH_MS, maxRows = LOG_FLUSH_ROWS } = {}) {
   let db = null, stmts = null, timer = null, refs = 0, closed = false;
   const queue = [];           // {row, perJobCap, now}
@@ -57,31 +104,9 @@ function createWriter(file, { flushMs = LOG_FLUSH_MS, maxRows = LOG_FLUSH_ROWS }
   // how full each job is. Under the lock only the inserts run (INSERT OR IGNORE still settles a src another process
   // stored meanwhile; the per-job cap is a soft limit, exact within one process). Returns the plan per item.
   const plan = (items) => {
-    const known = new Map(), counts = new Map(), batchOf = new Map(), truncated = new Map();
-    for (const { row } of items) if (row.jobId) batchOf.set(row.jobId, (batchOf.get(row.jobId) ?? 0) + 1);
-    const decisions = [];
-    for (const { row, perJobCap, now } of items) {
-      if (!known.has(row.workflowId)) known.set(row.workflowId, Boolean(stmts.workflow.get(row.workflowId)));
-      if (!known.get(row.workflowId) || !LOG_ACTORS.includes(row.actor) || !LOG_LEVELS.includes(row.level)) { decisions.push({ act: 'reject' }); continue; }
-      const capped = row.jobId && row.kind !== TRUNCATED && !String(row.src ?? '').startsWith('ev:');
-      if (!capped) { decisions.push({ act: 'insert', row }); continue; }
-      if (row.src && stmts.bySrc.get(row.src)) { decisions.push({ act: 'duplicate' }); continue; }
-      if (!counts.has(row.jobId)) {
-        // Cheap bound first: every row of the job, counted on the job index alone up to the cap. Only a job that could
-        // reach the cap with this batch gets the exact count of its own (capped) rows.
-        const all = Number(stmts.upTo.get(row.jobId, perJobCap).n);
-        counts.set(row.jobId, all + batchOf.get(row.jobId) <= perJobCap ? 0 : Number(stmts.capped.get(row.jobId).n));
-      }
-      if (counts.get(row.jobId) >= perJobCap) {
-        if (!truncated.has(row.jobId)) truncated.set(row.jobId, Boolean(stmts.truncated.get(row.jobId)));
-        decisions.push({ act: 'drop', truncate: !truncated.get(row.jobId) ? { now, perJobCap, row } : null });
-        truncated.set(row.jobId, true);
-        continue;
-      }
-      counts.set(row.jobId, counts.get(row.jobId) + 1);
-      decisions.push({ act: 'insert', row });
-    }
-    return decisions;
+    const c = { stmts, known: new Map(), counts: new Map(), batchOf: new Map(), truncated: new Map() };
+    for (const { row } of items) if (row.jobId) c.batchOf.set(row.jobId, (c.batchOf.get(row.jobId) ?? 0) + 1);
+    return items.map((item) => planItem(item, c));
   };
 
   // One short transaction over `items` (<= maxRows) and the cursor moves; returns its counts.
@@ -90,22 +115,7 @@ function createWriter(file, { flushMs = LOG_FLUSH_MS, maxRows = LOG_FLUSH_ROWS }
     const decisions = plan(items);
     beginImmediate(db);
     try {
-      for (const d of decisions) {
-        if (d.act === 'reject') { out.rejected += 1; out.seqs.push(null); continue; }
-        if (d.act === 'duplicate') { out.duplicate += 1; out.seqs.push(null); continue; }
-        if (d.act === 'drop') {
-          out.dropped += 1; out.seqs.push(null);
-          if (d.truncate) appendLog(db, { at: d.truncate.now, workflowId: d.truncate.row.workflowId, jobId: d.truncate.row.jobId, attemptId: d.truncate.row.attemptId ?? null,
-            actor: 'runtime', level: 'warn', kind: TRUNCATED, msg: `the job log hit its ${d.truncate.perJobCap}-line cap; later lines are dropped`, data: { cap: d.truncate.perJobCap }, refs: [] });
-          continue;
-        }
-        const { row } = d;
-        const r = appendLog(db, { at: row.at, workflowId: row.workflowId, jobId: row.jobId ?? null, attemptId: row.attemptId ?? null, traceId: row.traceId ?? null,
-          spanId: row.spanId ?? null, actor: row.actor, nodeId: row.nodeId ?? null, level: row.level, kind: row.kind, msg: row.msg, data: row.data ?? {}, refs: row.refs ?? [],
-          src: row.src ?? null, orIgnore: true });
-        if (r.changes) { out.inserted += 1; out.seqs.push(Number(r.lastInsertRowid)); }
-        else { out.duplicate += 1; out.seqs.push(null); }
-      }
+      for (const d of decisions) applyDecision(db, d, out);
       for (const [name, { value, mode }] of cursorMoves) setLogCursor(db, { name, value, mode });
       db.exec('COMMIT');
     } catch (error) { try { db.exec('ROLLBACK'); } catch { /* none open */ } throw error; }
@@ -125,6 +135,26 @@ function createWriter(file, { flushMs = LOG_FLUSH_MS, maxRows = LOG_FLUSH_ROWS }
 
   const isBusy = isBusyError;
 
+  // One chunk of <= maxRows queued rows committed and dequeued; true when the writer is busy and the rest waits for the next tick.
+  const flushChunk = (out) => {
+    const items = queue.slice(0, maxRows);
+    const moves = items.length === queue.length ? [...cursors] : [];
+    let r;
+    try { r = commit(items, moves); }
+    catch (error) {
+      if (isBusy(error)) { stats.busy += 1; out.deferred = true; schedule(); return true; }
+      // Anything else is this chunk's own fault: it leaves the queue so it cannot poison every later flush.
+      queue.splice(0, items.length);
+      if (moves.length) cursors.clear();
+      throw error;
+    }
+    queue.splice(0, items.length);
+    if (moves.length) cursors.clear();
+    for (const k of ['inserted', 'duplicate', 'dropped', 'rejected']) out[k] += r[k];
+    out.seqs.push(...r.seqs);
+    return false;
+  };
+
   /** Flush everything queued, in chunks of <= maxRows; cursors ride on the last chunk. Returns the summed counts. */
   const flush = ({ force = false } = {}) => {
     if (timer) { clearTimeout(timer); timer = null; }
@@ -133,21 +163,7 @@ function createWriter(file, { flushMs = LOG_FLUSH_MS, maxRows = LOG_FLUSH_ROWS }
     if (!force && ledgerTransactionDepth() > 0) { stats.deferred += 1; out.deferred = true; schedule(); return out; }
     connect();
     while (queue.length || cursors.size) {
-      const items = queue.slice(0, maxRows);
-      const moves = items.length === queue.length ? [...cursors] : [];
-      let r;
-      try { r = commit(items, moves); }
-      catch (error) {
-        if (isBusy(error)) { stats.busy += 1; out.deferred = true; schedule(); return out; }
-        // Anything else is this chunk's own fault: it leaves the queue so it cannot poison every later flush.
-        queue.splice(0, items.length);
-        if (moves.length) cursors.clear();
-        throw error;
-      }
-      queue.splice(0, items.length);
-      if (moves.length) cursors.clear();
-      for (const k of ['inserted', 'duplicate', 'dropped', 'rejected']) out[k] += r[k];
-      out.seqs.push(...r.seqs);
+      if (flushChunk(out)) return out;
     }
     return out;
   };
