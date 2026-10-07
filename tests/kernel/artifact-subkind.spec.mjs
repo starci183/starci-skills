@@ -15,6 +15,7 @@ import { proofRepo } from '../helpers/sonar-scan.mjs';
 import { fakeOrcaWorktrees } from '../helpers/fake-orca-worktrees.mjs';
 import { registerWorkflowWorktree } from '../../scripts/kernel/workflow-worktree.mjs';
 import { adoptLaunchTrust } from '../helpers/launch-trust.mjs';
+import { senderEnv } from '../helpers/sender-env.mjs';
 
 // git's repository-local variables (git rev-parse --local-env-vars) never reach a fixture: a hook or alias run in a linked
 // worktree exports GIT_DIR, and every fixture git then writes THAT repository whatever cwd or -C it names - a temp dir's
@@ -174,7 +175,7 @@ const promptWorld = (t) => {
     STARCI_FAKE_ORCA_LOG: path.join(root, 'orca-calls.jsonl'), STARCI_FAKE_ORCA_STATE: stateFile, STARCI_TEST_MACHINE_FILE: path.join(root, 'machine.sqlite'),
     STARCI_LOCAL_ROOT: path.join(root, 'localappdata'), ...adopted };
   for (const key of ['ORCA_TERMINAL_HANDLE', 'STARCI_ROLE', 'STARCI_OP_JOB', 'STARCI_GUARD_FILE']) delete env[key];
-  const run = (script, ...args) => spawnSync(process.execPath, ['--loader', new URL('../helpers/workflow-startup-loader.mjs', import.meta.url).href, script, ...args], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 180000, env });
+  const run = (script, ...args) => spawnSync(process.execPath, ['--loader', new URL('../helpers/workflow-startup-loader.mjs', import.meta.url).href, script, ...args], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 180000, env: senderEnv(script, env) });
   const state = () => JSON.parse(fs.readFileSync(stateFile, 'utf8'));
   return { root, repo, env, run, state };
 };

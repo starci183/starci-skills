@@ -108,7 +108,16 @@ claim:
     A later boot closes the exact recorded Dispatch and terminal through scripts/machine/worker-close.mjs,
     releases the original provider fence, then clears only its unchanged signal and accepted-goal transaction.
     Missing identity, incomplete closure or release, changed authority and retired workflows retain custody.
-    A request-only unknown launch remains held; elapsed time never proves no effect.
+    A request-only unknown launch remains held; elapsed time never proves no effect. The one exception has no terminal
+    and no Dispatch: its recorded run-create failure carries a typed Orca refusal named in modules/host/orca/calls.yaml
+    envelope.preEffectCodes, request-show answers absent for that run-create request id (stored on the signal as
+    hostRequestId, else derived from the attempt), and no Kernel Run of the workflow was created since the admission
+    (run-list). Then the provider reservation is released as failed-before-launch and the signal is cleared; any other
+    answer keeps the launch held with its precise reason.
+  senderTerminal: >-
+    A Kernel launch is the worker of an entry Run whose coordinator is the launching terminal, so start refuses with
+    step workflow-sender-terminal-missing, before any host startup effect, when ORCA_TERMINAL_HANDLE is not set. --plan
+    reports the sender. No other terminal stands in as coordinator.
   onHostOutage: >-
     Orca not answering - runtime_unavailable, orca.exe ENOENT while an update
     replaces it, a timed-out call - says nothing about any terminal. It is

@@ -9,6 +9,7 @@ import {openLedger,inspectLedger,ledgerFileFor} from '../../engine/db/ledger.mjs
 import { proofRepo } from '../helpers/sonar-scan.mjs';
 import { fakeOrcaWorktrees } from '../helpers/fake-orca-worktrees.mjs';
 import { registerWorkflowWorktree } from '../../scripts/kernel/workflow-worktree.mjs';
+import { senderEnv } from '../helpers/sender-env.mjs';
 
 // A terminal-send to a Claude Kernel answered agent_prompt_stalled while the wake text sat on its
 // screen. `starci kernel nudge` already proves delivery from the screen (tests/kernel/nudge-delivery-proof.spec.mjs);
@@ -171,7 +172,7 @@ const watchdogWorld=t=>{
   w.seedKernelTerminal();
   const tick=more=>{
     const r=spawnSync(process.execPath,[WATCHDOG,'--repo',w.repo,'--workflow',workflowId,'--once','--repair','--json'],
-      {cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...w.env,...more}});
+      {cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{ORCA_TERMINAL_HANDLE:'fake-sender-terminal',...w.env,...more}});
     return {status:r.status,result:json(r.stdout.trim().split('\n').at(-1)),stderr:r.stderr};
   };
   return {...w,workflowId,tick};
@@ -342,14 +343,14 @@ const unwritableWorld=t=>{
   // The repair invokes start-workflow in a grandchild; carry only the private external boundaries to it.
   const closureImport=`data:text/javascript,${encodeURIComponent(`import{register}from'node:module';register(${JSON.stringify(new URL('../helpers/worker-close-loader.mjs',import.meta.url).href)});register(${JSON.stringify(new URL('../helpers/workflow-startup-loader.mjs',import.meta.url).href)});`)}`;
   w.env.NODE_OPTIONS=[w.env.NODE_OPTIONS,`--import=${closureImport}`].filter(Boolean).join(' ');
-  const run=(script,args,more={})=>spawnSync(process.execPath,[script,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...w.env,...more}});
+  const run=(script,args,more={})=>spawnSync(process.execPath,[script,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:senderEnv(script,{...w.env,...more})});
   const defined=run(DEFINE_GOAL,['--repo',w.repo,'--text','refactor the stale architecture','--json']);
   assert.equal(defined.status,0,defined.stderr);
   const workflowId=json(defined.stdout)?.workflowId;assert.ok(workflowId);
   const boot=run(START_WORKFLOW,['--repo',w.repo,'--goal',workflowId,'--json']);
   assert.equal(boot.status,0,boot.stderr||boot.stdout);
   const terminal=json(boot.stdout)?.terminal;assert.ok(terminal,'the first kernel booted a terminal');
-  const tick=()=>{const r=run(WATCHDOG,['--repo',w.repo,'--workflow',workflowId,'--once','--repair','--json']);
+  const tick=()=>{const r=run(WATCHDOG,['--repo',w.repo,'--workflow',workflowId,'--once','--repair','--json'],{ORCA_TERMINAL_HANDLE:'fake-sender-terminal'});
     return {status:r.status,result:json(r.stdout.trim().split('\n').at(-1)),stderr:r.stderr,stdout:r.stdout};};
   const events=kind=>{const l=inspectLedger({file:w.ledgerFile()});
     try{return l.db.prepare("SELECT payload_json FROM events WHERE workflow_id=? AND kind=? ORDER BY seq").all(workflowId,kind).map(r=>json(r.payload_json));}

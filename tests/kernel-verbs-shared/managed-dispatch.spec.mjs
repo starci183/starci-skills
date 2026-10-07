@@ -15,6 +15,7 @@ process.env.STARCI_SLEEP_SCALE??='0.02';
 import {jobRowOf} from '../../scripts/kernel/verbs/shared/rows.mjs';
 import {writeGreenProofs,proofRepo} from '../helpers/sonar-scan.mjs';
 import {buildContext} from '../../scripts/context/pack.mjs';
+import { senderEnv } from '../helpers/sender-env.mjs';
 
 // Build the workflow and logical unit required by the current ledger before
 // exercising dispatch. Each fixture op job represents a distinct unit.
@@ -109,7 +110,7 @@ const fixture=(t,{dead=[],stale=[],allocationPolicy=null}={})=>{
     }else if(script===START_WORKFLOW&&!args.includes('--plan'))bindWorkflow(args[args.indexOf('--goal')+1]);
     return new Promise(resolve=>execFile(process.execPath,
       ['--import',`data:text/javascript,import{register}from'node:module';register(${JSON.stringify(new URL('../helpers/worker-close-loader.mjs',import.meta.url).href)});register(${JSON.stringify(new URL('../helpers/workflow-startup-loader.mjs',import.meta.url).href)});`,script,...placeOnRepo(args,repo)],
-      {cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env},
+      {cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:senderEnv(script,env)},
       (error,stdout,stderr)=>resolve({status:error?.code??0,signal:error?.signal??null,error,stdout,stderr})));
   };
   const callArgv=()=>fs.existsSync(path.join(root,'calls.jsonl'))
@@ -784,6 +785,40 @@ test('kernel launch fails closed when its entry Run cannot be created, and start
   assert.equal((json(r.stderr)||json(r.stdout))?.step,'run-create');
   assert.equal(fx.calls().includes('orchestration worker-start'),false,'no Kernel without its Run');
   assert.notEqual(jobRow(fx,`kernel-${workflowId}`)?.status,'running');
+});
+
+test('a run-create Orca refuses before any effect is recorded as no effect: the singleton is released and the next start boots',async t=>{
+  const fx=fixture(t);fx.writeConfig();
+  fx.env.STARCI_FAKE_ORCA_MODE='run-create-no-sender';
+  const workflowId=await defineGoal(fx);
+  const refused=await fx.run(START_WORKFLOW,'--repo',fx.repo,'--goal',workflowId,'--json');
+  assert.notEqual(refused.status,0);
+  const failure=json(refused.stderr)||json(refused.stdout);
+  assert.equal(failure?.step,'run-create');
+  assert.equal(failure?.effectState,'none');
+  assert.equal(kernelSignal(fx,workflowId),null,'a proven refusal leaves no launch-unknown signal');
+  assert.equal(fx.calls().includes('orchestration worker-start'),false);
+  delete fx.env.STARCI_FAKE_ORCA_MODE;
+  const retried=await fx.run(START_WORKFLOW,'--repo',fx.repo,'--goal',workflowId,'--json');
+  assert.equal(retried.status,0,retried.stderr);
+  assert.ok(json(retried.stdout)?.terminal,'the next start boots the Kernel');
+});
+
+test('a start without a sender terminal is refused before any host effect, and --plan reports it',async t=>{
+  const fx=fixture(t);fx.writeConfig();
+  fx.env.ORCA_TERMINAL_HANDLE='  ';
+  const workflowId=await defineGoal(fx);
+  const plan=await fx.run(START_WORKFLOW,'--repo',fx.repo,'--goal',workflowId,'--plan','--json');
+  assert.equal(plan.status,0,plan.stderr);
+  assert.equal(json(plan.stdout)?.sender?.ok,false);
+  const before=fx.calls().length;
+  const refused=await fx.run(START_WORKFLOW,'--repo',fx.repo,'--goal',workflowId,'--json');
+  assert.notEqual(refused.status,0);
+  const failure=json(refused.stdout)||json(refused.stderr);
+  assert.equal(failure?.step,'workflow-sender-terminal-missing');
+  assert.match(failure?.error??'',/Orca terminal/);
+  assert.equal(fx.calls().length,before,'no Orca call, no signal and no worktree before the refusal');
+  assert.equal(kernelSignal(fx,workflowId),null);
 });
 
 test('kernel launch fails closed when the worker does not attest the requested model, and releases it',async t=>{
