@@ -26,6 +26,10 @@ export const GRAMMAR_PACKAGE='@starci/grammar';
 export const GRAMMAR_DIST_FIX='run npm run build in packages/grammar';
 const GRAMMAR_DIST_CHECK='starci/grammar-dist-check@1';
 const TOKEN_DIFF_CAP=20;
+const CSS_TOKEN_NAME=String.raw`--[A-Za-z0-9_-]+`;
+const CSS_TOKEN_SPACE=String.raw`\s*`;
+const CSS_TOKEN_VALUE=String.raw`[^;{}]*`;
+const CSS_TOKEN_DECLARATION=new RegExp(`(${CSS_TOKEN_NAME})${CSS_TOKEN_SPACE}:(${CSS_TOKEN_VALUE})`,'g');
 
 
 export const defaultGrammarPackageRoot=()=>path.join(skillRoot,'packages','grammar');
@@ -33,7 +37,7 @@ export const defaultGrammarPackageRoot=()=>path.join(skillRoot,'packages','gramm
 /** Every `--name: value` declaration outside a comment, in document order, whitespace collapsed. */
 export function cssTokenDeclarations(text){
   const code=String(text).replace(/\/\*[\s\S]*?\*\//g,'');
-  return [...code.matchAll(/(--[A-Za-z0-9_-]+)\s*:([^;{}]*)/g)].map(m=>({name:m[1],value:m[2].trim().replace(/\s+/g,' ')}));
+  return [...code.matchAll(CSS_TOKEN_DECLARATION)].map(m=>({name:m[1],value:m[2].trim().replace(/\s+/g,' ')}));
 }
 
 /** The families `packages/grammar/scripts/copy-css.mjs` copies: every `src/<family>` that has a `styles.css`. */
@@ -147,8 +151,12 @@ export function grammarDistStatus(packageRoot=defaultGrammarPackageRoot()){
 }
 
 const short=digest=>typeof digest==='string'?digest.replace(/^sha256:/,'').slice(0,12):'(none)';
+const tokenDifferenceText=d=>{
+  if(!d.token)return `${d.file} ${d.dist}`;
+  return `${d.file} ${d.token} src=${d.src??'(absent)'} dist=${d.dist??'(absent)'}`;
+};
 function tokenSummary(tokens){
-  const shown=tokens.differences.slice(0,3).map(d=>d.token?`${d.file} ${d.token} src=${d.src??'(absent)'} dist=${d.dist??'(absent)'}`:`${d.file} ${d.dist}`);
+  const shown=tokens.differences.slice(0,3).map(tokenDifferenceText);
   return `${tokens.differenceCount} dist CSS token value(s) differ from src: ${shown.join('; ')}${tokens.differenceCount>3?'; ...':''}`;
 }
 
