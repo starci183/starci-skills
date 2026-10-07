@@ -180,7 +180,11 @@ export default {
       const probe = probeDraft({ terminal: worker.terminalHandle });
       if (probe.verdict === 'stale') staleDrafts.push(probe.draft);
       else if (probe.verdict !== 'none') {
-        const draftProbe = { verdict: probe.verdict, sends: probe.sends, ...(probe.verdict === 'real' ? { restored: probe.restored, ...(probe.restored ? {} : { removed: probe.removed }) } : {}) };
+        const draftProbe = { verdict: probe.verdict, sends: probe.sends };
+        if (probe.verdict === 'real') {
+          draftProbe.restored = probe.restored;
+          if (!probe.restored) draftProbe.removed = probe.removed;
+        }
         const out = { ok: false, jobId, nudged: false, reason: 'foreign-input', input: draftOwner.draft.slice(0, 200), inputSource: 'draft', draftProbe, worker };
         const shown = draftOwner.draft.length > 80 ? `${draftOwner.draft.slice(0, 80)}…` : draftOwner.draft;
         const probeNote = probe.verdict === 'real' ? `changed it - real text${probe.restored ? ', its cut typed back' : ', NOT restored'}` : 'left it unreadable';
