@@ -47,7 +47,7 @@ const SHA = /^[0-9a-f]{7,40}$/i;
 const RUNTIME_ROOT = path.resolve(import.meta.dirname, '..', '..');
 const WALK_MAX = 2000;
 const WALK_DEPTH = 6;
-const slashed = (p) => String(p).replaceAll(/\\/g, '/');
+const slashed = (p) => String(p).replaceAll('\\', '/');
 
 const statOf = (p) => { try { return fs.statSync(p); } catch { return null; } };
 const inside = (root, p) => isInside(path.resolve(root), path.resolve(p), { includeSelf: false });
@@ -56,12 +56,17 @@ const inside = (root, p) => isInside(path.resolve(root), path.resolve(p), { incl
 export const jobDirOf = (repo, workflowId, jobId) => jobScratchDirOf(repo, workflowId, jobId);
 
 const collectNamedFile = (p, searchRoots, missing, push) => {
-  const abs = path.isAbsolute(p) ? (statOf(p) ? path.resolve(p) : null) : searchRoots.map((r) => path.resolve(r, p)).find((c) => statOf(c));
+  const abs = resolveNamedFile(p, searchRoots);
   if (!abs) {
     if (/\.starciwork[\\/]/.test(p)) missing.push(slashed(p));
     return;
   }
   if (statOf(abs).isFile()) push({ abs, source: 'named' });
+};
+
+const resolveNamedFile = (p, searchRoots) => {
+  if (path.isAbsolute(p)) return statOf(p) ? path.resolve(p) : null;
+  return searchRoots.map((r) => path.resolve(r, p)).find((c) => statOf(c));
 };
 
 /**
@@ -139,24 +144,29 @@ const revParse = (root, ref, timeout) => { const r = gitResult(revParseQuery, ['
 const patchBaseOf = (root, full, specs, shas, sinceMs, timeout) => {
   let base = null;
   if (shas.cherryPicked) base = revParse(root, `${full}^`, timeout);
-  else if (specs.length && Number.isFinite(sinceMs)) {
-    const since = `@${Math.floor(sinceMs / 1000)}`;
-    const commits = new Set();
-    for (const batch of specBatches(specs)) {
-      const log = gitResult(revList, [`--since=${since}`, full, '--', ...batch.map((s) => `:(literal)${s}`)], { dir: root, timeout });
-      if (!log.ok) { commits.clear(); break; }
-      for (const sha of log.stdout.split(/\s+/).filter(Boolean)) commits.add(sha);
-    }
-    // A batch's last commit need not be the oldest across the whole owned set.
-    if (commits.size) {
-      const history = gitResult(revList, [`--since=${since}`, full], { dir: root, timeout, maxBuffer: 64 * 1024 * 1024 });
-      const oldest = history.ok ? history.stdout.split(/\s+/).findLast((sha) => commits.has(sha)) : null;
-      if (oldest) base = revParse(root, `${oldest}^`, timeout) ?? 'root';
-    }
-  }
-  if (!base) base = shas.base && revParse(root, shas.base, timeout) ? revParse(root, shas.base, timeout) : (revParse(root, `${full}^`, timeout) ?? 'root');
+  else if (specs.length && Number.isFinite(sinceMs)) base = recentOwnedBaseOf(root, full, specs, sinceMs, timeout);
+  if (!base) base = fallbackPatchBase(root, full, shas, timeout);
   return base;
 };
+
+const recentOwnedBaseOf = (root, full, specs, sinceMs, timeout) => {
+  const since = `@${Math.floor(sinceMs / 1000)}`;
+  const commits = new Set();
+  for (const batch of specBatches(specs)) {
+    const log = gitResult(revList, [`--since=${since}`, full, '--', ...batch.map((s) => `:(literal)${s}`)], { dir: root, timeout });
+    if (!log.ok) { commits.clear(); break; }
+    for (const sha of log.stdout.split(/\s+/).filter(Boolean)) commits.add(sha);
+  }
+  // A batch's last commit need not be the oldest across the whole owned set.
+  if (!commits.size) return null;
+  const history = gitResult(revList, [`--since=${since}`, full], { dir: root, timeout, maxBuffer: 64 * 1024 * 1024 });
+  const oldest = history.ok ? history.stdout.split(/\s+/).findLast((sha) => commits.has(sha)) : null;
+  return oldest ? revParse(root, `${oldest}^`, timeout) ?? 'root' : null;
+};
+
+const fallbackPatchBase = (root, full, shas, timeout) => shas.base && revParse(root, shas.base, timeout)
+  ? revParse(root, shas.base, timeout)
+  : (revParse(root, `${full}^`, timeout) ?? 'root');
 
 const formatPatch = (root, timeout, revs, paths) => {
   const parts = [];
@@ -183,22 +193,33 @@ export function writeJobPatch({ repo, job, envelope, result, payload, placements
   const state = shas.landed ? 'landed' : 'unlanded';
   const timeout = allocationMs('settleGit.commandMs');
   const landedRepos = typeof result?.landed === 'object' && result.landed ? arr(result.landed.repos) : [];
-  const candidates = [result?.landed?.repo, ...landedRepos.map((r) => r?.repo), ...arr(placements).map((p) => p?.base), ...roots, repo, payload?.staging?.path, RUNTIME_ROOT]
-    .filter((r) => typeof r === 'string' && r && statOf(r)?.isDirectory()).map((r) => path.resolve(r));
+  const candidates = candidateRootsOf({ result, landedRepos, placements, roots, repo, payload });
   const holder = [...new Set(candidates)].find((root) => revParse(root, target, timeout));
   if (!holder) return { missing: [target], head: shas.head, landed: shas.landed, state };
   const top = gitResult(revParseQuery, ['--show-toplevel'], { dir: holder, timeout });
   const root = top.ok ? path.resolve(top.stdout.trim()) : holder;
   const full = revParse(root, target, timeout);
+  const specs = patchSpecsOf({ landedRepos, root, shas, payload, repo, placements, timeout });
+  const base = patchBaseOf(root, full, specs, shas, sinceMs, timeout);
+  const out = { file, state, head: shas.head, landed: shas.landed, base: base === 'root' ? null : base, repo: root, specs };
+  return writePatchFile({ out, file, root, timeout, base, full, shas, specs, dryRun, jobDir });
+}
+
+const candidateRootsOf = ({ result, landedRepos, placements, roots, repo, payload }) =>
+  [result?.landed?.repo, ...landedRepos.map((r) => r?.repo), ...arr(placements).map((p) => p?.base), ...roots, repo, payload?.staging?.path, RUNTIME_ROOT]
+    .filter((r) => typeof r === 'string' && r && statOf(r)?.isDirectory()).map((r) => path.resolve(r));
+
+const patchSpecsOf = ({ landedRepos, root, shas, payload, repo, placements, timeout }) => {
   let specs = landedRepos.find((r) => r?.repo && resolvedKey(r.repo) === resolvedKey(root))?.paths ?? null;
   if (!specs && !shas.cherryPicked) {
     const owned = arr(payload?.owned_paths).map((p) => (typeof p === 'string' ? p : p?.path)).filter((p) => typeof p === 'string' && p);
     const grouped = landingRepos({ base: repo, ownedPaths: owned, placements: placements ?? undefined, timeoutMs: timeout });
     specs = [...grouped].find(([r]) => resolvedKey(r) === resolvedKey(root))?.[1]?.specs ?? null;
   }
-  specs = arr(specs).filter((s) => typeof s === 'string' && s && s !== '.');
-  const base = patchBaseOf(root, full, specs, shas, sinceMs, timeout);
-  const out = { file, state, head: shas.head, landed: shas.landed, base: base === 'root' ? null : base, repo: root, specs };
+  return arr(specs).filter((s) => typeof s === 'string' && s && s !== '.');
+};
+
+const writePatchFile = ({ out, file, root, timeout, base, full, shas, specs, dryRun, jobDir }) => {
   if (fs.existsSync(file)) return { ...out, kept: true };
   if (dryRun) return { ...out, file: null, wouldWrite: true };
   const range = base === 'root' ? ['--root', full] : [`${base}..${full}`];
@@ -209,7 +230,7 @@ export function writeJobPatch({ repo, job, envelope, result, payload, placements
   fs.mkdirSync(jobDir, { recursive: true });
   fs.writeFileSync(file, run.stdout, { flag: 'wx' });
   return out;
-}
+};
 
 /** Visual proof an op's manifest owes (policy.proofMedia {images, video: required|when-browser}); null when it owes none. */
 export function proofMediaPolicyOf(skillRoot, op) {
@@ -252,7 +273,7 @@ export function evidenceHostPathGate({ files, read = readText }) {
     for (const hit of found) {
       if (offenders.length >= MAX_OFFENDERS) break;
       const line = text.slice(0, hit.offset).split('\n').length;
-      offenders.push(`${String(file.name ?? abs).replaceAll(/\\/g, '/')}:${line} ${hit.sample}`);
+      offenders.push(`${String(file.name ?? abs).replaceAll('\\', '/')}:${line} ${hit.sample}`);
     }
   }
   if (!offenders.length) return null;

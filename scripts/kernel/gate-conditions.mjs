@@ -121,47 +121,51 @@ const invalid = (detail) => Object.assign(new Error(detail), { code: 'until-inva
 const iso = (ms) => isoOr(ms, '?');
 
 /** One raw `--until-<type> <spec>` into its stored shape, or a thrown until-invalid. */
+const CONDITION_PARSERS = new Map([
+  ['record', (type, spec) => {
+    const rev = /^(.*?)>=(\d+)$/.exec(spec);
+    if (rev) return { type, path: rev[1].trim(), minRev: Number(rev[2]) };
+    const at = spec.lastIndexOf('@');
+    if (at > 0 && at > spec.lastIndexOf('/') && at > spec.lastIndexOf('\\'))
+      return { type, path: spec.slice(0, at).trim(), state: spec.slice(at + 1).trim() };
+    return { type, path: spec };
+  }],
+  ['job', (type, spec) => {
+    const [jobId, want = 'settled'] = spec.split(':');
+    if (!JOB_WANTS.includes(want)) throw invalid(`--until-job ${spec}: the state is ${JOB_WANTS.join('|')}, got '${want}'`);
+    return { type, jobId: jobId.trim(), want };
+  }],
+  ['message', (type, spec) => {
+    const [peer, kind = null] = spec.split(':');
+    return { type, peer: peer.trim(), ...(kind ? { kind: kind.trim() } : {}) };
+  }],
+  ['commit', (type, spec) => {
+    // A Windows repo path carries its drive colon: the separator is the last colon past it.
+    const at = spec.lastIndexOf(':');
+    if (at <= 1) throw invalid(`--until-commit ${spec}: the form is <repo>:<ref-or-path>`);
+    return { type, repo: spec.slice(0, at).trim(), target: spec.slice(at + 1).trim() };
+  }],
+  ['incident', (type, spec) => {
+    const [incidentId, want = 'resolved'] = spec.split(':');
+    if (want !== 'resolved') throw invalid(`--until-incident ${spec}: the only state is resolved`);
+    return { type, incidentId: incidentId.trim(), want };
+  }],
+  ['foundation', (type, spec) => {
+    try { return { type, name: normalizeFoundationName(spec) }; } catch (error) { throw invalid(`--until-foundation ${spec}: ${error.message}`); }
+  }],
+  ['landed', (type, spec) => {
+    const at = spec.lastIndexOf('@');
+    if (at <= 0 || at === spec.length - 1) throw invalid(`--until-landed ${spec}: the form is <workflowId>@<repository> (a repository name like my-app, or its path)`);
+    return { type, workflowId: spec.slice(0, at).trim(), repository: spec.slice(at + 1).trim() };
+  }],
+]);
+
 export function parseCondition(type, raw) {
   const spec = String(raw ?? '').trim();
   if (!spec) throw invalid(`--until-${type} needs a value`);
-  switch (type) {
-    case 'record': {
-      const rev = /^(.*?)>=(\d+)$/.exec(spec);
-      if (rev) return { type, path: rev[1].trim(), minRev: Number(rev[2]) };
-      const at = spec.lastIndexOf('@');
-      if (at > 0 && at > spec.lastIndexOf('/') && at > spec.lastIndexOf('\\'))
-        return { type, path: spec.slice(0, at).trim(), state: spec.slice(at + 1).trim() };
-      return { type, path: spec };
-    }
-    case 'job': {
-      const [jobId, want = 'settled'] = spec.split(':');
-      if (!JOB_WANTS.includes(want)) throw invalid(`--until-job ${spec}: the state is ${JOB_WANTS.join('|')}, got '${want}'`);
-      return { type, jobId: jobId.trim(), want };
-    }
-    case 'message': {
-      const [peer, kind = null] = spec.split(':');
-      return { type, peer: peer.trim(), ...(kind ? { kind: kind.trim() } : {}) };
-    }
-    case 'commit': {
-      // A Windows repo path carries its drive colon: the separator is the last colon past it.
-      const at = spec.lastIndexOf(':');
-      if (at <= 1) throw invalid(`--until-commit ${spec}: the form is <repo>:<ref-or-path>`);
-      return { type, repo: spec.slice(0, at).trim(), target: spec.slice(at + 1).trim() };
-    }
-    case 'incident': {
-      const [incidentId, want = 'resolved'] = spec.split(':');
-      if (want !== 'resolved') throw invalid(`--until-incident ${spec}: the only state is resolved`);
-      return { type, incidentId: incidentId.trim(), want };
-    }
-    case 'foundation':
-      try { return { type, name: normalizeFoundationName(spec) }; } catch (error) { throw invalid(`--until-foundation ${spec}: ${error.message}`); }
-    case 'landed': {
-      const at = spec.lastIndexOf('@');
-      if (at <= 0 || at === spec.length - 1) throw invalid(`--until-landed ${spec}: the form is <workflowId>@<repository> (a repository name like my-app, or its path)`);
-      return { type, workflowId: spec.slice(0, at).trim(), repository: spec.slice(at + 1).trim() };
-    }
-    default: throw invalid(`unknown condition type ${type}`);
-  }
+  const parser = CONDITION_PARSERS.get(type);
+  if (!parser) throw invalid(`unknown condition type ${type}`);
+  return parser(type, spec);
 }
 
 /**
@@ -367,7 +371,9 @@ const kindOf = (lastProgress) => /^\[([^\]]+)\]/.exec(lastProgress ?? '')?.[1] ?
 
 const SHARED_BLOCKER_ROUTED = 'shared-blocker-routed';
 // Job ids are op-<op>-<10 hex> (starci kernel enqueue).
-const JOB_ID_RE = /\bop-[a-z][a-z0-9.-]*?-[0-9a-f]{10}\b/gi;
+const JOB_ID_PREFIX = String.raw`\bop-[a-z][a-z0-9.-]*?`;
+const JOB_ID_SUFFIX = String.raw`-[0-9a-f]{10}\b`;
+const JOB_ID_RE = new RegExp(`${JOB_ID_PREFIX}${JOB_ID_SUFFIX}`, 'gi');
 /**
  * The typed release of a shared blocker routed to workflow `to`: the reporter waits on the job of `to`
  * that owns the repair - succeeded, through its retry lineage. Candidates are the jobs of `to` that the

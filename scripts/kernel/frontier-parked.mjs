@@ -30,16 +30,25 @@ const rootOf = (roots, memo, byId, jobId, seen) => {
   return root;
 };
 
-export function parkedBehindWaits(queued = [], heldSettle = []) {
+const queuedRootsOf = (queued) => {
   const roots = new Map();
   for (const item of queued) {
     if (['owner-gate', 'peer-wait', 'supervisor-gate'].includes(item.queuedBecause) && item.blockedBy?.incident) {
       roots.set(item.jobId, { heldBecause: item.queuedBecause, incident: item.blockedBy.incident, ...(item.blockedBy.peer ? { peer: item.blockedBy.peer } : {}), via: item.jobId });
     }
   }
+  return roots;
+};
+
+const addSettleRoots = (roots, heldSettle) => {
   for (const item of heldSettle) {
     if (item.blockedBy?.incident) roots.set(item.jobId, { heldBecause: item.heldBecause, incident: item.blockedBy.incident, ...(item.blockedBy.peer ? { peer: item.blockedBy.peer } : {}), via: item.jobId, settle: true });
   }
+};
+
+export function parkedBehindWaits(queued = [], heldSettle = []) {
+  const roots = queuedRootsOf(queued);
+  addSettleRoots(roots, heldSettle);
   const byId = new Map(queued.map((item) => [item.jobId, item]));
   const memo = new Map();
   const out = new Map();

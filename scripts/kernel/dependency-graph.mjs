@@ -44,6 +44,7 @@ import { parseJson } from '../lib/json.mjs';
 import { recordPathTransfer } from '../../engine/db/ledger.mjs';
 import { byCodeUnit, list } from '../lib/list.mjs';
 import { clipLine } from '../lib/clip.mjs';
+import { addDuplicateFindings } from './dependency-graph-duplicates.mjs';
 
 const BRIDGE_SCOPE = 'supervisor-bridge';
 export const BRIDGE_SCHEMA = 'starci/supervisor-bridge@1';
@@ -54,14 +55,12 @@ export const HUB_STUCK_MS = 2 * 3_600_000;
 // A refused record-change older than this no longer counts as a live dependency.
 const REFUSAL_WINDOW_MS = 7 * 86_400_000;
 const HARD = 'hard', SOFT = 'soft';
-const OPEN_JOB = ['queued', 'leased', 'running', 'answering', 'effect_unknown'];
+const FOREIGN_FILE_START = String.raw`[\w@.-]+`;
+const FOREIGN_FILE_SEGMENT = String.raw`\/[\w@.[\]()-]+`;
+const FOREIGN_FILE = new RegExp(`${FOREIGN_FILE_START}(?:${FOREIGN_FILE_SEGMENT})+`, 'g');
 // Names that are one foundation under two spellings: a dotted project prefix and a starci- prefix
 // drop, and the shell is the layout tree (work-ownership.mjs FOUNDATION_ROOTS).
 const FOUNDATION_SYNONYMS = { shell: 'layout-tree', layout: 'layout-tree', 'layout-shell': 'layout-tree' };
-// Registration points every feature touches (a Nest root module, a manifest, the Work catalog): two
-// workflows owning one of them is shared wiring, not duplicated work.
-const SHARED_WIRING = /(?:^|\/)(?:app\.module\.ts|package\.json|package-lock\.json|pnpm-lock\.yaml|architecture\.json|\.starciwork\/index\.yaml)$/;
-
 const kindOf = (text) => /^\[([^\]]+)\]/.exec(String(text ?? ''))?.[1] ?? null;
 const clip = (s, n = 200) => clipLine(s, n);
 const pathForm = (p) => normWork(typeof p === 'string' ? p : p?.path).toLowerCase();
@@ -150,13 +149,16 @@ export function dependencyGraph(db, { repo = null, now = Date.now(), light = fal
   const typed = safe('typed', () => typedIncidents(db), []);
   const typedIds = new Set(typed.map((incident) => incident.incidentId));
   const blocking = safe('waiter-priority', () => blockingJobs(db, { now }), new Map());
-  for (const entry of blocking.values()) {
-    for (const w of entry.waiters) {
-      if (w.workflowId === entry.workflowId || (w.via === 'gate-names' && typedIds.has(w.ref))) continue;
-      edge({ from: w.workflowId, to: entry.workflowId, via: w.via, ref: w.ref, since: w.since, job: entry.jobId,
-        strength: w.via === 'peer-request' ? SOFT : HARD, item: { kind: 'job', jobId: entry.jobId, opId: entry.opId, status: entry.status } });
+  function addBlockingWaitEdges() {
+    for (const entry of blocking.values()) {
+      for (const w of entry.waiters) {
+        if (w.workflowId === entry.workflowId || (w.via === 'gate-names' && typedIds.has(w.ref))) continue;
+        edge({ from: w.workflowId, to: entry.workflowId, via: w.via, ref: w.ref, since: w.since, job: entry.jobId,
+          strength: w.via === 'peer-request' ? SOFT : HARD, item: { kind: 'job', jobId: entry.jobId, opId: entry.opId, status: entry.status } });
+      }
     }
   }
+  addBlockingWaitEdges();
 
   // Peer-waits (the peer itself, whatever the wait types) and the typed conditions the job view does not cover.
   const incidents = db.prepare("SELECT incident_id,workflow_id,op_id,last_progress,updated_at FROM incidents WHERE status='open' ORDER BY updated_at").all()
@@ -166,49 +168,59 @@ export function dependencyGraph(db, { repo = null, now = Date.now(), light = fal
     return { payload: parseJson(ev?.payload_json, {}) ?? {}, at: ev?.created_at ?? row.updated_at };
   };
   const deadWaits = [];
-  for (const row of incidents.filter((r) => kindOf(r.last_progress) === 'peer-wait')) {
-    const { payload, at } = raisedOf(row);
-    if (typeof payload.peer !== 'string') continue;
-    const e = { from: row.workflow_id, to: payload.peer, via: 'peer-wait', ref: row.incident_id, since: at, detail: payload.detail ?? row.last_progress,
-      item: { kind: 'incident', incidentId: row.incident_id, holds: list(payload.holds) } };
-    edge(e);
-    if (!live.has(payload.peer)) {
-      const peer = byId.get(payload.peer);
-      let peerPhase = 'unknown';
-      if (peer) peerPhase = peer.archived_at != null ? 'archived' : peer.phase;
-      deadWaits.push({ ...e, peerPhase });
+  function addPeerWaitEdges() {
+    for (const row of incidents.filter((r) => kindOf(r.last_progress) === 'peer-wait')) {
+      const { payload, at } = raisedOf(row);
+      if (typeof payload.peer !== 'string') continue;
+      const e = { from: row.workflow_id, to: payload.peer, via: 'peer-wait', ref: row.incident_id, since: at, detail: payload.detail ?? row.last_progress,
+        item: { kind: 'incident', incidentId: row.incident_id, holds: list(payload.holds) } };
+      edge(e);
+      if (!live.has(payload.peer)) {
+        const peer = byId.get(payload.peer);
+        let peerPhase = 'unknown';
+        if (peer) peerPhase = peer.archived_at != null ? 'archived' : peer.phase;
+        deadWaits.push({ ...e, peerPhase });
+      }
     }
   }
+  addPeerWaitEdges();
   const foundations = safe('foundations', () => readFoundations(db), []);
   const foundationByName = new Map(foundations.map((f) => [f.name, f]));
-  for (const incident of typed) {
-    for (const cond of incident.until) {
-      let to = null, item = null;
-      if (cond.type === 'message') { to = cond.peer; item = { kind: 'message', peer: cond.peer }; }
-      else if (cond.type === 'incident') { to = db.prepare('SELECT workflow_id FROM incidents WHERE incident_id=?').get(cond.incidentId)?.workflow_id ?? null; item = { kind: 'incident', incidentId: cond.incidentId }; }
-      else if (cond.type === 'landed') { to = cond.workflowId; item = { kind: 'landed', repository: cond.repository }; }
-      else if (cond.type === 'foundation') { const f = foundationByName.get(cond.name); to = f?.owner?.workflowId ?? null; item = { kind: 'foundation', name: cond.name }; }
-      else if (cond.type === 'job') { const j = jobRow(cond.jobId); to = j?.workflow_id ?? null; item = { kind: 'job', jobId: cond.jobId, status: j?.status ?? null }; }
-      else if (cond.type === 'record' && ownerOf) { to = ownerOf(normWork(cond.path))?.workflowId ?? null; item = { kind: 'record', path: normWork(cond.path) }; }
-      if (to) edge({ from: incident.workflowId, to, via: `until-${cond.type}`, ref: incident.incidentId, since: incident.since, item });
+  function addConditionEdge(incident, cond) {
+    let to = null, item = null;
+    if (cond.type === 'message') { to = cond.peer; item = { kind: 'message', peer: cond.peer }; }
+    else if (cond.type === 'incident') { to = db.prepare('SELECT workflow_id FROM incidents WHERE incident_id=?').get(cond.incidentId)?.workflow_id ?? null; item = { kind: 'incident', incidentId: cond.incidentId }; }
+    else if (cond.type === 'landed') { to = cond.workflowId; item = { kind: 'landed', repository: cond.repository }; }
+    else if (cond.type === 'foundation') { const f = foundationByName.get(cond.name); to = f?.owner?.workflowId ?? null; item = { kind: 'foundation', name: cond.name }; }
+    else if (cond.type === 'job') { const j = jobRow(cond.jobId); to = j?.workflow_id ?? null; item = { kind: 'job', jobId: cond.jobId, status: j?.status ?? null }; }
+    else if (cond.type === 'record' && ownerOf) { to = ownerOf(normWork(cond.path))?.workflowId ?? null; item = { kind: 'record', path: normWork(cond.path) }; }
+    if (to) edge({ from: incident.workflowId, to, via: `until-${cond.type}`, ref: incident.incidentId, since: incident.since, item });
+  }
+  function addTypedConditionEdges() {
+    for (const incident of typed) {
+      for (const cond of incident.until) addConditionEdge(incident, cond);
     }
   }
+  addTypedConditionEdges();
 
   // Foundations: a dependent of a foundation that has not landed waits on its owner.
   const unowned = [];
-  for (const f of foundations) {
-    if (f.state === 'landed' || f.mergedInto) continue;
-    const dependents = list(f.dependents).map((d) => d.workflowId).filter((wf) => live.has(wf));
-    const owner = f.owner?.workflowId ?? null;
-    for (const dep of dependents) if (owner) edge({ from: dep, to: owner, via: 'foundation', ref: f.name, strength: SOFT, since: f.updatedAt ?? null, item: { kind: 'foundation', name: f.name } });
-    if (dependents.length && (!owner || !live.has(owner))) unowned.push({ foundation: f, dependents, owner });
+  function addFoundationEdges() {
+    for (const f of foundations) {
+      if (f.state === 'landed' || f.mergedInto) continue;
+      const dependents = list(f.dependents).map((d) => d.workflowId).filter((wf) => live.has(wf));
+      const owner = f.owner?.workflowId ?? null;
+      for (const dep of dependents) if (owner) edge({ from: dep, to: owner, via: 'foundation', ref: f.name, strength: SOFT, since: f.updatedAt ?? null, item: { kind: 'foundation', name: f.name } });
+      if (dependents.length && (!owner || !live.has(owner))) unowned.push({ foundation: f, dependents, owner });
+    }
   }
+  addFoundationEdges();
 
   // Foreign files: a file committed by one workflow that another owns.
-  if (!light) for (const row of incidents.filter((r) => kindOf(r.last_progress) === 'foreign-file-committed')) {
+  function addForeignFileIncidentEdges(row) {
     const { payload, at } = raisedOf(row);
     const text = `${row.last_progress} ${payload.detail ?? ''}`;
-    const files = [...new Set((text.match(/[\w@.-]+(?:\/[\w@.[\]()-]+)+/g) ?? []).map(normWork))].slice(0, 40);
+    const files = [...new Set((text.match(FOREIGN_FILE) ?? []).map(normWork))].slice(0, 40);
     for (const file of files) {
       let owner = null;
       if (file.startsWith('.starciwork/') && ownerOf) owner = ownerOf(file)?.workflowId ?? null;
@@ -220,105 +232,160 @@ export function dependencyGraph(db, { repo = null, now = Date.now(), light = fal
       if (owner) edge({ from: row.workflow_id, to: owner, via: 'foreign-file', ref: row.incident_id, since: at, item: { kind: 'path', path: file } });
     }
   }
+  function addForeignFileEdges() {
+    if (!light) for (const row of incidents.filter((r) => kindOf(r.last_progress) === 'foreign-file-committed')) addForeignFileIncidentEdges(row);
+  }
+  addForeignFileEdges();
 
   // Refused record-change declarations: the record is a peer's (cli.mjs record-change-refused).
-  for (const ev of db.prepare('SELECT workflow_id,payload_json,created_at FROM events WHERE kind=? AND created_at>=? ORDER BY seq').all(RECORD_CHANGE_REFUSED, now - REFUSAL_WINDOW_MS)) {
-    const p = parseJson(ev.payload_json, {}) ?? {};
-    for (const owner of new Set(list(p.owners).map((o) => o?.workflowId).filter(Boolean))) {
-      edge({ from: ev.workflow_id, to: owner, via: 'record-owner', ref: p.record ?? null, strength: SOFT, since: ev.created_at, item: { kind: 'record', path: p.record ?? null } });
+  function addRecordOwnerEdges() {
+    for (const ev of db.prepare('SELECT workflow_id,payload_json,created_at FROM events WHERE kind=? AND created_at>=? ORDER BY seq').all(RECORD_CHANGE_REFUSED, now - REFUSAL_WINDOW_MS)) {
+      const p = parseJson(ev.payload_json, {}) ?? {};
+      for (const owner of new Set(list(p.owners).map((o) => o?.workflowId).filter(Boolean))) {
+        edge({ from: ev.workflow_id, to: owner, via: 'record-owner', ref: p.record ?? null, strength: SOFT, since: ev.created_at, item: { kind: 'record', path: p.record ?? null } });
+      }
     }
   }
+  addRecordOwnerEdges();
 
   // Work graphs: a node reads what a peer's node owns (soft), two workflows' nodes own one path (duplicate).
   const graphs = light ? [] : safe('work-graph', () => nodes.map((n) => ({ workflowId: n.workflowId, graph: latestVersion(db, n.workflowId)?.graph ?? null })).filter((g) => g.graph), []);
   const graphOwned = graphs.flatMap((g) => list(g.graph.nodes).map((node) => ({ workflowId: g.workflowId, node: node.id, owned: list(node.ownedPaths).map(pathForm).filter(Boolean), reads: list(node.reads).map(pathForm).filter(Boolean) })));
-  for (const a of graphOwned) for (const b of graphOwned) {
-    if (a.workflowId === b.workflowId) continue;
-    const read = a.reads.find((r) => b.owned.some((o) => within(r, o)));
-    if (read) edge({ from: a.workflowId, to: b.workflowId, via: 'work-graph-read', ref: `${a.node}->${b.node}`, strength: SOFT, item: { kind: 'path', path: read } });
+  function addWorkGraphEdges() {
+    for (const a of graphOwned) for (const b of graphOwned) {
+      if (a.workflowId === b.workflowId) continue;
+      const read = a.reads.find((r) => b.owned.some((o) => within(r, o)));
+      if (read) edge({ from: a.workflowId, to: b.workflowId, via: 'work-graph-read', ref: `${a.node}->${b.node}`, strength: SOFT, item: { kind: 'path', path: read } });
+    }
   }
+  addWorkGraphEdges();
 
   // ---------------------------------------------------------------- findings
   const findings = [];
   const hard = edges.filter((e) => e.strength === HARD && e.toLive);
   const titleOf = (wf) => byId.get(wf)?.title ?? shortWorkflow(wf);
 
-  for (const scc of cyclesOf([...live], hard)) {
-    const cycleEdges = hard.filter((e) => scc.includes(e.from) && scc.includes(e.to));
-    // The owner side: the workflow the most live workflows wait on overall, then the oldest.
-    const waitedBy = (wf) => new Set(hard.filter((e) => e.to === wf).map((e) => e.from)).size;
-    const owner = [...scc].toSorted((a, b) => waitedBy(b) - waitedBy(a) || (byId.get(a).created_at - byId.get(b).created_at))[0];
-    const waiter = scc.find((wf) => wf !== owner);
-    const release = cycleEdges.filter((e) => e.from === owner);
-    const waitLines = cycleEdges.map((e) => `${shortWorkflow(e.from)} waits on ${shortWorkflow(e.to)} (${e.via} ${e.ref})`).join('; ');
-    const judgment = scc.length === 2 ? '' : ' (a cycle of more than two needs judgement)';
-    const releaseNames = release.map((e) => e.ref).join(', ') || '-';
-    findings.push({
-      key: `circular-wait|${scc.join('+')}`, kind: 'circular-wait', workflows: scc,
-      summary: `circular wait ${scc.map(shortWorkflow).join(' <-> ')}: ${waitLines}`,
-      evidence: cycleEdges,
-      proposal: { action: 'designate', owner, waiter, releases: release.map((e) => e.ref).filter(Boolean),
-        clearCut: scc.length === 2 && release.every((e) => String(e.ref).startsWith('inc-')),
-        why: `${shortWorkflow(owner)} is waited on by the most workflows${judgment}; its own waits into the cycle (${releaseNames}) are released and the others keep waiting on it` },
-    });
-  }
-
-  for (const { foundation: f, dependents, owner } of unowned) {
-    const aliasLive = (o) => Boolean(o.owner?.workflowId && live.has(o.owner.workflowId));
-    const compatibleAlias = (o) => o.name !== f.name && foundationAliasKey(o.name) === foundationAliasKey(f.name);
-    const alias = foundations.find((o) => compatibleAlias(o) && aliasLive(o))
-      ?? foundations.find((o) => compatibleAlias(o) && o.state === 'landed') ?? null;
-    let proposal;
-    if (alias) {
-      const running = aliasLive(alias) ? '' : ', not running';
-      const landed = alias.state === 'landed' ? ', which already landed (each re-checks it in its own preflight)' : '';
-      proposal = { action: 'transfer', target: { foundation: f.name }, mergeInto: alias.name, to: alias.owner?.workflowId ?? null, clearCut: true,
-        why: `${f.name} is ${alias.name} under another name (${alias.state}, owner ${shortWorkflow(alias.owner?.workflowId ?? '-')}${running}): merge it - its dependents become dependents of ${alias.name}${landed}` };
-    } else if (dependents.length >= 2) {
-      proposal = { action: 'bridge', dependents, foundation: f.name, clearCut: false, why: `${dependents.length} live workflows need ${f.name} and no live workflow owns it: a bridging workflow owns it` };
-    } else {
-      proposal = { action: 'transfer', target: { foundation: f.name }, to: dependents[0], clearCut: false, why: `the one live workflow that needs ${f.name} owns it (judge whether it can build it)` };
+  function addCircularWaitFindings() {
+    for (const scc of cyclesOf([...live], hard)) {
+      const cycleEdges = hard.filter((e) => scc.includes(e.from) && scc.includes(e.to));
+      // The owner side: the workflow the most live workflows wait on overall, then the oldest.
+      const waitedBy = (wf) => new Set(hard.filter((e) => e.to === wf).map((e) => e.from)).size;
+      const owner = [...scc].toSorted((a, b) => waitedBy(b) - waitedBy(a) || (byId.get(a).created_at - byId.get(b).created_at))[0];
+      const waiter = scc.find((wf) => wf !== owner);
+      const release = cycleEdges.filter((e) => e.from === owner);
+      const waitLines = cycleEdges.map((e) => `${shortWorkflow(e.from)} waits on ${shortWorkflow(e.to)} (${e.via} ${e.ref})`).join('; ');
+      const judgment = scc.length === 2 ? '' : ' (a cycle of more than two needs judgement)';
+      const releaseNames = release.map((e) => e.ref).join(', ') || '-';
+      findings.push({
+        key: `circular-wait|${scc.join('+')}`, kind: 'circular-wait', workflows: scc,
+        summary: `circular wait ${scc.map(shortWorkflow).join(' <-> ')}: ${waitLines}`,
+        evidence: cycleEdges,
+        proposal: { action: 'designate', owner, waiter, releases: release.map((e) => e.ref).filter(Boolean),
+          clearCut: scc.length === 2 && release.every((e) => String(e.ref).startsWith('inc-')),
+          why: `${shortWorkflow(owner)} is waited on by the most workflows${judgment}; its own waits into the cycle (${releaseNames}) are released and the others keep waiting on it` },
+      });
     }
-    const ownerSummary = owner ? `its owner ${shortWorkflow(owner)} is not running` : 'nobody owns it';
-    findings.push({
-      key: `unowned-need|foundation:${f.name}`, kind: 'unowned-need', workflows: dependents,
-      summary: `foundation ${f.name} (${f.state}) is needed by ${dependents.map(shortWorkflow).join(', ')} and ${ownerSummary}`,
-      evidence: [{ foundation: f.name, state: f.state, owner, dependents }], proposal,
-    });
   }
-  for (const wait of deadWaits) {
-    findings.push({
-      key: `unowned-need|wait:${wait.ref}`, kind: 'unowned-need', workflows: [wait.from],
-      summary: `${shortWorkflow(wait.from)} waits (${wait.ref}) on ${shortWorkflow(wait.to)}, which is ${wait.peerPhase}: nothing live will land it`,
-      evidence: [wait],
-      proposal: { action: 'bridge', dependents: [wait.from], blocker: wait.to, clearCut: false, why: 'the awaited workflow stopped; the Kernel re-checks the prerequisite first (frontier.peerWaitsDead) - a bridge only when the need is real and shared' },
-    });
-  }
-  for (const row of incidents.filter((r) => kindOf(r.last_progress) === 'shared-blocker')) {
-    const routed = db.prepare("SELECT payload_json FROM events WHERE workflow_id=? AND entity_type='incident' AND entity_id=? AND kind='shared-blocker-routed' ORDER BY seq DESC LIMIT 1").get(row.workflow_id, row.incident_id);
-    const p = parseJson(routed?.payload_json, null);
-    if (!p || p.routed) continue;
-    findings.push({
-      key: `unowned-need|shared-blocker:${row.incident_id}`, kind: 'unowned-need', workflows: [row.workflow_id],
-      summary: `shared blocker ${row.incident_id} of ${shortWorkflow(row.workflow_id)} could not be routed (${clip(p.why, 120)}): no workflow owns its repair`,
-      evidence: [{ incidentId: row.incident_id, why: p.why ?? null, detail: clip(row.last_progress, 300) }],
-      proposal: { action: 'bridge', dependents: [row.workflow_id], clearCut: false, why: 'the Supervisor assigns the repair an owner: the introducer when known (transfer), else a bridging workflow' },
-    });
-  }
+  addCircularWaitFindings();
 
-  const blockers = new Map();
-  for (const e of hard) {
-    let group = blockers.get(e.to);
-    if (!group) {
-      group = [];
-      blockers.set(e.to, group);
+  function addFoundationNeedFindings() {
+    for (const { foundation: f, dependents, owner } of unowned) {
+      const aliasLive = (o) => Boolean(o.owner?.workflowId && live.has(o.owner.workflowId));
+      const compatibleAlias = (o) => o.name !== f.name && foundationAliasKey(o.name) === foundationAliasKey(f.name);
+      const alias = foundations.find((o) => compatibleAlias(o) && aliasLive(o))
+        ?? foundations.find((o) => compatibleAlias(o) && o.state === 'landed') ?? null;
+      let proposal;
+      if (alias) {
+        const running = aliasLive(alias) ? '' : ', not running';
+        const landed = alias.state === 'landed' ? ', which already landed (each re-checks it in its own preflight)' : '';
+        proposal = { action: 'transfer', target: { foundation: f.name }, mergeInto: alias.name, to: alias.owner?.workflowId ?? null, clearCut: true,
+          why: `${f.name} is ${alias.name} under another name (${alias.state}, owner ${shortWorkflow(alias.owner?.workflowId ?? '-')}${running}): merge it - its dependents become dependents of ${alias.name}${landed}` };
+      } else if (dependents.length >= 2) {
+        proposal = { action: 'bridge', dependents, foundation: f.name, clearCut: false, why: `${dependents.length} live workflows need ${f.name} and no live workflow owns it: a bridging workflow owns it` };
+      } else {
+        proposal = { action: 'transfer', target: { foundation: f.name }, to: dependents[0], clearCut: false, why: `the one live workflow that needs ${f.name} owns it (judge whether it can build it)` };
+      }
+      const ownerSummary = owner ? `its owner ${shortWorkflow(owner)} is not running` : 'nobody owns it';
+      findings.push({
+        key: `unowned-need|foundation:${f.name}`, kind: 'unowned-need', workflows: dependents,
+        summary: `foundation ${f.name} (${f.state}) is needed by ${dependents.map(shortWorkflow).join(', ')} and ${ownerSummary}`,
+        evidence: [{ foundation: f.name, state: f.state, owner, dependents }], proposal,
+      });
     }
-    group.push(e);
   }
-  for (const [blocker, into] of blockers) {
+  addFoundationNeedFindings();
+  function addDeadWaitFindings() {
+    for (const wait of deadWaits) {
+      findings.push({
+        key: `unowned-need|wait:${wait.ref}`, kind: 'unowned-need', workflows: [wait.from],
+        summary: `${shortWorkflow(wait.from)} waits (${wait.ref}) on ${shortWorkflow(wait.to)}, which is ${wait.peerPhase}: nothing live will land it`,
+        evidence: [wait],
+        proposal: { action: 'bridge', dependents: [wait.from], blocker: wait.to, clearCut: false, why: 'the awaited workflow stopped; the Kernel re-checks the prerequisite first (frontier.peerWaitsDead) - a bridge only when the need is real and shared' },
+      });
+    }
+  }
+  addDeadWaitFindings();
+  function addSharedBlockerNeedFindings() {
+    for (const row of incidents.filter((r) => kindOf(r.last_progress) === 'shared-blocker')) {
+      const routed = db.prepare("SELECT payload_json FROM events WHERE workflow_id=? AND entity_type='incident' AND entity_id=? AND kind='shared-blocker-routed' ORDER BY seq DESC LIMIT 1").get(row.workflow_id, row.incident_id);
+      const p = parseJson(routed?.payload_json, null);
+      if (!p || p.routed) continue;
+      findings.push({
+        key: `unowned-need|shared-blocker:${row.incident_id}`, kind: 'unowned-need', workflows: [row.workflow_id],
+        summary: `shared blocker ${row.incident_id} of ${shortWorkflow(row.workflow_id)} could not be routed (${clip(p.why, 120)}): no workflow owns its repair`,
+        evidence: [{ incidentId: row.incident_id, why: p.why ?? null, detail: clip(row.last_progress, 300) }],
+        proposal: { action: 'bridge', dependents: [row.workflow_id], clearCut: false, why: 'the Supervisor assigns the repair an owner: the introducer when known (transfer), else a bridging workflow' },
+      });
+    }
+  }
+  addSharedBlockerNeedFindings();
+
+  function blockersOfHardEdges() {
+    const blockers = new Map();
+    for (const e of hard) {
+      let group = blockers.get(e.to);
+      if (!group) {
+        group = [];
+        blockers.set(e.to, group);
+      }
+      group.push(e);
+    }
+    return blockers;
+  }
+  const blockers = blockersOfHardEdges();
+  function hubBlockerCopy({ blocker, waiters, sharedKey, sharedEdges, sharedWaiters, job, since, now, into, titleOf }) {
+    const title = job ? (parseJson(job.payload_json, {})?.title ?? null) : null;
+    const waitAge = job?.status === 'queued' ? ` ${Math.round((now - since) / 60_000)}m` : '';
+    const jobSummary = job ? ` (${job.op_id ?? '-'} ${job.status}${waitAge})` : '';
+    const sharedSummary = sharedKey ? `; ${sharedWaiters.length} of them on ${sharedKey}${jobSummary}` : '';
+    const summary = `${shortWorkflow(blocker)} blocks ${waiters.length} workflows (${waiters.map(shortWorkflow).join(', ')})${sharedSummary}`;
+    const titleSuffix = title ? `: ${clip(title, 160)}` : '';
+    const jobSuffix = job ? ` (${job.op_id} ${job.job_id}${titleSuffix})` : '';
+    const waitedTitles = sharedWaiters.map((wf) => titleOf(wf)).join(' and ');
+    const sharedKeySuffix = sharedKey ? `|${sharedKey}` : '';
+    const waitDetails = [...new Set(sharedEdges.map((e) => e.ref))].map((ref) => {
+      const detail = into.find((e) => e.ref === ref && e.detail)?.detail ?? '-';
+      return `${ref}: ${clip(detail, 240)}`;
+    }).join(' | ');
+    const goalDraft = `Bridging workflow (Supervisor, provisional): own and land the shared prerequisite ${sharedKey ?? '-'} that ${waitedTitles} wait on and ${titleOf(blocker)} has not moved${jobSuffix}. Waits: ${waitDetails}. Build only that shared part, commit it, verify it, then land the bridge foundation with its proof.`;
+    return { summary, sharedKeySuffix, goalDraft };
+  }
+  function hubBlockerWhy({ clearCut, sharedWaiters, sharedKey, blocker, now, since, job }) {
+    if (clearCut) return `${sharedWaiters.length} workflows wait on the one ${sharedKey} of ${shortWorkflow(blocker)}, queued ${Math.round((now - since) / 60_000)}m (>= ${HUB_STUCK_MS / 60_000}m): a bridging workflow owns it and both dependents wait on the bridge`;
+    if (job && job.status !== 'queued') return `${sharedKey} is ${job.status}: it moves; notify ${shortWorkflow(blocker)} rather than bridge`;
+    return 'the waits do not share one stuck item: notify the blocker first; bridge only when the shared part is concrete';
+  }
+  function hubBlockerProposal({ foundationItem, blocker, sharedKey, sharedWaiters, waiters, job, goalDraft, clearCut, why }) {
+    if (foundationItem) return { action: 'notify', blocker, item: sharedKey, clearCut: false,
+      why: `${sharedKey} is a foundation ${shortWorkflow(blocker)} owns and builds: the dependents wait on its landing by design; notify it when it does not move` };
+    const bridgeDependents = sharedWaiters.length >= 2 ? sharedWaiters : waiters;
+    const foundationName = `bridge-${shortWorkflow(blocker).replace(/[^a-z0-9-]/g, '').slice(0, 30)}-${(job?.op_id ?? sharedKey ?? 'shared').replace(/[^a-z0-9.-]/gi, '-').toLowerCase().slice(0, 30)}`;
+    return { action: 'bridge', blocker, dependents: bridgeDependents, item: sharedKey, foundation: foundationName, goalDraft, clearCut, why };
+  }
+  function addHubBlockerFinding(blocker, into) {
     const waiters = [...new Set(into.map((e) => e.from))];
     // A bridging workflow exists to be waited on: its dependents' waits are the resolution, not a finding.
-    if (waiters.length < 2 || bridgeOfWorkflow.has(blocker)) continue;
+    if (waiters.length < 2 || bridgeOfWorkflow.has(blocker)) return;
     // The one item most of them wait on: a job, else an incident or record they share.
     const itemKey = (e) => {
       if (e.job) return `job:${e.job}`;
@@ -346,97 +413,22 @@ export function dependencyGraph(db, { repo = null, now = Date.now(), light = fal
     const clearCut = sharedWaiters.length >= 2 && stuck;
     // Waiting on a foundation its owner builds is foundation planning working: the owner is told, nothing is bridged.
     const foundationItem = sharedKey?.startsWith('foundation:') && foundationByName.get(sharedKey.slice(11))?.owner?.workflowId === blocker;
-    const title = job ? (parseJson(job.payload_json, {})?.title ?? null) : null;
-    const waitAge = job?.status === 'queued' ? ` ${Math.round((now - since) / 60_000)}m` : '';
-    const jobSummary = job ? ` (${job.op_id ?? '-'} ${job.status}${waitAge})` : '';
-    const sharedSummary = sharedKey ? `; ${sharedWaiters.length} of them on ${sharedKey}${jobSummary}` : '';
-    const summary = `${shortWorkflow(blocker)} blocks ${waiters.length} workflows (${waiters.map(shortWorkflow).join(', ')})${sharedSummary}`;
-    const titleSuffix = title ? `: ${clip(title, 160)}` : '';
-    const jobSuffix = job ? ` (${job.op_id} ${job.job_id}${titleSuffix})` : '';
-    const waitedTitles = sharedWaiters.map((wf) => titleOf(wf)).join(' and ');
-    const sharedKeySuffix = sharedKey ? `|${sharedKey}` : '';
-    const waitDetails = [...new Set(sharedEdges.map((e) => e.ref))].map((ref) => {
-      const detail = into.find((e) => e.ref === ref && e.detail)?.detail ?? '-';
-      return `${ref}: ${clip(detail, 240)}`;
-    }).join(' | ');
-    const goalDraft = `Bridging workflow (Supervisor, provisional): own and land the shared prerequisite ${sharedKey ?? '-'} that ${waitedTitles} wait on and ${titleOf(blocker)} has not moved${jobSuffix}. Waits: ${waitDetails}. Build only that shared part, commit it, verify it, then land the bridge foundation with its proof.`;
-    let why;
-    if (clearCut) why = `${sharedWaiters.length} workflows wait on the one ${sharedKey} of ${shortWorkflow(blocker)}, queued ${Math.round((now - since) / 60_000)}m (>= ${HUB_STUCK_MS / 60_000}m): a bridging workflow owns it and both dependents wait on the bridge`;
-    else if (job && job.status !== 'queued') why = `${sharedKey} is ${job.status}: it moves; notify ${shortWorkflow(blocker)} rather than bridge`;
-    else why = 'the waits do not share one stuck item: notify the blocker first; bridge only when the shared part is concrete';
-    let proposal;
-    if (foundationItem) {
-      proposal = { action: 'notify', blocker, item: sharedKey, clearCut: false,
-        why: `${sharedKey} is a foundation ${shortWorkflow(blocker)} owns and builds: the dependents wait on its landing by design; notify it when it does not move` };
-    } else {
-      const bridgeDependents = sharedWaiters.length >= 2 ? sharedWaiters : waiters;
-      const foundationName = `bridge-${shortWorkflow(blocker).replace(/[^a-z0-9-]/g, '').slice(0, 30)}-${(job?.op_id ?? sharedKey ?? 'shared').replace(/[^a-z0-9.-]/gi, '-').toLowerCase().slice(0, 30)}`;
-      proposal = { action: 'bridge', blocker, dependents: bridgeDependents, item: sharedKey, foundation: foundationName, goalDraft, clearCut, why };
-    }
+    const copy = hubBlockerCopy({ blocker, waiters, sharedKey, sharedEdges, sharedWaiters, job, since, now, into, titleOf });
+    const why = hubBlockerWhy({ clearCut, sharedWaiters, sharedKey, blocker, now, since, job });
+    const proposal = hubBlockerProposal({ foundationItem, blocker, sharedKey, sharedWaiters, waiters, job, goalDraft: copy.goalDraft, clearCut, why });
     findings.push({
-      key: `hub-blocker|${blocker}${sharedKeySuffix}`, kind: 'hub-blocker', workflows: [blocker, ...waiters],
-      summary,
+      key: `hub-blocker|${blocker}${copy.sharedKeySuffix}`, kind: 'hub-blocker', workflows: [blocker, ...waiters],
+      summary: copy.summary,
       evidence: into, blocker, waiters, sharedItem: sharedKey, sharedWaiters,
       proposal,
     });
   }
+  function addHubBlockerFindings() {
+    for (const [blocker, into] of blockers) addHubBlockerFinding(blocker, into);
+  }
+  addHubBlockerFindings();
 
-  // Duplicate work: open jobs of two live workflows owning one path; two work-graph nodes owning one path; one foundation under two names.
-  const openJobs = db.prepare(`SELECT job_id,workflow_id,op_id,status,payload_json FROM jobs WHERE kind<>'kernel' AND status IN (${OPEN_JOB.map(() => '?').join(',')})`).all(...OPEN_JOB)
-    .filter((j) => live.has(j.workflow_id)).map((j) => ({ ...j, owned: ownedOf(parseJson(j.payload_json)).map((p) => p.toLowerCase()) }));
-  const dupPairs = new Map();
-  const addDup = (a, b, detail) => {
-    const pair = [a.workflowId, b.workflowId].toSorted(byCodeUnit);
-    const k = pair.join('+');
-    if (!dupPairs.has(k)) dupPairs.set(k, { workflows: pair, items: [] });
-    if (dupPairs.get(k).items.length < 12) dupPairs.get(k).items.push(detail);
-  };
-  for (let i = 0; i < openJobs.length; i++) for (let j = i + 1; j < openJobs.length; j++) {
-    const a = openJobs[i], b = openJobs[j];
-    if (a.workflow_id === b.workflow_id) continue;
-    const hit = a.owned.find((p) => !SHARED_WIRING.test(p) && b.owned.some((q) => within(p, q)));
-    if (hit) addDup({ workflowId: a.workflow_id }, { workflowId: b.workflow_id }, { via: 'open-jobs', path: hit, jobs: [a.job_id, b.job_id] });
-  }
-  for (let i = 0; i < graphOwned.length; i++) for (let j = i + 1; j < graphOwned.length; j++) {
-    const a = graphOwned[i], b = graphOwned[j];
-    if (a.workflowId === b.workflowId) continue;
-    const hit = a.owned.find((p) => !SHARED_WIRING.test(p) && b.owned.some((q) => within(p, q)));
-    if (hit) addDup(a, b, { via: 'work-graph', path: hit, nodes: [a.node, b.node] });
-  }
-  for (const { workflows, items } of dupPairs.values()) {
-    const [older, younger] = [...workflows].toSorted((a, b) => byId.get(a).created_at - byId.get(b).created_at);
-    const duplicateText = items.slice(0, 3).map((it) => {
-      let related = '';
-      if (it.jobs) related = ` ${it.jobs.join(' / ')}`;
-      else if (it.nodes) related = ` ${it.nodes.join(' / ')}`;
-      return `${it.path} (${it.via}${related})`;
-    }).join('; ');
-    findings.push({
-      key: `duplicate-work|${workflows.join('+')}`, kind: 'duplicate-work', workflows,
-      summary: `${shortWorkflow(workflows[0])} and ${shortWorkflow(workflows[1])} build the same thing: ${duplicateText}`,
-      evidence: items,
-      proposal: { action: 'revise', workflow: younger, keeps: older, paths: [...new Set(items.map((it) => it.path))], clearCut: false,
-        why: `the older ${shortWorkflow(older)} keeps the shared part; ${shortWorkflow(younger)} is revised to park (or merge) its duplicating legs - which legs is a judgement on the goal texts` },
-    });
-  }
-  const aliasGroups = new Map();
-  for (const f of foundations.filter((item) => !item.mergedInto)) {
-    const k = foundationAliasKey(f.name);
-    if (!aliasGroups.has(k)) aliasGroups.set(k, []);
-    aliasGroups.get(k).push(f);
-  }
-  for (const [k, group] of aliasGroups) {
-    const owned = group.filter((f) => f.owner?.workflowId && live.has(f.owner.workflowId) && f.state !== 'landed');
-    const owners = [...new Set(owned.map((f) => f.owner.workflowId))];
-    if (owners.length < 2) continue;
-    findings.push({
-      key: `duplicate-work|foundation:${k}`, kind: 'duplicate-work', workflows: owners,
-      summary: `foundation ${k} is claimed under ${group.map((f) => f.name).join(', ')} by ${owners.map(shortWorkflow).join(', ')}: two owners build one foundation`,
-      evidence: group.map((f) => ({ foundation: f.name, state: f.state, owner: f.owner?.workflowId ?? null })),
-      proposal: { action: 'transfer', target: { foundation: owned.slice(1).map((f) => f.name)[0] }, to: owned[0].owner.workflowId, clearCut: false,
-        why: 'one foundation, one owner: the older claim keeps it, the other claim transfers to it and its legs are revised' },
-    });
-  }
+  addDuplicateFindings({ db, live, graphOwned, foundations, findings, byId, foundationAliasKey, shortWorkflow });
 
   return {
     ok: true, at: now, nodes, edges, findings,

@@ -25,7 +25,7 @@ const GRAMMAR_INPUTS = Object.freeze(['reference', 'component-source']);
 export const grammarInputsOf = (brief) => (GRAMMAR_INPUTS.includes(brief?.grammarInputs) ? brief.grammarInputs : 'reference');
 
 
-const slash = (p) => p.replaceAll(/\\/g, '/');
+const slash = (p) => p.replaceAll('\\', '/');
 const yamlFilesUnder = (dir) => fs.readdirSync(dir, { withFileTypes: true, recursive: true })
   .filter((e) => e.isFile() && /\.ya?ml$/i.test(e.name))
   .map((e) => slash(path.join(e.parentPath ?? e.path, e.name))).sort();
@@ -62,15 +62,7 @@ const installedFamilyCss = ({ skillRoot, family, root }) => {
   return typeof target === 'string' ? path.join(pkgDir, target) : null;
 };
 
-// The family CSS of the brand record, pushed into sources/missing: every declared non-reference css
-// found in its repository, plus the installed @starci/grammar family export. Returns the family name.
-const familyCss = ({ skillRoot, repo, binding, roots, workDir, sources, missing }) => {
-  let brand = null;
-  try { brand = readBrandRecord(workDir); } catch (e) { missing.push({ role: 'family-css', detail: `no brand record to resolve the family CSS from: ${e.message}` }); }
-  const family = brand?.family ?? null;
-  if (!brand) return family;
-  const seen = new Set();
-  const add = (file) => { const key = path.resolve(file).toLowerCase(); if (!seen.has(key)) { seen.add(key); sources.push({ role: 'family-css', path: slash(path.resolve(file)) }); } };
+const appendDeclaredFamilyCss = ({ brand, repo, binding, roots, add, missing }) => {
   const declared = (Array.isArray(brand.brand.sources) ? brand.brand.sources : [])
     .filter((s) => typeof s?.path === 'string' && /\.css$/i.test(s.path) && s.kind !== 'reference');
   for (const source of declared) {
@@ -81,7 +73,23 @@ const familyCss = ({ skillRoot, repo, binding, roots, workDir, sources, missing 
       missing.push({ role: 'family-css', path: `${declaredAt}${source.path}`, detail: `declared in ${slash(brand.file)} brand.sources and not on disk in its repository` });
     }
   }
+};
+
+const appendInstalledFamilyCss = ({ skillRoot, family, roots, add }) => {
   if (family) for (const root of roots) { const file = installedFamilyCss({ skillRoot, family, root }); if (file && isFile(file)) add(file); }
+};
+
+// The family CSS of the brand record, pushed into sources/missing: every declared non-reference css
+// found in its repository, plus the installed @starci/grammar family export. Returns the family name.
+const familyCss = ({ skillRoot, repo, binding, roots, workDir, sources, missing }) => {
+  let brand = null;
+  try { brand = readBrandRecord(workDir); } catch (e) { missing.push({ role: 'family-css', detail: `no brand record to resolve the family CSS from: ${e.message}` }); }
+  const family = brand?.family ?? null;
+  if (!brand) return family;
+  const seen = new Set();
+  const add = (file) => { const key = path.resolve(file).toLowerCase(); if (!seen.has(key)) { seen.add(key); sources.push({ role: 'family-css', path: slash(path.resolve(file)) }); } };
+  appendDeclaredFamilyCss({ brand, repo, binding, roots, add, missing });
+  appendInstalledFamilyCss({ skillRoot, family, roots, add });
   if (!sources.length && !missing.length)
     missing.push({ role: 'family-css', detail: `${slash(brand.file)} declares no CSS in brand.sources and no bound repository installs a ${GRAMMAR_PACKAGE} CSS export for family ${family ?? '(none: brand.identity.family unset)'}` });
   return family;

@@ -49,12 +49,16 @@ const WORK_RECORD_FILES = new Set(['index.yaml', 'resource.yaml']);
 const WORK_SKIP_DIRS = new Set(['evidence', 'assets']);
 const WORK_FILE_MAP_MAX = 600;
 const SKIP_DIRS = new Set(['node_modules', '.git']);
+const LAW_WORD_SPLIT = new RegExp(String.raw`[\s+]+`);
+const LAW_TOKEN_PREFIX = new RegExp(String.raw`^[("\x60']+`);
+const LAW_TOKEN_SUFFIX = new RegExp(String.raw`[)"'\x60,;:.]+$`);
+const TRAILING_SLASHES = new RegExp(String.raw`\/+$`);
 
 /** The Source-law path tokens a free-form manifest `path:` string names, in order. */
 export function lawTokens(text) {
   const out = [];
-  for (const word of String(text ?? '').split(/[\s+]+/)) {
-    const token = word.replace(/^[("'`]+/, '').replace(/[)"'`,;:.]+$/, '').replaceAll('\\', '/').replace(/\/+$/, '');
+  for (const word of String(text ?? '').split(LAW_WORD_SPLIT)) {
+    const token = word.replace(LAW_TOKEN_PREFIX, '').replace(LAW_TOKEN_SUFFIX, '').replaceAll('\\', '/').replace(TRAILING_SLASHES, '');
     if (token && isSourceLaw(token) && !out.includes(token)) out.push(token);
   }
   return out;
@@ -107,7 +111,7 @@ const globRegex = (pattern) => new RegExp(`^${pattern
   .replaceAll(/[.+?^$()|[\]\\]/g, String.raw`\$&`)
   .replaceAll(/<[A-Za-z0-9_-]+>/g, '[^/]+')
   .replaceAll(/\{([^{}]*)\}/g, (whole, body) => `(?:${body.replaceAll(',', '|')})`)
-  .replaceAll(/\*\*\//g, '\0')
+  .replaceAll('**/', '\0')
   .replaceAll(/\*+/g, '.*')
   .replaceAll('\0', '(?:.*/)?')}$`);
 
@@ -120,7 +124,12 @@ const fileSha = (cache, abs, strict = false) => {
   return cache.get(abs);
 };
 const setDigestOf = (lines) => (lines.length ? sha256(lines.map(([rel, digest]) => `${rel}\0${digest}\n`).join('')) : ABSENT);
-const sortLines = (lines) => lines.toSorted(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+const compareLines = ([a], [b]) => {
+  if (a < b) return -1;
+  if (a > b) return 1;
+  return 0;
+};
+const sortLines = (lines) => lines.toSorted(compareLines);
 
 /**
  * A Source digester bound to one runtime root. Every file is hashed at most
@@ -231,10 +240,12 @@ export function baselineWorkInputs(record, repo, { workDir = '.starciwork', now 
 export function inputDrift(db, workflowId, options = {}) {
   const { root, repo = null, workDir = '.starciwork' } = options;
   const digest = options.digest === undefined ? createDigester(root) : options.digest;
-  const workDigest = options.workDigest === undefined ? (repo ? createWorkDigester(repo, { workDir }) : null) : options.workDigest;
+  const workDigest = options.workDigest === undefined ? defaultWorkDigest(repo, workDir) : options.workDigest;
   return inputDriftOf(db, workflowId, { root, repo, workDir, digest, workDigest,
     ownership: options.ownership ?? null, committed: options.committed, recordChanges: options.recordChanges ?? null });
 }
+
+const defaultWorkDigest = (repo, workDir) => repo ? createWorkDigester(repo, { workDir }) : null;
 
 /** The settled jobs whose Work inputs changed (inputDrift().stale); Source edits never make a job stale. */
 export function staleInputs(db, workflowId, options = {}) {
@@ -265,6 +276,16 @@ export function staleOperationsOf(staleInput) {
 export function peerDriftSummaryOf(peerDrift) {
   if (!peerDrift?.length) return null;
   const byFile = new Map();
+  appendPeerDriftFiles(peerDrift, byFile);
+  return {
+    advisory: true,
+    jobs: new Set(peerDrift.map((item) => item.jobId)).size,
+    records: [...byFile.values()].toSorted((a, b) => (a.file < b.file ? -1 : 1)).map((entry) => ({ file: entry.file, owner: entry.owner, ownerBy: entry.ownerBy, writers: [...entry.writers].toSorted(byCodeUnit), jobs: entry.jobs.size,
+      foreignWrite: entry.foreignWrite, ...(entry.breakingIgnored ? { breakingIgnored: entry.breakingIgnored } : {}) })),
+  };
+}
+
+const appendPeerDriftFiles = (peerDrift, byFile) => {
   for (const item of peerDrift) for (const f of item.files ?? []) {
     if (!byFile.has(f.file)) byFile.set(f.file, { file: f.file, owner: f.owner, ownerBy: f.ownerBy, writers: new Set(), jobs: new Set(), foreignWrite: false, breakingIgnored: null });
     const entry = byFile.get(f.file);
@@ -273,13 +294,7 @@ export function peerDriftSummaryOf(peerDrift) {
     if (f.foreignWrite) entry.foreignWrite = true;
     if (f.breakingIgnored) entry.breakingIgnored = f.breakingIgnored;
   }
-  return {
-    advisory: true,
-    jobs: new Set(peerDrift.map((item) => item.jobId)).size,
-    records: [...byFile.values()].toSorted((a, b) => (a.file < b.file ? -1 : 1)).map((entry) => ({ file: entry.file, owner: entry.owner, ownerBy: entry.ownerBy, writers: [...entry.writers].toSorted(byCodeUnit), jobs: entry.jobs.size,
-      foreignWrite: entry.foreignWrite, ...(entry.breakingIgnored ? { breakingIgnored: entry.breakingIgnored } : {}) })),
-  };
-}
+};
 
 /**
  * Source drift summarized per path for the status frontier - advisory only, never actionable:
