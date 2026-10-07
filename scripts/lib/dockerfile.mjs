@@ -101,11 +101,12 @@ function parseInstructions(lines) {
   const instructions = [];
   const comments = [];
   const state = { escape: '\\', directives: true };
-  for (let i = 0; i < lines.length; i += 1) {
+  let i = 0;
+  while (i < lines.length) {
     const parsed = parseInstructionLine(lines, i, state);
     if (parsed.comment) comments.push(parsed.comment);
     if (parsed.instruction) instructions.push(parsed.instruction);
-    i = parsed.nextLine;
+    i = parsed.nextLine + 1;
   }
   return { instructions, comments };
 }

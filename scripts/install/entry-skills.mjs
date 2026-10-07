@@ -99,7 +99,7 @@ function removeRetiredEntry(plan, item, log) {
   while (directory !== boundary) {
     entryPath(plan.repo, path.relative(plan.repo, directory).split(path.sep).join('/'));
     try { rmdirSync(directory); }
-    catch (error) { if (error.code === 'ENOTEMPTY' || error.code === 'EEXIST') break; throw error; }
+    catch (error) { if (error.code === 'ENOTEMPTY' || error.code === 'EEXIST') { break; } throw error; }
     directory = path.dirname(directory);
   }
   log(`removed unchanged retired entry ${item.relative}`);

@@ -77,20 +77,20 @@ export const DOC_PROFILE = 'docs';
 const GATE_PROFILES = Object.freeze(['code', DOC_PROFILE]);
 
 const GATE_VALUE_FLAGS = new Set(['--root', '--base', '--main', '--tests', '--out', '--tree', '--scope']);
-const changedFilesOf = (argv, opts, index) => { opts.changed = []; while (index + 1 < argv.length && !argv[index + 1].startsWith('--')) opts.changed.push(argv[++index]); return index; };
-
 /** The flags; `--changed` adds named files to the actual base-to-working-tree delta and never narrows it. */
 export function parseGateArgs(argv) {
   const opts = { root: null, base: null, main: null, changed: null, tests: null, out: null, profile: 'code', tree: null };
-  for (let i = 0; i < argv.length; i += 1) {
-    const arg = argv[i];
+  let i = 0;
+  while (i < argv.length) {
+    const arg = argv[i++];
     if (arg === '--changed') {
-      i = changedFilesOf(argv, opts, i);
+      opts.changed = [];
+      while (i < argv.length && !argv[i].startsWith('--')) opts.changed.push(argv[i++]);
       continue;
     }
     if (!GATE_VALUE_FLAGS.has(arg)) throw new Error(`unknown argument ${arg}; ${USAGE}`);
-    if (argv[i + 1] === undefined || argv[i + 1].startsWith('--')) throw new Error(`${arg} needs a value; ${USAGE}`);
-    opts[arg === '--scope' ? 'profile' : arg.slice(2)] = argv[++i];
+    if (argv[i] === undefined || argv[i].startsWith('--')) throw new Error(`${arg} needs a value; ${USAGE}`);
+    opts[arg === '--scope' ? 'profile' : arg.slice(2)] = argv[i++];
   }
   if (!GATE_PROFILES.includes(opts.profile)) throw new Error(`--scope must be one of ${GATE_PROFILES.join(', ')}; ${USAGE}`);
   if (opts.tree && opts.profile !== DOC_PROFILE) throw new Error(`--tree belongs to --scope ${DOC_PROFILE}; ${USAGE}`);

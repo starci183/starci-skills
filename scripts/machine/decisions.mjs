@@ -58,9 +58,9 @@ const PASS_THROUGH = ['productLedger', 'productWorkflowId', 'code', 'escalatedFr
 
 const one = (s, n = 300) => oneLine(s, n); export const refuse = (message, code, extra = {}) => refuseError(message, code, extra);
 const diIdOf = (workflowId, key) => `di-${crypto.createHash('sha256').update(workflowId + '\0' + key).digest('hex').slice(0, 8)}`; const isSupervisorActor = (by) => /^supervisor\b/i.test(String(by ?? ''));
-const keySuffix = (kind, summary) => kind === 'supervisor-ruling' ? ':' + crypto.createHash('sha256').update(summary).digest('hex').slice(0, 8) : ''; const dueMsOf = (spec, now) => { if (Number.isFinite(Number(spec.dueMs)) && Number(spec.dueMs) > 0) return Number(spec.dueMs); if (Number.isFinite(spec.dueAt) && spec.dueAt > now) return spec.dueAt - now; return null; };
-const escalationTarget = (decider) => { if (decider === 'kernel') return 'supervisor'; if (decider === 'supervisor') return 'owner'; return null; }; const closeOldCommand = (outcome, failCheck, api, repoArgs, jobId) => { if (outcome === 'done') return `${failCheck} ; ${api} settle ${repoArgs} --job ${jobId} --verdict fail`; return `${api} settle ${repoArgs} --job ${jobId} --verdict ${outcome === 'blocked' || outcome === 'ask' ? 'blocked' : 'fail'}`; };
-const statusOf = (error) => { if (!error) return 0; if (typeof error.code === 'number') return error.code; return null; }; const templateText = (value) => `${value}`;
+const keySuffix = (kind, summary) => kind === 'supervisor-ruling' ? ':' + crypto.createHash('sha256').update(summary).digest('hex').slice(0, 8) : ''; const dueMsOf = (spec, now) => { if (Number.isFinite(Number(spec.dueMs)) && Number(spec.dueMs) > 0) { return Number(spec.dueMs); } if (Number.isFinite(spec.dueAt) && spec.dueAt > now) { return spec.dueAt - now; } return null; };
+const escalationTarget = (decider) => { if (decider === 'kernel') { return 'supervisor'; } if (decider === 'supervisor') { return 'owner'; } return null; }; const closeOldCommand = (outcome, failCheck, api, repoArgs, jobId) => { if (outcome === 'done') { return `${failCheck} ; ${api} settle ${repoArgs} --job ${jobId} --verdict fail`; } return `${api} settle ${repoArgs} --job ${jobId} --verdict ${outcome === 'blocked' || outcome === 'ask' ? 'blocked' : 'fail'}`; };
+const statusOf = (error) => { if (!error) { return 0; } if (typeof error.code === 'number') { return error.code; } return null; }; const templateText = (value) => `${value}`;
 const doorbellOption = (command, index) => `(${String.fromCodePoint(97 + index)}) ${command.title}: ${command.run}`;
 
 /* ------------------------------------------------------------ the store: runtime.sqlite decision_items */
@@ -328,7 +328,7 @@ export function blockingDecisions(db, workflowId, { now = Date.now(), minAgeMs =
     .sort((a, b) => (b.severity === 'critical') - (a.severity === 'critical') || (a.openedAt ?? 0) - (b.openedAt ?? 0));
 }
 
-const q = (v) => (/[\s"'|;&<>]/.test(String(v)) ? `'${String(v).replaceAll("'", String.fromCharCode(39, 92, 39, 39))}'` : String(v));
+const q = (v) => (/[\s"'|;&<>]/.test(String(v)) ? `'${String(v).replaceAll("'", String.fromCodePoint(39, 92, 39, 39))}'` : String(v));
 const lastRefusalsOf = (db, jobId) => db.prepare("SELECT kind, payload_json FROM events WHERE entity_type='job' AND entity_id=? AND (kind LIKE '%-refused' OR kind LIKE '%needs-kernel') ORDER BY seq DESC LIMIT 6").all(jobId)
   .map((e) => ({ kind: e.kind, ...parseJsonOr(e.payload_json) }));
 const reportOf = (db, dispatchId) => {

@@ -18,9 +18,9 @@ export function percentile(values, p) {
 const dist = (values) => ({ n: values.filter(Number.isFinite).length, p50: percentile(values, 50), p90: percentile(values, 90) });
 const span = (from, to) => (Number.isFinite(from) && Number.isFinite(to) && to >= from ? to - from : null);
 
-const settledClassOf = (result, report) => { if (typeof result?.failureClass?.class === 'string') return result.failureClass.class; if (typeof result?.failureClass === 'string') return result.failureClass; if (typeof report?.failureClass === 'string') return report.failureClass; return null; };
-const settledSuffix = (settled, category, red) => { if (category) return `${settled}:${category}`; if (red.length) return `${settled}:${red[0]}`; return settled; };
-const outcomeOf = (status, verdict) => { if (status === 'succeeded') return 'succeeded'; if (status === 'awaiting_owner') return 'owner'; if (status === 'failed') return ['dropped', 'superseded'].includes(verdict) ? 'dropped' : 'failed'; if (status === 'cancelled') return 'cancelled'; return 'open'; };
+const settledClassOf = (result, report) => { if (typeof result?.failureClass?.class === 'string') { return result.failureClass.class; } if (typeof result?.failureClass === 'string') { return result.failureClass; } if (typeof report?.failureClass === 'string') { return report.failureClass; } return null; };
+const settledSuffix = (settled, category, red) => { if (category) { return `${settled}:${category}`; } if (red.length) { return `${settled}:${red[0]}`; } return settled; };
+const outcomeOf = (status, verdict) => { if (status === 'succeeded') { return 'succeeded'; } if (status === 'awaiting_owner') { return 'owner'; } if (status === 'failed') { return ['dropped', 'superseded'].includes(verdict) ? 'dropped' : 'failed'; } if (status === 'cancelled') { return 'cancelled'; } return 'open'; };
 
 const isRedCheck = (c) => c && (c.ok === false || (c.exitCode != null && Number(c.exitCode) !== 0));
 // A non-blank string, trimmed and lowercased; null otherwise.

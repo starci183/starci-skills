@@ -16,9 +16,8 @@ import {resolveCustodyFile,resolveDeclaredRepository,runtimeHostRoot,runtimeSecr
 import {bindSonarCredentials,sonarCredentialRequirements,suppliedSonarToken,sonarAnalysisEnvironment,safeSonarHost,sonarAnalysisAction,sonarAdministrativeConfig,sonarAdminForAnalysis} from './sonar-credentials.mjs';
 import {braceVariants,globExpression} from '../lib/glob.mjs';
 import {posixPath,trimTrailingSlashes} from '../lib/path-key.mjs';
-import { log as gitLog } from '../api/git/log.mjs'; import { statusQuery as gitStatus } from '../api/git/status-query.mjs'; import { git, splitList } from './sonar-slice-changes.mjs';
+import { log as gitLog } from '../api/git/log.mjs'; import { statusQuery as gitStatus } from '../api/git/status-query.mjs'; import { git, sliceChanges, splitList } from './sonar-slice-changes.mjs';
 export { parseDiffNewLines, sliceChanges } from './sonar-slice-changes.mjs';
-import { sliceChanges } from './sonar-slice-changes.mjs';
 import {emitCheckOutput} from './output.mjs';
 import {coverageScopeOf,coverageTargetOf,judgeDashboard,loadSonarGate,serverConditions,thresholdsOf} from './sonar-gate.mjs';
 import { evaluateSlice as evaluateSliceCore } from './sonar-slice.mjs';
@@ -1044,7 +1043,7 @@ export async function dashboard(cfg,options={}){
   const component=encodeURIComponent(key);
   const project=await read(cfg,tokens,`/api/measures/component?component=${component}&metricKeys=${dashboardMetrics(gate).join(',')}`);
   if(project.status===404)return finish('blocked',`${key} has no analysis on ${cfg.host}: run scan --project-gate --wait first`);
-   if(!project.reachable||project.status!==200)return finish('blocked',`the measures of ${key} could not be read: ${project.error??httpStatusLabel(project)}`);
+  if(!project.reachable||project.status!==200)return finish('blocked',`the measures of ${key} could not be read: ${project.error??httpStatusLabel(project)}`);
   const measures=Object.fromEntries((project.json?.component?.measures??[]).map(m=>[m.metric,m.value]));
   const tree=gate.overall.coverage?await readAll(cfg,tokens,`/api/measures/component_tree?component=${component}&metricKeys=${gate.overall.coverage.metric}&qualifiers=FIL`,'components'):{items:[]};
   if(tree.error)return finish('blocked',`the per-file coverage of ${key} could not be read: ${tree.error}`);
