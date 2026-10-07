@@ -198,3 +198,11 @@ test('the last step of every chain: an unresolved Supervisor DI climbs one level
   assert.match(urgent[0].text, /every agent spent/);
   assert.match(urgent[0].text, /claude-agent: excluded 2x/, 'the notice lists what was tried');
 });
+
+test('the Kernel watchdog reads its wake counters from the table', async () => {
+  const watchdog = await import('../../scripts/kernel/kernel-watchdog.mjs');
+  const { seatWake } = incidentPolicy();
+  assert.equal(watchdog.WAKE_FAIL_REPLACE, seatWake.failReplace);
+  assert.equal(watchdog.WAKE_FAIL_WINDOW_MS, seatWake.failWindowMs);
+  assert.equal(watchdog.WAKE_IDLE_WINDOW_MS, seatWake.failWindowMs);
+});

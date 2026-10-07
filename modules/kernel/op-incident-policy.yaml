@@ -45,6 +45,14 @@ ownerOnlyQuestions:
   - '\b(pay|payment|billing|invoice|purchase|spend|budget|subscription)\b'
   - '\b(delete|drop|wipe|overwrite|migrate)\b.{0,40}\b(production|prod|live data|customer data)\b'
 
+# The Kernel seat's wake counters (scripts/kernel/kernel-watchdog.mjs): missed wakes that prove a dead Kernel behind a listed terminal, delivered
+# wakes with no Kernel move that replace it once, and the window within which a second idle spell goes to the owner as a Decision Item.
+seatWake:
+  failReplace: 3
+  failWindowMs: 600000
+  idleReplace: 3
+  idleReplacedWindowMs: 3600000
+
 rows:
   - id: ask-worker-question
     situation: ask
@@ -169,7 +177,7 @@ rows:
     detector: "Host controller concern host.kernel-seat (scripts/kernel/kernel-watchdog.mjs)"
     handler: runtime-auto
     action: "wake an idle Kernel, replace a dead or non-answering one"
-    bound: {perAgent: {value: 3}, deadlineMs: {value: 600000}, windowMs: {value: 3600000}}
+    bound: {perAgent: {ref: "modules/kernel/op-incident-policy.yaml#seatWake.idleReplace"}, deadlineMs: {ref: "modules/kernel/op-incident-policy.yaml#seatWake.failWindowMs"}, windowMs: {ref: "modules/kernel/op-incident-policy.yaml#seatWake.idleReplacedWindowMs"}}
     next: owner
     code: op-incident-escalate-owner
 
@@ -200,5 +208,5 @@ holds:
   - {id: worker-stalled, scope: job, cause: "worker-stalled Decision Item: the nudges did not move the worker", handler: kernel, reeval: "the worker files a report or is settled", bound: {deadlineMs: {ref: "modules/reconciler/job.yaml#decisionDueMs"}}, chain: [kernel, supervisor], visible: "frontier worker-nudge-ready and worker-wedged", gap: [I8], gapWhy: "the chain ends at the Supervisor"}
   - {id: settle-nongreen, scope: job, cause: "settle-nongreen Decision Item: the runtime did not settle the report", handler: kernel, reeval: "starci kernel settle", bound: {deadlineMs: {ref: "modules/reconciler/job.yaml#decisionDueMs"}}, chain: [kernel, supervisor], visible: "frontier settle-ready and transition-ready", gap: [I8], gapWhy: "the chain ends at the Supervisor"}
   - {id: progress-stall, scope: workflow, workflowWide: "no unit moved across the whole workflow", cause: "progress-stall Decision Item", handler: kernel, reeval: "progress resumes", bound: {deadlineMs: {ref: "modules/models/runtimes.yaml#allocation.progress.supervisorGraceMs"}}, chain: [kernel, supervisor, owner], visible: "status progress.stall with the rca actions"}
-  - {id: kernel-seat, scope: workflow, workflowWide: "the workflow's single Kernel seat", cause: "Kernel dead, silent or replaced", handler: runtime-auto, reeval: "Host controller concern host.kernel-seat every pass", bound: {perAgent: {ref: "modules/reconciler/host.yaml#seats.kernel.maxReplacementsPerHour"}}, chain: [runtime-auto, supervisor, owner], visible: "SLA SEAT_VACANT and status kernel", gap: [I6], gapWhy: "a replacement is the same agent; switching agent on the seat's quota is not declared"}
+  - {id: kernel-seat, scope: workflow, workflowWide: "the workflow's single Kernel seat", cause: "Kernel dead, silent or replaced", handler: runtime-auto, reeval: "Host controller concern host.kernel-seat every pass", bound: {perAgent: {ref: "modules/reconciler/host.yaml#seats.kernel.maxReplacementsPerHour"}, wakes: {ref: "modules/kernel/op-incident-policy.yaml#seatWake.idleReplace"}}, chain: [runtime-auto, supervisor, owner], visible: "SLA SEAT_VACANT and status kernel", gap: [I6], gapWhy: "a replacement is the same agent; switching agent on the seat's quota is not declared"}
   - {id: land-queue, scope: machine, workflowWide: "one land at a time holds the host lock", cause: "supervisor land holds the host lock", handler: supervisor, reeval: "the land finishes or the ticket is cancelled", bound: {deadlineMs: {ref: "modules/models/runtimes.yaml#allocation.landGate.waitMs"}}, chain: [supervisor, owner], visible: "SLA LAND_QUEUE_STALL", gap: [I5, I8], gapWhy: "the lock is coarse (an npm ci waits behind a thirty minute land) and a stall stops at the Supervisor"}

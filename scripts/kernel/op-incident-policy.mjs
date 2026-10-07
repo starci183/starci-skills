@@ -66,3 +66,6 @@ export function policyStepOf(rowId, { attempt, of, detail }) {
 
 /** Whether a worker question is the owner's by the table's ownerOnlyQuestions classes. */
 export const ownerOnlyQuestion = (text) => incidentPolicy().ownerOnlyQuestions.some((source) => new RegExp(source, 'i').test(String(text ?? '')));
+
+/** The Kernel seat's wake counters: {failReplace, failWindowMs, idleReplace, idleReplacedWindowMs}. */
+export const seatWakeOf = () => incidentPolicy().seatWake;

@@ -44,6 +44,7 @@ import { isMain } from '../lib/is-main.mjs';
 import { arg as argvValue } from '../lib/cli-arg.mjs';
 import { createKernelTick } from './kernel-watchdog-tick.mjs';
 import { workflowSender } from './workflow-startup.mjs';
+import { seatWakeOf } from './op-incident-policy.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const apiFile = path.join(skillRoot, 'scripts', 'kernel', 'cli.mjs');
@@ -208,8 +209,9 @@ const replaceUnwritableKernel = ({ phase, terminal, dispatch = null, stale, outp
 // recorded kernel-wake-failed {terminal}; WAKE_FAIL_REPLACE misses on one terminal with no output since
 // the first of them, the first at least WAKE_FAIL_WINDOW_MS ago, close the terminal and replace the seat.
 const KERNEL_WAKE_FAILED_EVENT = 'kernel-wake-failed';
-export const WAKE_FAIL_REPLACE = 3;
-export const WAKE_FAIL_WINDOW_MS = 10 * 60_000;
+const SEAT_WAKE = seatWakeOf();
+export const WAKE_FAIL_REPLACE = SEAT_WAKE.failReplace;
+export const WAKE_FAIL_WINDOW_MS = SEAT_WAKE.failWindowMs;
 const recordKernelWakeFailed = (terminal, detail) => withKernelLedger((ledger) => ledger.transaction(() => ledger.appendEvent({
   workflowId, entityType: 'kernel', entityId: workflowId, kind: KERNEL_WAKE_FAILED_EVENT, payload: { terminal, ...detail } })));
 const kernelWakeFailures = (terminal) => withKernelLedger((ledger) => ledger.db.prepare(
@@ -233,9 +235,9 @@ export function wakeFailuresProveDead(failedAts, { lastOutputAt = null, now = Da
 // records between wakes that piled up within 90 s, and an op-settled between streaks kept the escalation from firing.
 const KERNEL_WOKEN_EVENT = 'kernel-woken';
 const KERNEL_IDLE_REPLACED_EVENT = 'kernel-replaced-idle';
-const WAKE_IDLE_REPLACE = 3;
+const WAKE_IDLE_REPLACE = SEAT_WAKE.idleReplace;
 export const WAKE_IDLE_WINDOW_MS = WAKE_FAIL_WINDOW_MS;
-const IDLE_REPLACED_WINDOW_MS = 60 * 60_000;
+const IDLE_REPLACED_WINDOW_MS = SEAT_WAKE.idleReplacedWindowMs;
 // Kernel-authored job moves: reset the wakes and the idle-replaced streak.
 const KERNEL_MOVES = new Set(['job-enqueued', 'follow-on-enqueued', 'job-dropped', 'kernel-graph-edit', 'lifecycle', 'phase-transition']);
 // Progress the Kernel did not author, and the Kernel's own records: reset the wakes only.
