@@ -14,28 +14,42 @@ import { verifyRecordParts } from './draw-loop.mjs';
 import { feedbackFindings } from './draw-feedback.mjs';
 
 
+function addUniqueLoops(parts, loops) {
+  for (const part of parts) {
+    const ref = loopLabelOf(part.asset.generation?.loop);
+    if (!ref || loops.some((loop) => loop.loop === ref)) continue;
+    let loop = null;
+    try { loop = JSON.parse(fs.readFileSync(loopFileOfRef(part.asset.generation?.loop), 'utf8')); } catch { loop = null; }
+    loops.push({ loop: ref, best: loop?.best ?? null, outcome: loop?.outcome ?? null });
+  }
+}
+
+function settleRecordContext(repo, rel, loops) {
+  const recordDir = path.dirname(path.resolve(repo, rel));
+  let record = null;
+  try { record = parseYaml(fs.readFileSync(path.join(recordDir, 'index.yaml'), 'utf8')); } catch { record = null; }
+  if (!record) return null;
+  const parts = livePartsOf(recordDir, record);
+  if (!parts.length) return null;
+  addUniqueLoops(parts, loops);
+  return { recordDir, record };
+}
+
+function addFeedbackFindings(findings, repo, recordDir, record) {
+  for (const finding of feedbackFindings(recordDir, record)) findings.push({ code: finding.code, path: path.relative(repo, recordDir).split(path.sep).join('/'), detail: finding.detail, note: finding.note });
+}
+
 /** {findings, records, loops:[{loop, best, outcome}]} for the files a pass binds. `verify` is injectable (tests). */
 export async function settleDrawMetricFindings({ repo, files, verify = verifyRecordParts }) {
   const { records } = drawAcceptanceFindings({ repo, files });
   const findings = [], loops = [];
   for (const rel of records) {
-    const recordDir = path.dirname(path.resolve(repo, rel));
-    let record = null;
-    try { record = parseYaml(fs.readFileSync(path.join(recordDir, 'index.yaml'), 'utf8')); } catch { record = null; }
-    if (!record) continue;
-    const parts = livePartsOf(recordDir, record);
-    if (!parts.length) continue;
-    for (const p of parts) {
-      const ref = loopLabelOf(p.asset.generation?.loop);
-      if (!ref || loops.some((l) => l.loop === ref)) continue;
-      let loop = null;
-      try { loop = JSON.parse(fs.readFileSync(loopFileOfRef(p.asset.generation?.loop), 'utf8')); } catch { loop = null; }
-      loops.push({ loop: ref, best: loop?.best ?? null, outcome: loop?.outcome ?? null });
-    }
-    const r = await verify({ recordDir, record, repo });
+    const context = settleRecordContext(repo, rel, loops);
+    if (!context) continue;
+    const r = await verify({ ...context, repo });
     findings.push(...r.findings);
     // The owner's open notes (draw-feedback.mjs): a redraw that does not address one is DRAW_FEEDBACK_UNADDRESSED.
-    for (const f of feedbackFindings(recordDir, record)) findings.push({ code: f.code, path: path.relative(repo, recordDir).split(path.sep).join('/'), detail: f.detail, note: f.note });
+    addFeedbackFindings(findings, repo, context.recordDir, context.record);
   }
   return { findings, records, loops };
 }

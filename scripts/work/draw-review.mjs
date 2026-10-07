@@ -55,10 +55,7 @@ import { REQUIRED_BREAKPOINTS, REQUIRED_THEMES, ownerAcceptanceOf, partAssetsOf,
 import { dataStatusOf, recipeRenderedOf } from './ui/ui-shapes.mjs';
 import { assetsOf, flag, indexFilesUnder, list, readYaml, reviewMain, sha256File, slash, stateKey, workRootOf, writeRecordFile } from './work-io.mjs';
 import { AUTO_ACCEPTED_BY } from '../machine/ask-recommendation.mjs';
-import { lineageJobsOf, ownerAnswersOf } from '../machine/owner-answers.mjs';
-import { retryDisposition, sameUnit } from '../../engine/admission.mjs';
 import { inspectLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
-import { parseJsonOr, readJsonFile } from '../lib/json.mjs';
 import { ownerLanguage, translator } from '../lib/i18n.mjs';
 import { proposalFilesUnder, proposalImageOf, readProposals } from './grammar-proposal.mjs';
 import { rationaleFileOf, rationaleSummary } from './draw/draw-rationale.mjs';
@@ -66,12 +63,12 @@ import { DRAW_FEEDBACK_UNADDRESSED, dnaNamesFor, feedbackFindings, feedbackOf, g
 import { learnIntoDirection, promoteGolden } from './brand-direction.mjs';
 import { DIRECTION_EXEMPT, archetypeOf } from './ui-archetype.mjs';
 import { readBrandRecord } from './brand/brand.mjs'; import { byCodeUnit } from '../lib/list.mjs';
+import { DRAW_REVIEW_DECISIONS, DRAW_REVIEW_KIND, drawOwnerRulingOf } from './draw-review-owner-ruling.mjs';
 
-export const DRAW_REVIEW_KIND = 'draw-review';
+export { DRAW_REVIEW_DECISIONS, DRAW_REVIEW_KIND, drawOwnerRulingOf };
 export const DRAW_REVIEW_SCHEMA = 'starci/draw-review@1';
 export const DRAW_REVIEW_OP = 'interface.draw';
 /** The two answers, in this order: 0 accepts the drawn parts, 1 asks for a redraw (the note says what to change). */
-export const DRAW_REVIEW_DECISIONS = Object.freeze(['accept', 'redraw']);
 const OPTIONS = ['Accept the drawn parts', 'Redraw - say in the note what to change'];
 const OWNER = 'owner';
 /** Autopilot (scripts/kernel/autopilot-run.mjs AUTOPILOT_BY; owner ruling 2026-09-28 autopilot-run-to-finish): a PROVISIONAL accept. */
@@ -200,76 +197,14 @@ export function drawReviewStatus(uiDir) {
   else if (acceptance?.current) { owed = true; why = `accepted by ${acceptance.answeredBy} in ask ${acceptance.dispatchId}, not by the owner: every drawing is the owner's to accept`; }
   else {
     owed = true;
-    why = (() => { if (acceptance) return `the owner-accepted drawing changed since (${acceptance.reasons.join('; ')}) - review it again`; return `the owner has not reviewed the drawn parts${gates.length ? '' : ' (nothing else waits on it, but every drawing goes to the owner)'}`; })();
+    why = ownerReviewReason(acceptance, gates);
   }
   return { id: record.id, state: record.state ?? null, dir: slash(dir), gates, shapes: split.shapes.map((s) => s.shape), parts, retired: [...split.retired, ...split.retiredAssets], missing, acceptance, owed, ...(provisional ? { provisional: true, owedAtHandover: true } : {}), why };
 }
 
-const OWNER_ANSWER_RETRY = 'owner-answer';
-const closingOf = (db, workflowId, dispatchId) => db.prepare(
-  `SELECT kind, payload_json FROM events WHERE workflow_id=? AND kind IN ('ask-answered','ask-superseded') AND json_extract(payload_json,'$.dispatchId')=? ORDER BY seq DESC LIMIT 1`,
-).get(workflowId, dispatchId);
-const askKindIn = (db, workflowId, dispatchId) => db.prepare(
-  `SELECT json_extract(report_json,'$.question.kind') AS kind FROM reports WHERE workflow_id=? AND dispatch_id=?`,
-).get(workflowId, dispatchId)?.kind ?? null;
-const noteOf = (answer) => {
-  const note = typeof answer.note === 'string' ? answer.note : readJsonFile(answer.receiptPath)?.note;
-  return typeof note === 'string' && note.trim() ? note.trim() : null;
-};
-
-/**
- * Why the owner asked for the drawing `job` (an interface.draw jobs row) draws for `record`, from ledger facts only -
- * or null. The newest owner act decides: an owner accept of a draw review with no note settles every request before
- * it. The owner asked when
- *   - `job` or its retry lineage carries params.ownerRulings;
- *   - an ask of the lineage was answered by the owner (not auto-recommended) with anything but a plain accept;
- *   - the lineage continued as an owner-answer retry (retryClass owner-answer) past an ask that was retired or is
- *     still open, never past one auto-accepted;
- *   - an earlier draw-review ask of `record` (any workflow of this ledger, before report `beforeReportId`) was
- *     answered by the owner with a redraw or a feedback note.
- */
-export function drawOwnerRulingOf(db, { job = null, record = null, beforeReportId = null } = {}) {
-  if (job) {
-    const chain = [job, ...lineageJobsOf(db, job)].filter((row) => row === job || sameUnit(row, job));
-    const answers = ownerAnswersOf(db, job);
-    for (let i = 0; i < chain.length; i += 1) {
-      const row = chain[i], payload = parseJsonOr(row.payload_json);
-      const rulings = payload.params?.ownerRulings;
-      if (typeof rulings === 'string' && rulings.trim()) return `job ${row.job_id} carries the owner's rulings (params.ownerRulings)`;
-      for (const a of answers.filter((x) => x.jobId === row.job_id).reverse()) {
-        if (a.answeredBy !== OWNER) continue;
-        const plainAccept = askKindIn(db, row.workflow_id, a.dispatchId) === DRAW_REVIEW_KIND && a.chosen?.index === 0 && !a.note;
-        if (plainAccept) return null;
-        const option = a.chosen ? ', option ' + (() => { if (a.chosen.index != null) return a.chosen.index + 1; return a.chosen.label; })() : ''; return `the owner answered ask ${a.dispatchId} of ${row.job_id}'s lineage (attempt ${a.attempt}${option}${a.note ? ', with a note' : ''})`;
-      }
-      const successor = chain[i - 1];
-      const waited = parseJsonOr(row.result_json).askDispatchId;
-      const ownerAnswerRetry = successor && (parseJsonOr(successor.payload_json).retry?.retryClass === OWNER_ANSWER_RETRY || retryDisposition(row).retryClass === OWNER_ANSWER_RETRY);
-      if (ownerAnswerRetry && waited) {
-        const closed = closingOf(db, row.workflow_id, waited);
-        const how = parseJsonOr(closed?.payload_json);
-        if (!closed) return `${successor.job_id} is an owner-answer retry of ${row.job_id}, whose ask ${waited} still waits on the owner`;
-        if (closed.kind === 'ask-superseded' && how.retired) return `${successor.job_id} is an owner-answer retry of ${row.job_id}, whose ask ${waited} was retired for it`;
-      }
-    }
-  }
-  if (!record) return null;
-  const earlier = db.prepare(
-    `SELECT r.workflow_id, r.dispatch_id, e.payload_json FROM reports r
-       JOIN events e ON e.workflow_id=r.workflow_id AND e.kind='ask-answered' AND json_extract(e.payload_json,'$.dispatchId')=r.dispatch_id
-      WHERE r.outcome='ask' AND (? IS NULL OR r.report_id < ?) AND json_extract(r.report_json,'$.question.kind')=?
-        AND json_extract(r.report_json,'$.question.review.record')=?
-      ORDER BY r.report_id DESC`,
-  ).all(beforeReportId, beforeReportId, DRAW_REVIEW_KIND, record);
-  for (const row of earlier) {
-    const answer = parseJsonOr(row.payload_json);
-    if ((answer.answeredBy ?? OWNER) !== OWNER) continue;
-    const note = noteOf(answer);
-    const redraw = DRAW_REVIEW_DECISIONS[Number(answer.optionIndex)] === 'redraw';
-    if (!redraw && !note) return null;
-    return `the owner ${redraw ? 'asked for a redraw of' : 'left feedback on'} ${record} in draw-review ask ${row.dispatch_id} (${row.workflow_id})`;
-  }
-  return null;
+function ownerReviewReason(acceptance, gates) {
+  if (acceptance) { return `the owner-accepted drawing changed since (${acceptance.reasons.join('; ')}) - review it again`; }
+  return `the owner has not reviewed the drawn parts${gates.length ? '' : ' (nothing else waits on it, but every drawing goes to the owner)'}`;
 }
 
 /** drawOwnerRulingOf read from the repository's ledger for op job `jobId` (read-only). Throws when it cannot read it. */
@@ -282,6 +217,16 @@ function drawOwnerRulingInRepo(repoRoot, { jobId, record }) {
     if (!job) throw new Error(`job ${jobId} is not in ${slash(file)}: cannot read whether the owner asked for this drawing`);
     return drawOwnerRulingOf(ledger.db, { job, record });
   } finally { ledger.close(); }
+}
+
+function reviewedPartsFromDisk(dir, parts) {
+  return parts.map((part) => {
+    const file = path.join(dir, part.path);
+    if (!fs.existsSync(file)) throw new Error(`${part.path} is not on disk`);
+    const sha256 = sha256File(file);
+    if (part.sha256 && part.sha256 !== sha256) throw new Error(`${part.path} no longer hashes to its recorded sha256 - record the part as drawn first`);
+    return { path: part.path, sha256, breakpoint: part.breakpoint, theme: part.theme, state: part.state, shape: part.shape };
+  });
 }
 
 /**
@@ -300,13 +245,7 @@ export function drawReviewQuestion(uiDir, { lang = ownerLanguage(), ownerRequest
   if (!split.parts.length) throw new Error(`${record.id} draws no shape (role direction-content) at desktop or mobile light` + (retiredStates(split).length ? '; retired images (' + retiredStates(split).join(', ') + ') are never put to the owner' : '') + ' - draw the shapes first');
   const missing = missingCells(split);
   if (missing.length) throw new Error(`${record.id} has no drawn part at ${missing.join(', ')}: the owner reviews every shape at desktop and mobile, light`);
-  const reviewed = split.parts.map((p) => {
-    const file = path.join(dir, p.path);
-    if (!fs.existsSync(file)) throw new Error(`${p.path} is not on disk`);
-    const sha256 = sha256File(file);
-    if (p.sha256 && p.sha256 !== sha256) throw new Error(`${p.path} no longer hashes to its recorded sha256 - record the part as drawn first`);
-    return { path: p.path, sha256, breakpoint: p.breakpoint, theme: p.theme, state: p.state, shape: p.shape };
-  });
+  const reviewed = reviewedPartsFromDisk(dir, split.parts);
   // A redraw answers the owner's notes before it is asked again (draw-feedback.mjs): every open note is addressed -
   // the part redrawn, the note id in its brief, the critic's gate check for it passed.
   const unaddressed = feedbackFindings(dir, record);
@@ -359,10 +298,7 @@ export function drawReviewQuestion(uiDir, { lang = ownerLanguage(), ownerRequest
  * under the repository (packet context.owner_answers names it). Returns {decision: 'accept'|'redraw', written,
  * record, owner?, note?} and throws for a receipt that does not answer this record's review of its current parts.
  */
-export function applyDrawReview(uiDir, receiptFile, { write = false, now = () => new Date().toISOString() } = {}) {
-  const drawing = loadDrawing(uiDir);
-  const { dir, file, record, repoRoot } = drawing;
-  const { receipt, receiptAbs, receiptRel } = readAnswerReceipt(receiptFile, { repoRoot });
+function reviewDecisionOf(receipt, record) {
   if (receipt.opId && receipt.opId !== DRAW_REVIEW_OP) throw new Error(`the receipt answers a ${receipt.opId} ask, not ${DRAW_REVIEW_OP}`);
   const review = receipt.review;
   if (review?.schema !== DRAW_REVIEW_SCHEMA) throw new Error(`the receipt of ask ${receipt.dispatchId ?? '?'} carries no draw review (question.review): it answered another question - park the draw-review ask (draw-review.mjs question) and apply its answer`);
@@ -370,80 +306,114 @@ export function applyDrawReview(uiDir, receiptFile, { write = false, now = () =>
   const decision = DRAW_REVIEW_DECISIONS[Number(receipt.optionIndex)];
   if (!decision) throw new Error(`the receipt chose option ${receipt.optionIndex ?? '(none)'}; a draw review is answered 1 (accept) or 2 (redraw)`);
   const note = typeof receipt.note === 'string' && receipt.note.trim() ? receipt.note.trim() : null;
-  // Every note of the answer is an owner ruling bound to its shape and the digests the owner saw (draw-feedback.mjs):
-  // recorded in ui.review.feedback, and a product-direction note is learned into brand.direction.learned (proposed).
-  const workRoot = drawing.workRoot;
-  const notes = notesOfReceipt({ ...receipt, review }, { dnaNames: dnaNamesFor(workRoot) });
-  const feedbackRound = { dispatchId: receipt.dispatchId ?? null, receipt: receiptRel, receiptSha256: sha256File(receiptAbs), at: receipt.at ?? null, answeredBy: receipt.answeredBy ?? null,
+  return { review, decision, note };
+}
+
+function feedbackRoundOf(receipt, review, receiptAbs, receiptRel, decision, notes) {
+  return { dispatchId: receipt.dispatchId ?? null, receipt: receiptRel, receiptSha256: sha256File(receiptAbs), at: receipt.at ?? null, answeredBy: receipt.answeredBy ?? null,
     decision, golden: decision === 'accept' && receipt.answeredBy === OWNER && goldenMarkOf(receipt),
-    parts: list(review.parts).map((p) => ({ path: slash(p.path ?? ''), sha256: p.sha256 ?? null, ...(p.shape ? { shape: p.shape } : {}), ...(p.breakpoint ? { breakpoint: p.breakpoint } : {}) })), notes };
-  const learn = () => learnIntoDirection(workRoot, notes, { record: record.id, receipt: receiptRel, write });
-  if (decision === 'redraw') {
-    const withNotes = withFeedbackRound(record, feedbackRound);
-    if (write) writeRecordFile(file, stringifyYaml(withNotes, { lineWidth: 110 }));
-    const learned = learn();
-    // The owner's words; the ids the redraw's brief must carry are in feedback.notes (draw-feedback.mjs brief).
-    const brief = note ?? (notes.length ? notes.map((n) => n.text).join('\n') : 'the owner asked for a redraw without a note: redraw against the review findings and ask again');
-    return { decision, written: false, record: record.id, dispatchId: receipt.dispatchId ?? null, note, brief,
-      feedback: { written: write, round: feedbackOf(withNotes).rounds.find((r) => r.dispatchId === feedbackRound.dispatchId)?.round ?? null, notes: notes.map(({ id, text, shape, class: cls }) => ({ id, text, shape, class: cls })) },
-      learned: learned.added.map((l) => l.id), ...(learned.skipped ? { learnSkipped: learned.skipped } : {}) };
+    parts: list(review.parts).map((part) => ({ path: slash(part.path ?? ''), sha256: part.sha256 ?? null, ...(part.shape ? { shape: part.shape } : {}), ...(part.breakpoint ? { breakpoint: part.breakpoint } : {}) })), notes };
+}
+
+function applyRedrawDecision({ decision, note, receipt, record, file, feedbackRound, notes, learn, write }) {
+  const withNotes = withFeedbackRound(record, feedbackRound);
+  if (write) writeRecordFile(file, stringifyYaml(withNotes, { lineWidth: 110 }));
+  const learned = learn();
+  // The owner's words; the ids the redraw's brief must carry are in feedback.notes (draw-feedback.mjs brief).
+  const brief = note ?? (notes.length ? notes.map((item) => item.text).join('\n') : 'the owner asked for a redraw without a note: redraw against the review findings and ask again');
+  return { decision, written: false, record: record.id, dispatchId: receipt.dispatchId ?? null, note, brief,
+    feedback: { written: write, round: feedbackOf(withNotes).rounds.find((round) => round.dispatchId === feedbackRound.dispatchId)?.round ?? null, notes: notes.map(({ id, text, shape, class: cls }) => ({ id, text, shape, class: cls })) },
+    learned: learned.added.map((item) => item.id), ...(learned.skipped ? { learnSkipped: learned.skipped } : {}) };
+}
+
+function validateAcceptedParts(dir, record, review, auto, receipt) {
+  const current = new Map(reviewPartsOf(record).map((part) => [part.path, part]));
+  const { parts: shapeParts, retired } = reviewShapesOf(record);
+  const problems = [];
+  for (const part of list(review.parts)) {
+    const file = path.join(dir, part.path ?? '');
+    if (!part.path || !fs.existsSync(file)) { problems.push(`${part.path ?? '(no path)'} is not on disk`); continue; }
+    if (typeof part.sha256 !== 'string' || !part.sha256) problems.push(`the receipt names ${part.path} without the sha256 the owner saw`);
+    else if (sha256File(file) !== part.sha256) problems.push(`${part.path} was redrawn after the owner reviewed it`);
+    if (!current.has(slash(part.path))) problems.push(`${part.path} is no longer a drawn part of ${record.id}`);
   }
+  const seen = new Set(list(review.parts).map((part) => slash(part.path ?? '')));
+  for (const part of shapeParts) if (!seen.has(part.path)) problems.push(`${part.path} (${part.shape} ${part.breakpoint}/${part.theme}) was not in the reviewed set`);
+  // A ui record reaches done only with a generated asset and a coverage map naming every state it lists
+  // (modules/schemas/work-layout.yaml ui rule).
+  if (!assetsOf(record).some((asset) => asset.generation)) problems.push(`${record.id} has no asset carrying generation (interface.draw's ImageGen record)`);
+  const covered = new Set(list(record.ui?.coverage?.map).map((mapping) => mapping?.state).filter(Boolean));
+  const unmapped = list(record.ui?.states).map((state) => (typeof state === 'string' ? state : state?.name)).filter((state) => state && !covered.has(state));
+  if (unmapped.length) problems.push(`ui.coverage.map names no ${unmapped.join(', ')} of ui.states`);
+  if (problems.length) throw new Error(`the ${auto ? 'auto-accepted' : "owner's"} acceptance in ask ${receipt.dispatchId ?? '?'} cannot settle ${record.id}: ${problems.join('; ')} - review the current drawing again`);
+  return { retired, seen };
+}
+
+function acceptedOwnerOf({ receipt, receiptAbs, receiptRel, note, pilot, review, retired, seen, now }) {
+  return {
+    decision: 'accepted', dispatchId: receipt.dispatchId ?? null, receipt: receiptRel, receiptSha256: sha256File(receiptAbs),
+    answeredBy: receipt.answeredBy, at: receipt.at ?? null, appliedAt: now(), ...(note ? { note } : {}),
+    ...(pilot ? { provisional: true, by: AUTOPILOT_BY, gates: { ok: receipt.acceptance?.receipt?.ok === true, beautyMin: receipt.acceptance?.receipt?.beautyMin ?? null, parts: (receipt.acceptance?.receipt?.parts ?? []).map((part) => ({ path: part.path, beauty: part.beauty ?? null, outcome: part.outcome ?? null })) } } : {}),
+    // A retired data-status part is named, never shown: no digest binds it to the acceptance.
+    parts: [
+      ...list(review.parts).map((part) => ({ path: slash(part.path), sha256: part.sha256, breakpoint: part.breakpoint ?? null, theme: part.theme ?? null, ...(part.shape ? { shape: part.shape } : {}) })),
+      ...retired.filter((part) => !seen.has(part.path)).map((part) => ({ path: part.path, sha256: null, breakpoint: part.breakpoint, theme: part.theme, retired: true })),
+    ],
+  };
+}
+
+function acceptanceBecauseOf(pilot, auto, owner, receiptRel) {
+  if (pilot) return `The drawn parts (desktop and mobile, light) were accepted PROVISIONALLY by autopilot in draw-review ask ${owner.dispatchId} at ${owner.at} (receipt ${receiptRel}, answeredBy ${AUTOPILOT_BY}): every machine gate passed - the draw loop metrics with the DNA gate, the independent critic's beauty, the rationale (owner ruling 2026-09-28 autopilot-run-to-finish). The owner reviews it once at handover; it is never golden until then. Implementation captures and browser UAT remain separate proof.`;
+  if (auto) return `The drawn parts (desktop and mobile, light) were accepted without the owner in draw-review ask ${owner.dispatchId} at ${owner.at} (receipt ${receiptRel}, answeredBy ${AUTO_ACCEPTED_BY}): config.yaml asks.autoAcceptRecommended accepts a drawing the owner did not ask to review (owner ruling 2026-09-26). A design direction is accepted, not proved by a run. Implementation captures and browser UAT remain separate proof.`;
+  return `The owner accepted the drawn parts (desktop and mobile, light) in draw-review ask ${owner.dispatchId} at ${owner.at} (receipt ${receiptRel}): a design direction is accepted by its owner, not proved by a run. Implementation captures and browser UAT remain separate proof.`;
+}
+
+function acceptedRecordOf({ record, feedbackRound, owner, golden, pilot, auto, receiptRel }) {
+  return {
+    ...withFeedbackRound(record, feedbackRound),
+    state: 'done',
+    verificationSource: 'authored-claim',
+    because: acceptanceBecauseOf(pilot, auto, owner, receiptRel),
+    ui: { ...record.ui, status: `${acceptedStatusOf(pilot, auto)} design direction (draw-review ask ${owner.dispatchId}, ${owner.at}); implementation and real-render review remain pending.`,
+      review: { ...withFeedbackRound(record, feedbackRound).ui?.review, owner, ...(golden?.promoted ? { golden: { archetype: golden.archetype, shapes: golden.shapes, dispatchId: owner.dispatchId, promotedAt: owner.appliedAt, archetypeAccepted: golden.archetypeAccepted } } : null) } },
+    ...(Number.isInteger(record.change?.rev) ? { change: { rev: record.change.rev + 1, kind: 'clarifying', at: owner.appliedAt, reason: `${acceptanceReasonOf(pilot, auto)} in draw-review ask ${owner.dispatchId}; the record is done on that acceptance.` } } : {}),
+  };
+}
+
+function applyAcceptedDecision({ drawing, record, receipt, receiptAbs, receiptRel, review, note, feedbackRound, learn, write, now }) {
   if (!ACCEPTORS.includes(receipt.answeredBy)) throw new Error(`the drawing was accepted by ${receipt.answeredBy ?? '(unknown)'}; only the owner, or config.yaml asks.autoAcceptRecommended for a drawing the owner did not ask for (answeredBy ${AUTO_ACCEPTED_BY}), accepts a drawing - park the ask`);
   if (receipt.answeredBy === AUTOPILOT_BY && receipt.provisional !== true) throw new Error(`an autopilot answer accepts a drawing only provisionally (receipt provisional:true with its gate evidence); ${receipt.dispatchId ?? '?'} is not one`);
   const pilot = receipt.answeredBy === AUTOPILOT_BY;
   const auto = receipt.answeredBy === AUTO_ACCEPTED_BY || pilot;
-  // The acceptance names exactly the parts the question showed; they must still be the record's current parts.
-  const current = new Map(reviewPartsOf(record).map((p) => [p.path, p]));
-  const { parts: shapeParts, retired } = reviewShapesOf(record);
-  const problems = [];
-  for (const p of list(review.parts)) {
-    const f = path.join(dir, p.path ?? '');
-    if (!p.path || !fs.existsSync(f)) { problems.push(`${p.path ?? '(no path)'} is not on disk`); continue; }
-    if (typeof p.sha256 !== 'string' || !p.sha256) problems.push(`the receipt names ${p.path} without the sha256 the owner saw`);
-    else if (sha256File(f) !== p.sha256) problems.push(`${p.path} was redrawn after the owner reviewed it`);
-    if (!current.has(slash(p.path))) problems.push(`${p.path} is no longer a drawn part of ${record.id}`);
-  }
-  const seen = new Set(list(review.parts).map((p) => slash(p.path ?? '')));
-  for (const p of shapeParts) if (!seen.has(p.path)) problems.push(`${p.path} (${p.shape} ${p.breakpoint}/${p.theme}) was not in the reviewed set`);
-  // A ui record reaches done only with a generated asset and a coverage map naming every state it lists
-  // (modules/schemas/work-layout.yaml ui rule).
-  if (!assetsOf(record).some((a) => a.generation)) problems.push(`${record.id} has no asset carrying generation (interface.draw's ImageGen record)`);
-  const covered = new Set(list(record.ui?.coverage?.map).map((m) => m?.state).filter(Boolean));
-  const unmapped = list(record.ui?.states).map((s) => (typeof s === 'string' ? s : s?.name)).filter((s) => s && !covered.has(s));
-  if (unmapped.length) problems.push(`ui.coverage.map names no ${unmapped.join(', ')} of ui.states`);
-  if (problems.length) throw new Error(`the ${auto ? 'auto-accepted' : "owner's"} acceptance in ask ${receipt.dispatchId ?? '?'} cannot settle ${record.id}: ${problems.join('; ')} - review the current drawing again`);
-  const owner = {
-    decision: 'accepted', dispatchId: receipt.dispatchId ?? null, receipt: receiptRel, receiptSha256: sha256File(receiptAbs),
-    answeredBy: receipt.answeredBy, at: receipt.at ?? null, appliedAt: now(), ...(note ? { note } : {}),
-    ...(pilot ? { provisional: true, by: AUTOPILOT_BY, gates: { ok: receipt.acceptance?.receipt?.ok === true, beautyMin: receipt.acceptance?.receipt?.beautyMin ?? null, parts: (receipt.acceptance?.receipt?.parts ?? []).map((p) => ({ path: p.path, beauty: p.beauty ?? null, outcome: p.outcome ?? null })) } } : {}),
-    // A retired data-status part is named, never shown: no digest binds it to the acceptance.
-    parts: [
-      ...list(review.parts).map((p) => ({ path: slash(p.path), sha256: p.sha256, breakpoint: p.breakpoint ?? null, theme: p.theme ?? null, ...(p.shape ? { shape: p.shape } : {}) })),
-      ...retired.filter((p) => !seen.has(p.path)).map((p) => ({ path: p.path, sha256: null, breakpoint: p.breakpoint, theme: p.theme, retired: true })),
-    ],
-  };
+  const { retired, seen } = validateAcceptedParts(drawing.dir, record, review, auto, receipt);
+  const owner = acceptedOwnerOf({ receipt, receiptAbs, receiptRel, note, pilot, review, retired, seen, now });
   // Golden (owner mission 2026-09-27): the owner's own accept of a drawing whose archetype has no golden yet, or one
   // the owner marks golden, is promoted into brand.direction.golden - never an automatic accept.
   let golden = null;
   if (!auto) {
     try { golden = goldenPromotionOf({ drawing, record, receipt, receiptAbs, review, write }); } catch (error) { golden = { promoted: false, why: `golden promotion refused: ${error.message}` }; }
   }
-  const next = {
-    ...withFeedbackRound(record, feedbackRound),
-    state: 'done',
-    verificationSource: 'authored-claim',
-    because: (() => {
-      if (pilot) return `The drawn parts (desktop and mobile, light) were accepted PROVISIONALLY by autopilot in draw-review ask ${owner.dispatchId} at ${owner.at} (receipt ${receiptRel}, answeredBy ${AUTOPILOT_BY}): every machine gate passed - the draw loop metrics with the DNA gate, the independent critic's beauty, the rationale (owner ruling 2026-09-28 autopilot-run-to-finish). The owner reviews it once at handover; it is never golden until then. Implementation captures and browser UAT remain separate proof.`;
-      if (auto) return `The drawn parts (desktop and mobile, light) were accepted without the owner in draw-review ask ${owner.dispatchId} at ${owner.at} (receipt ${receiptRel}, answeredBy ${AUTO_ACCEPTED_BY}): config.yaml asks.autoAcceptRecommended accepts a drawing the owner did not ask to review (owner ruling 2026-09-26). A design direction is accepted, not proved by a run. Implementation captures and browser UAT remain separate proof.`;
-      return `The owner accepted the drawn parts (desktop and mobile, light) in draw-review ask ${owner.dispatchId} at ${owner.at} (receipt ${receiptRel}): a design direction is accepted by its owner, not proved by a run. Implementation captures and browser UAT remain separate proof.`;
-    })(),
-    ui: { ...record.ui, status: `${(() => { if (pilot) return 'Provisionally accepted by autopilot (provisional; owner review at handover)'; if (auto) return 'Auto-accepted (unrequested by the owner)'; return 'Owner-accepted'; })()} design direction (draw-review ask ${owner.dispatchId}, ${owner.at}); implementation and real-render review remain pending.`,
-      review: { ...withFeedbackRound(record, feedbackRound).ui?.review, owner, ...(golden?.promoted ? { golden: { archetype: golden.archetype, shapes: golden.shapes, dispatchId: owner.dispatchId, promotedAt: owner.appliedAt, archetypeAccepted: golden.archetypeAccepted } } : null) } },
-    ...(Number.isInteger(record.change?.rev) ? { change: { rev: record.change.rev + 1, kind: 'clarifying', at: owner.appliedAt, reason: `${(() => { if (pilot) return 'The drawn parts were accepted provisionally by autopilot'; if (auto) return 'The drawn parts were auto-accepted'; return 'The owner accepted the drawn parts'; })()} in draw-review ask ${owner.dispatchId}; the record is done on that acceptance.` } } : {}),
-  };
-  if (write) writeRecordFile(file, stringifyYaml(next, { lineWidth: 110 }));
+  const next = acceptedRecordOf({ record, feedbackRound, owner, golden, pilot, auto, receiptRel });
+  if (write) writeRecordFile(drawing.file, stringifyYaml(next, { lineWidth: 110 }));
   const learned = learn();
-  return { decision, written: write, record: record.id, file: slash(file), owner, learned: learned.added.map((l) => l.id), ...(golden ? { golden } : {}) };
+  return { decision: 'accept', written: write, record: record.id, file: slash(drawing.file), owner, learned: learned.added.map((item) => item.id), ...(golden ? { golden } : {}) };
+}
+
+export function applyDrawReview(uiDir, receiptFile, { write = false, now = () => new Date().toISOString() } = {}) {
+  const drawing = loadDrawing(uiDir);
+  const { record, repoRoot } = drawing;
+  const { receipt, receiptAbs, receiptRel } = readAnswerReceipt(receiptFile, { repoRoot });
+  const { review, decision, note } = reviewDecisionOf(receipt, record);
+  // Every note of the answer is an owner ruling bound to its shape and the digests the owner saw (draw-feedback.mjs):
+  // recorded in ui.review.feedback, and a product-direction note is learned into brand.direction.learned (proposed).
+  const workRoot = drawing.workRoot;
+  const notes = notesOfReceipt({ ...receipt, review }, { dnaNames: dnaNamesFor(workRoot) });
+  const feedbackRound = feedbackRoundOf(receipt, review, receiptAbs, receiptRel, decision, notes);
+  const learn = () => learnIntoDirection(workRoot, notes, { record: record.id, receipt: receiptRel, write });
+  if (decision === 'redraw') {
+    return applyRedrawDecision({ decision, note, receipt, record, file: drawing.file, feedbackRound, notes, learn, write });
+  }
+  return applyAcceptedDecision({ drawing, record, receipt, receiptAbs, receiptRel, review, note, feedbackRound, learn, write, now });
 }
 
 /**
@@ -481,10 +451,27 @@ export function drawReviewMain(argv = []) {
     question: (ui, args) => ({ result: drawReviewQuestion(ui, { lang: flag(args, '--lang') ?? ownerLanguage(), ownerRequested: args.includes('--owner-requested'), jobId: flag(args, '--job') ?? opContextOf()?.jobId ?? null }) }),
     apply: (ui, receipt, args) => {
       const r = applyDrawReview(ui, receipt, { write: args.includes('--write') });
-      const text = (() => { if (r.decision === 'redraw') return `the owner asked for a redraw of ${r.record} (ask ${r.dispatchId}); nothing written. Redraw brief: ${r.brief}`; return `${r.written ? 'wrote' : 'would write (dry run - pass --write)'} ${r.record} done: accepted by ${r.owner.answeredBy} in ask ${r.owner.dispatchId} (receipt ${r.owner.receipt})`; })();
+      const text = reviewApplyText(r);
       return { result: r, text: `${text}\n` };
     },
   });
+}
+
+function acceptedStatusOf(pilot, auto) {
+  if (pilot) { return 'Provisionally accepted by autopilot (provisional; owner review at handover)'; }
+  if (auto) { return 'Auto-accepted (unrequested by the owner)'; }
+  return 'Owner-accepted';
+}
+
+function acceptanceReasonOf(pilot, auto) {
+  if (pilot) { return 'The drawn parts were accepted provisionally by autopilot'; }
+  if (auto) { return 'The drawn parts were auto-accepted'; }
+  return 'The owner accepted the drawn parts';
+}
+
+function reviewApplyText(result) {
+  if (result.decision === 'redraw') { return `the owner asked for a redraw of ${result.record} (ask ${result.dispatchId}); nothing written. Redraw brief: ${result.brief}`; }
+  return `${result.written ? 'wrote' : 'would write (dry run - pass --write)'} ${result.record} done: accepted by ${result.owner.answeredBy} in ask ${result.owner.dispatchId} (receipt ${result.owner.receipt})`;
 }
 
 /**
@@ -493,36 +480,40 @@ export function drawReviewMain(argv = []) {
  * judgement cannot read (an index.yaml that does not parse, a layout tree or a dependent record that does not) is
  * unjudged, never skipped: it may be one that owes the review.
  */
+function recordAbove(start, dirs, unjudged, shown) {
+  for (let dir = start; ; dir = path.dirname(dir)) {
+    const index = path.join(dir, 'index.yaml');
+    if (fs.existsSync(index)) {
+      let doc;
+      try { doc = readYaml(index); } catch (error) { unjudged.push({ path: shown(index), error: error.message }); return; }
+      if (doc?.schema === 'work/ui-screen@1') { dirs.add(dir); return; }
+    }
+    if (path.basename(dir) === '.starciwork' || path.dirname(dir) === dir) return;
+  }
+}
+
+function collectUiDirectories(repo, staticPart, dirs, unjudged, shown) {
+  const abs = path.resolve(repo, staticPart);
+  if (!fs.existsSync(abs)) return;
+  if (!fs.statSync(abs).isDirectory()) { recordAbove(path.dirname(abs), dirs, unjudged, shown); return; }
+  // A directory (a glob's static prefix): the ui record it sits in, and every ui record below it.
+  recordAbove(abs, dirs, unjudged, shown);
+  for (const index of indexFilesUnder(abs)) {
+    let doc;
+    try { doc = readYaml(index); } catch (error) { unjudged.push({ path: shown(index), error: error.message }); continue; }
+    if (doc?.schema === 'work/ui-screen@1') dirs.add(path.dirname(index));
+  }
+}
+
 export function drawReviewsOwed(repo, files) {
   const dirs = new Set();
   const unjudged = [];
   const shown = (p) => slash(path.relative(repo, p));
-  // The ui record a report file sits in: the nearest index.yaml above it, up to the Work root.
-  const recordAbove = (start) => {
-    for (let dir = start; ; dir = path.dirname(dir)) {
-      const index = path.join(dir, 'index.yaml');
-      if (fs.existsSync(index)) {
-        let doc;
-        try { doc = readYaml(index); } catch (error) { unjudged.push({ path: shown(index), error: error.message }); return; }
-        if (doc?.schema === 'work/ui-screen@1') { dirs.add(dir); return; }
-      }
-      if (path.basename(dir) === '.starciwork' || path.dirname(dir) === dir) return;
-    }
-  };
   for (const spec of list(files)) {
     const rel = slash(spec);
     const staticPart = /[*{[?]/.test(rel) ? rel.slice(0, rel.search(/[*{[?]/)).replace(/\/[^/]*$/, '') : rel;
     if (!/(^|\/)\.starciwork\//.test(staticPart) || !/(^|\/)ui(\/|$)/.test(staticPart)) continue;
-    const abs = path.resolve(repo, staticPart);
-    if (!fs.existsSync(abs)) continue;
-    if (!fs.statSync(abs).isDirectory()) { recordAbove(path.dirname(abs)); continue; }
-    // A directory (a glob's static prefix): the ui record it sits in, and every ui record below it.
-    recordAbove(abs);
-    for (const index of indexFilesUnder(abs)) {
-      let doc;
-      try { doc = readYaml(index); } catch (error) { unjudged.push({ path: shown(index), error: error.message }); continue; }
-      if (doc?.schema === 'work/ui-screen@1') dirs.add(path.dirname(index));
-    }
+    collectUiDirectories(repo, staticPart, dirs, unjudged, shown);
   }
   const owed = [];
   for (const dir of dirs) {
