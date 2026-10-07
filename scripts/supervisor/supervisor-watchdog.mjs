@@ -252,7 +252,9 @@ export function repairSupervisorTabTitles(seatTerminal, workers, d) {
 const DEAD_WORKER_STATE = /stop|fail|dead|exit|release|abandon/i;
 const bestEffort = bestEffortCall;
 
-/** Sweep one job: a reported worker is released and marked closed, a dead one without a report fails. Returns the reason the whole sweep stops (the host did not answer), or null. */
+/** Sweep one job: a reported worker is released and marked closed, a dead one without a report fails.
+ * Returns the reason the job is skipped - an unreadable worker proves nothing (the host did not answer,
+ * worker-show failed, or worker-release did not confirm) - or null. The sweep records it and moves on. */
 function sweepJob(job, { m, d, now, out, markClosed, fail }) {
   const handle = job.worker_id;
   const dispatch = job.payload.dispatch ?? null;
@@ -261,13 +263,13 @@ function sweepJob(job, { m, d, now, out, markClosed, fail }) {
   if (!dispatch) return null;
   const shown = bestEffort(() => d.show(dispatch));
   if (shown?.hostUnavailable) return shown.error ?? 'worker-show did not answer';
-  if (!shown?.ok) return null; // an unreadable worker proves nothing
+  if (!shown?.ok) return shown?.error ?? 'worker-show not ok';
   const dead = Boolean(shown.state && DEAD_WORKER_STATE.test(shown.state));
   if (reported) {
     const stop = dead ? null : bestEffort(() => d.stop(dispatch));
     const release = bestEffort(() => d.release(dispatch));
-    if (release?.ok) { markClosed(job, { released: { at: now, stopped: stop?.ok ?? null } }); out.closed.push({ jobId: job.job_id, handle, dispatch }); }
-    return null;
+    if (release?.ok) { markClosed(job, { released: { at: now, stopped: stop?.ok ?? null } }); out.closed.push({ jobId: job.job_id, handle, dispatch }); return null; }
+    return `worker-release did not confirm: ${release?.error ?? release?.outcome ?? 'not ok'}`;
   }
   if (!dead) return null;
   const reason = `worker ${shown.state} without a report`;
@@ -311,10 +313,13 @@ function sweepLeftovers(m, d, { now, out }) {
 }
 
 /**
- * The [Worker] sweep over the machine handle `m` (sup_jobs): returns {deaths:[{jobId, reason}], closed:[...]}.
- * Liveness is worker-show on the job's Dispatch; a reported or dead worker is fenced and released (worker-stop +
- * worker-release, which archives its output). A job with no Dispatch is not a worker-start worker (every [Worker]
- * is one): the sweep proves nothing about it and leaves it.
+ * The [Worker] sweep over the machine handle `m` (sup_jobs): returns {deaths:[{jobId, reason}], closed:[...]},
+ * plus skipped:[{jobId, reason}] when a job's Dispatch could not be read or released. Liveness is worker-show on
+ * the job's Dispatch; a reported or dead worker is fenced and released (worker-stop + worker-release, which
+ * archives its output). A job whose Dispatch cannot be read or released is recorded in `skipped` and the sweep
+ * moves on: one unreadable Dispatch never holds back the rest. A deps object without the worker-show seam asks
+ * for the leftover pass only (scripts/supervisor/workers.mjs closeWorkerTerminal); a job with no Dispatch is not
+ * a worker-start worker (every [Worker] is one): the sweep proves nothing about it and leaves it.
  */
 export function sweepWorkers(m, d, { now = Date.now() } = {}) {
   const out = { deaths: [], closed: [] };
@@ -324,9 +329,11 @@ export function sweepWorkers(m, d, { now = Date.now() } = {}) {
     m.setSupJobStatus(job.job_id, 'failed', { payload: { ...job.payload, terminalClosed: closed, result } });
     supervisorEvent(m, { entityType: 'job', entityId: job.job_id, kind: 'worker-died', payload: { terminal: job.worker_id, reason, agent: job.payload.agent ?? null, ...extra }, now });
   });
-  for (const job of jobsOf(m, ['running', 'reported'])) {
-    const skipped = sweepJob(job, { m, d, now, out, markClosed, fail });
-    if (skipped) return { ...out, skipped };
+  if (typeof d.show === 'function') {
+    for (const job of jobsOf(m, ['running', 'reported'])) {
+      const skipped = sweepJob(job, { m, d, now, out, markClosed, fail });
+      if (skipped) (out.skipped ??= []).push({ jobId: job.job_id, reason: skipped });
+    }
   }
   sweepLeftovers(m, d, { now, out });
   return out;

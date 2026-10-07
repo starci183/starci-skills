@@ -540,8 +540,16 @@ placeholders:
   app: shared
   bound-paths: shared
   asset: shared
+  family: "The bound brand record's brand.identity.family - the grammar family its
+    knowledge/grammars/<family>/ DNA reads resolve. Direction mode only: the identity
+    run has no brand record yet and never binds it."
 layoutPolicy:
   checks: [starci-validate]
+policy:
+  modes:
+    direction:
+      param: directionArchetype
+      reads: [direction]
 route:
   nodeKinds: [brand]
   phase: [decide, pre-implementation]

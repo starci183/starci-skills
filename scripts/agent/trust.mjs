@@ -41,7 +41,6 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { runNode } from '../api/node/run-node.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { lsFiles } from '../api/git/ls-files.mjs'; import { revParseQuery } from '../api/git/rev-parse-query.mjs';
 import { renameOver } from '../api/fs/rename-over.mjs';
@@ -50,6 +49,8 @@ import { parseJson } from '../lib/json.mjs';
 import { isSpecRun } from '../lib/env.mjs';
 import { orcaUserData } from './host-agents.mjs';
 export { codexTrustPaths, launchTrustVerdict } from './launch-trust-policy.mjs';
+import { codexAppServer } from './codex-app-server.mjs';
+export { codexAppServer };
 
 const CLAUDE_CARD = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'modules', 'models', 'agents', 'claude.yaml');
 
@@ -503,29 +504,9 @@ export function writeCodexToolGuard({ file, command, hooks }) {
   return updated.ok ? { file, ok: true, written: updated.result.written } : { file, ok: false, error: updated.error };
 }
 
-const APP_SERVER_CLIENT = String.raw`
-const { spawn } = require('node:child_process');
-const reqs = JSON.parse(process.argv[1]);
-const p = spawn('codex app-server', { shell: true, stdio: ['pipe', 'pipe', 'ignore'], windowsHide: true });
-const out = []; let buf = ''; let next = 0;
-const send = (o) => p.stdin.write(JSON.stringify(o) + '\n');
-const ask = () => { if (next >= reqs.length) { console.log(JSON.stringify(out)); p.kill(); process.exit(0); } send({ id: 100 + next, ...reqs[next] }); };
-p.stdout.on('data', (d) => { buf += d; let i; while ((i = buf.indexOf('\n')) >= 0) { const line = buf.slice(0, i); buf = buf.slice(i + 1); let m; try { m = JSON.parse(line); } catch { continue; }
-  if (m.id === 1) { send({ method: 'initialized' }); ask(); }
-  else if (m.id === 100 + next) { out.push(m.error ? { error: m.error } : m.result); next += 1; ask(); } } });
-send({ id: 1, method: 'initialize', params: { clientInfo: { name: 'starci-launch-trust', version: '1' } } });
-`;
-/**
- * The app-server calls of one Codex home, in order: `requests` [{method, params}] -> results[] (an error result is
- * {error}). Codex computes the hash it trusts a hook by; the runtime asks it, the way Orca trusts its own hooks.
- */
-export function codexAppServer({ home, requests, timeoutMs = 60_000 }) {
-  const r = runNode(['-e', APP_SERVER_CLIENT, JSON.stringify(requests)], { timeout: timeoutMs,
-    env: { ...process.env, CODEX_HOME: home } });
-  const results = parseJson(String(r.stdout ?? '').trim().split(/\r?\n/).pop() ?? '', null);
-  if (!Array.isArray(results)) { const detail = r.error ? ': ' + r.error.message : ''; throw new Error('codex app-server answered nothing (exit ' + r.status + detail + ')'); }
-  return results;
-}
+// The `codex app-server` client lives in codex-app-server.mjs (this file is over its size budget); it is re-exported
+// above so callers of trust.mjs keep their import. A launch that gets no answer throws APP_SERVER_FAILURE with
+// codex's own exit, stderr tail and version - a worker-start strike of the codex circuit (provider-outage.mjs).
 
 /** Trust the guard hook of one Codex home: hooks/list, then hooks.state.<key>.trusted_hash for each untrusted one. */
 export function trustCodexToolGuard({ home, cwd, command, appServer = codexAppServer }) {

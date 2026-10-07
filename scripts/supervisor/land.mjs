@@ -72,7 +72,7 @@ import { SKILL_ROOT, lanesRoot, landRoot, supervisorSettings } from '../machine/
 import { specsDirect, changedExports, headRanges, specsInvariant, touchingSelection, SMOKE_LIMIT } from './land-specs.mjs';
 import { fullCheckStep } from './land-full-check.mjs';
 import { fastForwardLive } from '../machine/live-fast-forward.mjs';
-import { withoutGitLocalEnv } from '../lib/git.mjs'; import { isMain } from '../lib/is-main.mjs';
+import { withoutGitLocalEnv } from '../lib/git.mjs'; import { isMain } from '../lib/is-main.mjs'; import { withoutSeatEnv } from '../lib/seat-env.mjs';
 import { tailLines } from '../lib/clip.mjs'; import { underHostLockWaiting } from './land-lock.mjs'; import { selfUpgradeBranchContaining, selfUpgradeIdOf, withSelfUpgradeRef, writeSelfUpgradeRef } from './self-upgrade-ref.mjs'; import { describe, failList, specsRedOnMainOf } from './land-format.mjs'; export { describe };
 import { failKey, pushOwedOf, landOutcomeOf, recordLand } from './land-record.mjs';
 import { conflictHint, conflictPreflight, pickConflicts } from './land-conflicts.mjs';
@@ -130,11 +130,11 @@ export function specPlan({ fullAllowed = false, fullByPushGit = false, asked = [
 /* ------------------------------------------------------------ scratch */
 
 const outcome = (r) => ({ ok: r.status === 0, status: r.status, stdout: String(r.stdout ?? ''), stderr: String(r.stderr ?? ''), error: r.error?.message ?? null });
-/** `node <args>` in `cwd`, with STARCI_RUNTIME = cwd: the CLI resolves its runtime root from that variable before the per-user record, so every child verifies the tree being landed, not the live checkout. */
-const node = (args, { cwd, timeout = 1_200_000, env = process.env } = {}) => outcome(runNode(args, { cwd, timeout, env: { ...env, STARCI_RUNTIME: cwd }, maxBuffer: 64 * 1024 * 1024 }));
-/** The env the gate's spec run gets: no test-runner channel, no git repository-local variables. */
+/** `node <args>` in `cwd`, with STARCI_RUNTIME = cwd: the CLI resolves its runtime root from that variable before the per-user record, so every child verifies the tree being landed, not the live checkout. The child is the gate's own work, never the calling seat's tool call: it runs without the seat identity (scripts/lib/seat-env.mjs). */
+const node = (args, { cwd, timeout = 1_200_000, env = process.env } = {}) => outcome(runNode(args, { cwd, timeout, env: { ...withoutSeatEnv(env), STARCI_RUNTIME: cwd }, maxBuffer: 64 * 1024 * 1024 }));
+/** The env the gate's spec run gets: no test-runner channel, no git repository-local variables, no seat identity — a spec's result never depends on which terminal ran the land. */
 export function specRunEnv(parent = process.env) {
-  const env = withoutGitLocalEnv(parent);
+  const env = withoutSeatEnv(withoutGitLocalEnv(parent));
   delete env.NODE_TEST_CONTEXT;
   return withSwcCache(env);
 }

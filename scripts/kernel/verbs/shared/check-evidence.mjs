@@ -5,14 +5,38 @@
 // the runtime could not re-run is authority 'declared' (its value kept as declared_exit_code, exit_code NULL). The whole
 // envelope entry (advisory, peerBlocked, attribution, measured, codes, failing) rides in summary_json.entry, so the
 // readers - settle, the failure routes, prior_attempt_failures - rebuild the envelope from the latest run of each check.
+import path from 'node:path';
 import { latestCheckRuns, recordCheck } from '../../../machine/evidence-store.mjs';
 import { parseJson } from '../../../lib/json.mjs';
+import { requireWorkflowPlacement, workflowAppRepo } from '../../workflow-worktree.mjs';
 
 /** Runners whose checks are independent evidence (never the op's own). */
 const INDEPENDENT_RUNNERS = Object.freeze(['kernel', 'settler', 'parity', 'integrate']);
 
 /** The latest op_attempts row id of a job, or null. */
 export const latestAttemptIdOf = (db, jobId) => db.prepare('SELECT max(attempt_id) id FROM op_attempts WHERE job_id=?').get(jobId)?.id ?? null;
+
+/**
+ * The directory a job's check re-run executes in (docs/workflow-kernel.md, Dispatch): a Git workflow's registered
+ * worktree, which every placement the attempt recorded must name (the same readers as settle's checkpoint); the
+ * ledger repo only for a non-Git ledger with no registered tree. A Git workflow whose tree cannot be resolved throws
+ * {code: 'check-rerun-worktree-unresolved', reason: <the placement refusal>} - a re-run never falls back to main.
+ */
+export function checkRerunRootOf(db, job, { repo, env = process.env, appRepoOf = workflowAppRepo } = {}) {
+  const attemptId = latestAttemptIdOf(db, job.job_id);
+  const attempt = attemptId == null ? null : db.prepare('SELECT worktree_path FROM op_attempts WHERE attempt_id=?').get(attemptId);
+  const context = parseJson(attemptId == null ? '' : (db.prepare('SELECT context_json FROM contracts WHERE attempt_id=?').get(attemptId)?.context_json ?? ''), null) ?? {};
+  const filedTree = context.packet?.context?.workflow_worktree;
+  const placements = [attempt?.worktree_path, context.worktree, filedTree?.path].filter((dir) => typeof dir === 'string' && dir).map((dir) => path.resolve(repo, dir));
+  const required = Boolean(filedTree || appRepoOf(repo) || placements.some((dir) => appRepoOf(dir)));
+  try {
+    const tree = requireWorkflowPlacement({ env }, { workflowId: job.workflow_id, placements, required });
+    return tree ? tree.path : path.resolve(repo);
+  } catch (cause) {
+    throw Object.assign(new Error(`check re-run of job ${job.job_id} refused: ${cause.message}`, { cause }),
+      { code: 'check-rerun-worktree-unresolved', reason: cause.code ?? null, workflowId: job.workflow_id });
+  }
+}
 
 /** Record one envelope's checks for `attemptId` (inside the caller's transaction). */
 export function recordEnvelopeChecks(db, { attemptId, checks, runner, observations = new Map(), now = Date.now() }) {

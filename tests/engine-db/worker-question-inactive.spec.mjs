@@ -10,6 +10,7 @@ import { seedWorkflow } from '../helpers/ledger-fixture.mjs';
 import { proofRepo } from '../helpers/sonar-scan.mjs';
 import { adoptLaunchTrust } from '../helpers/launch-trust.mjs';
 import { registerRepoWorkflowWorktree } from '../helpers/workflow-worktree-row.mjs';
+import { withoutSeatEnv } from '../../scripts/lib/seat-env.mjs';
 
 const root = path.resolve(import.meta.dirname, '..', '..');
 const apiFile = path.join(root, 'scripts', 'kernel', 'cli.mjs');
@@ -22,7 +23,7 @@ test('a filed report makes its worker question inactive before job settlement', 
   const repo = path.join(tmp, 'repo'); fs.mkdirSync(repo);proofRepo(t,repo);fs.mkdirSync(path.join(repo,'docs'),{recursive:true});
   const stub = path.join(tmp, 'fake-orca.mjs'); fs.writeFileSync(stub, FAKE_ORCA);
   const state = path.join(tmp, 'state.json');
-  const env = { ...process.env, STARCI_ORCA_COMMAND: process.execPath, STARCI_ORCA_ARGS: JSON.stringify([stub]),
+  const env = { ...withoutSeatEnv(process.env), STARCI_ORCA_COMMAND: process.execPath, STARCI_ORCA_ARGS: JSON.stringify([stub]),
     STARCI_FAKE_ORCA_LOG: path.join(tmp, 'calls.jsonl'), STARCI_FAKE_ORCA_STATE: state,
     STARCI_PROJECTS_ROOT:path.join(tmp,'projects'),STARCI_TEST_MACHINE_FILE:path.join(tmp,'machine.sqlite'),STARCI_LOCAL_ROOT:path.join(tmp,'localappdata'),
     ...adoptLaunchTrust(tmp,{roots:[repo],ref:'private worker-question fixture adoption'}) };
@@ -73,7 +74,7 @@ test('ledger-only status excludes a bridged question after its dispatch reports'
   t.after(() => fs.rmSync(tmp, { recursive: true, force: true }));
   const repo = path.join(tmp, 'repo'); fs.mkdirSync(repo);fs.mkdirSync(path.join(repo,'docs'),{recursive:true});
   const workflowId = 'wf-question-ledger-only', jobId = 'job-ledger-only', dispatchId = 'dispatch-ledger-only';
-  const env={...process.env,STARCI_PROJECTS_ROOT:path.join(tmp,'projects')};
+  const env={...withoutSeatEnv(process.env),STARCI_PROJECTS_ROOT:path.join(tmp,'projects')};
   const ledger = openLedger({ file: ledgerFileFor(repo,{env}) });
   try {
     seedWorkflow(ledger,{id:workflowId,jobs:[

@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { byCodeUnit } from '../lib/list.mjs';
 import {skillRoot} from '../../engine/runtime-root.mjs';
+import {gitDirOf} from '../lib/git-dir.mjs';
 import {readJsonFile as readJson} from '../lib/json.mjs';
 import {slash} from '../lib/path-key.mjs';
 import {DIGEST_ALGORITHM,STAMP_FILE,STAMP_SCHEMA,distDigest,sourceDigest} from '../../packages/grammar/scripts/build-stamp.mjs';
@@ -32,7 +33,35 @@ const CSS_TOKEN_VALUE = '[^;{}]*';
 const CSS_TOKEN_DECLARATION=new RegExp(`(${CSS_TOKEN_NAME})${CSS_TOKEN_SPACE}:(${CSS_TOKEN_VALUE})`,'g');
 
 
-export const defaultGrammarPackageRoot=()=>path.join(skillRoot,'packages','grammar');
+/**
+ * The primary worktree of the checkout `dir` belongs to, or null when `dir` is the primary itself or carries no
+ * linked-worktree metadata. A linked worktree's `.git` file names `<primary>/.git/worktrees/<name>`, and that
+ * directory's `commondir` file names `<primary>/.git` — read from disk, never a git spawn.
+ */
+const primaryWorktreeOf=(dir)=>{
+  const gitDir=gitDirOf(dir);
+  if(!gitDir||gitDir===path.join(path.resolve(dir),'.git'))return null;
+  try{
+    const common=path.resolve(gitDir,fs.readFileSync(path.join(gitDir,'commondir'),'utf8').trim());
+    return path.basename(common)==='.git'?path.dirname(common):null;
+  }catch{return null;}
+};
+
+/**
+ * The grammar package the runtime at `runtimeRoot` ships: its own packages/grammar while that carries a dist/, or the
+ * primary worktree's when this checkout is a linked worktree that never built one — dist/ is untracked, so a land
+ * scratch or a lane checkout shares the primary's build (draw-grammar.mjs resolves a lane's grammar the same way).
+ * The primary worktree itself, and any standalone checkout, always answer their own: a missing dist on live main
+ * stays `missing`.
+ */
+export function shippedGrammarPackageRoot(runtimeRoot=skillRoot,deps={}){
+  const own=path.join(runtimeRoot,'packages','grammar');
+  if((deps.exists??fs.existsSync)(path.join(own,'dist')))return own;
+  const primary=(deps.primaryOf??primaryWorktreeOf)(runtimeRoot);
+  return primary?path.join(primary,'packages','grammar'):own;
+}
+
+export const defaultGrammarPackageRoot=()=>shippedGrammarPackageRoot(skillRoot);
 
 /** Every `--name: value` declaration outside a comment, in document order, whitespace collapsed. */
 export function cssTokenDeclarations(text){

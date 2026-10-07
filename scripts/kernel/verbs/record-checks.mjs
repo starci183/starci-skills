@@ -7,7 +7,7 @@ import { classifyChecks } from '../../machine/contract-version.mjs';
 import { isMeasurementLeg } from '../verify-failure.mjs';
 import { classifyCheck, rerunCheck, settlerSettings } from '../settle/job-settle.mjs';
 import { checkVerdictOf } from '../settle/check-verdict.mjs';
-import { latestAttemptIdOf, recordEnvelopeChecks } from './shared/check-evidence.mjs';
+import { checkRerunRootOf, latestAttemptIdOf, recordEnvelopeChecks } from './shared/check-evidence.mjs';
 import { readEnv } from '../../lib/env.mjs';
 import { observationContextOf, observeCheck, stageObservation } from '../mechanism-observation.mjs';
 import { withWorkflowLock } from '../workflow-checkpoint.mjs';
@@ -57,12 +57,17 @@ export default {
   const settler = readEnv('STARCI_CALLER') === 'runtime-settler';
   if (!settler) {
     const { rerunTimeoutMs } = settlerSettings();
+    // A re-run executes where the op worked: the workflow's registered worktree, never the main checkout (a record
+    // the op created exists only there). A Git workflow whose tree cannot be resolved refuses the record.
+    let root = null;
+    const rootOf = () => (root ??= checkRerunRootOf(db, job, { repo }));
     parsed.checks = parsed.checks.map((check) => {
       const cls = classifyCheck(check, { skillRoot, mechanical: Boolean(context) });
       if (cls.kind !== 'runtime') return { ...check, authority: 'declared' };
       const invoke = (target) => rerunCheck(cls, { repo: target, timeoutMs: rerunTimeoutMs });
-      const r = cls.mechanical && context ? observeCheck(cls, context, invoke) : invoke(repo);
-      observations.set(String(check.name), stageObservation(r, [repo, ...(context?.roots ?? [])]));
+      // An observed mechanical check binds its own subject inside the filed roots; every other re-run takes the tree.
+      const r = cls.mechanical && context ? observeCheck(cls, context, invoke) : invoke(rootOf());
+      observations.set(String(check.name), stageObservation(r, [...new Set([r.cwd ?? repo, repo, ...(context?.roots ?? [])])]));
       const v = checkVerdictOf(r);
       return { ...check, authority: 'runtime', declaredExitCode: check.exitCode, exitCode: Number.isInteger(r.exitCode) ? r.exitCode : 127,
         ...(v.verdict === 'unavailable' ? { unavailable: true } : {}), evidence: `starci kernel record-checks re-run: raw exit ${r.exitCode} (declared ${check.exitCode}) ${r.tail ?? ''}`.slice(0, 1000) };

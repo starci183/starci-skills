@@ -157,17 +157,53 @@ export function stylelintRuleIds(root) {
   }
 }
 
-/** The rule ids of one eslint plugin package under `root`, or {error} when it cannot be loaded. */
+/**
+ * The `rules` binding of each `import { ... rules[ as <ident>] } from "./<file>"` of an eslint canon's entry, as
+ * {ident -> file}: CONTRIBUTIONS gathers those bindings, so this maps the names the entry's rules are built from.
+ */
+const eslintRuleImports = (text) => {
+  const map = new Map();
+  for (const m of String(text).matchAll(/import\s*\{([^}]*)\}\s*from\s*['"]\.\/([\w.-]+\.mjs)['"]/g)) {
+    const binding = /\brules(?:\s+as\s+([A-Za-z_$][\w$]*))?/.exec(m[1]);
+    if (binding) map.set(binding[1] ?? 'rules', m[2]);
+  }
+  return map;
+};
+
+/** The law files an eslint canon's entry gathers into its `rules` export: the CONTRIBUTIONS `rules:` bindings. */
+const eslintContributionFiles = (text) => {
+  const imported = eslintRuleImports(text);
+  const block = /const CONTRIBUTIONS = \[([\s\S]*?)\n?\]/.exec(text)?.[1] ?? '';
+  return [...new Set([...block.matchAll(/\brules:\s*([A-Za-z_$][\w$]*)/g)].map((m) => imported.get(m[1])).filter(Boolean))];
+};
+
+/**
+ * The rule ids of one eslint plugin package under `root`, or {error} when it cannot be loaded. The entry itself is
+ * not imported: its config module needs `@typescript-eslint/parser`, which installs only inside
+ * packages/node_modules, and a checkout without that install (a land scratch gets a root npm ci alone) must still
+ * judge the canon — the same reason the stylelint canon is read from source. The published ids are the keys of each
+ * CONTRIBUTIONS member's `rules` export, so the law modules are imported directly: their own imports resolve without
+ * the packages install (typescript sits in the root install, the `./runtime/` copies sync-runtime regenerates). The
+ * per-rule catalog codes a plugin publishes (`why[id].code`, how a sub-code is emitted) live in its lib/why.mjs,
+ * which the entry only re-exports.
+ */
 export async function pluginRuleIds(root, kind) {
   const entry = PLUGIN_ENTRY[kind];
   if (kind === 'stylelint') return stylelintRuleIds(root);
   try {
-    const loaded = await import(pathToFileURL(path.join(root, entry)).href);
-    const rules = loaded.default?.rules ?? loaded.rules;
-    if (!rules || typeof rules !== 'object') return { error: `${entry} exports no rules` };
-    // A plugin may publish, per rule, the catalog code it reports under (`why[rule].code`); that is how a sub-code is emitted.
-    const why = new Map(Object.entries(loaded.why ?? {}).filter(([, v]) => typeof v?.code === 'string').map(([id, v]) => [id, v.code]));
-    return { ids: new Set(Object.keys(rules)), why };
+    const dir = path.dirname(path.join(root, entry));
+    const files = eslintContributionFiles(fs.readFileSync(path.join(root, entry), 'utf8'));
+    if (!files.length) return { error: `${entry} gathers no CONTRIBUTIONS the check can name` };
+    const ids = new Set();
+    for (const file of files) {
+      const loaded = await import(pathToFileURL(path.join(dir, file)).href);
+      if (!loaded.rules || typeof loaded.rules !== 'object') throw new Error(`${file} exports no rules`);
+      for (const id of Object.keys(loaded.rules)) ids.add(id);
+    }
+    const whyFile = path.join(dir, 'lib', 'why.mjs');
+    const whyModule = fs.existsSync(whyFile) ? await import(pathToFileURL(whyFile).href) : {};
+    const why = new Map(Object.entries(whyModule.why ?? {}).filter(([, v]) => typeof v?.code === 'string').map(([id, v]) => [id, v.code]));
+    return { ids, why };
   } catch (error) {
     return { error: `${entry} cannot be loaded (${String(error?.message ?? error).split('\n')[0]})` };
   }

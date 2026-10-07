@@ -57,8 +57,14 @@ const GENERATED_SET = new Set(GENERATED);
  */
 const BLOB_SIDECAR = /^examples\/\.runtimes\/[^/]+\/artifacts\/[0-9a-f]{2}\/[0-9a-f]{64}\.json$/;
 
-/** Local runtime preferences and Claude Code's per-user project settings; gitignored; not skill-authored declarative source. */
-const LOCAL_ONLY = new Set(['config.json', 'settings.local.json', '.claude/settings.local.json']);
+/**
+ * Local runtime preferences; gitignored; not skill-authored declarative source. The nested paths are the exact
+ * project-scope files an agent launch writes into its worktree through scripts/agent/trust.mjs projectTargets
+ * (.claude/settings.local.json and .devin/config.local.json — the third target, .codex/config.toml, is not JSON):
+ * git-ignored local state wherever they land, wrongly blocked when scanned. A same-named file at any other path
+ * stays authored.
+ */
+const LOCAL_ONLY = new Set(['config.json', 'settings.local.json', '.claude/settings.local.json', '.devin/config.local.json']);
 
 /**
  * Runtime-owned storage at the skill root. These exact roots contain workflow state and sealed

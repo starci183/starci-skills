@@ -59,7 +59,7 @@ import { outageInText } from '../agent/provider-outage.mjs';
 import { recordWorkerLaunch, workerAttemptAgent, setJob, workerTerminalClosed, closeWorkerTerminalState } from './worker-state.mjs';
 import { recordWorkerReport, resolveReportCommit } from './workers-report.mjs';
 import { startWorkerAgent } from '../agent/start-worker.mjs'; import { isMain } from '../lib/is-main.mjs';
-import { slugify } from '../lib/slug.mjs';
+import { slugify } from '../lib/slug.mjs'; import { withoutSeatEnv } from '../lib/seat-env.mjs';
 import { runWorkersCli } from './workers-cli.mjs';
 import { pickWorkerPool } from './worker-pool.mjs';
 import { tierMembers, tierOfSeat, tierSettings } from '../agent/tiers.mjs';
@@ -209,7 +209,7 @@ export function createStaging({ jobId, root = SKILL_ROOT, env = process.env, orc
     removeOrcaWorktree({ repoRoot: root, orcaId: made.id, dir: made.path, env, orca });
     return { ok: false, reason: 'orca-worktree-create-failed', code: 'WORKER_STAGING_CREATE_FAILED', error: `orca worktree create reported no ${made.branch ? 'head' : 'branch'} for ${made.path}` };
   }
-  const deps = fs.existsSync(path.join(made.path, 'package-lock.json')) ? underHostLockWaiting({ purpose: 'npm-ci', env, deps: lockDeps }, () => install(made.path)) : { ok: true }; // under the host lock like every dependency install (waited for, bounded): the caller then owns the lock its install policy asks for
+  const deps = fs.existsSync(path.join(made.path, 'package-lock.json')) ? underHostLockWaiting({ purpose: 'npm-ci', env, deps: lockDeps }, () => install(made.path, { env: withoutSeatEnv(env) })) : { ok: true }; // under the host lock like every dependency install (waited for, bounded): the caller then owns the lock its install policy asks for. The install is the runtime's own work, never the seat's: it runs without the seat identity the spawn process shares (scripts/lib/seat-env.mjs), so a postinstall the PATH shim inspects binds no role (the spawn loop's worker-start can leave the shim on PATH for the next job).
   if (!deps.ok) {
     removeOrcaWorktree({ repoRoot: root, orcaId: made.id, dir: made.path, env, orca });
     return { ok: false, reason: 'staging-install-failed', code: 'WORKER_STAGING_CREATE_FAILED', error: `npm ci in the staging checkout failed (exit ${deps.status ?? 'unknown'}): ${String(deps.stderr ?? deps.detail ?? '').slice(-400)}` };

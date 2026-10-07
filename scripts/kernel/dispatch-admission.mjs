@@ -70,10 +70,49 @@ export function selectDispatchContract(root, op, payload, { planning = false } =
   return { brief: selected.contract, params, selected: { mode: selected.mode, contract: selected.contract, checks } };
 }
 
+/**
+ * A read bound to a mode is required only in that mode: `policy.modes.<mode>`
+ * names the param that selects it and the read ids the mode owns (brand.decide
+ * reads.direction, direction mode params.directionArchetype). The dispatch of an
+ * inactive mode leaves those reads out of the required set entirely; the mode's
+ * own dispatch still enforces every one of them.
+ */
+const modeReadBrief = (briefDoc, params) => {
+  const modes = briefDoc?.policy?.modes;
+  if (!modes || typeof modes !== 'object' || Array.isArray(modes)) return briefDoc;
+  const inactive = new Set();
+  for (const mode of Object.values(modes)) {
+    if (mode?.param && !params?.[mode.param]) for (const id of mode?.reads ?? []) inactive.add(id);
+  }
+  return inactive.size
+    ? { ...briefDoc, reads: (briefDoc.reads ?? []).filter((read) => !inactive.has(read?.id)) }
+    : briefDoc;
+};
+
+/** The `<family>` binding of grammar-law READ paths: the bound brand record's
+ * declared identity.family (work/brand@1), when the dispatch params name none. */
+const boundFamilyOf = (stateDir) => {
+  if (!stateDir) return null;
+  try {
+    const family = parseYaml(fs.readFileSync(path.join(stateDir, 'brand', 'index.yaml'), 'utf8'))?.brand?.identity?.family;
+    return typeof family === 'string' && /^[A-Za-z0-9_.-]+$/.test(family) ? family : null;
+  } catch { return null; }
+};
+
+/** READ-resolution bindings only: the packet keeps declared params, the read
+ * layer additionally binds `<family>` from the bound brand record. */
+const readBindingParams = (params, stateDir) => {
+  if (params?.family != null) return params;
+  const family = boundFamilyOf(stateDir);
+  return family ? { ...params, family } : params;
+};
+
 /** Capture selected READ files and input digests once for the immutable packet.
  * Failed measurement is not an absent optional product record or a usable snapshot. */
 export function captureDispatchInputs({ skillRoot, op, packet, briefDoc, params, repo, stateDir, workDir = '.starciwork', workerCwd, planning = false, inputRecorder = recordInputs }) {
-  const contextPack = buildContext({ op, records: packet.context.records, skillRoot, briefDoc, params,
+  const readBrief = modeReadBrief(briefDoc, params);
+  const readParams = readBindingParams(params, stateDir);
+  const contextPack = buildContext({ op, records: packet.context.records, skillRoot, briefDoc: readBrief, params: readParams,
     appRoot: workerCwd, stateDir, allowSelect: planning,
     ownedPaths: packet.context.owned_paths.map((place) => ({ ...place,
       abs: place.unresolved ? undefined : path.resolve(place.root ?? workerCwd, place.path) })),
@@ -82,7 +121,7 @@ export function captureDispatchInputs({ skillRoot, op, packet, briefDoc, params,
     throw Object.assign(new Error(contextPack.error ?? `required READ inputs missing or incomplete: ${contextPack.requiredMissing.join(', ')}`), { code: 'op-context-refused' });
   }
   let inputs;
-  try { inputs = inputRecorder(skillRoot, opInputPaths(briefDoc, { params }), undefined, { repo, workPaths: workInputPaths({ records: packet.context.records }), workDir, strict: true }); }
+  try { inputs = inputRecorder(skillRoot, opInputPaths(readBrief, { params: readParams }), undefined, { repo, workPaths: workInputPaths({ records: packet.context.records }), workDir, strict: true }); }
   catch (error) { throw Object.assign(new Error(`input capture failed: ${error.code ?? 'unreadable'}`), { code: 'op-context-refused' }); }
   if (inputs?.schema !== INPUT_DIGEST_SCHEMA || !Array.isArray(inputs.digests) || inputs.digests.some((row) => row.kind === 'source' && row.digest === ABSENT)) {
     throw Object.assign(new Error('input capture is malformed or required Source inputs are absent'), { code: 'op-context-refused' });
