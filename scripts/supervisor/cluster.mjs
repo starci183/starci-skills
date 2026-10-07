@@ -19,6 +19,14 @@ const trimTrailingDashes = (value) => {
 
 
 /** Cluster `items`; returns [{id, label, token, items, workflows, incidents, fixedBy, summary}] largest first. */
+function relatedItems(a, b, facts, items) {
+  const fa = facts[a], fb = facts[b];
+  if ((items[b].incidentId && fa.cites.has(items[b].incidentId)) || (items[a].incidentId && fb.cites.has(items[a].incidentId))) return true;
+  if (fa.fix && fa.fix === fb.fix) return true;
+  const sharedLabel = [...fa.labels].some((l) => fb.labels.has(l)) || (!fa.labels.size && !fb.labels.size && (items[a].pattern ?? items[a].kind) === (items[b].pattern ?? items[b].kind));
+  return sharedLabel && [...fa.tokens].some((t) => fb.tokens.has(t));
+}
+
 export function clusterOwed(items) {
   const n = items.length;
   const parent = items.map((_, i) => i);
@@ -40,11 +48,7 @@ export function clusterOwed(items) {
   });
   for (let a = 0; a < n; a += 1) {
     for (let b = a + 1; b < n; b += 1) {
-      const fa = facts[a], fb = facts[b];
-      if ((items[b].incidentId && fa.cites.has(items[b].incidentId)) || (items[a].incidentId && fb.cites.has(items[a].incidentId))) { join(a, b); continue; }
-      if (fa.fix && fa.fix === fb.fix) { join(a, b); continue; }
-      const sharedLabel = [...fa.labels].some((l) => fb.labels.has(l)) || (!fa.labels.size && !fb.labels.size && (items[a].pattern ?? items[a].kind) === (items[b].pattern ?? items[b].kind));
-      if (sharedLabel && [...fa.tokens].some((t) => fb.tokens.has(t))) join(a, b);
+      if (relatedItems(a, b, facts, items)) join(a, b);
     }
   }
   const groups = new Map();
