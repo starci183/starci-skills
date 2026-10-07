@@ -16,8 +16,9 @@ export function tapSummary(tap) {
   for (const raw of text.split(/\r?\n/)) {
     const sub = /^(\s*)# Subtest: (.*)$/.exec(raw);
     if (sub) { const depth = sub[1].length / 4; stack.length = depth; stack[depth] = sub[2]; continue; }
-    const bad = /^(\s*)not ok \d+ - (.*?)(\s+#\s*(TODO|SKIP)\b.*)?$/i.exec(raw);
-    if (bad && !bad[3]) failing.push([...stack.slice(0, bad[1].length / 4), bad[2]].join(' > '));
+    const bad = /^(\s*)not ok \d+ - (.*)$/i.exec(raw);
+    const skipped = bad && /\s+#\s*(TODO|SKIP)\b.*$/i.test(bad[2]);
+    if (bad && !skipped) failing.push([...stack.slice(0, bad[1].length / 4), bad[2]].join(' > '));
   }
   out.failing = failing.filter((name) => !failing.some((other) => other !== name && other.startsWith(`${name} > `)));
   return out;
