@@ -63,6 +63,7 @@ flag_management:
         - "engine/db/provider-reservations.mjs"
         - "engine/digest.mjs"
         - "engine/invalid-config.mjs"
+        - "engine/model-config.mjs"
         - "engine/orca-config.mjs"
         - "engine/plain-object.mjs"
         - "engine/refuse.mjs"
