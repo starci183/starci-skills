@@ -85,28 +85,37 @@ const defaultedParams = (declared, overrides) => {
   return { params };
 };
 
+const overridesOf = (declared, legValues, flagValues, opId) => {
+  const overrides = {};
+  for (const [source, values] of [['goal leg', legValues], ['--params', flagValues]]) {
+    for (const [name, value] of Object.entries(values)) {
+      const detail = overrideProblem(opId, declared, legValues, source, name, value);
+      if (detail) return { error: { ok: false, reason: 'params-invalid', detail } };
+      overrides[name] = value;
+    }
+  }
+  return { overrides };
+};
+
+const requiredParamError = (declared, overrides, opId, enforceRequired) => {
+  const missing = Object.entries(declared).filter(([name, def]) => def?.required === true && !Object.hasOwn(overrides, name));
+  if (!enforceRequired || !missing.length) return null;
+  const [name, def] = missing[0];
+  const via = def.setBy === 'owner' ? 'the approved goal leg (define-goal --params)' : `--params '{"${name}": <${def.type}>}'`;
+  return { ok: false, reason: 'params-invalid', param: name,
+    detail: `${opId} requires params.${name} (${def.type}, set by ${def.setBy}): ${def.doc?.en ?? ''} — none was given; re-run enqueue with ${via}` };
+};
+
 export function resolveOpParams(opDoc, { leg = null, flag = null, enforceRequired = false } = {}) {
   const declared = opDoc?.params && typeof opDoc.params === 'object' ? opDoc.params : {};
   const legValues = leg && typeof leg === 'object' ? leg : {};
   const flagValues = flag && typeof flag === 'object' ? flag : {};
-  const overrides = {};
   const opId = opDoc?.id ?? 'this op';
-
-  for (const [source, values] of [['goal leg', legValues], ['--params', flagValues]]) {
-    for (const [name, value] of Object.entries(values)) {
-      const detail = overrideProblem(opId, declared, legValues, source, name, value);
-      if (detail) return { ok: false, reason: 'params-invalid', detail };
-      overrides[name] = value;
-    }
-  }
-
-  const missing = Object.entries(declared).filter(([name, def]) => def?.required === true && !Object.hasOwn(overrides, name));
-  if (enforceRequired && missing.length) {
-    const [name, def] = missing[0];
-    const via = def.setBy === 'owner' ? 'the approved goal leg (define-goal --params)' : `--params '{"${name}": <${def.type}>}'`;
-    return { ok: false, reason: 'params-invalid', param: name,
-      detail: `${opId} requires params.${name} (${def.type}, set by ${def.setBy}): ${def.doc?.en ?? ''} — none was given; re-run enqueue with ${via}` };
-  }
+  const resolvedOverrides = overridesOf(declared, legValues, flagValues, opId);
+  if (resolvedOverrides.error) return resolvedOverrides.error;
+  const overrides = resolvedOverrides.overrides;
+  const requiredError = requiredParamError(declared, overrides, opId, enforceRequired);
+  if (requiredError) return requiredError;
   const defaulted = defaultedParams(declared, overrides);
   if (defaulted.error) return { ok: false, reason: 'params-invalid', detail: `default ${defaulted.error}` };
   return { ok: true, params: defaulted.params, overrides };
