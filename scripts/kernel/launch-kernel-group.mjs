@@ -9,6 +9,32 @@ const failureOf = (spawned, selected) => ({ agent: selected.provider, requestedM
   ...(spawned.cleanup ? { cleanup: spawned.cleanup } : undefined), ...(spawned.observation ? { observation: spawned.observation } : undefined),
   ...(spawned.trust ? { trust: spawned.trust } : undefined) });
 
+const nextMemberOf = ({ spawned, remaining, route, fellThrough, hostUnavailableExit, failStart }) => {
+  const selected = spawned.admission?.selected ?? { provider: remaining[0].agent, model: remaining[0].model };
+  const failure = failureOf(spawned, selected);
+  if (spawned.hostUnavailable) failStart('host-unavailable', spawned.error, spawned.terminal ?? null, { ...failure, launchStep: spawned.step }, hostUnavailableExit);
+  const selectedIndex = remaining.findIndex((candidate) => candidate.agent === selected.provider && candidate.model === selected.model);
+  remaining.splice(Math.max(selectedIndex, 0), 1);
+  const next = remaining[0] ?? null;
+  if (!route.fallThrough || !next || spawned.effectState !== 'none')
+    failStart(spawned.step, spawned.error, spawned.terminal ?? null,
+      { ...failure, ...(fellThrough.length ? { fellThrough } : undefined),
+        ...(route.fallThrough && next ? { fallThroughRefused: `the start left effect '${spawned.effectState ?? 'unknown'}'` } : undefined) });
+  return { selected, failure, next };
+};
+
+const recordFallThrough = ({ ledger, workflowId, spawned, failure, next, selected, member, memberLabel, fellThrough, now }) => {
+  const failedAt = now();
+  const workflow = ledger.db.prepare('SELECT generation FROM workflows WHERE workflow_id=?').get(workflowId);
+  ledger.transaction(() => {
+    ledger.appendEvent({ workflowId, entityType: 'kernel', entityId: workflowId, generation: workflow?.generation ?? 0,
+      kind: 'kernel-start-failed', createdAt: failedAt,
+      payload: { step: spawned.step, error: spawned.error, ...failure, fellThroughTo: { agent: next.agent, model: next.model ?? null } } });
+  });
+  fellThrough.push({ agent: selected.provider, model: selected.model ?? null, step: spawned.step, error: spawned.error });
+  console.error(`start-workflow: warning: kernel member ${memberLabel(member)} refused at ${spawned.step} (${spawned.error}) — falling through to ${memberLabel(next)}`);
+};
+
 export function launchKernelGroup({ ledger, workflowId, token, expected, route, members, launch, reservationMs,
   hostUnavailableExit, memberLabel, failStart }, { start = startAgent, now = Date.now } = {}) {
   const fellThrough = [];
@@ -33,26 +59,9 @@ export function launchKernelGroup({ ledger, workflowId, token, expected, route, 
         effort: spawned.effort, warnings: route.warnings, members: route.members, fallThrough: route.fallThrough };
       break;
     }
-    const selected = spawned.admission?.selected ?? { provider: member.agent, model: member.model };
-    const failure = failureOf(spawned, selected);
     // An Orca that stopped answering mid-boot proves nothing about any member: host-unavailable (exit 75), no fall-through.
-    if (spawned.hostUnavailable) failStart('host-unavailable', spawned.error, spawned.terminal ?? null, { ...failure, launchStep: spawned.step }, hostUnavailableExit);
-    const selectedIndex = remaining.findIndex((candidate) => candidate.agent === selected.provider && candidate.model === selected.model);
-    remaining.splice(Math.max(selectedIndex, 0), 1);
-    const next = remaining[0] ?? null;
-    if (!route.fallThrough || !next || spawned.effectState !== 'none')
-      failStart(spawned.step, spawned.error, spawned.terminal ?? null,
-        { ...failure, ...(fellThrough.length ? { fellThrough } : undefined),
-          ...(route.fallThrough && next ? { fallThroughRefused: `the start left effect '${spawned.effectState ?? 'unknown'}'` } : undefined) });
-    const failedAt = now();
-    const workflow = ledger.db.prepare('SELECT generation FROM workflows WHERE workflow_id=?').get(workflowId);
-    ledger.transaction(() => {
-      ledger.appendEvent({ workflowId, entityType: 'kernel', entityId: workflowId, generation: workflow?.generation ?? 0,
-        kind: 'kernel-start-failed', createdAt: failedAt,
-        payload: { step: spawned.step, error: spawned.error, ...failure, fellThroughTo: { agent: next.agent, model: next.model ?? null } } });
-    });
-    fellThrough.push({ agent: selected.provider, model: selected.model ?? null, step: spawned.step, error: spawned.error });
-    console.error(`start-workflow: warning: kernel member ${memberLabel(member)} refused at ${spawned.step} (${spawned.error}) — falling through to ${memberLabel(next)}`);
+    const { selected, failure, next } = nextMemberOf({ spawned, remaining, route, fellThrough, hostUnavailableExit, failStart });
+    recordFallThrough({ ledger, workflowId, spawned, failure, next, selected, member, memberLabel, fellThrough, now });
   }
   return { spawned, route, fellThrough };
 }
