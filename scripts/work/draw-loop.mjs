@@ -56,6 +56,8 @@ import {sha256} from '../../engine/digest.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { flag, isFile, list, sha256File, slash, workRootOf } from './work-io.mjs';
 import { readJsonFile } from '../lib/json.mjs';
+import { eachInOrder } from '../lib/in-order.mjs';
+import { groupLiveParts } from './draw-loop-groups.mjs';
 import { insidePath } from '../lib/path-key.mjs';
 import { writeJsonFile } from '../api/fs/write-json-file.mjs';
 import { buildFixtureHarness, captureHtml, loadPlaywright, parseViewports } from './draw-render.mjs';
@@ -67,7 +69,7 @@ import { drawLoopSettings } from './draw/draw-taste.mjs';
 import { contextualCriticFor, runCritic, rubricFor } from './draw-critic.mjs';
 import { archetypeOf } from './ui-archetype.mjs';
 import { readProposals, proposalFilesUnder } from './grammar-proposal.mjs';
-import { LOOP_SCHEMA, livePartsOf } from './draw/draw-loop-coverage.mjs';
+import { LOOP_SCHEMA } from './draw/draw-loop-coverage.mjs';
 import { rationaleFileOf } from './draw/draw-rationale.mjs'; import { isMain } from '../lib/is-main.mjs';
 import { browserProbes, DRAW_BEAUTY_BELOW, DRAW_CRITIC_MISSING, DRAW_METRICS_FAILED, DRAW_METRICS_UNVERIFIED, DRAW_RENDER_RED, GEOMETRY_OFF_GRAMMAR, machineMetrics, stemOf } from './draw-loop-metrics.mjs';
 
@@ -156,7 +158,7 @@ async function defaultComponentRender({ source, fixtures, css = [], productDir, 
     groups.get(f).push(v);
   }
   const records = [];
-  for (const [props, vps] of groups) {
+  await eachInOrder(groups, async ([props, vps]) => {
     const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-draw-loop-'));
     try {
       const built = await buildFixtureHarness({ component: source, exportName: name.split('#')[0], props, css, theme: 'light', workDir, productDir, grammar });
@@ -165,7 +167,7 @@ async function defaultComponentRender({ source, fixtures, css = [], productDir, 
     } finally {
       safeRemove(workDir, { hold: artifactHoldReason });
     }
-  }
+  });
   return records;
 }
 
@@ -625,28 +627,9 @@ export async function verifyRecordParts({ recordDir, record = null, repo, family
   const ui = loadUi(recordDir);
   const rec = record ?? ui.record;
   const findings = [], parts = [];
-  const byHtml = new Map();
-  const byDraw = new Map();
-  for (const p of livePartsOf(recordDir, rec)) {
-    const at = slash(path.relative(repo, p.png));
-    // A real-component part (<part>.draw.tsx + <part>.fixture.json beside it) is re-measured from its draw source.
-    if (p.source && p.viewport) {
-      const key = `${sha256File(p.source)}|${p.fixture ? sha256File(p.fixture) : ''}`;
-      if (!byDraw.has(key)) byDraw.set(key, { source: p.source, fixture: p.fixture, parts: [] });
-      byDraw.get(key).parts.push(p);
-      continue;
-    }
-    if (!p.html || !p.viewport) { findings.push({ code: DRAW_METRICS_UNVERIFIED, path: at, detail: `${p.asset.path} has no ${p.html ? 'viewport (draw-render record or <WxH> in its name)' : 'render source (.html) beside it'}: the runtime cannot re-measure it` }); continue; }
-    const key = sha256File(p.html);
-    if (!byHtml.has(key)) byHtml.set(key, { html: p.html, parts: [] });
-    byHtml.get(key).parts.push(p);
-  }
-  for (const { source, fixture, parts: group } of byDraw.values()) {
-    await verifyDrawGroup({ source, fixture, group, ui, record: rec, repo, family, settings, probes, componentRender, sourceCheck, tmpRoot, findings, parts });
-  }
-  for (const { html, parts: group } of byHtml.values()) {
-    await verifyHtmlGroup({ html, group, ui, record: rec, repo, family, settings, render, probes, tmpRoot, findings, parts });
-  }
+  const { byDraw, byHtml } = groupLiveParts({ recordDir, rec, repo, findings });
+  await eachInOrder(byDraw.values(), ({ source, fixture, parts: group }) => verifyDrawGroup({ source, fixture, group, ui, record: rec, repo, family, settings, probes, componentRender, sourceCheck, tmpRoot, findings, parts }));
+  await eachInOrder(byHtml.values(), ({ html, parts: group }) => verifyHtmlGroup({ html, group, ui, record: rec, repo, family, settings, render, probes, tmpRoot, findings, parts }));
   return { findings, parts };
 }
 
