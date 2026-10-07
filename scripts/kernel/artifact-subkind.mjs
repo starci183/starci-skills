@@ -99,7 +99,7 @@ function recordToolIndex(repo, recordDir) {
     const bases = [path.dirname(file), recordDir, repo];
     const visit = (node, depth = 0) => {
       if (!node || typeof node !== 'object' || depth > 12) return;
-      if (Array.isArray(node)) { for (const v of node) visit(v, depth + 1); return; }
+      if (Array.isArray(node)) { for (const v of node) { visit(v, depth + 1); } return; }
       const tool = toolOfNode(node);
       if (tool) {
         for (const name of namesOfNode(node)) {
@@ -208,4 +208,3 @@ export function subkindOf({ kind, path: rel, opId = null, origin = null, repo = 
   if (kind === 'log') return 'log';
   return null;
 }
-

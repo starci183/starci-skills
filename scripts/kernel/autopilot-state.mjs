@@ -254,7 +254,11 @@ const OWED_PROOFS = Object.freeze({
 });
 
 /** The owner-facing label of one ask option (a string option is its own label). */
-export const optionLabel = (o) => (o == null ? null : (typeof o === 'string' ? o : o.label ?? null));
+export const optionLabel = (o) => {
+  if (o == null) return null;
+  if (typeof o === 'string') return o;
+  return o.label ?? null;
+};
 
 /**
  * Write one autopilot answer receipt (blob + decisions row, ask-receipts.mjs) and its ask-answered event; returns the receipt file. Never answeredBy owner.
