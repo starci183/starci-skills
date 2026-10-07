@@ -15,8 +15,10 @@ const TEST_DIRECTORY = /(?:^|\/)(?:e2e|__tests__|__mocks__|test-support)\//;
 export const TEST_TOOL_FILE = /(?:^|\/)(?:(?:vitest|jest|playwright)\.[^/]+|cypress\.config\.[^/]+|tsconfig\.e2e\.json|e2e\.ya?ml)$/;
 // The edition rule (rules/edition.mjs, L01) applies the same lists to the whole app tree in lite: they are the test vocabulary.
 export const TEST_SCRIPT_NAME = /^(?:pre|post)?test(?::|$)/;
-export const TEST_RUNNER_COMMAND = /(?:^|[\s&|;(])(?:npx\s+)?(?:vitest|jest|playwright|cypress|mocha)(?=$|[\s&|;)])|\bnode\s+(?:--\S+\s+)*--test\b/;
-export const TEST_DEPENDENCY = /^(?:vitest|@vitest\/.+|playwright|playwright-core|@playwright\/.+|jest|@jest\/.+|ts-jest|babel-jest|@types\/jest|jest-[\w-]+|mocha|@types\/mocha|cypress|@testing-library\/.+|jsdom|@types\/jsdom|happy-dom|axe-core|@axe-core\/.+|vitest-axe|@starci\/(?:vitest|jest|playwright)-preset)$/;
+const TEST_RUNNER_COMMAND_SOURCE = String.raw`(?:^|[\s&|;(])(?:npx\s+)?(?:vitest|jest|playwright|cypress|mocha)(?=$|[\s&|;)])|\bnode\s+(?:--\S+\s+)*--test\b`;
+export const TEST_RUNNER_COMMAND = new RegExp(TEST_RUNNER_COMMAND_SOURCE);
+const TEST_DEPENDENCY_SOURCE = String.raw`^(?:vitest|@vitest\/.+|playwright|playwright-core|@playwright\/.+|jest|@jest\/.+|ts-jest|babel-jest|@types\/jest|jest-[\w-]+|mocha|@types\/mocha|cypress|@testing-library\/.+|jsdom|@types\/jsdom|happy-dom|axe-core|@axe-core\/.+|vitest-axe|@starci\/(?:vitest|jest|playwright)-preset)$`;
+export const TEST_DEPENDENCY = new RegExp(TEST_DEPENDENCY_SOURCE);
 export const DEPENDENCY_SECTIONS = ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies'];
 
 /** True for a path FE_NO_TESTS owns: a spec file, a test directory or a test-tool file. */
