@@ -102,6 +102,29 @@ export function satisfiesRange(version, range) {
   return v[0] === 0 && v[1] === 0 && v[2] === base[2];
 }
 
+function tryGrammarCandidates(candidates, { file, productDir, typecheck }) {
+  const attempts = [];
+  let pick = null;
+  for (const c of candidates) {
+    if (!file) { pick = c; break; }
+    const r = typecheck({ file, productDir, grammarRoot: c.root });
+    attempts.push({ source: c.source, version: c.version, root: c.root, ok: r.ok, errors: r.errors.slice(0, 20), typescript: r.typescript ?? null, ...(c.dist ? { dist: c.dist } : {}) });
+    if (r.ok) { pick = c; break; }
+  }
+  return { attempts, pick };
+}
+
+function upgradeOwedFor(pick, product, productRange) {
+  return pick?.source === 'claude-dist' ? { status: 'owed', package: GRAMMAR_PACKAGE, from: product?.version ?? null, to: pick.version, range: productRange,
+    inRange: satisfiesRange(pick.version, productRange), why: product ? `the product's installed ${GRAMMAR_PACKAGE}@${product.version} does not satisfy the drawing (it fails to type-check); ${pick.version} does` : `the product has no built ${GRAMMAR_PACKAGE} install` } : null;
+}
+
+function missingGrammarError(candidates, skillRoot) {
+  return candidates.length
+    ? `no grammar candidate type-checks the drawing (${candidates.map((candidate) => candidate.source + '@' + candidate.version + (candidate.dist && !candidate.dist.ok ? ' - its dist is ' + candidate.dist.state + ': ' + candidate.dist.detail + '; run npm run build in packages/grammar' : '')).join(', ')})`
+    : `no built ${GRAMMAR_PACKAGE} (product install, ${path.join(skillRoot, 'packages', 'grammar', 'dist')} or the main worktree's; run npm run build in packages/grammar, or pass --grammar-dist)`;
+}
+
 /**
  * Resolve the grammar a draw file renders against. `typecheck` is injectable (tests). Without `file` the first
  * candidate of the preference wins untested. Returns {ok, pick, grammarSource, productVersion, productRange,
@@ -113,19 +136,11 @@ export function resolveDrawGrammar({ file = null, productDir, skillRoot = SKILL_
   const product = all.find((c) => c.source === 'product') ?? null;
   const productRange = productRangeOf(productDir);
   const candidates = prefer === 'auto' ? all : all.filter((c) => c.source === prefer);
-  const attempts = [];
-  let pick = null;
-  for (const c of candidates) {
-    if (!file) { pick = c; break; }
-    const r = typecheck({ file, productDir, grammarRoot: c.root });
-    attempts.push({ source: c.source, version: c.version, root: c.root, ok: r.ok, errors: r.errors.slice(0, 20), typescript: r.typescript ?? null, ...(c.dist ? { dist: c.dist } : {}) });
-    if (r.ok) { pick = c; break; }
-  }
-  const upgradeOwed = pick?.source === 'claude-dist' ? { status: 'owed', package: GRAMMAR_PACKAGE, from: product?.version ?? null, to: pick.version, range: productRange,
-    inRange: satisfiesRange(pick.version, productRange), why: product ? `the product's installed ${GRAMMAR_PACKAGE}@${product.version} does not satisfy the drawing (it fails to type-check); ${pick.version} does` : `the product has no built ${GRAMMAR_PACKAGE} install` } : null;
+  const { attempts, pick } = tryGrammarCandidates(candidates, { file, productDir, typecheck });
+  const upgradeOwed = upgradeOwedFor(pick, product, productRange);
   return {
     ok: Boolean(pick), pick, grammarSource: pick ? `${pick.source}@${pick.version}` : null, productVersion: product?.version ?? null, productRange, upgradeOwed, attempts,
-    ...(pick ? {} : { error: candidates.length ? `no grammar candidate type-checks the drawing (${candidates.map((candidate) => candidate.source + '@' + candidate.version + (candidate.dist && !candidate.dist.ok ? ' - its dist is ' + candidate.dist.state + ': ' + candidate.dist.detail + '; run npm run build in packages/grammar' : '')).join(', ')})` : `no built ${GRAMMAR_PACKAGE} (product install, ${path.join(skillRoot, 'packages', 'grammar', 'dist')} or the main worktree's; run npm run build in packages/grammar, or pass --grammar-dist)` }),
+    ...(pick ? {} : { error: missingGrammarError(candidates, skillRoot) }),
   };
 }
 
