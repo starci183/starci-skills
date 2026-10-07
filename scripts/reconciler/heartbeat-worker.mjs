@@ -116,18 +116,15 @@ function workerMain({ file, leaseMs, renewMs, stallMaxMs, t0, sab }, parentPort)
     } catch { return false; } // busy: the next tick retries
   };
 
-  const tick = () => {
-    const now = Date.now();
-    const stallMs = now - (t0 + Atomics.load(stamp, 0) * 100);
-    const renewDue = now - lastRenewAt >= renewMs;
-    if (stallMs < STALL_MIN_MS) {
-      if (st.leader && renewDue) renew();
-      if (stalledAt != null) {
-        if (loggedAt != null) write('info', `engine main thread resumed after ${Math.round((now - stalledAt) / 1000)}s (last phase: ${st.phase ?? '-'})`, { resumed: true, stalledMs: now - stalledAt, phase: st.phase, ...sample() });
-        stalledAt = null; loggedAt = null; withheldLogged = false; prev = null;
-      }
-      return;
-    }
+  // The main thread answers again: note the end of the stall (when it was logged) and re-arm the clocks.
+  const noteResumed = (now) => {
+    if (stalledAt == null) return;
+    if (loggedAt != null) write('info', `engine main thread resumed after ${Math.round((now - stalledAt) / 1000)}s (last phase: ${st.phase ?? '-'})`, { resumed: true, stalledMs: now - stalledAt, phase: st.phase, ...sample() });
+    stalledAt = null; loggedAt = null; withheldLogged = false; prev = null;
+  };
+
+  // The main thread is blocked: renew or withhold the heartbeat as the plan says and log the stall once per interval.
+  const noteBlocked = (now, stallMs, renewDue) => {
     if (stalledAt == null) { stalledAt = now - stallMs; sample(); }
     const plan = heartbeatPlan({ stallMs, leader: st.leader, renewDue, stallMaxMs, loggedAt: loggedAt == null ? null : loggedAt - stalledAt, sinceMs: now - stalledAt });
     if (plan.renew) renew();
@@ -140,6 +137,18 @@ function workerMain({ file, leaseMs, renewMs, stallMaxMs, t0, sab }, parentPort)
       withheldLogged = true;
       write('error', `engine main thread blocked past ${Math.round(stallMaxMs / 1000)}s: the worker stops renewing so boot ensure replaces this engine`, { stallMs, phase: st.phase, running: st.running, withheld: true });
     }
+  };
+
+  const tick = () => {
+    const now = Date.now();
+    const stallMs = now - (t0 + Atomics.load(stamp, 0) * 100);
+    const renewDue = now - lastRenewAt >= renewMs;
+    if (stallMs < STALL_MIN_MS) {
+      if (st.leader && renewDue) renew();
+      noteResumed(now);
+      return;
+    }
+    noteBlocked(now, stallMs, renewDue);
   };
   setInterval(tick, Math.max(1000, Math.min(2500, Math.floor(renewMs / 4)))).unref?.();
   // the worker keeps the event loop of ITS thread alive; the main thread's exit ends it (worker.unref)

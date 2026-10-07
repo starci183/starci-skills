@@ -25,7 +25,8 @@ const RATE_LIMITED = /rate[- ]?limit|Send a message to retry|Upgrade to .* for h
 const DONE_NO_REPORT = /Worked for .* done|Press enter to continue/i;
 const RESET_HINT_TERMS = '(?:reset|resets|try again|retry|available)';
 const RESET_HINT_WAIT = '\\s+(?:in|after)\\s+';
-const RESET_HINT_DURATION = '(\\d+(?:\\.\\d+)?)\\s*(s|sec|secs|seconds?|m|min|mins|minutes?|h|hr|hours?)\\b';
+const RESET_HINT_UNITS = ['s', 'sec', 'secs', 'seconds?', 'm', 'min', 'mins', 'minutes?', 'h', 'hr', 'hours?'].join('|');
+const RESET_HINT_DURATION = `(\\d+(?:\\.\\d+)?)\\s*(${RESET_HINT_UNITS})\\b`;
 const RESET_HINT = new RegExp(RESET_HINT_TERMS + RESET_HINT_WAIT + RESET_HINT_DURATION, 'i');
 export const NUDGE = Object.freeze({
   retry: 'Retry: continue your task from where you stopped.',

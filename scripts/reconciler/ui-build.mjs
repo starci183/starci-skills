@@ -82,7 +82,7 @@ export async function buildUi({ uiDir = path.join(SKILL_ROOT, 'ui'), env = proce
       const manifests = guard();
       let install = null;
       if (!toolsReady()) {
-        install = await api.ci(root, { env });
+        install = await Promise.resolve(api.ci(root, { env }));
         if (install?.ok !== true || install?.status !== 0)
           return { ok: false, install, output: `UI dependency install failed: ${String(install?.stderr ?? 'no successful receipt').slice(0, 300)}` };
       }

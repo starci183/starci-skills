@@ -170,7 +170,11 @@ async function recordCrashAlert(plan, numbers, push, record, now) {
   return alert;
 }
 
-const startReasonOf = (safe, planned, leader) => safe ? 'crash-restart' : planned ?? (leader.holder ? 'ensure-stale-heartbeat' : 'boot');
+function startReasonOf(safe, planned, leader) {
+  if (safe) return 'crash-restart';
+  if (planned != null) return planned;
+  return leader.holder ? 'ensure-stale-heartbeat' : 'boot';
+}
 
 /**
  * Owner restart: stop the engine (if any), then ensure. The stop ends the engine's run `killed` by the owner and releases

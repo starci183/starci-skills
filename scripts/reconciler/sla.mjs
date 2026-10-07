@@ -26,8 +26,9 @@ import { openLedgerReader } from '../../engine/db/ledger.mjs';
 import { machineFileFor, openMachine, readMachine, withMachine } from '../../engine/db/machine.mjs';
 import { allocationSettings } from '../../engine/config.mjs';
 import { readSupervisor, supervisorEvent } from '../machine/home.mjs';
-import { SETTLED_JOB_LIST } from '../../engine/admission.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { eachInOrder } from '../lib/in-order.mjs';
+import { TRANSCRIPT_CODE, clockTruth } from './sla-truth.mjs';
 import { dotGet } from '../lib/dot-path.mjs';
 import { hasTable as sqliteHasTable } from '../lib/sqlite.mjs';
 import { positiveNumber } from '../lib/number.mjs';
@@ -47,6 +48,17 @@ const CLEAR_REPORT_WINDOW_MS = 7 * 86_400_000;
 const dotted = dotGet;
 const positiveOrZero = (v) => positiveNumber(v, null, { orZero: true });
 
+/** One catalogue code with its numbers resolved against the allocation settings `alloc`. */
+function catalogEntry(code, c, alloc) {
+  const base = c.slaKey ? positiveOrZero(dotted(alloc, c.slaKey)) : positiveOrZero(c.slaMs);
+  return {
+    code, severity: c.severity === 'critical' ? 'critical' : 'warn', owner: c.owner ?? null, autoAction: c.autoAction ?? null,
+    slaMs: base == null ? null : base + (positiveOrZero(c.plusMs) ?? 0),
+    criticalMs: c.criticalKey ? positiveOrZero(dotted(alloc, c.criticalKey)) : positiveOrZero(c.criticalMs),
+    ...(c.slaKey ? { slaKey: c.slaKey } : {}), ...(c.criticalKey ? { criticalKey: c.criticalKey } : {}),
+  };
+}
+
 /**
  * The catalogue with every number resolved: {passMs, codes: {CODE: {slaMs, criticalMs, severity, owner, autoAction,
  * slaKey?}}, states: {state: CODE}}. A slaKey the runtime profile does not declare leaves slaMs null (the clock's
@@ -58,16 +70,7 @@ export function slaCatalog({ file = SLA_FILE, allocation = null } = {}) {
   let alloc = allocation;
   if (!alloc) { try { alloc = allocationSettings(); } catch { alloc = {}; } }
   const codes = {};
-  for (const [code, raw] of Object.entries(doc.codes ?? {})) {
-    const c = raw ?? {};
-    const base = c.slaKey ? positiveOrZero(dotted(alloc, c.slaKey)) : positiveOrZero(c.slaMs);
-    codes[code] = {
-      code, severity: c.severity === 'critical' ? 'critical' : 'warn', owner: c.owner ?? null, autoAction: c.autoAction ?? null,
-      slaMs: base == null ? null : base + (positiveOrZero(c.plusMs) ?? 0),
-      criticalMs: c.criticalKey ? positiveOrZero(dotted(alloc, c.criticalKey)) : positiveOrZero(c.criticalMs),
-      ...(c.slaKey ? { slaKey: c.slaKey } : {}), ...(c.criticalKey ? { criticalKey: c.criticalKey } : {}),
-    };
-  }
+  for (const [code, raw] of Object.entries(doc.codes ?? {})) codes[code] = catalogEntry(code, raw ?? {}, alloc);
   return { passMs: positiveOrZero(doc.passMs) ?? 30_000, codes, states: { ...doc.states } };
 }
 
@@ -224,14 +227,7 @@ const typedRow = (ev, { now, cleared = false }) => {
 // only for a clock that is violated or due, so a pass never probes a healthy worker set. A controller that re-sets a clock
 // the truth cleared is cleared again on the next pass before it can re-violate.
 
-const SETTLED_JOB = new Set(SETTLED_JOB_LIST);
-const LIVE_DECISION = new Set(['open', 'claimed', 'escalated']);
 const KEY_SEP = '\u0000';
-/** job clock code -> the job statuses in which its condition can still hold (null: any unsettled status). */
-const JOB_TRUTH = Object.freeze({
-  LEASE_STUCK: ['leased'], QUESTION_OVERDUE: ['answering'], EFFECT_UNKNOWN_STUCK: ['effect_unknown'],
-  DEAD_WORKER_UNRECONCILED: ['running', 'answering', 'effect_unknown'], SETTLE_OVERDUE: null, DECISION_OVERDUE: null,
-});
 const PROBE_CODES = new Set(['SERVICE_DOWN']);
 
 /** Per-pass readers: product ledger handles by ledgerId, the service registry, the decisions module. */
@@ -264,74 +260,12 @@ function truthSources(ctx) {
   };
 }
 
-/** Whether one clock's condition still holds: {holds, why?} or null (unknown). Never throws. */
-async function clockTruth(row, code, src, { now = Date.now() } = {}) {
-  try {
-    const p = String(row.entity ?? '').split(':');
-    if (code === 'SERVICE_DOWN' && p[0] === 'service') {
-      const entry = (await src.registry())?.find((e) => e.name === p.slice(1).join(':'));
-      if (typeof entry?.probe !== 'function') return null;
-      // Two tries: the first request after idle can miss a short probe timeout while the service is up.
-      for (let i = 0; i < 2; i++) {
-        const r = await entry.probe();
-        if (r?.ok === true || r?.unmanaged === true) return { holds: false, why: 'probe ok' + (r?.status ? ' (http ' + r.status + ')' : '') + (i ? ' on the second try' : '') };
-      }
-      return { holds: true };
-    }
-    if (p[0] === 'job' && p.length >= 3 && Object.hasOwn(JOB_TRUTH, code)) {
-      const db = src.ledgerOf(p[1]);
-      if (!db) return null;
-      const jobId = p.slice(2).join(':');
-      const job = db.prepare('SELECT status, workflow_id FROM jobs WHERE job_id=?').get(jobId);
-      if (!job) return { holds: false, why: 'job gone' };
-      if (SETTLED_JOB.has(job.status)) return { holds: false, why: `job ${job.status}` };
-      const allowed = JOB_TRUTH[code];
-      if (allowed && !allowed.includes(job.status)) return { holds: false, why: `job ${job.status}` };
-      if (code === 'DECISION_OVERDUE') {
-        const mod = await src.decisions();
-        if (typeof mod?.listDecisions !== 'function') return null;
-        const mine = mod.listDecisions(db, { workflowId: job.workflow_id, all: true, now }).filter((d) => d?.entity?.id === jobId);
-        // Only a decision that existed and is no longer live clears it: before its DI opens, the clock is the job controller's.
-        if (mine.length && !mine.some((d) => LIVE_DECISION.has(d.status))) {
-          const last = mine[mine.length - 1];
-          return { holds: false, why: `decision ${last.id ?? last.idempotencyKey ?? ''} ${last.status}` };
-        }
-      }
-      return { holds: true };
-    }
-    if (code === TRANSCRIPT_CODE && p[0] === 'attempt' && p.length >= 3) {
-      const db = src.ledgerOf(p[1]);
-      if (!db) return null;
-      const a = db.prepare('SELECT transcript_sha FROM op_attempts WHERE attempt_id=?').get(p.slice(2).join(':'));
-      if (!a) return { holds: false, why: 'attempt gone' };
-      return a.transcript_sha ? { holds: false, why: 'transcript captured' } : { holds: true };
-    }
-    if (code === TRANSCRIPT_CODE && p[0] === 'seat-turn' && p.length >= 2) {
-      const t = src.state?.((db) => db.prepare('SELECT t.seat_id, t.ended_at, EXISTS(SELECT 1 FROM seat_transcript_snapshots s WHERE s.seat_id=t.seat_id AND s.at >= t.ended_at) AS captured FROM seat_turns t WHERE t.turn_id=?').get(Number(p[1])));
-      if (t == null) return null;
-      return t.captured ? { holds: false, why: 'transcript captured' } : { holds: true };
-    }
-    // MB-08 / Q14: a seat or workflow clock of a workflow that is no longer running (paused, stopped, finished,
-    // archived) is gone: a stopped workflow's seat is not vacant, and no controller ever brings it back.
-    if ((p[0] === 'workflow' && p.length >= 3) || (p[0] === 'stuck' && p.length >= 4) || (p[0] === 'seat' && p[1] === 'kernel' && p.length >= 4)) {
-      const db = src.ledgerOf(p[0] === 'seat' ? p[2] : p[1]);
-      if (!db) return null;
-      let wf = p[2]; if (p[0] === 'workflow') wf = p.slice(2).join(':'); else if (p[0] === 'seat') wf = p.slice(3).join(':');
-      const w = db.prepare('SELECT phase, archived_at FROM workflows WHERE workflow_id=?').get(wf);
-      if (w?.phase !== 'running' || w?.archived_at != null) return { holds: false, why: `workflow ${(w?.archived_at != null && 'archived') || (w?.phase ?? (w ? 'not running' : 'gone'))}` };
-      return { holds: true };
-    }
-    return null;
-  } catch { return null; }
-}
-
 /* ------------------------------------------------------------------------------------------------ transcripts */
 // TRANSCRIPT_MISSING (ui/CONTRACT.md): a closed op attempt (op_attempts.terminal_closed_at set) whose full scrollback
 // never became a blob (transcript_sha NULL), or an ended seat turn (machine seat_turns.ended_at) with no seat transcript
 // snapshot taken at or after its end. The clock starts at the close/end; the catalogue's grace (slaMs) is how long the
 // capture (close-op-terminal.mjs, orca-runs.mjs) may take. A ledger or state DB without those tables is skipped. The truth check clears the clock once the transcript exists.
 
-const TRANSCRIPT_CODE = 'TRANSCRIPT_MISSING';
 const TRANSCRIPT_WINDOW_MS = 86_400_000;
 const TRANSCRIPT_LIMIT = 200;
 const hasTable = (db, name) => sqliteHasTable(db, name, { views: true });
@@ -365,9 +299,9 @@ export async function transcriptPass(ctx, { catalog, now }) {
     } catch { /* unreadable ledger: its own clocks cover it */ } finally { try { db?.close(); } catch { /* closed */ } }
   }
   for (const t of withStateDb(ctx, (m) => seatTurnsWithoutTranscript(m.db, { now }), []) ?? []) found.push({ entity: `seat-turn:${t.turnId}`, ledgerId: 'supervisor', enteredAt: t.endedAt, meta: { seatId: t.seatId } });
-  for (const f of found) {
+  await eachInOrder(found, async (f) => {
     try { await setClock(ctx, { entity: f.entity, state: TRANSCRIPT_CODE, slaMs: graceMs, ledgerId: f.ledgerId, enteredAt: f.enteredAt, meta: { code: TRANSCRIPT_CODE, owner: 'gc-controller', ...f.meta } }); } catch { /* next */ }
-  }
+  });
   return found.length;
 }
 
@@ -380,13 +314,13 @@ async function truthPass(ctx, { catalog, now }) {
   const src = truthSources(ctx);
   const cleared = new Map();
   try {
-    for (const row of open) {
+    await eachInOrder(open, async (row) => {
       const { code } = codeOf(row.state, catalog);
       const due = row.violated_at != null || Number(row.entered_at) + Number(row.sla_ms) < now;
-      if (PROBE_CODES.has(code) && !due) continue;
+      if (PROBE_CODES.has(code) && !due) return;
       const t = await clockTruth(row, code, src, { now });
       if (t?.holds === false) cleared.set(`${row.entity}${KEY_SEP}${row.state}`, t.why ?? 'condition gone');
-    }
+    });
   } finally { src.close(); }
   if (cleared.size) {
     withStateDb(ctx, (m) => m.transaction(() => {
@@ -394,6 +328,48 @@ async function truthPass(ctx, { catalog, now }) {
     }), null, { write: true });
   }
   return cleared;
+}
+
+/** One transaction body: the Supervisor events, the invariant_violations rows, the typed log rows and the episode marks. Returns {toViolate, toClear}. */
+function writeEpisodes(m, { events, clears, now }) {
+  // A clear already reported (or an episode re-violated after one) is not reported twice: newest event per dedupeKey.
+  const last = lastInvariantKinds(m, [...new Set([...events, ...clears].map((x) => x.ev.dedupeKey))]);
+  const toViolate = [], toClear = [];
+  for (const x of events) if (last.get(x.ev.dedupeKey) !== VIOLATED_KIND) { toViolate.push(x); last.set(x.ev.dedupeKey, VIOLATED_KIND); }
+  for (const x of clears) if (last.get(x.ev.dedupeKey) === VIOLATED_KIND) { toClear.push(x); last.set(x.ev.dedupeKey, CLEARED_KIND); }
+  for (const { row, ev } of toViolate) {
+    supervisorEvent(m, { entityType: 'invariant', entityId: ev.dedupeKey, kind: VIOLATED_KIND, payload: ev, now });
+    m.recordViolation({ code: ev.code, severity: ev.severity, entity: row.entity, ledgerId: row.ledger_id ?? null, workflowId: row.workflow_id ?? ev.entity.workflowId ?? null,
+      episodeId: Number(row.episode_id), detail: ev });
+  }
+  for (const { row, ev } of toClear) {
+    supervisorEvent(m, { entityType: 'invariant', entityId: ev.dedupeKey, kind: CLEARED_KIND, payload: ev, now });
+    m.db.prepare('UPDATE invariant_violations SET cleared_at=? WHERE entity=? AND code=? AND cleared_at IS NULL').run(now, row.entity, ev.code);
+  }
+  m.log([...toViolate.map(({ ev }) => typedRow(ev, { now })), ...toClear.map(({ ev }) => typedRow(ev, { now, cleared: true }))].map((r) => ({ actor: 'reconciler', ...r })));
+  // Critical delivery stays pending until an actual DI acknowledgement; invariant history remains deduped.
+  for (const { row, ev } of events) { m.markSlaViolated(Number(row.episode_id)); if (ev.severity !== 'critical') m.markSlaReported(Number(row.episode_id)); }
+  return { toViolate, toClear };
+}
+
+/** Deliver each pending critical violation as a decision, one at a time; the episode is marked reported once the owner acknowledged it. */
+async function deliverCriticalDecisions(ctx, { pending, cat, now, out }) {
+  await eachInOrder(pending, async (row) => {
+    const ev = violationEvent(row, { catalog: cat, now });
+    if (ev.severity !== 'critical') return;
+    try {
+      if (typeof ctx?.openDecision !== 'function') throw new Error('decision owner unavailable');
+      const acknowledged = await ctx.openDecision(runtimeDefectDecision(ev, { now }));
+      if (ctx.mode === 'shadow') { out.wouldDecisions = (out.wouldDecisions ?? 0) + 1; return; }
+      if (acknowledged?.ok !== true || acknowledged.shadow || acknowledged.recordedOnly) throw new Error('decision delivery was not acknowledged');
+      const marked = withStateDb(ctx, (m) => m.transaction(() => {
+        m.markSlaReported(Number(row.episode_id));
+        return m.db.prepare('SELECT reported_at FROM sla_episodes WHERE episode_id=?').get(row.episode_id)?.reported_at != null;
+      }), false, { write: true });
+      if (!marked) throw new Error('decision acknowledgement write failed');
+      out.decisions += 1;
+    } catch (error) { out.ok = false; out.skipped.push(`decision:${ev.dedupeKey}: ${String(error?.message ?? error).slice(0, 120)}`); }
+  });
 }
 
 /**
@@ -419,48 +395,14 @@ export async function slaPass(ctx, { catalog = null, env = ctx?.env ?? process.e
     return { row, ev: { ...violationEvent(row, { catalog: cat, now }), kind: CLEARED_KIND, clearedAt: Number(row.cleared_at), clearedBy: why ? 'sla-truth' : 'controller', ...(why ? { clearedWhy: why } : {}) } };
   });
   // One transaction: the Supervisor events, the invariant_violations rows, the typed log rows and the episode marks.
-  const written = withStateDb(ctx, (m) => m.transaction(() => {
-    // A clear already reported (or an episode re-violated after one) is not reported twice: newest event per dedupeKey.
-    const last = lastInvariantKinds(m, [...new Set([...events, ...clears].map((x) => x.ev.dedupeKey))]);
-    const toViolate = [], toClear = [];
-    for (const x of events) if (last.get(x.ev.dedupeKey) !== VIOLATED_KIND) { toViolate.push(x); last.set(x.ev.dedupeKey, VIOLATED_KIND); }
-    for (const x of clears) if (last.get(x.ev.dedupeKey) === VIOLATED_KIND) { toClear.push(x); last.set(x.ev.dedupeKey, CLEARED_KIND); }
-    for (const { row, ev } of toViolate) {
-      supervisorEvent(m, { entityType: 'invariant', entityId: ev.dedupeKey, kind: VIOLATED_KIND, payload: ev, now });
-      m.recordViolation({ code: ev.code, severity: ev.severity, entity: row.entity, ledgerId: row.ledger_id ?? null, workflowId: row.workflow_id ?? ev.entity.workflowId ?? null,
-        episodeId: Number(row.episode_id), detail: ev });
-    }
-    for (const { row, ev } of toClear) {
-      supervisorEvent(m, { entityType: 'invariant', entityId: ev.dedupeKey, kind: CLEARED_KIND, payload: ev, now });
-      m.db.prepare('UPDATE invariant_violations SET cleared_at=? WHERE entity=? AND code=? AND cleared_at IS NULL').run(now, row.entity, ev.code);
-    }
-    m.log([...toViolate.map(({ ev }) => typedRow(ev, { now })), ...toClear.map(({ ev }) => typedRow(ev, { now, cleared: true }))].map((r) => ({ actor: 'reconciler', ...r })));
-    // Critical delivery stays pending until an actual DI acknowledgement; invariant history remains deduped.
-    for (const { row, ev } of events) { m.markSlaViolated(Number(row.episode_id)); if (ev.severity !== 'critical') m.markSlaReported(Number(row.episode_id)); }
-    return { toViolate, toClear };
-  }), null, { write: true });
+  const written = withStateDb(ctx, (m) => m.transaction(() => writeEpisodes(m, { events, clears, now })), null, { write: true });
   if (!written) return { ...out, ok: false, error: 'sla pass: machine.sqlite write failed' };
   const { toViolate, toClear } = written;
   out.violated = toViolate.map((x) => x.ev);
   out.cleared = toClear.map((x) => x.ev);
   const pending = withStateDb(ctx, (m) => m.db.prepare('SELECT * FROM sla_episodes WHERE violated_at IS NOT NULL AND reported_at IS NULL AND cleared_at IS NULL ORDER BY episode_id').all(), null);
   if (pending == null) return { ...out, ok: false, error: 'sla pass: pending decision read failed' };
-  for (const row of pending) {
-    const ev = violationEvent(row, { catalog: cat, now });
-    if (ev.severity !== 'critical') continue;
-    try {
-      if (typeof ctx?.openDecision !== 'function') throw new Error('decision owner unavailable');
-      const acknowledged = await ctx.openDecision(runtimeDefectDecision(ev, { now }));
-      if (ctx.mode === 'shadow') { out.wouldDecisions = (out.wouldDecisions ?? 0) + 1; continue; }
-      if (acknowledged?.ok !== true || acknowledged.shadow || acknowledged.recordedOnly) throw new Error('decision delivery was not acknowledged');
-      const marked = withStateDb(ctx, (m) => m.transaction(() => {
-        m.markSlaReported(Number(row.episode_id));
-        return m.db.prepare('SELECT reported_at FROM sla_episodes WHERE episode_id=?').get(row.episode_id)?.reported_at != null;
-      }), false, { write: true });
-      if (!marked) throw new Error('decision acknowledgement write failed');
-      out.decisions += 1;
-    } catch (error) { out.ok = false; out.skipped.push(`decision:${ev.dedupeKey}: ${String(error?.message ?? error).slice(0, 120)}`); }
-  }
+  await deliverCriticalDecisions(ctx, { pending, cat, now, out });
   if (typeof ctx?.log === 'function' && (out.violated.length || out.cleared.length)) {
     try { await ctx.log('reconciler.sla', `sla pass: ${out.violated.length} violated, ${out.cleared.length} cleared`, { violated: out.violated.map((e) => e.dedupeKey), cleared: out.cleared.map((e) => e.dedupeKey) }); } catch { /* best effort */ }
   }

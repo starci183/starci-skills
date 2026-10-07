@@ -38,6 +38,9 @@ import { openMachine } from '../../engine/db/machine.mjs'; import { runNode } fr
 import { allocationSettings, loadConfig } from '../../engine/config.mjs'; import { isMain } from '../lib/is-main.mjs';
 import { archiveRoot as archiveRootOf } from '../machine/home.mjs';
 import { httpUp } from '../api/http/http-up.mjs';
+import { repeatInOrder } from '../lib/in-order.mjs';
+import { recordNewProbe, recordServiceEvents } from './service-events.mjs';
+import { outcomeOf, probeCommand, reopenCommand } from './service-commands.mjs';
 export { httpUp };
 export const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const SERVICES_FILE = 'scripts/reconciler/services.mjs';
@@ -174,13 +177,16 @@ export async function probeOrcaAsync({ timeoutMs, run = runChild } = {}) {
 async function connectorUp(service, { timeoutMs, tries = 1, run = runChild, extraArgs = [], judge = (v) => v?.running === true } = {}) {
   const [cmd, args] = node(serviceScript(service), ['status', ...extraArgs]);
   let last = null;
-  for (let i = 1; i <= Math.max(1, tries); i += 1) {
-    const r = await run(cmd, args, { timeoutMs });
-    const value = lastJson(r.stdout);
-    last = value ? { ok: judge(value) === true, value, tries: i } : { ok: false, error: (r.timedOut && 'timeout') || String(r.stderr || `exit ${r.status}`).slice(0, 200), tries: i };
-    if (last.ok) return last;
-  }
-  return last;
+  return repeatInOrder(async (attempt) => {
+    const i = attempt + 1;
+    if (i <= Math.max(1, tries)) {
+      const r = await run(cmd, args, { timeoutMs });
+      const value = lastJson(r.stdout);
+      last = value ? { ok: judge(value) === true, value, tries: i } : { ok: false, error: (r.timedOut && 'timeout') || String(r.stderr || `exit ${r.status}`).slice(0, 200), tries: i };
+      return last.ok ? last : undefined;
+    }
+    return last;
+  });
 }
 
 /** schtasks /query of one task: {ok, exists, status} (status Ready|Running|Disabled|...). */
@@ -357,15 +363,8 @@ export function machineStore(m) {
     const fromState = row && !prev.removed ? prev.state ?? row.state : null;
     m.upsert('services', { name, kind: row?.kind ?? serviceKindOf(name), state: serviceStateOf(state), since: since ?? at,
       last_probe_json: { ...fields, state, restartsFrom } }, ['name']);
-    for (const t of fresh) m.insert('service_events', { name, at: t, from_state: fromState, to_state: state, action: 'restart' });
-    if (!fresh.length && fromState !== state) {
-      const action = state === 'quarantined' ? 'quarantine' : (fromState === 'quarantined' && 'release') || null;
-      m.insert('service_events', { name, at, from_state: fromState, to_state: state, action, probe_error: fields.lastProbe?.ok === false ? String(fields.lastProbe?.error ?? '').slice(0, 500) || null : null });
-    }
-    const probe = fields.lastProbe;
-    if (probe && Number.isFinite(Number(probe.at)) && Number(probe.at) !== Number(prev.lastProbe?.at)) {
-      m.recordProbe({ name, ok: probe.ok === true, latencyMs: Number.isFinite(Number(probe.ms ?? probe.latencyMs)) ? Number(probe.ms ?? probe.latencyMs) : null, detail: probe });
-    }
+    recordServiceEvents(m, { name, at, state, fromState, fresh, lastProbe: fields.lastProbe });
+    recordNewProbe(m, name, fields.lastProbe, prev.lastProbe);
     return rec;
   });
   const all = () => m.db.prepare('SELECT * FROM services ORDER BY name').all().map(read).filter(Boolean);
@@ -538,11 +537,15 @@ async function turnInterrupt({ terminal, agent, repo = null, workflowId = null, 
     sleepSync(400);
   }
   let after = null;
-  for (let waited = 0; waited <= settings.turnBudget.idleWaitMs; waited += 2000) {
-    after = await turnProbe({ terminal });
-    if (after.ok && !after.busy) break;
-    sleepSync(2000);
-  }
+  await repeatInOrder(async (round) => {
+    if (round * 2000 <= settings.turnBudget.idleWaitMs) {
+      after = await turnProbe({ terminal });
+      if (after.ok && !after.busy) return true;
+      sleepSync(2000);
+      return undefined;
+    }
+    return true;
+  });
   const [d, { wakeKernel }] = await Promise.all([import('../machine/decisions.mjs'), import('../kernel/wake-delivery.mjs')]);
   let ring;
   try { ring = supervisor ? await d.ringSupervisor({ wake: wakeKernel, minGapMs: 0 }) : await d.ringDoorbell({ repo, workflowId, wake: wakeKernel, minGapMs: 0 }); } catch (error) { ring = { action: 'ring-failed', error: String(error?.message ?? error) }; }
@@ -567,18 +570,9 @@ async function main() {
   const a = argsOf(process.argv.slice(2));
   const out = (v) => console.log(JSON.stringify(v, null, a.json ? 0 : 2));
   if (a.list) return out({ ok: true, rows: openServiceStore().all() });
-  if (a.reopen) {
-    const store = openServiceStore(), rec = store.get(a.reopen);
-    if (!rec) { out({ ok: false, error: `no row ${a.reopen}` }); process.exitCode = 1; return; }
-    store.put({ ...rec, state: 'declared', since: Date.now(), restarts: [], failStreak: 0, nextAttemptAt: null, reopenedAt: Date.now() });
-    return out({ ok: true, reopened: a.reopen, was: rec.state });
-  }
-  if (a.probe) {
-    const entry = serviceRegistry().find((e) => e.name === a.probe);
-    if (!entry) { out({ ok: false, error: `no service ${a.probe}` }); process.exitCode = 1; return; }
-    return out({ ok: true, name: a.probe, probe: await entry.probe() });
-  }
-  if (a.start) { const r = await startService(a.start); out({ name: a.start, ...r }); if (!r.ok) process.exitCode = 1; return; }
+  if (a.reopen) return reopenCommand(openServiceStore(), a, out);
+  if (a.probe) return probeCommand(serviceRegistry(), a, out);
+  if (a.start) { const r = await startService(a.start); outcomeOf(out, { name: a.start, ...r }); return; }
   if (a.dedupe) {
     const { resumeRepos } = await import('../kernel/managed-repos.mjs');
     const { dedupeTerminals } = await import('../kernel/terminal-dedupe.mjs');
@@ -588,10 +582,10 @@ async function main() {
   }
   if (a.turn) return out(await turnProbe({ terminal: a.terminal ?? null, supervisor: a.supervisor === true }));
   if (a['turn-interrupt']) {
-    const r = await turnInterrupt({ terminal: a.terminal, agent: a.agent, repo: a.repo ?? null, workflowId: a.workflow ?? null, supervisor: a.supervisor === true });
-    out(r); if (!r.ok) process.exitCode = 1; return;
+    outcomeOf(out, await turnInterrupt({ terminal: a.terminal, agent: a.agent, repo: a.repo ?? null, workflowId: a.workflow ?? null, supervisor: a.supervisor === true }));
+    return;
   }
-  if (a['turn-replace']) { const r = turnReplace({ terminal: a.terminal, agent: a.agent }); out(r); if (!r.ok) process.exitCode = 1; return; }
+  if (a['turn-replace']) { outcomeOf(out, turnReplace({ terminal: a.terminal, agent: a.agent })); return; }
   if (a.processes) {
     const { listProcesses } = await import('../supervisor/host-health.mjs');
     const procs = listProcesses();

@@ -20,6 +20,7 @@
 // The Workers controller calls `digest --send` / `urgent --send` through ctx.run, so in shadow nothing is sent.
 import fs from 'node:fs';
 import { clipLine } from '../lib/clip.mjs';
+import { eachInOrder } from '../lib/in-order.mjs';
 import { ownerLanguage, translator } from '../lib/i18n.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 import { isMain } from '../lib/is-main.mjs';
@@ -208,10 +209,10 @@ export async function urgent(items, { send = false, env = process.env, now = Dat
   const pusher = push ?? (await import('../connectors/telegram.mjs')).ownerPush;
   const tr = translator(language ?? await languageOf());
   const sent = [];
-  for (const i of plan.due) {
+  await eachInOrder(plan.due, async (i) => {
     const r = await pusher(tr('[urgent] {text}', { text: i.text }), { env });
     if (r?.ok && !r.skipped) { sent.push(i.key); if (!state) await record(URGENT_SENT_KIND, i.key, { class: i.class, text: clipLine(i.text, 300) }, { env, now }); else st.urgentSent[i.key] = now; }
-  }
+  });
   return { ok: true, sent, skipped: plan.skipped };
 }
 
