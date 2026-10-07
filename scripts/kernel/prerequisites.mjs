@@ -57,6 +57,22 @@ export function resolveReadPath(pattern, bindings) {
  * Evaluate one job's data prerequisites against the target repository.
  * Returns {unmet:[...], unknown:[...]} — an empty `unmet` admits.
  */
+const addDesignPrerequisites = ({ designRead, records, repo, unmet }) => {
+  if (!designRead) return;
+  for (const verdict of designVerdicts(repo, records)) {
+    if (verdict.unsettled) unmet.push({ kind: 'design-not-settled', code: DESIGN_NOT_SETTLED, read: designRead.id, record: verdict.record, ui: verdict.ui, why: verdict.why });
+  }
+};
+
+const addDirectionPrerequisites = ({ directionRead, bindings, payload, repo, unmet, unknown }) => {
+  if (!directionRead || !directionPrerequisiteOn()) return;
+  const workflowId = payload?.workflowId ?? payload?.workflow_id ?? null;
+  for (const verdict of directionVerdicts(repo, bindings, { workflowId })) {
+    if (verdict.unaccepted) unmet.push({ kind: 'direction-unaccepted', read: directionRead.id, record: verdict.record, archetype: verdict.archetype, derived: verdict.derived, status: verdict.status, why: verdict.why });
+    else if (verdict.unknown) unknown.push({ kind: 'direction-unknown', read: directionRead.id, record: verdict.record, why: verdict.unknown });
+  }
+};
+
 export function checkPrerequisites({ brief, payload, repo, params = payload?.params ?? {} }) {
   const records = (Array.isArray(payload?.records) ? payload.records : []).map(normRel).filter(Boolean);
   const bindings = [...(Array.isArray(payload?.owned_paths) ? payload.owned_paths : []), ...records];
@@ -66,21 +82,12 @@ export function checkPrerequisites({ brief, payload, repo, params = payload?.par
   // The hard design gate (owner ruling 2026-09-29 "code truoc ve sau la hong"): a frontend implementation is never
   // dispatched before the interface.draw of the ui record it proves has settled pass.
   const designRead = reads.find((read) => read?.designDrawn === true);
-  if (designRead) {
-    for (const verdict of designVerdicts(repo, records)) {
-      if (verdict.unsettled) unmet.push({ kind: 'design-not-settled', code: DESIGN_NOT_SETTLED, read: designRead.id, record: verdict.record, ui: verdict.ui, why: verdict.why });
-    }
-  }
+  addDesignPrerequisites({ designRead, records, repo, unmet });
 
   // An accepted brand.direction archetype before a surface is drawn under it (owner ruling 2026-09-27); the switch is
   // runtimes.yaml allocation.drawLoop.directionPrerequisite.
   const directionRead = reads.find((read) => read?.directionArchetype === true);
-  if (directionRead && directionPrerequisiteOn()) {
-    for (const verdict of directionVerdicts(repo, bindings, { workflowId: payload?.workflowId ?? payload?.workflow_id ?? null })) {
-      if (verdict.unaccepted) unmet.push({ kind: 'direction-unaccepted', read: directionRead.id, record: verdict.record, archetype: verdict.archetype, derived: verdict.derived, status: verdict.status, why: verdict.why });
-      else if (verdict.unknown) unknown.push({ kind: 'direction-unknown', read: directionRead.id, record: verdict.record, why: verdict.unknown });
-    }
-  }
+  addDirectionPrerequisites({ directionRead, bindings, payload, repo, unmet, unknown });
 
   return { unmet, unknown };
 }
