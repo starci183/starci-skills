@@ -570,7 +570,7 @@ export function createHostController(deps = {}) {
     await clock(ctx, key, 'LEDGER_CORRUPT', 0, { code: 'LEDGER_CORRUPT', severity: 'critical', owner: 'host-controller', ledgerId, result: r.result.slice(0, 5) });
     if (was === 'corrupt') return;
     await ctx.openDecision(di({
-      kind: 'runtime-defect', ledger: ledgerId, entity: { type: 'ledger', id: ledgerId }, idempotencyKey: `ledger-corrupt:${ledgerId}:${now}`, severity: 'critical',
+      kind: 'runtime-defect', ledger: 'supervisor', productLedger: ledgerId, entity: { type: 'ledger', id: ledgerId }, idempotencyKey: `ledger-corrupt:${ledgerId}:${now}`, severity: 'critical',
       summary: `${ledgerId}: database integrity failed; preserve the database and WAL, then inspect a verified ${settings().ledgerHealth.backupDir} snapshot and its loss window with the owner before restoration`,
       evidence: r.result.slice(0, 5).map((x) => ({ ref: `quick_check:${x}` })), escalateTo: 'owner',
     }));
@@ -580,7 +580,7 @@ export function createHostController(deps = {}) {
     const remedy = ((reason === 'schema-incompatible' || reason === 'sqlite-downgrade') && 'use a compatible runtime and SQLite version')
       || (reason === 'identity-mismatch' && 'resolve the registry and database identity with the owner') || 'resolve storage access or locking';
     await ctx.openDecision(di({
-      kind: 'runtime-defect', ledger: ledgerId, entity: { type: 'ledger', id: ledgerId }, idempotencyKey: `ledger-health:${ledgerId}:${reason}:${now}`, severity: 'high',
+      kind: 'runtime-defect', ledger: 'supervisor', productLedger: ledgerId, entity: { type: 'ledger', id: ledgerId }, idempotencyKey: `ledger-health:${ledgerId}:${reason}:${now}`, severity: 'high',
       summary: `${ledgerId}: ${reason}; preserve the database and WAL and ${remedy}`,
       evidence: r.result.slice(0, 5).map((x) => ({ ref: `ledger_health:${x}` })),
     }));
@@ -597,27 +597,50 @@ export function createHostController(deps = {}) {
     else if (!r.ok && was !== next) await flagUnhealthy(ctx, { r, reason, ledgerId, now });
   }
 
+  /**
+   * The identity a snapshot verifies against: the ledger's own meta.ledger_id (a UUID, engine/db/ledger-paths.mjs),
+   * never the basename label ctx.ledgers carries for it (sources.mjs ledgersOf). The file's meta answers first; the
+   * machine registry (ledgers.name -> the same file) answers when meta cannot be read. null when neither does.
+   */
+  async function ledgerIdentity(ctx, ledger) {
+    try {
+      const own = await ctx.read(ledger.ledgerId, (db) => db.prepare("SELECT value FROM meta WHERE key='ledger_id'").get()?.value ?? null);
+      if (own) return String(own);
+    } catch { /* this file carries no readable meta */ }
+    try {
+      const row = ctx.machine?.resolveLedger?.({ name: ledger.ledgerId });
+      if (row?.ledgerId && (!row.file || path.resolve(row.file) === path.resolve(ledger.file))) return String(row.ledgerId);
+    } catch { /* the registry does not name it */ }
+    return null;
+  }
+
+  // The cheap gates of backupOwed that need no identity read: the last check passed, the retry gate is open and
+  // today holds no verified snapshot yet.
+  const backupCandidate = (rec, now) => rec.lastCheck?.ok === true && now >= (rec.nextBackupAttemptAt ?? 0)
+    && !(rec.lastBackup?.verified === true && new Date(rec.lastBackupAt).toDateString() === new Date(now).toDateString());
+
   // Whether tonight's backup is owed: the last check passed, none verified today, the retry gate is open and the hour has come.
+  // `ledgerId` is the ledger's real meta.ledger_id: the snapshot file is named and verified with it.
   function backupOwed(rec, { ledgerId, lh, now }) {
     const today = new Date(now).toDateString();
     const backedUpToday = rec.lastBackup?.verified === true && rec.lastBackup?.ledgerId === ledgerId && new Date(rec.lastBackupAt).toDateString() === today;
     return rec.lastCheck?.ok === true && !backedUpToday && now >= (rec.nextBackupAttemptAt ?? 0) && isBackupDue({ ledgerId, now, dir: lh.backupDir, backupHour: lh.backupHour });
   }
 
-  async function backupLedger(ctx, { rec, ledger, ledgerId, lh, now, out }) {
-    const r = await ctx.run('node', [LEDGER_HEALTH, '--backup', '--ledger-id', ledgerId, '--file', ledger.file, '--json'], { timeoutMs: lh.backupTimeoutMs });
+  async function backupLedger(ctx, { rec, ledger, ledgerId, realId, lh, now, out }) {
+    const r = await ctx.run('node', [LEDGER_HEALTH, '--backup', '--ledger-id', realId, '--file', ledger.file, '--json'], { timeoutMs: lh.backupTimeoutMs });
     if (ctx.mode !== 'active' || r?.shadow) { out.backup = false; out.shadow = true; return; }
     const snapshot = outputOf(r);
     rec.lastBackupAttemptAt = now;
     rec.lastBackupAttempt = { ok: r?.ok === true, timedOut: r?.timedOut === true, result: snapshot };
-    out.backup = r?.ok === true && snapshot?.ok === true && snapshot?.verified === true && snapshot?.ledgerId === ledgerId;
+    out.backup = r?.ok === true && snapshot?.ok === true && snapshot?.verified === true && snapshot?.ledgerId === realId;
     if (out.backup) {
       rec.lastBackupAt = now; rec.lastBackup = snapshot; rec.nextBackupAttemptAt = null; rec.state = 'ok';
       return;
     }
     rec.nextBackupAttemptAt = now + lh.backupRetryMs; rec.state = 'backup-failed'; out.ok = false;
     await ctx.openDecision(di({
-      kind: 'runtime-defect', ledger: ledgerId, entity: { type: 'ledger', id: ledgerId }, idempotencyKey: `ledger-backup-failed:${ledgerId}`, severity: 'high',
+      kind: 'runtime-defect', ledger: 'supervisor', productLedger: ledgerId, entity: { type: 'ledger', id: ledgerId }, idempotencyKey: `ledger-backup-failed:${ledgerId}`, severity: 'high',
       summary: `${ledgerId}: no verified snapshot was published; inspect backup storage access, capacity and the recorded child result before the next retry`,
       evidence: [{ ref: `engine_action:${r?.actionId ?? 'unavailable'}` }],
     }));
@@ -641,7 +664,13 @@ export function createHostController(deps = {}) {
       out.ok = r.ok;
       out.check = r;
     }
-    if (backupOwed(rec, { ledgerId, lh, now })) await backupLedger(ctx, { rec, ledger, ledgerId, lh, now, out });
+    if (backupCandidate(rec, now)) {
+      const realId = await ledgerIdentity(ctx, ledger);
+      if (realId == null) {
+        out.backup = false;
+        await ctx.log('reconciler.host.ledger-identity', `${ledgerId}: meta.ledger_id is unreadable; the nightly backup cannot bind an identity`, { ledgerId });
+      } else if (backupOwed(rec, { ledgerId: realId, lh, now })) await backupLedger(ctx, { rec, ledger, ledgerId, realId, lh, now, out });
+    }
     store().put(rec);
     return out;
   }
