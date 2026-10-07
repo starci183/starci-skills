@@ -1,24 +1,36 @@
 // starci kernel route: choose and persist one pool for a queued operation.
+//
+// Precedence among the pool choosers (beside route-model's explicit --agent > config > default): a
+// Kernel-recorded op-override model — kernel-op-override events from `starci kernel op-override`, plus the
+// job's own kernelModel/kernelOverride — is the Kernel's explicit decision for that op in that workflow, so it
+// outranks the retry lineage's DEMOTION of the pinned pool (lineage is evidence, the recorded decision is
+// authority). It never outranks eligibility itself: a pin outside the op's order, a pool the lineage excluded
+// after two pool-attributable failures, a dead provider circuit or a missing host tool refuses typed with
+// 'op-override-ineligible' naming why — never a silent different pool.
 import { updateJob } from '../../../engine/db/ledger.mjs';
 import { eachInOrder } from '../../lib/in-order.mjs';
 import { jobResultOf,jobRowOf } from './shared/rows.mjs';
 import { queuedJobOp, refuseOwnerGate, refusePeerWait, opSlotsOrRefuse } from './shared/job-gates.mjs';
-import { biasForRole } from '../../lib/owner-routing-bias.mjs';
+import { biasForRole, asSelector } from '../../lib/owner-routing-bias.mjs';
 import { ownerReserveGrant, ownerBiasTrust, quotaForAdmission, admissionPolicyOf } from '../../agent/admission.mjs';
 import { pickOpModel } from '../../agent/op-pick.mjs';
 import { tierHistory } from '../../agent/tier-history.mjs';
 import { pickRecordText } from '../../lib/pick-record.mjs';
 import { prepareProviderBudget, providerBudgetUsage } from '../../agent/provider-budget.mjs';
+import { kernelOverrideFor } from '../kernel-authority.mjs';
 import { VerbExit } from './shared/verb-exit.mjs';
 
-function routeHumanOf({ jobId, kind, difficulty, decided, lineageAdjust, blockingView }) {
+function routeHumanOf({ jobId, kind, difficulty, decided, lineageAdjust, blockingView, overrideModel }) {
   const lines = [
     `route ${jobId} (${kind}, ${difficulty}) → ${decided.model} model=${decided.modelId ?? '-'} effort=${decided.effort ?? '-'}`,
   ];
+  if (overrideModel) lines.push(`  op-override: ${overrideModel} — the Kernel's recorded pin decides; it outranks a lineage demotion, never an eligibility refusal`);
   if (lineageAdjust && (lineageAdjust.demoted.length || lineageAdjust.excluded.length)) {
     const changedPools = [...lineageAdjust.demoted.map((pool) => `${pool} demoted`), ...lineageAdjust.excluded.map((pool) => `${pool} excluded`)].join(', ');
     const causes = Object.entries(lineageAdjust.pools).map(([pool, item]) => `${pool}: ${item.causes.join(', ')}`).join('; ');
-    const takenNote = lineageAdjust.demotedTaken ? '; no other pool was eligible' : '';
+    const takenNote = lineageAdjust.demotedTaken
+      ? (overrideModel ? '; taken anyway — the recorded op-override pins it' : '; no other pool was eligible')
+      : '';
     lines.push(`  retry lineage: ${changedPools} (${causes})${takenNote}`);
   }
   lines.push(...pickRecordText(decided.pick).map((line) => `  ${line}`));
@@ -91,12 +103,15 @@ async function capacityForPools({ db, jobId, ledger, pools, rtDoc, rtMerged, reg
 }
 
 function planRoute({ db, ledger, payload, kind, difficulty, rtDoc, rtMerged, regDoc, ownerRoot,
-  configuredAllocationPolicy, loadConfig, lineage, lineageError, scopeId, bias, biasTrusted, capacity, env }) {
+  configuredAllocationPolicy, loadConfig, lineage, lineageError, scopeId, bias, biasTrusted, capacity, env, overrideModel }) {
   let allocation = null;
   try { allocation = configuredAllocationPolicy(loadConfig(ownerRoot)); } catch { allocation = null; }
   const redesignAs = typeof payload.redesign?.routeAs === 'string' ? payload.redesign.routeAs : null;
   const historyOf = (tier) => tierHistory({ tier, db, ledgerFile: ledger.path ?? null, env, routeHoldMs: rtDoc?.allocation?.routeHoldMs });
-  const decision = pickOpModel({ kind: redesignAs ?? kind, difficulty, bias, biasTrusted, capacity, runtimes: rtMerged,
+  // The recorded op-override rides the `only` selector an owner routing_bias.only uses: every other member is dropped at the
+  // bias step, so no eligible substitute can be taken, while the hard filter (role, host tool, retry-lineage exclusion,
+  // provider circuit, capacity) still applies to the pin and the lineage demotion only reorders.
+  const decision = pickOpModel({ kind: redesignAs ?? kind, difficulty, bias: pinnedBias(bias, overrideModel, rtMerged.runtimes), biasTrusted, capacity, runtimes: rtMerged,
     scopeId, attemptId: scopeId, now: Date.now(), modelRegistry: regDoc, grants: allocation?.grants ?? undefined, historyOf,
     lineage: lineage && (lineage.demote.length || lineage.exclude.length) ? lineage : null });
   let lineageAdjust = null;
@@ -105,6 +120,48 @@ function planRoute({ db, ledger, payload, kind, difficulty, rtDoc, rtMerged, reg
       attempts: lineage.attempts, demotedTaken: decision?.lineage?.demotedTaken ?? false };
   } else if (lineageError) lineageAdjust = { demoted: [], excluded: [], error: lineageError };
   return { redesignAs, decision, lineageAdjust };
+}
+
+/** The registry pool [id, runtime] an op-override model names (its pool id or its target). */
+const pinPoolOf = (pools, model) => Object.entries(pools ?? {}).find(([id, rt]) => id === model || rt?.target === model) ?? null;
+
+/** The bias with the Kernel's recorded pin as `only`: it narrows an owner `only` to the pinned pool (an owner `only` that excludes the pin keeps the pin dropped, so the route refuses). */
+function pinnedBias(bias, overrideModel, pools) {
+  if (!overrideModel) return bias;
+  const pinPool = pinPoolOf(pools, overrideModel)?.[0] ?? overrideModel;
+  const owner = bias?.only ?? [];
+  if (!owner.length) return { ...bias, only: [{ pool: pinPool }] };
+  const narrowed = owner.map((item) => asSelector(item)).filter((item) => item.pool === undefined || item.pool === pinPool);
+  return { ...bias, only: narrowed.length ? narrowed.map((item) => ({ ...item, pool: pinPool })) : owner };
+}
+
+/** Why the pinned pool's members cannot take the job, from the tier pick record: a member's rejection or drop, or the pool's absence from the tier chain. */
+function overrideIneligibility({ decision, overrideModel, pinProvider, kind, difficulty }) {
+  const chain = Array.isArray(decision?.chain) ? decision.chain : [];
+  const ids = pinProvider ? chain.filter((id) => id.startsWith(`${pinProvider}/`)) : [];
+  if (decision?.chain && !ids.length) return `it is outside ${kind}'s tier ${decision.tier ?? '?'} at ${decision.difficulty ?? difficulty} [${chain.join(', ')}]`;
+  const record = decision?.pick?.record ?? decision?.pick ?? null;
+  const own = decision?.rejected?.find((row) => ids.includes(row.target));
+  const dropped = record?.dropped?.find((row) => ids.includes(row.id) && row.step !== 'tokens') ?? record?.dropped?.find((row) => ids.includes(row.id));
+  return own?.reason ?? (dropped ? `${dropped.id} dropped at ${dropped.step}: ${dropped.reason}` : null) ?? decision?.error ?? 'pickOpModel returned no decision';
+}
+
+/**
+ * The Kernel's recorded op-override pin never falls through to another pool: when the pinned pool cannot take
+ * this job the route is a typed refusal naming the real ineligibility — the pinned member's own rejection line,
+ * or its absence from the op's tier chain — and naming the verb that clears it. No route-decided is written; the job
+ * stays queued for the Kernel to retarget or clear the override.
+ */
+function refuseIneligibleOverride({ decision, overrideModel, pinProvider, kind, jobId, workflowId, difficulty, bias, routeFacts, runningByModel, poolLoad, emit, args }) {
+  if (!overrideModel) return;
+  if (decision && !decision.error && !decision.toolUnavailable && decision.target === overrideModel) return;
+  const why = overrideIneligibility({ decision, overrideModel, pinProvider, kind, difficulty });
+  const detail = `the recorded op-override pins ${overrideModel} for ${kind}, which is ineligible here: ${why}. Retarget or clear it with starci kernel op-override --workflow ${workflowId} --op ${kind}; route never silently takes another pool`;
+  const out = { ok: false, jobId, kind, difficulty, bias, ...routeFacts,
+    reason: 'op-override-ineligible', override: routeFacts.opOverride, detail,
+    rejected: decision?.rejected ?? [], poolLoad: { running: runningByModel, routeHoldMs: poolLoad.routeHoldMs } };
+  emit(out, `route REFUSED for ${jobId} (${kind}, ${difficulty}): op-override-ineligible — ${detail}`, args.json);
+  throw new VerbExit(1);
 }
 
 function refuseRouteDecision({ decision, bias, routeFacts, kind, jobId, difficulty, runningByModel, poolLoad, emit, args }) {
@@ -145,13 +202,15 @@ function routableJobOrThrow(db, jobId, finalSettled) {
 }
 
 /** The persisted route decision: pool, effort, chain, policy, balance and cross-family facts of the selected pool. */
-function routeDecidedOf({ decision, redesignAs, payload, rtDoc }) {
+function routeDecidedOf({ decision, redesignAs, payload, rtDoc, overrideModel, kind }) {
   const record = decision.pick ?? null;
   return {
     admission: decision.admission ?? null,
     // A redesign leg reasons at high effort even on a member that pins none (runtimes.yaml allocation.redesign.effort).
     model: decision.target, modelId: decision.modelId ?? null, effort: decision.effort ?? (redesignAs ? (payload.redesign?.effort ?? rtDoc?.allocation?.redesign?.effort ?? null) : null),
     tier: decision.tier ?? null, routeChain: decision.chain ?? [], routeRejected: decision.rejected ?? [],
+    // Always written (null when absent) so a reroute never keeps the previous pin's record.
+    routeOverride: overrideModel ? { op: kind, model: overrideModel } : null,
     // The one pick record (scripts/lib/tier-pick.mjs): tier, chain after each step, who was dropped and why, who was chosen and by which step.
     pick: record ? { tier: decision.tier, member: record.chosen?.id ?? null, by: record.chosen?.by ?? null, at: Date.now(), record } : null,
   };
@@ -208,6 +267,10 @@ export default {
   let lineage = null, lineageError = null;
   try { lineage = lineageRouteAdjust(db, job); } catch (e) { lineageError = String(e?.message ?? e); }
   const difficulty = args.difficulty ?? payload.difficulty ?? 'medium';
+  // The Kernel's recorded pool pin for this op in this workflow: the job's own kernelModel, else the merged
+  // op-override model (kernel-authority.mjs kernelOverrideFor — workflow op-override under the job's own
+  // kernelOverride). It pins the selection below; when the pin cannot take the job the route refuses typed.
+  const overrideModel = payload.kernelModel ?? kernelOverrideFor(db, job.workflow_id, kind, payload)?.model ?? null;
 
   // Capacity per registry.yaml pool includes the live running count, quota and typed provider-health circuit.
   const rtFile = path.join(skillRoot, 'modules', 'models', 'runtimes.yaml');
@@ -221,14 +284,16 @@ export default {
     poolLoadOf, accountList, normalizeProvider, probeQuotaSafe, providerHealthOf, circuitClearHint });
   const { accounts, poolLoad, runningByModel, capacity } = capacityResult;
 
-  const plan = planRoute({ db, ledger, job, payload, kind, difficulty, rtDoc, rtMerged, regDoc, ownerRoot,
+  const plan = planRoute({ db, ledger, payload, kind, difficulty, rtDoc, rtMerged, regDoc, ownerRoot,
     configuredAllocationPolicy, loadConfig, lineage, lineageError, scopeId, bias, biasTrusted: ownerBiasTrust(goalRow),
-    capacity, env: process.env });
+    capacity, env: process.env, overrideModel });
   const { redesignAs, decision, lineageAdjust } = plan;
-  const routeFacts = { ...(lineageAdjust ? { lineageAdjust } : {}) };
+  const routeFacts = { ...(lineageAdjust ? { lineageAdjust } : {}),
+    ...(overrideModel ? { opOverride: { op: kind, model: overrideModel } } : {}) };
+  refuseIneligibleOverride({ decision, overrideModel, pinProvider: pinPoolOf(pools, overrideModel)?.[1]?.provider ?? null, kind, jobId, workflowId: job.workflow_id, difficulty, bias, routeFacts, runningByModel, poolLoad, emit, args });
   refuseRouteDecision({ decision, bias, routeFacts, kind, jobId, difficulty, runningByModel, poolLoad, emit, args });
 
-  const decided = routeDecidedOf({ decision, redesignAs, payload, rtDoc });
+  const decided = routeDecidedOf({ decision, redesignAs, payload, rtDoc, overrideModel, kind });
   const selectedRuntime = Object.entries(pools)
     .find(([poolId, runtime]) => (runtime?.target ?? poolId) === decision.target)?.[1] ?? null;
   ledger.transaction(() => {
@@ -259,7 +324,7 @@ export default {
   // same workflow other workflows wait on and should be dispatched first.
   const blockingView = blockingViewOf(db, job);
   if (blockingView) out.blocking = blockingView;
-  emit(out, routeHumanOf({ jobId, kind, difficulty, decided, lineageAdjust, blockingView }), args.json);
+  emit(out, routeHumanOf({ jobId, kind, difficulty, decided, lineageAdjust, blockingView, overrideModel }), args.json);
 
   },
 };

@@ -94,7 +94,14 @@ export function providerReservationMethods({ need, parse, toJson, hex }) {
       const processEnded = !row.handle && row.pid && proof?.kind === 'process-exited' && proof.pid === row.pid;
       const ended = proof?.confirmed === true && (terminalEnded || processEnded)
         && (!row.pid || proof.pid == null || proof.pid === row.pid);
-      if (!noEffect && !ended) return { ok: false, reason: 'exit-unproven', reservation: providerReservationRow(row) };
+      // A kernel reconcile settled this receipt's dispatch to no effect and recorded it durably
+      // (job result + dispatch-reconciled event): the proof carries that dispatch's identity and the
+      // receipt's own attempt scope, so the release is bound to the launch the receipt reserved.
+      const reconciledNoEffect = row.state === 'unknown' && proof?.kind === 'reconciled-no-effect'
+        && proof.confirmed === true && proof.effectState === 'none'
+        && typeof proof.dispatchId === 'string' && proof.dispatchId.trim()
+        && parse(row.scope_json)?.scopeId === proof.scopeId;
+      if (!noEffect && !ended && !reconciledNoEffect) return { ok: false, reason: 'exit-unproven', reservation: providerReservationRow(row) };
       const at = m.now();
       db.prepare("UPDATE provider_reservations SET state='released',released_at=?,updated_at=?,proof_json=? WHERE id=? AND fence=?").run(at, at, toJson(proof), id, fence);
       db.prepare("INSERT INTO provider_reservation_events(reservation_id,at,from_state,to_state,proof_json) VALUES(?,?,?,'released',?)").run(id, at, row.state, toJson(proof));

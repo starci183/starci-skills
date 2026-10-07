@@ -1,8 +1,10 @@
 // starci kernel op-override — a per-workflow LOCAL variant of one op (owner 2026-09-28, tier 1): extra guidance notes, a longer
 // command window, a routing difficulty/model/effort, stored with the workflow and applied by starci kernel dispatch to every
-// later job of that op in THIS workflow (packet context.kernel_override). The shared manifest is never touched; a
-// shared fix is a tier-2 kernel-proposal. Additive only: an override never removes a check, write, step or gate, and
-// a note that says skip/disable/relax a check is refused (kernel-authority.mjs validateOverride).
+// later job of that op in THIS workflow (packet context.kernel_override). Its `model` is also the route's pool pin
+// (scripts/kernel/verbs/route.mjs): the Kernel's recorded decision outranks retry-lineage demotion of that pool —
+// an ineligible pin is a typed 'op-override-ineligible' refusal, never a silent different pool. The shared manifest
+// is never touched; a shared fix is a tier-2 kernel-proposal. Additive only: an override never removes a check,
+// write, step or gate, and a note that says skip/disable/relax a check is refused (kernel-authority.mjs validateOverride).
 //
 //   op-override --workflow <wf> --op <op> --set '<json>' --decision <id>
 //   op-override --workflow <wf> --op <op> --clear --decision <id>

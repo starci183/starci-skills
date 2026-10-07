@@ -139,8 +139,9 @@ export async function spawnJson(cmd, args, { env = process.env, cwd = SKILL_ROOT
 /**
  * Why an `starci kernel status --json` child gave no value, or null when it did: {cause, error, code, timedOut, stderrHead}.
  * cause is 'timeout' | 'spawn' | 'refused' (a typed {ok:false,error} answer, on stdout or on stderr: cli.mjs prints
- * its refusal JSON on stderr and exits 1, e.g. plan-edges-missing) | 'exit' (non-zero, no JSON) | 'no-json' (exit 0,
- * stdout carried no JSON line). Pure.
+ * its refusal JSON on stderr and exits 1, e.g. plan-edges-missing) | 'exit' (non-zero, no JSON) | 'busy' (exit 0 with
+ * BOTH streams empty: the child ran no status code at all — its entry module read mid-swap during a runtime land —
+ * a transient busy the next pass re-reads, not a defect) | 'no-json' (exit 0, stdout carried text but no JSON line). Pure.
  */
 export function statusFailureOf(r, { timeoutMs = null } = {}) {
   const value = r?.value && typeof r.value === 'object' ? r.value : null;
@@ -154,6 +155,10 @@ export function statusFailureOf(r, { timeoutMs = null } = {}) {
   if (refusal) return { cause: 'refused', error: clip(`starci kernel status refused (exit ${base.code ?? '?'}): ${refusal.error ?? refusal.code ?? 'ok:false'}`, 300), refusal: refusal.code ?? null, ...base };
   const exitDetail = stderrHead ? `: ${stderrHead}` : ' with no stderr';
   if (base.code !== 0) return { cause: 'exit', error: clip(`starci kernel status exited ${base.code ?? '?'}${exitDetail}`, 300), ...base };
+  // Exit 0 with nothing on either stream is a child that never ran status code: `node` exits an empty (or truncated
+  // to a still-valid module) entry file 0 without ever reaching main() — the runtime tree mid-land. Transient busy.
+  if (!String(r?.stdout ?? '').trim() && !stderrHead)
+    return { cause: 'busy', error: 'starci kernel status exited 0 having written nothing on either stream — the status entry module did not run (read mid-swap); transient busy, not a defect', ...base };
   const noJsonDetail = stderrHead ? ` (stderr: ${stderrHead})` : '';
   return { cause: 'no-json', error: clip(`starci kernel status exited 0 with no JSON on stdout${noJsonDetail}`, 300), ...base };
 }
@@ -295,7 +300,10 @@ export function createCtx({
       const promise = Promise.resolve(spawnChild(process.execPath, [API_FILE, 'status', '--repo', l.repo, '--workflow', workflowId, '--json'], { env: childEnv(), timeoutMs: DEFAULT_TIMEOUT_MS }))
         .then((r) => ({ value: r?.value && typeof r.value === 'object' ? r.value : null, failure: statusFailureOf(r, { timeoutMs: DEFAULT_TIMEOUT_MS }) }),
           (error) => ({ value: null, failure: { cause: 'spawn', error: clip(`starci kernel status threw: ${error?.message ?? error}`, 300) } }));
-      shared.statusCache.set(id, { at: now(), promise });
+      const entry = { at: now(), promise };
+      shared.statusCache.set(id, entry);
+      // A settled failure leaves the cache: the next pass spawns a fresh read instead of replaying one transient miss for the TTL.
+      promise.then((read) => { if (!read?.value && shared.statusCache.get(id) === entry) shared.statusCache.delete(id); });
       return promise;
     },
     async api(ledgerId, verb, argv = [], { timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
