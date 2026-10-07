@@ -338,15 +338,8 @@ function metricsUsage(store, url) {
     byDay, sources: [...new Set(parts.flatMap(part => part.sources))] };
 }
 
-/** Domain routes for dispatch, attempt, report, checks, verdict, and product land. */
-export async function handleAttempt(request, response, store, url) {
+function listedRoute(request, response, store, url) {
   const pathname = url.pathname;
-  if (!store.machine) {
-    if (pathname.startsWith('/api/attempts') || pathname === '/api/media' || pathname === '/api/metrics/ops' || pathname === '/api/metrics/usage') {
-      sendError(request, response, 503, 'MACHINE_UNAVAILABLE', 'Machine database unavailable'); return true;
-    }
-    return false;
-  }
   if (pathname === '/api/attempts') {
     const result = page(listedAttempts(store, url), url);
     sendJson(request, response, result.rows, { sources: store.projects().flatMap(ledger => source(ledger.name, 'v_op_history', 'op_attempts', 'check_runs')), stale: staleOf(store), next: result.next }); return true;
@@ -361,92 +354,120 @@ export async function handleAttempt(request, response, store, url) {
   if (pathname === '/api/metrics/ops') {
     sendJson(request, response, metricsOps(store, url), { sources: store.projects().flatMap(ledger => source(ledger.name, 'v_op_history')), stale: staleOf(store) }); return true;
   }
-  const match = /^\/api\/attempts\/([^/]+)\/(\d+)(?:\/(checks\/(\d+)|diff|products|transcript(?:\/snapshots)?))?$/.exec(pathname);
-  if (!match) return false;
+  return false;
+}
+
+function attemptContext(request, response, store, match) {
   let project;
-  try { project = decodeURIComponent(match[1]); } catch { sendError(request, response, 400, 'BAD_PATH', 'Invalid project encoding'); return true; }
+  try { project = decodeURIComponent(match[1]); } catch { sendError(request, response, 400, 'BAD_PATH', 'Invalid project encoding'); return null; }
   const target = store.ledger(project);
-  if (!target) { sendError(request, response, 404, 'NOT_FOUND', 'Project not found'); return true; }
+  if (!target) { sendError(request, response, 404, 'NOT_FOUND', 'Project not found'); return null; }
   const { row: ledger, db } = target;
   const id = Number(match[2]);
   const row = one(db, 'SELECT * FROM v_op_history WHERE attempt_id=?', id);
-  if (!row) { sendError(request, response, 404, 'NOT_FOUND', 'Attempt not found'); return true; }
-  const route = match[3] ?? 'detail';
-  if (route === 'detail') {
-    sendJson(request, response, attemptDetail(store, ledger, db, row), { sources: [
-      ...source(ledger.name, 'v_op_history', 'op_attempts', 'jobs', 'contracts', 'reports', 'check_runs', 'v_checks', 'v_media', 'job_artifacts', 'blobs', 'report_attachments', 'decisions', 'decision_items', 'work_units', 'attempt_transcript_snapshots', 'events', 'llm_usage'),
-      ...source('machine', 'v_engine_actions', 'action_steps', 'sup_learning'),
-      ...source('runtime', 'modules/reconciler/sla.yaml', 'modules/models/runtimes.yaml', 'modules/kernel/failure-codes.yaml'),
-      ...(admissionObserved(store.machine.db) ? source('machine', 'provider_reservations') : [])], stale: staleOf(store) }); return true;
+  if (!row) { sendError(request, response, 404, 'NOT_FOUND', 'Attempt not found'); return null; }
+  return { ledger, db, id, row, route: match[3] ?? 'detail', checkId: match[4] };
+}
+
+function detailRoute(request, response, store, ledger, db, row) {
+  sendJson(request, response, attemptDetail(store, ledger, db, row), { sources: [
+    ...source(ledger.name, 'v_op_history', 'op_attempts', 'jobs', 'contracts', 'reports', 'check_runs', 'v_checks', 'v_media', 'job_artifacts', 'blobs', 'report_attachments', 'decisions', 'decision_items', 'work_units', 'attempt_transcript_snapshots', 'events', 'llm_usage'),
+    ...source('machine', 'v_engine_actions', 'action_steps', 'sup_learning'),
+    ...source('runtime', 'modules/reconciler/sla.yaml', 'modules/models/runtimes.yaml', 'modules/kernel/failure-codes.yaml'),
+    ...(admissionObserved(store.machine.db) ? source('machine', 'provider_reservations') : [])], stale: staleOf(store) });
+  return true;
+}
+function checkRoute(request, response, store, ledger, db, id, checkId) {
+  const check = one(db, 'SELECT * FROM v_checks WHERE check_id=? AND attempt_id=?', Number(checkId), id);
+  if (!check) { sendError(request, response, 404, 'NOT_FOUND', 'Check not found'); return true; }
+  sendJson(request, response, { ...checkRow(db, check), stdoutTail: tail(db, check.stdout_sha), stderrTail: tail(db, check.stderr_sha) },
+    { sources: source(ledger.name, 'v_checks', 'blobs'), stale: staleOf(store) }); return true;
+}
+async function productsRoute(request, response, store, ledger, db, id) {
+  const raw = one(db, 'SELECT * FROM op_attempts WHERE attempt_id=?', id);
+  const report = parse(one(db, 'SELECT report_json FROM reports WHERE attempt_id=?', id)?.report_json);
+  const products = await attemptProducts(raw?.repo_root ?? null, report, { checkpoint: workflowCheckpoint(db, raw) });
+  sendJson(request, response, products,
+    { sources: [...source(ledger.name, 'op_attempts', 'reports', 'events'), ...(products.head ? [{ db: 'git', rel: `${products.repo ?? ''}@${products.head}` }] : [])], stale: staleOf(store) }); return true;
+}
+function diffSide(db, assets, indexed, side) {
+  if (!side) return null;
+  const assetName = typeof side.asset === 'string' ? `patch.assets/${path.posix.basename(side.asset.replaceAll('\\', '/'))}` : null;
+  let sha = null;
+  if (assetName) sha = assets.get(assetName);
+  else if (indexed.has(side.blob)) sha = side.blob;
+  return sha ? blobLink(db, sha) : null;
+}
+function diffRoute(request, response, store, ledger, db, id) {
+  const artifact = one(db, "SELECT * FROM job_artifacts WHERE attempt_id=? AND role='diff' AND subkind='patch-json' ORDER BY artifact_id DESC LIMIT 1", id);
+  let diff = null;
+  if (artifact) {
+    try { diff = parse(decodeText(getBlob(artifact.sha256))); }
+    catch { sendError(request, response, 410, 'DIFF_UNAVAILABLE', 'Recorded diff bytes unavailable'); return true; }
+    if (!diff || !Array.isArray(diff.files)) { sendError(request, response, 422, 'DIFF_INVALID', 'Recorded diff payload is invalid'); return true; }
   }
-  if (route.startsWith('checks/')) {
-    const check = one(db, 'SELECT * FROM v_checks WHERE check_id=? AND attempt_id=?', Number(match[4]), id);
-    if (!check) { sendError(request, response, 404, 'NOT_FOUND', 'Check not found'); return true; }
-    sendJson(request, response, { ...checkRow(db, check), stdoutTail: tail(db, check.stdout_sha), stderrTail: tail(db, check.stderr_sha) },
-      { sources: source(ledger.name, 'v_checks', 'blobs'), stale: staleOf(store) }); return true;
+  if (diff && Array.isArray(diff.files)) {
+    const assets = new Map(many(db, "SELECT name,sha256 FROM job_artifacts WHERE attempt_id=? AND role='diff' AND name LIKE 'patch.assets/%'", id)
+      .map(item => [item.name, item.sha256]));
+    const indexed = new Set(many(db, 'SELECT sha256 FROM job_artifacts WHERE attempt_id=?', id).map(item => item.sha256));
+    diff = { ...diff, files: diff.files.map(file => ({ ...file, before: diffSide(db, assets, indexed, file.before), after: diffSide(db, assets, indexed, file.after) })) };
   }
-  if (route === 'products') {
-    const raw = one(db, 'SELECT * FROM op_attempts WHERE attempt_id=?', id);
-    const report = parse(one(db, 'SELECT report_json FROM reports WHERE attempt_id=?', id)?.report_json);
-    const products = await attemptProducts(raw?.repo_root ?? null, report, { checkpoint: workflowCheckpoint(db, raw) });
-    sendJson(request, response, products,
-      { sources: [...source(ledger.name, 'op_attempts', 'reports', 'events'), ...(products.head ? [{ db: 'git', rel: `${products.repo ?? ''}@${products.head}` }] : [])], stale: staleOf(store) }); return true;
-  }
-  if (route === 'diff') {
-    const artifact = one(db, "SELECT * FROM job_artifacts WHERE attempt_id=? AND role='diff' AND subkind='patch-json' ORDER BY artifact_id DESC LIMIT 1", id);
-    let diff = null;
-    if (artifact) {
-      try { diff = parse(decodeText(getBlob(artifact.sha256))); }
-      catch { sendError(request, response, 410, 'DIFF_UNAVAILABLE', 'Recorded diff bytes unavailable'); return true; }
-      if (!diff || !Array.isArray(diff.files)) { sendError(request, response, 422, 'DIFF_INVALID', 'Recorded diff payload is invalid'); return true; }
-    }
-    if (diff && Array.isArray(diff.files)) {
-      const assets = new Map(many(db, "SELECT name,sha256 FROM job_artifacts WHERE attempt_id=? AND role='diff' AND name LIKE 'patch.assets/%'", id)
-        .map(item => [item.name, item.sha256]));
-      const indexed = new Set(many(db, 'SELECT sha256 FROM job_artifacts WHERE attempt_id=?', id).map(item => item.sha256));
-      diff = { ...diff, files: diff.files.map(file => {
-        const resolveSide = side => {
-          if (!side) return null;
-          const assetName = typeof side.asset === 'string' ? `patch.assets/${path.posix.basename(side.asset.replaceAll('\\', '/'))}` : null;
-          let sha = null;
-          if (assetName) sha = assets.get(assetName);
-          else if (indexed.has(side.blob)) sha = side.blob;
-          return sha ? blobLink(db, sha) : null;
-        };
-        return { ...file, before: resolveSide(file.before), after: resolveSide(file.after) };
-      }) };
-    }
-    sendJson(request, response, diff, { sources: source(ledger.name, 'job_artifacts', 'blobs'), stale: staleOf(store) }); return true;
-  }
-  if (route === 'transcript/snapshots') {
-    const snapshots = many(db, 'SELECT * FROM attempt_transcript_snapshots WHERE attempt_id=? ORDER BY at DESC,snapshot_id DESC', id)
-      .map(s => ({ id: s.snapshot_id, at: s.at, lines: s.lines, bytes: s.bytes, blob: blobLink(db, s.sha256) }));
-    sendJson(request, response, snapshots, { sources: source(ledger.name, 'attempt_transcript_snapshots', 'blobs'), stale: staleOf(store) }); return true;
-  }
-  if (route === 'transcript') {
-    const raw = one(db, 'SELECT transcript_sha,settled_at FROM op_attempts WHERE attempt_id=?', id);
-    const requested = url.searchParams.get('snapshot');
-    const snapshot = requested ? one(db, 'SELECT * FROM attempt_transcript_snapshots WHERE attempt_id=? AND snapshot_id=?', id, Number(requested))
-      : one(db, 'SELECT * FROM attempt_transcript_snapshots WHERE attempt_id=? ORDER BY at DESC,snapshot_id DESC LIMIT 1', id);
-    const final = !requested && Boolean(raw.transcript_sha);
-    const sha = final ? raw.transcript_sha : snapshot?.sha256;
-    if (!sha) { sendError(request, response, 404, 'TRANSCRIPT_MISSING', 'Transcript unavailable'); return true; }
-    const blob = one(db, 'SELECT * FROM blobs WHERE sha256=?', sha);
-    if (!blob) { sendError(request, response, 404, 'TRANSCRIPT_MISSING', 'Transcript blob unavailable'); return true; }
-    let text;
-    try { text = decodeText(getBlob(sha)); } catch { sendError(request, response, 410, 'TRANSCRIPT_ARCHIVED', 'Transcript bytes unavailable'); return true; }
-    if (blob.redaction !== 'v1') text = redactText(text);
-    let window;
-    try { window = await transcriptWindow(text, { q: url.searchParams.get('q'), around: url.searchParams.get('around'),
-      from: url.searchParams.get('from'), to: url.searchParams.get('to') }); }
-    catch (error) { sendError(request, response, 400, error.code ?? 'BAD_REGEX', error.message); return true; }
-    let timeSource = 'snapshot';
-    if (final) timeSource = blob.created_at == null ? null : 'blob';
-    sendJson(request, response, { final, snapshotId: final ? null : snapshot.snapshot_id,
-      at: final ? blob.created_at ?? null : snapshot.at, timeSource,
-      totalLines: window.totalLines, bytes: blob.bytes, blob: blobLink(db, sha), redaction: blob.redaction ?? 'stream-v1',
-      lines: window.lines, hits: window.hits, hitCount: window.hitCount },
-    { sources: source(ledger.name, 'op_attempts', 'attempt_transcript_snapshots', 'blobs'), stale: staleOf(store) }); return true;
-  }
+  sendJson(request, response, diff, { sources: source(ledger.name, 'job_artifacts', 'blobs'), stale: staleOf(store) }); return true;
+}
+function transcriptSnapshotsRoute(request, response, store, ledger, db, id) {
+  const snapshots = many(db, 'SELECT * FROM attempt_transcript_snapshots WHERE attempt_id=? ORDER BY at DESC,snapshot_id DESC', id)
+    .map(s => ({ id: s.snapshot_id, at: s.at, lines: s.lines, bytes: s.bytes, blob: blobLink(db, s.sha256) }));
+  sendJson(request, response, snapshots, { sources: source(ledger.name, 'attempt_transcript_snapshots', 'blobs'), stale: staleOf(store) }); return true;
+}
+async function transcriptRoute(request, response, store, url, ledger, db, id) {
+  const raw = one(db, 'SELECT transcript_sha,settled_at FROM op_attempts WHERE attempt_id=?', id);
+  const requested = url.searchParams.get('snapshot');
+  const snapshot = requested ? one(db, 'SELECT * FROM attempt_transcript_snapshots WHERE attempt_id=? AND snapshot_id=?', id, Number(requested))
+    : one(db, 'SELECT * FROM attempt_transcript_snapshots WHERE attempt_id=? ORDER BY at DESC,snapshot_id DESC LIMIT 1', id);
+  const final = !requested && Boolean(raw.transcript_sha);
+  const sha = final ? raw.transcript_sha : snapshot?.sha256;
+  if (!sha) { sendError(request, response, 404, 'TRANSCRIPT_MISSING', 'Transcript unavailable'); return true; }
+  const blob = one(db, 'SELECT * FROM blobs WHERE sha256=?', sha);
+  if (!blob) { sendError(request, response, 404, 'TRANSCRIPT_MISSING', 'Transcript blob unavailable'); return true; }
+  let text;
+  try { text = decodeText(getBlob(sha)); } catch { sendError(request, response, 410, 'TRANSCRIPT_ARCHIVED', 'Transcript bytes unavailable'); return true; }
+  if (blob.redaction !== 'v1') text = redactText(text);
+  let window;
+  try { window = await transcriptWindow(text, { q: url.searchParams.get('q'), around: url.searchParams.get('around'),
+    from: url.searchParams.get('from'), to: url.searchParams.get('to') }); }
+  catch (error) { sendError(request, response, 400, error.code ?? 'BAD_REGEX', error.message); return true; }
+  let timeSource = 'snapshot';
+  if (final) timeSource = blob.created_at == null ? null : 'blob';
+  sendJson(request, response, { final, snapshotId: final ? null : snapshot.snapshot_id,
+    at: final ? blob.created_at ?? null : snapshot.at, timeSource,
+    totalLines: window.totalLines, bytes: blob.bytes, blob: blobLink(db, sha), redaction: blob.redaction ?? 'stream-v1',
+    lines: window.lines, hits: window.hits, hitCount: window.hitCount },
+  { sources: source(ledger.name, 'op_attempts', 'attempt_transcript_snapshots', 'blobs'), stale: staleOf(store) }); return true;
+}
+async function attemptRoute(request, response, store, url, context) {
+  const { ledger, db, id, row, route, checkId } = context;
+  if (route === 'detail') return detailRoute(request, response, store, ledger, db, row);
+  if (route.startsWith('checks/')) return checkRoute(request, response, store, ledger, db, id, checkId);
+  if (route === 'products') return productsRoute(request, response, store, ledger, db, id);
+  if (route === 'diff') return diffRoute(request, response, store, ledger, db, id);
+  if (route === 'transcript/snapshots') return transcriptSnapshotsRoute(request, response, store, ledger, db, id);
+  if (route === 'transcript') return transcriptRoute(request, response, store, url, ledger, db, id);
   return false;
+}
+
+/** Domain routes for dispatch, attempt, report, checks, verdict, and product land. */
+export async function handleAttempt(request, response, store, url) {
+  const pathname = url.pathname;
+  if (!store.machine) {
+    if (pathname.startsWith('/api/attempts') || pathname === '/api/media' || pathname === '/api/metrics/ops' || pathname === '/api/metrics/usage') {
+      sendError(request, response, 503, 'MACHINE_UNAVAILABLE', 'Machine database unavailable'); return true;
+    }
+    return false;
+  }
+  if (listedRoute(request, response, store, url)) return true;
+  const match = /^\/api\/attempts\/([^/]+)\/(\d+)(?:\/(checks\/(\d+)|diff|products|transcript(?:\/snapshots)?))?$/.exec(pathname);
+  if (!match) return false;
+  const context = attemptContext(request, response, store, match);
+  if (!context) return true;
+  return attemptRoute(request, response, store, url, context);
 }
