@@ -61,6 +61,42 @@ const byId = (list) => {
   return map;
 };
 
+function mergeSharedPlaceholders(doc, shared, out, where) {
+  if (!isObj(doc.placeholders)) return;
+  const ph = { ...doc.placeholders };
+  for (const [key, value] of Object.entries(ph)) {
+    if (value === 'shared') {
+      if (!isObj(shared.placeholders) || !Object.hasOwn(shared.placeholders, key)) throw new Error(`op manifest ${where}: placeholders.${key} marks shared but _common.yaml shared.placeholders has no ${key}`);
+      ph[key] = shared.placeholders[key];
+    }
+  }
+  out.placeholders = ph;
+}
+
+function mergeSharedGraphPolicy(doc, shared, out, where) {
+  if (!isObj(doc.graphPolicy) || doc.graphPolicy.location !== 'shared') return;
+  if (shared.graphPolicy?.location === undefined) throw new Error(`op manifest ${where}: graphPolicy.location marks shared but _common.yaml shared.graphPolicy has no location`);
+  out.graphPolicy = { ...doc.graphPolicy, location: shared.graphPolicy.location };
+}
+
+function mergeSharedSection(doc, shared, out, section, where) {
+  if (!Array.isArray(doc[section])) return;
+  const table = byId(shared[section]);
+  // An entry merges when it carries any `shared` marker — `path: shared` is the
+  // common case; `purpose.en`/`content.en: shared` alone keeps a literal path,
+  // which is how a path that names a declared <token> stays visible in the file.
+  out[section] = doc[section].map((entry) => (isObj(entry)
+    && (entry.path === 'shared' || entry.purpose?.en === 'shared' || entry.content?.en === 'shared')
+    ? mergeEntry(entry, table.get(entry.id), `${where}.${section}`)
+    : entry));
+}
+
+function mergeExecutionModes(doc, shared, out) {
+  if (!isObj(doc.policy?.executionModes)) return;
+  out.policy = { ...doc.policy, executionModes: Object.fromEntries(Object.entries(doc.policy.executionModes)
+    .map(([mode, entry]) => [mode, mergeOpShared(entry, shared)])) };
+}
+
 /** The effective manifest: `shared` markers in `doc` replaced by the matching `_common.yaml`
  *  `shared:` entries. Unknown markers throw — a stub that names no shared fragment is a defect,
  *  not a silent null. `doc` is not mutated. */
@@ -68,35 +104,10 @@ export function mergeOpShared(doc, shared = {}) {
   if (!isObj(doc)) return doc;
   const where = doc.id ?? '?';
   const out = { ...doc };
-  if (isObj(doc.placeholders)) {
-    const ph = { ...doc.placeholders };
-    for (const [k, v] of Object.entries(ph)) {
-      if (v === 'shared') {
-        if (!isObj(shared.placeholders) || !Object.hasOwn(shared.placeholders, k)) throw new Error(`op manifest ${where}: placeholders.${k} marks shared but _common.yaml shared.placeholders has no ${k}`);
-        ph[k] = shared.placeholders[k];
-      }
-    }
-    out.placeholders = ph;
-  }
-  if (isObj(doc.graphPolicy) && doc.graphPolicy.location === 'shared') {
-    if (shared.graphPolicy?.location === undefined) throw new Error(`op manifest ${where}: graphPolicy.location marks shared but _common.yaml shared.graphPolicy has no location`);
-    out.graphPolicy = { ...doc.graphPolicy, location: shared.graphPolicy.location };
-  }
-  for (const section of ['reads', 'writes']) {
-    if (!Array.isArray(doc[section])) continue;
-    const table = byId(shared[section]);
-    // An entry merges when it carries any `shared` marker — `path: shared` is the
-    // common case; `purpose.en`/`content.en: shared` alone keeps a literal path,
-    // which is how a path that names a declared <token> stays visible in the file.
-    out[section] = doc[section].map((e) => (isObj(e)
-      && (e.path === 'shared' || e.purpose?.en === 'shared' || e.content?.en === 'shared')
-      ? mergeEntry(e, table.get(e.id), `${where}.${section}`)
-      : e));
-  }
-  if (isObj(doc.policy?.executionModes)) {
-    out.policy = { ...doc.policy, executionModes: Object.fromEntries(Object.entries(doc.policy.executionModes)
-      .map(([mode, entry]) => [mode, mergeOpShared(entry, shared)])) };
-  }
+  mergeSharedPlaceholders(doc, shared, out, where);
+  mergeSharedGraphPolicy(doc, shared, out, where);
+  for (const section of ['reads', 'writes']) mergeSharedSection(doc, shared, out, section, where);
+  mergeExecutionModes(doc, shared, out);
   return out;
 }
 
@@ -110,30 +121,43 @@ export function paramDefinitionError(name, def) {
     ? null : `${name} requires an object valueSchema with declared properties and additionalProperties: false`;
 }
 
-/** Validate one declared param value, including the defaults used at admission. */
-export function paramValueError(name, def, value) {
-  const type = def?.type, definitionError = paramDefinitionError(name, def);
-  if (definitionError) return definitionError;
-  if (type === 'object') {
-    if (!isObj(value)) return `${name} must be an object`;
-    try {
-      const errors = validateAgainstSchema(value, def.valueSchema);
-      return errors.length ? `${name}: ${errors.join('; ')}` : null;
-    } catch { return `${name} has an invalid valueSchema`; }
-  }
-  if (type === 'enum') {
-    const allowed = Array.isArray(def.enum) ? def.enum : [];
-    return allowed.includes(value) ? null : `${name} must be one of ${allowed.join(', ')} (got ${JSON.stringify(value)})`;
-  }
+function objectParamValueError(name, def, value) {
+  if (!isObj(value)) return `${name} must be an object`;
+  try {
+    const errors = validateAgainstSchema(value, def.valueSchema);
+    return errors.length ? `${name}: ${errors.join('; ')}` : null;
+  } catch { return `${name} has an invalid valueSchema`; }
+}
+
+const enumParamValueError = (name, def, value) => {
+  const allowed = Array.isArray(def.enum) ? def.enum : [];
+  return allowed.includes(value) ? null : `${name} must be one of ${allowed.join(', ')} (got ${JSON.stringify(value)})`;
+};
+
+function primitiveParamTypeError(name, type, value) {
   if (type === 'integer' && !Number.isInteger(value)) return `${name} must be an integer (got ${JSON.stringify(value)})`;
   if (type === 'number' && !(typeof value === 'number' && Number.isFinite(value))) return `${name} must be a number (got ${JSON.stringify(value)})`;
   if (type === 'string' && typeof value !== 'string') return `${name} must be a string (got ${JSON.stringify(value)})`;
   if (type === 'boolean' && typeof value !== 'boolean') return `${name} must be true or false (got ${JSON.stringify(value)})`;
+  return null;
+}
+
+function numericParamBoundsError(name, def, value) {
   if (typeof value === 'number') {
     if (def.min !== undefined && value < def.min) return `${name} is ${value}, below its minimum ${def.min}`;
     if (def.max !== undefined && value > def.max) return `${name} is ${value}, above its maximum ${def.max}`;
   }
   return null;
+}
+
+/** Validate one declared param value, including the defaults used at admission. */
+export function paramValueError(name, def, value) {
+  const type = def?.type, definitionError = paramDefinitionError(name, def);
+  if (definitionError) return definitionError;
+  if (type === 'object') return objectParamValueError(name, def, value);
+  if (type === 'enum') return enumParamValueError(name, def, value);
+  const typeError = primitiveParamTypeError(name, type, value);
+  return typeError ?? numericParamBoundsError(name, def, value);
 }
 
 const mergeByKey = (common, selected, key) => {
