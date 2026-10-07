@@ -175,16 +175,20 @@ const loadInputs=({manifestFile,deploymentModelFile,errors,add})=>{
   if(!object(input.model))input.model={};
   return input;
 };
+const checkStackEntry=(entry,environmentNames,add)=>{
+  if(!entry.isDirectory()||entry.isSymbolicLink())return;
+  if(entry.name==='tmp'){add('STACKS_SCRATCH_IN_CANONICAL',`${STACKS_DIR}/tmp`,'scratch belongs in the OS temp directory, not a tracked .starcistacks/tmp');return;}
+  if(entry.name==='k8s')return;
+  if(!environmentNames.has(entry.name))add('STACKS_UNDECLARED_ENVIRONMENT',`${STACKS_DIR}/${entry.name}`,`${entry.name} is not an environment the declaration admits; either the declaration admits it or it is not an environment`);
+};
+const checkDeclaredEnvironmentDirs=(stacksRoot,environmentNames,add)=>{
+  for(const name of environmentNames)if(!directory(path.join(stacksRoot,name)))add('environment-directory-missing',`${STACKS_DIR}/${name}`,`declared environment ${name} has no directory`);
+};
 const checkStacksTree=({stacksRoot,manifest,environmentNames,add})=>{
   if(!directory(stacksRoot))return;
   let entries=[];try{entries=fs.readdirSync(stacksRoot,{withFileTypes:true});}catch{}
-  for(const entry of entries){
-    if(!entry.isDirectory()||entry.isSymbolicLink())continue;
-    if(entry.name==='tmp'){add('STACKS_SCRATCH_IN_CANONICAL',`${STACKS_DIR}/tmp`,'scratch belongs in the OS temp directory, not a tracked .starcistacks/tmp');continue;}
-    if(entry.name==='k8s')continue;
-    if(!environmentNames.has(entry.name))add('STACKS_UNDECLARED_ENVIRONMENT',`${STACKS_DIR}/${entry.name}`,`${entry.name} is not an environment the declaration admits; either the declaration admits it or it is not an environment`);
-  }
-  for(const name of environmentNames)if(!directory(path.join(stacksRoot,name)))add('environment-directory-missing',`${STACKS_DIR}/${name}`,`declared environment ${name} has no directory`);
+  for(const entry of entries)checkStackEntry(entry,environmentNames,add);
+  checkDeclaredEnvironmentDirs(stacksRoot,environmentNames,add);
   const k8sDir=path.join(stacksRoot,'k8s'),k8sExists=directory(k8sDir);
   if(manifest.k8s?.status==='supported'&&!k8sExists)add('k8s-directory-missing',`${STACKS_DIR}/k8s`,'k8s.status is supported but .starcistacks/k8s is missing');
   if(manifest.k8s?.status==='deferred'&&k8sExists)add('k8s-directory-unexpected',`${STACKS_DIR}/k8s`,'k8s.status is deferred, so a .starcistacks/k8s directory contradicts the declaration');
@@ -258,18 +262,27 @@ const checkEnvironmentSpec=({spec,environment,envDir,ids,root,add})=>{
   checkRunbook({spec,environment,envDir,add});
   checkSecrets({spec,environment,envDir,root,add});
 };
-const checkModel=({model,ids,spec,add})=>{
-  const services=object(model.services)?model.services:{};
+const checkServiceIds=(services,ids,add)=>{
   for(const service of Object.keys(services))if(!ids.has(service))
     add('compose-service-unclassified',`services.${service}`,'rendered service name is not a declared component id');
-  if(unresolvedCompose(model))add('compose-placeholder-unresolved','composeModel','rendered Compose still contains an unresolved interpolation placeholder in a host-resolved field');
+};
+const checkServiceEnvironment=(services,add)=>{
   for(const [service,definition] of Object.entries(services))for(const [key] of envEntries(definition?.environment))
     if(sensitive.test(key)&&!/_FILE$/i.test(key))add('plaintext-sensitive-environment',`services.${service}.environment.${key}`,'sensitive configuration is present as a direct environment value; value redacted');
-  if(object(spec)&&spec.runtime==='docker-swarm')for(const [service,definition] of Object.entries(services)){
+};
+const checkSwarmServices=(services,ids,add)=>{
+  for(const [service,definition] of Object.entries(services)){
     if(!ids.has(service))continue;
     if(!nonempty(definition?.image))add('swarm-image-missing',`services.${service}.image`,'managed Swarm service needs a nonempty rendered image');
     if(definition?.build!==undefined)add('swarm-build-unrendered',`services.${service}.build`,'rendered Swarm model must not retain a build section');
   }
+};
+const checkModel=({model,ids,spec,add})=>{
+  const services=object(model.services)?model.services:{};
+  checkServiceIds(services,ids,add);
+  if(unresolvedCompose(model))add('compose-placeholder-unresolved','composeModel','rendered Compose still contains an unresolved interpolation placeholder in a host-resolved field');
+  checkServiceEnvironment(services,add);
+  if(object(spec)&&spec.runtime==='docker-swarm')checkSwarmServices(services,ids,add);
 };
 
 export function checkApplicationStacks({repoRoot,environment,deploymentModelFile}={}){
