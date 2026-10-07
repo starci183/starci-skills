@@ -67,6 +67,27 @@ const quotaProbeLine = (r) => {
   const outcome = r.recovered ? 'PASSED - circuit cleared' : `still unavailable (${r.probe.state}) - circuit kept`;
   return `quota-probe ${r.provider}: ${outcome}; ${r.probe.detail}`;
 };
+
+function providerStateOf({ circuit, row, rotated, credential }) {
+  let state = 'no row';
+  if (circuit) state = `OPEN (${circuit.failureKind ?? 'auth'}) until ${until(circuit.expiresAt)}`;
+  else if (row) {
+    if (row.expired) state = `closed (${row.status ?? '-'} row expired ${until(row.expiresAt)})`;
+    else if (rotated) state = `closed (credential rotated ${credential.recorded} -> ${credential.fingerprint}; row ${row.status})`;
+    else state = `closed (${row.status ?? '-'})`;
+  }
+  return state;
+}
+
+function clearWithOf(circuit, key, providerQuotaProbeCommand, providerRecoverCommand) {
+  if (!circuit) return '';
+  let clearCommand;
+  if (circuit.failureKind === QUOTA_FAILURE_KIND) {
+    clearCommand = `${providerQuotaProbeCommand(key)} (runs by itself every watchdog tick, at most once per probe interval)`;
+  } else clearCommand = providerRecoverCommand(key);
+  return `; clear with ${clearCommand}`;
+}
+
 async function quotaProbe(ledger, args, emit, internals) {
   const { normalizeProvider, providerHealthOf } = internals;
   const db = ledger.db, now = Date.now();
@@ -157,23 +178,10 @@ export default {
   const row = raw ? { ...value, at: raw.at, expiresAt: raw.expires_at, expired: raw.expires_at != null && raw.expires_at <= now } : null;
   const credential = { fingerprint: current.fingerprint, source: current.source, resolved: current.resolved,
     recorded: value?.credentialFingerprint ?? null, rotated };
-  let state = 'no row';
-  if (circuit) state = `OPEN (${circuit.failureKind ?? 'auth'}) until ${until(circuit.expiresAt)}`;
-  else if (row) {
-    if (row.expired) state = `closed (${row.status ?? '-'} row expired ${until(row.expiresAt)})`;
-    else if (rotated) state = `closed (credential rotated ${credential.recorded} -> ${credential.fingerprint}; row ${row.status})`;
-    else state = `closed (${row.status ?? '-'})`;
-  }
+  const state = providerStateOf({ circuit, row, rotated, credential });
   if (!args.recover) {
     const openedBy = row?.jobId ? `; opened by ${row.jobId} at ${row.step ?? '-'}: ${row.detail ?? row.signal ?? '-'}` : '';
-    let clearWith = '';
-    if (circuit) {
-      let clearCommand;
-      if (circuit.failureKind === QUOTA_FAILURE_KIND) {
-        clearCommand = `${providerQuotaProbeCommand(key)} (runs by itself every watchdog tick, at most once per probe interval)`;
-      } else clearCommand = providerRecoverCommand(key);
-      clearWith = `; clear with ${clearCommand}`;
-    }
+    const clearWith = clearWithOf(circuit, key, providerQuotaProbeCommand, providerRecoverCommand);
     emit({ ok: true, provider: key, open: Boolean(circuit), row, credential },
       `provider-health ${key}: ${state}${openedBy}; credential ${credential.fingerprint ?? 'unresolved'} (${credential.source ?? 'no source'})${clearWith}`, args.json);
     return;
