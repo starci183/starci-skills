@@ -38,6 +38,18 @@ function fieldType(ts, node) {
   return null;
 }
 
+function appendPayloadMember(ts, member, typeName, problems, where, payload) {
+  if (!ts.isPropertySignature(member) || !ts.isIdentifier(member.name) || member.type === undefined) {
+    problems.push(`${where}: the payload ${typeName} holds a member that is not \`name: type\``);
+    return;
+  }
+  const type = fieldType(ts, member.type);
+  let written = null;
+  if (type !== null) written = `${type}${member.questionToken ? '?' : ''}`;
+  if (written === null || !FIELD_TYPE.test(written)) problems.push(`${where}: payload field ${member.name.text} must be string, number, boolean, string[] or number[]`);
+  else payload[member.name.text] = written;
+}
+
 /** The payload fields of the interface or type literal named `typeName` in the file: `{ <field>: <type> }`, optional fields with a `?`. */
 function payloadOf(ts, sourceFile, typeName, problems, where) {
   let members = null;
@@ -50,17 +62,7 @@ function payloadOf(ts, sourceFile, typeName, problems, where) {
     return {};
   }
   const payload = {};
-  for (const member of members) {
-    if (!ts.isPropertySignature(member) || !ts.isIdentifier(member.name) || member.type === undefined) {
-      problems.push(`${where}: the payload ${typeName} holds a member that is not \`name: type\``);
-      continue;
-    }
-    const type = fieldType(ts, member.type);
-    let written = null;
-    if (type !== null) written = `${type}${member.questionToken ? '?' : ''}`;
-    if (written === null || !FIELD_TYPE.test(written)) problems.push(`${where}: payload field ${member.name.text} must be string, number, boolean, string[] or number[]`);
-    else payload[member.name.text] = written;
-  }
+  for (const member of members) appendPayloadMember(ts, member, typeName, problems, where, payload);
   return payload;
 }
 
