@@ -466,7 +466,7 @@ function lastRefusals({ env = process.env } = {}) {
       seen.add(r.key);
       if (r.result === 'pushed' || !r.head || !r.failure_signature) continue;
       let repeat = 0;
-      for (const x of rows.filter((y) => y.key === r.key)) { if (x.result === 'pushed' || x.head !== r.head || x.failure_signature !== r.failure_signature) break; repeat += 1; }
+      for (const x of rows.filter((y) => y.key === r.key)) { if (x.result === 'pushed' || x.head !== r.head || x.failure_signature !== r.failure_signature) { break; } repeat += 1; }
       out.set(r.key, { head: r.head, signature: r.failure_signature, at: Number(r.at), repeat: repeat || 1 });
     }
   } catch { /* no history: every push runs */ }
@@ -475,7 +475,7 @@ function lastRefusals({ env = process.env } = {}) {
 
 /** The pushes.result of one pushMain result. */
 const pushResultOf = (r) => (r.pushed && 'pushed') || ((r.skipped || r.deferred) && 'skipped') || (r.refused && 'refused') || 'failed';
-const blobText = (sha) => { if (!sha) return null; try { return getBlob(sha).toString('utf8'); } catch { return null; } };
+const blobText = (sha) => { if (!sha) { return null; } try { return getBlob(sha).toString('utf8'); } catch { return null; } };
 
 /** Push every listed main and record one pushes row per repository in machine.sqlite (MB-03: full stdout/stderr blobs). */
 export function pushMains({ repos = null, dryRun = false, hooksOnly = false, env = process.env, record = true, settings = null, sourceRoot = starciSourceRoot() } = {}) {
