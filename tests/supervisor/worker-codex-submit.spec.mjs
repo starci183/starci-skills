@@ -11,7 +11,7 @@ const staged = 'OpenAI Codex\n› [Pasted Content 11099 chars]\n  gpt-6.1-sol';
 const active = '• Working (1s • esc to interrupt)\n› Ask Codex to do anything';
 const settings = { workers: { base: 1, max: 1 } };
 function world(t, { stuck = false, terminal = null } = {}) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'worker-submit-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-worker-submit-'));
   const env = { STARCI_LOCAL_ROOT: dir, STARCI_TEST_MACHINE_FILE: path.join(dir, 'machine.sqlite') };
   const m = openMachine({ env });
   t.after(() => { m.close(); fs.rmSync(dir, { recursive: true, force: true }); });

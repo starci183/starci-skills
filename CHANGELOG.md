@@ -17,7 +17,7 @@ Theme: the first two real workflows run end to end through their first gates; mo
 - The Codex command guard is registered in the Codex home a worker starts in (the owner's `~/.codex` and Orca's managed home), not in the worktree's project layer, which Codex ignores in a linked worktree.
 
 ### Added
-- `modules/kernel/op-incident-policy.yaml`: one policy table for every hold on a job, seat or workflow, with a matrix of hold kinds against eight invariants. A launch refusal, quota or readiness failure demotes then excludes that agent for the job so the next chain member takes it; a job with every member spent opens one job-scoped escalation; a running worker's rate limit waits or is replaced by the reset time; an overdue Supervisor Decision Item climbs to the owner.
+- `modules/kernel/op-incident-policy.yaml`: one policy table for every hold on a job, seat or workflow, with a matrix of hold kinds against eight invariants. A launch refusal, quota or readiness failure demotes then excludes that agent for the job so the next chain member takes it; a job with every member spent opens one job-scoped escalation; a running worker's rate limit waits or is replaced by the reset time; an overdue Supervisor Decision Item climbs to the owner. A `supervisor-gate` needs a typed cause and a tried workaround (or a typed reason none exists), carries a machine-checked release condition where its cause allows, enters the same ladder, and takes one of three Supervisor resolutions: `fixed`, `workaround`, `not-runtime-fault`.
 - `roots.temp` and `resources.{minFreeDiskGb,minFreeDiskPct,minFreeRamPct}` in `config.yaml`: the runtime temp root and the host floors are the owner's to set.
 - A generic retry budget (`scripts/lib/retry-budget.mjs`) for the reconciler work queue, stale terminals and the host lock; a provider-reservation reaper; a leftover-worker sweep.
 - Host rows `command guard resolvable`, `drift-modes` and `drift-rev`; `reconciler status` leads with a `DRIFT:` line.
@@ -31,12 +31,11 @@ Theme: the first two real workflows run end to end through their first gates; mo
 - The reconciler engine recorded an unreadable `config.yaml` as every controller `off` and could not reload onto a new revision; it keeps its last good modes, reloads without reading the new config through old code, and reports drift.
 - Kernel and Supervisor token usage was not metered behind the Orca worker preamble.
 - Linux: the Windows launcher path, file-time rounding, temp-root and path-key assumptions in specs; `starci kernel route` dropped the per-member rejections when every member was refused.
-- SonarCloud findings from 5,701 to 59 code smells and 2 bugs open at this release.
+- SonarCloud findings: from 5,701 code smells down to 59 smells and 2 bugs on the last scan, each of which this release addresses in code.
 
 ### Known limitations
-- SonarCloud is not at zero: 59 code smells and 2 bugs are open; a fix branch exists and is unverified.
-- Two specs (`dead-worker-self-heal`, `gate-conditions`) failed once under load in the full Windows run and pass alone; the cause is not established.
-- `supervisor-gate` holds are not yet in the escalation ladder (no re-evaluated condition, no workaround-first rule, no owner step).
+- SonarCloud was at 59 code smells and 2 bugs on the last scan; this release changes the code for every one of them, and no scan has confirmed the count yet.
+- Two specs (`dead-worker-self-heal`, `gate-conditions`) failed once under load in a full Windows run and pass alone; the cause is not established. The full suite has not been run on the exact released commit: its lanes were run separately.
 - The incident policy has run against specs and ledger fixtures only, not through a full real workflow.
 - The machine store keeps the unused `models.share_pct` column so an existing store still opens.
 - Kernel-initiated Codex launches still fail on a launch-trust probe that inherits the seat's guard identity.

@@ -65,7 +65,7 @@ test('lifecycle admission comes from policy data and leaves unrelated Orca reads
 });
 
 test('wrongly blocked own lifecycle passes both hook and shim for op, Kernel, Supervisor seat/worker and coordinator', async (t) => {
-  const cwd = mkdtemp(t, 'orca-self-');
+  const cwd = mkdtemp(t, 'starci-orca-self-');
   const guards = path.join(cwd, 'guards');
   const bindings = [
     { name: 'op', role: 'op', guard: { role: 'op', workflowId: 'wf-self' } },
