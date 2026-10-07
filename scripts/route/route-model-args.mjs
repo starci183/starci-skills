@@ -12,6 +12,13 @@ const FLAG_OPTIONS = new Map([
   ['--no-checks', ['checks', false]], ['--plan', ['plan', true]], ['--json', ['json', true]], ['--verbose', ['verbose', true]],
 ]);
 
+function printHelp(helpFile) {
+  const header = fs.readFileSync(helpFile, 'utf8').split('\n');
+  const from = header.findIndex((line) => line.startsWith('// Internal entry:'));
+  const to = header.findIndex((line) => line.startsWith('// Owner config:'));
+  console.log(header.slice(from, to).map((line) => line.replace(/^\/\/ ?/, '')).join('\n').trimEnd());
+}
+
 export function parseArgs(argv, helpFile) {
   const args = { tools: [] };
   const take = (i) => {
@@ -22,10 +29,7 @@ export function parseArgs(argv, helpFile) {
   for (let i = 0; i < argv.length; i += 1) {
     const key = argv[i];
     if (key === '--help' || key === '-h') {
-      const header = fs.readFileSync(helpFile, 'utf8').split('\n');
-      const from = header.findIndex((line) => line.startsWith('// Internal entry:'));
-      const to = header.findIndex((line) => line.startsWith('// Owner config:'));
-      console.log(header.slice(from, to).map((line) => line.replace(/^\/\/ ?/, '')).join('\n').trimEnd());
+      printHelp(helpFile);
       process.exit(0);
     }
     const property = VALUE_OPTIONS.get(key);
