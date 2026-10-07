@@ -43,7 +43,7 @@ import { recordNewProbe, recordServiceEvents } from './service-events.mjs';
 import { outcomeOf, probeCommand, reopenCommand } from './service-commands.mjs';
 import { auditTasks } from '../machine/task-audit.mjs';
 import { TASK_DEFINITIONS, starciShimPath } from '../machine/task-register.mjs';
-import { RECONCILER_SERVICE, reconcilerTaskProbe } from './task-health.mjs';
+import { RECONCILER_SERVICE, reconcilerTaskProbe } from './task-health.mjs'; import { offInConfig } from './connector-wanted.mjs';
 export { httpUp };
 export const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const SERVICES_FILE = 'scripts/reconciler/services.mjs';
@@ -198,7 +198,7 @@ async function connectorUp(service, { timeoutMs, tries = 1, run = runChild, extr
  * host.yaml allowTaskRepair is false). `ownerPath`: the owner reaches the runtime through it, so a quarantine is
  * urgent for the owner too (DESIGN 9.7). Every seam is injectable for the specs.
  */
-export function serviceRegistry({ settings = hostSettings(), ports = servicePorts(), run = runChild, http = httpUp, platform = process.platform, audit = auditTasks } = {}) {
+export function serviceRegistry({ settings = hostSettings(), ports = servicePorts(), run = runChild, http = httpUp, platform = process.platform, audit = auditTasks, config = loadConfig } = {}) {
   const s = settings.services;
   const startCli = (name) => ({ cmd: 'node', args: [SERVICES_FILE, '--start', name, '--json'] });
   const entry = (name, fields) => {
@@ -228,11 +228,11 @@ export function serviceRegistry({ settings = hostSettings(), ports = servicePort
       judge: (v) => v.running === true && (ports.gatewayPort == null || v.port == null || Number(v.port) === ports.gatewayPort) }),
     // The gateway answers 404 for anything but a form: any HTTP answer on its port is a live gateway.
     answers: async () => (ports.gatewayPort ? (await http(`http://127.0.0.1:${ports.gatewayPort}/`, { timeoutMs: s['ask-gateway'].aliveTimeoutMs ?? 30_000 })).status != null : false) }),
-    entry('ask-tunnel', { ownerPath: true, probe: () => connectorUp('ask-tunnel', { timeoutMs: s['ask-tunnel'].probeTimeoutMs, tries: s['ask-tunnel'].probeTries ?? 1, run, extraArgs: ['--fast'],
-      judge: (v) => v.running === true && !(v.health?.problems ?? []).length }) }),
+    entry('ask-tunnel', { ownerPath: true, probe: offInConfig('ask-tunnel', () => connectorUp('ask-tunnel', { timeoutMs: s['ask-tunnel'].probeTimeoutMs, tries: s['ask-tunnel'].probeTries ?? 1, run, extraArgs: ['--fast'],
+      judge: (v) => v.running === true && !(v.health?.problems ?? []).length }), config) }),
     // The bridge long-polls: its offset advances only when an update arrives, so liveness is the recorded pid
     // alive (status.running); the offset is kept in the probe detail for the digest.
-    entry('telegram-bridge', { ownerPath: true, probe: () => connectorUp('telegram-bridge', { timeoutMs: s['telegram-bridge'].probeTimeoutMs, tries: s['telegram-bridge'].probeTries ?? 1, run }) }),
+    entry('telegram-bridge', { ownerPath: true, probe: offInConfig('telegram-bridge', () => connectorUp('telegram-bridge', { timeoutMs: s['telegram-bridge'].probeTimeoutMs, tries: s['telegram-bridge'].probeTries ?? 1, run }), config) }),
     entry(RECONCILER_SERVICE, { restart: settings.allowTaskRepair,
       probe: () => reconcilerTaskProbe({ audit, allowTaskRepair: settings.allowTaskRepair }),
       start: () => ({ cmd: starciShimPath(), args: ['task', 'register', 'reconciler', '--apply', '--json'] }) }),

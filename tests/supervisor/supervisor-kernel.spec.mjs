@@ -949,6 +949,16 @@ test('the Supervisor seat launches with its subagent tool denied; the prompt sen
   assert.match(fs.readFileSync(new URL('../../modules/supervisor/worker-prompt.md', import.meta.url), 'utf8'), /`diagnosed`/);
 });
 
+test('the [Worker] prompt orders `starci runtime check` in the staging checkout and a clean report before `done`', () => {
+  // 2026-10-07: five [Worker] reports were refused at the land gate by findings the worker could have caught itself
+  // (RT_CODE_UNCATALOGUED, HFS_SIZE_GROWTH, RT_BASE_IMPURE), each costing a 30-60 min land run plus a rework job.
+  const prompt = fs.readFileSync(new URL('../../modules/supervisor/worker-prompt.md', import.meta.url), 'utf8');
+  assert.match(prompt, /starci runtime check/);
+  assert.match(prompt, /modules\/kernel\/failure-codes\.yaml/);
+  assert.match(prompt, /HFS soft size/);
+  assert.match(prompt, /process\.env/);
+});
+
 test('a diagnosis worker files outcome diagnosed; the watchdog announces it once with a [report] wake', (t) => {
   const env = envOf(t);
   const m = machineOf(t, env);
