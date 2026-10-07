@@ -55,6 +55,9 @@ export const HUB_STUCK_MS = 2 * 3_600_000;
 const REFUSAL_WINDOW_MS = 7 * 86_400_000;
 const HARD = 'hard', SOFT = 'soft';
 const OPEN_JOB = ['queued', 'leased', 'running', 'answering', 'effect_unknown'];
+const FOREIGN_FILE_START = String.raw`[\w@.-]+`;
+const FOREIGN_FILE_SEGMENT = String.raw`\/[\w@.[\]()-]+`;
+const FOREIGN_FILE = new RegExp(`${FOREIGN_FILE_START}(?:${FOREIGN_FILE_SEGMENT})+`, 'g');
 // Names that are one foundation under two spellings: a dotted project prefix and a starci- prefix
 // drop, and the shell is the layout tree (work-ownership.mjs FOUNDATION_ROOTS).
 const FOUNDATION_SYNONYMS = { shell: 'layout-tree', layout: 'layout-tree', 'layout-shell': 'layout-tree' };
@@ -208,7 +211,7 @@ export function dependencyGraph(db, { repo = null, now = Date.now(), light = fal
   if (!light) for (const row of incidents.filter((r) => kindOf(r.last_progress) === 'foreign-file-committed')) {
     const { payload, at } = raisedOf(row);
     const text = `${row.last_progress} ${payload.detail ?? ''}`;
-    const files = [...new Set((text.match(/[\w@.-]+(?:\/[\w@.[\]()-]+)+/g) ?? []).map(normWork))].slice(0, 40);
+    const files = [...new Set((text.match(FOREIGN_FILE) ?? []).map(normWork))].slice(0, 40);
     for (const file of files) {
       let owner = null;
       if (file.startsWith('.starciwork/') && ownerOf) owner = ownerOf(file)?.workflowId ?? null;
