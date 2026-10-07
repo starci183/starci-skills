@@ -10,7 +10,8 @@ import { ownedPathPlacements, projectBinding } from './target-repo.mjs';
 import { isDir } from '../lib/fs-kind.mjs';
 
 const slash = (p) => String(p).replaceAll('\\', '/');
-const isGlobOrDir = (p) => /(^|\/)\*{1,2}$/.test(p) || p.endsWith('/');
+const GLOB_OR_DIR = new RegExp(String.raw`(^|\/)\*{1,2}$`);
+const isGlobOrDir = (p) => GLOB_OR_DIR.test(p) || p.endsWith('/');
 const tidy = (p) => slash(p).replace(/(^|\/)\*{1,2}$/, '').replace(/\/+$/, '').replace(/^\.\//, '') || '.';
 
 const newModulesOf = (payload) => (Array.isArray(payload?.new_modules) ? payload.new_modules : []);
