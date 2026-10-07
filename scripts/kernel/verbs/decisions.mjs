@@ -20,7 +20,11 @@ import { splitList } from '../../lib/list.mjs';
 
 const csv = (v) => splitList(v, { dedupe: true });
 const evidenceOf = (args) => {
-  if (args['evidence-json']) { const v = parseJsonOr(args['evidence-json'], null); if (!Array.isArray(v)) { throw refuse('--evidence-json must be a JSON array', 'decision-evidence-invalid'); } return v; }
+  if (args['evidence-json']) {
+    const v = parseJsonOr(args['evidence-json'], null);
+    if (!Array.isArray(v)) throw refuse('--evidence-json must be a JSON array', 'decision-evidence-invalid');
+    return v;
+  }
   if (args['evidence-file']) {
     if (!fs.existsSync(args['evidence-file'])) throw refuse(`--evidence-file ${args['evidence-file']} does not exist`, 'decision-evidence-invalid');
     const text = fs.readFileSync(args['evidence-file'], 'utf8');

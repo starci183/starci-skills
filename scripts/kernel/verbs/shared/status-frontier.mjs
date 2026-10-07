@@ -43,7 +43,7 @@ export const frontierStateOf = (s) => {
 };
 
 // An unanswered ask never reaches the owner (reserve), but a louder state already in flight still wins.
-const ASK_RESERVE_QUIET = ['transition-ready', 'settle-ready', 'worker-dead', 'worker-nudge-ready', 'worker-wedged', 'peer-message', 'handover-answered', 'finish-ready'];
+const ASK_RESERVE_QUIET = new Set(['transition-ready', 'settle-ready', 'worker-dead', 'worker-nudge-ready', 'worker-wedged', 'peer-message', 'handover-answered', 'finish-ready']);
 
 const reserveReason = (s) => `unanswered ask(s) ${s.askReserve.join(', ')} never reached the owner (not notified on Telegram, and no live form: never served, or the serve-ask ttl expired); park each with starci kernel serve-ask --workflow <id> --dispatch <id> before yielding`;
 
@@ -134,7 +134,7 @@ const staleReason = (s) => {
 };
 
 const REASON_ORDER = [
-  [(s) => s.frontierState === 'ask-reserve' || (s.askReserve.length > 0 && !ASK_RESERVE_QUIET.includes(s.frontierState)), reserveReason],
+  [(s) => s.frontierState === 'ask-reserve' || (s.askReserve.length > 0 && !ASK_RESERVE_QUIET.has(s.frontierState)), reserveReason],
   [(s) => s.frontierState === 'worker-question', questionReason],
   [(s) => s.frontierState === 'settle-ready', settleReason],
   [(s) => s.frontierState === 'worker-dead', deadReason],
