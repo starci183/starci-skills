@@ -8,8 +8,8 @@ import { runNode } from '../api/node/run-node.mjs';
 
 export const FULL_CHECK_ENTRY = 'packages/cli/bin/starci.mjs';
 
-/** `node <args>` through scripts/api/node: {ok, stdout, stderr}. */
-const nodeRunner = (args, options) => { const r = runNode(args, options); return { ok: !r.error && r.status === 0, stdout: String(r.stdout ?? ''), stderr: String(r.stderr ?? r.error?.message ?? '') }; };
+/** `node <args>` through scripts/api/node, STARCI_RUNTIME = the tree it runs in (the CLI otherwise reads the per-user record, the live checkout): {ok, stdout, stderr}. */
+const nodeRunner = (args, options) => { const r = runNode(args, { ...options, env: { ...process.env, STARCI_RUNTIME: options.cwd } }); return { ok: !r.error && r.status === 0, stdout: String(r.stdout ?? ''), stderr: String(r.stderr ?? r.error?.message ?? '') }; };
 
 /** The candidate's full check in `dir`: {ok, output, full}, or {ok: true, skipped: true} for a tree with no dispatcher. `runner(args, {cwd, timeout})` runs `node <args>` -> {ok, stdout, stderr}. */
 export function fullCheck(dir, runner = nodeRunner, tail = (text) => String(text ?? '').trim().split(/\r?\n/).slice(-30).join('\n')) {

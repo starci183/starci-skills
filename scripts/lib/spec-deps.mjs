@@ -108,6 +108,16 @@ export function specsDependingOn(root, changed, specs, { readFile } = {}) {
   return specs.filter((spec) => specDependsOnChange(root, spec, wanted, cache, readFile));
 }
 
+/**
+ * The specs that read a changed file AS DATA (a quoted path or path segments below the named tree, in the spec or a test helper it
+ * imports), whether or not they import it: the part of specsDependingOn that is a direct use, not a distant import.
+ */
+export function specsReadingData(root, changed, specs, { readFile } = {}) {
+  const wanted = new Set(changed.map(posix));
+  const cache = new Map();
+  return specs.filter((spec) => dataRefSelectsChange(root, reachableFrom(root, spec, { cache, readFile }), wanted, readFile));
+}
+
 // Internal entry: spawned by scripts/supervisor/land.mjs; not invoked directly.
 // Args: <root> <changed-file>... -> prints the dependent spec paths, one per line.
 // Stdin mode accepts `-` in place of changed-file arguments.

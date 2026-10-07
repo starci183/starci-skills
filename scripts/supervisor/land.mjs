@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // starci supervisor land — the ONE land gate of the live runtime (modules/supervisor/supervise.yaml landGate, docs/supervisor.md).
-// Serialized by a host lock; a change reaches live main only through all of it, or not at all.
+// Lands serialize on the land queue; the host lock is held for the publish alone (land-lock.mjs). A change reaches live main only through all of it, or not at all.
 //
 //   starci supervisor land --job <jobId> [--specs <csv>] [--no-push] [--notify] [--json]
 //   starci supervisor land --commit <sha>[,<sha>...] [--specs <csv|touching|direct|all|none>] [--reason <why>] [--full-by-push-git] [--lane <name>] [--no-push] [--notify] [--json]
@@ -25,11 +25,12 @@
 //      sync-runtime --check when the change touches a file a runtime mirror bundles (mirrorDriftCheck, same baseline);
 //      the clean-install proof of every published package the change touches, a file its runtime copy bundles included (packageProofCheck: package-clean-test.mjs --base <base>; red or not run refuses, no baseline);
 //      the FULL `starci runtime check` of the candidate (land-full-check.mjs: packages/cli/bin/starci.mjs runtime check, not only the gate), a step of its own; red refuses, no baseline;
-//      the specs named by the worker/--specs plus every spec that names a changed file (node --test,
-//        --test-concurrency allocation.landGate.specConcurrency, timeout specsBaseMs + perSpecMs per spec; `--specs direct` keeps the
-//        specs that can see the change instead: land-specs.mjs, hub files narrowed to the exports the diff reaches) -
-//        default mode `touching` (owner rule 2026-09-29, config.yaml `specs.harness` default false = touching-only): every
-//        named spec plus every spec naming a changed file runs and a red one refuses; the whole suite is never a land's
+//      the specs named by the worker/--specs plus the specs that can see the change (node --test,
+//        --test-concurrency allocation.landGate.specConcurrency, timeout specsBaseMs + perSpecMs per spec). Default mode `touching`
+//        (owner rule 2026-09-29, config.yaml `specs.harness` default false = touching-only): the named specs, the specs importing or
+//        spawning a changed file (hub files narrowed to the exports the diff reaches), the specs reading it as data, the tree-wide invariant
+//        specs, and a smoke set of at most SMOKE_LIMIT specs that reach it only through the import graph (land-specs.mjs); a red one refuses.
+//        `--specs direct` is the same without the smoke set. The whole suite is never a land's
 //        job - `--specs all` is refused unless `specs.harness: true` or the push-git flow passes `--full-by-push-git`
 //        (engine/config.mjs harnessSpecsEnabled); `--specs none` needs an explicit `--reason` (recorded as specReason on the
 //        land run); `--specs <csv>` adds named specs;
@@ -37,7 +38,7 @@
 // 3b. git health: a repo whose shared config says core.bare=true fails every work-tree operation ("this operation must be run
 //    in a work tree"); that is refused as `git-unusable` (before the queue and before each scratch), and a cherry-pick that fails
 //    without unmerged files is `git-failed`, never `conflict`. Each attempt owns one scratch-<pid>-<token> worktree it alone removes.
-// 4. Fast-forward live main: main must still be the scratch's base (else the whole gate reruns on the new main,
+// 4. Fast-forward live main, under the host lock (land-lock.mjs, held for this step and the push only, waited for up to 10 minutes): main must still be the scratch's base (else the whole gate reruns on the new main,
 //    at most 3 times), the live checkout must be on main and clean for the changed paths; then
 //    `git update-ref refs/heads/main <new> <base>` (compare-and-swap) and a working-tree + index update of just
 //    those paths. A failed tree update rolls the ref and the paths back.
@@ -68,16 +69,15 @@ import { sleepSync } from '../lib/sleep-sync.mjs';
 import { withSwcCache } from '../gates/build-env.mjs';
 import { hostThrottle } from '../machine/ram-throttle.mjs';
 import { buildGrammar } from '../gates/grammar-build.mjs';
-import { specsDependingOn } from '../lib/spec-deps.mjs';
 import { SKILL_ROOT, lanesRoot, landRoot, supervisorSettings } from '../machine/home.mjs';
-import { specsDirect, changedExports, headRanges } from './land-specs.mjs';
+import { specsDirect, changedExports, headRanges, specsInvariant, touchingSelection, SMOKE_LIMIT } from './land-specs.mjs';
 import { fullCheckStep } from './land-full-check.mjs';
 import { fastForwardLive } from '../machine/live-fast-forward.mjs';
 import { withoutGitLocalEnv } from '../lib/git.mjs'; import { isMain } from '../lib/is-main.mjs';
-import { tailLines } from '../lib/clip.mjs'; import { landUnderHostLock } from './land-lock.mjs'; import { selfUpgradeBranchContaining, selfUpgradeIdOf, withSelfUpgradeRef, writeSelfUpgradeRef } from './self-upgrade-ref.mjs'; import { describe, failList, specsRedOnMainOf } from './land-format.mjs'; export { describe };
+import { tailLines } from '../lib/clip.mjs'; import { underHostLockWaiting } from './land-lock.mjs'; import { selfUpgradeBranchContaining, selfUpgradeIdOf, withSelfUpgradeRef, writeSelfUpgradeRef } from './self-upgrade-ref.mjs'; import { describe, failList, specsRedOnMainOf } from './land-format.mjs'; export { describe };
 import { failKey, pushOwedOf, landOutcomeOf, recordLand } from './land-record.mjs';
 import { conflictHint, conflictPreflight, pickConflicts } from './land-conflicts.mjs';
-export { conflictHunks } from './land-conflicts.mjs'; export { conflictPreflight };
+export { specsTouching, invariantRootsOf } from './land-specs.mjs'; export { conflictHunks } from './land-conflicts.mjs'; export { conflictPreflight };
 export { specsRedOnMainDecision } from './land-record.mjs';
 export const TREE_CHECKS = Object.freeze(['scripts/hfs/sync-runtime.mjs', 'scripts/checks/check-module-yaml.mjs', 'scripts/checks/check-contract-cites.mjs', 'scripts/checks/check-cli-parity.mjs', 'scripts/checks/check-worktree-add.mjs']);
 const MAX_MAIN_RETRIES = 3;
@@ -105,31 +105,6 @@ export function specRunGate({ concurrency = specConcurrency(), waitMs = LAND_WAI
 
 /* ------------------------------------------------------------ pure pieces */
 
-/**
- * The roots a tree-wide invariant spec scans, as it declares them ONCE: `export const INVARIANT_ROOTS = ['scripts', ...]`
- * (the list its own walk uses). Such a spec never names the file it catches, so naming alone would skip it.
- */
-export const invariantRootsOf = (text) => {
-  const m = /^export const INVARIANT_ROOTS = \[([^\]]*)\]/m.exec(String(text ?? ''));
-  return m ? [...m[1].matchAll(/'([^']+)'/g)].map((x) => normPath(x[1])) : [];
-};
-/** Invariant specs (invariantRootsOf) scanning a root that holds a changed file. */
-const specsInvariant = (changed, { specs }) => {
-  const files = changed.map(normPath);
-  return specs.filter(({ file, text }) => file && invariantRootsOf(text).some((r) => files.some((f) => f.startsWith(`${r}/`)))).map((s) => s.file);
-};
-/** Specs that name a changed file (its last two path segments, or its name for a top-level file), the invariant specs
- *  scanning a changed file's root, plus changed specs. */
-export function specsTouching(changed, { specs, root = null }) {
-  const needles = changed.map(normPath).filter((f) => !f.startsWith('tests/')).map((f) => f.split('/').slice(-2).join('/'));
-  const own = changed.map(normPath).filter((f) => /^tests\/[^/]+\.spec\.mjs$/.test(f));
-  const hits = specs.filter(({ file, text }) => needles.some((n) => text.includes(n)) && file).map((s) => s.file);
-  // By dependency too: every spec whose relative-import graph reaches a changed file (scripts/lib/spec-deps.mjs), so a
-  // clash between two lanes is refused at land time, not found at the final full run.
-  const deps = root ? specsDependingOn(root, changed.map(normPath), specs.map((s) => s.file).filter(Boolean)) : [];
-  return [...new Set([...own, ...hits, ...deps, ...specsInvariant(changed, { specs })])];
-}
-
 /** --specs keywords: `touching` = the named specs plus every spec naming a changed file (the default); `all` = every spec
  *  (refused unless specs.harness is true or the push-git flow asks); `direct` = the specs that can see the change (hub files narrowed to the exports reached); `none` = no spec (needs an explicit --reason). */
 const SPEC_KEYWORDS = Object.freeze(['touching', 'direct', 'all', 'none']);
@@ -155,7 +130,8 @@ export function specPlan({ fullAllowed = false, fullByPushGit = false, asked = [
 /* ------------------------------------------------------------ scratch */
 
 const outcome = (r) => ({ ok: r.status === 0, status: r.status, stdout: String(r.stdout ?? ''), stderr: String(r.stderr ?? ''), error: r.error?.message ?? null });
-const node = (args, { cwd, timeout = 1_200_000, env = process.env } = {}) => outcome(runNode(args, { cwd, timeout, env, maxBuffer: 64 * 1024 * 1024 }));
+/** `node <args>` in `cwd`, with STARCI_RUNTIME = cwd: the CLI resolves its runtime root from that variable before the per-user record, so every child verifies the tree being landed, not the live checkout. */
+const node = (args, { cwd, timeout = 1_200_000, env = process.env } = {}) => outcome(runNode(args, { cwd, timeout, env: { ...env, STARCI_RUNTIME: cwd }, maxBuffer: 64 * 1024 * 1024 }));
 /** The env the gate's spec run gets: no test-runner channel, no git repository-local variables. */
 export function specRunEnv(parent = process.env) {
   const env = withoutGitLocalEnv(parent);
@@ -425,12 +401,12 @@ const symbolsOfChange = ({ dir, base, head, rows }, file) => {
 /** The spec files the gate runs for `specMode` ({allSpecs}) and the hub files `direct` narrowed ({narrowed}). */
 function chooseSpecs({ dir, base, head, rows, changed, specs, specMode }) {
   const pool = ['touching', 'direct', 'all'].includes(specMode) ? readSpecs(dir) : [];
-  let extra = [], narrowed = [];
+  let extra = [], narrowed = [], smoke = [];
   if (specMode === 'all') extra = pool.map((s) => s.file);
-  else if (specMode === 'touching') extra = specsTouching(changed, { specs: pool, root: dir });
+  else if (specMode === 'touching') { const t = touchingSelection(changed, { specs: pool, root: dir, symbolsOf: (file) => symbolsOfChange({ dir, base, head, rows }, file) }); extra = t.files; narrowed = t.narrowed; smoke = t.smoke; }
   else if (specMode === 'direct') { const d = specsDirect(changed, { specs: pool, symbolsOf: (file) => symbolsOfChange({ dir, base, head, rows }, file) }); extra = [...d.files, ...specsInvariant(changed, { specs: pool })]; narrowed = d.narrowed; }
   const allSpecs = specMode === 'none' ? [] : [...new Set([...specs.map(normPath), ...extra])].filter((f) => fs.existsSync(path.join(dir, f)));
-  return { allSpecs, narrowed };
+  return { allSpecs, narrowed, smoke };
 }
 
 /** The refusal text appended to a red spec run's output. */
@@ -480,12 +456,13 @@ export function runChecks({ dir, base, head, specs = [], specMode = 'touching', 
   const present = changed.filter((f) => fs.existsSync(path.join(dir, f)));
   const checks = [...syntaxChecks(dir, present), ...parseChecks(dir, present), ...treeChecks(dir, baseline)];
   for (const step of [mirrorDriftCheck({ dir, changed, baseline }), packageProofCheck({ dir, base }), fullCheckStep(dir)]) if (step) checks.push(step);
-  const { allSpecs, narrowed } = chooseSpecs({ dir, base, head, rows, changed, specs, specMode });
+  const { allSpecs, narrowed, smoke } = chooseSpecs({ dir, base, head, rows, changed, specs, specMode });
   if (specMode === 'none') checks.push({ name: 'specs skipped', ok: true, advisory: true, output: '--specs none with an explicit --reason: no spec ran (the reason is recorded as specReason on the land run)' });
   const missing = specs.map(normPath).filter((f) => !fs.existsSync(path.join(dir, f)));
   if (missing.length) checks.push({ name: 'named specs exist', ok: false, output: `missing: ${missing.join(', ')}` });
   checks.push(...specRunChecks({ dir, base, changed, allSpecs, runSpecs, baseTree, ramGate, env, specBaseRun }));
   if (narrowed.length) checks.push(narrowedCheck(narrowed));
+  if (smoke.length) checks.push({ name: 'specs touching: smoke set', ok: true, advisory: true, smoke, output: `${smoke.length} spec(s) reach the change only through imports (at most ${SMOKE_LIMIT} run, spread over spec directories); the rest of that set is the release run's` });
   return { ok: checks.every((c) => c.ok), checks, changed, rows, specs: allSpecs };
 }
 
@@ -566,11 +543,12 @@ function landInScratch(run, scratch, step) {
     result.attempts.push({ ...step, reason: 'checks-red' });
     return { ...result, base, head, reason: 'checks-red', checks: checked.checks, changed: checked.changed };
   }
-  const ff = fastForwardLive({ root, base, head, rows: checked.rows });
-  if (ff.ok) return landedResult(run, { checked, base, head });
+  // Only the publish holds the host lock; main must still be `base` when it does (compare-and-swap), else the gate reruns on the new main.
+  const ff = underHostLockWaiting(run, () => { const moved = fastForwardLive({ root, base, head, rows: checked.rows }); return moved.ok ? { ...moved, landed: landedResult(run, { checked, base, head }) } : moved; });
+  if (ff.ok) return ff.landed;
   result.attempts.push({ ...step, reason: ff.reason });
   if (ff.reason === 'main-moved') return null;
-  return { ...result, base, head, reason: ff.reason, detail: ff.detail ?? null, dirty: ff.dirty ?? null, checks: checked.checks };
+  return { ...result, base, head, reason: ff.reason, detail: ff.detail ?? null, dirty: ff.dirty ?? null, checks: checked.checks, ...(ff.reason === 'host-lock-held' ? { owner: ff.owner, hint: ff.hint, waitedMs: ff.waitedMs } : {}) };
 }
 
 /** One attempt of the gate on the current main: its own scratch, removed afterwards. The result, or null when main moved (rerun). */
@@ -738,7 +716,7 @@ function landInsideGate(c, { lock, plan, doPush, reason, notify, target, gate })
   // Records an earlier land could not write (machine-db outbox) are applied first, inside the gate.
   let outbox = null;
   try { outbox = withMachine((m) => m.flushOutbox(), { env }); } catch (error) { outbox = { error: String(error?.message ?? error) }; }
-  const landed = { ...landUnderHostLock({ commits, specs: plan.named, specMode: plan.mode, root, env, push: doPush, deps }, landCommits), specMode: plan.mode, ...(plan.mode === 'none' ? { specReason: String(reason).trim() } : {}) };
+  const landed = { ...landCommits({ commits, specs: plan.named, specMode: plan.mode, root, env, push: doPush, deps }), specMode: plan.mode, ...(plan.mode === 'none' ? { specReason: String(reason).trim() } : {}) };
   const result = withSelfUpgradeRef(landed, { root, id: upgradeIdOf(c, target), write: deps.writeSelfUpgradeRef ?? writeSelfUpgradeRef });
   if (outbox && (outbox.flushed || outbox.failed || outbox.error || outbox.busy)) result.outbox = outbox;
   if (pushOwedOf(result)) result.outcome = 'landed-push-owed';

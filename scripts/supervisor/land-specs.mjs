@@ -1,9 +1,16 @@
 // land-specs.mjs - the land gate's `--specs direct` selection: the specs that can see the change, not every spec that
 // merely mentions a changed file.
 //
-// `touching` (land.mjs specsTouching) keeps every spec whose text contains the last two path segments of a changed file,
-// prose and comments included. For a hub module that is most of the suite: lane/token-meter changed engine/db/ledger.mjs,
-// 113 specs import it, so `touching` ran 131 of 355 specs (2026-09-29, run 18, about an hour under load).
+// Two selections live here. `direct` is the exact one; `touching` (the default) is `direct` plus a bounded smoke set.
+//
+// History: `touching` used to keep every spec whose text contains the last two path segments of a changed file (prose
+// included) and every spec whose import graph reaches a changed file. For a hub module that is most of the suite: a change
+// to scripts/reconciler/services.mjs, scripts/agent/trust.mjs or scripts/kernel/verbs/shared/check-evidence.mjs reaches 250-285
+// of 696 specs through the graph alone, so a three-file fix ran 253-287 specs for 25-30 minutes (2026-10-07 audit, issue 3d).
+//
+// The `touching` rule (specsTouching): `direct`'s selection, the tree-wide invariant specs, the specs that read a changed file as data,
+// and a smoke set - at most SMOKE_LIMIT of the specs that only reach the change through the import graph, one per spec directory per
+// round with the directories named in a changed path first. The rest of the transitive set is the release run's (the full suite).
 //
 // `direct` keeps, per changed non-spec file:
 //   1. the spec named after it (tests/<stem>.spec.mjs, tests/<stem>-*.spec.mjs) - always;
@@ -14,9 +21,12 @@
 //      a non-JS file, a changed line outside every top-level declaration, an unreadable diff). Never fewer than
 //      `touching` where the answer is not known; the report says which files were narrowed.
 import path from 'node:path';
+import { specsDependingOn, specsReadingData } from '../lib/spec-deps.mjs';
+import { byCodeUnit } from '../../engine/by-code-unit.mjs';
 
 const HUB_IMPORTERS = 40;
 const DECL = /^(export\s+)?(default\s+)?(async\s+)?(function\*?|const|let|var|class)\s+([A-Za-z_$][\w$]*)/;
+const posix = (file) => String(file).replaceAll('\\', '/');
 const stemOf = (file) => path.posix.basename(file).replace(/\.[^.]+$/, '');
 const needleOf = (file) => file.split('/').slice(-2).join('/');
 
@@ -144,3 +154,52 @@ export function headRanges(diffText) {
   for (const m of String(diffText ?? '').matchAll(/^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/gm)) out.push([Number(m[1]), m[2] === undefined ? 1 : Number(m[2])]);
   return out;
 }
+
+/** The roots a tree-wide invariant spec scans, as it declares them ONCE: `export const INVARIANT_ROOTS = ['scripts', ...]`. Such a spec never names the file it catches, so naming alone would skip it. */
+export const invariantRootsOf = (text) => {
+  const m = /^export const INVARIANT_ROOTS = \[([^\]]*)\]/m.exec(String(text ?? ''));
+  return m ? [...m[1].matchAll(/'([^']+)'/g)].map((x) => posix(x[1])) : [];
+};
+/** Invariant specs (invariantRootsOf) scanning a root that holds a changed file. */
+export const specsInvariant = (changed, { specs }) => {
+  const files = changed.map(posix);
+  return specs.filter(({ file, text }) => file && invariantRootsOf(text).some((r) => files.some((f) => f.startsWith(`${r}/`)))).map((s) => s.file);
+};
+
+export const SMOKE_LIMIT = 24;
+const specAreaNamed = (spec, changed) => changed.some((file) => file.split('/').slice(0, -1).includes(path.posix.basename(path.posix.dirname(spec))));
+
+/**
+ * The smoke set: at most `limit` of `dependents` (specs reaching the change through the import graph) not already in `chosen`, spread
+ * across spec directories - one per directory per round, directories named in a changed path first, each directory in name order.
+ */
+export function smokeSpecs({ dependents, chosen, changed, limit = SMOKE_LIMIT }) {
+  const byDir = new Map();
+  for (const spec of [...new Set(dependents)].filter((file) => !chosen.has(file)).sort(byCodeUnit)) {
+    const dir = path.posix.dirname(spec);
+    byDir.set(dir, [...(byDir.get(dir) ?? []), spec]);
+  }
+  const dirs = [...byDir.keys()].sort((a, b) => Number(specAreaNamed(byDir.get(b)[0], changed)) - Number(specAreaNamed(byDir.get(a)[0], changed)) || byCodeUnit(a, b));
+  const out = [];
+  for (let round = 0; out.length < limit && dirs.some((dir) => byDir.get(dir)[round]); round += 1) {
+    for (const dir of dirs) if (out.length < limit && byDir.get(dir)[round]) out.push(byDir.get(dir)[round]);
+  }
+  return out;
+}
+
+/**
+ * The `touching` selection: {files, narrowed, smoke}. `direct`'s files and hub narrowing, the invariant specs, the specs reading a
+ * changed file as data, plus the smoke set of the specs that reach the change only through imports (needs `root`, the tree the specs live in).
+ */
+export function touchingSelection(changed, { specs, root = null, symbolsOf = () => null, smokeLimit = SMOKE_LIMIT }) {
+  const files = changed.map(posix);
+  const direct = specsDirect(files, { specs, symbolsOf });
+  const names = specs.map((s) => s.file).filter(Boolean);
+  const reading = root ? specsReadingData(root, files, names) : [];
+  const chosen = new Set([...direct.files, ...specsInvariant(files, { specs }), ...reading]);
+  const smoke = root ? smokeSpecs({ dependents: specsDependingOn(root, files, names), chosen, changed: files, limit: smokeLimit }) : [];
+  return { files: [...chosen, ...smoke], narrowed: direct.narrowed, smoke };
+}
+
+/** The spec files the `touching` selection keeps (touchingSelection(...).files). */
+export const specsTouching = (changed, options) => touchingSelection(changed, options).files;
