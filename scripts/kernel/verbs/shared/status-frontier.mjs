@@ -4,39 +4,39 @@ import { AUTOPILOT_RULING, SUPERVISOR_GATE } from '../../autopilot-run.mjs';
 import { handoverReason } from '../../handover.mjs';
 
 const STATE_ORDER = [
-  [(s) => s.wf.phase === 'finished', 'finished'],
-  [(s) => s.unconsumedReports > 0, 'transition-ready'],
-  [(s) => s.settleReady.length > 0, 'settle-ready'],
-  [(s) => s.deadWorkers.length > 0, 'worker-dead'],
-  [(s) => s.workerQuestions.length > 0, 'worker-question'],
-  [(s) => s.nudgeReadyWorkers.length > 0, 'worker-nudge-ready'],
-  [(s) => s.wedgedWorkers.length > 0, 'worker-wedged'],
-  [(s) => s.peerMessages.length > 0, 'peer-message'],
+  { when: (s) => s.wf.phase === 'finished', state: 'finished' },
+  { when: (s) => s.unconsumedReports > 0, state: 'transition-ready' },
+  { when: (s) => s.settleReady.length > 0, state: 'settle-ready' },
+  { when: (s) => s.deadWorkers.length > 0, state: 'worker-dead' },
+  { when: (s) => s.workerQuestions.length > 0, state: 'worker-question' },
+  { when: (s) => s.nudgeReadyWorkers.length > 0, state: 'worker-nudge-ready' },
+  { when: (s) => s.wedgedWorkers.length > 0, state: 'worker-wedged' },
+  { when: (s) => s.peerMessages.length > 0, state: 'peer-message' },
   // A held settle's job is still open, but it is the wait's to release, like a held queued job - and
   // so is a queued dependant parked behind either (frontier-parked.mjs waitHeldOperations).
-  [(s) => s.openOperations > s.waitHeld, 'engaged'],
-  [(s) => s.wf.phase === 'running' && s.handover.state === 'answered', 'handover-answered'],
-  [(s) => s.wf.phase === 'running' && s.handover.state === 'approved', 'finish-ready'],
+  { when: (s) => s.openOperations > s.waitHeld, state: 'engaged' },
+  { when: (s) => s.wf.phase === 'running' && s.handover.state === 'answered', state: 'handover-answered' },
+  { when: (s) => s.wf.phase === 'running' && s.handover.state === 'approved', state: 'finish-ready' },
   // Nothing open, but a question is with the owner: the workflow waits on
   // them, not on the Kernel, so nothing should wake it until the answer.
-  [(s) => s.wf.phase === 'running' && s.askReserve.length > 0, 'ask-reserve'],
+  { when: (s) => s.wf.phase === 'running' && s.askReserve.length > 0, state: 'ask-reserve' },
   // An open owner-gate incident waits on the owner too, even with no job to
   // hold yet (a leg whose first job cannot be enqueued before the owner
   // decides - a frontend workflow waiting on a peer's brand leg).
-  [(s) => s.wf.phase === 'running' && (s.approvalOwner.length > 0 || s.credentialWait || s.ownerGates.some((gate) => gate.kind !== SUPERVISOR_GATE)), 'awaiting-owner'],
+  { when: (s) => s.wf.phase === 'running' && (s.approvalOwner.length > 0 || s.credentialWait || s.ownerGates.some((gate) => gate.kind !== SUPERVISOR_GATE)), state: 'awaiting-owner' },
   // Autopilot: a supervisor-gate is the Supervisor's step; the Kernel has nothing to move until it resolves.
-  [(s) => s.wf.phase === 'running' && s.ownerGates.length > 0, 'supervisor-wait'],
+  { when: (s) => s.wf.phase === 'running' && s.ownerGates.length > 0, state: 'supervisor-wait' },
   // A typed wait on a peer workflow (starci kernel incident --kind peer-wait): the next approved step cannot
   // pass its preflight until the peer lands something, so the peer's message, not the watchdog,
   // wakes the Kernel. Never orphaned-frontier: that re-woke the Kernel for nothing.
-  [(s) => s.wf.phase === 'running' && s.peerWaits.length > 0, 'peer-wait'],
-  [(s) => s.wf.phase === 'running' && s.handover.due, 'handover-due'],
-  [(s) => s.wf.phase === 'running', 'orphaned-frontier'],
+  { when: (s) => s.wf.phase === 'running' && s.peerWaits.length > 0, state: 'peer-wait' },
+  { when: (s) => s.wf.phase === 'running' && s.handover.due, state: 'handover-due' },
+  { when: (s) => s.wf.phase === 'running', state: 'orphaned-frontier' },
 ];
 
 /** The frontier state word: the first state of the Kernel's priority order that holds. */
 export const frontierStateOf = (s) => {
-  for (const [when, state] of STATE_ORDER) {
+  for (const { when, state } of STATE_ORDER) {
     if (when(s)) return state;
   }
   return 'idle';
