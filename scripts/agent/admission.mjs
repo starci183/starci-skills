@@ -142,7 +142,7 @@ export function admitAgent(input = {}, options = {}) {
   let decision;
   try {
     const prepared = (options.io?.prepare ?? input.io?.prepare ?? prepareProviderBudget)({
-      env: options.env ?? input.env ?? process.env, now: options.now ?? input.now });
+      env: options.env ?? input.env ?? process.env, now: options.now ?? input.now, io: options.io ?? input.io });
     if (prepared?.ok !== true) throw new Error(prepared?.error ?? 'provider budget preparation was not confirmed');
     decision = planAgentAdmission({ ...input, ...options });
   }

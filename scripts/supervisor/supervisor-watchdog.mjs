@@ -25,7 +25,8 @@ import '../api/process/hide-child-windows.mjs';
 import path from 'node:path';
 import {sha256} from '../../engine/digest.mjs';
 import { runNode } from '../api/node/run-node.mjs';
-import { allocationMs } from '../../engine/config.mjs';
+import { allocationMs, allocationSettings } from '../../engine/config.mjs';
+import { retryAfterFailure } from '../lib/retry-budget.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { INPUT_GLYPH_CLASS } from '../lib/input-glyph.mjs';
 import { getSupervisor, heartbeatSupervisor } from './telegram-bridge.mjs';
@@ -36,6 +37,7 @@ import {
 } from '../machine/home.mjs';
 import { seatHealth } from './start-supervisor.mjs';
 import { jobsOf, reportOf } from './workers.mjs';
+import { workerTerminalClosed } from './worker-state.mjs';
 import { openMachine, withMachine } from '../../engine/db/machine.mjs';
 import { terminalList } from '../api/orca/terminal-list.mjs';
 import { terminalRename } from '../api/orca/terminal-rename.mjs';
@@ -275,6 +277,39 @@ function sweepJob(job, { m, d, now, out, markClosed, fail }) {
   return null;
 }
 
+const FINISHED_STATUSES = ['cancelled', 'failed', 'succeeded'];
+const LEFTOVER_CLOSES_PER_SWEEP = 3;
+
+/** The retry budget of closing a finished worker's terminal (modules/models/runtimes.yaml allocation.workerClose). */
+const leftoverCloseBudget = () => ({ intervalMs: allocationMs('workerClose.leftoverRetryMs'), maxIntervalMs: allocationMs('workerClose.leftoverRetryMaxMs'),
+  maxAttempts: allocationSettings().workerClose.leftoverRetryAttempts });
+
+/** A finished job whose worker terminal has no recorded closure and whose retry budget is not spent or waiting. */
+const leftoverDue = (job, now) => Boolean(job.worker_id) && !job.payload.self && !workerTerminalClosed(job)
+  && !job.payload.closeRetry?.exhausted && (job.payload.closeRetry?.nextAt ?? 0) <= now;
+
+/** Close one leftover; an unproven close is retried on the budget with its named reason, a spent budget stays recorded on the job. */
+function closeLeftover(job, { m, d, now, out, budget }) {
+  const closed = d.closeLeftover(m, { jobId: job.job_id, now });
+  if (!closed || closed.ok) { out.closed.push({ jobId: job.job_id, handle: job.worker_id, leftover: true }); return; }
+  const step = retryAfterFailure(budget, job.payload.closeRetry, { now, reason: closed.reason ?? 'worker-closure-unproven' });
+  const closeRetry = { attempts: step.attempts, firstAt: step.firstAt, nextAt: step.dueAt, reason: step.reason, ...(step.exhausted ? { exhausted: step.exhausted } : {}) };
+  m.transaction(() => m.update('sup_jobs', { payload_json: { ...job.payload, closeRetry }, updated_at: now }, { job_id: job.job_id }));
+  (out.unclosed ??= []).push({ jobId: job.job_id, handle: job.worker_id, ...closeRetry });
+}
+
+/**
+ * Finished [Worker] jobs (cancelled, failed, succeeded) whose terminal was never closed with proof: a worker that filed its report from
+ * inside its own terminal, or a cancel whose close was refused. The close, and with it the provider slot of that worker, is retried
+ * here on its own interval instead of waiting for a human; at most LEFTOVER_CLOSES_PER_SWEEP per pass, each a bounded Orca call.
+ */
+function sweepLeftovers(m, d, { now, out }) {
+  if (!d.closeLeftover) return;
+  const budget = leftoverCloseBudget();
+  const due = jobsOf(m, FINISHED_STATUSES).filter((job) => leftoverDue(job, now)).slice(0, LEFTOVER_CLOSES_PER_SWEEP);
+  for (const job of due) closeLeftover(job, { m, d, now, out, budget });
+}
+
 /**
  * The [Worker] sweep over the machine handle `m` (sup_jobs): returns {deaths:[{jobId, reason}], closed:[...]}.
  * Liveness is worker-show on the job's Dispatch; a reported or dead worker is fenced and released (worker-stop +
@@ -293,6 +328,7 @@ export function sweepWorkers(m, d, { now = Date.now() } = {}) {
     const skipped = sweepJob(job, { m, d, now, out, markClosed, fail });
     if (skipped) return { ...out, skipped };
   }
+  sweepLeftovers(m, d, { now, out });
   return out;
 }
 
