@@ -34,6 +34,7 @@ import { openLedgerReader } from '../../../engine/db/ledger.mjs';
 import { clipLine } from '../../lib/clip.mjs';
 import { shortHash } from '../../lib/hash.mjs';
 import { productLedgers } from '../../lib/ledgers.mjs';
+import { eachInOrder, mapInOrder } from '../../lib/in-order.mjs';
 import { yamlNumberSettings } from '../../lib/read-yaml.mjs';
 import { ownerLanguage, translator } from '../../lib/i18n.mjs';
 import { DEFAULTS as SUPERVISOR_DEFAULTS, supervisorSettings } from '../../machine/home.mjs';
@@ -241,9 +242,9 @@ function due(ctx, key, ms, now) {
 
 async function openAll(ctx, decisions) {
   const opened = [], failed = [];
-  for (const d of decisions) {
+  await eachInOrder(decisions, async (d) => {
     try { await ctx.openDecision(d); opened.push(d.idempotencyKey); } catch (error) { failed.push(`${d.idempotencyKey}: ${clipLine(error?.message ?? error, 120)}`); }
-  }
+  });
   return { opened, failed };
 }
 
@@ -290,8 +291,8 @@ async function reconcileLand(key, ctx, settings, now, deps) {
   let dist = deps.dist ?? null;
   if (!dist && !deps.landStatus) { try { dist = (await import('../../gates/grammar-dist.mjs')).grammarDistStatus(); } catch { dist = null; } }
   const plan = planLand({ land, events, dist, now, settings });
-  for (const c of plan.set) await ctx.clock(c.entity, c.state, c.slaMs, { ledgerId: SUPERVISOR, controller: 'workers', ...(c.enteredAt ? { enteredAt: c.enteredAt } : {}) });
-  for (const c of plan.clear) await ctx.clear(c.entity, c.state);
+  await eachInOrder(plan.set, (c) => ctx.clock(c.entity, c.state, c.slaMs, { ledgerId: SUPERVISOR, controller: 'workers', ...(c.enteredAt ? { enteredAt: c.enteredAt } : {}) }));
+  await eachInOrder(plan.clear, (c) => ctx.clear(c.entity, c.state));
   return { ok: true, key, clocks: plan.set.map((c) => `${c.state}:${c.entity}`), cleared: plan.clear.length };
 }
 
@@ -319,7 +320,7 @@ async function reconcileMetrics(key, ctx, now, force, settings, deps) {
   });
   // The stuck waits come from the cached starci kernel status (ctx.status, shared by every controller; never a fresh spawn per pass).
   const stuck = [];
-  for (const w of running) { try { const st = await ctx.status(w.ledgerId, w.workflowId); if (Array.isArray(st?.stuck)) stuck.push(...st.stuck); } catch { /* unreadable */ } }
+  await eachInOrder(running, async (w) => { try { const st = await ctx.status(w.ledgerId, w.workflowId); if (Array.isArray(st?.stuck)) stuck.push(...st.stuck); } catch { /* unreadable */ } });
   const payload = om.snapshotPayload(om.aggregate(records, { now, windowMs }), stuck);
   const record = deps.recordSnapshot ?? (async (p) => {
     const { withSupervisor } = await import('../../machine/home.mjs');
@@ -348,8 +349,7 @@ async function reconcileNotify(key, ctx, settings, now, force, language) {
     const dis = readSupervisor((m) => supervisorDecisions(m, { now }), [], { env: ctx.env ?? process.env });
     urgentItems = overdueUrgent(dis, { now, min: settings.urgentOverdueEscalations, language });
   } catch { urgentItems = []; }
-  const urgent = [];
-  for (const u of urgentItems) urgent.push(await ctx.run('node', ['scripts/reconciler/notifier.mjs', 'urgent', '--class', u.class, '--key', u.key, '--text', u.text, '--send', '--json'], { timeoutMs: 60_000 }));
+  const urgent = await mapInOrder(urgentItems, (u) => ctx.run('node', ['scripts/reconciler/notifier.mjs', 'urgent', '--class', u.class, '--key', u.key, '--text', u.text, '--send', '--json'], { timeoutMs: 60_000 }));
   let digestResult = 'not-due';
   if (digest?.shadow) digestResult = 'shadow';
   else if (digest?.value?.sent) digestResult = 'sent';
