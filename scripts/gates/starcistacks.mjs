@@ -262,7 +262,7 @@ const checkServiceCi = (service, id, at, { governing, name, ciUses, ciText, add,
   if (ciUses[id].length && service.projects.length && !service.projects.some((project) => project.repository === name) && !governing)
     add('refuse', 'STACKS_PROJECT_MISSING', `${at}.projects`, `the workflows call ${id} but no project entry names repository ${name}`);
 };
-const checkDisabledService = (service, id, at, ciUses, ambiguous, add) => { if (service.mode !== 'disabled') return false; if (!service.reason) ambiguous('a disabled service states its reason'); if (ciUses[id].length) add('refuse', 'STACKS_CI_CONTRADICTION', at, `declared disabled, but ${ciUses[id].join(', ')} call it`); return true; };
+const checkDisabledService = (service, id, at, ciUses, ambiguous, add) => { if (service.mode !== 'disabled') { return false; } if (!service.reason) { ambiguous('a disabled service states its reason'); } if (ciUses[id].length) { add('refuse', 'STACKS_CI_CONTRADICTION', at, `declared disabled, but ${ciUses[id].join(', ')} call it`); } return true; };
 const checkEnabledService = (service, id, at, { governing, name, ciUses, ciText, add }, ambiguous) => {
   if (service.mode === 'local') checkLocalStack(service, at, add, ambiguous);
   if (service.mode === 'hosted' && !service.host.public && !service.host.fromCredential) ambiguous('a hosted service names host.public, or host.fromCredential when the endpoint travels inside a credential');
@@ -299,7 +299,7 @@ const checkUndeclared = ({ repo, ciUses, normalized, services, declFile, add }) 
       `${files.join(', ')} call ${id}, which the declaration does not state${followUp}`);
   }
 };
-const checkQualityGate = (sonar, normalized, declFile, add) => { if (!sonar || sonar.mode === 'disabled') return; const gateName = loadSonarGate().gate.name; if (sonar.qualityGate !== gateName) add(normalized.sonar ? 'refuse' : 'suspect', 'STACKS_QUALITY_GATE_DRIFT', `${declFile}#services.sonar.qualityGate`, `services.sonar.qualityGate is ${sonar.qualityGate ?? 'absent'}; every product names the one gate ${gateName} (knowledge/sonar-gate.yaml owns its thresholds)`); };
+const checkQualityGate = (sonar, normalized, declFile, add) => { if (!sonar || sonar.mode === 'disabled') { return; } const gateName = loadSonarGate().gate.name; if (sonar.qualityGate !== gateName) { add(normalized.sonar ? 'refuse' : 'suspect', 'STACKS_QUALITY_GATE_DRIFT', `${declFile}#services.sonar.qualityGate`, `services.sonar.qualityGate is ${sonar.qualityGate ?? 'absent'}; every product names the one gate ${gateName} (knowledge/sonar-gate.yaml owns its thresholds)`); } };
 // Sonar settings the repository carries must agree with the declaration, and every repository names the one quality gate.
 const checkSonarDrift = ({ repo, name, normalized, services, declFile, add }) => {
   const sonar = normalized.sonar ?? (services ? null : resolveStackService(repo, 'sonar'));

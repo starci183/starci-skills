@@ -80,6 +80,14 @@ test('the host a request goes to is the policy constant, spelled from the policy
   assert.deepEqual(sent, ['127.0.0.1:127.0.0.1:9', 'localhost:localhost:9', '::1:[::1]:9', '::1:[::1]:9', 'api.example:api.example']);
 });
 
+test('options that name another connection target cannot override the checked host', () => {
+  const req = request({ host: '127.0.0.1', port: 9, path: '/', hostname: 'evil.example', socketPath: '/tmp/evil.sock' }, () => {}, 'loopback');
+  req.on('error', (error) => assert.equal(error.code, 'ECONNRESET'));
+  assert.equal(req.host, '127.0.0.1');
+  assert.equal(req.socketPath, undefined);
+  req.destroy();
+});
+
 test('the seat API runner sends only to a seat host over https or to a loopback server, and follows no redirect', async (t) => {
   for (const endpoint of ['https://evil.example/x', 'http://server.codeium.com/x', 'https://server.codeium.com.evil.example/x', 'https://user:pw@server.codeium.com/x', 'http://10.0.0.5/x', 'file:///etc/passwd', 'not a url', undefined]) {
     const r = await connectPost(endpoint, {}, 1000);

@@ -21,8 +21,8 @@ const quotedCharacter = (c, next) => {
   return { next: '', skip: 0, close: false };
 };
 const lineCommentEnd = (text, index) => {
-  while (index < text.length && text[index] !== '\n') { index += 1; }
-  return index;
+  const end = text.indexOf('\n', index);
+  return end < 0 ? text.length : end;
 };
 const blockCommentEnd = (text, index) => {
   index += 2;
@@ -32,8 +32,10 @@ const blockCommentEnd = (text, index) => {
 
 const stripJsonc = (text) => {
   let out = '', quoted = false;
-  for (let i = 0; i < text.length; i += 1) {
-    const c = text[i], next = text[i + 1];
+  let i = 0;
+  while (i < text.length) {
+    const at = i++;
+    const c = text[at], next = text[at + 1];
     if (quoted) {
       out += c;
       const result = quotedCharacter(c, next);
@@ -43,8 +45,8 @@ const stripJsonc = (text) => {
       continue;
     }
     if (c === '"') { quoted = true; out += c; continue; }
-    if (c === '/' && next === '/') { i = lineCommentEnd(text, i); out += '\n'; continue; }
-    if (c === '/' && next === '*') { i = blockCommentEnd(text, i); continue; }
+    if (c === '/' && next === '/') { i = lineCommentEnd(text, at) + 1; out += '\n'; continue; }
+    if (c === '/' && next === '*') { i = blockCommentEnd(text, at) + 1; continue; }
     out += c;
   }
   return out.replace(/,(\s*[}\]])/g, '$1');
@@ -107,7 +109,7 @@ const binIntoBuildOutput = (worktree, file, specifier) => {
 };
 
 // Built from named parts: the import/export statement head, the lazy clause before `from`, and the quoted specifier.
-const IMPORT_STATEMENT = new RegExp([String.raw`^\s*(?:import|export)\s`, String.raw`[^'";]*?`, String.raw`from\s*['"]([^'"]+)['"]`].join(''), 'gm');
+const IMPORT_STATEMENT = new RegExp([String.raw`^\s*(?:import|export)\s`, '[^\'";]*?', String.raw`from\s*['"]([^'"]+)['"]`].join(''), 'gm');
 // A relative specifier's query or fragment tail.
 const SPECIFIER_TAIL = new RegExp(['[?#]', '.*', '$'].join(''));
 

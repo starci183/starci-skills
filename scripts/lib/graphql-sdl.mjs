@@ -5,9 +5,9 @@
 const PUNCTUATORS = new Set(['{', '}', '(', ')', '[', ']', ':', '!', '=', '$', '@', '|', '&']);
 
 /** The tokens of a GraphQL source: names, punctuators, `...`, strings and numbers; comments and commas are insignificant. */
-function commentEnd(source, index) { while (index < source.length && source[index] !== '\n') index += 1; return index; }
-function blockStringAt(source, index) { const end = source.indexOf('"""', index + 3); if (end === -1) throw new SyntaxError('unterminated block string'); return { token: { kind: 'string', value: source.slice(index + 3, end) }, next: end + 3 }; }
-function quotedStringAt(source, index) { let end = index + 1; while (end < source.length && source[end] !== '"') end += source[end] === '\\' ? 2 : 1; return { token: { kind: 'string', value: source.slice(index + 1, end) }, next: end + 1 }; }
+function commentEnd(source, index) { while (index < source.length && source[index] !== '\n') { index += 1; } return index; }
+function blockStringAt(source, index) { const end = source.indexOf('"""', index + 3); if (end === -1) { throw new SyntaxError('unterminated block string'); } return { token: { kind: 'string', value: source.slice(index + 3, end) }, next: end + 3 }; }
+function quotedStringAt(source, index) { let end = index + 1; while (end < source.length && source[end] !== '"') { end += source[end] === '\\' ? 2 : 1; } return { token: { kind: 'string', value: source.slice(index + 1, end) }, next: end + 1 }; }
 function nameAt(source, index) { const match = /^[_A-Za-z]\w*/.exec(source.slice(index)); return { token: { kind: 'name', value: match[0] }, next: index + match[0].length }; }
 function numberAt(source, index) { return /^-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/.exec(source.slice(index)); }
 export function tokenize(source) {

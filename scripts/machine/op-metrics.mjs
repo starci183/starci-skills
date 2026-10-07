@@ -85,7 +85,7 @@ const pct = (rate) => (rate == null ? '-' : `${Math.round(rate * 100)}%`);
 
 
 /** severity of a wait of `ageMs` against {warnMs, criticalMs}. */
-export const severityOf = (ageMs, sla) => { if (ageMs >= sla.criticalMs) return 'critical'; if (ageMs >= sla.warnMs) return 'warn'; return 'ok'; };
+export const severityOf = (ageMs, sla) => { if (ageMs >= sla.criticalMs) { return 'critical'; } if (ageMs >= sla.warnMs) { return 'warn'; } return 'ok'; };
 
 /** Op health of one ledger (or one workflow of it) over the window. */
 export function opMetrics(db, { now = Date.now(), windowMs = telemetrySettings().windowMs, workflowId = null } = {}) {
@@ -263,7 +263,7 @@ export const stuckOwedItems = (stuck, { repo = null } = {}) => stuck.filter((s) 
 /** What the Supervisor does about one stuck item (the owner of its next action decides the verb). */
 function stuckAction(s) {
   if (s.owner === 'owner') return 'the owner holds it: make sure the ask reached the owner (Telegram /asks), remind once per digest; never answer it';
-  if (s.owner === 'supervisor') { if (s.kind === 'retry-cap') return 'diagnose the repeated failure (root cause, not a blind retry), then tell the Kernel the disposition'; if (s.kind === 'throttled') return 'capacity holds it: check the pool/circuit/lease holder and free or re-route it'; return 'no owner ask names this gate: rule it or type it (--until-*) and tell the Kernel'; }
+  if (s.owner === 'supervisor') { if (s.kind === 'retry-cap') { return 'diagnose the repeated failure (root cause, not a blind retry), then tell the Kernel the disposition'; } if (s.kind === 'throttled') { return 'capacity holds it: check the pool/circuit/lease holder and free or re-route it'; } return 'no owner ask names this gate: rule it or type it (--until-*) and tell the Kernel'; }
   if (String(s.owner).startsWith('peer:')) return `notify the peer Kernel ${s.owner.slice(5)} (what it owes is its next move) and the waiting Kernel`;
   return 'wake the Kernel (notify.mjs) with the item; a second breach is a wake/dispatch defect to fix in a lane';
 }
@@ -302,7 +302,7 @@ export const readSnapshots = (m, { limit = 96 } = {}) => m.db.prepare('SELECT at
 const TREND_TEXT = (tr, d) => tr('Op health {window}: success {rate}{rateDelta}, median wait {wait}{waitDelta}, stuck {stuck} ({critical} critical){stuckDelta}{top}{vs}',
   { window: fmtMs(d.windowMs), rate: d.rate, rateDelta: d.rateDelta, wait: d.wait, waitDelta: d.waitDelta, stuck: d.stuck, critical: d.critical, stuckDelta: d.stuckDelta,
     top: d.top ? tr('; top failure {top}', { top: d.top }) : '', vs: d.vs ? tr(' [vs {vs} ago]', { vs: d.vs }) : '' });
-const signed = (n, fmt) => { if (n == null || n === 0) return ''; return ` (${n > 0 ? '+' : '-'}${fmt(Math.abs(n))})`; };
+const signed = (n, fmt) => { if (n == null || n === 0) { return ''; } return ` (${n > 0 ? '+' : '-'}${fmt(Math.abs(n))})`; };
 
 /**
  * One short trend line from snapshots (oldest first): the newest against the one closest to `trendMs` before it.

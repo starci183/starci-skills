@@ -67,7 +67,7 @@ const filedReports = (m, now) => m.db.prepare("SELECT DISTINCT job_id FROM sup_r
  * split-send path (Escape first when the input row targets a subagent), and a frame still frozen after
  * the wake restarts the seat through the replace path.
  */
-const SUBAGENT_ROW = new RegExp(['^\\s*(?:❯\\s*)?', '[●◯◐◑◒◓]', '\\s+', '(?!main\\s*$)', '[\\w.@-]+', '\\s{2,}', '\\S.*?', '\\b\\d+m', '(?:\\s*\\d+s)?', '\\s*·'].join(''), 'mu');
+const SUBAGENT_ROW = new RegExp([String.raw`^\s*(?:❯\s*)?`, '[●◯◐◑◒◓]', String.raw`\s+`, String.raw`(?!main\s*$)`, String.raw`[\w.@-]+`, String.raw`\s{2,}`, String.raw`\S.*?`, String.raw`\b\d+m`, String.raw`(?:\s*\d+s)?`, String.raw`\s*·`].join(''), 'mu');
 export const busyScreen = (screen) => SUBAGENT_ROW.test(String(screen ?? ''));
 
 /**

@@ -43,7 +43,7 @@ function topLevelBlocks(source) {
 const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
 const uses = (text, name) => new RegExp(String.raw`(^|[^\w$.])${escapeRe(name)}(?![\w$])`).test(text);
 const hasIndirectExport = (source) => /^export\s+\*|^export\s+default\s+(?!(async\s+)?(function|class))/m.test(source);
-const AS_KEYWORD = new RegExp(['\\s+', 'as', '\\s+'].join(''));
+const AS_KEYWORD = new RegExp([String.raw`\s+`, 'as', String.raw`\s+`].join(''));
 const listedExports = (source) => new Set([...source.matchAll(/^export\s*\{([^}]*)\}(?!\s*from)/gm)].flatMap((m) => m[1].split(',').map((x) => x.trim().split(AS_KEYWORD)[0]).filter(Boolean)));
 
 function changedBlocks(blocks, ranges) {

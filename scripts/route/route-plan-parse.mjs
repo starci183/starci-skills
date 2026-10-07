@@ -8,9 +8,11 @@ import { normalizeText } from '../lib/normalize.mjs';
 import { phraseHits } from './phrase-match.mjs';
 
 const VAR_NAME = '[A-Za-z][A-Za-z0-9.]*';
-export const VAR_STATE_LINE = new RegExp('^(' + VAR_NAME + String.raw`)\s*:\s*(.+)$`);
+export const VAR_STATE_LINE = new RegExp('^(' + VAR_NAME + String.raw`)\s*:\s*(\S.*|[^\S\n\r\u2028\u2029])$`);
 const QUALIFIER_CONTENT = '[^)]*';
-export const STATE_QUALIFIER = new RegExp(String.raw`^(.*?)\s*\((` + QUALIFIER_CONTENT + String.raw`)\)\s*$`);
+// The text before the qualifier: it runs to the last `)` that precedes the qualifier's own `(`, then to its last non-space character, and holds no line terminator.
+const BEFORE_QUALIFIER = String.raw`(?:.*\))?(?:[^()\n\r\u2028\u2029]*[^()\s])?`;
+export const STATE_QUALIFIER = new RegExp('^(' + BEFORE_QUALIFIER + String.raw`)\s*\((` + QUALIFIER_CONTENT + String.raw`)\)\s*$`);
 
 // The intent->S* table for the archetypes in modules/goal/archetypes.yaml. The
 // signals (which prompt phrases select an archetype, in which order, which

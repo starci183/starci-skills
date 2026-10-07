@@ -97,14 +97,14 @@ export function planFor(repo, { runtimeRoot = SKILL_ROOT, pkg = readPackage(repo
 }
 
 const TRAILING_SLASHES = new RegExp([String.raw`\/+`, '$'].join(''));
-const NODE_SPEC_FAILURE = new RegExp([String.raw`^\s*[✖x]\s+`, String.raw`(.*?)`, String.raw`(?:\s+\([\d.]+m?s\))?\s*$`].join(''));
-const NODE_TAP_FAILURE = new RegExp([String.raw`^\s*not ok \d+ - `, String.raw`(.*?)`, String.raw`(?:\s+#.*)?$`].join(''));
-const NODE_TAP_LOCATION = new RegExp([String.raw`^\s*location:\s*'?`, String.raw`(.+?)`, String.raw`:\d+:\d+'?\s*$`].join(''));
-const JEST_FAIL_FILE = new RegExp([String.raw`^\s*FAIL\s+(?:\S+\s+)?(\S+\.(?:spec|test)\.[cm]?[jt]sx?)\b`, String.raw`.*?`, String.raw`(?:>\s*(.*))?$`].join(''));
+const NODE_SPEC_FAILURE = new RegExp([String.raw`^\s*[✖x]\s+`, '(.*?)', String.raw`(?:\s+\([\d.]+m?s\))?\s*$`].join(''));
+const NODE_TAP_FAILURE = new RegExp([String.raw`^\s*not ok \d+ - `, '(.*?)', String.raw`(?:\s+#.*)?$`].join(''));
+const NODE_TAP_LOCATION = new RegExp([String.raw`^\s*location:\s*'?`, '(.+?)', String.raw`:\d+:\d+'?\s*$`].join(''));
+const JEST_FAIL_FILE = new RegExp([String.raw`^\s*FAIL\s+(?:\S+\s+)?(\S+\.(?:spec|test)\.[cm]?[jt]sx?)\b`, '.*?', String.raw`(?:>\s*(.*))?$`].join(''));
 const JEST_TEST_NAME = new RegExp([String.raw`^\s*●\s+`, String.raw`(.*\S)`, String.raw`\s*$`].join(''));
-const TSC_PAREN_ERROR = new RegExp([String.raw`^`, String.raw`(.+?)`, String.raw`\((\d+),(\d+)\):\s+error\s+(TS\d+):\s+(.*)$`].join(''));
-const TSC_COLON_ERROR = new RegExp([String.raw`^`, String.raw`(.+?)`, String.raw`:(\d+):(\d+)\s+-\s+error\s+(TS\d+):\s+(.*)$`].join(''));
-const ESLINT_STYLISH_ROW = new RegExp([String.raw`^\s+(\d+):(\d+)\s+error\s+`, String.raw`(.*?)`, String.raw`\s{2,}(\S+)\s*$`].join(''));
+const TSC_PAREN_ERROR = new RegExp(['^', '(.+?)', String.raw`\((\d+),(\d+)\):\s+error\s+(TS\d+):\s+(.*)$`].join(''));
+const TSC_COLON_ERROR = new RegExp(['^', '(.+?)', String.raw`:(\d+):(\d+)\s+-\s+error\s+(TS\d+):\s+(.*)$`].join(''));
+const ESLINT_STYLISH_ROW = new RegExp([String.raw`^\s+(\d+):(\d+)\s+error\s+`, '(.*?)', String.raw`\s{2,}(\S+)\s*$`].join(''));
 
 const rel = (file, repo) => {
   const flat = (p) => String(p ?? '').replace(/^file:\/+/, '').replaceAll('\\', '/').replace(/^\/+/, '').replace(TRAILING_SLASHES, '');

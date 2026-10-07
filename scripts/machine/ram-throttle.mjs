@@ -144,7 +144,7 @@ export function opRamEstimates(table, samples = [], thresholds = throttleThresho
 }
 
 const estimateOf = (op, estimates) => estimates[op] ?? estimates.default;
-const heavyAdmissionText = (mode, held, heavyCap, typical) => { if (mode === 'normal') return ` or ${Math.max(0, heavyCap - held)} heavy (~${Math.round(typical('heavy'))} MB)`; if (mode === 'critical') return ', heavy only for the top priority - and not even that while critical'; return ', heavy only for the top priority'; };
+const heavyAdmissionText = (mode, held, heavyCap, typical) => { if (mode === 'normal') { return ` or ${Math.max(0, heavyCap - held)} heavy (~${Math.round(typical('heavy'))} MB)`; } if (mode === 'critical') { return ', heavy only for the top priority - and not even that while critical'; } return ', heavy only for the top priority'; };
 
 /** The next mode from the previous state and one host sample (ram-mode.mjs), over `t` (default: this host's thresholds). */
 export const nextMode = (prev, sample, t = throttleThresholds()) => nextModeOf(prev, sample, t);

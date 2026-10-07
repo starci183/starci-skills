@@ -472,7 +472,7 @@ export function fileReport(m, { jobId, outcome, commit = null, specs = [], summa
   const sha = commitResult.sha;
   const report = { outcome, commit: sha, base: job.payload.staging?.base ?? null, branch: job.payload.staging?.branch ?? null,
     specs: specs.length ? specs : job.payload.specs ?? [], incidents: incidents ?? job.payload.incidents ?? [], summary, needs, terminal };
-  recordWorkerReport(m, job, jobId, outcome, report, sha, summary, needs, now, { attemptIdOf, releaseLeases, setJob, supervisorEvent });
+  recordWorkerReport(m, job, report, now, { attemptIdOf, releaseLeases, setJob, supervisorEvent });
   // A diagnosed/blocked/failed report is the worker's last act: the Supervisor closes its terminal now (a done report
   // keeps it until the land, so a red gate can still be handed back to it). Filed from inside that terminal, the close
   // goes to a detached verifier (close-verify.mjs closeSelfSafe) so this process finishes writing first.

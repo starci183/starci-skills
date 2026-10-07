@@ -436,7 +436,7 @@ function thinkOrderOf(runtimes, route, w) {
   const frontier = preference?.think ?? [];
   const solThink = Array.isArray(preference?.['sol-think']) ? preference['sol-think'] : null;
   const hasRouteOrder = w.work === 'think' && route.order && !w.modelFunction && Array.isArray(preference?.[route.order]);
-  let thinkKey = 'think'; if (w.modelFunction && solThink) thinkKey = 'sol-think'; if (hasRouteOrder) thinkKey = route.order;
+  let thinkKey = 'think'; if (w.modelFunction && solThink) { thinkKey = 'sol-think'; } if (hasRouteOrder) { thinkKey = route.order; }
   return { frontier, solThink, thinkKey, thinkPools: thinkKey === 'think' ? frontier : runtimes.allocation.preference[thinkKey] };
 }
 

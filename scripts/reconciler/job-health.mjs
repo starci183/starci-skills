@@ -14,7 +14,7 @@ const leaseLostOf = (db, jobId) => {
 };
 let lastSendAt = 0;          // the stagger across every worker of the host
 const LIVE_WORKER = ['leased', 'running', 'answering'];
-const STALLED_STATES = ['rate-limited', 'idle-at-prompt', 'done-without-report'];
+const STALLED_STATES = new Set(['rate-limited', 'idle-at-prompt', 'done-without-report']);
 const TERMINAL_SEND = 'scripts/api/orca/terminal-send.mjs';
 
 async function showTerminal(handle, ctx) {
@@ -31,7 +31,7 @@ const liveJobsOf = (ctx, ledgerId) => ctx.read(ledgerId, (db) => db.prepare(`SEL
 
 /** The stall clock of a job: running while its worker is stalled, cleared otherwise. */
 function keepStallClock(ctx, entity, ledgerId, c, planned, probe) {
-  if (STALLED_STATES.includes(c.state)) ctx.clock(entity, 'WORKER_STALLED', probe.H.idleMs, { ledgerId, enteredAt: planned.mem.since ?? probe.now });
+  if (STALLED_STATES.has(c.state)) ctx.clock(entity, 'WORKER_STALLED', probe.H.idleMs, { ledgerId, enteredAt: planned.mem.since ?? probe.now });
   else ctx.clear(entity, 'WORKER_STALLED');
 }
 
@@ -53,8 +53,9 @@ function openStalledDecision(probe, l, j, c, planned, who, term) {
     dueAt: now + settings.decisionDueMs, escalateTo: 'supervisor', openedBy: OPENED_BY, openedAt: now });
 }
 
-/** Do the planned action of one job; the probe memory to keep for it. */
-async function act(probe, l, j, c, planned, mem, who, term) {
+/** Do the planned action of one job; the probe memory to keep for it. `judged` is the classified job: ledger, job, class, plan, memory, identity, terminal. */
+async function act(probe, judged) {
+  const { l, j, c, planned, mem, who, term } = judged;
   const { ctx, H, now, out } = probe;
   const a = planned.action;
   if (a && ctx.mode === 'active' && !ctx.owns('job.worker')) return mem;
@@ -93,7 +94,7 @@ async function probeJob(probe, l, j) {
   const payload = parseJson(j.payload_json) ?? {};
   const who = { jobId: j.job_id, workflowId: j.workflow_id, op: j.op_id, terminal: j.worker_id, provider: term?.agentIdentity ?? payload.provider ?? null, pool: payload.agent ?? payload.provider ?? null, model: payload.model ?? null };
   logStateChange(ctx, j, c, mem, who, term);
-  healthMem.set(j.job_id, await act(probe, l, j, c, planned, mem, who, term));
+  healthMem.set(j.job_id, await act(probe, { l, j, c, planned, mem, who, term }));
 }
 
 /** One probe: every live op job's worker, classified from ONE orca terminal list. */

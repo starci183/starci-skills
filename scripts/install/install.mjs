@@ -202,9 +202,9 @@ function stalePlan(target, manifest) {
     if (PRESERVED_ROOTS.has(relative.split('/')[0]) || INSTALLED_IGNORES.includes('/' + relative) || isNegated(relative)) { preserved.push(relative); continue; }
     if (current.has(relative)) continue;
     if (relative.split('/').includes('.git')) { preserved.push(relative); continue; }
-    const candidate = staleCandidate(target, relative, originalHash, manifest);
-    if (candidate === 'preserved') preserved.push(relative);
-    else if (candidate) remove.push(candidate);
+    const { outcome, item } = staleCandidate(target, relative, originalHash, manifest);
+    if (outcome === 'preserved') preserved.push(relative);
+    else if (outcome === 'remove') remove.push(item);
   }
   return { remove, preserved: [...new Set(preserved)] };
 }
@@ -213,6 +213,7 @@ function validateStaleManifestPath(relative) {
   if (typeof relative !== 'string' || relative.includes('\\') || relative.includes(':') || path.isAbsolute(relative) || relative.split('/').some(part => !part || part === '.' || part === '..')) throw new Error('invalid installed manifest path; refusing cleanup before writes');
 }
 
+/** The verdict on one stale manifest file: `missing`, `preserved`, or `remove` with the owned file to delete as `item`. */
 function staleCandidate(target, relative, originalHash, manifest) {
   let cursor = target, missing = false;
   for (const part of relative.split('/')) {
@@ -221,10 +222,10 @@ function staleCandidate(target, relative, originalHash, manifest) {
     if (!stat) { missing = true; break; }
     if (stat.isSymbolicLink()) throw new Error('stale manifest path uses a symlink/junction; refusing cleanup before writes');
   }
-  if (missing) return null;
+  if (missing) return { outcome: 'missing', item: null };
   if (!statSync(cursor).isFile()) throw new Error('stale manifest entry must name an owned file, not a directory');
-  if (manifest?.keptLocal?.includes(relative) || sha(cursor, relative) !== originalHash) return 'preserved';
-  return { relative, file: cursor, hash: originalHash };
+  if (manifest?.keptLocal?.includes(relative) || sha(cursor, relative) !== originalHash) return { outcome: 'preserved', item: null };
+  return { outcome: 'remove', item: { relative, file: cursor, hash: originalHash } };
 }
 
 function assertStalePathHasNoLinks(target, relative) {

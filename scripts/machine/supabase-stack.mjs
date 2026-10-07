@@ -73,7 +73,7 @@ export function parseSupabaseConfig(text) {
     if (!line) continue;
     const table = /^\[([^\]]+)\]$/u.exec(line);
     if (table) { section = table[1].trim(); continue; }
-    const assignment = /^([A-Za-z0-9_-]+)\s*=\s*([^\n\r\u2028\u2029]+)$/u.exec(line);
+    const assignment = /^([A-Za-z0-9_-]+)\s*=\s*(\S[^\n\r\u2028\u2029]*|[^\S\n\r\u2028\u2029])$/u.exec(line);
     if (!assignment) continue;
     const [, key, source] = assignment;
     const value = tomlScalar(source);
