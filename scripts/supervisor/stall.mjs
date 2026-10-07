@@ -190,7 +190,7 @@ export const openAskDispatches = (db, workflowId) => db.prepare(
 
 /** `.starciwork/...` paths an incident names, trailing punctuation dropped. */
 export const namedPaths = (text) => [...new Set((String(text ?? '').match(/\.starciwork\/[A-Za-z0-9._@\-/]+/g) ?? [])
-  .map((p) => p.replace(/[./-]+$/, '')).filter((p) => p.length > '.starciwork/'.length))];
+  .map((p) => p.replace(new RegExp(['[./-', ']+$'].join('')), '')).filter((p) => p.length > '.starciwork/'.length))];
 /** A gate that waits on an owner ask or decision (only such a gate is released by the ask closing). */
 const ASK_GATE = /\bask\b|\bowner(?:'s)? (?:decision|answer|choice|approval|ruling)\b|\bdecision pending\b/i;
 /** Workflow ids an incident names. */
