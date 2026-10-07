@@ -10,6 +10,7 @@ import { declareDependent, readFoundation, writeFoundation } from '../foundation
 import { AUTOPILOT_BY, SUPERVISOR_GATE, autopilotOn } from '../autopilot-run.mjs';
 import { commitOwnerJobs, followUpMessage, resolveIntroducer } from '../introducer.mjs';
 import { wakeKernelForTransition } from '../wake-delivery.mjs';
+import { gateStepOf } from './shared/gate-raise.mjs';
 
 export default {
   verb: 'incident',
@@ -42,7 +43,10 @@ export default {
     // need is an ask the runtime defers to handover (starci kernel autopilot --defer-to-handover), never a gate.
     const rerouted = internals.OWNER_GATE_KINDS.includes(args.kind) && autopilotOn(db, workflowId) ? { from: args.kind, to: SUPERVISOR_GATE } : null;
     if (rerouted) args = { ...args, kind: SUPERVISOR_GATE };
-    openRaisedIncident(ledger, { incidentId, workflowId, args, now, rerouted, holds, peerWait, until, foundationWait });
+    // A supervisor-gate is raised after its cause's workaround (policy gateCauses): tried and recorded, or a typed reason there is none.
+    const gate = gateStepOf(ledger, { workflowId, args, holds });
+    if (gate.redirected) { emit(gate.out, gate.text, args.json); return; }
+    openRaisedIncident(ledger, { incidentId, workflowId, args, now, rerouted, holds, peerWait, until, foundationWait, workaround: gate.workaround });
     // A condition that already holds resolves the wait now rather than at the next status.
     const released = until.length ? releaseTypedWaits(ledger, { repo: typedRepo, workflowId }).resolved.find((r) => r.incidentId === incidentId) ?? null : null;
     const sharedBlocker = args.kind === SHARED_BLOCKER ? routeSharedBlocker(ledger, { workflowId, incidentId, args, repo: typedRepo }) : null;
@@ -63,13 +67,13 @@ function peerWaitOf(db, workflowId, args, { foundationCond, landedCond }) {
 }
 
 // The incident row and its raised event, in one transaction; a wait on a foundation makes the waiter its dependent.
-function openRaisedIncident(ledger, { incidentId, workflowId, args, now, rerouted, holds, peerWait, until, foundationWait }) {
+function openRaisedIncident(ledger, { incidentId, workflowId, args, now, rerouted, holds, peerWait, until, foundationWait, workaround }) {
   const db = ledger.db;
   ledger.transaction(() => {
     openIncident(db, { incidentId, workflowId, kind: args.kind, opId: args.op ?? null, detail: args.detail, lastProgress: `[${args.kind}] ${args.detail}`, at: now });
     ledger.appendEvent({
       workflowId, entityType: 'incident', entityId: incidentId,
-      kind: 'incident-raised', payload: { kind: args.kind, ...(rerouted ? { rerouted, by: AUTOPILOT_BY } : {}), detail: args.detail, opId: args.op ?? null, ...(holds.length ? { holds } : {}), ...(peerWait), ...(until.length ? { until } : {}) },
+      kind: 'incident-raised', payload: { kind: args.kind, ...(rerouted ? { rerouted, by: AUTOPILOT_BY } : {}), detail: args.detail, opId: args.op ?? null, ...(holds.length ? { holds } : {}), ...(peerWait), ...(until.length ? { until } : {}), ...(workaround ? { workaround } : {}) },
     });
     // A wait on a foundation makes the waiter its dependent, so the landing notifies it.
     if (foundationWait && !(foundationWait.foundation.dependents ?? []).some((d) => d.workflowId === workflowId)) {

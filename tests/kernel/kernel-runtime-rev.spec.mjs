@@ -340,7 +340,7 @@ test('installed upcoming op keeps one READ revision through actual CLI enqueue a
   assert.equal(opCount(), 0);
   const enqueued = fx.ok(args, true);
   assert.ok(enqueued.job_id); assert.equal(opCount(), 1);
-  const gate = fx.ok(['incident', '--workflow', fx.wf, '--kind', 'supervisor-gate', '--op', op, '--holds', enqueued.job_id, '--detail', 'private fixture stops before provider launch']);
+  const gate = fx.ok(['incident', '--workflow', fx.wf, '--kind', 'supervisor-gate', '--op', op, '--holds', enqueued.job_id, '--cause', 'runtime-defect', '--no-workaround', 'defect-on-every-path', '--detail', 'private fixture stops before provider launch']);
   assert.ok(gate.incidentId);
   const dispatch = fx.api(['dispatch', '--job', enqueued.job_id], true);
   assert.equal(dispatch.status, 1);

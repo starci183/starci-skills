@@ -26,6 +26,18 @@ flags:
   - name: holds
     type: string
     summary: comma list of op or job ids the incident holds
+  - name: cause
+    type: string
+    summary: "the cause class of a supervisor-gate (op-incident-policy gateCauses): no-eligible-agent, plan-divergence, runtime-defect, retry-cap or budget"
+  - name: workaround
+    type: string
+    summary: "a supervisor-gate: the workaround of its cause class that you tried, and what came of it"
+  - name: no-workaround
+    type: string
+    summary: "a supervisor-gate: the typed reason from the cause class's list that there is no workaround (chain-spent, answer-not-reversible, no-route-avoids-defect, ...)"
+  - name: because
+    type: string
+    summary: "a supervisor-gate: the evidence behind --no-workaround"
   - name: peer
     type: string
     summary: workflow waited on (--kind peer-wait)

@@ -26,6 +26,6 @@ export const gateExceededBudget = ({ ledger, db, workflowId, budget, now = Date.
   if (supervisorGatesOf(db, workflowId).some((g) => g.holds.includes('*'))) return;
   const exceeded = budget.exceeded.map((k) => `${k} ${k === 'tokens' ? budget.measured.tokens : budget.used[k]} > ${budget.caps[k]}`);
   const detail = `${BUDGET_GATE_DETAIL} (${exceeded.join(', ')}): Supervisor review - extend with starci kernel autopilot --extend-budget, then resolve --by supervisor`;
-  const incidentId = openSupervisorGate(ledger, { workflowId, holds: ['*'], detail, evidence: budget });
+  const incidentId = openSupervisorGate(ledger, { workflowId, holds: ['*'], detail, evidence: budget, workaround: { cause: 'budget', noWorkaround: 'cap-exceeded' } });
   ledger.appendEvent({ workflowId, entityType: 'incident', entityId: incidentId, kind: AUTOPILOT_EVENTS.budget, payload: { ...budget, incidentId, by: AUTOPILOT_BY } });
 };

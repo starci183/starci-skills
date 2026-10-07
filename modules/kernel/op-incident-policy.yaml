@@ -53,6 +53,44 @@ seatWake:
   idleReplace: 3
   idleReplacedWindowMs: 3600000
 
+# The causes a supervisor-gate can name (owner goal G10, invariant I6): raising a gate for a job needs the cause class, then either the
+# workaround the class names, tried and recorded (--workaround), or one typed reason from the class's `noWorkaround` list (--no-workaround).
+# `verify: other-members` makes the runtime refuse a no-workaround claim while the job's route chain still has an untried member;
+# `mechanical: handover-decision` means the runtime records the workaround itself (a revisitable decision in the owner's handover list) and
+# opens no gate (scripts/kernel/gate-workaround.mjs). The runtime's own raises (every member spent, a spent retry cap, a spent budget) pass
+# their typed reason with the evidence they hold.
+gateCauses:
+  - id: no-eligible-agent
+    situation: "a launch or admission refusal that holds one job (no-eligible-candidate, a spent tier chain)"
+    workaround: "dispatch or route the job to another eligible agent of its candidate list (starci kernel dispatch --model <pool>)"
+    verify: other-members
+    noWorkaround:
+      chain-spent: "every member of the job's candidate list refused or is excluded for it"
+      single-member-chain: "the job's candidate list has one member"
+  - id: plan-divergence
+    situation: "a provisional answer or the approved plan leaves a step unable to run (plan divergence, plan deadlock)"
+    workaround: "record the provisional reversible answer as a revisitable decision in the owner's handover list and let the job continue"
+    mechanical: handover-decision
+    noWorkaround:
+      answer-not-reversible: "the answer would spend money, touch production data or set a credential"
+      owner-only-intent: "the choice is product intent no goal record or prior decision determines"
+  - id: runtime-defect
+    situation: "a runtime defect stops one job's step (settle, record-checks, dispatch) that no agent or retry changes"
+    workaround: "a route or agent that avoids the defect, or the step done by an independent leg, with every other leg left running"
+    noWorkaround:
+      no-route-avoids-defect: "every route and agent of the step runs through the defective code"
+      defect-on-every-path: "the defect is in the shared path every leg of the job takes"
+  - id: retry-cap
+    situation: "a route spent its retry limit for the node group"
+    workaround: "the retries already switched agents on the tier chain (lineage route)"
+    noWorkaround:
+      retry-cap-spent: "the route's retry limit is spent on every eligible agent"
+  - id: budget
+    situation: "a workflow cap (attempts, tokens, wall time) is exceeded"
+    workaround: "the cap is raised by the Supervisor's extension (autopilot budget extension)"
+    noWorkaround:
+      cap-exceeded: "a cap of the workflow is actually exceeded"
+
 rows:
   - id: ask-worker-question
     situation: ask

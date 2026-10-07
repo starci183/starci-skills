@@ -162,7 +162,7 @@ test('provision.ask opens only as the end-of-flow checklist; a mid-flow need is 
 test('an owner gate is the Supervisor\'s under autopilot: raised or older gates become supervisor-gates; an owner claim is still refused', (t) => {
   const repo = world(t);
   seed(repo, (l) => seedJob(l, { jobId: 'job-be', op: 'backend.implement', status: 'queued' }));
-  const raised = json(run({}, 'incident', '--repo', repo, '--workflow', WF, '--kind', 'owner-gate', '--detail', 'hold for a checker defect', '--holds', 'job-be', '--json'));
+  const raised = json(run({}, 'incident', '--repo', repo, '--workflow', WF, '--kind', 'owner-gate', '--detail', 'hold for a checker defect', '--holds', 'job-be', '--cause', 'runtime-defect', '--no-workaround', 'defect-on-every-path', '--json'));
   assert.equal(raised.kind, SUPERVISOR_GATE);
   // An owner-gate row from before autopilot is re-routed by the next status.
   seed(repo, (l) => {
