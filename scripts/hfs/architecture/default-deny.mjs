@@ -31,12 +31,13 @@ export function checkDefaultDeny(input) {
     const checker = kit.checkerOf(declaration.getSourceFile());
     if (!checker) return false;
     for (const clause of declaration.heritageClauses ?? []) {
-      for (const type of clause.types) {
-        if (kit.isImportOf(checker, type.expression, 'ThrottlerGuard', '@nestjs/throttler')) return true;
-        if (kit.declarationsOf(checker, type.expression).some(parent => parent !== declaration && extendsThrottler(parent, depth + 1))) return true;
-      }
+      for (const type of clause.types) if (extendsThrottlerType(checker, declaration, type, depth)) return true;
     }
     return false;
+  };
+  const extendsThrottlerType = (checker, declaration, type, depth) => {
+    if (kit.isImportOf(checker, type.expression, 'ThrottlerGuard', '@nestjs/throttler')) return true;
+    return kit.declarationsOf(checker, type.expression).some(parent => parent !== declaration && extendsThrottler(parent, depth + 1));
   };
 
   const keySymbol = (checker, node) => (node ? kit.aliased(checker, kit.symbolAt(checker, node)) ?? null : null);
@@ -91,18 +92,23 @@ export function checkDefaultDeny(input) {
     return found;
   };
 
+  const classifyDeclaration = (declaration) => {
+    const owner = kit.ownerOfDeclaration(declaration);
+    if (owner?.tier === 'platform' && owner.name === 'http-security' && ts.isClassDeclaration(declaration)) {
+      if (readsOrigin(declaration)) return 'csrf';
+      if (readsDoorMetadata(declaration, owner)) return 'throttler';
+    }
+    if (owner?.tier === 'domain' && owner.name === 'identity' && ts.isClassDeclaration(declaration) && declaration.name?.text === 'AuthGuard') return 'auth';
+    return null;
+  };
   const classify = (checker, node) => {
     if (!node) return null;
     if (kit.importBinding(checker, node)?.module === '@nestjs/throttler') return 'throttler';
     const declarations = kit.declarationsOf(checker, node);
     if (declarations.some(declaration => extendsThrottler(declaration))) return 'throttler';
     for (const declaration of declarations) {
-      const owner = kit.ownerOfDeclaration(declaration);
-      if (owner?.tier === 'platform' && owner.name === 'http-security' && ts.isClassDeclaration(declaration)) {
-        if (readsOrigin(declaration)) return 'csrf';
-        if (readsDoorMetadata(declaration, owner)) return 'throttler';
-      }
-      if (owner?.tier === 'domain' && owner.name === 'identity' && ts.isClassDeclaration(declaration) && declaration.name?.text === 'AuthGuard') return 'auth';
+      const role = classifyDeclaration(declaration);
+      if (role) return role;
     }
     return null;
   };
