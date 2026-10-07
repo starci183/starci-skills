@@ -8,7 +8,7 @@
 //       [--port <n>]   default config.yaml connectors.gateway.port
 //       [--repo <path>]...  extra ledger-owner repos beyond connectors.repos
 //
-// Routing: `/a-<nonce>` and `/a-<nonce>/...` (GET, HEAD, POST) are proxied to
+// Routing: `/a-<nonce>`, `/a-<nonce>/img/<n>` and `/a-<nonce>/answer` (GET, HEAD, POST) are proxied to
 // the loopback form whose latest open `ask-serving` event names that nonce in
 // one of the configured repos' ledgers (read-only), or of a repo a Telegram ask
 // notice named. Everything else is 404 and is never forwarded, and so is a
@@ -21,6 +21,7 @@
 import '../api/process/hide-child-windows.mjs';
 import { serve } from '../api/http/serve.mjs';
 import { request } from '../api/http/request.mjs';
+import { askUpstreamPath } from './ask-gateway-routes.mjs';
 import { fileURLToPath } from 'node:url';
 import { configRoot, connectorsConfig } from '../../engine/config.mjs';
 import { runtimeSecretEnv } from '../gates/runtime-host.mjs';
@@ -70,10 +71,13 @@ export function createGateway({ resolve, exposeCredentialAsks = () => false, lan
     for (const key of Object.keys(t)) t[key] = tr(t[key]);
     // A dot segment could walk from one nonce to another; such a path is refused before it is normalized.
     if (/(?:^|\/)(?:\.|%2e){1,2}(?:[/?#]|$)/i.test(req.url ?? '')) return deny(res, 404, t.notFound);
-    let pathname, search;
-    try { ({ pathname, search } = new URL(req.url ?? '/', 'https://gateway.invalid')); } catch { return deny(res, 404, t.notFound); }
+    let pathname;
+    try { ({ pathname } = new URL(req.url ?? '/', 'https://gateway.invalid')); } catch { return deny(res, 404, t.notFound); }
     const nonce = pathname.split('/')[1] ?? '';
     if (!NONCE.test(nonce) || (pathname !== `/${nonce}` && !pathname.startsWith(`/${nonce}/`)) ) return deny(res, 404, t.notFound);
+    // The form's own routes only: the path sent upstream is built from the route table, never copied from the caller.
+    const upstreamPath = askUpstreamPath(pathname);
+    if (upstreamPath === null) return deny(res, 404, t.notFound);
     const ask = resolve(nonce);
     if (!ask) return deny(res, 404, t.notFound);
     if (!['GET', 'HEAD', 'POST'].includes(req.method)) return deny(res, 405, 'method not allowed');
@@ -84,7 +88,7 @@ export function createGateway({ resolve, exposeCredentialAsks = () => false, lan
     const headers = {};
     for (const [key, value] of Object.entries(req.headers)) if (!HOP_BY_HOP.has(key)) headers[key] = value;
     headers.host = target.host;
-    let upstream; try { upstream = request({ host: target.hostname, port: target.port, method: req.method, path: `${pathname}${search}`, headers, timeout: 30000 }, (up) => {
+    let upstream; try { upstream = request({ host: target.hostname, port: target.port, method: req.method, path: upstreamPath, headers, timeout: 30000 }, (up) => {
       const out = { ...PAGE_HEADERS };
       for (const [key, value] of Object.entries(up.headers)) if (!HOP_BY_HOP.has(key)) out[key] = value;
       // A redirect to the form's own loopback origin becomes a path on the public host.
