@@ -273,8 +273,7 @@ function restartAction(r, now, entry, backoff, quarantine, from, to) {
   let act = null, quarantined = false;
   r.restarts = r.restarts.filter((t) => now - t < quarantine.windowMs);
   if (r.state === 'failed' && entry.restart !== false) { if (r.restarts.length >= quarantine.maxRestarts) { to('quarantined'); quarantined = true; } else { to('backoff'); r.nextAttemptAt = now + backoffDelay(r.restarts.length, backoff); } }
-  if (r.state === 'backoff' && now >= (r.nextAttemptAt ?? 0) && from === 'backoff') { to('starting'); r.restarts.push(now); r.nextAttemptAt = null; act = 'start'; }
-  else if (r.state === 'quarantined' && !quarantined && now - r.since >= quarantine.retryMs && entry.restart !== false) { to('starting'); r.restarts = [now]; act = 'start'; }
+  if (r.state === 'backoff' && now >= (r.nextAttemptAt ?? 0) && from === 'backoff') { to('starting'); r.restarts.push(now); r.nextAttemptAt = null; act = 'start'; } else if (r.state === 'quarantined' && !quarantined && now - r.since >= quarantine.retryMs && entry.restart !== false) { to('starting'); r.restarts = [now]; act = 'start'; }
   return { act, quarantined };
 }
 
