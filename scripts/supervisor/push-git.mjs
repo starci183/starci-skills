@@ -97,7 +97,7 @@ export function planFor(repo, { runtimeRoot = SKILL_ROOT, pkg = readPackage(repo
 }
 
 const rel = (file, repo) => {
-  const flat = (p) => String(p ?? '').replace(/^file:\/+/, '').replaceAll(/\\/g, '/').replace(/^\/+/, '').replace(/\/+$/, '');
+  const flat = (p) => String(p ?? '').replace(/^file:\/+/, '').replaceAll('\\', '/').replace(/^\/+/, '').replace(/\/+$/, '');
   const f = flat(file), base = flat(repo);
   return base && f.toLowerCase().startsWith(`${base.toLowerCase()}/`) ? f.slice(base.length + 1) : f;
 };
