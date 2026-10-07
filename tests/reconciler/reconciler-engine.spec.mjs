@@ -456,3 +456,25 @@ test('action journal failures gate effects and retain an unknown finish with its
     }
   }
 });
+
+test('a key that spent the retry budget parks with its named reason, and only a new event re-arms it', (t) => {
+  const st = tempState();
+  t.after(() => st.close());
+  let clock = 0;
+  const q = new WorkQueue({ rows: machineRows(st.m), now: () => clock, backoff: { minMs: 1000, maxMs: 4000, maxAttempts: 3 } });
+  q.add('host', 'ledger:starci');
+  const failOnce = (error) => { const [item] = q.take('host', 1); assert.ok(item, 'the key is due'); return q.failed('host', item.key, error); };
+  assert.equal(failOnce(Object.assign(Error('identity differs'), { reason: 'ledger-identity' })), 1000);
+  assert.equal(st.m.db.prepare("SELECT reason FROM engine_queue WHERE controller='host'").get().reason, 'ledger-identity', 'each attempt records its reason');
+  clock = 1000; assert.equal(failOnce(Error('identity differs')), 2000);
+  clock = 3000; assert.equal(failOnce(Error('identity differs')), null, 'the third failure spends the budget');
+  const parked = st.m.db.prepare("SELECT due_at, tries, reason FROM engine_queue WHERE controller='host'").get();
+  assert.deepEqual({ ...parked }, { due_at: null, tries: 3, reason: 'retry-exhausted:backoff' });
+  clock = 10_000_000;
+  assert.equal(q.take('host', 4).length, 0, 'a parked key is never due');
+  q.add('host', 'ledger:starci', { reason: 'resync' });
+  assert.equal(q.take('host', 4).length, 0, 'a resync changes nothing');
+  assert.equal(q.depth().host.parked, 1);
+  q.add('host', 'ledger:starci', { reason: 'event:ledger-repaired' });
+  assert.equal(q.take('host', 4).length, 1, 'a new event gives the key a fresh budget');
+});

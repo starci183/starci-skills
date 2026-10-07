@@ -4,6 +4,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { runGit } from '../../scripts/api/git/lib.mjs';
 import { npmInstall, resolveInstallPackages } from '../../scripts/machine/npm-install.mjs';
+import { hostLockRetryBudget } from '../../scripts/machine/verb-lock.mjs';
 import { mkdtemp } from '../helpers/tmpdir.mjs';
 
 function git(cwd, args) {
@@ -86,7 +87,7 @@ test('npm install uses exact specs under the host lock and reports the diff stat
     diffStat: 'package.json | 2 +-', ms: 20
   });
   assert.deepEqual(events, [
-    ['lock', { role: 'owner', purpose: 'npm-install', env: { SPEC: '1' } }, true],
+    ['lock', { role: 'owner', purpose: 'npm-install', env: { SPEC: '1' }, retry: hostLockRetryBudget() }, true],
     ['install', cwd, ['name@1.2.3'], { dev: true }],
     ['diff', ['--stat', '--', 'package.json', 'package-lock.json'], { cwd }]
   ]);

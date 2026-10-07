@@ -25,7 +25,7 @@ export const START_REASON_ENV = 'STARCI_ENGINE_START_REASON';
 
 const DEFAULT_NUMBERS = Object.freeze({
   pollMs: 2000, leaseMs: 30000, renewMs: 10000, heartbeatStaleMs: 60000, statusCacheMs: 20000, stallMaxMs: 300000,
-  backoff: Object.freeze({ minMs: 1000, maxMs: 300000 }), crashLoop: Object.freeze({ max: 3, windowMs: 1800000 }),
+  backoff: Object.freeze({ minMs: 1000, maxMs: 300000, maxAttempts: 24 }), crashLoop: Object.freeze({ max: 3, windowMs: 1800000 }),
 });
 
 /** runtimes.yaml allocation.reconciler with the brief's defaults for any key it omits. Never throws. */
@@ -39,7 +39,8 @@ export function reconcilerNumbers({ allocation = null } = {}) {
     statusCacheMs: num(raw?.statusCacheMs, DEFAULT_NUMBERS.statusCacheMs),
     // a blocked main thread past this is a hung engine: the heartbeat worker stops renewing (heartbeat-worker.mjs)
     stallMaxMs: num(raw?.stallMaxMs, DEFAULT_NUMBERS.stallMaxMs),
-    backoff: { minMs: num(raw?.backoff?.minMs, DEFAULT_NUMBERS.backoff.minMs), maxMs: num(raw?.backoff?.maxMs, DEFAULT_NUMBERS.backoff.maxMs) },
+    backoff: { minMs: num(raw?.backoff?.minMs, DEFAULT_NUMBERS.backoff.minMs), maxMs: num(raw?.backoff?.maxMs, DEFAULT_NUMBERS.backoff.maxMs),
+      maxAttempts: num(raw?.backoff?.maxAttempts, DEFAULT_NUMBERS.backoff.maxAttempts) },
     crashLoop: { max: num(raw?.crashLoop?.max, DEFAULT_NUMBERS.crashLoop.max), windowMs: num(raw?.crashLoop?.windowMs, DEFAULT_NUMBERS.crashLoop.windowMs) },
   };
 }
