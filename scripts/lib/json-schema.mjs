@@ -15,13 +15,14 @@ export function validateAgainstSchema(value, schema) {
     if (type === 'null') return node === null;
     return typeof node === type;
   };
-  const walk = (node, shape, at) => {
-    if (!isPlainObject(shape)) return;
-    if (shape.$ref) { walk(node, resolve(shape.$ref), at); return; }
+  const validateType = (node, shape, at) => {
     if (shape.type !== undefined && !typeOk(node, shape.type)) {
       errors.push(`${at}: expected ${Array.isArray(shape.type) ? shape.type.join('|') : shape.type}`);
-      return;
+      return false;
     }
+    return true;
+  };
+  const validateScalar = (node, shape, at) => {
     if (Object.hasOwn(shape, 'const') && node !== shape.const) errors.push(`${at}: must be ${JSON.stringify(shape.const)}`);
     if (Array.isArray(shape.enum) && !shape.enum.includes(node)) errors.push(`${at}: ${JSON.stringify(node)} is outside [${shape.enum.join(', ')}]`);
     if (typeof node === 'string') {
@@ -32,12 +33,12 @@ export function validateAgainstSchema(value, schema) {
       if (shape.minimum !== undefined && node < shape.minimum) errors.push(`${at}: below minimum ${shape.minimum}`);
       if (shape.maximum !== undefined && node > shape.maximum) errors.push(`${at}: above maximum ${shape.maximum}`);
     }
-    if (Array.isArray(node)) {
-      if (shape.minItems !== undefined && node.length < shape.minItems) errors.push(`${at}: needs at least ${shape.minItems} item(s)`);
-      if (shape.items) node.forEach((item, i) => walk(item, shape.items, `${at}[${i}]`));
-      return;
-    }
-    if (!isPlainObject(node)) return;
+  };
+  const validateArray = (node, shape, at, walk) => {
+    if (shape.minItems !== undefined && node.length < shape.minItems) errors.push(`${at}: needs at least ${shape.minItems} item(s)`);
+    if (shape.items) node.forEach((item, i) => walk(item, shape.items, `${at}[${i}]`));
+  };
+  const validateObject = (node, shape, at, walk) => {
     if (shape.minProperties !== undefined && Object.keys(node).length < shape.minProperties) errors.push(`${at}: needs at least ${shape.minProperties} entr(y|ies)`);
     for (const key of shape.required ?? []) if (!Object.hasOwn(node, key)) errors.push(`${at}: missing ${key}`);
     for (const [key, child] of Object.entries(node)) {
@@ -46,6 +47,18 @@ export function validateAgainstSchema(value, schema) {
       else if (shape.additionalProperties === false) errors.push(`${where}: unknown key`);
       else if (isPlainObject(shape.additionalProperties)) walk(child, shape.additionalProperties, where);
     }
+  };
+  const walk = (node, shape, at) => {
+    if (!isPlainObject(shape)) return;
+    if (shape.$ref) { walk(node, resolve(shape.$ref), at); return; }
+    if (!validateType(node, shape, at)) return;
+    validateScalar(node, shape, at);
+    if (Array.isArray(node)) {
+      validateArray(node, shape, at, walk);
+      return;
+    }
+    if (!isPlainObject(node)) return;
+    validateObject(node, shape, at, walk);
   };
   walk(value, schema, '$');
   return errors;
