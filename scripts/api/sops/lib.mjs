@@ -28,26 +28,34 @@ const sopsNames = (env, win, pathext) => {
   return String(env.PATHEXT || '.EXE;.CMD;.BAT').split(';').filter(Boolean).map((ext) => `sops${ext}`);
 };
 
-const wingetDirs = (filesystem, paths, env, wingetPackageTree) => {
+const nestedPackageDirs = (filesystem, paths, directory) => {
   const dirs = [];
-  if (!env.LOCALAPPDATA) return dirs;
-  const winget = paths.join(env.LOCALAPPDATA, 'Microsoft', 'WinGet');
-  dirs.push(paths.join(winget, 'Links'));
-  const packages = paths.join(winget, 'Packages');
+  try {
+    for (const nested of filesystem.readdirSync(directory, { withFileTypes: true })) {
+      if (nested.isDirectory()) dirs.push(paths.join(directory, nested.name));
+    }
+  } catch { /* unreadable package */ }
+  return dirs;
+};
+
+const wingetPackageDirs = (filesystem, paths, packages, wingetPackageTree) => {
+  const dirs = [];
   try {
     for (const entry of filesystem.readdirSync(packages)) {
       if (!wingetPackageTree && !/sops/i.test(entry)) continue;
       const directory = paths.join(packages, entry);
       dirs.push(directory);
-      if (wingetPackageTree) {
-        try {
-          for (const nested of filesystem.readdirSync(directory, { withFileTypes: true })) {
-            if (nested.isDirectory()) dirs.push(paths.join(directory, nested.name));
-          }
-        } catch { /* unreadable package */ }
-      }
+      if (wingetPackageTree) dirs.push(...nestedPackageDirs(filesystem, paths, directory));
     }
   } catch { /* no WinGet packages */ }
+  return dirs;
+};
+
+const wingetDirs = (filesystem, paths, env, wingetPackageTree) => {
+  const dirs = [];
+  if (!env.LOCALAPPDATA) return dirs;
+  const winget = paths.join(env.LOCALAPPDATA, 'Microsoft', 'WinGet');
+  dirs.push(paths.join(winget, 'Links'), ...wingetPackageDirs(filesystem, paths, paths.join(winget, 'Packages'), wingetPackageTree));
   return dirs;
 };
 
@@ -185,47 +193,75 @@ const encryptSelected = (run, exe, file, input, spec, recipient) => {
   return { status: 0, stdout: text, stderr: '', error: null };
 };
 
+const wipeCaptures = (captures) => {
+  for (const result of captures) {
+    if (Buffer.isBuffer(result?.stdout)) result.stdout.fill(0);
+    if (Buffer.isBuffer(result?.stderr)) result.stderr.fill(0);
+  }
+};
+
+// The one recipient an `age -y` capture names, or null.
+const recipientOf = (stdout) => {
+  const recipients = decoded(stdout).trim().split(/\r?\n/);
+  return recipients.length === 1 && /^age1[ac-hj-np-z02-9]+$/.test(recipients[0]) ? recipients[0] : null;
+};
+
+const toolProfileSupported = (version, ageVersion) => captured(version) && captured(ageVersion)
+  && SELECTED_SOPS_VERSIONS.has(/^sops\s+(\d+\.\d+\.\d+)/.exec(decoded(version.stdout))?.[1])
+  && SELECTED_AGE_VERSIONS.has(/^v?(\d+\.\d+\.\d+)/.exec(decoded(ageVersion.stdout))?.[1]);
+
+const invalidCaptureBudget = (deadline, maxBuffer) => !Number.isInteger(deadline) || deadline < 1 || deadline > 2_147_483_647 || !Number.isInteger(maxBuffer) || maxBuffer < 1;
+
+// The document bytes into `state.input`; the refusal when they are unavailable or over budget, else null.
+const readSelectedInput = (state, request, spec, file) => {
+  try { state.input = request.operation === 'seal' ? Buffer.from(spec.plaintext) : readSecretBytes(file); } catch { return held('actual-document-unavailable'); }
+  return state.input.length > CREDENTIAL_FILE_MAX_BYTES ? held('document-over-budget') : null;
+};
+
+const selectedRunner = (invocation, options, captures, selectedEnv) => (program, args, bytes, childEnv = selectedEnv) => {
+  const result = invocation.runProgram(program, args, { ...options, env: childEnv, input: bytes });
+  captures.push(result); return result;
+};
+
+const performSelected = (state, { bin, request, spec, key, selection, invocation, env, cwd, maxBuffer, timeout }) => {
+  const file = path.resolve(cwd ?? process.cwd(), spec.file);
+  const unavailable = readSelectedInput(state, request, spec, file);
+  if (unavailable) return unavailable;
+  const exe = bin ?? resolveSops(env), age = invocation.resolveRealTool('age-keygen', { env });
+  if (!nativeFile(exe) || !nativeFile(age)) return held('native-tool-unavailable');
+  if (!auditAbsent(cwd)) return held('unsupported-audit-context');
+  const deadline = timeout ?? IDENTITY_TIMEOUT_MS;
+  if (invalidCaptureBudget(deadline, maxBuffer)) return held('invalid-capture-budget');
+  state.selectedEnv = isolatedSopsEnv(env, selection.inlineName);
+  const publicEnv = isolatedSopsEnv(env, null);
+  const options = { cwd, env: state.selectedEnv, shell: false, encoding: 'buffer', windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'], timeout: deadline, maxBuffer };
+  const run = selectedRunner(invocation, options, state.captures, state.selectedEnv);
+  const version = run(exe, ['--disable-version-check', '--version'], undefined, publicEnv);
+  const ageVersion = run(age, ['--version'], undefined, publicEnv);
+  if (!toolProfileSupported(version, ageVersion)) return held('unsupported-tool-profile');
+  state.identity = Buffer.from(key.trim(), 'utf8');
+  const derived = run(age, ['-y'], state.identity, publicEnv);
+  if (!captured(derived)) return held('recipient-unproven');
+  const recipient = recipientOf(derived.stdout);
+  if (recipient === null) return held('recipient-unproven');
+  if (request.operation === 'decrypt') return decryptSelected(run, exe, file, state.input, spec, recipient);
+  return encryptSelected(run, exe, file, state.input, spec, recipient);
+};
+
 /** The domain composes the existing process owner: invocation={runProgram(file,args,options),resolveRealTool(program,{env})}. No API imports another system. */
 export function runSelectedSops(bin, request, { selection, invocation, env, cwd, maxBuffer, timeout } = {}) {
   if (selection?.error?.identityRefusal !== 'inline-context-unqualified' || typeof selection.inlineName !== 'string' || !env || typeof env !== 'object') return held('selected-context-missing');
   const spec = ownedRequest(request);
   const admitted = selectedAdmission(selection, spec, invocation, env);
   if (!admitted.key) return admitted;
-  const key = admitted.key;
-  let input, identity, selectedEnv;
-  const captures = [];
+  const state = { input: undefined, identity: undefined, selectedEnv: undefined, captures: [] };
   try {
-    const file = path.resolve(cwd ?? process.cwd(), spec.file);
-    try { input = request.operation === 'seal' ? Buffer.from(spec.plaintext) : readSecretBytes(file); } catch { return held('actual-document-unavailable'); }
-    if (input.length > CREDENTIAL_FILE_MAX_BYTES) return held('document-over-budget');
-    const exe = bin ?? resolveSops(env), age = invocation.resolveRealTool('age-keygen', { env });
-    if (!nativeFile(exe) || !nativeFile(age)) return held('native-tool-unavailable');
-    if (!auditAbsent(cwd)) return held('unsupported-audit-context');
-    const deadline = timeout ?? IDENTITY_TIMEOUT_MS;
-    if (!Number.isInteger(deadline) || deadline < 1 || deadline > 2_147_483_647 || !Number.isInteger(maxBuffer) || maxBuffer < 1) return held('invalid-capture-budget');
-    selectedEnv = isolatedSopsEnv(env, selection.inlineName);
-    const publicEnv = isolatedSopsEnv(env, null);
-    const options = { cwd, env: selectedEnv, shell: false, encoding: 'buffer', windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'], timeout: deadline, maxBuffer };
-    const run = (program, args, bytes, childEnv = selectedEnv) => {
-      const result = invocation.runProgram(program, args, { ...options, env: childEnv, input: bytes });
-      captures.push(result); return result;
-    };
-    const version = run(exe, ['--disable-version-check', '--version'], undefined, publicEnv);
-    const ageVersion = run(age, ['--version'], undefined, publicEnv);
-    if (!captured(version) || !captured(ageVersion) || !SELECTED_SOPS_VERSIONS.has(/^sops\s+(\d+\.\d+\.\d+)/.exec(decoded(version.stdout))?.[1]) || !SELECTED_AGE_VERSIONS.has(/^v?(\d+\.\d+\.\d+)/.exec(decoded(ageVersion.stdout))?.[1])) return held('unsupported-tool-profile');
-    identity = Buffer.from(key.trim(), 'utf8');
-    const derived = run(age, ['-y'], identity, publicEnv);
-    if (!captured(derived)) return held('recipient-unproven');
-    const recipients = decoded(derived.stdout).trim().split(/\r?\n/);
-    if (recipients.length !== 1 || !/^age1[ac-hj-np-z02-9]+$/.test(recipients[0])) return held('recipient-unproven');
-    const recipient = recipients[0];
-    if (request.operation === 'decrypt') return decryptSelected(run, exe, file, input, spec, recipient);
-    return encryptSelected(run, exe, file, input, spec, recipient);
+    return performSelected(state, { bin, request, spec, key: admitted.key, selection, invocation, env, cwd, maxBuffer, timeout });
   } catch { return held('selected-native-refused'); }
   finally {
-    identity?.fill(0); input?.fill(0);
-    for (const result of captures) { if (Buffer.isBuffer(result?.stdout)) { result.stdout.fill(0); } if (Buffer.isBuffer(result?.stderr)) { result.stderr.fill(0); } }
-    if (selectedEnv) delete selectedEnv.SOPS_AGE_KEY;
+    state.identity?.fill(0); state.input?.fill(0);
+    wipeCaptures(state.captures);
+    if (state.selectedEnv) delete state.selectedEnv.SOPS_AGE_KEY;
   }
 }
 
@@ -242,49 +278,56 @@ const declaredRecipientMatches = (lines, recipient) => {
 const publicationShaped = (publication) => publication && typeof publication.ok === 'boolean' && ['none', 'unknown', 'complete'].includes(publication.effectState);
 const publicationDurable = (publication) => [true, false].includes(publication.created) && ['file-fsync', 'file-and-parent-fsync', 'file-fsync-namespace-unqualified'].includes(publication.durability);
 
+const identityFailure = (reason, generated) => ({ ok: false, reason, captureState: generated ? 'unknown' : 'none', effectState: generated ? 'unknown' : 'none' });
+
+// The outcome of handing the captured identity to the installer's publication.
+const publicationOutcome = (publication, recipient) => {
+  if (!publicationShaped(publication)) return identityFailure('publication-unknown', true);
+  if (!publication.ok || publication.effectState !== 'complete') return { ok: false, captureState: 'generated', effectState: publication.effectState,
+    reason: 'publication-held' };
+  if (!publicationDurable(publication)) return identityFailure('publication-unknown', true);
+  return { ok: true, captureState: 'generated', effectState: 'complete', created: publication.created,
+    durability: publication.durability, publicRecipient: recipient };
+};
+
+// One age-keygen run under the caller's lease, its capture kept for wiping.
+const leasedAgeRunner = (invocation, age, options, captures, assertLease) => (args, input) => {
+  if (assertLease() !== true) throw new Error('initial age lease lost');
+  const result = invocation.runProgram(age, args, { ...options, input });
+  captures.push(result);
+  if (!captured(result) || result.stdout.length > options.maxBuffer || result.stderr.length > options.maxBuffer) throw new Error('initial age capture incomplete');
+  return result;
+};
+
+const generateAndPublish = (state, { env, cwd, invocation, assertLease, consume }) => {
+  const age = invocation.resolveRealTool('age-keygen', { env });
+  if (!nativeFile(age)) return identityFailure('native-tool-unavailable', false);
+  const options = { cwd, env: isolatedSopsEnv(env, null), shell: false, encoding: 'buffer', windowsHide: true,
+    stdio: ['pipe', 'pipe', 'pipe'], timeout: IDENTITY_TIMEOUT_MS, maxBuffer: CREDENTIAL_FILE_MAX_BYTES };
+  const run = leasedAgeRunner(invocation, age, options, state.captures, assertLease);
+  const version = run(['--version']);
+  if (!SELECTED_AGE_VERSIONS.has(/^v?(\d+\.\d+\.\d+)/.exec(decoded(version.stdout))?.[1])) return identityFailure('unsupported-tool-profile', false);
+  if (assertLease() !== true) return identityFailure('lease-lost', false);
+  state.generated = true;
+  const made = run([]), lines = decoded(made.stdout).trim().split(/\r?\n/);
+  const identities = lines.filter(line => line && !line.startsWith('#'));
+  if (!identityLinesValid(lines, identities)) return identityFailure('capture-incomplete', true);
+  state.identity = Buffer.from(identities[0], 'utf8');
+  const recipient = recipientOf(run(['-y'], state.identity).stdout);
+  if (recipient === null) return identityFailure('recipient-unproven', true);
+  if (!declaredRecipientMatches(lines, recipient) || assertLease() !== true) return identityFailure('recipient-unproven', true);
+  return publicationOutcome(consume(state.identity, recipient), recipient);
+};
+
 /** One real private capture for an admitted initial request; the installer owns its durable attempt. */
 export function withGeneratedAgeIdentity({ env, cwd, invocation, assertLease, consume } = {}) {
-  const failure = (reason, generated) => ({ ok: false, reason, captureState: generated ? 'unknown' : 'none', effectState: generated ? 'unknown' : 'none' });
-  if (!identityRequestValid({ env, cwd, invocation, assertLease, consume })) return failure('invalid-request', false);
-  const captures = [];
-  let generated = false, identity;
+  if (!identityRequestValid({ env, cwd, invocation, assertLease, consume })) return identityFailure('invalid-request', false);
+  const state = { captures: [], generated: false, identity: undefined };
   try {
-    const age = invocation.resolveRealTool('age-keygen', { env });
-    if (!nativeFile(age)) return failure('native-tool-unavailable', false);
-    const options = { cwd, env: isolatedSopsEnv(env, null), shell: false, encoding: 'buffer', windowsHide: true,
-      stdio: ['pipe', 'pipe', 'pipe'], timeout: IDENTITY_TIMEOUT_MS, maxBuffer: CREDENTIAL_FILE_MAX_BYTES };
-    const run = (args, input) => {
-      if (assertLease() !== true) throw new Error('initial age lease lost');
-      const result = invocation.runProgram(age, args, { ...options, input });
-      captures.push(result);
-      if (!captured(result) || result.stdout.length > options.maxBuffer || result.stderr.length > options.maxBuffer) throw new Error('initial age capture incomplete');
-      return result;
-    };
-    const version = run(['--version']);
-    if (!SELECTED_AGE_VERSIONS.has(/^v?(\d+\.\d+\.\d+)/.exec(decoded(version.stdout))?.[1])) return failure('unsupported-tool-profile', false);
-    if (assertLease() !== true) return failure('lease-lost', false);
-    generated = true;
-    const made = run([]), lines = decoded(made.stdout).trim().split(/\r?\n/);
-    const identities = lines.filter(line => line && !line.startsWith('#'));
-    if (!identityLinesValid(lines, identities)) return failure('capture-incomplete', true);
-    identity = Buffer.from(identities[0], 'utf8');
-    const derived = run(['-y'], identity), recipients = decoded(derived.stdout).trim().split(/\r?\n/);
-    if (recipients.length !== 1 || !/^age1[ac-hj-np-z02-9]+$/.test(recipients[0])) return failure('recipient-unproven', true);
-    const recipient = recipients[0];
-    if (!declaredRecipientMatches(lines, recipient) || assertLease() !== true) return failure('recipient-unproven', true);
-    const publication = consume(identity, recipient);
-    if (!publicationShaped(publication)) return failure('publication-unknown', true);
-    if (!publication.ok || publication.effectState !== 'complete') return { ok: false, captureState: 'generated', effectState: publication.effectState,
-      reason: 'publication-held' };
-    if (!publicationDurable(publication)) return failure('publication-unknown', true);
-    return { ok: true, captureState: 'generated', effectState: 'complete', created: publication.created,
-      durability: publication.durability, publicRecipient: recipient };
-  } catch { return failure('capture-or-publication-unknown', generated); }
+    return generateAndPublish(state, { env, cwd, invocation, assertLease, consume });
+  } catch { return identityFailure('capture-or-publication-unknown', state.generated); }
   finally {
-    identity?.fill(0);
-    for (const result of captures) {
-      if (Buffer.isBuffer(result?.stdout)) result.stdout.fill(0);
-      if (Buffer.isBuffer(result?.stderr)) result.stderr.fill(0);
-    }
+    state.identity?.fill(0);
+    wipeCaptures(state.captures);
   }
 }

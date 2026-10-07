@@ -45,14 +45,30 @@ const once = (target, { method, body, signal, started }) => new Promise(resolve 
   } catch (error) { finish({ state: 'error', code: error?.code ?? String(error?.message ?? error) }); }
 });
 
+// The parsed target and the option checks that precede the first request: `{ target }` or `{ error }`.
+function probeTarget(url, timeoutMs, follow) {
+  let target;
+  try { target = new URL(url); } catch { return { error: { state: 'error', code: 'URL_INVALID' } }; }
+  if (!supported(target)) return { error: { state: 'error', code: 'URL_PROTOCOL' } };
+  if (!Number.isFinite(timeoutMs) || timeoutMs < 1 || timeoutMs > 2_147_483_647)
+    return { error: { state: 'error', code: 'TIMEOUT_INVALID' } };
+  if (!Number.isSafeInteger(follow) || follow < 0) return { error: { state: 'error', code: 'FOLLOW_INVALID' } };
+  return { target };
+}
+
+// Where a redirect `location` leads from `target`: `{ target }` or `{ error }`.
+function redirectTarget(location, target) {
+  let next;
+  try { next = new URL(location, target); } catch { return { error: { state: 'error', code: 'REDIRECT_INVALID' } }; }
+  if (!supported(next)) return { error: { state: 'error', code: 'REDIRECT_PROTOCOL' } };
+  return { target: next };
+}
+
 /** answered headers/status/final URL | down (no connection) | hung (connected, no headers) | error. */
 export async function probe(url, { method = 'GET', body = null, timeoutMs = 20_000, follow = 20 } = {}) {
-  let target;
-  try { target = new URL(url); } catch { return { state: 'error', code: 'URL_INVALID' }; }
-  if (!supported(target)) return { state: 'error', code: 'URL_PROTOCOL' };
-  if (!Number.isFinite(timeoutMs) || timeoutMs < 1 || timeoutMs > 2_147_483_647)
-    return { state: 'error', code: 'TIMEOUT_INVALID' };
-  if (!Number.isSafeInteger(follow) || follow < 0) return { state: 'error', code: 'FOLLOW_INVALID' };
+  const first = probeTarget(url, timeoutMs, follow);
+  if (first.error) return first.error;
+  let { target } = first;
   const started = Date.now(), controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -62,8 +78,9 @@ export async function probe(url, { method = 'GET', body = null, timeoutMs = 20_0
       const location = r.headers?.location;
       if (!REDIRECT.has(r.status) || !location || hops >= follow)
         return { ...r, ms: Date.now() - started, url: target.toString() };
-      try { target = new URL(location, target); } catch { return { state: 'error', code: 'REDIRECT_INVALID' }; }
-      if (!supported(target)) return { state: 'error', code: 'REDIRECT_PROTOCOL' };
+      const next = redirectTarget(location, target);
+      if (next.error) return next.error;
+      target = next.target;
       if (r.status !== 307 && r.status !== 308) { method = method === 'HEAD' ? 'HEAD' : 'GET'; body = null; }
     }
   } finally { clearTimeout(timer); }
