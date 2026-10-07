@@ -1,9 +1,9 @@
 // A Kernel-recorded op-override model (starci kernel op-override → kernel-op-override events, plus a job's own
 // kernelModel/kernelOverride) is the Kernel's explicit pool decision for that op in that workflow — the same
 // authority tier as route-model's explicit --agent over config > default. At route time it outranks the retry
-// lineage's demotion of the pinned pool (lineage is evidence, the recorded decision is authority), while a hard
-// ineligibility — the pinned pool is outside the op's order, excluded after two pool-attributable lineage
-// failures, or behind a dead provider circuit — refuses typed with 'op-override-ineligible' and names why,
+// lineage's demotion and exclusion of the pinned pool (lineage is evidence, the recorded decision is authority; dispatch reads the same rule
+// in scripts/kernel/lineage-pin.mjs), while a hard
+// ineligibility — the pinned pool is outside the op's order or behind a dead provider circuit — refuses typed with 'op-override-ineligible' and names why,
 // never silently another pool.
 //
 // Live defect (kprop-3c575ffd11): job op-scope.define-f5c663aa85 carried a recorded op-override pinning
@@ -125,18 +125,29 @@ test('a recorded op-override model wins over lineage demotion of the pinned pool
   assert.ok(decided.pick.member.startsWith('claude/'), 'the chosen member is the pinned pool');
 });
 
-test('a recorded op-override never silently substitutes another pool: an excluded pin is a typed refusal', (t) => {
+test('a recorded op-override outranks the lineage exclusion of the pinned pool, and dispatch takes the same pin: route and dispatch agree', async (t) => {
   const repo = tmp(t, 'starci-route-override-excluded-');
   seedWorkflow(repo, { prior: [{ pool: 'claude-agent', result: overruled }, { pool: 'claude-agent', result: overruled }],
     override: { model: 'claude-agent' } });
-  const r = routeRaw(t, repo);
-  assert.equal(r.status, 1, `an ineligible pin refuses, got: ${r.stdout}${r.stderr}`);
-  assert.equal(r.body.reason, 'op-override-ineligible');
-  assert.match(r.body.detail, /claude-agent/);
-  assert.match(r.body.detail, /excluded for this retry lineage|ineligible/, 'the refusal names the actual ineligibility');
-  assert.equal(routeDecided(repo) ?? null, null, 'a refused route writes no route-decided');
-  assert.equal(read(repo, (l) => l.db.prepare('SELECT status FROM jobs WHERE job_id=?').get(JOB)?.status), 'queued',
-    'the job stays queued for the Kernel to retarget or clear the override');
+  const r = route(t, repo);
+  assert.equal(r.decision.model, 'claude-agent', "the Kernel's recorded pin is its acceptance of the history: the exclusion is lifted for the pinned pool only");
+  assert.deepEqual(r.lineageAdjust.overridden, ['claude-agent'], 'the lifted exclusion is reported');
+  assert.deepEqual(r.lineageAdjust.excluded, [], 'the pin took the pool out of the exclusion list the pick reads');
+  assert.equal(JSON.parse(routeDecided(repo)).routeOverride.model, 'claude-agent');
+  // dispatch --model reads the same rule: the same history with the same recorded pin is accepted, and refused without it.
+  const { planModel } = await import('../../scripts/kernel/verbs/shared/dispatch-plan.mjs');
+  const plan = (db, model) => {
+    const job = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(JOB);
+    return planModel({ args: { model }, db, job, jobId: JOB, op: OP, payload: JSON.parse(job.payload_json),
+      internals: { skillRoot: ROOT, resolveModel: (target) => ({ target, provider: target.split('-')[0] }) } });
+  };
+  read(repo, (l) => assert.doesNotThrow(() => plan(l.db, 'claude-agent'), 'dispatch accepts what route took'));
+  const bare = tmp(t, 'starci-route-override-bare-');
+  seedWorkflow(bare, { prior: [{ pool: 'claude-agent', result: overruled }, { pool: 'claude-agent', result: overruled }] });
+  const withoutPin = routeRaw(t, bare);
+  assert.equal(withoutPin.status, 0, 'without a pin the route takes the next eligible pool');
+  assert.equal(withoutPin.body.decision.model, 'codex-agent');
+  read(bare, (l) => assert.throws(() => plan(l.db, 'claude-agent'), (error) => error.code === 'pin-lineage-excluded'));
 });
 
 test("a pinned pool outside the op's tier chain refuses typed, naming the tier", (t) => {

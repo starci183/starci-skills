@@ -9,6 +9,7 @@
 // 'op-override-ineligible' naming why — never a silent different pool.
 import { updateJob } from '../../../engine/db/ledger.mjs';
 import { escalateExhaustedMembers } from './shared/member-exhaustion.mjs';
+import { liftPinnedPool, recordedPinOf } from '../lineage-pin.mjs';
 import { eachInOrder } from '../../lib/in-order.mjs';
 import { jobResultOf,jobRowOf } from './shared/rows.mjs';
 import { queuedJobOp, refuseOwnerGate, refusePeerWait, opSlotsOrRefuse } from './shared/job-gates.mjs';
@@ -18,7 +19,6 @@ import { pickOpModel } from '../../agent/op-pick.mjs';
 import { tierHistory } from '../../agent/tier-history.mjs';
 import { pickRecordText } from '../../lib/pick-record.mjs';
 import { prepareProviderBudget, providerBudgetUsage } from '../../agent/provider-budget.mjs';
-import { kernelOverrideFor } from '../kernel-authority.mjs';
 import { VerbExit } from './shared/verb-exit.mjs';
 
 function routeHumanOf({ jobId, kind, difficulty, decided, lineageAdjust, blockingView, overrideModel }) {
@@ -118,7 +118,7 @@ function planRoute({ db, ledger, payload, kind, difficulty, rtDoc, rtMerged, reg
   let lineageAdjust = null;
   if (lineage) {
     lineageAdjust = { demoted: lineage.demote, excluded: lineage.exclude, pools: lineage.pools,
-      attempts: lineage.attempts, demotedTaken: decision?.lineage?.demotedTaken ?? false };
+      attempts: lineage.attempts, demotedTaken: decision?.lineage?.demotedTaken ?? false, ...(lineage.overridden ? { overridden: lineage.overridden } : {}) };
   } else if (lineageError) lineageAdjust = { demoted: [], excluded: [], error: lineageError };
   return { redesignAs, decision, lineageAdjust };
 }
@@ -271,7 +271,7 @@ export default {
   // The Kernel's recorded pool pin for this op in this workflow: the job's own kernelModel, else the merged
   // op-override model (kernel-authority.mjs kernelOverrideFor — workflow op-override under the job's own
   // kernelOverride). It pins the selection below; when the pin cannot take the job the route refuses typed.
-  const overrideModel = payload.kernelModel ?? kernelOverrideFor(db, job.workflow_id, kind, payload)?.model ?? null;
+  const overrideModel = recordedPinOf(db, job.workflow_id, kind, payload);
 
   // Capacity per registry.yaml pool includes the live running count, quota and typed provider-health circuit.
   const rtFile = path.join(skillRoot, 'modules', 'models', 'runtimes.yaml');
@@ -285,6 +285,9 @@ export default {
     poolLoadOf, accountList, normalizeProvider, probeQuotaSafe, providerHealthOf, circuitClearHint });
   const { accounts, poolLoad, runningByModel, capacity } = capacityResult;
 
+  // The recorded pin outranks the lineage's demotion and exclusion of the pinned pool (lineage-pin.mjs, the rule dispatch reads too).
+  const pinned = pinPoolOf(pools, overrideModel);
+  lineage = liftPinnedPool(lineage, overrideModel, [overrideModel, pinned?.[0], pinned?.[1]?.target]);
   const plan = planRoute({ db, ledger, payload, kind, difficulty, rtDoc, rtMerged, regDoc, ownerRoot,
     configuredAllocationPolicy, loadConfig, lineage, lineageError, scopeId, bias, biasTrusted: ownerBiasTrust(goalRow),
     capacity, env: process.env, overrideModel });
