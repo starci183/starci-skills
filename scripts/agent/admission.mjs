@@ -75,7 +75,10 @@ const candidateEligibility = (member, registered, role) => {
   return { eligible: registered, mode: registered ? 'scoped-control-plane' : null,
     reasons: registered ? [] : ['concrete model/provider or pool is not registered'] };
 };
-const runningFor = (usage, held) => Number.isInteger(usage.running) ? usage.running - (held ? 1 : 0) : usage.running;
+const runningFor = (usage, held) => {
+  if (!Number.isInteger(usage.running)) return usage.running;
+  return usage.running - (held ? 1 : 0);
+};
 const heldAttemptsGate = (candidates, heldAttempts) => {
   if (!heldAttempts.size) return;
   const held = heldAttempts.size === 1 ? [...heldAttempts.values()][0] : null;
