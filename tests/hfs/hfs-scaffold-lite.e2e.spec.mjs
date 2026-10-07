@@ -15,6 +15,7 @@ import { nextBuildEnv } from '../../scripts/gates/build-env.mjs';
 import { runNpx } from '../../scripts/api/npm/run-npx.mjs';
 import { mkdtemp } from '../helpers/tmpdir.mjs';
 import { startSourceCanonRegistry } from '../helpers/source-canon-registry.mjs';
+import { OWNER_FILE, reclaimStaleStack, removeProjectStack } from '../helpers/supabase-project-stack.mjs';
 
 const tail = (run, lines = 30) => `${run.stdout ?? ''}\n${run.stderr ?? ''}`.trim().split(/\r?\n/).slice(-lines).join('\n');
 
@@ -56,13 +57,23 @@ test('hfs lite scaffold end to end: clean app, builds, isolated Supabase data, t
     }
   });
   // The scaffold writes its own port block into supabase/config.toml (one block per project name), so the stack runs beside any other.
-  // A port of that block already taken is a failure naming the port and its holder, never a skip.
-  for (const port of Object.values(supabasePortVars(APP_NAME)).map(Number)) {
+  // A port of that block already taken is a failure naming the port and its holder, never a skip - except the leftover stack
+  // of this very project (an earlier run killed before its teardown), which is reclaimed first: only containers of the project
+  // `litedemo` whose working directory is gone or whose owner process is dead; a stack held by anything else stays and fails.
+  const ports = Object.values(supabasePortVars(APP_NAME)).map(Number);
+  const busy = await Promise.all(ports.map(portBusy));
+  if (busy.some(Boolean)) reclaimStaleStack(APP_NAME);
+  for (const port of ports) {
     assert.equal(await portBusy(port), false, `HFS_E2E_PORT_BUSY: the local Supabase port ${port} of the ${APP_NAME} stack is held by ${holderOf(port)}; stop that holder or free the port`);
   }
   let stopDatabase = () => {};
-  const into = mkdtemp(t, 'hfs-scaffold-lite-e2e-', () => stopDatabase());
+  // Teardown on every path (pass, failure, timeout): the scaffold's own stop, then whatever of this app's stack is still there -
+  // the stack the scaffold-time type generation or a half-failed db:start left behind included.
+  const into = mkdtemp(t, 'hfs-scaffold-lite-e2e-', () => {
+    try { stopDatabase(); } finally { removeProjectStack(APP_NAME, { select: (container) => path.resolve(container.workdir).toLowerCase().startsWith(path.resolve(into).toLowerCase()) }); }
+  });
   const app = path.join(into, APP_NAME);
+  fs.writeFileSync(path.join(into, OWNER_FILE), String(process.pid));
   const registry = await startSourceCanonRegistry();
   t.after(() => registry.close());
 

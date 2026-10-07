@@ -640,7 +640,7 @@ export class World {
             await this.dependencies.resetRun(context)
             return
         }
-        const { stack } = await import("../stack")
+        const { stack } = require("../stack") as typeof import("../stack")
         await stack.reset({ namespace: context.namespace, infra: context.infra, keepTables: context.keepTables })
         const response = await fetch(`${context.fakes.controlUrl}/reset`, { method: "POST", signal: AbortSignal.timeout(30_000) })
         if (response.status !== 200) throw worldError(TestWorldErrorCode.FakeControlFailed, `resetting the fakes answered ${response.status}`)

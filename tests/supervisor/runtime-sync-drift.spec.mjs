@@ -54,3 +54,25 @@ test('the real generator and public check detect absent/stale UI output without 
   assert.deepEqual(driftOfRuntime(root), [`stale ${rel}`], 'fresh comparison includes changed canonical UI inputs');
   assert.deepEqual(fs.readFileSync(target), original);
 });
+
+test('a regeneration over current copies touches no file, and removes only the file no bundle lists', (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-runtime-sync-idle-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  for (const rel of new Set([CATALOG, ...catalogFiles(ROOT), ...Object.values(BUNDLES).flatMap((b) => b.files)])) {
+    const target = path.join(root, rel);
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.copyFileSync(path.join(ROOT, rel), target);
+  }
+  syncRuntime(root);
+  const bundle = Object.keys(BUNDLES)[0];
+  const first = BUNDLES[bundle].files[0];
+  const kept = path.join(root, bundle, first);
+  const old = new Date(Date.now() - 3600_000);
+  fs.utimesSync(kept, old, old);
+  const stray = path.join(root, bundle, 'stray.txt');
+  fs.writeFileSync(stray, 'x');
+  syncRuntime(root);
+  assert.equal(fs.statSync(kept).mtimeMs, old.getTime(), 'a current copy is not rewritten, so a concurrent reader never sees it cut');
+  assert.equal(fs.existsSync(stray), false);
+  assert.deepEqual(driftOfRuntime(root), []);
+});

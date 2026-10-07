@@ -238,7 +238,7 @@ describe("stack attach", () => {
         const docker = fakeDocker()
         const dead = new Set<number>([3333])
         const live = harness([], { home, pid: 4444, isAlive: (pid) => !dead.has(pid), docker })
-        const { Registry } = await import("./registry")
+        const { Registry } = require("./registry") as typeof import("./registry")
         await new Registry({ dir: home }).update((data) => void data.leases.push({ namespace: "ghost_w1", runId: "ghost", pid: 3333, since: "2026-01-01T00:00:00.000Z", containers: [] }))
         await live.stack.attach(request(namespace("shop_aaaaaa_w1"), "live-w1"))
         assert.equal(live.queries.some((query) => query.includes("ghost")), false)

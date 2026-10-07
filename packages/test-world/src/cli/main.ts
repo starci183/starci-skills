@@ -138,7 +138,7 @@ export const imagesFromDefinition = (root: string, stackDir: string, wanted: Rea
 const STACK_MODULE = "../stack"
 
 /** Loads the real stack lazily, so the CLI parses, prints usage and runs against an injected stack without docker code. */
-const loadStack = async (): Promise<StackApi> => ((await import(STACK_MODULE)) as { readonly stack: StackApi }).stack
+const loadStack = (): Promise<StackApi> => Promise.resolve().then(() => (require(STACK_MODULE) as { readonly stack: StackApi }).stack)
 
 /** Runs the command; answers the process exit code. */
 export const main = async (argv: ReadonlyArray<string>, dependencies: CliDependencies = {}): Promise<number> => {
