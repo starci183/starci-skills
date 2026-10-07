@@ -58,7 +58,7 @@ export function loadKnowledge(root = KNOWLEDGE) {
   const out = [];
   for (const layer of LAYERS) {
     const dir = path.join(root, layer);
-    for (const f of fs.readdirSync(dir).filter((x) => x.endsWith('.yaml') && x !== 'index.yaml').sort()) {
+    for (const f of fs.readdirSync(dir).filter((x) => x.endsWith('.yaml') && x !== 'index.yaml').sort(byCodeUnit)) {
       const file = path.join(dir, f);
       out.push({ layer, file, rel: path.relative(ROOT, file).split(path.sep).join('/'), doc: parseYaml(fs.readFileSync(file, 'utf8')) });
     }
