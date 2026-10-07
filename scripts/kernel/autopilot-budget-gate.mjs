@@ -1,5 +1,6 @@
 // autopilot-budget-gate.mjs — the supervisor-gate the runtime raises against a workflow's own budget, and its own release.
-// A cap actually exceeded, or token usage still unknown after the metering window, opens one gate holding every job ('*');
+// Only a cap actually exceeded opens the gate holding every job ('*'): usage still unknown after the metering window is reported in the
+// budget and its lower bound, and holds nothing. A gate past supervisorGateTimeoutMs defers its jobs (autopilot-state.mjs deferTimedOutGates).
 // the gate is the runtime's to clear: the first evaluation that finds the condition gone resolves it with the new budget as
 // evidence, so a gate raised before the usage sweep ran never waits for a human. An exceeded cap still needs the Supervisor.
 import { resolveIncident } from '../../engine/db/ledger.mjs';
@@ -13,7 +14,7 @@ const budgetGatesOf = (db, workflowId) => supervisorGatesOf(db, workflowId).filt
 const releaseBudgetGates = ({ ledger, db, workflowId, budget, now }) => {
   for (const gate of budgetGatesOf(db, workflowId)) {
     if (!resolveIncident(db, { incidentId: gate.incidentId, reason: 'fixed', at: now })) continue;
-    const detail = `the budget no longer holds the workflow: every completed attempt is measured (${budget.coverage.measured} of ${budget.coverage.attempts} attempts) and no cap is exceeded`;
+    const detail = `no budget cap is exceeded (${budget.coverage.measured} of ${budget.coverage.attempts} attempts measured; measured tokens are a lower bound)`;
     ledger.appendEvent({ workflowId, entityType: 'incident', entityId: gate.incidentId, kind: 'incident-resolved',
       payload: { detail, by: AUTOPILOT_BY, evidence: budget } });
   }
@@ -21,11 +22,10 @@ const releaseBudgetGates = ({ ledger, db, workflowId, budget, now }) => {
 
 /** One evaluation of the budget gate: open it when the budget holds the workflow, resolve it when it no longer does. */
 export const gateExceededBudget = ({ ledger, db, workflowId, budget, now = Date.now() }) => {
-  if (!(budget.exceeded.length || budget.unverified.length)) return releaseBudgetGates({ ledger, db, workflowId, budget, now });
+  if (!budget.exceeded.length) return releaseBudgetGates({ ledger, db, workflowId, budget, now });
   if (supervisorGatesOf(db, workflowId).some((g) => g.holds.includes('*'))) return;
   const exceeded = budget.exceeded.map((k) => `${k} ${k === 'tokens' ? budget.measured.tokens : budget.used[k]} > ${budget.caps[k]}`);
-  const unverified = budget.unverified.map((k) => `${k} unknown: ${budget.coverage.unknown} completed attempts lack usage`);
-  const detail = `${BUDGET_GATE_DETAIL} (${[...exceeded, ...unverified].join(', ')}): Supervisor review - record missing usage or extend with starci kernel autopilot --extend-budget, then resolve --by supervisor`;
+  const detail = `${BUDGET_GATE_DETAIL} (${exceeded.join(', ')}): Supervisor review - extend with starci kernel autopilot --extend-budget, then resolve --by supervisor`;
   const incidentId = openSupervisorGate(ledger, { workflowId, holds: ['*'], detail, evidence: budget });
   ledger.appendEvent({ workflowId, entityType: 'incident', entityId: incidentId, kind: AUTOPILOT_EVENTS.budget, payload: { ...budget, incidentId, by: AUTOPILOT_BY } });
 };

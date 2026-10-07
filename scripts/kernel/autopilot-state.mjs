@@ -360,7 +360,7 @@ export const deferTimedOutGates = ({ ledger, db, workflowId, settings, out, now 
     if (now - Number(gate.since) < settings.supervisorGateTimeoutMs) continue;
     const already = new Set(deferredLegsOf(db, workflowId).map((item) => item.jobId));
     const jobIds = db.prepare("SELECT job_id,op_id FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND status IN ('queued','failed')").all(workflowId)
-      .filter((job) => gate.holds.includes(job.job_id) || (job.op_id && gate.holds.includes(job.op_id))).map((job) => job.job_id).filter((id) => !already.has(id));
+      .filter((job) => gate.holds.includes('*') || gate.holds.includes(job.job_id) || (job.op_id && gate.holds.includes(job.op_id))).map((job) => job.job_id).filter((id) => !already.has(id));
     if (!jobIds.length) continue;
     ledger.appendEvent({ workflowId, entityType: 'incident', entityId: gate.incidentId, kind: AUTOPILOT_EVENTS.deferred,
       payload: { jobIds, opId: gate.opId, incidentId: gate.incidentId, by: AUTOPILOT_BY, reason: `supervisor-gate ${gate.incidentId} unresolved past ${Math.round(settings.supervisorGateTimeoutMs / 60000)} min` } });

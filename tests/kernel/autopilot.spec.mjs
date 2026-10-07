@@ -356,7 +356,7 @@ test('autopilot budgets count each real dispatch and measured attempt/Kernel tok
   assert.deepEqual(capped.exceeded, ['attempts', 'tokens']);
 }));
 
-test('completed missing usage is unknown and holds dispatch through the existing Supervisor gate; later measurement replaces unknown', t => withUsageBudget(t, ({ ledger, repoRoot, queue, dispatch, end, settings }) => {
+test('completed missing usage stays unknown in the budget and holds nothing; a gate raised for an exceeded cap is released when the cap is no longer exceeded', t => withUsageBudget(t, ({ ledger, repoRoot, queue, dispatch, end, settings }) => {
   queue('meter-unavailable'); queue('meter-pending');
   const unavailable = dispatch('meter-unavailable', 'ctx_meter_unavailable');
   end('meter-unavailable', unavailable, PAST_METERING);
@@ -369,24 +369,35 @@ test('completed missing usage is unknown and holds dispatch through the existing
   assert.deepEqual(before.unverified, ['tokens']);
   assert.equal(before.coverage.unknown, 2);
   assert.equal(before.coverage.complete, false);
-  const sweep = autopilotSweep({ ledger, repo: repoRoot, workflowId: WF, settings });
-  assert.deepEqual(sweep.budget.unverified, ['tokens']);
-  const gates = ledger.db.prepare("SELECT payload_json FROM events WHERE kind='incident-raised'").all().map(row => JSON.parse(row.payload_json)).filter(row => row.kind === SUPERVISOR_GATE);
-  assert.equal(gates.length, 1); assert.deepEqual(gates[0].holds, ['*']);
-  assert.match(gates[0].detail, /tokens unknown/);
+  const openGates = () => ledger.db.prepare("SELECT count(*) n FROM incidents WHERE status='open'").get().n;
   autopilotSweep({ ledger, repo: repoRoot, workflowId: WF, settings });
-  assert.equal(ledger.db.prepare("SELECT count(*) n FROM events WHERE kind='autopilot-budget-exceeded'").get().n, 1);
+  assert.equal(openGates(), 0, 'unknown usage is reported, not a hold on every job');
   for (const attemptId of [unavailable, pending]) ledger.write.recordAttemptUsage({ attemptId, rows: [{ model: 'm', inputTokens: 4, outputTokens: 2, cacheReadTokens: 0, cacheWriteTokens: 0 }] });
   const after = budgetOf(ledger.db, WF, settings);
   assert.equal(after.used.tokens, 12); assert.deepEqual(after.unverified, []); assert.equal(after.coverage.complete, true);
-  assert.equal(ledger.db.prepare("SELECT count(*) n FROM incidents WHERE status='open'").get().n, 1, 'the gate stays open until the next evaluation');
+  const tight = { ...settings, budgets: { ...settings.budgets, tokens: 5 } };
+  autopilotSweep({ ledger, repo: repoRoot, workflowId: WF, settings: tight });
+  assert.equal(openGates(), 1, 'a cap actually exceeded holds every job');
   autopilotSweep({ ledger, repo: repoRoot, workflowId: WF, settings });
-  assert.equal(ledger.db.prepare("SELECT count(*) n FROM incidents WHERE status='open'").get().n, 0, 'the runtime resolves a budget gate whose condition no longer holds');
+  assert.equal(openGates(), 0, 'the runtime resolves the gate once no cap is exceeded');
   const resolved = JSON.parse(ledger.db.prepare("SELECT payload_json FROM events WHERE kind='incident-resolved' ORDER BY seq DESC LIMIT 1").get().payload_json);
   assert.equal(resolved.by, AUTOPILOT_BY); assert.equal(resolved.evidence.coverage.complete, true);
 }));
 
-test('usage still being metered is not unknown: no budget gate inside the metering window, one after it, released when the usage arrives, kept while a cap is exceeded', t => withUsageBudget(t, ({ ledger, repoRoot, queue, dispatch, end, settings }) => {
+test('the gate of an exceeded cap holding every job times out into the handover path: the queued jobs are deferred', t => withUsageBudget(t, ({ ledger, repoRoot, queue, dispatch, end, settings }) => {
+  queue('meter-held'); queue('meter-spent');
+  const spent = dispatch('meter-spent', 'ctx_meter_spent');
+  ledger.write.recordAttemptUsage({ attemptId: spent, rows: [{ model: 'm', inputTokens: 40, outputTokens: 2, cacheReadTokens: 0, cacheWriteTokens: 0 }] });
+  end('meter-spent', spent);
+  const tight = { ...settings, budgets: { ...settings.budgets, tokens: 5 } };
+  const start = Date.now();
+  autopilotSweep({ ledger, repo: repoRoot, workflowId: WF, settings: tight, now: start });
+  const late = autopilotSweep({ ledger, repo: repoRoot, workflowId: WF, settings: tight, now: start + tight.supervisorGateTimeoutMs + 1000 });
+  assert.equal(late.timedOut.length, 1, 'the declared deadline moves the held jobs on');
+  assert.ok(late.timedOut[0].jobIds.includes('meter-held'));
+}));
+
+test('usage still being metered is not unknown and no usage gap holds a job; only an exceeded cap does, and it is kept while exceeded', t => withUsageBudget(t, ({ ledger, repoRoot, queue, dispatch, end, settings }) => {
   const openGates = () => ledger.db.prepare("SELECT count(*) n FROM incidents WHERE status='open'").get().n;
   const sweep = () => autopilotSweep({ ledger, repo: repoRoot, workflowId: WF, settings });
   queue('meter-fresh'); queue('meter-late');
@@ -402,10 +413,9 @@ test('usage still being metered is not unknown: no budget gate inside the meteri
   const late = dispatch('meter-late', 'ctx_meter_late');
   end('meter-late', late, PAST_METERING);
   assert.deepEqual(sweep().budget.unverified, ['tokens']);
-  assert.equal(openGates(), 1, 'usage still missing after the window opens the gate');
+  assert.equal(openGates(), 0, 'usage still missing after the window is reported, never a hold');
   ledger.write.recordAttemptUsage({ attemptId: late, rows: [{ model: 'm', inputTokens: 1, outputTokens: 1, cacheReadTokens: 0, cacheWriteTokens: 0 }] });
   sweep();
-  assert.equal(openGates(), 0, 'the usage arriving resolves the gate without a human');
   const exceeded = { ...settings, budgets: { ...settings.budgets, tokens: 5 } };
   autopilotSweep({ ledger, repo: repoRoot, workflowId: WF, settings: exceeded });
   assert.equal(openGates(), 1, 'a cap actually exceeded opens the gate');
