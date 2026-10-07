@@ -16302,3 +16302,33 @@ guard-command-unresolvable:
   nextStep_vi: "Không có agent nào được khởi động và không tốn lượt thử; chạy lại starci runtime link (hoặc starci runtime install) để ghi cả hai launcher, rồi khởi động lại; hàng 'command guard resolvable' của starci reconciler up --check cho biết shell nào lỗi."
   owner: supervisor
   kind: dispatch-refusal
+op-incident-agent-switch:
+  title: "A job left an agent that kept refusing its launch"
+  title_vi: "Job rời agent liên tục từ chối khởi chạy"
+  meaning_vi: "Provider hoặc agent đã từ chối khởi chạy job này nhiều lần mà không tốn lượt thử; bảng chính sách op-incident-policy tính từng lần theo từng pool và route chuyển job sang thành viên đủ điều kiện kế tiếp."
+  causes_vi:
+    - "Quota, rate limit hoặc circuit của provider đang mở"
+    - "Worker không xác nhận bắt đầu lượt hoặc admission không còn ứng viên cho pool đó"
+  nextStep_vi: "Không cần ai can thiệp: route đưa job sang agent kế tiếp; khi mọi thành viên đã hết lượt thì chuyển lên Supervisor."
+  owner: runtime-core
+  kind: runtime-fault
+op-incident-escalate-supervisor:
+  title: "An op incident exhausted its bound and goes to the Supervisor"
+  title_vi: "Sự cố op hết giới hạn và chuyển lên Supervisor"
+  meaning_vi: "Mọi bước xử lý của hàng chính sách tương ứng đã dùng hết số lần cho phép nên việc được chuyển lên Supervisor cùng bằng chứng đã thử."
+  causes_vi:
+    - "Mọi agent đủ điều kiện của job đã bị loại hoặc cạn quota"
+    - "Một điều kiện host hay lỗi runtime không đổi sau các lần thử"
+  nextStep_vi: "Supervisor đọc bằng chứng, sửa nguyên nhân hoặc trả lời là đã sửa, có cách tránh, hoặc không phải lỗi runtime để trả về Kernel."
+  owner: supervisor
+  kind: runtime-fault
+op-incident-escalate-owner:
+  title: "An op incident exhausted every handler and goes to the owner"
+  title_vi: "Sự cố op hết mọi bên xử lý và chuyển cho chủ dự án"
+  meaning_vi: "Kernel và Supervisor đã dùng hết giới hạn của hàng chính sách; chỉ chủ dự án quyết được ý định, thông tin xác thực hoặc chi phí còn lại."
+  causes_vi:
+    - "Câu hỏi về ý định sản phẩm hoặc thông tin xác thực mà hồ sơ mục tiêu không trả lời được"
+    - "Seat Kernel không phục hồi được sau số lần thay thế cho phép"
+  nextStep_vi: "Chủ dự án trả lời câu hỏi hoặc quyết định tiếp; việc bị giữ chỉ là job bị ảnh hưởng."
+  owner: owner
+  kind: runtime-fault

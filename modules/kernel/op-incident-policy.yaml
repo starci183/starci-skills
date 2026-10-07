@@ -1,0 +1,161 @@
+schema: starci/module-kernel-op-incident-policy@1
+id: kernel.op-incident-policy
+
+# The one table of what happens when an op cannot proceed on its own (owner goal G10). Rows are read by
+# scripts/kernel/op-incident-policy.mjs; a bound is a number here or a `ref` to the yaml key that already owns it
+# (`<file>#<dotted.path>`, `[id=<x>]` selects a list entry). The policy spec resolves every ref.
+
+about:
+  en: >-
+    A situation is detected once, by the row's detector, and handled by the row's handler: whoever owns the cause and has
+    the scope to fix it. A mechanical reaction (no judgment) runs in the runtime in the workflow's name and is shown to the
+    Kernel; the Kernel acts where judgment is needed. A bound is counted per (job, agent); the per-job total is not
+    reset by a switch of agent. A spent bound escalates to the row's `next` handler, and every step records its code.
+
+handlers:
+  runtime-auto: "reconciler Job controller, dispatch path or Host controller, in the workflow's name"
+  kernel: "the workflow's [Kernel] agent: one workflow's jobs (route, dispatch, retry, reply, re-plan)"
+  supervisor: "machine-wide and runtime code: capacity across workflows, provider circuits, runtime fixes, gate verdicts"
+  owner: "product intent, credentials, spend, irreversible choices"
+
+# Switching agent for one job (rows quota, launch-failure): counted per (job, pool) by scripts/kernel/job-rejections.mjs and
+# scripts/kernel/lineage-route.mjs. One failure of a pool demotes it for the job, `excludeAfter` exclude it; the route then
+# takes the next eligible member of the job's candidate list. The tiered chain plugs in as that candidate list.
+agentSwitch:
+  excludeAfter: 2
+  # Launch refusals that are the agent's or its provider's fault and spend no try; a refusal at any other step
+  # (leases, reserve, route, depth) is a wait and never moves a pool.
+  switchSteps: [admission, worker-start, attestation, prompt-delivery, agent-launch]
+
+codes:
+  agentSwitch: {code: 'op-incident-agent-switch'}
+  escalateSupervisor: {code: 'op-incident-escalate-supervisor'}
+  escalateOwner: {code: 'op-incident-escalate-owner'}
+
+rows:
+  - id: ask-worker-question
+    situation: ask
+    cause: intent
+    detector: "Job controller: job answering -> Decision Item worker-question (scripts/reconciler/controllers/job.mjs); frontier worker-question"
+    handler: kernel
+    action: "starci kernel questions, then starci kernel reply --body (what the goal, scope and prior decisions determine) or --to-owner"
+    bound: {deadlineMs: {ref: "modules/reconciler/job.yaml#sla.QUESTION_OVERDUE"}}
+    next: supervisor
+    code: worker-question
+  - id: ask-owner
+    situation: ask
+    cause: intent
+    detector: "report outcome ask; frontier ask-reserve / awaiting-owner"
+    handler: kernel
+    action: "starci kernel serve-ask; autopilot answers a reversible choice provisionally and records it for the handover; credentials, spend and costly intent go to the owner"
+    bound: {deadlineMs: {ref: "modules/models/runtimes.yaml#allocation.autopilot.supervisorGateTimeoutMs"}}
+    next: owner
+    code: op-incident-escalate-owner
+  - id: rate-limit-short
+    situation: rate-limit
+    cause: agent-provider
+    detector: "worker-health probe: rate-limit screen with a reset hint inside the wait budget (scripts/reconciler/worker-health.mjs)"
+    handler: runtime-auto
+    action: "wait in place for the reset hint (else backoff), then send the retry nudge; the agent is not killed"
+    bound: {waitMs: {ref: "modules/reconciler/job.yaml#health.backoffMaxMs"}, deadlineMs: {ref: "modules/reconciler/job.yaml#health.rateLimitDecisionMs"}}
+    next: kernel
+    code: op-incident-agent-switch
+  - id: quota-or-circuit
+    situation: rate-limit
+    cause: agent-provider
+    detector: "provider-health circuit (quota, capacity, auth, worker-start) read by route and admission; worker screen outage row"
+    handler: runtime-auto
+    action: "route the same job to the next eligible member of its candidate list and dispatch it (dispatch-ready)"
+    bound: {perAgent: {ref: "modules/kernel/op-incident-policy.yaml#agentSwitch.excludeAfter"}, waitMs: {ref: "modules/models/runtimes.yaml#allocation.cooldownMs.quota"}}
+    next: supervisor
+    code: op-incident-escalate-supervisor
+  - id: error-work
+    situation: error
+    cause: work
+    detector: "settle: red check, rejected or failed report"
+    handler: kernel
+    action: "retry the same agent with the failure fed back; the next attempt is routed to another agent; then re-plan (split or amend the contract)"
+    bound: {perJob: {ref: "modules/models/kinds.yaml#routes[id=rejected-report-retries].limit"}}
+    next: supervisor
+    code: op-incident-escalate-supervisor
+  - id: error-agent-crash
+    situation: error
+    cause: agent-provider
+    detector: "worker-health probe: terminal gone or exited; frontier worker-dead"
+    handler: runtime-auto
+    action: "starci kernel reconcile --dead-worker --settle-failed; the no-report route retries on another pool"
+    bound: {perJob: {ref: "modules/models/kinds.yaml#routes[id=no-report-retries-on-another-pool].limit"}}
+    next: kernel
+    code: failed-no-report
+  - id: error-launch
+    situation: error
+    cause: agent-provider
+    detector: "dispatch-rejected at a switch step (rejectDispatch, scripts/kernel/cli.mjs); the job returns to ready with no try spent"
+    handler: runtime-auto
+    action: "route the same job to the next eligible member of its candidate list and dispatch it (dispatch-ready)"
+    bound: {perAgent: {ref: "modules/kernel/op-incident-policy.yaml#agentSwitch.excludeAfter"}}
+    next: supervisor
+    code: op-incident-escalate-supervisor
+  - id: error-host
+    situation: error
+    cause: host
+    detector: "dispatch refusal host-resources-low, host lock held, Orca down; queuedBecause names it"
+    handler: runtime-auto
+    action: "wait with the named reason (never idle); the retry budget re-tries the host call"
+    bound: {deadlineMs: {ref: "modules/models/runtimes.yaml#allocation.hostLock.retryDeadlineMs"}}
+    next: supervisor
+    code: op-incident-escalate-supervisor
+  - id: error-runtime-defect
+    situation: error
+    cause: runtime-defect
+    detector: "the Kernel's evidence: failing command and code that no agent or retry changes"
+    handler: kernel
+    action: "take any available workaround route first, file the defect non-blocking (starci kernel incident --kind runtime-defect), hold only the affected job"
+    bound: {deadlineMs: {ref: "modules/models/runtimes.yaml#allocation.autopilot.supervisorGateTimeoutMs"}}
+    next: supervisor
+    code: op-incident-escalate-supervisor
+  - id: hang-idle
+    situation: hang
+    cause: agent-provider
+    detector: "worker-health probe: idle at its prompt without a report"
+    handler: runtime-auto
+    action: "nudge the worker; past the nudge bound a Decision Item worker-stalled goes to the Kernel"
+    bound: {perJob: {ref: "modules/reconciler/job.yaml#health.maxIdleNudges"}, deadlineMs: {ref: "modules/models/runtimes.yaml#allocation.liveness.quietMs"}}
+    next: kernel
+    code: failed-no-report
+  - id: hang-done-without-report
+    situation: hang
+    cause: agent-provider
+    detector: "worker-health probe: finished its turn with no filed report"
+    handler: runtime-auto
+    action: "nudge to file the report; past the deadline settle failed-no-report and retry on another pool"
+    bound: {deadlineMs: {ref: "modules/reconciler/job.yaml#health.doneFailAfterMs"}}
+    next: kernel
+    code: failed-no-report
+  - id: hang-silent
+    situation: hang
+    cause: agent-provider
+    detector: "terminal liveness: wedged, gate-loop or stale-active; frontier worker-wedged / worker-nudge-ready"
+    handler: kernel
+    action: "starci kernel nudge, else starci kernel reconcile --dead-worker --settle-failed"
+    bound: {deadlineMs: {ref: "modules/models/runtimes.yaml#allocation.liveness.activeStaleMs"}}
+    next: supervisor
+    code: failed-no-report
+  - id: restart-agent
+    situation: restart
+    cause: agent-provider
+    detector: "terminal gone or disconnected for a running op (frontier deadWorkerJobs)"
+    handler: runtime-auto
+    action: "reattach a live worker (live-worker-reconciled) or settle it failed-no-report and retry; a replacement may be another agent"
+    bound: {perJob: {ref: "modules/models/kinds.yaml#routes[id=no-report-retries-on-another-pool].limit"}}
+    next: kernel
+    code: failed-no-report
+  - id: seat-kernel
+    situation: restart
+    cause: agent-provider
+    detector: "Host controller concern host.kernel-seat (scripts/kernel/kernel-watchdog.mjs)"
+    handler: runtime-auto
+    action: "wake an idle Kernel, replace a dead or non-answering one"
+    bound: {perAgent: {value: 3}, deadlineMs: {value: 600000}, windowMs: {value: 3600000}}
+    next: owner
+    code: op-incident-escalate-owner

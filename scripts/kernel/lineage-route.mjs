@@ -34,8 +34,10 @@ import { OUTAGE_KEYS } from '../agent/provider-outage.mjs';
 import { hostDeadWorker, hostEventAround } from './host-event.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 import { independentChecksOf } from './verbs/shared/check-evidence.mjs';
+import { agentSwitchOf } from './op-incident-policy.mjs';
+import { rejectionAttemptsOf } from './job-rejections.mjs';
 
-export const EXCLUDE_AFTER = 2;
+export const EXCLUDE_AFTER = agentSwitchOf().excludeAfter;
 const FAILED_NO_REPORT = 'failed-no-report';
 
 const parse = parseJsonOr;
@@ -165,11 +167,13 @@ const poolsOf = (attempts) => {
 export function lineageRouteAdjust(db, job) {
   // Only the tries of this job's own work unit are its history (H4): the lineage stops at another unit's job.
   const lineage = lineageJobsOf(db, job).filter((row) => sameUnit(row, job));
-  if (!lineage.length) return null;
-  const attempts = lineage.map((row, i) => {
+  // The launches this very row met and the host or provider refused count against their pool like a failed try.
+  const refused = rejectionAttemptsOf(db, job);
+  if (!lineage.length && !refused.length) return null;
+  const attempts = [...refused, ...lineage.map((row, i) => {
     const { cause, attributable, detail } = attemptCauseOf(db, row, lineage[i + 1] ?? null);
     return { jobId: row.job_id, attempt: row.attempt, pool: attemptPoolOf(row), cause, attributable, detail };
-  });
+  })];
   const pools = poolsOf(attempts);
   const entries = Object.entries(pools);
   return {

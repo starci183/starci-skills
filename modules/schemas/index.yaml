@@ -886,6 +886,9 @@ moduleLocalDocumentKinds:
   - id: starci/module-kernel-start@1
     governs: "Claim a queued goal, spawn its kernel."
     files: [modules/kernel/start-workflow.yaml]
+  - id: starci/module-kernel-op-incident-policy@1
+    governs: "What happens when an op asks, hits a rate limit or quota, errors, hangs or is restarted: handler, bound and escalation per situation."
+    files: [modules/kernel/op-incident-policy.yaml]
   - id: starci/module-kernel-verdict@1
     governs: "What `starci kernel settle` accepts and rejects."
     files: [modules/kernel/verdict-contract.yaml]
