@@ -2,7 +2,7 @@
 // The pure selector owns ordering; this adapter owns observations and launch receipts.
 import { sha256 } from '../../engine/digest.mjs';
 import { loadModelRegistry, loadRuntimes, loadAdapter, adapterModelAuthority } from './model-registry.mjs';
-import { selectAdmission, admissionQualityFloor } from '../lib/agent-admission.mjs';
+import { selectAdmission, admissionQualityFloor, rejectionSummary } from '../lib/agent-admission.mjs';
 import { probeQuota } from './quota/index.mjs';
 import { prepareProviderBudget, reserveProviderBudget, markProviderBudget, releaseProviderBudget, providerBudgetUsage } from './provider-budget.mjs';
 import { biasForRole } from '../lib/owner-routing-bias.mjs';
@@ -147,7 +147,7 @@ export function admitAgent(input = {}, options = {}) {
     decision = planAgentAdmission({ ...input, ...options });
   }
   catch (error) { return { ok: false, step: 'admission', error: `admission evidence failed: ${error.message}`, effectState: 'none' }; }
-  if (!decision.ok) return { ok: false, step: 'admission', error: decision.reason, effectState: 'none', decision };
+  if (!decision.ok) return { ok: false, step: 'admission', error: decision.reason, effectState: 'none', decision, ...(rejectionSummary(decision) ? { detail: rejectionSummary(decision) } : {}) };
   for (const candidate of decision.eligible) {
     const attemptId = `${input.role}:${input.attemptId ?? input.scopeId}:${candidate.provider}:${candidate.account}:${candidate.model}`;
     const bias = biasForRole(input.bias, input.role, input.scopeId);
