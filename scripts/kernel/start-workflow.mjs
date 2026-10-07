@@ -36,7 +36,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { createKernelRoute, kernelBias, planLeadOf } from './kernel-route.mjs';
+import { createKernelRoute, kernelBias, kernelPlanFields } from './kernel-route.mjs';
 import { kernelLaunchStatus, launchAuthorityText, launchPlanText } from './start-workflow-display.mjs';
 import { openLedger, ledgerFileFor, transitionWorkflowToRunning, bindKernelJob, releaseKernelJob, recordJobResult, setSignal, clearSignal, updateSignal, openIncident, setInboxStatus } from '../../engine/db/ledger.mjs';
 // The kernel seat's boot count lives in its payload (hierarchy.attempt); jobs.try_no is the op-try ordinal only.
@@ -209,22 +209,19 @@ try {
     const admission = planAgentAdmission({ role: 'kernel', scopeId: `${ledger.ledgerId ?? ledger.path}:${target}:kernel-attempt:${kernelAttemptOf(priorKernel) + 1}`,
       bias: kernelBias(parseJsonOr(g?.json)?.routing_bias, route), ownerGrant: ownerReserveGrant(g), biasTrusted: ownerBiasTrust(g) || Boolean(route.pin), tier: route.tier ?? null,
       allowGroup: (route.members ?? [route]).map((member) => ({ id: member.id, provider: member.agent, model: member.model, effort: member.effort, pool: member.pool })) });
-    const { lead, refusal } = planLeadOf(route, admission);
     const out = {
       plan: true, workflowId: target, title: workflowDisplayName(wf), slug: wf?.title ?? null, phase: wf?.phase,
       goalRevision: g?.revision ?? null, goalIdentity: g?.goal_identity ?? null,
       opChain: chain, inbox: inbox?.status ?? 'none',
-      host: 'orca', executionHost: 'orca', agent: lead.agent ?? null, routedBy: route.routedBy,
+      host: 'orca', executionHost: 'orca', routedBy: route.routedBy,
       launch: 'worker',
       admission,
-      ...(lead.model ? { model: lead.model } : {}),
-      ...(lead.effort ? { effort: lead.effort } : {}),
+      ...kernelPlanFields(route, admission),
       ...(route.route?.profile ? { profile: route.route.profile } : {}),
       ...(route.runtimePool ? { runtimePool: route.runtimePool } : {}),
       config: route.config ?? (route.routedBy === 'override' ? { file: 'not consulted — explicit agent flag wins' } : { file: null }),
       ...(route.route ? { route: route.route } : {}),
       ...(route.error ? { step: route.errorStep ?? 'kernel-route', routeError: route.error } : {}),
-      ...(refusal ? { step: refusal.step, routeError: refusal.error } : {}),
       ...(route.warnings?.length ? { warnings: route.warnings } : {}),
       ...(route.members ? { group: route.members.map(memberSummary), fallThrough: route.fallThrough === true } : {}),
       sourceHost: sourceRoot, projectBinding: context?.file ?? null,
@@ -232,7 +229,7 @@ try {
       kernel: kernelLaunchStatus({ health, signal, route }),
     };
     console.log(launchPlanText({ asJson, out, wf, target, chain, route, memberLabel }));
-    process.exit(route.error || refusal ? 1 : 0);
+    process.exit(out.routeError ? 1 : 0);
   }
 
   // A finished or archived workflow's goal is closed — starting it again is refused.
