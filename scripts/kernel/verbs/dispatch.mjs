@@ -1,44 +1,14 @@
 // starci kernel dispatch: admit and launch an operation from its persisted route.
-import fs from 'node:fs';
-import path from 'node:path';
-import { transitionWorkflowToRunning, updateJob } from '../../../engine/db/ledger.mjs';
-import { allocationMs, allocationSettings, inspectOwnerConfig } from '../../../engine/config.mjs';
-import { buildOpPrompt, renderOwnedPath, ensureJobScratch, jobScratchDirOf } from '../op-prompt.mjs';
-import { priorAttemptFailures } from '../prior-failures.mjs';
-import { withLessons } from '../../machine/lessons-file.mjs';
-import { ownerAnswersOf } from '../../machine/owner-answers.mjs';
-import { isAwaitingOwner } from '../failure-steps.mjs';
-import { enqueueRepository, ownedPathPlacements } from '../target-repo.mjs';
-import { checkGrantParents } from '../grant-parents.mjs';
-import { workflowAppRepo, opWorktreeArgs, sideOf, workflowSideWait, workflowWorktreePromptRules, requireWorkflowPlacement } from '../workflow-worktree.mjs';
-import { grammarContextRequired, grammarInputsOf, resolveGrammarContext, grammarMissingDetail } from '../grammar-context.mjs';
-import { loadAdapter } from '../../agent/lib.mjs';
-import { spawnOperationAgent } from './shared/dispatch-agent.mjs';
-import { DISPATCHES, requirePhase } from './shared/workflow-transitions.mjs';
+import { transitionWorkflowToRunning } from '../../../engine/db/ledger.mjs';
+import { inspectOwnerConfig } from '../../../engine/config.mjs';
 import { depthPreflight } from '../../agent/depth-preflight.mjs';
+import { spawnOperationAgent } from './shared/dispatch-agent.mjs';
 import { markRunning, runningOrAbandon } from './shared/dispatch-running.mjs';
-import { latestGoal, ownedPathsOf, workDirOf, getWorkflow } from './shared/rows.mjs';
-import { leaseCanonOf, releaseTypedWaits } from './shared/peer-waits.mjs';
-import { queuedJobOp, refuseOwnerGate, refusePeerWait, opSlotsOrRefuse } from './shared/job-gates.mjs';
-import { hostResourcesFor, HOST_RESOURCES_LOW } from '../../machine/host-resources.mjs';
-import { hostThrottle, noteThrottled, releaseThrottled, DISPATCH_THROTTLED } from '../../machine/ram-throttle.mjs';
-import { deferredQueueCause } from '../autopilot-run.mjs';
-import { resolveWorkerLaunchModel, missingHostTools, defaultOperationTarget, kindOrder, isFanOutSlice } from '../../agent/models.mjs';
-import { checkPrerequisites, prerequisiteDetail } from '../prerequisites.mjs';
-import { FOUNDATION_WAIT, gateShellFoundation, shellFoundationNeed } from '../shell-foundation.mjs';
-import { resumeContextOf } from '../resume-context.mjs';
-import { jobDisplayName, jobWhat, workflowNameOf } from '../../lib/display-names.mjs';
-import { productLocaleFor } from '../product-locale.mjs';
-import { isSeamCut, seamStubForDispatch, cutManifestOf } from '../seam-policy.mjs';
-import { kernelOverrideFor } from '../kernel-authority.mjs';
-import { jobDirOf } from '../job-artifacts.mjs';
-import { packetFileOf } from '../../machine/task-spec.mjs';
-import { ENV_GATED_OPS } from '../verify-failure.mjs';
 import { bindGuardTerminal } from '../../guards/hook-install.mjs';
-import { readEnv } from '../../lib/env.mjs';
-import { admitPacket, selectDispatchContract, captureDispatchInputs } from '../dispatch-admission.mjs';
 import { reserveDispatch } from '../dispatch-reservation.mjs';
 import { VerbExit } from './shared/verb-exit.mjs';
+import { admitTarget, loadQueuedJob, refuseHolds, refuseHostLimits, refuseLaunchInputs, refuseProviderCircuit, refuseUnmetStart, refuseWaits } from './shared/dispatch-gates.mjs';
+import { emitDryRun, environmentGate, planModel, planPrompt, planWorker, prepareScratch } from './shared/dispatch-plan.mjs';
 
 export default {
   verb: 'dispatch',
@@ -46,353 +16,34 @@ export default {
   kernelOnly: true,
   usageInCore: true,
   run({ ledger, args, repo, emit, internals }) {
-    const { skillRoot, SETTLED, queuedSeamsOf, refuseStaleKernelRev, latestGraphNodesOf, deferQueuedTestLeg, refuseKernelBias, providerHealthOf, circuitClearHint, resolveModel, buildPacket, bestEffort, rejectDispatch, opLeaseRequests, livePathLeaseWait, envServicesOf, environmentPreStep, raiseEnvironmentIncident, opGuardLaunch } = internals;
-
-  const db = ledger.db, jobId = args.job;
-  // Dispatch never re-decides the route; a Kernel's --prefer/--avoid is an unknown option here as on starci kernel route.
-  refuseKernelBias('dispatch', args);
-  const job = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
-  if (!job) throw Object.assign(new Error(`unknown job ${jobId}`), { code: 'job-unknown' });
-  if (SETTLED.includes(job.status)) throw Object.assign(new Error(`job ${jobId} is already settled (${job.status})`), { code: 'job-settled' });
-  // Only a queued or ready job launches (ready: a launch refused before its op took the contract, H13); a cancelled,
-  // leased, running or settled one never does (H9).
-  if (!['queued', 'ready'].includes(job.status)) throw Object.assign(new Error(`job ${jobId} cannot dispatch while ${job.status}; settle/reconcile the current worker first`), { code: 'job-not-queued' });
-  // A paused, stopped, finished or archived workflow launches nothing (H9: an archived workflow's job ran 25 h).
-  requirePhase(getWorkflow(db, job.workflow_id), DISPATCHES, 'dispatch');
-  // SETTLE-FIRST (driver-loop.yaml progress.settleFirst): no new dispatch while filed reports wait unconsumed.
-  const { payload, op } = queuedJobOp(ledger, { job, verb: 'dispatch', liveHint: 'dispatching a duplicate', internals });
-  const selectedDispatch = selectDispatchContract(skillRoot, op, payload, { planning: !args.spawn });
-  const briefDoc = selectedDispatch.brief, dispatchParams = selectedDispatch.params;
-  const dispatchTarget = enqueueRepository({ op, repository: payload.repository, ownedPaths: ownedPathsOf(payload), repo });
-  if (!dispatchTarget.ok) {
-    const out = { ok: false, jobId, op, reason: dispatchTarget.reason, detail: dispatchTarget.detail };
-    emit(out, `dispatch REFUSED for ${jobId} (${op}): ${out.reason} — ${out.detail}`, args.json);
-    throw new VerbExit(1);
-  }
-  // Placement authority is checked before environment preparation, leases, packet files or an agent spawn.
-  const gitPlacement = Boolean(workflowAppRepo(repo) || (args.worktree && workflowAppRepo(path.resolve(repo, args.worktree))));
-  const workflowTree = args.spawn || !args.worktree ? requireWorkflowPlacement({ env: process.env }, { workflowId: job.workflow_id,
-    placements: args.worktree ? [path.resolve(repo, args.worktree)] : [], required: Boolean(args.spawn && gitPlacement) }) : null;
-  // The grant is re-judged at launch: the tree may have moved since enqueue.
-  {
-    const grant = checkGrantParents({ op, payload: { ...payload, repository: payload.repository ?? dispatchTarget.repository ?? undefined }, ownedPaths: ownedPathsOf(payload), repo });
-    if (!grant.ok) {
-      const out = { ok: false, jobId, op, reason: grant.reason, violations: grant.violations.map(({ owned, dir, closest }) => ({ owned, dir, closest })), detail: grant.detail };
-      emit(out, `dispatch REFUSED for ${jobId} (${op}): ${out.reason} — ${out.detail}; job stays queued`, args.json);
-      throw new VerbExit(1);
-    }
-  }
-  if (!payload.repository && dispatchTarget.repository) {
-    payload.repository = dispatchTarget.repository;
-    ledger.transaction((tx) => updateJob(tx, { jobId, payload }));
-  }
-  if (deferQueuedTestLeg(ledger, { job, op, payload, via: 'dispatch', args })) return;
-  refuseStaleKernelRev(db, job.workflow_id, op, 'dispatch');
-
-  // Concurrency admission, before the packet and before any Orca call: the
-  // workflow may hold min(budgets.maxOps, maxParallelOps) operations at once
-  // and a job above that line stays queued rather than launching
-  // (engine/admission.mjs admitOpSlot). Pool maxParallel is a separate fence
-  // route already applies; this one is the workflow's own ceiling.
-  // A wait whose typed --until-* conditions already hold is released before the gates below read it.
-  releaseTypedWaits(ledger, { repo, workflowId: job.workflow_id });
-  refuseOwnerGate(ledger, { job, op, opKey: 'op', verb: 'dispatch', suffix: '; job stays queued', emit, args, internals });
-  // Autopilot: a deferred leg, or a live proof waiting for the handover credential checklist, is not launched.
-  const deferredBy = deferredQueueCause(db, job);
-  if (deferredBy) {
-    const out = { ok: false, jobId, op, reason: deferredBy.queuedBecause, blockedBy: deferredBy.blockedBy, detail: deferredBy.detail };
-    emit(out, `dispatch REFUSED for ${jobId} (${op}): ${deferredBy.queuedBecause} — ${deferredBy.detail}; job stays queued`, args.json);
-    throw new VerbExit(1);
-  }
-  refusePeerWait(ledger, { job, op, opKey: 'op', verb: 'dispatch', suffix: '; job stays queued', emit, args, internals });
-  const slots = opSlotsOrRefuse(ledger, { job, op, opKey: 'op', verb: 'dispatch', suffix: '; job stays queued', emit, args, internals });
-  // Seam priority (cut-seam.mjs): the workflow's last free slot goes to a queued cut seam nothing else
-  // holds, never to other work, so a seam is not starved behind its own siblings and peers.
-  const seamFirst = slots.ceiling != null && slots.ceiling - slots.running <= 1 && !isSeamCut(payload.cut)
-    ? queuedSeamsOf(db, job.workflow_id).find((seam) => seam.job_id !== jobId) ?? null : null;
-  if (seamFirst) {
-    const out = { ok: false, jobId, op, reason: 'seam-priority', seam: seamFirst.job_id, slots };
-    emit(out, `dispatch REFUSED for ${jobId} (${op}): seam-priority — the last free slot (${slots.running}/${slots.ceiling}) goes to queued cut seam ${seamFirst.job_id} (${seamFirst.op_id}); dispatch it first, then this job`, args.json);
-    throw new VerbExit(1);
-  }
-  // A cut sibling dispatched before its seam passed runs on a stub and owes a reconcile (cut-seam.mjs):
-  // payload.cut.seamStub rides into the packet (context.cut) and the op prompt.
-  if (payload.cut && Number(payload.cut.ordinal) > 1) {
-    let seamStub = null;
-    try { seamStub = seamStubForDispatch(db, job, { isOwnerWait: (row) => isAwaitingOwner(db, row) }); } catch { seamStub = null; }
-    if (seamStub) payload.cut = { ...payload.cut, seamStub };
-    else if (payload.cut.seamStub) payload.cut = Object.fromEntries(Object.entries(payload.cut).filter(([key]) => key !== 'seamStub'));
-  }
-
-  // Data prerequisites, before the packet and before any Orca call: a record
-  // the op must read that the binding names but the repository lacks, or a
-  // bound record whose dependsOn is not done where the op requires done. A
-  // dispatch that can only end blocked on them is a wasted launch.
-  const briefForAdmission = briefDoc;
-  const prerequisites = checkPrerequisites({ brief: briefDoc, payload, repo, params: dispatchParams });
-  if (prerequisites.unmet.length) {
-    const designGate = prerequisites.unmet.find((item) => item.kind === 'design-not-settled');
-    const out = { ok: false, jobId, op, reason: 'prerequisite-unmet', ...(designGate ? { code: designGate.code } : {}), unmet: prerequisites.unmet,
-      detail: prerequisiteDetail({ op, jobId, unmet: prerequisites.unmet }) };
-    emit(out, `dispatch REFUSED for ${jobId} (${op}): prerequisite-unmet — ${out.detail}`, args.json);
-    throw new VerbExit(1);
-  }
-
-  // The layout chain above an interface.draw is one shared foundation (`shell`), never a refusal: a draw starts from a
-  // pending shell and unsettled ancestors. The first workflow to find parents to draw claims the foundation and draws them
-  // in this op; a live owner elsewhere makes this dispatch wait (foundation-wait) instead of drafting a second shell.
-  const shellNeed = briefForAdmission ? shellFoundationNeed({ brief: briefForAdmission, payload, repo }) : null;
-  if (shellNeed?.needed) {
-    const gate = gateShellFoundation(ledger, { job, need: shellNeed, settings: allocationSettings() });
-    if (gate.action === 'wait') {
-      const out = { ok: false, jobId, op, reason: FOUNDATION_WAIT, foundation: gate.foundation, owner: gate.owner, detail: gate.detail, ...(gate.decision ? { decision: gate.decision } : {}) };
-      const decisionNote = gate.decision ? `; Supervisor Decision Item ${gate.decision} opened (the owner is past its stall limit)` : '';
-      emit(out, `dispatch REFUSED for ${jobId} (${op}): ${FOUNDATION_WAIT} — ${gate.detail}${decisionNote}; job stays queued`, args.json);
-      throw new VerbExit(1);
-    }
-  }
-
-  const model = resolveModel(args.model ?? payload.model ?? defaultOperationTarget());
-  if (model.error) throw Object.assign(new Error(model.error), { code: 'model-unknown' });
-  // Dispatch launches only inside the kind's order at its tier, so strategy kinds run on Claude or Codex alone.
-  // A named profile target (gpt-6.1-sol) counts as its provider's pool.
-  const launchOrder = kindOrder({ kind: op, difficulty: payload.difficulty ?? 'medium', fanOut: isFanOutSlice(payload) });
-  const allowed = launchOrder.chain ?? [];
-  let selectedRoute = 'the unrouted default';
-  if (payload.model) selectedRoute = 'the persisted route';
-  if (args.model) selectedRoute = '--model';
-  const launchErrorNote = launchOrder.error ? ` (${launchOrder.error})` : '';
-  const correction = args.model ? 'dispatch without --model or name a pool of that order' : `re-run starci kernel route --job ${jobId}`;
-  const outsideDetail = `${selectedRoute} ${model.target} is outside ${op}'s ${launchOrder.orderKey ?? '?'} order at ${launchOrder.difficulty ?? '?'} [${allowed.join(', ')}]${launchErrorNote}; ${correction}. The job stays queued.`;
-  const outsideOrder = allowed.some((p) => p === model.target || launchOrder.rt?.runtimes?.[p]?.provider === model.provider) ? null : outsideDetail;
-  const briefAbs = path.join(skillRoot, 'modules', 'ops', 'ops', `${op}.yaml`);
-  const briefExists = fs.existsSync(briefAbs);
-  const lackingTools = missingHostTools({ pool: { provider: model.provider }, kind: op });
-
-  // The workflow worktree (owner decision WFWT, scripts/kernel/workflow-worktree.mjs): Orca created it before the
-  // Kernel started, and every op of the workflow launches with `--worktree <it>`; no op gets a tree of its own. Ops on
-  // one side (be/ or fe/) run one at a time, across sides together (canDispatchConcurrently): a busy side is the typed
-  // wait workflow-side-busy, checked with the other waits below. A workflow with no worktree (an unbound repo, the
-  // runtime repo included) is refused before preparation. An explicit --worktree may name this same registered tree.
-  const opTreeArgs = workflowTree ? opWorktreeArgs({ env: process.env }, { workflowId: job.workflow_id }) : [];
-  const checkoutRoot = args.worktree ?? opTreeArgs[1] ?? repo;
-  // The worker starts and works ON its checkout root: the workflow worktree is a git worktree of the app repository,
-  // which Orca created and lists under the project. Every owned path is app-relative (target-repo.mjs), so the app root
-  // is where they, gate.mjs --root and the app scripts resolve.
-  const worktree = checkoutRoot;
-  const workerCwd = (() => { const abs = path.resolve(repo, worktree); try { return fs.statSync(abs).isDirectory() ? abs : repo; } catch { return repo; } })();
-  const placements = (() => {
-    try {
-      return ownedPathPlacements({ op, payload, ownedPaths: ownedPathsOf(payload), repo, worktree: checkoutRoot, timeoutMs: allocationMs('settleGit.commandMs') });
-    } catch { return []; }
-  })();
-  // The asks this job's retry lineage already had answered ride in the packet, so an owner-answer
-  // retry applies the answer instead of asking again (scripts/machine/owner-answers.mjs).
-  const ownerAnswers = (() => { try { return ownerAnswersOf(db, job); } catch { return []; } })();
-  const boundGoal = payload.goal_binding?.revision != null
-    ? db.prepare('SELECT * FROM goals WHERE workflow_id=? AND revision=?').get(job.workflow_id, payload.goal_binding.revision) ?? null : null;
-  const packet = buildPacket({ job: { ...job, op_id: op }, payload, model, goal: latestGoal(db, job.workflow_id), params: dispatchParams, placements, productLocale: productLocaleFor(repo), ownerAnswers, boundGoal });
-  admitPacket(skillRoot, { packet, op, placements, db, workflowId: job.workflow_id });
-  packet.context.selected_op = selectedDispatch.selected;
-  if (payload.repairFor) packet.context.repair_for = payload.repairFor;
-  if (workflowTree) packet.context.workflow_worktree = { repo: workflowTree.repoRoot, path: workflowTree.path, branch: workflowTree.branch, checkpoint: workflowTree.checkpoint ?? null, side: sideOf(payload) };
-  // The cut manifest the brief binds before the first edit (cut-seam.mjs cutManifestOf): every ordinal's paths and
-  // status, the path union and the passed ordinals, read from the ledger now. Packet-only: never persisted on the job.
-  if (packet.context.cut) { let manifest = null; try { manifest = cutManifestOf(db, { workflowId: job.workflow_id, op, cut: payload.cut, ownJobId: jobId }); } catch { manifest = null; } if (manifest) packet.context.cut = { ...packet.context.cut, manifest }; }
-  // The Kernel's local, additive override of this op (starci kernel op-override, graph-edit params/continue, redesign).
-  { const ko = kernelOverrideFor(db, job.workflow_id, op, payload); if (ko) packet.context.kernel_override = ko; }
-  // The retry of a worker that died without a report resumes from what it left (scripts/kernel/resume-context.mjs).
-  const resumeFrom = bestEffort(() => resumeContextOf(db, job));
-  if (resumeFrom?.of) packet.context.resume_from = resumeFrom;
-  // grammarContext: required rides the grammar sources in the packet; a missing one refuses the spawn
-  // (scripts/kernel/grammar-context.mjs).
-  const grammarContext = grammarContextRequired(briefDoc) ? resolveGrammarContext({ skillRoot, repo, inputs: grammarInputsOf(briefDoc) }) : null;
-  if (grammarContext) packet.context.grammar = { family: grammarContext.family, sources: grammarContext.sources };
-  const grammarMissing = grammarContext?.missing.length ? grammarMissingDetail(grammarContext.missing) : null;
-  // The red checks of this job's own retry lineage - for a cut ordinal its own
-  // ordinal, never a sibling slice (scripts/kernel/prior-failures.mjs).
-  // plus the Supervisor's lessons whose signature names one of those checks (scripts/machine/lessons-file.mjs).
-  const priorFailures = withLessons(priorAttemptFailures(db, { ...job, op_id: op }), { root: skillRoot });
-  // The job scratch (evidence contract): the op writes its report and attachments there and starci kernel report reads them
-  // only from op_attempts.scratch_dir / STARCI_JOB_SCRATCH. Created fresh right before the launch.
-  const scratchDir = repo ? jobScratchDirOf(repo, job.workflow_id, jobId) : null;
-  const { inputs, contextPack } = captureDispatchInputs({ skillRoot, op, packet, briefDoc, params: dispatchParams,
-    repo, stateDir: repo ? path.resolve(repo, workDirOf(repo)) : null, workDir: workDirOf(repo), workerCwd, planning: !args.spawn });
-  // Environment pre-step, before any Orca call: a walk on a served stack (uat.verify, uat.assisted.verify,
-  // e2e.verify) first proves the environment its records reference is up - probes, health-endpoint
-  // discovery, a restart of the servers the runtime knows how to start - so a dead server is an
-  // environment fact on the packet, never a red walk blamed on the product (scripts/uat/env-health.mjs).
-  // A port held by a process that is not this workspace's server is the one state no op can fix: the job
-  // stays queued behind an [environment] incident. `--env-gate off` (or STARCI_ENV_GATE=off) skips it.
-  let environmentHealth = null;
-  if (ENV_GATED_OPS.includes(op) && args['env-gate'] !== 'off' && readEnv('STARCI_ENV_GATE') !== 'off') {
-    environmentHealth = environmentPreStep(repo, payload);
-    if (environmentHealth?.declared) {
-      ledger.transaction(() => ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: jobId, kind: 'environment-checked',
-        payload: { op, ready: environmentHealth.ready, hardBlock: environmentHealth.hardBlock, services: envServicesOf(environmentHealth) } }));
-    }
-    if (environmentHealth?.hardBlock) {
-      const incidentId = raiseEnvironmentIncident(ledger, job, environmentHealth);
-      const out = { ok: false, jobId, op, reason: 'environment-not-ready', incident: incidentId, services: envServicesOf(environmentHealth), remedies: environmentHealth.remedies };
-      emit(out, `dispatch REFUSED for ${jobId} (${op}): environment-not-ready — ${environmentHealth.remedies.join(' | ')}; incident ${incidentId}. This is the environment, not the product: the job stays queued and costs no attempt; dispatch again once the port is free (or --env-gate off to walk anyway)`, args.json);
-      throw new VerbExit(1);
-    }
-  }
-
-  if (environmentHealth?.declared) packet.context.environment = { ready: environmentHealth.ready, checkedAt: environmentHealth.at, services: envServicesOf(environmentHealth), remedies: environmentHealth.remedies };
-  const prompt = buildOpPrompt({ skillRoot, packet, jobId, repo, priorFailures, cwd: workerCwd, scratchDir, contextPack }) + workflowWorktreePromptRules(workflowTree);
-  const packetFile = repo ? packetFileOf(jobDirOf(repo, job.workflow_id, jobId), job.try_no) : null;
-  // The names a person reads (owner request 2026-09-27, scripts/lib/display-names.mjs): the Task display
-  // name, the managed worker's tab (terminal-rename once its handle is known) and the command terminal's title
-  // are all `[Op] <op label> · <what> · <workflow name>`. Left untitled, a terminal shows the provider's
-  // own auto-summary ("devin.exe: Kernel orchestration for…"). op_id and job_id stay the keys.
-  const opWhat = jobWhat({ payload, op, nodes: latestGraphNodesOf(db, job.workflow_id), repo });
-  const terminalTitle = `[Op] ${jobDisplayName({ op, what: opWhat, workflowName: workflowNameOf(db, job.workflow_id) })}`;
-  const title = terminalTitle;
-  // The one launch (modules/kernel/start-workflow.yaml, worker-start-spec.yaml): worker-start --spec
-  // --agent on the op's own worktree, which files the Task in the same call. The launch model is the persisted route's, else the pool's
-  // pin at the kind's tier, else the registry default (resolveWorkerLaunchModel); a card that takes no model flag (devin) starts on its default.
-  const launchModel = resolveWorkerLaunchModel({ target: model.target, payload: { ...payload, difficulty: launchOrder.difficulty ?? payload.difficulty } });
-  const takesModel = loadAdapter(model.provider).card?.start?.modelArgument !== false; // the plan shows the flags spawnAgent really sends: a card with start.modelArgument false (devin) gets no --model/--effort
-  const orcaCommands = [
-    { step: 'run', argv: ['orchestration', 'run-create', '--objective', `[Workflow] ${workflowNameOf(db, job.workflow_id)} — ${job.workflow_id}`, '--from', '<kernel-terminal>', '--json'], note: 'created once per workflow by the Kernel; later operations reuse it' },
-    { step: 'worker-start', argv: ['orchestration', 'worker-start', '--spec', '<prompt>', '--task-title', `${op} #${job.try_no}`, '--worktree', checkoutRoot, '--agent', model.provider ?? '<agent>',
-      ...(takesModel && launchModel.modelId ? ['--model', launchModel.modelId, ...(launchModel.effort ? ['--effort', launchModel.effort] : [])] : []), '--display-name', title, '--run', '<workflow-run-id>', '--from', '<kernel-terminal>',
-      '--retry-request', '<uuid derived from the job + lease>', '--json'], note: 'Orca files the Task (result.taskId) and names the agent terminal (result.worker.agentTerminalHandle)' },
-    { step: 'title', argv: ['terminal', 'rename', '--terminal', '<agent-terminal>', '--title', title, '--json'] },
-    { step: 'attest', argv: ['orchestration', 'worker-show', '--dispatch', '<dispatch-id>', '--json'], note: 'effective agent/model must equal the route' },
-  ];
-
-  if (!args.spawn) {
-    const out = {
-      ok: true, spawned: false, jobId, packet, prompt,
-      leases: opLeaseRequests(payload, leaseCanonOf(db, repo), op),
-      launch: launchModel.error ? { agent: model.provider, error: `${model.target} has no launch model: ${launchModel.error}` }
-        : { agent: model.provider, model: launchModel.modelId, effort: launchModel.effort ?? null, modelSource: launchModel.source },
-      orca: { worktree: checkoutRoot, title, profile: model.profile, commands: orcaCommands.map((c) => ({ step: c.step, cli: `orca ${c.argv.join(' ')}`, note: c.note })) },
-      ...(!briefExists && { briefMissing: `modules/ops/ops/${op}.yaml not present — spawn will refuse` }),
-      ...(lackingTools.length && { toolUnavailable: `${model.target} lacks host tool ${lackingTools.join(', ')} — spawn will refuse tool-unavailable` }),
-      ...(outsideOrder && { modelOutsideOrder: outsideOrder }),
-      ...(grammarMissing && { grammarContextMissing: `${grammarMissing} — spawn will refuse grammar-context-missing` }),
-    };
-    const ownerAnswerValues = packet.context.owner_answers?.map((answer) => `${answer.dispatchId} -> ${answer.chosen?.label ?? answer.chosen?.index ?? 'answered'} (${answer.answeredBy})`).join(', ');
-    const ownerAnswersLine = packet.context.owner_answers ? `  owner_answers: ${ownerAnswerValues}` : null;
-    const launchCommand = out.launch.error ?? `worker-start --agent ${out.launch.agent} --model ${out.launch.model} (${out.launch.modelSource})`;
-    const orcaCommandLines = out.orca.commands.map((command) => `    $ ${command.cli}`);
-    emit(out, [
-      `PACKET job=${jobId} op=${op} model=${model.target}`,
-      `  brief: ${packet.brief}${briefExists ? '' : ' — MISSING ON DISK'}`,
-      `  records: ${packet.context.records.join(', ') || '(none)'}`,
-      ...(packet.context.grammar ? [`  grammar (${packet.context.grammar.family ?? 'unset'}): ${packet.context.grammar.sources.map((s) => s.path).join(', ')}`] : []),
-      ...(grammarMissing ? [`  grammar MISSING: ${grammarMissing}`] : []),
-      ...(packet.context.cut ? [`  cut: ${packet.context.cut.id} ${packet.context.cut.ordinal}/${packet.context.cut.total}`] : []),
-      ...(ownerAnswersLine ? [ownerAnswersLine] : []),
-      `  owned_paths: ${packet.context.owned_paths.map((p) => renderOwnedPath(p, workerCwd)).join(', ') || '(none)'}`,
-      `  launch: ${launchCommand}`,
-      '  orca commands:', ...orcaCommandLines,
-      '  (dry run — pass --spawn to launch)',
-    ].join('\n'), args.json);
-    return;
-  }
-
-  if (!briefExists) throw Object.assign(new Error(`spawn refused — no brief at modules/ops/ops/${op}.yaml`), { code: 'brief-missing' });
-  if (outsideOrder) {
-    emit({ ok: false, jobId, op, reason: 'model-outside-order', model: model.target, order: launchOrder.orderKey ?? null,
-      difficulty: launchOrder.difficulty ?? null, allowed, detail: outsideOrder }, `dispatch REFUSED for ${jobId} (${op}): model-outside-order — ${outsideOrder}`, args.json);
-    throw new VerbExit(1);
-  }
-  // A route persisted before host tools gated routing, an unrouted job's
-  // default pool or a --model override can name an agent without a tool the op
-  // cannot run without. That launch is a wasted dispatch; nothing is reserved.
-  if (lackingTools.length) {
-    const detail = `${model.target} (agent ${model.provider}) lacks host tool ${lackingTools.join(', ')} that ${op} requires (route.riskHints host-tool-required on modules/ops/ops/${op}.yaml). Re-run starci kernel route --job ${jobId} — it now selects only agents whose card lists the tool — then dispatch again${args.model ? ' without --model' : ''}. The job stays queued.`;
-    emit({ ok: false, jobId, op, reason: 'tool-unavailable', tools: lackingTools, model: model.target, detail },
-      `dispatch REFUSED for ${jobId} (${op}): tool-unavailable — ${detail}`, args.json);
-    throw new VerbExit(1);
-  }
-  if (grammarMissing) {
-    const detail = `${op} declares grammarContext: required and ${grammarMissing}. Fix the product's brand.sources or the Source knowledge, then dispatch again. The job stays queued.`;
-    emit({ ok: false, jobId, op, reason: 'grammar-context-missing', missing: grammarContext.missing, detail },
-      `dispatch REFUSED for ${jobId} (${op}): grammar-context-missing — ${detail}`, args.json);
-    throw new VerbExit(1);
-  }
-  // A live lease on the write set is a wait (livePathLeaseWait), checked before the provider circuit,
-  // the leases and any Orca call: nothing is spawned, nothing is recorded as a rejection.
-  const leaseWait = livePathLeaseWait(db, job, payload, { repo });
-  if (leaseWait) {
-    emit({ ok: false, jobId, op, reason: 'path-lease', waiting: true, ...leaseWait },
-      `dispatch WAITING for ${jobId} (${op}): path-lease — ${leaseWait.detail}`, args.json);
-    throw new VerbExit(1);
-  }
-  // A busy side of the workflow worktree is the next wait (a path conflict above is the more precise answer).
-  const sideWait = workflowTree ? workflowSideWait(db, job, payload) : null;
-  if (sideWait) {
-    emit({ ok: false, jobId, op, waiting: true, ...sideWait },
-      `dispatch WAITING for ${jobId} (${op}): ${sideWait.reason} — ${sideWait.detail}`, args.json);
-    throw new VerbExit(1);
-  }
-  // Host resources are a launch gate on the same admission path as the provider circuit, checked before
-  // it, the leases and any Orca call. Disk below allocation.resources.minFreeDiskGb never spawns another
-  // worker (scripts/machine/host-resources.mjs). RAM and CPU go through the RAM-aware, priority-aware throttle
-  // (scripts/machine/ram-throttle.mjs, owner ruling 2026-09-28): the effective cap min(maxParallelOps, what fits
-  // in free RAM) across every ledger of the host, heavy ops paused below minFreeRamPct (the top-priority
-  // workflow's still start while they fit, until critical), every op sized by its RAM estimate. Both are a
-  // typed wait like path-lease - nothing is recorded as a rejection, a dispatch-throttled event carries the
-  // numbers - and each dispatch re-probes, so the job reads ready again on its own once there is room.
-  const host = hostResourcesFor({ env: process.env, repo });
-  const fmtNum = (n) => (typeof n === 'number' && Number.isFinite(n) ? n.toFixed(1) : '?');
-  const throttle = host.lowDisk ? null : (() => {
-    try { return hostThrottle({ op, workflowId: job.workflow_id, env: process.env, repo, db, ledgerFile: ledger.path ?? null }); }
-    catch (error) { return { error: String(error?.message ?? error) }; }
-  })();
-  const admission = throttle?.admission ?? null;
-  if (host.lowDisk || (admission && !admission.ok)) {
-    const parts = [];
-    if (host.lowDisk) parts.push(`drive ${host.drive ?? '?'} has ${fmtNum(host.freeDiskGb)} GB free (below allocation.resources.minFreeDiskGb ${host.thresholds?.minFreeDiskGb ?? '?'} GB)`);
-    if (admission && !admission.ok) parts.push(`RAM ${fmtNum(host.freeRamPct)}% free, effective cap ${admission.effectiveCap ?? '-'}/${admission.maxParallelOps ?? '-'} (${admission.running} running): ${admission.reason} - ${admission.detail}`);
-    const detail = `${parts.join('; ')}; the job stays queued and reads ready once there is room again - do not re-dispatch it by hand`;
-    const throttled = admission && !admission.ok ? {
-      reason: admission.reason, op, class: admission.class, estimateMb: admission.estimateMb, estimateSource: admission.estimateSource,
-      mode: throttle.mode, modeWhy: throttle.modeWhy, freeRamPct: Math.round(Number(host.freeRamPct ?? 0) * 10) / 10, cpuBusy: throttle.cpuBusy,
-      totalRamGb: Math.round(Number(host.totalRamBytes ?? 0) / 1e8) / 10, headroomMb: admission.headroomMb, reserveMb: admission.reserveMb,
-      running: admission.running, effectiveCap: admission.effectiveCap, heavyCap: admission.heavyCap, maxParallelOps: admission.maxParallelOps,
-      priority: admission.priority,
-    } : null;
-    if (throttled) {
-      try { ledger.transaction(() => ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: jobId, kind: DISPATCH_THROTTLED, payload: throttled })); } catch { /* the wait stands without its event */ }
-      if (!throttle.testContext) noteThrottled({ jobId, workflowId: job.workflow_id, ledgerId: ledger.ledgerId ?? null, reason: admission.reason });
-    }
-    emit({ ok: false, jobId, op, reason: HOST_RESOURCES_LOW, waiting: true, host: { ...host, lowRam: host.lowRam || Boolean(throttled) }, ...(throttled ? { throttle: throttled } : {}), detail },
-      `dispatch WAITING for ${jobId} (${op}): ${HOST_RESOURCES_LOW} - ${detail}`, args.json);
-    throw new VerbExit(1);
-  }
-  if (admission?.ok) releaseThrottled({ jobId, ledgerId: ledger.ledgerId ?? null });
-  // A route decision may have been persisted before another job proves the
-  // shared provider credential is dead. Re-check the durable provider circuit
-  // before taking leases or creating an Orca Task so an already-routed sibling
-  // pool cannot slip through the circuit.
-  const providerHealth = providerHealthOf(db, model.provider);
-  if (providerHealth) {
-    const error = `provider ${providerHealth.failureKind ?? 'auth'} unavailable (${providerHealth.provider}); circuit open until ${providerHealth.expiresAt ?? 'explicit recovery'}`;
-    const rejection = rejectDispatch(ledger, job, jobId, op, model, {
-      step: 'provider-health', error, effectState: 'none', details: providerHealth,
-      providerHealthEvidence: providerHealth,
-    });
-    emit({ ok: false, jobId, rejected: 'dispatch-rejected', packet, rejection, providerHealth },
-      `dispatch REJECTED for ${jobId} (provider-health): ${error}; logical attempt retained${circuitClearHint(providerHealth)}`, args.json);
-    throw new VerbExit(1);
-  }
-  // §6 admission — the repo-path leases and the job's fencing token are taken
-  // BEFORE anything launches, for both launch kinds. A refusal (a live lease
-  // already owns a path, or the machine arbiter can't open) is a dispatch
-  // rejection: the worker must never be what discovers the write set was
-  // already taken, and an unfenced dispatch is exactly what this layer kills.
-  const reserve = reserveDispatch({ ledger, args, job, jobId, payload, packet, op, model, repo, emit, internals });
-  if (scratchDir) ensureJobScratch({ repo, workflowId: job.workflow_id, jobId });
-  // worker-start owns the agent's environment, so no shim reaches it; the history hook in its checkouts does, finding
-  // the op by its bound Orca terminal (scripts/guards/hook-install.mjs bindGuardTerminal).
-  const guard = opGuardLaunch({ job, jobId, repo, placements, workerCwd, workflowWorktree: workflowTree?.path ?? null });
-  return cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, packet, prompt, packetFile, worktree, checkoutRoot, title, reserve, inputs, guard, launchModel, scratchDir }, internals, emit);
+    const jobId = args.job;
+    // One context carries the job and what each gate and plan step learns, in the order the verb runs them.
+    const d = { ledger, args, repo, emit, internals, db: ledger.db, jobId };
+    loadQueuedJob(d);
+    if (admitTarget(d)) return;
+    refuseHolds(d);
+    refuseUnmetStart(d);
+    planModel(d);
+    planWorker(d);
+    environmentGate(d);
+    planPrompt(d);
+    if (!args.spawn) { emitDryRun(d); return; }
+    refuseLaunchInputs(d);
+    refuseWaits(d);
+    refuseHostLimits(d);
+    refuseProviderCircuit(d);
+    const { job, payload, op, model, packet, prompt, packetFile, worktree, checkoutRoot, title, inputs, launchModel, scratchDir, placements, workerCwd, workflowTree } = d;
+    // §6 admission — the repo-path leases and the job's fencing token are taken
+    // BEFORE anything launches, for both launch kinds. A refusal (a live lease
+    // already owns a path, or the machine arbiter can't open) is a dispatch
+    // rejection: the worker must never be what discovers the write set was
+    // already taken, and an unfenced dispatch is exactly what this layer kills.
+    const reserve = reserveDispatch({ ledger, args, job, jobId, payload, packet, op, model, repo, emit, internals });
+    prepareScratch(d);
+    // worker-start owns the agent's environment, so no shim reaches it; the history hook in its checkouts does, finding
+    // the op by its bound Orca terminal (scripts/guards/hook-install.mjs bindGuardTerminal).
+    const guard = internals.opGuardLaunch({ job, jobId, repo, placements, workerCwd, workflowWorktree: workflowTree?.path ?? null });
+    return cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, packet, prompt, packetFile, worktree, checkoutRoot, title, reserve, inputs, guard, launchModel, scratchDir }, internals, emit);
   },
 };
 

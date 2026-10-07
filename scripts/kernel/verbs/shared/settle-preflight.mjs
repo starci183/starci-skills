@@ -2,13 +2,7 @@
 import { EVIDENCE_HOST_PATH } from '../../job-artifacts.mjs';
 import { recordSonarJudgment, refusalText } from '../../sonar-settle.mjs';
 import { loopRefusalText, proofRefusalText, recordLoopJudgment, recordProofJudgment } from '../../gate-settle.mjs';
-import { VerbExit } from './verb-exit.mjs';
-
-/** Emit the refusal object and text, then leave the verb with exit 1. */
-const refuse = (s, out, text) => {
-  s.emit(out, text, s.args.json);
-  throw new VerbExit(1);
-};
+import { refuseVerb } from './verb-exit.mjs';
 
 function mediaPhase(s, settleProofMedia) {
   const media = !s.replay && s.verdict === 'pass' ? settleProofMedia(s.db, s.jobId, s.repo, null, null) : null;
@@ -18,7 +12,7 @@ function mediaPhase(s, settleProofMedia) {
     const browser = media.detail.browserRan ? ' and its browser video' : '';
     advice = `Re-dispatch the op to capture its screenshots${browser} into its evidence and name them in report.files, then settle again`;
   }
-  refuse(s, { ok: false, jobId: s.jobId, op: media.op, reason: media.code, code: media.code, missing: media.missing, detail: media.detail },
+  refuseVerb(s, { ok: false, jobId: s.jobId, op: media.op, reason: media.code, code: media.code, missing: media.missing, detail: media.detail },
     `settle REFUSED for ${s.jobId} (${media.op}): ${media.code} — missing ${media.missing.join(', ')} (${JSON.stringify(media.detail)}); the job stays ${media.status}. ${advice}`);
 }
 
@@ -32,7 +26,7 @@ function sonarPhase(s, settleSonarGate) {
   const recorded = sonar.judged.record === false ? { green: sonar.judged.status === 'pass', status: sonar.judged.status, code: sonar.judged.code }
     : recordSonarJudgment(s.ledger, { workflowId: sonar.workflowId, jobId: s.jobId, opId: sonar.op, attemptId: sonar.attemptId, judgment: sonar });
   if (s.verdict === 'pass' && !recorded.green) {
-    refuse(s, { ok: false, jobId: s.jobId, op: sonar.op, reason: recorded.code, code: recorded.code, detail: sonar.judged.detail, findings: sonar.judged.findings, sonarStatus: recorded.status, ...(recorded.incidentId ? { incidentId: recorded.incidentId } : {}) },
+    refuseVerb(s, { ok: false, jobId: s.jobId, op: sonar.op, reason: recorded.code, code: recorded.code, detail: sonar.judged.detail, findings: sonar.judged.findings, sonarStatus: recorded.status, ...(recorded.incidentId ? { incidentId: recorded.incidentId } : {}) },
       refusalText(sonar.op, sonar.judged, s.jobId));
   }
 }
@@ -44,7 +38,7 @@ async function loopPhase(s, settleOpGate) {
   if (!loop) return;
   const recorded = recordLoopJudgment(s.ledger, { attemptId: loop.attemptId, judgment: loop });
   if (!recorded.green) {
-    refuse(s, { ok: false, jobId: s.jobId, op: loop.op, reason: recorded.code, code: recorded.code, detail: loop.judged.detail, findings: loop.judged.findings, gateStatus: recorded.status },
+    refuseVerb(s, { ok: false, jobId: s.jobId, op: loop.op, reason: recorded.code, code: recorded.code, detail: loop.judged.detail, findings: loop.judged.findings, gateStatus: recorded.status },
       loopRefusalText(loop.op, loop.judged, s.jobId));
   }
 }
@@ -56,7 +50,7 @@ async function proofPhase(s, settleOpProofs) {
   if (!proofs) return null;
   const recorded = recordProofJudgment(s.ledger, { attemptId: proofs.attemptId, judgment: proofs });
   if (!recorded.green) {
-    refuse(s, { ok: false, jobId: s.jobId, op: proofs.op, reason: recorded.code, code: recorded.code, proof: proofs.proof, detail: proofs.judged.detail, findings: proofs.judged.findings, proofStatus: recorded.status },
+    refuseVerb(s, { ok: false, jobId: s.jobId, op: proofs.op, reason: recorded.code, code: recorded.code, proof: proofs.proof, detail: proofs.judged.detail, findings: proofs.judged.findings, proofStatus: recorded.status },
       proofRefusalText(proofs.op, proofs, s.jobId));
   }
   return proofs;
@@ -66,7 +60,7 @@ function drawnPhase(s, settleDrawAcceptance) {
   const drawn = !s.replay && s.verdict === 'pass' ? settleDrawAcceptance(s.db, s.jobId, s.repo, null, null) : null;
   if (!drawn) return;
   const codes = [...new Set(drawn.findings.map((f) => f.code))];
-  refuse(s, { ok: false, jobId: s.jobId, op: drawn.op, reason: 'draw-not-accepted', codes, findings: drawn.findings.slice(0, 50), findingCount: drawn.findings.length, records: drawn.records },
+  refuseVerb(s, { ok: false, jobId: s.jobId, op: drawn.op, reason: 'draw-not-accepted', codes, findings: drawn.findings.slice(0, 50), findingCount: drawn.findings.length, records: drawn.records },
     `settle REFUSED for ${s.jobId} (${drawn.op}): draw-not-accepted — ${codes.join(', ')} (${drawn.findings.length} finding(s); first: ${drawn.findings[0].detail}); the job stays ${drawn.status}. Every asset the draw binds, adopted ones included, must be a draw-render shape of ui.shapes and never a data status (starci work draw-acceptance --repo <repo> --job ${s.jobId}); redraw, or settle fail`);
 }
 
@@ -79,7 +73,7 @@ async function metricsPhase(s, settleDrawMetrics) {
     const loopNames = measured.loops.map((l) => `${l.loop} best round ${l.best}`).join(', ');
     loops = ` (${loopNames})`;
   }
-  refuse(s, { ok: false, jobId: s.jobId, op: measured.op, reason: 'draw-metrics-failed', codes, findings: measured.findings.slice(0, 50), findingCount: measured.findings.length, records: measured.records, loops: measured.loops },
+  refuseVerb(s, { ok: false, jobId: s.jobId, op: measured.op, reason: 'draw-metrics-failed', codes, findings: measured.findings.slice(0, 50), findingCount: measured.findings.length, records: measured.records, loops: measured.loops },
     `settle REFUSED for ${s.jobId} (${measured.op}): draw-metrics-failed — ${codes.join(', ')} (${measured.findings.length} finding(s); first: ${measured.findings[0].detail}); the job stays ${measured.status}. The runtime re-rendered every drawn part and re-ran every machine metric itself (starci work draw-loop verify --ui <record> --repo <repo>): the draw is blocked with these remaining failures and its best round${loops} - redraw through the loop, or settle blocked, never pass`);
 }
 
@@ -87,7 +81,7 @@ function hygienePhase(s, settleWorkHygiene) {
   const hygiene = !s.replay && s.verdict === 'pass' ? settleWorkHygiene(s.db, s.jobId, s.repo, null, null) : null;
   if (!hygiene) return;
   const codes = [...new Set(hygiene.findings.map((f) => f.code))];
-  refuse(s, { ok: false, jobId: s.jobId, op: hygiene.op, reason: 'work-hygiene-red', codes, findings: hygiene.findings.slice(0, 50), findingCount: hygiene.findings.length, files: hygiene.files },
+  refuseVerb(s, { ok: false, jobId: s.jobId, op: hygiene.op, reason: 'work-hygiene-red', codes, findings: hygiene.findings.slice(0, 50), findingCount: hygiene.findings.length, files: hygiene.files },
     `settle REFUSED for ${s.jobId} (${hygiene.op}): work-hygiene-red - ${codes.join(', ')} (${hygiene.findings.length} finding(s); first: ${hygiene.findings[0].file} - ${hygiene.findings[0].detail}); the job stays ${hygiene.status}. Fix the named Work files (a YAML that parses, records that pass starci runtime validate --strict, no literal password or token outside an .enc file; starci work hygiene files --repo <repo> <file>...), rerun the applicable checks and settle again; the runtime checkpoints owned changes after green settle`);
 }
 
