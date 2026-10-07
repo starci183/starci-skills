@@ -19,7 +19,7 @@ npm run serve
 
 The tunnel runs with `starci harness start --tunnel` (cloudflared `tunnel --config %USERPROFILE%/.cloudflared/harness.yml run starci-harness`, without the CF token variables); `starci task register harness-tunnel [--apply]` prints or registers its scheduled task. Before use, create the named tunnel and DNS route with the Cloudflare CLI, point `harness.yml` at the same port (`statusApp.port` of `modules/models/runtimes.yaml` — the ingress is checked for `port-drift` against it), and check `cloudflared tunnel --config <file> ingress validate`. On the current machine, Windows Task Scheduler runs the app and the tunnel when the machine owner signs in, restarting automatically when a process fails.
 
-Set the host up once, in this order. Each `register` without `--apply` prints the exact PowerShell and changes nothing; `--apply` registers or updates the task for the current user without administrator rights.
+`starci reconciler up --services` sets the launcher shim and the three tasks up and refreshes a stale one without further steps; it records each applied registration with the hash of its script. The steps below are the manual path. Each `register` without `--apply` prints the exact PowerShell and changes nothing; `--apply` registers or updates the task for the current user without administrator rights.
 
 ```
 starci runtime link                                   # writes the per-user shim every task action calls
@@ -29,7 +29,7 @@ starci task register reconciler --apply               # `starci reconciler start
 starci task list                                      # state, last result and action of each registered task
 ```
 
-The harness app task is the one the reconciler runs when the UI is down. `starci reconciler up --check` compares each registered task's action with what a registration writes today and checks that the shim exists; a task that cannot work is a red row naming the fix. Run `starci task register <name> --apply` again after the runtime moves or the shim path changes.
+The harness app task is the one the reconciler runs when the UI is down. `starci reconciler up --check` compares each registered task's action with what a registration writes today and checks that the shim exists; a task that cannot work is a red row naming the fix, and `starci reconciler up --services` applies it. Run it again, or `starci task register <name> --apply`, after the runtime moves or the shim path changes.
 
 ## Verification
 

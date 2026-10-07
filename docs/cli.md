@@ -2796,11 +2796,13 @@ starci reconciler stop
 
 ### starci reconciler up
 
-bring the runtime host services and live seats up and print one checklist
+bring the host services and seats up, or check them read-only, and print the checklist
 
 | flag | type | |
 | --- | --- | --- |
 | `--check` | boolean |  |
+| `--services` | boolean |  |
+| `--brief` | boolean |  |
 | `--wait` | number |  |
 | `--no-build` | boolean |  |
 | `--retire-stale-ledgers` | boolean |  |
@@ -2809,13 +2811,15 @@ bring the runtime host services and live seats up and print one checklist
 | `--caller-model` | string |  |
 | `--caller-effort` | string |  |
 
-exit: 0 every required checklist row is green; 1 one or more required checklist rows are red; 2 bad usage
+exit: 0 every required checklist row is green (a seat that is not running while no workflow needs it is idle and green); 1 one or more required checklist rows are red; 2 bad usage, or --services combined with --check, --set-profile or --retire-stale-ledgers
 
 json: flag
 
 ```sh
 starci reconciler up
 starci reconciler up --check --json
+starci reconciler up --check --brief
+starci reconciler up --services
 starci reconciler up --caller-agent codex --caller-model gpt-6.1-sol --caller-effort high --json
 ```
 
