@@ -57,21 +57,22 @@ signalMatching:
     canonIntent: [conform to canon, conform to the canon, conform to the starci canon, conform to starci, canon conformance, canon-conformance, canon debt, canon findings, starci canon, starci-canon, starci-like, technical debt, tech debt, code-quality debt, lint debt, dọn nợ, nợ kỹ thuật, nợ code, trả nợ code, chuẩn hoá source, chuẩn hóa source, chuẩn hoá code, chuẩn hóa code, theo chuẩn starci, chuẩn starci]
     e2eIntent: [e2e, e2e-spec*, end-to-end test*, end to end test*, end-to-end verif*, end to end verif*, end-to-end proof*, end to end proof*, end-to-end check*, end to end check*, end-to-end suite*, end to end suite*, test end-to-end, test end to end, kiểm thử e2e, kiểm thử end-to-end, kiểm thử end to end, chạy e2e, test e2e]
     uatIntent: [uat, acceptance test*, acceptance testing, browser uat, nghiệm thu, kiểm thử uat, chạy uat, uat trình duyệt]
-    proofNegation: [no e2e, without e2e, skip e2e, skip the e2e, no uat, without uat, skip uat, skip the uat, không e2e, không chạy e2e, bỏ qua e2e, không uat, không chạy uat, bỏ qua uat]
+    proofNegation: [no, without, skip, do not, does not, never, none, zero, lacks, lacking, missing, absent, không, chưa, bỏ qua, thiếu]
     integrationIntent: [integration test*, integration testing, integration verif*, integration proof*, integration check*, live verification, live verify, live integration*, live provider*, real provider*, live oauth, live smtp, live payment*, live sso, oauth live, smtp live, payment live, sso live, verify oauth*, verify smtp*, verify payment*, verify sso*, kiểm thử tích hợp, kiểm tra tích hợp, xác minh tích hợp, chạy tích hợp, kiểm thử live, xác minh live, chạy live, test tích hợp]
-    integrationNegation: [no integration test*, without integration test*, skip integration, skip the integration, no live verification, without live verification, skip live, no live verify, không kiểm thử tích hợp, không test tích hợp, bỏ qua tích hợp, không chạy tích hợp, không xác minh live, bỏ qua live]
+    proofStateCue: [still to be, yet to be, not yet, to be built, to be implemented, to be written, chưa được xây, còn phải xây, còn phải viết]
     brandIntent: [brand, thương hiệu, mascot, linh vật, token màu, brand token, bộ nhận diện, logo]
   proofLegs: >-
     E2E runs manually only (owner ruling 2026-09-29): e2e.verify (api.X verified) and uat.verify (ui.X verified)
-    join a chain only when the prompt explicitly asks for them (phraseSets.e2eIntent / uatIntent, unless
-    phraseSets.proofNegation also hits). Without that ask a backend build ends at impl.X done (backend) and an
+    join a chain only when the prompt explicitly asks for them (phraseSets.e2eIntent / uatIntent); a mention whose clause
+    carries a phraseSets.proofNegation cue ("no UAT", "skip e2e") or whose sentence carries a phraseSets.proofStateCue cue
+    ("the e2e tests are still to be built") describes a state and asks for nothing, and it never cancels another kind or sentence. Without that ask a backend build ends at impl.X done (backend) and an
     interface build at ui.X audited; review.verify still closes the chain. An explicit ask adds the proof
     variable to whichever archetype matched.
   integrationLeg: >-
     Live integration verification runs on explicit request / before release only (owner ruling 2026-09-29):
     integration.verify (integration.X verified: real OAuth/IdP, SMTP, payment, external provider with real credentials)
-    joins a chain only when the prompt asks for it (phraseSets.integrationIntent, unless phraseSets.integrationNegation
-    also hits). Without that ask an external-integration prompt ends at impl.X done (backend) and no provision.ask
+    joins a chain only when the prompt asks for it (phraseSets.integrationIntent, read with the same
+    negation and current-state cues). Without that ask an external-integration prompt ends at impl.X done (backend) and no provision.ask
     custody leg precedes it; the kernel defers an already-approved integration.verify leg the goal did not ask for
     (scripts/route/spec-deferral.mjs). "Integrate X" asks to build the integration, not to prove it live.
   phraseSetReference: >-
