@@ -70,7 +70,7 @@ export function spawnAgent({ provider, model = null, effort = null, worktree, re
   const launchIdentity = launchScopeId('host-launch', { run, request, spec, worktree, repo, baseBranch, name, setup, provider, model: budgetModel });
   // Invalid model, eligibility or request cannot authorize provider trust writes.
   const trust = launchTrustOf(orca, { agent: provider, cwd: worktree, config, env });
-  if (launchTrustRefused(trust)) return noEffect('launch-trust', trust.reason ?? trust.errors?.[0]?.error ?? 'launch trust was not verified', { trust });
+  if (launchTrustRefused(trust)) return noEffect('launch-trust', trust.reason ?? trust.errors?.[0]?.error ?? 'launch trust was not verified', { trust, ...(trust.code ? { code: trust.code, errorCode: trust.code } : {}) });
   const consumed = consumeAgentAdmission(admission, { provider, model: budgetModel, role, launchIdentity, hostRequestId, io: io?.admission, env });
   const launch = { provider, model, takesModel, spec, taskTitle: taskTitle ?? title, title, worktree, repo, baseBranch, name, setup, agent, run, from, request: hostRequest };
   if (!consumed.ok) return consumeRefusal({ admission, orca, io, env, launch, hostRequestId, launchIdentity }, consumed, effort);

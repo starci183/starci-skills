@@ -4,13 +4,13 @@
       {
         "matcher": "Agent|Task",
         "hooks": [
-          { "type": "command", "command": "starci guard seat-tools" }
+          { "type": "command", "command": "\"$HOME/.starci/bin/starci\" guard seat-tools" }
         ]
       },
       {
         "matcher": "Bash|PowerShell|Edit|Write|MultiEdit|NotebookEdit",
         "hooks": [
-          { "type": "command", "command": "starci guard command", "timeout": 30 }
+          { "type": "command", "command": "\"$HOME/.starci/bin/starci\" guard command", "timeout": 30 }
         ]
       }
     ]

@@ -11,6 +11,7 @@ import {openMachine} from '../../engine/db/machine.mjs';
 import {writeProviderCircuit} from '../../scripts/machine/provider-circuit.mjs';
 import {inspectOwnerConfig} from '../../engine/config.mjs';
 import { senderEnv } from '../helpers/sender-env.mjs';
+import { installGuardLauncher } from '../helpers/guard-launcher.mjs';
 
 // The Kernel seat takes the `high` tier of modules/models/tiers.yaml: its members are tried in chain order through the
 // common picker (bias, balance, token use); config.yaml `kernel: {agent?, model?}` is the bias `only` over that tier and
@@ -27,7 +28,7 @@ const fixture=(t,kernelLine,modelsLine=null)=>{
   const repo=path.join(root,'repo');fs.mkdirSync(repo);
   const fake=path.join(root,'fake-orca.mjs'),state=path.join(root,'orca-state.json'),log=path.join(root,'calls.jsonl');
   const ownerRoot=path.join(root,'owner'),trustHome=path.join(root,'trust-home');
-  fs.mkdirSync(ownerRoot);fs.mkdirSync(trustHome);
+  fs.mkdirSync(ownerRoot);fs.mkdirSync(trustHome);installGuardLauncher(trustHome);
   // Adoption and provider trust files belong only to this private fixture's exact repository root.
   const launchTrust={profile:'automatic',approvedBy:'owner',approvalRef:'private kernel-group fixture adoption',roots:[repo]};
   const config=fs.readFileSync(path.join(ROOT,'config.example.yaml'),'utf8')

@@ -16,6 +16,7 @@ import {INPUT_DIGEST_SCHEMA,baselineWorkInputs,createDigester,inputKindOf,lawTok
 import {resolveOpContract} from '../../scripts/lib/op-shared.mjs';
 import {usageOfWorkflow} from '../../scripts/kernel/usage-report.mjs';
 import {EXAMPLE_CATALOG_FILE,EXAMPLES_ROOT,exampleSourcePaths,loadExampleCatalog} from '../../scripts/lib/example-refs.mjs';
+import { installGuardLauncher } from '../helpers/guard-launcher.mjs';
 
 // Stale input: `starci kernel dispatch` records the digests of the inputs an op reads
 // (contracts.context_json.inputs) by kind. A Source-law input (knowledge/**,
@@ -92,7 +93,7 @@ const fixture=t=>{
   const git=(...args)=>mainGit('-C',repo,...args);
   fs.writeFileSync(path.join(skill,'config.yaml'),fs.readFileSync(path.join(ROOT,'config.example.yaml'),'utf8')
     .replace(/^launchTrust:.*$/m,`launchTrust: ${JSON.stringify({profile:'automatic',approvedBy:'owner',approvalRef:'private stale-input fixture adoption',roots:[main]})}`));
-  const trustHome=path.join(root,'trust-home');fs.mkdirSync(trustHome);
+  const trustHome=path.join(root,'trust-home');fs.mkdirSync(trustHome);installGuardLauncher(trustHome);
   const stub=path.join(root,'fake-orca.mjs');fs.writeFileSync(stub,FAKE_ORCA);
   const env={...process.env,...fakeDevinQuotaEnv(t,path.join(root,'appdata')),
     STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),STARCI_FAKE_ORCA_MODE:'healthy',

@@ -14,6 +14,7 @@ import {
 } from '../../scripts/machine/contract-version.mjs';
 import {checkShellConformance} from '../../scripts/work/ui/shell-conformance.mjs';
 import {parseYaml,stringifyYaml} from '../../engine/yaml.mjs';
+import { installGuardLauncher } from '../helpers/guard-launcher.mjs';
 
 // Immutable selected inputs are preserved; current guards refuse red checks at every admission time.
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
@@ -71,7 +72,7 @@ const fixture=t=>{
   for(const d of ['docs','src'])fs.mkdirSync(path.join(repo,d),{recursive:true});
   const stub=path.join(root,'fake-orca.mjs');fs.writeFileSync(stub,FAKE_ORCA);
   const ownerRoot=path.join(root,'owner'),trustHome=path.join(root,'trust-home');
-  fs.mkdirSync(ownerRoot);fs.mkdirSync(trustHome);
+  fs.mkdirSync(ownerRoot);fs.mkdirSync(trustHome);installGuardLauncher(trustHome);
   const owner=parseYaml(fs.readFileSync(path.join(ROOT,'config.example.yaml'),'utf8'));
   owner.launchTrust={profile:'automatic',approvedBy:'owner',approvalRef:'private contract rollout fixture adoption',roots:[main]};
   fs.writeFileSync(path.join(ownerRoot,'config.yaml'),stringifyYaml(owner));

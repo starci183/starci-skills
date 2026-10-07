@@ -16,6 +16,7 @@ import {jobRowOf} from '../../scripts/kernel/verbs/shared/rows.mjs';
 import {writeGreenProofs,proofRepo} from '../helpers/sonar-scan.mjs';
 import {buildContext} from '../../scripts/context/pack.mjs';
 import { senderEnv } from '../helpers/sender-env.mjs';
+import { installGuardLauncher } from '../helpers/guard-launcher.mjs';
 
 // Build the workflow and logical unit required by the current ledger before
 // exercising dispatch. Each fixture op job represents a distinct unit.
@@ -62,7 +63,7 @@ const fixture=(t,{dead=[],stale=[]}={})=>{
   }`).replace(stalledDispatch,"last_failure: 'agent_prompt_stalled', assigneeHandle: state.assignees?.[arg('dispatch')] ?? null }");
   const stub=path.join(root,'fake-orca.mjs');fs.writeFileSync(stub,managedFake);
   const ownerRoot=path.join(root,'owner');fs.mkdirSync(ownerRoot,{recursive:true});
-  const trustHome=path.join(root,'trust-home');fs.mkdirSync(trustHome);
+  const trustHome=path.join(root,'trust-home');fs.mkdirSync(trustHome);installGuardLauncher(trustHome);
   const env={...process.env,
     STARCI_ORCA_COMMAND:process.execPath,
     STARCI_ORCA_ARGS:JSON.stringify([stub]),

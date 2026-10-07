@@ -7,13 +7,15 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { TOOL_GUARD_MARKER, TOOL_GUARD_MATCHER, TOOL_GUARD_TIMEOUT_S, toolGuardCommand } from '../../scripts/agent/trust.mjs';
+import { TOOL_GUARD_MATCHER, TOOL_GUARD_TIMEOUT_S } from '../../scripts/agent/trust.mjs';
+import { slashPath, winPath } from '../fixtures/win-path.mjs';
+import { PORTABLE_HOME, guardHookCommand, isGuardCommand, toolGuardCommand } from '../../scripts/lib/guard-command.mjs';
 import { commandVerdict } from '../../scripts/guards/command-guard.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const settings = JSON.parse(fs.readFileSync(path.join(ROOT, '.claude', 'settings.json'), 'utf8'));
 const groups = settings.hooks.PreToolUse;
-const guardGroups = groups.filter((g) => g.hooks.some((h) => h.command.includes(TOOL_GUARD_MARKER)));
+const guardGroups = groups.filter((g) => g.hooks.some((h) => isGuardCommand(h.command)));
 const GUARD = path.join(ROOT, 'scripts', 'guards', 'command-guard.mjs');
 
 test('the tracked settings register the command guard once, for the shell and the file-writing tools, next to seat-tools', () => {
@@ -25,15 +27,16 @@ test('the tracked settings register the command guard once, for the shell and th
   assert.equal(group.hooks.length, 1);
   assert.equal(group.hooks[0].type, 'command');
   assert.equal(group.hooks[0].timeout, TOOL_GUARD_TIMEOUT_S);
-  assert.ok(groups.some((g) => g.matcher === 'Agent|Task' && g.hooks.some((h) => h.command === 'starci guard seat-tools')), 'the seat-tools entry stays');
+  assert.ok(groups.some((g) => g.matcher === 'Agent|Task' && g.hooks.some((h) => h.command === guardHookCommand('seat-tools', { home: PORTABLE_HOME }))), 'the seat-tools entry stays');
 });
 
 test('the tracked hook and worker trust use the guard CLI fast path without a script path', () => {
   const { command } = guardGroups[0].hooks[0];
-  assert.equal(command, toolGuardCommand(), 'same command as the runtime writes');
-  assert.equal(command, 'starci guard command');
+  assert.equal(command, toolGuardCommand({ home: PORTABLE_HOME }), 'the runtime spelling, with the home the shell expands');
+  assert.equal(command, '"$HOME/.starci/bin/starci" guard command');
   assert.doesNotMatch(command, /[A-Za-z]:[\\/]|\/Users\//, 'no absolute host path in a tracked file');
-  assert.equal(toolGuardCommand(GUARD), 'starci guard command', 'the worker registration never persists a runtime script path');
+  assert.equal(toolGuardCommand({ home: winPath('C', 'Users', 'Some One') }), `"${slashPath('C', 'Users', 'Some One')}/.starci/bin/starci" guard command`, 'a worker registration names the per-user launcher by absolute path, quoted, with forward slashes');
+  assert.doesNotMatch(toolGuardCommand(), /command-guard\.mjs/, 'the worker registration never persists a runtime script path');
 });
 
 // What an owner (or lane) session runs all day. With no guard bound the hook meets one rule only (install through a linked node_modules).

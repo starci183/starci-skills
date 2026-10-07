@@ -63,8 +63,13 @@ before opting in. The installer does not run git commands, create project
 records, or touch product sources. See [releasing](releasing.md).
 
 The CLI records the active runtime root in `<home>/.starci/runtime.json` and
-writes a `starci` shim under `<home>/.starci/bin`, allowing agents to invoke the
-same CLI. If a runtime group is used before a runtime is installed, the command
+writes a `starci` shim under `<home>/.starci/bin` (on Windows both `starci.cmd` for cmd and an
+extensionless `starci` POSIX launcher for Git Bash), allowing agents to invoke the
+same CLI. The command guard hook that launch trust registers names that launcher by absolute
+path, quoted, so it resolves without the directory on PATH; a launch refuses with
+`guard-command-unresolvable` when no shell can run it, and `starci reconciler up --check` shows the
+required row `command guard resolvable`. An install made before this spelling is repaired by
+`starci runtime link`. If a runtime group is used before a runtime is installed, the command
 exits 3 and prints:
 
 ```text

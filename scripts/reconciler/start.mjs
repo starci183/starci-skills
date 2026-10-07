@@ -19,6 +19,7 @@ export { buildUi, uiBuildState };
 import { workflowCaller } from '../agent/caller-context.mjs';
 import { PROFILE, engineItems, profileItems, safeShadowOf, serviceItems } from './start-items.mjs';
 import { auditTasks } from '../machine/task-audit.mjs';
+import { guardCommandRow } from './guard-row.mjs';
 import { launcherItem, taskItems } from './task-health.mjs';
 import { applyEngine, applyUiBuild, startDownServices, startSeats, waitForLeader } from './start-apply.mjs';
 import { repeatInOrder } from '../lib/in-order.mjs';
@@ -222,11 +223,11 @@ function orcaRow(orcaProbe) {
  * Every checklist row, read-only: preflight, config, engine, controllers, services, seats, sla, ui build. Never throws
  * (a failing section is one red row). Seams (specs): env, config, machine reads, probes.
  */
-export async function gather({ env = process.env, config = safeRun(() => loadConfig(), null), orca = true, seats = true, workflowSeats = true, coreDebug = true, seatsRequested = true, depthProbe = null, platform = process.platform } = {}) {
+export async function gather({ env = process.env, config = safeRun(() => loadConfig(), null), orca = true, seats = true, workflowSeats = true, coreDebug = true, seatsRequested = true, depthProbe = null, platform = process.platform, guardProbe } = {}) {
   const items = [];
   const push = (...rows) => items.push(...rows.flat());
   // preflight
-  push(sqliteItem(), hostPlatformItem(platform));
+  push(sqliteItem(), hostPlatformItem(platform), guardCommandRow({ probe: guardProbe }));
   const machine = machineDbRows(env);
   push(machine.rows, ledgerRows(machine.ledgers));
   push(await worktreeItems({ env, repos: machine.ledgers.filter((l) => l.state !== 'retired').map((l) => l.repoRoot) }));

@@ -47,6 +47,7 @@ import { renameOver } from '../api/fs/rename-over.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { isSpecRun } from '../lib/env.mjs';
+import { isGuardCommand } from '../lib/guard-command.mjs';
 import { orcaUserData } from './host-agents.mjs';
 export { codexTrustPaths, launchTrustVerdict } from './launch-trust-policy.mjs';
 import { codexAppServer } from './codex-app-server.mjs';
@@ -67,7 +68,7 @@ export function orcaCodexHome({ env = process.env, platform = process.platform, 
 /**
  * The files trust is written to. STARCI_AGENT_TRUST_HOME re-roots every one of
  * them (specs); otherwise Claude's own CLAUDE_CONFIG_DIR and Codex's CODEX_HOME
- * are honoured. Returns {claudeJson, claudeSettings, codexHomes[], skipped?}.
+ * are honoured. Returns {claudeJson, codexHomes[], home, skipped?}.
  */
 export function trustTargets({ env = process.env, platform = process.platform } = {}) {
   const root = env.STARCI_AGENT_TRUST_HOME || null;
@@ -85,7 +86,7 @@ export function trustTargets({ env = process.env, platform = process.platform } 
   addHome('active-codex-home', root ? path.join(root,'.codex') : (env.CODEX_HOME || orcaCodexHome({ env, platform, home })));
   return {
     claudeJson: claudeDir ? path.join(claudeDir, '.claude.json') : path.join(home, '.claude.json'),
-    codexHomes,
+    codexHomes, home,
   };
 }
 
@@ -438,11 +439,8 @@ export function writeCodexNoModelNudge({ file, hooks }) {
 
 /* ------------------------------------------------------ the command guard */
 
-export const TOOL_GUARD_MARKER = 'starci guard command', TOOL_GUARD_MATCHER = 'Bash|PowerShell|Edit|Write|MultiEdit|NotebookEdit', TOOL_GUARD_TIMEOUT_S = 30; // the tracked .claude/settings.json registers the same entry
-/** The hook command every host runs through the per-user StarCi shim already placed on agent PATH. */
-export const toolGuardCommand = () => TOOL_GUARD_MARKER;
-const isGuardHandler = (h) => typeof h?.command === 'string'
-  && (h.command.includes(TOOL_GUARD_MARKER) || h.command.includes('command-guard.mjs'));
+export const TOOL_GUARD_MATCHER = 'Bash|PowerShell|Edit|Write|MultiEdit|NotebookEdit', TOOL_GUARD_TIMEOUT_S = 30; // the tracked .claude/settings.json registers the same entry
+const isGuardHandler = (h) => typeof h?.command === 'string' && (isGuardCommand(h.command) || h.command.includes('command-guard.mjs'));
 const isGuardGroup = (g) => Array.isArray(g?.hooks) && g.hooks.some(isGuardHandler);
 
 /**

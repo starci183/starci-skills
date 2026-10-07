@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { codexGuardBlock, toolGuardCommand } from '../../scripts/agent/trust.mjs';
+import { codexGuardBlock } from '../../scripts/agent/trust.mjs';
+import { toolGuardCommand } from '../../scripts/lib/guard-command.mjs';
 import { codexLaunchHomes, codexMirrorSource } from '../../scripts/agent/codex-mirror-source.mjs';
 import { ensureLaunchTrust as ensureAdoptedLaunchTrust } from '../../scripts/agent/trust-launch.mjs';
 
@@ -20,7 +21,9 @@ const tmp = (t, prefix) => {
   t.after(() => fs.rmSync(d, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
   return d;
 };
+// The shells that resolve the guard command are probed by tests/agent/guard-command-launch.spec.mjs; these specs answer ok.
 const ensureLaunchTrust = (options) => ensureAdoptedLaunchTrust({
+  guardProbe: () => ({ ok: true }),
   ...options,
   config: { launchTrust: { profile: 'automatic', approvedBy: 'owner', approvalRef: 'private fixture owner adoption', roots: [path.resolve(options.cwd)] } },
 });
@@ -55,7 +58,7 @@ function appServerFor(command) {
 test('the guard hook survives Orca mirroring the system Codex config into the managed home', (t) => {
   const trustHome = tmp(t, 'starci-codex-mirror-home-');
   const cwd = tmp(t, 'starci-codex-mirror-cwd-');
-  const command = toolGuardCommand();
+  const command = toolGuardCommand({ home: trustHome });
   const managedDir = path.join(trustHome, '.codex');
   const sourceDir = path.join(trustHome, 'system', '.codex');
   const managedFile = path.join(managedDir, 'config.toml');
@@ -91,7 +94,7 @@ test('a system Codex home without a config.toml is left alone: Orca refuses a bl
   const cwd = tmp(t, 'starci-codex-mirror-absent-cwd-');
   fs.mkdirSync(path.join(trustHome, '.codex'), { recursive: true });
   const env = { NODE_TEST_CONTEXT: 'child-v8', STARCI_AGENT_TRUST_HOME: trustHome };
-  const r = ensureLaunchTrust({ agent: 'codex', cwd, env, codexAppServer: appServerFor(toolGuardCommand()) });
+  const r = ensureLaunchTrust({ agent: 'codex', cwd, env, codexAppServer: appServerFor(toolGuardCommand({ home: trustHome })) });
   assert.notEqual(r.status, 'failed', JSON.stringify(r));
   assert.deepEqual(r.toolGuard.map((g) => g.file), [path.join(trustHome, '.codex', 'config.toml')]);
   assert.equal(fs.existsSync(path.join(trustHome, 'system')), false);
@@ -106,7 +109,7 @@ test('the mirror source is the system home, absent for an explicit CODEX_HOME, a
 test('the system home holds one guard block after repeated launches, an older block is replaced in place and the owner tables stay', (t) => {
   const trustHome = tmp(t, 'starci-codex-mirror-idem-');
   const cwd = tmp(t, 'starci-codex-mirror-idem-cwd-');
-  const command = toolGuardCommand();
+  const command = toolGuardCommand({ home: trustHome });
   const sourceDir = path.join(trustHome, 'system', '.codex');
   const sourceFile = path.join(sourceDir, 'config.toml');
   fs.mkdirSync(path.join(trustHome, '.codex'), { recursive: true });
@@ -138,7 +141,7 @@ test('a project the owner declined in the system home refuses the launch', (t) =
   const sourceFile = path.join(sourceDir, 'config.toml');
   fs.writeFileSync(sourceFile, `[projects.'${path.resolve(cwd).toLowerCase()}']\ntrust_level = "untrusted"\n`);
   const env = { NODE_TEST_CONTEXT: 'child-v8', STARCI_AGENT_TRUST_HOME: trustHome };
-  const r = ensureLaunchTrust({ agent: 'codex', cwd, env, codexAppServer: appServerFor(toolGuardCommand()) });
+  const r = ensureLaunchTrust({ agent: 'codex', cwd, env, codexAppServer: appServerFor(toolGuardCommand({ home: trustHome })) });
   assert.equal(r.status, 'declined', JSON.stringify(r));
   assert.ok(!fs.readFileSync(sourceFile, 'utf8').includes('starci-command-guard'), 'nothing is written for a declined launch');
 });

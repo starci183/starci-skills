@@ -175,7 +175,7 @@ is on record; links the launcher shim and registers or refreshes a missing or st
 `supervisor.mode: kernel`) and the Kernel watchdog `--once --repair` of each running workflow. It prints one checklist
 (text, or `--json`) of the engine leader and heartbeat, safe mode, each controller against the profile, each service
 (harness UI local and public `/healthz`, tunnels, Telegram, ask gateway), the Supervisor seat, each running workflow's
-Kernel seat, open violations and the preflight rows, and exits 0 only when every required row is green. `--check`
+Kernel seat, open violations and the preflight rows (among them `command guard resolvable`, which runs the exact guard hook command through bash and cmd, or sh on POSIX), and exits 0 only when every required row is green. `--check`
 changes nothing, and `--brief` prints it as one line per row that is not green. A seat that is not running while no
 workflow needs it is idle and green in a `--check`; a start path requires every seat. `--services` heals only the
 no-quota services (launcher shim, the three tasks, UI build, engine, harness UI and tunnel, ask gateway and tunnel),

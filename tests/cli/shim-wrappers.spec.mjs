@@ -29,8 +29,11 @@ test('writeRuntimeShim writes the exact Windows launcher and guarded tool wrappe
     root,
     runtimeJson: path.join(home, '.starci', 'runtime.json'),
     shim: path.join(bin, 'starci.cmd'),
+    posixShim: path.join(bin, 'starci'),
   });
   assert.equal(writes.get(result.shim), `@echo off\r\n"${node}" "${cli}" %*\r\n`);
+  const slashed = (file) => file.replaceAll('\\', '/');
+  assert.equal(writes.get(result.posixShim), `#!/bin/sh\nexec "${slashed(node)}" "${slashed(cli)}" "$@"\n`, 'bash runs this launcher: the same two paths with forward slashes and LF endings');
   for (const program of TOOL_WRAPPERS) {
     assert.equal(writes.get(path.join(bin, `${program}.cmd`)), `@echo off\r\n"${node}" "${cli}" guard raw ${program} -- %*\r\n`);
   }
