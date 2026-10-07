@@ -73,22 +73,29 @@ export const workingTreeFiles = (root, listFiles) => ({
 });
 
 /** Shared --root/--json envelope for tracked-text checks. */
-export function runTrackedTextCheckCli(argv, io, options) {
+function parseTrackedTextArgs(argv, io, options) {
   let root = options.defaultRoot;
   let json = false;
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
-    if (arg === '--help' || arg === '-h') { io.stdout.write(`${options.help}\n`); return 0; }
+    if (arg === '--help' || arg === '-h') { io.stdout.write(`${options.help}\n`); return { code: 0 }; }
     if (arg === '--json') { json = true; continue; }
     if (arg === '--root') {
       const value = argv[++i];
-      if (value === undefined) { io.stderr.write(`${options.command}: --root needs a path\n`); return 2; }
+      if (value === undefined) { io.stderr.write(`${options.command}: --root needs a path\n`); return { code: 2 }; }
       root = path.resolve(value);
       continue;
     }
     io.stderr.write(`${options.command}: unknown argument ${arg}\n${options.help}\n`);
-    return 2;
+    return { code: 2 };
   }
+  return { root, json };
+}
+
+export function runTrackedTextCheckCli(argv, io, options) {
+  const args = parseTrackedTextArgs(argv, io, options);
+  if (args.code != null) return args.code;
+  const { root, json } = args;
   let report;
   try { report = options.scan(root); } catch (error) {
     io.stderr.write(`${options.command}: ${error.message}\n`);

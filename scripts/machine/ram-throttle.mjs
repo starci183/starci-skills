@@ -144,6 +144,7 @@ export function opRamEstimates(table, samples = [], thresholds = throttleThresho
 }
 
 const estimateOf = (op, estimates) => estimates[op] ?? estimates.default;
+const heavyAdmissionText = (mode, held, heavyCap, typical) => { if (mode === 'normal') return ` or ${Math.max(0, heavyCap - held)} heavy (~${Math.round(typical('heavy'))} MB)`; if (mode === 'critical') return ', heavy only for the top priority - and not even that while critical'; return ', heavy only for the top priority'; };
 
 /**
  * The next mode from the previous state and one host sample, with hysteresis. `prev`: {ramMode, cpuHot} (a missing
@@ -247,7 +248,7 @@ export function effectiveCapOf({ maxParallelOps = null, running = 0, host, mode,
   const finite = (n) => (Number.isFinite(n) ? n : null);
   const why = effectiveCap >= ceiling && mode === 'normal'
     ? `maxParallelOps ${ceiling} binds (${Math.round(headroomMb)} MB free above the ${thresholds.hardFloorPct}% floor)`
-    : `${mode}: ${Math.round(headroomMb)} MB free above the ${thresholds.hardFloorPct}% floor fits ${Math.max(0, lightCap - held)} more light op(s) (~${Math.round(typical('light'))} MB)${mode === 'normal' ? ` or ${Math.max(0, heavyCap - held)} heavy (~${Math.round(typical('heavy'))} MB)` : `, heavy only for the top priority${mode === 'critical' ? ' - and not even that while critical' : ''}`} beside ${held} running`;
+    : `${mode}: ${Math.round(headroomMb)} MB free above the ${thresholds.hardFloorPct}% floor fits ${Math.max(0, lightCap - held)} more light op(s) (~${Math.round(typical('light'))} MB)${heavyAdmissionText(mode, held, heavyCap, typical)} beside ${held} running`;
   return { maxParallelOps: finite(ceiling), running: held, mode, headroomMb: Math.round(headroomMb), reserveMb: Math.round(reserveMb),
     effectiveCap: finite(effectiveCap), heavyCap: finite(heavyCap), lightCap: finite(lightCap), why };
 }
@@ -269,7 +270,7 @@ export function admitOp({ op, workflowId = null, ops = [], maxParallelOps = null
   if (cap.maxParallelOps != null && running >= cap.maxParallelOps)
     return refuse('workers-max-ops', `${running} op(s) already hold a slot across the host's ledgers at maxParallelOps ${cap.maxParallelOps}`);
   if (cap.maxParallelOps != null && claim.slots > 0 && running + 1 + claim.slots > cap.maxParallelOps)
-    return refuse('priority-reserved', `${running} running + ${claim.slots} slot(s) reserved for ${claim.above.filter((a) => a.pending).map((a) => `${a.workflowId} (weight ${a.weight})`).join(', ')} leave no slot under maxParallelOps ${cap.maxParallelOps} for ${workflowId ?? 'this workflow'} (weight ${claim.weight})`);
+    return refuse('priority-reserved', `${running} running + ${claim.slots} slot(s) reserved for ${claim.above.filter((a) => a.pending).map((a) => a.workflowId + ' (weight ' + a.weight + ')').join(', ')} leave no slot under maxParallelOps ${cap.maxParallelOps} for ${workflowId ?? 'this workflow'} (weight ${claim.weight})`);
   if (est.class === 'heavy' && mode === 'critical')
     return refuse('heavy-paused', `${op} is a heavy op (~${est.mb} MB) and the host is critical: ${modeWhy}`);
   if (est.class === 'heavy' && mode !== 'normal' && !top)
@@ -294,7 +295,6 @@ const codeMode = (mode) => {
   if (MODES.includes(mode)) return mode;
   return null;
 };
-
 
 /**
  * The throttle state object out of the throttle_state row and throttle_decisions: {mode, ramMode, cpuHot, why, at,
@@ -464,10 +464,10 @@ export const throttleSummary = (t) => (t ? {
 export function throttleLine(t) {
   if (!t) return 'ram-throttle: unread';
   const c = t.cap ?? {};
-  const prio = Object.entries(t.priorities ?? {}).filter(([, p]) => p.weight > 1).map(([wf, p]) => `${wf} w${p.weight}${p.reserve ? ` r${p.reserve}` : ''}`);
+  const prio = Object.entries(t.priorities ?? {}).filter(([, p]) => p.weight > 1).map(([wf, p]) => `${wf} w${p.weight}${p.reserve ? ' r' + p.reserve : ''}`);
   return `ram-throttle: effective cap ${c.effectiveCap ?? '-'}/${c.maxParallelOps ?? '-'} (heavy ${c.heavyCap ?? '-'}), ${t.running} running, mode ${t.mode}`
-    + ` - free RAM ${pct1(t.host?.freeRamPct)}${t.cpuBusy != null ? `, CPU ${Math.round(t.cpuBusy * 100)}%` : ''}; ${t.modeWhy}; ${c.why ?? ''}`
-    + `${prio.length ? `; priority ${prio.join(', ')}` : ''}${t.throttled?.count ? `; throttled ${t.throttled.count} dispatch(es), last ${t.throttled.last?.jobId ?? '-'} ${t.throttled.last?.reason ?? ''} at ${t.throttled.last?.at ?? '-'}` : ''}`;
+    + ` - free RAM ${pct1(t.host?.freeRamPct)}${t.cpuBusy != null ? ', CPU ' + Math.round(t.cpuBusy * 100) + '%' : ''}; ${t.modeWhy}; ${c.why ?? ''}`
+    + `${prio.length ? '; priority ' + prio.join(', ') : ''}${t.throttled?.count ? '; throttled ' + t.throttled.count + ' dispatch(es), last ' + (t.throttled.last?.jobId ?? '-') + ' ' + (t.throttled.last?.reason ?? '') + ' at ' + (t.throttled.last?.at ?? '-') : ''}`;
 }
 
 /* ------------------------------------------------------------ footprint history */

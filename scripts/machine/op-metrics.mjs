@@ -92,9 +92,12 @@ const span = (from, to) => (Number.isFinite(from) && Number.isFinite(to) && to >
 
 export { fmtMs };
 const pct = (rate) => (rate == null ? '-' : `${Math.round(rate * 100)}%`);
+const settledClassOf = (result, report) => { if (typeof result?.failureClass?.class === 'string') return result.failureClass.class; if (typeof result?.failureClass === 'string') return result.failureClass; if (typeof report?.failureClass === 'string') return report.failureClass; return null; };
+const settledSuffix = (settled, category, red) => { if (category) return `${settled}:${category}`; if (red.length) return `${settled}:${red[0]}`; return settled; };
+const outcomeOf = (status, verdict) => { if (status === 'succeeded') return 'succeeded'; if (status === 'awaiting_owner') return 'owner'; if (status === 'failed') return ['dropped', 'superseded'].includes(verdict) ? 'dropped' : 'failed'; if (status === 'cancelled') return 'cancelled'; return 'open'; };
 
 /** severity of a wait of `ageMs` against {warnMs, criticalMs}. */
-export const severityOf = (ageMs, sla) => (ageMs >= sla.criticalMs ? 'critical' : ageMs >= sla.warnMs ? 'warn' : 'ok');
+export const severityOf = (ageMs, sla) => { if (ageMs >= sla.criticalMs) return 'critical'; if (ageMs >= sla.warnMs) return 'warn'; return 'ok'; };
 
 /**
  * The failure class of one failed op job (see the header), or null when it did not fail. `result` is the job's
@@ -112,9 +115,8 @@ export function failureClassOf({ status, result = {}, report = null, checks = []
   const red = checks.filter((c) => c && (c.ok === false || (c.exitCode != null && Number(c.exitCode) !== 0))).map((c) => String(c.name ?? 'unnamed')).sort(byCodeUnit);
   // The settle's own class (scripts/kernel/verify-failure.mjs: result_json.failureClass {class, reason}, or the
   // report's failureClass) leads, narrowed by the root-cause category or the red check.
-  const settled = typeof result?.failureClass?.class === 'string' ? result.failureClass.class
-    : typeof result?.failureClass === 'string' ? result.failureClass : typeof report?.failureClass === 'string' ? report.failureClass : null;
-  if (settled) return `${settled}${category ? `:${category}` : red.length ? `:${red[0]}` : ''}`;
+  const settled = settledClassOf(result, report);
+  if (settled) return settledSuffix(settled, category, red);
   if (category) return `root-cause:${category}`;
   if (red.length) return `check:${red[0]}`;
   if (Number(result?.checkEvidence?.failed) > 0) return 'check:unnamed';
@@ -176,10 +178,7 @@ export function jobRecords(db, { since, now = Date.now(), workflowId = null } = 
     const verdict = result.verdict ?? parseJsonOr(settledEv?.payload_json, {})?.verdict ?? null;
     const deadEv = evs.find((e) => DEAD_KINDS.has(e.kind));
     const dead = deadEv ? (parseJsonOr(deadEv.payload_json, {})?.worker?.liveness ?? parseJsonOr(deadEv.payload_json, {})?.liveness ?? 'dead') : null;
-    const outcome = job.status === 'succeeded' ? 'succeeded'
-      : job.status === 'awaiting_owner' ? 'owner'
-        : job.status === 'failed' ? (['dropped', 'superseded'].includes(verdict) ? 'dropped' : 'failed')
-          : job.status === 'cancelled' ? 'cancelled' : 'open';
+    const outcome = outcomeOf(job.status, verdict);
     const jobChecks = checks.get(key) ?? [];
     const failureClass = outcome === 'failed' ? failureClassOf({ status: job.status, result, report, checks: jobChecks, dead }) : null;
     const dispatchedAt = dispatches[0] ?? null;
@@ -337,7 +336,7 @@ export function stuckOf({ db, workflowId, now = Date.now(), sla = telemetrySetti
   for (const wait of peerWaits) {
     push({ kind: 'peer-wait', incidentId: wait.incidentId, opId: wait.opId ?? null, since: wait.since ?? incidentRaisedAt(db, workflowId, wait.incidentId),
       owner: wait.peerRunning === false ? 'kernel' : `peer:${wait.peer ?? '?'}`, blockedBy: wait.peer ? { workflow: wait.peer } : null,
-      detail: `${wait.peerRunning === false ? `peer ${wait.peer} is ${wait.peerPhase ?? 'gone'}, re-point the wait: ` : ''}${wait.detail ?? ''}` });
+      detail: `${wait.peerRunning === false ? 'peer ' + wait.peer + ' is ' + (wait.peerPhase ?? 'gone') + ', re-point the wait: ' : ''}${wait.detail ?? ''}` });
   }
   for (const item of heldSettle) {
     const since = firstJobEventAt(db, item.jobId, ['report-consumed', 'report-filed']) ?? Number(jobRow.get(item.jobId)?.updated_at);
@@ -354,16 +353,9 @@ export function stuckOf({ db, workflowId, now = Date.now(), sla = telemetrySetti
   // job it waits on (followed through the chain), so N dependants of one held job are ONE item naming that owner.
   const gateOwner = new Map(out.filter((i) => i.incidentId).map((i) => [i.incidentId, i.owner]));
   const byJob = new Map(queued.map((q) => [q.jobId, q]));
-  const ownerOfJob = (jobId, seen = new Set()) => {
-    const q = byJob.get(jobId);
-    if (!q || seen.has(jobId)) return 'kernel';
-    seen.add(jobId);
-    if (['owner-gate', 'supervisor-gate', 'peer-wait'].includes(q.queuedBecause)) return gateOwner.get(q.blockedBy?.incident) ?? (q.queuedBecause === 'peer-wait' ? `peer:${q.blockedBy?.peer ?? '?'}` : q.queuedBecause === 'supervisor-gate' ? 'supervisor' : 'owner');
-    if (q.queuedBecause === 'dependency' && q.blockedBy?.job) return ownerOfJob(q.blockedBy.job, seen);
-    if (THROTTLE_CAUSES.includes(q.queuedBecause)) return 'supervisor';
-    return 'kernel';
-  };
+  const ownerOfJob = (jobId, seen = new Set()) => { const q = byJob.get(jobId); if (!q || seen.has(jobId)) return 'kernel'; seen.add(jobId); if (['owner-gate', 'supervisor-gate', 'peer-wait'].includes(q.queuedBecause)) { const owner = gateOwner.get(q.blockedBy?.incident); if (owner != null) return owner; if (q.queuedBecause === 'peer-wait') return `peer:${q.blockedBy?.peer ?? '?'}`; if (q.queuedBecause === 'supervisor-gate') return 'supervisor'; return 'owner'; } if (q.queuedBecause === 'dependency' && q.blockedBy?.job) return ownerOfJob(q.blockedBy.job, seen); if (THROTTLE_CAUSES.includes(q.queuedBecause)) return 'supervisor'; return 'kernel'; };
   const deps = new Map();
+  const dependencyOwnerOf = (parked, blockedBy) => { if (parked) { if (parked.heldBecause === 'peer-wait') return `peer:${parked.peer ?? '?'}`; return gateOwner.get(parked.incident) ?? 'owner'; } if (blockedBy?.job) return ownerOfJob(blockedBy.job); return 'kernel'; };
   for (const q of queued) {
     const job = jobRow.get(q.jobId);
     const since = Number(job?.updated_at ?? job?.created_at) || null;
@@ -378,7 +370,7 @@ export function stuckOf({ db, workflowId, now = Date.now(), sla = telemetrySetti
       if (held) { held.count++; held.dependants.push(q.jobId); held.since = Math.min(held.since, at); continue; }
       const parked = q.parkedBehind;
       deps.set(blocker, { kind: 'dependency', jobId: q.blockedBy?.job ?? q.jobId, opId: q.blockedBy?.op ?? q.opId ?? null, since: at, count: 1, dependants: [q.jobId],
-        owner: parked ? (parked.heldBecause === 'peer-wait' ? `peer:${parked.peer ?? '?'}` : gateOwner.get(parked.incident) ?? 'owner') : q.blockedBy?.job ? ownerOfJob(q.blockedBy.job) : 'kernel',
+        owner: dependencyOwnerOf(parked, q.blockedBy),
         blockedBy: q.blockedBy ?? null, detail: q.detail });
     } else if (because === 'dependency-failed') {
       push({ kind: 'queued-ready', cause: because, jobId: q.jobId, opId: q.opId ?? null, since, owner: 'kernel', blockedBy: q.blockedBy ?? null, detail: q.detail });
@@ -390,7 +382,7 @@ export function stuckOf({ db, workflowId, now = Date.now(), sla = telemetrySetti
   }
   for (const d of deps.values()) {
     const { dependants, ...item } = d;
-    push({ ...item, detail: `${dependants.length} job(s) wait on ${d.jobId}${d.opId ? ` (${d.opId})` : ''}: ${dependants.slice(0, 4).join(', ')}${dependants.length > 4 ? ', ...' : ''}; ${d.detail ?? ''}` });
+    push({ ...item, detail: `${dependants.length} job(s) wait on ${d.jobId}${d.opId ? ' (' + d.opId + ')' : ''}: ${dependants.slice(0, 4).join(', ')}${dependants.length > 4 ? ', ...' : ''}; ${d.detail ?? ''}` });
   }
   const rank = { critical: 2, warn: 1, ok: 0 };
   return out.sort((a, b) => rank[b.severity] - rank[a.severity] || b.ageMs - a.ageMs);
@@ -400,20 +392,18 @@ export function stuckOf({ db, workflowId, now = Date.now(), sla = telemetrySetti
 export const stuckOwedItems = (stuck, { repo = null } = {}) => stuck.filter((s) => s.severity !== 'ok').map((s) => ({
   key: s.key, class: 'supervisor', kind: `stuck-${s.kind}`, workflowId: s.workflowId, repo, severity: s.severity, owner: s.owner,
   incidentId: s.incidentId, jobId: s.jobId, raisedAt: s.since, ageMin: Math.round(s.ageMs / 60_000),
-  summary: `${s.kind}${s.cause && s.cause !== s.kind ? ` (${s.cause})` : ''} ${s.incidentId ?? s.jobId ?? ''} ${fmtMs(s.ageMs)}; next: ${s.owner}${s.detail ? ` - ${s.detail}` : ''}`,
+  summary: `${s.kind}${s.cause && s.cause !== s.kind ? ' (' + s.cause + ')' : ''} ${s.incidentId ?? s.jobId ?? ''} ${fmtMs(s.ageMs)}; next: ${s.owner}${s.detail ? ' - ' + s.detail : ''}`,
   action: stuckAction(s), line: stuckLine(s),
 }));
 
 /** What the Supervisor does about one stuck item (the owner of its next action decides the verb). */
 function stuckAction(s) {
   if (s.owner === 'owner') return 'the owner holds it: make sure the ask reached the owner (Telegram /asks), remind once per digest; never answer it';
-  if (s.owner === 'supervisor') return s.kind === 'retry-cap' ? 'diagnose the repeated failure (root cause, not a blind retry), then tell the Kernel the disposition'
-    : s.kind === 'throttled' ? 'capacity holds it: check the pool/circuit/lease holder and free or re-route it'
-      : 'no owner ask names this gate: rule it or type it (--until-*) and tell the Kernel';
+  if (s.owner === 'supervisor') { if (s.kind === 'retry-cap') return 'diagnose the repeated failure (root cause, not a blind retry), then tell the Kernel the disposition'; if (s.kind === 'throttled') return 'capacity holds it: check the pool/circuit/lease holder and free or re-route it'; return 'no owner ask names this gate: rule it or type it (--until-*) and tell the Kernel'; }
   if (String(s.owner).startsWith('peer:')) return `notify the peer Kernel ${s.owner.slice(5)} (what it owes is its next move) and the waiting Kernel`;
   return 'wake the Kernel (notify.mjs) with the item; a second breach is a wake/dispatch defect to fix in a lane';
 }
-export const stuckLine = (s) => `STUCK ${s.severity} ${s.workflowId} ${s.kind}${s.cause && s.cause !== s.kind ? `/${s.cause}` : ''} ${s.incidentId ?? s.jobId ?? '-'}${s.opId ? ` (${s.opId})` : ''} age=${fmtMs(s.ageMs)} next=${s.owner}${s.detail ? `: ${clipLine(s.detail, 160)}` : ''}`;
+export const stuckLine = (s) => 'STUCK ' + s.severity + ' ' + s.workflowId + ' ' + s.kind + (s.cause && s.cause !== s.kind ? '/' + s.cause : '') + ' ' + (s.incidentId ?? s.jobId ?? '-') + (s.opId ? ' (' + s.opId + ')' : '') + ' age=' + fmtMs(s.ageMs) + ' next=' + s.owner + (s.detail ? ': ' + clipLine(s.detail, 160) : '');
 
 /** {total, ok, warn, critical, byKind: {<kind>: n past SLA}, byOwner: {<owner>: n past SLA}} of stuck items. Pure. */
 export function stuckCounts(stuck) {
@@ -448,7 +438,7 @@ export const readSnapshots = (m, { limit = 96 } = {}) => m.db.prepare('SELECT at
 const TREND_TEXT = (tr, d) => tr('Op health {window}: success {rate}{rateDelta}, median wait {wait}{waitDelta}, stuck {stuck} ({critical} critical){stuckDelta}{top}{vs}',
   { window: fmtMs(d.windowMs), rate: d.rate, rateDelta: d.rateDelta, wait: d.wait, waitDelta: d.waitDelta, stuck: d.stuck, critical: d.critical, stuckDelta: d.stuckDelta,
     top: d.top ? tr('; top failure {top}', { top: d.top }) : '', vs: d.vs ? tr(' [vs {vs} ago]', { vs: d.vs }) : '' });
-const signed = (n, fmt) => (n == null || n === 0 ? '' : ` (${n > 0 ? '+' : '-'}${fmt(Math.abs(n))})`);
+const signed = (n, fmt) => { if (n == null || n === 0) return ''; return ` (${n > 0 ? '+' : '-'}${fmt(Math.abs(n))})`; };
 
 /**
  * One short trend line from snapshots (oldest first): the newest against the one closest to `trendMs` before it.
