@@ -459,20 +459,20 @@ function checkPromptLocale(workRoot, uiFile, record, shell) {
 // An implementation record
 // ---------------------------------------------------------------------------------------------------------
 
+function checkImplementationUiFiles(ui,appDir,repoRoot,at,scan,fileAt,out){
+  const values=surfaceValues(ui),wants=[];for(const value of new Set(values))if(SURFACE_FILE[value])wants.push(SURFACE_FILE[value]);
+  if(isOverlayRecord(ui)&&ui.routed===true)wants.push('page');
+  for(const kind of new Set(wants))if(!fileAt(ui.route,kind))out.push(finding('refuse','IMPL_ROUTE_FILE_MISSING',at,`${ui.id} is a ${values.join('/')} at ${ui.route}, but ${slash(path.relative(repoRoot,appDir))}${ui.route==='/'?'':ui.route}/${kind}.tsx does not exist`));
+  if(isOverlayRecord(ui)&&ui.routed===true&&!scan.nodes.some(node=>node.intercepts===ui.route))out.push(finding('refuse','IMPL_INTERCEPT_MISSING',at,`${ui.id} is a routed overlay: an intercepting route (@slot/(.)segment/page.tsx) presenting ${ui.route} must exist beside its full page`));
+}
+
 /** Findings about one implementation record: each routed ui record it builds has its app/ files. */
 function checkImplementationApp(raw,name,tree,uis,located,at,out){
   const appDir=tree.app?.appDir?path.join(located.repoRoot,tree.app.appDir):null;
   const inApp=(text)=>(appNamesOf(raw).length>1?`app ${name}: ${text}`:text);
   if(!appDir||!fs.existsSync(appDir)){out.push(finding('refuse','IMPL_APP_DIR_UNREADABLE',at,inApp(`${tree.app?.appDir??'app/'} is not readable, so the created route files cannot be verified`)));return;}
-  const scan=scanAppDir(appDir,{repoRoot:located.repoRoot,name});
-  const fileAt=(id,kind)=>{const dir=path.join(appDir,...id.split('/').filter(Boolean));return SOURCE_EXT.some(ext=>fs.existsSync(path.join(dir,`${kind}${ext}`)));};
-  for(const ui of uis){
-    const values=surfaceValues(ui),wants=[];
-    for(const v of new Set(values)){if(SURFACE_FILE[v])wants.push(SURFACE_FILE[v]);}
-    if(isOverlayRecord(ui)&&ui.routed===true)wants.push('page');
-    for(const kind of new Set(wants)){if(!fileAt(ui.route,kind))out.push(finding('refuse','IMPL_ROUTE_FILE_MISSING',at,`${ui.id} is a ${values.join('/')} at ${ui.route}, but ${slash(path.relative(located.repoRoot,appDir))}${ui.route==='/'?'':ui.route}/${kind}.tsx does not exist`));}
-    if(isOverlayRecord(ui)&&ui.routed===true&&!scan.nodes.some(n=>n.intercepts===ui.route))out.push(finding('refuse','IMPL_INTERCEPT_MISSING',at,`${ui.id} is a routed overlay: an intercepting route (@slot/(.)segment/page.tsx) presenting ${ui.route} must exist beside its full page`));
-  }
+  const scan=scanAppDir(appDir,{repoRoot:located.repoRoot,name}),fileAt=(id,kind)=>{const dir=path.join(appDir,...id.split('/').filter(Boolean));return SOURCE_EXT.some(ext=>fs.existsSync(path.join(dir,`${kind}${ext}`)));};
+  for(const ui of uis)checkImplementationUiFiles(ui,appDir,located.repoRoot,at,scan,fileAt,out);
   const fresh=new Map(scan.nodes.map(n=>[n.id,n]));
   for(const n of nodesOf(tree).filter(x=>x.files?.layout?.sha256)){if(fresh.get(n.id)?.files?.layout?.sha256&&fresh.get(n.id).files.layout.sha256!==n.files.layout.sha256)out.push(finding('suspect','LAYOUT_SOURCE_DRIFT',at,inApp(`${n.id} layout changed since the tree recorded it - brand.decide re-scans and re-captures`)));}
 }
