@@ -3,7 +3,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { locateRuntime, runtimeEntryOf } from './runtime-locate.mjs';
+import { foreignRuntimeNotice, locateRuntime, ownRuntimeRoot, runtimeEntryOf } from './runtime-locate.mjs';
 import { runtimeEnv } from './shim.mjs';
 
 const packageFile = fileURLToPath(new URL('../package.json', import.meta.url));
@@ -206,6 +206,8 @@ const runRuntime = (split, args, { io, cwd, env, home, stderr }) => {
   const skipped = [];
   const located = (io.locateRuntime ?? locateRuntime)({ cwd, env, skipped, ...(home ? { home } : {}) });
   if (!located) return noRuntime(stderr, split.group, skipped);
+  const notice = foreignRuntimeNotice(located, (io.ownRuntimeRoot ?? ownRuntimeRoot)());
+  if (notice) writeTo(stderr, notice);
   const spawn = io.spawn ?? spawnSync;
   let result;
   try {

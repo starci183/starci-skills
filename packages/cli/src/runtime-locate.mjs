@@ -51,4 +51,17 @@ export function locateRuntime({ cwd = process.cwd(), env = process.env, home = o
   return null;
 }
 
+/** The runtime root of the checkout this CLI file lives in, or null when that checkout is not a runtime root (a published install). */
+export const ownRuntimeRoot = ({ exists = existsSync, embeddedRoot = embeddedRuntimeRoot } = {}) => usableRoot(embeddedRoot, exists);
+
+/**
+ * The one stderr line naming a located runtime that is not the checkout the CLI runs from, or null when they are the same
+ * or the CLI lives outside a runtime. The record and STARCI_RUNTIME outrank the checkout, so the mismatch is said, never silent.
+ */
+export function foreignRuntimeNotice(located, own) {
+  if (!located || !own) return null;
+  const same = process.platform === 'win32' ? located.root.toLowerCase() === own.toLowerCase() : located.root === own;
+  return same ? null : `starci: running the runtime at ${located.root} (${located.source}), not this checkout's ${own}; set STARCI_RUNTIME=${own} to use the checkout\n`;
+}
+
 export const runtimeEntryOf = runtimeEntry;

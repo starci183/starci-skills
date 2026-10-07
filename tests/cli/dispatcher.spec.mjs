@@ -4,7 +4,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { main } from '../../packages/cli/src/main.mjs';
 import { installRuntime, RUNTIME_VERSION } from '../../packages/cli/src/runtime-install.mjs';
-import { locateRuntime } from '../../packages/cli/src/runtime-locate.mjs';
+import { locateRuntime, ownRuntimeRoot } from '../../packages/cli/src/runtime-locate.mjs';
 
 const global = [
   { name: 'json', type: 'boolean' },
@@ -267,4 +267,21 @@ test('a stale or corrupt runtime record falls through with a note and ends in ex
   });
   assert.equal(code, 3);
   assert.equal(output.value.err, 'starci: ignored: runtime.json is stale\nstarci: the runtime group "runtime" needs the StarCi runtime, which is not installed (run: starci runtime install)\n');
+});
+
+test('a located runtime that is not the checkout the CLI runs from is named once on stderr; the same root and a non-runtime install are silent', async () => {
+  const own = path.resolve('checkout');
+  const live = path.resolve('live-main');
+  const foreign = await runtimeCall(['runtime', 'plain'], { locateRuntime: () => ({ root: live, source: 'record' }), ownRuntimeRoot: () => own });
+  assert.equal(foreign.code, 0);
+  assert.equal(foreign.err, `starci: running the runtime at ${live} (record), not this checkout's ${own}; set STARCI_RUNTIME=${own} to use the checkout\n`);
+  assert.equal((await runtimeCall(['runtime', 'plain'], { locateRuntime: () => ({ root: own, source: 'STARCI_RUNTIME' }), ownRuntimeRoot: () => own })).err, '');
+  assert.equal((await runtimeCall(['runtime', 'plain'], { locateRuntime: () => ({ root: live, source: 'record' }), ownRuntimeRoot: () => null })).err, '');
+});
+
+test('ownRuntimeRoot is the embedded checkout only when it has a runtime entry', () => {
+  const root = path.resolve('embedded-runtime');
+  const entry = path.join(root, 'scripts', 'cli', 'main.mjs');
+  assert.equal(ownRuntimeRoot({ embeddedRoot: root, exists: (file) => file === entry }), root);
+  assert.equal(ownRuntimeRoot({ embeddedRoot: root, exists: () => false }), null);
 });
