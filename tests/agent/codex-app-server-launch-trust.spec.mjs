@@ -1,5 +1,5 @@
-// Codex launch trust asks `codex app-server` for the hash it trusts the guard hook by (scripts/agent/trust.mjs
-// codexAppServer). Live defect 2026-10-07: every codex-agent launch was refused at launch-trust with "codex
+// Codex launch trust asks `codex app-server` for the hash it trusts the guard hook by
+// (scripts/agent/codex-app-server.mjs codexAppServer). Live defect 2026-10-07: every codex-agent launch was refused at launch-trust with "codex
 // app-server answered nothing (exit 0)", and routing kept picking codex-agent (provider-health codex open:false).
 // Root cause in the runtime client: when `codex app-server` exits before it answers (codex missing from the
 // launching process's PATH, a crash, a refused CODEX_HOME), the node client's event loop simply drains and it
@@ -14,7 +14,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { codexAppServer } from '../../scripts/agent/trust.mjs';
+import { codexAppServer } from '../../scripts/agent/codex-app-server.mjs';
 import { outageInText } from '../../scripts/agent/provider-outage.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');

@@ -24,6 +24,7 @@
 // (runtimes.yaml allocation.providerStrikes.worker-start): one unrelated failure never opens the circuit, a repeat
 // does, and routing (scripts/agent/pool-selection.mjs) skips the open circuit until it expires or is recovered.
 import { agentCardOf } from './credential-fingerprint.mjs';
+import { APP_SERVER_FAILURE } from './codex-app-server.mjs';
 import { normalizeProvider } from '../lib/provider.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -37,9 +38,9 @@ const CAPACITY_FAILURE_KIND = 'capacity';
 export const OUTAGE_KEYS = Object.freeze({ quotaExhausted: QUOTA_FAILURE_KIND, capacityExhausted: CAPACITY_FAILURE_KIND });
 const DEFAULT_QUOTA_PROBE_EVERY_MS = 3600000;
 const LAUNCH_FAILURE_KIND = 'worker-start';
-// Runtime-owned launch failure texts, per provider. codex: scripts/agent/trust.mjs codexAppServer, the launch-trust
+// Runtime-owned launch failure texts, per provider. codex: scripts/agent/codex-app-server.mjs codexAppServer, the launch-trust
 // step that asks `codex app-server` for the guard hook's hash - every failure of it starts with this text.
-const LAUNCH_PATH_FAILURES = Object.freeze({ codex: [/codex app-server answered nothing[^\n]*/] });
+const LAUNCH_PATH_FAILURES = Object.freeze({ codex: [new RegExp(APP_SERVER_FAILURE.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '[^\\n]*')] });
 
 const compile = (source, flags) => { try { return new RegExp(source, flags); } catch { return null; } };
 const cardFor = (provider, card) => (card === undefined ? agentCardOf(provider) : card);

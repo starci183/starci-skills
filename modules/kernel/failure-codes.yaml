@@ -11465,6 +11465,17 @@ worker-quiet:
   nextStep_vi: "Nhắc bị từ chối; xử lý như worker chết hoặc khởi động lại."
   owner: op-retry
   kind: verb-refusal
+worker-start:
+  title: "Worker start failed before the worker existed"
+  title_vi: "Khởi động worker thất bại trước khi có worker"
+  meaning_vi: "Một lần khởi động worker thất bại ở bước worker-start (preflight host, launch-trust, hoặc chính cuộc gọi orchestration worker-start) được ghi là một strike worker-start lên provider-health của nhà cung cấp đó; khi số strike chạm allocation.providerStrikes['worker-start'] (mặc định 2), circuit mở và route bỏ qua provider đó cho đến khi circuit hết hạn hoặc được phục hồi."
+  causes_vi:
+    - "CLI của provider không có trong PATH của tiến trình khởi động, hoặc tự thoát trước khi trả lời (ví dụ codex app-server)"
+    - "Launch-trust hoặc preflight host từ chối vì lỗi của chính CLI provider"
+    - "Orca từ chối hoặc làm mất worker-start"
+  nextStep_vi: "Đọc chi tiết strike trong provider_health_events (detail_json nêu bước và lỗi); sửa nguyên nhân khởi động của provider đó hoặc route role sang provider khác; circuit tự hết hạn sau cooldown."
+  owner: runtime-core
+  kind: dispatch-refusal
 worker-start-no-task:
   title: "Worker started without its Task"
   title_vi: "Worker khởi động mà không có Task"
