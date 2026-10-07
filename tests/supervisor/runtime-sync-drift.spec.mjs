@@ -69,10 +69,11 @@ test('a regeneration over current copies touches no file, and removes only the f
   const kept = path.join(root, bundle, first);
   const old = new Date(Date.now() - 3600_000);
   fs.utimesSync(kept, old, old);
+  const stamped = fs.statSync(kept).mtimeMs; // the file system's own rounding of that time
   const stray = path.join(root, bundle, 'stray.txt');
   fs.writeFileSync(stray, 'x');
   syncRuntime(root);
-  assert.equal(fs.statSync(kept).mtimeMs, old.getTime(), 'a current copy is not rewritten, so a concurrent reader never sees it cut');
+  assert.equal(fs.statSync(kept).mtimeMs, stamped, 'a current copy is not rewritten, so a concurrent reader never sees it cut');
   assert.equal(fs.existsSync(stray), false);
   assert.deepEqual(driftOfRuntime(root), []);
 });

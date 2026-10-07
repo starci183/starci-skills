@@ -46,6 +46,7 @@ import {
   stepService, runChild, lastJson, probeOrcaAsync,
 } from '../services.mjs';
 import { quickCheck, backupDue } from '../ledger-health.mjs';
+import { createLedgerBackup } from '../ledger-identity.mjs';
 import { reconcileTurnBudget, turnCustodyHold } from '../turn-budget.mjs';
 export { turnStep } from '../turn-budget.mjs';
 import { goalTextRefusal } from '../../goal/goal-text.mjs';
@@ -69,7 +70,6 @@ export const CONCERNS = Object.freeze(['host.kernel-seat', 'host.supervisor-seat
 const KERNEL_WATCHDOG = 'scripts/kernel/kernel-watchdog.mjs';
 const SUPERVISOR_WATCHDOG = 'scripts/supervisor/supervisor-watchdog.mjs';
 const FOOTPRINT_SCAN = 'scripts/guards/footprint-scan.mjs';
-const LEDGER_HEALTH = 'scripts/reconciler/ledger-health.mjs';
 
 // A read-only probe answer that a --repair pass would act on (scripts/kernel/kernel-watchdog.mjs statusTick/kernelTick).
 export const NEEDS_REPAIR = new Set(['restart-needed', 'wake-needed', 'queued-input', 'staged-input']);
@@ -208,6 +208,7 @@ export function createHostController(deps = {}) {
   const bootIdOf = deps.bootId ?? (() => hostBootId());
   const state = { bootPending: null, lastProcessesAt: 0, orphanClocks: new Set(), clocks: new Map(), staleCloses: new Map() };
   const staleTerminalStep = createStaleTerminalStep({ state, terminalHandles, outputOf, di });
+  const ledgerBackupStep = createLedgerBackup({ di, outputOf, isBackupDue });
   // SLA clocks are sent on an edge only (ctx.clock when a clock starts, ctx.clear when it stops), as the other
   // controllers do; after an engine restart each clock state is sent once more.
   const clock = async (ctx, entity, st, slaMs, meta) => {
@@ -570,7 +571,7 @@ export function createHostController(deps = {}) {
     await clock(ctx, key, 'LEDGER_CORRUPT', 0, { code: 'LEDGER_CORRUPT', severity: 'critical', owner: 'host-controller', ledgerId, result: r.result.slice(0, 5) });
     if (was === 'corrupt') return;
     await ctx.openDecision(di({
-      kind: 'runtime-defect', ledger: ledgerId, entity: { type: 'ledger', id: ledgerId }, idempotencyKey: `ledger-corrupt:${ledgerId}:${now}`, severity: 'critical',
+      kind: 'runtime-defect', ledger: 'supervisor', productLedger: ledgerId, entity: { type: 'ledger', id: ledgerId }, idempotencyKey: `ledger-corrupt:${ledgerId}:${now}`, severity: 'critical',
       summary: `${ledgerId}: database integrity failed; preserve the database and WAL, then inspect a verified ${settings().ledgerHealth.backupDir} snapshot and its loss window with the owner before restoration`,
       evidence: r.result.slice(0, 5).map((x) => ({ ref: `quick_check:${x}` })), escalateTo: 'owner',
     }));
@@ -580,7 +581,7 @@ export function createHostController(deps = {}) {
     const remedy = ((reason === 'schema-incompatible' || reason === 'sqlite-downgrade') && 'use a compatible runtime and SQLite version')
       || (reason === 'identity-mismatch' && 'resolve the registry and database identity with the owner') || 'resolve storage access or locking';
     await ctx.openDecision(di({
-      kind: 'runtime-defect', ledger: ledgerId, entity: { type: 'ledger', id: ledgerId }, idempotencyKey: `ledger-health:${ledgerId}:${reason}:${now}`, severity: 'high',
+      kind: 'runtime-defect', ledger: 'supervisor', productLedger: ledgerId, entity: { type: 'ledger', id: ledgerId }, idempotencyKey: `ledger-health:${ledgerId}:${reason}:${now}`, severity: 'high',
       summary: `${ledgerId}: ${reason}; preserve the database and WAL and ${remedy}`,
       evidence: r.result.slice(0, 5).map((x) => ({ ref: `ledger_health:${x}` })),
     }));
@@ -595,32 +596,6 @@ export function createHostController(deps = {}) {
     if (next !== 'corrupt') await clear(ctx, key, 'LEDGER_CORRUPT');
     if (next === 'corrupt') await flagCorrupt(ctx, { key, r, ledgerId, was, now });
     else if (!r.ok && was !== next) await flagUnhealthy(ctx, { r, reason, ledgerId, now });
-  }
-
-  // Whether tonight's backup is owed: the last check passed, none verified today, the retry gate is open and the hour has come.
-  function backupOwed(rec, { ledgerId, lh, now }) {
-    const today = new Date(now).toDateString();
-    const backedUpToday = rec.lastBackup?.verified === true && rec.lastBackup?.ledgerId === ledgerId && new Date(rec.lastBackupAt).toDateString() === today;
-    return rec.lastCheck?.ok === true && !backedUpToday && now >= (rec.nextBackupAttemptAt ?? 0) && isBackupDue({ ledgerId, now, dir: lh.backupDir, backupHour: lh.backupHour });
-  }
-
-  async function backupLedger(ctx, { rec, ledger, ledgerId, lh, now, out }) {
-    const r = await ctx.run('node', [LEDGER_HEALTH, '--backup', '--ledger-id', ledgerId, '--file', ledger.file, '--json'], { timeoutMs: lh.backupTimeoutMs });
-    if (ctx.mode !== 'active' || r?.shadow) { out.backup = false; out.shadow = true; return; }
-    const snapshot = outputOf(r);
-    rec.lastBackupAttemptAt = now;
-    rec.lastBackupAttempt = { ok: r?.ok === true, timedOut: r?.timedOut === true, result: snapshot };
-    out.backup = r?.ok === true && snapshot?.ok === true && snapshot?.verified === true && snapshot?.ledgerId === ledgerId;
-    if (out.backup) {
-      rec.lastBackupAt = now; rec.lastBackup = snapshot; rec.nextBackupAttemptAt = null; rec.state = 'ok';
-      return;
-    }
-    rec.nextBackupAttemptAt = now + lh.backupRetryMs; rec.state = 'backup-failed'; out.ok = false;
-    await ctx.openDecision(di({
-      kind: 'runtime-defect', ledger: ledgerId, entity: { type: 'ledger', id: ledgerId }, idempotencyKey: `ledger-backup-failed:${ledgerId}`, severity: 'high',
-      summary: `${ledgerId}: no verified snapshot was published; inspect backup storage access, capacity and the recorded child result before the next retry`,
-      evidence: [{ ref: `engine_action:${r?.actionId ?? 'unavailable'}` }],
-    }));
   }
 
   async function ledgerHealth(ledgerId, ctx) {
@@ -641,7 +616,7 @@ export function createHostController(deps = {}) {
       out.ok = r.ok;
       out.check = r;
     }
-    if (backupOwed(rec, { ledgerId, lh, now })) await backupLedger(ctx, { rec, ledger, ledgerId, lh, now, out });
+    await ledgerBackupStep(ctx, { rec, ledger, ledgerId, lh, now, out });
     store().put(rec);
     return out;
   }

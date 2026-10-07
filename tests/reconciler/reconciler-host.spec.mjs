@@ -25,12 +25,16 @@ const S = hostSettings();
 const T0 = Date.UTC(2026, 8, 28, 1, 0, 0);
 const GOAL = '# Goal\nShip the canon refactor.';
 const observedClockCodes = new Set();
+// A product ledger's real identity is its meta.ledger_id (a UUID); ctx.ledgers only carries the basename label.
+const SHOP_BE_REAL_ID = '1dbeb7e6-9c8b-4a7f-8e6d-5c4b3a2f1e0d';
 
-function ledgerDb({ workflows = [], jobs = [] } = {}) {
+function ledgerDb({ workflows = [], jobs = [], ledgerId = SHOP_BE_REAL_ID } = {}) {
   const db = new DatabaseSync(':memory:');
-  db.exec(`CREATE TABLE workflows(workflow_id TEXT PRIMARY KEY, phase TEXT, archived_at INTEGER);
+  db.exec(`CREATE TABLE meta(key TEXT PRIMARY KEY, value TEXT);
+    CREATE TABLE workflows(workflow_id TEXT PRIMARY KEY, phase TEXT, archived_at INTEGER);
     CREATE TABLE goals(goal_seq INTEGER PRIMARY KEY AUTOINCREMENT, workflow_id TEXT, revision INTEGER, markdown TEXT);
     CREATE TABLE jobs(job_id TEXT PRIMARY KEY, status TEXT, worker_id TEXT);`);
+  if (ledgerId != null) db.prepare('INSERT INTO meta VALUES(?,?)').run('ledger_id', String(ledgerId));
   for (const w of workflows) {
     db.prepare('INSERT INTO workflows VALUES(?,?,?)').run(w.id, w.phase ?? 'running', w.archivedAt ?? null);
     if (w.goal !== undefined) db.prepare('INSERT INTO goals(workflow_id,revision,markdown) VALUES(?,?,?)').run(w.id, 1, w.goal);
@@ -39,13 +43,21 @@ function ledgerDb({ workflows = [], jobs = [] } = {}) {
   return db;
 }
 
-function hostCtx({ mode = 'shadow', now = T0, ledgers, dbs, runAnswer = null } = {}) {
+// The machine registry (machine.sqlite ledgers, engine/db/machine.mjs resolveLedger by name or repoRoot). By default
+// every ctx.ledgers entry is registered under its label with SHOP_BE_REAL_ID at its own file.
+function registryOf(rows) {
+  return { resolveLedger: ({ name = null, repoRoot = null } = {}) => rows.find((r) => (name && r.name === name) || (repoRoot && r.repoRoot === repoRoot)) ?? null };
+}
+
+function hostCtx({ mode = 'shadow', now = T0, ledgers, dbs, runAnswer = null, registry } = {}) {
   const calls = { run: [], api: [], clock: [], clear: [], decisions: [], log: [] };
   let t = now;
+  const list = ledgers ?? [{ ledgerId: 'shop-be', repo: fixtureRepo('shop-be'), file: fixtureLedger('shop-be') }];
+  const rows = registry ?? list.filter((l) => l.file).map((l) => ({ ledgerId: SHOP_BE_REAL_ID, name: l.ledgerId, repoRoot: l.repo, file: l.file }));
   const ctx = fakeCtx({
-    mode, calls,
+    mode, calls, machine: registryOf(rows),
     now: () => t, advance: (ms) => { t += ms; },
-    ledgers: ledgers ?? [{ ledgerId: 'shop-be', repo: fixtureRepo('shop-be'), file: fixtureLedger('shop-be') }],
+    ledgers: list,
     read: (id, fn) => fn(dbs[id]),
     run: async (cmd, args, o) => { calls.run.push({ cmd, args, o }); return mode === 'shadow' ? { ok: true, shadow: true } : (runAnswer?.(cmd, args) ?? { ok: true, stdout: '{}' }); },
     api: async (id, verb, argv) => { calls.api.push({ id, verb, argv }); return { ok: true, shadow: mode === 'shadow' }; },
@@ -311,14 +323,16 @@ test('a service that keeps failing: its start goes through ctx.run, then a quara
   assert.ok(ctx.calls.clear.some((x) => x.entity === 'service:orca' && x.state === 'SERVICE_DOWN'));
 });
 
-test('ledger health: a failed quick_check is LEDGER_CORRUPT + one DI; the nightly backup is recorded once a day', async () => {
+test('ledger health: a failed quick_check is LEDGER_CORRUPT + one Supervisor DI; the nightly backup is recorded once a day', async () => {
   const ledgers = [{ ledgerId: 'shop-be', repo: fixtureRepo('r'), file: fixtureLedger('r') }];
   let ok = false;
   const c = controller({ quickCheck: () => (ok ? { ok: true, result: ['ok'] } : { ok: false, result: ['*** in database main ***', 'page 7: btree'] }), backupDue: () => true });
-  const ctx = hostCtx({ mode: 'active', ledgers, dbs: { 'shop-be': ledgerDb() }, runAnswer: () => ({ ok: true, stdout: JSON.stringify({ ok: true, verified: true, ledgerId: 'shop-be' }) }) });
+  const ctx = hostCtx({ mode: 'active', ledgers, dbs: { 'shop-be': ledgerDb() }, runAnswer: () => ({ ok: true, stdout: JSON.stringify({ ok: true, verified: true, ledgerId: SHOP_BE_REAL_ID }) }) });
   await c.reconcile('ledger:shop-be', ctx);
   assert.ok(ctx.calls.clock.some((x) => x.code === 'LEDGER_CORRUPT' && x.severity === 'critical'));
   assert.equal(ctx.calls.decisions.length, 1);
+  assert.equal(ctx.calls.decisions[0].ledger, 'supervisor', 'a ledger-level defect has no workflow: it goes to the Supervisor ledger');
+  assert.equal(ctx.calls.decisions[0].productLedger, 'shop-be');
   assert.equal(ctx.calls.run.length, 0, 'no backup of a corrupt ledger');
   ctx.advance(S.ledgerHealth.quickCheckEveryMs);
   await c.reconcile('ledger:shop-be', ctx);
@@ -328,10 +342,110 @@ test('ledger health: a failed quick_check is LEDGER_CORRUPT + one DI; the nightl
   assert.ok(ctx.calls.clear.some((x) => x.entity === 'ledger:shop-be' && x.state === 'LEDGER_CORRUPT'));
   const backups = ctx.calls.run.filter((r) => r.args[0] === 'scripts/reconciler/ledger-health.mjs');
   assert.equal(backups.length, 1);
-  assert.deepEqual(backups[0].args, ['scripts/reconciler/ledger-health.mjs', '--backup', '--ledger-id', 'shop-be', '--file', fixtureLedger('r'), '--json']);
+  assert.deepEqual(backups[0].args, ['scripts/reconciler/ledger-health.mjs', '--backup', '--ledger-id', SHOP_BE_REAL_ID, '--file', fixtureLedger('r'), '--json']);
   ctx.advance(60_000);
   await c.reconcile('ledger:shop-be', ctx);
   assert.equal(ctx.calls.run.filter((r) => r.args[0] === 'scripts/reconciler/ledger-health.mjs').length, 1, 'once a day');
+});
+
+test('the backup binds meta.ledger_id (never the basename label) and a failed one opens a Supervisor DI', async () => {
+  const ledgers = [{ ledgerId: 'shop-be', repo: fixtureRepo('id'), file: fixtureLedger('id') }];
+  const store = memoryStore();
+  let answer = { ok: false, stdout: JSON.stringify({ ok: false, verified: false, error: `ledger identity ${SHOP_BE_REAL_ID} differs from shop-be` }) };
+  const c = controller({ store: () => store, backupDue: () => true });
+  const ctx = hostCtx({ mode: 'active', ledgers, dbs: { 'shop-be': ledgerDb() }, runAnswer: () => answer });
+  const failed = await c.reconcile('ledger:shop-be', ctx);
+  assert.equal(failed.backup, false);
+  assert.equal(store.get('ledger:shop-be').state, 'backup-failed');
+  const backups = ctx.calls.run.filter((x) => x.args[0] === 'scripts/reconciler/ledger-health.mjs');
+  assert.equal(backups.length, 1);
+  assert.deepEqual(backups[0].args, ['scripts/reconciler/ledger-health.mjs', '--backup', '--ledger-id', SHOP_BE_REAL_ID, '--file', fixtureLedger('id'), '--json'],
+    'the child verifies the snapshot against meta.ledger_id, not the registry label');
+  const defect = ctx.calls.decisions.find((d) => d.idempotencyKey === 'ledger-backup-failed:shop-be');
+  assert.equal(defect.kind, 'runtime-defect');
+  assert.equal(defect.ledger, 'supervisor', 'a ledger-level defect has no workflow: it goes to the Supervisor ledger');
+  assert.equal(defect.productLedger, 'shop-be');
+  assert.equal(defect.workflowId, undefined);
+  answer = { ok: true, stdout: JSON.stringify({ ok: true, verified: true, ledgerId: SHOP_BE_REAL_ID }) };
+  ctx.advance(S.ledgerHealth.backupRetryMs);
+  const r = await c.reconcile('ledger:shop-be', ctx);
+  assert.equal(r.backup, true);
+  assert.equal(store.get('ledger:shop-be').lastBackup.ledgerId, SHOP_BE_REAL_ID);
+  ctx.advance(60_000);
+  await c.reconcile('ledger:shop-be', ctx);
+  assert.equal(ctx.calls.run.filter((x) => x.args[0] === 'scripts/reconciler/ledger-health.mjs').length, 2, 'a verified snapshot suppresses the rest of the day');
+});
+
+test('the backup identity comes from the machine registry: a label that is not the meta UUID binds the registered UUID', async () => {
+  const ledgers = [{ ledgerId: 'nivo-monorepo', repo: fixtureRepo('nivo'), file: fixtureLedger('nivo') }];
+  const registry = [{ ledgerId: SHOP_BE_REAL_ID, name: 'nivo-monorepo', repoRoot: fixtureRepo('nivo'), file: fixtureLedger('nivo') }];
+  const store = memoryStore(), c = controller({ store: () => store, backupDue: () => true });
+  const ctx = hostCtx({ mode: 'active', ledgers, registry, dbs: { 'nivo-monorepo': ledgerDb() },
+    runAnswer: () => ({ ok: true, stdout: JSON.stringify({ ok: true, verified: true, ledgerId: SHOP_BE_REAL_ID }) }) });
+  const r = await c.reconcile('ledger:nivo-monorepo', ctx);
+  assert.equal(r.backup, true);
+  const backups = ctx.calls.run.filter((x) => x.args[0] === 'scripts/reconciler/ledger-health.mjs');
+  assert.deepEqual(backups[0].args, ['scripts/reconciler/ledger-health.mjs', '--backup', '--ledger-id', SHOP_BE_REAL_ID, '--file', fixtureLedger('nivo'), '--json']);
+  assert.equal(store.get('ledger:nivo-monorepo').lastBackup.ledgerId, SHOP_BE_REAL_ID);
+  assert.equal(ctx.calls.decisions.length, 0);
+});
+
+test('a registry row whose UUID differs from the file meta refuses the backup and opens one identity-mismatch Supervisor DI', async () => {
+  const ledgers = [{ ledgerId: 'nivo-monorepo', repo: fixtureRepo('nivo'), file: fixtureLedger('nivo') }];
+  const registry = [{ ledgerId: '00000000-1111-4222-8333-444444444444', name: 'nivo-monorepo', repoRoot: fixtureRepo('nivo'), file: fixtureLedger('nivo') }];
+  const store = memoryStore(), c = controller({ store: () => store, backupDue: () => true });
+  const ctx = hostCtx({ mode: 'active', ledgers, registry, dbs: { 'nivo-monorepo': ledgerDb() },
+    runAnswer: () => ({ ok: true, stdout: JSON.stringify({ ok: true, verified: true, ledgerId: SHOP_BE_REAL_ID }) }) });
+  const r = await c.reconcile('ledger:nivo-monorepo', ctx);
+  assert.equal(r.backup, false);
+  assert.equal(r.identity.reason, 'identity-mismatch');
+  assert.equal(ctx.calls.run.length, 0, 'a wrong file at a registered path is never snapshotted as that ledger');
+  assert.ok(ctx.calls.log.some((x) => x.kind === 'reconciler.host.ledger-identity' && x.data.reason === 'identity-mismatch'));
+  assert.equal(ctx.calls.decisions.length, 1);
+  assert.equal(ctx.calls.decisions[0].kind, 'runtime-defect');
+  assert.equal(ctx.calls.decisions[0].ledger, 'supervisor');
+  assert.equal(ctx.calls.decisions[0].productLedger, 'nivo-monorepo');
+  assert.ok(ctx.calls.decisions[0].summary.includes('identity-mismatch'));
+  ctx.advance(60_000);
+  await c.reconcile('ledger:nivo-monorepo', ctx);
+  assert.equal(ctx.calls.run.length, 0);
+  assert.equal(ctx.calls.decisions.length, 1, 'the DI opens once, on the edge');
+  registry[0].file = fixtureLedger('elsewhere');
+  ctx.advance(60_000);
+  const moved = await c.reconcile('ledger:nivo-monorepo', ctx);
+  assert.equal(moved.identity.reason, 'registry-file-mismatch', 'a row registering another file is no expectation for this one');
+  assert.equal(ctx.calls.run.length, 0);
+});
+
+test('a ledger with no registry row is never backed up: a typed log row and one unregistered Supervisor DI', async () => {
+  const ledgers = [{ ledgerId: 'nivo-monorepo', repo: fixtureRepo('nivo'), file: fixtureLedger('nivo') }];
+  const store = memoryStore(), c = controller({ store: () => store, backupDue: () => true });
+  const ctx = hostCtx({ mode: 'active', ledgers, registry: [], dbs: { 'nivo-monorepo': ledgerDb() },
+    runAnswer: () => ({ ok: true, stdout: JSON.stringify({ ok: true, verified: true, ledgerId: SHOP_BE_REAL_ID }) }) });
+  const r = await c.reconcile('ledger:nivo-monorepo', ctx);
+  assert.equal(r.backup, false);
+  assert.equal(ctx.calls.run.length, 0, 'the file meta alone is never the expected identity');
+  assert.ok(ctx.calls.log.some((x) => x.kind === 'reconciler.host.ledger-identity' && x.data.reason === 'unregistered'));
+  assert.equal(ctx.calls.decisions.length, 1);
+  assert.equal(ctx.calls.decisions[0].ledger, 'supervisor');
+  assert.equal(ctx.calls.decisions[0].productLedger, 'nivo-monorepo');
+  ctx.advance(60_000);
+  await c.reconcile('ledger:nivo-monorepo', ctx);
+  assert.equal(ctx.calls.decisions.length, 1, 'the DI opens once, on the edge');
+  const bare = hostCtx({ mode: 'active', ledgers, registry: [], dbs: { 'nivo-monorepo': ledgerDb() } });
+  delete bare.machine;
+  const none = await controller({ store: () => memoryStore(), backupDue: () => true }).reconcile('ledger:nivo-monorepo', bare);
+  assert.equal(none.identity.reason, 'registry-unavailable', 'no registry handle is a refusal, never a silent null');
+  assert.equal(bare.calls.run.length, 0);
+});
+
+// The land gate's catalogue check (scripts/checks/check-failure-codes.mjs) refuses an emitted code with no entry:
+// every kebab-case reason the identity gate emits must be catalogued ('unregistered' is one word, so the scanner
+// never treats it as a code and it holds no entry).
+test('every refusal reason the ledger-backup identity gate emits is catalogued', () => {
+  const catalog = parseYaml(fs.readFileSync(new URL('../../modules/kernel/failure-codes.yaml', import.meta.url), 'utf8'));
+  for (const reason of ['registry-unavailable', 'registry-file-mismatch', 'identity-unreadable', 'identity-mismatch'])
+    assert.ok(catalog?.[reason]?.title && catalog[reason].owner && catalog[reason].kind, `${reason}: no catalogue entry`);
 });
 
 test('the supervisor seat runs its watchdog pass through ctx.run; chat mode runs nothing', async () => {
@@ -527,6 +641,8 @@ test('ledger health reports compatibility and access failures without a corrupti
     assert.equal(r.ok, false, reason); assert.equal(ctx.calls.run.length, 0, reason);
     assert.equal(ctx.calls.clock.some((row) => row.state === 'LEDGER_CORRUPT'), false, reason);
     assert.equal(ctx.calls.decisions.length, 1, reason);
+    assert.equal(ctx.calls.decisions[0].ledger, 'supervisor', reason);
+    assert.equal(ctx.calls.decisions[0].productLedger, 'shop-be', reason);
     assert.ok(ctx.calls.decisions[0].summary.includes(reason));
     assert.equal(ctx.calls.decisions[0].summary.includes('restore'), false, reason);
   }
@@ -554,7 +670,7 @@ test('an active verified backup is retried after failure cooldown and suppresses
   const store = memoryStore(), c = controller({ store: () => store, backupDue: () => true });
   let success = false;
   const ctx = hostCtx({ mode: 'active', dbs: { 'shop-be': ledgerDb() }, runAnswer: () => success
-    ? { ok: true, stdout: JSON.stringify({ ok: true, verified: true, ledgerId: 'shop-be' }) } : { ok: false } });
+    ? { ok: true, stdout: JSON.stringify({ ok: true, verified: true, ledgerId: SHOP_BE_REAL_ID }) } : { ok: false } });
   await c.reconcile('ledger:shop-be', ctx); ctx.advance(1);
   await c.reconcile('ledger:shop-be', ctx); assert.equal(ctx.calls.run.length, 1, 'failure observes retry cooldown');
   success = true; ctx.advance(S.ledgerHealth.backupRetryMs);
