@@ -3,8 +3,14 @@
 /** `s` with &, < and > entity-escaped. */
 export const escapeHtml = (s) => String(s ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
 
-/** `value` as JSON on ONE log line: CR, LF, every other C0 control character and U+2028/2029 written as \uXXXX (JSON.stringify already does so for C0 inside strings, so well-formed data prints byte-identically). */
-export const logLine = (value) => Array.from(String(JSON.stringify(value)), (c) => {
+/** `c` (one character) with a C0 control character or U+2028/2029 written as \uXXXX. */
+const visibleChar = (c) => {
   const n = c.codePointAt(0);
   return n < 0x20 || n === 0x2028 || n === 0x2029 ? String.raw`\u${n.toString(16).padStart(4, '0')}` : c;
-}).join('');
+};
+
+/** `value` as JSON on ONE log line: CR, LF, every other C0 control character and U+2028/2029 written as \uXXXX (JSON.stringify already does so for C0 inside strings, so well-formed data prints byte-identically). */
+export const logLine = (value) => Array.from(String(JSON.stringify(value)), visibleChar).join('');
+
+/** `text` as ONE plain line: CR, LF and every other control character except the tab written as \uXXXX; ordinary text, quotes and backslashes print unchanged. */
+export const textLine = (text) => Array.from(String(text ?? ''), (c) => (c === '\t' ? c : visibleChar(c))).join('');

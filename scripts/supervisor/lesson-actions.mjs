@@ -131,7 +131,7 @@ if (isMain(import.meta.url)) {
         const status = r.telegram.ok ? r.telegram.skipped ?? 'sent' : 'FAILED';
         telegram = ` (telegram ${status})`;
       }
-      print(r, `${r.id} recorded${telegram}\n${r.text}`);
+      print(r, [`${r.id} recorded${telegram}`, ...String(r.text ?? '').split('\n')]);
     } else {
       console.error('use: starci supervisor lesson-actions land | revert | propose (see the header)');
       process.exitCode = 2;

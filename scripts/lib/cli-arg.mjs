@@ -1,5 +1,6 @@
 // cli-arg.mjs — the `--name value` and `--flag` readers of the thin CLI entries (the scripts/api call files run as
 // commands, scripts/agent/send.mjs). Pure.
+import { textLine } from './escape.mjs';
 
 /** The value after `--<name>` in argv, else `fallback`. */
 export const arg = (argv, name, fallback = null) => {
@@ -107,12 +108,13 @@ export function opCli(usageText, spec) {
 /**
  * The prelude the multi-verb lesson CLIs share (scripts/machine/lessons.mjs, scripts/supervisor/lesson-actions.mjs):
  * `verb` is argv[0]; `value(n)` the token after `--n` (null when absent); `csv(v)` a trimmed non-empty list;
- * `print(result, human)` logs the human text, or the JSON record under `--json`.
+ * `print(result, human)` logs the JSON record under `--json`, else the human text: one string is one line, an array
+ * holds one element per line; control characters inside a line (CR, LF, escape sequences) print as \uXXXX.
  */
 export function verbCli(argv = process.argv.slice(2)) {
   const value = (n) => { const i = argv.indexOf(`--${n}`); return i >= 0 ? argv[i + 1] ?? null : null; };
   const csv = (v) => String(v ?? '').split(',').map((s) => s.trim()).filter(Boolean);
   const asJson = argv.includes('--json');
-  const print = (r, human) => console.log(asJson ? JSON.stringify(r) : human);
+  const print = (r, human) => console.log(asJson ? JSON.stringify(r) : [human].flat().map(textLine).join('\n'));
   return { argv, verb: argv[0], value, csv, asJson, print };
 }

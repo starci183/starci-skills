@@ -6,7 +6,8 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { containedPath } from '../../scripts/lib/path-key.mjs';
-import { logLine } from '../../scripts/lib/escape.mjs';
+import { logLine, textLine } from '../../scripts/lib/escape.mjs';
+import { verbCli } from '../../scripts/lib/cli-arg.mjs';
 import { renderReportBlock } from '../../scripts/kernel/report-render.mjs';
 import { hasFlag } from '../../scripts/lib/ts-ast.mjs';
 
@@ -37,6 +38,29 @@ test('logLine prints well-formed data byte-identically to JSON.stringify and kee
   assert.equal(hostile, '{"text":"x\\u2028y\\u2029z","key":"k\\u001b[2J"}');
   assert.equal(logLine({ 'line\nbreak': 1 }).includes('\n'), false);
   assert.equal(logLine(undefined), 'undefined');
+});
+
+test('verbCli print keeps legitimate output and never lets a value forge a log line', (t) => {
+  const printed = [];
+  t.mock.method(console, 'log', (text) => printed.push(text));
+  const { print } = verbCli(['list']);
+  print({ ok: true }, 'plain "quoted" back\\slash\ttab');
+  print({ ok: true }, ['first', 'second line']);
+  print({ ok: true }, []);
+  assert.deepEqual(printed, ['plain "quoted" back\\slash\ttab', 'first\nsecond line', '']);
+  printed.length = 0;
+  print({ ok: true }, `title \r\nFORGED line\u001b[2J`);
+  print({ ok: true }, ['row \r\nFORGED', 'next']);
+  assert.deepEqual(printed, ['title \\u000d\\u000aFORGED line\\u001b[2J', 'row \\u000d\\u000aFORGED\nnext']);
+  printed.length = 0;
+  verbCli(['list', '--json']).print({ ok: true, text: 'a\r\nb' }, 'ignored');
+  assert.deepEqual(printed, ['{"ok":true,"text":"a\\r\\nb"}']);
+});
+
+test('textLine writes every control character but the tab visibly and leaves ordinary text alone', () => {
+  assert.equal(textLine('a\r\nb c\u007fd\te'), 'a\\u000d\\u000ab\\u2028c\u007fd\te');
+  assert.equal(textLine(null), '');
+  assert.equal(textLine('plain "q" \\ é \u{1F600}'), 'plain "q" \\ é \u{1F600}');
 });
 
 test('the report block never carries a secret from the report', () => {
