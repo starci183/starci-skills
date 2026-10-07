@@ -279,7 +279,7 @@ function recordSpawnFailure({ m, spawned, token, attempt, route, profile, settin
     supervisorEvent(m, { entityId: profile.id, kind: `${profile.eventPrefix}-start-failed`, payload: { step: spawned?.step ?? null, error: spawned?.error ?? null, terminal: spawned?.terminal ?? null,
       dispatch: spawned?.dispatchId ?? null, effectState: spawned?.effectState ?? null, agent: settings.agent }, now: now() });
   });
-  return { ok: false, exit: 1, action: 'launch-failed', step: spawned?.step ?? null, error: spawned?.error ?? 'spawn failed', terminal: spawned?.terminal ?? null,
+  return { ok: false, exit: 1, action: 'launch-failed', step: spawned?.step ?? null, error: spawned?.error ?? 'spawn failed', ...(spawned?.detail ? { detail: spawned.detail } : {}), terminal: spawned?.terminal ?? null,
     effectState: spawned?.effectState ?? 'unknown', admission: spawned?.admission ?? null };
 }
 

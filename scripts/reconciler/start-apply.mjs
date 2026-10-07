@@ -69,7 +69,7 @@ export async function startSeats(api, { env, orcaUp, config, workflowSeats }, ap
   if (!orcaUp) { applied.push('Orca is not reachable: services, Supervisor seat and Kernel seats were not touched (open Orca, run start again)'); return; }
   if (api.supervisorMode({ env, config }) === 'kernel') {
     const r = await api.json([path.join(SKILL_ROOT, 'scripts', 'supervisor', 'start-supervisor.mjs'), '--json'], { timeoutMs: 300_000 });
-    const error = r?.ok === false ? ` (${String(r.error ?? r.reason ?? '').slice(0, 120)})` : '';
+    const error = r?.ok === false ? ` (${String(r.error ?? r.reason ?? '').slice(0, 120)}${r.detail ? `: ${String(r.detail).slice(0, 240)}` : ''})` : '';
     applied.push(`Supervisor seat: ${r?.action ?? 'no answer'}${error}`);
   }
   if (workflowSeats) {

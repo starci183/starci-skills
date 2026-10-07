@@ -223,6 +223,14 @@ function candidateAssessment(candidate, state, ids, now) {
   return { codes, quota };
 }
 
+// A quota rejection carries the observation's own explanation (its age and the limit it failed).
+const quotaDetailOf = (candidate, codes) => codes.some((code) => code.startsWith('quota-')) && text(candidate.quota?.detail) ? { detail: candidate.quota.detail } : {};
+/** One line naming why each quota-rejected candidate was refused, or null when no rejection carries a detail. */
+export const rejectionSummary = (decision) => {
+  const lines = (decision?.rejected ?? []).filter((row) => text(row.detail)).map((row) => `${row.id}: ${row.detail}`);
+  return lines.length ? lines.join('; ') : null;
+};
+
 // Every candidate assessed in order: the rejected ones land on the receipt, the others are returned with their preference and quota.
 function assessCandidates(candidates, { state, prefer, now, receipt }) {
   const ids = new Set(), eligible = [];
@@ -230,7 +238,7 @@ function assessCandidates(candidates, { state, prefer, now, receipt }) {
     if (!isPlainObject(candidate)) { receipt.rejected.push({ id: null, provider: null, model: null, codes: [ADMISSION_REASON.CANDIDATE_INVALID] }); continue; }
     const { codes, quota } = candidateAssessment(candidate, state, ids, now);
     if (codes.length) receipt.rejected.push({ id: candidate.id ?? null, provider: candidate.provider ?? null,
-      model: candidate.model ?? null, codes: [...new Set(codes)] });
+      model: candidate.model ?? null, codes: [...new Set(codes)], ...quotaDetailOf(candidate, codes) });
     else {
       const preferredAt = prefer.findIndex((selector) => matches(candidate, selector));
       eligible.push({ candidate, index, preferredAt: preferredAt < 0 ? prefer.length : preferredAt, ...quota });

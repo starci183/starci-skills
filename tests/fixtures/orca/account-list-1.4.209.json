@@ -1,0 +1,53 @@
+{
+ "orcaVersion": "1.4.209",
+ "rateLimits": {
+  "claude": {
+   "provider": "claude",
+   "session": {
+    "usedPercent": 1,
+    "windowMinutes": 300,
+    "resetsAt": 1791372599594,
+    "resetDescription": "6:29 PM"
+   },
+   "weekly": {
+    "usedPercent": 8,
+    "windowMinutes": 10080,
+    "resetsAt": 1791860399594,
+    "resetDescription": "Tue 9:59 AM"
+   },
+   "fableWeekly": {
+    "usedPercent": 0,
+    "windowMinutes": 10080,
+    "resetsAt": 1791860400000,
+    "resetDescription": "Tue 10:00 AM"
+   },
+   "updatedAt": 1791357421340,
+   "error": null,
+   "status": "ok",
+   "usageMetadata": {
+    "source": "oauth",
+    "attemptedSources": [
+     "oauth"
+    ],
+    "credentialSource": "credentials-file",
+    "authProvenance": "managed:<account-id>",
+    "lastSuccessfulSource": "oauth"
+   }
+  },
+  "codex": {
+   "provider": "codex",
+   "session": null,
+   "weekly": {
+    "usedPercent": 0,
+    "windowMinutes": 10080,
+    "resetsAt": 1791949981000,
+    "resetDescription": "Wed 10:53 AM"
+   },
+   "rateLimitResetCredits": "<present>",
+   "updatedAt": 1791357401945,
+   "error": null,
+   "status": "ok",
+   "usageMetadata": {}
+  }
+ }
+}

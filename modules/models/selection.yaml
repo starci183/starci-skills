@@ -51,6 +51,7 @@ newAgentAdmission:
     - Missing, stale, invalid or mismatched quota/auth identity refuses every new normal admission; unknown is never presented as verified availability.
     - Every available quota window participates; any window at or above reservePercent blocks normal admission.
     - Only a matching scoped reserve override admits a fresh known reserve window below exhaustedPercent; bad auth, exhausted, stale and unknown cannot be overridden.
+    - Evidence the runtime observes itself (owner grants, direct probes) is fresh within allocation.admission.maxAgeMs; a provider window the host polls (observation host-polled, the Orca account reader only) is fresh within hostPolledMaxAgeMs, which defaults to maxAgeMs.
     - Owner-grant providers have scoped finite slots and fresh owner authority; no window percentages are invented for them.
     - A Critic must have a known author provider and select another provider. A caller may tighten independence to both provider and model, never relax the role rule.
     - Prefer ranks only candidates that passed every hard filter; require unavailability is a refusal with no silent fallback.
@@ -339,8 +340,8 @@ allocationFacts:
       all-window reserve rules, concrete owner constraints, known capacity and no open incident. Missing/unknown
       evidence refuses live routing. A selectPool call without a capacity map is only a static policy plan and
       reports live-evidence-required; it is not an admission receipt and cannot authorize launch.
-      Every skipped pool is reported with its typed reason. A stale token can undergo the provider's
-      refresh attempt before admission, which still requires fresh authenticated evidence. A confirmed auth
+      Every skipped pool is reported with its typed reason. A stale token is not admitted; the owner
+      re-authenticates in Orca, and admission requires fresh authenticated evidence. A confirmed auth
       rejection opens the provider circuit and excludes every pool sharing that credential.
     modelRule: >-
       Each pool's registry.yaml difficulty pin resolves to a declared model identity and effort before common

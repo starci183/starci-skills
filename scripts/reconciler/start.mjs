@@ -167,7 +167,7 @@ function supervisorItem({ mode, statusJson, startJson = null }) {
   const h = statusJson?.health;
   if (startJson?.ok === false) {
     const error = startJson.error || startJson.reason;
-    const detail = `start-supervisor: ${startJson.action ?? 'failed'}` + (error ? ` - ${String(startJson.error ?? startJson.reason).slice(0, 160)}` : '');
+    const detail = `start-supervisor: ${startJson.action ?? 'failed'}` + (error ? ` - ${String(startJson.error ?? startJson.reason).slice(0, 160)}${startJson.detail ? `: ${String(startJson.detail).slice(0, 240)}` : ''}` : '');
     return red('seats', 'supervisor', 'Supervisor seat', detail, 'starci supervisor start --json');
   }
   if (h?.live) {

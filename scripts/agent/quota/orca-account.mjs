@@ -1,4 +1,5 @@
 // Orca owns the observed account windows; runtime admission owns their normalized policy.
+// Every snapshot built here is host-polled: Orca, not the runtime, fetched the usage at entry.updatedAt.
 import { accountList } from '../../api/orca/account-list.mjs';
 import { allocationSettings } from '../../../engine/config.mjs';
 import { normalizeQuotaSnapshot } from './snapshot.mjs';
@@ -8,7 +9,7 @@ export function probeOrcaAccount(provider, options = {}) {
   const clock = typeof options.now === 'function' ? options.now : () => options.now ?? Date.now();
   const normalized = (input) => {
     const now = clock();
-    return normalizeQuotaSnapshot({ provider, account: options.account ?? 'default', observedAt: now, ...input }, { policy, now });
+    return normalizeQuotaSnapshot({ provider, account: options.account ?? 'default', observedAt: now, observation: 'host-polled', observedBy: 'Orca', ...input }, { policy, now });
   };
   let list;
   try { list = (options.accountList ?? accountList)(); }
@@ -17,7 +18,7 @@ export function probeOrcaAccount(provider, options = {}) {
   const entry = list.rateLimits?.[provider];
   if (!entry) return normalized({ state: 'dead', auth: 'unavailable', failureKind: 'missing-account', detail: `no account quota entry for ${provider}` });
   const account = entry.accountId ?? options.account ?? 'default';
-  const observedAt = entry.observedAt ?? entry.usageMetadata?.observedAt ?? list.observedAt ?? list.accounts?.observedAt ?? null;
+  const observedAt = entry.updatedAt ?? entry.observedAt ?? entry.usageMetadata?.observedAt ?? list.observedAt ?? list.accounts?.observedAt ?? null;
   if (entry.status === 'unavailable' || entry.usageMetadata?.failureKind === 'missing-credentials')
     return normalized({ account, observedAt, entry, state: 'dead', auth: 'unavailable', failureKind: entry.usageMetadata?.failureKind ?? 'unavailable', detail: entry.error ?? 'provider unavailable' });
   if (entry.status !== 'ok') return normalized({ account, observedAt, entry, state: 'unknown',
