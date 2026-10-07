@@ -22,7 +22,7 @@
 // A launch-path failure the runtime itself reports for a provider's CLI is classified too (LAUNCH_PATH_FAILURES),
 // as failureKind worker-start: the launch never got a worker because the provider's own CLI failed it. It is a strike
 // (runtimes.yaml allocation.providerStrikes.worker-start): one unrelated failure never opens the circuit, a repeat
-// does, and routing (scripts/agent/pool-selection.mjs) skips the open circuit until it expires or is recovered.
+// does, and routing (scripts/agent/admission.mjs) skips the open circuit until it expires or is recovered.
 import { agentCardOf } from './credential-fingerprint.mjs';
 import { APP_SERVER_FAILURE } from './codex-app-server.mjs';
 import { normalizeProvider } from '../lib/provider.mjs';
