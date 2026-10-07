@@ -2,9 +2,9 @@
 
 /** `text` without its trailing characters that are in `chars`. */
 export function trimTrailingChars(text, chars) {
-  let end = text.length;
-  while (end > 0 && chars.includes(text[end - 1])) end -= 1;
-  return text.slice(0, end);
+  let last = text.length - 1;
+  while (last >= 0 && chars.includes(text[last])) last -= 1;
+  return text.slice(0, last + 1);
 }
 
 /** `text` with every `<name>` placeholder (a `<`, one or more characters other than `>`, a `>`) replaced by `replacement`. */
