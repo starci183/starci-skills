@@ -4,6 +4,7 @@ import { sha256 } from '../../engine/digest.mjs';
 import { isFile, list, workRootOf } from './work-io.mjs';
 import { byCodeUnit } from '../lib/list.mjs';
 import { eachInOrder } from '../lib/in-order.mjs';
+import { bestEffortCallAsync } from '../agent/best-effort-call.mjs';
 import { DRAW_OFF_GRAMMAR_COMPONENT as DOM_OFF_GRAMMAR } from './draw/draw-source.mjs';
 import { anatomyFindings, dnaFindings, loadDna, proposalFilesFor, proposalNamesIn } from './draw/draw-dna.mjs';
 import { measureFindings, nestedVariantFindings } from './draw/draw-layer.mjs';
@@ -106,10 +107,6 @@ function paletteMetric(metrics, captures, brand, palette) {
 }
 
 const sizeOf = (viewport) => `${viewport.width}x${viewport.height}`;
-/** A probe's result, or `{ error }` when it throws or rejects. */
-async function probeResult(run) {
-  try { return await run(); } catch (error) { return { error: String(error?.message ?? error) }; }
-}
 
 function geometryFindingsAt(result, size) {
   if (!result || result.error) return [finding('geometry', DRAW_METRICS_UNVERIFIED, `grammar-geometry could not run at ${size}: ${result?.error ?? 'no result'}`)];
@@ -130,9 +127,9 @@ async function browserMetrics({ captures, html, ui, repo, probeRepo, family, dra
   await eachInOrder(captures, async (capture) => {
     const viewport = { width: capture.viewport.width, height: capture.viewport.height };
     const size = sizeOf(viewport);
-    geometry.push(...geometryFindingsAt(await probeResult(() => probes.geometry(html, viewport, { ...probeOptions })), size));
+    geometry.push(...geometryFindingsAt(await bestEffortCallAsync(() => probes.geometry(html, viewport, { ...probeOptions })), size));
     const scoreOptions = { ...probeOptions, record: ui?.record ?? null, recordFile: ui?.file ?? null };
-    score.push(...scoreFindingsAt(await probeResult(() => probes.score(html, viewport, scoreOptions)), size, capture.png, scores));
+    score.push(...scoreFindingsAt(await bestEffortCallAsync(() => probes.score(html, viewport, scoreOptions)), size, capture.png, scores));
   });
   return { geometry, score };
 }
