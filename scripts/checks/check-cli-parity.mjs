@@ -240,40 +240,42 @@ const strayEntryFindings = (root, files, knownPublic, internalPaths, bad) => {
   }
 };
 
-const catalogDocFindings = (cat, root, modules, switchVerbs, bad) => {
-  for (const g of cat.groups) {
-    for (const v of g.verbs) {
-      if (typeof v.summary !== 'string' || !v.summary.trim()) bad(`docs:${g.group}/${v.verb}`, 'catalog verb has no summary');
-      if (v.impl?.script && !fs.existsSync(path.join(root, v.impl.script))) bad(`handler:${g.group}/${v.verb}`, `impl script ${v.impl.script} does not exist`);
-      if (v.impl?.module) {
-        const moduleFile = path.join(root, v.impl.module);
-        if (!fs.existsSync(moduleFile)) bad(`handler:${g.group}/${v.verb}`, `impl module ${v.impl.module} does not exist`);
-        else if (!declaresExport(read(moduleFile), v.impl.export)) {
-          bad(`handler:${g.group}/${v.verb}`, `impl module ${v.impl.module} does not export ${v.impl.export}`);
-        }
-      }
-      if (g.group === 'kernel' && v.impl?.script === 'scripts/kernel/cli.mjs' && !modules.has(v.verb) && !switchVerbs.includes(v.verb)) {
-        bad(`handler:kernel/${v.verb}`, 'no verb module and no cli.mjs dispatch case');
-      }
+const catalogVerbFindings = (group, verb, root, modules, switchVerbs, bad) => {
+  if (typeof verb.summary !== 'string' || !verb.summary.trim()) bad(`docs:${group.group}/${verb.verb}`, 'catalog verb has no summary');
+  if (verb.impl?.script && !fs.existsSync(path.join(root, verb.impl.script))) bad(`handler:${group.group}/${verb.verb}`, `impl script ${verb.impl.script} does not exist`);
+  if (verb.impl?.module) {
+    const moduleFile = path.join(root, verb.impl.module);
+    if (!fs.existsSync(moduleFile)) bad(`handler:${group.group}/${verb.verb}`, `impl module ${verb.impl.module} does not exist`);
+    else if (!declaresExport(read(moduleFile), verb.impl.export)) {
+      bad(`handler:${group.group}/${verb.verb}`, `impl module ${verb.impl.module} does not export ${verb.impl.export}`);
     }
+  }
+  if (group.group === 'kernel' && verb.impl?.script === 'scripts/kernel/cli.mjs' && !modules.has(verb.verb) && !switchVerbs.includes(verb.verb)) {
+    bad(`handler:kernel/${verb.verb}`, 'no verb module and no cli.mjs dispatch case');
   }
 };
 
+const catalogDocFindings = (cat, root, modules, switchVerbs, bad) => {
+  for (const group of cat.groups) for (const verb of group.verbs) catalogVerbFindings(group, verb, root, modules, switchVerbs, bad);
+};
+
 // flags: usage + required of each module, plus the shared boolean flag file
+const flagNamesOf = (verb) => new Set((verb?.flags ?? []).map((flag) => flag.name));
+
+const kernelModuleFlagFindings = (verb, mod, catalogKernelVerbs, coreUsage, bad) => {
+  const doc = catalogKernelVerbs.get(verb);
+  if (!doc || doc.impl?.module) return;
+  const have = flagNamesOf(doc);
+  const inUsage = flagsOfUsage(mod.usage ?? (coreUsage[verb] ?? []).join('\n'));
+  for (const flag of inUsage) if (!have.has(flag)) bad(`flags:kernel/${verb}`, `--${flag} of the usage is not a catalog flag`);
+  for (const flag of mod.required) if (!have.has(flag)) bad(`flags:kernel/${verb}`, `required --${flag} is not a catalog flag`);
+};
+
 const kernelFlagFindings = (root, kernel, modules, catalogKernelVerbs, coreUsage, bad) => {
-  const flagNames = (v) => new Set((v?.flags ?? []).map((f) => f.name));
-  for (const [verb, mod] of modules) {
-    const doc = catalogKernelVerbs.get(verb);
-    if (!doc) continue;
-    if (doc.impl?.module) continue;
-    const have = flagNames(doc);
-    const inUsage = flagsOfUsage(mod.usage ?? (coreUsage[verb] ?? []).join('\n'));
-    for (const f of inUsage) if (!have.has(f)) bad(`flags:kernel/${verb}`, `--${f} of the usage is not a catalog flag`);
-    for (const f of mod.required) if (!have.has(f)) bad(`flags:kernel/${verb}`, `required --${f} is not a catalog flag`);
-  }
+  for (const [verb, mod] of modules) kernelModuleFlagFindings(verb, mod, catalogKernelVerbs, coreUsage, bad);
   const boolFile = path.join(root, 'scripts', 'kernel', 'api-boolean-flags.txt');
   if (fs.existsSync(boolFile)) {
-    const union = new Set((kernel?.verbs ?? []).flatMap((v) => [...flagNames(v)]));
+    const union = new Set((kernel?.verbs ?? []).flatMap((verb) => [...flagNamesOf(verb)]));
     for (const line of read(boolFile).split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('#'))) {
       if (!union.has(line)) bad('flags:kernel', `api-boolean-flags.txt: --${line} is in no kernel verb's catalog flags`);
     }
