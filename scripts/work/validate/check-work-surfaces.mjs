@@ -379,7 +379,7 @@ function portAppMap(workRoot, feRoot) {
 
 const normRoute = p => ('/' + String(p).split('/')
   .filter(Boolean)
-  .map(s => (/^[:[]/.test(s) ? ':_' : s))
+  .map(s => (s.startsWith(':') || s.startsWith('[') ? ':_' : s))
   .join('/')).replace(/\/+$/, '') || '/';
 
 const normMethod = m => String(m).toUpperCase();
