@@ -2,6 +2,7 @@
 import { changeWorkflowPhase, getUnit, recordJobResult, resolveIncident, setInboxStatus, setJobStatus, setUnitState, updateAttempt, updateIncident, updateJob } from '../../../engine/db/ledger.mjs';
 import { recordWhy } from '../why-record.mjs';
 import { parseJson } from '../../lib/json.mjs';
+import { eachInOrder } from '../../lib/in-order.mjs';
 import { JOB_ROW, latestAttemptOf } from '../../machine/job-row.mjs';
 import { ARCHIVED_BY, getWorkflow, jobOpOf, jobPayloadOf } from './shared/rows.mjs';
 import { kernelCustodyOf } from './shared/kernel-seat.mjs';
@@ -21,10 +22,10 @@ const STOP_FIRST = new Set(['awaiting-approval', 'queued', 'running', 'paused'])
 
 async function retireWorkflowAsks(ledger, workflowId, reason, repo) {
   const retired = [];
-  for (const dispatchId of openAskDispatchesOf(ledger.db, workflowId)) {
+  await eachInOrder(openAskDispatchesOf(ledger.db, workflowId), async (dispatchId) => {
     const result = await retireAsk(ledger, { workflowId, dispatchId, reason, repo });
     if (result.retired) retired.push(dispatchId);
-  }
+  });
   return retired;
 }
 

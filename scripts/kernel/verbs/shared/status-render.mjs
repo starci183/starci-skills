@@ -250,6 +250,21 @@ const hostPhase = (s) => {
   s.stuckPast = s.stuck.filter((item) => item.severity !== 'ok');
 };
 
+/** Attaches each non-green leg's attempt whys; returns the most recently ended one ({op, attemptId, ...why}) or null. */
+const attachLegWhys = (db, workflowId, legs) => {
+  let newestWhy = null;
+  for (const leg of legs) {
+    if (['green', 'green-provisional', 'deferred'].includes(leg.color)) continue;
+    const rows = db.prepare('SELECT * FROM op_attempts WHERE workflow_id=? AND op_id=? AND dispatched_at IS NOT NULL ORDER BY attempt_id DESC LIMIT 6').all(workflowId, leg.op);
+    const attempts = rows.map((a) => ({ attemptId: a.attempt_id, tryNo: a.try_no, verdict: a.verdict ?? null, endState: a.end_state ?? null, why: whyOf(db, a) })).filter((a) => a.why);
+    if (!attempts.length) continue;
+    leg.why = attempts[0].why;
+    leg.attempts = attempts;
+    if (!newestWhy || attempts[0].attemptId > newestWhy.attemptId) newestWhy = { op: leg.op, attemptId: attempts[0].attemptId, ...attempts[0].why };
+  }
+  return newestWhy;
+};
+
 // The names a person reads (scripts/lib/display-names.mjs): the workflow's display name as `title`, each
 // leg's and next step's op label, and the op-job name of a step that names its job. Ids stay the keys.
 const displayPhase = (s) => {
@@ -268,16 +283,7 @@ const displayPhase = (s) => {
   // Why each leg that is not green stands where it does, in the owner's words (scripts/kernel/why.mjs, stored in
   // op_attempts.why_json): leg.why is the latest attempt's, leg.attempts every attempt of the op that needed one (newest
   // first, at most 6); frontier.why is the most recently ended one. Headline first.
-  let newestWhy = null;
-  for (const leg of s.graph.legs) {
-    if (['green', 'green-provisional', 'deferred'].includes(leg.color)) continue;
-    const rows = db.prepare('SELECT * FROM op_attempts WHERE workflow_id=? AND op_id=? AND dispatched_at IS NOT NULL ORDER BY attempt_id DESC LIMIT 6').all(workflowId, leg.op);
-    const attempts = rows.map((a) => ({ attemptId: a.attempt_id, tryNo: a.try_no, verdict: a.verdict ?? null, endState: a.end_state ?? null, why: whyOf(db, a) })).filter((a) => a.why);
-    if (!attempts.length) continue;
-    leg.why = attempts[0].why;
-    leg.attempts = attempts;
-    if (!newestWhy || attempts[0].attemptId > newestWhy.attemptId) newestWhy = { op: leg.op, attemptId: attempts[0].attemptId, ...attempts[0].why };
-  }
+  const newestWhy = attachLegWhys(db, workflowId, s.graph.legs);
   if (newestWhy) s.frontier.why = { headline: newestWhy.headline, op: newestWhy.op, state: newestWhy.state, next: newestWhy.next, owner: newestWhy.owner, attemptId: newestWhy.attemptId };
   s.kernelNotes = kernelNotesOf(db, workflowId);
   // The owner's "test later" list: every leg the config.yaml specs switches deferred (starci kernel run-deferred-tests runs them).

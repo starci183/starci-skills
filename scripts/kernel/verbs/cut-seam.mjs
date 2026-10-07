@@ -30,7 +30,8 @@ function publishCutInterface({ ledger, db, args, repo, caller, internals, mode, 
 }
 
 function reconcileCut({ ledger, db, args, mode, now, job, cut, op, emit }) {
-  if (!cut || !(Number(cut.ordinal) > 1)) throw Object.assign(new Error(`${args.job} is not a sibling ordinal of a cut`), { code: 'cut-seam-not-sibling' });
+  const isSibling = Boolean(cut) && Number(cut.ordinal) > 1;
+  if (!isSibling) throw Object.assign(new Error(`${args.job} is not a sibling ordinal of a cut`), { code: 'cut-seam-not-sibling' });
   if (!cut.seamStub) throw Object.assign(new Error(`${args.job} did not run on a stub: nothing to reconcile`), { code: 'cut-seam-no-stub' });
   if (job.status !== 'succeeded') throw Object.assign(new Error(`${args.job} is ${job.status}: only a passed stub sibling is reconciled`), { code: 'cut-seam-not-passed' });
   const exitCode = Number(args['exit-code']);

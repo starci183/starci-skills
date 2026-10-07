@@ -6,3 +6,9 @@ export class VerbExit extends Error {
     this.exitCode = exitCode;
   }
 }
+
+/** Emits the refusal object and its text through the verb context `s` ({ emit, args }), then ends the verb with exit 1. */
+export const refuseVerb = (s, out, text) => {
+  s.emit(out, text, s.args.json);
+  throw new VerbExit(1);
+};

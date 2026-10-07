@@ -173,25 +173,29 @@ export default {
   // key cleared while the box was empty): foreign text gets one Ctrl+U probe (clear-draft.mjs
   // probeDraft). Text that changed is real - the deleted part is typed back and the nudge refuses;
   // text the Ctrl+U left unchanged is stale - noted draft-stale, never refused, and the wake is typed.
+  const draftProbeOf = (probe) => {
+    const draftProbe = { verdict: probe.verdict, sends: probe.sends };
+    if (probe.verdict !== 'real') return draftProbe;
+    draftProbe.restored = probe.restored;
+    if (!probe.restored) draftProbe.removed = probe.removed;
+    return draftProbe;
+  };
+  const refuseForeignDraft = (probe, draftOwner) => {
+    const draftProbe = draftProbeOf(probe);
+      const out = { ok: false, jobId, nudged: false, reason: 'foreign-input', input: draftOwner.draft.slice(0, 200), inputSource: 'draft', draftProbe, worker };
+    const shown = draftOwner.draft.length > 80 ? `${draftOwner.draft.slice(0, 80)}…` : draftOwner.draft;
+    const restoredNote = probe.restored ? ', its cut typed back' : ', NOT restored';
+    const probeNote = probe.verdict === 'real' ? `changed it - real text${restoredNote}` : 'left it unreadable';
+      emit(out, `nudge REFUSED for ${jobId}: foreign-input — the input box draft Orca reports holds '${shown}' that is neither a staged paste nor the runtime's own delivered text; the wake was not typed (a Ctrl+U probe ${probeNote}), no event is appended`, args.json);
+    throw new VerbExit(1);
+  };
   const foreignDraftGate = (prompt, stagedEvidence) => {
     const draftOwner = worker.draft ? draftOwnership(worker.draft, { texts: [prompt, stagedEvidence.sentText], stagedPattern: stagedEvidence.stagedPattern }) : null;
     const staleDrafts = [];
-    if (draftOwner?.kind === 'foreign') {
-      const probe = probeDraft({ terminal: worker.terminalHandle });
-      if (probe.verdict === 'stale') staleDrafts.push(probe.draft);
-      else if (probe.verdict !== 'none') {
-        const draftProbe = { verdict: probe.verdict, sends: probe.sends };
-        if (probe.verdict === 'real') {
-          draftProbe.restored = probe.restored;
-          if (!probe.restored) draftProbe.removed = probe.removed;
-        }
-        const out = { ok: false, jobId, nudged: false, reason: 'foreign-input', input: draftOwner.draft.slice(0, 200), inputSource: 'draft', draftProbe, worker };
-        const shown = draftOwner.draft.length > 80 ? `${draftOwner.draft.slice(0, 80)}…` : draftOwner.draft;
-        const probeNote = probe.verdict === 'real' ? `changed it - real text${probe.restored ? ', its cut typed back' : ', NOT restored'}` : 'left it unreadable';
-        emit(out, `nudge REFUSED for ${jobId}: foreign-input — the input box draft Orca reports holds '${shown}' that is neither a staged paste nor the runtime's own delivered text; the wake was not typed (a Ctrl+U probe ${probeNote}), no event is appended`, args.json);
-        throw new VerbExit(1);
-      }
-    }
+    if (draftOwner?.kind !== 'foreign') return staleDrafts;
+    const probe = probeDraft({ terminal: worker.terminalHandle });
+    if (probe.verdict === 'stale') staleDrafts.push(probe.draft);
+    else if (probe.verdict !== 'none') refuseForeignDraft(probe, draftOwner);
     return staleDrafts;
   };
   const inputRowGate = (prompt, stagedEvidence) => {
@@ -204,6 +208,28 @@ export default {
       throw new VerbExit(1);
     }
   };
+  // The input box changed between the check above and the send: foreign text appeared, or a pile of
+  // runtime text would not clear. Nothing was typed onto it.
+  const refuseDraftDelivery = (proof) => {
+    const out = { ok: false, jobId, nudged: false, reason: proof.delivery, input: proof.draft ?? null, inputSource: 'draft', ...deliveryFieldsOf(proof), worker };
+    const why = proof.delivery === 'foreign-input'
+      ? `the input box draft Orca reports holds '${String(proof.draft ?? '').slice(0, 80)}' that is neither a staged paste nor the runtime's own delivered text; the wake was not typed (only a Ctrl+U probe and its restore)`
+      : `the input box holds piled-up runtime text that bounded Ctrl+U shrank but could not empty ('${String(proof.draft ?? '').slice(0, 80)}'); the wake was not typed onto it`;
+    emit(out, `nudge REFUSED for ${jobId}: ${proof.delivery} — ${why}, no event is appended`, args.json);
+    throw new VerbExit(1);
+  };
+  const refuseAgentExitedAfterSend = (proof, delivered) => {
+    const typed = Boolean(proof.sent);
+    if (typed) ledger.transaction(() => ledger.appendEvent({
+      workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
+      kind: 'op-worker-wake-to-shell', payload: { opId: job.op_id, attempt: job.attempt, dispatchId, terminal: worker.terminalHandle,
+        priorLiveness: worker.liveness, shellPrompt: proof.shellPrompt ?? null, ...deliveredForEvent(delivered) },
+    }));
+    const out = { ok: false, jobId, nudged: false, reason: 'agent-exited', ...delivered, shellPrompt: proof.shellPrompt ?? null, typed, worker };
+    const what = typed ? `a shell received the wake: '${proof.shellPrompt}'` : `the worker's agent exited; its terminal shows the shell prompt '${proof.shellPrompt}'; nothing was typed`;
+    emit(out, `nudge REFUSED for ${jobId}: agent-exited — ${what} - ${deadWorkerRecovery(jobId)}`, args.json);
+    throw new VerbExit(1);
+  };
   const sendWake = (prompt, stagedEvidence, staleDrafts) => {
     // Delivery is proven from the screen, not Orca's receipt: agent_prompt_stalled
     // (text queued behind a running turn) and agent_prompt_blocked (Enter refused,
@@ -212,34 +238,14 @@ export default {
     const proof = sendWakeWithProof({ terminal: worker.terminalHandle, text: prompt, stagedPattern: stagedEvidence.stagedPattern,
       ownTexts: [stagedEvidence.sentText].filter(Boolean), staleDrafts });
     const sent = proof.sent ?? {};
-    // The input box changed between the check above and the send: foreign text appeared, or a pile of
-    // runtime text would not clear. Nothing was typed onto it.
-    if (!proof.ok && (proof.delivery === 'foreign-input' || proof.delivery === 'draft-stuck')) {
-      const out = { ok: false, jobId, nudged: false, reason: proof.delivery, input: proof.draft ?? null, inputSource: 'draft', ...deliveryFieldsOf(proof), worker };
-      const why = proof.delivery === 'foreign-input'
-        ? `the input box draft Orca reports holds '${String(proof.draft ?? '').slice(0, 80)}' that is neither a staged paste nor the runtime's own delivered text; the wake was not typed (only a Ctrl+U probe and its restore)`
-        : `the input box holds piled-up runtime text that bounded Ctrl+U shrank but could not empty ('${String(proof.draft ?? '').slice(0, 80)}'); the wake was not typed onto it`;
-      emit(out, `nudge REFUSED for ${jobId}: ${proof.delivery} — ${why}, no event is appended`, args.json);
-      throw new VerbExit(1);
-    }
+    if (!proof.ok && (proof.delivery === 'foreign-input' || proof.delivery === 'draft-stuck')) refuseDraftDelivery(proof);
     // A dropped wake (ok receipt, idle frame, no text) is retried once split -
     // text, then Enter-only - and says so: splitRetried/splitOutcome.
     const delivered = deliveryFieldsOf(proof);
     // The agent exited after the observation: the frame read right before typing
     // ended in a shell (nothing typed), or the frames after the send show a shell
     // got the text. Never a delivery; reconcile --dead-worker recovers the job.
-    if (!proof.ok && proof.delivery === 'agent-exited') {
-      const typed = Boolean(proof.sent);
-      if (typed) ledger.transaction(() => ledger.appendEvent({
-        workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
-        kind: 'op-worker-wake-to-shell', payload: { opId: job.op_id, attempt: job.attempt, dispatchId, terminal: worker.terminalHandle,
-          priorLiveness: worker.liveness, shellPrompt: proof.shellPrompt ?? null, ...deliveredForEvent(delivered) },
-      }));
-      const out = { ok: false, jobId, nudged: false, reason: 'agent-exited', ...delivered, shellPrompt: proof.shellPrompt ?? null, typed, worker };
-      const what = typed ? `a shell received the wake: '${proof.shellPrompt}'` : `the worker's agent exited; its terminal shows the shell prompt '${proof.shellPrompt}'; nothing was typed`;
-      emit(out, `nudge REFUSED for ${jobId}: agent-exited — ${what} - ${deadWorkerRecovery(jobId)}`, args.json);
-      throw new VerbExit(1);
-    }
+    if (!proof.ok && proof.delivery === 'agent-exited') refuseAgentExitedAfterSend(proof, delivered);
     if (!proof.ok) {
       const refused = recordSendRefused(ledger, job, { dispatchId, worker, proof });
       const out = { ok: false, jobId, nudged: false, reason: 'terminal-send-failed', ...delivered, worker, error: sent.error, ...(refused ? { sendRefused: true } : {}) };

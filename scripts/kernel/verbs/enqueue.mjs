@@ -20,39 +20,33 @@ import { seamPriorityOf } from '../seam-policy.mjs';
 import { deferralOf as testDeferralOf, deferJob, explicitAsksOf } from '../../route/spec-deferral.mjs';
 import { VerbExit } from './shared/verb-exit.mjs';
 
-export default {
-  verb: 'enqueue',
-  required: ['workflow', 'op', 'paths'],
-  kernelOnly: true,
-  usageInCore: true,
-  run({ ledger, args, repo, emit, internals }) {
-    const { refuseDecisionsFirst, refuseStaleKernelRev, goalLegOf, foundationDutyOf,
-      AGENT_HIERARCHY_SCHEMA, operationNodeId, kernelNodeId, FINAL_SETTLED, skillRoot } = internals;
-  const db = ledger.db, workflowId = args.workflow, now = Date.now();
-  refuseDecisionsFirst(db, workflowId, 'enqueue', { now, resolves: args.resolves ?? null, repo });
-  const wf = getWorkflow(db, workflowId);
-  if (!wf) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
-  // A paused, stopped, finished or archived workflow takes no new work (DBTREE jobs_enqueue_guard).
-  requirePhase(wf, ACCEPTS_WORK, 'enqueue');
-  const briefFile = path.join(skillRoot, 'modules', 'ops', 'ops', `${args.op}.yaml`);
-  if (!fs.existsSync(briefFile)) {
-    throw Object.assign(new Error(`unknown op ${args.op} — no brief at modules/ops/ops/${args.op}.yaml`), { code: 'unknown-op' });
+/** Emits the typed refusal object and its text, then leaves the verb with exit 1. */
+const refuseEnqueue = (emit, args, out) => {
+  emit(out, `enqueue REFUSED for ${args.op}: ${out.reason} — ${out.detail}`, args.json);
+  throw new VerbExit(1);
+};
+
+/** A comma list flag as its distinct, trimmed, non-empty items. */
+const listOf = (value) => [...new Set(String(value ?? '').split(',').map((s) => s.trim()).filter(Boolean))];
+
+/** The --params JSON object of the Kernel's own choices; anything else is refused. */
+function flagParamsOf(text) {
+  let flagParams;
+  try { flagParams = JSON.parse(text); }
+  catch (e) { throw Object.assign(new Error(`--params is not JSON: ${e.message}`), { code: 'params-invalid' }); }
+  if (flagParams === null || typeof flagParams !== 'object' || Array.isArray(flagParams)) {
+    throw Object.assign(new Error('--params must be a JSON object of {name: value}'), { code: 'params-invalid' });
   }
-  refuseStaleKernelRev(db, workflowId, args.op, 'enqueue');
-  const goal = latestGoal(db, workflowId);
-  // Tunables are data. The brief declares each param's type, default and setter;
-  // the approved goal leg carries what the owner chose, --params carries what the
-  // kernel chose, and a value that fails either authority is refused here rather
-  // than reaching an agent as an unbound number.
-  const brief = readOpManifest(briefFile);
-  let flagParams = null;
-  if (args.params !== undefined) {
-    try { flagParams = JSON.parse(args.params); }
-    catch (e) { throw Object.assign(new Error(`--params is not JSON: ${e.message}`), { code: 'params-invalid' }); }
-    if (flagParams === null || typeof flagParams !== 'object' || Array.isArray(flagParams)) {
-      throw Object.assign(new Error('--params must be a JSON object of {name: value}'), { code: 'params-invalid' });
-    }
-  }
+  return flagParams;
+}
+
+/**
+ * Tunables are data. The brief declares each param's type, default and setter; the approved goal leg carries what the
+ * owner chose, --params carries what the kernel chose, and a value that fails either authority is refused here rather
+ * than reaching an agent as an unbound number.
+ */
+function resolvedParamsOf({ db, args, brief, goal, workflowId, goalLegOf, emit }) {
+  const flagParams = args.params !== undefined ? flagParamsOf(args.params) : null;
   const legSplit = splitGoalLegParams(brief, goalLegOf(goal, args.op));
   const kernelFlag = Object.keys(legSplit.kernel).length || flagParams ? { ...legSplit.kernel, ...flagParams } : null;
   // Autopilot (owner ruling 2026-09-28 "limit provision asks"): no provision.ask leg opens mid-flow - the code
@@ -61,18 +55,33 @@ export default {
   // handover-credentials); a retry of an ask the owner already answered (--retry-of) still runs.
   if (args.op === 'provision.ask' && args['retry-of'] == null && provisionAskMidFlow(db, workflowId, { params: { ...legSplit.owner, ...kernelFlag } })) {
     const checklistParams = `{"subject":"${HANDOVER_CREDENTIALS_SUBJECT}"}`;
-    const out = { ok: false, workflowId, op: args.op, reason: 'autopilot-provision-deferred',
-      detail: `autopilot (${AUTOPILOT_RULING}) opens no provision.ask mid-flow: build on the sandbox/stub path, record the need with starci kernel autopilot --workflow ${workflowId} --defer-to-handover --op <asking op> --class credential|real-money|shared-system|owner-decision --detail "<what is owed>" [--fields <FILE_OR_VAR,...>], and the end-of-flow checklist (--params '${checklistParams}') collects it once` };
-    emit(out, `enqueue REFUSED for ${args.op}: ${out.reason} — ${out.detail}`, args.json);
-    throw new VerbExit(1);
+    refuseEnqueue(emit, args, { ok: false, workflowId, op: args.op, reason: 'autopilot-provision-deferred',
+      detail: `autopilot (${AUTOPILOT_RULING}) opens no provision.ask mid-flow: build on the sandbox/stub path, record the need with starci kernel autopilot --workflow ${workflowId} --defer-to-handover --op <asking op> --class credential|real-money|shared-system|owner-decision --detail "<what is owed>" [--fields <FILE_OR_VAR,...>], and the end-of-flow checklist (--params '${checklistParams}') collects it once` });
   }
   const resolvedParams = resolveOpParams(brief, { leg: legSplit.owner, flag: kernelFlag, enforceRequired: true });
   if (!resolvedParams.ok && resolvedParams.param) {
-    const out = { ok: false, workflowId, op: args.op, reason: resolvedParams.reason, param: resolvedParams.param, detail: resolvedParams.detail };
-    emit(out, `enqueue REFUSED for ${args.op}: ${out.reason} — ${out.detail}`, args.json);
-    throw new VerbExit(1);
+    refuseEnqueue(emit, args, { ok: false, workflowId, op: args.op, reason: resolvedParams.reason, param: resolvedParams.param, detail: resolvedParams.detail });
   }
   if (!resolvedParams.ok) throw Object.assign(new Error(resolvedParams.detail), { code: resolvedParams.reason });
+  return resolvedParams;
+}
+
+/** An authoring op goes only onto the Work families its manifest writes (scripts/kernel/write-families.mjs). */
+function refuseWrongFamily({ args, brief, ownedPaths, skillRoot, workflowId, emit }) {
+  const familyGuard = familyGuardOf(brief);
+  const wrongFamily = familyViolations(familyGuard, ownedPaths);
+  if (!wrongFamily.length) return;
+  const owners = familyOwners(fs.readdirSync(path.join(skillRoot, 'modules', 'ops', 'ops')).filter((f) => f.endsWith('.yaml'))
+    .map((f) => { try { return readOpManifest(path.join(skillRoot, 'modules', 'ops', 'ops', f)); } catch { return null; } }).filter(Boolean));
+  const hint = [...new Set(wrongFamily.map((v) => v.family).filter(Boolean))].map((family) => `${family}/ -> ${(owners.get(family) ?? ['no op']).join('|')}`).join('; ');
+  const pathDetails = wrongFamily.slice(0, 5).map((v) => `${v.path} (${v.why})`).join('; ');
+  const hintNote = hint ? `. Route by family: ${hint}` : '';
+  refuseEnqueue(emit, args, { ok: false, workflowId, op: args.op, reason: 'owned-paths-outside-writes', violations: wrongFamily, families: [...(familyGuard?.families ?? [])], owners: Object.fromEntries(owners),
+    detail: `${wrongFamily.length} owned path(s) lie outside ${args.op}'s writes: ${pathDetails}${hintNote}` });
+}
+
+/** The write set of the op: never empty, never a kernel custody root, and only the Work families its manifest writes. */
+function ownedPathsOf({ args, brief, skillRoot, workflowId, emit }) {
   const ownedPaths = [...new Set(String(args.paths).split(',').map((s) => s.trim()).filter(Boolean))];
   // An op with no owned_paths is an unbounded write grant: the packet would
   // tell the worker "(per brief write-ceiling)" and nothing would fence it.
@@ -86,62 +95,50 @@ export default {
   if (custody.length) {
     throw Object.assign(new Error(`--paths names kernel custody ${custody.join(', ')} for ${args.op}; kernel-evidence, kernel-strays and kernel-approvals are the kernel's, never an op's write set`), { code: 'path-kernel-custody' });
   }
-  // An authoring op goes only onto the Work families its manifest writes (scripts/kernel/write-families.mjs):
   // business.decide onto integration/, impl/ or src/ was an LLM attempt spent to report blocked authority.
-  {
-    const familyGuard = familyGuardOf(brief);
-    const wrongFamily = familyViolations(familyGuard, ownedPaths);
-    if (wrongFamily.length) {
-      const owners = familyOwners(fs.readdirSync(path.join(skillRoot, 'modules', 'ops', 'ops')).filter((f) => f.endsWith('.yaml'))
-        .map((f) => { try { return readOpManifest(path.join(skillRoot, 'modules', 'ops', 'ops', f)); } catch { return null; } }).filter(Boolean));
-      const hint = [...new Set(wrongFamily.map((v) => v.family).filter(Boolean))].map((family) => `${family}/ -> ${(owners.get(family) ?? ['no op']).join('|')}`).join('; ');
-      const pathDetails = wrongFamily.slice(0, 5).map((v) => `${v.path} (${v.why})`).join('; ');
-      const hintNote = hint ? `. Route by family: ${hint}` : '';
-      const out = { ok: false, workflowId, op: args.op, reason: 'owned-paths-outside-writes', violations: wrongFamily, families: [...(familyGuard?.families ?? [])], owners: Object.fromEntries(owners),
-        detail: `${wrongFamily.length} owned path(s) lie outside ${args.op}'s writes: ${pathDetails}${hintNote}` };
-      emit(out, `enqueue REFUSED for ${args.op}: ${out.reason} — ${out.detail}`, args.json);
-      throw new VerbExit(1);
-    }
-  }
-  const records = [...new Set(String(args.records ?? '').split(',').map((s) => s.trim()).filter(Boolean))];
+  refuseWrongFamily({ args, brief, ownedPaths, skillRoot, workflowId, emit });
+  return ownedPaths;
+}
+
+/** The cut of a sibling-ordinal enqueue ({id, ordinal, total}), or null; a partial or malformed cut is refused. */
+function cutOf(args) {
   const cutValues = [args['cut-id'], args['cut-ordinal'], args['cut-total']];
   const hasCut = cutValues.some((value) => value != null);
-  if (hasCut && cutValues.some((value) => value == null)) {
+  if (!hasCut) return null;
+  if (cutValues.some((value) => value == null)) {
     throw Object.assign(new Error('cut enqueue requires --cut-id, --cut-ordinal and --cut-total together'), { code: 'cut-invalid' });
   }
-  const cutOrdinal = hasCut ? Number(args['cut-ordinal']) : null;
-  const cutTotal = hasCut ? Number(args['cut-total']) : null;
-  if (hasCut && (!String(args['cut-id']).trim() || !Number.isInteger(cutOrdinal) || !Number.isInteger(cutTotal)
-      || cutOrdinal < 1 || cutTotal < 2 || cutOrdinal > cutTotal)) {
+  const cutOrdinal = Number(args['cut-ordinal']);
+  const cutTotal = Number(args['cut-total']);
+  if (!String(args['cut-id']).trim() || !Number.isInteger(cutOrdinal) || !Number.isInteger(cutTotal)
+      || cutOrdinal < 1 || cutTotal < 2 || cutOrdinal > cutTotal) {
     throw Object.assign(new Error('cut enqueue requires a non-empty id and integers 1 <= ordinal <= total with total >= 2'), { code: 'cut-invalid' });
   }
-  const cut = hasCut ? { id: String(args['cut-id']).trim(), ordinal: cutOrdinal, total: cutTotal } : null;
-  // H6: the first try of a canon slice comes from the canon plan (scripts/kernel/canon-plan-gate.mjs): its owned paths
-  // cover the plan's grants, and a slice whose moves another slice holds is cut again, never enqueued to block.
-  const canonPlan = isCanonSlice({ cut, params: resolvedParams.params }) && !(typeof args['retry-of'] === 'string' && args['retry-of'].trim())
-    ? requirePlannedCanonSlice({ cut, ownedPaths, scanFile: args['canon-scan'] ?? null }).plan : null;
-  // Persist the repository so dispatch, guards and settle use the same root.
+  return { id: String(args['cut-id']).trim(), ordinal: cutOrdinal, total: cutTotal };
+}
+
+/**
+ * The repository the op runs in, persisted so dispatch, guards and settle use the same root; a grant the worker could
+ * never satisfy (its directory does not exist in the target repository) is refused here, unless it is an explicit
+ * --new-module grant (scripts/kernel/grant-parents.mjs).
+ */
+function targetOf({ args, ownedPaths, repo, workflowId, emit }) {
   const target = enqueueRepository({ op: args.op, repository: args.repository, ownedPaths, repo });
-  if (!target.ok) {
-    const out = { ok: false, workflowId, op: args.op, reason: target.reason, detail: target.detail };
-    emit(out, `enqueue REFUSED for ${args.op}: ${out.reason} — ${out.detail}`, args.json);
-    throw new VerbExit(1);
+  if (!target.ok) refuseEnqueue(emit, args, { ok: false, workflowId, op: args.op, reason: target.reason, detail: target.detail });
+  const newModules = listOf(args['new-module']);
+  const grant = checkGrantParents({ op: args.op, payload: { repository: target.repository ?? undefined, new_modules: newModules }, ownedPaths, repo });
+  if (!grant.ok) {
+    refuseEnqueue(emit, args, { ok: false, workflowId, op: args.op, reason: grant.reason, violations: grant.violations.map(({ owned, dir, closest }) => ({ owned, dir, closest })), detail: grant.detail });
   }
-  // A grant the worker could never satisfy (its directory does not exist in the target repository) is refused here,
-  // unless it is an explicit --new-module grant (scripts/kernel/grant-parents.mjs).
-  const newModules = [...new Set(String(args['new-module'] ?? '').split(',').map((s) => s.trim()).filter(Boolean))];
-  {
-    const grant = checkGrantParents({ op: args.op, payload: { repository: target.repository ?? undefined, new_modules: newModules }, ownedPaths, repo });
-    if (!grant.ok) {
-      const out = { ok: false, workflowId, op: args.op, reason: grant.reason, violations: grant.violations.map(({ owned, dir, closest }) => ({ owned, dir, closest })), detail: grant.detail };
-      emit(out, `enqueue REFUSED for ${args.op}: ${out.reason} — ${out.detail}`, args.json);
-      throw new VerbExit(1);
-    }
-  }
-  // --after: jobs of this workflow that must settle succeeded before this one
-  // may run (a seam/composition job ahead of its record-level siblings). The
-  // order lives in the ledger, so status never calls a held sibling ready.
-  const after = [...new Set(String(args.after ?? '').split(',').map((s) => s.trim()).filter(Boolean))];
+  return { target, newModules };
+}
+
+/**
+ * --after: jobs of this workflow that must settle succeeded before this one may run (a seam/composition job ahead of its
+ * record-level siblings). The order lives in the ledger, so status never calls a held sibling ready.
+ */
+function afterOf({ db, args, workflowId, hasCut, FINAL_SETTLED }) {
+  const after = listOf(args.after);
   for (const prior of after) {
     const row = db.prepare('SELECT status FROM jobs WHERE job_id=? AND workflow_id=?').get(prior, workflowId);
     if (!row) throw Object.assign(new Error(`--after names ${prior}, which is not a job of ${workflowId}`), { code: 'after-unknown' });
@@ -156,10 +153,15 @@ export default {
       throw Object.assign(new Error(`--after names ${prior}, which already settled ${row.status} and can never succeed; a retry of it chains through its retry lineage (enqueue the same op${cutNote} without --after)`), { code: 'after-settled' });
     }
   }
-  // Shared foundations (driver-loop.yaml foundations): --foundation <name> marks a leg that builds a
-  // foundation this workflow owns, and such legs run first. A workflow with running peers declares
-  // its foundations before its first leg when this ledger plans shared foundations.
-  let foundationLeg = null, foundationAdvisory = null;
+  return after;
+}
+
+/**
+ * Shared foundations (driver-loop.yaml foundations): --foundation <name> marks a leg that builds a foundation this
+ * workflow owns, and such legs run first. A workflow with running peers declares its foundations before its first leg
+ * when this ledger plans shared foundations.
+ */
+function foundationOf({ db, args, wf, workflowId, foundationDutyOf, emit }) {
   if (args.foundation != null) {
     const name = normalizeFoundationName(args.foundation);
     const foundation = readFoundation(db, name);
@@ -167,63 +169,76 @@ export default {
       const ownerStatus = foundation?.owner ? `owned by ${foundation.owner.workflowId}` : 'not claimed';
       throw Object.assign(new Error(`--foundation ${name}: ${ownerStatus}; a foundation leg builds a foundation this workflow claimed (starci kernel foundation --claim ${name})`), { code: 'foundation-not-owned' });
     }
-    foundationLeg = name;
-  } else {
-    const duty = foundationDutyOf(db, wf);
-    if (duty.required) {
-      const out = { ok: false, workflowId, op: args.op, reason: 'foundations-undeclared', peers: duty.peers, detail: duty.detail };
-      emit(out, `enqueue REFUSED for ${args.op}: foundations-undeclared — ${duty.detail}`, args.json);
-      throw new VerbExit(1);
-    }
-    if (duty.advised) foundationAdvisory = duty.detail;
+    return { foundationLeg: name, foundationAdvisory: null };
   }
-  const jobId = `op-${args.op}-${newToken().slice(0, 10)}`;
-  let payload;
+  const duty = foundationDutyOf(db, wf);
+  if (duty.required) refuseEnqueue(emit, args, { ok: false, workflowId, op: args.op, reason: 'foundations-undeclared', peers: duty.peers, detail: duty.detail });
+  return { foundationLeg: null, foundationAdvisory: duty.advised ? duty.detail : null };
+}
 
-  let job, unit = null, peers = { overlap: [], messages: [] }, testsDeferred = null;
-  ledger.transaction(() => {
-    // The work unit this job is a try of (scripts/kernel/units.mjs, H3/H4/H5): its budget, its lineage (--retry-of may
-    // name only the unit's latest failed try) and the reopen a passed unit needs. A refusal is typed and nothing is written.
-    const admitted = admitUnit(db, { workflowId, op: args.op, goalRevision: goal?.revision ?? null,
-      payload: { cut, records, owned_paths: ownedPaths, ...(Object.keys(resolvedParams.params).length && { params: resolvedParams.params }) },
-      retryOf: typeof args['retry-of'] === 'string' && args['retry-of'].trim() ? args['retry-of'].trim() : null,
-      reopen: typeof args.reopen === 'string' && args.reopen.trim() ? { reason: args.reopen.trim(), by: 'kernel' } : null,
-      derivedFrom: String(args['derived-from'] ?? '').split(',').map((id) => id.trim()).filter(Boolean) });
-    // An --after on a try of this very unit waits on itself: a retry chains to its predecessor through the unit.
-    const self = admitted.unitId ? after.filter((prior) => db.prepare('SELECT unit_id FROM jobs WHERE job_id=?').get(prior)?.unit_id === admitted.unitId) : [];
-    if (self.length) throw Object.assign(new Error(`--after names ${self.join(', ')}, a try of this job's own unit ${admitted.unitId}: it would wait on itself; enqueue without that --after - a retry chains through its unit`), { code: 'after-self-lineage' });
-    payload = {
-      opId: args.op, records, owned_paths: ownedPaths, ...(newModules.length && { new_modules: newModules }), title: args.title ?? args.op, risk: args.risk ?? null,
-      // --what: the short human name of the target (Vietnamese, ≤40 chars) the op-job display name shows.
-      ...(typeof args.what === 'string' && args.what.trim() && { displayWhat: args.what.replace(/\s+/g, ' ').trim().slice(0, 60) }),
-      ...(target.repository && { repository: target.repository }),
-      ...(Object.keys(resolvedParams.params).length && { params: resolvedParams.params }),
-      ...(cut && { cut }),
-      ...(after.length && { after }),
-      ...(foundationLeg && { foundation: foundationLeg }),
-      ...(canonPlan && { canonPlan }),
-      // The manual-only proofs this goal explicitly asks for (spec-deferral.mjs): an explicit-ask-only leg without the stamp is deferred.
-      ...(explicitAsksOf({ skillRoot, text: goal?.markdown }).length && { explicitAsk: explicitAsksOf({ skillRoot, text: goal?.markdown }) }),
-      goal_binding: { revision: goal?.revision ?? null, identity: goal?.goal_identity ?? null },
-      hierarchy: {
-        schema: AGENT_HIERARCHY_SCHEMA,
-        nodeId: operationNodeId(jobId),
-        parentNodeId: kernelNodeId(workflowId),
-        role: 'operation',
-        workflowId,
-        jobId,
-        opId: args.op,
-        attempt: admitted.tryNo,
-        generation: wf.generation ?? 0,
-        runtime: { host: 'orca' },
-      },
-    };
+/** The unit the new job is a try of (scripts/kernel/units.mjs, H3/H4/H5): its budget, its lineage and the reopen a passed unit needs. */
+function admitTry({ db, args, workflowId, goal, plan, after }) {
+  const { cut, records, ownedPaths, resolvedParams } = plan;
+  const admitted = admitUnit(db, { workflowId, op: args.op, goalRevision: goal?.revision ?? null,
+    payload: { cut, records, owned_paths: ownedPaths, ...(Object.keys(resolvedParams.params).length && { params: resolvedParams.params }) },
+    retryOf: typeof args['retry-of'] === 'string' && args['retry-of'].trim() ? args['retry-of'].trim() : null,
+    reopen: typeof args.reopen === 'string' && args.reopen.trim() ? { reason: args.reopen.trim(), by: 'kernel' } : null,
+    derivedFrom: String(args['derived-from'] ?? '').split(',').map((id) => id.trim()).filter(Boolean) });
+  // An --after on a try of this very unit waits on itself: a retry chains to its predecessor through the unit.
+  const self = admitted.unitId ? after.filter((prior) => db.prepare('SELECT unit_id FROM jobs WHERE job_id=?').get(prior)?.unit_id === admitted.unitId) : [];
+  if (self.length) throw Object.assign(new Error(`--after names ${self.join(', ')}, a try of this job's own unit ${admitted.unitId}: it would wait on itself; enqueue without that --after - a retry chains through its unit`), { code: 'after-self-lineage' });
+  return admitted;
+}
+
+/** The queued job's payload: the write set, the resolved params, the cut, the foundation leg, the goal binding and the agent hierarchy. */
+function jobPayloadFor({ args, jobId, workflowId, wf, goal, plan, admitted, after, skillRoot, internals }) {
+  const { cut, records, ownedPaths, resolvedParams, target, newModules, foundationLeg, canonPlan } = plan;
+  const { AGENT_HIERARCHY_SCHEMA, operationNodeId, kernelNodeId } = internals;
+  return {
+    opId: args.op, records, owned_paths: ownedPaths, ...(newModules.length && { new_modules: newModules }), title: args.title ?? args.op, risk: args.risk ?? null,
+    // --what: the short human name of the target (Vietnamese, ≤40 chars) the op-job display name shows.
+    ...(typeof args.what === 'string' && args.what.trim() && { displayWhat: args.what.replace(/\s+/g, ' ').trim().slice(0, 60) }),
+    ...(target.repository && { repository: target.repository }),
+    ...(Object.keys(resolvedParams.params).length && { params: resolvedParams.params }),
+    ...(cut && { cut }),
+    ...(after.length && { after }),
+    ...(foundationLeg && { foundation: foundationLeg }),
+    ...(canonPlan && { canonPlan }),
+    // The manual-only proofs this goal explicitly asks for (spec-deferral.mjs): an explicit-ask-only leg without the stamp is deferred.
+    ...(explicitAsksOf({ skillRoot, text: goal?.markdown }).length && { explicitAsk: explicitAsksOf({ skillRoot, text: goal?.markdown }) }),
+    goal_binding: { revision: goal?.revision ?? null, identity: goal?.goal_identity ?? null },
+    hierarchy: {
+      schema: AGENT_HIERARCHY_SCHEMA,
+      nodeId: operationNodeId(jobId),
+      parentNodeId: kernelNodeId(workflowId),
+      role: 'operation',
+      workflowId,
+      jobId,
+      opId: args.op,
+      attempt: admitted.tryNo,
+      generation: wf.generation ?? 0,
+      runtime: { host: 'orca' },
+    },
+  };
+}
+
+/**
+ * The enqueue transaction: the unit's try, the queued job, the test deferral and the peer heads-up. Returns
+ * { job, unit, peers, testsDeferred, payload }.
+ */
+function writeQueuedJob({ ledger, args, repo, workflowId, wf, goal, plan, after, jobId, now, skillRoot, internals }) {
+  const db = ledger.db;
+  const { cut, ownedPaths } = plan;
+  return ledger.transaction(() => {
+    const admitted = admitTry({ db, args, workflowId, goal, plan, after });
+    const payload = jobPayloadFor({ args, jobId, workflowId, wf, goal, plan, admitted, after, skillRoot, internals });
     const unitTry = writeUnitTry(db, admitted, { workflowId, jobId, op: args.op, title: payload.title, cut, repository: payload.repository ?? null, at: now });
-    job = ledger.enqueueJob({ jobId, workflowId, opId: args.op, ...unitTry, generation: wf.generation ?? 0, kind: 'op', role: 'op', payload, priority: seamPriorityOf(cut), createdAt: now });
-    unit = { unitId: unitTry.unitId, tryNo: unitTry.tryNo, tryBudget: admitted.tryBudget, retryOf: unitTry.retryOf, resumeOf: unitTry.resumeOf, ...(admitted.reopen && { reopen: admitted.reopen }) };
+    let job = ledger.enqueueJob({ jobId, workflowId, opId: args.op, ...unitTry, generation: wf.generation ?? 0, kind: 'op', role: 'op', payload, priority: seamPriorityOf(cut), createdAt: now });
+    const unit = { unitId: unitTry.unitId, tryNo: unitTry.tryNo, tryBudget: admitted.tryBudget, retryOf: unitTry.retryOf, resumeOf: unitTry.resumeOf, ...(admitted.reopen && { reopen: admitted.reopen }) };
     // The owner's config.yaml specs switch off this test class: the leg settles deferred at once, no attempt
     // spent, and the legs behind it proceed (scripts/route/spec-deferral.mjs; starci kernel run-deferred-tests runs it later).
     // An explicit-ask-only leg (integration.verify) the goal did not ask for is deferred the same way.
+    let testsDeferred = null;
     const deferral = testDeferralOf({ skillRoot, op: args.op, payload });
     if (deferral) {
       testsDeferred = deferJob(ledger, { job: { job_id: jobId, workflow_id: workflowId, op_id: args.op, try_no: unitTry.tryNo }, deferral, via: 'enqueue', now });
@@ -231,13 +246,14 @@ export default {
     }
     // Owned paths that overlap an open job of a running peer workflow: the
     // receipt names them and each such peer gets one heads-up. Never a refusal.
-    peers = peerOverlapHeadsUp(ledger, { self: wf, jobId, op: args.op, ownedPaths, now, repo, payload });
+    const peers = peerOverlapHeadsUp(ledger, { self: wf, jobId, op: args.op, ownedPaths, now, repo, payload });
+    return { job, unit, peers, testsDeferred, payload };
   });
+}
 
-  const out = { ok: true, job_id: jobId, workflowId, op: args.op, status: job.status, unit, cut, params: payload.params ?? null, repository: payload.repository ?? null,
-    peerOverlap: peers.overlap, peerHeadsUp: peers.messages, ...(testsDeferred && { deferred: testsDeferred }),
-    ...(foundationLeg && { foundation: foundationLeg }), ...(foundationAdvisory && { foundationAdvisory }) };
-  if (foundationAdvisory) process.stderr.write(`api: advisory: ${foundationAdvisory}\n`);
+/** The human line of an enqueue: unit try, deferral, repository, cut, params and the peer overlap. */
+function enqueuedLine({ args, jobId, workflowId, cut, queued }) {
+  const { job, unit, peers, testsDeferred, payload } = queued;
   const retryNote = unit.retryOf ? ` retry of ${unit.retryOf}` : '';
   const reopenNote = unit.reopen ? ` REOPENED: ${unit.reopen.reason}` : '';
   const deferredNote = testsDeferred ? `, DEFERRED (${testsDeferred.reason}): not dispatched, no attempt spent; starci kernel run-deferred-tests --workflow ${workflowId} runs it later` : '';
@@ -254,7 +270,48 @@ export default {
     const recipients = peers.messages.map((message) => message.to).join(', ') || 'nobody new';
     overlapNote = `; overlaps peer job(s) ${overlapJobs}, heads-up sent to ${recipients}`;
   }
-  emit(out, `enqueued ${jobId} (op ${args.op}, unit ${unit.unitId} try ${unit.tryNo}/${unit.tryBudget}${retryNote}${reopenNote}, status ${job.status}${deferredNote}${repositoryNote}${cutNote}${paramsNote})${overlapNote}`, args.json);
+  return `enqueued ${jobId} (op ${args.op}, unit ${unit.unitId} try ${unit.tryNo}/${unit.tryBudget}${retryNote}${reopenNote}, status ${job.status}${deferredNote}${repositoryNote}${cutNote}${paramsNote})${overlapNote}`;
+}
 
+export default {
+  verb: 'enqueue',
+  required: ['workflow', 'op', 'paths'],
+  kernelOnly: true,
+  usageInCore: true,
+  run({ ledger, args, repo, emit, internals }) {
+    const { refuseDecisionsFirst, refuseStaleKernelRev, goalLegOf, foundationDutyOf, FINAL_SETTLED, skillRoot } = internals;
+    const db = ledger.db, workflowId = args.workflow, now = Date.now();
+    refuseDecisionsFirst(db, workflowId, 'enqueue', { now, resolves: args.resolves ?? null, repo });
+    const wf = getWorkflow(db, workflowId);
+    if (!wf) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
+    // A paused, stopped, finished or archived workflow takes no new work (DBTREE jobs_enqueue_guard).
+    requirePhase(wf, ACCEPTS_WORK, 'enqueue');
+    const briefFile = path.join(skillRoot, 'modules', 'ops', 'ops', `${args.op}.yaml`);
+    if (!fs.existsSync(briefFile)) {
+      throw Object.assign(new Error(`unknown op ${args.op} — no brief at modules/ops/ops/${args.op}.yaml`), { code: 'unknown-op' });
+    }
+    refuseStaleKernelRev(db, workflowId, args.op, 'enqueue');
+    const goal = latestGoal(db, workflowId);
+    const brief = readOpManifest(briefFile);
+    const resolvedParams = resolvedParamsOf({ db, args, brief, goal, workflowId, goalLegOf, emit });
+    const ownedPaths = ownedPathsOf({ args, brief, skillRoot, workflowId, emit });
+    const records = listOf(args.records);
+    const cut = cutOf(args);
+    // H6: the first try of a canon slice comes from the canon plan (scripts/kernel/canon-plan-gate.mjs): its owned paths
+    // cover the plan's grants, and a slice whose moves another slice holds is cut again, never enqueued to block.
+    const canonPlan = isCanonSlice({ cut, params: resolvedParams.params }) && !(typeof args['retry-of'] === 'string' && args['retry-of'].trim())
+      ? requirePlannedCanonSlice({ cut, ownedPaths, scanFile: args['canon-scan'] ?? null }).plan : null;
+    const { target, newModules } = targetOf({ args, ownedPaths, repo, workflowId, emit });
+    const after = afterOf({ db, args, workflowId, hasCut: cut != null, FINAL_SETTLED });
+    const { foundationLeg, foundationAdvisory } = foundationOf({ db, args, wf, workflowId, foundationDutyOf, emit });
+    const jobId = `op-${args.op}-${newToken().slice(0, 10)}`;
+    const plan = { cut, records, ownedPaths, resolvedParams, target, newModules, foundationLeg, canonPlan };
+    const queued = writeQueuedJob({ ledger, args, repo, workflowId, wf, goal, plan, after, jobId, now, skillRoot, internals });
+    const { job, unit, peers, testsDeferred, payload } = queued;
+    const out = { ok: true, job_id: jobId, workflowId, op: args.op, status: job.status, unit, cut, params: payload.params ?? null, repository: payload.repository ?? null,
+      peerOverlap: peers.overlap, peerHeadsUp: peers.messages, ...(testsDeferred && { deferred: testsDeferred }),
+      ...(foundationLeg && { foundation: foundationLeg }), ...(foundationAdvisory && { foundationAdvisory }) };
+    if (foundationAdvisory) process.stderr.write(`api: advisory: ${foundationAdvisory}\n`);
+    emit(out, enqueuedLine({ args, jobId, workflowId, cut, queued }), args.json);
   },
 };

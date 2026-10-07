@@ -36,7 +36,11 @@ const PARITY_OPS = Object.freeze(['code.refactor']);
 export const PARITY_REASONS = Object.freeze(['declared-check-red', 'check-not-reverifiable', 'nothing-reverifiable', 'rerun-red', 'cut-postcondition-red']);
 export const PARITY_CHECKS = Object.freeze({ lint: 'canon-parity-lint', tsc: 'canon-parity-typecheck', diff: 'canon-parity-diff-check' });
 /** `s` with every trailing `/` stripped — a `\/+$` match backtracks super-linearly, a loop does not. */
-export const stripSlashes = (s) => { let t = s; while (t.endsWith('/')) t = t.slice(0, -1); return t; };
+export const stripSlashes = (s) => {
+  let t = s;
+  while (t.endsWith('/')) t = t.slice(0, -1);
+  return t;
+};
 const keyOf = (p) => { const k = stripSlashes(slash(path.resolve(p))); return process.platform === 'win32' ? k.toLowerCase() : k; };
 const trimOwned = (p) => {
   let s = slash(p);
@@ -91,7 +95,8 @@ const cdDirOf = (command) => {
   if (end <= 0) return null;
   const dir = rest.slice(quoted ? 1 : 0, end);
   if (dir === '' || dir.includes('&') || dir.includes('"')) return null;
-  return rest.slice(quoted ? end + 1 : end).trimStart().startsWith('&&') ? dir : null;
+  const afterDir = rest.slice(quoted ? end + 1 : end).trimStart();
+  return afterDir.startsWith('&&') ? dir : null;
 };
 
 /** The tsconfig of one declared typecheck command (`cd <dir> && ... tsc`, `tsc -p|--project <path>`), or null. */

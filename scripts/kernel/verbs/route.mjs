@@ -1,5 +1,6 @@
 // starci kernel route: choose and persist one pool for a queued operation.
 import { updateJob } from '../../../engine/db/ledger.mjs';
+import { eachInOrder } from '../../lib/in-order.mjs';
 import { jobResultOf,jobRowOf } from './shared/rows.mjs';
 import { queuedJobOp, refuseOwnerGate, refusePeerWait, opSlotsOrRefuse } from './shared/job-gates.mjs';
 import { biasForRole } from '../../lib/owner-routing-bias.mjs';
@@ -38,6 +39,28 @@ function routeHumanOf({ jobId, kind, difficulty, decided, lineageAdjust, blockin
   return lines.join('\n');
 }
 
+/** Pool-load holders on this provider that hold no budget reservation of this ledger (their running jobs count locally). */
+function unreservedLocalOf({ db, poolLoad, budget, ledger, pools, provider }) {
+  const reservedJobs = new Set((budget?.reservations ?? []).filter((receipt) => receipt.scope?.scopeId?.startsWith(`${ledger.ledgerId ?? ledger.path}:`))
+    .map((receipt) => receipt.scope?.jobId).filter(Boolean));
+  return [...poolLoad.holders].filter((holder) => {
+    if (reservedJobs.has(holder)) return false;
+    const row = db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(holder);
+    let payload;
+    try { payload = JSON.parse(row?.payload_json ?? '{}'); } catch (error) { throw new Error(`routing capacity is unreadable for ${holder}: ${error.message}`); }
+    const ownerPool = pools[payload.model] ?? Object.values(pools).find((pool) => pool.target === payload.model);
+    return ownerPool?.provider === provider;
+  }).length;
+}
+
+/** The auth detail of a pool: the quota detail, or the open circuit's failure and clear hint. */
+function authDetailOf(quota, providerHealth, circuitClearHint) {
+  if (!providerHealth) return quota?.detail ?? null;
+  const failure = providerHealth.detail ?? providerHealth.signal ?? providerHealth.failureKind ?? 'circuit open';
+  const expires = providerHealth.expiresAt ? new Date(providerHealth.expiresAt).toISOString() : 'explicit recovery';
+  return `${failure} (circuit open until ${expires}${circuitClearHint(providerHealth)})`;
+}
+
 async function capacityForPools({ db, jobId, ledger, pools, rtDoc, rtMerged, regDoc, kind, difficulty, scopeId,
   poolLoadOf, accountList, normalizeProvider, probeQuotaSafe, providerHealthOf, circuitClearHint }) {
   const poolLoad = poolLoadOf(db, { excludeJobId: jobId });
@@ -47,7 +70,7 @@ async function capacityForPools({ db, jobId, ledger, pools, rtDoc, rtMerged, reg
   const quotaByProvider = new Map();
   const budgetByProvider = new Map();
   const capacity = {};
-  for (const [poolId, rt] of Object.entries(pools)) {
+  await eachInOrder(Object.entries(pools), async ([poolId, rt]) => {
     const target = rt?.target ?? poolId;
     const provider = rt?.provider ?? null;
     const providerKey = normalizeProvider(provider);
@@ -58,33 +81,18 @@ async function capacityForPools({ db, jobId, ledger, pools, rtDoc, rtMerged, reg
       scopeId, registry: regDoc, runtimes: rtMerged, policy: rtDoc?.allocation?.admission });
     if (provider && !budgetByProvider.has(providerKey)) budgetByProvider.set(providerKey, providerBudgetUsage(providerKey, quota.account));
     const budget = budgetByProvider.get(providerKey);
-    const reservedJobs = new Set((budget?.reservations ?? []).filter((receipt) => receipt.scope?.scopeId?.startsWith(`${ledger.ledgerId ?? ledger.path}:`))
-      .map((receipt) => receipt.scope?.jobId).filter(Boolean));
-    const unreservedLocal = [...poolLoad.holders].filter((holder) => {
-      if (reservedJobs.has(holder)) return false;
-      const row = db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(holder);
-      let payload;
-      try { payload = JSON.parse(row?.payload_json ?? '{}'); } catch (error) { throw new Error(`routing capacity is unreadable for ${holder}: ${error.message}`); }
-      const ownerPool = pools[payload.model] ?? Object.values(pools).find((pool) => pool.target === payload.model);
-      return ownerPool?.provider === provider;
-    }).length;
+    const unreservedLocal = unreservedLocalOf({ db, poolLoad, budget, ledger, pools, provider });
     const providerHealth = provider ? providerHealthOf(db, provider) : null;
-    let authDetail = quota?.detail ?? null;
-    if (providerHealth) {
-      const failure = providerHealth.detail ?? providerHealth.signal ?? providerHealth.failureKind ?? 'circuit open';
-      const expires = providerHealth.expiresAt ? new Date(providerHealth.expiresAt).toISOString() : 'explicit recovery';
-      authDetail = `${failure} (circuit open until ${expires}${circuitClearHint(providerHealth)})`;
-    }
     capacity[target] = {
       running: Number.isInteger(budget?.running) ? budget.running + unreservedLocal : null,
       maxParallel: rt?.maxParallel ?? null,
       quota,
       auth: providerHealth || quota?.state === 'dead' ? 'dead' : 'ok',
-      authDetail,
+      authDetail: authDetailOf(quota, providerHealth, circuitClearHint),
       providerHealth,
       openIncident: false,
     };
-  }
+  });
   return { accounts, poolLoad, runningByModel, capacity };
 }
 
@@ -144,6 +152,39 @@ function refuseRouteDecision({ decision, bias, routeFacts, kind, jobId, difficul
   }
 }
 
+/** The job row of a route call; an unknown, unreconciled, settled or non-routable job refuses with its code. */
+function routableJobOrThrow(db, jobId, finalSettled) {
+  const job = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
+  if (!job) throw Object.assign(new Error(`unknown job ${jobId}`), { code: 'job-unknown' });
+  if (job.status === 'effect_unknown') throw Object.assign(new Error(`job ${jobId} requires reconcile before it can be routed`), { code: 'job-reconcile-required' });
+  if (finalSettled.includes(job.status)) throw Object.assign(new Error(`job ${jobId} is already settled (${job.status})`), { code: 'job-settled' });
+  const lastResult=job.status==='ready'?jobResultOf(jobRowOf(db,jobId)):null;
+  const reusableReady=job.status==='ready'&&['dispatch-rejected','dispatch-reconciled'].includes(lastResult?.reason)
+    &&lastResult.effectState==='none'&&lastResult.attemptConsumed===false;
+  if (job.status !== 'queued'&&!reusableReady) throw Object.assign(new Error(`job ${jobId} cannot be routed while ${job.status}; only queued jobs and proven no-effect launch rejections are routable`), { code: 'job-not-queued' });
+  return job;
+}
+
+/** The persisted route decision: pool, effort, chain, policy, balance and cross-family facts of the selected pool. */
+function routeDecidedOf({ decision, redesignAs, payload, rtDoc, recent, author }) {
+  return {
+    admission: decision.admission ?? null,
+    // A redesign leg reasons at high effort even on a pool that pins none (runtimes.yaml allocation.redesign.effort).
+    model: decision.target, modelId: decision.modelId ?? null, effort: decision.effort ?? (redesignAs ? (payload.redesign?.effort ?? rtDoc?.allocation?.redesign?.effort ?? null) : null),
+    routeChain: decision.chain ?? [], routeRejected: decision.rejected ?? [], routeOrder: decision.order ?? null,
+    // Always written (null when absent) so a reroute never keeps the previous decision's values.
+    routePolicy: decision.policy ?? null,
+    routeBalance: decision.balance ? {
+      windowHours: recent?.windowHours ?? null, recentTotal: recent?.total ?? null, ledgers: recent?.ledgers?.length ?? 0,
+      candidates: decision.balance.candidates, rule: decision.balance.rule ?? null,
+      deficits: Object.fromEntries(Object.entries(decision.balance.deficits).map(([pool, d]) => [pool, {
+        target: Number(d.target.toFixed(3)), actual: Number(d.actual.toFixed(3)), deficit: Number(d.deficit.toFixed(3)) }])),
+    } : null,
+    routeCrossFamily: decision.crossFamily
+      ? { ...decision.crossFamily, authorJob: author?.jobId ?? null, authorOp: author?.opId ?? null } : null,
+  };
+}
+
 export default {
   verb: 'route',
   required: ['job'],
@@ -159,14 +200,7 @@ export default {
       operationNodeId, kernelNodeId, blockingViewOf } = internals;
   refuseKernelBias('route', args);
   const db = ledger.db, jobId = args.job;
-  const job = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
-  if (!job) throw Object.assign(new Error(`unknown job ${jobId}`), { code: 'job-unknown' });
-  if (job.status === 'effect_unknown') throw Object.assign(new Error(`job ${jobId} requires reconcile before it can be routed`), { code: 'job-reconcile-required' });
-  if (FINAL_SETTLED.includes(job.status)) throw Object.assign(new Error(`job ${jobId} is already settled (${job.status})`), { code: 'job-settled' });
-  const lastResult=job.status==='ready'?jobResultOf(jobRowOf(db,jobId)):null;
-  const reusableReady=job.status==='ready'&&['dispatch-rejected','dispatch-reconciled'].includes(lastResult?.reason)
-    &&lastResult.effectState==='none'&&lastResult.attemptConsumed===false;
-  if (job.status !== 'queued'&&!reusableReady) throw Object.assign(new Error(`job ${jobId} cannot be routed while ${job.status}; only queued jobs and proven no-effect launch rejections are routable`), { code: 'job-not-queued' });
+  const job = routableJobOrThrow(db, jobId, FINAL_SETTLED);
   // SETTLE-FIRST (driver-loop.yaml progress.settleFirst): no new route while filed reports wait unconsumed.
   const { payload, op: kind } = queuedJobOp(ledger, { job, verb: 'route', liveHint: 'rerouting', internals });
   if (deferQueuedTestLeg(ledger, { job, op: kind, payload, via: 'route', args })) return;
@@ -223,22 +257,7 @@ export default {
   const routeFacts = { ...(lineageAdjust ? { lineageAdjust } : {}) };
   refuseRouteDecision({ decision, bias, routeFacts, kind, jobId, difficulty, runningByModel, poolLoad, emit, args });
 
-  const decided = {
-    admission: decision.admission ?? null,
-    // A redesign leg reasons at high effort even on a pool that pins none (runtimes.yaml allocation.redesign.effort).
-    model: decision.target, modelId: decision.modelId ?? null, effort: decision.effort ?? (redesignAs ? (payload.redesign?.effort ?? rtDoc?.allocation?.redesign?.effort ?? null) : null),
-    routeChain: decision.chain ?? [], routeRejected: decision.rejected ?? [], routeOrder: decision.order ?? null,
-    // Always written (null when absent) so a reroute never keeps the previous decision's values.
-    routePolicy: decision.policy ?? null,
-    routeBalance: decision.balance ? {
-      windowHours: recent?.windowHours ?? null, recentTotal: recent?.total ?? null, ledgers: recent?.ledgers?.length ?? 0,
-      candidates: decision.balance.candidates, rule: decision.balance.rule ?? null,
-      deficits: Object.fromEntries(Object.entries(decision.balance.deficits).map(([pool, d]) => [pool, {
-        target: Number(d.target.toFixed(3)), actual: Number(d.actual.toFixed(3)), deficit: Number(d.deficit.toFixed(3)) }])),
-    } : null,
-    routeCrossFamily: decision.crossFamily
-      ? { ...decision.crossFamily, authorJob: author?.jobId ?? null, authorOp: author?.opId ?? null } : null,
-  };
+  const decided = routeDecidedOf({ decision, redesignAs, payload, rtDoc, recent, author });
   const selectedRuntime = Object.entries(pools)
     .find(([poolId, runtime]) => (runtime?.target ?? poolId) === decision.target)?.[1] ?? null;
   ledger.transaction(() => {

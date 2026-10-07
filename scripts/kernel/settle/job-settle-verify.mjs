@@ -9,6 +9,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { runNode } from '../../api/node/run-node.mjs';
+import { findInOrder } from '../../lib/in-order.mjs';
 import { classifyCheck } from './check-command.mjs';
 import { slash as norm } from '../../lib/path-key.mjs';
 import { observationContextOf, observeCheck } from '../mechanism-observation.mjs';
@@ -62,14 +63,18 @@ const attemptIdOf = (db, item) => item.attemptId ?? db.prepare(`SELECT attempt_i
 /** One check_runs row's blob contents, hash-verified: {raw} or {reason, detail}. */
 async function checkRowBlobs(row, blobs) {
   const raw = {};
-  for (const [key, sha] of [['stdout', row.stdout_sha], ['stderr', row.stderr_sha], ['output', row.output_sha]]) {
-    if (!sha) continue;
+  let refused = null;
+  await findInOrder([['stdout', row.stdout_sha], ['stderr', row.stderr_sha], ['output', row.output_sha]], async ([key, sha]) => {
+    if (!sha) return false;
     try { raw[key] = await blobs.getBlob(sha); }
-    catch { return { reason: 'check-output-missing', detail: [`${row.name}:${key}:${sha}`] }; }
-    if (!Buffer.isBuffer(raw[key]) || crypto.createHash('sha256').update(raw[key]).digest('hex') !== sha)
-      return { reason: 'check-output-corrupt', detail: [`${row.name}:${key}:${sha}`] };
-  }
-  return { raw };
+    catch { refused = { reason: 'check-output-missing', detail: [`${row.name}:${key}:${sha}`] }; return true; }
+    if (!Buffer.isBuffer(raw[key]) || crypto.createHash('sha256').update(raw[key]).digest('hex') !== sha) {
+      refused = { reason: 'check-output-corrupt', detail: [`${row.name}:${key}:${sha}`] };
+      return true;
+    }
+    return false;
+  });
+  return refused ?? { raw };
 }
 
 const storedCheckOf = async (row, byName, blobs) => {
@@ -92,11 +97,14 @@ async function checksFromStore(db, item, { store = null } = {}) {
   const declared = Array.isArray(item.report?.checks) ? item.report.checks : [];
   const byName = new Map(declared.map((c) => [String(c.name), c]));
   const checks = [];
-  for (const row of rows) {
+  let refused = null;
+  await findInOrder(rows, async (row) => {
     const stored = await storedCheckOf(row, byName, blobs);
-    if (stored.reason) return stored;
+    if (stored.reason) { refused = stored; return true; }
     checks.push(stored.check);
-  }
+    return false;
+  });
+  if (refused) return refused;
   if (declared.length !== checks.length || declared.some((c) => !checks.some((r) => r.name === c.name)))
     return { reason: 'check-run-missing', detail: [
       `declared=${declared.length} stored=${checks.length}`,
@@ -277,10 +285,12 @@ async function verifyDeclared(db, item, { repo, settings, rerun, canon, env, rec
   if (!runtime.length) return { green: false, reason: 'nothing-reverifiable' };
   const started = Date.now();
   const checks = [];
-  for (const c of runtime) {
-    const stop = await rerunDeclaredCheck(db, c, { item, repo, settings, env, observation, record, rerun, checks, started });
-    if (stop) return stop;
-  }
+  let rerunStop = null;
+  await findInOrder(runtime, async (c) => {
+    rerunStop = await rerunDeclaredCheck(db, c, { item, repo, settings, env, observation, record, rerun, checks, started });
+    return Boolean(rerunStop);
+  });
+  if (rerunStop) return rerunStop;
   if (item.payload.cut) {
     const stop = await slicePostcondition(item, { repo, canon, record, checks, runtime });
     if (stop) return stop;

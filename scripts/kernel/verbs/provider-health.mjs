@@ -1,5 +1,6 @@
 // starci kernel provider-health: inspect and recover provider circuits, including quota probes.
 import { parseJson } from '../../lib/json.mjs';
+import { mapInOrder } from '../../lib/in-order.mjs';
 import { readProviderCircuit, writeProviderCircuit } from '../../machine/provider-circuit.mjs';
 import { QUOTA_FAILURE_KIND, quotaSpecOf, quotaProbeProviders } from '../../agent/provider-outage.mjs';
 import { credentialRotated } from '../../agent/credential-fingerprint.mjs';
@@ -93,10 +94,7 @@ async function quotaProbe(ledger, args, emit, internals) {
   const db = ledger.db, now = Date.now();
   const providers = args.provider ? [normalizeProvider(args.provider)] : quotaProbeProviders();
   const { probeProviderQuota } = await import('../../agent/credential-probe.mjs');
-  const results = [];
-  for (const key of providers) {
-    results.push(await probeOneCircuit({ db, ledger, args, probeProviderQuota, providerHealthOf, key, now }));
-  }
+  const results = await mapInOrder(providers, (key) => probeOneCircuit({ db, ledger, args, probeProviderQuota, providerHealthOf, key, now }));
   emit({ ok: true, now, results },
     results.length ? results.map(quotaProbeLine).join('\n')
       : 'quota-probe: no provider declares a quota probe', args.json);

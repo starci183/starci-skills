@@ -64,19 +64,24 @@ async function answerWithConfig({ ledger, repo, workflowId, report, emit, args }
   return true;
 }
 
+/** Tells the Kernel the ask is parked on Telegram (a credential ask is only listed); no form is served. */
+function emitParkedAsk({ parked, notice, workflowId, report, emit, args }) {
+  const out = { ok: true, workflowId, dispatchId: report.dispatch_id, onDemand: true, askClass: parked.askClass, telegram: notice, superseded: parked.superseded, pid: null, servedBy: null };
+  let where;
+  if (parked.askClass === 'credential') {
+    where = 'a credential ask: listed in the owner\'s Telegram /creds, never pushed; it holds only the live-proof legs, so keep driving every other approved leg';
+  } else {
+    const delivery = notice.fresh ? 'sent now' : 'already in the chat';
+    where = `the owner has it on Telegram with a Generate URL button (${delivery})`;
+  }
+  emit(out, `ask ${report.dispatch_id} parked: ${where}; no form is served until the owner asks for one. The answer's ask-answered wakes you`, args.json);
+}
+
 async function serveOwnerAsk({ ledger, args, repo, emit, workflowId, dispatchId, report }) {
   const parked = report ? await parkAsk({ ledger, ledgerFile: ledgerFileFor(repo), repo, workflowId, report }) : null;
   const notice = parked?.notified ? { notified: true, messageId: parked.telegram?.messageId ?? null, fresh: Boolean(parked.telegram?.sent) } : null;
   if (parked?.notified && args.now !== true) {
-    const out = { ok: true, workflowId, dispatchId: report.dispatch_id, onDemand: true, askClass: parked.askClass, telegram: notice, superseded: parked.superseded, pid: null, servedBy: null };
-    let where;
-    if (parked.askClass === 'credential') {
-      where = 'a credential ask: listed in the owner\'s Telegram /creds, never pushed; it holds only the live-proof legs, so keep driving every other approved leg';
-    } else {
-      const delivery = notice.fresh ? 'sent now' : 'already in the chat';
-      where = `the owner has it on Telegram with a Generate URL button (${delivery})`;
-    }
-    emit(out, `ask ${report.dispatch_id} parked: ${where}; no form is served until the owner asks for one. The answer's ask-answered wakes you`, args.json);
+    emitParkedAsk({ parked, notice, workflowId, report, emit, args });
     return;
   }
   // Served now: --now (local use), or Telegram is off / unreachable so nothing else could serve it.
@@ -93,6 +98,10 @@ async function serveOwnerAsk({ ledger, args, repo, emit, workflowId, dispatchId,
   emit(out, `serve-ask launched for ${workflowId}${dispatchNote} (pid ${out.pid}${whyNote}); status shows ask-serving once the form binds`, args.json);
 }
 
+/** The newest ask report of the workflow (of one dispatch when named), joined with its attempt, or undefined. */
+const latestAskReport = (db, workflowId, dispatchId) => db.prepare(`SELECT r.*, a.op_id, a.try_no AS attempt FROM reports r JOIN op_attempts a ON a.attempt_id=r.attempt_id WHERE r.workflow_id=? AND r.outcome='ask' ${dispatchId ? 'AND r.dispatch_id=?' : ''} ORDER BY r.report_id DESC LIMIT 1`)
+  .get(...(dispatchId ? [workflowId, dispatchId] : [workflowId]));
+
 export default {
   verb: 'serve-ask',
   required: ['workflow'],
@@ -106,19 +115,15 @@ export default {
     if (dispatchId && !db.prepare("SELECT 1 FROM reports WHERE workflow_id=? AND dispatch_id=? AND outcome='ask' LIMIT 1").get(workflowId, dispatchId)) {
       throw Object.assign(new Error(`dispatch ${dispatchId} filed no ask report in ${workflowId}`), { code: 'ask-unknown' });
     }
-    const report = db.prepare(`SELECT r.*, a.op_id, a.try_no AS attempt FROM reports r JOIN op_attempts a ON a.attempt_id=r.attempt_id WHERE r.workflow_id=? AND r.outcome='ask' ${dispatchId ? 'AND r.dispatch_id=?' : ''} ORDER BY r.report_id DESC LIMIT 1`)
-      .get(...(dispatchId ? [workflowId, dispatchId] : [workflowId]));
+    const report = latestAskReport(db, workflowId, dispatchId);
     const answered = report && db.prepare("SELECT 1 FROM events WHERE workflow_id=? AND kind='ask-answered' AND json_extract(payload_json,'$.dispatchId')=? LIMIT 1").get(workflowId, report.dispatch_id);
+    const openAsk = report && !answered ? report : null;
     // Autopilot (owner ruling 2026-09-28): the ask is answered provisionally or deferred to handover - never sent to the
     // owner - unless it is the owner's own end-of-flow step (the handover, its credential checklist).
-    if (report && !answered) {
-      if (answerWithAutopilot({ ledger, repo, workflowId, report, emit, args })) return;
-    }
-    if (report && !answered) {
-      if (await answerWithConfig({ ledger, repo, workflowId, report, emit, args })) return;
-    }
+    if (openAsk && (answerWithAutopilot({ ledger, repo, workflowId, report, emit, args })
+      || await answerWithConfig({ ledger, repo, workflowId, report, emit, args }))) return;
     // Tell the owner, serve on demand (parkAsk). An answered ask (or none) goes
     // straight to serve-ask.mjs, which refuses it with its own error.
-    await serveOwnerAsk({ ledger, args, repo, emit, workflowId, dispatchId, report: report && !answered ? report : null });
+    await serveOwnerAsk({ ledger, args, repo, emit, workflowId, dispatchId, report: openAsk });
   },
 };

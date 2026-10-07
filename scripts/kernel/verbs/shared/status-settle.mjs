@@ -39,6 +39,14 @@ const heldWorkerState = (workers, item) => {
   if (worker?.terminalHandle) item.terminalHandle = worker.terminalHandle;
 };
 
+/** A queued job parked behind a recorded wait names the wait in its detail; a job outside any wait is left as it is. */
+const noteParkedBehind = (item, root) => {
+  if (!root) return;
+  item.parkedBehind = root;
+  const deferred = root.settle ? ' (its settle is deferred)' : '';
+  item.detail = `${item.detail ?? ''}; parked behind ${root.heldBecause} ${root.incident} through ${root.via}${deferred}`;
+};
+
 export const settlePhase = (s) => {
   const { db, internals } = s;
   const { ownerGateOf } = internals;
@@ -70,13 +78,7 @@ export const settlePhase = (s) => {
   // parked behind that wait, not engaged work (scripts/kernel/frontier-parked.mjs): it keeps
   // queuedBecause dependency and names the wait in parkedBehind.
   s.parkedBehind = parkedBehindWaits(s.queued, s.heldSettle);
-  for (const item of s.queued) {
-    const root = s.parkedBehind.get(item.jobId);
-    if (!root) continue;
-    item.parkedBehind = root;
-    const deferred = root.settle ? ' (its settle is deferred)' : '';
-    item.detail = `${item.detail ?? ''}; parked behind ${root.heldBecause} ${root.incident} through ${root.via}${deferred}`;
-  }
+  for (const item of s.queued) noteParkedBehind(item, s.parkedBehind.get(item.jobId));
   s.waitHeld = waitHeldOperations(s.queued, s.heldSettle, s.parkedBehind);
   s.parkedDependants = s.queued.filter((item) => item.parkedBehind && (item.parkedBehind.settle || item.parkedBehind.heldBecause === PEER_WAIT));
 };
