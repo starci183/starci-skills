@@ -41,6 +41,7 @@ export { REVIEW_DEFECTS_SCHEMA, SECURITY_FINDINGS_SCHEMA, proofsOf, judgeTestWor
   judgeTestWorld, judgeUnitRun, judgeLint, securityRelevant, feRelevant, judgeSecurityLint, judgeReviewGate, judgeReviewDefects,
   judgeRelease, judgeJobProofs, recordProofJudgment, proofRefusalText } from './mechanism-proofs.mjs';
 import { oneLine } from '../lib/clip.mjs';
+import { findInOrder } from '../lib/in-order.mjs';
 import { byCodeUnit } from '../lib/list.mjs';
 import { normRel, sameResolvedPath } from '../lib/path-key.mjs';
 import { isAncestor } from '../api/git/is-ancestor.mjs';
@@ -211,14 +212,17 @@ export async function judgeJobLoop({ op, files, roots = [], doc = loadOpGate(), 
     return unavailable('the admitted target list does not match the persisted placements');
   const ctx = { op, files, targets, placements, binding, doc, gateBases, mode, readDigest, kindResolver };
   const judgments = [];
-  for (const root of known) {
+  let early = null;
+  await findInOrder(known, async (root) => {
     try {
       const outcome = await judgeRoot(root, ctx);
-      if (!outcome) continue;
-      if (outcome.judged.status !== 'pass') return outcome;
+      if (!outcome) return false;
+      if (outcome.judged.status !== 'pass') { early = outcome; return true; }
       judgments.push(outcome);
-    } catch (error) { return unavailable(`the current owned slice could not be bound: ${String(error?.message ?? error)}`); }
-  }
+    } catch (error) { early = unavailable(`the current owned slice could not be bound: ${String(error?.message ?? error)}`); return true; }
+    return false;
+  });
+  if (early) return early;
   return judgments.length ? { op, judged: judgments[0].judged,
     gateFile: judgments.map((j) => j.gateFile).join(' + '), digestFile: judgments.map((j) => j.digestFile).join(' + ') } : null;
 }

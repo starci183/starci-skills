@@ -5,6 +5,7 @@
 // workflow leg can no longer reach it). The wait is bounded, so a driver that died never leaves the Kernel waiting.
 import fs from 'node:fs';
 import path from 'node:path';
+import { repeatInOrder } from '../lib/in-order.mjs';
 
 const releaseFile = (state, role) => path.join(state, 'stages', `${role}.release`);
 
@@ -15,9 +16,14 @@ export function releaseStageHold(state, role) {
 
 /** Wait up to `holdMs` for the driver's release; true when it came. holdMs 0 waits for nothing (the specs). */
 export async function holdStage({ state, role, holdMs, sleep, now = Date.now }) {
-  for (const deadline = now() + holdMs; now() < deadline;) {
-    if (fs.existsSync(releaseFile(state, role))) return true;
-    await sleep(1000);
-  }
-  return fs.existsSync(releaseFile(state, role));
+  const deadline = now() + holdMs;
+  const released = await repeatInOrder(async () => {
+    if (now() < deadline) {
+      if (fs.existsSync(releaseFile(state, role))) return true;
+      await sleep(1000);
+      return undefined;
+    }
+    return false;
+  });
+  return released || fs.existsSync(releaseFile(state, role));
 }
