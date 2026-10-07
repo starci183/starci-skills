@@ -95,79 +95,128 @@ function readsEventId(ts, sourceFile) {
 /** The sagas of the app: every folder of the saga kind (`be/src/features/saga/<saga>/`). */
 const featuresOf = (files) => [...new Set(files.map((file) => SAGA_FILE.exec(file)?.[1]).filter((feature) => feature !== undefined))].sort(byCodeUnit);
 
-/** Findings of R169 to R173 over the tracked paths `files` of the app at `repoRoot`. */
-export function sagaFindings({ repoRoot, files }) {
-  const features = featuresOf(files);
-  if (features.length === 0) return [];
-  const ts = typescriptFor(repoRoot);
-  if (ts === null) return [];
+function filesForFeature(files, pattern, feature) {
+  return files.filter((file) => pattern.test(file) && pattern.exec(file)[1] === feature);
+}
+
+function featureParts(files, feature) {
+  const steps = new Map(filesForFeature(files, STEP, feature).map((file) => [STEP.exec(file)[2], file]));
+  const compensations = new Map(filesForFeature(files, COMPENSATION, feature).map((file) => [COMPENSATION.exec(file)[2], file]));
+  const orchestrators = filesForFeature(files, ORCHESTRATOR, feature);
+  const states = new Map(filesForFeature(files, STATE, feature).map((file) => [STATE.exec(file)[2], file]));
+  return { steps, compensations, orchestrators, states };
+}
+
+function stepCompensationFindings(folder, steps, compensations, orchestrators) {
   const findings = [];
-  const events = new Map();
-  for (const contract of files.filter((file) => CONTRACT.test(file))) {
-    for (const [name, event] of Object.entries(readJson(repoRoot, contract)?.events ?? {})) events.set(name, { contract, ...event });
+  for (const [stem, file] of steps) if (!compensations.has(stem)) findings.push(found(SAGA_STEP_COMPENSATION, file, `${file} is a saga step with no compensation: add ${folder}compensations/${stem}.compensation.ts, the command that undoes it; every forward step of a saga has one.`, { step: stem }));
+  for (const [stem, file] of compensations) if (!steps.has(stem)) findings.push(found(SAGA_STEP_COMPENSATION, file, `${file} is a compensation of no step: ${folder}steps/${stem}.saga-step.ts does not exist; a compensation undoes the step of the same name.`, { step: stem }));
+  if (orchestrators.length === 0 && (steps.size > 0 || compensations.size > 0)) findings.push(found(SAGA_STEP_COMPENSATION, folder, `${folder} holds steps or compensations but no orchestrator: add <saga>.saga.service.ts, the list of the steps and their compensations.`));
+  return findings;
+}
+
+function orchestratorFindings(ts, repoRoot, orchestrator, folder, steps, compensations, states) {
+  const text = readText(repoRoot, orchestrator);
+  if (text === null) return [];
+  const findings = [];
+  const sourceFile = parse(ts, text);
+  const imported = new Set(specifiersOf(ts, sourceFile).map((specifier) => path.posix.normalize(path.posix.join(path.posix.dirname(orchestrator), specifier))));
+  for (const file of [...steps.values(), ...compensations.values()]) {
+    if (!imported.has(file.replace(/\.ts$/, ''))) findings.push(found(SAGA_STEP_COMPENSATION, orchestrator, `${orchestrator} does not list ${file}: the orchestrator imports every step and every compensation of its saga, so a step nobody runs cannot hide.`, { step: file }));
   }
-  const specs = files.filter((file) => E2E_SPEC.test(file)).map((file) => ({ file, text: readText(repoRoot, file) ?? '' })).filter(({ text }) => USE_TEST_WORLD.test(text));
+  const stem = ORCHESTRATOR.exec(orchestrator)[2];
+  const stateFile = states.get(stem);
+  if (stateFile === undefined) findings.push(found(SAGA_STATE_VERSIONED, orchestrator, `${orchestrator} has no ${folder}${stem}.saga-state.ts: the persisted state of a run is typed there, with its status and its version fence.`, { saga: stem }));
+  if (!specifiersOf(ts, sourceFile).some((specifier) => STORE_MODULE.test(specifier))) findings.push(found(SAGA_STATE_VERSIONED, orchestrator, `${orchestrator} does not use the fenced store of platform/saga: a run is persisted and moved only through it (every transition names the version it read), never by a write of its own.`, { saga: stem }));
+  return findings;
+}
+
+function stateFindings(ts, repoRoot, states) {
+  const findings = [];
+  for (const [stem, file] of states) {
+    const text = readText(repoRoot, file);
+    if (text !== null && !statesVersion(ts, parse(ts, text))) findings.push(found(SAGA_STATE_VERSIONED, file, `${file} exports no state type with a \`status\` and a \`version: number\`; a saga run is persisted with a version, the fence that stops a zombie delivery from moving it twice.`, { saga: stem }));
+  }
+  return findings;
+}
+
+function eventFindings(ts, repoRoot, steps, compensations, events) {
+  const findings = [];
+  const eventOfFile = new Map();
+  for (const [kind, map] of [['step', steps], ['compensation', compensations]]) {
+    for (const [stem, file] of map) {
+      const text = readText(repoRoot, file);
+      const name = text === null ? null : eventOf(ts, parse(ts, text));
+      const kindName = kind === 'step' ? 'step' : 'compensation';
+      const kindAction = kind === 'step' ? 'puts on the wire' : 'answers';
+      const key = kind === 'step' ? `step:${stem}` : `compensation:${stem}`;
+      eventOfFile.set(key, name);
+      if (name === null) findings.push(found(SAGA_EVENT_CONTRACT, file, `${file} names no event: a ${kindName} of a saga declares \`readonly event = "<name>"\`, the event of the contract it ${kindAction}.`, { step: stem }));
+      else if (!events.has(name)) findings.push(found(SAGA_EVENT_CONTRACT, file, `${file} names the event "${name}", which no be/contracts/<service>/events.json declares; every event of a saga is in a vendored contract.`, { step: stem, event: name }));
+    }
+  }
   const compensationPaths = [];
-  for (const feature of features) {
-    const under = (pattern) => files.filter((file) => pattern.test(file) && pattern.exec(file)[1] === feature);
-    const steps = new Map(under(STEP).map((file) => [STEP.exec(file)[2], file]));
-    const compensations = new Map(under(COMPENSATION).map((file) => [COMPENSATION.exec(file)[2], file]));
-    const orchestrators = under(ORCHESTRATOR);
-    const states = new Map(under(STATE).map((file) => [STATE.exec(file)[2], file]));
-    const folder = `be/src/features/saga/${feature}/`;
-    // R169
-    for (const [stem, file] of steps) if (!compensations.has(stem)) findings.push(found(SAGA_STEP_COMPENSATION, file, `${file} is a saga step with no compensation: add ${folder}compensations/${stem}.compensation.ts, the command that undoes it; every forward step of a saga has one.`, { step: stem }));
-    for (const [stem, file] of compensations) if (!steps.has(stem)) findings.push(found(SAGA_STEP_COMPENSATION, file, `${file} is a compensation of no step: ${folder}steps/${stem}.saga-step.ts does not exist; a compensation undoes the step of the same name.`, { step: stem }));
-    if (orchestrators.length === 0 && (steps.size > 0 || compensations.size > 0)) findings.push(found(SAGA_STEP_COMPENSATION, folder, `${folder} holds steps or compensations but no orchestrator: add <saga>.saga.service.ts, the list of the steps and their compensations.`));
-    for (const orchestrator of orchestrators) {
-      const text = readText(repoRoot, orchestrator);
-      if (text === null) continue;
-      const sourceFile = parse(ts, text);
-      const imported = new Set(specifiersOf(ts, sourceFile).map((specifier) => path.posix.normalize(path.posix.join(path.posix.dirname(orchestrator), specifier))));
-      for (const file of [...steps.values(), ...compensations.values()]) {
-        if (!imported.has(file.replace(/\.ts$/, ''))) findings.push(found(SAGA_STEP_COMPENSATION, orchestrator, `${orchestrator} does not list ${file}: the orchestrator imports every step and every compensation of its saga, so a step nobody runs cannot hide.`, { step: file }));
-      }
-      // R170
-      const stem = ORCHESTRATOR.exec(orchestrator)[2];
-      const stateFile = states.get(stem);
-      if (stateFile === undefined) findings.push(found(SAGA_STATE_VERSIONED, orchestrator, `${orchestrator} has no ${folder}${stem}.saga-state.ts: the persisted state of a run is typed there, with its status and its version fence.`, { saga: stem }));
-      if (!specifiersOf(ts, sourceFile).some((specifier) => STORE_MODULE.test(specifier))) findings.push(found(SAGA_STATE_VERSIONED, orchestrator, `${orchestrator} does not use the fenced store of platform/saga: a run is persisted and moved only through it (every transition names the version it read), never by a write of its own.`, { saga: stem }));
+  for (const [stem, file] of compensations) {
+    const compensationEvent = eventOfFile.get(`compensation:${stem}`);
+    const stepEvent = eventOfFile.get(`step:${stem}`);
+    if (compensationEvent && stepEvent && events.has(compensationEvent) && events.get(compensationEvent).compensates !== stepEvent) {
+      findings.push(found(SAGA_EVENT_CONTRACT, file, `${file}: the contract of "${compensationEvent}" (${events.get(compensationEvent).contract}) does not declare \`compensates: "${stepEvent}"\`; the failure event of a compensation says which step's event it undoes.`, { step: stem, event: compensationEvent }));
     }
-    for (const [stem, file] of states) {
-      const text = readText(repoRoot, file);
-      if (text !== null && !statesVersion(ts, parse(ts, text))) findings.push(found(SAGA_STATE_VERSIONED, file, `${file} exports no state type with a \`status\` and a \`version: number\`; a saga run is persisted with a version, the fence that stops a zombie delivery from moving it twice.`, { saga: stem }));
-    }
-    // R171
-    const eventOfFile = new Map();
-    for (const [kind, map] of [['step', steps], ['compensation', compensations]]) {
-      for (const [stem, file] of map) {
-        const text = readText(repoRoot, file);
-        const name = text === null ? null : eventOf(ts, parse(ts, text));
-        eventOfFile.set(`${kind}:${stem}`, name);
-        if (name === null) findings.push(found(SAGA_EVENT_CONTRACT, file, `${file} names no event: a ${kind} of a saga declares \`readonly event = "<name>"\`, the event of the contract it ${kind === 'step' ? 'puts on the wire' : 'answers'}.`, { step: stem }));
-        else if (!events.has(name)) findings.push(found(SAGA_EVENT_CONTRACT, file, `${file} names the event "${name}", which no be/contracts/<service>/events.json declares; every event of a saga is in a vendored contract.`, { step: stem, event: name }));
-      }
-    }
-    for (const [stem, file] of compensations) {
-      const compensationEvent = eventOfFile.get(`compensation:${stem}`);
-      const stepEvent = eventOfFile.get(`step:${stem}`);
-      if (compensationEvent && stepEvent && events.has(compensationEvent) && events.get(compensationEvent).compensates !== stepEvent) {
-        findings.push(found(SAGA_EVENT_CONTRACT, file, `${file}: the contract of "${compensationEvent}" (${events.get(compensationEvent).contract}) does not declare \`compensates: "${stepEvent}"\`; the failure event of a compensation says which step's event it undoes.`, { step: stem, event: compensationEvent }));
-      }
-      if (compensationEvent) compensationPaths.push({ file, stem, event: compensationEvent });
-    }
-    // R172
-    for (const file of under(CONSUMER)) {
-      const text = readText(repoRoot, file);
-      if (text !== null && !readsEventId(ts, parse(ts, text))) findings.push(found(SAGA_CONSUMER_DEDUPE, file, `${file} is a consumer of the saga ${feature} but never passes the id of the delivery on (\`message.eventId\`); the saga takes every event through the inbox, so the consumer hands the id to its command.`, { feature }));
-    }
+    if (compensationEvent) compensationPaths.push({ file, stem, event: compensationEvent });
   }
-  // R173
+  return { findings, compensationPaths };
+}
+
+function consumerFindings(ts, repoRoot, feature, files) {
+  const findings = [];
+  for (const file of filesForFeature(files, CONSUMER, feature)) {
+    const text = readText(repoRoot, file);
+    if (text !== null && !readsEventId(ts, parse(ts, text))) findings.push(found(SAGA_CONSUMER_DEDUPE, file, `${file} is a consumer of the saga ${feature} but never passes the id of the delivery on (\`message.eventId\`); the saga takes every event through the inbox, so the consumer hands the id to its command.`, { feature }));
+  }
+  return findings;
+}
+
+function featureFindings(ts, repoRoot, files, feature, events) {
+  const { steps, compensations, orchestrators, states } = featureParts(files, feature);
+  const folder = `be/src/features/saga/${feature}/`;
+  const findings = stepCompensationFindings(folder, steps, compensations, orchestrators);
+  for (const orchestrator of orchestrators) findings.push(...orchestratorFindings(ts, repoRoot, orchestrator, folder, steps, compensations, states));
+  findings.push(...stateFindings(ts, repoRoot, states));
+  const eventResult = eventFindings(ts, repoRoot, steps, compensations, events);
+  findings.push(...eventResult.findings, ...consumerFindings(ts, repoRoot, feature, files));
+  return { findings, compensationPaths: eventResult.compensationPaths };
+}
+
+function compensationE2eFindings(compensationPaths, specs) {
+  const findings = [];
   for (const { file, stem, event } of compensationPaths) {
     const named = specs.filter(({ text }) => text.includes(event));
     const expected = `be/src/tests/e2e/<area>/<name>.e2e-spec.ts`;
     if (named.length === 0) findings.push(found(SAGA_E2E_MISSING, file, `${file}: the compensation path of "${event}" has no e2e spec; add ${expected}, which boots the apps with useTestWorld, drives the failure and reads the compensated state back.`, { step: stem, event }));
     else if (!named.some(({ text }) => INJECTION.test(text))) findings.push(found(SAGA_E2E_MISSING, named[0].file, `${named[0].file} names "${event}" but injects no failure; the compensation path is proven with a fault through the world (an outage of an infra service or an app with \`during\`, \`cut\`, \`latency\`, a fake's \`failNext\`, \`interruptDatabase\`), not only the happy flow.`, { step: stem, event }));
   }
+  return findings;
+}
+
+/** Findings of R169 to R173 over the tracked paths `files` of the app at `repoRoot`. */
+export function sagaFindings({ repoRoot, files }) {
+  const features = featuresOf(files);
+  if (features.length === 0) return [];
+  const ts = typescriptFor(repoRoot);
+  if (ts === null) return [];
+  const events = new Map();
+  for (const contract of files.filter((file) => CONTRACT.test(file))) {
+    for (const [name, event] of Object.entries(readJson(repoRoot, contract)?.events ?? {})) events.set(name, { contract, ...event });
+  }
+  const specs = files.filter((file) => E2E_SPEC.test(file)).map((file) => ({ file, text: readText(repoRoot, file) ?? '' })).filter(({ text }) => USE_TEST_WORLD.test(text));
+  const findings = [];
+  const compensationPaths = [];
+  for (const feature of features) {
+    const result = featureFindings(ts, repoRoot, files, feature, events);
+    findings.push(...result.findings);
+    compensationPaths.push(...result.compensationPaths);
+  }
+  // R173
+  findings.push(...compensationE2eFindings(compensationPaths, specs));
   return findings;
 }
