@@ -59,6 +59,14 @@ function validateChains(bad,tiers,profile){
   }
 }
 
+/** A call tier is taken by a headless call only: no seat, difficulty, kind, order or caller reference may name it, and every call names one. */
+function validateUse(bad,{doc,names,refs}){
+  const callTiers=new Set(Object.entries(doc.tierUse).filter(([,use])=>use==='call').map(([tier])=>tier));
+  for(const tier of Object.keys(doc.tierUse))if(!names.has(tier))bad(`: tierUse names tier ${tier} (known: ${known(names)}).`);
+  for(const [where,tier] of refs)if(callTiers.has(tier))bad(`: ${where} names tier ${tier}, a call tier (tierUse): a headless call is made on it, no seat or op is seated on it.`);
+  for(const [call,spec] of Object.entries(doc.calls))if(!callTiers.has(spec.tier))bad(`: calls.${call}.tier ${spec.tier} must be a tier whose tierUse is call.`);
+}
+
 /** The tier document the picker reads: the shipped tiers.yaml with config.yaml `models` laid over it. Validated. */
 export function effectiveTiers(config,profile){
   const doc=shippedTiers(),models=plain(config?.models)?config.models:{};
@@ -72,6 +80,7 @@ export function effectiveTiers(config,profile){
   const refs=[...Object.entries(seats).map(([seat,tier])=>[`.seats.${seat}`,tier]),...DIFFICULTIES.map(level=>[`difficulty.${level}`,doc.difficulty[level]]),
     ...Object.entries(doc.kindTiers).map(([kind,tier])=>[`kindTiers.${kind}`,tier]),...doc.tierOrder.map(tier=>['tierOrder',tier]),...doc.callerSeatTiers.map(tier=>['callerSeatTiers',tier])];
   for(const [where,tier] of refs)if(!names.has(tier))bad(`: ${where} names tier ${tier} (known: ${known(names)}).`);
+  validateUse(bad,{doc,names,refs});
   if(!(Number.isInteger(balance.maxStreak)&&balance.maxStreak>=1))bad('.balance.maxStreak must be an integer >= 1.');
   if(!(typeof balance.maxSharePercent==='number'&&balance.maxSharePercent>0&&balance.maxSharePercent<=100))bad('.balance.maxSharePercent must be a number in (0, 100].');
   const {reservePercent,biasPercent,exhaustedPercent}=usage;

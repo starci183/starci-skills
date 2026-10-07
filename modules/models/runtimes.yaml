@@ -244,8 +244,9 @@ allocation:
   # context-free Orca worker that scores beauty and hierarchy against the product's brand.direction rubric: started
   # through orchestration worker-start --agent <provider> --model --effort (scripts/agent/lib.mjs startAgent) on a
   # runtime worktree detached at the empty tree (draw-critic.mjs criticWorkspace; Orca refuses a bare temp dir) holding only the PNGs, the HTML and the rubric; it writes verdict.json and reports worker_done; a
-  # critic with no worker_done within timeoutMs is stopped and released (outcome timeout, no beauty). The critic is a DIFFERENT model from the drawer: the imagegen tier (Codex) draws, so
-  # the round is judged by criticWhenDrawer.codex; for any other drawer the critic is Codex. When the drawer (the op's provider, bound to its
+  # critic with no worker_done within timeoutMs is stopped and released (outcome timeout, no beauty). The critic is a DIFFERENT model from the drawer: a Codex drawer (the high tier's second member)
+  # is judged by criticWhenDrawer.codex; for any other drawer the critic is Codex. The images a drawer asks of the imagegen call
+  # (starci work imagegen) do not make the call's model the drawer. When the drawer (the op's provider, bound to its
   # terminal - scripts/guards/op-context.mjs - or draw-loop.mjs round --drawer) is the critic's provider the round is
   # judged by criticWhenDrawer.<drawer> instead, and a round with no independent critic has no beauty. directionPrerequisite: interface.draw needs an ACCEPTED brand.direction
   # archetype for its ui record's ui.archetype - brand.mjs checkDirection evidence.ready, the owner's receipt
@@ -513,7 +514,7 @@ roleOfKind:
   provision.ask: {role: decide, work: think, floor: hard}
   brand.decide: {role: write, work: think, floor: hard}
   interface.draw: {role: write, work: think, floor: hard}
-  interface.asset: {role: write, work: hands-on, floor: medium}
+  interface.asset: {role: write, work: hands-on, floor: hard}
   work.author: {role: write, work: think, floor: hard}
   implementation.plan: {role: plan, work: think, floor: hard}
   workspace.manage: {role: plan, work: think, floor: hard}

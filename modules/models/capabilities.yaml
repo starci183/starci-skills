@@ -25,10 +25,10 @@ budget:
   mayLowerQualityFloor: false
 tooling:
   design-tool:
-    requiredInvocation: image_gen.imagegen
+    requiredInvocation: starci work imagegen
     provenance: >-
-      Record the actual built-in tool invocation, exact prompt asset and accepted input references. Tool model
-      selection is not exposed, so a model name must not be inferred, promised or used as proof.
+      Record the generation receipt the call wrote (generation-receipts.yaml: tool image_gen.imagegen, the model of the
+      imagegen call tier, toolOutputBasename, sha256), the exact prompt asset and the accepted input references.
     truthBoundary: >-
       An ImageGen direction is a visual design input. Exact Grammar component/render behavior and API behavior
       require implementation evidence; browser UAT remains separately required.

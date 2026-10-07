@@ -13,10 +13,23 @@ export function tierSettings({ config, registry } = {}) {
 
 const poolOf = (registry, provider) => Object.entries(registry?.pools ?? {}).find(([, pool]) => pool.provider === provider);
 
-/** One tier's ordered members as launch targets: {id, provider, agent, model, effort, pool, target, tier}. */
-export function tierMembers(tier, { settings = tierSettings(), registry = loadModelRegistry() } = {}) {
+/** Whether a tier is taken by a headless call only (tiers.yaml tierUse); every other tier is a seat tier. */
+export const isCallTier = (tier, settings = tierSettings()) => settings.tierUse?.[tier] === 'call';
+
+/** The refusal text of seating anything on a call tier. */
+export const callTierRefusal = (tier) => `tier ${tier} is a call tier (tiers.yaml tierUse): a headless call is made on it, no seat or op is seated on it`;
+
+/** The refusal text of making a call on a seat tier. */
+const seatTierRefusal = (tier) => `tier ${tier} is a seat tier: a headless call is made on a call tier (tiers.yaml tierUse)`;
+
+/**
+ * One tier's ordered members as launch targets: {id, provider, agent, model, effort, pool, target, tier}. A seat or an op
+ * takes a seat tier (the default `use`); `use: 'call'` reads the chain of a call tier, and a call tier is never read as a seat.
+ */
+export function tierMembers(tier, { settings = tierSettings(), registry = loadModelRegistry(), use = 'seat' } = {}) {
   const chain = settings.tiers[tier];
   if (!Array.isArray(chain)) return [];
+  if (isCallTier(tier, settings) !== (use === 'call')) throw new Error(use === 'call' ? seatTierRefusal(tier) : callTierRefusal(tier));
   return chain.map((member) => {
     const found = poolOf(registry, member.agent);
     return { id: `${member.agent}/${member.model}`, provider: member.agent, agent: member.agent, model: member.model, effort: member.effort ?? null,
@@ -42,3 +55,6 @@ export function callerMember(provider, { settings = tierSettings(), registry = l
   }
   return null;
 }
+
+/** The headless call `name` declares in tiers.yaml calls: {tier, timeoutMs, maxImages, maxReferences}, or null when none is declared. */
+export const callSpec = (name, settings = tierSettings()) => settings.calls?.[name] ?? null;

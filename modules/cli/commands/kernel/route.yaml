@@ -83,7 +83,7 @@ blocking: "a routed job's out carries blocking {waiters, workflows[], weight, ou
   Kernel dispatches the outranking job first (driver-loop.yaml tick.drive.waiterPriority)"
 order: "the op takes the tier of its difficulty (modules/models/tiers.yaml difficulty: insane frontier, hard high,
   medium, easy low; the measured difficulty is first raised to the kind's runtimes.yaml roleOfKind floor), or the tier its
-  kind names under tiers.yaml kindTiers (drawing ops: imagegen). The tier is an ordered chain of members (agent + model);
+  kind names under tiers.yaml kindTiers (none today; a call tier such as imagegen is never an op's tier). The tier is an ordered chain of members (agent + model);
   one common picker (scripts/lib/tier-pick.mjs) walks it: hard filter (role, host tool, owner grant, retry lineage,
   provider circuit, capacity), the goal's routing_bias (prefer moves a member first, avoid removes it, only keeps the named
   ones), balance (a head picked models.balance.maxStreak times in a row, or holding more than maxSharePercent of the

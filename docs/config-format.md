@@ -153,7 +153,31 @@ ordered chain of members `{agent, model, effort?}`; a model may sit in several t
 | `high` | Claude Sonnet 5.5, Codex `gpt-6.1-sol` | the Kernel and `[Worker]` seats; ops of difficulty `hard` |
 | `medium` | Devin `swe-2-max`, Codex `gpt-6.1-sol` | ops of difficulty `medium` |
 | `low` | Devin `swe-2-max`, Codex `gpt-6-luna` | ops of difficulty `easy` |
-| `imagegen` | Codex `gpt-6.1-sol` | drawing ops (`kindTiers`) |
+| `imagegen` | Codex `gpt-6.1-sol` | a call tier: only the headless image call (below), never a seat or an op |
+
+### Call tiers
+
+A tier named `call` under `tierUse` in `tiers.yaml` is taken by one headless call, never by a seat or an op: the
+validator refuses a config whose seat, difficulty, kind, order or caller reference names it, and the picker refuses to
+seat an op on it. `calls.<name>` binds a call to its tier and bounds it (`timeoutMs`, `maxImages`, `maxReferences`).
+
+`imagegen` is the one call. An op that draws (`interface.draw`, `interface.asset`, and the image part of `brand.decide`)
+runs on the tier of its difficulty like every core op and, when it needs an image, runs
+
+```
+starci work imagegen --prompt <file> --out <dir in the worktree> [--reference <image>]... [--count N] [--size WxH] [--name <stem>] --json
+```
+
+The verb admits the call through the picker over the `imagegen` chain (hard filter, owner bias, balance, a member at
+`reservePercent` of its tokens is skipped), holds one provider slot for the duration of the run, runs `codex exec`
+headlessly with the built-in image tool (read-only sandbox, nothing persisted, no seat identity), copies the generated
+PNGs into `--out` as `<stem>-<n>.png` with `<stem>-<n>.prompt.txt` and appends one entry per image to
+`<out>/generation-receipts.yaml` (`starci/generation-receipts@1`: model, effort, sha256 of image and prompt, toolOutputBasename,
+real pixel size, duration, token usage). `--size` is a request: the tool decides the size and the receipt records it. A
+refusal is typed and carries no retry: `IMAGEGEN_QUOTA`, `IMAGEGEN_CAPACITY`, `IMAGEGEN_UNAVAILABLE`,
+`IMAGEGEN_RUNNER_FAILED`, `IMAGEGEN_TIMEOUT`, `IMAGEGEN_NO_OUTPUT`, `IMAGEGEN_BAD_INPUT`, `IMAGEGEN_OUT_OF_WORKTREE`; the op
+reports it and the kernel's incident policy decides any retry. Only the ops named under `calls.imagegen` of
+`modules/kernel/command-policy.yaml` may run the verb, and a hand-run `codex exec` stays refused.
 
 `models` accepts four optional keys: `tiers` (`{<tier>: [{agent, model, effort?}, ...]}` replaces or adds a chain),
 `seats` (`{<seat>: <tier>}` remaps a seat), `balance` (`{maxStreak, maxSharePercent}`) and `usage`

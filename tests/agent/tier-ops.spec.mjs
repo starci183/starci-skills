@@ -41,16 +41,17 @@ test('an operation takes the chain of its difficulty tier and the first member w
   assert.deepEqual(route({kind:'backend.scaffold',difficulty:'hard'}).chain,['claude/claude-sonnet-5-5','codex/gpt-6.1-sol']);
 });
 
-test('a drawing op takes the imagegen tier: one Codex member, stopped when it is out of tokens',()=>{
-  for(const kind of ['interface.draw','interface.asset']){
-    const r=route({kind,difficulty:'easy'});
-    assert.deepEqual([r.tier,r.target,r.modelId],['imagegen','codex-agent','gpt-6.1-sol'],kind);
-    assert.deepEqual(r.chain,['codex/gpt-6.1-sol']);
+test('a drawing op takes the tier of its difficulty like every core op: high from its hard floor, frontier at insane, never the call tier',()=>{
+  for(const kind of ['interface.draw','interface.asset','brand.decide']){
+    // interface.draw needs the browser-dom host tool (Playwright capture), which Claude's card lacks: its high chain drops to Sol.
+    const [target,modelId]=kind==='interface.draw'?['codex-agent','gpt-6.1-sol']:['claude-agent','claude-sonnet-5-5'];
+    for(const difficulty of ['easy','medium','hard']){
+      const r=route({kind,difficulty});
+      assert.deepEqual([r.tier,r.target,r.modelId],['high',target,modelId],`${kind} ${difficulty}`);
+      assert.deepEqual(r.chain,['claude/claude-sonnet-5-5','codex/gpt-6.1-sol']);
+    }
+    assert.equal(route({kind,difficulty:'insane'}).tier,'frontier',kind);
   }
-  const used=pct=>({'codex-agent':{quota:{...selectPool({kind:'interface.draw',difficulty:'easy',runtimes,capacity:{}}).admission.selected.quota,windows:[{id:'w',usedPercent:pct,observedAt:Date.now(),resetsAt:Date.now()+3600000}],state:pct>=90?'limited':'ok',normalAdmission:pct<90}}});
-  const out=route({kind:'interface.draw',difficulty:'easy',capacity:used(93)});
-  assert.match(out.error,/out of tokens|refused/);
-  assert.equal(out.admission.reason,'tokens-out');
 });
 
 test('a streak of three picks of the head yields the fourth to the next member; a share over 70 percent yields too',()=>{

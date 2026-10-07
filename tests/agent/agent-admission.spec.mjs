@@ -198,8 +198,8 @@ test('live Op routing walks the tier chain by tokens and keeps the concrete owne
   const result = route({ capacity: unknown, bias: { only: [{ provider: 'codex' }] } });
   assert.equal(result.admission.reason, 'bias-empties-chain');
   assert.ok(result.admission.rejected.find((row) => row.id.startsWith('codex/')).codes.includes('quota-unknown'));
-  assert.equal(route({ kind: 'interface.asset', bias: { prefer: [{ provider: 'claude' }] } }).target, 'codex-agent');
-  assert.equal(route({ kind: 'interface.asset' }).tier, 'imagegen');
+  assert.equal(route({ kind: 'interface.asset', bias: { prefer: [{ provider: 'codex' }] } }).target, 'codex-agent');
+  assert.equal(route({ kind: 'interface.asset' }).tier, 'high', 'a drawing op takes the tier of its difficulty, not the image call tier');
 });
 
 test('static pool policy planning cannot claim fresh live admission or spend a concrete owner only-model', () => {

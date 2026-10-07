@@ -1,5 +1,5 @@
-// Drawing ops (interface.draw, interface.asset) take the imagegen tier (modules/models/tiers.yaml kindTiers: Codex only),
-// brand.decide the tier of its difficulty, and the draw loop's critic is a different model from the drawer.
+// Drawing ops (interface.draw, interface.asset) and brand.decide take the tier of their difficulty (the imagegen tier is a call tier,
+// modules/models/tiers.yaml tierUse), and the draw loop's critic is a different model from the drawer.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -20,31 +20,35 @@ const registry = read('modules/models/registry.yaml');
 const tiers = read('modules/models/tiers.yaml');
 const runtimes = { ...read('modules/models/runtimes.yaml'), runtimes: registry.pools };
 
-test('interface.draw takes the imagegen tier: one Codex member, no other provider', () => {
+test('interface.draw takes the tier of its difficulty; the imagegen call tier is never an op tier', () => {
   assert.deepEqual(runtimes.roleOfKind['interface.draw'], { role: 'write', work: 'think', floor: 'hard' });
-  assert.deepEqual(tiers.kindTiers, { 'interface.draw': 'imagegen', 'interface.asset': 'imagegen' });
+  assert.deepEqual(tiers.kindTiers, {});
+  assert.deepEqual(tiers.tierUse, { imagegen: 'call' });
   assert.deepEqual(tiers.tiers.imagegen, [{ agent: 'codex', model: 'gpt-6.1-sol', effort: 'high' }]);
   for (const d of ['easy', 'medium', 'hard', 'insane']) {
     const r = selectPool({ kind: 'interface.draw', difficulty: d, runtimes, capacity: {} });
-    assert.deepEqual([r.tier, r.target, r.modelId, r.chain], ['imagegen', 'codex-agent', 'gpt-6.1-sol', ['codex/gpt-6.1-sol']], d);
+    assert.equal(r.tier, d === 'insane' ? 'frontier' : 'high', d);
+    // The Playwright capture needs browser-dom, which Claude's card lacks: the chain is walked down to its Codex member.
+    assert.deepEqual([r.target, r.modelId], ['codex-agent', 'gpt-6.1-sol'], d);
     const down = selectPool({ kind: 'interface.draw', difficulty: d, runtimes, capacity: { 'codex-agent': { auth: 'dead' } } });
-    assert.ok(down.error && !down.target, `${d}: no image tool, no draw`);
+    assert.ok(down.error && !down.target, `${d}: no browser-dom holder, no draw`);
   }
-  // Devin runs Playwright in product checkouts: the manifest's browser-dom host tool is on its card.
   assert.deepEqual(hostToolsRequired('interface.draw'), ['browser-dom']);
+  assert.deepEqual(hostToolsRequired('interface.asset'), [], 'the asset op needs no image tool of its own agent: it calls starci work imagegen');
   assert.ok(hostToolsOf('devin').includes('browser-dom') && hostToolsOf('codex').includes('browser-dom'));
   assert.ok(registry.pools['devin-agent'].roles.includes('write'), 'the devin pool serves the draw kind role');
 });
 
-test('brand.decide takes the tier of its difficulty; interface.asset keeps the Codex image tool', () => {
+test('brand.decide and interface.asset take the high tier on Claude first; neither is seated on the image call tier', () => {
   assert.equal(tiers.kindTiers['brand.decide'], undefined, 'brand.decide is a decision op, not a drawing op');
   const b = selectPool({ kind: 'brand.decide', difficulty: 'medium', runtimes, capacity: {} });
   assert.deepEqual([b.tier, b.target, b.modelId, b.chain], ['high', 'claude-agent', 'claude-sonnet-5-5', ['claude/claude-sonnet-5-5', 'codex/gpt-6.1-sol']]);
   const down = selectPool({ kind: 'brand.decide', difficulty: 'hard', runtimes, capacity: { 'claude-agent': { auth: 'dead' } } });
   assert.deepEqual([down.target, down.modelId], ['codex-agent', 'gpt-6.1-sol']);
   const a = selectPool({ kind: 'interface.asset', difficulty: 'medium', runtimes, capacity: {} });
-  assert.deepEqual([a.tier, a.target, a.chain], ['imagegen', 'codex-agent', ['codex/gpt-6.1-sol']]);
-  assert.ok(selectPool({ kind: 'interface.asset', difficulty: 'medium', runtimes, capacity: { 'codex-agent': { auth: 'dead' } } }).error, 'no image tool, no asset');
+  assert.deepEqual([a.tier, a.target, a.chain], ['high', 'claude-agent', ['claude/claude-sonnet-5-5', 'codex/gpt-6.1-sol']]);
+  const onCodex = selectPool({ kind: 'interface.asset', difficulty: 'medium', runtimes, capacity: { 'claude-agent': { auth: 'dead' } } });
+  assert.deepEqual([onCodex.target, onCodex.modelId], ['codex-agent', 'gpt-6.1-sol']);
 });
 
 test('the route excludes unknown provider evidence and keeps eligible fallback models', (t) => {
@@ -59,9 +63,9 @@ test('the route excludes unknown provider evidence and keeps eligible fallback m
   const draw = route('interface.draw');
   assert.equal(draw.status, 0, draw.stderr + draw.stdout);
   const decision = JSON.parse(draw.stdout);
-  assert.equal(decision.tier, 'imagegen');
-  assert.equal(decision.pick.model, 'gpt-6.1-sol');
-  assert.deepEqual(decision.fallbackChain, [], 'the imagegen tier has no other member');
+  assert.equal(decision.tier, 'high');
+  assert.equal(decision.pick.model, 'gpt-6.1-sol', 'the draw op needs browser-dom: Sol is the high member that holds it');
+  assert.deepEqual(decision.fallbackChain, [], 'Claude is dropped by name for the missing host tool');
   const implement = JSON.parse(route('backend.implement').stdout);
   assert.equal(implement.tier, 'medium');
   assert.equal(implement.pick.model, 'gpt-6.1-sol', 'Devin has no verified quota here, so the medium tier falls to Codex');

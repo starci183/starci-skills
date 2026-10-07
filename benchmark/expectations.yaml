@@ -77,7 +77,7 @@ history:
         high: [claude-sonnet-5-5, gpt-6.1-sol]    # Kernel, worker; op difficulty hard
         medium: [swe-2-max, gpt-6.1-sol]          # op difficulty medium
         low: [swe-2-max, gpt-6-luna]              # op difficulty easy
-        imagegen: [gpt-6.1-sol]                   # interface.draw, interface.asset
+        imagegen: [gpt-6.1-sol]                   # a call tier: the headless image call of interface.draw, interface.asset, brand.decide; no seat or op
       precedence: hard filter > owner bias > a live seat keeps its member > balance > chain order by tokens
       tokens: automatic picks skip a member at 90 percent of its quota; an owner bias naming it keeps it usable up to 95 percent
       debug: core-debug runs in the app of the chat that started the workflow, on that provider's frontier model
@@ -98,7 +98,7 @@ pools:
         - strategy kinds: request.analyze, scope.define, business.decide, architecture.decide, brand.decide, decision.prepare, implementation.plan, workspace.manage
         - business/architecture.decide at 72-73% pass over the 72h snapshot
       notExpectedFor:
-        - "drawing ops (interface.draw, interface.asset: imagegen tier) and browser-dom routes (interface.audit): agents/claude.yaml hostTools is empty, so the hard filter drops it"
+        - "browser-dom routes (interface.draw capture, interface.audit): agents/claude.yaml hostTools is empty, so the hard filter drops it"
         - easy and medium work (the medium and low tiers hold no Claude member)
       cites: [modules/models/profiles/claude-agent.yaml, modules/models/runtimes.yaml]
     publicBenchmarks:
@@ -119,11 +119,13 @@ pools:
     maxParallel: 10
     expected:
       role: >-
-        Sol is the second member of the frontier, high and medium tiers and the only member of the imagegen tier;
-        Luna is the second member of the low tier. Codex is the fleet's ONLY image generator, so interface.draw and
-        interface.asset route nowhere else. The interface.audit of any UI goes to it because Claude lacks browser-dom.
+        Sol is the second member of the frontier, high and medium tiers and the only member of the imagegen call tier;
+        Luna is the second member of the low tier. Codex is the fleet's ONLY image generator: every image a drawing op
+        needs is made by the headless starci work imagegen call on it, whichever agent the op runs on. The interface.draw
+        and interface.audit of any UI go to it because Claude lacks browser-dom.
       strengths:
-        - interface.draw / interface.asset (sole route; image_gen.imagegen host tool)
+        - the headless imagegen call of interface.draw / interface.asset / brand.decide (sole route; image_gen.imagegen built-in tool)
+        - interface.draw (browser-dom host tool; Claude lacks it)
         - second after claude-agent in the frontier and high tiers
         - browser-dom host tool (interface.audit, with devin-agent)
       notExpectedFor:

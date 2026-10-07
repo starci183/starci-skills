@@ -187,8 +187,9 @@ costPolicy: |-
   Runtime pools are provider quota windows. Which model takes which seat or operation is modules/models/tiers.yaml:
   a seat or an op difficulty names a tier, a tier is an ordered member chain, and the picker takes the first member
   with tokens after the owner bias and the balance step. Devin opens through the owner's default grant (config.yaml
-  allocation.grants). Drawing and artwork (interface.draw, interface.asset) take the imagegen tier: the Codex member,
-  the one agent with the image tool. Every automatic launch contains only worker-start candidates and advances only
+  allocation.grants). Drawing and artwork ops (interface.draw, interface.asset, brand.decide) take the tier of their
+  difficulty like every core op and make images through the headless `starci work imagegen` call, which is picked from the
+  imagegen call tier (tiers.yaml calls, tierUse) and holds one provider slot while it runs. Every automatic launch contains only worker-start candidates and advances only
   after a verified no-effect failure. Agents have explicit turn, wall-time and tool-call ceilings; a ceiling stop is a
   failed attempt and never proof of completion. Never infer price or quality superiority from a subscription label;
   benchmark bounded representative operations before proposing another tier change. A native worker is released

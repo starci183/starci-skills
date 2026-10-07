@@ -18,20 +18,20 @@ identity:
 launch:
   hostTools: >-
     modules/models/agents/codex.yaml capabilities.hostTools — image_gen.imagegen and browser-dom (Codex CLI
-    built-ins, present in a worker-start Codex worker too). It is the only image-capable pool: interface.asset
-    routes nowhere else and has NO deferral fallback; interface.draw walks Devin first and this pool second (it
-    draws token-render, never ImageGen).
+    built-ins, present in a worker-start Codex worker too). It is the only image-capable pool: the headless
+    `starci work imagegen` call runs Codex non-interactively on it (tiers.yaml calls.imagegen), whichever agent the drawing op
+    runs on; a refused call has NO fallback to another pool.
 
 position: modules/models/tiers.yaml tiers, seats and difficulty; modules/models/runtimes.yaml roleOfKind; modules/models/registry.yaml pools
 
 business:
   question: >-
-    "Which pool is the second member of every Claude tier, the image tier, and the low-tier second?" —
+    "Which pool is the second member of every Claude tier, the image call tier, and the low-tier second?" —
     codex-agent, on gpt-6.1-sol in the frontier, high, medium and imagegen tiers and gpt-6-luna in the low tier.
   whenNeeded:
     - Any tier whose first member is out of tokens or filtered: Sol is the second member of frontier, high and medium.
     - interface.audit of what Devin implemented and any op needing browser-dom, since Claude lacks the tool (the hard filter drops Claude by name).
-    - "interface.draw and interface.asset — the ONLY member of the imagegen tier (image_gen.imagegen; tiers.yaml kindTiers); core-debug when the chat that started the workflow is Codex (gpt-6.1-sol, the frontier member of that provider)."
+    - "Every image a drawing op (interface.draw, interface.asset, brand.decide) needs — the ONLY member of the imagegen call tier (tiers.yaml tierUse, calls; the headless starci work imagegen); core-debug when the chat that started the workflow is Codex (gpt-6.1-sol, the frontier member of that provider)."
     - Easy hands-on work after Devin, on Luna (the low tier).
   whenNot:
     - As first pick for hands-on work — the medium and low tiers spend Devin capacity first.
@@ -41,5 +41,5 @@ business:
     structurally dominates.
   failureModes:
     - "Confusing the pool default (Luna) with a tier member: the tier names the model and effort per member (modules/models/tiers.yaml); attestation reads the member's model, not the pool's defaultModel (modules/models/registry.yaml pools.codex-agent)."
-    - Provider-level quota exhaustion disables Luna and Sol at once — the imagegen tier has one member, so an image op then waits for the reset; it is never rerouted to a non-image pool.
+    - Provider-level quota exhaustion disables Luna and Sol at once — the imagegen call tier has one member, so an image call is then refused (IMAGEGEN_QUOTA) until the reset; it is never rerouted to a non-image pool.
     - "INFERRED: using its 10-slot pool to parallelize easy implementation burns the shared quota the think and image lanes depend on."

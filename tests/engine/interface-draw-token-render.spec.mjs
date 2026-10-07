@@ -52,12 +52,13 @@ test('the self-check cites a rule id for every value and marks every proof case'
   assert.match(proof(draw, 'self-check').requirement.en, /rule id/);
 });
 
-test('draw takes the imagegen tier: Codex GPT-6.1 Sol at effort high, the only member', () => {
+test('draw takes the tier of its difficulty; the imagegen call tier is Codex GPT-6.1 Sol at effort high, the only member', () => {
   const rt = parseYaml(fs.readFileSync(path.join(root, 'modules/models/runtimes.yaml'), 'utf8'));
   const tiers = parseYaml(fs.readFileSync(path.join(root, 'modules/models/tiers.yaml'), 'utf8'));
   const kind = rt.roleOfKind['interface.draw'];
   assert.equal(kind.floor, 'hard');
-  assert.equal(tiers.kindTiers['interface.draw'], 'imagegen');
+  assert.equal(tiers.kindTiers['interface.draw'], undefined);
+  assert.equal(tiers.tierUse.imagegen, 'call');
   assert.deepEqual(tiers.tiers.imagegen, [{ agent: 'codex', model: 'gpt-6.1-sol', effort: 'high' }]);
 });
 

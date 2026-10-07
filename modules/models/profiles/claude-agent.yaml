@@ -31,7 +31,7 @@ business:
     - The [Kernel] seat (tiers.yaml seats.kernel: high, Sonnet 5.5 first, Sol behind it); config.yaml kernel.agent / kernel.model pin it as an `only` bias.
     - Core-debug when the chat that started the workflow is Claude: it runs in that app on the frontier model of that provider (Opus 5.5), never picked down a chain.
   whenNot:
-    - "Host-tool routes: the agent card lists no host tool, so interface.asset (image_gen.imagegen raster art) and interface.audit (browser-dom) pass it (route.riskHints host-tool-required, modules/models/agents/claude.yaml capabilities.hostTools); interface.draw walks the draw order, Devin then Codex (runtimes.yaml allocation.preference.draw), and the UI order leaves it off entirely. brand.decide walks the brand order, Claude first (owner ruling 2026-09-27); Claude is the draw critic only when Codex drew (drawLoop.criticWhenDrawer)."
+    - "Host-tool routes: the agent card lists no host tool, so interface.audit (browser-dom) passes it (route.riskHints host-tool-required, modules/models/agents/claude.yaml capabilities.hostTools). The drawing ops (interface.draw, interface.asset, brand.decide) need no host tool: they take the tier of their difficulty (Sonnet 5.5 first in high) and get images from the headless `starci work imagegen` call; Claude is the draw critic only when Codex drew (drawLoop.criticWhenDrawer)."
     - "Hands-on work as first pick: every hands-on order puts it last, keeping Opus for thinking."
   pickedBy: >-
     The kernel allocator via role preference + tier + qualification (selection.yaml);

@@ -6,7 +6,7 @@ import { pickFromTier } from '../lib/tier-pick.mjs';
 import { asSelector } from '../lib/owner-routing-bias.mjs';
 import { selectAdmission, admissionQualityFloor } from '../lib/agent-admission.mjs';
 import { kindRoute, raiseToFloor, missingHostTools, hostToolsRequired } from './models.mjs';
-import { tierMembers, tierOfOp, tierSettings } from './tiers.mjs';
+import { callTierRefusal, isCallTier, tierMembers, tierOfOp, tierSettings } from './tiers.mjs';
 import { poolCapsNow } from '../machine/pool-backoff.mjs';
 
 const roleReasons = (pool, role) => (!role || !pool.roles?.length || pool.roles.includes(role) ? [] : [`pool does not serve role '${role}'`]);
@@ -102,6 +102,7 @@ export function pickOpModel(input = {}) {
   if (!difficulty) return { error: `unknown difficulty '${measured}'` };
   if (!route.role) return { error: `no role resolves for kind '${kind}'` };
   const tier = tierOfOp({ kind, difficulty }, settings);
+  if (isCallTier(tier, settings)) return { error: callTierRefusal(tier), callTier: tier };
   const ctx = { kind, role: route.role, runtimes, grants, lineage, capacity, modelsDir, opsDir, registry, backoff: input.backoff ?? (capacity ? poolCapsNow() : {}) };
   const members = demotedLast(tierMembers(tier, { settings, registry }).map((member) => ({ ...member, hard: structuralReasons(member, ctx) })), lineage);
   const base = { tier, role: route.role, work: route.work, difficulty, measuredDifficulty: measured, floor: route.floor, chain: members.map((member) => member.id) };

@@ -300,11 +300,14 @@ reviewerPolicy:
 allocationFacts:
   # One picker for every seat and every operation (scripts/lib/tier-pick.mjs, reached through scripts/lib/agent-admission.mjs
   # selectAdmission). modules/models/tiers.yaml owns the data: tiers (ordered member chains), seats, difficulty, kindTiers,
-  # balance and usage. config.yaml `models` overrides any of those keys; there is no other policy key.
+  # tierUse, calls, balance and usage. config.yaml `models` overrides tiers, seats, balance and usage; there is no other policy key.
+  # A headless call (calls.imagegen, made by `starci work imagegen`) is picked by the same function over a call tier and reserves
+  # one provider slot for its duration (scripts/agent/call-admission.mjs); the owner decision of 2026-10-07 makes imagegen a call, never an op's seat.
   tiers: modules/models/tiers.yaml tiers
   seats: modules/models/tiers.yaml seats and kindSeats         # supervisor, kernel, worker, planner, validator, kernelManager
   difficultyTier: modules/models/tiers.yaml difficulty          # insane frontier, hard high, medium medium, easy low
-  kindTiers: modules/models/tiers.yaml kindTiers                # drawing ops take imagegen whatever their difficulty
+  kindTiers: modules/models/tiers.yaml kindTiers                # a kind that takes a tier whatever its difficulty (none today: the drawing ops take their difficulty's tier)
+  callTiers: modules/models/tiers.yaml tierUse and calls        # a call tier (imagegen) is read by a headless call only; no seat or op is seated on it
   callerSeat: modules/models/tiers.yaml callerSeatTiers         # core-debug runs in the caller's own app; never picked down a chain
   concurrency: modules/models/registry.yaml executionModel.concurrency
   workerCeiling: modules/models/runtimes.yaml maxParallelOps

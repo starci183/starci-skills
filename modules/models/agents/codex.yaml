@@ -51,6 +51,7 @@ capabilities:
   # browser-dom — public-web uat.verify a5 (luna) settled pass driving the served build in a browser
   # (33 screenshots, 7 WebM, per-route H1 and overflow DOM checks). WSPV interface.audit a6 blocked
   # CAPTURE_OR_MEASUREMENT_UNAVAILABLE on a PNG-only handoff without trying to serve, not on a missing tool.
+  # image_gen.imagegen is the built-in image tool the headless imagegen call (starci work imagegen) runs; no op route requires it of its agent.
   hostTools: [image_gen.imagegen, browser-dom]
   orca:
     nativeManagedAgent: supported

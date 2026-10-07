@@ -22,7 +22,7 @@ business:
   whenNeeded:
     - Bounded implement/verify/write inside an Orca workflow worktree after explicit slot grant.
     - Easy and medium hands-on implementation: first member of the medium and low tiers (tiers.yaml), Sol (medium) or Luna (low) behind it. Slots are owner-granted (config.yaml allocation.grants).
-    - "Not drawing: interface.draw takes the imagegen tier (Codex alone); Devin still runs token-render checks in product checkouts through its browser-dom tool."
+    - "Drawing ops take the tier of their difficulty (high holds no Devin member) and get images from the headless starci work imagegen call; Devin still runs token-render checks in product checkouts through its browser-dom tool."
     - Verification of hands-on work at easy and medium difficulty, with the browser-dom tool for UI audits.
   whenNot:
     - Anywhere outside Orca — the pool launches only as an Orca command-terminal inside the workflow worktree.

@@ -47,10 +47,15 @@ difficulty:
   hard: high
   medium: medium
   easy: low
-# Ops that draw or generate images take this tier whatever their difficulty.
-kindTiers:
-  interface.draw: imagegen
-  interface.asset: imagegen
+# A kind named here takes that tier whatever its difficulty; the drawing ops take the tier of their difficulty like every core op.
+kindTiers: {}
+# A tier no seat and no op takes: only a headless call made by one op is made on it (`calls`). A tier not named here is a seat tier.
+tierUse:
+  imagegen: call
+# Headless calls: the call tier whose chain the call is picked from (the same picker: hard filter, bias, balance, token use),
+# the longest one call may run, and the most images and reference images it takes.
+calls:
+  imagegen: {tier: imagegen, timeoutMs: 600000, maxImages: 8, maxReferences: 6}
 # Balance over the recent picks of one tier, running seats included.
 balance:
   maxStreak: 3
