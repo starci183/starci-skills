@@ -40,43 +40,42 @@ const supabaseSlotEnabled = (input, slotId) => {
   return Boolean(slot && input.graph.resolver.slotEnabled(slot));
 };
 
+function inspectOwnershipNode(kit, checker, file, slots, ruleId, violations, counters, node) {
+  const { ts } = kit;
+  const moduleName = moduleNameOf(ts, node);
+  if (moduleName && SUPABASE_MODULES.has(moduleName)) {
+    counters.imports += 1;
+    if (!slots.has(file.slot)) reportAt(violations, kit, ruleId, file, node, `${moduleName} is imported by ${file.rel}, whose slot is ${file.slot ?? 'unowned'}; Supabase imports belong only to ${[...slots].join(' or ')}.`, { module: moduleName, slot: file.slot ?? null });
+  }
+  if (ts.isTypeReferenceNode(node) && supabaseClientType(kit, checker, node)) {
+    counters.clients += 1;
+    if (!isDatabaseType(ts, node.typeArguments?.[0])) reportAt(violations, kit, ruleId, file, node, 'SupabaseClient must carry the committed Database type as SupabaseClient<Database>.');
+  }
+  if (!ts.isCallExpression(node)) return;
+  const binding = kit.importBinding(checker, node.expression);
+  if (binding && SUPABASE_MODULES.has(binding.module) && /^create(?:Client|ServerClient|BrowserClient)$/u.test(binding.name)) {
+    counters.clients += 1;
+    if (!isDatabaseType(ts, node.typeArguments?.[0]) && !contextTypesClient(kit, checker, node)) {
+      reportAt(violations, kit, ruleId, file, node, `${binding.name} creates an untyped Supabase client; create it as ${binding.name}<Database>(...) (or give it the contextual type SupabaseClient<Database>).`);
+    }
+  }
+  if (!isSupabaseCall(kit, checker, node)) return;
+  const properties = chainParts(ts, node);
+  const method = callName(ts, node);
+  if (!SUPABASE_CALLS.has(method) && !properties.includes('auth') && !properties.includes('storage')) return;
+  counters.calls += 1;
+  if (!slots.has(file.slot)) reportAt(violations, kit, ruleId, file, node, `A Supabase ${method ?? 'client'} call is made from ${file.slot ?? 'an unowned path'}; database, auth and storage calls belong only to ${[...slots].join(' or ')}.`, { method, slot: file.slot ?? null });
+}
+
 function checkClientOwnership(input, { slots, ruleId }) {
   const kit = machineKit(input);
-  const { ts } = kit;
   const violations = [];
-  let imports = 0;
-  let clients = 0;
-  let calls = 0;
+  const counters = { imports: 0, clients: 0, calls: 0 };
   for (const file of input.graph.files.values()) {
     const checker = kit.checkerOf(file.sourceFile);
-    const owned = slots.has(file.slot);
-    kit.walk(file.sourceFile, node => {
-      const moduleName = moduleNameOf(ts, node);
-      if (moduleName && SUPABASE_MODULES.has(moduleName)) {
-        imports += 1;
-        if (!owned) reportAt(violations, kit, ruleId, file, node, `${moduleName} is imported by ${file.rel}, whose slot is ${file.slot ?? 'unowned'}; Supabase imports belong only to ${[...slots].join(' or ')}.`, { module: moduleName, slot: file.slot ?? null });
-      }
-      if (ts.isTypeReferenceNode(node) && supabaseClientType(kit, checker, node)) {
-        clients += 1;
-        if (!isDatabaseType(ts, node.typeArguments?.[0])) reportAt(violations, kit, ruleId, file, node, 'SupabaseClient must carry the committed Database type as SupabaseClient<Database>.');
-      }
-      if (!ts.isCallExpression(node)) return;
-      const binding = kit.importBinding(checker, node.expression);
-      if (binding && SUPABASE_MODULES.has(binding.module) && /^create(?:Client|ServerClient|BrowserClient)$/u.test(binding.name)) {
-        clients += 1;
-        if (!isDatabaseType(ts, node.typeArguments?.[0]) && !contextTypesClient(kit, checker, node)) {
-          reportAt(violations, kit, ruleId, file, node, `${binding.name} creates an untyped Supabase client; create it as ${binding.name}<Database>(...) (or give it the contextual type SupabaseClient<Database>).`);
-        }
-      }
-      if (!isSupabaseCall(kit, checker, node)) return;
-      const properties = chainParts(ts, node);
-      const method = callName(ts, node);
-      if (!SUPABASE_CALLS.has(method) && !properties.includes('auth') && !properties.includes('storage')) return;
-      calls += 1;
-      if (!owned) reportAt(violations, kit, ruleId, file, node, `A Supabase ${method ?? 'client'} call is made from ${file.slot ?? 'an unowned path'}; database, auth and storage calls belong only to ${[...slots].join(' or ')}.`, { method, slot: file.slot ?? null });
-    });
+    kit.walk(file.sourceFile, node => inspectOwnershipNode(kit, checker, file, slots, ruleId, violations, counters, node));
   }
-  return { violations, coverage: { status: 'checked', imports, clients, calls, ownerSlots: [...slots] } };
+  return { violations, coverage: { status: 'checked', ...counters, ownerSlots: [...slots] } };
 }
 
 const symbolOf = (kit, checker, node) => kit.aliased(checker, kit.symbolAt(checker, node)) ?? kit.symbolAt(checker, node);
@@ -162,12 +161,43 @@ const dataSymbolFromAwait = (kit, checker, identifier) => {
   return null;
 };
 
+function inspectQueryResultNode(kit, input, file, checker, report, counters, node) {
+  const { ts } = kit;
+  if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) && QUERY_TERMINALS.has(node.expression.name.text)
+    && node.typeArguments?.length && isSupabaseValue(kit, checker, node.expression.expression)) {
+    report(FE_RESULT_TYPED, node, `${node.expression.name.text}<T>() supplies a result generic; derive the row type from Database and let the Supabase chain infer it.`);
+  }
+  if ((ts.isAsExpression(node) || ts.isTypeAssertionExpression(node) || ts.isNonNullExpression(node)) && fromAwaitedSupabase(kit, checker, node.expression)) {
+    report(FE_RESULT_TYPED, node, 'A Supabase query result is cast or non-null asserted; narrow its typed data/error outcome instead.');
+  }
+  if (ts.isAwaitExpression(node) && isSupabaseValue(kit, checker, node.expression)) {
+    const expression = unwrap(ts, node.expression);
+    if (!ts.isCallExpression(expression)) return true;
+    counters.awaited += 1;
+    const methods = chainParts(ts, expression);
+    if (methods.includes('select') && !methods.some(method => QUERY_WRITES.has(method)) && !methods.includes('single') && !methods.includes('maybeSingle')) {
+      counters.listReads += 1;
+      if (!methods.includes('limit') && !methods.some(method => LIST_BOUNDS.has(method))) {
+        report(FE_RESULT_TYPED, node, 'A Supabase list read has no .limit(), .range(), or keyset bound (.gt/.gte/.lt/.lte); bound every multi-row read.');
+      }
+    }
+    if (!handledAwait(kit, checker, input.graph, node)) {
+      report(FE_ERROR_HANDLED, node, 'The awaited Supabase result does not read its error and is not passed whole to toOutcome(result).');
+    }
+  }
+  if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken && ts.isArrayLiteralExpression(node.right) && node.right.elements.length === 0) {
+    const left = unwrap(ts, node.left);
+    const swallowed = ts.isIdentifier(left) ? Boolean(dataSymbolFromAwait(kit, checker, left))
+      : ts.isPropertyAccessExpression(left) && left.name.text === 'data' && fromAwaitedSupabase(kit, checker, left.expression);
+    if (swallowed) report(FE_ERROR_HANDLED, node, 'Supabase data is collapsed with ?? []; refused or unavailable is not empty data. Pass the whole result to toOutcome.');
+  }
+  return true;
+}
+
 function checkFrontendQueryResults(input) {
   const kit = machineKit(input);
-  const { ts } = kit;
   const violations = [];
-  let awaited = 0;
-  let listReads = 0;
+  const counters = { awaited: 0, listReads: 0 };
   for (const file of input.graph.files.values()) {
     const checker = kit.checkerOf(file.sourceFile);
     const seen = new Set();
@@ -177,39 +207,9 @@ function checkFrontendQueryResults(input) {
       seen.add(key);
       reportAt(violations, kit, ruleId, file, node, message);
     };
-    kit.walk(file.sourceFile, node => {
-      if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) && QUERY_TERMINALS.has(node.expression.name.text)
-        && node.typeArguments?.length && isSupabaseValue(kit, checker, node.expression.expression)) {
-        report(FE_RESULT_TYPED, node, `${node.expression.name.text}<T>() supplies a result generic; derive the row type from Database and let the Supabase chain infer it.`);
-      }
-      if ((ts.isAsExpression(node) || ts.isTypeAssertionExpression(node) || ts.isNonNullExpression(node)) && fromAwaitedSupabase(kit, checker, node.expression)) {
-        report(FE_RESULT_TYPED, node, 'A Supabase query result is cast or non-null asserted; narrow its typed data/error outcome instead.');
-      }
-      if (ts.isAwaitExpression(node) && isSupabaseValue(kit, checker, node.expression)) {
-        const expression = unwrap(ts, node.expression);
-        if (!ts.isCallExpression(expression)) return true;
-        awaited += 1;
-        const methods = chainParts(ts, expression);
-        if (methods.includes('select') && !methods.some(method => QUERY_WRITES.has(method)) && !methods.includes('single') && !methods.includes('maybeSingle')) {
-          listReads += 1;
-          if (!methods.includes('limit') && !methods.some(method => LIST_BOUNDS.has(method))) {
-            report(FE_RESULT_TYPED, node, 'A Supabase list read has no .limit(), .range(), or keyset bound (.gt/.gte/.lt/.lte); bound every multi-row read.');
-          }
-        }
-        if (!handledAwait(kit, checker, input.graph, node)) {
-          report(FE_ERROR_HANDLED, node, 'The awaited Supabase result does not read its error and is not passed whole to toOutcome(result).');
-        }
-      }
-      if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken && ts.isArrayLiteralExpression(node.right) && node.right.elements.length === 0) {
-        const left = unwrap(ts, node.left);
-        const swallowed = ts.isIdentifier(left) ? Boolean(dataSymbolFromAwait(kit, checker, left))
-          : ts.isPropertyAccessExpression(left) && left.name.text === 'data' && fromAwaitedSupabase(kit, checker, left.expression);
-        if (swallowed) report(FE_ERROR_HANDLED, node, 'Supabase data is collapsed with ?? []; refused or unavailable is not empty data. Pass the whole result to toOutcome.');
-      }
-      return true;
-    });
+    kit.walk(file.sourceFile, node => inspectQueryResultNode(kit, input, file, checker, report, counters, node));
   }
-  return { violations, coverage: { status: 'checked', awaited, listReads } };
+  return { violations, coverage: { status: 'checked', awaited: counters.awaited, listReads: counters.listReads } };
 }
 
 const words = text => String(text).replace(/([a-z0-9])([A-Z])/gu, '$1_$2').toUpperCase();
