@@ -51,6 +51,20 @@ export function resolveLedgerFile(root,{env,openReader}){
 
 const SYNTHETIC_LEDGER_ID=/^00000000-0000-4000-8000-[0-9a-f]{12}$/;
 const fixtureRefused=message=>{throw new TypeError(`ledger-fixture-refused: ${message}`);};
+const assertFixtureIdentity=fixture=>{
+  if(fixture.sqliteVersion!==undefined&&(typeof fixture.sqliteVersion!=='string'||!/^\d+\.\d+\.\d+(?:\.\d+)?$/.test(fixture.sqliteVersion)))fixtureRefused('sqliteVersion must be a dotted numeric version');
+  if(typeof fixture.ledgerId!=='string'||!SYNTHETIC_LEDGER_ID.test(fixture.ledgerId))fixtureRefused('ledgerId must be a synthetic UUID');
+  if(!Number.isSafeInteger(fixture.createdAt)||fixture.createdAt<=0||!Number.isFinite(new Date(fixture.createdAt).getTime()))fixtureRefused('createdAt must be a positive safe epoch millisecond');
+  const root=fixture.blobRoot;
+  if(typeof root!=='string'||!root||root.includes('\\')||root.trim()!==root||/[<>:"|?*\x00-\x1f]/.test(root)
+    ||path.posix.isAbsolute(root)||root.split('/').some(p=>!p||p==='.'||p==='..'))fixtureRefused('blobRoot must be a portable relative path');
+};
+const assertFixtureFile=file=>{
+  if(typeof file!=='string'||!path.isAbsolute(file)||path.basename(file)!=='runtime.sqlite')fixtureRefused('file must be an explicit absolute runtime.sqlite');
+  for(const suffix of ['','-wal','-shm'])if(fs.lstatSync(file+suffix,{throwIfNoEntry:false}))fixtureRefused('file and WAL/SHM must be absent');
+  const parent=path.dirname(file),stat=fs.lstatSync(parent,{throwIfNoEntry:false});
+  if(!stat?.isDirectory()||stat.isSymbolicLink()||fs.realpathSync.native(parent)!==path.resolve(parent))fixtureRefused('sample parent must be an existing physical directory');
+};
 /** Validate a fresh, initialization-only sample identity. Samples carry portable metadata,
  * never a repository/machine binding; the ordinary project resolver is not bypassed. */
 export function ledgerFixtureInit(fixture,{file,repoRoot,product,machine,mapped,checkpointer,now}){
@@ -61,18 +75,10 @@ export function ledgerFixtureInit(fixture,{file,repoRoot,product,machine,mapped,
   if(!fixture||typeof fixture!=='object'||Array.isArray(fixture)
     ||![Object.prototype,null].includes(Object.getPrototypeOf(fixture))
     ||!['blobRoot,createdAt,ledgerId','blobRoot,createdAt,ledgerId,sqliteVersion'].includes(Object.keys(fixture).sort(byCodeUnit).join(',')))fixtureRefused('needs ledgerId, createdAt and blobRoot, and may state sqliteVersion');
-  if(fixture.sqliteVersion!==undefined&&(typeof fixture.sqliteVersion!=='string'||!/^\d+\.\d+\.\d+(?:\.\d+)?$/.test(fixture.sqliteVersion)))fixtureRefused('sqliteVersion must be a dotted numeric version');
-  if(typeof fixture.ledgerId!=='string'||!SYNTHETIC_LEDGER_ID.test(fixture.ledgerId))fixtureRefused('ledgerId must be a synthetic UUID');
-  if(!Number.isSafeInteger(fixture.createdAt)||fixture.createdAt<=0||!Number.isFinite(new Date(fixture.createdAt).getTime()))fixtureRefused('createdAt must be a positive safe epoch millisecond');
-  const root=fixture.blobRoot;
-  if(typeof root!=='string'||!root||root.includes('\\')||root.trim()!==root||/[<>:"|?*\x00-\x1f]/.test(root)
-    ||path.posix.isAbsolute(root)||root.split('/').some(p=>!p||p==='.'||p==='..'))fixtureRefused('blobRoot must be a portable relative path');
+  assertFixtureIdentity(fixture);
   if(repoRoot!==null||product!==null||machine!==null||mapped)fixtureRefused('a sample cannot bind a repository, product, machine or cached project path');
   if(!checkpointer||now!==Date.now)fixtureRefused('initialization owns its frozen clock and requires a checkpointer');
-  if(typeof file!=='string'||!path.isAbsolute(file)||path.basename(file)!=='runtime.sqlite')fixtureRefused('file must be an explicit absolute runtime.sqlite');
-  for(const suffix of ['','-wal','-shm'])if(fs.lstatSync(file+suffix,{throwIfNoEntry:false}))fixtureRefused('file and WAL/SHM must be absent');
-  const parent=path.dirname(file),stat=fs.lstatSync(parent,{throwIfNoEntry:false});
-  if(!stat?.isDirectory()||stat.isSymbolicLink()||fs.realpathSync.native(parent)!==path.resolve(parent))fixtureRefused('sample parent must be an existing physical directory');
+  assertFixtureFile(file);
   return Object.freeze({...fixture,marker:'starci/basic-runtime-fixture@1'});
 }
 /** Refuse sample bytes as an operational ledger before opening a writer or beginning a transaction. */

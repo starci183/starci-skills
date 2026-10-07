@@ -60,6 +60,19 @@ const requiredCheck = (locals, values) => {
   }
 };
 
+/** The values one positional slot holds: a variadic slot's list, a single value, or none. */
+const candidatesOf = (supplied) => {
+  if (Array.isArray(supplied)) return supplied;
+  return supplied === undefined ? [] : [supplied];
+};
+
+/** A slot with an enum accepts only its members. */
+const checkEnum = (schema, candidates) => {
+  for (const candidate of candidates) {
+    if (schema.enum && !schema.enum.includes(candidate)) throw new Error(`${schema.name} expects one of: ${schema.enum.join(', ')}`);
+  }
+};
+
 /** Positional arity and enum checks; passthrough tokens fill free slots first. */
 const checkPositionals = (verb, positionals, passthrough) => {
   const positionalSchema = verb.positional ?? [];
@@ -72,14 +85,7 @@ const checkPositionals = (verb, positionals, passthrough) => {
     const supplied = variadicAt === index ? positionals.slice(index) : positionals[index];
     const empty = Array.isArray(supplied) ? supplied.length === 0 : supplied === undefined;
     if (schema.required && empty) throw new Error(`missing required positional ${schema.name}`);
-    let candidates = [];
-    if (Array.isArray(supplied)) candidates = supplied;
-    else if (supplied !== undefined) candidates = [supplied];
-    for (const candidate of candidates) {
-      if (schema.enum && !schema.enum.includes(candidate)) {
-        throw new Error(`${schema.name} expects one of: ${schema.enum.join(', ')}`);
-      }
-    }
+    checkEnum(schema, candidatesOf(supplied));
   }
 };
 
