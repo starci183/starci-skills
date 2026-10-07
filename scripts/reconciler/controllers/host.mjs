@@ -51,7 +51,7 @@ import { reconcileTurnBudget, turnCustodyHold } from '../turn-budget.mjs';
 export { turnStep } from '../turn-budget.mjs';
 import { goalTextRefusal } from '../../goal/goal-text.mjs';
 import { clocksOf } from '../sla.mjs';
-import { allocationSettings } from '../../../engine/config.mjs';
+import { allocationMs, allocationSettings } from '../../../engine/config.mjs';
 import { claimDue, finishDuty, listSchedules } from '../schedules.mjs';
 import { pathKey } from '../../lib/path-key.mjs';
 import os from 'node:os';
@@ -549,7 +549,7 @@ export function createHostController(deps = {}) {
    * so a re-run never counts twice. Shadow records the run and writes nothing.
    */
   async function usageSweep(ctx, now) {
-    const everyMs = deps.usageEveryMs ?? 300_000;
+    const everyMs = deps.usageEveryMs ?? allocationMs('usageEveryMs');
     if (!claimDue(ctx, { controller: 'host', duty: 'usage', intervalMs: everyMs, now }).due) return { skipped: 'fresh' };
     const r = await ctx.run('node', ['scripts/kernel/usage-record.mjs', 'sweep', '--json'], { timeoutMs: 180_000 });
     finishDuty(ctx, { controller: 'host', duty: 'usage', result: (r?.ok === false && 'failed') || (ctx.mode === 'active' && 'done') || 'skipped', now: ctx.now() });

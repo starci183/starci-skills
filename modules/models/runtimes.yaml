@@ -71,6 +71,9 @@ allocation:
   # and nowhere else.
   dispatchLeaseTtlMs: 1800000
   watchdogCadenceMs: 300000
+  # usageEveryMs: the token meter's sweep interval (host controller duty host/usage, scripts/kernel/usage-record.mjs). An attempt that ended less
+  # than this ago is still being metered: the autopilot budget does not count its missing usage as unknown (scripts/kernel/autopilot-budget.mjs).
+  usageEveryMs: 300000
   observeCadenceMs: 180000
   # activeStaleMs: an `active` screen (spinner/"Working" row) is trusted only while the terminal still
   # prints; a spinner re-renders every second, so output older than this is a frozen frame. The watchdog

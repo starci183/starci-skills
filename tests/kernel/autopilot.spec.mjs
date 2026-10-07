@@ -12,6 +12,7 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { stringifyYaml, parseYaml } from '../../engine/yaml.mjs';
+import { allocationMs } from '../../engine/config.mjs';
 import { inspectLedger, ledgerFileFor, openLedger } from '../../engine/db/ledger.mjs';
 import {seedWorkflow, withLedger} from '../helpers/ledger-fixture.mjs';
 import { AUTOPILOT_BY, SUPERVISOR_GATE, autopilotAnswerAsk, autopilotAskClass, autopilotOf, autopilotSettings, drawGateEvidence, routeCapUnderAutopilot, budgetOf, autopilotSweep } from '../../scripts/kernel/autopilot-run.mjs';
@@ -31,6 +32,8 @@ const json = (r) => { try { return JSON.parse(r.stdout); } catch { const s = r.s
 const seed = (repo, fn) => { const l = openLedger({ file: ledgerFileFor(repo) }); try { return fn(l); } finally { l.close(); } };
 const read = (repo, fn) => { const l = inspectLedger({ file: ledgerFileFor(repo) }); try { return fn(l.db); } finally { l.close(); } };
 const WF = 'wf-autopilot';
+// An attempt that ended longer ago than the usage sweep's interval (allocation.usageEveryMs) has had its usage metered or is unknown.
+const PAST_METERING = allocationMs('usageEveryMs') * 2;
 
 const world = (t, legs = [{ op: 'backend.implement' }, { op: 'e2e.verify' }, { op: 'handover.review' }]) => {
   const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-autopilot-'));
@@ -323,8 +326,8 @@ const withUsageBudget = (t, fn) => withLedger(t, ({ ledger, repoRoot }) => {
     ledger.write.setJobStatus({ jobId, to: 'running', reason: 'test worker accepted' });
     return attempt.attempt_id;
   };
-  const end = (jobId, attemptId) => {
-    ledger.write.updateAttempt({ attemptId, settledAt: Date.now(), endState: 'worker-dead' });
+  const end = (jobId, attemptId, endedAgoMs = 0) => {
+    ledger.write.updateAttempt({ attemptId, settledAt: Date.now() - endedAgoMs, endState: 'worker-dead' });
     ledger.write.setJobStatus({ jobId, to: 'ready', reason: 'test worker died; retry same job' });
   };
   return fn({ ledger, repoRoot, queue, dispatch, end, settings: autopilotSettings({ autopilot: { budgets: { attempts: 10, tokens: 1000, wallMs: 100000 } } }) });
@@ -356,10 +359,10 @@ test('autopilot budgets count each real dispatch and measured attempt/Kernel tok
 test('completed missing usage is unknown and holds dispatch through the existing Supervisor gate; later measurement replaces unknown', t => withUsageBudget(t, ({ ledger, repoRoot, queue, dispatch, end, settings }) => {
   queue('meter-unavailable'); queue('meter-pending');
   const unavailable = dispatch('meter-unavailable', 'ctx_meter_unavailable');
-  end('meter-unavailable', unavailable);
+  end('meter-unavailable', unavailable, PAST_METERING);
   ledger.write.markAttemptUsageUnavailable({ attemptId: unavailable, reason: 'private fixture has no adapter result' });
   const pending = dispatch('meter-pending', 'ctx_meter_pending');
-  end('meter-pending', pending);
+  end('meter-pending', pending, PAST_METERING);
   const before = budgetOf(ledger.db, WF, settings);
   assert.equal(before.used.tokens, null, 'completed unmeasured attempts cannot claim verified zero');
   assert.equal(before.measured.tokens, 0);
@@ -376,14 +379,45 @@ test('completed missing usage is unknown and holds dispatch through the existing
   for (const attemptId of [unavailable, pending]) ledger.write.recordAttemptUsage({ attemptId, rows: [{ model: 'm', inputTokens: 4, outputTokens: 2, cacheReadTokens: 0, cacheWriteTokens: 0 }] });
   const after = budgetOf(ledger.db, WF, settings);
   assert.equal(after.used.tokens, 12); assert.deepEqual(after.unverified, []); assert.equal(after.coverage.complete, true);
-  assert.equal(ledger.db.prepare("SELECT count(*) n FROM incidents WHERE status='open'").get().n, 1, 'measurement does not silently resolve the Supervisor decision');
+  assert.equal(ledger.db.prepare("SELECT count(*) n FROM incidents WHERE status='open'").get().n, 1, 'the gate stays open until the next evaluation');
+  autopilotSweep({ ledger, repo: repoRoot, workflowId: WF, settings });
+  assert.equal(ledger.db.prepare("SELECT count(*) n FROM incidents WHERE status='open'").get().n, 0, 'the runtime resolves a budget gate whose condition no longer holds');
+  const resolved = JSON.parse(ledger.db.prepare("SELECT payload_json FROM events WHERE kind='incident-resolved' ORDER BY seq DESC LIMIT 1").get().payload_json);
+  assert.equal(resolved.by, AUTOPILOT_BY); assert.equal(resolved.evidence.coverage.complete, true);
+}));
+
+test('usage still being metered is not unknown: no budget gate inside the metering window, one after it, released when the usage arrives, kept while a cap is exceeded', t => withUsageBudget(t, ({ ledger, repoRoot, queue, dispatch, end, settings }) => {
+  const openGates = () => ledger.db.prepare("SELECT count(*) n FROM incidents WHERE status='open'").get().n;
+  const sweep = () => autopilotSweep({ ledger, repo: repoRoot, workflowId: WF, settings });
+  queue('meter-fresh'); queue('meter-late');
+  const fresh = dispatch('meter-fresh', 'ctx_meter_fresh');
+  end('meter-fresh', fresh);
+  const inside = sweep();
+  assert.deepEqual(inside.budget.unverified, [], 'an attempt that just ended is being metered, not unknown');
+  assert.equal(inside.budget.coverage.metering, 1);
+  assert.equal(openGates(), 0, 'no gate inside the metering window');
+  ledger.write.recordAttemptUsage({ attemptId: fresh, rows: [{ model: 'm', inputTokens: 4, outputTokens: 2, cacheReadTokens: 0, cacheWriteTokens: 0 }] });
+  sweep();
+  assert.equal(openGates(), 0, 'usage arriving opens nothing');
+  const late = dispatch('meter-late', 'ctx_meter_late');
+  end('meter-late', late, PAST_METERING);
+  assert.deepEqual(sweep().budget.unverified, ['tokens']);
+  assert.equal(openGates(), 1, 'usage still missing after the window opens the gate');
+  ledger.write.recordAttemptUsage({ attemptId: late, rows: [{ model: 'm', inputTokens: 1, outputTokens: 1, cacheReadTokens: 0, cacheWriteTokens: 0 }] });
+  sweep();
+  assert.equal(openGates(), 0, 'the usage arriving resolves the gate without a human');
+  const exceeded = { ...settings, budgets: { ...settings.budgets, tokens: 5 } };
+  autopilotSweep({ ledger, repo: repoRoot, workflowId: WF, settings: exceeded });
+  assert.equal(openGates(), 1, 'a cap actually exceeded opens the gate');
+  autopilotSweep({ ledger, repo: repoRoot, workflowId: WF, settings: exceeded });
+  assert.equal(openGates(), 1, 'an exceeded cap needs the Supervisor: the runtime keeps the gate');
 }));
 
 test('an open attempt remains pending, extensions retain existing cap semantics, and a zero token cap does not require a usage hold', t => withUsageBudget(t, ({ ledger, queue, dispatch, end, settings }) => {
   queue('meter-open'); const attempt = dispatch('meter-open', 'ctx_meter_open');
   const open = budgetOf(ledger.db, WF, settings);
   assert.equal(open.used.attempts, 1); assert.equal(open.coverage.open, 1); assert.equal(open.coverage.complete, false); assert.deepEqual(open.unverified, []);
-  end('meter-open', attempt);
+  end('meter-open', attempt, PAST_METERING);
   const zero = budgetOf(ledger.db, WF, { ...settings, budgets: { ...settings.budgets, tokens: 0 } });
   assert.deepEqual(zero.unverified, []); assert.equal(zero.used.tokens, null, 'completed unavailable totals stay unknown even with no active token cap');
   ledger.appendEvent({ workflowId: WF, entityType: 'workflow', entityId: WF, kind: 'autopilot-budget-extended', payload: { attempts: 2, tokens: 3, wallMs: 4 } });
