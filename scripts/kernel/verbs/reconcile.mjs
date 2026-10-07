@@ -1,6 +1,7 @@
 // starci kernel reconcile: recover a fenced launch or handle one typed recovery mode.
 import { recordWhy } from '../why-record.mjs';
 import { recordJobResult, releaseLeases, setJobStatus, updateAttempt } from '../../../engine/db/ledger.mjs';
+import { readMachine, withMachine } from '../../../engine/db/machine.mjs';
 import { parseJson } from '../../lib/json.mjs';
 import { jobPayloadOf, jobRowOf, operationTerminalHandleOf } from './shared/rows.mjs';
 import { latestAttemptOf } from '../../machine/job-row.mjs';
@@ -54,6 +55,32 @@ function dispatchIdentityOf(payload, job) {
     .find((entry) => entry?.dispatchId && entry.effectState && entry.effectState !== 'none')?.dispatchId ?? null;
   return unsettled ?? payload.managed?.dispatchId
     ?? (String(job.worker_id ?? '').startsWith('ctx_') || String(job.worker_id ?? '').startsWith('dispatch-') ? job.worker_id : null);
+}
+
+// The launch's provider receipts release with its leases, inside the same transaction that returns the
+// job to ready: every 'unknown' or 'reserved' receipt of this attempt scope belongs to a rejected
+// dispatch of the same try, and reconcile only reaches this point after proving the one unsettled
+// rejection had no effect (earlier rejections of the try were already settled 'none'). A 'reserved'
+// receipt never crossed worker-start; 'launching' and 'live' receipts are another launch's custody and
+// stay held. A refused release aborts the reconcile — the job keeps its fence rather than leak the slot.
+function releaseAttemptReservations(ledger, job, { jobId, dispatchId }) {
+  const scopeId = `${ledger.ledgerId ?? ledger.path}:${jobId}:attempt:${job.attempt ?? job.try_no ?? 0}`;
+  const held = readMachine((m) => m.providerReservations({ activeOnly: true }), [])
+    .filter((row) => row.scope?.scopeId === scopeId && (row.state === 'reserved' || row.state === 'unknown'));
+  if (!held.length) return [];
+  const released = [];
+  withMachine((m) => {
+    for (const row of held) {
+      const proof = row.state === 'reserved'
+        ? { kind: 'failed-before-launch', confirmed: true, source: 'kernel-reconcile', dispatchId, scopeId }
+        : { kind: 'reconciled-no-effect', confirmed: true, source: 'kernel-reconcile', dispatchId, scopeId, effectState: 'none' };
+      const result = m.releaseProviderReservation({ ...row, proof });
+      if (!result.ok) throw Object.assign(new Error(`reconcile ${jobId}: provider reservation ${row.id} (${row.state}) refused the no-effect release: ${result.reason}`),
+        { code: 'provider-reservation-held', result });
+      if (!result.reused) released.push({ id: row.id, attemptId: row.attemptId, state: row.state });
+    }
+  });
+  return released;
 }
 
 export default {
@@ -111,10 +138,11 @@ export default {
     throw new VerbExit(1);
   }
 
-  let leasesReleased = 0;
+  let leasesReleased = 0, reservationsReleased = [];
   ledger.transaction(() => {
     const now = Date.now();
     leasesReleased = releaseLeases(db, { jobId });
+    reservationsReleased = releaseAttemptReservations(ledger, job, { jobId, dispatchId });
     const nextPayload = jobPayloadOf(job);
     delete nextPayload.managed;
     // The rejection is settled now: keep it as evidence, but stop it naming
@@ -148,13 +176,13 @@ export default {
     ledger.appendEvent({
       workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
       kind: 'dispatch-reconciled', payload: { dispatchId, effectState: 'none', attempt: job.attempt,
-        attemptConsumed: false, leasesReleased, proof: result.proof },
+        attemptConsumed: false, leasesReleased, reservationsReleased, proof: result.proof },
     });
   });
 
   const out = { ok: true, jobId, reconciled: true, dispatchId, status: 'ready', attempt: job.attempt,
-    effectState: 'none', attemptConsumed: false, leasesReleased, cleanup };
-  emit(out, `reconciled ${jobId}: ${dispatchId} proved no-effect; same try ${job.attempt} ready (leases released: ${leasesReleased})`, args.json);
+    effectState: 'none', attemptConsumed: false, leasesReleased, reservationsReleased, cleanup };
+  emit(out, `reconciled ${jobId}: ${dispatchId} proved no-effect; same try ${job.attempt} ready (leases released: ${leasesReleased}, provider receipts released: ${reservationsReleased.length})`, args.json);
 
   },
 };

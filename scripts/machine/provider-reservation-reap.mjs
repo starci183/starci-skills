@@ -1,8 +1,10 @@
 // Machine-owned closure of provider slots whose launch can no longer be alive. A reservation is released only on
 // the proof its owner would have supplied (releaseProviderReservation): a terminal Orca no longer lists (or lists
-// disconnected) whose process census carries no member, or a `reserved` receipt that never crossed worker-start.
+// disconnected) whose process census carries no member, a `reserved` receipt that never crossed worker-start, or
+// an `unknown` receipt whose job ledger already recorded every launch of its attempt settled to no effect.
 import { withMachine, readMachine } from '../../engine/db/machine.mjs';
 import { allocationMs } from '../../engine/config.mjs';
+import { parseJson } from '../lib/json.mjs';
 import { terminalList } from '../api/orca/terminal-list.mjs';
 import { processList } from '../api/process/process-list.mjs';
 import { processEnv } from '../api/process/process-env.mjs';
@@ -21,6 +23,52 @@ const listedState = (terminals, handle) => {
 
 /** A `reserved` receipt is consumed (moved to `launching`) before worker-start runs: one that stayed `reserved` held no launch. Pure. */
 const neverLaunched = (row, now, staleMs) => row.state === 'reserved' && !row.handle && !row.pid && now - Number(row.updatedAt) >= staleMs;
+
+// An op launch scopes its receipt `<ledger>:<job>:attempt:<n>` (scripts/kernel/verbs/shared/dispatch-agent.mjs).
+const ATTEMPT_SCOPE = /^(.*):([^:]+):attempt:(\d+)$/;
+
+/** The job's recorded proof that every named launch of `attempt` ended with no effect, or null. Pure reads of an open ledger. */
+function jobNoEffectProof(db, jobId, attempt) {
+  const job = db.prepare('SELECT try_no,payload_json FROM jobs WHERE job_id=?').get(jobId);
+  if (!job || Number(job.try_no) !== attempt) return null;
+  const entries = parseJson(job.payload_json, {})?.rejectedDispatches;
+  if (!Array.isArray(entries) || !entries.length || !entries.every((entry) => entry?.effectState === 'none')) return null;
+  const dispatches = entries.map((entry) => entry?.dispatchId).filter(Boolean);
+  if (!dispatches.length) return null;
+  // A dispatch-rejected event without a dispatch identity is a launch no reconcile could settle: its slot stays.
+  const unsettled = db.prepare("SELECT payload_json FROM events WHERE entity_type='job' AND entity_id=? AND kind='dispatch-rejected'").all(jobId)
+    .some((row) => { const payload = parseJson(row?.payload_json); return !payload?.terminal && payload?.effectState !== 'none'; });
+  return unsettled ? null : { jobId, attempt, dispatches };
+}
+
+/**
+ * The attempt-scoped 'unknown' receipts whose owning job's ledger proves every recorded launch of the attempt
+ * settled to no effect: [{row, proof, why}]. The reconcile that returned the job to ready marked each rejected
+ * dispatch entry effectState 'none'; a scope with any entry still unsettled — or an unattributable rejection —
+ * keeps its receipts held. kept: [{id, why}] for every receipt no ledger proves.
+ */
+function recordedNoEffect(rows, settings) {
+  const wanted = new Map(), kept = [], proven = [], found = new Set();
+  for (const row of rows) {
+    const match = ATTEMPT_SCOPE.exec(String(row.scope?.scopeId ?? ''));
+    if (match) wanted.set(match[1], [...(wanted.get(match[1]) ?? []), { row, jobId: match[2], attempt: Number(match[3]) }]);
+    else kept.push({ id: row.id, why: 'effect-unproven' });
+  }
+  if (wanted.size) for (const entry of readMachine((m) => m.forEachLedger(({ ledger, db }) => {
+    const group = wanted.get(ledger.ledgerId) ?? wanted.get(ledger.file);
+    return group ? group.map((item) => ({ ...item, proof: jobNoEffectProof(db, item.jobId, item.attempt) })) : null;
+  }), [], settings)) {
+    for (const item of entry?.result ?? []) {
+      found.add(item.row.id);
+      if (!item.proof) { kept.push({ id: item.row.id, why: 'effect-unproven' }); continue; }
+      proven.push({ row: item.row, why: 'no-effect-recorded', proof: { kind: 'reconciled-no-effect', confirmed: true,
+        source: 'reservation-reap', dispatchId: item.proof.dispatches.at(-1), dispatches: item.proof.dispatches,
+        scopeId: item.row.scope.scopeId, jobId: item.proof.jobId, effectState: 'none' } });
+    }
+  }
+  for (const row of rows) if (!found.has(row.id) && !kept.some((entry) => entry.id === row.id)) kept.push({ id: row.id, why: 'ledger-unproven' });
+  return { proven, kept };
+}
 
 const censusOf = (io) => {
   let table = null, envRows = null;
@@ -65,10 +113,11 @@ export function reapProviderReservations(options = {}, io = {}) {
     const staleMs = allocationMs('providerReservation.reservedStaleMs');
     const stale = active.filter((row) => neverLaunched(row, now, staleMs)).map((row) => ({ row, why: 'never-launched',
       proof: { kind: 'failed-before-launch', confirmed: true, source: 'reservation-reap' } }));
+    const recorded = recordedNoEffect(active.filter((row) => row.state === 'unknown' && !row.handle), settings);
     const { ended, kept } = endedTerminals(active.filter((row) => row.handle && LAUNCHED.has(row.state)), io);
     const proven = provenClosed(ended, io);
-    const releases = [...stale, ...proven.closed.map(({ row, proof }) => ({ row, proof, why: `terminal-${proof.terminalProof}` }))];
-    out.kept.push(...kept, ...proven.kept);
+    const releases = [...stale, ...recorded.proven, ...proven.closed.map(({ row, proof }) => ({ row, proof, why: `terminal-${proof.terminalProof}` }))];
+    out.kept.push(...kept, ...proven.kept, ...recorded.kept);
     if (!releases.length) return out;
     withMachine((m) => {
       for (const { row, proof, why } of releases) {
