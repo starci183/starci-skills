@@ -790,6 +790,19 @@ schemas:
       whenNot: Quota/eligibility still gate each call — registry presence is not dispatch authority.
       selectedBy: Provider validation + agent admission (modules/models/ holds the model-side detail).
 
+  - id: starci/model-tiers@1
+    file: modules/schemas/model-tiers.schema.yaml
+    dialect: json-schema
+    subsystem: model
+    governs: "The capability tiers (ordered member chains), the seat and difficulty maps onto them, the balance numbers and the token thresholds."
+    binds: "modules/models/tiers.yaml (carries schema starci/model-tiers@1)"
+    usedBy: [scripts/agent/tiers.mjs]
+    business:
+      question: "Which model takes this seat or operation, in which order?"
+      whenNeeded: Before any agent launch or op route; the picker reads the tier chain and applies bias, balance and token steps.
+      whenNot: Eligibility, quota and the host still gate each pick; tier membership is not launch authority.
+      selectedBy: scripts/agent/tiers.mjs tier lookups and scripts/lib/tier-pick.mjs.
+
   # --------------------------------------------------------------------------
   # BUILD HELPERS
   # --------------------------------------------------------------------------

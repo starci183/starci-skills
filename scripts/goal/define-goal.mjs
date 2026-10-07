@@ -185,8 +185,6 @@ function ownerConfigSummary() {
         agent: c?.kernel?.agent ?? null,
         model: c?.kernel?.model ?? null,
         effort: c?.kernel?.effort ?? c?.effort ?? null,
-        ...(Array.isArray(c?.kernel?.group)
-          ? { group: c.kernel.group.map(m => ({ agent: m?.agent ?? null, model: m?.model ?? null })) } : {}),
       },
       budgets: c?.budgets ?? null,
     };
@@ -411,12 +409,11 @@ if (planOnly) {
     lines.push('  underivable (kernel will derive at boot)', `  reason: ${underivable.status} — ${underivable.reason}`);
   }
   const cfg = out.config;
-  const groupRoute = cfg.kernel?.group?.map(m => `${m.agent}/${m.model ?? '(pool model)'}`).join(' → '),
-    kernelText = cfg.kernel?.group ? `kernel group ${groupRoute}` : `kernel pin agent=${cfg.kernel?.agent ?? '(none)'} model=${cfg.kernel?.model ?? '(none)'}`;
+  const kernelText = cfg.kernel?.agent || cfg.kernel?.model ? `kernel pin (only) agent=${cfg.kernel?.agent ?? '(none)'} model=${cfg.kernel?.model ?? '(none)'}` : 'kernel tier chain (no pin)';
   const budgetText = () => cfg.budgets && Object.values(cfg.budgets).some(v => v != null) ? ` budgets=${JSON.stringify(cfg.budgets)}` : '', errorText = () => cfg.error ? ` (${cfg.error})` : '';
   lines.push(cfg.file
     ? `CONFIG: ${cfg.file} — ${kernelText} effort=${cfg.kernel?.effort ?? '(default)'}${budgetText()}${errorText()}`
-    : 'CONFIG: no config.yaml — kernel route falls to --agent flag or route-model', 'WILL WRITE:', ...willWrite.map(w => `  - ${w}`));
+    : 'CONFIG: no config.yaml — kernel route takes the shipped tiers or the --agent flag', 'WILL WRITE:', ...willWrite.map(w => `  - ${w}`));
   if (revisionBase) {
     lines.push(`REVISION DIFF: remove [${preview.opChainDiff.removed.join(', ') || '-'}] add [${preview.opChainDiff.added.join(', ') || '-'}] reordered=${preview.opChainDiff.reordered}`,
       `APPROVAL REQUIRED: exact owner reply ok; token ${preview.approval.token}`,

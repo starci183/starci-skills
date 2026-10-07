@@ -48,7 +48,7 @@ const launchModelOf = (provider, model, card) => model ?? (card?.start?.defaultM
 // proves nothing: the launch goes on and Orca stays the authority. The receipt carries the attested `depth`.
 export function spawnAgent({ provider, model = null, effort = null, worktree, repo = null, baseBranch = null, name = null, setup = null, title, spec, taskTitle = null,
   run, from = null, request, onCreated = null, parentDispatch = null, maxDepth = null, preflight = null, io = null,
-  role = 'worker', scopeId = null, allowGroup = null, admission = null, bias = null, ownerGrant = null, author = null, qualityFloor = null, kind = null, difficulty = null, config = undefined, env = process.env } = {}) {
+  role = 'worker', scopeId = null, allowGroup = null, admission = null, bias = null, ownerGrant = null, biasTrusted = false, tier = null, liveSeat = null, history = null, author = null, qualityFloor = null, kind = null, difficulty = null, config = undefined, env = process.env } = {}) {
   addStarciShimToPath();
   const orca = { start: io?.start ?? workerStart, show: io?.show ?? workerShow,
     rename: io?.rename ?? terminalRename, stop: io?.stop ?? workerStop, release: io?.release ?? closeWorker,
@@ -60,7 +60,7 @@ export function spawnAgent({ provider, model = null, effort = null, worktree, re
   model = target.model;
   const budgetModel = model;
   admission ??= admitAgent({ role, scopeId: scopeId ?? launchScopeId(role, request), attemptId: launchScopeId(role, request), allowGroup: allowGroup ?? [{ provider, model: budgetModel, effort }],
-    bias, ownerGrant, author, qualityFloor, kind, difficulty, scope: { jobId: request?.job ?? request?.workerJob ?? null, runId: run ?? null, seat: request?.seat ?? null } }, { io: io?.admission, env });
+    bias, ownerGrant, biasTrusted, tier, liveSeat, history, author, qualityFloor, kind, difficulty, scope: { jobId: request?.job ?? request?.workerJob ?? null, runId: run ?? null, seat: request?.seat ?? null } }, { io: io?.admission, env });
   const unadmitted = unadmittedLaunch(admission, provider, budgetModel, noEffect);
   if (unadmitted) return unadmitted;
   const agent = card?.start?.agentArgument ?? provider;
@@ -317,7 +317,7 @@ function settleLaunch(session, launch, started, { effort, onCreated, depth, limi
 // Returns spawnAgent's receipt (runId/taskId on it), or {ok:false, step:'run-create', effectState:'none'}.
 export function startAgent({ provider, model = null, effort = null, worktree, repo = null, baseBranch = null, name = null, setup = null, title, prompt, specFile = null,
   heading = null, objective, entry = null, priorRunId = null, request, onCreated = null, parentDispatch = null, maxDepth = null, io = null,
-  role = 'worker', scopeId = null, allowGroup = null, admission = null, bias = null, ownerGrant = null, author = null, qualityFloor = null, kind = null, difficulty = null, config = undefined, env = process.env } = {}) {
+  role = 'worker', scopeId = null, allowGroup = null, admission = null, bias = null, ownerGrant = null, biasTrusted = false, tier = null, liveSeat = null, history = null, author = null, qualityFloor = null, kind = null, difficulty = null, config = undefined, env = process.env } = {}) {
   if (!request || typeof request !== 'object') throw new Error('startAgent needs request: the ledger identity of this launch (calls.yaml replay: request)');
   const orca = { runShow: io?.runShow ?? runShow, runCreate: io?.runCreate ?? runCreate };
   // The depth preflight runs before the Run exists, so a refused launch leaves nothing behind in Orca. With no parent named,
@@ -328,20 +328,20 @@ export function startAgent({ provider, model = null, effort = null, worktree, re
   const { card } = loadAdapter(provider);
   const budgetModel = launchModelOf(provider, model, card);
   admission ??= admitAgent({ role, scopeId: scopeId ?? launchScopeId(role, request), attemptId: launchScopeId(role, request), allowGroup: allowGroup ?? [{ provider, model: budgetModel, effort }],
-    bias, ownerGrant, author, qualityFloor, kind, difficulty, scope: { jobId: request?.workerJob ?? (request?.workflow ? `kernel-${request.workflow}` : null),
+    bias, ownerGrant, biasTrusted, tier, liveSeat, history, author, qualityFloor, kind, difficulty, scope: { jobId: request?.workerJob ?? (request?.workflow ? `kernel-${request.workflow}` : null),
       runId: null, seat: request?.seat ?? null } }, { io: io?.admission ?? io?.spawn?.admission, env });
   if (!admission.ok) return { ...admission, provider };
   provider = admission.selected.provider; model = admission.selected.model; effort = admission.selected.effort ?? effort;
   const spec = taskSpecOf({ prompt, file: specFile, heading: heading ?? title }).spec;
   const launch = (runId) => spawnAgent({ provider, model, effort, worktree, repo, baseBranch, name, setup, title, spec, taskTitle: title, run: runId, from: entry,
     request, onCreated, parentDispatch, maxDepth, preflight, io: { ...io?.spawn, admission: io?.admission ?? io?.spawn?.admission },
-    role, scopeId, allowGroup, admission, bias, ownerGrant, author, qualityFloor, kind, difficulty, config, env });
+    role, scopeId, allowGroup, admission, bias, ownerGrant, biasTrusted, tier, liveSeat, history, author, qualityFloor, kind, difficulty, config, env });
   if (priorRunId && orca.runShow({ id: priorRunId })?.ok) {
     const reused = launch(priorRunId);
     if (!coordinatorRefused(reused)) return reused;
     // A proved no-effect coordinator rejection consumed that candidate attempt. The fresh Run is a distinct attempt.
     admission = admitAgent({ role, scopeId: scopeId ?? launchScopeId(role, request), attemptId: `${launchScopeId(role, request)}:coordinator-retry`,
-      allowGroup: allowGroup ?? [{ provider, model, effort }], bias, ownerGrant, author, qualityFloor, kind, difficulty },
+      allowGroup: allowGroup ?? [{ provider, model, effort }], bias, ownerGrant, biasTrusted, tier, liveSeat, history, author, qualityFloor, kind, difficulty },
     { io: io?.admission ?? io?.spawn?.admission, env });
     if (!admission.ok) return { ...admission, provider };
     provider = admission.selected.provider; model = admission.selected.model; effort = admission.selected.effort ?? effort;

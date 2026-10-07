@@ -9,11 +9,13 @@ export { releaseProviderBudgetByHandle } from '../machine/provider-budget-releas
 
 const scopeOf = (input) => ({ scopeId: input.scopeId ?? input.scope?.scopeId ?? null,
   runId: input.scope?.runId ?? input.runId ?? null, jobId: input.scope?.jobId ?? input.jobId ?? null,
-  seat: input.scope?.seat ?? input.seat ?? null });
+  seat: input.scope?.seat ?? input.seat ?? null, tier: input.scope?.tier ?? input.tier ?? null });
 const policyOf = (options) => options.policy ?? allocationSettings()?.admission;
 const exactOverride = (override, input, scope) => override?.authorized === true && typeof override.reason === 'string' && override.reason.trim()
   && override.scopeId === scope?.scopeId && scope?.scopeId != null && override.role === input.role
   && override.provider === input.provider && override.model === input.model && (override.account ?? 'default') === (input.account ?? 'default');
+// An override (an owner reserve grant, or an owner bias naming the member) widens the 90..95 band only: at biasPercent it is refused.
+const withinBand = (quota, policy) => Number.isFinite(quota.usedPercent) && quota.usedPercent < policy.biasPercent;
 const validGrant = (quota, role, scopeId, policy, now) => quota.authority !== 'owner-grant'
   || inspectQuotaEvidence(quota, { role, scopeId, policy, now }).codes.length === 0;
 
@@ -40,7 +42,7 @@ export function reserveProviderBudget(input = {}, options = {}) {
   const override = input.override ?? input.reserveOverride;
   // The callback is a trusted runtime boundary: it verifies separately persisted owner authority,
   // not the requested override's self-asserted `authorized` flag or a pure selection plan.
-  const overrideApplied = quota.state === 'limited' && exactOverride(override, input, scope)
+  const overrideApplied = quota.state === 'limited' && withinBand(quota, policy) && exactOverride(override, input, scope)
     && options.authorizeOverride?.(override, input) === true;
   if (!quota.normalAdmission && !overrideApplied) return { ok: false, reason: 'quota-reserve', quota };
   return withMachine((m) => m.reserveProvider({ provider: input.provider, account: input.account ?? 'default',
@@ -56,7 +58,7 @@ export function markProviderBudget(receipt, observation, options = {}) {
       const now = clockOf(options)(), policy = policyOf(options), quota = normalizeQuotaSnapshot(stored.quota, { policy, now });
       if (!quota.fresh || quota.auth !== 'ok' || ['dead', 'unknown'].includes(quota.state)
         || !validGrant(quota, stored.role, stored.scope?.scopeId, policy, now)
-        || (!quota.normalAdmission && !exactOverride(stored.override, stored, stored.scope)))
+        || (!quota.normalAdmission && !(withinBand(quota, policy) && exactOverride(stored.override, stored, stored.scope))))
         return { ok: false, reason: 'quota-ineligible', quota, reservation: stored };
     }
     return m.markProviderReservation({ ...receipt, ...observation, id: receipt.id, fence: receipt.fence, attemptId: receipt.attemptId });

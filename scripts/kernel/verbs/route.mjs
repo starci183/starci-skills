@@ -4,14 +4,16 @@ import { eachInOrder } from '../../lib/in-order.mjs';
 import { jobResultOf,jobRowOf } from './shared/rows.mjs';
 import { queuedJobOp, refuseOwnerGate, refusePeerWait, opSlotsOrRefuse } from './shared/job-gates.mjs';
 import { biasForRole } from '../../lib/owner-routing-bias.mjs';
-import { ownerReserveGrant, quotaForAdmission } from '../../agent/admission.mjs';
+import { ownerReserveGrant, ownerBiasTrust, quotaForAdmission, admissionPolicyOf } from '../../agent/admission.mjs';
+import { pickOpModel } from '../../agent/op-pick.mjs';
+import { tierHistory } from '../../agent/tier-history.mjs';
+import { pickRecordText } from '../../lib/pick-record.mjs';
 import { prepareProviderBudget, providerBudgetUsage } from '../../agent/provider-budget.mjs';
 import { VerbExit } from './shared/verb-exit.mjs';
 
 function routeHumanOf({ jobId, kind, difficulty, decided, lineageAdjust, blockingView }) {
   const lines = [
     `route ${jobId} (${kind}, ${difficulty}) → ${decided.model} model=${decided.modelId ?? '-'} effort=${decided.effort ?? '-'}`,
-    `  chain: ${decided.routeChain.join(' → ') || '(none)'}`,
   ];
   if (lineageAdjust && (lineageAdjust.demoted.length || lineageAdjust.excluded.length)) {
     const changedPools = [...lineageAdjust.demoted.map((pool) => `${pool} demoted`), ...lineageAdjust.excluded.map((pool) => `${pool} excluded`)].join(', ');
@@ -19,15 +21,7 @@ function routeHumanOf({ jobId, kind, difficulty, decided, lineageAdjust, blockin
     const takenNote = lineageAdjust.demotedTaken ? '; no other pool was eligible' : '';
     lines.push(`  retry lineage: ${changedPools} (${causes})${takenNote}`);
   }
-  if (decided.routeBalance) {
-    const deficits = Object.entries(decided.routeBalance.deficits)
-      .map(([pool, item]) => `${pool} ${Math.round(item.actual * 100)}%/${Math.round(item.target * 100)}%`).join(', ');
-    lines.push(`  balanced (last ${decided.routeBalance.windowHours}h, ${decided.routeBalance.recentTotal} jobs): ${deficits}`);
-  }
-  if (decided.routeCrossFamily?.applied) {
-    lines.push(`  cross-family audit: ${decided.routeCrossFamily.authorOp ?? 'author op'} ran on ${decided.routeCrossFamily.author}; the auditor takes the other family`);
-  }
-  if (decided.routeRejected.length) lines.push('  rejected:', ...decided.routeRejected.map((item) => `    ${item.target}: ${item.reason}`));
+  lines.push(...pickRecordText(decided.pick).map((line) => `  ${line}`));
   if (blockingView?.waiters) {
     lines.push(`  blocking: ${blockingView.waiters} waiter(s) (${blockingView.workflows.length} other workflow(s)) wait on ${jobId}, weight ${blockingView.weight}: dispatch it first`);
   }
@@ -78,7 +72,7 @@ async function capacityForPools({ db, jobId, ledger, pools, rtDoc, rtMerged, reg
     const measuredQuota = provider ? quotaByProvider.get(providerKey)
       : { state: 'unknown', usedPercent: null, detail: 'pool declares no provider' };
     const quota = quotaForAdmission({ quota: measuredQuota, provider: providerKey, pool: poolId, role: 'op', kind, difficulty,
-      scopeId, registry: regDoc, runtimes: rtMerged, policy: rtDoc?.allocation?.admission });
+      scopeId, registry: regDoc, runtimes: rtMerged, policy: admissionPolicyOf(rtMerged) });
     if (provider && !budgetByProvider.has(providerKey)) budgetByProvider.set(providerKey, providerBudgetUsage(providerKey, quota.account));
     const budget = budgetByProvider.get(providerKey);
     const unreservedLocal = unreservedLocalOf({ db, poolLoad, budget, ledger, pools, provider });
@@ -96,36 +90,21 @@ async function capacityForPools({ db, jobId, ledger, pools, rtDoc, rtMerged, reg
   return { accounts, poolLoad, runningByModel, capacity };
 }
 
-function planRoute({ db, ledger, job, payload, kind, difficulty, rtDoc, rtMerged, regDoc, ownerRoot,
-  configuredAllocationPolicy, loadConfig, recentDispatchCounts, kindRouteOf, auditAuthorOf, isFanOutSlice, selectPool,
-  lineage, lineageError, scopeId, bias, capacity }) {
+function planRoute({ db, ledger, payload, kind, difficulty, rtDoc, rtMerged, regDoc, ownerRoot,
+  configuredAllocationPolicy, loadConfig, lineage, lineageError, scopeId, bias, biasTrusted, capacity, env }) {
   let allocation = null;
   try { allocation = configuredAllocationPolicy(loadConfig(ownerRoot)); } catch { allocation = null; }
-  const balancedRoute = (allocation?.policy ?? rtDoc?.allocation?.policy) === 'balanced';
-  const recent = balancedRoute
-    ? recentDispatchCounts({ db, ledgerFile: ledger.path ?? null, windowHours: allocation?.windowHours })
-    : null;
-  const routeKind = kindRouteOf(kind, rtDoc);
-  const author = routeKind.role === 'verify'
-    ? (() => { try { return auditAuthorOf(db, job, { runtimes: rtMerged }); } catch { return null; } })()
-    : null;
-  const fanOut = isFanOutSlice(payload);
   const redesignAs = typeof payload.redesign?.routeAs === 'string' ? payload.redesign.routeAs : null;
-  const decision = selectPool({ kind: redesignAs ?? kind, difficulty, bias, capacity, runtimes: rtMerged,
-    scopeId, attemptId: scopeId, now: Date.now(), modelRegistry: regDoc,
-    policy: allocation?.policy ?? undefined,
-    shares: allocation?.shares ?? undefined,
-    recent: recent?.counts,
-    grants: allocation?.grants ?? undefined,
-    auditOf: author?.pool ?? undefined,
-    fanOut,
+  const historyOf = (tier) => tierHistory({ tier, db, ledgerFile: ledger.path ?? null, env, routeHoldMs: rtDoc?.allocation?.routeHoldMs });
+  const decision = pickOpModel({ kind: redesignAs ?? kind, difficulty, bias, biasTrusted, capacity, runtimes: rtMerged,
+    scopeId, attemptId: scopeId, now: Date.now(), modelRegistry: regDoc, grants: allocation?.grants ?? undefined, historyOf,
     lineage: lineage && (lineage.demote.length || lineage.exclude.length) ? lineage : null });
   let lineageAdjust = null;
   if (lineage) {
     lineageAdjust = { demoted: lineage.demote, excluded: lineage.exclude, pools: lineage.pools,
-      attempts: lineage.attempts, demotedTaken: decision?.lineage?.demotedTaken ?? false };
+      attempts: lineage.attempts, demotedTaken: false };
   } else if (lineageError) lineageAdjust = { demoted: [], excluded: [], error: lineageError };
-  return { recent, redesignAs, decision, lineageAdjust, author };
+  return { redesignAs, decision, lineageAdjust };
 }
 
 function refuseRouteDecision({ decision, bias, routeFacts, kind, jobId, difficulty, runningByModel, poolLoad, emit, args }) {
@@ -146,7 +125,7 @@ function refuseRouteDecision({ decision, bias, routeFacts, kind, jobId, difficul
     throw new VerbExit(1);
   }
   if (!decision || decision.error) {
-    const out = { ok: false, jobId, kind, difficulty, bias, ...routeFacts, error: decision?.error ?? 'selectPool returned no decision', poolLoad: { running: runningByModel, routeHoldMs: poolLoad.routeHoldMs } };
+    const out = { ok: false, jobId, kind, difficulty, bias, ...routeFacts, error: decision?.error ?? 'pickOpModel returned no decision', poolLoad: { running: runningByModel, routeHoldMs: poolLoad.routeHoldMs } };
     emit(out, `route REFUSED for ${jobId} (${kind}, ${difficulty}): ${out.error}`, args.json);
     throw new VerbExit(1);
   }
@@ -166,22 +145,15 @@ function routableJobOrThrow(db, jobId, finalSettled) {
 }
 
 /** The persisted route decision: pool, effort, chain, policy, balance and cross-family facts of the selected pool. */
-function routeDecidedOf({ decision, redesignAs, payload, rtDoc, recent, author }) {
+function routeDecidedOf({ decision, redesignAs, payload, rtDoc }) {
+  const record = decision.pick ?? null;
   return {
     admission: decision.admission ?? null,
-    // A redesign leg reasons at high effort even on a pool that pins none (runtimes.yaml allocation.redesign.effort).
+    // A redesign leg reasons at high effort even on a member that pins none (runtimes.yaml allocation.redesign.effort).
     model: decision.target, modelId: decision.modelId ?? null, effort: decision.effort ?? (redesignAs ? (payload.redesign?.effort ?? rtDoc?.allocation?.redesign?.effort ?? null) : null),
-    routeChain: decision.chain ?? [], routeRejected: decision.rejected ?? [], routeOrder: decision.order ?? null,
-    // Always written (null when absent) so a reroute never keeps the previous decision's values.
-    routePolicy: decision.policy ?? null,
-    routeBalance: decision.balance ? {
-      windowHours: recent?.windowHours ?? null, recentTotal: recent?.total ?? null, ledgers: recent?.ledgers?.length ?? 0,
-      candidates: decision.balance.candidates, rule: decision.balance.rule ?? null,
-      deficits: Object.fromEntries(Object.entries(decision.balance.deficits).map(([pool, d]) => [pool, {
-        target: Number(d.target.toFixed(3)), actual: Number(d.actual.toFixed(3)), deficit: Number(d.deficit.toFixed(3)) }])),
-    } : null,
-    routeCrossFamily: decision.crossFamily
-      ? { ...decision.crossFamily, authorJob: author?.jobId ?? null, authorOp: author?.opId ?? null } : null,
+    tier: decision.tier ?? null, routeChain: decision.chain ?? [], routeRejected: decision.rejected ?? [],
+    // The one pick record (scripts/lib/tier-pick.mjs): tier, chain after each step, who was dropped and why, who was chosen and by which step.
+    pick: record ? { tier: decision.tier, member: record.chosen?.id ?? null, by: record.chosen?.by ?? null, at: Date.now(), record } : null,
   };
 }
 
@@ -195,8 +167,7 @@ export default {
       livePathLeaseWait, goalJsonOf, latestGoal,
       refuseKernelBias, lineageRouteAdjust, path, fs, skillRoot, parseYaml,
       poolLoadOf, accountList, normalizeProvider, probeQuotaSafe, providerHealthOf,
-      circuitClearHint, ownerRoot, configuredAllocationPolicy, loadConfig, recentDispatchCounts,
-      kindRouteOf, auditAuthorOf, isFanOutSlice, selectPool, AGENT_HIERARCHY_SCHEMA,
+      circuitClearHint, ownerRoot, configuredAllocationPolicy, loadConfig, AGENT_HIERARCHY_SCHEMA,
       operationNodeId, kernelNodeId, blockingViewOf } = internals;
   refuseKernelBias('route', args);
   const db = ledger.db, jobId = args.job;
@@ -244,20 +215,20 @@ export default {
   const regFile = path.join(skillRoot, 'modules', 'models', 'registry.yaml');
   const regDoc = fs.existsSync(regFile) ? parseYaml(fs.readFileSync(regFile, 'utf8')) : null;
   const pools = regDoc?.pools ?? {};
-  // The one merged view selectPool's helpers expect: allocation policy + pools.
+  // The one merged view the router's helpers expect: allocation policy + pools.
   const rtMerged = { ...(rtDoc), runtimes: pools };
   const capacityResult = await capacityForPools({ db, jobId, ledger, pools, rtDoc, rtMerged, regDoc, kind, difficulty, scopeId,
     poolLoadOf, accountList, normalizeProvider, probeQuotaSafe, providerHealthOf, circuitClearHint });
   const { accounts, poolLoad, runningByModel, capacity } = capacityResult;
 
   const plan = planRoute({ db, ledger, job, payload, kind, difficulty, rtDoc, rtMerged, regDoc, ownerRoot,
-    configuredAllocationPolicy, loadConfig, recentDispatchCounts, kindRouteOf, auditAuthorOf, isFanOutSlice, selectPool,
-    lineage, lineageError, scopeId, bias, capacity });
-  const { recent, redesignAs, decision, lineageAdjust, author } = plan;
+    configuredAllocationPolicy, loadConfig, lineage, lineageError, scopeId, bias, biasTrusted: ownerBiasTrust(goalRow),
+    capacity, env: process.env });
+  const { redesignAs, decision, lineageAdjust } = plan;
   const routeFacts = { ...(lineageAdjust ? { lineageAdjust } : {}) };
   refuseRouteDecision({ decision, bias, routeFacts, kind, jobId, difficulty, runningByModel, poolLoad, emit, args });
 
-  const decided = routeDecidedOf({ decision, redesignAs, payload, rtDoc, recent, author });
+  const decided = routeDecidedOf({ decision, redesignAs, payload, rtDoc });
   const selectedRuntime = Object.entries(pools)
     .find(([poolId, runtime]) => (runtime?.target ?? poolId) === decision.target)?.[1] ?? null;
   ledger.transaction(() => {

@@ -1,3 +1,4 @@
+import { pickRecordText } from '../lib/pick-record.mjs';
 export function launchAuthorityText({ workflowId, goalRevision, goalIdentity, approvedAt, restart, bridge = null }) {
   const goalIdentityLabel = goalIdentity ? ` (${goalIdentity})` : '';
   const goal = `goal revision ${goalRevision}${goalIdentityLabel}`;
@@ -49,8 +50,7 @@ function routeLineOf(route) {
   let configPin = '';
   if (route.routedBy === 'config') {
     let pin = 'kernel.model pin';
-    if (route.config?.group) pin = 'kernel.group';
-    else if (route.config?.agent) pin = 'kernel.agent pin';
+    if (route.config?.agent) pin = 'kernel.agent pin';
     configPin = ` — ${route.config?.file} ${pin}`;
   }
   const routeTarget = route.route ? ` — ${route.route.target} ${route.route.model ?? ''} [${route.route.mode}]` : '';
@@ -74,13 +74,14 @@ export function launchPlanText({ asJson, out, wf, target, chain, route, memberLa
   const slugLabel = out.slug && out.slug !== out.title ? ` (slug ${out.slug})` : '';
   const opChain = chain ? chain.join(' → ') : 'kernel derives at boot';
   const routeLine = routeLineOf(route);
-  const groupLine = groupLineOf(route, memberLabel);
+  const groupLine = groupLineOf(route, memberLabel) + pickRecordText(out.admission?.pick).map((line) => `
+  pick: ${line}`).join('');
   const budgets = route.config?.budgets;
   const maxOps = ['maxOps'].map((k) => `${k}=${budgets?.[k] ?? 'unbounded'}`).join('  ');
   const budgetLine = budgets && Object.values(budgets).some((value) => value != null)
     ? `\n  budgets (config.yaml): ${maxOps}` : '';
   const warningLine = (route.warnings ?? []).map((warning) => `\n  warning: ${warning}`).join('');
   const effortLabel = route.effort ? `  effort=${route.effort}` : '';
-  const configFile = out.config.file ?? 'absent — routing falls to route-model';
+  const configFile = out.config.file ?? 'absent — the shipped tiers apply';
   return `PLAN — start workflow ${target}\n  title: ${out.title}${slugLabel}\n  phase: ${wf?.phase} | goal rev ${out.goalRevision} (${out.goalIdentity}) | inbox: ${out.inbox}\n  op chain: ${opChain}\n  kernel: ${out.kernel}\n${routeLine}${groupLine}\n  launch: ${out.launch}\n  config: ${configFile}${effortLabel}${budgetLine}${warningLine}\n  command: ${out.command ?? '(unavailable)'}\n  command source: ${out.commandSource ?? '(unavailable)'}`;
 }

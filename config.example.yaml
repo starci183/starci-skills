@@ -2,7 +2,7 @@
 # The installer copies this file to the gitignored `config.yaml` next to it;
 # owners edit that copy. Everything below is read at runtime — no key here is
 # decorative. Kernel route precedence: explicit `--agent` flag >
-# `kernel` below > the route-model default.
+# `kernel` below > the tier chain (modules/models/tiers.yaml).
 language: vi
 model: null
 effort: medium
@@ -16,23 +16,11 @@ retention: null
 # false (or absent) starts the workflow without that pairing. The caller route is supplied by the
 # single public /starci entry; it never changes the Supervisor, Kernel or operation model pins.
 debug: false
-# kernel — the long-lived [Kernel] agent's route, in one of two shapes
-# (docs/config-format.md "Kernel group"):
-#   group form (the default below): {group: [{agent, model?}, ...], effort?}.
-#     Common admission filters the concrete group using the role floor, fresh
-#     quota and live reservations declared by modules/models/selection.yaml.
-#     Scoped owner preference and observed pressure rank eligible members.
-#     A proven failed-before-launch refusal may try another eligible member;
-#     uncertain effects keep their fenced reservation for reconciliation.
-#   single pin: {agent?, model?, effort?} — agent is an execution-agent id
-#     (claude|codex|devin), model a modules/models/registry.yaml model id
-#     (without agent, the pool that carries it supplies the agent). A pin is
-#     authoritative: common admission or a launch-guard refusal fails closed
-#     instead of substituting an identity outside the pin.
-#   effort: effort for the kernel seat (same vocabulary as `effort` above);
-#     null inherits `effort`.
-# modules/models/selection.yaml allocation.admission owns eligibility and ranking.
-kernel: {group: [{agent: claude, model: claude-sonnet-5-5}, {agent: codex, model: gpt-6.1-sol}], effort: high}
+# kernel — the long-lived [Kernel] seat. It takes the `high` tier of modules/models/tiers.yaml (an ordered chain of
+# members; the picker takes the first member with tokens after your bias and the balance step; docs/config-format.md).
+# {agent?, model?, effort?}: agent and/or model PIN the seat — the bias `only`, keeping the tier's model of that agent
+# (an explicit `--agent` flag is the same bias and wins). effort: the seat's effort; null takes the tier member's effort.
+kernel: {effort: high}
 # parallel — the one knob for how wide the workers run. `gear` indexes the agent
 # table in modules/models/runtimes.yaml allocation.slicing.size: a long (`l`)
 # operation asks for the `l.agents[gear]` agents, an extra-long (`xl`) one for
@@ -74,42 +62,20 @@ delegation: null
 budgets:
   maxOps: null       # max concurrent dispatched ops one workflow may hold open;
                      # route/dispatch refuse `max-ops` at min(this, maxParallelOps)
-# allocation — how `starci kernel route` spreads jobs over the runtime pools (scripts/agent/models.mjs selectPool).
-#   mode: adaptive (the only mode). Gates always apply first: role, difficulty pin, host tools, quota/auth,
-#     provider circuit, running < maxParallel. Each kind walks its modules/models/runtimes.yaml order
-#     (docs/config-format.md Model routing); the shares never move a kind outside its order.
-#   preferredProvider: a provider id (codex, devin, ...) for a bounded owner bias in route-model; not a
-#     fallback chain. null = none.
-#   policy: prefer-then-overflow — the first eligible pool of the runtimes.yaml tier order;
-#           balanced — the first eligible pool of the kind's order still below its target share of the jobs
-#           dispatched in the last windowHours (this repo's ledger plus the other product ledgers the
-#           machine ledger registered); when every eligible pool is at or over its share, the one furthest
-#           below. The order ranks, the share caps. --prefer only breaks ties under balanced; --avoid always removes.
-#     Absent = the runtimes.yaml allocation.policy default (prefer-then-overflow).
-#   shares: target shares per registry.yaml pool, normalized over the named pools. Absent = equal.
-#   windowHours: how far back the dispatches are counted.
+# allocation — the owner's default grant for a pool whose capacity is an explicit grant (Devin).
 #   grants: '<pool>=<slots>@<role>+<role>' — the default grant every workflow gets. Once a grants list is
 #     declared it is the whole set: a pool whose registry.yaml capacityAuthority is explicit-workflow-quota
 #     (Devin) routes only for the roles and up to the running slots a grant names ([] closes it).
 allocation:
-  mode: adaptive
-  preferredProvider: null
-  policy: balanced
-  shares: {devin-agent: 35, claude-agent: 20, codex-agent: 10}
-  windowHours: 24
   grants: [devin-agent=10@implement+verify+write]
-# Non-operation models are a quota-aware peer pool over the provider-window runtime pools of
-# modules/models/registry.yaml: claude-agent (Claude Opus 5.5) and codex-agent (GPT-6.1 Sol), the two
-# runtimes that carry plan, decide and verify. Member order is the route order; eligibility and qualification
-# still admit every actual call.
-models:
-  selection: quota-aware
-  pools:
-    sol-opus: [claude-agent, codex-agent]
-  nonOperation:
-    planner: sol-opus
-    kernelManager: sol-opus
-    validator: sol-opus
+# models — optional overrides of the shipped model tiers (modules/models/tiers.yaml owns the defaults). Every key is optional:
+#   tiers:   {<tier>: [{agent, model, effort?}, ...]}  replaces or adds one tier's ordered member chain
+#   seats:   {<seat>: <tier>}                          remaps a seat (supervisor, kernel, worker, planner, validator, kernelManager)
+#   balance: {maxStreak, maxSharePercent}              a head member picked maxStreak times in a row, or holding more than
+#                                                      maxSharePercent of the tier's running seats, yields to the next member
+#   usage:   {reservePercent, biasPercent}             a member at reservePercent of its tokens is skipped; an owner bias
+#                                                      naming it keeps it usable up to biasPercent; never above it
+models: {}
 # connectors — the owner's public ask channel (docs/connectors.md). Everything is off by default.
 # One local gateway (scripts/connectors/ask-gateway.mjs) fronts every serve-ask form; a Cloudflare
 # tunnel (scripts/connectors/tunnel.mjs) publishes the gateway; when serve-ask binds a form, the

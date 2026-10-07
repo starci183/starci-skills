@@ -2,7 +2,7 @@
 import { spawnAgent } from '../../../agent/lib.mjs';
 import { taskSpecOf } from '../../../machine/task-spec.mjs';
 import { biasForRole } from '../../../lib/owner-routing-bias.mjs';
-import { ownerReserveGrant } from '../../../agent/admission.mjs';
+import { ownerReserveGrant, ownerBiasTrust } from '../../../agent/admission.mjs';
 import { latestGoal, goalJsonOf } from './rows.mjs';
 
 export function spawnOperationAgent({ ledger, job, op, model, launchModel, payload, jobId, prompt, packetFile, ...launch }) {
@@ -24,6 +24,7 @@ export function spawnOperationAgent({ ledger, job, op, model, launchModel, paylo
   const spec = taskSpecOf({ prompt, file: packetFile, op, jobId, attempt: job.try_no }).spec;
   return spawnAgent({ ...launch, provider: model.provider, model: modelId, effort, spec, taskTitle: `${op} #${job.try_no}`,
     role: 'op', scopeId: admissionScopeId, kind: op, bias: ownerBias, ownerGrant: ownerReserveGrant(ownerGoalRow),
+    biasTrusted: ownerBiasTrust(ownerGoalRow), tier: payload.pick?.tier ?? null, history: {},
     difficulty: launchModel.difficulty ?? payload.difficulty,
     allowGroup: [{ provider: model.provider, model: modelId, pool: model.target, effort,
       eligibility: { eligible: true, mode: 'operation-policy', reasons: [] } }] });

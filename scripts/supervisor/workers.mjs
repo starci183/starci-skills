@@ -42,7 +42,7 @@ import '../api/process/hide-child-windows.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { allocationMs, loadConfig, DEFAULT_ALLOCATION_WINDOW_HOURS } from '../../engine/config.mjs';
+import { allocationMs, loadConfig } from '../../engine/config.mjs';
 import {
   SKILL_ROOT, FIX_KIND, WORKER_TITLE_PREFIX, readSupervisor,
   supervisorEvent, supervisorSettings, productRepos, supervisorLog,
@@ -56,15 +56,15 @@ import { catFile } from '../api/git/cat-file.mjs'; import { cherry as gitCherry 
 import { posixPath } from '../lib/path-key.mjs';
 import { guardLaunch, bindGuardTerminal } from '../guards/hook-install.mjs';
 import { outageInText } from '../agent/provider-outage.mjs';
-import { loadRuntimes } from '../agent/models.mjs';
 import { recordWorkerLaunch, workerAttemptAgent, setJob, workerTerminalClosed, closeWorkerTerminalState } from './worker-state.mjs';
 import { recordWorkerReport, resolveReportCommit } from './workers-report.mjs';
 import { startWorkerAgent } from '../agent/start-worker.mjs'; import { isMain } from '../lib/is-main.mjs';
 import { slugify } from '../lib/slug.mjs';
 import { runWorkersCli } from './workers-cli.mjs';
-import { equalPoolShares, pickWorkerPool } from './worker-pool.mjs';
+import { pickWorkerPool } from './worker-pool.mjs';
+import { tierMembers, tierOfSeat, tierSettings } from '../agent/tiers.mjs';
 import { eachInOrder } from '../lib/in-order.mjs';
-export { equalPoolShares, pickWorkerPool };
+export { pickWorkerPool };
 
 /**
  * The guard layer of a [Worker] launch, the same one op workers get (scripts/guards/hook-install.mjs guardLaunch), bound to
@@ -248,21 +248,10 @@ export function removeStaging({ jobId, staging, root = SKILL_ROOT, env = process
 
 /* ------------------------------------------------------------ routing */
 
-/** The live inputs of pickWorkerPool: config shares, recent dispatches (machine + workers), provider health. */
-export async function routeWorker({ m, prefer = null, avoid = [], config = undefined, env = process.env } = {}) {
+/** The live inputs of pickWorkerPool: the worker seat's tier chain and provider health. */
+export async function routeWorker({ m, prefer = null, avoid = [], config = undefined } = {}) {
   let cfg = config;
   if (cfg === undefined) { try { cfg = loadConfig(); } catch { cfg = null; } }
-  // Absent owner shares = equal over every pool registry.yaml declares (the
-  // configuredAllocationPolicy contract), never a literal pool list.
-  const shares = cfg?.allocation?.shares ?? equalPoolShares(loadRuntimes());
-  const windowHours = cfg?.allocation?.windowHours ?? DEFAULT_ALLOCATION_WINDOW_HOURS;
-  const recent = {};
-  try {
-    const { recentDispatchCounts } = await import('../agent/balance.mjs');
-    Object.assign(recent, recentDispatchCounts({ windowHours, machine: true, env }).counts);
-  } catch { /* balance is best effort */ }
-  const since = Date.now() - windowHours * 3_600_000;
-  for (const j of jobsOf(m).filter((x) => x.created_at >= since && x.payload.pool)) recent[j.payload.pool] = (recent[j.payload.pool] ?? 0) + 1;
   const { providerAvailability, providerCircuitOf } = await import('../agent/models.mjs');
   let probe = null;
   try { probe = (await import('../agent/quota/index.mjs')).probeQuota; } catch { probe = null; }
@@ -274,7 +263,8 @@ export async function routeWorker({ m, prefer = null, avoid = [], config = undef
     const circuit = repos.map((repo) => withLedgerRead(repo, (ldb) => providerCircuitOf(ldb, provider), null)).find(Boolean) ?? null;
     return providerAvailability({ probe: q, circuit });
   };
-  return pickWorkerPool({ shares, runtimes: loadRuntimes(), recent, availabilityOf, prefer, avoid });
+  const settings = tierSettings({ config: cfg });
+  return pickWorkerPool({ members: tierMembers(tierOfSeat('worker', settings), { settings }), availabilityOf, prefer, avoid });
 }
 
 /** Providers whose [Worker] spawn failed readiness or on a provider outage at least `min` times since `since` (sup_events worker-spawn-failed). */

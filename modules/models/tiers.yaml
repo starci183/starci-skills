@@ -1,0 +1,63 @@
+schema: starci/model-tiers@1
+purpose: >-
+  The ONE owner of which model takes which work. A tier is an ordered chain of members (agent + model, optional
+  effort); the first member with tokens is taken. Tiers are named by capability. A model may sit in several tiers.
+  Adding a tier or a member is a line here (or in config.yaml models.tiers) and needs no code.
+tiers:
+  frontier:
+    - {agent: claude, model: claude-opus-5-5}
+    - {agent: codex, model: gpt-6.1-sol, effort: max}
+  high:
+    - {agent: claude, model: claude-sonnet-5-5}
+    - {agent: codex, model: gpt-6.1-sol, effort: high}
+  medium:
+    - {agent: devin, model: swe-2-max}
+    - {agent: codex, model: gpt-6.1-sol, effort: medium}
+  low:
+    - {agent: devin, model: swe-2-max}
+    - {agent: codex, model: gpt-6-luna, effort: low}
+  imagegen:
+    - {agent: codex, model: gpt-6.1-sol, effort: high}
+# Highest first: a provider with no frontier member takes its member of the first tier that has one.
+tierOrder: [frontier, high, medium, low]
+# Seat -> tier. A seat is a long-lived agent role; an op takes the tier of its difficulty.
+seats:
+  supervisor: frontier
+  planner: frontier
+  validator: frontier
+  kernelManager: frontier
+  kernel: high
+  worker: high
+# The kernel's own model calls (selection.yaml kernelFunctionKinds) take the tier of their seat.
+kindSeats:
+  model.assessGoal: planner
+  model.planOp: planner
+  model.decide: kernelManager
+  model.manageWorkflow: kernelManager
+  model.validateOp: validator
+  model.critiqueGoal: validator
+  model.classifyScreen: kernelManager
+  model.presentOwnerQuestion: kernelManager
+  judge: validator
+# The agent of core-debug is the provider of the chat that started the workflow (--caller-agent), and its model that
+# provider's member of the first tier of `callerSeatTiers` that has one. It is never picked down a chain.
+callerSeatTiers: [frontier]
+difficulty:
+  insane: frontier
+  hard: high
+  medium: medium
+  easy: low
+# Ops that draw or generate images take this tier whatever their difficulty.
+kindTiers:
+  interface.draw: imagegen
+  interface.asset: imagegen
+# Balance over the recent picks of one tier, running seats included.
+balance:
+  maxStreak: 3
+  maxSharePercent: 70
+# Token use of the chosen member, in percent of its most used quota window. Automatic picks skip a member at
+# `reservePercent`; an owner bias naming the member keeps it usable up to `biasPercent`; `exhaustedPercent` is never used.
+usage:
+  reservePercent: 90
+  biasPercent: 95
+  exhaustedPercent: 100

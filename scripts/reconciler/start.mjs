@@ -85,13 +85,12 @@ export function ledgerIntegrity(ledgers, { check = (f) => quickCheck(f), exists 
   return out;
 }
 
-/** The pinned (agent, model) pairs of config.yaml kernel (group or single pin) and supervisor.kernel. Pure. */
+/** The pinned (agent, model) pairs of config.yaml kernel (the pin) and supervisor.kernel. Pure. */
 function configuredPins(config) {
   const pins = [];
   const add = (where, agent, model) => { if (agent && model) pins.push({ where, agent: String(agent), model: String(model) }); };
   const kernel = config?.kernel;
-  if (Array.isArray(kernel?.group)) kernel.group.forEach((m, i) => add(`kernel.group[${i}]`, m?.agent, m?.model));
-  else add('kernel', kernel?.agent, kernel?.model);
+  add('kernel', kernel?.agent, kernel?.model);
   const sup = config?.supervisor?.kernel;
   if (sup) add('supervisor.kernel', sup.agent, sup.model);
   return pins;

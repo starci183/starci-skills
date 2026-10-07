@@ -8,7 +8,9 @@ import { prepareProviderBudget, reserveProviderBudget, markProviderBudget, relea
 import { biasForRole } from '../lib/owner-routing-bias.mjs';
 import { inspectProviderCircuit } from '../machine/provider-circuit.mjs';
 import { poolCapsNow } from '../machine/pool-backoff.mjs';
-import { providerCircuitOf, kindOrder } from './models.mjs';
+import { providerCircuitOf, kindRoute } from './models.mjs';
+import { tierSettings } from './tiers.mjs';
+import { tierHistory } from './tier-history.mjs';
 import { inspectOwnerConfig, configuredAllocationPolicy, validateConfig } from '../../engine/config.mjs';
 import { normalizeQuotaSnapshot } from './quota/snapshot.mjs';
 import { quotaFreshAt, quotaMaxAgeMs } from '../lib/quota-evidence.mjs';
@@ -22,6 +24,15 @@ export function ownerReserveGrant(goalRow) {
   if (goal?.definedBy === 'supervisor' || goal?.approvedBy === 'supervisor') return null;
   return goal?.routing_bias?.reserveOverride ?? null;
 }
+/** An owner bias widens the 90..95 band only when the goal row is the owner's own (never a supervisor-defined goal). */
+export function ownerBiasTrust(goalRow) {
+  if (goalRow?.approved_by !== 'owner') return false;
+  let goal;
+  try { goal = typeof goalRow.json === 'string' ? JSON.parse(goalRow.json) : goalRow.json; } catch { return false; }
+  return goal?.definedBy !== 'supervisor' && goal?.approvedBy !== 'supervisor';
+}
+/** The admission policy: allocation.admission with the tier usage thresholds, the owner's `models.usage` over the shipped ones. */
+export const admissionPolicyOf = (runtimes, settings = tierSettings()) => ({ ...runtimes?.allocation?.admission, ...settings.usage });
 const selectorOf = (item) => typeof item === 'string' ? { pool: item } : item;
 
 /** Both planning and fenced consumption consult the same strict circuit observation. */
@@ -38,8 +49,8 @@ const ownerQuotaGrant = ({ provider, pool, role, kind, difficulty, scopeId, runt
   const config = validateConfig(observed.config), grants = configuredAllocationPolicy(config).grants;
   const grant = grants?.[pool];
   if (!grant) return null;
-  const operation = role === 'op' ? kindOrder({ kind, difficulty, runtimes }) : null;
-  if (operation?.error || !grant.roles.some((allowed) => allowed === role || allowed === operation?.role || allowed === operation?.orderKey)) return null;
+  const operation = role === 'op' ? kindRoute(kind, runtimes) : null;
+  if (!grant.roles.some((allowed) => allowed === role || allowed === operation?.role)) return null;
   return { owner: observed.file, scopeId, roles: [role], slots: grant.slots, observedAt: now, provider, pool };
 };
 
@@ -90,10 +101,11 @@ const heldAttemptsGate = (candidates, heldAttempts) => {
 
 /** A plan observes but never reserves. Callers must supply actual scoped eligibility for Op work. */
 export function planAgentAdmission({ role, scopeId, attemptId = null, kind = null, difficulty = null, allowGroup, qualityFloor = null, bias = null,
-  ownerGrant = null, author = null, independence = null, scope = null, registry = null, runtimes = null, now = Date.now, env = process.env,
-  io = null } = {}) {
+  ownerGrant = null, biasTrusted = false, tier = null, liveSeat = null, history = null, author = null, independence = null, scope = null, registry = null,
+  runtimes = null, now = Date.now, env = process.env, io = null } = {}) {
   const clock = typeof now === 'function' ? now : () => now;
-  const catalog = registry ?? loadModelRegistry(), rt = runtimes ?? loadRuntimes(), policy = rt?.allocation?.admission;
+  const catalog = registry ?? loadModelRegistry(), rt = runtimes ?? loadRuntimes();
+  const settings = tierSettings({ registry: catalog }), policy = admissionPolicyOf(rt, settings);
   const scoped = biasForRole(bias, role, scopeId);
   const override = trustedOverride(scoped.reserveOverride, ownerGrant, { role, scopeId });
   const observations = new Map();
@@ -129,15 +141,27 @@ export function planAgentAdmission({ role, scopeId, attemptId = null, kind = nul
         ...(circuit?.expiresAt != null ? { blockedUntil: circuit.expiresAt } : {}) } };
   });
   heldAttemptsGate(candidates, heldAttempts);
-  return selectAdmission({ request: { attemptId: attemptId ?? scopeId, scopeId, role, kind, difficulty,
-    qualityFloor: qualityFloor ?? admissionQualityFloor(role, difficulty, policy),
+  const picks = tier ? (history ?? (io?.history ?? tierHistory)({ tier, env, now: clock(), routeHoldMs: rt?.allocation?.routeHoldMs })) : {};
+  return selectAdmission({ request: { attemptId: attemptId ?? scopeId, scopeId, role, kind, difficulty, tier, liveSeat,
+    history: picks, balance: tier ? { maxStreak: settings.balance.maxStreak, maxSharePercent: settings.balance.maxSharePercent } : null,
+    qualityFloor: qualityFloor ?? admissionQualityFloor(role, difficulty, policy), biasTrusted,
     allowGroup: candidates.map(({ provider, model }) => ({ provider, model })),
-    prefer: (scoped.prefer ?? []).map(selectorOf), avoid: (scoped.avoid ?? []).map(selectorOf), require: scoped.require ?? null,
+    prefer: (scoped.prefer ?? []).map(selectorOf), avoid: (scoped.avoid ?? []).map(selectorOf), only: (scoped.only ?? []).map(selectorOf),
     reserveOverride: override, author: author ? { ...author, modelAuthority: adapterModelAuthority(loadAdapter(author.provider).card) } : null,
     independence: independence ?? policy?.roles?.[role]?.independence }, candidates, policy, now: clock() });
 }
 
-/** On a capacity race only the selector's eligible set is retried; require never widens. */
+const namedBy = (candidate, selectors) => (selectors ?? []).map(selectorOf)
+  .some((selector) => Object.entries(selector).every(([key, value]) => candidate[key] === value));
+/** The override a reservation in the 90..95 band carries: the owner's reserve grant, else a trusted owner bias naming the member. */
+function bandOverrideFor({ candidate, bias, input, override }) {
+  if (override) return override;
+  if (input.biasTrusted !== true || candidate.quota?.state !== 'limited' || !namedBy(candidate, [...(bias.prefer ?? []), ...(bias.only ?? [])])) return null;
+  return { authorized: true, scopeId: input.scopeId, role: input.role, provider: candidate.provider, model: candidate.model, account: candidate.account,
+    reason: 'the owner bias names this member', biasNamed: true };
+}
+
+/** On a capacity race only the selector's eligible set is retried; only never widens. */
 export function admitAgent(input = {}, options = {}) {
   let decision;
   try {
@@ -151,17 +175,18 @@ export function admitAgent(input = {}, options = {}) {
   for (const candidate of decision.eligible) {
     const attemptId = `${input.role}:${input.attemptId ?? input.scopeId}:${candidate.provider}:${candidate.account}:${candidate.model}`;
     const bias = biasForRole(input.bias, input.role, input.scopeId);
-    const override = trustedOverride(bias.reserveOverride, input.ownerGrant, input);
+    const override = bandOverrideFor({ candidate, bias, input, override: trustedOverride(bias.reserveOverride, input.ownerGrant, input) });
     let reserved;
     try { reserved = (options.io?.reserve ?? reserveProviderBudget)({ attemptId, scopeId: input.scopeId, role: input.role,
       provider: candidate.provider, account: candidate.account, model: candidate.model, maxParallel: candidate.capacity.maxParallel,
-      quota: candidate.quota, override, scope: input.scope ?? {} }, { env: options.env ?? input.env ?? process.env, policy: options.runtimes?.allocation?.admission,
+      quota: candidate.quota, override, scope: input.scope ?? {}, tier: input.tier ?? null }, { env: options.env ?? input.env ?? process.env, policy: admissionPolicyOf(options.runtimes ?? loadRuntimes()),
         now: options.now ?? input.now,
-        authorizeOverride: (requested) => override !== null && trustedOverride(requested, input.ownerGrant, input) !== null,
+        authorizeOverride: (requested) => override !== null && (trustedOverride(requested, input.ownerGrant, input) !== null
+          || (requested.biasNamed === true && input.biasTrusted === true)),
         authorizeGrant: (requested) => {
           const grant = ownerQuotaGrant({ provider: candidate.provider, pool: candidate.pool, role: input.role, kind: input.kind,
             difficulty: input.difficulty ?? 'medium', scopeId: input.scopeId, runtimes: options.runtimes ?? loadRuntimes(),
-            policy: options.runtimes?.allocation?.admission, now: Date.now(), io: options.io });
+            policy: admissionPolicyOf(options.runtimes ?? loadRuntimes()), now: Date.now(), io: options.io });
           return grant !== null && ['owner', 'scopeId', 'provider', 'pool', 'slots'].every((key) => requested[key] === grant[key])
             && requested.roles?.length === 1 && requested.roles[0] === input.role;
         } }); }

@@ -1,8 +1,7 @@
 // Preserve qualification/probation lineage, then project the common admission ordering.
-import { resolveLaunchModel } from '../agent/models.mjs';
 import { planAgentAdmission } from '../agent/admission.mjs';
 
-export function admittedModelSet({ evaluated, w, args, difficulty, registry, runtimes, effort }) {
+export function admittedModelSet({ evaluated, w, args, difficulty, registry, runtimes, effort, tier }) {
   // Quota-aware order among the eligible of one mode: available before limited,
   // declared order otherwise (a stable sort).
   const availabilityRank = e => (e.availability?.state === 'limited' ? 1 : 0);
@@ -25,9 +24,9 @@ export function admittedModelSet({ evaluated, w, args, difficulty, registry, run
   } else { pickedSet = []; rule = 'decisionFlow.verdict: no eligible model'; }
 
   const admission = planAgentAdmission({ role: w.modelFunction ? 'kernel' : 'op', scopeId: `route-model:${args.kind}:${difficulty}`,
-    kind: args.kind, difficulty,
-    registry, runtimes, allowGroup: pickedSet.map((entry) => ({ provider: entry.c.provider, model: resolveLaunchModel(entry.c.id, difficulty, { runtimes }).modelId,
-      pool: entry.c.id, target: entry.c.target, effort, eligibility: { eligible: entry.eligible, mode: entry.mode, reasons: entry.reasons } })) });
+    kind: args.kind, difficulty, tier,
+    registry, runtimes, allowGroup: pickedSet.map((entry) => ({ provider: entry.c.provider, model: entry.c.model,
+      pool: entry.c.id, target: entry.c.target, effort: entry.c.effort ?? effort, eligibility: { eligible: entry.eligible, mode: entry.mode, reasons: entry.reasons } })) });
   const eligibleIds = admission.eligible.map((candidate) => candidate.pool);
   pickedSet = eligibleIds.map((id) => pickedSet.find((entry) => entry.c.id === id)).filter(Boolean);
   return { pickedSet, rule, admission };

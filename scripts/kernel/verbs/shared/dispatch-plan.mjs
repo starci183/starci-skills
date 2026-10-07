@@ -14,7 +14,8 @@ import { grammarContextRequired, grammarInputsOf, resolveGrammarContext, grammar
 import { loadAdapter } from '../../../agent/lib.mjs';
 import { latestGoal, ownedPathsOf, workDirOf } from './rows.mjs';
 import { leaseCanonOf } from './peer-waits.mjs';
-import { resolveWorkerLaunchModel, missingHostTools, defaultOperationTarget, kindOrder, isFanOutSlice } from '../../../agent/models.mjs';
+import { resolveWorkerLaunchModel, missingHostTools, defaultOperationTarget, kindRoute, raiseToFloor, loadRuntimes } from '../../../agent/models.mjs';
+import { tierMembers, tierOfOp } from '../../../agent/tiers.mjs';
 import { resumeContextOf } from '../../resume-context.mjs';
 import { jobDisplayName, jobWhat, workflowNameOf } from '../../../lib/display-names.mjs';
 import { productLocaleFor } from '../../product-locale.mjs';
@@ -33,17 +34,21 @@ export function planModel(d) {
   const { skillRoot } = internals;
   const model = internals.resolveModel(args.model ?? payload.model ?? defaultOperationTarget());
   if (model.error) throw Object.assign(new Error(model.error), { code: 'model-unknown' });
-  // Dispatch launches only inside the kind's order at its tier, so strategy kinds run on Claude or Codex alone.
-  // A named profile target (gpt-6.1-sol) counts as its provider's pool.
-  const launchOrder = kindOrder({ kind: op, difficulty: payload.difficulty ?? 'medium', fanOut: isFanOutSlice(payload) });
-  const allowed = launchOrder.chain ?? [];
+  // Dispatch launches only inside the op's tier (tiers.yaml), so each kind runs on the members of its difficulty's chain.
+  const route = kindRoute(op, loadRuntimes());
+  const difficulty = raiseToFloor(payload.difficulty ?? 'medium', route.floor);
+  const tier = tierOfOp({ kind: op, difficulty });
+  const chain = tierMembers(tier);
+  const allowed = chain.map((member) => member.id);
   let selectedRoute = 'the unrouted default';
   if (payload.model) selectedRoute = 'the persisted route';
   if (args.model) selectedRoute = '--model';
-  const launchErrorNote = launchOrder.error ? ` (${launchOrder.error})` : '';
-  const correction = args.model ? 'dispatch without --model or name a pool of that order' : `re-run starci kernel route --job ${jobId}`;
-  const outsideDetail = `${selectedRoute} ${model.target} is outside ${op}'s ${launchOrder.orderKey ?? '?'} order at ${launchOrder.difficulty ?? '?'} [${allowed.join(', ')}]${launchErrorNote}; ${correction}. The job stays queued.`;
-  const outsideOrder = allowed.some((p) => p === model.target || launchOrder.rt?.runtimes?.[p]?.provider === model.provider) ? null : outsideDetail;
+  const correction = args.model ? 'dispatch without --model or name a member of that tier' : `re-run starci kernel route --job ${jobId}`;
+  const chosen = payload.modelId ? `${model.provider}/${payload.modelId}` : null;
+  const outsideDetail = `${selectedRoute} ${chosen ?? model.target} is outside ${op}'s tier ${tier} at ${difficulty} [${allowed.join(', ')}]; ${correction}. The job stays queued.`;
+  const inTier = chain.some((member) => member.provider === model.provider && (!chosen || member.id === chosen));
+  const outsideOrder = inTier ? null : outsideDetail;
+  const launchOrder = { difficulty, tier };
   const briefAbs = path.join(skillRoot, 'modules', 'ops', 'ops', `${op}.yaml`);
   const briefExists = fs.existsSync(briefAbs);
   const lackingTools = missingHostTools({ pool: { provider: model.provider }, kind: op });

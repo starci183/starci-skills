@@ -42,6 +42,7 @@ import { recordedSeatTerminals, seatSessions, entryTerminalOf, NO_ENTRY_REMEDY }
 import { isMain } from '../lib/is-main.mjs';
 import { bestEffortCall } from '../agent/best-effort-call.mjs';
 import { loadModelRegistry } from '../agent/model-registry.mjs';
+import { tierMembers, tierOfSeat } from '../agent/tiers.mjs';
 import { planAgentAdmission } from '../agent/admission.mjs';
 import { workerClosureProven } from '../machine/worker-close.mjs';
 
@@ -245,15 +246,23 @@ function surveyTerminals({ m, d, profile, health }) {
   return { listing, recorded, dedupe };
 }
 
-/** The launch group: the configured members, each with its provider, model (the pool default when unset) and effort. */
-function launchGroup(settings) {
-  const registry = loadModelRegistry();
-  return (settings.group?.length ? settings.group : [{ agent: settings.agent, model: settings.model }]).map(member => {
-    const provider = member.agent ?? member.provider;
-    return { provider, model: member.model ?? Object.values(registry.pools ?? {}).find(pool => pool.provider === provider)?.defaultModel,
-      effort: settings.effort };
-  });
+/**
+ * The launch chain: the members of the seat's tier (tiers.yaml seats.supervisor), each with its provider, model and effort.
+ * A caller that brings its own members (core-debug: the invoking agent) is launched on exactly those, with no tier.
+ */
+function launchGroup(settings, { seat = 'supervisor' } = {}) {
+  if (settings.group?.length) {
+    const registry = loadModelRegistry();
+    return settings.group.map(member => ({ provider: member.agent, effort: settings.effort,
+      model: member.model ?? Object.values(registry.pools ?? {}).find(pool => pool.provider === member.agent)?.defaultModel }));
+  }
+  const tier = tierOfSeat(seat);
+  return tierMembers(tier).map(member => ({ provider: member.provider, model: member.model, pool: member.pool, effort: settings.effort ?? member.effort, tier }));
 }
+
+/** The owner's pin of the seat as the bias `only` (config.yaml supervisor.kernel agent/model), or null. */
+const seatBias = (settings) => (settings.agent || settings.model
+  ? { only: [{ ...(settings.agent ? { provider: settings.agent } : {}), ...(settings.model ? { model: settings.model } : {}) }] } : null);
 
 /** Close the previous seat's worker: `{ closedPrevious, failure }`, the failure set when the closure is unproven. */
 function closePreviousSeat(previous, d) {
@@ -310,7 +319,7 @@ function reserveSeat({ m, seat, token, attempt, route, at, profile }) {
 /** What `--plan` reports: the admission verdict for the next attempt and whether a launch would follow. */
 function planResult({ seat, health, dedupe, group, settings, profile, env, d, enabled }) {
   const admission = planAgentAdmission({ role: 'supervisor', scopeId: `${profile.id}:attempt:${(seat?.value?.attempt ?? 0) + 1}`,
-    allowGroup: group, env, io: d.admission });
+    allowGroup: group, tier: group[0]?.tier ?? null, bias: seatBias(settings), biasTrusted: true, env, io: d.admission });
   return { ok: true, exit: 0, action: 'plan', enabled, seat: seat?.value ?? null, health, dedupe, admission,
     wouldLaunch: !health.live && admission.ok, agent: admission.selected?.provider ?? group[0].provider,
     model: admission.selected?.model ?? group[0].model, effort: settings.effort };
@@ -341,7 +350,7 @@ async function spawnSeat({ m, d, seat, health, listing, recorded, dedupe, group,
     settings, restart: previous ? (reason ?? `the previous Supervisor terminal ${previous.terminal} failed its liveness check (${previous.reason})`) : null,
   });
   const spawned = d.start({ provider: group[0].provider, model: group[0].model, effort: settings.effort, worktree: SKILL_ROOT, title: profile.title, prompt, env,
-    role: 'supervisor', scopeId: `${profile.id}:attempt:${attempt}`, allowGroup: group,
+    role: 'supervisor', scopeId: `${profile.id}:attempt:${attempt}`, allowGroup: group, tier: group[0]?.tier ?? null, bias: seatBias(settings), biasTrusted: true,
     specFile: path.join(starciLocalRoot(env), profile.seatId, `prompt.a${attempt}.md`), objective: `${profile.title} — ${profile.id}`,
     entry, priorRunId: seat?.value?.runId ?? null,
     request: { seat: profile.id, attempt, token } });

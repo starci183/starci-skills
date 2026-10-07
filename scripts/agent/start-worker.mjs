@@ -10,6 +10,6 @@
 export async function startWorkerAgent({ route, worktree, title, prompt, specFile = null, objective, entry = null, request, onCreated = null, start = null, env = process.env }) {
   const launch = start ?? (await import('./lib.mjs')).startAgent;
   return launch({ provider: route.agent, model: route.model, effort: route.effort, worktree, title, prompt, specFile, objective, entry, request, onCreated,
-    role: 'worker', allowGroup: route.allowGroup ?? [{ provider: route.agent, model: route.model, pool: route.pool, effort: route.effort }],
+    role: 'worker', tier: route.tier ?? null, allowGroup: route.allowGroup ?? [{ provider: route.agent, model: route.model, pool: route.pool, effort: route.effort }],
     admission: route.admission ?? null, env });
 }

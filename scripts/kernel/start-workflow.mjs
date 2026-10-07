@@ -36,7 +36,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { createKernelRoute } from './kernel-route.mjs';
+import { createKernelRoute, kernelBias } from './kernel-route.mjs';
 import { kernelLaunchStatus, launchAuthorityText, launchPlanText } from './start-workflow-display.mjs';
 import { openLedger, ledgerFileFor, transitionWorkflowToRunning, bindKernelJob, releaseKernelJob, recordJobResult, setSignal, clearSignal, updateSignal, openIncident, setInboxStatus } from '../../engine/db/ledger.mjs';
 // The kernel seat's boot count lives in its payload (hierarchy.attempt); jobs.try_no is the op-try ordinal only.
@@ -44,7 +44,7 @@ const kernelAttemptOf = (row) => parseJsonOr(row?.payload_json)?.hierarchy?.atte
 import { inspectOwnerConfig, loadConfig } from '../../engine/config.mjs';
 import { launchKernelGroup } from './launch-kernel-group.mjs';
 import { expiredKernelStartupHealth } from './kernel-startup-capacity.mjs';
-import { ownerReserveGrant, planAgentAdmission } from '../agent/admission.mjs';
+import { ownerReserveGrant, ownerBiasTrust, planAgentAdmission } from '../agent/admission.mjs';
 import { prepareProviderBudget } from '../agent/provider-budget.mjs';
 import { workerShow } from '../api/orca/worker-show.mjs';
 import { releaseWorkflowWorker as releaseManagedWorker, recoverWorkflowLaunch } from './workflow-launch-custody.mjs';
@@ -208,8 +208,8 @@ try {
     const route = await resolveKernelRoute(ledger.db);
     const priorKernel = ledger.db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(`kernel-${target}`);
     const admission = planAgentAdmission({ role: 'kernel', scopeId: `${ledger.ledgerId ?? ledger.path}:${target}:kernel-attempt:${kernelAttemptOf(priorKernel) + 1}`,
-      bias: parseJsonOr(g?.json)?.routing_bias, ownerGrant: ownerReserveGrant(g),
-      allowGroup: (route.members ?? [route]).map((member) => ({ provider: member.agent, model: member.model, effort: member.effort })) });
+      bias: kernelBias(parseJsonOr(g?.json)?.routing_bias, route), ownerGrant: ownerReserveGrant(g), biasTrusted: ownerBiasTrust(g) || Boolean(route.pin), tier: route.tier ?? null,
+      allowGroup: (route.members ?? [route]).map((member) => ({ provider: member.agent, model: member.model, effort: member.effort, pool: member.pool })) });
     const out = {
       plan: true, workflowId: target, title: workflowDisplayName(wf), slug: wf?.title ?? null, phase: wf?.phase,
       goalRevision: g?.revision ?? null, goalIdentity: g?.goal_identity ?? null,
@@ -469,7 +469,7 @@ try {
   const kernelLaunch = launchKernelGroup({ ledger, workflowId, token, expected: startAuthority, route, members, reservationMs: KERNEL_START_RESERVATION_MS,
     hostUnavailableExit: EXIT_HOST_UNAVAILABLE, memberLabel, failStart, launch: { worktree: kernelWorktree, title, prompt, specFile, config: route.ownerConfig,
       role: 'kernel', scopeId: `${ledger.ledgerId ?? ledger.path}:${workflowId}:kernel-attempt:${kernelAttemptOf(priorKernelJob) + 1}`,
-      bias: parseJsonOr(goal?.json)?.routing_bias, ownerGrant: ownerReserveGrant(goal),
+      bias: kernelBias(parseJsonOr(goal?.json)?.routing_bias, route), ownerGrant: ownerReserveGrant(goal), biasTrusted: ownerBiasTrust(goal) || Boolean(route.pin), tier: route.tier ?? null,
       objective: `[Kernel] ${kernelName} — ${workflowId}`, entry, priorRunId: priorManaged?.runId ?? null, onCreated: bindKernelGuard,
       request: { workflow: workflowId, kernelAttempt: kernelAttemptOf(priorKernelJob) + 1, reservation: token } } });
   const { spawned, fellThrough } = kernelLaunch;
