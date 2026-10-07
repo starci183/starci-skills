@@ -11,16 +11,25 @@ import { createProseResolver, pathTokens } from './prose-path.mjs';
 
 export const CODE = 'RT_PROSE_RESTATES_SLOTS';
 const PATH_LIMIT = 3;
-const PROSE = /^(?:knowledge\/(?!grammars\/|hfs\/slots\.yaml$|hfs\/runtime-slots\.yaml$|hfs\/canon-pins\.yaml$|hfs\/facts\.yaml$|hfs\/rules\.yaml$).+\.(?:ya?ml|md)|docs\/.+\.md|(?!examples\/|.+\/templates\/)(?:.+\/)?README\.md)$/;
+const KNOWLEDGE_PROSE = 'knowledge\\/(?!grammars\\/|hfs\\/slots\\.yaml$|hfs\\/runtime-slots\\.yaml$|hfs\\/canon-pins\\.yaml$|hfs\\/facts\\.yaml$|hfs\\/rules\\.yaml$).+\\.(?:ya?ml|md)';
+const DOC_PROSE = 'docs\\/.+\\.md';
+const README_PROSE = '(?!examples\\/|.+\\/templates\\/)(?:.+\\/)?README\\.md';
+const PROSE = new RegExp(`^(?:${KNOWLEDGE_PROSE}|${DOC_PROSE}|${README_PROSE})$`);
 const GENERATED = /<!-- hfs:generated (\S+) -->[\s\S]*?<!-- hfs:generated-end \1 -->/g;
+const SLASH = '/';
+const END = '$';
+const TRAILING_SLASHES = new RegExp(`${SLASH}+${END}`);
+const EXTENDED_FILE_NAME = '[.\\w-]+\\.[\\w.]+';
+const DOT_FILE_NAME = '\\.[\\w.-]+';
+const SLOT_FILE_NAME = new RegExp(`^(?:${EXTENDED_FILE_NAME}|${DOT_FILE_NAME})$`);
 
 /** The file names the slots of the app root and the sides declare as literal entries (no placeholder, no glob), as a Set. */
 export function slotFileNames(manifest) {
   const names = new Set();
   for (const slot of manifest.slots) {
     for (const entry of [...braceVariants(slot.path), ...(slot.requires ?? [])]) {
-      const name = String(entry).replace(/\/+$/, '').split('/').pop();
-      if (/^[.\w-]+\.[\w.]+$|^\.[\w.-]+$/.test(name) && !/[<*]/.test(name)) names.add(name);
+      const name = String(entry).replace(TRAILING_SLASHES, '').split('/').pop();
+      if (SLOT_FILE_NAME.test(name) && !/[<*]/.test(name)) names.add(name);
     }
   }
   return names;
