@@ -69,11 +69,13 @@ test('a program that cannot start resolves with its error and no pid', async () 
 
 test('the launcher runs the script behind the npm shim on Windows and plain codex elsewhere', () => {
   assert.deepEqual(codexLauncher({ platform: 'linux', env: {} }), { command: 'codex', prefix: [] });
-  const shim = path.join('C:\\npm', 'codex.cmd');
-  const script = path.join('C:\\npm', 'node_modules', '@openai', 'codex', 'bin', 'codex.js');
+  const npm = path.join(os.tmpdir(), 'starci-npm');
+  const shim = path.join(npm, 'codex.cmd');
+  const script = path.join(npm, 'node_modules', '@openai', 'codex', 'bin', 'codex.js');
   const exists = (file) => [shim, script].includes(file);
-  assert.deepEqual(codexLauncher({ platform: 'win32', env: { Path: 'C:\\other;"C:\\npm"' }, exists }), { command: process.execPath, prefix: [script] });
-  assert.deepEqual(codexLauncher({ platform: 'win32', env: { Path: 'C:\\other' }, exists }), { command: 'codex', prefix: [] });
+  const withPath = (...entries) => ({ Path: entries.join(';') });
+  assert.deepEqual(codexLauncher({ platform: 'win32', env: withPath(path.join(os.tmpdir(), 'other'), `"${npm}"`), exists }), { command: process.execPath, prefix: [script] });
+  assert.deepEqual(codexLauncher({ platform: 'win32', env: withPath(path.join(os.tmpdir(), 'other')), exists }), { command: 'codex', prefix: [] });
 });
 
 test('events: failures, thread and usage are read line by line and a failure text is classed', () => {
