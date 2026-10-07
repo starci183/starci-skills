@@ -223,6 +223,30 @@ function candidateAssessment(candidate, state, ids, now) {
   return { codes, quota };
 }
 
+// Every candidate assessed in order: the rejected ones land on the receipt, the others are returned with their preference and quota.
+function assessCandidates(candidates, { state, prefer, now, receipt }) {
+  const ids = new Set(), eligible = [];
+  for (const [index, candidate] of candidates.entries()) {
+    if (!isPlainObject(candidate)) { receipt.rejected.push({ id: null, provider: null, model: null, codes: [ADMISSION_REASON.CANDIDATE_INVALID] }); continue; }
+    const { codes, quota } = candidateAssessment(candidate, state, ids, now);
+    if (codes.length) receipt.rejected.push({ id: candidate.id ?? null, provider: candidate.provider ?? null,
+      model: candidate.model ?? null, codes: [...new Set(codes)] });
+    else {
+      const preferredAt = prefer.findIndex((selector) => matches(candidate, selector));
+      eligible.push({ candidate, index, preferredAt: preferredAt < 0 ? prefer.length : preferredAt, ...quota });
+    }
+  }
+  return eligible;
+}
+
+// Rank real observed pressure; owner grants contribute slots only, never synthetic quota percentages.
+function pressureOf({ candidate, pressure }, policy) {
+  const slots = candidate.quota?.authority === 'owner-grant'
+    ? Math.min(candidate.capacity.maxParallel, candidate.quota.grant.slots) : candidate.capacity.maxParallel;
+  const load = candidate.capacity.running / slots;
+  return pressure === null ? load : Math.max(load, pressure / policy.exhaustedPercent);
+}
+
 /** A deterministic plan. The runtime adapter must reserve before launch. Inputs are never mutated. */
 export function selectAdmission({ request, candidates, policy, now } = {}) {
   const receipt = { schema: 'starci/agent-admission@1', policyVersion: policy?.version ?? null, ok: false, reason: null,
@@ -242,26 +266,9 @@ export function selectAdmission({ request, candidates, policy, now } = {}) {
   const { prefer, avoid, required, override } = constraints;
   const { independence } = independenceResult;
   if (!Array.isArray(candidates)) return refuse(ADMISSION_REASON.CANDIDATES_INVALID);
-  const ids = new Set(), eligible = [];
   const state = { request, policy, floorRank, prefer, avoid, required, override, independence };
-  for (const [index, candidate] of candidates.entries()) {
-    if (!isPlainObject(candidate)) { receipt.rejected.push({ id: null, provider: null, model: null, codes: [ADMISSION_REASON.CANDIDATE_INVALID] }); continue; }
-    const { codes, quota } = candidateAssessment(candidate, state, ids, now);
-    if (codes.length) receipt.rejected.push({ id: candidate.id ?? null, provider: candidate.provider ?? null,
-      model: candidate.model ?? null, codes: [...new Set(codes)] });
-    else {
-      const preferredAt = prefer.findIndex((selector) => matches(candidate, selector));
-      eligible.push({ candidate, index, preferredAt: preferredAt < 0 ? prefer.length : preferredAt, ...quota });
-    }
-  }
-  // Rank real observed pressure; owner grants contribute slots only, never synthetic quota percentages.
-  const pressureOf = ({ candidate, pressure }) => {
-    const slots = candidate.quota?.authority === 'owner-grant'
-      ? Math.min(candidate.capacity.maxParallel, candidate.quota.grant.slots) : candidate.capacity.maxParallel;
-    const load = candidate.capacity.running / slots;
-    return pressure === null ? load : Math.max(load, pressure / policy.exhaustedPercent);
-  };
-  eligible.sort((left, right) => left.preferredAt - right.preferredAt || pressureOf(left) - pressureOf(right)
+  const eligible = assessCandidates(candidates, { state, prefer, now, receipt });
+  eligible.sort((left, right) => left.preferredAt - right.preferredAt || pressureOf(left, policy) - pressureOf(right, policy)
     || left.index - right.index || left.candidate.id.localeCompare(right.candidate.id));
   receipt.eligible = eligible.map(({ candidate }) => concrete(candidate));
   if (!eligible.length) return { ...receipt, reason: required ? ADMISSION_REASON.REQUIRED_UNAVAILABLE : ADMISSION_REASON.NO_ELIGIBLE_CANDIDATE };

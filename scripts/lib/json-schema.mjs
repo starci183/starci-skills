@@ -22,17 +22,19 @@ export function validateAgainstSchema(value, schema) {
     }
     return true;
   };
+  const validateString = (node, shape, at) => {
+    if (shape.minLength !== undefined && node.length < shape.minLength) errors.push(`${at}: empty or too short`);
+    if (shape.pattern && !new RegExp(shape.pattern, 'u').test(node)) errors.push(`${at}: ${JSON.stringify(node)} does not match ${shape.pattern}`);
+  };
+  const validateNumber = (node, shape, at) => {
+    if (shape.minimum !== undefined && node < shape.minimum) errors.push(`${at}: below minimum ${shape.minimum}`);
+    if (shape.maximum !== undefined && node > shape.maximum) errors.push(`${at}: above maximum ${shape.maximum}`);
+  };
   const validateScalar = (node, shape, at) => {
     if (Object.hasOwn(shape, 'const') && node !== shape.const) errors.push(`${at}: must be ${JSON.stringify(shape.const)}`);
     if (Array.isArray(shape.enum) && !shape.enum.includes(node)) errors.push(`${at}: ${JSON.stringify(node)} is outside [${shape.enum.join(', ')}]`);
-    if (typeof node === 'string') {
-      if (shape.minLength !== undefined && node.length < shape.minLength) errors.push(`${at}: empty or too short`);
-      if (shape.pattern && !new RegExp(shape.pattern, 'u').test(node)) errors.push(`${at}: ${JSON.stringify(node)} does not match ${shape.pattern}`);
-    }
-    if (typeof node === 'number') {
-      if (shape.minimum !== undefined && node < shape.minimum) errors.push(`${at}: below minimum ${shape.minimum}`);
-      if (shape.maximum !== undefined && node > shape.maximum) errors.push(`${at}: above maximum ${shape.maximum}`);
-    }
+    if (typeof node === 'string') validateString(node, shape, at);
+    if (typeof node === 'number') validateNumber(node, shape, at);
   };
   const validateArray = (node, shape, at, walk) => {
     if (shape.minItems !== undefined && node.length < shape.minItems) errors.push(`${at}: needs at least ${shape.minItems} item(s)`);

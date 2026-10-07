@@ -11,48 +11,7 @@ import {
   ACTIVE_MARKER, ELAPSED_HOURS, ELAPSED_MINUTES, FRAME_RAIL_PREFIX, FRAME_RAIL_SUFFIX, POSIX_PROMPT_PREFIX, POSIX_PROMPT_ROW, SPINNER_COMPANION, STATUS_WORD,
 } from './terminal-liveness-patterns.mjs';
 
-const TERMINAL_PROVIDERS = Object.freeze(['claude', 'codex', 'devin', 'cursor']);
-const identityText = (value) => typeof value === 'string' ? value.trim().toLowerCase() : '';
-const namedProviders = (text) => TERMINAL_PROVIDERS.filter((provider) => new RegExp(String.raw`\b${provider}\b`, 'i').test(text));
-
-/**
- * Pure terminal provider facts from explicit metadata, then title/frame cues.
- * attested means a recognized explicit metadata field, not cryptographic or
- * authorization proof; consumers separately decide which evidence may act.
- */
-export function terminalIdentityOf(entry, { screen = '' } = {}) {
-  const fields = [];
-  for (const key of ['agentIdentity', 'agent', 'provider', 'agentType']) {
-    const value = entry?.[key];
-    if (value && typeof value === 'object') {
-      for (const field of ['agent', 'provider', 'agentType', 'type', 'id']) {
-        const text = identityText(value[field]);
-        if (text) fields.push({ source: `${key}.${field}`, text });
-      }
-    } else {
-      const text = identityText(value);
-      if (text) fields.push({ source: key, text });
-    }
-  }
-  const raw = fields[0]?.text ?? '';
-  const explicit = fields.filter(({ text }) => TERMINAL_PROVIDERS.includes(text));
-  const providers = [...new Set(explicit.map(({ text }) => text))];
-  if (providers.length > 1) return { provider: null, proof: 'unknown', source: 'metadata', raw, reason: 'identity-conflict' };
-  if (providers.length === 1) return { provider: providers[0], proof: 'attested', source: explicit[0].source, raw, reason: null };
-  for (const field of fields) {
-    const hinted = namedProviders(field.text);
-    if (hinted.length > 1) return { provider: null, proof: 'unknown', source: field.source, raw, reason: 'identity-ambiguous' };
-    if (hinted.length === 1) return { provider: hinted[0], proof: 'heuristic', source: field.source, raw, reason: 'metadata-label' };
-  }
-  const title = [entry?.title, entry?.tabTitle, entry?.paneTitle].map(identityText).filter(Boolean).join(' ');
-  const hinted = namedProviders(title);
-  if (hinted.length > 1) return { provider: null, proof: 'unknown', source: 'title', raw, reason: 'title-ambiguous' };
-  if (hinted.length === 1) return { provider: hinted[0], proof: 'heuristic', source: 'title', raw, reason: 'title-label' };
-  if (/esc\s+twice\s+to\s+interrupt|Ask Devin\b/i.test(String(screen ?? ''))) {
-    return { provider: 'devin', proof: 'heuristic', source: 'screen', raw, reason: 'frame-cue' };
-  }
-  return { provider: null, proof: 'unknown', source: null, raw, reason: 'provider-unresolved' };
-}
+export { terminalIdentityOf } from './terminal-identity.mjs';
 
 // What a provider's frame looks like is declared on its card (modules/models/agents/<agent>.yaml
 // `liveness`), not guessed here:
@@ -370,6 +329,29 @@ const noOutputToolBlock = (lines) => {
   return lines.slice(Math.max(0, top - 1), at + 1);
 };
 
+// A screen whose input row holds an unsubmitted paste: the rows above decide whether a turn runs, a gate or failure shows, or the paste is staged.
+function classifyStagedScreen(screen, staged, provider) {
+  const recent = String(screen ?? '').split(/\r?\n/).filter(Boolean).slice(-TRAILING_ROWS).join('\n');
+  if (staged.rows.slice(staged.start).some((row) => QUEUED_BEHIND_TURN.test(row))) return { state: 'active', recent };
+  // The input region stands in as the prompt row, so a spinner followed by
+  // a finished answer reads finished exactly as it would above an empty row.
+  const above = classifyAgentScreen([...staged.above, '> '].join('\n'), { stagedPattern: /(?!)/, provider });
+  if (['active', 'wedged', 'interactive-gate', 'failed'].includes(above.state)) return { ...above, recent };
+  return { state: 'staged-input', row: staged.row, recent };
+}
+
+// A turn whose spinner has run past WEDGE_MINUTES while its one shell
+// command still shows no output is stuck, not working: a Collab worker sat
+// 60 minutes on `... | xargs grep` reading stdin, and "active" hid it.
+// A command carrying its own bound is a tool still running (BOUNDED_TOOL above).
+function spinnerVerdict(topLevelRecent, recentLines, recent) {
+  const spinner = /(?:Working|Thinking|Running tools)\b[^\n]*/.exec(topLevelRecent)?.[0] ?? '';
+  const minutes = Number(ELAPSED_HOURS.exec(spinner)?.[1] ?? 0) * 60 + Number(ELAPSED_MINUTES.exec(spinner)?.[1] ?? 0);
+  const block = minutes >= WEDGE_MINUTES ? noOutputToolBlock(recentLines) : null;
+  if (block && !block.some((line) => BOUNDED_TOOL.test(line))) return { state: 'wedged', minutes, recent };
+  return { state: 'active', recent };
+}
+
 export function classifyAgentScreen(screen, { stagedPattern = DEFAULT_STAGED_PATTERN, sentText = null, provider = null, draft = null } = {}) {
   // The input box's draft (Orca `terminal read` draft) is read where the agent shows it: a wake or a
   // contract left unsubmitted there is staged input, not an empty prompt (frameWithDraft).
@@ -381,15 +363,7 @@ export function classifyAgentScreen(screen, { stagedPattern = DEFAULT_STAGED_PAT
   // follow-up (active), a gate or failure there keeps its name, and anything
   // else is `staged-input` - the one Enter-only send submits it.
   const staged = stagedInputRegion(screen, { stagedPattern, sentText });
-  if (staged) {
-    const recent = String(screen ?? '').split(/\r?\n/).filter(Boolean).slice(-TRAILING_ROWS).join('\n');
-    if (staged.rows.slice(staged.start).some((row) => QUEUED_BEHIND_TURN.test(row))) return { state: 'active', recent };
-    // The input region stands in as the prompt row, so a spinner followed by
-    // a finished answer reads finished exactly as it would above an empty row.
-    const above = classifyAgentScreen([...staged.above, '> '].join('\n'), { stagedPattern: /(?!)/, provider });
-    if (['active', 'wedged', 'interactive-gate', 'failed'].includes(above.state)) return { ...above, recent };
-    return { state: 'staged-input', row: staged.row, recent };
-  }
+  if (staged) return classifyStagedScreen(screen, staged, provider);
   const lines = String(screen ?? '').split(/\r?\n/).filter(Boolean);
   const recentLines = lines.slice(-TRAILING_ROWS);
   const recent = recentLines.join('\n');
@@ -441,15 +415,7 @@ export function classifyAgentScreen(screen, { stagedPattern = DEFAULT_STAGED_PAT
     && wideRows.slice(lastActive + 1, lastPrompt).some((line, i) => !companion(line) && !wrapsFrom(wideRows[lastActive + i], line));
   const spinnerInWindow = lastActive >= wideRows.length - topRows.length;
   if (lastActive >= 0 && !finishedAfterSpinner && (spinnerInWindow || lastPrompt > lastActive)) {
-    // A turn whose spinner has run past WEDGE_MINUTES while its one shell
-    // command still shows no output is stuck, not working: a Collab worker sat
-    // 60 minutes on `... | xargs grep` reading stdin, and "active" hid it.
-    // A command carrying its own bound is a tool still running (BOUNDED_TOOL above).
-    const spinner = /(?:Working|Thinking|Running tools)\b[^\n]*/.exec(topLevelRecent)?.[0] ?? '';
-    const minutes = Number(ELAPSED_HOURS.exec(spinner)?.[1] ?? 0) * 60 + Number(ELAPSED_MINUTES.exec(spinner)?.[1] ?? 0);
-    const block = minutes >= WEDGE_MINUTES ? noOutputToolBlock(recentLines) : null;
-    if (block && !block.some((line) => BOUNDED_TOOL.test(line))) return { state: 'wedged', minutes, recent };
-    return { state: 'active', recent };
+    return spinnerVerdict(topLevelRecent, recentLines, recent);
   }
   // Devin queues a message sent while a turn runs; when the turn ends the
   // idle prompt waits for Enter and nothing else happens. Only an idle screen
