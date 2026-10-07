@@ -38,6 +38,13 @@ ladder:
   stepMs: {ref: "modules/reconciler/job.yaml#decisionDueMs"}
   ownerAfter: {ref: "modules/reconciler/workers.yaml#urgentOverdueEscalations"}
 
+# A worker question matching one of these (case-insensitive) is the owner's, not the Kernel's: credentials and secrets, spend, and irreversible
+# or production-data choices. The Job controller opens its Decision Item for the owner instead of the Kernel (scripts/reconciler/controllers/job.mjs).
+ownerOnlyQuestions:
+  - '\b(password|passphrase|api[ -]?key|secret|token|credential|private key)s?\b'
+  - '\b(pay|payment|billing|invoice|purchase|spend|budget|subscription)\b'
+  - '\b(delete|drop|wipe|overwrite|migrate)\b.{0,40}\b(production|prod|live data|customer data)\b'
+
 rows:
   - id: ask-worker-question
     situation: ask
@@ -189,7 +196,7 @@ holds:
   - {id: host-resources-low, queuedBecause: host-resources-low, scope: machine, workflowWide: "disk and RAM floors are machine facts", cause: "dispatch refused below the disk or RAM floor", handler: runtime-auto, reeval: "every dispatch and status read", bound: {deadlineMs: {ref: "modules/models/runtimes.yaml#allocation.hostLock.retryDeadlineMs"}}, chain: [supervisor, owner], visible: "status queued[].queuedBecause, frontier idle-waiting with the reason", gap: [I8], gapWhy: "the Kernel escalates once to the coordinator by hand; no runtime step tells the owner"}
   - {id: ready, queuedBecause: ready, scope: job, cause: "a launch refused at a switch step returned the job to ready", handler: runtime-auto, reeval: "dispatch-ready routes the job off the refusing pool on every push", bound: {perAgent: {ref: "modules/kernel/op-incident-policy.yaml#agentSwitch.excludeAfter"}}, chain: [runtime-auto, supervisor, owner], visible: "status queued[].policy and frontier.reason carry the step line", gap: [I8], gapWhy: "when every pool is excluded route refuses each push and the step line names the escalation, but nothing opens it"}
   - {id: effect-unknown, scope: job, cause: "a launch of unknown effect is fenced", handler: runtime-auto, reeval: "starci kernel reconcile on the Job controller's effectUnknownMs", bound: {deadlineMs: {ref: "modules/reconciler/job.yaml#sla.EFFECT_UNKNOWN_STUCK"}}, chain: [kernel, supervisor], visible: "SLA EFFECT_UNKNOWN_STUCK", gap: [I7, I8], gapWhy: "status shows no step; a worker that may have started is never forced"}
-  - {id: worker-question, scope: job, cause: "worker-question Decision Item", handler: kernel, reeval: "the reply closes it", bound: {deadlineMs: {ref: "modules/reconciler/job.yaml#sla.QUESTION_OVERDUE"}}, chain: [kernel, supervisor, owner], visible: "frontier worker-question", gap: [I8], gapWhy: "past the Supervisor escalation no step reaches the owner for a question only the owner can settle"}
+  - {id: worker-question, scope: job, cause: "worker-question Decision Item", handler: kernel, reeval: "the reply closes it", bound: {deadlineMs: {ref: "modules/reconciler/job.yaml#sla.QUESTION_OVERDUE"}}, chain: [kernel, supervisor, owner], visible: "frontier worker-question"}
   - {id: worker-stalled, scope: job, cause: "worker-stalled Decision Item: the nudges did not move the worker", handler: kernel, reeval: "the worker files a report or is settled", bound: {deadlineMs: {ref: "modules/reconciler/job.yaml#decisionDueMs"}}, chain: [kernel, supervisor], visible: "frontier worker-nudge-ready and worker-wedged", gap: [I8], gapWhy: "the chain ends at the Supervisor"}
   - {id: settle-nongreen, scope: job, cause: "settle-nongreen Decision Item: the runtime did not settle the report", handler: kernel, reeval: "starci kernel settle", bound: {deadlineMs: {ref: "modules/reconciler/job.yaml#decisionDueMs"}}, chain: [kernel, supervisor], visible: "frontier settle-ready and transition-ready", gap: [I8], gapWhy: "the chain ends at the Supervisor"}
   - {id: progress-stall, scope: workflow, workflowWide: "no unit moved across the whole workflow", cause: "progress-stall Decision Item", handler: kernel, reeval: "progress resumes", bound: {deadlineMs: {ref: "modules/models/runtimes.yaml#allocation.progress.supervisorGraceMs"}}, chain: [kernel, supervisor, owner], visible: "status progress.stall with the rca actions"}

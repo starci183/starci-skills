@@ -63,3 +63,6 @@ export function policyStepOf(rowId, { attempt, of, detail }) {
   return { row: row.id, handler: row.handler, attempt, of, next: row.next, code: row.code, escalateCode,
     line: `${row.id}: attempt ${attempt} of ${of} (${detail}); ${row.handler}: ${row.action}; when spent: escalate to ${row.next} (${escalateCode})` };
 }
+
+/** Whether a worker question is the owner's by the table's ownerOnlyQuestions classes. */
+export const ownerOnlyQuestion = (text) => incidentPolicy().ownerOnlyQuestions.some((source) => new RegExp(source, 'i').test(String(text ?? '')));

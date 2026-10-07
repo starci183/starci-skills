@@ -43,6 +43,7 @@ import { settlerSettings, releaseProofOf, EVENTS as SETTLE_EVENTS } from '../../
 import { reportedJobs, kernelHandoverOf, KERNEL_ONLY_OPS } from '../../machine/reported-jobs.mjs';
 import { SETTLED_JOB_LIST } from '../../../engine/admission.mjs'; import { isMain } from '../../lib/is-main.mjs';
 import { positiveNumber } from '../../lib/number.mjs';
+import { ownerOnlyQuestion } from '../../kernel/op-incident-policy.mjs';
 const selfFile = fileURLToPath(import.meta.url);
 const skillRoot = path.resolve(path.dirname(selfFile), '..', '..', '..');
 const JOB_FILE = path.join(skillRoot, 'modules', 'reconciler', 'job.yaml');
@@ -308,10 +309,11 @@ async function actJob(ctx, ledgerId, jobId, f, s, settings) {
       const bridged = await ctx.api(ledgerId, 'questions', ['--workflow', f.workflowId]);
       const opened = await mapInOrder(s.questions, (q) => {
         const id = q.questionId ?? q.id ?? q.dispatchId ?? q.at ?? 'q';
+        const ownerOnly = ownerOnlyQuestion(q.text ?? q.question);
         return ctx.openDecision({ schema: 'starci/decision-item@1', kind: 'worker-question', idempotencyKey: `worker-question:${jobId}:${id}`,
-          decider: 'kernel', ledger: ledgerId, workflowId: f.workflowId, entity: { type: 'job', id: jobId },
+          decider: ownerOnly ? 'owner' : 'kernel', ledger: ledgerId, workflowId: f.workflowId, entity: { type: 'job', id: jobId },
           summary: `${f.op} ${jobId} asks: ${String(q.text ?? q.question ?? '').slice(0, 300)}`, evidence: [{ ref: `worker-question:${id}` }],
-          allowedVerbs: ['reply', 'nudge', 'reconcile'], dueAt: ctx.now() + settings.sla.QUESTION_OVERDUE, escalateTo: 'supervisor', openedBy: OPENED_BY, openedAt: ctx.now() });
+          allowedVerbs: ['reply', 'nudge', 'reconcile'], dueAt: ctx.now() + settings.sla.QUESTION_OVERDUE, escalateTo: ownerOnly ? 'owner' : 'supervisor', openedBy: OPENED_BY, openedAt: ctx.now() });
       });
       return { action: 'questions', ok: bridged.ok !== false, decisions: opened.length };
     }
