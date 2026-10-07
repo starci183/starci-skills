@@ -1427,7 +1427,7 @@ export const CATALOG = {
           },
           "json": "none",
           "examples": [
-            "starci gate install-sandbox --tarball starci-1.0.0-alpha.5.tgz"
+            "starci gate install-sandbox --tarball starci-1.0.0-alpha.6.tgz"
           ],
           "editions": [
             "full"
@@ -6961,7 +6961,7 @@ export const CATALOG = {
           "json": "flag",
           "examples": [
             "starci release cut",
-            "starci release cut --repo <path> --tag v1.0.0-alpha.5 --json"
+            "starci release cut --repo <path> --tag v1.0.0-alpha.6 --json"
           ],
           "editions": [
             "full"
