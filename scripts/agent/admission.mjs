@@ -145,12 +145,12 @@ export function planAgentAdmission({ role, scopeId, attemptId = null, kind = nul
     history: picks, balance: tier ? { maxStreak: settings.balance.maxStreak, maxSharePercent: settings.balance.maxSharePercent } : null,
     qualityFloor: qualityFloor ?? admissionQualityFloor(role, difficulty, policy), biasTrusted,
     allowGroup: candidates.map(({ provider, model }) => ({ provider, model })),
-    prefer: (scoped.prefer ?? []).map(asSelector), avoid: (scoped.avoid ?? []).map(asSelector), only: (scoped.only ?? []).map(asSelector),
+    prefer: (scoped.prefer ?? []).map((item) => asSelector(item)), avoid: (scoped.avoid ?? []).map((item) => asSelector(item)), only: (scoped.only ?? []).map((item) => asSelector(item)),
     reserveOverride: override, author: author ? { ...author, modelAuthority: adapterModelAuthority(loadAdapter(author.provider).card) } : null,
     independence: independence ?? policy?.roles?.[role]?.independence }, candidates, policy, now: clock() });
 }
 
-const namedBy = (candidate, selectors) => (selectors ?? []).map(asSelector)
+const namedBy = (candidate, selectors) => (selectors ?? []).map((item) => asSelector(item))
   .some((selector) => Object.entries(selector).every(([key, value]) => candidate[key] === value));
 /** The override a reservation in the 90..95 band carries: the owner's reserve grant, else a trusted owner bias naming the member. */
 function bandOverrideFor({ candidate, bias, input, override }) {

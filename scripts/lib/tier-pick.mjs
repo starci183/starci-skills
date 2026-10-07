@@ -6,6 +6,8 @@ const matchesSelector = (member, selector) => Object.entries(selector).every(([k
 const named = (member, selectors) => selectors.some((selector) => matchesSelector(member, selector));
 const drop = (record, step, member, reason) => record.dropped.push({ id: member.id, step, reason });
 const snapshot = (record, step, chain) => record.steps.push({ step, chain: chain.map((member) => member.id) });
+/** The dropped members of one step (every step when `step` is null) as `<id> <reason>; ...`. */
+const droppedText = (record, step = null) => record.dropped.filter((row) => step === null || row.step === step).map((row) => row.id + ' ' + row.reason).join('; ');
 
 /** Step 1: members a bias can never restore (auth, host, circuit, role, capacity). */
 function hardFilter(chain, record) {
@@ -70,8 +72,9 @@ function balanceChain(chain, ctx) {
   const head = chain[0];
   if (chain.length < 2) return { chain, yielded: null };
   const streak = streakOf(history.recent ?? [], head.id), share = shareOf(history.running ?? {}, head.id);
-  const reason = streak >= balance.maxStreak ? `${head.id} was picked ${streak} times in a row`
-    : share > balance.maxSharePercent ? `${head.id} holds ${Math.round(share)}% of the running seats` : null;
+  let reason = null;
+  if (streak >= balance.maxStreak) reason = `${head.id} was picked ${streak} times in a row`;
+  else if (share > balance.maxSharePercent) reason = `${head.id} holds ${Math.round(share)}% of the running seats`;
   if (!reason) return { chain, yielded: null };
   const next = chain.slice(1).find((member) => tokenVerdict(member, ctx.usage, bandAllowed(member, ctx)) === null);
   if (!next) {
@@ -111,9 +114,9 @@ export function pickFromTier({ tier, members, bias = {}, override = null, liveSe
   const record = { tier, chain: members.map((member) => member.id), steps: [], dropped: [], chosen: null };
   const ctx = { bias, override, history, balance, usage, record };
   const hard = hardFilter(members, record);
-  if (!hard.length) return finish(record, { ok: false, reason: `no member of tier ${tier} passes the hard filter: ${record.dropped.map((row) => `${row.id} ${row.reason}`).join('; ')}`, resetAt: earliestReset(members) });
+  if (!hard.length) return finish(record, { ok: false, reason: `no member of tier ${tier} passes the hard filter: ${droppedText(record)}`, resetAt: earliestReset(members) });
   const biased = applyBias(hard, bias, record);
-  if (!biased.length) return finish(record, { ok: false, reason: `the owner bias leaves no member of tier ${tier} (${record.dropped.filter((row) => row.step === 'bias').map((row) => `${row.id} ${row.reason}`).join('; ')})` });
+  if (!biased.length) return finish(record, { ok: false, reason: `the owner bias leaves no member of tier ${tier} (${droppedText(record, 'bias')})` });
   const live = liveSeat ? biased.find((member) => member.id === liveSeat) : null;
   if (live) {
     snapshot(record, 'live-seat', [live]);
@@ -123,7 +126,7 @@ export function pickFromTier({ tier, members, bias = {}, override = null, liveSe
   const balanced = biasActive ? { chain: biased, yielded: null } : balanceChain(biased, ctx);
   snapshot(record, 'balance', balanced.chain);
   const ordered = takeByTokens(balanced.chain, ctx);
-  if (!ordered.length) return finish(record, { ok: false, reason: `every member of tier ${tier} is out of tokens: ${record.dropped.filter((row) => row.step === 'tokens').map((row) => `${row.id} ${row.reason}`).join('; ')}`, resetAt: earliestReset(balanced.chain) });
+  if (!ordered.length) return finish(record, { ok: false, reason: `every member of tier ${tier} is out of tokens: ${droppedText(record, 'tokens')}`, resetAt: earliestReset(balanced.chain) });
   let chosenBy = 'chain-order';
   if (biasActive) chosenBy = 'bias';
   else if (balanced.yielded && ordered[0] === balanced.chain[0]) chosenBy = 'balance';

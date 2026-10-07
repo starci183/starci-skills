@@ -398,6 +398,12 @@ function routingResult({ ctx, owner, evaluated, availability, pickedSet, rule, a
   return { result, pick };
 }
 
+function printFallbackChain(result) {
+  if (!result.fallbackChain.length) return;
+  console.log('fallback chain:');
+  for (const f of result.fallbackChain) console.log(`  -> ${f.target} (${f.model}) [${f.mode}]`);
+}
+
 function printRouting({ args, ctx, owner, result, pick, rule }) {
   const { w, difficulty, measured, route } = ctx;
   const floorNote = difficulty !== measured ? ` (raised from ${measured} to floor ${route.floor})` : '';
@@ -415,10 +421,7 @@ function printRouting({ args, ctx, owner, result, pick, rule }) {
   console.log(`  order: ${result.orderSource}`);
   for (const line of pickRecordText(result.pickRecord)) console.log(`  ${line}`);
   if (result.availability) console.log(`  availability: ${Object.entries(result.availability).map(([t, a]) => t + '=' + a.state).join(' ')}`);
-  if (result.fallbackChain.length) {
-    console.log('fallback chain:');
-    for (const f of result.fallbackChain) console.log(`  -> ${f.target} (${f.model}) [${f.mode}]`);
-  }
+  printFallbackChain(result);
   if (result.note) console.log(`  note: ${result.note}`);
   if (args.verbose) for (const r of result.rejected) console.log(`  rejected ${r.target}: ${r.reasons.join('; ')}`);
 }

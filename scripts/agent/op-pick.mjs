@@ -28,13 +28,15 @@ const toolReasons = ({ pool, kind, modelsDir, opsDir }) => missingHostTools({ po
 function lineageReasons({ target, lineage }) {
   if (!(lineage?.exclude ?? []).includes(target)) return [];
   const seen = lineage.pools?.[target];
-  return [`excluded for this retry lineage: failed ${seen?.failures ?? 'twice'}x on it${seen?.causes?.length ? ` (${seen.causes.join(', ')})` : ''}`];
+  const causes = seen?.causes?.length ? ' (' + seen.causes.join(', ') + ')' : '';
+  return [`excluded for this retry lineage: failed ${seen?.failures ?? 'twice'}x on it${causes}`];
 }
 
 const circuitReasons = (cap) => {
   if (cap?.auth !== 'dead') return [];
-  const kind = cap.providerHealth ? cap.providerHealth.failureKind ?? 'auth' : 'auth';
-  return [`provider ${kind} is unavailable${cap.authDetail ? `: ${cap.authDetail}` : ''}`];
+  const kind = cap.providerHealth?.failureKind ?? 'auth';
+  const detail = cap.authDetail ? ': ' + cap.authDetail : '';
+  return [`provider ${kind} is unavailable${detail}`];
 };
 
 /** The structural hard-filter reasons of one member for this op. */
@@ -67,7 +69,7 @@ function rejectedOf(admission, members) {
 }
 
 /** The bias with every entry as a selector: a pool id string names the pool. */
-const selectorBias = (bias) => ({ ...bias, prefer: (bias.prefer ?? []).map(asSelector), avoid: (bias.avoid ?? []).map(asSelector), only: (bias.only ?? []).map(asSelector) });
+const selectorBias = (bias) => ({ ...bias, prefer: (bias.prefer ?? []).map((item) => asSelector(item)), avoid: (bias.avoid ?? []).map((item) => asSelector(item)), only: (bias.only ?? []).map((item) => asSelector(item)) });
 
 /** A pool the retry's lineage failed on once is tried after the others of its tier (an owner bias still moves it first). */
 function demotedLast(members, lineage) {

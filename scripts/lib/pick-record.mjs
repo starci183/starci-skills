@@ -8,7 +8,10 @@ export function pickRecordText(pick) {
   const lines = [`tier ${record.tier ?? '(none)'}: ${chainText(record.chain)}`];
   for (const step of record.steps) lines.push(`after ${step.step}: ${chainText(step.chain)}`);
   for (const row of record.dropped) lines.push(`dropped ${row.id} at ${row.step}: ${row.reason}`);
-  if (record.balance) lines.push(`balance: ${record.balance.reason}${record.balance.applied ? `; yielded to ${record.balance.to}` : `; kept ${record.balance.kept}`}`);
+  if (record.balance) {
+    const outcome = record.balance.applied ? '; yielded to ' + record.balance.to : '; kept ' + record.balance.kept;
+    lines.push(`balance: ${record.balance.reason}${outcome}`);
+  }
   lines.push(record.chosen ? `chosen ${record.chosen.id} by ${record.chosen.by}` : 'chosen none');
   return lines;
 }
