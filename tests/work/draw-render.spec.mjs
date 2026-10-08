@@ -14,12 +14,14 @@ import {
 // scripts/work/draw-render.mjs is the capture interface.draw uses for code-native regions. The pure pieces run
 // everywhere; the browser captures need a project-local Playwright with Chromium: they run from
 // STARCI_PLAYWRIGHT_DIR (a directory whose node_modules holds playwright) and are skipped where there is none.
-// The fixture capture also needs examples/shape-slot's installed node_modules (or STARCI_SHAPE_SLOT_DIR).
+// The fixture capture also needs examples/shape-slot's installed node_modules (or STARCI_SHAPE_SLOT_DIR) for React, and an esbuild
+// resolvable from the Playwright directory or from the app.
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const CLI = path.join(ROOT, 'scripts', 'work', 'draw-render.mjs');
 const PW_DIR = [process.env.STARCI_PLAYWRIGHT_DIR, ROOT].find((d) => d && findPackage([d], ['playwright', '@playwright/test']));
+// The capture bundles with the esbuild of the directory it runs from (PW_DIR) or of the app: the app itself only has to hold React.
 const SHAPE_SLOT = [process.env.STARCI_SHAPE_SLOT_DIR, path.join(ROOT, 'examples', 'shape-slot')]
-  .find((d) => d && fs.existsSync(path.join(d, 'node_modules', 'react-dom')) && fs.existsSync(path.join(d, 'node_modules', 'esbuild')));
+  .find((d) => d && fs.existsSync(path.join(d, 'node_modules', 'react-dom')) && findPackage([PW_DIR, d].filter(Boolean), ['esbuild']));
 const NO_BROWSER = PW_DIR ? chromiumGap(loadPlaywright([PW_DIR]).chromium) : 'no project-local playwright (set STARCI_PLAYWRIGHT_DIR)';
 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'starci-draw-render-spec-'));
@@ -162,7 +164,7 @@ test('HTML capture: a missing font or horizontal overflow exits 1 and says so in
 const HANDOFF_FIXTURE = {
   state: 'prepared',
   props: {
-    order: { items: { code: 'SO-2026-091', customer: 'Northstar Retail', amount: 480000000, lines: [{ sku: 'A', qty: 2 }] } },
+    order: { items: { code: 'SO-2026-091', customer: 'Northstar Retail', amountText: '480,000,000', lines: [{ sku: 'A', qty: 2 }] } },
     handoff: { items: { status: 'prepared', fingerprint: 'fp-ho-91', revision: 2, receiptId: 'RC-1', reason: 'Missing VAT' } },
     labels: {
       title: 'Handoff', prepared: 'Prepared', sent: 'Sent', returned: 'Returned', send: 'Send', resend: 'Resend', fingerprint: 'Fingerprint',
@@ -170,8 +172,14 @@ const HANDOFF_FIXTURE = {
       orderSlot: { empty: 'empty', forbidden: 'forbidden', error: 'error', retry: 'retry' },
       handoffSlot: { empty: 'empty', forbidden: 'forbidden', error: 'error', retry: 'retry' },
     },
+    // The send overlay, closed: the composite's data plus its drawn shape.
+    send: {
+      isOpen: false, isSending: false, shape: 'form',
+      fingerprint: { value: 'fp-ho-91' }, revision: { value: '2' }, note: { value: '' },
+      labels: { title: 'Send handoff', fingerprint: 'Fingerprint', revision: 'Revision', note: 'Note', review: 'Review', confirmQuestion: 'Send it?', back: 'Back', confirm: 'Confirm' },
+    },
   },
-  on: { requestSend: '[Function]', retryOrder: '[Function]', retryHandoff: '[Function]' },
+  on: { requestSend: '[Function]', retryOrder: '[Function]', retryHandoff: '[Function]', sendClose: '[Function]', sendChange: '[Function]', sendReview: '[Function]', sendBack: '[Function]', sendConfirm: '[Function]' },
 };
 const NO_FIXTURE = NO_BROWSER || (SHAPE_SLOT ? false : 'examples/shape-slot has no installed node_modules (set STARCI_SHAPE_SLOT_DIR)');
 
