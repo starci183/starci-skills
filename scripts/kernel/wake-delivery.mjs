@@ -58,6 +58,7 @@ import { squash } from '../lib/clip.mjs';
 import { clearDraft, probeDraft, sameDraft, DRAFT_STALE, CLEAR_DRAFT_INTERVAL_MS } from './clear-draft.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { kernelRevWakeLine } from './runtime-rev.mjs';
+import { boundedWake } from './wake-bound.mjs';
 
 const PROVEN = new Set(['delivered', 'queued']);
 const WAITING_FOR_ENTER = new Set(['staged-input', 'queued-input']);
@@ -436,7 +437,7 @@ function wakeKernelIn({ db, workflowId, text, pending, activeStaleMs, terminal, 
   // signal shim and a seat-less ledger get none.
   const attempt = kernelAttemptOf(db, workflowId);
   const revLine = revLineOf(db, workflowId, attempt, deps);
-  const fullText = withWakeIdentity(text, workflowId, attempt, revLine);
+  const fullText = boundedWake({ text, workflowId, attempt, revLine, compose: withWakeIdentity });
   const shown = show({ terminal });
   if (!shown?.ok || shown.connected !== true || shown.writable !== true) {
     return { action: 'kernel-unavailable', terminal, delivered: false, error: shown?.error ?? shown?.exitCause ?? null };

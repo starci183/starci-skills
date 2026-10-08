@@ -56,6 +56,32 @@ cases:
     rule: {file: scripts/kernel/attempt-placement.mjs, anchor: "reconcileAttemptPlacements"}
     spec: tests/kernel/attempt-placement.spec.mjs
     status: covered
+  - id: op-prompt-files-the-whole-knowledge-tree
+    family: smooth-operation
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "the shared standard read of the nine deciding and authoring ops was knowledge/**: their prompt listed 260 to 290 mandatory files (2.4 to 2.9 MB) in a 88 to 95 KB prompt that the worker reads and carries in its context for every later turn; the usage rows of 14 decision attempts show 3.4 to 13.4 M tokens each, 47 to 113 turns, a prompt of 25 thousand tokens carried across 13 percent of all of it, and the READ digest it required hashed 254 files nobody can read", remedy: {state: in-tree, change: "each of the nine ops files the law inputs plus the knowledge its own READ step names (docs, op-gate, its patterns): 19 to 45 mandatory files and a 21 to 28 KB prompt; the budget is knowledge/op-gate.yaml readSet"}}
+    met: {date: "2026-10-08", where: "decision legs of the Nivo and StarCi auth-test workflows", evidence: "llm_usage rows of both product ledgers; worker transcript dd6caf3b (113 turns, 13.07 M cache-read tokens, a 102 KB packet read at turns 1 and 2)"}
+    rule: {file: knowledge/op-gate.yaml, anchor: "readSet"}
+    spec: tests/kernel/op-read-set.spec.mjs
+    status: covered
+  - id: documented-command-two-extractors
+    family: correctness
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "two code paths decided whether a text shows a starci command that exists, tests/helpers/doc-commands.mjs (tokens, flags, enums, required options) and scripts/checks/check-prose-commands.mjs (R230: regex heads and prose clauses); a regex written into a yaml value was read as a command by one and not the other, and an earlier attempt to give R230 the helper's extractor produced 15 false positives because a prose word after 'starci' was read as an unknown group", remedy: {state: in-tree, change: "scripts/checks/lib/doc-commands.mjs is the one extractor and judge; R230 and the doc-command specs call it, R230 holds a prose mention to unknown verbs and options and a span or fence to unknown groups too; 2834 occurrences of the tree and 6000 fuzzed lines read identically before and after the move"}}
+    met: {date: "2026-10-08", where: "R230 and the doc-command helper disagreed on a regex pattern over a command spelling", evidence: "tests/repo/doc-commands.spec.mjs regex-pattern test; lane brief alpha.8 E3"}
+    rule: {file: scripts/checks/lib/doc-commands.mjs, anchor: "extractCommands"}
+    spec: tests/checks/check-prose-commands.spec.mjs
+    status: covered
+  - id: land-gate-skips-specs-that-spawn-the-cli
+    family: correctness
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "the land gate's bounded selection (24 graph-only specs, one per directory) let a change through that broke 13 specs: each spawns scripts/kernel/cli.mjs or packages/cli/bin/starci.mjs and runs a verb whose handler reaches the changed file, so no import of theirs names it and the smoke bound left them out", remedy: {state: in-tree, change: "the direct and touching selections add the specs that spawn a CLI entry and name a verb whose handler reaches a changed file: the verbs importing a changed file themselves, then the nearest others up to allocation.landGate.cliVerbs (land-cli-specs.mjs)"}}
+    met: {date: "2026-10-07", where: "land of a shared verb helper change", evidence: "AUDIT-starci-workflow.md issue 3d; lane brief alpha.8 E4"}
+    rule: {file: scripts/supervisor/land-cli-specs.mjs, anchor: "specsExercisingChangedVerbs"}
+    spec: tests/supervisor/land-cli-selection.spec.mjs
+    status: covered
+  - id: worktree-gc-spec-red-once-under-load
+    family: concurrency
+    met: {date: "2026-10-08", where: "the alpha.6 full-suite run: tests/api-git/worktree-lifecycle.spec.mjs 'the GC reclaims orphans...' failed once at the assertion on the ended workflow's removal item, 18.4 s, then passed in 20 of 20 stress runs", evidence: "the alpha.6 clean-tree full-suite log and its 20 stress logs"}
+    status: open
+    why: "not reproduced: three runs of the spec beside six CPU-burning processes passed, and the item's reason was not recorded (the assertion then had no message; it now prints the removal item). The GC makes one Orca worktree remove per pass (kind mutation, replay none) and a refusal is recorded on the row for the next pass; the fake runs one git worktree remove --force. Whether a transient git refusal on Windows or something else failed that removal is not proven, so the fake is not changed on a guess"
   - id: quota-window-unstarted
     family: failure-while-running
     met: {date: "2026-10-08", where: "provider quota after re-login", evidence: "commit f4fca8baf"}
@@ -184,14 +210,18 @@ cases:
     why: "a Supervisor behaviour; the land gate now bounds its specs, and no digest signal shows a land cancelled by its caller"
   - id: wake-delivered-as-pasted-text
     family: record-vs-reality
-    met: {date: "2026-10-07", where: "Kernel ignored three watchdog wakes", evidence: "AUDIT-starci-workflow.md issue 6"}
-    status: open
-    why: "wake delivery is confirmed by submission, not by the agent acting on it; no signal tells the digest a wake was ignored"
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "Claude Code folds a typed paste of about 800 characters or more into a pasted_content block that the model reads as untrusted data. In the real Kernel transcripts every wake of 1218 to 1242 characters (twelve, the watchdog wake with its rev line) arrived pasted and three were refused, and all sixteen wakes of 325 to 730 characters arrived as the user's message; the watchdog wake was cut under 800 on 2026-10-08, but every other wake (transition, ask-answered, stall, supervisor) was typed at whatever length its lines made", remedy: {state: in-tree, change: "the one Kernel wake path and the watchdog wake bound the typed text by allocation.wake.maxChars: a longer wake keeps its opener, the rev line when it fits and the seat identity, and points at starci kernel status (wake-bound.mjs)"}}
+    met: {date: "2026-10-07", where: "Kernel ignored three watchdog wakes", evidence: "Kernel transcripts 3b231876 and 846648a6: user messages of 1218-1242 characters carry <pasted_content>, 16 of 325-730 characters do not; AUDIT-starci-workflow.md issue 6"}
+    rule: {file: scripts/kernel/wake-bound.mjs, anchor: "boundedWake"}
+    spec: tests/kernel/wake-bound.spec.mjs
+    status: covered
   - id: terminal-count-drift
     family: ending
-    met: {date: "2026-10-07", where: "41 terminals, finished workers' terminals still open", evidence: "AUDIT-starci-workflow.md issue 21"}
-    status: open
-    why: "the digest does not yet compare the seat rows with the Orca terminal list"
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "the TERMINAL_COUNT_DRIFT clock counted every Orca terminal (41) against the workers Orca held active (8) plus a slack of 5, so the owner's own lane shells, coordinators and per-worktree terminals, which the runtime may never close, kept it open for twenty hours (machine.sqlite sla_episodes 7: 2026-10-07T06:27Z to 2026-10-08T02:52Z); its declared auto-action, to collect the surplus shells, was performed by nothing but the boot dedupe", remedy: {state: in-tree, change: "the clock counts only runtime-titled tabs ([Kernel], [Op], [Worker], [Supervisor]) and a violated clock runs the dedupe pass (services --dedupe) once per SLA window (terminal-drift.mjs)"}}
+    met: {date: "2026-10-07", where: "41 terminals, finished workers' terminals still open", evidence: "AUDIT-starci-workflow.md issue 21; machine.sqlite sla_episodes episode 7"}
+    rule: {file: scripts/reconciler/terminal-drift.mjs, anchor: "runTerminalDrift"}
+    spec: tests/reconciler/terminal-drift.spec.mjs
+    status: covered
   - id: workflow-across-host-restart
     family: power-lifecycle
     met: {date: "2026-10-08", where: "CHANGELOG 1.0.0-alpha.6 Known limitations: the policy ran against fixtures only", evidence: "CHANGELOG.md"}
