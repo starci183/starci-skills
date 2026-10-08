@@ -177,7 +177,11 @@ export function citesIn(text) {
 }
 
 /** False when the cite is not one of this tree (skipped), true once it is judged (a dead one is pushed to `dead`). */
-const judgeCite = (root, cite, rel, readTarget, dead) => {
+/** The skill's own reference files are cited as `references/<file>.md`; they live under the skill folder. */
+const skillRooted = (cite) => (cite.target.startsWith('references/') ? { ...cite, target: `skills/starci/${cite.target}` } : cite);
+
+const judgeCite = (root, rawCite, rel, readTarget, dead) => {
+  const cite = skillRooted(rawCite);
   // Outside a cite key, only a token rooted at a real top-level entry is
   // a reference to this tree; `evidence/manifest.yaml` names a record artifact.
   if (cite.kind === 'path' && cite.form !== 'cite value'

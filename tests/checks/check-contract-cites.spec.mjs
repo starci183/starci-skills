@@ -66,14 +66,14 @@ test('a missing file, a missing symbol and a bare filename are each a dead cite'
 test('canonical host prompts are verifiable while local project runtime state remains exempt', () => {
   const root = fixtureTree({
     'skills/starci/references/host-startup.md': '# Native host startup\n',
-    'modules/kernel/fixture.yaml': 'source: skills/starci/references/host-startup.md\nmissing:\n  source: skills/starci/references/host-maintenance.md\nstate:\n  source: .starciwork/runtime.sqlite\n',
+    'modules/kernel/fixture.yaml': 'source: skills/starci/references/host-startup.md\nmissing:\n  source: skills/starci/references/missing-reference.md\nstate:\n  source: .starciwork/runtime.sqlite\n',
   });
   try {
     assert.equal(isUnverifiable('skills/starci/references/host-startup.md'), false);
     assert.equal(isUnverifiable('.starciwork/runtime.sqlite'), true);
     const report = checkContractCites(root);
     assert.equal(report.ok, false);
-    assert.deepEqual(report.dead.map(({target}) => target), ['skills/starci/references/host-maintenance.md']);
+    assert.deepEqual(report.dead.map(({target}) => target), ['skills/starci/references/missing-reference.md']);
     assert.equal(report.citesChecked, 2);
   } finally { fs.rmSync(root, {recursive: true, force: true}); }
 });
@@ -166,4 +166,14 @@ test('RT_CITED_PATH_MISSING: live prose whose every runtime path exists has no f
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
+});
+
+test('a skill reference cited as references/<file>.md resolves under the skill folder, and a missing one is dead', () => {
+  const root = fixtureTree({
+    'skills/starci/references/host-startup.md': '# Native host startup\n',
+    'modules/kernel/fixture.yaml': 'note: read `references/host-startup.md` and `references/gone.md`\n',
+  });
+  try {
+    assert.deepEqual(checkContractCites(root).dead.map(({target}) => target), ['skills/starci/references/gone.md']);
+  } finally { fs.rmSync(root, {recursive: true, force: true}); }
 });
