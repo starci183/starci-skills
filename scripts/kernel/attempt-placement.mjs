@@ -23,6 +23,7 @@ import { parseJson } from '../lib/json.mjs';
 import { recordWhy } from './why-record.mjs';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
 import { WORKER_STATES, workerStateOf } from './workflow-in-flight.mjs';
+import { workflowCustody, treeStateOf } from './workflow-custody.mjs';
 
 /** The typed machine cause of an attempt the runtime ends because its placement is lost. */
 export const PLACEMENT_LOST = 'placement-lost';
@@ -100,17 +101,29 @@ function endAttempt(ledger, row, { tree, lost, evidence, worker, now }) {
   });
 }
 
+/** Whether the registered tree holds what the workflow owns (its branch tip, its preserved work restored): only then are its files evidence of an attempt's work. */
+function treeIsAttached(tree, workflowId, env) {
+  const custody = workflowCustody({ appRepo: tree.repoRoot, workflowId, env });
+  if (custody.none) return true;
+  return !custody.fault && treeStateOf({ dir: tree.path, custody }).state === 'attached';
+}
+
 /**
  * Settle the placement of every admitted, unsettled attempt of `workflowId` against its registered `tree` ({path, branch, checkpoint,
- * orcaWorktreeId}). `jobId` narrows to one job. Returns {rebound, ended, deferred}: [{jobId, attemptId, from, ...}] each.
+ * orcaWorktreeId, repoRoot}). `jobId` narrows to one job. Returns {rebound, ended, deferred}: [{jobId, attemptId, from, ...}] each. A tree that
+ * is not yet attached to the workflow's branch decides nothing (starci workflow custody --apply moves it first): every lost attempt is deferred.
  */
-export function reconcileAttemptPlacements(ledger, { workflowId, tree, jobId = null, show = terminalShow, now = Date.now() }) {
+export function reconcileAttemptPlacements(ledger, { workflowId, tree, jobId = null, show = terminalShow, now = Date.now(), env = process.env }) {
   const db = ledger.db;
   const out = { rebound: [], ended: [], deferred: [] };
   if (!tree?.path || !fs.existsSync(tree.path)) return out;
-  for (const row of candidatesOf(db, workflowId, jobId)) {
-    const lost = lostDirsOf(db, row.attempt_id, tree);
-    if (!lost.length) continue;
+  const lostRows = candidatesOf(db, workflowId, jobId).map((row) => ({ row, lost: lostDirsOf(db, row.attempt_id, tree) })).filter((entry) => entry.lost.length);
+  if (!lostRows.length) return out;
+  if (!treeIsAttached(tree, workflowId, env)) {
+    out.deferred.push(...lostRows.map(({ row, lost }) => ({ jobId: row.job_id, attemptId: row.attempt_id, from: lost, worker: null, tree: 'not-attached' })));
+    return out;
+  }
+  for (const { row, lost } of lostRows) {
     const worker = workerStateOf(row, { show, now, reported: row.status === 'reported' }).state;
     const item = { jobId: row.job_id, attemptId: row.attempt_id, from: lost };
     if (worker !== WORKER_STATES.gone) { out.deferred.push({ ...item, worker }); continue; }

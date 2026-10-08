@@ -101,7 +101,7 @@ export function registerWorkflowWorktree(ctx, { workflowId, orcaWorktreeId, path
 export function ensureWorkflowWorktree(ctx, args) {
   const ensured = ensureTree(ctx, args);
   if (!ensured.ok || !args.ledger) return ensured;
-  return { ...ensured, placements: reconcileAttemptPlacements(args.ledger, { workflowId: args.workflowId, tree: ensured.record, show: ctx?.show }) };
+  return { ...ensured, placements: reconcileAttemptPlacements(args.ledger, { workflowId: args.workflowId, tree: ensured.record, show: ctx?.show, env: ctxOf(ctx).env }) };
 }
 
 /**

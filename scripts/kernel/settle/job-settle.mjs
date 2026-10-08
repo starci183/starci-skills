@@ -272,7 +272,7 @@ async function settleReported(ledger, fresh, { repo, settings, env, now, dryRun,
 /** The placement of a reported job's attempt against its workflow's registered tree, before its checks run: a lost admitted path is rebound, or the attempt ended. */
 function settlePlacement(ledger, item, { env, dryRun }) {
   const tree = dryRun ? null : workflowWorktreeOf({ env }, item.workflowId);
-  return tree ? reconcileAttemptPlacements(ledger, { workflowId: item.workflowId, tree, jobId: item.jobId }) : null;
+  return tree ? reconcileAttemptPlacements(ledger, { workflowId: item.workflowId, tree, jobId: item.jobId, env }) : null;
 }
 
 /** One reported job under its per-job lock: re-read, settle, and file the row into `out`; a throw is recorded, not rethrown. */

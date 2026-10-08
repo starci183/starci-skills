@@ -11,7 +11,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { openLedger } from '../../engine/db/ledger.mjs';
 import { retryDisposition } from '../../engine/admission.mjs';
-import { ensureWorkflowWorktree, setCheckpoint } from '../../scripts/kernel/workflow-worktree.mjs';
+import { ensureWorkflowWorktree, registerWorkflowWorktree, setCheckpoint } from '../../scripts/kernel/workflow-worktree.mjs';
 import { gcWorktrees } from '../../scripts/machine/worktrees.mjs';
 import { PLACEMENT_LOST, reconcileAttemptPlacements } from '../../scripts/kernel/attempt-placement.mjs';
 import { PLACEMENT_REBOUND, reboundBindingOf, reboundMapOf, placedWorktreeOf, supersedeDir } from '../../scripts/machine/placement-rebound.mjs';
@@ -66,7 +66,7 @@ function world(t, { reportFiles = [SDS], writeFiles = [SDS], status = 'reported'
   assert.ok(!fs.existsSync(lost), 'the first tree is gone');
   git(app, 'branch', '-f', `wf-${WF}`, git(app, 'rev-parse', 'refs/heads/preserved/' + WF + '/gc^'));
   const reensure = (show) => ensureWorkflowWorktree({ env, orca, show }, { workflowId: WF, appRepo: app, ledgerId: 'ledger-1', ledger });
-  return { app, env, ledger, lost, reensure };
+  return { app, env, orca, ledger, lost, reensure };
 }
 
 /** The ledger rows of one admitted attempt that filed (or did not file) its report from `lost`. */
@@ -189,4 +189,17 @@ test('the op gate binds the owned slice of a rebound attempt in the registered t
   const binding = reboundBindingOf(recorded, reboundMapOf(w.ledger.db, contract.attempt_id), placements);
   assert.deepEqual(binding.aliases.map((a) => [path.resolve(a.from), path.resolve(a.to)]), [[path.resolve(w.lost), path.resolve(tree)]]);
   assert.equal(await judge(binding), null, 'a docs-only op owes no loop judgment once its slice binds');
+});
+
+test('a registered tree still behind the workflow branch decides nothing: the attempt waits for the custody repair, which then rebinds it', (t) => {
+  const w = world(t);
+  const made = w.orca.create({ repo: `path:${w.app}`, name: `wf-${WF}`, baseBranch: 'main', setup: 'skip', comment: '' }).worktree;
+  const tree = registerWorkflowWorktree({ env: w.env }, { workflowId: WF, orcaWorktreeId: made.id, path: made.path, branch: made.branch, ledgerId: 'ledger-1' });
+  const waiting = reconcileAttemptPlacements(w.ledger, { workflowId: WF, tree, show: gone, env: w.env });
+  assert.deepEqual([waiting.rebound, waiting.ended], [[], []]);
+  assert.deepEqual(waiting.deferred.map((d) => [d.jobId, d.tree]), [[JOB, 'not-attached']]);
+  assert.equal(jobRow(w.ledger).status, 'reported', 'the attempt is not ended while its work may still be restored');
+  const repaired = w.reensure(gone);
+  assert.ok(repaired.ok && repaired.repaired, JSON.stringify(repaired));
+  assert.deepEqual(repaired.placements.rebound.map((r) => r.jobId), [JOB]);
 });
