@@ -15,5 +15,5 @@ exit:
   "2": bad usage or the sandbox could not run
 json: none
 examples:
-  - starci gate install-sandbox --tarball starci-1.0.0-alpha.6.tgz
+  - starci gate install-sandbox --tarball starci-1.0.0-alpha.7.tgz
 editions: [full]

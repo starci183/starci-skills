@@ -4,9 +4,9 @@ All notable changes to StarCi are documented here. The runtime is on the `1.0.0-
 until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` freezes them.
 `package.json` `version` is the only version authority.
 
-## [1.0.0-alpha.7] — in preparation
+## [1.0.0-alpha.7] — 2026-10-08
 
-Theme: the runtime's remote main moves only with a release, and a release is proven on the exact commit that is pushed.
+Theme: the roles are one declared contract, the system recovers from a host restart by itself, no smell or bug enters at commit, and the remote main moves only with a release proven on the exact commit that is pushed.
 
 ### Changed
 - A push of the runtime repository's `main` is a release. The installed pre-push hook (`scripts/guards/release-push-gate.mjs`) refuses a push of `main` or of a `v*` tag unless the pushed commit is a release commit (`scripts/guards/release-definition.mjs`, the same code `starci release cut` runs): `package.json` `version` differs from the remote main's, an annotated tag `v<version>` sits on the commit, `CHANGELOG.md` has a dated heading for that version with no unfinished mark, and the release record of exactly that commit holds a green full root suite, packages suites and checks. The refusal names what is missing and the command that produces it; there is no bypass switch. Any other ref is left alone.
@@ -14,15 +14,38 @@ Theme: the runtime's remote main moves only with a release, and a release is pro
 - The release cut runs the packages suites (`npm run test:packages`) as a row of its L4 plan and records them by sha; it refuses before the suite when the version has not moved past the remote main's or the CHANGELOG heading is undated.
 - The quota check treats a provider window with no use and no reset time yet as valid, not as an unstarted-window failure.
 - Spawn reconciliation moved from `workers.mjs` into `spawn-reconcile.mjs`.
+- Roles are one contract (`modules/kernel/roles.yaml`): eight principles, the runtime floor, the reporting chain Op → Kernel → Supervisor → owner, and per role its scope, job, cleanup duty and what it never does. Seat and op prompts carry role blocks generated from it (`roles-contract` check, R232).
+- The Supervisor no longer changes the runtime: it runs no fix workers (`supervisor.workers` accepts 0, the shipped default), and the guard refuses its lands and writes in the runtime checkout (`RUNTIME_CHANGE_OWNED_BY_DEBUG`). It rules on gates, resolves conflicts between workflows, divides shared resources and records runtime defects.
+- Debug is a time-boxed auditor of role conformance, a loop of the owner's chat: a role's wrong is recorded as role, broken duty and evidence and remedied by a change in the runtime with a spec; a blocked Op that reported with its cause is a correct error, not a departure. The Supervisor fix-lane instructions still present in its prompt text are refused by the guard and are retired in the next release.
+- An Op reports only to its Kernel: `starci supervisor tell` and `channel` refuse an Op (`OP_REPORTS_TO_KERNEL`).
+- `work.author` stands behind `business.decide`, `architecture.decide` and `interface.draw` in new and stored plans.
+- `ask-tunnel` is a required host row only when the Telegram connector is enabled.
 
 ### Added
 - `starci release cut --plan`: reports what the cut would run and require on this commit, and runs, tags and pushes nothing.
 - The `sonar-rules` self-check: Sonar's rules enforced locally (also at commit time on the staged files), with an empty baseline; own code is held to its own rules.
 - Checks: `removed-vocabulary` (removed spellings are refused in every instruction), `prose-commands` (every `starci` command an instruction shows exists in the CLI catalog, R230) and `documented-defaults` (a documented default cites its key and equals the value the code reads, R231); the validators read one key tree.
+- The edge-case registry (`modules/reconciler/edge-cases.yaml`): every edge case met, with its occurrence, the rule and spec that cover it, or `open` with the reason.
+- Restart recovery: a host restart releases the provider receipts its launches left (`dispatch-ended`, `host-restarted` proofs), fails a `spawning` job the restart ended, re-arms parked work-queue keys at engine start, and settles the custody a dead tunnel owed.
+- Hold kinds `failed-no-step`, `owner-wait-no-ask`, `reported-unsettled` and `orphaned-frontier`: a job that ended with nothing after it gets its route step from the Job controller, or a Decision Item for the Kernel.
+- An expired provider login is named in the refusal, a `login:<provider>` host row and the hold policy (`provider-login-expired`).
 
 ### Fixed
 - Five red specs and 17 findings left by the alpha.6 cleanup.
 - SonarCloud findings of the code-smell baseline are fixed in code (default sort comparators, optional chains, array callbacks, awaited loops through the in-order helpers).
+- After a host restart no seat could launch: an unconfirmable release of a Dispatch from the previous Orca runtime kept a proven-gone Kernel terminal `unclosed`; ten Codex receipts in `unknown` state filled the pool for good; a Claude window with no use yet was judged invalid.
+- `starci reconciler up --services` reported a failed connector start without its reason.
+- A whitespace normaliser in the gate re-raise check collapsed the letter `s` instead of whitespace.
+- The published canon packages lacked `config.example.yaml`, which their bundled engine reads.
+- The `starci` skill's goal reference taught the removed routing-bias field.
+
+### Known limitations
+- SonarCloud has not scanned this commit; the local `sonar-rules` gate reproduces 16 of the 17 findings of the previous scan and misses optional chains that need type information.
+- The operating standard, the debug questions and the digest's per-role conformance verdicts are designed, not built; 17 edge-case registry entries are `open`.
+- Both real workflows stop at `brand.decide`: the draw render path in a fresh worktree and the brand-token contract are open; per-op token cost (6 to 17 million tokens for a decision leg) is unmeasured against the declared budget.
+- An Op can still address any terminal through the shared Orca `orchestration send` allowance.
+- The Codex loop syntax in the debug reference is unverified.
+- The machine store keeps the unused `models.share_pct` column so an existing store still opens.
 
 ## [1.0.0-alpha.6] — 2026-10-08
 

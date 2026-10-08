@@ -653,7 +653,7 @@ exit: 0 every assertion passed; 1 an assertion failed; 2 bad usage or the sandbo
 json: none
 
 ```sh
-starci gate install-sandbox --tarball starci-1.0.0-alpha.6.tgz
+starci gate install-sandbox --tarball starci-1.0.0-alpha.7.tgz
 ```
 
 ### starci gate read
@@ -2902,7 +2902,7 @@ json: flag
 ```sh
 starci release cut
 starci release cut --plan --tag v1.0.0-alpha.7
-starci release cut --repo <path> --tag v1.0.0-alpha.6 --json
+starci release cut --repo <path> --tag v1.0.0-alpha.7 --json
 ```
 
 ### starci release images
