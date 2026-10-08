@@ -4,18 +4,17 @@
 // custody was never captured has no identity `tunnel stop` could stop.
 import { withMachine } from '../../engine/db/machine.mjs';
 import { processList } from '../api/process/process-list.mjs';
+import { bornAt } from '../lib/process-identity.mjs';
 import { connectorChildUnresolved, connectorState } from './lib.mjs';
 
-const BIRTH_EPOCH = 116444736000000000n;
-const birthMs = (identity) => { try { return Number((BigInt(identity.birth) - BIRTH_EPOCH) / 10000n); } catch { return null; } };
 const BIRTH_SLACK_MS = 2000;
 
 /** The recorded process objects of a row (manager and child) with the birth each carries. Pure. */
-export const recordedObjects = (record) => [record?.processIdentity ?? record?.processCapture?.identity, record?.childIdentity].filter(Boolean);
+const recordedObjects = (record) => [record?.processIdentity ?? record?.processCapture?.identity, record?.childIdentity].filter(Boolean);
 
 /** Whether no process of `table` is the recorded object (same pid born at the recorded instant). A birth that cannot be read proves nothing. Pure. */
 export function objectGone(identity, table) {
-  const born = birthMs(identity);
+  const born = bornAt(identity);
   if (born === null || !Array.isArray(table)) return false;
   return !table.some((row) => row.pid === identity.pid && Number.isFinite(row.created) && Math.abs(row.created - born) <= BIRTH_SLACK_MS);
 }
