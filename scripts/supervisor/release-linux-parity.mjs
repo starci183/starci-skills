@@ -49,12 +49,16 @@ export function readWorkflows(repo) {
 const expand = (text, ctx) => String(text ?? '').replace(/\$\{\{\s*(matrix|env)\.([\w-]+)\s*\}\}/g, (all, scope, key) => (ctx[scope]?.[key] !== undefined ? String(ctx[scope][key]) : all));
 const literalEnv = (env, ctx) => Object.fromEntries(Object.entries(env ?? {}).map(([k, v]) => [k, expand(v, ctx)]).filter(([, v]) => !v.includes('${{')));
 
+/** True when every line of `run` only writes a step output (`echo ... >> "$GITHUB_OUTPUT"`): plumbing with no work of its own. A step that does work and then names an output runs, with GITHUB_OUTPUT a scratch file. Pure. */
+const OUTPUT_LINE = /^echo\b.*>>\s*"?\$GITHUB_OUTPUT"?$/;
+const onlyOutputLines = (run) => run.split(/\r?\n/).filter((line) => line.trim()).every((line) => OUTPUT_LINE.test(line.trim()));
+
 /** Why a step is not run in the parity container, or null when it is. Pure. */
 function leaveOut({ step, dir, matrixJob }) {
   const run = String(step.run).trim();
   const gate = String(step.if ?? '');
   if (/workflow_dispatch|refs\/tags|always\(\)/.test(gate)) return 'manual or tag-upload step';
-  if (/GITHUB_OUTPUT/.test(run)) return 'workflow plumbing';
+  if (onlyOutputLines(run)) return 'workflow plumbing';
   if (/\bdocker\b/.test(run)) return 'docker build';
   if (BROWSER.test(run)) return 'browser run';
   if (SPEC_SUITE.test(run) && (dir === '.' || matrixJob)) return 'spec suite (the host ran it in this L4 row)';
@@ -124,6 +128,8 @@ export function parityScript(plan) {
     '#!/usr/bin/env bash',
     'set -eu',
     'export CI=1 NEXT_TELEMETRY_DISABLED=1 npm_config_update_notifier=false npm_config_fund=false npm_config_audit=false',
+    // The runner's scratch directory and step-output file, which workflow steps name.
+    'export RUNNER_TEMP=/tmp/runner-temp GITHUB_OUTPUT=/tmp/runner-temp/github-output && mkdir -p "$RUNNER_TEMP" && : > "$GITHUB_OUTPUT"',
     `mkdir -p ${WORK_DIR} && tar -xf /in/src.tar -C ${WORK_DIR}`,
     `cd ${WORK_DIR} && git init -q && git add -A && git -c user.name=starci -c user.email=l4@starci.invalid commit -q -m l4-snapshot`,
     `run_step() { name="$1"; dir="$2"; cmd="$(cat)"; echo "##STEP $name"; ( cd "${WORK_DIR}/$dir" && bash -ec "$cmd" ) || { echo "##FAILED $name"; exit 1; }; }`,

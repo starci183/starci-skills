@@ -66,6 +66,7 @@ Theme: the roles are one declared contract, the system recovers from a host rest
 - `starci release cut` and `release notes` default to the runtime they run from, not the git top of the working directory (a cut started in the backend repository judged that repository's tree); the cut's host check refuses in seconds when the root `node_modules` is not the lockfile's install, naming `npm ci`.
 - The `@starci/test-world` graphql-ws spec ended its fake server socket twice, which Linux reported as an uncaught `write after end`; the spec ends it once. The published package content is unchanged (specs are not in the tarball).
 - The Linux parity step ran the `github-release` job of `ci.yml` (it runs only on a pushed tag) and failed at it; a job gated on a release tag is left out like a manual one.
+- The Linux parity step treated any step that names `$GITHUB_OUTPUT` as plumbing, so `install-sandbox.yml` ran its "Verify the inventory" without the pack step that writes what it reads; only a step made of `echo … >> $GITHUB_OUTPUT` lines is plumbing now, and the container provides `RUNNER_TEMP` and `GITHUB_OUTPUT`.
 
 ### Known limitations
 - SonarCloud has not scanned this commit; the local `sonar-rules` gate reproduces 16 of the 17 findings of the previous scan and misses optional chains that need type information.

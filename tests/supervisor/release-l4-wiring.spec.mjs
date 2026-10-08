@@ -436,3 +436,16 @@ test('L4: a test-world package in the checkout is built after the installs and b
   fs.utimesSync(built, new Date(), new Date());
   assert.equal(testWorldDistProblem(producer), null);
 });
+
+test('a step that does work and then names an output runs, and the runner scratch variables exist in the container; a step that only echoes an output is plumbing', () => {
+  const doc = { jobs: { pack: { steps: [
+    { name: 'Pack', run: 'mkdir -p "$RUNNER_TEMP/pack"\nnpm pack --json > "$RUNNER_TEMP/npm-pack.json"\necho "tarball=x" >> "$GITHUB_OUTPUT"' },
+    { name: 'Verify', run: 'node check "$RUNNER_TEMP/npm-pack.json"' },
+    { name: 'Output', run: 'echo "apps=1" >> "$GITHUB_OUTPUT"' },
+  ] } } };
+  const plan = parityPlan({ workflows: [{ file: 'p.yml', doc }], apps: [] });
+  assert.deepEqual(plan.steps.map((s) => s.name.replace(/^.*?: /, '')), ['Pack', 'Verify']);
+  assert.match(plan.skipped[0].reason, /plumbing/);
+  const script = parityScript(plan);
+  assert.match(script, /export RUNNER_TEMP=\/tmp\/runner-temp GITHUB_OUTPUT=/);
+});
