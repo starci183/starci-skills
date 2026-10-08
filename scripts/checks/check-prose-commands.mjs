@@ -5,7 +5,7 @@
 // A command an instruction shows exists as written. The truth is the CLI catalog (modules/cli/commands): every
 // `starci <group> <verb> [--flag ...]` in a backticked span, a fenced code line or a yaml example item of skills/, docs/,
 // README.md, CONTEXT.md, CONTRIBUTING.md and modules/ must name a catalogued group and verb of a known group, and every
-// --flag it shows must be a flag of that verb or a global flag. The text after a lone `--` is the flags of another program
+// --flag it shows (in code formatting or in plain prose, a prose command ending at the first , ; : ( ) + or sentence end) must be a flag of that verb or a global flag. The text after a lone `--` is the flags of another program
 // (the check script a runtime check runs) and is not read; a chain of commands is read one command at a time. The removed-
 // vocabulary list file, the failure-code catalogue (quoted refusals) and a [removed-list] marked line are exempt.
 import { skillRoot } from '../../engine/runtime-root.mjs';
@@ -21,7 +21,8 @@ const SURFACE = /^(?:(?:skills|docs)\/.+\.md|(?:README|CONTEXT|CONTRIBUTING)\.md
 const EXEMPT = /^(?:modules\/kernel\/(?:removed-vocabulary|failure-codes)\.yaml|packages\/.*)$/;
 const SPAN = /`([^`\n]+)`/g;
 const COMMAND = /(?<![\w/.-])starci ([a-z][a-z-]*) ([a-z][a-z-]*)([^→]*?)(?=\s*(?:→|\bstarci [a-z]|$))/g;
-const FLAG = /(?<![\w-])--([a-z][a-z0-9-]*)/g;
+const PROSE_CLAUSE = /(?<![\w/.-])starci [a-z][a-z-]* [a-z][a-z-]*[^(),;:+→\n]*/g;
+const FLAG = /(?<![\w-])--([a-z][a-z0-9-]*[a-z0-9])(?![\w*-])/g;
 
 /** The group -> verb -> flag-name set of a loaded catalog, global flags included. */
 function commandTable(catalog = loadCatalog()) {
@@ -33,10 +34,12 @@ function commandTable(catalog = loadCatalog()) {
   return table;
 }
 
-/** The command-bearing parts of a line: backticked spans, and the whole line of a fenced block or a yaml example item. */
+/** The command-bearing parts of a line: backticked spans, each unbackticked `starci <group> <verb>` clause of prose, and the whole line of a fenced block or a yaml example item. */
 function partsOf(line, fenced) {
   if (fenced || /^\s*-\s+starci /.test(line)) return [line];
-  return [...line.matchAll(SPAN)].map((match) => match[1]);
+  const spans = [...line.matchAll(SPAN)].map((match) => match[1]);
+  const prose = [...line.replace(SPAN, ' ').matchAll(PROSE_CLAUSE)].map((match) => match[0].replace(/\.\s.*$/, ''));
+  return [...spans, ...prose];
 }
 
 function commandFindings(part, table) {

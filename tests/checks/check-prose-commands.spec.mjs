@@ -15,7 +15,13 @@ test('RT_PROSE_COMMAND_UNKNOWN names file:line for an unknown verb and an unknow
   assert.match(findings[0].message, /docs\/a\.md:1 starci kernel settle has no flag --bogus/);
 });
 
-test('RT_PROSE_COMMAND_UNKNOWN reads a chain one command at a time and ignores another program after a lone --, prose and marked lines', () => {
-  const doc = '```\nstarci kernel report --job a → starci kernel settle --job a --verdict pass\nstarci runtime check --only cli-parity -- --root x\n```\nprose: starci kernel dispatch --nonsense\n`starci debug pass` [removed-list]\n';
+test('RT_PROSE_COMMAND_UNKNOWN reads a chain one command at a time and ignores another program after a lone -- and marked lines', () => {
+  const doc = '```\nstarci kernel report --job a → starci kernel settle --job a --verdict pass\nstarci runtime check --only cli-parity -- --root x\n```\n`starci debug pass` [removed-list]\n';
   assert.deepEqual(proseCommandFindings({ 'docs/a.md': doc }), []);
+});
+
+test('RT_PROSE_COMMAND_UNKNOWN reads a command in plain prose up to its clause end and skips a wildcard flag family', () => {
+  const doc = 'Then starci kernel dispatch --nonsense, and starci kernel nope later; release with starci kernel incident --until-* conditions.\n';
+  assert.deepEqual(proseCommandFindings({ 'docs/a.md': doc }).map((finding) => finding.message), [
+    'docs/a.md:1 starci kernel dispatch has no flag --nonsense', 'docs/a.md:1 starci kernel nope is not a catalogued verb of kernel']);
 });
