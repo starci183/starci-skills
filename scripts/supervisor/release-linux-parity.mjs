@@ -131,8 +131,8 @@ export function parityScript(plan) {
     '#!/usr/bin/env bash',
     'set -eu',
     'export CI=1 NEXT_TELEMETRY_DISABLED=1 npm_config_update_notifier=false npm_config_fund=false npm_config_audit=false',
-    // The runner's scratch directory and step-output file, which workflow steps name.
-    'export RUNNER_TEMP=/tmp/runner-temp GITHUB_OUTPUT=/tmp/runner-temp/github-output && mkdir -p "$RUNNER_TEMP" && : > "$GITHUB_OUTPUT"',
+    // The runner's scratch directory, step-output file and step-summary file, which workflow steps name.
+    'export RUNNER_TEMP=/tmp/runner-temp GITHUB_OUTPUT=/tmp/runner-temp/github-output GITHUB_STEP_SUMMARY=/tmp/runner-temp/step-summary && mkdir -p "$RUNNER_TEMP" && : > "$GITHUB_OUTPUT" && : > "$GITHUB_STEP_SUMMARY"',
     `mkdir -p ${WORK_DIR} && tar -xf /in/src.tar -C ${WORK_DIR}`,
     `cd ${WORK_DIR} && git init -q && git add -A && git -c user.name=starci -c user.email=l4@starci.invalid commit -q -m l4-snapshot && export GITHUB_SHA=$(git rev-parse HEAD)`,
     `run_step() { name="$1"; dir="$2"; cmd="$(cat)"; echo "##STEP $name"; ( cd "${WORK_DIR}/$dir" && bash -ec "$cmd" ) || { echo "##FAILED $name"; exit 1; }; }`,

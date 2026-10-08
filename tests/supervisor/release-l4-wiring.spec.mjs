@@ -450,5 +450,5 @@ test('a step that does work and then names an output runs, and the runner scratc
   assert.match(plan.skipped[0].reason, /plumbing/);
   assert.match(plan.skipped[1].reason, /toolchain/, 'a step that needs the runner image Go is left out, not failed for a missing binary');
   const script = parityScript(plan);
-  assert.match(script, /export RUNNER_TEMP=\/tmp\/runner-temp GITHUB_OUTPUT=/);
+  assert.match(script, /export RUNNER_TEMP=\/tmp\/runner-temp GITHUB_OUTPUT=\S+ GITHUB_STEP_SUMMARY=/);
 });

@@ -67,7 +67,7 @@ Theme: the roles are one declared contract, the system recovers from a host rest
 - The `@starci/test-world` graphql-ws spec ended its fake server socket twice, which Linux reported as an uncaught `write after end`; the spec ends it once. The published package content is unchanged (specs are not in the tarball).
 - The Linux parity step ran the `github-release` job of `ci.yml` (it runs only on a pushed tag) and failed at it; a job gated on a release tag is left out like a manual one.
 - The Linux parity step treated any step that names `$GITHUB_OUTPUT` as plumbing, so `install-sandbox.yml` ran its "Verify the inventory" without the pack step that writes what it reads; only a step made of `echo … >> $GITHUB_OUTPUT` lines is plumbing now, and the container provides `RUNNER_TEMP` and `GITHUB_OUTPUT`.
-- The Linux parity step also left out a step that needs the runner image's Go (`go install` of the pinned age-keygen, which only the left-out install sandbox uses) and now provides `GITHUB_SHA` to the artifact staging step.
+- The Linux parity step also left out a step that needs the runner image's Go (`go install` of the pinned age-keygen, which only the left-out install sandbox uses) and now provides `GITHUB_SHA` and `GITHUB_STEP_SUMMARY` to the artifact staging step.
 
 ### Known limitations
 - SonarCloud has not scanned this commit; the local `sonar-rules` gate reproduces 16 of the 17 findings of the previous scan and misses optional chains that need type information.
