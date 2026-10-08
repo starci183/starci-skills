@@ -11,7 +11,7 @@ import { underHostLock as underHostLockCall } from '../machine/verb-lock.mjs';
 import { runLandGate as runLandGateCall } from './git-land-gate.mjs';
 import { runLandFullCheck, verifyLandSpecs } from './git-land-verify.mjs';
 import { announceLand as announceLandCall } from './land-announce.mjs';
-import { KERNEL_NOTE_TRAILER, kernelNoteRefusal } from './land-kernel-note.mjs';
+import { KERNEL_NOTE_TRAILER, kernelNoteRefusal } from '../machine/land-kernel-note.mjs';
 
 const SCHEMA = 'starci/git-land@1';
 const STEP = Object.freeze({ links: '1-linked-node-modules', gate: '2-land-gate', check: '3-runtime-check', specs: '4-specs', lock: '5-serial-lock', merge: '6-local-main' });

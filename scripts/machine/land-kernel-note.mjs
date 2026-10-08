@@ -3,7 +3,7 @@
 // reads it back from there when it wakes a Kernel (scripts/kernel/runtime-rev.mjs landKernelNotes).
 export const KERNEL_NOTE_TRAILER = 'Kernel-Note';
 /** The longest note a land carries: a line a wake can hold. */
-export const KERNEL_NOTE_MAX = 400;
+const KERNEL_NOTE_MAX = 400;
 
 /** Why `--kernel-note` value `raw` is refused, or null when it is absent or one non-empty line. Pure. */
 export function kernelNoteRefusal(raw) {

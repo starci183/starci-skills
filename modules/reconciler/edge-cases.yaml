@@ -577,7 +577,7 @@ cases:
     family: change-under-running
     finding: {role: runtime, duty: does, verdict: departs, evidence: "a land moved the runtime revision but a running Kernel noticed it only at its next wake or the controller's next resync (up to two minutes later, longer for a seat that was not woken)", remedy: {state: in-tree, change: "git land writes a land-passed event once main moved (land-announce.mjs); the Workflow controller routes it to the key rev-wake, which drops the status cache and looks at every running workflow at once; the stale revision rings the seat's doorbell through the existing wake path, once per workflow and revision (planRev, recentlyOpened)"}}
     met: {date: "2026-10-09", where: "wave 3 brief: a land or deploy wakes the affected seats at once", evidence: "briefs/WAVE3.md lane f7 item 3a"}
-    rule: {file: scripts/reconciler/controllers/workflow.mjs, anchor: "REV_WAKE_KEY"}
+    rule: {file: scripts/reconciler/controllers/workflow.mjs, anchor: "reconcileAfterLand"}
     spec: tests/reconciler/reconciler-workflow.spec.mjs
     status: covered
   - id: land-note-for-kernels-undelivered
