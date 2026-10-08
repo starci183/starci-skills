@@ -3,7 +3,7 @@
 // The bound is modules/models/runtimes.yaml allocation.opVerbs; a verb the contract names that the catalog lacks is a contract defect
 // (tests/kernel/op-prompt-verbs.spec.mjs), never printed.
 import fs from 'node:fs';
-import { CATALOG } from '../../packages/cli/src/catalog.generated.mjs';
+import { cliGroups, cliVerb } from '../machine/cli-verbs.mjs';
 import { allocationSettings } from '../../engine/config.mjs';
 
 const CALL = /\bstarci ([a-z][a-z0-9-]*) ([a-z][a-z0-9-]*)/g;
@@ -21,7 +21,8 @@ export function opVerbsBound() {
 /** Every `group verb` call the text names in the order it first appears, with the flags written within 300 characters after each call. */
 export function namedCalls(text) {
   const calls = new Map();
-  const hits = [...String(text).matchAll(CALL)].filter((hit) => CATALOG.groups[hit[1]]);
+  const groups = new Set(cliGroups());
+  const hits = [...String(text).matchAll(CALL)].filter((hit) => groups.has(hit[1]));
   for (const [index, hit] of hits.entries()) {
     const key = `${hit[1]} ${hit[2]}`;
     const end = Math.min(hit.index + 300, hits[index + 1]?.index ?? Infinity);
@@ -35,10 +36,7 @@ export function namedCalls(text) {
 export const missingVerbs = (text) => [...namedCalls(text).keys()].filter((key) => !catalogVerb(key));
 
 /** The catalog verb row of `group verb`, or null. */
-const catalogVerb = (key) => {
-  const [group, verb] = key.split(' ');
-  return CATALOG.groups[group]?.verbs?.[verb] ?? null;
-};
+const catalogVerb = (key) => cliVerb(...key.split(' '));
 
 const flagText = (flag) => {
   if (flag.type === 'boolean') return `--${flag.name}`;
