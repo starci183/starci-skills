@@ -263,3 +263,15 @@ cases:
     met: {date: "2026-10-08", where: "owner ruling: the Supervisor may not update .claude", evidence: "modules/kernel/roles.yaml rulings.runtime-changes"}
     status: open
     why: "the instruction text of supervisor-prompt.md, supervise.yaml and docs/supervisor.md still describes fix workers and lands; the rewrite is designed in ROLES-STANDARD-alpha8.md"
+  - id: kernel-start-repeats-one-failure
+    family: failure-while-running
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "the StarCi workflow's Kernel seat was started 303 times and every launch failed at the same step, workflow-worktree-install (starci npm ci, npm error code EPERM unlink); the retry repeats the identical launch and reports nothing up, so the Kernel stays down", remedy: {state: open}}
+    met: {date: "2026-10-08", where: "StarCi wf-starci-auth-test-workflow-muxq4oyr, kernel-start-failed events", evidence: "starci debug digest step kernel-booted over the ledger copy ledger-copy-a8c (departure kernel-start-loop)"}
+    status: open
+    why: "the Kernel start retries the same failing step without a bound or a cause routed to the Supervisor; the digest now names the loop (startLoopMin), the runtime rule that stops the loop and reports the cause is owed"
+  - id: read-verb-writes-the-ledger-as-the-caller
+    family: record-vs-reality
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "starci kernel status, a read verb, opens write transactions on the ledger (lease renewal, runtime drift records) as whoever calls it, so a person or Debug reading status leaves ledger writes under their own identity", remedy: {state: open}}
+    met: {date: "2026-10-08", where: "the first run of the debug digest over a ledger copy appended four ledger-written-outside-seat events, one per status call", evidence: "tests/kernel/intervention.spec.mjs; the digest runs its reads as STARCI_ACTOR debug-digest so they are not counted"}
+    status: open
+    why: "a verb that reads should not write; splitting the lease renewal and the drift record out of status is a change to the status verb that no lane has taken"

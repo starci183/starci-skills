@@ -29,7 +29,9 @@ function classify(p, standard, defs) {
   const def = defs.departures[p.code];
   if (!def) return { bug: { role: 'runtime', duty: 'does', registry: null } };
   const role = def.role === 'handler' ? handlerRole(p) : def.role;
-  return role ? { bug: { role, duty: def.duty, registry: def.registry } } : { happy: 'owner-wait', role: 'kernel' };
+  // A hold or Decision Item the runtime handles is a duty it does; one the Kernel or the Supervisor handles is a duty it must not leave.
+  const duty = def.role === 'handler' && role === 'runtime' ? 'does' : def.duty;
+  return role ? { bug: { role, duty, registry: def.registry } } : { happy: 'owner-wait', role: 'kernel' };
 }
 
 const remedyOf = (registryId, registry) => {
