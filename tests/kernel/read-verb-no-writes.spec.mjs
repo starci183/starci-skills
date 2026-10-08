@@ -18,7 +18,18 @@ const VERBS_DIR = path.join(ROOT, 'scripts', 'kernel', 'verbs');
 const MARKERS = ['STARCI_ACTOR', 'STARCI_API_CHILD', 'STARCI_CALLER'];
 
 // The arguments each read verb is run with; a verb that declares `reads: true` and has no row here fails the spec until it has one.
-const READ_VERB_ARGS = (world) => ({ status: ['--workflow', world.wf] });
+const READ_VERB_ARGS = (world) => ({
+  status: ['--workflow', world.wf],
+  survey: ['--workflow', world.wf], usage: ['--workflow', world.wf, '--legs'], observe: ['--job', 'job-d1'], logs: ['--workflow', world.wf],
+  questions: ['--workflow', world.wf], messages: ['--workflow', world.wf], hierarchy: ['--workflow', world.wf], artifacts: ['--workflow', world.wf],
+  coverage: ['--workflow', world.wf], peers: ['--workflow', world.wf], foundations: [], extensions: [], decisions: ['--workflow', world.wf, '--list'],
+  inbox: ['--workflow', world.wf],
+});
+// The read-looking verbs that write when a flag asks for it: with the flag the ledger opens writable, without it the verb reads.
+// A verb the world cannot satisfy refuses with its own code; the refusal still leaves the ledger untouched.
+const REFUSES = { coverage: 'handover-proof-unjudged' };
+const WRITING_FLAGS = { inbox: ['ack'], decisions: ['open', 'claim', 'resolve', 'escalate'] };
+const READ_LOOKING = ['status', 'survey', 'usage', 'observe', 'logs', 'questions', 'messages', 'hierarchy', 'artifacts', 'coverage', 'peers', 'foundations', 'extensions', 'decisions', 'inbox'];
 
 const readVerbs = async () => {
   const found = [];
@@ -64,14 +75,17 @@ function readAs(world, actor, file = 'scripts/kernel/cli.mjs', args = null) {
 
 test('every kernel verb that declares reads: true is run here against a ledger that records its writes', async (t) => {
   const verbs = await readVerbs();
-  assert.ok(verbs.some((spec) => spec.verb === 'status'), 'status is a read verb');
+  assert.deepEqual(READ_LOOKING.filter((name) => !verbs.some((spec) => spec.verb === name)), [], 'each read-looking verb declares reads: true');
   const world = reactiveWorld(t);
   const rows = READ_VERB_ARGS(world);
   for (const spec of verbs) {
     assert.ok(rows[spec.verb], `${spec.verb} declares reads: true and needs a row in READ_VERB_ARGS`);
     const { run, out } = readAs(world, null, 'scripts/kernel/cli.mjs', [spec.verb, ...rows[spec.verb]]);
-    assert.equal(run.status, 0, `${spec.verb}: ${run.stderr}`);
-    assert.equal(out.ok, true);
+    if (REFUSES[spec.verb]) assert.match(run.stdout + run.stderr, new RegExp(REFUSES[spec.verb]), spec.verb);
+    else {
+      assert.equal(run.status, 0, `${spec.verb}: ${run.stderr}${run.stdout}`);
+      assert.equal(out.ok, true, spec.verb);
+    }
     assert.deepEqual(written(world), [], `${spec.verb} run by a person wrote the ledger`);
   }
 });
@@ -100,7 +114,7 @@ test('status read by Debug, a monitor or an op is read-only too', (t) => {
 test('the Debug digest\'s watchdog probe writes nothing either', (t) => {
   const world = reactiveWorld(t);
   const { run } = readAs(world, 'debug-digest', 'scripts/kernel/kernel-watchdog.mjs', ['--workflow', world.wf, '--once']);
-  assert.equal(run.status, 0, run.stderr);
+  assert.equal(run.status, 0, run.stderr + run.stdout);
   assert.deepEqual(written(world), []);
   assert.equal(openIncidents(world), 2);
 });
@@ -163,4 +177,27 @@ test('a verb that is not a read verb gets the writable ledger, and a read verb t
   opened.length = 0;
   openVerbLedger(reacting, 'f', { openWritable, openReadOnly, resolve: () => ({ role: 'kernel' }), env: {} });
   assert.deepEqual(opened, ['reader f', 'closed reader', 'writable f']);
+});
+
+test('a read-looking verb opens the ledger writable only when a flag that writes is given', () => {
+  const opened = [];
+  const openWritable = (file) => { opened.push('writable'); return { close() {} }; };
+  const reader = { readOnly: true, db: {}, path: 'p', close() {} };
+  const openReadOnly = () => { opened.push('reader'); return reader; };
+  for (const [verb, flags] of Object.entries(WRITING_FLAGS)) {
+    const spec = { verb, reads: true, writesWith: flags };
+    for (const flag of flags) {
+      opened.length = 0;
+      openVerbLedger(spec, 'f', { openWritable, openReadOnly, args: { [flag]: 'x' } });
+      assert.deepEqual(opened, ['writable'], `${verb} --${flag}`);
+    }
+    opened.length = 0;
+    assert.equal(openVerbLedger(spec, 'f', { openWritable, openReadOnly, args: {} }), reader);
+    assert.deepEqual(opened, ['reader'], `${verb} without its writing flags`);
+  }
+});
+
+test('the verbs whose writing flags the spec names are the ones whose source declares them', async () => {
+  const verbs = await readVerbs();
+  for (const [name, flags] of Object.entries(WRITING_FLAGS)) assert.deepEqual(verbs.find((spec) => spec.verb === name).writesWith, flags, name);
 });

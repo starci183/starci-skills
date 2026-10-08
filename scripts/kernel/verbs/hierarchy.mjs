@@ -3,6 +3,7 @@ import { AWAITING_OWNER } from '../../../engine/admission.mjs';
 
 export default {
   verb: 'hierarchy',
+  reads: true,
   required: ['workflow'],
   usageInCore: true,
   run({ ledger, args, emit, internals }) {

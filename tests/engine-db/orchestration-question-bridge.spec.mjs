@@ -87,7 +87,7 @@ const fixture=(_t,{dispatched=true}={})=>{
   sharedFixture??=createSharedFixture();
   sharedFixture.restore(dispatched?sharedFixture.afterDispatch:sharedFixture.beforeDispatch);
   // The status that surfaces a worker ask drains the Runs: a reaction of the reconciler, which owns it, never of a person reading.
-  const api=(args,more={})=>args[0]==='dispatch'?sharedFixture.dispatch:sharedFixture.rawApi(args,args[0]==='status'?{STARCI_ACTOR:'reconciler/job',...more}:more);
+  const api=(args,more={})=>args[0]==='dispatch'?sharedFixture.dispatch:sharedFixture.rawApi(args,['status','questions','messages'].includes(args[0])?{STARCI_ACTOR:'reconciler/job',...more}:more);
   return {...sharedFixture,api};
 };
 test.after(()=>sharedFixture?.cleanup());

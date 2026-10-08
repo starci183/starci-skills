@@ -7,6 +7,7 @@ import { listJobArtifacts } from '../job-artifacts.mjs';
 
 export default {
   verb: 'artifacts',
+  reads: true,
   required: ['workflow'],
   usageInCore: true,
   usage: '  artifacts --workflow <id> [--job <job_id>] [--kind <kind>]   every indexed proof file of the workflow\'s jobs (job_artifacts), per job',

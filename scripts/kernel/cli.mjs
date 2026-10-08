@@ -389,10 +389,10 @@ const parseArgs = (argv) => {
   return a;
 };
 const need = (cond, msg) => { if (!cond) { console.error(`api: ${msg}`); usage(2); } };
-const openRepoLedger = (repo, spec = {}) => {
+const openRepoLedger = (repo, spec = {}, args = {}) => {
   const file = ledgerFileFor(repo); // throws ledger-root-is-runtime on a runtime root — deliberate
   if (!fs.existsSync(file)) throw Object.assign(new Error(`ledger-missing: ${file} — no .starciwork/runtime.sqlite at that repo`), { code: 'ledger-missing' });
-  return openVerbLedger(spec, file, { openWritable: (target) => openLedger({ file: target }) });
+  return openVerbLedger(spec, file, { openWritable: (target) => openLedger({ file: target }), args });
 };
 
 const emit = (out, human, asJson) => {
@@ -3683,22 +3683,24 @@ const API_INTERNALS = Object.freeze({
   settleDrawAcceptance, settleDrawMetrics, settleOpGate, settleOpProofs, settleProofMedia, settleSonarGate, settleWorkHygiene, widenCanonWire,
 });
 let statusAsk = null;
+// A refusal's receipt is a ledger write whoever asked: a read verb refused to an Op writes it through a writable connection of its own.
+const receiptLedger = (ledger) => (ledger.readOnly ? openLedger({ file: ledger.path }) : ledger);
 const runExtensionVerb = async (spec, args, repo) => {
   for (const k of requiredOf(spec, args)) need(args[k], `${spec.verb} needs --${k}`);
   if (typeof spec.validate === 'function') spec.validate(args, need);
   if (spec.ledger === false) return await spec.run({ ledger: null, args, repo, emit, need, caller: null, ext: API_EXT, internals: API_INTERNALS });
   let ledger;
-  try { ledger = openRepoLedger(repo, spec); } catch (error) {
+  try { ledger = openRepoLedger(repo, spec, args); } catch (error) {
     console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error) }));
     process.exitCode = 1; return;
   }
   const caller = callerOf(ledger.db, process.env, { file: ledger.path });
   if (caller.role === OP_ROLE && spec.kernelOnly) {
-    refuseOpCaller(ledger, { cmd: spec.verb, caller, code: 'op-context-refused',
+    refuseOpCaller(receiptLedger(ledger), { cmd: spec.verb, caller, code: 'op-context-refused',
       detail: `'${spec.verb}' is a kernel verb and this caller is operation ${caller.jobId ?? '(unbound)'} (${caller.via}); an op files its own starci kernel report and nothing else` });
   }
   if (caller.role === OP_ROLE && spec.jobOwnerOnly && caller.jobId !== args.job) {
-    refuseOpCaller(ledger, { cmd: spec.verb, caller, code: 'report-identity-mismatch',
+    refuseOpCaller(receiptLedger(ledger), { cmd: spec.verb, caller, code: 'report-identity-mismatch',
       detail: `operation ${caller.jobId ?? '(unbound)'} (${caller.via}) may file a report only for its own job, not ${args.job}` });
   }
   try {

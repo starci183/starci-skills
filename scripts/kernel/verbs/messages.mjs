@@ -23,7 +23,7 @@ export default workflowVerb('messages', ({ ledger, args, emit, internals }) => {
       jobId: m.jobId ?? null, opId: m.opId ?? null, attempt: m.attempt ?? null, jobStatus: m.jobId ? jobs.get(m.jobId) ?? null : null,
       new: !read.has(m.messageId), handle: MESSAGE_ROUTES[m.type] ?? 'information: read it; act only through api verbs' }));
     const fresh = messages.filter((m) => m.new).map((m) => m.id);
-    if (fresh.length) ledger.transaction(() => ledger.appendEvent({ workflowId, entityType: 'workflow', entityId: workflowId, kind: 'orchestration-messages-read', payload: { ids: fresh } }));
+    if (fresh.length && !ledger.readOnly) ledger.transaction(() => ledger.appendEvent({ workflowId, entityType: 'workflow', entityId: workflowId, kind: 'orchestration-messages-read', payload: { ids: fresh } }));
     const out = { ok: drained.ok, workflowId, runs: drained.runs, count: messages.length, new: fresh.length, heartbeats: drained.heartbeats, messages, ...(drained.error ? { error: drained.error } : {}) };
     const drainError = drained.error ? ` — orchestration check failed: ${drained.error}` : '';
     emit(out, [
@@ -34,4 +34,4 @@ export default workflowVerb('messages', ({ ledger, args, emit, internals }) => {
         return `  ${m.new ? '*' : ' '} ${m.id} [${m.type}] ${m.jobId ?? m.from ?? '-'}${op}: ${m.subject ?? ''} ${body}\n      -> ${m.handle}`;
       }),
     ].join('\n'), args.json);
-});
+}, { reads: true, reacts: true });

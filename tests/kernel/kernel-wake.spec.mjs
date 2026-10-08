@@ -7,7 +7,7 @@ import { spawnSync } from 'node:child_process';
 import { withLedger, seedWorkflow } from '../helpers/ledger-fixture.mjs';
 import { TEST_REGISTRY_ENV } from '../../engine/db/machine.mjs';
 import { buildWakePrompt } from '../../scripts/kernel/kernel-watchdog.mjs';
-import { exceededWakes, wakeBudget, wakeUsageOf } from '../../scripts/kernel/wake-budget.mjs';
+import { exceededWakes, kernelWakesOf, supervisorWakeBudget, wakeBudget, wakeTag, wakeUsageOf } from '../../scripts/kernel/wake-budget.mjs';
 import { liveFor } from '../../scripts/machine/decision-resolution.mjs';
 import { analyze } from '../../scripts/reconciler/debug-digest-analyze.mjs';
 import { digestNumbers } from '../../scripts/reconciler/debug-digest-numbers.mjs';
@@ -35,16 +35,18 @@ test('the Kernel role declares a per-wake budget taken from the measured usage r
   assert.deepEqual(over.map((wake) => wake.at), [2, 3]);
 });
 
-test('a wake owns the usage rows recorded after it and up to the next wake', (t) => withLedger(t, ({ ledger }) => {
+test('a wake owns the usage rows that carry its tag in their turn_ref', (t) => withLedger(t, ({ ledger }) => {
   seedWorkflow(ledger, { id: WF, state: { phase: 'running', job: 'wake' }, goalIdentity: 'wake-goal', goal: { revision: 0, identity: 'wake-goal', markdown: '# goal', json: {} },
     events: [{ kind: 'kernel-woken', entityType: 'kernel', at: NOW, payload: { terminal: 't' } }, { kind: 'kernel-woken', entityType: 'kernel', at: NOW + 30 * MIN, payload: { terminal: 't' } }] });
-  const usage = (at, turns, cacheRead) => ledger.db.prepare(`INSERT INTO llm_usage(workflow_id,subject_type,turn_ref,provider,input_tokens,output_tokens,cache_read_tokens,turns,source,at)
-    VALUES(?,'kernel-turn',?,'claude',10,5,?,?,'cli-transcript',?)`).run(WF, `kernel:${WF}:s@${at}`, cacheRead, turns, at);
-  usage(NOW + 5 * MIN, 12, 3_000_000);
-  usage(NOW + 10 * MIN, 12, 4_000_000);
-  usage(NOW + 40 * MIN, 3, 100_000);
+  const [first, second] = kernelWakesOf(ledger.db, WF);
+  const usage = (tag, at, turns, cacheRead) => ledger.db.prepare(`INSERT INTO llm_usage(workflow_id,subject_type,turn_ref,provider,input_tokens,output_tokens,cache_read_tokens,turns,source,at)
+    VALUES(?,'kernel-turn',?,'claude',10,5,?,?,'cli-transcript',?)`).run(WF, `kernel:${WF}:s@${at}#${tag}`, cacheRead, turns, at);
+  usage(wakeTag(first.seq), NOW + 5 * MIN, 12, 3_000_000);
+  usage(wakeTag(first.seq), NOW + 10 * MIN, 12, 4_000_000);
+  usage(wakeTag(second.seq), NOW + 12 * MIN, 3, 100_000);
+  usage(wakeTag(0), NOW - MIN, 9, 9_000_000);
   const wakes = wakeUsageOf(ledger.db, WF);
-  assert.deepEqual(wakes, [{ at: NOW, turns: 24, tokens: 7_000_030 }, { at: NOW + 30 * MIN, turns: 3, tokens: 100_015 }]);
+  assert.deepEqual(wakes, [{ seq: first.seq, at: NOW, turns: 24, tokens: 7_000_030 }, { seq: second.seq, at: NOW + 30 * MIN, turns: 3, tokens: 100_015 }], 'a row names its wake whatever the time it was recorded; what came before the first wake belongs to none');
   assert.deepEqual(exceededWakes(wakes, wakeBudget()).map((wake) => wake.at), [NOW]);
 }));
 
@@ -59,6 +61,19 @@ test('the digest reports a Kernel wake over its budget as a departure of the Ker
   const problem = digest.problems.find((p) => p.code === 'kernel-wake-budget');
   assert.deepEqual([problem.params.turns, problem.params.tokens, problem.params.budgetTurns, problem.params.budgetTokens], [61, 9_000_000, 20, 6_000_000]);
   assert.match(renderText(digest, { language: 'en' }), /spent 61 turns and 9000000 tokens in one wake, over its budget of 20 turns and 6000000 tokens/);
+});
+
+test('the digest reports a Supervisor wake over its token budget as a departure of the Supervisor', () => {
+  const policy = { ...incidentPolicy(), resolve: boundValue };
+  const wakes = [{ seq: 1, at: NOW - 40 * MIN, turns: 21, tokens: 12_000_000 }, { seq: 2, at: NOW - 20 * MIN, turns: 4, tokens: 900_000 }];
+  const digest = analyze({ now: NOW, liveRev: 'a', engine: { leader: { pid: 1, epoch: 1, heartbeatAt: NOW, rev: 'a' }, modes: {}, configured: {}, safe: [], failingQueue: [] },
+    supervisor: { seat: null, enabled: false, lastWakeAt: NOW - 20 * MIN, wakes, decisions: [], health: { live: true } }, reservations: [], seats: [], supJobs: [], workflows: [] }, policy, digestNumbers());
+  const problem = digest.problems.find((p) => p.code === 'supervisor-wake-budget');
+  assert.deepEqual([problem.params.tokens, problem.params.turns, problem.params.wakes, problem.params.budgetTokens], [12_000_000, 21, 1, supervisorWakeBudget().tokens]);
+  assert.match(renderText(digest, { language: 'en' }), /The Supervisor spent 12000000 tokens in 21 turns of one wake, over its budget of 10000000 tokens/);
+  const supervisor = digest.roles.find((role) => role.role === 'supervisor');
+  assert.equal(supervisor.verdict, 'bug');
+  assert.equal(supervisor.bugs[0].remedy.case, 'supervisor-wake-budget-unmeasured');
 });
 
 test('--field reduces an answer to the named paths', () => {

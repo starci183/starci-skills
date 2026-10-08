@@ -189,7 +189,7 @@ non-green decisions through `modules/kernel/driver-loop.yaml`
 - Owns: one attempt and its worktree. Decides alone: how to do the work inside its contract.
 - Reports to: Kernel (done, blocked, or a question). Overseen by: Kernel.
 - Measure: passes its gate first time.
-- Token budget (provisional): 6000000 per attempt; over it, the runtime measures each settled attempt from its usage rows (input, output, cache read and cache write tokens) and, for a job waiting on its Kernel, opens a Decision Item budget-overrun: the Kernel continues once, replaces the agent or re-scopes the leg.
+- Token budget (provisional): 6000000 per attempt; over it, the runtime measures each attempt from its usage rows when it settles, and a running attempt from its session file on the minute poll that snapshots it (the first reading past the budget is one attempt-budget-overrun event); for a job running past the budget or waiting on its Kernel it opens a Decision Item budget-overrun, once: the Kernel continues once, replaces the agent or re-scopes the leg.
 - Guard: its terminals are bound as the "op" role of modules/kernel/command-policy.yaml.
 - Happy errors it handles (the system working as designed, handled inside the chain through the policy):
   - asks-a-question (policy row ask-worker-question): the Op cannot decide inside its contract and reports an ask up to its Kernel, which answers from the goal and the recorded decisions

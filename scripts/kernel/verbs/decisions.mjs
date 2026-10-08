@@ -41,8 +41,15 @@ const line = (d) => {
   return `${d.id} [${d.status}${severity}] ${d.kind} ${d.entity?.type}:${d.entity?.id} due ${new Date(d.dueAt).toISOString().slice(0, 16)}Z (${d.decider}): ${d.summary}${resolve}`;
 };
 
+/** The items the sweep closed; a read-only ledger (a caller that owns no reaction) sweeps nothing. */
+const sweptBy = (ledger, workflowId) => (ledger.readOnly ? [] : sweepDecisions(ledger, workflowId));
+
 export default {
   verb: 'decisions',
+  // The listing is a read whose sweep of settled items belongs to the roles that own the reactions; the four flags below write.
+  reads: true,
+  reacts: true,
+  writesWith: ['open', 'claim', 'resolve', 'escalate'],
   required: (args) => (args.claim || args.resolve || args.escalate ? ['by'] : ['workflow']),
   kernelOnly: true,
   flags: ['open', 'list', 'all', 'next'],
@@ -79,7 +86,7 @@ export default {
       return;
     }
     // Close what no longer needs the Kernel first: rulings read (runtime rev acked), job DIs whose job was decided.
-    const autoClosed = sweepDecisions(ledger, args.workflow);
+    const autoClosed = sweptBy(ledger, args.workflow);
     const blocking = blockingDecisions(db, args.workflow, { minAgeMs: 0 });
     const next = blocking.length ? resolutionOf(db, blocking[0], { repo }) : null;
     const nextText = next ? decisionsFirstText('new work', args.workflow, blocking, next) : null;

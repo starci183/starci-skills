@@ -41,7 +41,7 @@ const lineOf = (finding) => `${finding.kind} ${finding.file}: ${finding.detail}`
 export function gateLooseningCheck({ dir, base, head }) {
   const judged = judgeChange({ dir, base, head, rules: looseningRules(dir) });
   if (!judged) return null;
-  if (judged.approved) return { name: 'gate-loosening', ok: true, advisory: true, findings: judged.findings, output: `loosens ${judged.findings.length} gate(s), approved by the owner (${judged.id})` };
-  return { name: 'gate-loosening', ok: false, findings: judged.findings, output: judged.findings.map(lineOf).join('\n'),
+  if (judged.approved) return { name: 'gate-loosening', ok: true, advisory: true, approved: true, id: judged.id, findings: judged.findings, output: `loosens ${judged.findings.length} gate(s), approved by the owner (${judged.id})` };
+  return { name: 'gate-loosening', ok: false, approved: false, id: judged.id, findings: judged.findings, output: judged.findings.map(lineOf).join('\n'),
     hint: `a change that loosens a gate is owner-class: it lands only when the owner has approved it. The owner approves exactly this loosening with an entry of ${RULINGS_FILE} whose id is ${judged.id}, landed before this change` };
 }

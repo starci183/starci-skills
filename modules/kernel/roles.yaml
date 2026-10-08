@@ -126,7 +126,7 @@ roles:
       status: provisional
       source: "the usage rows of the first real workflows: a decision leg spent 6 to 17 million tokens (10.8 million in the audit of the first real workflow)"
       perAttempt: {default: 6000000}
-      onExceed: "the runtime measures each settled attempt from its usage rows (input, output, cache read and cache write tokens) and, for a job waiting on its Kernel, opens a Decision Item budget-overrun: the Kernel continues once, replaces the agent or re-scopes the leg"
+      onExceed: "the runtime measures each attempt from its usage rows when it settles, and a running attempt from its session file on the minute poll that snapshots it (the first reading past the budget is one attempt-budget-overrun event); for a job running past the budget or waiting on its Kernel it opens a Decision Item budget-overrun, once: the Kernel continues once, replaces the agent or re-scopes the leg"
     cleanup:
       - "its own processes, temp files and servers, before it reports"
     never:
@@ -283,7 +283,7 @@ roles:
       source: "the 55 supervisor-turn usage rows of the first real workflows (machine store copy of the audit): turns p50 9, p75 15, p90 20; tokens (input, output, cache read, cache write) p50 4.3 million, p75 6.2 million, p90 9.7 million"
       perAttempt: {default: 10000000}
       unit: wake
-      onExceed: "recorded in the llm_usage supervisor-turn rows; no digest reads it yet, so an overrun is not surfaced (registry entry supervisor-wake-budget-unmeasured)"
+      onExceed: "the usage sweep cuts the Supervisor session at its supervisor-wake events and tags every supervisor-turn row with the wake that owns it; the digest reports a wake over the budget as a departure of the Supervisor (supervisor-wake-budget)"
     happyErrors:
       - {id: gate-ruling, row: supervisor-gate, what: "a gate a Kernel raised: the Supervisor rules with fixed, workaround or not-runtime-fault (menu gate-ruling)"}
       - {id: budget-gate, row: budget-gate, what: "a workflow cap exceeded holds dispatch: the Supervisor extends the budget or hands the matter to the owner"}
@@ -297,6 +297,7 @@ roles:
       - {bug: "the Supervisor changes .claude", signal: "RUNTIME_CHANGE_OWNED_BY_DEBUG from the command and file guards", detectedBy: scripts/machine/runtime-change.mjs}
       - {bug: "a menu choice of the Supervisor fails to execute", signal: "SUPERVISOR_MENU_STEP_FAILED", detectedBy: scripts/supervisor/decide.mjs}
       - {bug: "a gate stands past its acknowledgement bound", signal: "gate-stale departure of the digest", detectedBy: scripts/reconciler/debug-digest-analyze.mjs}
+      - {bug: "a Supervisor wake spends more tokens than its wake budget", signal: "supervisor-wake-budget problem line of the digest", detectedBy: scripts/reconciler/debug-digest-analyze.mjs}
     binds: [P1, P3, P4, P5, P6, P7, P8]
     contradicts:
       - {pattern: 'supervisor (?:may|can|should) (?:relax|loosen|waive) (?:a|the) gate', why: "loosening a gate is owner-class"}

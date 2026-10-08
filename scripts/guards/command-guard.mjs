@@ -484,7 +484,7 @@ export async function main({ stdin = process.stdin, stderr = process.stderr, env
     const { refusalLines, logRefusal } = await import('./refusals.mjs');
     const { tool, ...verdict } = decision.verdict;
     stderr.write(`${refusalLines(tool, verdict).join('\n')}\n`);
-    logRefusal({ tool, via: 'pre-tool-use', ...verdict, jobId: decision.guard?.jobId ?? null, workflowId: decision.guard?.workflowId ?? null, cwd: decision.cwd });
+    logRefusal({ tool, via: 'pre-tool-use', role: decision.guard?.role ?? seat?.role ?? null, ...verdict, jobId: decision.guard?.jobId ?? null, workflowId: decision.guard?.workflowId ?? null, cwd: decision.cwd });
     return 2;
   } catch (e) {
     stderr.write(`starci guard: guard error (${e?.message ?? e}); passing the command through\n`);

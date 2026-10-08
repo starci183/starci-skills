@@ -7,7 +7,7 @@
 // A write attempted through the handle throws `read-verb-write` and is counted; the verb's run then fails with that code, so a read
 // verb that writes is a loud bug and never a ledger write under the reader's own identity.
 import path from 'node:path';
-import { openLedgerReader, ledgerIdOf } from '../../engine/db/ledger.mjs';
+import { openLedgerReader, ledgerIdOf, readAccessors } from '../../engine/db/ledger.mjs';
 import { readEnv } from '../lib/env.mjs';
 
 const WRITE_SQL = /^\s*(?:INSERT|UPDATE|DELETE|REPLACE|CREATE|DROP|ALTER|BEGIN|COMMIT|VACUUM|REINDEX)\b/i;
@@ -36,6 +36,6 @@ export function readOnlyLedger(file, { open = openLedgerReader } = {}) {
   } });
   const transaction = Object.assign(() => refuse('transaction'), { active: () => false });
   const write = new Proxy({}, { get: (_target, name) => () => refuse(`write.${String(name)}`) });
-  return { readOnly: true, file, path: path.resolve(file), db, now: Date.now, ledgerId: ledgerIdOf({ db: raw }), attempts, transaction, write,
+  return { readOnly: true, file, path: path.resolve(file), db, ...readAccessors(raw), now: Date.now, ledgerId: ledgerIdOf({ db: raw }), attempts, transaction, write,
     appendEvent: () => refuse('appendEvent'), enqueueJob: () => refuse('enqueueJob'), ensureWorkflow: () => refuse('ensureWorkflow'), close: () => raw.close() };
 }

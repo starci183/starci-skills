@@ -12,9 +12,11 @@
 //   op attempt   one llm_usage row per model + op_attempts.tokens_in/out/cost_usd/usage_source, written once when the
 //                attempt is settled (settle-tail, before its session file moves) or by the periodic sweep.
 //   Kernel seat  llm_usage 'kernel-turn' rows in the workflow's ledger, incremental: turn_ref
-//                `kernel:<workflow>:<session>@<turns so far>`; a run writes only what the session added over the rows
-//                already recorded for that session, so a re-run never double counts.
-//   Supervisor   machine.sqlite llm_usage 'supervisor-turn' rows, same increments (`supervisor:<session>@<turns>`).
+//                `kernel:<workflow>:<session>@<turns so far>#w<wake seq>`; a run writes only what the session added over the rows
+//                already recorded for that session, so a re-run never double counts. The session is cut at the seat's wake events
+//                (kernel-woken) by the timestamps of its usage records, and the rows of each cut carry the wake that owns them.
+//   Supervisor   machine.sqlite llm_usage 'supervisor-turn' rows, same increments and cuts at its supervisor-wake events
+//                (`supervisor:<session>@<turns>#w<wake seq>`).
 //
 // Internal entry: spawned by scripts/kernel/cli.mjs; not invoked directly.
 // Args: sweep [--lookback-ms <ms>] [--dry-run] [--json].
@@ -23,10 +25,11 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { isMain } from '../lib/is-main.mjs';
-import { extractUsage, costOfRow, loadPrices, deltaRows, USAGE_AGENTS, USAGE_SOURCE, USAGE_UNAVAILABLE } from '../lib/llm-usage.mjs';
+import { extractUsage, costOfRow, loadPrices, USAGE_AGENTS, USAGE_SOURCE, USAGE_UNAVAILABLE } from '../lib/llm-usage.mjs';
 import { sessionHomes } from './op-session.mjs';
 import { agentOfJob } from '../lib/job-agent.mjs';
 import { archiveRoot as archiveRootOf } from '../machine/home.mjs';
+import { planSeatUsage } from './usage-seat-plan.mjs';
 
 const SESSION_HEAD_BYTES = 256 * 1024;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -170,7 +173,7 @@ function dedupeSessions(files) {
 }
 
 /** listSessionFiles with each file's head classified: [{file, agent, where, startMs, ...classification}]. */
-function indexSessions(options = {}) {
+export function indexSessions(options = {}) {
   return listSessionFiles(options).map((f) => {
     const { startMs, firstUser } = readSessionHead(f.agent, readHead(f.file));
     return { ...f, startMs: startMs ?? f.mtimeMs, ...classifySession(firstUser) };
@@ -187,7 +190,7 @@ export const attemptAgent = (a) => agentOfJob({ agent: a?.agent, provider: a?.pr
  * (op_attempts.dispatch_id, the Orca worker preamble's --dispatch-id) or task id. Both are unique per attempt, so a sibling that
  * shares the checkout, the job or the time window never matches; nothing is matched by cwd, time window or job id.
  */
-function entriesOfAttempt(index, attempt) {
+export function entriesOfAttempt(index, attempt) {
   const agent = attemptAgent(attempt);
   return index.filter((e) => e.role === 'op' && e.agent === agent
     && ((e.dispatchId && e.dispatchId === attempt.dispatch_id) || (e.taskId && attempt.task_id && e.taskId === attempt.task_id)));
@@ -211,7 +214,7 @@ const mergeRows = (lists) => {
  * The usage plan of one attempt: {attemptId, agent, ok:true, source, rows (priced), files} or {ok:false, source:'unavailable',
  * reason}. Pure over the index; nothing is written.
  */
-function planAttemptUsage(attempt, entries, { prices = loadPrices(), extract = extractUsage } = {}) {
+export function planAttemptUsage(attempt, entries, { prices = loadPrices(), extract = extractUsage } = {}) {
   const agent = attemptAgent(attempt);
   const base = { attemptId: attempt.attempt_id, workflowId: attempt.workflow_id, opId: attempt.op_id, agent, provider: attempt.provider ?? agent, endedAt: attempt.settled_at ?? attempt.dispatched_at ?? null };
   if (!agent || !USAGE_AGENTS.includes(agent)) return { ...base, ok: false, source: USAGE_UNAVAILABLE, definitive: true, ...extract(agent, null) };
@@ -280,32 +283,6 @@ export function recordSettledAttemptUsage(ledger, { jobId, agent, files, extract
 
 /* ---------------------------------------------------------------------------------------------- Kernel + Supervisor */
 
-const USAGE_SUMS = `response_model AS model, sum(input_tokens) AS inputTokens, sum(output_tokens) AS outputTokens,
-  sum(cache_read_tokens) AS cacheReadTokens, sum(cache_write_tokens) AS cacheWriteTokens, sum(reasoning_tokens) AS reasoningTokens,
-  sum(turns) AS turns, sum(tool_calls) AS toolCalls, sum(tool_errors) AS toolErrors`;
-
-/** The rows already recorded for one session (`prefix` = '<seat>:<session>@'), summed per model. */
-function recordedSession(db, { subjectType, prefix, workflowId = null }) {
-  const sql = `SELECT ${USAGE_SUMS} FROM llm_usage WHERE subject_type=? ${workflowId === null ? '' : 'AND workflow_id=?'} AND substr(turn_ref,1,length(?))=? GROUP BY response_model`;
-  const args = workflowId === null ? [subjectType, prefix, prefix] : [subjectType, workflowId, prefix, prefix];
-  return db.prepare(sql).all(...args).map((r) => ({ ...r }));
-}
-
-/**
- * What a Kernel/Supervisor session added since the rows already recorded: {ok, turnRef, rows} (rows priced deltas) or
- * {ok:false, reason} / {ok:true, rows:[]} when nothing is new. `db` is the ledger (kernel) or machine (supervisor) database.
- */
-function planSeatUsage(db, { role, workflowId = null, entry, prices = loadPrices(), extract = extractUsage }) {
-  const got = extract(entry.agent, entry.file);
-  if (!got.ok) return { ok: false, source: USAGE_UNAVAILABLE, reason: got.reason, file: entry.file };
-  const session = got.sessionId ?? path.basename(entry.file, '.jsonl');
-  const seat = role === 'kernel' ? `kernel:${workflowId}` : 'supervisor';
-  const prefix = `${seat}:${session}@`;
-  const recorded = recordedSession(db, { subjectType: role === 'kernel' ? 'kernel-turn' : 'supervisor-turn', prefix, workflowId: role === 'kernel' ? workflowId : null });
-  const rows = deltaRows(got.models, recorded).map((r) => ({ ...r, costUsd: costOfRow(r, prices) }));
-  return { ok: true, source: USAGE_SOURCE, agent: entry.agent, session, file: entry.file, turnRef: `${prefix}${got.turns}`, rows, totalTurns: got.turns };
-}
-
 /* ------------------------------------------------------------------------------------------------------- sweep */
 
 const ledgerUsagePlan = (l, { since, out, openLedgerReader }) => {
@@ -366,8 +343,10 @@ function recordAttemptUsagePlans(handle, work, ledger, out, now) {
 function recordKernelUsagePlans(handle, seatWork, ledger, out, now) {
   for (const { entry, plan } of seatWork) {
     try {
-      const result = handle.write.recordKernelUsage({ workflowId: entry.workflowId, turnRef: plan.turnRef, rows: plan.rows, provider: entry.agent, at: now });
-      if (result.recorded) { out.kernels.recorded += 1; out.kernels.rows += result.rows; }
+      for (const group of plan.groups) {
+        const result = handle.write.recordKernelUsage({ workflowId: entry.workflowId, turnRef: group.turnRef, rows: group.rows, provider: entry.agent, at: now });
+        if (result.recorded) { out.kernels.recorded += 1; out.kernels.rows += result.rows; }
+      }
     } catch (error) {
       if (archivedRefusal(error)) out.kernels.skippedEnded += 1;
       else out.errors.push(`${ledger.name} kernel ${entry.workflowId}: ${message(error).slice(0, 160)}`);
@@ -411,7 +390,7 @@ function recordSupervisorUsage(supervisors, { out, detail, dryRun, env, openMach
         out.supervisor.recorded += 1;
         out.supervisor.rows += plan.rows.length;
         if (dryRun) continue;
-        m.transaction(() => { for (const r of plan.rows) recordMachineLlmUsage(m, { subjectType: 'supervisor-turn', turnRef: plan.turnRef, provider: e.agent, responseModel: r.model, source: plan.source, inputTokens: r.inputTokens, outputTokens: r.outputTokens, cacheReadTokens: r.cacheReadTokens, cacheWriteTokens: r.cacheWriteTokens, reasoningTokens: r.reasoningTokens, costUsd: r.costUsd, turns: r.turns, toolCalls: r.toolCalls, toolErrors: r.toolErrors }); });
+        m.transaction(() => { for (const { turnRef, rows } of plan.groups) for (const r of rows) recordMachineLlmUsage(m, { subjectType: 'supervisor-turn', turnRef, provider: e.agent, responseModel: r.model, source: plan.source, inputTokens: r.inputTokens, outputTokens: r.outputTokens, cacheReadTokens: r.cacheReadTokens, cacheWriteTokens: r.cacheWriteTokens, reasoningTokens: r.reasoningTokens, costUsd: r.costUsd, turns: r.turns, toolCalls: r.toolCalls, toolErrors: r.toolErrors }); });
       } catch (error) { out.errors.push(`supervisor ${path.basename(e.file)}: ${message(error).slice(0, 160)}`); }
     }
   };

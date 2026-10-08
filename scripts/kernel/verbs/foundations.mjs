@@ -5,6 +5,7 @@ import { readFoundations } from '../foundation-registry.mjs';
 
 export default {
   verb: 'foundations',
+  reads: true,
   required: [],
   usageInCore: true,
   run({ ledger, args, repo, emit, internals }) {

@@ -48,7 +48,7 @@ function connectedTerminalState({ db, ledger, handle, job, now, internals, termi
   const turnState = shellPrompt ? 'agent-exited' : OBSERVE_TURN_STATES[stale.state] ?? 'unknown';
   if (stale.staleActive) terminal.livenessReason = 'stale-active';
   let outageCircuit = null;
-  if (screenState !== 'active') {
+  if (screenState !== 'active' && !ledger.readOnly) {
     const evidence = workerOutageEvidence(job, read.screen);
     if (evidence) outageCircuit = recordWorkerOutageEvidence(ledger, [{ jobId: job.job_id, providerOutage: evidence, lastOutputAt }], now)[0] ?? null;
   }
@@ -94,6 +94,9 @@ const learnSessionIdentity = (db, job, repo) => {
 
 export default {
   verb: 'observe',
+  // The observation record and the learned session identity are written only for the roles that own them.
+  reads: true,
+  reacts: true,
   required: ['job'],
   kernelOnly: true,
   usageInCore: true,
@@ -118,7 +121,7 @@ export default {
   const { terminal, turnState, outageCircuit } = observeTerminalState({ db, ledger, handle, job, now, internals });
   const output = observedOutputOf(operationDispatchOf(jobPayloadOf(job)), lines);
   const sessionIdentity = learnSessionIdentity(db, job, repo);
-  ledger.transaction(() => {
+  if (!ledger.readOnly) ledger.transaction(() => {
     ledger.appendEvent({
       workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
       kind: 'op-observed',

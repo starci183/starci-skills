@@ -90,6 +90,43 @@ function openEdgeCases(d, snapshot) {
   return verdictOf(open.length > 0, `${open.length} open: ${open.map((c) => c.id).join(', ')}`, 'no edge case is open');
 }
 
+const REFUSED_RUNTIME_CHANGE = 'RUNTIME_CHANGE_OWNED_BY_DEBUG';
+
+function runtimeChangeRefused(d, snapshot) {
+  const hits = (snapshot.refusals ?? []).filter((r) => r.code === REFUSED_RUNTIME_CHANGE);
+  const roles = [...new Set(hits.map((r) => r.role ?? 'unknown'))].join(', ');
+  return ok(hits.length ? `${hits.length} runtime change(s) asked by ${roles} and refused by the guard` : 'no runtime change was asked of the guard');
+}
+
+function gateLooseningLands(d, snapshot) {
+  const lands = snapshot.lands ?? [];
+  const unapprovedLanded = lands.filter((l) => l.result === 'passed' && !l.approved);
+  const text = `${lands.length} land(s) loosened a gate: ${lands.filter((l) => l.approved).length} approved by the owner, ${lands.filter((l) => !l.approved && l.result !== 'passed').length} refused`;
+  return verdictOf(unapprovedLanded.length > 0, `${unapprovedLanded.length} land(s) loosened a gate without the owner's approval (${unapprovedLanded.map((l) => l.runId).join(', ')})`, text);
+}
+
+function criticIndependent(d, snapshot) {
+  const runs = eventsOf(snapshot, 'critic-run');
+  if (!runs.length) return unknown('no critic-run event on record yet: the event is written when a draw pass settles');
+  const shared = runs.filter((r) => r.criticProvider && r.opProvider && !r.independent);
+  const unknownMaker = runs.filter((r) => !r.criticProvider || !r.opProvider);
+  const text = `${runs.length} Critic run(s), ${runs.length - shared.length - unknownMaker.length} on another provider than the op, ${unknownMaker.length} with a provider not recorded`;
+  return verdictOf(shared.length > 0, `${shared.length} Critic run(s) on the op's own provider; ${text}`, text);
+}
+
+/** The Kernel wakes that no turn of the agent followed: older than the grace, not followed by another wake inside wakeActMs. */
+function ignoredWakes(wakes, now, n) {
+  return wakes.filter((wake, index) => wake.turns === 0 && now - wake.at > n.wakeGraceMs && !(wakes[index + 1] && wakes[index + 1].at - wake.at < n.wakeActMs));
+}
+
+function wakeActed(d, snapshot, n) {
+  const measured = snapshot.workflows.filter((w) => (w.kernelWakes ?? []).some((wake) => wake.turns > 0));
+  if (!measured.length) return unknown('no Kernel wake has measured turns yet: the usage rows tag each wake from this runtime on');
+  const ignored = measured.flatMap((w) => ignoredWakes(w.kernelWakes, snapshot.now, n).map((wake) => ({ workflow: w.name, ...wake })));
+  const total = sum(measured.map((w) => w.kernelWakes.length));
+  return verdictOf(ignored.length > 0, `${ignored.length} of ${total} wake(s) were followed by no turn of the agent: ${ignored.map((w) => w.workflow).join(', ')}`, `${total} wake(s), each followed by a turn of the agent`);
+}
+
 /** The finished workflows that ran clean, newest last: no person's write, no runtime-defect incident, no failed Kernel launch. */
 const cleanFinished = (history) => (history ?? []).filter((h) => h.interventions === 0 && h.runtimeDefects === 0 && h.startFailures === 0);
 
@@ -146,6 +183,10 @@ const CHECKS = Object.freeze({
   'resources-released': (d) => verdictOf(d.standard.host.find((s) => s.id === 'resources-released')?.state === 'overdue', d.standard.host.find((s) => s.id === 'resources-released')?.evidence ?? '', 'no reservation outlives its work'),
   'open-edge-cases': openEdgeCases,
   'clean-run': cleanRunCheck,
+  'runtime-change-refused': runtimeChangeRefused,
+  'gate-loosening-lands': gateLooseningLands,
+  'critic-independent': criticIndependent,
+  'wake-acted': wakeActed,
 });
 
 /** The declared questions with the checks resolved; a question answerable today whose check does not exist is refused. */

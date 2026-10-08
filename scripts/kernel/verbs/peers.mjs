@@ -57,4 +57,4 @@ export default workflowVerb('peers', ({ ledger, args, repo, emit }) => {
       }),
       ...dependencyLines(),
     ].join('\n'), args.json);
-});
+}, { reads: true });

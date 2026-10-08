@@ -317,9 +317,11 @@ cases:
     status: covered
   - id: op-token-overrun-in-flight
     family: smooth-operation
-    met: {date: "2026-10-08", where: "scripts/kernel/usage-record.mjs records an attempt's usage when it settles", evidence: "scripts/kernel/attempt-budget.mjs"}
-    status: open
-    why: "the measure comes from the usage rows, which exist only for a settled attempt, so an overrun is seen after the attempt ends; an attempt still running past the budget is not seen until a live read of its session file feeds the same measure"
+    finding: {role: op, duty: bound, verdict: departs, evidence: "an attempt past its token budget was seen only after it settled, because its llm_usage rows exist only then", remedy: {state: in-tree, change: "the minute poll that snapshots the open attempts also reads their session files (scripts/kernel/attempt-live-usage.mjs); the first reading past the budget is one attempt-budget-overrun event, listed by starci kernel status as budgetOverruns with live: true, and the Workflow controller opens the budget-overrun Decision Item for the Kernel once"}}
+    met: {date: "2026-10-08", where: "scripts/kernel/usage-record.mjs recorded an attempt's usage only when it settled", evidence: "scripts/kernel/attempt-budget.mjs"}
+    rule: {file: scripts/kernel/attempt-live-usage.mjs, anchor: "measureOpenAttempts"}
+    spec: tests/kernel/attempt-live-usage.spec.mjs
+    status: covered
   - id: fix-agent-wiped-node-modules-printed-credentials-stashed
     family: authority-safety
     finding: {role: supervisor, duty: never, verdict: departs, evidence: "a fix agent wiped another lane's node_modules through junctions; an agent printed part of a credentials file; an agent ran git stash", remedy: {state: in-tree, change: "the worker prompt carries the never entries: no junction, symlink or hard link, no node_modules removal, no credential file read, no stash"}}
@@ -432,14 +434,18 @@ cases:
     status: covered
   - id: kernel-wake-usage-attribution-coarse
     family: smooth-operation
+    finding: {role: kernel, duty: bound, verdict: departs, evidence: "the usage rows landed about every five minutes, so a short wake read as the sum of its neighbours", remedy: {state: in-tree, change: "the usage sweep cuts a Kernel session at its kernel-woken events by the timestamps of its usage records and writes each cut as rows tagged with the wake that owns them (turn_ref ...#w<wake seq>); a wake reads exactly its rows"}}
     met: {date: "2026-10-08", where: "the per-wake budget of this change", evidence: "scripts/kernel/wake-budget.mjs"}
-    status: open
-    why: "the usage rows land every five minutes, so a wake owns the rows recorded between two wake events; a short wake can read as the sum of its neighbour"
+    rule: {file: scripts/kernel/usage-seat-plan.mjs, anchor: "wakeGroups"}
+    spec: tests/kernel/usage-wake-cuts.spec.mjs
+    status: covered
   - id: supervisor-wake-budget-unmeasured
     family: smooth-operation
-    met: {date: "2026-10-08", where: "role standard completion: the Supervisor budget is declared from 55 measured supervisor-turn rows but nothing compares a Supervisor turn with it", evidence: "modules/kernel/roles.yaml supervisor.tokenBudget; scripts/kernel/wake-budget.mjs reads the Kernel only"}
-    status: open
-    why: "the digest measures a Kernel wake against its budget (kernel-wake-budget) and an Op attempt against its budget (budget-overrun); a Supervisor turn over its provisional budget is recorded in llm_usage and surfaced nowhere"
+    finding: {role: supervisor, duty: bound, verdict: departs, evidence: "the Supervisor budget was declared from 55 measured supervisor-turn rows but nothing compared a Supervisor turn with it", remedy: {state: in-tree, change: "the usage sweep tags supervisor-turn rows with the supervisor-wake that owns them and starci debug digest reports a wake over the token budget as the supervisor-wake-budget departure of the Supervisor"}}
+    met: {date: "2026-10-08", where: "role standard completion: the Supervisor budget is declared from 55 measured supervisor-turn rows", evidence: "modules/kernel/roles.yaml supervisor.tokenBudget"}
+    rule: {file: scripts/reconciler/debug-digest-analyze.mjs, anchor: "supervisor-wake-budget"}
+    spec: tests/kernel/kernel-wake.spec.mjs
+    status: covered
   - id: supervisor-menu-escape-has-no-policy-row
     family: smooth-operation
     met: {date: "2026-10-08", where: "role standard completion: the Supervisor menu kind kernel-escape (a Kernel whose menu offered no fitting option) is handled by the Supervisor but names no row, hold or gate cause of the incident policy", evidence: "modules/supervisor/supervisor-menu.yaml kernel-escape; modules/kernel/op-incident-policy.yaml"}
@@ -631,3 +637,10 @@ cases:
     met: {date: "2026-10-09", where: "the wave 3 pass over the pending menu origins", evidence: "modules/kernel/kernel-menu.yaml kind handover-step, mode mechanical-pending"}
     status: open
     why: "handover-due, and a handover answered approve or question, are each one enqueue of handover.review on the fixed handover evidence path: nothing is judged, yet the Kernel still answers them from its menu; the move needs the handover projection (state, due, ask decision) in the status the Job controller reads, then the same once-per-process move as the other origins"
+  - id: debug-questions-lacked-four-signals
+    family: record-vs-reality
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "four of Debug's nine unanswerable questions needed a signal the runtime could emit where the fact occurs: a guard refusal with its role, the loosening on the land record, a critic-run event and the wake-tagged usage rows", remedy: {state: in-tree, change: "refusals.jsonl rows carry the role and the CLI dispatcher logs its RUNTIME_CHANGE_OWNED_BY_DEBUG refusals; land_runs.specs_json holds the loosening with its approval id; settle appends a critic-run event per draw loop; the digest answers fr-wake-acted from the wake-tagged usage rows"}}
+    met: {date: "2026-10-08", where: "modules/reconciler/debug-questions.yaml", evidence: "nine questions answerable: gap"}
+    rule: {file: scripts/reconciler/debug-questions.mjs, anchor: "wakeActed"}
+    spec: tests/reconciler/debug-signals.spec.mjs
+    status: covered

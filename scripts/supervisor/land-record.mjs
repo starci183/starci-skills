@@ -15,6 +15,12 @@ export const failKey = (f) => `${f.file}\u0000${f.name}`;
 const landResultOf = (r) => { if (r.ok) { return 'passed'; } if (r.reason === 'conflict') { return 'conflict'; } if (['dirty', 'not-on-main', 'live-not-on-main', 'main-moved', 'gate-busy', 'git-unusable', 'host-lock-held'].includes(r.reason)) { return 'refused'; } return 'failed'; };
 const landLogKind = (result) => (result.ok && 'land.passed') || (!result.ok && result.reason === 'gate-busy' && 'land.gate-busy') || 'land.failed';
 
+/** The gate-loosening step of a land as {loosening: {id, approved, findings}} for the land record, or nothing when the change loosened no gate. */
+const looseningOf = (result) => {
+  const step = (result.checks ?? []).find((c) => c.name === 'gate-loosening');
+  return step ? { loosening: { id: step.id ?? null, approved: step.approved === true, findings: (step.findings ?? []).length } } : {};
+};
+
 /**
  * The core record of one land as ONE idempotent write (machine-db recordLandOutcome, keyed on spanId): the
  * land_runs row (full result as the stdout blob), the lane head and the log line. Plain data, so a refused write can wait
@@ -24,7 +30,7 @@ export function landOutcomeOf(result, { ticketId = null, lane = null, commits, j
   const failed = (result.checks ?? []).filter((c) => !c.ok);
   const run = { ticketId, commitSha: commits[commits.length - 1], commits, landedSha: result.landed ?? null, result: landResultOf(result),
     // an already-landed pick moved nothing: no landed_sha (direct-commit detection keys on the mains the gate produced)
-    reason: result.reason ?? (result.alreadyLanded ? `already-landed ${result.alreadyLanded}` : null), specs: { mode: specMode, ...(result.specReason ? { reason: result.specReason } : {}), failed: failed.map((c) => c.name) },
+    reason: result.reason ?? (result.alreadyLanded ? `already-landed ${result.alreadyLanded}` : null), specs: { mode: specMode, ...(result.specReason ? { reason: result.specReason } : {}), failed: failed.map((c) => c.name), ...looseningOf(result) },
     stdout: JSON.stringify(result, null, 2), stderr: failed.map((c) => `## ${c.name}\n${c.output ?? ''}`).join('\n') || null, startedAt, finishedAt: Date.now() };
   const log = { actor: 'land', kind: landLogKind(result), level: result.ok ? 'info' : 'warn', msg: describe(result, { jobId }).slice(0, 2000),
     data: { ticketId, lane, jobId, commits, landed: result.landed ?? null, reason: result.reason ?? null }, refs: [...(lane ? [`lane:${lane}`] : []), ...commits.map((c) => `commit:${c}`)] };
