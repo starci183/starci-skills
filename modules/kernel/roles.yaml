@@ -101,13 +101,13 @@ standard:
     happy-errors: "`happyErrors`: the happy errors this role handles, each {id, row, what} naming a row, hold or gate cause of modules/kernel/op-incident-policy.yaml"
     bug-surface: "`bugSurface`: how a bug in this role is detected, each {bug, signal, detectedBy} naming the signal and an existing file or check that reads it"
     prompt-block: "a surface in `block` mode that exists and carries the generated block of the role"
-    guard-binding: "`guard: {role}` naming a role of modules/kernel/command-policy.yaml roles.bound, or `noSeat: true` for a role that owns no seat or terminal"
-    budget: "`tokenBudget` (turns or tokens per unit of the role's work), or `noBudget` with the reason the role has none"
+    guard-binding: "`guard: {role}` naming a role of modules/kernel/command-policy.yaml roles.bound, or the explicit form `noSeat: true` with a `noSeatReason` for a role that owns no seat or terminal"
+    budget: "`tokenBudget` or `wakeBudget` (turns or tokens per unit of the role's work), or `noBudget` with the reason the role has none"
     chain: "the role stands in the reporting chain (`chain.reports`, `chain.attached` or `chain.besides`)"
   onBug:
     chain: "records the evidence and keeps working inside its contract; it never fixes the bug and never works around it. Debug scans every role and removes the bug by changing .claude with a spec."
     debug: "removes the bug by changing .claude (contract, prompt, policy row, guard refusal or runtime code) with a spec and an edge-case entry."
-  pendingShape: "{requirements: [<requirement ids>], lane: <the lane building them>, since: <date>}"
+  pendingShape: "{requirements: [<requirement ids>], lane or entry: <the lane building them, or the open edge-case registry entry that tracks what no mechanism yet provides>, since: <date>}"
 
 roles:
   - id: op
@@ -137,8 +137,18 @@ roles:
       - "addresses anyone but its Kernel: its reports, questions, blocked causes and owner asks all go to its Kernel"
       - "sits stuck without reporting"
     escalatesTo: kernel
-    pending:
-      - {requirements: [happy-errors, bug-surface, guard-binding], lane: f6, since: "2026-10-08"}
+    guard: {role: op}
+    happyErrors:
+      - {id: asks-a-question, row: ask-worker-question, what: "the Op cannot decide inside its contract and reports an ask up to its Kernel, which answers from the goal and the recorded decisions"}
+      - {id: asks-the-owner, row: ask-owner, what: "the matter is the owner's (intent, credentials, spend): the Kernel sends it to the owner and the leg waits"}
+      - {id: red-check, row: error-work, what: "a check is red because the work is not good yet: the Kernel retries with the failure fed back, then on another agent"}
+      - {id: provider-quota, row: quota-or-circuit, what: "the provider quota ran out or its circuit opened: the next agent of the tier takes the job"}
+      - {id: login-expired, row: error-login-expired, what: "the provider login expired: the job moves to the next eligible agent and the owner logs in again in Orca"}
+    bugSurface:
+      - {bug: "an Op addresses a role above its Kernel", signal: "OP_REPORTS_TO_KERNEL when an Op addresses the Supervisor", detectedBy: scripts/cli/roles.mjs}
+      - {bug: "an Op runs a control-plane verb that is not its own", signal: "RIGHTS_OP_CONTROL_PLANE from the command guard", detectedBy: scripts/guards/op-starci.mjs}
+      - {bug: "an Op writes outside the paths its attempt owns", signal: "RIGHTS_OP_OUTSIDE_OWNED from the file-write guard", detectedBy: scripts/guards/op-write-scope.mjs}
+      - {bug: "an Op spends more tokens than its attempt budget", signal: "budget-overrun Decision Item and budgetOverruns in the Kernel status", detectedBy: scripts/reconciler/budget-plan.mjs}
     binds: [P2, P3, P4, P8]
     contradicts:
       - {pattern: 'starci\s+supervisor\s+(?:tell|channel|notify)', why: "an Op never messages the Supervisor"}
@@ -223,8 +233,20 @@ roles:
       - "raises a supervisor-gate before the workaround its gate cause names (the gate ladder refuses it: modules/kernel/op-incident-policy.yaml gateCauses)"
       - "pins a model around a lineage exclusion without a recorded op-override decision"
     escalatesTo: supervisor
-    pending:
-      - {requirements: [happy-errors, bug-surface, guard-binding, budget], lane: f3, since: "2026-10-08"}
+    guard: {role: lead}
+    happyErrors:
+      - {id: worker-question, row: worker-question, what: "an Op asks: the Kernel answers from the goal (menu worker-question) or sends it to the owner"}
+      - {id: worker-stalled, row: worker-stalled, what: "a worker the nudges did not move: the Kernel nudges, replaces or stops it (menu worker-wedged)"}
+      - {id: peer-wait, row: peer-wait, what: "another workflow has not landed what a step needs: the Kernel waits for the typed condition or the peer's message (menu peer-message)"}
+      - {id: supervisor-gate, row: supervisor-gate, what: "a gate the Supervisor rules on: the Kernel waits for the ruling and acts on it"}
+      - {id: owner-gate, row: owner-gate, what: "a matter that is the owner's: the Kernel waits for the answer"}
+      - {id: failed-leg, row: failed-no-step, what: "a leg failed with no recorded step: the Kernel retries, switches agent or re-plans inside the goal (menu job-decision)"}
+      - {id: orphaned-frontier, row: orphaned-frontier, what: "a running workflow with nothing open: the Kernel proposes the next leg (menu decision-item)"}
+    bugSurface:
+      - {bug: "the Kernel runs a command that is not a starci verb or a pure read", signal: "KERNEL_STARCI_ONLY from the seat guard", detectedBy: scripts/guards/kernel-seat.mjs}
+      - {bug: "the Kernel uses a verb the runtime-driven menu replaces", signal: "KERNEL_USE_DECIDE from the seat guard", detectedBy: scripts/guards/kernel-seat.mjs}
+      - {bug: "a Kernel wake spends more than the per-wake budget", signal: "kernel-wake-budget problem line of the digest", detectedBy: scripts/reconciler/debug-digest-analyze.mjs}
+      - {bug: "a Kernel decision names a menu item or choice the menu does not hold, or a step fails", signal: "menu-item-unknown, menu-choice-unknown, menu-direct-option, menu-text-missing, menu-step-failed, menu-step-usage, menu-verb-unknown, menu-unreadable", detectedBy: scripts/kernel/verbs/shared/menu-decide.mjs}
     binds: [P1, P2, P3, P4, P5, P6, P8]
     contradicts:
       - {pattern: 'the Kernel (?:edits|fixes|patches) (?:the )?(?:runtime|\.claude)', why: "the Kernel never changes the runtime"}
@@ -255,8 +277,25 @@ roles:
       - "pushes or releases"
       - "leaves a gate past its acknowledgement bound"
     escalatesTo: owner
-    pending:
-      - {requirements: [happy-errors, bug-surface, guard-binding, budget], lane: f6, since: "2026-10-08"}
+    guard: {role: supervisor}
+    tokenBudget:
+      status: provisional
+      source: "the 55 supervisor-turn usage rows of the first real workflows (machine store copy of the audit): turns p50 9, p75 15, p90 20; tokens (input, output, cache read, cache write) p50 4.3 million, p75 6.2 million, p90 9.7 million"
+      perAttempt: {default: 10000000}
+      unit: wake
+      onExceed: "recorded in the llm_usage supervisor-turn rows; no digest reads it yet, so an overrun is not surfaced (registry entry supervisor-wake-budget-unmeasured)"
+    happyErrors:
+      - {id: gate-ruling, row: supervisor-gate, what: "a gate a Kernel raised: the Supervisor rules with fixed, workaround or not-runtime-fault (menu gate-ruling)"}
+      - {id: budget-gate, row: budget-gate, what: "a workflow cap exceeded holds dispatch: the Supervisor extends the budget or hands the matter to the owner"}
+      - {id: workflow-conflict, row: peer-dependency, what: "two workflows want the same files, ports or foundation: the Supervisor decides who goes first (menu workflow-conflict)"}
+      - {id: resource-division, row: pool-full, what: "provider capacity is shared by every workflow: the Supervisor divides it (menu resource-division)"}
+      - {id: runtime-defect, row: runtime-defect, what: "a suspected runtime defect: the Supervisor gives the Kernel a workaround and records the defect for Debug (menu runtime-defect)"}
+    bugSurface:
+      - {bug: "the Supervisor runs a command that is not a starci verb or a pure read", signal: "SUPERVISOR_STARCI_ONLY from the seat guard", detectedBy: scripts/guards/supervisor-seat.mjs}
+      - {bug: "the Supervisor uses a verb the runtime-driven menu replaces", signal: "SUPERVISOR_USE_DECIDE from the seat guard", detectedBy: scripts/guards/supervisor-seat.mjs}
+      - {bug: "the Supervisor changes .claude", signal: "RUNTIME_CHANGE_OWNED_BY_DEBUG from the command and file guards", detectedBy: scripts/machine/runtime-change.mjs}
+      - {bug: "a menu choice of the Supervisor fails to execute", signal: "SUPERVISOR_MENU_STEP_FAILED", detectedBy: scripts/supervisor/decide.mjs}
+      - {bug: "a gate stands past its acknowledgement bound", signal: "gate-stale departure of the digest", detectedBy: scripts/reconciler/debug-digest-analyze.mjs}
     binds: [P1, P3, P4, P5, P6, P7, P8]
     contradicts:
       - {pattern: 'supervisor (?:may|can|should) (?:relax|loosen|waive) (?:a|the) gate', why: "loosening a gate is owner-class"}
@@ -296,8 +335,17 @@ roles:
         - {id: clean-workflows, min: 5, rule: "consecutive workflows ran start to handover with zero departures from the operating standard and zero human interventions"}
         - {id: no-open-edge-case, min: 0, rule: "no entry of the edge-case registry is open"}
         - {id: survived-restart, min: 1, rule: "one of those workflows ran across a host restart and resumed without lost or repeated work"}
-    pending:
-      - {requirements: [happy-errors, bug-surface, guard-binding, budget], lane: f4, since: "2026-10-08"}
+    noSeat: true
+    noSeatReason: "Debug is a loop of the owner's own chat session: it has no seat and no bound terminal, so the guard resolves its caller to the owner; its limits are the never list, the channels it speaks through and the gate-loosening check on what it changes"
+    noBudget: "Debug is the owner's chat loop: its turns are the owner's session and no ledger row records them; it is bounded by its time box and its end condition, not by tokens"
+    happyErrors:
+      - {id: owner-matter, row: owner-gate, what: "a matter that is the owner's (credentials, spend, a release): Debug reports it to the owner and does not decide it"}
+      - {id: owner-question, row: ask-owner, what: "a question only the owner can answer: Debug names it in its result and waits"}
+    bugSurface:
+      - {bug: "a departure of a role stands with no edge-case entry", signal: "a departure printed with remedy none in starci debug digest", detectedBy: scripts/reconciler/debug-digest-analyze.mjs}
+      - {bug: "Debug loosens a gate or check to let a workflow pass", signal: "RT_GATE_LOOSENING over the commits since the last release", detectedBy: scripts/checks/check-gate-loosening.mjs}
+      - {bug: "Debug changes the runtime without recording the case", signal: "RT_EDGE_CASE_REGISTRY: a covered entry without its rule and spec", detectedBy: scripts/checks/check-edge-case-registry.mjs}
+      - {bug: "the loop runs on after its end condition holds, or its standing is not printed", signal: "the standing against each end-condition criterion in the digest", detectedBy: scripts/reconciler/debug-questions.mjs}
     binds: [P1, P5, P6, P7]
     contradicts:
       - {pattern: 'change nothing and fix nothing', why: "Debug fixes .claude so a role cannot repeat a departure"}

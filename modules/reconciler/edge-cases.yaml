@@ -413,3 +413,13 @@ cases:
     met: {date: "2026-10-08", where: "the per-wake budget of this change", evidence: "scripts/kernel/wake-budget.mjs"}
     status: open
     why: "the usage rows land every five minutes, so a wake owns the rows recorded between two wake events; a short wake can read as the sum of its neighbour"
+  - id: supervisor-wake-budget-unmeasured
+    family: smooth-operation
+    met: {date: "2026-10-08", where: "role standard completion: the Supervisor budget is declared from 55 measured supervisor-turn rows but nothing compares a Supervisor turn with it", evidence: "modules/kernel/roles.yaml supervisor.tokenBudget; scripts/kernel/wake-budget.mjs reads the Kernel only"}
+    status: open
+    why: "the digest measures a Kernel wake against its budget (kernel-wake-budget) and an Op attempt against its budget (budget-overrun); a Supervisor turn over its provisional budget is recorded in llm_usage and surfaced nowhere"
+  - id: supervisor-menu-escape-has-no-policy-row
+    family: smooth-operation
+    met: {date: "2026-10-08", where: "role standard completion: the Supervisor menu kind kernel-escape (a Kernel whose menu offered no fitting option) is handled by the Supervisor but names no row, hold or gate cause of the incident policy", evidence: "modules/supervisor/supervisor-menu.yaml kernel-escape; modules/kernel/op-incident-policy.yaml"}
+    status: open
+    why: "the happy error has a menu kind and a Decision Item (menu-escape) but no policy row with a bound and a chain, so the roles contract cannot name its row"

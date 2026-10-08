@@ -107,6 +107,16 @@ State which of the three you used. Do not claim a loop exists until the host con
 - Owns: the edge-case registry, the operating standard and the queue of runtime defects. Decides alone: which role failed which duty, which collector to trigger, the fix lanes it opens, and restarting a seat (the owner's authority).
 - Reports to: Owner (a result, or an owner-only action). Overseen by: Owner.
 - Measure: no edge case reaches it twice.
+- No budget: Debug is the owner's chat loop: its turns are the owner's session and no ledger row records them; it is bounded by its time box and its end condition, not by tokens.
+- Guard: none by design; Debug is a loop of the owner's own chat session: it has no seat and no bound terminal, so the guard resolves its caller to the owner; its limits are the never list, the channels it speaks through and the gate-loosening check on what it changes.
+- Happy errors it handles (the system working as designed, handled inside the chain through the policy):
+  - owner-matter (policy row owner-gate): a matter that is the owner's (credentials, spend, a release): Debug reports it to the owner and does not decide it
+  - owner-question (policy row ask-owner): a question only the owner can answer: Debug names it in its result and waits
+- A bug in this role (the chain neither fixes nor works around it; Debug removes it with a change to .claude) is detected by:
+  - a departure of a role stands with no edge-case entry: a departure printed with remedy none in starci debug digest
+  - Debug loosens a gate or check to let a workflow pass: RT_GATE_LOOSENING over the commits since the last release
+  - Debug changes the runtime without recording the case: RT_EDGE_CASE_REGISTRY: a covered entry without its rule and spec
+  - the loop runs on after its end condition holds, or its standing is not printed: the standing against each end-condition criterion in the digest
 - Audits: Op, Critic, Kernel, Supervisor, the runtime.
 - Retires when:
   - clean-workflows: consecutive workflows ran start to handover with zero departures from the operating standard and zero human interventions

@@ -28,12 +28,16 @@ function chainLines(doc, role) {
 /** The token budget line of a role that declares one. */
 function budgetLines(role) {
   const b = role.tokenBudget;
-  return b ? [`- Token budget (${b.status}): ${b.perAttempt.default} per attempt; over it, ${b.onExceed}.`] : [];
+  const wake = role.wakeBudget;
+  if (b) return [`- Token budget (${b.status}): ${b.perAttempt.default} per ${b.unit ?? 'attempt'}; over it, ${b.onExceed}.`];
+  if (wake) return [`- Wake budget (${wake.status}): ${wake.perWake.turns} turns and ${wake.perWake.tokens} tokens per wake; over it, ${wake.onExceed}.`];
+  return role.noBudget ? [`- No budget: ${role.noBudget}.`] : [];
 }
 
 /** The guard binding, the happy errors and the bug surface of a role that declares them (the owner's two classes of error). */
 function standardLines(role) {
-  const guard = role.guard ? [`- Guard: its terminals are bound as the "${role.guard.role}" role of modules/kernel/command-policy.yaml.`] : [];
+  const unbound = role.noSeat ? [`- Guard: none by design; ${role.noSeatReason}.`] : [];
+  const guard = role.guard ? [`- Guard: its terminals are bound as the "${role.guard.role}" role of modules/kernel/command-policy.yaml.`] : unbound;
   const happy = role.happyErrors?.map((error) => `${error.id} (policy row ${error.row}): ${error.what}`);
   const bugs = role.bugSurface?.map((entry) => `${entry.bug}: ${entry.signal}`);
   return [...guard, ...bullets('Happy errors it handles (the system working as designed, handled inside the chain through the policy)', happy),

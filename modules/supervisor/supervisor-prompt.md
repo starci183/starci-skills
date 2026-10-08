@@ -163,5 +163,19 @@ digest and a short read of the files is recorded as a runtime defect with the ev
 - Owns: the machine's operations: the shared resources and the gates Kernels raise. Decides alone: gate rulings and the division of resources.
 - Reports to: Owner (an owner-class matter). Overseen by: the runtime, Debug.
 - Measure: gates answered inside their bound, and no defect left unrecorded.
+- Token budget (provisional): 10000000 per wake; over it, recorded in the llm_usage supervisor-turn rows; no digest reads it yet, so an overrun is not surfaced (registry entry supervisor-wake-budget-unmeasured).
+- Guard: its terminals are bound as the "supervisor" role of modules/kernel/command-policy.yaml.
+- Happy errors it handles (the system working as designed, handled inside the chain through the policy):
+  - gate-ruling (policy row supervisor-gate): a gate a Kernel raised: the Supervisor rules with fixed, workaround or not-runtime-fault (menu gate-ruling)
+  - budget-gate (policy row budget-gate): a workflow cap exceeded holds dispatch: the Supervisor extends the budget or hands the matter to the owner
+  - workflow-conflict (policy row peer-dependency): two workflows want the same files, ports or foundation: the Supervisor decides who goes first (menu workflow-conflict)
+  - resource-division (policy row pool-full): provider capacity is shared by every workflow: the Supervisor divides it (menu resource-division)
+  - runtime-defect (policy row runtime-defect): a suspected runtime defect: the Supervisor gives the Kernel a workaround and records the defect for Debug (menu runtime-defect)
+- A bug in this role (the chain neither fixes nor works around it; Debug removes it with a change to .claude) is detected by:
+  - the Supervisor runs a command that is not a starci verb or a pure read: SUPERVISOR_STARCI_ONLY from the seat guard
+  - the Supervisor uses a verb the runtime-driven menu replaces: SUPERVISOR_USE_DECIDE from the seat guard
+  - the Supervisor changes .claude: RUNTIME_CHANGE_OWNED_BY_DEBUG from the command and file guards
+  - a menu choice of the Supervisor fails to execute: SUPERVISOR_MENU_STEP_FAILED
+  - a gate stands past its acknowledgement bound: gate-stale departure of the digest
 - Principles: P1 P3 P4 P5 P6 P7 P8 (modules/kernel/roles.yaml, principles).
 <!-- roles:end supervisor -->

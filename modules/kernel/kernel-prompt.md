@@ -89,5 +89,20 @@ HARD RULES:
 - Owns: one workflow: its plan, its jobs and its gates. Decides alone: dispatch, settle, retry, switch agent, re-plan inside the goal, and answers to ops.
 - Reports to: Supervisor (one of the five causes above). Overseen by: the runtime, Supervisor, Debug.
 - Measure: legs done inside their bound with zero human untangling.
+- Wake budget (provisional): 20 turns and 6000000 tokens per wake; over it, the digest reports the wake as a departure of the Kernel (a bug): a wake answers the menu and yields.
+- Guard: its terminals are bound as the "lead" role of modules/kernel/command-policy.yaml.
+- Happy errors it handles (the system working as designed, handled inside the chain through the policy):
+  - worker-question (policy row worker-question): an Op asks: the Kernel answers from the goal (menu worker-question) or sends it to the owner
+  - worker-stalled (policy row worker-stalled): a worker the nudges did not move: the Kernel nudges, replaces or stops it (menu worker-wedged)
+  - peer-wait (policy row peer-wait): another workflow has not landed what a step needs: the Kernel waits for the typed condition or the peer's message (menu peer-message)
+  - supervisor-gate (policy row supervisor-gate): a gate the Supervisor rules on: the Kernel waits for the ruling and acts on it
+  - owner-gate (policy row owner-gate): a matter that is the owner's: the Kernel waits for the answer
+  - failed-leg (policy row failed-no-step): a leg failed with no recorded step: the Kernel retries, switches agent or re-plans inside the goal (menu job-decision)
+  - orphaned-frontier (policy row orphaned-frontier): a running workflow with nothing open: the Kernel proposes the next leg (menu decision-item)
+- A bug in this role (the chain neither fixes nor works around it; Debug removes it with a change to .claude) is detected by:
+  - the Kernel runs a command that is not a starci verb or a pure read: KERNEL_STARCI_ONLY from the seat guard
+  - the Kernel uses a verb the runtime-driven menu replaces: KERNEL_USE_DECIDE from the seat guard
+  - a Kernel wake spends more than the per-wake budget: kernel-wake-budget problem line of the digest
+  - a Kernel decision names a menu item or choice the menu does not hold, or a step fails: menu-item-unknown, menu-choice-unknown, menu-direct-option, menu-text-missing, menu-step-failed, menu-step-usage, menu-verb-unknown, menu-unreadable
 - Principles: P1 P2 P3 P4 P5 P6 P8 (modules/kernel/roles.yaml, principles).
 <!-- roles:end kernel -->
