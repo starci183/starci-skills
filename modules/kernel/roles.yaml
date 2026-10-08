@@ -28,6 +28,7 @@ floor:
     - "detects and counts every situation of the hold policy (modules/kernel/op-incident-policy.yaml) and takes its mechanical steps"
     - "dispatches ready work, retries inside bounds and switches agent on the tier chain"
     - "runs the checks, keeps the ledger, and collects leftovers no seat owns (reservations, leases, worktree records, queue items)"
+    - "wakes a seat only while its menu holds an item and replaces a Kernel that has received afterWakes wakes or spent afterTokens tokens since its boot by a fresh seat that reads the ledger (modules/reconciler/seat-cost.yaml), so a seat costs in proportion to its decisions; starci reconciler status prints per seat its wakes, its empty wakes and its tokens per wake"
   never:
     - "decides product intent or a costly-to-reverse choice"
 

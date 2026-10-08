@@ -3,14 +3,16 @@
 // and not the world, and a seat the runtime woke with an empty menu too often is a departure of the runtime in the digest.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { withLedger, seedWorkflow } from '../helpers/ledger-fixture.mjs';
 import { seatCostConfig, kernelWakeLog, kernelWorkAts, kernelSkippedLog, supervisorWakeLog, supervisorWorkAts, withWorked } from '../../scripts/kernel/seat-wakes.mjs';
-import { seatRow, seatsOverEmptyBound, kernelSeatOf, supervisorSeatOf, seatCostLines, withShares } from '../../scripts/reconciler/seat-cost.mjs';
+import { seatRow, seatsOverEmptyBound, kernelSeatOf, supervisorSeatOf, seatCostLines, withShares, wakesWithUsage, collectSeatCost } from '../../scripts/reconciler/seat-cost.mjs';
 import { rotationDue, rotationRule, kernelSinceBoot, createKernelRotation } from '../../scripts/kernel/seat-rotation.mjs';
-import { menuVerdict, gatedWake } from '../../scripts/kernel/wake-menu-gate.mjs';
+import { menuVerdict, gatedWake, probeMenu, repoOfLedger } from '../../scripts/kernel/wake-menu-gate.mjs';
 import { seatStatusText } from '../../scripts/kernel/verbs/shared/status-lines.mjs';
 import { supervisorMenuLines } from '../../scripts/supervisor/supervisor-menu.mjs';
+import { openDecisionRow, ringDoorbellWith } from '../../scripts/machine/decisions.mjs';
 import { analyze } from '../../scripts/reconciler/debug-digest-analyze.mjs';
 import { digestNumbers } from '../../scripts/reconciler/debug-digest-numbers.mjs';
 import { incidentPolicy, boundValue } from '../../scripts/kernel/op-incident-policy.mjs';
@@ -134,12 +136,12 @@ test('the menu gate holds a wake only for an explicit empty menu, writes one ski
   assert.equal(menuVerdict({}).hold, false, 'an unanswered field is not an empty menu');
   let sent = 0;
   const send = () => { sent += 1; return { action: 'kernel-woken', delivered: true }; };
-  const held = gatedWake(ledger, { workflowId: WF, cause: 'transition:report-filed', send, probe: () => ({ ok: true, fields: { 'frontier.actionable': false, 'frontier.reason': 'nothing to decide', menu: [] } }) });
+  const held = gatedWake(ledger, { workflowId: WF, cause: 'transition:report-filed', send, deps: { menuProbe: () => ({ ok: true, fields: { 'frontier.actionable': false, 'frontier.reason': 'nothing to decide', menu: [] } }) } });
   assert.deepEqual([held.sent, held.answer.action, sent], [false, 'kernel-no-menu', 0]);
   assert.deepEqual(kernelSkippedLog(ledger.db, WF), [{ at: kernelSkippedLog(ledger.db, WF)[0].at, cause: 'transition:report-filed' }]);
-  assert.equal(gatedWake(ledger, { workflowId: WF, cause: 'x', send, probe: () => ({ ok: true, fields: { 'frontier.actionable': true, menu: [{}] } }) }).sent, true);
-  assert.equal(gatedWake(ledger, { workflowId: WF, cause: 'x', send, probe: () => ({ ok: false, error: 'timeout' }) }).sent, true, 'a lost wake costs more than an empty one');
-  assert.equal(gatedWake(ledger, { workflowId: WF, cause: 'x', send, probe: () => assert.fail('a probe child does not probe'), env: { STARCI_WAKE_PROBE: '1' } }).sent, true);
+  assert.equal(gatedWake(ledger, { workflowId: WF, cause: 'x', send, deps: { menuProbe: () => ({ ok: true, fields: { 'frontier.actionable': true, menu: [{}] } }) } }).sent, true);
+  assert.equal(gatedWake(ledger, { workflowId: WF, cause: 'x', send, deps: { menuProbe: () => ({ ok: false, error: 'timeout' }) } }).sent, true, 'a lost wake costs more than an empty one');
+  assert.equal(gatedWake(ledger, { workflowId: WF, cause: 'x', send, deps: { menuProbe: () => assert.fail('a probe child does not probe') }, env: { STARCI_WAKE_PROBE: '1' } }).sent, true);
   assert.equal(sent, 3);
 }));
 
@@ -160,3 +162,39 @@ test('a bound seat reads its menu, bounded, on a ledger with a hundred open item
   assert.ok(lines.join('\n').length <= bounds.supervisorTextChars + 1500, 'the capped Supervisor menu is a few items, not a hundred');
   assert.match(lines.at(-1), new RegExp(`\\+${100 - bounds.supervisorMenuItems} more item`));
 });
+
+test('the doorbell rings for an item the menu lists, not for a settle item whose job the settler never handed over', (t) => withLedger(t, ({ ledger }) => {
+  seed(ledger, []);
+  openDecisionRow(ledger, { workflowId: WF, kind: 'settle-nongreen', entity: { type: 'job', id: 'op-gone' }, summary: 'blocked', by: 'reconciler/job' }, { now: 0 });
+  const calls = [];
+  const wake = (args) => { calls.push(args.text); return { action: 'kernel-woken', delivered: true, terminal: 'term_1', state: 'turn-idle' }; };
+  assert.equal(ringDoorbellWith({ ledger, workflowId: WF, wake, now: 1000 }).action, 'nothing-open');
+  openDecisionRow(ledger, { workflowId: WF, kind: 'supervisor-ruling', entity: { type: 'job', id: 'op-1' }, summary: 'ruling', by: 'supervisor' }, { now: 0 });
+  assert.equal(ringDoorbellWith({ ledger, workflowId: WF, wake, now: 2000 }).action, 'rung');
+  assert.equal(calls.length, 1);
+}));
+
+test('the probe asks a read-only status for the menu fields, and a stopped probe is not an answer', () => {
+  const asked = [];
+  const run = (args, options) => { asked.push({ args, env: options.env }); return { status: 0, stdout: JSON.stringify({ ok: true, fields: { 'frontier.actionable': false, menu: [] } }), stderr: '' }; };
+  assert.deepEqual(probeMenu({ repo: '/r', workflowId: WF, run, env: {} }).fields, { 'frontier.actionable': false, menu: [] });
+  assert.ok(asked[0].args.includes('--field') && asked[0].args.includes('status'));
+  assert.equal(asked[0].env.STARCI_WAKE_PROBE, '1', 'the child never gates a wake of its own');
+  assert.equal(probeMenu({ repo: '/r', workflowId: WF, run: () => ({ status: 1, stdout: '', stderr: 'boom' }), env: {} }).ok, false);
+  assert.equal(repoOfLedger({ file: path.join('r', '.starciwork', 'runtime.sqlite') }), 'r');
+  assert.equal(repoOfLedger({}), null);
+});
+
+test('the machine view joins the wakes with the usage they own and shares the machine total across Kernels and the Supervisor', (t) => withLedger(t, ({ ledger, ledgerFile }) => {
+  seed(ledger, [event('kernel-woken', T0), event('kernel-decision', T0 + MIN)]);
+  const [wake] = kernelWakeLog(ledger.db, WF);
+  ledger.db.prepare(`INSERT INTO llm_usage(workflow_id,subject_type,turn_ref,provider,cache_read_tokens,turns,source,at)
+    VALUES(?,'kernel-turn',?,'claude',1000,4,'cli-transcript',?)`).run(WF, `kernel:${WF}:s@4#w${wake.seq}`, T0);
+  assert.deepEqual(wakesWithUsage([{ seq: wake.seq, cause: 'stall', worked: true }, { seq: 999, cause: 'stall', worked: false }], [{ seq: wake.seq, turns: 4, tokens: 1000 }]).map((row) => row.tokens), [1000, 0]);
+  const machineDb = new DatabaseSync(':memory:');
+  machineDb.exec('CREATE TABLE sup_events(seq INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT, created_at INTEGER, payload_json TEXT); CREATE TABLE sup_messages(direction TEXT, at INTEGER);'
+    + 'CREATE TABLE llm_usage(subject_type TEXT, turn_ref TEXT, turns INTEGER, input_tokens INTEGER, output_tokens INTEGER, cache_read_tokens INTEGER, cache_write_tokens INTEGER);');
+  const cost = collectSeatCost({ machineDb, ledgers: [{ file: ledgerFile, name: 'cost' }], now: T0 + 10 * MIN });
+  machineDb.close();
+  assert.deepEqual(cost.seats.map((row) => [row.seat, row.wakes, row.tokens, row.sharePercent]), [['kernel', 1, 1000, 100], ['supervisor', 0, 0, 0]]);
+}));

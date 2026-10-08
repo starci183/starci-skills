@@ -360,3 +360,7 @@ dead agent's transcript.
   - a Kernel decision names a menu item or choice the menu does not hold, or a step fails: menu-item-unknown, menu-choice-unknown, menu-direct-option, menu-text-missing, menu-step-failed, menu-step-usage, menu-verb-unknown, menu-unreadable
 - Principles: P1 P2 P3 P4 P5 P6 P8 (modules/kernel/roles.yaml, principles).
 <!-- roles:end kernel -->
+
+## Seat cost
+
+A seat costs by the turns it re-reads, and its context grows about a thousand tokens per turn, so one long session costs the square of its turns (measured: 50 k tokens at the first turn, 700 k to 800 k at turn 230 to 620). The runtime therefore wakes a Kernel only while its menu holds an item (`scripts/kernel/wake-menu-gate.mjs`; the stall wake asks the same projection), prints per seat the wakes that decided nothing (`starci reconciler status`, `starci debug digest`), and replaces an idle Kernel that has received `rotation.kernel.afterWakes` wakes or spent `afterTokens` tokens since its boot by a fresh seat (`scripts/kernel/seat-rotation.mjs`): the new Kernel reads the ledger, never the old seat's memory. The numbers live in `modules/reconciler/seat-cost.yaml`.

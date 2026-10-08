@@ -19,7 +19,7 @@ const withOpenDi = (t) => {
   const ledger = openLedger({ file: ledgerFileFor(repo) });
   cleanup(t, repo, ledger);
   ledger.ensureWorkflow({ workflowId: WF, title: 'bell' });
-  openDecisionRow(ledger, { workflowId: WF, kind: 'settle-nongreen', entity: { type: 'job', id: 'op-1' }, summary: 'blocked', by: 'reconciler/job' }, { now: 0 });
+  openDecisionRow(ledger, { workflowId: WF, kind: 'supervisor-ruling', entity: { type: 'job', id: 'op-1' }, summary: 'blocked', by: 'reconciler/job' }, { now: 0 });
   return { repo, ledger };
 };
 const seat = (state) => {

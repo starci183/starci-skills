@@ -37,12 +37,14 @@ export function probeMenu({ repo, workflowId, run = runNode, env = process.env }
 export const repoOfLedger = (ledger) => (ledger?.file ? path.dirname(path.dirname(ledger.file)) : null);
 
 /**
- * `send()` unless the Kernel's menu is empty. `probe` answers {ok, fields}; the default probe is the real status child, skipped inside a probe
- * child, when the ledger names no repository and when `skip` (a caller that replaced the host seams, a spec). Returns {sent: true, answer} or {sent: false, answer: {action: 'kernel-no-menu', delivered: false, reason}}.
+ * `send()` unless the Kernel's menu is empty. `deps.menuProbe` answers {ok, fields}; the default probe is the real status child, skipped inside a probe
+ * child, when the ledger names no repository and when the caller replaced the host seams (`deps.show|read|send`, a spec) without a probe. Returns {sent: true, answer} or {sent: false, answer: {action: 'kernel-no-menu', delivered: false, reason}}.
  */
-export function gatedWake(ledger, { workflowId, cause, send, probe = null, skip = false, env = process.env }) {
+export function gatedWake(ledger, { workflowId, cause, send, deps = {}, env = process.env }) {
   const repo = repoOfLedger(ledger);
-  if (skip || readEnv('STARCI_WAKE_PROBE', env) || (!probe && !repo)) return { sent: true, answer: send() };
+  const probe = deps.menuProbe ?? null;
+  const seamsReplaced = Boolean(deps.show || deps.read || deps.send) && !probe;
+  if (seamsReplaced || readEnv('STARCI_WAKE_PROBE', env) || (!probe && !repo)) return { sent: true, answer: send() };
   const seen = (probe ?? (() => probeMenu({ repo, workflowId, env })))();
   const verdict = seen.ok ? menuVerdict(seen.fields) : { hold: false };
   if (!verdict.hold) return { sent: true, answer: send() };

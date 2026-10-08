@@ -8,8 +8,6 @@
 // status read is its handover: the menu, and the ledger behind it.
 import { seatCostConfig, kernelWakeLog } from './seat-wakes.mjs';
 
-const BOOT_KINDS = ['kernel-booted', 'kernel-restarted'];
-
 /** The rule of a role: {afterWakes, afterTokens, event}, or null when the role is not rotated. */
 export const rotationRule = (role) => seatCostConfig().rotation?.[role] ?? null;
 
@@ -26,8 +24,8 @@ const sessionOf = (turnRef) => String(turnRef).split('@')[0].split(':').slice(2)
 
 /** What the Kernel of a workflow has received and spent since its latest boot: {bootAt, wakes, tokens}. Ledger reads only. */
 export function kernelSinceBoot(db, workflowId) {
-  const marks = BOOT_KINDS.map(() => '?').join(',');
-  const bootAt = Number(db.prepare(`SELECT MAX(created_at) AS at FROM events WHERE workflow_id=? AND kind IN (${marks})`).get(workflowId, ...BOOT_KINDS)?.at ?? 0);
+  const boots = rotationRule('kernel').bootEvents;
+  const bootAt = Number(db.prepare(`SELECT MAX(created_at) AS at FROM events WHERE workflow_id=? AND kind IN (${boots.map(() => '?').join(',')})`).get(workflowId, ...boots)?.at ?? 0);
   const wakes = kernelWakeLog(db, workflowId).filter((wake) => wake.at >= bootAt).length;
   const rows = db.prepare("SELECT turn_ref, at, COALESCE(input_tokens,0)+COALESCE(output_tokens,0)+COALESCE(cache_read_tokens,0)+COALESCE(cache_write_tokens,0) AS tokens FROM llm_usage WHERE workflow_id=? AND subject_type='kernel-turn'").all(workflowId);
   const older = new Set(rows.filter((row) => Number(row.at) < bootAt).map((row) => sessionOf(row.turn_ref)));

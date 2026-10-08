@@ -471,8 +471,7 @@ export const transitionWakeText = (workflowId, transition, lines) =>
  */
 export function wakeKernelForTransition(ledger, { workflowId, transition, ids = {}, lines, deps = {} }) {
   const send = () => wakeKernel({ db: ledger.db, workflowId, text: transitionWakeText(workflowId, transition, lines), pending: 'enter', deps });
-  const seamsReplaced = Boolean(deps.show || deps.read || deps.send);
-  const { answer: woke } = gatedWake(ledger, { workflowId, cause: `transition:${String(transition).split(':')[0]}`, send, probe: deps.menuProbe ?? null, skip: seamsReplaced && !deps.menuProbe });
+  const { answer: woke } = gatedWake(ledger, { workflowId, cause: `transition:${String(transition).split(':')[0]}`, send, deps });
   if (woke.action !== 'kernel-woken') {
     // A refused wake send is recorded kernel-wake-unwritable (the kernel-side op-worker-unwritable),
     // so the watchdog's next tick closes the stale incarnation instead of typing into it again.
