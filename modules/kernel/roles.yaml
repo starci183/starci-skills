@@ -290,6 +290,7 @@ roles:
       - {id: workflow-conflict, row: peer-dependency, what: "two workflows want the same files, ports or foundation: the Supervisor decides who goes first (menu workflow-conflict)"}
       - {id: resource-division, row: pool-full, what: "provider capacity is shared by every workflow: the Supervisor divides it (menu resource-division)"}
       - {id: runtime-defect, row: runtime-defect, what: "a suspected runtime defect: the Supervisor gives the Kernel a workaround and records the defect for Debug (menu runtime-defect)"}
+      - {id: kernel-escape, row: menu-escape, what: "a Kernel whose menu offered no fitting option escaped it with none-fits: the Supervisor answers with a ruling to the Kernel or records the defect for Debug (menu kernel-escape)"}
     bugSurface:
       - {bug: "the Supervisor runs a command that is not a starci verb or a pure read", signal: "SUPERVISOR_STARCI_ONLY from the seat guard", detectedBy: scripts/guards/supervisor-seat.mjs}
       - {bug: "the Supervisor uses a verb the runtime-driven menu replaces", signal: "SUPERVISOR_USE_DECIDE from the seat guard", detectedBy: scripts/guards/supervisor-seat.mjs}

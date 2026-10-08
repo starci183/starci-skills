@@ -112,8 +112,8 @@ test('pending may name an open registry entry instead of a lane; a closed or unk
   assert.equal(standing(ok, 'supervisor').cells.budget, 'pending');
   assert.deepEqual(messagesOf(ok), []);
   assert.match(renderStandingTable(ok, roleStandings(ok, skillRoot)), /pending \(supervisor-wake-budget-unmeasured\)/);
-  const table = renderRolesTable(withRole('supervisor', (role) => { delete role.happyErrors; role.pending = [{ requirements: ['happy-errors'], entry: 'supervisor-menu-escape-has-no-policy-row', since: '2026-10-08' }]; }));
-  assert.match(table, /pending, entry supervisor-menu-escape-has-no-policy-row/);
+  const table = renderRolesTable(withRole('supervisor', (role) => { delete role.happyErrors; role.pending = [{ requirements: ['happy-errors'], entry: 'supervisor-wake-budget-unmeasured', since: '2026-10-08' }]; }));
+  assert.match(table, /pending, entry supervisor-wake-budget-unmeasured/);
   assert.match(messagesOf(pendingOn('critic-pinned-by-hand')).join('\n'), /is not an open entry/);
   assert.match(messagesOf(pendingOn('no-such-entry')).join('\n'), /is not an open entry/);
 });
