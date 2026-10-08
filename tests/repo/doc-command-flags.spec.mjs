@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { CATALOG } from '../../packages/cli/src/catalog.generated.mjs';
-import { checkCommand, docCommandFiles, extractCommands, problemsIn } from '../helpers/doc-commands.mjs';
+import { checkCommand, extractCommands } from '../../scripts/checks/lib/doc-commands.mjs';
+import { docCommandFiles, problemsIn } from '../helpers/doc-commands.mjs';
 
 // Every `starci <group> <verb> <flags>` shown to an agent or owner is a call the dispatcher would accept:
 // known verb, declared flags, valid enum values, required flags and positionals present (fragments excepted).

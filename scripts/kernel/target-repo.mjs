@@ -10,6 +10,7 @@ import { readModuleJson, starciSourceRoot } from '../../engine/runtime-root.mjs'
 import { readJsonFile } from '../lib/json.mjs';
 import { isDir } from '../lib/fs-kind.mjs';
 import { foldCase, realPath } from '../lib/path-key.mjs';
+import { trimEndWhile } from '../lib/trim-end.mjs';
 
 const key = (value) => foldCase(realPath(value));
 const samePath = (a, b) => key(a) === key(b);
@@ -51,11 +52,6 @@ export function boundRepoRoots(ledgerRepos) {
   return [...out.values()];
 }
 
-const trimEndWhile = (value, matches) => {
-  let end = value.length;
-  while (end > 0 && matches(value[end - 1])) end -= 1;
-  return value.slice(0, end);
-};
 const repoName = (url) => (typeof url === 'string' ? trimEndWhile(url, (c) => c === '/' || c === '\\').split(/[\\/:]/).pop().replace(/\.git$/i, '') : null);
 
 // A repo id is a side (be or fe), or the app repository's name or path.

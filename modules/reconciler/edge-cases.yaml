@@ -62,6 +62,13 @@ cases:
     rule: {file: knowledge/op-gate.yaml, anchor: "readSet"}
     spec: tests/kernel/op-read-set.spec.mjs
     status: covered
+  - id: documented-command-two-extractors
+    family: correctness
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "two code paths decided whether a text shows a starci command that exists, tests/helpers/doc-commands.mjs (tokens, flags, enums, required options) and scripts/checks/check-prose-commands.mjs (R230: regex heads and prose clauses); a regex written into a yaml value was read as a command by one and not the other, and an earlier attempt to give R230 the helper's extractor produced 15 false positives because a prose word after 'starci' was read as an unknown group", remedy: {state: in-tree, change: "scripts/checks/lib/doc-commands.mjs is the one extractor and judge; R230 and the doc-command specs call it, R230 holds a prose mention to unknown verbs and options and a span or fence to unknown groups too; 2834 occurrences of the tree and 6000 fuzzed lines read identically before and after the move"}}
+    met: {date: "2026-10-08", where: "R230 and the doc-command helper disagreed on a regex pattern over a command spelling", evidence: "tests/repo/doc-commands.spec.mjs regex-pattern test; lane brief alpha.8 E3"}
+    rule: {file: scripts/checks/lib/doc-commands.mjs, anchor: "extractCommands"}
+    spec: tests/checks/check-prose-commands.spec.mjs
+    status: covered
   - id: quota-window-unstarted
     family: failure-while-running
     met: {date: "2026-10-08", where: "provider quota after re-login", evidence: "commit f4fca8baf"}

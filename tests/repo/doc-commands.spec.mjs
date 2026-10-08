@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { CATALOG } from '../../packages/cli/src/catalog.generated.mjs';
-import { checkCommand, docCommandFiles, extractCommands } from '../helpers/doc-commands.mjs';
+import { checkCommand, extractCommands } from '../../scripts/checks/lib/doc-commands.mjs';
+import { docCommandFiles } from '../helpers/doc-commands.mjs';
 import { proseCommandFindings } from '../../scripts/checks/check-prose-commands.mjs';
 
 // Every `starci <group> <verb>` an agent or owner is told to run exists in the generated command catalog.
