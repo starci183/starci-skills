@@ -26,7 +26,7 @@ export const unsteppedFailures = (db, failedRows, workflowJobs) => unresolvedFai
 export const ownerWaitsWithoutAsk = (awaitingOwner) => awaitingOwner.filter((item) => !item.dispatchId);
 
 /** Whether one awaiting_owner job has neither an ask the owner can answer nor a retry that took its place. */
-export function ownerWaitIsAskless(db, row) {
+function ownerWaitIsAskless(db, row) {
   if (row.status !== 'awaiting_owner' || retryAttemptOf(db, row)) return false;
   const asked = jobResult(db, row.job_id)?.askDispatchId
     ?? db.prepare("SELECT dispatch_id FROM reports WHERE job_id=? AND outcome='ask' LIMIT 1").get(row.job_id)?.dispatch_id;
