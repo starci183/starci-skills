@@ -607,6 +607,7 @@ cases:
     met: {date: "2026-10-09", where: "wave 3 brief: a land carries a one-line note for the Kernels", evidence: "briefs/WAVE3.md lane f7 item 3b"}
     rule: {file: scripts/kernel/runtime-rev.mjs, anchor: "landKernelNotes"}
     spec: tests/kernel/kernel-runtime-rev.spec.mjs
+    status: covered
   - id: op-prompt-files-glob-and-schemas-beyond-its-read
     family: smooth-operation
     finding: {role: runtime, duty: does, verdict: departs, evidence: "code.refactor filed 91 mandatory files outside the example catalog (74 of them the sources of every architecture machine, 41 KB prompt), content.generate 68 (all of knowledge/patterns), security.verify 85 (the same 74 machine sources, 39 KB prompt) and business.decide 28 record schemas (341 KB) of which its record kinds use 9; the files ride in the worker's context on every turn", remedy: {state: in-tree, change: "each op files the law inputs plus the files its READ step names (gate.mjs and code-patterns.yaml instead of the machine sources; the kind-always patterns instead of the pattern tree; the schemas of fr, nfr, br, ac, decision, data, journey and the feature); knowledge/op-gate.yaml readSet.alsoBound and maxSchemaFiles bound them"}}

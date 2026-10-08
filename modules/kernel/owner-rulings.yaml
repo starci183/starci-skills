@@ -130,3 +130,7 @@ rulings:
     date: '2026-10-08'
     ruling: The example apps are analysed on SonarCloud with the runtime's one token and the local self-hosted Sonar solution for the examples is deleted ("xoa giai phap cua local di"); the specs of that removed stack supplier go with it.
     enforcedBy: [scripts/gates/starcistacks-form.mjs, scripts/hfs/runtime-rules/secret-tracked.mjs]
+  - id: gate-loosening-4c2ebeed9581
+    date: '2026-10-08'
+    ruling: The public runtime repository tracks no secret material, not even ciphertext ("khong muon commit enc cua .claude len"); the seven held .enc members, their allowance and the specs of sealing into ext/sonar are removed.
+    enforcedBy: [scripts/hfs/runtime-rules/secret-tracked.mjs]
