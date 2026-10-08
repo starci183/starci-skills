@@ -53,11 +53,18 @@ test('a redirect loop stops at the follow limit and answers the last redirect', 
 });
 
 test('refused is down, an accepted connection that never answers is hung, a bad URL is an error', async (t) => {
-  const free = net.createServer();
-  await new Promise((resolve) => free.listen(0, '127.0.0.1', resolve));
-  const deadPort = free.address().port;
-  await new Promise((resolve) => free.close(resolve));
-  assert.equal((await probe(`http://127.0.0.1:${deadPort}/`, { timeoutMs: 2000 })).state, 'down');
+  // A port is free only until another process of a parallel run binds it: a probe that met a foreign listener there is taken
+  // again on a fresh port, and the answer of the last try is what the assertion reads (with its code).
+  const refusedProbe = async (tries) => {
+    const free = net.createServer();
+    await new Promise((resolve) => free.listen(0, '127.0.0.1', resolve));
+    const deadPort = free.address().port;
+    await new Promise((resolve) => free.close(resolve));
+    const answer = await probe(`http://127.0.0.1:${deadPort}/`, { timeoutMs: 2000 });
+    return answer.state === 'down' || tries <= 1 ? answer : refusedProbe(tries - 1);
+  };
+  const refused = await refusedProbe(3);
+  assert.equal(refused.state, 'down', `a refused connection reads ${refused.state} (${refused.code})`);
   const sockets = [];
   const hung = net.createServer((s) => sockets.push(s));
   await new Promise((resolve) => hung.listen(0, '127.0.0.1', resolve));
