@@ -43,15 +43,19 @@ function endedByRestart(pass, job) {
   return incarnation.ok && Number.isFinite(spawnedAt) && incarnation.startedAt - allocationMs('providerReservation.restartToleranceMs') > spawnedAt;
 }
 
+/** Fails the job when a restart ended its launch: true once it did. */
+function failIfRestarted(pass, job, worker) {
+  if (!dispatchGone(job, worker) || !endedByRestart(pass, job)) return false;
+  failDeadSpawn(pass, job, { terminal: job.worker_id ?? null, reason: 'host-restarted' });
+  return true;
+}
+
 /** Reconcile the original Dispatch only: uncertain effects never authorize another worker. */
 export function reconcileSpawning(pass, job, { markRunning, renderPrompt }) {
   const { m, deps, root } = pass;
   try {
     const worker = job.payload.dispatch ? (deps.workerShow ?? workerShow)({ dispatch: job.payload.dispatch }) : null;
-    if (dispatchGone(job, worker) && endedByRestart(pass, job)) {
-      failDeadSpawn(pass, job, { terminal: job.worker_id ?? null, reason: 'host-restarted' });
-      return true;
-    }
+    if (failIfRestarted(pass, job, worker)) return true;
     if (!worker?.ok) return false;
     const terminal = worker.dispatch?.assigneeHandle ?? worker.result?.worker?.agentTerminalHandle ?? job.worker_id;
     if (!terminal || (job.worker_id && job.worker_id !== terminal)) return false;
