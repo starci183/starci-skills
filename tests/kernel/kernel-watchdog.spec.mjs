@@ -176,7 +176,7 @@ test('the whole typed wake stays under the size Claude Code folds into a pasted_
   const rev='Runtime rev c98cbc727 -> 1a5452b00 changed: 3 file(s); re-read them and ack before anything else.';
   const prompt=buildWakePrompt('wf-starci-auth-test-workflow-muxq4oyr',12,rev);
   assert.ok(prompt.length<800,`the wake is ${prompt.length} characters`);
-  assert.match(prompt,/needs-kernel-decision/);
+  assert.match(prompt,/starci kernel decide/);
 });
 
 test('watchdog wake names the Kernel seat it is for, checkable with starci kernel status, and claims no approval',()=>{
@@ -264,8 +264,10 @@ const KERNEL_IDLE = [' Yielding — waiting on the code.refactor report.', '✻ 
 
 // The sender terminal a launch needs (workflowSender); the fixture's own Kernel terminal stands in for the runtime-owned one.
 const SENDER = 'fake-sender-terminal';
-const watchdogWorld = async (t, { jobs = [], events = [], tabTitle = null, signalValue = null } = {}) => {
+// `stall`: the Workflow controller's orphaned-frontier Decision Item is open, so the Kernel's menu holds an item and its wake is due.
+const watchdogWorld = async (t, { jobs = [], events = [], tabTitle = null, signalValue = null, stall = true } = {}) => {
   const { seedWorkflow } = await import('../helpers/ledger-fixture.mjs');
+  const { openDecisionRow } = await import('../../scripts/machine/decisions.mjs');
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-watchdog-e2e-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
   const repo = path.join(root, 'repo'); fs.mkdirSync(repo, { recursive: true });
@@ -286,6 +288,7 @@ const watchdogWorld = async (t, { jobs = [], events = [], tabTitle = null, signa
         // The Kernel acked the current runtime rev: an unacked seat gets a rev paragraph that pushes the wake past the delivery proof's window.
         { kind: KERNEL_REV_ACKED_EVENT, entityType: 'kernel', payload: { rev: currentRuntimeRev(), files: [], source: 'ack', attempt: 2 } }, ...events],
       signals: [{ key: workflowId, value: signalValue ?? { terminal: KERNEL, dispatch: 'dispatch-kernel-1', host: 'orca', agent: 'claude', launch: 'worker' } }] });
+    if (stall) openDecisionRow(ledger, { workflowId, kind: 'orphaned-frontier', entity: { type: 'workflow', id: workflowId }, summary: 'nothing is open and nothing is owed', by: 'reconciler/workflow' });
     // A replaced seat starts only on an owner-approved goal.
     ledger.db.prepare("UPDATE goals SET approved_by='owner' WHERE workflow_id=?").run(workflowId);
     // A replaced seat re-binds the workflow's claimed goal: with none, start-workflow answers queue-empty and launches nothing.
@@ -327,7 +330,7 @@ test('a liveness tick types exactly the wake starci kernel status implies', asyn
 // A Kernel idle at its prompt with nothing actionable for it (a gate that names its cause and has no workaround is open, the frontier
 // is awaiting-owner) is left alone: the tick answers idle-waiting and types nothing.
 test('a turn-idle Kernel behind a non-actionable frontier is left alone', async (t) => {
-  const fx = await watchdogWorld(t);
+  const fx = await watchdogWorld(t, { stall: false });
   const incident = fx.api('incident', '--kind', 'owner-gate', '--detail', 'the owner decides the scope', '--cause', 'plan-divergence', '--no-workaround', 'owner-only-intent');
   assert.equal(incident.ok, true, JSON.stringify(incident));
   assert.equal(fx.api('status').frontier.actionable, false);

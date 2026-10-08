@@ -75,19 +75,16 @@ test("a raw git commit or git worktree add from the Kernel's terminal is refused
   assert.ok(await decide('Stop-Process -Name node', { tool: 'PowerShell' }));
 });
 
-test("the Kernel's legitimate api calls, git reads and Orca orchestration pass", async (t) => {
+test("the Kernel's own calls pass: the read verbs, the typed log and the decision verb; the runtime's verbs, git and Orca are refused (the seat table is tested in kernel-seat.spec.mjs)", async (t) => {
   const { decide, worktree } = kernelSeat(t), wt = worktree.replace(/\\/g, '/');
-  const api = path.join(ROOT, 'scripts', 'kernel', 'cli.mjs').replace(/\\/g, '/');
   for (const command of [
     `starci kernel status --repo ${wt} --workflow wf-kguard`,
-    `starci kernel dispatch-ready --repo ${wt} --workflow wf-kguard`,
     `starci kernel log --repo ${wt} --workflow wf-kguard --kind decision --msg "next slice" --data '{"why":"the runtime runs git commit at settle"}'`,
-    `starci kernel settle --repo ${wt} --job op-a --verdict pass`,
-    'git status --short',
-    'git log --oneline -5',
-    'git diff HEAD',
-    'orca orchestration worker-show --dispatch d-1 --json',
+    `starci kernel decide --repo ${wt} --workflow wf-kguard --item job-decision:op-a --choice continue --reason "retry"`,
   ]) assert.equal(await decide(command), null, command);
+  for (const command of [`starci kernel dispatch-ready --repo ${wt} --workflow wf-kguard`, `starci kernel settle --repo ${wt} --job op-a --verdict pass`, 'git status --short', 'orca orchestration worker-show --dispatch d-1 --json']) {
+    assert.ok(await decide(command), `refused: ${command}`);
+  }
 });
 
 test('the history hook skips a kernel guard (the runtime git under its api calls) and still refuses an op', (t) => {

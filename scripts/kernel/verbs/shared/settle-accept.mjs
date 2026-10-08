@@ -7,6 +7,7 @@ import { AWAITING_OWNER, AWAITING_OWNER_STATUS } from '../../../../engine/admiss
 import { settleCheckpoint } from '../../workflow-settle.mjs';
 import { appendEffectEvent } from '../../workflow-checkpoint-state.mjs';
 import { requireWorkflowPlacement, workflowAppRepo } from '../../workflow-worktree.mjs';
+import { supersedeDirs } from '../../../machine/placement-rebound.mjs';
 import { refuse } from '../../../../engine/refuse.mjs';
 import { parseJson } from '../../../lib/json.mjs';
 import { workRecordFilesOf } from './work-record-files.mjs';
@@ -232,7 +233,7 @@ function settleWorkflowCheckpoint(ctx, locked, replay) {
   const { st, jobId, verdict, repo, emit, args } = ctx;
   const job = st.job;
   const context = parseJson(ctx.replayAttempt?.context_json) ?? {};
-  const placements = [ctx.replayAttempt?.worktree_path, context.worktree, context.packet?.context?.workflow_worktree?.path].filter((dir) => typeof dir === 'string' && dir);
+  const placements = supersedeDirs(ctx.db, ctx.replayAttempt?.attempt_id ?? null, [ctx.replayAttempt?.worktree_path, context.worktree, context.packet?.context?.workflow_worktree?.path].filter((dir) => typeof dir === 'string' && dir).map((dir) => path.resolve(repo, dir)));
   const tree = requireWorkflowPlacement(locked, { workflowId: job.workflow_id, placements: placements.map((dir) => path.resolve(repo, dir)),
     required: Boolean(context.packet?.context?.workflow_worktree || replay || workflowAppRepo(repo) || placements.some((dir) => workflowAppRepo(path.resolve(repo, dir)))) });
   if (!tree) return;

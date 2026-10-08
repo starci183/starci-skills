@@ -4658,6 +4658,27 @@ RIGHTS_OP_RUNTIME_WRITE:
   owner: op-retry
   kind: verb-refusal
 
+RIGHTS_OP_OUTSIDE_OWNED:
+  title: "Op write outside its owned paths refused"
+  title_vi: "Từ chối op ghi ngoài đường dẫn được sở hữu"
+  meaning_vi: "Op chỉ ghi trong các đường dẫn mà lượt chạy của nó sở hữu và trong thư mục tạm của runtime; một tệp nằm ngoài các nơi đó không được ghi."
+  causes_vi:
+    - "Op sửa một tệp của ứng dụng nằm ngoài các đường dẫn được giao cho lượt chạy"
+    - "Op tạo tệp tạm trong worktree thay vì thư mục tạm của runtime"
+  nextStep_vi: "Lệnh bị từ chối; đặt tệp tạm trong thư mục tạm của runtime, còn thay đổi cần thiết ngoài phạm vi thì ghi là việc còn nợ trong báo cáo để Kernel cắt thành lượt chạy riêng."
+  owner: op-retry
+  kind: verb-refusal
+
+RIGHTS_OP_CONTROL_PLANE:
+  title: "Op control-plane verb refused"
+  title_vi: "Từ chối op gọi động từ của mặt phẳng điều khiển"
+  meaning_vi: "Op chỉ chạy các động từ năng lực của công việc (máy chủ, kết xuất, tạo ảnh, kiểm thử) và báo cáo cho Kernel; các nhóm supervisor, reconciler, workflow, route và debug do bộ điều khiển, Kernel và Supervisor chạy."
+  causes_vi:
+    - "Op chạy starci supervisor, reconciler, workflow, route hoặc debug"
+  nextStep_vi: "Lệnh bị từ chối; Op dùng động từ năng lực của công việc và nộp báo cáo blocked hoặc ask bằng starci kernel report."
+  owner: op-retry
+  kind: verb-refusal
+
 RIGHTS_PROTECTED_ZONE:
   title: "Protected-zone write refused"
   title_vi: "Từ chối ghi vào vùng được bảo vệ"
@@ -6592,11 +6613,11 @@ TEMP_ROOT_UNUSABLE:
 TERMINAL_COUNT_DRIFT:
   title: "More terminals than expected"
   title_vi: "Số terminal nhiều hơn dự kiến"
-  meaning_vi: "Số terminal đang mở nhiều hơn số worker mà Orca đang giữ ở trạng thái hoạt động, cộng phần dư cho phép, và tình trạng này kéo dài."
+  meaning_vi: "Số terminal do runtime mở (tab mang tiêu đề [Kernel], [Op], [Worker] hoặc [Supervisor]) nhiều hơn số worker mà Orca đang giữ ở trạng thái hoạt động, cộng phần dư cho phép, và tình trạng này kéo dài. Terminal của chủ máy không được tính."
   causes_vi:
     - "Terminal của worker đã xong chưa được giải phóng"
     - "Shell trống còn sót lại"
-  nextStep_vi: "Sau thời hạn chờ, bộ dọn rác giải phóng các worker Orca báo là có thể thu hồi và đóng các shell trống."
+  nextStep_vi: "Sau thời hạn chờ, bước dedupe của bộ điều phối đóng các terminal StarCi không còn sổ cái nào gắn vào, mỗi cửa sổ thời hạn một lần."
   owner: runtime-core
   kind: runtime-fault
 
@@ -10443,6 +10464,15 @@ rebase-conflict:
   nextStep_vi: "Kernel (hoặc Supervisor nếu được đẩy lên) giao một op giải xung đột trên worktree của workflow trước khi finish; finish vẫn từ chối khi còn xung đột."
   owner: supervisor
   kind: blocker
+budget-overrun:
+  title: "An Op attempt spent more tokens than its budget"
+  title_vi: "Một lượt chạy của op dùng nhiều token hơn ngân sách"
+  meaning_vi: "Vai trò Op khai báo ngân sách token cho mỗi lượt chạy; runtime đo lượt chạy đã kết thúc từ các dòng usage của nó, và khi job của nó đang chờ Kernel thì mở một Decision Item cho Kernel."
+  causes_vi:
+    - "Op đọc lại nhiều tệp hoặc gọi lặp lại các lệnh trạng thái trong một lượt chạy dài"
+  nextStep_vi: "Kernel chọn một trong ba hướng: tiếp tục một lần, thay agent hoặc thu hẹp phạm vi của lượt chạy."
+  owner: supervisor
+  kind: blocker
 record-change-not-owner:
   title: "Workflow does not own the record"
   title_vi: "Luồng không sở hữu hồ sơ này"
@@ -10836,15 +10866,6 @@ owes-no-step:
   nextStep_vi: "Không cần làm thêm; lệnh chạy lại là vô hại."
   owner: runtime-core
   kind: settle-reason
-owner-wait-no-ask:
-  title: "Owner wait without an ask"
-  title_vi: "Chờ owner nhưng không có câu hỏi"
-  meaning_vi: "Việc dừng ở trạng thái chờ owner nhưng không nộp câu hỏi nào để owner trả lời."
-  causes_vi:
-    - "Op báo chờ owner mà không đính kèm câu hỏi"
-  nextStep_vi: "Mục quyết định retry-decision được giao cho Kernel để chạy lại op và nộp câu hỏi."
-  owner: supervisor
-  kind: blocker
 retry-decision:
   title: "Retry decision needed"
   title_vi: "Cần quyết định có thử lại không"
@@ -12179,11 +12200,12 @@ workflow-custody-conflict:
   kind: verb-refusal
 # Proof: scripts/kernel/workflow-custody-cli.mjs main.
 workflow-custody-busy:
-  title: "An op of the workflow is in flight"
-  title_vi: "Một op của workflow đang chạy"
-  meaning_vi: "starci workflow custody --apply không đổi cây của workflow khi còn op leased, running, answering, reported, deciding hoặc effect_unknown: việc đưa cây về nhánh sẽ thay đổi tệp dưới tay op đó."
+  title: "An op of the workflow has a live worker"
+  title_vi: "Một op của workflow còn worker đang sống"
+  meaning_vi: "starci workflow custody --apply không đổi cây của workflow khi còn op leased, running, answering, reported, deciding hoặc effect_unknown mà worker của nó còn sống hoặc không đọc được: việc đưa cây về nhánh sẽ thay đổi tệp dưới tay worker đó. Một op mà worker đã chết (terminal biến mất sau khi máy khởi động lại) không giữ cây và không chặn việc này."
   causes_vi:
     - "Kernel vẫn đang giao việc trong cây sai"
+    - "Orca không trả lời nên chưa chứng minh được worker đã chết"
   nextStep_vi: "Chờ các op trong chi tiết chốt hoặc dừng Kernel giao thêm việc, rồi chạy lại với --apply."
   owner: runtime-core
   kind: verb-refusal
@@ -15556,6 +15578,16 @@ RT_EDGE_CASE_REGISTRY:
   nextStep_vi: "Người giám sát sửa mục cho đúng tệp, hoặc chuyển mục sang open kèm lý do."
   owner: supervisor
   kind: check-finding
+RT_GATE_LOOSENING:
+  title: "A change loosens a gate without the owner's approval"
+  title_vi: "Một thay đổi nới lỏng cổng kiểm mà chưa có chủ phê duyệt"
+  meaning_vi: "Bỏ một kiểm tra khỏi danh sách của cổng, hạ ngưỡng, thêm một mục vào allowlist, xoá hoặc làm yếu một spec cùng lúc với mã sản phẩm là việc của chủ dự án; commit hoặc lần land đó chỉ qua khi cây gốc đã có mục owner-rulings gate-loosening-<dấu vân> của đúng thay đổi này."
+  causes_vi:
+    - "Một lane gỡ kiểm tra hoặc hạ ngưỡng để cho workflow chạy qua"
+    - "Một spec bị xoá hoặc bớt khẳng định trong cùng thay đổi với mã sản phẩm"
+  nextStep_vi: "Khôi phục cổng; nếu chủ thật sự duyệt, chủ thêm mục owner-rulings gate-loosening-<dấu vân> trước, rồi mới land thay đổi."
+  owner: owner
+  kind: check-finding
 OP_REPORTS_TO_KERNEL:
   title: "An Op addressed a role above its Kernel"
   title_vi: "Một Op gửi thẳng lên vai trò cao hơn Kernel của nó"
@@ -15564,6 +15596,35 @@ OP_REPORTS_TO_KERNEL:
     - "Op chạy starci supervisor tell hoặc channel"
   nextStep_vi: "Op nộp báo cáo blocked hoặc ask bằng starci kernel report; Kernel trả lời hoặc nâng lên."
   owner: op-retry
+  kind: blocker
+SUPERVISOR_USE_DECIDE:
+  title: "A Supervisor call outside its menu was refused"
+  title_vi: "Lệnh của Supervisor nằm ngoài thực đơn bị từ chối"
+  meaning_vi: "Supervisor chỉ đọc, trả lời các mục của thực đơn bằng starci supervisor decide, ghi lỗi runtime và chạy các bộ dọn nó sở hữu. Lệnh khác bị từ chối kèm thực đơn hiện tại và cách viết lệnh quyết định."
+  causes_vi:
+    - "Supervisor chạy theo thói quen một lệnh cũ: giải quyết cổng bằng tay, nhận hoặc đóng Decision Item, gửi thông báo tay cho Kernel, đặt ưu tiên tay"
+    - "Supervisor ghi starci supervisor actions record cho một khóa không phải runtime-defect"
+  nextStep_vi: "Lệnh không được chạy; Supervisor chọn một mục trong thực đơn đã in kèm lời từ chối và chạy starci supervisor decide --item <id> --choice <choice> --reason <why>."
+  owner: op-retry
+  kind: verb-refusal
+SUPERVISOR_STARCI_ONLY:
+  title: "A Supervisor program other than starci was refused"
+  title_vi: "Chương trình ngoài starci của Supervisor bị từ chối"
+  meaning_vi: "Supervisor chỉ chạy các động từ starci và các lệnh đọc thuần. Một chương trình ghi, chạy mã hoặc gọi mạng bị từ chối kèm thực đơn hiện tại."
+  causes_vi:
+    - "Supervisor chạy node, cp, mv, curl hoặc một công cụ thô khác"
+  nextStep_vi: "Lệnh không được chạy; Supervisor dùng thực đơn của mình và starci supervisor decide."
+  owner: op-retry
+  kind: verb-refusal
+SUPERVISOR_MENU_STEP_FAILED:
+  title: "A step of a Supervisor menu choice failed"
+  title_vi: "Một bước của lựa chọn thực đơn Supervisor thất bại"
+  meaning_vi: "starci supervisor decide chạy từng bước của lựa chọn bằng động từ starci tương ứng và dừng ở bước đầu tiên thất bại; mục vẫn mở trên thực đơn."
+  causes_vi:
+    - "Động từ của bước từ chối đầu vào (cam kết chưa có trong runtime, kho lưu trữ không đọc được)"
+    - "Sổ cái của workflow không còn khớp với mục"
+  nextStep_vi: "Mục vẫn trên thực đơn; Supervisor đọc lỗi của bước, sửa đầu vào --text rồi chạy lại, hoặc chọn none-fits."
+  owner: supervisor
   kind: blocker
 DOCKER_PORT_POLICY:
   title: "Docker ownership or published-port policy was refused"
@@ -16894,3 +16955,130 @@ RIGHTS_CRITIC_REACH:
   nextStep_vi: "Lệnh bị từ chối; chấm chỉ bằng các tệp trong thư mục của bạn, ghi verdict.json rồi báo worker_done."
   owner: op-retry
   kind: verb-refusal
+placement-lost:
+  title: "Attempt ended: its tree path was lost"
+  title_vi: "Lượt chạy kết thúc: đường dẫn cây làm việc đã mất"
+  meaning_vi: "Cây của workflow được tạo lại ở đường dẫn khác, worker của lượt này đã chết và báo cáo của nó chưa nộp hoặc thiếu tệp trong cây mới, nên runtime tự kết thúc lượt, không tính vào số lần thử của op."
+  causes_vi:
+    - "Máy khởi động lại và bộ dọn cây gỡ thư mục cũ của workflow"
+    - "Báo cáo chưa được nộp, hoặc tệp nó nêu không còn trong cây mới"
+  nextStep_vi: "Runtime tự xếp lại lượt kế tiếp bằng đường failed-no-step; không cần ai làm gì thêm."
+  owner: op-retry
+  kind: settle-reason
+tree-reattached:
+  title: "Placement rebound after the tree was re-attached"
+  title_vi: "Vị trí làm việc được gắn lại sau khi cây được dựng lại"
+  meaning_vi: "Cây của workflow được dựng lại ở đường dẫn khác; lượt chạy đã nộp báo cáo và mọi tệp của nó có trong cây mới, nên sự kiện placement-rebound chuyển đường dẫn cũ sang cây mới cho bước chốt và các kiểm tra."
+  causes_vi:
+    - "Máy khởi động lại và cây cũ bị gỡ"
+  nextStep_vi: "Bộ chốt tự chốt lượt này trong cây mới; không cần ai làm gì thêm."
+  owner: runtime-core
+  kind: settle-reason
+KERNEL_USE_DECIDE:
+  title: "A Kernel seat ran a verb that is the runtime's"
+  title_vi: "Kernel seat gọi một động từ thuộc về runtime"
+  meaning_vi: "Kernel seat chỉ chạy các động từ đọc, starci kernel decide và kernel-ack-rev; động từ làm thay đổi workflow do runtime (controller) chạy, và lời từ chối kèm menu của Kernel."
+  causes_vi:
+    - "Kernel gõ starci kernel enqueue, settle, dispatch-ready... trực tiếp theo thói quen cũ"
+  nextStep_vi: "Đọc menu in kèm lời từ chối, trả lời mục bằng starci kernel decide --workflow <workflow> --item <id> --choice <lựa chọn> --reason <lý do>."
+  owner: op-retry
+  kind: verb-refusal
+KERNEL_STARCI_ONLY:
+  title: "A Kernel seat ran a program that is not starci"
+  title_vi: "Kernel seat chạy chương trình không phải starci"
+  meaning_vi: "Shell của Kernel là starci và các lệnh đọc thuần; node, git, npm, orca, sleep và mọi chương trình khác bị từ chối."
+  causes_vi:
+    - "Kernel chạy node -e, git, npm, orca hoặc vòng sleep để đọc hay điều khiển trạng thái"
+  nextStep_vi: "Dùng starci kernel status (có --field để chọn trường) hoặc starci kernel decide; không dùng chương trình khác."
+  owner: op-retry
+  kind: verb-refusal
+menu-item-unknown:
+  title: "The item is not on the Kernel menu"
+  title_vi: "Mục không có trên menu của Kernel"
+  meaning_vi: "starci kernel decide --item nêu một mục không mở trong menu hiện tại của workflow; lời từ chối kèm menu hiện tại."
+  causes_vi:
+    - "Mục đã được runtime xử lý hoặc id sai"
+  nextStep_vi: "Đọc menu trong câu trả lời và chọn một mục đang mở."
+  owner: op-retry
+  kind: blocker
+menu-choice-unknown:
+  title: "The choice is not an option of the item"
+  title_vi: "Lựa chọn không thuộc mục"
+  meaning_vi: "starci kernel decide --choice không nằm trong các lựa chọn của mục; lời từ chối kèm menu hiện tại."
+  causes_vi:
+    - "Gõ sai tên lựa chọn hoặc mục đã đổi"
+  nextStep_vi: "Chọn một lựa chọn trong menu, hoặc none-fits kèm lý do."
+  owner: op-retry
+  kind: blocker
+menu-direct-option:
+  title: "The option is run directly"
+  title_vi: "Lựa chọn này được chạy trực tiếp"
+  meaning_vi: "Lựa chọn (xác nhận phiên bản runtime) cần Kernel tự đọc tệp nên không chạy qua starci kernel decide."
+  causes_vi:
+    - "Kernel chọn ack-rev qua decide"
+  nextStep_vi: "Chạy lệnh mà phần effect của lựa chọn nêu."
+  owner: op-retry
+  kind: blocker
+menu-text-missing:
+  title: "The option needs --text"
+  title_vi: "Lựa chọn cần --text"
+  meaning_vi: "Lựa chọn nhận một đầu vào tự do (câu trả lời, đường dẫn, lời nhắn) qua --text nhưng không có."
+  causes_vi:
+    - "Thiếu --text"
+  nextStep_vi: "Gọi lại starci kernel decide kèm --text."
+  owner: op-retry
+  kind: blocker
+menu-step-failed:
+  title: "A step of the chosen option failed"
+  title_vi: "Một bước của lựa chọn thất bại"
+  meaning_vi: "Một động từ trong lựa chọn bị từ chối hoặc lỗi; các bước trước đó đã chạy, quyết định được đóng revert."
+  causes_vi:
+    - "Trạng thái đổi giữa lúc đọc menu và lúc chạy"
+  nextStep_vi: "Đọc status để thấy tình huống mới; trả lời lại hoặc none-fits kèm bằng chứng."
+  owner: op-retry
+  kind: blocker
+menu-step-usage:
+  title: "A step of the chosen option lacks an argument"
+  title_vi: "Một bước của lựa chọn thiếu tham số"
+  meaning_vi: "Lựa chọn dựng một động từ thiếu cờ bắt buộc vì mục không đủ dữ kiện."
+  causes_vi:
+    - "Dữ liệu của job thiếu đường dẫn sở hữu"
+  nextStep_vi: "Dùng none-fits kèm bằng chứng; đây là lỗi dữ liệu của runtime."
+  owner: supervisor
+  kind: blocker
+menu-verb-unknown:
+  title: "A step names a verb that does not exist"
+  title_vi: "Một bước gọi động từ không tồn tại"
+  meaning_vi: "Một lựa chọn của menu nêu động từ Kernel không có trong bản runtime này."
+  causes_vi:
+    - "Menu và danh mục động từ lệch nhau"
+  nextStep_vi: "Dùng none-fits kèm bằng chứng; Debug sửa menu."
+  owner: supervisor
+  kind: blocker
+menu-unreadable:
+  title: "The menu could not be read"
+  title_vi: "Không đọc được menu"
+  meaning_vi: "starci kernel decide chạy status trong tiến trình để lấy menu hiện tại nhưng status không trả menu."
+  causes_vi:
+    - "status lỗi hoặc workflow không đọc được"
+  nextStep_vi: "Chạy starci kernel status để thấy lỗi gốc."
+  owner: supervisor
+  kind: blocker
+decide-answer-incomplete:
+  title: "A menu answer needs --choice and --reason"
+  title_vi: "Câu trả lời menu thiếu --choice hoặc --reason"
+  meaning_vi: "starci kernel decide --item cần cả --choice lẫn --reason không rỗng."
+  causes_vi:
+    - "Thiếu --choice hoặc --reason"
+  nextStep_vi: "Gọi lại kèm cả hai."
+  owner: op-retry
+  kind: blocker
+menu-escape:
+  title: "The Kernel found no option that fits"
+  title_vi: "Kernel không thấy lựa chọn nào phù hợp"
+  meaning_vi: "Mục quyết định do none-fits mở cho Supervisor khi menu không có lựa chọn phù hợp, kèm lý do và bằng chứng."
+  causes_vi:
+    - "Một tình huống chỉ có lối đi vòng quanh lỗi, hoặc ngoài các lựa chọn của menu"
+  nextStep_vi: "Supervisor xử lý mục; nếu là lỗi runtime thì ghi runtime-defect cho Debug."
+  owner: supervisor
+  kind: blocker

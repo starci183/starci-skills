@@ -36,7 +36,7 @@ export function loadQueuedJob(d) {
   if (!['queued', 'ready'].includes(job.status)) throw Object.assign(new Error(`job ${jobId} cannot dispatch while ${job.status}; settle/reconcile the current worker first`), { code: 'job-not-queued' });
   // A paused, stopped, finished or archived workflow launches nothing (H9: an archived workflow's job ran 25 h).
   requirePhase(getWorkflow(db, job.workflow_id), DISPATCHES, 'dispatch');
-  // SETTLE-FIRST (driver-loop.yaml progress.settleFirst): no new dispatch while filed reports wait unconsumed.
+  // SETTLE-FIRST (driver-loop.yaml menu.settleFirst): no new dispatch while filed reports wait unconsumed.
   const { payload, op } = queuedJobOp(ledger, { job, verb: 'dispatch', liveHint: 'dispatching a duplicate', internals });
   Object.assign(d, { job, payload, op });
 }

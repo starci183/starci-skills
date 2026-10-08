@@ -189,7 +189,19 @@ non-green decisions through `modules/kernel/driver-loop.yaml`
 - Owns: one attempt and its worktree. Decides alone: how to do the work inside its contract.
 - Reports to: Kernel (done, blocked, or a question). Overseen by: Kernel.
 - Measure: passes its gate first time.
-- Token budget (provisional): 6000000 per attempt; over it, the Kernel acts on the overrun: it reads the attempt's usage, then stops, re-scopes or switches agent.
+- Token budget (provisional): 6000000 per attempt; over it, the runtime measures each settled attempt from its usage rows (input, output, cache read and cache write tokens) and, for a job waiting on its Kernel, opens a Decision Item budget-overrun: the Kernel continues once, replaces the agent or re-scopes the leg.
+- Guard: its terminals are bound as the "op" role of modules/kernel/command-policy.yaml.
+- Happy errors it handles (the system working as designed, handled inside the chain through the policy):
+  - asks-a-question (policy row ask-worker-question): the Op cannot decide inside its contract and reports an ask up to its Kernel, which answers from the goal and the recorded decisions
+  - asks-the-owner (policy row ask-owner): the matter is the owner's (intent, credentials, spend): the Kernel sends it to the owner and the leg waits
+  - red-check (policy row error-work): a check is red because the work is not good yet: the Kernel retries with the failure fed back, then on another agent
+  - provider-quota (policy row quota-or-circuit): the provider quota ran out or its circuit opened: the next agent of the tier takes the job
+  - login-expired (policy row error-login-expired): the provider login expired: the job moves to the next eligible agent and the owner logs in again in Orca
+- A bug in this role (the chain neither fixes nor works around it; Debug removes it with a change to .claude) is detected by:
+  - an Op addresses a role above its Kernel: OP_REPORTS_TO_KERNEL when an Op addresses the Supervisor
+  - an Op runs a control-plane verb that is not its own: RIGHTS_OP_CONTROL_PLANE from the command guard
+  - an Op writes outside the paths its attempt owns: RIGHTS_OP_OUTSIDE_OWNED from the file-write guard
+  - an Op spends more tokens than its attempt budget: budget-overrun Decision Item and budgetOverruns in the Kernel status
 - Principles: P2 P3 P4 P8 (modules/kernel/roles.yaml, principles).
 <!-- roles:end op -->
 

@@ -11,6 +11,7 @@ const publicVerbs = {
   actions: ['action', 'hold-ms', 'item', 'open', 'reason', 'refs', 'until', 'workflow'],
   bridge: ['blocker', 'bridge', 'dependents', 'dry-run', 'finding', 'foundation', 'goal', 'kind', 'lead', 'merge-into', 'no-notify', 'owner-ok', 'paths', 'reason', 'record', 'releases', 'repo', 'request-only', 'start', 'text', 'title', 'to', 'waiter', 'waits', 'workflow'],
   channel: ['force', 'id', 'label', 'peek', 'repos', 'text', 'text-file', 'timeout-ms', 'to'],
+  decide: ['choice', 'item', 'reason', 'text'],
   'direct-commits': ['repo'],
   'gate-stability': ['base', 'family', 'gate', 'head', 'ledger', 'tree'],
   gc: ['apply', 'dry-run', 'holder', 'only', 'plan', 'trigger'],
@@ -22,6 +23,7 @@ const publicVerbs = {
   push: ['check', 'repo'],
   'push-mains': ['dry-run', 'hooks-only', 'repo'],
   'ram-cap': ['op', 'reserve', 'weight', 'workflow'],
+  status: ['menu'],
   report: ['repo', 'send'],
   'telegram-bridge': [],
   tell: ['limit', 'read', 'since', 'timeout-ms', 'wait'],
@@ -44,7 +46,7 @@ test('supervisor verbs resolve only the public status/start/stop modes', () => {
   assert.equal(main(['supervisor', 'status', '--json'], { catalog, runScript }), 0);
   assert.equal(main(['supervisor', 'start', '--plan', '--reason', 'check'], { catalog, runScript }), 0);
   assert.equal(main(['supervisor', 'stop'], { catalog, runScript }), 0);
-  assert.deepEqual(calls.map((call) => call.args), [['--status', '--json'], ['--plan', '--reason', 'check'], ['--stop']]);
+  assert.deepEqual(calls.map((call) => call.args), [['--json'], ['--plan', '--reason', 'check'], ['--stop']]);
 });
 
 test('every added supervisor verb dispatches through the runtime seam', () => {

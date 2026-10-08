@@ -8,6 +8,7 @@ import { pendingFor } from './roles-table.mjs';
 
 const POLICY_FILE = 'modules/kernel/op-incident-policy.yaml';
 const COMMAND_POLICY_FILE = 'modules/kernel/command-policy.yaml';
+const REGISTRY_FILE = 'modules/reconciler/edge-cases.yaml';
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const present = (value) => value !== undefined && value !== null && !(typeof value === 'string' && !value.trim()) && !(Array.isArray(value) && !value.length);
 
@@ -18,6 +19,9 @@ function policyIds(root) {
   const policy = readYaml(root, POLICY_FILE);
   return new Set([...(policy.rows ?? []), ...(policy.holds ?? []), ...(policy.gateCauses ?? [])].map((entry) => entry.id));
 }
+
+/** The ids of the registry entries that are open: what a pending entry may name instead of a lane. */
+const openEntries = (root) => new Set((readYaml(root, REGISTRY_FILE).cases ?? []).filter((entry) => entry.status === 'open').map((entry) => entry.id));
 
 const boundRoles = (root) => new Set(readYaml(root, COMMAND_POLICY_FILE).roles?.bound ?? []);
 const fileOf = (ref) => String(ref).split('#')[0];
@@ -43,13 +47,13 @@ const blockProblem = (role, ctx) => (role.surfaces?.some((surface) => surface.mo
   ? null : 'has no existing surface in block mode');
 
 function guardProblem(role, ctx) {
-  if (role.noSeat === true) return null;
+  if (role.noSeat === true) return typeof role.noSeatReason === 'string' && role.noSeatReason.trim().length >= 20 ? null : 'declares noSeat without a noSeatReason that says why it has no bound terminal';
   return ctx.bound.has(role.guard?.role) ? null : `names no guard role of ${COMMAND_POLICY_FILE} roles.bound (and is not noSeat)`;
 }
 
 function budgetProblem(role) {
-  if (Number(role.tokenBudget?.perAttempt?.default) > 0) return null;
-  return typeof role.noBudget === 'string' && role.noBudget.trim().length >= 10 ? null : 'declares no tokenBudget and no noBudget reason';
+  if (Number(role.tokenBudget?.perAttempt?.default) > 0 || (Number(role.wakeBudget?.perWake?.tokens) > 0 && Number(role.wakeBudget?.perWake?.turns) > 0)) return null;
+  return typeof role.noBudget === 'string' && role.noBudget.trim().length >= 10 ? null : 'declares no tokenBudget, wakeBudget or noBudget reason';
 }
 
 function chainProblem(role, ctx) {
@@ -61,10 +65,11 @@ function chainProblem(role, ctx) {
 const CHECKS = { fields: fieldsProblem, 'happy-errors': happyProblem, 'bug-surface': bugProblem, 'prompt-block': blockProblem,
   'guard-binding': guardProblem, budget: budgetProblem, chain: chainProblem };
 
-function pendingProblems(role, problems, known) {
+function pendingProblems(role, problems, known, openEntries) {
   const issues = [];
   for (const entry of role.pending ?? []) {
-    if (!present(entry.lane) || !DATE.test(String(entry.since ?? ''))) issues.push(`pending entry ${JSON.stringify(entry.requirements)} names no lane or no ISO date`);
+    if (!(present(entry.lane) || present(entry.entry)) || !DATE.test(String(entry.since ?? ''))) issues.push(`pending entry ${JSON.stringify(entry.requirements)} names no lane or registry entry, or no ISO date`);
+    if (present(entry.entry) && !openEntries.has(entry.entry)) issues.push(`pending entry ${entry.entry} is not an open entry of ${REGISTRY_FILE}`);
     for (const id of entry.requirements ?? []) {
       if (!known.includes(id)) issues.push(`pending names the unknown requirement ${id}`);
       else if (!problems[id]) issues.push(`pending names ${id}, which the role already meets: remove the entry`);
@@ -83,12 +88,12 @@ function standingOf(role, ctx) {
   const known = Object.keys(ctx.doc.standard.requirements);
   const problems = Object.fromEntries(known.map((id) => [id, CHECKS[id](role, ctx)]));
   const cells = Object.fromEntries(known.map((id) => [id, cellOf(role, id, problems[id])]));
-  return { id: role.id, cells, problems, issues: pendingProblems(role, problems, known) };
+  return { id: role.id, cells, problems, issues: pendingProblems(role, problems, known, ctx.open) };
 }
 
 /** The standing of every role of `doc.standard.roles` in the tree at `root`: [{id, cells, problems, issues}]. */
 export function roleStandings(doc, root) {
-  const ctx = { doc, root, policy: policyIds(root), bound: boundRoles(root) };
+  const ctx = { doc, root, policy: policyIds(root), bound: boundRoles(root), open: openEntries(root) };
   return doc.standard.roles.map((id) => standingOf(doc.roles.find((role) => role.id === id), ctx));
 }
 
@@ -99,7 +104,7 @@ export function renderStandingTable(doc, standings) {
     const role = doc.roles.find((entry) => entry.id === standing.id);
     return [role.label, ...known.map((id) => {
       const cellState = standing.cells[id];
-      return cellState === 'pending' ? `pending (${pendingFor(role, id).lane})` : cellState;
+      return cellState === 'pending' ? `pending (${pendingFor(role, id).lane ?? pendingFor(role, id).entry})` : cellState;
     })];
   });
   const widths = ['Role', ...known].map((title, column) => Math.max(title.length, ...rows.map((row) => row[column].length)));

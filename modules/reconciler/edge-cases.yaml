@@ -51,10 +51,37 @@ cases:
     status: covered
   - id: admitted-op-placement-names-a-lost-tree-path
     family: power-lifecycle
-    finding: {role: runtime, duty: does, verdict: departs, evidence: "settle of a reported op (Nivo op-architecture.decide-e78adc94cc) refused op-gate-tool-failed 'the current owned slice could not be bound': the op's immutable admission names the original tree path (the workflow's first worktree directory), the GC removed that directory, and the replacement tree is registered at the -2 path; the custody repair restores the content and the checkpoint chain but not the original path", remedy: {state: open}}
-    met: {date: "2026-10-08", where: "settle of an op admitted before the tree was lost", evidence: "nivo runtime.sqlite events 489, 490, 496, 497 (kernel-proposal kprop-f9ee099c38, runtime-defect incident)"}
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "settle of a reported op (Nivo op-architecture.decide-e78adc94cc) refused op-gate-tool-failed 'the current owned slice could not be bound': the op's immutable admission names the original tree path (the workflow's first worktree directory), the GC removed that directory, and the replacement tree is registered at the -2 path; the custody repair restored the content and the checkpoint chain but not the original path; and starci workflow custody --apply refused workflow-custody-busy because the job was reported although its worker was gone", remedy: {state: in-tree, change: "when a workflow tree is put back at another path (starci workflow start, starci workflow custody --apply, the settler's own pass), every admitted, unsettled attempt whose recorded path is lost is rebound by a placement-rebound ledger event that settle, the checks and the op gate read (its worker gone, its report filed and every report file in the tree), or ended by the runtime as placement-lost with no business attempt spent (otherwise); the custody busy refusal counts only ops with a live worker"}}
+    met: {date: "2026-10-08", where: "settle of an op admitted before the tree was lost", evidence: "nivo runtime.sqlite events 489, 490, 496, 497 (kernel-proposal kprop-f9ee099c38, runtime-defect incident); check_runs 59 and 60 (op-gate, settler, 05:29 and 05:31Z); worktrees rows ...-muxq1xov (removed 03:01Z) and ...-muxq1xov-2 (created 05:26Z)"}
+    rule: {file: scripts/kernel/attempt-placement.mjs, anchor: "reconcileAttemptPlacements"}
+    spec: tests/kernel/attempt-placement.spec.mjs
+    status: covered
+  - id: op-prompt-files-the-whole-knowledge-tree
+    family: smooth-operation
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "the shared standard read of the nine deciding and authoring ops was knowledge/**: their prompt listed 260 to 290 mandatory files (2.4 to 2.9 MB) in a 88 to 95 KB prompt that the worker reads and carries in its context for every later turn; the usage rows of 14 decision attempts show 3.4 to 13.4 M tokens each, 47 to 113 turns, a prompt of 25 thousand tokens carried across 13 percent of all of it, and the READ digest it required hashed 254 files nobody can read", remedy: {state: in-tree, change: "each of the nine ops files the law inputs plus the knowledge its own READ step names (docs, op-gate, its patterns): 19 to 45 mandatory files and a 21 to 28 KB prompt; the budget is knowledge/op-gate.yaml readSet"}}
+    met: {date: "2026-10-08", where: "decision legs of the Nivo and StarCi auth-test workflows", evidence: "llm_usage rows of both product ledgers; worker transcript dd6caf3b (113 turns, 13.07 M cache-read tokens, a 102 KB packet read at turns 1 and 2)"}
+    rule: {file: knowledge/op-gate.yaml, anchor: "readSet"}
+    spec: tests/kernel/op-read-set.spec.mjs
+    status: covered
+  - id: documented-command-two-extractors
+    family: correctness
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "two code paths decided whether a text shows a starci command that exists, tests/helpers/doc-commands.mjs (tokens, flags, enums, required options) and scripts/checks/check-prose-commands.mjs (R230: regex heads and prose clauses); a regex written into a yaml value was read as a command by one and not the other, and an earlier attempt to give R230 the helper's extractor produced 15 false positives because a prose word after 'starci' was read as an unknown group", remedy: {state: in-tree, change: "scripts/checks/lib/doc-commands.mjs is the one extractor and judge; R230 and the doc-command specs call it, R230 holds a prose mention to unknown verbs and options and a span or fence to unknown groups too; 2834 occurrences of the tree and 6000 fuzzed lines read identically before and after the move"}}
+    met: {date: "2026-10-08", where: "R230 and the doc-command helper disagreed on a regex pattern over a command spelling", evidence: "tests/repo/doc-commands.spec.mjs regex-pattern test; lane brief alpha.8 E3"}
+    rule: {file: scripts/checks/lib/doc-commands.mjs, anchor: "extractCommands"}
+    spec: tests/checks/check-prose-commands.spec.mjs
+    status: covered
+  - id: land-gate-skips-specs-that-spawn-the-cli
+    family: correctness
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "the land gate's bounded selection (24 graph-only specs, one per directory) let a change through that broke 13 specs: each spawns scripts/kernel/cli.mjs or packages/cli/bin/starci.mjs and runs a verb whose handler reaches the changed file, so no import of theirs names it and the smoke bound left them out", remedy: {state: in-tree, change: "the direct and touching selections add the specs that spawn a CLI entry and name a verb whose handler reaches a changed file: the verbs importing a changed file themselves, then the nearest others up to allocation.landGate.cliVerbs (land-cli-specs.mjs)"}}
+    met: {date: "2026-10-07", where: "land of a shared verb helper change", evidence: "AUDIT-starci-workflow.md issue 3d; lane brief alpha.8 E4"}
+    rule: {file: scripts/supervisor/land-cli-specs.mjs, anchor: "specsExercisingChangedVerbs"}
+    spec: tests/supervisor/land-cli-selection.spec.mjs
+    status: covered
+  - id: worktree-gc-spec-red-once-under-load
+    family: concurrency
+    met: {date: "2026-10-08", where: "the alpha.6 full-suite run: tests/api-git/worktree-lifecycle.spec.mjs 'the GC reclaims orphans...' failed once at the assertion on the ended workflow's removal item, 18.4 s, then passed in 20 of 20 stress runs", evidence: "the alpha.6 clean-tree full-suite log and its 20 stress logs"}
     status: open
-    why: "the admission binds the op to the tree path it ran in; a registered tree that has to be recreated gets a new path from Orca, so a reported but unsettled op needs its admitted placement re-pointed to the registered tree by a runtime rule (an owner decision on who may rewrite an immutable admission), not by hand"
+    why: "not reproduced: three runs of the spec beside six CPU-burning processes passed, and the item's reason was not recorded (the assertion then had no message; it now prints the removal item). The GC makes one Orca worktree remove per pass (kind mutation, replay none) and a refusal is recorded on the row for the next pass; the fake runs one git worktree remove --force. Whether a transient git refusal on Windows or something else failed that removal is not proven, so the fake is not changed on a guess"
   - id: quota-window-unstarted
     family: failure-while-running
     met: {date: "2026-10-08", where: "provider quota after re-login", evidence: "commit f4fca8baf"}
@@ -183,14 +210,18 @@ cases:
     why: "a Supervisor behaviour; the land gate now bounds its specs, and no digest signal shows a land cancelled by its caller"
   - id: wake-delivered-as-pasted-text
     family: record-vs-reality
-    met: {date: "2026-10-07", where: "Kernel ignored three watchdog wakes", evidence: "AUDIT-starci-workflow.md issue 6"}
-    status: open
-    why: "wake delivery is confirmed by submission, not by the agent acting on it; no signal tells the digest a wake was ignored"
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "Claude Code folds a typed paste of about 800 characters or more into a pasted_content block that the model reads as untrusted data. In the real Kernel transcripts every wake of 1218 to 1242 characters (twelve, the watchdog wake with its rev line) arrived pasted and three were refused, and all sixteen wakes of 325 to 730 characters arrived as the user's message; the watchdog wake was cut under 800 on 2026-10-08, but every other wake (transition, ask-answered, stall, supervisor) was typed at whatever length its lines made", remedy: {state: in-tree, change: "the one Kernel wake path and the watchdog wake bound the typed text by allocation.wake.maxChars: a longer wake keeps its opener, the rev line when it fits and the seat identity, and points at starci kernel status (wake-bound.mjs)"}}
+    met: {date: "2026-10-07", where: "Kernel ignored three watchdog wakes", evidence: "Kernel transcripts 3b231876 and 846648a6: user messages of 1218-1242 characters carry <pasted_content>, 16 of 325-730 characters do not; AUDIT-starci-workflow.md issue 6"}
+    rule: {file: scripts/kernel/wake-bound.mjs, anchor: "boundedWake"}
+    spec: tests/kernel/wake-bound.spec.mjs
+    status: covered
   - id: terminal-count-drift
     family: ending
-    met: {date: "2026-10-07", where: "41 terminals, finished workers' terminals still open", evidence: "AUDIT-starci-workflow.md issue 21"}
-    status: open
-    why: "the digest does not yet compare the seat rows with the Orca terminal list"
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "the TERMINAL_COUNT_DRIFT clock counted every Orca terminal (41) against the workers Orca held active (8) plus a slack of 5, so the owner's own lane shells, coordinators and per-worktree terminals, which the runtime may never close, kept it open for twenty hours (machine.sqlite sla_episodes 7: 2026-10-07T06:27Z to 2026-10-08T02:52Z); its declared auto-action, to collect the surplus shells, was performed by nothing but the boot dedupe", remedy: {state: in-tree, change: "the clock counts only runtime-titled tabs ([Kernel], [Op], [Worker], [Supervisor]) and a violated clock runs the dedupe pass (services --dedupe) once per SLA window (terminal-drift.mjs)"}}
+    met: {date: "2026-10-07", where: "41 terminals, finished workers' terminals still open", evidence: "AUDIT-starci-workflow.md issue 21; machine.sqlite sla_episodes episode 7"}
+    rule: {file: scripts/reconciler/terminal-drift.mjs, anchor: "runTerminalDrift"}
+    spec: tests/reconciler/terminal-drift.spec.mjs
+    status: covered
   - id: workflow-across-host-restart
     family: power-lifecycle
     met: {date: "2026-10-08", where: "CHANGELOG 1.0.0-alpha.6 Known limitations: the policy ran against fixtures only", evidence: "CHANGELOG.md"}
@@ -225,8 +256,9 @@ cases:
   - id: gate-loosening-lands-without-owner-approval
     family: authority-safety
     met: {date: "2026-10-08", where: "owner ruling 6: loosening a gate is owner-class", evidence: "modules/kernel/roles.yaml rulings.loosening-is-owner-class"}
-    status: open
-    why: "the land gate does not yet refuse a removed check, a lowered threshold, an added allowlist entry or a weakened test without a recorded owner approval"
+    rule: {file: scripts/supervisor/land-gate-loosening.mjs, anchor: "gateLooseningCheck"}
+    spec: tests/supervisor/gate-loosening.spec.mjs
+    status: covered
   - id: supervisor-gates-left-unanswered-for-fixes
     family: smooth-operation
     finding: {role: supervisor, duty: never, verdict: departs, evidence: "gates stood unanswered for over an hour while the Supervisor worked on runtime fixes (AUDIT-starci-workflow.md issue 20 and the owner report)", remedy: {state: in-tree, change: "the Supervisor never updates .claude and never leaves a gate past its acknowledgement bound (roles.yaml supervisor.never)"}}
@@ -263,10 +295,16 @@ cases:
     why: "the not-runtime-fault return path exists in the gate ladder; the digest does not yet judge a Kernel's ready-work bound or a misclassified cause"
   - id: op-token-overrun-on-decision-leg
     family: smooth-operation
-    finding: {role: op, duty: bound, verdict: departs, evidence: "an Op spent 6 to 17 million tokens on a decision leg (AUDIT-starci-workflow.md issue 4: 10.8 million)", remedy: {state: in-tree, change: "the Op contract declares a provisional token budget per attempt; the Kernel acts on an overrun (roles.yaml op.tokenBudget)"}}
+    finding: {role: op, duty: bound, verdict: departs, evidence: "an Op spent 6 to 17 million tokens on a decision leg (AUDIT-starci-workflow.md issue 4: 10.8 million)", remedy: {state: in-tree, change: "each settled attempt is measured from its usage rows against the Op's declared budget; an overrun on a job waiting on its Kernel is listed in starci kernel status (budgetOverruns) and opens a Kernel Decision Item budget-overrun with continue-once, replace and re-scope"}}
     met: {date: "2026-10-07", where: "scope.define attempt 1", evidence: "AUDIT-starci-workflow.md issue 4"}
+    rule: {file: scripts/kernel/attempt-budget.mjs, anchor: "budgetOverruns"}
+    spec: tests/kernel/attempt-budget.spec.mjs
+    status: covered
+  - id: op-token-overrun-in-flight
+    family: smooth-operation
+    met: {date: "2026-10-08", where: "scripts/kernel/usage-record.mjs records an attempt's usage when it settles", evidence: "scripts/kernel/attempt-budget.mjs"}
     status: open
-    why: "the budget is declared and provisional; nothing yet measures an attempt against it, so the digest cannot flag an overrun"
+    why: "the measure comes from the usage rows, which exist only for a settled attempt, so an overrun is seen after the attempt ends; an attempt still running past the budget is not seen until a live read of its session file feeds the same measure"
   - id: fix-agent-wiped-node-modules-printed-credentials-stashed
     family: authority-safety
     finding: {role: supervisor, duty: never, verdict: departs, evidence: "a fix agent wiped another lane's node_modules through junctions; an agent printed part of a credentials file; an agent ran git stash", remedy: {state: in-tree, change: "the worker prompt carries the never entries: no junction, symlink or hard link, no node_modules removal, no credential file read, no stash"}}
@@ -280,12 +318,46 @@ cases:
     met: {date: "2026-10-07", where: "alpha.6 release", evidence: "owner report 2026-10-08; CHANGELOG 1.0.0-alpha.6 Known limitations"}
     status: open
     why: "the release rule belongs to the push-only-at-release lane (f1)"
+  - id: op-orca-send-addresses-anyone
+    family: authority-safety
+    finding: {role: op, duty: never, verdict: departs, evidence: "the shared Orca self-lifecycle allowance let an Op name any recipient or Run with --to and --run", remedy: {state: in-tree, change: "the policy entry refuses --to and --run for the op role (refuse-for): an Op reports to the Run of its own Kernel through starci kernel report"}}
+    met: {date: "2026-10-08", where: "owner ruling: an Op reports only to its Kernel", evidence: "modules/kernel/roles.yaml rulings.op-reports-to-kernel"}
+    rule: {file: modules/kernel/command-policy.yaml, anchor: "refuse-for"}
+    spec: tests/guards/op-enforcement.spec.mjs
+    status: covered
+  - id: op-writes-outside-owned-paths
+    family: authority-safety
+    finding: {role: op, duty: never, verdict: departs, evidence: "the file-write guard let an Op write anywhere in its workflow worktree, not only in the paths its attempt owns", remedy: {state: in-tree, change: "an Op writes only inside its owned paths and the runtime temp directory (RIGHTS_OP_OUTSIDE_OWNED), for Edit, Write and shell write targets alike"}}
+    met: {date: "2026-10-08", where: "owner ruling: an Op writes only inside its scope", evidence: "modules/kernel/roles.yaml op.never"}
+    rule: {file: scripts/guards/op-write-scope.mjs, anchor: "RIGHTS_OP_OUTSIDE_OWNED"}
+    spec: tests/guards/op-enforcement.spec.mjs
+    status: covered
+  - id: op-runs-control-plane-verbs
+    family: authority-safety
+    finding: {role: op, duty: never, verdict: departs, evidence: "an Op could run any starci verb whose catalog entry names no role, among them the control plane of the Supervisor, the reconciler, workflow start, routing and Debug", remedy: {state: in-tree, change: "the op table of the command policy refuses those groups (RIGHTS_OP_CONTROL_PLANE) and names the capability verbs of an Op's work"}}
+    met: {date: "2026-10-08", where: "owner ruling: capability verbs only for servers, renders, image generation and tests", evidence: "modules/kernel/roles.yaml op.never"}
+    rule: {file: scripts/guards/op-starci.mjs, anchor: "RIGHTS_OP_CONTROL_PLANE"}
+    spec: tests/guards/op-enforcement.spec.mjs
+    status: covered
   - id: supervisor-runtime-fix-lanes-retired
     family: authority-safety
-    finding: {role: supervisor, duty: never, verdict: departs, evidence: "the Supervisor prompt, supervise.yaml and docs still teach fix workers and lands as Supervisor duties", remedy: {state: open, change: "retire those instructions; the contract, the guards, the land verb and the default worker cap 0 already refuse them"}}
+    finding: {role: supervisor, duty: never, verdict: departs, evidence: "the Supervisor prompt, supervise.yaml and docs still taught fix workers and lands as Supervisor duties", remedy: {state: in-tree, change: "the prompt, supervise.yaml and docs/supervisor.md describe a menu-driven decision desk; the seat guard allows the reads, starci supervisor decide, the defect record and its collectors (modules/kernel/command-policy.yaml supervisor)"}}
     met: {date: "2026-10-08", where: "owner ruling: the Supervisor may not update .claude", evidence: "modules/kernel/roles.yaml rulings.runtime-changes"}
+    rule: {file: modules/supervisor/supervisor-menu.yaml, anchor: "Changing .claude is never an option"}
+    spec: tests/supervisor/supervisor-menu.spec.mjs
+    status: covered
+  - id: supervisor-habit-command-under-old-contract
+    family: change-under-running
+    finding: {role: supervisor, duty: never, verdict: departs, evidence: "a Supervisor seat started under the old contract tries the verbs it learned: land, a fix worker, a hand-resolved gate or Decision Item, a typed notice", remedy: {state: in-tree, change: "every such call is refused with the Supervisor's current menu and the spelling of starci supervisor decide (SUPERVISOR_USE_DECIDE, RUNTIME_CHANGE_OWNED_BY_DEBUG with the menu)"}}
+    met: {date: "2026-10-08", where: "a running Supervisor seat meets the alpha.8 contract", evidence: "tests/guards/supervisor-seat.spec.mjs"}
+    rule: {file: scripts/guards/supervisor-seat.mjs, anchor: "SUPERVISOR_USE_DECIDE"}
+    spec: tests/guards/supervisor-seat.spec.mjs
+    status: covered
+  - id: supervisor-owed-items-without-menu-kind
+    family: smooth-operation
+    met: {date: "2026-10-08", where: "the OWED ACTIONS list of the tick", evidence: "modules/supervisor/supervise.yaml mission.classes"}
     status: open
-    why: "the instruction text of supervisor-prompt.md, supervise.yaml and docs/supervisor.md still describes fix workers and lands; the rewrite is designed in ROLES-STANDARD-alpha8.md"
+    why: "the menu is built from the Supervisor's Decision Items; an OWED class that is no Decision Item (retry-cap, undispatched, orphaned) is read-only for the Supervisor, and a step left untaken past the SLA is recorded as a runtime defect by hand; the controllers do not yet open a Decision Item for each class"
   - id: kernel-start-repeats-one-failure
     family: failure-while-running
     finding: {role: runtime, duty: does, verdict: departs, evidence: "the StarCi workflow's Kernel seat was started 303 times in 3 hours and every launch failed at the same step, workflow-worktree-install (npm ci EPERM unlink of a loaded native .node file); every start ran a full npm ci that first deletes node_modules, so a process holding a binary of the tree stopped it half way, left a tree without react, and the next start did the same; a failed start was not a replacement, so the Host never counted it and the seat was never quarantined", remedy: {state: in-tree, change: "a start-up install runs only for a tree that is not a finished install of the current lockfile (a marker written after npm, cleared before it, so a half tree reads as incomplete), takes the host lock, and types a file lock as workflow-worktree-install-locked with the path and the holders; the launch of one cause backs off, is held after seats.kernel.startSameCauseMax failures and quarantines the seat with one seat-unrecoverable item naming the cause (scripts/kernel/start-hold.mjs, hold kernel-start-held)"}}
@@ -300,3 +372,56 @@ cases:
     rule: {file: scripts/kernel/read-only-ledger.mjs, anchor: "readOnlyLedger"}
     spec: tests/kernel/read-verb-no-writes.spec.mjs
     status: covered
+  - id: reported-job-never-planned
+    family: smooth-operation
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "the Job controller planned a settle only for a job in running, answering or effect_unknown, while starci kernel report moves a job to reported: no resync key, no SETTLE_OVERDUE clock and no settle step existed for a reported job, and the engine routed an event kind that nothing emits (the real event is report-filed); Nivo op-architecture.decide-e78adc94cc stayed reported from 2026-10-07 16:38 with no engine_actions row for it and no SLA episode (every other job of the ledger was settled by the Kernel's own call)", remedy: {state: in-tree, change: "a reported job is listed, timed (SETTLE_OVERDUE, the reported-unsettled bound) and settled by the Job controller, whose route includes report-filed; the reported-unsettled hold names this code as its enforcement (planReport)"}}
+    met: {date: "2026-10-08", where: "Nivo wf-nivo-auth-test-workflow-muxq1xov, job op-architecture.decide-e78adc94cc (attempt 6), ledger events 400-406, 2026-10-07 16:38-16:40 UTC", evidence: "nivo runtime.sqlite events 401, 405, 406 (report-filed, report-consumed, checks-recorded) and check_runs 58 (the Kernel's own settle refused, 16:40:21), no job-settle-* event and no sla_episodes row for the job; machine.sqlite engine_actions: job-controller rows exist only for starci-monorepo and for nivo-monorepo jobs after their Kernel settle"}
+    rule: {file: scripts/reconciler/controllers/job.mjs, anchor: "planReport"}
+    spec: tests/kernel-settle/reconciler-job.spec.mjs
+    status: covered
+  - id: custody-busy-counts-an-op-without-a-worker
+    family: concurrency
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "starci workflow custody --apply refused workflow-custody-busy for every op job in leased, running, answering, reported, deciding or effect_unknown, so a reported job whose worker had died with the host held the repair of its own workflow tree forever", remedy: {state: in-tree, change: "in flight means an attempt whose worker answers an Orca terminal read (or whose liveness cannot be read, or a launch inside its lease); a worker proven gone holds no tree (workflow-in-flight.mjs inFlightOps)"}}
+    met: {date: "2026-10-08", where: "Nivo wf-nivo-auth-test-workflow-muxq1xov custody repair with op-architecture.decide-e78adc94cc reported", evidence: "owner brief ALPHA8 lane A item 2; Supervisor ruling di-24b04547 (nivo runtime.sqlite events 509-519)"}
+    rule: {file: scripts/kernel/workflow-in-flight.mjs, anchor: "inFlightOps"}
+    spec: tests/kernel/attempt-placement.spec.mjs
+    status: covered
+  - id: kernel-left-ready-work
+    family: smooth-operation
+    finding: {role: kernel, duty: never, verdict: departs, evidence: "both real Kernels composed dispatch, retry and settle commands from the status text each wake and left ready work or a reported block unhandled for hours; the unit is now the runtime's (the controllers dispatch and retry) and the rest is a menu item", remedy: {state: in-tree}}
+    met: {date: "2026-10-08", where: "the two first real workflows", evidence: "AUDIT-starci-workflow.md issues 6 and 11; Kernel transcripts of wf-starci-auth-test-workflow-muxq4oyr"}
+    rule: {file: scripts/kernel/kernel-menu.mjs, anchor: buildMenu}
+    spec: tests/kernel/kernel-menu.spec.mjs
+    status: covered
+  - id: kernel-scripted-node-e-for-reads
+    family: smooth-operation
+    finding: {role: kernel, duty: never, verdict: departs, evidence: "the Kernel wrote node -e over status.json, survey.json and ack plans to read a few fields (legs, kernelRev, workGraph, jobs, stuck, opChain); the read verbs now take --field and every program but starci and the pure reads is refused", remedy: {state: in-tree}}
+    met: {date: "2026-10-08", where: "the two first real workflows", evidence: "Kernel transcripts: 4 node -e reads of the status and survey JSON"}
+    rule: {file: scripts/kernel/verbs/shared/field-view.mjs, anchor: fieldEmit}
+    spec: tests/guards/kernel-seat.spec.mjs
+    status: covered
+  - id: menu-mechanical-pending-next-actions
+    family: smooth-operation
+    met: {date: "2026-10-08", where: "the menu of this change", evidence: "modules/kernel/kernel-menu.yaml origins with class pending"}
+    status: open
+    why: "the enqueue of an approved leg, the rework of a red node, the re-dispatch of a stale proof, the asset leg, the credential ask, a redraw and the cut-seam duties are still next actions the Kernel answers from its menu (mode mechanical-pending); each moves into the controller with its bound from the policy table, one origin at a time"
+  - id: menu-handover-feedback-not-typed
+    family: smooth-operation
+    met: {date: "2026-10-08", where: "the menu of this change", evidence: "kernel-menu.yaml kind handover-step"}
+    status: open
+    why: "a defect the owner reports on the handover must be routed to the fix op of the slice it names; that routing is not yet a typed choice, so the item offers none-fits only"
+  - id: kernel-wake-usage-attribution-coarse
+    family: smooth-operation
+    met: {date: "2026-10-08", where: "the per-wake budget of this change", evidence: "scripts/kernel/wake-budget.mjs"}
+    status: open
+    why: "the usage rows land every five minutes, so a wake owns the rows recorded between two wake events; a short wake can read as the sum of its neighbour"
+  - id: supervisor-wake-budget-unmeasured
+    family: smooth-operation
+    met: {date: "2026-10-08", where: "role standard completion: the Supervisor budget is declared from 55 measured supervisor-turn rows but nothing compares a Supervisor turn with it", evidence: "modules/kernel/roles.yaml supervisor.tokenBudget; scripts/kernel/wake-budget.mjs reads the Kernel only"}
+    status: open
+    why: "the digest measures a Kernel wake against its budget (kernel-wake-budget) and an Op attempt against its budget (budget-overrun); a Supervisor turn over its provisional budget is recorded in llm_usage and surfaced nowhere"
+  - id: supervisor-menu-escape-has-no-policy-row
+    family: smooth-operation
+    met: {date: "2026-10-08", where: "role standard completion: the Supervisor menu kind kernel-escape (a Kernel whose menu offered no fitting option) is handled by the Supervisor but names no row, hold or gate cause of the incident policy", evidence: "modules/supervisor/supervisor-menu.yaml kernel-escape; modules/kernel/op-incident-policy.yaml"}
+    status: open
+    why: "the happy error has a menu kind and a Decision Item (menu-escape) but no policy row with a bound and a chain, so the roles contract cannot name its row"

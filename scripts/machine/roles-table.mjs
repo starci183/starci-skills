@@ -12,7 +12,9 @@ export const pendingFor = (role, requirement) => (role.pending ?? []).find((entr
 function happyCell(role) {
   if (role.happyErrors?.length) return role.happyErrors.map((error) => `${error.id} (${error.row})`).join('; ');
   const pending = pendingFor(role, 'happy-errors');
-  return pending ? `pending, lane ${pending.lane}` : 'none declared';
+  if (!pending) return 'none declared';
+  const kind = pending.lane ? 'lane' : 'entry';
+  return `pending, ${kind} ${pending.lane ?? pending.entry}`;
 }
 
 const bugCell = (doc, role) => (role.id === 'debug' ? doc.standard.onBug.debug : doc.standard.onBug.chain);

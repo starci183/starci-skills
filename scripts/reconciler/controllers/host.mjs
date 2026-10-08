@@ -43,7 +43,7 @@
 import path from 'node:path';
 import {
   SKILL_ROOT, SERVICES_FILE, OUTAGE_STATES, hostSettings, serviceRegistry, servicePorts, openServiceStore, newRecord,
-  stepService, runChild, lastJson, probeOrcaAsync,
+  stepService, runChild, lastJson,
 } from '../services.mjs';
 import { quickCheck, backupDue } from '../ledger-health.mjs';
 import { createLedgerBackup } from '../ledger-identity.mjs';
@@ -56,6 +56,7 @@ import { claimDue, finishDuty, listSchedules } from '../schedules.mjs';
 import { pathKey } from '../../lib/path-key.mjs';
 import os from 'node:os';
 import { seatStateOf, seatHold, seatQuarantine } from '../host-seats.mjs';
+import { runTerminalDrift, runtimeTerminalCount } from '../terminal-drift.mjs';
 import { createStaleTerminalStep } from '../host-stale.mjs';
 import { eachInOrder } from '../../lib/in-order.mjs';
 export { staleTerminalsOf, STALE_RETRY_MS, STALE_ESCALATE_TRIES, CLOSE_VERIFY } from '../host-stale.mjs'; export { seatStateOf };
@@ -192,7 +193,7 @@ export function createHostController(deps = {}) {
     const h = allocationSettings()?.supervisorTick?.host;
     return h ? verdict(procs, h) : { alert: false };
   });
-  const orcaTerminals = deps.orcaTerminals ?? (async () => (await probeOrcaAsync({ timeoutMs: settings().services.orca?.probeTimeoutMs ?? 30_000 })).terminals ?? null);
+  const orcaTerminals = deps.orcaTerminals ?? (async () => runtimeTerminalCount(lastJson((await runChild(process.execPath, [path.join(SKILL_ROOT, TERMINAL_LIST), '--include-visual-layouts'], { timeoutMs: settings().services.orca?.probeTimeoutMs ?? 30_000 })).stdout)));
   const supervisorMode = deps.supervisorMode ?? (async () => { try { return (await import('../../machine/home.mjs')).supervisorMode(); } catch { return 'chat'; } });
   // Orca's active workers over every Run (worker-list), or null when Orca does not answer for every Run.
   const activeWorkers = deps.activeWorkers ?? (async () => (await import('../../machine/worker-list-all.mjs')).activeWorkersAllRuns());
@@ -473,16 +474,7 @@ export function createHostController(deps = {}) {
 
   // INV-H2: Orca's terminals against the workers Orca itself holds active (every seat, op and [Worker] is a
   // worker-start worker; worker-list is the one count). An Orca that does not answer for every Run proves nothing (null).
-  async function terminalDrift(ctx, p) {
-    const terminals = await orcaTerminals();
-    const active = terminals == null ? null : await activeWorkers();
-    if (terminals == null || !Array.isArray(active)) return null;
-    const expected = active.length + p.terminalSlack;
-    const drift = { count: terminals, expected, workers: active.length };
-    if (terminals > expected) await clock(ctx, 'host:terminals', 'TERMINAL_COUNT_DRIFT', p.terminalDriftSlaMs, { code: 'TERMINAL_COUNT_DRIFT', owner: 'host-controller', ledgerId: 'supervisor', count: terminals, expected });
-    else await clear(ctx, 'host:terminals', 'TERMINAL_COUNT_DRIFT');
-    return drift;
-  }
+  const terminalDrift = (ctx, p) => runTerminalDrift({ ctx, p, state, orcaTerminals, activeWorkers, clock, clear, dedupeArgs: [SERVICES_FILE, '--dedupe', '--json'] });
 
   async function processes(ctx) {
     const now = ctx.now(), p = settings().processes;

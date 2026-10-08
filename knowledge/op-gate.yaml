@@ -49,6 +49,11 @@ digest:
   schema: starci/read-digest@1
   attach: read-digest.json
   required: [docs/architecture.md, docs/code-pattern-enforcement.md]
+# The READ set of a deciding or authoring op (an op with the read-knowledge proof in opProofs) is the law inputs plus the knowledge its own READ
+# step names; every mandatory file is carried in the agent's context for every later turn, so the set stays small.
+readSet:
+  maxMandatoryFiles: 60
+  maxPromptBytes: 40000
 # Topics select stable reference IDs; the catalog binds their complete actual app source sets.
 examples:
   catalog: examples/index.yaml

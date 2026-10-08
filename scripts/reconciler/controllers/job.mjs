@@ -48,13 +48,17 @@ import { SETTLED_JOB_LIST } from '../../../engine/admission.mjs'; import { isMai
 import { positiveNumber } from '../../lib/number.mjs';
 import { ownerOnlyQuestion } from '../../kernel/op-incident-policy.mjs';
 import { TERMINAL_HOLDS, holdView, terminalFactsOf } from '../../kernel/terminal-step.mjs';
+import { runMechanicalMoves } from '../mechanical-moves.mjs';
 const selfFile = fileURLToPath(import.meta.url);
 const skillRoot = path.resolve(path.dirname(selfFile), '..', '..', '..');
 const JOB_FILE = path.join(skillRoot, 'modules', 'reconciler', 'job.yaml');
 export const SETTLER_SCRIPT = 'scripts/kernel/settle/job-settle-main.mjs';
 const WORKERS_KEY = 'workers:supervisor';
 const HEALTH_KEY = 'health:all';
-const OPEN = ['queued', 'leased', 'running', 'answering', 'effect_unknown'];
+const OPEN = new Set(['queued', 'leased', 'running', 'answering', 'effect_unknown']);
+// The statuses a report puts a job in until a verdict settles it: `starci kernel report` moves running -> reported.
+const REPORT_WAIT = new Set(['running', 'answering', 'effect_unknown', 'reported']);
+const LISTED = [...OPEN, 'reported'];
 const SETTLED = SETTLED_JOB_LIST;
 
 /* ------------------------------------------------------------------------------------------------ settings */
@@ -138,7 +142,7 @@ export function jobFacts(db, jobId, { now = Date.now(), settings = jobSettings()
 /** Keys of the resync: open op jobs of running workflows, settled ones of the last settledWindowMs, and each running workflow. */
 export function listKeysOf(db, ledgerId, { now = Date.now(), settings = jobSettings(), openClockJobs = [] } = {}) {
   const live = db.prepare(`SELECT j.job_id, j.workflow_id FROM jobs j JOIN workflows w ON w.workflow_id=j.workflow_id
-    WHERE j.kind='op' AND w.archived_at IS NULL AND COALESCE(w.phase,'') <> 'finished' AND j.status IN (${OPEN.map(() => '?').join(',')})`).all(...OPEN);
+    WHERE j.kind='op' AND w.archived_at IS NULL AND COALESCE(w.phase,'') <> 'finished' AND j.status IN (${LISTED.map(() => '?').join(',')})`).all(...LISTED);
   const settled = db.prepare(`SELECT job_id, workflow_id FROM jobs WHERE kind='op' AND status IN (${SETTLED.map(() => '?').join(',')}) AND updated_at>?`)
     .all(...SETTLED, now - settings.settledWindowMs);
   const owing = db.prepare("SELECT j.job_id FROM jobs j JOIN workflows w ON w.workflow_id=j.workflow_id WHERE j.kind='op' AND w.archived_at IS NULL AND w.phase='running' AND j.status IN ('failed','awaiting_owner')").all()
@@ -169,7 +173,7 @@ export function planJob(f, { frontier = {}, questions = [], settings = jobSettin
     set({ kind: 'dead-worker', concern: 'job.worker', verb: 'reconcile', argv: ['--job', f.jobId, '--dead-worker', '--settle-failed'] });
   }
   if (live && (frontier.heldWorkerJobs ?? []).includes(f.jobId)) set({ kind: 'release-worker', concern: 'job.worker', verb: 'reconcile', argv: ['--job', f.jobId, '--release-worker'] });
-  if (live && f.report) planReport(f, clock, set);
+  if (REPORT_WAIT.has(f.status) && f.report) planReport(f, clock, set);
   if (f.status === 'answering') {
     clock('QUESTION_OVERDUE', f.questionAt ?? f.updatedAt);
     set({ kind: 'questions', concern: 'job.consume-check', questions: questions.filter((q) => q?.jobId === f.jobId) });
@@ -201,8 +205,8 @@ function planReport(f, clock, set) {
 /** The clock and step of a job left terminal with nothing after it (policy holds failed-no-step, owner-wait-no-ask). */
 function planTerminal(f, clock, set) {
   clock('DECISION_OVERDUE', f.terminal.since);
+  // An owner wait with no ask is the retry move of mechanical-moves.mjs (its refusal opens the retry-decision item).
   if (f.terminal.hold === TERMINAL_HOLDS.failedNoStep) set({ kind: 'route-failure', concern: 'job.settle', verb: 'reconcile', argv: ['--job', f.jobId, '--route-failure'] });
-  else set({ kind: 'terminal-decision', concern: 'job.consume-check', reason: 'owner-wait-no-ask' });
 }
 
 /** The clock and step of a settled job whose worker release is not proven. */
@@ -303,10 +307,10 @@ ${JSON.stringify(r?.value ?? null)}`);
 async function reconcileJob(ctx, ledgerId, jobId, settings) {
   const f = ctx.read(ledgerId, (db) => jobFacts(db, jobId, { now: ctx.now(), settings }));
   if (!f) { for (const state of CLOCK_CODES) { ctx.clear(jobKey(ledgerId, jobId), state); } return { ok: true, action: 'gone' }; }
-  const status = OPEN.includes(f.status) ? await ctx.status(ledgerId, f.workflowId) : null;
+  const status = OPEN.has(f.status) || f.status === 'reported' ? await ctx.status(ledgerId, f.workflowId) : null;
   const plan = planJob(f, { frontier: status?.frontier ?? {}, questions: status?.workerQuestions ?? [], settings });
   await keepClocks(ctx, ledgerId, jobId, plan.clocks);
-  if (!OPEN.includes(f.status)) ctx.clear(jobKey(ledgerId, jobId), 'WORKER_STALLED');
+  if (!OPEN.has(f.status)) ctx.clear(jobKey(ledgerId, jobId), 'WORKER_STALLED');
   const s = plan.step;
   if (!s) return { ok: true, action: 'idle', clocks: plan.clocks.map((c) => c.state) };
   if (!may(ctx, s.concern)) return { ok: true, action: 'not-owned', step: s.kind };
@@ -331,8 +335,6 @@ async function actJob(ctx, ledgerId, jobId, f, s, settings) {
       return { action: 'settle', ...(await ctx.run('node', [SETTLER_SCRIPT, '--repo', repo, '--job', jobId, '--json'], { timeoutMs: settings.settleRunTimeoutMs })) };
     case 'route-failure':
       return routeFailure(ctx, ledgerId, f, s, settings);
-    case 'terminal-decision':
-      return { action: 'terminal-decision', ...(await ctx.openDecision(retryDecision(f, ledgerId, s.reason, { now: ctx.now(), settings }))) };
     case 'settle-nongreen':
       return { action: 'settle-nongreen', ...(await ctx.openDecision(settleDecision(f, ledgerId, { now: ctx.now(), settings }))) };
     case 'questions': {
@@ -385,6 +387,8 @@ async function reconcileWorkflow(ctx, ledgerId, workflowId, settings) {
   const status = await ctx.status(ledgerId, workflowId);
   if (!status || status.phase === 'finished' || status.archivedAt) return { ok: true, action: 'ended' };
   const id = `${ledgerId}:${workflowId}`;
+  const moved = may(ctx, 'job.settle') ? await runMechanicalMoves(ctx, ledgerId, status, { facts: (jobId) => ctx.read(ledgerId, (db) => jobFacts(db, jobId, { now: ctx.now(), settings })), refused: (f, reason) => retryDecision(f, ledgerId, reason, { now: ctx.now(), settings }) }) : [];
+  if (moved.length) ctx.log('reconciler.act', `workflow ${id} ran ${moved.length} mechanical retry move(s)`, { moved });
   const plan = planWorkflow(status, { lastDispatchAt: lastDispatch.get(id) ?? 0, now: ctx.now(), settings });
   const entity = wfKey(ledgerId, workflowId);
   if (plan.readyJobs.length && (Number(status.progress?.running) || 0) < (Number(status.progress?.allowedParallel) || 0)) ctx.clock(entity, 'READY_UNDISPATCHED', settings.sla.READY_UNDISPATCHED, { ledgerId });
@@ -434,7 +438,7 @@ export default {
   concurrency: 2,
   timeoutMs: 960_000,
   routes: {
-    'op-dispatched': jobRoute, 'op-reported': jobRoute, 'report-consumed': jobRoute, 'checks-recorded': jobRoute, 'op-settled': jobRoute,
+    'op-dispatched': jobRoute, 'report-filed': jobRoute, 'report-consumed': jobRoute, 'checks-recorded': jobRoute, 'op-settled': jobRoute,
     'op-auto-settled': jobRoute, 'job-settle-*': jobRoute, 'worker-*': jobRoute, 'incident-raised': wfRoute, 'incident-resolved': wfRoute,
   },
   async list(ctx) {

@@ -171,3 +171,38 @@ removed:
     name: critic-coverage-define-architecture
     use: 'the edge-case registry entry is critic-coverage-decision-legs'
     since: 1.0.0-alpha.8
+  - id: supervisor-grammar-release
+    kind: vocabulary
+    name: grammarRelease
+    use: 'the owner publishes @starci/grammar through starci release publish; the Supervisor changes no runtime code'
+    since: 1.0.0-alpha.8
+  - id: supervise-yaml-worker-land-blocks
+    kind: vocabulary
+    name: supervise.yaml workers
+    use: 'the Supervisor spawns no fix workers and lands nothing: it answers its menu (starci supervisor status) and records runtime defects for Debug'
+    since: 1.0.0-alpha.8
+    match: 'supervise\.yaml\s+(?:workers|landGate)\b|supervise\.yaml\s+kernelSeat/workers'
+  - id: supervisor-fixes-through-lanes
+    kind: vocabulary
+    name: the Supervisor fixes through lanes
+    use: 'the Supervisor records a runtime defect (starci supervisor actions record --item runtime-defect:<cause>) and Debug changes .claude'
+    since: 1.0.0-alpha.8
+    match: 'Supervisor[^\n.]{0,60}\bfix(?:es)?\s+through\s+(?:its\s+own\s+)?(?:staged\s+)?lanes?\b'
+  - id: kernel-ranked-actions
+    kind: vocabulary
+    name: ranked actions
+    use: "the Kernel's menu: the Decide section of starci kernel status, answered with starci kernel decide"
+    since: 1.0.0-alpha.8
+    match: '[Ww]ork the ranked actions|[Ff]irst rca\.actions entry'
+  - id: kernel-run-next-actions
+    kind: vocabulary
+    name: run nextActions
+    use: "the Kernel answers the items of its menu; the runtime performs the mechanical next actions"
+    since: 1.0.0-alpha.8
+    match: 'run nextActions|run each\s+in order and never choose'
+  - id: event-op-reported
+    kind: vocabulary
+    name: op-reported
+    use: 'the event a filed report records is report-filed; no event named op-reported was ever emitted'
+    since: 1.0.0-alpha.8
+    match: '(?<![\w-])op-reported(?![\w-])'

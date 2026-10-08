@@ -7,6 +7,9 @@ impl:
   args:
     - status
 flags:
+  - name: field
+    type: string
+    summary: comma list of dotted paths of the answer; prints only those fields as JSON
   - name: repo
     type: string
     summary: managed repository whose .starciwork ledger the command uses

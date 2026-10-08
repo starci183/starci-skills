@@ -17,11 +17,11 @@ contract says.
 <!-- roles:table:begin -->
 | Role | Scope | Function | Happy errors it handles | On a bug |
 | --- | --- | --- | --- | --- |
-| Op | One unit of work of one workflow. | Owns one attempt and its worktree; decides alone how to do the work inside its contract | pending, lane f6 | records the evidence and keeps working inside its contract; it never fixes the bug and never works around it. Debug scans every role and removes the bug by changing .claude with a spec. |
+| Op | One unit of work of one workflow. | Owns one attempt and its worktree; decides alone how to do the work inside its contract | asks-a-question (ask-worker-question); asks-the-owner (ask-owner); red-check (error-work); provider-quota (quota-or-circuit); login-expired (error-login-expired) | records the evidence and keeps working inside its contract; it never fixes the bug and never works around it. Debug scans every role and removes the bug by changing .claude with a spec. |
 | Critic | One product of one op. | Owns one verdict; decides alone the score by the rubric | failing-verdict (error-work); no-independent-member (critic-no-independent-member); critic-unavailable (critic-unavailable); critic-quota-out (critic-quota-out) | records the evidence and keeps working inside its contract; it never fixes the bug and never works around it. Debug scans every role and removes the bug by changing .claude with a spec. |
-| Kernel | One workflow. | Owns one workflow: its plan, its jobs and its gates; decides alone dispatch, settle, retry, switch agent, re-plan inside the goal, and answers to ops | pending, lane f3 | records the evidence and keeps working inside its contract; it never fixes the bug and never works around it. Debug scans every role and removes the bug by changing .claude with a spec. |
-| Supervisor | All workflows on the machine, inside Orca. | Owns the machine's operations: the shared resources and the gates Kernels raise; decides alone gate rulings and the division of resources | pending, lane f6 | records the evidence and keeps working inside its contract; it never fixes the bug and never works around it. Debug scans every role and removes the bug by changing .claude with a spec. |
-| Debug | The owner's eyes: a loop of the owner's chat for a limited stabilisation period, not part of steady-state operation. | Owns the edge-case registry, the operating standard and the queue of runtime defects; decides alone which role failed which duty, which collector to trigger, the fix lanes it opens, and restarting a seat (the owner's authority) | pending, lane f4 | removes the bug by changing .claude (contract, prompt, policy row, guard refusal or runtime code) with a spec and an edge-case entry. |
+| Kernel | One workflow. | Owns one workflow: its plan, its jobs and its gates; decides alone dispatch, settle, retry, switch agent, re-plan inside the goal, and answers to ops | worker-question (worker-question); worker-stalled (worker-stalled); peer-wait (peer-wait); supervisor-gate (supervisor-gate); owner-gate (owner-gate); failed-leg (failed-no-step); orphaned-frontier (orphaned-frontier) | records the evidence and keeps working inside its contract; it never fixes the bug and never works around it. Debug scans every role and removes the bug by changing .claude with a spec. |
+| Supervisor | All workflows on the machine, inside Orca. | Owns the machine's operations: the shared resources and the gates Kernels raise; decides alone gate rulings and the division of resources | gate-ruling (supervisor-gate); budget-gate (budget-gate); workflow-conflict (peer-dependency); resource-division (pool-full); runtime-defect (runtime-defect) | records the evidence and keeps working inside its contract; it never fixes the bug and never works around it. Debug scans every role and removes the bug by changing .claude with a spec. |
+| Debug | The owner's eyes: a loop of the owner's chat for a limited stabilisation period, not part of steady-state operation. | Owns the edge-case registry, the operating standard and the queue of runtime defects; decides alone which role failed which duty, which collector to trigger, the fix lanes it opens, and restarting a seat (the owner's authority) | owner-matter (owner-gate); owner-question (ask-owner) | removes the bug by changing .claude (contract, prompt, policy row, guard refusal or runtime code) with a spec and an edge-case entry. |
 <!-- roles:table:end -->
 
 ## Lifecycle
@@ -80,19 +80,25 @@ preserves the plan, jobs and events across restarts.
 
 ## Kernel decision cycle — `modules/kernel/driver-loop.yaml`
 
-The Kernel uses these API calls for its decisions. Controllers own green settlement,
-worker recovery, ready dispatch and seat liveness:
+The runtime drives and the Kernel answers. The controllers dispatch ready work, retry inside the bounds of the hold policy, switch
+agent, settle green reports, run the retry of a job whose gate resolved or whose ask was answered, and collect leftovers. What needs
+judgment is the Kernel's menu (`modules/kernel/kernel-menu.yaml`), one function of the ledger state: `starci kernel status` prints its
+open items as the Decide section, and `menu[]` in its JSON.
 
 | Step | Call | Why |
 | --- | --- | --- |
-| survey | `starci kernel survey --workflow <id>` | Open on the ledger, never on memory: goal revision + `opChain`, all jobs, inbox, signals, event tail, open incidents. |
-| plan | `starci kernel plan --workflow <id> --file <plan.json>` | Persist the derived plan; the api stores its digest and the *structural* diff vs the approved `opChain`. Divergence → `incident --kind plan-divergence`; dispatch nothing on a divergent plan. |
-| enqueue | `starci kernel enqueue --workflow <id> --op <opId> --paths <csv>` | One `queued` job row per planned op the queue lacks. An oversized semantic op is partitioned into bounded same-op jobs with `--cut-id/--cut-ordinal/--cut-total`; this does not change the approved plan. |
-| drive | `starci kernel decisions --workflow <id>` then `starci kernel status` and an allowed decision verb | Claim and resolve non-green verdicts, worker questions, progress stalls and Supervisor rulings; use `--decision <id>` for the chosen action. Yield when no decision is executable. Job, Workflow and Host controllers continue their mechanical passes. |
-| finish | `starci kernel finish --workflow <id>` | Last call. Refuses while any job is unsettled (`workflow-open-jobs`) or the owner has not approved the newest handover after the last business settle (`handover-not-approved`). |
+| read | `starci kernel status --workflow <id>` (`--field <path>` selects fields) | The menu: each item names its situation, the policy step and deadline, and the options that answer it. |
+| answer | `starci kernel decide --workflow <id> --item <menu id> --choice <choice> --reason <why> [--text <input>]` | The choice is checked against the current menu, recorded in the decision log and executed in-process. A choice off the menu is refused with the menu. |
+| escape | `starci kernel decide ... --choice none-fits --reason <why>` | No option fits: the item escalates to the Supervisor. A bug of the runtime or of a role is never worked around; it is recorded for Debug. |
+| attest | `starci kernel kernel-ack-rev --workflow <id> --plan` | The runtime revision moved: read what the plan lists, then attest the complete READ manifest. |
+| yield | none | An empty menu is a wait; the watchdog wakes a Kernel only while its menu has an item. |
 
-The kernel decides the plan and its open Decision Items. It never decides scope, identity or
-authority, never answers an `ask` itself, and never edits the ledger by hand.
+The Kernel seat's shell is `starci`: the read verbs, `decide` and `kernel-ack-rev`. Every other `starci kernel` verb is the runtime's; a
+mutating verb typed from habit is refused (`KERNEL_USE_DECIDE`) with the menu. A wake that spends more than the per-wake budget of the
+Kernel role (`modules/kernel/roles.yaml`) is reported by the digest as a departure.
+
+The kernel decides the open items of its menu. It never decides scope, identity or authority, never answers an `ask` itself, and never
+edits the ledger by hand.
 
 ## The verbs — `modules/kernel/api.yaml`
 
@@ -330,10 +336,27 @@ dead agent's transcript.
   - touches another workflow
   - decides for the owner what is costly to reverse
   - leaves ready work or a reported block unhandled
+  - runs a mutating verb itself: it answers the items of its menu with starci kernel decide, and the runtime does the rest
+  - works around a bug: a bug is none-fits, recorded for Debug
   - raises a supervisor-gate before the workaround its gate cause names (the gate ladder refuses it: modules/kernel/op-incident-policy.yaml gateCauses)
   - pins a model around a lineage exclusion without a recorded op-override decision
 - Owns: one workflow: its plan, its jobs and its gates. Decides alone: dispatch, settle, retry, switch agent, re-plan inside the goal, and answers to ops.
 - Reports to: Supervisor (one of the five causes above). Overseen by: the runtime, Supervisor, Debug.
 - Measure: legs done inside their bound with zero human untangling.
+- Wake budget (provisional): 20 turns and 6000000 tokens per wake; over it, the digest reports the wake as a departure of the Kernel (a bug): a wake answers the menu and yields.
+- Guard: its terminals are bound as the "lead" role of modules/kernel/command-policy.yaml.
+- Happy errors it handles (the system working as designed, handled inside the chain through the policy):
+  - worker-question (policy row worker-question): an Op asks: the Kernel answers from the goal (menu worker-question) or sends it to the owner
+  - worker-stalled (policy row worker-stalled): a worker the nudges did not move: the Kernel nudges, replaces or stops it (menu worker-wedged)
+  - peer-wait (policy row peer-wait): another workflow has not landed what a step needs: the Kernel waits for the typed condition or the peer's message (menu peer-message)
+  - supervisor-gate (policy row supervisor-gate): a gate the Supervisor rules on: the Kernel waits for the ruling and acts on it
+  - owner-gate (policy row owner-gate): a matter that is the owner's: the Kernel waits for the answer
+  - failed-leg (policy row failed-no-step): a leg failed with no recorded step: the Kernel retries, switches agent or re-plans inside the goal (menu job-decision)
+  - orphaned-frontier (policy row orphaned-frontier): a running workflow with nothing open: the Kernel proposes the next leg (menu decision-item)
+- A bug in this role (the chain neither fixes nor works around it; Debug removes it with a change to .claude) is detected by:
+  - the Kernel runs a command that is not a starci verb or a pure read: KERNEL_STARCI_ONLY from the seat guard
+  - the Kernel uses a verb the runtime-driven menu replaces: KERNEL_USE_DECIDE from the seat guard
+  - a Kernel wake spends more than the per-wake budget: kernel-wake-budget problem line of the digest
+  - a Kernel decision names a menu item or choice the menu does not hold, or a step fails: menu-item-unknown, menu-choice-unknown, menu-direct-option, menu-text-missing, menu-step-failed, menu-step-usage, menu-verb-unknown, menu-unreadable
 - Principles: P1 P2 P3 P4 P5 P6 P8 (modules/kernel/roles.yaml, principles).
 <!-- roles:end kernel -->

@@ -74,7 +74,7 @@ codes:
   ORCA_DOWN:                {slaMs: 600000, severity: critical, owner: host-controller, autoAction: 'restartOrcaApp after hostOutage.waitMs probes'}
   SERVICE_DOWN:             {slaMs: 300000, severity: warn, owner: host-controller, autoAction: 'restart with backoff; the per-service SLA of DESIGN §8.4 rides on the clock'}
   SERVICE_QUARANTINED:      {slaMs: 0, severity: critical, owner: supervisor, autoAction: 'service-quarantined DI; urgent owner alert for an owner-path service'}
-  TERMINAL_COUNT_DRIFT:     {slaMs: 600000, severity: warn, owner: host-controller, autoAction: 'INV-H2: GC the surplus shells'}
+  TERMINAL_COUNT_DRIFT:     {slaMs: 600000, severity: warn, owner: host-controller, autoAction: 'INV-H2: the dedupe pass (services --dedupe) closes the StarCi terminals no ledger binds, once per SLA window'}
   ORPHAN_PROCESS:           {slaMs: 1800000, severity: warn, owner: host-controller, autoAction: 'kill the runtime loop of a repo outside supervisor.repos'}
   LEDGER_CORRUPT:           {slaMs: 0, severity: critical, owner: host-controller, autoAction: 'PRAGMA quick_check failed: urgent owner alert, restore from the nightly backup'}
   BOOT_TASK_MISSING:        {slaMs: 0, severity: warn, owner: host-controller, autoAction: 'recreate the StarCi-Reconciler scheduled task'}

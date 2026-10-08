@@ -12,7 +12,7 @@ const tempTree = (t) => {
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const doc = rolesContract(skillRoot);
   // The role standard reads the incident policy, the command policy, the generated table's document and the files bugSurface names.
-  const standard = ['modules/kernel/op-incident-policy.yaml', 'modules/kernel/command-policy.yaml', 'docs/workflow-kernel.md', ...doc.roles.flatMap((r) => (r.bugSurface ?? []).map((b) => b.detectedBy))];
+  const standard = ['modules/kernel/op-incident-policy.yaml', 'modules/kernel/command-policy.yaml', 'modules/reconciler/edge-cases.yaml', 'docs/workflow-kernel.md', ...doc.roles.flatMap((r) => (r.bugSurface ?? []).map((b) => b.detectedBy))];
   for (const file of new Set(['modules/kernel/roles.yaml', ...standard, ...doc.roles.flatMap((r) => r.surfaces.map((s) => s.file))])) {
     fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
     fs.copyFileSync(path.join(skillRoot, file), path.join(root, file));

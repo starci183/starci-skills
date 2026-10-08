@@ -3,7 +3,7 @@
 group: kernel
 verb: decide
 owner: runtime
-summary: open, list or close an entry of the Kernel decision log (hypothesis, action, metric)
+summary: answer one item of the Kernel menu with a typed choice, or keep the decision log
 impl:
   script: scripts/kernel/cli.mjs
   args:
@@ -43,18 +43,34 @@ flags:
   - name: list
     type: boolean
     summary: list the decisions of the workflow
+  - name: item
+    type: string
+    summary: id of the menu item to answer (starci kernel status menu[].id)
+  - name: choice
+    type: string
+    summary: the option of that item to take (menu[].options[].choice, or none-fits)
+  - name: reason
+    type: string
+    summary: why this choice; recorded in the decision log (required with --item)
+  - name: text
+    type: string
+    summary: the free-text input the chosen option names (its text field), e.g. the answer to a worker question
+  - name: evidence
+    type: string
+    summary: comma list of refs (ledger rows, events, files) the choice rests on
 exit:
-  "0": listed or recorded
-  "1": refused (incomplete, action already open or reverted, unknown or closed decision)
+  "0": listed, recorded or executed
+  "1": refused (an item or choice not on the menu, incomplete, action already open or reverted, unknown or closed decision) or a step of the choice failed
   "2": "bad usage: a required flag is missing or a flag has no value"
 json: flag
 examples:
+  - starci kernel decide --repo <path> --workflow <workflow> --item <item> --choice <choice> --reason <why>
   - starci kernel decide --repo <path> --workflow <workflow> --list
   - starci kernel decide --repo <path> --workflow <workflow> --hypothesis <hypothesis> --action-key <key> --metric <metric>
   - starci kernel decide --repo <path> --workflow <workflow> --close <decision> --result keep --observed <observed>
 editions:
   - full
-purpose: "Log every idea before acting on it: hypothesis -> action key -> metric, with a baseline
+purpose: "The Kernel's one decision verb. --item answers one item of the menu that starci kernel status prints: the choice is checked against the current menu, recorded in the decision log and executed in-process; a choice off the menu is refused with the menu, and none-fits escalates the item. Without --item it keeps the decision log. Log every idea before acting on it: hypothesis -> action key -> metric, with a baseline
   snapshot of the units that passed their gates; close it next wake with keep|revert and what the
   metric showed. A restarted Kernel reads the log (starci kernel status rca.decisions, decide --list) and
   never repeats a failed idea. Every mutating kernel verb (graph-edit, op-override, redesign) names

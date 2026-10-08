@@ -1,0 +1,36 @@
+schema: starci/module-kernel-gate-loosening@1
+id: kernel.gate-loosening
+
+# What "loosens a gate" means, mechanically (modules/kernel/roles.yaml rulings.loosening-is-owner-class). scripts/lib/gate-loosening.mjs reads
+# this table over the diff of one change (a land: base..head; the self-check: each commit since the last release against its parent).
+# A change that loosens is refused by the land gate and flagged by the `gate-loosening` self-check unless the owner approved exactly
+# that loosening: an entry of modules/kernel/owner-rulings.yaml, present in the tree the change is judged against (so a change cannot
+# approve itself), whose id is `gate-loosening-<fingerprint>`. The fingerprint is printed with the refusal.
+
+# Files whose lists and numbers are gates: a check, a rule, a protected path, a guard denial, a verdict condition.
+gateFiles:
+  - knowledge/hfs/runtime-slots.yaml
+  - knowledge/hfs/rules.yaml
+  - knowledge/hfs/facts.yaml
+  - modules/kernel/protected-zone.yaml
+  - modules/kernel/command-policy.yaml
+  - modules/kernel/verdict-contract.yaml
+  - modules/kernel/op-incident-policy.yaml
+
+# Files whose entries are exceptions: a list item added to one is a loosening.
+allowlistFiles:
+  - modules/kernel/allowlist.yaml
+
+# A number of a gate file is a threshold when a word of its key (split on camelCase and - _ .) is listed: a lower value loosens a floor,
+# a higher value loosens a ceiling.
+thresholds:
+  floors: [min, minimum, floor, required, threshold, score, coverage]
+  ceilings: [max, maximum, limit, cap, tolerance, slack, allowed, budget]
+
+# Product code: a deleted or weakened spec counts only together with a change to one of these.
+productPrefixes: [scripts/, engine/, modules/, knowledge/, packages/, ui/, init/]
+
+# Specs, and the markers that skip one.
+specPattern: 'tests/**/*.spec.mjs'
+skipMarkers: ['.skip(', 'skip: true', 'todo: true', '.todo(']
+assertionMarkers: ['assert.', 'expect(']

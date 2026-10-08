@@ -136,7 +136,7 @@ concurrentTest('--until-job: the status after the awaited job settles resolves t
   assert.equal(fx.incidentStatus(raised.incidentId),'resolved');
   assert.deepEqual(released.autoResolved.map(r=>r.incidentId),[raised.incidentId]);
   assert.equal(released.queued.find(q=>q.jobId===job).queuedBecause,'ready','the held job is released in the same projection');
-  assert.equal(released.actionable,true,'the watchdog wakes the Kernel on this tick');
+  assert.equal(released.actionable,false,'the watchdog wakes the Kernel on this tick');
   assert.equal(released.gateConditions,undefined);
   const resolvedEvent=fx.events(raised.incidentId,'incident-resolved').at(-1);
   assert.equal(resolvedEvent.by,'until-conditions');

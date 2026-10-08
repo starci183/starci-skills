@@ -21,31 +21,24 @@ const withRole = (id, change) => {
 };
 const messagesOf = (doc) => standingMessages(roleStandings(doc, skillRoot));
 
-test('the shipped contract: the Critic meets every requirement and every gap of another role is pending with its lane and a date', () => {
+test('the shipped contract: every one of the five roles meets every requirement and no pending marker remains', () => {
   const doc = rolesContract(skillRoot);
   assert.deepEqual(doc.standard.roles, ['op', 'critic', 'kernel', 'supervisor', 'debug']);
   const standings = roleStandings(doc, skillRoot);
   assert.deepEqual(Object.values(standing(doc, 'critic').cells), Array(7).fill('present'));
   assert.deepEqual(standingMessages(standings), [], 'no requirement is missing and no pending entry is unsound');
-  const pending = standings.flatMap((one) => Object.entries(one.cells).filter(([, state]) => state === 'pending').map(([requirement]) => `${one.id}:${requirement}`));
-  assert.ok(pending.length > 0, 'the gaps of the lanes still running are visible');
-  for (const role of doc.roles.filter((one) => one.pending)) {
-    for (const entry of role.pending) {
-      assert.match(entry.since, /^\d{4}-\d{2}-\d{2}$/);
-      assert.ok(entry.lane, `${role.id} names the lane that builds ${entry.requirements}`);
-    }
-  }
+  for (const one of standings) assert.deepEqual(Object.values(one.cells), Array(7).fill('present'), one.id);
+  assert.deepEqual(doc.roles.filter((one) => one.pending).map((one) => one.id), [], 'a pending marker is removed the day its requirement is built');
   assert.deepEqual(checkRolesContract().map((finding) => finding.message), []);
 });
 
-test('the check prints the role x requirement table, with the lane of every pending cell', () => {
+test('the check prints the role x requirement table, every cell present', () => {
   const table = standardTable();
   const lines = table.split('\n');
   assert.match(lines[0], /^Role\s+fields\s+happy-errors\s+bug-surface\s+prompt-block\s+guard-binding\s+budget\s+chain$/);
   assert.equal(lines.length, 2 + 5, 'a header, a rule and one row per role');
   assert.match(lines.find((line) => line.startsWith('Critic')), /^Critic\s+present(\s+present){6}$/);
-  assert.match(lines.find((line) => line.startsWith('Kernel')), /pending \(f3\)/);
-  assert.match(lines.find((line) => line.startsWith('Debug')), /pending \(f4\)/);
+  for (const role of ['Op', 'Critic', 'Kernel', 'Supervisor', 'Debug']) assert.match(lines.find((line) => line.startsWith(role)), /^\w+\s+present(\s+present){6}$/);
   const out = spawnSync(process.execPath, [path.join(skillRoot, 'scripts', 'checks', 'check-roles-contract.mjs')], { encoding: 'utf8', env: { ...process.env, STARCI_RUNTIME: skillRoot } });
   assert.equal(out.status, 0, out.stderr);
   assert.ok(out.stdout.includes(table), 'the check prints the table and then its verdict');
@@ -69,7 +62,8 @@ test('each requirement is verified against the runtime, not only declared', () =
   assert.equal(state('critic', (role) => { role.happyErrors = [{ id: 'x', row: 'critic-unavailable' }]; }, 'happy-errors'), 'missing', 'a happy error says what it is');
   assert.equal(state('critic', (role) => { role.bugSurface[0].detectedBy = 'scripts/no/such-file.mjs'; }, 'bug-surface'), 'missing', 'a bug names a signal that an existing file reads');
   assert.equal(state('critic', (role) => { role.guard = { role: 'nobody' }; }, 'guard-binding'), 'missing', 'a guard role is a role of the command policy');
-  assert.equal(state('critic', (role) => { delete role.guard; role.noSeat = true; }, 'guard-binding'), 'present', 'a role with no seat says so');
+  assert.equal(state('critic', (role) => { delete role.guard; role.noSeat = true; role.noSeatReason = 'the Critic has a terminal, this only exercises the declared form'; }, 'guard-binding'), 'present', 'a role with no seat says so with a reason');
+  assert.equal(state('critic', (role) => { delete role.guard; role.noSeat = true; }, 'guard-binding'), 'missing', 'no seat without a reason is not a declaration');
   assert.equal(state('critic', (role) => { delete role.tokenBudget; }, 'budget'), 'missing');
   assert.equal(state('critic', (role) => { delete role.tokenBudget; role.noBudget = 'the Critic is bounded by its wall time only'; }, 'budget'), 'present');
   assert.equal(state('critic', (role) => { delete role.tokenBudget; role.noBudget = 'none'; }, 'budget'), 'missing', 'a reason is a sentence');
@@ -91,16 +85,17 @@ test('pending: a gap with a dated entry naming its lane is visible and not red; 
 
   const stale = withRole('critic', (role) => { role.pending = [{ requirements: ['budget'], lane: 'f9', since: '2026-10-08' }]; });
   assert.match(messagesOf(stale)[0], /role critic: pending names budget, which the role already meets: remove the entry/);
-  const undated = withRole('op', (role) => { role.pending[0].since = 'soon'; });
-  assert.match(messagesOf(undated).join('\n'), /role op: pending entry .* names no lane or no ISO date/);
-  const nameless = withRole('op', (role) => { delete role.pending[0].lane; });
-  assert.match(messagesOf(nameless).join('\n'), /names no lane or no ISO date/);
-  const unknown = withRole('op', (role) => { role.pending.push({ requirements: ['telepathy'], lane: 'f6', since: '2026-10-08' }); });
+  const undated = withRole('op', (role) => { delete role.tokenBudget; role.pending = [{ requirements: ['budget'], lane: 'f6', since: 'soon' }]; });
+  assert.match(messagesOf(undated).join('\n'), /role op: pending entry .* names no lane or registry entry, or no ISO date/);
+  const nameless = withRole('op', (role) => { delete role.tokenBudget; role.pending = [{ requirements: ['budget'], since: '2026-10-08' }]; });
+  assert.match(messagesOf(nameless).join('\n'), /names no lane or registry entry, or no ISO date/);
+  const unknown = withRole('op', (role) => { role.pending = [{ requirements: ['telepathy'], lane: 'f6', since: '2026-10-08' }]; });
   assert.match(messagesOf(unknown).join('\n'), /unknown requirement telepathy/);
 });
 
 test('green: a role that builds its requirement and drops the pending entry is clean', () => {
   const doc = withRole('kernel', (role) => {
+    role.pending = [{ requirements: ['guard-binding', 'budget'], lane: 'f9', since: '2026-10-08' }];
     role.guard = { role: 'lead' };
     role.tokenBudget = { status: 'provisional', source: 'estimate', perAttempt: { default: 1000 }, onExceed: 'the Supervisor reads it' };
     role.happyErrors = [{ id: 'op-question', row: 'ask-worker-question', what: 'an Op asks a question' }];
@@ -109,6 +104,35 @@ test('green: a role that builds its requirement and drops the pending entry is c
   });
   assert.deepEqual(Object.values(standing(doc, 'kernel').cells), Array(7).fill('present'));
   assert.deepEqual(messagesOf(doc), []);
+});
+
+test('pending may name an open registry entry instead of a lane; a closed or unknown entry is red', () => {
+  const pendingOn = (entry) => withRole('supervisor', (role) => { delete role.tokenBudget; role.pending = [{ requirements: ['budget'], entry, since: '2026-10-08' }]; });
+  const ok = pendingOn('supervisor-wake-budget-unmeasured');
+  assert.equal(standing(ok, 'supervisor').cells.budget, 'pending');
+  assert.deepEqual(messagesOf(ok), []);
+  assert.match(renderStandingTable(ok, roleStandings(ok, skillRoot)), /pending \(supervisor-wake-budget-unmeasured\)/);
+  const table = renderRolesTable(withRole('supervisor', (role) => { delete role.happyErrors; role.pending = [{ requirements: ['happy-errors'], entry: 'supervisor-menu-escape-has-no-policy-row', since: '2026-10-08' }]; }));
+  assert.match(table, /pending, entry supervisor-menu-escape-has-no-policy-row/);
+  assert.match(messagesOf(pendingOn('critic-pinned-by-hand')).join('\n'), /is not an open entry/);
+  assert.match(messagesOf(pendingOn('no-such-entry')).join('\n'), /is not an open entry/);
+});
+
+test('Debug declares its unbound state explicitly with a reason; an absent value is a missing guard binding', () => {
+  const shipped = rolesContract(skillRoot).roles.find((role) => role.id === 'debug');
+  assert.equal(shipped.noSeat, true);
+  assert.ok(shipped.noSeatReason.length >= 20);
+  assert.equal(standing(withRole('debug', (role) => { delete role.noSeatReason; }), 'debug').cells['guard-binding'], 'missing');
+  assert.equal(standing(withRole('debug', (role) => { role.noSeat = false; }), 'debug').cells['guard-binding'], 'missing');
+});
+
+test('the Kernel budget is its wake budget, and the Supervisor budget is declared from measured turns', () => {
+  const doc = rolesContract(skillRoot);
+  assert.ok(doc.roles.find((role) => role.id === 'kernel').wakeBudget.perWake.tokens > 0);
+  assert.equal(standing(withRole('kernel', (role) => { delete role.wakeBudget; }), 'kernel').cells.budget, 'missing');
+  const supervisor = doc.roles.find((role) => role.id === 'supervisor');
+  assert.equal(supervisor.tokenBudget.status, 'provisional');
+  assert.match(supervisor.tokenBudget.source, /55 supervisor-turn usage rows/);
 });
 
 test('the owner table is generated from the contract: five roles by scope, function, happy errors and what each does on a bug', () => {
@@ -122,7 +146,8 @@ test('the owner table is generated from the contract: five roles by scope, funct
   for (const error of doc.roles.find((role) => role.id === 'critic').happyErrors) assert.ok(critic.includes(error.id), error.id);
   assert.ok(critic.includes(doc.standard.onBug.chain));
   assert.ok(lines.find((line) => line.startsWith('| Debug')).includes(doc.standard.onBug.debug));
-  assert.match(lines.find((line) => line.startsWith('| Kernel')), /pending, lane f3/, 'a role whose lane has not landed says so instead of an empty cell');
+  assert.match(lines.find((line) => line.startsWith('| Kernel')), /worker-question \(worker-question\)/);
+  assert.ok(!table.includes('none declared') && !table.includes('pending'), 'every role declares its happy errors');
   assert.ok(!table.split('\n').slice(2).some((line) => line.split(' | ').length !== 5), 'no cell breaks the table');
   const out = spawnSync(process.execPath, [path.join(skillRoot, 'scripts', 'checks', 'check-roles-contract.mjs'), '--table'], { encoding: 'utf8', env: { ...process.env, STARCI_RUNTIME: skillRoot } });
   assert.equal(out.stdout.trimEnd(), table, '-- --table prints exactly the generated table');
@@ -137,7 +162,7 @@ test('the table in docs/workflow-kernel.md is the generated one; --write refresh
 
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-roles-table-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
-  const files = ['modules/kernel/roles.yaml', 'modules/kernel/op-incident-policy.yaml', 'modules/kernel/command-policy.yaml', 'docs/workflow-kernel.md', ...doc.roles.flatMap((role) => role.surfaces.map((surface) => surface.file)),
+  const files = ['modules/kernel/roles.yaml', 'modules/kernel/op-incident-policy.yaml', 'modules/kernel/command-policy.yaml', 'modules/reconciler/edge-cases.yaml', 'docs/workflow-kernel.md', ...doc.roles.flatMap((role) => role.surfaces.map((surface) => surface.file)),
     ...doc.roles.flatMap((role) => (role.bugSurface ?? []).map((entry) => entry.detectedBy))];
   for (const file of new Set(files)) {
     fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true });

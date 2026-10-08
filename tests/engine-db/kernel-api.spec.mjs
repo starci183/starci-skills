@@ -176,16 +176,16 @@ test('status marks a running workflow with no operation frontier as orphaned-fro
   const r=runApi('status','--repo',repo,'--workflow',wf,'--json');
   assert.equal(r.status,0,r.stderr||r.error?.message);
   assert.deepEqual(out(r)?.frontier,{
-    state:'orphaned-frontier',actionable:true,openOperations:0,readyOperations:0,staleOperations:[],unconsumedReports:0,nudgeReadyJobs:[],workerQuestionJobs:[],wedgedJobs:[],deadWorkerJobs:[],settleReadyJobs:[],heldSettleJobs:[],heldWorkerJobs:[],askReserveDispatches:[],askOnDemandDispatches:[],credentialAskDispatches:[],peerMessageKeys:[],peerWaits:[],peerWaitsDead:[],
+    state:'orphaned-frontier',actionable:false,openOperations:0,readyOperations:0,staleOperations:[],unconsumedReports:0,nudgeReadyJobs:[],workerQuestionJobs:[],wedgedJobs:[],deadWorkerJobs:[],settleReadyJobs:[],heldSettleJobs:[],heldWorkerJobs:[],askReserveDispatches:[],askOnDemandDispatches:[],credentialAskDispatches:[],peerMessageKeys:[],peerWaits:[],peerWaitsDead:[],
     queued:[],queuedCauses:{},
     reason:'workflow is running but has no open operation and no unconsumed report; Kernel must derive/repair the next approved transition or finish; a next step that waits on a peer workflow is recorded as starci kernel incident --kind peer-wait --peer <workflowId>, never left orphaned',
   });
 });
 
-// driver-loop.yaml wait: the Kernel yields only on frontier.actionable:false.
+// driver-loop.yaml menu: the Kernel yields on an empty menu, and frontier.actionable is exactly `the menu holds an item`.
 // The field has to tell an engaged-and-waiting workflow from an engaged one
 // that is still holding work nobody has picked up.
-test('status: frontier.actionable is false only when nothing is waiting on the Kernel',t=>{
+test('status: frontier.actionable follows the menu, so work the controllers perform never wakes the Kernel',t=>{
   const fx=fixture(t),repo=fx.repo(),wf='wf-k7-actionable';
   seedGoal(repo,wf);
   seed(repo,ledger=>setPhase(ledger,wf,'running'));
@@ -201,7 +201,7 @@ test('status: frontier.actionable is false only when nothing is waiting on the K
   const queued=frontier();
   assert.equal(queued.state,'engaged','a queued job is an open operation');
   assert.equal(queued.readyOperations,1);
-  assert.equal(queued.actionable,true,'an undispatched job is work, not a wait — the Kernel must not yield on it');
+  assert.equal(queued.actionable,false,'an undispatched job is dispatched by the Workflow controller: the menu of the Kernel is empty');
   assert.match(queued.reason??'',/route\/dispatch or reconcile them before yielding/);
 
   // The same job, running and owing a report: this is the wait the yield rule
@@ -210,14 +210,14 @@ test('status: frontier.actionable is false only when nothing is waiting on the K
   const running=frontier();
   assert.equal(running.state,'engaged');
   assert.equal(running.readyOperations,0);
-  assert.equal(running.actionable,false,'an engaged frontier with nothing ready is the one state that may yield');
+  assert.equal(running.actionable,false,'an engaged frontier with nothing to decide may yield');
   assert.equal(running.reason,null);
 
   // A fenced launch needs reconcile before anything else can move.
   seed(repo,ledger=>moveJob(ledger,jobId,'effect_unknown'));
   const fenced=frontier();
   assert.equal(fenced.readyOperations,1,'an effect_unknown launch is the Kernel’s to reconcile');
-  assert.equal(fenced.actionable,true);
+  assert.equal(fenced.actionable,false,'the Job controller reconciles a fenced launch');
 
   // A settled workflow with nothing open is idle, and idle is the Kernel's
   // cue to plan the next leg or finish — never to yield.
@@ -227,7 +227,7 @@ test('status: frontier.actionable is false only when nothing is waiting on the K
   });
   const idle=frontier();
   assert.equal(idle.state,'idle');
-  assert.equal(idle.actionable,true);
+  assert.equal(idle.actionable,false);
 
   seed(repo,ledger=>setPhase(ledger,wf,'finished'));
   assert.deepEqual([frontier().state,frontier().actionable],['finished',false],
@@ -392,7 +392,7 @@ test('an owner-gate incident holds the jobs it names until the Kernel resolves i
   assert.equal(out(resolved).changed,true);
   fr=frontier();
   assert.equal(because(held,fr).queuedBecause,'ready');
-  assert.equal(fr.actionable,true);
+  assert.equal(fr.actionable,false,'a released job is dispatched by the Workflow controller');
   assert.equal(out(api('incident','--workflow',wf,'--resolve',incidentId)).changed,false,'resolving twice is a no-op');
   const kinds=read(repo,ledger=>ledger.db.prepare("SELECT kind FROM events WHERE entity_type='incident' AND entity_id=? ORDER BY seq").all(incidentId).map(r=>r.kind));
   assert.deepEqual(kinds,['incident-opened','incident-raised','incident-resolved','incident-resolved']);
@@ -460,7 +460,7 @@ test('enqueue --after and a cut seam hold siblings as dependency until the prior
   // A dead seam no longer holds its siblings (owner ruling 2026-09-28, scripts/kernel/seam-policy.mjs): they run on a stub.
   assert.equal(frontier.queued.find(q=>q.jobId===second).queuedBecause,'ready');
   assert.equal(frontier.queued.find(q=>q.jobId===second).seamStub.mode,'seam-failed');
-  assert.equal(frontier.actionable,true,'a dead dependency is the Kernel\'s to move, so the watchdog wakes it');
+  assert.equal(frontier.actionable,true,'a slipped seam is the Kernel\'s to re-cut: it is a seam-duty item of the menu');
   // A retry of the failed --after job is followed through its lineage: a live wait, no re-point by hand
   // (a live run dropped and re-enqueued its ordinal 6 after each failed attempt it named).
   const compositionRetry=enq('--op','docs.author','--paths','docs/composition','--retry-of',composition);
@@ -530,8 +530,8 @@ test('no open operation plus an unanswered ask is awaiting-owner, not actionable
   assert.deepEqual(s.awaitingOwner.map(a=>[a.jobId,a.answer]),[['bd-tax','pending']],'the pending ask is listed although a later attempt of the op exists');
   seed(repo,ledger=>ledger.appendEvent({workflowId:wf,entityType:'report',entityId:'ctx_tax',kind:'ask-answered',payload:{dispatchId:'ctx_tax'}}));
   s=status();
-  assert.equal(s.frontier.state,'next-ready','once answered the Kernel owes the next transition');
-  assert.equal(s.frontier.actionable,true);
+  assert.equal(s.frontier.state,'next-ready','once answered the retry is owed');
+  assert.equal(s.frontier.actionable,false,'the Job controller runs the retry; nothing waits on the Kernel');
 });
 
 // A WSPV kernel consumed a done report and yielded before settling it; the
@@ -548,7 +548,7 @@ test('a consumed report whose job is still running makes the frontier settle-rea
   assert.equal(r.status,0,r.stderr);
   const f=out(r).frontier;
   assert.equal(f.state,'settle-ready');
-  assert.equal(f.actionable,true);
+  assert.equal(f.actionable,false,'the Job controller settles the consumed report');
   assert.deepEqual(f.settleReadyJobs,['impl-a35']);
 });
 
@@ -577,7 +577,7 @@ test('a Work record dependsOn owned by another open job holds the job as depende
 
 // The Modules tax ask's serve-ask form hit its ttl while the kernel waited on
 // the owner; the owner's link was dead and nothing re-served it.
-test('an unanswered ask whose form expired is ask-reserve (actionable); a live form is awaiting-owner',t=>{
+test('an unanswered ask whose form expired is ask-reserve (the controller re-parks it); a live form is awaiting-owner',t=>{
   const fx=fixture(t),repo=fx.repo(),wf='wf-k7-ask-reserve';
   seedGoal(repo,wf);
   seed(repo,ledger=>{
@@ -592,7 +592,7 @@ test('an unanswered ask whose form expired is ask-reserve (actionable); a live f
   seed(repo,ledger=>ledger.appendEvent({workflowId:wf,entityType:'report',entityId:'ctx_tax',kind:'ask-serving-expired',payload:{dispatchId:'ctx_tax'}}));
   let f=frontier();
   assert.equal(f.state,'ask-reserve');
-  assert.equal(f.actionable,true);
+  assert.equal(f.actionable,false,'the Workflow controller re-parks the ask');
   assert.deepEqual(f.askReserveDispatches,['ctx_tax']);
   seed(repo,ledger=>ledger.appendEvent({workflowId:wf,entityType:'report',entityId:'ctx_tax',kind:'ask-serving',payload:{dispatchId:'ctx_tax',url:'http://127.0.0.1:6971/a-y',pid:process.pid}}));
   assert.equal(frontier().state,'awaiting-owner','re-served, it waits on the owner again');
@@ -604,7 +604,7 @@ test('an unanswered ask whose form expired is ask-reserve (actionable); a live f
   assert.ok(gone&&!alive(gone),'a pid proven dead');
   seed(repo,ledger=>ledger.appendEvent({workflowId:wf,entityType:'report',entityId:'ctx_tax',kind:'ask-serving',payload:{dispatchId:'ctx_tax',url:'http://127.0.0.1:6971/a-z',pid:gone}}));
   f=frontier();
-  assert.deepEqual([f.state,f.actionable,f.askReserveDispatches],['ask-reserve',true,['ctx_tax']]);
+  assert.deepEqual([f.state,f.actionable,f.askReserveDispatches],['ask-reserve',false,['ctx_tax']]);
   // An older event with no pid is judged by its port: nothing listens on port 9.
   seed(repo,ledger=>ledger.appendEvent({workflowId:wf,entityType:'report',entityId:'ctx_tax',kind:'ask-serving',payload:{dispatchId:'ctx_tax',url:'http://127.0.0.1:9/a-w'}}));
   assert.equal(frontier().state,'ask-reserve','a closed port is a dead link');

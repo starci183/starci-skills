@@ -1,15 +1,16 @@
 group: supervisor
 verb: status
 owner: runtime
-summary: print whether the Supervisor seat is enabled and healthy
+summary: print the Supervisor seat status and its menu of open judgment points
 impl:
-  script: scripts/supervisor/start-supervisor.mjs
-  args: [--status]
-flags: []
+  script: scripts/supervisor/status.mjs
+flags:
+  - {name: menu, type: boolean, summary: print only the menu of open items and the spelling of the decision verb}
 exit:
   "0": status printed
   "2": bad usage
 json: flag
 examples:
   - starci supervisor status
+  - starci supervisor status --json
 editions: [full]

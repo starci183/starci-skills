@@ -5,6 +5,7 @@ import { sha256 } from '../../engine/digest.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { asList, byCodeUnit } from '../lib/list.mjs';
 import { headShaOf } from '../lib/git-dir.mjs';
+export { placedWorktreeOf } from './placement-rebound.mjs';
 
 export const CONTRACT_VERSION_SCHEMA = 'starci/contract-version@1';
 const ABSENT = 'absent';

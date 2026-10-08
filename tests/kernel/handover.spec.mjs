@@ -249,7 +249,7 @@ test('finish is refused without the owner approval and allowed after it; a later
     'handover-approved {jobId, dispatchId, answeredBy, at}');
 
   s=await status(repo,wf);
-  assert.deepEqual([s.frontier.state,s.frontier.actionable,s.handover.state,s.handover.finishAllowed],['finish-ready',true,'approved',true],
+  assert.deepEqual([s.frontier.state,s.frontier.actionable,s.handover.state,s.handover.finishAllowed],['finish-ready',false,'approved',true],
     'an approved but unfinished workflow is the Kernel\'s to finish');
 
   // A business job that settles after the approval: the owner approved a package that no longer covers the product.

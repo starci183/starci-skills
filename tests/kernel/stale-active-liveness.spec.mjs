@@ -8,6 +8,7 @@ import {ledgerFileFor,openLedger} from '../../engine/db/ledger.mjs';
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
 import {allocationMs} from '../../engine/config.mjs';
 import {classifyAgentScreen,staleAwareState} from '../../scripts/lib/terminal-liveness.mjs'; const DRIVE=path.parse(os.tmpdir()).root;
+import {openDecisionRow} from '../../scripts/machine/decisions.mjs';
 
 // Two Kernels printed nothing for ~3.7 hours; their screens ended with a
 // finished answer at the prompt, but older spinner rows stayed in the last lines, so the watchdog
@@ -79,6 +80,7 @@ const watchdogOnce=(t,{screen,outputAgeMs})=>{
   try{
     const at=Date.now();
     seedWorkflow(ledger,{id:wf,state:{phase:'running',job:'stale active'},goal:{revision:0,identity:'stale',markdown:'# goal',json:{}}});
+    openDecisionRow(ledger,{workflowId:wf,kind:'orphaned-frontier',entity:{type:'workflow',id:wf},summary:'nothing is open and nothing is owed',by:'reconciler/workflow'});
     ledger.db.prepare("INSERT INTO signals(scope,key,holder_pid,token,value_json,at,expires_at) VALUES('kernel',?,NULL,?,?,?,NULL)")
       .run(wf,'kernel-test',JSON.stringify({terminal:'kern-term-1',dispatch:'dispatch-kernel-1',host:'orca',agent:'codex',launch:'worker'}),at);
   }finally{ledger.close();}
