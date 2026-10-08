@@ -72,6 +72,12 @@ export const workingTreeFiles = (root, listFiles) => ({
   read: relative => fs.readFileSync(path.join(root, relative), 'utf8'),
 });
 
+/** {relative path: text} of the working-tree files (tracked and new unignored ones) whose path `accept` passes. */
+export function workingTreeTexts(root, listFiles, accept) {
+  const { tracked, read } = workingTreeFiles(root, listFiles);
+  return Object.fromEntries(tracked.filter(accept).map((relative) => [relative, read(relative)]));
+}
+
 /** Shared --root/--json envelope for tracked-text checks. */
 function parseTrackedTextArgs(argv, io, options) {
   let root = options.defaultRoot;

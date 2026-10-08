@@ -161,6 +161,7 @@ ruleParams:
       - {id: slot-id-shape, run: scripts/checks/check-slot-id-shape.mjs}
       - {id: undeclared-identifiers, run: scripts/checks/check-undeclared-identifiers.mjs}
       - {id: removed-vocabulary, run: scripts/checks/check-removed-vocabulary.mjs}
+      - {id: prose-commands, run: scripts/checks/check-prose-commands.mjs}
 
 slots:
 

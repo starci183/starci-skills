@@ -15395,6 +15395,16 @@ RT_REMOVED_VOCABULARY:
   nextStep_vi: "Người giám sát viết lại dòng theo cách thay thế mà phát hiện nêu; nếu dòng là danh sách các tên đã gỡ, đánh dấu [removed-list]; nếu tên mới bị gỡ, thêm mục vào modules/kernel/removed-vocabulary.yaml trong cùng commit."
   owner: supervisor
   kind: check-finding
+RT_PROSE_COMMAND_UNKNOWN:
+  title: "Instruction text shows a starci command the CLI catalog does not have"
+  title_vi: "Văn bản hướng dẫn nêu một lệnh starci mà danh mục CLI không có"
+  meaning_vi: "Một lệnh `starci <nhóm> <verb>` trong đoạn mã, khối mã hay ví dụ yaml của skills/, docs/, README.md, CONTEXT.md, CONTRIBUTING.md hoặc modules/ nêu một verb không có trong modules/cli/commands, hoặc một cờ --flag mà verb đó và các cờ chung không nhận. Tác tử làm theo sẽ nhận lời từ chối thay vì kết quả. Danh mục CLI là sự thật; phát hiện nêu tệp:dòng và lệnh sai."
+  causes_vi:
+    - "Verb hoặc cờ bị gỡ hay đổi tên nhưng văn bản hướng dẫn vẫn nêu cách viết cũ"
+    - "Gõ sai tên verb hoặc cờ khi viết ví dụ"
+  nextStep_vi: "Người giám sát viết lại lệnh theo danh mục CLI (starci <nhóm> <verb> --help); nếu lệnh đã bị gỡ, thêm mục vào modules/kernel/removed-vocabulary.yaml và sửa mọi chỗ còn dạy nó."
+  owner: supervisor
+  kind: check-finding
 DOCKER_PORT_POLICY:
   title: "Docker ownership or published-port policy was refused"
   title_vi: "Chính sách sở hữu Docker hoặc cổng công bố đã từ chối thao tác"

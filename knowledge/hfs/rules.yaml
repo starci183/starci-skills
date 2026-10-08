@@ -2016,10 +2016,19 @@ rules:
       - {kind: runtime, id: undeclared-identifiers, at: scripts/checks/check-undeclared-identifiers.mjs}
   - id: R229
     code: "RT_REMOVED_VOCABULARY"
-    law: "No text an agent or the owner reads teaches a spelling the runtime refuses. The refused names - config keys, routing-bias fields, verbs, flags, codes and vocabulary - are the one list modules/kernel/removed-vocabulary.yaml, each with its replacement and the release that removed it; the config and routing-bias refusals read the same list. Every tracked file of skills/, docs/, README.md, CONTEXT.md, CONTRIBUTING.md, modules/ and knowledge/ (Markdown and yaml) is scanned line by line, and a line that spells a listed name is a finding naming file:line, the name and its replacement, unless the file is the list, CHANGELOG.md, or the line or block carries the [removed-list] marker (a marker alone on a comment line covers the lines up to the next blank one). Removing or renaming a key, flag, verb, field or code adds its entry to the list in the same commit."
+    law: "No text an agent or the owner reads teaches a spelling the runtime refuses. The refused names - config keys, routing-bias fields, verbs, flags, codes and vocabulary - are the one list modules/kernel/removed-vocabulary.yaml, each with its replacement and the release that removed it; the config and routing-bias refusals read the same list. Every tracked file of skills/, docs/, README.md, CONTEXT.md, CONTRIBUTING.md, modules/ and knowledge/ (Markdown and yaml) is scanned line by line, and a line that spells a listed name is a finding naming file:line, the name and its replacement, (and every tests/**/*.spec.mjs, where a name is allowed only on a line or under a test title that says refuse, reject, removed, throws or unknown) unless the file is the list, CHANGELOG.md, or the line or block carries the [removed-list] marker (a marker alone on a comment line covers the lines up to the next blank one). Removing or renaming a key, flag, verb, field or code adds its entry to the list in the same commit."
     scope: runtime
     kinds: [check]
     gates: [land, runtime]
     failureCodes: ["RT_REMOVED_VOCABULARY"]
     enforcers:
       - {kind: runtime, id: removed-vocabulary, at: scripts/checks/check-removed-vocabulary.mjs}
+  - id: R230
+    code: "RT_PROSE_COMMAND_UNKNOWN"
+    law: "A command an instruction shows exists as written. Every `starci <group> <verb>` in a backticked span, fenced code line or yaml example item of skills/, docs/, README.md, CONTEXT.md, CONTRIBUTING.md and modules/ names a verb of the CLI catalog (modules/cli/commands) in a catalogued group, and every --flag on it is a flag of that verb or a global flag; the text after a lone -- belongs to another program and a [removed-list] marked line is exempt. The catalog is generated into the valid set, never typed twice."
+    scope: runtime
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RT_PROSE_COMMAND_UNKNOWN"]
+    enforcers:
+      - {kind: runtime, id: prose-commands, at: scripts/checks/check-prose-commands.mjs}

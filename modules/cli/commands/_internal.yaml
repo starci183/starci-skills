@@ -60,6 +60,7 @@ internal:
   - {path: scripts/checks/check-spec-budget.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
   - {path: scripts/checks/check-schema-shared.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
   - {path: scripts/checks/check-slot-id-shape.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
+  - {path: scripts/checks/check-prose-commands.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
   - {path: scripts/checks/check-removed-vocabulary.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
   - {path: scripts/checks/check-undeclared-identifiers.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
   - {path: scripts/checks/check-version-pin-once.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
