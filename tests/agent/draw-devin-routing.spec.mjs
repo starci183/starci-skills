@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { hostToolsRequired, hostToolsOf } from '../../scripts/agent/models.mjs';
+import { hostToolsRequired, hostToolsOf, missingHostTools } from '../../scripts/agent/models.mjs';
 import { fakePoolSelection as selectPool } from '../helpers/fake-admission.mjs';
 import { criticFor } from '../../scripts/work/critic-pick.mjs';
 import { fakeAdmission } from '../helpers/fake-admission.mjs';
@@ -28,12 +28,13 @@ test('interface.draw takes the tier of its difficulty; the imagegen call tier is
   for (const d of ['easy', 'medium', 'hard', 'insane']) {
     const r = selectPool({ kind: 'interface.draw', difficulty: d, runtimes, capacity: {} });
     assert.equal(r.tier, d === 'insane' ? 'frontier' : 'high', d);
-    // The Playwright capture needs browser-dom, which Claude's card lacks: the chain is walked down to its Codex member.
-    assert.deepEqual([r.target, r.modelId], ['codex-agent', 'gpt-6.1-sol'], d);
-    const down = selectPool({ kind: 'interface.draw', difficulty: d, runtimes, capacity: { 'codex-agent': { auth: 'dead' } } });
-    assert.ok(down.error && !down.target, `${d}: no browser-dom holder, no draw`);
+    // The Playwright capture is a runtime verb (starci work draw-render / layout-render): the drawer needs no browser tool, so Claude leads.
+    assert.deepEqual([r.target, r.modelId], ['claude-agent', d === 'insane' ? 'claude-opus-5-5' : 'claude-sonnet-5-5'], d);
+    const claudeDown = selectPool({ kind: 'interface.draw', difficulty: d, runtimes, capacity: { 'claude-agent': { auth: 'dead' } } });
+    assert.equal(claudeDown.target, 'codex-agent', `${d}: Codex takes the draw when Claude is down`);
   }
-  assert.deepEqual(hostToolsRequired('interface.draw'), ['browser-dom']);
+  assert.deepEqual(hostToolsRequired('interface.draw'), [], 'interface.draw requires no host tool of its agent');
+  assert.deepEqual(hostToolsRequired('interface.audit'), ['browser-dom'], 'interface.audit still needs a browser of its own');
   assert.deepEqual(hostToolsRequired('interface.asset'), [], 'the asset op needs no image tool of its own agent: it calls starci work imagegen');
   assert.ok(hostToolsOf('devin').includes('browser-dom') && hostToolsOf('codex').includes('browser-dom'));
   assert.ok(registry.pools['devin-agent'].roles.includes('write'), 'the devin pool serves the draw kind role');
@@ -64,8 +65,8 @@ test('the route excludes unknown provider evidence and keeps eligible fallback m
   assert.equal(draw.status, 0, draw.stderr + draw.stdout);
   const decision = JSON.parse(draw.stdout);
   assert.equal(decision.tier, 'high');
-  assert.equal(decision.pick.model, 'gpt-6.1-sol', 'the draw op needs browser-dom: Sol is the high member that holds it');
-  assert.deepEqual(decision.fallbackChain, [], 'Claude is dropped by name for the missing host tool');
+  assert.equal(decision.pick.model, 'claude-sonnet-5-5', 'the draw op needs no host tool: Claude leads the high tier');
+  assert.equal(decision.fallbackChain[0].model, 'gpt-6.1-sol', 'Sol is the fallback behind it');
   const implement = JSON.parse(route('backend.implement').stdout);
   assert.equal(implement.tier, 'medium');
   assert.equal(implement.pick.model, 'gpt-6.1-sol', 'Devin has no verified quota here, so the medium tier falls to Codex');
@@ -124,4 +125,21 @@ test('the critic is another provider than the drawer, taken from its tier by the
     assert.equal(critique.outcome, 'launch-failed', 'the fake Orca never launches a real critic');
     assert.equal(JSON.parse(fs.readFileSync(path.join(dir, 'critique.json'), 'utf8')).critic.drawer, 'devin', 'written to the round');
   });
+});
+
+test('interface.draw is admitted on each provider of its tier chain: no card is asked for a host tool the op does not need', () => {
+  assert.deepEqual(hostToolsRequired('interface.draw'), []);
+  for (const provider of ['claude', 'codex', 'devin', 'cursor']) {
+    assert.deepEqual(missingHostTools({ pool: { provider }, kind: 'interface.draw' }), [], `${provider} is not excluded from interface.draw`);
+  }
+  // The draw runs through runtime verbs: the browser is driven by draw-render / layout-render, not by a tool of the agent.
+  const brief = read('modules/ops/ops/interface.draw.yaml');
+  assert.ok(!JSON.stringify(brief.route).includes('host-tool-required'));
+  for (const difficulty of ['easy', 'medium', 'hard']) {
+    for (const provider of ['claude-agent', 'codex-agent']) {
+      const others = Object.fromEntries(['claude-agent', 'codex-agent'].filter((p) => p !== provider).map((p) => [p, { auth: 'dead' }]));
+      const r = selectPool({ kind: 'interface.draw', difficulty, runtimes, capacity: others });
+      assert.equal(r.target, provider, `${difficulty}: ${provider} alone takes interface.draw`);
+    }
+  }
 });
