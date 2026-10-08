@@ -4,6 +4,14 @@ All notable changes to StarCi are documented here. The runtime is on the `1.0.0-
 until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` freezes them.
 `package.json` `version` is the only version authority.
 
+## [1.0.0-alpha.8] — in preparation
+
+### Added
+- `modules/reconciler/operating-standard.yaml`: the standard path of a workflow as ordered steps (actor, precondition, observable done-state, bound, evidence, probe), the departure table (role, broken duty, registry entry) and the happy errors that are only counted. `starci debug digest` judges every running workflow against it step by step and names the first departure.
+- `modules/reconciler/debug-questions.yaml`: the nine groups of Debug's questions, each answerable today by a digest check or a documented gap with the signal it needs; `starci debug digest --questions` lists them.
+- `starci debug digest` prints a verdict per role (Supervisor, each Kernel, each Op attempt, the Critic runs, the Runtime) as no error, happy error (counted) or BUG, and Debug's standing against its end condition. Only a BUG is a problem line; the digest schema is `starci/debug-digest@2`.
+- Three signals: a `reconciler.boot` row at every engine start (boot instant, uptime, boot id), the directory, commit and tree of every check on the `op-settled` event (`checkedIn`), and a `ledger-written-outside-seat` event for a ledger write by a person at a shell.
+
 ## [1.0.0-alpha.7] — 2026-10-08
 
 Theme: the roles are one declared contract, the system recovers from a host restart by itself, no smell or bug enters at commit, and the remote main moves only with a release proven on the exact commit that is pushed.

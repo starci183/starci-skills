@@ -2,6 +2,7 @@
 // Every sentence is an entry of debug-digest-text.mjs translated through scripts/lib/i18n.mjs.
 import { translator } from '../lib/i18n.mjs';
 import { PROBLEM_TEXT, TEXT } from './debug-digest-text.mjs';
+import { standardLines, roleLines, standingLines, questionsSummary, questionLines } from './debug-digest-verdict-render.mjs';
 
 const MIN = 60_000;
 const minutes = (ms) => Math.max(0, Math.round(ms / MIN));
@@ -59,7 +60,7 @@ function workflowLines(tr, w, now) {
 const problemText = (tr, p) => tr(PROBLEM_TEXT[p.code] ?? p.code, p.params);
 
 /** The digest as text in `language`; the controllers alarm, when there is one, is the first line after the title. */
-export function renderText(digest, { language }) {
+export function renderText(digest, { language, questions = false }) {
   const tr = translator(language);
   const lines = [tr(TEXT.title, { time: new Date(digest.at).toISOString() })];
   const alarm = digest.problems.find((p) => p.key === 'controllers-off');
@@ -67,7 +68,9 @@ export function renderText(digest, { language }) {
   lines.push(reconcilerLine(tr, digest.reconciler), supervisorLine(tr, digest.supervisor));
   if (!digest.workflows.length) lines.push(tr(TEXT.noWorkflow));
   for (const w of digest.workflows) lines.push(...workflowLines(tr, w, digest.at));
-  lines.push(tr(TEXT.admission, { live: digest.admission.live, leaked: digest.admission.leaked.length }));
+  lines.push(tr(TEXT.admission, { live: digest.admission.live, leaked: digest.admission.leaked.length }), ...standardLines(tr, digest.standard),
+    ...roleLines(tr, digest.roles, digest.problems, (p) => problemText(tr, p)), ...standingLines(tr, digest.debug.standing), questionsSummary(tr, digest.debug.questions),
+    ...(questions ? questionLines(tr, digest.debug.questions) : []));
   if (!digest.problems.length) return [...lines, tr(TEXT.healthy)].join('\n');
   lines.push(tr(TEXT.problems));
   digest.problems.forEach((p, i) => lines.push(tr(TEXT.problemLine, { n: i + 1, blocks: p.blocks, text: problemText(tr, p) })));

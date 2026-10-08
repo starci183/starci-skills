@@ -1,6 +1,9 @@
 // debug-digest-text.mjs — the English source of every line of `starci debug digest`; modules/i18n/messages/debug.yaml carries the
 // Vietnamese of each entry (scripts/lib/i18n.mjs). A problem code of debug-digest-analyze.mjs selects its entry of PROBLEM_TEXT.
+import { STANDARD_PROBLEM_TEXT } from './debug-digest-verdict-text.mjs';
+
 export const PROBLEM_TEXT = Object.freeze({
+  departure: STANDARD_PROBLEM_TEXT,
   'controllers-off': 'Controllers {names} are off although the config asks for them; nothing they own is being done.',
   'leader-missing': 'The reconciler has no leader row; no controller runs.',
   'leader-stale': 'The reconciler leader (pid {pid}) has not beaten for {min} min.',

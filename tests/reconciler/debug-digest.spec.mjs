@@ -5,33 +5,11 @@ import os from 'node:os';
 import path from 'node:path';
 import { openMachine } from '../../engine/db/machine.mjs';
 import { withLedger, seedWorkflow } from '../helpers/ledger-fixture.mjs';
-import { incidentPolicy, boundValue } from '../../scripts/kernel/op-incident-policy.mjs';
-import { analyze } from '../../scripts/reconciler/debug-digest-analyze.mjs';
-import { digestNumbers } from '../../scripts/reconciler/debug-digest-numbers.mjs';
 import { machineFacts } from '../../scripts/reconciler/debug-digest-machine.mjs';
 import { collectSnapshot, ledgerFacts } from '../../scripts/reconciler/debug-digest-collect.mjs';
 import { renderText } from '../../scripts/reconciler/debug-digest-render.mjs';
 import { main } from '../../scripts/reconciler/debug-digest.mjs';
-
-const NOW = 1_800_000_000_000;
-const MIN = 60_000;
-const REV = 'a'.repeat(40);
-const policy = { ...incidentPolicy(), resolve: boundValue };
-const numbers = digestNumbers();
-const digest = (snapshot) => analyze(snapshot, policy, numbers);
-
-const job = (over = {}) => ({ jobId: 'op-x-1', kind: 'op', opId: 'x', status: 'running', tryNo: 1, retryOf: null, workerId: 'w', deadline: null,
-  createdAt: NOW - 60 * MIN, updatedAt: NOW - 5 * MIN, ...over });
-const status = (over = {}) => ({ frontier: { state: 'engaged', openOperations: 1, readyOperations: 0, queued: [] }, legs: [], awaitingOwner: [],
-  kernelRev: { current: REV, acked: REV, stale: false, fileCount: 0 }, usage: { byOp: [{ opId: 'x', tokens: 1200, turns: 3, attempts: 1, costUsd: 0.5 }] }, ...over });
-const workflow = (over = {}) => ({ id: 'wf-1', name: 'Shop', ledger: 'shop', repo: 'work/shop', phase: 'running', jobs: [job(), job({ jobId: 'kernel-wf-1', kind: 'kernel', opId: null })],
-  incidents: [], decisions: [], kernelJob: { status: 'running', updatedAt: NOW - MIN }, kernelSignal: { terminal: 'term_k' }, lastKernelWakeAt: NOW - 2 * MIN,
-  status: status(), statusError: null, seatProbe: { action: 'idle-waiting' }, ...over });
-const snapshot = (over = {}) => ({ now: NOW, liveRev: REV,
-  engine: { leader: { pid: 7, epoch: 3, heartbeatAt: NOW - 10_000, rev: REV }, modes: { job: 'active', host: 'active' }, configured: { job: 'active', host: 'active' }, safe: [], failingQueue: [] },
-  supervisor: { seat: { state: 'live', terminalHandle: 'term_s', lastSeenAt: NOW - MIN, lastInputOkAt: NOW - MIN, deaf: false }, enabled: true, lastWakeAt: NOW - MIN, decisions: [], health: { live: true } },
-  reservations: [], seats: ['supervisor'], supJobs: [], workflows: [workflow()], ...over });
-const keys = (d) => d.problems.map((p) => p.key);
+import { NOW, MIN, REV, policy, digest, job, status, workflow, snapshot, keys } from '../helpers/debug-digest-fixture.mjs';
 
 test('a healthy workflow lists no problem and the digest says so in the owner language', () => {
   const d = digest(snapshot());
@@ -65,7 +43,7 @@ test('a hold the policy table does not list is a problem of its own', () => {
 });
 
 test('a dead Kernel outranks the held work it leaves behind and an idle Kernel with ready work is named', () => {
-  const dead = workflow({ kernelJob: { status: 'failed', updatedAt: NOW }, seatProbe: { action: 'restart-needed' } });
+  const dead = workflow({ kernelJob: { status: 'failed', updatedAt: NOW - 60 * MIN }, seatProbe: { action: 'restart-needed' } });
   const d = digest(snapshot({ workflows: [dead] }));
   assert.equal(d.workflows[0].kernel.alive, false);
   assert.equal(d.problems[0].key, 'kernel-dead-wf-1');
@@ -90,7 +68,7 @@ test('a stale Supervisor gate and a Decision Item past due are listed with their
   assert.equal(d.problems[0].code, 'gate-stale');
   assert.equal(d.supervisor.staleGates.length, 1);
   assert.equal(d.supervisor.openDecisions, 2);
-  const dead = digest(snapshot({ supervisor: { ...snapshot().supervisor, decisions, health: { live: false, reason: 'terminal gone' } } }));
+  const dead = digest(snapshot({ supervisor: { ...snapshot().supervisor, seat: { ...snapshot().supervisor.seat, lastSeenAt: NOW - 60 * MIN }, decisions, health: { live: false, reason: 'terminal gone' } } }));
   assert.equal(dead.problems[0].key, 'seat-dead');
 });
 
@@ -129,8 +107,9 @@ test('a stale leader, a leader on other code than the live runtime and failing q
   const stale = digest(snapshot({ engine: { ...snapshot().engine, leader: { pid: 7, epoch: 3, heartbeatAt: NOW - 600_000, rev: REV } } }));
   assert.ok(keys(stale).includes('leader-stale'));
   const drift = digest(snapshot({ engine: { ...snapshot().engine, leader: { pid: 7, epoch: 3, heartbeatAt: NOW - 1000, rev: 'c'.repeat(40) }, failingQueue: [{ controller: 'host', n: 4 }] } }));
-  assert.deepEqual(keys(drift), ['queue-host', 'leader-rev']);
+  assert.deepEqual(keys(drift), ['queue-host']);
   assert.equal(drift.problems[0].blocks, 4);
+  assert.deepEqual(drift.roles.find((r) => r.role === 'runtime').happy, [{ kind: 'runtime-rev-pending', count: 1 }]);
 });
 
 test('a failed op is judged by its recorded cause and by whether the policy next step happened', () => {
@@ -178,7 +157,7 @@ test('the text names every section in both languages and the JSON carries the sa
   const code = await main(['--json'], { collect: async () => snapshot(), print: (line) => printed.push(line), language: 'en' });
   assert.equal(code, 0);
   assert.deepEqual(JSON.parse(printed[0]).problems, []);
-  assert.equal(JSON.parse(printed[0]).schema, 'starci/debug-digest@1');
+  assert.equal(JSON.parse(printed[0]).schema, 'starci/debug-digest@2');
 });
 
 test('the verb exits 1 when the machine store is unreadable and 2 on a bad flag, and passes its filters on', async () => {
