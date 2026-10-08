@@ -2913,6 +2913,8 @@ cut the release, the only way the runtime's remote main and a release tag move
 | `--branch` | string |  |
 | `--plan` | boolean |  |
 | `--tag` | string |  |
+| `--rows` | string |  |
+| `--no-reuse` | boolean |  |
 
 exit: 0 the release was cut and main plus its tag were pushed atomically, or --plan found nothing missing; 1 refused (dirty tree, no or wrong tag, release notes incomplete, version not moved past the remote main, suite red, main moved, secret scan) and nothing was pushed; 2 bad usage
 
@@ -2921,6 +2923,7 @@ json: flag
 ```sh
 starci release cut
 starci release cut --plan --tag v1.0.0-alpha.7
+starci release cut --tag v1.0.0-alpha.7 --rows "npm test,linux-parity"
 starci release cut --repo <path> --tag v1.0.0-alpha.7 --json
 ```
 

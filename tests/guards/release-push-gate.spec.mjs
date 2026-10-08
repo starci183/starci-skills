@@ -104,6 +104,26 @@ test('the release record must be for the pushed commit and hold every required r
   assert.equal(fx.remoteMain(), fx.before);
 });
 
+test('the required rows must have RUN on the pushed commit: a record whose required row is reused from another commit refuses, a reused example row does not matter', (t) => {
+  const fx = fixture(t);
+  const head = commit(fx.repo, { version: NEXT, message: 'release' });
+  gitOk(fx.repo, ['tag', '-a', TAG, '-m', 'notes']);
+  const proving = 'a'.repeat(40);
+  const reusedExample = { name: 'shop: npm run lint', ok: true, log: 'lint.log', ms: 1, reusedFrom: proving };
+  assert.equal(writeL4Record({ repo: fx.repo, head, tag: TAG, logs: [...greenRows(), reusedExample] }).ok, true);
+  assert.deepEqual(releaseFindings({ cwd: fx.repo, commit: head, remoteCommit: fx.before }), [], 'a reused example row is listed in the record and the gate accepts it');
+  for (const required of RECEIPT_STEPS) {
+    const logs = greenRows().map((row) => (row.name === required ? { ...row, reusedFrom: proving } : row));
+    assert.equal(writeL4Record({ repo: fx.repo, head, tag: TAG, logs }).ok, true);
+    const findings = releaseFindings({ cwd: fx.repo, commit: head, remoteCommit: fx.before });
+    assert.deepEqual(findings.map((f) => f.code), ['RELEASE_RECEIPT_INCOMPLETE'], required);
+    assert.ok(findings[0].missing.includes(required) && findings[0].missing.includes('run on this commit'), findings[0].missing);
+    const out = fx.push('--atomic', 'main', `refs/tags/${TAG}`);
+    assert.notEqual(out.status, 0, `the hook refuses a reused ${required}`);
+    assert.equal(fx.remoteMain(), fx.before);
+  }
+});
+
 test('another branch and the backup namespace are not the hook\'s business', (t) => {
   const fx = fixture(t);
   commit(fx.repo, { version: NEXT, message: 'work on a lane' });

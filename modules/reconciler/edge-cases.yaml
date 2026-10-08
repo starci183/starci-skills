@@ -497,6 +497,13 @@ cases:
     rule: {file: scripts/supervisor/release-host.mjs, anchor: "releaseHostMissing"}
     spec: tests/supervisor/release-cut.spec.mjs
     status: covered
+  - id: release-proof-costs-the-whole-not-what-changed
+    family: smooth-operation
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "duty: the release proof costs what changed, not the whole; the two cuts of 1.0.0-alpha.7 ran 38 rows strictly one after another (4238 s of row time in the second); 36 rows were green and 2 red, the fix touches a few files, and the next cut would repeat all 38", remedy: {state: in-tree, change: "the L4 rows run as a schedule (parity first and beside everything, the example chains and proofs together after the suite), each cut leaves a ledger of its green rows with input digests, a later cut reuses a row with identical inputs (never the three rows the pre-push gate requires), and --rows re-runs named rows alone on the same commit"}}
+    met: {date: "2026-10-08", where: "release cuts of 1.0.0-alpha.7 (D:/starci-tmp/release/cut-alpha7.log, cut-a7-run2.log)", evidence: "second cut: npm test 855 s red, linux-parity 1484 s red, ecommerce-app rows 743 s plus its proof 179 s, the rest green; sum of row times 4238 s"}
+    rule: {file: scripts/supervisor/release-reuse.mjs, anchor: "chooseRows"}
+    spec: tests/supervisor/release-reuse.spec.mjs
+    status: covered
   - id: orca-worktree-rm-walks-junctions-measured
     family: authority-safety
     finding: {role: runtime, duty: never, verdict: departs, evidence: "the live junction probe found the fake main's node_modules content gone after a bare orca worktree rm --force of a worktree with node_modules junctions: Orca 1.4.221 walks junctions and deletes what they lead to (10 of 10 files of the fake main lost, measured 2026-10-09 from an Orca terminal)", remedy: {state: in-tree, change: "removeOrcaWorktree (scripts/machine/worktree-orca.mjs) unlinks every link first and is the only caller of the Orca removal (check-worktree-add); its Orca client reads the tree the selector names and refuses it with worktree-links-present while it holds a link, Orca never asked; the live spec prints the measurement and asserts the refusal and a byte-identical main after the runtime release"}}

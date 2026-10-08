@@ -7,6 +7,8 @@
 //   deps    before any step: a real `npm ci` in every example app (never a link into another checkout: a node_modules link is removed as a link first), then the build of packages/test-world (untracked output the spec run borrows: a stale one types the example apps against an old API)
 //   linux   the CI-equivalent light jobs in a Linux container (scripts/supervisor/release-linux-parity.mjs): derived from .github/workflows, never the spec suites
 // The Sonar proof is wired to the existing gate (scripts/supervisor/release-l4-sonar.mjs); the whole row runs inside the host lock of cutRelease.
+// The rows run as a schedule (release-l4-graph.mjs, release-l4-schedule.mjs, modules/supervisor/release-cut.yaml): installs together, the Linux container from the start and beside everything, the root rows one after another,
+// the example apps' chains and their Sonar proofs together once the suite has ended; a row already green for this commit, or reused from another (release-reuse.mjs), stands in as `carry`.
 // Every step logs to a file the result records. A step the repository does not define, or a proof nothing supplies, is `absent` and FAILS L4: nothing is skipped by silence.
 // Skips are judged too (evidence rule: every test must have passed in at least one leg, the host run or the Linux container run): every skipped test is reported with its reason; the spec files that hold a
 // test the host run skipped are run by the Linux leg (its shells installed inside the container only) and the two legs' results are merged by test name: a skip that passed in the other leg is COVERED and listed with
@@ -14,11 +16,13 @@
 // draw-rationale, draw-layer) may remain, listed by name in the record.
 import fs from 'node:fs';
 import path from 'node:path';
-import { planFor, runStep } from './push-git.mjs';
+import { planFor } from './push-git.mjs';
 import { unlinkNodeModulesLink } from '../api/fs/unlink-node-modules-link.mjs';
-import { LINUX_SPECS_LABEL, runParity } from './release-linux-parity.mjs';
+import { LINUX_SPECS_LABEL } from './release-linux-parity.mjs';
+import { parityInWorker, stepInWorker } from './release-l4-offload.mjs';
+import { l4Graph, LINUX_ROW, SPECS_ROW } from './release-l4-graph.mjs';
+import { runGraph, scheduleSettings } from './release-l4-schedule.mjs';
 import { sonarSupplier } from './release-l4-sonar.mjs';
-import { mapInOrder } from '../lib/in-order.mjs';
 import { resolveTestConcurrency } from '../machine/test-concurrency.mjs';
 import { byCodeUnit } from '../lib/list.mjs';
 import { idleScripts, stepEnv, testLayersOf } from './release-l4-layers.mjs';
@@ -177,12 +181,12 @@ export function planL4(repo, { runtimeRoot } = {}) {
   const apps = exampleApps(repo);
   const installs = apps.map((app) => {
     const name = `${app.name}: npm ci`;
-    return fs.existsSync(path.join(app.dir, 'package-lock.json')) ? { name, cmd: 'npm', args: ['ci', '--no-audit', '--no-fund'], cwd: app.dir, install: true } : { name, absent: true, cwd: app.dir };
+    return fs.existsSync(path.join(app.dir, 'package-lock.json')) ? { name, cmd: 'npm', args: ['ci', '--no-audit', '--no-fund'], cwd: app.dir, install: true } : { name, absent: true, cwd: app.dir, install: true };
   });
   const env = specEnv(apps);
   const notPlanned = [];
   const testWorld = path.join(repo, 'packages', 'test-world');
-  const builds = fs.existsSync(path.join(testWorld, 'package.json')) ? [{ name: 'test-world: npm run build', cmd: 'npm', args: ['run', 'build'], cwd: testWorld }] : [];
+  const builds = fs.existsSync(path.join(testWorld, 'package.json')) ? [{ name: 'test-world: npm run build', cmd: 'npm', args: ['run', 'build'], cwd: testWorld, prep: true }] : [];
   const steps = [...installs, ...builds, ...planFor(repo, runtimeRoot ? { runtimeRoot } : {}).steps.map((s) => ({ ...s, cwd: repo, ...(s.name === 'npm test' && !s.absent ? { env, evidence: true } : {}) }))];
   for (const app of apps) {
     let scripts = {};
@@ -196,43 +200,76 @@ export function planL4(repo, { runtimeRoot } = {}) {
   return { steps, notPlanned, proofs: apps.flatMap((app) => L4_PROOFS.map((proof) => `${app.name}: ${proof}`)), linux: true };
 }
 
+
+/** The work of one planned step: its row {name, ok, log, ms, skips, ...}. The runtime spec step (`evidence`) is bound to a fresh host budget when it starts. */
+function stepWork({ repo, step, unlink, concurrencyDeps }) {
+  return async (s) => {
+    if (s.absent) return { name: s.name, ok: false, absent: true, log: null, ms: 0, skips: [] };
+    // A real install, never through a link into another checkout: a node_modules link is removed as a link first.
+    if (s.install && !unlink(s.cwd)) return { name: s.name, ok: false, log: null, ms: 0, skips: [], why: 'a node_modules link could not be removed' };
+    // cutRelease already holds the release host lock. Probe afresh here, after installs, for this actual spec process only.
+    const decision = s.evidence ? resolveTestConcurrency(undefined, concurrencyDeps) : null;
+    const actual = decision ? runtimeSpecStep(s.cwd ?? repo, s, decision) : s;
+    const r = await step(actual, { cwd: s.cwd, timeoutMs: STEP_TIMEOUT_MS, tag: 'release', ...(s.env || s.nextBuild ? { env: stepEnv(s) } : {}) });
+    if (decision && r.log && fs.existsSync(r.log)) fs.appendFileSync(r.log, `\n[concurrency]\n${JSON.stringify(decision)}\n`);
+    return { name: s.name, ok: r.ok, log: r.log, ms: r.ms, skips: skipsOf(r.text), ...(s.evidence ? { passes: passesOf(r.text), concurrency: decision, command: { cmd: actual.cmd, args: actual.args } } : {}) };
+  };
+}
+
+/** The proof rows: each supplier proof answers {ok, log, ms}; a name nothing supplies is absent and fails. */
+const proofWork = (sup) => async (name) => {
+  const p = await sup.proofs[name]?.();
+  return p ? { name, ok: p.ok === true, log: p.log ?? null, ms: p.ms ?? 0, skips: [] } : { name, ok: false, absent: true, log: null, ms: 0, skips: [] };
+};
+
 /**
- * The Linux leg: the CI-equivalent jobs, plus the spec files that hold a test the host run SKIPPED (a shell, a symlink privilege or a platform the Windows host lacks), run in the container with
- * their shells installed INSIDE it. The log of that part is read back: the tests that passed there (`passes`) and the ones it skipped (`skips`) join the host run's, so a test that executed in
- * neither leg is a failure by name (skipReport). A skipped name no spec file holds the text of is returned as `unmatched` and stays a failure.
+ * The spec leg of the Linux step: the spec files that hold a test the host run SKIPPED (a shell, a symlink privilege or a platform the Windows host lacks), run in a second container
+ * that prepares like the first and has the shells installed INSIDE it. Its log is read back: the tests that passed there (`passes`) and the ones it skipped (`skips`) join the host run's,
+ * so a test that executed in neither leg is a failure by name (skipReport). A skipped name no spec file holds the text of is returned as `unmatched` and stays a failure.
+ * {files, unmatched, row, section}: `row` is null when no file needs the leg.
  */
-async function linuxLeg(repo, { parity, apps, ran, parityDeps }) {
-  const hostSkips = ran.filter((s) => s.passes).flatMap((s) => s.skips).filter((k) => classifySkip(k) !== 'declared');
+async function specsLeg({ repo, parity, apps, hostRows, parityDeps }) {
+  const hostSkips = hostRows.filter((s) => s.passes).flatMap((s) => s.skips).filter((k) => classifySkip(k) !== 'declared');
   const { files, unmatched } = parityDeps.specs ? { files: parityDeps.specs, unmatched: [] } : specFilesFor(repo, hostSkips.map((k) => k.name));
-  const leg = await parity(repo, { apps: () => apps.map((a) => a.name), ...parityDeps, specs: files });
-  if (!files.length || !leg.log || !fs.existsSync(leg.log)) return { ...leg, specs: files, unmatched };
-  const section = sectionOf(fs.readFileSync(leg.log, 'utf8'), LINUX_SPECS_LABEL);
-  return { ...leg, specs: files, unmatched, skips: [...(leg.skips ?? []), ...skipsOf(section)], passes: passesOf(section) };
+  if (!files.length) return { files, unmatched, row: null, section: '' };
+  const row = await parity(repo, { apps: () => apps.map((a) => a.name), ...parityDeps, specs: files, prepareOnly: true });
+  const section = row.log && fs.existsSync(row.log) ? sectionOf(fs.readFileSync(row.log, 'utf8'), LINUX_SPECS_LABEL) : '';
+  return { files, unmatched, row, section };
+}
+
+/** The one `linux-parity` row of the record: the CI-equivalent container and, when it ran, its spec leg (verdict, skips and passes merged). */
+function linuxRow(first, leg) {
+  if (!leg) return first;
+  const base = { ...first, specs: leg.files, unmatched: leg.unmatched };
+  if (!leg.row) return base;
+  const ok = first.ok && leg.row.ok;
+  const why = first.ok ? `${SPECS_ROW}: ${leg.row.why ?? 'red'}` : first.why;
+  return { ...base, ok, ms: first.ms + leg.row.ms, specsLog: leg.row.log, ...(ok ? {} : { why }), skips: [...(first.skips ?? []), ...(leg.row.skips ?? []), ...skipsOf(leg.section)], passes: passesOf(leg.section) };
 }
 
 /**
- * Run the L4 plan once (async: the Sonar gate is): a Promise of [{name, ok, log, ms, skips, absent?}]. `proofs` supplies the {ok, log} of each proof by name (default: the Sonar gate of every example, the stack
- * brought up and put back by `supplier.close`); a missing one is absent and fails. `parity` runs the Linux step (default runParity); `parity: null` leaves it out of a stand-in run.
+ * Run the L4 plan once (async: the Sonar gate is) as a schedule (release-l4-graph.mjs): a Promise of [{name, ok, log, ms, skips, absent?}] in plan order, the proofs, then the Linux row.
+ * `proofs` supplies the {ok, log} of each proof by name (default: the Sonar gate of every example, the stack brought up and put back by `supplier.close`); a missing one is absent and fails.
+ * `parity` runs the Linux container (default: in a worker thread); `parity: null` leaves it out of a stand-in run. `carry` maps a row name to a result that stands in for running it
+ * (a row already green for this commit, or reused from another one). A red row never cancels another; a row that throws stops the rest from starting and is raised once the running rows settled.
  */
-export async function runL4(repo, { proofs, parity = runParity, step = runStep, plan = planL4(repo), apps = exampleApps(repo), supplier = null, unlink = unlinkNodeModulesLink, parityDeps = {}, concurrencyDeps = {} } = {}) {
+export async function runL4(repo, { proofs, parity = parityInWorker, step = stepInWorker, plan = planL4(repo), apps = exampleApps(repo), supplier = null, unlink = unlinkNodeModulesLink, parityDeps = {}, concurrencyDeps = {}, carry = {}, settings = scheduleSettings() } = {}) {
   const sup = proofs === undefined ? (supplier ?? sonarSupplier(apps)) : { proofs, close: () => {} };
+  const finished = new Map(Object.entries(carry));
+  const remember = (work) => async (arg) => {
+    const row = await work(arg);
+    finished.set(row.name, row);
+    return row;
+  };
+  const tasks = {
+    step: remember(stepWork({ repo, step, unlink, concurrencyDeps })),
+    proof: remember(proofWork(sup)),
+    ...(parity ? { parity: async () => parity(repo, { apps: () => apps.map((a) => a.name), ...parityDeps, specs: [] }), specs: () => specsLeg({ repo, parity, apps, hostRows: [...finished.values()], parityDeps }) } : {}),
+  };
   try {
-    const ran = plan.steps.map((s) => {
-      if (s.absent) return { name: s.name, ok: false, absent: true, log: null, ms: 0, skips: [] };
-      // A real install, never through a link into another checkout: a node_modules link is removed as a link first.
-      if (s.install && !unlink(s.cwd)) return { name: s.name, ok: false, log: null, ms: 0, skips: [], why: 'a node_modules link could not be removed' };
-      // cutRelease already holds the release host lock. Probe afresh here, after installs, for this actual spec process only.
-      const decision = s.evidence ? resolveTestConcurrency(undefined, concurrencyDeps) : null;
-      const actual = decision ? runtimeSpecStep(s.cwd ?? repo, s, decision) : s;
-      const r = step(actual, { cwd: s.cwd, timeoutMs: STEP_TIMEOUT_MS, tag: 'release', ...(s.env || s.nextBuild ? { env: stepEnv(s) } : {}) });
-      if (decision && r.log && fs.existsSync(r.log)) fs.appendFileSync(r.log, `\n[concurrency]\n${JSON.stringify(decision)}\n`);
-      return { name: s.name, ok: r.ok, log: r.log, ms: r.ms, skips: skipsOf(r.text), ...(s.evidence ? { passes: passesOf(r.text), concurrency: decision, command: { cmd: actual.cmd, args: actual.args } } : {}) };
-    });
-    const proved = await mapInOrder(plan.proofs, async (name) => {
-      const p = await sup.proofs[name]?.();
-      return p ? { name, ok: p.ok === true, log: p.log ?? null, ms: p.ms ?? 0, skips: [] } : { name, ok: false, absent: true, log: null, ms: 0, skips: [] };
-    });
-    const linux = plan.linux && parity ? [await linuxLeg(repo, { parity, apps, ran, parityDeps })] : [];
-    return [...ran, ...proved, ...linux];
+    const { rows, limits } = l4Graph({ plan, apps, settings, tasks, carry, deps: concurrencyDeps });
+    const results = await runGraph(rows, limits);
+    const ordered = [...plan.steps.map((s) => s.name), ...plan.proofs].map((name) => results.get(name));
+    return [...ordered, ...(results.has(LINUX_ROW) ? [linuxRow(results.get(LINUX_ROW), results.get(SPECS_ROW))] : [])];
   } finally { sup.close?.(); }
 }

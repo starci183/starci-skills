@@ -1,0 +1,46 @@
+schema: starci/release-cut@1
+id: release-cut
+title: Release cut schedule and row reuse
+
+# The numbers and input sets of `starci release cut` (scripts/supervisor/release-l4*.mjs, release-reuse.mjs). Nothing here is typed in code.
+
+schedule:
+  # The L4 rows are a graph, not a line. Order: the installs and the test-world build (prep); the Linux parity container starts at once and runs beside everything;
+  # the root rows (the suite, then the packages suites, then the checks) keep the machine; when `appsAfter` has ended the example apps' row chains start together,
+  # each app's own rows in order, and each app's Sonar proof follows its chain. A red row never cancels another one.
+  pools:
+    prep: 4          # installs and the test-world build
+    root: 1          # the root rows, one after another
+    apps: 3          # example app chains running together; the host budget below lowers it
+    proofs: 3        # Sonar proofs running together (network bound)
+    containers: 2    # the Linux parity container and its spec leg
+  appsAfter: npm test
+  # What one running app chain needs of the host (a build, a test run and a docker build at a time): the number of chains is
+  # min(pools.apps, free logical threads / logicalThreads, (free RAM - the reserve of modules/supervisor/test-concurrency.yaml) / ramGiB), at least 1.
+  appChain: {logicalThreads: 3, ramGiB: 4}
+  # The parity spec leg: the container prepares with the workflow steps that come before the first of these and then runs the spec files the host run skipped tests of.
+  parityPrepareUntil: npm run check
+
+reuse:
+  # Bump to invalidate every recorded digest (a change in how rows are judged that the input sets cannot see).
+  digestVersion: 1
+  # A row is reused only when its class, its command and the bytes of its input set are identical between the two commits. A class not listed here, and the installs,
+  # always run. `acrossShas: false` keeps a class to the commit that ran it: a later commit with an identical input set still runs it.
+  required:
+    # The rows the pre-push gate asks to have RUN on the exact pushed commit (scripts/guards/release-definition.mjs RECEIPT_STEPS): never reused from another commit.
+    rows: [npm test, npm run test:packages, npm run check]
+  classes:
+    root:
+      rows: [npm test, npm run test:packages, npm run check]
+      acrossShas: false
+      exclude: [examples/, docs/]
+    whole:
+      rows: [linux-parity]
+      acrossShas: true
+      exclude: []
+    app:
+      acrossShas: true
+      # <app> is the example app a row belongs to: its tree, the lockfiles that pin the published packages it installs, the example index and the helpers the row scripts call.
+      include: [examples/<app>/, examples/index.yaml, package.json, package-lock.json, scripts/gates/build-env.mjs, scripts/supervisor/release-l4-layers.mjs]
+  always: ['<app>: npm ci', 'test-world: npm run build']
+  keep: 6

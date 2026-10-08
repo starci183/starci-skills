@@ -567,6 +567,7 @@ _starci() {
         release:cut:--remote) return 0;;
         release:cut:--branch) return 0;;
         release:cut:--tag) return 0;;
+        release:cut:--rows) return 0;;
         release:images:--app) return 0;;
         release:images:--sides) return 0;;
         release:images:--only) return 0;;
@@ -1076,7 +1077,7 @@ _starci() {
         release:app-installs) COMPREPLY=( $(compgen -W "--keep --json --cwd --quiet --help --edition" -- "$cur") );;
         release:check) COMPREPLY=( $(compgen -W "--final --only --json --cwd --quiet --help --edition" -- "$cur") );;
         release:clean-test) COMPREPLY=( $(compgen -W "--changed --base --json --cwd --quiet --help --edition" -- "$cur") );;
-        release:cut) COMPREPLY=( $(compgen -W "--repo --remote --branch --plan --tag --json --cwd --quiet --help --edition" -- "$cur") );;
+        release:cut) COMPREPLY=( $(compgen -W "--repo --remote --branch --plan --tag --rows --no-reuse --json --cwd --quiet --help --edition" -- "$cur") );;
         release:env-test) COMPREPLY=( $(compgen -W "--lane --reuse-installs --json --cwd --quiet --help --edition" -- "$cur") );;
         release:images) COMPREPLY=( $(compgen -W "--app --sides --only --wait-seconds --remove-images --json --cwd --quiet --help --edition" -- "$cur") );;
         release:launch-smoke) COMPREPLY=( $(compgen -W "--app-repo --entry --timeout-ms --out --as --json --cwd --quiet --help --edition" -- "$cur") );;

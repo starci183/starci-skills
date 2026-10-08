@@ -157,7 +157,9 @@ test('L4: the installs run first as a real npm ci (a node_modules link is remove
   }));
   assert.equal(order[0], 'shop: npm ci');
   assert.deepEqual(unlinked, ['shop'], 'the link guard runs before the install, only for a runnable install');
-  assert.deepEqual(order.slice(-3), ['sonar blog', 'sonar shop', 'parity']);
+  assert.ok(order.includes('parity') && order.indexOf('parity') < order.indexOf('npm test'), 'the Linux container starts beside the installs, before the suite ends');
+  assert.ok(order.indexOf('npm run check') < order.indexOf('sonar blog'), 'a proof follows the root rows (the apps wait for the suite)');
+  assert.deepEqual(order.slice(-2).sort(), ['sonar blog', 'sonar shop']);
   assert.equal(out.at(-1).name, 'linux-parity');
   assert.equal(closed, 1);
   assert.deepEqual(out.find((s) => s.name === 'blog: npm ci').absent, true);
