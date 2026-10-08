@@ -708,3 +708,10 @@ cases:
     rule: {file: modules/kernel/command-policy.yaml, anchor: "starci test affected --run in the runtime"}
     spec: tests/guards/role-rights.spec.mjs
     status: covered
+  - id: release-proof-cost-is-the-owners-to-spend
+    family: smooth-operation
+    finding: {role: owner, duty: does, verdict: departs, evidence: "three release cuts of 50 to 70 minutes on 2026-10-08 and 09, the root suite (about 35 minutes under the L4 env) and the Linux parity container (15 to 25 minutes, a local replay of the CI job) the largest rows, while the GitHub ci workflow runs the same suite with coverage on Linux for every push of main", remedy: {state: in-tree, change: "config.yaml release.suite local or ci (shipped default local); under ci the cut plans no root suite and no Linux row, lists them as delegated in the plan, the result and the release record, runs check, the packages suites, the affected specs of the release range (per commit with ledgers when the range is over the bound), the live Orca smokes and the example rows; the pre-push gate accepts the record only while the checked-out config says ci too; starci release ci-status reads the verdict back and records a red run as runtime-defect:release-ci-red-<tag>"}}
+    met: {date: "2026-10-09", where: "modules/kernel/owner-rulings.yaml release-suite-ci", evidence: "the owner chose it in his own words; the trade is stated in docs/releasing.md"}
+    rule: {file: scripts/guards/release-definition.mjs, anchor: "RELEASE_SUITE_MODE"}
+    spec: tests/guards/release-suite-gate.spec.mjs
+    status: covered

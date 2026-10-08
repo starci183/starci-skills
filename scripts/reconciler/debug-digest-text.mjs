@@ -61,6 +61,7 @@ export const TEXT = Object.freeze({
   reasonable: 'reasonable',
   unreasonable: 'NOT reasonable',
   burn: '  Tokens: {items}',
+  releaseCi: 'Last release CI: {line}',
   admission: 'Admission: {live} live reservation(s), {leaked} not backed by a running job',
   problems: 'Problems, ordered by the work each blocks:',
   problemLine: '  {n}. [blocks {blocks}] {text}',

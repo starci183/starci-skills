@@ -17228,3 +17228,14 @@ held-secret-import-refused:
   nextStep_vi: "Đọc `cause`: cung cấp danh tính age, đặt --rev đúng, hoặc sửa tay biến đã có trong secret.env; sau khi chuyển xong, xoay (rotate) mật khẩu quản trị, token quản trị và token tunnel vì bản mã hóa vẫn nằm trong lịch sử git công khai."
   owner: owner
   kind: verb-refusal
+
+RELEASE_SUITE_MODE:
+  title: "Release record claims the delegated suite without the config saying so"
+  title_vi: "Bản ghi phát hành nhận suite ủy quyền nhưng cấu hình không nói vậy"
+  meaning_vi: "Bản ghi của commit ghi suite ci (suite đầy đủ do CI chạy sau khi đẩy), nhưng config.yaml của checkout hiện tại không đặt release.suite là ci, hoặc bản ghi không liệt kê npm test là dòng được ủy quyền. Một bản ghi không tự chọn chế độ: chế độ do owner chọn trong config.yaml."
+  causes_vi:
+    - "Bản ghi được cắt khi config.yaml đặt release.suite: ci, rồi giá trị đó bị đổi lại hoặc xóa"
+    - "Bản ghi được ghi tay hoặc bởi một checkout khác"
+  nextStep_vi: "Owner đặt release.suite: ci trong config.yaml (quyết định của owner), hoặc chạy lại starci release cut --tag v<version> với release.suite: local để suite gốc chạy tại chỗ; không sửa tay bản ghi."
+  owner: owner
+  kind: verb-refusal

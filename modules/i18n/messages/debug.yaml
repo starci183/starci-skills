@@ -167,3 +167,5 @@ messages:
     vi: "    [khoảng trống] {ask} Cần tín hiệu: {signal}"
   - en: "(signal added: {signal})"
     vi: "(đã thêm tín hiệu: {signal})"
+  - en: "Last release CI: {line}"
+    vi: "CI của bản phát hành gần nhất: {line}"

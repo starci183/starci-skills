@@ -5,7 +5,7 @@
 //   publishPlanRefusal  the publish plan of scripts/gates/release-plan.mjs: refused in seconds when it reports a package to publish or a blocker (the examples install the registry copy, so a cut over an unpublished package judges stale bytes for an hour).
 //   planOf              `starci release cut --plan`: what the cut would run and push, and what the pre-push hook will then require. Nothing is run,
 //                       tagged or pushed.
-import { releaseFindings, RECEIPT_STEPS } from '../guards/release-definition.mjs';
+import { releaseFindings, RECEIPT_STEPS, RECEIPT_STEPS_CI } from '../guards/release-definition.mjs';
 import { exampleApps } from './release-l4.mjs';
 import { decisionLines } from './release-cut-rows.mjs';
 import { sonarCloudFindings } from './release-sonarcloud.mjs';
@@ -53,6 +53,10 @@ export function planOf({ head, tag, remote, branch, out, selection }) {
   const l4 = selection.plan;
   const rows = decisionLines(selection);
   const running = rows.filter((row) => row.action === 'run');
-  return { ...out, ok: true, verdict: 'plan', head, tag, steps: selection.names, rows, notPlanned: l4.notPlanned, receiptSteps: [...RECEIPT_STEPS],
-    why: `would run ${running.length} of ${rows.length} row(s) on ${head.slice(0, 9)} under the host lock (${rows.length - running.length} stand in from green runs, listed in rows), write the release record of that commit (rows RUN on it, never reused: ${RECEIPT_STEPS.join(', ')}), create the annotated tag ${tag}, and push ${branch} with it to ${remote} in one atomic push; nothing was run, tagged or pushed` };
+  const delegated = rows.filter((row) => row.action === 'delegated');
+  const required = l4.mode === 'ci' ? RECEIPT_STEPS_CI : RECEIPT_STEPS;
+  const named = delegated.map((row) => [row.name, row.why].join(': ')).join('; ');
+  const suite = l4.mode === 'ci' ? `suite: ci - the full suite is CI's (${named}); the record lists them as delegated, never green. ` : 'suite: local. ';
+  return { ...out, ok: true, verdict: 'plan', head, tag, suiteMode: l4.mode, steps: selection.names, rows, notPlanned: l4.notPlanned, receiptSteps: [...required],
+    why: `${suite}would run ${running.length} of ${rows.length - delegated.length} row(s) on ${head.slice(0, 9)} under the host lock (${rows.length - delegated.length - running.length} stand in from green runs, listed in rows), write the release record of that commit (rows RUN on it, never reused: ${required.join(', ')}), create the annotated tag ${tag}, and push ${branch} with it to ${remote} in one atomic push; nothing was run, tagged or pushed` };
 }

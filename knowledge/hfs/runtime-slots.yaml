@@ -76,6 +76,7 @@ ruleParams:
         npx: [api/npm]
         docker: [api/docker]
         docker-compose: [api/docker]
+        gh: [api/gh]
         sonar-scanner: [api/sonar]
         sonar: [api/sonar]
         sops: [api/sops]
@@ -349,7 +350,7 @@ slots:
   # ----- engine ---------------------------------------------------------------------------------------------
   - id: runtime.foundation
     profiles: [runtime]
-    path: "engine/{runtime-root,config,secrets,invalid-config,model-config,orca-config,resources-config,sonar-config,temp-root,plain-object,canonical-json,by-code-unit,constants,digest,admission,refuse,removed-vocabulary}.mjs"
+    path: "engine/{runtime-root,config,secrets,invalid-config,model-config,orca-config,resources-config,sonar-config,release-config,temp-root,plain-object,canonical-json,by-code-unit,constants,digest,admission,refuse,removed-vocabulary}.mjs"
     presence: required
     tracked: tracked
     tier: base

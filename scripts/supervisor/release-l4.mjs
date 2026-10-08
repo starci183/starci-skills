@@ -26,6 +26,7 @@ import { sonarSupplier } from './release-l4-sonar.mjs';
 import { resolveTestConcurrency } from '../machine/test-concurrency.mjs';
 import { byCodeUnit } from '../lib/list.mjs';
 import { idleScripts, stepEnv, testLayersOf } from './release-l4-layers.mjs';
+import { affectedRowExtras, ciPlan, ciSettings } from './release-ci-rows.mjs';
 
 /** The only skips a release may keep: tests that need a browser the host may lack, matched by name. */
 const BROWSER_SKIPS = Object.freeze(['draw-render', 'draw-rationale', 'draw-layer']);
@@ -177,7 +178,7 @@ export function runtimeSpecStep(repo, step, decision) {
 }
 
 /** The L4 plan of `repo`: {steps: [{name, cmd, args, cwd, absent?, install?, nextBuild?}], notPlanned: [{name, why}], proofs: [names], linux: true}: the installs first, then the npm steps, the proofs and the Linux step; `notPlanned` names each test row a full app has no spec file for (release-l4-layers.mjs). */
-export function planL4(repo, { runtimeRoot } = {}) {
+export function planL4(repo, { runtimeRoot, mode = 'local' } = {}) {
   const apps = exampleApps(repo);
   const installs = apps.map((app) => {
     const name = `${app.name}: npm ci`;
@@ -197,7 +198,8 @@ export function planL4(repo, { runtimeRoot } = {}) {
     }
     notPlanned.push(...(app.edition === 'lite' ? [] : idleScripts(app.layers)).map((idle) => ({ name: `${app.name}: npm run ${idle.script}`, why: idle.why })));
   }
-  return { steps, notPlanned, proofs: apps.flatMap((app) => L4_PROOFS.map((proof) => `${app.name}: ${proof}`)), linux: true };
+  const planned = { steps, notPlanned, proofs: apps.flatMap((app) => L4_PROOFS.map((proof) => `${app.name}: ${proof}`)), linux: true, mode: 'local', delegated: [] };
+  return mode === 'ci' ? ciPlan({ plan: planned, repo, env }) : planned;
 }
 
 
@@ -212,7 +214,7 @@ function stepWork({ repo, step, unlink, concurrencyDeps }) {
     const actual = decision ? runtimeSpecStep(s.cwd ?? repo, s, decision) : s;
     const r = await step(actual, { cwd: s.cwd, timeoutMs: STEP_TIMEOUT_MS, tag: 'release', ...(s.env || s.nextBuild ? { env: stepEnv(s) } : {}) });
     if (decision && r.log && fs.existsSync(r.log)) fs.appendFileSync(r.log, `\n[concurrency]\n${JSON.stringify(decision)}\n`);
-    return { name: s.name, ok: r.ok, log: r.log, ms: r.ms, skips: skipsOf(r.text), ...(s.evidence ? { passes: passesOf(r.text), concurrency: decision, command: { cmd: actual.cmd, args: actual.args } } : {}) };
+    return { name: s.name, ok: r.ok, log: r.log, ms: r.ms, skips: skipsOf(r.text), ...(s.affected ? affectedRowExtras(r.text) : {}), ...(s.evidence ? { passes: passesOf(r.text), concurrency: decision, command: { cmd: actual.cmd, args: actual.args } } : {}) };
   };
 }
 
@@ -267,7 +269,7 @@ export async function runL4(repo, { proofs, parity = parityInWorker, step = step
     ...(parity ? { parity: async () => parity(repo, { apps: () => apps.map((a) => a.name), ...parityDeps, specs: [] }), specs: () => specsLeg({ repo, parity, apps, hostRows: [...finished.values()], parityDeps }) } : {}),
   };
   try {
-    const { rows, limits } = l4Graph({ plan, apps, settings, tasks, carry, deps: concurrencyDeps });
+    const { rows, limits } = l4Graph({ plan, apps, settings: ciSettings(plan, settings), tasks, carry, deps: concurrencyDeps });
     const results = await runGraph(rows, limits);
     const ordered = [...plan.steps.map((s) => s.name), ...plan.proofs].map((name) => results.get(name));
     return [...ordered, ...(results.has(LINUX_ROW) ? [linuxRow(results.get(LINUX_ROW), results.get(SPECS_ROW))] : [])];

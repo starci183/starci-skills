@@ -28,7 +28,7 @@ _starci() {
         npm) COMPREPLY=( $(compgen -W "ci install" -- "$cur") );;
         orca) COMPREPLY=( $(compgen -W "terminal-read terminal-send" -- "$cur") );;
         reconciler) COMPREPLY=( $(compgen -W "once restart start status stop up" -- "$cur") );;
-        release) COMPREPLY=( $(compgen -W "app-installs check clean-test cut env-test images launch-smoke notes proof publish sync-runtime" -- "$cur") );;
+        release) COMPREPLY=( $(compgen -W "app-installs check ci-status clean-test cut env-test images launch-smoke notes proof publish sync-runtime" -- "$cur") );;
         route) COMPREPLY=( $(compgen -W "op" -- "$cur") );;
         runtime) COMPREPLY=( $(compgen -W "architecture benchmark-snapshot check derived-fields doctor gen-catalog gen-ops housekeeping import-held-secret install ledger-hygiene link machine-db owner-claims-audit readme-blocks status update validate version" -- "$cur") );;
         smoke) COMPREPLY=( $(compgen -W "scaffold" -- "$cur") );;
@@ -561,6 +561,8 @@ _starci() {
         reconciler:up:--wait) return 0;;
         reconciler:up:--set-profile) COMPREPLY=( $(compgen -W "operational observe" -- "$cur") ); return 0;;
         release:check:--only) return 0;;
+        release:ci-status:--repo) return 0;;
+        release:ci-status:--tag) return 0;;
         release:clean-test:--changed) return 0;;
         release:clean-test:--base) return 0;;
         release:cut:--repo) return 0;;
@@ -1080,6 +1082,7 @@ _starci() {
         reconciler:up) COMPREPLY=( $(compgen -W "--check --services --brief --wait --no-build --retire-stale-ledgers --set-profile --json --cwd --quiet --help --edition" -- "$cur") );;
         release:app-installs) COMPREPLY=( $(compgen -W "--keep --json --cwd --quiet --help --edition" -- "$cur") );;
         release:check) COMPREPLY=( $(compgen -W "--final --only --json --cwd --quiet --help --edition" -- "$cur") );;
+        release:ci-status) COMPREPLY=( $(compgen -W "--repo --tag --wait --json --cwd --quiet --help --edition" -- "$cur") );;
         release:clean-test) COMPREPLY=( $(compgen -W "--changed --base --json --cwd --quiet --help --edition" -- "$cur") );;
         release:cut) COMPREPLY=( $(compgen -W "--repo --remote --branch --plan --tag --rows --no-reuse --json --cwd --quiet --help --edition" -- "$cur") );;
         release:env-test) COMPREPLY=( $(compgen -W "--lane --reuse-installs --json --cwd --quiet --help --edition" -- "$cur") );;

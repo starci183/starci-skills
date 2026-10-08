@@ -16,7 +16,7 @@ test('a green full suite and a release tag write the record under <common dir>/s
   const written = writeL4Record({ head: HEAD, tag: 'v1.0.0-alpha.4', logs: GREEN, commonDir, now: () => new Date('2026-10-03T00:00:00Z') });
   assert.equal(written.ok, true);
   assert.equal(written.file, l4RecordPath({ commonDir, head: HEAD }));
-  assert.deepEqual(JSON.parse(fs.readFileSync(written.file, 'utf8')), { schema: 'starci/l4-record@1', head: HEAD, tag: 'v1.0.0-alpha.4', logs: GREEN, at: '2026-10-03T00:00:00.000Z' });
+  assert.deepEqual(JSON.parse(fs.readFileSync(written.file, 'utf8')), { schema: 'starci/l4-record@1', head: HEAD, tag: 'v1.0.0-alpha.4', suite: 'local', delegated: [], logs: GREEN, at: '2026-10-03T00:00:00.000Z' });
 });
 
 test('nothing is written for a bad head, a non-release tag, a red or empty-of-proof step', (t) => {

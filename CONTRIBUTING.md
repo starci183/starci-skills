@@ -31,6 +31,8 @@ a runtime module that reads a changed `modules/**` or `knowledge/**` file), runs
 A red file is fixed and that file is run again, then the affected set once; the root `npm test` is never the answer to a red file or a small fix.
 `starci test affected --changed <file...>` names the files itself; a selection above the bound in `modules/supervisor/affected-tests.yaml` is printed and left to the lead.
 
+Under `config.yaml` `release.suite: ci` (the owner's recorded choice, shipped default `local`) the cut's own full run does not exist: the GitHub `ci` workflow runs the suite after the push, the cut runs `npm run check`, `npm run test:packages`, the specs affected by the release range, the live Orca smokes and the example rows, and a red CI is fixed forward with the next pre-release (`starci release ci-status`; [releasing](docs/releasing.md#where-the-suite-runs)).
+
 The full suite runs exactly twice in a change's life: once by the lead on the merged tree when many lanes meet, and once inside `starci release cut`
 (the pre-push gate refuses a push of `main` without the release record of that commit). A bound role (op, kernel, supervisor, critic, a lane's lead
 seat) that runs the root `npm test` is refused by the command policy and sent to the affected verb; the owner, unbound, is never refused.

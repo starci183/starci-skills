@@ -36,6 +36,8 @@ import { planOf, preSuiteRefusal } from './release-cut-plan.mjs';
 import { releaseHostMissing, releaseHostWhy } from './release-host.mjs';
 import { withHostLock as holdHostLock } from '../machine/host-lock.mjs';
 import { writeL4Record } from '../guards/release-record.mjs';
+import { suiteModeOf } from '../guards/release-suite-mode.mjs';
+import { writeCiRecord } from './release-ci-status.mjs';
 
 /** A release tag: `v` and a version. Anything else is never pushed by the release flow. */
 const RELEASE_TAG = /^v\d[\w.+-]*$/;
@@ -144,6 +146,14 @@ async function releaseSuite({ repo, deps, out, refuse, lock, selection, tag }) {
   return { steps };
 }
 
+/** The result of a release that moved: leaves the pending CI record of the commit and names the command that reads CI's verdict (the suite itself under `suite: ci`). */
+function pushedResult({ out, repo, head, tag, branch, remote, mode, deps }) {
+  (deps.writeCi ?? writeCiRecord)({ repo, head, tag, suite: mode, state: 'pending' });
+  const watch = `starci release ci-status --tag ${tag} --wait`;
+  const judged = mode === 'ci' ? `; the full suite now runs only on GitHub (suite: ci) - watch it: ${watch}` : `; CI runs next - ${watch}`;
+  return { ...out, ok: true, verdict: 'pushed', why: `${branch} and ${tag} pushed to ${remote} in one atomic push${judged}`, pushed: true, ciWatch: watch };
+}
+
 /**
  * Cut the release `tag` (v<version>) of `repo`: see the header. Async (the L4 Sonar gate is): a Promise of {ok, verdict, why, tag, head, suite, skips, declaredSkips, pushed, tagCreated}.
  * The tag is required, must be `v*`, and is created here, ANNOTATED, with the CHANGELOG section as its message (an existing annotated tag on HEAD is reused).
@@ -162,7 +172,9 @@ export async function cutRelease({ repo, remote = 'origin', branch = 'main', tag
   const notes = releaseNotesFindings({ tags: [tag], changelog });
   if (notes.length) return refuse('release-notes', notes.map((f) => f.message).join('; '), { findings: notes });
 
-  const selection = selectionFor({ repo, head, rows, reuse, deps });
+  const mode = (deps.suiteMode ?? suiteModeOf)(repo);
+  out.suiteMode = mode;
+  const selection = selectionFor({ repo, head, rows, reuse, mode, deps });
   const stop = rowsRefusal(selection, rows, refuse) ?? await beforeSuiteRefusal({ repo, run, cwd, head, remote, branch, tag, deps, refuse, sonar: needsSonar(selection) });
   if (stop) return stop;
   if (plan) return planOf({ head, tag, remote, branch, out, selection });
@@ -186,7 +198,7 @@ export async function cutRelease({ repo, remote = 'origin', branch = 'main', tag
   const refs = [branch, `refs/tags/${tag}`];
   const refusal = pushRefusal({ refs });
   if (refusal) return refuse('push-refused', refusal);
-  const recorded = (deps.recordL4 ?? writeL4Record)({ repo, head, tag, logs: steps.filter((s) => !s.absent) });
+  const recorded = (deps.recordL4 ?? writeL4Record)({ repo, head, tag, logs: steps.filter((s) => !s.absent), suite: mode, delegated: selection.plan.delegated });
   if (!recorded.ok) return refuse('l4-record', `the L4 record of ${head.slice(0, 9)} could not be written (${recorded.reason}): the pre-push gate would refuse the push`);
   out.l4Record = recorded.file ?? null;
   const lifted = pushLiftTarget({ pushUrl: configGet(cwd, `remote.${remote}.pushurl`).stdout, fetchUrl: configGet(cwd, `remote.${remote}.url`).stdout });
@@ -194,5 +206,5 @@ export async function cutRelease({ repo, remote = 'origin', branch = 'main', tag
   if (heldBy(pushed)) return refuse('host-lock-held', heldWhy(heldBy(pushed)));
   if (pushed.status !== 0) return refuse('push-refused', `the atomic push of ${refs.join(' and ')} to ${remote} failed (the local tag stays, nothing moved on the remote): ${String(pushed.stderr ?? '').trim().slice(0, 300)}`);
   if (lifted) updateRef(cwd, `refs/remotes/${remote}/${branch}`, head, { message: `release push of ${tag}` });
-  return { ...out, ok: true, verdict: 'pushed', why: `${branch} and ${tag} pushed to ${remote} in one atomic push`, pushed: true };
+  return pushedResult({ out, repo, head, tag, branch, remote, mode, deps });
 }

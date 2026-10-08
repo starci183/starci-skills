@@ -11,8 +11,8 @@ import { chooseRows, readLedgers, signatureOf, treeEntries, writeLedger } from '
 const namesOf = (plan) => [...plan.steps.map((s) => s.name), ...plan.proofs, ...(plan.linux ? [LINUX_ROW] : [])];
 
 /** {plan, names, decisions, digests, unknown, carry}: `rows` is the list of --rows names (null for a whole cut), `reuse` false for --no-reuse. Seams: runtimeRoot, treeEntries, ledgers. */
-export function selectionFor({ repo, head, rows, reuse, deps = {} }) {
-  const plan = planL4(repo, deps.runtimeRoot ? { runtimeRoot: deps.runtimeRoot } : {});
+export function selectionFor({ repo, head, rows, reuse, mode = 'local', deps = {} }) {
+  const plan = planL4(repo, { mode, ...(deps.runtimeRoot ? { runtimeRoot: deps.runtimeRoot } : {}) });
   const names = namesOf(plan);
   const signatures = Object.fromEntries(plan.steps.map((s) => [s.name, signatureOf(s)]));
   const entries = (deps.treeEntries ?? treeEntries)({ repo, commit: head });
@@ -47,5 +47,8 @@ export function remember({ repo, head, tag, rows, selection, deps = {} }) {
   return (deps.writeLedger ?? writeLedger)({ repo, head, tag, rows, digests: selection.digests });
 }
 
-/** The per-row lines of a plan or a result: [{name, action, why, from?}]. */
-export const decisionLines = (selection) => selection.decisions.map(({ name, action, why, from }) => ({ name, action, why, ...(from ? { from } : {}) }));
+/** The per-row lines of a plan or a result: [{name, action, why, from?}]; under `suite: ci` the rows CI judges follow with the action `delegated`. */
+export const decisionLines = (selection) => [
+  ...selection.decisions.map(({ name, action, why, from }) => ({ name, action, why, ...(from ? { from } : {}) })),
+  ...selection.plan.delegated.map(({ name, why }) => ({ name, action: 'delegated', why })),
+];
