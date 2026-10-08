@@ -4,15 +4,17 @@
 //
 // Every commit since the last release commit (the last commit that changed the "version" of package.json) is judged against its parent by
 // scripts/lib/gate-loosening.mjs and modules/kernel/gate-loosening.yaml. A commit that loosens a gate or check is owner-class
-// (modules/kernel/roles.yaml rulings.loosening-is-owner-class): it is a finding unless its parent already holds the owner's approval,
-// an owner-rulings entry gate-loosening-<fingerprint>. The land gate refuses the same change before it reaches main
+// (modules/kernel/roles.yaml rulings.loosening-is-owner-class): it is a finding unless the owner approved it, an owner-rulings entry
+// gate-loosening-<fingerprint> held by its parent or by the checked-out tree (history that reached the branch by a merge was not judged
+// when it was written: the owner approves it after the fact, in a commit of its own). The land gate refuses the same change before it reaches main
 // (scripts/supervisor/land-gate-loosening.mjs).
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { printFindings } from '../lib/check-scan.mjs';
 import { log } from '../api/git/log.mjs';
 import { revList } from '../api/git/rev-list.mjs';
-import { judgeChange, looseningRules } from '../supervisor/land-gate-loosening.mjs';
+import { judgeChange, looseningRules, rulingsAt } from '../supervisor/land-gate-loosening.mjs';
+import { approved } from '../lib/gate-loosening.mjs';
 
 export const CODE = 'RT_GATE_LOOSENING';
 const COMMIT_LIMIT = 400;
@@ -32,9 +34,10 @@ export function checkGateLoosening(root = skillRoot) {
   if (!base) return [];
   const listed = revList(['--no-merges', '--reverse', `--max-count=${COMMIT_LIMIT}`, `${base}..HEAD`], { cwd: root });
   if (listed.status !== 0) return [];
+  const standing = rulingsAt(root, 'HEAD');
   return listed.stdout.split(/\r?\n/).filter(Boolean).flatMap((sha) => {
     const judged = judgeChange({ dir: root, base: `${sha}^`, head: sha, rules });
-    if (!judged || judged.approved) return [];
+    if (!judged || judged.approved || approved(judged.findings, standing)) return [];
     const what = judged.findings.map((entry) => `${entry.kind} ${entry.file}: ${entry.detail}`).join('; ');
     return [finding(sha, `loosens a gate (${what}) without the owner's approval: add the owner-rulings entry ${judged.id} first, or restore the gate`)];
   });
