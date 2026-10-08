@@ -63,13 +63,20 @@ function policyOf(deps) {
   return policy;
 }
 
-/** One spec file as its own `node --test` process with the four preloads: {file, pass, ms, tail}. */
+// The number of failing tests in the output of one `node --test` run (the reporter's own `fail N` summary line), or null when the output holds none.
+const failingTestsIn = (output) => {
+  const counts = [...output.matchAll(/^(?:ℹ|#) fail (\d+)\s*$/gm)];
+  return counts.length ? Number(counts.at(-1)[1]) : null;
+};
+
+/** One spec file as its own `node --test` process with the four preloads: {file, pass, ms, tail, failedTests}. */
 export async function runSpecFile(root, file, deps = {}) {
   const args = [...PRELOADS.flatMap((preload) => ['--import', preload]), '--test', file];
   const started = Date.now();
   const result = await (deps.execNode ?? execNode)(args, { cwd: root, maxBuffer: 1024 * 1024 * 1024 });
   const pass = !result.error;
-  return { file, pass, ms: Date.now() - started, tail: pass ? [] : lines(`${result.stdout ?? ''}\n${result.stderr ?? ''}`).slice(-TAIL_LINES) };
+  const output = `${result.stdout ?? ''}\n${result.stderr ?? ''}`;
+  return { file, pass, ms: Date.now() - started, tail: pass ? [] : lines(output).slice(-TAIL_LINES), failedTests: pass ? 0 : failingTestsIn(output) };
 }
 
 /** Run `files` with at most `limit` processes at once: the results in the order of `files`. */
@@ -104,8 +111,11 @@ async function runSelection({ root, picked, args, deps }) {
   const failed = results.filter((r) => !r.pass);
   const out = results.map(verdictLine);
   for (const r of failed) out.push(`--- ${r.file}`, ...r.tail.map((line) => `  ${line}`));
-  out.push(`affected: ${results.length} files, ${results.length - failed.length} pass, ${failed.length} fail`);
-  return reply(failed.length ? 1 : 0, out.join('\n'), { ok: !failed.length, scope: picked.files, results: results.map(({ file, pass, ms }) => ({ file, pass, ms })), concurrency: decision });
+  const known = failed.filter((r) => r.failedTests !== null);
+  const failedTests = known.length === failed.length ? known.reduce((sum, r) => sum + r.failedTests, 0) : null;
+  const tests = failed.length && failedTests !== null ? `; failing tests: ${failedTests}` : '';
+  out.push(`affected: ${results.length} files, ${results.length - failed.length} pass, ${failed.length} fail${tests}`);
+  return reply(failed.length ? 1 : 0, out.join('\n'), { ok: !failed.length, scope: picked.files, results: results.map(({ file, pass, ms, failedTests: count }) => ({ file, pass, ms, failedTests: count })), failedTests, concurrency: decision });
 }
 
 /** `starci test affected [--base <ref>] [--changed <file...>] [--by symbol|file] [--run] [--concurrency <n>]`. */

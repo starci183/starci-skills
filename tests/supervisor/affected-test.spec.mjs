@@ -98,6 +98,20 @@ test('--run runs each file once with the four preloads and ends with the counted
   assert.match(out.text.split('\n').at(-1), /^affected: 2 files, 1 pass, 1 fail$/);
 });
 
+test('the last line counts FILES; the failing tests inside the failing files are a separate number, printed only when every failing file reported one', async (t) => {
+  const summary = (n) => `not ok 1 - boom\nℹ tests 9\nℹ pass ${9 - n}\nℹ fail ${n}\nℹ cancelled 0`;
+  const failing = (n) => Promise.resolve({ error: new Error('exit 1'), stdout: summary(n), stderr: '' });
+  const files = { 'tests/core.spec.mjs': () => failing(3), 'tests/unrelated.spec.mjs': () => failing(5) };
+  const d = deps(t, { changedFiles: () => ['scripts/lib/core.mjs', 'scripts/lib/other.mjs'], execNode: (a) => files[a.at(-1)]?.() ?? passing() });
+  const out = await testAffected(ctxOf(d, { run: true }), d);
+  assert.equal(out.text.split('\n').at(-1), 'affected: 2 files, 0 pass, 2 fail; failing tests: 8');
+  assert.equal(out.data.failedTests, 8);
+  const mixed = deps(t, { changedFiles: () => ['scripts/lib/core.mjs', 'scripts/lib/other.mjs'], execNode: (a) => (a.at(-1) === 'tests/core.spec.mjs' ? failing(3) : Promise.resolve({ error: new Error('crash'), stdout: 'no summary', stderr: '' })) });
+  const unknown = await testAffected(ctxOf(mixed, { run: true }), mixed);
+  assert.equal(unknown.text.split('\n').at(-1), 'affected: 2 files, 0 pass, 2 fail', 'a crashed file has no test count: no number is invented');
+  assert.equal(unknown.data.failedTests, null);
+});
+
 test('all green exits 0 and an empty selection runs nothing', async (t) => {
   const green = deps(t, { changedFiles: () => ['scripts/lib/core.mjs'], execNode: passing });
   const ok = await testAffected(ctxOf(green, { run: true }), green);
