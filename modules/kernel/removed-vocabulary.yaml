@@ -154,3 +154,20 @@ removed:
     use: 'skills/starci/references/host-startup.md'
     since: 1.0.0-alpha.6
     match: '(?<![\w-])host-maintenance\b'
+  - id: config-drawloop-critic
+    kind: config-key
+    name: allocation.drawLoop.critic
+    use: 'the Critic is picked from its tier (modules/models/tiers.yaml seats.critic, modules/kernel/critic.yaml) with provider independence as a hard filter; its wall bound is allocation.drawLoop.criticTimeoutMs'
+    since: 1.0.0-alpha.8
+    match: 'allocation\.drawLoop\.critic(?![A-Za-z])'
+  - id: config-drawloop-criticwhendrawer
+    kind: config-key
+    name: allocation.drawLoop.criticWhenDrawer
+    use: 'the Critic tier holds a member of every provider and the picker removes the provider of the maker; there is no per-drawer table'
+    since: 1.0.0-alpha.8
+    match: 'criticWhenDrawer'
+  - id: registry-critic-coverage-define-architecture
+    kind: vocabulary
+    name: critic-coverage-define-architecture
+    use: 'the edge-case registry entry is critic-coverage-decision-legs'
+    since: 1.0.0-alpha.8

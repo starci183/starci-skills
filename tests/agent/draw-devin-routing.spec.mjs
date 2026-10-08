@@ -9,7 +9,7 @@ import { spawnSync } from 'node:child_process';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { hostToolsRequired, hostToolsOf } from '../../scripts/agent/models.mjs';
 import { fakePoolSelection as selectPool } from '../helpers/fake-admission.mjs';
-import { criticFor } from '../../scripts/work/draw-critic.mjs';
+import { criticFor } from '../../scripts/work/critic-pick.mjs';
 import { fakeAdmission } from '../helpers/fake-admission.mjs';
 import { FAKE_ORCA } from '../helpers/fake-orca.mjs';
 import { withMachine } from '../../engine/db/machine.mjs';
@@ -76,19 +76,21 @@ test('the route excludes unknown provider evidence and keeps eligible fallback m
   assert.equal(brand.fallbackChain[0].model, 'gpt-6.1-sol');
 });
 
-test('the critic is a different model from the drawer: Codex when Devin draws, Claude when Codex draws', async (t) => {
+test('the critic is another provider than the drawer, taken from its tier by the picker: Claude when Devin or Codex draws', async (t) => {
   const s = runtimes.allocation.drawLoop;
-  assert.equal(s.critic.provider, 'codex');
-  assert.equal(criticFor(s, 'devin').critic.provider, 'codex');
+  assert.equal(s.critic, undefined, 'no critic is pinned by hand');
+  assert.equal(criticFor(s, 'devin').critic.provider, 'claude');
+  assert.equal(criticFor(s, 'devin').critic.tier, 'frontier');
   assert.match(criticFor(s, null).error, /unknown/);
   const alt = criticFor(s, 'codex');
   assert.equal(alt.critic.provider, 'claude');
-  assert.notEqual(alt.critic.provider, 'codex');
-  assert.match(criticFor({ critic: s.critic }, 'codex').error, /different model from the drawer/);
   assert.equal(alt.critic.model, 'claude-opus-5-5');
-  for (const c of [s.critic, alt.critic]) assert.equal(c.command, undefined, 'a critic names its provider, never a CLI to spawn');
+  assert.ok(alt.critic.allowGroup.every((member) => member.provider !== 'codex'), "the drawer's provider is no candidate");
+  const claudeOnly = criticFor(s, 'claude');
+  assert.equal(claudeOnly.critic.provider, 'codex', 'a Claude drawer is judged by Codex');
+  for (const c of [alt.critic, claudeOnly.critic]) assert.equal(c.command, undefined, 'a critic names its provider, never a CLI to spawn');
   // The loop resolves the drawer from the op its Orca terminal is bound to (guards/op-context.mjs): with a Devin op
-  // on this terminal the critique the round writes names drawer 'devin' and critic 'codex' — no --drawer passed.
+  // on this terminal the critique the round writes names drawer 'devin' and a critic of another provider — no --drawer passed.
   const { withLedger, seedWorkflow } = await import('../helpers/ledger-fixture.mjs');
   const { guardsRoot } = await import('../../scripts/guards/guards-root.mjs');
   const { critiqueRound } = await import('../../scripts/work/draw-loop.mjs');
@@ -117,8 +119,8 @@ test('the critic is a different model from the drawer: Codex when Devin draws, C
       workerStop: () => ({ ok: true }), workerRelease: () => ({ ok: true }),
     } });
     assert.equal(critique.critic.drawer, 'devin', 'the bound op\'s provider is the drawer');
-    assert.equal(critique.critic.provider, 'codex', 'the critic is a different provider than the drawer');
-    assert.equal(started[0]?.agent, 'codex', 'the worker-start launch routes the critic to codex');
+    assert.equal(critique.critic.provider, 'claude', 'the critic is a different provider than the drawer');
+    assert.equal(started[0]?.agent, 'claude', 'the worker-start launch routes the critic to the tier member of another provider');
     assert.equal(critique.outcome, 'launch-failed', 'the fake Orca never launches a real critic');
     assert.equal(JSON.parse(fs.readFileSync(path.join(dir, 'critique.json'), 'utf8')).critic.drawer, 'devin', 'written to the round');
   });

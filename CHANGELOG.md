@@ -4,6 +4,17 @@ All notable changes to StarCi are documented here. The runtime is on the `1.0.0-
 until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` freezes them.
 `package.json` `version` is the only version authority.
 
+## [1.0.0-alpha.8] — in preparation
+
+### Changed
+- The Critic is a standardised role. Its model comes from the tier of the `critic` seat (`modules/models/tiers.yaml`, frontier) through the one picker with provider independence as a hard filter (`scripts/work/critic-pick.mjs`); a tier with no member of another provider refuses the critique with `CRITIC_NO_INDEPENDENT_MEMBER` and the maker's provider never judges. `allocation.drawLoop.critic` and `allocation.drawLoop.criticWhenDrawer` are removed (the wall bound is `allocation.drawLoop.criticTimeoutMs`).
+- The Critic is bound to a guard of role `critic`: its shell reads only inside its directory and writes only its verdict file, its Edit and Write tools reach the verdict file only, and on Claude and Devin its Read, Grep and Glob tools read only inside the directory (`RIGHTS_CRITIC_REACH`, `modules/kernel/command-policy.yaml` `critic`). Before, its terminal had no guard and ran with the owner's unrestricted rights.
+- The Critic's answer is one typed verdict, `starci/critic-verdict@1` (scores per check, the declared minimum, pass or fail against it, the digests of the bytes it judged). The draw gate refuses a part whose digest the verdict does not name (`CRITIC_VERDICT_STALE`); a Critic that returns no verdict, edits what it was handed or runs unguarded is refused (`CRITIC_NO_VERDICT`, `CRITIC_PRODUCT_MODIFIED`, `CRITIC_UNGUARDED`).
+- The three Critic happy errors are holds of the incident policy (`critic-no-independent-member`, `critic-unavailable`, `critic-quota-out`). The op kinds that owe a Critic are data (`modules/kernel/critic.yaml` coverage): `interface.draw` is covered; `scope.define` and `architecture.decide` are owed (registry entry `critic-coverage-decision-legs`).
+
+### Added
+- The role standard (`standard:` in `modules/kernel/roles.yaml`): every role block declares the same fields, its happy errors (each naming a policy row), its bug surface, a guard binding or `noSeat`, a budget or the reason it has none, and stands in the reporting chain. The `roles-contract` check prints the role by requirement table and is red for a missing requirement unless the role block carries a dated `pending:` entry naming the lane that builds it. `starci runtime check --only roles-contract -- --table` prints the five roles by scope, function, happy errors and what each does on a bug; `docs/workflow-kernel.md` carries the generated copy.
+
 ## [1.0.0-alpha.7] — 2026-10-08
 
 Theme: the roles are one declared contract, the system recovers from a host restart by itself, no smell or bug enters at commit, and the remote main moves only with a release proven on the exact commit that is pushed.

@@ -196,16 +196,31 @@ non-green decisions through `modules/kernel/driver-loop.yaml`
 <!-- roles:begin critic -->
 **Critic** (modules/kernel/roles.yaml#critic): One product of one op.
 - Does:
-  - Grades that product independently: from a different provider than the op that made it, seeing only the product and the rubric, not the op's context.
-  - Returns its verdict as evidence attached to the attempt of the op it judged.
+  - Grades that product independently: from a different provider than the op that made it, picked through the tier picker (tier frontier, modules/models/tiers.yaml seats.critic), seeing only the product bytes and the rubric handed to it, not the op's context.
+  - Returns ONE typed verdict (starci/critic-verdict@1): pass or fail with evidence for every rubric check, the score against the declared minimum, and the digests of the product bytes it judged. The runtime attaches it to the attempt of the op it judged and the settle gate requires it; a verdict whose digests do not match the attempt's product is refused as stale.
+  - Is owed by the op kinds listed in modules/kernel/critic.yaml coverage (today interface.draw); a kind declared owed there has no Critic yet.
 - Must clean up:
   - its placement worktree and processes, before it returns the verdict
 - Never:
   - edits the product
   - grades when it shares the maker's provider
   - addresses anyone but through the attempt
+  - reads anything but the product files and the rubric handed to it: not the op's worktree, the ledger, a transcript or any other path
+  - runs anything but the read-only commands and the one write of its verdict file
 - Owns: one verdict. Decides alone: the score by the rubric.
 - Reports to: Kernel (always, as the verdict attached to the op's attempt). Overseen by: Kernel, the runtime.
 - Measure: its verdict agrees with the later outcome.
+- Token budget (provisional): 1000000 per attempt; over it, the wall bound allocation.drawLoop.criticTimeoutMs stops and releases the worker with no verdict (a happy error, critic-unavailable); the token overrun is read from the usage rows once the attempt budget measurement covers Critic dispatches.
+- Guard: its terminals are bound as the "critic" role of modules/kernel/command-policy.yaml.
+- Happy errors it handles (the system working as designed, handled inside the chain through the policy):
+  - failing-verdict (policy row error-work): the verdict fails the minimum: the work is not good yet; the op redraws and the next round is judged again
+  - no-independent-member (policy row critic-no-independent-member): no member of the Critic tier is of another provider than the maker: the critique is refused with CRITIC_NO_INDEPENDENT_MEMBER and the op's leg reports blocked 'no independent critic available'; the maker's provider never judges
+  - critic-unavailable (policy row critic-unavailable): the independent members cannot start (login, circuit, capacity, a refused launch, a timeout): the leg reports blocked and finishes again when a member returns
+  - critic-quota-out (policy row critic-quota-out): every independent member is out of tokens: the next independent member takes over, and when none is left the leg waits for the quota to reset
+- A bug in this role (the chain neither fixes nor works around it; Debug removes it with a change to .claude) is detected by:
+  - the Critic returns no verdict although it reported done: CRITIC_NO_VERDICT on the round's critique.json (outcome verdict-missing)
+  - the Critic edited the product bytes it was handed: CRITIC_PRODUCT_MODIFIED: the digests of the handed files differ after the run
+  - the Critic judged other bytes than the attempt's product: CRITIC_VERDICT_STALE: the verdict's product digests do not match the installed part
+  - the Critic reached a path outside its directory: RIGHTS_CRITIC_REACH refusals of the command guard, logged with the terminal
 - Principles: P2 P3 P7 (modules/kernel/roles.yaml, principles).
 <!-- roles:end critic -->

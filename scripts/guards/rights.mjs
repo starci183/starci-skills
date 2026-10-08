@@ -61,6 +61,7 @@ export function boundIdentityOf(handle, { root, env = process.env } = {}) {
 export function rightsRoleOf({ guard = null, seat = null, env = process.env, lockOwner = null } = {}) {
   const claimed = String(env?.STARCI_ROLE ?? '').toLowerCase();
   if (guard?.role === 'kernel') return 'lead';
+  if (guard?.role === 'critic') return 'critic';
   if (guard?.role === 'op') return guard.workflowId === 'supervisor' ? 'supervisor' : 'op';
   if (seat?.role === 'supervisor') return 'supervisor';
   // A claim never outranks a bound guard or seat; the release claim holds only while the host lock is held live by role release.

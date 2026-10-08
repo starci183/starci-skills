@@ -20,6 +20,7 @@ import { JOB_ROW } from '../machine/job-row.mjs';
 import { custodyPresent, questionFields } from './ask-server.mjs';
 import { checkDirection, defaultGrammarRoot, readBrandRecord } from '../work/brand/brand.mjs';
 import { sha256File } from '../work/work-io.mjs';
+import { staleRefusal } from '../work/critic-verdict.mjs';
 import { AUTOPILOT_BY, AUTOPILOT_RULING, SUPERVISOR_GATE, openIncidents, kindOf, supervisorGatesOf } from './autopilot-budget.mjs';
 import { gateOwnerTold } from './gate-ladder.mjs';
 
@@ -170,7 +171,14 @@ const gatePart = ({ dir, min, p, parts, findings }) => {
   if (loop.outcome !== 'passed') findings.push({ code: 'DRAW_METRICS_FAILED', detail: `${rel}: loop ${loop.outcome ?? 'unfinished'}${remaining}` });
   if (!best?.allPass) findings.push({ code: 'DRAW_METRICS_FAILED', detail: `${rel}: the best round does not pass every machine metric (DNA included)` });
   if (!(Number.isFinite(best?.beauty) && best.beauty >= min)) findings.push({ code: 'DRAW_BEAUTY_BELOW', detail: `${rel}: the independent critic scored beauty ${best?.beauty ?? 'nothing'}, the bar is ${min}` });
+  if (Number.isFinite(best?.beauty)) findings.push(...staleFindings({ rel, best, sha }));
   if (!rationale) findings.push({ code: 'DRAW_RATIONALE_MISSING', detail: `${rel}: no rationale.json beside the render source` });
+};
+
+// A verdict is accepted only for the bytes it judged: the live part must be one of the digests the Critic was handed (a bug of the Critic path otherwise).
+const staleFindings = ({ rel, best, sha }) => {
+  const stale = sha ? staleRefusal(best.critic?.judged, [sha]) : null;
+  return stale ? [{ code: stale.code, detail: `${rel}: ${stale.detail}` }] : [];
 };
 
 /**

@@ -12,6 +12,8 @@ import {
 } from './trust.mjs';
 
 const TRUST_AGENTS = new Set(['claude', 'codex', 'devin']);
+// The Critic's own worktree also hooks the read tools: its guard confines them to its directory (scripts/guards/critic-reach.mjs).
+export const CRITIC_TOOL_GUARD_MATCHER = `${TOOL_GUARD_MATCHER}|Read|Grep|Glob`;
 
 /**
  * Pre-trust `cwd` for `agent` before launch. Never throws; a failure is
@@ -19,7 +21,7 @@ const TRUST_AGENTS = new Set(['claude', 'codex', 'devin']);
  * an agent with no trust prompt. A guard command no shell can run refuses the launch (status failed,
  * code guard-command-unresolvable) before any trust, settings or hook file is written (after the provider's own decline is read). Seam: `guardProbe`.
  */
-export function ensureLaunchTrust({ agent, cwd, config, env = process.env, platform = process.platform, hooks, codexAppServer: appServer = null, guardProbe = probeGuardCommand } = {}) {
+export function ensureLaunchTrust({ agent, cwd, config, role = null, env = process.env, platform = process.platform, hooks, codexAppServer: appServer = null, guardProbe = probeGuardCommand } = {}) {
   if (!TRUST_AGENTS.has(agent)) return null;
   const authorization = launchTrustVerdict({ cwd, config, platform });
   if (!authorization.ok) return { agent, paths: [], status: 'declined', reason: authorization.reason };
@@ -36,7 +38,7 @@ export function ensureLaunchTrust({ agent, cwd, config, env = process.env, platf
   const command = toolGuardCommand({ home: targets.home });
   const resolved = guardProbe({ command, home: targets.home, platform, env });
   if (!resolved.ok) return unresolvedGuard({ ...receipt, command, resolved });
-  const ctx = { dir, platform, hooks, env, appServer, targets, project, receipt, command };
+  const ctx = { dir, platform, hooks, env, appServer, targets, project, receipt, command, role };
   const early = trustFlowOf(agent)(ctx);
   if (early) return early;
   receipt.status = receipt.errors.length ? 'failed' : ['already', 'written'][Number(receipt.written.length > 0)];
@@ -115,7 +117,7 @@ function trustDevin(ctx) {
 // The directory trust record is Claude's own per-user state (~/.claude.json); everything else is the worktree's
 // local project settings (<dir>/.claude/settings.local.json), which Claude reads for the bypass consent, env and hooks.
 function trustClaude(ctx) {
-  const { receipt, targets, project, dir, platform, command, hooks } = ctx;
+  const { receipt, targets, project, dir, platform, command, hooks, role } = ctx;
   collectResult(receipt, guarded(targets.claudeJson, () => writeClaudeTrust({ file: targets.claudeJson, keys: claudeKeyForms(dir, platform), hooks })));
   if (receipt.errors.length) return { ...receipt, status: 'failed' };
   const file = project.claudeSettings;
@@ -126,7 +128,7 @@ function trustClaude(ctx) {
   const launchEnv = guarded(file, () => assertClaudeSettingsEnv({ file, vars: claudeLaunchEnv(), hooks }));
   receipt.launchEnv = launchEnv.state ?? 'failed';
   noteFailure(receipt, file, launchEnv);
-  const toolGuard = guarded(file, () => assertJsonToolGuard({ file, command, matcher: TOOL_GUARD_MATCHER, hooks }));
+  const toolGuard = guarded(file, () => assertJsonToolGuard({ file, command, matcher: role === 'critic' ? CRITIC_TOOL_GUARD_MATCHER : TOOL_GUARD_MATCHER, hooks }));
   receipt.toolGuard = [{ file, state: toolGuard.state ?? 'failed' }];
   noteFailure(receipt, file, toolGuard);
   if (consent.ok || launchEnv.ok || toolGuard.ok) excludeWritten(ctx, file);

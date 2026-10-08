@@ -27,6 +27,7 @@ import {
 } from '../../scripts/work/draw-loop.mjs';
 import { DEFAULT_RUBRIC, normaliseVerdict, parseVerdict, rubricFor, runCritic } from '../../scripts/work/draw-critic.mjs';
 import { fakeCriticOrca, passingVerdict } from '../helpers/fake-critic-orca.mjs';
+import { criticFor } from '../../scripts/work/critic-pick.mjs';
 import { settleDrawMetricFindings } from '../../scripts/work/draw-loop-settle.mjs';
 import { ARCHETYPES, archetypeOf, directionReadiness } from '../../scripts/work/ui-archetype.mjs';
 import { DIRECTION_ARCHETYPES } from '../../scripts/work/brand/brand.mjs';
@@ -208,13 +209,13 @@ test('the critic: the product rubric or the default, a verdict parsed and gate-c
   let seen = null;
   const orca = fakeCriticOrca({ verdict: passingVerdict(DEFAULT_RUBRIC, 9), onStart: (a) => { seen = { dir: a.worktree, files: fs.readdirSync(a.worktree).sort() }; } });
   const critique = await runCritic({ images: [{ path: png, label: 'desktop' }], html: path.join(dir, 'a.html'), rubric: DEFAULT_RUBRIC,
-    critic: { ...allocationSettings().drawLoop.critic, author: { provider: 'devin', model: 'swe-2-max' } }, placement: { tmpRoot: dir }, orca });
+    critic: criticFor(allocationSettings().drawLoop, { provider: 'devin', model: 'swe-2-max' }).critic, placement: { tmpRoot: dir }, orca });
   assert.deepEqual(seen.files, ['render-1.png', 'rubric.yaml', 'screen.html'], 'the critic sees only the PNGs, the HTML and the rubric');
   const spec = orca.calls.find((c) => c[0] === 'worker-start')[1].spec;
   assert.match(spec, /did NOT draw this screen/);
   assert.equal(critique.outcome, 'judged');
   assert.equal(critique.verdict.beauty, 9);
-  assert.equal(critique.critic.model, 'gpt-6.1-sol');
+  assert.equal(critique.critic.model, 'claude-opus-5-5', 'the Critic tier member of another provider than the Devin drawer');
   assert.equal(critique.critic.promptSha256, sha256(spec), 'the hash is of the exact Task spec');
   assert.equal(critique.critic.prompt, spec.split(seen.dir.replaceAll('\\', '/')).join('<clean-dir>'));
   assert.equal(critique.critic.independent, false, 'a fake Orca client is never recorded as the independent critic');

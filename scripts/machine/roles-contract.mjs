@@ -31,6 +31,15 @@ function budgetLines(role) {
   return b ? [`- Token budget (${b.status}): ${b.perAttempt.default} per attempt; over it, ${b.onExceed}.`] : [];
 }
 
+/** The guard binding, the happy errors and the bug surface of a role that declares them (the owner's two classes of error). */
+function standardLines(role) {
+  const guard = role.guard ? [`- Guard: its terminals are bound as the "${role.guard.role}" role of modules/kernel/command-policy.yaml.`] : [];
+  const happy = role.happyErrors?.map((error) => `${error.id} (policy row ${error.row}): ${error.what}`);
+  const bugs = role.bugSurface?.map((entry) => `${entry.bug}: ${entry.signal}`);
+  return [...guard, ...bullets('Happy errors it handles (the system working as designed, handled inside the chain through the policy)', happy),
+    ...bullets('A bug in this role (the chain neither fixes nor works around it; Debug removes it with a change to .claude) is detected by', bugs)];
+}
+
 /** The Debug lines that state whom it audits and when it retires. */
 function debugLines(doc, role) {
   if (!role.oversees) return [];
@@ -42,7 +51,7 @@ function debugLines(doc, role) {
 export function renderRoleBlock(doc, id) {
   const role = doc.roles.find((entry) => entry.id === id);
   const lines = [`**${role.label}** (${ROLES_FILE}#${id}): ${role.scope}`, ...bullets('Does', role.does), ...bullets('Must clean up', role.cleanup),
-    ...bullets('Never', role.never), ...chainLines(doc, role), ...budgetLines(role), ...debugLines(doc, role), `- Principles: ${role.binds.join(' ')} (${ROLES_FILE}, principles).`];
+    ...bullets('Never', role.never), ...chainLines(doc, role), ...budgetLines(role), ...standardLines(role), ...debugLines(doc, role), `- Principles: ${role.binds.join(' ')} (${ROLES_FILE}, principles).`];
   return lines.join('\n');
 }
 

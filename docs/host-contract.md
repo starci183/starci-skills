@@ -221,7 +221,9 @@ static file under the `public/` folder of the first fe app (`fe/apps/<app>/publi
 
 Each parent creates and coordinates the Run of its child (`run-create --from <its terminal>`). The draw critic is
 placed on a runtime worktree detached at the empty tree (`draw-critic.mjs criticWorkspace`): Orca places a worker
-only on a worktree it resolves, and a bare temp directory is refused `selector_not_found`.
+only on a worktree it resolves, and a bare temp directory is refused `selector_not_found`. The critic's terminal is bound
+to a job guard of role `critic` (`critic-guard.mjs`): its shell, file tools and, on Claude and Devin, its read tools reach
+that directory and its verdict file and nothing else (`scripts/guards/critic-reach.mjs`, `modules/kernel/command-policy.yaml` `critic`).
 
 ## Checklist for a new agent card
 

@@ -15,6 +15,7 @@ import { refusalLines } from './refusals.mjs';
 import { RUNTIME_CHANGE_CODE, runtimeChangeRefusal } from '../machine/runtime-change.mjs';
 import { kernelMailboxVerdict } from './install-verdict.mjs';
 import { orcaSelfLifecycleAllowed } from './orca-self-lifecycle.mjs';
+import { criticCommandVerdict } from './critic-reach.mjs';
 
 const policyCache = new Map();
 const compiledCache = new WeakMap();
@@ -250,6 +251,12 @@ const generalCommandVerdict = ({ role, program, args, p, policy, text }) => {
   return raw(role, text);
 };
 
+/** The Critic's verdict: the Orca self-lifecycle verbs, else only what critic-reach.mjs lets it read and write. */
+function criticPolicyVerdict({ program, args, command, guard, handle, policy }) {
+  if (program === 'orca' && orcaSelfLifecycleAllowed({ role: 'critic', args, handle, policy })) return null;
+  return criticCommandVerdict({ program, args, cwd: command.cwd, guard, critic: policy.critic, text: textOf({ ...command, program, args }) });
+}
+
 /**
  * Decide one normalized command for a bound role. Returns null to pass or the shared refusal shape.
  * `lockOwner` is a synchronous reader and is called only for a clean install.
@@ -260,6 +267,7 @@ export function policyVerdict({ role, command, guard = null, handle = null, lock
   let { program, args = [] } = command;
   program = programName(program);
   args = args.map(String);
+  if (role === 'critic') return criticPolicyVerdict({ program, args, command, guard, handle, policy });
   const nested = nestedProgram(program, args);
   if (nested) return policyVerdict({ role, command: { ...nested, cwd: command.cwd }, guard, handle, lockOwner, policy });
   const text = textOf({ ...command, program, args });

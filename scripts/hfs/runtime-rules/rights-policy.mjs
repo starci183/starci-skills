@@ -16,7 +16,7 @@ const FAILURE_CODES_FILE = 'modules/kernel/failure-codes.yaml';
 const R223_CODES = Object.freeze(['RIGHTS_ROLE_DENIED', 'RIGHTS_GIT_PUSH', 'RIGHTS_GIT_TAG', 'RIGHTS_GIT_COMMIT', 'RIGHTS_GIT_SYNC', 'RIGHTS_NPM_PUBLISH', 'RIGHTS_NPM_CI_UNLOCKED',
   'RIGHTS_SUITE_RUN', 'RIGHTS_RELEASE_CUT', 'RIGHTS_RAW_TOOL']);
 const R224_CODES = Object.freeze(['RIGHTS_PROTECTED_ZONE', 'RIGHTS_OP_RUNTIME_WRITE']);
-const BOUND_ROLES = Object.freeze(['op', 'lead', 'supervisor', 'coordinator']);
+const BOUND_ROLES = Object.freeze(['op', 'lead', 'supervisor', 'coordinator', 'critic']);
 
 const finding = (code, file, message) => ({ code, level: 'error', path: file, message: `${code} ${file}: ${message}` });
 const parse = (text) => { try { const value = parseYaml(text); return value && typeof value === 'object' ? value : null; } catch { return null; } };
