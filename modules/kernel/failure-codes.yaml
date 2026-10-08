@@ -16767,3 +16767,101 @@ RUNTIME_CHANGE_OWNED_BY_DEBUG:
   nextStep_vi: "Supervisor ghi lỗi runtime bằng starci supervisor actions record --item runtime-defect:<nguyên nhân> kèm bằng chứng, cho Kernel một cách đi vòng; Debug sửa."
   owner: supervisor
   kind: blocker
+
+CRITIC_NO_INDEPENDENT_MEMBER:
+  title: "No independent critic available"
+  title_vi: "Không có người chấm độc lập"
+  meaning_vi: "Hạng Critic không có thành viên nào thuộc nhà cung cấp khác với bên làm ra sản phẩm, nên lượt chấm bị từ chối và nhà cung cấp của bên làm ra không bao giờ tự chấm."
+  causes_vi:
+    - "Hạng Critic chỉ còn thành viên của nhà cung cấp đã làm ra sản phẩm"
+    - "Các thành viên khác nhà cung cấp bị gỡ khỏi hạng"
+  nextStep_vi: "Op báo blocked kèm nguyên nhân; Kernel chờ hoặc nâng lên Supervisor để có thành viên khác nhà cung cấp trở lại hạng Critic (modules/models/tiers.yaml seats.critic)."
+  owner: supervisor
+  kind: blocker
+
+CRITIC_UNAVAILABLE:
+  title: "Independent critic unavailable"
+  title_vi: "Người chấm độc lập chưa sẵn sàng"
+  meaning_vi: "Người chấm độc lập không khởi động hoặc không trả lời được: đăng nhập, mạch nhà cung cấp, sức chứa, lần khởi chạy bị từ chối, báo lên hoặc quá thời hạn."
+  causes_vi:
+    - "Nhà cung cấp hết phiên đăng nhập hoặc mạch đang mở"
+    - "Người chấm không trả lời trong thời hạn allocation.drawLoop.criticTimeoutMs"
+    - "Người chấm báo lên vì không thể chấm"
+  nextStep_vi: "Vòng vẽ chạy lại finish sau khi một thành viên độc lập quay lại; Kernel theo dõi báo cáo blocked của Op."
+  owner: op-retry
+  kind: blocker
+
+CRITIC_QUOTA_OUT:
+  title: "Every independent critic is out of tokens"
+  title_vi: "Mọi người chấm độc lập đã hết hạn mức"
+  meaning_vi: "Mọi thành viên độc lập của hạng Critic đều hết token, nên lượt chấm chờ đến khi hạn mức làm mới."
+  causes_vi:
+    - "Hạn mức tuần hoặc phiên của nhà cung cấp đã dùng hết"
+  nextStep_vi: "Bộ chọn tự lấy thành viên độc lập tiếp theo; khi không còn, Op báo blocked và Kernel chờ hạn mức làm mới."
+  owner: supervisor
+  kind: blocker
+
+CRITIC_AUTHOR_UNKNOWN:
+  title: "The maker of the product is unknown"
+  title_vi: "Không biết bên làm ra sản phẩm"
+  meaning_vi: "Runtime không xác định được nhà cung cấp đã làm ra sản phẩm nên không thể chứng minh người chấm độc lập."
+  causes_vi:
+    - "Terminal của Op không gắn với một nhà cung cấp"
+    - "Không truyền --drawer"
+  nextStep_vi: "Chạy vòng vẽ từ terminal đã gắn Op hoặc truyền --drawer <nhà cung cấp>."
+  owner: op-retry
+  kind: check-finding
+
+CRITIC_NO_VERDICT:
+  title: "The critic reported done without a verdict"
+  title_vi: "Người chấm báo xong nhưng không có phán quyết"
+  meaning_vi: "Người chấm báo worker_done mà tệp verdict.json không có hoặc không đọc được; đây là lỗi của vai trò Critic, không phải điểm thấp."
+  causes_vi:
+    - "Người chấm không ghi verdict.json"
+    - "verdict.json không phải JSON đúng dạng starci/draw-critique@1"
+  nextStep_vi: "Runtime từ chối và ghi lại cho Debug; vòng vẽ không có điểm cho đến khi chấm lại."
+  owner: runtime-core
+  kind: runtime-fault
+
+CRITIC_PRODUCT_MODIFIED:
+  title: "The critic changed what it was handed"
+  title_vi: "Người chấm đã sửa tệp được giao"
+  meaning_vi: "Sau khi chạy, các byte sản phẩm hoặc thước chấm trong thư mục của người chấm khác với lúc giao, hoặc có tệp lạ; phán quyết bị từ chối."
+  causes_vi:
+    - "Người chấm sửa hoặc xóa tệp được giao"
+    - "Người chấm tạo thêm tệp ngoài verdict.json"
+  nextStep_vi: "Runtime từ chối phán quyết và ghi lại cho Debug sửa .claude."
+  owner: runtime-core
+  kind: runtime-fault
+
+CRITIC_VERDICT_STALE:
+  title: "The verdict judged other bytes than the product"
+  title_vi: "Phán quyết chấm sai byte của sản phẩm"
+  meaning_vi: "Các dấu vết sha256 trong phán quyết không gồm phần sản phẩm mà lượt làm của Op đang giữ, nên phán quyết bị từ chối."
+  causes_vi:
+    - "Phần vẽ được vẽ lại sau lần chấm"
+    - "Phán quyết không nêu dấu vết sản phẩm"
+  nextStep_vi: "Cổng draw từ chối; chấm lại đúng phần sản phẩm hiện tại bằng finish."
+  owner: runtime-core
+  kind: check-finding
+
+CRITIC_UNGUARDED:
+  title: "The critic terminal is not bound to its guard"
+  title_vi: "Terminal người chấm chưa gắn vào guard"
+  meaning_vi: "Terminal của người chấm không được gắn với guard vai trò critic sau khi khởi chạy, nên phán quyết của nó không được tin."
+  causes_vi:
+    - "Việc ghi guard hoặc gắn terminal thất bại"
+  nextStep_vi: "Runtime từ chối lượt chấm và ghi lại cho Debug."
+  owner: runtime-core
+  kind: runtime-fault
+
+RIGHTS_CRITIC_REACH:
+  title: "Critic reach refused"
+  title_vi: "Từ chối người chấm đọc hoặc ghi ngoài phạm vi"
+  meaning_vi: "Người chấm chỉ đọc trong thư mục của mình và chỉ ghi tệp phán quyết; lệnh, đường dẫn hoặc công cụ khác bị từ chối."
+  causes_vi:
+    - "Người chấm chạy lệnh không chỉ đọc"
+    - "Người chấm đọc hoặc ghi đường dẫn ngoài thư mục được giao"
+  nextStep_vi: "Lệnh bị từ chối; chấm chỉ bằng các tệp trong thư mục của bạn, ghi verdict.json rồi báo worker_done."
+  owner: op-retry
+  kind: verb-refusal

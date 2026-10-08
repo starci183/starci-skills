@@ -2,7 +2,7 @@
 import { runtimeProfile } from '../../engine/config.mjs';
 import { loadPrices, priceOf } from '../lib/llm-usage.mjs';
 import { admissionQualityFloor } from '../lib/agent-admission.mjs';
-import { criticFor } from '../work/draw-critic.mjs';
+import { criticFor } from '../work/critic-pick.mjs';
 import { tierSettings } from '../agent/tiers.mjs';
 
 /** The priced USD per million tokens (input + output) of `model`, or null when it has no complete price. */

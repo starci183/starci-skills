@@ -23,6 +23,10 @@ bias that names the member, or an owner reserve grant for an exact scope, role, 
 Unknown, stale, exhausted or unauthenticated capacity cannot be overridden. Providers without window telemetry use a
 fresh explicit owner grant with scoped roles and finite slots; they receive no invented usage percentage.
 
+The Critic is admitted from the tier that `modules/models/tiers.yaml` `seats.critic` names (`modules/kernel/critic.yaml`): `scripts/work/critic-pick.mjs`
+removes every member of the maker's provider before the pick (a tier with none left refuses with `CRITIC_NO_INDEPENDENT_MEMBER`, and the maker's provider never
+judges), and the remaining members go to the same selector as the allow group; the only draw-loop setting left for it is its wall bound, `allocation.drawLoop.criticTimeoutMs`.
+
 A headless call (`modules/models/tiers.yaml` `calls`, tier use `call`) is admitted by the same selector and the same reservation:
 `scripts/agent/call-admission.mjs` builds the candidates from the call tier's chain with `role` `op`, reserves one provider slot
 before the child starts, marks it `launching` and then `live` with the child's pid, and releases it on the proof that the

@@ -339,7 +339,7 @@ test('a component round picks an independent critic; finish critiques an uncriti
   const base = { source, fixtures: fixturesByWidth([fixture]), product: dir, base: 'LedgerBase', state: 'installed', viewports: [{ width: 1184, height: 60 }, { width: 390, height: 60 }],
     repo: dir, render, probes, drawer: DRAWER, sourceCheck: async () => ({ findings: [], grammar }) };
 
-  // Codex drawing (the draw order's fallback): the component round is judged by criticWhenDrawer.codex, never Codex.
+  // Codex drawing (the draw order's fallback): the component round is judged by a Claude member of the Critic tier, never Codex.
   const judged = await runRound({ ...base, out: path.join(dir, 'loop-a'), drawer: { provider: 'codex', model: 'gpt-6.1-sol' }, criticOrca: critic(9) });
   assert.deepEqual(seen.at(-1), ['claude', 'claude-opus-5-5'], 'the claude critic worker');
   assert.equal(judged.critique.critic.provider, 'claude');

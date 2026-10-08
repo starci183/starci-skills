@@ -71,6 +71,7 @@ import { intrinsicPolicyRead, loadCommandPolicy, policyVerdict } from './command
 import { commandsOf, programOf } from './shell-commands.mjs';
 import { tempPath } from '../api/fs/temp-path.mjs';
 import { findInOrder } from '../lib/in-order.mjs';
+import { criticReadVerdict, criticWriteVerdict } from './critic-reach.mjs';
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export { boundGuard } from './rights.mjs';
 
@@ -257,6 +258,7 @@ async function rightsContext({ guard = null, seat = null, env = process.env, tex
 
 /** The refusal of one file write for the rights role, or null: the zone declaration loads only for a role that can be refused. */
 async function fileRightsVerdict({ role, filePath, tool = 'Edit', edit = null, guard = null, shell = false }) {
+  if (role === 'critic') return criticWriteVerdict({ filePath, guard, tool });
   if ((role !== 'supervisor' && role !== 'op') || !runtimeRootOf(filePath)) return null;
   let zone = { runtimeRoot: runtimeRootOf(filePath) };
   if (role === 'supervisor') {
@@ -275,8 +277,9 @@ const policyToolVerdict = (command, verdict) => {
 async function rightsOfCall({ commands, command, cwd, ctx, guard }) {
   if (!ctx.role) return null;
   // The file rights are the more specific refusal (a write into the protected zone, an op writing the runtime checkout): they come before the generic command policy.
-  if (ctx.role === 'supervisor' || ctx.role === 'op') {
-    const targets = [...commands.flatMap((c) => writeTargetsOf(c)), ...redirectTargetsOf(command, cwd)];
+  if (ctx.role === 'supervisor' || ctx.role === 'op' || ctx.role === 'critic') {
+    // The Critic's writer programs are judged whole by the command policy (their content words are not paths): only its redirections are targets here.
+    const targets = [...(ctx.role === 'critic' ? [] : commands.flatMap((c) => writeTargetsOf(c))), ...redirectTargetsOf(command, cwd)];
     let refusal = null;
     await findInOrder(targets, async (filePath) => {
       const v = await fileRightsVerdict({ role: ctx.role, filePath, tool: 'shell', guard, shell: true });
@@ -349,7 +352,7 @@ export async function commandVerdict({ command, cwd, guard, env = process.env, d
   let d = deps;
   const fullDeps = async () => { d ??= await loadDeps(); return d; };
   const commands = commandsOf(command, { cwd, env, dialect });
-  if (commands.length && commands.every(intrinsicPolicyRead) && !redirectTargetsOf(command, cwd).length) return null;
+  if (guard?.role !== 'critic' && commands.length && commands.every(intrinsicPolicyRead) && !redirectTargetsOf(command, cwd).length) return null;
   const ctx = rights ?? await rightsContext({ guard, env, text: command });
   const byQuery = queryKillVerdict(commands, command);
   if (byQuery) return { tool: 'process-query', ...byQuery };
@@ -388,6 +391,18 @@ function shellCallOf(input) {
 const NAMES_PACKAGE_MANAGER = /\b(?:npm|pnpm|yarn)\b/i;
 
 const FILE_TOOLS = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit']);
+const READ_TOOLS = new Set(['Read', 'Grep', 'Glob']);
+
+/** One file-reading tool call of a hook input: {tool, paths}, or null. A call that names no path reaches its working directory. */
+function readCallOf(input) {
+  const tool = String(input?.tool_name ?? '');
+  if (!READ_TOOLS.has(tool)) return null;
+  const given = input.tool_input ?? {};
+  const cwd = path.resolve(input.cwd || process.cwd());
+  const named = [given.file_path, given.path, given.notebook_path].filter((value) => typeof value === 'string' && value);
+  const pattern = typeof given.pattern === 'string' && tool === 'Glob' ? [path.join(path.resolve(cwd, named[0] ?? '.'), given.pattern)] : [];
+  return { tool, paths: [...(named.length ? named.map((one) => path.resolve(cwd, one)) : [cwd]), ...pattern] };
+}
 
 /** One file-writing tool call of a hook input: {tool, filePath, edit: {old, new}, cwd}, or null. */
 function fileCallOf(input) {
@@ -425,6 +440,12 @@ export async function hookDecision(input, { env = process.env, root = skillRoot,
   let seat = null;
   if (bindings) seat = bindings.seat;
   else if (!guard) seat = boundSeat(handle, { root, env });
+  const read = readCallOf(input);
+  if (read) {
+    const role = rightsRoleOf({ guard, seat, env, lockOwner: null });
+    const verdict = role === 'critic' ? criticReadVerdict({ paths: read.paths, guard, tool: read.tool }) : null;
+    return verdict ? { verdict: { tool: read.tool, ...verdict }, guard, cwd: path.resolve(input.cwd || process.cwd()) } : null;
+  }
   const file = fileCallOf(input);
   if (file) {
     // File rights do not consume the command table. A release claim without its lock resolves to owner here; both are
@@ -454,7 +475,7 @@ export async function main({ stdin = process.stdin, stderr = process.stderr, env
     const direct = input?.tool_input?.command;
     // Intrinsically read-only one-program calls cannot meet an older guard rule or write a shell target. Avoid the full
     // shell/environment parse and YAML load on this latency-critical path; compound/substituted/redirection text stays slow.
-    if (typeof direct === 'string' && direct.trim() && !/[;&|(){}<>\n\r`$]/.test(direct) && !/env:/i.test(direct)) {
+    if (guard?.role !== 'critic' && typeof direct === 'string' && direct.trim() && !/[;&|(){}<>\n\r`$]/.test(direct) && !/env:/i.test(direct)) {
       const first = direct.trim().split(/\s+/, 1)[0];
       if (intrinsicPolicyRead({ program: programOf(first) })) return 0;
     }

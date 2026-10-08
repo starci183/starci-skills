@@ -11,7 +11,7 @@
 # `use` names the allowed path (a verb of the CLI catalog, modules/cli/commands); the CLI lane edits the verbs, this file stays
 # the single place.
 roles:
-  bound: [op, lead, supervisor, coordinator]
+  bound: [op, lead, supervisor, coordinator, critic]
   # roles that may run a targeted `node --test <explicit spec files>` (L1 while working on the runtime); an op uses its gate
   node-test: [lead, supervisor, coordinator]
   # ops that may run a whole suite (the full unit / full e2e of an app)
@@ -19,6 +19,13 @@ roles:
   # the only refs a coordinator or the supervisor may push (backup namespace, explicit refspecs)
   backup-roles: [coordinator, supervisor]
   backup-ref: '^refs/backup/\S+$'
+# The Critic (rights role `critic`, a terminal bound to a critic job guard) reaches nothing but its own directory: scripts/guards/critic-reach.mjs.
+# `read` are the programs it may run on paths inside that directory; `write` the programs that may write the verdict file and nothing else.
+# The Orca self-lifecycle verbs (worker_done, escalation) below stay open to it; the rest of this table does not apply to it.
+critic:
+  read: [ls, dir, cat, type, head, tail, wc, file, stat, sha256sum, sha1sum, md5sum, cksum, od, xxd, hexdump, rg, grep, egrep, fgrep, jq, yq, nl, column, pwd, echo, printf, true, false,
+    get-content, gc, get-childitem, gci, get-item, gi, select-string, sls, test-path, resolve-path, get-location, write-output, write-host, measure-object, get-filehash]
+  write: [set-content, sc, out-file, add-content, ac]
 # The runtime's own verbs: the surface every other path is steered to.
 runtime: [starci]
 # Verbs that spend a provider model headlessly (a call tier of modules/models/tiers.yaml calls): a bound role runs one only as an op named
@@ -167,15 +174,17 @@ orca:
   # The Kernel mailbox refusal (install-verdict.mjs KERNEL_ORCA_CHECK) still precedes admission.
   self-lifecycle:
     group: orchestration
-    roles: [op, lead, supervisor, coordinator]
+    roles: [op, lead, supervisor, coordinator, critic]
     verbs:
       send:
         identity: --from
         types: [heartbeat, worker_done, escalation]
+        typesByRole: {critic: [worker_done, escalation]}
         values: [--from, --type, --subject, --body, --to, --run, --priority, --thread-id, --payload, --task-id, --dispatch-id,
           --outcome, --files-modified, --report-path, --phase, --dispatch-capability, --retry-request]
         flags: [--json, --help]
       ask:
+        roles: [op, lead, supervisor, coordinator]
         identity: --from
         values: [--from, --question, --resume, --to, --run, --options, --timeout-ms, --dispatch-capability, --retry-request]
         flags: [--json, --help]

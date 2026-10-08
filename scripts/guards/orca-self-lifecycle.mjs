@@ -20,8 +20,9 @@ export function orcaSelfLifecycleAllowed({ role, args, handle, policy }) {
   const lifecycle = policy.orca?.['self-lifecycle'];
   if (!handle || args[0] !== lifecycle?.group || !lifecycle.roles?.includes(role)) return false;
   const entry = lifecycle.verbs?.[args[1]];
-  if (!entry) return false;
+  if (!entry || (entry.roles && !entry.roles.includes(role))) return false;
   const options = optionsOf(args.slice(2), entry);
   if (!options || options.get(entry.identity) !== handle) return false;
-  return !entry.types || entry.types.includes(options.get('--type'));
+  const types = entry.typesByRole?.[role] ?? entry.types;
+  return !types || types.includes(options.get('--type'));
 }

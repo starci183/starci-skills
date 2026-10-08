@@ -280,7 +280,7 @@ test('every nesting path starts through the runtime launchers at the depth Orca 
   const critic = fake.criticLaunches[0].critic;
   assert.deepEqual([critic.author.provider, critic.author.model], [noop.provider, noop.model], 'the actual Op route supplies the Critic author');
   assert.notEqual(critic.provider, noop.provider, 'the Critic remains independent by provider');
-  assert.deepEqual([startOf('critic').agent, startOf('critic').model, startOf('critic').effort], [critic.provider, critic.model, critic.effort]);
+  assert.deepEqual([startOf('critic').agent, startOf('critic').model, startOf('critic').effort], [critic.provider, critic.model, critic.effort ?? undefined]);
   const runFroms = fake.calls.filter((c) => c[0] === 'run-create').map((c) => c[1].from).sort();
   assert.deepEqual(runFroms, ['term_entry', 'term_entry', 'term_kernel', 'term_kernel', 'term_kernel', 'term_op', 'term_supervisor'], 'each parent creates and coordinates the Run of its child');
   assert.equal(fake.calls.some(([n]) => n === 'task-create' || n === 'dispatch-show'), false, 'worker-start --spec files every Task: no task-create, no dispatch-show');

@@ -200,7 +200,7 @@ test('retry caps: supervisor-gate within supervisorExtraBudget, then the leg is 
 });
 
 /** A ui record with one live part drawn through a passing draw loop, beauty `beauty`, with its rationale. */
-const loopRecord = (t, { beauty = 9, outcome = 'passed', rationale = true } = {}) => {
+const loopRecord = (t, { beauty = 9, outcome = 'passed', rationale = true, judged = null } = {}) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-autopilot-ui-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   fs.mkdirSync(path.join(dir, 'assets', 'loop'), { recursive: true });
@@ -210,7 +210,7 @@ const loopRecord = (t, { beauty = 9, outcome = 'passed', rationale = true } = {}
   if (rationale) fs.writeFileSync(path.join(dir, 'assets', 'p.rationale.json'), '{"decisions":[]}');
   const sha = createHash('sha256').update(fs.readFileSync(png)).digest('hex');
   fs.writeFileSync(path.join(dir, 'assets', 'loop', 'loop.json'), JSON.stringify({ schema: 'starci/draw-loop@1', outcome, installed: [{ sha256: sha }],
-    rounds: [{ n: 1, allPass: outcome === 'passed', failures: outcome === 'passed' ? 0 : 2, beauty }], remaining: outcome === 'passed' ? [] : [{ code: 'DNA_OFF_GRAMMAR' }] }));
+    rounds: [{ n: 1, allPass: outcome === 'passed', failures: outcome === 'passed' ? 0 : 2, beauty, critic: { judged: judged ?? [sha] } }], remaining: outcome === 'passed' ? [] : [{ code: 'DNA_OFF_GRAMMAR' }] }));
   fs.writeFileSync(path.join(dir, 'index.yaml'), stringifyYaml({ schema: 'work/ui-screen@1', id: 'ui.x.y', state: 'todo',
     assets: [{ path: 'assets/p.png', role: 'direction-content', breakpoint: 'desktop', theme: 'light', sha256: sha, generation: { tool: 'draw-render', mode: 'draw-loop', loop: { sha256: putBundle(path.join(dir, 'assets', 'loop')), round: 1 } } }] }));
   return { dir, sha };
@@ -227,6 +227,17 @@ test('draw gates: provisional only when the loop passed, the critic scored at le
   assert.deepEqual(new Set(drawGateEvidence({ repo: red.dir, recordPath: 'index.yaml', beautyMin: 8 }).findings.map((f) => f.code)), new Set(['DRAW_METRICS_FAILED', 'DRAW_RATIONALE_MISSING']));
   const stale = drawGateEvidence({ repo: good.dir, recordPath: 'index.yaml', reviewed: [{ path: 'assets/p.png', sha256: 'f'.repeat(64) }], beautyMin: 8 });
   assert.deepEqual(stale.findings.map((f) => f.code), ['REVIEW_PART_REDRAWN']);
+});
+
+test('draw gates: a verdict is accepted only for the bytes it judged; another digest or none is CRITIC_VERDICT_STALE', (t) => {
+  const other = loopRecord(t, { judged: ['e'.repeat(64)] });
+  assert.deepEqual(drawGateEvidence({ repo: other.dir, recordPath: 'index.yaml', beautyMin: 8 }).findings.map((f) => f.code), ['CRITIC_VERDICT_STALE']);
+  const none = loopRecord(t, { judged: [] });
+  const findings = drawGateEvidence({ repo: none.dir, recordPath: 'index.yaml', beautyMin: 8 }).findings;
+  assert.deepEqual(findings.map((f) => f.code), ['CRITIC_VERDICT_STALE']);
+  assert.match(findings[0].detail, /names no product digest/);
+  const unscored = loopRecord(t, { beauty: null });
+  assert.deepEqual(drawGateEvidence({ repo: unscored.dir, recordPath: 'index.yaml', beautyMin: 8 }).findings.map((f) => f.code), ['DRAW_BEAUTY_BELOW'], 'no score is the beauty finding alone');
 });
 
 // The greenfield layout draw of tests/work/draw-review.spec.mjs, reused: apply settles a provisional acceptance.

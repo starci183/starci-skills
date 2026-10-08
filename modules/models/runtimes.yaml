@@ -248,14 +248,16 @@ allocation:
   # neither cut the failures nor raised the beauty; the best round is kept. Taste thresholds: accentBudget is the
   # largest share of the render the accent colour may fill (the brand art band excluded), bandsPerCardMax the most
   # hairline bands one card splits into, badgesPerEntityMax the most badges one entity carries. critic is the fresh,
-  # context-free Orca worker that scores beauty and hierarchy against the product's brand.direction rubric: started
+  # context-free Orca worker that scores beauty and hierarchy against the product's brand.direction rubric: picked through
+  # the tier picker from the Critic tier (modules/models/tiers.yaml seats.critic, modules/kernel/critic.yaml) with the
+  # independence rule as a hard filter, then started
   # through orchestration worker-start --agent <provider> --model --effort (scripts/agent/lib.mjs startAgent) on a
   # runtime worktree detached at the empty tree (draw-critic.mjs criticWorkspace; Orca refuses a bare temp dir) holding only the PNGs, the HTML and the rubric; it writes verdict.json and reports worker_done; a
-  # critic with no worker_done within timeoutMs is stopped and released (outcome timeout, no beauty). The critic is a DIFFERENT model from the drawer: a Codex drawer (the high tier's second member)
-  # is judged by criticWhenDrawer.codex; for any other drawer the critic is Codex. The images a drawer asks of the imagegen call
-  # (starci work imagegen) do not make the call's model the drawer. When the drawer (the op's provider, bound to its
-  # terminal - scripts/guards/op-context.mjs - or draw-loop.mjs round --drawer) is the critic's provider the round is
-  # judged by criticWhenDrawer.<drawer> instead, and a round with no independent critic has no beauty. directionPrerequisite: interface.draw needs an ACCEPTED brand.direction
+  # critic with no worker_done within criticTimeoutMs is stopped and released (outcome timeout, no beauty). The critic is a member of ANOTHER PROVIDER than
+  # the drawer: the members of its tier of that provider are removed before the pick, and a tier with no other provider's member refuses the critique with
+  # CRITIC_NO_INDEPENDENT_MEMBER (the drawer never judges itself). The images a drawer asks of the imagegen call
+  # (starci work imagegen) do not make the call's model the drawer. The drawer is the op's provider, bound to its
+  # terminal (scripts/guards/op-context.mjs) or named by draw-loop.mjs round --drawer; a round with no independent critic has no beauty. directionPrerequisite: interface.draw needs an ACCEPTED brand.direction
   # archetype for its ui record's ui.archetype - brand.mjs checkDirection evidence.ready, the owner's receipt
   # (scripts/kernel/prerequisites.mjs direction-unaccepted; the Kernel enqueues brand.decide --param
   # directionArchetype=<archetype> first). false switches the gate off.
@@ -266,9 +268,7 @@ allocation:
     accentBudget: 0.10
     bandsPerCardMax: 3
     badgesPerEntityMax: 2
-    critic: {provider: codex, model: gpt-6.1-sol, effort: high, timeoutMs: 900000}
-    criticWhenDrawer:
-      codex: {provider: claude, model: claude-opus-5-5, effort: high, timeoutMs: 900000}
+    criticTimeoutMs: 900000
     directionPrerequisite: true
     # How long the workflow that claimed foundation `shell` (the layout chain an interface.draw draws) may hold it before a
     # waiting draw opens a Supervisor Decision Item (scripts/kernel/shell-foundation.mjs; owner ruling 2026-09-29 draw-from-todo).

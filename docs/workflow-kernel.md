@@ -8,6 +8,22 @@ projections and mutates state only through `scripts/kernel/cli.mjs`. This page
 is the map; the authoritative contracts are the YAML files it cites — when
 they disagree with prose, the YAML wins.
 
+## The five roles at a glance
+
+Generated from `modules/kernel/roles.yaml` (`starci runtime check --only roles-contract -- --table` prints it; `-- --write` refreshes
+this copy). A happy error is the system working as designed and meeting a stop; a bug is a role or the runtime not doing what its
+contract says.
+
+<!-- roles:table:begin -->
+| Role | Scope | Function | Happy errors it handles | On a bug |
+| --- | --- | --- | --- | --- |
+| Op | One unit of work of one workflow. | Owns one attempt and its worktree; decides alone how to do the work inside its contract | pending, lane f6 | records the evidence and keeps working inside its contract; it never fixes the bug and never works around it. Debug scans every role and removes the bug by changing .claude with a spec. |
+| Critic | One product of one op. | Owns one verdict; decides alone the score by the rubric | failing-verdict (error-work); no-independent-member (critic-no-independent-member); critic-unavailable (critic-unavailable); critic-quota-out (critic-quota-out) | records the evidence and keeps working inside its contract; it never fixes the bug and never works around it. Debug scans every role and removes the bug by changing .claude with a spec. |
+| Kernel | One workflow. | Owns one workflow: its plan, its jobs and its gates; decides alone dispatch, settle, retry, switch agent, re-plan inside the goal, and answers to ops | pending, lane f3 | records the evidence and keeps working inside its contract; it never fixes the bug and never works around it. Debug scans every role and removes the bug by changing .claude with a spec. |
+| Supervisor | All workflows on the machine, inside Orca. | Owns the machine's operations: the shared resources and the gates Kernels raise; decides alone gate rulings and the division of resources | pending, lane f6 | records the evidence and keeps working inside its contract; it never fixes the bug and never works around it. Debug scans every role and removes the bug by changing .claude with a spec. |
+| Debug | The owner's eyes: a loop of the owner's chat for a limited stabilisation period, not part of steady-state operation. | Owns the edge-case registry, the operating standard and the queue of runtime defects; decides alone which role failed which duty, which collector to trigger, the fix lanes it opens, and restarting a seat (the owner's authority) | pending, lane f4 | removes the bug by changing .claude (contract, prompt, policy row, guard refusal or runtime code) with a spec and an edge-case entry. |
+<!-- roles:table:end -->
+
 ## Lifecycle
 
 ```text

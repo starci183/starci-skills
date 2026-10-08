@@ -196,11 +196,32 @@ cases:
     met: {date: "2026-10-08", where: "CHANGELOG 1.0.0-alpha.6 Known limitations: the policy ran against fixtures only", evidence: "CHANGELOG.md"}
     status: open
     why: "no real workflow has run start to handover across a host restart; the stable criteria of the debug role count it"
-  - id: critic-coverage-define-architecture
+  - id: critic-coverage-decision-legs
     family: correctness
     met: {date: "2026-10-08", where: "owner ruling 7: only drawing has an independent Critic", evidence: "modules/kernel/roles.yaml rulings.critic-coverage"}
     status: open
-    why: "scope.define and architecture.decide are owed one single-pass Critic on the frontier tier from another provider than the op"
+    why: "scope.define and architecture.decide are owed one single-pass Critic on the Critic tier from another provider than the op (modules/kernel/critic.yaml coverage, status owed): it needs a rubric per kind derived from the op contracts' acceptance statements and a settle-gate requirement for the verdict, which the kernel lanes also edit; the generic path (pick, guard, typed verdict, stale refusal, hold rows) is built, so the remaining change is that data and one gate requirement"
+  - id: critic-pinned-by-hand
+    family: correctness
+    finding: {role: critic, duty: never, verdict: departs, evidence: "the draw loop's Critic was pinned by hand in allocation.drawLoop (provider, model, effort) and bypassed the tier picker: a quota-out or closed circuit on the pinned member left the round with no judge, and a Claude drawer could be judged by the Claude pin", remedy: {state: in-tree, change: "the Critic is taken from the tier of tiers.yaml seats.critic through the one picker with provider independence as a hard filter; a tier with no independent member refuses with CRITIC_NO_INDEPENDENT_MEMBER; the keys of the hand pin are removed vocabulary"}}
+    met: {date: "2026-10-08", where: "alpha.7 draw loop: the earlier lane noted the Critic is still pinned by hand, not picked through the picker", evidence: "modules/models/runtimes.yaml allocation.drawLoop (alpha.7)"}
+    rule: {file: scripts/work/critic-pick.mjs, anchor: "independent"}
+    spec: tests/work/critic-standard.spec.mjs
+    status: covered
+  - id: critic-reach-unconfined
+    family: authority-safety
+    finding: {role: critic, duty: never, verdict: departs, evidence: "the Critic terminal was launched with no guard bound, so the rights role resolved to none (the owner's unrestricted session): it could read the op's worktree, the ledger and any transcript, and write anywhere", remedy: {state: in-tree, change: "the Critic is bound to a critic job guard (scripts/work/critic-guard.mjs); modules/kernel/command-policy.yaml critic lets its shell read only inside its directory and write only the verdict file, its file tools write only the verdict file and its Read, Grep and Glob tools read only inside the directory; the handed bytes are re-hashed after the run"}}
+    met: {date: "2026-10-08", where: "draw-critic launch of alpha.7: role critic had no command-policy row", evidence: "scripts/guards/rights.mjs rightsRoleOf had no critic role"}
+    rule: {file: scripts/guards/critic-reach.mjs, anchor: "RIGHTS_CRITIC_REACH"}
+    spec: tests/guards/critic-reach.spec.mjs
+    status: covered
+  - id: critic-verdict-for-other-bytes
+    family: correctness
+    finding: {role: critic, duty: does, verdict: departs, evidence: "a draw round's beauty was read from loop.json with no tie to the bytes the Critic judged: a part redrawn after the critique kept the earlier score", remedy: {state: in-tree, change: "the verdict carries the digests of the product bytes it was handed (starci/critic-verdict@1 product); drawGateEvidence refuses a part whose digest the verdict does not name with CRITIC_VERDICT_STALE"}}
+    met: {date: "2026-10-08", where: "draw gate of alpha.7 (autopilot-state gatePart)", evidence: "scripts/kernel/autopilot-state.mjs"}
+    rule: {file: scripts/work/critic-verdict.mjs, anchor: "staleRefusal"}
+    spec: tests/work/critic-standard.spec.mjs
+    status: covered
   - id: gate-loosening-lands-without-owner-approval
     family: authority-safety
     met: {date: "2026-10-08", where: "owner ruling 6: loosening a gate is owner-class", evidence: "modules/kernel/roles.yaml rulings.loosening-is-owner-class"}

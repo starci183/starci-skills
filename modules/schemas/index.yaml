@@ -889,6 +889,9 @@ moduleLocalDocumentKinds:
   - id: starci/module-kernel-op-incident-policy@1
     governs: "What happens when an op asks, hits a rate limit or quota, errors, hangs or is restarted: handler, bound and escalation per situation."
     files: [modules/kernel/op-incident-policy.yaml]
+  - id: starci/module-kernel-critic@1
+    governs: "The Critic as data: the seat whose tier it is picked from, the typed verdict, the codes of its holds and the op kinds that owe a Critic."
+    files: [modules/kernel/critic.yaml]
   - id: starci/module-kernel-roles@1
     governs: "The roles contract: the principles, the five roles with their scope, duties, cleanup, never list and reporting chain, and Debug's end condition."
     files: [modules/kernel/roles.yaml]

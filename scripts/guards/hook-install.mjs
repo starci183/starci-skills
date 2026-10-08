@@ -67,19 +67,20 @@ function writeGuardFile(dir, name, body) {
  * The roles a job guard is written for. 'op' is an op or [Worker] agent. 'kernel' is the Kernel: its shell commands meet
  * the same command guard (PreToolUse) as an op's, but the history hook does not apply its op rules to a kernel guard,
  * because the runtime's own git (checkpoints, land scratch trees) runs as children of the Kernel's api calls and
- * inherits its ORCA_TERMINAL_HANDLE (contract change kernel-guard-file).
+ * inherits its ORCA_TERMINAL_HANDLE (contract change kernel-guard-file). 'critic' is the Critic of a product: its `reach` names the
+ * one directory it may read and the one file it may write (scripts/guards/critic-reach.mjs).
  */
-const GUARD_ROLES = Object.freeze(['op', 'kernel']);
+const GUARD_ROLES = Object.freeze(['op', 'kernel', 'critic']);
 
 /** <guards root>/jobs/<job>.json — who the worker is, its role and which absolute paths it owns. */
-export function writeJobGuard({ skillRoot = path.resolve(here, '..', '..'), jobId, workflowId, ledgerRepo, owned, workflowWorktree = null, role = 'op', op = null }) {
+export function writeJobGuard({ skillRoot = path.resolve(here, '..', '..'), jobId, workflowId, ledgerRepo, owned, workflowWorktree = null, role = 'op', op = null, reach = null }) {
   if (!GUARD_ROLES.includes(role)) throw new Error(`unknown guard role ${role}`);
   // op: the job's op id, for the rules one op family owes (a uat op never starts a test world, launch-verdict.mjs).
   return writeGuardFile(path.join(guardsRoot(skillRoot), 'jobs'), jobId, { schema: 'starci/op-guard@1', role, jobId, workflowId, op: op ?? null,
     ledgerRepo: ledgerRepo ? path.resolve(ledgerRepo) : null, owned: [...new Set((owned ?? []).filter(Boolean).map(normOwned))],
     // The workflow worktree the op works in (scripts/kernel/workflow-worktree.mjs), or null: the guard refuses git history
     // and ref changes inside it - only the runtime's checkpoint commits there.
-    workflowWorktree: workflowWorktree ? path.resolve(workflowWorktree) : null, writtenAt: new Date().toISOString() });
+    workflowWorktree: workflowWorktree ? path.resolve(workflowWorktree) : null, ...(reach ? { reach: { dir: path.resolve(reach.dir), verdictFile: reach.verdictFile } } : {}), writtenAt: new Date().toISOString() });
 }
 
 /**

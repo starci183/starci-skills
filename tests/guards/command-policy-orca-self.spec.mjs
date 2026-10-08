@@ -9,6 +9,8 @@ import { mkdtemp } from '../helpers/tmpdir.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const POLICY = loadCommandPolicy({ root: ROOT });
+// The Critic's lifecycle is narrower (worker_done and escalation only, no ask) and is calibrated in critic-reach.spec.mjs.
+const SELF_ROLES = POLICY.roles.bound.filter((role) => role !== 'critic');
 const HANDLE = 'term-orca-self';
 const send = (type, from = HANDLE) => ['orchestration', 'send', '--from', from, '--type', type,
   '--subject', 'status', '--body', 'own lifecycle', '--task-id', 'task_self', '--dispatch-id', 'ctx_self'];
@@ -17,7 +19,7 @@ const verdict = (args, role = 'op', handle = HANDLE, policy = POLICY) => policyV
 });
 
 test('wrongly blocked: every bound rights role can send its own heartbeat, worker_done, escalation and ask', () => {
-  for (const role of POLICY.roles.bound) {
+  for (const role of SELF_ROLES) {
     for (const type of ['heartbeat', 'worker_done', 'escalation']) {
       const args = send(type);
       if (type === 'heartbeat') args.push('--phase', 'reviewing');
@@ -49,7 +51,7 @@ test('lifecycle calibration keeps impersonation, other message types and all oth
     ['orchestration', 'reply', '--from', HANDLE, '--id', 'message', '--body', 'x'],
     ['terminal', 'close', '--terminal', HANDLE], ['terminal', 'send', '--terminal', HANDLE, '--text', 'x'],
   ];
-  for (const role of POLICY.roles.bound) for (const args of cases) {
+  for (const role of SELF_ROLES) for (const args of cases) {
     assert.equal(verdict(args, role)?.code, 'RIGHTS_RAW_TOOL', `${role}: ${args.join(' ')}`);
   }
   assert.equal(verdict(send('heartbeat'), 'op', null)?.code, 'RIGHTS_RAW_TOOL', 'no caller identity');
