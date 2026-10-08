@@ -31,6 +31,7 @@ Theme: the roles are one declared contract, the system recovers from a host rest
 - An expired provider login is named in the refusal, a `login:<provider>` host row and the hold policy (`provider-login-expired`).
 
 ### Fixed
+- The worktree GC read no owner at all: its ledger lookup used a handle member that does not exist, so every workflow was "owner-unknown" and a running or paused workflow's tree was collected once Orca listed no terminal in it (after a host restart). The lookup now reads the ledger phase, and an unreadable ledger keeps the tree.
 - Five red specs and 17 findings left by the alpha.6 cleanup.
 - SonarCloud findings of the code-smell baseline are fixed in code (default sort comparators, optional chains, array callbacks, awaited loops through the in-order helpers).
 - After a host restart no seat could launch: an unconfirmable release of a Dispatch from the previous Orca runtime kept a proven-gone Kernel terminal `unclosed`; ten Codex receipts in `unknown` state filled the pool for good; a Claude window with no use yet was judged invalid.

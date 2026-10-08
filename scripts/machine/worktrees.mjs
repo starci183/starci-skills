@@ -44,7 +44,7 @@ import { isAncestor } from '../api/git/is-ancestor.mjs';
 import { branchDescription } from '../api/git/branch-description.mjs';
 import { removeOrcaWorktree, bindOrcaWorktree, orcaWorktreeClient } from './worktree-orca.mjs';
 import { pidAlive, machineLog, withMachine } from '../../engine/db/machine.mjs';
-import { openLedgerReader } from '../../engine/db/ledger.mjs';
+import { ledgerLookup } from './worktree-ledger-lookup.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { shortHash } from '../lib/hash.mjs';
 
@@ -83,36 +83,6 @@ export function worktreeCounts({ repos = [], env = process.env, settings = workt
 }
 
 /* ------------------------------------------------------------ gc */
-
-/**
- * The default owner lookups over every registered ledger, read-only, cached for one pass: a job's status and a
- * workflow's phase. Whether an agent still works in a tree is Orca's fact (`worktree ps` liveTerminalCount).
- */
-function ledgerLookup(env) {
-  const cache = new Map();
-  let ledgers = null;
-  const readers = new Map();
-  const ask = (ledgerId, k, sql, ...args) => {
-    const ck = `${k}\0${ledgerId ?? '*'}\0${args.join('\0')}`;
-    if (cache.has(ck)) return cache.get(ck);
-    let value = null;
-    try {
-      ledgers ??= withRegistry((m) => m.listLedgers(), env);
-      for (const l of ledgers.filter((x) => !ledgerId || x.ledgerId === ledgerId)) {
-        if (!l.file || !fs.existsSync(l.file)) continue;
-        if (!readers.has(l.file)) { try { readers.set(l.file, openLedgerReader(l.file)); } catch { readers.set(l.file, null); } }
-        const row = readers.get(l.file)?.db?.prepare(sql).get(...args);
-        if (row) { value = Object.values(row)[0] ?? null; break; }
-      }
-    } catch { value = null; }
-    cache.set(ck, value);
-    return value;
-  };
-  const jobStatus = (ledgerId, jobId) => ask(ledgerId, 'job', 'SELECT status FROM jobs WHERE job_id=?', jobId);
-  jobStatus.workflowPhase = (ledgerId, workflowId) => ask(ledgerId, 'wf', 'SELECT phase FROM workflows WHERE workflow_id=?', workflowId);
-  jobStatus.close = () => { for (const h of readers.values()) { try { h?.close?.(); } catch { /* closed */ } } };
-  return jobStatus;
-}
 
 const hashOf = (p) => shortHash(treeKey(p));
 const ageOf = (p, now) => { try { return now - fs.statSync(p).mtimeMs; } catch { return Infinity; } };
