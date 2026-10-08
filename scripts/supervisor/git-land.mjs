@@ -10,6 +10,8 @@ import { gitCallResult, linkedNodeModules, landLocalMain as landLocalMainCall } 
 import { underHostLock as underHostLockCall } from '../machine/verb-lock.mjs';
 import { runLandGate as runLandGateCall } from './git-land-gate.mjs';
 import { runLandFullCheck, verifyLandSpecs } from './git-land-verify.mjs';
+import { announceLand as announceLandCall } from './land-announce.mjs';
+import { KERNEL_NOTE_TRAILER, kernelNoteRefusal } from '../machine/land-kernel-note.mjs';
 
 const SCHEMA = 'starci/git-land@1';
 const STEP = Object.freeze({ links: '1-linked-node-modules', gate: '2-land-gate', check: '3-runtime-check', specs: '4-specs', lock: '5-serial-lock', merge: '6-local-main' });
@@ -56,7 +58,7 @@ function specsForLand({ worktree, ref, verified, verifiedLog, tip, base, concurr
   return { specRun, specs };
 }
 
-async function lockedLand({ worktree, ref, verified, verifiedLog, dryRun, lane, concurrency }, deps) {
+async function lockedLand({ worktree, ref, verified, verifiedLog, dryRun, lane, concurrency, kernelNote }, deps) {
   const tip = tipOf(worktree, ref, deps);
   if (!tip) return refused({ step: STEP.gate, cause: 'ref-unresolved', detail: ref });
   const head = tipOf(worktree, 'HEAD', deps);
@@ -76,14 +78,15 @@ async function lockedLand({ worktree, ref, verified, verifiedLog, dryRun, lane, 
   if (specResult.refusal) return specResult.refusal;
   const { specRun, specs } = specResult;
 
-  const trailers = [`Land-Verified: ${tip}`, `Specs: ${specs.pass}/${specs.selected}`, `Check: ${check.pass}/${check.total}`];
+  const trailers = [`Land-Verified: ${tip}`, `Specs: ${specs.pass}/${specs.selected}`, `Check: ${check.pass}/${check.total}`, ...(kernelNote ? [`${KERNEL_NOTE_TRAILER}: ${kernelNote}`] : [])];
   if (dryRun) {
     const data = { ...cleanResult({ ok: true, landed: false, tip, base, specs, check, log: specRun.log ?? null }), trailers };
     return { code: 0, text: `starci git land: dry run passed for ${tip.slice(0, 12)}; local main was not changed\n${trailers.join('\n')}`, data };
   }
   const landed = (deps.landLocalMain ?? landLocalMainCall)({ worktree, ref, tip, trailers }, deps);
   if (!landed?.ok) return refused({ step: STEP.merge, cause: landed?.cause ?? 'fast-forward', detail: landed?.detail ?? 'local main did not move', result: { landed: Boolean(landed?.landed), tip, base, specs, check, log: specRun.log ?? null } });
-  const data = { ...cleanResult({ ok: true, landed: true, tip, base, specs, check, log: specRun.log ?? null }), trailers };
+  const announced = (deps.announceLand ?? announceLandCall)({ landed: tip, lane, kernelNote });
+  const data = { ...cleanResult({ ok: true, landed: true, tip, base, specs, check, log: specRun.log ?? null }), trailers, announced };
   const laneText = lane ? ` (${lane})` : '';
   return { code: 0, text: `starci git land: landed ${tip.slice(0, 12)}${laneText} on local main\n${trailers.join('\n')}`, data };
 }
@@ -91,17 +94,19 @@ async function lockedLand({ worktree, ref, verified, verifiedLog, dryRun, lane, 
 /** Function-backed `git land <worktree> <ref>` verb. */
 export async function gitLand(ctx, deps = {}) {
   const [worktreeArg, ref, ...extra] = ctx?.positionals ?? [];
-  if (!worktreeArg || !ref || extra.length) return usage('usage: starci git land <worktree> <ref> [--verified <sha> --verified-log <file>] [--dry-run] [--lane <id>] [--concurrency <n>]');
+  if (!worktreeArg || !ref || extra.length) return usage('usage: starci git land <worktree> <ref> [--verified <sha> --verified-log <file>] [--dry-run] [--lane <id>] [--kernel-note <line>] [--concurrency <n>]');
   const args = ctx.args ?? {}, concurrency = Number(args.concurrency ?? 4);
   if (!Number.isInteger(concurrency) || concurrency < 1) return usage('--concurrency must be a positive integer');
   if (args['verified-log'] && !args.verified) return usage('--verified-log requires --verified');
+  const noteRefusal = kernelNoteRefusal(args['kernel-note']);
+  if (noteRefusal) return usage(noteRefusal);
   const worktree = path.resolve(ctx.cwd ?? process.cwd(), worktreeArg);
   if (!fs.existsSync(worktree)) return refused({ step: STEP.links, cause: 'worktree-missing', detail: worktree });
   const linked = (deps.linkedNodeModules ?? linkedNodeModules)(worktree);
   if (linked.length) return refused({ step: STEP.links, cause: 'linked-node-modules', failureCode: 'RT_NODE_MODULES_LINK', detail: linked.map((file) => path.relative(worktree, file) || file).join(', ') });
 
   const input = { worktree, ref, verified: args.verified ?? null, verifiedLog: args['verified-log'] ? path.resolve(ctx.cwd ?? process.cwd(), args['verified-log']) : null,
-    dryRun: Boolean(args['dry-run']), lane: args.lane ?? null, concurrency };
+    dryRun: Boolean(args['dry-run']), lane: args.lane ?? null, concurrency, kernelNote: args['kernel-note'] === undefined ? null : String(args['kernel-note']).trim() };
   const lockDoor = deps.underHostLock ?? underHostLockCall;
   const lock = await lockDoor({ role: 'coordinator', purpose: 'land', env: ctx.env ?? process.env }, () => lockedLand(input, deps), deps);
   if (!lock?.ok) return refused({ step: STEP.lock, cause: lock?.cause ?? 'held', owner: lock?.owner ?? 'unknown', detail: lock?.detail ?? '' });

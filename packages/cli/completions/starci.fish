@@ -465,6 +465,7 @@ complete -c starci -n '__starci_using_command git land' -l verified -r -d 'an ea
 complete -c starci -n '__starci_using_command git land' -l verified-log -r -d 'the earlier verification log whose prior-red specs must rerun'
 complete -c starci -n '__starci_using_command git land' -l dry-run -d 'run every verification step but stop before local main moves'
 complete -c starci -n '__starci_using_command git land' -l lane -r -d 'the workflow or lane id recorded in the human result'
+complete -c starci -n '__starci_using_command git land' -l kernel-note -r -d 'one line, what a Kernel must do differently after this land; the land record carries it and the runtime delivers it verbatim with the Kernels'\'' next wake (absent: no line)'
 complete -c starci -n '__starci_using_command git land' -l concurrency -r -d 'dependent spec file concurrency'
 complete -c starci -n '__starci_using_command git sync' -l main-ref -r -d 'the local main ref to merge'
 complete -c starci -n '__starci_using_command git sync' -l dry-run -d 'inspect the merge with merge-tree without changing the worktree'

@@ -5,6 +5,7 @@
 //   ctx.ledgers                 [{ledgerId, repo, file}] (sources.mjs ledgersOf)
 //   ctx.read(ledgerId, fn)      fn(db) over a read-only handle (openLedgerReader); null when the ledger is absent
 //   ctx.status(ledgerId, wf)    the cached `starci kernel status --json` value (TTL allocation.reconciler.statusCacheMs, shared)
+//   ctx.dropStatusCache()       forget the cached status reads (the workflow controller after a land)
 //   ctx.statusRead(ledgerId, wf) the same read as {value, failure}: failure names why it gave no value (statusFailureOf)
 //   ctx.api(ledgerId, verb, argv, {timeoutMs})
 //                               `starci kernel <verb> --repo <repo> ...argv --json` as a child with
@@ -285,6 +286,8 @@ export function createCtx({
       try { return fn(db); } finally { try { db.close(); } catch { /* closed */ } }
     },
     openReader: (file) => reader(file),
+    /** Forget every cached status read: the next read of each workflow spawns a fresh one (a land just moved the runtime revision). */
+    dropStatusCache() { shared.statusCache.clear(); },
     async status(ledgerId, workflowId) { return (await ctx.statusRead(ledgerId, workflowId)).value; },
     /** {value, failure}: the value ctx.status answers (null when the read failed) and statusFailureOf's why; cached alike. */
     async statusRead(ledgerId, workflowId) {

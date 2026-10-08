@@ -197,6 +197,7 @@ _starci() {
     'git:land:--verified') return 0 ;;
     'git:land:--verified-log') return 0 ;;
     'git:land:--lane') return 0 ;;
+    'git:land:--kernel-note') return 0 ;;
     'git:land:--concurrency') return 0 ;;
     'git:sync:--main-ref') return 0 ;;
     'guard:footprint-scan:--root') return 0 ;;
@@ -1008,7 +1009,7 @@ _starci() {
     'gate:unit') _values 'flags' '--root' '--out' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'git:backup') _values 'flags' '--remote' '--branches' '--dry-run' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'git:commit') _values 'flags' '--type' '--scope' '--summary' '--body' '--paths' '--lane' '--co-author' '--dry-run' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
-    'git:land') _values 'flags' '--verified' '--verified-log' '--dry-run' '--lane' '--concurrency' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
+    'git:land') _values 'flags' '--verified' '--verified-log' '--dry-run' '--lane' '--kernel-note' '--concurrency' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'git:sync') _values 'flags' '--main-ref' '--dry-run' '--abort-on-conflict' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'guard:command') _values 'flags' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'guard:footprint-scan') _values 'flags' '--root' '--depth' '--json' '--cwd' '--quiet' '--help' '--edition' ;;

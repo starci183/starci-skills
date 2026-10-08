@@ -940,6 +940,7 @@ verify a lane and fast-forward it onto local main without pushing
 | `--verified-log` | string |  |
 | `--dry-run` | boolean |  |
 | `--lane` | string |  |
+| `--kernel-note` | string |  |
 | `--concurrency` | number (default 4) |  |
 
 Positionals: worktree, ref
@@ -963,6 +964,7 @@ json: starci/git-land@1
 starci git land <worktree> <ref>
 starci git land <worktree> <ref> --verified <sha> --verified-log <file> --concurrency 2
 starci git land <worktree> <ref> --dry-run --json
+starci git land <worktree> <ref> --kernel-note "settle needs --evidence now"
 ```
 
 ### starci git sync

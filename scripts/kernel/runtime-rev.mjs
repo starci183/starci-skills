@@ -2,6 +2,8 @@
 import path from 'node:path';
 import { revParseQuery } from '../api/git/rev-parse-query.mjs';
 import { diff as gitDiff } from '../api/git/diff.mjs';
+import { log as gitLog } from '../api/git/log.mjs';
+import { kernelNotesOf } from '../machine/land-kernel-note.mjs';
 import { fileURLToPath } from 'node:url';
 import { contractFilesOf, runtimeShaOf } from '../machine/contract-version.mjs';
 import { parseJson } from '../lib/json.mjs';
@@ -67,6 +69,13 @@ function revDiff(root, from, to) {
   }
   diffMemo.set(key, result);
   return result;
+}
+
+/** The Kernel notes the lands between `from` (exclusive) and `to` carry, oldest first; [] when none or git cannot say. */
+export function landKernelNotes(root, from, to) {
+  if (!from || !to || from === to) return [];
+  const out = git(gitLog, root, ['--reverse', '--notes=land', '--format=%x01%N', `${from}..${to}`]);
+  return out == null ? [] : kernelNotesOf(out.split('\u0001'));
 }
 
 /** The latest runtime-rev-acked event of a workflow: {rev, at, source, files, attempt} or null. */
@@ -136,6 +145,9 @@ export function kernelRevState(db, workflowId, { root = revRootOf(), current = c
     const r = revGate({ root, db, workflowId, ack, current, now, ops });
     Object.assign(state, r.patch);
     gate = r.gate;
+    // A land that carries a note for the Kernels is always a re-read: the note rides the wake until the Kernel acknowledges the revision.
+    const notes = landKernelNotes(root, ack.rev, current);
+    if (notes.length) Object.assign(state, { notes, stale: true });
   }
   Object.defineProperty(state, 'allFiles', { value: gate.allFiles, enumerable: false });
   Object.defineProperty(state, 'gate', { value: gate, enumerable: false });
@@ -157,6 +169,9 @@ export function opRevStale(state, op, { root = revRootOf() } = {}) {
 
 const ackCommand = (workflowId, rev) => `starci kernel kernel-ack-rev --workflow ${workflowId} --plan; read every returned path, then attest with --rev ${rev} --read-manifest <file>`;
 
+/** What the lands since the acknowledged revision say a Kernel must do differently, verbatim; an empty string when no land carried a note. */
+const noteSentence = (notes) => (notes?.length ? ` What a Kernel must do differently: ${notes.join(' | ')}` : '');
+
 /** The one sentence a Kernel wake carries about the runtime revision (no newline); null without a revision. */
 export function revWakeLine(state, workflowId) {
   if (!state?.current) return null;
@@ -164,7 +179,8 @@ export function revWakeLine(state, workflowId) {
   if (!state.stale && !state.unacked) return `Runtime rev ${rev}.`;
   const reason = state.unacked ? 'no complete runtime READ is acknowledged' : `your acknowledged rev is ${shortRev(state.acked)}`;
   const files = state.full || state.unacked ? KERNEL_BOOT_FILES : state.files;
-  return `Runtime rev ${rev}: ${reason}; re-read ${files.join(' and ')}, then ${ackCommand(workflowId, state.current)}. Enqueue/dispatch of an affected op is refused ${KERNEL_REV_STALE} until its complete required READ is acknowledged.`;
+  const reread = files.length ? `re-read ${files.join(' and ')}, then ` : '';
+  return `Runtime rev ${rev}: ${reason}; ${reread}${ackCommand(workflowId, state.current)}. Enqueue/dispatch of an affected op is refused ${KERNEL_REV_STALE} until its complete required READ is acknowledged.${noteSentence(state.notes)}`;
 }
 
 /** revWakeLine read from the ledger; null when it cannot be read (a db with no events table, no git). */

@@ -170,6 +170,7 @@ _starci() {
         git:land:--verified) return 0;;
         git:land:--verified-log) return 0;;
         git:land:--lane) return 0;;
+        git:land:--kernel-note) return 0;;
         git:land:--concurrency) return 0;;
         git:sync:--main-ref) return 0;;
         guard:footprint-scan:--root) return 0;;
@@ -981,7 +982,7 @@ _starci() {
         gate:unit) COMPREPLY=( $(compgen -W "--root --out --json --cwd --quiet --help --edition" -- "$cur") );;
         git:backup) COMPREPLY=( $(compgen -W "--remote --branches --dry-run --json --cwd --quiet --help --edition" -- "$cur") );;
         git:commit) COMPREPLY=( $(compgen -W "--type --scope --summary --body --paths --lane --co-author --dry-run --json --cwd --quiet --help --edition" -- "$cur") );;
-        git:land) COMPREPLY=( $(compgen -W "--verified --verified-log --dry-run --lane --concurrency --json --cwd --quiet --help --edition" -- "$cur") );;
+        git:land) COMPREPLY=( $(compgen -W "--verified --verified-log --dry-run --lane --kernel-note --concurrency --json --cwd --quiet --help --edition" -- "$cur") );;
         git:sync) COMPREPLY=( $(compgen -W "--main-ref --dry-run --abort-on-conflict --json --cwd --quiet --help --edition" -- "$cur") );;
         guard:command) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
         guard:footprint-scan) COMPREPLY=( $(compgen -W "--root --depth --json --cwd --quiet --help --edition" -- "$cur") );;

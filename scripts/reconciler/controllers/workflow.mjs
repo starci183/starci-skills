@@ -249,7 +249,23 @@ async function openDecisions(ctx, plan, now, settings) {
   return opened;
 }
 
+/**
+ * The key a runtime land (the Supervisor ledger's land-passed event) routes to: every running workflow is looked at at once, so a Kernel
+ * whose acknowledged revision the land made stale is woken now instead of at the next resync. The wake itself is the one reconcileWorkflow
+ * rings (planRev: one doorbell per workflow and revision), so a land wakes a seat at most once.
+ */
+export const REV_WAKE_KEY = 'rev-wake';
+
+/** The re-look of every running workflow after a land: {ok, key, looked: [workflow keys]}. The status cache is dropped first so the pass reads the new revision. */
+async function reconcileAfterLand(ctx, settings) {
+  ctx.dropStatusCache?.();
+  const keys = await listWorkflows(ctx);
+  const results = await mapInOrder(keys, (workflowKey) => reconcileWorkflow(workflowKey, ctx, { settings }));
+  return { ok: results.every((r) => r?.ok !== false), key: REV_WAKE_KEY, looked: keys, doorbells: results.filter((r) => r?.doorbell).length };
+}
+
 export async function reconcileWorkflow(key, ctx, { settings = workflowSettings() } = {}) {
+  if (key === REV_WAKE_KEY) return reconcileAfterLand(ctx, settings);
   const k = parseKey(key);
   if (!k) return { ok: false, key, skipped: 'bad-key' };
   const { ledgerId, workflowId } = k;
@@ -309,7 +325,7 @@ export default {
   concerns: ['workflow.stall-wake', 'workflow.progress', 'workflow.ask-repark'],
   resyncMs: defaults.resyncMs,
   concurrency: defaults.concurrency,
-  routes: Object.fromEntries(defaults.routes.map((kind) => [kind, route])),
+  routes: { ...Object.fromEntries(defaults.routes.map((kind) => [kind, route])), 'land-passed': (ev) => (evLedger(ev) === SUPERVISOR_LEDGER ? REV_WAKE_KEY : null) },
   list: (ctx) => listWorkflows(ctx),
   reconcile: (key, ctx) => reconcileWorkflow(key, ctx, { settings: settingsNow() }),
 };
