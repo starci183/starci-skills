@@ -48,7 +48,7 @@ function cutFixture(t) {
   fs.writeFileSync(path.join(repo, 'package.json'), `${JSON.stringify({ name: 'rt', version: '1.0.0-alpha.4' })}\n`);
   git(repo, 'add', '-A');
   git(repo, 'commit', '-q', '-m', 'release commit');
-  const deps = { host: () => [], scan: () => ({ ok: true, findings: [] }), lock: (work) => work(), sonarCloud: async () => [], publishPlan: () => ({ blockers: [], toPublish: [] }) };
+  const deps = { host: () => [], scan: () => ({ ok: true, findings: [] }), lock: (work) => work(), sonarCloud: async () => [], publishPlan: () => ({ blockers: [], toPublish: [] }), jsonExceptions: () => ({ offenders: [], missingAllowlist: [] }) };
   return { repo, origin, deps };
 }
 

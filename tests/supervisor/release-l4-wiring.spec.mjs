@@ -132,6 +132,17 @@ test('parity: a red step fails the row and names the step; a container that dies
   assert.match(empty.why, /nothing proves Linux parity/);
 });
 
+test('parity: an interrupt while the container runs removes the container it named, and a finished run drops the registration', (t) => {
+  const docker = fakeDocker();
+  let undo;
+  let disposed = 0;
+  const run = docker.run;
+  docker.run = (args, opts) => { undo(); assert.deepEqual(docker.calls.rm, [args[args.indexOf('--name') + 1]], 'the interrupt removed the named container'); return run(args, opts); };
+  const out = runParity('repo', parityDeps(t, docker, { onInterrupt: (fn) => { undo = fn; return () => { disposed += 1; }; } }));
+  assert.equal(out.ok, true);
+  assert.equal(disposed, 1);
+});
+
 test('L4: the installs run first as a real npm ci (a node_modules link is removed as a link first, a missing lockfile is absent), the Sonar supplier closes after the proofs even when a step throws, and the Linux step ends the row', async (t) => {
   const base = tmp(t, 'wire');
   fs.writeFileSync(path.join(base, 'package.json'), JSON.stringify({ name: 'rt', scripts: { test: NODE_TEST, check: 'x' } }));
@@ -408,7 +419,7 @@ test('the cut runs the default L4 row with its wiring: a red Linux step is a red
     throw new Error(`unexpected git ${verb} ${args.join(' ')}`);
   };
   const changelog = '## [1.0.0-alpha.4] - 2026-10-04\n\n- done\n';
-  const out = (await cutRelease({ repo: base, tag: 'v1.0.0-alpha.4', deps: { host: () => [], sonarCloud: async () => [], publishPlan: () => ({ blockers: [], toPublish: [] }), git: fakeGit, findings: () => [], changelog: () => changelog, lock: (work) => { calls.push('lock'); return work(); }, suite: () => steps, push: () => { throw new Error('never pushed'); } } }));
+  const out = (await cutRelease({ repo: base, tag: 'v1.0.0-alpha.4', deps: { host: () => [], sonarCloud: async () => [], publishPlan: () => ({ blockers: [], toPublish: [] }), jsonExceptions: () => ({ offenders: [], missingAllowlist: [] }), git: fakeGit, findings: () => [], changelog: () => changelog, lock: (work) => { calls.push('lock'); return work(); }, suite: () => steps, push: () => { throw new Error('never pushed'); } } }));
   assert.deepEqual([out.ok, out.verdict], [false, 'suite-red']);
   assert.match(out.why, /linux-parity red/);
   assert.deepEqual(calls, ['lock']);

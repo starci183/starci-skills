@@ -16,6 +16,7 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { archive } from '../api/git/archive.mjs';
 import { run as dockerRun } from '../api/docker/run.mjs';
 import { containerRm } from '../api/docker/container-rm.mjs';
+import { onInterrupt } from '../lib/interrupt-cleanup.mjs';
 import { version as dockerVersion } from '../api/docker/version.mjs';
 import { safeRemove } from '../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
@@ -184,9 +185,10 @@ export function runParity(repo, deps = {}) {
     fs.writeFileSync(path.join(work, 'parity.sh'), parityScript(plan), 'utf8');
     const fd = fs.openSync(log, 'w');
     let r;
+    const disposeRm = (deps.onInterrupt ?? onInterrupt)(() => docker.rm(name)); // an interrupted cut removes the container it started
     try {
       r = docker.run(['--name', name, '--mount', `type=bind,source=${work},target=/in,readonly`, plan.image, 'bash', '/in/parity.sh'], { timeout: deps.timeoutMs ?? RUN_TIMEOUT_MS, stdio: ['ignore', fd, fd] });
-    } finally { fs.closeSync(fd); }
+    } finally { fs.closeSync(fd); disposeRm(); }
     docker.rm(name); // this run's own container only, by its exact name: nothing is left behind after a timeout
     const text = fs.readFileSync(log, 'utf8');
     const out = parityOutcome(text);

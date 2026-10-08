@@ -56,7 +56,7 @@ function fixture(t) {
     calls.push({ ran: wanted, carried: Object.keys(carry) });
     return wanted.map((name) => ({ name, ok: !state.red.has(name), log: `${name}.log`, ms: 1, skips: [] }));
   };
-  const deps = { host: () => [], suite, scan: () => ({ ok: true, findings: [] }), lock: (work) => work(), sonarCloud: async () => [], publishPlan: () => ({ blockers: [], toPublish: [] }), runtimeRoot: repo };
+  const deps = { host: () => [], suite, scan: () => ({ ok: true, findings: [] }), lock: (work) => work(), sonarCloud: async () => [], publishPlan: () => ({ blockers: [], toPublish: [] }), jsonExceptions: () => ({ offenders: [], missingAllowlist: [] }), runtimeRoot: repo };
   const cut = (extra = {}, more = {}) => cutRelease({ repo, tag: TAG, ...extra, deps: { ...deps, ...more } });
   return { base, origin, repo, calls, state, cut, remoteMain: () => git(origin, 'rev-parse', 'refs/heads/main'), before: git(origin, 'rev-parse', 'refs/heads/main') };
 }

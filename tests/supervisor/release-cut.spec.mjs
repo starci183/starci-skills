@@ -12,6 +12,7 @@ import { renderRuntimeHooks } from '../../scripts/guards/git-hooks.mjs';
 import { gitCommonDir, l4RecordPath, readL4Record, writeL4Record } from '../../scripts/guards/release-record.mjs';
 import { classifySkip, planL4, runL4, skipReport, skipsOf } from '../../scripts/supervisor/release-l4.mjs';
 import { releaseHostMissing } from '../../scripts/supervisor/release-host.mjs';
+import { leftoversRefusal } from '../../scripts/supervisor/release-cut-leftovers.mjs';
 
 for (const key of ['GIT_DIR', 'GIT_COMMON_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_OBJECT_DIRECTORY', 'GIT_PREFIX']) delete process.env[key];
 const git = (cwd, ...args) => {
@@ -45,7 +46,7 @@ function fixture(t, { changelog = CHANGELOG, version = '1.0.0-alpha.4' } = {}) {
   git(repo, 'commit', '-q', '-m', 'release commit');
   const remoteMain = () => git(origin, 'rev-parse', 'refs/heads/main');
   const remoteTags = () => git(origin, 'tag', '-l').split(/\r?\n/).filter(Boolean);
-  return { base, origin, repo, remoteMain, remoteTags, before: remoteMain(), deps: { host: () => [], suite: green, scan: scanOk, lock: (work) => work(), sonarCloud: async () => [], publishPlan: () => ({ blockers: [], toPublish: [] }) } };
+  return { base, origin, repo, remoteMain, remoteTags, before: remoteMain(), deps: { host: () => [], suite: green, scan: scanOk, lock: (work) => work(), sonarCloud: async () => [], publishPlan: () => ({ blockers: [], toPublish: [] }), jsonExceptions: () => ({ offenders: [], missingAllowlist: [] }) } };
 }
 const cut = (fx, extra = {}, deps = {}) => cutRelease({ repo: fx.repo, tag: TAG, ...extra, deps: { ...fx.deps, ...deps } });
 const untouched = (fx) => { assert.equal(fx.remoteMain(), fx.before, 'main did not move'); assert.deepEqual(fx.remoteTags(), [], 'no tag was pushed'); };
@@ -359,4 +360,32 @@ test('the cut refuses in seconds, before any suite, when the publish plan report
   untouched(fx);
   const clean = await cut(fx, { plan: true }, { suite, publishPlan: () => ({ blockers: [], toPublish: [] }) });
   assert.equal(clean.verdict, 'plan');
+});
+
+test('the cut refuses in seconds, before the host lock and any suite, when the checkout holds JSON a docs gate would refuse (a file an interrupted cut left), naming the file and the fix', async (t) => {
+  const fx = fixture(t);
+  let suites = 0;
+  const suite = () => { suites += 1; return green(); };
+  const left = { offenders: ['examples/lite-app/reports/lint.sonar.json'], missingAllowlist: [] };
+  for (const plan of [true, false]) {
+    const refused = await cut(fx, { plan }, { suite, jsonExceptions: () => left });
+    assert.equal(refused.verdict, 'tree-leftovers', JSON.stringify(refused));
+    assert.match(refused.why, /examples\/lite-app\/reports\/lint\.sonar\.json is JSON outside modules\/kernel\/allowlist\.yaml.*\(delete examples\/lite-app\/reports\/lint\.sonar\.json if an interrupted cut/);
+  }
+  const gone = await cut(fx, { plan: true }, { suite, jsonExceptions: () => ({ offenders: [], missingAllowlist: ['modules/x.json'] }) });
+  assert.match(gone.why, /modules\/x\.json is registered in modules\/kernel\/allowlist\.yaml but absent on disk/);
+  assert.equal(suites, 0, 'no suite ran');
+  untouched(fx);
+});
+
+test('the leftovers inventory is the docs gate own: a real checkout with a stray JSON file is refused, and a clean one is not', (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-leftovers-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  fs.mkdirSync(path.join(root, 'modules', 'kernel'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'modules', 'kernel', 'allowlist.yaml'), 'schema: starci/allowlist@1\njson-exceptions:\n  exceptions: []\n  directories: []\n');
+  assert.equal(leftoversRefusal({ repo: root }), null);
+  fs.mkdirSync(path.join(root, 'examples', 'lite-app', 'reports'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'examples', 'lite-app', 'reports', 'lint.sonar.json'), '{}');
+  const refused = leftoversRefusal({ repo: root });
+  assert.deepEqual(refused.findings.map((f) => f.fix.split(' if ')[0]), ['delete examples/lite-app/reports/lint.sonar.json']);
 });

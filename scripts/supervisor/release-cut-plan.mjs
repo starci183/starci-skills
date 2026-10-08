@@ -11,6 +11,7 @@ import { decisionLines } from './release-cut-rows.mjs';
 import { sonarCloudFindings } from './release-sonarcloud.mjs';
 import { buildPlan, planSummary } from '../gates/release-plan.mjs';
 import { npmRegistry } from '../gates/release-registry.mjs';
+import { leftoversRefusal } from './release-cut-leftovers.mjs';
 
 /** The head the remote main points at ('' for a remote with no main), or null when the remote cannot be read. */
 function remoteMainHead({ run, cwd, remote, branch }) {
@@ -43,9 +44,9 @@ export function publishPlanRefusal({ repo, deps = {} }) {
   return { verdict: 'publish-plan', why: `the publish plan (starci release check) is not clean: ${findings.join('; ')}`, findings };
 }
 
-/** The refusal of a cut before any suite runs: the release definition, the publish plan, then SonarCloud (only when a Sonar proof will run); null when none refuses. */
+/** The refusal of a cut before any suite runs: leftovers in the checkout, the release definition, the publish plan, then SonarCloud (only when a Sonar proof will run); null when none refuses. */
 export async function preSuiteRefusal({ repo, run, cwd, head, remote, branch, tag, deps = {}, sonar = true }) {
-  return definitionRefusal({ run, cwd, head, remote, branch, tag, deps }) ?? publishPlanRefusal({ repo, deps }) ?? (sonar ? await sonarCloudRefusal({ repo, deps }) : null);
+  return leftoversRefusal({ repo, deps }) ?? definitionRefusal({ run, cwd, head, remote, branch, tag, deps }) ?? publishPlanRefusal({ repo, deps }) ?? (sonar ? await sonarCloudRefusal({ repo, deps }) : null);
 }
 
 /** The result of `release cut --plan`: every row of the cut with what happens to it (run, or stand in from this commit or an earlier one, and why), the push it makes, the record the pre-push hook then asks for. */

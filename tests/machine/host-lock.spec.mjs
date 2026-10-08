@@ -175,3 +175,17 @@ test('withHostLock runs fn under the lock, releases on return and on throw, and 
   assert.equal(later, 'p');
   assert.equal(hostLockOwner(base(dir)), null, 'an async fn releases when it settles');
 });
+
+test('withHostLock: an interrupt while fn runs releases the lock (the registered undo), and a finished fn drops the registration', async (t) => {
+  const dir = lockOf(t);
+  let undo;
+  let disposed = 0;
+  const onInterrupt = (fn) => { undo = fn; return () => { disposed += 1; }; };
+  await withHostLock({ ...base(dir), role: 'release', purpose: 'release-cut', onInterrupt }, async ({ token }) => {
+    assert.equal(hostLockOwner(base(dir)).token, token);
+    undo();
+    assert.equal(hostLockOwner(base(dir)), null, 'the interrupt freed the lock before the process ended');
+  });
+  assert.equal(disposed, 1);
+  assert.equal(hostLockOwner(base(dir)), null);
+});
