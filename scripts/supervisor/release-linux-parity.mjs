@@ -87,7 +87,7 @@ function planStep({ file, id, app, ctx, jobEnv, defaultDir, step, seen, node }) 
 
 function planJob({ file, id, job, apps, base, seen, state, steps, skipped }) {
   const where = `${file}:${id}`;
-  if (/workflow_dispatch/.test(String(job.if ?? ''))) { skipped.push({ name: where, reason: 'manual job' }); return; }
+  if (/workflow_dispatch|refs\/tags/.test(String(job.if ?? ''))) { skipped.push({ name: where, reason: 'manual or tag-only job' }); return; }
   const matrixApps = job.strategy?.matrix?.app !== undefined ? apps : [null];
   for (const app of matrixApps) {
     const ctx = { matrix: app ? { app } : {}, env: base.env };
@@ -104,7 +104,7 @@ function planJob({ file, id, job, apps, base, seen, state, steps, skipped }) {
 
 /**
  * The parity plan: {image, steps: [{name, dir, run, env}], skipped: [{name, reason}]}. Pure over the parsed workflows and the example app names.
- * A job whose matrix is the derived app list runs once per example app; a job gated on workflow_dispatch is left out whole; a step identical to an earlier one
+ * A job whose matrix is the derived app list runs once per example app; a job gated on workflow_dispatch or on a release tag (the GitHub Release job) is left out whole; a step identical to an earlier one
  * (same directory, command and the env it reads: the repeated root install) runs once.
  */
 export function parityPlan({ workflows, apps }) {

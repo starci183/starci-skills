@@ -42,6 +42,7 @@ const WORKFLOWS = [
       { name: 'Build', run: 'npm run build:be' },
     ] },
     browser: { if: "${{ github.event_name == 'workflow_dispatch' }}", steps: [{ run: 'npm run test:browser' }] },
+    release: { if: "${{ startsWith(github.ref, 'refs/tags/v') }}", steps: [{ name: 'Create the GitHub Release', run: 'gh release create "$TAG"' }] },
     images: { steps: [{ uses: 'docker/build-push-action@v6' }, { name: 'Image', run: 'docker build .' }] },
   } } },
 ];
@@ -63,7 +64,9 @@ test('the parity plan is derived from the workflows: one run per example app, th
   assert.match(reasons.Integration, /manual or tag-upload/);
   assert.match(reasons.Unit, /spec suite/);
   assert.match(reasons.Image, /docker/);
-  assert.match(plan.skipped.find((s) => s.name.endsWith('browser')).reason, /manual job/);
+  assert.match(plan.skipped.find((s) => s.name.endsWith('browser')).reason, /manual or tag-only job/);
+  assert.match(plan.skipped.find((s) => s.name.endsWith(':release')).reason, /tag-only job/, 'the GitHub Release job runs only on a pushed tag, never in the parity container');
+  assert.equal(plan.steps.some((s) => s.name.includes('GitHub Release')), false);
   assert.match(plan.skipped.find((s) => s.name.includes('GITHUB_OUTPUT') || s.name.includes('apps=')).reason, /plumbing/);
 });
 
