@@ -263,3 +263,24 @@ cases:
     met: {date: "2026-10-08", where: "owner ruling: the Supervisor may not update .claude", evidence: "modules/kernel/roles.yaml rulings.runtime-changes"}
     status: open
     why: "the instruction text of supervisor-prompt.md, supervise.yaml and docs/supervisor.md still describes fix workers and lands; the rewrite is designed in ROLES-STANDARD-alpha8.md"
+  - id: release-sonar-proof-followed-public-host
+    family: correctness
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "the three L4 Sonar rows of the alpha.7 cut waited five minutes and failed 'SonarQube did not report UP in time' although the local server answered UP 19 s after its containers started: the proof's gate config took SONAR_HOST_URL from the host secret.env (https://sonar.starci.org, the CI tunnel whose container was stopped) before the host.local the example declares", remedy: {state: in-tree, change: "the proof is configured for the declared local host (localStackConfig strips SONAR_HOST_URL); the wait reads the server's own status and container and ends in a typed result naming STARTING, unreachable, DB_MIGRATION_NEEDED or the log-hinted stop; a paused or restarting container is stopped before the start; release cut and --plan refuse early on docker, memory, vm.max_map_count and missing containers (sonarHostRefusal)"}}
+    met: {date: "2026-10-08", where: "release cut v1.0.0-alpha.7, L4 rows ecommerce-app, lite-app, shape-slot: sonar", evidence: "the cut's starci-release-l4/sonar-<app>-*.log files; container starci-sonarqube operational 08:16:42 after starting 08:16:23"}
+    rule: {file: scripts/supervisor/release-sonar-stack.mjs, anchor: "localStackConfig"}
+    spec: tests/supervisor/release-sonar-stack.spec.mjs
+    status: covered
+  - id: release-sonar-proof-lint-report-never-produced
+    family: correctness
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "every example's sonar-project.properties imports reports/lint.sonar.json, which only `starci app lint --sonar` writes (the managed ci.yml runs it before the scan); the L4 lint row runs `starci app lint` without it, so the Sonar scan of a cut that reached the server failed in the scanner's ExternalIssueReportParser", remedy: {state: in-tree, change: "the Sonar proof writes the report itself with the app's installed CLI before the scan and fails by name when none is written (writeLintReport)"}}
+    met: {date: "2026-10-08", where: "proof of the stack fix, ecommerce-app scan", evidence: "scanner log: ExternalIssueReportParser.parse, Scanner engine failed with code 1"}
+    rule: {file: scripts/supervisor/release-sonar-report.mjs, anchor: "writeLintReport"}
+    spec: tests/supervisor/release-sonar-stack.spec.mjs
+    status: covered
+  - id: release-sonar-proof-stale-pooled-socket
+    family: failure-while-running
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "after the synchronous lint step blocked the process for 90 s, the first request of the scan reused a keep-alive socket pooled during the start-up wait; the docker port proxy had reset it, so the scan was blocked 'not reachable (ECONNRESET)' with the server UP and healthy", remedy: {state: in-tree, change: "the proof's requests send Connection: close (freshFetch), so no socket outlives a blocked event loop"}}
+    met: {date: "2026-10-08", where: "proof of the stack fix, ecommerce-app scan", evidence: "reproduced with a 75 s Atomics.wait between two fetches: ECONNRESET, none with Connection: close"}
+    rule: {file: scripts/api/sonar/fresh-fetch.mjs, anchor: "freshFetch"}
+    spec: tests/supervisor/release-sonar-stack.spec.mjs
+    status: covered

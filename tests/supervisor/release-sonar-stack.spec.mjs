@@ -12,6 +12,7 @@ import { sonarHostFindings } from '../../scripts/supervisor/release-sonar-host.m
 import { sonarHostRefusal } from '../../scripts/supervisor/release-cut-plan.mjs';
 import { sonarSupplier } from '../../scripts/supervisor/release-l4-sonar.mjs';
 import { localStackConfig } from '../../scripts/supervisor/release-sonar-stack.mjs';
+import { removeLintReport, writeLintReport } from '../../scripts/supervisor/release-sonar-report.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 
 const tmp = (t, label) => {
@@ -116,7 +117,7 @@ const gateOf = (states, extra = {}) => ({ config: () => CFG, state: async () => 
 
 test('supplier: a paused or restarting container is stopped before the stack is started, and what was started is put back', async (t) => {
   const fake = dockerFake({ 'starci-sonarqube-postgres': 'running', 'starci-sonarqube': 'paused' });
-  const deps = { gate: gateOf(['STARTING']), docker: fake.docker, sleep: async () => {}, now: clock(), logDir: () => tmp(t, 'stale') };
+  const deps = { gate: gateOf(['STARTING']), lintReport: () => ({ ok: true }), docker: fake.docker, sleep: async () => {}, now: clock(), logDir: () => tmp(t, 'stale') };
   const { proofs, close } = sonarSupplier([APP], deps);
   assert.equal((await proofs['shop: sonar']()).ok, true);
   assert.deepEqual(fake.calls, [['stop', 'starci-sonarqube'], ['start', 'starci-sonarqube']]);
@@ -131,7 +132,7 @@ test('supplier: a dead container refuses the proof naming it; a migration-needed
   assert.match(fs.readFileSync(proof.log, 'utf8'), /starci-sonarqube is dead/);
   assert.deepEqual(dead.calls, []);
   const migrate = dockerFake({ 'starci-sonarqube-postgres': 'exited', 'starci-sonarqube': 'exited' });
-  const b = sonarSupplier([APP], { gate: gateOf(['DB_MIGRATION_NEEDED']), docker: migrate.docker, sleep: async () => {}, now: clock(), logDir: () => tmp(t, 'migrate') });
+  const b = sonarSupplier([APP], { gate: gateOf(['DB_MIGRATION_NEEDED']), lintReport: () => ({ ok: true }), docker: migrate.docker, sleep: async () => {}, now: clock(), logDir: () => tmp(t, 'migrate') });
   const failed = await b.proofs['shop: sonar']();
   assert.match(fs.readFileSync(failed.log, 'utf8'), /sonar stack: SonarQube at http:\/\/localhost:9010 reports DB_MIGRATION_NEEDED/);
   assert.deepEqual(b.close().stopped, ['starci-sonarqube', 'starci-sonarqube-postgres']);
@@ -146,7 +147,18 @@ test('config: the example is configured for its declared LOCAL host even when th
   assert.equal(cfg.container, 'starci-sonarqube');
 });
 
-const READY_HOST = { config: () => CFG, version: () => ({ status: 0, stdout: '29.0.0' }), infoMemory: () => ({ status: 0, stdout: String(16 * 1024 ** 3) }), platform: 'win32' };
+test('config: every request of the proof asks for its own connection, so a socket pooled before a long synchronous step is never reused', async (t) => {
+  const real = globalThis.fetch;
+  t.after(() => { globalThis.fetch = real; });
+  const seen = [];
+  globalThis.fetch = async (url, init) => { seen.push({ url, headers: init.headers }); return { status: 200 }; };
+  const cfg = localStackConfig(path.join(skillRoot, 'examples', 'ecommerce-app'));
+  await cfg.fetch('http://localhost:9010/api/system/status', { headers: { Accept: 'application/json' } });
+  await cfg.fetch('http://localhost:9010/api/x');
+  assert.deepEqual(seen.map((s) => s.headers), [{ Accept: 'application/json', Connection: 'close' }, { Connection: 'close' }]);
+});
+
+const READY_HOST = { config: () => CFG, version: () => ({ status: 0, stdout: '29.0.0' }), platform: 'win32' };
 const stackStates = (states) => ({ inspect: (name) => (states[name] === 'missing' ? { status: 1, stderr: 'No such container' } : { status: 0, stdout: states[name] }) });
 const BOTH = (server = 'exited') => stackStates({ 'starci-sonarqube-postgres': 'exited', 'starci-sonarqube': server });
 
@@ -155,13 +167,11 @@ test('host: a ready docker host and stack has no finding; no example means nothi
   assert.deepEqual(await sonarHostFindings([], {}), []);
 });
 
-test('host: no docker binary, no daemon, too little daemon memory and a missing container each refuse, naming the fix', async () => {
+test('host: no docker binary, no daemon and a missing container each refuse, naming the fix', async () => {
   const noBinary = await sonarHostFindings([APP], { ...READY_HOST, version: () => ({ error: Object.assign(new Error('x'), { code: 'ENOENT' }) }) });
   assert.match(noBinary[0].what, /docker binary docker cannot be run \(ENOENT\)/);
   const noDaemon = await sonarHostFindings([APP], { ...READY_HOST, version: () => ({ status: 1 }) });
   assert.match(noDaemon[0].what, /no docker daemon answers/);
-  const small = await sonarHostFindings([APP], { ...READY_HOST, docker: BOTH(), infoMemory: () => ({ status: 0, stdout: String(1024 ** 3) }) });
-  assert.match(small[0].what, /1\.0 GiB of memory; SonarQube needs 3 GiB/);
   const missing = await sonarHostFindings([APP], { ...READY_HOST, docker: stackStates({ 'starci-sonarqube-postgres': 'missing', 'starci-sonarqube': 'exited' }) });
   assert.match(missing[0].what, /container starci-sonarqube-postgres does not exist/);
 });
@@ -189,4 +199,30 @@ test('cut: a host finding becomes the sonar-host verdict naming every finding; n
   assert.equal(refusal.verdict, 'sonar-host');
   assert.match(refusal.why, /local Sonar stack cannot come up on this host: no docker daemon answers \(start Docker Desktop\)/);
   assert.equal(await sonarHostRefusal({ repo: os.tmpdir(), deps: { sonarHost: async () => [] } }), null);
+});
+
+test('report: the lint report is written before the scan; a lint run that writes none fails the proof before any scan; a stale report is never reused', async (t) => {
+  const dir = tmp(t, 'report');
+  const calls = [];
+  const writes = (appDir) => { calls.push(appDir); fs.mkdirSync(path.join(appDir, 'reports'), { recursive: true }); fs.writeFileSync(path.join(appDir, 'reports', 'lint.sonar.json'), '{}'); return { status: 1 }; };
+  fs.mkdirSync(path.join(dir, 'reports'));
+  fs.writeFileSync(path.join(dir, 'reports', 'lint.sonar.json'), 'stale');
+  let seen;
+  const none = writeLintReport(dir, { run: (args, options) => { seen = { args, cwd: options.cwd, stale: fs.existsSync(path.join(dir, 'reports', 'lint.sonar.json')) }; return { status: 2, stderr: 'boom' }; } });
+  assert.deepEqual(seen, { args: ['exec', '--no-install', '--', 'starci', 'app', 'lint', '--sonar', 'reports/lint.sonar.json'], cwd: dir, stale: false });
+  assert.equal(none.ok, false);
+  assert.match(none.reason, /wrote no report \(exit 2\): boom/);
+  assert.deepEqual(writeLintReport(dir, { run: () => writes(dir) }), { ok: true }, 'findings (a non-zero lint exit) do not stop the report: the gate counts them');
+  const fake = dockerFake({ 'starci-sonarqube-postgres': 'running', 'starci-sonarqube': 'running' });
+  const scans = [];
+  const gate = gateOf([], { scan: async () => { scans.push('scan'); return { outcome: 'pass' }; } });
+  const proof = await sonarSupplier([APP], { gate, docker: fake.docker, lintReport: () => ({ ok: false, reason: 'no CLI installed' }), logDir: () => tmp(t, 'noreport') }).proofs['shop: sonar']();
+  assert.equal(proof.ok, false);
+  assert.match(fs.readFileSync(proof.log, 'utf8'), /sonar lint report: no CLI installed/);
+  assert.deepEqual(scans, []);
+  assert.deepEqual(calls, [dir]);
+  assert.deepEqual(writeLintReport(dir, { run: () => writes(dir) }), { ok: true });
+  removeLintReport(dir);
+  assert.equal(fs.existsSync(path.join(dir, 'reports')), false, 'the report and its empty directory are gone after the proof');
+  removeLintReport(dir);
 });

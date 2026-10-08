@@ -1,5 +1,5 @@
 // scripts/api/docker/lib.mjs — the runner of the docker CLI: `docker <args>` waited for, utf8 text, a hidden window, never a
-// shell. The call files beside it (container-inspect.mjs, container-lifecycle.mjs, container-rm.mjs, run.mjs, version.mjs)
+// shell. The call files beside it (container-inspect.mjs, container-lifecycle.mjs, container-logs.mjs, container-rm.mjs, run.mjs, version.mjs)
 // each name one use; nothing outside scripts/api/docker imports this runner. Options past docker and timeout (stdio, env, cwd,
 // maxBuffer) pass through to spawnSync, so a long run can write its output to a file instead of a buffer.
 import { spawnSync } from 'node:child_process';

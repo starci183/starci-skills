@@ -1,4 +1,4 @@
-// version.mjs — `docker version --format {{.Server.Version}}`: whether a docker daemon answers (the release flow's Linux parity step needs one).
+// version.mjs — `docker version --format {{.Server.Version}}`: whether a docker daemon answers (the release flow's Linux parity step and its Sonar stack check need one).
 import { dockerSpawn } from './lib.mjs';
 
 /** The spawnSync result {status, stdout, stderr, error}: stdout is the server version; error = docker itself unavailable, status != 0 = no daemon. */

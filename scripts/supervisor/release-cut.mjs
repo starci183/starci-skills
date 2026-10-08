@@ -28,7 +28,7 @@ import { updateRef } from '../api/git/update-ref.mjs';
 import { changelogSection, releaseNotesFindings } from '../hfs/runtime-rules/release-notes.mjs';
 import { runL4, skipReport } from './release-l4.mjs';
 import { scanRange } from './push-mains.mjs';
-import { definitionRefusal, planOf, sonarHostRefusal } from './release-cut-plan.mjs';
+import { planOf, preSuiteRefusal } from './release-cut-plan.mjs';
 import { withHostLock as holdHostLock } from '../machine/host-lock.mjs';
 import { writeL4Record } from '../guards/release-record.mjs';
 
@@ -137,12 +137,9 @@ export async function cutRelease({ repo, remote = 'origin', branch = 'main', tag
   const notes = releaseNotesFindings({ tags: [tag], changelog });
   if (notes.length) return refuse('release-notes', notes.map((f) => f.message).join('; '), { findings: notes });
 
-  // The release definition (scripts/guards/release-definition.mjs) is what the pre-push hook enforces: what is already known to be missing stops the cut before the suite runs.
-  const unmet = definitionRefusal({ run, cwd, head, remote, branch, tag, deps });
+  // The release definition (scripts/guards/release-definition.mjs) is what the pre-push hook enforces, and the docker host must be able to bring up the local Sonar stack: what is already known to be missing stops the cut before the suite runs.
+  const unmet = await preSuiteRefusal({ repo, run, cwd, head, remote, branch, tag, deps });
   if (unmet) return refuse(unmet.verdict, unmet.why, { findings: unmet.findings });
-  // The docker host must be able to bring up the local Sonar stack: refused here, in seconds, not by three red Sonar proofs after the suite.
-  const hostless = await sonarHostRefusal({ repo, deps });
-  if (hostless) return refuse(hostless.verdict, hostless.why, { findings: hostless.findings });
   if (plan) return planOf({ repo, head, tag, remote, branch, out });
 
   // L4 reports every skipped test with its reason, and every test must have passed in at least one leg (the host run or the Linux container run): a skip that passed in the other leg is covered and listed with where it passed;

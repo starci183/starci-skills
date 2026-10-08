@@ -5,7 +5,8 @@
 // The local SonarQube stack (the server container and its database container) is brought up for the proof when it is stopped (a paused or restarting container is stopped first),
 // waited for by the server's own status and its container (release-sonar-wait.mjs), and left exactly as it was found afterwards: a container that was running stays running, one this run
 // started is stopped again. Containers are started and stopped by exact name through the scripts/api/docker call files; no other container of this host is ever named.
-// Async because the gate is. Seams (deps): gate ({config, state, scan, dashboard}), docker ({inspect, start, stop}), logs, sleep (ms -> Promise), now, readyMs, pollMs, logDir.
+// The scan imports the app's lint report, which nothing earlier in L4 writes: the proof writes it first (release-sonar-report.mjs).
+// Async because the gate is. Seams (deps): gate ({config, state, scan, dashboard}), lintReport (appDir -> {ok, reason}), docker ({inspect, start, stop}), logs, sleep (ms -> Promise), now, readyMs, pollMs, logDir.
 import fs from 'node:fs';
 import path from 'node:path';
 import { sleep } from '../lib/sleep.mjs';
@@ -14,6 +15,7 @@ import { dashboard, scan, scrub } from '../gates/sonar-local.mjs';
 import { sonarState } from '../gates/sonar-status.mjs';
 import { STARTUP, dockerOf, localStackConfig, stateOf } from './release-sonar-stack.mjs';
 import { awaitSonarUp, logsOf } from './release-sonar-wait.mjs';
+import { removeLintReport, writeLintReport } from './release-sonar-report.mjs';
 import { tempRoot } from '../../engine/temp-root.mjs';
 
 const SCAN_TIMEOUT_SEC = 60 * 60;
@@ -43,7 +45,8 @@ export function sonarSupplier(apps, deps = {}) {
   /** The reason the stack cannot be started from the states its containers were found in, or null. */
   const unusable = (states) => {
     const bad = states.filter((s) => ['docker-unavailable', 'missing', 'dead', 'removing'].includes(s.state));
-    return bad.length ? `the Sonar stack cannot be started: ${bad.map((s) => `${s.name} is ${s.state}`).join(', ')} (ext/sonar/README.md re-creates it)` : null;
+    const named = bad.map((s) => `${s.name} is ${s.state}`).join(', ');
+    return bad.length ? `the Sonar stack cannot be started: ${named} (ext/sonar/README.md re-creates it)` : null;
   };
 
   /** Start what is not running, the database first; a paused or crash-looping container is stopped before. The reason it failed, or null. */
@@ -73,16 +76,18 @@ export function sonarSupplier(apps, deps = {}) {
     const t0 = now();
     const log = path.join(logDir(), `sonar-${app.name.replace(/[^\w.-]+/g, '_')}-${t0}.log`);
     const lines = [];
-    const finish = (ok) => { fs.writeFileSync(log, `${lines.join('\n')}\n`); return { ok, log, ms: now() - t0 }; };
+    const finish = (ok) => { removeLintReport(app.dir); fs.writeFileSync(log, `${lines.join('\n')}\n`); return { ok, log, ms: now() - t0 }; };
     let cfg;
     try { cfg = gate.config(app.dir); } catch (error) { lines.push(`sonar config: ${error.message}`); return finish(false); }
     const up = await bringUp(cfg);
     if (!up.ok) { lines.push(`sonar stack: ${up.reason}`); return finish(false); }
+    const report = (deps.lintReport ?? writeLintReport)(app.dir);
+    if (!report.ok) { lines.push(`sonar lint report: ${report.reason}`); return finish(false); }
     const failed = await findInOrder([['scan --project-gate', gate.scan], ['dashboard', gate.dashboard]], async ([command, run]) => {
-      let report;
-      try { report = await run(cfg, app.dir); } catch (error) { lines.push(`== sonar-local ${command} ${app.name}: threw ${scrub(error?.message ?? error)}`); return true; }
-      lines.push(`== sonar-local ${command} ${app.name}: ${report?.outcome ?? 'no outcome'}`, scrub(JSON.stringify(report, null, 2)));
-      return report?.outcome !== 'pass';
+      let outcome;
+      try { outcome = await run(cfg, app.dir); } catch (error) { lines.push(`== sonar-local ${command} ${app.name}: threw ${scrub(error?.message ?? error)}`); return true; }
+      lines.push(`== sonar-local ${command} ${app.name}: ${outcome?.outcome ?? 'no outcome'}`, scrub(JSON.stringify(outcome, null, 2)));
+      return outcome?.outcome !== 'pass';
     });
     return finish(failed === undefined);
   };

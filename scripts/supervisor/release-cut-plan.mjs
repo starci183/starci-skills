@@ -15,7 +15,7 @@ function remoteMainHead({ run, cwd, remote, branch }) {
 }
 
 /** {verdict, why, findings} when the commit cannot become the release `tag` of `remote`, else null. `deps.findings` replaces the definition in specs. */
-export function definitionRefusal({ run, cwd, head, remote, branch, tag, deps = {} }) {
+function definitionRefusal({ run, cwd, head, remote, branch, tag, deps = {} }) {
   const remoteHead = remoteMainHead({ run, cwd, remote, branch });
   if (remoteHead === null) return { verdict: 'remote-unreachable', why: `could not read ${branch} of ${remote}`, findings: [] };
   const findings = (deps.findings ?? releaseFindings)({ cwd, commit: head, remoteCommit: remoteHead || null, tag, needTag: false, needReceipt: false });
@@ -27,7 +27,13 @@ export function definitionRefusal({ run, cwd, head, remote, branch, tag, deps = 
 export async function sonarHostRefusal({ repo, deps = {} }) {
   const findings = await (deps.sonarHost ?? sonarHostFindings)(exampleApps(repo));
   if (!findings.length) return null;
-  return { verdict: 'sonar-host', why: `the local Sonar stack cannot come up on this host: ${findings.map((f) => `${f.what} (${f.fix})`).join('; ')}`, findings };
+  const described = findings.map((f) => `${f.what} (${f.fix})`);
+  return { verdict: 'sonar-host', why: `the local Sonar stack cannot come up on this host: ${described.join('; ')}`, findings };
+}
+
+/** The refusal of a cut before any suite runs: the release definition, then the docker host's ability to bring up the Sonar stack; null when neither refuses. */
+export async function preSuiteRefusal({ repo, run, cwd, head, remote, branch, tag, deps = {} }) {
+  return definitionRefusal({ run, cwd, head, remote, branch, tag, deps }) ?? await sonarHostRefusal({ repo, deps });
 }
 
 /** The result of `release cut --plan`: the steps the cut runs on this commit, the push it makes, the record the pre-push hook then asks for. */

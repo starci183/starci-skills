@@ -25,7 +25,8 @@ const seconds = (ms) => Math.round(ms / 1000);
 function stoppedReason({ host, container, containerState, logs }) {
   const tail = logs({ container });
   const hint = logHint(`${tail.stdout ?? ''}\n${tail.stderr ?? ''}`);
-  return `the SonarQube container ${container} is ${containerState} while waiting for ${host}${hint ? `: ${hint}` : ' (docker logs shows no known cause)'}`;
+  const cause = hint ? `: ${hint}` : ' (docker logs shows no known cause)';
+  return `the SonarQube container ${container} is ${containerState} while waiting for ${host}${cause}`;
 }
 
 /** The reason for a state the wait stops on at once, or '' when the wait goes on. */

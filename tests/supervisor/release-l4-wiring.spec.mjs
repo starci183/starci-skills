@@ -151,6 +151,7 @@ function fakeSonar({ states, upAfter = 0, scan = 'pass', dashboard = 'pass', sta
         start: (names) => { log.push(['start', ...names]); if (startStatus === 0) for (const n of names) state[n] = 'running'; return { status: startStatus, stderr: 'boom' }; },
         stop: (names) => { log.push(['stop', ...names]); for (const n of names) state[n] = 'exited'; return { status: 0 }; },
       },
+      lintReport: () => ({ ok: true }),
       sleep: async () => {},
       now: (() => { let n = 0; return () => (n += 1000); })(),
       logDir: null,
