@@ -590,6 +590,7 @@ complete -c starci -n '__starci_using_command kernel enqueue' -l after -r -d 'co
 complete -c starci -n '__starci_using_command kernel enqueue' -l foundation -r -d 'shared foundation this unit builds'
 complete -c starci -n '__starci_using_command kernel enqueue' -l new-module -r -d 'comma list of module root dirs the grant creates'
 complete -c starci -n '__starci_using_command kernel enqueue' -l retry-of -r -d 'job this one retries'
+complete -c starci -n '__starci_using_command kernel enqueue' -l switch-agent -d 'with --retry-of, the agent pool of the attempt being retried is demoted for this retry (the route table runs it on another eligible pool); a Kernel'\''s choice to replace the agent'
 complete -c starci -n '__starci_using_command kernel enqueue' -l reopen -r -d 'reason a settled unit is reopened'
 complete -c starci -n '__starci_using_command kernel enqueue' -l derived-from -r -d 'comma list of job ids this unit derives from'
 complete -c starci -n '__starci_using_command kernel enqueue' -l canon-scan -r -d 'canon scan file of a canon slice'

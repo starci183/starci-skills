@@ -1465,6 +1465,7 @@ enqueue a work-unit job with its op, owned paths, records and retry lineage
 | `--foundation` | string |  |
 | `--new-module` | string |  |
 | `--retry-of` | string |  |
+| `--switch-agent` | boolean |  |
 | `--reopen` | string |  |
 | `--derived-from` | string |  |
 | `--canon-scan` | string |  |
