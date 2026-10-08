@@ -65,7 +65,8 @@ test('the memo follows HEAD, and a revision git did not know is asked again, nev
   assert.deepEqual(open.out.frontier.gateConditions.map((g) => [g.incidentId, g.met]), fx.gates.map((id) => [id, false]));
   // Committing the awaited path moves the other repo's HEAD: the HEAD-pinned reads are new keys, read live.
   git(fx.other, 'add', '-A'); git(fx.other, 'commit', '-qm', 'app');
-  fx.status();
+  // Releasing a met gate is the reconciler's reaction; the status call of a person leaves it open.
+  fx.status({ STARCI_ACTOR: 'reconciler/job' });
   const states = fx.seed((l) => fx.gates.map((id) => l.db.prepare('SELECT status FROM incidents WHERE incident_id=?').get(id).status));
   assert.deepEqual(states, ['resolved', 'resolved'], 'the commit released both gates through a warm memo');
 
