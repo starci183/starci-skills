@@ -292,7 +292,13 @@ steps:
         custom property it declares there, the exact value, its line and the file digest. The brand
         checks pass it as planned-from-reference until the app declares it and refuse it at
         review.verify if the app still does not; the token name must still be one the grammar DNA
-        declares."
+        declares. A token the owner ruled in an ask that is already answered (owner_answers carries
+        `[dispatchId, ...]` and the chosen option's words hold the value) and that no file declares is traced to
+        that ruling: `valueSource: {ruling: <dispatchId>, token: <this brand token>, value: <the ruled
+        value>}`. The checks read the ledger's recorded answer, require it to carry the value and mark the token
+        planned-from-ruling; the declaration in the app theme is then owed to interface.implement, which must
+        write it, and review.verify refuses the token until it does. Such a token is never a question to the
+        owner again and never a blocker."
   - reads:
       - sources
       - knowledge
@@ -525,9 +531,11 @@ blockers:
         path; never substitute a remembered value for an unreadable file.
   - code: BRAND_TOKEN_UNTRACEABLE
     condition:
-      en: A required token value cannot be traced to a declaration in a real source file, or two sources
-        disagree about it. Report `ask` naming the token, the candidate values and the files; never
-        write the value you would have chosen.
+      en: A required token value cannot be traced to a declaration in a real source file, to a reference
+        render (`valueSource.path`) or to an answered ruling (`valueSource.ruling`), or two sources disagree
+        about it. Report `ask` naming the token, the candidate values and the files; never write the value
+        you would have chosen. A value the owner already ruled in an answered ask is traced to that ruling,
+        not asked again and not reported blocked for a declaration a later leg owes.
   - code: BRAND_DECISION_UNRULED
     condition:
       en: An identity decision the record needs - primary hue, whether danger may match primary, the

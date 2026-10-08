@@ -11,10 +11,11 @@ import {objectList} from '../../lib/list.mjs';
 import {formatCheckLines} from '../../lib/check-format.mjs';
 import { isInside as inside } from '../../lib/walk.mjs';
 import {readJsonFile as readJson} from '../../lib/json.mjs';
-import {parseColor,contrastRatio,deltaEOk} from './brand-colour.mjs';
+import {parseColor,contrastRatio,deltaEOk,TOKEN_TOLERANCE} from './brand-colour.mjs';
+import {OWED_TO,checkValueSource as checkSource} from './brand-value-source.mjs';
 import {readText,readSourceTokens,lookupToken} from './brand-tokens.mjs';
 import {text as trimmedText} from '../../lib/stack-declaration.mjs';
-export {parseColor,contrastRatio,deltaEOk,rgbToOklab,oklabToRgb,oklabToOklch,oklchToOklab,formatHex} from './brand-colour.mjs';
+export {TOKEN_TOLERANCE,parseColor,contrastRatio,deltaEOk,rgbToOklab,oklabToRgb,oklabToOklch,oklchToOklab,formatHex} from './brand-colour.mjs';
 export {parseCssCustomProperties,parseTokenData,readSourceTokens} from './brand-tokens.mjs';
 
 /**
@@ -51,7 +52,6 @@ const softToneOf=token=>{const match=/^(success|warning|info|danger)-soft$/.exec
  * "continue". The match tolerance is half a unit: below perception, wide enough for hex/oklch rounding.
  */
 export const MIN_PRIMARY_DANGER_DELTA=20;
-export const TOKEN_TOLERANCE=0.5;
 const ASSET_EXTENSIONS=['.png','.svg','.webp','.jpg','.jpeg'];
 export const OFFENDER_CAP=20;
 const SCAN_EXCLUDED=new Set(['node_modules','dist','.next','.git','.dist','coverage','build','out','.turbo','.cache']);
@@ -130,48 +130,11 @@ export function brandStage(value){
   if(!stage)throw new Error(`Unknown brand check stage ${JSON.stringify(value)}: expected one of ${Object.keys(STAGE_ALIASES).join(', ')}.`);
   return stage;
 }
-/** The statuses tokens-match-source accepts: the app source carries the colour, or (decide only) its reference does. */
-export const TOKEN_PASS_STATUSES=Object.freeze(['match','planned-from-reference']);
-const collapse=value=>String(value??'').trim().replace(/\s+/g,' ').toLowerCase();
+/** The statuses tokens-match-source accepts: the app source carries the colour, or (decide only) its reference file or its ruling does. */
+export const TOKEN_PASS_STATUSES=Object.freeze(['match','planned-from-reference','planned-from-ruling']);
 const isPlannedToken=token=>token?.valueSource!==undefined&&token?.valueSource!==null;
 
-/**
- * A token the app has not written yet may name the external render it was read from:
- * `valueSource: {path, value, token?, line?, sha256?}`. `path` is relative to the same --source root as
- * `sources[]` (for example `acme-fe/src/app/globals.css`) and is only ever read; `token` is the
- * name the reference declares (default: the brand token's own name); `value` is the exact value it declares
- * there. The reference passes when that declaration exists in the default (light) scope with exactly that
- * text, its colour is the brand value, and a declared sha256 still names the file's bytes.
- */
-export function checkValueSource({sourceRoot,token}){
-  const reference=token?.valueSource;
-  const invalid=why=>({status:'value-source-invalid',why});
-  if(!reference||typeof reference!=='object'||Array.isArray(reference))return invalid('valueSource must be an object {path, value, token?, line?, sha256?}');
-  if(typeof reference.path!=='string'||!reference.path.trim())return invalid('valueSource.path must name the reference file, relative to the --source root');
-  if(typeof reference.value!=='string'||!reference.value.trim())return invalid('valueSource.value must be the exact value the reference declares');
-  const name=reference.token??token.token;
-  if(typeof name!=='string'||!/^--[A-Za-z0-9_-]+$/.test(name))return invalid('valueSource.token must be the custom property the reference declares');
-  const evidence={path:slash(reference.path),token:name,value:reference.value,line:reference.line??null,declaredSha256:reference.sha256??null};
-  const extension=path.extname(reference.path).toLowerCase();
-  const read=readSourceTokens(sourceRoot,{path:reference.path,kind:extension==='.css'?'css':'tokens'});
-  if(read.error)return {...evidence,status:'reference-unreadable',why:read.error};
-  if(reference.sha256!==undefined&&reference.sha256!==null){
-    const computed=digest(fs.readFileSync(path.resolve(sourceRoot,reference.path)));
-    if(String(reference.sha256).toLowerCase()!==computed)
-      return {...evidence,computedSha256:computed,status:'reference-digest-mismatch',why:'the reference file is no longer the bytes the brand read'};
-  }
-  const found=lookupToken([read],name);
-  if(!found)return {...evidence,status:'reference-absent',why:`the reference does not declare ${name}`};
-  if(found.scope==='dark')return {...evidence,actual:found.value,selector:found.selector,status:'reference-only-in-dark-scope',why:`the reference declares ${name} only in a dark scope`};
-  const declared=[found.value,found.declaredValue].filter(value=>value!==undefined).map(collapse);
-  if(!declared.includes(collapse(reference.value)))
-    return {...evidence,actual:found.declaredValue??found.value,selector:found.selector,status:'reference-differs',why:`the reference declares ${name}: ${found.declaredValue??found.value}, not ${reference.value}`};
-  const expected=parseColor(token.value),planned=parseColor(reference.value);
-  if(!expected||!planned)return {...evidence,status:'unparseable-reference-value',why:'the brand value or the reference value is not a colour this runtime can parse'};
-  const delta=round(deltaEOk(expected,planned),3);
-  if(delta>TOKEN_TOLERANCE)return {...evidence,deltaE:delta,status:'reference-differs',why:`the brand value ${token.value} is not the reference value ${reference.value}`};
-  return {...evidence,selector:found.selector,deltaE:delta,status:'planned-from-reference'};
-}
+export const checkValueSource=options=>checkSource({findReceipt:findOwnerReceipt,...options});
 
 /**
  * 1. The brand is bound to the source, not copied from it. Every colour token the brand declares must exist
@@ -181,7 +144,7 @@ export function checkValueSource({sourceRoot,token}){
  * declared source carries the token the normal match applies, and at the `verify` stage a planned token
  * still absent from every declared source is `planned-source-missing`.
  */
-export function checkTokensMatchSource({brand,sourceRoot,stage='decide'}){
+export function checkTokensMatchSource({brand,sourceRoot,stage='decide',brandDir=null}){
   const id='tokens-match-source';
   const phase=brandStage(stage);
   const tokens=brandTokens(brand);
@@ -214,7 +177,7 @@ export function checkTokensMatchSource({brand,sourceRoot,stage='decide'}){
     if(!expected)return {token:token.token,expected:token.value??null,actual:found?.value??null,status:'unparseable-brand-value'};
     if(!found){
       if(!isPlanned)return {token:token.token,expected:token.value,actual:null,status:'absent'};
-      const {status,...reference}=checkValueSource({sourceRoot,token});
+      const {status,...reference}=checkValueSource({sourceRoot,token,brandDir});
       if(phase==='verify')return {token:token.token,expected:token.value,actual:null,status:'planned-source-missing',
         valueSource:{...reference,referenceStatus:status,why:'the app source does not declare this planned token at the verify stage'}};
       return {token:token.token,expected:token.value,actual:null,status,valueSource:reference};
@@ -229,10 +192,13 @@ export function checkTokensMatchSource({brand,sourceRoot,stage='decide'}){
   });
   const bad=findings.filter(finding=>!TOKEN_PASS_STATUSES.includes(finding.status));
   const fromReference=findings.filter(finding=>finding.status==='planned-from-reference');
+  const fromRuling=findings.filter(finding=>finding.status==='planned-from-ruling');
   const evidence={sourceRoot:slash(sourceRoot),tolerance:TOKEN_TOLERANCE,stage:phase,files,tokens:findings};
   const planNote=fromReference.map(finding=>`${finding.token} (${finding.valueSource.path} ${finding.valueSource.token})`).join(', ');
-  const passed=fromReference.length
-    ?`All ${findings.length} brand colour tokens are bound: ${findings.length-fromReference.length} present in the shipped source with the declared colour, ${fromReference.length} planned from their reference render until the app source declares them: ${planNote}.`
+  const rulingNote=fromRuling.map(finding=>`${finding.token} (ruling ${finding.valueSource.ruling}, ${finding.valueSource.answeredBy})`).join(', ');
+  const rulingText=fromRuling.length?`; ${fromRuling.length} planned from the ledger's recorded ruling and owed to ${OWED_TO} as a declaration in the app theme: ${rulingNote}`:'';
+  const passed=fromReference.length||fromRuling.length
+    ?`All ${findings.length} brand colour tokens are bound: ${findings.length-fromReference.length-fromRuling.length} present in the shipped source with the declared colour, ${fromReference.length} planned from their reference render until the app source declares them: ${planNote}${rulingText}.`
     :`All ${findings.length} brand colour tokens are present in the shipped source with the declared colour.`;
   return bad.length
     ?check(id,'fail',`${bad.length} of ${findings.length} brand colour tokens do not match the shipped source: ${bad.map(finding=>finding.token+' ('+finding.status+(finding.valueSource?.why?': '+finding.valueSource.why:'')+')').join(', ')}.`,evidence)
@@ -278,7 +244,7 @@ export function findOwnerReceipt({acceptedBy,receipt=null,brandDir=null,answerer
     if(answer?.schema!==OWNER_ANSWER_SCHEMA)return {ok:false,why:`${named} is not a ${OWNER_ANSWER_SCHEMA} receipt`};
     if(answer.dispatchId!==acceptedBy)return {ok:false,why:`${named} answers ${answer.dispatchId??'(no dispatch)'}, not ${acceptedBy}`};
     if(answer.answeredBy!==answerer)return {ok:false,why:`${acceptedBy} was answered by ${answer.answeredBy??'(nobody)'}, not ${answerer===OWNER_ANSWERER?'the owner':answerer}`};
-    return {ok:true,provisional:answer.provisional===true,gatesOk:answer.acceptance?.receipt?.ok===true,file:named,dispatchId:answer.dispatchId,answeredBy:answer.answeredBy,at:answer.at??null,option:answer.option??null,optionIndex:answer.optionIndex??null,review:answer.review??null};
+    return {ok:true,provisional:answer.provisional===true,gatesOk:answer.acceptance?.receipt?.ok===true,file:named,dispatchId:answer.dispatchId,answeredBy:answer.answeredBy,at:answer.at??null,option:answer.option??null,optionIndex:answer.optionIndex??null,note:answer.note??null,picks:answer.picks??null,review:answer.review??null};
   };
   if(receipt!==null&&receipt!==undefined){
     if(typeof receipt!=='string'||!receipt.trim())return {ok:false,why:'receipt must be blob:<sha256> or the path of the owner answer receipt'};

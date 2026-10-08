@@ -158,10 +158,11 @@ cases:
     why: "status and dispatch do not yet agree on the same admission verdict; the digest has no signal for the disagreement"
   - id: brand-decision-gate-needs-later-leg-edit
     family: correctness
-    finding: {role: runtime, duty: bound, verdict: departs, evidence: "Nivo brand.decide blocked BRAND_TOKEN_UNTRACEABLE: the op reported correctly (a correct error); the departure is the contract that demands a trace its own scope forbids producing", remedy: {state: open, lane: f2}}
-    met: {date: "2026-10-08", where: "brand.decide gate demanded an edit a later leg makes", evidence: "owner report 2026-10-08"}
-    status: open
-    why: "the brand.decide contract belongs to the workflow-blockers lane (f2) and is not yet merged"
+    finding: {role: runtime, duty: bound, verdict: departs, evidence: "Nivo brand.decide blocked BRAND_TOKEN_UNTRACEABLE: the op reported correctly (a correct error); the departure is the contract that demands a trace its own scope forbids producing. The ruling was an answered ask (dispatch ctx_398c5d4ea8da, answeredBy autopilot, option A naming --accent: #040d1c), no file declared the value, and the declaring file belongs to interface.implement", remedy: {state: in-tree, change: "valueSource has a ruling form {ruling, token, value} checked against the ledger's recorded answer (brand-value-source.mjs): the answer must exist, be an owner, autopilot or auto-accept answer, carry the value, and the token be this brand token; the token passes as planned-from-ruling with the declaration owed to interface.implement (its planned-brand-tokens requirement), and review.verify refuses it as planned-source-missing until the app theme declares it"}}
+    met: {date: "2026-10-08", where: "brand.decide gate demanded an edit a later leg makes", evidence: "owner report 2026-10-08; nivo ledger op-brand.decide-f093d5c923 report 4; decisions dec-26ab5d9fc8a0"}
+    rule: {file: scripts/work/brand/brand-value-source.mjs, anchor: "planned-from-ruling"}
+    spec: tests/work-brand/brand-ruling-source.spec.mjs
+    status: covered
   - id: work-author-before-prerequisite
     family: correctness
     finding: {role: kernel, duty: never, verdict: departs, evidence: "StarCi work.author blocked on a missing design input and reported it (a correct error); work.author was dispatched before its prerequisite and the reported block then stood 13 to 15 hours: the Kernel and the runtime left a reported block unhandled", remedy: {state: open, lane: f2}}

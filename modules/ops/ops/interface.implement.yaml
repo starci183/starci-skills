@@ -554,6 +554,13 @@ proofs:
       en: Fix scoped failures and rerun affected checks. Sonar passes only as the sonar-local.mjs
         attached sonar.json summary with scope slice and outcome pass for the tested commit, the whole-project gate is a note, never a
         block. Reuse existing authorization and keep secrets outside evidence.
+  - id: planned-brand-tokens
+    requirement:
+      en: "Every brand colour token that declares a valueSource (a reference render or a ruling the brand.decide leg traced it to) is
+        a declaration this leg owes: it is written into the app theme under its brand token name with its brand value, and
+        `starci work brand <work-root> --source <repository-root> --stage verify` reports no planned-source-missing token.
+        A planned token the app theme still does not declare keeps this leg from done."
+    check: scripts/work/brand/brand.mjs
   - id: shell-layout
     requirement:
       en: "`starci work shell-conformance <impl-record-dir>` exits 0 for the written
