@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { jobResult } from '../../engine/db/ledger.mjs';
 import { unresolvedFailures } from './failure-steps.mjs';
+import { TERMINAL_HOLDS, filedReportOf, holdView, ownerWaitsWithoutAsk, upstreamPlanOf } from './terminal-step.mjs';
 import { domainsOfPaths, latestVersion as latestGraphVersion } from '../work/work-graph-store.mjs';
 import { deferredFieldOf, externalOpsOf, legStatusColorOf } from './leg-status-view.mjs';
 import { ownerLanguage as ownerLanguageOf, translator } from '../lib/i18n.mjs';
@@ -28,14 +29,31 @@ export const LEG_IN_FLIGHT = ['leased', 'running', 'answering', 'effect_unknown'
 /** The newest work-graph nodes of a workflow (display names read what a job covers); null without one. */
 export const latestGraphNodesOf = (db, workflowId) => { try { return latestGraphVersion(db, workflowId)?.graph?.nodes ?? null; } catch { return null; } };
 export const nextActionLabel = (action) => `${action.kind} ${action.op ?? '-'}` + (action.jobId ? ' ' + action.jobId : '') + (action.displayName ?? action.label ? ' «' + (action.displayName ?? action.label) + '»' : '');
+/** A failed attempt whose settle recorded no step: the runtime routes it (reconcile --route-failure), or it waits for the leg that cures its blocker. */
+const unsteppedAction = (db, row) => {
+  const blocker = filedReportOf(db, row.job_id)?.blocker ?? null;
+  const upstream = blocker ? upstreamPlanOf(db, row, blocker) : null;
+  if (upstream?.action === 'wait') {
+    return { kind: 'wait', op: row.op_id, jobId: row.job_id, reason: `${row.job_id} was blocked (${blocker}) and waits for ${upstream.on}: its retry is enqueued behind that leg once it has a job` };
+  }
+  return { kind: 'retry', op: row.op_id, jobId: row.job_id, reason: `${row.job_id} failed and nothing follows it (no step recorded): starci kernel reconcile --job ${row.job_id} --route-failure routes it by the table - the Job controller runs it within a pass; a step that records none is yours: retry with the failure fed back, switch agent, re-plan, or raise the typed gate` };
+};
 /** A failed attempt nothing follows (its owner-gate resolved, no deferral): retry it. */
 const unresolvedRetryActions = (actions, ctx) => {
   const { db, ownerGates, unresolved, deferredJobs } = ctx;
   for (const row of unresolved) {
     const step = jobResult(db, row.job_id)?.nextStep;
-    if (!step || ownerGateOf(ownerGates, row) || step.kind === 'deferred' || deferredJobs.has(row.job_id)) continue;
+    if (ownerGateOf(ownerGates, row) || deferredJobs.has(row.job_id)) continue;
+    if (!step) { actions.push(unsteppedAction(db, row)); continue; }
+    if (step.kind === 'deferred') continue;
     actions.push({ kind: 'retry', op: row.op_id, jobId: row.job_id,
       reason: `${row.job_id} failed and nothing follows it (${['owner-gate', SUPERVISOR_GATE].includes(step.kind) ? step.kind + ' ' + step.incidentId + ' resolved' : step.reason}): starci kernel enqueue --op ${row.op_id} with its paths and records --retry-of ${row.job_id}` });
+  }
+};
+/** An owner wait that names no ask: the owner has nothing to answer, so the op runs again and files its question. */
+const askless = (actions, ctx) => {
+  for (const item of ownerWaitsWithoutAsk(ctx.awaitingOwner)) {
+    actions.push({ kind: 'retry', op: item.opId, jobId: item.jobId, reason: `${item.jobId} waits on the owner but filed no ask: starci kernel enqueue --op ${item.opId} --retry-of ${item.jobId} so it files its question` });
   }
 };
 /** An ask the owner (or the autopilot) answered: its op re-runs with the answer. */
@@ -236,8 +254,15 @@ const legsOf = (ctx) => {
   });
   return legs;
 };
+/** The terminal holds of the table that apply now, each with its handler, chain and bound: a failed job with no step, an owner wait with no ask. */
+const terminalHoldsOf = (ctx) => {
+  const { db, unresolved, awaitingOwner } = ctx;
+  const failed = unresolved.filter((row) => !jobResult(db, row.job_id)?.nextStep).map((row) => ({ jobId: row.job_id, op: row.op_id, ...holdView(TERMINAL_HOLDS.failedNoStep) }));
+  const asked = ownerWaitsWithoutAsk(awaitingOwner).map((item) => ({ jobId: item.jobId, op: item.opId, ...holdView(TERMINAL_HOLDS.ownerWaitNoAsk) }));
+  return [...failed, ...asked];
+};
 export function graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsByOp, failedRows, queued, ownerGates, peerWaits, awaitingOwner, staleReady, staleProofs = [], credentialWaitOps = new Set(), approvalWaitOps = new Set(), workGraph = null, assetSlotsOwed = [], autopilot = null }) {
-  if (wf.phase === 'finished') return { nextActions: [], legs: [] };
+  if (wf.phase === 'finished') return { nextActions: [], legs: [], terminal: [] };
   const unresolved = unresolvedFailures(db, failedRows, workflowJobs);
   const rowOf = new Map(workflowJobs.map((row) => [row.job_id, row]));
   const actions = [];
@@ -255,6 +280,7 @@ export function graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs,
   const ctx = { db, wf, legOps, planAncestors, workflowJobs, jobsByOp, failedRows, queued, ownerGates, peerWaits, awaitingOwner, staleReady, staleProofs, credentialWaitOps,
     approvalWaitOps, workGraph, assetSlotsOwed, autopilot, unresolved, rowOf, deferredJobs, specs, goalText, deferredPlanOps, specDeferredJobs, deferredQueued };
   unresolvedRetryActions(actions, ctx);
+  askless(actions, ctx);
   answeredAskActions(actions, ctx);
   reopenedActions(actions, ctx);
   deferredQueuedActions(actions, ctx);
@@ -270,7 +296,7 @@ export function graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs,
   inFlightWaitActions(actions, ctx);
   queuedWaitActions(actions, ctx);
   peerWaitActions(actions, ctx);
-  return { nextActions: nextActionsOf(actions, ownerGates, peerWaits), legs: legsOf(ctx) };
+  return { nextActions: nextActionsOf(actions, ownerGates, peerWaits), legs: legsOf(ctx), terminal: terminalHoldsOf(ctx) };
 }
 export const ownerGateOf = (gates, job) => {
   const opId = job.op_id ?? jobPayloadOf(job).opId ?? null;

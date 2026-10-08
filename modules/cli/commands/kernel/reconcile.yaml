@@ -31,6 +31,9 @@ flags:
   - name: release-worker
     type: boolean
     summary: release the worker of a job whose settle is held, keeping the job for its settle
+  - name: route-failure
+    type: boolean
+    summary: take the next step of a failed or blocked job that nothing follows (the Job controller runs it)
   - name: orphan-kernel-jobs
     type: boolean
     summary: cancel the kernel jobs of finished or archived workflows
@@ -65,6 +68,15 @@ hostEvent: "A worker disconnected, or gone with terminal_handle_stale, while the
   count. A launch-abandoned job (no worker ever launched) is environment launch-abandoned the same
   way, and a dirty file last written before the dispatch is debris, never the dead worker's effect
   evidence."
+routeFailure: "`--route-failure --job <id>` is the step of the `failed-no-step` hold (modules/kernel/op-incident-policy.yaml)
+  for a FAILED job that no retry, recorded next step or later success follows - a blocked report settles that way. It
+  routes the job like settle routes a failed attempt (modules/models/kinds.yaml routes, the report's blocker kind
+  in the shape) and records the step on its result: {ok, jobId, routed, step} with the step kinds of nextStep, or
+  {routed:false, wait:{action:'wait', on}} while the leg that cures a gap blocker has not started, or
+  {routed:false, reason:'owes-no-step'}. A gap blocker (srs-gap, sds-gap, interface-gap, brand-gap, grammar-gap,
+  test-gap) whose curing leg is in flight, or finished after the blocked attempt was dispatched, is not a gap in the record:
+  the op runs again `--after` that leg (route upstream-lands-first, counted false). Idempotent: a job with a step
+  answers owes-no-step. The Job controller runs it for every such job of a running workflow, whatever its age."
 orphanKernelJobs: "`--orphan-kernel-jobs` (no --job) settles every kernel job still queued, leased,
   running or answering whose workflow is finished or archived: status cancelled with result
   {reason:'orphan-kernel-job', workflowPhase, archivedAt, terminal}, its leases deleted, a finished

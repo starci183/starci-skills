@@ -7,6 +7,7 @@ import { jobPayloadOf, jobRowOf, operationTerminalHandleOf } from './shared/rows
 import { latestAttemptOf } from '../../machine/job-row.mjs';
 import { latestContractOf } from '../../machine/contract-version.mjs';
 import { leaseCanonOf } from './shared/peer-waits.mjs';
+import { routeFailure } from './shared/route-failure.mjs';
 import { VerbExit } from './shared/verb-exit.mjs';
 
 // A requeued job waits queued or ready (running -> ready after a dead worker, H13).
@@ -83,6 +84,14 @@ function releaseAttemptReservations(ledger, job, { jobId, dispatchId }) {
   return released;
 }
 
+/** The verdict line of `--route-failure`: the step recorded, the wait on the curing leg, or why none is owed. */
+function emitRouted(emit, args, jobId, out) {
+  let text = `route-failure ${jobId}: ${out.reason}`;
+  if (out.step) text = `route-failure ${jobId}: ${out.step.kind} - ${out.step.reason}`;
+  if (out.wait) text = `route-failure ${jobId}: waits on ${out.wait.on}`;
+  emit({ ok: true, jobId, ...out }, text, args.json);
+}
+
 export default {
   verb: 'reconcile',
   required: [],
@@ -100,10 +109,15 @@ export default {
   const db = ledger.db, jobId = args.job;
   const job = jobRowOf(db, jobId);
   if (!job) throw Object.assign(new Error(`unknown job ${jobId}`), { code: 'job-unknown' });
-  if (args.drop) return reconcileDrop(ledger, args, job);
-  if (args.reap) return reconcileReap(ledger, args, job);
-  if (args['release-worker']) return reconcileReleaseWorker(ledger, args, job, repo);
-  if (args['dead-worker']) return reconcileDeadWorker(ledger, args, job, repo);
+  const modes = {
+    'route-failure': () => emitRouted(emit, args, jobId, routeFailure({ ledger, job, repo, internals })),
+    drop: () => reconcileDrop(ledger, args, job),
+    reap: () => reconcileReap(ledger, args, job),
+    'release-worker': () => reconcileReleaseWorker(ledger, args, job, repo),
+    'dead-worker': () => reconcileDeadWorker(ledger, args, job, repo),
+  };
+  const mode = Object.keys(modes).find((flag) => args[flag]);
+  if (mode) return modes[mode]();
   if (job.status === 'effect_unknown' && parseJson(job.result_json ?? '', {})?.reason === 'dead-worker-fenced') {
     throw Object.assign(new Error(`job ${jobId} was fenced by --dead-worker on effect evidence (${(parseJson(job.result_json, {})?.evidence ?? []).join(', ')}); no host proof can requeue it - inspect the evidence and starci kernel settle it fail or blocked, then retry as a new attempt`), { code: 'dead-worker-fenced' });
   }

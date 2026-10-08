@@ -294,7 +294,7 @@ const displayPhase = (s) => {
 
 const statusOut = (s) => ({
   ok: true, workflowId: s.workflowId, title: s.title, slug: s.wf.title ?? null, phase: s.wf.phase ?? null, archivedAt: s.wf.archived_at ?? null,
-  frontier: s.frontier, nextActions: s.graph.nextActions, legs: s.graph.legs, testsDeferred: s.testsDeferred, autopilot: s.autopilotView.view,
+  frontier: s.frontier, nextActions: s.graph.nextActions, legs: s.graph.legs, terminal: s.graph.terminal, testsDeferred: s.testsDeferred, autopilot: s.autopilotView.view,
   workGraph: s.workGraph ? { version: s.workGraph.version, event: s.workGraph.event, counts: s.workGraph.counts, frontier: s.workGraph.frontier.map(({ id, domain, slice, color, lastOp }) => ({ id, domain, slice, color, lastOp })) } : null,
   kernel: s.kernel, jobs: s.byStatus, failures: s.failures, awaitingOwner: s.awaitingOwner, activeLeases: s.leases,
   inboxPending: s.inboxPending, reports: s.reports, workers: s.workers, workerQuestions: s.workerQuestions, peerMessages: s.peerMessages,

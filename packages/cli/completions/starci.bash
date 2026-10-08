@@ -1000,7 +1000,7 @@ _starci() {
         kernel:provider-backoff) COMPREPLY=( $(compgen -W "--repo --provider --open-circuit --kind --reason --by --json --cwd --quiet --help --edition" -- "$cur") );;
         kernel:provider-health) COMPREPLY=( $(compgen -W "--repo --provider --recover --reason --probe --quota-probe --force --workflow --json --cwd --quiet --help --edition" -- "$cur") );;
         kernel:questions) COMPREPLY=( $(compgen -W "--repo --workflow --json --cwd --quiet --help --edition" -- "$cur") );;
-        kernel:reconcile) COMPREPLY=( $(compgen -W "--repo --job --drop --reason --dead-worker --settle-failed --no-salvage --release-worker --orphan-kernel-jobs --workflow --dry-run --json --cwd --quiet --help --edition" -- "$cur") );;
+        kernel:reconcile) COMPREPLY=( $(compgen -W "--repo --job --drop --reason --dead-worker --settle-failed --no-salvage --release-worker --route-failure --orphan-kernel-jobs --workflow --dry-run --json --cwd --quiet --help --edition" -- "$cur") );;
         kernel:record-change) COMPREPLY=( $(compgen -W "--repo --workflow --record --reach --reason --json --cwd --quiet --help --edition" -- "$cur") );;
         kernel:record-checks) COMPREPLY=( $(compgen -W "--repo --job --checks --checks-file --json --cwd --quiet --help --edition" -- "$cur") );;
         kernel:redesign) COMPREPLY=( $(compgen -W "--repo --workflow --op --paths --decision --brief --json --cwd --quiet --help --edition" -- "$cur") );;

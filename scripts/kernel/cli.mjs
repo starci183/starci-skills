@@ -356,7 +356,7 @@ const usage = (code) => {
            re-queue the test legs the owner's config.yaml specs switches deferred (starci kernel status testsDeferred)`);
   throw new VerbExit(code);
 };
-const BOOLEAN_FLAGS = new Set(['json', 'spawn', 'drop', 'to-owner', 'deliveries', 'dead-worker', 'settle-failed', 'release-worker', 'now', 'recover', 'probe', 'until-message', 'orphan-kernel-jobs', 'dry-run', 'sweep', 'bundle', 'checklist', 'defer-to-handover', 'declare-none', 'quota-probe', 'force', 'no-terminals', 'publish-interface', 'release', 'reconcile']);
+const BOOLEAN_FLAGS = new Set(['json', 'spawn', 'drop', 'to-owner', 'deliveries', 'dead-worker', 'settle-failed', 'release-worker', 'route-failure', 'now', 'recover', 'probe', 'until-message', 'orphan-kernel-jobs', 'dry-run', 'sweep', 'bundle', 'checklist', 'defer-to-handover', 'declare-none', 'quota-probe', 'force', 'no-terminals', 'publish-interface', 'release', 'reconcile']);
 // A --until-<type> <spec> collects in order as [type, spec] (gate-conditions.mjs); a bare
 // --until-message keeps its peer-wait meaning (any next message from --peer).
 const untilSpecOf = (argv, i) => {
@@ -3678,7 +3678,7 @@ const API_INTERNALS = Object.freeze({
   cleanupManagedWorker,
   releaseManagedWorker, heldDispatchOf,
   CUT_SLICE_CHECKS, VERDICT_OUTCOMES, agentOfJob, canonSettleFollowUp, enqueueNextStep, failureClassOf,
-  failureShapeOf, latestKernelJobOf, recordOpRevDrift,
+  failureShapeOf, enqueueFollowOn, latestKernelJobOf, recordOpRevDrift,
   recordSettledAssetSlots, recordSettledGrammarProposals, releasedWhileHeldOf, seamSettleReconciles,
   settleDrawAcceptance, settleDrawMetrics, settleOpGate, settleOpProofs, settleProofMedia, settleSonarGate, settleWorkHygiene, widenCanonWire,
 });

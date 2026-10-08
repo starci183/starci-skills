@@ -17,6 +17,9 @@
 //   effect_unknown older than effectUnknownMs   -> starci kernel reconcile --job <id>                                  job.worker
 //   settled, worker release unproven            -> the settler for this job (its releaseSettled closes and    job.close-verify
 //                                                  verifies the terminal), recordLeftover op-worker-after-settle
+//   failed, nothing follows it                  -> starci kernel reconcile --job <id> --route-failure; a step that records   job.settle
+//                                                  none, or a refusal, opens Decision Item retry-decision
+//   awaiting_owner with no ask                  -> Decision Item retry-decision (the owner has nothing to answer)      job.consume-check
 //   wf: running < allowedParallel, queued-ready -> starci kernel dispatch-ready --workflow <wf> (at most once per       job.dispatch
 //                                                  dispatchEveryMs per workflow)
 //   workers:supervisor                          -> scripts/supervisor/supervisor-watchdog.mjs sweepWorkers (called, not   job.close-verify
@@ -44,6 +47,7 @@ import { reportedJobs, kernelHandoverOf, KERNEL_ONLY_OPS } from '../../machine/r
 import { SETTLED_JOB_LIST } from '../../../engine/admission.mjs'; import { isMain } from '../../lib/is-main.mjs';
 import { positiveNumber } from '../../lib/number.mjs';
 import { ownerOnlyQuestion } from '../../kernel/op-incident-policy.mjs';
+import { TERMINAL_HOLDS, holdView, terminalFactsOf } from '../../kernel/terminal-step.mjs';
 const selfFile = fileURLToPath(import.meta.url);
 const skillRoot = path.resolve(path.dirname(selfFile), '..', '..', '..');
 const JOB_FILE = path.join(skillRoot, 'modules', 'reconciler', 'job.yaml');
@@ -127,6 +131,7 @@ export function jobFacts(db, jobId, { now = Date.now(), settings = jobSettings()
     handover: handover ? { reason: handover.reason ?? null, detail: handover.detail ?? null, at: handover.at } : null,
     released, releaseProof: releaseProofOf(payload), settledAt: SETTLED.includes(row.status) ? Number(payload.settledAt ?? row.updated_at) : null,
     dispatchedAt: lastEventAt('op-dispatched'), questionAt: lastEventAt('worker-question-bridged'), now, windowMs: settings.settledWindowMs,
+    terminal: terminalFactsOf(db, jobId),
   };
 }
 
@@ -136,8 +141,10 @@ export function listKeysOf(db, ledgerId, { now = Date.now(), settings = jobSetti
     WHERE j.kind='op' AND w.archived_at IS NULL AND COALESCE(w.phase,'') <> 'finished' AND j.status IN (${OPEN.map(() => '?').join(',')})`).all(...OPEN);
   const settled = db.prepare(`SELECT job_id, workflow_id FROM jobs WHERE kind='op' AND status IN (${SETTLED.map(() => '?').join(',')}) AND updated_at>?`)
     .all(...SETTLED, now - settings.settledWindowMs);
+  const owing = db.prepare("SELECT j.job_id FROM jobs j JOIN workflows w ON w.workflow_id=j.workflow_id WHERE j.kind='op' AND w.archived_at IS NULL AND w.phase='running' AND j.status IN ('failed','awaiting_owner')").all()
+    .filter((r) => terminalFactsOf(db, r.job_id) !== null);
   const keys = new Set();
-  for (const r of [...live, ...settled]) keys.add(jobKey(ledgerId, r.job_id));
+  for (const r of [...live, ...settled, ...owing]) keys.add(jobKey(ledgerId, r.job_id));
   for (const id of openClockJobs) keys.add(jobKey(ledgerId, id));
   for (const r of live) keys.add(wfKey(ledgerId, r.workflow_id));
   return [...keys];
@@ -172,6 +179,7 @@ export function planJob(f, { frontier = {}, questions = [], settings = jobSettin
     if (f.now - f.updatedAt > settings.effectUnknownMs) set({ kind: 'effect-unknown', concern: 'job.worker', verb: 'reconcile', argv: ['--job', f.jobId] });
   }
   if (SETTLED.includes(f.status) && !f.released && f.now - f.updatedAt <= f.windowMs) planCloseVerify(f, clock, set);
+  if (f.terminal && !f.terminal.taken) planTerminal(f, clock, set);
   return { step, clocks };
 }
 
@@ -188,6 +196,13 @@ function planReport(f, clock, set) {
     clock('SETTLE_OVERDUE', f.report.filedAt);
     set({ kind: 'settle', concern: 'job.settle' });
   }
+}
+
+/** The clock and step of a job left terminal with nothing after it (policy holds failed-no-step, owner-wait-no-ask). */
+function planTerminal(f, clock, set) {
+  clock('DECISION_OVERDUE', f.terminal.since);
+  if (f.terminal.hold === TERMINAL_HOLDS.failedNoStep) set({ kind: 'route-failure', concern: 'job.settle', verb: 'reconcile', argv: ['--job', f.jobId, '--route-failure'] });
+  else set({ kind: 'terminal-decision', concern: 'job.consume-check', reason: 'owner-wait-no-ask' });
 }
 
 /** The clock and step of a settled job whose worker release is not proven. */
@@ -216,6 +231,17 @@ export function settleDecision(f, ledgerId, { now = Date.now(), settings = jobSe
     decider: 'kernel', ledger: ledgerId, workflowId: f.workflowId, entity: { type: 'job', id: f.jobId },
     summary: `${f.op} ${f.jobId} reported ${f.report?.outcome}: the runtime did not settle it (${reason})`,
     evidence: [{ ref: `report:${f.report?.dispatchId}` }, ...(f.handover ? [{ ref: `event:${SETTLE_EVENTS.needsKernel}` }] : []), ...(f.handover?.detail ?? []).slice(0, 6).map((d) => ({ ref: String(d) }))],
+    allowedVerbs: settings.allowedVerbs, dueAt: now + settings.decisionDueMs, escalateTo: 'supervisor', openedBy: OPENED_BY, openedAt: now,
+  };
+}
+
+/** The retry-decision Decision Item of a terminal job whose step the runtime could not take: the Kernel's judgment, one per job. Pure. */
+export function retryDecision(f, ledgerId, reason, { now = Date.now(), settings = jobSettings() } = {}) {
+  return {
+    schema: 'starci/decision-item@1', kind: 'retry-decision', idempotencyKey: `retry-decision:${f.jobId}`,
+    decider: 'kernel', ledger: ledgerId, workflowId: f.workflowId, entity: { type: 'job', id: f.jobId },
+    summary: `${f.op} ${f.jobId} ${f.status}: nothing follows it (${String(reason).slice(0, 220)}); retry with the failure fed back, switch agent, re-plan, or raise the typed gate`,
+    evidence: [{ ref: `hold:${f.terminal?.hold ?? TERMINAL_HOLDS.failedNoStep}` }, { ref: `job:${f.jobId}` }],
     allowedVerbs: settings.allowedVerbs, dueAt: now + settings.decisionDueMs, escalateTo: 'supervisor', openedBy: OPENED_BY, openedAt: now,
   };
 }
@@ -303,6 +329,10 @@ async function actJob(ctx, ledgerId, jobId, f, s, settings) {
     case 'settle':
       // The runtime settler for this one job: reconcileJobSettle (consume, re-verify / canon parity, starci kernel record-checks + settle, release).
       return { action: 'settle', ...(await ctx.run('node', [SETTLER_SCRIPT, '--repo', repo, '--job', jobId, '--json'], { timeoutMs: settings.settleRunTimeoutMs })) };
+    case 'route-failure':
+      return routeFailure(ctx, ledgerId, f, s, settings);
+    case 'terminal-decision':
+      return { action: 'terminal-decision', ...(await ctx.openDecision(retryDecision(f, ledgerId, s.reason, { now: ctx.now(), settings }))) };
     case 'settle-nongreen':
       return { action: 'settle-nongreen', ...(await ctx.openDecision(settleDecision(f, ledgerId, { now: ctx.now(), settings }))) };
     case 'questions': {
@@ -332,6 +362,23 @@ async function actJob(ctx, ledgerId, jobId, f, s, settings) {
     }
     default: return { ok: true, action: 'idle' };
   }
+}
+
+/**
+ * The failed-no-step step: the Kernel verb routes the job. A step that records none, a refusal, or a wait on a leg that has
+ * no job past the hold's bound is the Kernel's judgment, so it opens the retry-decision Decision Item.
+ */
+async function routeFailure(ctx, ledgerId, f, s, settings) {
+  const r = await ctx.api(ledgerId, s.verb, s.argv);
+  const step = r?.value?.step ?? null;
+  const wait = r?.value?.wait ?? null;
+  const stale = ctx.now() - f.terminal.since > holdView(TERMINAL_HOLDS.failedNoStep).deadlineMs;
+  let reason = null;
+  if (r?.ok === false) reason = `route-failure refused: ${String(r.error ?? r.stderr ?? 'no reason').slice(0, 200)}`;
+  else if (step?.kind === 'none') reason = step.reason;
+  else if (wait?.why === 'no-job' && stale) reason = `it waits for ${wait.on}, which has no job`;
+  if (!reason) return { action: 'route-failure', ...r };
+  return { action: 'route-failure', ...r, decision: (await ctx.openDecision(retryDecision(f, ledgerId, reason, { now: ctx.now(), settings }))) };
 }
 
 async function reconcileWorkflow(ctx, ledgerId, workflowId, settings) {

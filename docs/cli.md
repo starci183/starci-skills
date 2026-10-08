@@ -2054,6 +2054,7 @@ recover a fenced launch, drop a queued job, recover a dead worker or cancel orph
 | `--settle-failed` | boolean |  |
 | `--no-salvage` | boolean |  |
 | `--release-worker` | boolean |  |
+| `--route-failure` | boolean |  |
 | `--orphan-kernel-jobs` | boolean |  |
 | `--workflow` | string |  |
 | `--dry-run` | boolean |  |
