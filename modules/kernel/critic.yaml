@@ -35,6 +35,8 @@ codes:
 
 # Which op kinds owe a Critic. `covered`: the Critic runs and its verdict gates the op. `owed`: declared, not built, with the
 # open edge-case entry that tracks it (modules/reconciler/edge-cases.yaml).
+# A covered decision leg (scope.define, architecture.decide) has its rubric, minimum, product globs, cited fields and token budget in
+# modules/kernel/critic-rubrics.yaml; its settle gate is scripts/kernel/critic-settle.mjs.
 coverage:
   - kind: interface.draw
     status: covered
@@ -44,10 +46,20 @@ coverage:
     passes: "every round of the loop; finish judges the best round once more when it has no verdict"
     gate: "scripts/kernel/autopilot-state.mjs drawGateEvidence (DRAW_BEAUTY_BELOW, CRITIC_VERDICT_STALE)"
   - kind: scope.define
-    status: owed
+    status: covered
     entry: critic-coverage-decision-legs
-    why: "a decision leg's errors spread to every later leg; one single-pass Critic on the Critic tier is owed (ruling 7). Building it needs a rubric per kind from the op contract's acceptance statements and a settle-gate requirement for the verdict, which the kernel lanes also edit"
+    product: "the op's scope record (features/<feature>/index.yaml) and the records its nodes cite"
+    rubric: {ref: "modules/kernel/critic-rubrics.yaml#kinds[id=scope.define].checks"}
+    minimum: {ref: "modules/kernel/critic-rubrics.yaml#kinds[id=scope.define].minimum"}
+    tokenBudget: {ref: "modules/kernel/critic-rubrics.yaml#kinds[id=scope.define].tokenBudget"}
+    passes: "one single pass: the op runs starci work decision-critic once its records are written, and again after a failing verdict"
+    gate: "scripts/kernel/critic-settle.mjs judgeCriticVerdict at settle (op-critic-verdict-missing, op-critic-verdict-failed, CRITIC_VERDICT_STALE)"
   - kind: architecture.decide
-    status: owed
+    status: covered
     entry: critic-coverage-decision-legs
-    why: "the same single-pass Critic as scope.define"
+    product: "the op's sds, contract and integration records (features/<feature>/{sds,contract,integration}/**/index.yaml) and the records they cite"
+    rubric: {ref: "modules/kernel/critic-rubrics.yaml#kinds[id=architecture.decide].checks"}
+    minimum: {ref: "modules/kernel/critic-rubrics.yaml#kinds[id=architecture.decide].minimum"}
+    tokenBudget: {ref: "modules/kernel/critic-rubrics.yaml#kinds[id=architecture.decide].tokenBudget"}
+    passes: "one single pass: the op runs starci work decision-critic once its records are written, and again after a failing verdict"
+    gate: "scripts/kernel/critic-settle.mjs judgeCriticVerdict at settle (op-critic-verdict-missing, op-critic-verdict-failed, CRITIC_VERDICT_STALE)"

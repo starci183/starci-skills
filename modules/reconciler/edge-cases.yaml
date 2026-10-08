@@ -229,9 +229,11 @@ cases:
     why: "no real workflow has run start to handover across a host restart; the stable criteria of the debug role count it"
   - id: critic-coverage-decision-legs
     family: correctness
+    finding: {role: critic, duty: does, verdict: departs, evidence: "only interface.draw had an independent Critic: a scope or architecture decision, whose errors spread to every later leg, settled with no judge from another provider", remedy: {state: in-tree, change: "scope.define and architecture.decide run one single-pass Critic (starci work decision-critic) on the Critic tier from another provider than the op, against a rubric per kind in modules/kernel/critic-rubrics.yaml, handed the op's decision records and the records they cite; starci kernel settle refuses a done without a fresh passing verdict for exactly those bytes, and a failing verdict is the op's error-work"}}
     met: {date: "2026-10-08", where: "owner ruling 7: only drawing has an independent Critic", evidence: "modules/kernel/roles.yaml rulings.critic-coverage"}
-    status: open
-    why: "scope.define and architecture.decide are owed one single-pass Critic on the Critic tier from another provider than the op (modules/kernel/critic.yaml coverage, status owed): it needs a rubric per kind derived from the op contracts' acceptance statements and a settle-gate requirement for the verdict, which the kernel lanes also edit; the generic path (pick, guard, typed verdict, stale refusal, hold rows) is built, so the remaining change is that data and one gate requirement"
+    rule: {file: scripts/kernel/critic-settle.mjs, anchor: "judgeCriticVerdict"}
+    spec: tests/work/critic-decision-legs.spec.mjs
+    status: covered
   - id: critic-pinned-by-hand
     family: correctness
     finding: {role: critic, duty: never, verdict: departs, evidence: "the draw loop's Critic was pinned by hand in allocation.drawLoop (provider, model, effort) and bypassed the tier picker: a quota-out or closed circuit on the pinned member left the round with no judge, and a Claude drawer could be judged by the Claude pin", remedy: {state: in-tree, change: "the Critic is taken from the tier of tiers.yaml seats.critic through the one picker with provider independence as a hard filter; a tier with no independent member refuses with CRITIC_NO_INDEPENDENT_MEMBER; the keys of the hand pin are removed vocabulary"}}

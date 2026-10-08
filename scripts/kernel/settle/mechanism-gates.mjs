@@ -1,5 +1,6 @@
 // The existing CLI gate consumers share its private placement/evidence owners.
 import { judgeJobLoop, judgeJobProofs } from '../gate-settle.mjs';
+import { judgeCriticVerdict } from '../critic-settle.mjs';
 import { observationContextOf, mechanismObservations } from '../mechanism-observation.mjs';
 import { latestContractOf } from '../../machine/contract-version.mjs';
 import { parseJson } from '../../lib/json.mjs';
@@ -40,5 +41,15 @@ function settleOpProofs(db, jobId, repo) {
   const judgment = judgeJobProofs({ op: s.op, files, mode, context, observations: context ? mechanismObservations(db, context) : null });
   return judgment ? { ...judgment, jobId: s.job.job_id, attemptId: s.filed.attemptId, status: s.job.status } : null;
 }
-  return { settleOpGate, settleOpProofs };
+// The independent Critic's verdict a decision leg owes at settle (scripts/kernel/critic-settle.mjs over modules/kernel/critic.yaml coverage):
+// null when the op owes none, else the judgment of the attached verdict against the op's records now.
+function settleCriticVerdict(db, jobId, repo) {
+  const s = settleJobContext(db, jobId, { requiresReport: true });
+  if (!s) return null;
+  const { roots, files } = settleJobFiles(db, s.job, repo, s.filed, { jobId: s.job.job_id });
+  const owned = (jobPayloadOf(s.job).owned_paths ?? []).map((p) => (typeof p === 'string' ? p : p?.path)).filter((p) => typeof p === 'string' && !p.includes(':'));
+  const judged = judgeCriticVerdict({ op: s.op, files, roots: [...new Set([...roots, repo].filter(Boolean))], owned });
+  return judged ? { op: s.op, judged, jobId: s.job.job_id, attemptId: s.filed.attemptId, status: s.job.status } : null;
+}
+  return { settleOpGate, settleOpProofs, settleCriticVerdict };
 }

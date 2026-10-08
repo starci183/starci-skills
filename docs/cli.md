@@ -4436,6 +4436,28 @@ json: flag
 starci work compose-direction --ui <record> --content <png> --breakpoint mobile --theme light
 ```
 
+### starci work decision-critic
+
+judge a decision leg's records with the independent Critic and write its typed verdict
+
+| flag | type | |
+| --- | --- | --- |
+| `--kind` | enum scope.define|architecture.decide | required |
+| `--root` | string | required |
+| `--out` | string | required |
+| `--records` | string |  |
+| `--input` | string |  |
+| `--maker` | string |  |
+| `--json` | boolean |  |
+
+exit: 0 judged and the verdict passes; 1 judged and the verdict fails - fix every failed check and run it again; 2 bad usage; 3 no verdict - a Critic hold; report blocked with the CRITIC_ code
+
+json: flag
+
+```sh
+starci work decision-critic --kind scope.define --root <app> --out <STARCI_JOB_SCRATCH>/critic-verdict.json
+```
+
 ### starci work draw-acceptance
 
 verify that drawn assets are accepted render shapes

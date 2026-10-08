@@ -892,6 +892,9 @@ moduleLocalDocumentKinds:
   - id: starci/module-kernel-critic@1
     governs: "The Critic as data: the seat whose tier it is picked from, the typed verdict, the codes of its holds and the op kinds that owe a Critic."
     files: [modules/kernel/critic.yaml]
+  - id: starci/module-kernel-critic-rubrics@1
+    governs: "The rubric, minimum, product globs, cited fields and token budget of the Critic for each decision leg (scope.define, architecture.decide)."
+    files: [modules/kernel/critic-rubrics.yaml]
   - id: starci/module-kernel-roles@1
     governs: "The roles contract: the principles, the five roles with their scope, duties, cleanup, never list and reporting chain, and Debug's end condition."
     files: [modules/kernel/roles.yaml]

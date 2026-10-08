@@ -17125,3 +17125,25 @@ SCAN_SMELL:
   nextStep_vi: "Sửa đúng dòng được chỉ: chạy các bước độc lập bằng `Promise.all`, gọi tên thứ tự bằng `eachInOrder` của `platform/primitives`, bỏ import thừa, viết lại biểu thức lồng thành câu lệnh riêng, đọc locale qua `next/root-params`, trả `Promise.resolve(...)` thay vì `async` không `await`. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
   owner: op-retry
   kind: check-finding
+
+op-critic-verdict-missing:
+  title: "The decision leg has no Critic verdict"
+  title_vi: "Chặng quyết định chưa có phán quyết của người chấm độc lập"
+  meaning_vi: "Report không đính kèm phán quyết starci/critic-verdict@1 của loại op (scope.define hoặc architecture.decide): op chưa nhờ người chấm độc lập (nhà cung cấp khác, hạng Critic) chấm các bản ghi quyết định của mình."
+  causes_vi:
+    - "Op không chạy starci work decision-critic sau khi viết bản ghi"
+    - "Tệp critic-verdict.json không được đính kèm vào starci kernel report"
+  nextStep_vi: "Việc chốt bị từ chối; op chạy starci work decision-critic --kind <loại op> --root <app> --out critic-verdict.json rồi nộp lại kèm tệp đó; nếu người chấm báo CRITIC_NO_INDEPENDENT_MEMBER, CRITIC_UNAVAILABLE hoặc CRITIC_QUOTA_OUT thì báo blocked kèm mã, không báo done."
+  owner: op-retry
+  kind: settle-reason
+
+op-critic-verdict-failed:
+  title: "The independent Critic's verdict fails the minimum"
+  title_vi: "Phán quyết của người chấm độc lập dưới mức tối thiểu"
+  meaning_vi: "Người chấm độc lập chấm các bản ghi quyết định dưới điểm tối thiểu của thước chấm (modules/kernel/critic-rubrics.yaml): công việc chưa đạt, đây là lỗi vui (error-work) chứ không phải lỗi runtime."
+  causes_vi:
+    - "Một nút phạm vi hoặc thành phần thiết kế không có căn cứ trong yêu cầu hay bản ghi đã quyết"
+    - "Quyết định mâu thuẫn ràng buộc hoặc quyết định trước đó, hoặc thiếu phương án đã cân nhắc"
+  nextStep_vi: "Việc chốt bị từ chối kèm từng kiểm tra trượt, bằng chứng và cách sửa; op sửa các bản ghi theo đó rồi chạy lại starci work decision-critic; lượt thử kế tiếp nhận chính bản phê bình này làm lỗi được đưa lại."
+  owner: op-retry
+  kind: settle-reason

@@ -56,6 +56,7 @@ ops:
       - node
       - work-graph
       - read-digest
+      - critic-verdict
     route:
       nodeKinds:
         - architecture
@@ -1276,6 +1277,7 @@ ops:
       - catalog
       - evidence
       - read-digest
+      - critic-verdict
     route:
       nodeKinds:
         - operations

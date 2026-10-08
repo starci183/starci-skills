@@ -17,8 +17,8 @@ const DEFECT_CLASS_VALUES = Object.freeze(['business', 'non-business']);
 const FINDINGS_LISTED = 40;
 // ---- mechanism proofs (op-gate.yaml proofs/opProofs) ----
 
-const pass = () => ({ status: 'pass', code: null, detail: null, findings: [] });
-const refused = ({ status, code }, detail, findings = []) => ({ status, code, detail, findings: findings.slice(0, FINDINGS_LISTED) });
+export const pass = () => ({ status: 'pass', code: null, detail: null, findings: [] });
+export const refused = ({ status, code }, detail, findings = []) => ({ status, code, detail, findings: findings.slice(0, FINDINGS_LISTED) });
 const listed = (rows) => rows.map((f) => `${f.path ?? '-'}${f.line ? ':' + f.line : ''} ${f.rule ?? f.engine ?? ''} ${oneLine(f.message, 200)}`.trim());
 /** Whether the shared gate document measures the document profile. */
 export const isDocGate = (doc) => doc?.profile === DOC_PROFILE;

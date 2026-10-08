@@ -4,6 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { sha256 } from '../../engine/digest.mjs';
+import { oneLine } from '../lib/clip.mjs';
 import { criticContract } from './critic-contract.mjs';
 
 const SCHEMA = 'starci/critic-verdict@1';
@@ -19,6 +20,7 @@ export function typedVerdict({ normalised, handed, rubric, minimum, critic }) {
   const score = normalised.beauty;
   return { schema: SCHEMA, ...normalised, minimum, pass: Number.isFinite(score) && Number.isFinite(minimum) && score >= minimum,
     product: handed.filter((entry) => entry.role === 'product').map(({ label, sha256: digest }) => ({ label, sha256: digest })),
+    ...(handed.some((entry) => entry.role === 'input') ? { inputs: handed.filter((entry) => entry.role === 'input').map(({ label, sha256: digest }) => ({ label, sha256: digest })) } : {}),
     rubric: { source: rubric?.source ?? null, checks: (rubric?.checks ?? []).length }, critic: { provider: critic.provider, model: critic.model, tier: critic.tier ?? null } };
 }
 
@@ -56,4 +58,12 @@ export function codeOfOutcome(outcome) {
   const byOutcome = { 'verdict-missing': codes.noVerdict, 'product-modified': codes.productModified, unguarded: codes.unguarded, quota: codes.quotaOut };
   if (outcome in byOutcome) return byOutcome[outcome];
   return ['launch-failed', 'timeout', 'refused'].includes(outcome) ? codes.unavailable : null;
+}
+
+/** One line per failed check of a verdict: `<id>: <evidence> - fix: <fix>`. */
+export function failedCheckLines(checks) {
+  return (checks ?? []).filter((c) => !c.pass).map((c) => {
+    const fix = c.fix ? ` - fix: ${oneLine(c.fix, 240)}` : '';
+    return `${c.id}: ${oneLine(c.evidence ?? '', 200)}${fix}`;
+  });
 }
