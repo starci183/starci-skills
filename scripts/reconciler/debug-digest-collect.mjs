@@ -13,6 +13,8 @@ import { attemptFacts, eventFacts, historyFacts } from './debug-digest-ledger.mj
 import { registryFacts, endCriteria } from './debug-docs.mjs';
 import { wakeUsageOf } from '../kernel/wake-budget.mjs';
 import { kernelSeatOf } from './seat-cost.mjs';
+import { digestNumbers } from './debug-digest-numbers.mjs';
+import { mergeScans, scanBlobs } from './debug-secret-scan.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const OPEN_PHASES = new Set(['queued', 'running']);
@@ -41,6 +43,12 @@ export function ledgerFacts(file, workflowIds = null) {
         kernelSignal: parseJsonOr(signal?.value_json, null), lastKernelWakeAt: woken, kernelWakes: wakeUsageOf(db, w.workflow_id), seatCost: kernelSeatOf(db, { workflowId: w.workflow_id, name: w.display_name ?? w.title ?? w.workflow_id }) };
     });
   } finally { db.close(); }
+}
+
+/** The final transcripts of the newest `limit` op attempts of the running workflows, as artifacts to scan. */
+function attemptTranscripts(workflows, limit) {
+  return workflows.flatMap((w) => (w.attempts ?? []).filter((a) => a.transcriptSha).map((a) => ({ artifact: `attempt-transcript:${w.name}/${a.attemptId}`, kind: 'transcript', sha: a.transcriptSha, at: a.settledAt ?? a.dispatchedAt ?? 0 })))
+    .sort((a, b) => b.at - a.at).slice(0, limit);
 }
 
 /** The finished workflows of one ledger (the history the end condition counts). */
@@ -73,10 +81,10 @@ async function supervisorHealth({ timeoutMs, run }) {
  * machine store. Filters: `repos` (ledger-owner paths) and `workflowIds`. Seams: machine, ledger, run, now.
  */
 export async function collectSnapshot({ env = process.env, repos = [], workflowIds = [], timeoutMs = 90_000, now = Date.now(),
-  machine = machineFacts, ledger = ledgerFacts, history = ledgerHistory, run: runChild = child, liveRev = () => runtimeShaOf(env.STARCI_KERNEL_REV_ROOT ?? ROOT) } = {}) {
+  machine = machineFacts, ledger = ledgerFacts, history = ledgerHistory, run: runChild = child, numbers = digestNumbers(), readBlob = undefined, liveRev = () => runtimeShaOf(env.STARCI_KERNEL_REV_ROOT ?? ROOT) } = {}) {
   // The read verbs run as the digest: a stranger to every workflow, so `kernel status` projects through a read-only ledger and writes nothing.
   const run = (args, options) => runChild(args, { ...options, env: { ...env, STARCI_ACTOR: 'debug-digest' } });
-  const facts = machine({ env });
+  const facts = machine({ env, numbers, ...(readBlob ? { readBlob } : {}) });
   if (!facts) return { unavailable: 'machine store' };
   const wanted = facts.ledgers.filter((l) => !repos.length || repos.includes(l.repo_root));
   const workflows = [];
@@ -89,6 +97,8 @@ export async function collectSnapshot({ env = process.env, repos = [], workflowI
     try { finished.push(...history(l.file).map((h) => ({ ...h, ledger: l.name }))); } catch (e) { historyErrors.push(`${l.name}: ${String(e.message).slice(0, 100)}`); }
   });
   const health = await supervisorHealth({ timeoutMs, run });
+  const attemptScan = scanBlobs(attemptTranscripts(workflows, numbers.secretScanArtifacts), { maxBytes: numbers.secretScanBytes, ...(readBlob ? { readBlob } : {}) });
   return { now, liveRev: liveRev(), engine: facts.engine, supervisor: { ...facts.supervisor, health }, reservations: facts.reservations,
-    seats: facts.seats, supJobs: facts.supJobs, lands: facts.lands ?? [], refusals: refusalFacts(env), workflows, history: finished, historyErrors, registry: registryFacts(), criteria: endCriteria() };
+    seats: facts.seats, supJobs: facts.supJobs, lands: facts.lands ?? [], refusals: refusalFacts(env), workflows, history: finished, historyErrors, registry: registryFacts(), criteria: endCriteria(),
+    providerEvents: facts.providerEvents ?? [], runtimeChanges: facts.runtimeChange ?? [], hostDrift: facts.hostDrift ?? [], portClaims: facts.portClaim ?? [], secrets: mergeScans(facts.secrets ?? { scanned: 0, unreadable: 0, hits: [] }, attemptScan) };
 }

@@ -2,6 +2,7 @@
 // handler of the long-lived engine, and the recovery a new engine process runs before it leads (engine.mjs main()).
 import { reapProviderReservations } from '../machine/provider-reservation-reap.mjs';
 import { bootIdentity } from './boot-id.mjs';
+import { previousBootRev, recordSwap } from './revision-swap.mjs';
 
 /** The text line of a `--once` result. */
 export const onceLine = (result) => '[reconciler --once] ' + ((result.ok && 'ok') || 'NOT OK') + ' ' + (result.controllers.map((c) => `${c.name}(${c.mode}) keys=${c.keys} ok=${c.ok} failed=${c.failed.length}`).join('; ') || 'no controller on') + ((result.error && ` ${result.error}`) || '');
@@ -26,21 +27,29 @@ function recoveryStep(engine, step, run) {
 /**
  * What a new engine process settles before it leads: it names the host boot it started in, says what a self-reload decided, releases the provider
  * receipts the host restart ended (a reboot leaves the whole batch stale) and re-arms the queue keys whose retry budget an earlier process spent.
+ * When the previous engine booted on another revision it records the swap with the actions this start performed (revision-swap.mjs).
  */
 export function startRecovery(engine, safeStart, { reap = reapProviderReservations, boot = bootIdentity } = {}) {
   if (safeStart.reevaluated) logSafeReevaluated(engine, safeStart);
+  const priorRev = previousBootRev(engine.state);
+  const applied = [{ action: 'engine-restarted', count: 1 }];
   recoveryStep(engine, 'boot-id', () => {
     const identity = boot({ now: engine.now?.() });
     engine.log('reconciler.event', `engine start on host boot ${identity.bootId}`, { kind: 'reconciler.boot', ...identity, pid: process.pid, rev: engine.rev ?? null });
   });
   recoveryStep(engine, 'provider-receipts', () => {
     const reaped = reap({ env: process.env });
-    if (reaped.released.length) engine.log('reconciler.event', `engine start released ${reaped.released.length} provider receipt(s) the host restart ended`, { kind: 'reconciler.provider-receipts-released', released: reaped.released, held: reaped.held ?? [] });
+    if (!reaped.released.length) return;
+    applied.push({ action: 'provider-receipts-released', count: reaped.released.length });
+    engine.log('reconciler.event', `engine start released ${reaped.released.length} provider receipt(s) the host restart ended`, { kind: 'reconciler.provider-receipts-released', released: reaped.released, held: reaped.held ?? [] });
   });
   recoveryStep(engine, 'queue', () => {
     const rearmed = engine.queue.rearmParked();
-    if (rearmed.length) engine.log('reconciler.event', `engine start re-armed ${rearmed.length} parked queue key(s)`, { kind: 'reconciler.queue-rearmed', keys: rearmed.slice(0, 20) });
+    if (!rearmed.length) return;
+    applied.push({ action: 'queue-rearmed', count: rearmed.length });
+    engine.log('reconciler.event', `engine start re-armed ${rearmed.length} parked queue key(s)`, { kind: 'reconciler.queue-rearmed', keys: rearmed.slice(0, 20) });
   });
+  if (priorRev && engine.rev && priorRev !== engine.rev) recordSwap(engine.state, { cause: 'engine-start', fromRev: priorRev, toRev: engine.rev, applied, at: engine.now?.() });
 }
 
 /** A self-reload re-evaluated the crash-loop plan: say what it decided. */

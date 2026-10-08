@@ -42,6 +42,7 @@ import { spawnDetached } from '../api/process/spawn-detached.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { readMachine, withMachine } from '../../engine/db/machine.mjs';
 import { launchFor } from './launch.mjs';
+import { connectsTo, portClaimer } from './port-claim.mjs';
 import { killTree } from '../api/process/kill-tree.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { readEnv } from '../lib/env.mjs';
@@ -254,6 +255,7 @@ const startForService = (doc, name, repo, registered) => {
 async function restartProbe({ doc, row, url, expect, name, port, start, actions, listener, probeTimeoutMs, readyTimeoutMs, env, repo }) {
   const started = startServer({ command: start.command, cwd: start.cwd, envId: doc.id, service: name, env: start.env ? { ...env, ...start.env } : env });
   writeRegistered({ env: doc.id, service: name, repo, port, url, command: start.command, cwd: start.cwd, pid: started.pid, state: 'starting', startedAt: Date.now() }, env);
+  await portClaimer({ port, envId: doc.id, service: name, env })('claimed', { pid: started.pid });
   actions.push(`started ${name} (${start.from}) as PID ${started.pid}`);
   const waited = await waitReady(url, expect, { readyTimeoutMs, probeTimeoutMs });
   const logSha = judgeServer(doc.id, name, waited.ready, env);
@@ -268,7 +270,7 @@ async function failedProbe({ doc, row, url, expect, name, port, result, restart,
   const registered = readRegistered(doc.id, name, env);
   const listener = port && state !== 'down' ? portListener(port) : null;
   const listenerResult = resolveProbeListener({ listener, state, registered, roots, restart, port, url, expect });
-  if (listenerResult.result) return { ...row, ...listenerResult.result };
+  if (listenerResult.result) { await portClaimer({ port, envId: doc.id, service: name, env })('refused', listener); return { ...row, ...listenerResult.result }; }
   state = listenerResult.state;
   const actions = listenerResult.actions;
   const start = startForService(doc, name, repo, registered);
@@ -360,20 +362,23 @@ const serveTarget = (args, repo) => {
 const ownsServeListener = (args, repo, prior, listener) => (prior?.pid === listener.pid) || ownedByWorkspace(listener.commandLine, [path.resolve(args.cwd), ...(args.repo ? workspaceRoots(repo) : [])]);
 
 /** The reply of `serve` when the listener on the port is this workspace's server and already answers, else null. */
-async function adoptAnsweringListener({ args, repo, url, port, listener, env }) {
+async function adoptAnsweringListener({ args, repo, url, port, listener, env, claim }) {
   const answered = url ? await probeUrl(url, { timeoutMs: 8000, follow: 0 }) : null;
   if (answered?.state !== 'answered' || answered.status >= 500) return null;
   writeRegistered({ env: args.env, service: args.service, ...(args.repo ? { repo } : {}), port, url, command: args.command, cwd: path.resolve(args.cwd), pid: listener.pid, state: 'ready' }, env);
+  await claim('adopted', listener);
   return { schema: ENV_HEALTH_SCHEMA, ok: true, ready: true, adopted: true, pid: listener.pid, url };
 }
 
-async function startServing({ args, repo, url, port, actions, env, emit }) {
+async function startServing({ args, repo, url, port, actions, env, emit, claim }) {
   const started = startServer({ command: args.command, cwd: path.resolve(args.cwd), envId: args.env, service: args.service, env });
   writeRegistered({ env: args.env, service: args.service, ...(args.repo ? { repo } : {}), port, url, command: args.command, cwd: path.resolve(args.cwd), pid: started.pid, state: 'starting', startedAt: Date.now() }, env);
   actions.push(`started PID ${started.pid}`);
+  await claim('claimed', { pid: started.pid });
   if (!url) return emit({ schema: ENV_HEALTH_SCHEMA, ok: true, ready: null, pid: started.pid, log: started.log, actions, note: 'no probe url: readiness not awaited' }, EXIT_READY);
   const waited = await waitReady(url, 200, { readyTimeoutMs: Number(args['ready-timeout-ms']) || DEFAULT_READY_TIMEOUT_MS, probeTimeoutMs: DEFAULT_PROBE_TIMEOUT_MS });
   const logSha = judgeServer(args.env, args.service, waited.ready, env);
+  if (!waited.ready) await claim('released', { pid: started.pid });
   return emit({ schema: ENV_HEALTH_SCHEMA, ok: waited.ready, ready: waited.ready, pid: started.pid, log: started.log, logSha, url, actions, last: waited.last }, waited.ready ? EXIT_READY : EXIT_NOT_READY);
 }
 
@@ -383,15 +388,19 @@ async function serveMain(args, env, emit) {
   const { url, port } = serveTarget(args, repo);
   const prior = readRegistered(args.env, args.service, env);
   const listener = port ? portListener(port) : null;
+  // A holder the host does not list (a bind and a listener table both miss it on Windows) still accepts a connection.
+  const unlisted = port && !listener ? await connectsTo(port) : false;
   const actions = [];
+  const claim = portClaimer({ port, envId: args.env, service: args.service, env });
   if (listener && ownsServeListener(args, repo, prior, listener)) {
-    const adopted = await adoptAnsweringListener({ args, repo, url, port, listener, env });
+    const adopted = await adoptAnsweringListener({ args, repo, url, port, listener, env, claim });
     if (adopted) return emit(adopted, EXIT_READY);
-    if (stopListener(listener.pid)) actions.push(`killed stale own listener PID ${listener.pid}`);
-  } else if (listener) {
+    if (stopListener(listener.pid)) { actions.push(`killed stale own listener PID ${listener.pid}`); await claim('replaced', listener); }
+  } else if (listener || unlisted) {
+    await claim('refused', listener);
     return emit({ schema: ENV_HEALTH_SCHEMA, ok: false, ready: false, state: 'port-conflict', listener, remedy: `port ${port} is held by a process that is not this workspace's server` }, EXIT_NOT_READY);
   }
-  return startServing({ args, repo, url, port, actions, env, emit });
+  return startServing({ args, repo, url, port, actions, env, emit, claim });
 }
 
 export async function envHealthMain(argv, { write = (s) => process.stdout.write(s), env = process.env } = {}) {

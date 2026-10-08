@@ -15,13 +15,13 @@ groups:
       - {id: pl-seats-match-terminals, ask: "Is every live seat (the Supervisor, each Kernel) backed by a live terminal that takes input?", answerable: today, check: seats-live, source: "machine.sqlite seats; the Kernel watchdog probe and the Supervisor health probe (read-only)"}
       - {id: pl-restart-recovered, ask: "After the host restarted, did the engine come back, and did every workflow and reservation resume without a lost or repeated unit of work?", answerable: today, check: restart-recovered, signalAdded: "reconciler.boot (machine_logs): boot instant, uptime and boot id at every engine start", source: "machine_logs reconciler.boot rows, process_runs, jobs, provider_reservations"}
       - {id: pl-power-loss-ledger, ask: "Did a ledger survive an unclean stop readable?", answerable: today, check: ledgers-readable, source: "the digest opens every ledger read-only; an unreadable one is a status-unreadable departure"}
-      - {id: pl-network-loss, ask: "Did a provider or network outage stop work, and did the work resume when it returned?", answerable: gap, signal: "provider-reachability event: the probe result, the time it turned unreachable and the time it returned", why: "provider-unavailable events record a refusal, not reachability"}
+      - {id: pl-network-loss, ask: "Did a provider or network outage stop work, and did the work resume when it returned?", answerable: today, check: provider-reachability, signalAdded: "provider_health_events carry the circuit's end (circuitOpenUntil) beside the job, step, failure kind and signal of the call that opened it; an episode ends at its recovery row or the end of its cooldown, and work resumed when an attempt of that provider was dispatched after it", source: "machine.sqlite provider_health_events against op_attempts.provider and dispatched_at; a network loss the runtime cannot classify opens no circuit and is not seen"}
   - id: change-under-running
     title: "Change under a running system"
     questions:
       - {id: cu-engine-rev, ask: "Does the engine run the revision the live tree holds?", answerable: today, check: engine-rev, source: "engine_leader.rev against the live tree head"}
       - {id: cu-kernel-rev, ask: "Did each Kernel ack the current runtime revision inside its bound?", answerable: today, check: kernel-rev, source: "status kernelRev, events runtime-rev-acked"}
-      - {id: cu-live-state-untouched, ask: "Did a source change close, restart or rewrite a live terminal, ledger or product file?", answerable: gap, signal: "runtime-change-applied event: the revision swap with the list of live things it touched", why: "a revision swap leaves no row of what it affected"}
+      - {id: cu-live-state-untouched, ask: "Did a source change close, restart or rewrite a live terminal, ledger or product file?", answerable: today, check: live-state-untouched, signalAdded: "signal.runtime-change-applied (machine_logs): written when an engine starts on a revision other than the previous engine's and when a land re-looks at the running workflows, with both revisions, the actions performed and the schema identity of the two stores", source: "machine_logs signal.runtime-change-applied"}
   - id: failure-while-running
     title: "Failure while running"
     questions:
@@ -37,7 +37,7 @@ groups:
       - {id: co-done-on-evidence, ask: "Does every pass stand on checks that ran in the attempt's own tree?", answerable: today, check: done-on-evidence, signalAdded: "op-settled.checkedIn: the directory, commit and tree of every kernel or settler check", source: "events op-settled against op_attempts.worktree_path"}
       - {id: co-claim-vs-rerun, ask: "Did a claimed check result differ from the runtime's own re-run?", answerable: today, check: claim-vs-rerun, source: "check_runs declared_exit_code against exit_code"}
       - {id: co-critic-independent, ask: "Did each Critic run on another provider than the op, see only the product and have its verdict used?", answerable: today, check: critic-independent, signalAdded: "critic-run event written when a draw pass settles: critic provider and model, op provider, independence, judged digests, whether a score was used", source: "events critic-run"}
-      - {id: co-secret-in-transcript, ask: "Did a credential reach a transcript, a report or a log?", answerable: gap, signal: "a pattern-scan seam over the digest's own inputs (transcript snapshots, reports, logs) that counts matches without printing them", why: "redaction runs at write time and leaves no count of what it removed"}
+      - {id: co-secret-in-transcript, ask: "Did a credential reach a transcript, a report or a log?", answerable: today, check: secret-in-transcript, signalAdded: "a scan seam (debug-secret-scan.mjs) that re-runs the redaction rules (scripts/lib/redact.mjs redactTracked) over the stored artifacts the digest reads and reports the artifact and the rule of every secret that survived, never the matched text", source: "machine_logs, seat_transcript_snapshots, sup_reports and op_attempts.transcript_sha blobs"}
   - id: smooth-operation
     title: "Smooth operation"
     questions:
@@ -49,7 +49,7 @@ groups:
     questions:
       - {id: rr-reservations-vs-jobs, ask: "Is every live provider reservation backed by a running job, Kernel or seat?", answerable: today, check: reservations-backed, source: "provider_reservations against jobs, seats, sup_jobs"}
       - {id: rr-placement-exists, ask: "Does the tree an unsettled attempt names exist on disk?", answerable: today, check: placement-exists, source: "op_attempts.worktree_path against the file system (read-only)"}
-      - {id: rr-claimed-vs-observed, ask: "Does the ledger say what the host shows: terminals, worktrees, processes?", answerable: gap, signal: "a drift event per kind of thing (terminal, worktree, process) when the host's list and the ledger's differ", why: "terminal-count drift is detected by one controller and not recorded as an event the digest can read"}
+      - {id: rr-claimed-vs-observed, ask: "Does the ledger say what the host shows: terminals, worktrees, processes?", answerable: today, check: claimed-vs-observed, signalAdded: "signal.host-ledger-drift (machine_logs): one row per kind (terminal, process, seat, worktree, reservation, lease) when a clock of such a code outlives its bound, and one when it clears", source: "machine_logs signal.host-ledger-drift, written by the SLA pass from the driftKind of modules/reconciler/sla.yaml"}
   - id: authority-safety
     title: "Authority and safety"
     questions:
@@ -61,7 +61,7 @@ groups:
     title: "Concurrency"
     questions:
       - {id: cc-capacity-pressure, ask: "Is a workflow starved by a shared pool, port, lease or host lock?", answerable: today, check: capacity-holds, source: "status frontier.queued holds pool-full, path-lease, foundation-wait, host-resources-low"}
-      - {id: cc-port-claims, ask: "Do two workflows want one port, and who got it?", answerable: gap, signal: "port-claim event: the port, the claimant, the holder and the outcome", why: "server slots are rows with no refusal history"}
+      - {id: cc-port-claims, ask: "Do two workflows want one port, and who got it?", answerable: today, check: port-claims, signalAdded: "signal.port-claim (machine_logs): the port, the claimant, the outcome (claimed, adopted, replaced, refused, released) and the holder, observed by the listener table and by a connect to 127.0.0.1", source: "machine_logs signal.port-claim, written by starci gate env-health"}
   - id: ending
     title: "Ending"
     questions:

@@ -100,27 +100,48 @@ const declaredNameRule = () => {
 };
 
 // --------------------------------------------------------------------------------------------- text
-/**
- * `text` with every secret value blanked. `repoRoots` (optional) are product repos whose .starcistacks
- * declarations are learned first.
- */
-export function redactText(text, { repoRoots = [] } = {}) {
-  if (typeof text !== 'string' || !text) return text;
-  for (const root of repoRoots) learnStackSecrets(root);
-  let out = redactResolvedSecrets(text).replace(PEM_BLOCK, (m, kind) => `[redacted:pem ${kind}]`);
-  for (const value of secretValues) if (out.includes(value)) out = out.split(value).join('[redacted:stack-secret]');
-  for (const rule of PATTERNS) {
-    rule.g.lastIndex = 0;
-    out = out.replace(rule.g, (match, value) => {
-      if (rule.name === 'assigned-secret') return rule.placeholder?.test(value ?? '') ? match : match.replace(value, MARK);
-      return `[redacted:${rule.name}]`;
-    });
-  }
-  const declared = declaredNameRule();
-  if (declared) { declared.lastIndex = 0; out = out.replace(declared, (m, a, b) => `${a}${b}${MARK}`); }
-  for (const rule of RULES) { rule.re.lastIndex = 0; out = out.replace(rule.re, rule.to); }
-  return out;
+const PEM_RULE = 'private-key-block';
+
+/** `text` with `re` replaced by `to`, `hits` counting each replacement that changed the match under the rule's name. */
+function replaceCounting(text, re, name, to, hits) {
+  re.lastIndex = 0;
+  return text.replace(re, (...args) => {
+    const out = to(...args);
+    if (out !== args[0]) hits.set(name, (hits.get(name) ?? 0) + 1);
+    return out;
+  });
 }
+
+const patternTo = (rule) => (match, value) => {
+  if (rule.name === 'assigned-secret') return rule.placeholder?.test(value ?? '') ? match : match.replace(value, MARK);
+  return `[redacted:${rule.name}]`;
+};
+
+/**
+ * `text` with every secret value blanked, and what blanked it: {text, hits: Map(rule name -> replacements that changed the text)}. A rule
+ * that meets only a placeholder ([redacted...]) counts nothing, so a text redacted before reports no hit. `repoRoots` (optional) are product
+ * repos whose .starcistacks declarations are learned first.
+ */
+export function redactTracked(text, { repoRoots = [] } = {}) {
+  const hits = new Map();
+  if (typeof text !== 'string' || !text) return { text, hits };
+  for (const root of repoRoots) learnStackSecrets(root);
+  const resolved = redactResolvedSecrets(text);
+  if (resolved !== text) hits.set('resolved-secret', 1);
+  let out = replaceCounting(resolved, PEM_BLOCK, PEM_RULE, (m, kind) => `[redacted:pem ${kind}]`, hits);
+  for (const value of secretValues) if (out.includes(value)) { hits.set('stack-secret', (hits.get('stack-secret') ?? 0) + 1); out = out.split(value).join('[redacted:stack-secret]'); }
+  for (const rule of PATTERNS) out = replaceCounting(out, rule.g, rule.name, patternTo(rule), hits);
+  const declared = declaredNameRule();
+  if (declared) out = replaceCounting(out, declared, 'declared-secret-name', (m, a, b) => `${a}${b}${MARK}`, hits);
+  for (const rule of RULES) out = replaceCounting(out, rule.re, rule.name, rule.to, hits);
+  return { text: out, hits };
+}
+
+/** `text` with every secret value blanked. */
+export function redactText(text, options = {}) { return redactTracked(text, options).text; }
+
+/** The rules that still find a secret in `text` after redaction ran: [{rule, count}], never the matched text. */
+export function survivingSecrets(text, options = {}) { return [...redactTracked(text, options).hits].map(([rule, count]) => ({ rule, count })); }
 
 /** A path that is a secret by being one (an env file, a key file, .secrets/): blanked, its rule named. */
 export function redactPath(p) {

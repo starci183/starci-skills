@@ -39,6 +39,8 @@ import { productRepos } from '../../machine/home.mjs';
 import { slaCatalog, clocksOf, setClock, clearClock } from '../sla.mjs'; import { isMain } from '../../lib/is-main.mjs';
 import { planWorkflow, stuckPrefix, workflowEntity, SUPERVISOR_LEDGER } from '../workflow-plan.mjs';
 import { eachInOrder, mapInOrder } from '../../lib/in-order.mjs';
+import { recordSwap } from '../revision-swap.mjs';
+import { runtimeHead } from '../../machine/self-reload.mjs';
 export { planWorkflow, SUPERVISOR_LEDGER };
 const selfFile = fileURLToPath(import.meta.url);
 const skillRoot = path.resolve(path.dirname(selfFile), '..', '..', '..');
@@ -256,12 +258,15 @@ async function openDecisions(ctx, plan, now, settings) {
  */
 export const REV_WAKE_KEY = 'rev-wake';
 
-/** The re-look of every running workflow after a land: {ok, key, looked: [workflow keys]}. The status cache is dropped first so the pass reads the new revision. */
+/** The re-look of every running workflow after a land: {ok, key, looked: [workflow keys]}. The status cache is dropped first so the pass reads the new revision; the re-look is recorded as a runtime-change-applied signal. */
 async function reconcileAfterLand(ctx, settings) {
   ctx.dropStatusCache?.();
   const keys = await listWorkflows(ctx);
   const results = await mapInOrder(keys, (workflowKey) => reconcileWorkflow(workflowKey, ctx, { settings }));
-  return { ok: results.every((r) => r?.ok !== false), key: REV_WAKE_KEY, looked: keys, doorbells: results.filter((r) => r?.doorbell).length };
+  const doorbells = results.filter((r) => r?.doorbell).length;
+  const applied = [{ action: 'workflows-looked-at', count: keys.length }, { action: 'kernel-doorbells-rung', count: doorbells }];
+  recordSwap(ctx.machine, { cause: 'land', toRev: runtimeHead({ root: skillRoot }), applied, at: ctx.now() });
+  return { ok: results.every((r) => r?.ok !== false), key: REV_WAKE_KEY, looked: keys, doorbells };
 }
 
 export async function reconcileWorkflow(key, ctx, { settings = workflowSettings() } = {}) {

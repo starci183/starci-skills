@@ -22,12 +22,11 @@ const answers = (snapshot) => {
   return Object.fromEntries(answerQuestions(groups, {}, { now: NOW, workflows: [], ...snapshot }, n).flatMap((g) => g.questions).map((q) => [q.id, q]));
 };
 
-test('the four questions are answerable and the rest stay documented gaps with their reason', () => {
+test('the four questions are answerable, and so is every other: no documented gap is left', () => {
   const all = loadQuestions().flatMap((g) => g.questions);
   for (const id of IDS) assert.equal(all.find((q) => q.id === id).answerable, 'today', id);
-  const gaps = all.filter((q) => q.answerable === 'gap');
-  assert.deepEqual(gaps.map((q) => q.id).sort(), ['cc-port-claims', 'co-secret-in-transcript', 'cu-live-state-untouched', 'pl-network-loss', 'rr-claimed-vs-observed']);
-  assert.ok(gaps.every((q) => q.signal && q.why));
+  assert.deepEqual(all.filter((q) => q.answerable === 'gap').map((q) => q.id), []);
+  assert.ok(all.every((q) => q.check && !q.signal && !q.why), 'every question names its check and carries no gap reason');
 });
 
 test('a refusal row carries the role and the digest counts the runtime changes the guard refused', () => {

@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { SIGNAL_CHECKS } from './debug-signal-checks.mjs';
 
 const FILE = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'modules', 'reconciler', 'debug-questions.yaml');
 
@@ -187,6 +188,7 @@ const CHECKS = Object.freeze({
   'gate-loosening-lands': gateLooseningLands,
   'critic-independent': criticIndependent,
   'wake-acted': wakeActed,
+  ...SIGNAL_CHECKS,
 });
 
 /** The declared questions with the checks resolved; a question answerable today whose check does not exist is refused. */

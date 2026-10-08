@@ -151,6 +151,7 @@ departures:
   safe-mode: {role: runtime, duty: does, registry: null}
   queue-failing: {role: runtime, duty: does, registry: host-controller-actions-fail-forever}
   reservation-leak: {role: runtime, duty: cleanup, registry: worker-reservations-leaked}
+  secret-survived: {role: runtime, duty: does, registry: debug-questions-lacked-five-signals}
   hold-unlisted: {role: runtime, duty: does, registry: null}
   status-unreadable: {role: runtime, duty: does, registry: null}
   op-no-cause: {role: runtime, duty: does, registry: null}

@@ -46,9 +46,10 @@ function optionOf(spec, subject) {
 
 const jobOption = (option) => ({ choice: option.key, verb: option.steps.at(-1)?.verb ?? null, args: option.steps.at(-1)?.args ?? null, steps: option.steps, effect: option.title });
 
-/** The options a Decision Item carries that run as a Kernel verb (`starci kernel <verb> --flag value`); the others are prose and are not offered. */
+/** The options a Decision Item carries that run as a Kernel verb (`starci kernel <verb> --flag value`) or that wait (`snooze: true`: asked again after the snooze); the others are prose and are not offered. */
 function diOptionsOf(di, subject) {
   return (di.options ?? []).flatMap((o, index) => {
+    if (o.snooze === true) return [{ choice: String(o.key ?? `option-${index + 1}`), verb: null, args: null, steps: [], snooze: true, effect: String(o.title ?? 'asks again after the snooze').slice(0, 200) }];
     const step = parseKernelCommand(o.verb);
     return step ? [{ choice: String(o.key ?? `option-${index + 1}`), verb: step.verb, args: { ...step.args, workflow: subject.workflow }, steps: [{ verb: step.verb, args: { ...step.args, workflow: subject.workflow } }], effect: String(o.title ?? o.verb).slice(0, 200) }] : [];
   });

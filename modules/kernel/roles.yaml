@@ -127,7 +127,7 @@ roles:
       status: provisional
       source: "the usage rows of the first real workflows: a decision leg spent 6 to 17 million tokens (10.8 million in the audit of the first real workflow)"
       perAttempt: {default: 6000000}
-      onExceed: "the runtime measures each attempt from its usage rows when it settles, and a running attempt from its session file on the minute poll that snapshots it (the first reading past the budget is one attempt-budget-overrun event); for a job running past the budget or waiting on its Kernel it opens a Decision Item budget-overrun, once: the Kernel continues once, replaces the agent or re-scopes the leg"
+      onExceed: "the runtime measures each attempt from its usage rows when it settles, and a running attempt from its session file on the minute poll that snapshots it (the first reading past the budget is one attempt-budget-overrun event); for a job waiting on its Kernel it opens a Decision Item budget-overrun, once: the Kernel continues once, replaces the agent or re-scopes the leg; for an attempt still running it opens one whose only option is to let it finish (a retry is refused while a try is open and no verb stops a live worker), asked again after the snooze, and a second item with the retries opens when the attempt settles and its usage rows measure it"
     cleanup:
       - "its own processes, temp files and servers, before it reports"
     never:

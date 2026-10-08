@@ -21,3 +21,11 @@ blocksDeparture: 2
 # not have its usage rows yet (the usage sweep runs every five minutes), so it is not judged.
 wakeActMs: 120000
 wakeGraceMs: 600000
+# providerResumeMs: after a provider's circuit has closed (its recovery, or the end of its cooldown), work held behind it must start again inside this time.
+# secretScanArtifacts: how many of each kind of stored artifact (log rows, seat snapshots, Supervisor reports, op attempt transcripts) one digest re-scans for a secret that survived redaction.
+# secretScanBytes: how many bytes of one stored transcript or report the scan reads.
+# signalRows: how many rows of each machine signal (runtime-change-applied, host-ledger-drift, port-claim) one digest reads.
+providerResumeMs: {ref: "modules/reconciler/job.yaml#decisionDueMs"}
+secretScanArtifacts: 200
+secretScanBytes: 4000000
+signalRows: 500

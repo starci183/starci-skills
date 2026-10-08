@@ -688,3 +688,17 @@ cases:
     met: {date: "2026-10-09", where: "wave 4 lane perf/w4-seat-token-cost: the usage sweep cuts a Kernel session at kernel-woken events only", evidence: "scripts/kernel/wake-budget.mjs kernelWakesOf"}
     status: open
     why: "a transition or doorbell wake has no tokens of its own in the seat-cost view (tokens per wake p50 and p90 read the stall wakes); cutting at the other wake kinds changes the buckets of sessions already recorded and would count the range after an old transition wake twice, so the cut needs a marker event that starts the new cuts from its own instant"
+  - id: debug-questions-lacked-five-signals
+    family: record-vs-reality
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "the five questions Debug could not answer after the first four signals (a provider outage and the resumption of work, whether a source change touched live state, a secret that survived redaction, host-versus-ledger drift, two claimants of one port) each needed a fact the runtime observed and did not record where it occurs", remedy: {state: in-tree, change: "provider_health_events keep the end of the circuit beside the failing job, step and kind; the engine writes signal.runtime-change-applied when it starts on a new revision and when a land re-looks at the running workflows; the redaction module reports which rule still finds a secret in a stored artifact and the digest scans its own inputs with it; the SLA pass writes signal.host-ledger-drift for every clock whose code names a driftKind when it outlives its bound and when it clears; env-health writes signal.port-claim for every claim, refusal and release of a port"}}
+    met: {date: "2026-10-09", where: "modules/reconciler/debug-questions.yaml", evidence: "five of 34 questions answerable: gap"}
+    rule: {file: scripts/reconciler/debug-signal-checks.mjs, anchor: "live-state-untouched"}
+    spec: tests/reconciler/debug-signals-rest.spec.mjs
+    status: covered
+  - id: budget-overrun-running-offers-refused-retries
+    family: smooth-operation
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "the budget-overrun item of an attempt still running offered continue-once, replace and re-scope, three enqueues the ledger refuses unit-in-flight while the try runs, and the summary said so", remedy: {state: in-tree, change: "a running attempt's item has its own subject (attempt-<id>-running) and one option, let-finish, a snooze the menu offers; no stop is offered because no Kernel verb stops a live worker (reconcile --dead-worker refuses a live terminal, --release-worker serves a settled job or a held settle); when the attempt settles its usage rows open the settled item with the retries"}}
+    met: {date: "2026-10-09", where: "scripts/reconciler/budget-plan.mjs summary of a live overrun", evidence: "the retry options below are refused unit-in-flight until it settles"}
+    rule: {file: scripts/reconciler/budget-plan.mjs, anchor: "snooze: true"}
+    spec: tests/kernel/attempt-live-usage.spec.mjs
+    status: covered
