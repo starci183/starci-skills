@@ -1,5 +1,11 @@
 // Provider receipt SQL participates in the machine writer's existing fenced transactions.
 
+// The host restarted after this receipt's last update, so no launch of that update can still run: the proof is bound to the receipt's own
+// update instant (a later progress observation refuses it) and, when the receipt names a host request, to that request's absence in the current runtime.
+const hostRestartedEnd = (row, proof) => proof?.kind === 'host-restarted' && proof.confirmed === true && !row.handle && !row.pid
+  && proof.receiptUpdatedAt === row.updated_at && Number.isFinite(proof.restartedAt) && proof.restartedAt > row.updated_at
+  && (!row.host_request_id || (proof.hostRequestId === row.host_request_id && proof.requestState === 'absent'));
+
 export function providerReservationMethods({ need, parse, toJson, hex }) {
   // Provider/account slots are shared by all five agent roles. A clock timeout is not exit evidence.
   const providerReservationRow = (row) => row ? { id: row.id, fence: row.fence, attemptId: row.attempt_id,
@@ -101,7 +107,7 @@ export function providerReservationMethods({ need, parse, toJson, hex }) {
         && proof.confirmed === true && proof.effectState === 'none'
         && typeof proof.dispatchId === 'string' && proof.dispatchId.trim()
         && parse(row.scope_json)?.scopeId === proof.scopeId;
-      if (!noEffect && !ended && !reconciledNoEffect) return { ok: false, reason: 'exit-unproven', reservation: providerReservationRow(row) };
+      if (!noEffect && !ended && !reconciledNoEffect && !hostRestartedEnd(row, proof)) return { ok: false, reason: 'exit-unproven', reservation: providerReservationRow(row) };
       const at = m.now();
       db.prepare("UPDATE provider_reservations SET state='released',released_at=?,updated_at=?,proof_json=? WHERE id=? AND fence=?").run(at, at, toJson(proof), id, fence);
       db.prepare("INSERT INTO provider_reservation_events(reservation_id,at,from_state,to_state,proof_json) VALUES(?,?,?,'released',?)").run(id, at, row.state, toJson(proof));

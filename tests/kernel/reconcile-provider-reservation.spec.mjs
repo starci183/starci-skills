@@ -113,7 +113,7 @@ test('the reaper releases an unknown receipt whose recorded launches all settled
   const fenced = seedUnknownReservation(machine, { scopeId: fencedScope, jobId: fencedJob, attemptId: 'op:leak-fenced', provider: 'claude-fenced' });
 
   const reaped = reapProviderReservations({ env: process.env },
-    { list: () => ({ ok: true, terminals: [] }), table: () => [], env: () => [] });
+    { status: () => ({ reachable: false }), list: () => ({ ok: true, terminals: [] }), table: () => [], env: () => [] });
 
   assert.ok(reaped.released.some((row) => row.id === proven.id && row.why === 'no-effect-recorded'),
     `proven no-effect receipt reaped: ${JSON.stringify(reaped)}`);

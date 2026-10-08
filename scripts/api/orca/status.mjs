@@ -2,7 +2,7 @@
 // status.mjs — the calls.yaml `status` call as a callable function.
 // Internal entry: spawned by scripts/reconciler/services.mjs; not invoked directly.
 // Args: none.
-// Returns {ok, reachable, state, error, spawnError, appExe}: reachable when the Orca runtime answers and is ready.
+// Returns {ok, reachable, state, appPid, error, spawnError, appExe}: reachable when the Orca runtime answers and is ready; appPid is the desktop app process.
 // appExe is the Orca desktop app beside the CLI this runner resolves (<app>/resources/bin/orca.exe -> <app>/Orca.exe),
 // or null; it is read from disk, so it is there even when the runtime does not answer (the Orca restart needs it then).
 import { orcaCall, orcaAppExe } from './lib.mjs';
@@ -16,7 +16,7 @@ import { isMain } from '../../lib/is-main.mjs';
 export function status({ timeout } = {}) {
   const r = orcaCall('status', {}, { timeout });
   const runtime = r.result?.runtime ?? null;
-  return { ok: r.outcome === 'ok', reachable: runtime?.reachable === true, state: runtime?.state ?? null, error: r.error,
+  return { ok: r.outcome === 'ok', reachable: runtime?.reachable === true, state: runtime?.state ?? null, appPid: Number(r.result?.app?.pid) || null, error: r.error,
     spawnError: r.outcome !== 'ok' && !r.receipt ? r.error : null, appExe: orcaAppExe() };
 }
 
