@@ -2017,6 +2017,16 @@ PROVIDER_RESERVATION_HELD:
   owner: supervisor
   kind: runtime-fault
 
+host-restarted:
+  title: "The host restarted after the launch began"
+  title_vi: "Máy chủ đã khởi động lại sau khi lần khởi động bắt đầu"
+  meaning_vi: "Lần khởi động worker của job đã bắt đầu trước lần khởi động lại của máy hoặc của Orca, và Orca đang chạy không còn biết Dispatch của nó, nên lần khởi động đó đã kết thúc."
+  causes_vi:
+    - "Máy tắt hoặc khởi động lại giữa lúc worker đang được dựng"
+  nextStep_vi: "Job được đánh dấu thất bại và chỗ đường dẫn được trả; Supervisor đặt job mới nếu việc còn cần."
+  owner: supervisor
+  kind: runtime-fault
+
 ESLINT_UNAVAILABLE:
   title: "ESLint could not be loaded"
   title_vi: "Không nạp được ESLint của sản phẩm"
