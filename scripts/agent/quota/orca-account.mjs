@@ -3,6 +3,7 @@
 import { accountList } from '../../api/orca/account-list.mjs';
 import { allocationSettings } from '../../../engine/config.mjs';
 import { normalizeQuotaSnapshot } from './snapshot.mjs';
+import { loginExpiredOf, loginExpiredText, LOGIN_EXPIRED_KIND } from '../../lib/login-expired.mjs';
 
 export function probeOrcaAccount(provider, options = {}) {
   const policy = options.policy ?? allocationSettings()?.admission;
@@ -19,10 +20,17 @@ export function probeOrcaAccount(provider, options = {}) {
   if (!entry) return normalized({ state: 'dead', auth: 'unavailable', failureKind: 'missing-account', detail: `no account quota entry for ${provider}` });
   const account = entry.accountId ?? options.account ?? 'default';
   const observedAt = entry.updatedAt ?? entry.observedAt ?? entry.usageMetadata?.observedAt ?? list.observedAt ?? list.accounts?.observedAt ?? null;
+  const failing = failingEntryOf(provider, entry);
+  return normalized({ account, observedAt, entry, ...(failing ?? { auth: 'ok' }) });
+}
+
+// The quota fields of an account entry that cannot supply windows, or null for a healthy one.
+function failingEntryOf(provider, entry) {
   if (entry.status === 'unavailable' || entry.usageMetadata?.failureKind === 'missing-credentials')
-    return normalized({ account, observedAt, entry, state: 'dead', auth: 'unavailable', failureKind: entry.usageMetadata?.failureKind ?? 'unavailable', detail: entry.error ?? 'provider unavailable' });
-  if (entry.status !== 'ok') return normalized({ account, observedAt, entry, state: 'unknown',
-    auth: entry.usageMetadata?.failureKind === 'stale-token' ? 'refreshable' : 'unknown',
-    failureKind: entry.usageMetadata?.failureKind ?? null, detail: entry.error ?? 'account quota status unknown' });
-  return normalized({ account, observedAt, entry, auth: 'ok' });
+    return { state: 'dead', auth: 'unavailable', failureKind: entry.usageMetadata?.failureKind ?? 'unavailable', detail: entry.error ?? 'provider unavailable' };
+  const expired = loginExpiredOf(provider, entry);
+  if (expired) return { state: 'unknown', auth: 'unavailable', failureKind: LOGIN_EXPIRED_KIND, detail: loginExpiredText(expired) };
+  if (entry.status === 'ok') return null;
+  return { state: 'unknown', auth: entry.usageMetadata?.failureKind === 'stale-token' ? 'refreshable' : 'unknown',
+    failureKind: entry.usageMetadata?.failureKind ?? null, detail: entry.error ?? 'account quota status unknown' };
 }

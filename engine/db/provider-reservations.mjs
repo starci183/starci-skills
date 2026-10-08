@@ -6,6 +6,15 @@ const hostRestartedEnd = (row, proof) => proof?.kind === 'host-restarted' && pro
   && proof.receiptUpdatedAt === row.updated_at && Number.isFinite(proof.restartedAt) && proof.restartedAt > row.updated_at
   && (!row.host_request_id || (proof.hostRequestId === row.host_request_id && proof.requestState === 'absent'));
 
+/** The Dispatch states in which the worker has ended (Orca's own terminal states of a Dispatch). */
+export const ENDED_DISPATCH_STATES = Object.freeze(['failed', 'completed', 'stopped', 'released', 'cancelled']);
+
+// The host request of this receipt resolved to a Dispatch Orca reports ended, whose terminal (when it has one) is gone or disconnected and carries no process.
+const dispatchEndedEnd = (row, proof) => proof?.kind === 'dispatch-ended' && proof.confirmed === true && !row.handle && !row.pid
+  && Boolean(row.host_request_id) && proof.hostRequestId === row.host_request_id
+  && typeof proof.dispatchId === 'string' && proof.dispatchId.length > 0 && ENDED_DISPATCH_STATES.includes(proof.dispatchStatus)
+  && proof.processVerdict === 'none' && (!proof.handle || ['gone', 'disconnected'].includes(proof.terminalProof));
+
 export function providerReservationMethods({ need, parse, toJson, hex }) {
   // Provider/account slots are shared by all five agent roles. A clock timeout is not exit evidence.
   const providerReservationRow = (row) => row ? { id: row.id, fence: row.fence, attemptId: row.attempt_id,
@@ -107,7 +116,7 @@ export function providerReservationMethods({ need, parse, toJson, hex }) {
         && proof.confirmed === true && proof.effectState === 'none'
         && typeof proof.dispatchId === 'string' && proof.dispatchId.trim()
         && parse(row.scope_json)?.scopeId === proof.scopeId;
-      if (!noEffect && !ended && !reconciledNoEffect && !hostRestartedEnd(row, proof)) return { ok: false, reason: 'exit-unproven', reservation: providerReservationRow(row) };
+      if (!noEffect && !ended && !reconciledNoEffect && !hostRestartedEnd(row, proof) && !dispatchEndedEnd(row, proof)) return { ok: false, reason: 'exit-unproven', reservation: providerReservationRow(row) };
       const at = m.now();
       db.prepare("UPDATE provider_reservations SET state='released',released_at=?,updated_at=?,proof_json=? WHERE id=? AND fence=?").run(at, at, toJson(proof), id, fence);
       db.prepare("INSERT INTO provider_reservation_events(reservation_id,at,from_state,to_state,proof_json) VALUES(?,?,?,'released',?)").run(id, at, row.state, toJson(proof));

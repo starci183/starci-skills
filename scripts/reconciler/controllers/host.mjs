@@ -603,7 +603,7 @@ export function createHostController(deps = {}) {
     if (!ledger?.file) {
       // The ledger left the registry (or has no file): whatever episode it had cannot go on, so it closes now.
       await clear(ctx, key, 'LEDGER_CORRUPT');
-      return { ok: false, skipped: 'unknown-ledger' };
+      return { ok: true, skipped: 'unknown-ledger' };
     }
     const rec = rowOf(key, now);
     const out = { ok: rec.lastCheck?.ok !== false && rec.state !== 'backup-failed' };
@@ -635,7 +635,7 @@ export function createHostController(deps = {}) {
     async list(ctx) {
       const keys = bootPending(ctx) ? ['host:boot'] : [];
       keys.push(...registry().map((e) => `service:${e.name}`), 'host:processes', 'host:transcripts');
-      for (const l of ctx.ledgers ?? []) keys.push(`ledger:${l.ledgerId}`);
+      for (const l of ctx.ledgers ?? []) if (l.file) keys.push(`ledger:${l.ledgerId}`);
       // An open LEDGER_CORRUPT clock of a ledger no longer listed (its file absent, or it left supervisor.repos) gets
       // the pass that clears it.
       let openCorrupt = [];

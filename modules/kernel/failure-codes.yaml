@@ -2027,6 +2027,26 @@ host-restarted:
   owner: supervisor
   kind: runtime-fault
 
+provider-login-expired:
+  title: "Provider login expired"
+  title_vi: "Đăng nhập provider đã hết hạn"
+  meaning_vi: "Orca báo đăng nhập của provider đã hết hạn nên không có ứng viên nào của provider đó đủ điều kiện; thông báo nêu tên provider, lời của Orca và việc cần làm."
+  causes_vi:
+    - "Token OAuth của provider hết hạn và Orca chưa được đăng nhập lại"
+  nextStep_vi: "Owner đăng nhập lại provider trong Orca (Settings > Accounts) rồi chạy lại lệnh; runtime thử thành viên đủ điều kiện kế tiếp trước."
+  owner: owner
+  kind: dispatch-refusal
+
+process-gone-after-restart:
+  title: "Recorded connector processes are gone after a restart"
+  title_vi: "Các tiến trình đã ghi của connector không còn sau khi khởi động lại"
+  meaning_vi: "Dòng connector còn nợ việc đóng manager hoặc tiến trình con, nhưng cả hai (đúng pid và thời điểm sinh) không còn trong bảng tiến trình đọc được; nợ được xóa bằng sự vắng mặt đó và dòng được ghi là đã dừng."
+  causes_vi:
+    - "Máy khởi động lại khi tunnel hoặc gateway đang chạy"
+  nextStep_vi: "Không cần làm gì: lần start kế tiếp chạy bình thường."
+  owner: runtime-core
+  kind: check-status
+
 ESLINT_UNAVAILABLE:
   title: "ESLint could not be loaded"
   title_vi: "Không nạp được ESLint của sản phẩm"
@@ -10686,13 +10706,13 @@ report-job-not-active:
   owner: supervisor
   kind: verb-refusal
 report-scratch-invalid:
-  title: "Scratch dir not under temp"
-  title_vi: "Thư mục nháp không nằm trong thư mục tạm"
-  meaning_vi: "Thư mục nháp của lần giao nằm ngoài thư mục tạm của hệ điều hành nên không được tin."
+  title: "Scratch dir does not match dispatch"
+  title_vi: "Thư mục nháp không khớp lần giao"
+  meaning_vi: "Thư mục nháp đã ghi không khớp ràng buộc repository, workflow và job do runtime cấp cho lần giao."
   causes_vi:
-    - "Đặt STARCI_JOB_SCRATCH ở nơi khác"
-    - "Bản ghi thư mục nháp bị sai"
-  nextStep_vi: "Không nhận báo cáo. Thợ ghi báo cáo trong thư mục nháp đúng do runtime cấp."
+    - "Đường dẫn không phải thư mục nháp đã cấp cho job"
+    - "Thư mục nháp hoặc thư mục cha bị thay bằng liên kết"
+  nextStep_vi: "Không nhận báo cáo. Thợ dùng thư mục nháp đã ghi cho lần giao; thay đổi roots.temp không làm mất ràng buộc này."
   owner: op-retry
   kind: verb-refusal
 report-scratch-missing:

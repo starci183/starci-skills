@@ -54,6 +54,7 @@ import { runtimeSecretEnv } from '../gates/runtime-host.mjs';
 import { pidAlive, starciLocalRoot, withMachine } from '../../engine/db/machine.mjs';
 import { argsOf, claimManager, connectorLog, connectorState, lockHolder, markStarting, ownerConfig, recordAlive, spawnDetached, startingHolder, writeConnectorState, stopConnector, connectorChildUnresolved, connectorManagerBlocked, CONNECTOR_LAUNCH_ENV } from './lib.mjs';
 import { parseJson } from '../lib/json.mjs';
+import { settleGoneCustody } from './custody-gone.mjs';
 import { GATEWAY_FILE, gatewayAlive, gatewayState } from './ask-gateway.mjs';
 import { processList } from '../api/process/process-list.mjs';
 import { isMain } from '../lib/is-main.mjs';
@@ -352,6 +353,8 @@ const loadCloudflare = () => {
 
 /** `tunnel start`: launch the manager detached unless a live one already owns the tunnel. */
 const startVerb = ({ cf, port, secretEnv, out }) => {
+  // A host restart leaves custody the dead manager owed: the exact processes are gone, which settles it before the start is judged.
+  if (connectorManagerBlocked(tunnelState())) settleGoneCustody('tunnel');
   const live = managerAlive();
   if (live?.blocked) { out({ ok: false, effectState: 'unknown', reason: live.reason, custody: live }); process.exitCode = 1; return; }
   if (live) { out({ ok: true, already: true, pid: live.pid, publicBase: publicBase() }); return; }

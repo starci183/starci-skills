@@ -112,3 +112,13 @@ test('host list: an open LEDGER_CORRUPT clock of a ledger no longer listed gets 
     assert.ok(ctx.calls.clear.some((x) => x.entity === 'ledger:nivo-monorepo' && x.state === 'LEDGER_CORRUPT'));
   } finally { try { m.close(); } catch { /* closed */ } fs.rmSync(dir, { recursive: true, force: true }); }
 });
+
+test('host list: the machine\'s own ledger has no file and no ledger-health key, and a ledger that left the registry settles instead of failing every pass', async () => {
+  const c = controller();
+  const ctx = fakeCtx({ mode: 'active', controller: 'host', now: () => T0, ledgers: [{ ledgerId: 'supervisor', repo: null, file: null }, { ledgerId: 'real', repo: 'r', file: 'real.sqlite' }] });
+  const keys = await c.list(ctx);
+  assert.ok(!keys.includes('ledger:supervisor'), 'it failed ok:false at every pass of the real engine (60 attempts, then parked)');
+  assert.ok(keys.includes('ledger:real'));
+  const settled = await c.reconcile('ledger:supervisor', ctx);
+  assert.deepEqual([settled.ok, settled.skipped], [true, 'unknown-ledger']);
+});

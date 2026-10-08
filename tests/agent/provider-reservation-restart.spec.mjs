@@ -142,3 +142,51 @@ test('the incarnation start is the later of the boot instant and the Orca app cr
   assert.equal(hostIncarnation(host({ bootAt: 900, orcaCreatedAt: 500 })).startedAt, 900);
   assert.equal(hostIncarnation({ status: () => { throw new Error('orca down'); } }).why, 'host-unavailable');
 });
+
+// The real store after the engine restart (2026-10-08 05:25Z): the current Orca runtime KNOWS every request (state completed, receipt
+// outcome_unknown / turn_start_unobserved, or failed at agent_readiness for the launching one) and reports each Dispatch failed, completed or
+// stopped after its orchestration recovery; none of the terminals is listed any more. Statuses are the ten real ones, ids anonymised.
+const REAL_DISPATCHES = ['failed', 'failed', 'completed', 'completed', 'failed', 'completed', 'completed', 'completed', 'failed', 'failed'];
+const knownHost = ({ status = (index) => REAL_DISPATCHES[index], listed = [], envRows = [] } = {}) => ({
+  ...host({ bootAt: hoursAhead(-1), orcaCreatedAt: hoursAhead(-1) }),
+  request: (args) => ({ ok: true, state: 'completed', dispatchId: `ctx_${args.request.split('-')[1]}` }),
+  worker: ({ dispatch }) => ({ ok: true, result: { dispatch: { id: dispatch, status: status(Number(dispatch.split('_')[1])), assigneeHandle: `term_${dispatch.split('_')[1]}` } } }),
+  list: () => ({ ok: true, terminals: listed }), env: () => envRows });
+
+test('the ten real receipts, whose requests the new runtime knows, are released on their ended Dispatches with the terminals gone', (t) => {
+  const options = fixture(t);
+  seedPool(options);
+  assert.equal(active(options).length, CAP);
+  const reaped = reapProviderReservations(options, knownHost());
+  assert.equal(reaped.released.length, CAP, JSON.stringify(reaped.kept));
+  assert.ok(reaped.released.every((entry) => entry.why === 'dispatch-ended'));
+  assert.deepEqual(active(options), []);
+  const events = readMachine((m) => m.db.prepare("SELECT proof_json FROM provider_reservation_events WHERE to_state='released'").all(), [], options);
+  const proof = JSON.parse(events[0].proof_json);
+  assert.deepEqual([proof.kind, proof.dispatchStatus, proof.terminalProof, proof.processVerdict], ['dispatch-ended', 'failed', 'gone', 'none']);
+});
+
+test('a Dispatch still active, a terminal still connected or a process under the handle keeps the slot', (t) => {
+  const options = fixture(t);
+  seed(options, 0, 'unknown');
+  assert.deepEqual(reapProviderReservations(options, knownHost({ status: () => 'running' })).kept.map((entry) => entry.why), ['dispatch-active']);
+  assert.deepEqual(reapProviderReservations(options, knownHost({ listed: [{ handle: 'term_0', connected: true }] })).kept.map((entry) => entry.why), ['terminal-connected']);
+  const tagged = [{ pid: 7, readable: true, values: { ORCA_TERMINAL_HANDLE: 'term_0' } }];
+  const alive = { ...knownHost({ envRows: tagged }), table: () => [{ pid: 7, ppid: 1, name: 'codex.exe', created: 5 }] };
+  assert.deepEqual(reapProviderReservations(options, alive).kept.map((entry) => entry.why), ['process-alive']);
+  assert.deepEqual(reapProviderReservations(options, { ...knownHost(), env: () => null }).kept.map((entry) => entry.why), ['census-unreadable']);
+  assert.equal(active(options).length, 1);
+});
+
+test('the machine refuses a dispatch-ended proof for another request, an active state or a handle-bearing receipt', (t) => {
+  const options = fixture(t);
+  seed(options, 0, 'unknown');
+  const [row] = active(options);
+  const proof = { kind: 'dispatch-ended', confirmed: true, hostRequestId: row.hostRequestId, dispatchId: 'ctx_0', dispatchStatus: 'failed', handle: 'term_0', terminalProof: 'gone', processVerdict: 'none' };
+  const m = openMachine({ env: options.env });
+  try {
+    for (const bad of [{ hostRequestId: 'other' }, { dispatchStatus: 'running' }, { terminalProof: 'connected' }, { processVerdict: 'survived' }, { dispatchId: '' }])
+      assert.equal(m.releaseProviderReservation({ ...row, proof: { ...proof, ...bad } }).reason, 'exit-unproven', JSON.stringify(bad));
+    assert.equal(m.releaseProviderReservation({ ...row, proof }).ok, true);
+  } finally { m.close(); }
+});

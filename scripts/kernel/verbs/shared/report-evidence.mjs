@@ -16,7 +16,7 @@ import { safeRemove } from '../../../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../../../machine/artifact-hold.mjs';
 import { refuse } from '../../../../engine/refuse.mjs';
 import { resolvedKey } from '../../../lib/path-key.mjs';
-import { tempRoot } from '../../../../engine/temp-root.mjs';
+import { JOB_SCRATCH_ROOT, jobScratchDirOf } from '../../op-prompt.mjs';
 
 
 const slash = (s) => String(s).replaceAll('\\', '/');
@@ -29,14 +29,20 @@ const real = (p) => { try { return fs.realpathSync.native(p); } catch { return p
 const CHECK_FILE_FIELDS = Object.freeze([['stdoutPath', 'check-stdout', 'stdout'], ['stderrPath', 'check-stderr', 'stderr'], ['outputPath', 'check-output', 'output']]);
 
 /**
- * The attempt's scratch directory: op_attempts.scratch_dir. It must be an existing directory
- * under the temp root (engine/temp-root.mjs), never the temp root itself, so the delete after filing can never widen.
+ * The dispatch's recorded scratch, with the runtime allocator's repository/workflow/job binding.
+ * Its historical temp root may differ from today's config. Neither a foreign child nor a link
+ * replacing the allocated directory or namespace is admitted, so cleanup cannot widen.
  */
-export function scratchOf(attempt) {
+export function scratchOf(attempt, repo = attempt?.repo_root) {
   const raw = attempt?.scratch_dir || null;
   if (!raw) throw refuse('this attempt has no scratch directory (op_attempts.scratch_dir); write the report under the job scratch your contract names', 'report-scratch-unbound');
   const dir = real(raw);
-  if (!inside(real(tempRoot()), dir)) throw refuse(`scratch ${slash(dir)} is not under the temp root ${slash(real(tempRoot()))}`, 'report-scratch-invalid');
+  const recorded = path.resolve(raw), root = path.dirname(path.dirname(recorded));
+  const expected = repo && attempt.workflow_id && attempt.job_id
+    ? path.join(real(root), JOB_SCRATCH_ROOT, path.basename(jobScratchDirOf(repo, attempt.workflow_id, attempt.job_id))) : null;
+  if (!path.isAbsolute(raw) || !expected || resolvedKey(recorded) !== resolvedKey(path.join(root, JOB_SCRATCH_ROOT, path.basename(expected)))
+    || resolvedKey(dir) !== resolvedKey(expected))
+    throw refuse(`scratch ${slash(dir)} does not match this dispatch's repository/workflow/job binding`, 'report-scratch-invalid');
   let st = null;
   try { st = fs.statSync(dir); } catch { st = null; }
   if (!st?.isDirectory()) throw refuse(`scratch ${slash(dir)} does not exist`, 'report-scratch-missing');
@@ -283,8 +289,9 @@ function interfaceAuditOf(db, { attempt, staged, report, now }) {
   return { auditId: doc.id, verdict };
 }
 
-/** Delete the scratch once the report is durable. Only a directory strictly inside the temp root. */
-export function removeScratch(scratch) {
-  if (!scratch || !inside(real(tempRoot()), scratch)) return false;
+/** Delete only the same dispatch-bound directory validated for filing, including under an old temp root. */
+export function removeScratch(scratch, attempt, repo) {
+  try { if (!scratch || resolvedKey(scratchOf(attempt, repo)) !== resolvedKey(scratch)) return false; }
+  catch { return false; }
   return safeRemove(scratch, { hold: artifactHoldReason }).ok;
 }
