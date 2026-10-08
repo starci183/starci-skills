@@ -242,10 +242,12 @@ export function imageFiles(app) {
   const side = app.sides.fe;
   const inputs = [...(opensPackages(side) ? ['fe/packages'] : []), ...((side.reads ?? []).includes('be/contracts/') ? ['be/contracts'] : [])];
   const copyInputs = inputs.map(folder => `COPY ${folder} ${folder}\n`).join('');
+  // A lite back end imports the generated Supabase types from the app root, so each of its images carries that folder.
+  const copyBeInputs = app.edition === 'lite' ? 'COPY supabase/types supabase/types\n' : '';
   const entries = imageEntries(app).map(({ side: which, entry: item }) => ({ side: which, item }));
   return entries.map(({ side: which, item }) => {
     const template = IMAGE_TEMPLATE[item.kind];
-    const vars = { project: app.project, app: item.name, nodeImage: NODE_IMAGE, port: DEFAULT_PORT, copyInputs };
+    const vars = { project: app.project, app: item.name, nodeImage: NODE_IMAGE, port: DEFAULT_PORT, copyInputs, copyBeInputs };
     return { path: dockerfilePath(which, item.name), content: render(readBundled(`${template}/Dockerfile`), vars) };
   });
 }
