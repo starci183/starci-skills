@@ -3051,7 +3051,7 @@ Roles: release, owner
 
 Conventions:
 
-- plan mode is read-only and reports registry blockers, canon rebind drift and example pin drift
+- plan mode is read-only and reports registry blockers, canon rebind drift and example pin drift; the text and the json data.plan name every row and every blocker
 - publication uses the existing clean proof, registry confirmation and integrity verification
 - scripts/gates/release-plan.mjs publishOrder puts dependencies first and refuses cycles; packages without bundled canon pins win only among ready ties
 - the package phase rebinds code patterns, re-pins and installs examples, syncs them and proves every binding

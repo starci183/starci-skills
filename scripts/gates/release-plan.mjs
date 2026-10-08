@@ -159,3 +159,14 @@ export function buildPlan({ root, registry, scope = 'all' }) {
   const selected = scope === 'runtime' ? ordered.filter((row) => row.runtimePackage) : ordered;
   return { rows: selected, others, blockers, toPublish: selected.filter((r) => r.action === 'publish') };
 }
+
+/** The machine-readable plan: every ordered row with its verdict, every blocker by name, the names to publish. */
+export function planSummary(plan) {
+  return {
+    rows: plan.rows.map((row) => ({ name: row.name, version: row.version, pin: row.pin, bundles: Boolean(row.last), registry: row.registry.state,
+      action: row.action, note: row.note, blocker: row.blocker ?? null })),
+    skipped: plan.others.map((row) => ({ name: row.name, dir: row.dir, kind: row.kind })),
+    blockers: [...plan.blockers],
+    toPublish: plan.toPublish.map((row) => `${row.name}@${row.version}`),
+  };
+}

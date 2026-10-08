@@ -15,7 +15,7 @@ import { porcelainStatus } from '../api/git/porcelain-status.mjs';
 import { revParseQuery } from '../api/git/rev-parse-query.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
-import { buildPlan } from './release-plan.mjs';
+import { buildPlan, planSummary } from './release-plan.mjs';
 import { npmRegistry } from './release-registry.mjs';
 import { proveRuntimePackage } from './runtime-package-clean.mjs';
 import { releaseNotesFindings } from '../hfs/runtime-rules/release-notes.mjs';
@@ -190,7 +190,7 @@ const finishPublish = ({ runtimePackage, node, root, out }, plan) => {
 
 /**
  * Run the plan or publish it. deps (seams of a spec): registry, node (process runner), ci (npm ci), git ({status, branch, head}),
- * sleep, out (a line writer). Returns the exit code; every line goes through `out`.
+ * sleep, out (a line writer), plan (receives the machine-readable plan summary). Returns the exit code; every line goes through `out`.
  */
 export function releasePublish({ root = runtimeRoot, publish = false, runtimePackage = false, npmUser = null, pollMinutes = 15, preLandRef = null, env = process.env, deps = {} } = {}) {
   const { out, registry, node, install, sleep, git } = publishSeams(root, runtimePackage, deps);
@@ -198,6 +198,7 @@ export function releasePublish({ root = runtimeRoot, publish = false, runtimePac
   const plan = buildPlan({ root, registry, scope: runtimePackage ? 'runtime' : 'packages' });
   const publicationTag = runtimePackage ? runtimeTag(root, plan) : 'latest';
   for (const line of planLines(plan)) out(line);
+  deps.plan?.(planSummary(plan));
   if (!publish) return plan.blockers.length ? EXIT.blocked : EXIT.done;
   if (plan.blockers.length) { out('release-publish: refusing to publish with blockers'); return EXIT.failed; }
   const preflight = publishPreflight({ registry, git, npmUser, preLandRef, runtimePackage, out });

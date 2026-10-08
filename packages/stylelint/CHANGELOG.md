@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.6 - 2026-10-08
+
+- Changed: a behaviour-preserving clean-up of the plugin source (`String.raw` for the regular expressions, `Number.parseInt`, optional chaining, code-unit ordering through the new `lib/order.mjs`) and a regenerated `lib/grammar-values.generated.mjs` after the grammar dropped the muted-surface compatibility name. No rule changed.
+
 ## 2.0.4 - 2026-10-02
 
 - Comments and the rule-catalog prose (`lib/why.mjs`) are English only. No rule changed.
