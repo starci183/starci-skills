@@ -11,6 +11,7 @@ import { resourceList as realResourceList } from '../api/docker/resource-list.mj
 import { resourceRemove as realResourceRemove } from '../api/docker/resource-remove.mjs';
 import { safeRemove } from '../api/fs/safe-remove.mjs';
 import { resultDetail as detail, resultOk as ok } from '../lib/verb-call.mjs';
+import { findInOrder } from '../lib/in-order.mjs';
 import { underHostLock } from './verb-lock.mjs';
 import { makeTempDir } from '../api/fs/make-temp-dir.mjs';
 import {
@@ -186,11 +187,15 @@ export async function dockerDown(ctx, deps = {}) {
       const result = await (deps.composeDown ?? realComposeDown)(containers, { cwd });
       if (!ok(result)) return failed('down', result);
     }
-    for (const [kind, ids] of [['network', networks], ['volume', volumes]]) {
-      if (!ids.length) continue;
+    let failure = null;
+    await findInOrder([['network', networks], ['volume', volumes]], async ([kind, ids]) => {
+      if (!ids.length) return false;
       const result = await remove(kind, ids, { cwd });
-      if (!ok(result)) return failed('down', result);
-    }
+      if (ok(result)) return false;
+      failure = failed('down', result);
+      return true;
+    });
+    if (failure) return failure;
     const data = { schema: 'starci/docker-down@1', project: identity.project, stack: selected.stack, removed: { containers, networks, volumes } };
     const text = [
       `starci docker down: removed ${containers.length} container(s), ${networks.length} network(s), ${volumes.length} volume(s)`,

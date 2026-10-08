@@ -1,6 +1,7 @@
 // One HTTP header probe, with one wall-clock deadline across DNS, connect and redirects. Never throws.
 // A 301/302/303 becomes GET (HEAD stays HEAD), a 307/308 preserves method/body; follow:0 answers the redirect.
 import { transportOf } from './lib.mjs';
+import { repeatInOrder } from '../../lib/in-order.mjs';
 
 const REDIRECT = new Set([301, 302, 303, 307, 308]);
 const DOWN = new Set(['ECONNREFUSED', 'ECONNRESET', 'EHOSTUNREACH', 'ENOTFOUND', 'EADDRNOTAVAIL']);
@@ -72,7 +73,7 @@ export async function probe(url, { method = 'GET', body = null, timeoutMs = 20_0
   const started = Date.now(), controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    for (let hops = 0; ; hops += 1) {
+    return await repeatInOrder(async (hops) => {
       const r = await once(target, { method, body, signal: controller.signal, started });
       if (r.state !== 'answered') return r;
       const location = r.headers?.location;
@@ -82,6 +83,7 @@ export async function probe(url, { method = 'GET', body = null, timeoutMs = 20_0
       if (next.error) return next.error;
       target = next.target;
       if (r.status !== 307 && r.status !== 308) { method = method === 'HEAD' ? 'HEAD' : 'GET'; body = null; }
-    }
+      return undefined;
+    });
   } finally { clearTimeout(timer); }
 }

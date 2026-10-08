@@ -1,5 +1,7 @@
 // http-up.mjs — retrying HTTP availability and the strict harness health response.
 // Mechanically moved from reconciler/services.mjs; the caller still selects health and supplies its fetch seam.
+import { repeatInOrder } from '../../lib/in-order.mjs';
+
 /** The strict harness health response: HTTP 200 JSON whose data reports every database and a revision. */
 async function hasHarnessHealth(res) {
   const json = /^application\/json(?:\s*;|$)/i.test(res.headers?.get('content-type') ?? '');
@@ -15,7 +17,10 @@ async function hasHarnessHealth(res) {
 export async function httpUp(url, { timeoutMs, tries = 1, health = false, fetchImpl = fetch } = {}) {
   let last = null;
   const failures = [];
-  for (let i = 1; i <= Math.max(1, tries); i += 1) {
+  const attempts = Math.max(1, tries);
+  const succeeded = await repeatInOrder(async (done) => {
+    const i = done + 1;
+    if (!(i <= attempts)) return false;
     const started = Date.now();
     try {
       const res = await fetchImpl(url, { redirect: 'manual', signal: AbortSignal.timeout(timeoutMs) });
@@ -25,8 +30,10 @@ export async function httpUp(url, { timeoutMs, tries = 1, health = false, fetchI
         if (!last.ok) last.error = 'harness health contract unavailable';
       }
     } catch (error) { last = { ok: false, error: String(error?.cause?.code ?? error?.name ?? error?.message ?? error).slice(0, 200), tries: i, ms: Date.now() - started }; }
-    if (last.ok) return failures.length ? { ...last, failures } : last;
+    if (last.ok) return true;
     failures.push(`${last.status ?? last.error} ${last.ms}ms`);
-  }
+    return undefined;
+  });
+  if (succeeded) return failures.length ? { ...last, failures } : last;
   return { ...last, failures };
 }

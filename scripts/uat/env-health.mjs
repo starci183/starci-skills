@@ -46,7 +46,7 @@ import { killTree } from '../api/process/kill-tree.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { readEnv } from '../lib/env.mjs';
 import { normPath } from '../lib/path-key.mjs';
-import { eachInOrder, mapInOrder, repeatInOrder } from '../lib/in-order.mjs';
+import { eachInOrder, mapInOrder, repeatInOrder, findInOrder } from '../lib/in-order.mjs';
 import { tempRoot } from '../../engine/temp-root.mjs';
 
 const ENV_HEALTH_SCHEMA = 'starci/env-health@1';
@@ -69,14 +69,15 @@ const ENV_ID = /^environment\.[a-z0-9-]+\.[a-z0-9-]+$/;
 
 /** The first health endpoint an origin answers 2xx on, or null. */
 export async function discoverHealth(origin, { timeoutMs = 5000, candidates = HEALTH_CANDIDATES, skip = [] } = {}) {
-  for (const candidate of candidates) {
+  let found = null;
+  await findInOrder(candidates, async (candidate) => {
     const url = new URL(candidate.path, origin).toString();
-    if (skip.includes(url) && candidate.method === 'GET') continue;
+    if (skip.includes(url) && candidate.method === 'GET') return false;
     const r = await probeUrl(url, { method: candidate.method, body: candidate.body ?? null, timeoutMs, follow: 0 });
-    if (r.state === 'answered' && r.status >= 200 && r.status < 300) return { method: candidate.method, url, status: r.status };
-    if (r.state !== 'answered') return null; // the origin itself stopped answering: nothing to discover
-  }
-  return null;
+    if (r.state === 'answered' && r.status >= 200 && r.status < 300) { found = { method: candidate.method, url, status: r.status }; return true; }
+    return r.state !== 'answered'; // the origin itself stopped answering: nothing to discover
+  });
+  return found;
 }
 
 /* ---------------------------------------------------------------- listeners, processes */

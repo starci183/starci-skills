@@ -9,6 +9,7 @@ import { isProtectedContainer } from '../lib/protected-installations.mjs';
 import { underHostLock } from './verb-lock.mjs';
 import { checkPortBlock } from './supabase-policy.mjs';
 import { byCodeUnit } from '../lib/list.mjs';
+import { findInOrder } from '../lib/in-order.mjs';
 
 const SUPABASE_CONFIG = path.join('supabase', 'config.toml');
 
@@ -145,10 +146,13 @@ export async function supabaseStart(ctx, deps = {}) {
   const policy = checkPortBlock(app.ports);
   if (!policy.ok) return policyRefusal(policy.refusals.join('; '), policy.refusals);
 
-  for (const [name, port] of Object.entries(app.ports)) {
+  let busy = null;
+  await findInOrder(Object.entries(app.ports), async ([name, port]) => {
     const holder = await api.portListener(port);
-    if (holder) return policyRefusal(`${name} port ${port} is already listened to by ${holderName(holder)}; every configured port must be free`);
-  }
+    if (holder) busy = policyRefusal(`${name} port ${port} is already listened to by ${holderName(holder)}; every configured port must be free`);
+    return Boolean(holder);
+  });
+  if (busy) return busy;
 
   const lock = deps.underHostLock ?? underHostLock;
   const locked = await lock({ role: ctx?.role ?? 'owner', purpose: 'supabase-start' }, async () => {

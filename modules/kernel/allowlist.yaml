@@ -591,25 +591,4 @@ export-used: []
 # The findings of the sonar-rules self-check (scripts/checks/check-sonar-rules.mjs) that main carried when the gate landed: rule, file, a
 # fingerprint of the flagged node, its occurrence number and, for cognitive complexity, the score it may not exceed. Not a suppression
 # list: a finding that is not listed is red, a listed finding that is gone is red too, so the section only shrinks.
-sonar-rules:
-  - {rule: "S9382", file: "scripts/api/http/http-up.mjs", fingerprint: "6082ed915cc7", n: 1, reason: "present on main when the sonar-rules gate landed; fix the code and delete this entry (a fix commit removes its own)"}
-  - {rule: "S9382", file: "scripts/api/http/http-up.mjs", fingerprint: "e92a3f78130e", n: 1, reason: "present on main when the sonar-rules gate landed; fix the code and delete this entry (a fix commit removes its own)"}
-  - {rule: "S9382", file: "scripts/api/http/probe.mjs", fingerprint: "9263ce256dce", n: 1, reason: "present on main when the sonar-rules gate landed; fix the code and delete this entry (a fix commit removes its own)"}
-  - {rule: "S9382", file: "scripts/gates/sonar-local.mjs", fingerprint: "3ef17fac7e47", n: 1, reason: "present on main when the sonar-rules gate landed; fix the code and delete this entry (a fix commit removes its own)"}
-  - {rule: "S9382", file: "scripts/gates/sonar-local.mjs", fingerprint: "4cc3ab59eb82", n: 1, reason: "present on main when the sonar-rules gate landed; fix the code and delete this entry (a fix commit removes its own)"}
-  - {rule: "S9382", file: "scripts/gates/sonar-local.mjs", fingerprint: "5fcf99812fc7", n: 1, reason: "present on main when the sonar-rules gate landed; fix the code and delete this entry (a fix commit removes its own)"}
-  - {rule: "S9382", file: "scripts/gates/sonar-local.mjs", fingerprint: "6d0d09034198", n: 1, reason: "present on main when the sonar-rules gate landed; fix the code and delete this entry (a fix commit removes its own)"}
-  - {rule: "S9382", file: "scripts/gates/sonar-local.mjs", fingerprint: "74e4b187be5b", n: 1, reason: "present on main when the sonar-rules gate landed; fix the code and delete this entry (a fix commit removes its own)"}
-  - {rule: "S9382", file: "scripts/gates/sonar-local.mjs", fingerprint: "a41604e98759", n: 1, reason: "present on main when the sonar-rules gate landed; fix the code and delete this entry (a fix commit removes its own)"}
-  - {rule: "S9382", file: "scripts/gates/sonar-slice.mjs", fingerprint: "5eba83f2c697", n: 1, reason: "present on main when the sonar-rules gate landed; fix the code and delete this entry (a fix commit removes its own)"}
-  - {rule: "S9382", file: "scripts/gates/sonar-slice.mjs", fingerprint: "98096c30ab56", n: 1, reason: "present on main when the sonar-rules gate landed; fix the code and delete this entry (a fix commit removes its own)"}
-  - {rule: "S9382", file: "scripts/gates/sonar-slice.mjs", fingerprint: "a32ec56a2dff", n: 1, reason: "present on main when the sonar-rules gate landed; fix the code and delete this entry (a fix commit removes its own)"}
-  - {rule: "S9382", file: "scripts/gates/sonar-slice.mjs", fingerprint: "a4e7ad33a435", n: 1, reason: "present on main when the sonar-rules gate landed; fix the code and delete this entry (a fix commit removes its own)"}
-  - {rule: "S9382", file: "scripts/gates/sonar-slice.mjs", fingerprint: "ce3cc102040e", n: 1, reason: "present on main when the sonar-rules gate landed; fix the code and delete this entry (a fix commit removes its own)"}
-  - {rule: "S9382", file: "scripts/hfs/rules/database-migrations.mjs", fingerprint: "528bb4fb479d", n: 1, reason: "present on main when the sonar-rules gate landed; fix the code and delete this entry (a fix commit removes its own)"}
-  - {rule: "S9382", file: "scripts/machine/docker-stack.mjs", fingerprint: "5cfe1abbf31a", n: 1, reason: "present on main when the sonar-rules gate landed; fix the code and delete this entry (a fix commit removes its own)"}
-  - {rule: "S9382", file: "scripts/machine/smoke-scaffold.mjs", fingerprint: "0f2a2dd178ac", n: 1, reason: "present on main when the sonar-rules gate landed; fix the code and delete this entry (a fix commit removes its own)"}
-  - {rule: "S9382", file: "scripts/machine/supabase-stack.mjs", fingerprint: "29af66205574", n: 1, reason: "present on main when the sonar-rules gate landed; fix the code and delete this entry (a fix commit removes its own)"}
-  - {rule: "S9382", file: "scripts/uat/env-health.mjs", fingerprint: "274014a28f90", n: 1, reason: "present on main when the sonar-rules gate landed; fix the code and delete this entry (a fix commit removes its own)"}
-  - {rule: "S9382", file: "scripts/work/ui/grammar-geometry-page.mjs", fingerprint: "991cfb3b699f", n: 1, reason: "present on main when the sonar-rules gate landed; fix the code and delete this entry (a fix commit removes its own)"}
-  - {rule: "S9382", file: "ui/api/index.mjs", fingerprint: "f033a877e993", n: 1, reason: "present on main when the sonar-rules gate landed; fix the code and delete this entry (a fix commit removes its own)"}
+sonar-rules: []

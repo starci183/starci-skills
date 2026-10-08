@@ -20,6 +20,7 @@ export { parseDiffNewLines, sliceChanges } from './sonar-slice-changes.mjs';
 import {emitCheckOutput} from './output.mjs';
 import {coverageScopeOf,coverageTargetOf,judgeDashboard,loadSonarGate,serverConditions,thresholdsOf} from './sonar-gate.mjs';
 import { evaluateSlice as evaluateSliceCore } from './sonar-slice.mjs';
+import { acceptFirst, readPages, readWithTokens, syncConditions } from './sonar-sequential.mjs';
 import {text} from '../lib/stack-declaration.mjs';
 import {extSecretsDir,sealExtCustody,readCustody} from './sonar-ext-custody.mjs';
 import {inspectOwnerConfig,specsSettings} from '../../engine/config.mjs';
@@ -376,23 +377,7 @@ async function recordRemint(cfg,event){
  * Read custody members in order and return the first the server accepts. A member it rejects is skipped
  * and returned as `stale` (the first one), so the caller re-mints over it.
  */
-async function firstAccepted(cfg,refs){
-  const misses=[];
-  let stale=null;
-  for(const ref of refs){
-    const entry=readCustody(cfg,ref,{remember});
-    if(!entry.present){
-      misses.push(entry.reason);
-      if(entry.identityRefusal)return {entry:null,misses,stale,identityRefusal:entry.identityRefusal};
-      continue;
-    }
-    const accepted=await tokenAccepted(cfg,entry.value);
-    if(accepted!==false)return {entry:{...entry,accepted},misses,stale};
-    stale??=entry;
-    misses.push(`${entry.name} is rejected by the server (stale custody)`);
-  }
-  return {entry:null,misses,stale};
-}
+const firstAccepted=(cfg,refs)=>acceptFirst({cfg,refs,readCustody,tokenAccepted,remember});
 
 /**
  * The generic analysis token (cfg.analysisToken). One the server rejects is re-minted as a
@@ -594,26 +579,7 @@ async function ensureQualityGate(cfg,{key,admin,gate=loadSonarGate()}={}){
 }
 
 /** Create/update the gate's wanted conditions and drop the rest; {changed} or {failed}. */
-const syncGateConditions=async(cfg,token,name,have,want,failed)=>{
-  const changed=[];
-  for(const condition of want){
-    const current=have.get(condition.metric);
-    if(current?.op===condition.op&&String(current.error)===condition.error)continue;
-    const answer=current
-      ?await call(cfg,'POST','/api/qualitygates/update_condition',{token,form:{id:current.id,metric:condition.metric,op:condition.op,error:condition.error}})
-      :await call(cfg,'POST','/api/qualitygates/create_condition',{token,form:{gateName:name,metric:condition.metric,op:condition.op,error:condition.error}});
-    if(answer.status!==200&&answer.status!==201&&answer.status!==204)return {failed:failed(`condition ${condition.metric}`,answer)};
-    changed.push(condition.metric);
-  }
-  const wanted=new Set(want.map(c=>c.metric));
-  for(const current of have.values()){
-    if(wanted.has(current.metric))continue;
-    const answer=await call(cfg,'POST','/api/qualitygates/delete_condition',{token,form:{id:current.id}});
-    if(answer.status!==200&&answer.status!==204)return {failed:failed(`drop condition ${current.metric}`,answer)};
-    changed.push(`-${current.metric}`);
-  }
-  return {changed};
-};
+const syncGateConditions=(cfg,token,name,have,want,failed)=>syncConditions(call,{cfg,token,name,have,want,failed});
 
 const ESCAPED_QUOTE=String.raw`\"`;
 const quote=arg=>/^[\w@%+=:,./\\-]+$/.test(arg)?arg:`"${String(arg).replaceAll('"',ESCAPED_QUOTE)}"`;
@@ -649,30 +615,12 @@ function gitRevision(cwd){
 // ---- the slice ------------------------------------------------------------------------------------------
 
 /** GET with the analysis token, retried with the admin token when the analysis user may not browse. */
-async function read(cfg,tokens,pathname){
-  for(let i=0;i<tokens.length;i+=1){
-    const got=await call(cfg,'GET',pathname,{token:tokens[i]});
-    if(i===tokens.length-1||got.status!==401&&got.status!==403)return got;
-  }
-}
+const read=(cfg,tokens,pathname)=>readWithTokens(call,cfg,tokens,pathname);
 
 const facet=(json,property)=>Object.fromEntries((json?.facets??[]).find(f=>f.property===property)?.values?.map(v=>[v.val,v.count])??[]);
 
-const PAGE=500,MAX_PAGES=40;
-
 /** Every page of a paged Web API list, or {error} when a page cannot be read. */
-async function readAll(cfg,tokens,pathname,listKey){
-  const items=[];
-  for(let page=1;page<=MAX_PAGES;page++){
-    const got=await read(cfg,tokens,`${pathname}${pathname.includes('?')?'&':'?'}ps=${PAGE}&p=${page}`);
-    if(!got.reachable||got.status!==200)return {items,error:got.error??`HTTP ${got.status} ${got.text??''}`.trim(),status:got.status};
-    const batch=got.json?.[listKey]??[];
-    items.push(...batch);
-    const total=got.json?.paging?.total??got.json?.total??items.length;
-    if(!batch.length||items.length>=total)break;
-  }
-  return {items};
-}
+const readAll=(cfg,tokens,pathname,listKey)=>readPages(read,cfg,tokens,pathname,listKey);
 
 // SonarQube path patterns (sonar.test.inclusions) are the scripts/lib/glob.mjs subset
 // ESLint and the runtime's own path globs match with: ** spans directories, * and ? stay inside
