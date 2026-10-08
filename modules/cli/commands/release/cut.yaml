@@ -5,7 +5,7 @@ summary: cut the release, the only way the runtime's remote main and a release t
 impl:
   script: scripts/supervisor/release-cut-cli.mjs
 flags:
-  - {name: repo, type: string, summary: the repository to release (default is the current directory)}
+  - {name: repo, type: string, summary: "the repository to release (default: the runtime this command runs from, not the directory it is started in)"}
   - {name: remote, type: string, summary: the remote to push to (default origin)}
   - {name: branch, type: string, summary: the release branch (default main)}
   - {name: plan, type: boolean, summary: "report what the cut would run and require, and stop; it runs nothing"}

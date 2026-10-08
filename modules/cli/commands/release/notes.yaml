@@ -9,7 +9,7 @@ conventions:
   - the text is the CHANGELOG section the annotated tag message is made of, and --out writes only the named file
 flags:
   - {name: tag, type: string, summary: the release tag v<version> whose CHANGELOG section is read}
-  - {name: repo, type: string, summary: the repository holding CHANGELOG.md (default is the current directory)}
+  - {name: repo, type: string, summary: "the repository holding CHANGELOG.md (default: the runtime this command runs from, not the directory it is started in)"}
   - {name: out, type: string, summary: write the notes to this file instead of printing them}
 exit:
   "0": the notes were printed or written

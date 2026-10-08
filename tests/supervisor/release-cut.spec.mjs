@@ -11,7 +11,7 @@ import { push } from '../../scripts/api/git/push.mjs';
 import { renderRuntimeHooks } from '../../scripts/guards/git-hooks.mjs';
 import { gitCommonDir, l4RecordPath, readL4Record, writeL4Record } from '../../scripts/guards/release-record.mjs';
 import { classifySkip, planL4, runL4, skipReport, skipsOf } from '../../scripts/supervisor/release-l4.mjs';
-import { releaseHostMissing } from '../../scripts/supervisor/release-host.mjs';
+import { releaseHostMissing, rootInstallProblem } from '../../scripts/supervisor/release-host.mjs';
 
 for (const key of ['GIT_DIR', 'GIT_COMMON_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_OBJECT_DIRECTORY', 'GIT_PREFIX']) delete process.env[key];
 const git = (cwd, ...args) => {
@@ -343,4 +343,21 @@ test('the cut refuses at once, plan or run, when the host lacks an Orca terminal
   }
   assert.equal(ran, false, 'the suite never started');
   untouched(fx);
+});
+
+// The second alpha.7 cut ran 40 minutes of checks against a root node_modules that lacked @typescript-eslint/parser, which package-lock.json had gained that day.
+test('the host check refuses a root install that is not the lockfile\'s, naming npm ci, and ignores optional and platform-bound packages', (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-root-install-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const write = (rel, packages) => { fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true }); fs.writeFileSync(path.join(root, rel), JSON.stringify({ packages })); };
+  write('package-lock.json', { '': {}, 'node_modules/yaml': { version: '2.0.0' }, 'node_modules/@typescript-eslint/parser': { version: '8.0.0' }, 'node_modules/@esbuild/win32-x64': { version: '1.0.0', optional: true, os: ['win32'] }, 'node_modules/linked': { link: true } });
+  assert.match(rootInstallProblem(root), /no install record/);
+  write('node_modules/.package-lock.json', { 'node_modules/yaml': { version: '2.0.0' } });
+  assert.match(rootInstallProblem(root), /1 package\(s\) .*missing.*@typescript-eslint\/parser/);
+  write('node_modules/.package-lock.json', { 'node_modules/yaml': { version: '1.9.0' }, 'node_modules/@typescript-eslint/parser': { version: '8.0.0' } });
+  assert.match(rootInstallProblem(root), /yaml/, 'another version is drift');
+  write('node_modules/.package-lock.json', { 'node_modules/yaml': { version: '2.0.0' }, 'node_modules/@typescript-eslint/parser': { version: '8.0.0' } });
+  assert.equal(rootInstallProblem(root), null);
+  const missing = releaseHostMissing({ env: { ORCA_TERMINAL_HANDLE: 't' }, orca: () => ({ ok: true, reachable: true }), docker: () => ({ status: 0 }), root, install: () => 'drift' });
+  assert.deepEqual(missing.map((m) => [m.need, m.fix]), [['the lockfile install', 'run npm ci in the runtime root']]);
 });

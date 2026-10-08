@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { skillRoot } from '../../engine/runtime-root.mjs';
 import { changelogSection, releaseNotesFindings } from '../hfs/runtime-rules/release-notes.mjs';
 
 const SCHEMA = 'starci/release-notes@1';
@@ -17,7 +18,7 @@ export function releaseNotes(ctx, deps = {}) {
   const result = (code, text, extra = {}) => ({ code, text, data: { schema: SCHEMA, ok: code === 0, tag: args.tag ?? null, ...extra } });
   if ((ctx?.positionals ?? []).length || !args.tag) return result(2, `usage: ${USAGE}`);
   if (!RELEASE_TAG.test(args.tag)) return result(2, `${args.tag} is not a release tag: v<version>`);
-  const repo = path.resolve(args.repo ?? ctx?.cwd ?? process.cwd());
+  const repo = path.resolve(args.repo ?? skillRoot);
   const read = deps.readChangelog ?? ((dir) => fs.readFileSync(path.join(dir, 'CHANGELOG.md'), 'utf8'));
   let changelog;
   try { changelog = read(repo); } catch (error) { return result(1, `starci release notes: ${String(error?.message ?? error)}`); }

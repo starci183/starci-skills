@@ -400,3 +400,24 @@ cases:
     rule: {file: engine/config.mjs, anchor: "confines the owner"}
     spec: tests/engine/config.spec.mjs
     status: covered
+  - id: release-verb-judged-the-directory-it-was-started-in
+    family: correctness
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "starci release cut started in the backend repository judged that repository's tree (verdict dirty, 565 tracked changes) instead of the runtime repository: the repository defaulted to the working directory", remedy: {state: in-tree, change: "release cut and release notes default to the runtime root this command runs from (engine/runtime-root.mjs, STARCI_RUNTIME); --repo names another"}}
+    met: {date: "2026-10-09", where: "second release cut of 1.0.0-alpha.7", evidence: "cut verdict dirty from cwd of the product repository"}
+    rule: {file: scripts/supervisor/release-cut-cli.mjs, anchor: "options.repo ?? skillRoot"}
+    spec: tests/cli/release-cut-verb.spec.mjs
+    status: covered
+  - id: release-host-check-ignored-a-stale-root-install
+    family: smooth-operation
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "the cut's host check passed while the root node_modules lacked @typescript-eslint/parser, which package-lock.json had gained that day, so the checks failed late", remedy: {state: in-tree, change: "the host check compares node_modules/.package-lock.json with package-lock.json and refuses naming npm ci"}}
+    met: {date: "2026-10-09", where: "second release cut of 1.0.0-alpha.7", evidence: "root node_modules without @typescript-eslint/parser"}
+    rule: {file: scripts/supervisor/release-host.mjs, anchor: "rootInstallProblem"}
+    spec: tests/supervisor/release-cut.spec.mjs
+    status: covered
+  - id: test-world-subscription-spec-wrote-after-end-on-linux
+    family: concurrency
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "the graphql-ws spec's fake server ended the socket on a refusal and then ended it again when the client's close frame arrived; Linux delivers that frame after the end (uncaughtException write after end), Windows did not, so the Linux clean test of @starci/test-world was red", remedy: {state: in-tree, change: "the fake server ends the socket once"}}
+    met: {date: "2026-10-09", where: "second release cut of 1.0.0-alpha.7, linux-parity clean test of @starci/test-world", evidence: "linux-parity log: graphql-ws subscriptions, 231 of 232"}
+    rule: {file: packages/test-world/src/nest/subscription.spec.ts, anchor: "writableEnded"}
+    spec: packages/test-world/src/nest/subscription.spec.ts
+    status: covered

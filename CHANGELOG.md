@@ -61,6 +61,8 @@ Theme: the roles are one declared contract, the system recovers from a host rest
 - The last line of `starci runtime check` states the whole verdict (`check: ok — runtime HFS clean; self-checks 45 of 45` or `check: FAILED — runtime HFS 2 finding(s); self-checks 44 of 45 (failed: env)`): a failed runtime HFS stage was hidden behind an all-green self-check count.
 - The spec-run confinement of the owner `config.yaml` is a generic engine variable (`STARCI_OWNER_CONFIG_WITHIN`, set by the spec preload to the spec's temp root); the engine no longer imports the scripts tier for it.
 - The npm tarball ships no sealed example credential: npm reads an app's own ignore file instead of the root `files` negations, so each example app carries a `.npmignore` naming its `.starcistacks/<env>/secrets` folders (an optional `.npmignore` joins the `app.tool-config-optional` slot), and a spec holds the tarball free of them.
+- `starci release cut` and `release notes` default to the runtime they run from, not the git top of the working directory (a cut started in the backend repository judged that repository's tree); the cut's host check refuses in seconds when the root `node_modules` is not the lockfile's install, naming `npm ci`.
+- The `@starci/test-world` graphql-ws spec ended its fake server socket twice, which Linux reported as an uncaught `write after end`; the spec ends it once. The published package content is unchanged (specs are not in the tarball).
 
 ### Known limitations
 - SonarCloud has not scanned this commit; the local `sonar-rules` gate reproduces 16 of the 17 findings of the previous scan and misses optional chains that need type information.

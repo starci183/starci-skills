@@ -4,6 +4,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { isMain } from '../lib/is-main.mjs';
 import { cutRelease } from './release-cut.mjs';
+import { skillRoot } from '../../engine/runtime-root.mjs';
 
 const VALUE_FLAGS = new Set(['--repo', '--remote', '--branch', '--tag']);
 
@@ -30,7 +31,7 @@ export async function main(argv = process.argv.slice(2), io = {}) {
   let options;
   try { options = parseArgs(argv); } catch (error) { fail(`starci release cut: ${error.message}\n`); return 2; }
   const cut = io.cutRelease ?? cutRelease;
-  const result = await cut({ repo: path.resolve(options.repo ?? process.cwd()), remote: options.remote, branch: options.branch, tag: options.tag ?? null, plan: options.plan === true });
+  const result = await cut({ repo: path.resolve(options.repo ?? skillRoot), remote: options.remote, branch: options.branch, tag: options.tag ?? null, plan: options.plan === true });
   let output;
   if (options.json) output = `${JSON.stringify(result)}\n`;
   else {
