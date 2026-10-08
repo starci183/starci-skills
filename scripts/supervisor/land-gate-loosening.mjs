@@ -16,7 +16,8 @@ const DIFF_BUFFER = 64 * 1024 * 1024;
 /** The loosening table of the tree at `root`, or null when it has none. */
 export const looseningRules = (root) => readYamlFile(path.join(root, RULES_FILE));
 
-const rulingsAt = (cwd, rev) => {
+/** The owner's rulings of the tree at `rev` in the repository at `cwd`, or null when that tree holds none. */
+export const rulingsAt = (cwd, rev) => {
   const shown = show([`${rev}:${RULINGS_FILE}`], { cwd, maxBuffer: DIFF_BUFFER });
   return shown.status === 0 ? parseYaml(shown.stdout) : null;
 };
