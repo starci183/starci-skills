@@ -55,7 +55,7 @@ import { allocationMs, allocationSettings } from '../../../engine/config.mjs';
 import { claimDue, finishDuty, listSchedules } from '../schedules.mjs';
 import { pathKey } from '../../lib/path-key.mjs';
 import os from 'node:os';
-import { seatStateOf, seatHold } from '../host-seats.mjs';
+import { seatStateOf, seatHold, seatQuarantine } from '../host-seats.mjs';
 import { createStaleTerminalStep } from '../host-stale.mjs';
 import { eachInOrder } from '../../lib/in-order.mjs';
 export { staleTerminalsOf, STALE_RETRY_MS, STALE_ESCALATE_TRIES, CLOSE_VERIFY } from '../host-stale.mjs'; export { seatStateOf };
@@ -325,15 +325,8 @@ export function createHostController(deps = {}) {
     return { seatOut, action, acted };
   }
 
-  // More than maxReplacementsPerHour replacements: the seat is quarantined; the first time, one DI seat-unrecoverable.
-  async function quarantineSeat(ctx, { key, rec, next, ledgerId, workflowId, action, now }) {
-    if (rec.state === 'quarantined') return;
-    await ctx.openDecision(di({
-      kind: 'seat-unrecoverable', ledger: ledgerId, workflowId, entity: { type: 'seat', id: key }, idempotencyKey: `seat-unrecoverable:${key}:${now}`,
-      summary: `${workflowId}: the Kernel seat was replaced ${next.restarts.length} times in an hour; quarantined`,
-      evidence: [{ ref: `action:${action}` }], options: [{ key: 'reopen', verb: `node ${SERVICES_FILE} --reopen ${key}`, recommended: true }], allowedVerbs: ['reopen'],
-    }));
-  }
+  // More than maxReplacementsPerHour replacements, or a launch held for a cause it repeats: the seat is quarantined; the first time, one DI seat-unrecoverable.
+  const quarantineSeat = (ctx, args) => seatQuarantine(ctx, args, { di, servicesFile: SERVICES_FILE });
 
   // The seat's SLA clocks: each one runs while the seat is in one of its states and closes otherwise.
   async function seatClocks(ctx, { key, seat, s, ledgerId, workflowId, action }) {
@@ -378,9 +371,9 @@ export function createHostController(deps = {}) {
     const replaced = ctx.mode === 'active' ? REPLACED.has(action) : acted && action === 'restart-needed';
     const next = { ...rec, restarts: [...(rec.restarts ?? []).filter((t) => now - t < 3_600_000), ...(replaced ? [now] : [])], lastAction: action, lastAt: now, mode: ctx.mode };
     let seat = seatStateOf(action);
-    if (next.restarts.length > s.maxReplacementsPerHour) {
+    if (next.restarts.length > s.maxReplacementsPerHour || action === 'start-held') {
       seat = 'quarantined';
-      await quarantineSeat(ctx, { key, rec, next, ledgerId, workflowId, action, now });
+      await quarantineSeat(ctx, { key, rec, next, ledgerId, workflowId, action, now, hold: seatOut?.hold ?? null });
     }
     if (next.state !== seat) { next.state = seat; next.since = now; }
     await seatClocks(ctx, { key, seat, s, ledgerId, workflowId, action });

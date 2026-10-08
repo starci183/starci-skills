@@ -288,10 +288,11 @@ cases:
     why: "the instruction text of supervisor-prompt.md, supervise.yaml and docs/supervisor.md still describes fix workers and lands; the rewrite is designed in ROLES-STANDARD-alpha8.md"
   - id: kernel-start-repeats-one-failure
     family: failure-while-running
-    finding: {role: runtime, duty: does, verdict: departs, evidence: "the StarCi workflow's Kernel seat was started 303 times and every launch failed at the same step, workflow-worktree-install (starci npm ci, npm error code EPERM unlink); the retry repeats the identical launch and reports nothing up, so the Kernel stays down", remedy: {state: open}}
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "the StarCi workflow's Kernel seat was started 303 times in 3 hours and every launch failed at the same step, workflow-worktree-install (npm ci EPERM unlink of a loaded native .node file); every start ran a full npm ci that first deletes node_modules, so a process holding a binary of the tree stopped it half way, left a tree without react, and the next start did the same; a failed start was not a replacement, so the Host never counted it and the seat was never quarantined", remedy: {state: in-tree, change: "a start-up install runs only for a tree that is not a finished install of the current lockfile (a marker written after npm, cleared before it, so a half tree reads as incomplete), takes the host lock, and types a file lock as workflow-worktree-install-locked with the path and the holders; the launch of one cause backs off, is held after seats.kernel.startSameCauseMax failures and quarantines the seat with one seat-unrecoverable item naming the cause (scripts/kernel/start-hold.mjs, hold kernel-start-held)"}}
     met: {date: "2026-10-08", where: "StarCi wf-starci-auth-test-workflow-muxq4oyr, kernel-start-failed events", evidence: "starci debug digest step kernel-booted over the ledger copy ledger-copy-a8c (departure kernel-start-loop)"}
-    status: open
-    why: "the Kernel start retries the same failing step without a bound or a cause routed to the Supervisor; the digest now names the loop (startLoopMin), the runtime rule that stops the loop and reports the cause is owed"
+    rule: {file: scripts/kernel/start-hold.mjs, anchor: "startHoldOf"}
+    spec: tests/kernel/start-hold.spec.mjs
+    status: covered
   - id: read-verb-writes-the-ledger-as-the-caller
     family: record-vs-reality
     finding: {role: runtime, duty: does, verdict: departs, evidence: "starci kernel status, a read verb, opens write transactions on the ledger (lease renewal, runtime drift records) as whoever calls it, so a person or Debug reading status leaves ledger writes under their own identity", remedy: {state: open}}

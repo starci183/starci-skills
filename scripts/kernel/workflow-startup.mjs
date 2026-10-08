@@ -12,6 +12,7 @@ import { terminalList } from '../api/orca/terminal-list.mjs';
 import { runShow } from '../api/orca/run-show.mjs';
 import { SKILL_ROOT, supervisedSeatHandles } from '../machine/home.mjs';
 import { entryTerminalsOf, recordedSeatTerminals } from '../machine/seat-sessions.mjs';
+import { startFailureRun, startHoldBudget, startHoldOf, holdSummary } from './start-hold.mjs';
 
 async function workflowHost({ env }, run = execNode) {
   const args = [path.join(skillRoot, 'scripts/reconciler/workflow-up.mjs'), '--json'];
@@ -57,6 +58,16 @@ export function workflowSender({ env = process.env, launchedBy = 'supervisor', l
   if (!listing?.ok) return SENDER_MISSING(`the terminal listing is unavailable (${listing?.error ?? 'host-unavailable'})`);
   const owners = machine((m) => ({ recorded: recordedSeatTerminals(m), seats: supervisedSeatHandles(m) }), { recorded: new Set(), seats: new Set() }, { env });
   return headlessSenderOf({ listing, recorded: owners.recorded, seats: owners.seats, coordinator: runId ? show({ id: runId })?.coordinator ?? null : null, root });
+}
+
+/**
+ * Why a Kernel launch is refused before it touches anything, as {step, fields} for the refusal, or null: the goal is not startable, or the
+ * watchdog's launch is held because the same cause failed it as often as the declared bound allows (start-hold.mjs).
+ */
+export function startBar({ authority, launchedBy, db, workflowId, now = Date.now(), budget = startHoldBudget }) {
+  if (!authority.ok) return { step: authority.reason, fields: { workflowId, authority } };
+  const hold = launchedBy === 'watchdog' ? startHoldOf(startFailureRun(db, workflowId), { now, budget: budget() }) : null;
+  return hold ? { step: 'kernel-start-held', fields: { workflowId, error: holdSummary(hold), hold } } : null;
 }
 
 /** Why a finished or archived goal never gets a Kernel again, or null while it is open. */
@@ -156,10 +167,11 @@ export async function ensureWorkflowHost({ workflow, goal, env = process.env, pl
 export async function installWorkflowTree({ record, env = process.env } = {}, deps = {}) {
   if (!record?.path) return { ok: false, reason: 'workflow-worktree-missing' };
   let result;
-  try { result = await (deps.npmCi ?? npmCi)({ cwd: record.path, role: 'coordinator', env, args: {} }); }
+  try { result = await (deps.npmCi ?? npmCi)({ cwd: record.path, role: 'coordinator', env, args: {}, ifNeeded: true }); }
   catch (error) { return { ok: false, installed: false, reason: 'workflow-worktree-install-failed', path: record.path,
     receipt: null, error: String(error?.message ?? error) }; }
   const ok = result?.code === 0 && result?.data?.ok === true;
+  const locked = !ok && result?.data?.cause === 'file-locked';
   return { ok, installed: ok, path: record.path, receipt: result?.data ?? null,
-    ...(ok ? {} : { reason: 'workflow-worktree-install-failed', error: result?.text ?? 'npm ci did not return a successful receipt' }) };
+    ...(ok ? {} : { reason: locked ? 'workflow-worktree-install-locked' : 'workflow-worktree-install-failed', error: result?.text ?? 'npm ci did not return a successful receipt' }) };
 }

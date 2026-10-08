@@ -54,7 +54,7 @@ test('a red or throwing host leaves startup not ready with the host receipt', as
 test('workflow install uses the native npmCi owner in the exact tree with the shared lock role', async () => {
   const record = { path: '/owned/workflow', orcaWorktreeId: 'tree-a' }, env = { fixture: 'machine' }, calls = [];
   const result = await installWorkflowTree({ record, env }, { npmCi: async (ctx) => { calls.push(ctx); return { code: 0, data: { schema: 'starci/npm-ci@1', ok: true, cwd: ctx.cwd, ms: 42 } }; } });
-  assert.deepEqual(calls, [{ cwd: record.path, role: 'coordinator', env, args: {} }]);
+  assert.deepEqual(calls, [{ cwd: record.path, role: 'coordinator', env, args: {}, ifNeeded: true }]);
   assert.equal(result.installed, true);
   assert.equal(result.receipt.ms, 42);
 });

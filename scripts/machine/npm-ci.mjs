@@ -10,6 +10,8 @@ import { ci } from '../api/npm/ci.mjs';
 import { asList } from '../lib/list.mjs';
 import { refusal as verbRefusal, resultOk as success, resultOutput as output } from '../lib/verb-call.mjs';
 import { underHostLock, hostLockRetryBudget } from './verb-lock.mjs';
+import { installStateOf, writeInstallMarker, clearInstallMarker } from './npm-install-state.mjs';
+import { installFailureOf, treeHolders } from './npm-install-failure.mjs';
 
 const comparablePath = (value) => {
   const resolved = path.resolve(value);
@@ -62,7 +64,11 @@ export async function npmCi(ctx, deps = {}) {
     revParse: deps.revParse ?? revParseQuery,
     status: deps.status ?? porcelainStatus,
     lock: deps.underHostLock ?? underHostLock,
-    now: deps.now ?? Date.now
+    now: deps.now ?? Date.now,
+    installState: deps.installState ?? installStateOf,
+    markInstalled: deps.markInstalled ?? writeInstallMarker,
+    clearMarker: deps.clearMarker ?? clearInstallMarker,
+    holders: deps.holders ?? treeHolders
   };
   const role = ctx?.role ?? 'owner';
 
@@ -87,13 +93,22 @@ export async function npmCi(ctx, deps = {}) {
 
   try {
     const locked = await api.lock({ role, purpose: 'npm-ci', env: ctx?.env, retry: hostLockRetryBudget() }, async () => {
+      // A start-up install runs only for a tree that is not already a finished install of the current lockfile (ctx.ifNeeded).
+      const present = ctx?.ifNeeded === true && !workspaces.length ? api.installState(cwd) : null;
+      if (present?.state === 'installed') return { code: 0, text: `npm ci skipped in ${cwd}: node_modules is a finished install of the current lockfile`,
+        data: { schema: 'starci/npm-ci@1', ok: true, cwd, ms: 0, skipped: 'installed', digest: present.digest } };
+      api.clearMarker(cwd);
       const started = api.now();
       const result = await api.ci(cwd, { workspaces });
       const ms = Math.max(0, api.now() - started);
       if (!result?.ok) {
         const detail = String(result?.stderr ?? '').trim() || `npm exited ${String(result?.status ?? 'without a status')}`;
-        return refusal(cwd, `failed: ${detail}`, 1, { ms });
+        const failure = installFailureOf(result?.stderr);
+        if (failure.cause !== 'file-locked') return refusal(cwd, `failed: ${detail}`, 1, { ms, ...failure });
+        const holders = api.holders(cwd);
+        return refusal(cwd, `failed: file-locked (${failure.code} ${failure.syscall ?? 'access'} ${failure.path ?? cwd}); a running process holds a file of this tree: ${detail}`, 1, { ms, ...failure, holders });
       }
+      if (!workspaces.length) api.markInstalled(cwd, { at: api.now() });
       return {
         code: 0,
         text: `npm ci completed in ${cwd} (${ms} ms)`,

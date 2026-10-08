@@ -12116,6 +12116,25 @@ workflow-worktree-install-failed:
   owner: runtime-core
   kind: verb-refusal
 # Proof: scripts/kernel/workflow-worktree.mjs requireWorkflowPlacement; scripts/kernel/workflow-checkpoint.mjs followCheckpoint; scripts/lib/worktree-record.mjs.
+workflow-worktree-install-locked:
+  title: "A running process holds a file of the workflow tree during npm ci"
+  title_vi: "Một tiến trình đang chạy giữ file trong cây workflow khi npm ci"
+  meaning_vi: "npm ci không xóa được một file native (.node) trong node_modules vì một tiến trình đang tải nó (máy chủ dev, watcher, trình biên dịch), nên cây chưa được cài xong và không được coi là đã cài. Lần khởi động Kernel dừng, reservation được giải phóng; lỗi lặp lại do cùng nguyên nhân sẽ bị giữ lại thành một mục quyết định."
+  causes_vi:
+    - "Một tiến trình của workflow trước hoặc của một op vẫn chạy trong cây (dev server, watcher)"
+    - "Một cài đặt khác hoặc trình chống virus giữ file"
+  nextStep_vi: "Đọc đường dẫn bị khóa và danh sách tiến trình trong phiếu, dừng tiến trình giữ file rồi mở lại ghế bằng services.mjs --reopen; runtime tự bỏ qua npm ci khi cây đã cài đúng lockfile."
+  owner: runtime-core
+  kind: verb-refusal
+kernel-start-held:
+  title: "The Kernel launch is held after the same failure repeated"
+  title_vi: "Lần khởi động Kernel bị giữ vì cùng một lỗi lặp lại"
+  meaning_vi: "Lần khởi động Kernel đã thất bại đủ số lần đã khai báo vì cùng một nguyên nhân ở cùng một bước. Runtime không thử lại nữa cho đến hết thời gian giữ; ghế bị cách ly và một mục quyết định seat-unrecoverable nêu nguyên nhân, số lần và bằng chứng."
+  causes_vi:
+    - "Một bước khởi động lỗi lặp lại (cài đặt cây, tin cậy khởi chạy, cấp phép) mà thử lại không đổi được"
+  nextStep_vi: "Đọc nguyên nhân trong mục quyết định, sửa gốc rồi mở lại ghế bằng services.mjs --reopen; hết thời gian giữ runtime thử đúng một lần."
+  owner: supervisor
+  kind: blocker
 workflow-worktree-missing:
   title: "The op's workflow has no worktree"
   title_vi: "Workflow của op không có cây làm việc"
