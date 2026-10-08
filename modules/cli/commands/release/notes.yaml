@@ -1,0 +1,22 @@
+group: release
+verb: notes
+owner: runtime
+summary: print or write the release notes of a tag, its CHANGELOG section
+impl: {module: scripts/supervisor/release-notes.mjs, export: releaseNotes}
+effect: local-write
+roles: [worker, lead, coordinator, release, owner]
+conventions:
+  - the text is the CHANGELOG section the annotated tag message is made of, and --out writes only the named file
+flags:
+  - {name: tag, type: string, summary: the release tag v<version> whose CHANGELOG section is read}
+  - {name: repo, type: string, summary: the repository holding CHANGELOG.md (default is the current directory)}
+  - {name: out, type: string, summary: write the notes to this file instead of printing them}
+exit:
+  "0": the notes were printed or written
+  "1": the CHANGELOG has no finished section for the tag, or cannot be read
+  "2": bad usage
+json: starci/release-notes@1
+examples:
+  - starci release notes --tag v1.0.0-alpha.7
+  - starci release notes --tag v1.0.0-alpha.7 --out notes.md --json
+editions: [full]

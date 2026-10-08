@@ -22,6 +22,7 @@ Theme: the roles are one declared contract, the system recovers from a host rest
 - `ask-tunnel` is a required host row only when the Telegram connector is enabled.
 
 ### Added
+- `starci release notes --tag <v*>`: prints or writes the CHANGELOG section of a release tag; the `github-release` job of `ci.yml` creates the GitHub Release from it on a pushed `v*` tag (a pre-release when the version has a pre-release part).
 - `starci release cut --plan`: reports what the cut would run and require on this commit, and runs, tags and pushes nothing.
 - The `sonar-rules` self-check: Sonar's rules enforced locally (also at commit time on the staged files), with an empty baseline; own code is held to its own rules.
 - Checks: `removed-vocabulary` (removed spellings are refused in every instruction), `prose-commands` (every `starci` command an instruction shows exists in the CLI catalog, R230) and `documented-defaults` (a documented default cites its key and equals the value the code reads, R231); the validators read one key tree.

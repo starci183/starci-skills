@@ -28,7 +28,7 @@ _starci() {
         npm) COMPREPLY=( $(compgen -W "ci install" -- "$cur") );;
         orca) COMPREPLY=( $(compgen -W "terminal-read terminal-send" -- "$cur") );;
         reconciler) COMPREPLY=( $(compgen -W "once restart start status stop up" -- "$cur") );;
-        release) COMPREPLY=( $(compgen -W "app-installs check clean-test cut images launch-smoke proof publish sync-runtime" -- "$cur") );;
+        release) COMPREPLY=( $(compgen -W "app-installs check clean-test cut images launch-smoke notes proof publish sync-runtime" -- "$cur") );;
         route) COMPREPLY=( $(compgen -W "op" -- "$cur") );;
         runtime) COMPREPLY=( $(compgen -W "architecture benchmark-snapshot check derived-fields doctor gen-catalog gen-ops housekeeping install ledger-hygiene link machine-db owner-claims-audit readme-blocks status update validate version" -- "$cur") );;
         smoke) COMPREPLY=( $(compgen -W "scaffold" -- "$cur") );;
@@ -565,6 +565,9 @@ _starci() {
         release:launch-smoke:--timeout-ms) return 0;;
         release:launch-smoke:--out) return 0;;
         release:launch-smoke:--as) COMPREPLY=( $(compgen -W "supervisor worker kernel op opFe opFail critic" -- "$cur") ); return 0;;
+        release:notes:--tag) return 0;;
+        release:notes:--repo) return 0;;
+        release:notes:--out) return 0;;
         release:proof:--repo) return 0;;
         release:proof:--base) return 0;;
         release:proof:--main) return 0;;
@@ -1044,6 +1047,7 @@ _starci() {
         release:cut) COMPREPLY=( $(compgen -W "--repo --remote --branch --plan --tag --json --cwd --quiet --help --edition" -- "$cur") );;
         release:images) COMPREPLY=( $(compgen -W "--app --sides --only --wait-seconds --remove-images --json --cwd --quiet --help --edition" -- "$cur") );;
         release:launch-smoke) COMPREPLY=( $(compgen -W "--app-repo --entry --timeout-ms --out --as --json --cwd --quiet --help --edition" -- "$cur") );;
+        release:notes) COMPREPLY=( $(compgen -W "--tag --repo --out --json --cwd --quiet --help --edition" -- "$cur") );;
         release:proof) COMPREPLY=( $(compgen -W "--repo --base --main --out --json --cwd --quiet --help --edition" -- "$cur") );;
         release:publish) COMPREPLY=( $(compgen -W "--publish --runtime-package --npm-user --poll-minutes --pre-land-ref --expect-sha --examples --json --cwd --quiet --help --edition" -- "$cur") );;
         release:sync-runtime) COMPREPLY=( $(compgen -W "--check --prepare-grammar --json --cwd --quiet --help --edition" -- "$cur") );;

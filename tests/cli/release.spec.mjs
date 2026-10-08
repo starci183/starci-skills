@@ -40,7 +40,7 @@ const specs = {
 test('release catalog resolves every implementation and exactly declares its parsed flags', () => {
   const scriptVerbs = Object.keys(group.verbs).filter((name) => group.verbs[name].impl.script);
   assert.deepEqual(scriptVerbs.sort(), Object.keys(specs).sort());
-  assert.deepEqual(Object.keys(group.verbs).filter((name) => group.verbs[name].impl.module).sort(), ['images', 'publish', 'sync-runtime']);
+  assert.deepEqual(Object.keys(group.verbs).filter((name) => group.verbs[name].impl.module).sort(), ['images', 'notes', 'publish', 'sync-runtime']);
   for (const [verb, spec] of Object.entries(specs)) {
     const command = group.verbs[verb];
     assert.equal(command.impl.script, spec.script, verb);
