@@ -38,7 +38,7 @@ Theme: the first two real workflows run end to end through their first gates; mo
 - Two specs (`dead-worker-self-heal`, `gate-conditions`) failed once under load in a full Windows run and pass alone; the cause is not established. The full suite has not been run on the exact released commit: its lanes were run separately.
 - The incident policy has run against specs and ledger fixtures only, not through a full real workflow.
 - The machine store keeps the unused `models.share_pct` column so an existing store still opens.
-- Kernel-initiated Codex launches still fail on a launch-trust probe that inherits the seat's guard identity.
+- The Codex launch-trust probe runs without the seat identity and the seat's guard shim, which is what refused Kernel-initiated Codex launches; specs cover it and no real Kernel-initiated Codex launch has confirmed it.
 
 ## [1.0.0-alpha.5] — 2026-10-06
 
