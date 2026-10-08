@@ -5,9 +5,10 @@
 // server is started with no host pin and every URL the render visits names `localhost` (RENDER_HOST). A server the op started
 // by hand makes the same mistake; the command guard refuses it and names `starci work layout-render`.
 import fs from 'node:fs';
-import net from 'node:net';
 import path from 'node:path';
 import { allocationMs, allocationSettings } from '../../engine/config.mjs';
+import { probe } from '../api/http/probe.mjs';
+import { serve } from '../api/http/serve.mjs';
 import { killTree } from '../api/process/kill-tree.mjs';
 import { startProgram } from '../api/process/start-program.mjs';
 import { repeatInOrder } from '../lib/in-order.mjs';
@@ -31,7 +32,7 @@ export function nextBinOf(appRoot, find = findPackage) {
 
 /** A free TCP port on this host, asked of the OS. */
 export const freePort = () => new Promise((resolve, reject) => {
-  const server = net.createServer();
+  const server = serve(() => undefined);
   server.once('error', reject);
   server.listen(0, () => {
     const { port } = server.address();
@@ -63,12 +64,8 @@ export const serverErrors = (logFile) => {
   try { return fs.readFileSync(logFile, 'utf8').split('\n').filter((line) => line.startsWith('⨯')).slice(0, 5); } catch { return []; }
 };
 
-const answered = async (url) => {
-  try {
-    const response = await fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(allocationMs('layoutRender.readyMs')) });
-    return response.status > 0;
-  } catch { return false; }
-};
+/** Whether the server answered a request at `url` with any HTTP status (a connection refused or a hang is not an answer). */
+const answered = async (url) => (await probe(url, { follow: 0, timeoutMs: allocationMs('layoutRender.readyMs') })).state === 'answered';
 
 /** Resolve true when `url` answers any HTTP status before the server exits or readyMs passes; false otherwise. */
 export function waitReady(url, child) {
