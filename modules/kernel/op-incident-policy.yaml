@@ -152,6 +152,15 @@ rows:
     bound: {perAgent: {ref: "modules/kernel/op-incident-policy.yaml#agentSwitch.excludeAfter"}, waitMs: {ref: "modules/models/runtimes.yaml#allocation.cooldownMs.quota"}}
     next: supervisor
     code: op-incident-escalate-supervisor
+  - id: error-login-expired
+    situation: error
+    cause: credentials
+    detector: "admission rejection with failureKind login-expired: Orca reports the provider's login expired (scripts/lib/login-expired.mjs); the host checklist row login:<provider>"
+    handler: owner
+    action: "route the job to the next eligible member of its candidate list first (dispatch-ready); the owner logs in to the provider again in Orca, which the refusal, the checklist row and the start verbs name in plain words"
+    bound: {waitMs: {ref: "modules/models/runtimes.yaml#allocation.cooldownMs.quota"}}
+    next: owner
+    code: op-incident-escalate-owner
   - id: error-work
     situation: error
     cause: work

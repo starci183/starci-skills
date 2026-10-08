@@ -2027,6 +2027,16 @@ host-restarted:
   owner: supervisor
   kind: runtime-fault
 
+provider-login-expired:
+  title: "Provider login expired"
+  title_vi: "Đăng nhập provider đã hết hạn"
+  meaning_vi: "Orca báo đăng nhập của provider đã hết hạn nên không có ứng viên nào của provider đó đủ điều kiện; thông báo nêu tên provider, lời của Orca và việc cần làm."
+  causes_vi:
+    - "Token OAuth của provider hết hạn và Orca chưa được đăng nhập lại"
+  nextStep_vi: "Owner đăng nhập lại provider trong Orca (Settings > Accounts) rồi chạy lại lệnh; runtime thử thành viên đủ điều kiện kế tiếp trước."
+  owner: owner
+  kind: dispatch-refusal
+
 ESLINT_UNAVAILABLE:
   title: "ESLint could not be loaded"
   title_vi: "Không nạp được ESLint của sản phẩm"
