@@ -1,45 +1,30 @@
 // release-l4-sonar.mjs - the Sonar proof of the L4 row (scripts/supervisor/release-l4.mjs): for every example app, the existing gate
 // (scripts/gates/sonar-local.mjs, the code behind `starci gate sonar`) scans the project against the whole-project gate and reads its dashboard;
 // both must PASS (a disabled or blocked Sonar is not a proof). The gate's own functions are called in-process (no child `node <script>`); the scanner it
-// runs stays inside the gate's own call file. The local SonarQube stack (the server container and its database container) is brought up for the proof when
-// it is stopped, waited for until the server answers UP, and left exactly as it was found afterwards: a container that was running stays running, one this run
+// runs stays inside the gate's own call file. The gate is configured for the stack's LOCAL host (the one the example declares), never the public tunnel host of the environment.
+// The local SonarQube stack (the server container and its database container) is brought up for the proof when it is stopped (a paused or restarting container is stopped first),
+// waited for by the server's own status and its container (release-sonar-wait.mjs), and left exactly as it was found afterwards: a container that was running stays running, one this run
 // started is stopped again. Containers are started and stopped by exact name through the scripts/api/docker call files; no other container of this host is ever named.
-// Async because the gate is. Seams (deps): gate ({config, up, scan, dashboard}), docker ({inspect, start, stop}), sleep (ms -> Promise), now, readyMs, pollMs, logDir.
+// Async because the gate is. Seams (deps): gate ({config, state, scan, dashboard}), docker ({inspect, start, stop}), logs, sleep (ms -> Promise), now, readyMs, pollMs, logDir.
 import fs from 'node:fs';
 import path from 'node:path';
-import { containerInspect } from '../api/docker/container-inspect.mjs';
-import { containerLifecycle } from '../api/docker/container-lifecycle.mjs';
 import { sleep } from '../lib/sleep.mjs';
-import { findInOrder, repeatInOrder } from '../lib/in-order.mjs';
-import { dashboard, resolveConfig, scan, scrub } from '../gates/sonar-local.mjs';
-import { sonarUp } from '../gates/sonar-status.mjs';
+import { findInOrder } from '../lib/in-order.mjs';
+import { dashboard, scan, scrub } from '../gates/sonar-local.mjs';
+import { sonarState } from '../gates/sonar-status.mjs';
+import { STARTUP, dockerOf, localStackConfig, stateOf } from './release-sonar-stack.mjs';
+import { awaitSonarUp, logsOf } from './release-sonar-wait.mjs';
 import { tempRoot } from '../../engine/temp-root.mjs';
 
-const READY_MS = 5 * 60_000;
-const READY_POLL_MS = 5_000;
 const SCAN_TIMEOUT_SEC = 60 * 60;
 
-/** The gate's functions, as the supplier calls them: the config of an app, whether the server is UP, the project-gate scan and the dashboard. */
+/** The gate's functions, as the supplier calls them: the config of an app (local host), the server's status, the project-gate scan and the dashboard. */
 const GATE = Object.freeze({
-  config: (appDir) => resolveConfig({ cwd: appDir }),
-  up: sonarUp,
+  config: localStackConfig,
+  state: sonarState,
   scan: (cfg, appDir) => scan(cfg, { cwd: appDir, wait: true, projectGate: true, timeoutSec: SCAN_TIMEOUT_SEC }),
   dashboard: (cfg, appDir) => dashboard(cfg, { cwd: appDir }),
 });
-
-const dockerOf = (docker) => ({
-  inspect: (name) => containerInspect(name, '{{.State.Status}}', { docker }),
-  start: (names) => containerLifecycle('start', names, { docker }),
-  stop: (names) => containerLifecycle('stop', names, { docker }),
-});
-
-/** The state of one container: 'running', another docker state, or 'missing' / 'docker-unavailable'. */
-function stateOf(inspect, name) {
-  const r = inspect(name);
-  if (r.error) return 'docker-unavailable';
-  if (r.status !== 0) return 'missing';
-  return String(r.stdout ?? '').trim() || 'unknown';
-}
 
 const tail = (text, max = 400) => String(text ?? '').trim().slice(-max);
 
@@ -55,31 +40,32 @@ export function sonarSupplier(apps, deps = {}) {
   const started = [];
   let stack = null;
 
+  /** The reason the stack cannot be started from the states its containers were found in, or null. */
+  const unusable = (states) => {
+    const bad = states.filter((s) => ['docker-unavailable', 'missing', 'dead', 'removing'].includes(s.state));
+    return bad.length ? `the Sonar stack cannot be started: ${bad.map((s) => `${s.name} is ${s.state}`).join(', ')} (ext/sonar/README.md re-creates it)` : null;
+  };
+
+  /** Start what is not running, the database first; a paused or crash-looping container is stopped before. The reason it failed, or null. */
+  const startDown = (d, states) => {
+    const down = states.filter((s) => s.state !== 'running');
+    if (!down.length) return null;
+    const names = down.map((s) => s.name);
+    started.push(...names); // stopped again by close() even when the start failed half way: a stop of a stopped container is harmless
+    const stale = down.filter((s) => s.state === 'paused' || s.state === 'restarting').map((s) => s.name);
+    if (stale.length) d.stop(stale);
+    const r = d.start(names);
+    return r.error || r.status !== 0 ? `docker start ${names.join(' ')} failed: ${tail(r.stderr || r.error?.message)}` : null;
+  };
+
   const bringUp = async (cfg) => {
     if (stack) return stack;
-    const containers = [`${cfg.container}-postgres`, cfg.container]; // the database first
     const d = deps.docker ?? dockerOf(cfg.docker);
-    const states = containers.map((name) => ({ name, state: stateOf(d.inspect, name) }));
-    const unusable = states.filter((s) => s.state === 'docker-unavailable' || s.state === 'missing');
-    if (unusable.length) {
-      const unavailable = unusable.map((s) => `${s.name} is ${s.state}`).join(', ');
-      stack = { ok: false, reason: `the Sonar stack cannot be started: ${unavailable}` };
-      return stack;
-    }
-    const down = states.filter((s) => s.state !== 'running').map((s) => s.name);
-    if (down.length) {
-      started.push(...down); // stopped again by close() even when the start failed half way: a stop of a stopped container is harmless
-      const r = d.start(down);
-      if (r.error || r.status !== 0) { stack = { ok: false, reason: `docker start ${down.join(' ')} failed: ${tail(r.stderr || r.error?.message)}`, docker: d }; return stack; }
-    }
-    const deadline = now() + (deps.readyMs ?? READY_MS);
-    let up = await gate.up(cfg);
-    await repeatInOrder(async () => {
-      if (up || now() >= deadline) return true;
-      await pause(deps.pollMs ?? READY_POLL_MS);
-      up = await gate.up(cfg);
-    });
-    stack = up ? { ok: true, docker: d } : { ok: false, reason: 'SonarQube did not report UP in time after its containers started', docker: d };
+    const states = [`${cfg.container}-postgres`, cfg.container].map((name) => ({ name, state: stateOf(d.inspect, name) })); // the database first
+    const reason = unusable(states) ?? startDown(d, states);
+    if (reason) { stack = { ok: false, reason, docker: d }; return stack; }
+    const waited = await awaitSonarUp(cfg, { state: gate.state, containerState: () => stateOf(d.inspect, cfg.container), logs: deps.logs ?? logsOf(cfg.docker), sleep: pause, now, readyMs: deps.readyMs ?? STARTUP.readyMs, pollMs: deps.pollMs ?? STARTUP.pollMs });
+    stack = waited.ok ? { ok: true, docker: d } : { ok: false, reason: waited.reason, state: waited.state, docker: d };
     return stack;
   };
 
