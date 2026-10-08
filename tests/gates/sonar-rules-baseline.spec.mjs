@@ -34,7 +34,7 @@ test('an entry whose finding is gone is STALE: the baseline can only shrink', (t
   const { entries } = readBaseline(root);
   const { fresh, stale } = compareToBaseline([finding({ text: 'a.sort()' })], entries, all);
   assert.equal(fresh.length, 0);
-  assert.deepEqual(stale.map((e) => e.excerpt), ['b.sort()']);
+  assert.deepEqual(stale.map((e) => e.fingerprint), [fingerprintOf(finding({ text: 'b.sort()' }))]);
 });
 
 test('a listed finding is green, and a duplicate beyond the listed count is NEW', (t) => {
@@ -79,7 +79,7 @@ test('the section lives in the one allowlist, keeps the other sections, and ends
   assert.match(written, /\nsonar-rules:\n {2}- \{rule: "S2871"/);
   const { entries } = readBaseline(root);
   assert.equal(entries.length, 2);
-  assert.ok(entries.every((entry) => entry.reason.length > 20 && entry.excerpt), 'every entry carries its reason');
+  assert.ok(entries.every((entry) => entry.reason.length > 20 && entry.fingerprint), 'every entry carries its reason');
   assert.equal(pruneBaseline(root, [entries[0]]).length, 1);
   assert.equal(readBaseline(root).entries.length, 1);
   assert.equal(pruneBaseline(root, readBaseline(root).entries).length, 0);

@@ -77,7 +77,7 @@ test('a commit staging a new finding is refused and names it; the fix goes throu
   gitOk(repo, env, 'add', 'src/old.mjs');
   const stale = git(repo, env, 'commit', '-m', 'fixed, entry kept');
   assert.notEqual(stale.status, 0, 'a fix that leaves its baseline entry listed is refused');
-  assert.match(`${stale.stdout}\n${stale.stderr}`, /SONAR_BASELINE_STALE src\/old\.mjs/);
+  assert.match(`${stale.stdout}\n${stale.stderr}`, /RT_SONAR_BASELINE_STALE src\/old\.mjs/);
 
   spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'checks', 'check-sonar-rules.mjs'), '--root', repo, '--prune'], { encoding: 'utf8', env, windowsHide: true });
   gitOk(repo, env, 'add', '-A');

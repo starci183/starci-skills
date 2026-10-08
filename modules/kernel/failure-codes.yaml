@@ -16500,7 +16500,7 @@ gate-reraise-without-evidence:
   owner: op-retry
   kind: verb-refusal
 
-SONAR_BASELINE_STALE:
+RT_SONAR_BASELINE_STALE:
   title: "A sonar-rules baseline entry outlived its finding"
   title_vi: "Một mục baseline của sonar-rules còn lại khi phát hiện đã hết"
   meaning_vi: "Section sonar-rules của modules/kernel/allowlist.yaml liệt kê một phát hiện Sonar (luật, tệp, dấu vân tay của nút bị gắn cờ) mà mã hiện tại không còn mắc. Baseline chỉ được thu nhỏ: commit sửa phát hiện phải xóa luôn mục của nó, nếu không kiểm tra sonar-rules đỏ."

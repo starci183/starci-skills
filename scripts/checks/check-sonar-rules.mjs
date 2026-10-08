@@ -9,7 +9,7 @@
 //   starci runtime check --only sonar-rules -- --prune         delete the baseline entries whose finding is gone
 //
 // Output: one `S<id> <file>:<line> <message>` line per finding that is not in the committed baseline, and one
-// `SONAR_BASELINE_STALE` line per baseline entry whose finding no longer exists (the fix commit deletes the entry). Exit 1 on any.
+// `RT_SONAR_BASELINE_STALE` line per baseline entry whose finding no longer exists (the fix commit deletes the entry). Exit 1 on any.
 import fs from 'node:fs';
 import path from 'node:path';
 import { skillRoot } from '../../engine/runtime-root.mjs';
@@ -21,7 +21,7 @@ import { gitOutputOf } from '../lib/git.mjs';
 import { analysed, readSonarScope, scopeFiles } from '../gates/sonar-rules-scope.mjs';
 import { BASELINE_FILE, BASELINE_SECTION, compareToBaseline, pruneBaseline, readBaseline, writeBaseline } from '../gates/sonar-rules-baseline.mjs';
 
-export const CODE_STALE = 'SONAR_BASELINE_STALE';
+export const CODE_STALE = 'RT_SONAR_BASELINE_STALE';
 const FLAGS = Object.freeze(['--json', '--staged', '--init', '--prune', '--root']);
 const HELP = 'usage: check-sonar-rules [--root <dir>] [--staged] [--init | --prune] [--json]';
 
@@ -46,7 +46,7 @@ function sourcesOf(root, files, staged) {
 const line = (finding) => ({ code: finding.rule, message: `${finding.file}:${finding.line} ${finding.message}` });
 const staleLine = (entry) => ({
   code: CODE_STALE,
-  message: `${entry.file}: the baseline lists ${entry.rule} (${entry.excerpt}) but the finding no longer exists; delete the entry (starci runtime check --only sonar-rules -- --prune)`,
+  message: `${entry.file}: the baseline lists ${entry.rule} (fingerprint ${entry.fingerprint}) but the finding no longer exists; delete the entry (starci runtime check --only sonar-rules -- --prune)`,
 });
 
 /** The run's plan: which files are linted and which baseline entries it may judge. */

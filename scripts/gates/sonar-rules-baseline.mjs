@@ -14,8 +14,7 @@ import { ALLOWLIST_FILE } from '../lib/allowlist.mjs';
 
 export const BASELINE_SECTION = 'sonar-rules';
 export const BASELINE_FILE = ALLOWLIST_FILE;
-export const ENTRY_REASON = 'present on main when the sonar-rules gate landed; fix the code and delete this entry (a fix commit removes its own)';
-const EXCERPT = 80;
+const ENTRY_REASON = 'present on main when the sonar-rules gate landed; fix the code and delete this entry (a fix commit removes its own)';
 const SECTION_HEADER = `# The findings of the sonar-rules self-check (scripts/checks/check-sonar-rules.mjs) that main carried when the gate landed: rule, file, a
 # fingerprint of the flagged node, its occurrence number and, for cognitive complexity, the score it may not exceed. Not a suppression
 # list: a finding that is not listed is red, a listed finding that is gone is red too, so the section only shrinks.\n`;
@@ -56,7 +55,6 @@ const entryOf = (finding) => ({
   fingerprint: finding.fingerprint,
   n: finding.n,
   ...(finding.weight ? { weight: finding.weight } : {}),
-  excerpt: finding.text.slice(0, EXCERPT),
   reason: ENTRY_REASON,
 });
 
