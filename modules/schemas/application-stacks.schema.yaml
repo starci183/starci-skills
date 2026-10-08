@@ -119,6 +119,14 @@ $defs:
       credentials:
         type: array
         items: {$ref: '#/$defs/serviceCredential'}
+      runtimeSecrets:
+        description: >-
+          An app that lives inside the runtime repository (an example) holds no custody: it names the variables of the runtime's untracked
+          .claude/secret.env it reads (and, in CI, the repository secret or variable of the same name). A product declares credentials instead;
+          scripts/gates/starcistacks.mjs refuses each form for the other kind (STACKS_EXAMPLE_FORM, STACKS_PRODUCT_FORM).
+        type: array
+        minItems: 1
+        items: {type: string, pattern: '^[A-Z][A-Z0-9_]*$'}
       ci: {$ref: '#/$defs/serviceCi'}
       ownerAction:
         description: >-

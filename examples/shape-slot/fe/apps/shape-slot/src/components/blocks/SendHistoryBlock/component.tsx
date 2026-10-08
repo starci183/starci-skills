@@ -2,9 +2,6 @@ import { List, ListItem, Region, SectionHeader, Text } from "@starci/grammar/com
 import { SlotView } from "@/components/composites/SlotView"
 import type { SendAttempt, Slot, SlotLabels } from "@/modules/types"
 
-/** Shape of the block: one drawing. */
-export type SendHistoryBlockState = "list"
-
 /** Atoms only: one slot, the title and its status copy. */
 export type SendHistoryBlockData = {
     readonly attempts: Slot<ReadonlyArray<SendAttempt>>
@@ -17,7 +14,6 @@ export type SendHistoryBlockActions = { readonly retry: () => void }
 
 /** Complete input of SendHistoryBlockBase. */
 export type SendHistoryBlockBaseProps = {
-    readonly state: SendHistoryBlockState
     readonly props: SendHistoryBlockData
     readonly on: SendHistoryBlockActions
 }

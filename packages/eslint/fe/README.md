@@ -21,6 +21,7 @@ flat-config blocks and owns everything about the law: which files are linted (fr
 recommended set lifted to `error`), typed linting, and the inline-directive fence (`noInlineConfig` plus
 `reportUnusedDisableDirectives`). The repository states nothing.
 
+- The **Sonar parity** law (R235): the smells SonarCloud measures that a lint rule can decide, `no-await-in-loop`, `prefer-code-point`, `prefer-string-raw`, `no-nested-conditional`, `no-void-operator`, `no-unused-import`, `prefer-export-from` and `no-unused-prop-types`, plus the typescript-eslint rules `no-deprecated`, `no-base-to-string` and `require-await` the factory turns on (they read types, so the source block is typed). A Next `matcher` string keeps its escapes (the segment config is read statically); `*.spec.ts` and `*.e2e-spec.ts` are outside the scan, so outside these rules.
 - The **ignore** block: `node_modules`, `.next`, `dist`, `coverage`, `__generated__` and `.starci/`.
 - The **source** block governs `apps/*/src/**` and `packages/*/src/**` with types (`parserOptions.projectService`) and
   `settings.starci.hfs`, the slot view path-scoped rules ask (`lib/hfs.mjs` `hfsOf`), never a path pattern.

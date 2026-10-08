@@ -71,6 +71,7 @@ flag_management:
         - "engine/resources-config.mjs"
         - "engine/runtime-root.mjs"
         - "engine/secrets.mjs"
+        - "engine/sonar-config.mjs"
         - "engine/temp-root.mjs"
         - "packages/cli/bin/starci.mjs"
         - "packages/cli/src/**/*.mjs"

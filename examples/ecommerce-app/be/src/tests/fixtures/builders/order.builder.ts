@@ -1,6 +1,7 @@
 import { fakeIds } from "@starci/jest-preset"
 import type { EntityManager } from "typeorm"
 import type { PlacedOrder } from "@modules/domain/order"
+import { eachInOrder } from "@modules/platform/primitives"
 
 /** The columns of an order row. */
 export interface OrderRow {
@@ -88,12 +89,14 @@ export const orderBuilder = (manager: EntityManager) => ({
     async build(overrides: Partial<OrderRow> = {}, lineCount = 1): Promise<OrderRow> {
         const row = orderRow({ id: nextId(), personId: nextId(), ...overrides })
         await manager.insert(ORDERS, row)
-        for (let index = 1; index <= lineCount; index += 1) {
-            await manager.insert(
-                ORDER_LINES,
-                orderLineRow({ id: nextId(), orderId: row.id, productId: `sku-line-${index}` }),
-            )
-        }
+        await eachInOrder(
+            Array.from({ length: lineCount }, (_, at) => at + 1),
+            (index) =>
+                manager.insert(
+                    ORDER_LINES,
+                    orderLineRow({ id: nextId(), orderId: row.id, productId: `sku-line-${index}` }),
+                ),
+        )
         return row
     },
 })

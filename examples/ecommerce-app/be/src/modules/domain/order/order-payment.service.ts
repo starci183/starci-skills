@@ -12,6 +12,7 @@ import { InjectInbox } from "@modules/platform/inbox"
 import type { Inbox } from "@modules/platform/inbox"
 import { InjectLogger } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
+import { eachInOrder } from "@modules/platform/primitives"
 import type {
     ExpireOverdueOrdersParams,
     ExpireOverdueOrdersResult,
@@ -80,12 +81,12 @@ export class OrderPaymentService {
                 EXPIRY_BATCH,
             ])
             const at = now.toISOString()
-            for (const row of expired) {
-                await this.bus.publish(
+            await eachInOrder(expired, (row) =>
+                this.bus.publish(
                     OrderExpiredEvent.create({ orderId: row.id, personId: row.person_id, expiredAt: at }),
                     manager,
-                )
-            }
+                ),
+            )
             return { expired: expired.length }
         })
     }

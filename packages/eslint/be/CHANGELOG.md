@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- New: the `sonar-parity` law (R235 `SCAN_SMELL`): `no-await-in-loop` (S9382), `prefer-code-point` (S7758), `prefer-string-raw` (S7780), `no-nested-conditional` (S3358), `no-void-operator` (S3735), `no-unused-import` (S1128) and `prefer-export-from` (S7763), each the syntax-tree form of the Sonar rule SonarCloud flagged in the example apps, shared with the front-end canon through the bundled `runtime/scripts/lib/sonar-syntax-rules.mjs`. The factory also turns on the typescript-eslint rules `no-deprecated` (S1874), `no-base-to-string` (S6551) and `require-await` (S7503).
+
 - New: `feature-thin` (R203 `BE_FEATURE_THIN`, law `feature-thin`): a feature-tier file of a role of `ruleParams.be.thinRoles` (handler, resolver, controller, consumer, processor, step, saga, saga-step, compensation, webhook, gateway, subscription, cli, mapper, the saga orchestrator service) maps its parameters and makes ONE delegating call into modules/, with no branch, loop, ternary, try, throw or computation. The slot manifest copy gains `coverage` on every tracked be slot and `ruleParams.be.logicRoles` and `thinRoles`.
 - Changed: `unit-test-colocated` also allows `<name>.<role>.spec.ts` beside a logic role (policy, client, guard, mapper, ...) inside a slot whose coverage is required; the spec stays required only for the roles of `ruleParams.be.unitRoles`, and the texts say so.
 - Changed: `no-repository-class` (R83) accepts `platform/saga` as a platform persistence capability (state of a saga run with its version fence).

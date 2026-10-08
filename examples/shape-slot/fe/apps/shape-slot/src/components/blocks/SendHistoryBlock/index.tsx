@@ -16,7 +16,6 @@ export const SendHistoryBlock = (props: SendHistoryBlockProps) => {
     const attempts = useQuerySendAttemptsSwr({ handoffId: props.handoffId })
     return (
         <SendHistoryBlockBase
-            state="list"
             props={{ attempts: toSlot(attempts), title: t("title"), slotLabels: slotLabels(t("empty")) }}
             on={{
                 retry: () => {

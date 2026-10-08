@@ -154,3 +154,15 @@ removed:
     use: 'skills/starci/references/host-startup.md'
     since: 1.0.0-alpha.6
     match: '(?<![\w-])host-maintenance\b'
+  - id: file-sonar-secrets-keys
+    kind: file
+    name: KEYS.md
+    use: 'secret.env.example lists the names of the host secrets; ext/sonar/README.md describes the stack'
+    since: 1.0.0-alpha.7
+    match: '(?<![\w/.-])secrets/KEYS\.md'
+  - id: vocab-example-sonar-token-member
+    kind: vocabulary
+    name: per-example Sonar token custody
+    use: 'the examples are analysed on SonarCloud with the SONAR_TOKEN of the runtime secret.env (runtimeSecrets in their services.sonar declaration)'
+    since: 1.0.0-alpha.7
+    match: 'sonarqube-(?:lite-app|shape-slot|starci-ecommerce-app)-token'

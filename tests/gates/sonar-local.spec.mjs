@@ -1577,6 +1577,23 @@ test('dashboard prints the project numbers and fails unless bugs, smells and vul
 });
 
 
+test('dashboard --branch reads the measures of that branch, and without it the main branch',async t=>{
+  const custody=fakeCustody(temporary(t,'dash-branch-custody'));
+  const clean={bugs:0,code_smells:0,vulnerabilities:0,security_hotspots:0,duplicated_lines_density:0,coverage:100};
+  const files={'src/orders/order.service.js':100,'src/orders/payment.service.js':100};
+  const branchesOf=async(label,extra)=>{
+    const {host,state}=await fakeSonar(t,{projectMeasures:clean,coverage:files});
+    const out=await sonarLocalMain(['dashboard','--cwd',fakeRepo(temporary(t,label),{services:true}),...extra],{config:configFor(host,custody)});
+    assert.equal(out.exitCode,0,JSON.stringify(out.report));
+    return {branches:state.requests.filter(row=>row.path.startsWith('/api/measures/component')).map(row=>row.query.branch),report:out.report};
+  };
+  const proof=await branchesOf('dash-branch',['--branch','release-proof']);
+  assert.ok(proof.branches.length>=2&&proof.branches.every(branch=>branch==='release-proof'),JSON.stringify(proof.branches));
+  assert.match(proof.report.dashboardUrl,/&branch=release-proof$/);
+  const main=await branchesOf('dash-main',[]);
+  assert.ok(main.branches.every(branch=>branch===undefined),JSON.stringify(main.branches));
+});
+
 test('lite Sonar selects its canonical conditions and requires an actual processed project gate plus the non-coverage dashboard',async t=>{
   const root=temporary(t,'lite-policy'),custody=fakeCustody(root),repo=fakeRepo(root);
   write(repo,'hfs.json',JSON.stringify({hfs:2,kind:'app',edition:'lite'}));
@@ -1678,18 +1695,25 @@ test('both full and lite dashboards reject excessive or missing duplication and 
   }
 });
 
-test('an example app inside the runtime checkout resolves its host custody inside this runtime tree, worktree or main checkout', t => {
+const productDeclaration=(dir,name,credentials)=>write(dir,`${name}/.starcistacks/application-stacks.yaml`,[
+  'services:','  sonar:','    provider: sonarqube','    mode: local','    projects:',
+  `      - {repository: ${name}, key: starci-${name}}`,'    credentials:',
+  ...credentials.map(c=>`      - {id: ${c.id}, purpose: "${c.purpose}", env: SONAR_TOKEN, custody: {repository: starci-academy-backend, path: ${c.path}}}`),
+  '',
+].join(String.fromCharCode(10)));
+
+test('a product resolves its host custody inside this runtime tree, and an example declares none: it reads SONAR_TOKEN from the runtime secret.env on SonarCloud', t => {
   declaredHost(t);
   const root=path.resolve(import.meta.dirname,'..', '..');
-  const file=path.join(root,'examples','ecommerce-app','.starcistacks','application-stacks.yaml');
-  const declared=readSonarDeclaration(file);
+  const dir=temporary(t,'product-custody');
+  const product=readSonarDeclaration(productDeclaration(dir,'shop',[{id:'admin',purpose:'project provisioning',path:'.claude/ext/sonar/secrets/sonarqube-admin-token.key'}]));
   // The admin credential's custody entry names the runtime host: the file is this tree's ext/.
-  assert.equal(declared.admin,path.join(root,'ext','sonar','secrets','sonarqube-admin-token.key'));
-  assert.equal(declared.stackDir,path.join(root,'ext','sonar'));
-  assert.ok(!declared.admin.includes(`${path.sep}examples${path.sep}ecommerce-app`),'never under the app folder');
-  const cfg=resolveConfig({cwd:path.join(root,'examples','ecommerce-app')},{});
-  assert.equal(cfg.adminToken,declared.admin);
-  assert.ok(fs.existsSync(`${declared.admin}.enc`),'the encrypted member the declaration names exists at the resolved path');
+  assert.equal(product.admin,path.join(root,'ext','sonar','secrets','sonarqube-admin-token.key'));
+  assert.ok(!product.admin.includes(`${path.sep}shop${path.sep}`),'never under the product folder');
+  const example=readSonarDeclaration(path.join(root,'examples','ecommerce-app','.starcistacks','application-stacks.yaml'));
+  assert.deepEqual([example.provider,example.mode,example.admin,example.analysis,example.stackDir===null||example.stackDir===undefined||!example.stackDir.includes(`${path.sep}ext${path.sep}sonar`)],['sonarcloud','hosted',null,null,true],'an example holds no custody and no stack');
+  assert.equal(example.hostPublic,'https://sonarcloud.io');
+  assert.equal(example.projects[0].tokenRef,null,'no per-project token: the one SONAR_TOKEN of secretEnv is used');
 });
 
 test('the runtime host holds the runtime main checkout; .claude/ custody paths of it resolve in this runtime tree', t => {
@@ -1711,12 +1735,12 @@ test('the runtime host holds the runtime main checkout; .claude/ custody paths o
 test('a project token is the declared credential that names the project, else the one declared credential whose purpose is analysis', t => {
   declaredHost(t);
   const root=path.resolve(import.meta.dirname,'..', '..');
-  // The examples declare their own analysis credential, sealed in the host's ext/sonar custody: no --token-ref is needed.
-  for(const [app,key] of [['ecommerce-app','starci-ecommerce-app']]){
-    const declared=readSonarDeclaration(path.join(root,'examples',app,'.starcistacks','application-stacks.yaml'));
-    assert.equal(declared.projects.find(p=>p.key===key).tokenRef,path.join(root,'ext','sonar','secrets',`sonarqube-${key}-token.key`));
-    assert.ok(fs.existsSync(`${declared.projects[0].tokenRef}.enc`),`${app}: the analysis credential is sealed`);
-  }
+  // A product names its project's analysis credential in its own custody: no --token-ref is needed.
+  const own=readSonarDeclaration(productDeclaration(temporary(t,'named-project'),'shop',[{id:'starci-shop',purpose:'ci',path:'.claude/ext/sonar/secrets/sonarqube-starci-shop-token.key'}]));
+  assert.equal(own.projects[0].tokenRef,path.join(root,'ext','sonar','secrets','sonarqube-starci-shop-token.key'));
+  // An example declares none, so its project has no token reference.
+  const example=readSonarDeclaration(path.join(root,'examples','ecommerce-app','.starcistacks','application-stacks.yaml'));
+  assert.equal(example.projects[0].tokenRef,null);
   const dir=temporary(t,'purpose');
   const decl=(credentials)=>write(dir,`repo-${credentials.length}-${Math.random().toString(36).slice(2,6)}/.starcistacks/application-stacks.yaml`,
     `services:\n  sonar:\n    provider: sonarqube\n    mode: local\n    projects:\n      - {repository: repo, key: proj-key}\n    credentials:\n${credentials.map(c=>`      - {id: ${c.id}, purpose: "${c.purpose}", env: SONAR_TOKEN, custody: {repository: repo, path: .starcistacks/dev/runtime/files/${c.file}}}`).join('\n')}\n`);

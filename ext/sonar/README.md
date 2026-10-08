@@ -1,14 +1,14 @@
 # ext/sonar — the shared local SonarQube (host extension)
 
-One SonarQube Community Build (with a dedicated PostgreSQL) serves every StarCi product repository (apps and examples) on this
-host; the `.claude` runtime itself is analysed on SonarCloud by `.github/workflows/ci.yml` (docs/releasing.md). It is a host extension, not part of any product's `.starcistacks`: product repositories only
+One SonarQube Community Build (with a dedicated PostgreSQL) serves every StarCi PRODUCT repository on this
+host; everything that lives in the runtime repository (the runtime itself and the example apps under `examples/`) is analysed on SonarCloud with the one `SONAR_TOKEN` of `secret.env` (docs/releasing.md, docs/application-stacks.md). It is a host extension, not part of any product's `.starcistacks`: product repositories only
 *declare* it, via their `services.sonar.stack` block pointing at `owner: host` /
 `root: .claude/ext/sonar` (see `modules/schemas/application-stacks.schema.yaml` and
 `docs/application-stacks.md`).
 
 Files: `compose.yaml` (SonarQube + its Postgres + the one-shot admin-password bootstrap),
 `cloudflared.yaml` (the Cloudflare tunnel that publishes it publicly, profile `public`), `secrets/`
-(SOPS `*.enc` custody — ciphertext only, see `secrets/KEYS.md`).
+(the SOPS `*.enc` members of the stack itself: database password, admin password, admin token, server-wide analysis token, tunnel token; the public runtime repository is meant to hold none, `RT_SECRET_TRACKED` lists those still tracked in `ruleParams.runtime.heldSecrets` until they move into `secret.env`).
 
 Fixed identity, so the running container keeps
 working: Compose project `starci`, containers `starci-sonarqube`, `starci-sonarqube-postgres`,
@@ -32,7 +32,7 @@ The stack needs two untracked files beside `compose.yaml`; both are gitignored:
 
    They decrypt with the source stack identity (`~/.starci/master.identity`, age recipient
    `age1myd77xz5lhsluc4ejzztsck32pfq3vfpzrva8cegzydk2guhxqesgm3z4j`). If a `.enc` twin is missing on a
-   fresh host, see `secrets/KEYS.md` — the owner re-mints and re-encrypts it.
+   fresh host, the owner re-mints and re-encrypts it.
 
 2. Create `.env` next to `compose.yaml`:
 
@@ -66,7 +66,7 @@ starci-next, starci-next-fe, mia-mia-backend, miamia-fe, tedo-landing — the se
 `services.sonar.projects` entry, listed in the host declaration
 (`tests/fixtures/starcistacks-services/starci-academy-backend.application-stacks.yaml`). A product's own
 per-project analysis token stays in **its** custody
-(`.starcistacks/dev/runtime/files/sonarqube-<key>-token.key.enc`, written through that repository's stack-secret tool), never in this extension. The example apps under `examples/` are the exception: they belong to this runtime repository, so the tokens they declare (`services.sonar.credentials`, custody path `.claude/ext/sonar/secrets/sonarqube-<key>-token.key`) are sealed in `secrets/`. `sonar-local.mjs ensure-project --with-token` (and a scan whose member the server rejects) mints the token with the admin token and seals it there itself, with `sops --encrypt` to the one recipient the directory's sealed members share, through a 0600 temp file (never argv), writing only the `.enc`; a directory with no such recipient is refused and the minted value revoked.
+(`.starcistacks/dev/runtime/files/sonarqube-<key>-token.key.enc`, written through that repository's stack-secret tool), never in this extension. The example apps under `examples/` do not use this server and have no member here.
 
 ## Before merge: the local rule check, not this server
 

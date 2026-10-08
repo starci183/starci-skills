@@ -116,7 +116,7 @@ test('integration and e2e run on workflow_dispatch only; the automatic steps hol
   assert.equal(workflow.jobs.app.permissions['id-token'], 'write');
   assert.match(upload.if, /steps.policy.outputs.tests == 'true'/, 'only an example with generated tests uploads coverage');
   assert.ok(steps.some((entry) => String(entry.uses ?? '').startsWith('SonarSource/sonarqube-scan-action')));
-  assert.ok(steps.some((entry) => /no Sonar server is configured/.test(String(entry.run ?? ''))));
+  assert.ok(steps.some((entry) => /SonarCloud is not configured/.test(String(entry.run ?? ''))));
   assert.ok(steps.findIndex((entry) => entry.run === 'npm test -- --ci') < steps.indexOf(upload));
   assert.match(steps.find((entry) => entry.run === 'npm test -- --ci').if, /steps\.policy\.outputs\.tests == 'true'/);
   const at = (run) => steps.findIndex((entry) => entry.run === run);

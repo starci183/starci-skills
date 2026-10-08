@@ -278,6 +278,7 @@ const liteBaseFile = (scope, rel) => {
     && rel !== 'src/modules/platform/database/connection-source.client.ts'
     && rel !== 'src/modules/platform/database/migrate-connections.client.ts'
     && rel !== 'src/modules/platform/database/seed-connections.client.ts'
+    && rel !== 'src/modules/platform/primitives/sequence.policy.ts'
     && !LITE_DEFERRED_GENERATOR_FILES.has(rel)
     && !rel.startsWith('src/tests/')
     && !rel.endsWith('.spec.ts');

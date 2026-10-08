@@ -236,3 +236,25 @@ rules:
         - BE_JSON_PARSE_UNGUARDED
       manual: []
     relatedExamples: []
+  - id: BE-FUNCTION-10
+    title: Code clear of the smells the scan measures
+    kind: mandatory
+    hfsRules: [R235]
+    requirement: |-
+      Steps that run one after another are named, never an `await` inside a loop: `eachInOrder` of `platform/primitives` states the
+      sequence (an endless loop that polls or walks pages is the one loop that keeps its `await`), and independent steps run together
+      with `Promise.all`. A method a base class fixes as asynchronous but that awaits nothing returns the promise it already holds. The
+      remaining smells are refused where they are written: `codePointAt` over `charCodeAt`, `String.raw` for a string that only escapes
+      backslashes, no nested conditional expression, `void` only on a call, no unused import, `export ... from` for an import that is only
+      handed on, and no deprecated API or object turned into text.
+    rationale: |-
+      The scan measures these on every commit of the product; a lint rule says the same thing earlier, on the line, with the fix.
+    cases:
+      - id: case-1
+        when: A connection after connection is migrated or seeded
+        write: 'await eachInOrder(connections, async (connection) => { const source = opener.open(connection); await source.initialize(); try { await source.runMigrations() } finally { await source.destroy() } })'
+    verification:
+      automated:
+        - SCAN_SMELL
+      manual: []
+    relatedExamples: []

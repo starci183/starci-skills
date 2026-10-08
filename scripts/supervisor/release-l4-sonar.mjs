@@ -1,105 +1,63 @@
-// release-l4-sonar.mjs - the Sonar proof of the L4 row (scripts/supervisor/release-l4.mjs): for every example app, the existing gate
-// (scripts/gates/sonar-local.mjs, the code behind `starci gate sonar`) scans the project against the whole-project gate and reads its dashboard;
-// both must PASS (a disabled or blocked Sonar is not a proof). The gate's own functions are called in-process (no child `node <script>`); the scanner it
-// runs stays inside the gate's own call file. The gate is configured for the stack's LOCAL host (the one the example declares), never the public tunnel host of the environment.
-// The local SonarQube stack (the server container and its database container) is brought up for the proof when it is stopped (a paused or restarting container is stopped first),
-// waited for by the server's own status and its container (release-sonar-wait.mjs), and left exactly as it was found afterwards: a container that was running stays running, one this run
-// started is stopped again. Containers are started and stopped by exact name through the scripts/api/docker call files; no other container of this host is ever named.
-// The scan imports the app's lint report, which nothing earlier in L4 writes: the proof writes it first (release-sonar-report.mjs).
-// Async because the gate is. Seams (deps): gate ({config, state, scan, dashboard}), lintReport (appDir -> {ok, reason}), docker ({inspect, start, stop}), logs, sleep (ms -> Promise), now, readyMs, pollMs, logDir.
+// release-l4-sonar.mjs - the Sonar proof of the L4 row (scripts/supervisor/release-l4.mjs): every example app is analysed on SonarCloud with the one SONAR_TOKEN of the runtime's secret.env
+// (release-sonarcloud.mjs), by the existing gate (scripts/gates/sonar-local.mjs, the code behind `starci gate sonar`) called in-process: the project is created when absent, the app's lint report is
+// written (release-sonar-report.mjs), the scanner submits the analysis and the dashboard of the analysed branch is read (the proof branch, unless the analysis became the project's main); both must PASS (a disabled or blocked Sonar is not a proof).
+// The bar is the runtime's own (knowledge/sonar-gate.yaml): the scan row passes when the analysis was processed (the scanner exited 0 and SonarCloud's task succeeded) whatever the gate selected on
+// SonarCloud judges - a custom gate may not exist on the plan - and the dashboard row applies the declared thresholds to the measures read from the API (zero bugs, smells and vulnerabilities, every
+// hotspot reviewed, duplication, coverage 100 per service file and overall). Nothing is started or stopped on this host.
+// Async because the gate is. Seams (deps): gate ({config, ensure, scan, dashboard}), settings, lintReport (appDir -> {ok, reason}), logDir, now.
 import fs from 'node:fs';
 import path from 'node:path';
-import { sleep } from '../lib/sleep.mjs';
 import { findInOrder } from '../lib/in-order.mjs';
 import { dashboard, scan, scrub } from '../gates/sonar-local.mjs';
-import { sonarState } from '../gates/sonar-status.mjs';
-import { STARTUP, dockerOf, localStackConfig, stateOf } from './release-sonar-stack.mjs';
-import { awaitSonarUp, logsOf } from './release-sonar-wait.mjs';
 import { removeLintReport, writeLintReport } from './release-sonar-report.mjs';
+import { PROOF_BRANCH, cloudConfig, ensureCloudProject, hostSettings } from './release-sonarcloud.mjs';
 import { tempRoot } from '../../engine/temp-root.mjs';
 
 const SCAN_TIMEOUT_SEC = 60 * 60;
 
-/** The gate's functions, as the supplier calls them: the config of an app (local host), the server's status, the project-gate scan and the dashboard. */
+/** The gate's functions as the supplier calls them; `cloud` is {cfg, key, org}, `extra` the scanner defines. */
 const GATE = Object.freeze({
-  config: localStackConfig,
-  state: sonarState,
-  scan: (cfg, appDir) => scan(cfg, { cwd: appDir, wait: true, projectGate: true, timeoutSec: SCAN_TIMEOUT_SEC }),
-  dashboard: (cfg, appDir) => dashboard(cfg, { cwd: appDir }),
+  config: (appDir, settings) => cloudConfig(appDir, settings),
+  ensure: (cloud, token) => ensureCloudProject(cloud, token),
+  scan: (cloud, appDir, extra) => scan(cloud.cfg, { cwd: appDir, key: cloud.key, ensure: false, wait: true, projectGate: true, timeoutSec: SCAN_TIMEOUT_SEC, defines: extra }),
+  dashboard: (cloud, appDir, branch) => dashboard(cloud.cfg, { cwd: appDir, key: cloud.key, branch }),
 });
 
-const tail = (text, max = 400) => String(text ?? '').trim().slice(-max);
+/** Whether a scan report counts as an analysis processed on SonarCloud: the scanner exited 0 and SonarCloud's task succeeded, whatever the gate selected there says (a red gate, or NONE on a new project). */
+const processed = (report) => report?.scanner?.exitCode === 0 && report.ceTask?.status === 'SUCCESS';
+
+/** The scanner defines of one proof: the organization (the scan adds the project key itself), and a proof branch when the project already has its main branch. */
+const definesOf = (cloud, created) => [`-Dsonar.organization=${cloud.org}`, ...(created ? [] : [`-Dsonar.branch.name=${PROOF_BRANCH}`])];
 
 /**
- * The Sonar proofs of the example apps `apps` ([{name, dir}]): {proofs: {'<app>: sonar': async () => {ok, log, ms}}, close}. The stack comes up on the first
- * proof and `close()` (called once by runL4 after the last proof, also after a failure) puts it back as it was.
+ * The Sonar proofs of the example apps `apps` ([{name, dir}]): {proofs: {'<app>: sonar': async () => {ok, log, ms}}}.
  */
 export function sonarSupplier(apps, deps = {}) {
   const gate = deps.gate ?? GATE;
-  const pause = deps.sleep ?? sleep;
   const now = deps.now ?? Date.now;
   const logDir = deps.logDir ?? (() => { const dir = path.join(tempRoot(), 'starci-release-l4'); fs.mkdirSync(dir, { recursive: true }); return dir; });
-  const started = [];
-  let stack = null;
-
-  /** The reason the stack cannot be started from the states its containers were found in, or null. */
-  const unusable = (states) => {
-    const bad = states.filter((s) => ['docker-unavailable', 'missing', 'dead', 'removing'].includes(s.state));
-    const named = bad.map((s) => `${s.name} is ${s.state}`).join(', ');
-    return bad.length ? `the Sonar stack cannot be started: ${named} (ext/sonar/README.md re-creates it)` : null;
-  };
-
-  /** Start what is not running, the database first; a paused or crash-looping container is stopped before. The reason it failed, or null. */
-  const startDown = (d, states) => {
-    const down = states.filter((s) => s.state !== 'running');
-    if (!down.length) return null;
-    const names = down.map((s) => s.name);
-    started.push(...names); // stopped again by close() even when the start failed half way: a stop of a stopped container is harmless
-    const stale = down.filter((s) => s.state === 'paused' || s.state === 'restarting').map((s) => s.name);
-    if (stale.length) d.stop(stale);
-    const r = d.start(names);
-    return r.error || r.status !== 0 ? `docker start ${names.join(' ')} failed: ${tail(r.stderr || r.error?.message)}` : null;
-  };
-
-  const bringUp = async (cfg) => {
-    if (stack) return stack;
-    const d = deps.docker ?? dockerOf(cfg.docker);
-    const states = [`${cfg.container}-postgres`, cfg.container].map((name) => ({ name, state: stateOf(d.inspect, name) })); // the database first
-    const reason = unusable(states) ?? startDown(d, states);
-    if (reason) { stack = { ok: false, reason, docker: d }; return stack; }
-    const waited = await awaitSonarUp(cfg, { state: gate.state, containerState: () => stateOf(d.inspect, cfg.container), logs: deps.logs ?? logsOf(cfg.docker), sleep: pause, now, readyMs: deps.readyMs ?? STARTUP.readyMs, pollMs: deps.pollMs ?? STARTUP.pollMs });
-    stack = waited.ok ? { ok: true, docker: d } : { ok: false, reason: waited.reason, state: waited.state, docker: d };
-    return stack;
-  };
 
   const prove = (app) => async () => {
     const t0 = now();
     const log = path.join(logDir(), `sonar-${app.name.replace(/[^\w.-]+/g, '_')}-${t0}.log`);
     const lines = [];
     const finish = (ok) => { removeLintReport(app.dir); fs.writeFileSync(log, `${lines.join('\n')}\n`); return { ok, log, ms: now() - t0 }; };
-    let cfg;
-    try { cfg = gate.config(app.dir); } catch (error) { lines.push(`sonar config: ${error.message}`); return finish(false); }
-    const up = await bringUp(cfg);
-    if (!up.ok) { lines.push(`sonar stack: ${up.reason}`); return finish(false); }
+    const settings = deps.settings ?? hostSettings();
+    let cloud;
+    try { cloud = gate.config(app.dir, settings); } catch (error) { lines.push(`sonar config: ${error.message}`); return finish(false); }
     const report = (deps.lintReport ?? writeLintReport)(app.dir);
     if (!report.ok) { lines.push(`sonar lint report: ${report.reason}`); return finish(false); }
-    const failed = await findInOrder([['scan --project-gate', gate.scan], ['dashboard', gate.dashboard]], async ([command, run]) => {
+    const project = await gate.ensure(cloud, settings.SONAR_TOKEN);
+    if (project.error) { lines.push(`sonar project: ${project.error}`); return finish(false); }
+    const steps = [['scan --project-gate', (dir) => gate.scan(cloud, dir, definesOf(cloud, project.created)), processed], ['dashboard', (dir) => gate.dashboard(cloud, dir, project.created ? undefined : PROOF_BRANCH), (r) => r?.outcome === 'pass']];
+    const failed = await findInOrder(steps, async ([command, run, passes]) => {
       let outcome;
-      try { outcome = await run(cfg, app.dir); } catch (error) { lines.push(`== sonar-local ${command} ${app.name}: threw ${scrub(error?.message ?? error)}`); return true; }
+      try { outcome = await run(app.dir); } catch (error) { lines.push(`== sonar-local ${command} ${app.name}: threw ${scrub(error?.message ?? error)}`); return true; }
       lines.push(`== sonar-local ${command} ${app.name}: ${outcome?.outcome ?? 'no outcome'}`, scrub(JSON.stringify(outcome, null, 2)));
-      return outcome?.outcome !== 'pass';
+      return !passes(outcome);
     });
     return finish(failed === undefined);
   };
 
-  /** Leave the stack as found: stop only what this run started, the server before its database. */
-  const close = () => {
-    if (!stack?.docker || !started.length) return { stopped: [] };
-    const names = [...started].reverse();
-    stack.docker.stop(names);
-    started.length = 0;
-    return { stopped: names };
-  };
-
-  return { proofs: Object.fromEntries(apps.map((app) => [`${app.name}: sonar`, prove(app)])), close };
+  return { proofs: Object.fromEntries(apps.map((app) => [`${app.name}: sonar`, prove(app)])) };
 }

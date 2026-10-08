@@ -1,3 +1,4 @@
+import { eachInOrder } from "@modules/platform/primitives"
 import type { DatabaseConnectionOptions } from "./database.options"
 import type { ConnectionOpener } from "./database.port"
 
@@ -16,7 +17,7 @@ export async function migrateConnections(
     opener: ConnectionOpener,
 ): Promise<AppliedMigrations> {
     const applied: Record<string, ReadonlyArray<string>> = {}
-    for (const connection of connections) {
+    await eachInOrder(connections, async (connection) => {
         const source = opener.open(connection)
         await source.initialize()
         try {
@@ -25,6 +26,6 @@ export async function migrateConnections(
         } finally {
             await source.destroy()
         }
-    }
+    })
     return applied
 }

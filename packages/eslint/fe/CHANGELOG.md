@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- New: the `sonar-parity` law (R235 `SCAN_SMELL`): `no-await-in-loop` (S9382), `prefer-code-point` (S7758), `prefer-string-raw` (S7780), `no-nested-conditional` (S3358), `no-void-operator` (S3735), `no-unused-import` (S1128), `prefer-export-from` (S7763) and `no-unused-prop-types` (S6767), each the syntax-tree form of the Sonar rule SonarCloud flagged in the example apps, shared with the back-end canon through the bundled `runtime/scripts/lib/sonar-syntax-rules.mjs`. The factory also turns on the typescript-eslint rules `no-deprecated` (S1874), `no-base-to-string` (S6551) and `require-await` (S7503); `@typescript-eslint/eslint-plugin` becomes a dependency of this package.
 - Changed: `one-outcome-union` reads the Outcome home from the slot manifest (`outcomeHome` on `fe.transport.outcome`, `fe.package.api.outcome` and the lite `fe.modules.db.outcome`, i.e. `modules/db/outcome.ts`) instead of two slot ids in code; a lite app's db owner is its transport, so its `modules/db/outcome.ts` is THE union and a second one anywhere else is still refused. Full is unchanged.
 - Changed: `public-component-signature` accepts a component with no parameter; `no-raw-structural-element` names `Region`, `NavLandmark`, `List` and `ListItem` as owners of section, nav, ul/ol and li; FE-I18N-1 and FE-TYPING-6 canon text (request locale through `next/root-params`, no `void props`); the FE_SWR_KEY_IDENTITY check reads `&&` and `||` gates in its bundled runtime.
 ## Unreleased (C0 batch)

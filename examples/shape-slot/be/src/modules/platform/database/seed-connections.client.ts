@@ -1,5 +1,6 @@
 import { readFile, readdir } from "node:fs/promises"
 import { join } from "node:path"
+import { eachInOrder } from "@modules/platform/primitives"
 import { seedText } from "./database.sql"
 import type { SqlText } from "./database.sql"
 import type { DatabaseConnectionOptions } from "./database.options"
@@ -56,18 +57,18 @@ export async function seedConnections(
     opener: ConnectionOpener,
 ): Promise<SeedReport> {
     const applied: Record<string, ReadonlyArray<string>> = {}
-    for (const connection of connections) {
+    await eachInOrder(connections, async (connection) => {
         const own = files.filter((file) => seeds(file, connection))
-        if (own.length === 0) continue
+        if (own.length === 0) return
         const source = opener.open(connection)
         await source.initialize()
         try {
-            for (const file of own) await source.query(file.text)
+            await eachInOrder(own, (file) => source.query(file.text))
         } finally {
             await source.destroy()
         }
         applied[connection.name] = own.map((file) => file.name)
-    }
+    })
     const unmatched = files
         .filter((file) => !connections.some((connection) => seeds(file, connection)))
         .map((file) => file.name)

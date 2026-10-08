@@ -13,6 +13,6 @@ export type LayoutProps = {
 export const generateStaticParams = () => routing.locales.map((locale) => ({ locale }))
 
 /** Route adapter: params become atoms, then the layout owner renders. */
-const Layout = async (props: LayoutProps) => <LocaleLayout params={props.params}>{props.children}</LocaleLayout>
+const Layout = (props: LayoutProps) => <LocaleLayout params={props.params}>{props.children}</LocaleLayout>
 
 export default Layout

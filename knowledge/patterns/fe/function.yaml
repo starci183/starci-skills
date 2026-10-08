@@ -360,3 +360,25 @@ rules:
         - FE_SUSPENSE_NULL_FALLBACK
       manual: []
     relatedExamples: []
+  - id: FE-FUNCTION-8
+    title: Code clear of the smells the scan measures
+    kind: mandatory
+    hfsRules: [R235]
+    requirement: |-
+      No `await` inside a loop (independent steps run together with `Promise.all`), no `async` function that awaits nothing and returns no
+      promise (a layout or page that only renders is a plain function), no nested conditional expression (name the inner one), `void` only
+      on a call, no unused import, `export ... from` for an import that is only handed on, no member of a props type the component never
+      reads, `codePointAt` over `charCodeAt`, `String.raw` for a string that only escapes backslashes (a Next `matcher` keeps its
+      escapes: the segment config is read statically, so write the dot as `[.]`), and no deprecated API: the request locale is read through
+      `next/root-params`, never `requestLocale` or `setRequestLocale`.
+    rationale: |-
+      The scan measures these on every commit of the product; a lint rule says the same thing earlier, on the line, with the fix.
+    cases:
+      - id: case-1
+        when: A layout or page that only hands params on
+        write: 'const Layout = (props: LayoutProps) => <LocaleLayout params={props.params}>{props.children}</LocaleLayout> - no async, no await'
+    verification:
+      automated:
+        - SCAN_SMELL
+      manual: []
+    relatedExamples: []
