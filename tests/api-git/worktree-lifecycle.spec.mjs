@@ -143,7 +143,7 @@ test('the GC reclaims orphans: an ended workflow\'s tree (through Orca), an unre
   const by = (p) => items.find((i) => i.path && path.resolve(i.path) === path.resolve(p));
   assert.equal(by(ended.path)?.reason, 'owner-settled', JSON.stringify(items));
   assert.equal(by(ended.path)?.home, 'orca');
-  assert.equal(by(ended.path)?.ok, true);
+  assert.equal(by(ended.path)?.ok, true, JSON.stringify(by(ended.path)));
   assert.equal(by(ended.path)?.preserved, 'refs/heads/preserved/wf-shop-fe-ended-1a/gc');
   assert.ok(orca.calls.some(([verb, a]) => verb === 'remove' && a.worktree === `id:${ended.orcaWorktreeId}`), 'Orca removed it');
   assert.equal(by(orphan)?.reason, 'orphan');
