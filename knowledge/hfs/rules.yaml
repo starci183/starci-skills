@@ -2068,3 +2068,25 @@ rules:
     failureCodes: ["RT_SECRET_TRACKED"]
     enforcers:
       - {kind: runtime, id: secret-tracked, at: scripts/hfs/runtime-rules/secret-tracked.mjs}
+  - id: R235
+    code: "SONAR_PARITY"
+    law: "Code carries none of the smells SonarCloud measures that a lint rule can decide: no `await` inside a loop (S9382; an endless loop is spared), no `charCodeAt`/`fromCharCode` (S7758), no string that only escapes backslashes (S7780; a Next `matcher` is spared, it is read statically), no nested conditional expression (S3358), no `void` on anything but a call (S3735), no unused import (S1128), no import that is only handed on instead of `export ... from` (S7763), no prop of a component's props type the component never reads (S6767, front end), and, through typescript-eslint with type information, no deprecated API (S1874), no object turned into text (S6551) and no `async` function that never awaits and returns no promise (S7503). The files a unit or an end-to-end spec names are outside the scan, so outside these rules."
+    kinds: [lint, codemod]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["SONAR_PARITY"]
+    enforcers:
+      - {kind: eslint-be, id: no-await-in-loop}
+      - {kind: eslint-be, id: prefer-code-point}
+      - {kind: eslint-be, id: prefer-string-raw}
+      - {kind: eslint-be, id: no-nested-conditional}
+      - {kind: eslint-be, id: no-void-operator}
+      - {kind: eslint-be, id: no-unused-import}
+      - {kind: eslint-be, id: prefer-export-from}
+      - {kind: eslint-fe, id: no-await-in-loop}
+      - {kind: eslint-fe, id: prefer-code-point}
+      - {kind: eslint-fe, id: prefer-string-raw}
+      - {kind: eslint-fe, id: no-nested-conditional}
+      - {kind: eslint-fe, id: no-void-operator}
+      - {kind: eslint-fe, id: no-unused-import}
+      - {kind: eslint-fe, id: prefer-export-from}
+      - {kind: eslint-fe, id: no-unused-prop-types}

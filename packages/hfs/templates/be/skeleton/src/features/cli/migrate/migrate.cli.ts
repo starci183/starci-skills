@@ -10,6 +10,6 @@ import { RunCli } from "./subs/run.cli"
 export class MigrateCli extends CommandRunner {
     /** Without a sub-command the group shows its help. */
     run(): Promise<void> {
-        return Promise.resolve(this.command.help())
+        return this.command.help()
     }
 }

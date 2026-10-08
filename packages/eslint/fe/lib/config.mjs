@@ -23,6 +23,13 @@ export const SOURCE_FILES = Object.freeze(["apps/*/src/**/*.{ts,tsx}", "packages
 /** Build output, installed packages, generated wire types and the harness's report directory are never linted. */
 export const IGNORED = Object.freeze(["**/node_modules/**", "**/.next/**", "**/dist/**", "**/coverage/**", "**/__generated__/**", ".starci/**"])
 
+/** The type-aware typescript-eslint rules the canon borrows for Sonar S1874 (a deprecated API), S6551 (an object turned into text) and S7503 (an `async` function that never awaits), all `error`. */
+export const BORROWED = Object.freeze({
+  "@typescript-eslint/no-deprecated": "error",
+  "@typescript-eslint/no-base-to-string": "error",
+  "@typescript-eslint/require-await": "error",
+})
+
 const levelOf = (setting) => (Array.isArray(setting) ? setting[0] : setting)
 
 /**
@@ -33,9 +40,10 @@ const levelOf = (setting) => (Array.isArray(setting) ? setting[0] : setting)
  * @param {object} input.plugin - The canon plugin.
  * @param {Record<string, unknown>} input.source - The source-tree levels (canon rules plus the React Hooks rules).
  * @param {object} input.reactHooks - The React Hooks plugin.
+ * @param {object} input.tsPlugin - The typescript-eslint plugin.
  * @returns {Array<object>} The flat config: one ignore block and one typed source block.
  */
-export const buildFeConfig = ({ hfs, plugin, source, reactHooks }) => {
+export const buildFeConfig = ({ hfs, plugin, source, reactHooks, tsPlugin }) => {
   if (!hfs || typeof hfs.slotOf !== "function" || typeof hfs.repoRoot !== "string") {
     throw new Error("starciFeConfig needs { hfs: loadHfs(import.meta.url) } - the rules read the repository's slots through it")
   }
@@ -55,9 +63,9 @@ export const buildFeConfig = ({ hfs, plugin, source, reactHooks }) => {
         parserOptions: { projectService: true, tsconfigRootDir: hfs.repoRoot, ecmaFeatures: { jsx: true } },
       },
       linterOptions: { ...linterOptions },
-      plugins: { "starci-fe": plugin, "react-hooks": reactHooks },
+      plugins: { "starci-fe": plugin, "react-hooks": reactHooks, "@typescript-eslint": tsPlugin },
       settings,
-      rules: { ...source },
+      rules: { ...source, ...BORROWED },
     },
   ]
 }

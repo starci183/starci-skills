@@ -16787,3 +16787,15 @@ RT_SECRET_TRACKED:
   nextStep_vi: "git rm tệp, thêm tên biến vào secret.env.example và danh mục env, owner đặt giá trị vào secret.env; bản mã hóa đã nằm trong lịch sử git chỉ mất khi xoay (rotate) bí mật."
   owner: owner
   kind: check-finding
+
+SONAR_PARITY:
+  title: "Code carries a smell SonarCloud measures"
+  title_vi: "Mã mang một mùi mã mà SonarCloud đo"
+  meaning_vi: "Tệp `<file>` có một đoạn mã mà SonarCloud sẽ báo thành code smell: `await` trong vòng lặp, `charCodeAt`, chuỗi chỉ thoát dấu gạch chéo ngược, biểu thức điều kiện lồng nhau, `void` trên giá trị không phải lời gọi, import không dùng, import chỉ để chuyển tiếp, prop khai báo mà component không đọc, API đã deprecated, đối tượng bị ép thành chuỗi hoặc hàm `async` không `await`; luật bắt ở máy trước khi bản quét đến."
+  causes_vi:
+    - "Vi phạm luật R235: một vòng lặp `await` từng bước mà không gọi tên thứ tự"
+    - "Import còn sót sau khi mã dùng nó đã bị xóa"
+    - "Dùng API next-intl `requestLocale` hay `setRequestLocale` đã bị thay bằng `next/root-params`"
+  nextStep_vi: "Sửa đúng dòng được chỉ: chạy các bước độc lập bằng `Promise.all`, gọi tên thứ tự bằng `eachInOrder` của `platform/primitives`, bỏ import thừa, viết lại biểu thức lồng thành câu lệnh riêng, đọc locale qua `next/root-params`, trả `Promise.resolve(...)` thay vì `async` không `await`. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
+  owner: op-retry
+  kind: check-finding

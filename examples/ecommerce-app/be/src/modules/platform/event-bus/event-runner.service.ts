@@ -4,7 +4,7 @@ import { InjectClock } from "@modules/platform/clock"
 import type { Clock } from "@modules/platform/clock"
 import { InjectLogger } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
-import { repeatInOrder } from "@modules/platform/primitives"
+import { eachInOrder } from "@modules/platform/primitives"
 import type { BaseEvent } from "./event-bus.contracts"
 import { InjectEventBusOptions, InjectEventTransport } from "./event-bus.decorators"
 import { EventBusLogEvent } from "./event-bus.log-events"
@@ -75,13 +75,14 @@ export class EventRunnerService implements EventConsumerRegistry, OnApplicationB
         const pause = notBefore - this.clock.now().getTime()
         if (pause > 0) await this.transport.wait(pause)
         const failures: Array<unknown> = []
-        const buried = await repeatInOrder(async (index) => {
-            const consumer = consumers[index]
-            if (consumer === undefined) return false
+        let buried = false
+        await eachInOrder(consumers, async (consumer) => {
+            if (buried) return
             const event = consumer.event.parse(envelope)
             if (event === null) {
+                buried = true
                 await this.bury(message, eventName, attempt, "the envelope does not have the shape of the event")
-                return true
+                return
             }
             try {
                 await consumer.handle({ eventId: event.eventId, event, attempt })
@@ -89,7 +90,6 @@ export class EventRunnerService implements EventConsumerRegistry, OnApplicationB
                 this.logger.error(EventBusLogEvent.DeliveryFailed, cause, { event: eventName, attempt })
                 failures.push(cause)
             }
-            return undefined
         })
         if (buried) return
         const [first] = failures

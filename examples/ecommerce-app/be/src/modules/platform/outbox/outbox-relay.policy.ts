@@ -1,7 +1,7 @@
 import type { OnApplicationBootstrap, OnApplicationShutdown } from "@nestjs/common"
 import type { EntityManager } from "typeorm"
 import type { Logger } from "@modules/platform/logging"
-import { mapInOrder, repeatInOrder } from "@modules/platform/primitives"
+import { eachInOrder } from "@modules/platform/primitives"
 import { OutboxLogEvent } from "./outbox.log-events"
 
 /**
@@ -28,8 +28,11 @@ export abstract class OutboxRelayPolicy<Row extends { readonly id: string }>
 
     /** One pass over every connection: relays the oldest waiting rows of each and answers how many it relayed. */
     async relay(): Promise<number> {
-        const counts = await mapInOrder(this.managers, (manager) => this.relayOf(manager))
-        return counts.reduce((total, count) => total + count, 0)
+        let relayed = 0
+        await eachInOrder(this.managers, async (manager) => {
+            relayed += await this.relayOf(manager)
+        })
+        return relayed
     }
 
     /** Starts the relay loop over the outbox of every connection. */
@@ -66,15 +69,25 @@ export abstract class OutboxRelayPolicy<Row extends { readonly id: string }>
         })
     }
 
-    private async run(): Promise<void> {
-        await repeatInOrder(async () => {
-            if (!this.running) return true
-            const relayed = await this.relay().catch((cause: unknown) => {
-                this.logger.error(OutboxLogEvent.RelayFailed, cause, { outbox: this.outbox })
-                return 0
-            })
-            if (relayed === 0 && this.running) await this.idle()
-            return undefined
+    /** One pass, then the next, until the app stops: each pass starts from the settled promise of the last, so the loop holds no growing chain. */
+    private run(): Promise<void> {
+        return new Promise<void>((resolve, reject) => {
+            const next = (): void => {
+                if (!this.running) {
+                    resolve()
+                    return
+                }
+                void this.pass().then(next, reject)
+            }
+            next()
         })
+    }
+
+    private async pass(): Promise<void> {
+        const relayed = await this.relay().catch((cause: unknown) => {
+            this.logger.error(OutboxLogEvent.RelayFailed, cause, { outbox: this.outbox })
+            return 0
+        })
+        if (relayed === 0 && this.running) await this.idle()
     }
 }
