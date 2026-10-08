@@ -1042,7 +1042,7 @@ _starci() {
         kernel:serve-ask) COMPREPLY=( $(compgen -W "--repo --workflow --dispatch --ttl --now --json --cwd --quiet --help --edition" -- "$cur") );;
         kernel:settle) COMPREPLY=( $(compgen -W "--repo --job --verdict --tool-error --report --sync-tail --json --cwd --quiet --help --edition" -- "$cur") );;
         kernel:settle-tail) COMPREPLY=( $(compgen -W "--repo --job --json --cwd --quiet --help --edition" -- "$cur") );;
-        kernel:status) COMPREPLY=( $(compgen -W "--field --repo --workflow --json --cwd --quiet --help --edition" -- "$cur") );;
+        kernel:status) COMPREPLY=( $(compgen -W "--field --full --repo --workflow --json --cwd --quiet --help --edition" -- "$cur") );;
         kernel:survey) COMPREPLY=( $(compgen -W "--field --repo --workflow --deliveries --json --cwd --quiet --help --edition" -- "$cur") );;
         kernel:unit) COMPREPLY=( $(compgen -W "--repo --workflow --unit --raise-budget --by --ref --json --cwd --quiet --help --edition" -- "$cur") );;
         kernel:usage) COMPREPLY=( $(compgen -W "--repo --workflow --legs --json --cwd --quiet --help --edition" -- "$cur") );;

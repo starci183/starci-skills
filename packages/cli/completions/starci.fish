@@ -841,6 +841,7 @@ complete -c starci -n '__starci_using_command kernel settle' -l sync-tail -d 'ru
 complete -c starci -n '__starci_using_command kernel settle-tail' -l repo -r -d 'managed repository whose .starciwork ledger the command uses'
 complete -c starci -n '__starci_using_command kernel settle-tail' -l job -r -d 'settled job whose queued tail runs'
 complete -c starci -n '__starci_using_command kernel status' -l field -r -d 'comma list of dotted paths of the answer; prints only those fields as JSON'
+complete -c starci -n '__starci_using_command kernel status' -l full -d 'the whole text view (every section); the Kernel seat'\''s own call prints its one-line state and its Decide section by default'
 complete -c starci -n '__starci_using_command kernel status' -l repo -r -d 'managed repository whose .starciwork ledger the command uses'
 complete -c starci -n '__starci_using_command kernel status' -l workflow -r -d 'workflow to project'
 complete -c starci -n '__starci_using_command kernel survey' -l field -r -d 'comma list of dotted paths of the answer; prints only those fields as JSON'

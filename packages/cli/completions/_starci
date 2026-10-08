@@ -1069,7 +1069,7 @@ _starci() {
     'kernel:serve-ask') _values 'flags' '--repo' '--workflow' '--dispatch' '--ttl' '--now' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'kernel:settle') _values 'flags' '--repo' '--job' '--verdict' '--tool-error' '--report' '--sync-tail' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'kernel:settle-tail') _values 'flags' '--repo' '--job' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
-    'kernel:status') _values 'flags' '--field' '--repo' '--workflow' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
+    'kernel:status') _values 'flags' '--field' '--full' '--repo' '--workflow' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'kernel:survey') _values 'flags' '--field' '--repo' '--workflow' '--deliveries' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'kernel:unit') _values 'flags' '--repo' '--workflow' '--unit' '--raise-budget' '--by' '--ref' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'kernel:usage') _values 'flags' '--repo' '--workflow' '--legs' '--json' '--cwd' '--quiet' '--help' '--edition' ;;

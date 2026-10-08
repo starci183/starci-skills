@@ -644,3 +644,34 @@ cases:
     rule: {file: scripts/reconciler/debug-questions.mjs, anchor: "wakeActed"}
     spec: tests/reconciler/debug-signals.spec.mjs
     status: covered
+  - id: seat-cost-exceeds-decisions
+    family: smooth-operation
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "2026-10-08, 644 M tokens recorded: the Supervisor seat 307 M (48 percent of the machine), Kernels 235 M against 102 M of op work; a seat costs by the turns it re-reads, not by its decisions, and nothing showed per seat how many wakes decided nothing", remedy: {state: in-tree, change: "starci reconciler status and starci debug digest print per seat the wakes, the wakes after which it decided nothing, the wakes the runtime withheld, the tokens per wake p50 and p90 and its share of the machine; a seat over modules/reconciler/seat-cost.yaml emptyWakeSharePercent is the seat-empty-wakes departure of the runtime"}}
+    met: {date: "2026-10-09", where: "wave 4 lane perf/w4-seat-token-cost: ledger copies a8c and seat transcripts, 177 wakes", evidence: "Kernel wakes with no ledger write by the seat: 29 percent (Nivo 3 of 18, StarCi 11 of 34); Supervisor 3 percent"}
+    rule: {file: scripts/reconciler/debug-digest-analyze.mjs, anchor: "seat-empty-wakes"}
+    spec: tests/kernel/seat-cost.spec.mjs
+    status: covered
+  - id: kernel-woken-with-empty-menu
+    family: smooth-operation
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "only the watchdog's stall wake asked the status projection whether the menu held an item; the durable transition wakes and the doorbell reached a Kernel by wake-delivery.mjs without that question, and each wake re-reads the whole session of the seat", remedy: {state: in-tree, change: "wakeKernelForTransition asks the same read-only status projection before typing (wake-menu-gate.mjs gatedWake): an explicit empty menu writes kernel-wake-skipped and sends nothing, a probe that cannot answer lets the wake through; the doorbell counts only the open Decision Items the menu still lists"}}
+    met: {date: "2026-10-09", where: "wave 4 lane perf/w4-seat-token-cost: audit of every Kernel wake path", evidence: "wake paths: stall (kernel-watchdog-tick.mjs frontier.actionable), transition, ask-answered, gate-answered, foundation-landed, follow-up-received, peer message (wakeKernelForTransition), doorbell (ringDoorbellWith), supervisor tell (doorbell)"}
+    rule: {file: scripts/kernel/wake-menu-gate.mjs, anchor: "gatedWake"}
+    spec: tests/kernel/seat-cost.spec.mjs
+    status: covered
+  - id: kernel-session-grows-without-bound
+    family: smooth-operation
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "a Kernel session re-reads its whole context at every turn and the context grows about a thousand tokens per turn with no compaction: 52 k at turn 0, 806 k at turn 230 (nivo bf945eb6), 128 M tokens for one session; the Kernel reads the ledger, not its memory, so nothing needed the old session", remedy: {state: in-tree, change: "the watchdog replaces an idle Kernel that received rotation.kernel.afterWakes wakes or spent afterTokens tokens since its boot by a fresh seat through start-workflow (seat-rotation.mjs createKernelRotation, event kernel-rotated, action rotated, not counted toward the replacements an hour allows)"}}
+    met: {date: "2026-10-09", where: "wave 4 lane perf/w4-seat-token-cost: per-turn context of the seven seat sessions", evidence: "projected saving of a rotation every 8 wakes on the two real Kernels: 23 and 20 percent of 137 M and 97 M tokens (replayed per-turn contexts, boot cost 2 M)"}
+    rule: {file: scripts/kernel/seat-rotation.mjs, anchor: "createKernelRotation"}
+    spec: tests/kernel/seat-cost.spec.mjs
+    status: covered
+  - id: supervisor-session-grows-without-bound
+    family: smooth-operation
+    met: {date: "2026-10-09", where: "wave 4 lane perf/w4-seat-token-cost: the Supervisor session a6aac83e ran 619 turns, 270 M tokens, context 50 k to 718 k", evidence: "replayed per-turn contexts: a fresh seat every 8 wakes would have cost 157 M of the 307 M (49 percent saved)"}
+    status: open
+    why: "start-supervisor --replace refuses a seat worker-show reports live and --restart disables the seat and stops its workers; a rotation needs a stop-and-replace that keeps the seat enabled, closes only the idle seat terminal and starts the standing prompt again (the Supervisor reads machine.sqlite, not its memory); the facts (wakes since supervisor-booted, tokens since boot) and the rule row rotation.supervisor of seat-cost.yaml follow the Kernel's"
+  - id: kernel-transition-wake-usage-not-cut
+    family: smooth-operation
+    met: {date: "2026-10-09", where: "wave 4 lane perf/w4-seat-token-cost: the usage sweep cuts a Kernel session at kernel-woken events only", evidence: "scripts/kernel/wake-budget.mjs kernelWakesOf"}
+    status: open
+    why: "a transition or doorbell wake has no tokens of its own in the seat-cost view (tokens per wake p50 and p90 read the stall wakes); cutting at the other wake kinds changes the buckets of sessions already recorded and would count the range after an old transition wake twice, so the cut needs a marker event that starts the new cuts from its own instant"

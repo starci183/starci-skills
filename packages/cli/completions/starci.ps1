@@ -136,7 +136,7 @@ Register-ArgumentCompleter -Native -CommandName starci -ScriptBlock {
         'kernel serve-ask' = @('--repo','--workflow','--dispatch','--ttl','--now','--json','--cwd','--quiet','--help','--edition')
         'kernel settle' = @('--repo','--job','--verdict','--tool-error','--report','--sync-tail','--json','--cwd','--quiet','--help','--edition')
         'kernel settle-tail' = @('--repo','--job','--json','--cwd','--quiet','--help','--edition')
-        'kernel status' = @('--field','--repo','--workflow','--json','--cwd','--quiet','--help','--edition')
+        'kernel status' = @('--field','--full','--repo','--workflow','--json','--cwd','--quiet','--help','--edition')
         'kernel survey' = @('--field','--repo','--workflow','--deliveries','--json','--cwd','--quiet','--help','--edition')
         'kernel unit' = @('--repo','--workflow','--unit','--raise-budget','--by','--ref','--json','--cwd','--quiet','--help','--edition')
         'kernel usage' = @('--repo','--workflow','--legs','--json','--cwd','--quiet','--help','--edition')

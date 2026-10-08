@@ -1,3 +1,4 @@
 # Boolean api flags, one per line, any verb (scripts/kernel/api-extensions.mjs). Add a line here instead of
 # editing the boolean-flag list in scripts/kernel/cli.mjs parseArgs; .gitattributes merges this file union.
 sync-tail
+full
