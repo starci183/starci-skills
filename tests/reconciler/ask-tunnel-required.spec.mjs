@@ -23,3 +23,12 @@ test('with Telegram on the down tunnel stays required', () => {
 test('the other services keep their requirement', () => {
   assert.equal(rowOf('ask-gateway', { connectors: { cloudflare: { mode: 'named' }, telegram: { enabled: false } } }).status, 'red');
 });
+
+test('a failed connector start names its reason: the answer reason first, then stderr, then the exit code', async () => {
+  const { connectorStartResult } = await import('../../scripts/reconciler/service-commands.mjs');
+  const blocked = { reason: 'connector-child-custody-unreconciled' };
+  assert.equal(connectorStartResult({ status: 1, stderr: 'warning: access is false' }, blocked).error, 'connector-child-custody-unreconciled');
+  assert.equal(connectorStartResult({ status: 2, stderr: 'boom' }, null).error, 'boom');
+  assert.equal(connectorStartResult({ status: 3, stderr: '' }, null).error, 'exit 3');
+  assert.equal(connectorStartResult({ status: 0, stderr: '' }, { ok: true }).error, undefined);
+});
