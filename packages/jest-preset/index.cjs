@@ -187,7 +187,8 @@ function starciJestConfig(options) {
     // Every spec file in a process of its own (never in band): nothing one file or the globalSetup put on a process global
     // (a framework registry such as @nestjs/graphql's type metadata) reaches another file. See world-runner.cjs.
     runner: WORLD_RUNNER,
-    testMatch: [`<rootDir>/src/tests/${displayName}/**/*.${suffix}.ts`],
+    // A glob without the root's absolute path: jest's roots (src, apps) already bound the search, and a root path that holds a dot-named folder (a checkout under `.claude`) turns its backslash separator into a glob escape on Windows, so a path-prefixed pattern would match no file.
+    testMatch: [`**/src/tests/${displayName}/**/*.${suffix}.ts`],
     // The one test world: started once per run of a project that has a test to run, torn down after it.
     globalSetup: "<rootDir>/src/tests/world/global-setup.ts",
     globalTeardown: "<rootDir>/src/tests/world/global-teardown.ts",
