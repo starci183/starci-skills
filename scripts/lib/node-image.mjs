@@ -9,7 +9,7 @@ export const DEFAULT_NODE = '22';
  * carries git 2.39, which lacks `git merge-tree --merge-base` (2.40) and `git rev-parse --show-ref-format` (2.46), so a gate that needs them behaves differently there.
  * trixie carries git 2.47.
  */
-export const PARITY_DISTRO = 'trixie';
+const PARITY_DISTRO = 'trixie';
 
 /** The Linux container image of the release parity step for node major `major`. */
 export const parityImage = (major) => `node:${major}-${PARITY_DISTRO}`;

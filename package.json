@@ -91,6 +91,7 @@
   "scripts": {
     "check": "node packages/cli/bin/starci.mjs runtime check",
     "test": "node --import ./tests/setup/low-priority.mjs --import ./tests/setup/isolated-temp.mjs --import ./tests/setup/isolated-registry.mjs --import ./tests/setup/runtime-copies.mjs --test \"tests/**/*.spec.mjs\"",
+    "test:release-env": "node packages/cli/bin/starci.mjs release env-test",
     "test:packages": "node packages/cli/bin/starci.mjs release clean-test",
     "test:coverage": "node packages/cli/bin/starci.mjs gate runtime-coverage",
     "starci": "node packages/cli/bin/starci.mjs",

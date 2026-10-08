@@ -42,6 +42,9 @@ Theme: the roles are one declared contract, the system recovers from a host rest
 - The published canon packages lacked `config.example.yaml`, which their bundled engine reads.
 - The `starci` skill's goal reference taught the removed routing-bias field.
 - The repository's `package.json` carried a `pretest` hook the release cut refuses; the hook is gone (the spec preload already regenerates the runtime copies) and a spec binds the real test script the way the cut does.
+- A spec run no longer reads the checkout's own `config.yaml` (`roots.temp`, `supervisor.landGate`, launch trust): the owner's live file made the temp-root, registry-isolation, land-gate and checkpoint specs differ between a lane clone and the release host. An owner config is seen in a spec run only from under the spec's temp directory.
+- The release cut found its L4 row red on a host the plain suite passed on. The causes are fixed at their roots: the `release notes` verb is named by the command policy; a stale `packages/test-world/dist` (now built by L4 and refused by the spec that borrows it); the JSON inventory scanning a spec's scratch app beside a settle spec; the op-worktree history hook switching itself off on a git before 2.46 (`rev-parse --show-ref-format` echoes the flag); `GIT_INTERNAL_SUPER_PREFIX` missing from the git local-env list; the Linux parity container's old git (`node:<major>-trixie`) and its one-level checkout path.
+- `starci release cut` (and `--plan`) refuses `release-host` at once when the host lacks an Orca terminal, a reachable Orca or a Docker daemon, instead of failing an hour into L4; `starci release env-test` (`npm run test:release-env`) runs the suite under the cut's conditions in everyday verification.
 
 ### Known limitations
 - SonarCloud has not scanned this commit; the local `sonar-rules` gate reproduces 16 of the 17 findings of the previous scan and misses optional chains that need type information.

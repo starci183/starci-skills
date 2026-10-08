@@ -82,8 +82,8 @@ test('the repository\'s own workflows give a plan that holds the full check set,
 
 test('the parity script extracts HEAD from the read-only tar, snapshots it as a git repository, runs each step with its env and marks each step', () => {
   const script = parityScript(parityPlan({ workflows: WORKFLOWS, apps: ['shop'] }));
-  assert.match(script, /tar -xf \/in\/src\.tar -C \/home\/runner\/work\/runtime\/runtime/);
-  assert.match(script, /cd "\/home\/runner\/work\/runtime\/runtime\/\$dir"/);
+  assert.match(script, /tar -xf \/in\/src\.tar -C \/opt\/starci-parity\/checkout/);
+  assert.match(script, /cd "\/opt\/starci-parity\/checkout\/\$dir"/);
   assert.match(script, /git init -q && git add -A && git -c user\.name=starci/);
   assert.match(script, /run_step 'examples\.yml:app\[shop\]: starci app lint' '\.' <<'__STEP_\d+__'\nexport NODE_VERSION='22'\nexport APP_DIR='examples\/shop'\nnpm run starci/);
   assert.match(script, /##DONE"\n$/);
@@ -456,7 +456,7 @@ test('the cut runs the default L4 row with its wiring: a red Linux step is a red
     throw new Error(`unexpected git ${verb} ${args.join(' ')}`);
   };
   const changelog = '## [1.0.0-alpha.4] - 2026-10-04\n\n- done\n';
-  const out = (await cutRelease({ repo: base, tag: 'v1.0.0-alpha.4', deps: { git: fakeGit, findings: () => [], changelog: () => changelog, lock: (work) => { calls.push('lock'); return work(); }, suite: () => steps, push: () => { throw new Error('never pushed'); } } }));
+  const out = (await cutRelease({ repo: base, tag: 'v1.0.0-alpha.4', deps: { host: () => [], git: fakeGit, findings: () => [], changelog: () => changelog, lock: (work) => { calls.push('lock'); return work(); }, suite: () => steps, push: () => { throw new Error('never pushed'); } } }));
   assert.deepEqual([out.ok, out.verdict], [false, 'suite-red']);
   assert.match(out.why, /linux-parity red/);
   assert.deepEqual(calls, ['lock']);

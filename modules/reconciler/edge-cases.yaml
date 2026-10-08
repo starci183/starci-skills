@@ -263,3 +263,51 @@ cases:
     met: {date: "2026-10-08", where: "owner ruling: the Supervisor may not update .claude", evidence: "modules/kernel/roles.yaml rulings.runtime-changes"}
     status: open
     why: "the instruction text of supervisor-prompt.md, supervise.yaml and docs/supervisor.md still describes fix workers and lands; the rewrite is designed in ROLES-STANDARD-alpha8.md"
+  - id: spec-reads-owner-live-config
+    family: record-vs-reality
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "the release cut ran the suite from the live checkout, whose owner config.yaml sets roots.temp and supervisor.landGate: the temp-root, registry-isolation, land-gate and checkpoint specs read that file and failed, though the same commit was green in a lane clone without one", remedy: {state: in-tree, change: "engine/config.mjs shows a spec run an owner config.yaml only from under the spec's temp directory; the checkout's live file never reaches a spec"}}
+    met: {date: "2026-10-08", where: "release cut of 1.0.0-alpha.7, L4 npm test", evidence: "D:/starci-tmp/release/cut-alpha7.log; release-npm_test log: 16 failures"}
+    rule: {file: engine/config.mjs, anchor: "ownerFileVisible"}
+    spec: tests/engine-db/runtime-state-root.spec.mjs
+    status: covered
+  - id: l4-borrows-stale-test-world-build
+    family: record-vs-reality
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "the spec run borrowed packages/test-world/dist, an untracked build older than its source: the example apps were typed against an API without writeFault and subscribe, and the scaffold end-to-end spec attached a stack of the old shape", remedy: {state: in-tree, change: "L4 builds packages/test-world after the installs and before the suite, and a spec that borrows the build refuses a stale or absent one with the command"}}
+    met: {date: "2026-10-08", where: "release cut of 1.0.0-alpha.7, L4 npm test", evidence: "release-npm_test log: actual catalog programs resolve current module APIs, 22 TS diagnostics"}
+    rule: {file: scripts/supervisor/release-l4.mjs, anchor: "test-world: npm run build"}
+    spec: tests/supervisor/release-l4-wiring.spec.mjs
+    status: covered
+  - id: spec-scratch-app-seen-by-json-inventory
+    family: concurrency
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "a scaffold spec builds an app in .tmp-hfs-fe-build-* inside the checkout while settle specs run the docs gate over the same root: check-json-exceptions listed the scratch app's package.json files and five checkpoint specs failed", remedy: {state: in-tree, change: "the JSON inventory skips the git-ignored scratch prefixes at the root"}}
+    met: {date: "2026-10-08", where: "release cut of 1.0.0-alpha.7, L4 npm test (the scaffold fe build runs only where app installs are required)", evidence: "release-npm_test log: workflow-checkpoint and workflow-rebase-milestone, check-json-exceptions .tmp-hfs-fe-build-hwMjHJ"}
+    rule: {file: scripts/checks/check-json-exceptions.mjs, anchor: "Disposable scratch trees"}
+    spec: tests/checks/check-json-exceptions.spec.mjs
+    status: covered
+  - id: op-worktree-guard-off-on-old-git
+    family: authority-safety
+    finding: {role: runtime, duty: never, verdict: departs, evidence: "the history hook refused an op's git worktree add only when git rev-parse --show-ref-format answered files; a git before 2.46 echoes the flag, so the refusal switched itself off and an op could create a worktree again", remedy: {state: in-tree, change: "the hook treats the echoed flag as the files backend (HOOK_VERSION 7)"}}
+    met: {date: "2026-10-08", where: "release cut of 1.0.0-alpha.7, Linux parity container (git 2.39)", evidence: "linux-parity log: the history hook specs"}
+    rule: {file: scripts/guards/hook-install.mjs, anchor: "predates --show-ref-format"}
+    spec: tests/guards/op-worktree-link-guard.spec.mjs
+    status: covered
+  - id: linux-parity-container-differs-from-ci
+    family: record-vs-reality
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "the parity container ran node:22 (git 2.39) at /work: seven specs failed there that the CI runner (a current git, a deep checkout path) passes, so the parity step blocked a release for reasons CI does not have", remedy: {state: in-tree, change: "the container image is node:<major>-trixie (git 2.47) and the checkout is several levels below the root"}}
+    met: {date: "2026-10-08", where: "release cut of 1.0.0-alpha.7, linux-parity step", evidence: "linux-parity log: safeRemove, kernel-guard, op-worktree-link-guard, land-git-env, land-throughput"}
+    rule: {file: scripts/lib/node-image.mjs, anchor: "trixie"}
+    spec: tests/supervisor/release-l4-wiring.spec.mjs
+    status: covered
+  - id: release-cut-fails-late-on-host-prerequisites
+    family: smooth-operation
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "a cut started outside an Orca terminal ran 40 minutes of L4 before failing on skipped live-Orca specs, and a host without Docker failed at the parity step", remedy: {state: in-tree, change: "release cut and --plan refuse release-host at once when an Orca terminal, a reachable Orca or a Docker daemon is missing; npm run test:release-env runs the cut's spec leg in everyday verification"}}
+    met: {date: "2026-10-08", where: "release cut of 1.0.0-alpha.7", evidence: "release-npm_test log: SKIPPED orca settle smokes, no ORCA_TERMINAL_HANDLE"}
+    rule: {file: scripts/supervisor/release-host.mjs, anchor: "releaseHostMissing"}
+    spec: tests/supervisor/release-cut.spec.mjs
+    status: covered
+  - id: orca-worktree-rm-walks-junctions-measured
+    family: authority-safety
+    finding: {role: runtime, duty: never, verdict: departs, evidence: "the live junction probe found the fake main's node_modules content gone after a bare orca worktree rm --force of a worktree with node_modules junctions on the release host", remedy: {state: open, change: "the runtime already unlinks every link before Orca removes a worktree (worktree-orca.mjs removeOrcaWorktree); whether this Orca build walks junctions on this host needs a probe from an Orca terminal"}}
+    met: {date: "2026-10-08", where: "release cut of 1.0.0-alpha.7, L4 npm test, orca-worktree-rm-live", evidence: "release-npm_test log: Orca did not walk the junctions: the fake main is byte-identical"}
+    status: open
+    why: "a probe of the real Orca writes a repository into it, which a lane may not do; run STARCI_ORCA_LIVE=1 on tests/api-orca/orca-worktree-rm-live.spec.mjs from an Orca terminal and record the measurement"

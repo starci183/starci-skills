@@ -26,6 +26,8 @@ repeated confirmation. Never supply missing approval from an agent's judgement.
    hook refuses a push of `main` or of a `v*` tag unless the pushed commit is a release commit (version moved past the remote main's, annotated tag `v<version>`, dated
    CHANGELOG heading, and the release record of that exact commit with a green root suite, packages suites and checks), so this cut is the only way the remote moves.
 
+   The cut refuses at once (verdict `release-host`, in `--plan` too) unless the host provides what L4 needs: it is started from an Orca terminal (`ORCA_TERMINAL_HANDLE` set: the live Orca specs and the settle smokes run with `STARCI_REQUIRE_ORCA_LIVE=1`, and a skip from missing infrastructure fails L4), Orca answers, and a Docker daemon answers (the example images, the stack-backed specs and the Linux parity container). Before cutting, run `starci release env-test` there: it is the cut's spec leg alone.
+
    The release cut owns L4, the host lock, Linux parity, main-stability and secret checks, the annotated
    tag and atomic main-plus-tag push. Read its recorded logs and actual result. Do not start a second
    full-suite run in a lane, monitor or maintenance worker, and do not reconstruct this flow manually.

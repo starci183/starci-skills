@@ -11,6 +11,7 @@ import { push } from '../../scripts/api/git/push.mjs';
 import { renderRuntimeHooks } from '../../scripts/guards/git-hooks.mjs';
 import { gitCommonDir, l4RecordPath, readL4Record, writeL4Record } from '../../scripts/guards/release-record.mjs';
 import { classifySkip, planL4, runL4, skipReport, skipsOf } from '../../scripts/supervisor/release-l4.mjs';
+import { releaseHostMissing } from '../../scripts/supervisor/release-host.mjs';
 
 for (const key of ['GIT_DIR', 'GIT_COMMON_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_OBJECT_DIRECTORY', 'GIT_PREFIX']) delete process.env[key];
 const git = (cwd, ...args) => {
@@ -44,7 +45,7 @@ function fixture(t, { changelog = CHANGELOG, version = '1.0.0-alpha.4' } = {}) {
   git(repo, 'commit', '-q', '-m', 'release commit');
   const remoteMain = () => git(origin, 'rev-parse', 'refs/heads/main');
   const remoteTags = () => git(origin, 'tag', '-l').split(/\r?\n/).filter(Boolean);
-  return { base, origin, repo, remoteMain, remoteTags, before: remoteMain(), deps: { suite: green, scan: scanOk, lock: (work) => work() } };
+  return { base, origin, repo, remoteMain, remoteTags, before: remoteMain(), deps: { host: () => [], suite: green, scan: scanOk, lock: (work) => work() } };
 }
 const cut = (fx, extra = {}, deps = {}) => cutRelease({ repo: fx.repo, tag: TAG, ...extra, deps: { ...fx.deps, ...deps } });
 const untouched = (fx) => { assert.equal(fx.remoteMain(), fx.before, 'main did not move'); assert.deepEqual(fx.remoteTags(), [], 'no tag was pushed'); };
@@ -321,4 +322,20 @@ test('--plan reports what the cut would run and require and runs, tags and pushe
   const refused = (await cut(stale, { plan: true }));
   assert.deepEqual([refused.ok, refused.verdict], [false, 'release-definition']);
   untouched(stale);
+});
+
+test('the cut refuses at once, plan or run, when the host lacks an Orca terminal, a reachable Orca or a Docker daemon; nothing runs', async (t) => {
+  const fx = fixture(t);
+  const missing = releaseHostMissing({ env: {}, orca: () => ({ ok: false, reachable: false, error: 'no answer' }), docker: () => ({ status: 1, error: null }) });
+  assert.deepEqual(missing.map((m) => m.need), ['an Orca terminal', 'a reachable Orca', 'a Docker daemon']);
+  assert.deepEqual(releaseHostMissing({ env: { ORCA_TERMINAL_HANDLE: 'term_1' }, orca: () => ({ ok: true, reachable: true }), docker: () => ({ status: 0 }) }), []);
+  let ran = false;
+  for (const plan of [true, false]) {
+    const refused = await cut(fx, { plan }, { host: () => missing, suite: () => { ran = true; return green(); } });
+    assert.equal(refused.ok, false);
+    assert.equal(refused.verdict, 'release-host');
+    assert.match(refused.why, /an Orca terminal \(ORCA_TERMINAL_HANDLE is empty[^)]*run starci release cut from a terminal Orca owns/);
+  }
+  assert.equal(ran, false, 'the suite never started');
+  untouched(fx);
 });

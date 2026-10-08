@@ -30,8 +30,8 @@ export const LINUX_SPECS_LABEL = 'linux-specs';
 /** The spec setup the root `npm test` runs under (package.json scripts.test): the same isolation for the files the container runs. */
 const SPEC_IMPORTS = ['low-priority', 'isolated-temp', 'isolated-registry', 'runtime-copies'].map((name) => `--import ./tests/setup/${name}.mjs`).join(' ');
 const RUN_TIMEOUT_MS = 90 * 60_000;
-/** Where the container checks HEAD out: a runner-shaped path several levels below the filesystem root, as GitHub's checkout is (a spec that judges the runtime's distance from the root sees the same depth). */
-export const WORK_DIR = '/home/runner/work/runtime/runtime';
+/** Where the container checks HEAD out: a path several levels below the filesystem root, as GitHub's runner checkout is (a spec that judges the runtime's distance from the root sees the same depth). */
+export const WORK_DIR = '/opt/starci-parity/checkout';
 /** The spec suites: the root `npm test` and an example app's npm test / test:<layer> runs. The host ran them in this L4 row. */
 const SPEC_SUITE = /^npm (?:run )?test(?::[\w:-]+)?(?: -- .*)?$/;
 const BROWSER = /playwright install|test:a11y|test:browser/;
