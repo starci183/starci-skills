@@ -15,7 +15,7 @@ import { allocationSettings } from '../../engine/config.mjs';
 import { CATALOG_DIR, loadCatalog } from '../cli/catalog.mjs';
 import { byCodeUnit } from '../../engine/by-code-unit.mjs';
 
-const STARCI_BIN = 'starci.mjs';
+const CLI_BIN_FILE = 'starci.mjs';
 const posix = (file) => String(file).replaceAll('\\', '/');
 
 /** The flat verb list of a loaded catalog (scripts/cli/catalog.mjs loadCatalog): [{group, verb, dispatcher}] where dispatcher is the repo path of the verb's script or module. */
@@ -99,7 +99,7 @@ export function specsExercisingChangedVerbs({ root, changed, specs, verbs }) {
   if (!hit.length) return [];
   const texts = new Map();
   // the spec or a test helper it reaches runs packages/cli/bin/starci.mjs
-  const runsStarci = (spec, reach) => spec.code.includes(STARCI_BIN) || [...reach].some((file) => file.startsWith('tests/helpers/') && textOf(root, file, texts).includes(STARCI_BIN));
+  const runsStarci = (spec, reach) => spec.code.includes(CLI_BIN_FILE) || [...reach].some((file) => file.startsWith('tests/helpers/') && textOf(root, file, texts).includes(CLI_BIN_FILE));
   return specs.filter((spec) => {
     const reach = reachableFrom(root, spec.file, { cache });
     return hit.some((entry) => namesVerb(spec.code, entry) && (reach.has(entry.dispatcher) || runsStarci(spec, reach)));

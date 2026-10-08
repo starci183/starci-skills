@@ -29,7 +29,7 @@ const inner = (t) => t.replace(/^<|>$/g, '');
 
 // ---- extraction -----------------------------------------------------------------------------------------------
 
-const STARCI_AT = /(?<![\w@./:-])(?:npx\s+starci|npm\s+run\s+starci(?:\s+--silent)?(?:\s+--)?|starci)(?![\w@./-])(?=\s|$)/g;
+const COMMAND_AT = /(?<![\w@./:-])(?:npx\s+starci|npm\s+run\s+starci(?:\s+--silent)?(?:\s+--)?|starci)(?![\w@./-])(?=\s|$)/g;
 const FENCE = /^\s*(?:[-*>|]\s*)?```/;
 const SCRIPT_COMMENT = /^\s*(?:\/\/|\*|\/\*)/;
 const CONTINUED = /\\\s*$/;
@@ -102,7 +102,7 @@ function withoutComment(code) {
 
 // every `starci` of `body` as an occurrence {line, mode, preceded, text}; `modeOf(before)` names the mode
 function occurrencesIn(body, line, modeOf, scan = body) {
-  return [...scan.matchAll(STARCI_AT)].map((m) => {
+  return [...scan.matchAll(COMMAND_AT)].map((m) => {
     const before = body.slice(0, m.index);
     return { line, mode: modeOf(before), preceded: before, text: unescape(body.slice(m.index + m[0].length)) };
   });
