@@ -1,6 +1,7 @@
 // Owner intent normalization. This preserves constraints; it never grants launch or budget authority.
 import { isPlainObject } from '../../engine/plain-object.mjs';
 import { allocationSettings } from '../../engine/config.mjs';
+import { removedNotice } from '../../engine/removed-vocabulary.mjs';
 import { admissionRoles, admissionSelectorFields } from './agent-admission.mjs';
 
 const POOLS = Object.freeze({codex:'codex-agent','codex-agent':'codex-agent',claude:'claude-agent','claude-agent':'claude-agent',devin:'devin-agent','devin-agent':'devin-agent'});
@@ -19,10 +20,14 @@ const text = (value,key) => {
   if(typeof value !== 'string' || !value.trim())throw invalid(`${key} must be a nonempty string`);
   return value.trim();
 };
+/** `; <field> is removed (<replacement>)` for each unknown bias field the removed list names. */
+const removedHints = (label,unknown) => label==='bias'
+  ? unknown.map(field=>removedNotice('bias-field',field)).filter(Boolean).map(notice=>`; ${notice}`).join('')
+  : '';
 const keys = (value,allowed,label) => {
   if(!plain(value))throw invalid(`${label} must be a plain object`);
   const unknown=Object.keys(value).filter(key=>!allowed.includes(key));
-  if(unknown.length)throw invalid(`${label} has unknown fields: ${unknown.join(', ')}`);
+  if(unknown.length)throw invalid(`${label} has unknown fields: ${unknown.join(', ')}${removedHints(label,unknown)}`);
 };
 const provider = value => {
   const found=PROVIDERS[text(value,'provider').toLowerCase()];

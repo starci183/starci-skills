@@ -67,6 +67,7 @@ flag_management:
         - "engine/orca-config.mjs"
         - "engine/plain-object.mjs"
         - "engine/refuse.mjs"
+        - "engine/removed-vocabulary.mjs"
         - "engine/resources-config.mjs"
         - "engine/runtime-root.mjs"
         - "engine/secrets.mjs"

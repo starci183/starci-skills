@@ -4,6 +4,7 @@ import {parseYaml} from './yaml.mjs';
 import {isPlainObject as plain} from './plain-object.mjs';
 import {invalid} from './invalid-config.mjs';
 import {byCodeUnit} from './by-code-unit.mjs';
+import {removedOfKind} from './removed-vocabulary.mjs';
 
 /** The effort vocabulary, ordered weakest to strongest — the only list of it. */
 export const EFFORT_LEVELS=new Set(['none','minimal','low','medium','high','xhigh','max','ultra']);
@@ -11,29 +12,13 @@ const DIFFICULTIES=['easy','medium','hard','insane'];
 const MODELS_KEYS=['tiers','seats','balance','usage'];
 const known=names=>[...names].sort(byCodeUnit).join(', ');
 
-/** Keys an earlier config shape carried, each with its place in the tier model; a config holding one is refused. */
-const REMOVED_KEYS=Object.freeze([
-  ['models.pools','tiers are ordered member chains in modules/models/tiers.yaml; override one with models.tiers'],
-  ['models.nonOperation','planner, validator and kernelManager take the frontier tier (modules/models/tiers.yaml seats); remap with models.seats'],
-  ['models.selection','selection is always quota-aware; there is no key'],
-  ['allocation.shares','the picker balances by models.balance (maxStreak, maxSharePercent); there are no per-provider weights'],
-  ['allocation.windowHours','balance reads the recent picks of one tier (models.balance); there is no window'],
-  ['allocation.preferredProvider','an owner preference is a goal routing bias (prefer <agent>)'],
-  ['allocation.policy','the picker is the one policy; there is no key'],
-  ['allocation.mode','allocation holds grants only'],
-  ['kernel.group','the Kernel takes the high tier; pin with kernel.agent / kernel.model (an `only` bias)'],
-  ['supervisor.kernel.group','the Supervisor takes the frontier tier; pin with supervisor.kernel.agent / .model (an `only` bias)'],
-  ['coreDebug','the debug watcher is a /loop of the calling chat, not a seat; the cadence and the worktree alert limit are debugLoop.interval and debugLoop.worktreeLimit'],
-  ['debug','the debug watcher is started by the /starci skill in the calling chat; there is no switch (debugLoop.interval sets its cadence)'],
-]);
-
 const hasPath=(root,dotted)=>dotted.split('.').reduce((node,key)=>(plain(node)&&Object.hasOwn(node,key)?node[key]:undefined),root)!==undefined;
 
-/** Refuse an old-shape config, naming every removed key and where its meaning lives now. */
+/** Refuse an old-shape config (the removed keys of modules/kernel/removed-vocabulary.yaml), naming every removed key and where its meaning lives now. */
 export function refuseRemovedKeys(config){
-  const found=REMOVED_KEYS.filter(([key])=>hasPath(config,key));
+  const found=removedOfKind('config-key').filter(({name})=>hasPath(config,name));
   if(!found.length)return;
-  const removed=found.map(([key,place])=>`${key} is removed (${place})`).join('; ');
+  const removed=found.map(({name,use})=>`${name} is removed (${use})`).join('; ');
   throw new Error(`Invalid config.yaml: ${removed}.`);
 }
 

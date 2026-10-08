@@ -1,0 +1,116 @@
+# Every spelling the runtime refuses by name, each with what replaced it. engine/removed-vocabulary.mjs reads this file:
+# the config and routing-bias refusals take their names and replacements from it, and the `removed-vocabulary` self-check
+# refuses any of these spellings in text an agent or the owner reads, outside this file, CHANGELOG.md and a block marked
+# `[removed-list]` (CONTRIBUTING.md, "Removing or renaming a spelling").
+# Fields: id; kind (config-key | bias-field | verb | flag | code | vocabulary); name (the removed spelling); use (the
+# replacement, worded to finish the sentence "<name> is removed (<use>)"); since (the release that removed it);
+# match (optional regular expression the scan uses instead of the literal name); scan (false when the name is too common
+# a word to scan for).
+kinds: [config-key, bias-field, verb, flag, code, vocabulary]
+removed:
+  - id: bias-require
+    kind: bias-field
+    name: require
+    use: 'a requirement is now `only`, which keeps just the named members of the tier chain: write each as "<agent>", "<agent>/<model>" or a {pool, provider, model} selector, e.g. {"only":["claude"]}'
+    since: 1.0.0-alpha.6
+    match: '\brequire\s*:\s*[\[{]|"require"\s*:|\brequire bias\b|\bbias[^\n.]{0,30}`require`'
+  - id: config-models-pools
+    kind: config-key
+    name: models.pools
+    use: 'tiers are ordered member chains in modules/models/tiers.yaml; override one with models.tiers'
+    since: 1.0.0-alpha.6
+  - id: config-models-nonoperation
+    kind: config-key
+    name: models.nonOperation
+    use: 'planner, validator and kernelManager take the frontier tier (modules/models/tiers.yaml seats); remap with models.seats'
+    since: 1.0.0-alpha.6
+  - id: config-models-selection
+    kind: config-key
+    name: models.selection
+    use: 'selection is always quota-aware; there is no key'
+    since: 1.0.0-alpha.6
+  - id: config-allocation-shares
+    kind: config-key
+    name: allocation.shares
+    use: 'the picker balances by models.balance (maxStreak, maxSharePercent); there are no per-provider weights'
+    since: 1.0.0-alpha.6
+    match: 'allocation[. ]shares'
+  - id: config-allocation-windowhours
+    kind: config-key
+    name: allocation.windowHours
+    use: 'balance reads the recent picks of one tier (models.balance); there is no window'
+    since: 1.0.0-alpha.6
+  - id: config-allocation-preferredprovider
+    kind: config-key
+    name: allocation.preferredProvider
+    use: 'an owner preference is a goal routing bias (prefer <agent>)'
+    since: 1.0.0-alpha.6
+    match: 'preferredProvider'
+  - id: config-allocation-policy
+    kind: config-key
+    name: allocation.policy
+    use: 'the picker is the one policy; there is no key'
+    since: 1.0.0-alpha.6
+  - id: config-allocation-mode
+    kind: config-key
+    name: allocation.mode
+    use: 'allocation holds grants only'
+    since: 1.0.0-alpha.6
+  - id: config-kernel-group
+    kind: config-key
+    name: kernel.group
+    use: 'the Kernel takes the high tier; pin with kernel.agent / kernel.model (an `only` bias)'
+    since: 1.0.0-alpha.6
+  - id: config-supervisor-kernel-group
+    kind: config-key
+    name: supervisor.kernel.group
+    use: 'the Supervisor takes the frontier tier; pin with supervisor.kernel.agent / .model (an `only` bias)'
+    since: 1.0.0-alpha.6
+  - id: config-coredebug
+    kind: config-key
+    name: coreDebug
+    use: 'the debug watcher is a /loop of the calling chat, not a seat; the cadence and the worktree alert limit are debugLoop.interval and debugLoop.worktreeLimit'
+    since: 1.0.0-alpha.6
+  - id: config-debug
+    kind: config-key
+    name: debug
+    use: 'the debug watcher is started by the /starci skill in the calling chat; there is no switch (debugLoop.interval sets its cadence)'
+    since: 1.0.0-alpha.6
+    scan: false
+  - id: vocabulary-sol-opus
+    kind: vocabulary
+    name: sol-opus
+    use: 'a pool of two providers is a tier chain of members (modules/models/tiers.yaml)'
+    since: 1.0.0-alpha.6
+  - id: seat-core-debug
+    kind: vocabulary
+    name: core-debug seat
+    use: 'the debug watcher is a /loop of the calling chat running `starci debug digest`'
+    since: 1.0.0-alpha.6
+    match: '\bcore-debug\s+(?:seat|watcher|worker|pass)\b'
+  - id: verb-debug-pass
+    kind: verb
+    name: starci debug pass
+    use: '`starci debug digest` (read-only) and `starci debug run <probe>`'
+    since: 1.0.0-alpha.6
+    match: 'starci debug pass\b'
+  - id: flag-caller-agent
+    kind: flag
+    name: --caller-agent
+    use: 'the debug digest runs in the calling chat; it takes no caller flag'
+    since: 1.0.0-alpha.6
+  - id: flag-caller-model
+    kind: flag
+    name: --caller-model
+    use: 'the debug digest runs in the calling chat; it takes no caller flag'
+    since: 1.0.0-alpha.6
+  - id: flag-caller-effort
+    kind: flag
+    name: --caller-effort
+    use: 'the debug digest runs in the calling chat; it takes no caller flag'
+    since: 1.0.0-alpha.6
+  - id: code-workflow-debug-not-ready
+    kind: code
+    name: workflow-debug-not-ready
+    use: 'there is no debug seat to be ready; the digest reads the ledger directly'
+    since: 1.0.0-alpha.6
