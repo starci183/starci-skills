@@ -13,6 +13,9 @@ function usdPerMTok(model, prices) {
   return Number.isFinite(Number(price.input)) && Number.isFinite(Number(price.output)) ? total : null;
 }
 
+/** The providers the live settle smokes launch (tests/api-orca/orca-settle-live.spec.mjs): one no-op agent each. */
+export const SETTLE_SMOKE_PROVIDERS = Object.freeze(['claude', 'codex', 'devin']);
+
 /** The cheapest priced tier member meeting all smoke control-plane role floors, with its tier effort; `provider` limits the pick to that provider's members, and then an unpriced member of it counts, after the priced ones. */
 export function noopAgent({ runtimes = runtimeProfile(), prices = loadPrices(), settings = tierSettings(), provider = null } = {}) {
   const policy = runtimes?.allocation?.admission, order = policy?.qualityOrder ?? [];
