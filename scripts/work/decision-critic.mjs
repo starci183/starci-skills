@@ -105,8 +105,7 @@ function plainText({ kind, critique, document }) {
     const verdict = document.pass ? 'PASS' : 'FAIL';
     head = `critic ${verdict} ${kind}: score ${document.beauty ?? 'none'} (minimum ${document.minimum}), ${document.product.length} record(s) judged`;
   }
-  return [head, ...failedCheckLines(document?.checks).map((line) => `  ${line}`), ''].join('
-');
+  return [head, ...failedCheckLines(document?.checks).map((line) => `  ${line}`), ''].join('\n');
 }
 
 /** The verb: argv -> {text, exitCode}. */

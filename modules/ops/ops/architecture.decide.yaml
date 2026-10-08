@@ -280,7 +280,7 @@ steps:
         ownership, contract, authority, durable state/effect, compatibility, material
         failure/recovery or quality mechanism belongs here. Revise only that bounded design delta,
         preserve valid unrelated design and invalidate only affected downstream proof."
-  - reads: [records]
+  - reads: [business]
     writes: [critic-verdict]
     action:
       en: "Have the decision judged once by the independent Critic before reporting done: after the sds, contract and integration records and the work graph are written and validated, run starci work decision-critic --kind architecture.decide --root <app> --out $STARCI_JOB_SCRATCH/critic-verdict.json [--input <the file holding the request or goal text>] and attach critic-verdict.json. The Critic is a fresh worker of the Critic tier from another provider than yours; it sees only your decision records, the records they cite and the rubric (modules/kernel/critic-rubrics.yaml), and answers with one typed verdict. Exit 1 means the verdict fails: fix every failed check it prints in the records (each carries its fix and its evidence) and run it again - the verdict must name the sha256 of the records as they stand when you report, so any later edit needs a new run. Exit 3 is a hold of the Critic (CRITIC_NO_INDEPENDENT_MEMBER, CRITIC_UNAVAILABLE, CRITIC_QUOTA_OUT, CRITIC_AUTHOR_UNKNOWN): report blocked with that code and the printed detail, never done, and never judge your own work or edit the verdict. starci kernel settle refuses a done without a fresh passing verdict for exactly these bytes (op-critic-verdict-missing, CRITIC_VERDICT_STALE, op-critic-verdict-failed)."

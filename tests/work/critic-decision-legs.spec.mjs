@@ -63,7 +63,7 @@ const OWNED = { 'scope.define': ['.starciwork/features/shop/index.yaml'], 'archi
 const judge = (r, kind, files) => judgeCriticVerdict({ op: kind, files, roots: [r.root], owned: OWNED[kind] });
 
 test('the rubric file validates: a rubric per kind, derived from its op contract, with checks, gates, anchors, a minimum and a token budget', () => {
-  assert.equal(rubrics.schema, 'starci/critic-rubrics@1');
+  assert.equal(rubrics.schema, 'starci/module-kernel-critic-rubrics@1');
   assert.deepEqual(rubrics.kinds.map((row) => row.id), KINDS);
   assert.ok(rubrics.inputs.maxFiles > 0 && rubrics.inputs.maxBytes > 0);
   for (const row of rubrics.kinds) {

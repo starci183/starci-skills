@@ -1,4 +1,4 @@
-schema: starci/critic-rubrics@1
+schema: starci/module-kernel-critic-rubrics@1
 id: kernel.critic-rubrics
 
 # The rubric of the Critic for each decision leg, as data (modules/kernel/critic.yaml coverage names the kinds). Each rubric is derived
