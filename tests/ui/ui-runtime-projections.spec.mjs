@@ -5,7 +5,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
 import { withLedger, seedWorkflow } from '../helpers/ledger-fixture.mjs';
-import { openLedgerReader, recordCheckRun } from '../../engine/db/ledger.mjs';
+import { openLedger, openLedgerReader, recordCheckRun } from '../../engine/db/ledger.mjs';
 import { openMachineObserver, providerReservations, providerReservationUsage, MACHINE_VERSION } from '../../engine/db/machine.mjs';
 import { admissionReservation, admissionView, attemptAdmission } from '../../ui/api/admission-read.mjs';
 import { workflowCheckpoint, workflowLand } from '../../ui/api/land-read.mjs';
@@ -13,6 +13,7 @@ import { pipelineOf } from '../../ui/api/pipeline.mjs';
 import { handleSystem } from '../../ui/api/routes/system.mjs';
 import { handleAttempt } from '../../ui/api/routes/attempt.mjs';
 import { handleWork } from '../../ui/api/routes/work.mjs';
+import { handleDecisions } from '../../ui/api/routes/decisions.mjs';
 import { search } from '../../ui/api/routes/meta.mjs';
 import { sendJson } from '../../ui/api/envelope.mjs';
 import { openUiDb } from '../../ui/api/db.mjs';
@@ -511,4 +512,128 @@ test('identical machine and ledger DI IDs retain native namespaces and suppress 
   const response = await request(search, readStore(fixture), '/api/search?q=di-same');
   assert.equal(response.json.data.hits.filter(hit => hit.kind === 'di').length, 2);
   assert.doesNotMatch(response.body, /raw-credential-fixture/);
+}));
+
+test('Overview attention preserves actual DI content, lifecycle, decider and colliding native scopes without read effects', t => withLedger(t, async fixture => {
+  const ledgerId = registerFixture(fixture), now = Date.now(), openedAt = now - 60_000, dueAt = now - 1;
+  const otherRoot = path.join(fixture.root, 'other-repo'), otherFile = path.join(fixture.root, 'other-runtime.sqlite');
+  fs.mkdirSync(path.join(otherRoot, '.starciwork'), { recursive: true });
+  const other = fixture.track(openLedger({ file: otherFile, repoRoot: otherRoot }));
+  fixture.machine.registerLedger({ ledgerId: other.ledgerId, name: 'other', repoRoot: otherRoot, file: otherFile });
+  seedWorkflow(fixture.ledger, { id: 'wf-one' });
+  seedWorkflow(other, { id: 'wf-two' });
+  const insert = `INSERT INTO decision_items(di_id,idempotency_key,key_parts_json,kind,decider,summary,status,opened_by,opened_at,due_at,payload_json,workflow_id)
+    VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`;
+  fixture.ledger.transaction(db => {
+    db.prepare(insert).run('di-shared', 'build:entity:error:head', '{}', 'settle-nongreen', 'kernel', 'Resolve the build evidence mismatch.', 'claimed', 'fixture', openedAt, dueAt, '{}', 'wf-one');
+    db.prepare(insert).run('di-credential', 'credential:entity:error:head', '{}', 'credential-missing', 'owner', 'opaque-sensitive-ledger-summary', 'open', 'fixture', openedAt, dueAt, '{}', 'wf-one');
+  });
+  other.transaction(db => db.prepare(insert).run('di-shared', 'rollout:entity:error:head', '{}', 'worker-question', 'owner', 'Choose the rollout boundary.', 'escalated', 'fixture', openedAt, dueAt, '{}', 'wf-two'));
+  fixture.machine.transaction(db => {
+    const machineInsert = `INSERT INTO sup_decision_items(di_id,idempotency_key,key_parts_json,kind,decider,summary,status,opened_by,opened_at,due_at,payload_json,ledger_id,workflow_id)
+      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`;
+    db.prepare(machineInsert).run('di-shared', 'host:entity:error:head', '{}', 'runtime-defect', 'owner', 'Approve host readiness recovery.', 'open', 'fixture', openedAt, dueAt, '{}', ledgerId, 'wf-one');
+    db.prepare(machineInsert).run('di-credential', 'credential:entity:error:head', '{}', 'credential-missing', 'supervisor', 'opaque-sensitive-machine-summary', 'claimed', 'fixture', openedAt, dueAt, '{}', null, null);
+    db.prepare('INSERT INTO invariant_violations(code,severity,entity,ledger_id,workflow_id,violated_at) VALUES(?,?,?,?,?,?)')
+      .run('READINESS_UNKNOWN', 'warn', 'fixture', ledgerId, 'wf-one', openedAt);
+  });
+  const store = fixture.track(openUiDb({ env: { ...process.env, STARCI_MACHINE_DB: fixture.machineFile } }));
+  const scope = store.request(), before = observerEvidence(fixture);
+  const response = await request(handleWork, scope, '/api/workers?project=fixture');
+  assert.equal(response.status, 200);
+  const attention = response.json.data.attention, shared = attention.filter(item => item.ref.id === 'di-shared');
+  assert.equal(shared.length, 3);
+  assert.deepEqual(new Set(shared.map(item => item.detail.summary)), new Set(['Resolve the build evidence mismatch.', 'Choose the rollout boundary.', 'Approve host readiness recovery.']));
+  assert.deepEqual(new Set(shared.map(item => item.detail.status)), new Set(['claimed', 'escalated', 'open']));
+  assert.equal(new Set(shared.map(item => item.ref.href)).size, 3);
+  for (const item of shared) {
+    const target = new URL(item.ref.href.slice(1), 'http://fixture');
+    assert.equal(target.searchParams.get('store'), item.scope.store);
+    assert.equal(target.searchParams.get('ledger'), item.scope.ledgerId);
+    assert.equal(target.searchParams.get('project'), item.detail.project);
+    assert.equal(item.ref.store, item.scope.store);
+    assert.equal(item.ref.ledgerId, item.scope.ledgerId);
+    assert.equal(item.who, item.scope.decider);
+    const detail = await request(handleDecisions, scope, `/api/decisions/${item.ref.id}?${target.searchParams}`);
+    assert.equal(detail.status, 200);
+    assert.equal(detail.json.data.summary, item.detail.summary);
+    assert.equal(detail.json.data.status, item.detail.status);
+    assert.equal(detail.json.data.wf, item.detail.workflow);
+    assert.equal(detail.json.data.decider, item.who);
+  }
+  const credentialRows = attention.filter(item => item.ref.id === 'di-credential');
+  assert.equal(credentialRows.length, 2);
+  assert.ok(credentialRows.every(item => item.detail.summary === 'Credential content hidden.'));
+  assert.doesNotMatch(response.body, /opaque-sensitive-(?:ledger|machine)-summary/);
+  const violation = attention.find(item => item.ref.kind === 'violation');
+  assert.equal(violation.reason.code, 'READINESS_UNKNOWN');
+  assert.equal(violation.who, 'controller');
+  assert.equal(violation.detail, undefined);
+  assert.equal(response.json.data.counts.ownerDecisions, 2);
+  assert.equal(response.json.data.counts.violationsOpen, 1);
+  assert.equal(response.json.data.coverage.workflows.registered, 2);
+  for (const workflow of response.json.data.workflows) {
+    const item = attention.find(item => item.ref.store === 'ledger' && item.ref.ledgerId === workflow.ledgerId && item.ref.id === workflow.onIt.ref.id);
+    assert.ok(item);
+    assert.deepEqual(workflow.onIt.ref, item.ref);
+  }
+  const workflowDetail = await request(handleWork, scope, '/api/workflows/fixture/wf-one');
+  assert.doesNotMatch(workflowDetail.body, /opaque-sensitive-(?:ledger|machine)-summary/);
+  assert.equal(workflowDetail.json.data.blockedBy.find(item => item.ref.id === 'di-shared').reason.raw, 'Resolve the build evidence mismatch.');
+  assert.equal(workflowDetail.json.data.blockedBy.find(item => item.ref.id === 'di-credential').reason.raw, 'Credential content hidden.');
+  for (const blocker of workflowDetail.json.data.blockedBy.filter(item => item.ref.kind === 'di')) {
+    assert.equal(blocker.ref.store, 'ledger');
+    assert.equal(blocker.ref.ledgerId, ledgerId);
+    assert.equal(new URL(blocker.ref.href.slice(1), 'http://fixture').searchParams.get('ledger'), ledgerId);
+  }
+  const headResponse = await request(handleWork, scope, '/api/workers', { method: 'HEAD' });
+  assert.equal(headResponse.status, 200);
+  assert.equal(headResponse.body, null);
+  assert.equal(scope.machine.db.prepare('SELECT total_changes() AS n').get().n, 0);
+  for (const row of scope.projects()) assert.equal(scope.ledger(row.ledgerId).db.prepare('SELECT total_changes() AS n').get().n, 0);
+  assert.deepEqual(observerEvidence(fixture), before);
+}));
+
+test('Overview attention keeps native severity separate from an escalated Decision Item deadline', t => withLedger(t, async fixture => {
+  registerFixture(fixture);
+  seedWorkflow(fixture.ledger, { id: 'wf' });
+  const now = Date.now(), fields = ['di-future', 'future:entity:error:head', '{}', 'runtime-defect', 'supervisor', 'Escalation needs review.', 'escalated', 'fixture', now - 60_000, now + 60_000, '{}', 2];
+  fixture.machine.transaction(db => db.prepare(`INSERT INTO sup_decision_items(di_id,idempotency_key,key_parts_json,kind,decider,summary,status,opened_by,opened_at,due_at,payload_json,escalations)
+    VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`).run(...fields));
+  fixture.ledger.transaction(db => db.prepare(`INSERT INTO decision_items(di_id,idempotency_key,key_parts_json,kind,decider,summary,status,opened_by,opened_at,due_at,payload_json,escalations,workflow_id)
+    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(...fields, 'wf'));
+  const store = readStore(fixture), prepare = DatabaseSync.prototype.prepare;
+  // Inject native severity at the read boundary while retaining verified schema and recorded dates.
+  t.mock.method(DatabaseSync.prototype, 'prepare', function (sql, ...args) {
+    const statement = prepare.call(this, sql, ...args);
+    if (!sql.includes('v_open_sup_decisions')) return statement;
+    return new Proxy(statement, { get(target, property) {
+      const value = Reflect.get(target, property, target);
+      if (property === 'all') return (...params) => value.apply(target, params).map(row => row.di_id === 'di-future' ? { ...row, ui: 'bad' } : row);
+      return typeof value === 'function' ? value.bind(target) : value;
+    } });
+  });
+  const response = await request(handleWork, store, '/api/workers');
+  const items = response.json.data.attention;
+  assert.equal(items.length, 2);
+  assert.ok(items.every(item => item.ui === 'bad'));
+  assert.ok(items.every(item => item.detail.status === 'escalated'));
+  assert.ok(items.every(item => item.reason.code === 'DECISION_OPEN'));
+  assert.equal(new Set(items.map(item => item.scope.store)).size, 2);
+}));
+
+test('Overview attention remains a host-wide capped preview while owner totals include every open item', t => withLedger(t, async fixture => {
+  registerFixture(fixture);
+  seedWorkflow(fixture.ledger, { id: 'wf' });
+  const now = Date.now();
+  fixture.ledger.transaction(db => {
+    const insert = db.prepare(`INSERT INTO decision_items(di_id,idempotency_key,key_parts_json,kind,decider,summary,status,opened_by,opened_at,due_at,payload_json,workflow_id)
+      VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`);
+    for (let i = 0; i < 12; i++) insert.run(`di-preview-${i}`, `question:entity:error:head-${i}`, '{}', 'worker-question', 'owner', `Question ${i}`, 'open', 'fixture', now - 60_000 + i, now - 1, '{}', 'wf');
+  });
+  const response = await request(handleWork, readStore(fixture), '/api/workers?project=unrelated');
+  assert.equal(response.status, 200);
+  assert.equal(response.json.data.attention.length, 10);
+  assert.equal(response.json.data.counts.ownerDecisions, 12);
+  assert.deepEqual(response.json.data.attention.map(item => item.ref.id), Array.from({ length: 10 }, (_, i) => `di-preview-${i}`));
 }));

@@ -10,6 +10,7 @@ import { uiState } from '../state.mjs';
 import { reason } from '../reason.mjs';
 import { attemptRow } from '../attempt-read.mjs';
 import { readMetricSnapshot, metricPayload } from '../metric-read.mjs';
+import { decisionPresentation } from './decisions.mjs';
 
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
@@ -72,7 +73,7 @@ function workflowRow(store, row, db, progress, extra = {}) {
     phaseUi: uiState(db, 'workflow', progress.phase) });
   const primaryDI = dIs.sort((a, b) => Number(b.ui === 'bad') - Number(a.ui === 'bad') || a.opened_at - b.opened_at)[0];
   let onIt = null;
-  if (primaryDI) onIt = { who: primaryDI.decider, ref: ref('di', primaryDI.di_id, p), reason: reason('DECISION_OPEN', { kind: primaryDI.kind ?? 'decision' }) };
+  if (primaryDI) onIt = { who: primaryDI.decider, ref: decisionRef(decisionPresentation(primaryDI, p, { store: 'ledger', ledgerId: row.ledgerId })), reason: reason('DECISION_OPEN', { kind: primaryDI.kind ?? 'decision' }) };
   else if (state.ui === 'warn' || state.ui === 'bad') onIt = { who: 'kernel', ref: null, reason: state.reason ?? reason('PROGRESS', {}) };
   const pipe = pipelineOf(db, p, wf);
   return {
@@ -102,18 +103,28 @@ function workflowRows(store, { project = null } = {}, observations = null) {
   observations?.push(...reads);
   return reads.flatMap(entry => entry.error ? [] : entry.result ?? []);
 }
+function decisionRef(row) {
+  return { kind: 'di', ...(row.project ? { project: row.project } : {}), store: row.store, ledgerId: row.ledgerId, id: row.id, href: row.href };
+}
+function attentionDecision(di, project, namespace, asOf) {
+  const row = decisionPresentation(di, project, namespace);
+  return {
+    ref: decisionRef(row),
+    ui: di.ui, reason: reason(di.overdue ? 'DECISION_OVERDUE' : 'DECISION_OPEN', { kind: row.kind }),
+    age: Math.max(0, asOf - di.opened_at), who: row.decider, since: di.opened_at,
+    detail: { summary: row.summary, status: row.status, project: row.project, workflow: row.wf },
+    scope: { store: row.store, ledgerId: row.ledgerId, project: row.project, workflow: row.wf, decider: row.decider },
+  };
+}
 function attention(store) {
   const machine = store.machine.db;
   const asOf = Math.floor(Date.now() / 60_000) * 60_000;
   const ledgerNames = new Map(store.projects().map(row => [row.ledgerId, row.name]));
-  const items = ledgerRows(store, (row, db) => many(db, `SELECT * FROM v_decision_rows WHERE status IN ${OPEN_DI} AND ui IN ('bad','warn')`).map(di => ({
-    ref: ref('di', di.di_id, row.name), ui: di.ui, reason: reason(di.overdue ? 'DECISION_OVERDUE' : 'DECISION_OPEN', { kind: di.kind }),
-    age: Math.max(0, asOf - di.opened_at), who: di.decider, since: di.opened_at,
-  })));
-  for (const di of many(machine, "SELECT * FROM v_open_sup_decisions WHERE ui IN ('bad','warn')")) items.push({
-    ref: ref('di', di.di_id), ui: di.ui, reason: reason(di.ui === 'bad' ? 'DECISION_OVERDUE' : 'DECISION_OPEN', { kind: di.kind }),
-    age: Math.max(0, asOf - di.opened_at), who: 'supervisor', since: di.opened_at,
-  });
+  const items = ledgerRows(store, (row, db) => many(db, `SELECT * FROM v_decision_rows WHERE status IN ${OPEN_DI} AND ui IN ('bad','warn')`)
+    .map(di => attentionDecision(di, row.name, { store: 'ledger', ledgerId: row.ledgerId }, asOf)));
+  for (const di of many(machine, "SELECT d.*,v.ui,(d.due_at IS NOT NULL AND d.due_at<?) AS overdue FROM sup_decision_items d JOIN v_open_sup_decisions v USING(di_id) WHERE v.ui IN ('bad','warn')", Date.now())) {
+    items.push(attentionDecision(di, ledgerNames.get(di.ledger_id) ?? null, { store: 'machine', ledgerId: di.ledger_id ?? null }, asOf));
+  }
   for (const row of many(machine, 'SELECT * FROM invariant_violations WHERE cleared_at IS NULL')) items.push({
     ref: ref('violation', row.violation_id, ledgerNames.get(row.ledger_id)), ui: row.severity === 'critical' ? 'bad' : 'warn',
     reason: reason(row.code, {}), age: Math.max(0, asOf - row.violated_at), who: 'controller', since: row.violated_at,
@@ -291,8 +302,17 @@ function blockedBy(store, row, db, wf) {
     reason: reason(blocker.reason_code, {}, blocker.detail ?? undefined), since: blocker.since, who: blocker.who,
     sort: blockerSort(blocker.blocker_type),
   }));
-  const diById = new Map(many(db, `SELECT di_id,ui,overdue FROM v_decision_rows WHERE workflow_id=? AND status IN ${OPEN_DI}`, wf).map(di => [di.di_id, di]));
-  for (const item of rows) if (item.ref.kind === 'di') { const di = diById.get(item.ref.id); if (di) { item.ui = di.ui; item.sort = di.overdue || di.ui === 'bad' ? -1 : 0; } }
+  const diById = new Map(many(db, `SELECT * FROM v_decision_rows WHERE workflow_id=? AND status IN ${OPEN_DI}`, wf).map(di => [di.di_id, di]));
+  for (const item of rows) if (item.ref.kind === 'di') {
+    const di = diById.get(item.ref.id);
+    if (!di) continue;
+    const decision = decisionPresentation(di, row.name, { store: 'ledger', ledgerId: row.ledgerId });
+    item.ref = decisionRef(decision);
+    // The blocker view carries DI text; its public presenter owns credential disclosure here too.
+    item.reason = reason(item.reason.code, item.reason.params, decision.summary ?? undefined);
+    item.ui = di.ui;
+    item.sort = di.overdue || di.ui === 'bad' ? -1 : 0;
+  }
   for (const sla of many(machine, 'SELECT * FROM v_sla_open WHERE ledger_id=? AND workflow_id=?', row.ledgerId, wf)) rows.push({
     ref: ref('violation', sla.episode_id, row.name), ui: sla.ui, reason: reason(sla.code, {}),
     since: sla.entered_at, who: 'controller', sort: 1,

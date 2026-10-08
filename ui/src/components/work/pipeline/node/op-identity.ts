@@ -5,14 +5,15 @@ import { agentOf } from '../../../agent/agent-avatar';
 
 const infoOf = (leg: LegRow) => (leg as LegRowV3).info ?? null;
 
-/** Vietnamese name of a leg (falls back to the op id). */
-export const legName = (leg: LegRow) => infoOf(leg)?.nameVi ?? leg.op;
+/** Human operation label from the current catalog; the exact leg id remains the fallback. */
+export const legName = (leg: LegRow) => infoOf(leg)?.nameVi?.trim() || infoOf(leg)?.nameEn?.trim() || leg.op;
 /** One-line goal: Vietnamese, else English, else null. */
 export const legGoal = (leg: LegRow) => infoOf(leg)?.goal.vi ?? infoOf(leg)?.goal.en ?? null;
 export const legInfo = infoOf;
 
-/** One agent per distinct agent/pool/model that ran an attempt on this leg, in first-use order. */
+/** Distinct recorded attempt agents in first-use order; unbound planned legs have no assignment marks. */
 export function legAgents(leg: LegRow): AgentRef[] {
+  if (leg.inPlan && leg.binding === 'unbound') return [];
   const seen = new Map<string, AgentRef>();
   for (const attempt of leg.attempts) {
     if (!attempt.agent && !attempt.pool && !attempt.model) continue;

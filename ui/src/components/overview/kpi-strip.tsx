@@ -13,10 +13,10 @@ const observed = (value: number | null | undefined) => typeof value === 'number'
 /** Essentials: four big numbers (ops running, workflows needing attention, passed / failed in 24 h) that count up on first view. */
 export function KpiStrip({ summary, needsAttention, loading = false }: Readonly<{ summary: WorkersSummary | null | undefined; needsAttention: number | null | undefined; loading?: boolean }>) {
   const items: Kpi[] = [
-    { tone: 'running', value: observed(summary?.opsRunning), label: t('ops running'), note: t('Dispatched attempts the agent has not reported yet.') },
-    { tone: 'failed', value: observed(needsAttention), label: t('workflows needing attention'), note: t('Workflows that are stuck or slow and need a person.') },
-    { tone: 'success', value: observed(summary?.passed24h), label: t('settled passes in 24 h'), note: t('Attempts settled with a passing result.') },
-    { tone: 'failed', value: observed(summary?.failed24h), label: t('settled failures in 24 h'), note: t('Attempts settled with a failing result.') },
+    { tone: 'running', value: observed(summary?.opsRunning), label: t('ops running'), note: t('Active dispatched attempts, before an agent report.') },
+    { tone: 'failed', value: observed(needsAttention), label: t('workflows needing attention'), note: t('Workflows with a recorded bad or warning state.') },
+    { tone: 'success', value: observed(summary?.passed24h), label: t('settled passes in 24 h'), note: t('Pass verdicts settled in the recorded 24-hour window.') },
+    { tone: 'failed', value: observed(summary?.failed24h), label: t('settled failures in 24 h'), note: t('Fail or partial verdicts settled in the recorded 24-hour window.') },
   ];
   if (!summary && loading) return <section aria-label={t('Worker metrics')} className="kpi-strip grid grid-cols-2 lg:grid-cols-4">
     {Array.from({ length: 4 }, (_, index) => <div key={index} className="kpi-cell"><div className="h-8 w-12 rounded bg-muted" /><div className="mt-3 h-4 w-24 rounded bg-muted" /><div className="mt-2 h-3 w-full rounded bg-muted" /></div>)}

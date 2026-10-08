@@ -2,7 +2,7 @@ import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { useApiQuery } from '../../../api/query';
 import type { AttemptDetailV3, ContractInfo, Ref } from '../../../contract';
 import { formatOpLabel } from '../../../i18n/vi';
-import { compactVi } from '../../usage-view';
+import { compactVi, costVi } from '../../usage-view';
 import { formatSpan } from './util';
 import { statusFromOutcome, statusFromVerdict, statusTone, type Tone } from '../../status';
 import { StatusChip, StatusDot } from '../../status-chip';
@@ -28,7 +28,7 @@ function SiblingLink({ target, label, dir }: Readonly<{ target: Ref; label: stri
   </a>;
 }
 
-/** Job try and dispatch sequence are distinct; the unit's current budget is reference metadata. */
+/** Displays the native Attempt identity; job try, dispatch sequence and model provenance remain separate facts. */
 export function AttemptHeader({ attempt, project }: Readonly<{ attempt: AttemptDetailV3; project: string }>) {
   const open = isOpen(attempt);
   const outcome = statusFromOutcome(attempt.reportOutcome);
@@ -36,7 +36,7 @@ export function AttemptHeader({ attempt, project }: Readonly<{ attempt: AttemptD
   const previous = attempt.retry.redispatchOf ?? attempt.retry.retryOf ?? attempt.retry.resumeOf;
   const outcomeLabel = attempt.reportOutcome ? t('Op self-reported: {outcome}', { outcome: outcomeWords[attempt.reportOutcome] ?? attempt.reportOutcome }) : attempt.reportedAt ? t('Op self-reported: unclear') : t('Op self-reported: not reported');
   const verdictLabel = verdict === 'awaiting-owner' ? t('Verdict: awaiting the owner') : verdict === 'rejected' ? t('Rejected at dispatch') : attempt.verdict ? t('Recorded verdict: {verdict}', { verdict: verdictWords[attempt.verdict] ?? attempt.verdict }) : open && attempt.reportedAt ? t('Verdict: settling') : t('No recorded verdict');
-  const tone: Tone = statusTone[verdict === 'unknown' ? outcome : verdict];
+  const tone: Tone = statusTone[verdict];
   const enc = encodeURIComponent;
   const agent = agentOf({ ...attempt, model: attempt.modelAuthority === 'attested' ? attempt.model : null });
   const contract = useApiQuery<ContractInfo>('/api/contract', { topics: ['system'], intervalMs: 60_000 });
@@ -44,10 +44,12 @@ export function AttemptHeader({ attempt, project }: Readonly<{ attempt: AttemptD
   const end = attempt.settledAt ?? attempt.reportedAt ?? (open ? Date.now() : null);
   const duration = attempt.dispatchedAt && end ? end - attempt.dispatchedAt : null;
   const total = attempt.usage?.total;
+  // The Attempt summary includes cache tokens; llm_usage input/output measurements have a different scope.
+  const tokens = attempt.tokensIn != null && attempt.tokensOut != null ? attempt.tokensIn + attempt.tokensOut : null;
   const partialTokens = (attempt.tokensIn == null) !== (attempt.tokensOut == null);
-  const totalComplete = total?.completeness?.fields.input.complete && total.completeness.fields.output.complete;
-  const tokens = attempt.tokensIn != null && attempt.tokensOut != null ? attempt.tokensIn + attempt.tokensOut : !partialTokens && totalComplete && total?.input != null && total.output != null ? total.input + total.output : null;
-  const tokenText = tokens != null ? `${compactVi(tokens)} token` : partialTokens || total?.input != null || total?.output != null ? t('tokens partially recorded') : attempt.usageSource === 'unavailable' ? t('tokens not measurable{reason}', { reason: attempt.usageReason ? ` · ${attempt.usageReason}` : '' }) : t('tokens not recorded');
+  const tokenText = tokens != null ? `${compactVi(tokens)} token` : partialTokens ? t('tokens partially recorded') : attempt.usageSource === 'unavailable' ? t('tokens not measurable{reason}', { reason: attempt.usageReason ? ` · ${attempt.usageReason}` : '' }) : t('tokens not recorded');
+  const costText = attempt.costUsd != null ? costVi(attempt.costUsd) : t('Cost not recorded');
+  const modelText = attempt.modelAuthority === 'attested' && attempt.model ? t('Attested model: {model}', { model: attempt.model }) : t('Model attestation has not been observed.');
   return <header className="flex min-w-0 flex-col gap-4" data-tone={tone}>
     <nav aria-label={t('Breadcrumb')} className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
       <Crumb href="#/">{t('Overview')}</Crumb><span aria-hidden="true">/</span>
@@ -58,10 +60,15 @@ export function AttemptHeader({ attempt, project }: Readonly<{ attempt: AttemptD
       <div className="flex min-w-0 items-start gap-3">
         <AgentAvatar agent={agent} size={52} live={open && !attempt.reportedAt} />
         <div className="flex min-w-0 flex-col gap-2">
-          <h1 className="m-0 text-2xl font-semibold tracking-tight sm:text-3xl">{name} <span className="whitespace-nowrap text-lg font-normal text-muted-foreground sm:text-xl">· {t('job try {n}', { n: attempt.attempt })}</span></h1>
+          <h1 className="m-0 text-2xl font-semibold tracking-tight sm:text-[28px] sm:leading-[34px]">{t('Attempt #{id}', { id: attempt.id })}</h1>
+          <p className="m-0 break-words text-base font-medium leading-6">{name}</p>
           <p className="m-0 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-            <span>Agent: <strong className="font-medium text-foreground">{agent.label}</strong></span>
+            <span>Agent: <strong className="font-medium text-foreground">{attempt.agent ?? attempt.provider ?? t('unknown')}</strong></span>
+            <span>{modelText}</span>
+          </p>
+          <p className="m-0 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
             <span>{t('Duration:')} <strong className="font-medium text-foreground">{formatSpan(duration)}</strong></span>
+            <span>{t('job try {n}', { n: attempt.attempt })}</span>
             <span>{t('dispatch #{id}', { id: attempt.dispatchSeq })}</span>
           </p>
         </div>
@@ -76,15 +83,20 @@ export function AttemptHeader({ attempt, project }: Readonly<{ attempt: AttemptD
       {previous ? <SiblingLink target={previous} label={attempt.retry.redispatchOf ? t('Previous dispatch of this job') : attempt.retry.resumeOf && !attempt.retry.retryOf ? t('Resumed from') : t('Previous')} dir="prev" /> : null}
       {attempt.retry.next ? <SiblingLink target={attempt.retry.next} label={t('Next')} dir="next" /> : null}
     </div> : null}
-    <Advanced summary={`${attempt.job} · ${tokenText}`}>
+    <p className="m-0 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground"><span>{tokenText}</span><span>{t('Cost')}: {costText}</span></p>
+    <Advanced summary={`${attempt.job} · ${attempt.op}`}>
       <div className="flex min-w-0 flex-col gap-2 text-xs text-muted-foreground">
         <p className="m-0 break-all font-mono">{attempt.op} · {attempt.job} · attempt {attempt.id} · {t('dispatch #{id}', { id: attempt.dispatchSeq })}</p>
         <p className="m-0 flex flex-wrap gap-x-4 gap-y-1">
           <span>Agent: <strong className="font-medium text-foreground">{agent.label}</strong>{[attempt.pool, attempt.effort ? `effort ${attempt.effort}` : null].filter(Boolean).map(part => <span key={part}> · {part}</span>)}</span>
-          <span>{tokens != null ? <>Token: <strong className="font-medium text-foreground">{compactVi(tokens)}</strong></> : tokenText}</span>
+          <span>{t('Requested model: {model}', { model: attempt.requestedModel ?? t('Not recorded') })}</span>
+          <span>{modelText}</span>
+          <span>{tokenText}</span>
+          <span>{t('Cost')}: {costText}</span>
           {attempt.retry.class ? <span>{t('Retry reason:')} {attempt.retry.class}</span> : null}
           {attempt.tryBudget != null ? <span>{t('Current unit try budget: {n}', { n: attempt.tryBudget })}</span> : null}
         </p>
+        {total?.completeness ? <p className="m-0 flex flex-wrap gap-x-4 gap-y-1"><span>{t('Measurement coverage')} · <code>llm_usage</code>: {t('Input tokens')} {total.completeness.fields.input.known}/{total.completeness.fields.input.total}</span><span>{t('Output tokens')} {total.completeness.fields.output.known}/{total.completeness.fields.output.total}</span><span>{t('Cost')} {total.completeness.fields.costUsd.known}/{total.completeness.fields.costUsd.total}</span></p> : null}
       </div>
     </Advanced>
   </header>;

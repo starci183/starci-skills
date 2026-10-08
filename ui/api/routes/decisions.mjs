@@ -47,13 +47,18 @@ function channel(machine, item, ledgerId) {
   if (delivery?.channel === 'telegram' || delivery?.channel === 'serve-ask') return delivery.channel;
   return (item.decider === 'kernel' && 'kernel-seat') || (item.decider === 'supervisor' && 'supervisor-seat') || null;
 }
+/** Public Decision Item identity and text; preserve the native namespace and suppress credential summaries across read surfaces. */
+export function decisionPresentation(item, project = null, namespace = DEFAULT_NAMESPACE) {
+  return { id: item.di_id, key: JSON.stringify([namespace.store, namespace.ledgerId, item.di_id]), project, ...namespace,
+    href: ref('di', item.di_id, project, namespace).href, wf: item.workflow_id ?? null, kind: item.kind, decider: item.decider,
+    status: item.status, summary: item.kind === 'credential-missing' ? 'Credential content hidden.' : item.summary };
+}
 function decisionRow(machine, item, project = null, namespace = DEFAULT_NAMESPACE) {
   const now = Date.now();
   const expiry = item.claim_at != null && item.claim_ttl_ms != null ? item.claim_at + item.claim_ttl_ms : null;
   const overdue = Boolean(item.overdue ?? (item.due_at != null && item.due_at < now && ['open', 'claimed', 'escalated'].includes(item.status)));
   const ui = item.ui ?? (overdue || item.escalations >= 2 ? 'bad' : uiState(machine, 'decision', item.status));
-  return { id: item.di_id, key: JSON.stringify([namespace.store, namespace.ledgerId, item.di_id]), project, ...namespace, href: ref('di', item.di_id, project, namespace).href, wf: item.workflow_id ?? null, kind: item.kind, decider: item.decider,
-    status: item.status, ui, summary: item.kind === 'credential-missing' ? 'Credential content hidden.' : item.summary,
+  return { ...decisionPresentation(item, project, namespace), ui,
     entity: item.entity_type && item.entity_id ? ref(item.entity_type, item.entity_id, project, namespace, item.workflow_id) : null,
     openedBy: item.opened_by ?? null, openedAt: item.opened_at, dueAt: item.due_at, overdue,
     escalations: item.escalations ?? 0,

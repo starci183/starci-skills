@@ -2,7 +2,7 @@ function collectionRoute(request, response, store, url, pathname, helpers) {
   const { sendJson, source, staleOf, workers, projects, workflowRows, pageData, decisionLog } = helpers;
   if (pathname === '/api/workers') {
     sendJson(request, response, workers(store, url), { sources: [
-      ...source('machine', 'v_engine_health', 'v_sla_open', 'invariant_violations', 'v_open_sup_decisions', 'v_seats', 'metrics_snapshots'),
+      ...source('machine', 'v_engine_health', 'v_sla_open', 'invariant_violations', 'sup_decision_items', 'v_open_sup_decisions', 'v_seats', 'metrics_snapshots'),
       ...store.projects().flatMap(row => source(row.name, 'v_workflow_progress', 'workflows', 'v_units', 'v_decision_rows', 'jobs', 'goals', 'work_graph_versions', 'logs', 'events', 'v_op_history', 'op_attempts', 'check_runs', 'llm_usage')),
       ...source('runtime', 'modules/ops/ops/*.yaml', 'modules/ops/_common.yaml', 'modules/ops/_labels.yaml')], stale: staleOf(store) });
     return true;
