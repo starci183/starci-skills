@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 3.1.0 - 2026-10-08
 
 - New: the `sonar-parity` law (R235 `SCAN_SMELL`): `no-await-in-loop` (S9382), `prefer-code-point` (S7758), `prefer-string-raw` (S7780), `no-nested-conditional` (S3358), `no-void-operator` (S3735), `no-unused-import` (S1128) and `prefer-export-from` (S7763), each the syntax-tree form of the Sonar rule SonarCloud flagged in the example apps, shared with the front-end canon through the bundled `runtime/scripts/lib/sonar-syntax-rules.mjs`. The factory also turns on the typescript-eslint rules `no-deprecated` (S1874), `no-base-to-string` (S6551) and `require-await` (S7503).
 

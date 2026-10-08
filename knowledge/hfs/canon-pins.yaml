@@ -29,21 +29,21 @@ pins:
     source: packages/grammar/package.json
     why: 'the grammar front ends read: the brand layer sets `--font-sans` and `--font-mono` and the grammar reads them; it carries the Input tel kind and the IconButton disclosure props. The runtime source version wins for a @starci package.'
   '@starci/eslint-canon-be':
-    version: 3.0.10
+    version: 3.1.0
     group: starci
     install: registry
     side: be
     source: packages/eslint/be/package.json
     why: 'the back-end ESLint canon: `loadHfs(import.meta.url)` of be/eslint.config.mjs finds the app-root hfs.json (kind app) and gives every linted file the view of the be side, and the project graph is built per side; its bundled runtime copies (slots, canon-pins, failure codes, the architecture machine) put .starcistacks and .sops.yaml at the app root; `starciBeConfig({ hfs: loadHfs(import.meta.url) })` is the typed factory and the BE-CONVENTION laws are its rules.'
   '@starci/eslint-canon-fe':
-    version: 8.0.10
+    version: 8.1.0
     group: starci
     install: registry
     side: fe
     source: packages/eslint/fe/package.json
     why: 'the front-end ESLint canon: `loadHfs(import.meta.url)` of fe/eslint.config.mjs finds the app-root hfs.json (kind app) and gives every linted file the view of the fe side, and the project graph is built per side; its bundled runtime copies (slots, canon-pins, failure codes, the architecture machine) put .starcistacks and .sops.yaml at the app root; the front end has no tests (FE_NO_TESTS R97 in hfs) and no-vietnamese-in-source (R91) applies.'
   '@starci/stylelint-canon':
-    version: 2.0.5
+    version: 2.0.6
     group: starci
     install: registry
     side: fe
@@ -62,7 +62,7 @@ pins:
     side: both
     source: packages/prettier-config/package.json
   '@starci/jest-preset':
-    version: 2.2.5
+    version: 2.2.6
     group: starci
     install: registry
     side: be
@@ -76,14 +76,14 @@ pins:
     source: packages/test-world/package.json
     why: 'the shared e2e library of every back end (R47, R48), a devDependency of every back end: the warm stack behind toxiproxy, the network-edge fakes, the Nest boot, the typed useTestWorld handle, useSandbox for contract specs and the outage lock. Kafka is real own infra (the one digest-pinned apache/kafka KRaft image, a broker listener and proxy per slot, slot-prefixed topics, consumer groups and client ids) and Postgres is schema-per-context (a schema and a login role per context in a shared database). Each worker has its own data slot (<ns>_w<k>) with its own databases, Keycloak realm, leased Redis DB, bucket/collection/topic prefixes, fakes host, toxiproxy proxies and outage lock; a run provisions min(jest workers, workers cap, default 2) slots, and state file protocol 2 pairs exactly with @starci/jest-preset (TEST_WORLD_PAIR_MISMATCH otherwise). A modules world boots real peer apps beside its modules, world.apps.<name>.during(fn) is the outage of a peer app, w.keycloak.clientSecret(client) answers the run-generated secret of a confidential realm client, world.keycloak.events/sessions read the realm user events and live sessions, world.infra.postgresql.connection(name) takes one database connection down while the others serve, and world.resolve and scope.resolve take any Nest token. Every path a declaration names (`stack`, seeds, the realm, Dockerfiles) resolves from the app root (the directory of hfs.json); the globalSetup registers the path aliases as TypeScript resolves them. Its CLI main is exported at ./cli for starci app stack.'
   '@starci/cli':
-    version: 1.0.1
+    version: 1.1.0
     group: starci
     install: registry
     side: both
     source: packages/cli/package.json
     why: 'the only StarCi command package; product repositories install it for starci app, while @starci/hfs remains its pinned transitive implementation.'
   '@starci/hfs':
-    version: 4.0.10
+    version: 4.1.0
     group: starci
     install: registry
     side: both

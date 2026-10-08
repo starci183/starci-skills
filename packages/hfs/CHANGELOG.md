@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 4.1.0 - 2026-10-08
 
 - Breaking (runtime alpha.4 CLI unification): remove the `hfs` bin and expose `main(argv, io)` for the sole `starci app ...` grammar; the app flags `--repo` and `--root` are replaced by the global `--cwd` flag.
 - Changed (contract change `coverage-modules-logic`): the coverage scope is derived once from the slot manifest (`coverage: required|none` on every tracked be slot, `ruleParams.be.logicRoles`; `scripts/hfs/coverage-scope.mjs`). `hfs sync` renders it into `be/jest.config.js` (`starciJestConfig({ coverage })`), `sonar.coverage.exclusions` and `codecov.yml` (the measured roots, plus one Codecov component per service app and one `platform`, each at 100); `coverageScope`, `coverageExclusions` and `HFS_SYNC_COVERAGE_SCOPE` are gone. New R204 `HFS_COVERAGE_SCOPE_DRIFT`: a hand edit of any of the three coverage statements is drift. `hfs scaffold app` renders with the source it just wrote.
