@@ -2006,6 +2006,27 @@ EFFECT_UNKNOWN_STUCK:
   owner: supervisor
   kind: runtime-fault
 
+PROVIDER_RESERVATION_HELD:
+  title: "Provider slot held by a launch of unknown outcome"
+  title_vi: "Chỗ provider bị giữ bởi một lần khởi động chưa rõ kết quả"
+  meaning_vi: "Một biên nhận provider_reservations chưa có terminal hay tiến trình và chưa được chứng minh đã chết quá thời hạn cho phép, nên chỗ của provider vẫn bị tính là đang dùng."
+  causes_vi:
+    - "Lần khởi động worker bị cắt giữa chừng và máy chưa khởi động lại để chứng minh nó đã chết"
+    - "Orca hoặc bảng tiến trình không đọc được nên reaper không có chứng cứ"
+  nextStep_vi: "Reaper giải phóng biên nhận khi chứng minh được máy đã khởi động lại hoặc kết quả khởi động là không tác động; nếu vẫn kẹt, Supervisor đọc biên nhận trong provider_reservations và hòa giải tay."
+  owner: supervisor
+  kind: runtime-fault
+
+host-restarted:
+  title: "The host restarted after the launch began"
+  title_vi: "Máy chủ đã khởi động lại sau khi lần khởi động bắt đầu"
+  meaning_vi: "Lần khởi động worker của job đã bắt đầu trước lần khởi động lại của máy hoặc của Orca, và Orca đang chạy không còn biết Dispatch của nó, nên lần khởi động đó đã kết thúc."
+  causes_vi:
+    - "Máy tắt hoặc khởi động lại giữa lúc worker đang được dựng"
+  nextStep_vi: "Job được đánh dấu thất bại và chỗ đường dẫn được trả; Supervisor đặt job mới nếu việc còn cần."
+  owner: supervisor
+  kind: runtime-fault
+
 ESLINT_UNAVAILABLE:
   title: "ESLint could not be loaded"
   title_vi: "Không nạp được ESLint của sản phẩm"
@@ -9551,7 +9572,7 @@ release-unknown:
 retry-exhausted:
   title: "Retry budget spent"
   title_vi: "Đã hết ngân sách thử lại"
-  meaning_vi: "Một khóa công việc của bộ điều phối đã thất bại đủ số lần của ngân sách thử lại (allocation.reconciler.backoff.maxAttempts); hàng đợi giữ nó ở trạng thái đỗ cùng lý do của lần thất bại cuối, cho đến khi một sự kiện mới nhắc tới khóa đó."
+  meaning_vi: "Một khóa công việc của bộ điều phối đã thất bại đủ số lần của ngân sách thử lại (allocation.reconciler.backoff.maxAttempts); hàng đợi giữ nó ở trạng thái đỗ cùng lý do của lần thất bại cuối, cho đến khi một sự kiện mới nhắc tới khóa đó hoặc một tiến trình engine mới khởi động (engine cấp lại ngân sách cho mọi khóa đang đỗ)."
   causes_vi:
     - "Lỗi vĩnh viễn mà thử lại không sửa được (ví dụ danh tính sổ cái sai)"
     - "Một sự cố tạm thời kéo dài hơn toàn bộ ngân sách"

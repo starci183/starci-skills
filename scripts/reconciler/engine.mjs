@@ -54,7 +54,7 @@ import {
 import { WorkQueue, machineRows, memoryRows, failureLog } from './workqueue.mjs'; import { isMain } from '../lib/is-main.mjs';
 import { readEnv } from '../lib/env.mjs';
 import { eachInOrder, repeatInOrder } from '../lib/in-order.mjs';
-import { crashHandler, logSafeReevaluated, onceLine } from './engine-process.mjs';
+import { crashHandler, startRecovery, onceLine } from './engine-process.mjs';
 import { runOnce } from './engine-once.mjs';
 import { readModes, writeModes } from './engine-modes.mjs';
 import { RELOAD_CHECK_MS, RELOAD_HEAD_PATHS } from './reload-bounds.mjs';
@@ -614,7 +614,7 @@ async function main(argv = process.argv.slice(2)) {
   process.on('uncaughtException', onCrash);
   process.on('unhandledRejection', onCrash);
   await engine.load();
-  if (safeStart.reevaluated) logSafeReevaluated(engine, safeStart);
+  startRecovery(engine, safeStart);
   // The heartbeat worker (heartbeat-worker.mjs): its own connection renews the lease while a synchronous duty blocks this thread.
   engine.hb = startHeartbeatWorker({ file: engine.stateFile, leaseMs: engine.numbers.leaseMs, renewMs: engine.numbers.renewMs, stallMaxMs: engine.numbers.stallMaxMs ?? DEFAULT_STALL_MAX_MS });
   if (!engine.hb.active) throw new Error('the heartbeat worker did not start: this engine cannot keep its lease');
