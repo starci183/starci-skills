@@ -846,10 +846,10 @@ test('push-mains: the default list adds each bound app once, never a guessed sib
   const cfg = { ...settings, repos: ['miamia', 'next'] };
   assert.deepEqual(boundRepos(owner, { sourceRoot: source }).map((r) => path.resolve(r)), [owner]);
   const list = defaultPushRepos(cfg, { sourceRoot: source });
-  assert.deepEqual(list, [SKILL_ROOT, owner, next].map((p) => path.resolve(p)),
+  assert.deepEqual(list, [owner, next].map((p) => path.resolve(p)),
     'each app repository is pushed once, with no separate push for its be/ or fe/ folders');
   assert.ok(!list.includes(stray), 'a sibling checkout no binding declares is never pushed');
-  assert.deepEqual(defaultPushRepos({ ...settings, repos: ['stray-fe'] }, { sourceRoot: source }), [SKILL_ROOT, stray].map((p) => path.resolve(p)),
+  assert.deepEqual(defaultPushRepos({ ...settings, repos: ['stray-fe'] }, { sourceRoot: source }), [stray].map((p) => path.resolve(p)),
     'a ledger owner no binding claims still pushes, with no targets invented');
 });
 
