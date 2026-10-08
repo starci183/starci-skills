@@ -7,6 +7,7 @@ import { shortRev } from '../kernel/runtime-rev.mjs';
 import { CRITICAL_SUFFIX } from './sla.mjs';
 import { planSupervisorGates } from './gate-plan.mjs';
 import { planBudgetOverruns } from './budget-plan.mjs';
+import { planSupervisorOwed } from './owed-plan.mjs';
 
 const DI_SCHEMA = 'starci/decision-item@1';
 const OPENED_BY = 'workflow-controller';
@@ -193,7 +194,7 @@ function planFinish(p) {
   if (!hasOpenOperations) p.out.finish = true;
 }
 
-const SECTIONS = [planGoal, planStall, planOrphaned, planRev, planUnreadable, planFindings, planSupervisorGates, planBudgetOverruns, planStuckClocks, planAsks, planFinish];
+const SECTIONS = [planGoal, planStall, planOrphaned, planRev, planUnreadable, planFindings, planSupervisorGates, planBudgetOverruns, planSupervisorOwed, planStuckClocks, planAsks, planFinish];
 
 /**
  * Everything one pass decides for one running workflow. Pure: no ledger, no clock, no spawn.

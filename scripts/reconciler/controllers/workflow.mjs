@@ -71,7 +71,7 @@ export function workflowSettings({ file = WORKFLOW_FILE, allocation = null, cata
     revAckMs: cat.codes.REV_ACK_OVERDUE?.slaMs ?? 1_800_000,
     goalMs: cat.codes.GOAL_TEXT_MISSING?.slaMs ?? 0,
     supervisorGateMs: cat.codes.SUPERVISOR_GATE_OVERDUE?.slaMs ?? num(alloc?.autopilot?.supervisorGateTimeoutMs, 21_600_000),
-    stuckSla,
+    stuckSla, supervisorOwed: Object.fromEntries(Object.entries(doc.supervisorOwed ?? {}).map(([kind, diKind]) => [kind, String(diKind)])),
   };
 }
 

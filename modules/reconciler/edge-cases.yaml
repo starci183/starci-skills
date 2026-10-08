@@ -206,8 +206,10 @@ cases:
   - id: supervisor-killed-its-own-land
     family: smooth-operation
     met: {date: "2026-10-07", where: "Supervisor ran land under timeout 590 while the gate needs about 30 minutes", evidence: "AUDIT-starci-workflow.md issue 20"}
-    status: open
-    why: "a Supervisor behaviour; the land gate now bounds its specs, and no digest signal shows a land cancelled by its caller"
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "a land ran in the process that typed it, so a caller whose command window (timeout 590) was shorter than the gate (about 30 minutes) killed the land, its ticket was cancelled and the wait and the checks were lost; since alpha.8 the Supervisor lands nothing (the guard refuses land with RUNTIME_CHANGE_OWNED_BY_DEBUG), but the lead and Debug type the same verb under a command window of their own", remedy: {state: in-tree, change: "starci supervisor land without --foreground starts the land in a detached child of its own session and answers at once with the child's pid, answer file and log under <lanesRoot>/land-runs; --foreground waits in the caller's process; the seat's refusal of land stays pinned"}}
+    rule: {file: scripts/supervisor/land-detach.mjs, anchor: "startDetachedLand"}
+    spec: tests/supervisor/land-detach.spec.mjs
+    status: covered
   - id: wake-delivered-as-pasted-text
     family: record-vs-reality
     finding: {role: runtime, duty: does, verdict: departs, evidence: "Claude Code folds a typed paste of about 800 characters or more into a pasted_content block that the model reads as untrusted data. In the real Kernel transcripts every wake of 1218 to 1242 characters (twelve, the watchdog wake with its rev line) arrived pasted and three were refused, and all sixteen wakes of 325 to 730 characters arrived as the user's message; the watchdog wake was cut under 800 on 2026-10-08, but every other wake (transition, ask-answered, stall, supervisor) was typed at whatever length its lines made", remedy: {state: in-tree, change: "the one Kernel wake path and the watchdog wake bound the typed text by allocation.wake.maxChars: a longer wake keeps its opener, the rev line when it fits and the seat identity, and points at starci kernel status (wake-bound.mjs)"}}
@@ -363,8 +365,10 @@ cases:
   - id: supervisor-owed-items-without-menu-kind
     family: smooth-operation
     met: {date: "2026-10-08", where: "the OWED ACTIONS list of the tick", evidence: "modules/supervisor/supervise.yaml mission.classes"}
-    status: open
-    why: "the menu is built from the Supervisor's Decision Items; an OWED class that is no Decision Item (retry-cap, undispatched, orphaned) is read-only for the Supervisor, and a step left untaken past the SLA is recorded as a runtime defect by hand; the controllers do not yet open a Decision Item for each class"
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "the menu is built from the Supervisor's Decision Items; an OWED class that is no Decision Item (retry-cap, undispatched, orphaned) was read-only for the Supervisor: a step left untaken past the SLA was recorded as a runtime defect by hand. Also found: the Workflow controller opens Decision Items of kind stale-peer-wait, a kind decisions.mjs DI_KINDS did not list", remedy: {state: in-tree, change: "the Workflow controller opens one Supervisor Decision Item for a stuck retry-cap or queued-ready wait past its critical bound (retry-decision, ready-undispatched; workflow.yaml supervisorOwed) and for a frontier orphaned past progress.supervisorGraceMs (orphaned-frontier); supervisor-menu.yaml gives them the menu kinds retry-cap, undispatched and orphaned (a ruling to the Kernel, or a recorded defect), and its owedClasses table maps every class of supervise.yaml to the path that reaches the menu, which the spec holds to the class list"}}
+    rule: {file: scripts/reconciler/owed-plan.mjs, anchor: "planSupervisorOwed"}
+    spec: tests/supervisor/supervisor-owed-menu.spec.mjs
+    status: covered
   - id: kernel-start-repeats-one-failure
     family: failure-while-running
     finding: {role: runtime, duty: does, verdict: departs, evidence: "the StarCi workflow's Kernel seat was started 303 times in 3 hours and every launch failed at the same step, workflow-worktree-install (npm ci EPERM unlink of a loaded native .node file); every start ran a full npm ci that first deletes node_modules, so a process holding a binary of the tree stopped it half way, left a tree without react, and the next start did the same; a failed start was not a replacement, so the Host never counted it and the seat was never quarantined", remedy: {state: in-tree, change: "a start-up install runs only for a tree that is not a finished install of the current lockfile (a marker written after npm, cleared before it, so a half tree reads as incomplete), takes the host lock, and types a file lock as workflow-worktree-install-locked with the path and the holders; the launch of one cause backs off, is held after seats.kernel.startSameCauseMax failures and quarantines the seat with one seat-unrecoverable item naming the cause (scripts/kernel/start-hold.mjs, hold kernel-start-held)"}}
@@ -430,8 +434,10 @@ cases:
   - id: supervisor-menu-escape-has-no-policy-row
     family: smooth-operation
     met: {date: "2026-10-08", where: "role standard completion: the Supervisor menu kind kernel-escape (a Kernel whose menu offered no fitting option) is handled by the Supervisor but names no row, hold or gate cause of the incident policy", evidence: "modules/supervisor/supervisor-menu.yaml kernel-escape; modules/kernel/op-incident-policy.yaml"}
-    status: open
-    why: "the happy error has a menu kind and a Decision Item (menu-escape) but no policy row with a bound and a chain, so the roles contract cannot name its row"
+    finding: {role: supervisor, duty: does, verdict: departs, evidence: "the happy error had a menu kind and a Decision Item (menu-escape) but no policy row with a bound and a chain, so the roles contract could not name its row", remedy: {state: in-tree, change: "the hold row menu-escape (handler supervisor, bound workflow.yaml decisionDueMs, chain supervisor then owner) in op-incident-policy.yaml, named as kernel-escape in the Supervisor's happyErrors in roles.yaml; the roles-contract check resolves the row"}}
+    rule: {file: modules/kernel/op-incident-policy.yaml, anchor: "id: menu-escape"}
+    spec: tests/supervisor/supervisor-owed-menu.spec.mjs
+    status: covered
   - id: spec-reads-owner-live-config
     family: record-vs-reality
     finding: {role: runtime, duty: does, verdict: departs, evidence: "the release cut ran the suite from the live checkout, whose owner config.yaml sets roots.temp and supervisor.landGate: the temp-root, registry-isolation, land-gate and checkpoint specs read that file and failed, though the same commit was green in a lane clone without one", remedy: {state: in-tree, change: "engine/config.mjs shows a spec run an owner config.yaml only from under the spec's temp directory; the checkout's live file never reaches a spec"}}

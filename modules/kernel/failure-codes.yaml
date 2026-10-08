@@ -17125,3 +17125,22 @@ SCAN_SMELL:
   nextStep_vi: "Sửa đúng dòng được chỉ: chạy các bước độc lập bằng `Promise.all`, gọi tên thứ tự bằng `eachInOrder` của `platform/primitives`, bỏ import thừa, viết lại biểu thức lồng thành câu lệnh riêng, đọc locale qua `next/root-params`, trả `Promise.resolve(...)` thay vì `async` không `await`. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
   owner: op-retry
   kind: check-finding
+ready-undispatched:
+  title: "Ready work stands undispatched past its critical bound"
+  title_vi: "Việc sẵn sàng nằm chưa phát quá ngưỡng nghiêm trọng"
+  meaning_vi: "Mục quyết định mở cho Supervisor khi một việc queued-ready vẫn chờ quá ngưỡng criticalMs của nó dù Kernel còn sống; menu có kind undispatched."
+  causes_vi:
+    - "Kernel không phát việc sẵn sàng sau lần đánh thức đã giao"
+    - "Một từ chối nhận việc lặp lại mà không ai xử lý"
+  nextStep_vi: "Supervisor chọn rule để gửi phán quyết cho Kernel, hoặc record-defect để Debug sửa nếu runtime không phát việc sẵn sàng."
+  owner: supervisor
+  kind: blocker
+stale-peer-wait:
+  title: "A wait on a peer workflow stands past its bound"
+  title_vi: "Một lần chờ workflow ngang hàng quá hạn"
+  meaning_vi: "Mục quyết định mở cho Kernel khi chờ một workflow ngang hàng quá ngưỡng; nếu Kernel để quá hạn, mục leo lên Supervisor."
+  causes_vi:
+    - "Workflow ngang hàng chưa đưa vào main thứ mà bước này cần"
+  nextStep_vi: "Kernel kiểm tra lại điều kiện của peer và giải quyết hoặc gõ lại lần chờ; Supervisor phán quyết khi mục leo lên."
+  owner: op-retry
+  kind: blocker
