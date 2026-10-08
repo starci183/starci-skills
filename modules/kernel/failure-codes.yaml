@@ -10452,6 +10452,15 @@ rebase-conflict:
   nextStep_vi: "Kernel (hoặc Supervisor nếu được đẩy lên) giao một op giải xung đột trên worktree của workflow trước khi finish; finish vẫn từ chối khi còn xung đột."
   owner: supervisor
   kind: blocker
+budget-overrun:
+  title: "An Op attempt spent more tokens than its budget"
+  title_vi: "Một lượt chạy của op dùng nhiều token hơn ngân sách"
+  meaning_vi: "Vai trò Op khai báo ngân sách token cho mỗi lượt chạy; runtime đo lượt chạy đã kết thúc từ các dòng usage của nó, và khi job của nó đang chờ Kernel thì mở một Decision Item cho Kernel."
+  causes_vi:
+    - "Op đọc lại nhiều tệp hoặc gọi lặp lại các lệnh trạng thái trong một lượt chạy dài"
+  nextStep_vi: "Kernel chọn một trong ba hướng: tiếp tục một lần, thay agent hoặc thu hẹp phạm vi của lượt chạy."
+  owner: supervisor
+  kind: blocker
 record-change-not-owner:
   title: "Workflow does not own the record"
   title_vi: "Luồng không sở hữu hồ sơ này"

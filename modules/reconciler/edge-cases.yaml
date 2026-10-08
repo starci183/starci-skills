@@ -240,10 +240,16 @@ cases:
     why: "the not-runtime-fault return path exists in the gate ladder; the digest does not yet judge a Kernel's ready-work bound or a misclassified cause"
   - id: op-token-overrun-on-decision-leg
     family: smooth-operation
-    finding: {role: op, duty: bound, verdict: departs, evidence: "an Op spent 6 to 17 million tokens on a decision leg (AUDIT-starci-workflow.md issue 4: 10.8 million)", remedy: {state: in-tree, change: "the Op contract declares a provisional token budget per attempt; the Kernel acts on an overrun (roles.yaml op.tokenBudget)"}}
+    finding: {role: op, duty: bound, verdict: departs, evidence: "an Op spent 6 to 17 million tokens on a decision leg (AUDIT-starci-workflow.md issue 4: 10.8 million)", remedy: {state: in-tree, change: "each settled attempt is measured from its usage rows against the Op's declared budget; an overrun on a job waiting on its Kernel is listed in starci kernel status (budgetOverruns) and opens a Kernel Decision Item budget-overrun with continue-once, replace and re-scope"}}
     met: {date: "2026-10-07", where: "scope.define attempt 1", evidence: "AUDIT-starci-workflow.md issue 4"}
+    rule: {file: scripts/kernel/attempt-budget.mjs, anchor: "budgetOverruns"}
+    spec: tests/kernel/attempt-budget.spec.mjs
+    status: covered
+  - id: op-token-overrun-in-flight
+    family: smooth-operation
+    met: {date: "2026-10-08", where: "scripts/kernel/usage-record.mjs records an attempt's usage when it settles", evidence: "scripts/kernel/attempt-budget.mjs"}
     status: open
-    why: "the budget is declared and provisional; nothing yet measures an attempt against it, so the digest cannot flag an overrun"
+    why: "the measure comes from the usage rows, which exist only for a settled attempt, so an overrun is seen after the attempt ends; an attempt still running past the budget is not seen until a live read of its session file feeds the same measure"
   - id: fix-agent-wiped-node-modules-printed-credentials-stashed
     family: authority-safety
     finding: {role: supervisor, duty: never, verdict: departs, evidence: "a fix agent wiped another lane's node_modules through junctions; an agent printed part of a credentials file; an agent ran git stash", remedy: {state: in-tree, change: "the worker prompt carries the never entries: no junction, symlink or hard link, no node_modules removal, no credential file read, no stash"}}
