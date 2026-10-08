@@ -29,13 +29,13 @@ const WAKE=`Operation liveness wake for durable job ${JOB} (${OP}) attempt 1.`;
 // worker_id is the Dispatch id, the terminal comes from payload.managed.agentTerminalHandle; a
 // command-terminal job carries payload.orca and worker_id=handle), its contract row and the
 // op-dispatched event the grace measures from.
-const world=(t,fn,{screen=IDLE,dispatchedAgo=30*SEC,managed=true,nudgeAgo=null}={})=>withLedger(t,({root,repoRoot,machineHome,ledger})=>{
+const world=(t,fn,{screen=IDLE,dispatchedAgo=30*SEC,managed=true,nudgeAgo=null,staged=false}={})=>withLedger(t,({root,repoRoot,machineHome,ledger})=>{
   const stub=path.join(root,'fake-orca.mjs');fs.writeFileSync(stub,FAKE_ORCA);
   const stateFile=path.join(root,'orca-state.json');
-  fs.writeFileSync(stateFile,JSON.stringify({sends:0,terminals:{[HANDLE]:{handle:HANDLE,connected:true,writable:true,command:'claude',screen,lastOutputAt:Date.now()}}}));
+  fs.writeFileSync(stateFile,JSON.stringify({sends:0,terminals:{[HANDLE]:{handle:HANDLE,connected:true,writable:true,command:'claude',screen,lastOutputAt:Date.now(),...(staged?{dropStaged:true,prompt:'[Pasted Content 512 chars]'}:{})}}}));
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),
     STARCI_FAKE_ORCA_MODE:'healthy',STARCI_FAKE_ORCA_STATE:stateFile,STARCI_FAKE_ORCA_LOG:path.join(root,'calls.jsonl'),
-    STARCI_LOCAL_ROOT:machineHome};
+    STARCI_LOCAL_ROOT:machineHome,...(staged?{STARCI_FAKE_ORCA_DROP_ENTER_SEND:'1'}:{})};
   delete env.ORCA_TERMINAL_HANDLE;
   const run=(args,more={})=>spawnSync(process.execPath,[API,...args,'--repo',repoRoot,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...env,...more}});
   const dispatchedAt=Date.now()-dispatchedAgo;
@@ -98,7 +98,7 @@ test('a staged paste is nudge-ready inside the grace and one Enter submits it',t
   assert.equal(out(nudge).action,'submit-staged-input');
   assert.equal(orcaState().terminals[HANDLE].enters,1,'one Enter-only send');
   assert.equal(events('op-worker-nudged').length,1);
-},{screen:['Claude','','❯ [Pasted Content 512 chars]'].join('\n')}));
+},{staged:true,screen:'Claude'}));
 
 test('a command-terminal worker has no launch grace: its prompt was already proven submitted',t=>world(t,({run})=>{
   const body=status(run);

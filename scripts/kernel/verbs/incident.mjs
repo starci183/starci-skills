@@ -101,6 +101,14 @@ const peerWaitNote = (peerWait) => {
   return ` on ${peerWait.peer}${messageNote}${foundationNote}`;
 };
 
+/** The refusal of a resolution that rests on an owner claim no verified owner answer backs. */
+function refuseUnprovenOwnerClaim(row, ownerCheck, changed) {
+  if (!changed || !ownerCheck.needs || ownerCheck.proven) return;
+  const tried = ownerCheck.tried.map((t) => t.reason).join('; ');
+  const triedNote = tried ? ` (${tried})` : '';
+  throw Object.assign(new Error(`incident ${row.incident_id} not resolved: ${ownerCheck.why}, but no verified owner answer backs it${triedNote}. Name the ask the owner answered with --owner-answer <dispatchId> (its ask-answered event and receipt must both say answeredBy owner). No such answer: keep the incident open and raise or keep an owner ask (the owner answers it); resolved by the Kernel or the supervisor without the owner, say --by kernel|supervisor and state what landed, never that the owner decided`), { code: OWNER_CLAIM_UNPROVEN });
+}
+
 function incidentResolveExisting(ledger, db, workflowId, args, now, emit, repo) {
   const row = db.prepare('SELECT incident_id,status,last_progress FROM incidents WHERE incident_id=? AND workflow_id=?').get(args.resolve, workflowId);
   if (!row) throw Object.assign(new Error(`incident ${args.resolve} is not on ${workflowId}`), { code: 'incident-unknown' });
@@ -116,11 +124,7 @@ function incidentResolveExisting(ledger, db, workflowId, args, now, emit, repo) 
     emit({ ok: true, incidentId: row.incident_id, workflowId, status: 'open', changed: false, answered: answered.answer }, `incident ${row.incident_id} answered fixed ${answered.answer.commit.slice(0, 12)}: the runtime resolves it once the live runtime contains the commit`, args.json);
     return;
   }
-  if (changed && ownerCheck.needs && !ownerCheck.proven) {
-    const tried = ownerCheck.tried.map((t) => t.reason).join('; ');
-    const triedNote = tried ? ` (${tried})` : '';
-    throw Object.assign(new Error(`incident ${row.incident_id} not resolved: ${ownerCheck.why}, but no verified owner answer backs it${triedNote}. Name the ask the owner answered with --owner-answer <dispatchId> (its ask-answered event and receipt must both say answeredBy owner). No such answer: keep the incident open and raise or keep an owner ask (the owner answers it); resolved by the Kernel or the supervisor without the owner, say --by kernel|supervisor and state what landed, never that the owner decided`), { code: OWNER_CLAIM_UNPROVEN });
-  }
+  refuseUnprovenOwnerClaim(row, ownerCheck, changed);
   if (changed) {
     ledger.transaction(() => {
       resolveIncident(db, { incidentId: row.incident_id, reason: 'answered', at: now });

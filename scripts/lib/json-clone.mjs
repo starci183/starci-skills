@@ -5,8 +5,8 @@
 
 /** The boxed primitives JSON.stringify unwraps: recognised by the internal slot a valueOf call reads, as JSON does. */
 const BOXED = [
-  { slot: Number.prototype.valueOf, read: (box) => Number(box) },
-  { slot: String.prototype.valueOf, read: (box) => String(box) },
+  { slot: Number.prototype.valueOf, read: Number },
+  { slot: String.prototype.valueOf, read: String },
   { slot: Boolean.prototype.valueOf, read: (box) => Boolean.prototype.valueOf.call(box) },
   { slot: BigInt.prototype.valueOf, read: (box) => BigInt.prototype.valueOf.call(box) },
 ];

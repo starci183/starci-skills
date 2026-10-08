@@ -10,7 +10,7 @@ import { skillRoot } from '../../engine/runtime-root.mjs';
 import { independentChecksOf } from './verbs/shared/check-evidence.mjs';
 
 const SHA = /^[0-9a-f]{7,40}$/i;
-const HELD_STATES = ['reserved', 'unknown'];
+const HELD_STATES = new Set(['reserved', 'unknown']);
 const short = (sha) => String(sha ?? '').slice(0, 12);
 const invalid = (detail) => Object.assign(new Error(detail), { code: 'until-invalid' });
 
@@ -54,9 +54,10 @@ const runtimeHas = (cond) => {
 
 const admission = (cond) => {
   const held = readMachine((m) => m.providerReservations({ activeOnly: true }), [])
-    .filter((row) => HELD_STATES.includes(row.state) && String(row.scope?.scopeId ?? '').includes(`:${cond.jobId}:attempt:`));
+    .filter((row) => HELD_STATES.has(row.state) && String(row.scope?.scopeId ?? '').includes(`:${cond.jobId}:attempt:`));
   if (!held.length) return { met: true, evidence: `no provider receipt of ${cond.jobId} holds a slot` };
-  return { met: false, evidence: `${held.length} provider receipt(s) of ${cond.jobId} hold a slot: ${held.map((row) => `${row.id.slice(0, 8)} ${row.state}`).join(', ')}` };
+  const receipts = held.map((row) => `${row.id.slice(0, 8)} ${row.state}`).join(', ');
+  return { met: false, evidence: `${held.length} provider receipt(s) of ${cond.jobId} hold a slot: ${receipts}` };
 };
 
 const checkGreen = (db, cond) => {

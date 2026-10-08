@@ -323,9 +323,32 @@ const markRunning = (pass, { job, route, staging, leased, spawned, payload }) =>
   result.launched.push({ jobId: job.job_id, terminal: spawned.terminal, agent: route.agent, model: route.model, staging: staging.path });
 };
 
+/** A dead original Dispatch ends its job as failed (not requeued): the worker exited before its Task landed. */
+function failDeadSpawn(pass, job, { terminal, reason }) {
+  const { m, now, result } = pass;
+  m.transaction(() => {
+    releaseLeases(m, job.job_id);
+    m.updateSupAttempt(job.attempt_id, { cancelledAt: now(), failureClass: 'spawn:worker-exited' });
+    setJob(m, job.job_id, { status: 'failed', payload: { ...job.payload, launchEffect: 'dead', result: { reason } } });
+    supervisorEvent(m, { entityType: 'job', entityId: job.job_id, kind: 'worker-spawn-failed', payload: { terminal, reason }, now: now() });
+  });
+  result.failed.push({ jobId: job.job_id, terminal, error: reason, requeued: false });
+}
+
+/** Whether the original worker's frame shows its prompt submitted; a staged Codex paste gets one proven Enter. */
+function spawnSubmitted({ job, shown, frame, terminal, deps }) {
+  const prompt = renderWorkerPrompt(job, job.payload.staging), draft = draftText(frame);
+  const screen = draft ? frameWithDraft(frame.screen, draft) : frame.screen;
+  const state = classifyAgentScreen(screen, { sentText: prompt, provider: job.payload.agent }).state;
+  if (state === 'staged-input' || state === 'queued-input') {
+    return job.payload.agent === 'codex' && shown.writable === true && sendEnterWithProof({ terminal, sentText: prompt, deps }).ok;
+  }
+  return state === 'active' || wakeDeliveryOf({ after: screen, text: prompt }).delivery === 'delivered';
+}
+
 /** Reconcile the original Dispatch only: uncertain effects never authorize another worker. */
 function reconcileSpawning(pass, job) {
-  const { m, deps, root, now, result } = pass;
+  const { m, deps, root } = pass;
   if (!job.payload.dispatch) return false;
   try {
     const worker = (deps.workerShow ?? workerShow)({ dispatch: job.payload.dispatch });
@@ -339,28 +362,13 @@ function reconcileSpawning(pass, job) {
     const dead = (shown?.ok && shown.connected === false) || shown?.errorCode === 'terminal_handle_stale'
       || (frame?.ok && exitedAgentPromptRow(frame.screen));
     if (dead) {
-      const reason = shown?.exitCause ?? shown?.errorCode ?? 'agent-exited';
-      m.transaction(() => {
-        releaseLeases(m, job.job_id);
-        m.updateSupAttempt(job.attempt_id, { cancelledAt: now(), failureClass: 'spawn:worker-exited' });
-        setJob(m, job.job_id, { status: 'failed', payload: { ...job.payload, launchEffect: 'dead', result: { reason } } });
-        supervisorEvent(m, { entityType: 'job', entityId: job.job_id, kind: 'worker-spawn-failed', payload: { terminal, reason }, now: now() });
-      });
-      result.failed.push({ jobId: job.job_id, terminal, error: reason, requeued: false });
+      failDeadSpawn(pass, job, { terminal, reason: shown?.exitCause ?? shown?.errorCode ?? 'agent-exited' });
       return true;
     }
     const effective = worker.effective;
     if (!shown?.ok || !frame?.ok || (effective?.agent ?? effective?.provider) !== job.payload.agent
       || (effective?.model ?? effective?.modelId) !== job.payload.model) return false;
-    const prompt = renderWorkerPrompt(job, job.payload.staging), draft = draftText(frame);
-    const screen = draft ? frameWithDraft(frame.screen, draft) : frame.screen;
-    const state = classifyAgentScreen(screen, { sentText: prompt, provider: job.payload.agent }).state;
-    let submitted = state === 'active' || wakeDeliveryOf({ after: screen, text: prompt }).delivery === 'delivered';
-    if (state === 'staged-input' || state === 'queued-input') {
-      if (job.payload.agent !== 'codex' || shown.writable !== true) return false;
-      submitted = sendEnterWithProof({ terminal, sentText: prompt, deps }).ok;
-    }
-    if (!submitted) return false;
+    if (!spawnSubmitted({ job, shown, frame, terminal, deps })) return false;
     if (typeof job.payload.guard?.jobFile === 'string') (deps.bindGuard ?? bindGuardTerminal)({ skillRoot: root, handle: terminal, jobFile: job.payload.guard.jobFile });
     m.updateSupAttempt(job.attempt_id, { failureClass: null });
     markRunning(pass, { job, route: { agent: job.payload.agent, model: job.payload.model, pool: job.payload.pool },
