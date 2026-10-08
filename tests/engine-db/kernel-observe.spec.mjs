@@ -45,7 +45,7 @@ const fixture=(t,{mode='healthy',sends=0}={})=>{
     if(priorProjects===undefined)delete process.env.STARCI_PROJECTS_ROOT;else process.env.STARCI_PROJECTS_ROOT=priorProjects;
     if(priorMachine===undefined)delete process.env.STARCI_TEST_MACHINE_FILE;else process.env.STARCI_TEST_MACHINE_FILE=priorMachine;
   });
-  const run=(...args)=>spawnSync(process.execPath,[API,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env});
+  const run=(...args)=>spawnSync(process.execPath,[API,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...env,STARCI_ACTOR:'reconciler/job'}});
   const calls=()=>fs.existsSync(path.join(root,'calls.jsonl'))
     ?fs.readFileSync(path.join(root,'calls.jsonl'),'utf8').trim().split('\n').filter(Boolean).map(l=>JSON.parse(l).argv.slice(0,2).join(' '))
     :[];

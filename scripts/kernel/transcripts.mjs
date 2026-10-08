@@ -127,6 +127,9 @@ if (isMain(import.meta.url)) {
   const ledger = openLedger({ file: ledgerFileFor(repo) });
   try {
     const r = snapshotOpenAttempts(ledger, { everyMs: Number(arg('every-ms') ?? TRANSCRIPT_SNAPSHOT_MS), repoRoots: [repo] });
+    // The same poll reads the token spend of the running attempts: an attempt past its budget is seen while it runs.
+    const { measureOpenAttempts } = await import('./attempt-live-usage.mjs');
+    r.live = measureOpenAttempts(ledger);
     console.log(argv.includes('--json') ? JSON.stringify({ ok: true, repo, ...r }) : `transcripts ${repo}: ${r.written} written, ${r.unchanged} unchanged, ${r.unreadable} unreadable of ${r.checked} open`);
   } finally { ledger.close(); }
 }

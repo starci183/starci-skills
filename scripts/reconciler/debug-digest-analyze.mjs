@@ -7,7 +7,7 @@ import { loadStandard, judgeStandard } from './debug-standard.mjs';
 import { classifyAll } from './debug-verdicts.mjs';
 import { roleRows } from './debug-roles.mjs';
 import { loadQuestions, answerQuestions, standingOf } from './debug-questions.mjs';
-import { exceededWakes, wakeBudget } from '../kernel/wake-budget.mjs';
+import { exceededWakes, supervisorWakeBudget, wakeBudget } from '../kernel/wake-budget.mjs';
 
 const MIN = 60_000;
 const LIVE_JOB = new Set(['leased', 'running', 'answering', 'reported', 'deciding', 'effect_unknown']);
@@ -71,7 +71,8 @@ function supervisorSection({ snapshot }) {
     lastInputOkAgeMs: seat.lastInputOkAt ? now - Number(seat.lastInputOkAt) : null, deaf: seat.deaf === true } : null;
   return { enabled: supervisor.enabled, seat: view, health: supervisor.health,
     lastWakeAgeMs: supervisor.lastWakeAt ? now - Number(supervisor.lastWakeAt) : null,
-    openDecisions: supervisor.decisions.length, dueDecisions, staleGates: dueDecisions.filter((d) => d.gate) };
+    openDecisions: supervisor.decisions.length, dueDecisions, staleGates: dueDecisions.filter((d) => d.gate),
+    overBudgetWakes: exceededWakes(supervisor.wakes ?? [], supervisorWakeBudget()) };
 }
 
 function seatProblem(section, n) {
@@ -81,8 +82,15 @@ function seatProblem(section, n) {
   return seat?.deaf ? problem('supervisor', n.blocksEverything, 'seat-deaf', 'supervisor-deaf', {}, seat) : null;
 }
 
+/** A Supervisor wake that spent more tokens than its budget is a departure of the Supervisor. */
+function wakeBudgetProblem(section) {
+  const worst = section.overBudgetWakes.at(-1);
+  if (!worst) return null;
+  return problem('supervisor', 1, 'supervisor-wake-budget', 'supervisor-wake-budget', { turns: worst.turns, tokens: worst.tokens, wakes: section.overBudgetWakes.length, budgetTokens: supervisorWakeBudget().tokens }, section.overBudgetWakes);
+}
+
 function supervisorProblems(section, n) {
-  const out = [seatProblem(section, n)];
+  const out = [seatProblem(section, n), wakeBudgetProblem(section)];
   for (const d of section.dueDecisions) {
     out.push(problem('supervisor', d.gate ? n.staleGateBlocks : 1, `di-${d.id}`, d.gate ? 'gate-stale' : 'decision-overdue',
       { kind: d.kind, decider: d.decider, min: minutes(d.overdueMs), summary: d.summary ?? '' }, d));

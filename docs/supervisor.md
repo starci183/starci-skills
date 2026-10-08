@@ -195,7 +195,7 @@ playbooks and mechanism owners rather than duplicating their defaults.
 - Owns: the machine's operations: the shared resources and the gates Kernels raise. Decides alone: gate rulings and the division of resources.
 - Reports to: Owner (an owner-class matter). Overseen by: the runtime, Debug.
 - Measure: gates answered inside their bound, and no defect left unrecorded.
-- Token budget (provisional): 10000000 per wake; over it, recorded in the llm_usage supervisor-turn rows; no digest reads it yet, so an overrun is not surfaced (registry entry supervisor-wake-budget-unmeasured).
+- Token budget (provisional): 10000000 per wake; over it, the usage sweep cuts the Supervisor session at its supervisor-wake events and tags every supervisor-turn row with the wake that owns it; the digest reports a wake over the budget as a departure of the Supervisor (supervisor-wake-budget).
 - Guard: its terminals are bound as the "supervisor" role of modules/kernel/command-policy.yaml.
 - Happy errors it handles (the system working as designed, handled inside the chain through the policy):
   - gate-ruling (policy row supervisor-gate): a gate a Kernel raised: the Supervisor rules with fixed, workaround or not-runtime-fault (menu gate-ruling)
@@ -209,5 +209,6 @@ playbooks and mechanism owners rather than duplicating their defaults.
   - the Supervisor changes .claude: RUNTIME_CHANGE_OWNED_BY_DEBUG from the command and file guards
   - a menu choice of the Supervisor fails to execute: SUPERVISOR_MENU_STEP_FAILED
   - a gate stands past its acknowledgement bound: gate-stale departure of the digest
+  - a Supervisor wake spends more tokens than its wake budget: supervisor-wake-budget problem line of the digest
 - Principles: P1 P3 P4 P5 P6 P7 P8 (modules/kernel/roles.yaml, principles).
 <!-- roles:end supervisor -->

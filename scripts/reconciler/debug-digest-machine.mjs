@@ -3,6 +3,7 @@
 import { readMachine } from '../../engine/db/machine.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 import { SUPERVISOR_SEAT } from '../machine/home.mjs';
+import { supervisorWakeUsageOf } from '../kernel/wake-budget.mjs';
 import { CONTROLLER_NAMES, LEADER_NAME, configuredMode, reconcilerConfig } from './state.mjs';
 
 const KERNEL_SCOPE = /^[^:]+:([^:]+):kernel-attempt:\d+$/;
@@ -40,7 +41,7 @@ function supervisorOf(m) {
   const decisions = ask(m, "SELECT di_id, kind, decider, due_at, summary, workflow_id FROM sup_decision_items WHERE status='open'")
     .map((d) => ({ id: d.di_id, kind: d.kind, decider: d.decider, dueAt: d.due_at ?? null, summary: d.summary, workflowId: d.workflow_id }));
   return { seat: seat ? { state: seat.state, terminalHandle: seat.terminal_handle, lastSeenAt: seat.last_seen_at, lastInputOkAt: seat.last_input_ok_at, deaf } : null,
-    enabled, lastWakeAt: wake, decisions, health: null };
+    enabled, lastWakeAt: wake, wakes: supervisorWakeUsageOf(m.db), decisions, health: null };
 }
 
 function reservationsOf(m) {

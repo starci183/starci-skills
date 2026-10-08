@@ -19,6 +19,7 @@ export const PROBLEM_TEXT = Object.freeze({
   'kernel-rev': 'The Kernel of {name} acked runtime {acked} while {current} is current ({files} file(s) behind).',
   'kernel-idle': 'The Kernel of {name} is idle with {ready} unit(s) of ready work, last woken {min} min ago.',
   'kernel-wake-budget': 'The Kernel of {name} spent {turns} turns and {tokens} tokens in one wake, over its budget of {budgetTurns} turns and {budgetTokens} tokens ({wakes} wake(s) over): a departure of the Kernel.',
+  'supervisor-wake-budget': 'The Supervisor spent {tokens} tokens in {turns} turns of one wake, over its budget of {budgetTokens} tokens ({wakes} wake(s) over): a departure of the Supervisor.',
   'hold-overdue': '{op} ({jobId}) is held by {hold} {min} min past its deadline; handler {handler}; the bound is spent and {next} must take over.',
   'hold-unlisted': '{op} ({jobId}) is held by {hold}, which the hold policy table does not list.',
   'op-no-cause': '{op} is {status} and no cause is recorded for the stop.',

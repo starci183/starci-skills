@@ -22,8 +22,8 @@ export function planBudgetOverruns(p) {
   for (const row of p.status?.budgetOverruns ?? []) {
     const tokens = row.tokens.toLocaleString('en-US');
     p.di({ kind: 'budget-overrun', subject: `attempt-${row.attemptId}`, entity: { type: 'job', id: row.jobId },
-      summary: `budget-overrun ${row.opId} attempt ${row.attemptId}: ${tokens} tokens against a budget of ${row.budget.toLocaleString('en-US')} (${row.agent ?? 'agent unknown'}); the job is ${row.jobStatus}`,
-      evidence: [`attempt ${row.attemptId} of ${row.jobId}`, 'measured from the llm_usage rows of the attempt: input + output + cache read + cache write'],
+      summary: `budget-overrun ${row.opId} attempt ${row.attemptId}: ${tokens} tokens against a budget of ${row.budget.toLocaleString('en-US')} (${row.agent ?? 'agent unknown'}); the job is ${row.jobStatus}${row.live ? ' and still running: the retry options below are refused unit-in-flight until it settles' : ''}`,
+      evidence: [`attempt ${row.attemptId} of ${row.jobId}`, row.live ? 'measured while the attempt runs, from its session file (the attempt-budget-overrun event)' : 'measured from the llm_usage rows of the attempt: input + output + cache read + cache write'],
       options: budgetOptions(p.workflowId, row), allowedVerbs: ['enqueue'] });
   }
 }
