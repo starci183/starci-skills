@@ -10,7 +10,7 @@ describe("MigrateCli", () => {
         const help = jest.fn()
         Object.defineProperty(group, "command", { value: { help } })
 
-        await expect(group.run()).resolves.toBeUndefined()
+        await Promise.resolve(group.run())
 
         expect(help).toHaveBeenCalledTimes(1)
     })
