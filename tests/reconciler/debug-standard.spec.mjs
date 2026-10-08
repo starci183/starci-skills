@@ -9,7 +9,7 @@ import { renderText } from '../../scripts/reconciler/debug-digest-render.mjs';
 import { rolesContract } from '../../scripts/machine/roles-contract.mjs';
 import { NOW, MIN, digest, job, status, workflow, snapshot, keys } from '../helpers/debug-digest-fixture.mjs';
 
-const TREE = 'D:\\orca\\starci-monorepo\\wf-one';
+const TREE = '/orca/starci-monorepo/wf-one';
 const attempt = (over = {}) => ({ attemptId: 1, jobId: 'op-x-1', op: 'x', tryNo: 1, agent: 'claude', provider: 'claude', dispatchedAt: NOW - 90 * MIN, startedAt: NOW - 89 * MIN,
   reportedAt: NOW - 60 * MIN, settledAt: NOW - 59 * MIN, reportOutcome: 'done', verdict: 'pass', endState: 'settled', settledBy: 'settler', worktreePath: TREE, claimMismatch: 0, treeExists: null, ...over });
 const event = (kind, over = {}) => ({ kind, attemptId: null, entityId: 'x', at: NOW - 60 * MIN, step: null, error: null, op: null, verb: null, verdict: null, claimOverruled: false, checkedIn: null, ...over });
@@ -103,10 +103,12 @@ test('a report that is not done is the Kernel\'s to settle and its overdue settl
 });
 
 test('checks that ran outside the attempt tree are a runtime departure; a subdirectory of the tree, and a settle that names no directory, are not', () => {
-  const outside = digest(snapshot({ workflows: [withRows({ events: settledEvents([{ cwd: 'D:\\Repositories\\starci-monorepo', commit: 'c'.repeat(40), tree: 'd'.repeat(40) }]) })] }));
+  const outside = digest(snapshot({ workflows: [withRows({ events: settledEvents([{ cwd: '/repos/starci-monorepo', commit: 'c'.repeat(40), tree: 'd'.repeat(40) }]) })] }));
   assert.deepEqual(bugCodes(outside), ['checks-ran-outside-tree']);
   assert.equal(outside.problems[0].remedy.case, 'checks-rerun-wrong-tree');
-  const inside = digest(snapshot({ workflows: [withRows({ events: settledEvents([{ cwd: `${TREE}\\apps\\web`.toLowerCase().replace('d:', 'D:'), commit: 'c', tree: 'd' }]) })] }));
+  const spelled = (cwd) => digest(snapshot({ workflows: [withRows({ events: settledEvents([{ cwd, commit: 'c', tree: 'd' }]) })] }));
+  const inside = spelled(`${TREE}/apps/web/`);
+  assert.deepEqual(spelled(`\\orca\\starci-monorepo\\wf-one\\apps`).problems, []);
   assert.deepEqual(inside.problems, []);
   const old = digest(snapshot({ workflows: [withRows({ events: settledEvents(null) })] }));
   assert.equal(step(old, 'settle-evidence').state, 'na');
