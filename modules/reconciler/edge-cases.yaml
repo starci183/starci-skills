@@ -384,3 +384,32 @@ cases:
     rule: {file: scripts/kernel/workflow-in-flight.mjs, anchor: "inFlightOps"}
     spec: tests/kernel/attempt-placement.spec.mjs
     status: covered
+  - id: kernel-left-ready-work
+    family: smooth-operation
+    finding: {role: kernel, duty: never, verdict: departs, evidence: "both real Kernels composed dispatch, retry and settle commands from the status text each wake and left ready work or a reported block unhandled for hours; the unit is now the runtime's (the controllers dispatch and retry) and the rest is a menu item", remedy: {state: in-tree}}
+    met: {date: "2026-10-08", where: "the two first real workflows", evidence: "AUDIT-starci-workflow.md issues 6 and 11; Kernel transcripts of wf-starci-auth-test-workflow-muxq4oyr"}
+    rule: {file: scripts/kernel/kernel-menu.mjs, anchor: buildMenu}
+    spec: tests/kernel/kernel-menu.spec.mjs
+    status: covered
+  - id: kernel-scripted-node-e-for-reads
+    family: smooth-operation
+    finding: {role: kernel, duty: never, verdict: departs, evidence: "the Kernel wrote node -e over status.json, survey.json and ack plans to read a few fields (legs, kernelRev, workGraph, jobs, stuck, opChain); the read verbs now take --field and every program but starci and the pure reads is refused", remedy: {state: in-tree}}
+    met: {date: "2026-10-08", where: "the two first real workflows", evidence: "Kernel transcripts: 4 node -e reads of the status and survey JSON"}
+    rule: {file: scripts/kernel/verbs/shared/field-view.mjs, anchor: fieldEmit}
+    spec: tests/guards/kernel-seat.spec.mjs
+    status: covered
+  - id: menu-mechanical-pending-next-actions
+    family: smooth-operation
+    met: {date: "2026-10-08", where: "the menu of this change", evidence: "modules/kernel/kernel-menu.yaml origins with class pending"}
+    status: open
+    why: "the enqueue of an approved leg, the rework of a red node, the re-dispatch of a stale proof, the asset leg, the credential ask, a redraw and the cut-seam duties are still next actions the Kernel answers from its menu (mode mechanical-pending); each moves into the controller with its bound from the policy table, one origin at a time"
+  - id: menu-handover-feedback-not-typed
+    family: smooth-operation
+    met: {date: "2026-10-08", where: "the menu of this change", evidence: "kernel-menu.yaml kind handover-step"}
+    status: open
+    why: "a defect the owner reports on the handover must be routed to the fix op of the slice it names; that routing is not yet a typed choice, so the item offers none-fits only"
+  - id: kernel-wake-usage-attribution-coarse
+    family: smooth-operation
+    met: {date: "2026-10-08", where: "the per-wake budget of this change", evidence: "scripts/kernel/wake-budget.mjs"}
+    status: open
+    why: "the usage rows land every five minutes, so a wake owns the rows recorded between two wake events; a short wake can read as the sum of its neighbour"

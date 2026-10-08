@@ -83,14 +83,15 @@ test('wrongly blocked own lifecycle passes both hook and shim for op, Kernel, Su
       fs.mkdirSync(path.join(guards, family), { recursive: true });
       fs.writeFileSync(path.join(guards, family, `${handle}.json`), JSON.stringify({ ...body, terminal: handle, owned: [] }));
     }
+    const refused = binding.name === 'kernel' ? 'KERNEL_STARCI_ONLY' : 'RIGHTS_RAW_TOOL';
     const env = { ...process.env, STARCI_GUARDS_ROOT: guards, ORCA_TERMINAL_HANDLE: handle, STARCI_ROLE: binding.claimed ?? '' };
     const cases = ['heartbeat', 'worker_done', 'escalation'].map((type) => ({ args: send(type, handle), code: null }));
     cases.push(
       { args: ['orchestration', 'ask', '--from', handle, '--question', 'x'], code: null },
       { args: ['orchestration', 'check', '--terminal', handle, '--json'], code: binding.name === 'kernel' ? 'KERNEL_ORCA_CHECK' : null },
       { args: ['orchestration', 'check', '--terminal', handle, '--ack', 'delivery'], code: binding.name === 'kernel' ? 'KERNEL_ORCA_CHECK' : null },
-      { args: send('heartbeat', 'term_other'), code: 'RIGHTS_RAW_TOOL' },
-      { args: ['orchestration', 'worker-start', '--agent', 'codex'], code: 'RIGHTS_RAW_TOOL' },
+      { args: send('heartbeat', 'term_other'), code: refused },
+      { args: ['orchestration', 'worker-start', '--agent', 'codex'], code: refused },
     );
     for (const row of cases) {
       const command = ['orca', ...row.args.map((word) => /\s/.test(word) ? `'${word}'` : word)].join(' ');
@@ -104,6 +105,6 @@ test('wrongly blocked own lifecycle passes both hook and shim for op, Kernel, Su
     }
     const chain = `orca orchestration send --from ${handle} --type heartbeat --subject alive; orca orchestration worker-start --agent codex`;
     const decision = await hookDecision({ tool_name: 'Bash', cwd, tool_input: { command: chain } }, { env, root: ROOT });
-    assert.equal(decision?.verdict?.code, 'RIGHTS_RAW_TOOL', 'each command in a shell chain is still judged');
+    assert.equal(decision?.verdict?.code, refused, 'each command in a shell chain is still judged');
   }
 });

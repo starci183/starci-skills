@@ -36,7 +36,7 @@ const drawRetriesOf = (s) => {
 
 const drawRetry = (entry) => {
   const retryOf = entry.redrawOwed.jobId ? ` --retry-of ${entry.redrawOwed.jobId}` : '';
-  return { kind: 'retry', op: DRAW_REVIEW_OP, jobId: entry.redrawOwed.jobId ?? null,
+  return { kind: 'retry', origin: 'draw-redraw', op: DRAW_REVIEW_OP, jobId: entry.redrawOwed.jobId ?? null,
     reason: `the owner asked for a redraw of ${entry.record} in ask ${entry.redrawOwed.dispatchId} (${entry.redrawOwed.notes.length} note(s)): starci kernel enqueue --op ${DRAW_REVIEW_OP}${retryOf} - the packet carries the answer (context.owner_answers); the redraw must address every note (draw-feedback.mjs brief)` };
 };
 

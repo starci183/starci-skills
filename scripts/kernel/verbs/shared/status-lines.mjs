@@ -4,6 +4,7 @@ import { OP_REV_DRIFT, shortRev } from '../../runtime-rev.mjs';
 import { nameWithId } from '../../../lib/display-names.mjs';
 import { shortWorkflow } from '../../dependency-graph.mjs';
 import { stuckLine } from '../../../machine/op-metrics.mjs';
+import { menuLines } from './status-menu.mjs';
 
 const headline = (s, out) => {
   const mark = s.actionable ? ' ACTIONABLE' : ' (no actionable work)';
@@ -172,13 +173,14 @@ export const statusText = (s, out) => [
   headline(s, out),
   ...(s.ramThrottle?.line ? [`  ${s.ramThrottle.line}`] : []),
   ...(s.kernel ? [kernelLine(s)] : []),
+  ...menuLines(s),
   ...(s.kernelRev ? [kernelRevLine(s)] : []),
   ...s.opRevDriftWarnings.map(opRevLine),
   ...s.runningRevDrift.map(runningRevLine),
   ...s.outageCircuits.map(outageLine),
   ...s.awaitingOwner.map((item) => `  ${item.jobId} (${item.opId} a${item.attempt}) awaiting-owner — ask ${item.dispatchId ?? '-'} ${item.answer}`),
   handoverLine(s),
-  ...(s.frontier.reason ? [`  reason: ${s.frontier.reason}`] : []),
+  ...(s.frontier.reason && !s.menu?.length ? [`  reason: ${s.frontier.reason}`] : []),
   ...(s.frontier.why ? [`  why: ${s.frontier.why.headline} -> ${s.frontier.why.next}`] : []),
   ...s.graph.legs.filter((leg) => leg.why).map((leg) => `  why ${leg.op}: ${leg.why.headline}`),
   ...(s.kernelNotes.length ? [kernelNotesLine(s)] : []),
@@ -188,7 +190,6 @@ export const statusText = (s, out) => [
   ...s.graph.terminal.map(terminalLine),
   ...testsDeferredLines(s),
   ...(s.workGraph ? [workGraphLine(s)] : []),
-  ...s.graph.nextActions.map((action, index) => `  next ${index + 1}: ${s.internals.nextActionLabel(action)} — ${action.reason}`),
   ...(s.frontier.ownerGatesNotOwnerWork ?? []).map((g) => `  lint owner-gate-not-owner-work: ${g.incidentId} says "${g.marker}" - not the owner's step; a runtime defect goes to the supervisor as --kind source-runtime-defect (the gate only holds jobs), and it resolves --by kernel|supervisor`),
   ...s.logTypedMissing.slice(0, 5).map((w) => `  warn ${w.code}: ${w.jobId} (${w.op ?? '-'} a${w.attempt ?? '-'}) settled with ${w.opRows} op log row(s); missing ${w.missing.join(', ')}`),
   ...s.assetSlotsOwed.map((slot) => `  asset-slot-owed: ${slot.key} (${slot.opId ?? '-'} ${slot.jobId ?? '-'}, ${slot.html ?? '-'})${slot.requested ? '' : ' NO REQUEST'} - interface.asset fills it (src + data-asset-sha256)`),
@@ -206,7 +207,7 @@ export const statusText = (s, out) => [
   ...s.peerMessages.map((message) => `  peer-message: ${message.key} from ${message.from} [${message.kind}] ${message.subject}`),
   ...s.peerWaits.map(peerWaitLine),
   ...s.heldSettle.map(heldSettleLine),
-  ...s.askReserve.map((dispatchId) => `  ask-reserve: ${dispatchId} never reached the owner; park it: starci kernel serve-ask --repo <repo> --workflow ${s.workflowId} --dispatch ${dispatchId}`),
+  ...s.askReserve.map((dispatchId) => `  ask-reserve: ${dispatchId} never reached the owner; the Workflow controller parks it`),
   ...s.askOnDemand.map((dispatchId) => `  ask-on-demand: ${dispatchId} is on Telegram; the owner generates its link (no form until then)`),
   ...s.typedWaits.resolved.map((item) => `  auto-resolved: ${item.incidentId} [${item.kind ?? '-'}] every typed condition holds — ${item.evidence.join('; ').slice(0, 240)}`),
   ...s.typedWaits.open.map(openWaitLine),

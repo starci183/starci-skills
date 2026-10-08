@@ -148,7 +148,8 @@ test('the Job controller plans route-failure for a terminal job, whatever its ag
   assert.deepEqual(plan.clocks.map((clock) => clock.state), ['DECISION_OVERDUE']);
   assert.equal(planJob({ ...facts, terminal: { ...facts.terminal, taken: true } }, { settings }).step, null);
   const ask = planJob({ ...facts, status: 'awaiting_owner', terminal: { ...facts.terminal, hold: TERMINAL_HOLDS.ownerWaitNoAsk } }, { settings });
-  assert.equal(ask.step.kind, 'terminal-decision');
+  assert.equal(ask.step, null, 'an owner wait with no ask is the retry move of the workflow pass, not a job step');
+  assert.deepEqual(ask.clocks.map((clock) => clock.state), ['DECISION_OVERDUE']);
 });
 
 test('the retry-decision Decision Item belongs to the Kernel, one per job, with the way out named', () => {

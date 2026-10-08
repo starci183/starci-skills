@@ -7,12 +7,14 @@ import { autopilotBundle, autopilotOn } from '../autopilot-run.mjs';
 import { workflowDisplayName } from '../../lib/display-names.mjs';
 import { staleOperationsOf, sourceDriftSummaryOf, peerDriftSummaryOf } from '../input-digests.mjs';
 import { providerCircuits } from '../../machine/provider-circuit.mjs';
+import { fieldEmit } from './shared/field-view.mjs';
 
 export default {
   verb: 'survey',
   required: ['workflow'],
   usageInCore: true,
-  run({ ledger, args, repo, emit, need, internals }) {
+  run({ ledger, args, repo, emit: rawEmit, need, internals }) {
+    const emit = fieldEmit(rawEmit, args);
     const db = ledger.db, workflowId = args.workflow, now = Date.now();
     const wf = getWorkflow(db, workflowId);
     if (!wf) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });

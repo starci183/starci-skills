@@ -188,3 +188,15 @@ removed:
     use: 'the Supervisor records a runtime defect (starci supervisor actions record --item runtime-defect:<cause>) and Debug changes .claude'
     since: 1.0.0-alpha.8
     match: 'Supervisor[^\n.]{0,60}\bfix(?:es)?\s+through\s+(?:its\s+own\s+)?(?:staged\s+)?lanes?\b'
+  - id: kernel-ranked-actions
+    kind: vocabulary
+    name: ranked actions
+    use: "the Kernel's menu: the Decide section of starci kernel status, answered with starci kernel decide"
+    since: 1.0.0-alpha.8
+    match: '[Ww]ork the ranked actions|[Ff]irst rca\.actions entry'
+  - id: kernel-run-next-actions
+    kind: vocabulary
+    name: run nextActions
+    use: "the Kernel answers the items of its menu; the runtime performs the mechanical next actions"
+    since: 1.0.0-alpha.8
+    match: 'run nextActions|run each\s+in order and never choose'

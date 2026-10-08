@@ -88,8 +88,8 @@ const classifyKernelScreen = classifyAgentScreen;
 // whole typed wake (this text, the rev line, the seat identity) is bounded by wake-bound.mjs, so it arrives as the user's message.
 export const buildWakePrompt = (workflow, attempt = null, revLine = null) => boundedWake({ workflowId: workflow, attempt, revLine, compose: withWakeIdentity, text: [
   `Watchdog liveness wake for ${workflow}: phase=running, your last turn ended at the prompt; act on it now.`,
-  'Read starci kernel status; settle each needs-kernel-decision item, then work the ranked actions.',
-  'If only a recorded wait remains, yield the model turn immediately: the runtime wakes this Kernel again.',
+  'Read starci kernel status: its menu lists what waits on you. Answer each item with starci kernel decide.',
+  'When the menu is empty, yield the model turn immediately: the runtime wakes this Kernel again.',
   'Never run Start-Sleep, shell sleep or a polling loop.',
   WAKE_BOUNDS,
 ].join(' ') });

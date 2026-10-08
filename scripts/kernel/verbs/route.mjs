@@ -231,7 +231,7 @@ export default {
   refuseKernelBias('route', args);
   const db = ledger.db, jobId = args.job;
   const job = routableJobOrThrow(db, jobId, FINAL_SETTLED);
-  // SETTLE-FIRST (driver-loop.yaml progress.settleFirst): no new route while filed reports wait unconsumed.
+  // SETTLE-FIRST (driver-loop.yaml menu.settleFirst): no new route while filed reports wait unconsumed.
   const { payload, op: kind } = queuedJobOp(ledger, { job, verb: 'route', liveHint: 'rerouting', internals });
   if (deferQueuedTestLeg(ledger, { job, op: kind, payload, via: 'route', args })) return;
 

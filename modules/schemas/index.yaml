@@ -895,6 +895,9 @@ moduleLocalDocumentKinds:
   - id: starci/module-kernel-roles@1
     governs: "The roles contract: the principles, the five roles with their scope, duties, cleanup, never list and reporting chain, and Debug's end condition."
     files: [modules/kernel/roles.yaml]
+  - id: starci/module-kernel-menu@1
+    governs: "The Kernel's menu: its kinds of decision point with their typed options, the classification of every next-action origin and of every frontier state, and the escape and snooze bounds."
+    files: [modules/kernel/kernel-menu.yaml]
   - id: starci/module-reconciler-edge-cases@1
     governs: "The registry of every edge case met: family, real occurrence, the rule that handles it, the spec that reproduces it, and its status."
     files: [modules/reconciler/edge-cases.yaml]

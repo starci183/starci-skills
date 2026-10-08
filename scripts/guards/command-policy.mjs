@@ -18,6 +18,7 @@ import { kernelMailboxVerdict } from './install-verdict.mjs';
 import { orcaAddressedOption, orcaSelfLifecycleAllowed } from './orca-self-lifecycle.mjs';
 import { criticCommandVerdict } from './critic-reach.mjs';
 import { rolesContract } from '../machine/roles-contract.mjs';
+import { kernelSeatVerdict } from './kernel-seat.mjs';
 
 const policyCache = new Map();
 const compiledCache = new WeakMap();
@@ -265,6 +266,17 @@ function criticPolicyVerdict({ program, args, command, guard, handle, policy }) 
 }
 
 /**
+ * The verdict of the seat tables (Supervisor, Op, Kernel). Undefined when the general policy decides: a Kernel seat is decided here in
+ * full (null passes), a Supervisor or Op only when its table refuses.
+ */
+function seatVerdict({ role, guard, handle, policy, program, args, text }) {
+  if (guard?.role === 'kernel') return kernelSeatVerdict({ policy, program, args, text, guard, handle });
+  if (role === 'supervisor') return supervisorSeatVerdict({ policy, program, args, text }) ?? undefined;
+  if (role === 'op') return opStarciVerdict({ policy, program, args, text }) ?? undefined;
+  return undefined;
+}
+
+/**
  * Decide one normalized command for a bound role. Returns null to pass or the shared refusal shape.
  * `lockOwner` is a synchronous reader and is called only for a clean install.
  */
@@ -283,14 +295,8 @@ export function policyVerdict({ role, command, guard = null, handle = null, lock
     const use = useOf(policy.release, 'starci release cut');
     return refusal('RIGHTS_RELEASE_CUT', text, `the ${role} role does not cut or publish a release because the release cut is owner-approved and runs once per release`, use);
   }
-  if (role === 'supervisor') {
-    const seat = supervisorSeatVerdict({ policy, program, args, text });
-    if (seat) return seat;
-  }
-  if (role === 'op') {
-    const control = opStarciVerdict({ policy, program, args, text });
-    if (control) return control;
-  }
+  const seat = seatVerdict({ role, guard, handle, policy, program, args, text });
+  if (seat !== undefined) return seat;
   const call = callVerdict({ role, program, args, guard, policy, text });
   if (call) return call;
   if (p.runtime.has(program)) return null;

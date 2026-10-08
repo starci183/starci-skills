@@ -4,13 +4,15 @@
 //
 //   logs --workflow <id> [--job <job_id>] [--after <seq>] [--kinds <csv>] [--limit <n>]
 import { LOG_KINDS, openLogs, readLogs, syncLogs } from '../typed-logs.mjs';
+import { fieldEmit } from './shared/field-view.mjs';
 
 export default {
   verb: 'logs',
   required: ['workflow'],
   usageInCore: true,
   usage: "  logs     --workflow <id> [--job <job_id>] [--after <seq>] [--kinds <csv>] [--limit <n>]   the workflow's typed log rows (events synced first)",
-  run({ ledger, args, repo, emit, internals }) {
+  run({ ledger, args, repo, emit: rawEmit, internals }) {
+    const emit = fieldEmit(rawEmit, args);
     if (!internals.getWorkflow(ledger.db, args.workflow)) throw Object.assign(new Error(`unknown workflow ${args.workflow}`), { code: 'workflow-unknown' });
     const kinds = args.kinds ? String(args.kinds).split(',').map((k) => k.trim()).filter(Boolean) : null;
     const unknown = (kinds ?? []).filter((k) => !LOG_KINDS[k]);

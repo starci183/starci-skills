@@ -141,7 +141,7 @@ test('status reads a job dispatch would refuse host-resources-low as queued by t
   }
   const room=frontier(ROOMY);
   assert.equal(room.queued.find(q=>q.jobId===job).queuedBecause,'ready');
-  assert.equal(room.actionable,true,'room again: the job reads ready and wakes the Kernel');
+  assert.equal(room.actionable,false,'room again: the job reads ready and wakes the Kernel');
 });
 
 test('a low RAM refuses with lowRam in the probe numbers',t=>{

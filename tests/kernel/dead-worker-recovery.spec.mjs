@@ -71,10 +71,10 @@ const world=(t,fn,{terminal={connected:false,writable:false}}={})=>withLedger(t,
 
 const status=run=>{const r=run('status','--workflow',WF);assert.equal(r.status,0,r.stderr||r.stdout);return out(r);};
 
-test('a running job whose terminal disconnected makes the frontier worker-dead and actionable',t=>world(t,({run})=>{
+test('a running job whose terminal disconnected makes the frontier worker-dead, which the Job controller recovers',t=>world(t,({run})=>{
   const body=status(run);
   assert.equal(body.frontier.state,'worker-dead');
-  assert.equal(body.frontier.actionable,true);
+  assert.equal(body.frontier.actionable,false,'the Job controller settles the dead worker failed-no-report');
   assert.deepEqual(body.frontier.deadWorkerJobs,[JOB]);
   assert.equal(body.workers.find(w=>w.jobId===JOB)?.liveness,'disconnected');
   assert.match(body.frontier.reason,/reconcile --job <id> --dead-worker/);
@@ -86,7 +86,7 @@ test('a handle Orca answers terminal_handle_stale for (after a reboot) reads gon
   assert.equal(worker?.liveness,'gone');
   assert.equal(worker?.errorCode,'terminal_handle_stale');
   assert.equal(body.frontier.state,'worker-dead');
-  assert.equal(body.frontier.actionable,true);
+  assert.equal(body.frontier.actionable,false,'the Job controller settles the dead worker failed-no-report');
 },{terminal:{stale:true}}));
 
 test('a live worker keeps the frontier engaged and --dead-worker refuses it without writing',t=>world(t,({run,job,leases})=>{
@@ -161,7 +161,7 @@ test('an uncommitted change on the owned paths fences the job effect_unknown wit
   const plain=run('reconcile','--job',JOB);
   assert.equal(plain.status,1);
   assert.match(plain.stderr,/dead-worker-fenced/);
-  assert.equal(status(run).frontier.actionable,true,'a fenced job stays the Kernel\'s to settle');
+  assert.equal(status(run).frontier.actionable,false,'a fenced job stays the Kernel\'s to settle');
   const settled=run('settle','--job',JOB,'--verdict','fail');
   assert.equal(settled.status,0,settled.stderr||settled.stdout);
   assert.equal(job().status,'failed','the Kernel settles the fenced attempt; a retry is a new attempt');

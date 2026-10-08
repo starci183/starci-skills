@@ -1,0 +1,182 @@
+schema: starci/module-kernel-menu@1
+id: kernel.menu
+
+# The Kernel's menu: the decision points a workflow's Kernel may answer now, built by scripts/kernel/kernel-menu.mjs from the same
+# sources as the `next` lines of `starci kernel status` and the hold policy (modules/kernel/op-incident-policy.yaml); it adds no policy.
+# `starci kernel status` prints the open items as the Kernel's only actionable section, and `starci kernel decide --item <id> --choice
+# <choice> --reason <text>` validates the choice against the current menu, records it in the decision log and executes the option's
+# steps in-process. A step is a Kernel verb with typed arguments: `$name` takes the value of the item's subject, a value that is not
+# known drops the flag, and `text` names the flag that receives the Kernel's `--text` input.
+
+about:
+  en: >-
+    Mechanical work never appears here: the runtime does it in its controllers. An item is a point of judgment, a duty only the Kernel
+    can attest (the runtime revision), or work the runtime does not yet do itself (mode mechanical-pending).
+
+# Every menu carries this typed escape. It records the decision, then escalates along the role chain of modules/kernel/roles.yaml.
+escape:
+  choice: none-fits
+  effect: "records the reason and escalates this item to the Supervisor; an owner-class question of a worker is the ask-owner choice of its item, which reaches the owner through the ask channel"
+  dueMs: {ref: "modules/reconciler/job.yaml#decisionDueMs"}
+
+# A wait the Kernel chose is not asked again before this long.
+snooze:
+  ms: {ref: "modules/reconciler/job.yaml#decisionDueMs"}
+
+# Every origin of a `next` action of `starci kernel status`. `mechanical`: the runtime performs it; `doneBy` names where. `pending`: the
+# runtime does not yet perform it, so the Kernel's menu carries it (mode mechanical-pending) and the edge-case registry lists it as open.
+# `wait`: a wait or a gate that is the Supervisor's or the owner's step, never the Kernel's.
+origins:
+  - {id: unstepped-failure, kind: retry, class: mechanical, doneBy: "Job controller: starci kernel reconcile --route-failure (a step that records none opens Decision Item retry-decision)"}
+  - {id: unstepped-failure-wait, kind: wait, class: wait, doneBy: "the leg that cures the blocker; its retry is enqueued behind that leg once it has a job"}
+  - {id: failed-step-open, kind: retry, class: mechanical, doneBy: "Job controller: the retry move (scripts/reconciler/mechanical-moves.mjs)"}
+  - {id: askless-owner-wait, kind: retry, class: mechanical, doneBy: "Job controller: the retry move (scripts/reconciler/mechanical-moves.mjs)"}
+  - {id: answered-ask, kind: retry, class: mechanical, doneBy: "Job controller: the retry move (scripts/reconciler/mechanical-moves.mjs)"}
+  - {id: reopened-provisional, kind: retry, class: mechanical, doneBy: "Job controller: the retry move (scripts/reconciler/mechanical-moves.mjs)"}
+  - {id: deferred-queued, kind: dispatch, class: mechanical, doneBy: "Workflow controller: starci kernel dispatch-ready routes the job, which settles it deferred"}
+  - {id: ready-queued, kind: dispatch, class: mechanical, doneBy: "Workflow controller: starci kernel dispatch-ready (a root-verify job and a seam job included)"}
+  - {id: approved-leg, kind: dispatch, class: pending, menu: leg-ready}
+  - {id: red-node, kind: dispatch, class: pending, menu: node-rework}
+  - {id: stale-proof, kind: impact-check, class: pending, menu: stale-redispatch}
+  - {id: stale-ready, kind: impact-check, class: pending, menu: stale-redispatch}
+  - {id: asset-slots, kind: dispatch, class: pending, menu: asset-slots}
+  - {id: supervisor-gate, kind: supervisor-gate, class: wait, doneBy: "the Supervisor rules on the gate; its resolution wakes the Kernel"}
+  - {id: owner-gate, kind: owner-gate, class: wait, doneBy: "the owner's step; the answer wakes the Kernel"}
+  - {id: pending-ask, kind: owner-gate, class: wait, doneBy: "the owner's answer (or the autopilot's) wakes the Kernel"}
+  - {id: credential-step, kind: dispatch, class: pending, menu: credential-step}
+  - {id: in-flight, kind: wait, class: wait, doneBy: "the running leg"}
+  - {id: queued-wait, kind: wait, class: wait, doneBy: "the cause queuedBecause names; the runtime re-evaluates it on every pass"}
+  - {id: peer-wait, kind: wait, class: wait, doneBy: "the peer workflow; a typed condition or its message releases it"}
+  - {id: rev-reread, kind: reread, class: duty, menu: rev-ack}
+  - {id: draw-redraw, kind: retry, class: pending, menu: draw-redraw}
+  - {id: seam-reconcile, kind: impact-check, class: pending, menu: seam-duty}
+  - {id: seam-reconcile-red, kind: retry, class: pending, menu: seam-duty}
+  - {id: seam-recut, kind: retry, class: pending, menu: seam-duty}
+
+# Frontier states that wake a Kernel, each classified. A state not listed here and not named by a kind below wakes nobody.
+frontier:
+  - {state: transition-ready, class: mechanical, doneBy: "Job controller: the settler consumes and settles the report"}
+  - {state: settle-ready, class: mechanical, doneBy: "Job controller: the settler settles the consumed report"}
+  - {state: worker-dead, class: mechanical, doneBy: "Job controller: starci kernel reconcile --dead-worker --settle-failed"}
+  - {state: worker-nudge-ready, class: mechanical, doneBy: "Job controller: the worker-health nudge (scripts/reconciler/worker-health.mjs)"}
+  - {state: ask-reserve, class: mechanical, doneBy: "Workflow controller: starci kernel serve-ask re-parks the ask"}
+  - {state: finish-ready, class: mechanical, doneBy: "Workflow controller: starci kernel finish"}
+  - {state: worker-question, class: judgment, kind: worker-question}
+  - {state: worker-wedged, class: judgment, kind: worker-wedged}
+  - {state: peer-message, class: judgment, kind: peer-message}
+  - {state: handover-answered, class: pending, kind: handover-step}
+  - {state: handover-due, class: pending, kind: handover-step}
+  - {state: next-ready, class: nextActions, doneBy: "each next action by its origin above"}
+  - {state: orphaned-frontier, class: judgment, kind: decision-item}
+
+# The kinds of menu item. `source` names where the item comes from; `hold` the row of the hold table that owns its handler, chain and
+# deadline. `question` and an option's `effect` are templates over the item's subject.
+kinds:
+  - id: rev-ack
+    mode: duty
+    source: "kernelRev.stale"
+    question: "The runtime moved from revision {acked} to {rev}: read the files it lists, then attest the complete READ manifest."
+    options:
+      - {choice: ack-rev, direct: true, effect: "run directly: starci kernel kernel-ack-rev --workflow {workflow} --plan, read every path it lists under unread, then starci kernel kernel-ack-rev --workflow {workflow} --rev {rev} --read-manifest <file>"}
+
+  - id: job-decision
+    mode: judgment
+    source: "Decision Items settle-nongreen, checks-needed and retry-decision, and the reports the settler handed to the Kernel"
+    hold: settle-nongreen
+    question: "{situation}"
+    builder: job-resolution
+
+  - id: worker-question
+    mode: judgment
+    source: "starci kernel status workerQuestions"
+    hold: worker-question
+    question: "{op} {job} asks: {ask}"
+    options:
+      - {choice: answer, text: body, steps: [{verb: reply, args: {workflow: $workflow, message: $message, body: $text}}], effect: "the worker receives your answer (give it with --text) and continues"}
+      - {choice: ask-owner, text: body, optionalText: true, steps: [{verb: reply, args: {workflow: $workflow, message: $message, to-owner: true, body: $text}}], effect: "the worker files outcome ask and the runtime serves it to the owner; --text adds a note"}
+
+  - id: peer-message
+    mode: judgment
+    source: "starci kernel status peerMessages"
+    question: "{from} sent a {messageKind}: {subject}"
+    options:
+      - {choice: acknowledge, text: disposition, steps: [{verb: inbox, args: {workflow: $workflow, ack: $key, disposition: $text}}], effect: "acknowledges the message with --text as the disposition"}
+      - {choice: reply, text: body, steps: [{verb: notify, args: {workflow: $workflow, to: $from, kind: reply, reply-to: $key, subject: $subject, body: $text}}, {verb: inbox, args: {workflow: $workflow, ack: $key, disposition: replied}}], effect: "sends --text to the sender as a reply, then acknowledges the message"}
+
+  - id: worker-wedged
+    mode: judgment
+    source: "starci kernel status frontier.wedgedJobs"
+    hold: worker-stalled
+    question: "{op} {job} is wedged: one silent command past the wedge threshold, or a host dialog back after its answers."
+    options:
+      - {choice: settle-failed, steps: [{verb: reconcile, args: {job: $job, dead-worker: true, settle-failed: true}}], effect: "ends the worker and settles the attempt failed-no-report; the route table retries it on another pool"}
+      - {choice: keep-waiting, snooze: true, effect: "asks again after the snooze"}
+
+  - id: dead-wait
+    mode: judgment
+    source: "a peer-wait whose peer no longer runs, and a typed wait whose release condition can no longer be met"
+    question: "{situation}"
+    options:
+      - {choice: release-wait, text: detail, steps: [{verb: incident, args: {workflow: $workflow, resolve: $incident, by: kernel, detail: $text}}], effect: "resolves the wait; --text is the evidence that its prerequisite holds or no longer applies"}
+
+  - id: decision-item
+    mode: judgment
+    source: "every other live Decision Item whose decider is the Kernel (progress-stall, orphaned-frontier, stale-gate, stale-wait, worker-stalled, rebase-conflict, ...)"
+    question: "{summary}"
+    builder: di-options
+    snoozeKinds: [progress-stall, stale-wait, stale-gate, worker-stalled, orphaned-frontier]
+
+  - id: leg-ready
+    mode: mechanical-pending
+    source: "next action approved-leg"
+    question: "Approved leg {op} has no job and every plan leg before it succeeded."
+    options:
+      - {choice: enqueue-leg, text: paths, steps: [{verb: enqueue, args: {workflow: $workflow, op: $op, paths: $text}}], effect: "enqueues {op} on the paths in --text (its write set); the Workflow controller then routes and dispatches it"}
+
+  - id: node-rework
+    mode: mechanical-pending
+    source: "next action red-node"
+    question: "Work-graph node {node} turned red: {op} wrote it last."
+    options:
+      - {choice: rework-node, steps: [{verb: enqueue, args: {workflow: $workflow, op: $op, paths: $paths}}], effect: "enqueues {op} again on the node's owned paths"}
+
+  - id: stale-redispatch
+    mode: mechanical-pending
+    source: "next actions stale-proof and stale-ready"
+    question: "{op} {job}: {situation}"
+    options:
+      - {choice: redispatch, steps: [{verb: enqueue, args: {workflow: $workflow, op: $op, paths: $paths, retry-of: $job}}], effect: "enqueues a new attempt of {op} retrying {job}"}
+
+  - id: asset-slots
+    mode: mechanical-pending
+    source: "next action asset-slots"
+    question: "{situation}"
+    options:
+      - {choice: enqueue-asset-leg, steps: [{verb: enqueue, args: {workflow: $workflow, op: $op, paths: $paths}}], effect: "enqueues {op} on the records that declare the slots"}
+
+  - id: credential-step
+    mode: mechanical-pending
+    source: "next action credential-step"
+    question: "The end-of-flow owner step 'supply credentials' is due."
+    options:
+      - {choice: enqueue-credential-ask, steps: [{verb: enqueue, args: {workflow: $workflow, op: provision.ask, params: $params, paths: $paths}}], effect: "enqueues the one provision.ask whose question lists every deferred credential"}
+
+  - id: draw-redraw
+    mode: mechanical-pending
+    source: "next action draw-redraw"
+    question: "{situation}"
+    options:
+      - {choice: redraw, steps: [{verb: enqueue, args: {workflow: $workflow, op: $op, paths: $paths, retry-of: $job}}], effect: "enqueues {op} again; the packet carries the owner's notes"}
+
+  - id: seam-duty
+    mode: mechanical-pending
+    source: "next actions seam-reconcile, seam-reconcile-red and seam-recut"
+    question: "{situation}"
+    options: []
+
+  - id: handover-step
+    mode: mechanical-pending
+    source: "frontier states handover-due and handover-answered"
+    question: "{situation}"
+    options:
+      - {choice: rerun-handover-review, steps: [{verb: enqueue, args: {workflow: $workflow, op: handover.review, paths: $paths}}], effect: "enqueues handover.review, which asks the owner (or applies the owner's answer) and hands over again"}

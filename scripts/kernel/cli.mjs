@@ -1159,7 +1159,7 @@ function recordOpRevDrift(ledger, job) {
 }
 
 /** The nextActions step a stale Kernel runs first: re-read what changed, then ack the current rev. */
-const rereadActionOf = (rev, workflowId) => ({ kind: 'reread', rev: rev.current, acked: rev.acked, files: rev.full ? ['modules/kernel/kernel-prompt.md', 'modules/kernel/driver-loop.yaml'] : rev.files,
+const rereadActionOf = (rev, workflowId) => ({ kind: 'reread', origin: 'rev-reread', rev: rev.current, acked: rev.acked, files: rev.full ? ['modules/kernel/kernel-prompt.md', 'modules/kernel/driver-loop.yaml'] : rev.files,
   reason: `the runtime moved from the rev you acked (${shortRev(rev.acked)}) to ${shortRev(rev.current)}: re-read ${rev.full ? 'modules/kernel/kernel-prompt.md and modules/kernel/driver-loop.yaml in full' : rev.files.join(', ')}, then starci kernel kernel-ack-rev --workflow ${workflowId} --plan and submit the complete READ manifest with --rev ${rev.current} --read-manifest <file>; until then enqueue/dispatch of a leg whose op contract changed is refused ${KERNEL_REV_STALE}` });
 /**
  * The RUNNING legs whose op contract moved on the runtime since their dispatch (op-rev-drift before settle): the
@@ -1250,15 +1250,15 @@ function seamActionsOf(set) {
   if (!view) return [];
   const actions = [];
   for (const item of view.reconcile?.owed ?? []) {
-    actions.push({ kind: 'impact-check', op: set.op, jobId: item.jobId, cutId: set.id, seamDuty: 'reconcile',
+    actions.push({ kind: 'impact-check', origin: 'seam-reconcile', op: set.op, jobId: item.jobId, cutId: set.id, seamDuty: 'reconcile',
       reason: `cut ${set.id} seam ${view.jobId} landed after ordinal ${item.ordinal} (${item.jobId}) passed on a stub (${item.mode}): re-verify it against the real seam - rerun its scoped checks (typecheck/build and its slice tests) and record starci kernel cut-seam --reconcile --job ${item.jobId} --exit-code <n> --command "<cmd>"; a light re-check, not a redo` });
   }
   for (const item of view.reconcile?.red ?? []) {
-    actions.push({ kind: 'retry', op: set.op, jobId: item.jobId, cutId: set.id, seamDuty: 'reconcile-red',
+    actions.push({ kind: 'retry', origin: 'seam-reconcile-red', op: set.op, jobId: item.jobId, cutId: set.id, seamDuty: 'reconcile-red',
       reason: `ordinal ${item.ordinal} (${item.jobId}) does not reconcile with the landed seam (${SEAM_RECONCILE_CHECK} red): starci kernel enqueue --op ${set.op} with its paths --cut-id ${set.id} --cut-ordinal ${item.ordinal} --cut-total ${set.total} --retry-of ${item.jobId} (that ordinal only)` });
   }
   if (view.recutPlan) {
-    actions.push({ kind: 'retry', op: set.op, jobId: view.jobId, cutId: set.id, seamDuty: 'recut',
+    actions.push({ kind: 'retry', origin: 'seam-recut', op: set.op, jobId: view.jobId, cutId: set.id, seamDuty: 'recut',
       reason: `cut ${set.id} seam ${view.jobId} slipped (${view.failures} failed attempt(s), now ${view.status}); its siblings already run on a stub - re-cut the seam smaller: ${view.recutPlan.steps.join('; ')}` });
   }
   return actions;

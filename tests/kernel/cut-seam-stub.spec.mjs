@@ -94,7 +94,7 @@ test('a sibling waits on a queued seam at most maxSiblingWaitMs, then runs on a 
   assert.equal(released.seamStub.seamJobId,seam);
   assert.equal(q(b).queuedBecause,'dependency','a younger sibling still waits its own window');
   const s=status();
-  assert.equal(s.frontier.actionable,true);
+  assert.equal(s.frontier.actionable,false,'the Workflow controller dispatches the sibling that runs on a stub');
   assert.match(s.nextActions.find(x=>x.jobId===a).reason,/ready on a stub \(timeout\).*owes cut-seam-reconcile/);
   assert.deepEqual(s.cutSets[0].seam.siblingsOnStub,[{jobId:a,mode:'timeout'}]);
   assert.deepEqual(s.cutSets[0].seam.siblingsHeld,[b]);

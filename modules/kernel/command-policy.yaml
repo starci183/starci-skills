@@ -230,3 +230,20 @@ orca:
         values: [--terminal, --run, --ack, --types, --timeout-ms, --retry-request]
         flags: [--json, --help, --unread, --peek, --all, --format, --wait]
   use: starci worker start, starci worker show, starci worker read, starci worker list, starci worker stop, starci worker release, or starci worker close
+# The Kernel seat (a bound guard of role kernel). A Kernel judges and answers: it reads, it answers the items of its menu with
+# `starci kernel decide`, and it attests the runtime revision. Every other `starci kernel <verb>` is the runtime's own (the
+# controllers run it) or the lead's and owner's; a Kernel that calls one is refused with the menu (KERNEL_USE_DECIDE). Every program
+# but the pure reads below is refused (KERNEL_STARCI_ONLY): the Kernel's shell is starci.
+kernel:
+  # starci <group> <verb> words the Kernel seat may run
+  verbs:
+    kernel: [status, logs, questions, messages, survey, hierarchy, artifacts, coverage, usage, observe, peers, foundations, extensions, decisions, inbox, log, decide, kernel-ack-rev]
+    workflow: [status]
+    gate: [read]
+  # read verbs that also have mutating flags: refused when one of these flags is present
+  read-flags:
+    decisions: [open, claim, resolve, escalate]
+    inbox: [ack]
+  # pure reads of `read` that the Kernel does not get
+  deny-programs: [sleep]
+  use: "answer an item of the menu: starci kernel status prints it, starci kernel decide --workflow <workflow> --item <id> --choice <choice> --reason <why> answers it"

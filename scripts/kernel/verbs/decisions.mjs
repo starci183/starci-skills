@@ -15,6 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parseJsonOr } from '../../lib/json.mjs';
 import { blockingDecisions, claimDecision, decisionsFirstText, escalateDecision, listDecisions, openDecisionRow, refuse, resolutionOf, resolveDecision, sweepDecisions } from '../../machine/decisions.mjs';
+import { fieldEmit } from './shared/field-view.mjs';
 import { readEnv } from '../../lib/env.mjs';
 import { splitList } from '../../lib/list.mjs';
 
@@ -46,7 +47,8 @@ export default {
   kernelOnly: true,
   flags: ['open', 'list', 'all', 'next'],
   usage: '  decisions --workflow <id> [--list] [--all] [--next] | --open --workflow <id> --kind <k> --summary <t> --by <actor> [...] | --claim <id> --by <a> | --resolve <id> --by <a> --verb <v> [--decision <id>] | --escalate <id> [--to supervisor]   Decision Items: read them first every wake',
-  run({ ledger, args, repo, emit }) {
+  run({ ledger, args, repo, emit: rawEmit }) {
+    const emit = fieldEmit(rawEmit, args);
     const db = ledger.db;
     const by = args.by ?? readEnv('STARCI_ACTOR') ?? (args.workflow ? `kernel:${args.workflow}` : null);
     if (args.open) {

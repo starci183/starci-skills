@@ -190,7 +190,8 @@ test('the hook enforces the policy by job guard, seat guard and claimed role, wh
   bind('seats', 'hk-sup', { schema: 'starci/seat-guard@1', role: 'supervisor', terminal: 'hk-sup', deniedTools: [] });
   assert.equal((await run('hk-op', 'git push origin main')).verdict.code, 'RIGHTS_GIT_PUSH');
   assert.equal((await run('hk-op', 'docker compose up -d')).verdict.code, 'RIGHTS_RAW_TOOL');
-  assert.equal((await run('hk-kernel', 'npm publish')).verdict.code, 'RIGHTS_NPM_PUBLISH');
+  assert.equal((await run('hk-op', 'npm publish')).verdict.code, 'RIGHTS_NPM_PUBLISH');
+  assert.equal((await run('hk-kernel', 'npm publish')).verdict.code, 'KERNEL_STARCI_ONLY', 'the Kernel seat runs starci and pure reads only');
   assert.equal((await run('hk-sup', 'git tag v1')).verdict.code, 'RIGHTS_GIT_TAG');
   assert.equal(await run('hk-sup', 'git push origin HEAD:refs/backup/x'), null);
   assert.equal((await run('', 'git push origin main', { STARCI_ROLE: 'coordinator' })).verdict.code, 'RIGHTS_GIT_PUSH');
