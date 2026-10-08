@@ -1105,7 +1105,7 @@ _starci() {
         supervisor:direct-commits) COMPREPLY=( $(compgen -W "--repo --json --cwd --quiet --help --edition" -- "$cur") );;
         supervisor:gate-stability) COMPREPLY=( $(compgen -W "--family --tree --base --head --ledger --gate --json --cwd --quiet --help --edition" -- "$cur") );;
         supervisor:gc) COMPREPLY=( $(compgen -W "--dry-run --apply --only --plan --holder --trigger --json --cwd --quiet --help --edition" -- "$cur") );;
-        supervisor:land) COMPREPLY=( $(compgen -W "--job --commit --specs --reason --full-by-push-git --lane --notify --status --wait-ms --json --cwd --quiet --help --edition" -- "$cur") );;
+        supervisor:land) COMPREPLY=( $(compgen -W "--job --commit --specs --reason --full-by-push-git --lane --notify --foreground --status --wait-ms --json --cwd --quiet --help --edition" -- "$cur") );;
         supervisor:lesson-actions) COMPREPLY=( $(compgen -W "--signature --commit --lane --specs --wrongly-blocked --reason --wait-ms --experiment --apply --title --evidence --options --recommendation --send --json --cwd --quiet --help --edition" -- "$cur") );;
         supervisor:notify) COMPREPLY=( $(compgen -W "--repo --workflow --text --text-file --item --entity --json --cwd --quiet --help --edition" -- "$cur") );;
         supervisor:owed) COMPREPLY=( $(compgen -W "--repo --workflow --all --item --commits --reason --force --json --cwd --quiet --help --edition" -- "$cur") );;

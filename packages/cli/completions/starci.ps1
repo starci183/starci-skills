@@ -200,7 +200,7 @@ Register-ArgumentCompleter -Native -CommandName starci -ScriptBlock {
         'supervisor direct-commits' = @('--repo','--json','--cwd','--quiet','--help','--edition')
         'supervisor gate-stability' = @('--family','--tree','--base','--head','--ledger','--gate','--json','--cwd','--quiet','--help','--edition')
         'supervisor gc' = @('--dry-run','--apply','--only','--plan','--holder','--trigger','--json','--cwd','--quiet','--help','--edition')
-        'supervisor land' = @('--job','--commit','--specs','--reason','--full-by-push-git','--lane','--notify','--status','--wait-ms','--json','--cwd','--quiet','--help','--edition')
+        'supervisor land' = @('--job','--commit','--specs','--reason','--full-by-push-git','--lane','--notify','--foreground','--status','--wait-ms','--json','--cwd','--quiet','--help','--edition')
         'supervisor lesson-actions' = @('--signature','--commit','--lane','--specs','--wrongly-blocked','--reason','--wait-ms','--experiment','--apply','--title','--evidence','--options','--recommendation','--send','--json','--cwd','--quiet','--help','--edition')
         'supervisor notify' = @('--repo','--workflow','--text','--text-file','--item','--entity','--json','--cwd','--quiet','--help','--edition')
         'supervisor owed' = @('--repo','--workflow','--all','--item','--commits','--reason','--force','--json','--cwd','--quiet','--help','--edition')

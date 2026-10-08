@@ -5,6 +5,7 @@
 //   starci supervisor land --job <jobId> [--specs <csv>] [--notify] [--json]
 //   starci supervisor land --commit <sha>[,<sha>...] [--specs <csv|touching|direct|all|none>] [--reason <why>] [--full-by-push-git] [--lane <name>] [--notify] [--json]
 //   starci supervisor land --status [--json]
+// Without --foreground the land runs in a detached child (land-detach.mjs) and the verb answers at once: a caller whose command window is shorter than the gate cannot kill the land.
 //
 // 1. The land queue in machine.sqlite (engine/db/machine.mjs land_queue): each waiter files a ticket and only the
 //    oldest live ticket enters the gate; a ticket whose process died is cancelled (waits up to --wait-ms, default
@@ -53,7 +54,8 @@ import path from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { setPriority } from '../api/process/set-priority.mjs';
 import { runNode } from '../api/node/run-node.mjs';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { detachedLandLine, startDetachedLand } from './land-detach.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { allocationMs, allocationSettings, harnessSpecsEnabled } from '../../engine/config.mjs';
 import { git, normPath } from './workers.mjs';
@@ -748,8 +750,11 @@ if (isMain(import.meta.url)) {
   const value = (n) => { const i = argv.indexOf(`--${n}`); return i >= 0 ? argv[i + 1] ?? null : null; };
   const csv = (v) => (v ? v.split(',').map((s) => s.trim()).filter(Boolean) : []);
   if (has('status')) console.log(JSON.stringify(landStatus()));
-  else if (!value('job') && !value('commit')) { console.error('use: starci supervisor land --job <id> | --commit <sha>[,<sha>] [--specs <csv|touching|direct|all|none>] [--reason <why>] [--full-by-push-git] [--lane <name>] [--notify] [--json]'); process.exitCode = 2; }
-  else {
+  else if (!value('job') && !value('commit')) { console.error('use: starci supervisor land --job <id> | --commit <sha>[,<sha>] [--specs <csv|touching|direct|all|none>] [--reason <why>] [--full-by-push-git] [--lane <name>] [--notify] [--foreground] [--json]'); process.exitCode = 2; }
+  else if (!has('foreground')) {
+    const started = startDetachedLand({ script: fileURLToPath(import.meta.url), argv });
+    console.log(has('json') ? JSON.stringify({ ok: true, detached: true, ...started }) : detachedLandLine(started));
+  } else {
     const r = await land({ jobId: value('job'), commits: value('commit') ? csv(value('commit')) : null, specs: csv(value('specs')), reason: value('reason'), fullByPushGit: has('full-by-push-git'), lane: value('lane'),
       notify: has('notify'), waitMs: Number(value('wait-ms')) || LAND_WAIT_MS });
     console.log(has('json') ? JSON.stringify(r) : describe(r, { jobId: value('job') }));
