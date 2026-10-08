@@ -68,6 +68,7 @@ export function renderText(digest, { language, questions = false }) {
   lines.push(reconcilerLine(tr, digest.reconciler), supervisorLine(tr, digest.supervisor));
   if (!digest.workflows.length) lines.push(tr(TEXT.noWorkflow));
   for (const w of digest.workflows) lines.push(...workflowLines(tr, w, digest.at));
+  if (digest.releaseCi) lines.push(tr(TEXT.releaseCi, { line: digest.releaseCi }));
   lines.push(tr(TEXT.admission, { live: digest.admission.live, leaked: digest.admission.leaked.length }), ...standardLines(tr, digest.standard),
     ...roleLines(tr, digest.roles, digest.problems, (p) => problemText(tr, p)), ...standingLines(tr, digest.debug.standing), questionsSummary(tr, digest.debug.questions),
     ...(questions ? questionLines(tr, digest.debug.questions) : []));

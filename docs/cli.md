@@ -2884,6 +2884,30 @@ starci release check --final --json
 starci release check --only publish-plan,canon-pins
 ```
 
+### starci release ci-status
+
+the verdict of the GitHub ci workflow, Codecov and Sonar for a release; red is recorded for Debug
+
+| flag | type | |
+| --- | --- | --- |
+| `--repo` | string |  |
+| `--tag` | string |  |
+| `--wait` | boolean |  |
+
+Conventions:
+
+- Under suite ci the full test suite runs only in this workflow, after the push; this verb is how its verdict comes back.
+- The state is left beside the release record (starci-release/<sha>.ci.json); starci debug digest and starci reconciler up --check show the last release CI.
+
+exit: 0 the ci workflow of the release commit is green; 1 it is red (for a release cut under suite ci: recorded once as runtime-defect:release-ci-red-<tag>); 2 bad usage; 3 no verdict yet - no run, still running, or GitHub could not be read
+
+json: flag
+
+```sh
+starci release ci-status --tag v1.0.0-alpha.8 --wait
+starci release ci-status --json
+```
+
 ### starci release clean-test
 
 test published packages from fresh isolated installs

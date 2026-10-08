@@ -117,3 +117,4 @@ internal:
   - {path: scripts/reconciler/core-watch.mjs, why: "Core-watch probe run by the debug run verb", usedBy: [scripts/cli/lib/debug-run.mjs]}
   - {path: scripts/gates/release-publish.mjs, why: "Publication owner called by the release publish flow", usedBy: [scripts/supervisor/release-publish-flow.mjs]}
   - {path: scripts/hfs/sync-runtime.mjs, why: "Runtime-copy sync owner called by the release sync-runtime verb", usedBy: [scripts/supervisor/release-sync-runtime.mjs]}
+  - {path: scripts/supervisor/release-affected.mjs, why: "The affected tests row of a release cut under suite ci, run as a plan step", usedBy: [modules/supervisor/release-cut.yaml]}

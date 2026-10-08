@@ -134,3 +134,7 @@ rulings:
     date: '2026-10-08'
     ruling: The public runtime repository tracks no secret material, not even ciphertext ("khong muon commit enc cua .claude len"); the seven held .enc members, their allowance and the specs of sealing into ext/sonar are removed.
     enforcedBy: [scripts/hfs/runtime-rules/secret-tracked.mjs]
+  - id: release-suite-ci
+    date: '2026-10-09'
+    ruling: "The owner's words: add to config.yaml a setting 'full test: none' so the full test is never applied locally and it is pushed to git, letting Codecov handle it, to save time; locally it still runs PARTIAL tests, the tests related to the commit. Recorded as release.suite (local or ci, shipped default local; the value is ci because the suite moves to CI, it does not vanish). Under ci the release cut plans no root suite and no Linux parity row, the pre-push gate accepts a release record without a local npm test row only when the record says suite ci and the checked-out config says ci, and a red CI is fixed forward with the next pre-release. The trade the owner accepts, that a release can reach GitHub and its tag before the suite has run, is stated in docs/releasing.md."
+    enforcedBy: [scripts/guards/release-definition.mjs, scripts/guards/release-suite-mode.mjs, scripts/supervisor/release-ci-rows.mjs, engine/release-config.mjs]

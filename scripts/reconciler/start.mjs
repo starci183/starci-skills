@@ -26,6 +26,7 @@ import { repeatInOrder } from '../lib/in-order.mjs';
 import { json, kernelSeatItems, seatNeed, supervisorRow } from './seat-items.mjs';
 import { isLauncherOrTaskRow, healLauncherAndTasks, registerTask, runtimeLink } from './start-heal.mjs';
 import { renderBrief, renderText } from './start-render.mjs';
+import { releaseCiItems } from './release-ci-item.mjs';
 import { tempRoot } from '../../engine/temp-root.mjs';
 export { PROFILE, engineItems, profileItems, safeShadowOf };
 export { engineIsSafe } from './start-items.mjs';
@@ -231,7 +232,7 @@ export async function gather({ env = process.env, config = safeRun(() => loadCon
   const machine = machineDbRows(env);
   push(machine.rows, ledgerRows(machine.ledgers));
   push(await worktreeItems({ env, repos: machine.ledgers.filter((l) => l.state !== 'retired').map((l) => l.repoRoot) }));
-  push(pinRows(config));
+  push(pinRows(config), releaseCiItems({ repo: SKILL_ROOT }));
   const orcaProbe = orca ? await probeOrcaAsync({ timeoutMs: 30_000 }) : { ok: null };
   // config + engine + controllers + sla
   push(engineRows(env, config));

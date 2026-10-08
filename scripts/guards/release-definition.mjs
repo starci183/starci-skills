@@ -7,15 +7,20 @@
 //   RELEASE_TAG_MISSING         an ANNOTATED tag v<version> points at the pushed commit
 //   RELEASE_RECEIPT_MISSING     the L4 record of exactly this commit (scripts/guards/release-record.mjs, written by the cut) names this tag
 //   RELEASE_RECEIPT_INCOMPLETE  that record holds a green row for each of RECEIPT_STEPS (the root suite, the packages suites and the checks) that RAN on this commit: a row the record marks `reusedFrom` another commit does not count
+//   RELEASE_SUITE_MODE          the record says `suite: ci` (the full suite delegated to CI) while the checked-out config says `local`, or it lists no delegated root suite: a record never claims the mode by itself
+//                               (the mode `ci` asks for the packages suites and the checks only, scripts/guards/release-suite-mode.mjs)
 // Each finding names what is missing and the command that produces it. Pure over the git reads; no bypass.
 import { catFile } from '../api/git/cat-file.mjs';
 import { revParseQuery } from '../api/git/rev-parse-query.mjs';
 import { show } from '../api/git/show.mjs';
 import { changelogSection, releaseNotesFindings } from '../hfs/runtime-rules/release-notes.mjs';
 import { readL4Record } from './release-record.mjs';
+import { suiteModeOf } from './release-suite-mode.mjs';
 
 /** The rows the L4 record must hold green: the full root suite, the packages suites and the checks of the exact commit. */
 export const RECEIPT_STEPS = Object.freeze(['npm test', 'npm run test:packages', 'npm run check']);
+/** The rows a record cut under `suite: ci` must hold green, RUN on the exact commit: the root suite is CI's, these two are not. */
+export const RECEIPT_STEPS_CI = Object.freeze(['npm run test:packages', 'npm run check']);
 const CUT_COMMAND = (tag) => `starci release cut --tag ${tag}`;
 const REGEX_SPECIALS = /[.*+?^$()|[\]{}\\]/g;
 const HEADING_HEAD = String.raw`^## \[`;
@@ -58,12 +63,23 @@ function tagFindings({ cwd, commit, tag }) {
   return [finding('RELEASE_TAG_MISSING', `no annotated tag ${tag} points at ${commit.slice(0, 9)}`, CUT_COMMAND(tag))];
 }
 
+/** The finding of a record that claims the delegated suite without the checked-out config saying so (or without naming the delegated root suite), else null. */
+function suiteModeFinding({ record, cwd, commit, tag }) {
+  if (record.suite !== 'ci') return null;
+  if (suiteModeOf(cwd) !== 'ci') return finding('RELEASE_SUITE_MODE', `the release record of ${commit.slice(0, 9)} says suite: ci, but this checkout's config.yaml release.suite is not ci: a record does not choose the mode`, `set release.suite: ci in config.yaml (the owner's choice), or ${CUT_COMMAND(tag)} under suite: local`);
+  if (!(record.delegated ?? []).some((row) => row?.name === 'npm test')) return finding('RELEASE_SUITE_MODE', `the suite: ci record of ${commit.slice(0, 9)} does not list npm test as delegated`, CUT_COMMAND(tag));
+  return null;
+}
+
 function receiptFindings({ cwd, commit, tag }) {
   const record = readL4Record({ repo: cwd, head: commit, tag });
   if (!record) return [finding('RELEASE_RECEIPT_MISSING', `no release record for exactly ${commit.slice(0, 9)} and ${tag}: the full suite and the packages suites did not run green on this commit`, CUT_COMMAND(tag))];
+  const mode = suiteModeFinding({ record, cwd, commit, tag });
+  if (mode) return [mode];
   // A row reused from another commit (reusedFrom) was not run on this one: the required rows count only when they RAN on the exact pushed commit.
   const green = new Set((record.logs ?? []).filter((row) => row?.ok === true && !row.reusedFrom).map((row) => row.name));
-  const absent = RECEIPT_STEPS.filter((name) => !green.has(name));
+  const required = record.suite === 'ci' ? RECEIPT_STEPS_CI : RECEIPT_STEPS;
+  const absent = required.filter((name) => !green.has(name));
   return absent.length ? [finding('RELEASE_RECEIPT_INCOMPLETE', `the release record of ${commit.slice(0, 9)} has no green row run on this commit for: ${absent.join(', ')}`, CUT_COMMAND(tag))] : [];
 }
 

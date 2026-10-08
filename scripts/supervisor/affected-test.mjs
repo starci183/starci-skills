@@ -39,7 +39,7 @@ export function changedSince(root, base, deps = {}) {
 }
 
 // The exports the diff of one changed file against `base` reaches (the land gate's hub narrowing), or an unmapped answer.
-function symbolsAgainst({ root, base, deps }, file) {
+export function symbolsAgainst({ root, base, deps }, file) {
   if (!file.endsWith('.mjs')) return { symbols: null, why: 'not a .mjs file' };
   const result = (deps.diff ?? diff)(['-U0', '--no-color', base, '--', file], { cwd: root });
   let source;

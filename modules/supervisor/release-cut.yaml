@@ -44,3 +44,31 @@ reuse:
       include: [examples/<app>/, examples/index.yaml, package.json, package-lock.json, scripts/gates/build-env.mjs, scripts/supervisor/release-l4-layers.mjs]
   always: ['<app>: npm ci', 'test-world: npm run build']
   keep: 6
+
+# The suite mode `ci` (config.yaml release.suite: ci, the owner's recorded choice of 2026-10-09, modules/kernel/owner-rulings.yaml release-suite-ci): the full suite and the Linux parity container are judged by
+# the GitHub workflow after the push, so the cut plans neither. What it keeps running locally is what CI cannot give or what is cheap and catches the most.
+suite:
+  ci:
+    # The rows the cut does not run, and the reason the plan, the result and the release record state for each.
+    delegated:
+      - {name: npm test, why: delegated to CI}
+      - {name: linux-parity, why: delegated to CI}
+    # The commit-bound partial tests: the specs the release range (last release tag..HEAD) can break, chosen by `starci test affected`'s selection. A range over the verb's bound
+    # (modules/supervisor/affected-tests.yaml maxFiles) is run commit by commit: a commit whose affected set already passed (its ledger beside the release record) is not run again.
+    affected:
+      row: affected tests
+      script: scripts/supervisor/release-affected.mjs
+      maxCommits: 80       # commits examined one by one; older ones are listed as not covered locally
+      maxRunFiles: 400     # spec files one cut runs; the rest are listed as not run locally
+    # The live Orca smokes (four real agent launches): CI has no Orca, so they stay local and get a row of their own, with the L4 env.
+    orca:
+      row: orca live smokes
+      specs: [tests/api-orca/orca-settle-live.spec.mjs, tests/api-orca/orca-worktree-rm-live.spec.mjs]
+    # The example apps start after this row (the suite row they wait for in local mode is not planned); the live Orca smokes, the longest local row, run beside the apps.
+    appsAfter: npm run check
+    # The GitHub workflow whose run judges a `suite: ci` release (.github/workflows/ci.yml, name: ci) and the check names read as the Codecov and Sonar verdicts.
+    workflow: ci
+    statusPatterns: [codecov, sonar]
+    # `starci release ci-status --wait`: how often the run is read and how long it is waited for (the workflow's own timeout is 150 minutes).
+    pollSeconds: 30
+    waitMinutes: 160

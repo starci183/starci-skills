@@ -266,7 +266,7 @@ export function analyze(snapshot, policy, n, docs = declared()) {
   const standard = judgeStandard(docs.standard, { now: snapshot.now, n, reconciler, supervisor, admission }, views);
   const verdicts = classifyAll({ n, defs: docs.standard, standard, views, registry: snapshot.registry ?? [], problems: legacy });
   const rows = roleRows({ bugs: verdicts.bugs, happy: verdicts.happy, views });
-  const digest = { schema: 'starci/debug-digest@2', at: snapshot.now, ok: verdicts.bugs.length === 0, reconciler, supervisor, workflows, admission, standard, roles: rows, problems: verdicts.bugs };
+  const digest = { schema: 'starci/debug-digest@2', at: snapshot.now, ok: verdicts.bugs.length === 0, reconciler, supervisor, workflows, admission, releaseCi: snapshot.releaseCi ?? null, standard, roles: rows, problems: verdicts.bugs };
   const debug = { standing: standingOf(snapshot, n), questions: answerQuestions(docs.questions, { ...digest, bugs: verdicts.bugs }, snapshot, n) };
   return { ...digest, debug };
 }

@@ -2,6 +2,7 @@
 // each ledger are opened through their readers, and the children are the existing read verbs (`kernel status`, the Kernel
 // watchdog probe without --repair, the Supervisor seat status), each with a timeout. A failing read becomes a field of the snapshot.
 import path from 'node:path';
+import { ciLine, latestCiRecord } from '../supervisor/release-ci-status.mjs';
 import { fileURLToPath } from 'node:url';
 import { openLedgerReader } from '../../engine/db/ledger.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
@@ -80,6 +81,11 @@ async function supervisorHealth({ timeoutMs, run }) {
  * The snapshot: {now, liveRev, engine, supervisor, reservations, seats, supJobs, workflows}, or {unavailable} when there is no
  * machine store. Filters: `repos` (ledger-owner paths) and `workflowIds`. Seams: machine, ledger, run, now.
  */
+/** The last release's CI verdict as one line (`tag state (suite: mode)`), or null when no release was cut in this checkout or its record cannot be read. */
+function releaseCiLine(env) {
+  try { return ciLine(latestCiRecord({ repo: env.STARCI_KERNEL_REV_ROOT ?? ROOT })); } catch { return null; }
+}
+
 export async function collectSnapshot({ env = process.env, repos = [], workflowIds = [], timeoutMs = 90_000, now = Date.now(),
   machine = machineFacts, ledger = ledgerFacts, history = ledgerHistory, run: runChild = child, numbers = digestNumbers(), readBlob = undefined, liveRev = () => runtimeShaOf(env.STARCI_KERNEL_REV_ROOT ?? ROOT) } = {}) {
   // The read verbs run as the digest: a stranger to every workflow, so `kernel status` projects through a read-only ledger and writes nothing.
@@ -98,7 +104,7 @@ export async function collectSnapshot({ env = process.env, repos = [], workflowI
   });
   const health = await supervisorHealth({ timeoutMs, run });
   const attemptScan = scanBlobs(attemptTranscripts(workflows, numbers.secretScanArtifacts), { maxBytes: numbers.secretScanBytes, ...(readBlob ? { readBlob } : {}) });
-  return { now, liveRev: liveRev(), engine: facts.engine, supervisor: { ...facts.supervisor, health }, reservations: facts.reservations,
+  return { now, liveRev: liveRev(), releaseCi: releaseCiLine(env), engine: facts.engine, supervisor: { ...facts.supervisor, health }, reservations: facts.reservations,
     seats: facts.seats, supJobs: facts.supJobs, lands: facts.lands ?? [], refusals: refusalFacts(env), workflows, history: finished, historyErrors, registry: registryFacts(), criteria: endCriteria(),
     providerEvents: facts.providerEvents ?? [], runtimeChanges: facts.runtimeChange ?? [], hostDrift: facts.hostDrift ?? [], portClaims: facts.portClaim ?? [], secrets: mergeScans(facts.secrets ?? { scanned: 0, unreadable: 0, hits: [] }, attemptScan) };
 }
