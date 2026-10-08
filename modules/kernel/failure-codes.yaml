@@ -17125,3 +17125,13 @@ SCAN_SMELL:
   nextStep_vi: "Sửa đúng dòng được chỉ: chạy các bước độc lập bằng `Promise.all`, gọi tên thứ tự bằng `eachInOrder` của `platform/primitives`, bỏ import thừa, viết lại biểu thức lồng thành câu lệnh riêng, đọc locale qua `next/root-params`, trả `Promise.resolve(...)` thay vì `async` không `await`. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
   owner: op-retry
   kind: check-finding
+move-refused:
+  title: "A move the runtime made for the Kernel was refused"
+  title_vi: "Một bước runtime làm thay Kernel bị từ chối"
+  meaning_vi: "Runtime tự làm các bước cơ học của Kernel (đưa một chặng đã duyệt vào hàng chờ, làm lại một nút đỏ, chạy lại một bằng chứng cũ, hỏi thông tin đăng nhập, vẽ lại, làm lại một phần của lát cắt); khi lệnh đưa việc vào hàng chờ bị từ chối thì runtime mở mục quyết định này cho Kernel."
+  causes_vi:
+    - "Đơn vị việc đã dùng hết lượt thử hoặc đang có một lượt chạy mở"
+    - "Phạm vi ghi hoặc tham số của việc không còn hợp lệ"
+  nextStep_vi: "Kernel đọc lý do từ chối, sửa điều nó nêu (nâng ngân sách qua người có quyền, đổi phạm vi, chờ lượt đang mở) rồi chạy lại lệnh, hoặc chọn hướng khác."
+  owner: supervisor
+  kind: blocker

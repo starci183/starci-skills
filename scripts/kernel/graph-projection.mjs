@@ -15,6 +15,7 @@ import { HANDOVER_OP } from './handover.mjs';
 import { SEAM_PRIORITY_CLASS, SEAM_RECONCILE_CHECK } from './seam-policy.mjs';
 import { ASSET_OP } from '../work/asset-slot.mjs';
 import { retryMoveOf } from './retry-move.mjs';
+import { enqueueMove, legPathsOf, rerunMoveOf, withMove } from './next-moves.mjs';
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const ownerLanguage = () => ownerLanguageOf();
 
@@ -110,7 +111,9 @@ const approvedLegAction = (op, ctx, credentialOnly) => {
   const placeholder = (planAncestors.get(op) ?? []).some((ancestor) => credentialOnly(ancestor));
   const nodes = workGraph ? workGraph.frontier.map((node) => node.id) : [];
   const deferral = deferredPlanOps.get(op);
-  const action = { kind: 'dispatch', origin: 'approved-leg', op, ...(nodes.length ? { nodes } : {}), ...(deferral ? { deferred: deferral.reason } : {}) };
+  // The plan leg's own write set is the move; a work graph partitions the leg per node and a leg that declares none leaves the write set to the Kernel.
+  const move = nodes.length ? null : enqueueMove(ctx.wf.workflow_id, { op, paths: ctx.legPaths.get(op) });
+  const action = withMove({ kind: 'dispatch', origin: 'approved-leg', op, ...(nodes.length ? { nodes } : {}), ...(deferral ? { deferred: deferral.reason } : {}) }, move);
   if (deferral) {
     action.reason = `approved leg ${op} is deferred (${deferral.reason}): starci kernel enqueue --op ${op} with its paths records it - it settles deferred at once, never dispatched, no attempt spent - and the legs behind it do not wait on it`;
   } else {
@@ -139,14 +142,18 @@ const redNodeActions = (actions, ctx) => {
   const { workGraph } = ctx;
   for (const node of workGraph?.frontier ?? []) {
     if (node.color !== 'red' || !node.lastOp) continue;
-    actions.push({ kind: 'dispatch', origin: 'red-node', op: node.lastOp, nodes: [node.id], paths: node.ownedPaths.join(','), reason: `work-graph v${workGraph.version} turned ${node.id} red: starci kernel enqueue --op ${node.lastOp} --paths ${node.ownedPaths.join(',')}, then route and dispatch it` });
+    const row = ctx.rowOf.get(node.lastJob);
+    const again = row?.status === 'succeeded' ? { reopen: `work-graph node ${node.id} turned red` } : { 'retry-of': ['failed', 'awaiting_owner'].includes(row?.status) ? row.job_id : null };
+    const move = enqueueMove(ctx.wf.workflow_id, { op: node.lastOp, paths: node.ownedPaths, ...again });
+    actions.push(withMove({ kind: 'dispatch', origin: 'red-node', op: node.lastOp, nodes: [node.id], round: node.lastJob, paths: node.ownedPaths.join(','), reason: `work-graph v${workGraph.version} turned ${node.id} red: starci kernel enqueue --op ${node.lastOp} --paths ${node.ownedPaths.join(',')}, then route and dispatch it` }, move));
   }
 };
 /** A proof whose every piece of evidence is stale re-runs only the check that made it (proof-integrity.mjs). */
 const staleProofActions = (actions, ctx) => {
   const { staleReady, staleProofs } = ctx;
   for (const item of staleProofs.filter((proof) => !staleReady.some((stale) => stale.jobId === proof.jobId))) {
-    actions.push({ kind: 'impact-check', origin: 'stale-proof', op: item.op, jobId: item.jobId, reason: `its proof of ${item.items.slice(0, 5).join(', ')}${item.items.length > 5 ? ' (+' + (item.items.length - 5) + ')' : ''} is stale: ${item.changed.slice(0, 5).join(', ')} changed since it was indexed; re-dispatch ${item.op} as a new attempt --retry-of ${item.jobId} (only that check)` });
+    const move = rerunMoveOf(ctx.rowOf.get(item.jobId), { op: item.op, reason: `its proof is stale: ${item.changed.slice(0, 3).join(', ')} changed` });
+    actions.push(withMove({ kind: 'impact-check', origin: 'stale-proof', op: item.op, jobId: item.jobId, reason: `its proof of ${item.items.slice(0, 5).join(', ')}${item.items.length > 5 ? ' (+' + (item.items.length - 5) + ')' : ''} is stale: ${item.changed.slice(0, 5).join(', ')} changed since it was indexed; re-dispatch ${item.op} as a new attempt --retry-of ${item.jobId} (only that check)` }, move));
   }
 };
 /** Artwork slots a drawing declared and interface.asset has not filled: propose the interface.asset leg that owes them. */
@@ -155,15 +162,16 @@ const assetSlotActions = (actions, ctx) => {
   const assetLegOpen = workflowJobs.some((row) => row.op_id === ASSET_OP && (row.status === 'queued' || LEG_IN_FLIGHT.includes(row.status)));
   if (assetSlotsOwed.length && !assetLegOpen) {
     const records = [...new Set(assetSlotsOwed.map((slot) => slot.ui).filter(Boolean))];
-    actions.push({ kind: 'dispatch', origin: 'asset-slots', op: ASSET_OP, paths: records.join(','), slots: assetSlotsOwed.map((slot) => slot.key),
-      reason: `${assetSlotsOwed.length} artwork slot(s) the drawing owes to interface.asset (${assetSlotsOwed.slice(0, 5).map((slot) => slot.key).join(', ')}${assetSlotsOwed.length > 5 ? ' (+' + (assetSlotsOwed.length - 5) + ')' : ''}): starci kernel enqueue --op ${ASSET_OP} --paths ${records.join(',')}, then route and dispatch it - it generates each slot under the brand imagery.promptRules and replaces the placeholder (src + data-asset-sha256)` });
+    actions.push(withMove({ kind: 'dispatch', origin: 'asset-slots', op: ASSET_OP, paths: records.join(','), slots: assetSlotsOwed.map((slot) => slot.key),
+      reason: `${assetSlotsOwed.length} artwork slot(s) the drawing owes to interface.asset (${assetSlotsOwed.slice(0, 5).map((slot) => slot.key).join(', ')}${assetSlotsOwed.length > 5 ? ' (+' + (assetSlotsOwed.length - 5) + ')' : ''}): starci kernel enqueue --op ${ASSET_OP} --paths ${records.join(',')}, then route and dispatch it - it generates each slot under the brand imagery.promptRules and replaces the placeholder (src + data-asset-sha256)` }, enqueueMove(ctx.wf.workflow_id, { op: ASSET_OP, paths: records })));
   }
 };
 /** A ready attempt whose read records changed: re-dispatch it as a new attempt. */
 const staleReadyActions = (actions, ctx) => {
   const { staleReady } = ctx;
   for (const item of staleReady) {
-    const action = { kind: 'impact-check', origin: 'stale-ready', op: item.op, jobId: item.jobId };
+    const move = rerunMoveOf(ctx.rowOf.get(item.jobId), { op: item.op, reason: item.followUp ? 'the owner of a record it read declared the change breaking' : 'records it read changed since it settled' });
+    const action = withMove({ kind: 'impact-check', origin: 'stale-ready', op: item.op, jobId: item.jobId }, move);
     if (item.followUp) action.reason = `the owner of a record it read declared the change breaking: enqueue ONE follow-up attempt of ${item.op}${item.cut ? ' cut ordinal ' + item.cut.ordinal : ''}`; else action.reason = `records it read changed since it settled: re-dispatch ${item.op} as a new attempt${item.cut ? ' of cut ordinal ' + item.cut.ordinal : ''}`;
     actions.push(action);
   }
@@ -191,7 +199,8 @@ const pendingAskActions = (actions, ctx) => {
 const credentialStepAction = (actions, ctx) => {
   const { wf, autopilot } = ctx;
   if (autopilot?.on && autopilot.checklistDue) {
-    actions.push({ kind: 'dispatch', origin: 'credential-step', op: 'provision.ask', final: true, params: `{"subject":"${HANDOVER_CREDENTIALS_SUBJECT}"}`, paths: `.starciwork/evidence/${wf.workflow_id}.credentials`, reason: `the end-of-flow owner step "supply credentials": starci kernel enqueue --op provision.ask --params '{"subject":"${HANDOVER_CREDENTIALS_SUBJECT}"}' --paths .starciwork/evidence/${wf.workflow_id}.credentials; its ask files the question \`starci kernel autopilot --workflow ${wf.workflow_id} --checklist --json\` prints (.question), verbatim - one form for every deferred credential; the deferred approvals (${(autopilot.checklistApprovals ?? []).join(', ') || 'none'}) are released at the same time (starci kernel autopilot --release <dispatchId>). The deferred live proofs resume by themselves once the owner answers` });
+    const params = `{"subject":"${HANDOVER_CREDENTIALS_SUBJECT}"}`, paths = `.starciwork/evidence/${wf.workflow_id}.credentials`;
+    actions.push(withMove({ kind: 'dispatch', origin: 'credential-step', op: 'provision.ask', final: true, params, paths, reason: `the end-of-flow owner step "supply credentials": starci kernel enqueue --op provision.ask --params '{"subject":"${HANDOVER_CREDENTIALS_SUBJECT}"}' --paths .starciwork/evidence/${wf.workflow_id}.credentials; its ask files the question \`starci kernel autopilot --workflow ${wf.workflow_id} --checklist --json\` prints (.question), verbatim - one form for every deferred credential; the deferred approvals (${(autopilot.checklistApprovals ?? []).join(', ') || 'none'}) are released at the same time (starci kernel autopilot --release <dispatchId>). The deferred live proofs resume by themselves once the owner answers` }, enqueueMove(wf.workflow_id, { op: 'provision.ask', paths, params })));
   }
 };
 /** A leg in flight is a wait. */
@@ -284,7 +293,8 @@ export function graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs,
   // deferred at once (no dispatch, no attempt), which releases every leg behind it.
   const deferredQueued = new Map(queued.map((item) => [item.jobId, testDeferralOf({ skillRoot, op: item.opId, payload: jobPayloadOf(rowOf.get(item.jobId)), settings: specs })]).filter(([, deferral]) => deferral));
   const ctx = { db, wf, legOps, planAncestors, workflowJobs, jobsByOp, failedRows, queued, ownerGates, peerWaits, awaitingOwner, staleReady, staleProofs, credentialWaitOps,
-    approvalWaitOps, workGraph, assetSlotsOwed, autopilot, unresolved, rowOf, deferredJobs, specs, goalText, deferredPlanOps, specDeferredJobs, deferredQueued };
+    approvalWaitOps, workGraph, assetSlotsOwed, autopilot, unresolved, rowOf, deferredJobs, specs, goalText, deferredPlanOps, specDeferredJobs, deferredQueued,
+    legPaths: legPathsOf(latestGoal(db, wf.workflow_id)?.json) };
   unresolvedRetryActions(actions, ctx);
   askless(actions, ctx);
   answeredAskActions(actions, ctx);
