@@ -169,7 +169,7 @@ test('the text prints the standard, every role, the standing and the questions i
   const wf = withRows({ attempts: [attempt({ settledAt: null, verdict: null, endState: null })], events: [] });
   const d = digest(snapshot({ workflows: [wf], criteria: endCriteria() }));
   const en = renderText(d, { language: 'en', questions: true });
-  for (const word of ['Standard: at step', 'Verdict per role', 'Critic runs: unobserved', 'Runtime: BUG - ', 'Debug standing against its end condition', 'clean-workflows', 'Power and lifecycle', '[gap]']) assert.ok(en.includes(word), word);
+  for (const word of ['Standard: at step', 'Verdict per role', 'Critic runs: unobserved', 'Runtime: BUG - ', 'Debug standing against its end condition', 'clean-workflows', 'Power and lifecycle', '0 documented gaps']) assert.ok(en.includes(word), word);
   const vi = renderText(d, { language: 'vi', questions: false });
   for (const word of ['Chu\u1ea9n v\u1eadn h\u00e0nh', 'K\u1ebft lu\u1eadn theo t\u1eebng vai', 'ch\u01b0a quan s\u00e1t \u0111\u01b0\u1ee3c', 'V\u1ecb th\u1ebf c\u1ee7a Debug', 'C\u00e2u h\u1ecfi c\u1ee7a Debug']) assert.ok(vi.includes(word), word);
   assert.equal(vi.includes('Power and lifecycle'), false);
@@ -178,12 +178,12 @@ test('the text prints the standard, every role, the standing and the questions i
 test('the attempts, step events and finished workflows are read from a ledger, the claim mismatch counting only the last run of each check', () => {
   const db = new DatabaseSync(':memory:');
   db.exec(`CREATE TABLE op_attempts(attempt_id INTEGER, workflow_id TEXT, job_id TEXT, op_id TEXT, try_no INTEGER, agent TEXT, provider TEXT, dispatched_at INTEGER, started_at INTEGER,
-      reported_at INTEGER, settled_at INTEGER, report_outcome TEXT, verdict TEXT, end_state TEXT, settled_by TEXT, worktree_path TEXT);
+      reported_at INTEGER, settled_at INTEGER, report_outcome TEXT, verdict TEXT, end_state TEXT, settled_by TEXT, worktree_path TEXT, transcript_sha TEXT);
     CREATE TABLE check_runs(attempt_id INTEGER, name TEXT, runner TEXT, run_seq INTEGER, declared_exit_code INTEGER, exit_code INTEGER, cwd TEXT);
     CREATE TABLE events(seq INTEGER PRIMARY KEY AUTOINCREMENT, workflow_id TEXT, kind TEXT, attempt_id INTEGER, entity_id TEXT, created_at INTEGER, payload_json TEXT);
     CREATE TABLE workflows(workflow_id TEXT, phase TEXT, created_at INTEGER, finished_at INTEGER, updated_at INTEGER);
     CREATE TABLE incidents(workflow_id TEXT, kind TEXT);`);
-  db.prepare("INSERT INTO op_attempts VALUES(1,'wf','j','x',1,'claude','claude',10,11,12,NULL,'done',NULL,NULL,NULL,'/tree/a'),(2,'wf','j2','y',1,'claude','claude',10,11,12,13,'done','pass','settled','settler','/tree/b')").run();
+  db.prepare("INSERT INTO op_attempts VALUES(1,'wf','j','x',1,'claude','claude',10,11,12,NULL,'done',NULL,NULL,NULL,'/tree/a',NULL),(2,'wf','j2','y',1,'claude','claude',10,11,12,13,'done','pass','settled','settler','/tree/b','sha')").run();
   db.prepare("INSERT INTO check_runs VALUES(1,'lint','kernel',1,0,1,'/t'),(1,'lint','kernel',2,0,0,'/t'),(2,'lint','kernel',1,0,1,'/t')").run();
   const insert = db.prepare('INSERT INTO events(workflow_id, kind, attempt_id, entity_id, created_at, payload_json) VALUES(?,?,?,?,?,?)');
   insert.run('wf', 'op-settled', 2, 'j2', 14, JSON.stringify({ verdict: 'pass', claimOverruled: false, checkedIn: [{ cwd: '/tree/b', commit: 'c', tree: 't' }] }));
