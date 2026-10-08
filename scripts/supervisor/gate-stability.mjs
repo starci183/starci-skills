@@ -13,7 +13,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { openLedgerReader } from '../../engine/db/ledger.mjs';
 import { machineFileFor, readMachine } from '../../engine/db/machine.mjs';
 import { parseJson } from '../lib/json.mjs';
-import { asList } from '../lib/list.mjs';
+import { asList, byCodeUnit } from '../lib/list.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { eachInOrder } from '../lib/in-order.mjs';
 
@@ -23,7 +23,7 @@ const SELF_ROOT = path.resolve(path.dirname(selfFile), '..', '..');
 /** The ledger files of this host's registry (machine.sqlite `ledgers`) that still exist. */
 function registeredLedgers({ machine = machineFileFor() } = {}) {
   if (!fs.existsSync(machine)) return [];
-  return readMachine((m) => m.listLedgers().map((l) => l.file).sort(), [], { file: machine }).filter((file) => fs.existsSync(file));
+  return readMachine((m) => m.listLedgers().map((l) => l.file).sort(byCodeUnit), [], { file: machine }).filter((file) => fs.existsSync(file));
 }
 
 /** The latest accepted leg of `family` per live workflow of one ledger: [{workflowId, jobId, attempt, files[]}]. */

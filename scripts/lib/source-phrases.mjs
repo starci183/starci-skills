@@ -19,7 +19,7 @@ function sourcePhrases(root = skillRoot) {
   if (!cache.has(root)) {
     let doc = null;
     try { doc = parseYaml(fs.readFileSync(path.join(root, ...SOURCE_PHRASES_FILE.split('/')), 'utf8')); } catch { doc = null; }
-    cache.set(root, doc && typeof doc.phrases === 'object' && doc.phrases ? doc.phrases : {});
+    cache.set(root, doc?.phrases && typeof doc.phrases === 'object' ? doc.phrases : {});
   }
   return cache.get(root);
 }

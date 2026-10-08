@@ -62,10 +62,10 @@ function learnStackDirectory(root, stackDir, entry) {
   const text = readSafe(path.join(dir, 'stack.yaml'));
   let doc = null;
   try { doc = text ? parseYaml(text) : null; } catch { doc = null; }
-  const secrets = doc && typeof doc.secrets === 'object' && doc.secrets ? doc.secrets : {};
+  const secrets = doc?.secrets && typeof doc.secrets === 'object' ? doc.secrets : {};
   for (const [name, spec] of Object.entries(secrets)) {
     secretNames.add(envName(name));
-    if (spec && typeof spec.file === 'string') addSecretValue(readSafe(path.resolve(dir, spec.file)));
+    if (typeof spec?.file === 'string') addSecretValue(readSafe(path.resolve(dir, spec.file)));
   }
   // Plaintext runtime copies of the secrets (git-ignored): their values are secrets too.
   for (const file of listSafe(path.join(dir, 'runtime', 'files'))) if (file.isFile()) addSecretValue(readSafe(path.join(dir, 'runtime', 'files', file.name)));

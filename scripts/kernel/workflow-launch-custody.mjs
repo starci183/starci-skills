@@ -65,7 +65,7 @@ export function recoverWorkflowLaunch(ledger, { workflowId, signal, env = proces
   }
   // A Dispatch without a bound terminal (the start failed before Orca's answer named one) is reconciled from Orca's own report of it.
   const adopted = isUnadopted(owned, value, receipt) ? settled({ dispatch: value.dispatch, receipt }) : null;
-  if (adopted && !adopted.ok) return held(adopted.reason, adopted);
+  if (adopted?.ok === false) return held(adopted.reason, adopted);
   const terminal = adopted?.handle ?? value?.terminal;
   if (!isBoundLaunch(owned, value, terminal, receipt)) return held('kernel-launch-custody-incomplete');
   if (!expected.ok || canonicalJSON(current()) !== canonicalJSON(signal))

@@ -674,7 +674,7 @@ ${errors.length ? `<p style="color:#a33">errors: ${esc(errors.join('; '))}</p>` 
       ctx.done = true;
       // Answered: the ask's Telegram messages are deleted, then the form stops serving.
       closeAskMessages(ledger, { ledgerFile: file, workflowId: args.workflow, dispatchIds: [report.dispatch_id], reason: 'answered', by: guard.answeredBy })
-        .catch(() => {}).finally(() => setTimeout(() => { server.close(); process.exit(0); }, 400).unref());
+        .finally(() => setTimeout(() => { server.close(); process.exit(0); }, 400).unref()).catch(() => {});
     } finally { held.release(); }
   } catch (error) {
     res.writeHead(500, { 'content-type': 'text/html; charset=utf-8' });

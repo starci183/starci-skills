@@ -216,8 +216,9 @@ export function checkUiRecord(workRoot, uiFile, record, shell, { mode = 'op', ui
   const level = LEVELS[mode];
   const at = shown(workRoot, uiFile);
   const out = checkBinding({ shell, level }, at, record);
-  const raw = shell && !shell.error && isLayoutTree(shell.record) ? shell.record : null;
-  if (shell && !shell.error && !raw && record?.shell?.chromeless !== true) {
+  const bound = shell?.error ? null : shell;
+  const raw = bound && isLayoutTree(bound.record) ? bound.record : null;
+  if (bound && !raw && record?.shell?.chromeless !== true) {
     out.push(finding(level.missing, 'SHELL_RECORD_NOT_TREE', at, `the shell record names schema ${shell.record?.schema ?? '(none)'}, not ${TREE_SCHEMA}; the ui record cannot be placed in a layout tree`));
     return out;
   }

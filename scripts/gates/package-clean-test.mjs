@@ -91,7 +91,7 @@ function workspaceMembers(wsRoot) {
       const parent = path.join(wsRoot, pattern.slice(0, -2));
       let names = [];
       try { names = fs.readdirSync(parent, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name); } catch { /* no such folder */ }
-      for (const name of names.sort()) if (fs.existsSync(path.join(parent, name, 'package.json'))) out.push(path.join(parent, name));
+      for (const name of names.sort(byCodeUnit)) if (fs.existsSync(path.join(parent, name, 'package.json'))) out.push(path.join(parent, name));
     } else if (fs.existsSync(path.join(wsRoot, pattern, 'package.json'))) out.push(path.join(wsRoot, pattern));
   }
   return out;

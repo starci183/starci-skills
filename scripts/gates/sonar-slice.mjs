@@ -1,4 +1,5 @@
 import { coverageScopeOf, coverageTargetOf, judgeCoverage } from './sonar-gate.mjs';
+import { findInOrder } from '../lib/in-order.mjs';
 
 const ITEM_CAP = 50, ISSUE_BATCH = 25;
 const tally = (items, field) => items.reduce((out, item) => { const key = item[field] ?? 'unknown'; out[key] = (out[key] ?? 0) + 1; return out; }, {});
@@ -22,12 +23,14 @@ const sliceIssues = async (cfg, tokens, keys, readAll) => {
   if (got.error && got.status === 400) got = await readAll(cfg, tokens, `/api/issues/search?componentKeys=${batch}&resolved=false`, 'issues');
   if (got.error && got.status === 400 && keys.length > 1 && /same qualifier/i.test(got.error)) {
     const items = [];
-    for (const key of keys) {
+    let failure = null;
+    await findInOrder(keys, async (key) => {
       const single = await sliceIssues(cfg, tokens, [key], readAll);
-      if (single.error) return single;
+      if (single.error) { failure = single; return true; }
       items.push(...single.items);
-    }
-    return { items };
+      return false;
+    });
+    return failure ?? { items };
   }
   return got;
 };
@@ -44,20 +47,23 @@ const fileCoverage = async (cfg, tokens, fileKey, read) => {
 const changedSources = async ({ cfg, tokens, key, files, qualifierOf, read }) => {
   const analyzed = new Map(), notAnalyzed = [];
   let changedSourceLines = 0;
-  for (const file of files) {
+  let failure = null;
+  await findInOrder(files, async (file) => {
     const fileKey = `${key}:${file.path}`;
     const from = file.ranges.length ? Math.min(...file.ranges.map((range) => range[0])) : 1;
     const to = file.ranges.length ? Math.max(...file.ranges.map((range) => range[1])) : 1;
     const lines = await read(cfg, tokens, `/api/sources/lines?key=${encodeURIComponent(fileKey)}&from=${from}&to=${to}`);
-    if (lines.status === 404) { notAnalyzed.push(file.path); continue; }
+    if (lines.status === 404) { notAnalyzed.push(file.path); return false; }
     if (!lines.reachable || lines.status !== 200) {
       const detail = lines.error ?? `HTTP ${lines.status}`;
-      return { error: `source lines of ${file.path} could not be read: ${detail}` };
+      failure = { error: `source lines of ${file.path} could not be read: ${detail}` };
+      return true;
     }
     analyzed.set(fileKey, file);
     if (qualifierOf(file.path) === 'FIL') changedSourceLines += file.ranges.reduce((total, [start, end]) => total + (end - start + 1), 0);
-  }
-  return { analyzed, notAnalyzed, changedSourceLines };
+    return false;
+  });
+  return failure ?? { analyzed, notAnalyzed, changedSourceLines };
 };
 
 /** Read issues and hotspots limited to the changed lines. */
@@ -76,11 +82,15 @@ const sliceEvidence = async ({ cfg, tokens, key, analyzed, qualifierOf, readAll,
     groups.get(qualifier).push(fileKey);
   }
   const issues = [];
-  for (const group of groups.values()) for (let index = 0; index < group.length; index += ISSUE_BATCH) {
-    const got = await sliceIssues(cfg, tokens, group.slice(index, index + ISSUE_BATCH), readAll);
-    if (got.error) return { error: `issues of the slice could not be read: ${got.error}` };
+  const batches = [...groups.values()].flatMap((group) => Array.from({ length: Math.ceil(group.length / ISSUE_BATCH) }, (_, n) => group.slice(n * ISSUE_BATCH, (n + 1) * ISSUE_BATCH)));
+  let failure = null;
+  await findInOrder(batches, async (batch) => {
+    const got = await sliceIssues(cfg, tokens, batch, readAll);
+    if (got.error) { failure = { error: `issues of the slice could not be read: ${got.error}` }; return true; }
     issues.push(...got.items.filter((issue) => onSlice(issue, issue.component)));
-  }
+    return false;
+  });
+  if (failure) return failure;
   const hotspotsRead = keys.length ? await readAll(cfg, tokens, `/api/hotspots/search?projectKey=${encodeURIComponent(key)}&status=TO_REVIEW`, 'hotspots') : { items: [] };
   if (hotspotsRead.error) return { error: `hotspots of the project could not be read: ${hotspotsRead.error}` };
   return { keys, issues, hotspots: hotspotsRead.items.filter((hotspot) => onSlice(hotspot, hotspot.component)), onSlice };
@@ -89,19 +99,23 @@ const sliceEvidence = async ({ cfg, tokens, key, analyzed, qualifierOf, readAll,
 /** The duplicated share of changed source lines, including the first API error if any. */
 const duplicationResult = async ({ cfg, tokens, keys, analyzed, qualifierOf, changedLines, gate, read }) => {
   const duplication = { changedLines, duplicatedLines: 0, percent: null, threshold: gate.duplicationMaxPercent, files: [] };
-  for (const fileKey of keys) {
+  let failure = null;
+  await findInOrder(keys, async (fileKey) => {
     const file = analyzed.get(fileKey);
-    if (qualifierOf(file.path) !== 'FIL' || !file.ranges.length) continue;
+    if (qualifierOf(file.path) !== 'FIL' || !file.ranges.length) return false;
     const shown = await read(cfg, tokens, `/api/duplications/show?key=${encodeURIComponent(fileKey)}`);
-    if (shown.status === 404) continue;
+    if (shown.status === 404) return false;
     if (!shown.reachable || shown.status !== 200) {
       const detail = shown.error ?? `HTTP ${shown.status}`;
-      return { error: `duplications of ${file.path} could not be read: ${detail}` };
+      failure = { error: `duplications of ${file.path} could not be read: ${detail}` };
+      return true;
     }
     const mine = duplicatedLinesOf(shown.json, fileKey);
     const hit = [...mine].filter((line) => inRanges(file.ranges, line)).sort((a, b) => a - b);
     if (hit.length) { duplication.duplicatedLines += hit.length; duplication.files.push({ path: file.path, lines: hit.slice(0, ITEM_CAP) }); }
-  }
+    return false;
+  });
+  if (failure) return failure;
   duplication.percent = changedLines ? Math.round((duplication.duplicatedLines / changedLines) * 1000) / 10 : null;
   return { duplication };
 };
@@ -119,13 +133,16 @@ const coverageStatus = (coverage) => {
 /** Measure each changed coverage target in order and return its policy result. */
 const coverageResult = async ({ cfg, tokens, keys, analyzed, qualifierOf, props, coverageRun, gate, read }) => {
   const scope = coverageScopeOf(props), isTarget = coverageTargetOf(scope), measured = [];
-  for (const fileKey of coverageRun?.judged === false ? [] : keys) {
+  let failure = null;
+  await findInOrder(coverageRun?.judged === false ? [] : keys, async (fileKey) => {
     const file = analyzed.get(fileKey);
-    if (qualifierOf(file.path) !== 'FIL' || !isTarget(file.path)) continue;
+    if (qualifierOf(file.path) !== 'FIL' || !isTarget(file.path)) return false;
     const got = await fileCoverage(cfg, tokens, fileKey, read);
-    if (got.error) return { error: `coverage of ${file.path} could not be read: ${got.error}` };
+    if (got.error) { failure = { error: `coverage of ${file.path} could not be read: ${got.error}` }; return true; }
     measured.push({ path: file.path, coverage: got.coverage });
-  }
+    return false;
+  });
+  if (failure) return failure;
   let coverage;
   if (coverageRun?.judged === false) {
     const status = coverageRun.ownerMode ? 'not-measured' : 'not-required';

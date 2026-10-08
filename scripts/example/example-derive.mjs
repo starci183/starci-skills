@@ -428,7 +428,7 @@ export function runGenerated(workRoot, {write} = {}, {boundaryError, yamlRel, te
   let onDiskText = null;
   try { onDiskText = fs.readFileSync(textPath); } catch { onDiskText = null; }
   const ok = onDiskDoc !== null && canonicalJSON(onDiskDoc) === canonicalJSON(doc)
-    && onDiskText !== null && onDiskText.equals(Buffer.from(text, 'utf8'));
+    && onDiskText?.equals(Buffer.from(text, 'utf8')) === true;
   return {ok, computed, doc, text, onDiskDoc, onDiskText};
 }
 

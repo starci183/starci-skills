@@ -4,7 +4,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { walkFiles } from '../../lib/walk.mjs';
 import { readEnv } from '../../lib/env.mjs';
-import { eachInOrder, repeatInOrder } from '../../lib/in-order.mjs';
+import { eachInOrder, repeatInOrder, findInOrder } from '../../lib/in-order.mjs';
 import { byCodeUnit } from '../../lib/list.mjs';
 import { DEFAULT_VIEWPORT } from './grammar-geometry-resolve.mjs';
 
@@ -16,14 +16,16 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '.
 /** Playwright's chromium, resolved from the product repo first (the way .claude runs the project's own Playwright). */
 export async function loadChromium(repo) {
   const bases = [repo, ROOT, readEnv('STARCI_PLAYWRIGHT_DIR')].filter(Boolean).map((d) => path.join(path.resolve(d), 'package.json'));
-  for (const base of bases) for (const name of ['playwright', '@playwright/test', 'playwright-core']) {
+  let loaded = null;
+  await findInOrder(bases, (base) => findInOrder(['playwright', '@playwright/test', 'playwright-core'], async (name) => {
     let resolved;
-    try { resolved = createRequire(base).resolve(name); } catch { continue; }
+    try { resolved = createRequire(base).resolve(name); } catch { return false; }
     const mod = await import(pathToFileURL(resolved).href);
     const chromium = mod.chromium ?? mod.default?.chromium;
-    if (chromium) return { chromium, from: resolved };
-  }
-  return null;
+    if (chromium) loaded = { chromium, from: resolved };
+    return Boolean(chromium);
+  }));
+  return loaded;
 }
 
 /** The html files a --check or --score target names: the file itself, or every .html of a capture dir. */

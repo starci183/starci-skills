@@ -62,7 +62,7 @@ function checkCodeDigest({ problems, resolveMap, workspaceDoc, resolveRoot }, { 
 // is refused as not replayable.
 function checkAssertionsReplayable({ problems }, { record, shown }) {
   for (const assertion of Array.isArray(record.assertions) ? record.assertions : []) {
-    if (!assertion || typeof assertion.command !== 'string' || !assertion.command.trim()) {
+    if (typeof assertion?.command !== 'string' || !assertion.command.trim()) {
       problems.push(`${shown}: assertion ${assertion?.id ?? '(unnamed)'} carries no command - evidence without a replayable command is refused [PROOF_NOT_REPLAYABLE]`);
     }
   }

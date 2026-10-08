@@ -39,7 +39,7 @@ const findRecordDir = (workRoot, recordId) => {
  * "verified" forever by never actually being checked. */
 function replayAssertion(assertion, cwd) {
   const claimedOutcome = assertion?.outcome ?? 'pass';
-  if (!assertion || typeof assertion.command !== 'string' || !assertion.command.trim()) {
+  if (typeof assertion?.command !== 'string' || !assertion.command.trim()) {
     return {id: assertion?.id ?? '(unnamed)', ok: false, reason: 'no command recorded; not replayable', claimedOutcome, replayedOutcome: null, replayedExit: null};
   }
   const status = runCommand(assertion.command, {cwd}).status;

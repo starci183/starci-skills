@@ -81,8 +81,8 @@ function markdownHeading(line) {
 function textExtent(content) {
   let firstText = -1;
   let lastText = -1;
-  for (let index = 0; index < content.length; index += 1) {
-    if (!WHITESPACE.test(content[index])) {
+  for (const [index, unit] of content.split('').entries()) {
+    if (!WHITESPACE.test(unit)) {
       if (firstText < 0) firstText = index;
       lastText = index;
     }

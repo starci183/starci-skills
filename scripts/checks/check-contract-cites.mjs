@@ -29,6 +29,7 @@ import { generatedRootsOf, isHistoryPath } from '../lib/check-scan.mjs';
 import { ts } from '../hfs/runtime-rules/source-ast.mjs';
 import { lsFiles } from '../api/git/ls-files.mjs';
 import { gitOutputOf } from '../lib/git.mjs';
+import { byCodeUnit } from '../lib/list.mjs';
 import { checkReportResult } from '../lib/check-cli.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { trimTrailingChars } from '../lib/normalize.mjs';
@@ -248,7 +249,7 @@ export function runtimeCiteScan(root = DEFAULT_ROOT) {
   const generated = generatedRootsOf(root);
   const scoped = (rel) => CITE_EXT.test(rel) && !isHistoryPath(rel) && !generated.some((g) => rel.startsWith(g));
   try {
-    return gitOutputOf(lsFiles(['-z'], { dir: root, maxBuffer: 256 * 1024 * 1024 }), 'git ls-files').split('\0').filter(Boolean).map((f) => f.replaceAll('\\', '/')).filter((rel) => scoped(rel) && fs.existsSync(path.join(root, rel))).sort();
+    return gitOutputOf(lsFiles(['-z'], { dir: root, maxBuffer: 256 * 1024 * 1024 }), 'git ls-files').split('\0').filter(Boolean).map((f) => f.replaceAll('\\', '/')).filter((rel) => scoped(rel) && fs.existsSync(path.join(root, rel))).sort(byCodeUnit);
   } catch {
     return walkFiles(root, { sorted: true, exclude: (name) => NOT_TRACKED_DIRS.has(name) }).map((f) => path.relative(root, f).replaceAll('\\', '/')).filter(scoped);
   }

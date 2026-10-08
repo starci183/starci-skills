@@ -18,6 +18,7 @@ import { runNode } from '../api/node/run-node.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { starciBin } from '../lib/package-at.mjs';
+import { byCodeUnit } from '../lib/list.mjs';
 
 const USAGE = 'usage: starci runtime check --only example-architecture -- [--examples <dir>] [--only <name>]';
 
@@ -25,7 +26,7 @@ const USAGE = 'usage: starci runtime check --only example-architecture -- [--exa
 export function exampleDirs(examplesDir, only) {
   return fs.readdirSync(examplesDir, { withFileTypes: true })
     .filter((e) => e.isDirectory() && fs.existsSync(path.join(examplesDir, e.name, 'hfs.json')) && (!only || e.name === only))
-    .map((e) => e.name).sort();
+    .map((e) => e.name).sort(byCodeUnit);
 }
 
 const LINT_SHAPE = (report) => report.schema === 'starci/lint@1' && typeof report.ok === 'boolean'

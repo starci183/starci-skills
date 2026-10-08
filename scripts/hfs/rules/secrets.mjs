@@ -29,8 +29,8 @@ export function secretFileFindings({ file, text }) {
   const findings = [];
   const lines = text.split(/\r?\n/);
   const seen = new Set();
-  for (let index = 0; index < lines.length; index += 1) {
-    for (const pattern of secretHits(file, lines[index])) {
+  for (const [index, line] of lines.entries()) {
+    for (const pattern of secretHits(file, line)) {
       if (seen.has(pattern)) continue;
       seen.add(pattern);
       findings.push(found(PLAINTEXT_SECRET, file, `${file}:${index + 1} holds a plaintext secret (${pattern}); seal it with sops at .starcistacks/<env>/secrets/<slug>.enc and read it by *_FILE`, { line: index + 1, pattern }));

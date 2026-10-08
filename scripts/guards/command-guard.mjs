@@ -70,6 +70,7 @@ import { boundGuard, boundSeat, fileWriteVerdict, gitSubOf, redirectTargetsOf, r
 import { intrinsicPolicyRead, loadCommandPolicy, policyVerdict } from './command-policy.mjs';
 import { commandsOf, programOf } from './shell-commands.mjs';
 import { tempPath } from '../api/fs/temp-path.mjs';
+import { findInOrder } from '../lib/in-order.mjs';
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export { boundGuard } from './rights.mjs';
 
@@ -132,7 +133,7 @@ const WORKFLOW_HISTORY_VERBS = new Set(['commit', 'merge', 'rebase', 'push', 'pu
 const RESET_MODES = new Set(['--hard', '--soft', '--mixed', '--merge', '--keep']);
 const BRANCH_WRITE_FLAGS = new Set(['-d', '-D', '-m', '-M', '-c', '-C', '-f', '-u', '--delete', '--move', '--copy', '--force', '--unset-upstream', '--edit-description', '--no-track']);
 const branchWriteValue = (option, name) => option === name || (option.startsWith(`${name}=`)
-  && !['\n', '\r', '\u2028', '\u2029'].some(lineBreak => option.slice(name.length + 1).includes(lineBreak)));
+  && !/[\n\r\u2028\u2029]/.test(option.slice(name.length + 1)));
 const isBranchWrite = option => BRANCH_WRITE_FLAGS.has(option) || branchWriteValue(option, '--set-upstream-to') || branchWriteValue(option, '--track');
 const BRANCH_READ_WORDS = new Set(['--list', '--all', '--remotes', '--show-current', '--contains', '--no-contains', '--merged', '--no-merged', '--points-at', '--sort', '--format', '--color', '--no-color', '--column', '--no-column', '-vv', '--verbose']);
 const BRANCH_READ_VALUES = /^--(?:sort|format|color|column)=/;
@@ -276,10 +277,13 @@ async function rightsOfCall({ commands, command, cwd, ctx, guard }) {
   // The file rights are the more specific refusal (a write into the protected zone, an op writing the runtime checkout): they come before the generic command policy.
   if (ctx.role === 'supervisor' || ctx.role === 'op') {
     const targets = [...commands.flatMap((c) => writeTargetsOf(c)), ...redirectTargetsOf(command, cwd)];
-    for (const filePath of targets) {
+    let refusal = null;
+    await findInOrder(targets, async (filePath) => {
       const v = await fileRightsVerdict({ role: ctx.role, filePath, tool: 'shell', guard, shell: true });
-      if (v) return { tool: 'shell', ...v };
-    }
+      if (v) refusal = { tool: 'shell', ...v };
+      return Boolean(v);
+    });
+    if (refusal) return refusal;
   }
   for (const c of commands) {
     const v = policyVerdict({ role: ctx.role, command: c, guard, handle: ctx.handle, lockOwner: ctx.lockOwner, policy: ctx.policy });
@@ -330,6 +334,17 @@ const packageManagerCommandVerdict = async (command, guard, fullDeps) => {
   return installVerdict({ program: command.program, args: command.args, cwd: command.cwd, guard, deps: loaded });
 };
 
+/** The first refusal of one parsed command, in rule order: the synchronous rules, git, the kernel mailbox, the package managers; falsy when none. */
+async function commandRefusal(c, ctx, guard, fullDeps) {
+  const sync = syncCommandVerdict(c, guard);
+  if (sync) return { tool: c.program, ...sync };
+  const gitResult = await gitCommandVerdict(c, ctx, guard, fullDeps);
+  if (gitResult) return gitResult;
+  const mailbox = kernelMailboxVerdict(c.program, c.args, guard);
+  if (mailbox) return { tool: c.program, ...mailbox };
+  return packageManagerCommandVerdict(c, guard, fullDeps);
+}
+
 export async function commandVerdict({ command, cwd, guard, env = process.env, dialect = 'bash', deps = null, rights = null }) {
   let d = deps;
   const fullDeps = async () => { d ??= await loadDeps(); return d; };
@@ -338,16 +353,12 @@ export async function commandVerdict({ command, cwd, guard, env = process.env, d
   const ctx = rights ?? await rightsContext({ guard, env, text: command });
   const byQuery = queryKillVerdict(commands, command);
   if (byQuery) return { tool: 'process-query', ...byQuery };
-  for (const c of commands) {
-    const sync = syncCommandVerdict(c, guard);
-    if (sync) return { tool: c.program, ...sync };
-    const gitResult = await gitCommandVerdict(c, ctx, guard, fullDeps);
-    if (gitResult) return gitResult;
-    const mailbox = kernelMailboxVerdict(c.program, c.args, guard);
-    if (mailbox) return { tool: c.program, ...mailbox };
-    const packageResult = await packageManagerCommandVerdict(c, guard, fullDeps);
-    if (packageResult) return packageResult;
-  }
+  let refusal = null;
+  await findInOrder(commands, async (c) => {
+    refusal = await commandRefusal(c, ctx, guard, fullDeps);
+    return Boolean(refusal);
+  });
+  if (refusal) return refusal;
   return rightsOfCall({ commands, command, cwd, ctx, guard });
 }
 

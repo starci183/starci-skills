@@ -70,7 +70,7 @@ export function captureGateBinding(placements, { at, revision = (root) => revPar
     }
     if (!target.owned.includes(owned)) target.owned.push(owned);
   }
-  for (const target of targets) target.owned.sort();
+  for (const target of targets) target.owned.sort(byCodeUnit);
   return { at, targets };
 }
 

@@ -244,12 +244,12 @@ const landingPages = (nodes) => {
 
 const matchUrl = (pattern, url) => {
   const p = urlParts(pattern), u = urlParts(url);
-  for (let i = 0; i < p.length; i += 1) {
-    const kind = segmentKindOf(p[i]);
+  for (const [i, segment] of p.entries()) {
+    const kind = segmentKindOf(segment);
     if (kind === 'catch-all') return u.length > i;
     if (kind === 'optional-catch-all') return true;
     if (i >= u.length) return false;
-    if (kind !== 'dynamic' && p[i] !== u[i]) return false;
+    if (kind !== 'dynamic' && segment !== u[i]) return false;
   }
   return p.length === u.length;
 };

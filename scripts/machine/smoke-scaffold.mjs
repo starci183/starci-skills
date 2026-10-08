@@ -6,6 +6,7 @@ import { safeRemove } from '../api/fs/safe-remove.mjs';
 import { runNode } from '../api/node/run-node.mjs';
 import { runNpm } from '../api/npm/run-npm.mjs';
 import { resultDetail, resultOk } from '../lib/verb-call.mjs';
+import { findInOrder } from '../lib/in-order.mjs';
 import { underHostLock } from './verb-lock.mjs';
 import { tempRoot } from '../../engine/temp-root.mjs';
 
@@ -52,14 +53,18 @@ export async function smokeScaffold(ctx, deps = {}) {
         return ok(first) ? npm(['ci', '--no-audit', '--no-fund'], { cwd: app, env, timeout: 900_000 }) : first;
       });
       if (!install.passed) return { code: 1, stderr: `starci smoke scaffold: install failed (${detail(install.result) || 'no detail'})` };
-      for (const [name, argv] of [
+      let failure = null;
+      await findInOrder([
         ['lint', ['run', 'lint']],
         ['typecheck', ['run', 'typecheck', '--if-present']],
         ['build', ['run', 'build', '--if-present']],
-      ]) {
+      ], async ([name, argv]) => {
         const step = await record(name, () => npm(argv, { cwd: app, env, timeout: 900_000 }));
-        if (!step.passed) return { code: 1, stderr: `starci smoke scaffold: ${name} failed (${detail(step.result) || 'no detail'})` };
-      }
+        if (step.passed) return false;
+        failure = { code: 1, stderr: `starci smoke scaffold: ${name} failed (${detail(step.result) || 'no detail'})` };
+        return true;
+      });
+      if (failure) return failure;
       const check = await record('check', () => node([cliEntry, 'app', 'check', '--cwd', app], { cwd: app, env, timeout: 900_000 }));
       if (!check.passed) return { code: 1, stderr: `starci smoke scaffold: check failed (${detail(check.result) || 'no detail'})` };
       return { code: 0 };

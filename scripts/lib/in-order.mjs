@@ -33,7 +33,7 @@ const walk = (items, visit, decide) => new Promise((resolve, reject) => {
       if (step.done) { resolve(undefined); return; }
       pending = visit(step.value, index++);
     } catch (error) {
-      if (step && !step.done) fail(error); else reject(error);
+      if (step === undefined || step.done) reject(error); else fail(error);
       return;
     }
     Promise.resolve(pending).then((outcome) => {

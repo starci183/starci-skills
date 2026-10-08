@@ -101,7 +101,7 @@ export function judgeUnitRun(summary) {
 export function judgeLint(report, relevant, what) {
   if (report?.schema !== LINT_SCHEMA) return refused({ status: 'missing', code: 'op-lint-proof-missing' }, `no starci app lint report (schema ${LINT_SCHEMA}) is attached: run starci app lint --format json at the app root and attach lint.json`);
   if ((report.errors ?? []).length) return refused({ status: 'unavailable', code: 'op-lint-tool-failed' }, `starci app lint could not run: ${oneLine(report.errors.join('; '))}`, report.errors.map(String));
-  const findings = (report.findings ?? []).filter(relevant);
+  const findings = (report.findings ?? []).filter((finding) => relevant(finding));
   if (findings.length) return refused({ status: 'red', code: 'op-lint-findings' }, `${findings.length} ${what} finding(s); first: ${listed(findings)[0]}`, listed(findings));
   return pass();
 }
@@ -126,7 +126,7 @@ export function judgeSecurityLint(report, findingsDoc, relevant) {
   if (findingsDoc?.schema !== SECURITY_FINDINGS_SCHEMA || !Array.isArray(findingsDoc.findings))
     return refused({ status: 'missing', code: 'op-security-findings-missing' }, `no typed security findings (schema ${SECURITY_FINDINGS_SCHEMA}, findings[] by rule, empty when there are none) are attached beside lint.json`);
   const carried = findingsDoc.findings.map((f) => ({ path: slash(f?.path), code: f?.code ?? null, rule: ruleName(f?.rule) }));
-  const dropped = (report.findings ?? []).filter(relevant).filter((f) => {
+  const dropped = (report.findings ?? []).filter((finding) => relevant(finding)).filter((f) => {
     const p = slash(f.path);
     return !carried.some((c) => c.path === p && ((f.code && c.code === f.code) || (c.rule && c.rule === ruleName(f.rule))));
   });
@@ -146,7 +146,7 @@ function judgeInspectionCarriage(report, findingsDoc, relevant) {
   if (findingsDoc?.schema !== SECURITY_FINDINGS_SCHEMA || !Array.isArray(findingsDoc.findings) || !findingsDoc.findings.every(complete))
     return refused({ status: 'red', code: 'op-security-findings-missing' }, 'the native inspection requires complete typed findings: rule, code (null only when the lint has no code), path, line, severity and reachability');
   const carried = findingsDoc.findings, used = new Set();
-  const dropped = (report.findings ?? []).filter(relevant).filter((f) => {
+  const dropped = (report.findings ?? []).filter((finding) => relevant(finding)).filter((f) => {
     // Consume each carried location once: one path/rule row cannot cover two
     // reported locations or duplicate observations of the same location.
     const index = carried.findIndex((c, i) => !used.has(i) && slash(c.path) === slash(f.path)

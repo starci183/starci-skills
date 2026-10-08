@@ -340,7 +340,7 @@ const settleBacklogAct = (progress, { api, repo }) => {
 // them. ONE wire unit owning every broken importer, before the next queued units - ranked right after the settle backlog: every later unit's checker fails on these imports until it runs.
 const repointAct = ({ importsBroken, brokenCluster, units, queuedOf, N, api, base }) => {
   if (!((importsBroken?.count && !importsBroken.repointQueued) || (!importsBroken && brokenCluster?.open))) return null;
-  const files = importsBroken?.brokenFiles ?? []; const nextUnits = units.flatMap(queuedOf).slice(0, N - 1).map((j) => j.job_id);
+  const files = importsBroken?.brokenFiles ?? []; const nextUnits = units.flatMap((unit) => queuedOf(unit)).slice(0, N - 1).map((j) => j.job_id);
   return act(actionKey('repoint', ...(files.length ? files.slice(0, 4) : ['rca'])), 'light', 'broken-import', 500 + (importsBroken?.files ?? brokenCluster?.open ?? 1),
     importsBroken
       ? `enqueue ONE repoint unit owning the ${importsBroken.files} file(s) whose ${importsBroken.count} import(s) resolve to nothing (IMPORTS_BROKEN_AFTER_MOVE): repoint imports to the new locations; no other change`
@@ -403,7 +403,7 @@ const failedUnitActs = ({ c, us, rows, shared, lastFailedOf, N, api, base }) => 
 const narrowActs = ({ c, us, rows, queuedOf, lastFailedOf, N, api, base }) => {
   const acts = [];
   const shared = c.destinations.filter((d) => rows.filter((r) => r.destinations.includes(d)).length >= 2);
-  const befores = us.flatMap(queuedOf).slice(0, N - 1).map((j) => j.job_id);
+  const befores = us.flatMap((unit) => queuedOf(unit)).slice(0, N - 1).map((j) => j.job_id);
   if (shared.length) acts.push(act(actionKey('wire', ...shared.slice(0, 4)), 'light', c.cause, us.length,
     `add ONE serial wire unit owning the shared destinations ${shared.slice(0, 4).join(', ')} that ${us.length} unit(s) need`,
     `${api} graph-edit ${base} --edit wire --op ${us[0]?.op ?? 'code.refactor'} --paths ${q(shared.slice(0, 6).join(','))}${befores.length ? ' --before ' + befores.join(',') : ''} --decision <id>`,

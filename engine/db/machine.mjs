@@ -667,11 +667,11 @@ function acquireLeader(m, { name = 'reconciler', holder, pid = process.pid, leas
   return m.transaction((db) => {
     const at = m.now();
     const cur = db.prepare('SELECT * FROM engine_leader WHERE name=?').get(name);
-    if (cur && cur.holder === holder && cur.pid === pid) {
+    if (cur?.holder === holder && cur?.pid === pid) {
       db.prepare('UPDATE engine_leader SET heartbeat_at=?, expires_at=?, rev=?, process_run_id=COALESCE(?,process_run_id) WHERE name=?').run(at, at + leaseMs, rev, processRunId, name);
       return { leader: true, epoch: cur.epoch, renewed: true };
     }
-    if (cur && cur.expires_at > at && !handover) return { leader: false, epoch: cur.epoch, holder: cur.holder, pid: cur.pid };
+    if (cur?.expires_at > at && !handover) return { leader: false, epoch: cur.epoch, holder: cur.holder, pid: cur.pid };
     const epoch = Math.max(Number(cur?.epoch ?? 0), Number(db.prepare('SELECT COALESCE(max(epoch),0) e FROM leader_history').get().e)) + 1;
     if (cur) db.prepare('UPDATE leader_history SET released_at=?, release_reason=? WHERE epoch=? AND released_at IS NULL').run(at, handover ? 'reload' : 'lost', cur.epoch);
     upsertRow(db, 'engine_leader', { name, holder, pid, epoch, process_run_id: processRunId, heartbeat_at: at, expires_at: at + leaseMs, rev, draining: 0, passes: 0, last_pass_ms: null, last_error: null }, ['name']);
@@ -829,9 +829,9 @@ function setService(m, { name, kind, state, pid = undefined, port = undefined, u
     const cur = db.prepare('SELECT state FROM services WHERE name=?').get(name);
     const at = m.now();
     upsertRow(db, 'services', { name, kind, state, since: cur?.state === state ? undefined : at, pid, port, url, last_probe_json: probe, quarantined_until: quarantinedUntil }, ['name']);
-    if (!cur || cur.state !== state || (action && action !== 'none'))
+    if (cur?.state !== state || (action && action !== 'none'))
       insertRow(db, 'service_events', { name, at, from_state: cur?.state ?? null, to_state: state, probe_ms: probeMs, probe_error: probeError, action, action_id: actionId });
-    return { changed: !cur || cur.state !== state, from: cur?.state ?? null };
+    return { changed: cur?.state !== state, from: cur?.state ?? null };
   });
 }
 const recordProbe = (m, { name, ok, latencyMs = null, detail = null }) => insertRow(m.db, 'service_probes', { name, at: m.now(), ok: ok ? 1 : 0, latency_ms: latencyMs, detail_json: detail });
@@ -924,7 +924,7 @@ function setThrottle(m, { mode, effectiveCap = null, heavyCap = null, running = 
     // MB-15: a process running an OLDER runtime never overwrites what a newer runtime wrote.
     if (cur && compareRevs(writerRev, cur.writer_rev) < 0)
       return { changed: false, refused: `stale-writer-rev: ${writerRev} is older than ${cur.writer_rev} (${cur.writer})`, from: cur.mode };
-    const changed = !cur || cur.mode !== mode;
+    const changed = cur?.mode !== mode;
     if (changed) insertRow(db, 'throttle_events', { at, from_mode: cur?.mode ?? null, to_mode: mode, reason, free_ram_pct: freeRamPct, cpu_pct: cpuPct, effective_cap: effectiveCap, running, writer_rev: writerRev, sample_json: sample });
     upsertRow(db, 'throttle_state', { id: 1, mode, effective_cap: effectiveCap, heavy_cap: heavyCap, running, free_ram_pct: freeRamPct, free_ram_mb: freeRamMb, cpu_pct: cpuPct, cpu_hot: int(cpuHot),
       since: changed ? at : cur.since, updated_at: at, reason, writer, writer_rev: writerRev, slot_targets_json: slotTargets, priorities_json: priorities }, ['id']);
@@ -943,8 +943,8 @@ function setProviderHealth(m, { provider, status, failureKind = null, strikes = 
     const at = m.now();
     upsertRow(db, 'provider_health', { provider, status, failure_kind: failureKind, strikes, strike_limit: strikeLimit, circuit_open_until: circuitOpenUntil,
       recovered_at: status === 'recovered' ? at : undefined, reason, updated_at: at, detail_json: detail }, ['provider']);
-    if (!cur || cur.status !== status) insertRow(db, 'provider_health_events', { provider, at, from_status: cur?.status ?? null, to_status: status, failure_kind: failureKind, ledger_id: ledgerId, attempt_id: attemptId, detail_json: detail });
-    return { changed: !cur || cur.status !== status };
+    if (cur?.status !== status) insertRow(db, 'provider_health_events', { provider, at, from_status: cur?.status ?? null, to_status: status, failure_kind: failureKind, ledger_id: ledgerId, attempt_id: attemptId, detail_json: detail });
+    return { changed: cur?.status !== status };
   });
 }
 const providerHealth = (m) => m.db.prepare('SELECT * FROM provider_health ORDER BY provider').all();

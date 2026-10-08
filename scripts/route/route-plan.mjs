@@ -35,7 +35,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { routeFields, stringItems } from './route-fields.mjs';
-import { asList } from '../lib/list.mjs';
+import { asList, byCodeUnit } from '../lib/list.mjs';
 import { ownerSpecs, planLegDeferral } from './spec-deferral.mjs';
 import { applyExtend, impactOf, satisfiedByS0, surveyS0 } from './route-plan-survey.mjs';
 import { STATE_QUALIFIER, VAR_STATE_LINE, dedupeVars, intentToStar, loadArchetypeSignals, normalizeTargetVar, varKey } from './route-plan-parse.mjs';
@@ -85,7 +85,7 @@ function loadOps(opsDir) {
   const root = path.join(opsDir, 'ops');
   const files = fs.existsSync(root) ? fs.readdirSync(root) : [];
   const ops = new Map();
-  for (const file of files.filter(f => f.endsWith('.yaml')).sort()) {
+  for (const file of files.filter(f => f.endsWith('.yaml')).sort(byCodeUnit)) {
     let doc;
     try { doc = parseYaml(fs.readFileSync(path.join(root, file), 'utf8')); }
     catch (e) { ops.set(file, { id: file, error: `unparseable: ${e.message}` }); continue; }

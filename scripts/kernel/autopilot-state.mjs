@@ -374,7 +374,7 @@ const writtenName = (w) => {
   const s = String(w);
   if (!s.endsWith(')')) return s;
   let lastLine = -1;
-  for (let i = s.length - 1; i >= 0; i -= 1) { if ('\n\r\u2028\u2029'.includes(s[i])) { lastLine = i; break; } }
+  for (let i = s.length - 1; i >= 0; i -= 1) { if (/[\n\r\u2028\u2029]/.test(s[i])) { lastLine = i; break; } }
   const open = s.indexOf('(', lastLine + 1);
   if (open < 0) return s;
   let head = open;

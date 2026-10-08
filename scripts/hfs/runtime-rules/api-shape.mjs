@@ -49,7 +49,7 @@ function apiCallFileFindings(ctx, file, owner, contracts) {
   const contract = contracts.get(owner);
   const stem = path.posix.basename(file).replace(/\.[cm]?js$/, '');
   if (contract?.ids === null) found.push({ code: CODE, level: 'error', path: contract.file, line: 1, message: `${contract.file}, the calls contract of ${owner}, cannot be read` });
-  else if (contract && !contract.ids.has(stem)) found.push({ code: CODE, level: 'error', path: file, line: 1, message: `${file} is not a call of ${contract.file}: a call file of ${owner} is named after the call id it wraps (${stem} is no id under calls:)` });
+  else if (contract?.ids.has(stem) === false) found.push({ code: CODE, level: 'error', path: file, line: 1, message: `${file} is not a call of ${contract.file}: a call file of ${owner} is named after the call id it wraps (${stem} is no id under calls:)` });
   return found;
 }
 

@@ -7,6 +7,7 @@ import { SKILL_ROOT } from '../machine/home.mjs';
 import { DEFAULT_DUE_MS } from '../machine/decisions.mjs';
 import { finishLanded, selfJobsLandedBy, recordLandFailed } from './workers.mjs';
 import { describe, failList, specsRedOnMainOf } from './land-format.mjs';
+import { byCodeUnit } from '../lib/list.mjs';
 
 /** A spec failure's identity: its file and its test name. */
 export const failKey = (f) => `${f.file}\u0000${f.name}`;
@@ -45,7 +46,7 @@ export function landOutcomeOf(result, { root = SKILL_ROOT, ticketId = null, lane
 
 /** The openSupDecision args of the specs-red-on-main DI: ONE per set of failing tests, due like any Supervisor-decided DI. */
 export function specsRedOnMainDecision({ redOnMain, root, commits, now }) {
-  const signature = createHash('sha1').update(redOnMain.inherited.map(failKey).sort().join('/')).digest('hex').slice(0, 12);
+  const signature = createHash('sha1').update(redOnMain.inherited.map(failKey).sort(byCodeUnit).join('/')).digest('hex').slice(0, 12);
   return { keyParts: { kind: 'specs-red-on-main', repo: path.basename(root).replace(/[^\w.-]/g, '_') || 'runtime', signature }, kind: 'runtime-defect',
     summary: `${redOnMain.name} at ${String(redOnMain.base).slice(0, 9)}: the land gate tolerated them as inherited; fix main: ${failList(redOnMain.inherited)}`.slice(0, 1000), entityType: 'repo', entityId: root, openedBy: 'land-gate',
     dueAt: now + DEFAULT_DUE_MS.supervisor, escalateTo: 'owner',

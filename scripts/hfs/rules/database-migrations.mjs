@@ -5,7 +5,7 @@ import { log } from '../../api/git/log.mjs';
 import { mergeBase } from '../../api/git/merge-base.mjs';
 import { show } from '../../api/git/show.mjs';
 import { withoutGitLocalEnv } from '../../lib/git.mjs';
-import { eachInOrder } from '../../lib/in-order.mjs';
+import { eachInOrder, findInOrder } from '../../lib/in-order.mjs';
 import { sameText } from '../../lib/same-text.mjs';
 import { found, readText } from './read.mjs';
 import { DB_MIGRATION_SHAPE, MIGRATIONS_DIR } from './database-constants.mjs';
@@ -36,11 +36,13 @@ const runGit = (git, repoRoot, args) => Promise.resolve(git(args, { cwd: repoRoo
   .then((result) => ({ ok: result?.ok === true, stdout: String(result?.stdout ?? '') }));
 
 async function baseShaOf(git, repoRoot, base) {
-  for (const ref of base ? [base] : ['origin/main', 'main']) {
+  let found = null;
+  await findInOrder(base ? [base] : ['origin/main', 'main'], async (ref) => {
     const result = await runGit(git, repoRoot, ['merge-base', 'HEAD', ref]);
-    if (result.ok && result.stdout.trim()) return { ref, sha: result.stdout.trim() };
-  }
-  return null;
+    if (result.ok && result.stdout.trim()) found = { ref, sha: result.stdout.trim() };
+    return found !== null;
+  });
+  return found;
 }
 
 async function baseMigrationNames(git, repoRoot, sha) {

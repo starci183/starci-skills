@@ -58,10 +58,14 @@ function ownerGrantInvalid(grant, { scopeId, role, now, maxAgeMs }) {
     || !quotaFreshAt(grant.observedAt, now, maxAgeMs);
 }
 
+/** A window nothing has drawn on yet: the provider reports 0 percent used and no reset time until its first use. */
+const unstartedWindow = (window) => window.usedPercent === 0 && window.resetsAt == null;
+
 function appendQuotaWindowCodes(window, now, maxAgeMs, codes) {
   const reset = quotaTimestamp(window?.resetsAt);
-  if (!isPlainObject(window) || !text(window.id) || !Number.isFinite(window.usedPercent)
-    || window.usedPercent < 0 || window.usedPercent > 100 || reset === null || reset <= now) codes.push(QUOTA_CODE.QUOTA_WINDOW_INVALID);
+  const shaped = isPlainObject(window) && text(window.id) && Number.isFinite(window.usedPercent)
+    && window.usedPercent >= 0 && window.usedPercent <= 100;
+  if (!shaped || (!unstartedWindow(window) && (reset === null || reset <= now))) codes.push(QUOTA_CODE.QUOTA_WINDOW_INVALID);
   if (!quotaFreshAt(window?.observedAt, now, maxAgeMs)) codes.push(QUOTA_CODE.QUOTA_WINDOW_STALE);
 }
 

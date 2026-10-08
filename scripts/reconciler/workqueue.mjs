@@ -46,7 +46,7 @@ export function memoryRows() {
 /** The engine log row of failed attempt `attempts`, or null when it is not logged (attempts at powers of two and the attempt that spent the budget are). */
 export function failureLog({ controller, key, attempts, delayMs, error }) {
   const spent = delayMs === null;
-  if (!spent && (attempts & (attempts - 1)) !== 0) return null;
+  if (!spent && !Number.isInteger(Math.log2(attempts))) return null;
   const head = spent ? `${controller} ${key} spent its retry budget after ${attempts} attempts and is parked until a new event names it`
     : `${controller} ${key} failed (attempt ${attempts}, retry in ${delayMs}ms)`;
   return { line: `${head}: ${String(error?.message ?? error).slice(0, 300)}`,
@@ -81,7 +81,7 @@ export class WorkQueue {
     if (flight) { flight.dirty = true; flight.dirtyReason = reason; return true; }
     const cur = this.rows.get(controller, key);
     const backingOff = Number(cur?.tries) > 0;
-    if (cur && cur.due_at == null && backingOff && reason !== 'resync') this.rows.put({ controller, key, due_at: at, reason, tries: 0, last_error: null });
+    if (cur?.due_at == null && backingOff && reason !== 'resync') this.rows.put({ controller, key, due_at: at, reason, tries: 0, last_error: null });
     else if (!cur) this.rows.put({ controller, key, due_at: at, reason, tries: 0, last_error: null });
     else if (!backingOff) this.rows.put({ controller, key, due_at: Math.min(Number(cur.due_at ?? at), at), reason });
     return true;

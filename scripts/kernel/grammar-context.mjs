@@ -13,6 +13,7 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { readBrandRecord } from '../work/brand/brand.mjs';
 import { projectBinding, bindingRepo } from './target-repo.mjs';
 import { isFile, isDir } from '../lib/fs-kind.mjs';
+import { byCodeUnit } from '../lib/list.mjs';
 
 export const GRAMMAR_PACKAGE = '@starci/grammar';
 const GRAMMAR_KNOWLEDGE_FAMILY = 'starci';
@@ -28,7 +29,7 @@ export const grammarInputsOf = (brief) => (GRAMMAR_INPUTS.includes(brief?.gramma
 const slash = (p) => p.replaceAll('\\', '/');
 const yamlFilesUnder = (dir) => fs.readdirSync(dir, { withFileTypes: true, recursive: true })
   .filter((e) => e.isFile() && /\.ya?ml$/i.test(e.name))
-  .map((e) => slash(path.join(e.parentPath ?? e.path, e.name))).sort();
+  .map((e) => slash(path.join(e.parentPath ?? e.path, e.name))).sort(byCodeUnit);
 
 // A brand source resolves against its declared repository - bound, else the ledger repository's sibling
 // of that name - with its path relative to that root or spelled from the root's parent

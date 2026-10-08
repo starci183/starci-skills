@@ -63,8 +63,8 @@ async function findHits(lines, pattern, regex) {
   if (regex) return regexHits(lines, pattern);
   const needle = pattern.toLocaleLowerCase();
   const hits = [];
-  for (let i = 0; i < lines.length; i++) {
-    if (lines[i].toLocaleLowerCase().includes(needle)) hits.push(i + 1);
+  for (const [i, line] of lines.entries()) {
+    if (line.toLocaleLowerCase().includes(needle)) hits.push(i + 1);
     if (hits.length >= MAX_HITS) break;
   }
   return hits;

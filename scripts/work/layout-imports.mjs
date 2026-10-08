@@ -40,7 +40,7 @@ function tailBefore(text, quote) {
 function stopFinder(text, stops) {
   let known = null;
   return (from) => {
-    if (known && known.from <= from && from <= known.at) return known.found;
+    if (known?.from <= from && from <= known.at) return known.found;
     let at = from;
     while (at < text.length && !stops.has(text[at])) at += 1;
     const found = { at, tail: isQuote(text[at]) ? tailBefore(text, at) : null };

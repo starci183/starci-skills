@@ -29,6 +29,7 @@ import { hostPathHits } from '../lib/host-path.mjs';
 import { ts } from '../hfs/runtime-rules/source-ast.mjs';
 import { lsFiles } from '../api/git/ls-files.mjs';
 import { gitOutputOf } from '../lib/git.mjs';
+import { byCodeUnit } from '../lib/list.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { lineOf, runReportMain } from '../lib/check-scan.mjs';
 
@@ -94,7 +95,7 @@ export function exampleCouplingScan(root = DEFAULT_ROOT) {
   try {
     return gitOutputOf(lsFiles(['-z'], { dir: root, maxBuffer: 256 * 1024 * 1024 }), 'git ls-files').split('\0').filter(Boolean)
       .map((f) => f.replaceAll('\\', '/'))
-      .filter((rel) => scoped(rel) && fs.existsSync(path.join(root, rel))).sort();
+      .filter((rel) => scoped(rel) && fs.existsSync(path.join(root, rel))).sort(byCodeUnit);
   } catch {
     return walkFiles(root, { sorted: true, exclude: (name) => name === '.git' || name === 'node_modules' })
       .map((f) => path.relative(root, f).replaceAll('\\', '/')).filter(scoped);

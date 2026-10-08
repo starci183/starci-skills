@@ -51,7 +51,7 @@ const ancestorsIn = (nodes) => {
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const up = (id, seen = new Set()) => {
     const n = byId.get(id);
-    for (const p of [n?.parent, n && n.slice !== n.id ? n.slice : null].filter(Boolean)) if (!seen.has(p)) { seen.add(p); up(p, seen); }
+    for (const p of [n?.parent, n?.slice !== n?.id ? n.slice : null].filter(Boolean)) if (!seen.has(p)) { seen.add(p); up(p, seen); }
     return seen;
   };
   return new Map(nodes.map((n) => [n.id, up(n.id)]));

@@ -154,7 +154,7 @@ function overrideIneligibility({ decision, overrideModel, pinProvider, kind, dif
  */
 function refuseIneligibleOverride({ decision, overrideModel, pinProvider, kind, jobId, workflowId, difficulty, bias, routeFacts, runningByModel, poolLoad, emit, args }) {
   if (!overrideModel) return;
-  if (decision && !decision.error && !decision.toolUnavailable && decision.target === overrideModel) return;
+  if (decision?.target === overrideModel && !decision.error && !decision.toolUnavailable) return;
   const why = overrideIneligibility({ decision, overrideModel, pinProvider, kind, difficulty });
   const detail = `the recorded op-override pins ${overrideModel} for ${kind}, which is ineligible here: ${why}. Retarget or clear it with starci kernel op-override --workflow ${workflowId} --op ${kind}; route never silently takes another pool`;
   const out = { ok: false, jobId, kind, difficulty, bias, ...routeFacts,

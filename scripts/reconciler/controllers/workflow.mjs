@@ -148,7 +148,7 @@ function holdStatus(ctx, key, read, now, passes) {
   return { status: hold ? next.last : null, unreadable: { misses: next.misses, since: next.since, error: read.error, failure: read.failure ?? null, heldAt: hold ? next.lastAt : null } };
 }
 /** An starci kernel status value in the shape stall.mjs frontierOf answers (apiFrontier). */
-const asFrontier = (v) => (v && v.ok !== false && v.frontier ? { ...v, ok: true, frontier: v.frontier ?? {}, workers: v.workers ?? [] } : { ok: false, error: v?.error ?? 'status unreadable' });
+const asFrontier = (v) => (v?.frontier && v.ok !== false ? { ...v, ok: true, frontier: v.frontier ?? {}, workers: v.workers ?? [] } : { ok: false, error: v?.error ?? 'status unreadable' });
 
 /* ------------------------------------------------------------------------------------------------ apply */
 

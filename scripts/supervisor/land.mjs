@@ -96,7 +96,7 @@ export const specTimeoutMs = (count) => allocationMs('landGate.specsBaseMs') + c
 export function specRunGate({ concurrency = specConcurrency(), waitMs = LAND_WAIT_MS, pollMs = 30_000, probe = () => hostThrottle({}), sleep = sleepSync, now = Date.now } = {}) {
   const start = now();
   let t = probe();
-  while (t && !t.testContext && t.mode === 'critical' && now() - start < waitMs) { sleep(Math.min(pollMs, Math.max(1, waitMs - (now() - start)))); t = probe(); }
+  while (t?.mode === 'critical' && !t.testContext && now() - start < waitMs) { sleep(Math.min(pollMs, Math.max(1, waitMs - (now() - start)))); t = probe(); }
   const waitedMs = now() - start;
   if (!t || t.testContext) return { ok: true, concurrency, mode: t?.mode ?? null, waitedMs, why: null };
   if (t.mode === 'critical') return { ok: false, concurrency: 0, mode: t.mode, waitedMs, why: t.modeWhy };
@@ -441,7 +441,7 @@ function specRunChecks(o) {
   const { allSpecs, runSpecs, ramGate } = o;
   const gate = runSpecs && allSpecs.length ? ramGate() : null;
   const checks = [];
-  if (gate && !gate.ok) checks.push({ name: `specs (${allSpecs.length})`, ok: false, specs: allSpecs, output: `spec run paused: host RAM critical after waiting ${Math.round(gate.waitedMs / 1000)}s - ${gate.why}; land again once free RAM is back above allocation.resources.ramThrottle.landSpecResumeAbovePct` });
+  if (gate?.ok === false) checks.push({ name: `specs (${allSpecs.length})`, ok: false, specs: allSpecs, output: `spec run paused: host RAM critical after waiting ${Math.round(gate.waitedMs / 1000)}s - ${gate.why}; land again once free RAM is back above allocation.resources.ramThrottle.landSpecResumeAbovePct` });
   if (runSpecs && allSpecs.length && gate?.ok !== false) checks.push(...ranSpecChecks(o, gate?.concurrency || specConcurrency()));
   return checks;
 }
