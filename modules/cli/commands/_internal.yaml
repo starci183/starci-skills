@@ -98,6 +98,7 @@ internal:
   - {path: scripts/reconciler/notifier.mjs, why: "Fleet notification controller", usedBy: [scripts/reconciler/controllers/workers.mjs]}
   - {path: scripts/reconciler/services.mjs, why: "Host service-registry controller", usedBy: [scripts/reconciler/controllers/host.mjs]}
   - {path: scripts/reconciler/sla.mjs, why: "Workflow SLA controller", usedBy: [scripts/reconciler/engine.mjs]}
+  - {path: scripts/guards/release-push-gate.mjs, why: "Body of the generated pre-push hook of the runtime repository", usedBy: [scripts/guards/git-hooks.mjs]}
   - {path: scripts/route/route-model.mjs, why: "Model-route selector and --plan preview", usedBy: [scripts/goal/define-goal.mjs]}
   - {path: scripts/route/route-plan.mjs, why: "Goal route-plan helper", usedBy: [scripts/goal/define-goal.mjs]}
   - {path: scripts/uat/test-secret.mjs, why: "Runtime test-secret reader behind the app secret owner", usedBy: [scripts/supervisor/push-mains.mjs]}
