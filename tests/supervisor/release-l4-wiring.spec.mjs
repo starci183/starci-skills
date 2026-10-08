@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { parityOutcome, parityPlan, parityScript, readWorkflows, runParity } from '../../scripts/supervisor/release-linux-parity.mjs';
 import { sonarSupplier } from '../../scripts/supervisor/release-l4-sonar.mjs';
 import { sonarUp } from '../../scripts/gates/sonar-status.mjs';
+import { stepEnv } from '../../scripts/supervisor/release-l4-layers.mjs';
 import { exampleApps, passesOf, planL4, runL4, runtimeSpecStep, scriptsOf, sectionOf, skipReport, specEnv, specFilesFor } from '../../scripts/supervisor/release-l4.mjs';
 import { cutRelease } from '../../scripts/supervisor/release-cut.mjs';
 
@@ -356,6 +357,11 @@ test('L4: a lite app is planned without the test scripts it cannot have, a full 
     fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name, scripts: Object.fromEntries(scripts.map((s) => [s, 'x'])) }));
     fs.writeFileSync(path.join(dir, 'package-lock.json'), '{}');
   }
+  for (const layer of ['contract', 'integration', 'e2e']) {
+    const folder = path.join(base, 'examples', 'big', 'be', 'src', 'tests', layer);
+    fs.mkdirSync(folder, { recursive: true });
+    fs.writeFileSync(path.join(folder, `one.${layer}-spec.ts`), '');
+  }
   assert.deepEqual(exampleApps(base).map((a) => [a.name, a.edition]), [['big', 'full'], ['tiny', 'lite']]);
   const plan = planL4(base, { runtimeRoot: base });
   const rows = (app) => plan.steps.filter((s) => s.name.startsWith(`${app}: npm run `)).map((s) => [s.name.replace(`${app}: npm run `, ''), s.absent ?? false]);
@@ -363,6 +369,38 @@ test('L4: a lite app is planned without the test scripts it cannot have, a full 
   assert.deepEqual(rows('big').filter(([, absent]) => absent), [['test:e2e', true]], 'a full app that lacks a script is absent, never skipped by silence');
   assert.equal(rows('big').length, 12);
   assert.deepEqual(scriptsOf({ edition: 'full' }).length, 12);
+  assert.deepEqual(plan.notPlanned, [], 'an app that holds a spec file in every layer has every row');
+});
+
+test('L4: a full app is planned only the test rows its files can run, each omission is named with its reason, and a layer that holds a spec file keeps its row', (t) => {
+  const base = tmp(t, 'layers');
+  fs.writeFileSync(path.join(base, 'package.json'), JSON.stringify({ name: 'rt', scripts: { test: NODE_TEST, check: 'x' } }));
+  const dir = path.join(base, 'examples', 'slim');
+  fs.mkdirSync(path.join(dir, 'be', 'src', 'tests'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'hfs.json'), JSON.stringify({ kind: 'app' }));
+  fs.writeFileSync(path.join(dir, 'package-lock.json'), '{}');
+  fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'slim', scripts: Object.fromEntries(scriptsOf({ edition: 'full' }).map((script) => [script, 'x'])) }));
+  fs.writeFileSync(path.join(dir, 'be', 'src', 'tests', 'tsconfig.json'), '{}');
+  const rows = () => planL4(base, { runtimeRoot: base }).steps.filter((s) => s.name.startsWith('slim: npm run ')).map((s) => s.name.replace('slim: npm run ', ''));
+  const bare = planL4(base, { runtimeRoot: base });
+  assert.deepEqual(rows().filter((row) => row.startsWith('test') || row === 'typecheck:tests'), ['test'], 'unit is the only test row of an app without a test file');
+  assert.deepEqual(bare.notPlanned.map((row) => row.name), ['slim: npm run typecheck:tests', 'slim: npm run test:contract', 'slim: npm run test:integration', 'slim: npm run test:e2e']);
+  assert.ok(bare.notPlanned.every((row) => row.why.includes('holds no')), 'each omission says why');
+  fs.mkdirSync(path.join(dir, 'be', 'src', 'tests', 'e2e', 'area'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'be', 'src', 'tests', 'e2e', 'area', 'flow.e2e-spec.ts'), '');
+  assert.deepEqual(rows().filter((row) => row.startsWith('test') || row === 'typecheck:tests'), ['typecheck:tests', 'test', 'test:e2e'], 'one spec file brings its layer and the tests typecheck back');
+  const plan = planL4(base, { runtimeRoot: base });
+  assert.deepEqual(plan.notPlanned.map((row) => row.name), ['slim: npm run test:contract', 'slim: npm run test:integration']);
+  assert.ok(plan.steps.filter((s) => s.name.startsWith('slim: npm run ')).every((s) => s.nextBuild === true), 'every example script runs with the SWC cache env');
+});
+
+test('L4: a step that builds a Next app runs with the SWC cache and telemetry off over its own env, any other step with its own env only', (t) => {
+  const cache = path.join(tmp(t, 'swc'), 'cache');
+  const env = stepEnv({ nextBuild: true, env: { KEEP: 'a' } }, { STARCI_SWC_CACHE: cache, BASE: 'b' });
+  assert.equal(env.SWC_NATIVE_BINDING_CACHE, cache);
+  assert.equal(env.NEXT_TELEMETRY_DISABLED, '1');
+  assert.deepEqual([env.KEEP, env.BASE], ['a', 'b']);
+  assert.deepEqual(stepEnv({ env: { KEEP: 'a' } }, { BASE: 'b' }), { BASE: 'b', KEEP: 'a' });
 });
 
 test('evidence rule: the log readers know the passed tests of both reporters and the part of the container log one step printed', () => {

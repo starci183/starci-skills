@@ -21,6 +21,7 @@ import { sonarSupplier } from './release-l4-sonar.mjs';
 import { mapInOrder } from '../lib/in-order.mjs';
 import { resolveTestConcurrency } from '../machine/test-concurrency.mjs';
 import { byCodeUnit } from '../lib/list.mjs';
+import { idleScripts, stepEnv, testLayersOf } from './release-l4-layers.mjs';
 
 /** The only skips a release may keep: tests that need a browser the host may lack, matched by name. */
 const BROWSER_SKIPS = Object.freeze(['draw-render', 'draw-rationale', 'draw-layer']);
@@ -28,7 +29,8 @@ const INFRASTRUCTURE = /\b(?:docker|postgres(?:ql)?|supabase|kafka|redis|minio|k
 const EXAMPLE_SCRIPTS = Object.freeze(['codegen', 'typecheck', 'typecheck:tests', 'lint', 'format:check', 'test', 'test:contract', 'test:integration', 'test:e2e', 'build:be', 'build:fe', 'docker:build']);
 /** A lite app holds no tests (lite holds no tests): its row is the full row without them; the lite scaffold e2e inside the spec run is its behaviour proof. */
 const LITE_NO_SCRIPTS = Object.freeze(['typecheck:tests', 'test', 'test:contract', 'test:integration', 'test:e2e']);
-export const scriptsOf = (app) => (app.edition === 'lite' ? EXAMPLE_SCRIPTS.filter((script) => !LITE_NO_SCRIPTS.includes(script)) : EXAMPLE_SCRIPTS);
+/** The scripts of an app's row: a lite app has no test scripts, a full app has none for a test layer it holds no spec file in (`layers`, read from the checkout by exampleApps; absent means every layer). */
+export const scriptsOf = (app) => (app.edition === 'lite' ? EXAMPLE_SCRIPTS.filter((script) => !LITE_NO_SCRIPTS.includes(script)) : EXAMPLE_SCRIPTS.filter((script) => !idleScripts(app.layers).some((idle) => idle.script === script)));
 /** The proofs of the checks column that only a tool outside npm scripts can give (Sonar: release-l4-sonar.mjs): each must answer {ok, log}. */
 const L4_PROOFS = Object.freeze(['sonar']);
 const STEP_TIMEOUT_MS = 60 * 60_000;
@@ -127,14 +129,16 @@ export function skipReport(steps, opts) {
   return { skips, failures, covered, declared: [...new Set(skips.filter((k) => k.class === 'declared').map((k) => k.name))].sort(byCodeUnit) };
 }
 
-/** The example apps of `repo` (examples/<name>/hfs.json of kind app): [{name, dir, edition}], the edition `lite` or `full`. */
+/** The example apps of `repo` (examples/<name>/hfs.json of kind app): [{name, dir, edition, layers?}], the edition `lite` or `full`, the test layers a full app holds (testLayersOf). */
 export function exampleApps(repo) {
   const root = path.join(repo, 'examples');
   if (!fs.existsSync(root)) return [];
   return fs.readdirSync(root, { withFileTypes: true }).filter((e) => e.isDirectory()).flatMap((e) => {
     try {
       const hfs = JSON.parse(fs.readFileSync(path.join(root, e.name, 'hfs.json'), 'utf8'));
-      return hfs.kind === 'app' ? [{ name: e.name, dir: path.join(root, e.name), edition: hfs.edition === 'lite' ? 'lite' : 'full' }] : [];
+      if (hfs.kind !== 'app') return [];
+      const dir = path.join(root, e.name), edition = hfs.edition === 'lite' ? 'lite' : 'full';
+      return [{ name: e.name, dir, edition, ...(edition === 'full' ? { layers: testLayersOf(dir) } : {}) }];
     } catch { return []; }
   });
 }
@@ -168,7 +172,7 @@ export function runtimeSpecStep(repo, step, decision) {
   return { ...step, cmd: 'node', args };
 }
 
-/** The L4 plan of `repo`: {steps: [{name, cmd, args, cwd, absent?, install?}], proofs: [names], linux: true}: the installs first, then the npm steps, the proofs and the Linux step. */
+/** The L4 plan of `repo`: {steps: [{name, cmd, args, cwd, absent?, install?, nextBuild?}], notPlanned: [{name, why}], proofs: [names], linux: true}: the installs first, then the npm steps, the proofs and the Linux step; `notPlanned` names each test row a full app has no spec file for (release-l4-layers.mjs). */
 export function planL4(repo, { runtimeRoot } = {}) {
   const apps = exampleApps(repo);
   const installs = apps.map((app) => {
@@ -176,16 +180,18 @@ export function planL4(repo, { runtimeRoot } = {}) {
     return fs.existsSync(path.join(app.dir, 'package-lock.json')) ? { name, cmd: 'npm', args: ['ci', '--no-audit', '--no-fund'], cwd: app.dir, install: true } : { name, absent: true, cwd: app.dir };
   });
   const env = specEnv(apps);
+  const notPlanned = [];
   const steps = [...installs, ...planFor(repo, runtimeRoot ? { runtimeRoot } : {}).steps.map((s) => ({ ...s, cwd: repo, ...(s.name === 'npm test' && !s.absent ? { env, evidence: true } : {}) }))];
   for (const app of apps) {
     let scripts = {};
     try { scripts = JSON.parse(fs.readFileSync(path.join(app.dir, 'package.json'), 'utf8')).scripts ?? {}; } catch { scripts = {}; }
     for (const script of scriptsOf(app)) {
       const name = `${app.name}: npm run ${script}`;
-      steps.push(scripts[script] ? { name, cmd: 'npm', args: ['run', script], cwd: app.dir } : { name, absent: true, cwd: app.dir });
+      steps.push(scripts[script] ? { name, cmd: 'npm', args: ['run', script], cwd: app.dir, nextBuild: true } : { name, absent: true, cwd: app.dir });
     }
+    notPlanned.push(...(app.edition === 'lite' ? [] : idleScripts(app.layers)).map((idle) => ({ name: `${app.name}: npm run ${idle.script}`, why: idle.why })));
   }
-  return { steps, proofs: apps.flatMap((app) => L4_PROOFS.map((proof) => `${app.name}: ${proof}`)), linux: true };
+  return { steps, notPlanned, proofs: apps.flatMap((app) => L4_PROOFS.map((proof) => `${app.name}: ${proof}`)), linux: true };
 }
 
 /**
@@ -216,7 +222,7 @@ export async function runL4(repo, { proofs, parity = runParity, step = runStep, 
       // cutRelease already holds the release host lock. Probe afresh here, after installs, for this actual spec process only.
       const decision = s.evidence ? resolveTestConcurrency(undefined, concurrencyDeps) : null;
       const actual = decision ? runtimeSpecStep(s.cwd ?? repo, s, decision) : s;
-      const r = step(actual, { cwd: s.cwd, timeoutMs: STEP_TIMEOUT_MS, tag: 'release', ...(s.env ? { env: { ...process.env, ...s.env } } : {}) });
+      const r = step(actual, { cwd: s.cwd, timeoutMs: STEP_TIMEOUT_MS, tag: 'release', ...(s.env || s.nextBuild ? { env: stepEnv(s) } : {}) });
       if (decision && r.log && fs.existsSync(r.log)) fs.appendFileSync(r.log, `\n[concurrency]\n${JSON.stringify(decision)}\n`);
       return { name: s.name, ok: r.ok, log: r.log, ms: r.ms, skips: skipsOf(r.text), ...(s.evidence ? { passes: passesOf(r.text), concurrency: decision, command: { cmd: actual.cmd, args: actual.args } } : {}) };
     });

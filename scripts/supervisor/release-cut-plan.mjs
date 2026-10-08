@@ -25,6 +25,6 @@ export function definitionRefusal({ run, cwd, head, remote, branch, tag, deps = 
 export function planOf({ repo, head, tag, remote, branch, out }) {
   const l4 = planL4(repo);
   const steps = [...l4.steps.map((s) => s.name), ...l4.proofs, ...(l4.linux ? ['linux parity'] : [])];
-  return { ...out, ok: true, verdict: 'plan', head, tag, steps, receiptSteps: [...RECEIPT_STEPS],
+  return { ...out, ok: true, verdict: 'plan', head, tag, steps, notPlanned: l4.notPlanned, receiptSteps: [...RECEIPT_STEPS],
     why: `would run ${steps.length} step(s) on ${head.slice(0, 9)} under the host lock, write the release record of that commit (green rows required: ${RECEIPT_STEPS.join(', ')}), create the annotated tag ${tag}, and push ${branch} with it to ${remote} in one atomic push; nothing was run, tagged or pushed` };
 }
