@@ -347,22 +347,35 @@ cases:
     why: "publishing needs the owner's credentials, and the cut's pre-flight is not built: the cut specs inject every seam and a default registry read there needs its own design"
   - id: release-sonar-proof-followed-public-host
     family: correctness
-    finding: {role: runtime, duty: does, verdict: departs, evidence: "the three L4 Sonar rows of the alpha.7 cut waited five minutes and failed 'SonarQube did not report UP in time' although the local server answered UP 19 s after its containers started: the proof's gate config took SONAR_HOST_URL from the host secret.env (https://sonar.starci.org, the CI tunnel whose container was stopped) before the host.local the example declares", remedy: {state: in-tree, change: "the proof is configured for the declared local host (localStackConfig strips SONAR_HOST_URL); the wait reads the server's own status and container and ends in a typed result naming STARTING, unreachable, DB_MIGRATION_NEEDED or the log-hinted stop; a paused or restarting container is stopped before the start; release cut and --plan refuse early on docker, memory, vm.max_map_count and missing containers (sonarHostRefusal)"}}
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "the three L4 Sonar rows of the alpha.7 cut waited five minutes and failed 'SonarQube did not report UP in time' although the local server answered UP 19 s after its containers started: the proof's gate config took SONAR_HOST_URL from the host secret.env (https://sonar.starci.org, the CI tunnel whose container was stopped) before the host.local the example declares", remedy: {state: in-tree, change: "the self-hosted stack is out of the examples' proof: it scans SonarCloud (cloudConfig) with the runtime's one SONAR_TOKEN, the host being the declared hosted one, never the SONAR_HOST_URL of the environment; release cut and --plan refuse in seconds when SONAR_TOKEN or SONAR_ORGANIZATION is absent, the token or organization is rejected, or SonarCloud is unreachable (sonarCloudRefusal)"}}
     met: {date: "2026-10-08", where: "release cut v1.0.0-alpha.7, L4 rows ecommerce-app, lite-app, shape-slot: sonar", evidence: "the cut's starci-release-l4/sonar-<app>-*.log files; container starci-sonarqube operational 08:16:42 after starting 08:16:23"}
-    rule: {file: scripts/supervisor/release-sonar-stack.mjs, anchor: "localStackConfig"}
-    spec: tests/supervisor/release-sonar-stack.spec.mjs
+    rule: {file: scripts/supervisor/release-sonarcloud.mjs, anchor: "cloudConfig"}
+    spec: tests/supervisor/release-sonarcloud.spec.mjs
     status: covered
   - id: release-sonar-proof-lint-report-never-produced
     family: correctness
     finding: {role: runtime, duty: does, verdict: departs, evidence: "every example's sonar-project.properties imports reports/lint.sonar.json, which only `starci app lint --sonar` writes (the managed ci.yml runs it before the scan); the L4 lint row runs `starci app lint` without it, so the Sonar scan of a cut that reached the server failed in the scanner's ExternalIssueReportParser", remedy: {state: in-tree, change: "the Sonar proof writes the report itself with the app's installed CLI before the scan and fails by name when none is written (writeLintReport)"}}
     met: {date: "2026-10-08", where: "proof of the stack fix, ecommerce-app scan", evidence: "scanner log: ExternalIssueReportParser.parse, Scanner engine failed with code 1"}
     rule: {file: scripts/supervisor/release-sonar-report.mjs, anchor: "writeLintReport"}
-    spec: tests/supervisor/release-sonar-stack.spec.mjs
+    spec: tests/supervisor/release-sonarcloud.spec.mjs
     status: covered
   - id: release-sonar-proof-stale-pooled-socket
     family: failure-while-running
     finding: {role: runtime, duty: does, verdict: departs, evidence: "after the synchronous lint step blocked the process for 90 s, the first request of the scan reused a keep-alive socket pooled during the start-up wait; the docker port proxy had reset it, so the scan was blocked 'not reachable (ECONNRESET)' with the server UP and healthy", remedy: {state: in-tree, change: "the proof's requests send Connection: close (freshFetch), so no socket outlives a blocked event loop"}}
     met: {date: "2026-10-08", where: "proof of the stack fix, ecommerce-app scan", evidence: "reproduced with a 75 s Atomics.wait between two fetches: ECONNRESET, none with Connection: close"}
     rule: {file: scripts/api/sonar/fresh-fetch.mjs, anchor: "freshFetch"}
-    spec: tests/supervisor/release-sonar-stack.spec.mjs
+    spec: tests/supervisor/release-sonarcloud.spec.mjs
     status: covered
+  - id: release-examples-sonar-token-sealed-in-public-repo
+    family: authority-safety
+    finding: {role: runtime, duty: never, verdict: departs, evidence: "the three example apps' Sonar tokens (and the admin token) were sealed with sops into ext/sonar/secrets/*.enc and committed to the public runtime repository, minted and re-sealed by sonar-local.mjs; the owner's rule is that the public repository holds no secret material, not even ciphertext, and the L4 proof then needed a SOPS identity and a self-hosted Docker server for projects that CI and the runtime itself analyse on SonarCloud", remedy: {state: in-tree, change: "the examples declare SonarCloud with runtimeSecrets [SONAR_TOKEN, SONAR_ORGANIZATION] (STACKS_EXAMPLE_FORM refuses custody, a stack or host.local in an example, STACKS_PRODUCT_FORM refuses runtimeSecrets in a product), their sealed members are deleted, and RT_SECRET_TRACKED refuses any tracked *.enc, secret.env or .env outside ruleParams.runtime.heldSecrets"}}
+    met: {date: "2026-10-08", where: "owner ruling on the release proof's credentials", evidence: "owner: I do not want any .enc of .claude committed"}
+    rule: {file: scripts/hfs/runtime-rules/secret-tracked.mjs, anchor: "RT_SECRET_TRACKED"}
+    spec: tests/checks/secret-tracked.spec.mjs
+    status: covered
+  - id: release-tracked-secrets-remaining
+    family: authority-safety
+    finding: {role: runtime, duty: never, verdict: departs, evidence: "five sealed stack members of the product Sonar server (database password, admin password, admin token, server-wide analysis token, tunnel token) and two demo secrets of the ecommerce example's own docker stack are still tracked in the public runtime repository", remedy: {state: open, change: "move each into the untracked secret.env under names that cannot be confused with SonarCloud's (SONARQUBE_DB_PASSWORD, SONARQUBE_ADMIN_PASSWORD, SONARQUBE_ADMIN_TOKEN, SONARQUBE_ANALYSIS_TOKEN, CLOUDFLARE_TUNNEL_TOKEN), make compose read them from the environment the runtime passes from secretEnv, then delete the members and the heldSecrets entries"}}
+    met: {date: "2026-10-08", where: "owner ruling: no .enc of .claude committed", evidence: "ruleParams.runtime.heldSecrets of knowledge/hfs/runtime-slots.yaml lists them"}
+    status: open
+    why: "the stack's compose files, sonar-local.mjs's admin-token reader and the product declarations still read ext/sonar/secrets; moving them touches the product Sonar server and the owner's own decrypt-and-append step, which no lane may run against real secrets; heldSecrets is the dated allowance (2026-10-08) and only shrinks"

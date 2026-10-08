@@ -241,7 +241,7 @@ export function slotProblems(slot, index, kind, { appScope = 'app', scopes = [] 
 
 /** The owners of an external call in a runtime manifest: an api system folder (`api/<system>`, `api/*` any system) or the DB tier. */
 const INFRA_OWNER = /^(?:api\/(?:\*|[a-z][a-z0-9-]*)|engine\/db)$/;
-const RUNTIME_PARAM_KEYS = new Set(['fileLines', 'sourceRoots', 'infraOwners', 'baseWriteMembers', 'baseEnvSeams', 'apiContracts', 'sourceName', 'oneOffNames', 'sharedBasenames', 'generated', 'pinned', 'selfChecks']);
+const RUNTIME_PARAM_KEYS = new Set(['fileLines', 'sourceRoots', 'infraOwners', 'baseWriteMembers', 'baseEnvSeams', 'apiContracts', 'sourceName', 'oneOffNames', 'sharedBasenames', 'generated', 'heldSecrets', 'pinned', 'selfChecks']);
 const relPath = (v) => typeof v === 'string' && v.length > 0 && !v.startsWith('/') && !v.includes('..') && !v.includes('\\');
 
 function runtimeHeaderProblems(m) {

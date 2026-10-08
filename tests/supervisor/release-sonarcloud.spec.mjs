@@ -110,7 +110,7 @@ const APP = { name: 'shop', dir: path.join(os.tmpdir(), 'x', 'examples', 'shop')
 const CLOUD = { cfg: { host: 'https://sonarcloud.io' }, key: 'acme_starci-example-shop', org: 'acme' };
 const processedScan = (extra = {}) => ({ outcome: 'fail', reason: 'the quality gate failed: new_coverage 0', scanner: { exitCode: 0 }, ceTask: { status: 'SUCCESS' }, projectGate: { status: 'ERROR' }, ...extra });
 /** A fake gate: records its calls; `scan` and `dashboard` are the reports it returns. */
-function gateOf({ scan = { outcome: 'pass' }, dashboard = { outcome: 'pass' }, project = { created: false }, config } = {}) {
+function gateOf({ scan = { outcome: 'pass', scanner: { exitCode: 0 }, ceTask: { status: 'SUCCESS' } }, dashboard = { outcome: 'pass' }, project = { created: false }, config } = {}) {
   const calls = [];
   return {
     calls,
@@ -124,22 +124,24 @@ function gateOf({ scan = { outcome: 'pass' }, dashboard = { outcome: 'pass' }, p
 }
 const supplier = (t, fake, extra = {}) => sonarSupplier([APP], { gate: fake.gate, secrets: SECRETS, lintReport: () => ({ ok: true }), logDir: () => tmp(t, 'log'), ...extra });
 
-test('supplier: the project is ensured, the scan runs with the organization and key on the proof branch, the dashboard is read, and both passing is the proof', async (t) => {
+test('supplier: the project is ensured, the scan runs with the organization on the proof branch, the dashboard is read, and both passing is the proof', async (t) => {
   const fake = gateOf();
   const proof = await supplier(t, fake).proofs['shop: sonar']();
   assert.equal(proof.ok, true);
-  assert.deepEqual(fake.calls, ['ensure', ['scan', ['-Dsonar.organization=acme', '-Dsonar.projectKey=acme_starci-example-shop', `-Dsonar.branch.name=${PROOF_BRANCH}`]], 'dashboard']);
+  assert.deepEqual(fake.calls, ['ensure', ['scan', ['-Dsonar.organization=acme', `-Dsonar.branch.name=${PROOF_BRANCH}`]], 'dashboard']);
 });
 
 test('supplier: a project created by this proof is analysed as its main branch, never on a branch of a project that has none', async (t) => {
   const fake = gateOf({ project: { created: true } });
   await supplier(t, fake).proofs['shop: sonar']();
-  assert.deepEqual(fake.calls[1][1], ['-Dsonar.organization=acme', '-Dsonar.projectKey=acme_starci-example-shop']);
+  assert.deepEqual(fake.calls[1][1], ['-Dsonar.organization=acme']);
 });
 
-test('supplier: the scan row holds the runtime bar elsewhere: a processed analysis whose SonarCloud gate is red still passes the scan row and the dashboard decides', async (t) => {
+test('supplier: the scan row holds the runtime bar elsewhere: a processed analysis whose SonarCloud gate is red or NONE still passes the scan row and the dashboard decides', async (t) => {
   const green = gateOf({ scan: processedScan() });
   assert.equal((await supplier(t, green).proofs['shop: sonar']()).ok, true);
+  const none = gateOf({ scan: processedScan({ outcome: 'blocked', reason: 'no quality-gate result for the analysis (status NONE)', projectGate: { status: 'NONE' } }) });
+  assert.equal((await supplier(t, none).proofs['shop: sonar']()).ok, true, 'a new project has no gate: NONE is not a failed analysis');
   const red = gateOf({ scan: processedScan(), dashboard: { outcome: 'fail', reason: 'the dashboard fails: code_smells 3 > 0' } });
   const proof = await supplier(t, red).proofs['shop: sonar']();
   assert.equal(proof.ok, false);

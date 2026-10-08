@@ -41,6 +41,7 @@ import { readProperties } from '../lib/properties.mjs';
 import { escapeRegExp } from '../lib/regex.mjs';
 import { isInfrastructureValueFile } from './starcistacks-value-file.mjs';
 import { STACK_DECLARATION_TEMPLATE } from '../lib/example-refs.mjs';
+import { checkSecretForm, kindOf } from './starcistacks-form.mjs';
 export { DECLARATION, STACK_ROOT, findStackDeclaration };
 const RESULT_SCHEMA = 'starci/starcistacks-check@1';
 const DECLARATION_SCHEMA = 'starci/application-stacks@1';
@@ -265,27 +266,6 @@ const checkServiceCi = (service, id, at, { governing, name, ciUses, ciText, add,
     add('refuse', 'STACKS_PROJECT_MISSING', `${at}.projects`, `the workflows call ${id} but no project entry names repository ${name}`);
 };
 const checkDisabledService = (service, id, at, ciUses, ambiguous, add) => { if (service.mode !== 'disabled') { return false; } if (!service.reason) { ambiguous('a disabled service states its reason'); } if (ciUses[id].length) { add('refuse', 'STACKS_CI_CONTRADICTION', at, `declared disabled, but ${ciUses[id].join(', ')} call it`); } return true; };
-/** 'example' for an app that lives inside the runtime repository (its checkout sits under the runtime's examples/), else 'product'. */
-const kindOf = (repo, examplesRoot) => {
-  const relative = path.relative(path.resolve(examplesRoot), repo);
-  return relative && !relative.startsWith('..') && !path.isAbsolute(relative) ? 'example' : 'product';
-};
-/**
- * Where a secret may live, per repository kind (docs/application-stacks.md). An example belongs to the public runtime repository, which holds no secret
- * file at all: it declares SonarCloud (provider sonarcloud, mode hosted) and names the variables of the runtime's untracked secret.env it reads
- * (runtimeSecrets), with no stack, no host.local and no custody credential. A product keeps its own custody and declares no runtimeSecrets.
- */
-function checkSecretForm(service, id, at, kind, add) {
-  if (id !== 'sonar' || service.mode === 'disabled') return;
-  if (kind === 'product') {
-    if (service.runtimeSecrets.length) add('refuse', 'STACKS_PRODUCT_FORM', at + '.runtimeSecrets', 'runtimeSecrets name variables of the runtime repository secret.env, which a product does not read; a product declares its credentials in its own custody');
-    return;
-  }
-  const wrong = [service.stack && 'a stack', service.host.local && 'host.local', service.credentials.length && 'custody credentials'].filter(Boolean);
-  if (wrong.length) add('refuse', 'STACKS_EXAMPLE_FORM', at, 'an example of the runtime repository declares ' + wrong.join(', ') + '; the runtime repository holds no secret file, so an example declares provider sonarcloud, mode hosted and runtimeSecrets [SONAR_TOKEN, SONAR_ORGANIZATION]');
-  if (service.provider !== 'sonarcloud' || service.mode !== 'hosted') add('refuse', 'STACKS_EXAMPLE_FORM', at + '.provider', 'an example of the runtime repository is analysed on SonarCloud: provider sonarcloud and mode hosted');
-  if (!['SONAR_TOKEN', 'SONAR_ORGANIZATION'].every((name) => service.runtimeSecrets.includes(name))) add('refuse', 'STACKS_EXAMPLE_FORM', at + '.runtimeSecrets', 'an example names the secret.env variables it reads: runtimeSecrets [SONAR_TOKEN, SONAR_ORGANIZATION]');
-}
 const checkEnabledService = (service, id, at, { governing, name, ciUses, ciText, add, kind }, ambiguous) => {
   checkSecretForm(service, id, at, kind, add);
   if (service.mode === 'local') checkLocalStack(service, at, add, ambiguous);

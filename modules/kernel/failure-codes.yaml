@@ -16755,16 +16755,6 @@ RUNTIME_CHANGE_OWNED_BY_DEBUG:
   nextStep_vi: "Supervisor ghi lỗi runtime bằng starci supervisor actions record --item runtime-defect:<nguyên nhân> kèm bằng chứng, cho Kernel một cách đi vòng; Debug sửa."
   owner: supervisor
   kind: blocker
-DB_MIGRATION_NEEDED:
-  title: "The local SonarQube database needs its migration"
-  title_vi: "Cơ sở dữ liệu SonarQube cục bộ cần được di trú"
-  meaning_vi: "Máy chủ SonarQube cục bộ báo trạng thái DB_MIGRATION_NEEDED: các volume của stack chứa cơ sở dữ liệu do một phiên bản SonarQube cũ ghi, nên máy chủ chờ lệnh di trú và sẽ không tự lên UP. Release cut không đợi trạng thái này; nó dừng ngay và gọi tên trạng thái."
-  causes_vi:
-    - "Image sonarqube trong ext/sonar/compose.yaml được nâng phiên bản trong khi volume dữ liệu vẫn của phiên bản trước"
-    - "Volume sonarqube-postgres-data được khôi phục từ bản sao lưu cũ"
-  nextStep_vi: "Owner mở <host>/setup một lần (hoặc gửi POST /api/system/migrate_db bằng tài khoản admin) để di trú, chờ máy chủ báo UP, rồi chạy lại starci release cut."
-  owner: owner
-  kind: blocker
 
 STACKS_EXAMPLE_FORM:
   title: "An example declares Sonar in the product form"
@@ -16785,4 +16775,15 @@ STACKS_PRODUCT_FORM:
     - "Khối services.sonar của sản phẩm sao chép dạng khai báo của ví dụ"
   nextStep_vi: "Bỏ runtimeSecrets và khai báo credentials với custody của repository sản phẩm."
   owner: other-op:workspace.manage
+  kind: check-finding
+
+RT_SECRET_TRACKED:
+  title: "A secret is tracked in the public runtime repository"
+  title_vi: "Một bí mật được theo dõi trong repository runtime công khai"
+  meaning_vi: "Một tệp *.enc hoặc secret.env/.env được git theo dõi trong repository runtime, vốn là public và không giữ vật liệu bí mật nào, kể cả bản mã hóa. Mọi bí mật của máy chủ nằm trong .claude/secret.env chưa theo dõi, chỉ đọc qua engine/secrets.mjs; các tên được liệt kê trong secret.env.example."
+  causes_vi:
+    - "Một bí mật mới được niêm phong và commit thay vì thêm tên vào secret.env"
+    - "Tệp bí mật bị gitignore sót nên bị git add"
+  nextStep_vi: "git rm tệp, thêm tên biến vào secret.env.example và danh mục env, owner đặt giá trị vào secret.env; bản mã hóa đã nằm trong lịch sử git chỉ mất khi xoay (rotate) bí mật."
+  owner: owner
   kind: check-finding

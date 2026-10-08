@@ -23,11 +23,11 @@ const GATE = Object.freeze({
   dashboard: (cloud, appDir) => dashboard(cloud.cfg, { cwd: appDir, key: cloud.key }),
 });
 
-/** Whether a scan report counts as an analysis processed on SonarCloud: a pass, or a fail of the server's own gate on an analysis the scanner submitted and SonarCloud finished. */
-const processed = (report) => report?.outcome === 'pass' || (report?.outcome === 'fail' && report.scanner?.exitCode === 0 && report.ceTask?.status === 'SUCCESS' && Boolean(report.projectGate?.status));
+/** Whether a scan report counts as an analysis processed on SonarCloud: the scanner exited 0 and SonarCloud's task succeeded, whatever the gate selected there says (a red gate, or NONE on a new project). */
+const processed = (report) => report?.scanner?.exitCode === 0 && report.ceTask?.status === 'SUCCESS';
 
-/** The scanner defines of one proof: the organization, the project key, and a proof branch when the project already has its main branch. */
-const definesOf = (cloud, created) => [`-Dsonar.organization=${cloud.org}`, `-Dsonar.projectKey=${cloud.key}`, ...(created ? [] : [`-Dsonar.branch.name=${PROOF_BRANCH}`])];
+/** The scanner defines of one proof: the organization (the scan adds the project key itself), and a proof branch when the project already has its main branch. */
+const definesOf = (cloud, created) => [`-Dsonar.organization=${cloud.org}`, ...(created ? [] : [`-Dsonar.branch.name=${PROOF_BRANCH}`])];
 
 /**
  * The Sonar proofs of the example apps `apps` ([{name, dir}]): {proofs: {'<app>: sonar': async () => {ok, log, ms}}}.

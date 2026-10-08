@@ -10,14 +10,14 @@ name: examples
 #                         the unit project with coverage (per-file 100 on the logic of be/src/modules/**; it writes be/coverage/lcov.info), the Codecov
 #                         upload under the app's flag, the be build (tsc and tsc-alias) and the fe build (turbo, the packages first, then
 #                         every Next app), and the Sonar scan and quality gate where a server is configured
-#                         (vars.SONAR_HOST_URL and secrets.SONAR_TOKEN; otherwise the job notes the skip). A second job, `images`, builds the
+#                         (SonarCloud: secrets.SONAR_TOKEN and vars.SONAR_ORGANIZATION, the same the runtime's ci.yml reads; project <organization>_starci-example-<app>; otherwise the job notes the skip). A second job, `images`, builds the
 #                         deployable images declared by every example (full: be+fe; lite: be only; the matrix is
 #                         `check-examples-ci.mjs --images`) and never pushes
 #   workflow_dispatch     the same, plus the layers that start the docker stack through the test world, chosen by the
 #                         `layers` input: integration, e2e, or both. They never run on a tag push (npm run check
 #                         refuses an integration or e2e step that is not gated on workflow_dispatch). A third manual job,
 #                         `browser`, runs each app's one Playwright journey against a stack it provisions itself.
-# The local dashboard gate (scripts/gates/sonar-local.mjs dashboard) is a release-checklist item, not a CI step.
+# The release cut's Sonar proof (scripts/supervisor/release-l4-sonar.mjs) reads the same projects on SonarCloud with the dashboard gate (scripts/gates/sonar-local.mjs dashboard).
 #
 # Codecov and Sonar upload only in the tag run (startsWith(github.ref, refs/tags/v)): a manual dispatch checks the app but publishes no measurement.
 #
@@ -100,7 +100,8 @@ jobs:
     env:
       APP_DIR: examples/${{ matrix.app }}
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-      SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
+      SONAR_HOST_URL: https://sonarcloud.io
+      SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION }}
     defaults:
       run:
         working-directory: examples/${{ matrix.app }}
@@ -164,19 +165,20 @@ jobs:
         if: ${{ steps.policy.outputs.tests == 'true' && github.event_name == 'workflow_dispatch' && contains(inputs.layers, 'e2e') }}
         run: npm run test:e2e -- --ci
       - name: Sonar scan
-        if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') && env.SONAR_TOKEN != '' && env.SONAR_HOST_URL != '' }}
+        if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') && env.SONAR_TOKEN != '' && env.SONAR_ORGANIZATION != '' }}
         uses: SonarSource/sonarqube-scan-action@c7ee0f9df90b7aa20e8dcf9695dcfe2e7da5b4f2 # v7.2.1
         with:
           projectBaseDir: ${{ env.APP_DIR }}
+          args: -Dsonar.organization=${{ env.SONAR_ORGANIZATION }} -Dsonar.projectKey=${{ env.SONAR_ORGANIZATION }}_starci-example-${{ matrix.app }}
       - name: Sonar quality gate
-        if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') && env.SONAR_TOKEN != '' && env.SONAR_HOST_URL != '' }}
+        if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') && env.SONAR_TOKEN != '' && env.SONAR_ORGANIZATION != '' }}
         uses: SonarSource/sonarqube-quality-gate-action@7a5fffe8e523c40e0c740b6bc2712ab503e52efa # v1.2.1
         timeout-minutes: 10
         with:
           scanMetadataReportFile: ${{ env.APP_DIR }}/.scannerwork/report-task.txt
       - name: Sonar skipped (no server configured)
-        if: ${{ startsWith(github.ref, 'refs/tags/v') && (env.SONAR_TOKEN == '' || env.SONAR_HOST_URL == '') }}
-        run: echo "::notice title=Sonar skipped::no Sonar server is configured for this repository (vars.SONAR_HOST_URL and secrets.SONAR_TOKEN), so ${{ matrix.app }} was not scanned; the local dashboard gate (scripts/gates/sonar-local.mjs dashboard) is a release-checklist item."
+        if: ${{ startsWith(github.ref, 'refs/tags/v') && (env.SONAR_TOKEN == '' || env.SONAR_ORGANIZATION == '') }}
+        run: echo "::notice title=Sonar skipped::SonarCloud is not configured for this repository (secrets.SONAR_TOKEN and vars.SONAR_ORGANIZATION, the runtime's own ci.yml settings), so ${{ matrix.app }} was not scanned."
 
   # The one Playwright journey of each example app (owner ruling: manual only, like the docker-stack layers). It
   # provisions the whole product itself: ephemeral env values for the compose services (never the sealed demo

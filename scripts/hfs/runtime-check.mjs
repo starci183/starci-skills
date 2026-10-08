@@ -24,6 +24,7 @@ import { show } from '../api/git/show.mjs';
 import { checkRepo, readWhy, trackedFiles } from './check.mjs';
 import { GENERATED_DRIFT, driftOfRuntime, syncRuntime } from './sync-runtime.mjs';
 import { generatedUntrackedFindings } from './runtime-rules/generated-untracked.mjs';
+import { secretTrackedFindings } from './runtime-rules/secret-tracked.mjs';
 import { syntaxFindings } from './runtime-rules/syntax.mjs';
 import { RUNTIME_MANIFEST_FILE, createSlotResolver, loadSlotManifest, readRepoDeclaration, ruleParams } from './slots.mjs';
 import { absolutePathRepoFindings } from './runtime-rules/absolute-path.mjs';
@@ -135,6 +136,7 @@ export function runtimeCheck({ repoRoot = skillRoot, root = skillRoot, files, tr
     ...controlCharFindings(ctx),
     ...absolutePathRepoFindings(ctx),
     ...generatedUntrackedFindings(ctx),
+    ...secretTrackedFindings(ctx),
     ...syntaxFindings(ctx),
     ...appCliTemplateFindings(ctx),
     ...factFindings(ctx),

@@ -2059,3 +2059,12 @@ rules:
     failureCodes: ["RT_EDGE_CASE_REGISTRY"]
     enforcers:
       - {kind: runtime, id: edge-case-registry, at: scripts/checks/check-edge-case-registry.mjs}
+  - id: R234
+    code: "RT_SECRET_TRACKED"
+    law: "The runtime repository is public and tracks no secret material, not even ciphertext: no tracked *.enc member and no tracked secret.env or .env file, except the paths ruleParams.runtime.heldSecrets names with their reason (a list that only shrinks). Every secret the host needs lives in the one untracked .claude/secret.env, read only through engine/secrets.mjs, its names listed in the tracked secret.env.example; a product repository keeps its own custody in its own repository. Two Sonar servers, no overlap: SonarCloud serves everything that lives in the runtime repository (the runtime and the example apps, token SONAR_TOKEN), the self-hosted ext/sonar serves product repositories only."
+    scope: runtime
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RT_SECRET_TRACKED"]
+    enforcers:
+      - {kind: runtime, id: secret-tracked, at: scripts/hfs/runtime-rules/secret-tracked.mjs}

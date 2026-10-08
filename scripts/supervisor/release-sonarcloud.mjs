@@ -8,7 +8,7 @@ import { resolveConfig } from '../gates/sonar-local.mjs';
 import { runtimeSecretEnv } from '../gates/runtime-host.mjs';
 import { freshFetch } from '../api/sonar/fresh-fetch.mjs';
 
-export const SONARCLOUD = 'https://sonarcloud.io';
+const SONARCLOUD = 'https://sonarcloud.io';
 /** The branch a release proof analyses on a project that already has its main branch, so a proof never lands in the main history of the example's project. */
 export const PROOF_BRANCH = 'release-proof';
 const TOKEN = 'SONAR_TOKEN';

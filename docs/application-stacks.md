@@ -54,7 +54,8 @@ The declaration's `services` block (schema `$defs.service`) states the delivery,
 | `auth` | `token`, `oidc`, `github-token` (GHCR), `none` |
 | `projects` | `[{repository, key}]` - the project key per repository (`sonar.projectKey` must match) |
 | `qualityGate` | sonar only: `starci-quality`, the one gate whose thresholds live in `knowledge/sonar-gate.yaml` (any other value is `STACKS_QUALITY_GATE_DRIFT`); `sonar-local` makes the server gate of that name carry them and `starci kernel settle` holds `backend.implement`, `interface.implement` and `code.refactor` to it |
-| `credentials` | `[{id, env or key, custody: {repository, path}}]` - custody references, never values; `<path>.enc` must exist |
+| `credentials` | product form: `[{id, env or key, custody: {repository, path}}]` - custody references in the product's own repository, never values; `<path>.enc` must exist |
+| `runtimeSecrets` | example form: `[SONAR_TOKEN, SONAR_ORGANIZATION]` - the variables of the runtime's untracked `.claude/secret.env` an app inside the runtime repository reads (CI: the repository secret and variable of the same name); no stack, no `host.local`, no custody. Each form is refused for the other kind: `STACKS_EXAMPLE_FORM` (an example declaring a stack, `host.local` or custody, another provider, or no `runtimeSecrets`), `STACKS_PRODUCT_FORM` (a product declaring `runtimeSecrets`) |
 | `ci` | `wiring` required / optional-follow-up / not-used, `secrets [{name, credential}]`, `vars [{name, value}]`, `permissions`, `provisioning` |
 | `ownerAction` | `none` unless the owner alone can give something (`{needed, reason}`); `none` is mandatory while custody holds every credential |
 
@@ -117,3 +118,7 @@ Read 2026-09-15:
 - [Next environment variables](https://nextjs.org/docs/pages/guides/environment-variables) — server-only vs build-inlined `NEXT_PUBLIC_*` values
 - [Next instrumentation](https://nextjs.org/docs/pages/api-reference/file-conventions/instrumentation) — `register` as server-instance initialization
 - [Kubernetes probes](https://kubernetes.io/docs/concepts/workloads/pods/probes/) — the startup/liveness/readiness distinction applies to every placement
+
+### Where a secret may live
+
+The runtime repository is public and tracks no secret, not even ciphertext (`RT_SECRET_TRACKED`). Every secret the host needs lives in the one untracked `.claude/secret.env`, read only through `engine/secrets.mjs` (`secret.env.example` lists the names). A product repository keeps its own custody in its own repository. Two Sonar servers, no overlap: **SonarCloud** serves everything that lives in the runtime repository (the runtime and the three example apps, one `SONAR_TOKEN`, the organization `SONAR_ORGANIZATION`, project key `<organization>_<declared key>`); the **self-hosted `ext/sonar`** serves product repositories only. An example declares `provider: sonarcloud`, `mode: hosted`, `host.public: https://sonarcloud.io`, `auth: token` and `runtimeSecrets`; a product declares the host stack and its custody as above.
