@@ -121,5 +121,14 @@ test('the self-check flags an unapproved loosening in a commit since the release
   assert.equal(found[0].code, 'RT_GATE_LOOSENING');
   assert.match(found[0].message, new RegExp(bad.slice(0, 10)));
   assert.match(found[0].message, /add the owner-rulings entry gate-loosening-[0-9a-f]{12} first/);
+  // History that was not judged when it was written is approved after the fact: a later commit of its own holds the ruling.
+  write(dir, 'modules/kernel/owner-rulings.yaml', `schema: starci/owner-rulings@1
+rulings:
+  - id: ${found[0].message.match(/gate-loosening-[0-9a-f]{12}/)[0]}
+    date: '2026-10-09'
+    ruling: the check one is retired
+`);
+  commit(dir, 'owner approves after the fact');
+  assert.deepEqual(checkGateLoosening(dir), [], 'a ruling in the checked-out tree approves the earlier commit');
   assert.ok(release);
 });
