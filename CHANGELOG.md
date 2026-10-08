@@ -4,6 +4,11 @@ All notable changes to StarCi are documented here. The runtime is on the `1.0.0-
 until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` freezes them.
 `package.json` `version` is the only version authority.
 
+## [1.0.0-alpha.8] — in preparation
+
+### Fixed
+- A reported job is settled by the runtime: the Job controller listed, timed and settled only running, answering and effect_unknown jobs, while `starci kernel report` moves a job to `reported`, so a reported job had no settle step, no SETTLE_OVERDUE clock and no handover Decision Item (Nivo `architecture.decide` sat reported from 2026-10-07 16:38). The controller now plans `reported`, routes `report-filed`, and the `reported-unsettled` hold names this code as its enforcement.
+
 ## [1.0.0-alpha.7] — 2026-10-08
 
 Theme: the roles are one declared contract, the system recovers from a host restart by itself, no smell or bug enters at commit, and the remote main moves only with a release proven on the exact commit that is pushed.

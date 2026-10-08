@@ -263,3 +263,10 @@ cases:
     met: {date: "2026-10-08", where: "owner ruling: the Supervisor may not update .claude", evidence: "modules/kernel/roles.yaml rulings.runtime-changes"}
     status: open
     why: "the instruction text of supervisor-prompt.md, supervise.yaml and docs/supervisor.md still describes fix workers and lands; the rewrite is designed in ROLES-STANDARD-alpha8.md"
+  - id: reported-job-never-planned
+    family: smooth-operation
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "the Job controller planned a settle only for a job in running, answering or effect_unknown, while starci kernel report moves a job to reported: no resync key, no SETTLE_OVERDUE clock and no settle step existed for a reported job, and the engine routed the event kind op-reported that nothing emits; Nivo op-architecture.decide-e78adc94cc stayed reported from 2026-10-07 16:38 with no engine_actions row for it and no SLA episode (every other job of the ledger was settled by the Kernel's own call)", remedy: {state: in-tree, change: "a reported job is listed, timed (SETTLE_OVERDUE, the reported-unsettled bound) and settled by the Job controller, whose route includes report-filed; the reported-unsettled hold names this code as its enforcement (planReport)"}}
+    met: {date: "2026-10-08", where: "Nivo wf-nivo-auth-test-workflow-muxq1xov, job op-architecture.decide-e78adc94cc (attempt 6), ledger events 400-406, 2026-10-07 16:38-16:40 UTC", evidence: "nivo runtime.sqlite events 401, 405, 406 (report-filed, report-consumed, checks-recorded) and check_runs 58 (the Kernel's own settle refused, 16:40:21), no job-settle-* event and no sla_episodes row for the job; machine.sqlite engine_actions: job-controller rows exist only for starci-monorepo and for nivo-monorepo jobs after their Kernel settle"}
+    rule: {file: scripts/reconciler/controllers/job.mjs, anchor: "planReport"}
+    spec: tests/kernel-settle/reconciler-job.spec.mjs
+    status: covered
