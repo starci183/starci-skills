@@ -5,6 +5,7 @@ import { sha256, sha256File } from '../../engine/digest.mjs';
 import { getBlob } from '../../engine/db/blob.mjs';
 import { latestCheckRuns, stageBlob } from '../machine/evidence-store.mjs';
 import { admittedContractOf, latestContractOf } from '../machine/contract-version.mjs';
+import { supersedeDirs } from '../machine/placement-rebound.mjs';
 import { inputStamp } from '../gates/type-impact.mjs';
 import { DIGEST_SCHEMA } from '../gates/read-digest.mjs';
 import { isLinkLike } from '../api/fs/is-link-like.mjs';
@@ -44,8 +45,8 @@ export function observationContextOf(db, job, { repo, skillRoot }) {
   const context = filed?.packet?.context;
   const selected = context?.selected_op;
   if (!selected?.contract || !Array.isArray(context?.readRefs)) throw new Error('current mechanism proof has no filed selected contract or READ snapshot');
-  const roots = [filed.worktree, context.workflow_worktree?.path, ...(context.owned_paths ?? []).map((row) => row.root)]
-    .filter((value) => typeof value === 'string' && value).map((value) => path.resolve(repo, value));
+  const roots = supersedeDirs(db, contract.attempt_id, [filed.worktree, context.workflow_worktree?.path, ...(context.owned_paths ?? []).map((row) => row.root)]
+    .filter((value) => typeof value === 'string' && value).map((value) => path.resolve(repo, value)));
   if (!roots.length) throw new Error('current mechanism proof has no filed target root');
   const attempt = db.prepare('SELECT * FROM op_attempts WHERE attempt_id=? AND job_id=?').get(contract.attempt_id, job.job_id);
   if (!attempt || attempt.try_no !== job.try_no) throw new Error('current mechanism proof has no exact active attempt');

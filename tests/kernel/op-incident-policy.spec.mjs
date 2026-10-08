@@ -206,3 +206,16 @@ test('the Kernel watchdog reads its wake counters from the table', async () => {
   assert.equal(watchdog.WAKE_FAIL_WINDOW_MS, seatWake.failWindowMs);
   assert.equal(watchdog.WAKE_IDLE_WINDOW_MS, seatWake.failWindowMs);
 });
+
+test('a hold that names the code enforcing it points at an existing anchor and spec; reported-unsettled is enforced by the Job controller', () => {
+  const root = path.resolve(import.meta.dirname, '..', '..');
+  const policy = incidentPolicy();
+  const enforced = policy.holds.filter((hold) => hold.enforcedBy);
+  assert.ok(enforced.some((hold) => hold.id === 'reported-unsettled'), 'reported-unsettled names its enforcement');
+  for (const hold of enforced) {
+    const { file, anchor, spec } = hold.enforcedBy;
+    assert.ok(fs.readFileSync(path.join(root, file), 'utf8').includes(anchor), `${hold.id}: ${file} holds ${anchor}`);
+    assert.ok(fs.existsSync(path.join(root, spec)), `${hold.id}: ${spec} exists`);
+    assert.ok(fs.readFileSync(path.join(root, spec), 'utf8').includes(hold.id), `${hold.id}: its spec exercises it`);
+  }
+});

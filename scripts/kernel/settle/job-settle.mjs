@@ -49,6 +49,8 @@ import { claimManager, lockHolder } from '../../connectors/lib.mjs';
 import { SETTLED_JOB_LIST } from '../../../engine/admission.mjs';
 import { NEEDS_KERNEL_EVENT, KERNEL_ONLY_OPS, reportedJobs, kernelHandoverOf } from '../../machine/reported-jobs.mjs';
 import { eachInOrder } from '../../lib/in-order.mjs';
+import { workflowWorktreeOf } from '../../machine/workflow-tree.mjs';
+import { reconcileAttemptPlacements } from '../attempt-placement.mjs';
 import { settlerSettings, runtimeEnv, verifyReported, recordSettlerCheck, parse, slug, jsonOf } from './job-settle-verify.mjs';
 import { tempRoot } from '../../../engine/temp-root.mjs';
 export { classifyCheck, argvOf } from './check-command.mjs';
@@ -267,6 +269,12 @@ async function settleReported(ledger, fresh, { repo, settings, env, now, dryRun,
   return { target: 'settled', row: { jobId: fresh.jobId, op: fresh.op, verdict: settleAs, via: judged.via, latencyMs: at - fresh.filedAt, status: settled.value?.status ?? (settleAs === 'pass' ? 'succeeded' : 'failed') } };
 }
 
+/** The placement of a reported job's attempt against its workflow's registered tree, before its checks run: a lost admitted path is rebound, or the attempt ended. */
+function settlePlacement(ledger, item, { env, dryRun }) {
+  const tree = dryRun ? null : workflowWorktreeOf({ env }, item.workflowId);
+  return tree ? reconcileAttemptPlacements(ledger, { workflowId: item.workflowId, tree, jobId: item.jobId, env }) : null;
+}
+
 /** One reported job under its per-job lock: re-read, settle, and file the row into `out`; a throw is recorded, not rethrown. */
 async function settleItem(ledger, item, out, { repo, abs, settings, env, now, dryRun, verify, api, locks }) {
   const held = locks && !dryRun ? claimManager(lockName(repo, item.jobId), { env }) : { ok: true, release: () => {} };
@@ -275,6 +283,7 @@ async function settleItem(ledger, item, out, { repo, abs, settings, env, now, dr
     // Re-read under the lock: another pass (or the Kernel) may have settled it meanwhile.
     const fresh = reportedJobs(ledger.db, { jobId: item.jobId })[0];
     if (!fresh) { out.skipped.push({ jobId: item.jobId, reason: 'no-longer-reported' }); return; }
+    if (settlePlacement(ledger, fresh, { env, dryRun })?.ended.length) { out.skipped.push({ jobId: item.jobId, reason: 'placement-lost' }); return; }
     const done = await settleReported(ledger, fresh, { repo: abs, settings, env, now, dryRun, verify, api });
     out[done.target].push(done.row);
   } catch (error) {

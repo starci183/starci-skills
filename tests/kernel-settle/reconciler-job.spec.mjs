@@ -209,3 +209,34 @@ test('a worker question the policy table marks owner-only opens its Decision Ite
     assert.equal(byKey['worker-question:op-a:q2'].escalateTo, 'supervisor');
   } finally { fx.close(); }
 });
+
+test('reported-unsettled: a job that filed its report sits in status reported, and the planner settles it, times it and keys it', async () => {
+  const fx = fixture({ status: 'reported', report: { outcome: 'done', agoMs: 10 * 60_000 } });
+  try {
+    assert.equal(jobFacts(fx.db, 'op-a', { now: NOW, settings }).status, 'reported');
+    assert.ok(listKeysOf(fx.db, 'shop-be', { now: NOW, settings }).includes('job:shop-be:op-a'), 'the resync lists a reported job');
+    const plan = planJob(jobFacts(fx.db, 'op-a', { now: NOW, settings }), { settings });
+    assert.equal(plan.step.kind, 'settle');
+    assert.ok(plan.clocks.some((c) => c.state === 'SETTLE_OVERDUE'), 'the reported-unsettled bound runs');
+    const ctx = ctxFor(fx);
+    const r = await job.reconcile('job:shop-be:op-a', ctx);
+    assert.equal(r.action, 'settle');
+    assert.deepEqual(ctx.calls.run[0].args, [SETTLER_SCRIPT, '--repo', 'shop-be', '--job', 'op-a', '--json']);
+    assert.ok(ctx.calls.clock.some((c) => c.state === 'SETTLE_OVERDUE' && c.entity === 'job:shop-be:op-a'));
+  } finally { fx.close(); }
+});
+
+test('a reported job whose report the settler handed to the Kernel opens one settle-nongreen item, never a second settle', async () => {
+  const fx = fixture({ status: 'reported', report: { outcome: 'done' }, handover: { reason: 'settle-refused', code: 'op-gate-tool-failed' } });
+  try {
+    const ctx = ctxFor(fx);
+    const r = await job.reconcile('job:shop-be:op-a', ctx);
+    assert.equal(r.action, 'settle-nongreen');
+    assert.equal(ctx.calls.run.length, 0);
+    assert.equal(ctx.calls.decisions[0].kind, 'settle-nongreen');
+  } finally { fx.close(); }
+});
+
+test('the filed report is a route of the Job controller', () => {
+  assert.deepEqual(job.routes['report-filed']({ ledgerId: 'n', entityType: 'job', entityId: 'op-a', workflowId: 'wf-x' }), ['job:n:op-a', 'wf:n:wf-x']);
+});

@@ -135,7 +135,7 @@ import { QUOTA_FAILURE_KIND, outageSpecsOf, outageInText, outageOnScreen } from 
 import { deferJob, deferralOf as testDeferralOf, ownerSpecs, specsOff } from '../route/spec-deferral.mjs';
 import { admittedVersionOf } from './dispatch-admission.mjs';
 import { baselineWorkInputs, inputDrift } from './input-digests.mjs';
-import { admittedContractOf, latestContractOf } from '../machine/contract-version.mjs';
+import { admittedContractOf, latestContractOf, placedWorktreeOf } from '../machine/contract-version.mjs';
 import { queueSettleMedia } from '../connectors/telegram-media.mjs';
 import { guardLaunch } from '../guards/hook-install.mjs';
 import { attributeRedGate, failingFromText, peerRouteOf } from './gate-attribution.mjs';
@@ -3277,8 +3277,8 @@ function reconcileOrphanKernelJobs(ledger, args) {
 // A job's owned paths resolved per target repository, against the dispatch
 // contract's worktree (where the worker was placed) when it recorded one.
 const contractWorktreeOf = (db, job, repo) => {
-  const context = parseJson(latestContractOf(db, job.job_id)?.context_json);
-  return typeof context?.worktree === 'string' ? path.resolve(repo, context.worktree) : null;
+  const placed = placedWorktreeOf(db, latestContractOf(db, job.job_id));
+  return placed ? path.resolve(repo, placed) : null;
 };
 function jobPlacements(db, job, repo) {
   const op = jobOpOf(job), payload = jobPayloadOf(job);
