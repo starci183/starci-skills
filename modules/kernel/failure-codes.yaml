@@ -10824,15 +10824,6 @@ owes-no-step:
   nextStep_vi: "Không cần làm thêm; lệnh chạy lại là vô hại."
   owner: runtime-core
   kind: settle-reason
-owner-wait-no-ask:
-  title: "Owner wait without an ask"
-  title_vi: "Chờ owner nhưng không có câu hỏi"
-  meaning_vi: "Việc dừng ở trạng thái chờ owner nhưng không nộp câu hỏi nào để owner trả lời."
-  causes_vi:
-    - "Op báo chờ owner mà không đính kèm câu hỏi"
-  nextStep_vi: "Mục quyết định retry-decision được giao cho Kernel để chạy lại op và nộp câu hỏi."
-  owner: supervisor
-  kind: blocker
 retry-decision:
   title: "Retry decision needed"
   title_vi: "Cần quyết định có thử lại không"
@@ -16753,5 +16744,113 @@ RUNTIME_CHANGE_OWNED_BY_DEBUG:
     - "Supervisor chạy starci supervisor land, lesson-actions hoặc workers create/stage/spawn"
     - "Supervisor ghi một tệp trong bản checkout runtime"
   nextStep_vi: "Supervisor ghi lỗi runtime bằng starci supervisor actions record --item runtime-defect:<nguyên nhân> kèm bằng chứng, cho Kernel một cách đi vòng; Debug sửa."
+  owner: supervisor
+  kind: blocker
+KERNEL_USE_DECIDE:
+  title: "A Kernel seat ran a verb that is the runtime's"
+  title_vi: "Kernel seat gọi một động từ thuộc về runtime"
+  meaning_vi: "Kernel seat chỉ chạy các động từ đọc, starci kernel decide và kernel-ack-rev; động từ làm thay đổi workflow do runtime (controller) chạy, và lời từ chối kèm menu của Kernel."
+  causes_vi:
+    - "Kernel gõ starci kernel enqueue, settle, dispatch-ready... trực tiếp theo thói quen cũ"
+  nextStep_vi: "Đọc menu in kèm lời từ chối, trả lời mục bằng starci kernel decide --workflow <workflow> --item <id> --choice <lựa chọn> --reason <lý do>."
+  owner: op-retry
+  kind: verb-refusal
+KERNEL_STARCI_ONLY:
+  title: "A Kernel seat ran a program that is not starci"
+  title_vi: "Kernel seat chạy chương trình không phải starci"
+  meaning_vi: "Shell của Kernel là starci và các lệnh đọc thuần; node, git, npm, orca, sleep và mọi chương trình khác bị từ chối."
+  causes_vi:
+    - "Kernel chạy node -e, git, npm, orca hoặc vòng sleep để đọc hay điều khiển trạng thái"
+  nextStep_vi: "Dùng starci kernel status (có --field để chọn trường) hoặc starci kernel decide; không dùng chương trình khác."
+  owner: op-retry
+  kind: verb-refusal
+menu-item-unknown:
+  title: "The item is not on the Kernel menu"
+  title_vi: "Mục không có trên menu của Kernel"
+  meaning_vi: "starci kernel decide --item nêu một mục không mở trong menu hiện tại của workflow; lời từ chối kèm menu hiện tại."
+  causes_vi:
+    - "Mục đã được runtime xử lý hoặc id sai"
+  nextStep_vi: "Đọc menu trong câu trả lời và chọn một mục đang mở."
+  owner: op-retry
+  kind: blocker
+menu-choice-unknown:
+  title: "The choice is not an option of the item"
+  title_vi: "Lựa chọn không thuộc mục"
+  meaning_vi: "starci kernel decide --choice không nằm trong các lựa chọn của mục; lời từ chối kèm menu hiện tại."
+  causes_vi:
+    - "Gõ sai tên lựa chọn hoặc mục đã đổi"
+  nextStep_vi: "Chọn một lựa chọn trong menu, hoặc none-fits kèm lý do."
+  owner: op-retry
+  kind: blocker
+menu-direct-option:
+  title: "The option is run directly"
+  title_vi: "Lựa chọn này được chạy trực tiếp"
+  meaning_vi: "Lựa chọn (xác nhận phiên bản runtime) cần Kernel tự đọc tệp nên không chạy qua starci kernel decide."
+  causes_vi:
+    - "Kernel chọn ack-rev qua decide"
+  nextStep_vi: "Chạy lệnh mà phần effect của lựa chọn nêu."
+  owner: op-retry
+  kind: blocker
+menu-text-missing:
+  title: "The option needs --text"
+  title_vi: "Lựa chọn cần --text"
+  meaning_vi: "Lựa chọn nhận một đầu vào tự do (câu trả lời, đường dẫn, lời nhắn) qua --text nhưng không có."
+  causes_vi:
+    - "Thiếu --text"
+  nextStep_vi: "Gọi lại starci kernel decide kèm --text."
+  owner: op-retry
+  kind: blocker
+menu-step-failed:
+  title: "A step of the chosen option failed"
+  title_vi: "Một bước của lựa chọn thất bại"
+  meaning_vi: "Một động từ trong lựa chọn bị từ chối hoặc lỗi; các bước trước đó đã chạy, quyết định được đóng revert."
+  causes_vi:
+    - "Trạng thái đổi giữa lúc đọc menu và lúc chạy"
+  nextStep_vi: "Đọc status để thấy tình huống mới; trả lời lại hoặc none-fits kèm bằng chứng."
+  owner: op-retry
+  kind: blocker
+menu-step-usage:
+  title: "A step of the chosen option lacks an argument"
+  title_vi: "Một bước của lựa chọn thiếu tham số"
+  meaning_vi: "Lựa chọn dựng một động từ thiếu cờ bắt buộc vì mục không đủ dữ kiện."
+  causes_vi:
+    - "Dữ liệu của job thiếu đường dẫn sở hữu"
+  nextStep_vi: "Dùng none-fits kèm bằng chứng; đây là lỗi dữ liệu của runtime."
+  owner: supervisor
+  kind: blocker
+menu-verb-unknown:
+  title: "A step names a verb that does not exist"
+  title_vi: "Một bước gọi động từ không tồn tại"
+  meaning_vi: "Một lựa chọn của menu nêu động từ Kernel không có trong bản runtime này."
+  causes_vi:
+    - "Menu và danh mục động từ lệch nhau"
+  nextStep_vi: "Dùng none-fits kèm bằng chứng; Debug sửa menu."
+  owner: supervisor
+  kind: blocker
+menu-unreadable:
+  title: "The menu could not be read"
+  title_vi: "Không đọc được menu"
+  meaning_vi: "starci kernel decide chạy status trong tiến trình để lấy menu hiện tại nhưng status không trả menu."
+  causes_vi:
+    - "status lỗi hoặc workflow không đọc được"
+  nextStep_vi: "Chạy starci kernel status để thấy lỗi gốc."
+  owner: supervisor
+  kind: blocker
+decide-answer-incomplete:
+  title: "A menu answer needs --choice and --reason"
+  title_vi: "Câu trả lời menu thiếu --choice hoặc --reason"
+  meaning_vi: "starci kernel decide --item cần cả --choice lẫn --reason không rỗng."
+  causes_vi:
+    - "Thiếu --choice hoặc --reason"
+  nextStep_vi: "Gọi lại kèm cả hai."
+  owner: op-retry
+  kind: blocker
+menu-escape:
+  title: "The Kernel found no option that fits"
+  title_vi: "Kernel không thấy lựa chọn nào phù hợp"
+  meaning_vi: "Mục quyết định do none-fits mở cho Supervisor khi menu không có lựa chọn phù hợp, kèm lý do và bằng chứng."
+  causes_vi:
+    - "Một tình huống chỉ có lối đi vòng quanh lỗi, hoặc ngoài các lựa chọn của menu"
+  nextStep_vi: "Supervisor xử lý mục; nếu là lỗi runtime thì ghi runtime-defect cho Debug."
   owner: supervisor
   kind: blocker

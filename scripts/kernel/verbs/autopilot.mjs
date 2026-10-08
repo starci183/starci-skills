@@ -12,7 +12,7 @@ function contextOf({ ledger, args, repo, emit }) {
   const needReason = (flag) => { if (!reason) throw Object.assign(new Error(`autopilot ${flag} needs --reason <text>`), { code: 'reason-missing' }); };
   const append = (kind, payload, entityType = 'workflow', entityId = workflowId) => ledger.transaction(() => ledger.appendEvent({ workflowId, entityType, entityId, kind, payload }));
   const wake = (l, o) => wakeKernelForTransition(l, { workflowId: o.workflowId, transition: 'ask-answered', ids: { dispatchId: o.dispatchId }, lines: [
-    `autopilot answered ask ${o.dispatchId} (answeredBy autopilot); receipt ${o.receiptPath}.`, 'Re-read starci kernel status and run nextActions.'] });
+    `autopilot answered ask ${o.dispatchId} (answeredBy autopilot); receipt ${o.receiptPath}.`, 'The runtime re-runs the asking op with the receipt; read starci kernel status for what waits on you.'] });
   return { ledger, args, repo, emit, db, workflowId, reason, by, needReason, append, wake };
 }
 

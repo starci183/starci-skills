@@ -154,3 +154,15 @@ removed:
     use: 'skills/starci/references/host-startup.md'
     since: 1.0.0-alpha.6
     match: '(?<![\w-])host-maintenance\b'
+  - id: kernel-ranked-actions
+    kind: vocabulary
+    name: ranked actions
+    use: "the Kernel's menu: the Decide section of starci kernel status, answered with starci kernel decide"
+    since: 1.0.0-alpha.8
+    match: '[Ww]ork the ranked actions|[Ff]irst rca\.actions entry'
+  - id: kernel-run-next-actions
+    kind: vocabulary
+    name: run nextActions
+    use: "the Kernel answers the items of its menu; the runtime performs the mechanical next actions"
+    since: 1.0.0-alpha.8
+    match: 'run nextActions|run each\s+in order and never choose'

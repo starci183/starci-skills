@@ -1321,7 +1321,7 @@ starci kernel cut-seam --repo <path> --reconcile --job <job> --exit-code 0
 
 ### starci kernel decide
 
-open, list or close an entry of the Kernel decision log (hypothesis, action, metric)
+answer one item of the Kernel menu with a typed choice, or keep the decision log
 
 | flag | type | |
 | --- | --- | --- |
@@ -1335,12 +1335,18 @@ open, list or close an entry of the Kernel decision log (hypothesis, action, met
 | `--result` | enum keep|revert |  |
 | `--observed` | string |  |
 | `--list` | boolean |  |
+| `--item` | string |  |
+| `--choice` | string |  |
+| `--reason` | string |  |
+| `--text` | string |  |
+| `--evidence` | string |  |
 
-exit: 0 listed or recorded; 1 refused (incomplete, action already open or reverted, unknown or closed decision); 2 bad usage: a required flag is missing or a flag has no value
+exit: 0 listed, recorded or executed; 1 refused (an item or choice not on the menu, incomplete, action already open or reverted, unknown or closed decision) or a step of the choice failed; 2 bad usage: a required flag is missing or a flag has no value
 
 json: flag
 
 ```sh
+starci kernel decide --repo <path> --workflow <workflow> --item <item> --choice <choice> --reason <why>
 starci kernel decide --repo <path> --workflow <workflow> --list
 starci kernel decide --repo <path> --workflow <workflow> --hypothesis <hypothesis> --action-key <key> --metric <metric>
 starci kernel decide --repo <path> --workflow <workflow> --close <decision> --result keep --observed <observed>
@@ -1352,6 +1358,7 @@ list, open, claim, resolve or escalate Decision Items; the Kernel reads them fir
 
 | flag | type | |
 | --- | --- | --- |
+| `--field` | string |  |
 | `--repo` | string |  |
 | `--workflow` | string |  |
 | `--list` | boolean |  |
@@ -1801,6 +1808,7 @@ list the workflow's typed log rows, oldest first
 
 | flag | type | |
 | --- | --- | --- |
+| `--field` | string |  |
 | `--repo` | string |  |
 | `--workflow` | string | required |
 | `--job` | string |  |
@@ -2324,6 +2332,7 @@ the live status projection of a workflow (frontier, progress, waits)
 
 | flag | type | |
 | --- | --- | --- |
+| `--field` | string |  |
 | `--repo` | string |  |
 | `--workflow` | string | required |
 
@@ -2341,6 +2350,7 @@ the read projection a Kernel scans each wake (jobs, inbox, signals, drift)
 
 | flag | type | |
 | --- | --- | --- |
+| `--field` | string |  |
 | `--repo` | string |  |
 | `--workflow` | string | required |
 | `--deliveries` | boolean |  |

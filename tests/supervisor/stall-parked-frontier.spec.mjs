@@ -87,7 +87,7 @@ test('a job queued --after a peer-wait-held job is parked behind the wait - the 
   // Resolved, the chain is the Kernel's again: the held job reads ready, its dependants wait on it (engaged).
   fx.ok(['incident','--workflow',WORK,'--resolve',incidentId,'--detail','peer gates green']);
   const after=fx.status(fx.repo,WORK).frontier;
-  assert.deepEqual([after.state,after.actionable],['engaged',true]);
+  assert.deepEqual([after.state,after.actionable],['engaged',false]);
   assert.equal(after.queued.find(q=>q.jobId===ord6).parkedBehind,undefined);
 });
 

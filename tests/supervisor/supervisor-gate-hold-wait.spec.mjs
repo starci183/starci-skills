@@ -47,10 +47,10 @@ for (const holds of [['*'], ['backend.implement', 'interface.implement']]) test(
   assert.ok(!found.some((f) => f.type === 'STALLED' && f.workflowId === WF));
 }));
 
-test('a ready job outside a named supervisor gate remains actionable', (t) => withLedger(t, ({ repoRoot, ledger }) => {
+test('a ready job outside a named supervisor gate is dispatched by the Workflow controller', (t) => withLedger(t, ({ repoRoot, ledger }) => {
   fixture(ledger, ['job-held'], [{ jobId: 'job-free', opId: 'interface.implement', status: 'queued', createdAt: NOW - 90 * MIN, updatedAt: NOW - 90 * MIN }]);
   const s = status(repoRoot);
   assert.equal(s.frontier.queued.find((q) => q.jobId === 'job-free').queuedBecause, 'ready');
-  assert.equal(s.frontier.actionable, true);
+  assert.equal(s.frontier.actionable, false);
   assert.ok(s.nextActions.some((a) => a.kind === 'dispatch' && a.jobId === 'job-free' && !a.heldBy));
 }));

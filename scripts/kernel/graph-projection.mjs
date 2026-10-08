@@ -14,9 +14,15 @@ import { deferralOf as testDeferralOf, ownerSpecs, deferredTestsOf, planLegDefer
 import { HANDOVER_OP } from './handover.mjs';
 import { SEAM_PRIORITY_CLASS, SEAM_RECONCILE_CHECK } from './seam-policy.mjs';
 import { ASSET_OP } from '../work/asset-slot.mjs';
+import { retryMoveOf } from './retry-move.mjs';
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const ownerLanguage = () => ownerLanguageOf();
 
+/** A retry action with the typed move that performs it (scripts/kernel/retry-move.mjs), when the job has a write set to repeat. */
+const retryAction = (ctx, origin, action) => {
+  const move = retryMoveOf(ctx.rowOf.get(action.jobId), { op: action.op });
+  return { ...action, origin, ...(move ? { move } : {}) };
+};
 const NEXT_ACTION_KINDS = ['retry', 'root-verify', 'dispatch', 'impact-check', 'supervisor-gate', 'owner-gate', 'wait'];
 // Legs that run per domain in parallel once the workflow has a work graph (scripts/work/work-graph-store.mjs).
 export const DOMAIN_PARALLEL_OPS = new Set(['business.decide', 'architecture.decide']);
@@ -34,9 +40,9 @@ const unsteppedAction = (db, row) => {
   const blocker = filedReportOf(db, row.job_id)?.blocker ?? null;
   const upstream = blocker ? upstreamPlanOf(db, row, blocker) : null;
   if (upstream?.action === 'wait') {
-    return { kind: 'wait', op: row.op_id, jobId: row.job_id, reason: `${row.job_id} was blocked (${blocker}) and waits for ${upstream.on}: its retry is enqueued behind that leg once it has a job` };
+    return { kind: 'wait', origin: 'unstepped-failure-wait', op: row.op_id, jobId: row.job_id, reason: `${row.job_id} was blocked (${blocker}) and waits for ${upstream.on}: its retry is enqueued behind that leg once it has a job` };
   }
-  return { kind: 'retry', op: row.op_id, jobId: row.job_id, reason: `${row.job_id} failed and nothing follows it (no step recorded): starci kernel reconcile --job ${row.job_id} --route-failure routes it by the table - the Job controller runs it within a pass; a step that records none is yours: retry with the failure fed back, switch agent, re-plan, or raise the typed gate` };
+  return { kind: 'retry', origin: 'unstepped-failure', op: row.op_id, jobId: row.job_id, reason: `${row.job_id} failed and nothing follows it (no step recorded): starci kernel reconcile --job ${row.job_id} --route-failure routes it by the table - the Job controller runs it within a pass; a step that records none is yours: retry with the failure fed back, switch agent, re-plan, or raise the typed gate` };
 };
 /** A failed attempt nothing follows (its owner-gate resolved, no deferral): retry it. */
 const unresolvedRetryActions = (actions, ctx) => {
@@ -46,14 +52,14 @@ const unresolvedRetryActions = (actions, ctx) => {
     if (ownerGateOf(ownerGates, row) || deferredJobs.has(row.job_id)) continue;
     if (!step) { actions.push(unsteppedAction(db, row)); continue; }
     if (step.kind === 'deferred') continue;
-    actions.push({ kind: 'retry', op: row.op_id, jobId: row.job_id,
-      reason: `${row.job_id} failed and nothing follows it (${['owner-gate', SUPERVISOR_GATE].includes(step.kind) ? step.kind + ' ' + step.incidentId + ' resolved' : step.reason}): starci kernel enqueue --op ${row.op_id} with its paths and records --retry-of ${row.job_id}` });
+    actions.push(retryAction(ctx, 'failed-step-open', { kind: 'retry', op: row.op_id, jobId: row.job_id,
+      reason: `${row.job_id} failed and nothing follows it (${['owner-gate', SUPERVISOR_GATE].includes(step.kind) ? step.kind + ' ' + step.incidentId + ' resolved' : step.reason}): starci kernel enqueue --op ${row.op_id} with its paths and records --retry-of ${row.job_id}` }));
   }
 };
 /** An owner wait that names no ask: the owner has nothing to answer, so the op runs again and files its question. */
 const askless = (actions, ctx) => {
   for (const item of ownerWaitsWithoutAsk(ctx.awaitingOwner)) {
-    actions.push({ kind: 'retry', op: item.opId, jobId: item.jobId, reason: `${item.jobId} waits on the owner but filed no ask: starci kernel enqueue --op ${item.opId} --retry-of ${item.jobId} so it files its question` });
+    actions.push(retryAction(ctx, 'askless-owner-wait', { kind: 'retry', op: item.opId, jobId: item.jobId, reason: `${item.jobId} waits on the owner but filed no ask: starci kernel enqueue --op ${item.opId} --retry-of ${item.jobId} so it files its question` }));
   }
 };
 /** An ask the owner (or the autopilot) answered: its op re-runs with the answer. */
@@ -63,14 +69,14 @@ const answeredAskActions = (actions, ctx) => {
     const action = { kind: 'retry', op: item.opId, jobId: item.jobId };
     if (item.answeredBy === AUTOPILOT_BY) { const dispatchId = item.dispatchId; const ruling = item.provisional ? 'provisional acceptance, ' + PROVISIONAL_LABEL : 'redraw/revise with the gate findings as the brief'; action.reason = `autopilot answered ask ${dispatchId} (${ruling}; owner ruling ${AUTOPILOT_RULING}): starci kernel enqueue --op ${item.opId} --retry-of ${item.jobId} so it applies the receipt`; }
     else action.reason = `the owner answered ask ${item.dispatchId}: starci kernel enqueue --op ${item.opId} --retry-of ${item.jobId} so it runs with the answer`;
-    actions.push(action);
+    actions.push(retryAction(ctx, 'answered-ask', action));
   }
 };
 /** The owner's handover feedback re-opened a provisional acceptance: only that op re-runs (draw-feedback loop). */
 const reopenedActions = (actions, ctx) => {
   const { autopilot } = ctx;
   for (const item of autopilot?.reopened ?? []) {
-    actions.push({ kind: 'retry', op: item.opId, jobId: item.jobId, reason: `the owner's handover answer ${item.handoverDispatchId} re-opened the provisional ${item.record ?? item.dispatchId}: starci kernel enqueue --op ${item.opId} --retry-of ${item.jobId} - the redraw's brief is the owner's note in ${item.receiptPath}` });
+    actions.push(retryAction(ctx, 'reopened-provisional', { kind: 'retry', op: item.opId, jobId: item.jobId, reason: `the owner's handover answer ${item.handoverDispatchId} re-opened the provisional ${item.record ?? item.dispatchId}: starci kernel enqueue --op ${item.opId} --retry-of ${item.jobId} - the redraw's brief is the owner's note in ${item.receiptPath}` }));
   }
 };
 /** A queued leg the specs switches defer: its route settles it deferred at once, which releases every leg behind it. */
@@ -78,7 +84,7 @@ const deferredQueuedActions = (actions, ctx) => {
   const { queued, deferredQueued } = ctx;
   for (const item of queued.filter((row) => deferredQueued.has(row.jobId))) {
     const deferral = deferredQueued.get(item.jobId);
-    actions.push({ kind: 'dispatch', op: item.opId, jobId: item.jobId, deferred: deferral.reason,
+    actions.push({ kind: 'dispatch', origin: 'deferred-queued', op: item.opId, jobId: item.jobId, deferred: deferral.reason,
       reason: `deferred (${deferral.reason}): starci kernel route --job ${item.jobId} settles it deferred without dispatch (no attempt spent, whatever it was queued behind) and the legs behind it proceed` });
   }
 };
@@ -87,7 +93,7 @@ const readyQueuedActions = (actions, ctx) => {
   const { queued, rowOf, deferredQueued } = ctx;
   for (const item of queued.filter((row) => row.queuedBecause === 'ready' && !deferredQueued.has(row.jobId))) {
     const payload = jobPayloadOf(rowOf.get(item.jobId));
-    const action = { kind: payload.rootVerify ? 'root-verify' : 'dispatch', op: item.opId, jobId: item.jobId, ...(item.seam ? { seamDuty: 'dispatch-seam' } : {}) };
+    const action = { kind: payload.rootVerify ? 'root-verify' : 'dispatch', origin: 'ready-queued', op: item.opId, jobId: item.jobId, ...(item.seam ? { seamDuty: 'dispatch-seam' } : {}) };
     if (payload.rootVerify) action.reason = `read-only check of the root-cause claim on ${payload.rootVerify.node} (for ${payload.rootVerify.of}): starci kernel route --job ${item.jobId}, then starci kernel dispatch`; else if (item.seam) action.reason = `dispatch seam now: ordinal 1 of cut ${item.seam.cutId}, ${item.seam.siblings} sibling ordinal(s) build on it (priority ${SEAM_PRIORITY_CLASS}): starci kernel route --job ${item.jobId}, then starci kernel dispatch - before any other queued work`; else if (item.seamStub) action.reason = `ready on a stub (${item.seamStub.mode}): ${item.seamStub.reason}; starci kernel route --job ${item.jobId}, then starci kernel dispatch - it owes ${SEAM_RECONCILE_CHECK} once the seam lands`; else action.reason = `ready: starci kernel route --job ${item.jobId}, then starci kernel dispatch`;
     actions.push(action);
   }
@@ -104,7 +110,7 @@ const approvedLegAction = (op, ctx, credentialOnly) => {
   const placeholder = (planAncestors.get(op) ?? []).some((ancestor) => credentialOnly(ancestor));
   const nodes = workGraph ? workGraph.frontier.map((node) => node.id) : [];
   const deferral = deferredPlanOps.get(op);
-  const action = { kind: 'dispatch', op, ...(nodes.length ? { nodes } : {}), ...(deferral ? { deferred: deferral.reason } : {}) };
+  const action = { kind: 'dispatch', origin: 'approved-leg', op, ...(nodes.length ? { nodes } : {}), ...(deferral ? { deferred: deferral.reason } : {}) };
   if (deferral) {
     action.reason = `approved leg ${op} is deferred (${deferral.reason}): starci kernel enqueue --op ${op} with its paths records it - it settles deferred at once, never dispatched, no attempt spent - and the legs behind it do not wait on it`;
   } else {
@@ -133,14 +139,14 @@ const redNodeActions = (actions, ctx) => {
   const { workGraph } = ctx;
   for (const node of workGraph?.frontier ?? []) {
     if (node.color !== 'red' || !node.lastOp) continue;
-    actions.push({ kind: 'dispatch', op: node.lastOp, nodes: [node.id], reason: `work-graph v${workGraph.version} turned ${node.id} red: starci kernel enqueue --op ${node.lastOp} --paths ${node.ownedPaths.join(',')}, then route and dispatch it` });
+    actions.push({ kind: 'dispatch', origin: 'red-node', op: node.lastOp, nodes: [node.id], paths: node.ownedPaths.join(','), reason: `work-graph v${workGraph.version} turned ${node.id} red: starci kernel enqueue --op ${node.lastOp} --paths ${node.ownedPaths.join(',')}, then route and dispatch it` });
   }
 };
 /** A proof whose every piece of evidence is stale re-runs only the check that made it (proof-integrity.mjs). */
 const staleProofActions = (actions, ctx) => {
   const { staleReady, staleProofs } = ctx;
   for (const item of staleProofs.filter((proof) => !staleReady.some((stale) => stale.jobId === proof.jobId))) {
-    actions.push({ kind: 'impact-check', op: item.op, jobId: item.jobId, reason: `its proof of ${item.items.slice(0, 5).join(', ')}${item.items.length > 5 ? ' (+' + (item.items.length - 5) + ')' : ''} is stale: ${item.changed.slice(0, 5).join(', ')} changed since it was indexed; re-dispatch ${item.op} as a new attempt --retry-of ${item.jobId} (only that check)` });
+    actions.push({ kind: 'impact-check', origin: 'stale-proof', op: item.op, jobId: item.jobId, reason: `its proof of ${item.items.slice(0, 5).join(', ')}${item.items.length > 5 ? ' (+' + (item.items.length - 5) + ')' : ''} is stale: ${item.changed.slice(0, 5).join(', ')} changed since it was indexed; re-dispatch ${item.op} as a new attempt --retry-of ${item.jobId} (only that check)` });
   }
 };
 /** Artwork slots a drawing declared and interface.asset has not filled: propose the interface.asset leg that owes them. */
@@ -149,7 +155,7 @@ const assetSlotActions = (actions, ctx) => {
   const assetLegOpen = workflowJobs.some((row) => row.op_id === ASSET_OP && (row.status === 'queued' || LEG_IN_FLIGHT.includes(row.status)));
   if (assetSlotsOwed.length && !assetLegOpen) {
     const records = [...new Set(assetSlotsOwed.map((slot) => slot.ui).filter(Boolean))];
-    actions.push({ kind: 'dispatch', op: ASSET_OP, slots: assetSlotsOwed.map((slot) => slot.key),
+    actions.push({ kind: 'dispatch', origin: 'asset-slots', op: ASSET_OP, paths: records.join(','), slots: assetSlotsOwed.map((slot) => slot.key),
       reason: `${assetSlotsOwed.length} artwork slot(s) the drawing owes to interface.asset (${assetSlotsOwed.slice(0, 5).map((slot) => slot.key).join(', ')}${assetSlotsOwed.length > 5 ? ' (+' + (assetSlotsOwed.length - 5) + ')' : ''}): starci kernel enqueue --op ${ASSET_OP} --paths ${records.join(',')}, then route and dispatch it - it generates each slot under the brand imagery.promptRules and replaces the placeholder (src + data-asset-sha256)` });
   }
 };
@@ -157,7 +163,7 @@ const assetSlotActions = (actions, ctx) => {
 const staleReadyActions = (actions, ctx) => {
   const { staleReady } = ctx;
   for (const item of staleReady) {
-    const action = { kind: 'impact-check', op: item.op, jobId: item.jobId };
+    const action = { kind: 'impact-check', origin: 'stale-ready', op: item.op, jobId: item.jobId };
     if (item.followUp) action.reason = `the owner of a record it read declared the change breaking: enqueue ONE follow-up attempt of ${item.op}${item.cut ? ' cut ordinal ' + item.cut.ordinal : ''}`; else action.reason = `records it read changed since it settled: re-dispatch ${item.op} as a new attempt${item.cut ? ' of cut ordinal ' + item.cut.ordinal : ''}`;
     actions.push(action);
   }
@@ -168,9 +174,9 @@ const gateActions = (actions, ctx) => {
   for (const gate of ownerGates) {
     const held = gate.holds.find((id) => rowOf.has(id)) ?? null;
     actions.push(gate.kind === SUPERVISOR_GATE
-      ? { kind: SUPERVISOR_GATE, op: gate.opId ?? (held ? rowOf.get(held).op_id : null), ...(held ? { jobId: held } : {}), incidentId: gate.incidentId,
+      ? { kind: SUPERVISOR_GATE, origin: 'supervisor-gate', op: gate.opId ?? (held ? rowOf.get(held).op_id : null), ...(held ? { jobId: held } : {}), incidentId: gate.incidentId,
         reason: `supervisor-gate ${gate.incidentId}: ${gate.detail}; the Supervisor's step (never the owner's) - keep driving every other leg; its resolve --by supervisor wakes you` }
-      : { kind: 'owner-gate', op: gate.opId ?? (held ? rowOf.get(held).op_id : null), ...(held ? { jobId: held } : {}), incidentId: gate.incidentId,
+      : { kind: 'owner-gate', origin: 'owner-gate', op: gate.opId ?? (held ? rowOf.get(held).op_id : null), ...(held ? { jobId: held } : {}), incidentId: gate.incidentId,
         reason: `owner-gate ${gate.incidentId}: ${gate.detail}; the owner's step, then starci kernel incident --resolve` });
   }
 };
@@ -178,21 +184,21 @@ const gateActions = (actions, ctx) => {
 const pendingAskActions = (actions, ctx) => {
   const { awaitingOwner, autopilot } = ctx;
   for (const item of awaitingOwner.filter((ask) => ask.answer === 'pending')) {
-    actions.push({ kind: 'owner-gate', op: item.opId, jobId: item.jobId, reason: autopilot?.on ? `ask ${item.dispatchId ?? '-'} is the end-of-flow owner step (handover or its credential checklist)` : `ask ${item.dispatchId ?? '-'} waits on the owner` });
+    actions.push({ kind: 'owner-gate', origin: 'pending-ask', op: item.opId, jobId: item.jobId, reason: autopilot?.on ? `ask ${item.dispatchId ?? '-'} is the end-of-flow owner step (handover or its credential checklist)` : `ask ${item.dispatchId ?? '-'} waits on the owner` });
   }
 };
 /** The ONE end-of-flow credential step: every business leg but the deferred live proofs settled (or deferred). */
 const credentialStepAction = (actions, ctx) => {
   const { wf, autopilot } = ctx;
   if (autopilot?.on && autopilot.checklistDue) {
-    actions.push({ kind: 'dispatch', op: 'provision.ask', final: true, reason: `the end-of-flow owner step "supply credentials": starci kernel enqueue --op provision.ask --params '{"subject":"${HANDOVER_CREDENTIALS_SUBJECT}"}' --paths .starciwork/evidence/${wf.workflow_id}.credentials; its ask files the question \`starci kernel autopilot --workflow ${wf.workflow_id} --checklist --json\` prints (.question), verbatim - one form for every deferred credential; the deferred approvals (${(autopilot.checklistApprovals ?? []).join(', ') || 'none'}) are released at the same time (starci kernel autopilot --release <dispatchId>). The deferred live proofs resume by themselves once the owner answers` });
+    actions.push({ kind: 'dispatch', origin: 'credential-step', op: 'provision.ask', final: true, params: `{"subject":"${HANDOVER_CREDENTIALS_SUBJECT}"}`, paths: `.starciwork/evidence/${wf.workflow_id}.credentials`, reason: `the end-of-flow owner step "supply credentials": starci kernel enqueue --op provision.ask --params '{"subject":"${HANDOVER_CREDENTIALS_SUBJECT}"}' --paths .starciwork/evidence/${wf.workflow_id}.credentials; its ask files the question \`starci kernel autopilot --workflow ${wf.workflow_id} --checklist --json\` prints (.question), verbatim - one form for every deferred credential; the deferred approvals (${(autopilot.checklistApprovals ?? []).join(', ') || 'none'}) are released at the same time (starci kernel autopilot --release <dispatchId>). The deferred live proofs resume by themselves once the owner answers` });
   }
 };
 /** A leg in flight is a wait. */
 const inFlightWaitActions = (actions, ctx) => {
   const { workflowJobs } = ctx;
   for (const row of workflowJobs.filter((job) => LEG_IN_FLIGHT.includes(job.status))) {
-    actions.push({ kind: 'wait', op: row.op_id, jobId: row.job_id, reason: row.status === 'effect_unknown' ? 'effect_unknown: reconcile it' : row.status });
+    actions.push({ kind: 'wait', origin: 'in-flight', op: row.op_id, jobId: row.job_id, reason: row.status === 'effect_unknown' ? 'effect_unknown: reconcile it' : row.status });
   }
 };
 /** A queued job that is not ready is a wait on what holds it. */
@@ -201,13 +207,13 @@ const queuedWaitActions = (actions, ctx) => {
   for (const item of queued.filter((row) => !['ready', 'owner-gate', SUPERVISOR_GATE].includes(row.queuedBecause) && !deferredQueued.has(row.jobId))) {
     const seamFirst = item.seam && ['max-ops', 'pool-full', 'circuit-open', 'path-lease'].includes(item.queuedBecause)
       ? '; seam first: it takes the next free slot of this workflow (starci kernel dispatch refuses other work the last slot while it is queued)' : '';
-    actions.push({ kind: 'wait', op: item.opId, jobId: item.jobId, reason: `${item.queuedBecause}${item.detail ? ': ' + item.detail : ''}${seamFirst}` });
+    actions.push({ kind: 'wait', origin: 'queued-wait', op: item.opId, jobId: item.jobId, reason: `${item.queuedBecause}${item.detail ? ': ' + item.detail : ''}${seamFirst}` });
   }
 };
 /** A peer-wait incident is a wait. */
 const peerWaitActions = (actions, ctx) => {
   const { peerWaits } = ctx;
-  for (const wait of peerWaits) actions.push({ kind: 'wait', op: wait.opId, incidentId: wait.incidentId, reason: `peer-wait on ${wait.peer}: ${wait.detail.slice(0, 160)}` });
+  for (const wait of peerWaits) actions.push({ kind: 'wait', origin: 'peer-wait', op: wait.opId, incidentId: wait.incidentId, reason: `peer-wait on ${wait.peer}: ${wait.detail.slice(0, 160)}` });
 };
 /** The actions ranked by kind; a move held by a supervisor-gate or a peer-wait says so. */
 const nextActionsOf = (actions, ownerGates, peerWaits) => {

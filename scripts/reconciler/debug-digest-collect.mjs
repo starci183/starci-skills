@@ -9,6 +9,7 @@ import { eachInOrder } from '../lib/in-order.mjs';
 import { runtimeShaOf } from '../machine/contract-version.mjs';
 import { child, firstJson } from './core-watch.mjs';
 import { machineFacts } from './debug-digest-machine.mjs';
+import { wakeUsageOf } from '../kernel/wake-budget.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const OPEN_PHASES = new Set(['running']);
@@ -33,7 +34,7 @@ export function ledgerFacts(file, workflowIds = null) {
         incidents: db.prepare("SELECT * FROM incidents WHERE workflow_id=? AND status='open'").all(w.workflow_id).map(incidentOf),
         decisions: db.prepare("SELECT * FROM decision_items WHERE workflow_id=? AND status='open'").all(w.workflow_id).map(decisionOf),
         kernelJob: kernelJob ? { status: kernelJob.status, updatedAt: kernelJob.updated_at } : null,
-        kernelSignal: parseJsonOr(signal?.value_json, null), lastKernelWakeAt: woken };
+        kernelSignal: parseJsonOr(signal?.value_json, null), lastKernelWakeAt: woken, kernelWakes: wakeUsageOf(db, w.workflow_id) };
     });
   } finally { db.close(); }
 }

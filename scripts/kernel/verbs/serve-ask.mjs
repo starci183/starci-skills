@@ -37,7 +37,7 @@ function ensureAskConnectors() {
 function answerWithAutopilot({ ledger, repo, workflowId, report, emit, args }) {
   const pilot = autopilotAnswerAsk({ ledger, repo, workflowId, report,
     wake: (l, o) => wakeKernelForTransition(l, { workflowId: o.workflowId, transition: 'ask-answered', ids: { dispatchId: o.dispatchId }, lines: [
-      `autopilot answered ask ${o.dispatchId} (answeredBy autopilot); receipt ${o.receiptPath}.`, 'Re-read starci kernel status and run nextActions.'] }) });
+      `autopilot answered ask ${o.dispatchId} (answeredBy autopilot); receipt ${o.receiptPath}.`, 'The runtime re-runs the asking op with the receipt; read starci kernel status for what waits on you.'] }) });
   if (!pilot.handled) return false;
   const out = { ok: true, workflowId, dispatchId: report.dispatch_id, autopilot: true, action: pilot.action, class: pilot.class, ...(pilot.receiptPath ? { receiptPath: pilot.receiptPath } : {}),
     ...(pilot.stubPath ? { stubPath: pilot.stubPath, owed: pilot.owed } : {}), ...(pilot.findings ? { findings: pilot.findings.slice(0, 20) } : {}) };

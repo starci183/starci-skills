@@ -4,6 +4,23 @@ All notable changes to StarCi are documented here. The runtime is on the `1.0.0-
 until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` freezes them.
 `package.json` `version` is the only version authority.
 
+## [1.0.0-alpha.8] — in preparation
+
+Theme: the runtime drives and the Kernel answers. The Kernel no longer reads state, derives the next step and composes command lines each wake; it answers the items of a menu with one typed choice.
+
+### Changed
+- `starci kernel status` prints the Kernel's menu (`menu[]` in the JSON) as its only actionable section: the open decision points of the workflow, built by one function from the Decision Items, the reported blocks, the worker questions, the peer messages and the next actions the runtime does not yet perform, with the options that answer each (`modules/kernel/kernel-menu.yaml`). `frontier.actionable` follows the menu, so the watchdog wakes a Kernel only while its menu has an item.
+- `starci kernel decide --item <id> --choice <choice> --reason <why> [--text <input>]` answers one item: the choice is validated against the current menu, recorded in the decision log and executed in-process through the verb's own code path. A choice off the menu is refused with the menu; `none-fits` records the reason and escalates the item to the Supervisor (`menu-escape` Decision Item). The decision-log modes (`--hypothesis`, `--close`, `--list`) are unchanged.
+- The Kernel seat's shell is `starci`: the read verbs, `log`, `decide` and `kernel-ack-rev`, plus pure read programs. Every other `starci kernel` verb is the runtime's and is refused to a Kernel seat (`KERNEL_USE_DECIDE`) with the seat's menu; any other program is refused (`KERNEL_STARCI_ONLY`). The table is `kernel` in `modules/kernel/command-policy.yaml`.
+- The Job controller performs the retry of a job whose gate resolved, whose owner wait filed no ask, whose ask was answered or whose provisional acceptance the owner re-opened (`scripts/reconciler/mechanical-moves.mjs`); a refused retry opens the `retry-decision` item. Every next action carries an `origin` classified in the menu catalog, and a retry its typed `move`.
+- `kernel-prompt.md` and `driver-loop.yaml` shrink to the menu loop; the ranked-actions, decisions-first and nextActions procedures are retired from the instructions (removed-vocabulary).
+- The wake prompt tells the Kernel to answer its menu and yield when it is empty.
+- The roles contract names exactly two classes of error, happy error and bug; Debug's goal is a workflow with no bug. The Kernel role declares a per-wake budget (20 turns, 6 million tokens, from the usage rows of the first real workflows) and the digest reports a wake over it as a departure.
+- A `retry-decision` item lives while its job has no later try (it was closed as soon as it was read).
+
+### Added
+- `--field <path>[,<path>...]` on `starci kernel status`, `survey`, `logs` and `decisions`: the answer reduced to the named fields.
+
 ## [1.0.0-alpha.7] — 2026-10-08
 
 Theme: the roles are one declared contract, the system recovers from a host restart by itself, no smell or bug enters at commit, and the remote main moves only with a release proven on the exact commit that is pushed.

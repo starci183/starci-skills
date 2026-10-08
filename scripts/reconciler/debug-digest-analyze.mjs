@@ -3,6 +3,7 @@
 // `policy`) and the numbers of modules/reconciler/debug-digest.yaml (`n`); it reads no store, runs no child and never decides a
 // repair. A problem carries a `code` and its `params`; scripts/reconciler/debug-digest-render.mjs words it in the owner's language.
 import { byCodeUnit } from '../lib/list.mjs';
+import { exceededWakes, wakeBudget } from '../kernel/wake-budget.mjs';
 
 const MIN = 60_000;
 const LIVE_JOB = new Set(['leased', 'running', 'answering', 'reported', 'deciding', 'effect_unknown']);
@@ -149,7 +150,8 @@ function kernelSection(workflow, ctx) {
   const { kernelJob, kernelSignal, status, lastKernelWakeAt, seatProbe } = workflow;
   const rev = status?.kernelRev ?? null;
   const frontier = status?.frontier ?? {};
-  const ready = (frontier.readyOperations ?? 0) + (frontier.nudgeReadyJobs?.length ?? 0) + (frontier.settleReadyJobs?.length ?? 0);
+  // What waits on the Kernel is its menu; a status without one reads the frontier counts.
+  const ready = Array.isArray(status?.menu) ? status.menu.length : (frontier.readyOperations ?? 0) + (frontier.nudgeReadyJobs?.length ?? 0) + (frontier.settleReadyJobs?.length ?? 0);
   const wakeAgeMs = lastKernelWakeAt ? ctx.now - Number(lastKernelWakeAt) : null;
   const probe = seatProbe?.action ?? null;
   const idle = frontier.state === 'idle' || /idle/.test(String(probe ?? ''));
@@ -157,7 +159,8 @@ function kernelSection(workflow, ctx) {
     job: kernelJob?.status ?? null, terminal: kernelSignal?.terminal ?? null, probe, lastWakeAgeMs: wakeAgeMs,
     ackedRev: rev?.acked ?? null, currentRev: rev?.current ?? null, revStale: rev?.stale === true, filesBehind: rev?.fileCount ?? 0,
     frontierState: frontier.state ?? null, readyWork: ready,
-    idleWithReady: ready > 0 && idle && wakeAgeMs !== null && wakeAgeMs > ctx.n.kernelIdleWakeMs };
+    idleWithReady: ready > 0 && idle && wakeAgeMs !== null && wakeAgeMs > ctx.n.kernelIdleWakeMs,
+    overBudgetWakes: exceededWakes(workflow.kernelWakes ?? [], wakeBudget()) };
 }
 
 function kernelProblems(view, n) {
@@ -167,6 +170,8 @@ function kernelProblems(view, n) {
   if (kernel.revStale) out.push(problem('kernel', n.revDriftBlocks, `kernel-rev-${id}`, 'kernel-rev',
     { name, acked: String(kernel.ackedRev).slice(0, 9), current: String(kernel.currentRev).slice(0, 9), files: kernel.filesBehind }, kernel));
   if (kernel.idleWithReady) out.push(problem('kernel', kernel.readyWork, `kernel-idle-${id}`, 'kernel-idle', { name, ready: kernel.readyWork, min: minutes(kernel.lastWakeAgeMs) }, kernel));
+  const worst = kernel.overBudgetWakes.at(-1);
+  if (worst) out.push(problem('kernel', 1, `kernel-wake-budget-${id}`, 'kernel-wake-budget', { name, turns: worst.turns, tokens: worst.tokens, wakes: kernel.overBudgetWakes.length, budgetTurns: wakeBudget().turns, budgetTokens: wakeBudget().tokens }, kernel.overBudgetWakes));
   return out;
 }
 

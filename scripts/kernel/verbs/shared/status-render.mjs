@@ -27,6 +27,7 @@ import { driftPhase, handoverPhase } from './status-drift.mjs';
 import { frontierOf, frontierStateOf } from './status-frontier.mjs';
 import { cutPhase, decorPhase } from './status-decor.mjs';
 import { statusText } from './status-lines.mjs';
+import { menuPhase } from './status-menu.mjs';
 
 const tryOr = (fn, fallback) => { try { return fn(); } catch { return fallback; } };
 
@@ -48,7 +49,7 @@ const preludePhase = (s) => {
     s.autopilotSweepOut = autopilotSweep({ ledger, repo: path.resolve(args.repo ?? process.cwd()), workflowId, settings: s.autopilotSettingsNow,
       wake: (l, o) => wakeKernelForTransition(l, { workflowId: o.workflowId, transition: 'ask-answered', ids: { dispatchId: o.dispatchId }, lines: [
         `autopilot answered ask ${o.dispatchId} (answeredBy autopilot, owner ruling ${AUTOPILOT_RULING}); receipt ${o.receiptPath}.`,
-        'Re-read canonical starci kernel status now and run nextActions: re-enqueue the asking op --retry-of its job so it applies the receipt.'] }) });
+        'The runtime re-runs the asking op with the receipt; read starci kernel status for what waits on you.'] }) });
   } catch (error) { s.autopilotSweepOut = { on: true, errors: [{ error: String(error?.message ?? error).slice(0, 300) }], answered: [], deferred: [], rerouted: [], timedOut: [], supplied: [] }; }
 };
 
@@ -333,7 +334,9 @@ export function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
   cutPhase(s);
   hostPhase(s);
   displayPhase(s);
+  menuPhase(s);
   const out = statusOut(s);
+  out.menu = s.menu;
   out.opHealth = s.opHealth;
   out.kernelNotes = s.kernelNotes;
   out.stuck = s.stuck;

@@ -25,7 +25,8 @@ import { execNode } from '../api/node/exec-node.mjs';
 import { fileURLToPath } from 'node:url';
 import { parseJsonOr } from '../lib/json.mjs';
 import { refuse as refuseError } from '../../engine/refuse.mjs';
-import { kernelDecisionItems } from './reported-jobs.mjs';
+import { liveFor, pendingJobsOf, resolutionOf } from './decision-resolution.mjs';
+export { resolutionOf };
 import { appendEvent, openDecisionItem, recordDecision, updateDecisionItem } from '../../engine/db/ledger.mjs'; import { isMain } from '../lib/is-main.mjs'; import { eachInOrder } from '../lib/in-order.mjs';
 import { oneLine } from '../lib/clip.mjs';
 
@@ -37,7 +38,7 @@ export const DI_SCHEMA = 'starci/decision-item@1';
 export const DI_KINDS = Object.freeze(['settle-nongreen', 'worker-question', 'checks-needed', 'graph-edit-needed', 'progress-stall',
   'stale-gate', 'stale-wait', 'unread-peer', 'orphaned-frontier', 'rev-ack', 'supervisor-ruling', 'cross-workflow', 'deadlock',
   'runtime-defect', 'kernel-proposal', 'seat-unrecoverable', 'service-quarantined', 'quota-exhausted', 'experiment-revert',
-  'push-refused', 'retry-decision', 'dispatch-refused', 'cap-starved', 'hypothesis', 'rebase-conflict']);
+  'push-refused', 'retry-decision', 'dispatch-refused', 'cap-starved', 'hypothesis', 'rebase-conflict', 'menu-escape']);
 const DECIDERS = Object.freeze(['kernel', 'supervisor', 'owner']);
 /**
  * Kinds the Supervisor decides unless the opener names another decider (DESIGN §6.4 escalation column: resource,
@@ -45,7 +46,7 @@ const DECIDERS = Object.freeze(['kernel', 'supervisor', 'owner']);
  * rc-gc-resource's Resource controller), next to `quota-exhausted`.
  */
 const SUPERVISOR_KINDS = Object.freeze(['cap-starved', 'quota-exhausted', 'runtime-defect', 'cross-workflow', 'deadlock',
-  'seat-unrecoverable', 'service-quarantined', 'experiment-revert', 'hypothesis', 'push-refused', 'kernel-proposal']);
+  'seat-unrecoverable', 'service-quarantined', 'experiment-revert', 'hypothesis', 'push-refused', 'kernel-proposal', 'menu-escape']);
 const defaultDeciderOf = (kind) => (SUPERVISOR_KINDS.includes(kind) ? 'supervisor' : 'kernel');
 /** Kinds the Supervisor may claim from a Kernel without an escalation (DESIGN §11.3 rule 1). */
 const CROSS_WORKFLOW_KINDS = Object.freeze(['cross-workflow', 'deadlock']);
@@ -59,8 +60,8 @@ const PASS_THROUGH = ['productLedger', 'productWorkflowId', 'code', 'escalatedFr
 const one = (s, n = 300) => oneLine(s, n); export const refuse = (message, code, extra = {}) => refuseError(message, code, extra);
 const diIdOf = (workflowId, key) => `di-${crypto.createHash('sha256').update(workflowId + '\0' + key).digest('hex').slice(0, 8)}`; const isSupervisorActor = (by) => /^supervisor\b/i.test(String(by ?? ''));
 const keySuffix = (kind, summary) => kind === 'supervisor-ruling' ? ':' + crypto.createHash('sha256').update(summary).digest('hex').slice(0, 8) : ''; const dueMsOf = (spec, now) => { if (Number.isFinite(Number(spec.dueMs)) && Number(spec.dueMs) > 0) { return Number(spec.dueMs); } if (Number.isFinite(spec.dueAt) && spec.dueAt > now) { return spec.dueAt - now; } return null; };
-const escalationTarget = (decider) => { if (decider === 'kernel') { return 'supervisor'; } if (decider === 'supervisor') { return 'owner'; } return null; }; const closeOldCommand = (outcome, failCheck, api, repoArgs, jobId) => { if (outcome === 'done') { return `${failCheck} ; ${api} settle ${repoArgs} --job ${jobId} --verdict fail`; } return `${api} settle ${repoArgs} --job ${jobId} --verdict ${outcome === 'blocked' || outcome === 'ask' ? 'blocked' : 'fail'}`; };
-const statusOf = (error) => { if (!error) { return 0; } if (typeof error.code === 'number') { return error.code; } return null; }; const templateText = (value) => `${value}`;
+const escalationTarget = (decider) => { if (decider === 'kernel') { return 'supervisor'; } if (decider === 'supervisor') { return 'owner'; } return null; };
+const templateText = (value) => `${value}`; const statusOf = (error) => { if (!error) { return 0; } if (typeof error.code === 'number') { return error.code; } return null; };
 const doorbellOption = (command, index) => `(${String.fromCodePoint(97 + index)}) ${command.title}: ${command.run}`;
 
 /* ------------------------------------------------------------ the store: runtime.sqlite decision_items */
@@ -304,13 +305,9 @@ export function escalateDecision(ledger, id, { to = 'supervisor', by = 'unknown'
 /** A Kernel DI blocks new work once it is this old, open and unclaimed (coordinator 2026-09-28, fe-canon). */
 export const BLOCK_AGE_MS = 2 * 60_000;
 const DECISIONS_FIRST = 'decisions-first';
-/** Kinds whose entity is a reported job: live only while the settler still hands that job to the Kernel. */
-const JOB_KINDS = new Set(['settle-nongreen', 'checks-needed', 'retry-decision']);
 /** The env mark apiRun (kernel-authority.mjs) sets on its children: graph-edit / redesign resolve DIs through them. */
 export const CHILD_ENV = 'STARCI_API_CHILD';
 
-const pendingJobsOf = (db, workflowId, now) => { try { return new Map(kernelDecisionItems(db, workflowId, { now }).map((i) => [i.jobId, i])); } catch { return null; } };
-const liveFor = (d, pending) => !(JOB_KINDS.has(d.kind) && d.entity?.type === 'job' && pending && !pending.has(d.entity.id));
 const lastAckAt = (db, workflowId) => db.prepare("SELECT max(created_at) t FROM events WHERE workflow_id=? AND kind='runtime-rev-acked'").get(workflowId)?.t ?? null;
 
 /**
@@ -324,70 +321,8 @@ export function blockingDecisions(db, workflowId, { now = Date.now(), minAgeMs =
   items = items.filter((d) => d.status === 'open' && d.kind !== 'supervisor-ruling' && now - (d.openedAt ?? now) >= minAgeMs);
   if (!items.length) return [];
   const pending = pendingJobsOf(db, workflowId, now);
-  return items.filter((d) => liveFor(d, pending))
+  return items.filter((d) => liveFor(d, pending, db))
     .sort((a, b) => (b.severity === 'critical') - (a.severity === 'critical') || (a.openedAt ?? 0) - (b.openedAt ?? 0));
-}
-
-const q = (v) => (/[\s"'|;&<>]/.test(String(v)) ? `'${String(v).replaceAll("'", String.fromCodePoint(39, 92, 39, 39))}'` : String(v));
-const lastRefusalsOf = (db, jobId) => db.prepare("SELECT kind, payload_json FROM events WHERE entity_type='job' AND entity_id=? AND (kind LIKE '%-refused' OR kind LIKE '%needs-kernel') ORDER BY seq DESC LIMIT 6").all(jobId)
-  .map((e) => ({ kind: e.kind, ...parseJsonOr(e.payload_json) }));
-const reportOf = (db, dispatchId) => {
-  if (!dispatchId) return null;
-  const r = db.prepare('SELECT outcome, report_json FROM reports WHERE dispatch_id=? ORDER BY rowid DESC LIMIT 1').get(dispatchId);
-  return r ? { outcome: r.outcome, ...parseJsonOr(r.report_json) } : null;
-};
-const appOf = (p) => /(?:^|\/)((?:apps|packages)\/[^/]+)/.exec(String(p).replaceAll('\\', '/'))?.[1] ?? '.';
-
-/**
- * One DI in copy-paste form: {id, kind, jobId, code, what, commands: [{key, title, run}], decide, resolve}. For a job DI
- * the commands are filled from the job, its report and its last refusal: continue it on the current base with the
- * failing files added, split it per app when its paths span apps, and accept it again (settle pass re-runs the
- * integration and parity on the current tip) or drop it. Every command is an existing verb; the api refuses a wrong one.
- */
-export function resolutionOf(db, di, { repo = '<repo>', now = Date.now() } = {}) {
-  const wf = di.workflowId, api = 'starci kernel', R = `--repo ${q(repo)}`;
-  const base = { id: di.id, kind: di.kind, summary: di.summary };
-  const resolve = (verb) => `${api} decisions ${R} --resolve ${di.id} --by kernel:${wf} --verb ${q(verb)} --decision <decide id>`;
-  if (!(JOB_KINDS.has(di.kind) && di.entity?.type === 'job')) {
-    const opts = (di.options ?? []).slice(0, 3).map((o, i) => ({ key: o.key ?? `option-${i + 1}`, title: o.title ?? o.key ?? '', run: o.verb ?? '' }));
-    return { ...base, jobId: null, code: di.kind, what: di.summary, commands: opts, decide: null, resolve: resolve(opts[0]?.run || '<what you ran>') };
-  }
-  const jobId = di.entity.id;
-  const job = db.prepare('SELECT job_id, op_id, status, payload_json FROM jobs WHERE job_id=?').get(jobId);
-  const payload = parseJsonOr(job?.payload_json);
-  const pending = pendingJobsOf(db, wf, now)?.get(jobId) ?? null;
-  const refusal = lastRefusalsOf(db, jobId).find((r) => r.kind !== 'job-settle-needs-kernel') ?? null;
-  const report = reportOf(db, pending?.dispatchId);
-  const code = pending?.reason === 'settle-refused' ? (pending.detail?.[0] ?? refusal?.reason ?? 'settle-refused') : (pending?.reason ?? refusal?.reason ?? 'needs-kernel-decision');
-  const outcome = pending?.outcome ?? report?.outcome ?? null;
-  const failures = (refusal?.failures ?? []).map(String);
-  const owned = (payload.owned_paths ?? []).map(String);
-  // Owned paths may carry the product repo's folder (my-app/apps/...) while a report names repo-relative files.
-  const repoPrefix = owned.map((p) => p.replaceAll('\\', '/').match(/^([^/]+\/)(?:apps|packages|src)\//)?.[1]).find(Boolean) ?? '';
-  const withPrefix = (p) => (repoPrefix && !String(p).startsWith(repoPrefix) && /^(apps|packages|src)\//.test(String(p)) ? `${repoPrefix}${p}` : String(p));
-  const failing = [...new Set([...(refusal?.files ?? []), ...(refusal?.continuation?.files ?? []), ...((report?.owedToWire ?? []).map((o) => o?.path).filter(Boolean))].map(withPrefix))].slice(0, 20);
-  const paths = [...new Set([...owned, ...failing])];
-  const op = job?.op_id ?? pending?.op ?? '<op>';
-  const what = String(payload.displayWhat ?? payload.title ?? jobId);
-  const params = { ...payload.params, ...(refusal?.continuation?.resumeFrom ? { resumeFrom: refusal.continuation.resumeFrom } : {}) };
-  const paramsArg = Object.keys(params).length ? ` --params ${q(JSON.stringify(params))}` : '';
-  const oneLine = String(report?.summary ?? di.summary).replace(/\s+/g, ' ').slice(0, 160);
-  const whatLine = `${op} ${jobId} reported ${outcome ?? '?'}; refused ${code}${failures.length ? ' (' + failures[0].replace(/\s+/g, ' ').slice(0, 80) + ')' : ''}: ${oneLine}`;
-  const decide = `${api} decide ${R} --workflow ${wf} --hypothesis ${q(templateText(code) + ' on ' + templateText(jobId))} --action-key resolve-${code}-${jobId.slice(-10)} --metric ${q(templateText(jobId) + ' decided and its unit moves')}`;
-  const failCheck = `${api} check ${R} --job ${jobId} --checks ${q(JSON.stringify([{ name: code, command: 'runtime settle', exitCode: 1, evidence: templateText(code) + ': ' + (failures.join('; ').replace(/\s+/g, ' ').slice(0, 200) || 'refused by the runtime') }]))}`;
-  const closeOld = closeOldCommand(outcome, failCheck, api, R, jobId);
-  const enqueue = (ps, tag) => `${api} enqueue ${R} --workflow ${wf} --op ${op} --paths ${q(ps.join(','))} --retry-of ${jobId}${paramsArg} --what ${q((templateText(tag) + ': ' + templateText(what)).slice(0, 40))} --resolves ${di.id}`;
-  const commands = [{ key: 'continue', title: `continue on the current base with the failing files added (${failing.length} file(s))`, run: `${closeOld} ; ${enqueue(paths, 'continue')}` }];
-  const apps = [...new Set(paths.map(appOf))];
-  if (apps.length > 1) {
-    commands.push({ key: 'split-per-app', title: `split it per app (${apps.join(', ')})`, run: [closeOld, ...apps.slice(0, 4).map((a) => enqueue(paths.filter((p) => appOf(p) === a), a.split('/').pop()))].join(' ; ') });
-  }
-  if (outcome === 'done') {
-    commands.push({ key: 'accept', title: 'accept it: settle pass re-runs integration and parity on the current tip (only when the blocker the refusal names has since landed)', run: `${api} settle ${R} --job ${jobId} --verdict pass` });
-  } else {
-    commands.push({ key: 'drop', title: 'drop the unit (the goal no longer needs it)', run: `${closeOld} ; ${api} reconcile ${R} --job ${jobId} --drop --reason ${q(templateText(code) + ': dropped by the Kernel')}` });
-  }
-  return { ...base, jobId, code, outcome, what: whatLine, failing, commands: commands.slice(0, 3), decide, resolve: resolve('<the option you ran>') };
 }
 
 /** The refusal text of decisions-first: the top item and its exact commands. */
@@ -434,7 +369,7 @@ export function sweepDecisions(ledger, workflowId, { now = Date.now(), prefix = 
   ledger.transaction(() => {
     for (const d of live) {
       const acked = d.kind === 'supervisor-ruling' && ackAt != null && ackAt >= (d.openedAt ?? Infinity);
-      const gone = !liveFor(d, pending);
+      const gone = !liveFor(d, pending, ledger.db);
       if (!acked && !gone) continue;
       const next = { ...d, status: 'resolved', claim: null, resolution: { by: 'runtime', verb: acked ? 'kernel-ack-rev' : 'job-decided', decisionId: null, at: now } };
       write(ledger, next, now);

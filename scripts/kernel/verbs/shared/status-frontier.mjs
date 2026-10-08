@@ -178,7 +178,7 @@ const peerWaitReason = (s) => {
 const nextReadyReason = (s) => {
   const { NEXT_ACTION_MOVES, nextActionLabel } = s.internals;
   const steps = s.graph.nextActions.filter((action) => NEXT_ACTION_MOVES.includes(action.kind)).map(nextActionLabel).join('; ');
-  return `no operation is open and the ledger names the next steps: ${steps}; run nextActions in order before yielding${credentialSuffix(s)}`;
+  return `no operation is open and the ledger names the next steps: ${steps}; the Workflow and Job controllers perform them, and the menu holds what waits on the Kernel${credentialSuffix(s)}`;
 };
 
 const credentialSuffix = (s) => (s.credentialAsks.length ? `; credential ask(s) ${s.credentialAsks.join(', ')} hold only the live-proof legs: enqueue ${s.mainLineOwed.join(', ')} now with placeholder values (credentialPending)` : '');

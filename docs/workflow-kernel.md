@@ -64,19 +64,25 @@ preserves the plan, jobs and events across restarts.
 
 ## Kernel decision cycle — `modules/kernel/driver-loop.yaml`
 
-The Kernel uses these API calls for its decisions. Controllers own green settlement,
-worker recovery, ready dispatch and seat liveness:
+The runtime drives and the Kernel answers. The controllers dispatch ready work, retry inside the bounds of the hold policy, switch
+agent, settle green reports, run the retry of a job whose gate resolved or whose ask was answered, and collect leftovers. What needs
+judgment is the Kernel's menu (`modules/kernel/kernel-menu.yaml`), one function of the ledger state: `starci kernel status` prints its
+open items as the Decide section, and `menu[]` in its JSON.
 
 | Step | Call | Why |
 | --- | --- | --- |
-| survey | `starci kernel survey --workflow <id>` | Open on the ledger, never on memory: goal revision + `opChain`, all jobs, inbox, signals, event tail, open incidents. |
-| plan | `starci kernel plan --workflow <id> --file <plan.json>` | Persist the derived plan; the api stores its digest and the *structural* diff vs the approved `opChain`. Divergence → `incident --kind plan-divergence`; dispatch nothing on a divergent plan. |
-| enqueue | `starci kernel enqueue --workflow <id> --op <opId> --paths <csv>` | One `queued` job row per planned op the queue lacks. An oversized semantic op is partitioned into bounded same-op jobs with `--cut-id/--cut-ordinal/--cut-total`; this does not change the approved plan. |
-| drive | `starci kernel decisions --workflow <id>` then `starci kernel status` and an allowed decision verb | Claim and resolve non-green verdicts, worker questions, progress stalls and Supervisor rulings; use `--decision <id>` for the chosen action. Yield when no decision is executable. Job, Workflow and Host controllers continue their mechanical passes. |
-| finish | `starci kernel finish --workflow <id>` | Last call. Refuses while any job is unsettled (`workflow-open-jobs`) or the owner has not approved the newest handover after the last business settle (`handover-not-approved`). |
+| read | `starci kernel status --workflow <id>` (`--field <path>` selects fields) | The menu: each item names its situation, the policy step and deadline, and the options that answer it. |
+| answer | `starci kernel decide --workflow <id> --item <menu id> --choice <choice> --reason <why> [--text <input>]` | The choice is checked against the current menu, recorded in the decision log and executed in-process. A choice off the menu is refused with the menu. |
+| escape | `starci kernel decide ... --choice none-fits --reason <why>` | No option fits: the item escalates to the Supervisor. A bug of the runtime or of a role is never worked around; it is recorded for Debug. |
+| attest | `starci kernel kernel-ack-rev --workflow <id> --plan` | The runtime revision moved: read what the plan lists, then attest the complete READ manifest. |
+| yield | none | An empty menu is a wait; the watchdog wakes a Kernel only while its menu has an item. |
 
-The kernel decides the plan and its open Decision Items. It never decides scope, identity or
-authority, never answers an `ask` itself, and never edits the ledger by hand.
+The Kernel seat's shell is `starci`: the read verbs, `decide` and `kernel-ack-rev`. Every other `starci kernel` verb is the runtime's; a
+mutating verb typed from habit is refused (`KERNEL_USE_DECIDE`) with the menu. A wake that spends more than the per-wake budget of the
+Kernel role (`modules/kernel/roles.yaml`) is reported by the digest as a departure.
+
+The kernel decides the open items of its menu. It never decides scope, identity or authority, never answers an `ask` itself, and never
+edits the ledger by hand.
 
 ## The verbs — `modules/kernel/api.yaml`
 
@@ -314,6 +320,8 @@ dead agent's transcript.
   - touches another workflow
   - decides for the owner what is costly to reverse
   - leaves ready work or a reported block unhandled
+  - runs a mutating verb itself: it answers the items of its menu with starci kernel decide, and the runtime does the rest
+  - works around a bug: a bug is none-fits, recorded for Debug
   - raises a supervisor-gate before the workaround its gate cause names (the gate ladder refuses it: modules/kernel/op-incident-policy.yaml gateCauses)
   - pins a model around a lineage exclusion without a recorded op-override decision
 - Owns: one workflow: its plan, its jobs and its gates. Decides alone: dispatch, settle, retry, switch agent, re-plan inside the goal, and answers to ops.

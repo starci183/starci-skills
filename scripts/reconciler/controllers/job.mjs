@@ -48,6 +48,7 @@ import { SETTLED_JOB_LIST } from '../../../engine/admission.mjs'; import { isMai
 import { positiveNumber } from '../../lib/number.mjs';
 import { ownerOnlyQuestion } from '../../kernel/op-incident-policy.mjs';
 import { TERMINAL_HOLDS, holdView, terminalFactsOf } from '../../kernel/terminal-step.mjs';
+import { runMechanicalMoves } from '../mechanical-moves.mjs';
 const selfFile = fileURLToPath(import.meta.url);
 const skillRoot = path.resolve(path.dirname(selfFile), '..', '..', '..');
 const JOB_FILE = path.join(skillRoot, 'modules', 'reconciler', 'job.yaml');
@@ -201,8 +202,8 @@ function planReport(f, clock, set) {
 /** The clock and step of a job left terminal with nothing after it (policy holds failed-no-step, owner-wait-no-ask). */
 function planTerminal(f, clock, set) {
   clock('DECISION_OVERDUE', f.terminal.since);
+  // An owner wait with no ask is the retry move of mechanical-moves.mjs (its refusal opens the retry-decision item).
   if (f.terminal.hold === TERMINAL_HOLDS.failedNoStep) set({ kind: 'route-failure', concern: 'job.settle', verb: 'reconcile', argv: ['--job', f.jobId, '--route-failure'] });
-  else set({ kind: 'terminal-decision', concern: 'job.consume-check', reason: 'owner-wait-no-ask' });
 }
 
 /** The clock and step of a settled job whose worker release is not proven. */
@@ -331,8 +332,6 @@ async function actJob(ctx, ledgerId, jobId, f, s, settings) {
       return { action: 'settle', ...(await ctx.run('node', [SETTLER_SCRIPT, '--repo', repo, '--job', jobId, '--json'], { timeoutMs: settings.settleRunTimeoutMs })) };
     case 'route-failure':
       return routeFailure(ctx, ledgerId, f, s, settings);
-    case 'terminal-decision':
-      return { action: 'terminal-decision', ...(await ctx.openDecision(retryDecision(f, ledgerId, s.reason, { now: ctx.now(), settings }))) };
     case 'settle-nongreen':
       return { action: 'settle-nongreen', ...(await ctx.openDecision(settleDecision(f, ledgerId, { now: ctx.now(), settings }))) };
     case 'questions': {
@@ -385,6 +384,8 @@ async function reconcileWorkflow(ctx, ledgerId, workflowId, settings) {
   const status = await ctx.status(ledgerId, workflowId);
   if (!status || status.phase === 'finished' || status.archivedAt) return { ok: true, action: 'ended' };
   const id = `${ledgerId}:${workflowId}`;
+  const moved = may(ctx, 'job.settle') ? await runMechanicalMoves(ctx, ledgerId, status, { facts: (jobId) => ctx.read(ledgerId, (db) => jobFacts(db, jobId, { now: ctx.now(), settings })), refused: (f, reason) => retryDecision(f, ledgerId, reason, { now: ctx.now(), settings }) }) : [];
+  if (moved.length) ctx.log('reconciler.act', `workflow ${id} ran ${moved.length} mechanical retry move(s)`, { moved });
   const plan = planWorkflow(status, { lastDispatchAt: lastDispatch.get(id) ?? 0, now: ctx.now(), settings });
   const entity = wfKey(ledgerId, workflowId);
   if (plan.readyJobs.length && (Number(status.progress?.running) || 0) < (Number(status.progress?.allowedParallel) || 0)) ctx.clock(entity, 'READY_UNDISPATCHED', settings.sla.READY_UNDISPATCHED, { ledgerId });

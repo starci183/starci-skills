@@ -59,6 +59,6 @@ test('status projects the ready job as ready work with its step, so the frontier
   assert.equal(item.queuedBecause, 'ready');
   assert.deepEqual(item.launchRefusals, { pool: 'claude-agent', count: 2, of: 2 });
   assert.ok(status.frontier.readyOperations >= 1);
-  assert.equal(status.frontier.actionable, true);
+  assert.equal(status.frontier.actionable, false);
   assert.match(status.frontier.reason, /error-launch: attempt 2 of 2/);
 });

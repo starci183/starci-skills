@@ -11,6 +11,7 @@ import { fakeOrcaWorktrees } from '../helpers/fake-orca-worktrees.mjs';
 import { registerWorkflowWorktree } from '../../scripts/kernel/workflow-worktree.mjs';
 import { senderEnv } from '../helpers/sender-env.mjs';
 import { installGuardLauncher } from '../helpers/guard-launcher.mjs';
+import {openDecisionRow} from '../../scripts/machine/decisions.mjs';
 
 // A terminal-send to a Claude Kernel answered agent_prompt_stalled while the wake text sat on its
 // screen. `starci kernel nudge` already proves delivery from the screen (tests/kernel/nudge-delivery-proof.spec.mjs);
@@ -168,6 +169,8 @@ const watchdogWorld=t=>{
     ledger.write.changeWorkflowPhase({workflowId,to:'running',by:'test-fixture',reason:'seed'});
     ledger.db.prepare('INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)')
       .run(workflowId,0,'watchdog-wake','# goal','{}',Date.now());
+    // The Workflow controller's orphaned-frontier item is what puts an entry on the Kernel's menu, and the menu is what the wake is due for.
+    openDecisionRow(ledger,{workflowId:workflowId,kind:'orphaned-frontier',entity:{type:'workflow',id:workflowId},summary:'nothing is open and nothing is owed',by:'reconciler/workflow'});
     signalKernel(ledger,workflowId);
   }finally{ledger.close();}
   w.seedKernelTerminal();
@@ -351,6 +354,8 @@ const unwritableWorld=t=>{
   const boot=run(START_WORKFLOW,['--repo',w.repo,'--goal',workflowId,'--json']);
   assert.equal(boot.status,0,boot.stderr||boot.stdout);
   const terminal=json(boot.stdout)?.terminal;assert.ok(terminal,'the first kernel booted a terminal');
+  const open=openLedger({file:w.ledgerFile()});
+  try{openDecisionRow(open,{workflowId,kind:'orphaned-frontier',entity:{type:'workflow',id:workflowId},summary:'nothing is open and nothing is owed',by:'reconciler/workflow'});}finally{open.close();}
   const tick=()=>{const r=run(WATCHDOG,['--repo',w.repo,'--workflow',workflowId,'--once','--repair','--json'],{ORCA_TERMINAL_HANDLE:'fake-sender-terminal'});
     return {status:r.status,result:json(r.stdout.trim().split('\n').at(-1)),stderr:r.stderr,stdout:r.stdout};};
   const events=kind=>{const l=inspectLedger({file:w.ledgerFile()});

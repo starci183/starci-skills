@@ -15,6 +15,7 @@ import { refusalLines } from './refusals.mjs';
 import { RUNTIME_CHANGE_CODE, runtimeChangeRefusal } from '../machine/runtime-change.mjs';
 import { kernelMailboxVerdict } from './install-verdict.mjs';
 import { orcaSelfLifecycleAllowed } from './orca-self-lifecycle.mjs';
+import { kernelSeatVerdict } from './kernel-seat.mjs';
 
 const policyCache = new Map();
 const compiledCache = new WeakMap();
@@ -270,6 +271,7 @@ export function policyVerdict({ role, command, guard = null, handle = null, lock
   }
   const owned = role === 'supervisor' && program === 'starci' ? runtimeChangeRefusal(args.filter((value) => !value.startsWith('-'))) : null;
   if (owned) return refusal(RUNTIME_CHANGE_CODE, text, owned.reason, owned.remedy);
+  if (guard?.role === 'kernel') return kernelSeatVerdict({ policy, program, args, text, guard, handle });
   const call = callVerdict({ role, program, args, guard, policy, text });
   if (call) return call;
   if (p.runtime.has(program)) return null;

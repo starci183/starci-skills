@@ -44,12 +44,23 @@ chain:
   ownerQuestion: "An owner-class question goes from the Kernel straight to the owner through the runtime's ask channel; the Supervisor is informed, not a relay (the one exception to P3)."
 
 # The test that attributes a stuck thing to exactly one role, and the shape of what Debug records.
+# Exactly two classes of error exist. A happy error is the system working as designed (a Kernel waits on a question, an Op is blocked with a
+# clear cause, a quota runs out and the next agent takes over, a gate asks for a ruling): the roles handle it inside the chain, Op to Kernel to
+# Supervisor to owner, through the policy, and the Supervisor, Kernel, Op and Critic handle happy errors only. A bug is a role or the runtime not
+# doing what its contract says (a Kernel hangs or dies, a seat ignores ready work, an Op is stuck silently, a mechanism leaves a leftover, a verb
+# misbehaves): a bug is never the chain's to fix, Debug scans every role and the runtime floor, finds it and removes it by changing .claude with a spec.
+errors:
+  happy: "the system working as designed; handled inside the chain by the roles through the policy"
+  bug: "a role or the runtime does not do what its contract says; found and removed by Debug, never worked around by the chain"
+  goal: "every workflow operates completely inside Orca with no bug: no Debug is needed to change .claude"
+  menu: "everything on the Kernel's menu is a happy error for the Kernel to decide; a bug is never offered as a choice: the Kernel's exits are none-fits and the Supervisor's runtime-defect record"
+
 findings:
   test: "When this role met something it could not finish, did it report up through its own channel, with a cause and evidence, inside its bound?"
   verdicts:
-    conforms: "the role did its duties"
-    correct-error: "it met something it could not finish and reported it up with a cause and evidence inside its bound: the system worked as designed, the responsibility moved one level up, and the verdict is now about how the next role handles it. A count of correct errors is information, never a problem line."
-    departs: "it was silent, late, misclassified or mishandled: stuck with no report, question or blocked cause inside its bound; claimed done without evidence; named the wrong cause class; wrote outside its scope; went around the supported path; kept retrying instead of reporting. A stuck thing is attributed to the lowest role that failed the test."
+    conforms: "no error: the role did its duties"
+    correct-error: "a happy error: it met something it could not finish and reported it up with a cause and evidence inside its bound: the system worked as designed, the responsibility moved one level up, and the verdict is now about how the next role handles it. A count of correct errors is information, never a problem line."
+    departs: "a bug: it was silent, late, misclassified or mishandled: stuck with no report, question or blocked cause inside its bound; claimed done without evidence; named the wrong cause class; wrote outside its scope; went around the supported path; kept retrying instead of reporting. A stuck thing is attributed to the lowest role that failed the test."
   shape:
     role: "the role that departed"
     duty: "the field of that role's contract block it broke: does, cleanup, never, reportsUpWhen, or a bound"
@@ -141,6 +152,11 @@ roles:
       - "Dispatches ops by the plan, settles reports by re-running the checks, decides retry, switch agent or re-plan inside the goal, and answers ops' questions from the goal and the recorded decisions."
       - "Reports up to the Supervisor for: a conflict with another workflow (shared files, ports, provider capacity, a shared foundation); a suspected runtime defect, with evidence, after the workaround; a self-contradicting contract; bounds exhausted inside the workflow; a plan deadlock it cannot re-plan inside the goal. No routine status reports: the Supervisor reads the ledger."
       - "Sends an owner-class question to the owner through the runtime's ask channel."
+    wakeBudget:
+      status: provisional
+      source: "kernel-turn usage rows of the two first real workflows (45 rows): turns p50 11, p75 19, p90 28; tokens (input, output, cache read) p50 3.7 million, p75 5.7 million, p90 9.8 million"
+      perWake: {turns: 20, tokens: 6000000}
+      onExceed: "the digest reports the wake as a departure of the Kernel (a bug): a wake answers the menu and yields"
     owns: "one workflow: its plan, its jobs and its gates"
     decidesAlone: "dispatch, settle, retry, switch agent, re-plan inside the goal, and answers to ops"
     reportsUpWhen: "one of the five causes above"
@@ -155,6 +171,8 @@ roles:
       - "touches another workflow"
       - "decides for the owner what is costly to reverse"
       - "leaves ready work or a reported block unhandled"
+      - "runs a mutating verb itself: it answers the items of its menu with starci kernel decide, and the runtime does the rest"
+      - "works around a bug: a bug is none-fits, recorded for Debug"
       - "raises a supervisor-gate before the workaround its gate cause names (the gate ladder refuses it: modules/kernel/op-incident-policy.yaml gateCauses)"
       - "pins a model around a lineage exclusion without a recorded op-override decision"
     escalatesTo: supervisor
@@ -200,7 +218,7 @@ roles:
     label: Debug
     scope: "The owner's eyes: a loop of the owner's chat for a limited stabilisation period, not part of steady-state operation."
     does:
-      - "Audits whether each of the four roles above and the runtime floor did its job, each tick, through the digest: per op its attempt, report, evidence and hold; per Critic that it ran, on another provider, saw only the product, and had its verdict used; per Kernel seat that it is alive, acked the runtime revision, acts on ready work and takes the policy steps; per Supervisor seat that it is alive and answers gates inside their bound. Each stuck thing is a correct error or a departure of exactly one role."
+      - "Audits whether each of the four roles above and the runtime floor did its job, each tick, through the digest: per op its attempt, report, evidence and hold; per Critic that it ran, on another provider, saw only the product, and had its verdict used; per Kernel seat that it is alive, acked the runtime revision, acts on ready work and takes the policy steps; per Supervisor seat that it is alive and answers gates inside their bound. Each stuck thing is a happy error or a bug of exactly one role; Debug removes bugs only, and happy errors stay with the chain."
       - "For every departure records a finding (role, broken duty, evidence, remedy) and changes .claude at once so the role cannot repeat it: the contract block or generated prompt, a policy-table rule, a gate or guard refusal, or a runtime fix with a spec, carried onto the host. Records the case in the edge-case registry in the same change."
       - "Owns the edge-case registry, the operating standard and the queue of runtime defects the Supervisor records. A leftover is evidence that its owner failed its cleanup duty; Debug may trigger the existing collector to unblock, and the finding is still the owner's."
       - "Reports results to the owner, and retires itself when the stable criteria below hold."
@@ -222,7 +240,7 @@ roles:
     escalatesTo: owner
     oversees: [op, critic, kernel, supervisor, runtime]
     endCondition:
-      about: "Debug is set up no more once the system is stable: every criterion holds, and the digest prints the current standing against each."
+      about: "The goal: every workflow operates completely inside Orca with no bug, so no Debug is needed to change .claude. Debug is set up no more once the system is stable: every criterion holds, and the digest prints the current standing against each."
       criteria:
         - {id: clean-workflows, min: 5, rule: "consecutive workflows ran start to handover with zero departures from the operating standard and zero human interventions"}
         - {id: no-open-edge-case, min: 0, rule: "no entry of the edge-case registry is open"}

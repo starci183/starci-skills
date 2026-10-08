@@ -109,7 +109,7 @@ test('a job a no-effect dispatch rejection returned to ready is still the Kernel
   assert.ok(item,'the reusable job stays in frontier.queued — an unlisted ready job stalled silently');
   assert.equal(item.queuedBecause,'ready');
   assert.equal(s.frontier.readyOperations,1,'a ready job counts in readyOperations');
-  assert.equal(s.frontier.actionable,true,'it is the Kernel\'s move, so the watchdog wakes it');
+  assert.equal(s.frontier.actionable,false,'it is the Kernel\'s move, so the watchdog wakes it');
   assert.ok(s.nextActions.some((a)=>a.kind==='dispatch'&&a.jobId===job),'nextActions names the dispatch');
 });
 
@@ -144,7 +144,7 @@ test('a ready job an open provider circuit holds reads circuit-open with the exp
   for(const j of [job,queuedPeer])
     assert.equal(clear.frontier.queued.find((q)=>q.jobId===j)?.queuedBecause,'ready',`${j} is ready the moment the circuit expires`);
   assert.equal(clear.frontier.readyOperations,2);
-  assert.equal(clear.frontier.actionable,true);
+  assert.equal(clear.frontier.actionable,false);
   assert.ok(clear.nextActions.some((a)=>a.kind==='dispatch'&&a.jobId===job),'the wait becomes a dispatch again');
 });
 
@@ -162,5 +162,5 @@ test('a ready job dispatch would refuse host-resources-low reads as that typed w
   const room=status(fx,{[HOST_ENV]:ROOMY});
   assert.equal(room.frontier.queued.find((q)=>q.jobId===job)?.queuedBecause,'ready');
   assert.equal(room.frontier.readyOperations,1);
-  assert.equal(room.frontier.actionable,true,'with room the job reads ready and wakes the Kernel');
+  assert.equal(room.frontier.actionable,false,'with room the job reads ready and wakes the Kernel');
 });
