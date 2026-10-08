@@ -87,7 +87,8 @@
 //                          of the same id answers that receipt with result.mutation.replayed:true
 //                          and no second effect (state.replays lists them). `orchestration
 //                          request-show --request <id>` answers completed for a recorded id, else
-//                          absent; STARCI_FAKE_ORCA_REQUEST_STATE=<state> forces its answer.
+//                          absent; STARCI_FAKE_ORCA_REQUEST_STATE=<state> forces its answer;
+//                          STARCI_FAKE_ORCA_REQUEST_DISPATCH=<id> adds the recorded worker-start receipt naming that Dispatch.
 //   STARCI_FAKE_ORCA_LOSE_RECEIPT '<command>' ('orchestration run-create'): the first issue of
 //                          that command takes effect (and records its receipt under its request id), then answers a
 //                          non-JSON transport error (exit 1) - the lost receipt orcaCall settles.
@@ -327,7 +328,8 @@ if (argv[0] === 'agent-context') {
 }
 if (verb === 'orchestration request-show') {
   const id = arg('request');
-  console.log(JSON.stringify({ ok: true, result: { requestId: id, state: process.env.STARCI_FAKE_ORCA_REQUEST_STATE || (state.requests?.[id] ? 'completed' : 'absent') } }));
+  const dispatchId = process.env.STARCI_FAKE_ORCA_REQUEST_DISPATCH;
+  console.log(JSON.stringify({ ok: true, result: { requestId: id, state: process.env.STARCI_FAKE_ORCA_REQUEST_STATE || (state.requests?.[id] ? 'completed' : 'absent'), ...(dispatchId ? { receipt: { dispatchId } } : {}) } }));
   process.exit(0);
 }
 if (verb !== 'terminal send' && arg('retry-request') && state.requests?.[arg('retry-request')]) {

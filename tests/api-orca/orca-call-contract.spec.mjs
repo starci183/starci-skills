@@ -147,10 +147,14 @@ test('request-show wrapper issues one declared read and rejects unreadable state
   for(const state of ['completed','pending','absent','garbled']) {
     const fx=stubEnv(t,{STARCI_FAKE_ORCA_REQUEST_STATE:state});
     const out=call(fx,`(c,show)=>show({request:'request-fixture'})`);
-    assert.deepEqual(out,state==='garbled'?{ok:false,state:null}:{ok:true,state});
+    assert.deepEqual(out,state==='garbled'?{ok:false,state:null,dispatchId:null}:{ok:true,state,dispatchId:null});
     assert.equal(logged(fx).length,1,'the wrapper issues exactly one read');
     assert.deepEqual(logged(fx)[0],['orchestration','request-show','--request','request-fixture','--json']);
   }
+  const named=stubEnv(t,{STARCI_FAKE_ORCA_REQUEST_STATE:'completed',STARCI_FAKE_ORCA_REQUEST_DISPATCH:'ctx_recorded'});
+  assert.deepEqual(call(named,`(c,show)=>show({request:'request-fixture'})`),{ok:true,state:'completed',dispatchId:'ctx_recorded'},
+    'a recorded worker-start receipt names its Dispatch');
+  assert.equal(logged(named).length,1,'naming the Dispatch costs no second read');
   assert.equal(requestStateFrom({outcome:'failed',result:{state:'completed'}}),null,
     'a failed read cannot reconcile a lost mutation receipt');
 });

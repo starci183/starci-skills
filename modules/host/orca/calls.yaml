@@ -203,7 +203,7 @@ calls:
     receipt: [result.state]
     allowedValues:
       state: [completed, pending, absent]
-    note: Read-only. scripts/api/orca/lib.mjs orcaCall asks it after a replay request mutation lost its receipt; absent is not proof that nothing happened.
+    note: Read-only. A recorded worker-start request also answers result.receipt.dispatchId, which scripts/api/orca/request-show.mjs returns as dispatchId (null when the receipt names none); no required path, because only that request kind records it. scripts/api/orca/lib.mjs orcaCall asks it after a replay request mutation lost its receipt; absent is not proof that nothing happened.
   worker-show:
     command: orchestration worker-show
     kind: read
