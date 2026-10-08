@@ -26,7 +26,19 @@ test('the named ops run the verb; any other op or bound role is refused with the
     assert.match(verdict.reason, /only brand\.decide, interface\.draw call it/);
     assert.match(verdict.use, /starci work layout-render/);
   }
-  for (const role of ['lead', 'supervisor', 'coordinator']) assert.equal(policyVerdict({ role, command: { cwd: ROOT, ...verbCommand }, guard: null, policy: POLICY })?.code, 'RIGHTS_ROLE_DENIED', role);
+  for (const role of ['lead', 'coordinator']) assert.equal(policyVerdict({ role, command: { cwd: ROOT, ...verbCommand }, guard: null, policy: POLICY })?.code, 'RIGHTS_ROLE_DENIED', role);
+});
+
+test('a Supervisor or Kernel seat is outside the verb: its own seat table refuses first, the refusal still stops the verb and names the menu verb of that seat', () => {
+  const seats = [
+    { name: 'supervisor', role: 'supervisor', guard: null, code: 'SUPERVISOR_USE_DECIDE' },
+    { name: 'kernel', role: 'lead', guard: { role: 'kernel', workflowId: 'wf-seat' }, code: 'KERNEL_USE_DECIDE' },
+  ];
+  for (const { name, role, guard, code } of seats) {
+    const verdict = policyVerdict({ role, command: { cwd: ROOT, ...verbCommand }, guard, policy: POLICY });
+    assert.equal(verdict?.code, code, name);
+    assert.match(verdict.use, /decide/, name);
+  }
 });
 
 test('a dev server started by hand is refused and the refusal names the verb, whichever way it is spelled', () => {
