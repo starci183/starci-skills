@@ -802,7 +802,7 @@ complete -c starci -n '__starci_using_command kernel report' -l job -r -d 'job t
 complete -c starci -n '__starci_using_command kernel report' -l report -r -d 'report JSON file inside the attempt'\''s scratch (starci/op-report@1)'
 complete -c starci -n '__starci_using_command kernel report' -l attach -r -d 'attachment file inside the scratch; repeat the flag for each file'
 complete -c starci -n '__starci_using_command kernel report' -l outcome -r -a 'done partial failed ask blocked' -d 'the outcome the report must carry; refused when the envelope says otherwise'
-complete -c starci -n '__starci_using_command kernel report' -l dispatch-capability -r -d 'the dispatch capability from the Orca preamble, authenticating the worker_done message'
+complete -c starci -n '__starci_using_command kernel report' -l dispatch-capability -r -d 'the dispatch capability of the Orca preamble when it carries one, forwarded with the worker_done message'
 complete -c starci -n '__starci_using_command kernel retire-ask' -l repo -r -d 'managed repository whose .starciwork ledger the command uses'
 complete -c starci -n '__starci_using_command kernel retire-ask' -l workflow -r -d 'workflow that owns the ask'
 complete -c starci -n '__starci_using_command kernel retire-ask' -l dispatch -r -d 'dispatch id of the ask report to retire'
