@@ -353,12 +353,13 @@ calls:
     replay: none
     timeoutMs: 120000
     note: |-
-      Removes the worktree from Orca and from git (scripts/machine/worktree-orca.mjs removeOrcaWorktree, after the runtime removed
-      every link in it as a link and proved none is left). Orca also deletes the checked-out local branch when it can
-      prove the branch merged and keeps it otherwise, so a caller that deletes the branch itself first checks it still
-      exists. Measured 2026-10-01 (lane ORCAWT): with node_modules and packages/node_modules junctions into a fake main
-      checkout, `worktree rm --force` removed the tree and left the junction targets byte-identical; the runtime still
-      unlinks every link first.
+      Removes the worktree from Orca and from git. The runtime asks Orca only for a tree that holds no link: its Orca client
+      (scripts/machine/worktree-orca.mjs) refuses a tree with a junction or symlink (errorCode worktree-links-present), because Orca
+      walks a junction and deletes what it leads to (measured on Orca 1.4.221: a worktree whose node_modules were junctions into a main checkout lost the
+      main's files; tests/api-orca/orca-worktree-rm-live.spec.mjs prints the measurement on every live run). Its one caller is
+      scripts/machine/worktree-orca.mjs removeOrcaWorktree, which removes every link as a link first (check-worktree-add). Orca
+      also deletes the checked-out local branch when it can prove the branch merged and keeps it otherwise, so a caller that
+      deletes the branch itself first checks it still exists.
     flags: [worktree, force]
     required: [worktree]
     receipt: [result.removed]
