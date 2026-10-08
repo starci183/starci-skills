@@ -15,7 +15,7 @@ const PORT_ENV='STARCI_PORT_SONARQUBE';
 const STOP_STAND_IN='not-read-by-stop';
 
 /** The Compose files and the secret variables of the stack part: the local server, plus the public tunnel with `publicTunnel`. */
-export function stackPlan({root,publicTunnel=false}){
+function stackPlan({root,publicTunnel=false}){
   const files=[BASE_FILE,...(publicTunnel?[PUBLIC_FILE]:[])].map(name=>path.join(root,name));
   const variables=[...STACK_VARIABLES.base,...(publicTunnel?STACK_VARIABLES.public:[])];
   return {files,variables};
@@ -25,10 +25,10 @@ const publishedPort=host=>{
   try{return new URL(host).port||null;}catch{return null;}
 };
 
-const composeOptions=(cfg,env)=>({cwd:cfg.extRoot,docker:cfg.docker,env});
+const composeOptions=(cfg,env)=>({cwd:cfg.stackRun.extRoot,docker:cfg.docker,env});
 
 /** The Compose call owners; a spec passes its own as `composeRunner` (docker is not run). */
-const runnerOf=cfg=>cfg.composeRunner??{up:composeUp,stop:composeStop};
+const runnerOf=cfg=>cfg.stackRun.composeRunner??{up:composeUp,stop:composeStop};
 
 /** The report of one Compose result: ok, or blocked with the last lines of its output (scrubbed). */
 function composeReport({command,result,scrub,files}){
@@ -40,7 +40,7 @@ function composeReport({command,result,scrub,files}){
 
 /** `up`: refuse naming the missing variables, else start the stack (detached) with the secrets in the child environment only. */
 export function stackUp(cfg,{env,publicTunnel=false,scrub,remember}){
-  const plan=stackPlan({root:cfg.extRoot,publicTunnel});
+  const plan=stackPlan({root:cfg.stackRun.extRoot,publicTunnel});
   const missing=missingVariables(env,plan.variables);
   if(missing.length>0){
     const refusal=hostSecretRefusal(missing);
@@ -56,7 +56,7 @@ export function stackUp(cfg,{env,publicTunnel=false,scrub,remember}){
 
 /** `stop`: stop the stack's containers (data kept); no secret is read, so an absent variable never refuses it. */
 export function stackStop(cfg,{env,publicTunnel=false,scrub}){
-  const plan=stackPlan({root:cfg.extRoot,publicTunnel});
+  const plan=stackPlan({root:cfg.stackRun.extRoot,publicTunnel});
   const child={...env,...Object.fromEntries(missingVariables(env,plan.variables).map(name=>[name,STOP_STAND_IN])),[PORT_ENV]:publishedPort(cfg.host)??''};
   const result=runnerOf(cfg).stop({files:plan.files,projectName:PROJECT},composeOptions(cfg,child));
   return composeReport({command:'stop',result,scrub,files:plan.files});

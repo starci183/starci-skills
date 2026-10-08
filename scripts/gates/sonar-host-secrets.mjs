@@ -21,7 +21,7 @@ export const STACK_VARIABLES=Object.freeze({
 
 /**
  * The sealed members the public runtime repository once tracked, and what replaced each: the secret.env variable it moved to (null
- * for a retired member nothing reads any more) and who reads it. `starci runtime import-held-secret` moves one member's value from
+ * for a retired member nothing reads any more); the two demo secrets of an example are retired without an entry and who reads it. `starci runtime import-held-secret` moves one member's value from
  * git history into secret.env. The members are deleted from the tree; their ciphertext stays in history.
  */
 export const HELD_MEMBERS=Object.freeze([
@@ -30,8 +30,6 @@ export const HELD_MEMBERS=Object.freeze([
   {path:'ext/sonar/secrets/sonarqube-admin-token.key.enc',variable:ADMIN_TOKEN_ENV,reader:'scripts/gates/sonar-local.mjs (ensure-project, status, scan --isolate)'},
   {path:'ext/sonar/secrets/cloudflare-starci-local-services-tunnel-token.key.enc',variable:TUNNEL_TOKEN_ENV,reader:'ext/sonar/cloudflared.yaml, through starci gate sonar up --public'},
   {path:'ext/sonar/secrets/sonarqube-analysis-token.txt.enc',variable:null,reader:'retired: no code reads a server-wide analysis token of the extension; a product reads the analysis token of its own custody'},
-  {path:'examples/ecommerce-app/.starcistacks/dev/secrets/keycloak-env.enc',variable:null,reader:'retired: the example carries demo-only defaults in its compose files'},
-  {path:'examples/ecommerce-app/.starcistacks/dev/secrets/minio-env.enc',variable:null,reader:'retired: the example carries demo-only defaults in its compose files'},
 ]);
 
 /** The custody reference that reads `name` from the environment. */

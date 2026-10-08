@@ -10,7 +10,7 @@ import { spawnSync } from 'node:child_process';
 import { decryptCiphertext, importHeldSecret, readMemberFromHistory } from '../../scripts/gates/import-held-secret.mjs';
 import { HELD_MEMBERS } from '../../scripts/gates/sonar-host-secrets.mjs';
 
-const DB_MEMBER = 'ext/sonar/secrets/sonarqube-db-password.txt.enc';
+const DB_MEMBER = 'ext/sonar/secrets/sonarqube-db-password.txt.enc'; // [removed-list]
 const VALUE = 'decrypted-value-0011';
 
 function temporary(t, label) {
@@ -49,7 +49,7 @@ test('an absent secret.env is created owner-only and a trailing newline is not d
   if (process.platform !== 'win32') assert.equal(fs.statSync(file).mode & 0o077, 0, 'no group or other permission bits');
   const second = path.join(root, 'second.env');
   fs.writeFileSync(second, 'A=1\n');
-  importHeldSecret({ member: 'ext/sonar/secrets/sonarqube-admin-password.txt.enc', secretFile: second, ...fakes() });
+  importHeldSecret({ member: 'ext/sonar/secrets/sonarqube-admin-password.txt.enc', secretFile: second, ...fakes() }); // [removed-list]
   assert.equal(fs.readFileSync(second, 'utf8'), `A=1\nSONARQUBE_ADMIN_PASSWORD=${VALUE}\n`);
 });
 
@@ -69,7 +69,7 @@ test('an existing name is never overwritten, even a blank one, and nothing is re
 test('a retired or unknown member writes nothing and says why', (t) => {
   const file = path.join(temporary(t, 'retired'), 'secret.env');
   const retired = HELD_MEMBERS.filter((entry) => entry.variable === null);
-  assert.equal(retired.length, 3, 'the analysis token and the two ecommerce demo secrets are retired');
+  assert.equal(retired.length, 1, 'the server-wide analysis token is retired');
   for (const entry of retired) {
     const ports = fakes();
     const report = importHeldSecret({ member: entry.path, secretFile: file, ...ports });
@@ -99,11 +99,11 @@ test('history that lacks the member, a decryptor that refuses, and a multi-line 
   assert.equal(fs.existsSync(file), false);
 });
 
-test('every held member is either mapped to one distinct secret.env variable or retired', () => {
+test('every held member is either mapped to one distinct secret.env variable or retired (the demo secrets of an example have no entry)', () => {
   const variables = HELD_MEMBERS.map((entry) => entry.variable).filter(Boolean);
   assert.deepEqual(variables, ['SONARQUBE_DB_PASSWORD', 'SONARQUBE_ADMIN_PASSWORD', 'SONARQUBE_ADMIN_TOKEN', 'CLOUDFLARE_TUNNEL_TOKEN']);
   assert.equal(new Set(variables).size, variables.length);
-  assert.equal(HELD_MEMBERS.length, 7);
+  assert.equal(HELD_MEMBERS.length, 5);
   assert.ok(HELD_MEMBERS.every((entry) => entry.reader.length > 0));
 });
 

@@ -10,7 +10,6 @@ import {isolatedSopsEnv,withGeneratedAgeIdentity,runSelectedSops} from '../../sc
 import {runProgram} from '../../scripts/api/process/run-program.mjs';
 import {resolveRealTool} from '../../scripts/api/process/resolve-real-tool.mjs';
 import {decrypt} from '../../scripts/api/sops/decrypt.mjs';
-import {encrypt} from '../../scripts/api/sops/encrypt.mjs';
 import {seal} from '../../scripts/api/sops/seal.mjs';
 import {execEnv} from '../../scripts/api/sops/exec-env.mjs';
 import {execWithCustody} from '../../scripts/gates/custody-exec.mjs';
@@ -132,8 +131,7 @@ test('SOPS adapters preserve typed inline and blank refusal before launching a f
   const file=path.join(root,'original.identity');fs.writeFileSync(file,'FAKE-ORIGINAL-IDENTITY');
   for(const [value,reason] of [['AGE-SECRET-KEY-FAKE','inline-context-unqualified'],['','disabled-inline'],[undefined,'disabled-inline']]){
     const env={SOPS_AGE_KEY:value,SOPS_AGE_KEY_FILE:file},snapshot=structuredClone(env);
-    const results=[decrypt(process.execPath,[probe],{env}),encrypt(process.execPath,[probe],{env,identity:file}),
-      seal(process.execPath,{inputType:'json',plaintext:'{}',recipients:['age1fake'],filenameOverride:'fixture.json'},{env})];
+    const results=[decrypt(process.execPath,[probe],{env}),seal(process.execPath,{inputType:'json',plaintext:'{}',recipients:['age1fake'],filenameOverride:'fixture.json'},{env})];
     for(const result of results){assert.equal(result.status,null);assert.equal(result.error.identityRefusal,reason);assert.equal(result.stdout,'');assert.equal(result.stderr,'');}
     assert.throws(()=>execEnv(path.join(root,'fixture.json.enc'),{env,sops:process.execPath}),error=>error.identityRefusal===reason);
     assert.ok(!fs.existsSync(marker));assert.deepEqual(env,snapshot);

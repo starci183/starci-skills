@@ -27,6 +27,7 @@ value once with his own age identity: `starci runtime import-held-secret --membe
 history (without `--rev`, from the parent of the commit that deleted it), decrypts it through the sops call owner and appends
 `NAME=value` to `secret.env` without printing it, and it never overwrites a name already there. The member table:
 
+<!-- [removed-list] -->
 | Old member | Variable | Read by |
 | --- | --- | --- |
 | `ext/sonar/secrets/sonarqube-db-password.txt.enc` | `SONARQUBE_DB_PASSWORD` | `ext/sonar/compose.yaml`, through `starci gate sonar up` |
