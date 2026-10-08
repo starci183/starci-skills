@@ -49,7 +49,7 @@ const WORKFLOWS = [
 
 test('the parity plan is derived from the workflows: one run per example app, the root install once, the spec suites and the manual, upload, docker, browser and plumbing steps left out with a reason', () => {
   const plan = parityPlan({ workflows: WORKFLOWS, apps: ['shop', 'blog'] });
-  assert.equal(plan.image, 'node:22');
+  assert.equal(plan.image, 'node:22-trixie', 'the image carries a git as new as the CI runner has');
   assert.deepEqual(plan.steps.map((s) => [s.dir, s.run]), [
     ['.', 'npm ci'], ['packages/grammar', 'npm ci\nnpm run build'], ['.', 'npm run check'],
     ['examples/shop', 'npm ci'], ['examples/shop', 'npm run typecheck'], ['.', 'npm run starci --silent -- app lint --cwd "$APP_DIR"'], ['examples/shop', 'npm run build:be'],
@@ -82,7 +82,8 @@ test('the repository\'s own workflows give a plan that holds the full check set,
 
 test('the parity script extracts HEAD from the read-only tar, snapshots it as a git repository, runs each step with its env and marks each step', () => {
   const script = parityScript(parityPlan({ workflows: WORKFLOWS, apps: ['shop'] }));
-  assert.match(script, /tar -xf \/in\/src\.tar -C \/work/);
+  assert.match(script, /tar -xf \/in\/src\.tar -C \/home\/runner\/work\/runtime\/runtime/);
+  assert.match(script, /cd "\/home\/runner\/work\/runtime\/runtime\/\$dir"/);
   assert.match(script, /git init -q && git add -A && git -c user\.name=starci/);
   assert.match(script, /run_step 'examples\.yml:app\[shop\]: starci app lint' '\.' <<'__STEP_\d+__'\nexport NODE_VERSION='22'\nexport APP_DIR='examples\/shop'\nnpm run starci/);
   assert.match(script, /##DONE"\n$/);
@@ -106,13 +107,13 @@ const parityDeps = (t, docker, extra = {}) => ({ docker, logDir: () => tmp(t, 'p
 test('parity: a green container run is ok; the repository is mounted read-only, no port or network is given, and only its own named container is removed', async (t) => {
   const docker = fakeDocker();
   const out = runParity('repo', parityDeps(t, docker));
-  assert.deepEqual([out.name, out.ok, out.image], ['linux-parity', true, 'node:22'], JSON.stringify(out));
+  assert.deepEqual([out.name, out.ok, out.image], ['linux-parity', true, 'node:22-trixie'], JSON.stringify(out));
   const [{ args }] = docker.calls.run;
   assert.ok(args.includes('--mount') && args.some((a) => /^type=bind,source=.+,target=\/in,readonly$/.test(a)), 'the mount is read-only');
   assert.ok(!args.some((a) => /^(-p|--publish|--network|--net|-v|--volume|--privileged)$/.test(a)), 'no port, host network, volume or privilege');
   assert.equal(args[args.indexOf('--name') + 1], docker.calls.rm[0], 'it removes exactly the container it named');
   assert.match(docker.calls.rm[0], /^starci-l4-parity-/, 'never a container of anything else');
-  assert.deepEqual(args.slice(-3), ['node:22', 'bash', '/in/parity.sh']);
+  assert.deepEqual(args.slice(-3), ['node:22-trixie', 'bash', '/in/parity.sh']);
   assert.ok(fs.existsSync(out.log) && out.skipped.length > 0 && out.steps.length > 0);
 });
 
