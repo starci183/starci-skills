@@ -57,6 +57,7 @@ import path from 'node:path';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { ARCHITECTURE_RULE_IDS, checkArchitecture } from './architecture/index.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { readCatalogOnce } from './catalog-once.mjs';
 import { APP_SCOPE, HFS_DECLARATION_FILE, appRelativeMessages, HfsSlotsError, SIDES, createSlotResolver, loadRuleCatalog, loadSlotManifest, readRepoDeclaration, resolveRepoDeclaration } from './slots.mjs';
 import { RUNTIME_KIND } from './manifest-shape.mjs';
 import { lsFiles } from '../api/git/ls-files.mjs';
@@ -112,22 +113,9 @@ const VAR = /<([a-z][a-z0-9-]*)>/g;
 
 const refuse = (code, message, details = {}) => { throw new HfsSlotsError(code, message, details); };
 
-const catalogs = new Map();
-/** The parsed failure-code catalog under `root`; the megabyte of YAML is parsed once per file state (path, size, mtime), not once per check. */
-function readCatalog(root) {
-  const file = path.join(root, FAILURE_CODES_FILE);
-  const { size, mtimeMs } = fs.statSync(file);
-  const key = `${file}|${size}|${mtimeMs}`;
-  if (!catalogs.has(key)) {
-    catalogs.clear();
-    catalogs.set(key, parseYaml(fs.readFileSync(file, 'utf8')));
-  }
-  return catalogs.get(key);
-}
-
 /** {code: {title, title_vi, meaning_vi, nextStep_vi}} for the codes asked for, read from the failure-code catalog under `root`. */
 export function readWhy(root = skillRoot, codes = CHECK_CODES) {
-  const catalog = readCatalog(root);
+  const catalog = readCatalogOnce(path.join(root, FAILURE_CODES_FILE));
   const why = {};
   for (const code of codes) {
     const entry = catalog?.[code];

@@ -644,3 +644,8 @@ cases:
     rule: {file: scripts/reconciler/debug-questions.mjs, anchor: "wakeActed"}
     spec: tests/reconciler/debug-signals.spec.mjs
     status: covered
+  - id: slow-specs-over-the-budget
+    family: smooth-operation
+    met: {date: "2026-10-09", where: "npm run check, RT_SPEC_OVER_BUDGET lines of the 2026-10-08 land record", evidence: "hfs-cli 336s, hfs-scaffold-app 333s, hfs-scaffold-app.e2e 282s, supervisor-kernel 190s, sonar-local 117s, architecture 109s, workflow-checkpoint 93s, hfs-docker-rules 90s, peer-messages 89s, managed-dispatch 80s, kernel-api 69s, launch-smoke 69s"}
+    status: open
+    why: "a spec stays inside its budget: cut at the cause for the hfs family (the failure-code catalog parsed once per file state instead of twice per check, the repository tree listed once per machine run instead of by every checker, app lint starting both ESLint sides, stylelint and the app check together); the scaffold e2e specs keep one real npm ci, one real build and a real Postgres, and the kernel specs (workflow-checkpoint, peer-messages, managed-dispatch, kernel-api, launch-smoke) are bound by one CLI process per assertion step, which needs the verbs callable in-process before a spec can share one process"
