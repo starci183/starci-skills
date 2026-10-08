@@ -242,8 +242,9 @@ export function imageFiles(app) {
   const side = app.sides.fe;
   const inputs = [...(opensPackages(side) ? ['fe/packages'] : []), ...((side.reads ?? []).includes('be/contracts/') ? ['be/contracts'] : [])];
   const copyInputs = inputs.map(folder => `COPY ${folder} ${folder}\n`).join('');
-  // A lite back end imports the generated Supabase types from the app root, so each of its images carries that folder.
-  const copyBeInputs = app.edition === 'lite' ? 'COPY supabase/types supabase/types\n' : '';
+  // The folders outside be/ that the back end declares it reads (the generated Supabase types of a lite back end, which an upgraded app keeps reading) are in every one of its images.
+  const beFolders = (app.sides.be.reads ?? []).map(folder => folder.replace(/\/$/, ''));
+  const copyBeInputs = beFolders.map(folder => `COPY ${folder} ${folder}\n`).join('');
   const entries = imageEntries(app).map(({ side: which, entry: item }) => ({ side: which, item }));
   return entries.map(({ side: which, item }) => {
     const template = IMAGE_TEMPLATE[item.kind];
