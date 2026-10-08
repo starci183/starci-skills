@@ -165,10 +165,10 @@ npm:
     add: {code: RIGHTS_RAW_TOOL, use: starci npm install adds exact-pinned dependencies and is limited to lead or owner}
     update: {code: RIGHTS_RAW_TOOL, use: starci npm install is the owner-controlled dependency-change path using canon pins}
     uninstall: {code: RIGHTS_RAW_TOOL, use: starci npm install is the owner-controlled dependency-change path using canon pins}
-    test: {code: RIGHTS_RAW_TOOL, use: starci test run --level L1|L2 in the runtime or starci gate unit --root <app> in an app}
-    t: {code: RIGHTS_RAW_TOOL, use: starci test run --level L1|L2 in the runtime or starci gate unit --root <app> in an app}
-    run: {code: RIGHTS_RAW_TOOL, use: 'starci test run runs tests; starci work layout-render serves the app for a layout capture; use starci release sync-runtime for package runtime copies and grammar preparation, or starci check run, starci lint run, starci typecheck run, starci app stack, or starci gate run for other scripts'}
-    run-script: {code: RIGHTS_RAW_TOOL, use: 'starci test run runs tests; use starci check run, starci lint run, starci typecheck run, starci app stack, or starci gate run for other scripts'}
+    test: {code: RIGHTS_RAW_TOOL, use: starci test affected --run in the runtime (the specs your change can break; the full suite is the release cut) or starci gate unit --root <app> in an app}
+    t: {code: RIGHTS_RAW_TOOL, use: starci test affected --run in the runtime (the specs your change can break; the full suite is the release cut) or starci gate unit --root <app> in an app}
+    run: {code: RIGHTS_RAW_TOOL, use: 'starci test affected --run runs the specs your change can break; starci work layout-render serves the app for a layout capture; use starci release sync-runtime for package runtime copies and grammar preparation, or starci check run, starci lint run, starci typecheck run, starci app stack, or starci gate run for other scripts'}
+    run-script: {code: RIGHTS_RAW_TOOL, use: 'starci test affected --run runs the specs your change can break; use starci check run, starci lint run, starci typecheck run, starci app stack, or starci gate run for other scripts'}
     start: {code: RIGHTS_RAW_TOOL, use: 'starci app stack'}
     exec: {code: RIGHTS_RAW_TOOL, use: 'starci check run, starci lint run, starci typecheck run, or starci gate run for that tool'}
     link: {code: RIGHTS_RAW_TOOL, use: starci npm install is the dependency path; an agent never makes a package link}

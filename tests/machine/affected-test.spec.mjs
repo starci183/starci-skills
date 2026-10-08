@@ -1,0 +1,156 @@
+// affected-test.spec.mjs - `starci test affected`: the selection is the land gate's plus the readers of changed shared data, the runner runs one
+// file per process with the four preloads at a bounded concurrency, and a selection above the declared bound is printed and not run.
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import test from 'node:test';
+import { affectedSelection, dataFilesOf, readsData } from '../../scripts/machine/affected-select.mjs';
+import { baseOf, runBounded, runSpecFile, testAffected } from '../../scripts/machine/affected-test.mjs';
+import { readSpecs } from '../../scripts/lib/spec-pool.mjs';
+import { mkdtemp } from '../helpers/tmpdir.mjs';
+
+const POLICY = { maxFiles: 10, dataRoots: ['modules', 'knowledge'] };
+
+function tree(t) {
+  const root = mkdtemp(t, 'starci-affected-');
+  const put = (rel, text) => { fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true }); fs.writeFileSync(path.join(root, rel), text); };
+  put('scripts/lib/core.mjs', 'export const core = 1;\n');
+  put('scripts/lib/reader.mjs', "export const registry = () => ['modules', 'reg', 'rows.yaml'].join('/');\n");
+  put('scripts/lib/other.mjs', 'export const other = 2;\n');
+  put('modules/reg/rows.yaml', 'rows: []\n');
+  put('tests/core.spec.mjs', "import { core } from '../scripts/lib/core.mjs';\n");
+  put('tests/via-reader.spec.mjs', "import { registry } from '../scripts/lib/reader.mjs';\n");
+  put('tests/unrelated.spec.mjs', "import { other } from '../scripts/lib/other.mjs';\n");
+  return root;
+}
+
+const select = (root, changed, overrides = {}) => affectedSelection({
+  root, changed, specs: readSpecs(root), sources: [
+    { file: 'scripts/lib/reader.mjs', text: fs.readFileSync(path.join(root, 'scripts/lib/reader.mjs'), 'utf8') },
+    { file: 'scripts/lib/other.mjs', text: fs.readFileSync(path.join(root, 'scripts/lib/other.mjs'), 'utf8') },
+  ],
+  symbolsOf: () => null, exists: () => true, maxFiles: POLICY.maxFiles, dataRoots: POLICY.dataRoots, ...overrides,
+});
+
+test('a changed module selects the spec named after it and the specs importing it, not the others', (t) => {
+  const picked = select(tree(t), ['scripts/lib/core.mjs']);
+  assert.deepEqual(picked.files, ['tests/core.spec.mjs']);
+  assert.equal(picked.over, false);
+});
+
+test('a changed registry yaml selects the specs behind the module that reads it, though no spec names the yaml', (t) => {
+  const picked = select(tree(t), ['modules/reg/rows.yaml']);
+  assert.deepEqual(picked.readers.map((r) => r.file), ['scripts/lib/reader.mjs']);
+  assert.ok(picked.files.includes('tests/via-reader.spec.mjs'));
+  assert.ok(!picked.files.includes('tests/unrelated.spec.mjs'));
+});
+
+test('shared data is only the declared data roots, and a reader names the file by path or by name with its directory', () => {
+  assert.deepEqual(dataFilesOf(['package.json', 'modules/a/b.yaml', 'knowledge/x.md', 'scripts/a.mjs', 'modules/a/c.mjs'], ['modules', 'knowledge']), ['modules/a/b.yaml', 'knowledge/x.md']);
+  assert.equal(readsData("read('modules/a/b.yaml')", 'modules/a/b.yaml'), true);
+  assert.equal(readsData("join('modules', 'a', 'b.yaml')", 'modules/a/b.yaml'), true);
+  assert.equal(readsData("'b.yaml'", 'modules/a/b.yaml'), false, 'the file name alone is any file of that name');
+});
+
+test('a deleted spec is not selected', (t) => {
+  const picked = select(tree(t), ['scripts/lib/core.mjs'], { exists: (file) => file !== 'tests/core.spec.mjs' });
+  assert.deepEqual(picked.files, []);
+});
+
+const passing = () => Promise.resolve({ error: null, stdout: 'ok', stderr: '' });
+const context = (args) => ({ args, cwd: process.cwd() });
+const deps = (t, extra = {}) => ({
+  policy: POLICY, mergeBase: () => 'abcdef123456', exists: () => true, sources: [], hostSample: () => ({ logicalThreads: 16, cpuBusy: 0, totalRamBytes: 64 * 1024 ** 3, freeRamBytes: 48 * 1024 ** 3 }),
+  root: tree(t), ...extra,
+});
+
+function ctxOf(d, args) { return { args: { root: d.root, ...args }, cwd: d.root }; }
+
+test('without --run the verb prints the selection and starts nothing', async (t) => {
+  const calls = [];
+  const d = deps(t, { changedFiles: () => ['scripts/lib/core.mjs'], execNode: (a) => { calls.push(a); return passing(); } });
+  const out = await testAffected(ctxOf(d, {}), d);
+  assert.equal(out.code, 0);
+  assert.match(out.text, /^affected: 1 spec file\(s\) for 1 changed file\(s\) since abcdef123/);
+  assert.match(out.text, /tests\/core\.spec\.mjs/);
+  assert.deepEqual(calls, []);
+});
+
+test('--run runs each file once with the four preloads and ends with the counted line', async (t) => {
+  const calls = [];
+  const d = deps(t, {
+    changedFiles: () => ['scripts/lib/core.mjs', 'scripts/lib/other.mjs'],
+    execNode: (a) => { calls.push(a); return a.at(-1) === 'tests/unrelated.spec.mjs' ? Promise.resolve({ error: new Error('exit 1'), stdout: 'not ok 1 - boom', stderr: '' }) : passing(); },
+  });
+  const out = await testAffected(ctxOf(d, { run: true, concurrency: 1 }), d);
+  assert.equal(out.code, 1);
+  assert.equal(calls.length, 2);
+  for (const args of calls) {
+    assert.deepEqual(args.filter((a, i) => args[i - 1] === '--import'), ['./tests/setup/low-priority.mjs', './tests/setup/isolated-temp.mjs', './tests/setup/isolated-registry.mjs', './tests/setup/runtime-copies.mjs']);
+    assert.equal(args.at(-2), '--test');
+  }
+  assert.match(out.text, /^PASS tests\/core\.spec\.mjs/m);
+  assert.match(out.text, /^FAIL tests\/unrelated\.spec\.mjs/m);
+  assert.match(out.text, /not ok 1 - boom/);
+  assert.match(out.text.split('\n').at(-1), /^affected: 2 files, 1 pass, 1 fail$/);
+});
+
+test('all green exits 0 and an empty selection runs nothing', async (t) => {
+  const green = deps(t, { changedFiles: () => ['scripts/lib/core.mjs'], execNode: passing });
+  const ok = await testAffected(ctxOf(green, { run: true }), green);
+  assert.equal(ok.code, 0);
+  assert.match(ok.text.split('\n').at(-1), /^affected: 1 files, 1 pass, 0 fail$/);
+  const empty = deps(t, { changedFiles: () => ['docs/readme.md'], execNode: () => assert.fail('nothing is selected') });
+  const none = await testAffected(ctxOf(empty, { run: true }), empty);
+  assert.equal(none.code, 0);
+  assert.equal(none.text, 'affected: 0 files, 0 pass, 0 fail');
+});
+
+test('a selection above the declared bound is printed with the full suite named as the lead job, and --run refuses it', async (t) => {
+  const calls = [];
+  const d = deps(t, { policy: { ...POLICY, maxFiles: 1 }, changedFiles: () => ['scripts/lib/core.mjs', 'scripts/lib/other.mjs'], execNode: (a) => { calls.push(a); return passing(); } });
+  const shown = await testAffected(ctxOf(d, {}), d);
+  assert.equal(shown.code, 0);
+  assert.match(shown.text, /exceed the declared bound of 1/);
+  assert.match(shown.text, /full suite on the merged tree \(the lead\) and by the release cut/);
+  const refused = await testAffected(ctxOf(d, { run: true }), d);
+  assert.equal(refused.code, 2);
+  assert.deepEqual(calls, []);
+});
+
+test('--changed names the files itself, and no base without --changed is a usage refusal', async (t) => {
+  const d = deps(t, { mergeBase: () => null, execNode: passing });
+  const none = await testAffected(ctxOf(d, {}), d);
+  assert.equal(none.code, 2);
+  assert.match(none.text, /pass --base <ref> or --changed/);
+  const named = await testAffected(ctxOf(d, { changed: ['scripts/lib/core.mjs'] }), d);
+  assert.equal(named.code, 0);
+  assert.match(named.text, /tests\/core\.spec\.mjs/);
+});
+
+test('the base is main, else origin/main, unless a ref is named', () => {
+  const asked = [];
+  const base = baseOf('.', undefined, { mergeBase: (_root, _head, ref) => { asked.push(ref); return ref === 'origin/main' ? 'sha' : null; } });
+  assert.equal(base, 'sha');
+  assert.deepEqual(asked, ['main', 'origin/main']);
+  assert.equal(baseOf('.', 'topic', { mergeBase: (_r, _h, ref) => ref }), 'topic');
+});
+
+test('the runner never has more files in flight than the limit and keeps the order of the files', async () => {
+  let live = 0, peak = 0;
+  const files = ['a', 'b', 'c', 'd', 'e'];
+  const results = await runBounded(files, 2, (file) => {
+    live += 1; peak = Math.max(peak, live);
+    return new Promise((resolve) => setTimeout(() => { live -= 1; resolve(file); }, 5));
+  });
+  assert.deepEqual(results, files);
+  assert.equal(peak, 2);
+});
+
+test('a spec file that fails reports the tail of its output, one that passes reports none', async () => {
+  const fail = await runSpecFile('.', 'tests/x.spec.mjs', { execNode: () => Promise.resolve({ error: new Error('1'), stdout: Array.from({ length: 40 }, (_, i) => `line ${i}`).join('\n'), stderr: '' }) });
+  assert.equal(fail.pass, false);
+  assert.equal(fail.tail.length, 25);
+  assert.equal(fail.tail.at(-1), 'line 39');
+  assert.deepEqual((await runSpecFile('.', 'tests/x.spec.mjs', { execNode: passing })).tail, []);
+});

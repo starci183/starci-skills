@@ -212,7 +212,7 @@ const nodePolicyVerdict = ({ role, args, p, policy, guard, text }) => {
   if (args.includes('--test')) {
     if (nodeWholeSuite(args)) {
       if (p.suiteOps.has(String(guard?.op ?? ''))) return null;
-      return refusal('RIGHTS_SUITE_RUN', text, `the ${role} role does not run a whole suite because full suites run only in the release cut or the requested verify ops`, 'run one explicit spec file or use the matching starci verify verb');
+      return refusal('RIGHTS_SUITE_RUN', text, `the ${role} role does not run a whole suite because full suites run only in the release cut or the requested verify ops`, 'starci test affected --run (the specs your change can break), or one explicit spec file');
     }
     const targets = nodeOperands(args).filter((value) => value !== 'test');
     if (p.nodeTest.has(role) && targets.length && targets.every((value) => /\.(?:spec|test)\.[cm]?js$/i.test(value))) return null;
