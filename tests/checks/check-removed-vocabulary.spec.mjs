@@ -35,7 +35,7 @@ test('the changelog, the list file and files outside the instruction surfaces ar
 test('a config key, a flag, a verb and a code are found by their literal; a longer word is not', () => {
   const text = 'set models.pools\nrun starci debug pass now\nuse --caller-model x\nerror workflow-debug-not-ready\nmodels.poolsize is unrelated\n'; // [removed-list]
   assert.deepEqual(removedVocabularyFindings({ 'docs/a.md': text }).map((finding) => [finding.line, finding.name]),
-    [[1, 'models.pools'], [2, 'starci debug pass'], [3, '--caller-model'], [4, 'workflow-debug-not-ready']]); // [removed-list]
+    [[1, 'models.pools'], [2, 'debug pass'], [3, '--caller-model'], [4, 'workflow-debug-not-ready']]); // [removed-list]
 });
 
 test('every entry declares its kind, replacement and release, and each config-key entry is refused by name with that replacement', () => {
