@@ -34,7 +34,7 @@ reads:
         variable name - and which identity:<identity-slug> alias in the selected backend Stack environment
         (.starcistacks/<env>/secrets/<identity-slug>.enc, app-relative) holds it. The resource metadata names the custody and variable.
   - id: standard
-    path: shared
+    path: docs/architecture.md + docs/code-pattern-enforcement.md + knowledge/op-gate.yaml + knowledge/design-patterns.yaml + knowledge/architecture-rules.yaml + knowledge/hfs/rules.yaml
     purpose:
       en: shared
       vi: "Chuẩn mà quyết định và bản ghi của op dẫn ra: knowledge/op-gate.yaml (proofs.read-knowledge), các tệp knowledge liệt kê ở bước ĐỌC và bản đồ slot hfs của mọi bản ghi op viết (starci app explain ở gốc app). Các tệp được đọc tại chỗ và ghi kèm sha256 vào bản tóm tắt ĐỌC; không chép lại vào bản ghi."

@@ -4,6 +4,11 @@ All notable changes to StarCi are documented here. The runtime is on the `1.0.0-
 until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` freezes them.
 `package.json` `version` is the only version authority.
 
+## [1.0.0-alpha.8] — in preparation
+
+### Fixed
+- The prompt of a deciding or authoring op no longer lists the whole of `knowledge/`. The nine ops with the read-knowledge proof (architecture.decide, brand.decide, business.decide, decision.prepare, docs.author, knowledge.repair, scope.define, scope.finish, work.author) filed `knowledge/**` as their standard: 260 to 290 mandatory files and a 88 to 95 KB prompt that the worker read and carried in its context for every later turn (up to 13 percent of the 3 to 13 million tokens a decision leg cost in the real usage rows). Each now files the law inputs and the knowledge its own READ step names (19 to 45 files, a 21 to 28 KB prompt); `knowledge/op-gate.yaml` `readSet` bounds the file count and the prompt, and a spec holds it.
+
 ## [1.0.0-alpha.7] — 2026-10-08
 
 Theme: the roles are one declared contract, the system recovers from a host restart by itself, no smell or bug enters at commit, and the remote main moves only with a release proven on the exact commit that is pushed.

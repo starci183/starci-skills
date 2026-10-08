@@ -55,6 +55,13 @@ cases:
     met: {date: "2026-10-08", where: "settle of an op admitted before the tree was lost", evidence: "nivo runtime.sqlite events 489, 490, 496, 497 (kernel-proposal kprop-f9ee099c38, runtime-defect incident)"}
     status: open
     why: "the admission binds the op to the tree path it ran in; a registered tree that has to be recreated gets a new path from Orca, so a reported but unsettled op needs its admitted placement re-pointed to the registered tree by a runtime rule (an owner decision on who may rewrite an immutable admission), not by hand"
+  - id: op-prompt-files-the-whole-knowledge-tree
+    family: smooth-operation
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "the shared standard read of the nine deciding and authoring ops was knowledge/**: their prompt listed 260 to 290 mandatory files (2.4 to 2.9 MB) in a 88 to 95 KB prompt that the worker reads and carries in its context for every later turn; the usage rows of 14 decision attempts show 3.4 to 13.4 M tokens each, 47 to 113 turns, a prompt of 25 thousand tokens carried across 13 percent of all of it, and the READ digest it required hashed 254 files nobody can read", remedy: {state: in-tree, change: "each of the nine ops files the law inputs plus the knowledge its own READ step names (docs, op-gate, its patterns): 19 to 45 mandatory files and a 21 to 28 KB prompt; the budget is knowledge/op-gate.yaml readSet"}}
+    met: {date: "2026-10-08", where: "decision legs of the Nivo and StarCi auth-test workflows", evidence: "llm_usage rows of both product ledgers; worker transcript dd6caf3b (113 turns, 13.07 M cache-read tokens, a 102 KB packet read at turns 1 and 2)"}
+    rule: {file: knowledge/op-gate.yaml, anchor: "readSet"}
+    spec: tests/kernel/op-read-set.spec.mjs
+    status: covered
   - id: quota-window-unstarted
     family: failure-while-running
     met: {date: "2026-10-08", where: "provider quota after re-login", evidence: "commit f4fca8baf"}
