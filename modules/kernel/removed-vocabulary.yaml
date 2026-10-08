@@ -236,3 +236,9 @@ removed:
     use: 'the ecommerce example carries demo-only defaults in its compose files and declares no sealed secret (secrets: [])'
     since: 1.0.0-alpha.8
     match: '(?<![\w-])(?:keycloak|minio)-env(?:\.enc)?(?![\w-])'
+  - id: vocab-handover-step-mechanical-pending
+    kind: vocabulary
+    name: the handover-step menu mode mechanical-pending and its choice rerun-handover-review
+    use: 'the Job controller enqueues handover.review itself when the handover is due or its ask was answered approve or question (next action handover-review, scripts/kernel/handover-move.mjs); the handover-step item holds only the typed routing of a reported defect'
+    since: 1.0.0-alpha.8
+    match: '(?<![\w-])(?:mechanical-pending|rerun-handover-review)(?![\w-])'

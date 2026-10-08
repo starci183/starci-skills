@@ -956,9 +956,9 @@ handoverLoop:
     (modules/ops/ops/handover.review.yaml; modules/models/kinds.yaml
     handover routes).
   enqueue: >-
-    When every other approved leg settled (frontier `handover-due`), enqueue
-    handover.review with `--paths .starciwork/evidence/<workflow>.handover`
-    and no other grant, route it and dispatch it. A chain approved before the
+    When every other approved leg settled (frontier `handover-due`), the Job controller enqueues
+    handover.review (next action origin `handover-review`) with `--paths .starciwork/evidence/<workflow>.handover`
+    and no other grant; the Workflow controller routes and dispatches it. A chain approved before the
     op existed has no handover leg: append it as the LAST leg of the derived
     plan - `starci kernel plan` records divergence.handoverAppended and does not count
     it as divergence - and enqueue it anyway; no owner question is needed to
@@ -973,8 +973,8 @@ handoverLoop:
     Telegram button, and only an ask that never reached the owner is
     `ask-reserve`.
   approve: >-
-    `handover-answered` with decision approve and byOwner true: enqueue
-    handover.review again. It reads the approval and files done; record one
+    `handover-answered` with decision approve and byOwner true: the Job controller enqueues
+    handover.review again (origin `handover-review`). It reads the approval and files done; record one
     kernel check (name handover-owner-approval, command the `starci kernel status
     --workflow <id> --json` read, exit 0, evidence the ask dispatch, decision
     and answeredBy) with `starci kernel record-checks`, then `starci kernel settle --job <id> --verdict pass`. Settle
@@ -997,13 +997,13 @@ handoverLoop:
     or the design itself is wrong - enqueued with `--title "handover feedback
     <ask dispatch>: <the note in a line>"`; the fix op reads the whole note in
     `starci kernel survey --workflow <id> --deliveries` handoverHistory. Once that fix
-    settles pass the frontier reads `handover-due`: run handover.review again;
+    settles pass the frontier reads `handover-due`: the Job controller runs handover.review again;
     its package opens with what was fixed and how to re-test it. The menu item handover-step carries the typed choices: route-fix-<job>
     for each slice the workflow built (the passed unit of a build-family op; the choice reopens it titled with the note) and
     route-requirement-gap, route-design-gap, route-interface-gap with the record in `--text`. A slice the workflow did not build is not
     on the menu, so `decide` refuses it before anything is enqueued.
   question: >-
-    `handover-answered` with decision question: enqueue handover.review again.
+    `handover-answered` with decision question: the Job controller enqueues handover.review again (origin `handover-review`).
     The attempt reads the question from `starci kernel survey --deliveries`
     handoverHistory and opens its package with the answer, then asks again.
     The kernel never answers the owner in chat or in an ask of its own.

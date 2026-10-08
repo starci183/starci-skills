@@ -499,10 +499,11 @@ cases:
     status: covered
   - id: orca-worktree-rm-walks-junctions-measured
     family: authority-safety
-    finding: {role: runtime, duty: never, verdict: departs, evidence: "the live junction probe found the fake main's node_modules content gone after a bare orca worktree rm --force of a worktree with node_modules junctions on the release host", remedy: {state: open, change: "the runtime already unlinks every link before Orca removes a worktree (worktree-orca.mjs removeOrcaWorktree); whether this Orca build walks junctions on this host needs a probe from an Orca terminal"}}
-    met: {date: "2026-10-08", where: "release cut of 1.0.0-alpha.7, L4 npm test, orca-worktree-rm-live", evidence: "release-npm_test log: Orca did not walk the junctions: the fake main is byte-identical"}
-    status: open
-    why: "a probe of the real Orca writes a repository into it, which a lane may not do; run STARCI_ORCA_LIVE=1 on tests/api-orca/orca-worktree-rm-live.spec.mjs from an Orca terminal and record the measurement"
+    finding: {role: runtime, duty: never, verdict: departs, evidence: "the live junction probe found the fake main's node_modules content gone after a bare orca worktree rm --force of a worktree with node_modules junctions: Orca 1.4.221 walks junctions and deletes what they lead to (10 of 10 files of the fake main lost, measured 2026-10-09 from an Orca terminal)", remedy: {state: in-tree, change: "removeOrcaWorktree (scripts/machine/worktree-orca.mjs) unlinks every link first and is the only caller of the Orca removal (check-worktree-add); its Orca client reads the tree the selector names and refuses it with worktree-links-present while it holds a link, Orca never asked; the live spec prints the measurement and asserts the refusal and a byte-identical main after the runtime release"}}
+    met: {date: "2026-10-08", where: "release cut of 1.0.0-alpha.7, L4 npm test, orca-worktree-rm-live", evidence: "release-npm_test log: Orca did not walk the junctions: the fake main is byte-identical (assertion failed: the fake main lost node_modules/left-pad/lib/f1..f5.js and packages/node_modules/@x/y/g1..g5.js)"}
+    rule: {file: scripts/machine/worktree-orca.mjs, anchor: "worktree-links-present"}
+    spec: tests/api-orca/worktree-rm-links.spec.mjs
+    status: covered
   - id: example-fell-behind-renderer-unseen
     family: record-vs-reality
     finding: {role: runtime, duty: does, verdict: departs, evidence: "the three example apps are the runtime's reference applications, yet no check in npm run check judged them: a hand-added .starcistacks/.npmignore, a lite quality gate left at the full name, Next config modules that need a projection at image build and Dockerfile text the templates no longer write all reached the release cut, where 16 L4 example rows failed after an hour of run", remedy: {state: in-tree, change: "the example-render self-check judges every example with the runtime's own HFS and renderer, without an app install (scripts/checks/check-example-render.mjs)"}}
@@ -638,9 +639,10 @@ cases:
     status: covered
   - id: menu-handover-rerun-still-pending
     family: smooth-operation
-    met: {date: "2026-10-09", where: "the wave 3 pass over the pending menu origins", evidence: "modules/kernel/kernel-menu.yaml kind handover-step, mode mechanical-pending"}
-    status: open
-    why: "handover-due, and a handover answered approve or question, are each one enqueue of handover.review on the fixed handover evidence path: nothing is judged, yet the Kernel still answers them from its menu; the move needs the handover projection (state, due, ask decision) in the status the Job controller reads, then the same once-per-process move as the other origins"
+    met: {date: "2026-10-09", where: "the wave 3 pass over the pending menu origins", evidence: "modules/kernel/kernel-menu.yaml kind handover-step answered handover-due and approve or question answers from the menu"}
+    rule: {file: scripts/kernel/handover-move.mjs, anchor: "handoverReviewAction"}
+    spec: tests/reconciler-controllers/handover-review-move.spec.mjs
+    status: covered
   - id: debug-questions-lacked-four-signals
     family: record-vs-reality
     finding: {role: runtime, duty: does, verdict: departs, evidence: "four of Debug's nine unanswerable questions needed a signal the runtime could emit where the fact occurs: a guard refusal with its role, the loosening on the land record, a critic-run event and the wake-tagged usage rows", remedy: {state: in-tree, change: "refusals.jsonl rows carry the role and the CLI dispatcher logs its RUNTIME_CHANGE_OWNED_BY_DEBUG refusals; land_runs.specs_json holds the loosening with its approval id; settle appends a critic-run event per draw loop; the digest answers fr-wake-acted from the wake-tagged usage rows"}}

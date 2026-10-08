@@ -222,6 +222,7 @@ export function handoverProjection(db, workflowId, { legOps = [], alsoSettled = 
     due,
     inApprovedChain: legOps.includes(HANDOVER_OP),
     jobId: latestJob?.job_id ?? null,
+    jobStatus: latestJob?.status ?? null,
     ask: latestAsk ? {
       dispatchId: latestAsk.dispatchId, jobId: latestAsk.jobId, attempt: latestAsk.attempt, state: latestAsk.state,
       decision: latestAsk.decision, answeredBy: latestAsk.answeredBy, byOwner: latestAsk.byOwner,
@@ -242,21 +243,21 @@ export function handoverReason(handover, workflowId) {
   }
   if (handover?.state === 'answered' && ask) {
     if (ask.decision === 'approve' && ask.byOwner) {
-      return `the owner approved handover ask ${ask.dispatchId}; enqueue handover.review again (it reads the approval through starci kernel survey --deliveries and files done), then starci kernel record-checks and starci kernel settle --verdict pass record handover-approved; then starci kernel finish`;
+      return `the owner approved handover ask ${ask.dispatchId}; the runtime enqueues handover.review again (next action handover-review; it reads the approval through starci kernel survey --deliveries and files done), then starci kernel record-checks and starci kernel settle --verdict pass record handover-approved; then starci kernel finish`;
     }
     if (ask.decision === 'approve') {
-      return `handover ask ${ask.dispatchId} was answered approve by ${ask.answeredBy ?? 'a delegate'}, and only the owner approves a handover; enqueue handover.review again so the owner is asked`;
+      return `handover ask ${ask.dispatchId} was answered approve by ${ask.answeredBy ?? 'a delegate'}, and only the owner approves a handover; the runtime enqueues handover.review again (next action handover-review) so the owner is asked`;
     }
     if (ask.decision === 'feedback') {
-      return `the owner reported a defect on handover ask ${ask.dispatchId}; route the note to the fix op of the slice it names with the menu choice route-fix-<job> of item handover-step (modules/models/kinds.yaml route handover-feedback-repairs-the-build; route-requirement-gap, route-design-gap or route-interface-gap when the record itself is wrong), and once that fix settles run handover.review again`;
+      return `the owner reported a defect on handover ask ${ask.dispatchId}; route the note to the fix op of the slice it names with the menu choice route-fix-<job> of item handover-step (modules/models/kinds.yaml route handover-feedback-repairs-the-build; route-requirement-gap, route-design-gap or route-interface-gap when the record itself is wrong), and once that fix settles the runtime enqueues handover.review again (next action handover-review)`;
     }
     if (ask.decision === 'question') {
-      return `the owner asked a question on handover ask ${ask.dispatchId}; enqueue handover.review again — the attempt answers it in the package and hands over again`;
+      return `the owner asked a question on handover ask ${ask.dispatchId}; the runtime enqueues handover.review again (next action handover-review) — the attempt answers it in the package and hands over again`;
     }
-    return `handover ask ${ask.dispatchId} was answered with no recognised option; enqueue handover.review again`;
+    return `handover ask ${ask.dispatchId} was answered with no recognised option; the runtime enqueues handover.review again (next action handover-review)`;
   }
   if (handover?.due) {
-    return `every approved leg settled and no current owner approval exists; enqueue handover.review as the final leg (--paths .starciwork/evidence/${workflowId}.handover) — starci kernel finish refuses handover-not-approved until the owner approves`;
+    return `every approved leg settled and no current owner approval exists; the runtime enqueues handover.review as the final leg (next action handover-review, --paths .starciwork/evidence/${workflowId}.handover) — starci kernel finish refuses handover-not-approved until the owner approves`;
   }
   return null;
 }

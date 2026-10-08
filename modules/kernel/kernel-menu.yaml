@@ -11,8 +11,8 @@ id: kernel.menu
 about:
   en: >-
     Mechanical work never appears here: the runtime does it in its controllers. An item is a point of judgment (more than one legitimate
-    answer given the ledger), a duty only the Kernel can attest (the runtime revision), or the handover step the runtime does not yet do
-    itself (mode mechanical-pending).
+    answer given the ledger) or a duty only the Kernel can attest (the runtime revision). A handover that is due, and a handover ask the
+    owner answered approve or question, are the runtime's: the next action of origin handover-review.
 
 # Every menu carries this typed escape. It records the decision, then escalates along the role chain of modules/kernel/roles.yaml.
 escape:
@@ -48,6 +48,7 @@ origins:
   - {id: supervisor-gate, kind: supervisor-gate, class: wait, doneBy: "the Supervisor rules on the gate; its resolution wakes the Kernel"}
   - {id: owner-gate, kind: owner-gate, class: wait, doneBy: "the owner's step; the answer wakes the Kernel"}
   - {id: pending-ask, kind: owner-gate, class: wait, doneBy: "the owner's answer (or the autopilot's) wakes the Kernel"}
+  - {id: handover-review, kind: dispatch, class: mechanical, doneBy: "Job controller: the enqueue move of handover.review on the handover evidence path, when the handover is due or its ask was answered approve or question (scripts/kernel/handover-move.mjs)"}
   - {id: credential-step, kind: dispatch, class: mechanical, fallback: move-unbuilt, doneBy: "Job controller: the enqueue move of the one provision.ask whose question lists every deferred credential"}
   - {id: in-flight, kind: wait, class: wait, doneBy: "the running leg"}
   - {id: queued-wait, kind: wait, class: wait, doneBy: "the cause queuedBecause names; the runtime re-evaluates it on every pass"}
@@ -71,8 +72,8 @@ frontier:
   - {state: worker-question, class: judgment, kind: worker-question}
   - {state: worker-wedged, class: judgment, kind: worker-wedged}
   - {state: peer-message, class: judgment, kind: peer-message}
-  - {state: handover-answered, class: pending, kind: handover-step}
-  - {state: handover-due, class: pending, kind: handover-step}
+  - {state: handover-answered, class: judgment, kind: handover-step, why: "only a defect the owner reported (answer feedback) is the Kernel's: which slice or record it concerns is a judgment; an approve or a question is the handover-review move"}
+  - {state: handover-due, class: mechanical, doneBy: "Job controller: the handover-review move (scripts/kernel/handover-move.mjs)"}
   - {state: next-ready, class: nextActions, doneBy: "each next action by its origin above"}
   - {state: orphaned-frontier, class: judgment, kind: decision-item}
 
@@ -162,8 +163,8 @@ kinds:
       - {choice: enqueue-by-hand, direct: true, effect: "run directly: starci kernel enqueue as the situation names it, with the unit's write set"}
 
   - id: handover-step
-    mode: mechanical-pending
-    source: "frontier states handover-due and handover-answered"
+    mode: judgment
+    source: "frontier state handover-answered with the decision feedback"
     question: "{situation}"
     # A defect the owner reported (answer feedback) is routed to the fix of the slice it names: one choice per slice the workflow built
     # (scripts/kernel/handover-slices.mjs: the unit of a build-family op that passed), validated by `starci kernel decide` against the
@@ -176,5 +177,3 @@ kinds:
         - {choice: route-requirement-gap, op: business.revise, effect: "the note says the requirement itself is wrong: enqueues business.revise on the record in --text"}
         - {choice: route-design-gap, op: architecture.revise, effect: "the note says the design itself is wrong: enqueues architecture.revise on the record in --text"}
         - {choice: route-interface-gap, op: interface.draw, effect: "the note says the drawing itself is wrong: enqueues interface.draw on the record in --text"}
-    options:
-      - {choice: rerun-handover-review, steps: [{verb: enqueue, args: {workflow: $workflow, op: handover.review, paths: $paths}}], effect: "enqueues handover.review, which asks the owner (or applies the owner's answer) and hands over again"}
