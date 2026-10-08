@@ -36,6 +36,8 @@ const SKIP_DIR_NAMES = new Set([
   '.venv',
   'worktrees',
   'coverage',
+  // Turbo's task cache of an example app (examples/<app>/.turbo/cache): build output, git-ignored by the app's own managed .gitignore.
+  '.turbo',
   // Scratch files (lint reports, perf baselines) under examples/; not authored source.
   'ex-testing',
   // Gitignored local credentials (ui/.secrets); never authored source and never committed.
