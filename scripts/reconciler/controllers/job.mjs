@@ -438,7 +438,7 @@ export default {
   concurrency: 2,
   timeoutMs: 960_000,
   routes: {
-    'op-dispatched': jobRoute, 'op-reported': jobRoute, 'report-filed': jobRoute, 'report-consumed': jobRoute, 'checks-recorded': jobRoute, 'op-settled': jobRoute,
+    'op-dispatched': jobRoute, 'report-filed': jobRoute, 'report-consumed': jobRoute, 'checks-recorded': jobRoute, 'op-settled': jobRoute,
     'op-auto-settled': jobRoute, 'job-settle-*': jobRoute, 'worker-*': jobRoute, 'incident-raised': wfRoute, 'incident-resolved': wfRoute,
   },
   async list(ctx) {

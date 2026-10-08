@@ -38,6 +38,7 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 - The `TERMINAL_COUNT_DRIFT` clock counts only the tabs the runtime titled (`[Kernel]`, `[Op]`, `[Worker]`, `[Supervisor]`), not the owner's own terminals, and a violated clock runs the dedupe pass once per SLA window; before, it counted every Orca terminal, stayed open for twenty hours and named an auto-action nothing performed (`scripts/reconciler/terminal-drift.mjs`).
 - One extractor owns "a documented command exists": `scripts/checks/lib/doc-commands.mjs` (moved out of `tests/helpers/doc-commands.mjs`, split to pass the Sonar rules). The prose-commands self-check (R230) and the doc-command specs call it; before, two code paths decided what a command is and disagreed on a regex written into a yaml value.
 - The land gate's `direct` and `touching` selections add the specs that spawn the CLI and run a verb whose handler reaches a changed file (`scripts/supervisor/land-cli-specs.mjs`; the verbs importing a changed file themselves, then the nearest others up to `allocation.landGate.cliVerbs`). A change to a shared verb helper passed the gate and broke 13 such specs, which no import of theirs reached and the 24-spec smoke bound left out.
+- The dead `op-reported` route key of the Job controller and `reconciler.yaml` is removed (nothing emitted it; `report-filed` is the event a filed report records) and is refused by name.
 
 ## [1.0.0-alpha.7] — 2026-10-08
 

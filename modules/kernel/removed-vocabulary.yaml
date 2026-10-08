@@ -200,3 +200,9 @@ removed:
     use: "the Kernel answers the items of its menu; the runtime performs the mechanical next actions"
     since: 1.0.0-alpha.8
     match: 'run nextActions|run each\s+in order and never choose'
+  - id: event-op-reported
+    kind: vocabulary
+    name: op-reported
+    use: 'the event a filed report records is report-filed; no event named op-reported was ever emitted'
+    since: 1.0.0-alpha.8
+    match: '(?<![\w-])op-reported(?![\w-])'
