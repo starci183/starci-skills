@@ -45,7 +45,7 @@ export function liveRowsMissing({ repo, providers = SETTLE_SMOKE_PROVIDERS, now 
   let listed = null;
   const once = () => { listed ??= accountList(); return listed; };
   const read = probe ?? ((provider) => probeOrcaAccount(provider, { now, policy, accountList: once }));
-  for (const provider of providers.filter(polled)) {
+  for (const provider of providers.filter((provider) => polled(provider))) {
     const need = quotaNeed(provider, read(provider), { now, policy });
     if (need) missing.push(need);
   }

@@ -194,7 +194,7 @@ const peerMovable = (s, op) => !s.jobsByOp.has(op) && !s.peerHeldOps.has(op)
 const graphPhase = (s) => {
   const { db, workflowId, wf, internals } = s;
   const { ACTIONABLE_FRONTIER_STATES, NEXT_ACTION_MOVES, graphProjectionOf, opRevDriftOf, rereadActionOf, runningOpRevDriftOf } = internals;
-  s.graph = graphProjectionOf(db, { wf, legOps: s.legOps, planAncestors: s.planAncestors, workflowJobs: s.workflowJobs, jobsByOp: s.jobsByOp, failedRows: s.failedRows, queued: s.queued, ownerGates: s.ownerGates, peerWaits: s.peerWaits, awaitingOwner: s.awaitingOwner, staleReady: s.staleReady, staleProofs: s.staleProofs, credentialWaitOps: s.credentialWaitOps, approvalWaitOps: s.approvalWaitOps, workGraph: s.workGraph, assetSlotsOwed: s.assetSlotsOwed, autopilot: s.autopilotView.graph });
+  s.graph = graphProjectionOf(db, { wf, legOps: s.legOps, planAncestors: s.planAncestors, workflowJobs: s.workflowJobs, jobsByOp: s.jobsByOp, failedRows: s.failedRows, queued: s.queued, ownerGates: s.ownerGates, peerWaits: s.peerWaits, awaitingOwner: s.awaitingOwner, staleReady: s.staleReady, staleProofs: s.staleProofs, credentialWaitOps: s.credentialWaitOps, approvalWaitOps: s.approvalWaitOps, workGraph: s.workGraph, assetSlotsOwed: s.assetSlotsOwed, autopilot: s.autopilotView.graph, handover: s.handover });
   // The runtime rev the Kernel acked against the runtime's HEAD (runtime-rev.mjs): a stale Kernel re-reads the
   // changed kernel files and acks before anything else, and enqueue/dispatch of a leg whose op contract changed
   // is refused kernel-rev-stale until it does. op-rev-drift: settled legs whose op contract moved after dispatch.

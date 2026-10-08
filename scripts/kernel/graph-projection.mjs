@@ -16,6 +16,7 @@ import { SEAM_PRIORITY_CLASS, SEAM_RECONCILE_CHECK } from './seam-policy.mjs';
 import { ASSET_OP } from '../work/asset-slot.mjs';
 import { retryMoveOf } from './retry-move.mjs';
 import { enqueueMove, legPathsOf, rerunMoveOf, withMove } from './next-moves.mjs';
+import { handoverReviewAction } from './handover-move.mjs';
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const ownerLanguage = () => ownerLanguageOf();
 
@@ -276,7 +277,7 @@ const terminalHoldsOf = (ctx) => {
   const asked = ownerWaitsWithoutAsk(awaitingOwner).map((item) => ({ jobId: item.jobId, op: item.opId, ...holdView(TERMINAL_HOLDS.ownerWaitNoAsk) }));
   return [...failed, ...asked];
 };
-export function graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsByOp, failedRows, queued, ownerGates, peerWaits, awaitingOwner, staleReady, staleProofs = [], credentialWaitOps = new Set(), approvalWaitOps = new Set(), workGraph = null, assetSlotsOwed = [], autopilot = null }) {
+export function graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsByOp, failedRows, queued, ownerGates, peerWaits, awaitingOwner, staleReady, staleProofs = [], credentialWaitOps = new Set(), approvalWaitOps = new Set(), workGraph = null, assetSlotsOwed = [], autopilot = null, handover = null }) {
   if (wf.phase === 'finished') return { nextActions: [], legs: [], terminal: [] };
   const unresolved = unresolvedFailures(db, failedRows, workflowJobs);
   const rowOf = new Map(workflowJobs.map((row) => [row.job_id, row]));
@@ -309,6 +310,8 @@ export function graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs,
   gateActions(actions, ctx);
   pendingAskActions(actions, ctx);
   credentialStepAction(actions, ctx);
+  const handoverAction = handoverReviewAction(handover, wf.workflow_id);
+  if (handoverAction) actions.push(handoverAction);
   inFlightWaitActions(actions, ctx);
   queuedWaitActions(actions, ctx);
   peerWaitActions(actions, ctx);

@@ -228,11 +228,13 @@ returns:
     jobId, ask:{dispatchId, jobId, attempt, state, decision, answeredBy, byOwner, note,
     receiptPath}|null, approvedSeq, lastBusinessSettleSeq, finishAllowed, finishRefusal?} — the
     owner handover (scripts/kernel/handover.mjs handoverProjection; driver-loop.yaml handoverLoop).
-    With no operation open it decides three frontier states, each actionable: `handover-answered`
+    With no operation open it decides three frontier states: `handover-answered`
     (the latest handover ask was answered and nothing acted on it yet; reason names the move per
-    decision) and `finish-ready` (a handover-approved event newer than the last business settle: run
+    decision; only a reported defect, the decision feedback, wakes the Kernel, an approve or a question is the
+    next action `handover-review` the Job controller performs) and `finish-ready` (a handover-approved event newer than the last business settle: run
     starci kernel finish) stand before ask-reserve; `handover-due` (every approved leg other than the handover
-    holds a succeeded job, no current approval, no other answered ask left to re-enqueue) stands
+    holds a succeeded job, no current approval, no other answered ask left to re-enqueue; the Job controller
+    enqueues handover.review as the next action `handover-review`) stands
     before orphaned-frontier. A pending handover ask is `awaiting-owner` like any other ask"
   frontier.staleOperations: "[{jobId, op, attempt, cut?, heldBy?, followUp?, breakingBy?[], paths[]}]
     — staleInput grouped per job: settled work whose product Work inputs changed in a way that owes

@@ -224,3 +224,9 @@ removed:
     use: 'the Job controller enqueues a red node, a stale proof or attempt, the asset leg and the credential ask itself (scripts/kernel/next-moves.mjs); the Kernel menu keeps leg-ready, draw-redraw, seam-duty and move-unbuilt'
     since: 1.0.0-alpha.8
     match: '(?<![\w-])(?:node-rework|stale-redispatch|enqueue-asset-leg|enqueue-credential-ask|rework-node)(?![\w-])'
+  - id: vocab-handover-step-mechanical-pending
+    kind: vocabulary
+    name: the handover-step menu mode mechanical-pending and its choice rerun-handover-review
+    use: 'the Job controller enqueues handover.review itself when the handover is due or its ask was answered approve or question (next action handover-review, scripts/kernel/handover-move.mjs); the handover-step item holds only the typed routing of a reported defect'
+    since: 1.0.0-alpha.8
+    match: '(?<![\w-])(?:mechanical-pending|rerun-handover-review)(?![\w-])'

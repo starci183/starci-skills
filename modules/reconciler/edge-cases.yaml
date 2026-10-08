@@ -635,9 +635,10 @@ cases:
     status: covered
   - id: menu-handover-rerun-still-pending
     family: smooth-operation
-    met: {date: "2026-10-09", where: "the wave 3 pass over the pending menu origins", evidence: "modules/kernel/kernel-menu.yaml kind handover-step, mode mechanical-pending"}
-    status: open
-    why: "handover-due, and a handover answered approve or question, are each one enqueue of handover.review on the fixed handover evidence path: nothing is judged, yet the Kernel still answers them from its menu; the move needs the handover projection (state, due, ask decision) in the status the Job controller reads, then the same once-per-process move as the other origins"
+    met: {date: "2026-10-09", where: "the wave 3 pass over the pending menu origins", evidence: "modules/kernel/kernel-menu.yaml kind handover-step answered handover-due and approve or question answers from the menu"}
+    rule: {file: scripts/kernel/handover-move.mjs, anchor: "handoverReviewAction"}
+    spec: tests/reconciler-controllers/handover-review-move.spec.mjs
+    status: covered
   - id: debug-questions-lacked-four-signals
     family: record-vs-reality
     finding: {role: runtime, duty: does, verdict: departs, evidence: "four of Debug's nine unanswerable questions needed a signal the runtime could emit where the fact occurs: a guard refusal with its role, the loosening on the land record, a critic-run event and the wake-tagged usage rows", remedy: {state: in-tree, change: "refusals.jsonl rows carry the role and the CLI dispatcher logs its RUNTIME_CHANGE_OWNED_BY_DEBUG refusals; land_runs.specs_json holds the loosening with its approval id; settle appends a critic-run event per draw loop; the digest answers fr-wake-acted from the wake-tagged usage rows"}}

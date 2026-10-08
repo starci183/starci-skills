@@ -153,14 +153,13 @@ function feedbackOptionsOf(feedback, slices, subject) {
 }
 
 const handoverItems = (handover, workflow, report) => {
-  if (!['answered'].includes(handover?.state) && !handover?.due) return [];
+  // Only a reported defect is the Kernel's; a due handover and an approve or question answer are the handover-review move (scripts/kernel/handover-move.mjs).
+  if (!(handover?.state === 'answered' && handover.ask?.decision === 'feedback')) return [];
   const paths = `.starciwork/evidence/${workflow}.handover`;
-  const feedback = handover.state === 'answered' && handover.ask?.decision === 'feedback';
   const spec = kindOf('handover-step');
-  const state = handover.state === 'answered' ? 'answered' : 'due';
-  const situation = feedback ? `the owner reported a defect on handover ask ${handover.ask.dispatchId}` : `handover is ${state}`;
+  const situation = `the owner reported a defect on handover ask ${handover.ask.dispatchId}`;
   const subject = { workflow, paths, situation, title: report?.title };
-  const options = feedback ? feedbackOptionsOf(spec.feedback, report?.slices ?? [], subject) : (spec.options ?? []).map((option) => optionOf(option, subject));
+  const options = feedbackOptionsOf(spec.feedback, report?.slices ?? [], subject);
   return [itemOf('handover-step', { key: workflow, subject, options })];
 };
 
@@ -185,5 +184,5 @@ export function buildMenu(sources) {
   ];
   const seen = new Set();
   return items.filter((item) => !sources.snoozed.has(item.id) && !seen.has(item.id) && seen.add(item.id))
-    .sort((a, b) => (a.mode === 'duty' ? 0 : 1) - (b.mode === 'duty' ? 0 : 1) || (a.mode === 'mechanical-pending' ? 1 : 0) - (b.mode === 'mechanical-pending' ? 1 : 0) || sinceOf(a) - sinceOf(b));
+    .sort((a, b) => (a.mode === 'duty' ? 0 : 1) - (b.mode === 'duty' ? 0 : 1) || sinceOf(a) - sinceOf(b));
 }

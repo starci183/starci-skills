@@ -226,9 +226,10 @@ test('finish is refused without the owner approval and allowed after it; a later
   assert.equal(read(repo,db=>db.prepare('SELECT phase FROM workflows WHERE workflow_id=?').get(wf).phase),'running','a refused finish writes nothing');
 
   let s=await status(repo,wf);
-  assert.deepEqual([s.frontier.state,s.frontier.actionable,s.handover.state,s.handover.due],['handover-due',true,'not-started',true],
-    'every approved leg settled: the handover is the Kernel\'s next move');
-  assert.match(s.frontier.reason,/enqueue handover\.review as the final leg/);
+  assert.deepEqual([s.frontier.state,s.frontier.actionable,s.handover.state,s.handover.due],['handover-due',false,'not-started',true],
+    'every approved leg settled: the handover is the runtime\'s next move, the Kernel has nothing to decide');
+  assert.match(s.frontier.reason,/enqueues handover\.review as the final leg/);
+  assert.deepEqual(s.nextActions.filter((action)=>action.origin==='handover-review').map((action)=>action.move.args),[{workflow:wf,op:'handover.review',paths:`.starciwork/evidence/${wf}.handover`}]);
 
   await handOver(repo,wf,{attempt:1,dispatchId:'ho-d1'});
   s=await status(repo,wf);
@@ -237,8 +238,9 @@ test('finish is refused without the owner approval and allowed after it; a later
 
   answer(repo,wf,{dispatchId:'ho-d1',optionIndex:0});
   s=await status(repo,wf);
-  assert.deepEqual([s.frontier.state,s.frontier.actionable,s.handover.ask.decision,s.handover.ask.byOwner],['handover-answered',true,'approve',true]);
-  assert.match(s.frontier.reason,/enqueue handover\.review again/);
+  assert.deepEqual([s.frontier.state,s.frontier.actionable,s.handover.ask.decision,s.handover.ask.byOwner],['handover-answered',false,'approve',true]);
+  assert.match(s.frontier.reason,/enqueues handover\.review again/);
+  assert.equal(s.nextActions.filter((action)=>action.origin==='handover-review').length,1,'an approve is the handover-review move, not a menu item');
   assert.equal((await run('finish','--repo',repo,'--workflow',wf,'--json')).status===0,false,'an answer is not yet the recorded approval');
 
   const settled=await settleApproval(repo,wf,{attempt:2,dispatchId:'ho-d2'});
@@ -327,6 +329,7 @@ test('feedback and question answers are the Kernel\'s move, and a passed fix mak
   s=await status(repo,wf);
   assert.deepEqual([s.frontier.state,s.handover.ask.decision],['handover-answered','question']);
   assert.match(s.frontier.reason,/answers it in the package/);
+  assert.deepEqual([s.frontier.actionable,s.menu.length,s.nextActions.filter((action)=>action.origin==='handover-review').length],[false,0,1],'a question is the handover-review move, not a menu item');
 });
 
 test('a defect reported on the handover is routed by a typed choice per slice the workflow built, and the choice reopens that slice through enqueue',async t=>{
