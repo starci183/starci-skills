@@ -41,6 +41,7 @@ Theme: the roles are one declared contract, the system recovers from a host rest
 - A whitespace normaliser in the gate re-raise check collapsed the letter `s` instead of whitespace.
 - The published canon packages lacked `config.example.yaml`, which their bundled engine reads.
 - The `starci` skill's goal reference taught the removed routing-bias field.
+- The repository's `package.json` carried a `pretest` hook the release cut refuses; the hook is gone (the spec preload already regenerates the runtime copies) and a spec binds the real test script the way the cut does.
 
 ### Known limitations
 - SonarCloud has not scanned this commit; the local `sonar-rules` gate reproduces 16 of the 17 findings of the previous scan and misses optional chains that need type information.
