@@ -53,6 +53,7 @@ supervisor:
     - supervisor-experiment
 rotation:
   kernel: {afterWakes: 8, afterTokens: 12000000, event: kernel-rotated, bootEvents: [kernel-booted, kernel-restarted]}
+  supervisor: {afterWakes: 8, afterTokens: 40000000, minIntervalMs: 3600000, event: supervisor-rotated, bootEvents: [supervisor-booted, supervisor-restarted, supervisor-adopted]}
 statusBounds:
   kernelMenuItems: 6
   kernelTextChars: 3500

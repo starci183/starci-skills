@@ -36,6 +36,7 @@ import {
   supervisorMode, terminalSignalDb, supervisorLog, DEFAULTS,
 } from '../machine/home.mjs';
 import { seatHealth } from './start-supervisor.mjs';
+import { planRotation } from './seat-rotation.mjs';
 import { jobsOf, reportOf } from './workers.mjs';
 import { workerTerminalClosed } from './worker-state.mjs';
 import { openMachine, withMachine } from '../../engine/db/machine.mjs';
@@ -206,6 +207,10 @@ async function hostDeps() {
     enter: (terminal) => wake.sendEnterWithProof({ terminal }),
     quit: (handle, agent) => quitMod.quitAgent({ handle, agent }),
     close: (handle) => closeMod.closeOperationTerminal(handle),
+    rotate: (handover) => {
+      const r = runNode([START_FILE, '--rotate', '--reason', handover, '--json'], { cwd: SKILL_ROOT, timeout: 600_000 });
+      try { return JSON.parse(String(r.stdout ?? '').trim().split(/\r?\n/).pop()); } catch { return { ok: false, action: 'replace-failed', error: String(r.stderr || r.stdout || `exit ${r.status}`).slice(0, 300) }; }
+    },
     replace: () => {
       const r = runNode([START_FILE, '--replace', '--json'], { cwd: SKILL_ROOT, timeout: 600_000 });
       try { return JSON.parse(String(r.stdout ?? '').trim().split(/\r?\n/).pop()); } catch { return { ok: false, action: 'replace-failed', error: String(r.stderr || r.stdout || `exit ${r.status}`).slice(0, 300) }; }
@@ -343,11 +348,13 @@ export function sweepWorkers(m, d, { now = Date.now() } = {}) {
 }
 
 /** Replace the seat through the host seam, repair the new seat's tab titles and log the replacement: the pass outcome, `fields` after `action`. */
-function replaceSeat(deps, env, label, fields = {}) {
-  const replaced = deps.replace();
+function replaceSeat(deps, env, label, fields = {}, handover = null) {
+  const replaced = handover ? deps.rotate(handover) : deps.replace();
   const titleRepairs = replaced?.ok && replaced?.terminal ? repairSupervisorTabTitles(replaced.terminal, [], deps) : [];
   supervisorLog('watchdog', `${label}: ${JSON.stringify(replaced)}`, { env });
-  return { ok: replaced?.ok !== false, action: replaced?.action === 'booted' || replaced?.action === 'restarted' ? 'restarted' : (replaced?.action ?? 'replace-failed'), ...fields, detail: replaced, ...(titleRepairs.length ? { titleRepairs } : {}) };
+  const launched = replaced?.action === 'booted' || replaced?.action === 'restarted';
+  const launchedAction = handover ? 'rotated' : 'restarted';
+  return { ok: replaced?.ok !== false, action: launched ? launchedAction : (replaced?.action ?? 'replace-failed'), ...fields, detail: replaced, ...(titleRepairs.length ? { titleRepairs } : {}) };
 }
 
 /** The seat's standing: `{ result }` ends the pass (disabled, starting, unverified, dead and replaced), otherwise `{ health }` of a live seat. */
@@ -438,6 +445,8 @@ function wakeLiveSeat({ m, deps, env, now, settings, terminal }) {
   if (state === 'turn-idle') { frame = deps.screen(terminal); busy = busyScreen(frame) ? 'subagents-running' : null; }
   if (busy && FROZEN_BUSY.has(busy)) return wakeFrozenSeat({ m, deps, env, now, settings, terminal, plan, sweep, busy, frame });
   if (busy) return { ok: true, action: 'busy', state: busy, terminal, pending: plan.tags };
+  const rotation = planRotation(m, now());
+  if (rotation) { m.close(); return replaceSeat(deps, env, 'rotation', { terminal, rotation: rotation.reason }, rotation.handover); }
   return wakeIdleSeat({ m, deps, env, now, terminal, plan, sweep });
 }
 

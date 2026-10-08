@@ -56,6 +56,8 @@ import { setPriority } from '../api/process/set-priority.mjs';
 import { runNode } from '../api/node/run-node.mjs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { detachedLandLine, startDetachedLand } from './land-detach.mjs';
+import { landQueue, landStatus } from './land-status.mjs';
+export { landQueue, landStatus };
 import { parseYaml } from '../../engine/yaml.mjs';
 import { allocationMs, allocationSettings, harnessSpecsEnabled } from '../../engine/config.mjs';
 import { git, normPath } from './workers.mjs';
@@ -589,11 +591,6 @@ export function landCommits({ commits, specs = [], specMode = 'touching', root =
   return { ...result, reason: 'main-moving', detail: `main moved under the gate ${MAX_MAIN_RETRIES} times` };
 }
 
-/** The open tickets of the land queue, oldest first ({ticketId, lane, commit, state, requestedBy, enqueuedAt}). */
-export function landQueue({ env = process.env } = {}) {
-  return readMachine((m) => m.landQueue().map((t) => ({ ticketId: t.ticket_id, lane: t.lane, commit: t.commit_sha, state: t.state, requestedBy: t.requested_by, enqueuedAt: t.enqueued_at })), [], { env });
-}
-
 const claimGate = (env, ticketId) => {
   try { return withMachine((m) => m.claimLandGate({ ticketId }), { env }); }
   catch (error) { if (!isMachineBusy(error)) { throw error; } return { ok: false, dbBusy: error.message }; }
@@ -734,13 +731,6 @@ export async function land({ jobId = null, commits = null, specs = [], reason = 
   if (!lock.ok) return refuseLand(c, gateBusyResult(c, lock));
   const gate = { state: 'cancelled' };
   try { return landInsideGate(c, { lock, plan, reason, notify, target, gate }); } finally { lock.release(gate.state); }
-}
-
-/** The gate for /status: {busy, current, queued}. */
-export function landStatus({ env = process.env } = {}) {
-  const queue = landQueue({ env });
-  const current = queue.find((t) => t.state === 'running') ?? null;
-  return { busy: Boolean(current), current, queued: queue.filter((t) => t.state === 'queued').length };
 }
 
 if (isMain(import.meta.url)) {
