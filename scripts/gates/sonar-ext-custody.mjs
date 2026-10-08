@@ -1,76 +1,34 @@
-// sonar-ext-custody.mjs — custody plumbing of sonar-local.mjs: launching a .mjs fake under node,
-// and sealing a minted analysis token into a runtime extension's ext/<service>/secrets directory (the example apps' tokens).
+// sonar-ext-custody.mjs — custody plumbing of sonar-local.mjs: launching a .mjs fake under node, and reading one custody reference
+// (a sops member of a repository's .starcistacks tree, its materialized sibling, or a secret.env variable named `env:NAME`).
 import fs from 'node:fs';
 import path from 'node:path';
-import {skillRoot} from '../../engine/runtime-root.mjs';
-import {encrypt} from '../api/sops/encrypt.mjs';
 import {decrypt} from '../api/sops/decrypt.mjs';
 import {sonarAnalysisEnvironment} from './sonar-credentials.mjs';
 import {resolveSops} from '../api/sops/resolve-sops.mjs';
 import {runProgram} from '../api/process/run-program.mjs';
 import {resolveRealTool} from '../api/process/resolve-real-tool.mjs';
-import { tempPath } from '../api/fs/temp-path.mjs';
+import {isEnvironmentReference,readEnvironmentCustody} from './sonar-host-secrets.mjs';
 
 const sopsInvocation=Object.freeze({runProgram,resolveRealTool});
 
 /** A .mjs/.js "binary" (the specs' fake sops) runs under this node; anything else runs directly. */
 export const launcher=(bin,args)=>/\.[cm]?js$/i.test(bin)?[process.execPath,[bin,...args]]:[bin,args];
 
-/** A runtime extension's custody directory: <runtime>/ext/<service>/secrets, a host tree no stack-secret tool manages. */
-export const extSecretsDir=file=>{
-  const dir=path.dirname(file);
-  if(path.basename(dir)!=='secrets')return null;
-  const ext=path.dirname(path.dirname(dir));
-  return path.basename(ext)==='ext'&&(path.dirname(ext)===skillRoot||path.basename(path.dirname(ext))==='.claude')?dir:null;
-};
-
-/** The one age recipient the sealed members of an extension custody directory share; null when there is none or they differ. */
-function extRecipient(dir){
-  const recipients=new Set();
-  for(const name of fs.existsSync(dir)?fs.readdirSync(dir):[]){
-    if(!name.endsWith('.enc'))continue;
-    try{for(const r of JSON.parse(fs.readFileSync(path.join(dir,name),'utf8')).sops?.age??[])if(typeof r.recipient==='string')recipients.add(r.recipient);}catch{/* not a sops json member */}
-  }
-  return recipients.size===1?[...recipients][0]:null;
-}
-
-/**
- * Seal a value as a member of a runtime extension's custody (ext/<service>/secrets) with sops, to the recipient its
- * sealed siblings already share: the same recipient, never a new key. Only the .enc twin is written. The value
- * travels through a 0600 temp file read by sops - never argv.
- */
-export function sealExtCustody(cfg,file,value,{scrub}){
-  const dir=extSecretsDir(file);
-  const recipient=extRecipient(dir);
-  if(!recipient)return {ok:false,reason:`${path.basename(dir)} holds no sealed member with exactly one age recipient to seal to`};
-  const env=sonarAnalysisEnvironment(cfg);
-  const sops=cfg.sops??resolveSops(env,{pathext:true,wingetPackageTree:true});
-  const tmp=tempPath(`sonar-local-${process.pid}-${Date.now().toString(36)}`);
-  try{
-    fs.writeFileSync(tmp,value,{mode:0o600});
-    const command=['--encrypt','--age',recipient,'--input-type','binary','--output-type','json',tmp];
-    const [bin,args]=sops?launcher(sops,command):[null,command];
-    const result=encrypt(bin,args,{identity:cfg.identity,env,invocation:sopsInvocation,timeout:cfg.timeoutMs});
-    if(result.error?.identityRefusal)return {ok:false,identityRefusal:result.error.identityRefusal,reason:result.error.message};
-    if(result.status!==0||!String(result.stdout??'').trim())return {ok:false,reason:scrub(`sops --encrypt of ${path.basename(file)} exited ${result.status}: ${String(result.stderr).trim().split(/\r?\n/).slice(-2).join(' ')}`)};
-    fs.writeFileSync(`${file}.enc`,result.stdout);
-    return {ok:true};
-  }finally{
-    try{fs.rmSync(tmp,{force:true});}catch{/* best effort */}
-  }
-}
-
 const custodyInside=(cfg,ref,plainFile)=>path.isAbsolute(String(ref))
-  ?/[\\/]\.starcistacks[\\/]/.test(plainFile)||/[\\/]\.claude[\\/]ext[\\/]/.test(plainFile)||plainFile.startsWith(path.join(skillRoot,'ext')+path.sep)
+  ?/[\\/]\.starcistacks[\\/]/.test(plainFile)
   :plainFile.startsWith(cfg.stackDir+path.sep);
+
+/** The sops result of decrypting one binary-store .enc member: the owner's call file, the identity the environment selects, the selected tool or the one found. */
+export const decryptMember=({env,sops=null,identity=null,timeoutMs},enc)=>{
+  const tool=sops??resolveSops(env,{pathext:true,wingetPackageTree:true});
+  const command=['--decrypt','--input-type','binary','--output-type','binary',enc];
+  const [bin,args]=tool?launcher(tool,command):[null,command];
+  return decrypt(bin,args,{env,identity,invocation:sopsInvocation,maxBuffer:1024*1024,timeout:timeoutMs});
+};
 
 /** The .enc member decrypted by sops: a read verdict, or null after recording why it could not serve. */
 const decryptCustody=(cfg,enc,name,reasons,remember)=>{
-  const env=sonarAnalysisEnvironment(cfg);
-  const sops=cfg.sops??resolveSops(env,{pathext:true,wingetPackageTree:true});
-  const command=['--decrypt','--input-type','binary','--output-type','binary',enc];
-  const [bin,args]=sops?launcher(sops,command):[null,command];
-  const result=decrypt(bin,args,{env,identity:cfg.identity,invocation:sopsInvocation,maxBuffer:1024*1024,timeout:cfg.timeoutMs});
+  const result=decryptMember({env:sonarAnalysisEnvironment(cfg),sops:cfg.sops,identity:cfg.identity,timeoutMs:cfg.timeoutMs},enc);
   if(result.error?.identityRefusal)return {present:false,name,identityRefusal:result.error.identityRefusal,reason:result.error.message};
   const value=result.status===0?String(result.stdout??'').trim():'';
   if(value)return {present:true,value:remember(value),via:'sops',name};
@@ -89,9 +47,9 @@ const decryptCustody=(cfg,enc,name,reasons,remember)=>{
  */
 export function readCustody(cfg,ref,{remember}){
   // A relative reference is a member of the configured stack; an absolute one (a declaration credential,
-  // resolved from its repository root) must still sit inside a custody tree - a repository's
-  // .starcistacks or a runtime's extension tree (.claude/ext/<service>, or this runtime's own ext/ when it is a
-  // lane worktree, where a host custody path resolves - scripts/gates/runtime-host.mjs resolveCustodyFile).
+  // resolved from its repository root) must still sit inside a repository's .starcistacks custody tree. A reference
+  // `env:NAME` is a secret.env variable of the resolved environment.
+  if(isEnvironmentReference(ref))return readEnvironmentCustody(sonarAnalysisEnvironment(cfg),ref,{remember});
   const plainFile=path.resolve(cfg.stackDir,ref);
   const name=String(ref).replaceAll('\\','/');
   const inside=custodyInside(cfg,ref,plainFile);

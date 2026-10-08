@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { envFacts, envFindings, parseCatalog } from '../../scripts/checks/check-env.mjs';
+import { envFacts, envFindings, exampleNamesOf, parseCatalog } from '../../scripts/checks/check-env.mjs';
 
 // ENV_CATALOGUED: every environment variable is catalogued and read through one owner.
 const catalog = (names) => ({ reader: 'scripts/lib/env.mjs', variables: Object.fromEntries(names.map((n) => [n, { purpose: 'a variable', kind: 'config' }])) });
@@ -55,4 +55,10 @@ test('a readEnv call and a spelled-out name count as reading a catalogued variab
   assert.deepEqual(envFacts("export const a = () => readEnv('ORCA_CLI_COMMAND', env);\n").reads, [{ name: 'ORCA_CLI_COMMAND', line: 1, direct: false }]);
   assert.deepEqual(run([{ rel: 'scripts/a.mjs', text: "export const a = (env) => readEnv('ORCA_CLI_COMMAND', env);\nexport const SET = new Set(['SOPS_AGE_KEY']);\nexport const c = () => readEnv('ComSpec');\n" }], ['ORCA_CLI_COMMAND', 'SOPS_AGE_KEY', 'COMSPEC']), []);
   assert.deepEqual(run([{ rel: 'scripts/a.mjs', text: "export const a = (env) => readEnv('GONE_X', env);\n" }], []), [['RT_ENV_UNCATALOGUED', 'scripts/a.mjs']]);
+});
+
+test('secret.env.example lists a name set or commented out, with or without a space after the hash, and ignores prose lines', () => {
+  const text = ['SONAR_TOKEN=', '# CLOUDFLARE_TUNNEL_TOKEN=', '#TELEGRAM_BOT_TOKEN=', '#   SONARQUBE_DB_PASSWORD=', '# SONARQUBE_ADMIN_TOKEN: prose naming a variable', '# lowercase=not-a-name', ''].join('\n');
+  const names = exampleNamesOf(text);
+  assert.deepEqual([...names].sort(), ['CLOUDFLARE_TUNNEL_TOKEN', 'SONARQUBE_DB_PASSWORD', 'SONAR_TOKEN', 'TELEGRAM_BOT_TOKEN']);
 });

@@ -22,7 +22,9 @@ import {coverageScopeOf,coverageTargetOf,judgeDashboard,loadSonarGate,serverCond
 import { evaluateSlice as evaluateSliceCore } from './sonar-slice.mjs';
 import { acceptFirst, readPages, readWithTokens, syncConditions } from './sonar-sequential.mjs';
 import {text} from '../lib/stack-declaration.mjs';
-import {extSecretsDir,sealExtCustody,readCustody} from './sonar-ext-custody.mjs';
+import {readCustody} from './sonar-ext-custody.mjs';
+import {ADMIN_TOKEN_ENV,environmentReference} from './sonar-host-secrets.mjs';
+import {stackStop,stackUp} from './sonar-stack.mjs';
 import {inspectOwnerConfig,specsSettings} from '../../engine/config.mjs';
 import {createRequire} from 'node:module';
 import { isSpecRun } from '../lib/env.mjs';
@@ -84,7 +86,6 @@ const SCAN_SCHEMA='starci/sonar-local-scan@3';
 const DEFAULT_HOST='http://localhost:9010';
 const PUBLIC_HOST='https://sonar.starci.org';
 const CONTAINER='starci-sonarqube';
-const ADMIN_TOKEN='sonarqube-admin-token.key';
 const ANALYSIS_TOKEN='sonarqube-analysis-token.txt';
 /** The Supervisor audit event (sup_events) a re-mint of a token the server rejected records. */
 const REMINT_EVENT='sonar-token-reminted';
@@ -189,9 +190,9 @@ const declaredProjectsOf=sonar=>{
  *     runtime tree (`environment` names the slot the extension serves, never a path segment); the
  *     string `source-host` (or no stack) means the runtime source repository's dev stack,
  *   projects [{repository, key, name}],
- *   credentials [{id, env, custody {repository, path}}] - custody paths from that repository's root; an
- *     `admin` credential creates projects and mints tokens, a SONAR_TOKEN credential naming a project key
- *     is that project's analysis token, another SONAR_TOKEN credential is the generic analysis token,
+ *   credentials [{id, env, custody {repository, path}}] - custody paths from that repository's root; a SONAR_TOKEN
+ *     credential naming a project key is that project's analysis token, another SONAR_TOKEN credential is the generic
+ *     analysis token (an `admin` credential is not read: the admin token is SONARQUBE_ADMIN_TOKEN of the resolved secret.env),
  *   ci and ownerAction, passed through.
  * Returns null when the declaration carries no Sonar service.
  */
@@ -223,7 +224,6 @@ export function readSonarDeclaration(file,repoRoot=path.dirname(path.dirname(pat
     hostPublic:text(sonar.host?.public),
     qualityGate:text(sonar.qualityGate),
     projects,
-    admin:credentials.find(isAdmin)?.file??null,
     analysis:analysis.find(c=>!projects.some(p=>p.tokenRef===c.file))?.file??null,
     ci:sonar.ci??null,
     ownerAction:sonar.ownerAction??null,
@@ -262,7 +262,8 @@ export function resolveConfig(options={},env=process.env){
     docker:options.docker??env.STARCI_DOCKER??'docker',
     stackSecret:options.stackSecret??null,
     record:options.record??null,
-    adminToken:options.adminToken??decl?.admin??`runtime/files/${ADMIN_TOKEN}`,
+    adminToken:environmentReference(ADMIN_TOKEN_ENV),
+    stackRun:{extRoot:options.extRoot??path.join(skillRoot,'ext','sonar'),composeRunner:options.composeRunner??null},
     analysisToken:options.analysisToken??decl?.analysis??`runtime/files/${ANALYSIS_TOKEN}`,
     declaredQualityGate:decl?.qualityGate??null,
     declaredKey:project?.key??null,
@@ -284,7 +285,7 @@ export function resolveConfig(options={},env=process.env){
 
 /** The custody entry without its value - what a report may carry. */
 const custodyView=entry=>({name:entry.name,present:entry.present,...(entry.via?{via:entry.via}:{}),...(entry.reminted?{reminted:true}:{}),
-  ...(entry.rejected?{rejected:true}:{}),...(entry.identityRefusal?{identityRefusal:entry.identityRefusal}:{}),...(entry.reason?{reason:entry.reason}:{})});
+  ...(entry.rejected?{rejected:true}:{}),...(entry.refusal?{refusal:entry.refusal}:{}),...(entry.identityRefusal?{identityRefusal:entry.identityRefusal}:{}),...(entry.reason?{reason:entry.reason}:{})});
 
 /** The custody member a minted project analysis token lives in: runtime/files/sonarqube-KEY-token.key. */
 export const projectTokenRef=key=>`runtime/files/sonarqube-${String(key).replace(/[^A-Za-z0-9_.-]/g,'_')}-token.key`;
@@ -296,20 +297,18 @@ const stackRootOf=file=>{
 };
 
 /**
- * Store a value as an encrypted custody member. Two managed custodies exist: a repository's .starcistacks tree, written
+ * Store a value as an encrypted custody member of a repository's .starcistacks tree, written
  * through that repository's own tool (<repo>/scripts/stack-secret.mjs inside that repository, not this runtime; an absolute reference names that tree directly - a project
  * token minted into the declaring repository while the sonar stack itself is the host extension - and a relative one stays a
- * member of the configured stack), and a runtime extension's ext/<service>/secrets directory (the example apps' analysis
- * tokens), sealed by sealExtCustody. Anything else is refused and mintToken revokes the value again. Never argv.
+ * member of the configured stack). Anything else is refused and mintToken revokes the value again. Never argv.
  */
 function writeCustody(cfg,ref,value,{env}){
   const file=path.resolve(cfg.stackDir,ref);
-  if(extSecretsDir(file))return sealExtCustody(cfg,file,value,{scrub});
   const managed=path.isAbsolute(String(ref))?stackRootOf(file):path.dirname(cfg.stackDir);
   const stacksRoot=managed??path.dirname(cfg.stackDir);
   const tool=cfg.stackSecret??path.join(path.dirname(stacksRoot),'scripts','stack-secret.mjs');
   if((!managed||path.basename(managed)!=='.starcistacks')&&!cfg.stackSecret)
-    return {ok:false,reason:`the custody member ${ref} is neither under a .starcistacks tree a stack-secret tool manages nor in a runtime extension's secrets directory`};
+    return {ok:false,reason:`the custody member ${ref} is not under a .starcistacks tree a stack-secret tool manages`};
   if(!fs.existsSync(tool))return {ok:false,reason:`no stack-secret tool at ${tool}`};
   const target=path.relative(stacksRoot,file).replaceAll('\\','/');
   const tmp=tempPath(`sonar-local-${process.pid}-${Date.now().toString(36)}`);
@@ -334,10 +333,9 @@ async function tokenAccepted(cfg,value){
 }
 
 /** A custody reference writeCustody may store over: a member of the configured stack, or an absolute
- *  declaration credential inside a repository's .starcistacks tree or a runtime extension's secrets directory. */
+ *  declaration credential inside a repository's .starcistacks tree. */
 const inStack=(cfg,ref)=>{
   const file=path.resolve(cfg.stackDir,ref);
-  if(extSecretsDir(file))return true;
   if(!path.isAbsolute(String(ref))&&!file.startsWith(cfg.stackDir+path.sep))return false;
   return stackRootOf(file)!==null;
 };
@@ -529,10 +527,10 @@ async function ensureProject(cfg,{key,name}={}){
   const base={schema:SCHEMA,command:'ensure-project',host:cfg.host,projectKey:key,...(cfg.declaration?{declaration:cfg.declaration}:{})};
   if(!key||!KEY_PATTERN.test(key))return {...base,outcome:'blocked',message:`invalid project key ${JSON.stringify(key??null)}: letters, digits, - _ . : and at least one non-digit`};
   const admin=readCustody(cfg,cfg.adminToken,{remember});
-  if(!admin.present)return {...base,outcome:'blocked',custody:custodyView(admin),message:`the admin token is missing from custody (${admin.reason}); repair the source stack custody - never ask the owner for it.`};
+  if(!admin.present)return {...base,outcome:'blocked',custody:custodyView(admin),...(admin.refusal?{refusal:admin.refusal}:{}),message:admin.reason};
   const found=await call(cfg,'GET',`/api/projects/search?projects=${encodeURIComponent(key)}`,{token:admin.value});
   if(!found.reachable){const docker=containerState(cfg);return {...base,outcome:'blocked',docker,message:downMessage(cfg,found,docker)};}
-  if(found.status===401||found.status===403)return {...base,outcome:'blocked',message:`the admin token was refused (HTTP ${found.status}); repair the source stack custody.`};
+  if(found.status===401||found.status===403)return {...base,outcome:'blocked',message:`the admin token was refused (HTTP ${found.status}); check ${ADMIN_TOKEN_ENV} in secret.env.`};
   if(found.status!==200)return {...base,outcome:'blocked',message:`project search failed: HTTP ${found.status} ${found.text}`};
   const existing=(found.json?.components??[]).find(c=>c.key===key);
   if(existing)return {...base,outcome:'ok',created:false,projectName:existing.name,dashboardUrl:`${cfg.host}/dashboard?id=${encodeURIComponent(key)}`,publicDashboardUrl:`${cfg.publicHost}/dashboard?id=${encodeURIComponent(key)}`};
@@ -554,7 +552,7 @@ async function ensureProject(cfg,{key,name}={}){
 async function ensureQualityGate(cfg,{key,admin,gate=loadSonarGate()}={}){
   const name=gate.gate.name;
   const base={name,projectKey:key,conditions:serverConditions(gate).length};
-  if(!admin?.present)return {...base,outcome:'skipped',message:'admin token not in custody'};
+  if(!admin?.present)return {...base,outcome:'skipped',message:`${ADMIN_TOKEN_ENV} is not set`};
   const token=admin.value;
   const failed=(step,answer)=>({...base,outcome:'failed',message:`${step}: HTTP ${answer.status||0} ${answer.text??answer.error??''}`.trim()});
   const encoded=encodeURIComponent(name);
@@ -845,7 +843,7 @@ const prepareScanExecution=async(cfg,options,inputs,summary,finish)=>{
   const admin=(options.isolate||options.ensure===true)&&sonarAdminForAnalysis(cfg)?readCustody(cfg,cfg.adminToken,{remember}):{present:false,name:cfg.adminToken,reason:'the analysis server has separate provisioning'};
   summary.custody.admin=custodyView(admin);
   if(options.ensure!==false){
-    const ensured=admin.present?await ensureProject(cfg,{key,name:cfg.declaredName??props['sonar.projectName']??key}):{outcome:'skipped',message:'admin token not in custody'};
+    const ensured=admin.present?await ensureProject(cfg,{key,name:cfg.declaredName??props['sonar.projectName']??key}):{outcome:'skipped',message:`${ADMIN_TOKEN_ENV} is not set`};
     summary.project={outcome:ensured.outcome,...(ensured.created!==undefined?{created:ensured.created}:{}),...(ensured.message?{message:ensured.message}:{})};
   }
   if(options.ensure!==false)summary.qualityGate=await ensureQualityGate(cfg,{key,admin,gate:gateDoc});
@@ -1009,6 +1007,7 @@ export async function dashboard(cfg,options={}){
 const HELP=`Usage: starci gate sonar <command> [options]
 
   status                                  server, container, custody presence and token validity
+  up [--public] | stop [--public]         start / stop the self-hosted stack of ext/sonar; its secrets come from secret.env
   ensure-project --key K [--name N]       create the project on the local server when it is missing;
                  [--with-token [--token-ref REF]] also make sure a project analysis token is in custody
   token [--key K] [-- command args...]    run a command with SONAR_TOKEN and SONAR_HOST_URL in its env;
@@ -1028,7 +1027,7 @@ const HELP=`Usage: starci gate sonar <command> [options]
 Exit 0 pass/up/ok, 1 failing result or refused scan (empty slice), 2 blocked or usage.`;
 
 const BOOLEAN_FLAGS=new Map([['--wait','wait'],['--no-ensure','ensure'],['--with-token','withToken'],['--project-gate','projectGate'],
-  ['--isolate','isolate'],['--keep-slice-project','keepSliceProject'],['--blob','blob'],['--help','help'],['-h','help']]);
+  ['--isolate','isolate'],['--public','publicTunnel'],['--keep-slice-project','keepSliceProject'],['--blob','blob'],['--help','help'],['-h','help']]);
 const parseArgument=(out,argv,index)=>{
   const arg=argv[index];
   if(arg==='--'){out.rest=argv.slice(index+1);return argv.length;}
@@ -1069,6 +1068,7 @@ const runSonarCommand=async(args,cfg,key,env,put)=>{
   const command=args._[0];
   if(command==='status')return {report:await status(cfg)};
   if(command==='ensure-project')return {report:await ensureProjectReport(cfg,args,key)};
+  if(command==='up'||command==='stop')return {report:{schema:SCHEMA,...(command==='up'?stackUp:stackStop)(cfg,{env:sonarAnalysisEnvironment(cfg),publicTunnel:args.publicTunnel===true,scrub,remember})}};
   if(command==='token')return tokenCommandResult(cfg,args,key,env);
   if(command==='scan'){
     const report=await scan(cfg,{cwd:args.cwd,key:args.key,wait:args.wait,out:args.out,log:args.log,blob:args.blob,put,tokenRef:args.tokenRef,ensure:args.ensure,timeoutSec:args.timeout,waitSec:args.waitTimeout,
@@ -1093,7 +1093,7 @@ const commandRefusal=(args,command)=>{
 
 const commandConfig=(args,config,env,command)=>{
   const cfg=resolveConfig({...config,...(args.host?{host:args.host}:{}),...(args.stack?{stack:args.stack}:{}),...(args.cwd?{cwd:args.cwd}:{}),...(args.declaration?{declaration:args.declaration}:{})},env);
-  return command==='status'||command==='ensure-project'?sonarAdministrativeConfig(cfg):cfg;
+  return command==='status'||command==='ensure-project'||command==='up'||command==='stop'?sonarAdministrativeConfig(cfg):cfg;
 };
 
 export async function sonarLocalMain(argv=[],{env=process.env,config,put=null}={}){

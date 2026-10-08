@@ -771,7 +771,7 @@ starci gate runtime-coverage tests/cli/catalog.spec.mjs
 
 ### starci gate sonar
 
-inspect, provision and run the local Sonar quality gate
+inspect, provision, run and start the local Sonar quality gate
 
 | flag | type | |
 | --- | --- | --- |
@@ -795,6 +795,7 @@ inspect, provision and run the local Sonar quality gate
 | `--declaration` | string |  |
 | `--host` | string |  |
 | `--stack` | string |  |
+| `--public` | boolean |  |
 
 Positionals: command, arguments?
 
@@ -806,6 +807,8 @@ json: always
 starci gate sonar status
 starci gate sonar scan --cwd <repo> --base <rev> --paths src --wait
 starci gate sonar dashboard --cwd <repo>
+starci gate sonar up
+starci gate sonar up --public
 ```
 
 ### starci gate starcistacks
@@ -3290,6 +3293,23 @@ json: always
 ```sh
 starci runtime housekeeping --dry-run
 starci runtime housekeeping --apply --only tmp,logs
+```
+
+### starci runtime import-held-secret
+
+move one sealed member of the old tracked custody from git history into secret.env
+
+| flag | type | |
+| --- | --- | --- |
+| `--member` | string |  |
+| `--rev` | string |  |
+
+exit: 0 the variable was appended to secret.env; 1 refused and nothing written; 2 bad usage
+
+json: flag
+
+```sh
+starci runtime import-held-secret --member <old path of the member>
 ```
 
 ### starci runtime install

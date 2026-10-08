@@ -59,17 +59,10 @@ environments:
       billing:
         port: 7070
     runbook: README.md
-    # The local Postgres runs with trust auth; the secret material is Keycloak's (its bootstrap admin password and the secret
-    # of the identity-admin client) and MinIO's root password, sealed with SOPS+age.
-    secrets:
-      - name: keycloak-env
-        where: secrets/keycloak-env
-        recipientPolicy: DEMO-ONLY - encrypted to the example identity at runtime/env/demo.agekey, never a real recipient
-        keyCustody: DEMO-ONLY - private identity is untracked and provisioned externally before decryption
-      - name: minio-env
-        where: secrets/minio-env
-        recipientPolicy: DEMO-ONLY - encrypted to the example identity at runtime/env/demo.agekey, never a real recipient
-        keyCustody: DEMO-ONLY - private identity is untracked and provisioned externally before decryption
+    # The local Postgres runs with trust auth; Keycloak's bootstrap admin password, the identity-admin client secret and MinIO's
+    # root password are DEMO-ONLY defaults carried by the compose files (demo-only-...). An example runs from a clean clone with
+    # no owner secret, so it declares no sealed secret.
+    secrets: []
 # Delivery/quality services (contract change starcistacks-services). Sonar points to the shared host extension;
 # CI does not scan this example.
 services:

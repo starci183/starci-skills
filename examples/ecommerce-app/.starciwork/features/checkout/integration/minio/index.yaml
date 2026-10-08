@@ -11,7 +11,7 @@ credential:
   name: RECEIPTS_S3_SECRET_ACCESS_KEY
   providedBy: owner
   custody: identity:receipts-s3-secret-access-key
-  # sealed in .starcistacks/dev/secrets/minio-env.enc (DEMO-ONLY recipient)
+  # a DEMO-ONLY default of the compose file (KEYS.md), not a secret; a run exports another value
 sandbox: The dev environment runs MinIO (the Chainguard build, pinned by digest) in Compose on 9069.
 refs: [fr.checkout.download-receipt]
 
