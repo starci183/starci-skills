@@ -10706,13 +10706,13 @@ report-job-not-active:
   owner: supervisor
   kind: verb-refusal
 report-scratch-invalid:
-  title: "Scratch dir not under temp"
-  title_vi: "Thư mục nháp không nằm trong thư mục tạm"
-  meaning_vi: "Thư mục nháp của lần giao nằm ngoài thư mục tạm của hệ điều hành nên không được tin."
+  title: "Scratch dir does not match dispatch"
+  title_vi: "Thư mục nháp không khớp lần giao"
+  meaning_vi: "Thư mục nháp đã ghi không khớp ràng buộc repository, workflow và job do runtime cấp cho lần giao."
   causes_vi:
-    - "Đặt STARCI_JOB_SCRATCH ở nơi khác"
-    - "Bản ghi thư mục nháp bị sai"
-  nextStep_vi: "Không nhận báo cáo. Thợ ghi báo cáo trong thư mục nháp đúng do runtime cấp."
+    - "Đường dẫn không phải thư mục nháp đã cấp cho job"
+    - "Thư mục nháp hoặc thư mục cha bị thay bằng liên kết"
+  nextStep_vi: "Không nhận báo cáo. Thợ dùng thư mục nháp đã ghi cho lần giao; thay đổi roots.temp không làm mất ràng buộc này."
   owner: op-retry
   kind: verb-refusal
 report-scratch-missing:

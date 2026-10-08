@@ -62,9 +62,9 @@ function sendOpWorkerDone(ledger, job, payload, report, reportPath, dispatchCapa
 // The report is read from the attempt's scratch only: a Work path or any other file is refused (H10). A filed
 // attempt's scratch is gone: filing again answers with the stored row instead of a missing file - the guard emits
 // the replay and returns null.
-function reportFileTextOf(db, job, attempt, args, emit) {
+function reportFileTextOf(db, job, attempt, args, emit, repo) {
   let scratch, reportAbs;
-  try { scratch = scratchOf(attempt); reportAbs = scratchFile(args.report, scratch, 'report file'); }
+  try { scratch = scratchOf(attempt, repo); reportAbs = scratchFile(args.report, scratch, 'report file'); }
   catch (error) {
     const prior = db.prepare('SELECT report_id,outcome FROM reports WHERE attempt_id=?').get(attempt.attempt_id);
     if (prior && ['report-scratch-missing', 'report-attachment-missing'].includes(error.code)) {
@@ -221,7 +221,7 @@ export default {
   const db = ledger.db, job = resolveJob(db, args.job);
   const jobPayload = jobPayloadOf(job);
   const attempt = requireReportAttempt(db, job);
-  const read = reportFileTextOf(db, job, attempt, args, emit);
+  const read = reportFileTextOf(db, job, attempt, args, emit, repo);
   if (!read) return;
   const { scratch, reportAbs, reportRaw } = read;
   const parsed = parseJson(reportRaw);
@@ -262,7 +262,7 @@ export default {
   }));
   const { reportId, attachments, artifacts = [], audit = null } = filed.result;
   ingestOpScratchLog(repo, job, scratch);
-  removeScratch(scratch);
+  removeScratch(scratch, attempt, repo);
   if (filed.replayed) {
     emit({ ok: true, replayed: true, jobId: job.job_id, workflowId: job.workflow_id, dispatchId, outcome: report.outcome, reportId, attachments },
       `report already filed for ${job.job_id} (dispatch ${dispatchId}, report ${reportId})`, args.json);
