@@ -126,3 +126,35 @@ jobs:
       # STARCI_REQUIRE_APP_INSTALLS=1 inside the script turns a missing install into a failure, never a skip.
       - name: Scaffold app against registry installs
         run: npm run starci --silent -- release app-installs
+
+  # A pushed release tag becomes a GitHub Release: named after the tag, its body exactly the CHANGELOG section of that version (the same
+  # section `starci release cut` made the annotated tag message from: `starci release notes`), marked a pre-release when the version has a
+  # pre-release part. It runs only on a tag run and only after the check-and-test job is green; the trigger set is unchanged (R221).
+  github-release:
+    name: github release
+    needs: check-and-test
+    if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+
+      - name: Create or update the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          node packages/cli/bin/starci.mjs release notes --tag "$TAG" --out "$RUNNER_TEMP/notes.md" --json > "$RUNNER_TEMP/notes.json"
+          PRERELEASE=""
+          if [ "$(node -p "JSON.parse(require('fs').readFileSync(process.argv[1], 'utf8')).prerelease" "$RUNNER_TEMP/notes.json")" = "true" ]; then PRERELEASE="--prerelease"; fi
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release edit "$TAG" --title "$TAG" --notes-file "$RUNNER_TEMP/notes.md" $PRERELEASE
+          else
+            gh release create "$TAG" --verify-tag --title "$TAG" --notes-file "$RUNNER_TEMP/notes.md" $PRERELEASE
+          fi

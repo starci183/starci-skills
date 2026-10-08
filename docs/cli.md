@@ -2961,6 +2961,33 @@ starci release launch-smoke stage --as kernel
 starci release launch-smoke mark --as op
 ```
 
+### starci release notes
+
+print or write the release notes of a tag, its CHANGELOG section
+
+| flag | type | |
+| --- | --- | --- |
+| `--tag` | string |  |
+| `--repo` | string |  |
+| `--out` | string |  |
+
+Effect: local-write
+
+Roles: worker, lead, coordinator, release, owner
+
+Conventions:
+
+- the text is the CHANGELOG section the annotated tag message is made of, and --out writes only the named file
+
+exit: 0 the notes were printed or written; 1 the CHANGELOG has no finished section for the tag, or cannot be read; 2 bad usage
+
+json: starci/release-notes@1
+
+```sh
+starci release notes --tag v1.0.0-alpha.7
+starci release notes --tag v1.0.0-alpha.7 --out notes.md --json
+```
+
 ### starci release proof
 
 build the release proof attached before publish or deploy effects

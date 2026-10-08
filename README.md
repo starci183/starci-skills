@@ -1,184 +1,160 @@
 # StarCi
 
-**A kernel-agent workflow runtime for AI-assisted delivery — one durable goal, one kernel agent, one ledger.**
+AI agents write code fast and check it badly. StarCi makes every step pass a gate before the next one starts.
 
-StarCi turns an owner's request into a durable goal with a queued chain of operations, then runs it
-under supervision: a long-lived `[Kernel]` agent owns the workflow and mutates state only through a
-single API gate, while one ephemeral `[Op]` agent executes each job. Every decision, dispatch,
-verdict and incident lands in the project's SQLite ledger (`runtime.sqlite`, outside every repository) and every
-byte of agent output in a content-addressed blob store — evidence before completion, always.
+[![ci](https://github.com/starci183/starci-skills/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/starci183/starci-skills/actions/workflows/ci.yml)
+[![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=starci183_starci-skills&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=starci183_starci-skills)
+[![Bugs](https://sonarcloud.io/api/project_badges/measure?project=starci183_starci-skills&metric=bugs)](https://sonarcloud.io/summary/new_code?id=starci183_starci-skills)
+[![Code Smells](https://sonarcloud.io/api/project_badges/measure?project=starci183_starci-skills&metric=code_smells)](https://sonarcloud.io/summary/new_code?id=starci183_starci-skills)
+[![codecov](https://codecov.io/gh/starci183/starci-skills/branch/main/graph/badge.svg)](https://codecov.io/gh/starci183/starci-skills)
+[![release](https://img.shields.io/github/v/release/starci183/starci-skills?include_prereleases)](https://github.com/starci183/starci-skills/releases)
+[![license](https://img.shields.io/github/license/starci183/starci-skills)](LICENSE)
 
-StarCi provides:
-
-- **A durable goal and plan:** the explicitly selected `/starci` entry assesses and previews the request;
-  after the owner accepts the exact goal and plan, native goal definition writes and enqueues the
-  op chain in the ledger — the plan survives sessions, restarts and context loss.
-- **A kernel agent per workflow:** native workflow startup claims an accepted queued goal and boots one long-lived
-  `[Kernel]` agent. It never writes sqlite directly and never touches the host — every mutation goes
-  through one `starci kernel <verb>` call. `modules/kernel/api.yaml` and
-  `modules/cli/commands/kernel/` hold the verb contracts; [docs/cli.md](docs/cli.md) is the human list.
-- **One host reconciler:** active controllers handle mechanical Job, Workflow, Resource, Host,
-  GC, Workers and Learning concerns. Kernels decide through durable Decision Items; `scripts/reconciler/engine.mjs`
-  is the single host runtime loop (`modules/reconciler/reconciler.yaml`).
-- **Ephemeral op agents:** `starci kernel dispatch` spawns one short-lived `[Op]` agent per job through the
-  per-agent cards (`modules/models/agents/`). Adapter flags are injected by the spawner — the kernel
-  cannot forget them; `settle` records the verdict and closes the worker.
-- **Contracts as data:** goals, kernel loop, op manifests, model routing and quality gates are YAML
-  under `modules/` — mechanism code stays under `engine/` and `scripts/`.
-- **Machine checks:** `scripts/checks/` holds the deterministic gates (architecture, brand,
-  staleness, proof bundles, example evidence) that ops must pass before a job settles.
-
-**Requirements:** Node.js 22.22.3 or later within the 22 branch, or 24.15.0 or later within the 24 branch,
-with unflagged `node:sqlite`, and a coding agent host (`package.json` `engines.node`). Provider access
-comes from locally configured agent CLIs (Devin, Claude Code, Codex, Orca) — StarCi has no API key
-of its own.
-
-**Source version:** `1.0.0-alpha.7` (alpha line; contracts are provisional until `1.0.0`), MIT.
-
-[Overview](#overview) · [Stack](#stack) · [Repository layout](#repository-layout) ·
-[Development](#development) · [Install](#install) · [Documentation](#documentation)
+```mermaid
+flowchart LR
+  G[Owner goal] --> K[Kernel]
+  K -->|dispatches| O[Op does the work]
+  O --> C{Gate re-runs the checks}
+  C -->|pass| N[Next leg]
+  C -->|fail| K
+  N --> K
+  N -.->|last leg| H[Handover to the owner]
+  S[Supervisor and runtime floor] -. watches, cleans up, keeps the ledger .- K
+```
 
 ## Overview
 
-StarCi stores each workflow's decisions and evidence outside product repositories while its
-contracts and checks live in this source tree. [How it runs](#how-it-runs) follows one goal
-through the kernel and operation agents.
+**Why StarCi.** A coding agent that grades its own work will usually pass itself. StarCi removes that:
+the agent that makes a piece of work never judges it. A separate check, run by the runtime, decides
+whether the work is accepted, and the next step cannot start until it is. Everything that happens is
+written to a ledger (a SQLite database kept outside your repositories), so a workflow survives a
+restart, a closed chat or a dead agent.
+
+You hand StarCi a software goal. It plans the work as a chain of small jobs, gives each job to an
+AI agent, checks the result, and hands the finished work back to you.
+
+**Terms.** A *workflow* is one goal and its chain of jobs. An *op* is one short-lived agent that does one job.
+A *gate* is a check the runtime re-runs itself before it accepts an op's result. A *seat* is a long-lived
+agent session. A *lane* is a separate git worktree where one workflow works, so workflows do not collide.
+
+**How it works.** Five roles stand on one floor. The floor is the runtime itself: it detects, counts, retries
+within bounds, cleans up and runs the checks. Agents are used only where judgment is needed.
+Reports go up one level at a time, and instructions go down one level at a time.
+
+| Role | Scope | Job |
+| --- | --- | --- |
+| Op | one unit of work | Does one job under its contract and reports with evidence. Never grades itself. |
+| Critic | one product of one op | Grades that product independently, from a different provider than the maker. |
+| Kernel | one workflow | Dispatches ops by the plan, settles their reports by re-running the checks, decides retry or re-plan. |
+| Supervisor | all workflows on the machine | Rules on gates, resolves conflicts between workflows, divides shared resources. |
+| Debug | the owner's chat, for a limited stabilisation period | Audits whether each role did its job and fixes the runtime when one did not. |
+
+The owner decides what only a person can: intent, credentials, spend and irreversible choices.
+The reporting chain is Op to Kernel to Supervisor to owner. The full contract is `modules/kernel/roles.yaml`.
+
+One workflow, step by step:
+
+1. You describe a goal in a chat with the `/starci` entry. StarCi assesses it and shows the plan.
+2. You approve the exact goal and plan. Only then is the job chain written to the ledger.
+3. You start the workflow. The runtime boots one Kernel for it.
+4. The Kernel dispatches ops one job at a time. Each op works in its own worktree.
+5. When an op reports, a gate re-runs the checks and accepts or rejects the result. A rejected job is retried or re-planned.
+6. When every leg has passed, the work is handed over to you with its evidence.
 
 ## Stack
 
-Supported Node.js 22/24, npm, SQLite (`node:sqlite`), authored YAML contracts, and JavaScript checks.
-The examples use NestJS backend and Next.js frontend applications.
+- Node.js `^22.22.3 || ^24.15.0` (`package.json` `engines.node`) with unflagged `node:sqlite`. The runtime ships sources only and needs no dependency install.
+- An agent host that can run `/starci`, and Orca, the only place the runtime launches agents. The agent CLIs StarCi can drive are Claude Code, Codex and Devin; StarCi has no API key of its own.
+- `age-keygen` on `PATH` for the install's secret setup (`docs/installation.md`).
+- Platforms: the host services are developed and used on Windows (Task Scheduler). CI builds and tests on Linux. macOS and Linux host startup is not yet proven (`docs/host-contract.md`).
 
-## Repository layout
+## Quick start
 
-This repository is the StarCi runtime package: `modules/` holds contracts, `engine/` and
-`scripts/` hold mechanism and checks, `knowledge/` holds HFS and code rules, `docs/` holds
-human guidance, and `examples/` holds one backend/frontend product example (ecommerce-app), the
-shape-slot front-end slot-teaching fixture (not a product) and the starcistacks-services declarations. Each
-product example follows the [HFS tree](docs/architecture.md); [Detailed layout](#detailed-layout)
-maps the runtime directories below.
-
-## Development
-
-From this repository root, run `starci npm ci` once; while working, use `starci check run --level L1 --changed <files>`
-for syntax and contract gates and `starci test run --level L1 --spec <files>` for the affected Node specs. Leads use
-L2 before land, and the release cut owns the whole suite. The runtime package has no separate TypeScript
-typecheck, lint, or build script; product examples declare their own `typecheck`,
-`lint`, `build`, and `test` commands. Run the runtime presentation gate with
-`starci gate repo-presentation --root . --runtime`.
-
-## Install
-
-Have the owner install the exact reviewed `@starci/cli` package globally, then install the runtime into a host:
+Install the CLI once, then install the runtime into the directory that will own `.claude/`:
 
 ```sh
 starci runtime install --cwd <host>
-starci runtime doctor --cwd <host>
+starci runtime doctor --cwd <host> --quick
 ```
 
-Without a global install, use `npx @starci/cli` in place of `starci`. Use
-`starci runtime update --cwd <host>` to update an installed tree and
-`starci runtime version` to print the runtime version.
+Without a global install, run `npx @starci/cli` in place of `starci`. `docs/installation.md` has the details,
+including what the installer writes and how to update.
 
-The installer:
+Check the host, then define and start a workflow. The normal route is a chat that selects `/starci`; the
+commands below are what it runs:
 
-1. Copies the declared payload (`package.json` `files[]`) into `<host>/.claude` — the installed
-   source is the runtime and `node` reads it directly.
-2. Writes the `AGENTS.md` bootstrap pointing agents at `.claude/CONTEXT.md` (other host bootstrap
-   names are opt-in).
-3. Installs the one public `starci` entry in `.agents/skills/starci/` and in an existing
-   `.devin/skills/` discovery root, recording exact file custody. Internal references are not skills.
-4. Seeds an untracked `config.yaml` from `config.example.yaml` and records an install manifest.
-5. Prints the consumer `.gitignore` lines — `.starciwork/` (runtime state) and `config.yaml`
-   (local config) must never be committed by the host project.
-
-The CLI records the selected runtime in `<home>/.starci/runtime.json` and writes the
-`starci` shim under `<home>/.starci/bin`, so agents can run the same command. A runtime
-group used before installation exits 3 and prints
-`starci: the runtime group "<g>" needs the StarCi runtime, which is not installed (run: starci runtime install)`.
-
-## How it runs
-
-```text
-explicit /starci request
-  └─ read-only goal assessment + derived plan → owner accepts exact goal and intended actions
-       └─ native goal definition → queue in the project ledger (runtime.sqlite)
-            └─ native workflow start → host readiness + optional maintenance + attested [Kernel]
-            └─ starci kernel survey → plan → enqueue → dispatch → settle → finish
-                 └─ dispatch spawns one ephemeral [Op] agent per job
-                      (adapter card injects the provider CLI flags)
+```sh
+starci reconciler up --check --brief
+starci workflow define --repo <project-repo> --text "Add a login page"
+starci workflow start --repo <project-repo>
+starci workflow status --workflow <id>
 ```
 
-- The kernel agent reasons; `cli.mjs` is the only mutation surface. It owns host mechanics —
-  terminals, prompt delivery, worker lifecycle — so the kernel never calls a provider CLI directly.
-- Dispatch attests the spawn before a job is marked `running`; `settle` requires a verdict plus
-  evidence and closes the worker terminal; `incident` records failures without losing the ledger.
-- Re-plans persist lineage (`replannedFrom`, blocker, path delta, routing reason) — the ledger is
-  the audit trail, not the chat log.
+If something looks stuck, print the read-only digest of every running workflow:
+
+```sh
+starci debug digest
+```
 
 ## Configuration
 
-`config.yaml` (untracked, seeded from `config.example.yaml`) holds per-project settings: kernel
-model, effort and budgets. Resolution order: explicit `--agent` flag > owner `config.yaml` >
-`scripts/route/route-model.mjs` defaults. See [config format](docs/config-format.md).
+`config.yaml` is local to the host and is seeded from `config.example.yaml` at install. It is never committed.
+The keys an owner meets first:
 
-## Detailed layout
+- `language`: the language of the owner-facing text.
+- `model` and `effort`: the model and effort agents use when nothing more specific is routed.
+- `kernel.effort`: the effort of Kernel agents.
+- `budgets.maxOps`: how many ops one workflow may hold open at once.
+- `launchTrust`: the repository roots on which unattended agent launches are allowed.
+
+Every key and its allowed values are in [docs/config-format.md](docs/config-format.md).
+
+## Project status
+
+StarCi is on the alpha line `1.0.0-alpha.N`; the current source is `1.0.0-alpha.7`. Contracts are provisional.
+`1.0.0` means the two real workflows run smoothly from the goal to the handover, and then the contracts freeze.
+Today both stop at a design gate (`brand.decide`), and the cost of a decision leg is not yet measured against
+its budget. [CHANGELOG.md](CHANGELOG.md) lists what changed in each release and its "Known limitations".
+The target state is [docs/goal.md](docs/goal.md).
+
+## Repository layout
 
 ```text
-CONTEXT.md          canonical runtime entry and instruction load order
-modules/            contracts as data — goal, kernel, ops, models, host, supervisor,
-                    reconciler, schemas
-engine/             mechanism — ledger-db, schema.sql, yaml (vendored), config, constants
-scripts/            executables — kernel/cli.mjs, kernel/start-workflow.mjs, goal/, route/,
-                    agent/, api/, reconciler/, supervisor/, connectors/, work/, guards/,
-                    uat/, checks/, context/, lib/, reconcile/, example/, install/
-packages/cli/       @starci/cli, the thin dispatcher and the only starci bin
-modules/host/       per-host contracts — orca call surface (data only)
-skills/starci/      one explicit public entry, provider policy and conditional internal references
-init/               AGENTS.md bootstrap template
-knowledge/          authored YAML doctrine the checks and skills cite
-benchmark/          model-pool evidence: expectations.yaml, append-only snapshots/
-docs/               documentation
-examples/           ecommerce-app (a reference product with recorded .starciwork evidence), lite-app (a tools-produced lite booking app), shape-slot (a slot-teaching fixture, not a product) and starcistacks-services (service declarations)
-tests/              node:test specs — npm test
-packages/           vendored toolkits (eslint configs, grammar, fe-kit, heroicons)
+modules/     contracts as data: roles, goal, kernel, ops, models, host, CLI verbs
+engine/      shared mechanisms: the ledger databases, config, constants
+scripts/     the runtime code: Kernel verbs, reconciler, supervisor, checks, gates
+packages/    the CLI and the published toolkits
+knowledge/   authored rules the checks and skills cite
+skills/      the one public /starci entry
+docs/        human documentation
+examples/    reference products
+tests/       the specs
 ```
 
-## CLI
+## Development
 
-`@starci/cli` owns the only `starci` binary. Its command groups are:
+Run `starci npm ci` once. The local gates:
 
-| Groups | Surface |
-| --- | --- |
-| `app`, `workflow`, `kernel`, `runtime` | Product apps, workflow lifecycle, the Kernel gate, and runtime management |
-| `supervisor`, `debug`, `harness`, `reconciler` | Host supervision, inspection, UI, and reconciliation |
-| `guard`, `gate`, `release`, `work` | Fast guards, quality gates, releases, and Work records |
-| `machine`, `connect`, `route`, `uat`, `orca` | Host state, connectors, routing, UAT, and Orca adapters |
+- `starci runtime check` runs every self-check, including the Sonar rules enforced locally.
+- `starci check run --level L1 --changed <files>` runs the fast gates on the files you changed.
+- `starci test run --level L1 --spec <files>` runs the specs that cover them.
+- The pre-commit hook runs the Sonar-rules gate on the staged files.
 
-The generated [CLI reference](docs/cli.md) is the complete source for verbs, flags,
-examples, and exit codes. Removed spellings are refused with their replacement and exit 2;
-there are no aliases.
+Nothing is pushed between releases. A release is cut with `starci release cut`, which pushes `main` and an
+annotated tag together, and CI then runs on the tag. See [CONTRIBUTING.md](CONTRIBUTING.md) and
+[docs/releasing.md](docs/releasing.md).
 
 ## Documentation
 
-- [Installation, update and binding](docs/installation.md)
-- [Architecture: two databases, blob store, Kernel, reconciler, Supervisor, phases](docs/architecture.md)
-- [Storage: runtime.sqlite, machine.sqlite and blobs](docs/ledger-db.md)
-- [Debugging: the ten questions and their SQL](docs/debugging.md)
-- [Writing an op manifest](docs/ops.md)
-- [Host contracts and agent cards](docs/host-contract.md)
-- [CLI reference](docs/cli.md)
-- [Build, test, package and release](docs/releasing.md)
+- [Installation](docs/installation.md) and [CLI reference](docs/cli.md)
+- [Architecture](docs/architecture.md), [the Kernel](docs/workflow-kernel.md), [the Supervisor](docs/supervisor.md)
+- [Writing an op](docs/ops.md) and [host contracts](docs/host-contract.md)
+- [Debugging](docs/debugging.md) and [storage](docs/ledger-db.md)
+- [Releasing](docs/releasing.md) and [the target state](docs/goal.md)
 
-Agent-facing instructions live in [CONTEXT.md](CONTEXT.md); humans only need this page and `docs/`.
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md): use `starci npm ci` and
-`starci test run --level L1 --spec <files>` for affected specs under `tests/**/*.spec.mjs`.
-The release cut owns the full suite; evidence is re-recorded — never hand-edited.
+Agent-facing instructions live in [CONTEXT.md](CONTEXT.md).
 
 ## License
 
-MIT — [LICENSE](LICENSE). `engine/yaml.mjs` is a vendored bundle of the `yaml` package; see
+MIT, see [LICENSE](LICENSE). `engine/yaml.mjs` is a vendored bundle of the `yaml` package; see
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
