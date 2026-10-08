@@ -5,6 +5,7 @@ import path from 'node:path';
 import { AUTOPILOT_BY, AUTOPILOT_RULING, SUPERVISOR_GATE } from '../../autopilot-budget.mjs';
 import { AUTOPILOT_EVENTS } from '../../autopilot-state.mjs';
 import { gateCauses, gateWorkaroundOf } from '../../gate-workaround.mjs';
+import { workClassedJobs } from '../../failure-class.mjs';
 import { evaluateCondition, parseCondition } from '../../gate-conditions.mjs';
 import { parseJson } from '../../../lib/json.mjs';
 import { byCodeUnit } from '../../../lib/list.mjs';
@@ -30,8 +31,22 @@ function refuseWithoutNewEvidence(db, { workflowId, args, cause, holds }) {
     'gate-reraise-without-evidence', { cause, incidents: refuted.map((answer) => answer.incidentId) });
 }
 
+/**
+ * The runtime-defect cause over jobs whose evidence the failure-code catalog classes as work (a failing check on the op's own product)
+ * is a wrong class: it is the Kernel's error-work step (retry, switch agent, re-plan), so the raise is refused and names the jobs.
+ */
+function refuseWorkClass(db, { cause, holds }) {
+  if (cause !== 'runtime-defect') return;
+  const jobs = holds.filter((hold) => hold !== '*');
+  const work = jobs.length ? workClassedJobs(db, jobs) : [];
+  if (!work.length || work.length !== jobs.length) return;
+  throw refuse(`supervisor-gate (runtime-defect): ${work.join(', ')} failed on evidence the failure-code catalog classes as work (a failing check on the op's own product), so it is the Kernel's step (starci kernel status menu: retry, switch agent, re-plan), not a runtime fault`,
+    'gate-cause-class-work', { cause, jobs: work });
+}
+
 /** The workaround record of a gate raise, or {redirected} after the runtime recorded the workaround itself. Throws the typed refusal. */
 function gateRaiseOf(ledger, { workflowId, args, holds }) {
+  refuseWorkClass(ledger.db, { cause: textOf(args.cause), holds });
   const record = gateWorkaroundOf(ledger.db, { cause: textOf(args.cause), workaround: textOf(args.workaround), noWorkaround: textOf(args['no-workaround']),
     because: textOf(args.because), holds, mechanical: true });
   if (!record.mechanical) {

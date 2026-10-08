@@ -174,7 +174,7 @@ refuses:
     (interface.implement reads.draws), a bound implementation record whose proved ui record
     (`proves`/`dependsOn` ui.<feature>.<name>) does not exist or has no settled interface.draw
     (state done, owner-accepted drawing current): the hard design gate, code before design is
-    refused with code DESIGN_NOT_SETTLED and a Vietnamese explanation. interface.draw has NO layout
+    refused with code DESIGN_NOT_SETTLED and a Vietnamese explanation; work.author is refused with code WORK_AUTHOR_PREREQUISITE_UNSETTLED (unmet kind plan-prerequisite-unsettled, op, state, jobId) while a plan ancestor named by modules/goal/legality.yaml workAuthorAfter has no succeeded job. interface.draw has NO layout
     prerequisite: a todo shell and unsettled ancestor layouts admit (see foundation-wait). An
     unresolved placeholder, a record outside a Work tree or an invalid tree is unknown and admits.
     Prints {ok:false, jobId, op, reason:\"prerequisite-unmet\", unmet:[{kind:record-missing, read,

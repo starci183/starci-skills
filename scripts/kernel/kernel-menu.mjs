@@ -93,19 +93,23 @@ function policyOf(hold, sinceRaw) {
 const kindOf = (id) => menuCatalog().kinds.find((kind) => kind.id === id);
 
 /** One menu item from a kind, a subject and the options its builder produced (else the kind's own). */
-function itemOf(kind, { key, subject, options = null, since = null, evidence = [], di = null, deadlineAt = null }) {
+function itemOf(kind, { key, subject, options = null, since = null, evidence = [], di = null, deadlineAt = null, escape = true }) {
   const spec = kindOf(kind);
   const policy = policyOf(spec.hold, since);
   const own = options ?? (spec.options ?? []).map((option) => optionOf(option, subject));
   return {
     id: `${kind}:${key}`, kind, mode: spec.mode, subject: { ...subject }, question: fillTemplate(spec.question, subject),
-    options: [...own, escapeOption()], evidence, deadline: deadlineAt ?? policy.deadlineAt, step: policy.step, hold: spec.hold ?? null, di,
+    options: escape ? [...own, escapeOption()] : own, evidence, deadline: deadlineAt ?? policy.deadlineAt, step: policy.step, hold: spec.hold ?? null, di,
   };
 }
 
+// A failure the catalog classes as work that still has retries is the Kernel's own step (policy row error-work): its options are the
+// whole menu, and no escape sends it up the chain as if the runtime had failed.
+const withholdsEscape = (resolution) => resolution.failure?.class === 'work' && resolution.failure.retriesLeft > 0;
+
 const jobItem = ({ di, resolution }, workflow) => {
   const subject = { workflow, job: resolution.jobId, op: resolution.op ?? null, situation: resolution.what, summary: di.summary };
-  return itemOf('job-decision', { key: resolution.jobId, subject, options: resolution.options.map(jobOption), since: di.openedAt ?? null,
+  return itemOf('job-decision', { key: resolution.jobId, subject, options: resolution.options.map(jobOption), escape: !withholdsEscape(resolution), since: di.openedAt ?? null,
     evidence: [{ ref: `job:${resolution.jobId}` }, ...(di.evidence ?? []).slice(0, 6)], di: di.id ?? null });
 };
 

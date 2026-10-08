@@ -17136,3 +17136,13 @@ WORK_AUTHOR_PREREQUISITE_UNSETTLED:
   nextStep_vi: "Runtime từ chối giao work.author và nêu chặng còn thiếu cùng trạng thái job mới nhất của nó; Kernel enqueue hoặc chờ chặng đó settle xanh rồi giao lại."
   owner: "other-op:business.decide"
   kind: dispatch-refusal
+
+gate-cause-class-work:
+  title: "A work failure was raised as a runtime fault"
+  title_vi: "Một lỗi của công việc bị nêu như lỗi của runtime"
+  meaning_vi: "Bằng chứng của job là một check thất bại trên sản phẩm của chính op (danh mục mã lỗi xếp vào loại công việc), nên đây là bước của Kernel (thử lại, đổi agent, lập lại kế hoạch), không phải lỗi runtime."
+  causes_vi:
+    - "Kernel dựng supervisor-gate với cause runtime-defect cho job mà bằng chứng là check đỏ của op"
+  nextStep_vi: "Chọn một phương án trong thực đơn của Kernel (continue, split-per-app, settle-fail); chỉ khi bằng chứng là mã runtime-fault thì mới nêu lỗi runtime."
+  owner: op-retry
+  kind: verb-refusal

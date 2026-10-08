@@ -180,9 +180,11 @@ cases:
     status: covered
   - id: job-refused-by-admission-while-pool-admits-others
     family: failure-while-running
-    met: {date: "2026-10-07", where: "wf-starci-auth-test dispatch refused host-resources-low while status said actionable", evidence: "AUDIT-starci-workflow.md issue 8"}
-    status: open
-    why: "status and dispatch do not yet agree on the same admission verdict; the digest has no signal for the disagreement"
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "Nivo op-business.decide-58d0a31e7e was refused at admission (no-eligible-candidate, provider claude) six times in two hours while the pool admitted other jobs; the dispatch-rejected record kept only that string, never the per-candidate codes, so neither the Kernel nor the ledger could say which rule refused it (the machine copy has purged the reservation rows of that hour), and every refusal counted as claude's fault toward the agent switch although a full pool is a wait. The StarCi host-resources-low disagreement between status and dispatch was closed earlier (host-hold.mjs, status-frontier-admission.spec.mjs)", remedy: {state: in-tree, change: "a refused launch admission records its candidates with their typed codes and the untried members of the job's route chain on the dispatch-rejected event, the job result and the printed refusal; a refusal whose every code is a capacity condition (capacity-full, incident-open, provider-blocked) is a wait that reads as the policy hold pool-full or circuit-open and spends no pool strike (job-rejections.mjs); a status projection of provider-reservation load is not added, so the Kernel meets the wait at dispatch, typed"}}
+    met: {date: "2026-10-07", where: "Nivo wf-nivo-auth-test-workflow-muxq1xov business.decide retry; wf-starci-auth-test dispatch", evidence: "AUDIT-starci-workflow.md issue 8; nivo ledger op-business.decide-58d0a31e7e dispatch-rejected events 12:28-14:16"}
+    rule: {file: scripts/kernel/admission-refusal.mjs, anchor: "admissionRefusalOf"}
+    spec: tests/kernel/admission-refusal.spec.mjs
+    status: covered
   - id: brand-decision-gate-needs-later-leg-edit
     family: correctness
     finding: {role: runtime, duty: bound, verdict: departs, evidence: "Nivo brand.decide blocked BRAND_TOKEN_UNTRACEABLE: the op reported correctly (a correct error); the departure is the contract that demands a trace its own scope forbids producing. The ruling was an answered ask (dispatch ctx_398c5d4ea8da, answeredBy autopilot, option A naming --accent: #040d1c), no file declared the value, and the declaring file belongs to interface.implement", remedy: {state: in-tree, change: "valueSource has a ruling form {ruling, token, value} checked against the ledger's recorded answer (brand-value-source.mjs): the answer must exist, be an owner, autopilot or auto-accept answer, carry the value, and the token be this brand token; the token passes as planned-from-ruling with the declaration owed to interface.implement (its planned-brand-tokens requirement), and review.verify refuses it as planned-source-missing until the app theme declares it"}}
@@ -192,10 +194,11 @@ cases:
     status: covered
   - id: work-author-before-prerequisite
     family: correctness
-    finding: {role: kernel, duty: never, verdict: departs, evidence: "StarCi work.author blocked on a missing design input and reported it (a correct error); work.author was dispatched before its prerequisite and the reported block then stood 13 to 15 hours: the Kernel and the runtime left a reported block unhandled", remedy: {state: open, lane: f2}}
+    finding: {role: kernel, duty: never, verdict: departs, evidence: "StarCi work.author blocked on a missing design input and reported it (a correct error); work.author was dispatched before its prerequisite and the reported block then stood 13 to 15 hours: the Kernel and the runtime left a reported block unhandled", remedy: {state: in-tree, change: "the plan law orders the legs (workAuthorAfter, plan-edges.mjs); starci kernel dispatch now also refuses work.author itself, prerequisite-unmet WORK_AUTHOR_PREREQUISITE_UNSETTLED, while a plan ancestor of work.author named by that law has no succeeded job, naming the leg and the state of its newest job; the reported block that stood is the job controller's failed-no-step hold of the workflow-blockers lane"}}
     met: {date: "2026-10-08", where: "work.author dispatched before its prerequisite", evidence: "owner report 2026-10-08"}
-    status: open
-    why: "the work.author contract belongs to the workflow-blockers lane (f2) and is not yet merged"
+    rule: {file: scripts/kernel/plan-prerequisites.mjs, anchor: "unsettledPlanPrerequisites"}
+    spec: tests/kernel/work-author-prerequisite.spec.mjs
+    status: covered
   - id: render-environment-unavailable-in-fresh-worktree
     family: failure-while-running
     finding: {role: runtime, duty: does, verdict: departs, evidence: "StarCi brand.decide reported SHELL_RENDER_UNAVAILABLE after starting next dev by hand pinned to 127.0.0.1: the product's shared next-intl proxy rewrites to localhost, which a server pinned to another host treats as an external rewrite and answers 307 to / for ever (reproduced in a scratch copy of the worktree: a pinned server loops, a server with no pin answers 200 on localhost and 127.0.0.1); the op prompt and contract named no render path and no verb served the app", remedy: {state: in-tree, change: "starci work layout-render serves the app itself (next dev, free port, no host pin, localhost URLs, the scaffold's public-origin variables set), keys the slot, records the capture and stops its server; the command policy refuses a hand-started server and names the verb; the op prompt and brand.decide name it; a render that cannot be produced prints SHELL_RENDER_UNAVAILABLE with a typed cause, the URL and the redirect chain"}}
@@ -289,10 +292,11 @@ cases:
     status: covered
   - id: kernel-labelled-work-failure-runtime-fault
     family: correctness
-    finding: {role: kernel, duty: reportsUpWhen, verdict: departs, evidence: "a work failure labelled a runtime fault; and ready work left undispatched past its bound unless the runtime owns dispatch-ready", remedy: {state: open, lane: f2}}
+    finding: {role: kernel, duty: reportsUpWhen, verdict: departs, evidence: "a work failure labelled a runtime fault; and ready work left undispatched past its bound unless the runtime owns dispatch-ready", remedy: {state: in-tree, change: "the class is decided by the evidence and the failure-code catalog kind (failure-class.mjs): a failing check on the op's own product or a check-finding code is work, a runtime-fault code is runtime; the Kernel's job-decision item withholds none-fits from a work failure that still has retries (the error-work bound), and a supervisor-gate of cause runtime-defect over work-classed jobs is refused gate-cause-class-work; dispatch-ready is the Workflow controller's (origin ready-queued, mechanical)"}}
     met: {date: "2026-10-07", where: "wf-starci-auth-test", evidence: "owner report 2026-10-08"}
-    status: open
-    why: "the not-runtime-fault return path exists in the gate ladder; the digest does not yet judge a Kernel's ready-work bound or a misclassified cause"
+    rule: {file: scripts/kernel/failure-class.mjs, anchor: "failureClassOf"}
+    spec: tests/kernel/failure-class.spec.mjs
+    status: covered
   - id: op-token-overrun-on-decision-leg
     family: smooth-operation
     finding: {role: op, duty: bound, verdict: departs, evidence: "an Op spent 6 to 17 million tokens on a decision leg (AUDIT-starci-workflow.md issue 4: 10.8 million)", remedy: {state: in-tree, change: "each settled attempt is measured from its usage rows against the Op's declared budget; an overrun on a job waiting on its Kernel is listed in starci kernel status (budgetOverruns) and opens a Kernel Decision Item budget-overrun with continue-once, replace and re-scope"}}

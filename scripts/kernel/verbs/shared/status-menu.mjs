@@ -5,10 +5,14 @@ import { listDecisions } from '../../../machine/decisions.mjs';
 import { JOB_KINDS, liveFor, pendingJobsOf, resolutionOf } from '../../../machine/decision-resolution.mjs';
 import { buildMenu, snoozeMs } from '../../kernel-menu.mjs';
 import { decisionsOf } from '../../progress-rca.mjs';
+import { failureFactsOf } from '../../failure-class.mjs';
 
 const LIVE_KERNEL = new Set(['open', 'claimed']);
 // Kinds with their own menu kind (or a notice): the generic decision-item kind never repeats them.
 const OWN_KIND = new Set(['worker-question', 'rev-ack', 'unread-peer', 'supervisor-ruling', ...JOB_KINDS]);
+
+/** The resolution with the class its evidence decides (scripts/kernel/failure-class.mjs): the menu reads it to withhold the escape from a work failure. */
+const withFailure = (db, resolution) => (resolution.jobId ? { ...resolution, failure: failureFactsOf(db, resolution.jobId) } : resolution);
 
 /** The job items waiting on the Kernel: [{di, resolution}] for each reported job the settler handed over and each live retry-decision. */
 function jobDecisionsOf(s, kernelDis) {
@@ -17,7 +21,7 @@ function jobDecisionsOf(s, kernelDis) {
   const byJob = new Map(kernelDis.filter((di) => JOB_KINDS.has(di.kind) && di.entity?.type === 'job').map((di) => [di.entity.id, di]));
   const virtual = handed.filter((item) => !byJob.has(item.jobId))
     .map((item) => ({ kind: 'settle-nongreen', workflowId, entity: { type: 'job', id: item.jobId }, summary: `${item.op} ${item.jobId} reported ${item.outcome}: the runtime did not settle it (${item.reason})`, evidence: [] }));
-  return [...byJob.values(), ...virtual].map((di) => ({ di, resolution: resolutionOf(db, di, { repo, now }) }));
+  return [...byJob.values(), ...virtual].map((di) => ({ di, resolution: withFailure(db, resolutionOf(db, di, { repo, now })) }));
 }
 
 /** The waits that can no longer end on their own: a peer-wait whose peer is not running and a typed wait with an unmeetable condition. */
