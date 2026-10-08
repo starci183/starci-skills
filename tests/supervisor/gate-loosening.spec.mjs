@@ -22,6 +22,8 @@ const kinds = (diff) => looseningsOf(diff, RULES).map((finding) => finding.kind)
 
 test('a list item removed from a gate file loosens it, and one moved inside the file does not', () => {
   assert.deepEqual(kinds(fileDiff('knowledge/hfs/runtime-slots.yaml', ['      - {id: sonar-rules, run: a.mjs}'], [])), ['check-removed']);
+  assert.deepEqual(kinds(fileDiff('knowledge/hfs/runtime-slots.yaml', ['      - {id: sonar-rules, run: a.mjs}'], ['      - {id: sonar-rules, run: a.mjs, spec: a.spec.mjs}'])), [], 'a row whose fields change keeps its id and stays a check');
+  assert.deepEqual(kinds(fileDiff('knowledge/hfs/runtime-slots.yaml', ['      - {id: sonar-rules, run: a.mjs}'], ['      - {id: other, run: a.mjs}'])), ['check-removed'], 'another id does not restore it');
   assert.deepEqual(kinds(fileDiff('knowledge/hfs/runtime-slots.yaml', ['      - {id: sonar-rules, run: a.mjs}'], ['      - {id: sonar-rules, run: a.mjs}'])), []);
   assert.deepEqual(kinds(fileDiff('docs/readme.md', ['- an item'], [])), [], 'a file that is no gate is not judged');
 });

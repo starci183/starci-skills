@@ -1,6 +1,7 @@
 // gate-loosening.mjs — what "loosens a gate" means, mechanically (modules/kernel/gate-loosening.yaml), over the unified diff of one change.
 // A loosening is one of:
-//   check-removed      a list item removed from a gate file and not added back in the same file
+//   check-removed      a list item removed from a gate file and not added back in the same file (an item that carries an id is the
+//                      same item while an added item carries that id: a row whose fields change stays a check)
 //   threshold-lowered  a number of a gate file moved the loose way: a floor lowered, a ceiling raised
 //   allowlist-added    a list item added to an allowlist file
 //   spec-deleted       a spec file deleted in a change that also changes product code
@@ -34,13 +35,22 @@ const keyWords = (key) => key.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase().
 const trimmed = (line) => line.trim();
 const clip = (text) => (text.length > 90 ? `${text.slice(0, 89)}…` : text);
 
+/** What makes a list item the same item: its id when it carries one, else its text. */
+function identityOf(line) {
+  const item = trimmed(line).slice(1).trimStart();
+  const body = (item.startsWith('{') ? item.slice(1) : item).trimStart();
+  if (!body.startsWith('id:')) return trimmed(line);
+  const id = body.slice(3).trimStart().split(/[,}\s]/)[0];
+  return id ? `id:${id}` : trimmed(line);
+}
+
 /** The removed list items of a gate file that no added line restores. */
 function checksRemoved(entry) {
   const back = new Map();
-  for (const line of entry.added.filter((value) => LIST_ITEM.test(value))) back.set(trimmed(line), (back.get(trimmed(line)) ?? 0) + 1);
+  for (const line of entry.added.filter((value) => LIST_ITEM.test(value))) back.set(identityOf(line), (back.get(identityOf(line)) ?? 0) + 1);
   return entry.removed.filter((value) => LIST_ITEM.test(value)).filter((value) => {
-    const left = back.get(trimmed(value)) ?? 0;
-    if (left > 0) { back.set(trimmed(value), left - 1); return false; }
+    const left = back.get(identityOf(value)) ?? 0;
+    if (left > 0) { back.set(identityOf(value), left - 1); return false; }
     return true;
   }).map((value) => ({ kind: 'check-removed', file: entry.file, detail: clip(trimmed(value)) }));
 }
