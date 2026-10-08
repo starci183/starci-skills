@@ -1,0 +1,20 @@
+group: supervisor
+verb: decide
+owner: runtime
+summary: answer one item of the Supervisor's menu with one typed choice
+impl:
+  script: scripts/supervisor/decide.mjs
+flags:
+  - {name: item, type: string, summary: "id of the open menu item, as starci supervisor status prints it"}
+  - {name: choice, type: string, summary: the choice of that item to take}
+  - {name: reason, type: string, summary: "why this choice, with the evidence: it is the record and the notice"}
+  - {name: text, type: string, summary: "the input the choice names: a commit, a pool, a ruling, a workflow or a cause slug"}
+exit:
+  "0": the choice was executed and the item closed
+  "1": the choice is not on the menu, an input is missing, or a step failed
+  "2": bad usage
+json: flag
+examples:
+  - starci supervisor decide --item gate-ruling:<id> --choice not-runtime-fault --reason <evidence>
+  - starci supervisor decide --item workflow-conflict:<id> --choice rule --text <ruling> --reason <why>
+editions: [full]

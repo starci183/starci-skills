@@ -256,8 +256,9 @@ cases:
   - id: gate-loosening-lands-without-owner-approval
     family: authority-safety
     met: {date: "2026-10-08", where: "owner ruling 6: loosening a gate is owner-class", evidence: "modules/kernel/roles.yaml rulings.loosening-is-owner-class"}
-    status: open
-    why: "the land gate does not yet refuse a removed check, a lowered threshold, an added allowlist entry or a weakened test without a recorded owner approval"
+    rule: {file: scripts/supervisor/land-gate-loosening.mjs, anchor: "gateLooseningCheck"}
+    spec: tests/supervisor/gate-loosening.spec.mjs
+    status: covered
   - id: supervisor-gates-left-unanswered-for-fixes
     family: smooth-operation
     finding: {role: supervisor, duty: never, verdict: departs, evidence: "gates stood unanswered for over an hour while the Supervisor worked on runtime fixes (AUDIT-starci-workflow.md issue 20 and the owner report)", remedy: {state: in-tree, change: "the Supervisor never updates .claude and never leaves a gate past its acknowledgement bound (roles.yaml supervisor.never)"}}
@@ -294,10 +295,16 @@ cases:
     why: "the not-runtime-fault return path exists in the gate ladder; the digest does not yet judge a Kernel's ready-work bound or a misclassified cause"
   - id: op-token-overrun-on-decision-leg
     family: smooth-operation
-    finding: {role: op, duty: bound, verdict: departs, evidence: "an Op spent 6 to 17 million tokens on a decision leg (AUDIT-starci-workflow.md issue 4: 10.8 million)", remedy: {state: in-tree, change: "the Op contract declares a provisional token budget per attempt; the Kernel acts on an overrun (roles.yaml op.tokenBudget)"}}
+    finding: {role: op, duty: bound, verdict: departs, evidence: "an Op spent 6 to 17 million tokens on a decision leg (AUDIT-starci-workflow.md issue 4: 10.8 million)", remedy: {state: in-tree, change: "each settled attempt is measured from its usage rows against the Op's declared budget; an overrun on a job waiting on its Kernel is listed in starci kernel status (budgetOverruns) and opens a Kernel Decision Item budget-overrun with continue-once, replace and re-scope"}}
     met: {date: "2026-10-07", where: "scope.define attempt 1", evidence: "AUDIT-starci-workflow.md issue 4"}
+    rule: {file: scripts/kernel/attempt-budget.mjs, anchor: "budgetOverruns"}
+    spec: tests/kernel/attempt-budget.spec.mjs
+    status: covered
+  - id: op-token-overrun-in-flight
+    family: smooth-operation
+    met: {date: "2026-10-08", where: "scripts/kernel/usage-record.mjs records an attempt's usage when it settles", evidence: "scripts/kernel/attempt-budget.mjs"}
     status: open
-    why: "the budget is declared and provisional; nothing yet measures an attempt against it, so the digest cannot flag an overrun"
+    why: "the measure comes from the usage rows, which exist only for a settled attempt, so an overrun is seen after the attempt ends; an attempt still running past the budget is not seen until a live read of its session file feeds the same measure"
   - id: fix-agent-wiped-node-modules-printed-credentials-stashed
     family: authority-safety
     finding: {role: supervisor, duty: never, verdict: departs, evidence: "a fix agent wiped another lane's node_modules through junctions; an agent printed part of a credentials file; an agent ran git stash", remedy: {state: in-tree, change: "the worker prompt carries the never entries: no junction, symlink or hard link, no node_modules removal, no credential file read, no stash"}}
@@ -311,12 +318,46 @@ cases:
     met: {date: "2026-10-07", where: "alpha.6 release", evidence: "owner report 2026-10-08; CHANGELOG 1.0.0-alpha.6 Known limitations"}
     status: open
     why: "the release rule belongs to the push-only-at-release lane (f1)"
+  - id: op-orca-send-addresses-anyone
+    family: authority-safety
+    finding: {role: op, duty: never, verdict: departs, evidence: "the shared Orca self-lifecycle allowance let an Op name any recipient or Run with --to and --run", remedy: {state: in-tree, change: "the policy entry refuses --to and --run for the op role (refuse-for): an Op reports to the Run of its own Kernel through starci kernel report"}}
+    met: {date: "2026-10-08", where: "owner ruling: an Op reports only to its Kernel", evidence: "modules/kernel/roles.yaml rulings.op-reports-to-kernel"}
+    rule: {file: modules/kernel/command-policy.yaml, anchor: "refuse-for"}
+    spec: tests/guards/op-enforcement.spec.mjs
+    status: covered
+  - id: op-writes-outside-owned-paths
+    family: authority-safety
+    finding: {role: op, duty: never, verdict: departs, evidence: "the file-write guard let an Op write anywhere in its workflow worktree, not only in the paths its attempt owns", remedy: {state: in-tree, change: "an Op writes only inside its owned paths and the runtime temp directory (RIGHTS_OP_OUTSIDE_OWNED), for Edit, Write and shell write targets alike"}}
+    met: {date: "2026-10-08", where: "owner ruling: an Op writes only inside its scope", evidence: "modules/kernel/roles.yaml op.never"}
+    rule: {file: scripts/guards/op-write-scope.mjs, anchor: "RIGHTS_OP_OUTSIDE_OWNED"}
+    spec: tests/guards/op-enforcement.spec.mjs
+    status: covered
+  - id: op-runs-control-plane-verbs
+    family: authority-safety
+    finding: {role: op, duty: never, verdict: departs, evidence: "an Op could run any starci verb whose catalog entry names no role, among them the control plane of the Supervisor, the reconciler, workflow start, routing and Debug", remedy: {state: in-tree, change: "the op table of the command policy refuses those groups (RIGHTS_OP_CONTROL_PLANE) and names the capability verbs of an Op's work"}}
+    met: {date: "2026-10-08", where: "owner ruling: capability verbs only for servers, renders, image generation and tests", evidence: "modules/kernel/roles.yaml op.never"}
+    rule: {file: scripts/guards/op-starci.mjs, anchor: "RIGHTS_OP_CONTROL_PLANE"}
+    spec: tests/guards/op-enforcement.spec.mjs
+    status: covered
   - id: supervisor-runtime-fix-lanes-retired
     family: authority-safety
-    finding: {role: supervisor, duty: never, verdict: departs, evidence: "the Supervisor prompt, supervise.yaml and docs still teach fix workers and lands as Supervisor duties", remedy: {state: open, change: "retire those instructions; the contract, the guards, the land verb and the default worker cap 0 already refuse them"}}
+    finding: {role: supervisor, duty: never, verdict: departs, evidence: "the Supervisor prompt, supervise.yaml and docs still taught fix workers and lands as Supervisor duties", remedy: {state: in-tree, change: "the prompt, supervise.yaml and docs/supervisor.md describe a menu-driven decision desk; the seat guard allows the reads, starci supervisor decide, the defect record and its collectors (modules/kernel/command-policy.yaml supervisor)"}}
     met: {date: "2026-10-08", where: "owner ruling: the Supervisor may not update .claude", evidence: "modules/kernel/roles.yaml rulings.runtime-changes"}
+    rule: {file: modules/supervisor/supervisor-menu.yaml, anchor: "Changing .claude is never an option"}
+    spec: tests/supervisor/supervisor-menu.spec.mjs
+    status: covered
+  - id: supervisor-habit-command-under-old-contract
+    family: change-under-running
+    finding: {role: supervisor, duty: never, verdict: departs, evidence: "a Supervisor seat started under the old contract tries the verbs it learned: land, a fix worker, a hand-resolved gate or Decision Item, a typed notice", remedy: {state: in-tree, change: "every such call is refused with the Supervisor's current menu and the spelling of starci supervisor decide (SUPERVISOR_USE_DECIDE, RUNTIME_CHANGE_OWNED_BY_DEBUG with the menu)"}}
+    met: {date: "2026-10-08", where: "a running Supervisor seat meets the alpha.8 contract", evidence: "tests/guards/supervisor-seat.spec.mjs"}
+    rule: {file: scripts/guards/supervisor-seat.mjs, anchor: "SUPERVISOR_USE_DECIDE"}
+    spec: tests/guards/supervisor-seat.spec.mjs
+    status: covered
+  - id: supervisor-owed-items-without-menu-kind
+    family: smooth-operation
+    met: {date: "2026-10-08", where: "the OWED ACTIONS list of the tick", evidence: "modules/supervisor/supervise.yaml mission.classes"}
     status: open
-    why: "the instruction text of supervisor-prompt.md, supervise.yaml and docs/supervisor.md still describes fix workers and lands; the rewrite is designed in ROLES-STANDARD-alpha8.md"
+    why: "the menu is built from the Supervisor's Decision Items; an OWED class that is no Decision Item (retry-cap, undispatched, orphaned) is read-only for the Supervisor, and a step left untaken past the SLA is recorded as a runtime defect by hand; the controllers do not yet open a Decision Item for each class"
   - id: kernel-start-repeats-one-failure
     family: failure-while-running
     finding: {role: runtime, duty: does, verdict: departs, evidence: "the StarCi workflow's Kernel seat was started 303 times and every launch failed at the same step, workflow-worktree-install (starci npm ci, npm error code EPERM unlink); the retry repeats the identical launch and reports nothing up, so the Kernel stays down", remedy: {state: open}}

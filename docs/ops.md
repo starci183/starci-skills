@@ -189,7 +189,7 @@ non-green decisions through `modules/kernel/driver-loop.yaml`
 - Owns: one attempt and its worktree. Decides alone: how to do the work inside its contract.
 - Reports to: Kernel (done, blocked, or a question). Overseen by: Kernel.
 - Measure: passes its gate first time.
-- Token budget (provisional): 6000000 per attempt; over it, the Kernel acts on the overrun: it reads the attempt's usage, then stops, re-scopes or switches agent.
+- Token budget (provisional): 6000000 per attempt; over it, the runtime measures each settled attempt from its usage rows (input, output, cache read and cache write tokens) and, for a job waiting on its Kernel, opens a Decision Item budget-overrun: the Kernel continues once, replaces the agent or re-scopes the leg.
 - Principles: P2 P3 P4 P8 (modules/kernel/roles.yaml, principles).
 <!-- roles:end op -->
 

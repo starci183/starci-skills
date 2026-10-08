@@ -135,7 +135,7 @@ function inboxWakePart(unread, fresh, remind) {
 }
 
 function decisionWakePart(openDis, diFresh, diRemind) {
-  return '[decide] ' + openDis.length + ' open Supervisor decision(s)' + (diFresh.length ? ' (new ' + diFresh.join(',') + ')' : '') + (diRemind.length ? ' (still open ' + diRemind.join(',') + ')' : '') + ': starci machine decisions supervisor --list, then claim and resolve each.';
+  return '[decide] ' + openDis.length + ' open Supervisor decision(s)' + (diFresh.length ? ' (new ' + diFresh.join(',') + ')' : '') + (diRemind.length ? ' (still open ' + diRemind.join(',') + ')' : '') + ': starci supervisor status --json, then starci supervisor decide --item <id> --choice <choice> --reason <why> for each.';
 }
 
 function wakeText({ tags, unread, fresh, remind, openDis, diFresh, diRemind, land, report, workerDeaths }) {
@@ -143,9 +143,9 @@ function wakeText({ tags, unread, fresh, remind, openDis, diFresh, diRemind, lan
   if (tags.includes('register')) parts.push(`[register] channel '${SUPERVISOR_ID}' is not registered from this terminal: starci supervisor channel register --id ${SUPERVISOR_ID} --label "Supervisor".`);
   if (tags.includes('inbox')) parts.push(inboxWakePart(unread, fresh, remind));
   if (tags.includes('decide')) parts.push(decisionWakePart(openDis, diFresh, diRemind));
-  if (tags.includes('land')) parts.push(`[land] report(s) filed by ${land.join(', ')}: starci supervisor workers list, then land (starci supervisor land --job <id>) or redirect.`);
-  if (tags.includes('report')) parts.push(`[report] ${report.join(', ')} filed a diagnosis or a blocked/failed report: starci supervisor workers show --job <id>, then decide.`);
-  if (tags.includes('worker')) parts.push(`[worker] ${workerDeaths.map((d) => d.jobId + ' (' + d.reason + ')').join(', ')}: respawn, reassign or take it yourself.`);
+  if (tags.includes('land')) parts.push(`[land] report(s) filed by ${land.join(', ')}: starci supervisor workers show --job <id>; a runtime change is Debug's, so record the defect (starci supervisor actions record --item runtime-defect:<cause>).`);
+  if (tags.includes('report')) parts.push(`[report] ${report.join(', ')} filed a diagnosis or a blocked/failed report: starci supervisor workers show --job <id>, then record the defect it names (starci supervisor actions record --item runtime-defect:<cause>).`);
+  if (tags.includes('worker')) parts.push(`[worker] ${workerDeaths.map((d) => d.jobId + ' (' + d.reason + ')').join(', ')}: record the worker death as a runtime defect (starci supervisor actions record --item runtime-defect:<cause>).`);
   const text = parts.length ? `${WAKE_TAG} ${parts.join(' ')} Act until nothing is executable, then yield; never sleep or poll in a turn.` : null;
   return text;
 }

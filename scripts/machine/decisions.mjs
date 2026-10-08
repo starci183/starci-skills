@@ -37,7 +37,7 @@ export const DI_SCHEMA = 'starci/decision-item@1';
 export const DI_KINDS = Object.freeze(['settle-nongreen', 'worker-question', 'checks-needed', 'graph-edit-needed', 'progress-stall',
   'stale-gate', 'stale-wait', 'unread-peer', 'orphaned-frontier', 'rev-ack', 'supervisor-ruling', 'cross-workflow', 'deadlock',
   'runtime-defect', 'kernel-proposal', 'seat-unrecoverable', 'service-quarantined', 'quota-exhausted', 'experiment-revert',
-  'push-refused', 'retry-decision', 'dispatch-refused', 'cap-starved', 'hypothesis', 'rebase-conflict']);
+  'push-refused', 'retry-decision', 'dispatch-refused', 'cap-starved', 'hypothesis', 'rebase-conflict', 'budget-overrun']);
 const DECIDERS = Object.freeze(['kernel', 'supervisor', 'owner']);
 /**
  * Kinds the Supervisor decides unless the opener names another decider (DESIGN §6.4 escalation column: resource,

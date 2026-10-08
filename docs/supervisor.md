@@ -1,8 +1,8 @@
 Owner: modules/supervisor/
 # Supervisor
 
-One Supervisor decision seat, `[Worker]` fix agents spawned on demand, and one land gate.
-`modules/supervisor/supervise.yaml` defines the seat and its authority. The single
+One Supervisor decision seat. It answers a menu of judgment points and changes no runtime code.
+`modules/supervisor/supervise.yaml` defines the seat and its authority; `modules/supervisor/supervisor-menu.yaml` defines the menu. The single
 long-running host loop is `scripts/reconciler/engine.mjs`: its Job, Workflow,
 Resource, Host, GC, Workers and Learning controllers perform deterministic duties
 and open Decision Items for the Supervisor when judgment is required.
@@ -14,8 +14,7 @@ and open Decision Items for the Supervisor when judgment is required.
 
 - **chat** (default): the owner's desktop chat is the Supervisor. It owns channel `main`
   without an Orca terminal (`channel.mjs register --id main --label <text>`), reads
-  its inbox and Supervisor Decision Items, and fixes through lanes landed by
-  `scripts/supervisor/land.mjs`. `scripts/supervisor/poll.mjs --once` is a read-only
+  its inbox and its menu, and answers the menu with `starci supervisor decide`. `scripts/supervisor/poll.mjs --once` is a read-only
   digest; the chat does not run a deterministic tick. No `[Supervisor]` terminal is
   started in this mode (`start-supervisor.mjs` answers `chat-mode`).
 - **kernel** (optional): `[Supervisor] main` is one long-lived Orca terminal.
@@ -26,14 +25,34 @@ and open Decision Items for the Supervisor when judgment is required.
 Either way: the Supervisor never dispatches ops, never writes a product ledger and never answers an owner ask;
 define-goal and a kernel start run only in the owner's chat, on the owner's own words.
 
+## The menu
+
+`starci supervisor status --json` prints `menu[]`: one item per live Decision Item the Supervisor decides, with the typed choices
+that answer it. `starci supervisor decide --item <id> --choice <choice> --reason <why> [--text <input>]` validates the choice
+against the current menu, records it as a Supervisor action, runs the choice's steps as the `starci` verbs they name and closes the
+item. A choice off the menu is refused with the menu.
+
+| Kind | Items | Choices |
+| --- | --- | --- |
+| `gate-ruling` | a supervisor-gate a Kernel raised | `fixed` (commit), `workaround` (pool), `not-runtime-fault`, `record-defect` |
+| `workflow-conflict` | cross-workflow, deadlock | `rule`, `prioritize` |
+| `resource-division` | cap-starved, quota-exhausted | `prioritize`, `rule` |
+| `kernel-escape` | a Kernel item escalated, a Kernel menu with no fitting option | `rule`, `record-defect` |
+| `runtime-defect` | every other Supervisor item | `record-defect` |
+
+Every item also carries `none-fits`, which records the reason and hands the item to the owner. The guard of the Supervisor seat
+(`modules/kernel/command-policy.yaml`, `supervisor`) allows the reads, `starci supervisor decide`,
+`starci supervisor actions record --item runtime-defect:<cause>`, the owner channel and the collectors the Supervisor owns; any other
+call is refused with the menu and the spelling of the decision verb.
+
 ## Roles
 
 | Role | Responsibility |
 | --- | --- |
-| Supervisor (chat or kernel mode) | Decides runtime and cross-workflow questions from Decision Items, handles owner messages, and fixes through the land gate. It does not dispatch product work or write a product ledger directly. |
-| `[Worker] <cluster>` | Works on one fix cluster in an ephemeral staging checkout with file leases and one report. |
+| Supervisor (chat or kernel mode) | Decides gate rulings, conflicts between workflows and the division of shared resources from its menu, records runtime defects for Debug, and handles owner messages. It changes no runtime code, dispatches no product work and writes no product ledger. |
+| Debug | Fixes the recorded runtime defects in `.claude` with a spec. |
 | Reconciler Host controller | Maintains the Supervisor seat and runs `scripts/supervisor/supervisor-watchdog.mjs --once` in kernel mode. |
-| Reconciler Job controller | Verifies and closes reported `[Worker]` terminals through `sweepWorkers`. |
+| Reconciler Job controller | Settles reports and reconciles dead workers. |
 | Reconciler Workers controller | Opens Supervisor Decision Items for owed work and sends the owner digest through `scripts/reconciler/notifier.mjs`. |
 | Telegram bridge | Files owner messages in channel `main` and relays replies. |
 
@@ -42,7 +61,7 @@ State lives in `machine.sqlite`, written only through `engine/db/machine.mjs` ([
 | Fact | Table |
 | --- | --- |
 | The seat, its terminal, parked state and input failures | `seats`, `deliveries`, `seat_turns`, `seat_transcript_snapshots` |
-| `runtime.fix` jobs, their file leases, attempts and reports | `sup_jobs`, `sup_leases`, `sup_attempts`, `sup_reports` |
+| Worker records of earlier fix jobs, read-only | `sup_jobs`, `sup_leases`, `sup_attempts`, `sup_reports` |
 | Decision Items and decisions | `sup_decision_items`, `sup_decisions` |
 | Owed clusters, lessons, owner rulings | `sup_owed`, `sup_learning`, `sup_owner_rulings` |
 | Channel messages and bridges | `sup_messages`, `sup_bridges`, `sup_signals` |
@@ -116,51 +135,17 @@ snapshots to `metrics_snapshots` and opens and escalates stall Decision Items; t
 clusters into Supervisor Decision Items and includes owner waits in its digest. `op-metrics.mjs` stays a
 read-only measurement command. The harness reads these rows; it never runs `starci kernel status`.
 
-## Worker lifecycle
-
-```
-workers.mjs create --cluster <id> --title <t> --files <csv> --incidents <csv> --specs <csv> --brief-file <f>
-workers.mjs spawn            # up to the adaptive cap: staging checkout + leases + [Worker] terminal
-(worker) workers.mjs report --job <id> --outcome done --commit <sha> --specs <csv> --summary <t>
-land.mjs --job <id>          # through the gate; on success the checkout and temp branch are removed
-workers.mjs list | cap | cancel --job <id> | cleanup
-```
-
-The staging checkout is an Orca worktree of `.claude` (`orca worktree create --name sup-<job>`, made by the runtime
-through `scripts/machine/worktree-orca.mjs` createOrcaWorktree, registry kind `supervisor-staging` keyed by Orca's worktree
-id). Orca picks its path and branch; the job records both, and every reader uses the recorded values. It lives only
-until its commit lands, then goes through the link-safe Orca removal. Cap: at most
-10, default base 4 plus one per two queued jobs, halved under machine load. A worker whose terminal dies without a
-report fails its job; a reported worker is quit and closed. The Supervisor's own changes use
-`workers.mjs stage --self --name <slug> --files <csv>` and land the same way.
-
 ## Land gate
 
+The land gate serves the lead, the coordinator and the owner; the Supervisor lands nothing on the runtime (`RUNTIME_CHANGE_OWNED_BY_DEBUG`).
+A change that loosens a gate (a check removed from a gate file's list, a floor lowered or a ceiling raised there, an allowlist entry added, a spec deleted, weakened or skipped together with product code: `modules/kernel/gate-loosening.yaml`) is owner-class: the gate refuses it as `gate-loosening` and the `gate-loosening` self-check flags it, unless the tree it is judged against already holds the owner's `owner-rulings.yaml` entry `gate-loosening-<fingerprint>` for exactly that loosening.
 `scripts/supervisor/land.mjs`, serialized by a lock that waiters take in request order: cherry-pick onto current main in
 a scratch worktree (a pick with no diff is already landed and moves nothing); then
 `node --check`, YAML/JSON parse, `check-module-yaml`, `check-contract-cites`, `check-cli-parity`, the named specs
 plus the specs that can see the change (`--specs touching`, the default: the named specs, the specs importing or reading a changed file, the specs that spawn the CLI entry of a verb whose handler reaches a changed file and name that verb (the verbs importing a changed file themselves, then the nearest others up to `allocation.landGate.cliVerbs`), the tree-wide invariant specs and a smoke set of at most 24 specs reaching it only through the import graph; `--specs direct` is the same without the smoke set; a land never runs the whole suite - `--specs all` needs `specs.harness: true`, `--specs none` needs `--reason`; the full suite is /starci release's). Current contract and native package/proof checks refuse red or unavailable evidence. Every child of the gate runs with `STARCI_RUNTIME` set to the scratch tree it verifies, never the per-user runtime record. The gate holds no host lock: lands serialize on the land queue. Only when all pass does it take the host lock (purpose `land`, waited for up to 10 minutes, then refused as `host-lock-held` naming the holder), move live main by compare-and-swap, update exactly
 those (clean) paths - each swapped in atomically by rename of a fully written temp (checkout-paths.mjs), so a reader mid-update never opens a partial file); the lock is released then, so a dependency install (`starci npm ci`, a staging checkout) is never starved for the length of a gate. A land runs up to 30 minutes: start it in the background (a shell `timeout` kills it, cancels its ticket and loses the run) and read `land.mjs --status`. Red lands nothing. Lanes already committing directly keep doing so until they finish
-(`landGate.mode: shared`). A land ends at the fast-forward of local main and never pushes: the remote main of the runtime moves once per release (`starci release cut`), the pre-push hook of the runtime repository refuses every other push of it, and the Supervisor's push-mains covers product repositories only. `land.mjs --commit <sha> --lane <name>` moves a lane to the gate, and the owner sets
+(`landGate.mode: shared`). A land ends at the fast-forward of local main and never pushes: the remote main of the runtime moves once per release (`starci release cut`), the pre-push hook of the runtime repository refuses every other push of it, and push-mains covers product repositories only. `land.mjs --commit <sha> --lane <name>` moves a lane to the gate, and the owner sets
 `exclusive` when all have.
-
-## Grammar release
-
-Releasing `@starci/grammar` to npm is a Supervisor duty, done without asking the owner first (owner, 2026-09-25;
-`supervise.yaml` `grammarRelease`). It covers this one package; every other publish stays the owner's. Consumers
-pin registry semver, never a `file:` link.
-
-1. Bump the version in a lane (`packages/grammar/package.json` and `package-lock.json`) by semver: additive is
-   minor or patch, a fix is patch.
-2. Build (`npm ci` then `npm run build` in `packages/grammar`, a real directory, never a `node_modules` junction)
-   and verify the stamp: `starci runtime check --only grammar-dist` is fresh.
-3. Move the CHANGELOG entry under the version with its date; `starci work grammar-knowledge --write`
-   and qualify the actual current knowledge edit through its owning checks.
-4. Land through the gate; `dist/` is untracked, so rebuild `packages/grammar/dist` on live main afterwards.
-5. `npm pack --dry-run` from live `packages/grammar`: the file list is dist, README.md, LICENSE, package.json; and
-   `starci release clean-test` is green for every package of the publish set.
-6. `starci release publish --publish`, then verify the published `@starci/grammar` version in the registry.
-7. Tell the owner afterwards, and the consumer Kernels whose pinned range does not cover the new version.
 
 ## Chat
 

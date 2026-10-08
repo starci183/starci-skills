@@ -1,0 +1,70 @@
+schema: starci/module-supervisor-menu@1
+id: supervisor.menu
+
+# The Supervisor's menu: the judgment points of the machine it may answer now, built by scripts/supervisor/supervisor-menu.mjs from the
+# Decision Items waiting on the Supervisor in machine.sqlite (sup_decision_items). `starci supervisor status --json` prints them as
+# `menu[]`; `starci supervisor decide --item <id> --choice <choice> --reason <text> [--text <input>]` validates the choice against the
+# current menu, records the decision, executes the option's steps and closes the item. A step is one `starci <group> <verb>` call with
+# typed arguments: `$name` takes the value of the item's subject, a value that is not known drops the flag, `$text` takes the caller's
+# --text. Mechanical work never appears here: the controllers do it. Changing .claude is never an option.
+
+about:
+  en: >-
+    A point of judgment that only the Supervisor can settle: a ruling on a gate, a conflict between workflows, the division of a shared
+    resource, or a runtime defect to record for Debug.
+
+# Every menu carries this typed escape: it records the decision and hands the item to the owner as an owner-class Decision Item.
+escape:
+  choice: none-fits
+  effect: "records the reason and hands this item to the owner as an owner-class Decision Item"
+
+# Which Decision Item belongs to which kind. A gate item is a runtime-defect DI whose refs name a gateIncident; a Kernel item escalated to the
+# Supervisor carries the key prefix `escalated:`. A Decision Item that no route names is a runtime-defect.
+routes:
+  - {kind: gate-ruling, when: gateIncident}
+  - {kind: workflow-conflict, diKinds: [cross-workflow, deadlock]}
+  - {kind: resource-division, diKinds: [cap-starved, quota-exhausted]}
+  - {kind: kernel-escape, diKinds: [menu-escape], keyPrefix: 'escalated:'}
+  - {kind: runtime-defect, default: true}
+
+# Dispatch of the weight a prioritised workflow receives.
+priority:
+  weight: 2
+  reserve: 1
+
+kinds:
+  - id: gate-ruling
+    source: "a supervisor-gate a Kernel raised (Decision Item with refs.gateIncident)"
+    question: "{summary}"
+    options:
+      - {choice: fixed, text: commit, steps: [{run: kernel incident, args: {repo: $repo, workflow: $workflow, resolve: $incident, by: supervisor, resolution: fixed, commit: $text, detail: $reason}}], effect: "a runtime fix is on the live runtime: --text is its commit; the gate resolves once the live runtime contains it and wakes the Kernel"}
+      - {choice: workaround, text: route, steps: [{run: kernel incident, args: {repo: $repo, workflow: $workflow, resolve: $incident, by: supervisor, resolution: workaround, route: $text, detail: $reason}}], effect: "the gate resolves and the Kernel dispatches the held job with the pool in --text"}
+      - {choice: not-runtime-fault, steps: [{run: kernel incident, args: {repo: $repo, workflow: $workflow, resolve: $incident, by: supervisor, resolution: not-runtime-fault, detail: $reason}}], effect: "the gate resolves back to the Kernel, which must act on the cause; --reason is the evidence"}
+      - {choice: record-defect, text: cause, keepsOpen: true, steps: [{run: supervisor actions, args: {_: record, item: "runtime-defect:$text", action: recorded, reason: $reason, workflow: $workflow, refs: $refs}}], effect: "records the runtime defect (--text is a short cause slug) in the defect queue for Debug; the gate stays open for its ruling"}
+
+  - id: workflow-conflict
+    source: "Decision Items cross-workflow and deadlock"
+    question: "{summary}"
+    options:
+      - {choice: rule, text: ruling, steps: [{run: supervisor notify, args: {repo: $repo, workflow: $workflow, text: $text, item: $key}}], effect: "sends --text to the workflow's Kernel as a durable Supervisor ruling"}
+      - {choice: prioritize, text: workflow, steps: [{run: supervisor ram-cap, args: {_: prioritize, workflow: $text, weight: $weight, reserve: $reserve}}], effect: "gives the workflow in --text the priority weight and reserve of this table"}
+
+  - id: resource-division
+    source: "Decision Items cap-starved and quota-exhausted"
+    question: "{summary}"
+    options:
+      - {choice: prioritize, steps: [{run: supervisor ram-cap, args: {_: prioritize, workflow: $workflow, weight: $weight, reserve: $reserve}}], effect: "gives {workflow} the priority weight and reserve of this table"}
+      - {choice: rule, text: ruling, steps: [{run: supervisor notify, args: {repo: $repo, workflow: $workflow, text: $text, item: $key}}], effect: "sends --text to the workflow's Kernel as a durable Supervisor ruling on the shared resource"}
+
+  - id: kernel-escape
+    source: "a Kernel item escalated to the Supervisor, and the Decision Item menu-escape: no option of a Kernel's menu fit"
+    question: "{summary}"
+    options:
+      - {choice: rule, text: ruling, steps: [{run: supervisor notify, args: {repo: $repo, workflow: $workflow, text: $text, item: $key}}], effect: "sends --text to the workflow's Kernel as a durable Supervisor ruling"}
+      - {choice: record-defect, text: cause, steps: [{run: supervisor actions, args: {_: record, item: "runtime-defect:$text", action: recorded, reason: $reason, workflow: $workflow, refs: $refs}}], effect: "records the runtime defect (--text is a short cause slug) in the defect queue for Debug"}
+
+  - id: runtime-defect
+    source: "every other Decision Item decided by the Supervisor: a defect of the runtime, a seat or a push"
+    question: "{summary}"
+    options:
+      - {choice: record-defect, text: cause, steps: [{run: supervisor actions, args: {_: record, item: "runtime-defect:$text", action: recorded, reason: $reason, workflow: $workflow, refs: $refs}}], effect: "records the runtime defect (--text is a short cause slug) in the defect queue for Debug and closes the item"}

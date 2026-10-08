@@ -121,6 +121,9 @@ for (const role of [...GUARDED, 'release', 'owner']) {
     for (const row of CASES) {
       const verdict = decisionOf(policyRole, row.text);
       const expected = role === 'owner' || role === 'release' || row.code == null || row.roles?.includes(role) ? null : row.code;
+      // The Supervisor seat has its own table (tests/guards/supervisor-seat.spec.mjs): it may be refused more than the others, never less.
+      if (role === 'supervisor' && !expected) continue;
+      if (role === 'supervisor') { assert.ok(verdict, `${role}: ${row.text}`); continue; }
       assert.equal(verdict?.code ?? null, expected, `${role}: ${row.text}`);
       if (expected && row.use) assert.match(verdict.use, row.use, `${role}: ${row.text} names the allowed path`);
     }

@@ -3647,6 +3647,26 @@ starci supervisor channel inbox --id main --peek
 starci supervisor channel reply --id main --text <text> --to <message-id>
 ```
 
+### starci supervisor decide
+
+answer one item of the Supervisor's menu with one typed choice
+
+| flag | type | |
+| --- | --- | --- |
+| `--item` | string |  |
+| `--choice` | string |  |
+| `--reason` | string |  |
+| `--text` | string |  |
+
+exit: 0 the choice was executed and the item closed; 1 the choice is not on the menu, an input is missing, or a step failed; 2 bad usage
+
+json: flag
+
+```sh
+starci supervisor decide --item gate-ruling:<id> --choice not-runtime-fault --reason <evidence>
+starci supervisor decide --item workflow-conflict:<id> --choice rule --text <ruling> --reason <why>
+```
+
 ### starci supervisor direct-commits
 
 find runtime main commits that bypassed the exclusive land gate
@@ -3940,7 +3960,11 @@ starci supervisor start --plan
 
 ### starci supervisor status
 
-print whether the Supervisor seat is enabled and healthy
+print the Supervisor seat status and its menu of open judgment points
+
+| flag | type | |
+| --- | --- | --- |
+| `--menu` | boolean |  |
 
 exit: 0 status printed; 2 bad usage
 
@@ -3948,6 +3972,7 @@ json: flag
 
 ```sh
 starci supervisor status
+starci supervisor status --json
 ```
 
 ### starci supervisor stop

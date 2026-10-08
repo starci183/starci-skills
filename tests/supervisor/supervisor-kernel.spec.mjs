@@ -1,5 +1,5 @@
 // The one [Supervisor] kernel, its [Worker] fix agents, the land gate and the chat relay
-// (modules/supervisor/supervise.yaml kernelSeat/workers/landGate/chat, docs/supervisor.md).
+// (modules/supervisor/supervise.yaml kernelSeat and chat, docs/supervisor.md).
 // Every spec runs on a temp supervisor home, a temp STARCI_LOCAL_ROOT and, for git, a temp repository:
 // no live Orca (a [Worker] staging checkout goes through the fake Orca worktree client,
 // tests/helpers/fake-orca-worktrees.mjs), no agent, no network, never the live runtime.
@@ -325,11 +325,12 @@ test('a seat start from the reconciler (no ORCA_TERMINAL_HANDLE) names an existi
 test('the prompt doctrine is built from supervise.yaml kernelSeat', () => {
   const doc = parseYaml(fs.readFileSync(new URL('../../modules/supervisor/supervise.yaml', import.meta.url), 'utf8'));
   const text = doctrineOf(doc);
-  assert.match(text, /single brain/);
+  assert.match(text, /single decision desk/);
   assert.match(text, /never answers|answers an owner ask/);
   assert.ok(doc.guardrails.some((g) => g.id === 'one-supervisor-seat'));
   assert.ok(!doc.guardrails.some((g) => g.id === 'chat-only-debug-mode'), 'the chat-only rule is replaced');
-  for (const key of ['kernelSeat', 'workers', 'landGate', 'chat']) assert.ok(doc[key], key);
+  for (const key of ['kernelSeat', 'chat']) assert.ok(doc[key], key);
+  for (const key of ['workers', 'landGate', 'grammarRelease']) assert.equal(doc[key], undefined, `${key} is removed from the Supervisor's law`);
 });
 
 /* ------------------------------------------------------------ workers */
@@ -925,7 +926,7 @@ test('status block and clustering', (t) => {
 
 /* ------------------------------------------------------------ 2026-09-24 live defects */
 
-test('the Supervisor seat launches with its subagent tool denied; the prompt sends diagnosis to [Worker]s', async (t) => {
+test('the Supervisor seat launches with its subagent tool denied; the prompt says it has no subagents', async (t) => {
   // worker-start takes no provider argv, so the denial is a seat guard bound to the seat's terminal and enforced by
   // the project PreToolUse hook (scripts/guards/seat-tools.mjs) - for that terminal only.
   assert.deepEqual([...SEAT_DENIED_TOOLS.claude], ['Agent', 'Task']);
@@ -945,7 +946,7 @@ test('the Supervisor seat launches with its subagent tool denied; the prompt sen
   const settings = JSON.parse(fs.readFileSync(new URL('../../.claude/settings.json', import.meta.url), 'utf8'));
   assert.match(JSON.stringify(settings.hooks.PreToolUse), /starci\\" guard seat-tools/);
   const prompt = fs.readFileSync(new URL('../../modules/supervisor/supervisor-prompt.md', import.meta.url), 'utf8');
-  assert.match(prompt, /Diagnosis is a \[Worker\] job too/);
+  assert.match(prompt, /You have no subagents/);
   assert.match(fs.readFileSync(new URL('../../modules/supervisor/worker-prompt.md', import.meta.url), 'utf8'), /`diagnosed`/);
 });
 

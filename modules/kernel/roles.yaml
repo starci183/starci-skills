@@ -67,7 +67,7 @@ rulings:
   supervisor-priority: "The Supervisor answers gates and unblocks workflows; anything the machine can resolve does not wait for it."
   kernel-judgment: "The Kernel role is judgment only: dispatch-ready, bounded retry and agent switch belong to the runtime."
   op-reports-to-kernel: "An Op reports into the ledger, addressed to its Kernel; never to a seat's memory or terminal, and never to the Supervisor, the owner, Debug or another workflow."
-  loosening-is-owner-class: "Any change that loosens a gate or check (a check removed from a list, a threshold lowered, an allowlist or baseline entry added, a test deleted or weakened with product code) is owner-class: nobody relaxes a gate to let a workflow pass."
+  loosening-is-owner-class: "Any change that loosens a gate or check (a check removed from a list, a threshold lowered, an allowlist or baseline entry added, a test deleted or weakened with product code) is owner-class: nobody relaxes a gate to let a workflow pass. modules/kernel/gate-loosening.yaml defines it mechanically; the land gate refuses such a change and the gate-loosening self-check flags it unless the owner's approval of exactly that loosening (an owner-rulings entry gate-loosening-<fingerprint>) is already in the tree it is judged against."
   critic-coverage: "An independent Critic runs today for drawing. scope.define and architecture.decide are owed one single-pass Critic on the frontier tier from another provider than the op (registry entry critic-coverage-decision-legs)."
   debug-is-time-boxed: "Debug is a time-boxed auditor of role conformance for the stabilisation phase, bound to a chat session; the runtime is self-sufficient, every edge case Debug meets becomes a rule plus a spec, and the loop is set up no more once the end condition of the debug role holds."
   debug-channels: "Debug speaks only through runtime channels (starci supervisor tell; a durable ruling to a Kernel through the Supervisor's notify), never by typing into a seat's terminal, and never to an Op or a Critic."
@@ -115,7 +115,7 @@ roles:
       status: provisional
       source: "the usage rows of the first real workflows: a decision leg spent 6 to 17 million tokens (10.8 million in the audit of the first real workflow)"
       perAttempt: {default: 6000000}
-      onExceed: "the Kernel acts on the overrun: it reads the attempt's usage, then stops, re-scopes or switches agent"
+      onExceed: "the runtime measures each settled attempt from its usage rows (input, output, cache read and cache write tokens) and, for a job waiting on its Kernel, opens a Decision Item budget-overrun: the Kernel continues once, replaces the agent or re-scopes the leg"
     cleanup:
       - "its own processes, temp files and servers, before it reports"
     never:

@@ -26,3 +26,14 @@ export function orcaSelfLifecycleAllowed({ role, args, handle, policy }) {
   const types = entry.typesByRole?.[role] ?? entry.types;
   return !types || types.includes(options.get('--type'));
 }
+
+/**
+ * The option a role may not use on a policy-listed lifecycle call ('refuse-for' in the policy entry), or null: an Op that names
+ * a recipient (--to) or another Run (--run) addresses someone other than its own Kernel.
+ */
+export function orcaAddressedOption({ role, args, policy }) {
+  const lifecycle = policy.orca?.['self-lifecycle'];
+  if (args[0] !== lifecycle?.group) return null;
+  const refused = lifecycle.verbs?.[args[1]]?.['refuse-for']?.[role] ?? [];
+  return args.slice(2).map((word) => String(word).split('=', 1)[0]).find((name) => refused.includes(name)) ?? null;
+}
