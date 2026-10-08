@@ -7,13 +7,14 @@
 //   E3  the no-op agent runs scripts/api/orca/send.mjs with its own ids - the exact path `starci kernel report` uses to send
 //       worker_done - then: does the Dispatch settle (worker-show state succeeded), and does Orca itself read the Task
 //       completed (task-list, read BEFORE any update: Orca accepts a later same-state task-update, so a refusal proves nothing)?
-//   E1  worker-release on a settled Claude, Codex and Devin worker: does any agent process remain afterwards?
+//   E1  worker-release on a settled Claude, Codex and Devin worker (one test each): does any agent process remain afterwards?
 // The result of a run is printed as one JSON line per smoke (SMOKE-E3 / SMOKE-E1) for the lane report.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { status as orcaStatus } from '../../scripts/api/orca/status.mjs';
 import { startAgent } from '../../scripts/agent/lib.mjs';
+import { noopAgent } from '../../scripts/kernel/launch-smoke-models.mjs';
 import { workerOutput } from '../../scripts/machine/worker-output.mjs';
 import { workerShow } from '../../scripts/api/orca/worker-show.mjs';
 import { workerStop } from '../../scripts/api/orca/worker-stop.mjs';
@@ -22,6 +23,9 @@ import { taskList } from '../../scripts/api/orca/task-list.mjs';
 import { processList as listHostProcesses } from '../../scripts/api/process/process-list.mjs';
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
+// A real launch is authorised by the owner's own launchTrust decision (the checkout's config.yaml). The suite preload hides
+// that file from a spec, so a live run reads it from under the checkout root.
+if (process.env.STARCI_ORCA_LIVE === '1' || process.env.STARCI_REQUIRE_ORCA_LIVE === '1') process.env.STARCI_OWNER_CONFIG_WITHIN = ROOT;
 const AGENTS = ['claude', 'codex', 'devin'];
 const AGENT_PROCESS_WHERE = "Name='claude.exe' OR Name='codex.exe' OR Name='devin.exe'";
 const NOOP_SPEC = `This is a smoke test. Do not read, edit, create or delete anything. Run exactly one shell command, with your own ids from your Orca worker preamble (your task id, your dispatch id, and your terminal handle as --from): node ${ROOT}scripts/api/orca/send.mjs --task-id <your task id> --dispatch-id <your dispatch id> --from <your terminal handle> --dispatch-capability <the dcap_ value of the --dispatch-capability flag in your Orca preamble> --outcome succeeded --report-path smoke . Do not send worker_done any other way. Then stay idle and never exit.`;
@@ -41,12 +45,18 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const agentPids = () => new Map((listHostProcesses({ where: AGENT_PROCESS_WHERE, timeoutMs: 30000 }) ?? []).map((p) => [p.pid, p]));
 
 // The runtime's one launch path (startAgent -> spawnAgent): pre-trusts the directory, so the first-run trust prompt
-// cannot hold the agent, creates the Run from this terminal, starts with --spec and attests the agent.
+// cannot hold the agent, creates the Run from this terminal, starts with --spec and attests the agent. The launch names
+// the cheapest priced tier member of the provider that meets the worker floors (noopAgent: the member modules/models/tiers.yaml
+// declares, its tier and effort), so the admission allow group is that one concrete member.
 async function startNoop(agent, label) {
-  const started = startAgent({ provider: agent, worktree: ROOT, title: `smoke settled ${label}`, prompt: NOOP_SPEC, objective: `smoke settled ${label}`,
+  const member = noopAgent({ provider: agent });
+  assert.ok(!member.error, `no-op member of ${agent}: ${member.error}`);
+  const started = startAgent({ provider: agent, model: member.model, effort: member.effort, role: 'worker', tier: member.tier,
+    allowGroup: [{ provider: agent, model: member.model, pool: member.pool, effort: member.effort }],
+    worktree: ROOT, title: `smoke settled ${label}`, prompt: NOOP_SPEC, objective: `smoke settled ${label}`,
     entry: process.env.ORCA_TERMINAL_HANDLE, request: { smoke: 'settled', label, at: Date.now() } });
-  console.log(`SMOKE-START ${JSON.stringify({ label, ok: started.ok, dispatchId: started.dispatchId ?? null, runId: started.runId ?? null, step: started.step ?? null, error: started.error ?? null })}`);
-  assert.ok(started.ok, `start ${agent}: ${started.error ?? started.step}`);
+  console.log(`SMOKE-START ${JSON.stringify({ label, member: `${member.model}/${member.effort ?? '-'}/${member.tier}`, ok: started.ok, dispatchId: started.dispatchId ?? null, runId: started.runId ?? null, step: started.step ?? null, error: started.error ?? null, refused: started.ok ? null : { detail: started.detail ?? null, rejected: started.decision?.rejected ?? null } })}`);
+  assert.ok(started.ok, `start ${agent}: ${started.error ?? started.step}${started.detail ? ` (${started.detail})` : ''}`);
   return started;
 }
 // Before any teardown: the dispatch id and the pane tail, so a stall (a trust prompt, a login) is diagnosable.
@@ -76,21 +86,23 @@ test('E3: worker_done settles the Dispatch and Orca completes its Task', { skip,
   } finally { teardown(a.dispatchId); }
 });
 
-test('E1: worker-release leaves no agent process (Claude, Codex, Devin)', { skip, timeout: 900_000 }, async () => {
-  const results = {};
-  for (const agent of AGENTS) {
+// One test per provider: a provider the host cannot admit (its account window was not refreshed by Orca, a login that expired)
+// fails on its own and leaves the other providers' verdicts standing.
+for (const agent of AGENTS) {
+  test(`E1: worker-release leaves no ${agent} agent process`, { skip, timeout: 600_000 }, async () => {
     const before = agentPids();
     const a = await startNoop(agent, `e1-${agent}`);
-    await until(() => workerShow({ dispatch: a.dispatchId }), (r) => SETTLED.includes(r.state), 240_000);
-    diagnose(`e1-${agent}`, a);
-    const during = agentPids();
-    const started = [...during.keys()].filter((pid) => !before.has(pid));
-    const released = teardown(a.dispatchId);
-    await sleep(10_000);
-    const after = agentPids();
-    const left = started.filter((pid) => after.has(pid));
-    results[agent] = { released: released.ok, startedPids: started, leftAfterRelease: left };
-  }
-  console.log(`SMOKE-E1 ${JSON.stringify(results)}`);
-  for (const [agent, r] of Object.entries(results)) assert.deepEqual(r.leftAfterRelease, [], `${agent}: agent process left after worker-release`);
-});
+    let released = null;
+    try {
+      await until(() => workerShow({ dispatch: a.dispatchId }), (r) => SETTLED.includes(r.state), 240_000);
+      diagnose(`e1-${agent}`, a);
+      const started = [...agentPids().keys()].filter((pid) => !before.has(pid));
+      released = teardown(a.dispatchId);
+      await sleep(10_000);
+      const after = agentPids();
+      const left = started.filter((pid) => after.has(pid));
+      console.log(`SMOKE-E1 ${JSON.stringify({ agent, released: released.ok, startedPids: started, leftAfterRelease: left })}`);
+      assert.deepEqual(left, [], `${agent}: agent process left after worker-release`);
+    } finally { if (!released) teardown(a.dispatchId); }
+  });
+}

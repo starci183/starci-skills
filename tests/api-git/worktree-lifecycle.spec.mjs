@@ -185,6 +185,21 @@ test('the ban check fires on a stray `git worktree add` and on nothing else', (t
   assert.equal(live.ok, true, `the runtime itself is clean: ${JSON.stringify(live.hits.slice(0, 3))}`);
 });
 
+test('the ban check fires on an Orca worktree removal outside scripts/machine/worktree-orca.mjs and on nothing else', () => {
+  const hit = (text, file = 'scripts/x.mjs') => strayLines(text, file).filter((h) => h.orcaRemoval).length;
+  assert.equal(hit("import { worktreeRm } from '../api/orca/worktree-rm.mjs';\n"), 1);
+  assert.equal(hit("const m = await import('../api/orca/worktree-rm.mjs');\n"), 1);
+  assert.equal(hit("orcaCall('worktree-rm', { worktree });\n"), 1);
+  assert.equal(hit("run(['worktree', 'rm', '--force', id]);\n"), 1);
+  assert.equal(hit('execSync(`orca --json worktree rm --worktree ${id}`);\n'), 1);
+  assert.equal(hit('orca worktree rm --worktree x\n', 'scripts/clean.sh'), 1);
+  assert.equal(hit("git(repoRoot, ['worktree', 'remove', '--force', dir]);\n"), 0, 'git has its own removal');
+  assert.equal(hit("// import { worktreeRm } from './worktree-rm.mjs'; orca worktree rm\n"), 0);
+  assert.equal(hit("return { error: 'orca worktree rm refused' };\n"), 0);
+  assert.equal(hit("import { worktreeRm } from '../api/orca/worktree-rm.mjs';\n", 'scripts/machine/worktree-orca.mjs'), 0, 'the owner');
+  assert.equal(hit("const r = orcaCall('worktree-rm', { worktree, force });\n", 'scripts/api/orca/worktree-rm.mjs'), 0, 'the call file');
+});
+
 /** Every file under `root` (links reported, never followed) -> sha256; a stable picture of a tree. */
 function picture(root) {
   const out = {};

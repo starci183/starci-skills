@@ -8,7 +8,9 @@
 // registers it in machine.sqlite and hands it to the GC. A `git worktree add` anywhere else - another file, or the call
 // file outside that function - is red, and so is a
 // createScratchWorktree call that names an Orca kind (scripts/lib/worktree-kinds.mjs ORCA_KINDS: an agent's workspace made by
-// git; createScratchWorktree also refuses it at run time). A land gate tree check (scripts/supervisor/land.mjs
+// git; createScratchWorktree also refuses it at run time). The removal has one home too: Orca walks a junction and deletes what it
+// leads to, so the Orca removal call (scripts/api/orca/worktree-rm.mjs) is imported, called through orcaCall or spelled
+// `orca worktree rm` only by scripts/machine/worktree-orca.mjs, which hands Orca a tree without a link. A land gate tree check (scripts/supervisor/land.mjs
 // TREE_CHECKS) and part of `npm run check`.
 //
 // It scans every tracked script outside tests/ (.mjs .js .cjs .ts .ps1 .sh; node_modules and the packages' copied
@@ -44,6 +46,14 @@ const KIND_LITERAL = /\bkind\s*:\s*['"`]([a-z-]+)['"`]/;
 const SHELL_CALL = /\b(?:exec|execSync|execFile|execFileSync|spawn|spawnSync)\s*\(|\bshell\s*:/;
 const SHELL_SCRIPT = /\.(?:ps1|sh)$/;
 
+/** The two files that may name the Orca removal: the call file and the module that hands it a link-free tree. */
+const ORCA_RM_HOMES = new Set(['scripts/api/orca/worktree-rm.mjs', 'scripts/machine/worktree-orca.mjs']);
+const ORCA_RM_IMPORT = /\bfrom\s+['"][^'"]*worktree-rm\.mjs['"]|\bimport\s*\(\s*['"][^'"]*worktree-rm\.mjs['"]|\borcaCall\s*\(\s*['"`]worktree-rm['"`]/;
+const ORCA_RM_ARGV = /['"`]worktree['"`]\s*,\s*['"`]rm['"`]/;
+const ORCA_RM_SHELL = new RegExp(String.raw`${SHELL_PREFIX.source.replace('git', 'orca')}(?:\s+--?[\w-]+)*\s+worktree\s+(?:rm|remove)\b`);
+/** Whether a line removes an Orca worktree outside its homes: an import of the call file, an orcaCall of it, the argument list `worktree, rm`, or `orca worktree rm` handed to a shell. */
+const orcaRemoval = (line, file, script) => !ORCA_RM_HOMES.has(file) && (ORCA_RM_IMPORT.test(line) || ORCA_RM_ARGV.test(line) || (ORCA_RM_SHELL.test(line) && (script || SHELL_CALL.test(line))));
+
 /** The 1-based [first, last] lines of `export function <name>(` in a module's text (to its `}` at column 0), or null. */
 function functionSpan(text, name) {
   const lines = String(text).split(/\r?\n/);
@@ -65,9 +75,18 @@ export function strayLines(text, file = 'x.mjs', { allowed = null } = {}) {
     if (allowed && i + 1 >= allowed[0] && i + 1 <= allowed[1]) return;
     const shell = SHELL_FORM.test(line) && (script || SHELL_CALL.test(line));
     const orcaKind = SCRATCH_CALL.test(line) && ORCA_KINDS.includes(KIND_LITERAL.exec(line)?.[1]);
-    if (ARGV_FORM.test(line) || shell || orcaKind) out.push({ line: i + 1, text: line.trim().slice(0, 200), ...(orcaKind ? { orcaKind: KIND_LITERAL.exec(line)[1] } : {}) });
+    const orcaRm = orcaRemoval(line, file, script);
+    if (ARGV_FORM.test(line) || shell || orcaKind || orcaRm) out.push({ line: i + 1, text: line.trim().slice(0, 200), ...(orcaKind ? { orcaKind: KIND_LITERAL.exec(line)[1] } : {}), ...(orcaRm ? { orcaRemoval: true } : {}) });
   });
   return out;
+}
+
+/** The report line of one hit. */
+function describeHit(h) {
+  const where = `  ${h.file}:${h.line}  `;
+  if (h.orcaRemoval) return `${where}an Orca worktree is removed only through scripts/machine/worktree-orca.mjs (links unlinked first, then scripts/api/orca/worktree-rm.mjs): ${h.text}`;
+  if (h.orcaKind) return `${where}createScratchWorktree asked for Orca kind ${h.orcaKind} (an agent workspace is created by Orca through createOrcaWorktree): ${h.text}`;
+  return `${where}git worktree add outside ${WORKTREE_API} ${WORKTREE_ADD_HOME} (an agent workspace is created by Orca, a runtime scratch tree by scripts/machine/worktree-git.mjs createScratchWorktree): ${h.text}`;
 }
 
 const scanned = (rel) => EXTENSIONS.test(rel) && !rel.startsWith('tests/') && !rel.includes('node_modules/') && !/^packages\/[^/]+(?:\/[^/]+)?\/runtime\//.test(rel);
@@ -100,12 +119,8 @@ function main(argv) {
   const r = scanWorktreeAdd(root);
   if (asJson) console.log(JSON.stringify(r, null, 2));
   else {
-    for (const h of r.hits) {
-      console.log(h.orcaKind
-        ? `  ${h.file}:${h.line}  createScratchWorktree asked for Orca kind ${h.orcaKind} (an agent workspace is created by Orca through createOrcaWorktree): ${h.text}`
-        : `  ${h.file}:${h.line}  git worktree add outside ${WORKTREE_API} ${WORKTREE_ADD_HOME} (an agent workspace is created by Orca, a runtime scratch tree by scripts/machine/worktree-git.mjs createScratchWorktree): ${h.text}`);
-    }
-    console.log(r.ok ? `check-worktree-add: only ${WORKTREE_API} ${WORKTREE_ADD_HOME} runs git worktree add (${r.files} files)` : `check-worktree-add: red (${r.hits.length} stray)`);
+    for (const h of r.hits) console.log(describeHit(h));
+    console.log(r.ok ? `check-worktree-add: only ${WORKTREE_API} ${WORKTREE_ADD_HOME} runs git worktree add and only scripts/machine/worktree-orca.mjs removes an Orca worktree (${r.files} files)` : `check-worktree-add: red (${r.hits.length} stray)`);
   }
   return r.ok ? 0 : 1;
 }
