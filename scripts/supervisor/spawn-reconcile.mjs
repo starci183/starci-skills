@@ -9,6 +9,8 @@ import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { draftText } from '../lib/orca-terminal.mjs';
 import { classifyAgentScreen, exitedAgentPromptRow, frameWithDraft, wakeDeliveryOf } from '../lib/terminal-liveness.mjs';
 import { sendEnterWithProof } from '../kernel/wake-delivery.mjs';
+import { allocationMs } from '../../engine/config.mjs';
+import { hostIncarnation } from '../machine/provider-reservation-restart.mjs';
 
 /** A dead original Dispatch ends its job as failed (not requeued): the worker exited before its Task landed. */
 function failDeadSpawn(pass, job, { terminal, reason }) {
@@ -33,12 +35,23 @@ function spawnSubmitted({ job, shown, frame, terminal, deps, renderPrompt }) {
   return state === 'active' || wakeDeliveryOf({ after: screen, text: prompt }).delivery === 'delivered';
 }
 
+// A host restart after the launch began ended it: the Dispatch is gone from a running Orca (or was never recorded) and the incarnation that started it is over.
+const dispatchGone = (job, worker) => !job.payload.dispatch || String(worker?.error ?? '').startsWith('dispatch_not_found');
+function endedByRestart(pass, job) {
+  const spawnedAt = Number(pass.m.latestSupAttempt(job.job_id)?.spawned_at);
+  const incarnation = hostIncarnation(pass.deps.host ?? {});
+  return incarnation.ok && Number.isFinite(spawnedAt) && incarnation.startedAt - allocationMs('providerReservation.restartToleranceMs') > spawnedAt;
+}
+
 /** Reconcile the original Dispatch only: uncertain effects never authorize another worker. */
 export function reconcileSpawning(pass, job, { markRunning, renderPrompt }) {
   const { m, deps, root } = pass;
-  if (!job.payload.dispatch) return false;
   try {
-    const worker = (deps.workerShow ?? workerShow)({ dispatch: job.payload.dispatch });
+    const worker = job.payload.dispatch ? (deps.workerShow ?? workerShow)({ dispatch: job.payload.dispatch }) : null;
+    if (dispatchGone(job, worker) && endedByRestart(pass, job)) {
+      failDeadSpawn(pass, job, { terminal: job.worker_id ?? null, reason: 'host-restarted' });
+      return true;
+    }
     if (!worker?.ok) return false;
     const terminal = worker.dispatch?.assigneeHandle ?? worker.result?.worker?.agentTerminalHandle ?? job.worker_id;
     if (!terminal || (job.worker_id && job.worker_id !== terminal)) return false;
