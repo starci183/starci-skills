@@ -78,7 +78,7 @@ cases:
     status: covered
   - id: worktree-gc-spec-red-once-under-load
     family: concurrency
-    met: {date: "2026-10-08", where: "the alpha.6 full-suite run: tests/api-git/worktree-lifecycle.spec.mjs 'the GC reclaims orphans...' failed once at the assertion on the ended workflow's removal item, 18.4 s, then passed in 20 of 20 stress runs", evidence: "D:/starci-tmp/alpha6-clean-fulltest.log; stress-1..20.log"}
+    met: {date: "2026-10-08", where: "the alpha.6 full-suite run: tests/api-git/worktree-lifecycle.spec.mjs 'the GC reclaims orphans...' failed once at the assertion on the ended workflow's removal item, 18.4 s, then passed in 20 of 20 stress runs", evidence: "the alpha.6 clean-tree full-suite log and its 20 stress logs"}
     status: open
     why: "not reproduced: three runs of the spec beside six CPU-burning processes passed, and the item's reason was not recorded (the assertion then had no message; it now prints the removal item). The GC makes one Orca worktree remove per pass (kind mutation, replay none) and a refusal is recorded on the row for the next pass; the fake runs one git worktree remove --force. Whether a transient git refusal on Windows or something else failed that removal is not proven, so the fake is not changed on a guess"
   - id: quota-window-unstarted
