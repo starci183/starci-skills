@@ -3313,7 +3313,7 @@ exit: 0 the variable was appended to secret.env; 1 refused and nothing written; 
 json: flag
 
 ```sh
-starci runtime import-held-secret --member <old path of the member>
+starci runtime import-held-secret --member <member-path>
 ```
 
 ### starci runtime install
