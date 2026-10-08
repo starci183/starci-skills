@@ -49,8 +49,20 @@ function diskFiles(root, relative = '') {
   return out;
 }
 
-/** The repository tree as file and directory sets over posix relatives. */
-export function treeOf(root) {
+let runTrees = null;
+
+/** Runs `run` with one tree read per root: every checker of one machine run shares the repository listing instead of spawning git again. */
+export function withTreeCache(run) {
+  const outer = runTrees;
+  runTrees = outer ?? new Map();
+  try {
+    return run();
+  } finally {
+    runTrees = outer;
+  }
+}
+
+function readTree(root) {
   const list = gitFiles(root) ?? diskFiles(root);
   const files = new Set(list);
   const directories = new Set();
@@ -59,6 +71,13 @@ export function treeOf(root) {
     for (let i = 1; i < parts.length; i += 1) directories.add(parts.slice(0, i).join('/'));
   }
   return { files, directories };
+}
+
+/** The repository tree as file and directory sets over posix relatives. */
+export function treeOf(root) {
+  if (!runTrees) return readTree(root);
+  if (!runTrees.has(root)) runTrees.set(root, readTree(root));
+  return runTrees.get(root);
 }
 
 /**

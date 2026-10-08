@@ -14,7 +14,7 @@ import { buildHfsGraph } from './hfs-graph.mjs';
 import { checkTiers, TIER_RULE_IDS } from './tiers.mjs';
 import { checkReachability, REACHABILITY_RULE_IDS } from './reachability.mjs';
 import { checkDeadExports, DEAD_EXPORT_RULE_IDS } from './dead-exports.mjs';
-import { checkRequiredFiles, REQUIRED_FILE_RULE_IDS } from './required-files.mjs';
+import { checkRequiredFiles, REQUIRED_FILE_RULE_IDS, withTreeCache } from './required-files.mjs';
 import { checkClones, CLONE_RULE_IDS } from './clones.mjs';
 import { checkSymbols, SYMBOL_RULE_IDS } from './symbols.mjs';
 import { checkConnectionMap, CONNECTION_RULE_IDS } from './connection-map.mjs';
@@ -321,7 +321,11 @@ function scopeFindings({ config, context, violations, paths, surface }) {
  * Check a target repository. injectedTypeScript exists only for hermetic rule fixtures. `fast` leaves out the checks
  * that read the whole repository to answer (clones, dead exports, repository-wide symbols); the pre-push check of the changed owners uses it.
  */
-export function checkArchitecture({ repositoryRoot, injectedTypeScript, paths = [], base, fast = false, hfs: openedHfs, surface = 'all' } = {}) {
+export function checkArchitecture(options = {}) {
+  return withTreeCache(() => checkArchitectureOnce(options));
+}
+
+function checkArchitectureOnce({ repositoryRoot, injectedTypeScript, paths = [], base, fast = false, hfs: openedHfs, surface = 'all' }) {
   if (!['all', 'lint', 'check'].includes(surface)) throw new Error(`unknown surface ${surface}`);
   let config;
   try {

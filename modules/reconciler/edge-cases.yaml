@@ -500,7 +500,7 @@ cases:
   - id: release-proof-costs-the-whole-not-what-changed
     family: smooth-operation
     finding: {role: runtime, duty: does, verdict: departs, evidence: "duty: the release proof costs what changed, not the whole; the two cuts of 1.0.0-alpha.7 ran 38 rows strictly one after another (4238 s of row time in the second); 36 rows were green and 2 red, the fix touches a few files, and the next cut would repeat all 38", remedy: {state: in-tree, change: "the L4 rows run as a schedule (parity first and beside everything, the example chains and proofs together after the suite), each cut leaves a ledger of its green rows with input digests, a later cut reuses a row with identical inputs (never the three rows the pre-push gate requires), and --rows re-runs named rows alone on the same commit"}}
-    met: {date: "2026-10-08", where: "release cuts of 1.0.0-alpha.7 (D:/starci-tmp/release/cut-alpha7.log, cut-a7-run2.log)", evidence: "second cut: npm test 855 s red, linux-parity 1484 s red, ecommerce-app rows 743 s plus its proof 179 s, the rest green; sum of row times 4238 s"}
+    met: {date: "2026-10-08", where: "release cuts of 1.0.0-alpha.7 (the cut logs of both runs)", evidence: "second cut: npm test 855 s red, linux-parity 1484 s red, ecommerce-app rows 743 s plus its proof 179 s, the rest green; sum of row times 4238 s"}
     rule: {file: scripts/supervisor/release-reuse.mjs, anchor: "chooseRows"}
     spec: tests/supervisor/release-reuse.spec.mjs
     status: covered
@@ -701,6 +701,7 @@ cases:
     met: {date: "2026-10-09", where: "scripts/reconciler/budget-plan.mjs summary of a live overrun", evidence: "the retry options below are refused unit-in-flight until it settles"}
     rule: {file: scripts/reconciler/budget-plan.mjs, anchor: "snooze: true"}
     spec: tests/kernel/attempt-live-usage.spec.mjs
+    status: covered
   - id: verification-not-proportional-to-the-change
     family: smooth-operation
     finding: {role: debug, duty: does, verdict: departs, evidence: "about twelve full-suite runs on 2026-10-08, several on trees where the set of specs the diff can reach would have answered in minutes; a hand-picked file misses dependents (a template fix broke the lite scaffold, one registry file broke 52 specs)", remedy: {state: in-tree, change: "starci test affected computes the set with the land gate selection plus the readers of changed modules and knowledge data and runs each file once; the command policy sends a bound role that runs the root npm test to it; the full suite is the merged-tree run and the release cut"}}
@@ -708,3 +709,8 @@ cases:
     rule: {file: modules/kernel/command-policy.yaml, anchor: "starci test affected --run in the runtime"}
     spec: tests/guards/role-rights.spec.mjs
     status: covered
+  - id: slow-specs-over-the-budget
+    family: smooth-operation
+    met: {date: "2026-10-09", where: "npm run check, RT_SPEC_OVER_BUDGET lines of the 2026-10-08 land record", evidence: "hfs-cli 336s, hfs-scaffold-app 333s, hfs-scaffold-app.e2e 282s, supervisor-kernel 190s, sonar-local 117s, architecture 109s, workflow-checkpoint 93s, hfs-docker-rules 90s, peer-messages 89s, managed-dispatch 80s, kernel-api 69s, launch-smoke 69s"}
+    status: open
+    why: "a spec stays inside its budget: cut at the cause for the hfs family (the failure-code catalog parsed once per file state instead of twice per check, the repository tree listed once per machine run instead of by every checker, app lint starting both ESLint sides, stylelint and the app check together); the scaffold e2e specs keep one real npm ci, one real build and a real Postgres, and the kernel specs (workflow-checkpoint, peer-messages, managed-dispatch, kernel-api, launch-smoke) are bound by one CLI process per assertion step, which needs the verbs callable in-process before a spec can share one process"
