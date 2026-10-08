@@ -432,7 +432,6 @@ cases:
     met: {date: "2026-10-08", where: "role standard completion: the Supervisor menu kind kernel-escape (a Kernel whose menu offered no fitting option) is handled by the Supervisor but names no row, hold or gate cause of the incident policy", evidence: "modules/supervisor/supervisor-menu.yaml kernel-escape; modules/kernel/op-incident-policy.yaml"}
     status: open
     why: "the happy error has a menu kind and a Decision Item (menu-escape) but no policy row with a bound and a chain, so the roles contract cannot name its row"
-    why: "the instruction text of supervisor-prompt.md, supervise.yaml and docs/supervisor.md still describes fix workers and lands; the rewrite is designed in ROLES-STANDARD-alpha8.md"
   - id: spec-reads-owner-live-config
     family: record-vs-reality
     finding: {role: runtime, duty: does, verdict: departs, evidence: "the release cut ran the suite from the live checkout, whose owner config.yaml sets roots.temp and supervisor.landGate: the temp-root, registry-isolation, land-gate and checkpoint specs read that file and failed, though the same commit was green in a lane clone without one", remedy: {state: in-tree, change: "engine/config.mjs shows a spec run an owner config.yaml only from under the spec's temp directory; the checkout's live file never reaches a spec"}}
