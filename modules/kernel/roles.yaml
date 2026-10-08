@@ -163,7 +163,7 @@ roles:
     does:
       - "Grades that product independently: from a different provider than the op that made it, picked through the tier picker (tier frontier, modules/models/tiers.yaml seats.critic), seeing only the product bytes and the rubric handed to it, not the op's context."
       - "Returns ONE typed verdict (starci/critic-verdict@1): pass or fail with evidence for every rubric check, the score against the declared minimum, and the digests of the product bytes it judged. The runtime attaches it to the attempt of the op it judged and the settle gate requires it; a verdict whose digests do not match the attempt's product is refused as stale."
-      - "Is owed by the op kinds listed in modules/kernel/critic.yaml coverage (today interface.draw); a kind declared owed there has no Critic yet."
+      - "Is owed by the op kinds listed in modules/kernel/critic.yaml coverage (today interface.draw, scope.define and architecture.decide); a decision leg is judged once by `starci work decision-critic` against its rubric in modules/kernel/critic-rubrics.yaml, handed the op's decision records and the records they cite, and `starci kernel settle` refuses its done without a fresh passing verdict for exactly those bytes; a kind declared owed there has no Critic yet."
     owns: "one verdict"
     decidesAlone: "the score by the rubric"
     reportsUpWhen: "always, as the verdict attached to the op's attempt"
@@ -175,6 +175,7 @@ roles:
       status: provisional
       source: "an estimate for one round (two renders, the HTML source and the rubric), not yet measured from usage rows"
       perAttempt: {default: 1000000}
+      byKind: "a decision leg declares its own budget in modules/kernel/critic-rubrics.yaml kinds[].tokenBudget (provisional, unmeasured)"
       onExceed: "the wall bound allocation.drawLoop.criticTimeoutMs stops and releases the worker with no verdict (a happy error, critic-unavailable); the token overrun is read from the usage rows once the attempt budget measurement covers Critic dispatches"
     cleanup:
       - "its placement worktree and processes, before it returns the verdict"
@@ -185,14 +186,14 @@ roles:
       - "reads anything but the product files and the rubric handed to it: not the op's worktree, the ledger, a transcript or any other path"
       - "runs anything but the read-only commands and the one write of its verdict file"
     happyErrors:
-      - {id: failing-verdict, row: error-work, what: "the verdict fails the minimum: the work is not good yet; the op redraws and the next round is judged again"}
+      - {id: failing-verdict, row: error-work, what: "the verdict fails the minimum: the work is not good yet; the op redraws (a decision leg revises its records and runs the Critic again) and the next round is judged again"}
       - {id: no-independent-member, row: critic-no-independent-member, what: "no member of the Critic tier is of another provider than the maker: the critique is refused with CRITIC_NO_INDEPENDENT_MEMBER and the op's leg reports blocked 'no independent critic available'; the maker's provider never judges"}
       - {id: critic-unavailable, row: critic-unavailable, what: "the independent members cannot start (login, circuit, capacity, a refused launch, a timeout): the leg reports blocked and finishes again when a member returns"}
       - {id: critic-quota-out, row: critic-quota-out, what: "every independent member is out of tokens: the next independent member takes over, and when none is left the leg waits for the quota to reset"}
     bugSurface:
       - {bug: "the Critic returns no verdict although it reported done", signal: "CRITIC_NO_VERDICT on the round's critique.json (outcome verdict-missing)", detectedBy: scripts/work/critic-verdict.mjs}
       - {bug: "the Critic edited the product bytes it was handed", signal: "CRITIC_PRODUCT_MODIFIED: the digests of the handed files differ after the run", detectedBy: scripts/work/critic-verdict.mjs}
-      - {bug: "the Critic judged other bytes than the attempt's product", signal: "CRITIC_VERDICT_STALE: the verdict's product digests do not match the installed part", detectedBy: scripts/kernel/autopilot-state.mjs}
+      - {bug: "the Critic judged other bytes than the attempt's product", signal: "CRITIC_VERDICT_STALE: the verdict's product digests do not match the installed part (a decision leg: the records the op owns now, judged by scripts/kernel/critic-settle.mjs at settle)", detectedBy: scripts/kernel/autopilot-state.mjs}
       - {bug: "the Critic reached a path outside its directory", signal: "RIGHTS_CRITIC_REACH refusals of the command guard, logged with the terminal", detectedBy: scripts/guards/critic-reach.mjs}
     escalatesTo: kernel
     binds: [P2, P3, P7]

@@ -2,6 +2,7 @@
 import { EVIDENCE_HOST_PATH } from '../../job-artifacts.mjs';
 import { recordSonarJudgment, refusalText } from '../../sonar-settle.mjs';
 import { loopRefusalText, proofRefusalText, recordLoopJudgment, recordProofJudgment } from '../../gate-settle.mjs';
+import { criticRefusalText, recordCriticJudgment } from '../../critic-settle.mjs';
 import { refuseVerb } from './verb-exit.mjs';
 
 function mediaPhase(s, settleProofMedia) {
@@ -56,6 +57,18 @@ async function proofPhase(s, settleOpProofs) {
   return proofs;
 }
 
+// The independent Critic's verdict of a decision leg (scripts/kernel/critic-settle.mjs): a pass without a fresh passing verdict for exactly
+// the op's records now is refused, recorded as the runtime check op-proof (independent-critic) on the attempt; a failing verdict is the op's error-work.
+function criticPhase(s, settleCriticVerdict) {
+  const critic = !s.replay && s.verdict === 'pass' ? settleCriticVerdict(s.db, s.jobId, s.repo) : null;
+  if (!critic) return;
+  const recorded = recordCriticJudgment(s.ledger, { attemptId: critic.attemptId, judgment: critic });
+  if (!recorded.green) {
+    refuseVerb(s, { ok: false, jobId: s.jobId, op: critic.op, reason: recorded.code, code: recorded.code, detail: critic.judged.detail, findings: critic.judged.findings, criticStatus: recorded.status },
+      criticRefusalText(critic.op, critic.judged, s.jobId));
+  }
+}
+
 function drawnPhase(s, settleDrawAcceptance) {
   const drawn = !s.replay && s.verdict === 'pass' ? settleDrawAcceptance(s.db, s.jobId, s.repo, null, null) : null;
   if (!drawn) return;
@@ -89,11 +102,12 @@ function hygienePhase(s, settleWorkHygiene) {
  * its frozen decision; a fresh pass returns the exact native proof identity. */
 export async function settlePreflight({ ledger, args, repo, emit, internals, replay, verdict, jobId }) {
   const s = { db: ledger.db, ledger, args, repo, emit, replay, verdict, jobId };
-  const { settleProofMedia, settleSonarGate, settleOpGate, settleOpProofs, settleDrawAcceptance, settleDrawMetrics, settleWorkHygiene } = internals;
+  const { settleProofMedia, settleSonarGate, settleOpGate, settleOpProofs, settleCriticVerdict, settleDrawAcceptance, settleDrawMetrics, settleWorkHygiene } = internals;
   mediaPhase(s, settleProofMedia);
   sonarPhase(s, settleSonarGate);
   await loopPhase(s, settleOpGate);
   const proofs = await proofPhase(s, settleOpProofs);
+  criticPhase(s, settleCriticVerdict);
   drawnPhase(s, settleDrawAcceptance);
   await metricsPhase(s, settleDrawMetrics);
   hygienePhase(s, settleWorkHygiene);

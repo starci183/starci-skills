@@ -130,6 +130,11 @@ writes:
     content:
       en: "The READ digest (read-digest.mjs --knowledge): every knowledge file the decision cites and the hfs slot of every record written, each with its sha256."
       vi: "Bản tóm tắt ĐỌC (read-digest.mjs --knowledge): mọi tệp knowledge mà quyết định dẫn ra và slot hfs của mọi bản ghi đã viết, kèm sha256 của từng tệp."
+  - id: critic-verdict
+    path: STARCI_JOB_SCRATCH/critic-verdict.json
+    schema: starci/critic-verdict@1
+    content:
+      en: "The independent Critic's typed verdict (starci work decision-critic --kind architecture.decide): the rubric of modules/kernel/critic-rubrics.yaml judged check by check with evidence and fix, the score against the declared minimum, and the sha256 of every record and cited input it was handed. Written by the runtime from the Critic's answer, never by this op."
 steps:
   - reads: [standard, design-patterns, application-stacks]
     writes: [read-digest]
@@ -275,6 +280,10 @@ steps:
         ownership, contract, authority, durable state/effect, compatibility, material
         failure/recovery or quality mechanism belongs here. Revise only that bounded design delta,
         preserve valid unrelated design and invalidate only affected downstream proof."
+  - reads: [business]
+    writes: [critic-verdict]
+    action:
+      en: "Have the decision judged once by the independent Critic before reporting done: after the sds, contract and integration records and the work graph are written and validated, run starci work decision-critic --kind architecture.decide --root <app> --out $STARCI_JOB_SCRATCH/critic-verdict.json [--input <the file holding the request or goal text>] and attach critic-verdict.json. The Critic is a fresh worker of the Critic tier from another provider than yours; it sees only your decision records, the records they cite and the rubric (modules/kernel/critic-rubrics.yaml), and answers with one typed verdict. Exit 1 means the verdict fails: fix every failed check it prints in the records (each carries its fix and its evidence) and run it again - the verdict must name the sha256 of the records as they stand when you report, so any later edit needs a new run. Exit 3 is a hold of the Critic (CRITIC_NO_INDEPENDENT_MEMBER, CRITIC_UNAVAILABLE, CRITIC_QUOTA_OUT, CRITIC_AUTHOR_UNKNOWN): report blocked with that code and the printed detail, never done, and never judge your own work or edit the verdict. starci kernel settle refuses a done without a fresh passing verdict for exactly these bytes (op-critic-verdict-missing, CRITIC_VERDICT_STALE, op-critic-verdict-failed)."
 proofs:
   - id: binding
     requirement:
@@ -317,6 +326,10 @@ proofs:
       en: "starci kernel settle re-reads the attached read-digest.json (runtime check op-proof, proof read-knowledge): a done whose digest is missing (op-read-digest-missing), names no knowledge file or leaves a written record without its hfs slot (op-read-digest-no-knowledge) is refused."
       vi: "starci kernel settle tự đọc lại read-digest.json đính kèm (check op-proof, proof read-knowledge): done thiếu bản tóm tắt (op-read-digest-missing), không nêu tệp knowledge nào hoặc có bản ghi đã viết thiếu slot hfs (op-read-digest-no-knowledge) đều bị từ chối."
     check: scripts/kernel/gate-settle.mjs
+  - id: independent-critic
+    requirement:
+      en: "A Critic of another provider than this op, picked from the Critic tier, judged exactly the architecture.decide records written here and the records they cite against the rubric of modules/kernel/critic-rubrics.yaml, and its verdict passes the declared minimum. starci kernel settle re-reads the attached critic-verdict.json and recomputes the sha256 of the records now (scripts/kernel/critic-settle.mjs): a missing verdict (op-critic-verdict-missing), a verdict of other bytes (CRITIC_VERDICT_STALE) or a failing one (op-critic-verdict-failed, error-work: the next attempt is fed the critique) is refused."
+    check: scripts/kernel/critic-settle.mjs
 blockers:
   - code: OWNERSHIP_UNKNOWN
     condition:
@@ -330,6 +343,9 @@ blockers:
       en: A declared prerequisite is not effectively done, or a required declared input/scope is missing.
         Report node/resource IDs and propose a separately selected graph update when needed; never
         run predecessors or weaken dependsOn/refs to proceed.
+  - code: CRITIC_HOLD
+    condition:
+      en: "The independent Critic could not judge the decision - no member of another provider (CRITIC_NO_INDEPENDENT_MEMBER), none able to start or answer (CRITIC_UNAVAILABLE), or every one out of tokens (CRITIC_QUOTA_OUT). A happy error held by the Kernel (the critic-* holds of modules/kernel/op-incident-policy.yaml). Report blocked naming the code; never self-judge, never skip the verdict."
 placeholders:
   feature: shared
 layoutPolicy:

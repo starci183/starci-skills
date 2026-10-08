@@ -1,0 +1,89 @@
+schema: starci/module-kernel-critic-rubrics@1
+id: kernel.critic-rubrics
+
+# The rubric of the Critic for each decision leg, as data (modules/kernel/critic.yaml coverage names the kinds). Each rubric is derived
+# from the contract of its op (modules/ops/ops/<kind>.yaml proofs and writes) and from the work-record schema of what the op writes
+# (modules/schemas/work-feature.schema.yaml $defs.scope; the sds, contract and integration family schemas), and says what a good
+# decision of that kind must contain and must not contradict. scripts/work/decision-critic-product.mjs decisionRubric turns an entry into the rubric file
+# the Critic reads (checks, gateCap, beautyAnchors - the shape of the drawing rubric, so one verdict reader judges both). The Critic
+# is handed the op's decision records (role product) and the inputs they cite (role input) and nothing else.
+#
+#   minimum    the lowest overall score (1-10, by the anchors) a passing verdict may carry
+#   gateCap    the score a failed gate check caps the verdict at
+#   product    the glob(s), relative to the work root (.starciwork), of the records the op writes; the settle gate re-discovers the
+#              op's product with them, so a verdict that judged a subset of the records is stale
+#   cites      the fields of a product record whose values name the records the decision rests on; each is resolved to a record of
+#              the work root by id and handed as an input
+#   tokenBudget the tokens one critique of this kind may spend (provisional until usage rows of Critic dispatches are measured)
+
+# What one critique may be handed besides the product: the inputs the product cites, resolved to records of the work root by id (or to a
+# file the work root's repository holds), each at most maxBytes, at most maxFiles of them. Past a bound the rest stay cited and unhanded:
+# the verdict lists them under unhanded, and the Critic judges only what it was given.
+inputs:
+  maxFiles: 24
+  maxBytes: 200000
+
+kinds:
+  - id: scope.define
+    op: modules/ops/ops/scope.define.yaml
+    derivedFrom:
+      - "modules/ops/ops/scope.define.yaml proofs[bounded, typed] and writes[scope]"
+      - "modules/schemas/work-feature.schema.yaml $defs.scope"
+    minimum: 7
+    gateCap: 5
+    product:
+      records: ["features/*/index.yaml"]
+    cites: [extensions.work3.scope.nodes.grounding, extensions.work3.scope.deps.from, extensions.work3.scope.deps.to, refs, dependsOn]
+    tokenBudget:
+      status: provisional
+      perAttempt: 600000
+      source: "an estimate for one single-pass critique of one feature record and the records it cites; not yet measured from usage rows"
+    checks:
+      - {id: S1, group: grounding, gate: true, check: "Every node is grounded", test: "Each entry of extensions.work3.scope.nodes names grounding that is the request, a decided record id handed to you, or an inspected path; a node with no grounding, or grounding that names nothing handed or nothing real, fails."}
+      - {id: S2, group: invention, gate: true, check: "No requirement is invented", test: "Every outcome, completion criterion and node follows from the request or from a handed decided record; any item that adds a capability, actor, store or effect that neither states fails. A scope item that cannot be grounded must be an open question, not an entry."}
+      - {id: S3, group: sources, check: "Sources are named", test: "request.source and the grounding of each node point at a named source (a request, a record id, a path), never at 'the codebase' or 'common practice'."}
+      - {id: S4, group: earlier-decisions, gate: true, check: "Earlier decisions are honoured", test: "No node duplicates or contradicts a handed decided record; an existing record is referenced by id and never restated; no exclusion removes what a decided record already owns."}
+      - {id: S5, group: alternatives, check: "Boundary alternatives are weighed", test: "Where the request leaves the boundary open, the record shows the other boundary as an exclusion with its reason or as an open question; a boundary chosen silently where the request or a handed record allows two readings fails."}
+      - {id: S6, group: exclusions, check: "Exclusions carry reasons", test: "Every exclusion has a subject, a path and a reason, and the reason follows from the request, a handed decided record or the effect ceiling."}
+      - {id: S7, group: dependencies, check: "Dependencies are real and acyclic", test: "Every dep names declared node ids with a reason; no node depends on itself or in a cycle; a dependency on a decided record names its real id."}
+      - {id: S8, group: traceability, gate: true, check: "Traceable to the goal", test: "request.goalIdentity and goalRevision are present; the outcome restates the goal without widening it; effectCeiling does not exceed what the request grants."}
+      - {id: S9, group: open-questions, check: "Open questions are honest", test: "Each open question names the exact choice that cannot be resolved; nothing the request already decides is listed as open, and nothing unresolved is decided in a node."}
+    scoreAnchors:
+      - {score: "1-2", anchor: "Invents a scope: nodes without grounding, requirements the goal never stated."}
+      - {score: "3-4", anchor: "Mostly plausible but several nodes ungrounded or a decided record contradicted."}
+      - {score: "5-6", anchor: "Grounded nodes, but exclusions without reasons, silent boundary choices or a widened outcome."}
+      - {score: "7", anchor: "Every node grounded and traceable, earlier decisions honoured; one or two thin reasons."}
+      - {score: "8", anchor: "All checks pass; boundary alternatives visible; a planning operation can consume it without re-reading the request."}
+      - {score: "9-10", anchor: "8, and every exclusion and open question is exact enough that no later leg has to reinterpret the scope."}
+
+  - id: architecture.decide
+    op: modules/ops/ops/architecture.decide.yaml
+    derivedFrom:
+      - "modules/ops/ops/architecture.decide.yaml proofs[implementability, impact-security-coverage, revision-decision-log] and writes[node]"
+      - "modules/schemas/work-sds-component.schema.yaml, work-contract.schema.yaml, work-integration.schema.yaml"
+    minimum: 7
+    gateCap: 5
+    product:
+      records: ["features/*/sds/**/index.yaml", "features/*/contract/**/index.yaml", "features/*/integration/**/index.yaml"]
+    cites: [refs, dependsOn, blockedBy, between, extensions.work3.integrations, extensions.work3.decisionLog.refs]
+    tokenBudget:
+      status: provisional
+      perAttempt: 900000
+      source: "an estimate for one single-pass critique of a handful of design records and the requirement records they cite; not yet measured from usage rows"
+    checks:
+      - {id: A1, group: traceability, gate: true, check: "Traceable to accepted requirements", test: "Every component, contract and integration refs the accepted requirement, decision or constraint records it serves (handed to you); a design element serving no handed requirement fails, and so does a requirement outcome no element owns."}
+      - {id: A2, group: invention, gate: true, check: "No requirement or mechanism is invented", test: "No endpoint, table, event topic, retry count, file layout, private helper, repository path or symbol appears unless a handed accepted constraint makes it necessary; no requirement is added that no handed record states."}
+      - {id: A3, group: alternatives, gate: true, check: "Alternatives are weighed", test: "A core choice (ownership, contract shape, data or commit boundary, an integration) has its alternatives named with why each was not taken, in the record or in its decisionLog; a choice presented as the only possibility where two readings were open fails. A revised record carries exactly one new decisionLog entry naming the gap, the reading, why and the alternatives."}
+      - {id: A4, group: constraints, gate: true, check: "Constraints and earlier decisions are honoured", test: "Stated deployment, storage, trust and compatibility constraints and every handed accepted decision hold; a design that contradicts one, or reverses it without a decision record, fails."}
+      - {id: A5, group: sources, check: "Sources are named", test: "A technology or platform claim cites a primary source or a handed constraint; a design is never presented as a deployed-source observation."}
+      - {id: A6, group: ownership, check: "Ownership is unambiguous", test: "Each state, operation and contract has one logical owner; a contract names between, owner, surface, guarantees and consumerObligations; no write crosses an owner without a contract."}
+      - {id: A7, group: failure, check: "Failure and recovery are resolved", test: "Each significant operation resolves its data or commit boundary, authorization, state or transaction, return and recovery, and its planned verification; material failure cases are named, not left for implementers."}
+      - {id: A8, group: security, check: "Authority, data and threats are assessed", test: "Authority and customer-data effects are explicit; relevant threats and limitations are named; an effect on money, authority or customer data taken without a numbered-option decision record fails."}
+      - {id: A9, group: consistency, check: "References resolve and are consistent", test: "Every refs, dependsOn and between value names a handed record or an element of the same set; there is no dependency cycle; one name per thing across the records."}
+    scoreAnchors:
+      - {score: "1-2", anchor: "A design that serves no handed requirement or invents mechanisms; contradicts an accepted decision."}
+      - {score: "3-4", anchor: "Plausible components but untraceable, constraints ignored or core choices stated as the only way."}
+      - {score: "5-6", anchor: "Traceable and consistent, but alternatives missing, ownership blurred or failure paths left to implementers."}
+      - {score: "7", anchor: "Traceable, constraints honoured, core choices with alternatives; a thin spot in failure or security coverage."}
+      - {score: "8", anchor: "All checks pass; each significant operation resolves owner, contract, boundary, recovery and verification."}
+      - {score: "9-10", anchor: "8, and an implementer needs to invent no material case; every choice shows what was weighed against it."}

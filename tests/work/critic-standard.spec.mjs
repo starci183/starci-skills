@@ -212,7 +212,8 @@ test('the coverage table names every op kind that owes a Critic, and an owed kin
     const entry = registry.cases.find((one) => one.id === row.entry);
     assert.equal(entry?.status, 'open', `${row.kind} is owed and tracked by the open entry ${row.entry}`);
   }
-  assert.deepEqual(contract.coverage.filter((row) => row.status === 'owed').map((row) => row.kind), ['scope.define', 'architecture.decide']);
+  assert.deepEqual(contract.coverage.filter((row) => row.status === 'owed').map((row) => row.kind), [], 'the decision legs are covered (tests/work/critic-decision-legs.spec.mjs)');
+  assert.deepEqual(contract.coverage.map((row) => row.kind), ['interface.draw', 'scope.define', 'architecture.decide']);
   assert.equal(coverageOf('brand.decide'), null);
 });
 

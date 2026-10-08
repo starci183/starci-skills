@@ -125,6 +125,9 @@ export function rubricFor({ workRoot = null, archetype = null, record = null, sh
 /** The gate check ids of a rubric: every check marked gate. */
 const gateIdsOf = (rubric) => [...new Set((rubric.checks ?? []).filter((c) => c?.gate === true).map((c) => String(c.id)))];
 
+/** What the Critic worker is titled and tasked with for the drawing loop; a decision critique passes its own (decision-critic.mjs). */
+const DRAW_SUBJECT = Object.freeze({ title: 'draw', objective: 'independent critique of one draw-loop round' });
+
 /** The one file the critic writes, in its clean directory. */
 export const VERDICT_FILE = 'verdict.json';
 
@@ -155,7 +158,7 @@ export function parseVerdict(text) {
     for (let start = s.lastIndexOf('{', end); start >= 0; start = s.lastIndexOf('{', start - 1)) {
       try {
         const v = JSON.parse(s.slice(start, end + 1));
-        if (v && typeof v === 'object' && Array.isArray(v.checks) && v.beauty != null) return v;
+        if (v && typeof v === 'object' && Array.isArray(v.checks) && (v.beauty ?? v.score) != null) return v;
       } catch { /* keep widening */ }
       if (end - start > 200000) break;
     }
@@ -170,7 +173,7 @@ export function normaliseVerdict(v, rubric) {
     const got = byId.get(String(c.id));
     return { id: String(c.id), pass: got ? got.pass === true || got.pass === 'P' || got.pass === 'pass' : false, evidence: got?.evidence ?? (got ? '' : 'the critic did not judge this check'), fix: got?.fix ?? null };
   });
-  let beauty = Number(v?.beauty);
+  let beauty = Number(v?.beauty ?? v?.score);
   if (!Number.isFinite(beauty)) beauty = null;
   const gateFailed = gateIdsOf(rubric).filter((id) => checks.find((c) => c.id === id)?.pass === false);
   if (beauty != null && gateFailed.length && Number.isFinite(Number(rubric.gateCap))) beauty = Math.min(beauty, Number(rubric.gateCap));
@@ -242,11 +245,11 @@ export function removeCriticWorkspace({ dir, repoRoot, orcaId, branch = null, en
  * worker-start --spec --agent --model --effort, worker-show attestation). `orca` replaces the Orca client
  * (clientOf). The launch receipt of scripts/agent/lib.mjs startAgent.
  */
-export function launchCriticWorker({ critic, dir, prompt, entry = null, parentDispatch = null, orca = null, context = null }) {
+export function launchCriticWorker({ critic, dir, prompt, entry = null, parentDispatch = null, orca = null, context = null, subject = DRAW_SUBJECT }) {
   const guardFile = writeCriticGuard({ dir, verdictFile: VERDICT_FILE, context, id: path.basename(dir) });
   return clientOf(orca).launch({ provider: critic.provider, model: critic.model, effort: critic.effort ?? null, worktree: dir, onCreated: bindCriticTerminal(guardFile),
     role: 'critic', tier: critic.tier ?? null, author: critic.author, allowGroup: critic.allowGroup ?? [{ provider: critic.provider, model: critic.model, effort: critic.effort }],
-    title: `[Critic] draw ${critic.model}`, prompt, objective: 'independent critique of one draw-loop round', entry, parentDispatch,
+    title: `[Critic] ${subject.title} ${critic.model}`, prompt, objective: subject.objective, entry, parentDispatch,
     // Its clean directory is made once per round (criticWorkspace): the launch's ledger identity.
     request: { critic: dir } });
 }
@@ -292,7 +295,7 @@ async function awaitCritic({ client, runId, entry, dispatchId, terminal, taskId,
  * `parentDispatch` the op's Dispatch the critic nests under (the depth preflight).
  * Returns the critique.json body (never throws): {schema, outcome, critic, rubric, verdict|null, error|null}.
  */
-export async function runCritic({ images, html, rubric, critic, minimum = null, orca = null, entry = readEnv('ORCA_TERMINAL_HANDLE') || null, placement = {},
+export async function runCritic({ images = [], html = null, rubric, critic, minimum = null, orca = null, spec = null, entry = readEnv('ORCA_TERMINAL_HANDLE') || null, placement = {},
   parentDispatch = placement?.context?.dispatchId ?? (orca ? null : opContextOf()?.dispatchId ?? null),
   pollMs = DEFAULT_POLL_MS, sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), now = Date.now }) {
   const rubricInfo = { source: rubric?.source ?? null, checks: (rubric?.checks ?? []).length };
@@ -310,8 +313,8 @@ export async function runCritic({ images, html, rubric, critic, minimum = null, 
   if (!workspace?.ok) return failed('launch-failed', `the critic has no placement: ${workspace?.error ?? 'criticWorkspace returned nothing'}`);
   const { dir } = workspace;
   try {
-    const { prompt, started, handed } = prepareCriticWorkspace({ files, dir, html, rubric, base, now });
-    launched = launchCriticWorker({ critic, dir, prompt, entry, parentDispatch, orca, context: placement?.context ?? opContextOf() });
+    const { prompt, started, handed } = spec ? prepareSpecWorkspace({ spec, dir, rubric, base, now }) : prepareCriticWorkspace({ files, dir, html, rubric, base, now });
+    launched = launchCriticWorker({ critic, dir, prompt, entry, parentDispatch, orca, context: placement?.context ?? opContextOf(), ...(spec ? { subject: spec.subject } : {}) });
     if (!launched?.ok) return launchRefusal(launched, failed);
     if (!criticBound(launched.terminal)) return failed('unguarded', 'the critic terminal is not bound to a critic guard, so its verdict is not trusted');
     Object.assign(base.critic, { provider: launched.provider, model: launched.admission?.selected?.model ?? launched.model,
@@ -352,6 +355,24 @@ function prepareCriticWorkspace({ files, dir, html, rubric, base, now }) {
   const handed = handedDigests(dir, [...files.map((f) => ({ file: f.file, label: f.label, role: 'product' })), { file: 'screen.html', label: 'html', role: 'product' }, { file: 'rubric.yaml', label: 'rubric', role: 'rubric' }]);
   const started = now();
   return { prompt, started, handed };
+}
+
+/**
+ * The workspace of a critique whose product is not a drawing (`spec` from decision-critic.mjs): spec.files [{file, label, role, from|content}]
+ * are copied or written into `dir`, the rubric beside them, and spec.prompt({dir, rubricFile, verdictFile}) is the Task. The same digests, the same
+ * touched-by-critic refusal and the same typed verdict as a drawing round.
+ */
+function prepareSpecWorkspace({ spec, dir, rubric, base, now }) {
+  for (const f of spec.files) {
+    if (f.from) fs.copyFileSync(f.from, path.join(dir, f.file));
+    else fs.writeFileSync(path.join(dir, f.file), f.content);
+  }
+  fs.writeFileSync(path.join(dir, 'rubric.yaml'), stringifyYaml(rubric));
+  const prompt = spec.prompt({ dir, rubricFile: 'rubric.yaml', verdictFile: VERDICT_FILE });
+  base.critic.prompt = prompt.split(slash(dir)).join('<clean-dir>');
+  base.critic.promptSha256 = sha256(prompt);
+  const handed = handedDigests(dir, [...spec.files.map(({ file, label, role }) => ({ file, label, role })), { file: 'rubric.yaml', label: 'rubric', role: 'rubric' }]);
+  return { prompt, started: now(), handed };
 }
 
 async function criticVerdict({ client, launched, entry, critic, pollMs, sleep, now, started, dir, base, rubric, failed, handed, minimum }) {

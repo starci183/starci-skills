@@ -156,6 +156,27 @@ terminal>`, which files the op's Task), never with `--parent`: Orca nests the
 workflow Run under the Kernel's Dispatch, so `worker-show` shows the Kernel at
 depth 1 and its ops at depth 2. `settle` stops and releases the op's worker.
 
+## The Critic — `modules/kernel/critic.yaml`
+
+The Critic is a standardised role: a fresh worker of the tier `modules/models/tiers.yaml` `seats.critic` names (frontier), never of the
+maker's provider (`scripts/work/critic-pick.mjs`, refusal `CRITIC_NO_INDEPENDENT_MEMBER`), bound to the `critic` guard that confines it to
+its directory and its verdict file, answering with one `starci/critic-verdict@1` that carries the sha256 of every byte it judged. A
+verdict that names other bytes than the attempt's product is `CRITIC_VERDICT_STALE`. The `coverage` table of `critic.yaml` lists the op
+kinds that owe one; three are covered:
+
+- `interface.draw` — every draw-loop round, gated by the draw loop's finish and `drawGateEvidence`.
+- `scope.define` and `architecture.decide` — the decision legs, because a decision's errors spread to every later leg. The op runs
+  `starci work decision-critic` once its records are written: the Critic is handed the op's decision records and the records they cite
+  (copied into its directory and hashed), the rubric of its kind from `modules/kernel/critic-rubrics.yaml` (derived from the op's
+  contract and its work-record schema: sources named, alternatives weighed, constraints and earlier decisions honoured, no requirement
+  invented, traceable to the goal) and a manifest. `starci kernel settle` (`scripts/kernel/critic-settle.mjs`) recomputes the digests of the
+  op's records now and refuses a done without a fresh passing verdict for exactly those bytes: `op-critic-verdict-missing`,
+  `CRITIC_VERDICT_STALE`, or `op-critic-verdict-failed` (a score under the declared minimum is the op's `error-work`: the refusal carries every
+  failed check with its evidence and fix, and the retry is fed that critique). The three happy errors of the Critic
+  (`CRITIC_NO_INDEPENDENT_MEMBER`, `CRITIC_UNAVAILABLE`, `CRITIC_QUOTA_OUT`) end `decision-critic` with exit 3 and the leg reports blocked
+  through the existing holds `critic-*` of `op-incident-policy.yaml`. The token budget of one critique is declared per kind in
+  `critic-rubrics.yaml`; it is provisional, and what a real critique costs is not yet measured.
+
 ## The op loop — `knowledge/op-gate.yaml`
 
 Every code-writing op listed in `knowledge/op-gate.yaml` `enforcedOps`

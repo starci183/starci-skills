@@ -38,7 +38,7 @@ _starci() {
         test) COMPREPLY=( $(compgen -W "run" -- "$cur") );;
         typecheck) COMPREPLY=( $(compgen -W "run" -- "$cur") );;
         uat) COMPREPLY=( $(compgen -W "assisted-runner slots" -- "$cur") );;
-        work) COMPREPLY=( $(compgen -W "asset-slot brand brand-direction brand-palette check-example-work compose-direction draw-acceptance draw-dna draw-feedback draw-gates draw-grammar draw-layer draw-loop draw-rationale draw-render draw-review draw-source draw-taste evidence-binding example-critique example-derive example-evidence example-verify grammar-geometry grammar-knowledge grammar-proposal grammar-registry-pin graph hygiene imagegen layout-render layout-tree render-proof shell-conformance ui-proof-brief" -- "$cur") );;
+        work) COMPREPLY=( $(compgen -W "asset-slot brand brand-direction brand-palette check-example-work compose-direction decision-critic draw-acceptance draw-dna draw-feedback draw-gates draw-grammar draw-layer draw-loop draw-rationale draw-render draw-review draw-source draw-taste evidence-binding example-critique example-derive example-evidence example-verify grammar-geometry grammar-knowledge grammar-proposal grammar-registry-pin graph hygiene imagegen layout-render layout-tree render-proof shell-conformance ui-proof-brief" -- "$cur") );;
         worker) COMPREPLY=( $(compgen -W "close list read release show start stop" -- "$cur") );;
         workflow) COMPREPLY=( $(compgen -W "assess bias custody define start status stop" -- "$cur") );;
         completion) COMPREPLY=( $(compgen -W "bash zsh fish powershell" -- "$cur") );;
@@ -762,6 +762,12 @@ _starci() {
         work:compose-direction:--tool) return 0;;
         work:compose-direction:--prompt) return 0;;
         work:compose-direction:--out) return 0;;
+        work:decision-critic:--kind) COMPREPLY=( $(compgen -W "scope.define architecture.decide" -- "$cur") ); return 0;;
+        work:decision-critic:--root) return 0;;
+        work:decision-critic:--out) return 0;;
+        work:decision-critic:--records) return 0;;
+        work:decision-critic:--input) return 0;;
+        work:decision-critic:--maker) return 0;;
         work:draw-acceptance:--repo) return 0;;
         work:draw-acceptance:--job) return 0;;
         work:draw-acceptance:--files) return 0;;
@@ -1135,6 +1141,7 @@ _starci() {
         work:brand-palette) COMPREPLY=( $(compgen -W "--prompt --check --brand --scan --json --cwd --quiet --help --edition" -- "$cur") );;
         work:check-example-work) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
         work:compose-direction) COMPREPLY=( $(compgen -W "--ui --content --breakpoint --theme --state --presentation --host-state --fit --scrim --tool --prompt --out --json --cwd --quiet --help --edition" -- "$cur") );;
+        work:decision-critic) COMPREPLY=( $(compgen -W "--kind --root --out --records --input --maker --json --json --cwd --quiet --help --edition" -- "$cur") );;
         work:draw-acceptance) COMPREPLY=( $(compgen -W "--repo --job --files --json --cwd --quiet --help --edition" -- "$cur") );;
         work:draw-dna) COMPREPLY=( $(compgen -W "--family --proposals --json --cwd --quiet --help --edition" -- "$cur") );;
         work:draw-feedback) COMPREPLY=( $(compgen -W "--ui --shape --note --class --target --as --by --write --json --cwd --quiet --help --edition" -- "$cur") );;

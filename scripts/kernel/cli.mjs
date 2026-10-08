@@ -3346,7 +3346,7 @@ function settleSonarGate(db, jobId, repo) {
   const judgment = judgeJob({ op: s.op, files });
   return judgment ? { ...judgment, workflowId: s.job.workflow_id, jobId: s.job.job_id, attemptId: s.filed.attemptId, status: s.job.status } : null;
 }
-const { settleOpGate, settleOpProofs } = mechanismGates({ skillRoot, settleJobContext, settleJobFiles, jobPlacements, opGateBasesOf });
+const { settleOpGate, settleOpProofs, settleCriticVerdict } = mechanismGates({ skillRoot, settleJobContext, settleJobFiles, jobPlacements, opGateBasesOf });
 // The draw acceptance an interface.draw pass owes (scripts/work/draw/draw-acceptance.mjs): every asset the pass binds -
 // written, adopted, inherited or already there - is a token-rendered shape, no drawing names a data status, and the pass
 // drew something under the current contract (a product's op-interface.draw-7c2821e002 adopted 40 image-gen files unchanged).
@@ -3668,7 +3668,7 @@ const API_INTERNALS = Object.freeze({
   heldSettleText, nextActionLabel, opRevDriftOf, poolLoadOf, queuedBecauseOf, recordDependencies,
   renewLiveWorkerLeases, rereadActionOf, seamActionsOf, staleLabel, statusWorkerRowsOf, typedLogWarningsOf,
   prefetchStatusOrcaReads, withStatusSpawnMemo, setStatusAsk: (value) => { statusAsk = value; },
-  refuseSettleBacklog, operationTerminalHandleOf, jobPayloadOf,
+  refuseSettleBacklog, operationTerminalHandleOf, jobPayloadOf, settleCriticVerdict,
   releaseTypedWaits, openPeerWaits, PEER_WAIT,
   goalJsonOf, latestGoal, csvList,
   lineageRouteAdjust, accountList, probeQuotaSafe,

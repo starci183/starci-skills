@@ -14,6 +14,18 @@ export const INCIDENT_CODES = Object.freeze({
   escalateOwner: { code: 'op-incident-escalate-owner' },
 });
 const SELECTOR = /^([^[]+)\[id=([^\]]+)\]$/;
+/** The steps of a dotted path; a dot inside a selector is no separator: kinds[id=scope.define].minimum is two steps. */
+function pathSteps(dotted) {
+  const steps = [''];
+  let depth = 0;
+  for (const char of dotted) {
+    if (char === '[') depth += 1;
+    if (char === ']') depth -= 1;
+    if (char === '.' && depth === 0) steps.push('');
+    else steps[steps.length - 1] += char;
+  }
+  return steps.filter(Boolean);
+}
 
 const readYaml = (file) => parseYaml(fs.readFileSync(path.join(skillRoot, file), 'utf8'));
 
@@ -30,7 +42,7 @@ const stepOf = (node, token) => {
 export function refValue(ref) {
   const [file, dotted = ''] = String(ref).split('#');
   let node = readYaml(file);
-  for (const token of dotted.split('.').filter(Boolean)) node = stepOf(node, token);
+  for (const token of pathSteps(dotted)) node = stepOf(node, token);
   return node;
 }
 
