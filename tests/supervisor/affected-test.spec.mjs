@@ -82,8 +82,11 @@ test('--run runs each file once with the four preloads and ends with the counted
     changedFiles: () => ['scripts/lib/core.mjs', 'scripts/lib/other.mjs'],
     execNode: (a) => { calls.push(a); return a.at(-1) === 'tests/unrelated.spec.mjs' ? Promise.resolve({ error: new Error('exit 1'), stdout: 'not ok 1 - boom', stderr: '' }) : passing(); },
   });
+  const seen = [];
+  d.progress = (line) => seen.push(line);
   const out = await testAffected(ctxOf(d, { run: true, concurrency: 1 }), d);
   assert.equal(out.code, 1);
+  assert.equal(seen.length, 2, 'each verdict line is shown as its file ends');
   assert.equal(calls.length, 2);
   for (const args of calls) {
     assert.deepEqual(args.filter((a, i) => args[i - 1] === '--import'), ['./tests/setup/low-priority.mjs', './tests/setup/isolated-temp.mjs', './tests/setup/isolated-registry.mjs', './tests/setup/runtime-copies.mjs']);

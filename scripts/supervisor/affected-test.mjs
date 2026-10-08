@@ -90,7 +90,8 @@ const overText = (picked) => `affected: ${picked.files.length} spec files exceed
 
 async function runSelection({ root, picked, args, deps }) {
   const decision = resolveTestConcurrency(args.concurrency, deps);
-  const results = await runBounded(picked.files, decision.concurrency, (file) => runSpecFile(root, file, deps));
+  const progress = deps.progress ?? ((line) => process.stderr.write(line + '\n'));
+  const results = await runBounded(picked.files, decision.concurrency, (file) => runSpecFile(root, file, deps).then((result) => { progress(verdictLine(result)); return result; }));
   const failed = results.filter((r) => !r.pass);
   const out = results.map(verdictLine);
   for (const r of failed) out.push(`--- ${r.file}`, ...r.tail.map((line) => `  ${line}`));
