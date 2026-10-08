@@ -169,7 +169,7 @@ test('the text prints the standard, every role, the standing and the questions i
   const en = renderText(d, { language: 'en', questions: true });
   for (const word of ['Standard: at step', 'Verdict per role', 'Critic runs: unobserved', 'Runtime: BUG - ', 'Debug standing against its end condition', 'clean-workflows', 'Power and lifecycle', '[gap]']) assert.ok(en.includes(word), word);
   const vi = renderText(d, { language: 'vi', questions: false });
-  for (const word of ['Chuẩn vận hành', 'Kết luận theo từng vai', 'chưa quan sát được', 'Vị thế của Debug', 'Câu hỏi của Debug']) assert.ok(vi.includes(word), word);
+  for (const word of ['Chu\u1ea9n v\u1eadn h\u00e0nh', 'K\u1ebft lu\u1eadn theo t\u1eebng vai', 'ch\u01b0a quan s\u00e1t \u0111\u01b0\u1ee3c', 'V\u1ecb th\u1ebf c\u1ee7a Debug', 'C\u00e2u h\u1ecfi c\u1ee7a Debug']) assert.ok(vi.includes(word), word);
   assert.equal(vi.includes('Power and lifecycle'), false);
 });
 
