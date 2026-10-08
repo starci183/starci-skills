@@ -74,7 +74,7 @@ function cssFamilies(packageRoot){
   const src=path.join(packageRoot,'src');
   if(!fs.existsSync(src))return [];
   return fs.readdirSync(src,{withFileTypes:true}).filter(entry=>entry.isDirectory()&&fs.existsSync(path.join(src,entry.name,'styles.css')))
-    .map(entry=>entry.name).sort();
+    .map(entry=>entry.name).sort(byCodeUnit);
 }
 
 /**

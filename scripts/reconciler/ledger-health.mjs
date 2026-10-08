@@ -9,6 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { isMain } from '../lib/is-main.mjs';
+import { byCodeUnit } from '../lib/list.mjs';
 import { openLedgerReader } from '../../engine/db/ledger.mjs';
 import { isCorruptError } from '../../engine/db/machine-connection.mjs';
 import { sha256File } from '../../engine/digest.mjs';
@@ -70,7 +71,7 @@ export function backupDue({ ledgerId, now, dir, backupHour, exists = fs.existsSy
 function prunePlan(files, { ledgerId, keep }) {
   const escapedDot = String.raw`\.`;
   const re = new RegExp(String.raw`^${safeId(ledgerId).replaceAll('.', escapedDot)}-(\d{8})\.sqlite$`);
-  const mine = files.filter((f) => re.test(f)).sort();
+  const mine = files.filter((f) => re.test(f)).sort(byCodeUnit);
   return mine.slice(0, Math.max(0, mine.length - keep));
 }
 

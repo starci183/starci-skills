@@ -10,6 +10,7 @@ import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { validateAgainstSchema } from './json-schema.mjs';
 import { insidePath, samePath, slash } from './path-key.mjs';
+import { byCodeUnit } from './list.mjs';
 
 /** The runtime's example tree root. */
 export const EXAMPLES_ROOT = 'examples';
@@ -25,7 +26,7 @@ export function discoverExampleApps(root) {
   return entries.filter((entry) => entry.isDirectory()).filter((entry) => {
     try { return JSON.parse(fs.readFileSync(path.join(directory, entry.name, 'hfs.json'), 'utf8'))?.kind === 'app'; }
     catch { return false; }
-  }).map((entry) => entry.name).sort();
+  }).map((entry) => entry.name).sort(byCodeUnit);
 }
 
 /** The generic services-block template a starcistacks follow-up leg is pointed at (S11-02: one template

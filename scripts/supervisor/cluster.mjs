@@ -9,6 +9,7 @@
 import crypto from 'node:crypto';
 import { fixTokens, citedIncidents } from './owed.mjs';
 import { slugify } from '../lib/slug.mjs';
+import { byCodeUnit } from '../lib/list.mjs';
 
 const GENERIC_LABEL = 'addressed-to-supervisor';
 const trimTrailingDashes = (value) => {
@@ -68,7 +69,7 @@ export function clusterOwed(items) {
     const label = count((i) => facts[i].labels) ?? items[members[0]].pattern ?? items[members[0]].kind ?? 'owed';
     const token = count((i) => facts[i].tokens);
     const its = members.map((i) => items[i]);
-    const keySeed = token ?? its.map((x) => x.incidentId ?? x.key).sort()[0] ?? crypto.randomUUID();
+    const keySeed = token ?? its.map((x) => x.incidentId ?? x.key).sort(byCodeUnit)[0] ?? crypto.randomUUID();
     const fixes = [...new Set(its.map((x) => x.fixedBy?.sha).filter(Boolean))];
     return {
       id: trimTrailingDashes(`${slugify(label)}-${slugify(keySeed)}`),

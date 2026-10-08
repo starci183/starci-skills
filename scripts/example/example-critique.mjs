@@ -372,7 +372,7 @@ function computeTodoDesignFindings(derived, rawRecords) {
         because: `${rec.id} is todo, blocked on ${roots.join(', ')} - a real product question, not missing code; it moves once that is settled.`,
       });
     } else if (leftoverGaps.length) {
-      const roots = leftoverGaps.map(b => b.id).sort();
+      const roots = leftoverGaps.map(b => b.id).sort(byCodeUnit);
       findings.push({
         id: `leftover-todo:${rec.id}`,
         kind: 'leftover-todo',

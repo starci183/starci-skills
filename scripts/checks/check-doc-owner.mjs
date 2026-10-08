@@ -21,6 +21,7 @@ import { fileURLToPath } from 'node:url';
 import { walkFiles } from '../lib/walk.mjs';
 import { lsFiles } from '../api/git/ls-files.mjs';
 import { gitOutputOf } from '../lib/git.mjs';
+import { byCodeUnit } from '../lib/list.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { parseCheckArgs } from '../lib/check-scan.mjs';
 
@@ -52,7 +53,7 @@ export function docFiles(root = DEFAULT_ROOT) {
   const isDoc = (rel) => /^docs\/.+\.md$/.test(rel);
   try {
     return gitOutputOf(lsFiles(['-z', '--', DOC_DIR], { dir: root }), 'git ls-files').split('\0').filter(Boolean)
-      .map((f) => f.replaceAll('\\', '/')).filter((rel) => isDoc(rel) && fs.existsSync(path.join(root, ...rel.split('/')))).sort();
+      .map((f) => f.replaceAll('\\', '/')).filter((rel) => isDoc(rel) && fs.existsSync(path.join(root, ...rel.split('/')))).sort(byCodeUnit);
   } catch {
     const dir = path.join(root, DOC_DIR);
     return fs.existsSync(dir) ? walkFiles(dir, { sorted: true, filter: (name) => name.endsWith('.md') }).map((f) => path.relative(root, f).replaceAll('\\', '/')) : [];

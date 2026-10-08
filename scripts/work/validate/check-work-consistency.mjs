@@ -317,7 +317,7 @@ if (isMain(import.meta.url)) {
   const bySeverity = [
     ['REFUSE', sink.refuse], ['SUSPECT', sink.suspect], ['INFO', sink.info],
   ];
-  for (const [tier, lines] of bySeverity) for (const line of lines.sort()) console.log(`${tier.padEnd(7)} ${line}`);
+  for (const [tier, lines] of bySeverity) for (const line of lines.sort(byCodeUnit)) console.log(`${tier.padEnd(7)} ${line}`);
   console.log(`\n${recordCount} record(s) across ${workRoots.length} tree(s): ${sink.refuse.length} refused, ${sink.suspect.length} suspect, ${sink.info.length} info`);
   process.exitCode = sink.refuse.length ? 1 : 0;
 }

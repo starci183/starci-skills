@@ -18,6 +18,7 @@
 import { KERNEL_ONLY_OPS } from './reported-jobs.mjs';
 import { parseJsonOr, readJsonFile } from '../lib/json.mjs';
 import { normalizeText } from '../lib/normalize.mjs';
+import { byCodeUnit } from '../lib/list.mjs';
 import { JOB_ROW } from './job-row.mjs';
 
 const parse = parseJsonOr;
@@ -118,11 +119,11 @@ export function repeatedAnswerOf(question, answers, { op = null } = {}) {
   // a redrawn drawing is a new question, so only the same text repeats one (scripts/work/draw-review.mjs).
   // A brand-direction review is the same shape: its text names the rev and the golden digests (brand-direction.mjs).
   if (question.kind === 'draw-review' || question.kind === 'brand-direction-review') return answers.find((answer) => text && norm(answer.question) === text) ?? null;
-  const options = (Array.isArray(question.options) ? question.options : []).map((o) => norm(labelOf(o))).filter(Boolean).sort();
+  const options = (Array.isArray(question.options) ? question.options : []).map((o) => norm(labelOf(o))).filter(Boolean).sort(byCodeUnit);
   return answers.find((answer) => {
     if (text && norm(answer.question) === text) return true;
     if (options.length < 2) return false;
-    const prior = answer.options.map(norm).filter(Boolean).sort();
+    const prior = answer.options.map(norm).filter(Boolean).sort(byCodeUnit);
     return prior.length === options.length && prior.every((o, i) => o === options[i]);
   }) ?? null;
 }
