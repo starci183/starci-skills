@@ -160,6 +160,7 @@ ruleParams:
       - {id: version-pin-once, run: scripts/checks/check-version-pin-once.mjs}
       - {id: slot-id-shape, run: scripts/checks/check-slot-id-shape.mjs}
       - {id: undeclared-identifiers, run: scripts/checks/check-undeclared-identifiers.mjs}
+      - {id: sonar-rules, run: scripts/checks/check-sonar-rules.mjs}
 
 slots:
 

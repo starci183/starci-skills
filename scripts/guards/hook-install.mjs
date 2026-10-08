@@ -41,7 +41,7 @@ const normOwned = (p) => path.resolve(p).replaceAll('\\', '/');
 const safeName = (s) => String(s).replace(/[^A-Za-z0-9._-]/g, '_');
 // A single-quoted shell word: ' wrapped as '\'' (close, escaped quote, reopen).
 const SQUOTE = String.raw`'\''`;
-const shellQuote = (s) => `'${String(s).replaceAll('\\', '/').replaceAll("'", SQUOTE)}'`;
+export const shellQuote = (s) => `'${String(s).replaceAll('\\', '/').replaceAll("'", SQUOTE)}'`;
 export const JOB_GUARD_TTL_MS = allocationMs('jobGuard.ttlMs');
 export const terminalsDir = (skillRoot = path.resolve(here, '..', '..')) => path.join(guardsRoot(skillRoot), 'terminals');
 
