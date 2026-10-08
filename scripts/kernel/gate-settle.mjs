@@ -74,16 +74,20 @@ export function captureGateBinding(placements, { at, revision = (root) => revPar
   return { at, targets };
 }
 
+// Whether a root the evidence recorded names the root `root` now judges: the same directory, or the admitted root a rebound placement replaced.
+const sameTarget = (recorded, root, aliases = []) => sameResolvedPath(recorded, root)
+  || aliases.some((pair) => sameResolvedPath(pair.to, root) && sameResolvedPath(pair.from, recorded));
+
 /**
  * What the attached gate JSON and READ digest say, as a settle judgment {status, code, detail, findings[]}. `kinds` is
  * [{path, slot}] of the gate's changed files as the runtime resolved them.
  */
 // The 'unavailable' detail a current-bound gate earns, or null: wrong target, base or HEAD, a malformed
 // or repeated input entry, an owned input the gate dropped or changed silently, or a READ/CHECK pair out of order.
-const currentGateProblem = (gate, snapshot, digest) => {
+const currentGateProblem = (gate, snapshot, digest, aliases = []) => {
   if (!snapshot || !Array.isArray(gate.inputs) || !Array.isArray(gate.changed))
     return 'the gate has no independently bound current input snapshot';
-  if (typeof gate.root !== 'string' || !/^[0-9a-f]{40,64}$/.test(String(gate.head ?? '')) || !sameResolvedPath(gate.root, snapshot.root)
+  if (typeof gate.root !== 'string' || !/^[0-9a-f]{40,64}$/.test(String(gate.head ?? '')) || !sameTarget(gate.root, snapshot.root, aliases)
     || gate.base !== snapshot.base || !isAncestor(snapshot.root, gate.head, snapshot.head))
     return 'the gate belongs to another target, base or unrelated HEAD; rerun CHECK';
   const inputs = new Map();
@@ -102,7 +106,7 @@ const currentGateProblem = (gate, snapshot, digest) => {
   return null;
 };
 
-export function judgeLoop({ gate, digest, kinds, doc = loadOpGate(), gateBases = [], current = false, snapshot = null, expectedRead = null }) {
+export function judgeLoop({ gate, digest, kinds, doc = loadOpGate(), gateBases = [], current = false, snapshot = null, expectedRead = null, aliases = [] }) {
   if (gate?.schema !== GATE_SCHEMA)
     return { status: 'missing', code: 'op-gate-proof-missing', detail: `no gate JSON (schema ${GATE_SCHEMA}) is attached to the report: run starci gate run --changed ... --out gate.json and attach it`, findings: [] };
   // In a workflow worktree the gate must measure against a checkpoint the op's side has not moved since
@@ -125,7 +129,7 @@ export function judgeLoop({ gate, digest, kinds, doc = loadOpGate(), gateBases =
     return { status: 'red', code: 'op-gate-new-findings', detail: `${gate.counts?.new ?? fresh.length} new finding(s) over base ${String(gate.base ?? '').slice(0, 12)}; first: ${first}`, findings: listed };
   }
   if (current) {
-    const problem = currentGateProblem(gate, snapshot, digest);
+    const problem = currentGateProblem(gate, snapshot, digest, aliases);
     if (problem) return { status: 'unavailable', code: 'op-gate-tool-failed', detail: problem, findings: [] };
   }
   let read;
@@ -180,8 +184,8 @@ const judgeRoot = async (root, ctx) => {
   const owned = [...new Set(placements.filter((p) => sameResolvedPath(p.base, root)).map((p) => normRel(p.path)))].sort(byCodeUnit);
   if (!target?.head || JSON.stringify(target.owned) !== JSON.stringify(owned))
     throw new Error('the admitted baseline or owned paths differ from the job placement');
-  const gate = readAttached(files, GATE_SCHEMA, (g) => !isDocGate(g) && typeof g.root === 'string' && sameResolvedPath(g.root, root));
-  const digest = readAttached(files, DIGEST_SCHEMA, (d) => typeof d.root === 'string' && sameResolvedPath(d.root, root));
+  const gate = readAttached(files, GATE_SCHEMA, (g) => !isDocGate(g) && typeof g.root === 'string' && sameTarget(g.root, root, ctx.aliases));
+  const digest = readAttached(files, DIGEST_SCHEMA, (d) => typeof d.root === 'string' && sameTarget(d.root, root, ctx.aliases));
   if (gate && (!Number.isFinite(Date.parse(gate.doc.at)) || Date.parse(gate.doc.at) < binding.at || Date.parse(gate.doc.at) > Date.now()))
     throw new Error('CHECK is not from the current admitted attempt');
   if (digest && (!Number.isFinite(Date.parse(digest.doc.at)) || Date.parse(digest.doc.at) < binding.at))
@@ -195,7 +199,7 @@ const judgeRoot = async (root, ctx) => {
   const expectedRead = await ctx.readDigest({ root, touch: snapshot.inputs.map((file) => file.path), doc: ctx.doc });
   const kinds = expectedRead.slotMap.map(({ path: file, slot }) => ({ path: file, slot }));
   const judged = judgeLoop({ gate: gate?.doc ?? null, digest: digest?.doc ?? null, kinds, doc: ctx.doc,
-    gateBases, current: true, snapshot, expectedRead });
+    gateBases, current: true, snapshot, expectedRead, aliases: ctx.aliases });
   return { op: ctx.op, judged, gateFile: gate?.file ?? null, digestFile: digest?.file ?? null };
 };
 
@@ -210,7 +214,7 @@ export async function judgeJobLoop({ op, files, roots = [], doc = loadOpGate(), 
   const known = [...new Set(placements.map((p) => path.resolve(p.base)))];
   if (targets.length !== known.length || targets.some((row, i) => targets.slice(0, i).some((prior) => sameResolvedPath(prior.root, row.root))))
     return unavailable('the admitted target list does not match the persisted placements');
-  const ctx = { op, files, targets, placements, binding, doc, gateBases, mode, readDigest, kindResolver };
+  const ctx = { op, files, targets, placements, binding, doc, gateBases, mode, readDigest, kindResolver, aliases: binding.aliases ?? [] };
   const judgments = [];
   let early = null;
   await findInOrder(known, async (root) => {

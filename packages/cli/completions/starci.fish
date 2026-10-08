@@ -1329,7 +1329,7 @@ complete -c starci -n '__starci_using_command workflow assess' -l repo -r -d 're
 complete -c starci -n '__starci_using_command workflow bias' -l normalize -r -d 'owner bias JSON: prefer/avoid/only member lists (a pool, an agent or agent/model), roles and an explicit attempt reserveOverride; an only list that avoid empties is refused'
 complete -c starci -n '__starci_using_command workflow custody' -l repo -r -d 'repository whose registered project ledger holds the workflow (default: the working directory)'
 complete -c starci -n '__starci_using_command workflow custody' -l workflow -r -d 'the workflow_id'
-complete -c starci -n '__starci_using_command workflow custody' -l apply -d 'move a tree that is behind its branch onto it (its own work preserved), or make a missing one at the branch; refused while an op is in flight'
+complete -c starci -n '__starci_using_command workflow custody' -l apply -d 'move a tree that is behind its branch onto it (its own work preserved), or make a missing one at the branch; refused while an op has a live worker; the admitted attempts whose tree path was lost are rebound to the tree or ended placement-lost'
 complete -c starci -n '__starci_using_command workflow define' -l repo -r -d 'repository whose .starciwork ledger owns the goal (default: the working directory)'
 complete -c starci -n '__starci_using_command workflow define' -l project -r -d 'registered project name; resolves the work.json binding (mutually exclusive with --repo)'
 complete -c starci -n '__starci_using_command workflow define' -l text -r -d 'the owner prompt the goal is defined from'

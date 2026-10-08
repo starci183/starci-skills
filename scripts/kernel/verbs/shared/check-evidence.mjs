@@ -8,6 +8,7 @@
 import path from 'node:path';
 import { latestCheckRuns, recordCheck } from '../../../machine/evidence-store.mjs';
 import { parseJson } from '../../../lib/json.mjs';
+import { supersedeDirs } from '../../../machine/placement-rebound.mjs';
 import { requireWorkflowPlacement, workflowAppRepo } from '../../workflow-worktree.mjs';
 
 /** Runners whose checks are independent evidence (never the op's own). */
@@ -27,7 +28,7 @@ export function checkRerunRootOf(db, job, { repo, env = process.env, appRepoOf =
   const attempt = attemptId == null ? null : db.prepare('SELECT worktree_path FROM op_attempts WHERE attempt_id=?').get(attemptId);
   const context = parseJson(attemptId == null ? '' : (db.prepare('SELECT context_json FROM contracts WHERE attempt_id=?').get(attemptId)?.context_json ?? ''), null) ?? {};
   const filedTree = context.packet?.context?.workflow_worktree;
-  const placements = [attempt?.worktree_path, context.worktree, filedTree?.path].filter((dir) => typeof dir === 'string' && dir).map((dir) => path.resolve(repo, dir));
+  const placements = supersedeDirs(db, attemptId, [attempt?.worktree_path, context.worktree, filedTree?.path].filter((dir) => typeof dir === 'string' && dir).map((dir) => path.resolve(repo, dir)));
   const required = Boolean(filedTree || appRepoOf(repo) || placements.some((dir) => appRepoOf(dir)));
   try {
     const tree = requireWorkflowPlacement({ env }, { workflowId: job.workflow_id, placements, required });

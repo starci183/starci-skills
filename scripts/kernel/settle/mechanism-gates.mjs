@@ -4,6 +4,7 @@ import { observationContextOf, mechanismObservations } from '../mechanism-observ
 import { latestContractOf } from '../../machine/contract-version.mjs';
 import { parseJson } from '../../lib/json.mjs';
 import { jobPayloadOf } from '../verbs/shared/rows.mjs';
+import { reboundBindingOf, reboundMapOf } from '../../machine/placement-rebound.mjs';
 
 /** Bind the native consumers to the CLI's existing private context and placement
  * functions. The proof consumer stays synchronous for the workflow-lock recheck. */
@@ -19,7 +20,7 @@ async function settleOpGate(db, jobId, repo) {
   const gateBases = opGateBasesOf({ db, env: process.env }, { workflowId: s.job.workflow_id, opId: s.job.job_id });
   const context = parseJson(latestContractOf(db, s.job.job_id)?.context_json);
   const recorded = context?.packet?.context?.gate_binding;
-  const binding = { ...recorded, placements: jobPlacements(db, s.job, repo) };
+  const binding = reboundBindingOf(recorded, reboundMapOf(db, s.filed.attemptId), jobPlacements(db, s.job, repo));
   const judgment = await judgeJobLoop({ op: s.op, files, roots: roots.length ? roots : [repo], gateBases, binding,
     mode: context?.packet?.context?.selected_op?.mode ?? (typeof jobPayloadOf(s.job).params?.mode === 'string' ? jobPayloadOf(s.job).params.mode : null) });
   return judgment ? { ...judgment, jobId: s.job.job_id, attemptId: s.filed.attemptId, status: s.job.status } : null;

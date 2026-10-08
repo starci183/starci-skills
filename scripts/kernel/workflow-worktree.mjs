@@ -40,6 +40,7 @@ import { isInside } from '../lib/walk.mjs';
 import { pathKey } from '../lib/path-key.mjs';
 import { requireWorktreeRecord } from '../lib/worktree-record.mjs';
 import { workflowCustody, repairRegisteredTree, restorePreserved } from './workflow-custody.mjs';
+import { reconcileAttemptPlacements } from './attempt-placement.mjs';
 
 const WORKFLOW_WORKTREE_KIND = 'workflow';
 /** The typed dispatch wait of an op whose side is busy in its workflow worktree (modules/kernel/failure-codes.yaml). */
@@ -94,13 +95,23 @@ export function registerWorkflowWorktree(ctx, { workflowId, orcaWorktreeId, path
 }
 
 /**
+ * The workflow's worktree, created through Orca when it has none, and - when the caller hands the workflow's `ledger` - the placement of
+ * every admitted, unsettled attempt of the workflow settled against it (scripts/kernel/attempt-placement.mjs: rebound or ended), reported as `placements`.
+ */
+export function ensureWorkflowWorktree(ctx, args) {
+  const ensured = ensureTree(ctx, args);
+  if (!ensured.ok || !args.ledger) return ensured;
+  return { ...ensured, placements: reconcileAttemptPlacements(args.ledger, { workflowId: args.workflowId, tree: ensured.record, show: ctx?.show }) };
+}
+
+/**
  * The workflow's worktree, created through Orca when it has none. A workflow that already owns a branch (scripts/kernel/
  * workflow-custody.mjs) never starts from main: a new tree is cut at that branch's last checkpoint and the work a collector
  * preserved is put back; a registered tree that is behind the branch is moved to it. {ok, created, record, repaired?} |
  * {ok:false, reason: 'worktree-cap'|'worktree-registry-unavailable'|'orca-worktree-create-failed'|'workflow-custody-diverged'|
  * 'workflow-custody-conflict', detail, live?, cap?}
  */
-export function ensureWorkflowWorktree(ctx, { workflowId, appRepo, ledgerId = null }) {
+function ensureTree(ctx, { workflowId, appRepo, ledgerId = null }) {
   const { env, orca, git } = ctxOf(ctx);
   const custody = workflowCustody({ appRepo, workflowId, env });
   if (custody.fault) return { ok: false, reason: custody.fault.code, detail: custody.fault.detail };

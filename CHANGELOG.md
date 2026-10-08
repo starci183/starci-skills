@@ -8,6 +8,8 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 
 ### Fixed
 - A reported job is settled by the runtime: the Job controller listed, timed and settled only running, answering and effect_unknown jobs, while `starci kernel report` moves a job to `reported`, so a reported job had no settle step, no SETTLE_OVERDUE clock and no handover Decision Item (Nivo `architecture.decide` sat reported from 2026-10-07 16:38). The controller now plans `reported`, routes `report-filed`, and the `reported-unsettled` hold names this code as its enforcement.
+- An admitted attempt survives the loss of its workflow tree: when the tree is put back at another path (`starci workflow start`, `starci workflow custody --apply`, the settler's pass), every admitted, unsettled attempt whose recorded path is lost is rebound by a `placement-rebound` ledger event that settle, the checks and the op gate read (its worker gone, its report filed, every report file in the tree) or ended by the runtime as `placement-lost` (an environment cause: no business attempt spent, the failed-no-step route queues the next attempt). The admission stays immutable.
+- `workflow-custody-busy` refuses only while an op has a live worker (or one whose liveness cannot be read): a reported job whose worker is gone no longer holds the repair of its own workflow tree.
 
 ## [1.0.0-alpha.7] — 2026-10-08
 

@@ -12148,11 +12148,12 @@ workflow-custody-conflict:
   kind: verb-refusal
 # Proof: scripts/kernel/workflow-custody-cli.mjs main.
 workflow-custody-busy:
-  title: "An op of the workflow is in flight"
-  title_vi: "Một op của workflow đang chạy"
-  meaning_vi: "starci workflow custody --apply không đổi cây của workflow khi còn op leased, running, answering, reported, deciding hoặc effect_unknown: việc đưa cây về nhánh sẽ thay đổi tệp dưới tay op đó."
+  title: "An op of the workflow has a live worker"
+  title_vi: "Một op của workflow còn worker đang sống"
+  meaning_vi: "starci workflow custody --apply không đổi cây của workflow khi còn op leased, running, answering, reported, deciding hoặc effect_unknown mà worker của nó còn sống hoặc không đọc được: việc đưa cây về nhánh sẽ thay đổi tệp dưới tay worker đó. Một op mà worker đã chết (terminal biến mất sau khi máy khởi động lại) không giữ cây và không chặn việc này."
   causes_vi:
     - "Kernel vẫn đang giao việc trong cây sai"
+    - "Orca không trả lời nên chưa chứng minh được worker đã chết"
   nextStep_vi: "Chờ các op trong chi tiết chốt hoặc dừng Kernel giao thêm việc, rồi chạy lại với --apply."
   owner: runtime-core
   kind: verb-refusal
@@ -16755,3 +16756,22 @@ RUNTIME_CHANGE_OWNED_BY_DEBUG:
   nextStep_vi: "Supervisor ghi lỗi runtime bằng starci supervisor actions record --item runtime-defect:<nguyên nhân> kèm bằng chứng, cho Kernel một cách đi vòng; Debug sửa."
   owner: supervisor
   kind: blocker
+placement-lost:
+  title: "Attempt ended: its tree path was lost"
+  title_vi: "Lượt chạy kết thúc: đường dẫn cây làm việc đã mất"
+  meaning_vi: "Cây của workflow được tạo lại ở đường dẫn khác, worker của lượt này đã chết và báo cáo của nó chưa nộp hoặc thiếu tệp trong cây mới, nên runtime tự kết thúc lượt, không tính vào số lần thử của op."
+  causes_vi:
+    - "Máy khởi động lại và bộ dọn cây gỡ thư mục cũ của workflow"
+    - "Báo cáo chưa được nộp, hoặc tệp nó nêu không còn trong cây mới"
+  nextStep_vi: "Runtime tự xếp lại lượt kế tiếp bằng đường failed-no-step; không cần ai làm gì thêm."
+  owner: op-retry
+  kind: settle-reason
+tree-reattached:
+  title: "Placement rebound after the tree was re-attached"
+  title_vi: "Vị trí làm việc được gắn lại sau khi cây được dựng lại"
+  meaning_vi: "Cây của workflow được dựng lại ở đường dẫn khác; lượt chạy đã nộp báo cáo và mọi tệp của nó có trong cây mới, nên sự kiện placement-rebound chuyển đường dẫn cũ sang cây mới cho bước chốt và các kiểm tra."
+  causes_vi:
+    - "Máy khởi động lại và cây cũ bị gỡ"
+  nextStep_vi: "Bộ chốt tự chốt lượt này trong cây mới; không cần ai làm gì thêm."
+  owner: runtime-core
+  kind: settle-reason
