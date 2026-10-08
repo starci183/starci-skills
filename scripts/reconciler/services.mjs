@@ -415,7 +415,8 @@ export function orcaRestartScript({ app, closeWaitMs }) {
 
 const connectorStart = (service, env) => {
   const r = runNode([path.join(SKILL_ROOT, serviceScript(service)), 'start'], { timeout: 120_000, cwd: SKILL_ROOT, env });
-  return { ok: r.status === 0, answer: lastJson(r.stdout), stderr: String(r.stderr ?? '').trim().slice(0, 300) };
+  const answer = lastJson(r.stdout), stderr = String(r.stderr ?? '').trim().slice(0, 300);
+  return { ok: r.status === 0, answer, stderr, ...(r.status === 0 ? {} : { error: String(answer?.reason ?? answer?.error ?? (stderr || `exit ${r.status}`)) }) };
 };
 
 /** Start one service now. Only ever reached through ctx.run in active mode (or by hand). Seams: powershell, tasks. */
