@@ -14,6 +14,7 @@ conventions:
 flags:
   - {name: base, type: string, summary: 'ref to diff against (default: the merge-base with main, else origin/main)'}
   - {name: changed, type: list, summary: explicit changed repository paths instead of the diff}
+  - {name: by, type: string, summary: 'symbol (default: the specs related to the changed functions) or file (every spec importing a changed file)'}
   - {name: run, type: boolean, summary: 'run the selected spec files, one per process'}
   - {name: concurrency, type: number, summary: override automatic file concurrency with a positive integer}
   - {name: root, type: string, summary: 'repository root (default: the command cwd)'}

@@ -23,7 +23,7 @@ export const catalogVerbs = (loaded) => loaded.groups.flatMap((group) => group.v
   .map((entry) => ({ group: group.group, verb: entry.verb, dispatcher: posix(entry.impl?.script ?? entry.impl?.module ?? '') }))
   .filter((entry) => entry.dispatcher));
 
-const handlerOf = (root, entry) => {
+export const handlerOf = (root, entry) => {
   const own = `${path.posix.dirname(entry.dispatcher)}/verbs/${entry.verb}.mjs`;
   return fs.existsSync(path.join(root, own)) ? own : entry.dispatcher;
 };
@@ -95,7 +95,11 @@ const namesVerb = (code, entry) => new RegExp(String.raw`['"\`]${escapeRe(entry.
  */
 export function specsExercisingChangedVerbs({ root, changed, specs, verbs }) {
   const cache = new Map();
-  const hit = changedVerbs({ root, changed, verbs, cache });
+  return specsRunningVerbs({ root, hit: changedVerbs({ root, changed, verbs, cache }), specs, cache });
+}
+
+/** The specs that spawn the CLI entry of a verb in `hit` ([{group, verb, dispatcher}]) and name that verb; `cache` holds the direct imports reachableFrom filed. */
+export function specsRunningVerbs({ root, hit, specs, cache = new Map() }) {
   if (!hit.length) return [];
   const texts = new Map();
   // the spec or a test helper it reaches runs packages/cli/bin/starci.mjs

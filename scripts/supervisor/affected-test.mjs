@@ -13,6 +13,8 @@ import { readModuleJson } from '../../engine/runtime-root.mjs';
 import { readSpecs } from '../lib/spec-pool.mjs';
 import { changedExports, headRanges } from './land-specs.mjs';
 import { affectedSelection, readSources } from './affected-select.mjs';
+import { affectedBySymbol, symbolData, symbolLines } from './affected-symbols.mjs';
+import { show } from '../api/git/show.mjs';
 import { pathList } from '../machine/test-ladder.mjs';
 import { resolveTestConcurrency } from '../machine/test-concurrency.mjs';
 import { byCodeUnit } from '../lib/list.mjs';
@@ -47,10 +49,17 @@ function symbolsAgainst({ root, base, deps }, file) {
   return succeeded(result) ? changedExports({ source, ranges: headRanges(result.stdout) }) : { symbols: null, why: 'diff unreadable' };
 }
 
+// The text of `file` at the diff base, or null when the base has none (a new file) or git cannot answer.
+function baseSourceOf({ root, base, deps }, file) {
+  const result = (deps.show ?? show)([`${base}:${file}`], { cwd: root });
+  return succeeded(result) ? String(result.stdout) : null;
+}
+
 function policyOf(deps) {
   const policy = deps.policy ?? readModuleJson('modules', 'supervisor', 'affected-tests.yaml');
   if (!Number.isSafeInteger(policy?.maxFiles) || policy.maxFiles < 1) throw new Error('modules/supervisor/affected-tests.yaml maxFiles must be a positive integer');
   if (!Array.isArray(policy.dataRoots) || !policy.dataRoots.every((root) => typeof root === 'string' && root)) throw new Error('modules/supervisor/affected-tests.yaml dataRoots must list directory names');
+  if (!Number.isSafeInteger(policy.symbolDepth) || policy.symbolDepth < 1) throw new Error('modules/supervisor/affected-tests.yaml symbolDepth must be a positive integer');
   return policy;
 }
 
@@ -82,7 +91,7 @@ function selectionText({ base, changed, picked }) {
   const since = base ? ` since ${String(base).slice(0, 9)}` : '';
   const head = `affected: ${picked.files.length} spec file(s) for ${changed.length} changed file(s)${since}`;
   const readers = picked.readers.map((r) => `  data reader ${r.file} reads ${r.reads.join(', ')}`);
-  return [head, ...readers, ...picked.files.map((file) => `  ${file}`)];
+  return [head, ...symbolLines(picked), ...readers, ...picked.files.map((file) => `  ${file}`)];
 }
 
 const overText = (picked) => `affected: ${picked.files.length} spec files exceed the declared bound of ${picked.maxFiles} (modules/supervisor/affected-tests.yaml); `
@@ -99,9 +108,10 @@ async function runSelection({ root, picked, args, deps }) {
   return reply(failed.length ? 1 : 0, out.join('\n'), { ok: !failed.length, scope: picked.files, results: results.map(({ file, pass, ms }) => ({ file, pass, ms })), concurrency: decision });
 }
 
-/** `starci test affected [--base <ref>] [--changed <file...>] [--run] [--concurrency <n>]`. */
+/** `starci test affected [--base <ref>] [--changed <file...>] [--by symbol|file] [--run] [--concurrency <n>]`. */
 export async function testAffected(ctx, deps = {}) {
   const args = ctx?.args ?? {};
+  if (args.by !== undefined && !['file', 'symbol'].includes(args.by)) return reply(2, 'starci test affected: --by is file or symbol', { ok: false, scope: [] });
   const root = path.resolve(ctx?.cwd ?? process.cwd(), args.root ?? '.');
   const explicit = pathList(args.changed);
   const base = explicit.length && !args.base ? null : baseOf(root, args.base, deps);
@@ -109,11 +119,12 @@ export async function testAffected(ctx, deps = {}) {
   const changed = explicit.length ? explicit : changedSince(root, base, deps);
   const policy = policyOf(deps);
   const diffBase = base ?? (deps.revParse ?? revParse)(root, 'HEAD');
-  const picked = affectedSelection({
+  const common = {
     root, changed, specs: deps.specs ?? readSpecs(root), sources: deps.sources ?? readSources(root), maxFiles: policy.maxFiles, dataRoots: policy.dataRoots,
     exists: deps.exists ?? ((file) => fs.existsSync(path.join(root, file))), symbolsOf: (file) => symbolsAgainst({ root, base: diffBase, deps }, file),
-  });
-  const data = { ok: true, scope: picked.files, changed, base, readers: picked.readers, narrowed: picked.narrowed, over: picked.over, maxFiles: picked.maxFiles };
+  };
+  const picked = args.by === 'file' ? affectedSelection(common) : affectedBySymbol({ ...common, depth: policy.symbolDepth, baseSource: (file) => baseSourceOf({ root, base: diffBase, deps }, file) });
+  const data = { ok: true, scope: picked.files, changed, base, readers: picked.readers, narrowed: picked.narrowed, over: picked.over, maxFiles: picked.maxFiles, ...symbolData(picked) };
   if (picked.over) return reply(args.run ? 2 : 0, [...selectionText({ base, changed, picked }), overText(picked)].join('\n'), { ...data, ok: !args.run });
   if (!args.run) return reply(0, selectionText({ base, changed, picked }).join('\n'), data);
   if (!picked.files.length) return reply(0, 'affected: 0 files, 0 pass, 0 fail', { ...data, results: [] });

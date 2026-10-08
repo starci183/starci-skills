@@ -1160,6 +1160,7 @@ complete -c starci -n '__starci_using_command supervisor workers' -l reason -r -
 complete -c starci -n '__starci_using_command task register' -l apply -d 'register or update the task after reviewing the default output'
 complete -c starci -n '__starci_using_command test affected' -l base -r -d 'ref to diff against (default: the merge-base with main, else origin/main)'
 complete -c starci -n '__starci_using_command test affected' -l changed -r -d 'explicit changed repository paths instead of the diff'
+complete -c starci -n '__starci_using_command test affected' -l by -r -d 'symbol (default: the specs related to the changed functions) or file (every spec importing a changed file)'
 complete -c starci -n '__starci_using_command test affected' -l run -d 'run the selected spec files, one per process'
 complete -c starci -n '__starci_using_command test affected' -l concurrency -r -d 'override automatic file concurrency with a positive integer'
 complete -c starci -n '__starci_using_command test affected' -l root -r -d 'repository root (default: the command cwd)'

@@ -4236,6 +4236,7 @@ the specs a change can break, chosen by the land gate selection; --run runs each
 | --- | --- | --- |
 | `--base` | string |  |
 | `--changed` | list |  |
+| `--by` | string |  |
 | `--run` | boolean |  |
 | `--concurrency` | number |  |
 | `--root` | string |  |

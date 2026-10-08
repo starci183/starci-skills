@@ -32,7 +32,7 @@ const HUB_IMPORTERS = 40;
 const DECL = /^(export\s+)?(default\s+)?(async\s+)?(function\*?|const|let|var|class)\s+([A-Za-z_$][\w$]*)/;
 const posix = (file) => String(file).replaceAll('\\', '/');
 const stemOf = (file) => path.posix.basename(file).replace(/\.[^.]+$/, '');
-const needleOf = (file) => file.split('/').slice(-2).join('/');
+export const needleOf = (file) => file.split('/').slice(-2).join('/');
 
 /** The text of a spec without comment-only lines: a mention in prose is not a use. */
 export function codeOf(text) {
@@ -83,7 +83,7 @@ function closeChangedDependencies(blocks, hit) {
   }
 }
 
-function addNamedSpecs(file, specs, files) {
+export function addNamedSpecs(file, specs, files) {
   const stem = stemOf(file);
   if (stem.length < 4) return;
   for (const spec of specs) {

@@ -756,6 +756,7 @@ _starci() {
     'supervisor:workers:--reason') return 0 ;;
     'test:affected:--base') return 0 ;;
     'test:affected:--changed') return 0 ;;
+    'test:affected:--by') return 0 ;;
     'test:affected:--concurrency') return 0 ;;
     'test:affected:--root') return 0 ;;
     'test:run:--level') _values 'values' 'L1' 'L2' 'L3' 'L4'; return 0 ;;
@@ -1166,7 +1167,7 @@ _starci() {
     'task:list') _values 'flags' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'task:register') _values 'flags' '--apply' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'task:show') _values 'flags' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
-    'test:affected') _values 'flags' '--base' '--changed' '--run' '--concurrency' '--root' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
+    'test:affected') _values 'flags' '--base' '--changed' '--by' '--run' '--concurrency' '--root' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'test:run') _values 'flags' '--level' '--changed' '--against' '--spec' '--concurrency' '--root' '--release-cut' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'typecheck:run') _values 'flags' '--level' '--changed' '--project' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'uat:assisted-runner') _values 'flags' '--request' '--receipt' '--after' '--value' '--actor' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
