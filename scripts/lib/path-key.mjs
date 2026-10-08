@@ -21,8 +21,9 @@ const stripTrailingStars = (text) => {
 export const posixPath = (p) => slash(p).replace(/^\.\//, '');
 /** Whether posix `file` is `prefix` itself or under it (`file === prefix || file` starts with `prefix/`). */
 export const sameOrUnder = (file, prefix) => file === prefix || file.startsWith(`${prefix}/`);
-/** `p` case-folded where the filesystem ignores case (Windows). */
-export const foldCase = (p) => (WIN ? p.toLowerCase() : p);
+import { foldCase, insidePath } from '../../engine/inside-path.mjs';
+
+export { foldCase, insidePath, resolvedKey } from '../../engine/inside-path.mjs';
 /** Whether two spellings name the same path on this host's filesystem. */
 export const samePath = (a, b) => foldCase(a) === foldCase(b);
 /**
@@ -69,18 +70,8 @@ export const canonicalPath = (p) => {
     rest.unshift(path.basename(at));
   }
 };
-/** `p` resolved and case-folded where the filesystem ignores case — the Map key of an absolute path. */
-export const resolvedKey = (p) => foldCase(path.resolve(p));
 /** Whether `a` and `b` resolve to the same path (always case-folded, so differently-cased spellings count). */
 export const sameResolvedPath = (a, b) => pathKey(a, { fold: true }) === pathKey(b, { fold: true });
-/**
- * Whether `file` sits under `root`; `includeSelf` also admits the root itself. `key` normalizes
- * both sides first (e.g. the registry's realpath-folded treeKey) when their spellings need it.
- */
-export const insidePath = (root, file, { key = (p) => p, includeSelf = false } = {}) => {
-  const rel = path.relative(key(root), key(file));
-  return (includeSelf || Boolean(rel)) && !rel.startsWith('..') && !path.isAbsolute(rel);
-};
 /**
  * `candidate` (absolute, or relative to `base`) resolved and dereferenced, required to sit under `base` (or be it):
  * the boundary check for a path an operator, an agent or another process hands in. `base` is canonicalised once and the

@@ -6,5 +6,4 @@
 /** The value of the environment variable `name` in `env` (default: the process environment), or undefined. */
 export const readEnv = (name, env = process.env) => env[name];
 
-/** True when `env` (default: the process environment) belongs to a spec run (`node --test` marks its children with NODE_TEST_CONTEXT). */
-export const isSpecRun = (env = process.env) => Boolean(env.NODE_TEST_CONTEXT);
+export { isSpecRun } from '../../engine/spec-run.mjs';
