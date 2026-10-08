@@ -83,7 +83,7 @@ const planWaitsOf = (op, ctx, { firstReached, succeeded, credentialOnly }) => {
 /** The dispatch action of an approved leg nothing holds: deferred, or a dispatch building on placeholder values when only a credential holds it. */
 const approvedLegAction = (op, ctx, credentialOnly) => {
   const { planAncestors, workGraph, deferredPlanOps } = ctx;
-  const placeholder = (planAncestors.get(op) ?? []).some(credentialOnly);
+  const placeholder = (planAncestors.get(op) ?? []).some((ancestor) => credentialOnly(ancestor));
   const nodes = workGraph ? workGraph.frontier.map((node) => node.id) : [];
   const deferral = deferredPlanOps.get(op);
   const action = { kind: 'dispatch', op, ...(nodes.length ? { nodes } : {}), ...(deferral ? { deferred: deferral.reason } : {}) };

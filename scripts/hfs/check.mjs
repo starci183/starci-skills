@@ -244,8 +244,8 @@ function minimumInstanceFindings(resolver, required, instances) {
 function contentRuleFindings({ repoRoot, repo, resolver, files, all, scoped, pins, inScope, isRoot, editionDeclaration }) {
   const findings = [
     ...pinFindings({ repoRoot, files, profile: repo.profile, pins, only: scoped }),
-    ...supabaseSecretFindings({ repoRoot, files: files.filter(inScope), resolver, repo }),
-    ...editionFindings({ repoRoot, files: files.filter(inScope), repo, resolver, withDeclaration: editionDeclaration }),
+    ...supabaseSecretFindings({ repoRoot, files: files.filter((file) => inScope(file)), resolver, repo }),
+    ...editionFindings({ repoRoot, files: files.filter((file) => inScope(file)), repo, resolver, withDeclaration: editionDeclaration }),
     ...repoLocalCheckFindings({ repoRoot, files }),
     ...lintSuppressionFindings({ repoRoot, files }),
   ];
@@ -257,7 +257,7 @@ function contentRuleFindings({ repoRoot, repo, resolver, files, all, scoped, pin
   } else if (repo.profile === 'be') {
     findings.push(...contractFindings({ repoRoot, files, repo, resolver }), ...testTopologyFindings({ repoRoot, files }));
   } else {
-    findings.push(...frontendFindings({ repoRoot, files, repo }), ...feNoTestsFindings({ repoRoot, files: files.filter(inScope) }));
+    findings.push(...frontendFindings({ repoRoot, files, repo }), ...feNoTestsFindings({ repoRoot, files: files.filter((file) => inScope(file)) }));
   }
   return findings;
 }
