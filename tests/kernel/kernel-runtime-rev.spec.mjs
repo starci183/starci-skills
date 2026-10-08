@@ -363,3 +363,33 @@ test('installed upcoming op keeps one READ revision through actual CLI enqueue a
   assert.equal(changed.status, 1); assert.equal(lastJson(changed.stderr)?.code, 'kernel-read-unverified');
   assert.equal(opCount(), 1, 'refused missing/forged/changed READ adds no job');
 });
+
+test('a land that carries a Kernel note delivers it verbatim with the wake; a land without one adds no line; the ack clears it', (t) => {
+  const rt = runtime(t); rt.checkout(rt.B);
+  const { db, wf, ack } = ledgerFixture(t);
+  const note = 'report with --evidence from now on; the old flag is refused';
+  git(rt.root, 'notes', '--ref=land', 'add', '-m', `Land-Verified: ${rt.B}\nSpecs: 1/1\nKernel-Note: ${note}`, rt.B);
+  ack(rt.A, 'boot');
+  const withNote = kernelRevState(db, wf, { root: rt.root, ops: ['interface.draw'] });
+  assert.deepEqual(withNote.notes, [note]);
+  const line = revWakeLine(withNote, wf);
+  assert.ok(line.endsWith(` What a Kernel must do differently: ${note}`), line);
+  assert.doesNotMatch(line, /\n/, 'one line');
+  // A note on a revision whose changed files are not this Kernel's contract still asks for the re-read and carries the line.
+  const only = runtime(t); only.checkout(only.B);
+  git(only.root, 'notes', '--ref=land', 'add', '-m', 'Kernel-Note: only the note changed', only.B);
+  const silent = ledgerFixture(t);
+  silent.ack(only.A, 'boot');
+  const state = kernelRevState(silent.db, silent.wf, { root: only.root, ops: ['code.refactor'] });
+  assert.equal(state.stale, true);
+  assert.match(revWakeLine(state, silent.wf), /What a Kernel must do differently: only the note changed/);
+  // Without a note on any land since the ack there is no line, and after the ack nothing is stale.
+  const none = runtime(t); none.checkout(none.B);
+  const plain = ledgerFixture(t);
+  plain.ack(none.A, 'boot');
+  assert.equal(kernelRevState(plain.db, plain.wf, { root: none.root, ops: ['interface.draw'] }).notes, undefined);
+  assert.doesNotMatch(revWakeLine(kernelRevState(plain.db, plain.wf, { root: none.root, ops: ['interface.draw'] }), plain.wf), /must do differently/);
+  ack(rt.B);
+  const acked = kernelRevState(db, wf, { root: rt.root });
+  assert.equal(revWakeLine(acked, wf), `Runtime rev ${shortRev(rt.B)}.`);
+});

@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { withLedger, seedWorkflow } from '../helpers/ledger-fixture.mjs';
 import { createUnit, enqueueJob, setJobStatus, startAttempt, fileReport, changeWorkflowPhase } from '../../engine/db/ledger.mjs';
-import controller, { reconcileWorkflow, listWorkflows, planWorkflow, workflowSettings, keyOf } from '../../scripts/reconciler/controllers/workflow.mjs';
+import controller, { reconcileWorkflow, listWorkflows, planWorkflow, workflowSettings, keyOf, REV_WAKE_KEY } from '../../scripts/reconciler/controllers/workflow.mjs';
 import { slaPass, clocksOf } from '../../scripts/reconciler/sla.mjs';
 import { TEST_REGISTRY_ENV } from '../../engine/db/machine.mjs';
 
@@ -186,3 +186,22 @@ test('stuck[] waits become clocks at their opTelemetry.stuckSla thresholds; the 
   assert.equal(controller.routes['op-settled']({ ledgerId: LEDGER, workflowId: WF, kind: 'op-settled' }), keyOf(LEDGER, WF));
   assert.equal(controller.routes['runtime-rev-acked']({ ledgerId: 'supervisor', workflowId: 'wf-supervisor' }), null);
 });
+
+test('a land-passed event of the Supervisor ledger re-looks at every running workflow at once; a product-ledger event of that kind routes nowhere', async (t) => withLedger(t, async ({ repoRoot, ledger, ledgerFile }) => {
+  seed(ledger, { progressAgoMin: 5 });
+  const route = controller.routes['land-passed'];
+  assert.equal(route({ ledgerId: 'supervisor', kind: 'land-passed' }), REV_WAKE_KEY);
+  assert.equal(route({ ledgerId: LEDGER, workflowId: WF, kind: 'land-passed' }), null);
+  const staleStatus = { ...status(), kernelRev: { stale: true, acked: 'aaaaaaaaaaaa', current: 'bbbbbbbbbbbb', files: ['modules/kernel/driver-loop.yaml'] } };
+  const { ctx, rec } = fakeCtx({ repoRoot, ledgerFile, statusOf: () => staleStatus });
+  let dropped = 0;
+  ctx.dropStatusCache = () => { dropped += 1; };
+  const result = await controller.reconcile(REV_WAKE_KEY, ctx);
+  assert.equal(dropped, 1, 'the status cache is forgotten so the pass reads the new revision');
+  assert.deepEqual(result.looked.sort(), [keyOf(LEDGER, WF), keyOf(LEDGER, PEER)].sort());
+  const bells = rec.logs.filter((l) => l.kind === 'reconciler.would' && l.data?.action === 'doorbell' && l.data.keys.includes('rev:bbbbbbbbbbbb'));
+  assert.deepEqual(bells.map((b) => b.data.workflowId).sort(), [PEER, WF].sort(), 'one doorbell per running workflow');
+  // The same revision twice rings nobody again: one wake per seat per revision.
+  await controller.reconcile(REV_WAKE_KEY, ctx);
+  assert.equal(rec.logs.filter((l) => l.kind === 'reconciler.would' && l.data?.action === 'doorbell' && l.data.keys.includes('rev:bbbbbbbbbbbb')).length, 2);
+}));

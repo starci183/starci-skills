@@ -224,9 +224,11 @@ cases:
     status: covered
   - id: workflow-across-host-restart
     family: power-lifecycle
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "after the host restart of 2026-10-07 the two real workflows needed hand repair in five places (stale provider reservations, dead terminals, a workflow tree collected and re-created, custody behind, a reported job never settled); each single cause was fixed on its own but no run put them together", remedy: {state: in-tree, change: "one end-to-end spec builds the running workflow (Kernel seat, running and reported op, reservations with and without a handle, the registered tree) and replays the restart through the engine's own recovery, the worktree GC pass, the Kernel start path's custody, the Job controller pass and the Kernel launch bar; it asserts the end state"}}
     met: {date: "2026-10-08", where: "CHANGELOG 1.0.0-alpha.6 Known limitations: the policy ran against fixtures only", evidence: "CHANGELOG.md"}
-    status: open
-    why: "no real workflow has run start to handover across a host restart; the stable criteria of the debug role count it"
+    rule: {file: scripts/reconciler/engine-process.mjs, anchor: "startRecovery"}
+    spec: tests/reconciler/host-restart-end-to-end.spec.mjs
+    status: covered
   - id: critic-coverage-decision-legs
     family: correctness
     met: {date: "2026-10-08", where: "owner ruling 7: only drawing has an independent Critic", evidence: "modules/kernel/roles.yaml rulings.critic-coverage"}
@@ -321,10 +323,11 @@ cases:
     status: covered
   - id: lead-released-without-full-suite
     family: authority-safety
-    finding: {role: debug, duty: never, verdict: departs, evidence: "the lead released without the full suite on the exact commit and pushed repeatedly for CI readings", remedy: {state: open, lane: f1}}
+    finding: {role: debug, duty: never, verdict: departs, evidence: "the lead released without the full suite on the exact commit and pushed repeatedly for CI readings", remedy: {state: in-tree, change: "a push of main or of a v* tag is judged by the release definition (scripts/guards/release-definition.mjs) in the pre-push hook: it needs the L4 record of exactly the pushed commit, naming the tag, with a green row for npm test, npm run test:packages and npm run check; the record is written only by starci release cut after its suite ran on that commit, and git push --no-verify is refused by the git policy (HOOKS_BYPASS)"}}
     met: {date: "2026-10-07", where: "alpha.6 release", evidence: "owner report 2026-10-08; CHANGELOG 1.0.0-alpha.6 Known limitations"}
-    status: open
-    why: "the release rule belongs to the push-only-at-release lane (f1)"
+    rule: {file: scripts/guards/release-push-gate.mjs, anchor: "RIGHTS_PUSH_NOT_RELEASE"}
+    spec: tests/guards/release-push-gate.spec.mjs
+    status: covered
   - id: op-orca-send-addresses-anyone
     family: authority-safety
     finding: {role: op, duty: never, verdict: departs, evidence: "the shared Orca self-lifecycle allowance let an Op name any recipient or Run with --to and --run", remedy: {state: in-tree, change: "the policy entry refuses --to and --run for the op role (refuse-for): an Op reports to the Run of its own Kernel through starci kernel report"}}
@@ -510,10 +513,11 @@ cases:
     status: covered
   - id: example-installs-resolve-stale-registry-packages
     family: record-vs-reality
-    finding: {role: runtime, duty: does, verdict: departs, evidence: "six packages differ from their registry copy at the same version; each example installs the registry copy, so the example lint judges the renderer of the last publication, and the cut started a one-hour L4 run that could not pass while the publish plan (starci release check, proof publish-plan) already reported five blockers", remedy: {state: open, change: "the cut reads the publish plan before it starts the L4 run; the owner publishes the packages at bumped versions and re-pins the examples"}}
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "six packages differ from their registry copy at the same version; each example installs the registry copy, so the example lint judges the renderer of the last publication, and the cut started a one-hour L4 run that could not pass while the publish plan (starci release check, proof publish-plan) already reported five blockers", remedy: {state: in-tree, change: "the six packages were published on 2026-10-09 and the examples re-pinned (the example-render self-check judges the rendered bytes); the cut reads the publish plan (scripts/gates/release-plan.mjs planSummary over the registry) before its suite and refuses in seconds with the verdict publish-plan when it reports a package to publish or a blocker (publishPlanRefusal; the spec injects deps.publishPlan)"}}
     met: {date: "2026-10-08", where: "release cut of 1.0.0-alpha.7, lint rows of all three examples", evidence: "starci release publish (plan): 5 blockers"}
-    status: open
-    why: "publishing needs the owner's credentials, and the cut's pre-flight is not built: the cut specs inject every seam and a default registry read there needs its own design"
+    rule: {file: scripts/supervisor/release-cut-plan.mjs, anchor: "publishPlanRefusal"}
+    spec: tests/supervisor/release-cut.spec.mjs
+    status: covered
   - id: release-sonar-proof-followed-public-host
     family: correctness
     finding: {role: runtime, duty: does, verdict: departs, evidence: "the three L4 Sonar rows of the alpha.7 cut waited five minutes and failed 'SonarQube did not report UP in time' although the local server answered UP 19 s after its containers started: the proof's gate config took SONAR_HOST_URL from the host secret.env (https://sonar.starci.org, the CI tunnel whose container was stopped) before the host.local the example declares", remedy: {state: in-tree, change: "the self-hosted stack is out of the examples' proof: it scans SonarCloud (cloudConfig) with the runtime's one SONAR_TOKEN, the host being the declared hosted one, never the SONAR_HOST_URL of the environment; release cut and --plan refuse in seconds when SONAR_TOKEN or SONAR_ORGANIZATION is absent, the token or organization is rejected, or SonarCloud is unreachable (sonarCloudRefusal)"}}
@@ -568,4 +572,18 @@ cases:
     met: {date: "2026-10-08", where: "commit 6ad9c7cca on the alpha.7 integration branch", evidence: "npm run check: ARCH_OWNER_CYCLE engine/config.mjs:13"}
     rule: {file: engine/config.mjs, anchor: "confines the owner"}
     spec: tests/engine/config.spec.mjs
+    status: covered
+  - id: runtime-land-woke-seats-at-their-next-wake
+    family: change-under-running
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "a land moved the runtime revision but a running Kernel noticed it only at its next wake or the controller's next resync (up to two minutes later, longer for a seat that was not woken)", remedy: {state: in-tree, change: "git land writes a land-passed event once main moved (land-announce.mjs); the Workflow controller routes it to the key rev-wake, which drops the status cache and looks at every running workflow at once; the stale revision rings the seat's doorbell through the existing wake path, once per workflow and revision (planRev, recentlyOpened)"}}
+    met: {date: "2026-10-09", where: "wave 3 brief: a land or deploy wakes the affected seats at once", evidence: "briefs/WAVE3.md lane f7 item 3a"}
+    rule: {file: scripts/reconciler/controllers/workflow.mjs, anchor: "REV_WAKE_KEY"}
+    spec: tests/reconciler/reconciler-workflow.spec.mjs
+    status: covered
+  - id: land-note-for-kernels-undelivered
+    family: change-under-running
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "a land that changes how a Kernel must act had no way to say so: the Kernel learned the new revision from its wake line and had to find the difference itself", remedy: {state: in-tree, change: "starci git land --kernel-note <line> (one line, at most 400 characters) is a Kernel-Note trailer of the land record (refs/notes/land); the Kernel's wake line carries the notes of every land since its acknowledged revision verbatim, and a note makes the revision a required re-read; no note, no line"}}
+    met: {date: "2026-10-09", where: "wave 3 brief: a land carries a one-line note for the Kernels", evidence: "briefs/WAVE3.md lane f7 item 3b"}
+    rule: {file: scripts/kernel/runtime-rev.mjs, anchor: "landKernelNotes"}
+    spec: tests/kernel/kernel-runtime-rev.spec.mjs
     status: covered
