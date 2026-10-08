@@ -25,22 +25,17 @@ import { machineLoad } from '../machine/host-resources.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 import { catFile } from '../api/git/cat-file.mjs'; import { cherry as gitCherry } from '../api/git/cherry.mjs'; import { cherryPick } from '../api/git/cherry-pick.mjs'; import { commitTree } from '../api/git/commit-tree.mjs'; import { config as gitConfig } from '../api/git/config.mjs'; import { diff as gitDiff } from '../api/git/diff.mjs'; import { hook as gitHook } from '../api/git/hook.mjs'; import { log as gitLog } from '../api/git/log.mjs'; import { lsFiles } from '../api/git/ls-files.mjs'; import { mergeBaseQuery } from '../api/git/merge-base-query.mjs'; import { mergeTree } from '../api/git/merge-tree.mjs'; import { push as gitPush } from '../api/git/push.mjs'; import { remote as gitRemote } from '../api/git/remote.mjs'; import { revList } from '../api/git/rev-list.mjs'; import { revParseQuery } from '../api/git/rev-parse-query.mjs'; import { show as gitShow } from '../api/git/show.mjs'; import { statusQuery } from '../api/git/status-query.mjs'; import { symbolicRefQuery } from '../api/git/symbolic-ref-query.mjs'; const SUPERVISOR_GIT = { 'cat-file': catFile, cherry: gitCherry, 'cherry-pick': cherryPick, 'commit-tree': commitTree, config: gitConfig, diff: gitDiff, hook: gitHook, log: gitLog, 'ls-files': lsFiles, 'merge-base': mergeBaseQuery, 'merge-tree': mergeTree, push: gitPush, remote: gitRemote, 'rev-list': revList, 'rev-parse': revParseQuery, show: gitShow, status: statusQuery, 'symbolic-ref': symbolicRefQuery };
 import { posixPath } from '../lib/path-key.mjs';
-import { guardLaunch, bindGuardTerminal } from '../guards/hook-install.mjs';
+import { guardLaunch } from '../guards/hook-install.mjs';
 import { outageInText } from '../agent/provider-outage.mjs';
 import { recordWorkerLaunch, workerAttemptAgent, setJob, workerTerminalClosed, closeWorkerTerminalState } from './worker-state.mjs';
 import { recordWorkerReport, resolveReportCommit } from './workers-report.mjs';
 import { startWorkerAgent } from '../agent/start-worker.mjs'; import { isMain } from '../lib/is-main.mjs';
 import { slugify } from '../lib/slug.mjs'; import { withoutSeatEnv } from '../lib/seat-env.mjs';
 import { runWorkersCli } from './workers-cli.mjs';
+import { reconcileSpawning as reconcileSpawningWith } from './spawn-reconcile.mjs';
 import { pickWorkerPool } from './worker-pool.mjs';
 import { tierMembers, tierOfSeat, tierSettings } from '../agent/tiers.mjs';
 import { eachInOrder } from '../lib/in-order.mjs';
-import { workerShow } from '../api/orca/worker-show.mjs';
-import { terminalShow } from '../api/orca/terminal-show.mjs';
-import { terminalRead } from '../api/orca/terminal-read.mjs';
-import { draftText } from '../lib/orca-terminal.mjs';
-import { classifyAgentScreen, exitedAgentPromptRow, frameWithDraft, wakeDeliveryOf } from '../lib/terminal-liveness.mjs';
-import { sendEnterWithProof } from '../kernel/wake-delivery.mjs';
 export { pickWorkerPool };
 
 /**
@@ -323,60 +318,8 @@ const markRunning = (pass, { job, route, staging, leased, spawned, payload }) =>
   result.launched.push({ jobId: job.job_id, terminal: spawned.terminal, agent: route.agent, model: route.model, staging: staging.path });
 };
 
-/** A dead original Dispatch ends its job as failed (not requeued): the worker exited before its Task landed. */
-function failDeadSpawn(pass, job, { terminal, reason }) {
-  const { m, now, result } = pass;
-  m.transaction(() => {
-    releaseLeases(m, job.job_id);
-    m.updateSupAttempt(job.attempt_id, { cancelledAt: now(), failureClass: 'spawn:worker-exited' });
-    setJob(m, job.job_id, { status: 'failed', payload: { ...job.payload, launchEffect: 'dead', result: { reason } } });
-    supervisorEvent(m, { entityType: 'job', entityId: job.job_id, kind: 'worker-spawn-failed', payload: { terminal, reason }, now: now() });
-  });
-  result.failed.push({ jobId: job.job_id, terminal, error: reason, requeued: false });
-}
-
-/** Whether the original worker's frame shows its prompt submitted; a staged Codex paste gets one proven Enter. */
-function spawnSubmitted({ job, shown, frame, terminal, deps }) {
-  const prompt = renderWorkerPrompt(job, job.payload.staging), draft = draftText(frame);
-  const screen = draft ? frameWithDraft(frame.screen, draft) : frame.screen;
-  const state = classifyAgentScreen(screen, { sentText: prompt, provider: job.payload.agent }).state;
-  if (state === 'staged-input' || state === 'queued-input') {
-    return job.payload.agent === 'codex' && shown.writable === true && sendEnterWithProof({ terminal, sentText: prompt, deps }).ok;
-  }
-  return state === 'active' || wakeDeliveryOf({ after: screen, text: prompt }).delivery === 'delivered';
-}
-
-/** Reconcile the original Dispatch only: uncertain effects never authorize another worker. */
-function reconcileSpawning(pass, job) {
-  const { m, deps, root } = pass;
-  if (!job.payload.dispatch) return false;
-  try {
-    const worker = (deps.workerShow ?? workerShow)({ dispatch: job.payload.dispatch });
-    if (!worker?.ok) return false;
-    const terminal = worker.dispatch?.assigneeHandle ?? worker.result?.worker?.agentTerminalHandle ?? job.worker_id;
-    if (!terminal || (job.worker_id && job.worker_id !== terminal)) return false;
-    m.updateSupAttempt(job.attempt_id, { terminalHandle: terminal });
-    const shown = (deps.show ?? terminalShow)({ terminal });
-    if (shown?.hostUnavailable) return false;
-    const frame = shown?.ok && shown.connected === true ? (deps.read ?? terminalRead)({ terminal, screen: true }) : null;
-    const dead = (shown?.ok && shown.connected === false) || shown?.errorCode === 'terminal_handle_stale'
-      || (frame?.ok && exitedAgentPromptRow(frame.screen));
-    if (dead) {
-      failDeadSpawn(pass, job, { terminal, reason: shown?.exitCause ?? shown?.errorCode ?? 'agent-exited' });
-      return true;
-    }
-    const effective = worker.effective;
-    if (!shown?.ok || !frame?.ok || (effective?.agent ?? effective?.provider) !== job.payload.agent
-      || (effective?.model ?? effective?.modelId) !== job.payload.model) return false;
-    if (!spawnSubmitted({ job, shown, frame, terminal, deps })) return false;
-    if (typeof job.payload.guard?.jobFile === 'string') (deps.bindGuard ?? bindGuardTerminal)({ skillRoot: root, handle: terminal, jobFile: job.payload.guard.jobFile });
-    m.updateSupAttempt(job.attempt_id, { failureClass: null });
-    markRunning(pass, { job, route: { agent: job.payload.agent, model: job.payload.model, pool: job.payload.pool },
-      staging: job.payload.staging, leased: { attemptId: job.attempt_id }, spawned: { terminal, dispatchId: job.payload.dispatch },
-      payload: { ...job.payload, launchEffect: 'submitted', lastSpawnError: null } });
-    return true;
-  } catch { return false; } // Host/read failures retain custody for the next pass.
-}
+/** Reconcile the original Dispatch only (spawn-reconcile.mjs), resuming through this module's launch bookkeeping. */
+const reconcileSpawning = (pass, job) => reconcileSpawningWith(pass, job, { markRunning, renderPrompt: renderWorkerPrompt });
 
 /** One queued job's launch: lease check, route, staging checkout, leases, worker. Records into pass.result. */
 async function launchJob(pass, job) {
