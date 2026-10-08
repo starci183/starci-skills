@@ -29,7 +29,8 @@ test('a filed report makes its worker question inactive before job settlement', 
     ...adoptLaunchTrust(tmp,{roots:[repo],ref:'private worker-question fixture adoption'}) };
   const api = (...args) => {
     const run = spawnSync(process.execPath, [apiFile, ...args, '--repo', repo, '--json'],
-      { cwd: root, encoding: 'utf8', windowsHide: true, timeout: 120000, env });
+      // The status drain of the Runs is a reaction of the reconciler, which owns it; a person reading status leaves it alone.
+      { cwd: root, encoding: 'utf8', windowsHide: true, timeout: 120000, env: args[0] === 'status' ? { ...env, STARCI_ACTOR: 'reconciler/job' } : env });
     return { run, body: JSON.parse(run.stdout || 'null') };
   };
   const workflowId = 'wf-question-inactive', jobId = 'job-question-inactive';

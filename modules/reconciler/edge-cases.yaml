@@ -295,7 +295,8 @@ cases:
     status: covered
   - id: read-verb-writes-the-ledger-as-the-caller
     family: record-vs-reality
-    finding: {role: runtime, duty: does, verdict: departs, evidence: "starci kernel status, a read verb, opens write transactions on the ledger (lease renewal, runtime drift records) as whoever calls it, so a person or Debug reading status leaves ledger writes under their own identity", remedy: {state: open}}
-    met: {date: "2026-10-08", where: "the first run of the debug digest over a ledger copy appended four ledger-written-outside-seat events, one per status call", evidence: "tests/kernel/intervention.spec.mjs; the digest runs its reads as STARCI_ACTOR debug-digest so they are not counted"}
-    status: open
-    why: "a verb that reads should not write; splitting the lease renewal and the drift record out of status is a change to the status verb that no lane has taken"
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "starci kernel status, a read verb, opened the ledger writable and ran six write sites as whoever called it (resolve a met typed wait, sweep the autopilot, renew leases, record a provider outage, send the blocking heads-up, drain the Runs), each in a ledger transaction whose admission noted a person at a shell as ledger-written-outside-seat; a call by Debug, a monitor or an op left ledger writes under its own identity", remedy: {state: in-tree, change: "a verb spec declares reads: true and gets a read-only connection whose every write call and write statement throws read-verb-write and fails the call; reacts: true reopens it writable only for the roles that own the reactions (Kernel seat, Supervisor, reconciler, settler, api child), so status read by anyone else projects without writing (read-only-ledger.mjs, caller-admission.mjs openVerbLedger)"}}
+    met: {date: "2026-10-08", where: "the first run of the debug digest over a ledger copy appended four ledger-written-outside-seat events, one per status call", evidence: "tests/kernel/intervention.spec.mjs; the digest runs its reads as STARCI_ACTOR debug-digest"}
+    rule: {file: scripts/kernel/read-only-ledger.mjs, anchor: "readOnlyLedger"}
+    spec: tests/kernel/read-verb-no-writes.spec.mjs
+    status: covered

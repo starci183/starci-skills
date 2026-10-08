@@ -19,7 +19,7 @@ const comparablePath = (value) => {
 };
 
 /** Whether `cwd` is the primary checkout identified by Git's common directory. */
-export function primaryWorktree(cwd, revParse = revParseQuery) {
+function primaryWorktree(cwd, revParse = revParseQuery) {
   const top = revParse(['--show-toplevel'], { cwd });
   const common = revParse(['--git-common-dir'], { cwd });
   if (!success(top) || !success(common)) {
@@ -31,6 +31,14 @@ export function primaryWorktree(cwd, revParse = revParseQuery) {
   const commonDir = path.isAbsolute(commonName) ? commonName : path.resolve(root, commonName);
   const primary = path.dirname(commonDir);
   return { ok: true, root, primary, isPrimary: comparablePath(root) === comparablePath(primary) };
+}
+
+/** The refusal of a role that may not install in this checkout (the primary main worktree is the owner's and the release's), or null. */
+export function ownedTreeRefusal(cwd, role, revParse, refusal) {
+  if (['owner', 'release'].includes(role)) return null;
+  const primary = primaryWorktree(cwd, revParse);
+  if (!primary.ok) return refusal(cwd, `cannot prove this is an owned worktree: ${primary.error}`);
+  return primary.isPrimary ? refusal(cwd, 'the primary main worktree is reserved for the owner or release role') : null;
 }
 
 /** Refuse a node_modules junction or symbolic link; a missing directory is safe for a real install. */
@@ -72,11 +80,8 @@ export async function npmCi(ctx, deps = {}) {
   };
   const role = ctx?.role ?? 'owner';
 
-  if (!['owner', 'release'].includes(role)) {
-    const primary = primaryWorktree(cwd, api.revParse);
-    if (!primary.ok) return refusal(cwd, `cannot prove this is an owned worktree: ${primary.error}`);
-    if (primary.isPrimary) return refusal(cwd, 'the primary main worktree is reserved for the owner or release role');
-  }
+  const unowned = ownedTreeRefusal(cwd, role, api.revParse, refusal);
+  if (unowned) return unowned;
 
   const dirty = api.status(cwd, { pathspecs: ['package.json', 'package-lock.json'], untracked: 'all', literal: true });
   if (!dirty?.ok) return refusal(cwd, `cannot inspect package.json and package-lock.json: ${dirty?.stderr || 'git status failed'}`);

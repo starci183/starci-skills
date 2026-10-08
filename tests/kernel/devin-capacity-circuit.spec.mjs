@@ -88,7 +88,8 @@ const fixture = (t) => {
   const writeState = (fn) => { const s = json(fs.readFileSync(stateFile, 'utf8')) ?? {}; fn(s); fs.writeFileSync(stateFile, JSON.stringify(s)); };
   const db = (fn) => { const l = inspectLedger({ file: ledgerFile }); try { return fn(l.db); } finally { l.close(); } };
   const row = () => {const m=openMachineReader({file:env.STARCI_TEST_MACHINE_FILE});try{const r=readProviderCircuit('devin',{machine:m});return r?{...r.value,expiresAt:r.expiresAt}:null;}finally{m.close();}};
-  return { repo, env, ledgerFile, writeState, db, row, run: (...args) => runApi(env, ...args) };
+  // Recording the outage a worker screen shows is a reaction of the reconciler's status pass, which owns it; a person reading status records nothing.
+  return { repo, env, ledgerFile, writeState, db, row, run: (...args) => runApi({ ...env, STARCI_ACTOR: 'reconciler/job' }, ...args) };
 };
 
 test('a Devin worker screen showing the capacity error opens the devin capacity circuit; the retry routes around Devin and counts the outage against it', async (t) => {

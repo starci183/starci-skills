@@ -2,6 +2,8 @@
 // and one launch is let through when the hold has passed (scripts/kernel/start-hold.mjs, the workflow start's startBar).
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import os from 'node:os';
+import path from 'node:path';
 import { startBar } from '../../scripts/kernel/workflow-startup.mjs';
 import { startCauseOf, startFailureRun, startHoldBudget, startHoldOf, holdSummary } from '../../scripts/kernel/start-hold.mjs';
 import { withLedger, seedWorkflow } from '../helpers/ledger-fixture.mjs';
@@ -9,6 +11,7 @@ import { withLedger, seedWorkflow } from '../helpers/ledger-fixture.mjs';
 const budget = { intervalMs: 60_000, maxIntervalMs: 900_000, maxAttempts: 3, heldRetryMs: 3_600_000 };
 const T0 = 1_800_000_000_000;
 const workflowId = 'wf-start-hold';
+const lockedFile = (name) => path.join(os.tmpdir(), 'starci-hold-tree', 'node_modules', `${name}.node`);
 const locked = (path) => ({ step: 'workflow-worktree-install', reason: 'workflow-worktree-install-locked', error: `npm error code EPERM\nnpm error path ${path}`,
   install: { receipt: { cause: 'file-locked', code: 'EPERM', path, holders: [{ pid: 4242, name: 'node.exe' }] } } });
 
@@ -23,7 +26,7 @@ test('the bound is declared in host.yaml and refuses a missing number by its key
 });
 
 test('one failure backs the next launch off, and the launch is free again once the interval has passed', (t) => world(t, (ledger) => {
-  fail(ledger, T0, locked('D:/tree/node_modules/a.node'));
+  fail(ledger, T0, locked(lockedFile('a')));
   const run = startFailureRun(ledger.db, workflowId);
   assert.equal(run.length, 1);
   const hold = startHoldOf(run, { now: T0 + 10_000, budget });
@@ -33,15 +36,15 @@ test('one failure backs the next launch off, and the launch is free again once t
 }));
 
 test('the same cause failing the declared number of times holds the launch, with the cause and the evidence', (t) => world(t, (ledger) => {
-  fail(ledger, T0, locked('D:/tree/node_modules/a.node'));
-  fail(ledger, T0 + 100_000, locked('D:/tree/node_modules/b.node'));
-  fail(ledger, T0 + 300_000, locked('D:/tree/node_modules/c.node'));
+  fail(ledger, T0, locked(lockedFile('a')));
+  fail(ledger, T0 + 100_000, locked(lockedFile('b')));
+  fail(ledger, T0 + 300_000, locked(lockedFile('c')));
   const hold = startHoldOf(startFailureRun(ledger.db, workflowId), { now: T0 + 400_000, budget });
   assert.equal(hold.state, 'held');
   assert.equal(hold.count, 3);
   assert.equal(hold.step, 'workflow-worktree-install');
   assert.equal(hold.reason, 'workflow-worktree-install-locked');
-  assert.equal(hold.lockedPath, 'D:/tree/node_modules/c.node');
+  assert.equal(hold.lockedPath, lockedFile('c'));
   assert.deepEqual(hold.holders, [{ pid: 4242, name: 'node.exe' }]);
   assert.equal(hold.retryAtMs, T0 + 300_000 + budget.heldRetryMs);
   assert.match(holdSummary(hold), /3 Kernel launches failed at workflow-worktree-install for one cause, held/);
@@ -53,7 +56,7 @@ test('303 ticks of a seat pass launch a handful of times, not 303', (t) => world
   for (let now = T0; now < T0 + 3 * 3_600_000; now += 51_000) {
     if (startHoldOf(startFailureRun(ledger.db, workflowId), { now, budget })) continue;
     launches += 1;
-    fail(ledger, now, locked('D:/tree/node_modules/a.node'));
+    fail(ledger, now, locked(lockedFile('a')));
   }
   assert.ok(launches <= 7, `launched ${launches} times in three hours`);
   assert.ok(launches >= 3);
@@ -73,9 +76,9 @@ test('two causes that alternate are still a loop, and a fall-through to the next
 }));
 
 test('a Kernel launch that stands ends the run', (t) => world(t, (ledger) => {
-  fail(ledger, T0, locked('D:/tree/node_modules/a.node'));
-  fail(ledger, T0 + 100_000, locked('D:/tree/node_modules/a.node'));
-  fail(ledger, T0 + 300_000, locked('D:/tree/node_modules/a.node'));
+  fail(ledger, T0, locked(lockedFile('a')));
+  fail(ledger, T0 + 100_000, locked(lockedFile('a')));
+  fail(ledger, T0 + 300_000, locked(lockedFile('a')));
   ledger.appendEvent({ workflowId, entityType: 'kernel', entityId: workflowId, generation: 1, kind: 'kernel-booted', payload: {}, createdAt: T0 + 310_000 });
   assert.deepEqual(startFailureRun(ledger.db, workflowId), []);
   assert.equal(startHoldOf([], { now: T0 + 311_000, budget }), null);
@@ -87,7 +90,7 @@ test('the cause is the step and the typed reason, else the first line of the err
 });
 
 test('startBar refuses the watchdog launch of a held cause and leaves the Supervisor and a startable goal alone', (t) => world(t, (ledger) => {
-  for (const [i, at] of [T0, T0 + 100_000, T0 + 300_000].entries()) fail(ledger, at, locked(`D:/tree/node_modules/${i}.node`));
+  for (const [i, at] of [T0, T0 + 100_000, T0 + 300_000].entries()) fail(ledger, at, locked(lockedFile(i)));
   const ok = { ok: true };
   const now = T0 + 400_000;
   const barred = startBar({ authority: ok, launchedBy: 'watchdog', db: ledger.db, workflowId, now, budget: () => budget });

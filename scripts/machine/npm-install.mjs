@@ -10,7 +10,7 @@ import { diff } from '../api/git/diff.mjs';
 import { revParseQuery } from '../api/git/rev-parse-query.mjs';
 import { install } from '../api/npm/install.mjs';
 import { refusal as verbRefusal, resultOk as success, resultOutput as output } from '../lib/verb-call.mjs';
-import { primaryWorktree, linkedNodeModules, lockedValue } from './npm-ci.mjs';
+import { ownedTreeRefusal, linkedNodeModules, lockedValue } from './npm-ci.mjs';
 import { underHostLock, hostLockRetryBudget } from './verb-lock.mjs';
 
 const PINS_FILE = 'knowledge/hfs/canon-pins.yaml';
@@ -74,11 +74,8 @@ export async function npmInstall(ctx, deps = {}) {
   };
   const role = ctx?.role ?? 'owner';
 
-  if (!['owner', 'release'].includes(role)) {
-    const primary = primaryWorktree(cwd, api.revParse);
-    if (!primary.ok) return refusal(cwd, `cannot prove this is an owned worktree: ${primary.error}`);
-    if (primary.isPrimary) return refusal(cwd, 'the primary main worktree is reserved for the owner or release role');
-  }
+  const unowned = ownedTreeRefusal(cwd, role, api.revParse, refusal);
+  if (unowned) return unowned;
 
   const link = linkedNodeModules(cwd, api.lstat);
   if (!link.ok) return refusal(cwd, `cannot inspect node_modules: ${link.error}`);

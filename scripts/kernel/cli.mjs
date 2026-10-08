@@ -101,7 +101,7 @@ import { WORKER_QUESTION } from './verbs/shared/worker-messages.mjs';
 import { PEER_WAIT, blockingViewOf, leaseCanonOf, openPeerWaits, releaseTypedWaits } from './verbs/shared/peer-waits.mjs';
 import { VerbExit } from './verbs/shared/verb-exit.mjs';
 import { OP_ROLE, callerOf, refuseOpCaller } from '../guards/op-caller.mjs';
-import { callerAdmission, requireAdmittedKernelRead } from './caller-admission.mjs';
+import { callerAdmission, guardedRun, openVerbLedger, requireAdmittedKernelRead } from './caller-admission.mjs';
 import { slash } from '../lib/path-key.mjs';
 import { releaseSettledSession } from './op-session.mjs';
 import { recordSettledAttemptUsage } from './usage-record.mjs';
@@ -389,10 +389,10 @@ const parseArgs = (argv) => {
   return a;
 };
 const need = (cond, msg) => { if (!cond) { console.error(`api: ${msg}`); usage(2); } };
-const openRepoLedger = (repo) => {
+const openRepoLedger = (repo, spec = {}) => {
   const file = ledgerFileFor(repo); // throws ledger-root-is-runtime on a runtime root — deliberate
   if (!fs.existsSync(file)) throw Object.assign(new Error(`ledger-missing: ${file} — no .starciwork/runtime.sqlite at that repo`), { code: 'ledger-missing' });
-  return openLedger({ file });
+  return openVerbLedger(spec, file, { openWritable: (target) => openLedger({ file: target }) });
 };
 
 const emit = (out, human, asJson) => {
@@ -3688,7 +3688,7 @@ const runExtensionVerb = async (spec, args, repo) => {
   if (typeof spec.validate === 'function') spec.validate(args, need);
   if (spec.ledger === false) return await spec.run({ ledger: null, args, repo, emit, need, caller: null, ext: API_EXT, internals: API_INTERNALS });
   let ledger;
-  try { ledger = openRepoLedger(repo); } catch (error) {
+  try { ledger = openRepoLedger(repo, spec); } catch (error) {
     console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error) }));
     process.exitCode = 1; return;
   }
@@ -3703,7 +3703,7 @@ const runExtensionVerb = async (spec, args, repo) => {
   }
   try {
     const admitted = callerAdmission(ledger, args, { caller, verb: spec.verb });
-    return await admitted.run(() => spec.run({ ledger, args, repo, emit, need, caller: admitted.caller, ext: API_EXT, internals: API_INTERNALS }));
+    return await admitted.run(() => guardedRun(ledger, () => spec.run({ ledger, args, repo, emit, need, caller: admitted.caller, ext: API_EXT, internals: API_INTERNALS })));
   } catch (error) {
     if (!(error instanceof VerbExit)) console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error), code: error?.code }));
     process.exitCode = error instanceof VerbExit ? error.exitCode : 1;

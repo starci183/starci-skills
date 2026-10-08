@@ -5,6 +5,10 @@ import { cmdStatus } from './shared/status-render.mjs';
 export default {
   verb: 'status',
   required: ['workflow'],
+  // A read verb: its reactions (resolve a met wait, answer an ask, renew a lease, drain the Runs) run only for the roles that own them
+  // (caller-admission.mjs openVerbLedger); any other caller reads through a read-only ledger.
+  reads: true,
+  reacts: true,
   async run({ ledger, args, repo, emit, internals, ext }) {
     // Exit 0 must carry the status JSON: a run that ends having emitted nothing is a typed refusal, never silence.
     let emitted = false;

@@ -6,9 +6,11 @@
 // verb help line), so each land invalidated every queued lane. New work goes through files instead, one per
 // thing, discovered at startup:
 //
-//   scripts/kernel/verbs/<verb>.mjs      a verb: export default {verb, required?, kernelOnly?, flags?, ledger?, usage, run}
+//   scripts/kernel/verbs/<verb>.mjs      a verb: export default {verb, required?, kernelOnly?, reads?, reacts?, flags?, ledger?, usage, run}
 //                                            required: [flag] or (args) => [flag]; flags: its boolean flags;
 //                                            ledger false: run without opening the repo ledger;
+//                                            reads true: a read verb, opened read-only (a write attempt fails the call with read-verb-write);
+//                                            reacts true: its mechanical reactions run on a writable ledger for the roles that own them only;
 //                                            run({ledger, args, repo, emit, need, caller, ext}) (may be async)
 //   modules/cli/commands/kernel/<verb>.yaml  its catalog contract (what `commands.<verb>` of api.yaml would hold)
 //   scripts/kernel/status/<key>.mjs      a status field: export default {key, compute(ctx), lines?(value)}

@@ -67,7 +67,7 @@ export function workflowSender({ env = process.env, launchedBy = 'supervisor', l
 export function startBar({ authority, launchedBy, db, workflowId, now = Date.now(), budget = startHoldBudget }) {
   if (!authority.ok) return { step: authority.reason, fields: { workflowId, authority } };
   const hold = launchedBy === 'watchdog' ? startHoldOf(startFailureRun(db, workflowId), { now, budget: budget() }) : null;
-  return hold ? { step: 'kernel-start-held', fields: { workflowId, error: holdSummary(hold), hold } } : null;
+  return hold ? { step: 'kernel-start-held', fields: { workflowId, reason: 'kernel-start-held', error: holdSummary(hold), hold } } : null;
 }
 
 /** Why a finished or archived goal never gets a Kernel again, or null while it is open. */
@@ -171,7 +171,8 @@ export async function installWorkflowTree({ record, env = process.env } = {}, de
   catch (error) { return { ok: false, installed: false, reason: 'workflow-worktree-install-failed', path: record.path,
     receipt: null, error: String(error?.message ?? error) }; }
   const ok = result?.code === 0 && result?.data?.ok === true;
-  const locked = !ok && result?.data?.cause === 'file-locked';
-  return { ok, installed: ok, path: record.path, receipt: result?.data ?? null,
-    ...(ok ? {} : { reason: locked ? 'workflow-worktree-install-locked' : 'workflow-worktree-install-failed', error: result?.text ?? 'npm ci did not return a successful receipt' }) };
+  const done = { ok, installed: ok, path: record.path, receipt: result?.data ?? null };
+  const error = result?.text ?? 'npm ci did not return a successful receipt';
+  if (ok) return done;
+  return result?.data?.cause === 'file-locked' ? { ...done, reason: 'workflow-worktree-install-locked', error } : { ...done, reason: 'workflow-worktree-install-failed', error };
 }

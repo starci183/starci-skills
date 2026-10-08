@@ -39,7 +39,8 @@ const world = (t, { orca = false } = {}) => {
     Object.assign(env, { STARCI_ORCA_COMMAND: process.execPath, STARCI_ORCA_ARGS: JSON.stringify([stub]), STARCI_FAKE_ORCA_LOG: path.join(root, 'calls.jsonl'), STARCI_FAKE_ORCA_STATE: stateFile,
       ...adoptLaunchTrust(root, { roots: [repo], ref: 'private kernel-bridges fixture adoption' }) });
   }
-  const api = (args) => spawnSync(process.execPath, [API, ...args, '--repo', repo, '--json'], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 180000, env });
+  // A typed wait is released by the status pass of the reconciler, which owns that reaction; a person reading status releases nothing.
+  const api = (args) => spawnSync(process.execPath, [API, ...args, '--repo', repo, '--json'], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 180000, env: args[0] === 'status' ? { ...env, STARCI_ACTOR: 'reconciler/job' } : env });
   const apiAsync = (args) => new Promise((resolve) => {
     const child = spawn(process.execPath, [API, ...args, '--repo', repo, '--json'], { cwd: ROOT, windowsHide: true, env });
     let stdout = '', stderr = '';

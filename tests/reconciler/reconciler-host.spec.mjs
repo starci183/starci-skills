@@ -174,7 +174,7 @@ test('active: watchdog --once --repair runs through ctx.run and its action=resta
 test('active: a start-held answer quarantines the seat with one DI naming the cause, and the seat is then left alone', async () => {
   const dbs = { 'shop-be': ledgerDb({ workflows: [{ id: 'wf-shop-fe-canon', goal: GOAL }] }) };
   const store = memoryStore();
-  const hold = { state: 'held', step: 'workflow-worktree-install', reason: 'workflow-worktree-install-locked', count: 3, lockedPath: 'D:/tree/node_modules/a.node', retryAtMs: T0 + 3_600_000 };
+  const hold = { state: 'held', step: 'workflow-worktree-install', reason: 'workflow-worktree-install-locked', count: 3, lockedPath: path.join(os.tmpdir(), 'starci-hold-tree', 'node_modules', 'a.node'), retryAtMs: T0 + 3_600_000 };
   const answer = JSON.stringify({ ok: false, action: 'start-held', reason: 'kernel-start-held', hold });
   const c = booted(controller({ store: () => store }));
   const ctx = hostCtx({ dbs, mode: 'active', runAnswer: () => ({ ok: true, stdout: answer }) });

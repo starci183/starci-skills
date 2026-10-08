@@ -16394,6 +16394,16 @@ kernel-caller-stale:
   owner: supervisor
   kind: verb-refusal
 
+read-verb-write:
+  title: "A read verb tried to write the ledger"
+  title_vi: "Một lệnh chỉ đọc đã cố ghi vào ledger"
+  meaning_vi: "Lệnh đọc (reads: true) chạy qua kết nối ledger chỉ đọc cho người gọi không sở hữu các phản ứng cơ học của nó; nó gọi một thao tác ghi (giao dịch, sự kiện, câu lệnh INSERT/UPDATE/DELETE) nên lệnh thất bại và không ghi gì. Đây là lỗi của lệnh, không phải của người gọi."
+  causes_vi:
+    - "Một pha mới của lệnh đọc ghi vào ledger mà chưa được chặn cho người gọi không phải chủ sở hữu phản ứng"
+  nextStep_vi: "Đưa thao tác ghi sang vai sở hữu nó (Kernel, Supervisor, reconciler) hoặc chặn nó khi ledger chỉ đọc; không mở ledger ghi được cho người đọc."
+  owner: runtime-core
+  kind: runtime-fault
+
 kernel-caller-unknown:
   title: "Managed caller custody is unavailable"
   title_vi: "Không xác minh được quyền của caller"

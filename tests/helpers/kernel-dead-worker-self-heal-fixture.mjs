@@ -83,7 +83,9 @@ export function createKernelDeadWorkerSelfHealFixture({api,fakeOrca,root:runtime
   const machineFile=path.join(machineHome,'machine.sqlite');
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),
     STARCI_FAKE_ORCA_MODE:'healthy',STARCI_FAKE_ORCA_STATE:stateFile,STARCI_FAKE_ORCA_LOG:path.join(root,'calls.jsonl'),
-    STARCI_LOCAL_ROOT:machineHome,STARCI_PROJECTS_ROOT:path.join(root,'projects'),[TEST_REGISTRY_ENV]:machineFile};
+    STARCI_LOCAL_ROOT:machineHome,STARCI_PROJECTS_ROOT:path.join(root,'projects'),[TEST_REGISTRY_ENV]:machineFile,
+    // The calls model the reconciler's pass over the workflow: the upkeep a status call runs (renewing a live worker's lease) belongs to that role.
+    STARCI_ACTOR:'reconciler/job'};
   delete env.ORCA_TERMINAL_HANDLE;
   const ledgerFile=ledgerFileFor(repoRoot,{env});
   fs.mkdirSync(path.dirname(ledgerFile),{recursive:true});

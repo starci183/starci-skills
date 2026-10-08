@@ -3,6 +3,7 @@
 // install never reads as done (scripts/machine/npm-ci.mjs, npm-install-state.mjs, npm-install-failure.mjs).
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { installFailureOf, insideTree, treeHolders } from '../../scripts/machine/npm-install-failure.mjs';
@@ -125,8 +126,9 @@ test('the workflow install types a locked tree and a plain failure apart', async
 });
 
 test('the stderr of npm is read for its code, syscall and path, and only a lock code is a file lock', () => {
-  const read = installFailureOf(EPERM('D:\\orca\\wf\\node_modules\\a.node'));
-  assert.deepEqual(read, { cause: 'file-locked', code: 'EPERM', syscall: 'unlink', path: 'D:\\orca\\wf\\node_modules\\a.node' });
+  const file = path.join(os.tmpdir(), 'starci-wf', 'node_modules', 'a.node');
+  const read = installFailureOf(EPERM(file));
+  assert.deepEqual(read, { cause: 'file-locked', code: 'EPERM', syscall: 'unlink', path: file });
   assert.equal(installFailureOf('npm error code E404\nnpm error 404 Not Found').cause, 'other');
   assert.equal(installFailureOf('').cause, 'other');
 });

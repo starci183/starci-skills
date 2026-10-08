@@ -5,18 +5,18 @@
 // holder runs repeats the same failure. The failure names the locked path and, where the process table can be read, the
 // processes whose command line is inside the tree.
 import path from 'node:path';
+import { isBusyError } from '../api/fs/is-busy-error.mjs';
 import { processList } from '../api/process/process-list.mjs';
 import { isSpecRun } from '../lib/env.mjs';
 import { foldCase, slash } from '../lib/path-key.mjs';
 
-export const LOCK_ERROR_CODES = Object.freeze(['EPERM', 'EBUSY', 'EACCES']);
 const NPM_FIELD = /^npm error (code|syscall|path) (.+)$/gm;
 
 /** The cause npm's stderr names: {cause: 'file-locked' | 'other', code, syscall, path}. Pure. */
 export function installFailureOf(stderr) {
   const fields = {};
   for (const [, key, value] of String(stderr ?? '').matchAll(NPM_FIELD)) fields[key] ??= value.trim();
-  const locked = LOCK_ERROR_CODES.includes(fields.code);
+  const locked = isBusyError(fields.code);
   return { cause: locked ? 'file-locked' : 'other', code: fields.code ?? null, syscall: fields.syscall ?? null, path: fields.path ?? null };
 }
 
