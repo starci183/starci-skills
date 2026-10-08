@@ -42,6 +42,13 @@ Theme: the roles are one declared contract, the system recovers from a host rest
 - The published canon packages lacked `config.example.yaml`, which their bundled engine reads.
 - The `starci` skill's goal reference taught the removed routing-bias field.
 - The repository's `package.json` carried a `pretest` hook the release cut refuses; the hook is gone (the spec preload already regenerates the runtime copies) and a spec binds the real test script the way the cut does.
+- The example apps failed 16 rows of the L4 plan. Examples: each held a hand-added `.starcistacks/.npmignore` that `starci app lint` refuses; the lite example named the full quality gate; the ecommerce landing and app read the shop and service origins as module constants, which Next evaluates while it collects page data, so their image builds died on the missing `.starcistacks` projection (now read when a request needs them).
+- Image templates: a Next image copied `fe/apps/<app>/public`, a folder the scaffold never writes (the build stage now creates it), and the images of a lite back end did not copy the `supabase/types` its sources import.
+- `starci app check` judged an app nested in a larger repository (every example) against an empty base: the migration immutability read used a repository-top path next to a working-folder listing and reported every untouched migration as edited.
+- The L4 plan demanded the `test:contract`, `test:integration`, `test:e2e` and `typecheck:tests` rows of a full app that holds no spec file in that layer (the scaffold has the scripts and the tests tsconfig only). A row now exists for each layer that holds a spec file, and `release cut --plan` lists the others as `notPlanned` with the reason. Every example script step also runs with the SWC cache of `build-env.mjs`: `@swc/core` refused its native binding under the host's cache ancestor ACL and every `build:fe` failed on `next.config.ts`.
+- `@starci/jest-preset` matched a layer's spec files with a pattern prefixed by the root path; on Windows a root with a dot-named folder (the runtime checkout is `.claude`) turned the separator into a glob escape and `test:contract`, `test:integration` and `test:e2e` found no file.
+- `npm run check` now runs `example-render`: every example is judged by the runtime's own HFS (its tree and every managed file against the renderer of this checkout, no app install), so an example can no longer fall behind a renderer, template or canon change unseen until the release cut.
+- Two specs of the scaffold read stale state: the app scaffold spec expected the CLI pin `1.0.0` where the package is `1.0.1` (it now reads the pin from `packages/cli`), and the scaffold end-to-end spec used a `packages/test-world/dist` left by an earlier checkout (it builds the package from the checked-out source each run).
 
 ### Known limitations
 - SonarCloud has not scanned this commit; the local `sonar-rules` gate reproduces 16 of the 17 findings of the previous scan and misses optional chains that need type information.
@@ -49,6 +56,7 @@ Theme: the roles are one declared contract, the system recovers from a host rest
 - Both real workflows stop at `brand.decide`: the draw render path in a fresh worktree and the brand-token contract are open; per-op token cost (6 to 17 million tokens for a decision leg) is unmeasured against the declared budget.
 - An Op can still address any terminal through the shared Orca `orchestration send` allowance.
 - The Codex loop syntax in the debug reference is unverified.
+- The packages `@starci/hfs`, `@starci/cli`, `@starci/eslint-canon-be`, `@starci/eslint-canon-fe`, `@starci/stylelint-canon` and `@starci/jest-preset` differ from their registry versions at the same number, and each example installs the registry copy: the L4 example rows (lint above all) pass only after `starci release publish --publish` has republished them at bumped versions and re-pinned the examples. The cut does not read the publish plan before it starts the L4 run.
 - The machine store keeps the unused `models.share_pct` column so an existing store still opens.
 
 ## [1.0.0-alpha.6] — 2026-10-08

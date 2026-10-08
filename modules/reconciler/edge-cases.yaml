@@ -263,3 +263,37 @@ cases:
     met: {date: "2026-10-08", where: "owner ruling: the Supervisor may not update .claude", evidence: "modules/kernel/roles.yaml rulings.runtime-changes"}
     status: open
     why: "the instruction text of supervisor-prompt.md, supervise.yaml and docs/supervisor.md still describes fix workers and lands; the rewrite is designed in ROLES-STANDARD-alpha8.md"
+  - id: example-fell-behind-renderer-unseen
+    family: record-vs-reality
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "the three example apps are the runtime's reference applications, yet no check in npm run check judged them: a hand-added .starcistacks/.npmignore, a lite quality gate left at the full name, Next config modules that need a projection at image build and Dockerfile text the templates no longer write all reached the release cut, where 16 L4 example rows failed after an hour of run", remedy: {state: in-tree, change: "the example-render self-check judges every example with the runtime's own HFS and renderer, without an app install (scripts/checks/check-example-render.mjs)"}}
+    met: {date: "2026-10-08", where: "release cut of 1.0.0-alpha.7", evidence: "D:/starci-tmp/release/cut-alpha7.log, verdict suite-red"}
+    rule: {file: scripts/checks/check-example-render.mjs, anchor: "the examples are their render"}
+    spec: tests/checks/example-render.spec.mjs
+    status: covered
+  - id: l4-row-demands-what-the-app-never-had
+    family: correctness
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "the L4 plan ran test:contract, test:integration, test:e2e and typecheck:tests for a full app whose scaffold holds the scripts and the tests tsconfig but no spec file, so shape-slot failed four rows on 'No tests found' and TS18003 that no change to the app could meaningfully satisfy", remedy: {state: in-tree, change: "a row exists for each layer that holds a spec file; the others are listed as notPlanned with the reason (scripts/supervisor/release-l4-layers.mjs)"}}
+    met: {date: "2026-10-08", where: "release cut of 1.0.0-alpha.7, shape-slot rows", evidence: "release-shape-slot_npm_run_typecheck_tests log"}
+    rule: {file: scripts/supervisor/release-l4-layers.mjs, anchor: "demand what nothing produced"}
+    spec: tests/supervisor/release-l4-wiring.spec.mjs
+    status: covered
+  - id: release-step-env-lacks-swc-cache
+    family: concurrency
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "the L4 example steps inherited the cut's environment, which names no SWC cache; @swc/core refused its native binding under the host cache ancestor ACL, so next.config.ts failed to load in every build:fe while the land gate and the scaffold spec, which set the cache, passed", remedy: {state: in-tree, change: "every example script step runs with the env of build-env.mjs (stepEnv in release-l4-layers.mjs)"}}
+    met: {date: "2026-10-08", where: "release cut of 1.0.0-alpha.7, build:fe rows", evidence: "release-lite-app_npm_run_build_fe log: Failed to load native binding"}
+    rule: {file: scripts/supervisor/release-l4-layers.mjs, anchor: "SWC cache"}
+    spec: tests/supervisor/release-l4-wiring.spec.mjs
+    status: covered
+  - id: jest-layer-glob-breaks-under-dot-folder
+    family: correctness
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "the integration, e2e and contract projects matched a pattern prefixed with the absolute root; under a Windows root holding a dot-named folder (the runtime checkout is .claude) the separator before it became a glob escape and jest found 0 spec files", remedy: {state: in-tree, change: "the projects match **/src/tests/<layer>/** (packages/jest-preset/index.cjs); the package needs a version bump and publication to reach the examples"}}
+    met: {date: "2026-10-08", where: "release cut of 1.0.0-alpha.7, ecommerce-app test:contract", evidence: "testMatch ... 0 matches"}
+    rule: {file: packages/jest-preset/index.cjs, anchor: "dot-named folder"}
+    spec: packages/jest-preset/preset.spec.mjs
+    status: covered
+  - id: example-installs-resolve-stale-registry-packages
+    family: record-vs-reality
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "six packages differ from their registry copy at the same version; each example installs the registry copy, so the example lint judges the renderer of the last publication, and the cut started a one-hour L4 run that could not pass while the publish plan (starci release check, proof publish-plan) already reported five blockers", remedy: {state: open, change: "the cut reads the publish plan before it starts the L4 run; the owner publishes the packages at bumped versions and re-pins the examples"}}
+    met: {date: "2026-10-08", where: "release cut of 1.0.0-alpha.7, lint rows of all three examples", evidence: "starci release publish (plan): 5 blockers"}
+    status: open
+    why: "publishing needs the owner's credentials, and the cut's pre-flight is not built: the cut specs inject every seam and a default registry read there needs its own design"
