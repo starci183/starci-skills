@@ -2,39 +2,25 @@
 schema: starci/application-stacks@1
 services:
   sonar:
-    provider: sonarqube
-    mode: local
-    purpose: Local release analysis for the shape-slot app example.
+    provider: sonarcloud
+    mode: hosted
+    purpose: Release analysis of the shape-slot example on SonarCloud, with the one SONAR_TOKEN the runtime holds in its secret.env.
     host:
-      local: http://localhost:9010
-      public: https://sonar.starci.org
-    qualityGate: starci-quality
-    stack:
-      owner: host
-      root: .claude/ext/sonar
-      environment: dev
-      compose: compose.yaml
-      container: starci-sonarqube
-      publishedBy: cloudflared.yaml
+      public: https://sonarcloud.io
     auth: token
+    qualityGate: starci-quality
     projects:
-      - {repository: shape-slot, key: shape-slot}
-    credentials:
-      - id: admin
-        purpose: Host project provisioning through the existing Sonar gate.
-        env: SONAR_TOKEN
-        custody: {repository: starci-academy-backend, path: .claude/ext/sonar/secrets/sonarqube-admin-token.key}
-      - id: shape-slot
-        purpose: Project analysis token provisioned and sealed by the existing Sonar gate before release analysis.
-        env: SONAR_TOKEN
-        custody: {repository: starci-academy-backend, path: .claude/ext/sonar/secrets/sonarqube-shape-slot-token.key}
+      - {repository: shape-slot, key: starci-example-shape-slot}
+    runtimeSecrets: [SONAR_TOKEN, SONAR_ORGANIZATION]
     ci:
       workflow: .github/workflows/examples.yml
       wiring: optional-follow-up
       secrets: []
       vars:
-        - {name: SONAR_HOST_URL, value: https://sonar.starci.org}
+        - {name: SONAR_HOST_URL, value: https://sonarcloud.io}
       provisioning: >-
-        The tag workflow scans only when the host repository has SONAR_TOKEN and SONAR_HOST_URL.
-        The release host uses this example's local project token; CI credential wiring is a separate follow-up.
-    ownerAction: none
+        The tag workflow scans only when the host repository has the secret SONAR_TOKEN and the variables SONAR_HOST_URL and SONAR_ORGANIZATION;
+        the project key on SonarCloud is <SONAR_ORGANIZATION>_<key above>. The release cut scans with the SONAR_TOKEN of the runtime's secret.env.
+    ownerAction:
+      needed: SONAR_TOKEN (a SonarCloud token) and SONAR_ORGANIZATION (the SonarCloud organization key) in .claude/secret.env, and the same two as the repository secret and variable.
+      reason: the runtime repository is public and holds no secret, so the token lives only in the owner's untracked secret.env and in GitHub.

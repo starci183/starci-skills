@@ -16765,3 +16765,24 @@ DB_MIGRATION_NEEDED:
   nextStep_vi: "Owner mở <host>/setup một lần (hoặc gửi POST /api/system/migrate_db bằng tài khoản admin) để di trú, chờ máy chủ báo UP, rồi chạy lại starci release cut."
   owner: owner
   kind: blocker
+
+STACKS_EXAMPLE_FORM:
+  title: "An example declares Sonar in the product form"
+  title_vi: "Ví dụ khai báo Sonar theo dạng của sản phẩm"
+  meaning_vi: "Một app nằm trong chính repository runtime (thư mục examples/) khai báo stack, host.local hoặc credential trong custody, hoặc không khai báo runtimeSecrets. Repository runtime là public và không giữ tệp bí mật nào: ví dụ được phân tích trên SonarCloud bằng một SONAR_TOKEN duy nhất trong secret.env của runtime."
+  causes_vi:
+    - "Khối services.sonar của ví dụ còn stack, host.local hoặc credentials trỏ tới tệp .enc"
+    - "Khối services.sonar không phải provider sonarcloud, mode hosted, hoặc thiếu runtimeSecrets [SONAR_TOKEN, SONAR_ORGANIZATION]"
+  nextStep_vi: "Khai báo provider: sonarcloud, mode: hosted, host.public: https://sonarcloud.io, auth: token và runtimeSecrets: [SONAR_TOKEN, SONAR_ORGANIZATION]; bỏ stack, host.local và credentials."
+  owner: other-op:workspace.manage
+  kind: check-finding
+
+STACKS_PRODUCT_FORM:
+  title: "A product declares runtime secret.env variables"
+  title_vi: "Sản phẩm khai báo biến secret.env của runtime"
+  meaning_vi: "Một repository sản phẩm khai báo runtimeSecrets. secret.env là tệp chưa theo dõi của repository runtime; sản phẩm giữ credential trong custody của chính nó."
+  causes_vi:
+    - "Khối services.sonar của sản phẩm sao chép dạng khai báo của ví dụ"
+  nextStep_vi: "Bỏ runtimeSecrets và khai báo credentials với custody của repository sản phẩm."
+  owner: other-op:workspace.manage
+  kind: check-finding

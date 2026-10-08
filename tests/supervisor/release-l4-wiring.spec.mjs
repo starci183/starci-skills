@@ -8,8 +8,6 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parityOutcome, parityPlan, parityScript, readWorkflows, runParity } from '../../scripts/supervisor/release-linux-parity.mjs';
-import { sonarSupplier } from '../../scripts/supervisor/release-l4-sonar.mjs';
-import { sonarUp } from '../../scripts/gates/sonar-status.mjs';
 import { stepEnv } from '../../scripts/supervisor/release-l4-layers.mjs';
 import { exampleApps, passesOf, planL4, runL4, runtimeSpecStep, scriptsOf, sectionOf, skipReport, specEnv, specFilesFor } from '../../scripts/supervisor/release-l4.mjs';
 import { testWorldDistProblem } from '../helpers/test-world-dist.mjs';
@@ -132,93 +130,6 @@ test('parity: a red step fails the row and names the step; a container that dies
   assert.match(nowhere.why, /git archive HEAD failed/);
   const empty = runParity('repo', parityDeps(t, fakeDocker(), { workflows: () => [] }));
   assert.match(empty.why, /nothing proves Linux parity/);
-});
-
-/** A fake gate + docker for the Sonar supplier: container states by name, and a status that reports STARTING until `upAfter` polls, then UP. */
-function fakeSonar({ states, upAfter = 0, scan = 'pass', dashboard = 'pass', startStatus = 0 } = {}) {
-  const log = [];
-  let polls = 0;
-  const state = { ...states };
-  return {
-    log,
-    state,
-    deps: {
-      gate: {
-        config: () => ({ docker: 'docker', container: 'starci-sonarqube' }),
-        state: async () => { log.push(['gate', 'state']); return { state: polls++ >= upAfter ? 'UP' : 'STARTING' }; },
-        scan: async () => { log.push(['gate', 'scan']); return { outcome: scan }; },
-        dashboard: async () => { log.push(['gate', 'dashboard']); return { outcome: dashboard }; },
-      },
-      docker: {
-        inspect: (name) => (state[name] === 'missing' ? { status: 1, stderr: 'no such container' } : { status: 0, stdout: state[name] }),
-        start: (names) => { log.push(['start', ...names]); if (startStatus === 0) for (const n of names) state[n] = 'running'; return { status: startStatus, stderr: 'boom' }; },
-        stop: (names) => { log.push(['stop', ...names]); for (const n of names) state[n] = 'exited'; return { status: 0 }; },
-      },
-      lintReport: () => ({ ok: true }),
-      sleep: async () => {},
-      now: (() => { let n = 0; return () => (n += 1000); })(),
-      logDir: null,
-    },
-  };
-}
-const APP = { name: 'shop', dir: path.join(os.tmpdir(), 'x', 'examples', 'shop') };
-
-test('sonar: a stopped stack is started (database first), waited for until UP, scanned against the project gate, the dashboard read, and stopped again; nothing else is named', async (t) => {
-  const fake = fakeSonar({ states: { 'starci-sonarqube-postgres': 'exited', 'starci-sonarqube': 'exited' }, upAfter: 2 });
-  fake.deps.logDir = () => tmp(t, 'sonar');
-  const { proofs, close } = sonarSupplier([APP], fake.deps);
-  const proof = await proofs['shop: sonar']();
-  assert.equal(proof.ok, true);
-  assert.ok(fs.existsSync(proof.log));
-  assert.deepEqual(fake.log, [['start', 'starci-sonarqube-postgres', 'starci-sonarqube'], ['gate', 'state'], ['gate', 'state'], ['gate', 'state'], ['gate', 'scan'], ['gate', 'dashboard']]);
-  assert.deepEqual(close().stopped, ['starci-sonarqube', 'starci-sonarqube-postgres'], 'the server stops before its database');
-  assert.deepEqual(fake.state, { 'starci-sonarqube-postgres': 'exited', 'starci-sonarqube': 'exited' }, 'left as found');
-  assert.deepEqual(fake.log.slice(-1), [['stop', 'starci-sonarqube', 'starci-sonarqube-postgres']]);
-});
-
-test('sonar: a stack that was running is left running; only the stopped container this run started is stopped again', async (t) => {
-  const running = fakeSonar({ states: { 'starci-sonarqube-postgres': 'running', 'starci-sonarqube': 'running' } });
-  running.deps.logDir = () => tmp(t, 'sonar');
-  const a = sonarSupplier([APP], running.deps);
-  assert.equal((await a.proofs['shop: sonar']()).ok, true);
-  assert.deepEqual(a.close().stopped, []);
-  assert.ok(!running.log.some(([verb]) => verb === 'start' || verb === 'stop'), 'a running stack is never started or stopped');
-  const half = fakeSonar({ states: { 'starci-sonarqube-postgres': 'running', 'starci-sonarqube': 'exited' } });
-  half.deps.logDir = () => tmp(t, 'sonar');
-  const b = sonarSupplier([APP], half.deps);
-  assert.equal((await b.proofs['shop: sonar']()).ok, true);
-  assert.deepEqual(half.log.filter(([verb]) => verb !== 'gate'), [['start', 'starci-sonarqube']]);
-  assert.deepEqual(b.close().stopped, ['starci-sonarqube']);
-  assert.equal(half.state['starci-sonarqube-postgres'], 'running', 'the database stays up');
-});
-
-test('sonar: a red scan fails the proof without reading the dashboard; a missing container, a failed start and a server that never comes up fail it, and close still puts back what was started', async (t) => {
-  const red = fakeSonar({ states: { 'starci-sonarqube-postgres': 'running', 'starci-sonarqube': 'running' }, scan: 'fail' });
-  red.deps.logDir = () => tmp(t, 'sonar');
-  const a = sonarSupplier([APP], red.deps);
-  assert.equal((await a.proofs['shop: sonar']()).ok, false);
-  assert.ok(!red.log.some(([, what]) => what === 'dashboard'));
-  const missing = fakeSonar({ states: { 'starci-sonarqube-postgres': 'missing', 'starci-sonarqube': 'exited' } });
-  missing.deps.logDir = () => tmp(t, 'sonar');
-  const b = sonarSupplier([APP], missing.deps);
-  const miss = (await b.proofs['shop: sonar']());
-  assert.equal(miss.ok, false);
-  assert.match(fs.readFileSync(miss.log, 'utf8'), /starci-sonarqube-postgres is missing/);
-  assert.ok(!missing.log.some(([verb]) => verb === 'start'), 'nothing is started when a part of the stack does not exist');
-  const failed = fakeSonar({ states: { 'starci-sonarqube-postgres': 'exited', 'starci-sonarqube': 'exited' }, startStatus: 1 });
-  failed.deps.logDir = () => tmp(t, 'sonar');
-  const c = sonarSupplier([APP], failed.deps);
-  assert.equal((await c.proofs['shop: sonar']()).ok, false);
-  c.close();
-  assert.deepEqual(failed.log.at(-1), ['stop', 'starci-sonarqube', 'starci-sonarqube-postgres'], 'a half-started stack is stopped again');
-  const never = fakeSonar({ states: { 'starci-sonarqube-postgres': 'exited', 'starci-sonarqube': 'exited' }, upAfter: 10_000 });
-  never.deps.logDir = () => tmp(t, 'sonar');
-  never.deps.readyMs = 30_000;
-  const d = sonarSupplier([APP], never.deps);
-  const slow = (await d.proofs['shop: sonar']());
-  assert.equal(slow.ok, false);
-  assert.match(fs.readFileSync(slow.log, 'utf8'), /still reports STARTING after 30s although starci-sonarqube is running/);
-  assert.deepEqual(d.close().stopped, ['starci-sonarqube', 'starci-sonarqube-postgres']);
 });
 
 test('L4: the installs run first as a real npm ci (a node_modules link is removed as a link first, a missing lockfile is absent), the Sonar supplier closes after the proofs even when a step throws, and the Linux step ends the row', async (t) => {
@@ -495,35 +406,10 @@ test('the cut runs the default L4 row with its wiring: a red Linux step is a red
     throw new Error(`unexpected git ${verb} ${args.join(' ')}`);
   };
   const changelog = '## [1.0.0-alpha.4] - 2026-10-04\n\n- done\n';
-  const out = (await cutRelease({ repo: base, tag: 'v1.0.0-alpha.4', deps: { host: () => [], sonarHost: async () => [], git: fakeGit, findings: () => [], changelog: () => changelog, lock: (work) => { calls.push('lock'); return work(); }, suite: () => steps, push: () => { throw new Error('never pushed'); } } }));
+  const out = (await cutRelease({ repo: base, tag: 'v1.0.0-alpha.4', deps: { host: () => [], sonarCloud: async () => [], git: fakeGit, findings: () => [], changelog: () => changelog, lock: (work) => { calls.push('lock'); return work(); }, suite: () => steps, push: () => { throw new Error('never pushed'); } } }));
   assert.deepEqual([out.ok, out.verdict], [false, 'suite-red']);
   assert.match(out.why, /linux-parity red/);
   assert.deepEqual(calls, ['lock']);
-});
-
-test('sonar: only a pass is a proof: a disabled or blocked Sonar, or a thrown gate, fails the proof', async (t) => {
-  for (const scan of ['disabled', 'blocked']) {
-    const fake = fakeSonar({ states: { 'starci-sonarqube-postgres': 'running', 'starci-sonarqube': 'running' }, scan });
-    fake.deps.logDir = () => tmp(t, 'sonar');
-    const { proofs } = sonarSupplier([APP], fake.deps);
-    assert.equal((await proofs['shop: sonar']()).ok, false, scan);
-    assert.ok(!fake.log.some(([, what]) => what === 'dashboard'), 'the dashboard is not read after a scan that did not pass');
-  }
-  const thrown = fakeSonar({ states: { 'starci-sonarqube-postgres': 'running', 'starci-sonarqube': 'running' } });
-  thrown.deps.logDir = () => tmp(t, 'sonar');
-  thrown.deps.gate.scan = async () => { throw new Error('scanner exploded'); };
-  const proof = await sonarSupplier([APP], thrown.deps).proofs['shop: sonar']();
-  assert.equal(proof.ok, false);
-  assert.match(fs.readFileSync(proof.log, 'utf8'), /scanner exploded/);
-});
-
-test('sonarUp: only a 200 with status UP is up; any other state, status or a failed fetch is not', async () => {
-  const cfg = (fetch) => ({ host: 'http://sonar.test', timeoutMs: 1000, fetch });
-  const answer = (status, body) => async () => ({ status, json: async () => body });
-  assert.equal(await sonarUp(cfg(answer(200, { status: 'UP' }))), true);
-  assert.equal(await sonarUp(cfg(answer(200, { status: 'STARTING' }))), false);
-  assert.equal(await sonarUp(cfg(answer(503, { status: 'UP' }))), false);
-  assert.equal(await sonarUp(cfg(async () => { throw new Error('ECONNREFUSED'); })), false);
 });
 
 test('L4: a test-world package in the checkout is built after the installs and before the runtime suite; a stale or absent build is named by the helper', (t) => {

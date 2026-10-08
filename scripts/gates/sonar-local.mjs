@@ -856,7 +856,7 @@ const prepareScanExecution=async(cfg,options,inputs,summary,finish)=>{
   const analysisToken=token.value;
   const childEnv={...sonarAnalysisEnvironment(cfg),SONAR_HOST_URL:cfg.host,SONAR_TOKEN:analysisToken};
   const workDir=makeTempDir('starci-sonar-');
-  return {cwd,props,pkg,gateDoc,slice,projectGateMode:inputs.projectGateMode,key:isolation.key,admin,isolated:isolation.isolated,extra:isolation.extra,
+  return {cwd,props,pkg,gateDoc,slice,projectGateMode:inputs.projectGateMode,key:isolation.key,admin,isolated:isolation.isolated,extra:[...(options.defines??[]),...isolation.extra],
     coverageRun,analysisToken,tokenName:token.name,childEnv,workDir};
 };
 

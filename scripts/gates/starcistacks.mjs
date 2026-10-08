@@ -64,6 +64,7 @@ export const CODES = [
   'STACKS_SERVICE_UNDECLARED', 'STACKS_CI_CONTRADICTION', 'STACKS_CI_UNUSED', 'STACKS_CI_NAME_UNREFERENCED',
   'STACKS_PLAINTEXT_TRACKED', 'STACKS_ENC_TWIN_MISSING', 'STACKS_GITIGNORE_OPEN', 'STACKS_DECLARATION_IGNORED',
   'STACKS_GITIGNORE_VALUE_OPEN', 'STACKS_RUNBOOK_IGNORED', 'STACKS_QUALITY_GATE_DRIFT',
+  'STACKS_EXAMPLE_FORM', 'STACKS_PRODUCT_FORM',
 ];
 /** A plaintext value file inside infra/** (compose, terraform): env files, keys, certificates, tfvars. */
 /** Paths (under <root>/<environment>/) the ignore rules must deny; they need not exist. */
@@ -166,6 +167,7 @@ export function normalizeService(id, entry, { declaringRepo } = {}) {
       composeFile: stackDir && text(stack.compose) ? path.join(stackDir, stack.compose) : null } : null,
     projects: list(s.projects).filter(plain).map((project) => ({ repository: text(project.repository), key: text(project.key), name: text(project.name) })),
     credentials,
+    runtimeSecrets: list(s.runtimeSecrets).map(String),
     ci: { wiring: text(ci.wiring), workflow: text(ci.workflow), permissions: list(ci.permissions).map(String),
       secrets: list(ci.secrets).filter(plain).map((item) => ({ name: text(item.name), credential: text(item.credential) })),
       vars: list(ci.vars).filter(plain).map((item) => ({ name: text(item.name), value: text(item.value) })),
@@ -263,17 +265,39 @@ const checkServiceCi = (service, id, at, { governing, name, ciUses, ciText, add,
     add('refuse', 'STACKS_PROJECT_MISSING', `${at}.projects`, `the workflows call ${id} but no project entry names repository ${name}`);
 };
 const checkDisabledService = (service, id, at, ciUses, ambiguous, add) => { if (service.mode !== 'disabled') { return false; } if (!service.reason) { ambiguous('a disabled service states its reason'); } if (ciUses[id].length) { add('refuse', 'STACKS_CI_CONTRADICTION', at, `declared disabled, but ${ciUses[id].join(', ')} call it`); } return true; };
-const checkEnabledService = (service, id, at, { governing, name, ciUses, ciText, add }, ambiguous) => {
+/** 'example' for an app that lives inside the runtime repository (its checkout sits under the runtime's examples/), else 'product'. */
+const kindOf = (repo, examplesRoot) => {
+  const relative = path.relative(path.resolve(examplesRoot), repo);
+  return relative && !relative.startsWith('..') && !path.isAbsolute(relative) ? 'example' : 'product';
+};
+/**
+ * Where a secret may live, per repository kind (docs/application-stacks.md). An example belongs to the public runtime repository, which holds no secret
+ * file at all: it declares SonarCloud (provider sonarcloud, mode hosted) and names the variables of the runtime's untracked secret.env it reads
+ * (runtimeSecrets), with no stack, no host.local and no custody credential. A product keeps its own custody and declares no runtimeSecrets.
+ */
+function checkSecretForm(service, id, at, kind, add) {
+  if (id !== 'sonar' || service.mode === 'disabled') return;
+  if (kind === 'product') {
+    if (service.runtimeSecrets.length) add('refuse', 'STACKS_PRODUCT_FORM', at + '.runtimeSecrets', 'runtimeSecrets name variables of the runtime repository secret.env, which a product does not read; a product declares its credentials in its own custody');
+    return;
+  }
+  const wrong = [service.stack && 'a stack', service.host.local && 'host.local', service.credentials.length && 'custody credentials'].filter(Boolean);
+  if (wrong.length) add('refuse', 'STACKS_EXAMPLE_FORM', at, 'an example of the runtime repository declares ' + wrong.join(', ') + '; the runtime repository holds no secret file, so an example declares provider sonarcloud, mode hosted and runtimeSecrets [SONAR_TOKEN, SONAR_ORGANIZATION]');
+  if (service.provider !== 'sonarcloud' || service.mode !== 'hosted') add('refuse', 'STACKS_EXAMPLE_FORM', at + '.provider', 'an example of the runtime repository is analysed on SonarCloud: provider sonarcloud and mode hosted');
+  if (!['SONAR_TOKEN', 'SONAR_ORGANIZATION'].every((name) => service.runtimeSecrets.includes(name))) add('refuse', 'STACKS_EXAMPLE_FORM', at + '.runtimeSecrets', 'an example names the secret.env variables it reads: runtimeSecrets [SONAR_TOKEN, SONAR_ORGANIZATION]');
+}
+const checkEnabledService = (service, id, at, { governing, name, ciUses, ciText, add, kind }, ambiguous) => {
+  checkSecretForm(service, id, at, kind, add);
   if (service.mode === 'local') checkLocalStack(service, at, add, ambiguous);
   if (service.mode === 'hosted' && !service.host.public && !service.host.fromCredential) ambiguous('a hosted service names host.public, or host.fromCredential when the endpoint travels inside a credential');
   if (ciUses[id].length && service.ci.wiring !== 'not-used' && !service.host.public) ambiguous('GitHub CI reaches a service only through host.public; name it');
   if (!service.auth) ambiguous('auth is token, oidc, github-token or none');
-  if (service.auth === 'token' && !service.credentials.length) ambiguous('auth token names at least one credential in custody');
+  if (service.auth === 'token' && !service.credentials.length && !service.runtimeSecrets.length) ambiguous('auth token names at least one credential in custody, or the runtime secret.env variables an example reads (runtimeSecrets)');
   if (service.host.fromCredential && !service.credentials.some((credential) => credential.id === service.host.fromCredential)) ambiguous(`host.fromCredential names ${service.host.fromCredential}, which is not one of its credentials`);
   if (!service.projects.length) ambiguous('an enabled service lists the project key of every repository it serves');
   checkServiceCi(service, id, at, { governing, name, ciUses, ciText, add, ambiguous });
 };
-const checkService = (id, entry, { schema, declFile, declaration, governing, name, ciUses, ciText, normalized, add }) => {
+const checkService = (id, entry, { schema, declFile, declaration, governing, name, ciUses, ciText, normalized, add, kind }) => {
   if (!Object.hasOwn(SERVICE_CATALOG, id)) {
     add('refuse', 'STACKS_SERVICE_UNKNOWN', `${declFile}#services.${id}`, `${id} is not a catalogued service (${Object.keys(SERVICE_CATALOG).join(', ')}); a service the catalog does not know is one nobody can read unambiguously`);
     return;
@@ -287,7 +311,7 @@ const checkService = (id, entry, { schema, declFile, declaration, governing, nam
   if (service.provider && !SERVICE_CATALOG[id].providers.includes(service.provider))
     add('refuse', 'STACKS_PROVIDER_UNKNOWN', `${at}.provider`, `${service.provider} is not a ${id} provider (${SERVICE_CATALOG[id].providers.join(', ')})`);
   if (checkDisabledService(service, id, at, ciUses, ambiguous, add)) return;
-  checkEnabledService(service, id, at, { governing, name, ciUses, ciText, add }, ambiguous);
+  checkEnabledService(service, id, at, { governing, name, ciUses, ciText, add, kind }, ambiguous);
 };
 const checkUndeclared = ({ repo, ciUses, normalized, services, declFile, add }) => {
   for (const [id, files] of Object.entries(ciUses)) {
@@ -392,9 +416,9 @@ const declarationView = (own, governing, missingLevel, shown, add) => {
   if (doc && !Object.hasOwn(doc, 'services')) add(missingLevel, 'STACKS_SERVICES_MISSING', declFile, `the declaration has no services block; declare sonar and every other delivery/quality service the repository uses - follow-up: ${FOLLOW_UP.op} mode stacks`);
   return { declaration, services, declFile };
 };
-const checkDeclaredServices = ({ services, declaration, governing, name, ciUses, ciText, declFile, normalized, add }) => {
+const checkDeclaredServices = ({ services, declaration, governing, name, ciUses, ciText, declFile, normalized, add, kind }) => {
   if (!services) return;
-  const schema = declarationSchema(), ctx = { schema, declFile, declaration, governing, name, ciUses, ciText, normalized, add };
+  const schema = declarationSchema(), ctx = { schema, declFile, declaration, governing, name, ciUses, ciText, normalized, add, kind };
   for (const [id, entry] of Object.entries(services)) checkService(id, entry, ctx);
 };
 const checkDeclarationIgnore = (own, repo, shown, add) => {
@@ -407,7 +431,7 @@ const checkDeclarationIgnore = (own, repo, shown, add) => {
  * The whole check for one repository. `newRepo`: the leg creates this repository, so what it lacks is
  * refused under the current declaration and custody rules.
  */
-export function checkStarciStacks(repoRoot, { newRepo = false } = {}) {
+export function checkStarciStacks(repoRoot, { newRepo = false, examplesRoot = path.join(skillRoot, 'examples') } = {}) {
   const repo = path.resolve(String(repoRoot ?? ''));
   const name = repositoryName(repo);
   const findings = [];
@@ -421,7 +445,7 @@ export function checkStarciStacks(repoRoot, { newRepo = false } = {}) {
   const ciText = workflows.map((workflow) => workflow.text).join('\n');
   const ciUses = Object.fromEntries(Object.entries(SERVICE_CATALOG).map(([id, entry]) => [id, workflows.filter((workflow) => entry.ci.some((re) => re.test(workflow.text))).map((workflow) => workflow.file)]));
   const normalized = {};
-  checkDeclaredServices({ services, declaration, governing, name, ciUses, ciText, declFile, normalized, add });
+  checkDeclaredServices({ services, declaration, governing, name, ciUses, ciText, declFile, normalized, add, kind: kindOf(repo, examplesRoot) });
   checkUndeclared({ repo, ciUses, normalized, services, declFile, add });
   checkSonarDrift({ repo, name, normalized, services, declFile, add });
   checkCustodyLayout({ repo, own, add });
