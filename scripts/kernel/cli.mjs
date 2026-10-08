@@ -3702,7 +3702,7 @@ const runExtensionVerb = async (spec, args, repo) => {
       detail: `operation ${caller.jobId ?? '(unbound)'} (${caller.via}) may file a report only for its own job, not ${args.job}` });
   }
   try {
-    const admitted = callerAdmission(ledger, args, { caller });
+    const admitted = callerAdmission(ledger, args, { caller, verb: spec.verb });
     return await admitted.run(() => spec.run({ ledger, args, repo, emit, need, caller: admitted.caller, ext: API_EXT, internals: API_INTERNALS }));
   } catch (error) {
     if (!(error instanceof VerbExit)) console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error), code: error?.code }));

@@ -5,6 +5,7 @@ import { kernelReadManifest, requireKernelRead } from './required-read.mjs';
 import { revRootOf } from './runtime-rev.mjs';
 import { withMutationFence, mutationAuthority } from '../lib/mutation-fence.mjs';
 import { parseJson } from '../lib/json.mjs';
+import { personActor, recordIntervention } from './intervention.mjs';
 const refuse = (detail, code = 'kernel-caller-stale') => Object.assign(new Error(detail), { code });
 
 const targetWorkflow = (db, args) => {
@@ -69,17 +70,28 @@ const checkOpIncarnation = (ledger, identity) => {
     || latest.dispatch_id !== identity.identity?.dispatch_id) throw refuse('operation report incarnation changed before mutation');
 };
 
+/** Append the intervention event of one call; a failure to record it is reported and never blocks the person's write. Returns whether the call is noted. */
+function noteIntervention(ledger, args, { verb, actor }) {
+  try { recordIntervention(ledger, { targets: targetWorkflow(ledger.db, args), verb, actor }); } catch (error) {
+    console.error(JSON.stringify({ ok: true, warning: `intervention not recorded: ${String(error?.message ?? error)}` }));
+  }
+  return true;
+}
+
 /** Capture existing owners once; each write/effect rechecks against those same actual owners. */
-export function callerAdmission(ledger, args, { env = process.env, root = revRootOf(env), caller = null, resolve = callerOf, authorityOf = kernelAuthorityOf, manifestOf = kernelReadManifest } = {}) {
+export function callerAdmission(ledger, args, { env = process.env, root = revRootOf(env), caller = null, verb = null, resolve = callerOf, authorityOf = kernelAuthorityOf, manifestOf = kernelReadManifest } = {}) {
   const identity = caller ?? resolve(ledger.db,env,{ file: ledger.path });
   if (['unknown','foreign','stale'].includes(identity.role)) throw refuse(`caller custody ${identity.via ?? 'unknown'}`, 'kernel-caller-unknown');
   const { authority, baseline } = admissionBasis({ identity, ledger, args, root, authorityOf, manifestOf });
+  const person = personActor(identity, env);
+  let intervened = false;
   const check = boundary => {
     const fresh = resolve(ledger.db,env,{ file: ledger.path });
     if (fresh.role !== identity.role || fresh.jobId !== identity.jobId || fresh.handle !== identity.handle) throw refuse('caller binding changed before mutation');
     if (identity.role === 'kernel') checkKernel({ ledger, identity, authority, baseline, args, boundary, authorityOf, manifestOf, root });
     else if (identity.role === 'op') checkOpIncarnation(ledger, identity);
     else if (identity.role === 'supervisor' && JSON.stringify(fresh.identity) !== JSON.stringify(identity.identity)) throw refuse('Supervisor incarnation changed before mutation');
+    else if (person && !intervened && boundary?.kind === 'ledger-write' && boundary.db === ledger.db) intervened = noteIntervention(ledger, args, { verb, actor: person });
   };
   const stamp = authority ? Object.freeze(Object.fromEntries(Object.entries(authority).filter(([key]) => key !== 'token'))) : null;
   return { caller: identity, authority: stamp, run: fn => withMutationFence(check,stamp,fn) };

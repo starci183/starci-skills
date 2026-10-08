@@ -23,6 +23,8 @@ const parkedQueue = () => {
   queue.add('host', 'service:orca', { reason: 'resync' });
   return { queue, now: () => clock };
 };
+const BOOT = { bootAt: 500, uptimeMs: 500, bootId: 'boot0' };
+const boot = () => BOOT;
 const fakeEngine = (queue) => {
   const lines = [];
   return { queue, lines, log: (kind, message, data) => lines.push({ kind, message, data }) };
@@ -45,14 +47,22 @@ test('engine start releases the host restart receipts and re-arms the parked key
   const { queue } = parkedQueue();
   const engine = fakeEngine(queue);
   const reaped = { released: [{ id: 'r1', why: 'host-restarted' }], kept: [], held: [] };
-  startRecovery(engine, { reevaluated: false }, { reap: () => reaped });
-  assert.deepEqual(engine.lines.map((line) => line.data.kind), ['reconciler.provider-receipts-released', 'reconciler.queue-rearmed']);
-  assert.deepEqual(engine.lines[1].data.keys.sort(), ['host ledger:one', 'host seat:supervisor']);
+  startRecovery(engine, { reevaluated: false }, { reap: () => reaped, boot });
+  assert.deepEqual(engine.lines.map((line) => line.data.kind), ['reconciler.boot', 'reconciler.provider-receipts-released', 'reconciler.queue-rearmed']);
+  assert.deepEqual([engine.lines[0].data.bootId, engine.lines[0].data.bootAt], ['boot0', 500]);
+  assert.deepEqual(engine.lines[2].data.keys.sort(), ['host ledger:one', 'host seat:supervisor']);
 });
 
 test('a recovery step that throws is logged with its step and the next step still runs', () => {
   const { queue } = parkedQueue();
   const engine = fakeEngine(queue);
-  startRecovery(engine, { reevaluated: false }, { reap: () => { throw new Error('census down'); } });
-  assert.deepEqual(engine.lines.map((line) => [line.data.kind, line.data.step]), [['reconciler.start-recovery-failed', 'provider-receipts'], ['reconciler.queue-rearmed', undefined]]);
+  startRecovery(engine, { reevaluated: false }, { reap: () => { throw new Error('census down'); }, boot });
+  assert.deepEqual(engine.lines.map((line) => [line.data.kind, line.data.step]), [['reconciler.boot', undefined], ['reconciler.start-recovery-failed', 'provider-receipts'], ['reconciler.queue-rearmed', undefined]]);
+});
+
+test('a boot identity that cannot be read is a recovery step failure and the next steps still run', () => {
+  const { queue } = parkedQueue();
+  const engine = fakeEngine(queue);
+  startRecovery(engine, { reevaluated: false }, { reap: () => ({ released: [], kept: [], held: [] }), boot: () => { throw new Error('no uptime'); } });
+  assert.deepEqual(engine.lines.map((line) => [line.data.kind, line.data.step]), [['reconciler.start-recovery-failed', 'boot-id'], ['reconciler.queue-rearmed', undefined]]);
 });

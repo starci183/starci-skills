@@ -1,6 +1,7 @@
 // scripts/reconciler/engine-process.mjs — what the engine process says about itself: the `--once` result line, the crash
 // handler of the long-lived engine, and the recovery a new engine process runs before it leads (engine.mjs main()).
 import { reapProviderReservations } from '../machine/provider-reservation-reap.mjs';
+import { bootIdentity } from './boot-id.mjs';
 
 /** The text line of a `--once` result. */
 export const onceLine = (result) => '[reconciler --once] ' + ((result.ok && 'ok') || 'NOT OK') + ' ' + (result.controllers.map((c) => `${c.name}(${c.mode}) keys=${c.keys} ok=${c.ok} failed=${c.failed.length}`).join('; ') || 'no controller on') + ((result.error && ` ${result.error}`) || '');
@@ -23,11 +24,15 @@ function recoveryStep(engine, step, run) {
 }
 
 /**
- * What a new engine process settles before it leads: it says what a self-reload decided, releases the provider receipts the host restart
- * ended (a reboot leaves the whole batch stale) and re-arms the queue keys whose retry budget an earlier process spent.
+ * What a new engine process settles before it leads: it names the host boot it started in, says what a self-reload decided, releases the provider
+ * receipts the host restart ended (a reboot leaves the whole batch stale) and re-arms the queue keys whose retry budget an earlier process spent.
  */
-export function startRecovery(engine, safeStart, { reap = reapProviderReservations } = {}) {
+export function startRecovery(engine, safeStart, { reap = reapProviderReservations, boot = bootIdentity } = {}) {
   if (safeStart.reevaluated) logSafeReevaluated(engine, safeStart);
+  recoveryStep(engine, 'boot-id', () => {
+    const identity = boot({ now: engine.now?.() });
+    engine.log('reconciler.event', `engine start on host boot ${identity.bootId}`, { kind: 'reconciler.boot', ...identity, pid: process.pid, rev: engine.rev ?? null });
+  });
   recoveryStep(engine, 'provider-receipts', () => {
     const reaped = reap({ env: process.env });
     if (reaped.released.length) engine.log('reconciler.event', `engine start released ${reaped.released.length} provider receipt(s) the host restart ended`, { kind: 'reconciler.provider-receipts-released', released: reaped.released, held: reaped.held ?? [] });
