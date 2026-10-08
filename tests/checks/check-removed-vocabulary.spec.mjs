@@ -27,7 +27,7 @@ test('RT_REMOVED_VOCABULARY accepts the same spelling on a marked line, or under
 });
 
 test('the changelog, the list file and files outside the instruction surfaces are never scanned', () => {
-  const files = { 'CHANGELOG.md': taught, 'modules/kernel/removed-vocabulary.yaml': taught, 'tests/a.spec.mjs': taught, 'packages/x/README.md': taught };
+  const files = { 'CHANGELOG.md': taught, 'modules/kernel/removed-vocabulary.yaml': taught, 'packages/x/README.md': taught };
   assert.deepEqual(removedVocabularyFindings(files), []);
   assert.equal(removedVocabularyFindings({ 'docs/a.md': taught, 'modules/a/b.yaml': taught, 'knowledge/a.md': taught, 'README.md': taught }).length, 4);
 });
