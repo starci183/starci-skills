@@ -324,11 +324,11 @@ test('a liveness tick types exactly the wake starci kernel status implies', asyn
     'the Kernel attempt starci kernel status names rides in the wake');
 });
 
-// A Kernel idle at its prompt with nothing actionable for it (an owner-gate is open, the frontier
+// A Kernel idle at its prompt with nothing actionable for it (a gate that names its cause and has no workaround is open, the frontier
 // is awaiting-owner) is left alone: the tick answers idle-waiting and types nothing.
 test('a turn-idle Kernel behind a non-actionable frontier is left alone', async (t) => {
   const fx = await watchdogWorld(t);
-  const incident = fx.api('incident', '--kind', 'owner-gate', '--detail', 'the owner decides the scope');
+  const incident = fx.api('incident', '--kind', 'owner-gate', '--detail', 'the owner decides the scope', '--cause', 'plan-divergence', '--no-workaround', 'owner-only-intent');
   assert.equal(incident.ok, true, JSON.stringify(incident));
   assert.equal(fx.api('status').frontier.actionable, false);
   const { status, result, stderr } = fx.tick();
