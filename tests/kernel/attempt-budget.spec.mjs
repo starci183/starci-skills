@@ -5,6 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { withLedger } from '../helpers/ledger-fixture.mjs';
 import { attemptBudget, attemptsOverBudget, budgetOverruns } from '../../scripts/kernel/attempt-budget.mjs';
+import { buildMenu } from '../../scripts/kernel/kernel-menu.mjs';
 import { budgetOptions, planBudgetOverruns } from '../../scripts/reconciler/budget-plan.mjs';
 import budgetStatus from '../../scripts/kernel/status/budget-overruns.mjs';
 
@@ -75,7 +76,8 @@ test('the Workflow controller plans one Kernel Decision Item per overrun with co
   assert.match(out[0].summary, /15,600,000 tokens against a budget of 6,000,000/);
   assert.deepEqual(out[0].options.map((option) => option.key), ['continue-once', 'replace', 're-scope']);
   assert.match(out[0].options[0].verb, /^starci kernel enqueue --workflow wf-budget --op business\.decide --retry-of job-7 --paths /);
-  assert.equal(out[0].options[1].verb, 'starci kernel settle --workflow wf-budget --job job-7 --verdict fail');
+  assert.equal(out[0].options[1].verb, "starci kernel enqueue --workflow wf-budget --op business.decide --retry-of job-7 --paths 'apps/web/src/a.tsx,apps/web/src/b.tsx,apps/api/src/c.ts' --switch-agent --what 'replace: over budget'");
+  assert.deepEqual(out[0].allowedVerbs, ['enqueue']);
   assert.match(out[0].options[2].verb, /--paths 'apps\/web\/src\/a\.tsx,apps\/web\/src\/b\.tsx'/);
 });
 
@@ -85,4 +87,18 @@ test('a leg that owns one path cannot be re-scoped, and an empty status plans no
   const out = [];
   planBudgetOverruns({ workflowId: WF, status: {}, di: (di) => out.push(di) });
   assert.deepEqual(out, []);
+});
+
+test('the Kernel menu offers the overrun as a decision item with the three choices as typed enqueue steps, the replace step switching the agent', () => {
+  const row = { attemptId: 7, jobId: 'job-7', opId: 'business.decide', agent: 'claude', tokens: 15_600_000, budget: 6_000_000, jobStatus: 'failed', ownedPaths: OWNED };
+  const planned = [];
+  planBudgetOverruns({ workflowId: WF, status: { budgetOverruns: [row] }, di: (di) => planned.push({ id: 'di-budget-7', ...di }) });
+  const menu = buildMenu({ workflow: WF, rev: null, jobDecisions: [], questions: [], peers: [], wedged: [], deadWaits: [], decisions: planned, nextActions: [], handover: null, snoozed: new Set() });
+  assert.equal(menu.length, 1);
+  assert.equal(menu[0].kind, 'decision-item');
+  assert.deepEqual(menu[0].options.map((option) => option.choice), ['continue-once', 'replace', 're-scope', 'none-fits']);
+  const replace = menu[0].options.find((option) => option.choice === 'replace');
+  assert.equal(replace.verb, 'enqueue');
+  assert.deepEqual(replace.args, { workflow: WF, op: 'business.decide', 'retry-of': 'job-7', paths: OWNED.join(','), 'switch-agent': true, what: 'replace: over budget' });
+  assert.equal(menu[0].options.find((option) => option.choice === 'continue-once').args['switch-agent'], undefined);
 });

@@ -52,6 +52,9 @@ flags:
   - name: retry-of
     type: string
     summary: job this one retries
+  - name: switch-agent
+    type: boolean
+    summary: with --retry-of, the agent pool of the attempt being retried is demoted for this retry (the route table runs it on another eligible pool); a Kernel's choice to replace the agent
   - name: reopen
     type: string
     summary: reason a settled unit is reopened

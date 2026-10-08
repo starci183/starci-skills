@@ -300,6 +300,13 @@ cases:
     rule: {file: scripts/kernel/attempt-budget.mjs, anchor: "budgetOverruns"}
     spec: tests/kernel/attempt-budget.spec.mjs
     status: covered
+  - id: budget-overrun-replace-names-a-call-the-catalog-lacks
+    family: smooth-operation
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "the replace option of the budget-overrun Decision Item named starci kernel settle --workflow --job --verdict fail: settle takes no --workflow, and an overrun is listed only for a job that already settled red, which settle refuses (job-settled), so the option the Kernel menu offered could not be executed and no route cause moved the pool", remedy: {state: in-tree, change: "replace is starci kernel enqueue --retry-of <job> --switch-agent on the same paths; the retry's lineage route demotes the pool of the attempt it retries (kernel-switch-agent); the documented-command spec and the menu spec hold the argv"}}
+    met: {date: "2026-10-08", where: "the first full suite of the merged alpha.8 tree, tests/repo/doc-command-flags.spec.mjs", evidence: "scripts/reconciler/budget-plan.mjs:15 starci kernel settle --workflow ... -> unknown option --workflow"}
+    rule: {file: scripts/kernel/lineage-route.mjs, anchor: "replacedAttempts"}
+    spec: tests/kernel/attempt-budget.spec.mjs
+    status: covered
   - id: op-token-overrun-in-flight
     family: smooth-operation
     met: {date: "2026-10-08", where: "scripts/kernel/usage-record.mjs records an attempt's usage when it settles", evidence: "scripts/kernel/attempt-budget.mjs"}

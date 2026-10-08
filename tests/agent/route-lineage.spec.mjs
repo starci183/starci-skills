@@ -74,14 +74,14 @@ const routeDecided = (repo) => read(repo, (l) => JSON.parse(l.db.prepare(
 
 // `prior` are the earlier attempts of the lineage, oldest first: {pool, result, outcome?, red?[], gateLoop?}.
 // The queued job retries the newest of them.
-const seedWorkflow = (repo, { goalBias = null, prior = [] } = {}) => seed(repo, (l) => {
+const seedWorkflow = (repo, { goalBias = null, prior = [], switchAgent = false } = {}) => seed(repo, (l) => {
   const at = Date.now();
   const ids = [P1, P2];
   const payload=(extra={})=>({opId:OP,owned_paths:['apps/web/src/features/interface/'],...extra});
   const jobs=prior.map((p,i)=>({jobId:ids[i],unitId:'route-unit',opId:OP,tryNo:i+1,
     retryOf:i?ids[i-1]:null,status:p.status??'failed',pool:p.pool,payload:payload({model:p.pool}),result:p.result,createdAt:at+i}));
   jobs.push({jobId:JOB,unitId:'route-unit',opId:OP,tryNo:prior.length+1,
-    retryOf:prior.length?ids[prior.length-1]:null,status:'queued',payload:payload(),createdAt:at+prior.length});
+    retryOf:prior.length?ids[prior.length-1]:null,status:'queued',payload:payload(switchAgent?{switchAgent:true}:{}),createdAt:at+prior.length});
   seedLedgerWorkflow(l,{id:WF,state:{phase:'running',job:'lineage routing'},goalIdentity:'lineagegoal',
     goal:{revision:0,identity:'lineagegoal',markdown:'# goal',json:{routing_bias:goalBias}},jobs});
   prior.forEach((p, i) => {
@@ -236,6 +236,24 @@ test('attempt causes: model-quality fails count, a failed report or a first red 
     assert.deepEqual([repeated.cause, repeated.attributable, repeated.detail], ['agent-crash', true, 'launch failed at send (prompt-delivery-stalled)']);
     const adjust = lineageRouteAdjust(l.db, row(JOB));
     assert.deepEqual([adjust.demote, adjust.exclude], [['devin-agent'], []]);
+  });
+});
+
+test('a retry enqueued with --switch-agent demotes the pool of the attempt it retries, whatever that attempt failed on', (t) => {
+  const repo = tmp(t, 'starci-route-switch-');
+  const failedReport = { pool: 'devin-agent', result: { verdict: 'fail' }, outcome: 'failed' };
+  seedWorkflow(repo, { prior: [failedReport] });
+  read(repo, (l) => {
+    const adjust = lineageRouteAdjust(l.db, l.db.prepare('SELECT * FROM jobs WHERE job_id=?').get(JOB));
+    assert.deepEqual([adjust.demote, adjust.exclude], [[], []], 'without the flag a failed report is the work, not the pool');
+  });
+  const switched = tmp(t, 'starci-route-switch-on-');
+  seedWorkflow(switched, { prior: [failedReport], switchAgent: true });
+  read(switched, (l) => {
+    const adjust = lineageRouteAdjust(l.db, l.db.prepare('SELECT * FROM jobs WHERE job_id=?').get(JOB));
+    assert.deepEqual([adjust.demote, adjust.exclude], [['devin-agent'], []]);
+    assert.equal(adjust.attempts[0].cause, 'kernel-switch-agent');
+    assert.match(adjust.attempts[0].detail, /report-failed/);
   });
 });
 

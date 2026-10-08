@@ -15,6 +15,7 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 - The wake prompt tells the Kernel to answer its menu and yield when it is empty.
 - The roles contract names exactly two classes of error, happy error and bug; Debug's goal is a workflow with no bug. The Kernel role declares a per-wake budget (20 turns, 6 million tokens, from the usage rows of the first real workflows) and the digest reports a wake over it as a departure.
 - A `retry-decision` item lives while its job has no later try (it was closed as soon as it was read).
+- The budget-overrun item's replace option is `starci kernel enqueue --retry-of <job> --switch-agent` (the old text named a `kernel settle` call the verb cannot take); `--switch-agent` demotes the pool of the attempt being retried for that retry's route.
 
 ### Added
 - `starci work layout-render`: the one way an op gets a real browser render of a product layout. The runtime serves the app itself (`next dev` on a free port with no host pin, every URL on `localhost`, the scaffold's public-origin variables set), keys the page slot #FF00FF, captures the viewport at the tree's breakpoint size, stops the server it started and, with `--write`, records the capture as `layout-tree capture` does. A render it cannot produce prints `SHELL_RENDER_UNAVAILABLE` with a typed cause, the failing URL and the redirect chain.

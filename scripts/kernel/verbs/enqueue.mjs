@@ -201,6 +201,7 @@ function jobPayloadFor({ args, jobId, workflowId, wf, goal, plan, admitted, afte
     ...(target.repository && { repository: target.repository }),
     ...(Object.keys(resolvedParams.params).length && { params: resolvedParams.params }),
     ...(cut && { cut }),
+    ...(args['switch-agent'] === true && args['retry-of'] && { switchAgent: true }),
     ...(after.length && { after }),
     ...(foundationLeg && { foundation: foundationLeg }),
     ...(canonPlan && { canonPlan }),

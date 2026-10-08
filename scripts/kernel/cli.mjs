@@ -299,7 +299,7 @@ const usage = (code) => {
   coverage --workflow <id>   every FR, shape and proof case of the workflow's scope with its evidence: proven|stale|missing
   verify-proofs --workflow <id>   re-hash every indexed proof file and walk the events digest chain; exit 1 on tampering
   plan     --workflow <id> --file <plan.json>
-  enqueue  --workflow <id> --op <opId> --paths <csv> [--records <csv>] [--title <t>] [--what <short name>] [--risk <r>] [--retry-of <job>] [--reopen <reason>] [--derived-from <jobs>]
+  enqueue  --workflow <id> --op <opId> --paths <csv> [--records <csv>] [--title <t>] [--what <short name>] [--risk <r>] [--retry-of <job> [--switch-agent]] [--reopen <reason>] [--derived-from <jobs>]
            [--repository <repo-id>] [--params '<json>'] [--cut-id <id> --cut-ordinal <n> --cut-total <n>]
            [--new-module <repository-relative dir>,...]   the grant creates these module roots (else every granted directory must already exist)
   estimate --files <n> [--assertions <n>] [--components <n>] [--records <n>]
