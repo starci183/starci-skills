@@ -188,9 +188,11 @@ cases:
     why: "a Supervisor behaviour; the land gate now bounds its specs, and no digest signal shows a land cancelled by its caller"
   - id: wake-delivered-as-pasted-text
     family: record-vs-reality
-    met: {date: "2026-10-07", where: "Kernel ignored three watchdog wakes", evidence: "AUDIT-starci-workflow.md issue 6"}
-    status: open
-    why: "wake delivery is confirmed by submission, not by the agent acting on it; no signal tells the digest a wake was ignored"
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "Claude Code folds a typed paste of about 800 characters or more into a pasted_content block that the model reads as untrusted data. In the real Kernel transcripts every wake of 1218 to 1242 characters (twelve, the watchdog wake with its rev line) arrived pasted and three were refused, and all sixteen wakes of 325 to 730 characters arrived as the user's message; the watchdog wake was cut under 800 on 2026-10-08, but every other wake (transition, ask-answered, stall, supervisor) was typed at whatever length its lines made", remedy: {state: in-tree, change: "the one Kernel wake path and the watchdog wake bound the typed text by allocation.wake.maxChars: a longer wake keeps its opener, the rev line when it fits and the seat identity, and points at starci kernel status (wake-bound.mjs)"}}
+    met: {date: "2026-10-07", where: "Kernel ignored three watchdog wakes", evidence: "Kernel transcripts 3b231876 and 846648a6: user messages of 1218-1242 characters carry <pasted_content>, 16 of 325-730 characters do not; AUDIT-starci-workflow.md issue 6"}
+    rule: {file: scripts/kernel/wake-bound.mjs, anchor: "boundedWake"}
+    spec: tests/kernel/wake-bound.spec.mjs
+    status: covered
   - id: terminal-count-drift
     family: ending
     met: {date: "2026-10-07", where: "41 terminals, finished workers' terminals still open", evidence: "AUDIT-starci-workflow.md issue 21"}

@@ -96,6 +96,10 @@ allocation:
     kernelTurnBudgetMs: 1200000, supervisorTurnBudgetMs: 1800000, turnInterruptGraceMs: 300000}
   # one local git read over a job's owned paths (scripts/kernel/owned-path-effects.mjs ownedPathEffects, job-artifacts.mjs).
   settleGit: {commandMs: 15000}
+  # wake.maxChars: the longest wake typed into a Kernel's input box (scripts/kernel/wake-bound.mjs). Claude Code folds a paste of about
+  # 800 characters or more into a pasted_content block that the model reads as untrusted data: on 2026-10-07 every wake of 1218 characters
+  # or more arrived pasted and was refused three times, while all sixteen wakes of 730 characters or fewer arrived as the user's message.
+  wake: {maxChars: 790}
   # Typed logs (scripts/kernel/typed-logs.mjs, the ledger's logs table): perJobCap rows a job's own writes
   # may store before one log.truncated row closes them (derived event rows are never capped); dataMaxBytes bounds
   # one row's data after redaction. diff: the caps of a job patch's pre-structured <patch>.json

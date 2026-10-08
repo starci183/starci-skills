@@ -29,6 +29,7 @@ import { terminalRename } from '../api/orca/terminal-rename.mjs';
 import { tabTitlesOf } from './terminal-dedupe.mjs';
 import { classifyAgentScreen, staleAwareState, outputAgeOf, exitedAgentPromptRow } from '../lib/terminal-liveness.mjs';
 import { sendWakeWithProof, sendEnterWithProof, deliveryFieldsOf, wakeSendRefused, WAKE_BOUNDS, withWakeIdentity } from './wake-delivery.mjs';
+import { boundedWake } from './wake-bound.mjs';
 import { closeOperationTerminal } from './close-op-terminal.mjs';
 import { openLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
 import { settledKernelVerdict, DEAD_VERDICTS, DEATH_SETTLE_MS } from './host-outage.mjs';
@@ -84,14 +85,14 @@ const classifyKernelScreen = classifyAgentScreen;
 
 // A wake is typed into the Kernel's input box as one paste. Claude Code folds a paste of about 800 characters or more into a
 // pasted_content block, which the Kernel model reads as untrusted pasted data and refused three times on 2026-10-07; the
-// whole typed wake (this text, the rev line, the seat identity) stays well under that, so it arrives as the user's message.
-export const buildWakePrompt = (workflow, attempt = null, revLine = null) => withWakeIdentity([
+// whole typed wake (this text, the rev line, the seat identity) is bounded by wake-bound.mjs, so it arrives as the user's message.
+export const buildWakePrompt = (workflow, attempt = null, revLine = null) => boundedWake({ workflowId: workflow, attempt, revLine, compose: withWakeIdentity, text: [
   `Watchdog liveness wake for ${workflow}: phase=running, your last turn ended at the prompt; act on it now.`,
   'Read starci kernel status; settle each needs-kernel-decision item, then work the ranked actions.',
   'If only a recorded wait remains, yield the model turn immediately: the runtime wakes this Kernel again.',
   'Never run Start-Sleep, shell sleep or a polling loop.',
   WAKE_BOUNDS,
-].join(' '), workflow, attempt, revLine);
+].join(' ') });
 /** The liveness wake this tick would type, from one starci kernel status read: its seat attempt and its kernelRev (runtime-rev.mjs). */
 export const wakePromptOf = (workflow, statusValue) =>
   buildWakePrompt(workflow, statusValue?.kernel?.attempt ?? null, statusValue?.kernel ? revWakeLine(statusValue?.kernelRev, workflow) : null);
