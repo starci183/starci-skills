@@ -24,6 +24,9 @@ for (const key of Object.keys(process.env)) {
     || /^GIT_CONFIG_(KEY|VALUE)_\d+$/.test(key)) delete process.env[key];
 }
 
+// A per-user runtime record points the CLI a spec spawns at the live checkout; a spec run names the checkout under test, so its children never read another runtime's law.
+process.env.STARCI_RUNTIME ??= path.resolve(import.meta.dirname, '..', '..');
+
 if (!process.env[TEST_REGISTRY_ENV] || !process.env[ARTIFACT_ROOT_ENV]) {
   const dir = fs.mkdtempSync(path.join(process.env.STARCI_TEMP_ROOT || os.tmpdir(), 'starci-test-registry-'));
   if (!process.env[TEST_REGISTRY_ENV]) process.env[TEST_REGISTRY_ENV] = path.join(dir, 'machine.sqlite');
