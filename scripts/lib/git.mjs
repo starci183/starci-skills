@@ -13,7 +13,7 @@ export const unquoteDiffPath = (value) =>
 // git's repository-local variables (git rev-parse --local-env-vars). A hook or alias run in a linked worktree exports
 // GIT_DIR=<main>/.git/worktrees/<wt>; a spec inheriting it pointed every fixture git at the LIVE .claude repo and re-inited
 // it core.bare=true (2026-09-29, a6f60352c). tests/setup/isolated-registry.mjs drops the same list.
-export const GIT_LOCAL_ENV_VARS = ['GIT_DIR', 'GIT_COMMON_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_OBJECT_DIRECTORY', 'GIT_ALTERNATE_OBJECT_DIRECTORIES', 'GIT_IMPLICIT_WORK_TREE', 'GIT_PREFIX', 'GIT_CONFIG', 'GIT_CONFIG_PARAMETERS', 'GIT_CONFIG_COUNT', 'GIT_GRAFT_FILE', 'GIT_NO_REPLACE_OBJECTS', 'GIT_REPLACE_REF_BASE', 'GIT_SHALLOW_FILE'];
+export const GIT_LOCAL_ENV_VARS = ['GIT_DIR', 'GIT_COMMON_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_OBJECT_DIRECTORY', 'GIT_ALTERNATE_OBJECT_DIRECTORIES', 'GIT_IMPLICIT_WORK_TREE', 'GIT_PREFIX', 'GIT_CONFIG', 'GIT_CONFIG_PARAMETERS', 'GIT_CONFIG_COUNT', 'GIT_GRAFT_FILE', 'GIT_NO_REPLACE_OBJECTS', 'GIT_REPLACE_REF_BASE', 'GIT_SHALLOW_FILE', 'GIT_INTERNAL_SUPER_PREFIX'];
 /** `parent` (the caller's env) without git's repository-local variables (GIT_CONFIG_KEY_n/VALUE_n go with GIT_CONFIG_COUNT). Pure. */
 export function withoutGitLocalEnv(parent) {
   const env = { ...parent };
