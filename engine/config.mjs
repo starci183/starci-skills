@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {skillRoot} from './runtime-root.mjs';
@@ -9,6 +10,8 @@ import {validateOrca,ORCA_KEYS} from './orca-config.mjs';
 import {validateResources,RESOURCE_KEYS} from './resources-config.mjs';
 import {ENV_NAME,secretEnv,connectorSecret} from './secrets.mjs';
 import {byCodeUnit} from './by-code-unit.mjs';
+import {isSpecRun} from '../scripts/lib/env.mjs';
+import {insidePath,resolvedKey} from '../scripts/lib/path-key.mjs';
 import {EFFORT_LEVELS,MODELS_KEYS,validateModelsBlock,refuseRemovedKeys,shippedTiers} from './model-config.mjs';
 const knownNames=names=>[...names].sort(byCodeUnit).join(', ');
 export {readDotenv,connectorSecret} from './secrets.mjs';
@@ -354,6 +357,13 @@ export function configuredAllocationPolicy(config=loadConfig()){
     :null;
   return {grants,source:allocation?'allocation':'default'};
 }
+/**
+ * Whether the owner's `config.yaml` under `root` is visible to this process. A spec run (`node --test`) reads an owner file only
+ * from under its own temp directory, where a fixture wrote it: the owner's live file of the checkout under test never reaches a
+ * spec, so a result does not depend on the host's settings (roots.temp, landGate, launch trust) and a lane clone, the release
+ * host and a clean checkout run the same suite.
+ */
+const ownerFileVisible=root=>!isSpecRun()||insidePath(os.tmpdir(),root,{key:resolvedKey});
 /** The validated config one yaml file holds, or null when the file is absent. */
 const readYamlConfig=(root,name)=>{const yaml=path.join(root,name);return fs.existsSync(yaml)?validateConfig(parseYaml(fs.readFileSync(yaml,'utf8'))):null;};
 function readExample(root=configRoot){const example=readYamlConfig(root,'config.example.yaml');if(example!==null){return example;}throw new Error('Missing config.example.yaml');}
@@ -363,7 +373,7 @@ function readExample(root=configRoot){const example=readYamlConfig(root,'config.
  * all). Returns the validated owner config, or null when that file does not
  * exist; falling back to the example's defaults is `loadConfig`.
  */
-function readOwnerConfig(root=configRoot){return readYamlConfig(root,'config.yaml');}
+function readOwnerConfig(root=configRoot){return ownerFileVisible(root)?readYamlConfig(root,'config.yaml'):null;}
 /**
  * The tolerant read the kernel boot and the router share: an owner file that is absent, unparsable or
  * short of the closed schema must never stop a workflow from routing. Returns
@@ -373,7 +383,7 @@ function readOwnerConfig(root=configRoot){return readYamlConfig(root,'config.yam
  */
 export function inspectOwnerConfig(root=configRoot){
   const file=path.join(root,'config.yaml');
-  if(!fs.existsSync(file))return {file,config:null,error:null,invalid:null};
+  if(!ownerFileVisible(root)||!fs.existsSync(file))return {file,config:null,error:null,invalid:null};
   let parsed;
   try{parsed=parseYaml(fs.readFileSync(file,'utf8'))??null;}
   catch(error){return {file,config:null,error:`config.yaml unparsable: ${error.message}`,invalid:null};}
