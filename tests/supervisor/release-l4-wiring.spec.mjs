@@ -433,7 +433,8 @@ test('L4: a test-world package in the checkout is built after the installs and b
   const old = new Date(Date.now() - 60_000);
   fs.utimesSync(built, old, old);
   assert.match(testWorldDistProblem(producer), /older than its source/);
-  fs.utimesSync(built, new Date(), new Date());
+  const later = new Date(Date.now() + 5_000);
+  fs.utimesSync(built, later, later);
   assert.equal(testWorldDistProblem(producer), null);
 });
 
@@ -442,10 +443,12 @@ test('a step that does work and then names an output runs, and the runner scratc
     { name: 'Pack', run: 'mkdir -p "$RUNNER_TEMP/pack"\nnpm pack --json > "$RUNNER_TEMP/npm-pack.json"\necho "tarball=x" >> "$GITHUB_OUTPUT"' },
     { name: 'Verify', run: 'node check "$RUNNER_TEMP/npm-pack.json"' },
     { name: 'Output', run: 'echo "apps=1" >> "$GITHUB_OUTPUT"' },
+    { name: 'Provide age', run: 'go install example.org/tool@v1\necho "$(go env GOPATH)/bin" >> "$GITHUB_PATH"' },
   ] } } };
   const plan = parityPlan({ workflows: [{ file: 'p.yml', doc }], apps: [] });
   assert.deepEqual(plan.steps.map((s) => s.name.replace(/^.*?: /, '')), ['Pack', 'Verify']);
   assert.match(plan.skipped[0].reason, /plumbing/);
+  assert.match(plan.skipped[1].reason, /toolchain/, 'a step that needs the runner image Go is left out, not failed for a missing binary');
   const script = parityScript(plan);
   assert.match(script, /export RUNNER_TEMP=\/tmp\/runner-temp GITHUB_OUTPUT=/);
 });

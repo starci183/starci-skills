@@ -34,6 +34,8 @@ const RUN_TIMEOUT_MS = 90 * 60_000;
 export const WORK_DIR = '/opt/starci-parity/checkout';
 /** The spec suites: the root `npm test` and an example app's npm test / test:<layer> runs. The host ran them in this L4 row. */
 const SPEC_SUITE = /^npm (?:run )?test(?::[\w:-]+)?(?: -- .*)?$/;
+/** A step that calls a toolchain the GitHub runner image carries and the node image does not (the Go that builds a pinned release): provisioning for a step the container leaves out. */
+const RUNNER_TOOLCHAIN = /^[ \t]*go[ \t]/m;
 const BROWSER = /playwright install|test:a11y|test:browser/;
 
 /** The workflows of `repo` as parsed documents: [{file, doc}] (the root .github/workflows/*.yml, sorted by name). */
@@ -60,6 +62,7 @@ function leaveOut({ step, dir, matrixJob }) {
   if (/workflow_dispatch|refs\/tags|always\(\)/.test(gate)) return 'manual or tag-upload step';
   if (onlyOutputLines(run)) return 'workflow plumbing';
   if (/\bdocker\b/.test(run)) return 'docker build';
+  if (RUNNER_TOOLCHAIN.test(run)) return 'runner toolchain the container lacks (go)';
   if (BROWSER.test(run)) return 'browser run';
   if (SPEC_SUITE.test(run) && (dir === '.' || matrixJob)) return 'spec suite (the host ran it in this L4 row)';
   if (run.includes('${{')) return 'depends on a workflow expression';
@@ -131,7 +134,7 @@ export function parityScript(plan) {
     // The runner's scratch directory and step-output file, which workflow steps name.
     'export RUNNER_TEMP=/tmp/runner-temp GITHUB_OUTPUT=/tmp/runner-temp/github-output && mkdir -p "$RUNNER_TEMP" && : > "$GITHUB_OUTPUT"',
     `mkdir -p ${WORK_DIR} && tar -xf /in/src.tar -C ${WORK_DIR}`,
-    `cd ${WORK_DIR} && git init -q && git add -A && git -c user.name=starci -c user.email=l4@starci.invalid commit -q -m l4-snapshot`,
+    `cd ${WORK_DIR} && git init -q && git add -A && git -c user.name=starci -c user.email=l4@starci.invalid commit -q -m l4-snapshot && export GITHUB_SHA=$(git rev-parse HEAD)`,
     `run_step() { name="$1"; dir="$2"; cmd="$(cat)"; echo "##STEP $name"; ( cd "${WORK_DIR}/$dir" && bash -ec "$cmd" ) || { echo "##FAILED $name"; exit 1; }; }`,
   ];
   plan.steps.forEach((s, i) => {
