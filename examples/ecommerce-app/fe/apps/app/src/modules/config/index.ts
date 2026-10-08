@@ -2,7 +2,7 @@ import "server-only"
 import { readProjectedOrigins } from "@ecommerce/api"
 
 /**
- * Backend endpoints the shop talks to, and the facts of its session cookie, read once.
+ * Backend endpoints the shop talks to, and the facts of its session cookie; the endpoints are read when a request needs them.
  *
  * A component or page never touches `process.env` and never hardcodes a host: each service base URL is one
  * `NEXT_PUBLIC_*_API_URL` env value, and the fallback is the product's resolved projection
@@ -12,12 +12,12 @@ import { readProjectedOrigins } from "@ecommerce/api"
  * needs to. Point the shop at a deployed stack by setting the env vars.
  */
 
-/** Order service: catalogue reads and the cart/checkout/orders writes behind them. */
-export const ORDER_API_URL: string =
+/** Order service: catalogue reads and the cart/checkout/orders writes behind them; read per call, never when the module loads (an image build has no projection). */
+export const orderApiUrl = (): string =>
     process.env.NEXT_PUBLIC_ORDER_API_URL ?? readProjectedOrigins(process.env.ECOMMERCE_APP_METADATA).orderApi
 
-/** Identity service: who the shopper is. */
-export const IDENTITY_API_URL: string =
+/** Identity service: who the shopper is; read per call like the order service. */
+export const identityApiUrl = (): string =>
     process.env.NEXT_PUBLIC_IDENTITY_API_URL ?? readProjectedOrigins(process.env.ECOMMERCE_APP_METADATA).identityApi
 
 /** The parent domain the session cookie is shared on when the two apps are served on separate hostnames; host-only when unset. */

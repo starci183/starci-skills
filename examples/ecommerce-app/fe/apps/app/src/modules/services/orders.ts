@@ -1,6 +1,6 @@
 import "server-only"
 import { parseOutcome, requestGraphql, type Outcome } from "@ecommerce/api"
-import { ORDER_API_URL } from "../config"
+import { orderApiUrl } from "../config"
 import { toOrderConfirmation, toReceiptLink } from "../order"
 import type { OrderConfirmation, ReceiptLink } from "../types"
 import { DOCUMENTS } from "./__generated__/documents"
@@ -14,7 +14,7 @@ import { DOCUMENTS } from "./__generated__/documents"
 export const placeOrder = async (sessionToken: string, idempotencyKey: string): Promise<Outcome<OrderConfirmation>> =>
     parseOutcome(
         await requestGraphql({
-            baseUrl: ORDER_API_URL,
+            baseUrl: orderApiUrl(),
             document: DOCUMENTS.ShopPlaceOrder,
             variables: { input: { idempotencyKey } },
             token: sessionToken,
@@ -30,7 +30,7 @@ export const placeOrder = async (sessionToken: string, idempotencyKey: string): 
 export const fetchOrderReceipt = async (sessionToken: string, orderId: string): Promise<Outcome<ReceiptLink>> =>
     parseOutcome(
         await requestGraphql({
-            baseUrl: ORDER_API_URL,
+            baseUrl: orderApiUrl(),
             document: DOCUMENTS.ShopOrderReceipt,
             variables: { input: { orderId } },
             token: sessionToken,

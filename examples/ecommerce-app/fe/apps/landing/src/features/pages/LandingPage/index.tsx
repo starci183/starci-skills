@@ -1,6 +1,6 @@
 import { getFormatter, getLocale, getTranslations } from "next-intl/server"
 import { CATALOG } from "../../../modules/catalog"
-import { SHOP_URL } from "../../../modules/config"
+import { shopUrl } from "../../../modules/config"
 import { LandingPageBase } from "./component"
 
 /** The teaser shows a curated slice of the catalogue rather than the whole order-service feed. */
@@ -41,7 +41,7 @@ export const LandingPage = async () => {
                     blurb: t(`catalogue.products.${product.id}.blurb`),
                     price: format.number(product.priceCents / 100, { style: "currency", currency: product.currency }),
                 })),
-                shopHref: `${SHOP_URL}/${locale}`,
+                shopHref: `${shopUrl()}/${locale}`,
             }}
         />
     )

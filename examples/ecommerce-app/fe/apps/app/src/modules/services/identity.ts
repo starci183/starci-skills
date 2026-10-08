@@ -1,6 +1,6 @@
 import "server-only"
 import { isRecord, parseOutcome, requestGraphql, type Outcome } from "@ecommerce/api"
-import { IDENTITY_API_URL } from "../config"
+import { identityApiUrl } from "../config"
 import { readSessionToken } from "../session"
 import { DOCUMENTS } from "./__generated__/documents"
 
@@ -70,7 +70,7 @@ const toAccountView = (data: unknown): AccountView | null =>
 export const signInWithPassword = async (email: string, password: string): Promise<Outcome<IssuedSession>> =>
     parseOutcome(
         await requestGraphql({
-            baseUrl: IDENTITY_API_URL,
+            baseUrl: identityApiUrl(),
             document: DOCUMENTS.SignIn,
             variables: { input: { email, password } },
         }),
@@ -81,7 +81,7 @@ export const signInWithPassword = async (email: string, password: string): Promi
 export const registerAccount = async (email: string, password: string): Promise<Outcome<string>> =>
     parseOutcome(
         await requestGraphql({
-            baseUrl: IDENTITY_API_URL,
+            baseUrl: identityApiUrl(),
             document: DOCUMENTS.Register,
             variables: { input: { email, password } },
         }),
@@ -96,7 +96,7 @@ export const registerAccount = async (email: string, password: string): Promise<
 const verifySession = async (sessionToken: string): Promise<Outcome<string | null>> => {
     const outcome = parseOutcome(
         await requestGraphql({
-            baseUrl: IDENTITY_API_URL,
+            baseUrl: identityApiUrl(),
             document: DOCUMENTS.VerifySession,
             variables: { input: { sessionToken } },
         }),
@@ -108,7 +108,7 @@ const verifySession = async (sessionToken: string): Promise<Outcome<string | nul
 /** `account`: the caller's own view behind the bearer, joining their live buyer status from the order service. */
 const fetchAccount = async (sessionToken: string): Promise<Outcome<AccountView>> =>
     parseOutcome(
-        await requestGraphql({ baseUrl: IDENTITY_API_URL, document: DOCUMENTS.Account, token: sessionToken }),
+        await requestGraphql({ baseUrl: identityApiUrl(), document: DOCUMENTS.Account, token: sessionToken }),
         toAccountView,
     )
 
@@ -118,7 +118,7 @@ const fetchAccount = async (sessionToken: string): Promise<Outcome<AccountView>>
  */
 export const revokeSession = async (sessionToken: string): Promise<void> => {
     await requestGraphql({
-        baseUrl: IDENTITY_API_URL,
+        baseUrl: identityApiUrl(),
         document: DOCUMENTS.RevokeSession,
         variables: { input: { sessionToken } },
         token: sessionToken,

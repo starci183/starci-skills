@@ -1,7 +1,7 @@
 import { getFormatter, getTranslations } from "next-intl/server"
 import type { Outcome } from "@ecommerce/api"
 import { collectionSlot } from "@ecommerce/ui"
-import { ORDER_API_URL } from "../../../modules/config"
+import { orderApiUrl } from "../../../modules/config"
 import { fetchProducts, type Product } from "../../../modules/services"
 import { readSessionToken } from "../../../modules/session"
 import { BrowsePageBase } from "./component"
@@ -59,7 +59,7 @@ export const BrowsePage = async () => {
                 signedOutDescription: t("signedOut.description"),
                 unreachableTitle: t("unreachable.title"),
                 unreachableDescription:
-                    outcome.kind === "ok" ? "" : t("unreachable.description", { url: ORDER_API_URL }),
+                    outcome.kind === "ok" ? "" : t("unreachable.description", { url: orderApiUrl() }),
                 emptyTitle: t("empty.title"),
                 emptyDescription: t("empty.description"),
             }}
