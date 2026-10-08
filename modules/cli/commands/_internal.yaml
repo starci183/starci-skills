@@ -64,6 +64,7 @@ internal:
   - {path: scripts/checks/check-prose-commands.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
   - {path: scripts/checks/check-removed-vocabulary.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
   - {path: scripts/checks/check-undeclared-identifiers.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
+  - {path: scripts/checks/check-sonar-rules.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
   - {path: scripts/checks/check-version-pin-once.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
   - {path: scripts/checks/check-env.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
   - {path: scripts/checks/check-export-used.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}

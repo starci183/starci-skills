@@ -1,6 +1,6 @@
 // allowlist.mjs — the one reader of the ONE explicit allowlist of the runtime: modules/kernel/allowlist.yaml
 // (schema starci/allowlist@1). Every exception list a runtime check keeps is a named section of that file —
-// not-codes, json-exceptions, dead-script-entries and the reserved export-used — and a reader takes its
+// not-codes, json-exceptions, dead-script-entries, the reserved export-used and the sonar-rules findings of main — and a reader takes its
 // section here; no second allowlist, baseline, pending or entries file exists anywhere in the tree
 // (scripts/checks/check-one-allowlist.mjs enforces the law by file name).
 import fs from 'node:fs';
@@ -15,7 +15,7 @@ export const ALLOWLIST_FILE = 'modules/kernel/allowlist.yaml';
 const ALLOWLIST_SCHEMA = 'starci/allowlist@1';
 
 /** The section names of the one allowlist, in file order. */
-const ALLOWLIST_SECTIONS = Object.freeze(['not-codes', 'json-exceptions', 'dead-script-entries', 'export-used']);
+const ALLOWLIST_SECTIONS = Object.freeze(['not-codes', 'json-exceptions', 'dead-script-entries', 'export-used', 'sonar-rules']);
 
 /** The `kind` section of one already-parsed allowlist document; a malformed document or an unknown section is an error, never a silent empty list. */
 export function allowlistSection(doc, kind, at = ALLOWLIST_FILE) {

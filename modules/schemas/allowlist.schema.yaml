@@ -9,7 +9,7 @@ description: >-
   (scripts/checks/check-one-allowlist.mjs).
 type: object
 additionalProperties: false
-required: [schema, not-codes, json-exceptions, dead-script-entries, export-used]
+required: [schema, not-codes, json-exceptions, dead-script-entries, export-used, sonar-rules]
 properties:
   schema:
     const: starci/allowlist@1
@@ -49,7 +49,31 @@ properties:
     description: >-
       Reserved: the export-to-reader exceptions of the symbol-graph check land here; shrink-only once
       populated.
+  sonar-rules:
+    type: array
+    description: >-
+      The Sonar findings the sonar-rules self-check found on main when it landed, each as {rule, file, fingerprint, n,
+      weight?, reason}; written once by `--init`, shrink-only (a fix commit deletes its own entry), and ends as [].
+    items:
+      $ref: '#/$defs/sonarFinding'
 $defs:
+  sonarFinding:
+    type: object
+    additionalProperties: false
+    required: [rule, file, fingerprint, n, reason]
+    properties:
+      rule:
+        type: string
+      file:
+        type: string
+      fingerprint:
+        type: string
+      n:
+        type: integer
+      weight:
+        type: integer
+      reason:
+        type: string
   literalReason:
     type: object
     additionalProperties: false
