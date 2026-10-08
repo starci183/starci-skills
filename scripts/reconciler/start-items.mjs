@@ -100,6 +100,9 @@ export const serviceWanted = (name, config) => {
   return true;
 };
 
+/** The public ask tunnel gates a start only when the Telegram notifier is the one pushing its link to the owner; serve-ask starts it on demand otherwise. Pure. */
+const tunnelRequired = (name, config) => name !== 'ask-tunnel' || config == null || config.connectors?.telegram?.enabled === true;
+
 const serviceDownReason = (detail) => {
   let reason = detail.error ?? detail.status ?? detail.verdict;
   if (reason != null) return reason;
@@ -130,6 +133,7 @@ const serviceItem = (probe, { publicUrl, config, audits }) => {
   const fix = taskNote?.fix ?? (probe.name === 'orca'
     ? 'open Orca yourself, then run start again (start never launches a GUI app)'
     : HEAL_SERVICES);
+  if (!tunnelRequired(probe.name, config)) return warn('services', probe.name, label, detail + '; not required: nothing pushes the public ask link (connectors.telegram is off), serve-ask starts the tunnel when an ask is served', fix);
   return red('services', probe.name, label, detail, fix);
 };
 

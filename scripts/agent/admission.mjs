@@ -14,6 +14,7 @@ import { tierHistory } from './tier-history.mjs';
 import { inspectOwnerConfig, configuredAllocationPolicy, validateConfig } from '../../engine/config.mjs';
 import { normalizeQuotaSnapshot } from './quota/snapshot.mjs';
 import { quotaFreshAt, quotaMaxAgeMs } from '../lib/quota-evidence.mjs';
+import { LOGIN_EXPIRED_KIND } from '../lib/login-expired.mjs';
 
 export const launchScopeId = (role, request = {}) => `${role}:${sha256(JSON.stringify(request))}`;
 /** Authorization comes from the ledger row, never JSON that asserts its own author. */
@@ -160,6 +161,14 @@ function bandOverrideFor({ candidate, bias, input, override }) {
     reason: 'the owner bias names this member', biasNamed: true };
 }
 
+/** The refusal of a plan with no eligible member; a provider whose login expired is named as such, ahead of the generic codes. */
+function refusedAdmission(decision) {
+  const expired = (decision.rejected ?? []).filter((row) => row.failureKind === LOGIN_EXPIRED_KIND).map((row) => row.provider);
+  const summary = rejectionSummary(decision);
+  return { ok: false, step: 'admission', error: decision.reason, effectState: 'none', decision, ...(summary ? { detail: summary } : {}),
+    ...(expired.length ? { code: 'provider-login-expired', providers: [...new Set(expired)] } : {}) };
+}
+
 /** On a capacity race only the selector's eligible set is retried; only never widens. */
 export function admitAgent(input = {}, options = {}) {
   let decision;
@@ -170,7 +179,7 @@ export function admitAgent(input = {}, options = {}) {
     decision = planAgentAdmission({ ...input, ...options });
   }
   catch (error) { return { ok: false, step: 'admission', error: `admission evidence failed: ${error.message}`, effectState: 'none' }; }
-  if (!decision.ok) return { ok: false, step: 'admission', error: decision.reason, effectState: 'none', decision, ...(rejectionSummary(decision) ? { detail: rejectionSummary(decision) } : {}) };
+  if (!decision.ok) return refusedAdmission(decision);
   for (const candidate of decision.eligible) {
     const attemptId = `${input.role}:${input.attemptId ?? input.scopeId}:${candidate.provider}:${candidate.account}:${candidate.model}`;
     const bias = biasForRole(input.bias, input.role, input.scopeId);

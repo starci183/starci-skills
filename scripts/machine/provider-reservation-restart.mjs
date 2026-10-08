@@ -6,6 +6,11 @@ import { allocationMs } from '../../engine/config.mjs';
 import { status as orcaStatus } from '../api/orca/status.mjs';
 import { requestShow } from '../api/orca/request-show.mjs';
 import { processList } from '../api/process/process-list.mjs';
+import { processEnv } from '../api/process/process-env.mjs';
+import { terminalList } from '../api/orca/terminal-list.mjs';
+import { workerShow } from '../api/orca/worker-show.mjs';
+import { ENDED_DISPATCH_STATES } from '../../engine/db/provider-reservations.mjs';
+import { terminalTree } from './worker-close.mjs';
 
 export const HELD_CLOCK = 'PROVIDER_RESERVATION_HELD';
 export const heldEntity = (id) => `provider-reservation:${id}`;
@@ -26,7 +31,7 @@ export function hostIncarnation(io = {}) {
   const bootAt = (io.bootAt ?? (() => Date.now() - os.uptime() * 1000))();
   const app = table.find((row) => row.pid === status.appPid);
   const orcaStartedAt = createdKnown(app?.created) ? app.created : null;
-  return { ok: true, bootAt, orcaStartedAt, startedAt: Math.max(bootAt, orcaStartedAt ?? 0) };
+  return { ok: true, table, bootAt, orcaStartedAt, startedAt: Math.max(bootAt, orcaStartedAt ?? 0) };
 }
 
 /** A receipt whose launch can still be running: no handle and no process recorded. Pure. */
@@ -37,7 +42,7 @@ function requestStateOf(row, io) {
   if (!row.hostRequestId) return { state: 'none' };
   try {
     const shown = (io.request ?? requestShow)({ request: row.hostRequestId });
-    return shown?.ok === true ? { state: shown.state } : { state: null };
+    return shown?.ok === true ? { state: shown.state, dispatchId: shown.dispatchId ?? null } : { state: null };
   } catch { return { state: null }; }
 }
 
@@ -47,26 +52,68 @@ function proofOf(row, incarnation, request) {
     hostRequestId: row.hostRequestId ?? null, requestState: request.state === 'none' ? null : request.state };
 }
 
-/** One receipt's verdict against the incarnation: {row, proof, why} to release, or {id, why} to keep. */
-function verdictOf(row, incarnation, io, toleranceMs) {
-  if (incarnation.startedAt - toleranceMs <= Number(row.updatedAt)) return { id: row.id, why: 'host-not-restarted' };
-  const request = requestStateOf(row, io);
+const HANDLE_ENV = 'ORCA_TERMINAL_HANDLE';
+
+/** The terminal listing and the handle environments, read at most once per pass: {terminals, envRows} or null when either cannot be read. */
+function censusReader(io) {
+  let cached;
+  return () => {
+    if (cached !== undefined) return cached;
+    try {
+      const listed = (io.list ?? terminalList)();
+      const envRows = (io.env ?? (() => processEnv({ names: [HANDLE_ENV] })))();
+      cached = listed?.ok && !listed.hostUnavailable && Array.isArray(envRows) ? { terminals: listed.terminals ?? [], envRows } : null;
+    } catch { cached = null; }
+    return cached;
+  };
+}
+
+/** What the current runtime reports of the Dispatch a known host request resolved to: {dispatchId, status, handle} or {why}. */
+function dispatchOf(request, io) {
+  if (!request.dispatchId) return { why: 'request-known' };
+  let shown = null;
+  try { shown = (io.worker ?? workerShow)({ dispatch: request.dispatchId }); } catch { shown = null; }
+  if (shown?.hostUnavailable || !shown?.ok) return { why: shown?.hostUnavailable ? 'host-unavailable' : 'request-known' };
+  const dispatch = shown.result?.dispatch;
+  if (!ENDED_DISPATCH_STATES.includes(dispatch?.status)) return { why: 'dispatch-active' };
+  return { dispatchId: request.dispatchId, status: dispatch.status, handle: dispatch.assigneeHandle ?? null };
+}
+
+/** A receipt whose host request the runtime knows: released when its Dispatch ended and its terminal is gone with no process under it. */
+function endedDispatchVerdict(row, request, ctx) {
+  const dispatch = dispatchOf(request, ctx.io);
+  if (dispatch.why) return { id: row.id, why: dispatch.why };
+  const census = ctx.census();
+  if (!census) return { id: row.id, why: 'census-unreadable' };
+  const listed = census.terminals.find((terminal) => terminal?.handle === dispatch.handle);
+  if (dispatch.handle && listed && listed.connected !== false) return { id: row.id, why: 'terminal-connected' };
+  if (dispatch.handle && terminalTree(dispatch.handle, { table: ctx.table, envRows: census.envRows }).members.length) return { id: row.id, why: 'process-alive' };
+  return { row, why: 'dispatch-ended', proof: { kind: 'dispatch-ended', confirmed: true, source: 'reservation-reap', hostRequestId: row.hostRequestId,
+    dispatchId: dispatch.dispatchId, dispatchStatus: dispatch.status, handle: dispatch.handle,
+    terminalProof: listed ? 'disconnected' : 'gone', processVerdict: 'none' } };
+}
+
+/** One receipt's verdict: {row, proof, why} to release, or {id, why} to keep. */
+function verdictOf(row, ctx) {
+  const request = requestStateOf(row, ctx.io);
   if (request.state === null) return { id: row.id, why: 'host-unavailable' };
-  if (request.state !== 'none' && request.state !== 'absent') return { id: row.id, why: 'request-known' };
-  return { row, why: 'host-restarted', proof: proofOf(row, incarnation, request) };
+  if (request.state === 'completed' || request.state === 'pending') return endedDispatchVerdict(row, request, ctx);
+  if (ctx.incarnation.startedAt - ctx.toleranceMs <= Number(row.updatedAt)) return { id: row.id, why: 'host-not-restarted' };
+  return { row, why: 'host-restarted', proof: proofOf(row, ctx.incarnation, request) };
 }
 
 /**
- * The handle-less receipts whose launch the host restart ended: {proven: [{row, proof, why}], kept: [{id, why}]}. No Orca or census read is made
- * for an empty set; an unreachable Orca or an unreadable table keeps every slot; a receipt whose host request the current runtime still knows
- * (completed or pending) is a launch it ran and stays held.
+ * The handle-less receipts whose launch has ended: {proven: [{row, proof, why}], kept: [{id, why}]}. No Orca or census read is made for an empty
+ * set; an unreachable Orca or an unreadable table keeps every slot. A receipt whose host request the current runtime records is judged by its
+ * Dispatch (ended, terminal gone, no process under it: dispatch-ended); one it has no record of is released once the host restarted after the
+ * receipt's last update (host-restarted).
  */
 export function restartedReleases(rows, io = {}) {
   if (!rows.length) return { proven: [], kept: [] };
   const incarnation = hostIncarnation(io);
   if (!incarnation.ok) return { proven: [], kept: rows.map((row) => ({ id: row.id, why: incarnation.why })) };
-  const toleranceMs = allocationMs('providerReservation.restartToleranceMs');
-  const verdicts = rows.map((row) => verdictOf(row, incarnation, io, toleranceMs));
+  const ctx = { io, incarnation, table: incarnation.table, toleranceMs: allocationMs('providerReservation.restartToleranceMs'), census: censusReader(io) };
+  const verdicts = rows.map((row) => verdictOf(row, ctx));
   return { proven: verdicts.filter((verdict) => verdict.row), kept: verdicts.filter((verdict) => !verdict.row) };
 }
 

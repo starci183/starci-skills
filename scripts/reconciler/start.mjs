@@ -16,6 +16,7 @@ import { probeOrcaAsync, serviceRegistry, servicePorts, servicePlatformProblem, 
 import { sleep } from '../lib/sleep.mjs'; import { isMain } from '../lib/is-main.mjs';
 import { buildUi, uiBuildState } from './ui-build.mjs';
 export { buildUi, uiBuildState };
+import { loginRows } from './login-items.mjs';
 import { PROFILE, engineItems, profileItems, safeShadowOf, serviceItems } from './start-items.mjs';
 import { auditTasks } from '../machine/task-audit.mjs';
 import { guardCommandRow } from './guard-row.mjs';
@@ -240,6 +241,7 @@ export async function gather({ env = process.env, config = safeRun(() => loadCon
   const need = await seatNeed({ config, seatsRequested });
   push(await supervisorRow({ env, config, orca, seats, orcaProbe, needed: need.needed }), orcaRow(orcaProbe));
   if (seats && workflowSeats) push(await kernelSeatItems({ orcaOk: orcaProbe.ok !== false, config, rows: need.rows }));
+  if (orcaProbe.ok === true) push(loginRows());
   push(await depthItems({ env, config, orcaOk: orcaProbe.ok === true, ...(depthProbe ? { probe: depthProbe } : {}) }));
   return items;
 }

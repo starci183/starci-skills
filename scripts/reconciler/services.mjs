@@ -40,7 +40,7 @@ import { archiveRoot as archiveRootOf } from '../machine/home.mjs';
 import { httpUp } from '../api/http/http-up.mjs';
 import { repeatInOrder } from '../lib/in-order.mjs';
 import { recordNewProbe, recordServiceEvents } from './service-events.mjs';
-import { outcomeOf, probeCommand, reopenCommand } from './service-commands.mjs';
+import { connectorStartResult, outcomeOf, probeCommand, reopenCommand } from './service-commands.mjs';
 import { auditTasks } from '../machine/task-audit.mjs';
 import { TASK_DEFINITIONS, starciShimPath } from '../machine/task-register.mjs';
 import { RECONCILER_SERVICE, reconcilerTaskProbe } from './task-health.mjs'; import { offInConfig } from './connector-wanted.mjs';
@@ -415,7 +415,7 @@ export function orcaRestartScript({ app, closeWaitMs }) {
 
 const connectorStart = (service, env) => {
   const r = runNode([path.join(SKILL_ROOT, serviceScript(service)), 'start'], { timeout: 120_000, cwd: SKILL_ROOT, env });
-  return { ok: r.status === 0, answer: lastJson(r.stdout), stderr: String(r.stderr ?? '').trim().slice(0, 300) };
+  return connectorStartResult(r, lastJson(r.stdout));
 };
 
 /** Start one service now. Only ever reached through ctx.run in active mode (or by hand). Seams: powershell, tasks. */

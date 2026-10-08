@@ -3,6 +3,7 @@
 import { isPlainObject } from '../../engine/plain-object.mjs';
 import { quotaTimestamp, quotaPolicyValid, inspectQuotaEvidence } from './quota-evidence.mjs';
 import { pickFromTier } from './tier-pick.mjs';
+import { LOGIN_EXPIRED_KIND } from './login-expired.mjs';
 
 const ADMISSION_REASONS = Object.freeze([
   'admitted-plan',
@@ -222,7 +223,9 @@ function candidateAssessment(candidate, state, ids, now) {
 }
 
 // A quota rejection carries the observation's own explanation (its age and the limit it failed).
-const quotaDetailOf = (candidate, codes) => codes.some((code) => code.startsWith('quota-')) && text(candidate.quota?.detail) ? { detail: candidate.quota.detail } : {};
+const loginExpiredCandidate = (candidate) => candidate.quota?.failureKind === LOGIN_EXPIRED_KIND;
+const quotaDetailOf = (candidate, codes) => (codes.some((code) => code.startsWith('quota-')) || loginExpiredCandidate(candidate)) && text(candidate.quota?.detail)
+  ? { detail: candidate.quota.detail, ...(loginExpiredCandidate(candidate) ? { failureKind: LOGIN_EXPIRED_KIND } : {}) } : {};
 /** One line naming why each quota-rejected candidate was refused, or null when no rejection carries a detail. */
 export const rejectionSummary = (decision) => {
   const lines = (decision?.rejected ?? []).filter((row) => text(row.detail)).map((row) => `${row.id}: ${row.detail}`);

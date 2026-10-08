@@ -20,3 +20,9 @@ export async function probeCommand(registry, a, out) {
   if (!entry) { out({ ok: false, error: `no service ${a.probe}` }); process.exitCode = 1; return; }
   return out({ ok: true, name: a.probe, probe: await entry.probe() });
 }
+
+/** A connector start's result: the answer it printed and, when it failed, the reason it named (the answer's reason or error, else stderr, else the exit code). Pure. */
+export function connectorStartResult(r, answer) {
+  const stderr = String(r.stderr ?? '').trim().slice(0, 300);
+  return { ok: r.status === 0, answer, stderr, ...(r.status === 0 ? {} : { error: String(answer?.reason ?? answer?.error ?? (stderr || `exit ${r.status}`)) }) };
+}

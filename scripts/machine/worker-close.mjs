@@ -26,7 +26,7 @@
 import { allocationMs } from '../../engine/config.mjs';
 import { captureProcessIdentity } from '../api/process/capture-process-identity.mjs';
 import { stopOwnedProcess } from '../api/process/stop-owned-process.mjs';
-import { OWNED_PROCESS_SCHEMA } from '../lib/process-identity.mjs';
+import { OWNED_PROCESS_SCHEMA, bornAt } from '../lib/process-identity.mjs';
 import { processEnv } from '../api/process/process-env.mjs';
 import { processList } from '../api/process/process-list.mjs';
 import { workerRelease } from '../api/orca/worker-release.mjs';
@@ -59,9 +59,6 @@ export const survivorsOf = (members, table) => members.filter((m) => createdKnow
   && (table ?? []).some((p) => p.pid === m.pid && createdKnown(p.created) && m.created === p.created));
 
 const members = (list) => list.map((m) => ({ pid: m.pid, name: m.name ?? null, created: m.created, identity: m.identity ?? null }));
-const bornAt = identity => {
-  try { return Number((BigInt(identity.birth) - 116444736000000000n) / 10000n); } catch { return null; }
-};
 const exactIdentity = (a, b) => Boolean(a && b) && a.pid === b.pid && a.birth === b.birth
   && typeof a.exe === 'string' && typeof b.exe === 'string' && a.exe.toLowerCase() === b.exe.toLowerCase();
 const capturedIdentity = (receipt, row) => receipt?.schema === OWNED_PROCESS_SCHEMA && receipt.ok === true
