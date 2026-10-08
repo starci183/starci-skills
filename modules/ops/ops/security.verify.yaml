@@ -42,7 +42,7 @@ reads:
       en: Read the declared responsibility boundaries and enforcement rules the inspection measures
         against - secret/public value separation, denial handling, ownership boundaries.
   - id: machines
-    path: scripts/gates/gate.mjs + scripts/hfs/architecture/*.mjs
+    path: scripts/gates/gate.mjs
     purpose:
       en: When the selected inspection includes boundary or enforcement checks, read the sealed machines'
         supported arguments, report schema, exit codes and coverage limits and run them read-only

@@ -38,7 +38,12 @@ reads:
         with source citation/revision. Existing behavior does not authorize a new rule.
   - id: specification
     path: modules/ops/ops/business.decide.yaml + modules/schemas/work-layout.yaml +
-      modules/schemas/work-*.schema.yaml
+      modules/schemas/work-common.schema.yaml + modules/schemas/work-feature.schema.yaml +
+      modules/schemas/work-functional-requirement.schema.yaml +
+      modules/schemas/work-non-functional-requirement.schema.yaml +
+      modules/schemas/work-business-rule.schema.yaml + modules/schemas/work-acceptance-criterion.schema.yaml +
+      modules/schemas/work-policy-decision.schema.yaml + modules/schemas/work-data.schema.yaml +
+      modules/schemas/work-customer-journey.schema.yaml
     purpose:
       en: Read the record family contracts and this operator procedure before authoring the .starciwork
         payload.
