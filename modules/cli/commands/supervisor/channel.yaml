@@ -22,4 +22,5 @@ examples:
   - starci supervisor channel register --id main --label Supervisor
   - starci supervisor channel inbox --id main --peek
   - starci supervisor channel reply --id main --text <text> --to <message-id>
+roles: [lead, coordinator, owner]
 editions: [full]

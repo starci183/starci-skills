@@ -889,6 +889,12 @@ moduleLocalDocumentKinds:
   - id: starci/module-kernel-op-incident-policy@1
     governs: "What happens when an op asks, hits a rate limit or quota, errors, hangs or is restarted: handler, bound and escalation per situation."
     files: [modules/kernel/op-incident-policy.yaml]
+  - id: starci/module-kernel-roles@1
+    governs: "The roles contract: the principles, the five roles with their scope, duties, cleanup, never list and reporting chain, and Debug's end condition."
+    files: [modules/kernel/roles.yaml]
+  - id: starci/module-reconciler-edge-cases@1
+    governs: "The registry of every edge case met: family, real occurrence, the rule that handles it, the spec that reproduces it, and its status."
+    files: [modules/reconciler/edge-cases.yaml]
   - id: starci/module-kernel-verdict@1
     governs: "What `starci kernel settle` accepts and rejects."
     files: [modules/kernel/verdict-contract.yaml]

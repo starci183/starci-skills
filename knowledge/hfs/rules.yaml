@@ -2041,3 +2041,21 @@ rules:
     failureCodes: ["RT_DOCUMENTED_DEFAULT_DRIFT"]
     enforcers:
       - {kind: runtime, id: documented-defaults, at: scripts/checks/check-documented-defaults.mjs}
+  - id: R232
+    code: "RT_ROLES_CONTRACT_DRIFT"
+    law: "A role is described once. modules/kernel/roles.yaml holds, per role, its scope, what it does, what it must clean up, what it never does, whom it reports to and who oversees it; a Markdown surface of the role carries the block generated from it, a yaml or script surface cites modules/kernel/roles.yaml#<role>, and no surface teaches a spelling the role's contradicts list names."
+    scope: runtime
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RT_ROLES_CONTRACT_DRIFT"]
+    enforcers:
+      - {kind: runtime, id: roles-contract, at: scripts/checks/check-roles-contract.mjs}
+  - id: R233
+    code: "RT_EDGE_CASE_REGISTRY"
+    law: "Every edge case met is a declared entry of modules/reconciler/edge-cases.yaml with its family, its real occurrence and a status of covered or open; a covered entry names the rule that handles it and the spec that reproduces it, and both exist, and an open entry says why."
+    scope: runtime
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RT_EDGE_CASE_REGISTRY"]
+    enforcers:
+      - {kind: runtime, id: edge-case-registry, at: scripts/checks/check-edge-case-registry.mjs}

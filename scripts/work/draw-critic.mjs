@@ -127,6 +127,7 @@ export const VERDICT_FILE = 'verdict.json';
  * The critic's Task spec. It never sees the drawing brief, the worker's notes or any earlier round: only the clean
  * directory `dir` with the images, the HTML and the rubric. Its one write is `dir`/verdict.json.
  */
+// The critic's role (scope, never, reports to) is modules/kernel/roles.yaml#critic.
 function criticPrompt({ dir, images, html = 'screen.html', rubricFile = 'rubric.yaml', verdictFile = VERDICT_FILE }) {
   const at = (f) => slash(path.join(dir, f));
   return [

@@ -163,6 +163,8 @@ ruleParams:
       - {id: removed-vocabulary, run: scripts/checks/check-removed-vocabulary.mjs}
       - {id: prose-commands, run: scripts/checks/check-prose-commands.mjs}
       - {id: documented-defaults, run: scripts/checks/check-documented-defaults.mjs}
+      - {id: roles-contract, run: scripts/checks/check-roles-contract.mjs}
+      - {id: edge-case-registry, run: scripts/checks/check-edge-case-registry.mjs}
       - {id: sonar-rules, run: scripts/checks/check-sonar-rules.mjs}
 
 slots:

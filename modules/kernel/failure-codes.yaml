@@ -15436,6 +15436,35 @@ RT_DOCUMENTED_DEFAULT_DRIFT:
   nextStep_vi: "Người giám sát sửa số trong tài liệu cho khớp giá trị của khóa, hoặc sửa khóa dẫn; không chép lại một số không dẫn khóa."
   owner: supervisor
   kind: check-finding
+RT_ROLES_CONTRACT_DRIFT:
+  title: "A role surface differs from the roles contract"
+  title_vi: "Một bề mặt mô tả vai trò khác với hợp đồng vai trò"
+  meaning_vi: "Hợp đồng vai trò (modules/kernel/roles.yaml) là nơi duy nhất mô tả một vai trò. Một bề mặt Markdown mang khối sinh từ hợp đồng, một bề mặt yaml hoặc script dẫn id của vai trò, và không bề mặt nào dạy điều mà danh sách contradicts của vai trò cấm."
+  causes_vi:
+    - "Sửa hợp đồng mà không sinh lại các khối"
+    - "Viết lại một đoạn mô tả vai trò trong prompt hoặc tài liệu thay vì dẫn hợp đồng"
+  nextStep_vi: "Người giám sát chạy starci runtime check --only roles-contract -- --write, hoặc sửa câu mâu thuẫn theo hợp đồng."
+  owner: supervisor
+  kind: check-finding
+RT_EDGE_CASE_REGISTRY:
+  title: "The edge-case registry is inconsistent"
+  title_vi: "Sổ tình huống biên không nhất quán"
+  meaning_vi: "Mỗi mục covered của modules/reconciler/edge-cases.yaml phải nêu một tệp spec và một quy tắc đều tồn tại; mỗi mục có họ, lần xảy ra thật và trạng thái hợp lệ."
+  causes_vi:
+    - "Mục covered thiếu spec hoặc quy tắc"
+    - "Spec hoặc quy tắc được đổi tên mà sổ không đổi theo"
+  nextStep_vi: "Người giám sát sửa mục cho đúng tệp, hoặc chuyển mục sang open kèm lý do."
+  owner: supervisor
+  kind: check-finding
+OP_REPORTS_TO_KERNEL:
+  title: "An Op addressed a role above its Kernel"
+  title_vi: "Một Op gửi thẳng lên vai trò cao hơn Kernel của nó"
+  meaning_vi: "Op chỉ báo cáo cho Kernel của mình. Lệnh nhắn Supervisor hoặc chủ sở hữu bị từ chối; báo cáo, câu hỏi và nguyên nhân bị chặn đều đi qua starci kernel report."
+  causes_vi:
+    - "Op chạy starci supervisor tell hoặc channel"
+  nextStep_vi: "Op nộp báo cáo blocked hoặc ask bằng starci kernel report; Kernel trả lời hoặc nâng lên."
+  owner: op-retry
+  kind: blocker
 DOCKER_PORT_POLICY:
   title: "Docker ownership or published-port policy was refused"
   title_vi: "Chính sách sở hữu Docker hoặc cổng công bố đã từ chối thao tác"
@@ -16561,3 +16590,13 @@ RT_SONAR_BASELINE_STALE:
   nextStep_vi: "Người sửa chạy starci runtime check --only sonar-rules -- --prune để xóa các mục đã hết phát hiện, rồi đưa thay đổi allowlist vào cùng commit."
   owner: supervisor
   kind: check-finding
+RUNTIME_CHANGE_OWNED_BY_DEBUG:
+  title: "The Supervisor tried to change the runtime"
+  title_vi: "Supervisor cố thay đổi runtime"
+  meaning_vi: "Thay đổi .claude (hợp đồng, prompt, chính sách, cổng kiểm, mã runtime) thuộc về Debug và các lane sửa do Debug mở trong giai đoạn ổn định, rồi thuộc về luồng phát hành của chủ sở hữu. Supervisor không chạy fix worker, không land lên kho runtime, không sửa tệp trong bản checkout runtime."
+  causes_vi:
+    - "Supervisor chạy starci supervisor land, lesson-actions hoặc workers create/stage/spawn"
+    - "Supervisor ghi một tệp trong bản checkout runtime"
+  nextStep_vi: "Supervisor ghi lỗi runtime bằng starci supervisor actions record --item runtime-defect:<nguyên nhân> kèm bằng chứng, cho Kernel một cách đi vòng; Debug sửa."
+  owner: supervisor
+  kind: blocker

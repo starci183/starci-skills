@@ -21,4 +21,5 @@ examples:
   - starci supervisor land --status
   - starci supervisor land --job <job-id>
   - starci supervisor land --commit <sha> --specs touching --lane <name>
+roles: [coordinator, owner, release]
 editions: [full]

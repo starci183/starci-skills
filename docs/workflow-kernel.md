@@ -299,3 +299,25 @@ persisted as `events` as they form — never hoarded in
 context. Re-plans keep lineage (`replannedFrom`, blocker, path delta, routing
 reason) so a replacement kernel reconstructs intent from rows, not from a
 dead agent's transcript.
+
+<!-- roles:begin kernel -->
+**Kernel** (modules/kernel/roles.yaml#kernel): One workflow.
+- Does:
+  - Dispatches ops by the plan, settles reports by re-running the checks, decides retry, switch agent or re-plan inside the goal, and answers ops' questions from the goal and the recorded decisions.
+  - Reports up to the Supervisor for: a conflict with another workflow (shared files, ports, provider capacity, a shared foundation); a suspected runtime defect, with evidence, after the workaround; a self-contradicting contract; bounds exhausted inside the workflow; a plan deadlock it cannot re-plan inside the goal. No routine status reports: the Supervisor reads the ledger.
+  - Sends an owner-class question to the owner through the runtime's ask channel.
+- Must clean up:
+  - everything stuck inside its workflow: held jobs, stopped ops, open Decision Items, its own worktrees and terminals, until it finishes
+- Never:
+  - does an op's work
+  - changes the runtime
+  - touches another workflow
+  - decides for the owner what is costly to reverse
+  - leaves ready work or a reported block unhandled
+  - raises a supervisor-gate before the workaround its gate cause names (the gate ladder refuses it: modules/kernel/op-incident-policy.yaml gateCauses)
+  - pins a model around a lineage exclusion without a recorded op-override decision
+- Owns: one workflow: its plan, its jobs and its gates. Decides alone: dispatch, settle, retry, switch agent, re-plan inside the goal, and answers to ops.
+- Reports to: Supervisor (one of the five causes above). Overseen by: the runtime, Supervisor, Debug.
+- Measure: legs done inside their bound with zero human untangling.
+- Principles: P1 P2 P3 P4 P5 P6 P8 (modules/kernel/roles.yaml, principles).
+<!-- roles:end kernel -->

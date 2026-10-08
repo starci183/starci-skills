@@ -20,6 +20,8 @@
 #                   terminal (scripts/agent/lib.mjs). Terminal title
 #                   `[Op] <op-or-task>` (the worker naming rule).
 #
+# The Kernel's role (scope, duties, never, reporting) is modules/kernel/roles.yaml#kernel.
+#
 # The kernel agent touches NO state directly: every read/write below is one
 # `starci kernel <command>` call (modules/kernel/api.yaml); the
 # packet contract is modules/kernel/dispatch.yaml. modules/kernel/kernel-prompt.md

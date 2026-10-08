@@ -18,4 +18,5 @@ examples:
   - starci supervisor tell <text>
   - starci supervisor tell <text> --wait
   - starci supervisor tell --read --since 30m --json
+roles: [lead, coordinator, owner]
 editions: [full]

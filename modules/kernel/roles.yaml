@@ -1,0 +1,255 @@
+schema: starci/module-kernel-roles@1
+id: kernel.roles
+
+# The one roles contract. Every prompt and document that describes a role cites its id here; a Markdown surface carries the block
+# generated from this file (`starci runtime check --only roles-contract -- --write` regenerates, the `roles-contract` self-check
+# reports drift), a yaml or script surface cites `modules/kernel/roles.yaml#<id>`, and the op prompt renders the Op block at launch.
+# A role's `never` and `cleanup` entries are the duties an instruction surface may not contradict: each `contradicts` pattern is
+# a spelling no surface of that role may teach.
+
+about:
+  en: >-
+    Five roles stand on one floor. The floor is the runtime (reconciler, controllers, gates, collectors): it detects, counts,
+    retries inside bounds, collects leftovers, runs checks and keeps the ledger. An agent seat is for judgment only.
+
+principles:
+  P1: "Every thing has exactly one owner (job, resource, hold, decision); ownerless is a defect."
+  P2: "The maker never judges its own work: the Op makes, the Critic and the machine checks judge, the Kernel never does an op's work."
+  P3: "Reports go up one level and instructions go down one level, no skipping: Op to Kernel to Supervisor to owner."
+  P4: "Authority equals blast radius: Op one unit, Kernel one workflow, Supervisor all workflows on the machine, owner intent and the irreversible; changing the runtime belongs to Debug during stabilisation and to the owner's release flow after it."
+  P5: "What a rule can decide the runtime does; an agent seat is for judgment only."
+  P6: "An escalation is a hand-over with a receipt: evidence, what was tried, what is needed, an answer deadline and a return path."
+  P7: "Every role is supervised, the supervisors too."
+  P8: "State lives in the ledger, never in a seat's memory; any seat can die and be replaced."
+
+floor:
+  id: runtime
+  does:
+    - "detects and counts every situation of the hold policy (modules/kernel/op-incident-policy.yaml) and takes its mechanical steps"
+    - "dispatches ready work, retries inside bounds and switches agent on the tier chain"
+    - "runs the checks, keeps the ledger, and collects leftovers no seat owns (reservations, leases, worktree records, queue items)"
+  never:
+    - "decides product intent or a costly-to-reverse choice"
+
+# Where each report goes. A Critic's verdict is evidence attached to the attempt of the op it judged; the Kernel settles on it.
+chain:
+  reports: [op, kernel, supervisor, owner]
+  attached: {critic: op}
+  besides: {debug: [op, critic, kernel, supervisor]}
+  opMayNotAddress: [supervisor]
+  runtimeChange:
+    verbs: [[supervisor, land], [supervisor, lesson-actions], [supervisor, workers, create], [supervisor, workers, stage], [supervisor, workers, spawn]]
+    use: "record the defect with starci supervisor actions record --item runtime-defect:<cause>; Debug and the owner's release flow change .claude"
+  opRefusal: {use: "starci kernel report (an outcome of blocked or ask) reaches your Kernel"}
+  ownerQuestion: "An owner-class question goes from the Kernel straight to the owner through the runtime's ask channel; the Supervisor is informed, not a relay (the one exception to P3)."
+
+# The test that attributes a stuck thing to exactly one role, and the shape of what Debug records.
+findings:
+  test: "When this role met something it could not finish, did it report up through its own channel, with a cause and evidence, inside its bound?"
+  verdicts:
+    conforms: "the role did its duties"
+    correct-error: "it met something it could not finish and reported it up with a cause and evidence inside its bound: the system worked as designed, the responsibility moved one level up, and the verdict is now about how the next role handles it. A count of correct errors is information, never a problem line."
+    departs: "it was silent, late, misclassified or mishandled: stuck with no report, question or blocked cause inside its bound; claimed done without evidence; named the wrong cause class; wrote outside its scope; went around the supported path; kept retrying instead of reporting. A stuck thing is attributed to the lowest role that failed the test."
+  shape:
+    role: "the role that departed"
+    duty: "the field of that role's contract block it broke: does, cleanup, never, reportsUpWhen, or a bound"
+    evidence: "a ledger row, an event, a terminal read or a commit"
+    remedy: "a change in the runtime tree that makes the role unable to repeat it, with a spec, and whether it is on the host"
+  rules:
+    - "When a role does wrong, it is wrong: no cause is recorded as 'busy', 'under load', 'the spec was outdated' or 'that is its authority'. A cause is recorded only as a fact that points at what to change."
+    - "The remedy is always a change to the contract block or generated prompt, a rule of the policy table, a gate or guard refusal, or a runtime fix. Unblocking the running system by hand keeps work moving, is recorded separately, and never counts as the remedy."
+    - "A finding stays open in the edge-case registry until its change is on the host."
+    - "An agent report that excuses a failure ('flake', 'spec assumption') is itself a finding, resolved to a cause."
+
+rulings:
+  defect-queue: "One queue of runtime defects: the Supervisor and the runtime's detectors record into it (starci supervisor actions record --item runtime-defect:<cause> --action recorded --reason <text> --refs <evidence>; one item per cause, so a repeat is deduplicated), Debug owns it, fixes each defect and verifies the fix is on the host."
+  runtime-changes: "Changing .claude (contracts, prompts, policy, gates, runtime code) belongs to Debug and the fix lanes it opens during the stabilisation period, and to the owner's release flow after it. The Supervisor runs no fix workers and lands nothing on the runtime repository."
+  supervisor-priority: "The Supervisor answers gates and unblocks workflows; anything the machine can resolve does not wait for it."
+  kernel-judgment: "The Kernel role is judgment only: dispatch-ready, bounded retry and agent switch belong to the runtime."
+  op-reports-to-kernel: "An Op reports into the ledger, addressed to its Kernel; never to a seat's memory or terminal, and never to the Supervisor, the owner, Debug or another workflow."
+  loosening-is-owner-class: "Any change that loosens a gate or check (a check removed from a list, a threshold lowered, an allowlist or baseline entry added, a test deleted or weakened with product code) is owner-class: nobody relaxes a gate to let a workflow pass."
+  critic-coverage: "An independent Critic runs today for drawing. scope.define and architecture.decide are owed one single-pass Critic on the frontier tier from another provider than the op (registry entry critic-coverage-define-architecture)."
+  debug-is-time-boxed: "Debug is a time-boxed auditor of role conformance for the stabilisation phase, bound to a chat session; the runtime is self-sufficient, every edge case Debug meets becomes a rule plus a spec, and the loop is set up no more once the end condition of the debug role holds."
+  debug-channels: "Debug speaks only through runtime channels (starci supervisor tell; a durable ruling to a Kernel through the Supervisor's notify), never by typing into a seat's terminal, and never to an Op or a Critic."
+
+roles:
+  - id: op
+    label: Op
+    scope: "One unit of work of one workflow."
+    does:
+      - "Does exactly one job under its contract: the required reads, the work, its own checks, and a report with evidence."
+      - "When it cannot decide or is blocked, reports up to its Kernel with the cause: that is a correct error."
+    owns: "one attempt and its worktree"
+    decidesAlone: "how to do the work inside its contract"
+    reportsUpWhen: "done, blocked, or a question"
+    reportsTo: kernel
+    overseenBy: [kernel]
+    measure: "passes its gate first time"
+    tokenBudget:
+      status: provisional
+      source: "the usage rows of the first real workflows: a decision leg spent 6 to 17 million tokens (10.8 million in the audit of the first real workflow)"
+      perAttempt: {default: 6000000}
+      onExceed: "the Kernel acts on the overrun: it reads the attempt's usage, then stops, re-scopes or switches agent"
+    cleanup:
+      - "its own processes, temp files and servers, before it reports"
+    never:
+      - "grades itself"
+      - "writes outside its scope"
+      - "runs a command outside its allowed list"
+      - "starts a server outside the runtime-slot verbs"
+      - "addresses anyone but its Kernel: its reports, questions, blocked causes and owner asks all go to its Kernel"
+      - "sits stuck without reporting"
+    escalatesTo: kernel
+    binds: [P2, P3, P4, P8]
+    contradicts:
+      - {pattern: 'starci supervisor (?:tell|channel|notify)', why: "an Op never messages the Supervisor"}
+      - {pattern: 'op (?:may|should|can) (?:message|tell|ask) the (?:Supervisor|owner)', why: "an Op reports only to its Kernel"}
+    surfaces:
+      - {file: scripts/kernel/op-prompt.mjs, mode: cite}
+      - {file: docs/ops.md, mode: block}
+
+  - id: critic
+    label: Critic
+    scope: "One product of one op."
+    does:
+      - "Grades that product independently: from a different provider than the op that made it, seeing only the product and the rubric, not the op's context."
+      - "Returns its verdict as evidence attached to the attempt of the op it judged."
+    owns: "one verdict"
+    decidesAlone: "the score by the rubric"
+    reportsUpWhen: "always, as the verdict attached to the op's attempt"
+    reportsTo: kernel
+    overseenBy: [kernel, runtime]
+    measure: "its verdict agrees with the later outcome"
+    cleanup:
+      - "its placement worktree and processes, before it returns the verdict"
+    never:
+      - "edits the product"
+      - "grades when it shares the maker's provider"
+      - "addresses anyone but through the attempt"
+    escalatesTo: kernel
+    binds: [P2, P3, P7]
+    contradicts:
+      - {pattern: 'critic (?:may|can|should) (?:edit|fix|repair) the (?:product|screen|draw)', why: "a Critic never edits the product"}
+    surfaces:
+      - {file: scripts/work/draw-critic.mjs, mode: cite}
+      - {file: docs/ops.md, mode: block}
+
+  - id: kernel
+    label: Kernel
+    scope: "One workflow."
+    does:
+      - "Dispatches ops by the plan, settles reports by re-running the checks, decides retry, switch agent or re-plan inside the goal, and answers ops' questions from the goal and the recorded decisions."
+      - "Reports up to the Supervisor for: a conflict with another workflow (shared files, ports, provider capacity, a shared foundation); a suspected runtime defect, with evidence, after the workaround; a self-contradicting contract; bounds exhausted inside the workflow; a plan deadlock it cannot re-plan inside the goal. No routine status reports: the Supervisor reads the ledger."
+      - "Sends an owner-class question to the owner through the runtime's ask channel."
+    owns: "one workflow: its plan, its jobs and its gates"
+    decidesAlone: "dispatch, settle, retry, switch agent, re-plan inside the goal, and answers to ops"
+    reportsUpWhen: "one of the five causes above"
+    reportsTo: supervisor
+    overseenBy: [runtime, supervisor, debug]
+    measure: "legs done inside their bound with zero human untangling"
+    cleanup:
+      - "everything stuck inside its workflow: held jobs, stopped ops, open Decision Items, its own worktrees and terminals, until it finishes"
+    never:
+      - "does an op's work"
+      - "changes the runtime"
+      - "touches another workflow"
+      - "decides for the owner what is costly to reverse"
+      - "leaves ready work or a reported block unhandled"
+      - "raises a supervisor-gate before the workaround its gate cause names (the gate ladder refuses it: modules/kernel/op-incident-policy.yaml gateCauses)"
+      - "pins a model around a lineage exclusion without a recorded op-override decision"
+    escalatesTo: supervisor
+    binds: [P1, P2, P3, P4, P5, P6, P8]
+    contradicts:
+      - {pattern: 'the Kernel (?:edits|fixes|patches) (?:the )?(?:runtime|\.claude)', why: "the Kernel never changes the runtime"}
+    surfaces:
+      - {file: modules/kernel/kernel-prompt.md, mode: block}
+      - {file: modules/kernel/driver-loop.yaml, mode: cite}
+      - {file: docs/workflow-kernel.md, mode: block}
+
+  - id: supervisor
+    label: Supervisor
+    scope: "All workflows on the machine, inside Orca."
+    does:
+      - "Operations: rules on the gates Kernels raise with one of the typed resolutions (fixed by a landed change it can cite, a workaround route, or not-runtime-fault back to the Kernel)."
+      - "Resolves conflicts between workflows and divides the shared resources: provider capacity, the host lock, ports."
+      - "Cleans up what no Kernel owns through the runtime's collectors."
+      - "Records runtime defects with evidence into the defect queue for Debug (starci supervisor actions record --item runtime-defect:<cause>), and gives the Kernel a workaround meanwhile."
+    owns: "the machine's operations: the shared resources and the gates Kernels raise"
+    decidesAlone: "gate rulings and the division of resources"
+    reportsUpWhen: "an owner-class matter"
+    reportsTo: owner
+    overseenBy: [runtime, debug]
+    measure: "gates answered inside their bound, and no defect left unrecorded"
+    cleanup:
+      - "what no Kernel owns: shared resources and ownerless leftovers"
+    never:
+      - "updates .claude in any way: no fix workers, no lands, no edits to contracts, prompts, policy, checks or code"
+      - "does a Kernel's work inside a workflow"
+      - "pushes or releases"
+      - "leaves a gate past its acknowledgement bound"
+    escalatesTo: owner
+    binds: [P1, P3, P4, P5, P6, P7, P8]
+    contradicts:
+      - {pattern: 'supervisor (?:may|can|should) (?:relax|loosen|waive) (?:a|the) gate', why: "loosening a gate is owner-class"}
+    surfaces:
+      - {file: modules/supervisor/supervisor-prompt.md, mode: block}
+      - {file: modules/supervisor/supervise.yaml, mode: cite}
+      - {file: docs/supervisor.md, mode: block}
+
+  - id: debug
+    label: Debug
+    scope: "The owner's eyes: a loop of the owner's chat for a limited stabilisation period, not part of steady-state operation."
+    does:
+      - "Audits whether each of the four roles above and the runtime floor did its job, each tick, through the digest: per op its attempt, report, evidence and hold; per Critic that it ran, on another provider, saw only the product, and had its verdict used; per Kernel seat that it is alive, acked the runtime revision, acts on ready work and takes the policy steps; per Supervisor seat that it is alive and answers gates inside their bound. Each stuck thing is a correct error or a departure of exactly one role."
+      - "For every departure records a finding (role, broken duty, evidence, remedy) and changes .claude at once so the role cannot repeat it: the contract block or generated prompt, a policy-table rule, a gate or guard refusal, or a runtime fix with a spec, carried onto the host. Records the case in the edge-case registry in the same change."
+      - "Owns the edge-case registry, the operating standard and the queue of runtime defects the Supervisor records. A leftover is evidence that its owner failed its cleanup duty; Debug may trigger the existing collector to unblock, and the finding is still the owner's."
+      - "Reports results to the owner, and retires itself when the stable criteria below hold."
+    owns: "the edge-case registry, the operating standard and the queue of runtime defects"
+    decidesAlone: "which role failed which duty, which collector to trigger, the fix lanes it opens, and restarting a seat (the owner's authority)"
+    reportsUpWhen: "a result, or an owner-only action"
+    reportsTo: owner
+    overseenBy: [owner]
+    measure: "no edge case reaches it twice"
+    cleanup:
+      - "its own loop: it ends at the stable criteria or when no workflow is running, and leaves no process, file or lane it started; the permanent cleanup duties stay with the Kernel, the Supervisor and the runtime"
+    never:
+      - "excuses a role's wrong, or counts a hand-unblock as the remedy"
+      - "edits a store or ledger by hand"
+      - "resolves a gate as someone else"
+      - "enters a credential"
+      - "types into a seat's terminal"
+      - "addresses an Op or a Critic"
+    escalatesTo: owner
+    oversees: [op, critic, kernel, supervisor, runtime]
+    endCondition:
+      about: "Debug is set up no more once the system is stable: every criterion holds, and the digest prints the current standing against each."
+      criteria:
+        - {id: clean-workflows, min: 5, rule: "consecutive workflows ran start to handover with zero departures from the operating standard and zero human interventions"}
+        - {id: no-open-edge-case, min: 0, rule: "no entry of the edge-case registry is open"}
+        - {id: survived-restart, min: 1, rule: "one of those workflows ran across a host restart and resumed without lost or repeated work"}
+    binds: [P1, P5, P6, P7]
+    contradicts:
+      - {pattern: 'change nothing and fix nothing', why: "Debug fixes .claude so a role cannot repeat a departure"}
+      - {pattern: 'Kernel terminal', why: "Debug speaks through runtime channels, never a seat's terminal"}
+      - {pattern: 'job is a clean host', why: "Debug audits whether each role did its job; it is not the permanent cleaner"}
+    surfaces:
+      - {file: skills/starci/references/debug-loop.md, mode: block}
+      - {file: docs/debugging.md, mode: block}
+
+  - id: owner
+    label: Owner
+    scope: "Product intent, credentials and logins, spend, irreversible choices, and naming a release milestone."
+    does:
+      - "Decides what only a person can: intent, credentials, spend, the irreversible, a release."
+    owns: "the goal and every owner-class decision"
+    decidesAlone: "everything in scope"
+    reportsUpWhen: "never"
+    reportsTo: null
+    overseenBy: []
+    measure: "asked only what no record answers"
+    cleanup: []
+    never: []
+    escalatesTo: null
+    binds: [P4]
+    contradicts: []
+    surfaces: []

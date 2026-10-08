@@ -18,6 +18,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { guardsRoot } from './guards-root.mjs';
 import { pathKey, sameOrUnder } from '../lib/path-key.mjs';
+import { RUNTIME_CHANGE_CODE, runtimeWriteRefusal } from '../machine/runtime-change.mjs';
 
 const ENV_ROLES = new Set(['op', 'supervisor', 'lead', 'coordinator', 'release']);
 const safeName = (s) => String(s).replace(/[^A-Za-z0-9._-]/g, '_');
@@ -219,7 +220,8 @@ export function fileWriteVerdict({ role, filePath, tool = 'Edit', edit = null, g
     const verdict = catalogWriteVerdict({ zone, shell, tool, edit });
     if (verdict) return verdict;
   }
-  return null;
+  const change = runtimeWriteRefusal();
+  return refusal(RUNTIME_CHANGE_CODE, zone.rel, change.reason, change.remedy);
 }
 
 /** The protected-zone refusal for a catalog write, or null when no protected entry is named. */

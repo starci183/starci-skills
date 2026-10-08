@@ -150,8 +150,8 @@ test('a supervisor is refused every zone and only protected catalog edits', asyn
     assert.equal((await fileRightsVerdict({ role: 'supervisor', filePath }))?.code, 'RIGHTS_PROTECTED_ZONE', rel);
   }
   const ordinary = fullPath(runtime, 'scripts/lib/other.mjs');
-  assert.equal(fileWriteVerdict({ role: 'supervisor', filePath: ordinary, zone: zoneFor(ordinary) }), null);
-  assert.equal(await fileRightsVerdict({ role: 'supervisor', filePath: ordinary }), null);
+  assert.equal(fileWriteVerdict({ role: 'supervisor', filePath: ordinary, zone: zoneFor(ordinary) })?.code, 'RUNTIME_CHANGE_OWNED_BY_DEBUG');
+  assert.equal((await fileRightsVerdict({ role: 'supervisor', filePath: ordinary }))?.code, 'RUNTIME_CHANGE_OWNED_BY_DEBUG');
 
   for (const entry of DECLARATION.catalog) {
     const filePath = fullPath(runtime, entry.file);
@@ -167,7 +167,7 @@ test('a supervisor is refused every zone and only protected catalog edits', asyn
 
   const rules = fullPath(runtime, 'knowledge/hfs/rules.yaml');
   for (const text of ['R22', 'R2240', 'R2250', 'XR224', 'R999', 'OTHER_FAILURE']) {
-    assert.equal(fileWriteVerdict({ role: 'supervisor', filePath: rules, tool: 'Edit', edit: { old: text, new: 'ordinary' }, zone: zoneFor(rules) }), null, text);
+    assert.equal(fileWriteVerdict({ role: 'supervisor', filePath: rules, tool: 'Edit', edit: { old: text, new: 'ordinary' }, zone: zoneFor(rules) })?.code, 'RUNTIME_CHANGE_OWNED_BY_DEBUG', text);
   }
   assert.equal(fileWriteVerdict({ role: 'supervisor', filePath: rules, tool: 'MultiEdit', edit: { old: 'ordinary', new: 'first\nR225\nlast' }, zone: zoneFor(rules) })?.code,
     'RIGHTS_PROTECTED_ZONE', 'joined MultiEdit text names a protected rule');
@@ -218,7 +218,7 @@ const WRITERS = [
   ['PowerShell', 'Out-File', (file) => `Out-File -FilePath ${quote(file)} -InputObject x`],
 ];
 
-test('shell writers are refused on a supervisor zone and pass on an ordinary runtime path', async (t) => {
+test('shell writers are refused on a supervisor zone and are refused on an ordinary runtime path as a runtime change', async (t) => {
   const runtime = runtimeCheckout(t, 'rights-shell-supervisor-');
   const zonePath = fullPath(runtime, 'scripts/guards/rights.mjs');
   const ordinary = fullPath(runtime, 'scripts/lib/ordinary.mjs');
@@ -227,7 +227,7 @@ test('shell writers are refused on a supervisor zone and pass on an ordinary run
   for (const [tool, label, command] of WRITERS) {
     const refused = await hookDecision(shellCall(tool, command(zonePath), runtime), { env: envFor(handle) });
     assert.equal(refused?.verdict.code, 'RIGHTS_PROTECTED_ZONE', `${label}: zone`);
-    assert.equal(await hookDecision(shellCall(tool, command(ordinary), runtime), { env: envFor(handle) }), null, `${label}: ordinary`);
+    assert.equal((await hookDecision(shellCall(tool, command(ordinary), runtime), { env: envFor(handle) }))?.verdict.code, 'RUNTIME_CHANGE_OWNED_BY_DEBUG', `${label}: ordinary`);
   }
 });
 
@@ -264,7 +264,6 @@ test('reading zone paths and ordinary supervisor commands have no false positive
     'node --check scripts/x.mjs',
     'npx tsc --noEmit',
     `rg zone ${quote(ordinary)}`,
-    `cp ${quote(ordinary)} ${quote(fullPath(runtime, 'scripts/lib/copy.mjs'))}`,
   ];
   for (const command of commands) {
     assert.equal(await hookDecision(shellCall('Bash', command, runtime), { env: envFor(handle) }), null, command);

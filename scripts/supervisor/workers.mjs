@@ -73,11 +73,11 @@ export function git([verb, ...args], { cwd = SKILL_ROOT, input = undefined, env 
 
 /** The adaptive worker cap: {cap, base, max, queued, running, load, reason}. Pure given `load`. */
 export function adaptiveCap({ base = 4, max = 10, queued = 0, running = 0, load = null } = {}) {
-  const hardMax = Math.min(10, Math.max(1, max));
-  let cap = Math.min(hardMax, Math.max(1, base) + Math.ceil(Math.max(0, queued) / 2));
+  const hardMax = Math.min(10, Math.max(0, max));
+  let cap = hardMax === 0 ? 0 : Math.min(hardMax, Math.max(1, base) + Math.ceil(Math.max(0, queued) / 2));
   let reason = queued > 0 ? `base ${base} + ${Math.ceil(queued / 2)} for ${queued} queued` : `base ${base}`;
-  if (load && (load.cpuBusy >= 0.95 || load.freeMem < 0.06)) { cap = 1; reason += '; machine saturated -> 1'; }
-  else if (load && (load.cpuBusy >= 0.85 || load.freeMem < 0.12)) { cap = Math.max(1, Math.floor(cap / 2)); reason += '; machine loaded -> halved'; }
+  if (load && (load.cpuBusy >= 0.95 || load.freeMem < 0.06)) { cap = Math.min(1, cap); reason += '; machine saturated -> 1'; }
+  else if (load && (load.cpuBusy >= 0.85 || load.freeMem < 0.12)) { cap = Math.min(cap, Math.max(1, Math.floor(cap / 2))); reason += '; machine loaded -> halved'; }
   return { cap, base, max: hardMax, queued, running, load, reason, free: Math.max(0, cap - running) };
 }
 
