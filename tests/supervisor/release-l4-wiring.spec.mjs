@@ -11,6 +11,7 @@ import { parityOutcome, parityPlan, parityScript, readWorkflows, runParity } fro
 import { sonarSupplier } from '../../scripts/supervisor/release-l4-sonar.mjs';
 import { sonarUp } from '../../scripts/gates/sonar-status.mjs';
 import { exampleApps, passesOf, planL4, runL4, runtimeSpecStep, scriptsOf, sectionOf, skipReport, specEnv, specFilesFor } from '../../scripts/supervisor/release-l4.mjs';
+import { testWorldDistProblem } from '../helpers/test-world-dist.mjs';
 import { cutRelease } from '../../scripts/supervisor/release-cut.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -483,4 +484,26 @@ test('sonarUp: only a 200 with status UP is up; any other state, status or a fai
   assert.equal(await sonarUp(cfg(answer(200, { status: 'STARTING' }))), false);
   assert.equal(await sonarUp(cfg(answer(503, { status: 'UP' }))), false);
   assert.equal(await sonarUp(cfg(async () => { throw new Error('ECONNREFUSED'); })), false);
+});
+
+test('L4: a test-world package in the checkout is built after the installs and before the runtime suite; a stale or absent build is named by the helper', (t) => {
+  const base = tmp(t, 'testworld');
+  fs.writeFileSync(path.join(base, 'package.json'), JSON.stringify({ name: 'rt', scripts: { test: NODE_TEST, check: 'x' } }));
+  assert.equal(planL4(base, { runtimeRoot: base }).steps.some((s) => s.name === 'test-world: npm run build'), false, 'no package, no build step');
+  const producer = path.join(base, 'packages', 'test-world');
+  fs.mkdirSync(path.join(producer, 'src'), { recursive: true });
+  fs.writeFileSync(path.join(producer, 'package.json'), JSON.stringify({ name: '@starci/test-world', types: 'dist/index.d.ts' }));
+  fs.writeFileSync(path.join(producer, 'tsconfig.json'), '{}');
+  fs.writeFileSync(path.join(producer, 'src', 'index.ts'), 'export {};\n');
+  const names = planL4(base, { runtimeRoot: base }).steps.map((s) => s.name);
+  assert.ok(names.indexOf('test-world: npm run build') >= 0 && names.indexOf('test-world: npm run build') < names.indexOf('npm test'), 'built before the suite that borrows it');
+  assert.match(testWorldDistProblem(producer), /build is absent/);
+  fs.mkdirSync(path.join(producer, 'dist'));
+  const built = path.join(producer, 'dist', 'index.d.ts');
+  fs.writeFileSync(built, 'export {};\n');
+  const old = new Date(Date.now() - 60_000);
+  fs.utimesSync(built, old, old);
+  assert.match(testWorldDistProblem(producer), /older than its source/);
+  fs.utimesSync(built, new Date(), new Date());
+  assert.equal(testWorldDistProblem(producer), null);
 });

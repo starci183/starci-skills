@@ -12,6 +12,7 @@ import { byCodeUnit } from '../../scripts/lib/list.mjs';
 import { runNode } from '../../scripts/api/node/run-node.mjs';
 import { runGit } from '../../scripts/api/git/lib.mjs';
 import { installInto, uninstall, runtimeInstalls, missingFrom, LINT_DEPENDENCIES, STARCI_PACKAGES } from '../helpers/hfs-app-install.mjs';
+import { testWorldDistProblem } from '../helpers/test-world-dist.mjs';
 
 const runtime = path.resolve(import.meta.dirname, '../..');
 const stableIds = ['api', 'cli', 'connected-block', 'domain', 'event-bus', 'fenced-job', 'injector', 'named-exception', 'projection', 'queue', 'realtime', 'saga', 'service-spec', 'webhooks'];
@@ -208,7 +209,7 @@ function installedApp(t, name, projects) {
     const pin = parseYaml(fs.readFileSync(path.join(runtime, 'knowledge/hfs/canon-pins.yaml'), 'utf8')).pins[testWorldName];
     assert.equal(pkg.name, testWorldName);
     assert.equal(pkg.version, pin.version, 'the private current test-world producer must have the canonical version');
-    assert.equal(fs.lstatSync(path.join(producer, pkg.types)).isFile(), true, 'the current test-world owner build is required');
+    assert.equal(testWorldDistProblem(producer), null, 'the current test-world owner build is required');
     for (const field of testWorldFields) manifest[field][testWorldName] = pkg.version;
     write(app, 'package.json', JSON.stringify(manifest, null, 2)+'\n');
     // The current package's genuine build supplies both JS and declarations; borrowed published installs may predate its API.

@@ -4,7 +4,7 @@
 //   checks  the full runtime check, the app format check, and the Sonar and coverage proof of every example (a proof seam)
 //   tsc     every project: each example's typecheck and test typecheck, and the builds
 //   images  every image of every example builds (`docker:build`)
-//   deps    before any step: a real `npm ci` in every example app (never a link into another checkout: a node_modules link is removed as a link first)
+//   deps    before any step: a real `npm ci` in every example app (never a link into another checkout: a node_modules link is removed as a link first), then the build of packages/test-world (untracked output the spec run borrows: a stale one types the example apps against an old API)
 //   linux   the CI-equivalent light jobs in a Linux container (scripts/supervisor/release-linux-parity.mjs): derived from .github/workflows, never the spec suites
 // The Sonar proof is wired to the existing gate (scripts/supervisor/release-l4-sonar.mjs); the whole row runs inside the host lock of cutRelease.
 // Every step logs to a file the result records. A step the repository does not define, or a proof nothing supplies, is `absent` and FAILS L4: nothing is skipped by silence.
@@ -176,7 +176,9 @@ export function planL4(repo, { runtimeRoot } = {}) {
     return fs.existsSync(path.join(app.dir, 'package-lock.json')) ? { name, cmd: 'npm', args: ['ci', '--no-audit', '--no-fund'], cwd: app.dir, install: true } : { name, absent: true, cwd: app.dir };
   });
   const env = specEnv(apps);
-  const steps = [...installs, ...planFor(repo, runtimeRoot ? { runtimeRoot } : {}).steps.map((s) => ({ ...s, cwd: repo, ...(s.name === 'npm test' && !s.absent ? { env, evidence: true } : {}) }))];
+  const testWorld = path.join(repo, 'packages', 'test-world');
+  const builds = fs.existsSync(path.join(testWorld, 'package.json')) ? [{ name: 'test-world: npm run build', cmd: 'npm', args: ['run', 'build'], cwd: testWorld }] : [];
+  const steps = [...installs, ...builds, ...planFor(repo, runtimeRoot ? { runtimeRoot } : {}).steps.map((s) => ({ ...s, cwd: repo, ...(s.name === 'npm test' && !s.absent ? { env, evidence: true } : {}) }))];
   for (const app of apps) {
     let scripts = {};
     try { scripts = JSON.parse(fs.readFileSync(path.join(app.dir, 'package.json'), 'utf8')).scripts ?? {}; } catch { scripts = {}; }
