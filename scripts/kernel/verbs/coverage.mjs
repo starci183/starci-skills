@@ -11,6 +11,7 @@ import { HANDOVER_OP, handoverApprovalOf, handoverGateOf } from '../handover.mjs
 
 export default {
   verb: 'coverage',
+  reads: true,
   required: ['workflow'],
   usageInCore: true,
   usage: '  coverage --workflow <id>   every FR, shape and proof case of the workflow\'s scope with its evidence: proven|stale|missing',

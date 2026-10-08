@@ -226,6 +226,6 @@ function drainRun(ledger, { workflowId, runId, terminal, kernelRunId, rebind, ch
  */
 export function drainForVerb(ledger, { args, internals, by }) {
   const { db, workflowId } = verbWorkflow(ledger, args);
-  const drained = drainWorkflowMessages(ledger, workflowId, { rebind: (runId) => internals.bindRunToKernel({ db, ledger, workflowId, runId, by }) });
+  const drained = ledger.readOnly ? { ok: true, error: null, runs: [], questions: 0, closed: 0, deliveries: 0, messages: 0, heartbeats: 0 } : drainWorkflowMessages(ledger, workflowId, { rebind: (runId) => internals.bindRunToKernel({ db, ledger, workflowId, runId, by }) });
   return { db, workflowId, drained };
 }

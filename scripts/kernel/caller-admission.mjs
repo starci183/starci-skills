@@ -111,8 +111,8 @@ export function requireAdmittedKernelRead(db, workflowId, op, { root = revRootOf
  * The ledger a verb runs with. A read verb (`reads: true`) is opened read-only; one that also reacts (`reacts: true`) is reopened writable
  * only when its caller owns the reactions (read-only-ledger.mjs reactionOwner), so a person or Debug reading it writes nothing.
  */
-export function openVerbLedger(spec, file, { openWritable, env = process.env, resolve = callerOf, openReadOnly = readOnlyLedger }) {
-  if (spec.reads !== true) return openWritable(file);
+export function openVerbLedger(spec, file, { openWritable, env = process.env, resolve = callerOf, openReadOnly = readOnlyLedger, args = {} }) {
+  if (spec.reads !== true || (spec.writesWith ?? []).some((flag) => args[flag] != null && args[flag] !== false)) return openWritable(file);
   const reader = openReadOnly(file);
   if (spec.reacts !== true || !reactionOwner(resolve(reader.db, env, { file: reader.path }), env)) return reader;
   reader.close();

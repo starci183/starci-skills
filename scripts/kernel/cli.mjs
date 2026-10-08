@@ -389,10 +389,10 @@ const parseArgs = (argv) => {
   return a;
 };
 const need = (cond, msg) => { if (!cond) { console.error(`api: ${msg}`); usage(2); } };
-const openRepoLedger = (repo, spec = {}) => {
+const openRepoLedger = (repo, spec = {}, args = {}) => {
   const file = ledgerFileFor(repo); // throws ledger-root-is-runtime on a runtime root — deliberate
   if (!fs.existsSync(file)) throw Object.assign(new Error(`ledger-missing: ${file} — no .starciwork/runtime.sqlite at that repo`), { code: 'ledger-missing' });
-  return openVerbLedger(spec, file, { openWritable: (target) => openLedger({ file: target }) });
+  return openVerbLedger(spec, file, { openWritable: (target) => openLedger({ file: target }), args });
 };
 
 const emit = (out, human, asJson) => {
@@ -3688,7 +3688,7 @@ const runExtensionVerb = async (spec, args, repo) => {
   if (typeof spec.validate === 'function') spec.validate(args, need);
   if (spec.ledger === false) return await spec.run({ ledger: null, args, repo, emit, need, caller: null, ext: API_EXT, internals: API_INTERNALS });
   let ledger;
-  try { ledger = openRepoLedger(repo, spec); } catch (error) {
+  try { ledger = openRepoLedger(repo, spec, args); } catch (error) {
     console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error) }));
     process.exitCode = 1; return;
   }

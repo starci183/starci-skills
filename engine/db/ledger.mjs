@@ -236,7 +236,7 @@ export function openLedgerReader(file,{busyTimeoutMs=LEDGER_BUSY_TIMEOUT_MS,veri
   return db;
 }
 const rowOf=row=>row?{...row,payload:parseJson(row.payload_json)}:null;
-const readAccessors=db=>({
+export const readAccessors=db=>({
   eventsHead(workflowId){return eventsHead(db,workflowId);},
   getJob(jobId){return rowOf(db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId));},
   listJobs({status=null,kind=null,workflowId=null}={}){let sql='SELECT * FROM jobs WHERE 1=1';const args=[];if(status){sql+=' AND status=?';args.push(status);}if(kind){sql+=' AND kind=?';args.push(kind);}if(workflowId){sql+=' AND workflow_id=?';args.push(workflowId);}sql+=' ORDER BY created_at,job_id';return db.prepare(sql).all(...args).map(rowOf);},

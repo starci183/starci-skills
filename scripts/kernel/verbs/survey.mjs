@@ -11,6 +11,7 @@ import { fieldEmit } from './shared/field-view.mjs';
 
 export default {
   verb: 'survey',
+  reads: true,
   required: ['workflow'],
   usageInCore: true,
   run({ ledger, args, repo, emit: rawEmit, need, internals }) {
