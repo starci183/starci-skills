@@ -196,7 +196,11 @@ test('a land-passed event of the Supervisor ledger re-looks at every running wor
   const { ctx, rec } = fakeCtx({ repoRoot, ledgerFile, statusOf: () => staleStatus });
   let dropped = 0;
   ctx.dropStatusCache = () => { dropped += 1; };
+  const swaps = [];
+  ctx.machine = { log: (row) => swaps.push(row) };
   const result = await controller.reconcile(REV_WAKE_KEY, ctx);
+  assert.deepEqual(swaps.map((row) => [row.kind, row.data.cause, row.data.applied.map((a) => [a.action, a.count])]),
+    [['signal.runtime-change-applied', 'land', [['workflows-looked-at', 2], ['kernel-doorbells-rung', 2]]]], 'the re-look is one runtime-change-applied signal naming what it did');
   assert.equal(dropped, 1, 'the status cache is forgotten so the pass reads the new revision');
   assert.deepEqual(result.looked.sort(), [keyOf(LEDGER, WF), keyOf(LEDGER, PEER)].sort());
   const bells = rec.logs.filter((l) => l.kind === 'reconciler.would' && l.data?.action === 'doorbell' && l.data.keys.includes('rev:bbbbbbbbbbbb'));

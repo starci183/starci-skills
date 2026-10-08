@@ -943,7 +943,7 @@ function setProviderHealth(m, { provider, status, failureKind = null, strikes = 
     const at = m.now();
     upsertRow(db, 'provider_health', { provider, status, failure_kind: failureKind, strikes, strike_limit: strikeLimit, circuit_open_until: circuitOpenUntil,
       recovered_at: status === 'recovered' ? at : undefined, reason, updated_at: at, detail_json: detail }, ['provider']);
-    if (cur?.status !== status) insertRow(db, 'provider_health_events', { provider, at, from_status: cur?.status ?? null, to_status: status, failure_kind: failureKind, ledger_id: ledgerId, attempt_id: attemptId, detail_json: detail });
+    if (cur?.status !== status) insertRow(db, 'provider_health_events', { provider, at, from_status: cur?.status ?? null, to_status: status, failure_kind: failureKind, ledger_id: ledgerId, attempt_id: attemptId, detail_json: circuitOpenUntil == null ? detail : { ...detail, circuitOpenUntil } });
     return { changed: cur?.status !== status };
   });
 }

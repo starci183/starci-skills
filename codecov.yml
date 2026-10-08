@@ -53,6 +53,7 @@ flag_management:
         - "engine/canonical-json.mjs"
         - "engine/config.mjs"
         - "engine/constants.mjs"
+        - "engine/db/attempt-overrun.mjs"
         - "engine/db/authorizer.mjs"
         - "engine/db/blob.mjs"
         - "engine/db/ledger-paths.mjs"

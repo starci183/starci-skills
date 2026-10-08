@@ -9,6 +9,7 @@ import { withLedger } from '../helpers/ledger-fixture.mjs';
 import { attemptsOverBudget, budgetOverruns } from '../../scripts/kernel/attempt-budget.mjs';
 import { measureOpenAttempts } from '../../scripts/kernel/attempt-live-usage.mjs';
 import { planBudgetOverruns } from '../../scripts/reconciler/budget-plan.mjs';
+import { buildMenu } from '../../scripts/kernel/kernel-menu.mjs';
 import budgetStatus from '../../scripts/kernel/status/budget-overruns.mjs';
 
 const WF = 'wf-live-budget';
@@ -60,9 +61,28 @@ test('the live reading is listed by status and planned as the budget-overrun ite
   const planned = [];
   for (let poll = 0; poll < 3; poll += 1) planBudgetOverruns({ workflowId: WF, status: { budgetOverruns: budgetOverruns(ledger.db, WF) }, di: (di) => planned.push(di) });
   assert.equal(new Set(planned.map((di) => `${di.kind}:${di.subject}`)).size, 1, 'three polls name one item');
-  assert.equal(planned[0].subject, `attempt-${attemptId}`);
-  assert.match(planned[0].summary, /still running/);
-  assert.deepEqual(planned[0].options.map((option) => option.key), ['continue-once', 'replace', 're-scope']);
+  assert.equal(planned[0].subject, `attempt-${attemptId}-running`, 'the running reading has its own subject: the settled item opens beside it, not instead of it');
+  assert.match(planned[0].summary, /still running: it can only be let finish/);
+  assert.deepEqual(planned[0].options.map((option) => option.key), ['let-finish'], 'a retry is refused unit-in-flight while the try runs and no verb stops a live worker: only waiting is offered');
+  assert.deepEqual(planned[0].allowedVerbs, []);
+}));
+
+test('a running overrun reaches the Kernel menu as a snooze, never as an enqueue the ledger would refuse; the settled one carries the retries', (t) => world(t, ({ ledger, attemptId, sessions, measure }) => {
+  writeSession(sessions, 7_000_000);
+  measure();
+  const plan = (rows) => { const out = []; planBudgetOverruns({ workflowId: WF, status: { budgetOverruns: rows }, di: (di) => out.push({ id: `di-${di.subject}`, ...di }) }); return out; };
+  const running = plan(budgetOverruns(ledger.db, WF));
+  const menuOf = (decisions) => buildMenu({ workflow: WF, rev: null, jobDecisions: [], questions: [], peers: [], wedged: [], deadWaits: [], decisions, nextActions: [], handover: null, snoozed: new Set() });
+  const [item] = menuOf(running);
+  assert.deepEqual(item.options.map((option) => [option.choice, option.verb, option.snooze === true]), [['let-finish', null, true], ['none-fits', null, false]]);
+  assert.equal(item.options.some((option) => option.verb === 'enqueue'), false, 'no option enqueues a retry while the try is running');
+  ledger.write.recordAttemptUsage({ attemptId, rows: [{ model: 'm', inputTokens: 1, outputTokens: 1, cacheReadTokens: 9_000_000, cacheWriteTokens: 0 }] });
+  ledger.write.updateAttempt({ attemptId, settledAt: Date.now(), endState: 'settled' });
+  ledger.write.setJobStatus({ jobId: 'job-live', to: 'failed', reason: 'test settle' });
+  const settled = plan(budgetOverruns(ledger.db, WF));
+  assert.equal(settled[0].subject, `attempt-${attemptId}`, 'the settled measure is a new item');
+  assert.notEqual(settled[0].subject, running[0].subject);
+  assert.deepEqual(menuOf(settled)[0].options.map((option) => option.choice), ['continue-once', 'replace', 're-scope', 'none-fits']);
 }));
 
 test('the rows written at settle replace the live reading', (t) => world(t, ({ ledger, attemptId, sessions, measure }) => {

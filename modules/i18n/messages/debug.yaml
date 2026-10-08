@@ -47,6 +47,8 @@ messages:
     vi: "Không đọc được trạng thái của {name}: {error}"
   - en: "The {provider} reservation {id} ({state}) is live for {owner}, which is not running; held {min} min."
     vi: "Chỗ giữ {provider} {id} ({state}) còn hiệu lực cho {owner}, nhưng việc này không chạy; đã giữ {min} phút."
+  - en: "A secret survived redaction in {artifact} ({kind}): the {rule} rule still matches {count} time(s) in the stored text."
+    vi: "Một bí mật đã lọt qua bước che trong {artifact} ({kind}): luật {rule} vẫn khớp {count} lần trong văn bản đã lưu."
   - en: "StarCi debug digest at {time}"
     vi: "Bản tóm tắt gỡ lỗi StarCi lúc {time}"
   - en: "No problem found."

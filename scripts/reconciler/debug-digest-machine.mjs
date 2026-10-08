@@ -7,6 +7,9 @@ import { guardsRoot } from '../guards/guards-root.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 import { SUPERVISOR_SEAT } from '../machine/home.mjs';
 import { supervisorWakeUsageOf } from '../kernel/wake-budget.mjs';
+import { digestNumbers } from './debug-digest-numbers.mjs';
+import { SIGNAL, signalRows } from '../machine/debug-signals.mjs';
+import { machineBlobItems, mergeScans, scanBlobs, scanLogs } from './debug-secret-scan.mjs';
 import { CONTROLLER_NAMES, LEADER_NAME, configuredMode, reconcilerConfig } from './state.mjs';
 
 const KERNEL_SCOPE = /^[^:]+:([^:]+):kernel-attempt:\d+$/;
@@ -56,6 +59,22 @@ function reservationsOf(m) {
   });
 }
 
+/** The provider circuit transitions on record, oldest first: what failed (job, step, failure kind, signal class), when, and until when the circuit was to stay open. */
+function providerEventsOf(m, limit) {
+  return ask(m, 'SELECT seq, provider, at, from_status, to_status, failure_kind, detail_json FROM provider_health_events ORDER BY seq DESC LIMIT ?', [limit]).reverse().map((r) => {
+    const d = parseJsonOr(r.detail_json, {}) ?? {};
+    return { seq: Number(r.seq), provider: r.provider, at: Number(r.at), from: r.from_status, to: r.to_status, failureKind: r.failure_kind, jobId: d.jobId ?? null, step: d.step ?? null,
+      signal: typeof d.signal === 'string' ? d.signal.slice(0, 120) : null, circuitOpenUntil: Number.isFinite(Number(d.circuitOpenUntil)) ? Number(d.circuitOpenUntil) : null };
+  });
+}
+
+/** The machine-level signals (debug-signals.mjs) and the secret scan of the artifacts this store holds. */
+function signalsOf(m, n, readBlob) {
+  const blobs = scanBlobs(machineBlobItems(m, { limit: n.secretScanArtifacts }), { maxBytes: n.secretScanBytes, ...(readBlob ? { readBlob } : {}) });
+  return { runtimeChange: signalRows(m, SIGNAL.runtimeChange, { limit: n.signalRows }), hostDrift: signalRows(m, SIGNAL.hostDrift, { limit: n.signalRows }),
+    portClaim: signalRows(m, SIGNAL.portClaim, { limit: n.signalRows }), secrets: mergeScans(blobs, scanLogs(m, { limit: n.secretScanArtifacts })) };
+}
+
 const REFUSAL_TAIL_BYTES = 1024 * 1024;
 
 /** The guard refusals on record (<guards root>/refusals.jsonl, the newest megabyte): [{at, role, code, via, command}]; none when the file is absent. */
@@ -76,8 +95,9 @@ export function refusalFacts(env = process.env) {
 }
 
 /** The machine facts of one digest, or null when there is no machine store. Seam: the reader. */
-export function machineFacts({ env = process.env, read = readMachine } = {}) {
+export function machineFacts({ env = process.env, read = readMachine, numbers = digestNumbers(), readBlob = undefined } = {}) {
   return read((m) => ({
+    providerEvents: providerEventsOf(m, numbers.signalRows), ...signalsOf(m, numbers, readBlob),
     ledgers: ask(m, "SELECT ledger_id, name, repo_root, file FROM ledgers WHERE state='active' ORDER BY name"),
     engine: engineOf(m), supervisor: supervisorOf(m), reservations: reservationsOf(m),
     seats: ask(m, 'SELECT seat_id FROM seats').map((r) => r.seat_id),

@@ -16,6 +16,7 @@ const FAILED_LEG = new Set(['failed', 'blocked', 'cancelled', 'awaiting_owner'])
 const DEAD_PROBES = new Set(['restart-needed', 'agent-exit-unconfirmed', 'terminal-unverified', 'terminal-unreadable']);
 
 const minutes = (ms) => Math.max(0, Math.round(ms / MIN));
+const SECRET_PROBLEMS = 10;
 const problem = (area, blocks, key, code, params = {}, evidence = {}) => ({ area, blocks, key, code, params, evidence });
 
 /** The hold and row lookups over the policy table; `bound` resolves one named bound of an entry to a number or null. */
@@ -212,6 +213,12 @@ function workflowView(workflow, ctx) {
   return { ...view, problems: [...kernelProblems(view, ctx.n), ...stopProblems(view), ...failed].map((p) => ({ ...p, workflowId: view.id })) };
 }
 
+/** A secret that survived redaction in a stored artifact is a departure of the runtime's redaction duty: one problem per artifact and rule, never the text. */
+function secretProblems({ snapshot }) {
+  const hits = new Map((snapshot.secrets?.hits ?? []).map((h) => [`${h.artifact}|${h.rule}`, h]));
+  return [...hits.values()].slice(0, SECRET_PROBLEMS).map((h) => problem('runtime', 1, `secret-${h.artifact}-${h.rule}`, 'secret-survived', { artifact: h.artifact, rule: h.rule, kind: h.kind, count: h.count }, h));
+}
+
 /** Reservations live for a job that is not running, a Supervisor job that ended, or a seat that is gone. */
 function admissionSection({ snapshot }) {
   const running = new Map(snapshot.workflows.flatMap((w) => w.jobs.map((j) => [j.jobId, LIVE_JOB.has(j.status)])));
@@ -245,7 +252,7 @@ export function analyze(snapshot, policy, n, docs = declared()) {
   const supervisor = supervisorSection(ctx);
   const workflows = snapshot.workflows.map((w) => workflowView(w, ctx));
   const admission = admissionSection(ctx);
-  const legacy = [...reconcilerProblems(reconciler, n), ...supervisorProblems(supervisor, n), ...workflows.flatMap((w) => w.problems), ...admissionProblems(admission)];
+  const legacy = [...reconcilerProblems(reconciler, n), ...supervisorProblems(supervisor, n), ...workflows.flatMap((w) => w.problems), ...admissionProblems(admission), ...secretProblems(ctx)];
   const views = workflows.map((view, i) => ({ ...view, source: withRows(snapshot.workflows[i]) }));
   const standard = judgeStandard(docs.standard, { now: snapshot.now, n, reconciler, supervisor, admission }, views);
   const verdicts = classifyAll({ n, defs: docs.standard, standard, views, registry: snapshot.registry ?? [], problems: legacy });
