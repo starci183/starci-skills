@@ -12,6 +12,7 @@ import { slash } from '../lib/path-key.mjs';
 import { SKILL_ROOT } from './guards-root.mjs';
 import { boundGuard, boundSeat, gitListFormRead, gitSubOf, nodeWholeSuite, pushTargets, refusal as baseRefusal, rightsRoleOf } from './rights.mjs';
 import { refusalLines } from './refusals.mjs';
+import { RUNTIME_CHANGE_CODE, runtimeChangeRefusal } from '../machine/runtime-change.mjs';
 import { kernelMailboxVerdict } from './install-verdict.mjs';
 import { orcaSelfLifecycleAllowed } from './orca-self-lifecycle.mjs';
 
@@ -267,6 +268,8 @@ export function policyVerdict({ role, command, guard = null, handle = null, lock
     const use = useOf(policy.release, 'starci release cut');
     return refusal('RIGHTS_RELEASE_CUT', text, `the ${role} role does not cut or publish a release because the release cut is owner-approved and runs once per release`, use);
   }
+  const owned = role === 'supervisor' && program === 'starci' ? runtimeChangeRefusal(args.filter((value) => !value.startsWith('-'))) : null;
+  if (owned) return refusal(RUNTIME_CHANGE_CODE, text, owned.reason, owned.remedy);
   const call = callVerdict({ role, program, args, guard, policy, text });
   if (call) return call;
   if (p.runtime.has(program)) return null;

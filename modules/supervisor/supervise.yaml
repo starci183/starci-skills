@@ -2,6 +2,7 @@ schema: starci/supervisor@1
 id: supervisor
 title: Supervisor — the owner's chat (default) or the optional [Supervisor] kernel, [Worker] fix agents, one land gate
 
+# The Supervisor's role (scope, duties, never, reporting) is modules/kernel/roles.yaml#supervisor.
 purpose: |
   The supervisor is ONE seat, never a second orchestrator, and config.yaml supervisor.mode says where it runs
   (scripts/machine/home.mjs supervisorMode):
@@ -307,8 +308,9 @@ workers:
     worker seat's tier (modules/models/tiers.yaml seats.worker) through the common picker, skipping a
     provider whose quota probe is dead or whose provider-health circuit is open.
   cap: |
-    At most 10 concurrent. Adaptive: config.yaml supervisor.workers.base (default 4) plus one per two queued
-    jobs, up to supervisor.workers.max (default 10); halved while the machine is loaded (CPU >= 85% or free
+    The shipped default is no fix worker (config.yaml supervisor.workers.base and max, 0): the Supervisor changes no
+    runtime code (modules/kernel/roles.yaml rulings.runtime-changes). With a cap above 0 the cap is at most 10 concurrent,
+    adaptive: supervisor.workers.base plus one per two queued jobs, up to supervisor.workers.max; halved while the machine is loaded (CPU >= 85% or free
     memory < 12%), 1 while it is saturated (CPU >= 95% or free memory < 6%). `workers.mjs cap` prints it.
   lifecycle: |
     create (cluster, explicit file leases, incidents, specs, brief) -> spawn: an EPHEMERAL staging checkout

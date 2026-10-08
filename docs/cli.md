@@ -3606,6 +3606,8 @@ register, inspect, and answer the Supervisor owner-message channel
 
 Positionals: action
 
+Roles: lead, coordinator, owner
+
 exit: 0 channel action completed; 1 channel action refused or failed; 2 bad usage; 124 inbox wait timed out
 
 json: flag
@@ -3693,6 +3695,8 @@ run the in-runtime land gate; it fast-forwards local main and never pushes
 | `--notify` | boolean |  |
 | `--status` | boolean |  |
 | `--wait-ms` | number |  |
+
+Roles: coordinator, owner, release
 
 exit: 0 land passed or status was read; 1 land refused or failed; 2 bad usage
 
@@ -3958,6 +3962,8 @@ send a desktop message to the Supervisor or read its recent replies
 | `--limit` | number |  |
 
 Positionals: text?
+
+Roles: lead, coordinator, owner
 
 exit: 0 message sent or replies read; 2 bad usage; 124 reply wait timed out
 

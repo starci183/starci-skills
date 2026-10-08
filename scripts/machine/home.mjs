@@ -48,7 +48,7 @@ export const FIX_KIND = 'runtime.fix';
 export const STARTUP_RESERVATION_MS = 180_000;
 
 export const DEFAULTS = Object.freeze({
-  workers: Object.freeze({ base: 4, max: 10 }),
+  workers: Object.freeze({ base: 0, max: 0, hardMax: 10 }),
   landGate: Object.freeze({ mode: 'shared' }),
   frozenMinutes: 10,
   pollIntervalMs: 600_000,
@@ -193,7 +193,7 @@ export function supervisorSettings({ config = undefined } = {}) {
     repos: Array.isArray(sup.repos) ? sup.repos : [],
     pollIntervalMs: Number.isInteger(sup.pollIntervalMs) ? sup.pollIntervalMs : DEFAULTS.pollIntervalMs,
     workers: { base: Number.isInteger(sup.workers?.base) ? sup.workers.base : DEFAULTS.workers.base,
-      max: Math.min(DEFAULTS.workers.max, Number.isInteger(sup.workers?.max) ? sup.workers.max : DEFAULTS.workers.max) },
+      max: Math.min(DEFAULTS.workers.hardMax, Number.isInteger(sup.workers?.max) ? sup.workers.max : DEFAULTS.workers.max) },
     landGate: { mode: sup.landGate?.mode === 'exclusive' ? 'exclusive' : DEFAULTS.landGate.mode },
     // supervisor-watchdog.mjs: a busy seat frame with no turn progress for this long is frozen, not busy.
     frozenMinutes: Number.isInteger(sup.frozenMinutes) && sup.frozenMinutes > 0 ? sup.frozenMinutes : DEFAULTS.frozenMinutes,

@@ -179,11 +179,12 @@ pin registry semver, never a `file:` link.
 
 ## Debug watcher
 
-Workflow debugging is a `/loop` of the chat that started the workflow (Claude Code `/loop`, Codex `/loop`; the `/starci`
-skill sets it up). Each tick runs the read-only `starci debug digest` and then gets every problem it lists cleaned up by
-its owner: the policy step is relayed to the Kernel or the Supervisor, a leftover goes to the runtime's collector, a
-runtime defect is fixed with a spec and carried onto the host (`skills/starci/references/debug-loop.md`). No Orca seat,
-background agent or runtime process schedules the loop; the digest verb itself never changes anything.
+Debug is a time-boxed auditor of role conformance for the stabilisation phase, a `/loop` of the chat that started the
+workflow (Claude Code `/loop`, Codex `/loop`; the `/starci` skill sets it up). Each tick runs the read-only
+`starci debug digest`, which judges the Supervisor, each Kernel, each Op, each Critic and the runtime floor against their
+roles contract block (`modules/kernel/roles.yaml`) and the hold policy table. For each departure it names the role that failed the duty and gets the cause
+fixed at its owner (`skills/starci/references/debug-loop.md`). No Orca seat, background agent or runtime process schedules
+the loop; the digest verb itself never changes anything. The loop is not set up once the end condition of the debug role holds.
 
 `scripts/reconciler/core-watch.mjs` supplies the read-only core snapshot. Maintenance diagnoses
 runtime defects, assigns a bounded lane per new alert under native custody, and qualifies fixes
@@ -191,3 +192,23 @@ through the normal targeted/dependent gates. Kernels own product operations; the
 its own decision contract. Maintenance cannot answer owner approvals or change protected release,
 verification, permission or model settings. The internal prompt cites the maintained failure
 playbooks and mechanism owners rather than duplicating their defaults.
+
+<!-- roles:begin supervisor -->
+**Supervisor** (modules/kernel/roles.yaml#supervisor): All workflows on the machine, inside Orca.
+- Does:
+  - Operations: rules on the gates Kernels raise with one of the typed resolutions (fixed by a landed change it can cite, a workaround route, or not-runtime-fault back to the Kernel).
+  - Resolves conflicts between workflows and divides the shared resources: provider capacity, the host lock, ports.
+  - Cleans up what no Kernel owns through the runtime's collectors.
+  - Records runtime defects with evidence into the defect queue for Debug (starci supervisor actions record --item runtime-defect:<cause>), and gives the Kernel a workaround meanwhile.
+- Must clean up:
+  - what no Kernel owns: shared resources and ownerless leftovers
+- Never:
+  - updates .claude in any way: no fix workers, no lands, no edits to contracts, prompts, policy, checks or code
+  - does a Kernel's work inside a workflow
+  - pushes or releases
+  - leaves a gate past its acknowledgement bound
+- Owns: the machine's operations: the shared resources and the gates Kernels raise. Decides alone: gate rulings and the division of resources.
+- Reports to: Owner (an owner-class matter). Overseen by: the runtime, Debug.
+- Measure: gates answered inside their bound, and no defect left unrecorded.
+- Principles: P1 P3 P4 P5 P6 P7 P8 (modules/kernel/roles.yaml, principles).
+<!-- roles:end supervisor -->

@@ -18,7 +18,9 @@ import { specsBriefLines, specsOf, verificationScopeLines } from '../route/spec-
 import { ownerLanguage, translator } from '../lib/i18n.mjs';
 import { tempRoot } from '../../engine/temp-root.mjs';
 import { imagegenPromptLines } from './op-prompt-imagegen.mjs';
+import { renderRoleLines } from '../machine/roles-contract.mjs';
 
+// The Op's role (scope, never, clean up, reporting) is modules/kernel/roles.yaml#op; the prompt prints it from there.
 const VERDICT_CONTRACT = 'modules/kernel/verdict-contract.yaml';
 
 // An owned path as the worker reads it: bare when it lives in the worker's
@@ -147,6 +149,7 @@ export function buildOpPrompt({ skillRoot, packet, jobId = null, repo = null, pr
     `  attempt's report or claiming done without new authored writes is an automatic fail:`,
     ...priorFailures.map((f) => `  - [${f.name}] ${f.evidence}`),
   ] : []),
+  ...renderRoleLines('op'),
   ...resumePromptLines(packet.context.resume_from),
   ...(contextPack
     ? renderPromptReads(contextPack)

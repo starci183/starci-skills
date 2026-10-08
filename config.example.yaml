@@ -37,7 +37,7 @@ parallel: {gear: 1}
 # the Workflow controller turns actionable findings into Decision Items. The [Supervisor]
 # kernel (docs/supervisor.md) also takes, optional, defaults in home.mjs DEFAULTS:
 #   kernel: {agent, model, effort}   its agent pin (default: the kernel pin below)
-#   workers: {base, max}             the adaptive [Worker] cap
+#   workers: {base, max}             the adaptive [Worker] cap, 0 to 10 (0 = the Supervisor runs no fix worker)
 #   landGate: {mode: shared}         shared lets running lanes commit directly; exclusive = gate only. A land
 #                                    fast-forwards LOCAL main only: the remote main moves with a release (starci release cut)
 supervisor:

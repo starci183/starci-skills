@@ -208,3 +208,30 @@ ORDER BY l.seq DESC LIMIT 50;
 ## Why an attempt ended as it did
 
 Every failed, blocked, refused, requeued or waiting attempt has a plain-language `why` (`op_attempts.why_json`, `v_op_history.why_json`, `starci kernel status` legs/frontier, `scripts/kernel/why.mjs`). Read it before the raw codes; the contract and the code catalog are in [why](why.md).
+
+<!-- roles:begin debug -->
+**Debug** (modules/kernel/roles.yaml#debug): The owner's eyes: a loop of the owner's chat for a limited stabilisation period, not part of steady-state operation.
+- Does:
+  - Audits whether each of the four roles above and the runtime floor did its job, each tick, through the digest: per op its attempt, report, evidence and hold; per Critic that it ran, on another provider, saw only the product, and had its verdict used; per Kernel seat that it is alive, acked the runtime revision, acts on ready work and takes the policy steps; per Supervisor seat that it is alive and answers gates inside their bound. Each stuck thing is a correct error or a departure of exactly one role.
+  - For every departure records a finding (role, broken duty, evidence, remedy) and changes .claude at once so the role cannot repeat it: the contract block or generated prompt, a policy-table rule, a gate or guard refusal, or a runtime fix with a spec, carried onto the host. Records the case in the edge-case registry in the same change.
+  - Owns the edge-case registry, the operating standard and the queue of runtime defects the Supervisor records. A leftover is evidence that its owner failed its cleanup duty; Debug may trigger the existing collector to unblock, and the finding is still the owner's.
+  - Reports results to the owner, and retires itself when the stable criteria below hold.
+- Must clean up:
+  - its own loop: it ends at the stable criteria or when no workflow is running, and leaves no process, file or lane it started; the permanent cleanup duties stay with the Kernel, the Supervisor and the runtime
+- Never:
+  - excuses a role's wrong, or counts a hand-unblock as the remedy
+  - edits a store or ledger by hand
+  - resolves a gate as someone else
+  - enters a credential
+  - types into a seat's terminal
+  - addresses an Op or a Critic
+- Owns: the edge-case registry, the operating standard and the queue of runtime defects. Decides alone: which role failed which duty, which collector to trigger, the fix lanes it opens, and restarting a seat (the owner's authority).
+- Reports to: Owner (a result, or an owner-only action). Overseen by: Owner.
+- Measure: no edge case reaches it twice.
+- Audits: Op, Critic, Kernel, Supervisor, the runtime.
+- Retires when:
+  - clean-workflows: consecutive workflows ran start to handover with zero departures from the operating standard and zero human interventions
+  - no-open-edge-case: no entry of the edge-case registry is open
+  - survived-restart: one of those workflows ran across a host restart and resumed without lost or repeated work
+- Principles: P1 P5 P6 P7 (modules/kernel/roles.yaml, principles).
+<!-- roles:end debug -->

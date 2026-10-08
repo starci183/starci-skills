@@ -1,0 +1,245 @@
+schema: starci/module-reconciler-edge-cases@1
+id: reconciler.edge-cases
+
+# The registry of every edge case met so far. An entry is added in the same change that resolves the case (skills/starci/references/
+# debug-loop.md). `covered` names the rule that handles it (a file, and an `anchor` text that file contains) and the spec that
+# reproduces it; `open` names why it is not covered. The `edge-case-registry` self-check refuses a covered entry whose rule or spec
+# does not exist, and an entry whose family is not listed.
+families:
+  - power-lifecycle
+  - change-under-running
+  - failure-while-running
+  - correctness
+  - smooth-operation
+  - record-vs-reality
+  - authority-safety
+  - concurrency
+  - ending
+
+cases:
+  - id: reboot-reservations-unprovable
+    family: power-lifecycle
+    met: {date: "2026-10-07", where: "host restart during the first real workflows", evidence: "AUDIT-starci-workflow.md issue 10; commit 870044c87"}
+    rule: {file: scripts/machine/provider-reservation-restart.mjs, anchor: "restart"}
+    spec: tests/agent/provider-reservation-restart.spec.mjs
+    status: covered
+  - id: reboot-spawning-job
+    family: power-lifecycle
+    met: {date: "2026-10-08", where: "Supervisor worker spawn across a host restart", evidence: "commit d82e50618"}
+    rule: {file: scripts/supervisor/spawn-reconcile.mjs, anchor: "restart"}
+    spec: tests/supervisor/spawn-restart.spec.mjs
+    status: covered
+  - id: reboot-closure-unconfirmable
+    family: power-lifecycle
+    met: {date: "2026-10-08", where: "worker release after the terminal is gone", evidence: "commit 1a39c73c9"}
+    rule: {file: scripts/machine/worker-close.mjs, anchor: "moot"}
+    spec: tests/machine/worker-close-moot.spec.mjs
+    status: covered
+  - id: quota-window-unstarted
+    family: failure-while-running
+    met: {date: "2026-10-08", where: "provider quota after re-login", evidence: "commit f4fca8baf"}
+    rule: {file: scripts/lib/quota-evidence.mjs}
+    spec: tests/agent-quota/quota-host-polled.spec.mjs
+    status: covered
+  - id: provider-login-expired
+    family: failure-while-running
+    met: {date: "2026-10-07", where: "provider circuit auth", evidence: "OP-INCIDENT-POLICY.md row quota-or-circuit"}
+    rule: {file: modules/kernel/op-incident-policy.yaml, anchor: "quota-or-circuit"}
+    spec: tests/kernel/op-incident-policy.spec.mjs
+    status: covered
+  - id: config-unreadable-controllers-off
+    family: change-under-running
+    met: {date: "2026-10-07", where: "reconciler engine on an unreadable config.yaml", evidence: "commit 6a6eb2b7e; CHANGELOG 1.0.0-alpha.6 Fixed"}
+    rule: {file: scripts/reconciler/engine-modes.mjs}
+    spec: tests/reconciler/engine-modes.spec.mjs
+    status: covered
+  - id: autopilot-budget-gate-race
+    family: smooth-operation
+    met: {date: "2026-10-07", where: "budget gate held every job while an attempt was not yet metered", evidence: "commits 2302cf95a, 27b925c84"}
+    rule: {file: scripts/kernel/autopilot-budget-gate.mjs}
+    spec: tests/kernel/autopilot.spec.mjs
+    status: covered
+  - id: kernel-killed-waiting-on-condition
+    family: failure-while-running
+    met: {date: "2026-10-07", where: "wf-starci-auth-test kernel replaced as idle during a typed machine wait", evidence: "AUDIT-starci-workflow.md issue 7"}
+    rule: {file: scripts/kernel/kernel-watchdog.mjs}
+    spec: tests/kernel/kernel-watchdog.spec.mjs
+    status: covered
+  - id: kernel-restart-no-sender-terminal
+    family: power-lifecycle
+    met: {date: "2026-10-07", where: "wf-starci-auth-test kernel seat vacant, 47 failed restarts", evidence: "AUDIT-starci-workflow.md issue 1; commit 7021bbae8"}
+    rule: {file: scripts/reconciler/controllers/host.mjs}
+    spec: tests/reconciler/reconciler-host.spec.mjs
+    status: covered
+  - id: launch-unknown-no-terminal
+    family: record-vs-reality
+    met: {date: "2026-10-07", where: "a Kernel launch whose Dispatch never bound a terminal", evidence: "commit ef457aaf8"}
+    rule: {file: scripts/kernel/workflow-launch-custody.mjs}
+    spec: tests/kernel/workflow-launch-custody.spec.mjs
+    status: covered
+  - id: codex-project-hook-ignored
+    family: authority-safety
+    met: {date: "2026-10-07", where: "Codex worker in a linked worktree", evidence: "CODEX-ORCA-READINESS.md; commit dc3a444f4"}
+    rule: {file: scripts/agent/trust-launch.mjs}
+    spec: tests/agent/codex-guard-mirror.spec.mjs
+    status: covered
+  - id: guard-hook-unresolvable-git-bash
+    family: authority-safety
+    met: {date: "2026-10-07", where: "Windows seat under Git Bash", evidence: "commit f30acc9e4; CHANGELOG 1.0.0-alpha.6 Fixed"}
+    rule: {file: scripts/api/process/probe-guard-command.mjs}
+    spec: tests/api-process/probe-guard-command.spec.mjs
+    status: covered
+  - id: read-proof-nothing-produced
+    family: correctness
+    met: {date: "2026-10-07", where: "scope.define attempt 1 failed on op-read-digest-missing", evidence: "AUDIT-starci-workflow.md issue 4; commit 9526b2b73"}
+    rule: {file: scripts/kernel/mechanism-proofs.mjs}
+    spec: tests/kernel/read-digest-source-drift.spec.mjs
+    status: covered
+  - id: checks-rerun-wrong-tree
+    family: correctness
+    met: {date: "2026-10-07", where: "record-checks and settle re-ran checks in the main checkout", evidence: "AUDIT-starci-workflow.md issue 5; commit 3d187fbac"}
+    rule: {file: scripts/kernel/settle/job-settle-verify.mjs}
+    spec: tests/kernel-settle/check-rerun-worktree.spec.mjs
+    status: covered
+  - id: plan-divergence-after-provisional-answer
+    family: failure-while-running
+    met: {date: "2026-10-07", where: "a provisional answer left a step unable to run", evidence: "commit cdcbdcf71; op-incident-policy gateCauses"}
+    rule: {file: modules/kernel/op-incident-policy.yaml, anchor: "plan-divergence"}
+    spec: tests/kernel/gate-ladder.spec.mjs
+    status: covered
+  - id: land-host-lock-starves-workflows
+    family: concurrency
+    met: {date: "2026-10-07", where: "Supervisor land held the host lock 30 minutes", evidence: "AUDIT-starci-workflow.md issue 2; commit 462bda821"}
+    rule: {file: scripts/supervisor/land-lock.mjs}
+    spec: tests/supervisor/land-lock.spec.mjs
+    status: covered
+  - id: worker-reservations-leaked
+    family: ending
+    met: {date: "2026-10-07", where: "reported or cancelled workers kept provider reservations", evidence: "AUDIT-starci-workflow.md issue 10"}
+    rule: {file: scripts/machine/provider-reservation-reap.mjs}
+    spec: tests/agent/provider-reservation-reap.spec.mjs
+    status: covered
+  - id: host-controller-actions-fail-forever
+    family: smooth-operation
+    met: {date: "2026-10-07", where: "queue keys at tries=50", evidence: "AUDIT-starci-workflow.md issue 13; commit 32cc56945"}
+    rule: {file: scripts/lib/retry-budget.mjs}
+    spec: tests/lib/retry-budget.spec.mjs
+    status: covered
+  - id: op-addresses-role-above-kernel
+    family: authority-safety
+    met: {date: "2026-10-08", where: "owner ruling: an Op reports only to its Kernel", evidence: "modules/kernel/roles.yaml chain.opMayNotAddress"}
+    rule: {file: scripts/cli/roles.mjs, anchor: "opAddressRefusal"}
+    spec: tests/cli/op-reports-to-kernel.spec.mjs
+    status: covered
+  - id: job-refused-by-admission-while-pool-admits-others
+    family: failure-while-running
+    met: {date: "2026-10-07", where: "wf-starci-auth-test dispatch refused host-resources-low while status said actionable", evidence: "AUDIT-starci-workflow.md issue 8"}
+    status: open
+    why: "status and dispatch do not yet agree on the same admission verdict; the digest has no signal for the disagreement"
+  - id: brand-decision-gate-needs-later-leg-edit
+    family: correctness
+    finding: {role: runtime, duty: bound, verdict: departs, evidence: "Nivo brand.decide blocked BRAND_TOKEN_UNTRACEABLE: the op reported correctly (a correct error); the departure is the contract that demands a trace its own scope forbids producing", remedy: {state: open, lane: f2}}
+    met: {date: "2026-10-08", where: "brand.decide gate demanded an edit a later leg makes", evidence: "owner report 2026-10-08"}
+    status: open
+    why: "the brand.decide contract belongs to the workflow-blockers lane (f2) and is not yet merged"
+  - id: work-author-before-prerequisite
+    family: correctness
+    finding: {role: kernel, duty: never, verdict: departs, evidence: "StarCi work.author blocked on a missing design input and reported it (a correct error); work.author was dispatched before its prerequisite and the reported block then stood 13 to 15 hours: the Kernel and the runtime left a reported block unhandled", remedy: {state: open, lane: f2}}
+    met: {date: "2026-10-08", where: "work.author dispatched before its prerequisite", evidence: "owner report 2026-10-08"}
+    status: open
+    why: "the work.author contract belongs to the workflow-blockers lane (f2) and is not yet merged"
+  - id: render-environment-unavailable-in-fresh-worktree
+    family: failure-while-running
+    finding: {role: op, duty: never, verdict: unjudged, evidence: "StarCi brand.decide reported SHELL_RENDER_UNAVAILABLE (a correct error); whether starting next dev by hand was wrong handling depends on what the op contract told it as it stood, which is not yet read", remedy: {state: open, lane: f2}}
+    met: {date: "2026-10-08", where: "draw render in a fresh workflow worktree", evidence: "owner report 2026-10-08"}
+    status: open
+    why: "the draw render path belongs to the workflow-blockers lane (f2) and is not yet merged"
+  - id: supervisor-killed-its-own-land
+    family: smooth-operation
+    met: {date: "2026-10-07", where: "Supervisor ran land under timeout 590 while the gate needs about 30 minutes", evidence: "AUDIT-starci-workflow.md issue 20"}
+    status: open
+    why: "a Supervisor behaviour; the land gate now bounds its specs, and no digest signal shows a land cancelled by its caller"
+  - id: wake-delivered-as-pasted-text
+    family: record-vs-reality
+    met: {date: "2026-10-07", where: "Kernel ignored three watchdog wakes", evidence: "AUDIT-starci-workflow.md issue 6"}
+    status: open
+    why: "wake delivery is confirmed by submission, not by the agent acting on it; no signal tells the digest a wake was ignored"
+  - id: terminal-count-drift
+    family: ending
+    met: {date: "2026-10-07", where: "41 terminals, finished workers' terminals still open", evidence: "AUDIT-starci-workflow.md issue 21"}
+    status: open
+    why: "the digest does not yet compare the seat rows with the Orca terminal list"
+  - id: workflow-across-host-restart
+    family: power-lifecycle
+    met: {date: "2026-10-08", where: "CHANGELOG 1.0.0-alpha.6 Known limitations: the policy ran against fixtures only", evidence: "CHANGELOG.md"}
+    status: open
+    why: "no real workflow has run start to handover across a host restart; the stable criteria of the debug role count it"
+  - id: critic-coverage-define-architecture
+    family: correctness
+    met: {date: "2026-10-08", where: "owner ruling 7: only drawing has an independent Critic", evidence: "modules/kernel/roles.yaml rulings.critic-coverage"}
+    status: open
+    why: "scope.define and architecture.decide are owed one single-pass Critic on the frontier tier from another provider than the op"
+  - id: gate-loosening-lands-without-owner-approval
+    family: authority-safety
+    met: {date: "2026-10-08", where: "owner ruling 6: loosening a gate is owner-class", evidence: "modules/kernel/roles.yaml rulings.loosening-is-owner-class"}
+    status: open
+    why: "the land gate does not yet refuse a removed check, a lowered threshold, an added allowlist entry or a weakened test without a recorded owner approval"
+  - id: supervisor-gates-left-unanswered-for-fixes
+    family: smooth-operation
+    finding: {role: supervisor, duty: never, verdict: departs, evidence: "gates stood unanswered for over an hour while the Supervisor worked on runtime fixes (AUDIT-starci-workflow.md issue 20 and the owner report)", remedy: {state: in-tree, change: "the Supervisor never updates .claude and never leaves a gate past its acknowledgement bound (roles.yaml supervisor.never)"}}
+    met: {date: "2026-10-07", where: "Supervisor seat of the first real workflows", evidence: "AUDIT-starci-workflow.md; owner report 2026-10-08"}
+    rule: {file: modules/kernel/roles.yaml, anchor: "leaves a gate past its acknowledgement bound"}
+    spec: tests/checks/check-roles-contract.spec.mjs
+    status: covered
+  - id: supervisor-landed-red-candidates
+    family: authority-safety
+    finding: {role: supervisor, duty: never, verdict: departs, evidence: "lands that failed the land gate repeatedly, and landed code carrying Sonar findings", remedy: {state: in-tree, change: "the Supervisor lands nothing on the runtime repository: the verb, the file-write guard and the dispatcher refuse with RUNTIME_CHANGE_OWNED_BY_DEBUG"}}
+    met: {date: "2026-10-07", where: "Supervisor land gate runs", evidence: "AUDIT-starci-workflow.md issue 3; owner report 2026-10-08"}
+    rule: {file: scripts/machine/runtime-change.mjs, anchor: "RUNTIME_CHANGE_OWNED_BY_DEBUG"}
+    spec: tests/guards/runtime-change-owned.spec.mjs
+    status: covered
+  - id: kernel-raised-gate-before-workaround
+    family: correctness
+    finding: {role: kernel, duty: never, verdict: departs, evidence: "a supervisor-gate raised before the workaround its own gate text listed", remedy: {state: in-tree, change: "the gate ladder refuses a raise without the workaround or a typed reason"}}
+    met: {date: "2026-10-07", where: "wf-starci-auth-test", evidence: "commit b8482a35e; op-incident-policy gateCauses"}
+    rule: {file: modules/kernel/op-incident-policy.yaml, anchor: "gateCauses"}
+    spec: tests/kernel/gate-ladder.spec.mjs
+    status: covered
+  - id: kernel-pinned-model-around-exclusion
+    family: authority-safety
+    finding: {role: kernel, duty: never, verdict: departs, evidence: "a dispatch with a --model pin to get around a lineage exclusion", remedy: {state: in-tree, change: "route and dispatch agree on a Kernel-recorded pin over a lineage-excluded pool; an unrecorded pin is refused"}}
+    met: {date: "2026-10-07", where: "wf-starci-auth-test", evidence: "commit 410734210"}
+    rule: {file: scripts/kernel/lineage-pin.mjs}
+    spec: tests/agent/route-op-override.spec.mjs
+    status: covered
+  - id: kernel-labelled-work-failure-runtime-fault
+    family: correctness
+    finding: {role: kernel, duty: reportsUpWhen, verdict: departs, evidence: "a work failure labelled a runtime fault; and ready work left undispatched past its bound unless the runtime owns dispatch-ready", remedy: {state: open, lane: f2}}
+    met: {date: "2026-10-07", where: "wf-starci-auth-test", evidence: "owner report 2026-10-08"}
+    status: open
+    why: "the not-runtime-fault return path exists in the gate ladder; the digest does not yet judge a Kernel's ready-work bound or a misclassified cause"
+  - id: op-token-overrun-on-decision-leg
+    family: smooth-operation
+    finding: {role: op, duty: bound, verdict: departs, evidence: "an Op spent 6 to 17 million tokens on a decision leg (AUDIT-starci-workflow.md issue 4: 10.8 million)", remedy: {state: in-tree, change: "the Op contract declares a provisional token budget per attempt; the Kernel acts on an overrun (roles.yaml op.tokenBudget)"}}
+    met: {date: "2026-10-07", where: "scope.define attempt 1", evidence: "AUDIT-starci-workflow.md issue 4"}
+    status: open
+    why: "the budget is declared and provisional; nothing yet measures an attempt against it, so the digest cannot flag an overrun"
+  - id: fix-agent-wiped-node-modules-printed-credentials-stashed
+    family: authority-safety
+    finding: {role: supervisor, duty: never, verdict: departs, evidence: "a fix agent wiped another lane's node_modules through junctions; an agent printed part of a credentials file; an agent ran git stash", remedy: {state: in-tree, change: "the worker prompt carries the never entries: no junction, symlink or hard link, no node_modules removal, no credential file read, no stash"}}
+    met: {date: "2026-10-07", where: "Supervisor fix workers", evidence: "owner report 2026-10-08"}
+    rule: {file: modules/supervisor/worker-prompt.md, anchor: "Never create a junction"}
+    spec: tests/guards/op-worktree-link-guard.spec.mjs
+    status: covered
+  - id: lead-released-without-full-suite
+    family: authority-safety
+    finding: {role: debug, duty: never, verdict: departs, evidence: "the lead released without the full suite on the exact commit and pushed repeatedly for CI readings", remedy: {state: open, lane: f1}}
+    met: {date: "2026-10-07", where: "alpha.6 release", evidence: "owner report 2026-10-08; CHANGELOG 1.0.0-alpha.6 Known limitations"}
+    status: open
+    why: "the release rule belongs to the push-only-at-release lane (f1)"
+  - id: supervisor-runtime-fix-lanes-retired
+    family: authority-safety
+    finding: {role: supervisor, duty: never, verdict: departs, evidence: "the Supervisor prompt, supervise.yaml and docs still teach fix workers and lands as Supervisor duties", remedy: {state: open, change: "retire those instructions; the contract, the guards, the land verb and the default worker cap 0 already refuse them"}}
+    met: {date: "2026-10-08", where: "owner ruling: the Supervisor may not update .claude", evidence: "modules/kernel/roles.yaml rulings.runtime-changes"}
+    status: open
+    why: "the instruction text of supervisor-prompt.md, supervise.yaml and docs/supervisor.md still describes fix workers and lands; the rewrite is designed in ROLES-STANDARD-alpha8.md"
