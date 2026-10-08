@@ -1631,8 +1631,8 @@ const screenTailOf = (screen) => {
   return rows.length ? rows.join('\n').slice(-1500) : null;
 };
 // The one human-readable line of a refused launch (op attempt settle_json.message, the UI): what step refused it and why.
-const dispatchRejectedMessage = ({ step, signal = null, error = null }) =>
-  'dispatch rejected at ' + (step ?? 'launch') + (signal ? ' (' + signal + ')' : '') + (error ? ': ' + String(error).slice(0, 300) : '') + '; no try spent, the job goes back to ready';
+const dispatchRejectedMessage = ({ step, signal = null, error = null, admission = null }) =>
+  'dispatch rejected at ' + (step ?? 'launch') + (signal ? ' (' + signal + ')' : '') + (error ? ': ' + String(error).slice(0, 300) : '') + (admission ? ' (' + admission.line + ')' : '') + '; no try spent, the job goes back to ready';
 /** The provider circuit a refused launch opens, or null: an outage circuit, the auth circuit, or a strike when the host refused a launch path without saying why. */
 const rejectionCircuit = (db, { outageFailure, authFailure, providerHealthEvidence, model, jobId, step, signal, error, now, credential }) => {
   if (outageFailure) {
@@ -1694,7 +1694,7 @@ const recordRejectionCause = (ledger, { job, op, jobId, attemptId, now, provider
 const rejectDispatch = (ledger, job, jobId, op, model, {
   step, signal = null, error = null, terminal = null, incident = false, attemptId = null,
   effectState = 'none', details = null, providerHealthEvidence = null,
-  settled = null, trust = null,
+  settled = null, trust = null, admission = null,
 }) => {
   // A provider whose card declares an outage key: its outage codes in the failure text, or its outage
   // error row on the refused terminal's screen, open that outage circuit (not the auth one).
@@ -1732,8 +1732,8 @@ const rejectDispatch = (ledger, job, jobId, op, model, {
     const result = {
       reason: 'dispatch-rejected', step, signal, detail: error, provider: model.provider,
       effectState, attemptConsumed: false, retryable: reusable, providerHealth, at: now,
-      message: dispatchRejectedMessage({ step, signal, error }),
-      terminalClosed, ...(closed ? { closed } : {}),
+      message: dispatchRejectedMessage({ step, signal, error, admission }),
+      terminalClosed, ...(closed ? { closed } : {}), ...(admission ? { admission } : {}),
     };
     const db = ledger.db, current = db.prepare('SELECT status FROM jobs WHERE job_id=?').get(jobId)?.status;
     requeueRejectedJob(db, { reusable, jobId, step, now, priorPayload, current, terminal });
@@ -1748,7 +1748,7 @@ const rejectDispatch = (ledger, job, jobId, op, model, {
       payload: { op, step, signal, error, provider: model.provider, model: model.target, terminal,
         effectState, attemptConsumed: false, retryable: reusable, leasesReleased, providerHealth,
         terminalClosed, ...(closed ? { closed } : {}), ...(attemptId != null ? { attemptId } : {}),
-        ...(trust ? { trust } : {}),
+        ...(trust ? { trust } : {}), ...(admission ? { admission } : {}),
         ...(screenTailOf(details?.screen) ? { screenTail: screenTailOf(details.screen) } : {}) },
     });
     recordRejectionCause(ledger, { job, op, jobId, attemptId, now, providerHealth, incident, authFailure, outageFailure, model, signal, error });

@@ -4,6 +4,7 @@
 // pool that keeps refusing (modules/kernel/op-incident-policy.yaml agentSwitch). Ledger reads only.
 import { agentSwitchOf, INCIDENT_CODES } from './op-incident-policy.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
+import { isAdmissionWait } from './admission-refusal.mjs';
 
 /** One lineage-shaped attempt per switch-step refusal of the job: {jobId, attempt, pool, cause, attributable, detail}. */
 export function rejectionAttemptsOf(db, job) {
@@ -11,7 +12,7 @@ export function rejectionAttemptsOf(db, job) {
   const code = INCIDENT_CODES.agentSwitch.code;
   const rows = db.prepare("SELECT payload_json FROM events WHERE entity_type='job' AND entity_id=? AND kind='dispatch-rejected' ORDER BY seq").all(job.job_id);
   return rows.map((row) => parseJsonOr(row.payload_json, {}))
-    .filter((payload) => payload.effectState === 'none' && payload.model && switchSteps.includes(payload.step))
+    .filter((payload) => payload.effectState === 'none' && payload.model && switchSteps.includes(payload.step) && !isAdmissionWait(payload))
     .map((payload) => {
       const error = payload.error ? ' (' + String(payload.error).slice(0, 80) + ')' : '';
       return { jobId: job.job_id, attempt: job.attempt ?? job.try_no ?? null, pool: payload.model, cause: code, attributable: true, detail: `launch refused at ${payload.step}${error}` };

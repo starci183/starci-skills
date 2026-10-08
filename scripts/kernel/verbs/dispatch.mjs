@@ -3,6 +3,7 @@ import { transitionWorkflowToRunning } from '../../../engine/db/ledger.mjs';
 import { inspectOwnerConfig } from '../../../engine/config.mjs';
 import { depthPreflight } from '../../agent/depth-preflight.mjs';
 import { spawnOperationAgent } from './shared/dispatch-agent.mjs';
+import { admissionRefusalOf } from '../admission-refusal.mjs';
 import { markRunning, runningOrAbandon } from './shared/dispatch-running.mjs';
 import { bindGuardTerminal } from '../../guards/hook-install.mjs';
 import { reserveDispatch } from '../dispatch-reservation.mjs';
@@ -55,14 +56,14 @@ function cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, pack
   // A rejection before the launch has no effect; a launch rejection arrives already reconciled by spawnAgent
   // (worker-show before any stop on an unknown effect, cleanupManagedWorker on a partial one).
   const reject = ({ step, signal = null, error = null, dispatchId = null, incident = false,
-    effectState = 'none', observation = null, cleanup = null, details = null, code = null }) => {
+    effectState = 'none', observation = null, cleanup = null, details = null, code = null, admission = null }) => {
     const rejection = rejectDispatch(ledger, job, jobId, op, model, {
       step, signal, error, terminal: dispatchId, incident,
-      effectState, details, settled: cleanup, trust,
+      effectState, details, settled: cleanup, trust, admission,
     });
-    const reason = signal ?? error ?? `managed dispatch failed at ${step}`;
+    const reason = (signal ?? error ?? `managed dispatch failed at ${step}`) + (admission ? ` (${admission.line})` : '');
     const out = { ok: false, jobId, rejected: 'dispatch-rejected', packet, rejection,
-      managed: { step, dispatchId, effectState, ...(code ? { code } : {}), ...(observation ? { observation } : {}), ...(cleanup ? { cleanup } : {}) } };
+      managed: { step, dispatchId, effectState, ...(code ? { code } : {}), ...(admission ? { admission } : {}), ...(observation ? { observation } : {}), ...(cleanup ? { cleanup } : {}) } };
     const cleanupNote = cleanup ? `, worker ${dispatchId} cleanup stop=${cleanup.stop?.ok} release=${cleanup.release?.ok}` : '';
     emit(out, `dispatch REJECTED for ${jobId} (${step}): ${reason} — job status=${rejection.status}, effect=${effectState}${cleanupNote}`, args.json);
     throw new VerbExit(1);
@@ -91,7 +92,8 @@ function cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, pack
   if (!launched.ok) {
     return reject({ step: launched.step, dispatchId: launched.dispatchId, incident: launched.incident === true,
       ...(launched.step === 'attestation' ? { signal: launched.error } : { error: launched.error }),
-      effectState: launched.effectState, observation: launched.observation ?? null, cleanup: launched.cleanup ?? null, details: launched.details ?? null });
+      effectState: launched.effectState, observation: launched.observation ?? null, cleanup: launched.cleanup ?? null, details: launched.details ?? null,
+      admission: admissionRefusalOf(launched, payload, model) });
   }
   const { dispatchId, taskId } = launched;
   // The op's guard, keyed by the terminal Orca exports as ORCA_TERMINAL_HANDLE (scripts/guards/hook-install.mjs bindGuardTerminal).
