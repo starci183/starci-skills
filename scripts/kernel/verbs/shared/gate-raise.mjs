@@ -7,6 +7,7 @@ import { AUTOPILOT_EVENTS } from '../../autopilot-state.mjs';
 import { gateCauses, gateWorkaroundOf } from '../../gate-workaround.mjs';
 import { evaluateCondition, parseCondition } from '../../gate-conditions.mjs';
 import { parseJson } from '../../../lib/json.mjs';
+import { byCodeUnit } from '../../../lib/list.mjs';
 import { refuse } from '../../../../engine/refuse.mjs';
 
 const textOf = (value) => (typeof value === 'string' ? value : undefined);
@@ -16,7 +17,7 @@ const norm = (value) => String(value ?? '').trim().replaceAll(/\s+/g, ' ');
 /** What the Supervisor answered not-runtime-fault for this cause and scope, with the evidence of that gate: [{incidentId, evidence}]. */
 const refutedOf = (db, workflowId, { cause, holds }) => db.prepare("SELECT entity_id,payload_json FROM events WHERE workflow_id=? AND entity_type='incident' AND kind='gate-answered' ORDER BY seq").all(workflowId)
   .map((row) => ({ incidentId: row.entity_id, ...parseJson(row.payload_json, {}) }))
-  .filter((answer) => answer.resolution === 'not-runtime-fault' && answer.cause === cause && [...(answer.holds ?? [])].sort().join('+') === [...holds].sort().join('+'));
+  .filter((answer) => answer.resolution === 'not-runtime-fault' && answer.cause === cause && [...(answer.holds ?? [])].sort(byCodeUnit).join('+') === [...holds].sort(byCodeUnit).join('+'));
 
 /** A gate for a cause and scope the Supervisor already ruled not the runtime's needs --evidence the earlier gate did not carry. */
 function refuseWithoutNewEvidence(db, { workflowId, args, cause, holds }) {

@@ -217,6 +217,8 @@ test('I4, not-runtime-fault: back to the Kernel, and the same cause and scope is
   assert.equal(json(again).code, 'gate-reraise-without-evidence');
   const same = run(repo, 'incident', '--workflow', WF, '--kind', 'owner-gate', '--holds', STARCI_JOB, '--detail', 'settle held waiting for a runtime fix to record-checks cwd', '--cause', 'runtime-defect', '--no-workaround', 'defect-on-every-path', '--evidence', 'settle held waiting for a runtime fix to record-checks cwd');
   assert.equal(json(same).code, 'gate-reraise-without-evidence', 'the old evidence repeated is not new');
+  const reflowed = run(repo, 'incident', '--workflow', WF, '--kind', 'owner-gate', '--holds', STARCI_JOB, '--detail', 'settle held waiting for a runtime fix to record-checks cwd', '--cause', 'runtime-defect', '--no-workaround', 'defect-on-every-path', '--evidence', '  settle held   waiting for a runtime fix to record-checks cwd ');
+  assert.equal(json(reflowed).code, 'gate-reraise-without-evidence', 'the old evidence with other whitespace is not new');
   const other = run(repo, 'incident', '--workflow', WF, '--kind', 'owner-gate', '--holds', NIVO_JOB, '--detail', 'x', '--cause', 'runtime-defect', '--no-workaround', 'defect-on-every-path');
   assert.equal(other.status, 0, 'another scope is not refused');
   const fresh = run(repo, 'incident', '--workflow', WF, '--kind', 'owner-gate', '--holds', STARCI_JOB, '--detail', 'x', '--cause', 'runtime-defect', '--no-workaround', 'defect-on-every-path', '--evidence', 'record-checks exit 2 with ENOENT in the leg worktree after your reply');

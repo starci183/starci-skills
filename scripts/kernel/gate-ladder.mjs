@@ -5,7 +5,7 @@
 // This module is the shared reading of that chain: the DI key, the gate's current handler / step / deadline / watched condition, and whether the owner was told.
 import { readMachine } from '../../engine/db/machine.mjs';
 import { parseJson } from '../lib/json.mjs';
-import { list } from '../lib/list.mjs';
+import { byCodeUnit, list } from '../lib/list.mjs';
 import { boundValue, incidentPolicy } from './op-incident-policy.mjs';
 import { ladderOf } from './supervisor-di-ladder.mjs';
 
@@ -25,12 +25,12 @@ export const gateResolutions = () => gatePolicyOf().resolutions;
 export const gateCauseOf = (gate) => gate.workaround?.cause ?? UNCLASSIFIED;
 
 /** The scope of a gate: its holds, in a stable order. */
-const gateScopeOf = (gate) => [...gate.holds].sort().join('+');
+const gateScopeOf = (gate) => [...gate.holds].sort(byCodeUnit).join('+');
 
 /** Gates raised earlier in the workflow with the same cause and scope: the episode number of this one. */
 const episodeOf = (db, workflowId, gate) => db.prepare("SELECT entity_id,payload_json FROM events WHERE workflow_id=? AND entity_type='incident' AND kind='incident-raised' ORDER BY seq").all(workflowId)
   .map((row) => ({ id: row.entity_id, ...parseJson(row.payload_json, {}) }))
-  .filter((raised) => raised.kind === 'supervisor-gate' && (raised.workaround?.cause ?? UNCLASSIFIED) === gateCauseOf(gate) && [...list(raised.holds)].sort().join('+') === gateScopeOf(gate))
+  .filter((raised) => raised.kind === 'supervisor-gate' && (raised.workaround?.cause ?? UNCLASSIFIED) === gateCauseOf(gate) && [...list(raised.holds)].sort(byCodeUnit).join('+') === gateScopeOf(gate))
   .findIndex((raised) => raised.id === gate.incidentId);
 
 /** The subject part of the gate's Decision Item key: one per (cause, scope) episode, so the owner is told once per cause. */
@@ -49,7 +49,8 @@ const conditionOf = (gate, typed, cause) => {
   const open = typed.find((incident) => incident.incidentId === gate.incidentId);
   if (open) return { condition: open.results.map(({ condition, met, evidence }) => ({ condition, met, evidence })), conditionNote: null };
   const why = list(incidentPolicy().gateCauses).find((entry) => entry.id === cause)?.conditionWhy;
-  return { condition: null, conditionNote: `none${why ? `: ${why}` : ''}; the ladder carries it` };
+  const reason = why ? `: ${why}` : '';
+  return { condition: null, conditionNote: `none${reason}; the ladder carries it` };
 };
 
 /**

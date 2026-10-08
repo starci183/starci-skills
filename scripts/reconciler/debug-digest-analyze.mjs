@@ -71,8 +71,8 @@ function supervisorSection({ snapshot }) {
 
 function seatProblem(section, n) {
   const { seat, enabled, health } = section;
-  if (enabled !== false && (!seat || seat.state !== 'live')) return problem('supervisor', n.blocksEverything, 'seat-down', 'supervisor-down', { state: seat?.state ?? 'absent' }, { seat });
-  if (health && health.live === false) return problem('supervisor', n.blocksEverything, 'seat-dead', 'supervisor-dead', { reason: health.reason ?? 'none recorded' }, health);
+  if (enabled !== false && seat?.state !== 'live') return problem('supervisor', n.blocksEverything, 'seat-down', 'supervisor-down', { state: seat?.state ?? 'absent' }, { seat });
+  if (health?.live === false) return problem('supervisor', n.blocksEverything, 'seat-dead', 'supervisor-dead', { reason: health.reason ?? 'none recorded' }, health);
   return seat?.deaf ? problem('supervisor', n.blocksEverything, 'seat-deaf', 'supervisor-deaf', {}, seat) : null;
 }
 
