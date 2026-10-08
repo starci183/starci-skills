@@ -170,6 +170,7 @@ _starci() {
     'gate:sonar:--name') return 0 ;;
     'gate:sonar:--base') return 0 ;;
     'gate:sonar:--paths') return 0 ;;
+    'gate:sonar:--branch') return 0 ;;
     'gate:sonar:--out') return 0 ;;
     'gate:sonar:--log') return 0 ;;
     'gate:sonar:--token-ref') return 0 ;;
@@ -979,7 +980,7 @@ _starci() {
     'gate:run') _values 'flags' '--root' '--base' '--main' '--changed' '--tests' '--out' '--scope' '--tree' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'gate:runtime-artifact') _values 'flags' '--pack' '--dir' '--out' '--root' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'gate:runtime-coverage') _values 'flags' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
-    'gate:sonar') _values 'flags' '--key' '--name' '--with-token' '--wait' '--base' '--paths' '--project-gate' '--out' '--blob' '--log' '--token-ref' '--no-ensure' '--timeout' '--wait-timeout' '--isolate' '--keep-slice-project' '--declaration' '--host' '--stack' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
+    'gate:sonar') _values 'flags' '--key' '--name' '--with-token' '--wait' '--base' '--paths' '--project-gate' '--branch' '--out' '--blob' '--log' '--token-ref' '--no-ensure' '--timeout' '--wait-timeout' '--isolate' '--keep-slice-project' '--declaration' '--host' '--stack' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'gate:starcistacks') _values 'flags' '--new' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'gate:test-world') _values 'flags' '--root' '--project' '--tests' '--out' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'gate:unit') _values 'flags' '--root' '--out' '--json' '--cwd' '--quiet' '--help' '--edition' ;;

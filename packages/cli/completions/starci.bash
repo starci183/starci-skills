@@ -143,6 +143,7 @@ _starci() {
         gate:sonar:--name) return 0;;
         gate:sonar:--base) return 0;;
         gate:sonar:--paths) return 0;;
+        gate:sonar:--branch) return 0;;
         gate:sonar:--out) return 0;;
         gate:sonar:--log) return 0;;
         gate:sonar:--token-ref) return 0;;
@@ -952,7 +953,7 @@ _starci() {
         gate:run) COMPREPLY=( $(compgen -W "--root --base --main --changed --tests --out --scope --tree --json --cwd --quiet --help --edition" -- "$cur") );;
         gate:runtime-artifact) COMPREPLY=( $(compgen -W "--pack --dir --out --root --json --cwd --quiet --help --edition" -- "$cur") );;
         gate:runtime-coverage) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
-        gate:sonar) COMPREPLY=( $(compgen -W "--key --name --with-token --wait --base --paths --project-gate --out --blob --log --token-ref --no-ensure --timeout --wait-timeout --isolate --keep-slice-project --declaration --host --stack --json --cwd --quiet --help --edition" -- "$cur") );;
+        gate:sonar) COMPREPLY=( $(compgen -W "--key --name --with-token --wait --base --paths --project-gate --branch --out --blob --log --token-ref --no-ensure --timeout --wait-timeout --isolate --keep-slice-project --declaration --host --stack --json --cwd --quiet --help --edition" -- "$cur") );;
         gate:starcistacks) COMPREPLY=( $(compgen -W "--new --json --cwd --quiet --help --edition" -- "$cur") );;
         gate:test-world) COMPREPLY=( $(compgen -W "--root --project --tests --out --json --cwd --quiet --help --edition" -- "$cur") );;
         gate:unit) COMPREPLY=( $(compgen -W "--root --out --json --cwd --quiet --help --edition" -- "$cur") );;

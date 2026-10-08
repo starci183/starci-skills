@@ -780,6 +780,7 @@ inspect, provision and run the local Sonar quality gate
 | `--base` | string |  |
 | `--paths` | list |  |
 | `--project-gate` | boolean |  |
+| `--branch` | string |  |
 | `--out` | string |  |
 | `--blob` | boolean |  |
 | `--log` | string |  |

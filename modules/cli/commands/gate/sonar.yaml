@@ -14,6 +14,7 @@ flags:
   - {name: base, type: string, summary: base revision for changed-line analysis}
   - {name: paths, type: list, summary: repository paths in the slice}
   - {name: project-gate, type: boolean, summary: judge the whole-project quality gate}
+  - {name: branch, type: string, summary: read the dashboard of this branch instead of the main branch}
   - {name: out, type: string, summary: write the summary to this file}
   - {name: blob, type: boolean, summary: store the summary as a blob}
   - {name: log, type: string, summary: write scanner output to this file}

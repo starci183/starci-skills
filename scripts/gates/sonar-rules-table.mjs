@@ -83,12 +83,12 @@ export const sonarIdOf = (ruleId) => [...RULES, ...TS_RULES].find((entry) => ent
 
 const rulesOf = (table) => Object.fromEntries(table.map((entry) => [entry.rule, ['error', ...(entry.options ?? [])]]));
 
-/** The TypeScript parser of the lint canons, installed by `npm ci` in packages/ (the canons' own workspace). */
+/** The TypeScript parser of the example scope: a devDependency of the root package, installed by `npm ci`. */
 const typescriptParser = () => {
   try {
-    return createRequire(path.join(skillRoot, 'packages', 'package.json'))('@typescript-eslint/parser');
+    return createRequire(path.join(skillRoot, 'package.json'))('@typescript-eslint/parser');
   } catch (cause) {
-    throw new Error('the sonar-rules gate parses the example apps with @typescript-eslint/parser: run npm ci in packages/', { cause });
+    throw new Error('the sonar-rules gate parses the example apps with @typescript-eslint/parser: run npm ci', { cause });
   }
 };
 

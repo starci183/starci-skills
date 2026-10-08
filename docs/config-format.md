@@ -299,3 +299,11 @@ different directory, from it as well, because tools the runtime does not control
   `roots.temp` to another drive moves the measured drive with it.
 
 A refused dispatch (`host-resources-low`) names the drive, the floor and the keys above, and the temp root in use.
+
+## SonarCloud organization (`sonar`)
+
+`sonar: {organization?}` (config.yaml, gitignored) names the SonarCloud organization the release's Sonar proof of the example apps analyses in
+(`scripts/supervisor/release-sonarcloud.mjs`); the project keys are `<organization>_starci-example-<app>`. It is configuration, not a secret, so it
+is not a line of `secret.env` (which keeps only `SONAR_TOKEN`). `organization` is a key of lowercase letters, digits, `-` and `_`, or `null`; an unknown
+key or another value is refused with `Invalid config.yaml: sonar...`. The environment variable `SONAR_ORGANIZATION` wins over it (CI reads the
+repository variable of the same name). With neither set, the pre-cut check refuses and names `sonar.organization`.

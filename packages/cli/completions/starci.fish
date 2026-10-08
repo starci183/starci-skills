@@ -427,6 +427,7 @@ complete -c starci -n '__starci_using_command gate sonar' -l wait -d 'wait for t
 complete -c starci -n '__starci_using_command gate sonar' -l base -r -d 'base revision for changed-line analysis'
 complete -c starci -n '__starci_using_command gate sonar' -l paths -r -d 'repository paths in the slice'
 complete -c starci -n '__starci_using_command gate sonar' -l project-gate -d 'judge the whole-project quality gate'
+complete -c starci -n '__starci_using_command gate sonar' -l branch -r -d 'read the dashboard of this branch instead of the main branch'
 complete -c starci -n '__starci_using_command gate sonar' -l out -r -d 'write the summary to this file'
 complete -c starci -n '__starci_using_command gate sonar' -l blob -d 'store the summary as a blob'
 complete -c starci -n '__starci_using_command gate sonar' -l log -r -d 'write scanner output to this file'

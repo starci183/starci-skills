@@ -340,6 +340,7 @@ ruleParams:
     sourceName: "^[a-z0-9]+(-[a-z0-9]+)*$"
     oneOffNames: ["tmp-*"]
     sharedBasenames: [lib.mjs]
+    heldSecrets: []
     generated: [{root: packages/x/runtime, generatedBy: scripts/kernel/sync.mjs}]
     pinned: [{path: scripts/kernel/cli.mjs, why: the fixture's pinned entry}]
     selfChecks: [{id: none, run: scripts/kernel/cli.mjs}]
