@@ -723,3 +723,10 @@ cases:
     rule: {file: scripts/guards/release-definition.mjs, anchor: "RELEASE_SUITE_MODE"}
     spec: tests/guards/release-suite-gate.spec.mjs
     status: covered
+  - id: verification-follows-the-file-not-the-function
+    family: smooth-operation
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "duty: verification proportional to the change; the affected set followed the changed FILE: the wake-bound commit (nudge.mjs, wake-bound.mjs) selected 109 specs and the lite i18n and template fix 189, over the bound of 120, though the owner's rule is that the tests to run are the tests related to the changed functions", remedy: {state: in-tree, change: "starci test affected compares each changed .mjs with its version at the base, follows the changed exported symbols by name through importers, namespace and default uses, re-exports and callers (to symbolDepth), adds the CLI verbs whose handler reaches them, and keeps the file-level rule, named in the report, for what it cannot follow; the answer is never larger than the file-level one"}}
+    met: {date: "2026-10-09", where: "wave 5 lane feat/w5-affected-by-symbol: the owner's rule if functions A and B are changed the tests to run are the tests related to A and B", evidence: "284780404 wake bound 106 specs by file, 13 by symbol, the 93 others stay green with both functions made to throw; 2cd24485b release cut refusal 28 to 7, the other 21 stay green"}
+    rule: {file: scripts/supervisor/affected-symbols.mjs, anchor: "never larger than the file-level"}
+    spec: tests/supervisor/affected-symbols.spec.mjs
+    status: covered

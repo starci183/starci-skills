@@ -77,7 +77,7 @@ State which of the three you used. Do not claim a loop exists until the host con
     host. The Supervisor changes no runtime code.
   - a seat that is down or drifted: `starci workflow start` or `starci supervisor start` from an Orca terminal;
     `starci reconciler restart` for an engine on an old revision.
-- A fix lane verifies with `starci runtime check` and `starci test affected --run`: a red file is run again, then the affected set once. The whole suite is the merged-tree run and the release cut, never a lane's routine.
+- A fix lane verifies with `starci runtime check` and `starci test affected --run`: a red file is run again, then the affected set once. The whole suite is the merged-tree run and the release cut, never a lane's routine. "Related" means the changed symbols: `starci test affected` follows each changed function through the specs that import it and the specs behind its callers, and falls back to every importer of a file it cannot follow by name (yaml, a template, a statement that runs at load); the report names each fallback.
 - Every edge case met is an entry of the edge-case registry (`modules/reconciler/edge-cases.yaml`), added in the same change
   that resolves it, with the rule that now handles it and the spec that reproduces it. A `covered` entry names both.
 - Never edit a store, a ledger or a product repository by hand, never resolve a gate as someone else, never enter a

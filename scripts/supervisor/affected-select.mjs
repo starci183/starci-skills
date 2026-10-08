@@ -45,14 +45,14 @@ function readText(file) {
 
 /**
  * The affected specs of `changed`. `specs` = [{file, text}], `sources` = [{file, text}] (readSources), `symbolsOf(file)` = the land narrowing of a
- * changed file, `exists(file)` filters deleted specs, `maxFiles` the declared bound, `dataRoots` the trees whose files readers are looked up for. Returns {files, readers, narrowed, smoke, over, maxFiles}.
+ * changed file, `exists(file)` filters deleted specs, `maxFiles` the declared bound, `smokeLimit` (the land gate's smoke bound when absent), `dataRoots` the trees whose files readers are looked up for. Returns {files, readers, narrowed, smoke, over, maxFiles}.
  */
-export function affectedSelection({ root, changed, specs, sources, symbolsOf, exists, maxFiles, dataRoots }) {
+export function affectedSelection({ root, changed, specs, sources, symbolsOf, exists, maxFiles, dataRoots, smokeLimit }) {
   const files = changed.map(posix);
   const readers = dataReaders({ dataFiles: dataFilesOf(files, dataRoots), sources }).filter((entry) => !files.includes(entry.file));
   const readerFiles = new Set(readers.map((entry) => entry.file));
   const picked = touchingSelection([...files, ...readerFiles], {
-    specs, root,
+    specs, root, smokeLimit,
     symbolsOf: (file) => (readerFiles.has(file) ? { symbols: [] } : symbolsOf(file)),
   });
   const selected = [...new Set(picked.files)].filter((file) => exists(file)).sort(byCodeUnit);

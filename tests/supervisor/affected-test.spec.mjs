@@ -9,7 +9,7 @@ import { baseOf, runBounded, runSpecFile, testAffected } from '../../scripts/sup
 import { readSpecs } from '../../scripts/lib/spec-pool.mjs';
 import { mkdtemp } from '../helpers/tmpdir.mjs';
 
-const POLICY = { maxFiles: 10, dataRoots: ['modules', 'knowledge'] };
+const POLICY = { maxFiles: 10, dataRoots: ['modules', 'knowledge'], symbolDepth: 4 };
 
 function tree(t) {
   const root = mkdtemp(t, 'starci-affected-');
@@ -156,4 +156,23 @@ test('a spec file that fails reports the tail of its output, one that passes rep
   assert.equal(fail.tail.length, 25);
   assert.equal(fail.tail.at(-1), 'line 39');
   assert.deepEqual((await runSpecFile('.', 'tests/x.spec.mjs', { execNode: passing })).tail, []);
+});
+
+test('by symbol (the default) selects the specs of the changed function only; --by file keeps every importer; another value is a usage refusal', async (t) => {
+  const d = deps(t, {
+    changedFiles: () => ['scripts/lib/pair.mjs'],
+    show: () => ({ status: 0, stdout: 'export const a = 1;\nexport const b = 2;\n' }),
+  });
+  for (const [rel, text] of [['scripts/lib/pair.mjs', 'export const a = 1;\nexport const b = 3;\n'], ['tests/uses-a.spec.mjs', "import { a } from '../scripts/lib/pair.mjs';\n"], ['tests/uses-b.spec.mjs', "import { b } from '../scripts/lib/pair.mjs';\n"]]) {
+    fs.writeFileSync(path.join(d.root, rel), text);
+  }
+  const bySymbol = await testAffected(ctxOf(d, {}), d);
+  assert.deepEqual(bySymbol.data.scope, ['tests/uses-b.spec.mjs']);
+  assert.match(bySymbol.text, /symbol scripts\/lib\/pair\.mjs#b: 1 spec\(s\)/);
+  assert.equal(bySymbol.data.mode, 'symbol');
+  const byFile = await testAffected(ctxOf(d, { by: 'file' }), d);
+  assert.deepEqual(byFile.data.scope, ['tests/uses-a.spec.mjs', 'tests/uses-b.spec.mjs']);
+  assert.equal(byFile.data.mode, 'file');
+  const refused = await testAffected(ctxOf(d, { by: 'function' }), d);
+  assert.equal(refused.code, 2);
 });

@@ -19,6 +19,18 @@ const ts = () => (typescript ??= createRequire(import.meta.url)('typescript'));
 const EXTENSIONS = ['', '.mjs', '.js', '.cjs', '.ts', '.mts', '.cts', '.json', '/index.mjs', '/index.js'];
 const posix = (p) => p.split(path.sep).join('/');
 
+const isFileOnDisk = (candidate) => {
+  try { return fs.statSync(candidate).isFile(); } catch { return false; }
+};
+
+/** The repository-relative path of the file the relative specifier `fileName` names from `file` (absolute), or null when it resolves to no file inside `root`; `isFile(absolutePath)` says whether a candidate exists (the disk by default). */
+export function resolveRelative(root, file, fileName, isFile = isFileOnDisk) {
+  if (!fileName.startsWith('.')) return null;
+  const base = path.resolve(path.dirname(file), fileName);
+  const hit = EXTENSIONS.map((ext) => base + ext).find((candidate) => isFile(candidate));
+  return hit && !path.relative(root, hit).startsWith('..') ? posix(path.relative(root, hit)) : null;
+}
+
 /** Repository-relative paths of the files `file` (absolute) imports relatively, resolved to existing files. */
 function relativeImportsOf(root, file, readFile = (f) => fs.readFileSync(f, 'utf8')) {
   let text;
@@ -26,12 +38,8 @@ function relativeImportsOf(root, file, readFile = (f) => fs.readFileSync(f, 'utf
   const info = ts().preProcessFile(text, true, true);
   const out = [];
   for (const { fileName } of info.importedFiles) {
-    if (!fileName.startsWith('.')) continue;
-    const base = path.resolve(path.dirname(file), fileName);
-    const hit = EXTENSIONS.map((ext) => base + ext).find((candidate) => {
-      try { return fs.statSync(candidate).isFile(); } catch { return false; }
-    });
-    if (hit && !path.relative(root, hit).startsWith('..')) out.push(posix(path.relative(root, hit)));
+    const resolved = resolveRelative(root, file, fileName);
+    if (resolved) out.push(resolved);
   }
   // A runtime entry a file starts as a process (`path.join(ROOT, 'scripts', 'kernel', 'cli.mjs')`, 'scripts/kernel/cli.mjs') is a
   // dependency too: the spec exercises that entry and everything it imports.
@@ -41,7 +49,7 @@ function relativeImportsOf(root, file, readFile = (f) => fs.readFileSync(f, 'utf
 
 const ENTRY_ROOTS = '(?:scripts|engine|bin)';
 /** Repository-relative runtime .mjs paths `text` names as a string ('scripts/kernel/cli.mjs') or as path segments ('scripts', 'kernel', 'cli.mjs'). */
-function spawnedEntriesOf(text) {
+export function spawnedEntriesOf(text) {
   const out = new Set();
   for (const m of text.matchAll(new RegExp(`['"\`](${ENTRY_ROOTS}/[\\w./-]+\\.mjs)['"\`]`, 'g'))) out.add(m[1]);
   for (const m of text.matchAll(new RegExp(`['"\`](${ENTRY_ROOTS})['"\`]((?:\\s*,\\s*['"\`][\\w.-]+['"\`])+)`, 'g'))) {
