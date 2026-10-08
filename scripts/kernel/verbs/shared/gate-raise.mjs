@@ -11,7 +11,7 @@ import { refuse } from '../../../../engine/refuse.mjs';
 
 const textOf = (value) => (typeof value === 'string' ? value : undefined);
 
-const norm = (value) => String(value ?? '').trim().replaceAll(/s+/g, ' ');
+const norm = (value) => String(value ?? '').trim().replaceAll(/\s+/g, ' ');
 
 /** What the Supervisor answered not-runtime-fault for this cause and scope, with the evidence of that gate: [{incidentId, evidence}]. */
 const refutedOf = (db, workflowId, { cause, holds }) => db.prepare("SELECT entity_id,payload_json FROM events WHERE workflow_id=? AND entity_type='incident' AND kind='gate-answered' ORDER BY seq").all(workflowId)
