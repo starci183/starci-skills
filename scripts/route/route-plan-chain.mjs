@@ -2,6 +2,7 @@
 // its prerequisites, into the plan's legs and edges.
 import { satisfiedByS0 } from './route-plan-survey.mjs';
 import { varKey } from './route-plan-parse.mjs';
+import { authorPrerequisitesOf } from './plan-edges.mjs';
 
 function legIdFor(opId, instance) { return instance ? `${opId}#${instance}` : opId; }
 
@@ -376,6 +377,12 @@ function injectWorkAuthor(P) {
   const isLaneBuild = (l) => isBuildLeg(P, l) && l.op !== 'code.refactor';
   if (P.hints.workspaceCanonicalization || !P.legs.has('scope.define') || !hasLeg(P, isLaneBuild)) return;
   const wa = ensureLeg(P, 'work.author', { injected: 'lane reads authored Work records — scope.define produced the scope' });
+  // Its implementation records prove against the requirement, design and interface records: those legs run first.
+  const laws = authorPrerequisitesOf([...P.legs.values()].map((l) => l.op), P.edges.map(([from, to]) => [P.legs.get(from)?.op ?? from, P.legs.get(to)?.op ?? to]));
+  for (const op of laws) {
+    P.edges.push([op, wa.legId]);
+    wa.needsSatisfiedBy.push(`${op} (the records its implementation records prove)`);
+  }
   for (const l of P.legs.values()) {
     if (isLaneBuild(l)) {
       P.edges.push([wa.legId, l.legId]);

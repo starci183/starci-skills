@@ -61,6 +61,9 @@ const legsLine = (s) => {
   return `  legs: ${legs}`;
 };
 
+/** A job left terminal with nothing after it: the table's hold, who handles it and the chain to the owner. */
+const terminalLine = (item) => `  hold ${item.hold}: ${item.jobId} (${item.op}) - ${item.handler} takes the step; after ${Math.round(item.deadlineMs / 60_000)}m it goes ${item.chain.slice(1).join(' -> ') || 'nowhere'}`;
+
 const testsDeferredLines = (s) => {
   const t = s.testsDeferred;
   if (!t.jobs.length && !t.planned.length) return [];
@@ -182,6 +185,7 @@ export const statusText = (s, out) => [
   ...(s.stuck.length ? [stuckSummaryLine(s)] : []),
   ...s.stuckPast.slice(0, 8).map((item) => `    ${stuckLine(item)}`),
   ...(s.graph.legs.length ? [legsLine(s)] : []),
+  ...s.graph.terminal.map(terminalLine),
   ...testsDeferredLines(s),
   ...(s.workGraph ? [workGraphLine(s)] : []),
   ...s.graph.nextActions.map((action, index) => `  next ${index + 1}: ${s.internals.nextActionLabel(action)} — ${action.reason}`),

@@ -159,6 +159,10 @@ producesVocabulary:
 # 1 — FORWARD EDGES. Ordering constraints as {if, then-required/before} rules.
 #    "X is illegal without/before Y" — the chain must satisfy every one.
 # ============================================================================
+# The legs whose records an implementation record of work.author proves and depends on (work/implementation@1 `proves`,
+# `dependsOn` name the requirement, design, contract and interface records they author): in a plan that has them, the
+# records exist before work.author runs. scripts/route/plan-edges.mjs adds the edges to a stored plan as it reads it.
+workAuthorAfter: [business.decide, architecture.decide, interface.draw]
 forwardEdges:
 
   - id: draw-before-ui-build

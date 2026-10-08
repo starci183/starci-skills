@@ -763,6 +763,7 @@ complete -c starci -n '__starci_using_command kernel reconcile' -l dead-worker -
 complete -c starci -n '__starci_using_command kernel reconcile' -l settle-failed -d 'with --dead-worker, settle the job failed instead of requeueing it'
 complete -c starci -n '__starci_using_command kernel reconcile' -l no-salvage -d 'with --dead-worker, skip filing a report the dead worker wrote but never filed'
 complete -c starci -n '__starci_using_command kernel reconcile' -l release-worker -d 'release the worker of a job whose settle is held, keeping the job for its settle'
+complete -c starci -n '__starci_using_command kernel reconcile' -l route-failure -d 'take the next step of a failed or blocked job that nothing follows (the Job controller runs it)'
 complete -c starci -n '__starci_using_command kernel reconcile' -l orphan-kernel-jobs -d 'cancel the kernel jobs of finished or archived workflows'
 complete -c starci -n '__starci_using_command kernel reconcile' -l workflow -r -d 'with --orphan-kernel-jobs, limit to one workflow'
 complete -c starci -n '__starci_using_command kernel reconcile' -l dry-run -d 'with --orphan-kernel-jobs, list what would be cancelled without writing'

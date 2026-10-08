@@ -10815,6 +10815,24 @@ retire-needs-reason:
   nextStep_vi: "Kernel chạy lại lệnh và ghi lý do vì sao chủ dự án không còn cần trả lời nữa."
   owner: op-retry
   kind: input-invalid
+owes-no-step:
+  title: "The job owes no next step"
+  title_vi: "Việc này không còn nợ bước tiếp theo"
+  meaning_vi: "Việc đã có bước tiếp theo được ghi, đã có lượt thử lại hoặc không ở trạng thái thất bại."
+  causes_vi:
+    - "Việc đã được định tuyến trước đó"
+  nextStep_vi: "Không cần làm thêm; lệnh chạy lại là vô hại."
+  owner: runtime-core
+  kind: settle-reason
+owner-wait-no-ask:
+  title: "Owner wait without an ask"
+  title_vi: "Chờ owner nhưng không có câu hỏi"
+  meaning_vi: "Việc dừng ở trạng thái chờ owner nhưng không nộp câu hỏi nào để owner trả lời."
+  causes_vi:
+    - "Op báo chờ owner mà không đính kèm câu hỏi"
+  nextStep_vi: "Mục quyết định retry-decision được giao cho Kernel để chạy lại op và nộp câu hỏi."
+  owner: supervisor
+  kind: blocker
 retry-decision:
   title: "Retry decision needed"
   title_vi: "Cần quyết định có thử lại không"

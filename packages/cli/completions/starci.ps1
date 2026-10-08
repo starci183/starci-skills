@@ -123,7 +123,7 @@ Register-ArgumentCompleter -Native -CommandName starci -ScriptBlock {
         'kernel provider-backoff' = @('--repo','--provider','--open-circuit','--kind','--reason','--by','--json','--cwd','--quiet','--help','--edition')
         'kernel provider-health' = @('--repo','--provider','--recover','--reason','--probe','--quota-probe','--force','--workflow','--json','--cwd','--quiet','--help','--edition')
         'kernel questions' = @('--repo','--workflow','--json','--cwd','--quiet','--help','--edition')
-        'kernel reconcile' = @('--repo','--job','--drop','--reason','--dead-worker','--settle-failed','--no-salvage','--release-worker','--orphan-kernel-jobs','--workflow','--dry-run','--json','--cwd','--quiet','--help','--edition')
+        'kernel reconcile' = @('--repo','--job','--drop','--reason','--dead-worker','--settle-failed','--no-salvage','--release-worker','--route-failure','--orphan-kernel-jobs','--workflow','--dry-run','--json','--cwd','--quiet','--help','--edition')
         'kernel record-change' = @('--repo','--workflow','--record','--reach','--reason','--json','--cwd','--quiet','--help','--edition')
         'kernel record-checks' = @('--repo','--job','--checks','--checks-file','--json','--cwd','--quiet','--help','--edition')
         'kernel redesign' = @('--repo','--workflow','--op','--paths','--decision','--brief','--json','--cwd','--quiet','--help','--edition')
