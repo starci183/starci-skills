@@ -40,7 +40,7 @@ const world = (t, { orca = false } = {}) => {
       ...adoptLaunchTrust(root, { roots: [repo], ref: 'private kernel-bridges fixture adoption' }) });
   }
   // A typed wait is released by the status pass of the reconciler, which owns that reaction; a person reading status releases nothing.
-  const api = (args) => spawnSync(process.execPath, [API, ...args, '--repo', repo, '--json'], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 180000, env: args[0] === 'status' ? { ...env, STARCI_ACTOR: 'reconciler/job' } : env });
+  const api = (args) => spawnSync(process.execPath, [API, ...args, '--repo', repo, '--json'], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 180000, env: ['status', 'messages'].includes(args[0]) ? { ...env, STARCI_ACTOR: 'reconciler/job' } : env });
   const apiAsync = (args) => new Promise((resolve) => {
     const child = spawn(process.execPath, [API, ...args, '--repo', repo, '--json'], { cwd: ROOT, windowsHide: true, env });
     let stdout = '', stderr = '';
