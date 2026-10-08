@@ -1,5 +1,4 @@
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {skillRoot} from './runtime-root.mjs';
@@ -10,8 +9,6 @@ import {validateOrca,ORCA_KEYS} from './orca-config.mjs';
 import {validateResources,RESOURCE_KEYS} from './resources-config.mjs';
 import {ENV_NAME,secretEnv,connectorSecret} from './secrets.mjs';
 import {byCodeUnit} from './by-code-unit.mjs';
-import {isSpecRun} from '../scripts/lib/env.mjs';
-import {insidePath,resolvedKey} from '../scripts/lib/path-key.mjs';
 import {EFFORT_LEVELS,MODELS_KEYS,validateModelsBlock,refuseRemovedKeys,shippedTiers} from './model-config.mjs';
 const knownNames=names=>[...names].sort(byCodeUnit).join(', ');
 export {readDotenv,connectorSecret} from './secrets.mjs';
@@ -357,13 +354,20 @@ export function configuredAllocationPolicy(config=loadConfig()){
     :null;
   return {grants,source:allocation?'allocation':'default'};
 }
+/** The variable that confines the owner's `config.yaml` to a directory tree: set, an owner file is read only from under that directory (tests/setup/isolated-temp.mjs points it at a spec's own temp root). */
+export const OWNER_CONFIG_WITHIN_ENV='STARCI_OWNER_CONFIG_WITHIN';
+const foldPath=p=>process.platform==='win32'?path.resolve(p).toLowerCase():path.resolve(p);
 /**
- * Whether the owner's `config.yaml` under `root` is visible to this process. A spec run (`node --test`) reads an owner file only
- * from under its own temp directory, where a fixture wrote it: the owner's live file of the checkout under test never reaches a
- * spec, so a result does not depend on the host's settings (roots.temp, landGate, launch trust) and a lane clone, the release
- * host and a clean checkout run the same suite.
+ * Whether the owner's `config.yaml` under `root` is visible to this process. Unconfined (the variable unset) every owner file is visible; confined, only the files under the named
+ * directory, where a fixture wrote them, so the checkout's live file (roots.temp, supervisor.landGate, launch trust) never decides a result and a lane clone, the release host and a
+ * clean checkout run the same suite. The engine knows nothing of why a caller confines it: the spec preload sets the variable.
  */
-const ownerFileVisible=root=>!isSpecRun()||insidePath(os.tmpdir(),root,{key:resolvedKey});
+const ownerFileVisible=(root,env=process.env)=>{
+  const within=env[OWNER_CONFIG_WITHIN_ENV];
+  if(!within)return true;
+  const rel=path.relative(foldPath(within),foldPath(root));
+  return !rel.startsWith('..')&&!path.isAbsolute(rel);
+};
 /** The validated config one yaml file holds, or null when the file is absent. */
 const readYamlConfig=(root,name)=>{const yaml=path.join(root,name);return fs.existsSync(yaml)?validateConfig(parseYaml(fs.readFileSync(yaml,'utf8'))):null;};
 function readExample(root=configRoot){const example=readYamlConfig(root,'config.example.yaml');if(example!==null){return example;}throw new Error('Missing config.example.yaml');}

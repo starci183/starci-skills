@@ -366,3 +366,17 @@ cases:
     rule: {file: scripts/api/sonar/fresh-fetch.mjs, anchor: "freshFetch"}
     spec: tests/supervisor/release-sonar-stack.spec.mjs
     status: covered
+  - id: check-count-read-as-green-while-hfs-failed
+    family: record-vs-reality
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "starci runtime check printed 'self-checks: 44 of 44 passed' while its runtime HFS stage had failed and the exit code was 1; a lane and the lead both reported the check green", remedy: {state: in-tree, change: "the last line of the check states the whole verdict: 'check: ok — runtime HFS clean; self-checks N of N' or 'check: FAILED — runtime HFS n finding(s); self-checks a of b (failed: ...)'"}}
+    met: {date: "2026-10-08", where: "lane f10 report and the alpha.7 integration branch", evidence: "ARCH_OWNER_CYCLE engine/config.mjs printed above the self-check lines"}
+    rule: {file: scripts/checks/check-runtime.mjs, anchor: "verdictLine"}
+    spec: tests/checks/check-runtime-only.spec.mjs
+    status: covered
+  - id: engine-config-imports-scripts-tier-for-spec-isolation
+    family: correctness
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "engine/config.mjs imported isSpecRun and insidePath from scripts/lib to keep the live config.yaml out of a spec: ARCH_OWNER_CYCLE engine -> scripts/lib -> engine", remedy: {state: in-tree, change: "the engine reads one generic confinement variable (STARCI_OWNER_CONFIG_WITHIN) and knows nothing of tests; the spec preload sets it to the spec's temp root"}}
+    met: {date: "2026-10-08", where: "commit 6ad9c7cca on the alpha.7 integration branch", evidence: "npm run check: ARCH_OWNER_CYCLE engine/config.mjs:13"}
+    rule: {file: engine/config.mjs, anchor: "confines the owner"}
+    spec: tests/engine/config.spec.mjs
+    status: covered
