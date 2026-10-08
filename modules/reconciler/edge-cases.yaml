@@ -266,7 +266,7 @@ cases:
   - id: spec-reads-owner-live-config
     family: record-vs-reality
     finding: {role: runtime, duty: does, verdict: departs, evidence: "the release cut ran the suite from the live checkout, whose owner config.yaml sets roots.temp and supervisor.landGate: the temp-root, registry-isolation, land-gate and checkpoint specs read that file and failed, though the same commit was green in a lane clone without one", remedy: {state: in-tree, change: "engine/config.mjs shows a spec run an owner config.yaml only from under the spec's temp directory; the checkout's live file never reaches a spec"}}
-    met: {date: "2026-10-08", where: "release cut of 1.0.0-alpha.7, L4 npm test", evidence: "D:/starci-tmp/release/cut-alpha7.log; release-npm_test log: 16 failures"}
+    met: {date: "2026-10-08", where: "release cut of 1.0.0-alpha.7, L4 npm test", evidence: "the result log of the 1.0.0-alpha.7 release cut; release-npm_test log: 16 failures"}
     rule: {file: engine/config.mjs, anchor: "ownerFileVisible"}
     spec: tests/engine-db/runtime-state-root.spec.mjs
     status: covered
