@@ -275,14 +275,10 @@ $defs:
     type: object
     additionalProperties: false
     oneOf:
-      - required: [path, value]
-        not: {required: [ruling]}
-      - required: [ruling, token, value]
-        not:
-          anyOf:
-            - required: [path]
-            - required: [line]
-            - required: [sha256]
+      - properties: {path: true, value: true, ruling: false}
+        required: [path, value]
+      - properties: {ruling: true, token: true, value: true, path: false, line: false, sha256: false}
+        required: [ruling, token, value]
     description: "Two forms. {path, value, ...}: the external reference render a colour token's value was read from. {ruling, token, value}: the answered ask that ruled the value, when no file declares it. Either is for a token the app's
       own theme has not written yet (interface.implement writes it later). scripts/work/brand/brand.mjs
       tokens-match-source reads the reference - never writes it - and, at the decide stage, passes the token
