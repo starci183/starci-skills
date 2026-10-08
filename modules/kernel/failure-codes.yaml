@@ -16755,3 +16755,13 @@ RUNTIME_CHANGE_OWNED_BY_DEBUG:
   nextStep_vi: "Supervisor ghi lỗi runtime bằng starci supervisor actions record --item runtime-defect:<nguyên nhân> kèm bằng chứng, cho Kernel một cách đi vòng; Debug sửa."
   owner: supervisor
   kind: blocker
+DB_MIGRATION_NEEDED:
+  title: "The local SonarQube database needs its migration"
+  title_vi: "Cơ sở dữ liệu SonarQube cục bộ cần được di trú"
+  meaning_vi: "Máy chủ SonarQube cục bộ báo trạng thái DB_MIGRATION_NEEDED: các volume của stack chứa cơ sở dữ liệu do một phiên bản SonarQube cũ ghi, nên máy chủ chờ lệnh di trú và sẽ không tự lên UP. Release cut không đợi trạng thái này; nó dừng ngay và gọi tên trạng thái."
+  causes_vi:
+    - "Image sonarqube trong ext/sonar/compose.yaml được nâng phiên bản trong khi volume dữ liệu vẫn của phiên bản trước"
+    - "Volume sonarqube-postgres-data được khôi phục từ bản sao lưu cũ"
+  nextStep_vi: "Owner mở <host>/setup một lần (hoặc gửi POST /api/system/migrate_db bằng tài khoản admin) để di trú, chờ máy chủ báo UP, rồi chạy lại starci release cut."
+  owner: owner
+  kind: blocker

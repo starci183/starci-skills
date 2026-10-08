@@ -29,7 +29,7 @@ import { updateRef } from '../api/git/update-ref.mjs';
 import { changelogSection, releaseNotesFindings } from '../hfs/runtime-rules/release-notes.mjs';
 import { runL4, skipReport } from './release-l4.mjs';
 import { scanRange } from './push-mains.mjs';
-import { definitionRefusal, planOf } from './release-cut-plan.mjs';
+import { planOf, preSuiteRefusal } from './release-cut-plan.mjs';
 import { releaseHostMissing, releaseHostWhy } from './release-host.mjs';
 import { withHostLock as holdHostLock } from '../machine/host-lock.mjs';
 import { writeL4Record } from '../guards/release-record.mjs';
@@ -100,8 +100,8 @@ function releaseTagState({ tag, branch, remote, cwd, run, out, refuse }) {
  * What is already known to stop the cut before the suite runs, as a refusal or null: the release definition (scripts/guards/release-definition.mjs) is what the pre-push hook enforces, and what the
  * L4 row needs from this host (an Orca terminal, a reachable Orca, a Docker daemon) decides whether the row can pass at all: a cut that would fail an hour in refuses in seconds.
  */
-function beforeSuiteRefusal({ run, cwd, head, remote, branch, tag, deps, refuse }) {
-  const unmet = definitionRefusal({ run, cwd, head, remote, branch, tag, deps });
+async function beforeSuiteRefusal({ repo, run, cwd, head, remote, branch, tag, deps, refuse }) {
+  const unmet = await preSuiteRefusal({ repo, run, cwd, head, remote, branch, tag, deps });
   if (unmet) return refuse(unmet.verdict, unmet.why, { findings: unmet.findings });
   const hostMissing = (deps.host ?? releaseHostMissing)({});
   return hostMissing.length ? refuse('release-host', releaseHostWhy(hostMissing), { hostMissing }) : null;
@@ -150,7 +150,7 @@ export async function cutRelease({ repo, remote = 'origin', branch = 'main', tag
   const notes = releaseNotesFindings({ tags: [tag], changelog });
   if (notes.length) return refuse('release-notes', notes.map((f) => f.message).join('; '), { findings: notes });
 
-  const stop = beforeSuiteRefusal({ run, cwd, head, remote, branch, tag, deps, refuse });
+  const stop = await beforeSuiteRefusal({ repo, run, cwd, head, remote, branch, tag, deps, refuse });
   if (stop) return stop;
   if (plan) return planOf({ repo, head, tag, remote, branch, out });
 

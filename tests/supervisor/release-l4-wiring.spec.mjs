@@ -134,7 +134,7 @@ test('parity: a red step fails the row and names the step; a container that dies
   assert.match(empty.why, /nothing proves Linux parity/);
 });
 
-/** A fake gate + docker for the Sonar supplier: container states by name, and a status that reports UP after `upAfter` polls. */
+/** A fake gate + docker for the Sonar supplier: container states by name, and a status that reports STARTING until `upAfter` polls, then UP. */
 function fakeSonar({ states, upAfter = 0, scan = 'pass', dashboard = 'pass', startStatus = 0 } = {}) {
   const log = [];
   let polls = 0;
@@ -145,7 +145,7 @@ function fakeSonar({ states, upAfter = 0, scan = 'pass', dashboard = 'pass', sta
     deps: {
       gate: {
         config: () => ({ docker: 'docker', container: 'starci-sonarqube' }),
-        up: async () => { log.push(['gate', 'up']); return polls++ >= upAfter; },
+        state: async () => { log.push(['gate', 'state']); return { state: polls++ >= upAfter ? 'UP' : 'STARTING' }; },
         scan: async () => { log.push(['gate', 'scan']); return { outcome: scan }; },
         dashboard: async () => { log.push(['gate', 'dashboard']); return { outcome: dashboard }; },
       },
@@ -154,6 +154,7 @@ function fakeSonar({ states, upAfter = 0, scan = 'pass', dashboard = 'pass', sta
         start: (names) => { log.push(['start', ...names]); if (startStatus === 0) for (const n of names) state[n] = 'running'; return { status: startStatus, stderr: 'boom' }; },
         stop: (names) => { log.push(['stop', ...names]); for (const n of names) state[n] = 'exited'; return { status: 0 }; },
       },
+      lintReport: () => ({ ok: true }),
       sleep: async () => {},
       now: (() => { let n = 0; return () => (n += 1000); })(),
       logDir: null,
@@ -169,7 +170,7 @@ test('sonar: a stopped stack is started (database first), waited for until UP, s
   const proof = await proofs['shop: sonar']();
   assert.equal(proof.ok, true);
   assert.ok(fs.existsSync(proof.log));
-  assert.deepEqual(fake.log, [['start', 'starci-sonarqube-postgres', 'starci-sonarqube'], ['gate', 'up'], ['gate', 'up'], ['gate', 'up'], ['gate', 'scan'], ['gate', 'dashboard']]);
+  assert.deepEqual(fake.log, [['start', 'starci-sonarqube-postgres', 'starci-sonarqube'], ['gate', 'state'], ['gate', 'state'], ['gate', 'state'], ['gate', 'scan'], ['gate', 'dashboard']]);
   assert.deepEqual(close().stopped, ['starci-sonarqube', 'starci-sonarqube-postgres'], 'the server stops before its database');
   assert.deepEqual(fake.state, { 'starci-sonarqube-postgres': 'exited', 'starci-sonarqube': 'exited' }, 'left as found');
   assert.deepEqual(fake.log.slice(-1), [['stop', 'starci-sonarqube', 'starci-sonarqube-postgres']]);
@@ -216,7 +217,7 @@ test('sonar: a red scan fails the proof without reading the dashboard; a missing
   const d = sonarSupplier([APP], never.deps);
   const slow = (await d.proofs['shop: sonar']());
   assert.equal(slow.ok, false);
-  assert.match(fs.readFileSync(slow.log, 'utf8'), /did not report UP/);
+  assert.match(fs.readFileSync(slow.log, 'utf8'), /still reports STARTING after 30s although starci-sonarqube is running/);
   assert.deepEqual(d.close().stopped, ['starci-sonarqube', 'starci-sonarqube-postgres']);
 });
 
@@ -494,7 +495,7 @@ test('the cut runs the default L4 row with its wiring: a red Linux step is a red
     throw new Error(`unexpected git ${verb} ${args.join(' ')}`);
   };
   const changelog = '## [1.0.0-alpha.4] - 2026-10-04\n\n- done\n';
-  const out = (await cutRelease({ repo: base, tag: 'v1.0.0-alpha.4', deps: { host: () => [], git: fakeGit, findings: () => [], changelog: () => changelog, lock: (work) => { calls.push('lock'); return work(); }, suite: () => steps, push: () => { throw new Error('never pushed'); } } }));
+  const out = (await cutRelease({ repo: base, tag: 'v1.0.0-alpha.4', deps: { host: () => [], sonarHost: async () => [], git: fakeGit, findings: () => [], changelog: () => changelog, lock: (work) => { calls.push('lock'); return work(); }, suite: () => steps, push: () => { throw new Error('never pushed'); } } }));
   assert.deepEqual([out.ok, out.verdict], [false, 'suite-red']);
   assert.match(out.why, /linux-parity red/);
   assert.deepEqual(calls, ['lock']);

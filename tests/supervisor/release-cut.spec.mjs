@@ -45,7 +45,7 @@ function fixture(t, { changelog = CHANGELOG, version = '1.0.0-alpha.4' } = {}) {
   git(repo, 'commit', '-q', '-m', 'release commit');
   const remoteMain = () => git(origin, 'rev-parse', 'refs/heads/main');
   const remoteTags = () => git(origin, 'tag', '-l').split(/\r?\n/).filter(Boolean);
-  return { base, origin, repo, remoteMain, remoteTags, before: remoteMain(), deps: { host: () => [], suite: green, scan: scanOk, lock: (work) => work() } };
+  return { base, origin, repo, remoteMain, remoteTags, before: remoteMain(), deps: { host: () => [], suite: green, scan: scanOk, lock: (work) => work(), sonarHost: async () => [] } };
 }
 const cut = (fx, extra = {}, deps = {}) => cutRelease({ repo: fx.repo, tag: TAG, ...extra, deps: { ...fx.deps, ...deps } });
 const untouched = (fx) => { assert.equal(fx.remoteMain(), fx.before, 'main did not move'); assert.deepEqual(fx.remoteTags(), [], 'no tag was pushed'); };
@@ -169,11 +169,16 @@ test('the L4 row: the runtime suite and check, every example script (lint, tsc, 
   fs.mkdirSync(app, { recursive: true });
   fs.writeFileSync(path.join(app, 'hfs.json'), JSON.stringify({ kind: 'app' }));
   fs.writeFileSync(path.join(app, 'package.json'), JSON.stringify({ name: 'shop', scripts: { lint: 'x', typecheck: 'x', test: 'x', 'test:e2e': 'x' } }));
+  // a test layer has a row once the app holds a spec file in it: this app holds one e2e spec, no contract or integration spec
+  fs.mkdirSync(path.join(app, 'be', 'src', 'tests', 'e2e'), { recursive: true });
+  fs.writeFileSync(path.join(app, 'be', 'src', 'tests', 'e2e', 'shop.e2e-spec.ts'), 'export {};');
   const plan = planL4(base, { runtimeRoot: base });
   const names = plan.steps.map((s) => s.name);
   assert.deepEqual(names.filter((n) => n.startsWith('npm ')), ['npm test', 'npm run test:packages', 'npm run check'], 'the runtime rows: the root suite, the packages suites, the checks');
   for (const expected of ['shop: npm run lint', 'shop: npm run typecheck', 'shop: npm run test', 'shop: npm run test:e2e', 'shop: npm run docker:build', 'shop: npm run build:be']) assert.ok(names.includes(expected), expected);
-  assert.deepEqual(plan.steps.filter((s) => s.absent).map((s) => s.name).sort(), ['shop: npm ci', 'shop: npm run build:be', 'shop: npm run build:fe', 'shop: npm run codegen', 'shop: npm run docker:build', 'shop: npm run format:check', 'shop: npm run test:contract', 'shop: npm run test:integration', 'shop: npm run typecheck:tests']);
+  assert.deepEqual(plan.steps.filter((s) => s.absent).map((s) => s.name).sort(), ['shop: npm ci', 'shop: npm run build:be', 'shop: npm run build:fe', 'shop: npm run codegen', 'shop: npm run docker:build', 'shop: npm run format:check', 'shop: npm run typecheck:tests']);
+  assert.deepEqual(plan.notPlanned.map((row) => row.name).sort(), ['shop: npm run test:contract', 'shop: npm run test:integration'], 'a layer with no spec file has no row and is named with its reason');
+  assert.ok(plan.notPlanned.every((row) => row.why), 'each row left out carries its reason');
   assert.deepEqual(plan.proofs, ['shop: sonar']);
   const ran = [];
   const out = (await runL4(base, { plan, step: (s, o) => { ran.push([s.name, o.cwd]); return { ok: true, log: 'x.log', ms: 1, text: '﹣ draw-layer (1ms) # no browser\n' }; }, proofs: {}, parity: null }));
