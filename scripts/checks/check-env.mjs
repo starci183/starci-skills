@@ -152,7 +152,7 @@ export function envFindings(files, catalog, failureCodes = new Set(), exampleNam
 }
 
 /** The variable names secret.env.example lists, commented or not (NAME=). */
-const exampleNamesOf = (text) => new Set([...text.matchAll(/^#?[ \t]*([A-Z][A-Z0-9_]*)=/gm)].map((m) => m[1]));
+export const exampleNamesOf = (text) => new Set([...text.matchAll(/^#?[ \t]*([A-Z][A-Z0-9_]*)=/gm)].map((m) => m[1]));
 
 /** Run the check on the runtime at `root`. */
 function checkEnv(root = skillRoot) {

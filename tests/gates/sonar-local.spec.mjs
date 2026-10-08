@@ -520,7 +520,7 @@ test('status reports server, custody and token validity - never a value', async 
   assert.equal(exitCode,0);
   assert.equal(report.outcome,'up');
   assert.equal(report.server.version,'26.8.0.fake');
-  assert.deepEqual([report.custody.admin.via,report.custody.admin.valid],['materialized',true]);
+  assert.deepEqual([report.custody.admin.via,report.custody.admin.valid,report.custody.admin.name],['environment',true,'SONARQUBE_ADMIN_TOKEN']);
   assert.deepEqual([report.custody.analysis.via,report.custody.analysis.valid],['sops',true]);
   assertNoSecret(report,'status report');
   let blobBytes;
@@ -688,11 +688,14 @@ test('a custody reference inside a runtime extension is refused: the extension h
   const custody=fakeCustody(root);
   const ref=path.join(root,'.claude','ext','sonar','secrets','sonarqube-example-token.key');
   write(path.dirname(ref),'sonarqube-example-token.key.enc','ENC:fake-stale-token-0006');
+  state.mintValues.push(REMINTED);
   const {report}=await sonarLocalMain(['ensure-project','--key','example','--with-token','--token-ref',ref],{config:configFor(host,custody)});
-  assert.equal(report.tokenCustody.present,false);
-  assert.match(report.tokenCustody.reason,/outside a stack custody tree/);
-  assert.equal(state.requests.filter(r=>r.path==='/api/user_tokens/revoke').length,0);
-  assert.equal(fs.readFileSync(`${ref}.enc`,'utf8'),'ENC:fake-stale-token-0006','the member is left as it was');
+  assert.deepEqual([report.tokenCustody.via,report.tokenCustody.name],['minted',projectTokenRef('example')],'the token lands in the project member of the stack custody, never in the extension');
+  assert.equal(fs.readFileSync(`${ref}.enc`,'utf8'),'ENC:fake-stale-token-0006','the extension member is neither read nor written');
+  assert.deepEqual(fs.readdirSync(path.dirname(ref)),['sonarqube-example-token.key.enc']);
+  const read=readCustody(resolveConfig(configFor(host,custody),{}),ref,{remember:value=>value});
+  assert.equal(read.present,false);
+  assert.match(read.reason,/outside a stack custody tree/);
 });
 
 test('canonical inline custody is held before SOPS and cannot fall through plaintext or minting',async t=>{
@@ -1376,7 +1379,7 @@ services:
     ownerAction: none
 `);
   const declared=readSonarDeclaration(file);
-  assert.deepEqual([declared.hostLocal,declared.hostPublic,declared.admin,declared.analysis],[null,null,null,null]);
+  assert.deepEqual([declared.hostLocal,declared.hostPublic,declared.admin,declared.analysis],[null,null,undefined,null]);
   assert.equal(readSonarDeclaration(write(root,'string-host.yaml','schema: starci/application-stacks@1\nservices:\n  sonar: {provider: sonarqube, mode: local, host: "http://old-host:1", ci: {wiring: not-used}, ownerAction: none}\n')).hostLocal,null);
 });
 
