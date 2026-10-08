@@ -112,9 +112,22 @@ const VAR = /<([a-z][a-z0-9-]*)>/g;
 
 const refuse = (code, message, details = {}) => { throw new HfsSlotsError(code, message, details); };
 
+const catalogs = new Map();
+/** The parsed failure-code catalog under `root`; the megabyte of YAML is parsed once per file state (path, size, mtime), not once per check. */
+function readCatalog(root) {
+  const file = path.join(root, FAILURE_CODES_FILE);
+  const { size, mtimeMs } = fs.statSync(file);
+  const key = `${file}|${size}|${mtimeMs}`;
+  if (!catalogs.has(key)) {
+    catalogs.clear();
+    catalogs.set(key, parseYaml(fs.readFileSync(file, 'utf8')));
+  }
+  return catalogs.get(key);
+}
+
 /** {code: {title, title_vi, meaning_vi, nextStep_vi}} for the codes asked for, read from the failure-code catalog under `root`. */
 export function readWhy(root = skillRoot, codes = CHECK_CODES) {
-  const catalog = parseYaml(fs.readFileSync(path.join(root, FAILURE_CODES_FILE), 'utf8'));
+  const catalog = readCatalog(root);
   const why = {};
   for (const code of codes) {
     const entry = catalog?.[code];
