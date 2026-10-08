@@ -257,7 +257,7 @@ scenario('dispatch records Source and Work digests by kind; settle re-baselines 
   const loud=await status(fx);
   assert.deepEqual(loud.staleInput.map(s=>[s.jobId,s.path,s.kind,s.changed]),[['job-refactor',FR_DIR,'work',[`${FR_DIR}/index.yaml`]]],'a product record the job read, changed from outside its workflow, is stale');
   assert.deepEqual(loud.frontier.staleOperations,[{jobId:'job-refactor',op:OP,attempt:1,paths:[FR_DIR]}]);
-  assert.equal(loud.frontier.actionable,true);
+  assert.equal(loud.frontier.actionable,false,'stale-ready is a mechanical Job controller move: the Kernel menu holds nothing for it');
   assert.match(loud.frontier.reason,/job-refactor.*product records/);
 
   withLedger(fx,ledger=>enqueueSeed(ledger,{jobId:'job-refactor-redo',workflowId:WORKFLOW,opId:OP,attempt:2,kind:'op',payload:{opId:OP,owned_paths:['src/refactor/']}}));
@@ -406,7 +406,7 @@ scenario('cut: Work-stale slices list their ordinals; while the seam redo is ope
   assert.deepEqual(all.frontier.staleOperations.map(s=>[s.jobId,s.cut?.ordinal??null,s.heldBy??null]),
     [['job-cut-1',1,null],['job-cut-2',2,null],['job-cut-3',3,null],['job-partial',null,null]],'partial counts, a plain failure does not');
   assert.deepEqual(all.staleInput.find(s=>s.jobId==='job-cut-2').cut,cut(2));
-  assert.equal(all.frontier.actionable,true);
+  assert.equal(all.frontier.actionable,false,'stale-ready is a mechanical Job controller move: the Kernel menu holds nothing for it');
 
   withLedger(fx,ledger=>enqueueSeed(ledger,{jobId:'job-cut-1-redo',workflowId:WORKFLOW,opId:OP,attempt:4,kind:'op',payload:{opId:OP,owned_paths:['src/job-cut-1/'],cut:cut(1)}}));
   const seam=await status(fx);
