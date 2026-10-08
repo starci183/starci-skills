@@ -195,9 +195,11 @@ cases:
     status: covered
   - id: terminal-count-drift
     family: ending
-    met: {date: "2026-10-07", where: "41 terminals, finished workers' terminals still open", evidence: "AUDIT-starci-workflow.md issue 21"}
-    status: open
-    why: "the digest does not yet compare the seat rows with the Orca terminal list"
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "the TERMINAL_COUNT_DRIFT clock counted every Orca terminal (41) against the workers Orca held active (8) plus a slack of 5, so the owner's own lane shells, coordinators and per-worktree terminals, which the runtime may never close, kept it open for twenty hours (machine.sqlite sla_episodes 7: 2026-10-07T06:27Z to 2026-10-08T02:52Z); its declared auto-action, to collect the surplus shells, was performed by nothing but the boot dedupe", remedy: {state: in-tree, change: "the clock counts only runtime-titled tabs ([Kernel], [Op], [Worker], [Supervisor]) and a violated clock runs the dedupe pass (services --dedupe) once per SLA window (terminal-drift.mjs)"}}
+    met: {date: "2026-10-07", where: "41 terminals, finished workers' terminals still open", evidence: "AUDIT-starci-workflow.md issue 21; machine.sqlite sla_episodes episode 7"}
+    rule: {file: scripts/reconciler/terminal-drift.mjs, anchor: "runTerminalDrift"}
+    spec: tests/reconciler/terminal-drift.spec.mjs
+    status: covered
   - id: workflow-across-host-restart
     family: power-lifecycle
     met: {date: "2026-10-08", where: "CHANGELOG 1.0.0-alpha.6 Known limitations: the policy ran against fixtures only", evidence: "CHANGELOG.md"}

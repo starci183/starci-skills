@@ -67,8 +67,8 @@ turnBudget:
 
 # Processes (DESIGN 8.4): every everyMs. An orphan runtime loop (watchdog.mjs / start-workflow.mjs / serve-ask.mjs
 # whose --repo no managed ledger owns and whose workflow no managed ledger runs) older than orphanMinAgeMs is
-# stopped. The footprint scan runs every footprintEveryMs. More Orca terminals than seats + running workers +
-# terminalSlack -> the TERMINAL_COUNT_DRIFT clock.
+# stopped. The footprint scan runs every footprintEveryMs. More runtime-titled Orca tabs ([Kernel], [Op], [Worker], [Supervisor]; the owner's
+# own terminals are not counted) than active workers + terminalSlack -> the TERMINAL_COUNT_DRIFT clock, and the dedupe pass once per terminalDriftSlaMs.
 processes: {everyMs: 60000, orphanMinAgeMs: 1800000, orphanSlaMs: 60000, footprintEveryMs: 600000, terminalSlack: 5, terminalDriftSlaMs: 600000}
 
 # Ledger health (DESIGN 13): PRAGMA quick_check (read-only) every quickCheckEveryMs; nightly (from backupHour local

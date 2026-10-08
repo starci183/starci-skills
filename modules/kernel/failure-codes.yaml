@@ -6580,11 +6580,11 @@ TEMP_ROOT_UNUSABLE:
 TERMINAL_COUNT_DRIFT:
   title: "More terminals than expected"
   title_vi: "Số terminal nhiều hơn dự kiến"
-  meaning_vi: "Số terminal đang mở nhiều hơn số worker mà Orca đang giữ ở trạng thái hoạt động, cộng phần dư cho phép, và tình trạng này kéo dài."
+  meaning_vi: "Số terminal do runtime mở (tab mang tiêu đề [Kernel], [Op], [Worker] hoặc [Supervisor]) nhiều hơn số worker mà Orca đang giữ ở trạng thái hoạt động, cộng phần dư cho phép, và tình trạng này kéo dài. Terminal của chủ máy không được tính."
   causes_vi:
     - "Terminal của worker đã xong chưa được giải phóng"
     - "Shell trống còn sót lại"
-  nextStep_vi: "Sau thời hạn chờ, bộ dọn rác giải phóng các worker Orca báo là có thể thu hồi và đóng các shell trống."
+  nextStep_vi: "Sau thời hạn chờ, bước dedupe của bộ điều phối đóng các terminal StarCi không còn sổ cái nào gắn vào, mỗi cửa sổ thời hạn một lần."
   owner: runtime-core
   kind: runtime-fault
 
