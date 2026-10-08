@@ -45,7 +45,7 @@ function fixture(t, { changelog = CHANGELOG, version = '1.0.0-alpha.4' } = {}) {
   git(repo, 'commit', '-q', '-m', 'release commit');
   const remoteMain = () => git(origin, 'rev-parse', 'refs/heads/main');
   const remoteTags = () => git(origin, 'tag', '-l').split(/\r?\n/).filter(Boolean);
-  return { base, origin, repo, remoteMain, remoteTags, before: remoteMain(), deps: { host: () => [], suite: green, scan: scanOk, lock: (work) => work(), sonarCloud: async () => [] } };
+  return { base, origin, repo, remoteMain, remoteTags, before: remoteMain(), deps: { host: () => [], suite: green, scan: scanOk, lock: (work) => work(), sonarCloud: async () => [], publishPlan: () => ({ blockers: [], toPublish: [] }) } };
 }
 const cut = (fx, extra = {}, deps = {}) => cutRelease({ repo: fx.repo, tag: TAG, ...extra, deps: { ...fx.deps, ...deps } });
 const untouched = (fx) => { assert.equal(fx.remoteMain(), fx.before, 'main did not move'); assert.deepEqual(fx.remoteTags(), [], 'no tag was pushed'); };
@@ -343,4 +343,20 @@ test('the cut refuses at once, plan or run, when the host lacks an Orca terminal
   }
   assert.equal(ran, false, 'the suite never started');
   untouched(fx);
+});
+
+test('the cut refuses in seconds, before any suite, when the publish plan reports a package to publish or a blocker; a clean plan lets it go on', async (t) => {
+  const fx = fixture(t);
+  let suites = 0;
+  const suite = () => { suites += 1; return green(); };
+  const dirty = await cut(fx, {}, { suite, publishPlan: () => ({ blockers: ['@starci/canon@1.0.0 is on the registry but its bytes differ'], toPublish: ['@starci/eslint@2.0.0'] }) });
+  assert.equal(dirty.verdict, 'publish-plan', JSON.stringify(dirty));
+  assert.match(dirty.why, /@starci\/canon@1\.0\.0 is on the registry but its bytes differ; @starci\/eslint@2\.0\.0 is not on the registry: publish it/);
+  assert.equal(dirty.findings.length, 2);
+  const planned = await cut(fx, { plan: true }, { suite, publishPlan: () => ({ blockers: [], toPublish: ['@starci/eslint@2.0.0'] }) });
+  assert.equal(planned.verdict, 'publish-plan', 'the plan mode refuses the same way');
+  assert.equal(suites, 0, 'no suite ran');
+  untouched(fx);
+  const clean = await cut(fx, { plan: true }, { suite, publishPlan: () => ({ blockers: [], toPublish: [] }) });
+  assert.equal(clean.verdict, 'plan');
 });
