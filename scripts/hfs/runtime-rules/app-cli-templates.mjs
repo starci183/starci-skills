@@ -17,8 +17,7 @@ export function appCliTemplateFindings({ files, read }) {
     const text = read(file);
     if (text === null) continue;
     const lines = text.split(/\r?\n/u);
-    for (let index = 0; index < lines.length; index += 1) {
-      const line = lines[index];
+    for (const [index, line] of lines.entries()) {
       const match = WRONG_STARCI_GROUP.exec(line);
       if (!match) continue;
       findings.push({

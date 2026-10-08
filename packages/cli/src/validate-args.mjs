@@ -80,8 +80,7 @@ const checkPositionals = (verb, positionals, passthrough) => {
   const maximum = variadicAt >= 0 ? Infinity : positionalSchema.length;
   if (positionals.length > maximum) throw new Error(`too many positional arguments for ${verb.verb ?? 'command'}`);
   positionals.push(...passthrough.slice(0, Math.max(0, maximum - positionals.length)));
-  for (let index = 0; index < positionalSchema.length; index += 1) {
-    const schema = positionalSchema[index];
+  for (const [index, schema] of positionalSchema.entries()) {
     const supplied = variadicAt === index ? positionals.slice(index) : positionals[index];
     const empty = Array.isArray(supplied) ? supplied.length === 0 : supplied === undefined;
     if (schema.required && empty) throw new Error(`missing required positional ${schema.name}`);

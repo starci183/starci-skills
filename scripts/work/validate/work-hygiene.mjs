@@ -81,7 +81,7 @@ function entropy(text) {
 }
 /** `value` without a trailing ` # comment`: the whitespace run before the first `#` that has no line break after it, and all that follows. */
 const withoutTrailingComment = (value) => {
-  const lastBreak = Math.max(value.lastIndexOf('\n'), value.lastIndexOf('\r'), value.lastIndexOf('\u2028'), value.lastIndexOf('\u2029'));
+  const lastBreak = ([...value.matchAll(/[\n\r\u2028\u2029]/g)].at(-1)?.index ?? -1);
   for (let at = value.indexOf('#', lastBreak + 1); at >= 0; at = value.indexOf('#', at + 1)) {
     if (at === 0 || !/\s/.test(value[at - 1])) continue;
     let start = at - 1;

@@ -45,7 +45,7 @@ function ownerOfItem(item, index, kinds) {
 
 /** `text` up to its first `]` that no line terminator follows: the `]` closing a `hfsRules` list ends the line. */
 function withoutRuleListTail(text) {
-  const lineStart = Math.max(...['\n', '\r', '\u2028', '\u2029'].map((terminator) => text.lastIndexOf(terminator))) + 1;
+  const lineStart = ([...text.matchAll(/[\n\r\u2028\u2029]/g)].at(-1)?.index ?? -1) + 1;
   const close = text.indexOf(']', lineStart);
   return close < 0 ? text : text.slice(0, close);
 }

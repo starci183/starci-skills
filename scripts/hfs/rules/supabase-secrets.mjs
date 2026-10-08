@@ -67,8 +67,8 @@ function providerSecretFindings(repoRoot, file, repo, findings) {
   if (text === null) return;
   const seen = new Set();
   const lines = text.split(/\r?\n/u);
-  for (let index = 0; index < lines.length; index += 1) {
-    for (const pattern of liteSecretPatterns(lines[index])) {
+  for (const [index, line] of lines.entries()) {
+    for (const pattern of liteSecretPatterns(line)) {
       if (seen.has(pattern)) continue;
       seen.add(pattern);
       findings.push(found(LITE_SECRET_CUSTODY, file, `${file}:${index + 1} holds a provider-shaped secret (${pattern}); lite keeps no secret literal under fe/ or supabase/.`, { line: index + 1, pattern }));

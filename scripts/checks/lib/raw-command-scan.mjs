@@ -21,7 +21,7 @@ const programName = (value) => {
 };
 const lineAt = (text, at) => text.slice(0, at).split('\n').length;
 
-const LINE_TERMINATOR = new Set(['\n', '\r', '\u2028', '\u2029']);
+const LINE_TERMINATOR = /[\n\r\u2028\u2029]/;
 
 /**
  * Each /.*(?:\n|$)/g match of `text`, with its offset: [{index, line}] — a run of
@@ -33,7 +33,7 @@ const lineSpans = (text) => {
   const spans = [];
   let run = null;
   for (let i = 0; i < text.length; i += 1) {
-    if (!LINE_TERMINATOR.has(text[i])) {
+    if (!LINE_TERMINATOR.test(text[i])) {
       if (run === null) run = i;
       continue;
     }
