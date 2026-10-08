@@ -1,7 +1,7 @@
 import { getTranslations } from "next-intl/server"
 import type { Outcome } from "@ecommerce/api"
 import type { Slot } from "@ecommerce/ui"
-import { IDENTITY_API_URL } from "../../../modules/config"
+import { identityApiUrl } from "../../../modules/config"
 import { fetchCurrentUser, type CurrentUser } from "../../../modules/services"
 import { AccountPageBase } from "./component"
 import type { AccountPageState } from "./component"
@@ -16,7 +16,7 @@ const accountPageStateOf = (who: Outcome<CurrentUser | null>): AccountPageState 
 
 /** The one line under the title that says who is signed in, or why that cannot be said. */
 const accountLineOf = (who: Outcome<CurrentUser | null>, t: Awaited<ReturnType<typeof getTranslations>>): string => {
-    if (who.kind !== "ok") return t("unreachable", { url: IDENTITY_API_URL })
+    if (who.kind !== "ok") return t("unreachable", { url: identityApiUrl() })
     return who.data === null ? t("anonymous") : t("signedInAs", { email: who.data.email })
 }
 
@@ -49,7 +49,7 @@ export const AccountPage = async () => {
                 ordersSignedOutDescription: t("ordersSignedOut.description"),
                 ordersUnreachableTitle: t("ordersUnreachable.title"),
                 ordersUnreachableDescription:
-                    who.kind === "ok" ? "" : t("ordersUnreachable.description", { url: IDENTITY_API_URL }),
+                    who.kind === "ok" ? "" : t("ordersUnreachable.description", { url: identityApiUrl() }),
                 ordersEmptyTitle: t("ordersEmpty.title"),
                 ordersEmptyDescription: t("ordersEmpty.description"),
                 ordersBuyerTitle: t("ordersBuyer.title"),

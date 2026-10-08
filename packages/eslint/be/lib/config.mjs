@@ -32,7 +32,7 @@ export const IGNORED = Object.freeze(["dist/**", "coverage/**", "**/node_modules
  */
 const ROOT_SCRIPTS = Object.freeze(["*.js", "*.mjs", "*.cjs"])
 
-/** The typescript-eslint rules the canon borrows (BE-CONVENTION 1.17, R72/R73), all `error`. */
+/** The typescript-eslint rules the canon borrows (BE-CONVENTION 1.17, R72/R73; Sonar S1874, S6551 and S7503 through R235), all `error`. */
 export const BORROWED = Object.freeze({
     "@typescript-eslint/consistent-type-assertions": ["error", { assertionStyle: "never" }],
     "@typescript-eslint/no-explicit-any": "error",
@@ -41,6 +41,9 @@ export const BORROWED = Object.freeze({
     "@typescript-eslint/no-misused-promises": "error",
     "@typescript-eslint/switch-exhaustiveness-check": "error",
     "@typescript-eslint/array-type": ["error", { default: "generic", readonly: "generic" }],
+    "@typescript-eslint/no-deprecated": "error",
+    "@typescript-eslint/no-base-to-string": "error",
+    "@typescript-eslint/require-await": "error",
     "no-console": "error",
 })
 

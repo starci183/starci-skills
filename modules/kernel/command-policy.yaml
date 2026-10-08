@@ -80,7 +80,7 @@ op:
 release:
   verbs: [cut, publish]
   scripts: [release:cut, release:publish]
-  use: starci release cut is owner-approved and moves main plus its tag; starci release publish publishes packages from that release
+  use: starci release cut is owner-approved and moves main plus its tag; starci release publish publishes packages from that release; starci release notes prints or writes a tag CHANGELOG section and is not owner-gated
 # Programs that cannot change state, with any arguments.
 read: [ls, dir, cat, type, head, tail, wc, uniq, cut, tr, diff, cmp, comm, rg, grep, egrep, fgrep, echo, printf, pwd, cd, pushd, popd, which, where, whoami, hostname,
   stat, file, realpath, readlink, dirname, basename, date, true, false, test, '[', expr, sleep, seq, basename, md5sum, sha1sum, sha256sum, shasum, cksum, od, xxd, hexdump,

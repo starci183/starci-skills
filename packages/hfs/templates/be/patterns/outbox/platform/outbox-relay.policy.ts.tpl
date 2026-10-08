@@ -1,6 +1,7 @@
 import type { OnApplicationBootstrap, OnApplicationShutdown } from "@nestjs/common"
 import type { EntityManager } from "typeorm"
 import type { Logger } from "@modules/platform/logging"
+import { eachInOrder } from "@modules/platform/primitives"
 import { OutboxLogEvent } from "./outbox.log-events"
 
 /**
@@ -28,7 +29,9 @@ export abstract class OutboxRelayPolicy<Row extends { readonly id: string }>
     /** One pass over every connection: relays the oldest waiting rows of each and answers how many it relayed. */
     async relay(): Promise<number> {
         let relayed = 0
-        for (const manager of this.managers) relayed += await this.relayOf(manager)
+        await eachInOrder(this.managers, async (manager) => {
+            relayed += await this.relayOf(manager)
+        })
         return relayed
     }
 
@@ -66,13 +69,25 @@ export abstract class OutboxRelayPolicy<Row extends { readonly id: string }>
         })
     }
 
-    private async run(): Promise<void> {
-        while (this.running) {
-            const relayed = await this.relay().catch((cause: unknown) => {
-                this.logger.error(OutboxLogEvent.RelayFailed, cause, { outbox: this.outbox })
-                return 0
-            })
-            if (relayed === 0 && this.running) await this.idle()
-        }
+    /** One pass, then the next, until the app stops: each pass starts from the settled promise of the last, so the loop holds no growing chain. */
+    private run(): Promise<void> {
+        return new Promise<void>((resolve, reject) => {
+            const next = (): void => {
+                if (!this.running) {
+                    resolve()
+                    return
+                }
+                void this.pass().then(next, reject)
+            }
+            next()
+        })
+    }
+
+    private async pass(): Promise<void> {
+        const relayed = await this.relay().catch((cause: unknown) => {
+            this.logger.error(OutboxLogEvent.RelayFailed, cause, { outbox: this.outbox })
+            return 0
+        })
+        if (relayed === 0 && this.running) await this.idle()
     }
 }

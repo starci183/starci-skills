@@ -432,3 +432,141 @@ cases:
     met: {date: "2026-10-08", where: "role standard completion: the Supervisor menu kind kernel-escape (a Kernel whose menu offered no fitting option) is handled by the Supervisor but names no row, hold or gate cause of the incident policy", evidence: "modules/supervisor/supervisor-menu.yaml kernel-escape; modules/kernel/op-incident-policy.yaml"}
     status: open
     why: "the happy error has a menu kind and a Decision Item (menu-escape) but no policy row with a bound and a chain, so the roles contract cannot name its row"
+    why: "the instruction text of supervisor-prompt.md, supervise.yaml and docs/supervisor.md still describes fix workers and lands; the rewrite is designed in ROLES-STANDARD-alpha8.md"
+  - id: spec-reads-owner-live-config
+    family: record-vs-reality
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "the release cut ran the suite from the live checkout, whose owner config.yaml sets roots.temp and supervisor.landGate: the temp-root, registry-isolation, land-gate and checkpoint specs read that file and failed, though the same commit was green in a lane clone without one", remedy: {state: in-tree, change: "engine/config.mjs shows a spec run an owner config.yaml only from under the spec's temp directory; the checkout's live file never reaches a spec"}}
+    met: {date: "2026-10-08", where: "release cut of 1.0.0-alpha.7, L4 npm test", evidence: "the result log of the 1.0.0-alpha.7 release cut; release-npm_test log: 16 failures"}
+    rule: {file: engine/config.mjs, anchor: "ownerFileVisible"}
+    spec: tests/engine-db/runtime-state-root.spec.mjs
+    status: covered
+  - id: l4-borrows-stale-test-world-build
+    family: record-vs-reality
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "the spec run borrowed packages/test-world/dist, an untracked build older than its source: the example apps were typed against an API without writeFault and subscribe, and the scaffold end-to-end spec attached a stack of the old shape", remedy: {state: in-tree, change: "L4 builds packages/test-world after the installs and before the suite, and a spec that borrows the build refuses a stale or absent one with the command"}}
+    met: {date: "2026-10-08", where: "release cut of 1.0.0-alpha.7, L4 npm test", evidence: "release-npm_test log: actual catalog programs resolve current module APIs, 22 TS diagnostics"}
+    rule: {file: scripts/supervisor/release-l4.mjs, anchor: "test-world: npm run build"}
+    spec: tests/supervisor/release-l4-wiring.spec.mjs
+    status: covered
+  - id: spec-scratch-app-seen-by-json-inventory
+    family: concurrency
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "a scaffold spec builds an app in .tmp-hfs-fe-build-* inside the checkout while settle specs run the docs gate over the same root: check-json-exceptions listed the scratch app's package.json files and five checkpoint specs failed", remedy: {state: in-tree, change: "the JSON inventory skips the git-ignored scratch prefixes at the root"}}
+    met: {date: "2026-10-08", where: "release cut of 1.0.0-alpha.7, L4 npm test (the scaffold fe build runs only where app installs are required)", evidence: "release-npm_test log: workflow-checkpoint and workflow-rebase-milestone, check-json-exceptions .tmp-hfs-fe-build-hwMjHJ"}
+    rule: {file: scripts/checks/check-json-exceptions.mjs, anchor: "Disposable scratch trees"}
+    spec: tests/checks/check-json-exceptions.spec.mjs
+    status: covered
+  - id: op-worktree-guard-off-on-old-git
+    family: authority-safety
+    finding: {role: runtime, duty: never, verdict: departs, evidence: "the history hook refused an op's git worktree add only when git rev-parse --show-ref-format answered files; a git before 2.46 echoes the flag, so the refusal switched itself off and an op could create a worktree again", remedy: {state: in-tree, change: "the hook treats the echoed flag as the files backend (HOOK_VERSION 7)"}}
+    met: {date: "2026-10-08", where: "release cut of 1.0.0-alpha.7, Linux parity container (git 2.39)", evidence: "linux-parity log: the history hook specs"}
+    rule: {file: scripts/guards/hook-install.mjs, anchor: "predates --show-ref-format"}
+    spec: tests/guards/op-worktree-link-guard.spec.mjs
+    status: covered
+  - id: linux-parity-container-differs-from-ci
+    family: record-vs-reality
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "the parity container ran node:22 (git 2.39) at /work: seven specs failed there that the CI runner (a current git, a deep checkout path) passes, so the parity step blocked a release for reasons CI does not have", remedy: {state: in-tree, change: "the container image is node:<major>-trixie (git 2.47) and the checkout is several levels below the root"}}
+    met: {date: "2026-10-08", where: "release cut of 1.0.0-alpha.7, linux-parity step", evidence: "linux-parity log: safeRemove, kernel-guard, op-worktree-link-guard, land-git-env, land-throughput"}
+    rule: {file: scripts/lib/node-image.mjs, anchor: "trixie"}
+    spec: tests/supervisor/release-l4-wiring.spec.mjs
+    status: covered
+  - id: release-cut-fails-late-on-host-prerequisites
+    family: smooth-operation
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "a cut started outside an Orca terminal ran 40 minutes of L4 before failing on skipped live-Orca specs, and a host without Docker failed at the parity step", remedy: {state: in-tree, change: "release cut and --plan refuse release-host at once when an Orca terminal, a reachable Orca or a Docker daemon is missing; npm run test:release-env runs the cut's spec leg in everyday verification"}}
+    met: {date: "2026-10-08", where: "release cut of 1.0.0-alpha.7", evidence: "release-npm_test log: SKIPPED orca settle smokes, no ORCA_TERMINAL_HANDLE"}
+    rule: {file: scripts/supervisor/release-host.mjs, anchor: "releaseHostMissing"}
+    spec: tests/supervisor/release-cut.spec.mjs
+    status: covered
+  - id: orca-worktree-rm-walks-junctions-measured
+    family: authority-safety
+    finding: {role: runtime, duty: never, verdict: departs, evidence: "the live junction probe found the fake main's node_modules content gone after a bare orca worktree rm --force of a worktree with node_modules junctions on the release host", remedy: {state: open, change: "the runtime already unlinks every link before Orca removes a worktree (worktree-orca.mjs removeOrcaWorktree); whether this Orca build walks junctions on this host needs a probe from an Orca terminal"}}
+    met: {date: "2026-10-08", where: "release cut of 1.0.0-alpha.7, L4 npm test, orca-worktree-rm-live", evidence: "release-npm_test log: Orca did not walk the junctions: the fake main is byte-identical"}
+    status: open
+    why: "a probe of the real Orca writes a repository into it, which a lane may not do; run STARCI_ORCA_LIVE=1 on tests/api-orca/orca-worktree-rm-live.spec.mjs from an Orca terminal and record the measurement"
+  - id: example-fell-behind-renderer-unseen
+    family: record-vs-reality
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "the three example apps are the runtime's reference applications, yet no check in npm run check judged them: a hand-added .starcistacks/.npmignore, a lite quality gate left at the full name, Next config modules that need a projection at image build and Dockerfile text the templates no longer write all reached the release cut, where 16 L4 example rows failed after an hour of run", remedy: {state: in-tree, change: "the example-render self-check judges every example with the runtime's own HFS and renderer, without an app install (scripts/checks/check-example-render.mjs)"}}
+    met: {date: "2026-10-08", where: "release cut of 1.0.0-alpha.7", evidence: "the release cut of v1.0.0-alpha.7 refused suite-red with 21 red rows"}
+    rule: {file: scripts/checks/check-example-render.mjs, anchor: "the examples are their render"}
+    spec: tests/checks/example-render.spec.mjs
+    status: covered
+  - id: l4-row-demands-what-the-app-never-had
+    family: correctness
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "the L4 plan ran test:contract, test:integration, test:e2e and typecheck:tests for a full app whose scaffold holds the scripts and the tests tsconfig but no spec file, so shape-slot failed four rows on 'No tests found' and TS18003 that no change to the app could meaningfully satisfy", remedy: {state: in-tree, change: "a row exists for each layer that holds a spec file; the others are listed as notPlanned with the reason (scripts/supervisor/release-l4-layers.mjs)"}}
+    met: {date: "2026-10-08", where: "release cut of 1.0.0-alpha.7, shape-slot rows", evidence: "release-shape-slot_npm_run_typecheck_tests log"}
+    rule: {file: scripts/supervisor/release-l4-layers.mjs, anchor: "demand what nothing produced"}
+    spec: tests/supervisor/release-l4-wiring.spec.mjs
+    status: covered
+  - id: release-step-env-lacks-swc-cache
+    family: concurrency
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "the L4 example steps inherited the cut's environment, which names no SWC cache; @swc/core refused its native binding under the host cache ancestor ACL, so next.config.ts failed to load in every build:fe while the land gate and the scaffold spec, which set the cache, passed", remedy: {state: in-tree, change: "every example script step runs with the env of build-env.mjs (stepEnv in release-l4-layers.mjs)"}}
+    met: {date: "2026-10-08", where: "release cut of 1.0.0-alpha.7, build:fe rows", evidence: "release-lite-app_npm_run_build_fe log: Failed to load native binding"}
+    rule: {file: scripts/supervisor/release-l4-layers.mjs, anchor: "SWC cache"}
+    spec: tests/supervisor/release-l4-wiring.spec.mjs
+    status: covered
+  - id: jest-layer-glob-breaks-under-dot-folder
+    family: correctness
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "the integration, e2e and contract projects matched a pattern prefixed with the absolute root; under a Windows root holding a dot-named folder (the runtime checkout is .claude) the separator before it became a glob escape and jest found 0 spec files", remedy: {state: in-tree, change: "the projects match **/src/tests/<layer>/** (packages/jest-preset/index.cjs); the package needs a version bump and publication to reach the examples"}}
+    met: {date: "2026-10-08", where: "release cut of 1.0.0-alpha.7, ecommerce-app test:contract", evidence: "testMatch ... 0 matches"}
+    rule: {file: packages/jest-preset/index.cjs, anchor: "dot-named folder"}
+    spec: packages/jest-preset/preset.spec.mjs
+    status: covered
+  - id: example-installs-resolve-stale-registry-packages
+    family: record-vs-reality
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "six packages differ from their registry copy at the same version; each example installs the registry copy, so the example lint judges the renderer of the last publication, and the cut started a one-hour L4 run that could not pass while the publish plan (starci release check, proof publish-plan) already reported five blockers", remedy: {state: open, change: "the cut reads the publish plan before it starts the L4 run; the owner publishes the packages at bumped versions and re-pins the examples"}}
+    met: {date: "2026-10-08", where: "release cut of 1.0.0-alpha.7, lint rows of all three examples", evidence: "starci release publish (plan): 5 blockers"}
+    status: open
+    why: "publishing needs the owner's credentials, and the cut's pre-flight is not built: the cut specs inject every seam and a default registry read there needs its own design"
+  - id: release-sonar-proof-followed-public-host
+    family: correctness
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "the three L4 Sonar rows of the alpha.7 cut waited five minutes and failed 'SonarQube did not report UP in time' although the local server answered UP 19 s after its containers started: the proof's gate config took SONAR_HOST_URL from the host secret.env (https://sonar.starci.org, the CI tunnel whose container was stopped) before the host.local the example declares", remedy: {state: in-tree, change: "the self-hosted stack is out of the examples' proof: it scans SonarCloud (cloudConfig) with the runtime's one SONAR_TOKEN, the host being the declared hosted one, never the SONAR_HOST_URL of the environment; release cut and --plan refuse in seconds when SONAR_TOKEN or SONAR_ORGANIZATION is absent, the token or organization is rejected, or SonarCloud is unreachable (sonarCloudRefusal)"}}
+    met: {date: "2026-10-08", where: "release cut v1.0.0-alpha.7, L4 rows ecommerce-app, lite-app, shape-slot: sonar", evidence: "the cut's starci-release-l4/sonar-<app>-*.log files; container starci-sonarqube operational 08:16:42 after starting 08:16:23"}
+    rule: {file: scripts/supervisor/release-sonarcloud.mjs, anchor: "cloudConfig"}
+    spec: tests/supervisor/release-sonarcloud.spec.mjs
+    status: covered
+  - id: release-sonar-proof-lint-report-never-produced
+    family: correctness
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "every example's sonar-project.properties imports reports/lint.sonar.json, which only `starci app lint --sonar` writes (the managed ci.yml runs it before the scan); the L4 lint row runs `starci app lint` without it, so the Sonar scan of a cut that reached the server failed in the scanner's ExternalIssueReportParser", remedy: {state: in-tree, change: "the Sonar proof writes the report itself with the app's installed CLI before the scan and fails by name when none is written (writeLintReport)"}}
+    met: {date: "2026-10-08", where: "proof of the stack fix, ecommerce-app scan", evidence: "scanner log: ExternalIssueReportParser.parse, Scanner engine failed with code 1"}
+    rule: {file: scripts/supervisor/release-sonar-report.mjs, anchor: "writeLintReport"}
+    spec: tests/supervisor/release-sonarcloud.spec.mjs
+    status: covered
+  - id: release-sonar-proof-stale-pooled-socket
+    family: failure-while-running
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "after the synchronous lint step blocked the process for 90 s, the first request of the scan reused a keep-alive socket pooled during the start-up wait; the docker port proxy had reset it, so the scan was blocked 'not reachable (ECONNRESET)' with the server UP and healthy", remedy: {state: in-tree, change: "the proof's requests send Connection: close (freshFetch), so no socket outlives a blocked event loop"}}
+    met: {date: "2026-10-08", where: "proof of the stack fix, ecommerce-app scan", evidence: "reproduced with a 75 s Atomics.wait between two fetches: ECONNRESET, none with Connection: close"}
+    rule: {file: scripts/api/sonar/fresh-fetch.mjs, anchor: "freshFetch"}
+    spec: tests/supervisor/release-sonarcloud.spec.mjs
+    status: covered
+  - id: release-examples-sonar-token-sealed-in-public-repo
+    family: authority-safety
+    finding: {role: runtime, duty: never, verdict: departs, evidence: "the three example apps' Sonar tokens (and the admin token) were sealed with sops into ext/sonar/secrets/*.enc and committed to the public runtime repository, minted and re-sealed by sonar-local.mjs; the owner's rule is that the public repository holds no secret material, not even ciphertext, and the L4 proof then needed a SOPS identity and a self-hosted Docker server for projects that CI and the runtime itself analyse on SonarCloud", remedy: {state: in-tree, change: "the examples declare SonarCloud with runtimeSecrets [SONAR_TOKEN, SONAR_ORGANIZATION] (STACKS_EXAMPLE_FORM refuses custody, a stack or host.local in an example, STACKS_PRODUCT_FORM refuses runtimeSecrets in a product), their sealed members are deleted, and RT_SECRET_TRACKED refuses any tracked *.enc, secret.env or .env outside ruleParams.runtime.heldSecrets"}}
+    met: {date: "2026-10-08", where: "owner ruling on the release proof's credentials", evidence: "owner: I do not want any .enc of .claude committed"}
+    rule: {file: scripts/hfs/runtime-rules/secret-tracked.mjs, anchor: "RT_SECRET_TRACKED"}
+    spec: tests/checks/secret-tracked.spec.mjs
+    status: covered
+  - id: release-tracked-secrets-remaining
+    family: authority-safety
+    finding: {role: runtime, duty: never, verdict: departs, evidence: "five sealed stack members of the product Sonar server (database password, admin password, admin token, server-wide analysis token, tunnel token) and two demo secrets of the ecommerce example's own docker stack are still tracked in the public runtime repository", remedy: {state: open, change: "move each into the untracked secret.env under names that cannot be confused with SonarCloud's (SONARQUBE_DB_PASSWORD, SONARQUBE_ADMIN_PASSWORD, SONARQUBE_ADMIN_TOKEN, SONARQUBE_ANALYSIS_TOKEN, CLOUDFLARE_TUNNEL_TOKEN), make compose read them from the environment the runtime passes from secretEnv, then delete the members and the heldSecrets entries"}}
+    met: {date: "2026-10-08", where: "owner ruling: no .enc of .claude committed", evidence: "ruleParams.runtime.heldSecrets of knowledge/hfs/runtime-slots.yaml lists them"}
+    status: open
+    why: "the stack's compose files, sonar-local.mjs's admin-token reader and the product declarations still read ext/sonar/secrets; moving them touches the product Sonar server and the owner's own decrypt-and-append step, which no lane may run against real secrets; heldSecrets is the dated allowance (2026-10-08) and only shrinks"
+  - id: examples-reached-release-with-sonar-smells
+    family: correctness
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "SonarCloud scanned the three example apps of the alpha.7 cut and their dashboards failed on 46 code smells (S9382 x23, S7503 x6, S1874 x6, S1128 x2 and nine others) although every L4 row before the scan was green: the sonar-rules self-check judged the runtime's .mjs only, the examples had been judged by an older self-hosted server, and neither lint canon carried a rule for these smells, so nothing refused them before the scan", remedy: {state: in-tree, change: "the smells are fixed in the code and in the templates that render it; both lint canons publish the law SCAN_SMELL (R235), and the sonar-rules self-check also judges the TypeScript each example scans, so the examples cannot regress before the scan"}}
+    met: {date: "2026-10-08", where: "release-proof analysis of the three examples on SonarCloud", evidence: "api/issues/search on starcidapride_starci-example-ecommerce-app, -lite-app, -shape-slot: 20, 10 and 16 open code smells"}
+    rule: {file: scripts/lib/sonar-syntax-rules.mjs, anchor: "SONAR_SYNTAX_RULES"}
+    spec: packages/eslint/be/sonar-parity.spec.mjs
+    status: covered
+  - id: check-count-read-as-green-while-hfs-failed
+    family: record-vs-reality
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "starci runtime check printed 'self-checks: 44 of 44 passed' while its runtime HFS stage had failed and the exit code was 1; a lane and the lead both reported the check green", remedy: {state: in-tree, change: "the last line of the check states the whole verdict: 'check: ok — runtime HFS clean; self-checks N of N' or 'check: FAILED — runtime HFS n finding(s); self-checks a of b (failed: ...)'"}}
+    met: {date: "2026-10-08", where: "lane f10 report and the alpha.7 integration branch", evidence: "ARCH_OWNER_CYCLE engine/config.mjs printed above the self-check lines"}
+    rule: {file: scripts/checks/check-runtime.mjs, anchor: "verdictLine"}
+    spec: tests/checks/check-runtime-only.spec.mjs
+    status: covered
+  - id: engine-config-imports-scripts-tier-for-spec-isolation
+    family: correctness
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "engine/config.mjs imported isSpecRun and insidePath from scripts/lib to keep the live config.yaml out of a spec: ARCH_OWNER_CYCLE engine -> scripts/lib -> engine", remedy: {state: in-tree, change: "the engine reads one generic confinement variable (STARCI_OWNER_CONFIG_WITHIN) and knows nothing of tests; the spec preload sets it to the spec's temp root"}}
+    met: {date: "2026-10-08", where: "commit 6ad9c7cca on the alpha.7 integration branch", evidence: "npm run check: ARCH_OWNER_CYCLE engine/config.mjs:13"}
+    rule: {file: engine/config.mjs, anchor: "confines the owner"}
+    spec: tests/engine/config.spec.mjs
+    status: covered

@@ -8,6 +8,12 @@ import { SignInFormBase } from "./component"
 
 type SignInFailure = "refused" | "not-found" | "invalid" | "unavailable"
 
+/** The state the form shows: working while a request runs, failed after a refusal, else ready. */
+const stateOf = (pending: boolean, failure: SignInFailure | undefined): "working" | "ready" | "failed" => {
+    if (pending) return "working"
+    return failure === undefined ? "ready" : "failed"
+}
+
 /** The interactive sign-in form wired to the schema-checked Server Action. */
 export const SignInForm = () => {
     const router = navigation.useRouter()
@@ -27,7 +33,7 @@ export const SignInForm = () => {
     }
     return (
         <SignInFormBase
-            state={pending ? "working" : failure === undefined ? "ready" : "failed"}
+            state={stateOf(pending, failure)}
             props={{
                 title: t("title"),
                 emailLabel: t("email"),

@@ -9,7 +9,7 @@ import { RunCli } from "./subs/run.cli"
 /** `cli migrate`: the migration group; its commands are the sub-commands (`cli migrate run`). */
 export class MigrateCli extends CommandRunner {
     /** Without a sub-command the group shows its help. */
-    async run(): Promise<void> {
-        this.command.help()
+    run(): Promise<void> {
+        return this.command.help()
     }
 }

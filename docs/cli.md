@@ -782,6 +782,7 @@ inspect, provision and run the local Sonar quality gate
 | `--base` | string |  |
 | `--paths` | list |  |
 | `--project-gate` | boolean |  |
+| `--branch` | string |  |
 | `--out` | string |  |
 | `--blob` | boolean |  |
 | `--log` | string |  |
@@ -2918,6 +2919,29 @@ starci release cut --plan --tag v1.0.0-alpha.7
 starci release cut --repo <path> --tag v1.0.0-alpha.7 --json
 ```
 
+### starci release env-test
+
+run the runtime spec suite under the release cut's own conditions
+
+| flag | type | |
+| --- | --- | --- |
+| `--lane` | boolean |  |
+| `--reuse-installs` | boolean |  |
+
+Conventions:
+
+- the suite is the cut's own spec leg, so a red the cut would find shows here first; it takes minutes to an hour and writes each step to a log
+- without --lane it refuses (exit 2) unless the host has an Orca terminal, a reachable Orca and a Docker daemon, the same prerequisites the cut refuses on
+
+exit: 0 the suite is green and no skip fails the evidence rule; 1 a step is red or a skipped test ran in no leg; 2 the host lacks a prerequisite of the cut, or bad usage
+
+json: none
+
+```sh
+starci release env-test
+starci release env-test --lane --reuse-installs
+```
+
 ### starci release images
 
 build, run, health-check and tear down the shipped application images
@@ -3040,7 +3064,7 @@ Roles: release, owner
 
 Conventions:
 
-- plan mode is read-only and reports registry blockers, canon rebind drift and example pin drift
+- plan mode is read-only and reports registry blockers, canon rebind drift and example pin drift; the text and the json data.plan name every row and every blocker
 - publication uses the existing clean proof, registry confirmation and integrity verification
 - scripts/gates/release-plan.mjs publishOrder puts dependencies first and refuses cycles; packages without bundled canon pins win only among ready ties
 - the package phase rebinds code patterns, re-pins and installs examples, syncs them and proves every binding

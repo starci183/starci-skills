@@ -47,6 +47,7 @@ import { recommended as typeSafetyRecommended, rules as typeSafetyRules } from "
 import { recommended as typographyRecommended, rules as typographyRules } from "./typography.mjs"
 import { recommended as vendorRecommended, rules as vendorRules } from "./vendor-boundary.mjs"
 import { recommended as projectGraphRecommended, rules as projectGraphRules } from "./project-graph.mjs"
+import { recommended as sonarParityRecommended, rules as sonarParityRules } from "./sonar-parity.mjs"
 import { buildFeConfig } from "./lib/config.mjs"
 import { why } from "./lib/why.mjs"
 
@@ -88,6 +89,7 @@ const CONTRIBUTIONS = [
   { law: "type-safety", rules: typeSafetyRules, recommended: typeSafetyRecommended },
   { law: "typography", rules: typographyRules, recommended: typographyRecommended },
   { law: "vendor-boundary", rules: vendorRules, recommended: vendorRecommended },
+  { law: "sonar-parity", rules: sonarParityRules, recommended: sonarParityRecommended },
 ]
 
 /** Every gathered law. */
@@ -176,6 +178,9 @@ const loadReactHooks = () => {
   throw new Error("starciFeConfig needs eslint-plugin-react-hooks 7 or newer: npm i -D eslint-plugin-react-hooks")
 }
 
+/** The typescript-eslint plugin whose type-aware rules the factory borrows (Sonar S1874, S6551 and S7503); a dependency of this package. */
+const loadTsPlugin = () => createRequire(import.meta.url)("@typescript-eslint/eslint-plugin")
+
 /**
  * The React Hooks rules of a plugin, all at error.
  *
@@ -226,6 +231,7 @@ export const starciFeConfig = ({ hfs } = {}) => {
     hfs,
     plugin,
     reactHooks,
+    tsPlugin: loadTsPlugin(),
     source: { ...recommended, ...reactHooksRules(reactHooks) },
   })
 }

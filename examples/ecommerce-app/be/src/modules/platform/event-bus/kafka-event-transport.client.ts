@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common"
 import type { OnApplicationShutdown } from "@nestjs/common"
 import { InjectIds } from "@modules/platform/ids"
 import type { Ids } from "@modules/platform/ids"
+import { eachInOrder } from "@modules/platform/primitives"
 import type { Probe } from "@modules/platform/probes"
 import { EventBusError, EventBusErrorCode } from "./errors/event-bus.error"
 import { InjectEventBusOptions, InjectKafkaFactory } from "./event-bus.decorators"
@@ -181,7 +182,7 @@ export class KafkaEventTransportClient implements EventTransport, Probe, OnAppli
 
     /** Disconnects the producer, the consumer and the admin client. */
     async onApplicationShutdown(): Promise<void> {
-        for (const client of [this.producer, this.consumer, this.admin]) await this.close(client)
+        await eachInOrder([this.producer, this.consumer, this.admin], (client) => this.close(client))
     }
 
     /** The end offsets of the topic; a topic that does not exist yet answers no partitions and the cause. */

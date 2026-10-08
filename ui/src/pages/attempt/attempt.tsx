@@ -114,7 +114,7 @@ function AttemptDetailPage({ project, attemptId, routeStep }: Readonly<{ project
       <StaggerItem><AttemptHeader attempt={data} project={project} /></StaggerItem>
       <StaggerItem><StepBar steps={stepItems(data)} selected={step} onSelect={selectStep} /></StaggerItem>
       <StaggerItem><AttemptOpGoal attempt={data} info={info.info} loading={info.loading} reference={info} /></StaggerItem>
-      <StaggerItem><ResultCard attempt={data} /></StaggerItem>
+      <StaggerItem><ResultCard attempt={data} onShowChecks={() => selectStep('checks')} /></StaggerItem>
       <StaggerItem><ProductsCard project={project} attempt={data} /></StaggerItem>
     </Stagger>
 

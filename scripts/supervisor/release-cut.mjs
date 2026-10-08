@@ -4,6 +4,7 @@
 //   2. the release tag `v<version>` is named, is not on the remote yet, and is either absent or an annotated tag already on HEAD; any other tag is refused;
 //   3. RELEASE_NOTES holds: the tag's CHANGELOG section exists and has no unfinished entries (scripts/hfs/runtime-rules/release-notes.mjs), and the rest of the release
 //      definition that can hold before the suite ran (scripts/guards/release-definition.mjs: the version moved past the remote main's, a dated heading); `--plan` stops here and reports what the cut would run;
+//      the release host provides what L4 needs (scripts/supervisor/release-host.mjs: an Orca terminal, a reachable Orca, a Docker daemon), else the cut refuses `release-host` at once;
 //   4. the L4 row runs once (scripts/supervisor/release-l4.mjs: the example installs, every spec, lint, checks, tsc, images, the Sonar proof and the Linux parity step), each step to a log recorded in the result;
 //      every skipped test is reported with its reason, and a skip from missing infrastructure (or any skip but the declared browser ones) fails L4;
 //   5. main did not move meanwhile; the pushed range passes the secret scan;
@@ -28,7 +29,8 @@ import { updateRef } from '../api/git/update-ref.mjs';
 import { changelogSection, releaseNotesFindings } from '../hfs/runtime-rules/release-notes.mjs';
 import { runL4, skipReport } from './release-l4.mjs';
 import { scanRange } from './push-mains.mjs';
-import { definitionRefusal, planOf } from './release-cut-plan.mjs';
+import { planOf, preSuiteRefusal } from './release-cut-plan.mjs';
+import { releaseHostMissing, releaseHostWhy } from './release-host.mjs';
 import { withHostLock as holdHostLock } from '../machine/host-lock.mjs';
 import { writeL4Record } from '../guards/release-record.mjs';
 
@@ -94,6 +96,17 @@ function releaseTagState({ tag, branch, remote, cwd, run, out, refuse }) {
   return { head, local };
 }
 
+/**
+ * What is already known to stop the cut before the suite runs, as a refusal or null: the release definition (scripts/guards/release-definition.mjs) is what the pre-push hook enforces, and what the
+ * L4 row needs from this host (an Orca terminal, a reachable Orca, a Docker daemon) decides whether the row can pass at all: a cut that would fail an hour in refuses in seconds.
+ */
+async function beforeSuiteRefusal({ repo, run, cwd, head, remote, branch, tag, deps, refuse }) {
+  const unmet = await preSuiteRefusal({ repo, run, cwd, head, remote, branch, tag, deps });
+  if (unmet) return refuse(unmet.verdict, unmet.why, { findings: unmet.findings });
+  const hostMissing = (deps.host ?? releaseHostMissing)({});
+  return hostMissing.length ? refuse('release-host', releaseHostWhy(hostMissing), { hostMissing }) : null;
+}
+
 async function releaseSuite({ repo, deps, out, refuse, lock }) {
   const ran = await lock(() => (deps.suite ?? defaultSuite)(repo, deps));
   if (heldBy(ran)) return { refusal: refuse('host-lock-held', heldWhy(heldBy(ran))) };
@@ -137,9 +150,8 @@ export async function cutRelease({ repo, remote = 'origin', branch = 'main', tag
   const notes = releaseNotesFindings({ tags: [tag], changelog });
   if (notes.length) return refuse('release-notes', notes.map((f) => f.message).join('; '), { findings: notes });
 
-  // The release definition (scripts/guards/release-definition.mjs) is what the pre-push hook enforces: what is already known to be missing stops the cut before the suite runs.
-  const unmet = definitionRefusal({ run, cwd, head, remote, branch, tag, deps });
-  if (unmet) return refuse(unmet.verdict, unmet.why, { findings: unmet.findings });
+  const stop = await beforeSuiteRefusal({ repo, run, cwd, head, remote, branch, tag, deps, refuse });
+  if (stop) return stop;
   if (plan) return planOf({ repo, head, tag, remote, branch, out });
 
   // L4 reports every skipped test with its reason, and every test must have passed in at least one leg (the host run or the Linux container run): a skip that passed in the other leg is covered and listed with where it passed;

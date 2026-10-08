@@ -13,7 +13,7 @@ import {publish as publishNpm} from '../../scripts/api/npm/publish.mjs';
 import { tarFiles } from '../../scripts/lib/tar-files.mjs';
 import { tapSummary } from '../../scripts/lib/tap-summary.mjs';
 import { classifyContent, npmRegistry } from '../../scripts/gates/release-registry.mjs';
-import { buildPlan, publishOrder, readRows } from '../../scripts/gates/release-plan.mjs';
+import { buildPlan, planSummary, publishOrder, readRows } from '../../scripts/gates/release-plan.mjs';
 import { FINAL_PROOFS, PROOFS, parseArgs, runProofs, verdictOf } from '../../scripts/gates/release-check.mjs';
 import { EXIT, releasePublish, parseArgs as publishArgs } from '../../scripts/gates/release-publish.mjs';
 import { releasePublishFlow } from '../../scripts/supervisor/release-publish-flow.mjs';
@@ -136,6 +136,23 @@ test('optional in-set dependencies also precede their consumers', (t) => {
   consumer.optionalDependencies = { '@starci/canon': '2.0.0' };
   fs.writeFileSync(file, JSON.stringify(consumer));
   assert.deepEqual(publishOrder(readRows(root)).map((row) => row.name), ['@starci/canon', '@starci/leaf-a', '@starci/leaf-b']);
+});
+
+test('plan mode names every blocker and every row in the machine-readable summary and in the flow data', async (t) => {
+  const root = tree(t), lines = [];
+  const registry = allPublished({ local: 'other', content: (name) => (name === '@starci/leaf-a' ? 'drift 1: differs a.js' : 'same') });
+  const summary = planSummary(buildPlan({ root, registry, scope: 'packages' }));
+  assert.ok(summary.blockers.length >= 1);
+  assert.ok(summary.blockers.some((blocker) => blocker.startsWith('@starci/leaf-a@1.0.0 is on the registry')));
+  assert.equal(summary.rows.find((row) => row.name === '@starci/leaf-a').action, 'drift');
+  assert.match(summary.rows.find((row) => row.name === '@starci/leaf-a').blocker, /differs a\.js/);
+  const ctx = { cwd: root, args: { 'npm-user': 'releaser' }, env: {}, role: 'release' };
+  const flow = await releasePublishFlow(ctx, { status: () => ({ ok: true, stdout: '' }), revParse: (args) => ({ status: 0, stdout: args[0] === 'HEAD' ? 'abc' : 'main' }),
+    underHostLock: async (options, operation) => ({ ok: true, value: await operation() }),
+    releasePublish: (options) => { const code = releasePublish({ ...options, deps: { ...options.deps, registry, out: (line) => lines.push(line) } }); return code; } });
+  assert.equal(flow.code, 1);
+  assert.deepEqual(flow.data.plan.blockers, summary.blockers);
+  assert.ok(lines.some((line) => line.includes('@starci/leaf-a@1.0.0 is on the registry')));
 });
 
 test('plan blockers: a pin mismatch, an unreachable registry, content drift and the canon cascade', (t) => {

@@ -5,6 +5,7 @@ import { ESLint } from 'eslint';
 import { sonarFlatConfig, sonarIdOf } from './sonar-rules-table.mjs';
 
 const WEIGHT = /\bfrom (\d+) to\b/;
+const TYPESCRIPT_FILE = /\.tsx?$/;
 
 /** The offset of 1-based `line`/`column` in `source`. */
 function offsetOf(lineStarts, line, column) {
@@ -36,7 +37,8 @@ const toFinding = (file, source, starts, message) => ({
 
 /** Lint `entries` ([{file, source}], posix paths relative to `root`); a syntax error is a finding of rule `PARSE`. */
 export async function lintSources(root, entries) {
-  const eslint = new ESLint({ cwd: root, overrideConfigFile: true, overrideConfig: sonarFlatConfig(), ignore: false });
+  const typescript = entries.some(({ file }) => TYPESCRIPT_FILE.test(file));
+  const eslint = new ESLint({ cwd: root, overrideConfigFile: true, overrideConfig: sonarFlatConfig({ typescript }), ignore: false });
   const results = await Promise.all(entries.map(({ file, source }) => eslint.lintText(source, { filePath: file })));
   return results.flatMap(([result], at) => {
     const { file, source } = entries[at];

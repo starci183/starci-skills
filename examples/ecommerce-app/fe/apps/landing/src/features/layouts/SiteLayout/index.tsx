@@ -1,6 +1,6 @@
 import type { ReactNode } from "react"
 import { getLocale, getTranslations } from "next-intl/server"
-import { SHOP_URL } from "../../../modules/config"
+import { shopUrl } from "../../../modules/config"
 import { LANDING_ROUTES } from "../../../modules/routes"
 import { SiteLayoutBase } from "./component"
 
@@ -37,7 +37,7 @@ export const SiteLayout = async (props: SiteLayoutProps) => {
                 homeHref: `/${locale}`,
                 catalogueHref: `/${locale}${LANDING_ROUTES.catalogue}`,
                 aboutHref: `/${locale}${LANDING_ROUTES.about}`,
-                shopHref: `${SHOP_URL}/${locale}`,
+                shopHref: `${shopUrl()}/${locale}`,
             }}
         >
             {props.content}

@@ -8,9 +8,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parityOutcome, parityPlan, parityScript, readWorkflows, runParity } from '../../scripts/supervisor/release-linux-parity.mjs';
-import { sonarSupplier } from '../../scripts/supervisor/release-l4-sonar.mjs';
-import { sonarUp } from '../../scripts/gates/sonar-status.mjs';
+import { stepEnv } from '../../scripts/supervisor/release-l4-layers.mjs';
 import { exampleApps, passesOf, planL4, runL4, runtimeSpecStep, scriptsOf, sectionOf, skipReport, specEnv, specFilesFor } from '../../scripts/supervisor/release-l4.mjs';
+import { testWorldDistProblem } from '../helpers/test-world-dist.mjs';
 import { cutRelease } from '../../scripts/supervisor/release-cut.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -48,7 +48,7 @@ const WORKFLOWS = [
 
 test('the parity plan is derived from the workflows: one run per example app, the root install once, the spec suites and the manual, upload, docker, browser and plumbing steps left out with a reason', () => {
   const plan = parityPlan({ workflows: WORKFLOWS, apps: ['shop', 'blog'] });
-  assert.equal(plan.image, 'node:22');
+  assert.equal(plan.image, 'node:22-trixie', 'the image carries a git as new as the CI runner has');
   assert.deepEqual(plan.steps.map((s) => [s.dir, s.run]), [
     ['.', 'npm ci'], ['packages/grammar', 'npm ci\nnpm run build'], ['.', 'npm run check'],
     ['examples/shop', 'npm ci'], ['examples/shop', 'npm run typecheck'], ['.', 'npm run starci --silent -- app lint --cwd "$APP_DIR"'], ['examples/shop', 'npm run build:be'],
@@ -81,7 +81,8 @@ test('the repository\'s own workflows give a plan that holds the full check set,
 
 test('the parity script extracts HEAD from the read-only tar, snapshots it as a git repository, runs each step with its env and marks each step', () => {
   const script = parityScript(parityPlan({ workflows: WORKFLOWS, apps: ['shop'] }));
-  assert.match(script, /tar -xf \/in\/src\.tar -C \/work/);
+  assert.match(script, /tar -xf \/in\/src\.tar -C \/opt\/starci-parity\/checkout/);
+  assert.match(script, /cd "\/opt\/starci-parity\/checkout\/\$dir"/);
   assert.match(script, /git init -q && git add -A && git -c user\.name=starci/);
   assert.match(script, /run_step 'examples\.yml:app\[shop\]: starci app lint' '\.' <<'__STEP_\d+__'\nexport NODE_VERSION='22'\nexport APP_DIR='examples\/shop'\nnpm run starci/);
   assert.match(script, /##DONE"\n$/);
@@ -105,13 +106,13 @@ const parityDeps = (t, docker, extra = {}) => ({ docker, logDir: () => tmp(t, 'p
 test('parity: a green container run is ok; the repository is mounted read-only, no port or network is given, and only its own named container is removed', async (t) => {
   const docker = fakeDocker();
   const out = runParity('repo', parityDeps(t, docker));
-  assert.deepEqual([out.name, out.ok, out.image], ['linux-parity', true, 'node:22'], JSON.stringify(out));
+  assert.deepEqual([out.name, out.ok, out.image], ['linux-parity', true, 'node:22-trixie'], JSON.stringify(out));
   const [{ args }] = docker.calls.run;
   assert.ok(args.includes('--mount') && args.some((a) => /^type=bind,source=.+,target=\/in,readonly$/.test(a)), 'the mount is read-only');
   assert.ok(!args.some((a) => /^(-p|--publish|--network|--net|-v|--volume|--privileged)$/.test(a)), 'no port, host network, volume or privilege');
   assert.equal(args[args.indexOf('--name') + 1], docker.calls.rm[0], 'it removes exactly the container it named');
   assert.match(docker.calls.rm[0], /^starci-l4-parity-/, 'never a container of anything else');
-  assert.deepEqual(args.slice(-3), ['node:22', 'bash', '/in/parity.sh']);
+  assert.deepEqual(args.slice(-3), ['node:22-trixie', 'bash', '/in/parity.sh']);
   assert.ok(fs.existsSync(out.log) && out.skipped.length > 0 && out.steps.length > 0);
 });
 
@@ -129,92 +130,6 @@ test('parity: a red step fails the row and names the step; a container that dies
   assert.match(nowhere.why, /git archive HEAD failed/);
   const empty = runParity('repo', parityDeps(t, fakeDocker(), { workflows: () => [] }));
   assert.match(empty.why, /nothing proves Linux parity/);
-});
-
-/** A fake gate + docker for the Sonar supplier: container states by name, and a status that reports UP after `upAfter` polls. */
-function fakeSonar({ states, upAfter = 0, scan = 'pass', dashboard = 'pass', startStatus = 0 } = {}) {
-  const log = [];
-  let polls = 0;
-  const state = { ...states };
-  return {
-    log,
-    state,
-    deps: {
-      gate: {
-        config: () => ({ docker: 'docker', container: 'starci-sonarqube' }),
-        up: async () => { log.push(['gate', 'up']); return polls++ >= upAfter; },
-        scan: async () => { log.push(['gate', 'scan']); return { outcome: scan }; },
-        dashboard: async () => { log.push(['gate', 'dashboard']); return { outcome: dashboard }; },
-      },
-      docker: {
-        inspect: (name) => (state[name] === 'missing' ? { status: 1, stderr: 'no such container' } : { status: 0, stdout: state[name] }),
-        start: (names) => { log.push(['start', ...names]); if (startStatus === 0) for (const n of names) state[n] = 'running'; return { status: startStatus, stderr: 'boom' }; },
-        stop: (names) => { log.push(['stop', ...names]); for (const n of names) state[n] = 'exited'; return { status: 0 }; },
-      },
-      sleep: async () => {},
-      now: (() => { let n = 0; return () => (n += 1000); })(),
-      logDir: null,
-    },
-  };
-}
-const APP = { name: 'shop', dir: path.join(os.tmpdir(), 'x', 'examples', 'shop') };
-
-test('sonar: a stopped stack is started (database first), waited for until UP, scanned against the project gate, the dashboard read, and stopped again; nothing else is named', async (t) => {
-  const fake = fakeSonar({ states: { 'starci-sonarqube-postgres': 'exited', 'starci-sonarqube': 'exited' }, upAfter: 2 });
-  fake.deps.logDir = () => tmp(t, 'sonar');
-  const { proofs, close } = sonarSupplier([APP], fake.deps);
-  const proof = await proofs['shop: sonar']();
-  assert.equal(proof.ok, true);
-  assert.ok(fs.existsSync(proof.log));
-  assert.deepEqual(fake.log, [['start', 'starci-sonarqube-postgres', 'starci-sonarqube'], ['gate', 'up'], ['gate', 'up'], ['gate', 'up'], ['gate', 'scan'], ['gate', 'dashboard']]);
-  assert.deepEqual(close().stopped, ['starci-sonarqube', 'starci-sonarqube-postgres'], 'the server stops before its database');
-  assert.deepEqual(fake.state, { 'starci-sonarqube-postgres': 'exited', 'starci-sonarqube': 'exited' }, 'left as found');
-  assert.deepEqual(fake.log.slice(-1), [['stop', 'starci-sonarqube', 'starci-sonarqube-postgres']]);
-});
-
-test('sonar: a stack that was running is left running; only the stopped container this run started is stopped again', async (t) => {
-  const running = fakeSonar({ states: { 'starci-sonarqube-postgres': 'running', 'starci-sonarqube': 'running' } });
-  running.deps.logDir = () => tmp(t, 'sonar');
-  const a = sonarSupplier([APP], running.deps);
-  assert.equal((await a.proofs['shop: sonar']()).ok, true);
-  assert.deepEqual(a.close().stopped, []);
-  assert.ok(!running.log.some(([verb]) => verb === 'start' || verb === 'stop'), 'a running stack is never started or stopped');
-  const half = fakeSonar({ states: { 'starci-sonarqube-postgres': 'running', 'starci-sonarqube': 'exited' } });
-  half.deps.logDir = () => tmp(t, 'sonar');
-  const b = sonarSupplier([APP], half.deps);
-  assert.equal((await b.proofs['shop: sonar']()).ok, true);
-  assert.deepEqual(half.log.filter(([verb]) => verb !== 'gate'), [['start', 'starci-sonarqube']]);
-  assert.deepEqual(b.close().stopped, ['starci-sonarqube']);
-  assert.equal(half.state['starci-sonarqube-postgres'], 'running', 'the database stays up');
-});
-
-test('sonar: a red scan fails the proof without reading the dashboard; a missing container, a failed start and a server that never comes up fail it, and close still puts back what was started', async (t) => {
-  const red = fakeSonar({ states: { 'starci-sonarqube-postgres': 'running', 'starci-sonarqube': 'running' }, scan: 'fail' });
-  red.deps.logDir = () => tmp(t, 'sonar');
-  const a = sonarSupplier([APP], red.deps);
-  assert.equal((await a.proofs['shop: sonar']()).ok, false);
-  assert.ok(!red.log.some(([, what]) => what === 'dashboard'));
-  const missing = fakeSonar({ states: { 'starci-sonarqube-postgres': 'missing', 'starci-sonarqube': 'exited' } });
-  missing.deps.logDir = () => tmp(t, 'sonar');
-  const b = sonarSupplier([APP], missing.deps);
-  const miss = (await b.proofs['shop: sonar']());
-  assert.equal(miss.ok, false);
-  assert.match(fs.readFileSync(miss.log, 'utf8'), /starci-sonarqube-postgres is missing/);
-  assert.ok(!missing.log.some(([verb]) => verb === 'start'), 'nothing is started when a part of the stack does not exist');
-  const failed = fakeSonar({ states: { 'starci-sonarqube-postgres': 'exited', 'starci-sonarqube': 'exited' }, startStatus: 1 });
-  failed.deps.logDir = () => tmp(t, 'sonar');
-  const c = sonarSupplier([APP], failed.deps);
-  assert.equal((await c.proofs['shop: sonar']()).ok, false);
-  c.close();
-  assert.deepEqual(failed.log.at(-1), ['stop', 'starci-sonarqube', 'starci-sonarqube-postgres'], 'a half-started stack is stopped again');
-  const never = fakeSonar({ states: { 'starci-sonarqube-postgres': 'exited', 'starci-sonarqube': 'exited' }, upAfter: 10_000 });
-  never.deps.logDir = () => tmp(t, 'sonar');
-  never.deps.readyMs = 30_000;
-  const d = sonarSupplier([APP], never.deps);
-  const slow = (await d.proofs['shop: sonar']());
-  assert.equal(slow.ok, false);
-  assert.match(fs.readFileSync(slow.log, 'utf8'), /did not report UP/);
-  assert.deepEqual(d.close().stopped, ['starci-sonarqube', 'starci-sonarqube-postgres']);
 });
 
 test('L4: the installs run first as a real npm ci (a node_modules link is removed as a link first, a missing lockfile is absent), the Sonar supplier closes after the proofs even when a step throws, and the Linux step ends the row', async (t) => {
@@ -356,6 +271,11 @@ test('L4: a lite app is planned without the test scripts it cannot have, a full 
     fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name, scripts: Object.fromEntries(scripts.map((s) => [s, 'x'])) }));
     fs.writeFileSync(path.join(dir, 'package-lock.json'), '{}');
   }
+  for (const layer of ['contract', 'integration', 'e2e']) {
+    const folder = path.join(base, 'examples', 'big', 'be', 'src', 'tests', layer);
+    fs.mkdirSync(folder, { recursive: true });
+    fs.writeFileSync(path.join(folder, `one.${layer}-spec.ts`), '');
+  }
   assert.deepEqual(exampleApps(base).map((a) => [a.name, a.edition]), [['big', 'full'], ['tiny', 'lite']]);
   const plan = planL4(base, { runtimeRoot: base });
   const rows = (app) => plan.steps.filter((s) => s.name.startsWith(`${app}: npm run `)).map((s) => [s.name.replace(`${app}: npm run `, ''), s.absent ?? false]);
@@ -363,6 +283,38 @@ test('L4: a lite app is planned without the test scripts it cannot have, a full 
   assert.deepEqual(rows('big').filter(([, absent]) => absent), [['test:e2e', true]], 'a full app that lacks a script is absent, never skipped by silence');
   assert.equal(rows('big').length, 12);
   assert.deepEqual(scriptsOf({ edition: 'full' }).length, 12);
+  assert.deepEqual(plan.notPlanned, [], 'an app that holds a spec file in every layer has every row');
+});
+
+test('L4: a full app is planned only the test rows its files can run, each omission is named with its reason, and a layer that holds a spec file keeps its row', (t) => {
+  const base = tmp(t, 'layers');
+  fs.writeFileSync(path.join(base, 'package.json'), JSON.stringify({ name: 'rt', scripts: { test: NODE_TEST, check: 'x' } }));
+  const dir = path.join(base, 'examples', 'slim');
+  fs.mkdirSync(path.join(dir, 'be', 'src', 'tests'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'hfs.json'), JSON.stringify({ kind: 'app' }));
+  fs.writeFileSync(path.join(dir, 'package-lock.json'), '{}');
+  fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'slim', scripts: Object.fromEntries(scriptsOf({ edition: 'full' }).map((script) => [script, 'x'])) }));
+  fs.writeFileSync(path.join(dir, 'be', 'src', 'tests', 'tsconfig.json'), '{}');
+  const rows = () => planL4(base, { runtimeRoot: base }).steps.filter((s) => s.name.startsWith('slim: npm run ')).map((s) => s.name.replace('slim: npm run ', ''));
+  const bare = planL4(base, { runtimeRoot: base });
+  assert.deepEqual(rows().filter((row) => row.startsWith('test') || row === 'typecheck:tests'), ['test'], 'unit is the only test row of an app without a test file');
+  assert.deepEqual(bare.notPlanned.map((row) => row.name), ['slim: npm run typecheck:tests', 'slim: npm run test:contract', 'slim: npm run test:integration', 'slim: npm run test:e2e']);
+  assert.ok(bare.notPlanned.every((row) => row.why.includes('holds no')), 'each omission says why');
+  fs.mkdirSync(path.join(dir, 'be', 'src', 'tests', 'e2e', 'area'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'be', 'src', 'tests', 'e2e', 'area', 'flow.e2e-spec.ts'), '');
+  assert.deepEqual(rows().filter((row) => row.startsWith('test') || row === 'typecheck:tests'), ['typecheck:tests', 'test', 'test:e2e'], 'one spec file brings its layer and the tests typecheck back');
+  const plan = planL4(base, { runtimeRoot: base });
+  assert.deepEqual(plan.notPlanned.map((row) => row.name), ['slim: npm run test:contract', 'slim: npm run test:integration']);
+  assert.ok(plan.steps.filter((s) => s.name.startsWith('slim: npm run ')).every((s) => s.nextBuild === true), 'every example script runs with the SWC cache env');
+});
+
+test('L4: a step that builds a Next app runs with the SWC cache and telemetry off over its own env, any other step with its own env only', (t) => {
+  const cache = path.join(tmp(t, 'swc'), 'cache');
+  const env = stepEnv({ nextBuild: true, env: { KEEP: 'a' } }, { STARCI_SWC_CACHE: cache, BASE: 'b' });
+  assert.equal(env.SWC_NATIVE_BINDING_CACHE, cache);
+  assert.equal(env.NEXT_TELEMETRY_DISABLED, '1');
+  assert.deepEqual([env.KEEP, env.BASE], ['a', 'b']);
+  assert.deepEqual(stepEnv({ env: { KEEP: 'a' } }, { BASE: 'b' }), { BASE: 'b', KEEP: 'a' });
 });
 
 test('evidence rule: the log readers know the passed tests of both reporters and the part of the container log one step printed', () => {
@@ -454,33 +406,30 @@ test('the cut runs the default L4 row with its wiring: a red Linux step is a red
     throw new Error(`unexpected git ${verb} ${args.join(' ')}`);
   };
   const changelog = '## [1.0.0-alpha.4] - 2026-10-04\n\n- done\n';
-  const out = (await cutRelease({ repo: base, tag: 'v1.0.0-alpha.4', deps: { git: fakeGit, findings: () => [], changelog: () => changelog, lock: (work) => { calls.push('lock'); return work(); }, suite: () => steps, push: () => { throw new Error('never pushed'); } } }));
+  const out = (await cutRelease({ repo: base, tag: 'v1.0.0-alpha.4', deps: { host: () => [], sonarCloud: async () => [], git: fakeGit, findings: () => [], changelog: () => changelog, lock: (work) => { calls.push('lock'); return work(); }, suite: () => steps, push: () => { throw new Error('never pushed'); } } }));
   assert.deepEqual([out.ok, out.verdict], [false, 'suite-red']);
   assert.match(out.why, /linux-parity red/);
   assert.deepEqual(calls, ['lock']);
 });
 
-test('sonar: only a pass is a proof: a disabled or blocked Sonar, or a thrown gate, fails the proof', async (t) => {
-  for (const scan of ['disabled', 'blocked']) {
-    const fake = fakeSonar({ states: { 'starci-sonarqube-postgres': 'running', 'starci-sonarqube': 'running' }, scan });
-    fake.deps.logDir = () => tmp(t, 'sonar');
-    const { proofs } = sonarSupplier([APP], fake.deps);
-    assert.equal((await proofs['shop: sonar']()).ok, false, scan);
-    assert.ok(!fake.log.some(([, what]) => what === 'dashboard'), 'the dashboard is not read after a scan that did not pass');
-  }
-  const thrown = fakeSonar({ states: { 'starci-sonarqube-postgres': 'running', 'starci-sonarqube': 'running' } });
-  thrown.deps.logDir = () => tmp(t, 'sonar');
-  thrown.deps.gate.scan = async () => { throw new Error('scanner exploded'); };
-  const proof = await sonarSupplier([APP], thrown.deps).proofs['shop: sonar']();
-  assert.equal(proof.ok, false);
-  assert.match(fs.readFileSync(proof.log, 'utf8'), /scanner exploded/);
-});
-
-test('sonarUp: only a 200 with status UP is up; any other state, status or a failed fetch is not', async () => {
-  const cfg = (fetch) => ({ host: 'http://sonar.test', timeoutMs: 1000, fetch });
-  const answer = (status, body) => async () => ({ status, json: async () => body });
-  assert.equal(await sonarUp(cfg(answer(200, { status: 'UP' }))), true);
-  assert.equal(await sonarUp(cfg(answer(200, { status: 'STARTING' }))), false);
-  assert.equal(await sonarUp(cfg(answer(503, { status: 'UP' }))), false);
-  assert.equal(await sonarUp(cfg(async () => { throw new Error('ECONNREFUSED'); })), false);
+test('L4: a test-world package in the checkout is built after the installs and before the runtime suite; a stale or absent build is named by the helper', (t) => {
+  const base = tmp(t, 'testworld');
+  fs.writeFileSync(path.join(base, 'package.json'), JSON.stringify({ name: 'rt', scripts: { test: NODE_TEST, check: 'x' } }));
+  assert.equal(planL4(base, { runtimeRoot: base }).steps.some((s) => s.name === 'test-world: npm run build'), false, 'no package, no build step');
+  const producer = path.join(base, 'packages', 'test-world');
+  fs.mkdirSync(path.join(producer, 'src'), { recursive: true });
+  fs.writeFileSync(path.join(producer, 'package.json'), JSON.stringify({ name: '@starci/test-world', types: 'dist/index.d.ts' }));
+  fs.writeFileSync(path.join(producer, 'tsconfig.json'), '{}');
+  fs.writeFileSync(path.join(producer, 'src', 'index.ts'), 'export {};\n');
+  const names = planL4(base, { runtimeRoot: base }).steps.map((s) => s.name);
+  assert.ok(names.indexOf('test-world: npm run build') >= 0 && names.indexOf('test-world: npm run build') < names.indexOf('npm test'), 'built before the suite that borrows it');
+  assert.match(testWorldDistProblem(producer), /build is absent/);
+  fs.mkdirSync(path.join(producer, 'dist'));
+  const built = path.join(producer, 'dist', 'index.d.ts');
+  fs.writeFileSync(built, 'export {};\n');
+  const old = new Date(Date.now() - 60_000);
+  fs.utimesSync(built, old, old);
+  assert.match(testWorldDistProblem(producer), /older than its source/);
+  fs.utimesSync(built, new Date(), new Date());
+  assert.equal(testWorldDistProblem(producer), null);
 });

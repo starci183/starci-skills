@@ -11,6 +11,8 @@
 // removes the root, and exits nonzero, which fails that spec file and the run. A value already set — a nested
 // runner, an explicit choice — is kept.
 //
+// STARCI_OWNER_CONFIG_WITHIN confines the owner's config.yaml to this root (engine/config.mjs): the checkout's live file never reaches a spec.
+//
 // The root is created inside the base directory the runner names with STARCI_TEMP_ROOT, else the OS temp directory. The
 // environment variable is the suite's only input: it never reads config.yaml, so a spec run does not depend on the owner's
 // live settings (CONTRIBUTING.md, "Temp files": STARCI_TEMP_ROOT=<dir> runs the whole suite on another drive).
@@ -36,6 +38,7 @@ if (!process.env[TEST_TEMP_ENV]) {
   const dir = fs.realpathSync.native(fs.mkdtempSync(path.join(baseDir(), 'starci-test-tmp-')));
   process.env[TEST_TEMP_ENV] = dir;
   process.env.STARCI_TEMP_ROOT = dir;
+  process.env.STARCI_OWNER_CONFIG_WITHIN = dir;
   process.env.TEMP = dir;
   process.env.TMP = dir;
   process.env.TMPDIR = dir;

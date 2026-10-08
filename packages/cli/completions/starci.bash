@@ -28,7 +28,7 @@ _starci() {
         npm) COMPREPLY=( $(compgen -W "ci install" -- "$cur") );;
         orca) COMPREPLY=( $(compgen -W "terminal-read terminal-send" -- "$cur") );;
         reconciler) COMPREPLY=( $(compgen -W "once restart start status stop up" -- "$cur") );;
-        release) COMPREPLY=( $(compgen -W "app-installs check clean-test cut images launch-smoke notes proof publish sync-runtime" -- "$cur") );;
+        release) COMPREPLY=( $(compgen -W "app-installs check clean-test cut env-test images launch-smoke notes proof publish sync-runtime" -- "$cur") );;
         route) COMPREPLY=( $(compgen -W "op" -- "$cur") );;
         runtime) COMPREPLY=( $(compgen -W "architecture benchmark-snapshot check derived-fields doctor gen-catalog gen-ops housekeeping install ledger-hygiene link machine-db owner-claims-audit readme-blocks status update validate version" -- "$cur") );;
         smoke) COMPREPLY=( $(compgen -W "scaffold" -- "$cur") );;
@@ -143,6 +143,7 @@ _starci() {
         gate:sonar:--name) return 0;;
         gate:sonar:--base) return 0;;
         gate:sonar:--paths) return 0;;
+        gate:sonar:--branch) return 0;;
         gate:sonar:--out) return 0;;
         gate:sonar:--log) return 0;;
         gate:sonar:--token-ref) return 0;;
@@ -974,7 +975,7 @@ _starci() {
         gate:run) COMPREPLY=( $(compgen -W "--root --base --main --changed --tests --out --scope --tree --json --cwd --quiet --help --edition" -- "$cur") );;
         gate:runtime-artifact) COMPREPLY=( $(compgen -W "--pack --dir --out --root --json --cwd --quiet --help --edition" -- "$cur") );;
         gate:runtime-coverage) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
-        gate:sonar) COMPREPLY=( $(compgen -W "--key --name --with-token --wait --base --paths --project-gate --out --blob --log --token-ref --no-ensure --timeout --wait-timeout --isolate --keep-slice-project --declaration --host --stack --json --cwd --quiet --help --edition" -- "$cur") );;
+        gate:sonar) COMPREPLY=( $(compgen -W "--key --name --with-token --wait --base --paths --project-gate --branch --out --blob --log --token-ref --no-ensure --timeout --wait-timeout --isolate --keep-slice-project --declaration --host --stack --json --cwd --quiet --help --edition" -- "$cur") );;
         gate:starcistacks) COMPREPLY=( $(compgen -W "--new --json --cwd --quiet --help --edition" -- "$cur") );;
         gate:test-world) COMPREPLY=( $(compgen -W "--root --project --tests --out --json --cwd --quiet --help --edition" -- "$cur") );;
         gate:unit) COMPREPLY=( $(compgen -W "--root --out --json --cwd --quiet --help --edition" -- "$cur") );;
@@ -1067,6 +1068,7 @@ _starci() {
         release:check) COMPREPLY=( $(compgen -W "--final --only --json --cwd --quiet --help --edition" -- "$cur") );;
         release:clean-test) COMPREPLY=( $(compgen -W "--changed --base --json --cwd --quiet --help --edition" -- "$cur") );;
         release:cut) COMPREPLY=( $(compgen -W "--repo --remote --branch --plan --tag --json --cwd --quiet --help --edition" -- "$cur") );;
+        release:env-test) COMPREPLY=( $(compgen -W "--lane --reuse-installs --json --cwd --quiet --help --edition" -- "$cur") );;
         release:images) COMPREPLY=( $(compgen -W "--app --sides --only --wait-seconds --remove-images --json --cwd --quiet --help --edition" -- "$cur") );;
         release:launch-smoke) COMPREPLY=( $(compgen -W "--app-repo --entry --timeout-ms --out --as --json --cwd --quiet --help --edition" -- "$cur") );;
         release:notes) COMPREPLY=( $(compgen -W "--tag --repo --out --json --cwd --quiet --help --edition" -- "$cur") );;

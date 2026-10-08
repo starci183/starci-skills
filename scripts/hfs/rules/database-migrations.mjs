@@ -53,7 +53,8 @@ async function baseMigrationNames(git, repoRoot, sha) {
 }
 
 async function baseFileText(git, repoRoot, sha, file) {
-  const result = await runGit(git, repoRoot, ['show', `${sha}:${file}`]);
+  // `./` reads the path from the app root, which is a folder of a larger repository when the app is nested in one (an example of the runtime).
+  const result = await runGit(git, repoRoot, ['show', `${sha}:./${file}`]);
   return result.ok ? result.stdout : null;
 }
 

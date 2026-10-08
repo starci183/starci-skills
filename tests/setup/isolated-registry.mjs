@@ -14,14 +14,18 @@ import os from 'node:os';
 import path from 'node:path';
 import { TEST_REGISTRY_ENV } from '../../engine/db/machine.mjs';
 import { ARTIFACT_ROOT_ENV } from '../../engine/db/blob.mjs';
+import { GIT_LOCAL_ENV_VARS } from '../../scripts/lib/git.mjs';
 
 // git's repository-local variables (git rev-parse --local-env-vars) never reach a spec: a hook or alias run in a linked
 // worktree exports GIT_DIR, and every fixture git then writes THAT repository whatever cwd or -C it names - a temp dir's
-// `git init` re-inited the live .claude repo core.bare=true (2026-09-29). Same list as scripts/lib/git.mjs GIT_LOCAL_ENV_VARS.
+// `git init` re-inited the live .claude repo core.bare=true (2026-09-29). The list is scripts/lib/git.mjs GIT_LOCAL_ENV_VARS.
 for (const key of Object.keys(process.env)) {
-  if (['GIT_DIR', 'GIT_COMMON_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_OBJECT_DIRECTORY', 'GIT_ALTERNATE_OBJECT_DIRECTORIES', 'GIT_IMPLICIT_WORK_TREE', 'GIT_PREFIX', 'GIT_CONFIG', 'GIT_CONFIG_PARAMETERS', 'GIT_CONFIG_COUNT', 'GIT_GRAFT_FILE', 'GIT_NO_REPLACE_OBJECTS', 'GIT_REPLACE_REF_BASE', 'GIT_SHALLOW_FILE'].includes(key)
+  if (GIT_LOCAL_ENV_VARS.includes(key)
     || /^GIT_CONFIG_(KEY|VALUE)_\d+$/.test(key)) delete process.env[key];
 }
+
+// A per-user runtime record points the CLI a spec spawns at the live checkout; a spec run names the checkout under test, so its children never read another runtime's law.
+process.env.STARCI_RUNTIME ??= path.resolve(import.meta.dirname, '..', '..');
 
 if (!process.env[TEST_REGISTRY_ENV] || !process.env[ARTIFACT_ROOT_ENV]) {
   const dir = fs.mkdtempSync(path.join(process.env.STARCI_TEMP_ROOT || os.tmpdir(), 'starci-test-registry-'));

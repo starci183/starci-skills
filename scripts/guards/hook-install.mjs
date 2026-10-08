@@ -32,7 +32,7 @@ import { allocationMs } from '../../engine/config.mjs';
 const here = path.dirname(fileURLToPath(import.meta.url));
 export { guardsRoot };
 const HOOK_MARKER = 'starci-history-guard';
-export const HOOK_VERSION = 6;
+export const HOOK_VERSION = 7;
 export const WORK_HOOK_MARKER = 'starci-work-guard';
 export const RUNTIME_GIT_HOOKS_MARKER = 'starci-git-hooks';
 const WORK_HOOK_VERSION = 1;
@@ -147,6 +147,8 @@ while read -r old new ref; do
       if [ -n "$guard" ] && [ "$op_worktree_refused" = 0 ]; then
         gd=$(git rev-parse --git-dir 2>/dev/null)
         fmt=$(git rev-parse --show-ref-format 2>/dev/null)
+        # A git that predates --show-ref-format (before 2.46) echoes the flag back and has only the files backend.
+        case "$fmt" in files|--show-ref-format) fmt=files ;; esac
         if [ -n "$gd" ] && [ "$fmt" = "files" ] && [ ! -e "$gd/HEAD.lock" ]; then
           echo "starci history guard: refused - an op worker never creates a git worktree; work in the checkout you were dispatched to (a private worktree with links into the live repository deleted live files)" >&2
           op_worktree_refused=1; status=1

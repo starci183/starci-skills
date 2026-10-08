@@ -252,3 +252,45 @@ test('a frontend governed by its backend declaration is not held to the backend-
   assert.ok(!codes(result).includes('STACKS_CI_UNUSED'), JSON.stringify(result.findings));
   assert.ok(!codes(result).includes('STACKS_DECLARATION_MISSING'), JSON.stringify(result.findings));
 });
+
+const exampleEntry = (repo, extra = {}) => ({ provider: 'sonarcloud', mode: 'hosted', host: { public: 'https://sonarcloud.io' }, auth: 'token',
+  projects: [{ repository: repo, key: `starci-example-${repo}` }], runtimeSecrets: ['SONAR_TOKEN'],
+  ci: { wiring: 'optional-follow-up', secrets: [], vars: [{ name: 'SONAR_HOST_URL', value: 'https://sonarcloud.io' }] },
+  qualityGate: 'starci-quality', ownerAction: { needed: 'SONAR_TOKEN in secret.env', reason: 'the runtime repository holds no secret' }, ...extra });
+
+test('an example of the runtime repository declares SonarCloud with the runtime secret.env variables by name, and nothing else is asked of its form', (t) => {
+  const own = workspace(t, { services: { sonar: exampleEntry('product'), 'error-tracking': sentryEntry('product') }, props: 'sonar.projectKey=starci-example-product\n' });
+  const result = checkStarciStacks(own.product, { examplesRoot: own.dir });
+  assert.deepEqual(codes(result, 'refuse').filter((code) => code.startsWith('STACKS_EXAMPLE') || code.startsWith('STACKS_PRODUCT')), []);
+  assert.ok(!codes(result, 'refuse').includes('STACKS_SERVICE_AMBIGUOUS'), 'runtimeSecrets satisfy "auth token names a credential"');
+});
+
+test('an example that declares a stack, host.local or a custody credential, another provider, or no runtimeSecrets is refused with STACKS_EXAMPLE_FORM', (t) => {
+  const own = workspace(t, { services: { sonar: sonarEntry('product'), 'error-tracking': sentryEntry('product') } });
+  const stackForm = checkStarciStacks(own.product, { examplesRoot: own.dir });
+  const refusal = stackForm.findings.filter((finding) => finding.code === 'STACKS_EXAMPLE_FORM');
+  assert.ok(refusal.some((finding) => /a stack, host\.local, custody credentials/.test(finding.message)));
+  assert.ok(refusal.some((finding) => /provider sonarcloud and mode hosted/.test(finding.message)));
+  assert.ok(refusal.some((finding) => /runtimeSecrets \[SONAR_TOKEN\]/.test(finding.message)));
+  const withOrganization = workspace(t, { services: { sonar: exampleEntry('product', { runtimeSecrets: ['SONAR_TOKEN', 'SONAR_ORGANIZATION'] }), 'error-tracking': sentryEntry('product') } });
+  const organization = checkStarciStacks(withOrganization.product, { examplesRoot: withOrganization.dir }).findings.filter((finding) => finding.code === 'STACKS_EXAMPLE_FORM');
+  assert.ok(organization.some((finding) => /organization is configuration \(config\.yaml sonar\.organization\)/.test(finding.message)), JSON.stringify(organization));
+  const bare = workspace(t, { services: { sonar: (({ runtimeSecrets, ...rest }) => rest)(exampleEntry('product')), 'error-tracking': sentryEntry('product') } });
+  assert.ok(codes(checkStarciStacks(bare.product, { examplesRoot: bare.dir }), 'refuse').includes('STACKS_EXAMPLE_FORM'));
+});
+
+test('a product that declares runtimeSecrets is refused with STACKS_PRODUCT_FORM, and its own custody form is untouched', (t) => {
+  const copied = workspace(t, { services: { sonar: exampleEntry('product'), 'error-tracking': sentryEntry('product') } });
+  const refusal = checkStarciStacks(copied.product, { examplesRoot: path.join(copied.dir, 'examples') }).findings.find((finding) => finding.code === 'STACKS_PRODUCT_FORM');
+  assert.ok(refusal, 'a product outside examples/ is a product');
+  assert.match(refusal.message, /secret\.env.*custody/);
+  const own = workspace(t, { services: { sonar: sonarEntry('product'), 'error-tracking': sentryEntry('product') } });
+  assert.ok(!codes(checkStarciStacks(own.product, { examplesRoot: path.join(own.dir, 'examples') })).some((code) => code === 'STACKS_PRODUCT_FORM' || code === 'STACKS_EXAMPLE_FORM'));
+});
+
+test('the three example apps of this repository declare the example form and satisfy the stacks check', () => {
+  for (const app of ['ecommerce-app', 'lite-app', 'shape-slot']) {
+    const result = checkStarciStacks(path.join(root, 'examples', app));
+    assert.deepEqual(codes(result, 'refuse').filter((code) => code.startsWith('STACKS_EXAMPLE') || code === 'STACKS_PRODUCT_FORM' || code === 'STACKS_SCHEMA_INVALID' || code === 'STACKS_PROJECT_DRIFT' || code === 'STACKS_SERVICE_AMBIGUOUS'), [], app);
+  }
+});

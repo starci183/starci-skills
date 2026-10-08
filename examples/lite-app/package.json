@@ -25,11 +25,11 @@
     "nest-commander": "3.21.0"
   },
   "devDependencies": {
-    "@starci/cli": "1.0.1",
-    "@starci/eslint-canon-be": "3.0.10",
-    "@starci/eslint-canon-fe": "8.0.10",
+    "@starci/cli": "1.1.0",
+    "@starci/eslint-canon-be": "3.1.0",
+    "@starci/eslint-canon-fe": "8.1.0",
     "@starci/prettier-config": "1.0.3",
-    "@starci/stylelint-canon": "2.0.5",
+    "@starci/stylelint-canon": "2.0.6",
     "@starci/tsconfig": "2.0.3",
     "@tailwindcss/postcss": "4.3.3",
     "@types/express": "4.17.25",

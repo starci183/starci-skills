@@ -188,3 +188,27 @@ test('the footprint watch flags a new worktree or cross-repository link under th
   const back = scanFootprint({ root, state: gone.state, git, listLinks, now: 't4' });
   assert.deepEqual(back.fresh.map((entry) => entry.type), ['link'], 'made again: fresh again');
 });
+
+// git before 2.46 has no `rev-parse --show-ref-format`: it echoes the flag back and has only the files ref backend. The hook still refuses
+// the op's worktree there (a guard that switched itself off on an older git would let the incident through again).
+test('the history hook refuses an op worktree on a git that predates --show-ref-format', (t) => {
+  const repo = initRepo(t);
+  assert.equal(ensureHistoryHook(repo, { skillRoot: ROOT }).installed, true);
+  const names = process.platform === 'win32' ? ['git.exe', 'git'] : ['git'];
+  const real = (process.env.PATH ?? '').split(path.delimiter).flatMap((dir) => names.map((name) => path.join(dir, name))).find((file) => fs.existsSync(file));
+  assert.ok(real, 'a git binary is on PATH');
+  const old = tempDir(t, 'guard-old-git-');
+  const wrapper = path.join(old, 'git');
+  const realGit = real.split(path.sep).join('/');
+  fs.writeFileSync(wrapper, `#!/bin/sh\nif [ "$1" = rev-parse ] && [ "$2" = --show-ref-format ]; then echo --show-ref-format; exit 0; fi\nexec "${realGit}" "$@"\n`, { mode: 0o755 });
+  const guardRoot = tempDir(t, 'guard-old-git-root-');
+  const file = writeJobGuard({ skillRoot: guardRoot, jobId: 'op-docs.author-old-git', workflowId: 'wf-x', ledgerRepo: null, owned: [path.join(repo, 'src')] });
+  const handle = `term_spec-old-git-${process.pid}`;
+  const bound = bindGuardTerminal({ skillRoot: ROOT, handle, jobFile: file });
+  t.after(() => fs.rmSync(bound, { force: true }));
+  const beside = path.join(path.dirname(repo), `${path.basename(repo)}-wt-old`);
+  t.after(() => safeRemove(beside, { hold: artifactHoldReason }));
+  const added = sh(repo, ['worktree', 'add', '--detach', beside, 'HEAD'], { ORCA_TERMINAL_HANDLE: handle, PATH: `${old}${path.delimiter}${process.env.PATH}` });
+  assert.notEqual(added.status, 0, 'an op worktree is refused on an old git');
+  assert.match(added.stderr, /an op worker never creates a git worktree/);
+});

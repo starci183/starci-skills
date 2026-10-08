@@ -292,7 +292,7 @@ $defs:
           runtime:
             type: object
             additionalProperties: false
-            required: [fileLines, sourceRoots, infraOwners, baseWriteMembers, baseEnvSeams, apiContracts, sourceName, oneOffNames, sharedBasenames, generated, pinned, selfChecks]
+            required: [fileLines, sourceRoots, infraOwners, baseWriteMembers, baseEnvSeams, apiContracts, sourceName, oneOffNames, sharedBasenames, generated, heldSecrets, pinned, selfChecks]
             properties:
               fileLines: {$ref: '#/$defs/fileLines'}
               sourceRoots: {$ref: '#/$defs/uniqueNames'}
@@ -324,6 +324,16 @@ $defs:
                   properties:
                     root: {type: string, minLength: 1}
                     generatedBy: {type: string, minLength: 1}
+              heldSecrets:
+                type: array
+                description: The sealed secrets the public runtime repository still tracks (RT_SECRET_TRACKED), each with why; the list only shrinks.
+                items:
+                  type: object
+                  additionalProperties: false
+                  required: [path, reason]
+                  properties:
+                    path: {type: string, minLength: 1}
+                    reason: {type: string, minLength: 1}
               pinned:
                 type: array
                 minItems: 1

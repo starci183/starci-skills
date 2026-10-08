@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// check-gate-loosening.mjs - RT_GATE_LOOSENING (R234; part of `npm run check`).
+// check-gate-loosening.mjs - RT_GATE_LOOSENING (R236; part of `npm run check`).
 //   runs in the check stage (self-check gate-loosening)
 //
 // Every commit since the last release commit (the last commit that changed the "version" of package.json) is judged against its parent by

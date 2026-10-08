@@ -5,7 +5,7 @@
 //   packages/hfs/runtime         what `hfs` reads (with the one Sonar gate, knowledge/sonar-gate.yaml, whose name starci app check holds a stack declaration to): the slot loader, the check, the architecture machine and every file either
 //                                imports (computed from the import graph, not listed), plus the failure-code catalog slice
 //                                holding exactly the codes `starci app check` can emit (its own and the machine's rule id lists)
-//   packages/eslint/be/runtime   what @starci/eslint-canon-be reads through lib/hfs.mjs (loadHfs: slots, hfs.json, the view) and the project graph
+//   packages/eslint/be/runtime   what @starci/eslint-canon-be reads through lib/hfs.mjs (loadHfs: slots, hfs.json, the view), the shared Sonar syntax rules and the project graph
 //                                (scripts/hfs/project-rule.mjs -> project-graph.mjs -> the architecture machine) its project rules share
 //   packages/eslint/fe/runtime   the same files for @starci/eslint-canon-fe (lib/hfs.mjs, lib/params.mjs)
 //   starci release sync-runtime [--check]     --check exits 1 when a copy differs; starci runtime check judges the same
@@ -83,8 +83,8 @@ const CONFIG_EXAMPLE = 'config.example.yaml';
 /** bundle directory (runtime-relative) -> the files it copies and whether it carries the failure-code slice. */
 export const BUNDLES = Object.freeze({
   'packages/hfs/runtime': Object.freeze({ files: Object.freeze([...new Set([...SLOT_FILES, ...importClosure(CHECK_ENTRIES), 'knowledge/hfs/canon-pins.yaml', 'knowledge/sonar-gate.yaml', CONFIG_EXAMPLE, RULE_CATALOG_FILE, ...patternTopicFiles()])].sort(byCodeUnit)), catalog: true }),
-  'packages/eslint/be/runtime': Object.freeze({ files: Object.freeze([...new Set([...SLOT_FILES, ...importClosure(['scripts/api/git/recorded-lines.mjs', 'scripts/lib/language.mjs', 'scripts/lib/jsdoc.mjs', 'scripts/hfs/project-rule.mjs']), ...MACHINE_DATA, CONFIG_EXAMPLE, RULE_CATALOG_FILE])].sort(byCodeUnit)), catalog: false }),
-  'packages/eslint/fe/runtime': Object.freeze({ files: Object.freeze([...new Set([...SLOT_FILES, ...importClosure(['scripts/api/git/recorded-lines.mjs', 'scripts/lib/next-contract.mjs', 'scripts/lib/language.mjs', 'scripts/lib/jsdoc.mjs', 'scripts/hfs/project-rule.mjs']), ...MACHINE_DATA, CONFIG_EXAMPLE])].sort(byCodeUnit)), catalog: false }),
+  'packages/eslint/be/runtime': Object.freeze({ files: Object.freeze([...new Set([...SLOT_FILES, ...importClosure(['scripts/api/git/recorded-lines.mjs', 'scripts/lib/language.mjs', 'scripts/lib/jsdoc.mjs', 'scripts/lib/sonar-syntax-rules.mjs', 'scripts/hfs/project-rule.mjs']), ...MACHINE_DATA, CONFIG_EXAMPLE, RULE_CATALOG_FILE])].sort(byCodeUnit)), catalog: false }),
+  'packages/eslint/fe/runtime': Object.freeze({ files: Object.freeze([...new Set([...SLOT_FILES, ...importClosure(['scripts/api/git/recorded-lines.mjs', 'scripts/lib/next-contract.mjs', 'scripts/lib/language.mjs', 'scripts/lib/jsdoc.mjs', 'scripts/lib/sonar-syntax-rules.mjs', 'scripts/hfs/project-rule.mjs']), ...MACHINE_DATA, CONFIG_EXAMPLE])].sort(byCodeUnit)), catalog: false }),
 });
 
 /** The catalog entries for `codes`, in the catalog's own text, keyed by top-level line. */

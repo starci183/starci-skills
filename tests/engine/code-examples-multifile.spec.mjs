@@ -12,6 +12,8 @@ import { byCodeUnit } from '../../scripts/lib/list.mjs';
 import { runNode } from '../../scripts/api/node/run-node.mjs';
 import { runGit } from '../../scripts/api/git/lib.mjs';
 import { installInto, uninstall, runtimeInstalls, missingFrom, LINT_DEPENDENCIES, STARCI_PACKAGES } from '../helpers/hfs-app-install.mjs';
+import { nextBuildEnv } from '../../scripts/gates/build-env.mjs';
+import { testWorldDistProblem } from '../helpers/test-world-dist.mjs';
 
 const runtime = path.resolve(import.meta.dirname, '../..');
 const stableIds = ['api', 'cli', 'connected-block', 'domain', 'event-bus', 'fenced-job', 'injector', 'named-exception', 'projection', 'queue', 'realtime', 'saga', 'service-spec', 'webhooks'];
@@ -208,7 +210,7 @@ function installedApp(t, name, projects) {
     const pin = parseYaml(fs.readFileSync(path.join(runtime, 'knowledge/hfs/canon-pins.yaml'), 'utf8')).pins[testWorldName];
     assert.equal(pkg.name, testWorldName);
     assert.equal(pkg.version, pin.version, 'the private current test-world producer must have the canonical version');
-    assert.equal(fs.lstatSync(path.join(producer, pkg.types)).isFile(), true, 'the current test-world owner build is required');
+    assert.equal(testWorldDistProblem(producer), null, 'the current test-world owner build is required');
     for (const field of testWorldFields) manifest[field][testWorldName] = pkg.version;
     write(app, 'package.json', JSON.stringify(manifest, null, 2)+'\n');
     // The current package's genuine build supplies both JS and declarations; borrowed published installs may predate its API.
@@ -239,7 +241,7 @@ function installedApp(t, name, projects) {
     // may finish this process. The outer timeout bounds fixture custody when framework setup cannot finish.
     const lifetime = write(app, '.starci-next-typegen-lifetime.cjs', 'setInterval(() => {}, 1000);\n');
     const types = runNode(['--require', lifetime, require.resolve('next/dist/bin/next'), 'typegen', directory], { cwd: directory,
-      env: { ...process.env, CI: '1', NEXT_TELEMETRY_DISABLED: '1' }, timeout: 120_000, maxBuffer: 16 * 1024 * 1024 });
+      env: { ...nextBuildEnv(), CI: '1' }, timeout: 120_000, maxBuffer: 16 * 1024 * 1024 });
     assert.equal(types.status, 0, types.stderr || types.stdout);
     assert.equal(types.error ?? null, null); assert.equal(types.signal ?? null, null);
     assert.match(types.stdout, /Types generated successfully/, `the public Next CLI must finish its real typegen action: ${types.stderr || types.stdout}`);

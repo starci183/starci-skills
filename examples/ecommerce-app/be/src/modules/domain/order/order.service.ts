@@ -10,7 +10,7 @@ import type { SagaService } from "@modules/platform/saga"
 import { OrderPlacedEvent } from "@modules/events/order"
 import { InjectEventBus } from "@modules/platform/event-bus"
 import type { EventBus } from "@modules/platform/event-bus"
-import { ok } from "@modules/platform/primitives"
+import { eachInOrder, ok } from "@modules/platform/primitives"
 import type { Outcome } from "@modules/platform/primitives"
 import { evaluateCheckout } from "./checkout.policy"
 import { OrderError, OrderErrorCode } from "./errors/order.error"
@@ -94,9 +94,9 @@ export class OrderService {
                 where: { orderId: params.orderId },
                 take: LIST_ROWS_MAX,
             })
-            for (const line of lines) {
-                await this.catalog.releaseStock({ manager, productId: line.productId, quantity: line.quantity })
-            }
+            await eachInOrder(lines, (line) =>
+                this.catalog.releaseStock({ manager, productId: line.productId, quantity: line.quantity }),
+            )
             return true
         })
         return { orderId: params.orderId, cancelled }
@@ -129,7 +129,7 @@ export class OrderService {
         ])
         const orderId = toOrderId(rows)
         if (orderId === null) return this.replayOf(params)
-        for (const line of plan.lines) {
+        await eachInOrder(plan.lines, async (line) => {
             const reserved = await this.catalog.reserveStock({
                 manager,
                 productId: line.productId,
@@ -141,7 +141,7 @@ export class OrderService {
                     params: { productId: line.productId, requested: line.quantity },
                 })
             }
-        }
+        })
         await manager.insert(
             OrderLineEntity,
             plan.lines.map((line) => ({

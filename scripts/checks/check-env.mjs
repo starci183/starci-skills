@@ -28,7 +28,7 @@ import { lineOf, parseSource, ts } from '../hfs/runtime-rules/source-ast.mjs';
 export const CATALOG_FILE = 'modules/schemas/env.yaml';
 const FAILURE_CODES_FILE = 'modules/kernel/failure-codes.yaml';
 const ENV_ROOTS = Object.freeze(['scripts', 'engine', 'modules', 'bin', 'ext', 'ui', 'packages']);
-export const KINDS = Object.freeze(['config', 'seam', 'handoff', 'host']);
+export const KINDS = Object.freeze(['config', 'seam', 'handoff', 'host', 'secret']);
 const TEST_RUNNER_VARIABLE = 'NODE_TEST_CONTEXT';
 const GENERATED = /^packages\/[^/]+(\/[^/]+)?\/runtime\//;
 const VENDORED = /(^|\/)(node_modules|dist|reference-renders)\//;
@@ -132,7 +132,7 @@ const fileEnvFindings = (facts, ctx) => {
  * The findings of a source set: [{code, path, line, message}]. files: [{rel, text}] (the runtime sources among them are
  * judged); catalog: parseCatalog(...); failureCodes: the names of modules/kernel/failure-codes.yaml (a STARCI_* refusal code is not a variable).
  */
-export function envFindings(files, catalog, failureCodes = new Set()) {
+export function envFindings(files, catalog, failureCodes = new Set(), exampleNames = null) {
   const findings = [];
   // Windows environment names are case-insensitive (ComSpec is COMSPEC), so names compare upper-cased.
   const known = new Set(Object.keys(catalog.variables).map((n) => n.toUpperCase()));
@@ -145,14 +145,21 @@ export function envFindings(files, catalog, failureCodes = new Set()) {
     if (!seen.has(name.toUpperCase())) findings.push({ code: 'RT_ENV_STALE_ENTRY', path: CATALOG_FILE, line: 1, message: `${name} is in ${CATALOG_FILE} but no production source reads or names it: delete the entry` });
     if (typeof entry?.purpose !== 'string' || !entry.purpose.trim() || !KINDS.includes(entry?.kind)) findings.push({ code: 'RT_ENV_UNCATALOGUED', path: CATALOG_FILE, line: 1, message: `${name} needs a purpose (a sentence) and a kind (${KINDS.join('|')})` });
   }
+  for (const [name, entry] of Object.entries(catalog.variables)) {
+    if (entry?.kind === 'secret' && exampleNames && !exampleNames.has(name)) findings.push({ code: 'RT_ENV_UNCATALOGUED', path: 'secret.env.example', line: 1, message: `${name} is a secret of ${CATALOG_FILE} (held in the untracked secret.env) and secret.env.example does not list it: add NAME= with a comment saying what it is for and where its value comes from` });
+  }
   return findings;
 }
+
+/** The variable names secret.env.example lists, commented or not (NAME=). */
+const exampleNamesOf = (text) => new Set([...text.matchAll(/^#?s*([A-Z][A-Z0-9_]*)=/gm)].map((m) => m[1]));
 
 /** Run the check on the runtime at `root`. */
 function checkEnv(root = skillRoot) {
   const files = trackedTextFiles(root, (rel) => rel.endsWith('.mjs') && !GENERATED.test(rel) && !VENDORED.test(rel));
   const failureCodes = new Set(Object.keys(parseYaml(fs.readFileSync(path.join(root, FAILURE_CODES_FILE), 'utf8')) ?? {}));
-  return envFindings(files, parseCatalog(fs.readFileSync(path.join(root, CATALOG_FILE), 'utf8')), failureCodes);
+  const example = fs.existsSync(path.join(root, 'secret.env.example')) ? exampleNamesOf(fs.readFileSync(path.join(root, 'secret.env.example'), 'utf8')) : new Set();
+  return envFindings(files, parseCatalog(fs.readFileSync(path.join(root, CATALOG_FILE), 'utf8')), failureCodes, example);
 }
 
 if (isMain(import.meta.url)) {

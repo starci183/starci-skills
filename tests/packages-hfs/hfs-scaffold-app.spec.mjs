@@ -378,7 +378,8 @@ test('starci app scaffold writes the app shape and starci app lint finds nothing
   // The lockfile is npm's own (the scaffold runs `npm install --package-lock-only`): it resolves every dependency of the root and
   // of every workspace, and `npm ci` accepts it. Checked before any node_modules exists, so the dry run touches no link.
   const manifest = JSON.parse(fs.readFileSync(path.join(app, 'package.json'), 'utf8'));
-  assert.equal(manifest.devDependencies['@starci/cli'], '1.0.0', 'the app installs the exact public CLI pin');
+  const cliVersion = JSON.parse(fs.readFileSync(path.join(RUNTIME, 'packages', 'cli', 'package.json'), 'utf8')).version;
+  assert.equal(manifest.devDependencies['@starci/cli'], cliVersion, 'the app installs the exact CLI pin: the version of packages/cli');
   assert.equal(manifest.devDependencies['@starci/hfs'], undefined, '@starci/hfs stays a transitive implementation dependency');
   const lock = JSON.parse(fs.readFileSync(path.join(app, 'package-lock.json'), 'utf8'));
   assert.equal(lock.lockfileVersion, 3);
@@ -432,7 +433,7 @@ test('starci app scaffold writes the app shape and starci app lint finds nothing
   edit(app, 'fe/apps/app/src/features/pages/AppHomePage/component.tsx', '<Heading level={1}>{props.props.title}</Heading>', '<h1>{props.props.title}</h1>');
   fs.writeFileSync(path.join(app, 'fe', 'apps', 'app', 'src', 'modules', 'config', 'alias.ts'), 'import { siteUrl } from "./index"\n\nexport const origin = siteUrl\n');
   const planted = await lint(app);
-  assert.equal(planted.code, 1);
+  assert.equal(planted.code, 1, `the planted violations are reported, every tool ran: ${JSON.stringify(planted.report.errors).slice(0, 600)}`);
   const eslint = planted.report.findings.filter((f) => f.engine === 'eslint');
   assert.ok(eslint.some((f) => f.rule === 'starci-be/public-needs-reason' && f.path === 'be/src/features/api/system-health/transport/http/live.controller.ts'), 'the BE canon judged be/');
   assert.ok(eslint.some((f) => f.rule.startsWith('starci-fe/') && f.path === 'fe/apps/app/src/features/pages/AppHomePage/component.tsx'), 'the FE canon judged fe/');

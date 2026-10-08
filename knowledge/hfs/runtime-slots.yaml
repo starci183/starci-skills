@@ -113,6 +113,16 @@ ruleParams:
       - {root: packages/eslint/be/runtime, generatedBy: scripts/hfs/sync-runtime.mjs}
       - {root: packages/eslint/fe/runtime, generatedBy: scripts/hfs/sync-runtime.mjs}
       - {root: ui/src/i18n/generated, generatedBy: scripts/hfs/sync-runtime.mjs}
+    # RT_SECRET_TRACKED: the sealed secrets still tracked, each with why; the list only shrinks. The stack members of the self-hosted ext/sonar (the product Sonar server) and the demo
+    # secrets of the ecommerce example's own docker stack remain until their move into secret.env (modules/reconciler/edge-cases.yaml, release-tracked-secrets-remaining).
+    heldSecrets:
+      - {path: ext/sonar/secrets/cloudflare-starci-local-services-tunnel-token.key.enc, reason: the public tunnel of the product Sonar server}
+      - {path: ext/sonar/secrets/sonarqube-admin-password.txt.enc, reason: the bootstrap admin password of the product Sonar server}
+      - {path: ext/sonar/secrets/sonarqube-admin-token.key.enc, reason: the admin token sonar-local.mjs uses to provision product projects}
+      - {path: ext/sonar/secrets/sonarqube-analysis-token.txt.enc, reason: the server-wide fallback analysis token of the product Sonar server}
+      - {path: ext/sonar/secrets/sonarqube-db-password.txt.enc, reason: the database password of the product Sonar server}
+      - {path: examples/ecommerce-app/.starcistacks/dev/secrets/keycloak-env.enc, reason: demo secret of the ecommerce example's own docker stack}
+      - {path: examples/ecommerce-app/.starcistacks/dev/secrets/minio-env.enc, reason: demo secret of the ecommerce example's own docker stack}
     # RT_PINNED_PATH_MOVED: paths persisted outside git (provider hooks, settings, the scheduled task, rendered prompts).
     pinned:
       - {path: packages/cli/bin/starci.mjs, why: the @starci/cli npm bin}
@@ -153,6 +163,7 @@ ruleParams:
       - {id: specs, run: scripts/checks/check-specs.mjs}
       - {id: worktree-add, run: scripts/checks/check-worktree-add.mjs}
       - {id: examples-ci, run: scripts/checks/check-examples-ci.mjs}
+      - {id: example-render, run: scripts/checks/check-example-render.mjs}
       - {id: guidance-commands, run: scripts/checks/check-guidance-commands.mjs}
       - {id: port-once, run: scripts/checks/check-port-once.mjs}
       - {id: spec-budget, run: scripts/checks/check-spec-budget.mjs}
@@ -345,7 +356,7 @@ slots:
   # ----- engine ---------------------------------------------------------------------------------------------
   - id: runtime.foundation
     profiles: [runtime]
-    path: "engine/{runtime-root,config,secrets,invalid-config,model-config,orca-config,resources-config,temp-root,plain-object,canonical-json,by-code-unit,constants,digest,admission,refuse,removed-vocabulary}.mjs"
+    path: "engine/{runtime-root,config,secrets,invalid-config,model-config,orca-config,resources-config,sonar-config,temp-root,plain-object,canonical-json,by-code-unit,constants,digest,admission,refuse,removed-vocabulary}.mjs"
     presence: required
     tracked: tracked
     tier: base
@@ -678,7 +689,7 @@ slots:
     tier: none
     tests: none
     coverage: none
-    allows: [compose.yaml, cloudflared.yaml, README.md, .gitignore, "secrets/*.enc", secrets/KEYS.md]
+    allows: [compose.yaml, cloudflared.yaml, README.md, .gitignore, "secrets/*.enc"]
   - id: runtime.example-catalog
     profiles: [runtime]
     path: examples/index.yaml

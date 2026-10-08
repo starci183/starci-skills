@@ -24,6 +24,43 @@ const healthNames: Record<string, string> = { engine: 'Engine', services: t('Ser
 const whoNames: Record<string, string> = { owner: t('The owner'), supervisor: 'Supervisor', kernel: 'Kernel', controller: 'Controller' };
 const count = (value: number | null | undefined) => value == null || !Number.isFinite(value) ? '—' : value;
 
+type AttentionItem = WorkersViewV2['attention'][number];
+
+/** Keep the recorded Decision Item lifecycle separate from its attention cause. */
+function AttentionRow({ item, workflows }: Readonly<{ item: AttentionItem; workflows: WorkersViewV2['workflows'] }>) {
+  const isDecision = item.ref.kind === 'di';
+  const cause = formatReason(item.reason);
+  const recordedSummary = item.detail?.summary;
+  const summary = recordedSummary?.trim() ? recordedSummary : cause;
+  const projectName = item.detail?.project?.trim() || item.scope?.project || item.ref.project;
+  const nativeWorkflow = item.scope?.workflow;
+  const nativeLedger = item.scope?.ledgerId || item.ref.ledgerId;
+  const nativeProject = item.scope?.project || item.ref.project;
+  // Workflow IDs may repeat across ledgers; a display name requires the same native scope.
+  const workflow = nativeWorkflow ? workflows.find(row => row.id === nativeWorkflow && (nativeLedger ? row.ledgerId === nativeLedger : nativeProject ? row.project === nativeProject : false)) : undefined;
+  const workflowName = workflow?.name?.trim() || nativeWorkflow || item.detail?.workflow?.trim();
+  const recordedStatus = item.detail?.status?.trim();
+  const decisionStatus = recordedStatus ? t(recordedStatus[0].toUpperCase() + recordedStatus.slice(1)) : t('Not recorded.');
+  const overdue = isDecision && item.reason.code === 'DECISION_OVERDUE';
+  const source = item.scope?.store === 'machine' ? t('Host machine record') : item.scope?.store === 'ledger' ? t('Project ledger record') : t('Recorded source');
+  // A decision deadline breach is an attention signal, not an Attempt verdict.
+  const status = isDecision && (item.ui === 'bad' || item.ui === 'warn') ? 'warning' : statusFromUi(item.ui);
+  return <a href={item.ref.href} className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-2 hover:text-primary sm:grid-cols-[auto_minmax(0,1fr)_auto]">
+    <StatusChip status={status} label={isDecision ? t('DI: {status}', { status: decisionStatus }) : undefined} suffix={overdue ? t('Overdue') : undefined} className="mt-0.5 shrink-0" />
+    <span className="col-span-2 row-start-2 flex min-w-0 flex-col gap-1 sm:col-span-1 sm:col-start-2 sm:row-start-1">
+      <span className="line-clamp-3 break-words text-sm sm:line-clamp-2" title={summary}>{summary}</span>
+      <span className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+        <span>{projectName ? t('Project: {project}', { project: projectName }) : item.scope?.store === 'ledger' ? t('Project not recorded') : t('Host scope')}</span>
+        {isDecision && <span title={nativeWorkflow || item.detail?.workflow || undefined}>{workflowName ? t('Workflow: {workflow}', { workflow: workflowName }) : t('Workflow not recorded')}</span>}
+        <span>{t('Decider role: {who}', { who: whoNames[item.who] ?? item.who })}</span>
+      </span>
+      {isDecision && Boolean(recordedSummary?.trim()) && !overdue && <span className="break-words text-xs text-muted-foreground">{t('Why attention: {reason}', { reason: cause })}</span>}
+      <span className="flex min-w-0 flex-wrap gap-x-2 gap-y-1 text-xs text-muted-foreground"><span>{source}</span><span className="max-w-32 truncate font-mono" title={`${item.ref.kind}:${item.ref.id}`}>{item.ref.kind}:{item.ref.id}</span><span>{t('Open source')}</span></span>
+    </span>
+    <ArrowRight className="col-start-2 row-start-1 mt-1 size-4 shrink-0 sm:col-start-3" aria-hidden="true" />
+  </a>;
+}
+
 export function WorkersPage() {
   const [project, setProject] = useState('all');
   const workers = useApiQuery<WorkersViewV2>('/api/workers?phase=all', { topics: ['workers', 'decisions', 'system'], intervalMs: 20_000 });
@@ -43,8 +80,9 @@ export function WorkersPage() {
     {workers.error && <FeedbackState error onRetry={() => refreshQuery('/api/workers?phase=all')}>{workers.error}</FeedbackState>}
     {sourceStale && <output className="shell-error block">{t('Some sources are unavailable; showing the recorded part.')}{workers.meta?.stale?.length ? ` ${workers.meta.stale.join(', ')}` : ''}</output>}
     <KpiStrip summary={data?.summary} needsAttention={needsAttention} loading={!data && !workers.error && !workers.meta} />
+    <p className="-mt-4 text-xs text-muted-foreground">{t('Host KPI totals · project filters apply to workflow cards only')}</p>
     <ConceptBlock concept="C12" as="section"><div className="mb-3 flex flex-wrap items-center gap-2"><CircleAlert className="size-4" aria-hidden="true" /><h2 className="font-semibold">{t('Needs attention')}</h2><span className="text-sm text-muted-foreground">{data?.attention.length ?? '—'}</span><span className="text-xs text-muted-foreground">{t('Host scope · capped attention preview')}</span></div>
-      <Card><CardContent>{data?.attention.length ? <Stagger className="divide-y">{data.attention.map((item, index) => <StaggerItem key={`${item.ref.project ?? 'machine'}-${item.ref.kind}-${item.ref.id}-${index}`} className="py-3 first:pt-0 last:pb-0"><a href={item.ref.href} className="flex min-w-0 items-center gap-3 hover:text-primary"><StatusChip status={statusFromUi(item.ui)} /><span className="min-w-0 flex-1 truncate text-sm" title={formatReason(item.reason)}>{formatReason(item.reason)}</span><span className="hidden text-xs text-muted-foreground sm:block">{whoNames[item.who] ?? item.who}</span><ArrowRight className="size-4 shrink-0" aria-hidden="true" /></a></StaggerItem>)}</Stagger> : !data ? workers.error ? <FeedbackState>{t('The source is unavailable.')}</FeedbackState> : workers.meta ? <FeedbackState>{t('Attention observations have not been recorded.')}</FeedbackState> : <PageSkeleton label={t('Loading…')} /> : <FeedbackState>{workers.error || sourceStale ? t('No attention items were observed in the last read.') : t('Nothing needs attention.')}</FeedbackState>}</CardContent></Card>
+      <Card><CardContent>{data?.attention.length ? <Stagger className="divide-y">{data.attention.map((item, index) => <StaggerItem key={`${item.scope?.store ?? (item.ref.project ? 'ledger' : 'machine')}-${item.scope?.ledgerId ?? item.ref.project ?? 'machine'}-${item.ref.kind}-${item.ref.id}-${index}`} className="py-3 first:pt-0 last:pb-0"><AttentionRow item={item} workflows={data.workflows} /></StaggerItem>)}</Stagger> : !data ? workers.error ? <FeedbackState>{t('The source is unavailable.')}</FeedbackState> : workers.meta ? <FeedbackState>{t('Attention observations have not been recorded.')}</FeedbackState> : <PageSkeleton label={t('Loading…')} /> : <FeedbackState>{workers.error || sourceStale ? t('No attention items were observed in the last read.') : t('Nothing needs attention.')}</FeedbackState>}</CardContent></Card>
     </ConceptBlock>
     <ConceptBlock concept="C2" as="section" className="min-w-0"><div className="mb-3 flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold">Workflow</h2><div className="flex min-w-0 items-center gap-2"><span className="shrink-0 text-xs text-muted-foreground">{t('Loaded workflows: {n}', { n: data ? visibleWorkflows.length : '—' })}</span><label className="sr-only" htmlFor="workers-project">{t('Project')}</label><Select value={project} onValueChange={setProject}><SelectTrigger id="workers-project" size="sm" className="min-w-0 max-w-48 text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">{t('All projects')}</SelectItem>{projects.data?.map(item => <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>)}</SelectContent></Select></div></div>
       <Stagger key={project} className="grid gap-4 md:grid-cols-2">{visibleWorkflows.map(row => <StaggerItem key={`${row.project}/${row.id}`} className="min-w-0"><WorkflowCard row={row} /></StaggerItem>)}</Stagger>

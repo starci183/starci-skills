@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common"
 import { injector } from "@modules/platform/composition"
 import type { TypedParameterDecorator } from "@modules/platform/composition"
 import type { EntityManager } from "typeorm"
+import { eachInOrder } from "@modules/platform/primitives"
 import type { Probe } from "@modules/platform/probes"
 import { PING } from "./database.sql"
 
@@ -21,9 +22,7 @@ export class DatabaseProbe implements Probe {
     constructor(@InjectDatabaseManagers() private readonly managers: ReadonlyArray<EntityManager>) {}
 
     /** Resolves when every connection answers, rejects with the driver failure when one does not. */
-    async check(): Promise<void> {
-        for (const manager of this.managers) {
-            await manager.query(PING, [])
-        }
+    check(): Promise<void> {
+        return eachInOrder(this.managers, (manager) => manager.query(PING, []))
     }
 }

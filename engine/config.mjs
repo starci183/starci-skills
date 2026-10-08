@@ -5,6 +5,7 @@ import {skillRoot} from './runtime-root.mjs';
 import {parseYaml} from './yaml.mjs';
 import {isPlainObject as plain} from './plain-object.mjs';
 import {invalid,validateRoots,ROOT_KEYS} from './invalid-config.mjs';
+import {validateSonar} from './sonar-config.mjs';
 import {validateOrca,ORCA_KEYS} from './orca-config.mjs';
 import {validateResources,RESOURCE_KEYS} from './resources-config.mjs';
 import {ENV_NAME,secretEnv,connectorSecret} from './secrets.mjs';
@@ -241,7 +242,7 @@ export function uatSettings(config=loadConfig()){
 const GRANT=/^([a-z0-9][a-z0-9.-]*)=(\d+)@([a-z]+(?:\+[a-z]+)*)$/;
 /** One grant string `<pool>=<slots>@<role>+<role>` as {pool, slots, roles}, or null when it is not that shape. */
 /** The closed set of top-level config.yaml blocks: the validator accepts these and refuses every other key. */
-export const CONFIG_BLOCKS=Object.freeze(['language','model','effort','models','allocation','kernel','budgets','supervisor','parallel','delegation','connectors','asks','uat','specs','reconciler','debugLoop','orca','roots','resources','launchTrust','retention']);
+export const CONFIG_BLOCKS=Object.freeze(['language','model','effort','models','allocation','kernel','budgets','supervisor','parallel','delegation','connectors','asks','uat','specs','reconciler','debugLoop','orca','roots','resources','sonar','launchTrust','retention']);
 export function parseAllocationGrant(text){
   const m=typeof text==='string'?GRANT.exec(text.trim()):null;
   return m?{pool:m[1],slots:Number(m[2]),roles:m[3].split('+')}:null;
@@ -322,7 +323,7 @@ const validateEarlyConfigBlocks=(config)=>{
   if(config?.launchTrust!==undefined){launchTrustSettings(config);} if(config?.retention!==undefined){workflowPurgeSettings(config);}
   if(config?.connectors!==undefined){validateConnectors(config.connectors);} if(config?.asks!==undefined){validateAsks(config.asks);}
   if(config?.uat!==undefined){validateUat(config.uat);} if(config?.debugLoop!==undefined){validateDebugLoop(config.debugLoop);}
-  if(config?.orca!==undefined){validateOrca(config.orca);} if(config?.roots!==undefined){validateRoots(config.roots);} if(config?.resources!==undefined){validateResources(config.resources);}
+  if(config?.orca!==undefined){validateOrca(config.orca);} if(config?.roots!==undefined){validateRoots(config.roots);} if(config?.resources!==undefined){validateResources(config.resources);} if(config?.sonar!==undefined){validateSonar(config.sonar);}
 };
 const validateConfigBlocks=(config,knownProviders,runtimes,profile)=>{
   // specs (owner 2026-09-28): {harness?, unit?, e2e?} booleans - each family a boolean; absent = its default (SPEC_DEFAULTS: harness off, unit on, e2e off; specsSettings).
@@ -354,6 +355,20 @@ export function configuredAllocationPolicy(config=loadConfig()){
     :null;
   return {grants,source:allocation?'allocation':'default'};
 }
+/** The variable that confines the owner's `config.yaml` to a directory tree: set, an owner file is read only from under that directory (tests/setup/isolated-temp.mjs points it at a spec's own temp root). */
+export const OWNER_CONFIG_WITHIN_ENV='STARCI_OWNER_CONFIG_WITHIN';
+const foldPath=p=>process.platform==='win32'?path.resolve(p).toLowerCase():path.resolve(p);
+/**
+ * Whether the owner's `config.yaml` under `root` is visible to this process. Unconfined (the variable unset) every owner file is visible; confined, only the files under the named
+ * directory, where a fixture wrote them, so the checkout's live file (roots.temp, supervisor.landGate, launch trust) never decides a result and a lane clone, the release host and a
+ * clean checkout run the same suite. The engine knows nothing of why a caller confines it: the spec preload sets the variable.
+ */
+const ownerFileVisible=(root,env=process.env)=>{
+  const within=env[OWNER_CONFIG_WITHIN_ENV];
+  if(!within)return true;
+  const rel=path.relative(foldPath(within),foldPath(root));
+  return !rel.startsWith('..')&&!path.isAbsolute(rel);
+};
 /** The validated config one yaml file holds, or null when the file is absent. */
 const readYamlConfig=(root,name)=>{const yaml=path.join(root,name);return fs.existsSync(yaml)?validateConfig(parseYaml(fs.readFileSync(yaml,'utf8'))):null;};
 function readExample(root=configRoot){const example=readYamlConfig(root,'config.example.yaml');if(example!==null){return example;}throw new Error('Missing config.example.yaml');}
@@ -363,7 +378,7 @@ function readExample(root=configRoot){const example=readYamlConfig(root,'config.
  * all). Returns the validated owner config, or null when that file does not
  * exist; falling back to the example's defaults is `loadConfig`.
  */
-function readOwnerConfig(root=configRoot){return readYamlConfig(root,'config.yaml');}
+function readOwnerConfig(root=configRoot){return ownerFileVisible(root)?readYamlConfig(root,'config.yaml'):null;}
 /**
  * The tolerant read the kernel boot and the router share: an owner file that is absent, unparsable or
  * short of the closed schema must never stop a workflow from routing. Returns
@@ -373,7 +388,7 @@ function readOwnerConfig(root=configRoot){return readYamlConfig(root,'config.yam
  */
 export function inspectOwnerConfig(root=configRoot){
   const file=path.join(root,'config.yaml');
-  if(!fs.existsSync(file))return {file,config:null,error:null,invalid:null};
+  if(!ownerFileVisible(root)||!fs.existsSync(file))return {file,config:null,error:null,invalid:null};
   let parsed;
   try{parsed=parseYaml(fs.readFileSync(file,'utf8'))??null;}
   catch(error){return {file,config:null,error:`config.yaml unparsable: ${error.message}`,invalid:null};}

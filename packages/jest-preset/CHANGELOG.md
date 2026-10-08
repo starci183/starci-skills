@@ -1,6 +1,11 @@
 # Changelog
 
-## Unreleased
+## 2.2.6 - 2026-10-08
+
+- Fixed: the `integration`, `e2e` and `contract` projects match `**/src/tests/<layer>/**/*.<layer>-spec.ts` instead of a pattern prefixed with the root path. On Windows a root that holds a dot-named folder (a checkout under `.claude`) turned the path separator before it into a glob escape, so the contract run found 0 spec files ("No tests found") although they exist.
+- Fixed: `jest-util` is a declared devDependency of the package, which its own spec requires.
+
+## 2.2.5 (published before this release)
 
 - Breaking (contract change `coverage-modules-logic`): `starciJestConfig({ coverage: { roots, roles, excludes } })` takes the coverage scope the managed `be/jest.config.js` renders (`hfs sync`, from the `coverage` field of the slot manifest and `ruleParams.be.logicRoles`, through `scripts/hfs/coverage-scope.mjs`), and refuses to run without it. `COVERAGE_SOURCES` is deleted: per-file 100 now holds on every logic role (service, policy, projection, guard, mapper, client, filter, interceptor, processor, step, saga, saga-step, compensation, consumer, webhook) inside the measured roots (the logic of `be/src/modules`), never on `be/src/features` (thin by R203). New exports `rootGlob` and `StarciCoverageScope`; `collectCoverageFrom(coverage)` and `hasCoverageSubjects(root, glob)` take a scope and a glob with `**` and `{a,b}`.
 - New: `fakeInbox()` (also `@starci/jest-preset/inbox`), the twin of `recordingOutbox()` for the delivery side: `claim` answers true for the first call of a (source, eventId) pair and false afterwards, `release` gives the claim back, `seen` marks a redelivery, and `claims`, `claimed`, `released`, `failNext` and `clear` let a spec assert what a consumer or a signed webhook did. A spec no longer stubs `mock<Inbox>()` by hand.

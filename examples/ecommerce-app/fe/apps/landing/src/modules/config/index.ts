@@ -13,6 +13,6 @@ import { readProjectedOrigins } from "@ecommerce/api"
  * this repository to drift against the allocation.
  */
 
-/** Origin of the authenticated shop app this site hands visitors off to. */
-export const SHOP_URL: string =
+/** Origin of the authenticated shop app this site hands visitors off to; read per call, never when the module loads (an image build has no projection). */
+export const shopUrl = (): string =>
     process.env.NEXT_PUBLIC_SHOP_URL ?? readProjectedOrigins(process.env.ECOMMERCE_APP_METADATA).app

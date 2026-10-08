@@ -1,6 +1,6 @@
 import "server-only"
 import { collectionSlot, type GateNoticeProps, type LineItemRow, type Slot, type SlotLabels } from "@ecommerce/ui"
-import { ORDER_API_URL } from "../config"
+import { orderApiUrl } from "../config"
 import { SHOP_ROUTES } from "../routes"
 import { readCart, type CartRead } from "../services"
 
@@ -40,7 +40,7 @@ export const cartPageCopy = (t: Translate, locale: string, read: CartRead): Cart
         emptyTitle: t("empty.title"),
         emptyDescription: t("empty.description"),
         errorTitle: t("unreachable.title"),
-        errorDescription: read.outcome.kind === "ok" ? "" : t("unreachable.description", { url: ORDER_API_URL }),
+        errorDescription: read.outcome.kind === "ok" ? "" : t("unreachable.description", { url: orderApiUrl() }),
     },
     linesSlot: collectionSlot(read.outcome.kind === "ok" ? read.summary.rows : null),
 })

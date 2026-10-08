@@ -173,6 +173,11 @@ reconciler:
 # and the OS temp directory (engine/temp-root.mjs tempRoot; the processes the runtime starts get it as TEMP/TMP/TMPDIR). No host location lives in
 # a tracked file: set the real directories only in the gitignored config.yaml copy, e.g.
 #   roots: {archive: <absolute directory>, lanes: <absolute directory>, temp: <absolute directory>}
+# sonar — the SonarCloud organization the release's Sonar proof of the example apps analyses in (scripts/supervisor/release-sonarcloud.mjs). It is configuration, not a secret,
+# so it lives here and not in secret.env; the project keys are <organization>_starci-example-<app>. The environment variable SONAR_ORGANIZATION wins over it (CI reads the
+# repository variable of the same name). Empty until the owner sets it in the gitignored config.yaml copy, e.g.
+#   sonar: {organization: <the organization key shown on sonarcloud.io>}
+sonar: {organization: null}
 # resources — the host capacity floors the dispatch gate enforces, over the shipped numbers of modules/models/runtimes.yaml allocation.resources
 # (scripts/machine/host-resources.mjs; docs/config-format.md "Host resource floors"). Every key is optional (a number above 0, or null):
 #   minFreeDiskGb  free GB a drive holding the temp root or the repository must keep

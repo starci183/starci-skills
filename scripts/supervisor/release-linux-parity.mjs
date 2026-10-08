@@ -19,7 +19,7 @@ import { containerRm } from '../api/docker/container-rm.mjs';
 import { version as dockerVersion } from '../api/docker/version.mjs';
 import { safeRemove } from '../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
-import { DEFAULT_NODE } from '../lib/node-image.mjs';
+import { DEFAULT_NODE, parityImage } from '../lib/node-image.mjs';
 import { byCodeUnit } from '../lib/list.mjs';
 import { tempRoot } from '../../engine/temp-root.mjs';
 import { makeTempDir } from '../api/fs/make-temp-dir.mjs';
@@ -30,6 +30,8 @@ export const LINUX_SPECS_LABEL = 'linux-specs';
 /** The spec setup the root `npm test` runs under (package.json scripts.test): the same isolation for the files the container runs. */
 const SPEC_IMPORTS = ['low-priority', 'isolated-temp', 'isolated-registry', 'runtime-copies'].map((name) => `--import ./tests/setup/${name}.mjs`).join(' ');
 const RUN_TIMEOUT_MS = 90 * 60_000;
+/** Where the container checks HEAD out: a path several levels below the filesystem root, as GitHub's runner checkout is (a spec that judges the runtime's distance from the root sees the same depth). */
+export const WORK_DIR = '/opt/starci-parity/checkout';
 /** The spec suites: the root `npm test` and an example app's npm test / test:<layer> runs. The host ran them in this L4 row. */
 const SPEC_SUITE = /^npm (?:run )?test(?::[\w:-]+)?(?: -- .*)?$/;
 const BROWSER = /playwright install|test:a11y|test:browser/;
@@ -111,7 +113,7 @@ export function parityPlan({ workflows, apps }) {
     const base = { env: { ...doc.env } };
     for (const [id, job] of Object.entries(doc.jobs ?? {})) planJob({ file, id, job, apps, base, seen, state, steps, skipped });
   }
-  return { image: `node:${state.node ?? DEFAULT_NODE}`, steps, skipped };
+  return { image: parityImage(state.node ?? DEFAULT_NODE), steps, skipped };
 }
 
 const quote = (v) => "'" + String(v).replaceAll("'", String.raw`'\''`) + "'";
@@ -122,9 +124,9 @@ export function parityScript(plan) {
     '#!/usr/bin/env bash',
     'set -eu',
     'export CI=1 NEXT_TELEMETRY_DISABLED=1 npm_config_update_notifier=false npm_config_fund=false npm_config_audit=false',
-    'mkdir -p /work && tar -xf /in/src.tar -C /work',
-    'cd /work && git init -q && git add -A && git -c user.name=starci -c user.email=l4@starci.invalid commit -q -m l4-snapshot',
-    'run_step() { name="$1"; dir="$2"; cmd="$(cat)"; echo "##STEP $name"; ( cd "/work/$dir" && bash -ec "$cmd" ) || { echo "##FAILED $name"; exit 1; }; }',
+    `mkdir -p ${WORK_DIR} && tar -xf /in/src.tar -C ${WORK_DIR}`,
+    `cd ${WORK_DIR} && git init -q && git add -A && git -c user.name=starci -c user.email=l4@starci.invalid commit -q -m l4-snapshot`,
+    `run_step() { name="$1"; dir="$2"; cmd="$(cat)"; echo "##STEP $name"; ( cd "${WORK_DIR}/$dir" && bash -ec "$cmd" ) || { echo "##FAILED $name"; exit 1; }; }`,
   ];
   plan.steps.forEach((s, i) => {
     const exports = Object.entries(s.env).map(([k, v]) => `export ${k}=${quote(v)}`).join('\n');

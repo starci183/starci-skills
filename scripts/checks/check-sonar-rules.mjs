@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // check-sonar-rules.mjs - the Sonar rules of this project, enforced locally in seconds before merge (part of `npm run check`, the
 // Supervisor's land gate and the pre-commit hook). SonarCloud stays the final measurement (its scan lands ~90 minutes after a
-// push); this check judges the same source scope (sonar-project.properties) with the rule table of scripts/gates/sonar-rules-table.mjs.
+// push); this check judges the same source scope (sonar-project.properties) with the rule table of scripts/gates/sonar-rules-table.mjs,
+// and the TypeScript of each example app (examples/<app>/sonar-project.properties) with the TypeScript table of the same file.
 //
 //   starci runtime check --only sonar-rules [-- --json]
 //   starci runtime check --only sonar-rules -- --staged        the staged files only, read from the index (the pre-commit hook)
@@ -18,7 +19,7 @@ import { printFindings } from '../lib/check-scan.mjs';
 import { catFile } from '../api/git/cat-file.mjs';
 import { diff } from '../api/git/diff.mjs';
 import { gitOutputOf } from '../lib/git.mjs';
-import { analysed, readSonarScope, scopeFiles } from '../gates/sonar-rules-scope.mjs';
+import { analysed, analysedExampleFile, exampleFiles, exampleScopes, readSonarScope, scopeFiles } from '../gates/sonar-rules-scope.mjs';
 import { BASELINE_FILE, BASELINE_SECTION, compareToBaseline, pruneBaseline, readBaseline, writeBaseline } from '../gates/sonar-rules-baseline.mjs';
 
 export const CODE_STALE = 'RT_SONAR_BASELINE_STALE';
@@ -49,11 +50,12 @@ const staleLine = (entry) => ({
   message: `${entry.file}: the baseline lists ${entry.rule} (fingerprint ${entry.fingerprint}) but the finding no longer exists; delete the entry (starci runtime check --only sonar-rules -- --prune)`,
 });
 
-/** The run's plan: which files are linted and which baseline entries it may judge. */
+/** The run's plan: which files are linted (the runtime's own scope and the TypeScript the example scans analyse) and which baseline entries it may judge. */
 function planOf(root, scope, staged) {
-  if (!staged) return { files: scopeFiles(root, scope), covered: () => true };
+  const examples = exampleScopes(root);
+  if (!staged) return { files: [...scopeFiles(root, scope), ...exampleFiles(root, examples)], covered: () => true };
   const { present, removed } = stagedPaths(root);
-  const files = present.filter((file) => analysed(file, scope));
+  const files = present.filter((file) => analysed(file, scope) || analysedExampleFile(file, examples));
   const touched = new Set([...files, ...removed]);
   return { files, covered: (file) => touched.has(file) };
 }

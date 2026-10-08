@@ -17,6 +17,10 @@ function fixture(t) {
     const previous = process.env.STARCI_TEMP_ROOT;
     delete process.env.STARCI_TEMP_ROOT;
     t.after(() => { if (previous === undefined) delete process.env.STARCI_TEMP_ROOT; else process.env.STARCI_TEMP_ROOT = previous; });
+    // The owner config at the runtime root is simulated by the fs mocks below (nothing real is read), so the spec lifts the confinement that hides the real file from a spec.
+    const confined = process.env.STARCI_OWNER_CONFIG_WITHIN;
+    delete process.env.STARCI_OWNER_CONFIG_WITHIN;
+    t.after(() => { if (confined !== undefined) process.env.STARCI_OWNER_CONFIG_WITHIN = confined; });
     const configFile = path.join(configRoot, 'config.yaml');
     const exists = fs.existsSync, read = fs.readFileSync;
     const example = parseYaml(read(path.join(configRoot, 'config.example.yaml'), 'utf8'));

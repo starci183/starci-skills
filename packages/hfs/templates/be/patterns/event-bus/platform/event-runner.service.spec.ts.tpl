@@ -197,6 +197,19 @@ describe("EventRunnerService", () => {
             ])
         })
 
+        it("buries once and runs no later consumer of the event when an envelope cannot be read", async () => {
+            const { runner, handle, transport } = await build()
+            const later = jest.fn<Promise<void>, Array<never>>()
+            runner.add({ event: PingEvent, handle: later })
+            const value = JSON.stringify({ eventId: "o-2", eventName: "probe.ping", payload: {} })
+
+            await runner.receive(message({ key: "o-2", value }))
+
+            expect(handle).not.toHaveBeenCalled()
+            expect(later).not.toHaveBeenCalled()
+            expect(transport.send).toHaveBeenCalledTimes(1)
+        })
+
         it("puts a failed delivery on the retry topic with the next attempt and a doubled backoff", async () => {
             const { runner, handle, transport, logger } = await build()
             const failure = new Error("the database is down")

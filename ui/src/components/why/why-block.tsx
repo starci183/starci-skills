@@ -6,17 +6,20 @@ import { t } from '../../i18n/t';
 
 export const concept: Concept = 'C10';
 
-/** Who acts next (docs/why.md `owner`), owner-visible label with a tone. */
+/** Display the supplied handling role or retry handoff; it does not identify an assigned person or prove active work. */
 export function whyOwner(owner: string | null | undefined): { label: string; tone: 'owner' | 'warning' | 'failed' | 'running' | 'queued' } {
-  if (!owner) return { label: t('Handler unknown'), tone: 'queued' };
-  if (owner === 'owner') return { label: t('Waiting for the owner'), tone: 'owner' };
-  if (owner === 'op-retry') return { label: t('The op retries itself'), tone: 'running' };
-  if (owner === 'supervisor') return { label: t('The supervisor handles it'), tone: 'warning' };
-  if (owner === 'runtime-core') return { label: t('Runtime error · core fixes'), tone: 'failed' };
-  if (owner.startsWith('other-op:')) return { label: t('Waiting for op {op}', { op: owner.slice('other-op:'.length) }), tone: 'warning' };
-  return { label: owner, tone: 'queued' };
+  if (!owner) return { label: t('Handling role not recorded'), tone: 'queued' };
+  if (owner === 'owner') return { label: t('Workflow owner'), tone: 'owner' };
+  if (owner === 'op-retry') return { label: t('Kernel · retry coordination'), tone: 'warning' };
+  if (owner === 'supervisor') return { label: t('Supervisor'), tone: 'queued' };
+  if (owner === 'kernel') return { label: t('Kernel'), tone: 'queued' };
+  if (owner === 'controller') return { label: t('Reconciler controller'), tone: 'queued' };
+  if (owner === 'runtime-core') return { label: t('Runtime core'), tone: 'queued' };
+  if (owner.startsWith('other-op:')) return { label: t('Op: {op}', { op: owner.slice('other-op:'.length) }), tone: 'warning' };
+  return { label: t('Handling role: {role}', { role: owner }), tone: 'queued' };
 }
 
+/** Render the source role label without implying a named person, launch, repair or completed outcome. */
 export function WhyOwnerBadge({ owner }: Readonly<{ owner: string | null | undefined }>) {
   const o = whyOwner(owner);
   return <span data-tone={o.tone} className="inline-flex shrink-0 items-center gap-1.5 text-xs font-medium text-[var(--tone)]">
@@ -34,17 +37,19 @@ function CodeChips({ why }: Readonly<{ why: Why }>) {
 }
 
 /**
- * The owner-facing reason (starci/why@1). `compact`: headline + who acts next (cards, headers, drawers).
+ * The owner-facing reason (starci/why@1). `compact`: source headline and a separate handling role.
  * Full: headline, cause, op-vs-runtime disagreement, what happens next; codes and refs under "Advanced".
  */
 export function WhyBlock({ why, compact = false, className = '' }: Readonly<{ why: Why | null | undefined; compact?: boolean; className?: string }>) {
   if (!why?.headline) return null;
-  if (compact) return <div className={`flex min-w-0 flex-wrap items-start gap-2 ${className}`}>
-    <p className="m-0 min-w-0 flex-1 text-sm leading-6">{why.headline}</p><WhyOwnerBadge owner={why.owner} />
+  if (compact) return <div className={`flex min-w-0 flex-col gap-1 ${className}`}>
+    <p className="m-0 min-w-0 text-sm leading-6">{why.headline}</p>
+    <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground"><span>{t('Handling role:')}</span><WhyOwnerBadge owner={why.owner} /></div>
   </div>;
   return <div className={`flex min-w-0 flex-col gap-3 ${className}`}>
-    <div className="flex min-w-0 flex-wrap items-start gap-2"><p className="m-0 min-w-0 flex-1 text-[15px] font-medium leading-6">{why.headline}</p><WhyOwnerBadge owner={why.owner} /></div>
+    <p className="m-0 min-w-0 text-[15px] font-medium leading-6">{why.headline}</p>
     {why.cause ? <p className="m-0 text-sm leading-6 text-muted-foreground">{why.cause}</p> : null}
+    <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground"><span>{t('Handling role:')}</span><WhyOwnerBadge owner={why.owner} /></div>
     {why.disagreement ? <div data-tone="warning" className="rounded-lg border border-[var(--tone-line)] bg-[var(--tone-bg)] p-3 text-sm leading-6">
       <strong className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--tone)]">{t('Op and runtime disagree')}</strong>{why.disagreement}
     </div> : null}

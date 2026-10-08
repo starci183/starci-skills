@@ -1,6 +1,6 @@
 import "server-only"
 import { isRecord, parseList, parseOutcome, requestGraphql, type Outcome } from "@ecommerce/api"
-import { ORDER_API_URL } from "../config"
+import { orderApiUrl } from "../config"
 import type { LineItemRow } from "@ecommerce/ui"
 import { DOCUMENTS } from "./__generated__/documents"
 
@@ -65,7 +65,7 @@ const toCleared = (data: unknown): boolean | null =>
 export const fetchCart = async (sessionToken: string | null): Promise<Outcome<CartView>> => {
     if (sessionToken === null) return SIGNED_OUT
     return parseOutcome(
-        await requestGraphql({ baseUrl: ORDER_API_URL, document: DOCUMENTS.ShopCart, token: sessionToken }),
+        await requestGraphql({ baseUrl: orderApiUrl(), document: DOCUMENTS.ShopCart, token: sessionToken }),
         toCartView,
     )
 }
@@ -81,7 +81,7 @@ export const addCartItem = async (
 ): Promise<Outcome<CartLine>> =>
     parseOutcome(
         await requestGraphql({
-            baseUrl: ORDER_API_URL,
+            baseUrl: orderApiUrl(),
             document: DOCUMENTS.ShopAddCartItem,
             variables: { input: { productId, quantity } },
             token: sessionToken,
@@ -95,7 +95,7 @@ export const addCartItem = async (
  */
 export const clearCart = async (sessionToken: string): Promise<Outcome<boolean>> =>
     parseOutcome(
-        await requestGraphql({ baseUrl: ORDER_API_URL, document: DOCUMENTS.ShopClearCart, token: sessionToken }),
+        await requestGraphql({ baseUrl: orderApiUrl(), document: DOCUMENTS.ShopClearCart, token: sessionToken }),
         toCleared,
     )
 

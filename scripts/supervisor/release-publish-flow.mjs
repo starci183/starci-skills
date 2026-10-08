@@ -72,7 +72,7 @@ export async function releasePublishFlow(ctx, deps = {}) {
   if (runtimePackage && ctx.args?.examples !== undefined) return { code: 2, stderr: 'starci release publish: --runtime-package cannot re-pin examples' };
   const examples = runtimePackage ? [] : exampleNames(ctx.args?.examples, root);
   const lines = [];
-  const data = { schema: 'starci/release-publish-flow@1', published: ctx.args?.publish === true, phase: runtimePackage ? 'runtime' : 'packages', rebind: null, examples: [] };
+  const data = { schema: 'starci/release-publish-flow@1', published: ctx.args?.publish === true, phase: runtimePackage ? 'runtime' : 'packages', rebind: null, examples: [], plan: null };
   const node = deps.runNode ?? runNode, npm = deps.runNpm ?? runNpm;
   const operation = async () => {
     const tracked = await (deps.status ?? porcelainStatus)(root, { untracked: 'no' });
@@ -86,7 +86,7 @@ export async function releasePublishFlow(ctx, deps = {}) {
     if (ctx.args?.['expect-sha']) {
       if (data.head !== String(ctx.args['expect-sha']).trim()) return { code: 2, stderr: 'starci release publish: --expect-sha is not HEAD' };
     }
-    const publishCode = await runPublicationPlan(ctx, deps, root, runtimePackage, lines);
+    const publishCode = await runPublicationPlan(ctx, deps, root, runtimePackage, lines, data);
     if (publishCode.error) return publishCode.error;
     if (runtimePackage) return publishCode.value === 0 ? { code: 0 } : { code: 1, stderr: 'starci release publish: runtime phase must finish without an unbound canon' };
     if (!lines.some((line) => /@starci\/cli@/.test(line)) || !lines.some((line) => /@starci\/hfs@/.test(line))) {
@@ -108,12 +108,12 @@ export async function releasePublishFlow(ctx, deps = {}) {
   return { ...result, text: [...lines, `starci release publish: ${ctx.args?.publish ? 'flow completed' : 'plan only'}`].join('\n'), data };
 }
 
-async function runPublicationPlan(ctx, deps, root, runtimePackage, lines) {
+async function runPublicationPlan(ctx, deps, root, runtimePackage, lines, data) {
   try {
     const value = await (deps.releasePublish ?? releasePublish)({
       root, publish: ctx.args?.publish === true, runtimePackage, env: ctx.env, npmUser: ctx.args?.['npm-user'] ?? null,
       pollMinutes: Number(ctx.args?.['poll-minutes'] ?? 15), preLandRef: ctx.args?.['pre-land-ref'] ?? null,
-      deps: { ...deps.releaseDeps, out: (line) => lines.push(line) },
+      deps: { ...deps.releaseDeps, out: (line) => lines.push(line), plan: (summary) => { data.plan = summary; } },
     });
     if (value === 2) return { error: { code: 2, stderr: lines.at(-1) ?? 'starci release publish: bad usage' } };
     if (![0, 3].includes(value)) return { error: { code: 1, stderr: lines.at(-1) ?? 'starci release publish: publication plan is blocked' } };

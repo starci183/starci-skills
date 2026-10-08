@@ -46,7 +46,9 @@ parses TOML. `devDependencies` support contributor specs and tooling:
   never `os.tmpdir()` or `fs.mkdtempSync(os.tmpdir())`, and its children get `TEMP`/`TMP`/`TMPDIR` from `tempChildEnv` (`engine/temp-root.mjs`), which the `scripts/api/` spawn wrappers apply. The suite
   preload `tests/setup/isolated-temp.mjs` reads only the environment, never the owner's `config.yaml`: it makes a fresh per-spec root inside
   `STARCI_TEMP_ROOT` (else the OS temp directory) and points `TEMP`, `TMP`, `TMPDIR` and `STARCI_TEMP_ROOT` at it, so
-  `STARCI_TEMP_ROOT=<dir on another drive> node --test ...` puts the whole suite's files there.
+  `STARCI_TEMP_ROOT=<dir on another drive> node --test ...` puts the whole suite's files there. A spec run never reads the checkout's own `config.yaml` either:
+  `loadConfig` and `inspectOwnerConfig` (`engine/config.mjs`) see an owner file only from under the directory `STARCI_OWNER_CONFIG_WITHIN` names (the spec preload sets it to the spec's temp root), where a fixture wrote it, so a lane clone, the release host and a clean checkout give one result.
+- The release cut runs the suite under conditions a plain `npm test` does not have (`STARCI_REQUIRE_APP_INSTALLS=1`, `STARCI_REQUIRE_ORCA_LIVE=1`, real `npm ci` of every example app, a fresh `packages/test-world` build, the host's concurrency budget, an Orca terminal, a Docker daemon). `starci release env-test` (`npm run test:release-env`) runs the suite exactly so (`--lane` leaves out the Orca requirement a lane clone cannot meet; `--reuse-installs` keeps installed example apps): run it before asking for a release cut, and after a change to a spec's isolation, a verb catalog row or a git-dependent gate.
 - No real network. Provider CLIs (`orca`, `devin`, `claude`, `codex`) are stubbed or recorded; a
   spec that would spawn a real agent is wrong.
 - Specs may spawn `starci <group> <verb>` under test with `spawnSync` — that is the sanctioned
@@ -179,7 +181,7 @@ comment line (`<!-- [removed-list] -->` in Markdown, `# [removed-list]` in yaml)
 
 ## Pushing and releasing
 
-The remote `main` of this repository is not pushed between releases. A land fast-forwards LOCAL main, and the work is verified locally (`npm run check` with the Sonar-rules gate, the full `npm test`, the packages suites with `npm run test:packages`); nobody pushes to obtain a CI or SonarCloud reading.
+The remote `main` of this repository is not pushed between releases. A land fast-forwards LOCAL main, and the work is verified locally (`npm run check` with the Sonar-rules gate, the full `npm test`, the cut's own spec conditions with `starci release env-test`, the packages suites with `npm run test:packages`); nobody pushes to obtain a CI or SonarCloud reading.
 Main goes to the remote exactly when a release milestone is cut, in one atomic push of main and one annotated `v*` tag, through `starci release cut --tag v<version>` (`--plan` reports what it would run and require; it runs nothing).
 The installed pre-push hook (`scripts/guards/release-push-gate.mjs`, written by `starci runtime link`) makes that mechanical: it refuses a push of `main` or of a `v*` tag unless the pushed commit is a release commit — the version moved past the remote main's, an annotated tag `v<version>` on it, a dated CHANGELOG heading for exactly that version, and the release record of that exact commit with a green full suite, packages suites and checks. The refusal names what is missing and the command that produces it; there is no bypass switch.
 R221 `CI_TRIGGERS_RELEASE_ONLY` refuses any other workflow trigger and R222 `RELEASE_NOTES` refuses a tag over unfinished CHANGELOG notes. The model, the release definition, the refusals and the risks are in [git governance](docs/git-governance.md).
