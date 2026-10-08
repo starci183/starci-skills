@@ -1,7 +1,7 @@
 group: supervisor
 verb: land
 owner: runtime
-summary: run the in-runtime land gate; external land-to-main.sh remains external
+summary: run the in-runtime land gate; it fast-forwards local main and never pushes
 impl:
   script: scripts/supervisor/land.mjs
 flags:
@@ -11,7 +11,6 @@ flags:
   - {name: reason, type: string, summary: reason required when no spec applies}
   - {name: full-by-push-git, type: boolean, summary: authorize the full suite from the push flow}
   - {name: lane, type: string, summary: source lane name}
-  - {name: no-push, type: boolean, summary: leave landed main unpushed}
   - {name: notify, type: boolean, summary: file the land outcome in the Supervisor inbox}
   - {name: status, type: boolean, summary: inspect the land queue without landing}
   - {name: wait-ms, type: number, summary: maximum land-queue wait in milliseconds}

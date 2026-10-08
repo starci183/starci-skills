@@ -17,8 +17,9 @@ test('the catalog resolves release cut to its entry and declares exactly the fla
   const verb = CATALOG.groups.release.verbs.cut;
   assert.equal(verb.impl.script, 'scripts/supervisor/release-cut-cli.mjs');
   assert.ok(fs.existsSync(path.join(repoRoot, verb.impl.script)));
-  assert.deepEqual(verb.flags.map((flag) => flag.name).sort(), ['branch', 'remote', 'repo', 'tag']);
+  assert.deepEqual(verb.flags.map((flag) => flag.name).sort(), ['branch', 'plan', 'remote', 'repo', 'tag']);
   assert.deepEqual(parseArgs(['--repo', 'r', '--remote', 'o', '--branch', 'b', '--tag', 'v1', '--json']), { json: true, repo: 'r', remote: 'o', branch: 'b', tag: 'v1' });
+  assert.deepEqual(parseArgs(['--plan']), { json: false, plan: true });
 });
 
 test('a bad argument is exit 2 and cutRelease is never reached', async () => {

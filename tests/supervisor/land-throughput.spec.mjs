@@ -52,12 +52,12 @@ const lightChecks = (opts) => runChecks({ ...opts, runSpecs: false });
 test('current module edits land through actual checks; unparseable edits refuse without moving main', (t) => {
   const root = repoFixture(t), env = envOf(t);
   const accepted = sideCommit(root, 'current-module', { 'modules/kernel/rules.yaml': 'rule: two\n' });
-  const green = landCommits({ commits: [accepted], root, env, push: false, deps: { runChecks: lightChecks } });
+  const green = landCommits({ commits: [accepted], root, env, deps: { runChecks: lightChecks } });
   assert.ok(green.ok, JSON.stringify(green));
   assert.equal(fs.readFileSync(path.join(root, 'modules/kernel/rules.yaml'), 'utf8'), 'rule: two\n');
   const main = git(root, 'rev-parse', 'main');
   const broken = sideCommit(root, 'broken-module', { 'modules/kernel/broken.yaml': 'value: [unclosed\n' });
-  const red = landCommits({ commits: [broken], root, env, push: false, deps: { runChecks: lightChecks } });
+  const red = landCommits({ commits: [broken], root, env, deps: { runChecks: lightChecks } });
   assert.equal(red.ok, false);
   assert.ok(red.checks.some((c) => c.name === 'parse modules/kernel/broken.yaml' && !c.ok), JSON.stringify(red));
   assert.equal(git(root, 'rev-parse', 'main'), main);
@@ -68,7 +68,7 @@ test('disjoint current module edits from two lanes both land through their actua
   const a = sideCommit(root, 'lane-a', { 'modules/kernel/lane-a.yaml': 'value: one\n' });
   const b = sideCommit(root, 'lane-b', { 'modules/kernel/lane-b.yaml': 'value: two\n' });
   for (const sha of [a, b]) {
-    const result = landCommits({ commits: [sha], root, env, push: false, deps: { runChecks: lightChecks } });
+    const result = landCommits({ commits: [sha], root, env, deps: { runChecks: lightChecks } });
     assert.ok(result.ok, JSON.stringify(result));
   }
   assert.equal(fs.readFileSync(path.join(root, 'modules/kernel/lane-a.yaml'), 'utf8'), 'value: one\n');
@@ -85,10 +85,10 @@ test('a pick that cannot apply is refused before the queue with every file and h
   const mine = sideCommit(root, 'mine', { 'scripts/a.mjs': 'export const a = 3;\n' });
   const append = sideCommit(root, 'append', { [APPEND_ONLY]: `${CHANGELOG}## appended
 ` });
-  const first = await land({ commits: [theirs], root, env, push: false, deps: { runChecks: lightChecks } });
+  const first = await land({ commits: [theirs], root, env, deps: { runChecks: lightChecks } });
   assert.ok(first.ok, JSON.stringify(first));
   let locked = false;
-  const refused = await land({ commits: [mine], root, env, push: false, deps: { runChecks: (o) => { locked = true; return lightChecks(o); } } });
+  const refused = await land({ commits: [mine], root, env, deps: { runChecks: (o) => { locked = true; return lightChecks(o); } } });
   assert.equal(refused.ok, false);
   assert.equal(refused.reason, 'conflict');
   assert.equal(refused.preflight, true, 'refused before it took the lock');
@@ -98,13 +98,13 @@ test('a pick that cannot apply is refused before the queue with every file and h
   assert.match(refused.hint, /rebase the lane onto current main.*scripts\/a\.mjs/);
   assert.match(describe(refused), /CONFLICT scripts\/a\.mjs[\s\S]*next: rebase/);
   // The gate's own cherry-pick reports the same shape when main moved after the preflight.
-  const inGate = landCommits({ commits: [mine], root, env, push: false, deps: { runChecks: lightChecks } });
+  const inGate = landCommits({ commits: [mine], root, env, deps: { runChecks: lightChecks } });
   assert.equal(inGate.reason, 'conflict');
   assert.deepEqual(inGate.conflicts.map((c) => c.file), ['scripts/a.mjs']);
   assert.ok(inGate.conflicts[0].hunks.length === 1);
   const appended = sideCommit(root, 'append-2', { [APPEND_ONLY]: `${CHANGELOG}## appended-2
 ` });
-  assert.ok((await land({ commits: [append], root, env, push: false, deps: { runChecks: lightChecks } })).ok);
+  assert.ok((await land({ commits: [append], root, env, deps: { runChecks: lightChecks } })).ok);
   assert.equal(conflictPreflight({ root, commits: [appended] }).ok, true, 'merge=union: two appends never conflict');
   assert.deepEqual(conflictHunks('a\n<<<<<<< x\nb\n=======\nc\n>>>>>>> y\nd\n').map((h) => h.line), [2]);
 });

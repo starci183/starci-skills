@@ -179,9 +179,10 @@ comment line (`<!-- [removed-list] -->` in Markdown, `# [removed-list]` in yaml)
 
 ## Pushing and releasing
 
-Lands fast-forward local main, and main goes to the remote fast-forward (no force push); CI runs on every push to main, on every `v*` tag and when a person dispatches it.
-A release is main and one annotated `v*` tag pushed together through the release flow (`starci release cut`). R221 `CI_TRIGGERS_RELEASE_ONLY` refuses any other workflow trigger and R222 `RELEASE_NOTES` refuses a tag over
-unfinished CHANGELOG notes. The model, the refusals and the risks are in [git governance](docs/git-governance.md).
+The remote `main` of this repository is not pushed between releases. A land fast-forwards LOCAL main, and the work is verified locally (`npm run check` with the Sonar-rules gate, the full `npm test`, the packages suites with `npm run test:packages`); nobody pushes to obtain a CI or SonarCloud reading.
+Main goes to the remote exactly when a release milestone is cut, in one atomic push of main and one annotated `v*` tag, through `starci release cut --tag v<version>` (`--plan` reports what it would run and require; it runs nothing).
+The installed pre-push hook (`scripts/guards/release-push-gate.mjs`, written by `starci runtime link`) makes that mechanical: it refuses a push of `main` or of a `v*` tag unless the pushed commit is a release commit — the version moved past the remote main's, an annotated tag `v<version>` on it, a dated CHANGELOG heading for exactly that version, and the release record of that exact commit with a green full suite, packages suites and checks. The refusal names what is missing and the command that produces it; there is no bypass switch.
+R221 `CI_TRIGGERS_RELEASE_ONLY` refuses any other workflow trigger and R222 `RELEASE_NOTES` refuses a tag over unfinished CHANGELOG notes. The model, the release definition, the refusals and the risks are in [git governance](docs/git-governance.md).
 
 ## Editing contracts and prose
 

@@ -18,8 +18,13 @@ repeated confirmation. Never supply missing approval from an agent's judgement.
 3. Invoke the native release cut for the accepted tag:
 
    ```
+   starci release cut --plan --tag v<version>
    starci release cut --tag v<version>
    ```
+
+   The `--plan` form reports what the cut would run and require and runs, tags and pushes nothing. The runtime's remote main is not pushed between releases: the pre-push
+   hook refuses a push of `main` or of a `v*` tag unless the pushed commit is a release commit (version moved past the remote main's, annotated tag `v<version>`, dated
+   CHANGELOG heading, and the release record of that exact commit with a green root suite, packages suites and checks), so this cut is the only way the remote moves.
 
    The release cut owns L4, the host lock, Linux parity, main-stability and secret checks, the annotated
    tag and atomic main-plus-tag push. Read its recorded logs and actual result. Do not start a second
@@ -33,5 +38,5 @@ repeated confirmation. Never supply missing approval from an agent's judgement.
 
 Product releases follow the same maintained governance for their own accepted scope. Full app
 `unit.verify` or `e2e.verify` runs are on-demand goal/owner actions, not an automatic extra release.
-`scripts/supervisor/push-git.mjs` remains a native compatibility mechanism; its existence grants
-neither another public entry nor an alternative permission to push main outside the release owner.
+`scripts/supervisor/push-git.mjs` and `push-mains` push product repositories only; they refuse the runtime
+repository, whose main moves only through the release owner.

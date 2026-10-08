@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-// starci supervisor push-mains — the Supervisor pushes main of the runtime and of every product repository each tick
+// starci supervisor push-mains — the Supervisor pushes main of every product repository each tick
 // (modules/supervisor/supervise.yaml kernelSeat, owner 2026-09-24). Secret scan first, hooks on:
 // never --no-verify, never force, never a branch other than main, never a repository not listed.
 //
 //   starci supervisor push-mains [--repo <path>]... [--dry-run] [--hooks-only] [--json]
-//       default repositories: the runtime (.claude) plus one app checkout per
+//       default repositories: one app checkout per
 //       configured project binding (.workspaces/projects/<p>/work.json —
 //       scripts/kernel/target-repo.mjs projectBinding)
 //   --hooks-only   prepare the scratch of committed main and run its pre-push hook (`git hook run pre-push`)
@@ -129,9 +129,13 @@ export function scanRange({ cwd, from, to }) {
   } finally { safeRemove(dir, { hold: artifactHoldReason }); }
 }
 
+/** Why the runtime repository is never pushed here: the hook of that repository refuses every push of its main that is not a release. */
+export const RUNTIME_RELEASE_ONLY = 'the runtime main moves only with a release: starci release cut --tag v<version>';
+
 /** Push one repository's main (see the header). `dryRun` stops after the scan. Never throws. */
 export function pushMain(repo, { dryRun = false, hooksOnly = false, run = git, scratchPush = null, prior = null, now = Date.now() } = {}) {
   const out = { repo, pushed: false };
+  if (repoKey(repo) === repoKey(SKILL_ROOT)) return { ...out, skipped: RUNTIME_RELEASE_ONLY };
   try {
     const state = readPushState(repo, run);
     if (state.skipped) return { ...out, skipped: state.skipped };
@@ -245,14 +249,13 @@ export function boundRepos(repo, { sourceRoot = starciSourceRoot() } = {}) {
 }
 
 /**
- * The default push set: the runtime (.claude), each config supervisor.repos ledger owner, and every
- * app repository each owner binds. Canonical-deduped: an app root already in
+ * The default push set: each config supervisor.repos ledger owner and every app repository each owner binds. The runtime
+ * repository is not in it: its main moves only with a release (RUNTIME_RELEASE_ONLY). Canonical-deduped: an app root already in
  * supervisor.repos is pushed once.
  */
 export function defaultPushRepos(settings = supervisorSettings(), { sourceRoot = starciSourceRoot() } = {}) {
   const seen = new Map();
   const add = (repo) => { const k = repoKey(repo); if (!seen.has(k)) seen.set(k, path.resolve(repo)); };
-  add(SKILL_ROOT);
   for (const owner of productRepos(settings, { sourceRoot })) {
     add(boundRepos(owner, { sourceRoot })[0] ?? owner);
   }

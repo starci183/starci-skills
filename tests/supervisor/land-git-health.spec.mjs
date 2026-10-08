@@ -61,7 +61,7 @@ test('core.bare=true is git-unusable: refused before the queue with its own reas
   assert.equal(h.bare, true);
   assert.match(h.hint, /config core\.bare false/);
   let queued = false;
-  const out = await land({ commits: [sha], root, env, push: false, deps: { gitHealth: noWait, acquireLand: () => { queued = true; return { ok: false }; }, runChecks: lightChecks } });
+  const out = await land({ commits: [sha], root, env, deps: { gitHealth: noWait, acquireLand: () => { queued = true; return { ok: false }; }, runChecks: lightChecks } });
   assert.equal(out.ok, false);
   assert.equal(out.reason, 'git-unusable');
   assert.equal(out.preflight, true);
@@ -72,7 +72,7 @@ test('core.bare=true is git-unusable: refused before the queue with its own reas
   assert.equal(rows[0].result, 'refused', 'recorded as a refusal, not a conflict');
   assert.equal(rows[0].reason, 'git-unusable');
   git(root, 'config', 'core.bare', 'false');
-  const ok = await land({ commits: [sha], root, env, push: false, deps: { runChecks: lightChecks } });
+  const ok = await land({ commits: [sha], root, env, deps: { runChecks: lightChecks } });
   assert.ok(ok.ok, `the next land after the repo is healthy lands: ${JSON.stringify(ok)}`);
   assert.deepEqual(scratchesIn(env), [], 'no scratch left behind');
 });
@@ -82,21 +82,21 @@ test('a cherry-pick git itself fails is git-failed or git-unusable, not conflict
   const root = repoFixture(t);
   const sha = sideCommit(root, 'lane-a', { 'scripts/b.mjs': 'export const b = 1;\n' });
   git(root, 'config', 'core.bare', 'true'); // flips after the health check passed (a transient value)
-  const failed = landCommits({ commits: [sha], root, env, push: false, deps: { gitHealth: () => ({ ok: true }), runChecks: lightChecks } });
+  const failed = landCommits({ commits: [sha], root, env, deps: { gitHealth: () => ({ ok: true }), runChecks: lightChecks } });
   assert.equal(failed.reason, 'git-failed');
   assert.match(failed.detail, /must be run in a work tree/);
   assert.deepEqual(failed.conflicts ?? [], []);
   assert.match(failed.hint, /not a content conflict/);
   let calls = 0;
-  const unusable = landCommits({ commits: [sha], root, env, push: false, deps: { gitHealth: () => (++calls === 1 ? { ok: true } : { ok: false, detail: 'core.bare=true', hint: 'fix' }), runChecks: lightChecks } });
+  const unusable = landCommits({ commits: [sha], root, env, deps: { gitHealth: () => (++calls === 1 ? { ok: true } : { ok: false, detail: 'core.bare=true', hint: 'fix' }), runChecks: lightChecks } });
   assert.equal(unusable.reason, 'git-unusable', 'the failing pick is traced to the repo, not the commit');
   assert.equal(unusable.hint, 'fix');
   assert.deepEqual(scratchesIn(env), [], 'every failed attempt removed its own scratch');
   git(root, 'config', 'core.bare', 'false');
   const theirs = sideCommit(root, 'theirs', { 'scripts/a.mjs': 'export const a = 2;\n' });
   const mine = sideCommit(root, 'mine', { 'scripts/a.mjs': 'export const a = 3;\n' });
-  assert.ok(landCommits({ commits: [theirs], root, env, push: false, deps: { runChecks: lightChecks } }).ok);
-  const conflict = landCommits({ commits: [mine], root, env, push: false, deps: { runChecks: lightChecks } });
+  assert.ok(landCommits({ commits: [theirs], root, env, deps: { runChecks: lightChecks } }).ok);
+  const conflict = landCommits({ commits: [mine], root, env, deps: { runChecks: lightChecks } });
   assert.equal(conflict.reason, 'conflict');
   assert.deepEqual(conflict.conflicts.map((c) => c.file), ['scripts/a.mjs']);
 });
@@ -122,10 +122,10 @@ test('each land owns one uniquely named scratch: a foreign scratch dir is never 
   fs.writeFileSync(path.join(foreign, 'keep.txt'), 'another land in use');
   const bad = sideCommit(root, 'bad', { 'scripts/bad.mjs': 'export const = ;\n' });
   const good = sideCommit(root, 'good', { 'scripts/good.mjs': 'export const g = 1;\n' });
-  const red = landCommits({ commits: [bad], root, env, push: false, deps: { runChecks: lightChecks } });
+  const red = landCommits({ commits: [bad], root, env, deps: { runChecks: lightChecks } });
   assert.equal(red.reason, 'checks-red');
   assert.deepEqual(red.cleanup.left, []);
-  const ok = landCommits({ commits: [good], root, env, push: false, deps: { runChecks: lightChecks } });
+  const ok = landCommits({ commits: [good], root, env, deps: { runChecks: lightChecks } });
   assert.ok(ok.ok, JSON.stringify(ok));
   assert.equal(fs.readFileSync(path.join(foreign, 'keep.txt'), 'utf8'), 'another land in use');
   assert.deepEqual(scratchesIn(env), [path.basename(foreign)]);

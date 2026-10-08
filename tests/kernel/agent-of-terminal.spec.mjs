@@ -68,7 +68,7 @@ test('the supervisor close-out passes explicit metadata independently of its con
   withSupervisor((m) => supervisorEvent(m, { kind: 'supervisor-booted', payload: { terminal: 'term_old' } }), { env });
   const quits = [];
   const launch = await launchSupervisor({ env, template: '{launchAuthority}\n{doctrine}', doc: { kernelSeat: { does: ['x'] } },
-    settings: { agent: 'codex', model: 'gpt-6.1-sol', effort: 'high', repos: [], pollIntervalMs: 600000, language: 'vi', workers: { base: 4, max: 10 }, landGate: { mode: 'shared', push: false } },
+    settings: { agent: 'codex', model: 'gpt-6.1-sol', effort: 'high', repos: [], pollIntervalMs: 600000, language: 'vi', workers: { base: 4, max: 10 }, landGate: { mode: 'shared' } },
     deps: {
       list: () => ({ ok: true, terminals: [{ handle: 'term_old', title: 'pwsh', agentIdentity: 'devin', connected: true }], visualLayouts: [] }),
       tabTitles: () => new Map(),
@@ -179,7 +179,7 @@ test('live supervisor duplicate closure uses exact metadata without adopting or 
   }, { env });
   const quits = [], closes = [];
   const launch = await launchSupervisor({ env, now: () => 1000,
-    settings: { agent: 'codex', model: 'gpt-6.1-sol', effort: 'high', repos: [], pollIntervalMs: 600000, language: 'vi', workers: { base: 4, max: 10 }, landGate: { mode: 'shared', push: false } },
+    settings: { agent: 'codex', model: 'gpt-6.1-sol', effort: 'high', repos: [], pollIntervalMs: 600000, language: 'vi', workers: { base: 4, max: 10 }, landGate: { mode: 'shared' } },
     deps: {
       list: () => ({ ok: true, terminals: [
         { handle: 'term_seat', agentIdentity: 'codex', connected: true },

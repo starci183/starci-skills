@@ -75,7 +75,7 @@ test('a Supervisor watchdog pass applies the seat title while handling a wake', 
   t.after(() => fs.rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 }));
   const env = { STARCI_LOCAL_ROOT: path.join(root, 'local'), STARCI_SUPERVISOR_MODE: 'kernel' };
   const settings = { agent: 'claude', model: 'claude-opus-5-5', effort: 'high', repos: [], pollIntervalMs: 600000,
-    language: 'vi', workers: { base: 4, max: 10 }, landGate: { mode: 'shared', push: false } };
+    language: 'vi', workers: { base: 4, max: 10 }, landGate: { mode: 'shared' } };
   let startRequest = null;
   const launch = await launchSupervisor({ env, settings, template: '{launchAuthority}\n{doctrine}', doc: { kernelSeat: { does: ['x'] } }, deps: {
     list: () => ({ ok: true, terminals: [{ handle: 'term_entry', title: 'pwsh', worktreePath: SKILL_ROOT, writable: true }], visualLayouts: [] }), tabTitles: () => new Map(),

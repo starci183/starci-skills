@@ -15,7 +15,7 @@ const TEMP_DIRS = [];
 after(() => { for (const dir of TEMP_DIRS) { try { fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 50 }); } catch { /* still held */ } } });
 const tmp = (prefix) => { const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix)); TEMP_DIRS.push(dir); return dir; };
 const envOf = () => { const root = tmp('worker-guard-'); return { STARCI_LOCAL_ROOT: path.join(root, 'la'), STARCI_SUPERVISOR_HOME: path.join(root, 'home'), STARCI_LANES_ROOT: path.join(root, 'lanes'), STARCI_SUPERVISOR_MODE: 'kernel', STARCI_TEST_MACHINE_FILE: path.join(root, 'machine.sqlite') }; };
-const settings = { agent: 'claude', model: 'claude-opus-5-5', effort: 'high', repos: [], pollIntervalMs: 600000, language: 'vi', workers: { base: 4, max: 10 }, landGate: { mode: 'shared', push: false } };
+const settings = { agent: 'claude', model: 'claude-opus-5-5', effort: 'high', repos: [], pollIntervalMs: 600000, language: 'vi', workers: { base: 4, max: 10 }, landGate: { mode: 'shared' } };
 const fakeLaunch = (into) => (args) => { into.push(args); return { receipt: { jobFile: 'job.json' } }; };
 
 test('workerGuard: owned = the leased files resolved absolute in the staging checkout, repos = [] (no history hook)', () => {
