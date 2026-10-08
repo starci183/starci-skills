@@ -4658,6 +4658,27 @@ RIGHTS_OP_RUNTIME_WRITE:
   owner: op-retry
   kind: verb-refusal
 
+RIGHTS_OP_OUTSIDE_OWNED:
+  title: "Op write outside its owned paths refused"
+  title_vi: "Từ chối op ghi ngoài đường dẫn được sở hữu"
+  meaning_vi: "Op chỉ ghi trong các đường dẫn mà lượt chạy của nó sở hữu và trong thư mục tạm của runtime; một tệp nằm ngoài các nơi đó không được ghi."
+  causes_vi:
+    - "Op sửa một tệp của ứng dụng nằm ngoài các đường dẫn được giao cho lượt chạy"
+    - "Op tạo tệp tạm trong worktree thay vì thư mục tạm của runtime"
+  nextStep_vi: "Lệnh bị từ chối; đặt tệp tạm trong thư mục tạm của runtime, còn thay đổi cần thiết ngoài phạm vi thì ghi là việc còn nợ trong báo cáo để Kernel cắt thành lượt chạy riêng."
+  owner: op-retry
+  kind: verb-refusal
+
+RIGHTS_OP_CONTROL_PLANE:
+  title: "Op control-plane verb refused"
+  title_vi: "Từ chối op gọi động từ của mặt phẳng điều khiển"
+  meaning_vi: "Op chỉ chạy các động từ năng lực của công việc (máy chủ, kết xuất, tạo ảnh, kiểm thử) và báo cáo cho Kernel; các nhóm supervisor, reconciler, workflow, route và debug do bộ điều khiển, Kernel và Supervisor chạy."
+  causes_vi:
+    - "Op chạy starci supervisor, reconciler, workflow, route hoặc debug"
+  nextStep_vi: "Lệnh bị từ chối; Op dùng động từ năng lực của công việc và nộp báo cáo blocked hoặc ask bằng starci kernel report."
+  owner: op-retry
+  kind: verb-refusal
+
 RIGHTS_PROTECTED_ZONE:
   title: "Protected-zone write refused"
   title_vi: "Từ chối ghi vào vùng được bảo vệ"
@@ -15533,6 +15554,35 @@ OP_REPORTS_TO_KERNEL:
     - "Op chạy starci supervisor tell hoặc channel"
   nextStep_vi: "Op nộp báo cáo blocked hoặc ask bằng starci kernel report; Kernel trả lời hoặc nâng lên."
   owner: op-retry
+  kind: blocker
+SUPERVISOR_USE_DECIDE:
+  title: "A Supervisor call outside its menu was refused"
+  title_vi: "Lệnh của Supervisor nằm ngoài thực đơn bị từ chối"
+  meaning_vi: "Supervisor chỉ đọc, trả lời các mục của thực đơn bằng starci supervisor decide, ghi lỗi runtime và chạy các bộ dọn nó sở hữu. Lệnh khác bị từ chối kèm thực đơn hiện tại và cách viết lệnh quyết định."
+  causes_vi:
+    - "Supervisor chạy theo thói quen một lệnh cũ: giải quyết cổng bằng tay, nhận hoặc đóng Decision Item, gửi thông báo tay cho Kernel, đặt ưu tiên tay"
+    - "Supervisor ghi starci supervisor actions record cho một khóa không phải runtime-defect"
+  nextStep_vi: "Lệnh không được chạy; Supervisor chọn một mục trong thực đơn đã in kèm lời từ chối và chạy starci supervisor decide --item <id> --choice <choice> --reason <why>."
+  owner: op-retry
+  kind: verb-refusal
+SUPERVISOR_STARCI_ONLY:
+  title: "A Supervisor program other than starci was refused"
+  title_vi: "Chương trình ngoài starci của Supervisor bị từ chối"
+  meaning_vi: "Supervisor chỉ chạy các động từ starci và các lệnh đọc thuần. Một chương trình ghi, chạy mã hoặc gọi mạng bị từ chối kèm thực đơn hiện tại."
+  causes_vi:
+    - "Supervisor chạy node, cp, mv, curl hoặc một công cụ thô khác"
+  nextStep_vi: "Lệnh không được chạy; Supervisor dùng thực đơn của mình và starci supervisor decide."
+  owner: op-retry
+  kind: verb-refusal
+SUPERVISOR_MENU_STEP_FAILED:
+  title: "A step of a Supervisor menu choice failed"
+  title_vi: "Một bước của lựa chọn thực đơn Supervisor thất bại"
+  meaning_vi: "starci supervisor decide chạy từng bước của lựa chọn bằng động từ starci tương ứng và dừng ở bước đầu tiên thất bại; mục vẫn mở trên thực đơn."
+  causes_vi:
+    - "Động từ của bước từ chối đầu vào (cam kết chưa có trong runtime, kho lưu trữ không đọc được)"
+    - "Sổ cái của workflow không còn khớp với mục"
+  nextStep_vi: "Mục vẫn trên thực đơn; Supervisor đọc lỗi của bước, sửa đầu vào --text rồi chạy lại, hoặc chọn none-fits."
+  owner: supervisor
   kind: blocker
 DOCKER_PORT_POLICY:
   title: "Docker ownership or published-port policy was refused"

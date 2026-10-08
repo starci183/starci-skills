@@ -900,8 +900,11 @@ moduleLocalDocumentKinds:
     files: [modules/kernel/verdict-contract.yaml]
 
   - id: starci/supervisor@1
-    governs: "The chat-facing observe/analyze/patch/restart loop contract."
+    governs: "The Supervisor's duty contract: the decision desk that answers its menu, records runtime defects and changes no runtime code."
     files: [modules/supervisor/supervise.yaml]
+  - id: starci/module-supervisor-menu@1
+    governs: "The Supervisor's menu: the judgment points waiting on it, the typed options that answer each, and how a Decision Item is routed to a kind."
+    files: [modules/supervisor/supervisor-menu.yaml]
   - id: starci/supervisor-bridging@1
     governs: "Cross-workflow dependency findings and Supervisor bridging actions."
     files: [modules/supervisor/bridging.yaml]

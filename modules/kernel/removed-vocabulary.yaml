@@ -154,3 +154,20 @@ removed:
     use: 'skills/starci/references/host-startup.md'
     since: 1.0.0-alpha.6
     match: '(?<![\w-])host-maintenance\b'
+  - id: supervisor-grammar-release
+    kind: vocabulary
+    name: grammarRelease
+    use: 'the owner publishes @starci/grammar through starci release publish; the Supervisor changes no runtime code'
+    since: 1.0.0-alpha.8
+  - id: supervise-yaml-worker-land-blocks
+    kind: vocabulary
+    name: supervise.yaml workers
+    use: 'the Supervisor spawns no fix workers and lands nothing: it answers its menu (starci supervisor status) and records runtime defects for Debug'
+    since: 1.0.0-alpha.8
+    match: 'supervise\.yaml\s+(?:workers|landGate)\b|supervise\.yaml\s+kernelSeat/workers'
+  - id: supervisor-fixes-through-lanes
+    kind: vocabulary
+    name: the Supervisor fixes through lanes
+    use: 'the Supervisor records a runtime defect (starci supervisor actions record --item runtime-defect:<cause>) and Debug changes .claude'
+    since: 1.0.0-alpha.8
+    match: 'Supervisor[^\n.]{0,60}\bfix(?:es)?\s+through\s+(?:its\s+own\s+)?(?:staged\s+)?lanes?\b'

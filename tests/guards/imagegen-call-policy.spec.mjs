@@ -29,9 +29,10 @@ test('every other op and every other bound role is refused the verb with the ver
     assert.match(verdict.reason, /only interface\.draw, interface\.asset, brand\.decide call it/);
     assert.match(verdict.use, /starci work imagegen/);
   }
-  for (const role of ['lead', 'supervisor', 'coordinator']) {
+  for (const role of ['lead', 'coordinator']) {
     assert.equal(policyVerdict({ role, command: verbCommand, guard: null, policy: POLICY })?.code, 'RIGHTS_ROLE_DENIED', role);
   }
+  assert.equal(policyVerdict({ role: 'supervisor', command: verbCommand, guard: null, policy: POLICY })?.code, 'SUPERVISOR_USE_DECIDE', 'the Supervisor seat answers its menu and runs no image generation');
 });
 
 test('the verb adds no other starci permission: its neighbours pass or fail exactly as before', () => {

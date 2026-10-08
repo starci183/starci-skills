@@ -12,9 +12,11 @@ import { slash } from '../lib/path-key.mjs';
 import { SKILL_ROOT } from './guards-root.mjs';
 import { boundGuard, boundSeat, gitListFormRead, gitSubOf, nodeWholeSuite, pushTargets, refusal as baseRefusal, rightsRoleOf } from './rights.mjs';
 import { refusalLines } from './refusals.mjs';
-import { RUNTIME_CHANGE_CODE, runtimeChangeRefusal } from '../machine/runtime-change.mjs';
+import { supervisorSeatVerdict } from './supervisor-seat.mjs';
+import { opStarciVerdict } from './op-starci.mjs';
 import { kernelMailboxVerdict } from './install-verdict.mjs';
-import { orcaSelfLifecycleAllowed } from './orca-self-lifecycle.mjs';
+import { orcaAddressedOption, orcaSelfLifecycleAllowed } from './orca-self-lifecycle.mjs';
+import { rolesContract } from '../machine/roles-contract.mjs';
 
 const policyCache = new Map();
 const compiledCache = new WeakMap();
@@ -219,6 +221,8 @@ const orcaPolicyVerdict = ({ role, args, p, policy, guard, handle, text }) => {
   const [group, verb] = args;
   const mailbox = kernelMailboxVerdict('orca', args, guard);
   if (mailbox) return mailbox;
+  const addressed = orcaAddressedOption({ role, args, policy });
+  if (addressed) return refusal('OP_REPORTS_TO_KERNEL', text, `an Op reports only to its Kernel: ${addressed} addresses another recipient`, rolesContract().chain.opRefusal.use);
   if (orcaSelfLifecycleAllowed({ role, args, handle, policy })) return null;
   // Implicit current-terminal checks retain their existing read admission; an explicit target must prove self.
   const targetedCheck = group === 'orchestration' && verb === 'check' && hasOption(args.slice(2), '--terminal');
@@ -268,8 +272,14 @@ export function policyVerdict({ role, command, guard = null, handle = null, lock
     const use = useOf(policy.release, 'starci release cut');
     return refusal('RIGHTS_RELEASE_CUT', text, `the ${role} role does not cut or publish a release because the release cut is owner-approved and runs once per release`, use);
   }
-  const owned = role === 'supervisor' && program === 'starci' ? runtimeChangeRefusal(args.filter((value) => !value.startsWith('-'))) : null;
-  if (owned) return refusal(RUNTIME_CHANGE_CODE, text, owned.reason, owned.remedy);
+  if (role === 'supervisor') {
+    const seat = supervisorSeatVerdict({ policy, program, args, text });
+    if (seat) return seat;
+  }
+  if (role === 'op') {
+    const control = opStarciVerdict({ policy, program, args, text });
+    if (control) return control;
+  }
   const call = callVerdict({ role, program, args, guard, policy, text });
   if (call) return call;
   if (p.runtime.has(program)) return null;

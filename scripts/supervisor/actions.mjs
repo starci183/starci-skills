@@ -17,13 +17,15 @@
 //   starci supervisor actions list [--json] [--open]
 //   starci supervisor actions record --item <key> --action <verb> --reason <text> [--workflow <id>] [--refs <csv>] [--until <iso> | --hold-ms <ms>]
 //   starci supervisor actions digest [--json]                       read-only preview of the owner digest
+import fs from 'node:fs';
 import path from 'node:path';
+import { parseYaml } from '../../engine/yaml.mjs';
 import { clipLine } from '../lib/clip.mjs';
 import { hhmm, stampMinute } from '../lib/time.mjs';
 import { OWNER_ONLY } from './owed-text.mjs';
 import { actionRow, supLog } from '../machine/sup-log.mjs';
 import { fullJson } from '../../engine/db/machine.mjs';
-import { newestEvent, readSupervisor, supervisorEvent, supervisorSettings, withSupervisor } from '../machine/home.mjs';
+import { newestEvent, readSupervisor, SKILL_ROOT, supervisorEvent, supervisorSettings, withSupervisor } from '../machine/home.mjs';
 import { ownerLanguage, translator } from '../lib/i18n.mjs';
 import { isMain } from '../lib/is-main.mjs';
 
@@ -32,27 +34,8 @@ export const OWED_ACTIONS_KIND = 'supervisor-owed-actions';
 export const DIGEST_KIND = 'supervisor-owner-digest';
 export const NOTICE_KIND = 'supervisor-notice';
 
-/** The classes, each with what the Supervisor does (supervise.yaml mission.classes). */
-export const CLASSES = Object.freeze({
-  'progress-stall': 'OUTCOME FIRST: the workflow does not progress past allocation.progress.supervisorGraceMs although its Kernel owns it. Read starci kernel status progress + rca, five-whys to the root cause, find the ONE systemic change that fixes the most (never re-dispatch the same failing shape): the Kernel lacks authority -> do it (lane) or rule it; a runtime cause -> runtime-defect; cross-workflow -> bridge/notify the peer; the Kernel ignores its rca.actions -> the tick already notified it, a second miss is a Kernel-loop defect (lane)',
-  'kernel-proposal': 'a Kernel filed a tier-2 change for shared .claude (starci kernel kernel-proposal): AUTO tier -> land it through a lane (starci supervisor lesson-actions land), IMPORTANT -> starci supervisor lesson-actions propose to the owner; record the result and close it in the product ledger',
-  'runtime-defect': 'fix it in an Opus lane or ONE [Worker] job per cluster, land it, then resolve each incident: starci kernel incident --resolve <inc> --by supervisor --detail "fixed by .claude <sha>" and notify the Kernel',
-  'fixed-defect': 'verify the commit against the incident, then starci kernel incident --resolve <inc> --by supervisor --detail "fixed by .claude <sha>" and notify the Kernel (or ack the pattern: owed.mjs ack)',
-  'retry-cap': 'never a blind retry: diagnose the root cause (a [Worker] diagnose job), then notify the Kernel with the disposition - re-route to the root-cause op, re-cut the leg, or drop it',
-  'stale-gate': 'notify the owning Kernel with the evidence; still open past the SLA: resolve it yourself, starci kernel incident --resolve <inc> --by supervisor --detail "<evidence>"',
-  'owner-gate-no-ask': 'autopilot: not an owner step - take the ruling, record it, resolve --by supervisor (or type it: --attach <inc> --until-*); only credentials/handover stay the owner\'s',
-  'peer-wait': 'notify the waiting Kernel and the PEER Kernel (the thing it owes is its next move); a peer that is itself stuck is escalated as its own item',
-  'owner-ask': 'autopilot (owner 2026-09-28): only credentials and the handover are the owner\'s. Never answer the ask: tell the Kernel to retire it (starci kernel retire-ask --dispatch <id> --reason ...) and take the decision itself or bring it to you as a delegated ruling you record; a credential/handover ask stays and is named in the owner digest',
-  'unread-peer': 'notify the Kernel to read starci kernel inbox and act on the message',
-  undispatched: 'ready work is not dispatched: wake the Kernel (notify.mjs, [supervisor] dispatch <job>); a repeat is a wake defect - open a lane fix',
-  'dead-worker': 'notify the Kernel to reconcile (starci kernel reconcile --job <id> --dead-worker [--settle-failed]); its Kernel dead or gated: run that reconcile yourself',
-  'dead-kernel': 'the Host controller replaces a dead Kernel seat; if it is quarantined, starci workflow start --goal <id>',
-  orphaned: 'wake the Kernel to name its next step; a plan that cannot continue: request a re-plan (define-goal --revise path) or archive --by supervisor',
-  stalled: 'read starci kernel status; actionable -> wake the Kernel; held by a stale gate/wait -> that item; unexplained -> diagnose',
-  'contract-stale': 'notify the Kernel to re-read the changed runtime files and starci kernel kernel-ack-rev --rev <sha>',
-  'experiment-revert': 'a self-learning experiment measured no improvement or a regression: starci supervisor lesson-actions revert --experiment <id> --apply (a revert lane through the land gate), which records "did not work"',
-  'push-refused': 'classify (secret / lint / test / hook) from the refusal and route the fix to a lane; a secret is removed from history in a lane, never pushed',
-});
+/** The classes, each with what the Supervisor does: modules/supervisor/supervise.yaml mission.classes, the one place the texts live. */
+export const CLASSES = Object.freeze(parseYaml(fs.readFileSync(path.join(SKILL_ROOT, 'modules', 'supervisor', 'supervise.yaml'), 'utf8')).mission.classes);
 
 const RETRY_PATTERNS = new Set(['retry-loop', 'repeat-check', 'reroute-loop', 'repeat-reject', 'worker-died']);
 // A retry cap a Kernel recorded as an incident (route failed-retries-the-same-op, "fired 3 of 3", attempt caps).

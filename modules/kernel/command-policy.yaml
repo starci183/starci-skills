@@ -28,6 +28,40 @@ calls:
     verb: [work, imagegen]
     ops: [interface.draw, interface.asset, brand.decide]
     use: starci work imagegen --prompt <file> --out <dir in the worktree> (interface.draw, interface.asset and brand.decide only)
+# The Supervisor seat (a bound caller of role supervisor). The Supervisor judges and answers: it reads, it answers the items of its menu
+# with `starci supervisor decide`, it records a runtime defect for Debug and it runs the collectors it owns. It changes no runtime code
+# (RUNTIME_CHANGE_OWNED_BY_DEBUG) and runs no other mutating verb: a call outside this table is refused with the menu
+# (SUPERVISOR_USE_DECIDE). Every program but starci, the pure reads and the read forms of git and npm is refused (SUPERVISOR_STARCI_ONLY).
+supervisor:
+  # starci <group> <verb> words the Supervisor seat may run
+  verbs:
+    supervisor: [status, decide, poll, actions, channel, workers, gc]
+    machine: [decisions]
+    kernel: [status, logs, questions, messages, survey, hierarchy, artifacts, coverage, usage, observe, peers, foundations, extensions, decisions, inbox, log]
+    workflow: [status]
+    gate: [read]
+  # a verb of several actions allows only these
+  actions:
+    actions: [list, digest, record]
+    channel: [register, inbox, reply]
+    workers: [list, show, cap]
+  # read verbs that also have mutating flags: refused when one of these flags is present
+  read-flags:
+    decisions: [open, claim, resolve, escalate, ring]
+    inbox: [ack]
+  # `supervisor actions record` is the defect queue: allowed for these --item values only
+  record-items: '^runtime-defect:[^ ]+$'
+  # programs whose read forms the general policy judges (git status, npm view); every write form of them is refused there
+  defer: [orca, git, npm, pnpm, yarn, bun]
+  # pure reads that the Supervisor does not get
+  deny-programs: [sleep, node]
+  use: "answer an item of the menu: starci supervisor status prints it, starci supervisor decide --item <id> --choice <choice> --reason <why> [--text <input>] answers it; a defect of the runtime is recorded with starci supervisor actions record --item runtime-defect:<cause> --action recorded --reason <why>"
+# The Op (a bound guard of role op). Its starci calls are its work: the capability verbs (starci app stack and the runtime-slot verbs for servers,
+# starci work draw-render for renders, starci work imagegen for images, starci test run and starci gate unit for tests, the checks) and its
+# report to its Kernel (starci kernel report). These groups are the control plane: the controllers, the Kernel and the Supervisor run them.
+op:
+  deny-groups: [supervisor, reconciler, workflow, route, debug]
+  use: "an Op runs the capability verbs of its work (starci app stack for servers, starci work draw-render for renders, starci work imagegen for images, starci test run or starci gate unit for tests) and reports to its Kernel with starci kernel report"
 # Release path: refused to every bound role.
 release:
   verbs: [cut, publish]
@@ -167,10 +201,13 @@ orca:
         values: [--from, --type, --subject, --body, --to, --run, --priority, --thread-id, --payload, --task-id, --dispatch-id,
           --outcome, --files-modified, --report-path, --phase, --dispatch-capability, --retry-request]
         flags: [--json, --help]
+        # an Op reports to its own Kernel's Run and addresses no one else (modules/kernel/roles.yaml chain.opMayNotAddress)
+        refuse-for: {op: [--to, --run]}
       ask:
         identity: --from
         values: [--from, --question, --resume, --to, --run, --options, --timeout-ms, --dispatch-capability, --retry-request]
         flags: [--json, --help]
+        refuse-for: {op: [--to, --run]}
       check:
         identity: --terminal
         values: [--terminal, --run, --ack, --types, --timeout-ms, --retry-request]

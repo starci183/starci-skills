@@ -364,7 +364,7 @@ test('the Kernel loop and the Supervisor are taught the workaround-first rule, t
   const loop = read('modules/kernel/driver-loop.yaml');
   for (const needle of ['WORKAROUND FIRST', '--cause', '--no-workaround', '--until-runtime-has', 'not-runtime-fault', 'gate-reraise-without-evidence', 'only after the owner was told']) assert.ok(loop.includes(needle), `driver-loop.yaml: ${needle}`);
   const supervise = read('modules/supervisor/supervise.yaml');
-  for (const needle of ['GATES:', '--resolution fixed --commit', 'workaround --route', 'not-runtime-fault --detail']) assert.ok(supervise.includes(needle), `supervise.yaml: ${needle}`);
+  for (const needle of ['GATES:', 'fixed --text <commit>', 'workaround --text <pool>', 'not-runtime-fault --reason']) assert.ok(supervise.includes(needle), `supervise.yaml: ${needle}`);
   const prompt = read('modules/supervisor/supervisor-prompt.md');
-  for (const needle of ['--resolution fixed --commit', 'workaround --route', 'not-runtime-fault --detail']) assert.ok(prompt.includes(needle), `supervisor-prompt.md: ${needle}`);
+  for (const needle of ['starci supervisor decide --item', 'fixed --text <commit>', 'workaround --text <pool>', 'not-runtime-fault']) assert.ok(prompt.includes(needle), `supervisor-prompt.md: ${needle}`);
 });

@@ -72,7 +72,7 @@ export function launchAuthorityText({ restart = null } = {}) {
     ? [`LAUNCH AUTHORITY - REPLACEMENT [Supervisor]: ${restart}.`,
       '  Nothing about your mandate changed. Re-register the channel, read the inbox, run one tick and continue.']
     : ['LAUNCH AUTHORITY - the owner approved the single [Supervisor] kernel design on 2026-09-24',
-      '  ("1 Supervisor, many Workers spawned on demand; chat only reads/sends to the supervisor"). This prompt is the go.'];
+      '  ("1 Supervisor; chat only reads/sends to the supervisor"). This prompt is the go.'];
   return [...head,
     '  Watchdog wakes are the runtime cadence, not owner messages: act on each. Never ask the owner for a go to start',
     '  or continue (owner rule: the owner never approves launch gates).'].join('\n');
@@ -92,9 +92,8 @@ function renderSupervisorPrompt({ template, doc, settings, restart = null, skill
 /* ------------------------------------------------------------ the seat's denied tools */
 
 /**
- * Tools the Supervisor's own agent may not use. Its in-process subagents (Claude Code's Agent tool) bypass the design - [Worker]s across four providers, leases, staging, the land gate and /status all
- * see nothing of them (2026-09-24: four "general-purpose" subagents diagnosed clusters). Diagnosis is a
- * [Worker] job too (modules/supervisor/supervisor-prompt.md). worker-start takes no provider argv, so the denial is
+ * Tools the Supervisor's own agent may not use. Its in-process subagents (Claude Code's Agent tool) sit outside the menu and the decision
+ * log: a judgment is one typed choice of the menu (modules/supervisor/supervisor-prompt.md). worker-start takes no provider argv, so the denial is
  * a seat guard bound to the seat's terminal (bindSeatGuard) that the project PreToolUse hook enforces.
  */
 export const SEAT_DENIED_TOOLS = Object.freeze({ claude: Object.freeze(['Agent', 'Task']) });
@@ -409,6 +408,13 @@ export async function stopSupervisor({ env = process.env, deps = null, now = Dat
 }
 
 
+/** The seat's status: {ok, action: 'status', supervisorMode, enabled, seat, health}. */
+export async function supervisorStatus() {
+  const d = await orcaDeps();
+  const { seat, enabled } = readSupervisor((m) => ({ seat: seatOf(m), enabled: enabledOf(m) }), { seat: null, enabled: null });
+  return { ok: true, action: 'status', supervisorMode: supervisorMode(), enabled, seat: seat?.value ?? null, health: seatHealth(seat, d) };
+}
+
 /* ------------------------------------------------------------ CLI */
 
 const bestEffort = bestEffortCall;
@@ -433,11 +439,7 @@ async function main() {
   const asJson = has('json');
   const out = (r) => { console.log(asJson ? JSON.stringify(r) : describe(r)); process.exitCode = r.exit ?? (r.ok ? 0 : 1); };
   if (has('help')) { console.log('use: start-supervisor.mjs [--plan] [--reason <t>] | --replace | --status | --stop | --restart  [--json]'); return; }
-  if (has('status')) {
-    const d = await orcaDeps();
-    const { seat, enabled } = readSupervisor((m) => ({ seat: seatOf(m), enabled: enabledOf(m) }), { seat: null, enabled: null });
-    return out({ ok: true, action: 'status', supervisorMode: supervisorMode(), enabled, seat: seat?.value ?? null, health: seatHealth(seat, d) });
-  }
+  if (has('status')) return out(await supervisorStatus());
   if (has('stop')) { const r = await stopSupervisor(); supervisorLog('start', describe(r), { data: r }); return out(r); }
   if (has('restart')) {
     const stopped = await stopSupervisor();

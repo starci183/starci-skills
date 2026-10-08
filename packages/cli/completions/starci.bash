@@ -33,7 +33,7 @@ _starci() {
         runtime) COMPREPLY=( $(compgen -W "architecture benchmark-snapshot check derived-fields doctor gen-catalog gen-ops housekeeping install ledger-hygiene link machine-db owner-claims-audit readme-blocks status update validate version" -- "$cur") );;
         smoke) COMPREPLY=( $(compgen -W "scaffold" -- "$cur") );;
         supabase) COMPREPLY=( $(compgen -W "start status stop" -- "$cur") );;
-        supervisor) COMPREPLY=( $(compgen -W "actions bridge channel direct-commits gate-stability gc land lesson-actions notify owed poll push push-mains ram-cap report start status stop telegram-bridge tell watchdog workers" -- "$cur") );;
+        supervisor) COMPREPLY=( $(compgen -W "actions bridge channel decide direct-commits gate-stability gc land lesson-actions notify owed poll push push-mains ram-cap report start status stop telegram-bridge tell watchdog workers" -- "$cur") );;
         task) COMPREPLY=( $(compgen -W "list register show" -- "$cur") );;
         test) COMPREPLY=( $(compgen -W "run" -- "$cur") );;
         typecheck) COMPREPLY=( $(compgen -W "run" -- "$cur") );;
@@ -639,6 +639,10 @@ _starci() {
         supervisor:channel:--text-file) return 0;;
         supervisor:channel:--to) return 0;;
         supervisor:channel:--timeout-ms) return 0;;
+        supervisor:decide:--item) return 0;;
+        supervisor:decide:--choice) return 0;;
+        supervisor:decide:--reason) return 0;;
+        supervisor:decide:--text) return 0;;
         supervisor:direct-commits:--repo) return 0;;
         supervisor:gate-stability:--family) return 0;;
         supervisor:gate-stability:--tree) return 0;;
@@ -1077,6 +1081,7 @@ _starci() {
         supervisor:actions) COMPREPLY=( $(compgen -W "--open --item --action --reason --workflow --refs --until --hold-ms --json --cwd --quiet --help --edition" -- "$cur") );;
         supervisor:bridge) COMPREPLY=( $(compgen -W "--repo --start --dry-run --no-notify --request-only --owner-ok --dependents --foundation --goal --reason --blocker --title --kind --waits --paths --finding --bridge --record --to --merge-into --workflow --text --lead --waiter --releases --json --cwd --quiet --help --edition" -- "$cur") );;
         supervisor:channel) COMPREPLY=( $(compgen -W "--id --label --repos --force --peek --text --text-file --to --timeout-ms --json --cwd --quiet --help --edition" -- "$cur") );;
+        supervisor:decide) COMPREPLY=( $(compgen -W "--item --choice --reason --text --json --cwd --quiet --help --edition" -- "$cur") );;
         supervisor:direct-commits) COMPREPLY=( $(compgen -W "--repo --json --cwd --quiet --help --edition" -- "$cur") );;
         supervisor:gate-stability) COMPREPLY=( $(compgen -W "--family --tree --base --head --ledger --gate --json --cwd --quiet --help --edition" -- "$cur") );;
         supervisor:gc) COMPREPLY=( $(compgen -W "--dry-run --apply --only --plan --holder --trigger --json --cwd --quiet --help --edition" -- "$cur") );;
@@ -1090,7 +1095,7 @@ _starci() {
         supervisor:ram-cap) COMPREPLY=( $(compgen -W "--op --workflow --weight --reserve --json --cwd --quiet --help --edition" -- "$cur") );;
         supervisor:report) COMPREPLY=( $(compgen -W "--repo --send --json --cwd --quiet --help --edition" -- "$cur") );;
         supervisor:start) COMPREPLY=( $(compgen -W "--plan --reason --json --cwd --quiet --help --edition" -- "$cur") );;
-        supervisor:status) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
+        supervisor:status) COMPREPLY=( $(compgen -W "--menu --json --cwd --quiet --help --edition" -- "$cur") );;
         supervisor:stop) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
         supervisor:telegram-bridge) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
         supervisor:tell) COMPREPLY=( $(compgen -W "--wait --timeout-ms --read --since --limit --json --cwd --quiet --help --edition" -- "$cur") );;
