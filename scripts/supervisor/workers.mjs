@@ -348,7 +348,7 @@ function spawnSubmitted({ job, shown, frame, terminal, deps }) {
 
 /** Reconcile the original Dispatch only: uncertain effects never authorize another worker. */
 function reconcileSpawning(pass, job) {
-  const { m, deps, root, now, result } = pass;
+  const { m, deps, root } = pass;
   if (!job.payload.dispatch) return false;
   try {
     const worker = (deps.workerShow ?? workerShow)({ dispatch: job.payload.dispatch });
