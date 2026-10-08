@@ -53,6 +53,7 @@ import { parseJson, parseJsonOr, readJsonFile } from '../lib/json.mjs';
 import { workflowDisplayName, workflowNameOf } from '../lib/display-names.mjs';
 import { KERNEL_BOOT_FILES, currentRuntimeRev, revRootOf, shortRev } from './runtime-rev.mjs';
 import { ensureWorkflowWorktree, workflowAppRepo } from './workflow-worktree.mjs';
+import { appendWorktreeEvent } from './workflow-worktree-events.mjs';
 import { ensureWorkflowHost, installWorkflowTree, workflowStartAuthority, commitWorkflowStart, recordWorkflowStartFailure, workflowSender, closedGoalMessage } from './workflow-startup.mjs';
 import { guardLaunch, bindGuardTerminal, unbindGuardTerminal, guardReceiptErrors } from '../guards/hook-install.mjs';
 import { readEnv } from '../lib/env.mjs';
@@ -423,17 +424,13 @@ try {
     if (!ensured.ok) failStart(ensured.reason === 'worktree-cap' ? 'worktree-cap' : 'workflow-worktree', ensured.detail ?? ensured.reason, null,
       { reason: ensured.reason, appRepo, ...(ensured.cap != null ? { live: ensured.live, cap: ensured.cap } : {}) });
     workflowWorktree = ensured.record;
-    if (ensured.created) {
-      const wf = ledger.db.prepare('SELECT generation FROM workflows WHERE workflow_id=?').get(workflowId);
-      ledger.transaction(() => ledger.appendEvent({ workflowId, entityType: 'workflow', entityId: workflowId, generation: wf?.generation ?? 0, kind: 'workflow-worktree-created',
-        payload: { orcaWorktreeId: workflowWorktree.orcaWorktreeId, path: workflowWorktree.path, branch: workflowWorktree.branch, appRepo } }));
-    }
+    const placed = { path: workflowWorktree.path, branch: workflowWorktree.branch };
+    if (ensured.created) appendWorktreeEvent(ledger, workflowId, 'workflow-worktree-created', { orcaWorktreeId: workflowWorktree.orcaWorktreeId, ...placed, appRepo });
+    if (ensured.repaired) appendWorktreeEvent(ledger, workflowId, 'workflow-worktree-repaired', { orcaWorktreeId: workflowWorktree.orcaWorktreeId, ...placed, ...ensured.repaired });
     workflowInstall = await installWorkflowTree({ record: workflowWorktree, env: process.env });
     if (!workflowInstall.ok) failStart('workflow-worktree-install', workflowInstall.error ?? workflowInstall.reason, null,
       { reason: workflowInstall.reason, workflowWorktree, install: workflowInstall });
-    const wf = ledger.db.prepare('SELECT generation FROM workflows WHERE workflow_id=?').get(workflowId);
-    ledger.transaction(() => ledger.appendEvent({ workflowId, entityType: 'workflow', entityId: workflowId, generation: wf?.generation ?? 0,
-      kind: 'workflow-worktree-installed', payload: { orcaWorktreeId: workflowWorktree.orcaWorktreeId, ...workflowInstall } }));
+    appendWorktreeEvent(ledger, workflowId, 'workflow-worktree-installed', { orcaWorktreeId: workflowWorktree.orcaWorktreeId, ...workflowInstall });
   }
   const kernelWorktree = workflowWorktree?.path ?? repo;
   // The Kernel's guard: the same job guard an op gets (scripts/guards/hook-install.mjs

@@ -35,6 +35,26 @@ cases:
     rule: {file: scripts/machine/worker-close.mjs, anchor: "moot"}
     spec: tests/machine/worker-close-moot.spec.mjs
     status: covered
+  - id: running-workflow-tree-collected-after-reboot
+    family: power-lifecycle
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "the worktree GC (reconciler gc controller, always active) collected the trees of two running workflows as owner-unknown after the host restart: its ledger lookup read a handle member that does not exist, so no workflow had a phase, and Orca listed no terminal in a tree after the reboot; each tree was removed after its uncommitted work was preserved to preserved/<workflow>/gc", remedy: {state: in-tree, change: "the lookup reads the ledger phase through the open reader, an unreadable ledger answers ledger-unreadable and keeps the tree (worktree-ledger-lookup.mjs)"}}
+    met: {date: "2026-10-08", where: "wf-nivo-auth-test-workflow and wf-starci-auth-test-workflow after the 2026-10-07 shutdown", evidence: "machine.sqlite gc_items runs 110 and 111, machine_logs seq 3483 and 3502; Debug custody audit 2026-10-08"}
+    rule: {file: scripts/machine/worktree-ledger-lookup.mjs, anchor: "readerOf"}
+    spec: tests/machine/worktree-gc-workflow-phase.spec.mjs
+    status: covered
+  - id: workflow-restarted-from-main-after-tree-loss
+    family: power-lifecycle
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "ensureWorkflowWorktree created the replacement tree of both workflows from main (branch wf-<id>-2) while the workflow branch and its preserved ref held the checkpoints and the uncommitted records; a Kernel started in that tree would have worked without them and the settle gate then saw an owned slice of records only", remedy: {state: in-tree, change: "a workflow that owns a branch or a preserved ref gets its tree at that branch with the preserved work restored; a registered tree behind the branch is moved onto it; refs off one chain are refused workflow-custody-diverged (workflow-custody.mjs, starci workflow custody)"}}
+    met: {date: "2026-10-08", where: "starci workflow start of both real workflows after the GC removed their trees", evidence: "git reflog of starci183/wf-wf-nivo-auth-test-workflow-muxq1xov-2 (Created from refs/heads/main 05:26Z); Debug custody audit 2026-10-08"}
+    rule: {file: scripts/kernel/workflow-custody.mjs, anchor: "moveTreeToTip"}
+    spec: tests/kernel/workflow-custody.spec.mjs
+    status: covered
+  - id: admitted-op-placement-names-a-lost-tree-path
+    family: power-lifecycle
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "settle of a reported op (Nivo op-architecture.decide-e78adc94cc) refused op-gate-tool-failed 'the current owned slice could not be bound': the op's immutable admission names the original tree path (the workflow's first worktree directory), the GC removed that directory, and the replacement tree is registered at the -2 path; the custody repair restores the content and the checkpoint chain but not the original path", remedy: {state: open}}
+    met: {date: "2026-10-08", where: "settle of an op admitted before the tree was lost", evidence: "nivo runtime.sqlite events 489, 490, 496, 497 (kernel-proposal kprop-f9ee099c38, runtime-defect incident)"}
+    status: open
+    why: "the admission binds the op to the tree path it ran in; a registered tree that has to be recreated gets a new path from Orca, so a reported but unsettled op needs its admitted placement re-pointed to the registered tree by a runtime rule (an owner decision on who may rewrite an immutable admission), not by hand"
   - id: quota-window-unstarted
     family: failure-while-running
     met: {date: "2026-10-08", where: "provider quota after re-login", evidence: "commit f4fca8baf"}

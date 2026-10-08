@@ -32,6 +32,7 @@ Theme: the roles are one declared contract, the system recovers from a host rest
 
 ### Fixed
 - The worktree GC read no owner at all: its ledger lookup used a handle member that does not exist, so every workflow was "owner-unknown" and a running or paused workflow's tree was collected once Orca listed no terminal in it (after a host restart). The lookup now reads the ledger phase, and an unreadable ledger keeps the tree.
+- A workflow keeps its branch: a replacement tree is cut at the workflow branch (or its preserved ref) and the preserved uncommitted work is restored, never cut from main; a registered tree behind the branch is moved onto it at the next `starci workflow start` or with `starci workflow custody --apply`; refs off one history are refused `workflow-custody-diverged`.
 - Five red specs and 17 findings left by the alpha.6 cleanup.
 - SonarCloud findings of the code-smell baseline are fixed in code (default sort comparators, optional chains, array callbacks, awaited loops through the in-order helpers).
 - After a host restart no seat could launch: an unconfirmable release of a Dispatch from the previous Orca runtime kept a proven-gone Kernel terminal `unclosed`; ten Codex receipts in `unknown` state filled the pool for good; a Claude window with no use yet was judged invalid.

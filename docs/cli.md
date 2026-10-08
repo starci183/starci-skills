@@ -5165,6 +5165,25 @@ starci workflow bias --normalize '{"prefer":["codex"],"avoid":["devin"]}'
 starci workflow bias "don't use codex"
 ```
 
+### starci workflow custody
+
+show a workflow tree against its branch and preserved work; --apply moves it onto them
+
+| flag | type | |
+| --- | --- | --- |
+| `--repo` | string |  |
+| `--workflow` | string | required |
+| `--apply` | boolean |  |
+
+exit: 0 the state printed (attached, behind or tree-missing without --apply) or the repair applied; 1 refusal (workflow-custody-diverged, workflow-custody-conflict, workflow-custody-busy) or error; 2 bad usage
+
+json: flag
+
+```sh
+starci workflow custody --workflow <id>
+starci workflow custody --workflow <id> --apply
+```
+
 ### starci workflow define
 
 define a goal — assess the prompt, plan the op chain, queue it in the ledger inbox

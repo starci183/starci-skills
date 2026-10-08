@@ -1,0 +1,27 @@
+group: workflow
+verb: custody
+owner: runtime
+summary: show a workflow tree against its branch and preserved work; --apply moves it onto them
+impl:
+  script: scripts/kernel/workflow-custody-cli.mjs
+flags:
+  - name: repo
+    type: string
+    summary: "repository whose registered project ledger holds the workflow (default: the working directory)"
+  - name: workflow
+    type: string
+    required: true
+    summary: the workflow_id
+  - name: apply
+    type: boolean
+    summary: move a tree that is behind its branch onto it (its own work preserved), or make a missing one at the branch; refused while an op is in flight
+exit:
+  "0": the state printed (attached, behind or tree-missing without --apply) or the repair applied
+  "1": refusal (workflow-custody-diverged, workflow-custody-conflict, workflow-custody-busy) or error
+  "2": bad usage
+json: flag
+examples:
+  - starci workflow custody --workflow <id>
+  - starci workflow custody --workflow <id> --apply
+editions:
+  - full

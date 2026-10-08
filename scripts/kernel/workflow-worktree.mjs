@@ -8,7 +8,8 @@
 //              first (worktrees.capPerRepo: a full repository refuses worktree-cap and the Kernel launch waits) and
 //              registers the row keyed by Orca's worktree id (kind workflow). Orca names the branch after the worktree
 //              (wf-<id>, its '/' rule): that branch IS the workflow branch, recorded as Orca reported it; every reader
-//              takes it from workflowWorktreeOf().branch and never constructs one. The Kernel then starts with
+//              takes it from workflowWorktreeOf().branch and never constructs one. A workflow that already owns a branch or a
+//              preserved ref is never cut from main (workflow-custody.mjs): its tree is made at that branch and the preserved work restored. The Kernel then starts with
 //              `orchestration worker-start --worktree <that path>`: an existing worktree, so launch trust (the provider's
 //              project config, a Devin model pin) is written into it before the agent starts, which a `--worktree
 //              new-child` start cannot offer (the directory does not exist until the start returns).
@@ -38,6 +39,7 @@ import { workflowRecordOf, workflowWorktreeOf } from '../machine/workflow-tree.m
 import { isInside } from '../lib/walk.mjs';
 import { pathKey } from '../lib/path-key.mjs';
 import { requireWorktreeRecord } from '../lib/worktree-record.mjs';
+import { workflowCustody, repairRegisteredTree, restorePreserved } from './workflow-custody.mjs';
 
 const WORKFLOW_WORKTREE_KIND = 'workflow';
 /** The typed dispatch wait of an op whose side is busy in its workflow worktree (modules/kernel/failure-codes.yaml). */
@@ -92,18 +94,35 @@ export function registerWorkflowWorktree(ctx, { workflowId, orcaWorktreeId, path
 }
 
 /**
- * The workflow's worktree, created through Orca when it has none. {ok, created, record} | {ok:false, reason:
- * 'worktree-cap'|'worktree-registry-unavailable'|'orca-worktree-create-failed', detail, live?, cap?}
+ * The workflow's worktree, created through Orca when it has none. A workflow that already owns a branch (scripts/kernel/
+ * workflow-custody.mjs) never starts from main: a new tree is cut at that branch's last checkpoint and the work a collector
+ * preserved is put back; a registered tree that is behind the branch is moved to it. {ok, created, record, repaired?} |
+ * {ok:false, reason: 'worktree-cap'|'worktree-registry-unavailable'|'orca-worktree-create-failed'|'workflow-custody-diverged'|
+ * 'workflow-custody-conflict', detail, live?, cap?}
  */
 export function ensureWorkflowWorktree(ctx, { workflowId, appRepo, ledgerId = null }) {
   const { env, orca, git } = ctxOf(ctx);
+  const custody = workflowCustody({ appRepo, workflowId, env });
+  if (custody.fault) return { ok: false, reason: custody.fault.code, detail: custody.fault.detail };
   const existing = workflowWorktreeOf({ env }, workflowId);
-  if (existing && fs.existsSync(existing.path)) return { ok: true, created: false, record: existing };
+  if (existing && fs.existsSync(existing.path)) return keepRegisteredTree({ env, appRepo, workflowId, existing, custody });
   const spec = workflowWorktreeSpec({ workflowId, appRepo });
-  const made = createOrcaWorktree({ repoRoot: appRepo, kind: WORKFLOW_WORKTREE_KIND, name: spec.name, base: spec.baseBranch, setup: 'run', owner: { workflowId, ledgerId }, env, git, orca });
+  const made = createOrcaWorktree({ repoRoot: appRepo, kind: WORKFLOW_WORKTREE_KIND, name: spec.name, base: custody.none ? spec.baseBranch : custody.branchTip.name ?? custody.tip.name, setup: 'run', owner: { workflowId, ledgerId }, env, git, orca });
   if (!made.ok) return { ok: false, reason: made.reason, detail: made.detail ?? null, ...(made.cap != null ? { live: made.live, cap: made.cap } : {}) };
   const record = registerWorkflowWorktree({ env, git }, { workflowId, orcaWorktreeId: made.id, path: made.path, branch: made.branch ?? spec.branch, ledgerId });
-  return { ok: true, created: true, record };
+  if (custody.none) return { ok: true, created: true, record };
+  setCheckpoint({ env }, workflowId, custody.branchTip.sha);
+  const restored = restorePreserved({ appRepo, workflowId, dir: record.path, custody });
+  return restored.ok ? { ok: true, created: true, record: { ...record, checkpoint: custody.branchTip.sha } } : restored;
+}
+
+// A registered, present tree of a workflow that owns a branch: moved to the branch when it is behind it, its checkpoint the branch's tip.
+function keepRegisteredTree({ env, appRepo, workflowId, existing, custody }) {
+  if (custody.none) return { ok: true, created: false, record: existing };
+  const repaired = repairRegisteredTree({ appRepo, workflowId, dir: existing.path, custody });
+  if (!repaired.ok) return repaired;
+  if (repaired.repaired) setCheckpoint({ env }, workflowId, custody.branchTip.sha);
+  return { ok: true, created: false, record: repaired.repaired ? workflowWorktreeOf({ env }, workflowId) : existing, ...(repaired.repaired ? { repaired } : {}) };
 }
 
 /** Record the workflow's last checkpoint (part B, after committing a green op on the workflow branch). true when a live row took it. */

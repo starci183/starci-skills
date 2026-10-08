@@ -12125,6 +12125,37 @@ workflow-worktree-mismatch:
   nextStep_vi: "Dùng đúng cây đã đăng ký khi giao. Với một lượt đã chạy, runtime owner đối chiếu phiếu dispatch và sổ đăng ký để khôi phục đúng vị trí trước khi chốt; không sửa hợp đồng bất biến hay gán hiệu ứng ở cây khác thành không áp dụng."
   owner: runtime-core
   kind: verb-refusal
+# Proof: scripts/kernel/workflow-custody.mjs workflowCustody and repairRegisteredTree; scripts/kernel/workflow-worktree.mjs ensureWorkflowWorktree.
+workflow-custody-diverged:
+  title: "The workflow's branch refs or its tree do not form one history"
+  title_vi: "Các nhánh của workflow hoặc cây của nó không tạo thành một lịch sử"
+  meaning_vi: "Nhánh workflow, nhánh -N Orca đặt lại tên, ref preserved/<workflow>/gc hoặc HEAD của cây đã đăng ký không nằm trên cùng một chuỗi tổ tiên (cây giữ commit riêng ngoài chuỗi). Runtime không gộp và không bỏ bên nào: workflow không được khởi động lại cho tới khi chủ quyết định."
+  causes_vi:
+    - "Một cây tạo từ main đã được làm việc và checkpoint trước khi lưu ký được khôi phục"
+    - "Một ref preserved không phải hậu duệ của nhánh workflow"
+  nextStep_vi: "Chủ xem các ref được liệt kê trong chi tiết, chọn bên giữ và đưa bên kia vào preserved bằng lệnh git; sau đó khởi động lại workflow."
+  owner: runtime-core
+  kind: verb-refusal
+# Proof: scripts/kernel/workflow-custody.mjs moveTreeToTip.
+workflow-custody-conflict:
+  title: "The workflow's tree could not be moved onto its branch"
+  title_vi: "Không thể đưa cây của workflow về nhánh của nó"
+  meaning_vi: "Cây đã đăng ký đứng trước nhánh workflow nhưng git từ chối tua nhanh hoặc khôi phục việc đã preserved (tệp chưa theo dõi hoặc thay đổi cục bộ trùng tệp đến). Công việc của cây đã được preserved dưới preserved/<workflow>/wrong-tree; không có gì bị xoá."
+  causes_vi:
+    - "Cây đăng ký có tệp chưa theo dõi trùng đường dẫn với tệp của nhánh"
+  nextStep_vi: "Xem chi tiết lỗi git, dọn tệp trùng trong cây (đã có bản preserved) rồi khởi động lại workflow."
+  owner: runtime-core
+  kind: verb-refusal
+# Proof: scripts/kernel/workflow-custody-cli.mjs main.
+workflow-custody-busy:
+  title: "An op of the workflow is in flight"
+  title_vi: "Một op của workflow đang chạy"
+  meaning_vi: "starci workflow custody --apply không đổi cây của workflow khi còn op leased, running, answering, reported, deciding hoặc effect_unknown: việc đưa cây về nhánh sẽ thay đổi tệp dưới tay op đó."
+  causes_vi:
+    - "Kernel vẫn đang giao việc trong cây sai"
+  nextStep_vi: "Chờ các op trong chi tiết chốt hoặc dừng Kernel giao thêm việc, rồi chạy lại với --apply."
+  owner: runtime-core
+  kind: verb-refusal
 worktree-add-failed:
   title: "Adding worktree failed"
   title_vi: "Tạo worktree thất bại"
