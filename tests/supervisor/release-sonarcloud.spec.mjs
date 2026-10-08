@@ -119,7 +119,7 @@ function gateOf({ scan = { outcome: 'pass', scanner: { exitCode: 0 }, ceTask: { 
       config: config ?? (() => CLOUD),
       ensure: async () => { calls.push('ensure'); return project; },
       scan: async (cloud, dir, defines) => { calls.push(['scan', defines]); return scan; },
-      dashboard: async () => { calls.push('dashboard'); return dashboard; },
+      dashboard: async (cloud, dir, branch) => { calls.push(['dashboard', branch]); return dashboard; },
     },
   };
 }
@@ -129,13 +129,14 @@ test('supplier: the project is ensured, the scan runs with the organization on t
   const fake = gateOf();
   const proof = await supplier(t, fake).proofs['shop: sonar']();
   assert.equal(proof.ok, true);
-  assert.deepEqual(fake.calls, ['ensure', ['scan', ['-Dsonar.organization=acme', `-Dsonar.branch.name=${PROOF_BRANCH}`]], 'dashboard']);
+  assert.deepEqual(fake.calls, ['ensure', ['scan', ['-Dsonar.organization=acme', `-Dsonar.branch.name=${PROOF_BRANCH}`]], ['dashboard', PROOF_BRANCH]]);
 });
 
 test('supplier: a project created by this proof is analysed as its main branch, never on a branch of a project that has none', async (t) => {
   const fake = gateOf({ project: { created: true } });
   await supplier(t, fake).proofs['shop: sonar']();
   assert.deepEqual(fake.calls[1][1], ['-Dsonar.organization=acme']);
+  assert.deepEqual(fake.calls[2], ['dashboard', undefined], 'the dashboard reads the main branch the analysis became');
 });
 
 test('supplier: the scan row holds the runtime bar elsewhere: a processed analysis whose SonarCloud gate is red or NONE still passes the scan row and the dashboard decides', async (t) => {
@@ -153,7 +154,7 @@ test('supplier: an analysis that was not processed (scanner failed, task failed,
   for (const scan of [processedScan({ scanner: { exitCode: 1 } }), processedScan({ ceTask: { status: 'FAILED' } }), { outcome: 'blocked', reason: 'no token' }]) {
     const fake = gateOf({ scan });
     assert.equal((await supplier(t, fake).proofs['shop: sonar']()).ok, false);
-    assert.ok(!fake.calls.includes('dashboard'));
+    assert.ok(!fake.calls.some((call) => call[0] === 'dashboard'));
   }
 });
 

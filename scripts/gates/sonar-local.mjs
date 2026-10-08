@@ -42,7 +42,7 @@ import { makeTempDir } from '../api/fs/make-temp-dir.mjs'; import { tempPath } f
  *        [--project-gate]                    (inside --paths), not the whole project
  *        [--out summary.json | --blob] [--log scanner.txt] [--no-ensure] [--timeout SECONDS]
  *        [--isolate]
- *   dashboard --cwd REPO [--key K]           the project's dashboard numbers from its last analysis (bugs, code
+ *   dashboard --cwd REPO [--key K] [--branch B]  the project's dashboard numbers from its last analysis (of branch B when given; bugs, code
  *                                            smells, vulnerabilities, hotspots reviewed, coverage and the coverage
  *                                            of every file of the coverage scope), judged by judgeDashboard
  *
@@ -988,16 +988,16 @@ export async function dashboard(cfg,options={}){
   const token=await suppliedSonarToken(cfg,{validate:value=>tokenAccepted(cfg,value),remember});
   if(!token.present)return finish('blocked',token.reason);
   const tokens=[token.value];
-  const component=encodeURIComponent(key);
-  const project=await read(cfg,tokens,`/api/measures/component?component=${component}&metricKeys=${dashboardMetrics(gate).join(',')}`);
+  const component=encodeURIComponent(key),onBranch=options.branch?`&branch=${encodeURIComponent(options.branch)}`:'';
+  const project=await read(cfg,tokens,`/api/measures/component?component=${component}&metricKeys=${dashboardMetrics(gate).join(',')}${onBranch}`);
   if(project.status===404)return finish('blocked',`${key} has no analysis on ${cfg.host}: run scan --project-gate --wait first`);
   if(!project.reachable||project.status!==200)return finish('blocked',`the measures of ${key} could not be read: ${project.error??httpStatusLabel(project)}`);
   const measures=Object.fromEntries((project.json?.component?.measures??[]).map(m=>[m.metric,m.value]));
-  const tree=gate.overall.coverage?await readAll(cfg,tokens,`/api/measures/component_tree?component=${component}&metricKeys=${gate.overall.coverage.metric}&qualifiers=FIL`,'components'):{items:[]};
+  const tree=gate.overall.coverage?await readAll(cfg,tokens,`/api/measures/component_tree?component=${component}&metricKeys=${gate.overall.coverage.metric}&qualifiers=FIL${onBranch}`,'components'):{items:[]};
   if(tree.error)return finish('blocked',`the per-file coverage of ${key} could not be read: ${tree.error}`);
   const files=tree.items.map(item=>({path:item.path,coverage:(item.measures??[]).find(m=>m.metric===gate.overall.coverage.metric)?.value??null}));
   const judged=judgeDashboard({measures,files,scope},gate);
-  summary.dashboardUrl=`${cfg.host}/dashboard?id=${component}`;
+  summary.dashboardUrl=`${cfg.host}/dashboard?id=${component}${onBranch}`;
   summary.numbers=judged.numbers;
   summary.coverage=judged.coverage;
   summary.failures=judged.failures;
@@ -1018,7 +1018,7 @@ const HELP=`Usage: starci gate sonar <command> [options]
        [--project-gate]                 (default base HEAD); --project-gate judges the whole-project gate instead
        [--out FILE.json | --blob] [--log FILE.txt] [--no-ensure] [--timeout SEC] [--wait-timeout SEC]
        [--isolate] [--keep-slice-project] analyse only --paths in a throwaway project (minutes, not a whole-repo scan)
-  dashboard --cwd REPO [--key K]          the dashboard numbers of the project's last analysis: bugs, code smells,
+  dashboard --cwd REPO [--key K] [--branch B]  the dashboard numbers of the last analysis (of branch B when given): bugs, code smells,
                                           vulnerabilities, hotspots reviewed, coverage and the coverage of every
                                           file of the coverage scope; fails unless all are at the gate
 
@@ -1077,7 +1077,7 @@ const runSonarCommand=async(args,cfg,key,env,put)=>{
     return {report};
   }
   if(command==='dashboard'){
-    const report=await dashboard(cfg,{cwd:args.cwd,key:args.key,tokenRef:args.tokenRef});
+    const report=await dashboard(cfg,{cwd:args.cwd,key:args.key,branch:args.branch,tokenRef:args.tokenRef});
     if(args.out)await emitCheckOutput(`${scrub(JSON.stringify(report,null,2))}\n`,{out:args.out});
     return {report};
   }

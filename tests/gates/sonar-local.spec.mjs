@@ -1577,6 +1577,23 @@ test('dashboard prints the project numbers and fails unless bugs, smells and vul
 });
 
 
+test('dashboard --branch reads the measures of that branch, and without it the main branch',async t=>{
+  const custody=fakeCustody(temporary(t,'dash-branch-custody'));
+  const clean={bugs:0,code_smells:0,vulnerabilities:0,security_hotspots:0,duplicated_lines_density:0,coverage:100};
+  const files={'src/orders/order.service.js':100,'src/orders/payment.service.js':100};
+  const branchesOf=async(label,extra)=>{
+    const {host,state}=await fakeSonar(t,{projectMeasures:clean,coverage:files});
+    const out=await sonarLocalMain(['dashboard','--cwd',fakeRepo(temporary(t,label),{services:true}),...extra],{config:configFor(host,custody)});
+    assert.equal(out.exitCode,0,JSON.stringify(out.report));
+    return {branches:state.requests.filter(row=>row.path.startsWith('/api/measures/component')).map(row=>row.query.branch),report:out.report};
+  };
+  const proof=await branchesOf('dash-branch',['--branch','release-proof']);
+  assert.ok(proof.branches.length>=2&&proof.branches.every(branch=>branch==='release-proof'),JSON.stringify(proof.branches));
+  assert.match(proof.report.dashboardUrl,/&branch=release-proof$/);
+  const main=await branchesOf('dash-main',[]);
+  assert.ok(main.branches.every(branch=>branch===undefined),JSON.stringify(main.branches));
+});
+
 test('lite Sonar selects its canonical conditions and requires an actual processed project gate plus the non-coverage dashboard',async t=>{
   const root=temporary(t,'lite-policy'),custody=fakeCustody(root),repo=fakeRepo(root);
   write(repo,'hfs.json',JSON.stringify({hfs:2,kind:'app',edition:'lite'}));
