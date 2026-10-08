@@ -594,6 +594,7 @@ _starci() {
     'release:cut:--remote') return 0 ;;
     'release:cut:--branch') return 0 ;;
     'release:cut:--tag') return 0 ;;
+    'release:cut:--rows') return 0 ;;
     'release:images:--app') return 0 ;;
     'release:images:--sides') return 0 ;;
     'release:images:--only') return 0 ;;
@@ -1095,7 +1096,7 @@ _starci() {
     'release:app-installs') _values 'flags' '--keep' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'release:check') _values 'flags' '--final' '--only' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'release:clean-test') _values 'flags' '--changed' '--base' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
-    'release:cut') _values 'flags' '--repo' '--remote' '--branch' '--plan' '--tag' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
+    'release:cut') _values 'flags' '--repo' '--remote' '--branch' '--plan' '--tag' '--rows' '--no-reuse' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'release:env-test') _values 'flags' '--lane' '--reuse-installs' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'release:images') _values 'flags' '--app' '--sides' '--only' '--wait-seconds' '--remove-images' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'release:launch-smoke') _values 'flags' '--app-repo' '--entry' '--timeout-ms' '--out' '--as' '--json' '--cwd' '--quiet' '--help' '--edition' ;;

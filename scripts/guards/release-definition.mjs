@@ -6,7 +6,7 @@
 //   RELEASE_CHANGELOG_SECTION   CHANGELOG.md holds `## [<version>] - <date>` (a dated heading) with no unfinished marker (R222)
 //   RELEASE_TAG_MISSING         an ANNOTATED tag v<version> points at the pushed commit
 //   RELEASE_RECEIPT_MISSING     the L4 record of exactly this commit (scripts/guards/release-record.mjs, written by the cut) names this tag
-//   RELEASE_RECEIPT_INCOMPLETE  that record holds a green row for each of RECEIPT_STEPS: the root suite, the packages suites and the checks
+//   RELEASE_RECEIPT_INCOMPLETE  that record holds a green row for each of RECEIPT_STEPS (the root suite, the packages suites and the checks) that RAN on this commit: a row the record marks `reusedFrom` another commit does not count
 // Each finding names what is missing and the command that produces it. Pure over the git reads; no bypass.
 import { catFile } from '../api/git/cat-file.mjs';
 import { revParseQuery } from '../api/git/rev-parse-query.mjs';
@@ -61,9 +61,10 @@ function tagFindings({ cwd, commit, tag }) {
 function receiptFindings({ cwd, commit, tag }) {
   const record = readL4Record({ repo: cwd, head: commit, tag });
   if (!record) return [finding('RELEASE_RECEIPT_MISSING', `no release record for exactly ${commit.slice(0, 9)} and ${tag}: the full suite and the packages suites did not run green on this commit`, CUT_COMMAND(tag))];
-  const green = new Set((record.logs ?? []).filter((row) => row?.ok === true).map((row) => row.name));
+  // A row reused from another commit (reusedFrom) was not run on this one: the required rows count only when they RAN on the exact pushed commit.
+  const green = new Set((record.logs ?? []).filter((row) => row?.ok === true && !row.reusedFrom).map((row) => row.name));
   const absent = RECEIPT_STEPS.filter((name) => !green.has(name));
-  return absent.length ? [finding('RELEASE_RECEIPT_INCOMPLETE', `the release record of ${commit.slice(0, 9)} has no green row for: ${absent.join(', ')}`, CUT_COMMAND(tag))] : [];
+  return absent.length ? [finding('RELEASE_RECEIPT_INCOMPLETE', `the release record of ${commit.slice(0, 9)} has no green row run on this commit for: ${absent.join(', ')}`, CUT_COMMAND(tag))] : [];
 }
 
 /**

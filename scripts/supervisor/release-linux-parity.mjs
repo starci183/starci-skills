@@ -9,7 +9,7 @@
 // out) on a READ-ONLY mount, and extracted to a copy inside the container to write in (then a throwaway git repository, since the checks read git). Docker is spoken
 // only through the scripts/api/docker call files, to a container this run names and removes; no port is published and no other container is touched.
 // A red step, or no docker daemon, is a red L4 step: it blocks the cut.
-// Seams (deps): docker ({version, run, rm}), archive (repo, file -> {ok, error}), workflows (repo -> [{file, doc}]), apps (repo -> [names]; runL4 hands over its example apps), logDir, now.
+// Seams (deps): select (a filter over the planned steps: the spec leg of the cut prepares with the steps before the checks), docker ({version, run, rm}), archive (repo, file -> {ok, error}), workflows (repo -> [{file, doc}]), apps (repo -> [names]; runL4 hands over its example apps), logDir, now.
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
@@ -164,6 +164,7 @@ export function runParity(repo, deps = {}) {
   const log = path.join(logDir, `${STEP_NAME}-${t0}.log`);
   const docker = deps.docker ?? { version: dockerVersion, run: dockerRun, rm: containerRm };
   const plan = { ...parityPlan({ workflows: (deps.workflows ?? readWorkflows)(repo), apps: (deps.apps ?? (() => []))(repo) }), specs: [...(deps.specs ?? [])] };
+  if (deps.select) plan.steps = plan.steps.filter((step, index, all) => deps.select(step, index, all));
   const result = (ok, why, extra = {}) => ({ name: STEP_NAME, ok, log, ms: now() - t0, skips: [], image: plan.image, steps: plan.steps.map((s) => s.name), skipped: plan.skipped, ...(why && { why }), ...extra });
   const refuse = (why) => { fs.writeFileSync(log, `${why}\n`); return result(false, why); };
 

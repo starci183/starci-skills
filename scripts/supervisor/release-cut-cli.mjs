@@ -5,15 +5,16 @@ import process from 'node:process';
 import { isMain } from '../lib/is-main.mjs';
 import { cutRelease } from './release-cut.mjs';
 
-const VALUE_FLAGS = new Set(['--repo', '--remote', '--branch', '--tag']);
+const VALUE_FLAGS = new Set(['--repo', '--remote', '--branch', '--tag', '--rows']);
 
-/** Parse `[--repo <dir>] [--remote <name>] [--branch <name>] [--tag <v*>] [--plan] [--json]`; a bad argument is an Error. */
+/** Parse `[--repo <dir>] [--remote <name>] [--branch <name>] [--tag <v*>] [--rows <row,row>] [--no-reuse] [--plan] [--json]`; a bad argument is an Error. */
 export function parseArgs(argv) {
   const out = { json: false };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--json') { out.json = true; continue; }
     if (arg === '--plan') { out.plan = true; continue; }
+    if (arg === '--no-reuse') { out['no-reuse'] = true; continue; }
     if (!VALUE_FLAGS.has(arg)) throw new Error(`unknown argument ${arg}`);
     const value = argv[i + 1];
     if (value === undefined || value.startsWith('--')) throw new Error(`${arg} needs a value`);
@@ -30,7 +31,7 @@ export async function main(argv = process.argv.slice(2), io = {}) {
   let options;
   try { options = parseArgs(argv); } catch (error) { fail(`starci release cut: ${error.message}\n`); return 2; }
   const cut = io.cutRelease ?? cutRelease;
-  const result = await cut({ repo: path.resolve(options.repo ?? process.cwd()), remote: options.remote, branch: options.branch, tag: options.tag ?? null, plan: options.plan === true });
+  const result = await cut({ repo: path.resolve(options.repo ?? process.cwd()), remote: options.remote, branch: options.branch, tag: options.tag ?? null, plan: options.plan === true, rows: options.rows ? options.rows.split(',').map((row) => row.trim()).filter(Boolean) : null, reuse: options['no-reuse'] !== true });
   let output;
   if (options.json) output = `${JSON.stringify(result)}\n`;
   else {

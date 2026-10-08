@@ -933,6 +933,8 @@ complete -c starci -n '__starci_using_command release cut' -l remote -r -d 'the 
 complete -c starci -n '__starci_using_command release cut' -l branch -r -d 'the release branch (default main)'
 complete -c starci -n '__starci_using_command release cut' -l plan -d 'report what the cut would run and require, and stop; it runs nothing'
 complete -c starci -n '__starci_using_command release cut' -l tag -r -d 'the release tag v* to push (default is the one new annotated v* tag on HEAD)'
+complete -c starci -n '__starci_using_command release cut' -l rows -r -d 're-run only these rows (comma separated, names as --plan lists them) on the SAME commit and complete the record when every other row is already green on it; a row that is not green there refuses the cut'
+complete -c starci -n '__starci_using_command release cut' -l no-reuse -d 'run every row; stand in for none from an earlier commit or an earlier cut of this one'
 complete -c starci -n '__starci_using_command release env-test' -l lane -d 'a lane clone is no Orca terminal: leave out STARCI_REQUIRE_ORCA_LIVE and the host check, keep everything else of the cut'
 complete -c starci -n '__starci_using_command release env-test' -l reuse-installs -d 'keep an example app whose node_modules exists instead of a fresh npm ci'
 complete -c starci -n '__starci_using_command release images' -l app -r -d 'app root to prove (default is the current directory)'

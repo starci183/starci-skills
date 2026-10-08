@@ -6,7 +6,8 @@
 //   planOf              `starci release cut --plan`: what the cut would run and push, and what the pre-push hook will then require. Nothing is run,
 //                       tagged or pushed.
 import { releaseFindings, RECEIPT_STEPS } from '../guards/release-definition.mjs';
-import { exampleApps, planL4 } from './release-l4.mjs';
+import { exampleApps } from './release-l4.mjs';
+import { decisionLines } from './release-cut-rows.mjs';
 import { sonarCloudFindings } from './release-sonarcloud.mjs';
 import { buildPlan, planSummary } from '../gates/release-plan.mjs';
 import { npmRegistry } from '../gates/release-registry.mjs';
@@ -42,15 +43,16 @@ export function publishPlanRefusal({ repo, deps = {} }) {
   return { verdict: 'publish-plan', why: `the publish plan (starci release check) is not clean: ${findings.join('; ')}`, findings };
 }
 
-/** The refusal of a cut before any suite runs: the release definition, the publish plan, then SonarCloud; null when none refuses. */
-export async function preSuiteRefusal({ repo, run, cwd, head, remote, branch, tag, deps = {} }) {
-  return definitionRefusal({ run, cwd, head, remote, branch, tag, deps }) ?? publishPlanRefusal({ repo, deps }) ?? await sonarCloudRefusal({ repo, deps });
+/** The refusal of a cut before any suite runs: the release definition, the publish plan, then SonarCloud (only when a Sonar proof will run); null when none refuses. */
+export async function preSuiteRefusal({ repo, run, cwd, head, remote, branch, tag, deps = {}, sonar = true }) {
+  return definitionRefusal({ run, cwd, head, remote, branch, tag, deps }) ?? publishPlanRefusal({ repo, deps }) ?? (sonar ? await sonarCloudRefusal({ repo, deps }) : null);
 }
 
-/** The result of `release cut --plan`: the steps the cut runs on this commit, the push it makes, the record the pre-push hook then asks for. */
-export function planOf({ repo, head, tag, remote, branch, out }) {
-  const l4 = planL4(repo);
-  const steps = [...l4.steps.map((s) => s.name), ...l4.proofs, ...(l4.linux ? ['linux parity'] : [])];
-  return { ...out, ok: true, verdict: 'plan', head, tag, steps, notPlanned: l4.notPlanned, receiptSteps: [...RECEIPT_STEPS],
-    why: `would run ${steps.length} step(s) on ${head.slice(0, 9)} under the host lock, write the release record of that commit (green rows required: ${RECEIPT_STEPS.join(', ')}), create the annotated tag ${tag}, and push ${branch} with it to ${remote} in one atomic push; nothing was run, tagged or pushed` };
+/** The result of `release cut --plan`: every row of the cut with what happens to it (run, or stand in from this commit or an earlier one, and why), the push it makes, the record the pre-push hook then asks for. */
+export function planOf({ head, tag, remote, branch, out, selection }) {
+  const l4 = selection.plan;
+  const rows = decisionLines(selection);
+  const running = rows.filter((row) => row.action === 'run');
+  return { ...out, ok: true, verdict: 'plan', head, tag, steps: selection.names, rows, notPlanned: l4.notPlanned, receiptSteps: [...RECEIPT_STEPS],
+    why: `would run ${running.length} of ${rows.length} row(s) on ${head.slice(0, 9)} under the host lock (${rows.length - running.length} stand in from green runs, listed in rows), write the release record of that commit (rows RUN on it, never reused: ${RECEIPT_STEPS.join(', ')}), create the annotated tag ${tag}, and push ${branch} with it to ${remote} in one atomic push; nothing was run, tagged or pushed` };
 }

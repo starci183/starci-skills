@@ -318,7 +318,7 @@ test('--plan reports what the cut would run and require and runs, tags and pushe
   const planned = (await cut(fx, { plan: true }, { suite: () => { suites += 1; return green(); } }));
   assert.deepEqual([planned.ok, planned.verdict, planned.tag], [true, 'plan', TAG], JSON.stringify(planned));
   assert.deepEqual(planned.receiptSteps, ['npm test', 'npm run test:packages', 'npm run check']);
-  assert.ok(planned.steps.length > 0 && planned.steps.includes('linux parity'), planned.steps.join(', '));
+  assert.ok(planned.steps.length > 0 && planned.steps.includes('linux-parity'), planned.steps.join(', '));
   assert.match(planned.why, /nothing was run, tagged or pushed/);
   assert.equal(suites, 0);
   assert.equal(git(fx.repo, 'tag', '-l'), '', 'no tag was created');
