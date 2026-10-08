@@ -3779,6 +3779,7 @@ run the in-runtime land gate; it fast-forwards local main and never pushes
 | `--full-by-push-git` | boolean |  |
 | `--lane` | string |  |
 | `--notify` | boolean |  |
+| `--foreground` | boolean |  |
 | `--status` | boolean |  |
 | `--wait-ms` | number |  |
 

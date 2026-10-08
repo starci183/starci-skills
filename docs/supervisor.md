@@ -203,6 +203,7 @@ playbooks and mechanism owners rather than duplicating their defaults.
   - workflow-conflict (policy row peer-dependency): two workflows want the same files, ports or foundation: the Supervisor decides who goes first (menu workflow-conflict)
   - resource-division (policy row pool-full): provider capacity is shared by every workflow: the Supervisor divides it (menu resource-division)
   - runtime-defect (policy row runtime-defect): a suspected runtime defect: the Supervisor gives the Kernel a workaround and records the defect for Debug (menu runtime-defect)
+  - kernel-escape (policy row menu-escape): a Kernel whose menu offered no fitting option escaped it with none-fits: the Supervisor answers with a ruling to the Kernel or records the defect for Debug (menu kernel-escape)
 - A bug in this role (the chain neither fixes nor works around it; Debug removes it with a change to .claude) is detected by:
   - the Supervisor runs a command that is not a starci verb or a pure read: SUPERVISOR_STARCI_ONLY from the seat guard
   - the Supervisor uses a verb the runtime-driven menu replaces: SUPERVISOR_USE_DECIDE from the seat guard

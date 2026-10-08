@@ -24,8 +24,35 @@ routes:
   - {kind: gate-ruling, when: gateIncident}
   - {kind: workflow-conflict, diKinds: [cross-workflow, deadlock]}
   - {kind: resource-division, diKinds: [cap-starved, quota-exhausted]}
+  - {kind: retry-cap, diKinds: [retry-decision]}
+  - {kind: undispatched, diKinds: [ready-undispatched]}
+  - {kind: orphaned, diKinds: [orphaned-frontier]}
   - {kind: kernel-escape, diKinds: [menu-escape], keyPrefix: 'escalated:'}
   - {kind: runtime-defect, default: true}
+
+# The OWED classes of modules/supervisor/supervise.yaml mission.classes and how each reaches this menu: `direct` = the Decision Item kind a controller
+# opens for the Supervisor; `ladder` = the Kernel's Decision Item kind that climbs to the Supervisor when the Kernel leaves it past its bound (it
+# arrives as `escalated:` and takes the route of its kind, else kernel-escape); `gate` = it is answered as the supervisor-gate it belongs to. Every class
+# of supervise.yaml has a row here (tests/supervisor/supervisor-owed-menu.spec.mjs), so a class added there without a menu path is red.
+owedClasses:
+  progress-stall: {reaches: direct, diKind: progress-stall}
+  kernel-proposal: {reaches: direct, diKind: kernel-proposal}
+  runtime-defect: {reaches: direct, diKind: runtime-defect}
+  fixed-defect: {reaches: gate, diKind: runtime-defect}
+  retry-cap: {reaches: direct, diKind: retry-decision}
+  stale-gate: {reaches: ladder, diKind: stale-gate}
+  owner-gate-no-ask: {reaches: gate, diKind: runtime-defect}
+  owner-ask: {reaches: ladder, diKind: worker-question}
+  peer-wait: {reaches: ladder, diKind: stale-peer-wait}
+  unread-peer: {reaches: ladder, diKind: unread-peer}
+  undispatched: {reaches: direct, diKind: ready-undispatched}
+  dead-worker: {reaches: ladder, diKind: retry-decision}
+  dead-kernel: {reaches: direct, diKind: seat-unrecoverable}
+  orphaned: {reaches: direct, diKind: orphaned-frontier}
+  stalled: {reaches: direct, diKind: progress-stall}
+  contract-stale: {reaches: ladder, diKind: rev-ack}
+  experiment-revert: {reaches: direct, diKind: experiment-revert}
+  push-refused: {reaches: direct, diKind: push-refused}
 
 # Dispatch of the weight a prioritised workflow receives.
 priority:
@@ -62,6 +89,27 @@ kinds:
     options:
       - {choice: rule, text: ruling, steps: [{run: supervisor notify, args: {repo: $repo, workflow: $workflow, text: $text, item: $key}}], effect: "sends --text to the workflow's Kernel as a durable Supervisor ruling"}
       - {choice: record-defect, text: cause, steps: [{run: supervisor actions, args: {_: record, item: "runtime-defect:$text", action: recorded, reason: $reason, workflow: $workflow, refs: $refs}}], effect: "records the runtime defect (--text is a short cause slug) in the defect queue for Debug"}
+
+  - id: retry-cap
+    source: "Decision Item retry-decision: a retry loop or retry cap that stands past its critical bound (stuck retry-cap), or the Kernel's own retry-decision left past its bound"
+    question: "{summary}"
+    options:
+      - {choice: rule, text: ruling, steps: [{run: supervisor notify, args: {repo: $repo, workflow: $workflow, text: $text, item: $key}}], effect: "sends --text to the workflow's Kernel as a durable Supervisor ruling: retry with the failure fed back, switch agent, or re-cut the leg; never the same shape again"}
+      - {choice: record-defect, text: cause, steps: [{run: supervisor actions, args: {_: record, item: "runtime-defect:$text", action: recorded, reason: $reason, workflow: $workflow, refs: $refs}}], effect: "records the runtime cause (--text is a short cause slug) in the defect queue for Debug and closes the item"}
+
+  - id: undispatched
+    source: "Decision Item ready-undispatched: ready work stands queued past its critical bound although the Kernel's seat is alive"
+    question: "{summary}"
+    options:
+      - {choice: rule, text: ruling, steps: [{run: supervisor notify, args: {repo: $repo, workflow: $workflow, text: $text, item: $key}}], effect: "sends --text to the workflow's Kernel as a durable Supervisor ruling: dispatch the ready work now or name why it waits"}
+      - {choice: record-defect, text: cause, steps: [{run: supervisor actions, args: {_: record, item: "runtime-defect:$text", action: recorded, reason: $reason, workflow: $workflow, refs: $refs}}], effect: "records the runtime defect (the runtime dispatches ready work; the same item after a delivered wake is one) for Debug and closes the item"}
+
+  - id: orphaned
+    source: "Decision Item orphaned-frontier: a frontier with nothing open and no next step stands past the Supervisor grace"
+    question: "{summary}"
+    options:
+      - {choice: rule, text: ruling, steps: [{run: supervisor notify, args: {repo: $repo, workflow: $workflow, text: $text, item: $key}}], effect: "sends --text to the workflow's Kernel as a durable Supervisor ruling: name the next leg, or revise the plan"}
+      - {choice: record-defect, text: cause, steps: [{run: supervisor actions, args: {_: record, item: "runtime-defect:$text", action: recorded, reason: $reason, workflow: $workflow, refs: $refs}}], effect: "records the runtime defect (an orphan that stays orphaned) for Debug and closes the item"}
 
   - id: runtime-defect
     source: "every other Decision Item decided by the Supervisor: a defect of the runtime, a seat or a push"
