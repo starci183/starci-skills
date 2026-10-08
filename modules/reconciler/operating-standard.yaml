@@ -175,6 +175,7 @@ departures:
   kernel-idle: {role: kernel, duty: never, registry: null}
   kernel-wake-budget: {role: kernel, duty: bound, registry: kernel-wake-usage-attribution-coarse}
   supervisor-wake-budget: {role: supervisor, duty: bound, registry: supervisor-wake-budget-unmeasured}
+  seat-empty-wakes: {role: runtime, duty: does, registry: seat-cost-exceeds-decisions}
   op-owner-without-ask: {role: kernel, duty: reportsUpWhen, registry: null}
   op-step-missing: {role: kernel, duty: never, registry: null}
   settle-overdue-kernel: {role: kernel, duty: never, registry: null}

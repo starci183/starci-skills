@@ -1,0 +1,60 @@
+# Numbers and tables of the seat cost view (scripts/kernel/seat-wakes.mjs, scripts/reconciler/seat-cost.mjs): what a long-lived seat (a
+# Kernel, the Supervisor) costs against the decisions it made. A seat costs in proportion to its decisions: a wake that finds nothing to
+# decide re-reads the whole session for nothing, so the runtime counts those wakes per seat and cause, prints them in `starci reconciler
+# status` and `starci debug digest`, and a seat over the bound below is a departure of the RUNTIME (it woke a seat with an empty menu), never
+# of the seat. Measured 2026-10-08 on the first real workflows (ledger copies a8c, seat transcripts): the Supervisor seat 307 M tokens,
+# Kernels 235 M against 102 M of op work; 38 percent of Kernel wakes and 44 percent of Supervisor wakes ended with no decision.
+#
+# emptyWakeSharePercent: the share of a seat's wakes that ended with no decision above which the digest names the runtime. minWakes: a seat with
+#   fewer wakes is not judged. wakeActMs: a wake followed by another within this time shares the next wake's decisions (the seat answers once).
+# kernel.wakes: the ledger event of a delivered Kernel wake and the cause it names (the `transition` event names its transition in payload.transition,
+#   the first word before `:`). kernel.skipped: the event the runtime writes when it withholds a wake because the menu holds no item (payload.cause).
+# kernel.work: the events a Kernel seat authors by deciding; `by` limits a kind to rows whose payload.by starts with it (the runtime writes
+#   decision rows too). supervisor.*: the same for the Supervisor in machine.sqlite (sup_events; replies are sup_messages direction out).
+# rotation: a seat's context grows by a fixed amount per turn and every turn re-reads all of it, so the cost of a session grows with the square
+#   of its turns (measured: 50 k tokens at the first turn, 700 k to 800 k at turn 230 to 620, no compaction). A Kernel that has received
+#   `afterWakes` wakes or spent `afterTokens` tokens since its boot is replaced at its next idle wake by a fresh seat that reads the ledger.
+# statusBounds: the size a bound seat reads per status call: the menu items printed (the rest are counted, with the way to the full view) and the
+#   characters of the text. The Kernel seat's default view is the one-line state and the Decide section; the full view stays behind `starci kernel status
+#   --full`. Checked by tests/kernel/seat-cost.spec.mjs on a large fixture.
+emptyWakeSharePercent: 35
+minWakes: 6
+wakeActMs: 120000
+kernel:
+  wakes:
+    kernel-woken: stall
+    kernel-transition-woken: transition
+    decision-doorbell: doorbell
+  skipped: kernel-wake-skipped
+  work:
+    - {kind: kernel-decision}
+    - {kind: kernel-decision-result}
+    - {kind: kernel-proposal}
+    - {kind: kernel-graph-edit}
+    - {kind: kernel-op-override}
+    - {kind: kernel-dispatch-push}
+    - {kind: route-decided}
+    - {kind: report-consumed}
+    - {kind: op-worker-nudged}
+    - {kind: worker-done-sent}
+    - {kind: decision}
+    - {kind: decision-resolved, by: "kernel:"}
+    - {kind: decision-claimed, by: "kernel:"}
+supervisor:
+  wake: supervisor-wake
+  work:
+    - supervisor-action
+    - sup-decision-claimed
+    - sup-decision-resolved
+    - worker-job-created
+    - sup-job-cancelled
+    - supervisor-lesson
+    - supervisor-proposal
+    - supervisor-experiment
+rotation:
+  kernel: {afterWakes: 8, afterTokens: 12000000, event: kernel-rotated, bootEvents: [kernel-booted, kernel-restarted]}
+statusBounds:
+  kernelMenuItems: 6
+  kernelTextChars: 3500
+  supervisorMenuItems: 6
+  supervisorTextChars: 3500

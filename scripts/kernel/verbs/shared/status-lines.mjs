@@ -5,6 +5,7 @@ import { nameWithId } from '../../../lib/display-names.mjs';
 import { shortWorkflow } from '../../dependency-graph.mjs';
 import { stuckLine } from '../../../machine/op-metrics.mjs';
 import { menuLines } from './status-menu.mjs';
+import { seatCostConfig } from '../../seat-wakes.mjs';
 
 const headline = (s, out) => {
   const mark = s.actionable ? ' ACTIONABLE' : ' (no actionable work)';
@@ -166,6 +167,24 @@ const queuedLine = (item) => {
 const staleLine = (s, item) => {
   const held = item.heldBy ? ` (waits on seam ${item.heldBy})` : '';
   return `  ${s.internals.staleOperationLine(item)}${held}`;
+};
+
+/**
+ * The bound Kernel seat's default view: the one-line state, the Decide section (at most statusBounds.kernelMenuItems items, the rest counted) and,
+ * when the revision is stale or nothing waits, the line that says so. Everything else is `starci kernel status --full`.
+ */
+export const seatStatusText = (s, out) => {
+  const bounds = seatCostConfig().statusBounds;
+  const total = s.menu?.length ?? 0;
+  const shown = { ...s, menu: (s.menu ?? []).slice(0, bounds.kernelMenuItems) };
+  const decide = menuLines(shown).map((line) => line.replace(/^Decide \(\d+\)/, `Decide (${total})`));
+  const text = [headline(s, out), ...decide,
+    ...(total > shown.menu.length ? [`  +${total - shown.menu.length} more item(s): answer these first, then read the next with starci kernel status`] : []),
+    ...(s.kernelRev && (s.kernelRev.stale || s.kernelRev.unacked) ? [kernelRevLine(s)] : []),
+    ...(s.frontier.reason && !total ? [`  reason: ${s.frontier.reason}`] : []),
+    '  full view: starci kernel status --full'].join('\n');
+  const cut = '\n  ... (cut: starci kernel status --full)';
+  return text.length > bounds.kernelTextChars ? `${text.slice(0, bounds.kernelTextChars - cut.length)}${cut}` : text;
 };
 
 /** The joined status text: every section in the order the Kernel reads them. */

@@ -8,6 +8,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { clipLine } from '../lib/clip.mjs';
+import { seatCostConfig } from '../kernel/seat-wakes.mjs';
 
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 let cached = null;
@@ -81,6 +82,8 @@ const optionLine = (option) => [option.choice, option.text ? `--text <${option.t
 /** The menu as the lines the seat reads: each item, its options and the decision verb's spelling. */
 export function supervisorMenuLines(menu) {
   if (!menu.length) return ['Decide (0): nothing waits on the Supervisor; yield until the runtime wakes it.'];
+  const cap = seatCostConfig().statusBounds.supervisorMenuItems;
   return [`Decide (${menu.length}): answer with starci supervisor decide --item <id> --choice <choice> --reason <why> [--text <input>]`,
-    ...menu.flatMap((item) => [` ${item.id} [${item.kind}] ${clipLine(item.question, 160)}`, `   choices: ${item.options.map(optionLine).join(' | ')}`])];
+    ...menu.slice(0, cap).flatMap((item) => [` ${item.id} [${item.kind}] ${clipLine(item.question, 160)}`, `   choices: ${item.options.map(optionLine).join(' | ')}`]),
+    ...(menu.length > cap ? [` +${menu.length - cap} more item(s): answer these first, then read the next with starci supervisor status`] : [])];
 }

@@ -46,6 +46,7 @@ import { arg as argvValue } from '../lib/cli-arg.mjs';
 import { createKernelTick } from './kernel-watchdog-tick.mjs';
 import { workflowSender } from './workflow-startup.mjs';
 import { seatWakeOf } from './op-incident-policy.mjs';
+import { createKernelRotation } from './seat-rotation.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const apiFile = path.join(skillRoot, 'scripts', 'kernel', 'cli.mjs');
@@ -349,7 +350,8 @@ const finalKernelAction = (state) => {
   if (state === 'active') return 'active';
   return state === 'wedged' ? 'kernel-wedged' : 'observed';
 };
-const kernelTick = createKernelTick({ api, workflowId, repair, lostSeatWorker, exitedTwice, stopAndRelease, replaceKernel,
+const kernelRotation = createKernelRotation({ workflowId, openLedger: withKernelLedger, close: closeKernelTerminal, replace: replaceKernel, sender: launchableSender });
+const kernelTick = createKernelTick({ api, kernelRotation, workflowId, repair, lostSeatWorker, exitedTwice, stopAndRelease, replaceKernel,
   workerShow, DEAD_WORKER_STATE, settledKernelVerdict, DEAD_VERDICTS, terminalRead, classifyKernelScreen, outputAgeOf,
   staleAwareState, ACTIVE_STALE_MS, exitedAgentPromptRow, DEATH_SETTLE_MS, sleepSync, kernelWakeFailures,
   wakeFailuresProveDead, replaceWakeDeadKernel, sendEnterWithProof, recordKernelWakeFailed, deliveryFieldsOf,

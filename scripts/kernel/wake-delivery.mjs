@@ -59,6 +59,7 @@ import { clearDraft, probeDraft, sameDraft, DRAFT_STALE, CLEAR_DRAFT_INTERVAL_MS
 import { parseJson } from '../lib/json.mjs';
 import { kernelRevWakeLine } from './runtime-rev.mjs';
 import { boundedWake } from './wake-bound.mjs';
+import { gatedWake } from './wake-menu-gate.mjs';
 
 const PROVEN = new Set(['delivered', 'queued']);
 const WAITING_FOR_ENTER = new Set(['staged-input', 'queued-input']);
@@ -469,7 +470,8 @@ export const transitionWakeText = (workflowId, transition, lines) =>
  * terminal or event failure is the answer, never thrown into the caller's committed transaction.
  */
 export function wakeKernelForTransition(ledger, { workflowId, transition, ids = {}, lines, deps = {} }) {
-  const woke = wakeKernel({ db: ledger.db, workflowId, text: transitionWakeText(workflowId, transition, lines), pending: 'enter', deps });
+  const send = () => wakeKernel({ db: ledger.db, workflowId, text: transitionWakeText(workflowId, transition, lines), pending: 'enter', deps });
+  const { answer: woke } = gatedWake(ledger, { workflowId, cause: `transition:${String(transition).split(':')[0]}`, send, deps });
   if (woke.action !== 'kernel-woken') {
     // A refused wake send is recorded kernel-wake-unwritable (the kernel-side op-worker-unwritable),
     // so the watchdog's next tick closes the stale incarnation instead of typing into it again.

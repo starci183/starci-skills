@@ -493,7 +493,9 @@ export async function ringDoorbell(first = {}, second = null) {
 
 /** ringDoorbell's synchronous core over an open write handle; `wake` is wake-delivery.mjs wakeKernel (or a spec stub). */
 export function ringDoorbellWith({ ledger, workflowId, wake, now = Date.now(), minGapMs = RING_MIN_GAP_MS, repo = null }) {
-  const open = listDecisions(ledger.db, { workflowId, decider: 'kernel', now }).filter((d) => d.status === 'open').length;
+  // The doorbell rings for what the Kernel's menu lists: an open item that is still live (a settled job's item waits no more).
+  const pending = pendingJobsOf(ledger.db, workflowId, now);
+  const open = listDecisions(ledger.db, { workflowId, decider: 'kernel', now }).filter((d) => d.status === 'open' && liveFor(d, pending, ledger.db)).length;
   const last = lastRingOf(ledger.db, RING_SCOPE, workflowId);
   // The oldest open decision in copy-paste form rides on the ring, so the Kernel only has to pick one and run it.
   let top = null;

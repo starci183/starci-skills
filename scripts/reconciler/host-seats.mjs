@@ -5,7 +5,7 @@ import { holdSummary } from '../kernel/start-hold.mjs';
 export function seatStateOf(action) {
   if (['finished', 'archived'].includes(action)) return 'vacant';
   if (['restart-needed', 'agent-exit-unconfirmed', 'terminal-unverified', 'terminal-unreadable'].includes(action)) return 'suspect';
-  if (action === 'restarted') return 'reserving';
+  if (['restarted', 'rotated'].includes(action)) return 'reserving';
   if (action === 'start-held') return 'quarantined';
   if (['restart-failed', 'restart-blocked', 'kernel-terminal-close-failed'].includes(action)) return 'replacing';
   if (action === 'host-unavailable') return 'hostOutage';

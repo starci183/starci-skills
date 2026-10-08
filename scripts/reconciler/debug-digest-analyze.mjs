@@ -8,6 +8,7 @@ import { classifyAll } from './debug-verdicts.mjs';
 import { roleRows } from './debug-roles.mjs';
 import { loadQuestions, answerQuestions, standingOf } from './debug-questions.mjs';
 import { exceededWakes, supervisorWakeBudget, wakeBudget } from '../kernel/wake-budget.mjs';
+import { seatsOverEmptyBound } from './seat-cost.mjs';
 
 const MIN = 60_000;
 const LIVE_JOB = new Set(['leased', 'running', 'answering', 'reported', 'deciding', 'effect_unknown']);
@@ -72,7 +73,7 @@ function supervisorSection({ snapshot }) {
   return { enabled: supervisor.enabled, seat: view, health: supervisor.health,
     lastWakeAgeMs: supervisor.lastWakeAt ? now - Number(supervisor.lastWakeAt) : null,
     openDecisions: supervisor.decisions.length, dueDecisions, staleGates: dueDecisions.filter((d) => d.gate),
-    overBudgetWakes: exceededWakes(supervisor.wakes ?? [], supervisorWakeBudget()) };
+    overBudgetWakes: exceededWakes(supervisor.wakes ?? [], supervisorWakeBudget()), seatCost: supervisor.seatCost ?? null };
 }
 
 function seatProblem(section, n) {
@@ -89,8 +90,14 @@ function wakeBudgetProblem(section) {
   return problem('supervisor', 1, 'supervisor-wake-budget', 'supervisor-wake-budget', { turns: worst.turns, tokens: worst.tokens, wakes: section.overBudgetWakes.length, budgetTokens: supervisorWakeBudget().tokens }, section.overBudgetWakes);
 }
 
+/** A seat woken with an empty menu more often than the declared bound is a departure of the runtime that woke it (never of the seat). */
+function emptyWakeProblem(seatCost, name, key) {
+  if (!seatCost || !seatsOverEmptyBound([seatCost]).length) return null;
+  return problem('runtime', 1, `seat-empty-wakes-${key}`, 'seat-empty-wakes', { name, empty: seatCost.emptyWakes, wakes: seatCost.wakes, percent: seatCost.emptySharePercent }, seatCost);
+}
+
 function supervisorProblems(section, n) {
-  const out = [seatProblem(section, n), wakeBudgetProblem(section)];
+  const out = [seatProblem(section, n), wakeBudgetProblem(section), emptyWakeProblem(section.seatCost, 'the Supervisor', 'supervisor')];
   for (const d of section.dueDecisions) {
     out.push(problem('supervisor', d.gate ? n.staleGateBlocks : 1, `di-${d.id}`, d.gate ? 'gate-stale' : 'decision-overdue',
       { kind: d.kind, decider: d.decider, min: minutes(d.overdueMs), summary: d.summary ?? '' }, d));
@@ -172,7 +179,7 @@ function kernelSection(workflow, ctx) {
     ackedRev: rev?.acked ?? null, currentRev: rev?.current ?? null, revStale: rev?.stale === true, filesBehind: rev?.fileCount ?? 0,
     frontierState: frontier.state ?? null, readyWork: ready,
     idleWithReady: ready > 0 && idle && wakeAgeMs !== null && wakeAgeMs > ctx.n.kernelIdleWakeMs,
-    overBudgetWakes: exceededWakes(workflow.kernelWakes ?? [], wakeBudget()) };
+    overBudgetWakes: exceededWakes(workflow.kernelWakes ?? [], wakeBudget()), seatCost: workflow.seatCost ?? null };
 }
 
 function kernelProblems(view, n) {
@@ -182,6 +189,8 @@ function kernelProblems(view, n) {
   if (kernel.revStale) out.push(problem('kernel', n.revDriftBlocks, `kernel-rev-${id}`, 'kernel-rev',
     { name, acked: String(kernel.ackedRev).slice(0, 9), current: String(kernel.currentRev).slice(0, 9), files: kernel.filesBehind }, kernel));
   if (kernel.idleWithReady) out.push(problem('kernel', kernel.readyWork, `kernel-idle-${id}`, 'kernel-idle', { name, ready: kernel.readyWork, min: minutes(kernel.lastWakeAgeMs) }, kernel));
+  const empty = emptyWakeProblem(kernel.seatCost, `the Kernel of ${name}`, id);
+  if (empty) out.push(empty);
   const worst = kernel.overBudgetWakes.at(-1);
   if (worst) out.push(problem('kernel', 1, `kernel-wake-budget-${id}`, 'kernel-wake-budget', { name, turns: worst.turns, tokens: worst.tokens, wakes: kernel.overBudgetWakes.length, budgetTurns: wakeBudget().turns, budgetTokens: wakeBudget().tokens }, kernel.overBudgetWakes));
   return out;

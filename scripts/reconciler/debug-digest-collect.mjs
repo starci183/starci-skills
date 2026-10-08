@@ -12,6 +12,7 @@ import { machineFacts, refusalFacts } from './debug-digest-machine.mjs';
 import { attemptFacts, eventFacts, historyFacts } from './debug-digest-ledger.mjs';
 import { registryFacts, endCriteria } from './debug-docs.mjs';
 import { wakeUsageOf } from '../kernel/wake-budget.mjs';
+import { kernelSeatOf } from './seat-cost.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const OPEN_PHASES = new Set(['queued', 'running']);
@@ -37,7 +38,7 @@ export function ledgerFacts(file, workflowIds = null) {
         incidents: db.prepare("SELECT * FROM incidents WHERE workflow_id=? AND status='open'").all(w.workflow_id).map(incidentOf),
         decisions: db.prepare("SELECT * FROM decision_items WHERE workflow_id=? AND status='open'").all(w.workflow_id).map(decisionOf),
         kernelJob: kernelJob ? { status: kernelJob.status, updatedAt: kernelJob.updated_at } : null,
-        kernelSignal: parseJsonOr(signal?.value_json, null), lastKernelWakeAt: woken, kernelWakes: wakeUsageOf(db, w.workflow_id) };
+        kernelSignal: parseJsonOr(signal?.value_json, null), lastKernelWakeAt: woken, kernelWakes: wakeUsageOf(db, w.workflow_id), seatCost: kernelSeatOf(db, { workflowId: w.workflow_id, name: w.display_name ?? w.title ?? w.workflow_id }) };
     });
   } finally { db.close(); }
 }

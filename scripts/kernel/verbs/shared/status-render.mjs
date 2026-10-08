@@ -26,7 +26,7 @@ import { settlePhase } from './status-settle.mjs';
 import { driftPhase, handoverPhase } from './status-drift.mjs';
 import { frontierOf, frontierStateOf } from './status-frontier.mjs';
 import { cutPhase, decorPhase } from './status-decor.mjs';
-import { statusText } from './status-lines.mjs';
+import { seatStatusText, statusText } from './status-lines.mjs';
 import { menuPhase } from './status-menu.mjs';
 
 const tryOr = (fn, fallback) => { try { return fn(); } catch { return fallback; } };
@@ -344,5 +344,5 @@ export function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
   out.ramThrottle = s.ramThrottle;
   out.poolLoad = { running: s.poolLoad.byModel, routeHoldMs: s.poolLoad.routeHoldMs };
   if (s.dependencies) out.dependencies = s.dependencies;
-  emit(out, statusText(s, out), args.json);
+  emit(out, s.kernel?.you && !args.full ? seatStatusText(s, out) : statusText(s, out), args.json);
 }

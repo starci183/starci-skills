@@ -2342,6 +2342,7 @@ the live status projection of a workflow (frontier, progress, waits)
 | flag | type | |
 | --- | --- | --- |
 | `--field` | string |  |
+| `--full` | boolean |  |
 | `--repo` | string |  |
 | `--workflow` | string | required |
 

@@ -77,11 +77,22 @@ const wakeResultOf = ({ proof, workflowId, phase, terminal, stale, outputAgeMs, 
   receipt: proof.sent?.receipt ?? null, error: proof.ok ? null : (proof.sent?.error || proof.sendErrorCode || null),
 });
 
+/** The proven liveness wake of an idle Kernel and its tick answer (a refused send on a stale frame replaces the seat). */
+const sendIdleWake = (ctx, idle) => {
+  const { status, workflowId, phase, terminal, stale, outputAgeMs, liveness, dispatch, replaceUnwritableKernel, sendWakeWithProof, wakePromptOf, read,
+    recordKernelWakeFailed, recordKernelWoken, wakeSendRefused, wakeActionOf, deliveryFieldsOf, classified } = ctx;
+  const proof = sendWakeWithProof({ terminal, text: wakePromptOf(workflowId, status.value), before: String(read.screen ?? '') });
+  if (!proof.ok && proof.delivery !== 'agent-exited') recordKernelWakeFailed(terminal, { state: classified.state, sendErrorCode: proof.sendErrorCode ?? null, delivery: proof.delivery ?? null });
+  if (proof.ok) recordKernelWoken(terminal, { delivery: proof.delivery ?? null, idleWakes: idle.wakes + 1 });
+  if (!proof.ok && liveness.staleActive && wakeSendRefused(proof))
+    return replaceUnwritableKernel({ phase, terminal, dispatch, stale, outputAgeMs, proof });
+  return wakeResultOf({ proof, workflowId, phase, terminal, stale, outputAgeMs, wakeActionOf, deliveryFieldsOf });
+};
+
 const idleTurnResult = (ctx) => {
   const { classified, status, repair, workflowId, phase, terminal, stale, outputAgeMs, liveness, lastOutputAt,
     dispatch, kernelWakeRefusedAt, replaceUnwritableKernel, kernelWakeFailures, wakeFailuresProveDead, replaceWakeDeadKernel,
-    kernelIdleWakes, escalateIdleStall, replaceIdleKernel, sendWakeWithProof, wakePromptOf, read, recordKernelWakeFailed,
-    recordKernelWoken, wakeSendRefused, wakeActionOf, deliveryFieldsOf } = ctx;
+    kernelIdleWakes, escalateIdleStall, replaceIdleKernel, kernelRotation } = ctx;
   if (classified.state !== 'turn-idle') return null;
   if (status.value?.frontier?.actionable === false) return { ok: true, workflowId, phase, terminal, action: 'idle-waiting', ...stale, reason: status.value?.frontier?.reason ?? 'frontier not actionable', outputAgeMs };
   if (!repair) return { ok: true, workflowId, phase, terminal, action: 'wake-needed', ...stale, outputAgeMs };
@@ -92,12 +103,9 @@ const idleTurnResult = (ctx) => {
   if (earlier.dead) return replaceWakeDeadKernel({ phase, terminal, dispatch, stale, outputAgeMs, ...earlier });
   const idle = kernelIdleWakes();
   if (idle.due) return idle.replaced ? escalateIdleStall({ phase, terminal, idle, outputAgeMs }) : replaceIdleKernel({ phase, terminal, dispatch, stale, outputAgeMs, idle });
-  const proof = sendWakeWithProof({ terminal, text: wakePromptOf(workflowId, status.value), before: String(read.screen ?? '') });
-  if (!proof.ok && proof.delivery !== 'agent-exited') recordKernelWakeFailed(terminal, { state: classified.state, sendErrorCode: proof.sendErrorCode ?? null, delivery: proof.delivery ?? null });
-  if (proof.ok) recordKernelWoken(terminal, { delivery: proof.delivery ?? null, idleWakes: idle.wakes + 1 });
-  if (!proof.ok && liveness.staleActive && wakeSendRefused(proof))
-    return replaceUnwritableKernel({ phase, terminal, dispatch, stale, outputAgeMs, proof });
-  return wakeResultOf({ proof, workflowId, phase, terminal, stale, outputAgeMs, wakeActionOf, deliveryFieldsOf });
+  const rotation = kernelRotation.due();
+  if (rotation.due) return kernelRotation.rotate({ phase, terminal, dispatch, stale, outputAgeMs, rotation });
+  return sendIdleWake(ctx, idle);
 };
 
 export function createKernelTick(deps) {
