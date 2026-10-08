@@ -913,6 +913,9 @@ moduleLocalDocumentKinds:
   - id: starci/module-kernel-verdict@1
     governs: "What `starci kernel settle` accepts and rejects."
     files: [modules/kernel/verdict-contract.yaml]
+  - id: starci/release-cut@1
+    governs: "The numbers and input sets of `starci release cut`: the L4 schedule pools, the host-budget settings and the row-reuse classes, digests and retention."
+    files: [modules/supervisor/release-cut.yaml]
 
   - id: starci/supervisor@1
     governs: "The Supervisor's duty contract: the decision desk that answers its menu, records runtime defects and changes no runtime code."

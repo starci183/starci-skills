@@ -1,12 +1,12 @@
 // release-l4-offload.mjs - run one blocking release task (a plan step: spawnSync to a log file; the Linux parity container: docker run) in a worker thread, so the rows the schedule
 // (release-l4-schedule.mjs) runs together really run together. The worker (release-l4-worker.mjs) calls the same runStep and runParity the sequential cut called, so a row keeps its own
 // log, its own verdict and its own timing. Returns a promise of the task's result; a worker that dies without a result is an error.
-import { Worker } from 'node:worker_threads';
+import { startWorker } from '../api/node/start-worker.mjs';
 
 /** Run `task` ('step' | 'parity') with the plain-data `payload` in a worker thread: a Promise of its result. */
 export function offload(task, payload) {
   return new Promise((resolve, reject) => {
-    const worker = new Worker(new URL('./release-l4-worker.mjs', import.meta.url), { workerData: { task, payload } });
+    const worker = startWorker(new URL('./release-l4-worker.mjs', import.meta.url), { workerData: { task, payload } });
     let answered = false;
     worker.once('message', (result) => { answered = true; resolve(result); });
     worker.once('error', reject);
