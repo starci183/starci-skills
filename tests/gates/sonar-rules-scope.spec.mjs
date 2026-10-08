@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { analysed, globRegex, inScope, parseProperties, readSonarScope, scopeFiles } from '../../scripts/gates/sonar-rules-scope.mjs';
+import { analysed, inScope, readSonarScope, scopeFiles } from '../../scripts/gates/sonar-rules-scope.mjs';
 import { mkdtemp } from '../helpers/tmpdir.mjs';
 
 const put = (root, relative, text = '') => {
@@ -19,24 +19,6 @@ const PROPERTIES = [
   'sonar.tests=tests',
   '',
 ].join('\n');
-
-test('properties parse as key=value lines and skip comments', () => {
-  assert.deepEqual(parseProperties('# c\na=1\n\nb = x,y\n=bad\n'), { a: '1', b: 'x,y' });
-});
-
-test('globs: ** crosses directories, * and ? stay inside one', () => {
-  assert.ok(globRegex('**/*.mjs').test('a/b/c.mjs'));
-  assert.ok(globRegex('**/*.mjs').test('c.mjs'));
-  assert.ok(!globRegex('**/*.mjs').test('a/c.mjsx'));
-  assert.ok(globRegex('**/dist/**').test('pkg/dist/x/y.mjs'));
-  assert.ok(globRegex('**/dist/**').test('dist/x.mjs'));
-  assert.ok(!globRegex('**/dist/**').test('distant/x.mjs'));
-  assert.ok(globRegex('src/*.mjs').test('src/a.mjs'));
-  assert.ok(!globRegex('src/*.mjs').test('src/sub/a.mjs'));
-  assert.ok(globRegex('a?.mjs').test('ab.mjs'));
-  assert.ok(globRegex('src/generated.mjs').test('src/generated.mjs'));
-  assert.ok(!globRegex('src/generated.mjs').test('src/generatedXmjs'));
-});
 
 test('the scope is read from sonar-project.properties: sources, inclusions, exclusions', (t) => {
   const root = mkdtemp(t, 'starci-sonar-scope-');

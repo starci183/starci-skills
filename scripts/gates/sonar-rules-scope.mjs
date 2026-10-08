@@ -3,43 +3,27 @@
 // sonar.sources lists files and directories; sonar.inclusions keeps the matching ones; sonar.exclusions drops them.
 import fs from 'node:fs';
 import path from 'node:path';
+import { globExpression } from '../lib/glob.mjs';
 import { byCodeUnit } from '../lib/list.mjs';
+import { readProperties } from '../lib/properties.mjs';
 import { walkFiles } from '../lib/walk.mjs';
 
 export const PROPERTIES_FILE = 'sonar-project.properties';
 
 const list = (value) => (value ?? '').split(',').map((entry) => entry.trim()).filter(Boolean);
 
-/** The `key=value` pairs of a properties text; blank lines and `#` comments are skipped. */
-export function parseProperties(text) {
-  const out = {};
-  for (const line of text.split(/\r?\n/)) {
-    const trimmed = line.trim();
-    const at = trimmed.indexOf('=');
-    if (!trimmed || trimmed.startsWith('#') || at < 1) continue;
-    out[trimmed.slice(0, at).trim()] = trimmed.slice(at + 1).trim();
-  }
-  return out;
-}
-
 /** The scope {sources, inclusions, exclusions} declared at `root`, or null when the checkout carries no properties file. */
 export function readSonarScope(root) {
   const file = path.join(root, PROPERTIES_FILE);
   if (!fs.existsSync(file)) return null;
-  const props = parseProperties(fs.readFileSync(file, 'utf8'));
+  const props = readProperties(file);
   return { sources: list(props['sonar.sources']), inclusions: list(props['sonar.inclusions']), exclusions: list(props['sonar.exclusions']) };
 }
 
-const GLOB_TOKENS = /\*\*\/|\/\*\*|\*\*|\*|\?|[.+^${}()|[\]\\]/g;
-const GLOB_PARTS = Object.freeze({ '**/': '(?:.*/)?', '/**': '(?:/.*)?', '**': '.*', '*': '[^/]*', '?': '[^/]' });
-
-/** The anchored regular expression of a Sonar glob (`**` crosses directories, `*` and `?` stay inside one). */
-export const globRegex = (glob) => new RegExp(`^${glob.replaceAll(GLOB_TOKENS, (token) => GLOB_PARTS[token] ?? `\\${token}`)}$`);
-
 /** Whether the posix path `rel` is analysed under `scope` (it is assumed to sit below one of the sources). */
 export function inScope(rel, scope) {
-  const included = !scope.inclusions.length || scope.inclusions.some((glob) => globRegex(glob).test(rel));
-  return included && !scope.exclusions.some((glob) => globRegex(glob).test(rel));
+  const included = !scope.inclusions.length || scope.inclusions.some((glob) => globExpression(glob).test(rel));
+  return included && !scope.exclusions.some((glob) => globExpression(glob).test(rel));
 }
 
 const underSource = (rel, source) => rel === source || rel.startsWith(`${source.replace(/\/$/, '')}/`);
