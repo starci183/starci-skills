@@ -81,6 +81,13 @@ const RUNTIME_OWNED_ROOTS = new Set(['.starciwork', 'runtime', RUNTIME_STATE_DIR
 const SPEC_ROOT = 'tests';
 
 /**
+ * Disposable scratch trees a spec makes at the skill root while it runs (the git-ignored `.gitignore` entries of the same names): a
+ * scaffolded app built inside the checkout so its links resolve. A spec running beside the gate that scans the root would otherwise
+ * find the scratch app's package.json and refuse a clean tree. Only these exact root prefixes are skipped.
+ */
+const SPEC_SCRATCH_PREFIXES = Object.freeze(['.starci-wk-spec-', '.tmp-hfs-fe-build-']);
+
+/**
  * Generated mirrors of runtime files that the published packages carry: scripts/hfs/sync-runtime.mjs writes each
  * tree byte for byte from the runtime (its BUNDLES) and `sync-runtime --check` fails on any missing, stale or extra file.
  * The authored originals stay in the inventory; only these exact skill-root paths are skipped, not a same-named tree elsewhere.
@@ -147,7 +154,7 @@ function loadAllowlist(allowlistFile) {
 
 function shouldSkipDir(relativePosix, name) {
   if (SKIP_DIR_NAMES.has(name)) return true;
-  if (relativePosix === '' && (RUNTIME_OWNED_ROOTS.has(name) || name === SPEC_ROOT)) return true;
+  if (relativePosix === '' && (RUNTIME_OWNED_ROOTS.has(name) || name === SPEC_ROOT || SPEC_SCRATCH_PREFIXES.some((prefix) => name.startsWith(prefix)))) return true;
   if (GENERATED_MIRROR_SET.has(relativePosix ? `${relativePosix}/${name}` : name)) return true;
   if (relativePosix.startsWith('sites/') && (name === '.next' || name === 'out')) return true;
   return false;

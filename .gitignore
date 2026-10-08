@@ -7,6 +7,7 @@ dist/
 # Operational state and disposable runtime specs stay untracked.
 /.starciwork/
 /.starci-wk-spec-*/
+/.tmp-hfs-fe-build-*/
 
 # Curated sample snapshots exclude process-local sidecars and materialized output.
 /examples/.runtimes/*/runtime.sqlite-wal
