@@ -15385,6 +15385,16 @@ RT_IDENTIFIER_UNDECLARED:
   nextStep_vi: "Người giám sát khai báo hoặc import tên đó, truyền nó qua tham số, hoặc xóa chỗ đọc; không thêm ngoại lệ hay che bằng typeof."
   owner: supervisor
   kind: check-finding
+RT_REMOVED_VOCABULARY:
+  title: "Instruction text spells a name the runtime refuses"
+  title_vi: "Văn bản hướng dẫn viết một tên mà runtime từ chối"
+  meaning_vi: "modules/kernel/removed-vocabulary.yaml là danh sách duy nhất các tên đã bị gỡ (khóa config, trường bias định tuyến, verb, cờ, mã, từ vựng), mỗi tên kèm thứ thay thế và bản phát hành đã gỡ nó. Một dòng trong skills/, docs/, README.md, CONTEXT.md, CONTRIBUTING.md, modules/ hoặc knowledge/ viết một tên trong danh sách mà không nằm trong CHANGELOG.md, không nằm trong chính danh sách và không mang dấu [removed-list] là dạy tác tử một cách viết mà runtime sẽ từ chối. Phát hiện nêu tệp:dòng, tên bị gỡ và cách viết thay thế."
+  causes_vi:
+    - "Một skill hay tài liệu còn dạy cách viết cũ sau khi runtime đổi"
+    - "Gỡ hoặc đổi tên một khóa, cờ, verb, trường hay mã mà không thêm mục vào danh sách tên đã gỡ"
+  nextStep_vi: "Người giám sát viết lại dòng theo cách thay thế mà phát hiện nêu; nếu dòng là danh sách các tên đã gỡ, đánh dấu [removed-list]; nếu tên mới bị gỡ, thêm mục vào modules/kernel/removed-vocabulary.yaml trong cùng commit."
+  owner: supervisor
+  kind: check-finding
 DOCKER_PORT_POLICY:
   title: "Docker ownership or published-port policy was refused"
   title_vi: "Chính sách sở hữu Docker hoặc cổng công bố đã từ chối thao tác"

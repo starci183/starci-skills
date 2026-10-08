@@ -40,7 +40,7 @@ Optional keys:
 - `debugLoop` — `{interval?, worktreeLimit?}`: the cadence of the chat `/loop` that runs `starci debug digest`
   (`<n>s`, `<n>m` or `<n>h`, positive; shipped default `10m`) and the positive integer worktree alert threshold of
   `starci debug run core-watch` (shipped default 40). Both keys are optional and read through `engine/config.mjs`
-  `debugLoopSettings`. The removed `debug` and `coreDebug` keys are refused by name.
+  `debugLoopSettings`. The removed `debug` and `coreDebug` keys are refused by name. <!-- [removed-list] -->
 - `specs` — `{harness?, unit?, e2e?}` booleans or null (owner, 2026-09-28 and 2026-09-29; `engine/config.mjs`
   `specsSettings`, defaults in `SPEC_DEFAULTS`); a config without the key gets the defaults, so the shipped example
   carries no block. `harness` (default **false**, touching-only): `.claude` work writes and runs the specs of new or changed
@@ -205,9 +205,10 @@ floors. See [agent admission](agent-admission.md) for the reservation and uncert
 ### Keys of an earlier shape
 
 A `config.yaml` that still holds one of these keys is refused, naming the key and its new place:
+<!-- [removed-list] -->
 `models.pools`, `models.nonOperation`, `models.selection`, `allocation.shares`, `allocation.windowHours`,
 `allocation.preferredProvider`, `allocation.policy`, `allocation.mode`, `kernel.group`, `supervisor.kernel.group`
-(`engine/model-config.mjs` `REMOVED_KEYS`).
+(`modules/kernel/removed-vocabulary.yaml`, the `config-key` entries).
 
 The runtime pin seals the accepted `config.yaml` digest. Config changes apply to future assignments
 through a new pin and an orderly same-id restart or retry boundary; a running dispatch keeps its identity.

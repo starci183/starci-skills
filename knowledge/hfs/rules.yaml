@@ -2014,3 +2014,12 @@ rules:
     failureCodes: ["RT_IDENTIFIER_UNDECLARED"]
     enforcers:
       - {kind: runtime, id: undeclared-identifiers, at: scripts/checks/check-undeclared-identifiers.mjs}
+  - id: R229
+    code: "RT_REMOVED_VOCABULARY"
+    law: "No text an agent or the owner reads teaches a spelling the runtime refuses. The refused names - config keys, routing-bias fields, verbs, flags, codes and vocabulary - are the one list modules/kernel/removed-vocabulary.yaml, each with its replacement and the release that removed it; the config and routing-bias refusals read the same list. Every tracked file of skills/, docs/, README.md, CONTEXT.md, CONTRIBUTING.md, modules/ and knowledge/ (Markdown and yaml) is scanned line by line, and a line that spells a listed name is a finding naming file:line, the name and its replacement, unless the file is the list, CHANGELOG.md, or the line or block carries the [removed-list] marker (a marker alone on a comment line covers the lines up to the next blank one). Removing or renaming a key, flag, verb, field or code adds its entry to the list in the same commit."
+    scope: runtime
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RT_REMOVED_VOCABULARY"]
+    enforcers:
+      - {kind: runtime, id: removed-vocabulary, at: scripts/checks/check-removed-vocabulary.mjs}
