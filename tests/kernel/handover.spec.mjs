@@ -17,6 +17,7 @@ import {proofRepo} from '../helpers/sonar-scan.mjs';
 import {registerWorkflowWorktree} from '../../scripts/kernel/workflow-worktree.mjs';
 import {checkpointOp} from '../../scripts/kernel/workflow-checkpoint.mjs';
 import {fileDispatchContract} from '../helpers/filed-contract.mjs';
+import {allocateDispatchedScratch,releaseDispatchedScratchAfter} from '../helpers/dispatched-scratch.mjs';
 import { recordArtifactProofs } from '../../scripts/kernel/proof-integrity.mjs';
 import { stageBlob, putArtifact, recordCheck } from '../../scripts/machine/evidence-store.mjs';
 import { fileReport } from '../../engine/db/ledger.mjs';
@@ -54,6 +55,7 @@ const OPTIONS=['Duy\u1ec7t - workflow ho\u00e0n t\u1ea5t','G\u00f3p \u00fd / b\u
 const fixture=t=>{
   const repo=fs.mkdtempSync(path.join(os.tmpdir(),'starci-handover-'));
   t.after(()=>fs.rmSync(repo,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
+  releaseDispatchedScratchAfter(t,repo);
   proofRepo(t,repo);
   return repo;
 };
@@ -87,7 +89,7 @@ const seedWorkflow=(repo,wf,{worktree=true}={})=>seed(repo,ledger=>ledger.transa
 function seedJob(ledger,{wf,jobId,op,unitKey=null,status='running',dispatchId=null,result=null,repo=null}){
   const db=ledger.db??ledger,at=Date.now();
   const unitId=unitKey??`unit-${jobId}`;
-  const scratch=dispatchId?fs.mkdtempSync(path.join(os.tmpdir(),'starci-ho-scratch-')):null;
+  const scratch=dispatchId?allocateDispatchedScratch({repo,workflowId:wf,jobId}):null;
   if(!db.prepare('SELECT 1 FROM work_units WHERE workflow_id=? AND unit_id=?').get(wf,unitId))
     createUnit(db,{workflowId:wf,unitId,opId:op,subjectKey:unitId,goalRevision:0,createdAt:at});
   const last=db.prepare('SELECT job_id,try_no,status FROM jobs WHERE workflow_id=? AND unit_id=? ORDER BY try_no DESC LIMIT 1').get(wf,unitId);

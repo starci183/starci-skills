@@ -163,6 +163,7 @@ test('starci kernel report refuses an ask for a declared credential and files an
   for (const key of ['ORCA_TERMINAL_HANDLE', 'STARCI_ROLE', 'STARCI_OP_JOB']) delete env[key];
   const api = (...args) => spawnSync(process.execPath, [path.join(root, 'scripts', 'kernel', 'cli.mjs'), ...args], { cwd: root, encoding: 'utf8', windowsHide: true, timeout: 120000, env });
   const { seedWorkflow } = await import('../helpers/ledger-fixture.mjs');
+  const { dispatchedScratch } = await import('../helpers/dispatched-scratch.mjs');
   const { setJobStatus, startAttempt, writeContract } = await import('../../engine/db/ledger.mjs');
   const seed = (fn) => { const l = openLedger({ file: ledgerFileFor(product) }); try { return fn(l); } finally { l.close(); } };
   const wf = 'wf-starcistacks-ask', op = 'docs.author';
@@ -174,8 +175,7 @@ test('starci kernel report refuses an ask for a declared credential and files an
   assert.equal(enqueued.status, 0, enqueued.stderr);
   const job = JSON.parse(enqueued.stdout).job_id;
   // starci kernel report reads the report only from the attempt's scratch dir (op_attempts.scratch_dir).
-  const scratch = path.join(product, '.starciwork', 'scratch', job);
-  fs.mkdirSync(scratch, { recursive: true });
+  const scratch = dispatchedScratch(t, { repo: product, workflowId: wf, jobId: job });
   seed((l) => {
     l.transaction((db) => {
       setJobStatus(db, { jobId: job, to: 'ready', reason: 'seed' });

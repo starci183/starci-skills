@@ -20,6 +20,7 @@ import { validateConfig } from '../../engine/config.mjs';
 import { repeatedAnswerOf } from '../../scripts/machine/owner-answers.mjs';
 import { buildProduct, layoutCapture, uiSkeleton } from '../fixtures/layout-tree.mjs';
 import { seedWorkflow } from '../helpers/ledger-fixture.mjs';
+import { dispatchedScratch } from '../helpers/dispatched-scratch.mjs';
 
 // A product workflow's brand.decide could not crop the greenfield lockup. The
 // planned layout ui.learning.app-layout was drawn (interface.draw passed) but stayed todo: with candidatesPerScreen 1
@@ -203,17 +204,20 @@ test('a draw-review ask is never auto-accepted: owner-only, owner-requested when
   assert.equal(repeatedAnswerOf(question, answers)?.dispatchId, 'ctx_first');
 });
 
-/** A running interface.draw job bound to a contract admitted at `admittedAt`. */
-const reportScratchOf=p=>{const dir=path.join(p.repo,'.starciwork','scratch','draw-review');fs.mkdirSync(dir,{recursive:true});return dir;};
-function seedDrawJob(p, { wf = 'wf-draw', jobId = 'job-draw-1', attempt = 1, dispatchId = 'ctx_draw_1', admittedAt }) {
+/** A running interface.draw job bound to a contract admitted at `admittedAt`; returns the scratch dispatch allocates
+ * for the job, where the report is written as a worker does. */
+function seedDrawJob(t, p, { wf = 'wf-draw', jobId = 'job-draw-1', attempt = 1, dispatchId = 'ctx_draw_1', admittedAt }) {
   const l = openLedger({ file: ledgerFileFor(p.repo) });
+  let scratch = null;
   try {
       seedWorkflow(l,{id:wf,jobs:[{jobId,opId:'interface.draw',status:'running',dispatchId,
         payload:{opId:'interface.draw',owned_paths:['.starciwork/features/home/ui/**'],orca:{dispatchId}}}]});
       const attemptId=l.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(jobId).attempt_id;
-      l.write.updateAttempt({attemptId,scratchDir:reportScratchOf(p)});
+      scratch=dispatchedScratch(t,{repo:p.repo,workflowId:wf,jobId});
+      l.write.updateAttempt({attemptId,scratchDir:scratch});
       l.write.writeContract({attemptId,markdown:'# contract',context:{contract:{schema:'starci/contract-version@1',admittedAt}}});
   } finally { l.close(); }
+  return scratch;
 }
 const runApi = (...args) => spawnSync(process.execPath, [API, ...args], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 120000, env });
 const lastErr = (r) => { try { return JSON.parse(String(r.stderr).trim().split('\n').at(-1)); } catch { return null; } };
@@ -224,29 +228,31 @@ test('starci kernel report refuses a done interface.draw that leaves a gating dr
   const files = ['.starciwork/features/home/ui/app-layout/index.yaml', '.starciwork/features/home/ui/app-layout/assets/directions/default--page--desktop--light.content.png'];
   assert.deepEqual(drawReviewsOwed(p.repo, files), { owed: [{ id: DESIGN, dir: '.starciwork/features/home/ui/app-layout', why: 'the owner has not reviewed the drawn parts', gates: ['planned-layout'] }], unjudged: [] });
   assert.deepEqual(drawReviewsOwed(p.repo, ['.starciwork/features/home/ui/**']).owed.map((o) => o.id), [DESIGN], 'a glob reaches the records under it');
-  const report = path.join(reportScratchOf(p), 'report.json');
+  const scratch = seedDrawJob(t, p, { admittedAt: Date.parse('2099-01-01T00:00:00Z') });
+  const report = path.join(scratch, 'report.json');
   fs.writeFileSync(report, JSON.stringify({ schema: 'starci/op-report@1', outcome: 'done', summary: 'Drew the planned layout.', files, checks: [], head: 'abcdef1234567' }));
-  seedDrawJob(p, { admittedAt: Date.parse('2099-01-01T00:00:00Z') });
   const refused = runApi('report', '--repo', p.repo, '--job', 'job-draw-1', '--report', report, '--json');
   assert.equal(refused.status, 1, refused.stdout);
   assert.equal(lastErr(refused)?.code, 'draw-review-owed', refused.stderr);
   assert.match(lastErr(refused).error, /ui\.home\.app-layout .* gates another leg \(planned-layout\).*draw-review\.mjs question --ui/);
   // The ask itself is what the attempt files.
-  const ask = path.join(reportScratchOf(p), 'ask.json');
+  const ask = path.join(scratch, 'ask.json');
   fs.writeFileSync(ask, JSON.stringify({ schema: 'starci/op-report@1', outcome: 'ask', summary: 'The owner reviews the drawn parts.', files, checks: [], question: drawReviewQuestion(dir, { lang: 'en' }) }));
   const asked = runApi('report', '--repo', p.repo, '--job', 'job-draw-1', '--report', ask, '--json');
   assert.equal(asked.status, 0, asked.stderr);
   // After the owner's accept answer is applied, the done report is filed.
   applyDrawReview(dir, receiptFor(p, drawReviewQuestion(dir, { lang: 'en' })), { write: true });
-  seedDrawJob(p, { jobId: 'job-draw-2', attempt: 2, dispatchId: 'ctx_draw_2', admittedAt: Date.parse('2099-01-01T00:00:00Z') });
-  fs.writeFileSync(report, JSON.stringify({ schema: 'starci/op-report@1', outcome: 'done', summary: 'Drew the planned layout.', files, checks: [], head: 'abcdef1234567' }));
-  const filed = runApi('report', '--repo', p.repo, '--job', 'job-draw-2', '--report', report, '--json');
+  const scratch2 = seedDrawJob(t, p, { jobId: 'job-draw-2', attempt: 2, dispatchId: 'ctx_draw_2', admittedAt: Date.parse('2099-01-01T00:00:00Z') });
+  const report2 = path.join(scratch2, 'report.json');
+  fs.writeFileSync(report2, JSON.stringify({ schema: 'starci/op-report@1', outcome: 'done', summary: 'Drew the planned layout.', files, checks: [], head: 'abcdef1234567' }));
+  const filed = runApi('report', '--repo', p.repo, '--job', 'job-draw-2', '--report', report2, '--json');
   assert.equal(filed.status, 0, filed.stderr);
   // Current owner review remains mandatory at an earlier admission time.
   drawLayout(p, { mark: [0, 250, 0, 255] });
-  seedDrawJob(p, { jobId: 'job-draw-3', attempt: 3, dispatchId: 'ctx_draw_3', admittedAt: Date.parse('2020-01-01T00:00:00Z') });
-  fs.writeFileSync(report, JSON.stringify({ schema: 'starci/op-report@1', outcome: 'done', summary: 'Drew the planned layout.', files, checks: [], head: 'abcdef1234567' }));
-  const older = runApi('report', '--repo', p.repo, '--job', 'job-draw-3', '--report', report, '--json');
+  const scratch3 = seedDrawJob(t, p, { jobId: 'job-draw-3', attempt: 3, dispatchId: 'ctx_draw_3', admittedAt: Date.parse('2020-01-01T00:00:00Z') });
+  const report3 = path.join(scratch3, 'report.json');
+  fs.writeFileSync(report3, JSON.stringify({ schema: 'starci/op-report@1', outcome: 'done', summary: 'Drew the planned layout.', files, checks: [], head: 'abcdef1234567' }));
+  const older = runApi('report', '--repo', p.repo, '--job', 'job-draw-3', '--report', report3, '--json');
   assert.equal(older.status,1,older.stderr);
   assert.equal(lastErr(older)?.code,'draw-review-owed');
 });
@@ -297,8 +303,7 @@ test('starci kernel report refuses draw-review-unjudged when the guard cannot re
   fs.writeFileSync(path.join(pageDir, 'index.yaml'), stringifyYaml(uiSkeleton('ui.home.dashboard', { route: `${APP}/dashboard`, routeParent: APP, surface: 'page' })));
   const layoutFiles = ['.starciwork/features/home/ui/app-layout/index.yaml', '.starciwork/features/home/ui/app-layout/assets/directions/default--page--desktop--light.content.png'];
   const files = ['.starciwork/features/home/ui/dashboard/index.yaml'];
-  const report = path.join(reportScratchOf(p), 'report.json');
-  fs.writeFileSync(report, JSON.stringify({ schema: 'starci/op-report@1', outcome: 'done', summary: 'Drew the dashboard.', files, checks: [], head: 'abcdef1234567' }));
+  const doneReport = JSON.stringify({ schema: 'starci/op-report@1', outcome: 'done', summary: 'Drew the dashboard.', files, checks: [], head: 'abcdef1234567' });
   // A record under features/ that does not parse may be one that dependsOn the page: the page is unjudged. The
   // planned layout still gates (planned-layout is known without it), so it is judged owed as before.
   const broken = path.join(p.work, 'features', 'home', 'impl', 'web', 'dashboard', 'index.yaml');
@@ -308,14 +313,16 @@ test('starci kernel report refuses draw-review-unjudged when the guard cannot re
   assert.deepEqual(judged.owed.map((o) => o.id), [DESIGN]);
   assert.deepEqual(judged.unjudged.map((u) => u.path), ['.starciwork/features/home/ui/dashboard']);
   assert.match(judged.unjudged[0].error, /cannot tell what waits on ui\.home\.dashboard: features\/home\/impl\/web\/dashboard\/index\.yaml \(.*\) does not parse/);
-  seedDrawJob(p, { admittedAt: Date.parse('2099-01-01T00:00:00Z') });
+  const report = path.join(seedDrawJob(t, p, { admittedAt: Date.parse('2099-01-01T00:00:00Z') }), 'report.json');
+  fs.writeFileSync(report, doneReport);
   const refused = runApi('report', '--repo', p.repo, '--job', 'job-draw-1', '--report', report, '--json');
   assert.equal(refused.status, 1, refused.stdout);
   assert.equal(lastErr(refused)?.code, 'draw-review-unjudged', refused.stderr);
   assert.match(lastErr(refused).error, /could not judge \.starciwork\/features\/home\/ui\/dashboard: cannot tell what waits on/);
   // The guard refuses unavailable evidence even for an earlier admission.
-  seedDrawJob(p, { jobId: 'job-draw-2', attempt: 2, dispatchId: 'ctx_draw_2', admittedAt: Date.parse('2026-09-25T12:00:00+07:00') });
-  const warned = runApi('report', '--repo', p.repo, '--job', 'job-draw-2', '--report', report, '--json');
+  const report2 = path.join(seedDrawJob(t, p, { jobId: 'job-draw-2', attempt: 2, dispatchId: 'ctx_draw_2', admittedAt: Date.parse('2026-09-25T12:00:00+07:00') }), 'report.json');
+  fs.writeFileSync(report2, doneReport);
+  const warned = runApi('report', '--repo', p.repo, '--job', 'job-draw-2', '--report', report2, '--json');
   assert.equal(warned.status,1,warned.stderr);
   assert.equal(lastErr(warned)?.code,'draw-review-unjudged');
   // An unparseable layout tree, and a report's ui record that does not parse, are unjudged too.

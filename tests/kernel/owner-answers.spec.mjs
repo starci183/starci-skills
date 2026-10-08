@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {proofRepo} from '../helpers/sonar-scan.mjs';
+import {dispatchedScratch} from '../helpers/dispatched-scratch.mjs';
 import {inspectLedger,ledgerFileFor,openLedger,ensureWorkflow,changeWorkflowPhase,insertGoal,createUnit,enqueueJob,setJobStatus,startAttempt,writeContract,fileReport,markReportConsumed,recordJobResult,appendEvent} from '../../engine/db/ledger.mjs';
 import {lineageJobsOf,ownerAnswersOf,repeatedAnswerOf} from '../../scripts/machine/owner-answers.mjs';
 
@@ -159,7 +160,7 @@ test('starci kernel report refuses an ask that repeats an answered ask of the li
   const retry=enqueue(fx,wf);
   // Bind the retry the way dispatch does: an op_attempts row with its scratch dir, a contract row
   // bound to that attempt, and the job running (H10: starci kernel report reads only the attempt's scratch).
-  const scratch=fs.mkdtempSync(path.join(os.tmpdir(),'starci-owner-answers-scratch-'));
+  const scratch=dispatchedScratch(t,{repo:fx.repo,workflowId:wf,jobId:retry});
   fx.seed(l=>l.transaction(db=>{
     const at=Date.now();
     setJobStatus(db,{jobId:retry,to:'ready',reason:'dispatch',at});
@@ -202,7 +203,7 @@ test('starci kernel report still files a genuinely new ask on an owner-answer re
   const ask=enqueue(fx,wf);
   answeredAsk(fx,wf,ask);
   const retry=enqueue(fx,wf);
-  const scratch=fs.mkdtempSync(path.join(os.tmpdir(),'starci-owner-answers-scratch-'));
+  const scratch=dispatchedScratch(t,{repo:fx.repo,workflowId:wf,jobId:retry});
   fx.seed(l=>l.transaction(db=>{
     const at=Date.now();
     setJobStatus(db,{jobId:retry,to:'ready',reason:'dispatch',at});
