@@ -7,8 +7,7 @@ services:
     command: server /data
     environment:
       MINIO_ROOT_USER: ecommerce
-    # MINIO_ROOT_PASSWORD comes from the decrypted secrets/minio-env.enc.
-    env_file:
-      - ../../runtime/env/minio.env
+      # DEMO-ONLY default of a local stack on loopback: not a secret; a run that wants another value exports the name.
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-demo-only-minio-root-password}
     ports:
       - "9069:9000"

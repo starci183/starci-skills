@@ -6,53 +6,53 @@ host; everything that lives in the runtime repository (the runtime itself and th
 `root: .claude/ext/sonar` (see `modules/schemas/application-stacks.schema.yaml` and
 `docs/application-stacks.md`).
 
-Files: `compose.yaml` (SonarQube + its Postgres + the one-shot admin-password bootstrap),
-`cloudflared.yaml` (the Cloudflare tunnel that publishes it publicly, profile `public`), `secrets/`
-(the SOPS `*.enc` members of the stack itself: database password, admin password, admin token, server-wide analysis token, tunnel token; the public runtime repository is meant to hold none, `RT_SECRET_TRACKED` lists those still tracked in `ruleParams.runtime.heldSecrets` until they move into `secret.env`).
+Files: `compose.yaml` (SonarQube + its Postgres + the one-shot admin-password bootstrap) and
+`cloudflared.yaml` (the Cloudflare tunnel that publishes it publicly, profile `public`). The directory holds **no secret and no
+custody**: the public runtime repository tracks none (`RT_SECRET_TRACKED`, empty allowance), and the Compose files read their secrets
+from the environment of the process that runs them.
 
 Fixed identity, so the running container keeps
 working: Compose project `starci`, containers `starci-sonarqube`, `starci-sonarqube-postgres`,
 `starci-sonarqube-bootstrap`, `starci-cloudflared-sonarqube`, named volumes `starci-sonarqube-*`,
 published port `${STARCI_PORT_SONARQUBE}` → container `9000` (this host's published port is the one
 `scripts/gates/sonar-local.mjs` states once as `DEFAULT_HOST`, served locally at that host and published as
-`https://sonar.starci.org`).
+`https://sonar.starci.org`; the verb below derives the variable from it).
 
-## One-time materialization (owner, per host)
+## Secrets: the owner's `secret.env`
 
-The stack needs two untracked files beside `compose.yaml`; both are gitignored:
+The stack's secrets are variables of the one untracked `.claude/secret.env` (`secret.env.example` lists each with what it is for),
+read only through `engine/secrets.mjs`:
 
-1. Decrypt the custody twins the stack consumes:
+| Variable | Used by |
+| --- | --- |
+| `SONARQUBE_DB_PASSWORD` | the Postgres of the stack and the SonarQube JDBC login (`compose.yaml`) |
+| `SONARQUBE_ADMIN_PASSWORD` | the one-shot bootstrap that replaces SonarQube's default admin password (`compose.yaml`) |
+| `CLOUDFLARE_TUNNEL_TOKEN` | the public tunnel (`cloudflared.yaml`, only with `--public`) |
+| `SONARQUBE_ADMIN_TOKEN` | `scripts/gates/sonar-local.mjs`: `status`, `ensure-project` and `scan --isolate` provision product projects with it |
 
-   ```
-   sops -d secrets/sonarqube-db-password.txt.enc  > secrets/sonarqube-db-password.txt
-   sops -d secrets/sonarqube-admin-password.txt.enc > secrets/sonarqube-admin-password.txt
-   sops -d secrets/cloudflare-starci-local-services-tunnel-token.key.enc \
-        > secrets/cloudflare-starci-local-services-tunnel-token.key   # only for the public profile
-   ```
-
-   They decrypt with the source stack identity (`~/.starci/master.identity`, age recipient
-   `age1myd77xz5lhsluc4ejzztsck32pfq3vfpzrva8cegzydk2guhxqesgm3z4j`). If a `.enc` twin is missing on a
-   fresh host, the owner re-mints and re-encrypts it.
-
-2. Create `.env` next to `compose.yaml`:
-
-   ```
-   STARCI_PORT_SONARQUBE=<the DEFAULT_HOST port of scripts/gates/sonar-local.mjs>   # this host's published SonarQube port (metadata.json port map)
-   SONARQUBE_DB_PASSWORD=<contents of secrets/sonarqube-db-password.txt>
-   # STARCI_CONTAINER_PREFIX=starci-   # optional; must stay starci- in steady state
-   ```
+The per-PRODUCT analysis tokens that `ensure-project --with-token` mints stay sealed in the product's own custody, and there is no
+server-wide analysis token of the extension. A missing variable is a typed refusal that names it (`sonar-host-secret-missing`); the verb
+below never starts a container without the ones it needs.
 
 ## Start / stop
 
 ```
-cd .claude/ext/sonar
-docker compose -f compose.yaml up -d                                  # local SonarQube
-docker compose -f compose.yaml -f cloudflared.yaml --profile public up -d   # + public tunnel
-docker compose -f compose.yaml -f cloudflared.yaml --profile public down    # stop (data kept)
+starci gate sonar up              # local SonarQube (compose.yaml)
+starci gate sonar up --public     # + the public tunnel (cloudflared.yaml, profile public)
+starci gate sonar stop [--public] # stop the containers; the data is kept
 ```
 
-Never `down -v`: the named volumes hold the server data and projects. Do not call Docker before the
-two files above exist — `sonarqube-bootstrap` and the tunnel mount them read-only.
+`up` builds the child environment from `secret.env` (plus `STARCI_PORT_SONARQUBE` from the declared host), hands it to
+`docker compose up -d` and prints a report with the file names and the outcome only: a value is never on argv, in a file or in the
+report. A container's environment is readable by whoever can `docker inspect` it on this host. Never `down -v`: the named volumes hold
+the server data and projects.
+
+## Moving off the old sealed members
+
+The previous layout tracked five sealed members in `secrets/`. They are deleted from the tree; their ciphertext stays in git history,
+encrypted to the owner's age key, so rotate the stack's admin password, admin token and tunnel token after the move. Once per member:
+`starci runtime import-held-secret --member <old path>` decrypts it with the owner's own identity from git history and appends
+`NAME=value` to `secret.env` without printing it, refusing to overwrite an existing name (docs/host-secrets.md has the table).
 
 ## The quality gate
 

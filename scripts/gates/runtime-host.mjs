@@ -20,7 +20,8 @@ export function runtimeHostRoot(env = process.env) {
   return path.dirname(repositoryHome(skillRoot));
 }
 
-function verifiedRuntimeMain(runtimeRoot, env) {
+/** The canonical runtime main root of a runtime checkout or lane (its secret.env lives there); throws when the root is not a verified Git top level. */
+export function verifiedRuntimeMain(runtimeRoot, env) {
   if (typeof runtimeRoot !== 'string' || !path.isAbsolute(runtimeRoot))
     throw new TypeError('runtimeSecretEnv requires an absolute runtime root');
   const stat = fs.lstatSync(runtimeRoot);

@@ -61,6 +61,6 @@
         }
     },
     "secrets": {
-        "note": "The local Postgres runs with trust authentication. Keycloak's bootstrap admin password and the identity-admin client secret are sealed in secrets/keycloak-env.enc, MinIO's root password in secrets/minio-env.enc (SOPS+age, DEMO-ONLY recipient); runtime/env/*.env are their decrypted members and are never tracked."
+        "note": "The local Postgres runs with trust authentication. Keycloak's bootstrap admin password, the identity-admin client secret and MinIO's root password are DEMO-ONLY defaults carried by the compose files (demo-only-...), not secrets; a run exports other values for compose and the services."
     }
 }

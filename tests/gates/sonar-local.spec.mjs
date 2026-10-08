@@ -14,7 +14,7 @@ import {
 import {resolveCustodyFile,runtimeHostRoot} from '../../scripts/gates/runtime-host.mjs';
 import {loadSonarGate,serverConditions} from '../../scripts/gates/sonar-gate.mjs';
 import {resolveSops} from '../../scripts/api/sops/lib.mjs';
-import {launcher,sealExtCustody,readCustody} from '../../scripts/gates/sonar-ext-custody.mjs';
+import {launcher,readCustody} from '../../scripts/gates/sonar-ext-custody.mjs';
 
 // Fake values only: no real token is ever read by this spec.
 const ADMIN='fake-admin-token-0001';
@@ -193,7 +193,6 @@ async function fakeSonar(t,{gate='OK',firstAnalysis=false,up=true,sources=knownS
  */
 function fakeCustody(root,{canary=null,marker=null}={}){
   const stack=path.join(root,'source','.starcistacks','dev');
-  write(stack,'runtime/files/sonarqube-admin-token.key',`${ADMIN}\n`);
   write(stack,'runtime/files/sonarqube-analysis-token.txt.enc',`ENC:${ANALYSIS}`);
   const identity=write(root,'master.identity','AGE-SECRET-KEY-FAKE');
   const sops=write(root,'fake-sops.mjs',`import fs from 'node:fs';
@@ -225,7 +224,7 @@ const PATH_ENV={PATH:process.env.PATH};
 function configFor(host,custody,extra={}){
   // record: a re-mint event of a spec never reaches the supervisor ledger.
   // specs: the owner switches are fixed (unit on), never the developer's config.yaml.
-  return {host,stack:custody.stack,identity:custody.identity,sops:custody.sops,stackSecret:custody.stackSecret,docker:'starci-no-such-docker',pollMs:5,timeoutMs:CHILD_TIMEOUT_MS,record:()=>{},specs:{unit:true,e2e:false},runtimeSecretEnv:env=>{const fixture={...env,SONAR_TOKEN:ANALYSIS};delete fixture.SOPS_AGE_KEY;delete fixture.SOPS_AGE_KEY_FILE;return fixture;},...extra};
+  return {host,stack:custody.stack,identity:custody.identity,sops:custody.sops,stackSecret:custody.stackSecret,docker:'starci-no-such-docker',pollMs:5,timeoutMs:CHILD_TIMEOUT_MS,record:()=>{},specs:{unit:true,e2e:false},runtimeSecretEnv:env=>{const fixture={...env,SONAR_TOKEN:ANALYSIS,SONARQUBE_ADMIN_TOKEN:ADMIN};delete fixture.SOPS_AGE_KEY;delete fixture.SOPS_AGE_KEY_FILE;return fixture;},...extra};
 }
 
 const assertNoSecret=(value,label)=>{
@@ -561,10 +560,14 @@ test('ensure-project creates a missing project with the admin token and is idemp
   assert.ok(state.requests.filter(r=>r.path.startsWith('/api/projects')).every(r=>r.auth===ADMIN),'project calls use the admin token');
   const bad=await sonarLocalMain(['ensure-project','--key','12345'],{config:configFor(host,custody)});
   assert.equal(bad.exitCode,2);
-  fs.rmSync(path.join(custody.stack,'runtime/files/sonarqube-admin-token.key'));
-  const missing=await sonarLocalMain(['ensure-project','--key','other'],{config:configFor(host,custody)});
+  const withoutAdmin=configFor(host,custody,{runtimeSecretEnv:env=>({...env,SONARQUBE_ADMIN_TOKEN:undefined})});
+  const missing=await sonarLocalMain(['ensure-project','--key','other'],{config:withoutAdmin});
+  assert.equal(missing.exitCode,2);
   assert.equal(missing.report.outcome,'blocked');
-  assert.match(missing.report.message,/never ask the owner/);
+  assert.deepEqual([missing.report.refusal.code,missing.report.refusal.variables],['sonar-host-secret-missing',['SONARQUBE_ADMIN_TOKEN']]);
+  assert.match(missing.report.message,/SONARQUBE_ADMIN_TOKEN is not set: add it to \.claude\/secret\.env/);
+  assert.equal(state.requests.filter(r=>r.path==='/api/projects/create').length,1,'no project is created without the admin token');
+  assertNoSecret(missing.report,'missing admin report');
 });
 
 test('ensure-project --with-token mints a project analysis token into custody through the stack-secret tool', async t => {
@@ -672,33 +675,25 @@ test('a declared or explicit token reference the server rejects is repaired in p
   assert.equal(events.length,1);
 });
 
-// A runtime extension's custody (ext/<service>/secrets, where the example apps' analysis tokens live) has no stack-secret
-// tool: the runtime seals a minted token itself, with sops, to the recipient its sealed members already share.
-const extCustody=(root,{sealed=true}={})=>{
-  const dir=path.join(root,'.claude','ext','sonar','secrets');
-  if(sealed)write(dir,'sonarqube-admin-token.key.enc',JSON.stringify({data:'ENC[x]',sops:{age:[{recipient:'age1fakerecipient'}]}}));
-  else fs.mkdirSync(dir,{recursive:true});
+// A project token member of the configured stack custody (written through the stack-secret tool), sealed to a recipient by the fake sops.
+const extCustody=root=>{
+  const dir=path.join(root,'source','.starcistacks','dev','runtime','files');
   write(dir,'sonarqube-example-token.key.enc','ENC:fake-stale-token-0006');
   return path.join(dir,'sonarqube-example-token.key');
 };
 
-test('a rejected example token sealed in a runtime extension custody is re-minted and sealed there, never via argv or plaintext', async t => {
-  const root=temporary(t,'ext-seal');
+test('a custody reference inside a runtime extension is refused: the extension holds no custody',async t=>{
+  const root=temporary(t,'ext-refused');
   const {host,state}=await fakeSonar(t);
   const custody=fakeCustody(root);
-  const ref=extCustody(root);
-  state.mintValues.push(REMINTED);
-  const {exitCode,report}=await sonarLocalMain(['ensure-project','--key','example','--with-token','--token-ref',ref],{config:configFor(host,custody)});
-  assert.equal(exitCode,0,JSON.stringify(report));
-  assert.deepEqual([report.tokenCustody.via,report.tokenCustody.reminted,report.tokenCustody.name],['minted',true,ref.split(path.sep).join('/')]);
-  assert.equal(fs.readFileSync(`${ref}.enc`,'utf8'),`ENC:${REMINTED}`,'sealed over the rejected member');
-  assert.ok(!fs.existsSync(ref),'no plaintext twin is written');
+  const ref=path.join(root,'.claude','ext','sonar','secrets','sonarqube-example-token.key');
+  write(path.dirname(ref),'sonarqube-example-token.key.enc','ENC:fake-stale-token-0006');
+  const {report}=await sonarLocalMain(['ensure-project','--key','example','--with-token','--token-ref',ref],{config:configFor(host,custody)});
+  assert.equal(report.tokenCustody.present,false);
+  assert.match(report.tokenCustody.reason,/outside a stack custody tree/);
   assert.equal(state.requests.filter(r=>r.path==='/api/user_tokens/revoke').length,0);
-  assertNoSecret(report,'ensure report');
-  const again=await sonarLocalMain(['ensure-project','--key','example','--with-token','--token-ref',ref],{config:configFor(host,custody)});
-  assert.equal(again.report.tokenCustody.via,'sops','the sealed member is read back, not minted again');
+  assert.equal(fs.readFileSync(`${ref}.enc`,'utf8'),'ENC:fake-stale-token-0006','the member is left as it was');
 });
-
 
 test('canonical inline custody is held before SOPS and cannot fall through plaintext or minting',async t=>{
   const root=temporary(t,'age-inline-held'),main=path.join(root,'runtime-main'),lane=path.join(root,'lane');
@@ -706,16 +701,14 @@ test('canonical inline custody is held before SOPS and cannot fall through plain
   const custody=fakeCustody(root,{marker}),ref=extCustody(root);
   fs.rmSync(custody.identity);
   write(custody.stack,'runtime/files/sonarqube-analysis-token.txt',ANALYSIS);
-  const contents='SOPS_AGE_KEY=AGE-SECRET-KEY-FAKE-CANONICAL\n';
+  const contents=`SOPS_AGE_KEY=AGE-SECRET-KEY-FAKE-CANONICAL\nSONARQUBE_ADMIN_TOKEN=${ADMIN}\n`;
   const canonical=write(main,SECRET_ENV_FILE,contents),decoy=write(lane,SECRET_ENV_FILE,'SOPS_AGE_KEY=AGE-SECRET-KEY-FAKE-DECOY\n');
   const runtimeSecretEnv=(env,root)=>{assert.equal(root,lane);return secretEnv(main,env);};
   const options=configFor(host,custody,{runtimeRoot:lane,runtimeSecretEnv,identity:null});
   const env={},report=(await sonarLocalMain(['status'],{env,config:options})).report;
   assert.equal(report.outcome,'blocked');assert.equal(report.custody.analysis.identityRefusal,'inline-context-unqualified');
   assert.match(report.custody.analysis.reason,/selected-identity isolation capability/);
-  const cfg=resolveConfig(options,env),before=fs.readFileSync(ref+'.enc');
-  const sealed=sealExtCustody(cfg,ref,MINTED,{scrub});
-  assert.equal(sealed.identityRefusal,'inline-context-unqualified');assert.equal(sealed.ok,false);
+  const before=fs.readFileSync(ref+'.enc');
   const requested=await sonarLocalMain(['ensure-project','--key','example','--with-token','--token-ref',ref],{env,config:options});
   assert.equal(requested.report.tokenCustody.identityRefusal,'inline-context-unqualified');
   fs.rmSync(ref+'.enc');
@@ -726,28 +719,26 @@ test('canonical inline custody is held before SOPS and cannot fall through plain
   assert.equal(state.requests.filter(row=>row.path.startsWith('/api/user_tokens/')).length,0,'held identity never triggers mint/revoke');
   assert.ok(!fs.existsSync(marker));assert.deepEqual(fs.readFileSync(ref+'.enc'),before);assert.ok(!fs.existsSync(ref));
   assert.equal(fs.readFileSync(canonical,'utf8'),contents);assert.match(fs.readFileSync(decoy,'utf8'),/DECOY/);
-  assert.deepEqual(env,{});assertNoSecret([report,requested.report,sealed],'inline-held reports');
-  assert.ok(!JSON.stringify([report,requested.report,sealed,cfg]).includes('AGE-SECRET-KEY-FAKE-CANONICAL'));
+  assert.deepEqual(env,{});assertNoSecret([report,requested.report],'inline-held reports');
+  assert.ok(!JSON.stringify([report,requested.report]).includes('AGE-SECRET-KEY-FAKE-CANONICAL'));
 });
 
 test('blank actual age input refuses custody and extension seal despite a usable original FILE',async t=>{
   const root=temporary(t,'age-disabled'),main=path.join(root,'runtime-main'),{host,state}=await fakeSonar(t);
   const marker=path.join(root,'sops-called'),custody=fakeCustody(root,{marker}),ref=extCustody(root);
-  const contents='SOPS_AGE_KEY=AGE-SECRET-KEY-FAKE-CANONICAL\nSOPS_AGE_KEY_FILE='+custody.identity+'\n';
+  const contents='SOPS_AGE_KEY=AGE-SECRET-KEY-FAKE-CANONICAL\nSOPS_AGE_KEY_FILE='+custody.identity+'\nSONARQUBE_ADMIN_TOKEN='+ADMIN+'\n';
   const canonical=write(main,SECRET_ENV_FILE,contents),before=fs.readFileSync(ref+'.enc');
   const options=configFor(host,custody,{runtimeSecretEnv:env=>secretEnv(main,env)});
   for(const value of ['', '   ',null,undefined]){
     const env={SOPS_AGE_KEY:value},snapshot=structuredClone(env);
     const report=(await sonarLocalMain(['status'],{env,config:options})).report;
     assert.equal(report.outcome,'blocked');assert.equal(report.custody.analysis.identityRefusal,'disabled-inline');
-    const sealed=sealExtCustody(resolveConfig(options,env),ref,MINTED,{scrub});
-    assert.equal(sealed.ok,false);assert.equal(sealed.identityRefusal,'disabled-inline');
     fs.rmSync(ref+'.enc');
     const absent=await sonarLocalMain(['ensure-project','--key','example','--with-token','--token-ref',ref],{env,config:options});
     assert.equal(absent.report.tokenCustody.identityRefusal,'disabled-inline');assert.ok(!fs.existsSync(ref+'.enc'));
     fs.writeFileSync(ref+'.enc',before);
     assert.deepEqual(env,snapshot);assert.deepEqual(fs.readFileSync(ref+'.enc'),before);
-    assertNoSecret([report,sealed],'blank-age reports');
+    assertNoSecret([report],'blank-age reports');
   }
   assert.ok(!fs.existsSync(marker));assert.equal(fs.readFileSync(canonical,'utf8'),contents);
   assert.equal(fs.readFileSync(custody.identity,'utf8'),'AGE-SECRET-KEY-FAKE');assert.ok(!fs.existsSync(ref));
@@ -758,7 +749,7 @@ test('canonical original FILE environment reaches decrypt, seal and readback wit
   const root=temporary(t,'age-file-forward'),main=path.join(root,'runtime-main'),lane=path.join(root,'lane');
   fs.mkdirSync(lane);const {host,state}=await fakeSonar(t),marker=path.join(root,'sops-called');
   const custody=fakeCustody(root,{canary:'canonical-owner',marker}),ref=extCustody(root);
-  const contents='SOPS_AGE_KEY_FILE='+custody.identity+'\nFIXTURE_SOPS_CANARY=canonical-owner\n';
+  const contents='SOPS_AGE_KEY_FILE='+custody.identity+'\nFIXTURE_SOPS_CANARY=canonical-owner\nSONARQUBE_ADMIN_TOKEN='+ADMIN+'\n';
   const canonical=write(main,SECRET_ENV_FILE,contents),original=fs.readFileSync(custody.identity);
   const options=configFor(host,custody,{identity:null,runtimeRoot:lane,runtimeSecretEnv:(env,root)=>{assert.equal(root,lane);return secretEnv(main,env);}});
   const env={},snapshot=structuredClone(env),first=await sonarLocalMain(['status'],{env,config:options});
@@ -774,26 +765,11 @@ test('canonical original FILE environment reaches decrypt, seal and readback wit
   const stackFile=path.join(custody.stack,projectTokenRef('stack-example')+'.enc');
   assert.equal(fs.readFileSync(stackFile,'utf8'),'ENC:'+MINTED);
   const calls=fs.readFileSync(marker,'utf8').trim().split('\n');
-  assert.equal(calls.filter(call=>call==='stack-set').length,1,'canonical environment reaches the existing stack-secret child');
-  assert.equal(calls.filter(call=>call==='encrypt').length,1);assert.ok(calls.filter(call=>call==='decrypt').length>=3);
+  assert.equal(calls.filter(call=>call==='stack-set').length,2,'canonical environment reaches the stack-secret child for each mint');
+  assert.ok(calls.filter(call=>call==='decrypt').length>=3);
   assert.equal(fs.readFileSync(ref+'.enc','utf8'),'ENC:'+REMINTED);assert.ok(!fs.existsSync(ref));
   assert.deepEqual(fs.readFileSync(custody.identity),original);assert.equal(fs.readFileSync(canonical,'utf8'),contents);
   assert.deepEqual(env,snapshot);assert.deepEqual(fs.readdirSync(lane),[]);assertNoSecret([first.report,minted.report,again.report],'original-file reports');
-});
-
-test('a token that cannot be sealed into an extension custody with no recipient is refused with the reason and revoked', async t => {
-  const root=temporary(t,'ext-refuse');
-  const {host,state}=await fakeSonar(t);
-  const custody=fakeCustody(root);
-  fs.rmSync(path.join(custody.stack,'runtime/files/sonarqube-analysis-token.txt.enc'));
-  const ref=extCustody(root,{sealed:false});
-  state.mintValues.push(REMINTED);
-  const {report}=await sonarLocalMain(['ensure-project','--key','example','--with-token','--token-ref',ref],{config:configFor(host,custody)});
-  assert.notEqual(report.tokenCustody.via,'minted');
-  assert.match(JSON.stringify(report),/holds no sealed member with exactly one age recipient/);
-  assert.equal(fs.readFileSync(`${ref}.enc`,'utf8'),'ENC:fake-stale-token-0006','the member is left as it was');
-  assert.equal(state.requests.filter(r=>r.path==='/api/user_tokens/revoke').length,1,'the minted value is revoked again');
-  assertNoSecret(report,'refused report');
 });
 
 test('token runs a child with the analysis token in its env only, and alone reports presence', async t => {
@@ -923,32 +899,23 @@ test('rejected supplied analysis stops isolation before admin reads, minting or 
   const root=temporary(t,'rejected-analysis');
   const {host,state}=await fakeSonar(t),custody=fakeCustody(root),repo=fakeRepo(root);
   state.tokens.delete(ANALYSIS);
-  const marker=path.join(root,'admin-decrypted');
-  fs.rmSync(path.join(custody.stack,'runtime/files/sonarqube-admin-token.key'));
-  write(custody.stack,'runtime/files/sonarqube-admin-token.key.enc','ENC:'+ADMIN);
-  fs.writeFileSync(custody.sops,"import fs from 'node:fs';fs.writeFileSync("+JSON.stringify(marker)+",'called');process.stdout.write("+JSON.stringify(ADMIN)+");");
   const run=await sonarLocalMain(['scan','--cwd',repo,'--wait','--isolate'],{env:{...PATH_ENV,SONAR_TOKEN:ANALYSIS},config:configFor(host,custody)});
   assert.equal(run.exitCode,2);assert.equal(run.report.custody.analysis.rejected,true);
   assert.match(run.report.reason,/SONAR_TOKEN is rejected/);
-  assert.equal(fs.existsSync(marker),false,'analysis rejection precedes administrative custody');
   assert.equal(fs.existsSync(path.join(root,'scanner-auth.json')),false);
   assert.ok(!state.requests.some(r=>r.auth===ADMIN||r.path.startsWith('/api/user_tokens/')||r.path==='/api/projects/create'));
   assertNoSecret(run.report,'rejected token report');
 });
 
-test('ordinary analysis reads no encrypted admin and a denied evidence read cannot fall back to admin',async t=>{
+test('ordinary analysis presents no admin token and a denied evidence read cannot fall back to admin',async t=>{
   const root=temporary(t,'read-permission');
   const {host,state}=await fakeSonar(t),custody=fakeCustody(root),repo=fakeRepo(root);
-  const marker=path.join(root,'admin-decrypted');
-  fs.rmSync(path.join(custody.stack,'runtime/files/sonarqube-admin-token.key'));
-  write(custody.stack,'runtime/files/sonarqube-admin-token.key.enc','ENC:'+ADMIN);
-  fs.writeFileSync(custody.sops,"import fs from 'node:fs';fs.writeFileSync("+JSON.stringify(marker)+",'called');process.stdout.write("+JSON.stringify(ADMIN)+");");
   const ordinary=await sonarLocalMain(['scan','--cwd',repo,'--wait'],{config:configFor(host,custody)});
-  assert.equal(ordinary.exitCode,0,JSON.stringify(ordinary.report));assert.equal(fs.existsSync(marker),false);
+  assert.equal(ordinary.exitCode,0,JSON.stringify(ordinary.report));assert.ok(!state.requests.some(r=>r.auth===ADMIN),'ordinary analysis never presents the admin token');
   state.rejectedAnalysisPaths.add('/api/ce/task');
   const isolated=await sonarLocalMain(['scan','--cwd',repo,'--wait','--isolate'],{config:configFor(host,custody)});
   assert.equal(isolated.exitCode,2);assert.match(isolated.report.reason,/HTTP 403/);
-  assert.equal(fs.existsSync(marker),true,'explicit same-host isolation selects administrative preparation');
+  assert.ok(state.requests.some(r=>r.auth===ADMIN),'explicit same-host isolation selects administrative preparation');
   const reads=state.requests.filter(r=>r.path==='/api/ce/task');
   assert.ok(reads.some(r=>r.status===403));assert.ok(reads.every(r=>r.auth===ANALYSIS));
   assert.deepEqual(JSON.parse(fs.readFileSync(path.join(root,'scanner-auth.json'),'utf8')),{analysis:true,admin:false,argvHasToken:false});
@@ -959,17 +926,13 @@ test('ordinary analysis reads no encrypted admin and a denied evidence read cann
 test('shared analysis cannot borrow custody configured for another administrative server',async t=>{
   const root=temporary(t,'foreign-server');
   const adminServer=await fakeSonar(t),analysisServer=await fakeSonar(t),custody=fakeCustody(root),repo=fakeRepo(root);
-  const marker=path.join(root,'admin-decrypted');
-  fs.rmSync(path.join(custody.stack,'runtime/files/sonarqube-admin-token.key'));
-  write(custody.stack,'runtime/files/sonarqube-admin-token.key.enc','ENC:'+ADMIN);
-  fs.writeFileSync(custody.sops,"import fs from 'node:fs';fs.writeFileSync("+JSON.stringify(marker)+",'called');process.stdout.write("+JSON.stringify(ADMIN)+");");
   const run=await sonarLocalMain(['scan','--cwd',repo,'--wait','--isolate'],{
     env:{...PATH_ENV,SONAR_TOKEN:ANALYSIS,SONAR_HOST_URL:analysisServer.host,STARCI_SONAR_HOST_URL:adminServer.host},
     config:configFor(undefined,custody,{runtimeSecretEnv:value=>value}),
   });
   assert.equal(run.exitCode,0,JSON.stringify(run.report));assert.equal(run.report.host,analysisServer.host);
   assert.match(run.report.isolated.skipped,/separate provisioning/);
-  assert.equal(fs.existsSync(marker),false);assert.equal(adminServer.state.requests.length,0);
+  assert.equal(adminServer.state.requests.length,0);
   assert.ok(!analysisServer.state.requests.some(r=>r.auth===ADMIN||r.path==='/api/projects/create'));
   assert.deepEqual(JSON.parse(fs.readFileSync(path.join(root,'scanner-auth.json'),'utf8')),{analysis:true,admin:false,argvHasToken:false});
   assertNoSecret(run.report,'foreign analysis report');
@@ -1272,7 +1235,7 @@ services:
   assert.equal(be.stackDir,infra);
   assert.equal(be.composeFile,path.join(infra,'infra','compose','sonarqube.yaml'));
   assert.equal(be.container,'shop-sonarqube');
-  assert.equal(be.adminToken,path.join(infra,'runtime','files','sonarqube-admin-token.key'));
+  assert.equal(be.adminToken,'env:SONARQUBE_ADMIN_TOKEN','the admin token is the SONARQUBE_ADMIN_TOKEN of secretEnv, whatever credential the declaration lists');
   assert.equal(be.analysisToken,path.join(infra,'runtime','files','sonarqube-analysis-token.txt'));
   assert.deepEqual([be.declaredKey,be.declaredName,be.declaredTokenRef],['shop-backend','Shop Backend',null]);
   assert.deepEqual([be.declaration.ownerAction,be.declaration.ci],['none','optional-follow-up']);
@@ -1706,12 +1669,13 @@ test('a product resolves its host custody inside this runtime tree, and an examp
   declaredHost(t);
   const root=path.resolve(import.meta.dirname,'..', '..');
   const dir=temporary(t,'product-custody');
-  const product=readSonarDeclaration(productDeclaration(dir,'shop',[{id:'admin',purpose:'project provisioning',path:'.claude/ext/sonar/secrets/sonarqube-admin-token.key'}]));
-  // The admin credential's custody entry names the runtime host: the file is this tree's ext/.
-  assert.equal(product.admin,path.join(root,'ext','sonar','secrets','sonarqube-admin-token.key'));
-  assert.ok(!product.admin.includes(`${path.sep}shop${path.sep}`),'never under the product folder');
+  const product=readSonarDeclaration(productDeclaration(dir,'shop',[{id:'scanner',purpose:'analysis',path:'.claude/ext/sonar/secrets/sonarqube-shop-token.key'}]));
+  // A credential whose custody entry names the runtime host resolves into this tree's ext/, never under the product folder.
+  assert.equal(product.projects[0].tokenRef,path.join(root,'ext','sonar','secrets','sonarqube-shop-token.key'));
+  assert.ok(!product.projects[0].tokenRef.includes(`${path.sep}shop${path.sep}`),'never under the product folder');
+  assert.equal(product.admin,undefined,'the admin token is not a declared custody: it is the SONARQUBE_ADMIN_TOKEN of secretEnv');
   const example=readSonarDeclaration(path.join(root,'examples','ecommerce-app','.starcistacks','application-stacks.yaml'));
-  assert.deepEqual([example.provider,example.mode,example.admin,example.analysis,example.stackDir===null||example.stackDir===undefined||!example.stackDir.includes(`${path.sep}ext${path.sep}sonar`)],['sonarcloud','hosted',null,null,true],'an example holds no custody and no stack');
+  assert.deepEqual([example.provider,example.mode,example.admin??null,example.analysis,example.stackDir===null||example.stackDir===undefined||!example.stackDir.includes(`${path.sep}ext${path.sep}sonar`)],['sonarcloud','hosted',null,null,true],'an example holds no custody and no stack');
   assert.equal(example.hostPublic,'https://sonarcloud.io');
   assert.equal(example.projects[0].tokenRef,null,'no per-project token: the one SONAR_TOKEN of secretEnv is used');
 });
@@ -1752,8 +1716,8 @@ test('a project token is the declared credential that names the project, else th
   assert.match(named.projects[0].tokenRef,/p\.key$/,'a credential naming the project wins');
 });
 
-test('extension custody composes real process ports but script-shaped selected tools cannot fall back or publish',t=>{
-  const root=temporary(t,'age-native-script-refusal'),custody=fakeCustody(root),ref=extCustody(root);
+test('custody reading composes real process ports but script-shaped selected tools cannot fall back to the materialized sibling',t=>{
+  const root=temporary(t,'age-native-script-refusal'),custody=fakeCustody(root);
   const tool=path.join(root,process.platform==='win32'?'sops.exe':'sops'),marker=path.join(root,'selected-child-called');
   fs.writeFileSync(tool,`#!/usr/bin/env node
 require('node:fs').writeFileSync(${JSON.stringify(marker)},'called');
@@ -1762,13 +1726,11 @@ require('node:fs').writeFileSync(${JSON.stringify(marker)},'called');
   const cfg=resolveConfig(configFor('http://fixture.invalid',custody,{sops:tool,identity:null,runtimeSecretEnv:value=>value}),env);
   const analysis=path.join(custody.stack,'runtime/files/sonarqube-analysis-token.txt');
   fs.writeFileSync(analysis,ANALYSIS);
-  const original=fs.readFileSync(ref+'.enc'),encrypted=fs.readFileSync(analysis+'.enc');
+  const encrypted=fs.readFileSync(analysis+'.enc');
   const read=readCustody(cfg,'runtime/files/sonarqube-analysis-token.txt',{remember:value=>value});
   assert.equal(read.present,false);assert.equal(read.identityRefusal,'native-tool-unavailable');
   assert.equal(read.value,undefined,'native refusal cannot expose the materialized sibling');
-  const sealed=sealExtCustody(cfg,ref,MINTED,{scrub});
-  assert.equal(sealed.ok,false);assert.equal(sealed.identityRefusal,'native-tool-unavailable');
-  assert.deepEqual(fs.readFileSync(ref+'.enc'),original);assert.deepEqual(fs.readFileSync(analysis+'.enc'),encrypted);
-  assert.ok(!fs.existsSync(ref));assert.ok(!fs.existsSync(marker));assert.deepEqual(env,snapshot);
-  assert.ok(!JSON.stringify([read,sealed,cfg]).includes(synthetic));assertNoSecret([read,sealed],'native-script refusal');
+  assert.deepEqual(fs.readFileSync(analysis+'.enc'),encrypted);
+  assert.ok(!fs.existsSync(marker));assert.deepEqual(env,snapshot);
+  assert.ok(!JSON.stringify([read,cfg]).includes(synthetic));assertNoSecret([read],'native-script refusal');
 });

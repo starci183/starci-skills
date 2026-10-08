@@ -218,3 +218,15 @@ removed:
     use: 'the examples are analysed on SonarCloud with the SONAR_TOKEN of the runtime secret.env (runtimeSecrets in their services.sonar declaration)'
     since: 1.0.0-alpha.7
     match: 'sonarqube-(?:lite-app|shape-slot|starci-ecommerce-app)-token'
+  - id: vocab-sonar-stack-sealed-members
+    kind: vocabulary
+    name: ext/sonar secrets custody
+    use: 'the stack secrets are the secret.env variables SONARQUBE_DB_PASSWORD, SONARQUBE_ADMIN_PASSWORD, SONARQUBE_ADMIN_TOKEN and CLOUDFLARE_TUNNEL_TOKEN, passed by starci gate sonar up; ext/sonar tracks no sealed member'
+    since: 1.0.0-alpha.8
+    match: 'ext/sonar/secrets/(?:sonarqube-(?:db|admin|analysis)-(?:password|token)|cloudflare-starci-local-services-tunnel-token)'
+  - id: vocab-ecommerce-sealed-demo-secrets
+    kind: vocabulary
+    name: ecommerce sealed demo secrets
+    use: 'the ecommerce example carries demo-only defaults in its compose files and declares no sealed secret (secrets: [])'
+    since: 1.0.0-alpha.8
+    match: '(?<![\w-])(?:keycloak|minio)-env(?:\.enc)?(?![\w-])'

@@ -326,7 +326,7 @@ $defs:
                     generatedBy: {type: string, minLength: 1}
               heldSecrets:
                 type: array
-                description: The sealed secrets the public runtime repository still tracks (RT_SECRET_TRACKED), each with why; the list only shrinks.
+                description: The sealed secrets the public runtime repository may still track (RT_SECRET_TRACKED), each with why; the list is empty and stays empty.
                 items:
                   type: object
                   additionalProperties: false

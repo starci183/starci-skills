@@ -30,7 +30,7 @@ _starci() {
         reconciler) COMPREPLY=( $(compgen -W "once restart start status stop up" -- "$cur") );;
         release) COMPREPLY=( $(compgen -W "app-installs check clean-test cut env-test images launch-smoke notes proof publish sync-runtime" -- "$cur") );;
         route) COMPREPLY=( $(compgen -W "op" -- "$cur") );;
-        runtime) COMPREPLY=( $(compgen -W "architecture benchmark-snapshot check derived-fields doctor gen-catalog gen-ops housekeeping install ledger-hygiene link machine-db owner-claims-audit readme-blocks status update validate version" -- "$cur") );;
+        runtime) COMPREPLY=( $(compgen -W "architecture benchmark-snapshot check derived-fields doctor gen-catalog gen-ops housekeeping import-held-secret install ledger-hygiene link machine-db owner-claims-audit readme-blocks status update validate version" -- "$cur") );;
         smoke) COMPREPLY=( $(compgen -W "scaffold" -- "$cur") );;
         supabase) COMPREPLY=( $(compgen -W "start status stop" -- "$cur") );;
         supervisor) COMPREPLY=( $(compgen -W "actions bridge channel decide direct-commits gate-stability gc land lesson-actions notify owed poll push push-mains ram-cap report start status stop telegram-bridge tell watchdog workers" -- "$cur") );;
@@ -602,6 +602,8 @@ _starci() {
         runtime:gen-ops:--ops-dir) return 0;;
         runtime:gen-ops:--out) return 0;;
         runtime:housekeeping:--only) return 0;;
+        runtime:import-held-secret:--member) return 0;;
+        runtime:import-held-secret:--rev) return 0;;
         runtime:install:--hosts) return 0;;
         runtime:link:--root) return 0;;
         runtime:machine-db:--file) return 0;;
@@ -975,7 +977,7 @@ _starci() {
         gate:run) COMPREPLY=( $(compgen -W "--root --base --main --changed --tests --out --scope --tree --json --cwd --quiet --help --edition" -- "$cur") );;
         gate:runtime-artifact) COMPREPLY=( $(compgen -W "--pack --dir --out --root --json --cwd --quiet --help --edition" -- "$cur") );;
         gate:runtime-coverage) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
-        gate:sonar) COMPREPLY=( $(compgen -W "--key --name --with-token --wait --base --paths --project-gate --branch --out --blob --log --token-ref --no-ensure --timeout --wait-timeout --isolate --keep-slice-project --declaration --host --stack --json --cwd --quiet --help --edition" -- "$cur") );;
+        gate:sonar) COMPREPLY=( $(compgen -W "--key --name --with-token --wait --base --paths --project-gate --branch --out --blob --log --token-ref --no-ensure --timeout --wait-timeout --isolate --keep-slice-project --declaration --host --stack --public --json --cwd --quiet --help --edition" -- "$cur") );;
         gate:starcistacks) COMPREPLY=( $(compgen -W "--new --json --cwd --quiet --help --edition" -- "$cur") );;
         gate:test-world) COMPREPLY=( $(compgen -W "--root --project --tests --out --json --cwd --quiet --help --edition" -- "$cur") );;
         gate:unit) COMPREPLY=( $(compgen -W "--root --out --json --cwd --quiet --help --edition" -- "$cur") );;
@@ -1084,6 +1086,7 @@ _starci() {
         runtime:gen-catalog) COMPREPLY=( $(compgen -W "--write --check --root --json --cwd --quiet --help --edition" -- "$cur") );;
         runtime:gen-ops) COMPREPLY=( $(compgen -W "--check --ops-dir --out --json --cwd --quiet --help --edition" -- "$cur") );;
         runtime:housekeeping) COMPREPLY=( $(compgen -W "--dry-run --apply --only --json --cwd --quiet --help --edition" -- "$cur") );;
+        runtime:import-held-secret) COMPREPLY=( $(compgen -W "--member --rev --json --cwd --quiet --help --edition" -- "$cur") );;
         runtime:install) COMPREPLY=( $(compgen -W "--force --hosts --no-bootstrap --json --cwd --quiet --help --edition" -- "$cur") );;
         runtime:ledger-hygiene) COMPREPLY=( $(compgen -W "--apply --json --cwd --quiet --help --edition" -- "$cur") );;
         runtime:link) COMPREPLY=( $(compgen -W "--root --json --cwd --quiet --help --edition" -- "$cur") );;

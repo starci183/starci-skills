@@ -17125,3 +17125,26 @@ SCAN_SMELL:
   nextStep_vi: "Sửa đúng dòng được chỉ: chạy các bước độc lập bằng `Promise.all`, gọi tên thứ tự bằng `eachInOrder` của `platform/primitives`, bỏ import thừa, viết lại biểu thức lồng thành câu lệnh riêng, đọc locale qua `next/root-params`, trả `Promise.resolve(...)` thay vì `async` không `await`. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
   owner: op-retry
   kind: check-finding
+
+sonar-host-secret-missing:
+  title: "A secret of the self-hosted Sonar stack is not in secret.env"
+  title_vi: "Một bí mật của stack Sonar tự lưu trữ chưa có trong secret.env"
+  meaning_vi: "`starci gate sonar up`, `status`, `ensure-project` hoặc `scan --isolate` cần một biến của stack Sonar tự lưu trữ (SONARQUBE_DB_PASSWORD, SONARQUBE_ADMIN_PASSWORD, SONARQUBE_ADMIN_TOKEN hoặc, với --public, CLOUDFLARE_TUNNEL_TOKEN) nhưng môi trường đã phân giải từ .claude/secret.env không có hoặc để trống. Stack không giữ bí mật nào trong cây mã nguồn; báo cáo nêu tên biến, không bao giờ nêu giá trị."
+  causes_vi:
+    - "Owner chưa chuyển bí mật cũ của stack sang secret.env"
+    - "Tên biến trong secret.env sai chính tả hoặc còn là mẫu CHANGE_ME"
+  nextStep_vi: "Owner thêm đúng tên biến vào .claude/secret.env (secret.env.example mô tả từng biến); với bản mã hóa cũ, chạy `starci runtime import-held-secret --member <đường dẫn cũ>` một lần cho mỗi thành viên."
+  owner: owner
+  kind: verb-refusal
+
+held-secret-import-refused:
+  title: "A held secret was not moved into secret.env"
+  title_vi: "Một bí mật cũ chưa được chuyển vào secret.env"
+  meaning_vi: "`starci runtime import-held-secret` không ghi gì vào secret.env. Trường `cause` nêu lý do: thành viên không thuộc danh sách, thành viên đã ngừng dùng (không có biến thay thế), biến đã có trong secret.env nên không bị ghi đè, lịch sử git không còn thành viên đó, sops không giải mã được bằng danh tính age của owner, hoặc giá trị giải mã rỗng hay nhiều dòng. Giá trị không bao giờ được in."
+  causes_vi:
+    - "Danh tính age của owner chưa được cung cấp (SOPS_AGE_KEY hoặc SOPS_AGE_KEY_FILE)"
+    - "Biến đã được thêm vào secret.env từ trước"
+    - "--rev trỏ tới một revision không còn chứa thành viên"
+  nextStep_vi: "Đọc `cause`: cung cấp danh tính age, đặt --rev đúng, hoặc sửa tay biến đã có trong secret.env; sau khi chuyển xong, xoay (rotate) mật khẩu quản trị, token quản trị và token tunnel vì bản mã hóa vẫn nằm trong lịch sử git công khai."
+  owner: owner
+  kind: verb-refusal

@@ -14,7 +14,7 @@ credential:
   name: KEYCLOAK_ADMIN_CLIENT_SECRET
   providedBy: owner
   custody: identity:keycloak-admin-client-secret
-  # sealed in .starcistacks/dev/secrets/keycloak-env.enc (DEMO-ONLY recipient)
+  # a DEMO-ONLY default of the compose file (KEYS.md), not a secret; a run exports another value
 sandbox: The dev environment runs its own Keycloak on 8149 with the imported ecommerce realm; it is a real Keycloak, not a
   stub.
 refs: [fr.identity.sign-in]
