@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { parseYaml } from '../../engine/yaml.mjs';
 import { checkRolesContract, standardTable, writeRoleBlocks } from '../../scripts/checks/check-roles-contract.mjs';
 import { renderStandingTable, roleStandings, standingMessages } from '../../scripts/machine/roles-standard.mjs';
 import { renderRolesTable, tableOf, withRolesTable } from '../../scripts/machine/roles-table.mjs';
@@ -108,13 +109,14 @@ test('green: a role that builds its requirement and drops the pending entry is c
 
 test('pending may name an open registry entry instead of a lane; a closed or unknown entry is red', () => {
   const pendingOn = (entry) => withRole('supervisor', (role) => { delete role.tokenBudget; role.pending = [{ requirements: ['budget'], entry, since: '2026-10-08' }]; });
-  const ok = pendingOn('supervisor-wake-budget-unmeasured');
+  const openId = parseYaml(fs.readFileSync(path.join(skillRoot, 'modules/reconciler/edge-cases.yaml'), 'utf8')).cases.find((one) => one.status === 'open').id;
+  const ok = pendingOn(openId);
   assert.equal(standing(ok, 'supervisor').cells.budget, 'pending');
   assert.deepEqual(messagesOf(ok), []);
-  assert.match(renderStandingTable(ok, roleStandings(ok, skillRoot)), /pending \(supervisor-wake-budget-unmeasured\)/);
-  const table = renderRolesTable(withRole('supervisor', (role) => { delete role.happyErrors; role.pending = [{ requirements: ['happy-errors'], entry: 'supervisor-wake-budget-unmeasured', since: '2026-10-08' }]; }));
-  assert.match(table, /pending, entry supervisor-wake-budget-unmeasured/);
-  assert.match(messagesOf(pendingOn('critic-pinned-by-hand')).join('\n'), /is not an open entry/);
+  assert.ok(renderStandingTable(ok, roleStandings(ok, skillRoot)).includes(`pending (${openId})`));
+  const table = renderRolesTable(withRole('supervisor', (role) => { delete role.happyErrors; role.pending = [{ requirements: ['happy-errors'], entry: openId, since: '2026-10-08' }]; }));
+  assert.match(table, new RegExp(`pending, entry ${openId}`));
+  assert.match(messagesOf(pendingOn('supervisor-wake-budget-unmeasured')).join('\n'), /is not an open entry/);
   assert.match(messagesOf(pendingOn('no-such-entry')).join('\n'), /is not an open entry/);
 });
 

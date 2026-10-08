@@ -34,7 +34,7 @@ test('the contract chain follows reportsTo and names only known roles', () => {
 test('RT_ROLES_CONTRACT_DRIFT names a block that differs from the contract and --write repairs it', (t) => {
   const root = tempTree(t);
   const file = path.join(root, 'modules/kernel/kernel-prompt.md');
-  fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace('Dispatches ops by the plan', 'Does everything'));
+  fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace('Answers the judgments of its menu', 'Does everything'));
   const findings = checkRolesContract(root);
   assert.equal(findings.length, 1);
   assert.equal(findings[0].code, CODE);
