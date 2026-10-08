@@ -17125,3 +17125,14 @@ SCAN_SMELL:
   nextStep_vi: "Sửa đúng dòng được chỉ: chạy các bước độc lập bằng `Promise.all`, gọi tên thứ tự bằng `eachInOrder` của `platform/primitives`, bỏ import thừa, viết lại biểu thức lồng thành câu lệnh riêng, đọc locale qua `next/root-params`, trả `Promise.resolve(...)` thay vì `async` không `await`. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
   owner: op-retry
   kind: check-finding
+
+WORK_AUTHOR_PREREQUISITE_UNSETTLED:
+  title: "A leg work.author proves against has not settled"
+  title_vi: "Một chặng mà work.author chứng minh dựa vào chưa settle xanh"
+  meaning_vi: "work.author viết bản ghi triển khai và uat chứng minh các bản ghi yêu cầu, kiến trúc và giao diện; chặng business.decide, architecture.decide hoặc interface.draw của kế hoạch chưa có job settle thành công nên chưa có gì để chứng minh."
+  causes_vi:
+    - "Kernel giao work.author trước khi chặng tiền đề của kế hoạch settle"
+    - "Chặng tiền đề chưa được enqueue, đang chạy hoặc settle đỏ"
+  nextStep_vi: "Runtime từ chối giao work.author và nêu chặng còn thiếu cùng trạng thái job mới nhất của nó; Kernel enqueue hoặc chờ chặng đó settle xanh rồi giao lại."
+  owner: "other-op:business.decide"
+  kind: dispatch-refusal

@@ -20,6 +20,7 @@ import { DIRECTION_EXEMPT, archetypeOf, directionReadiness } from '../work/ui-ar
 import { boundRecordPaths, segments } from './bound-records.mjs';
 import { normRel } from '../lib/path-key.mjs';
 import { readParamName } from '../context/read-refs.mjs';
+import { planPrerequisiteLine } from './plan-prerequisites.mjs';
 
 /** The refusal code of the design gate (unmet kind design-not-settled). */
 export const DESIGN_NOT_SETTLED = 'DESIGN_NOT_SETTLED';
@@ -120,6 +121,7 @@ export function prerequisiteDetail({ op, jobId, unmet }) {
       return `${DESIGN_NOT_SETTLED}: implementation record ${item.record} proves ui record ${item.ui}, whose interface.draw has not settled pass - ${item.why} (reads.${item.read}, designDrawn). Code is never built before its design: enqueue interface.draw for ${item.ui} and dispatch this job --after it. ${translator(ownerLanguage())('Vietnamese: the drawing (interface.draw) of {ui} is not settled yet, so code must not be written; dispatch implement only once it is drawn and accepted', { ui: item.ui })}`;
     if (item.kind === 'direction-unaccepted')
       return `bound ui record ${item.record} is a ${item.archetype} surface${item.derived ? ' (derived; set ui.archetype to override)' : ''} and its brand.direction archetype is not accepted by the owner - ${item.why ?? 'status ' + (item.status ?? 'absent')} (reads.${item.read}, directionArchetype); enqueue brand.decide --param directionArchetype=${item.archetype} (direction mode; it asks the owner, BRAND_DIRECTION_UNACCEPTED until answered) and dispatch this job --after it`;
+    if (item.kind === 'plan-prerequisite-unsettled') return planPrerequisiteLine(item);
     return `${op} has an unmet prerequisite (${item.kind})`;
   });
   return `${lines.join('; ')}. Produce the missing record or finish the dependency through the op that owns it, then run starci kernel dispatch --job ${jobId} again; if the job binds the wrong record, enqueue a corrected job and settle this one --verdict blocked. The job stays queued and nothing was reserved or launched.`;

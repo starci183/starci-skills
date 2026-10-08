@@ -18,6 +18,7 @@ import { ensureTempRoot } from '../../../api/fs/ensure-temp-root.mjs';
 import { hostThrottle, noteThrottled, releaseThrottled, DISPATCH_THROTTLED } from '../../../machine/ram-throttle.mjs';
 import { deferredQueueCause } from '../../autopilot-run.mjs';
 import { checkPrerequisites, prerequisiteDetail } from '../../prerequisites.mjs';
+import { unsettledPlanPrerequisites } from '../../plan-prerequisites.mjs';
 import { FOUNDATION_WAIT, gateShellFoundation, shellFoundationNeed } from '../../shell-foundation.mjs';
 import { isSeamCut, seamStubForDispatch } from '../../seam-policy.mjs';
 import { selectDispatchContract } from '../../dispatch-admission.mjs';
@@ -139,12 +140,12 @@ export function refuseHolds(d) {
  * only end blocked on them is a wasted launch.
  */
 function refuseUnmetPrerequisites(d) {
-  const { repo, jobId, op, payload, briefDoc, dispatchParams } = d;
-  const prerequisites = checkPrerequisites({ brief: briefDoc, payload, repo, params: dispatchParams });
-  if (!prerequisites.unmet.length) return;
-  const designGate = prerequisites.unmet.find((item) => item.kind === 'design-not-settled');
-  const out = { ok: false, jobId, op, reason: 'prerequisite-unmet', ...(designGate ? { code: designGate.code } : {}), unmet: prerequisites.unmet,
-    detail: prerequisiteDetail({ op, jobId, unmet: prerequisites.unmet }) };
+  const { repo, db, job, jobId, op, payload, briefDoc, dispatchParams } = d;
+  const unmet = [...checkPrerequisites({ brief: briefDoc, payload, repo, params: dispatchParams }).unmet, ...unsettledPlanPrerequisites(db, { workflowId: job.workflow_id, op })];
+  if (!unmet.length) return;
+  const coded = unmet.find((item) => item.code);
+  const out = { ok: false, jobId, op, reason: 'prerequisite-unmet', ...(coded ? { code: coded.code } : {}), unmet,
+    detail: prerequisiteDetail({ op, jobId, unmet }) };
   refuseVerb(d, out, `dispatch REFUSED for ${jobId} (${op}): prerequisite-unmet — ${out.detail}`);
 }
 
