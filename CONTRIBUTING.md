@@ -158,6 +158,17 @@ Every runtime change meets these rules on top of the commit bar:
    New admission requires the exact current READ manifest and current safeguards. Unknown custody stays held.
    A source change never closes, restarts or rewrites live terminals, ledgers or product files.
 
+## Removing or renaming a spelling
+
+Removing or renaming any key, flag, verb, field or code adds, in the same commit, one entry to
+`modules/kernel/removed-vocabulary.yaml`: the removed spelling (a literal name, or a `match` regular expression when the
+bare name is a common word), what replaced it, and the release that removed it. The runtime's refusal of that spelling reads
+the same entry, so the refusal says what to write instead. The self-check `removed-vocabulary` (`RT_REMOVED_VOCABULARY`)
+scans `skills/`, `docs/`, `README.md`, `CONTEXT.md`, `CONTRIBUTING.md`, `modules/` and `knowledge/` and refuses any removed
+spelling there, so the same commit rewrites every instruction that still teaches it. Exempt: the list file, `CHANGELOG.md`
+and a removed-list, which is a line carrying the marker `[removed-list]` or a block under a marker that stands alone on a
+comment line (`<!-- [removed-list] -->` in Markdown, `# [removed-list]` in yaml) up to the next blank line.
+
 ## Commit bar
 
 - The checks required by [useful verification](docs/verify-proof.md) pass for the cut's actual change.
