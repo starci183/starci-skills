@@ -422,3 +422,10 @@ cases:
     rule: {file: packages/test-world/src/nest/subscription.spec.ts, anchor: "writableEnded"}
     spec: packages/test-world/src/nest/subscription.spec.ts
     status: covered
+  - id: worker-done-required-a-preamble-capability-orca-no-longer-sends
+    family: correctness
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "starci kernel report refused to send the op's worker_done (dispatch_capability_missing) without the dcap_ value of the Orca worker preamble; the Orca 1.4.221 preamble of a Claude, Codex or Devin worker carries no --dispatch-capability, so no op could settle its Task and Dispatch by worker_done and settle fenced every one", remedy: {state: in-tree, change: "the report verb sends the worker_done with the capability when the op has one and without it otherwise (Orca authenticates from the dispatched pane); the op prompt asks for the flag only when the preamble carries it; the live settle smoke runs the same send call without inventing a capability"}}
+    met: {date: "2026-10-09", where: "release cut of 1.0.0-alpha.7, live orca-settle-live E3 in the release checkout", evidence: "live-a7-2 log: the Claude worker found no dcap_ in its preamble, SMOKE-E3 dispatchStateAfterOrchSend ready, taskStatusAfterWorkerDone dispatched"}
+    rule: {file: scripts/kernel/verbs/report.mjs, anchor: "Orca 1.4.221 sends none"}
+    spec: tests/kernel-verbs-shared/managed-dispatch.spec.mjs
+    status: covered

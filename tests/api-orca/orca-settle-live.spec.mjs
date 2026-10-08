@@ -29,7 +29,7 @@ const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 if (process.env.STARCI_ORCA_LIVE === '1' || process.env.STARCI_REQUIRE_ORCA_LIVE === '1') process.env.STARCI_OWNER_CONFIG_WITHIN = ROOT;
 const AGENTS = ['claude', 'codex', 'devin'];
 const AGENT_PROCESS_WHERE = "Name='claude.exe' OR Name='codex.exe' OR Name='devin.exe'";
-const NOOP_SPEC = `This is a smoke test. Do not read, edit, create or delete anything. Run exactly one shell command, with your own ids from your Orca worker preamble (your task id, your dispatch id, and your terminal handle as --from): node ${ROOT}scripts/api/orca/send.mjs --task-id <your task id> --dispatch-id <your dispatch id> --from <your terminal handle> --dispatch-capability <the dcap_ value of the --dispatch-capability flag in your Orca preamble> --outcome succeeded --report-path smoke . Do not send worker_done any other way. Then stay idle and never exit.`;
+const NOOP_SPEC = `This is a smoke test. Do not read, edit, create or delete anything. Run exactly one shell command, with your own ids from your Orca worker preamble (your task id, your dispatch id, and your terminal handle as --from): node ${ROOT}scripts/api/orca/send.mjs --task-id <your task id> --dispatch-id <your dispatch id> --from <your terminal handle> --outcome succeeded --report-path smoke . Add --dispatch-capability <its dcap_ value> only if your Orca preamble carries that flag; if it does not, run the command without it. Do not send worker_done any other way. Then stay idle and never exit.`;
 const SETTLED = ['succeeded', 'failed'];
 
 const unavailable = () => {

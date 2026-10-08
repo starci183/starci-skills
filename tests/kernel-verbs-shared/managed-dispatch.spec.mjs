@@ -342,7 +342,7 @@ test('managed dispatch: route persists the decision, spawn marks the job running
   assert.equal('taskClosed' in (json(s.stdout)??{}),false);
 });
 
-test('starci kernel report without the op\'s Dispatch capability sends no worker_done, records dispatch_capability_missing, and settle fences the Dispatch with worker-stop then releases it',async t=>{
+test('starci kernel report without a Dispatch capability still sends the worker_done, from the op\'s own pane, with no capability flag',async t=>{
   const fx=fixture(t);
   const jobId='job-managed-no-capability';
   const ledger=openLedger({file:fx.ledgerFile});
@@ -359,9 +359,9 @@ test('starci kernel report without the op\'s Dispatch capability sends no worker
   }));
   const filed=await fx.run(API,'report','--repo',fx.repo,'--job',jobId,'--report',report,'--attach',attachProofs(fx,jobId,report),'--json');
   assert.equal(filed.status,0,filed.stderr||filed.stdout);
-  assert.equal(fx.calls().includes('orchestration send'),false,'no capability, no worker_done attempt');
+  assert.equal(fx.calls().includes('orchestration send'),true,'the worker_done is attempted without a capability');
   const done=json(jobRow(fx,jobId)?.payload_json)?.workerDone;
-  assert.deepEqual([done?.ok,done?.errorCode,done?.code],[false,'dispatch_capability_missing','worker-done-unsent']);
+  assert.deepEqual([done?.ok,done?.outcome],[true,'succeeded']);
 });
 
 test('managed settle: a Dispatch with no worker_done (the op filed no report) is fenced with worker-stop, then released',async t=>{

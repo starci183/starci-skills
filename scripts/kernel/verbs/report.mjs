@@ -40,10 +40,9 @@ function sendOpWorkerDone(ledger, job, payload, report, reportPath, dispatchCapa
   const outcome = WORKER_DONE_OUTCOME[report?.outcome];
   if (!outcome || !managed?.dispatchId || !managed?.taskId) return null;
   let sent;
-  // Orca authenticates a worker_done with the Dispatch capability only the worker holds (its preamble: `--dispatch-capability dcap_...`;
-  // live E3, 2026-10-02: dispatch_capability_invalid without it). The op passes it to starci kernel report; it is never stored.
-  if (!dispatchCapability) sent = { ok: false, outcome: 'failed', errorCode: 'dispatch_capability_missing', error: 'starci kernel report was given no --dispatch-capability (the one in the op\'s Orca preamble)' };
-  else try {
+  // Orca authenticates a worker_done from the dispatched pane; a preamble that carries a Dispatch capability (`--dispatch-capability dcap_...`)
+  // has the op pass it to starci kernel report, which forwards it and never stores it. Orca 1.4.221 sends none, so none is required.
+  try {
     sent = send({ taskId: managed.taskId, dispatchId: managed.dispatchId, from: managed.agentTerminalHandle ?? null,
       outcome, reportPath, subject: `${jobOpOf(job)} ${report.outcome}`, dispatchCapability });
   } catch (error) { sent = { ok: false, outcome: 'failed', error: String(error?.message ?? error) }; }
