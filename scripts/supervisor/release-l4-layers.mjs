@@ -8,7 +8,7 @@ import path from 'node:path';
 import { nextBuildEnv } from '../gates/build-env.mjs';
 
 /** The test layers a full app may hold, with the suffix of their spec files. */
-export const TEST_LAYERS = Object.freeze(['contract', 'integration', 'e2e']);
+const TEST_LAYERS = Object.freeze(['contract', 'integration', 'e2e']);
 
 const hasFile = (dir, accept) => {
   if (!fs.existsSync(dir)) return false;

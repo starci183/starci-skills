@@ -30,6 +30,8 @@ const SKIP_DIR_NAMES = new Set([
   'storybook-static',
   'node_modules',
   '.next',
+  // The turbo task cache an example's build writes (manifest and meta JSON per task); build output like .next, never authored.
+  '.turbo',
   'out',
   '.venv',
   'worktrees',

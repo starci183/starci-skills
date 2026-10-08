@@ -266,7 +266,7 @@ cases:
   - id: example-fell-behind-renderer-unseen
     family: record-vs-reality
     finding: {role: runtime, duty: does, verdict: departs, evidence: "the three example apps are the runtime's reference applications, yet no check in npm run check judged them: a hand-added .starcistacks/.npmignore, a lite quality gate left at the full name, Next config modules that need a projection at image build and Dockerfile text the templates no longer write all reached the release cut, where 16 L4 example rows failed after an hour of run", remedy: {state: in-tree, change: "the example-render self-check judges every example with the runtime's own HFS and renderer, without an app install (scripts/checks/check-example-render.mjs)"}}
-    met: {date: "2026-10-08", where: "release cut of 1.0.0-alpha.7", evidence: "D:/starci-tmp/release/cut-alpha7.log, verdict suite-red"}
+    met: {date: "2026-10-08", where: "release cut of 1.0.0-alpha.7", evidence: "the release cut of v1.0.0-alpha.7 refused suite-red with 21 red rows"}
     rule: {file: scripts/checks/check-example-render.mjs, anchor: "the examples are their render"}
     spec: tests/checks/example-render.spec.mjs
     status: covered
