@@ -78,3 +78,16 @@ test('a reservation and its launching mark agree with admission for a 33-minute-
   const late = markProviderBudget(reserved.reservation, { state: 'launching', launchIdentity: 'run-a:worker-request-a' }, { ...options, now: () => updatedAt + 25 * HOUR });
   assert.equal(late.ok, false);
 });
+
+test('a window the provider has not started (0 percent, no reset time) is valid; a used window without a reset time is not', () => {
+  const entry = { provider: 'claude', status: 'ok', error: null, updatedAt,
+    session: { usedPercent: 0, windowMinutes: 300, resetsAt: null, resetDescription: null },
+    weekly: { usedPercent: 15, windowMinutes: 10080, resetsAt: updatedAt + 5 * 24 * HOUR, resetDescription: 'Tue 10:00 AM' } };
+  const probeClaude = (claude) => probeOrcaAccount('claude', { policy, now: updatedAt + MIN,
+    accountList: () => ({ ok: true, accounts: {}, rateLimits: { claude: structuredClone(claude) } }) });
+  const fresh = probeClaude(entry);
+  assert.equal(fresh.normalAdmission, true, fresh.detail);
+  assert.equal(fresh.usedPercent, 15);
+  const used = probeClaude({ ...entry, session: { ...entry.session, usedPercent: 40 } });
+  assert.equal(used.normalAdmission, false, 'a window in use must say when it resets');
+});
