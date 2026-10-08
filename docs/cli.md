@@ -4230,7 +4230,7 @@ run the bounded L1-L4 test ladder without accidental whole-suite work
 
 ### starci test affected
 
-the specs a change can break, chosen by the land gate selection; --run runs each once
+the specs related to the changed functions (--by file: every importer); --run runs each once
 
 | flag | type | |
 | --- | --- | --- |
@@ -4248,7 +4248,9 @@ Roles: worker, lead, coordinator, release, owner
 Conventions:
 
 - Everyday verification after npm run check; the whole suite is the merged-tree run and the release cut.
-- The set is computed, not guessed - the land gate selection, plus the specs behind a runtime module that reads a changed yaml.
+- The set is computed - each changed .mjs symbol is followed by name through its importers, callers and CLI verbs.
+- What cannot be followed by name (yaml, templates, load-time statements, no base, the depth bound) keeps the file-level rule, named in the report.
+- The report names every symbol with its specs and why, and every file that fell back; --json carries them; never larger than --by file.
 - A selection above the bound in modules/supervisor/affected-tests.yaml is printed, not run; the full suite is the lead's.
 - A red file is fixed and run again, then the affected set once; never the whole suite.
 - Each file is its own low-priority node process with the four preloads, at the concurrency of test-concurrency.yaml.

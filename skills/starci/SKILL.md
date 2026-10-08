@@ -31,7 +31,7 @@ shim, the three Windows tasks with whether their action is current, the Supervis
   other than start: only `starci workflow start`, `starci supervisor start` or an explicit owner request starts one.
 - Orca is opened by the owner. A red row the services heal does not repair is reported with its fix.
 
-Verification of runtime changes is `npm run check` plus `starci test affected --run`; the whole suite is only the merged-tree run and the release cut, and a bound role that runs the root `npm test` is refused.
+Verification of runtime changes is `npm run check` plus `starci test affected --run`; the whole suite is only the merged-tree run and the release cut, and a bound role that runs the root `npm test` is refused. The affected set is the specs related to the changed functions (each changed `.mjs` symbol followed by name through its importers and callers, the CLI verbs that reach it, the invariant specs); what cannot be followed by name falls back to every importer of that file and the report says which (`--by file` forces the file-level rule).
 
 Load only the reference needed for the requested action:
 
