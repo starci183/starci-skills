@@ -254,7 +254,7 @@ test('a frontend governed by its backend declaration is not held to the backend-
 });
 
 const exampleEntry = (repo, extra = {}) => ({ provider: 'sonarcloud', mode: 'hosted', host: { public: 'https://sonarcloud.io' }, auth: 'token',
-  projects: [{ repository: repo, key: `starci-example-${repo}` }], runtimeSecrets: ['SONAR_TOKEN', 'SONAR_ORGANIZATION'],
+  projects: [{ repository: repo, key: `starci-example-${repo}` }], runtimeSecrets: ['SONAR_TOKEN'],
   ci: { wiring: 'optional-follow-up', secrets: [], vars: [{ name: 'SONAR_HOST_URL', value: 'https://sonarcloud.io' }] },
   qualityGate: 'starci-quality', ownerAction: { needed: 'SONAR_TOKEN in secret.env', reason: 'the runtime repository holds no secret' }, ...extra });
 
@@ -271,7 +271,10 @@ test('an example that declares a stack, host.local or a custody credential, anot
   const refusal = stackForm.findings.filter((finding) => finding.code === 'STACKS_EXAMPLE_FORM');
   assert.ok(refusal.some((finding) => /a stack, host\.local, custody credentials/.test(finding.message)));
   assert.ok(refusal.some((finding) => /provider sonarcloud and mode hosted/.test(finding.message)));
-  assert.ok(refusal.some((finding) => /runtimeSecrets \[SONAR_TOKEN, SONAR_ORGANIZATION\]/.test(finding.message)));
+  assert.ok(refusal.some((finding) => /runtimeSecrets \[SONAR_TOKEN\]/.test(finding.message)));
+  const withOrganization = workspace(t, { services: { sonar: exampleEntry('product', { runtimeSecrets: ['SONAR_TOKEN', 'SONAR_ORGANIZATION'] }), 'error-tracking': sentryEntry('product') } });
+  const organization = checkStarciStacks(withOrganization.product, { examplesRoot: withOrganization.dir }).findings.filter((finding) => finding.code === 'STACKS_EXAMPLE_FORM');
+  assert.ok(organization.some((finding) => /organization is configuration \(config\.yaml sonar\.organization\)/.test(finding.message)), JSON.stringify(organization));
   const bare = workspace(t, { services: { sonar: (({ runtimeSecrets, ...rest }) => rest)(exampleEntry('product')), 'error-tracking': sentryEntry('product') } });
   assert.ok(codes(checkStarciStacks(bare.product, { examplesRoot: bare.dir }), 'refuse').includes('STACKS_EXAMPLE_FORM'));
 });

@@ -16762,8 +16762,8 @@ STACKS_EXAMPLE_FORM:
   meaning_vi: "Một app nằm trong chính repository runtime (thư mục examples/) khai báo stack, host.local hoặc credential trong custody, hoặc không khai báo runtimeSecrets. Repository runtime là public và không giữ tệp bí mật nào: ví dụ được phân tích trên SonarCloud bằng một SONAR_TOKEN duy nhất trong secret.env của runtime."
   causes_vi:
     - "Khối services.sonar của ví dụ còn stack, host.local hoặc credentials trỏ tới tệp .enc"
-    - "Khối services.sonar không phải provider sonarcloud, mode hosted, hoặc thiếu runtimeSecrets [SONAR_TOKEN, SONAR_ORGANIZATION]"
-  nextStep_vi: "Khai báo provider: sonarcloud, mode: hosted, host.public: https://sonarcloud.io, auth: token và runtimeSecrets: [SONAR_TOKEN, SONAR_ORGANIZATION]; bỏ stack, host.local và credentials."
+    - "Khối services.sonar không phải provider sonarcloud, mode hosted, hoặc runtimeSecrets khác [SONAR_TOKEN] (tổ chức SonarCloud là cấu hình config.yaml sonar.organization, không phải bí mật)"
+  nextStep_vi: "Khai báo provider: sonarcloud, mode: hosted, host.public: https://sonarcloud.io, auth: token và runtimeSecrets: [SONAR_TOKEN]; bỏ stack, host.local và credentials."
   owner: other-op:workspace.manage
   kind: check-finding
 

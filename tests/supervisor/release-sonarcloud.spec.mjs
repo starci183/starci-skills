@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { freshFetch } from '../../scripts/api/sonar/fresh-fetch.mjs';
-import { PROOF_BRANCH, cloudConfig, ensureCloudProject, sonarCloudFindings } from '../../scripts/supervisor/release-sonarcloud.mjs';
+import { PROOF_BRANCH, cloudConfig, ensureCloudProject, sonarCloudFindings, sonarOrganization } from '../../scripts/supervisor/release-sonarcloud.mjs';
 import { removeLintReport, writeLintReport } from '../../scripts/supervisor/release-sonar-report.mjs';
 import { sonarCloudRefusal } from '../../scripts/supervisor/release-cut-plan.mjs';
 import { sonarSupplier } from '../../scripts/supervisor/release-l4-sonar.mjs';
@@ -17,7 +17,7 @@ const tmp = (t, label) => {
   t.after(() => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
   return dir;
 };
-const SECRETS = { SONAR_TOKEN: 'cloud-token-value', SONAR_ORGANIZATION: 'acme' };
+const SETTINGS = { SONAR_TOKEN: 'cloud-token-value', SONAR_ORGANIZATION: 'acme' };
 const EXAMPLE = path.join(skillRoot, 'examples', 'ecommerce-app');
 const answer = (status, body) => ({ status, json: async () => body, text: async () => JSON.stringify(body) });
 
@@ -48,12 +48,12 @@ test('config: SonarCloud host, the runtime token from secret.env (not the SONAR_
   t.after(() => { for (const [name, value] of [['SONAR_HOST_URL', keep.host], ['SONAR_TOKEN', keep.token]]) { if (value === undefined) delete process.env[name]; else process.env[name] = value; } });
   process.env.SONAR_HOST_URL = 'https://sonar.starci.org';
   process.env.SONAR_TOKEN = 'self-hosted-token';
-  const cloud = cloudConfig(EXAMPLE, SECRETS);
+  const cloud = cloudConfig(EXAMPLE, SETTINGS);
   assert.equal(cloud.cfg.host, 'https://sonarcloud.io');
   assert.equal(cloud.key, 'acme_starci-example-ecommerce-app');
   assert.equal(cloud.org, 'acme');
   assert.equal(typeof cloud.cfg.fetch, 'function');
-  assert.throws(() => cloudConfig(tmp(t, 'nokey'), SECRETS), /no sonar\.projectKey/);
+  assert.throws(() => cloudConfig(tmp(t, 'nokey'), SETTINGS), /no sonar\.projectKey/);
 });
 
 test('fetch: every request asks for its own connection, so a socket pooled before a long synchronous step is never reused', async (t) => {
@@ -68,30 +68,31 @@ test('fetch: every request asks for its own connection, so a socket pooled befor
 
 test('findings: a ready SonarCloud has none; no example means nothing to check; the token travels only as a bearer header', async () => {
   const cloud = fakeCloud();
-  assert.deepEqual(await sonarCloudFindings([{ name: 'shop' }], { secrets: SECRETS, fetch: cloud.send }), []);
-  assert.deepEqual(await sonarCloudFindings([], { secrets: {}, fetch: cloud.send }), []);
+  assert.deepEqual(await sonarCloudFindings([{ name: 'shop' }], { settings: SETTINGS, fetch: cloud.send }), []);
+  assert.deepEqual(await sonarCloudFindings([], { settings: {}, fetch: cloud.send }), []);
   assert.ok(cloud.log.filter(([, p]) => p !== '/api/system/status').every(([, , authorization]) => authorization === 'Bearer cloud-token-value'));
 });
 
-test('findings: a missing SONAR_TOKEN or SONAR_ORGANIZATION is named at once, with where to get it, before any request', async () => {
+test('findings: a missing SONAR_TOKEN or SonarCloud organization is named at once, with where to set it, before any request', async () => {
   const cloud = fakeCloud();
-  const none = await sonarCloudFindings([{ name: 'shop' }], { secrets: {}, fetch: cloud.send });
-  assert.deepEqual(none.map((f) => f.what), ["SONAR_TOKEN is not set in the runtime's secret.env", "SONAR_ORGANIZATION is not set in the runtime's secret.env"]);
+  const none = await sonarCloudFindings([{ name: 'shop' }], { settings: {}, fetch: cloud.send });
+  assert.deepEqual(none.map((f) => f.what), ["SONAR_TOKEN is not set in the runtime's secret.env", 'the SonarCloud organization is not set (config.yaml sonar.organization, or the env SONAR_ORGANIZATION)']);
   assert.match(none[0].fix, /sonarcloud\.io > My Account > Security > Generate Tokens/);
+  assert.match(none[1].fix, /`sonar: \{organization: [^}]*\}` in \.claude\/config\.yaml/);
   assert.deepEqual(cloud.log, []);
 });
 
 test('findings: an unreachable API, a rejected token (a self-hosted prefix is named) and an unknown organization each refuse', async () => {
-  const down = await sonarCloudFindings([{ name: 'shop' }], { secrets: SECRETS, fetch: async () => { throw Object.assign(new Error('fetch failed'), { cause: { code: 'ENOTFOUND' } }); } });
+  const down = await sonarCloudFindings([{ name: 'shop' }], { settings: SETTINGS, fetch: async () => { throw Object.assign(new Error('fetch failed'), { cause: { code: 'ENOTFOUND' } }); } });
   assert.match(down[0].what, /SonarCloud is unreachable \(ENOTFOUND\)/);
-  const unavailable = await sonarCloudFindings([{ name: 'shop' }], { secrets: SECRETS, fetch: fakeCloud({ up: 503 }).send });
+  const unavailable = await sonarCloudFindings([{ name: 'shop' }], { settings: SETTINGS, fetch: fakeCloud({ up: 503 }).send });
   assert.match(unavailable[0].what, /HTTP 503/);
-  const rejected = await sonarCloudFindings([{ name: 'shop' }], { secrets: { ...SECRETS, SONAR_TOKEN: 'sqa_selfhosted' }, fetch: fakeCloud({ valid: false }).send });
+  const rejected = await sonarCloudFindings([{ name: 'shop' }], { settings: { ...SETTINGS, SONAR_TOKEN: 'sqa_selfhosted' }, fetch: fakeCloud({ valid: false }).send });
   assert.match(rejected[0].what, /SonarCloud rejects SONAR_TOKEN \(its prefix is that of a self-hosted SonarQube token\)/);
   assert.match(rejected[0].fix, /replace SONAR_TOKEN in \.claude\/secret\.env with a SonarCloud token/);
-  const plain = await sonarCloudFindings([{ name: 'shop' }], { secrets: SECRETS, fetch: fakeCloud({ valid: false }).send });
+  const plain = await sonarCloudFindings([{ name: 'shop' }], { settings: SETTINGS, fetch: fakeCloud({ valid: false }).send });
   assert.doesNotMatch(plain[0].what, /prefix/);
-  const unknown = await sonarCloudFindings([{ name: 'shop' }], { secrets: SECRETS, fetch: fakeCloud({ organizations: [] }).send });
+  const unknown = await sonarCloudFindings([{ name: 'shop' }], { settings: SETTINGS, fetch: fakeCloud({ organizations: [] }).send });
   assert.match(unknown[0].what, /no organization acme/);
 });
 
@@ -122,7 +123,7 @@ function gateOf({ scan = { outcome: 'pass', scanner: { exitCode: 0 }, ceTask: { 
     },
   };
 }
-const supplier = (t, fake, extra = {}) => sonarSupplier([APP], { gate: fake.gate, secrets: SECRETS, lintReport: () => ({ ok: true }), logDir: () => tmp(t, 'log'), ...extra });
+const supplier = (t, fake, extra = {}) => sonarSupplier([APP], { gate: fake.gate, settings: SETTINGS, lintReport: () => ({ ok: true }), logDir: () => tmp(t, 'log'), ...extra });
 
 test('supplier: the project is ensured, the scan runs with the organization on the proof branch, the dashboard is read, and both passing is the proof', async (t) => {
   const fake = gateOf();
@@ -190,4 +191,13 @@ test('cut: a SonarCloud finding becomes the sonar-cloud verdict naming every fin
   assert.equal(refusal.verdict, 'sonar-cloud');
   assert.match(refusal.why, /the Sonar proofs cannot reach SonarCloud: SONAR_TOKEN is not set \(owner: put it in secret\.env\)/);
   assert.equal(await sonarCloudRefusal({ repo: os.tmpdir(), deps: { sonarCloud: async () => [] } }), null);
+});
+
+test('the organization is configuration: the env SONAR_ORGANIZATION wins over config.yaml sonar.organization, and none is null', () => {
+  const config = { sonar: { organization: 'from-config' } };
+  assert.equal(sonarOrganization({}, config), 'from-config');
+  assert.equal(sonarOrganization({ SONAR_ORGANIZATION: ' from-env ' }, config), 'from-env');
+  assert.equal(sonarOrganization({ SONAR_ORGANIZATION: '' }, config), 'from-config');
+  assert.equal(sonarOrganization({}, {}), null);
+  assert.equal(sonarOrganization({}, { sonar: null }), null);
 });

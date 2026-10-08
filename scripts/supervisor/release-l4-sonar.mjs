@@ -4,20 +4,20 @@
 // The bar is the runtime's own (knowledge/sonar-gate.yaml): the scan row passes when the analysis was processed (the scanner exited 0 and SonarCloud's task succeeded) whatever the gate selected on
 // SonarCloud judges - a custom gate may not exist on the plan - and the dashboard row applies the declared thresholds to the measures read from the API (zero bugs, smells and vulnerabilities, every
 // hotspot reviewed, duplication, coverage 100 per service file and overall). Nothing is started or stopped on this host.
-// Async because the gate is. Seams (deps): gate ({config, ensure, scan, dashboard}), secrets, lintReport (appDir -> {ok, reason}), logDir, now.
+// Async because the gate is. Seams (deps): gate ({config, ensure, scan, dashboard}), settings, lintReport (appDir -> {ok, reason}), logDir, now.
 import fs from 'node:fs';
 import path from 'node:path';
 import { findInOrder } from '../lib/in-order.mjs';
 import { dashboard, scan, scrub } from '../gates/sonar-local.mjs';
 import { removeLintReport, writeLintReport } from './release-sonar-report.mjs';
-import { PROOF_BRANCH, cloudConfig, ensureCloudProject, hostSecrets } from './release-sonarcloud.mjs';
+import { PROOF_BRANCH, cloudConfig, ensureCloudProject, hostSettings } from './release-sonarcloud.mjs';
 import { tempRoot } from '../../engine/temp-root.mjs';
 
 const SCAN_TIMEOUT_SEC = 60 * 60;
 
 /** The gate's functions as the supplier calls them; `cloud` is {cfg, key, org}, `extra` the scanner defines. */
 const GATE = Object.freeze({
-  config: (appDir, secrets) => cloudConfig(appDir, secrets),
+  config: (appDir, settings) => cloudConfig(appDir, settings),
   ensure: (cloud, token) => ensureCloudProject(cloud, token),
   scan: (cloud, appDir, extra) => scan(cloud.cfg, { cwd: appDir, key: cloud.key, ensure: false, wait: true, projectGate: true, timeoutSec: SCAN_TIMEOUT_SEC, defines: extra }),
   dashboard: (cloud, appDir) => dashboard(cloud.cfg, { cwd: appDir, key: cloud.key }),
@@ -42,12 +42,12 @@ export function sonarSupplier(apps, deps = {}) {
     const log = path.join(logDir(), `sonar-${app.name.replace(/[^\w.-]+/g, '_')}-${t0}.log`);
     const lines = [];
     const finish = (ok) => { removeLintReport(app.dir); fs.writeFileSync(log, `${lines.join('\n')}\n`); return { ok, log, ms: now() - t0 }; };
-    const secrets = deps.secrets ?? hostSecrets();
+    const settings = deps.settings ?? hostSettings();
     let cloud;
-    try { cloud = gate.config(app.dir, secrets); } catch (error) { lines.push(`sonar config: ${error.message}`); return finish(false); }
+    try { cloud = gate.config(app.dir, settings); } catch (error) { lines.push(`sonar config: ${error.message}`); return finish(false); }
     const report = (deps.lintReport ?? writeLintReport)(app.dir);
     if (!report.ok) { lines.push(`sonar lint report: ${report.reason}`); return finish(false); }
-    const project = await gate.ensure(cloud, secrets.SONAR_TOKEN);
+    const project = await gate.ensure(cloud, settings.SONAR_TOKEN);
     if (project.error) { lines.push(`sonar project: ${project.error}`); return finish(false); }
     const steps = [['scan --project-gate', (dir) => gate.scan(cloud, dir, definesOf(cloud, project.created)), processed], ['dashboard', (dir) => gate.dashboard(cloud, dir), (r) => r?.outcome === 'pass']];
     const failed = await findInOrder(steps, async ([command, run, passes]) => {

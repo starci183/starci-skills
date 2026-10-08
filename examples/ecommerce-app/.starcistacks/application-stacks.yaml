@@ -83,7 +83,7 @@ services:
     qualityGate: starci-quality
     projects:
       - {repository: ecommerce-app, key: starci-example-ecommerce-app}
-    runtimeSecrets: [SONAR_TOKEN, SONAR_ORGANIZATION]
+    runtimeSecrets: [SONAR_TOKEN]
     ci:
       workflow: .github/workflows/examples.yml
       wiring: optional-follow-up
@@ -92,9 +92,9 @@ services:
         - {name: SONAR_HOST_URL, value: https://sonarcloud.io}
       provisioning: >-
         The tag workflow scans only when the host repository has the secret SONAR_TOKEN and the variables SONAR_HOST_URL and SONAR_ORGANIZATION;
-        the project key on SonarCloud is <SONAR_ORGANIZATION>_<key above>. The release cut scans with the SONAR_TOKEN of the runtime's secret.env.
+        the project key on SonarCloud is <SONAR_ORGANIZATION>_<key above>. The release cut scans with the SONAR_TOKEN of the runtime's secret.env and the organization of the runtime's config.yaml (sonar.organization).
     ownerAction:
-      needed: SONAR_TOKEN (a SonarCloud token) and SONAR_ORGANIZATION (the SonarCloud organization key) in .claude/secret.env, and the same two as the repository secret and variable.
+      needed: SONAR_TOKEN (a SonarCloud token) in .claude/secret.env and as the repository secret, the SonarCloud organization key as config.yaml sonar.organization and as the repository variable SONAR_ORGANIZATION.
       reason: the runtime repository is public and holds no secret, so the token lives only in the owner's untracked secret.env and in GitHub.
 k8s:
   status: deferred

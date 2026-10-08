@@ -6,6 +6,7 @@ import {skillRoot} from './runtime-root.mjs';
 import {parseYaml} from './yaml.mjs';
 import {isPlainObject as plain} from './plain-object.mjs';
 import {invalid,validateRoots,ROOT_KEYS} from './invalid-config.mjs';
+import {validateSonar} from './sonar-config.mjs';
 import {validateOrca,ORCA_KEYS} from './orca-config.mjs';
 import {validateResources,RESOURCE_KEYS} from './resources-config.mjs';
 import {ENV_NAME,secretEnv,connectorSecret} from './secrets.mjs';
@@ -244,7 +245,7 @@ export function uatSettings(config=loadConfig()){
 const GRANT=/^([a-z0-9][a-z0-9.-]*)=(\d+)@([a-z]+(?:\+[a-z]+)*)$/;
 /** One grant string `<pool>=<slots>@<role>+<role>` as {pool, slots, roles}, or null when it is not that shape. */
 /** The closed set of top-level config.yaml blocks: the validator accepts these and refuses every other key. */
-export const CONFIG_BLOCKS=Object.freeze(['language','model','effort','models','allocation','kernel','budgets','supervisor','parallel','delegation','connectors','asks','uat','specs','reconciler','debugLoop','orca','roots','resources','launchTrust','retention']);
+export const CONFIG_BLOCKS=Object.freeze(['language','model','effort','models','allocation','kernel','budgets','supervisor','parallel','delegation','connectors','asks','uat','specs','reconciler','debugLoop','orca','roots','resources','sonar','launchTrust','retention']);
 export function parseAllocationGrant(text){
   const m=typeof text==='string'?GRANT.exec(text.trim()):null;
   return m?{pool:m[1],slots:Number(m[2]),roles:m[3].split('+')}:null;
@@ -325,7 +326,7 @@ const validateEarlyConfigBlocks=(config)=>{
   if(config?.launchTrust!==undefined){launchTrustSettings(config);} if(config?.retention!==undefined){workflowPurgeSettings(config);}
   if(config?.connectors!==undefined){validateConnectors(config.connectors);} if(config?.asks!==undefined){validateAsks(config.asks);}
   if(config?.uat!==undefined){validateUat(config.uat);} if(config?.debugLoop!==undefined){validateDebugLoop(config.debugLoop);}
-  if(config?.orca!==undefined){validateOrca(config.orca);} if(config?.roots!==undefined){validateRoots(config.roots);} if(config?.resources!==undefined){validateResources(config.resources);}
+  if(config?.orca!==undefined){validateOrca(config.orca);} if(config?.roots!==undefined){validateRoots(config.roots);} if(config?.resources!==undefined){validateResources(config.resources);} if(config?.sonar!==undefined){validateSonar(config.sonar);}
 };
 const validateConfigBlocks=(config,knownProviders,runtimes,profile)=>{
   // specs (owner 2026-09-28): {harness?, unit?, e2e?} booleans - each family a boolean; absent = its default (SPEC_DEFAULTS: harness off, unit on, e2e off; specsSettings).
