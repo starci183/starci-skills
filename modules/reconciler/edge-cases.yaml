@@ -680,9 +680,11 @@ cases:
     status: covered
   - id: supervisor-session-grows-without-bound
     family: smooth-operation
-    met: {date: "2026-10-09", where: "wave 4 lane perf/w4-seat-token-cost: the Supervisor session a6aac83e ran 619 turns, 270 M tokens, context 50 k to 718 k", evidence: "replayed per-turn contexts: a fresh seat every 8 wakes would have cost 157 M of the 307 M (49 percent saved)"}
-    status: open
-    why: "start-supervisor --replace refuses a seat worker-show reports live and --restart disables the seat and stops its workers; a rotation needs a stop-and-replace that keeps the seat enabled, closes only the idle seat terminal and starts the standing prompt again (the Supervisor reads machine.sqlite, not its memory); the facts (wakes since supervisor-booted, tokens since boot) and the rule row rotation.supervisor of seat-cost.yaml follow the Kernel's"
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "the Supervisor session a6aac83e ran 619 turns and 270 M tokens with its context growing from 50 k to 718 k (the seat is 48 percent of the 644 M tokens recorded); start --replace refuses a live seat and --restart disables it, so nothing could renew an idle seat; the seat keeps nothing outside machine.sqlite (menu, Decision Items, channel inbox and replies, action log)", remedy: {state: in-tree, change: "the watchdog rotates an idle Supervisor that received rotation.supervisor.afterWakes wakes or spent afterTokens tokens since its boot: start-supervisor --rotate closes the old worker with proof, keeps the seat enabled and boots the standing prompt with a handover generated from the stores (open Decision Items, its last actions); it waits while an item is claimed, a worker job or a land runs, never repeats inside minIntervalMs, records supervisor-rotated and answers rotated, which the Host does not count toward any quarantine"}}
+    met: {date: "2026-10-09", where: "wave 4 lane perf/w4-supervisor-rotation: replay of the two Supervisor sessions", evidence: "a fresh seat every 8 wakes would have cost 157 M of the 307 M tokens (49 percent saved); of the 49 notification wakes (103 M) 26 were background lands (64 M) and 9 background worker spawns (17 M), both forbidden to the Supervisor since alpha.8, 13 were Orca messages of worker runs (20 M)"}
+    rule: {file: scripts/supervisor/seat-rotation.mjs, anchor: "planRotation"}
+    spec: tests/supervisor/seat-rotation.spec.mjs
+    status: covered
   - id: kernel-transition-wake-usage-not-cut
     family: smooth-operation
     met: {date: "2026-10-09", where: "wave 4 lane perf/w4-seat-token-cost: the usage sweep cuts a Kernel session at kernel-woken events only", evidence: "scripts/kernel/wake-budget.mjs kernelWakesOf"}

@@ -125,3 +125,6 @@ export async function guardedRun(ledger, run) {
   if (ledger.attempts?.length) throw Object.assign(new Error(`a read verb tried to write the ledger: ${ledger.attempts.join(', ')}`), { code: 'read-verb-write' });
   return result;
 }
+
+/** The ledger a refusal's receipt is written through: a read verb refused to an Op still writes it, through a writable connection of its own. */
+export const receiptLedger = (ledger, openWritable) => (ledger.readOnly ? openWritable({ file: ledger.path }) : ledger);

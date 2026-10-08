@@ -14,6 +14,7 @@
 //   starci supervisor start [--json] [--plan] [--reason <text>]
 //       enable the seat and launch it unless one is live
 //   starci supervisor start --replace [--json]      (the watchdog's call; never enables)
+//   starci supervisor start --rotate --reason <handover> [--json]   (the watchdog's call: close the idle live seat and start the standing prompt again; the seat stays enabled)
 //   starci supervisor status [--json]
 //   starci supervisor stop [--json]         disable, worker-stop + worker-release
 //   starci supervisor start --restart [--json]      stop + start (a contract reload)
@@ -351,7 +352,7 @@ async function spawnSeat({ m, d, seat, health, listing, recorded, dedupe, group,
  * enabled). Every host seam is in `deps`. Returns a result object; `exit` is the
  * process exit code it maps to.
  */
-export async function launchSupervisor({ mode = 'start', reason = null, plan: planOnly = false,
+export async function launchSupervisor({ mode = 'start', reason = null, plan: planOnly = false, rotate = false,
   env = process.env, deps = null, settings = supervisorSettings(), template = null, doc = null, now = Date.now,
   profile = SUPERVISOR_SEAT } = {}) {
   const refusal = chatModeRefusal({ env, planOnly, mode });
@@ -371,7 +372,7 @@ export async function launchSupervisor({ mode = 'start', reason = null, plan: pl
     const group = launchGroup(settings);
     if (planOnly) return planResult({ seat, health, dedupe, group, settings, profile, env, d, enabled });
 
-    if (health.live) {
+    if (health.live && !rotate) {
       const closed = closeDuplicates(dedupe.close, d, listing);
       return { ok: true, exit: 0, action: health.starting ? 'starting' : 'already-live', terminal: health.terminal, reason: health.reason, ...(closed.length ? { closedDuplicates: closed } : {}) };
     }
@@ -438,7 +439,7 @@ async function main() {
   const value = (n) => { const i = argv.indexOf(`--${n}`); return i >= 0 ? argv[i + 1] ?? null : null; };
   const asJson = has('json');
   const out = (r) => { console.log(asJson ? JSON.stringify(r) : describe(r)); process.exitCode = r.exit ?? (r.ok ? 0 : 1); };
-  if (has('help')) { console.log('use: start-supervisor.mjs [--plan] [--reason <t>] | --replace | --status | --stop | --restart  [--json]'); return; }
+  if (has('help')) { console.log('use: start-supervisor.mjs [--plan] [--reason <t>] | --replace | --rotate | --status | --stop | --restart  [--json]'); return; }
   if (has('status')) return out(await supervisorStatus());
   if (has('stop')) { const r = await stopSupervisor(); supervisorLog('start', describe(r), { data: r }); return out(r); }
   if (has('restart')) {
@@ -448,8 +449,8 @@ async function main() {
     supervisorLog('start', `restart: ${describe(r)}`, { level: r.ok ? 'info' : 'warn', data: r });
     return out(r);
   }
-  const mode = has('replace') ? 'replace' : 'start';
-  const r = await launchSupervisor({ mode, reason: value('reason'), plan: has('plan') });
+  const mode = has('replace') || has('rotate') ? 'replace' : 'start';
+  const r = await launchSupervisor({ mode, reason: value('reason'), plan: has('plan'), rotate: has('rotate') });
   if (!has('plan')) supervisorLog('start', `${mode}: ${describe(r)}`, { level: r.ok ? 'info' : 'warn', data: r });
   return out(r);
 }
