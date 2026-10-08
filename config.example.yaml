@@ -137,8 +137,8 @@ orca:
   maxWorkerDepth: 4
 # debugLoop — the debug watcher. Workflow DEBUG is a /loop of the chat that started the workflow (the /starci skill sets it up in
 # Claude Code and Codex; no seat, no background agent, nothing in the runtime schedules it). Each tick runs the read-only
-# `starci debug digest`. interval is the loop cadence (<n>s | <n>m | <n>h, shipped default 10m); worktreeLimit is the
-# per-repository core-watch alert threshold (shipped default 40). Both keys are optional (engine/config.mjs DEBUG_LOOP_DEFAULTS).
+# `starci debug digest`. interval is the loop cadence (<n>s | <n>m | <n>h, default `10m` = `debugLoop.interval`); worktreeLimit is the
+# per-repository core-watch alert threshold (default `40` = `debugLoop.worktreeLimit`). Both keys are optional (engine/config.mjs DEBUG_LOOP_DEFAULTS).
 debugLoop:
   interval: 10m
   worktreeLimit: 40

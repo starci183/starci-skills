@@ -49,8 +49,8 @@ newAgentAdmission:
     - Validate policy version, role floor, concrete group and caller constraints before ranking.
     - Require group membership, model floor, existing eligibility, live capacity and closed incident/cooldown (the hard filter; a bias never restores a member it drops).
     - Missing, stale, invalid or mismatched quota/auth identity refuses every new normal admission; unknown is never presented as verified availability.
-    - Every available quota window participates; the most used window sets the member's token use. At or above reservePercent (90) an automatic pick skips the member for this pick only (it stays in the chain).
-    - A member named by the owner bias (prefer or only) or by a matching scoped reserve override stays usable from reservePercent up to biasPercent (95); at or above biasPercent no pick takes it. Bad auth, exhausted, stale and unknown cannot be overridden.
+    - Every available quota window participates; the most used window sets the member's token use. At or above reservePercent (default `90` = `modules/models/tiers.yaml:usage.reservePercent`) an automatic pick skips the member for this pick only (it stays in the chain).
+    - A member named by the owner bias (prefer or only) or by a matching scoped reserve override stays usable from reservePercent up to biasPercent (default `95` = `modules/models/tiers.yaml:usage.biasPercent`); at or above biasPercent no pick takes it. Bad auth, exhausted, stale and unknown cannot be overridden.
     - Evidence the runtime observes itself (owner grants, direct probes) is fresh within allocation.admission.maxAgeMs; a provider window the host polls (observation host-polled, the Orca account reader only) is fresh within hostPolledMaxAgeMs, which defaults to maxAgeMs.
     - Owner-grant providers have scoped finite slots and fresh owner authority; no window percentages are invented for them.
     - A Critic must have a known author provider and select another provider. A caller may tighten independence to both provider and model, never relax the role rule.
@@ -340,10 +340,10 @@ allocationFacts:
       maxSharePercent of the tier's running seats (running seats counted), yields to the next member that passes the hard
       filter and the token step; with no such member the head stays. A bias skips this step.
     tokens: >-
-      The first member below reservePercent (90) of its most used quota window; an automatic pick skips a member at or above
+      The first member below reservePercent (default `90` = `modules/models/tiers.yaml:usage.reservePercent`) of its most used quota window; an automatic pick skips a member at or above
       it for this pick only, and the member stays in the chain. A member named by the owner bias (prefer or only), or by an
-      owner reserve grant, stays usable up to biasPercent (95); from biasPercent no pick takes it, with or without a bias;
-      exhaustedPercent (100) is never used. Every member out of tokens refuses (tokens-out) and reports the earliest reset.
+      owner reserve grant, stays usable up to biasPercent (default `95` = `modules/models/tiers.yaml:usage.biasPercent`); from biasPercent no pick takes it, with or without a bias;
+      exhaustedPercent (default `100` = `modules/models/tiers.yaml:usage.exhaustedPercent`) is never used. Every member out of tokens refuses (tokens-out) and reports the earliest reset.
     liveSeat: >-
       A live seat keeps its member; the steps above apply only to a new pick or to the replacement of a dead seat.
     record: >-
