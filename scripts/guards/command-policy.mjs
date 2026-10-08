@@ -177,7 +177,8 @@ const npmCleanInstallVerdict = ({ args, policy, handle, lockOwner, text, verb })
   if (args.includes('--dry-run')) return null;
   let owner = null;
   try { owner = lockOwner(); } catch { /* an unreadable lock proves no ownership */ }
-  if (owner && !owner.stale && (owner.role === 'release' || (handle && owner.handle === handle))) return null;
+  const owns = (held) => !held.stale && (held.role === 'release' || (handle && held.handle === handle));
+  if (owner && owns(owner)) return null;
   const denied = policy.npm?.deny?.ci, use = useOf(denied, 'the runtime installs dependencies under the host lock');
   return refusal(codeOf(denied, 'RIGHTS_NPM_CI_UNLOCKED'), text, 'this clean install rewrites node_modules without the caller holding the host lock', use);
 };

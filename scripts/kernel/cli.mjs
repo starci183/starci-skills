@@ -943,7 +943,7 @@ function queuedBecauseOf(db, job, ctx) {
   let seamHold = null;
   try { seamHold = siblingSeamHold(db, job, { now: ctx.now ?? Date.now(), isOwnerWait: (row) => isAwaitingOwner(db, row) }); } catch { seamHold = null; }
   const out = queuedBecauseInner(db, job, { ...ctx, seamHold });
-  if (seamHold && !seamHold.hold) out.seamStub = { mode: seamHold.stub.mode, seamJobId: seamHold.stub.seamJobId, seamStatus: seamHold.stub.seamStatus, reason: seamHold.stub.reason };
+  if (seamHold?.hold === false) out.seamStub = { mode: seamHold.stub.mode, seamJobId: seamHold.stub.seamJobId, seamStatus: seamHold.stub.seamStatus, reason: seamHold.stub.reason };
   if (isSeamCut(payload.cut)) out.seam = { cutId: String(payload.cut.id), siblings: Number(payload.cut.total) - 1 };
   return out;
 }
@@ -3108,7 +3108,7 @@ const custodyOfRelease = (release, agentHandle = null) => {
     let shown = null;
     try { shown = terminalShow({ terminal: agentHandle }); } catch { shown = null; }
     if (shown?.ok && shown.connected !== true) return { state: 'released', proof: 'terminal-disconnected', terminal: agentHandle };
-    if (shown && !shown.ok && !shown.hostUnavailable && TERMINAL_GONE_CODES.has(shown.errorCode)) return { state: 'released', proof: 'terminal-gone', terminal: agentHandle };
+    if (TERMINAL_GONE_CODES.has(shown?.errorCode) && !shown.ok && !shown.hostUnavailable) return { state: 'released', proof: 'terminal-gone', terminal: agentHandle };
     if (shown?.ok && shown.connected === true) return { state: 'retained', proof: 'terminal-connected', terminal: agentHandle };
   }
   return { state: 'unknown', proof: release ? `release-${release.state ?? release.outcome ?? 'refused'}` : 'release-unanswered' };
@@ -3138,7 +3138,7 @@ function releaseManagedWorker(settledPayload) {
   const shape = (r) => ({ ok: r?.ok === true, outcome: r?.outcome ?? null, state: r?.state ?? null, ...(r?.error ? { error: r.error } : {}) });
   return {
     dispatchId: managed.dispatchId,
-    dispatch: { state: dispatchState, workerDone, ...(before && !before.ok ? { unreadable: true } : {}) },
+    dispatch: { state: dispatchState, workerDone, ...(before?.ok === false ? { unreadable: true } : {}) },
     stop: stop ? shape(stop) : null,
     release: shape(release),
     ...(retry ? { retryRelease: shape(retry) } : {}),

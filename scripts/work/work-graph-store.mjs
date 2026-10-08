@@ -160,7 +160,7 @@ export function recordVersion(ledger, { workflowId, graph, event, reason, author
 function insertNextVersion(ledger, { workflowId, candidate, event, reason, authorOp, authorJob, scope, now }) {
   const prev = latestVersion(ledger.db, workflowId);
   const digest = graphDigest(candidate);
-  if (prev && prev.digest === digest) return { ok: true, unchanged: true, version: prev.version, digest };
+  if (prev?.digest === digest) return { ok: true, unchanged: true, version: prev.version, digest };
   const diff = diffGraphs(prev?.graph ?? null, candidate);
   if (prev && diffIsEmpty(diff)) return { ok: true, unchanged: true, version: prev.version, digest: prev.digest };
   if (scope) {

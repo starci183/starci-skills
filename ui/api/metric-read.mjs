@@ -16,9 +16,9 @@ export function readMetricSnapshot(machine, kind, ledgerId, workflowId, now = Da
 }
 
 export function metricPayload(snapshot, schema) {
-  if (snapshot && snapshot.payload.schema !== schema) throw new Error(`Unsupported metric snapshot schema: ${snapshot.payload.schema ?? 'missing'}`);
   if (snapshot) {
     const data = snapshot.payload;
+    if (data.schema !== schema) throw new Error(`Unsupported metric snapshot schema: ${data.schema ?? 'missing'}`);
     const numbers = (value, keys) => value && keys.every(key => Number.isFinite(value[key]));
     let valid = false;
     switch (schema) {

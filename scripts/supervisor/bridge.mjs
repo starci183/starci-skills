@@ -396,7 +396,7 @@ async function cmdRevise(args, { env = process.env } = {}) {
   const rec = withWrite(repo, (ledger) => {
     const rec = { schema: BRIDGE_SCHEMA, id: bridgeId, action: 'revise', state: revisionState(applied), by: 'supervisor', ...approval, reason, finding: args.finding ?? null,
       workflowId, text: clip(text, 2000), preview: { baseRevision: preview.baseRevision, nextRevision: preview.nextRevision, opChainDiff: preview.opChainDiff, token: preview.approval.token },
-      ...(applied && !applied.ok ? { error: applied.error } : {}), at: now, updatedAt: now };
+      ...(applied?.ok === false ? { error: applied.error } : {}), at: now, updatedAt: now };
     writeBridge(ledger.db, rec, now);
     appendEvents(ledger, [workflowId], 'supervisor-revision-requested', { bridgeId, state: rec.state, reason, ...approval, opChainDiff: preview.opChainDiff });
     return rec;

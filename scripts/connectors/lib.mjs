@@ -89,7 +89,7 @@ function takeLock(m, name) {
     if (connectorManagerBlocked(custody)) return { ok: false, holder: custody, reason: 'connector-child-custody-unreconciled' };
     const cur = m.hostLock(name);
     if (cur?.state === 'held' && cur.holder_pid !== process.pid && liveRow(cur)) return { ok: false, holder: lockRecord(cur) };
-    if (cur && cur.state !== 'released' && cur.holder_pid !== process.pid) m.releaseHostLock({ name, force: true });
+    if ((cur?.state ?? 'released') !== 'released' && cur.holder_pid !== process.pid) m.releaseHostLock({ name, force: true });
     const got = m.acquireHostLock({ name, holder: holderLabel(), ttlMs: LOCK_TTL_MS, state: 'held' });
     return got.ok ? { ok: true } : { ok: false, holder: lockRecord(got.holder) };
   });
@@ -134,7 +134,7 @@ export function claimOrTakeOver(name, { from = null, env = process.env } = {}) {
 export const reassertManager = (name, { env = process.env } = {}) => {
   const ok = withMachine((m) => m.transaction(() => {
     const cur = m.hostLock(name);
-    if (cur && cur.state !== 'released' && cur.holder_pid !== process.pid) m.releaseHostLock({ name, force: true });
+    if ((cur?.state ?? 'released') !== 'released' && cur.holder_pid !== process.pid) m.releaseHostLock({ name, force: true });
     return m.acquireHostLock({ name, holder: holderLabel(), ttlMs: LOCK_TTL_MS, state: 'held' }).ok;
   }), { env });
   if (ok) startRenewal(name, env);
@@ -160,7 +160,7 @@ export const markStarting = (name, pid, env = process.env) => {
     const cur = m.hostLock(name);
     // A live holder (the launched manager already claimed, or another one) is never overwritten.
     if (cur?.state === 'held' && liveRow(cur)) return false;
-    if (cur && cur.state !== 'released' && cur.holder_pid !== pid) m.releaseHostLock({ name, force: true });
+    if ((cur?.state ?? 'released') !== 'released' && cur.holder_pid !== pid) m.releaseHostLock({ name, force: true });
     return m.acquireHostLock({ name, holder: 'starting', pid, ttlMs: STARTING_MS, state: 'starting' }).ok;
   }), { env });
 };
@@ -192,7 +192,7 @@ export function withHostMutex(name, fn, { env = process.env, waitMs = 10_000, st
     try { return await fn(); } finally { try { withMachine((m) => m.releaseHostLock({ name }), { env }); } catch { /* gone */ } }
   });
   chains.set(name, run);
-  run.catch(() => {}).finally(() => { if (chains.get(name) === run) chains.delete(name); });
+  run.finally(() => { if (chains.get(name) === run) chains.delete(name); }).catch(() => {});
   return run;
 }
 

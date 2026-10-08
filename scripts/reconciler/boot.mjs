@@ -71,7 +71,7 @@ export function leaderState({ env = process.env, now = Date.now(), numbers = rec
     holder: row?.holder ?? null, pid: row?.pid ?? null, epoch: row?.epoch ?? null, heartbeatAt, ageMs,
     expiresAt: row?.expires_at ?? null, rev: row?.rev ?? null, safe: safeModes.length > 0, safeModes, runId: run?.run_id ?? null,
     exitReason: run?.exit_reason ?? null, killedBy: run?.killed_by ?? null, startReason: run?.start_reason ?? null,
-    draining: Number(row?.draining) === 1 || (run != null && run.ended_at == null && run.draining_since != null), pushRunning,
+    draining: Number(row?.draining) === 1 || (run?.draining_since != null && run.ended_at == null), pushRunning,
     fresh: ageMs != null && ageMs < numbers.heartbeatStaleMs,
   };
 }

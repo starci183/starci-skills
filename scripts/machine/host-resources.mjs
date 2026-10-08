@@ -105,7 +105,7 @@ const finishProbe = ({ drives, totalRamBytes, freeRamBytes, freeRamPct, ramKnown
     .map((d) => ({ ...d, requiredDiskGb: requiredGbOf(d, thresholds) }))
     .sort((a, b) => (a.freeDiskGb - a.requiredDiskGb) - (b.freeDiskGb - b.requiredDiskGb));
   const worst = measured[0] ?? null;
-  const lowDisk = worst != null && worst.freeDiskGb < worst.requiredDiskGb;
+  const lowDisk = worst?.freeDiskGb < worst?.requiredDiskGb;
   const lowRam = ramKnown === true && freeRamPct < thresholds.minFreeRamPct;
   return {
     ok: !lowDisk && !lowRam, lowDisk, lowRam,

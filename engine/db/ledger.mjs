@@ -343,7 +343,7 @@ export function appendEvent(db,{eventId=newToken(),workflowId,entityType,entityI
   need(workflowId&&entityType&&entityId!=null&&kind,'Event workflowId, entityType, entityId and kind are required');
   let payloadJson=payload===null||payload===undefined?null:JSON.stringify(redactData(payload));
   need(payloadJson===null||payloadJson.length<=EVENT_PAYLOAD_MAX||payloadSha,`event payload is ${payloadJson?.length} bytes (> ${EVENT_PAYLOAD_MAX}); store it as a blob and pass payloadSha`,'STARCI_EVENT_PAYLOAD_TOO_LARGE');
-  if(payloadSha&&payloadJson&&payloadJson.length>EVENT_PAYLOAD_MAX)payloadJson=null;
+  if(payloadSha&&payloadJson?.length>EVENT_PAYLOAD_MAX)payloadJson=null;
   const gen=generation??db.prepare('SELECT generation FROM workflows WHERE workflow_id=?').get(workflowId)?.generation??0;
   const prevDigest=eventsHead(db,workflowId);
   const digest=eventDigest({prevDigest,eventId,kind,payloadJson,createdAt});
@@ -822,7 +822,7 @@ export function setLogCursor(db,{name,value,mode='set'}){
 /** Upsert one condition; a status change moves last_transition_at and appends 'condition-changed'. */
 export function setCondition(db,{workflowId,entityType,entityId,type,status,reason,message=null,owner=null,observedGeneration=null,at=nowMs()}){
   const prior=db.prepare('SELECT * FROM conditions WHERE entity_type=? AND entity_id=? AND type=?').get(entityType,String(entityId),type);
-  const moved=!prior||prior.status!==status;
+  const moved=prior?.status!==status;
   db.prepare(`INSERT INTO conditions(workflow_id,entity_type,entity_id,type,status,reason,message,owner,observed_generation,last_transition_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)
     ON CONFLICT(entity_type,entity_id,type) DO UPDATE SET status=excluded.status,reason=excluded.reason,message=excluded.message,owner=excluded.owner,
     observed_generation=excluded.observed_generation,updated_at=excluded.updated_at,last_transition_at=CASE WHEN conditions.status<>excluded.status THEN excluded.last_transition_at ELSE conditions.last_transition_at END`)

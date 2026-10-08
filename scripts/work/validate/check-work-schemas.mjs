@@ -28,7 +28,7 @@ let cached = null;
 
 /** Every catalogued work-tree schema compiled once per process, keyed by its `schema` const. */
 export function loadWorkSchemaValidators(root = runtimeRoot) {
-  if (cached && cached.root === root) return cached;
+  if (cached?.root === root) return cached;
   let Ajv2020;
   try {
     const require = createRequire(path.join(root, 'package.json'));

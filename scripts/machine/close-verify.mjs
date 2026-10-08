@@ -59,7 +59,7 @@ export function terminalState(handle, { show = terminalShow } = {}) {
   let shown;
   try { shown = show({ terminal: handle }); } catch { return 'unknown'; }
   if (shown?.ok && shown.terminal) return shown.connected === true ? 'connected' : 'disconnected';
-  if (shown && !shown.hostUnavailable && TERMINAL_GONE_CODES.has(shown.errorCode)) return 'gone';
+  if (TERMINAL_GONE_CODES.has(shown?.errorCode) && !shown.hostUnavailable) return 'gone';
   return 'unknown';
 }
 

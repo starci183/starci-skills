@@ -212,7 +212,7 @@ let gitMemo = null;
  * `git log` per minute per root; an unreadable repository is [].
  */
 function gitCommits({ root = SKILL_ROOT, since = 0, log = logSince, memoMs = 60_000, now = Date.now() } = {}) {
-  if (gitMemo && gitMemo.root === root && gitMemo.since <= since && now - gitMemo.at < memoMs && log === logSince) return gitMemo.commits.filter((c) => c.at >= since);
+  if (gitMemo?.root === root && gitMemo.since <= since && now - gitMemo.at < memoMs && log === logSince) return gitMemo.commits.filter((c) => c.at >= since);
   const r = log(root, new Date(Math.max(0, since - 60_000)).toISOString(), '%H%x1f%ct%x1f%s%x1f%b%x1e');
   if (!r.ok) return [];
   const commits = String(r.stdout ?? '').split('\x1e').map((rec) => rec.replace(/^\s+/, '')).filter(Boolean).map((rec) => {

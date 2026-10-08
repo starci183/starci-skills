@@ -31,7 +31,7 @@ export const ledgerIdForRepo=repoRoot=>ledgerIdFromKey(repoRootKey(repoRoot));
 /** The registered runtime.sqlite of `repoRoot` in machine.ledgers (a3-2 resolveLedger), or null. */
 function registeredLedgerFile(root,env,openReader){
   let row;try{row=readMachine(m=>m.resolveLedger({repoRoot:root}),null,{env});}catch{return null;}
-  const file=row&&row.state!=='retired'&&row.file?path.resolve(row.file):null;
+  const file=row?.file&&row.state!=='retired'?path.resolve(row.file):null;
   if(file&&fs.existsSync(file))assertLedgerRoot(file,root,openReader);
   return file;
 }

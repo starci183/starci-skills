@@ -375,7 +375,7 @@ async function criticVerdict({ client, launched, entry, critic, pollMs, sleep, n
 }
 
 function cleanupCriticWorkspace({ launched, client, entry, orca, base, unplace, workspace, dir }) {
-  let placementSafe = !launched || launched.effectState === 'none';
+  let placementSafe = launched?.effectState === 'none' || !launched;
   if (launched?.ok) {
     // Stop is a no-op for a worker that already settled; release frees its seat; the Task closes.
     const stop = settle(() => client.stop({ dispatch: launched.dispatchId }));

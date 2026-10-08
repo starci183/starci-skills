@@ -29,7 +29,7 @@ function assertFinishable({ db, workflowId, repo, internals }) {
     code: 'handover-not-approved', pendingRevisions: pendingRevisions.map(row => row.inbox_id),
   });
   const handoverGate = already ? null : handoverGateOf(db, workflowId);
-  if (handoverGate && !handoverGate.ok) {
+  if (handoverGate?.ok === false) {
     throw Object.assign(new Error(`workflow ${workflowId} cannot finish: ${handoverGate.reason}; run handover.review as the final leg and let the owner approve it (starci kernel status handover)`), {
       code: 'handover-not-approved', approvedSeq: handoverGate.approvedSeq ?? null, lastBusinessSettleSeq: handoverGate.lastBusinessSettleSeq ?? null,
     });

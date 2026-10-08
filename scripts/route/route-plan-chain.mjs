@@ -104,7 +104,7 @@ function ensureLeg(P, opId, { forVar = null, instance = null, injected = null } 
     external: EXTERNAL_OPS.has(opId) || undefined,
     injected: injected ?? undefined,
     yaml: op?.file ?? null,
-    missingOp: !op || !!op.error || undefined,
+    missingOp: !op || Boolean(op.error) || undefined,
   };
   legs.set(lid, leg);
   leg._seq = P.seq++;

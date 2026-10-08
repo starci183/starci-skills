@@ -153,7 +153,7 @@ function objectContractTypeStatus(ts, checker, type, nextSeen, depth) {
     return argumentsList.length === 1 ? contractTypeStatusFromType(ts, checker, argumentsList[0], nextSeen, depth + 1) : 'unavailable';
   }
   const declarations = type.symbol?.getDeclarations?.() ?? [];
-  if (type.symbol && !type.symbol.getName().startsWith('__') && declarations.some(declaration => ts.isInterfaceDeclaration(declaration)
+  if (type.symbol?.getName().startsWith('__') === false && declarations.some(declaration => ts.isInterfaceDeclaration(declaration)
     || ts.isClassDeclaration(declaration) || ts.isTypeAliasDeclaration(declaration) || ts.isEnumDeclaration(declaration))) return 'named';
   return 'inline';
 }
@@ -389,10 +389,10 @@ function hasInjectedMember(ts, checker, declaration, targets) {
 }
 
 function checkMessageHandlers(state, sourceFile, checker, decorators, kinds) {
-  for (let index = 0; index < decorators.length; index += 1) {
+  for (const [index, decorator] of decorators.entries()) {
     const kind = kinds[index];
     if (!MESSAGE_HANDLERS.has(kind)) continue;
-    const message = messageClass(state.config, state.context, checker, decorators[index], state.localFiles, state.readonlyReasons);
+    const message = messageClass(state.config, state.context, checker, decorator, state.localFiles, state.readonlyReasons);
     if (!message) continue;
     const key = `${message.getSourceFile().fileName}:${message.pos}`;
     if (state.messageSeen.has(key)) continue;

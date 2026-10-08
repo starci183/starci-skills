@@ -353,7 +353,7 @@ export function shellBindingFindings(root, workRoot = workRootOf(root)) {
 /** A ui record: the shell record it is bound to (its ROUTE_NOT_IN_NAV info omitted), the record itself, its images. */
 function uiTargetFindings(workRoot, indexFile, own, shell, uiRecords) {
   const findings = [];
-  const lockupDeferredFor = shell && !shell.error && isPlannedLayoutDrawing(shell.record, own) ? own.id : null;
+  const lockupDeferredFor = !shell?.error && shell && isPlannedLayoutDrawing(shell.record, own) ? own.id : null;
   if (shell && own.shell?.chromeless !== true) findings.push(...checkShellRecord(workRoot, shell, { requireAll: false, uiRecords, lockupDeferredFor }).filter((f) => f.code !== 'ROUTE_NOT_IN_NAV'));
   findings.push(...checkUiRecord(workRoot, indexFile, own, shell, { mode: 'op', uiRecords }), ...uiPaletteFindings(workRoot, indexFile, own));
   return findings;

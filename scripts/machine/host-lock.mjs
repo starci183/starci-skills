@@ -175,7 +175,7 @@ export function withHostLock(options, fn) {
   const release = () => releaseHostLock({ token: got.token, env: options?.env, dir: options?.dir, fs: options?.fs, now: options?.now, isAlive: options?.isAlive, host: options?.host, remove: options?.remove });
   let out;
   try { out = fn(got); } catch (error) { release(); throw error; }
-  if (out && typeof out.then === 'function') return out.finally(release);
+  if (typeof out?.then === 'function') return out.finally(release);
   release();
   return out;
 }

@@ -66,7 +66,7 @@ export function createStaleTerminalStep({ state, terminalHandles, outputOf, di }
     if (!proof && closed.ok === true) {
       let listed = null;
       try { listed = await terminalHandles(); } catch { listed = null; }
-      if (listed && !listed.has(t.handle)) proof = 'unlisted';
+      if (listed?.has(t.handle) === false) proof = 'unlisted';
       else reason = listed ? 'terminal-still-listed' : 'terminal-list-unavailable';
     }
     return { proof, reason };

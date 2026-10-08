@@ -10,7 +10,7 @@ function revisableState({ ledger, workflowId, preview, approveRevision }) {
   if (current?.revision === preview.nextRevision && currentJson?.revision?.approvalToken === approveRevision) {
     return { alreadyApplied: true };
   }
-  if (!current || current.revision !== preview.baseRevision || current.goal_identity !== preview.goalIdentity) {
+  if (current?.revision !== preview.baseRevision || current.goal_identity !== preview.goalIdentity) {
     throw new Error(`stale revision preview for ${workflowId}: expected rev ${preview.baseRevision} and identity ${preview.goalIdentity}`);
   }
   const workflow = ledger.db.prepare('SELECT * FROM workflows WHERE workflow_id=?').get(workflowId);

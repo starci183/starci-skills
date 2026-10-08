@@ -211,7 +211,7 @@ const packSlices = (groups, maxFiles, conformance) => {
   let open = null;
   for (const group of ordered) {
     const size = group.units.reduce((sum, unit) => sum + Math.max(unit.files.size, 1), 0);
-    if (!open || open.wave !== group.wave || open.home !== group.home || open.files + size > maxFiles) {
+    if (open?.wave !== group.wave || open.home !== group.home || open.files + size > maxFiles) {
       open = { wave: group.wave, home: group.home, paths: [], files: 0, findings: 0, byFamily: {} };
       slices.push(open);
     }

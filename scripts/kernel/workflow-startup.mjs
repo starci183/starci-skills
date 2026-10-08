@@ -105,7 +105,7 @@ export function recordWorkflowStartFailure(ledger, { workflowId, token, holderPi
     const generation = workflow?.generation ?? 0;
     const unknown = ['partial', 'unknown'].includes(extra.effectState);
     // An archived ledger rejects further events; the machine owns unresolved host custody after retirement.
-    if (!workflow || workflow.phase === 'archived' || workflow.archived_at != null) {
+    if (workflow?.phase === 'archived' || workflow?.archived_at != null || !workflow) {
       const payload = { step, error, terminal: handle, ...extra, reservation: token, signalRetained: false };
       try {
         const custody = machine((m) => m.transaction(() => {

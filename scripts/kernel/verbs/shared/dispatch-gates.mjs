@@ -270,9 +270,9 @@ export function refuseHostLimits(d) {
   const host = hostResourcesFor({ env: process.env, repo });
   const throttle = hostThrottleOf(d, host);
   const admission = throttle?.admission ?? null;
-  if (host.lowDisk || (admission && !admission.ok)) {
+  if (host.lowDisk || admission?.ok === false) {
     const detail = hostLimitDetail(host, admission);
-    const throttled = admission && !admission.ok ? throttledOf(d, host, throttle, admission) : null;
+    const throttled = admission?.ok === false ? throttledOf(d, host, throttle, admission) : null;
     if (throttled) recordThrottled(d, throttle, admission, throttled);
     refuseVerb(d, { ok: false, jobId, op, reason: HOST_RESOURCES_LOW, waiting: true, host: { ...host, lowRam: host.lowRam || Boolean(throttled) }, ...(throttled ? { throttle: throttled } : {}), detail },
       `dispatch WAITING for ${jobId} (${op}): ${HOST_RESOURCES_LOW} - ${detail}`);
