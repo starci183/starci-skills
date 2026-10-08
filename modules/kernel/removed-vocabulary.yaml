@@ -2,11 +2,11 @@
 # the config and routing-bias refusals take their names and replacements from it, and the `removed-vocabulary` self-check
 # refuses any of these spellings in text an agent or the owner reads, outside this file, CHANGELOG.md and a block marked
 # `[removed-list]` (CONTRIBUTING.md, "Removing or renaming a spelling").
-# Fields: id; kind (config-key | bias-field | verb | flag | code | vocabulary); name (the removed spelling); use (the
+# Fields: id; kind (config-key | bias-field | verb | flag | code | vocabulary | file; a file is named by its base name); name (the removed spelling); use (the
 # replacement, worded to finish the sentence "<name> is removed (<use>)"); since (the release that removed it);
 # match (optional regular expression the scan uses instead of the literal name); scan (false when the name is too common
 # a word to scan for).
-kinds: [config-key, bias-field, verb, flag, code, vocabulary]
+kinds: [config-key, bias-field, verb, flag, code, vocabulary, file]
 removed:
   - id: bias-require
     kind: bias-field
@@ -90,10 +90,10 @@ removed:
     match: '\bcore-debug\s+(?:seat|watcher|worker|pass)\b'
   - id: verb-debug-pass
     kind: verb
-    name: starci debug pass
+    name: debug pass
     use: '`starci debug digest` (read-only) and `starci debug run <probe>`'
     since: 1.0.0-alpha.6
-    match: 'starci debug pass\b'
+    match: '(?<![\w-])debug pass\b'
   - id: flag-caller-agent
     kind: flag
     name: --caller-agent
@@ -114,3 +114,27 @@ removed:
     name: workflow-debug-not-ready
     use: 'there is no debug seat to be ready; the digest reads the ledger directly'
     since: 1.0.0-alpha.6
+  - id: file-core-debug
+    kind: file
+    name: core-debug.mjs
+    use: 'the debug watcher is a /loop of the calling chat running `starci debug digest`; the core-watch probe is scripts/reconciler/core-watch.mjs'
+    since: 1.0.0-alpha.6
+    match: '(?<![\w-])core-debug\.mjs\b'
+  - id: file-debug-pass
+    kind: file
+    name: debug-pass.mjs
+    use: '`starci debug digest` (read-only)'
+    since: 1.0.0-alpha.6
+    match: '(?<![\w-])debug-pass\.mjs\b'
+  - id: file-caller-context
+    kind: file
+    name: caller-context.mjs
+    use: 'there is no declared caller context; the debug digest runs in the calling chat'
+    since: 1.0.0-alpha.6
+    match: '(?<![\w-])caller-context\b'
+  - id: file-host-maintenance
+    kind: file
+    name: host-maintenance.md
+    use: 'skills/starci/references/host-startup.md'
+    since: 1.0.0-alpha.6
+    match: '(?<![\w-])host-maintenance\b'

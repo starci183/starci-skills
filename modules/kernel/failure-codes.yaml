@@ -15405,6 +15405,16 @@ RT_PROSE_COMMAND_UNKNOWN:
   nextStep_vi: "Người giám sát viết lại lệnh theo danh mục CLI (starci <nhóm> <verb> --help); nếu lệnh đã bị gỡ, thêm mục vào modules/kernel/removed-vocabulary.yaml và sửa mọi chỗ còn dạy nó."
   owner: supervisor
   kind: check-finding
+RT_DOCUMENTED_DEFAULT_DRIFT:
+  title: "A documented default differs from the value the code reads"
+  title_vi: "Một giá trị mặc định được ghi trong tài liệu khác với giá trị mà code đọc"
+  meaning_vi: "Tài liệu nêu giá trị mặc định bằng cách dẫn khóa sở hữu nó (default <giá trị> = `<khóa>`); khóa là đường dẫn config.yaml (xác định qua hàm settings của bộ kiểm tra) hoặc <tệp yaml trong modules/>:<đường dẫn>. Giá trị ghi khác giá trị khóa đó thực sự cho, hoặc khóa không xác định được, là một phát hiện nêu tệp:dòng."
+  causes_vi:
+    - "Đổi mặc định trong code hoặc yaml mà không sửa số trong tài liệu"
+    - "Gõ sai khóa dẫn hoặc dẫn tới khóa đã bị đổi tên"
+  nextStep_vi: "Người giám sát sửa số trong tài liệu cho khớp giá trị của khóa, hoặc sửa khóa dẫn; không chép lại một số không dẫn khóa."
+  owner: supervisor
+  kind: check-finding
 DOCKER_PORT_POLICY:
   title: "Docker ownership or published-port policy was refused"
   title_vi: "Chính sách sở hữu Docker hoặc cổng công bố đã từ chối thao tác"

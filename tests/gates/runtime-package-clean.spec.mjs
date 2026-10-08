@@ -17,7 +17,7 @@ function fixture(t, options = {}) {
   const source = {
     'package.json': JSON.stringify(manifest), 'skills/starci/SKILL.md': 'entry\r\n',
     'skills/starci/agents/openai.yaml': 'policy: manual\n', 'skills/starci/references/host-startup.md': 'startup\n',
-    'skills/starci/references/host-maintenance.md': 'maintenance\n', 'ui/server.mjs': 'export const server = true;\n',
+    'skills/starci/references/missing-reference.md': 'maintenance\n', 'ui/server.mjs': 'export const server = true;\n',
     'ui/api/index.mjs': 'export const api = true;\n', 'ui/package.json': '{}\n', 'ui/package-lock.json': '{}\n',
     'ui/src/main.tsx': 'export default null;\n', 'scripts/cli/main.mjs': 'dispatcher\n',
   };
@@ -71,7 +71,7 @@ function fixture(t, options = {}) {
         if (options.doctorIncomplete) return {status: null, stdout: '', stderr: ''};
         if (options.doctorSignal) return {status: null, signal: 'SIGTERM', stdout: '', stderr: ''};
         if (options.doctorError) return {error: {code: 'ENOENT', message: 'fixture doctor runner missing'}, stdout: '', stderr: ''};
-        if (options.doctorTamper) write(path.join(opts.cwd, '.claude/skills/starci/references/host-maintenance.md'), 'changed during diagnosis');
+        if (options.doctorTamper) write(path.join(opts.cwd, '.claude/skills/starci/references/missing-reference.md'), 'changed during diagnosis');
         return {status: 0, stdout: 'doctor: installed source and local runtime capabilities passed', stderr: ''};
       }
       assert.deepEqual(args.slice(1), ['runtime', args[2], '--cwd', opts.cwd, '--no-bootstrap']);
@@ -88,7 +88,7 @@ function fixture(t, options = {}) {
       const target = path.join(opts.cwd, '.claude');
       for (const [file, bytes] of Object.entries(source)) write(path.join(target, file), bytes);
       for (const entry of entries) write(path.join(opts.cwd, entry.relative), source[entry.source]);
-      if (options.projectedTamper) write(path.join(target, 'skills/starci/references/host-maintenance.md'), 'different');
+      if (options.projectedTamper) write(path.join(target, 'skills/starci/references/missing-reference.md'), 'different');
       if (options.entryTamper) write(path.join(opts.cwd, entries[0].relative), 'different');
       if (options.bootstrap) write(path.join(opts.cwd, 'AGENTS.md'), 'unexpected');
       write(path.join(target, '.starci-skills.json'), JSON.stringify({ ...manifest,

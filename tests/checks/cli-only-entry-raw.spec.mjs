@@ -38,11 +38,11 @@ test('read-only commands in explicit guidance spans pass', () => {
 
 test('internalized host prompts and procedure references retain native CLI-only enforcement', () => {
   const report = scan({
-    'skills/starci/references/host-maintenance.md': 'Commit with `git commit -m repair`.\n',
+    'skills/starci/references/missing-reference.md': 'Commit with `git commit -m repair`.\n',
     'skills/starci/references/release.md': 'Verify with `npm test`.\n',
   });
   assert.deepEqual(report.findings.map(({file, program, sub}) => [file, program, sub]), [
-    ['skills/starci/references/host-maintenance.md', 'git', 'commit'],
+    ['skills/starci/references/missing-reference.md', 'git', 'commit'],
     ['skills/starci/references/release.md', 'npm', 'test'],
   ]);
 });

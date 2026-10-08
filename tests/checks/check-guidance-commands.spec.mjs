@@ -105,7 +105,7 @@ test('scope: module yaml and prompts and skill files; never the refusal catalog;
   assert.ok(isGuidanceFile('modules/kernel/kernel-prompt.md'));
   assert.ok(isGuidanceFile('skills/starci/SKILL.md'));
   assert.ok(isGuidanceFile('skills/starci/references/release.md'));
-  assert.ok(isGuidanceFile('skills/starci/references/host-maintenance.md'));
+  assert.ok(isGuidanceFile('skills/starci/references/missing-reference.md'));
   assert.ok(!isGuidanceFile('modules/kernel/failure-codes.yaml'));
   assert.ok(isGuidanceFile('modules/kernel/current.yaml'));
   assert.ok(!isGuidanceFile('docs/verify-proof.md'));
@@ -113,7 +113,7 @@ test('scope: module yaml and prompts and skill files; never the refusal catalog;
 
 test('internalized reference and host prompt instructions are still judged by the actual guard', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'guidance-internal-'));
-  const files = ['skills/starci/references/release.md', 'skills/starci/references/host-maintenance.md'];
+  const files = ['skills/starci/references/release.md', 'skills/starci/references/missing-reference.md'];
   try {
     for (const relative of files) {
       const file = path.join(root, relative);

@@ -2032,3 +2032,12 @@ rules:
     failureCodes: ["RT_PROSE_COMMAND_UNKNOWN"]
     enforcers:
       - {kind: runtime, id: prose-commands, at: scripts/checks/check-prose-commands.mjs}
+  - id: R231
+    code: "RT_DOCUMENTED_DEFAULT_DRIFT"
+    law: "A default a document states equals the value the code reads. A document states a default by citing its key - default <value> = `<key>` - where the key is a config.yaml path (resolved through the validator's settings reader, so an absent block yields its code default) or <yaml file under modules/>:<dotted path>; the check resolves the key and compares, and a key that resolves to nothing is a finding. docs/, README.md, CONTEXT.md, config.example.yaml and modules/ prose and yaml are scanned; a bare number stated as a default without its key is not judged, so the owner of a default is cited, never retyped."
+    scope: runtime
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RT_DOCUMENTED_DEFAULT_DRIFT"]
+    enforcers:
+      - {kind: runtime, id: documented-defaults, at: scripts/checks/check-documented-defaults.mjs}
