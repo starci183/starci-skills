@@ -180,8 +180,10 @@ pin registry semver, never a `file:` link.
 ## Debug watcher
 
 Workflow debugging is a `/loop` of the chat that started the workflow (Claude Code `/loop`, Codex `/loop`; the `/starci`
-skill sets it up). Each tick runs the read-only `starci debug digest`. No Orca seat, background agent or runtime process
-schedules it, and it never fixes, dispatches or resolves anything; the Supervisor and the Kernels own every repair.
+skill sets it up). Each tick runs the read-only `starci debug digest` and then gets every problem it lists cleaned up by
+its owner: the policy step is relayed to the Kernel or the Supervisor, a leftover goes to the runtime's collector, a
+runtime defect is fixed with a spec and carried onto the host (`skills/starci/references/debug-loop.md`). No Orca seat,
+background agent or runtime process schedules the loop; the digest verb itself never changes anything.
 
 `scripts/reconciler/core-watch.mjs` supplies the read-only core snapshot. Maintenance diagnoses
 runtime defects, assigns a bounded lane per new alert under native custody, and qualifies fixes

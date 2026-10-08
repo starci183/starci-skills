@@ -5,19 +5,22 @@ subagent or a runtime process: the chat session runs the loop on its own model, 
 Set it up yourself right after `starci workflow start` reports a Kernel, or whenever the owner asks to debug or watch a
 workflow. Set up one loop per chat; if the chat already runs one, keep it.
 
+The loop's job is a clean host, not a report. Each tick finds what is stuck or left behind and gets it cleaned up; the
+owner hears results. A list of standing problems handed to the owner is the loop failing at its job.
+
 Interval: `debugLoop.interval` of the owner's `config.yaml` (`<n>s`, `<n>m` or `<n>h`); an absent key means the shipped
 default in `config.example.yaml` (10 minutes). Never write the config to choose it.
 
 The loop prompt is this one fixed sentence:
 
 ```text
-Run `starci debug digest`, report what changed since the previous tick and the standing problems in the owner's language, change nothing and fix nothing, and end this loop when the digest shows no running workflow.
+Run `starci debug digest`, get every problem it lists cleaned up now by its owner as `references/debug-loop.md` says, report in the owner's language only what was cleaned up and what truly needs the owner, and end this loop when the digest shows no running workflow.
 ```
 
 ## Claude Code
 
 ```text
-/loop <interval> Run `starci debug digest`, report what changed since the previous tick and the standing problems in the owner's language, change nothing and fix nothing, and end this loop when the digest shows no running workflow.
+/loop <interval> Run `starci debug digest`, get every problem it lists cleaned up now by its owner as `references/debug-loop.md` says, report in the owner's language only what was cleaned up and what truly needs the owner, and end this loop when the digest shows no running workflow.
 ```
 
 `<interval>` is the config value, for example `10m`. Claude Code's `/loop` takes a leading interval and a prompt.
@@ -37,6 +40,21 @@ State which of the three you used. Do not claim a loop exists until the host con
 
 ## Rules
 
-- The digest is read only. Report its problems; the Supervisor and the Kernels own every repair. Do not start, restart or
-  resolve anything because the digest shows a problem; relay it to the owner or to the workflow's Kernel terminal.
+- `starci debug digest` itself only reads. Acting on what it shows is the tick's work, in the same turn.
+- Every problem the digest lists gets an owner and an action before the tick ends:
+  - a stuck or failed job, a hold past its bound, a gate nobody answered: the policy step the digest names is taken by its
+    handler. Relay it to that handler now (the workflow's Kernel terminal, or `starci supervisor tell` for the Supervisor)
+    and check on the next tick that it was done.
+  - a leftover (a reservation, lease, worktree record, terminal or queue item nothing stands behind): run the runtime's own
+    collector for it (`starci machine worktrees gc`, `starci supervisor gc --apply`, `starci reconciler up --services`);
+    a leftover no collector takes is a runtime defect.
+  - a runtime defect (the runtime did the wrong thing, or nothing cleans a leftover): it is fixed in the runtime with a
+    spec, through the Supervisor's fix lane or a fix lane the chat opens, and the fix is carried onto the running host.
+  - a seat that is down or drifted: `starci workflow start` or `starci supervisor start` from an Orca terminal;
+    `starci reconciler restart` for an engine on an old revision.
+- Never edit a store, a ledger or a product repository by hand, never resolve a gate as someone else, never enter a
+  credential. What only the owner can do (a login, a product decision, a publication) is the one thing reported as open,
+  once, with the exact action.
+- Report what was cleaned up and what is in progress, short. Do not ask the owner whether to fix something the rules
+  above already assign.
 - Show the first lines as they are: a controllers alarm is the first line of the digest.
