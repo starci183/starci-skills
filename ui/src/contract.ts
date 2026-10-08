@@ -32,7 +32,8 @@ export type ContractInfo = {
 };
 
 export type UiState = 'ok'|'running'|'waiting'|'warn'|'bad'|'done'|'unknown';
-export type Ref = { kind: 'workflow'|'unit'|'attempt'|'di'|'incident'|'service'|'seat'|'lane'|'land'|'gc'|'blob'|'terminal'|'violation'; project?: string; id: string; href: string };
+export type Ref = { kind: 'workflow'|'unit'|'attempt'|'di'|'incident'|'service'|'seat'|'lane'|'land'|'gc'|'blob'|'terminal'|'violation'; project?: string; id: string; href: string;
+  store?: 'machine' | 'ledger'; ledgerId?: string | null };
 export type BlobLink = { sha: string; bytes: number; mediaType: string; href: `/api/blob/${string}`; archived: boolean };
 export type SearchIdentity = { store: 'machine' | 'ledger'; ledgerId: string | null; workflow: string | null; kind: string; id: string };
 export type SearchHit = {
@@ -44,7 +45,9 @@ export type Reason = { code: string; params: Record<string, string|number>; raw?
 export type LedgerReadCoverage = { registered: number; readable: number; complete: boolean; unavailable: string[] };
 
 export type WorkersView = {
-  attention: { ref: Ref; ui: UiState; reason: Reason; age: number; who: 'owner'|'supervisor'|'kernel'|'controller' }[];
+  attention: { ref: Ref; ui: UiState; reason: Reason; age: number; who: 'owner'|'supervisor'|'kernel'|'controller';
+    detail?: { summary?: string | null; status?: string | null; project?: string | null; workflow?: string | null };
+    scope?: { store: 'machine' | 'ledger'; ledgerId?: string | null; project?: string | null; workflow?: string | null; decider?: string | null } }[];
   workflows: WorkflowRow[];
   health: HealthSummary;
   counts: { live: number | null; bad: number | null; warn: number | null; ownerDecisions: number | null; violationsOpen: number };

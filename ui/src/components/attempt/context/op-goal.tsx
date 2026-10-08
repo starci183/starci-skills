@@ -8,17 +8,17 @@ import { FeedbackState } from '../../feedback-state';
 
 export const concept: Concept = 'C8';
 
-/** Block 2 "What this op does": the Vietnamese goal, what it must produce, its limits. `info` is null while loading or when the op has no yaml. */
+/** Shows the current operation's human purpose and declared outputs beside this dispatch's recorded write scope. */
 export function OpGoalCard({ attempt, info, loading }: Readonly<{ attempt: AttemptDetailV3; info: OpInfo | null; loading: boolean }>) {
-  const goalVi = info?.goal?.vi ?? null;
-  const goalEn = info?.goal?.en ?? null;
+  const goalVi = info?.goal?.vi?.trim() || null;
+  const goalEn = info?.goal?.en?.trim() || null;
   const main = goalVi ?? goalEn;
   const owned = attempt.where?.ownedPaths?.length ? attempt.where.ownedPaths : (attempt.input?.ownedPaths ?? []).map(rel => ({ rel, abs: null as string | null }));
   const produces = info?.writes ?? [];
   const effects = info?.sideEffects ?? [];
   const scopeKnown = attempt.where.scopeSource === 'contract';
   const h3 = 'm-0 mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground';
-  return <Card id="attempt-op-goal" concept="C8" title={t('What this op does')} hint={info?.nameEn ?? undefined}>
+  return <Card id="attempt-op-goal" concept="C8" title={t('What this op does')} hint={info?.nameVi?.trim() || info?.nameEn?.trim() || attempt.op}>
     <div className="flex min-w-0 flex-col gap-4">
       {info?.readError ? <FeedbackState error>{info.readError}</FeedbackState> : null}
       {main ? <p className="m-0 max-w-[72ch] text-base leading-relaxed">{main}</p> : <p className="m-0 text-sm text-muted-foreground">{loading ? t('Loading the description…') : t('No description for this op yet.')}</p>}
@@ -27,7 +27,7 @@ export function OpGoalCard({ attempt, info, loading }: Readonly<{ attempt: Attem
       <Advanced summary={scopeKnown ? t('{n} writable paths', { n: owned.length }) : t('Write scope not recorded')}>
         <div className="grid gap-4 md:grid-cols-2">
           <div>
-            <h3 className={h3}>{t('Must produce')}</h3>
+            <h3 className={h3}>{t('Declared products')}</h3>
             {produces.length ? <ul className="m-0 flex list-none flex-col gap-1 p-0">{produces.map(item => <li key={item} className="break-all font-mono text-xs">{item}</li>)}</ul> : <p className="m-0 text-sm text-muted-foreground">{info?.declarations?.writes ? t('The op contract declares no products.') : t('Product declarations not recorded')}</p>}
           </div>
           <div>
