@@ -102,7 +102,7 @@ roles:
     escalatesTo: kernel
     binds: [P2, P3, P4, P8]
     contradicts:
-      - {pattern: 'starci supervisor (?:tell|channel|notify)', why: "an Op never messages the Supervisor"}
+      - {pattern: 'starci\s+supervisor\s+(?:tell|channel|notify)', why: "an Op never messages the Supervisor"}
       - {pattern: 'op (?:may|should|can) (?:message|tell|ask) the (?:Supervisor|owner)', why: "an Op reports only to its Kernel"}
     surfaces:
       - {file: scripts/kernel/op-prompt.mjs, mode: cite}
