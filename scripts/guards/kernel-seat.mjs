@@ -2,6 +2,7 @@
 // modules/kernel/command-policy.yaml. The PreToolUse guard and the PATH shims evaluate it (command-policy.mjs policyVerdict): a
 // mutating verb is the runtime's, never the seat's. A refused verb carries the Kernel's menu, so the seat answers in one step.
 import path from 'node:path';
+import { plainWords } from '../lib/menu-parts.mjs';
 import { refusal } from './rights.mjs';
 import { runNode } from '../api/node/run-node.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
@@ -13,8 +14,6 @@ const flagsOf = (args) => new Set(args.map((value) => OPTION.exec(String(value))
 const HINT_TIMEOUT_MS = 45_000;
 
 /** The first two non-option words of a starci call: its group and verb. */
-const starciWords = (args) => args.filter((value) => !String(value).startsWith('-')).slice(0, 2).map(String);
-
 /** Whether the Kernel seat may run `starci <group> <verb>` with these option names: {allowed, reason?}. */
 export function kernelSeatAllowsVerb(table, group, verb, flags = new Set()) {
   if (!(table?.verbs?.[group] ?? []).includes(verb)) return { allowed: false, reason: `starci ${group} ${verb} is not a verb of the Kernel seat` };
@@ -49,7 +48,7 @@ export function kernelSeatVerdict({ policy, program, args, text, guard = null, h
     if (orcaSelfLifecycleAllowed({ role: 'lead', args, handle, policy })) return null;
   }
   if (program === 'starci') {
-    const [group, verb] = starciWords(args);
+    const [group, verb] = plainWords(args, 2);
     const verdict = kernelSeatAllowsVerb(table, group, verb, flagsOf(args));
     if (verdict.allowed) return null;
     const use = useOf(table, menuHintOf(guard, { env }));

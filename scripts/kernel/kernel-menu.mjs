@@ -3,6 +3,7 @@
 // kinds, options and the classification of every next-action origin are data in modules/kernel/kernel-menu.yaml. The menu adds
 // no policy: who handles a situation, its chain and its deadline come from the hold table (modules/kernel/op-incident-policy.yaml).
 import fs from 'node:fs';
+import { escapeOptionOf, fillTemplate } from '../lib/menu-parts.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
@@ -23,8 +24,6 @@ export const originOf = (action) => menuCatalog().origins.find((row) => row.id =
 /** The snooze of a chosen wait, in ms. */
 export const snoozeMs = () => boundValue(menuCatalog().snooze.ms);
 
-const fill = (template, subject) => String(template ?? '').replace(/\{(\w+)\}/g, (match, key) => (subject[key] == null ? match : String(subject[key])));
-
 /** The arguments of a step with `$name` values taken from the subject; a value the subject does not know drops the flag. */
 export function resolveArgs(args, subject) {
   const out = {};
@@ -41,7 +40,7 @@ export function resolveArgs(args, subject) {
 function optionOf(spec, subject) {
   const steps = (spec.steps ?? []).map((step) => ({ verb: step.verb, args: resolveArgs(step.args, subject) }));
   const last = steps.at(-1) ?? null;
-  return { choice: spec.choice, verb: last?.verb ?? null, args: last?.args ?? null, steps, effect: fill(spec.effect, subject),
+  return { choice: spec.choice, verb: last?.verb ?? null, args: last?.args ?? null, steps, effect: fillTemplate(spec.effect, subject),
     ...(spec.text ? { text: spec.text } : {}), ...(spec.optionalText ? { optionalText: true } : {}), ...(spec.direct ? { direct: true } : {}), ...(spec.snooze ? { snooze: true } : {}) };
 }
 
@@ -72,10 +71,7 @@ export function parseKernelCommand(text) {
   return { verb: words[2], args };
 }
 
-const escapeOption = () => {
-  const { escape } = menuCatalog();
-  return { choice: escape.choice, verb: null, args: null, steps: [], effect: escape.effect, text: 'reason', escape: true };
-};
+const escapeOption = () => escapeOptionOf(menuCatalog().escape, { verb: null, args: null });
 
 /** A time as epoch ms: a number as it is, an ISO string parsed, anything else null. */
 const msOf = (value) => {
@@ -102,7 +98,7 @@ function itemOf(kind, { key, subject, options = null, since = null, evidence = [
   const policy = policyOf(spec.hold, since);
   const own = options ?? (spec.options ?? []).map((option) => optionOf(option, subject));
   return {
-    id: `${kind}:${key}`, kind, mode: spec.mode, subject: { ...subject }, question: fill(spec.question, subject),
+    id: `${kind}:${key}`, kind, mode: spec.mode, subject: { ...subject }, question: fillTemplate(spec.question, subject),
     options: [...own, escapeOption()], evidence, deadline: deadlineAt ?? policy.deadlineAt, step: policy.step, hold: spec.hold ?? null, di,
   };
 }

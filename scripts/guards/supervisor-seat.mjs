@@ -4,6 +4,7 @@
 // collectors it owns. Every refusal carries the menu and the decision verb's spelling, so a seat that tries a command from habit
 // recovers in one step.
 import path from 'node:path';
+import { plainWords } from '../lib/menu-parts.mjs';
 import { refusal } from './rights.mjs';
 import { runNode } from '../api/node/run-node.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
@@ -28,8 +29,6 @@ function optionsOf(args) {
 }
 
 /** The first three non-option words of a starci call: its group, verb and action. */
-const starciActionWords = (args) => args.filter((value) => !String(value).startsWith('-')).slice(0, 3).map(String);
-
 const listed = (table, group, verb) => (table?.verbs?.[group] ?? []).includes(verb);
 
 /** The reason a listed verb is still refused for its action or options, or null. */
@@ -78,7 +77,7 @@ export function supervisorSeatVerdict({ policy, program, args, text, env = proce
   const table = policy?.supervisor;
   if (!table) return null;
   if (program === 'starci') {
-    const words = starciActionWords(args);
+    const words = plainWords(args, 3);
     const changed = runtimeChangeVerdict({ table, words, text, env });
     if (changed) return changed;
     const verdict = supervisorSeatAllows(table, words, args);

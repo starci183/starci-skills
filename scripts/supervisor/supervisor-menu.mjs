@@ -3,6 +3,7 @@
 // are data in modules/supervisor/supervisor-menu.yaml. The menu adds no policy: a gate is answered with the typed resolutions of
 // modules/kernel/op-incident-policy.yaml, and nothing on it changes the runtime.
 import fs from 'node:fs';
+import { escapeOptionOf, fillTemplate } from '../lib/menu-parts.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
@@ -16,8 +17,6 @@ const CALLER_TOKENS = new Set(['text', 'reason']);
 
 /** The menu catalog (modules/supervisor/supervisor-menu.yaml). */
 const supervisorMenuCatalog = () => (cached ??= parseYaml(fs.readFileSync(path.join(skillRoot, 'modules', 'supervisor', 'supervisor-menu.yaml'), 'utf8')));
-
-const fill = (template, subject) => String(template ?? '').replace(/\{(\w+)\}/g, (match, key) => (subject[key] == null ? match : String(subject[key])));
 
 /** A step argument with the item's subject bound; a caller token stays as written, an unknown subject value drops the flag (null). */
 function bindValue(raw, subject) {
@@ -44,13 +43,10 @@ function resolveSupervisorArgs(args, subject) {
 
 const optionOf = (spec, subject) => {
   const steps = (spec.steps ?? []).map((step) => ({ run: step.run, args: resolveSupervisorArgs(step.args, subject) }));
-  return { choice: spec.choice, steps, effect: fill(spec.effect, subject), ...(spec.text ? { text: spec.text } : {}), ...(spec.keepsOpen ? { keepsOpen: true } : {}) };
+  return { choice: spec.choice, steps, effect: fillTemplate(spec.effect, subject), ...(spec.text ? { text: spec.text } : {}), ...(spec.keepsOpen ? { keepsOpen: true } : {}) };
 };
 
-const escapeOption = () => {
-  const { escape } = supervisorMenuCatalog();
-  return { choice: escape.choice, steps: [], effect: escape.effect, text: 'reason', escape: true };
-};
+const escapeOption = () => escapeOptionOf(supervisorMenuCatalog().escape);
 
 const routeMatches = (entry, di) => entry.default === true || (entry.when === 'gateIncident' ? Boolean(di.refs?.gateIncident)
   : (entry.diKinds ?? []).includes(di.kind) || (entry.keyPrefix !== undefined && String(di.idempotencyKey ?? '').startsWith(entry.keyPrefix)));
@@ -71,7 +67,7 @@ export function menuItemOf(di, ledger) {
   const kind = kindOfItem(di);
   const spec = supervisorMenuCatalog().kinds.find((entry) => entry.id === kind);
   const subject = subjectOf(di, ledger);
-  return { id: `${kind}:${di.id}`, kind, subject, question: fill(spec.question, subject), options: [...spec.options.map((option) => optionOf(option, subject)), escapeOption()],
+  return { id: `${kind}:${di.id}`, kind, subject, question: fillTemplate(spec.question, subject), options: [...spec.options.map((option) => optionOf(option, subject)), escapeOption()],
     evidence: [{ ref: `decision:${di.id}` }, ...(di.evidence ?? []).slice(0, 6)], deadline: di.dueAt ?? null, di: di.id, severity: di.severity ?? 'normal' };
 }
 
