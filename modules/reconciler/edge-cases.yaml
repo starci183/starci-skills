@@ -69,6 +69,13 @@ cases:
     rule: {file: scripts/checks/lib/doc-commands.mjs, anchor: "extractCommands"}
     spec: tests/checks/check-prose-commands.spec.mjs
     status: covered
+  - id: land-gate-skips-specs-that-spawn-the-cli
+    family: correctness
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "the land gate's bounded selection (24 graph-only specs, one per directory) let a change through that broke 13 specs: each spawns scripts/kernel/cli.mjs or packages/cli/bin/starci.mjs and runs a verb whose handler reaches the changed file, so no import of theirs names it and the smoke bound left them out", remedy: {state: in-tree, change: "the direct and touching selections add the specs that spawn a CLI entry and name a verb whose handler reaches a changed file: the verbs importing a changed file themselves, then the nearest others up to allocation.landGate.cliVerbs (land-cli-specs.mjs)"}}
+    met: {date: "2026-10-07", where: "land of a shared verb helper change", evidence: "AUDIT-starci-workflow.md issue 3d; lane brief alpha.8 E4"}
+    rule: {file: scripts/supervisor/land-cli-specs.mjs, anchor: "specsExercisingChangedVerbs"}
+    spec: tests/supervisor/land-cli-selection.spec.mjs
+    status: covered
   - id: quota-window-unstarted
     family: failure-while-running
     met: {date: "2026-10-08", where: "provider quota after re-login", evidence: "commit f4fca8baf"}

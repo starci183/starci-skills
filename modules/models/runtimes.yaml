@@ -198,7 +198,7 @@ allocation:
   jobGuard: {ttlMs: 604800000}
   # landGate (scripts/supervisor/land.mjs): a land waits waitMs for its turn at the gate; its spec run may take
   # specsBaseMs plus perSpecMs for every spec it runs, specConcurrency spec files at a time.
-  landGate: {waitMs: 1800000, specsBaseMs: 600000, perSpecMs: 60000, specConcurrency: 6}
+  landGate: {waitMs: 1800000, specsBaseMs: 600000, perSpecMs: 60000, specConcurrency: 6, cliVerbs: 12}
   # workerClose (scripts/machine/worker-close.mjs; owner rule: a finished worker is closed COMPLETELY): after worker-release and the terminal
   # close the runtime waits verifyMs for every process of that terminal's shell tree to end (polled every pollMs); a survivor proven to belong
   # to the tree is stopped and given stopVerifyMs to end before the finding is raised.

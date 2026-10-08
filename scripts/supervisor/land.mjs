@@ -403,7 +403,7 @@ function chooseSpecs({ dir, base, head, rows, changed, specs, specMode }) {
   let extra = [], narrowed = [], smoke = [];
   if (specMode === 'all') extra = pool.map((s) => s.file);
   else if (specMode === 'touching') { const t = touchingSelection(changed, { specs: pool, root: dir, symbolsOf: (file) => symbolsOfChange({ dir, base, head, rows }, file) }); extra = t.files; narrowed = t.narrowed; smoke = t.smoke; }
-  else if (specMode === 'direct') { const d = specsDirect(changed, { specs: pool, symbolsOf: (file) => symbolsOfChange({ dir, base, head, rows }, file) }); extra = [...d.files, ...specsInvariant(changed, { specs: pool })]; narrowed = d.narrowed; }
+  else if (specMode === 'direct') { const d = specsDirect(changed, { specs: pool, root: dir, symbolsOf: (file) => symbolsOfChange({ dir, base, head, rows }, file) }); extra = [...d.files, ...specsInvariant(changed, { specs: pool })]; narrowed = d.narrowed; }
   const allSpecs = specMode === 'none' ? [] : [...new Set([...specs.map(normPath), ...extra])].filter((f) => fs.existsSync(path.join(dir, f)));
   return { allSpecs, narrowed, smoke };
 }
