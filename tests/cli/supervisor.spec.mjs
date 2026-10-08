@@ -15,7 +15,7 @@ const publicVerbs = {
   'direct-commits': ['repo'],
   'gate-stability': ['base', 'family', 'gate', 'head', 'ledger', 'tree'],
   gc: ['apply', 'dry-run', 'holder', 'only', 'plan', 'trigger'],
-  land: ['commit', 'full-by-push-git', 'job', 'lane', 'notify', 'reason', 'specs', 'status', 'wait-ms'],
+  land: ['commit', 'foreground', 'full-by-push-git', 'job', 'lane', 'notify', 'reason', 'specs', 'status', 'wait-ms'],
   'lesson-actions': ['apply', 'commit', 'evidence', 'experiment', 'lane', 'options', 'reason', 'recommendation', 'send', 'signature', 'specs', 'title', 'wait-ms', 'wrongly-blocked'],
   notify: ['entity', 'item', 'repo', 'text', 'text-file', 'workflow'],
   owed: ['all', 'commits', 'force', 'item', 'reason', 'repo', 'workflow'],

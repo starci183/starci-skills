@@ -1016,10 +1016,11 @@ test('route admits only agents that carry the op host tool; with every carrier e
   assert.equal(decided.decision.model,'codex-agent','the tier leads with the member that carries browser-dom');
   assert.match(decided.rejected.find(r=>r.target==='claude/claude-sonnet-5-5')?.reasons?.join(';')??'',/lacks host tool 'browser-dom'/,'claude is rejected by name for the missing tool');
 
+  // The tool filter above is the audit route; interface.draw lost its browser-dom hint (commit 71c9eb3e2), so it is a plain prefer.
   seedOp(fx,wf,'job-draw','interface.draw');
   const draw=await fx.run(API,'route','--repo',fx.repo,'--job','job-draw','--difficulty','medium','--json');
   assert.equal(draw.status,0,draw.stderr||draw.stdout);
-  assert.equal(json(draw.stdout).decision.model,'codex-agent','a prefer bias never hoists an agent past a missing tool');
+  assert.equal(json(draw.stdout).decision.model,'claude-agent','interface.draw carries no host-tool hint (it renders through runtime verbs), so the prefer bias for claude-agent applies');
 
   seedGoalBias(fx,'wf-host-tools-avoid',{prefer:[],avoid:['codex-agent','devin-agent']});
   seedOp(fx,'wf-host-tools-avoid','job-audit-avoid','interface.audit');
