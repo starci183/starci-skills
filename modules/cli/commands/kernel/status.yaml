@@ -32,11 +32,16 @@ reads: workflows.phase + generation; jobs grouped by status; leases joined to li
   count against min(budgets.maxOps, maxParallelOps), the typed provider-health signal for its routed
   pool, overlapping `path:<owned_path>` lease rows, and the pool's declared maxParallel; the
   stale-input and source-drift projections survey.staleInput / survey.sourceDrift describe
-writes: "Status can resolve met typed waits, sweep autopilot asks and gates, renew leases of live
-  workers, and record provider outages observed on worker screens. Unless the workflow finished, it
-  drains the workflow's Orca Runs into the ledger first (the same drain as starci kernel questions,
-  scripts/kernel/verbs/shared/worker-messages.mjs: orchestration check, one ledger transaction, then
-  --ack). Its projection reflects those transitions in the same call."
+writes: "Status is a read verb (reads: true). Called by the roles that own a workflow's upkeep - its Kernel seat,
+  the Supervisor, and the reconciler, settler and api children that export STARCI_ACTOR reconciler/<controller> or
+  supervisor, STARCI_CALLER or STARCI_API_CHILD - it can resolve met typed waits, sweep autopilot asks and gates,
+  renew leases of live workers, send the blocking heads-up, and record provider outages observed on worker
+  screens. Unless the workflow finished, it drains the workflow's Orca Runs into the ledger first (the same
+  drain as starci kernel questions, scripts/kernel/verbs/shared/worker-messages.mjs: orchestration check, one
+  ledger transaction, then --ack). Its projection reflects those transitions in the same call. Called by anyone
+  else (a person at a shell, Debug, a monitor, an op) it runs none of them: the ledger is opened read-only
+  (scripts/kernel/read-only-ledger.mjs), a met typed wait is projected as met and left open for its owner, the
+  projection carries readOnly: true, and a write attempted anyway fails the call with read-verb-write."
 returns:
   ok: true
   title: "<the workflow's display name: workflows.display_name (starci kernel rename, define-goal), else the

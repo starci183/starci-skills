@@ -62,7 +62,8 @@ const seedAsk = (repo, { jobId, op, dispatchId, question, params = null }) => se
   l.db.prepare('INSERT INTO reports(workflow_id,attempt_id,dispatch_id,job_id,outcome,report_json,consumed_at,created_at) VALUES(?,?,?,?,?,?,?,?)')
     .run(WF, attemptId, dispatchId, jobId, 'ask', JSON.stringify({ schema: 'starci/op-report@1', outcome: 'ask', from: jobId, summary: 'ask', question }), Date.now(), Date.now());
 });
-const status = (repo, env = {}) => { const r = run(env, 'status', '--repo', repo, '--workflow', WF, '--json'); assert.equal(r.status, 0, r.stderr); return json(r); };
+// The status call is the reconciler's: the autopilot sweep is a reaction that runs for the roles that own it, never for a person reading.
+const status = (repo, env = {}) => { const r = run({ STARCI_ACTOR: 'reconciler/job', ...env }, 'status', '--repo', repo, '--workflow', WF, '--json'); assert.equal(r.status, 0, r.stderr); return json(r); };
 
 const CREDENTIAL = { kind: 'credential', text: 'VNPAY sandbox: nh\u1eadp vnpay-hash-secret.key v\u00e0 VNPAY_TMN_CODE', options: [], refs: [] };
 const PAYOS = { kind: 'irreversible-confirmation', text: '\u0110\u0103ng k\u00fd webhook dev l\u00ean k\u00eanh PayOS d\u00f9ng chung c\u1ee7a Academy v\u00e0 m\u1ed9t giao d\u1ecbch th\u1eadt 229.000 VND',

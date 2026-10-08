@@ -73,7 +73,7 @@ async function supervisorHealth({ timeoutMs, run }) {
  */
 export async function collectSnapshot({ env = process.env, repos = [], workflowIds = [], timeoutMs = 90_000, now = Date.now(),
   machine = machineFacts, ledger = ledgerFacts, history = ledgerHistory, run: runChild = child, liveRev = () => runtimeShaOf(env.STARCI_KERNEL_REV_ROOT ?? ROOT) } = {}) {
-  // The read verbs run as the digest, never as a person: a verb that writes the ledger while it reads is not an intervention.
+  // The read verbs run as the digest: a stranger to every workflow, so `kernel status` projects through a read-only ledger and writes nothing.
   const run = (args, options) => runChild(args, { ...options, env: { ...env, STARCI_ACTOR: 'debug-digest' } });
   const facts = machine({ env });
   if (!facts) return { unavailable: 'machine store' };

@@ -112,6 +112,7 @@ test('Host controller lists no debug seat and refuses its removed key', async ()
 test('pure helpers: seat states, goal problems, child output', () => {
   assert.equal(seatStateOf('restart-needed'), 'suspect');
   assert.equal(seatStateOf('restarted'), 'reserving');
+  assert.equal(seatStateOf('start-held'), 'quarantined');
   assert.equal(seatStateOf('host-unavailable'), 'hostOutage');
   assert.equal(seatStateOf('interactive-gate'), 'gated');
   assert.equal(seatStateOf('active'), 'live');
@@ -166,6 +167,32 @@ test('active: watchdog --once --repair runs through ctx.run and its action=resta
   const held = await c.reconcile(SEAT, ctx);
   assert.equal(held.quarantined, true);
   assert.equal(repairRuns(ctx).length, before, 'a quarantined seat is left alone');
+});
+
+// The audited seat: 303 Kernel launches failed at one step for one cause. A launch the watchdog answers start-held (the ledger's
+// failures of one cause reached the declared bound) quarantines the seat at once, with one DI that names the cause and the evidence.
+test('active: a start-held answer quarantines the seat with one DI naming the cause, and the seat is then left alone', async () => {
+  const dbs = { 'shop-be': ledgerDb({ workflows: [{ id: 'wf-shop-fe-canon', goal: GOAL }] }) };
+  const store = memoryStore();
+  const hold = { state: 'held', step: 'workflow-worktree-install', reason: 'workflow-worktree-install-locked', count: 3, lockedPath: path.join(os.tmpdir(), 'starci-hold-tree', 'node_modules', 'a.node'), retryAtMs: T0 + 3_600_000 };
+  const answer = JSON.stringify({ ok: false, action: 'start-held', reason: 'kernel-start-held', hold });
+  const c = booted(controller({ store: () => store }));
+  const ctx = hostCtx({ dbs, mode: 'active', runAnswer: () => ({ ok: true, stdout: answer }) });
+  const r = await c.reconcile(SEAT, ctx);
+  assert.equal(r.seat, 'quarantined');
+  assert.equal(r.replaced, false, 'a held launch replaces nothing');
+  assert.equal(store.get(SEAT).restarts.length, 0);
+  assert.equal(ctx.calls.decisions.length, 1);
+  assert.equal(ctx.calls.decisions[0].kind, 'seat-unrecoverable');
+  assert.match(ctx.calls.decisions[0].summary, /3 Kernel launches failed at workflow-worktree-install for one cause, held/);
+  assert.match(JSON.stringify(ctx.calls.decisions[0].evidence), /workflow-worktree-install-locked/);
+  ctx.advance(60_000);
+  const again = await c.reconcile(SEAT, ctx);
+  assert.equal(again.quarantined, true, 'the quarantine holds the seat for holdMs');
+  assert.equal(ctx.calls.decisions.length, 1, 'one problem, one Decision Item');
+  ctx.advance(S.seats.kernel.holdMs);
+  await c.reconcile(SEAT, ctx);
+  assert.equal(ctx.calls.decisions.length, 1, 'a later held answer of the same quarantine opens no second item');
 });
 
 // The audited seat: 50 restarts in 47 minutes, every one refused no_active_sender_terminal. A restart the watchdog answers

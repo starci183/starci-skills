@@ -6,6 +6,7 @@ import { revRootOf } from './runtime-rev.mjs';
 import { withMutationFence, mutationAuthority } from '../lib/mutation-fence.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { personActor, recordIntervention } from './intervention.mjs';
+import { reactionOwner, readOnlyLedger } from './read-only-ledger.mjs';
 const refuse = (detail, code = 'kernel-caller-stale') => Object.assign(new Error(detail), { code });
 
 const targetWorkflow = (db, args) => {
@@ -104,4 +105,23 @@ export function requireAdmittedKernelRead(db, workflowId, op, { root = revRootOf
     if (workflowId !== authority.workflowId) throw refuse('new leg targets another workflow');
     requireKernelRead(db,workflowId,{ root,authority,op });
   }
+}
+
+/**
+ * The ledger a verb runs with. A read verb (`reads: true`) is opened read-only; one that also reacts (`reacts: true`) is reopened writable
+ * only when its caller owns the reactions (read-only-ledger.mjs reactionOwner), so a person or Debug reading it writes nothing.
+ */
+export function openVerbLedger(spec, file, { openWritable, env = process.env, resolve = callerOf, openReadOnly = readOnlyLedger }) {
+  if (spec.reads !== true) return openWritable(file);
+  const reader = openReadOnly(file);
+  if (spec.reacts !== true || !reactionOwner(resolve(reader.db, env, { file: reader.path }), env)) return reader;
+  reader.close();
+  return openWritable(file);
+}
+
+/** Run a read verb and fail it with the code `read-verb-write` when it tried to write, even if the verb swallowed the refusal. */
+export async function guardedRun(ledger, run) {
+  const result = await run();
+  if (ledger.attempts?.length) throw Object.assign(new Error(`a read verb tried to write the ledger: ${ledger.attempts.join(', ')}`), { code: 'read-verb-write' });
+  return result;
 }

@@ -143,6 +143,8 @@ const replaceKernel = (base) => {
   // No sender terminal to launch from is a refusal retrying cannot change: answered once as restart-blocked, which the Host
   // controller holds for blockedRetryMs (modules/reconciler/host.yaml) instead of repeating it every pass.
   if (step === 'workflow-sender-terminal-missing') return { ...base, ok: false, action: 'restart-blocked', reason: step, error: started.value?.error ?? null, detail: started.value };
+  // The same cause failed the launch as often as the bound allows: held until its declared time, answered once (a quarantine of the seat).
+  if (step === 'kernel-start-held') return { ...base, ok: false, action: 'start-held', reason: step, hold: started.value?.hold ?? null, detail: started.value };
   if (step === 'kernel-worker-alive') return { ...base, ok: true, action: 'already-live', note: started.value?.error ?? null,
     replacementTerminal: null, detail: started.value };
   return startAnswerOf(started, base);

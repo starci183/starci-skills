@@ -115,7 +115,8 @@ test('the runtime\'s own raises pass their typed reason: a gate opened without o
 const headSha = () => spawnSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT, encoding: 'utf8' }).stdout.trim();
 const NOT_LANDED = 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef';
 const defectGate = (repo, extra = []) => run(repo, ...gateArgs(['--cause', 'runtime-defect', '--no-workaround', 'defect-on-every-path', ...extra], STARCI_JOB));
-const statusOf = (repo) => json(run(repo, 'status', '--workflow', WF));
+// The status pass that resolves a gate is the reconciler's: the reaction runs for the role that owns it, never for a person reading.
+const statusOf = (repo) => json(spawnSync(process.execPath, [API, 'status', '--workflow', WF, '--repo', repo, '--json'], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 120000, env: { ...baseEnv, STARCI_ACTOR: 'reconciler/job' } }));
 const resolvedEvents = (repo) => read(repo, (db) => db.prepare("SELECT kind,payload_json FROM events WHERE kind IN ('incident-resolved','incident-auto-resolved') ORDER BY seq").all()
   .map((row) => ({ kind: row.kind, ...JSON.parse(row.payload_json) })).filter((event) => event.by));
 

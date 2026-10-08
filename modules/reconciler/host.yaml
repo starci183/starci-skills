@@ -47,9 +47,12 @@ checkers: []
 # Kernel seats (DESIGN 9.4): more than maxReplacementsPerHour replacements -> quarantined + DI seat-unrecoverable;
 # a quarantined seat is left alone for holdMs (or until `services.mjs --reopen <seat>`). A restart the watchdog answers
 # restart-blocked (no sender terminal to launch from: a refusal only a human opening a terminal changes) is tried again
-# once per blockedRetryMs, not every pass.
+# once per blockedRetryMs, not every pass. A Kernel launch that fails again for the same cause (scripts/kernel/start-hold.mjs) waits
+# startRetryMs, doubling to startRetryMaxMs, between attempts; after startSameCauseMax failures of one cause it is held for
+# startHeldRetryMs and the seat is quarantined with one DI seat-unrecoverable that names the cause (hold `kernel-start-held` of
+# modules/kernel/op-incident-policy.yaml).
 seats:
-  kernel: {maxReplacementsPerHour: 3, holdMs: 3600000, timeoutMs: 900000, vacantSlaMs: 180000, inputSlaMs: 60000, gatedSlaMs: 600000, hostOutageSlaMs: 600000, quarantinedSlaMs: 1800000, blockedRetryMs: 300000}
+  kernel: {maxReplacementsPerHour: 3, holdMs: 3600000, timeoutMs: 900000, vacantSlaMs: 180000, inputSlaMs: 60000, gatedSlaMs: 600000, hostOutageSlaMs: 600000, quarantinedSlaMs: 1800000, blockedRetryMs: 300000, startRetryMs: 60000, startRetryMaxMs: 900000, startSameCauseMax: 3, startHeldRetryMs: 3600000}
   supervisor: {timeoutMs: 900000}
 
 # Turn budget (the numbers are modules/models/runtimes.yaml allocation.liveness kernelTurnBudgetMs,

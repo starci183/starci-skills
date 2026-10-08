@@ -54,7 +54,7 @@ import { workflowDisplayName, workflowNameOf } from '../lib/display-names.mjs';
 import { KERNEL_BOOT_FILES, currentRuntimeRev, revRootOf, shortRev } from './runtime-rev.mjs';
 import { ensureWorkflowWorktree, workflowAppRepo } from './workflow-worktree.mjs';
 import { appendWorktreeEvent } from './workflow-worktree-events.mjs';
-import { ensureWorkflowHost, installWorkflowTree, workflowStartAuthority, commitWorkflowStart, recordWorkflowStartFailure, workflowSender, closedGoalMessage } from './workflow-startup.mjs';
+import { ensureWorkflowHost, installWorkflowTree, workflowStartAuthority, commitWorkflowStart, recordWorkflowStartFailure, workflowSender, closedGoalMessage, startBar } from './workflow-startup.mjs';
 import { guardLaunch, bindGuardTerminal, unbindGuardTerminal, guardReceiptErrors } from '../guards/hook-install.mjs';
 import { readEnv } from '../lib/env.mjs';
 import { arg as argvValue } from '../lib/cli-arg.mjs';
@@ -241,7 +241,7 @@ try {
     goal: ledger.db.prepare('SELECT revision,goal_identity,markdown,json,approved_by FROM goals WHERE workflow_id=? ORDER BY revision DESC LIMIT 1').get(target) });
   const { workflow: startWorkflow, goal: startGoal } = startInput();
   const startAuthority = workflowStartAuthority({ workflow: startWorkflow, goal: startGoal });
-  if (!startAuthority.ok) refuse(startAuthority.reason, { workflowId: target, authority: startAuthority });
+  const barred = startBar({ authority: startAuthority, launchedBy, db: ledger.db, workflowId: target }); if (barred) refuse(barred.step, barred.fields);
   const sender = workflowSender({ env: process.env, launchedBy, ledger, workflowId: target }); if (!sender.ok) refuse(sender.reason, { workflowId: target, error: sender.error });
   const hostStartup = await ensureWorkflowHost({ workflow: startWorkflow, goal: startGoal, env: process.env });
   if (hostStartup.ok !== true || hostStartup.ready !== true)

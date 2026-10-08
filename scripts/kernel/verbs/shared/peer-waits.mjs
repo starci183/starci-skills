@@ -161,9 +161,9 @@ export const peerWaitMessageArrived = (ledger, { waiter, peer, key, kind, subjec
  * own, already awake) gets a transition wake. Never throws: the caller's verb must not fail on it.
  * Returns {resolved, open} (gate-conditions.mjs autoResolveTypedIncidents).
  */
-export const releaseTypedWaits = (ledger, { repo, workflowId = null, wake = false, self = null }) => {
+export const releaseTypedWaits = (ledger, { repo, workflowId = null, wake = false, self = null, resolve = true }) => {
   let result = { resolved: [], open: [] };
-  try { result = autoResolveTypedIncidents(ledger, { repo, workflowId }); } catch { return result; }
+  try { result = autoResolveTypedIncidents(ledger, { repo, workflowId, resolve }); } catch { return result; }
   if (!wake) return result;
   for (const waiter of [...new Set(result.resolved.map((r) => r.workflowId))].filter((wf) => wf !== self)) {
     const mine = result.resolved.filter((r) => r.workflowId === waiter);

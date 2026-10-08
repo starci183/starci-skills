@@ -37,14 +37,14 @@ const preludePhase = (s) => {
   // Typed release conditions first (scripts/kernel/gate-conditions.mjs): a wait whose --until-*
   // conditions all hold is resolved here - on every status, so on every watchdog tick - before the
   // gates below are read, so what it held reads ready (actionable) in this same projection.
-  s.typedWaits = wf.phase === 'finished' ? { resolved: [], open: [] } : releaseTypedWaits(ledger, { repo: path.resolve(args.repo ?? process.cwd()), workflowId });
+  s.typedWaits = wf.phase === 'finished' ? { resolved: [], open: [] } : releaseTypedWaits(ledger, { repo: path.resolve(args.repo ?? process.cwd()), workflowId, resolve: !ledger.readOnly });
   s.typedUnmeetable = s.typedWaits.open.filter((incident) => incident.unmeetable.length > 0);
   // Autopilot (scripts/kernel/autopilot-run.mjs, owner ruling 2026-09-28): on every status - so every watchdog tick -
   // pending asks are answered provisionally or deferred to handover, owner gates re-routed to the Supervisor, timed-out
   // supervisor gates deferred and budgets checked, before anything below is projected. Never fails the read.
   s.autopilotSettingsNow = autopilotSettings();
   s.autopilotSweepOut = null;
-  if (wf.phase !== 'running' || wf.archived_at != null) return;
+  if (wf.phase !== 'running' || wf.archived_at != null || ledger.readOnly) return;
   try {
     s.autopilotSweepOut = autopilotSweep({ ledger, repo: path.resolve(args.repo ?? process.cwd()), workflowId, settings: s.autopilotSettingsNow,
       wake: (l, o) => wakeKernelForTransition(l, { workflowId: o.workflowId, transition: 'ask-answered', ids: { dispatchId: o.dispatchId }, lines: [
@@ -73,10 +73,10 @@ const jobsPhase = (s) => {
   // A worker that is still running keeps its path leases: status renews them while its liveness is
   // not proven dead, so a long op no longer loses its fence at dispatchLeaseTtlMs and reads
   // leases=0 while a peer could be granted its paths (inc-2262f5eab354).
-  renewLiveWorkerLeases(s.ledger, s.workers, s.now);
+  if (!s.ledger.readOnly) renewLiveWorkerLeases(s.ledger, s.workers, s.now);
   // A worker whose screen shows its provider's outage row (quota spent, no capacity) opens that provider's
   // circuit, so route/dispatch skip the pool at once instead of after the worker goes quiet.
-  s.outageCircuits = recordWorkerOutageEvidence(s.ledger, s.workers, s.now);
+  s.outageCircuits = s.ledger.readOnly ? [] : recordWorkerOutageEvidence(s.ledger, s.workers, s.now);
   s.leases = db.prepare('SELECT resource_key,job_id,expires_at FROM leases WHERE workflow_id=? AND expires_at>? ORDER BY resource_key').all(workflowId, s.now);
   // Operations the Kernel can move right now with no wait at all: a queued job
   // to route/dispatch, a fenced launch to reconcile. An 'engaged' frontier that
@@ -134,7 +134,7 @@ const queuePhase = (s) => {
   try { blocking = blockingJobs(db, { now: s.now }); } catch { blocking = new Map(); }
   orderQueuedByBlocking(s.queued, blocking);
   s.blockingOthers = blockingOthersOf(blocking, workflowId, { now: s.now });
-  if (wf.phase === 'running') blockingHeadsUp(s.ledger, { self: wf, blocking, now: s.now });
+  if (wf.phase === 'running' && !s.ledger.readOnly) blockingHeadsUp(s.ledger, { self: wf, blocking, now: s.now });
   // Queued jobs a peer-wait holds are the peer's to unblock: when they are all that is open, the
   // frontier is peer-wait rather than engaged. A wait whose peer is no longer running can never be
   // met by it, so it is the Kernel's move again.
@@ -176,7 +176,7 @@ const messagesPhase = (s) => {
   // drains the workflow's Runs into the ledger first (orchestration check, then
   // the ledger write, then --ack: api-lib/messages.mjs), so the questions it
   // projects are the ledger's. A finished workflow has no worker left to ask.
-  const drained = wf.phase === 'finished' ? { error: null } : drainWorkflowMessages(ledger, workflowId, { rebind: (runId) => internals.bindRunToKernel({ db, ledger, workflowId, runId, by: 'status' }) });
+  const drained = wf.phase === 'finished' || ledger.readOnly ? { error: null } : drainWorkflowMessages(ledger, workflowId, { rebind: (runId) => internals.bindRunToKernel({ db, ledger, workflowId, runId, by: 'status' }) });
   s.workerAsks = { pending: workerQuestionsOf(db, workflowId).pending, error: drained.error };
   s.workerQuestions = s.workerAsks.pending.map(({ messageId, type, jobId, opId, attempt, question, options, askedAt }) => ({ messageId, type, jobId, opId, attempt, question, options, askedAt }));
   // A peer workflow's pending message (starci kernel notify, or the enqueue overlap
@@ -337,6 +337,7 @@ export function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
   menuPhase(s);
   const out = statusOut(s);
   out.menu = s.menu;
+  if (ledger.readOnly) out.readOnly = true;
   out.opHealth = s.opHealth;
   out.kernelNotes = s.kernelNotes;
   out.stuck = s.stuck;

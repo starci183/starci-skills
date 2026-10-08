@@ -10,6 +10,8 @@ import { ci } from '../api/npm/ci.mjs';
 import { asList } from '../lib/list.mjs';
 import { refusal as verbRefusal, resultOk as success, resultOutput as output } from '../lib/verb-call.mjs';
 import { underHostLock, hostLockRetryBudget } from './verb-lock.mjs';
+import { installStateOf, writeInstallMarker, clearInstallMarker } from './npm-install-state.mjs';
+import { installFailureOf, treeHolders } from './npm-install-failure.mjs';
 
 const comparablePath = (value) => {
   const resolved = path.resolve(value);
@@ -17,7 +19,7 @@ const comparablePath = (value) => {
 };
 
 /** Whether `cwd` is the primary checkout identified by Git's common directory. */
-export function primaryWorktree(cwd, revParse = revParseQuery) {
+function primaryWorktree(cwd, revParse = revParseQuery) {
   const top = revParse(['--show-toplevel'], { cwd });
   const common = revParse(['--git-common-dir'], { cwd });
   if (!success(top) || !success(common)) {
@@ -29,6 +31,14 @@ export function primaryWorktree(cwd, revParse = revParseQuery) {
   const commonDir = path.isAbsolute(commonName) ? commonName : path.resolve(root, commonName);
   const primary = path.dirname(commonDir);
   return { ok: true, root, primary, isPrimary: comparablePath(root) === comparablePath(primary) };
+}
+
+/** The refusal of a role that may not install in this checkout (the primary main worktree is the owner's and the release's), or null. */
+export function ownedTreeRefusal(cwd, role, revParse, refusal) {
+  if (['owner', 'release'].includes(role)) return null;
+  const primary = primaryWorktree(cwd, revParse);
+  if (!primary.ok) return refusal(cwd, `cannot prove this is an owned worktree: ${primary.error}`);
+  return primary.isPrimary ? refusal(cwd, 'the primary main worktree is reserved for the owner or release role') : null;
 }
 
 /** Refuse a node_modules junction or symbolic link; a missing directory is safe for a real install. */
@@ -62,15 +72,16 @@ export async function npmCi(ctx, deps = {}) {
     revParse: deps.revParse ?? revParseQuery,
     status: deps.status ?? porcelainStatus,
     lock: deps.underHostLock ?? underHostLock,
-    now: deps.now ?? Date.now
+    now: deps.now ?? Date.now,
+    installState: deps.installState ?? installStateOf,
+    markInstalled: deps.markInstalled ?? writeInstallMarker,
+    clearMarker: deps.clearMarker ?? clearInstallMarker,
+    holders: deps.holders ?? treeHolders
   };
   const role = ctx?.role ?? 'owner';
 
-  if (!['owner', 'release'].includes(role)) {
-    const primary = primaryWorktree(cwd, api.revParse);
-    if (!primary.ok) return refusal(cwd, `cannot prove this is an owned worktree: ${primary.error}`);
-    if (primary.isPrimary) return refusal(cwd, 'the primary main worktree is reserved for the owner or release role');
-  }
+  const unowned = ownedTreeRefusal(cwd, role, api.revParse, refusal);
+  if (unowned) return unowned;
 
   const dirty = api.status(cwd, { pathspecs: ['package.json', 'package-lock.json'], untracked: 'all', literal: true });
   if (!dirty?.ok) return refusal(cwd, `cannot inspect package.json and package-lock.json: ${dirty?.stderr || 'git status failed'}`);
@@ -87,13 +98,22 @@ export async function npmCi(ctx, deps = {}) {
 
   try {
     const locked = await api.lock({ role, purpose: 'npm-ci', env: ctx?.env, retry: hostLockRetryBudget() }, async () => {
+      // A start-up install runs only for a tree that is not already a finished install of the current lockfile (ctx.ifNeeded).
+      const present = ctx?.ifNeeded === true && !workspaces.length ? api.installState(cwd) : null;
+      if (present?.state === 'installed') return { code: 0, text: `npm ci skipped in ${cwd}: node_modules is a finished install of the current lockfile`,
+        data: { schema: 'starci/npm-ci@1', ok: true, cwd, ms: 0, skipped: 'installed', digest: present.digest } };
+      api.clearMarker(cwd);
       const started = api.now();
       const result = await api.ci(cwd, { workspaces });
       const ms = Math.max(0, api.now() - started);
       if (!result?.ok) {
         const detail = String(result?.stderr ?? '').trim() || `npm exited ${String(result?.status ?? 'without a status')}`;
-        return refusal(cwd, `failed: ${detail}`, 1, { ms });
+        const failure = installFailureOf(result?.stderr);
+        if (failure.cause !== 'file-locked') return refusal(cwd, `failed: ${detail}`, 1, { ms, ...failure });
+        const holders = api.holders(cwd);
+        return refusal(cwd, `failed: file-locked (${failure.code} ${failure.syscall ?? 'access'} ${failure.path ?? cwd}); a running process holds a file of this tree: ${detail}`, 1, { ms, ...failure, holders });
       }
+      if (!workspaces.length) api.markInstalled(cwd, { at: api.now() });
       return {
         code: 0,
         text: `npm ci completed in ${cwd} (${ms} ms)`,

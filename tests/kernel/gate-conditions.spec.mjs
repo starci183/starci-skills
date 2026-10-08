@@ -43,12 +43,13 @@ const fixture=t=>{
   const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});
   const env={...process.env,STARCI_TEST_TEMP_DIR:root};
   for(const key of ['ORCA_TERMINAL_HANDLE','STARCI_ROLE','STARCI_OP_JOB'])delete env[key];
-  const api=async(args,{json:asJson=true}={})=>{
+  // `actor` is the runtime marker of the caller: the reactions of a status call (resolving a met wait) run for the reconciler, not for a person.
+  const api=async(args,{json:asJson=true,actor=null}={})=>{
     await acquireApiSlot();
     try{
       return await new Promise((resolve,reject)=>{
         const child=spawn(process.execPath,[API,...args,'--repo',repo,...(asJson?['--json']:[])],
-          {cwd:ROOT,windowsHide:true,timeout:120000,env});
+          {cwd:ROOT,windowsHide:true,timeout:120000,env:actor?{...env,STARCI_ACTOR:actor}:env});
         let stdout='',stderr='';
         child.stdout.setEncoding('utf8');child.stderr.setEncoding('utf8');
         child.stdout.on('data',chunk=>{stdout+=chunk;});
@@ -71,9 +72,9 @@ const fixture=t=>{
   }finally{ledger.close();}
   const read=fn=>{const l=inspectLedger({file:ledgerFileFor(repo)});try{return fn(l.db);}finally{l.close();}};
   const seed=fn=>{const l=openLedger({file:ledgerFileFor(repo)});try{return fn(l);}finally{l.close();}};
-  const ok=async args=>{const r=await api(args);assert.equal(r.status,0,`${args.join(' ')}: ${r.stderr||r.stdout}`);return json(r.stdout);};
+  const ok=async(args,options)=>{const r=await api(args,options);assert.equal(r.status,0,`${args.join(' ')}: ${r.stderr||r.stdout}`);return json(r.stdout);};
   const refused=async(args,code)=>{const r=await api(args);assert.equal(r.status,1,`${args.join(' ')} must be refused: ${r.stdout}`);assert.equal(lastLine(r.stderr)?.code,code,r.stderr);return lastLine(r.stderr);};
-  const frontier=async wf=>(await ok(['status','--workflow',wf])).frontier;
+  const frontier=async wf=>(await ok(['status','--workflow',wf],{actor:'reconciler/job'})).frontier;
   const incidentStatus=id=>read(db=>db.prepare('SELECT status FROM incidents WHERE incident_id=?').get(id)?.status);
   const events=(id,kind)=>read(db=>db.prepare('SELECT payload_json FROM events WHERE entity_id=? AND kind=? ORDER BY seq').all(id,kind).map(r=>JSON.parse(r.payload_json)));
   const seedJob=(workflowId,jobId,{op='backend.implement',status='running',payload={}}={})=>seed(l=>{

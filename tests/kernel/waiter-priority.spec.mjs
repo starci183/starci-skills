@@ -33,7 +33,8 @@ const fixture=t=>{
     STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),
     STARCI_FAKE_ORCA_STATE:path.join(root,'state.json'),STARCI_TEST_MACHINE_FILE:path.join(root,'machine.db')};
   for(const key of ['ORCA_TERMINAL_HANDLE','STARCI_ROLE','STARCI_OP_JOB'])delete env[key];
-  const api=args=>runKernelCli({args,repo,env,cwd:ROOT});
+  // The status pass sends the blocking heads-up: a reaction of the reconciler, which owns it; a person reading status sends nothing.
+  const api=args=>runKernelCli({args,repo,env:args[0]==='status'?{...env,STARCI_ACTOR:'reconciler/job'}:env,cwd:ROOT});
   const ledger=openLedger({file:ledgerFileFor(repo,{env})});
   try{
     const at=Date.now();
