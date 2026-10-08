@@ -569,3 +569,31 @@ cases:
     rule: {file: engine/config.mjs, anchor: "confines the owner"}
     spec: tests/engine/config.spec.mjs
     status: covered
+  - id: op-prompt-files-glob-and-schemas-beyond-its-read
+    family: smooth-operation
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "code.refactor filed 91 mandatory files outside the example catalog (74 of them the sources of every architecture machine, 41 KB prompt), content.generate 68 (all of knowledge/patterns), security.verify 85 (the same 74 machine sources, 39 KB prompt) and business.decide 28 record schemas (341 KB) of which its record kinds use 9; the files ride in the worker's context on every turn", remedy: {state: in-tree, change: "each op files the law inputs plus the files its READ step names (gate.mjs and code-patterns.yaml instead of the machine sources; the kind-always patterns instead of the pattern tree; the schemas of fr, nfr, br, ac, decision, data, journey and the feature); knowledge/op-gate.yaml readSet.alsoBound and maxSchemaFiles bound them"}}
+    met: {date: "2026-10-09", where: "fixture prompts built with buildOpPrompt/buildContext per op", evidence: "code.refactor 91 -> 17 files and 41.3 -> 22.4 KB, content.generate 68 -> 22 and 34.5 -> 23.0 KB, security.verify 85 -> 11 and 39.3 -> 20.4 KB, business.decide 28 -> 10 schemas"}
+    rule: {file: knowledge/op-gate.yaml, anchor: "alsoBound"}
+    spec: tests/kernel/op-read-set.spec.mjs
+    status: covered
+  - id: op-calls-help-for-verbs-the-prompt-does-not-name
+    family: smooth-operation
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "in a measured op transcript the worker ran --help 15 times (11 percent of its turns) and re-read its contract yaml 3 times because the prompt named none of the verbs the contract uses", remedy: {state: in-tree, change: "the [Op] prompt carries a generated your-verbs block: each starci verb the op's contract names, from the CLI catalog, with its positionals, required flags and the flags the contract uses, one line each; the bound is allocation.opVerbs"}}
+    met: {date: "2026-10-09", where: "worker transcript of a decision op, 135 turns", evidence: "15 --help calls and 3 contract-yaml reads; blocks of the 38 ops are 0 to 2.2 KB (average 0.56 KB)"}
+    rule: {file: scripts/kernel/op-prompt-verbs.mjs, anchor: "opVerbsLines"}
+    spec: tests/kernel/op-prompt-verbs.spec.mjs
+    status: covered
+  - id: op-liveness-wake-unbounded
+    family: smooth-operation
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "the operation-liveness wake typed into an op worker was about 420 characters plus an uncapped contract-drift notice (file list and advisory findings); Claude Code folds a paste of about 800 characters into a pasted_content block the model reads as untrusted data", remedy: {state: in-tree, change: "opLivenessWake keeps the fixed instruction whole and prints the drift notice in the longest form that keeps the wake within allocation.wake.maxChars, else a short notice, else none"}}
+    met: {date: "2026-10-09", where: "scripts/kernel/verbs/nudge.mjs prompt composition", evidence: "a drift notice with four files and six advisory findings pushed the wake past 800 characters"}
+    rule: {file: scripts/kernel/wake-bound.mjs, anchor: "opLivenessWake"}
+    spec: tests/kernel/wake-bound.spec.mjs
+    status: covered
+  - id: interface-draw-excludes-claude-for-an-unneeded-browser-tool
+    family: correctness
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "interface.draw declared route.riskHints host-tool-required:browser-dom while the Claude agent card lists no host tool, so the allocator dropped Claude by name and the op landed on Codex; draw-render and layout-render are runtime verbs that drive Playwright themselves and the op needs no browser tool of its agent", remedy: {state: in-tree, change: "the hint is removed from interface.draw (and the generated ops registry); interface.audit, which opens a browser of its own, keeps it"}}
+    met: {date: "2026-10-09", where: "route-model --kind interface.draw before the change", evidence: "candidates claude-agent, codex-agent with Claude dropped for lacks host tool browser-dom"}
+    rule: {file: modules/ops/ops/interface.draw.yaml, anchor: "declares no host tool"}
+    spec: tests/agent/draw-devin-routing.spec.mjs
+    status: covered
