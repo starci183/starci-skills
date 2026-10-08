@@ -75,7 +75,7 @@ const CASES = [
     'npm publish', 'npm publish --access public', 'pnpm publish', 'yarn publish', 'npm unpublish pkg', 'npm deprecate pkg old', 'npm dist-tag add pkg@1 latest',
     'npm run publish', 'npm run publish:packages', 'npm run publish-packages', ['npm', 'run', 'release:publish:dry'].join(' '),
   ]),
-  ...deny('RIGHTS_SUITE_RUN', /^starci test run/, [
+  ...deny('RIGHTS_SUITE_RUN', /^starci test affected --run/, [
     'npm test', 'npm t', 'npm run test', 'pnpm test', 'yarn test', 'npm test -- --coverage', 'npm run test -- --runInBand',
   ]),
   ...deny('RIGHTS_NPM_CI_UNLOCKED', /^starci npm ci/, [
@@ -228,4 +228,19 @@ test('the hot-path subset of read-only programs is a subset of the table: one so
   }
   assert.equal(intrinsicPolicyRead({ program: 'ls' }), true);
   for (const program of ['sed', 'find', 'git', 'node', 'rm', 'tee', 'sort']) assert.equal(intrinsicPolicyRead({ program }), false, program);
+});
+
+test('every bound role that runs the root suite is sent to starci test affected, and the owner or an unbound lead is never refused', () => {
+  const bound = POLICY.roles.bound.filter((role) => role !== 'kernel');
+  assert.ok(bound.includes('critic') && bound.includes('lead') && bound.includes('supervisor') && bound.includes('op'));
+  for (const role of bound) {
+    for (const text of ['npm test', 'npm run test', 'pnpm test']) {
+      const verdict = decisionOf(role, text);
+      assert.ok(verdict, `${role}: ${text} is refused`);
+      // the Supervisor and the Critic run no test verb at all: the Supervisor is sent to its menu, the Critic to its verdict file
+      if (!['supervisor', 'critic'].includes(role)) assert.match(verdict.use, /starci test affected --run/, `${role}: ${text} names the affected verb as the use`);
+    }
+    if (!['supervisor', 'critic'].includes(role)) assert.equal(decisionOf(role, 'starci test affected --run'), null, `${role} may run the affected verb`);
+  }
+  for (const text of ['npm test', 'npm run test', 'node --test']) assert.equal(decisionOf(null, text), null, `unbound: ${text}`);
 });

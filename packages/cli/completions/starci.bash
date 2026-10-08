@@ -35,7 +35,7 @@ _starci() {
         supabase) COMPREPLY=( $(compgen -W "start status stop" -- "$cur") );;
         supervisor) COMPREPLY=( $(compgen -W "actions bridge channel decide direct-commits gate-stability gc land lesson-actions notify owed poll push push-mains ram-cap report start status stop telegram-bridge tell watchdog workers" -- "$cur") );;
         task) COMPREPLY=( $(compgen -W "list register show" -- "$cur") );;
-        test) COMPREPLY=( $(compgen -W "run" -- "$cur") );;
+        test) COMPREPLY=( $(compgen -W "affected run" -- "$cur") );;
         typecheck) COMPREPLY=( $(compgen -W "run" -- "$cur") );;
         uat) COMPREPLY=( $(compgen -W "assisted-runner slots" -- "$cur") );;
         work) COMPREPLY=( $(compgen -W "asset-slot brand brand-direction brand-palette check-example-work compose-direction decision-critic draw-acceptance draw-dna draw-feedback draw-gates draw-grammar draw-layer draw-loop draw-rationale draw-render draw-review draw-source draw-taste evidence-binding example-critique example-derive example-evidence example-verify grammar-geometry grammar-knowledge grammar-proposal grammar-registry-pin graph hygiene imagegen layout-render layout-tree render-proof shell-conformance ui-proof-brief" -- "$cur") );;
@@ -727,6 +727,10 @@ _starci() {
         supervisor:workers:--summary-file) return 0;;
         supervisor:workers:--needs) return 0;;
         supervisor:workers:--reason) return 0;;
+        test:affected:--base) return 0;;
+        test:affected:--changed) return 0;;
+        test:affected:--concurrency) return 0;;
+        test:affected:--root) return 0;;
         test:run:--level) COMPREPLY=( $(compgen -W "L1 L2 L3 L4" -- "$cur") ); return 0;;
         test:run:--changed) return 0;;
         test:run:--against) return 0;;
@@ -1135,6 +1139,7 @@ _starci() {
         task:list) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
         task:register) COMPREPLY=( $(compgen -W "--apply --json --cwd --quiet --help --edition" -- "$cur") );;
         task:show) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
+        test:affected) COMPREPLY=( $(compgen -W "--base --changed --run --concurrency --root --json --cwd --quiet --help --edition" -- "$cur") );;
         test:run) COMPREPLY=( $(compgen -W "--level --changed --against --spec --concurrency --root --release-cut --json --cwd --quiet --help --edition" -- "$cur") );;
         typecheck:run) COMPREPLY=( $(compgen -W "--level --changed --project --json --cwd --quiet --help --edition" -- "$cur") );;
         uat:assisted-runner) COMPREPLY=( $(compgen -W "--request --receipt --after --value --actor --json --cwd --quiet --help --edition" -- "$cur") );;

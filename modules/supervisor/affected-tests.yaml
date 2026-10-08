@@ -1,0 +1,5 @@
+# starci test affected: the bound of one everyday verification. A selection above maxFiles is not run by the verb; it names the full suite
+# (the merged-tree run and the release cut) as the lead's job. The land gate's own smoke bound (SMOKE_LIMIT) is separate.
+maxFiles: 120
+# The trees of shared data: a changed file below one is looked up in the runtime modules that read it, and the specs behind those readers join the set.
+dataRoots: [modules, knowledge]

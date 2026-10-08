@@ -62,7 +62,7 @@ test('inline, fenced, shell-prompt, and PowerShell-prompt commands produce exact
   });
   assert.deepEqual(report.findings.map(({ file, line, program, sub, use }) => ({ file, line, program, sub, use })), [
     { file: 'docs/actions.md', line: 1, program: 'git', sub: 'commit', use: 'starci git commit' },
-    { file: 'docs/actions.md', line: 3, program: 'npm', sub: 'test', use: 'starci test run --level L1|L2 in the runtime or starci gate unit --root <app> in an app' },
+    { file: 'docs/actions.md', line: 3, program: 'npm', sub: 'test', use: 'starci test affected --run in the runtime (the specs your change can break; the full suite is the release cut) or starci gate unit --root <app> in an app' },
     { file: 'docs/actions.md', line: 4, program: 'docker', sub: 'compose', use: 'starci docker up, starci docker down, starci docker build, or starci docker ps; a release image proof is starci release images' },
     { file: 'docs/actions.md', line: 6, program: 'supabase', sub: 'start', use: "starci supabase start, starci supabase stop, or starci supabase status for the app's own stack" },
     { file: 'docs/actions.md', line: 7, program: 'node', sub: '--test', use: 'starci gate unit --root <app> (the op gate selects the specs of the change)' },

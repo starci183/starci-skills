@@ -70,6 +70,7 @@ import { withSwcCache } from '../gates/build-env.mjs';
 import { hostThrottle } from '../machine/ram-throttle.mjs';
 import { buildGrammar } from '../gates/grammar-build.mjs';
 import { SKILL_ROOT, lanesRoot, landRoot } from '../machine/home.mjs';
+import { readSpecs } from '../lib/spec-pool.mjs';
 import { specsDirect, changedExports, headRanges, specsInvariant, touchingSelection, SMOKE_LIMIT } from './land-specs.mjs';
 import { fullCheckStep, gateLooseningCheck } from './land-full-check.mjs';
 import { fastForwardLive } from '../machine/live-fast-forward.mjs';
@@ -364,13 +365,6 @@ export function packageProofCheck({ dir, base, runner = node }) {
   const r = runner([PACKAGE_PROOF, '--base', base], { cwd: dir, timeout: PACKAGE_PROOF_TIMEOUT_MS, env: specRunEnv() });
   return { name: 'package-clean-test', ok: r.ok, output: tailLines(String(r.stdout) + String(r.stderr) + (r.error ? '\n' + String(r.error) : ''), r.ok ? 4 : 60) };
 }
-
-const readSpecs = (dir) => {
-  const tests = path.join(dir, 'tests');
-  let names = [];
-  try { names = fs.readdirSync(tests, { recursive: true }).map((n) => String(n).split(path.sep).join('/')).filter((n) => n.endsWith('.spec.mjs')); } catch { return []; }
-  return names.map((n) => ({ file: `tests/${n}`, text: (() => { try { return fs.readFileSync(path.join(tests, n), 'utf8'); } catch { return ''; } })() }));
-};
 
 const syntaxChecks = (dir, present) => present.filter((x) => x.endsWith('.mjs')).map((f) => {
   const r = node(['--check', f], { cwd: dir, timeout: 60_000 });
