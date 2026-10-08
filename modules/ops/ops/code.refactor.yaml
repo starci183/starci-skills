@@ -93,7 +93,7 @@ reads:
       en: The adopted naming, error-identity, structure and typing conventions, and the FE or BE pattern
         topics for the selected repository.
   - id: machines
-    path: scripts/gates/gate.mjs + scripts/hfs/architecture/*.mjs + modules/models/code-patterns.yaml +
+    path: scripts/gates/gate.mjs + modules/models/code-patterns.yaml +
       docs/architecture.md
     purpose:
       en: When the slice lives in a checked app (`be/` or `fe/`), read the sealed architecture and

@@ -5,6 +5,7 @@ import { sendEnterWithProof, sendWakeWithProof, deliveryFieldsOf } from '../wake
 import { answerAllowlistedGate } from '../../agent/lib.mjs';
 import { probeDraft } from '../clear-draft.mjs';
 import { draftOwnership } from '../../lib/terminal-liveness.mjs';
+import { opLivenessWake } from '../wake-bound.mjs';
 import { VerbExit } from './shared/verb-exit.mjs';
 
 export default {
@@ -151,11 +152,11 @@ export default {
   const driftNotice = () => {
     try {
       const drift = runningOpRevDriftOf(db, job.workflow_id).find((w) => w.jobId === jobId);
-      if (!drift) return [];
+      if (!drift) return null;
       const more = drift.files.length > 4 ? ', ...' : '';
       const advisory = drift.advisoryChanges.length ? ` - findings of ${drift.advisoryChanges.slice(0, 6).join(', ')} are advisory for you, do not loop on them` : '';
-      return [`Notice: this op's contract changed on the runtime since your dispatch (${drift.files.slice(0, 4).join(', ')}${more}); you are judged by the contract you were admitted under${advisory}.`];
-    } catch { return []; }
+      return `Notice: this op's contract changed on the runtime since your dispatch (${drift.files.slice(0, 4).join(', ')}${more}); you are judged by the contract you were admitted under${advisory}.`;
+    } catch { return null; }
   };
   // A wake is typed into whatever the input row already holds. Text that is neither the provider's
   // painted placeholder nor the runtime's own (a staged paste marker, the dispatched contract, or
@@ -264,13 +265,7 @@ export default {
   if (!earlyGate()) return;
   const stagedEvidence = stagedInputEvidenceOf(db, job);
   if (midGate(stagedEvidence) !== 'send') return;
-  const prompt = [
-    `Operation liveness wake for durable job ${jobId} (${job.op_id}) attempt ${job.attempt}.`,
-    'Your accepted contract remains running but no durable report is filed.',
-    'Re-read the exact contract with starci kernel op-contract, continue only inside its existing authority, and file exactly one starci kernel report.',
-    'Report done, partial, failed, ask or blocked truthfully; do not wait for another chat prompt and do not widen scope.',
-    ...driftNotice(),
-  ].join(' ');
+  const prompt = opLivenessWake({ jobId, opId: job.op_id, attempt: job.attempt, drift: driftNotice() });
   const staleDrafts = foreignDraftGate(prompt, stagedEvidence);
   inputRowGate(prompt, stagedEvidence);
   sendWake(prompt, stagedEvidence, staleDrafts);

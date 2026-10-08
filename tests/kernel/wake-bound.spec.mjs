@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { wakeKernelForTransition, transitionWakeText, wakeIdentity, withWakeIdentity } from '../../scripts/kernel/wake-delivery.mjs';
-import { boundedWake, wakeMaxChars } from '../../scripts/kernel/wake-bound.mjs';
+import { boundedWake, opLivenessWake, wakeMaxChars } from '../../scripts/kernel/wake-bound.mjs';
 import { buildWakePrompt } from '../../scripts/kernel/kernel-watchdog.mjs';
 
 // 2026-10-07, a real Kernel: twelve wakes of 1218 to 1242 characters reached it as <pasted_content> blocks (three refused), and all
@@ -56,4 +56,25 @@ test('the one Kernel wake path types a long transition wake bounded', () => {
   wakeKernelForTransition(ledger, { workflowId: 'wf-a', transition: 'report-filed:done', lines: LONG_LINES, deps });
   assert.equal(sends.length, 1);
   assert.ok(sends[0].text.length <= wakeMaxChars(), `${sends[0].text.length} characters typed`);
+});
+
+const LONG_DRIFT = `Notice: this op's contract changed on the runtime since your dispatch (${'modules/ops/ops/some-long-op-name.yaml, '.repeat(4)}...); you are judged by the contract you were admitted under - findings of ${'RULE-1234, '.repeat(6)} are advisory for you, do not loop on them.`;
+
+test('the operation-liveness wake of an op worker stays under the size Claude Code folds, with or without a drift notice', () => {
+  const ids = { jobId: 'op-architecture.decide-e78adc94cc', opId: 'architecture.decide', attempt: 3 };
+  const plain = opLivenessWake(ids);
+  assert.ok(plain.length <= wakeMaxChars(), `${plain.length} characters`);
+  assert.match(plain, /starci kernel op-contract/);
+  assert.match(plain, /file exactly one starci kernel report/);
+  assert.ok(`${plain} ${LONG_DRIFT}`.length > CLAUDE_CODE_PASTE_FOLD, 'the unbounded wake with this drift notice is over the fold');
+  const drifted = opLivenessWake({ ...ids, drift: LONG_DRIFT });
+  assert.ok(drifted.length <= wakeMaxChars(), `${drifted.length} characters`);
+  assert.ok(drifted.startsWith(plain), 'the instruction is never cut');
+  assert.match(drifted, /contract changed on the runtime/);
+});
+
+test('a drift notice that fits is kept whole', () => {
+  const ids = { jobId: 'op-a-1', opId: 'a.b', attempt: 1 };
+  const short = "Notice: this op's contract changed (x.yaml).";
+  assert.ok(opLivenessWake({ ...ids, drift: short }).endsWith(short));
 });

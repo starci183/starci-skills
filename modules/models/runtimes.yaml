@@ -100,6 +100,12 @@ allocation:
   # 800 characters or more into a pasted_content block that the model reads as untrusted data: on 2026-10-07 every wake of 1218 characters
   # or more arrived pasted and was refused three times, while all sixteen wakes of 730 characters or fewer arrived as the user's message.
   wake: {maxChars: 790}
+  # opVerbs: the bound of the "your verbs" block of an [Op] prompt (scripts/kernel/op-prompt-verbs.mjs): the starci calls the op's contract names,
+  # each with the flags the contract uses and the required ones, one line per verb. A worker that has the exact call never runs --help
+  # (a measured op spent 15 of its 135 turns on it). `standing` verbs are printed in full by the prompt's own reporting and logging blocks;
+  # `omitGroups` are the verbs of the Kernel and above, which an op's contract names only to say who runs them.
+  opVerbs: {maxVerbs: 20, maxChars: 3000, lineChars: 190, standing: ["kernel report", "kernel log", "kernel op-contract"],
+    omitGroups: [kernel, supervisor, workflow, reconciler]}
   # Typed logs (scripts/kernel/typed-logs.mjs, the ledger's logs table): perJobCap rows a job's own writes
   # may store before one log.truncated row closes them (derived event rows are never capped); dataMaxBytes bounds
   # one row's data after redaction. diff: the caps of a job patch's pre-structured <patch>.json

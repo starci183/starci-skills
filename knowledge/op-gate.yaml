@@ -54,6 +54,11 @@ digest:
 readSet:
   maxMandatoryFiles: 60
   maxPromptBytes: 40000
+  # An op files only the record schemas its own record kinds use: the cap per op (business.decide writes fr, nfr, br, ac, decision, data,
+  # journey and the feature overview, and their common and layout contracts).
+  maxSchemaFiles: {business.decide: 12}
+  # Ops that carry no read-knowledge proof but are held to the same bound.
+  alsoBound: [code.refactor, content.generate, security.verify]
 # Topics select stable reference IDs; the catalog binds their complete actual app source sets.
 examples:
   catalog: examples/index.yaml

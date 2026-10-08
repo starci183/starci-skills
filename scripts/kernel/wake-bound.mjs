@@ -38,3 +38,22 @@ export function boundedWake({ text, workflowId, attempt, revLine = null, compose
   const room = Math.max(0, short.length - (bare.length - max));
   return compose(short.slice(0, room), workflowId, attempt, null);
 }
+
+const SHORT_DRIFT = "Notice: this op's contract changed on the runtime since your dispatch; starci kernel op-contract names the files.";
+
+/**
+ * The liveness wake typed into a running op worker: the fixed instruction, then the contract-drift notice in the longest form that
+ * keeps the whole wake within the cap (`drift` is the full sentence, or null when the contract has not moved). The instruction
+ * itself is never cut.
+ */
+export function opLivenessWake({ jobId, opId, attempt, drift = null }) {
+  const max = wakeMaxChars();
+  const base = [
+    `Operation liveness wake for durable job ${jobId} (${opId}) attempt ${attempt}.`,
+    'Your accepted contract remains running but no durable report is filed.',
+    'Re-read the exact contract with starci kernel op-contract, continue only inside its existing authority, and file exactly one starci kernel report.',
+    'Report done, partial, failed, ask or blocked truthfully; do not wait for another chat prompt and do not widen scope.',
+  ].join(' ');
+  const fitting = [drift, SHORT_DRIFT].filter((notice) => notice && base.length + 1 + notice.length <= max);
+  return fitting.length && drift ? `${base} ${fitting[0]}` : base;
+}

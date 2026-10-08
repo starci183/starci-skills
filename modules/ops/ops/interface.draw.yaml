@@ -879,9 +879,8 @@ route:
   nodeKinds: [ui]
   phase: [direct, pre-implementation]
   intent: [direction, draw, render, ui-design]
-  # draw-render captures with Playwright in the product checkout (owner ruling 2026-09-27: Devin draws, Codex falls back).
-  riskHints:
-    - host-tool-required:browser-dom
+  # draw-render and layout-render drive Playwright themselves in the product checkout (runtime verbs, no browser tool of the agent): the op
+  # declares no host tool, so every agent that can run the verbs and read a PNG is eligible.
   prerequisites:
     - business.decide settled pass (reviewed SRS seed; Work leaves remain todo)
     - architecture.decide settled pass (reviewed SDS seed; Work leaves remain todo)
