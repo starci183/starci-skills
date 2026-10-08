@@ -4,12 +4,12 @@ import { fileURLToPath } from 'node:url';
 import {skillRoot} from './runtime-root.mjs';
 import {parseYaml} from './yaml.mjs';
 import {isPlainObject as plain} from './plain-object.mjs';
-import {invalid,validateRoots} from './invalid-config.mjs';
-import {validateOrca} from './orca-config.mjs';
-import {validateResources} from './resources-config.mjs';
+import {invalid,validateRoots,ROOT_KEYS} from './invalid-config.mjs';
+import {validateOrca,ORCA_KEYS} from './orca-config.mjs';
+import {validateResources,RESOURCE_KEYS} from './resources-config.mjs';
 import {ENV_NAME,secretEnv,connectorSecret} from './secrets.mjs';
 import {byCodeUnit} from './by-code-unit.mjs';
-import {EFFORT_LEVELS,validateModelsBlock,refuseRemovedKeys,shippedTiers} from './model-config.mjs';
+import {EFFORT_LEVELS,MODELS_KEYS,validateModelsBlock,refuseRemovedKeys,shippedTiers} from './model-config.mjs';
 const knownNames=names=>[...names].sort(byCodeUnit).join(', ');
 export {readDotenv,connectorSecret} from './secrets.mjs';
 
@@ -211,7 +211,7 @@ function validateAsks(asks){
   if(asks===null)return;
   const bad=invalid('asks');
   if(!plain(asks))bad(' must be {autoAcceptRecommended?, excludes?} or null.');
-  for(const key of Object.keys(asks))if(!['autoAcceptRecommended','excludes'].includes(key))bad(` has unknown key ${key} (allowed: autoAcceptRecommended, excludes).`);
+  for(const key of Object.keys(asks))if(!CONFIG_KEY_TREE.asks.includes(key))bad(` has unknown key ${key} (allowed: ${CONFIG_KEY_TREE.asks.join(', ')}).`);
   if(asks.autoAcceptRecommended!==undefined&&typeof asks.autoAcceptRecommended!=='boolean')bad('.autoAcceptRecommended must be true or false.');
   const excludes=asks.excludes;
   if(excludes!==undefined&&excludes!==null)validateAskExcludes(bad,excludes);
@@ -225,7 +225,7 @@ function validateUat(uat){
   if(uat===null)return;
   const bad=invalid('uat');
   if(!plain(uat))bad(' must be {maxConcurrent?} or null.');
-  for(const key of Object.keys(uat))if(key!=='maxConcurrent')bad(` has unknown key ${key} (allowed: maxConcurrent).`);
+  for(const key of Object.keys(uat))if(!CONFIG_KEY_TREE.uat.includes(key))bad(` has unknown key ${key} (allowed: ${CONFIG_KEY_TREE.uat.join(', ')}).`);
   if(uat.maxConcurrent!==undefined&&uat.maxConcurrent!==null&&!(Number.isInteger(uat.maxConcurrent)&&uat.maxConcurrent>=1))bad('.maxConcurrent must be a positive integer (default 10) or null.');
 }
 /** The owner's UAT concurrency settings: {maxConcurrent, source}. An absent or null block is the default. */
@@ -238,7 +238,6 @@ export function uatSettings(config=loadConfig()){
  * config.yaml `allocation` — {grants?}: ['<pool>=<slots>@<role>+<role>'], the owner's default grant, applied to every
  * workflow, that opens a capacityAuthority explicit-workflow-quota pool (Devin) for those roles up to <slots> running jobs.
  */
-const ALLOCATION_KEYS=Object.freeze(['grants']);
 const GRANT=/^([a-z0-9][a-z0-9.-]*)=(\d+)@([a-z]+(?:\+[a-z]+)*)$/;
 /** One grant string `<pool>=<slots>@<role>+<role>` as {pool, slots, roles}, or null when it is not that shape. */
 /** The closed set of top-level config.yaml blocks: the validator accepts these and refuses every other key. */
@@ -263,31 +262,31 @@ const validateGrants=(bad,grants,runtimes)=>{
 };
 function validateAgentSeat(seat,name,profile){
   const runtimes=profile?.runtimes??{},knownProviders=new Set(Object.values(runtimes).map(runtime=>runtime?.provider).filter(Boolean));
-  if(!plain(seat)||Object.keys(seat).some(key=>!['agent','model','effort'].includes(key))||Object.values(seat).some(value=>value!==null&&(typeof value!=='string'||!value.trim())))
+  if(!plain(seat)||Object.keys(seat).some(key=>!SEAT_KEYS.includes(key))||Object.values(seat).some(value=>value!==null&&(typeof value!=='string'||!value.trim())))
     throw new Error(`Invalid config.yaml: ${name} must be {agent?, model?, effort?} with string-or-null values (agent and model pin the seat: an \`only\` bias).`);
   if(typeof seat.agent==='string'&&!knownProviders.has(seat.agent))throw new Error(`Invalid config.yaml: ${name}.agent ${seat.agent} is not declared by a runtime (known: ${knownNames(knownProviders)}).`);
   if(seat.effort!==undefined&&seat.effort!==null&&!EFFORT_LEVELS.has(seat.effort))throw new Error(`Invalid config.yaml: ${name}.effort must use the effort vocabulary.`);
 }
 const validateReconcilerBlock=r=>{
   const ctl=r?.controllers;
-  if(!plain(r)||Object.keys(r).some(key=>!['enabled','profile','controllers'].includes(key))||(r.enabled!==undefined&&typeof r.enabled!=='boolean')||!(r.profile===undefined||r.profile===null||['operational','observe'].includes(r.profile))||!(ctl===undefined||ctl===null||(plain(ctl)&&Object.entries(ctl).every(([name,c])=>/^[a-z][a-z0-9-]*$/.test(name)&&plain(c)&&Object.keys(c).every(key=>key==='mode')&&['off','shadow','active'].includes(c.mode)))))
+  if(!plain(r)||Object.keys(r).some(key=>!CONFIG_KEY_TREE.reconciler.includes(key))||(r.enabled!==undefined&&typeof r.enabled!=='boolean')||!(r.profile===undefined||r.profile===null||['operational','observe'].includes(r.profile))||!(ctl===undefined||ctl===null||(plain(ctl)&&Object.entries(ctl).every(([name,c])=>/^[a-z][a-z0-9-]*$/.test(name)&&plain(c)&&Object.keys(c).every(key=>key==='mode')&&['off','shadow','active'].includes(c.mode)))))
     throw new Error('Invalid config.yaml: reconciler must be {enabled?: boolean, profile?: operational|observe, controllers?: {<name>: {mode: off|shadow|active}}}, or null.');
 };
 const validateAllocationBlock=(allocation,runtimes)=>{
-  if(!plain(allocation)||Object.keys(allocation).some(key=>!ALLOCATION_KEYS.includes(key)))
+  if(!plain(allocation)||Object.keys(allocation).some(key=>!CONFIG_KEY_TREE.allocation.includes(key)))
     throw new Error('Invalid config.yaml: allocation must be {grants?: [<pool>=<slots>@<role>+<role>]}.');
   if(allocation.grants!==undefined&&allocation.grants!==null)validateGrants(invalid('allocation.'),allocation.grants,runtimes);
 };
 const validateParallelBlock=parallel=>{
   const gears=slicingGears();
-  if(!plain(parallel)||Object.keys(parallel).some(key=>key!=='gear')||!Number.isInteger(parallel.gear))
+  if(!plain(parallel)||Object.keys(parallel).some(key=>!CONFIG_KEY_TREE.parallel.includes(key))||!Number.isInteger(parallel.gear))
     throw new Error('Invalid config.yaml: parallel must be {gear: <integer>}.');
   if(!gears.includes(parallel.gear))
     throw new Error(`Invalid config.yaml: parallel.gear ${parallel.gear} is not declared by modules/models/runtimes.yaml allocation.slicing.gears (known: ${gears.join(', ')}).`);
 };
 const validateSupervisorBlock=(supervisor,profile)=>{
   const interval=supervisor?.pollIntervalMs,repos=supervisor?.repos,stall=supervisor?.stallMinutes;
-  if(!plain(supervisor)||Object.keys(supervisor).some(key=>!['mode','pollIntervalMs','repos','stallMinutes','kernel','workers','landGate','frozenMinutes'].includes(key))||!(interval===null||interval===undefined||(Number.isInteger(interval)&&interval>=60000)))
+  if(!plain(supervisor)||Object.keys(supervisor).some(key=>!CONFIG_KEY_TREE.supervisor.includes(key))||!(interval===null||interval===undefined||(Number.isInteger(interval)&&interval>=60000)))
     throw new Error('Invalid config.yaml: supervisor must be {mode?, pollIntervalMs?, repos?, stallMinutes?, kernel?, workers?, landGate?, frozenMinutes?} with an integer of at least 60000 ms, or null.');
   // mode: where the Supervisor role runs (scripts/machine/home.mjs supervisorMode) - chat (default: the owner's desktop
   // chat session owns channel 'main' and ticks itself) or kernel (the optional [Supervisor] Orca kernel, start-supervisor.mjs).
@@ -312,8 +311,8 @@ const validateSupervisorBlock=(supervisor,profile)=>{
   if(!(repos===undefined||repos===null||(Array.isArray(repos)&&repos.every(repo=>typeof repo==='string'&&repo.trim()))))
     throw new Error('Invalid config.yaml: supervisor.repos must be a list of ledger-owner repository paths, or null.');
 };
-const validateDelegationBlock=d=>{if(!plain(d)||Object.keys(d).some(key=>!['asks','until','excludes','note'].includes(key))||typeof d.asks!=='string'||!d.asks.trim()||typeof d.until!=='string'||Number.isNaN(Date.parse(d.until))||(d.excludes!==undefined&&(!Array.isArray(d.excludes)||d.excludes.some(x=>typeof x!=='string'))))throw new Error('Invalid config.yaml: delegation must be {asks: <delegate>, until: <ISO time>, excludes?: [<class>], note?} or null.');};
-const validateBudgetsBlock=budgets=>{if(!plain(budgets)||Object.keys(budgets).some(key=>!['maxOps'].includes(key))||Object.values(budgets).some(value=>value!==null&&!(Number.isInteger(value)&&value>0)))throw new Error('Invalid config.yaml: budgets must be {maxOps?} with positive-integer-or-null values.');};
+const validateDelegationBlock=d=>{if(!plain(d)||Object.keys(d).some(key=>!CONFIG_KEY_TREE.delegation.includes(key))||typeof d.asks!=='string'||!d.asks.trim()||typeof d.until!=='string'||Number.isNaN(Date.parse(d.until))||(d.excludes!==undefined&&(!Array.isArray(d.excludes)||d.excludes.some(x=>typeof x!=='string'))))throw new Error('Invalid config.yaml: delegation must be {asks: <delegate>, until: <ISO time>, excludes?: [<class>], note?} or null.');};
+const validateBudgetsBlock=budgets=>{if(!plain(budgets)||Object.keys(budgets).some(key=>!CONFIG_KEY_TREE.budgets.includes(key))||Object.values(budgets).some(value=>value!==null&&!(Number.isInteger(value)&&value>0)))throw new Error('Invalid config.yaml: budgets must be {maxOps?} with positive-integer-or-null values.');};
 const validateRootKeys=(config)=>{
   const allowed=new Set(CONFIG_BLOCKS);
   if(!plain(config)||Object.keys(config).some(key=>!allowed.has(key))||typeof config.language!=='string'||!/^[a-z]{2,3}(?:-[A-Za-z0-9]+)*$/.test(config.language)||!(config.model===null||typeof config.model==='string'&&config.model.trim())||!EFFORT_LEVELS.has(config.effort))
@@ -327,7 +326,7 @@ const validateEarlyConfigBlocks=(config)=>{
 };
 const validateConfigBlocks=(config,knownProviders,runtimes,profile)=>{
   // specs (owner 2026-09-28): {harness?, unit?, e2e?} booleans - each family a boolean; absent = its default (SPEC_DEFAULTS: harness off, unit on, e2e off; specsSettings).
-  if(config?.specs!==undefined&&config.specs!==null&&(!plain(config.specs)||Object.keys(config.specs).some(key=>!SPEC_FAMILIES.includes(key)||typeof config.specs[key]!=='boolean')))throw new Error(`Invalid config.yaml: specs must be {${SPEC_FAMILIES.map(k=>k+'?: boolean').join(', ')}}, or null.`);
+  if(config?.specs!==undefined&&config.specs!==null&&(!plain(config.specs)||Object.keys(config.specs).some(key=>!CONFIG_KEY_TREE.specs.includes(key)||typeof config.specs[key]!=='boolean')))throw new Error(`Invalid config.yaml: specs must be {${SPEC_FAMILIES.map(k=>k+'?: boolean').join(', ')}}, or null.`);
   // reconciler (scripts/reconciler/state.mjs reconcilerConfig): {enabled?: boolean, profile?: operational|observe, controllers?: {<name>: {mode: off|shadow|active}}}, or null.
   if(config?.reconciler!==undefined&&config.reconciler!==null){validateReconcilerBlock(config.reconciler);} if(config?.allocation!==undefined){validateAllocationBlock(config.allocation,runtimes);}
   if(config?.kernel!==undefined){validateAgentSeat(config.kernel,'kernel',profile);} if(config?.parallel!==undefined){validateParallelBlock(config.parallel);}
@@ -395,6 +394,15 @@ export function inspectOwnerConfig(root=configRoot){
  * An absent, null or unreadable owner file reads as the defaults: harness off, unit on, e2e off.
  */
 const SPEC_FAMILIES=Object.freeze(['harness','unit','e2e']);
+const SEAT_KEYS=Object.freeze(['agent','model','effort']);
+/** The keys each config block accepts directly under it (the validators read these lists; docs/config-format.md and the example are checked against them). Blocks whose keys are open or deeper than this are not listed. */
+export const CONFIG_KEY_TREE=Object.freeze({
+  models:MODELS_KEYS,allocation:Object.freeze(['grants']),kernel:SEAT_KEYS,budgets:Object.freeze(['maxOps']),parallel:Object.freeze(['gear']),
+  supervisor:Object.freeze(['mode','pollIntervalMs','repos','stallMinutes','kernel','workers','landGate','frozenMinutes']),
+  delegation:Object.freeze(['asks','until','excludes','note']),asks:Object.freeze(['autoAcceptRecommended','excludes']),uat:Object.freeze(['maxConcurrent']),
+  specs:SPEC_FAMILIES,reconciler:Object.freeze(['enabled','profile','controllers']),debugLoop:Object.freeze(['interval','worktreeLimit']),
+  orca:ORCA_KEYS,roots:ROOT_KEYS,resources:RESOURCE_KEYS,
+});
 export const SPEC_DEFAULTS=Object.freeze({harness:false,unit:true,e2e:false});
 export function specsSettings(config){const specs=plain(config?.specs)?config.specs:{};return Object.fromEntries(SPEC_FAMILIES.map(key=>[key,typeof specs[key]==='boolean'?specs[key]:SPEC_DEFAULTS[key]]));}
 /** specs.harness of the owner file under `root` (tolerant read: inspectOwnerConfig): true only when the owner opted in to `--specs all`. */
@@ -412,7 +420,7 @@ function validateDebugLoop(block){
   if(block===null)return;
   const bad=invalid('debugLoop');
   if(!plain(block))bad(' must be {interval?: <n>s|<n>m|<n>h, worktreeLimit?: <integer >= 1>} or null.');
-  for(const key of Object.keys(block))if(!['interval','worktreeLimit'].includes(key))bad(` has unknown key ${key} (allowed: interval, worktreeLimit).`);
+  for(const key of Object.keys(block))if(!CONFIG_KEY_TREE.debugLoop.includes(key))bad(` has unknown key ${key} (allowed: ${CONFIG_KEY_TREE.debugLoop.join(', ')}).`);
   if(block.interval!==undefined&&durationMs(block.interval)===null)bad('.interval must be <n>s, <n>m or <n>h with n >= 1 (e.g. 10m).');
   if(block.worktreeLimit!==undefined&&!(Number.isInteger(block.worktreeLimit)&&block.worktreeLimit>=1))bad('.worktreeLimit must be an integer >= 1.');
 }

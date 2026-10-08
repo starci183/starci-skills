@@ -10,12 +10,14 @@ import {invalid} from './invalid-config.mjs';
  * a measured probe (scripts/agent/depth-probe.mjs).
  */
 export const ORCA_DEFAULTS=Object.freeze({maxWorkerDepth:4});
+/** The keys of the orca block. */
+export const ORCA_KEYS=Object.freeze(Object.keys(ORCA_DEFAULTS));
 export const MAX_WORKER_DEPTH_CEILING=16;
 export function validateOrca(orca){
   if(orca===null)return;
   const bad=invalid('orca');
   if(!plain(orca))bad(' must be {maxWorkerDepth?} or null.');
-  for(const key of Object.keys(orca))if(key!=='maxWorkerDepth')bad(` has unknown key ${key} (allowed: maxWorkerDepth).`);
+  for(const key of Object.keys(orca))if(!ORCA_KEYS.includes(key))bad(` has unknown key ${key} (allowed: ${ORCA_KEYS.join(', ')}).`);
   const v=orca.maxWorkerDepth;
   if(v!==undefined&&v!==null&&!(Number.isInteger(v)&&v>=1&&v<=MAX_WORKER_DEPTH_CEILING))bad(`.maxWorkerDepth must be an integer from 1 to ${MAX_WORKER_DEPTH_CEILING} equal to the Orca app's worker depth setting (default ${ORCA_DEFAULTS.maxWorkerDepth}), or null.`);
 }

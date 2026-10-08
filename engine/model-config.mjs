@@ -9,7 +9,7 @@ import {removedOfKind} from './removed-vocabulary.mjs';
 /** The effort vocabulary, ordered weakest to strongest — the only list of it. */
 export const EFFORT_LEVELS=new Set(['none','minimal','low','medium','high','xhigh','max','ultra']);
 const DIFFICULTIES=['easy','medium','hard','insane'];
-const MODELS_KEYS=['tiers','seats','balance','usage'];
+export const MODELS_KEYS=['tiers','seats','balance','usage'];
 const known=names=>[...names].sort(byCodeUnit).join(', ');
 
 const hasPath=(root,dotted)=>dotted.split('.').reduce((node,key)=>(plain(node)&&Object.hasOwn(node,key)?node[key]:undefined),root)!==undefined;

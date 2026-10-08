@@ -40,12 +40,12 @@ Optional keys:
 - `orca` — `{maxWorkerDepth?}` or null: the worker depth the Orca app is set to; an integer from 1 to `MAX_WORKER_DEPTH_CEILING`,
   absent or null meaning `ORCA_DEFAULTS` (both in `engine/orca-config.mjs`, read through `orcaSettings`)
 - `debugLoop` — `{interval?, worktreeLimit?}`: the cadence of the chat `/loop` that runs `starci debug digest`
-  (`<n>s`, `<n>m` or `<n>h`, positive; shipped default `10m`) and the positive integer worktree alert threshold of
-  `starci debug run core-watch` (shipped default 40). Both keys are optional and read through `engine/config.mjs`
+  (`<n>s`, `<n>m` or `<n>h`, positive; default `10m` = `debugLoop.interval`) and the positive integer worktree alert threshold of
+  `starci debug run core-watch` (default `40` = `debugLoop.worktreeLimit`). Both keys are optional and read through `engine/config.mjs`
   `debugLoopSettings`. The removed `debug` and `coreDebug` keys are refused by name. <!-- [removed-list] -->
 - `specs` — `{harness?, unit?, e2e?}` booleans or null (owner, 2026-09-28 and 2026-09-29; `engine/config.mjs`
   `specsSettings`, defaults in `SPEC_DEFAULTS`); a config without the key gets the defaults, so the shipped example
-  carries no block. `harness` (default **false**, touching-only): `.claude` work writes and runs the specs of new or changed
+  carries no block. `harness` (default **false** = `specs.harness`, touching-only): `.claude` work writes and runs the specs of new or changed
   code, the land gate runs only the specs touching the landed files (`land.mjs --specs touching`, its default) and refuses
   `--specs all` unless `harness: true`; `--specs none` needs `--reason`. The full `.claude` suite runs in exactly one place,
   `/starci release` selects the [release procedure](../skills/starci/references/release.md), after the owner sees
@@ -53,9 +53,9 @@ Optional keys:
   `starci release cut` through `scripts/supervisor/release-cut-cli.mjs` and `scripts/supervisor/release-cut.mjs`.
   The native owner runs L4 once, including Linux parity, checks that frozen main stayed unchanged, and
   gates the annotated tag and atomic main-plus-tag push ([release governance](git-governance.md)).
-  `unit` (default **true**): a code-writing
+  `unit` (default **true** = `specs.unit`): a code-writing
   op writes or updates the unit specs of the source it changes and runs only those; the whole unit suite is `unit.verify`'s
-  (only when the goal asks) or that approved release. `e2e` (default **false**): e2e runs only when the goal or the owner asks,
+  (only when the goal asks) or that approved release. `e2e` (default **false** = `specs.e2e`): e2e runs only when the goal or the owner asks,
   then `e2e.verify` runs the full e2e suite (see "Product test switches")
 - `connectors` — the public owner-ask channel `{repos?, gateway?, cloudflare?, telegram?}`,
   all off by default; credential fields name environment variables ([connectors](connectors.md)).
@@ -185,8 +185,8 @@ the live facts. Precedence: hard filter, owner bias, a live seat keeps its membe
 3. **A live seat keeps its member.**
 4. **Balance**: a head member picked more than `maxStreak` times in a row, or holding more than `maxSharePercent` of
    the tier's running seats, yields to the next eligible member; a bias skips this step.
-5. **Tokens**: an automatic pick skips a member at `reservePercent` (90) or more of its tokens. A member the owner bias
-   names stays usable from 90 up to `biasPercent` (95); from 95 it is refused even with a bias; from 100 it is never used.
+5. **Tokens**: an automatic pick skips a member at `reservePercent` (default `90` = `modules/models/tiers.yaml:usage.reservePercent`) or more of its tokens. A member the owner bias
+   names stays usable from 90 up to `biasPercent` (default `95` = `modules/models/tiers.yaml:usage.biasPercent`); from 95 it is refused even with a bias; from 100 it is never used.
    A chain with no member left refuses and reports the earliest reset.
 6. **Reserve, launch, attest.** A proved no-effect failure continues down the chain in the same attempt; an unknown effect
    stops for reconciliation (`modules/kernel/start-workflow.yaml` `spawn.fallThrough`).
@@ -234,12 +234,12 @@ Files without `allocation` resolve to `{grants:null}` in memory: no grant gating
 
 ## Product test switches (`specs.unit`, `specs.e2e`)
 
-Owner rulings 2026-09-28 ("speed up development; test later when asked") and 2026-09-29. `specs.unit` (default on)
+Owner rulings 2026-09-28 ("speed up development; test later when asked") and 2026-09-29. `specs.unit` (default `true` = `specs.unit`)
 covers the back end's unit tests in workflows (jest and its per-file coverage threshold, and the coverage Sonar
 judges; the front end has no tests): while on, an op that writes code also writes or updates the specs of that code and runs only
 those - the specs of the changed or added source and the specs that import it - through the op gate (`gate.mjs --tests`),
 never the app's whole unit suite; `unit.verify` is the op that runs the whole unit suite (`npm test`), dispatched only when the goal
-or the owner asks for it ("full unit", or its Vietnamese phrase for running the whole unit suite), never by default. `specs.e2e` (default off) covers product
+or the owner asks for it ("full unit", or its Vietnamese phrase for running the whole unit suite), never by default. `specs.e2e` (default `false` = `specs.e2e`) covers product
 e2e (e2e.verify, Playwright and `*.e2e-spec.*` specs): it runs only when the goal or the owner asks, and `e2e.verify`
 then runs the full e2e suite. `false` for either family switches that class off for the workflow. uat.verify is neither:
 it is owner-deferred separately until credentials. The switches are read per call

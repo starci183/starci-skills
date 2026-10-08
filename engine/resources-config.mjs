@@ -11,10 +11,13 @@ import {invalid} from './invalid-config.mjs';
 const FLOOR_LIMITS=Object.freeze({minFreeDiskGb:Infinity,minFreeDiskPct:100,minFreeRamPct:100});
 const inRange=(value,limit)=>typeof value==='number'&&Number.isFinite(value)&&value>0&&value<=limit;
 
+/** The keys of the resources block. */
+export const RESOURCE_KEYS=Object.freeze(Object.keys(FLOOR_LIMITS));
+
 export function validateResources(resources){
   if(resources===null)return;
   const bad=invalid('resources');
-  const keys=Object.keys(FLOOR_LIMITS);
+  const keys=RESOURCE_KEYS;
   const shape=keys.map(key=>`${key}?`).join(', ');
   if(!plain(resources))bad(` must be {${shape}} or null.`);
   for(const key of Object.keys(resources))if(!keys.includes(key))bad(` has unknown key ${key} (allowed: ${keys.join(', ')}).`);

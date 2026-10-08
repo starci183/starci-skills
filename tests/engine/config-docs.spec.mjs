@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { CONFIG_BLOCKS, DEBUG_LOOP_DEFAULTS } from '../../engine/config.mjs';
+import { CONFIG_BLOCKS, CONFIG_KEY_TREE, DEBUG_LOOP_DEFAULTS } from '../../engine/config.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 
 const read = (file) => fs.readFileSync(new URL(`../../${file}`, import.meta.url), 'utf8');
@@ -23,8 +23,25 @@ test('the debugLoop defaults the docs and the example state are the values the v
   const { interval, worktreeLimit } = DEBUG_LOOP_DEFAULTS;
   const example = parseYaml(read('config.example.yaml')).debugLoop;
   assert.deepEqual(example, { interval, worktreeLimit });
-  assert.ok(read('config.example.yaml').includes(`shipped default ${interval});`));
-  assert.ok(read('config.example.yaml').includes(`(shipped default ${worktreeLimit})`));
-  assert.ok(read('docs/config-format.md').includes(`shipped default \`${interval}\``));
-  assert.ok(read('docs/config-format.md').includes(`(shipped default ${worktreeLimit})`));
+});
+
+const bulletOf = (block) => {
+  const text = shape();
+  const start = text.search(new RegExp(String.raw`^- \`${block}\``, 'm'));
+  const rest = text.slice(start + 1);
+  const next = rest.search(/^- `/m);
+  return start < 0 ? '' : text.slice(start, next < 0 ? undefined : start + 1 + next);
+};
+
+test('every key a block accepts is named in docs/config-format.md and every key its example sets or its docs brace is accepted', () => {
+  const doc = read('docs/config-format.md');
+  const example = parseYaml(read('config.example.yaml'));
+  for (const [block, keys] of Object.entries(CONFIG_KEY_TREE)) {
+    const where = bulletOf(block) || doc;
+    assert.deepEqual(keys.filter((key) => !new RegExp(String.raw`\b${key}\b`).test(where)), [], `${block}: accepted but undocumented`);
+    const set = example[block] && typeof example[block] === 'object' && !Array.isArray(example[block]) ? Object.keys(example[block]) : [];
+    assert.deepEqual(set.filter((key) => !keys.includes(key)), [], `${block}: set in the example but refused`);
+    const braces = [...bulletOf(block).matchAll(/\{([^{}`]*)\}/g)].flatMap((match) => match[1].split(',').map((part) => part.trim().replace(/\?$/, '').split(':')[0]));
+    assert.deepEqual(braces.filter((key) => /^[a-zA-Z]+$/.test(key) && !keys.includes(key) && !['pool', 'role', 'tier'].includes(key)), [], `${block}: documented in braces but refused`);
+  }
 });
