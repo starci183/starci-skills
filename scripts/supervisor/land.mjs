@@ -69,7 +69,7 @@ import { hostThrottle } from '../machine/ram-throttle.mjs';
 import { buildGrammar } from '../gates/grammar-build.mjs';
 import { SKILL_ROOT, lanesRoot, landRoot } from '../machine/home.mjs';
 import { specsDirect, changedExports, headRanges, specsInvariant, touchingSelection, SMOKE_LIMIT } from './land-specs.mjs';
-import { fullCheckStep } from './land-full-check.mjs';
+import { fullCheckStep, gateLooseningCheck } from './land-full-check.mjs';
 import { fastForwardLive } from '../machine/live-fast-forward.mjs';
 import { withoutGitLocalEnv } from '../lib/git.mjs'; import { isMain } from '../lib/is-main.mjs'; import { withoutSeatEnv } from '../lib/seat-env.mjs';
 import { tailLines } from '../lib/clip.mjs'; import { underHostLockWaiting } from './land-lock.mjs'; import { selfUpgradeBranchContaining, selfUpgradeIdOf, withSelfUpgradeRef, writeSelfUpgradeRef } from './self-upgrade-ref.mjs'; import { describe, failList, specsRedOnMainOf } from './land-format.mjs'; export { describe };
@@ -454,7 +454,7 @@ export function runChecks({ dir, base, head, specs = [], specMode = 'touching', 
   const changed = rows.map((r) => normPath(r.at(-1)));
   const present = changed.filter((f) => fs.existsSync(path.join(dir, f)));
   const checks = [...syntaxChecks(dir, present), ...parseChecks(dir, present), ...treeChecks(dir, baseline)];
-  for (const step of [mirrorDriftCheck({ dir, changed, baseline }), packageProofCheck({ dir, base }), fullCheckStep(dir)]) if (step) checks.push(step);
+  for (const step of [mirrorDriftCheck({ dir, changed, baseline }), packageProofCheck({ dir, base }), gateLooseningCheck({ dir, base, head }), fullCheckStep(dir)]) if (step) checks.push(step);
   const { allSpecs, narrowed, smoke } = chooseSpecs({ dir, base, head, rows, changed, specs, specMode });
   if (specMode === 'none') checks.push({ name: 'specs skipped', ok: true, advisory: true, output: '--specs none with an explicit --reason: no spec ran (the reason is recorded as specReason on the land run)' });
   const missing = specs.map(normPath).filter((f) => !fs.existsSync(path.join(dir, f)));

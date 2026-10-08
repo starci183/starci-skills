@@ -4,6 +4,16 @@ All notable changes to StarCi are documented here. The runtime is on the `1.0.0-
 until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` freezes them.
 `package.json` `version` is the only version authority.
 
+## [1.0.0-alpha.8] — in preparation
+
+### Changed
+- The Supervisor is a decision desk that answers a menu. `starci supervisor status --json` prints `menu[]` (gate rulings, conflicts between workflows, the division of shared resources, Kernel escapes, runtime defects) and `starci supervisor decide --item <id> --choice <choice> --reason <why> [--text <input>]` executes one typed choice and closes the item (modules/supervisor/supervisor-menu.yaml). The seat guard allows only the reads, the decision verb, `supervisor actions record --item runtime-defect:<cause>`, the owner channel and its collectors; any other call is refused with the menu and the decision verb's spelling (`SUPERVISOR_USE_DECIDE`). The fix-worker, land and grammar-release instructions are removed from the Supervisor prompt, supervise.yaml and docs/supervisor.md.
+- An Op reports only to its Kernel (`orchestration send` and `ask` refuse `--to` and `--run`), runs no control-plane verb (`RIGHTS_OP_CONTROL_PLANE`) and writes only inside its attempt's owned paths and the runtime temp directory (`RIGHTS_OP_OUTSIDE_OWNED`).
+- A change that loosens a gate or check is owner-class (modules/kernel/gate-loosening.yaml): the land gate refuses it as `gate-loosening` and the new `gate-loosening` self-check (R234) flags it, unless the owner's `gate-loosening-<fingerprint>` ruling is already in the tree the change is judged against.
+
+### Added
+- The Op's token budget is measured: each settled attempt is summed from its usage rows, `starci kernel status` lists the attempts over budget whose job waits on the Kernel (`budgetOverruns`), and the Workflow controller opens a Kernel Decision Item `budget-overrun` with the options continue-once, replace and re-scope.
+
 ## [1.0.0-alpha.7] — 2026-10-08
 
 Theme: the roles are one declared contract, the system recovers from a host restart by itself, no smell or bug enters at commit, and the remote main moves only with a release proven on the exact commit that is pushed.

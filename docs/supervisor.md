@@ -138,6 +138,7 @@ read-only measurement command. The harness reads these rows; it never runs `star
 ## Land gate
 
 The land gate serves the lead, the coordinator and the owner; the Supervisor lands nothing on the runtime (`RUNTIME_CHANGE_OWNED_BY_DEBUG`).
+A change that loosens a gate (a check removed from a gate file's list, a floor lowered or a ceiling raised there, an allowlist entry added, a spec deleted, weakened or skipped together with product code: `modules/kernel/gate-loosening.yaml`) is owner-class: the gate refuses it as `gate-loosening` and the `gate-loosening` self-check flags it, unless the tree it is judged against already holds the owner's `owner-rulings.yaml` entry `gate-loosening-<fingerprint>` for exactly that loosening.
 `scripts/supervisor/land.mjs`, serialized by a lock that waiters take in request order: cherry-pick onto current main in
 a scratch worktree (a pick with no diff is already landed and moves nothing); then
 `node --check`, YAML/JSON parse, `check-module-yaml`, `check-contract-cites`, `check-cli-parity`, the named specs

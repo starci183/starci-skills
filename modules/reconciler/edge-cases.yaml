@@ -202,8 +202,9 @@ cases:
   - id: gate-loosening-lands-without-owner-approval
     family: authority-safety
     met: {date: "2026-10-08", where: "owner ruling 6: loosening a gate is owner-class", evidence: "modules/kernel/roles.yaml rulings.loosening-is-owner-class"}
-    status: open
-    why: "the land gate does not yet refuse a removed check, a lowered threshold, an added allowlist entry or a weakened test without a recorded owner approval"
+    rule: {file: scripts/supervisor/land-gate-loosening.mjs, anchor: "gateLooseningCheck"}
+    spec: tests/supervisor/gate-loosening.spec.mjs
+    status: covered
   - id: supervisor-gates-left-unanswered-for-fixes
     family: smooth-operation
     finding: {role: supervisor, duty: never, verdict: departs, evidence: "gates stood unanswered for over an hour while the Supervisor worked on runtime fixes (AUDIT-starci-workflow.md issue 20 and the owner report)", remedy: {state: in-tree, change: "the Supervisor never updates .claude and never leaves a gate past its acknowledgement bound (roles.yaml supervisor.never)"}}

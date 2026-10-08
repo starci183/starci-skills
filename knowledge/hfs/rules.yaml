@@ -2059,3 +2059,12 @@ rules:
     failureCodes: ["RT_EDGE_CASE_REGISTRY"]
     enforcers:
       - {kind: runtime, id: edge-case-registry, at: scripts/checks/check-edge-case-registry.mjs}
+  - id: R234
+    code: "RT_GATE_LOOSENING"
+    law: "A change that loosens a gate or check is owner-class: a check removed from a gate file's list, a floor lowered or a ceiling raised there, an allowlist entry added, a spec deleted or weakened or skipped together with product code (modules/kernel/gate-loosening.yaml). It lands, and passes the check, only when the tree it is judged against already holds the owner's approval of exactly that loosening, an owner-rulings entry gate-loosening-<fingerprint>."
+    scope: runtime
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RT_GATE_LOOSENING"]
+    enforcers:
+      - {kind: runtime, id: gate-loosening, at: scripts/checks/check-gate-loosening.mjs}
