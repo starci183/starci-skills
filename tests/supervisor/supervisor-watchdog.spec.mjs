@@ -44,7 +44,7 @@ function fakeHost({ terminals = [], live = new Set(), screens = {}, workers = ne
     start: (opts) => { calls.start.push(opts); const h = `term_new${++n}`, d = `ctx_new${n}`; live.add(h); workers.set(d, 'ready'); return { ok: true, terminal: h, dispatchId: d, runId: 'run_sup', taskId: `task_${n}` }; },
   };
 }
-const settings = { agent: 'claude', model: 'claude-opus-5-5', effort: 'high', repos: [], pollIntervalMs: 600000, language: 'vi', workers: { base: 4, max: 10 }, landGate: { mode: 'shared', push: false } };
+const settings = { agent: 'claude', model: 'claude-opus-5-5', effort: 'high', repos: [], pollIntervalMs: 600000, language: 'vi', workers: { base: 4, max: 10 }, landGate: { mode: 'shared' } };
 const launch = (env, host) => launchSupervisor({ env, deps: host, settings, template: '{launchAuthority}\n{doctrine}', doc: { kernelSeat: { does: ['x'] } } });
 
 /* ------------------------------------------------------------ fake seat (watchdog pass) */

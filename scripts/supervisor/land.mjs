@@ -2,8 +2,8 @@
 // starci supervisor land — the ONE land gate of the live runtime (modules/supervisor/supervise.yaml landGate, docs/supervisor.md).
 // Lands serialize on the land queue; the host lock is held for the publish alone (land-lock.mjs). A change reaches live main only through all of it, or not at all.
 //
-//   starci supervisor land --job <jobId> [--specs <csv>] [--no-push] [--notify] [--json]
-//   starci supervisor land --commit <sha>[,<sha>...] [--specs <csv|touching|direct|all|none>] [--reason <why>] [--full-by-push-git] [--lane <name>] [--no-push] [--notify] [--json]
+//   starci supervisor land --job <jobId> [--specs <csv>] [--notify] [--json]
+//   starci supervisor land --commit <sha>[,<sha>...] [--specs <csv|touching|direct|all|none>] [--reason <why>] [--full-by-push-git] [--lane <name>] [--notify] [--json]
 //   starci supervisor land --status [--json]
 //
 // 1. The land queue in machine.sqlite (engine/db/machine.mjs land_queue): each waiter files a ticket and only the
@@ -38,12 +38,12 @@
 // 3b. git health: a repo whose shared config says core.bare=true fails every work-tree operation ("this operation must be run
 //    in a work tree"); that is refused as `git-unusable` (before the queue and before each scratch), and a cherry-pick that fails
 //    without unmerged files is `git-failed`, never `conflict`. Each attempt owns one scratch-<pid>-<token> worktree it alone removes.
-// 4. Fast-forward live main, under the host lock (land-lock.mjs, held for this step and the push only, waited for up to 10 minutes): main must still be the scratch's base (else the whole gate reruns on the new main,
+// 4. Fast-forward live main, under the host lock (land-lock.mjs, held for this step only, waited for up to 10 minutes): main must still be the scratch's base (else the whole gate reruns on the new main,
 //    at most 3 times), the live checkout must be on main and clean for the changed paths; then
 //    `git update-ref refs/heads/main <new> <base>` (compare-and-swap) and a working-tree + index update of just those paths - each swapped in by
 //    rename of a fully written temp (checkout-paths.mjs), so a reader mid-update only ever opens the old or the new full file. A failed tree update rolls the ref and the paths back.
-// 5. Push main (secret scan of origin/main..main first, hooks on) unless --no-push or config
-//    supervisor.landGate.push is false. A push the remote refuses leaves the land in place and is reported.
+// 5. Nothing is pushed: a land fast-forwards LOCAL main only. The remote main moves once per release, through `starci release cut`, and the pre-push hook of the
+//    runtime repository refuses every other push of it (docs/git-governance.md).
 // A worker job lands as `succeeded` and its staging checkout and temp branch are removed - so does a self job
 // (`starci supervisor workers stage --self`) whose branch --commit landed in full (selfJobsLandedBy); a red gate records
 // `land-failed` and, with --notify, tells the Supervisor through its inbox. Nothing half-lands.
@@ -58,7 +58,6 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { allocationMs, allocationSettings, harnessSpecsEnabled } from '../../engine/config.mjs';
 import { git, normPath } from './workers.mjs';
 import { withMachine, readMachine, writeOrDefer, isMachineBusy } from '../../engine/db/machine.mjs';
-import { scanRange, scanHint } from './push-mains.mjs';
 import { safeRemove } from '../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 import { safeRemoveWorktree, createScratchWorktree } from '../machine/worktree-git.mjs';
@@ -68,13 +67,13 @@ import { sleepSync } from '../lib/sleep-sync.mjs';
 import { withSwcCache } from '../gates/build-env.mjs';
 import { hostThrottle } from '../machine/ram-throttle.mjs';
 import { buildGrammar } from '../gates/grammar-build.mjs';
-import { SKILL_ROOT, lanesRoot, landRoot, supervisorSettings } from '../machine/home.mjs';
+import { SKILL_ROOT, lanesRoot, landRoot } from '../machine/home.mjs';
 import { specsDirect, changedExports, headRanges, specsInvariant, touchingSelection, SMOKE_LIMIT } from './land-specs.mjs';
 import { fullCheckStep } from './land-full-check.mjs';
 import { fastForwardLive } from '../machine/live-fast-forward.mjs';
 import { withoutGitLocalEnv } from '../lib/git.mjs'; import { isMain } from '../lib/is-main.mjs'; import { withoutSeatEnv } from '../lib/seat-env.mjs';
 import { tailLines } from '../lib/clip.mjs'; import { underHostLockWaiting } from './land-lock.mjs'; import { selfUpgradeBranchContaining, selfUpgradeIdOf, withSelfUpgradeRef, writeSelfUpgradeRef } from './self-upgrade-ref.mjs'; import { describe, failList, specsRedOnMainOf } from './land-format.mjs'; export { describe };
-import { failKey, pushOwedOf, landOutcomeOf, recordLand } from './land-record.mjs';
+import { failKey, landOutcomeOf, recordLand } from './land-record.mjs';
 import { conflictHint, conflictPreflight, pickConflicts } from './land-conflicts.mjs';
 import { makeTempDir } from '../api/fs/make-temp-dir.mjs';
 export { specsTouching, invariantRootsOf } from './land-specs.mjs'; export { conflictHunks } from './land-conflicts.mjs'; export { conflictPreflight };
@@ -502,15 +501,14 @@ function pickRefusal({ root, deps, result }, { scratch, step, base, pick }) {
   return { ...result, base, reason: 'conflict', detail: tailLines(said, 12), conflicts, hint: conflictHint(conflicts, stopped) };
 }
 
-/** The landed result: main moved to `head`; the grammar rebuild when the change touched it, then the push. */
-function landedResult({ root, env, push, deps, result }, { checked, base, head }) {
+/** The landed result: main moved to `head`; the grammar rebuild when the change touched it. */
+function landedResult({ root, env, deps, result }, { checked, base, head }) {
   const landed = { ...result, ok: true, landed: head, base, head, checks: checked.checks, changed: checked.changed };
   const grammarPaths = [...(checked.changed ?? []), ...(checked.rows ?? []).flatMap((row) => row.slice(1))].map(normPath);
   if (grammarPaths.some((file) => file.startsWith('packages/grammar/src/') || file === 'packages/grammar/package.json')) {
     try { landed.grammarRebuild = (deps.rebuildGrammar ?? buildGrammar)({ root, changed: grammarPaths, env }); }
     catch (error) { landed.grammarRebuild = { ok: false, step: 'exception', detail: String(error?.message ?? error), owed: ['grammar-dist-rebuild'] }; }
   }
-  if (push) landed.push = (deps.push ?? pushLive)({ root });
   return landed;
 }
 
@@ -570,34 +568,23 @@ function landAttempt(run, attempt) {
 }
 
 /**
- * Land `commits` (in order) on live main of `root`. `deps.runChecks` / `deps.push` replace the checks and the
- * push in specs. Returns {ok, landed?, base, head?, checks, reason?, push?}. A live runtime without its installed
+ * Land `commits` (in order) on live main of `root`. `deps.runChecks` replaces the checks in specs. Returns {ok, landed?, base, head?, checks, reason?}. A live runtime without its installed
  * dependencies is refused before any check (reason live-deps-missing): its specs would fail on ERR_MODULE_NOT_FOUND
  * and read as the commit's fault. The same reason refuses a land whose checks ran while the live node_modules lost
  * entries, and result.cleanup.liveDepsLost names a scratch removal after which it had fewer.
  */
-export function landCommits({ commits, specs = [], specMode = 'touching', root = SKILL_ROOT, env = process.env, push = true, deps = {} }) {
+export function landCommits({ commits, specs = [], specMode = 'touching', root = SKILL_ROOT, env = process.env, deps = {} }) {
   const check = deps.runChecks ?? runChecks;
   // cleanup is shared by reference with every result below: a scratch this land could not remove shows in it.
   const result = { ok: false, commits, attempts: [], cleanup: { left: [] } };
   const liveDeps = liveDepsState(root);
   if (depsMissing(liveDeps)) return { ...result, reason: 'live-deps-missing', detail: `${path.join(root, 'node_modules')}: ${liveDeps.entries ?? 'no'} entries, package.json declares ${liveDeps.declared}`, hint: depsHint(root) };
-  const run = { commits, specs, specMode, root, env, push, deps, check, result, liveDeps };
+  const run = { commits, specs, specMode, root, env, deps, check, result, liveDeps };
   for (let attempt = 1; attempt <= MAX_MAIN_RETRIES; attempt += 1) {
     const landed = landAttempt(run, attempt);
     if (landed) return landed;
   }
   return { ...result, reason: 'main-moving', detail: `main moved under the gate ${MAX_MAIN_RETRIES} times` };
-}
-
-/** Push live main after a secret scan of origin/main..main. */
-function pushLive({ root = SKILL_ROOT } = {}) {
-  const hasRemote = git(['rev-parse', '--verify', '--quiet', 'refs/remotes/origin/main'], { cwd: root }).ok;
-  if (!hasRemote) return { pushed: false, skipped: 'no origin/main' };
-  const scan = scanRange({ cwd: root, from: 'origin/main', to: 'main' });
-  if (!scan.ok) return { pushed: false, refused: 'secret scan', findings: scan.findings, ...(scanHint(scan.findings) ? { hint: scanHint(scan.findings) } : {}) };
-  const r = git(['push', 'origin', 'main'], { cwd: root });
-  return r.ok ? { pushed: true } : { pushed: false, error: (r.stderr || r.error || '').split(/\r?\n/).slice(-4).join(' | ').slice(0, 400) };
 }
 
 /** The open tickets of the land queue, oldest first ({ticketId, lane, commit, state, requestedBy, enqueuedAt}). */
@@ -696,7 +683,7 @@ const gateBusyResult = (c, lock) => ({ ok: false, commits: c.commits, lane: c.la
 const persistLand = (c, result, { ticketId, specMode }) => {
   const { root, env, lane, commits, jobId, startedAt, deps } = c;
   // A failed record is reported (recordError) and the core record is written again, or queued in the outbox for the next land (recordDeferred).
-  const outcome = landOutcomeOf(result, { root, ticketId, lane, commits, jobId, specMode, startedAt });
+  const outcome = landOutcomeOf(result, { ticketId, lane, commits, jobId, specMode, startedAt });
   try { result.landRun = withMachine((m) => recordLand(m, { result, root, env, ticketId, lane, commits, jobId, specMode, startedAt, outcome, orca: deps.orca }), { env }); }
   catch (error) {
     result.recordError = String(error?.message ?? error);
@@ -711,15 +698,14 @@ const upgradeIdOf = (c, { sourceBranch, supervisorJob }) => selfUpgradeIdOf({
   lane: c.lane, jobId: supervisorJob ? c.jobId : null });
 
 /** The land itself, inside the gate: the outbox, the checks and the fast-forward, the records. `gate.state` is what the ticket is released as. */
-function landInsideGate(c, { lock, plan, doPush, reason, notify, target, gate }) {
+function landInsideGate(c, { lock, plan, reason, notify, target, gate }) {
   const { root, env, commits, jobId, deps } = c;
   // Records an earlier land could not write (machine-db outbox) are applied first, inside the gate.
   let outbox = null;
   try { outbox = withMachine((m) => m.flushOutbox(), { env }); } catch (error) { outbox = { error: String(error?.message ?? error) }; }
-  const landed = { ...landCommits({ commits, specs: plan.named, specMode: plan.mode, root, env, push: doPush, deps }), specMode: plan.mode, ...(plan.mode === 'none' ? { specReason: String(reason).trim() } : {}) };
+  const landed = { ...landCommits({ commits, specs: plan.named, specMode: plan.mode, root, env, deps }), specMode: plan.mode, ...(plan.mode === 'none' ? { specReason: String(reason).trim() } : {}) };
   const result = withSelfUpgradeRef(landed, { root, id: upgradeIdOf(c, target), write: deps.writeSelfUpgradeRef ?? writeSelfUpgradeRef });
   if (outbox && (outbox.flushed || outbox.failed || outbox.error || outbox.busy)) result.outbox = outbox;
-  if (pushOwedOf(result)) result.outcome = 'landed-push-owed';
   gate.state = result.ok ? 'passed' : 'failed';
   persistLand(c, result, { ticketId: lock.ticketId, specMode: plan.mode });
   if (notify || result.grammarRebuild?.ok === false || specsRedOnMainOf(result)) {
@@ -729,9 +715,7 @@ function landInsideGate(c, { lock, plan, doPush, reason, notify, target, gate })
 }
 
 /** The full gate for one job or commit list, with the queue, the machine records and the optional inbox notice. */
-export async function land({ jobId = null, commits = null, specs = [], reason = null, fullByPushGit = false, lane = null, push = null, notify = false, waitMs = LAND_WAIT_MS, root = SKILL_ROOT, env = process.env, deps = {} } = {}) {
-  const settings = supervisorSettings();
-  const doPush = push ?? settings.landGate.push;
+export async function land({ jobId = null, commits = null, specs = [], reason = null, fullByPushGit = false, lane = null, notify = false, waitMs = LAND_WAIT_MS, root = SKILL_ROOT, env = process.env, deps = {} } = {}) {
   const asked = specs.map((s) => String(s).trim()).filter(Boolean);
   let target = { commits, named: [], sourceBranch: null, supervisorJob: false };
   if (jobId) target = jobLandTarget({ jobId, commits, root, env });
@@ -747,7 +731,7 @@ export async function land({ jobId = null, commits = null, specs = [], reason = 
   const lock = (deps.acquireLand ?? acquireLand)({ env, waitMs, lane, commits: c.commits });
   if (!lock.ok) return refuseLand(c, gateBusyResult(c, lock));
   const gate = { state: 'cancelled' };
-  try { return landInsideGate(c, { lock, plan, doPush, reason, notify, target, gate }); } finally { lock.release(gate.state); }
+  try { return landInsideGate(c, { lock, plan, reason, notify, target, gate }); } finally { lock.release(gate.state); }
 }
 
 /** The gate for /status: {busy, current, queued}. */
@@ -764,10 +748,10 @@ if (isMain(import.meta.url)) {
   const value = (n) => { const i = argv.indexOf(`--${n}`); return i >= 0 ? argv[i + 1] ?? null : null; };
   const csv = (v) => (v ? v.split(',').map((s) => s.trim()).filter(Boolean) : []);
   if (has('status')) console.log(JSON.stringify(landStatus()));
-  else if (!value('job') && !value('commit')) { console.error('use: starci supervisor land --job <id> | --commit <sha>[,<sha>] [--specs <csv|touching|direct|all|none>] [--reason <why>] [--full-by-push-git] [--lane <name>] [--no-push] [--notify] [--json]'); process.exitCode = 2; }
+  else if (!value('job') && !value('commit')) { console.error('use: starci supervisor land --job <id> | --commit <sha>[,<sha>] [--specs <csv|touching|direct|all|none>] [--reason <why>] [--full-by-push-git] [--lane <name>] [--notify] [--json]'); process.exitCode = 2; }
   else {
     const r = await land({ jobId: value('job'), commits: value('commit') ? csv(value('commit')) : null, specs: csv(value('specs')), reason: value('reason'), fullByPushGit: has('full-by-push-git'), lane: value('lane'),
-      push: has('no-push') ? false : null, notify: has('notify'), waitMs: Number(value('wait-ms')) || LAND_WAIT_MS });
+      notify: has('notify'), waitMs: Number(value('wait-ms')) || LAND_WAIT_MS });
     console.log(has('json') ? JSON.stringify(r) : describe(r, { jobId: value('job') }));
     if (!r.ok) process.exitCode = 1;
   }

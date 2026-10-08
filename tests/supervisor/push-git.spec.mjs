@@ -6,6 +6,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { render } from '../../packages/hfs/sync/index.mjs';
+import { SKILL_ROOT } from '../../scripts/machine/home.mjs';
+import { pushMain, RUNTIME_RELEASE_ONLY } from '../../scripts/supervisor/push-mains.mjs';
 import { planFor, failuresOf, mainState, pushGitRepo, pushGit, describeRun, selectRepos } from '../../scripts/supervisor/push-git.mjs';
 
 const RUNTIME = path.resolve('/x/runtime');
@@ -35,10 +37,10 @@ const KEEP_PLACEHOLDERS = new Proxy(Object.create(null), {
 const MANAGED = JSON.parse(render(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'packages', 'hfs', 'templates', 'app', 'package-scripts', 'package.json'), 'utf8'), KEEP_PLACEHOLDERS)
   .replace(/^\s*\{\{appScripts\}\}\s*$/m, '').replace(/\{\{\w+\}\}/g, 'x')).scripts;
 
-test('planFor: runtime = npm test + npm run check; an app = its managed typecheck, lint, test, build:be, build:fe, canon-scan; never e2e', () => {
+test('planFor: runtime = npm test + npm run test:packages + npm run check; an app = its managed typecheck, lint, test, build:be, build:fe, canon-scan; never e2e', () => {
   const rt = planFor(RUNTIME, { runtimeRoot: RUNTIME });
   assert.equal(rt.kind, 'runtime');
-  assert.deepEqual(rt.steps.map((s) => s.name), ['npm test', 'npm run check']);
+  assert.deepEqual(rt.steps.map((s) => s.name), ['npm test', 'npm run test:packages', 'npm run check']);
   const app = planFor(PRODUCT, { runtimeRoot: RUNTIME, skillRoot: RUNTIME, pkg: { scripts: MANAGED } });
   assert.equal(app.kind, 'product');
   assert.deepEqual(app.steps.map((s) => s.name), ['npm run typecheck', 'npm run lint', 'npm test', 'npm run build:be', 'npm run build:fe', 'canon-scan']);
@@ -138,6 +140,16 @@ test('pushGitRepo: green pushes in the promised order (dry run, hooks only, push
   assert.equal(refused.verdict, 'push-refused');
   const hooksRed = pushGitRepo(RUNTIME, { deps: { ...base, git: fakeGit({ ahead: 4 }), push: (o) => [o.dryRun ? { wouldPush: true } : { hooks: 'red', error: 'lint' }] } });
   assert.equal(hooksRed.verdict, 'hooks-red');
+});
+
+test('the runtime repository is never pushed here: release-only, no suite and no push; push-mains skips it too', () => {
+  let ran = 0;
+  const out = pushGitRepo(RUNTIME, { deps: { runtimeRoot: RUNTIME, git: fakeGit({ ahead: 4 }), step: () => { ran += 1; return greenStep(); }, push: () => { ran += 1; return []; } } });
+  assert.equal(out.verdict, 'release-only');
+  assert.match(out.why, /starci release cut/);
+  assert.equal(ran, 0);
+  assert.equal(pushMain(SKILL_ROOT, { run: () => { ran += 1; return { ok: false, stdout: '' }; } }).skipped, RUNTIME_RELEASE_ONLY);
+  assert.equal(ran, 0);
 });
 
 test('pushGit stops at the first repository that is not green; an explicit --repo runs even when nothing is ahead', () => {

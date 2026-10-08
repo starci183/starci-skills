@@ -92,7 +92,7 @@ function fakeHost({ terminals = [], live = new Set(), screens = {}, spawnOk = tr
     },
   };
 }
-const settings = { agent: 'claude', model: 'claude-opus-5-5', effort: 'high', repos: [], pollIntervalMs: 600000, language: 'vi', workers: { base: 4, max: 10 }, landGate: { mode: 'shared', push: false } };
+const settings = { agent: 'claude', model: 'claude-opus-5-5', effort: 'high', repos: [], pollIntervalMs: 600000, language: 'vi', workers: { base: 4, max: 10 }, landGate: { mode: 'shared' } };
 const launch = (env, host, extra = {}) => launchSupervisor({ env, deps: host, settings, template: '{launchAuthority}\n{doctrine}', doc: { kernelSeat: { does: ['x'] } }, ...extra });
 
 test('a refused worker observation is unverified rather than affirmative death', () => {
@@ -556,7 +556,7 @@ test('land gate pass: cherry-picked onto current main, live main fast-forwards a
   const sha = sideCommit(root, 'w1', { 'scripts/a.mjs': 'export const a = 42;\n', 'scripts/new.mjs': 'export const n = 1;\n' });
   sideCommit(root, 'other', { 'scripts/b.mjs': 'export const b = 1;\n' });
   git(root, 'merge', '-q', '--ff-only', 'other');   // main moved after the worker branched: rebase-free apply still lands
-  const r = landCommits({ commits: [sha], root, env, push: false, deps: { runChecks: lightChecks } });
+  const r = landCommits({ commits: [sha], root, env, deps: { runChecks: lightChecks } });
   assert.ok(r.ok, JSON.stringify(r));
   assert.equal(git(root, 'rev-parse', 'main'), r.landed);
   assert.equal(fs.readFileSync(path.join(root, 'scripts', 'a.mjs'), 'utf8'), 'export const a = 42;\n');
@@ -570,7 +570,7 @@ test('land gate fail: a red check, a conflict or a dirty live path lands nothing
   const root = repoFixture(t);
   const before = git(root, 'rev-parse', 'main');
   const bad = sideCommit(root, 'bad', { 'scripts/a.mjs': 'export const a = ;\n' });
-  const red = landCommits({ commits: [bad], root, env, push: false, deps: { runChecks: lightChecks } });
+  const red = landCommits({ commits: [bad], root, env, deps: { runChecks: lightChecks } });
   assert.equal(red.reason, 'checks-red');
   assert.ok(red.checks.some((c) => c.name === 'node --check scripts/a.mjs' && !c.ok));
   assert.equal(git(root, 'rev-parse', 'main'), before);
@@ -578,7 +578,7 @@ test('land gate fail: a red check, a conflict or a dirty live path lands nothing
 
   const good = sideCommit(root, 'good', { 'scripts/a.mjs': 'export const a = 3;\n' });
   fs.writeFileSync(path.join(root, 'scripts', 'a.mjs'), 'export const a = 99; // another lane is editing\n');
-  const dirty = landCommits({ commits: [good], root, env, push: false, deps: { runChecks: lightChecks } });
+  const dirty = landCommits({ commits: [good], root, env, deps: { runChecks: lightChecks } });
   assert.equal(dirty.reason, 'live-paths-dirty');
   assert.equal(git(root, 'rev-parse', 'main'), before, 'nothing half-lands');
   assert.match(fs.readFileSync(path.join(root, 'scripts', 'a.mjs'), 'utf8'), /another lane/, 'the lane edit is untouched');
@@ -587,7 +587,7 @@ test('land gate fail: a red check, a conflict or a dirty live path lands nothing
   const onMain = sideCommit(root, 'mainedit', { 'scripts/a.mjs': 'export const a = 5;\n' });
   git(root, 'merge', '-q', '--ff-only', 'mainedit');
   const moved = git(root, 'rev-parse', 'main');
-  const conflict = landCommits({ commits: [good], root, env, push: false, deps: { runChecks: lightChecks } });
+  const conflict = landCommits({ commits: [good], root, env, deps: { runChecks: lightChecks } });
   assert.equal(conflict.reason, 'conflict');
   assert.equal(git(root, 'rev-parse', 'main'), moved);
   assert.ok(onMain);
@@ -597,11 +597,11 @@ test('land gate: re-landing a landed commit is already-landed and moves nothing,
   const env = envOf(t);
   const root = repoFixture(t);
   const sha = sideCommit(root, 'once', { 'scripts/a.mjs': 'export const a = 7;\n' });
-  const first = landCommits({ commits: [sha], root, env, push: false, deps: { runChecks: lightChecks } });
+  const first = landCommits({ commits: [sha], root, env, deps: { runChecks: lightChecks } });
   assert.ok(first.ok && first.landed, JSON.stringify(first));
   fs.writeFileSync(path.join(root, 'scripts', 'unrelated.mjs'), 'export const u = 1; // another lane\n');
   let checked = false;
-  const again = landCommits({ commits: [sha], root, env, push: false, deps: { runChecks: (o) => { checked = true; return lightChecks(o); } } });
+  const again = landCommits({ commits: [sha], root, env, deps: { runChecks: (o) => { checked = true; return lightChecks(o); } } });
   assert.equal(again.ok, true, JSON.stringify(again));
   assert.equal(again.alreadyLanded, first.landed);
   assert.equal(again.landed, null, 'an already-landed pick is no gate land (direct-commits keeps its boundary)');
@@ -609,7 +609,7 @@ test('land gate: re-landing a landed commit is already-landed and moves nothing,
   assert.equal(checked, false, 'no checks or specs run for an empty diff');
   assert.equal(git(root, 'rev-parse', 'main'), first.landed);
   assert.match(describe(again), /LAND already-landed .*nothing moved/);
-  const gate = await land({ commits: [sha], root, env, push: false, deps: { runChecks: lightChecks } });
+  const gate = await land({ commits: [sha], root, env, deps: { runChecks: lightChecks } });
   assert.equal(gate.ok, true);
   assert.deepEqual(readSupervisor((m) => gateLandedShas(m), [], { env }), [], 'no land-passed sha is recorded for it');
 });
@@ -644,7 +644,7 @@ test('land gate: main moving under the checks reruns the gate on the new main', 
   const sha = sideCommit(root, 'w', { 'scripts/c.mjs': 'export const c = 1;\n' });
   const lane = sideCommit(root, 'lane', { 'scripts/d.mjs': 'export const d = 1;\n' });
   let calls = 0;
-  const r = landCommits({ commits: [sha], root, env, push: false, deps: { runChecks: (o) => {
+  const r = landCommits({ commits: [sha], root, env, deps: { runChecks: (o) => {
     calls += 1;
     if (calls === 1) git(root, 'merge', '-q', '--ff-only', lane);   // a lane commits directly meanwhile
     return lightChecks(o);
@@ -659,11 +659,11 @@ test('land gate: main moving under the checks reruns the gate on the new main', 
 test('current module edits require actual parse checks and preserve main when those checks refuse', (t) => {
   const env = envOf(t), root = repoFixture(t);
   const changed = sideCommit(root, 'c1', { 'modules/kernel/rules.yaml': 'rule: two\n' });
-  const accepted = landCommits({ commits: [changed], root, env, push: false, deps: { runChecks: lightChecks } });
+  const accepted = landCommits({ commits: [changed], root, env, deps: { runChecks: lightChecks } });
   assert.ok(accepted.ok, JSON.stringify(accepted.checks));
   const main = git(root, 'rev-parse', 'main');
   const broken = sideCommit(root, 'c2', { 'modules/kernel/x.yaml': 'a: [unclosed\n' });
-  const refused = landCommits({ commits: [broken], root, env, push: false, deps: { runChecks: lightChecks } });
+  const refused = landCommits({ commits: [broken], root, env, deps: { runChecks: lightChecks } });
   assert.equal(refused.ok, false);
   assert.ok(refused.checks.some((c) => c.name === 'parse modules/kernel/x.yaml' && !c.ok));
   assert.equal(git(root, 'rev-parse', 'main'), main);
@@ -683,13 +683,13 @@ test('land specs: touching by default, never the whole suite (--specs all refuse
   const root = repoFixture(t);
   const red = "import test from 'node:test';\nimport '../scripts/a.mjs';\ntest('red', () => { throw Error('red'); });\n";
   const sha = sideCommit(root, 'sp1', { 'scripts/a.mjs': 'export const a = 7;\n', 'tests/red.spec.mjs': red });
-  const touching = await land({ commits: [sha], root, env, push: false });
+  const touching = await land({ commits: [sha], root, env });
   assert.equal(touching.specMode, 'touching');
   assert.equal(touching.ok, false, 'the spec touching the change ran and refused');
   assert.ok(touching.checks.some((c) => /^specs \(/.test(c.name) && !c.ok));
-  assert.equal((await land({ commits: [sha], specs: ['all'], root, env, push: false, deps: { specsEnabled: () => false } })).reason, 'specs-all-refused');
-  assert.equal((await land({ commits: [sha], specs: ['none'], root, env, push: false })).reason, 'specs-none-needs-reason');
-  const quiet = await land({ commits: [sha], specs: ['none'], reason: 'fixture change no spec covers', root, env, push: false });
+  assert.equal((await land({ commits: [sha], specs: ['all'], root, env, deps: { specsEnabled: () => false } })).reason, 'specs-all-refused');
+  assert.equal((await land({ commits: [sha], specs: ['none'], root, env })).reason, 'specs-none-needs-reason');
+  const quiet = await land({ commits: [sha], specs: ['none'], reason: 'fixture change no spec covers', root, env });
   assert.ok(quiet.ok, JSON.stringify(quiet.checks));
   assert.equal(quiet.specMode, 'none');
   assert.equal(quiet.specReason, 'fixture change no spec covers');
@@ -715,7 +715,7 @@ test('a worker job lands end to end: report -> gate -> succeeded, leases release
   assert.ok(rep.ok, rep.error);
   assert.equal(jobOf(m, job.job_id).status, 'reported');
   m.close();
-  const out = await land({ jobId: job.job_id, root, env, push: false, deps: { runChecks: lightChecks, orca } });
+  const out = await land({ jobId: job.job_id, root, env, deps: { runChecks: lightChecks, orca } });
   assert.ok(out.ok, JSON.stringify(out));
   assert.equal(fs.readFileSync(path.join(root, 'scripts', 'a.mjs'), 'utf8'), 'export const a = 7;\n');
   const after = machineOf(t, env);
@@ -748,7 +748,7 @@ test('the grammar changelog is never leased; two appends to the changelog both l
   const a = sideCommit(root, 'append-a', { 'packages/grammar/CHANGELOG.md': `${log}## a\n` });
   const b = sideCommit(root, 'append-b', { 'packages/grammar/CHANGELOG.md': `${log}## b\n` });
   for (const sha of [a, b]) {
-    const out = await land({ commits: [sha], root, env, push: false, deps: { runChecks: lightChecks, orca } });
+    const out = await land({ commits: [sha], root, env, deps: { runChecks: lightChecks, orca } });
     assert.ok(out.ok, JSON.stringify(out));
   }
   const sections = git(root, 'show', 'main:packages/grammar/CHANGELOG.md').split(/\r?\n/).filter((l) => l.startsWith('## '));
@@ -775,7 +775,7 @@ test('a self checkout landed with --commit closes its job: succeeded, leases rel
   git(two.path, 'commit', '-q', '-am', 'r3');
   const r3 = git(two.path, 'rev-parse', 'HEAD');
   m.close();
-  const out = await land({ commits: [sha], root, env, push: false, deps: { runChecks: lightChecks, orca } });
+  const out = await land({ commits: [sha], root, env, deps: { runChecks: lightChecks, orca } });
   assert.ok(out.ok, JSON.stringify(out));
   let db = openMachine({ env });
   assert.equal(jobOf(db, one.jobId).status, 'succeeded', 'land --commit of a self branch never leaves its job running');
@@ -784,13 +784,13 @@ test('a self checkout landed with --commit closes its job: succeeded, leases rel
   assert.equal(git(root, 'branch', '--list', one.branch), '');
   assert.equal(jobOf(db, two.jobId).status, 'running', 'an untouched self job stays open');
   db.close();
-  const half = await land({ commits: [r2], root, env, push: false, deps: { runChecks: lightChecks, orca } });
+  const half = await land({ commits: [r2], root, env, deps: { runChecks: lightChecks, orca } });
   assert.ok(half.ok, JSON.stringify(half));
   assert.deepEqual(half.selfPending.map((p) => p.jobId), [two.jobId]);
   db = openMachine({ env });
   assert.equal(jobOf(db, two.jobId).status, 'running', 'a partly landed self branch keeps its checkout');
   db.close();
-  const rest = await land({ commits: [r3], root, env, push: false, deps: { runChecks: lightChecks, orca } });
+  const rest = await land({ commits: [r3], root, env, deps: { runChecks: lightChecks, orca } });
   assert.ok(rest.ok, JSON.stringify(rest));
   db = machineOf(t, env);
   assert.equal(jobOf(db, two.jobId).status, 'succeeded');

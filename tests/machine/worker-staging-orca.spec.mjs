@@ -26,7 +26,7 @@ const git = (cwd, ...args) => {
   assert.equal(r.status, 0, `git ${args.join(' ')}: ${r.stderr}`);
   return r.stdout.trim();
 };
-const settings = { agent: 'claude', model: 'm', effort: 'high', repos: [], pollIntervalMs: 600000, language: 'vi', workers: { base: 4, max: 10 }, landGate: { mode: 'shared', push: false } };
+const settings = { agent: 'claude', model: 'm', effort: 'high', repos: [], pollIntervalMs: 600000, language: 'vi', workers: { base: 4, max: 10 }, landGate: { mode: 'shared' } };
 
 /** A runtime repo on main with an installed node_modules, a machine registry and a fake Orca of its own. */
 function fixture(t, opts = {}) {

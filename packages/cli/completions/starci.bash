@@ -1039,7 +1039,7 @@ _starci() {
         release:app-installs) COMPREPLY=( $(compgen -W "--keep --json --cwd --quiet --help --edition" -- "$cur") );;
         release:check) COMPREPLY=( $(compgen -W "--final --only --json --cwd --quiet --help --edition" -- "$cur") );;
         release:clean-test) COMPREPLY=( $(compgen -W "--changed --base --json --cwd --quiet --help --edition" -- "$cur") );;
-        release:cut) COMPREPLY=( $(compgen -W "--repo --remote --branch --tag --json --cwd --quiet --help --edition" -- "$cur") );;
+        release:cut) COMPREPLY=( $(compgen -W "--repo --remote --branch --plan --tag --json --cwd --quiet --help --edition" -- "$cur") );;
         release:images) COMPREPLY=( $(compgen -W "--app --sides --only --wait-seconds --remove-images --json --cwd --quiet --help --edition" -- "$cur") );;
         release:launch-smoke) COMPREPLY=( $(compgen -W "--app-repo --entry --timeout-ms --out --as --json --cwd --quiet --help --edition" -- "$cur") );;
         release:proof) COMPREPLY=( $(compgen -W "--repo --base --main --out --json --cwd --quiet --help --edition" -- "$cur") );;
@@ -1074,7 +1074,7 @@ _starci() {
         supervisor:direct-commits) COMPREPLY=( $(compgen -W "--repo --json --cwd --quiet --help --edition" -- "$cur") );;
         supervisor:gate-stability) COMPREPLY=( $(compgen -W "--family --tree --base --head --ledger --gate --json --cwd --quiet --help --edition" -- "$cur") );;
         supervisor:gc) COMPREPLY=( $(compgen -W "--dry-run --apply --only --plan --holder --trigger --json --cwd --quiet --help --edition" -- "$cur") );;
-        supervisor:land) COMPREPLY=( $(compgen -W "--job --commit --specs --reason --full-by-push-git --lane --no-push --notify --status --wait-ms --json --cwd --quiet --help --edition" -- "$cur") );;
+        supervisor:land) COMPREPLY=( $(compgen -W "--job --commit --specs --reason --full-by-push-git --lane --notify --status --wait-ms --json --cwd --quiet --help --edition" -- "$cur") );;
         supervisor:lesson-actions) COMPREPLY=( $(compgen -W "--signature --commit --lane --specs --wrongly-blocked --reason --wait-ms --experiment --apply --title --evidence --options --recommendation --send --json --cwd --quiet --help --edition" -- "$cur") );;
         supervisor:notify) COMPREPLY=( $(compgen -W "--repo --workflow --text --text-file --item --entity --json --cwd --quiet --help --edition" -- "$cur") );;
         supervisor:owed) COMPREPLY=( $(compgen -W "--repo --workflow --all --item --commits --reason --force --json --cwd --quiet --help --edition" -- "$cur") );;

@@ -1,7 +1,7 @@
 group: supervisor
 verb: push-mains
 owner: runtime
-summary: scan and push main for the runtime and configured product repositories
+summary: scan and push main for the configured product repositories (not the runtime)
 impl:
   script: scripts/supervisor/push-mains.mjs
 flags:

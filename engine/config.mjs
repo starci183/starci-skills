@@ -294,13 +294,13 @@ const validateSupervisorBlock=(supervisor,profile)=>{
     throw new Error('Invalid config.yaml: supervisor.mode must be chat or kernel, or null.');
   // The [Supervisor] kernel seat (scripts/machine/home.mjs supervisorSettings): kernel {agent?, model?, effort?}
   // pins its agent (default: the kernel pin), workers {base?, max?} its adaptive [Worker] cap (max <= 10),
-  // landGate {mode?: shared|exclusive, push?} the land gate (scripts/supervisor/land.mjs).
+  // landGate {mode?: shared|exclusive} the land gate (scripts/supervisor/land.mjs).
   const seat=supervisor.kernel,workers=supervisor.workers,gate=supervisor.landGate;
   if(seat!==undefined&&seat!==null)validateAgentSeat(seat,'supervisor.kernel',profile);
   if(!(workers===undefined||workers===null||(plain(workers)&&Object.keys(workers).every(key=>['base','max'].includes(key)&&Number.isInteger(workers[key])&&workers[key]>=1&&workers[key]<=10))))
     throw new Error('Invalid config.yaml: supervisor.workers must be {base?, max?} integers from 1 to 10, or null.');
-  if(!(gate===undefined||gate===null||(plain(gate)&&Object.keys(gate).every(key=>(key==='mode'&&['shared','exclusive'].includes(gate.mode))||(key==='push'&&typeof gate.push==='boolean')))))
-    throw new Error('Invalid config.yaml: supervisor.landGate must be {mode?: shared|exclusive, push?: boolean}, or null.');
+  if(!(gate===undefined||gate===null||(plain(gate)&&Object.keys(gate).every(key=>key==='mode'&&['shared','exclusive'].includes(gate.mode)))))
+    throw new Error('Invalid config.yaml: supervisor.landGate must be {mode?: shared|exclusive}, or null.');
   // stallMinutes: scripts/supervisor/stall.mjs calls a running workflow STALLED after this many minutes with no progress.
   // frozenMinutes: scripts/supervisor/supervisor-watchdog.mjs reads a busy seat frame with no turn progress for this long as frozen.
   const frozen=supervisor.frozenMinutes;

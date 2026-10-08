@@ -2884,21 +2884,23 @@ starci release clean-test --base origin/main
 
 ### starci release cut
 
-cut the release, the only push of main with its annotated release tag
+cut the release, the only way the runtime's remote main and a release tag move
 
 | flag | type | |
 | --- | --- | --- |
 | `--repo` | string |  |
 | `--remote` | string |  |
 | `--branch` | string |  |
+| `--plan` | boolean |  |
 | `--tag` | string |  |
 
-exit: 0 the release was cut and main plus its tag were pushed atomically; 1 refused (dirty tree, no or wrong tag, release notes incomplete, suite red, main moved, secret scan) and nothing was pushed; 2 bad usage
+exit: 0 the release was cut and main plus its tag were pushed atomically, or --plan found nothing missing; 1 refused (dirty tree, no or wrong tag, release notes incomplete, version not moved past the remote main, suite red, main moved, secret scan) and nothing was pushed; 2 bad usage
 
 json: flag
 
 ```sh
 starci release cut
+starci release cut --plan --tag v1.0.0-alpha.7
 starci release cut --repo <path> --tag v1.0.0-alpha.6 --json
 ```
 
@@ -3677,7 +3679,7 @@ starci supervisor gc --plan --json
 
 ### starci supervisor land
 
-run the in-runtime land gate; external land-to-main.sh remains external
+run the in-runtime land gate; it fast-forwards local main and never pushes
 
 | flag | type | |
 | --- | --- | --- |
@@ -3687,7 +3689,6 @@ run the in-runtime land gate; external land-to-main.sh remains external
 | `--reason` | string |  |
 | `--full-by-push-git` | boolean |  |
 | `--lane` | string |  |
-| `--no-push` | boolean |  |
 | `--notify` | boolean |  |
 | `--status` | boolean |  |
 | `--wait-ms` | number |  |
@@ -3825,7 +3826,7 @@ starci supervisor push --json
 
 ### starci supervisor push-mains
 
-scan and push main for the runtime and configured product repositories
+scan and push main for the configured product repositories (not the runtime)
 
 | flag | type | |
 | --- | --- | --- |

@@ -182,6 +182,13 @@ test('supervisor.frozenMinutes is accepted, malformed shapes are refused, and th
   assert.throws(()=>validateConfig({...ok,supervisor:{...ok.supervisor,frozenMinutes:0}}),/frozenMinutes/);
 });
 
+test('supervisor.landGate takes only a mode: the removed push key is refused by name, with where the push lives now',()=>{
+  const ok={...expected(),supervisor:{pollIntervalMs:null,repos:[],landGate:{mode:'shared'}}};
+  assert.doesNotThrow(()=>validateConfig(ok));
+  assert.throws(()=>validateConfig({...ok,supervisor:{...ok.supervisor,landGate:{mode:'shared',push:true}}}),/supervisor.landGate.push is removed [(]a land fast-forwards local main only .*starci release cut[)]/);
+  assert.throws(()=>validateConfig({...ok,supervisor:{...ok.supervisor,landGate:{mode:'shared',other:true}}}),/supervisor.landGate must be [{]mode[?]: shared[|]exclusive[}]/);
+});
+
 test('a config naming a provider no runtime declares is refused by the provider whitelist',()=>{
   const ok=expected();
   assert.throws(()=>validateConfig({...ok,kernel:{agent:'no-such-provider'}}),/Invalid config\.yaml/);

@@ -4,6 +4,26 @@ All notable changes to StarCi are documented here. The runtime is on the `1.0.0-
 until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` freezes them.
 `package.json` `version` is the only version authority.
 
+## [1.0.0-alpha.7] — in preparation
+
+Theme: the runtime's remote main moves only with a release, and a release is proven on the exact commit that is pushed.
+
+### Changed
+- A push of the runtime repository's `main` is a release. The installed pre-push hook (`scripts/guards/release-push-gate.mjs`) refuses a push of `main` or of a `v*` tag unless the pushed commit is a release commit (`scripts/guards/release-definition.mjs`, the same code `starci release cut` runs): `package.json` `version` differs from the remote main's, an annotated tag `v<version>` sits on the commit, `CHANGELOG.md` has a dated heading for that version with no unfinished mark, and the release record of exactly that commit holds a green full root suite, packages suites and checks. The refusal names what is missing and the command that produces it; there is no bypass switch. Any other ref is left alone.
+- A land fast-forwards local main and never pushes. `supervisor.landGate.push` and `starci supervisor land --no-push` are removed and refused by name, the land records no push row and opens no push-owed decision, and `supervisor push` and `push-mains` skip the runtime repository (product repositories are pushed as before). Publication is the release flow's job.
+- The release cut runs the packages suites (`npm run test:packages`) as a row of its L4 plan and records them by sha; it refuses before the suite when the version has not moved past the remote main's or the CHANGELOG heading is undated.
+- The quota check treats a provider window with no use and no reset time yet as valid, not as an unstarted-window failure.
+- Spawn reconciliation moved from `workers.mjs` into `spawn-reconcile.mjs`.
+
+### Added
+- `starci release cut --plan`: reports what the cut would run and require on this commit, and runs, tags and pushes nothing.
+- The `sonar-rules` self-check: Sonar's rules enforced locally (also at commit time on the staged files), with an empty baseline; own code is held to its own rules.
+- Checks: `removed-vocabulary` (removed spellings are refused in every instruction), `prose-commands` (every `starci` command an instruction shows exists in the CLI catalog, R230) and `documented-defaults` (a documented default cites its key and equals the value the code reads, R231); the validators read one key tree.
+
+### Fixed
+- Five red specs and 17 findings left by the alpha.6 cleanup.
+- SonarCloud findings of the code-smell baseline are fixed in code (default sort comparators, optional chains, array callbacks, awaited loops through the in-order helpers).
+
 ## [1.0.0-alpha.6] — 2026-10-08
 
 Theme: the first two real workflows run end to end through their first gates; model picking moves to capability tiers; every hold on a job gets one declared policy.

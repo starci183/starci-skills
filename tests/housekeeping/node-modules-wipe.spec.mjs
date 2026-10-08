@@ -59,14 +59,14 @@ test('the land gate refuses to run specs when the live node_modules is empty (li
   for (const dep of entries(path.join(root, 'node_modules'))) fs.rmSync(path.join(root, 'node_modules', dep), { recursive: true });
   assert.deepEqual(liveDepsState(root), { declared: 3, entries: 0 });
   let ran = 0;
-  const r = landCommits({ commits: ['c0ffee'], root, env, push: false, deps: { gitHealth: healthy, runChecks: () => { ran += 1; return { ok: false, checks: [] }; } } });
+  const r = landCommits({ commits: ['c0ffee'], root, env, deps: { gitHealth: healthy, runChecks: () => { ran += 1; return { ok: false, checks: [] }; } } });
   assert.equal(r.ok, false);
   assert.equal(r.reason, 'live-deps-missing');
   assert.match(r.hint, /npm ci/);
   assert.equal(ran, 0, 'no check runs without the live deps');
   // A missing node_modules is the same refusal; a manifest with no dependencies is not.
   fs.rmSync(path.join(root, 'node_modules'), { recursive: true });
-  assert.equal(landCommits({ commits: ['x'], root, env, push: false, deps: { gitHealth: healthy } }).reason, 'live-deps-missing');
+  assert.equal(landCommits({ commits: ['x'], root, env, deps: { gitHealth: healthy } }).reason, 'live-deps-missing');
   fs.writeFileSync(path.join(root, 'package.json'), '{"name":"live"}');
   assert.equal(liveDepsState(root).declared, 0);
 });
@@ -75,7 +75,7 @@ test('a land scratch carries no link to the live node_modules; links a check mak
   const { root, env } = liveRuntime(t);
   const main = git(root, 'rev-parse', 'main');
   let scratch = null;
-  const r = landCommits({ commits: [sideCommit(root)], root, env, push: false, deps: { gitHealth: healthy, runChecks: ({ dir }) => {
+  const r = landCommits({ commits: [sideCommit(root)], root, env, deps: { gitHealth: healthy, runChecks: ({ dir }) => {
     scratch = dir;
     const nm = path.join(dir, 'node_modules');
     assert.equal(fs.existsSync(nm), false, 'the scratch gets its own npm ci, never a link to the live deps (RT_NODE_MODULES_LINK)');
@@ -97,7 +97,7 @@ test('a land scratch carries no link to the live node_modules; links a check mak
 test('checks that emptied the live node_modules through a link refuse the land (live-deps-missing), never land it', (t) => {
   const { root, env } = liveRuntime(t);
   const main = git(root, 'rev-parse', 'main');
-  const r = landCommits({ commits: [sideCommit(root)], root, env, push: false, deps: { gitHealth: healthy, runChecks: ({ dir }) => {
+  const r = landCommits({ commits: [sideCommit(root)], root, env, deps: { gitHealth: healthy, runChecks: ({ dir }) => {
     // What an npm reify (or any delete) through a link to the live deps does: the children go, the directory stays.
     const nm = path.join(dir, 'node_modules');
     fs.symlinkSync(path.join(root, 'node_modules'), nm, LINK);

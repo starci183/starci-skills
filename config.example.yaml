@@ -38,7 +38,8 @@ parallel: {gear: 1}
 # kernel (docs/supervisor.md) also takes, optional, defaults in home.mjs DEFAULTS:
 #   kernel: {agent, model, effort}   its agent pin (default: the kernel pin below)
 #   workers: {base, max}             the adaptive [Worker] cap
-#   landGate: {mode: shared, push: true}   shared lets running lanes commit directly; exclusive = gate only
+#   landGate: {mode: shared}         shared lets running lanes commit directly; exclusive = gate only. A land
+#                                    fast-forwards LOCAL main only: the remote main moves with a release (starci release cut)
 supervisor:
   # mode: chat (default) - the owner's desktop chat session is the Supervisor: it owns channel 'main'
   #   and reads Decision Items; nothing starts a [Supervisor] kernel. kernel - the optional [Supervisor]
@@ -48,7 +49,7 @@ supervisor:
   pollIntervalMs: null
   repos: []
   # frozenMinutes: <n>   # Host seat check: a busy frame unchanged this long is frozen, not busy
-  # landGate: {mode: shared|exclusive, push: true}
+  # landGate: {mode: shared|exclusive}
 # delegation — while the owner is away, a named delegate (e.g. the supervisor chat) may
 # answer owner asks until the given time; excluded classes stay owner-only. null = none.
 #   delegation: {asks: supervisor, until: 2026-09-23T09:00:00+07:00,

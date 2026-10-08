@@ -4631,12 +4631,12 @@ RIGHTS_PROTECTED_ZONE:
 RIGHTS_PUSH_NOT_RELEASE:
   title: "Pre-push gate refused the push"
   title_vi: "Cổng pre-push từ chối lần đẩy"
-  meaning_vi: "Hook pre-push đã chặn một đích không phải refs/backup/*, không phải lần đẩy fast-forward của main, và không phải thẻ v* do release cut tạo, vì HEAD thiếu thẻ annotated hợp lệ hoặc thiếu bản ghi L4 khớp HEAD và thẻ."
+  meaning_vi: "Hook pre-push đã chặn một lần đẩy main hoặc thẻ v* của runtime vì commit được đẩy chưa phải commit phát hành: phiên bản chưa vượt phiên bản ở main trên remote, thiếu thẻ annotated v<version>, thiếu tiêu đề CHANGELOG có ngày, hoặc thiếu bản ghi L4 của đúng commit đó với suite gốc, suite các package và check đều xanh."
   causes_vi:
-    - "Đích là một nhánh khác, một thẻ không bắt đầu bằng v, hoặc thao tác xóa ref"
+    - "Thao tác xóa main hoặc xóa thẻ phát hành"
     - "Đẩy main không phải fast-forward của main trên remote (force push, rewind hoặc nhánh rẽ)"
-    - "HEAD không mang thẻ annotated v[0-9]* hoặc bản ghi starci-release của HEAD thiếu hay không khớp"
-  nextStep_vi: "Đẩy main fast-forward (không force), dùng refs/backup/* cho bản sao lưu, hoặc chạy release cut đã được owner duyệt để ghi L4 rồi đẩy main và thẻ v* cùng nhau."
+    - "Commit được đẩy không phải commit phát hành: version trùng version ở main remote, thiếu thẻ annotated v<version>, CHANGELOG chưa có tiêu đề có ngày, hoặc bản ghi starci-release của đúng commit đó thiếu hay có dòng đỏ"
+  nextStep_vi: "Không đẩy main giữa hai bản phát hành; chạy starci release cut --tag v<version> (thêm --plan để xem trước) đã được owner duyệt, lệnh này ghi bản ghi L4 rồi đẩy main và thẻ v* cùng nhau."
   owner: supervisor
   kind: verb-refusal
 
@@ -16540,3 +16540,89 @@ RT_SONAR_BASELINE_STALE:
   nextStep_vi: "Người sửa chạy starci runtime check --only sonar-rules -- --prune để xóa các mục đã hết phát hiện, rồi đưa thay đổi allowlist vào cùng commit."
   owner: supervisor
   kind: check-finding
+
+RELEASE_VERSION_UNCHANGED:
+  title: "Release commit keeps the version of the remote main"
+  title_vi: "Commit phát hành giữ nguyên phiên bản của main trên remote"
+  meaning_vi: "package.json của commit được đẩy có version trùng với version tại đầu main trên remote, nên đây không phải một bản phát hành mới; main của runtime chỉ di chuyển cùng một bản phát hành."
+  causes_vi:
+    - "Đẩy main để lấy kết quả CI hoặc SonarCloud giữa hai bản phát hành"
+    - "Quên nâng version trong package.json trước khi cắt bản phát hành"
+  nextStep_vi: "Không đẩy main giữa hai bản phát hành; khi owner chốt cột mốc, nâng version, chuyển mục CHANGELOG sang version mới, commit rồi chạy starci release cut --tag v<version>."
+  owner: supervisor
+  kind: verb-refusal
+
+RELEASE_TAG_VERSION:
+  title: "Release tag is not the version of the commit"
+  title_vi: "Thẻ phát hành không phải version của commit"
+  meaning_vi: "Tên thẻ được đẩy hoặc được yêu cầu cắt khác v<version> theo package.json của commit; thẻ phát hành luôn là v cộng với version của chính commit mà nó trỏ tới."
+  causes_vi:
+    - "Gọi release cut với tên thẻ không khớp package.json"
+    - "Tạo thẻ v* tay trên một commit chưa nâng version"
+  nextStep_vi: "Dùng đúng thẻ v<version> của commit, hoặc sửa version trong package.json rồi commit; không dời hay xóa thẻ đã có."
+  owner: supervisor
+  kind: verb-refusal
+
+RELEASE_CHANGELOG_SECTION:
+  title: "Release commit has no finished, dated CHANGELOG section"
+  title_vi: "Commit phát hành chưa có mục CHANGELOG hoàn chỉnh và có ngày"
+  meaning_vi: "CHANGELOG.md tại commit được đẩy không có tiêu đề ## [<version>] kèm ngày, hoặc mục đó còn TODO, PENDING, TBD hay dấu in preparation."
+  causes_vi:
+    - "Mục của bản phát hành vẫn đang ở trạng thái in preparation"
+    - "Còn sót dấu chưa xong trong mục CHANGELOG"
+  nextStep_vi: "Hoàn tất mục CHANGELOG của version, ghi ngày vào tiêu đề, commit rồi chạy starci release cut --tag v<version>."
+  owner: supervisor
+  kind: verb-refusal
+
+RELEASE_TAG_MISSING:
+  title: "No annotated release tag on the pushed commit"
+  title_vi: "Commit được đẩy chưa có thẻ phát hành annotated"
+  meaning_vi: "Không có thẻ annotated v<version> trỏ tới commit được đẩy; thẻ do release cut tạo với mục CHANGELOG làm thông điệp, nên một lần đẩy main không đi kèm thẻ đó không phải bản phát hành."
+  causes_vi:
+    - "Đẩy main bằng git push thay vì release cut"
+    - "Thẻ là lightweight hoặc nằm trên commit khác"
+  nextStep_vi: "Chạy starci release cut --tag v<version> (thêm --plan để xem trước); lệnh này tạo thẻ annotated rồi đẩy main và thẻ cùng nhau."
+  owner: supervisor
+  kind: verb-refusal
+
+RELEASE_RECEIPT_MISSING:
+  title: "No release record for exactly the pushed commit"
+  title_vi: "Không có bản ghi phát hành cho đúng commit được đẩy"
+  meaning_vi: "Thư mục git chung không có bản ghi starci-release của đúng commit này và thẻ này, nghĩa là suite đầy đủ và các suite của package chưa chạy xanh trên chính commit sẽ được đẩy."
+  causes_vi:
+    - "Bản ghi thuộc về một commit khác vì main đã di chuyển sau lần chạy suite"
+    - "Đẩy main mà không đi qua release cut"
+  nextStep_vi: "Chạy starci release cut --tag v<version> trên đúng commit sẽ phát hành; lệnh này chạy suite, ghi bản ghi theo sha rồi đẩy."
+  owner: supervisor
+  kind: verb-refusal
+
+RELEASE_RECEIPT_INCOMPLETE:
+  title: "Release record lacks a green row"
+  title_vi: "Bản ghi phát hành thiếu một dòng xanh"
+  meaning_vi: "Bản ghi của commit có tồn tại nhưng thiếu dòng xanh cho suite gốc, các suite của package hoặc các check mà định nghĩa bản phát hành yêu cầu."
+  causes_vi:
+    - "Bản ghi được ghi bởi một phiên bản release cut cũ chưa chạy suite của package"
+    - "Một bước của L4 đỏ hoặc vắng mặt"
+  nextStep_vi: "Chạy lại starci release cut --tag v<version> sau khi sửa phần đỏ; không sửa tay bản ghi."
+  owner: supervisor
+  kind: verb-refusal
+
+RELEASE_REMOTE_HEAD_UNKNOWN:
+  title: "Remote main head is not in this repository"
+  title_vi: "Đầu main trên remote không có trong repository này"
+  meaning_vi: "Commit mà remote main đang trỏ tới chưa được fetch về, nên không so được version của bản phát hành mới với bản đang có trên remote."
+  causes_vi:
+    - "Remote có commit mới mà clone này chưa fetch"
+  nextStep_vi: "Fetch main từ remote rồi chạy lại release cut; không đẩy force."
+  owner: supervisor
+  kind: verb-refusal
+
+RELEASE_VERSION_UNREADABLE:
+  title: "package.json of the pushed commit has no readable version"
+  title_vi: "package.json của commit được đẩy không có version đọc được"
+  meaning_vi: "Không đọc được trường version từ package.json tại commit được đẩy, nên không xác định được bản phát hành."
+  causes_vi:
+    - "package.json bị xóa, hỏng JSON hoặc thiếu trường version"
+  nextStep_vi: "Khôi phục package.json với trường version hợp lệ rồi commit."
+  owner: supervisor
+  kind: verb-refusal

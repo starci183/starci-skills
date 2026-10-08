@@ -2,9 +2,10 @@
 // starci supervisor push — the ONE place the full test suites run (owner 2026-09-29), then the push of main.
 //
 //   starci supervisor push [--repo <path>]... [--check] [--json]
-//       default repositories: the runtime (.claude) and every product repository a project binding names
+//       default repositories: every product repository a project binding names
 //       (.workspaces/projects/*/work.json, the push-mains default set) that has unpushed main commits;
-//       an explicit --repo runs whether or not it is ahead.
+//       an explicit --repo runs whether or not it is ahead. The runtime repository is not pushed here (verdict release-only):
+//       its main moves only with `starci release cut`, which runs the same suites on the exact commit.
 //   --check   everything except the push (clean checkout, full suites, dry-run and hooks-only of the push)
 //
 // The harness never runs a full suite in normal work (config.yaml specs.harness, default false = touching-only:
@@ -13,7 +14,7 @@
 //   1. the main checkout must be clean - on branch main, no tracked modification, no staged change. The dirty
 //      paths are reported and NOTHING is stashed, reset or cleaned. (Untracked files are counted, not blocking.)
 //   2. the full suite of that repository, each step to a log file:
-//        .claude          npm test, npm run check
+//        .claude          npm test, npm run test:packages, npm run check (the release cut's rows; this flow does not push it)
 //        app              the app's managed scripts (packages/hfs/templates/app/package-scripts): npm run typecheck,
 //                         npm run lint, npm test (the be unit project only - e2e is manual-only and never run here),
 //                         every npm run build:<side> the app declares (build:be, build:fe), canon-scan
@@ -32,7 +33,7 @@ import path from 'node:path';
 import { runNpm } from '../api/npm/run-npm.mjs';
 import { runNode } from '../api/node/run-node.mjs';
 import { git } from './workers.mjs';
-import { defaultPushRepos, pushMains, describePush } from './push-mains.mjs';
+import { defaultPushRepos, pushMains, describePush, RUNTIME_RELEASE_ONLY } from './push-mains.mjs';
 import { SKILL_ROOT, supervisorLog } from '../machine/home.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { readJsonFile } from '../lib/json.mjs';
@@ -76,7 +77,7 @@ const readPackage = (repo) => readJsonFile(path.join(repo, 'package.json'));
  */
 export function planFor(repo, { runtimeRoot = SKILL_ROOT, pkg = readPackage(repo), skillRoot = SKILL_ROOT } = {}) {
   if (isRuntime(repo, runtimeRoot)) {
-    return { kind: 'runtime', steps: [{ name: 'npm test', cmd: 'npm', args: ['test'] }, { name: 'npm run check', cmd: 'npm', args: ['run', 'check'] }] };
+    return { kind: 'runtime', steps: [{ name: 'npm test', cmd: 'npm', args: ['test'] }, { name: 'npm run test:packages', cmd: 'npm', args: ['run', 'test:packages'] }, { name: 'npm run check', cmd: 'npm', args: ['run', 'check'] }] };
   }
   const scripts = pkg?.scripts ?? {};
   const npmStep = (script, extra = {}) => (scripts[script]
@@ -274,6 +275,7 @@ export function pushGitRepo(repo, { check = false, explicit = false, deps = {} }
   const stepRun = deps.step ?? runStep;
   const pushRun = deps.push ?? pushMains;
   const out = { repo, name: path.basename(repo), verdict: 'green', steps: [] };
+  if (isRuntime(repo, deps.runtimeRoot)) return { ...out, verdict: 'release-only', why: RUNTIME_RELEASE_ONLY };
   const state = mainState(repo, { run: gitRun });
   Object.assign(out, { branch: state.branch, ahead: state.ahead, head: state.head, untracked: state.untracked });
   if (!state.onMain) return { ...out, verdict: 'not-on-main', why: `the checkout is on ${state.branch ?? 'a detached HEAD'}, not main` };

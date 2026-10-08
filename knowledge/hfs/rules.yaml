@@ -1980,7 +1980,7 @@ rules:
       - {kind: runtime, id: protected-zone, at: scripts/hfs/runtime-rules/rights-policy.mjs}
   - id: R225
     code: "RT_HOOK_SHAPE"
-    law: "The app hook templates keep the gate model: pre-commit is L0 only (no typecheck, no test run); pre-push checks the release gate (the starci-release L4 record, refs/backup/, v[0-9] tags; the runtime's own hook also lets main through fast-forward) and runs no npm test, jest, typecheck or lint."
+    law: "The app hook templates keep the gate model: pre-commit is L0 only (no typecheck, no test run); pre-push checks the release gate (the starci-release L4 record, refs/backup/, v[0-9] tags; the runtime's own hook is scripts/guards/release-push-gate.mjs, which judges main and v* tags against the release definition and lets every other ref through) and runs no npm test, jest, typecheck or lint."
     scope: runtime
     kinds: [check]
     gates: [land, runtime]

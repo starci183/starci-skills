@@ -94,6 +94,22 @@ removed:
     use: '`starci debug digest` (read-only) and `starci debug run <probe>`'
     since: 1.0.0-alpha.6
     match: '(?<![\w-])debug pass\b'
+  - id: config-supervisor-landgate-push
+    kind: config-key
+    name: supervisor.landGate.push
+    use: 'a land fast-forwards local main only and never pushes; the remote main of the runtime moves once per release, through starci release cut'
+    since: 1.0.0-alpha.7
+    match: 'landGate\.push\b'
+  - id: flag-land-no-push
+    kind: flag
+    name: --no-push
+    use: 'a land never pushes, so there is nothing to leave unpushed'
+    since: 1.0.0-alpha.7
+  - id: code-landed-push-owed
+    kind: code
+    name: landed-push-owed
+    use: 'a land has no push step; the outcome is landed'
+    since: 1.0.0-alpha.7
   - id: flag-caller-agent
     kind: flag
     name: --caller-agent

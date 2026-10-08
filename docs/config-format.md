@@ -63,7 +63,10 @@ Optional keys:
 - `supervisor` — `{mode?, kernel?, pollIntervalMs?, repos?, stallMinutes?, frozenMinutes?, workers?, landGate?}`:
   the Supervisor seat, optional chat digest cadence and managed product repositories; the reconciler
   Host and Workflow controllers own seat recovery and stall detection ([supervisor](supervisor.md);
-  defaults `scripts/machine/home.mjs` `DEFAULTS`)
+  defaults `scripts/machine/home.mjs` `DEFAULTS`).
+  `landGate` is `{mode?: shared|exclusive}` (default `shared`): a land fast-forwards LOCAL main only and never pushes. The remote main of the
+  runtime moves once per release, through `starci release cut`, and the pre-push hook of the runtime repository refuses every other push
+  of it ([release governance](git-governance.md))
 - `reconciler` — `{enabled?, profile?, controllers?}`: `profile` `operational` (job, host, workflow, resource active; gc, workers,
   learning shadow) or `observe` (all shadow) sets every controller's default mode; `controllers.<name>.mode`
   (`off|shadow|active`) overrides one. Approved workflow startup automatically ensures the host is ready;
