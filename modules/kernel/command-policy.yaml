@@ -28,6 +28,13 @@ calls:
     verb: [work, imagegen]
     ops: [interface.draw, interface.asset, brand.decide]
     use: starci work imagegen --prompt <file> --out <dir in the worktree> (interface.draw, interface.asset and brand.decide only)
+# Capability verbs the runtime performs for an op (a served app and a browser): a bound role runs one only as an op named here. The app is
+# served by the verb, on the host name the app's own proxy uses; a server an op starts by hand is refused (raw-tools.next, the node and npm rows).
+renders:
+  layoutRender:
+    verb: [work, layout-render]
+    ops: [brand.decide, interface.draw]
+    use: starci work layout-render --work .starciwork --node <layout node id> --breakpoint <bp> --theme <theme> --write (brand.decide and interface.draw only)
 # Release path: refused to every bound role.
 release:
   verbs: [cut, publish]
@@ -119,7 +126,7 @@ npm:
     uninstall: {code: RIGHTS_RAW_TOOL, use: starci npm install is the owner-controlled dependency-change path using canon pins}
     test: {code: RIGHTS_RAW_TOOL, use: starci test run --level L1|L2 in the runtime or starci gate unit --root <app> in an app}
     t: {code: RIGHTS_RAW_TOOL, use: starci test run --level L1|L2 in the runtime or starci gate unit --root <app> in an app}
-    run: {code: RIGHTS_RAW_TOOL, use: 'starci test run runs tests; use starci release sync-runtime for package runtime copies and grammar preparation, or starci check run, starci lint run, starci typecheck run, starci app stack, or starci gate run for other scripts'}
+    run: {code: RIGHTS_RAW_TOOL, use: 'starci test run runs tests; starci work layout-render serves the app for a layout capture; use starci release sync-runtime for package runtime copies and grammar preparation, or starci check run, starci lint run, starci typecheck run, starci app stack, or starci gate run for other scripts'}
     run-script: {code: RIGHTS_RAW_TOOL, use: 'starci test run runs tests; use starci check run, starci lint run, starci typecheck run, starci app stack, or starci gate run for other scripts'}
     start: {code: RIGHTS_RAW_TOOL, use: 'starci app stack'}
     exec: {code: RIGHTS_RAW_TOOL, use: 'starci check run, starci lint run, starci typecheck run, or starci gate run for that tool'}
@@ -139,6 +146,7 @@ raw-tools:
   schtasks: {use: 'starci task register, starci task show, or starci task list for runtime scheduled tasks'}
   shutdown: {use: 'ask the owner: a worker never shuts the host down'}
   reboot: {use: 'ask the owner: a worker never reboots the host'}
+  next: {use: 'starci work layout-render serves the product app on localhost and captures a layout (brand.decide and interface.draw); a dev server started by hand renders nothing the runtime can use'}
   jest: {use: starci test run in the runtime or starci gate unit --root <app> in an app}
   vitest: {use: starci test run in the runtime or starci gate unit --root <app> in an app}
   mocha: {use: starci test run in the runtime or starci gate unit --root <app> in an app}

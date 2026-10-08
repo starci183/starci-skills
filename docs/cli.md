@@ -4868,6 +4868,31 @@ starci work imagegen --prompt <STARCI_JOB_SCRATCH>/mascot.prompt.txt --out .star
 starci work imagegen --prompt hero.prompt.txt --out ui/home/assets --reference ui/home/assets/hero-ref.png --count 2 --size 1536x1024
 ```
 
+### starci work layout-render
+
+serve the product app and capture one layout in a real browser with its page slot keyed
+
+| flag | type | |
+| --- | --- | --- |
+| `--work` | string |  |
+| `--node` | string |  |
+| `--breakpoint` | string |  |
+| `--theme` | string |  |
+| `--app` | string |  |
+| `--route` | string |  |
+| `--locale` | string |  |
+| `--slot` | string |  |
+| `--out` | string |  |
+| `--write` | boolean |  |
+
+exit: 0 rendered; 1 no render could be produced: code SHELL_RENDER_UNAVAILABLE with a typed cause, the failing URL and the redirect chain; 2 bad usage
+
+json: flag
+
+```sh
+starci work layout-render --work .starciwork --node "/[locale]" --breakpoint desktop --theme light --write --json
+```
+
 ### starci work layout-tree
 
 scan, capture, plan, lock, or inspect a product layout tree

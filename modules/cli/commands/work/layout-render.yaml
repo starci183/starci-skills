@@ -1,0 +1,20 @@
+group: work
+verb: layout-render
+owner: runtime
+summary: serve the product app and capture one layout in a real browser with its page slot keyed
+impl: {script: scripts/work/layout-render.mjs}
+flags:
+  - {name: work, type: string, summary: the .starciwork root that holds the shell record}
+  - {name: node, type: string, summary: layout node id to render}
+  - {name: breakpoint, type: string, summary: breakpoint of the capture}
+  - {name: theme, type: string, summary: theme of the capture}
+  - {name: app, type: string, summary: app name when the shell has several apps}
+  - {name: route, type: string, summary: "path to load; default the node's url with the locale filled by the product locale"}
+  - {name: locale, type: string, summary: locale that fills the locale segment of the route}
+  - {name: slot, type: string, summary: "CSS selector of the page slot, exactly one match; default main"}
+  - {name: out, type: string, summary: directory for the capture and the server log; default a temp directory}
+  - {name: write, type: boolean, summary: "record the capture in the layout tree as layout-tree capture does"}
+exit: {"0": rendered, "1": "no render could be produced: code SHELL_RENDER_UNAVAILABLE with a typed cause, the failing URL and the redirect chain", "2": bad usage}
+json: flag
+examples: ['starci work layout-render --work .starciwork --node "/[locale]" --breakpoint desktop --theme light --write --json']
+editions: [full]

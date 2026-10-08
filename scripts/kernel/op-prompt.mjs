@@ -17,7 +17,7 @@ import { resumePromptLines } from './resume-context.mjs';
 import { specsBriefLines, specsOf, verificationScopeLines } from '../route/spec-deferral.mjs';
 import { ownerLanguage, translator } from '../lib/i18n.mjs';
 import { tempRoot } from '../../engine/temp-root.mjs';
-import { imagegenPromptLines } from './op-prompt-imagegen.mjs';
+import { capabilityPromptLines } from './op-prompt-capabilities.mjs';
 import { renderRoleLines } from '../machine/roles-contract.mjs';
 
 // The Op's role (scope, never, clean up, reporting) is modules/kernel/roles.yaml#op; the prompt prints it from there.
@@ -202,7 +202,7 @@ export function buildOpPrompt({ skillRoot, packet, jobId = null, repo = null, pr
   `  starci-release-proof → starci release proof --repo <released repository> --base <first commit of the release range>^ --out <STARCI_JOB_SCRATCH>/release-proof.json — release-app-installs, check-canon-pins with the content digest, the merge guard over the range and npm run check, none skipped; attach it. Enforced at settle (op-proof release)`,
   `  review-defects → write <STARCI_JOB_SCRATCH>/review-defects.json {"schema":"starci/review-defects@1","defects":[{"id","title","class":"business|non-business","caughtBy":"<check that caught it, or null>","missingCheck":{"check","rule","detail"} when non-business and no check caught it}]} — every defect review.verify finds; attach it. Enforced at settle (op-proof review-defects)`,
   `  hfs-lint → starci app lint --cwd <app> --format json through the app's own install — the whole-repository lint measurement (review.verify, a refactor's full-regression-final); interface.audit/draw/asset run it with --changed <the files they audit or produce>, and security.verify over the inspected slice; each saves it as <STARCI_JOB_SCRATCH>/lint.json and attaches it (op-proof fe-lint, security-lint). security.verify also attaches <STARCI_JOB_SCRATCH>/security-findings.json {"schema":"starci/security-findings@1","findings":[{"rule","code","path","line","severity","reachability"}]} carrying every security canon finding of the lint by rule`,
-  ...imagegenPromptLines({ skillRoot, op: packet.op }),
+  ...capabilityPromptLines({ skillRoot, op: packet.op }),
   ...(briefUses(brief, '--isolate') ? [`  sonar → starci gate sonar scan --cwd <absolute repository root> --wait --isolate --base <commit before your first edit> --paths <owned paths> --out <STARCI_JOB_SCRATCH>/checks/sonar.json --log <STARCI_JOB_SCRATCH>/checks/sonar.txt; attach both outputs with starci kernel report. Enforced at settle: done needs outcome pass in that sonar.json; a blocked scan (unavailable true) is reported blocked, never done`] : []),
   `  a check you cannot execute is reported as environment/unavailable evidence — a placeholder result is NOT proof of an upstream defect.`,
   `  a repository-wide gate (typecheck, lint, tests over the whole tree) red ONLY on files you did not change and that import nothing you changed, while your scoped runs pass, is another op's defect: record that check with its real exitCode and "failing":["path[:line]", ...] plus rootCause {node:"<the op that owns that file, or its workflow>", self:false, category:"shared-change", claim, evidence:[the failing line]}; it is never an open item, never partial, never a blocker, and it never turns an otherwise green done into anything else (modules/ops/_common.yaml Bounded finish and blockers (d)). The api attributes it to the peer whose commit left it and routes it there.`,

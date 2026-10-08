@@ -170,10 +170,11 @@ cases:
     why: "the work.author contract belongs to the workflow-blockers lane (f2) and is not yet merged"
   - id: render-environment-unavailable-in-fresh-worktree
     family: failure-while-running
-    finding: {role: op, duty: never, verdict: unjudged, evidence: "StarCi brand.decide reported SHELL_RENDER_UNAVAILABLE (a correct error); whether starting next dev by hand was wrong handling depends on what the op contract told it as it stood, which is not yet read", remedy: {state: open, lane: f2}}
-    met: {date: "2026-10-08", where: "draw render in a fresh workflow worktree", evidence: "owner report 2026-10-08"}
-    status: open
-    why: "the draw render path belongs to the workflow-blockers lane (f2) and is not yet merged"
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "StarCi brand.decide reported SHELL_RENDER_UNAVAILABLE after starting next dev by hand pinned to 127.0.0.1: the product's shared next-intl proxy rewrites to localhost, which a server pinned to another host treats as an external rewrite and answers 307 to / for ever (reproduced in a scratch copy of the worktree: a pinned server loops, a server with no pin answers 200 on localhost and 127.0.0.1); the op prompt and contract named no render path and no verb served the app", remedy: {state: in-tree, change: "starci work layout-render serves the app itself (next dev, free port, no host pin, localhost URLs, the scaffold's public-origin variables set), keys the slot, records the capture and stops its server; the command policy refuses a hand-started server and names the verb; the op prompt and brand.decide name it; a render that cannot be produced prints SHELL_RENDER_UNAVAILABLE with a typed cause, the URL and the redirect chain"}}
+    met: {date: "2026-10-08", where: "draw render in a fresh workflow worktree", evidence: "owner report 2026-10-08; inc-cf0119538b5a; scratch reproduction D:/starci-tmp/a8b-scratch"}
+    rule: {file: scripts/work/layout-render-serve.mjs, anchor: "no host pin"}
+    spec: tests/work/layout-render.spec.mjs
+    status: covered
   - id: supervisor-killed-its-own-land
     family: smooth-operation
     met: {date: "2026-10-07", where: "Supervisor ran land under timeout 590 while the gate needs about 30 minutes", evidence: "AUDIT-starci-workflow.md issue 20"}

@@ -38,7 +38,7 @@ _starci() {
         test) COMPREPLY=( $(compgen -W "run" -- "$cur") );;
         typecheck) COMPREPLY=( $(compgen -W "run" -- "$cur") );;
         uat) COMPREPLY=( $(compgen -W "assisted-runner slots" -- "$cur") );;
-        work) COMPREPLY=( $(compgen -W "asset-slot brand brand-direction brand-palette check-example-work compose-direction draw-acceptance draw-dna draw-feedback draw-gates draw-grammar draw-layer draw-loop draw-rationale draw-render draw-review draw-source draw-taste evidence-binding example-critique example-derive example-evidence example-verify grammar-geometry grammar-knowledge grammar-proposal grammar-registry-pin graph hygiene imagegen layout-tree render-proof shell-conformance ui-proof-brief" -- "$cur") );;
+        work) COMPREPLY=( $(compgen -W "asset-slot brand brand-direction brand-palette check-example-work compose-direction draw-acceptance draw-dna draw-feedback draw-gates draw-grammar draw-layer draw-loop draw-rationale draw-render draw-review draw-source draw-taste evidence-binding example-critique example-derive example-evidence example-verify grammar-geometry grammar-knowledge grammar-proposal grammar-registry-pin graph hygiene imagegen layout-render layout-tree render-proof shell-conformance ui-proof-brief" -- "$cur") );;
         worker) COMPREPLY=( $(compgen -W "close list read release show start stop" -- "$cur") );;
         workflow) COMPREPLY=( $(compgen -W "assess bias custody define start status stop" -- "$cur") );;
         completion) COMPREPLY=( $(compgen -W "bash zsh fish powershell" -- "$cur") );;
@@ -847,6 +847,15 @@ _starci() {
         work:imagegen:--size) return 0;;
         work:imagegen:--name) return 0;;
         work:imagegen:--stage) return 0;;
+        work:layout-render:--work) return 0;;
+        work:layout-render:--node) return 0;;
+        work:layout-render:--breakpoint) return 0;;
+        work:layout-render:--theme) return 0;;
+        work:layout-render:--app) return 0;;
+        work:layout-render:--route) return 0;;
+        work:layout-render:--locale) return 0;;
+        work:layout-render:--slot) return 0;;
+        work:layout-render:--out) return 0;;
         work:layout-tree:--work) return 0;;
         work:layout-tree:--app-dir) return 0;;
         work:layout-tree:--app) return 0;;
@@ -1133,6 +1142,7 @@ _starci() {
         work:graph) COMPREPLY=( $(compgen -W "--repo --workflow --version --file --from --to --job --reason --slice --json --cwd --quiet --help --edition" -- "$cur") );;
         work:hygiene) COMPREPLY=( $(compgen -W "--repo --json --cwd --quiet --help --edition" -- "$cur") );;
         work:imagegen) COMPREPLY=( $(compgen -W "--prompt --out --reference --count --size --name --stage --json --cwd --quiet --help --edition" -- "$cur") );;
+        work:layout-render) COMPREPLY=( $(compgen -W "--work --node --breakpoint --theme --app --route --locale --slot --out --write --json --cwd --quiet --help --edition" -- "$cur") );;
         work:layout-tree) COMPREPLY=( $(compgen -W "--work --app-dir --write --app --repo-root --node --breakpoint --theme --file --url --provenance --destination --route --locale --from --rect --active-nav --design --files --key --tolerance --json --cwd --quiet --help --edition" -- "$cur") );;
         work:render-proof) COMPREPLY=( $(compgen -W "--work --record --json --cwd --quiet --help --edition" -- "$cur") );;
         work:shell-conformance) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;

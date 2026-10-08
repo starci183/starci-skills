@@ -238,6 +238,10 @@ allocation:
   quitAgent: {waitMs: 6000}
   # drawRender (scripts/work/draw-render.mjs): a capture waits settleMs after document.fonts.ready.
   drawRender: {settleMs: 500}
+  # layoutRender (scripts/work/layout-render.mjs): the runtime serves the product app for one capture; readyMs is how long the dev server may take to answer
+  # its first request (a cold Next compile), navigateMs the page load, settleMs the wait after fonts are ready, stopMs the grace before a still-running server is killed.
+  # publicOriginKeys are the scaffold's public-origin variables (its README: the product app's own address and the product app the landing hands over to); each gets the render's origin.
+  layoutRender: {readyMs: 180000, navigateMs: 90000, settleMs: 500, stopMs: 5000, publicOriginKeys: [NEXT_PUBLIC_SITE_URL, NEXT_PUBLIC_APP_URL]}
   # drawLoop (scripts/work/draw-loop.mjs, scripts/work/draw/draw-taste.mjs; owner rulings 2026-09-27): interface.draw
   # draws -> shoots -> evaluates -> fixes in rounds. A loop stops when every machine metric passes and the
   # independent critic's beauty is at least beautyMin, after maxRounds, or after stallRounds rounds in a row that

@@ -4,6 +4,14 @@ All notable changes to StarCi are documented here. The runtime is on the `1.0.0-
 until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` freezes them.
 `package.json` `version` is the only version authority.
 
+## [1.0.0-alpha.8] — in preparation
+
+### Added
+- `starci work layout-render`: the one way an op gets a real browser render of a product layout. The runtime serves the app itself (`next dev` on a free port with no host pin, every URL on `localhost`, the scaffold's public-origin variables set), keys the page slot #FF00FF, captures the viewport at the tree's breakpoint size, stops the server it started and, with `--write`, records the capture as `layout-tree capture` does. A render it cannot produce prints `SHELL_RENDER_UNAVAILABLE` with a typed cause, the failing URL and the redirect chain.
+
+### Fixed
+- `brand.decide` looped on `SHELL_RENDER_UNAVAILABLE` in a fresh workflow tree: the op started `next dev --hostname 127.0.0.1` by hand, the product's i18n proxy rewrites to `localhost`, and a server pinned to another host answers that rewrite with 307 for ever. The command policy now refuses a hand-started app server (`next`, `node …/next`, `npm run dev`) and names the verb; the op prompt and `brand.decide` name it (`renders.layoutRender` in `command-policy.yaml`).
+
 ## [1.0.0-alpha.7] — 2026-10-08
 
 Theme: the roles are one declared contract, the system recovers from a host restart by itself, no smell or bug enters at commit, and the remote main moves only with a release proven on the exact commit that is pushed.

@@ -70,11 +70,11 @@ const codeOf = (entry, fallback) => (RIGHTS_CODES.has(entry?.code) ? entry.code 
 const genericUse = 'use the starci verb of the action (modules/cli/commands) or ask the owner';
 const raw = (role, text, use = genericUse, what = 'raw tool command') => refusal('RIGHTS_RAW_TOOL', text, `the ${role} role does not run this ${what} directly because side effects go through a starci verb`, use);
 
-/** A headless-call verb (policy.calls) refuses every bound role but the ops the table names. */
+/** A headless-call verb (policy.calls) or a capability verb (policy.renders) refuses every bound role but the ops the table names. */
 const callVerdict = ({ role, program, args, guard, policy, text }) => {
   if (program !== 'starci') return null;
   const words = args.filter((value) => !value.startsWith('-'));
-  const call = Object.values(policy.calls ?? {}).find((entry) => words[0] === entry.verb?.[0] && words[1] === entry.verb?.[1]);
+  const call = [...Object.values(policy.calls ?? {}), ...Object.values(policy.renders ?? {})].find((entry) => words[0] === entry.verb?.[0] && words[1] === entry.verb?.[1]);
   if (!call || (role === 'op' && toSet(call.ops).has(String(guard?.op ?? '')))) return null;
   return refusal('RIGHTS_ROLE_DENIED', text, `${guard?.op ?? role} does not run starci ${call.verb.join(' ')}: only ${[...toSet(call.ops)].join(', ')} call it`, useOf(call, genericUse));
 };
@@ -199,7 +199,9 @@ const npmPolicyVerdict = ({ role, args, p, policy, guard, handle, lockOwner, tex
   return refusal(codeOf(denied, 'RIGHTS_RAW_TOOL'), text, `the ${role} role does not run this package-manager action directly because scripts and dependency changes go through a starci verb`, use);
 };
 
-const nodePolicyVerdict = ({ role, args, p, guard, text }) => {
+const SERVES_APP = /(?:^|[\\/])next(?:\.js)?$/;
+
+const nodePolicyVerdict = ({ role, args, p, policy, guard, text }) => {
   if (hasOption(args, '--eval', '-e', '--print', '-p')) return raw(role, text, 'use the starci verb of the action or check a file with node --check', 'inline Node.js program');
   if (args.length === 1 && ['--version', '-v'].includes(args[0])) return null;
   if (hasOption(args, '--check', '-c')) return null;
@@ -212,6 +214,7 @@ const nodePolicyVerdict = ({ role, args, p, guard, text }) => {
     if (p.nodeTest.has(role) && targets.length && targets.every((value) => /\.(?:spec|test)\.[cm]?js$/i.test(value))) return null;
     return raw(role, text, 'starci gate unit --root <app> (the op gate selects the specs of the change)', 'raw test runner');
   }
+  if (nodeOperands(args).some((value) => SERVES_APP.test(slash(value)))) return raw(role, text, useOf(policy['raw-tools']?.next, genericUse), 'app server start');
   return raw(role, text, genericUse, 'Node.js script');
 };
 
@@ -230,7 +233,7 @@ const specificCommandVerdict = (context) => {
   const { role, program, args, p, policy, guard, handle, lockOwner, text } = context;
   if (program === 'git') return gitPolicyVerdict({ role, args, p, policy, text });
   if (p.npmPrograms.has(program)) return npmPolicyVerdict({ role, args, p, policy, guard, handle, lockOwner, text });
-  if (program === 'node') return nodePolicyVerdict({ role, args, p, guard, text });
+  if (program === 'node') return nodePolicyVerdict({ role, args, p, policy, guard, text });
   if (program === 'orca') return orcaPolicyVerdict({ role, args, p, policy, guard, handle, text });
   return undefined;
 };

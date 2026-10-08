@@ -393,11 +393,15 @@ steps:
         destination reaches. Report each finding as it is; never edit the navigation to hide one, and never
         type a label the catalogs do not hold. Decide every layout whose chrome is unknown: visible when it
         draws a rail, bar or frame around its children, passthrough when it renders only document,
-        providers or a guard. Serve the app locally and, for every visible layout at desktop and mobile in
-        the light theme (dark only where the tree already carries it - never demanded), render a route directly under it in a real browser with the whole chain above,
-        hide the slot's children and fill the slot element #FF00FF, capture the viewport, and record it
-        with `starci work layout-tree capture --work .starciwork --node <id> --breakpoint <bp>
-        --theme <theme> --file <png> --url <url> --provenance <how> --write`. A layout that marks where the
+        providers or a guard. For every visible layout at desktop and mobile in
+        the light theme (dark only where the tree already carries it - never demanded), get the render from the runtime:
+        `starci work layout-render --work .starciwork [--app <name>] --node <id> --breakpoint <bp> --theme <theme> --write`.
+        The verb serves the app itself (next dev on a free port with no host pin, every URL on localhost - the app's i18n proxy
+        rewrites to localhost, so a server pinned to 127.0.0.1 loops 307 for ever), loads the layout's route with the whole
+        chain above, hides the slot's children (`--slot <selector>`, default `main`, exactly one match) and fills the slot
+        #FF00FF, captures the viewport, stops the server and records the capture as `starci work layout-tree capture`
+        does. Never start next, `npm run dev` or any server by hand and never browse 127.0.0.1: the command guard refuses it
+        and names the verb. A render the verb cannot produce is reported through SHELL_RENDER_UNAVAILABLE. A layout that marks where the
         user is (an active sidebar destination, an active tab) is also captured once per active state, with
         that state active, into layout.destinations: `layout-tree.mjs capture ... --destination <nav or tab
         key> [--route <node-id>]...` (a nav key defaults to its item's target node; a tab names the nodes it is
@@ -510,9 +514,10 @@ proofs:
 blockers:
   - code: SHELL_RENDER_UNAVAILABLE
     condition:
-      en: The frontend has a visible layout but it cannot be served or rendered in a browser on this host,
-        so no real layout capture can be taken. Report `blocked` with `environment` and the exact command
-        that failed; never substitute a generated image or a description for the capture.
+      en: "`starci work layout-render` printed code SHELL_RENDER_UNAVAILABLE - the frontend has a visible layout but the
+        runtime could not serve or render it, so no real layout capture can be taken. Report `blocked` with `environment`,
+        the verb's `cause`, its failing `url` and its redirect chain; never start a server by hand, never retry in a loop
+        and never substitute a generated image or a description for the capture."
   - code: BRAND_SOURCE_MISSING
     condition:
       en: A token/style source file this record must read does not exist in the selected repository, or

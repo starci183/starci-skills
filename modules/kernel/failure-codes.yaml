@@ -5479,6 +5479,18 @@ SHARED_WORKTREE_DISCARD:
   owner: op-retry
   kind: verb-refusal
 
+SHELL_RENDER_UNAVAILABLE:
+  title: "Layout render unavailable"
+  title_vi: "Không dựng được ảnh chụp bố cục"
+  meaning_vi: "Runtime đã dựng ứng dụng để chụp một bố cục nhưng không lấy được ảnh thật; kết quả kèm nguyên nhân có kiểu, địa chỉ lỗi và chuỗi chuyển hướng."
+  causes_vi:
+    - "Ứng dụng chưa được cài đủ phụ thuộc trong cây của workflow"
+    - "Máy chủ phát triển không phản hồi, hoặc chuyển hướng 307 mãi mãi"
+    - "Ứng dụng ghi lỗi khi dựng trang, hoặc vùng chứa trang không khớp đúng một phần tử"
+  nextStep_vi: "Op báo blocked loại environment kèm kết quả của lệnh; Kernel xử lý theo bảng chính sách sự cố, runtime chuẩn bị môi trường trước khi giao lại."
+  owner: runtime-core
+  kind: blocker
+
 SHELL_BINDING_INVALID:
   title: "Chromeless shell binding lacks reason"
   title_vi: "Liên kết shell không lý do"
