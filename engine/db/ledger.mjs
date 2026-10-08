@@ -805,19 +805,6 @@ export function recordKernelUsage(db,{workflowId,turnRef,rows,provider,source='c
   return {recorded:true,rows:rows.length};
 }
 
-/**
- * An attempt still running that has spent more tokens than its budget, read from its session file by the live measure
- * (scripts/kernel/attempt-live-usage.mjs): one 'attempt-budget-overrun' event, once per attempt (the first reading past the budget).
- * The attempt's llm_usage rows are written when it settles and replace this measure. Returns {recorded}.
- */
-export function recordAttemptOverrun(db,{attemptId,tokens,budget,at=nowMs()}){
-  const a=db.prepare('SELECT * FROM op_attempts WHERE attempt_id=?').get(attemptId);
-  need(a,`attempt ${attemptId} not found`,'STARCI_ATTEMPT_NOT_FOUND');
-  if(db.prepare("SELECT 1 FROM events WHERE attempt_id=? AND kind='attempt-budget-overrun' LIMIT 1").get(attemptId))return {recorded:false};
-  appendEvent(db,{workflowId:a.workflow_id,entityType:'attempt',entityId:String(attemptId),attemptId,spanId:a.span_id,kind:'attempt-budget-overrun',payload:{attemptId,jobId:a.job_id,opId:a.op_id,agent:a.agent??null,tokens,budget,live:true},createdAt:at});
-  return {recorded:true};
-}
-
 // --- logs ---------------------------------------------------------------------------------------------------------
 export const LOG_ACTORS=Object.freeze(['kernel','op','runtime','check','land','settler','reconciler']);
 export const LOG_LEVELS=Object.freeze(['debug','info','warn','error']);
@@ -1023,7 +1010,7 @@ export function deleteWorkflowRows(db,{workflowId}){
 const LEDGER_WRITES=Object.freeze({recordBlob,storeBlob,appendEvent,createWorkflow,ensureWorkflow,changeWorkflowPhase,updateWorkflow,insertGoal,recordGoalInput,
   createUnit,setUnitState,reopenUnit,raiseTryBudget,addUnitEdge,recordGraphVersion,enqueueJob,setJobStatus,updateJob,startAttempt,updateAttempt,endRejectedAttempt,writeContract,
   declareResource,acquireLease,renewLeases,releaseLeases,idempotent,recordFailedRequest,fileReport,markReportConsumed,recordCheckRun,recordArtifact,attachToReport,
-  recordArtifactProof,citeBlob,recordTranscriptSnapshot,setAttemptTranscript,recordLlmUsage,recordAttemptUsage,markAttemptUsageUnavailable,recordKernelUsage,recordAttemptOverrun,appendLog,setLogCursor,setCondition,openIncident,updateIncident,resolveIncident,
+  recordArtifactProof,citeBlob,recordTranscriptSnapshot,setAttemptTranscript,recordLlmUsage,recordAttemptUsage,markAttemptUsageUnavailable,recordKernelUsage,appendLog,setLogCursor,setCondition,openIncident,updateIncident,resolveIncident,
   postInbox,setInboxStatus,setInboxStatusByKey,updateGoalJson,openDecisionItem,updateDecisionItem,recordDecision,setSignal,updateSignal,clearSignal,queueSettleTail,recordJobResult,bindKernelJob,releaseKernelJob,recordPurge,deleteWorkflowRows,markBlobArchived,pruneAttemptSnapshots,upsertFoundation,declareFoundations,recordPathTransfer,recordRecordChange,updateSettleTail});
 
 // initLedger + verifyLedger + the meta touch-ups of a fresh openLedger open; throws leaving the caller to close db.

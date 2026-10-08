@@ -44,9 +44,9 @@ export function staleRefusal(judged, current) {
   return missing.length ? { code: codes.verdictStale, detail: `the verdict judged other bytes than the attempt's product (${missing.length} digest(s) not judged)` } : null;
 }
 
-/** What a round records about its critique: the model, whether it was independent, the typed code of a refusal and the digests judged. */
+/** What a round records about its critique: the provider and model, whether it was independent, the typed code of a refusal and the digests judged. */
 export function roundCritic(critique) {
-  return { model: critique?.critic?.model ?? null, independent: critique?.critic?.independent ?? false, error: critique?.error ?? null, code: critique?.code ?? null,
+  return { provider: critique?.critic?.provider ?? null, model: critique?.critic?.model ?? null, independent: critique?.critic?.independent ?? false, error: critique?.error ?? null, code: critique?.code ?? null,
     judged: (critique?.verdict?.product ?? []).map((entry) => entry.sha256) };
 }
 

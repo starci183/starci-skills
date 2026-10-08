@@ -8,7 +8,7 @@ import { parseJsonOr } from '../lib/json.mjs';
 import { eachInOrder } from '../lib/in-order.mjs';
 import { runtimeShaOf } from '../machine/contract-version.mjs';
 import { child, firstJson } from './core-watch.mjs';
-import { machineFacts } from './debug-digest-machine.mjs';
+import { machineFacts, refusalFacts } from './debug-digest-machine.mjs';
 import { attemptFacts, eventFacts, historyFacts } from './debug-digest-ledger.mjs';
 import { registryFacts, endCriteria } from './debug-docs.mjs';
 import { wakeUsageOf } from '../kernel/wake-budget.mjs';
@@ -89,5 +89,5 @@ export async function collectSnapshot({ env = process.env, repos = [], workflowI
   });
   const health = await supervisorHealth({ timeoutMs, run });
   return { now, liveRev: liveRev(), engine: facts.engine, supervisor: { ...facts.supervisor, health }, reservations: facts.reservations,
-    seats: facts.seats, supJobs: facts.supJobs, workflows, history: finished, historyErrors, registry: registryFacts(), criteria: endCriteria() };
+    seats: facts.seats, supJobs: facts.supJobs, lands: facts.lands ?? [], refusals: refusalFacts(env), workflows, history: finished, historyErrors, registry: registryFacts(), criteria: endCriteria() };
 }

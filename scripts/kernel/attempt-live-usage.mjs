@@ -3,8 +3,9 @@
 // so an overrun was seen only after the attempt ended. This pass runs on the poll that already snapshots the open attempts (every
 // minute, scripts/kernel/transcripts.mjs): it reads the session file of each open attempt the way the settle hook does
 // (usage-record.mjs, by the attempt's dispatch id), and the first reading past the budget records one `attempt-budget-overrun` event
-// (ledger.write.recordAttemptOverrun, once per attempt). `starci kernel status` lists it as budgetOverruns with live: true and the
+// (engine/db/attempt-overrun.mjs, once per attempt). `starci kernel status` lists it as budgetOverruns with live: true and the
 // Workflow controller opens the budget-overrun Decision Item for the Kernel; the rows written at settle replace the live reading.
+import { recordAttemptOverrun } from '../../engine/db/attempt-overrun.mjs';
 import { attemptBudget } from './attempt-budget.mjs';
 import { SESSION_LEAD_MS, attemptAgent, entriesOfAttempt, indexSessions, planAttemptUsage } from './usage-record.mjs';
 
@@ -31,7 +32,7 @@ export function measureOpenAttempts(ledger, { now = Date.now(), budget = attempt
     if (!plan.ok) continue;
     out.measured += 1;
     const tokens = sumTokens(plan.rows);
-    if (tokens > budget && ledger.write.recordAttemptOverrun({ attemptId: attempt.attempt_id, tokens, budget, at: now }).recorded) out.overruns.push({ attemptId: attempt.attempt_id, tokens });
+    if (tokens > budget && ledger.transaction(() => recordAttemptOverrun(ledger.db, { attemptId: attempt.attempt_id, tokens, budget, at: now })).recorded) out.overruns.push({ attemptId: attempt.attempt_id, tokens });
   }
   return out;
 }

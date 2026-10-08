@@ -17,3 +17,7 @@ decisionDueMs: {ref: "modules/reconciler/job.yaml#decisionDueMs"}
 startLoopMin: 5
 bootJitterMs: 120000
 blocksDeparture: 2
+# wakeActMs: a wake followed by another within this time shares the turns of the second (the agent answers once). wakeGraceMs: a wake younger than this may
+# not have its usage rows yet (the usage sweep runs every five minutes), so it is not judged.
+wakeActMs: 120000
+wakeGraceMs: 600000

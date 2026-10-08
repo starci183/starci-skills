@@ -423,7 +423,7 @@ cases:
     family: smooth-operation
     finding: {role: kernel, duty: bound, verdict: departs, evidence: "the usage rows landed about every five minutes, so a short wake read as the sum of its neighbours", remedy: {state: in-tree, change: "the usage sweep cuts a Kernel session at its kernel-woken events by the timestamps of its usage records and writes each cut as rows tagged with the wake that owns them (turn_ref ...#w<wake seq>); a wake reads exactly its rows"}}
     met: {date: "2026-10-08", where: "the per-wake budget of this change", evidence: "scripts/kernel/wake-budget.mjs"}
-    rule: {file: scripts/kernel/usage-record.mjs, anchor: "wakeGroups"}
+    rule: {file: scripts/kernel/usage-seat-plan.mjs, anchor: "wakeGroups"}
     spec: tests/kernel/usage-wake-cuts.spec.mjs
     status: covered
   - id: supervisor-wake-budget-unmeasured
@@ -574,4 +574,11 @@ cases:
     met: {date: "2026-10-08", where: "commit 6ad9c7cca on the alpha.7 integration branch", evidence: "npm run check: ARCH_OWNER_CYCLE engine/config.mjs:13"}
     rule: {file: engine/config.mjs, anchor: "confines the owner"}
     spec: tests/engine/config.spec.mjs
+    status: covered
+  - id: debug-questions-lacked-four-signals
+    family: record-vs-reality
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "four of Debug's nine unanswerable questions needed a signal the runtime could emit where the fact occurs: a guard refusal with its role, the loosening on the land record, a critic-run event and the wake-tagged usage rows", remedy: {state: in-tree, change: "refusals.jsonl rows carry the role and the CLI dispatcher logs its RUNTIME_CHANGE_OWNED_BY_DEBUG refusals; land_runs.specs_json holds the loosening with its approval id; settle appends a critic-run event per draw loop; the digest answers fr-wake-acted from the wake-tagged usage rows"}}
+    met: {date: "2026-10-08", where: "modules/reconciler/debug-questions.yaml", evidence: "nine questions answerable: gap"}
+    rule: {file: scripts/reconciler/debug-questions.mjs, anchor: "wakeActed"}
+    spec: tests/reconciler/debug-signals.spec.mjs
     status: covered

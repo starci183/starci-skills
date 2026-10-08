@@ -1,6 +1,9 @@
 // debug-digest-machine.mjs — the machine-store reads of `starci debug digest`: the reconciler leader and controller modes, the
 // Supervisor seat and its open Decision Items, the provider reservations and the Supervisor jobs. Read only, through one reader.
+import fs from 'node:fs';
+import path from 'node:path';
 import { readMachine } from '../../engine/db/machine.mjs';
+import { guardsRoot } from '../guards/guards-root.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 import { SUPERVISOR_SEAT } from '../machine/home.mjs';
 import { supervisorWakeUsageOf } from '../kernel/wake-budget.mjs';
@@ -53,6 +56,25 @@ function reservationsOf(m) {
   });
 }
 
+const REFUSAL_TAIL_BYTES = 1024 * 1024;
+
+/** The guard refusals on record (<guards root>/refusals.jsonl, the newest megabyte): [{at, role, code, via, command}]; none when the file is absent. */
+export function refusalFacts(env = process.env) {
+  let text = '';
+  try {
+    const file = path.join(guardsRoot(undefined, env), 'refusals.jsonl');
+    const size = fs.statSync(file).size;
+    const fd = fs.openSync(file, 'r');
+    try {
+      const buf = Buffer.alloc(Math.min(size, REFUSAL_TAIL_BYTES));
+      fs.readSync(fd, buf, 0, buf.length, size - buf.length);
+      text = buf.toString('utf8');
+    } finally { fs.closeSync(fd); }
+  } catch { return []; }
+  return text.split('\n').map((line) => parseJsonOr(line.trim(), null)).filter((row) => row?.code)
+    .map((row) => ({ at: row.at ?? null, role: row.role ?? null, code: row.code, via: row.via ?? null, command: row.command ?? null }));
+}
+
 /** The machine facts of one digest, or null when there is no machine store. Seam: the reader. */
 export function machineFacts({ env = process.env, read = readMachine } = {}) {
   return read((m) => ({
@@ -60,5 +82,7 @@ export function machineFacts({ env = process.env, read = readMachine } = {}) {
     engine: engineOf(m), supervisor: supervisorOf(m), reservations: reservationsOf(m),
     seats: ask(m, 'SELECT seat_id FROM seats').map((r) => r.seat_id),
     supJobs: ask(m, 'SELECT job_id, status FROM sup_jobs').map((r) => ({ jobId: r.job_id, status: r.status })),
+    lands: ask(m, "SELECT run_id, lane, result, started_at, json_extract(specs_json,'$.loosening.id') AS id, json_extract(specs_json,'$.loosening.approved') AS approved FROM land_runs WHERE json_extract(specs_json,'$.loosening') IS NOT NULL ORDER BY run_id DESC LIMIT 50")
+      .map((r) => ({ runId: r.run_id, lane: r.lane, result: r.result, at: r.started_at, id: r.id, approved: r.approved === 1 })),
   }), null, { env });
 }

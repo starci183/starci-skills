@@ -30,13 +30,13 @@ groups:
       - {id: fr-retry-loops, ask: "Does any start, dispatch or retry repeat the same failure instead of reporting it?", answerable: today, check: retry-loops, source: "events kernel-start-failed, dispatch-rejected, jobs per op"}
       - {id: fr-queue-failing, ask: "Does any reconciler queue key keep failing?", answerable: today, check: queue-failing, source: "engine_queue tries"}
       - {id: fr-op-silent, ask: "Is any running op past its deadline without a report?", answerable: today, check: op-deadline, source: "jobs.deadline against now"}
-      - {id: fr-wake-acted, ask: "After a wake, did the woken agent act?", answerable: gap, signal: "agent-acted-after-wake event: the first tool call or ledger write of the seat after each wake delivery", why: "a delivered wake and an ignored wake look the same in the stores"}
+      - {id: fr-wake-acted, ask: "After a wake, did the woken agent act?", answerable: today, check: wake-acted, signalAdded: "usage rows tagged with the wake that owns them: a wake with no turn of the agent after it is an ignored wake", source: "kernel-woken events against the kernel-turn rows tagged #w<seq>"}
   - id: correctness
     title: "Correctness of results"
     questions:
       - {id: co-done-on-evidence, ask: "Does every pass stand on checks that ran in the attempt's own tree?", answerable: today, check: done-on-evidence, signalAdded: "op-settled.checkedIn: the directory, commit and tree of every kernel or settler check", source: "events op-settled against op_attempts.worktree_path"}
       - {id: co-claim-vs-rerun, ask: "Did a claimed check result differ from the runtime's own re-run?", answerable: today, check: claim-vs-rerun, source: "check_runs declared_exit_code against exit_code"}
-      - {id: co-critic-independent, ask: "Did each Critic run on another provider than the op, see only the product and have its verdict used?", answerable: gap, signal: "critic-run event on the attempt it judged: critic provider, op provider, inputs digest and the verdict's use", why: "the draw loop keeps the critique in its round file; the ledger holds no critic row"}
+      - {id: co-critic-independent, ask: "Did each Critic run on another provider than the op, see only the product and have its verdict used?", answerable: today, check: critic-independent, signalAdded: "critic-run event written when a draw pass settles: critic provider and model, op provider, independence, judged digests, whether a score was used", source: "events critic-run"}
       - {id: co-secret-in-transcript, ask: "Did a credential reach a transcript, a report or a log?", answerable: gap, signal: "a pattern-scan seam over the digest's own inputs (transcript snapshots, reports, logs) that counts matches without printing them", why: "redaction runs at write time and leaves no count of what it removed"}
   - id: smooth-operation
     title: "Smooth operation"
@@ -55,8 +55,8 @@ groups:
     questions:
       - {id: as-op-reports-to-kernel, ask: "Did an op address anyone but its Kernel?", answerable: today, check: op-refusals, source: "events op-caller-refused"}
       - {id: as-interventions, ask: "Did a person write the ledger by hand during the run?", answerable: today, check: interventions, signalAdded: "ledger-written-outside-seat event: one per call of an unbound owner with no runtime marker", source: "events ledger-written-outside-seat"}
-      - {id: as-runtime-change-refused, ask: "Did the Supervisor try to change the runtime, and was it refused?", answerable: gap, signal: "guard-refusal row per refused verb with the role, the verb and the code", why: "RUNTIME_CHANGE_OWNED_BY_DEBUG is returned to the caller and not stored"}
-      - {id: as-gate-loosening, ask: "Did a land loosen a gate or a check without the owner's approval?", answerable: gap, signal: "land-loosening finding on the land record, with the owner approval id it needed", why: "the land gate compares the diff against no list of loosenings yet"}
+      - {id: as-runtime-change-refused, ask: "Did the Supervisor try to change the runtime, and was it refused?", answerable: today, check: runtime-change-refused, signalAdded: "refusals.jsonl rows carry the role of the seat, and the CLI dispatcher logs its RUNTIME_CHANGE_OWNED_BY_DEBUG refusals there", source: "<guards root>/refusals.jsonl"}
+      - {id: as-gate-loosening, ask: "Did a land loosen a gate or a check without the owner's approval?", answerable: today, check: gate-loosening-lands, signalAdded: "land_runs.specs_json.loosening: the approval id, whether the owner approved it and the number of findings", source: "land_runs"}
   - id: concurrency
     title: "Concurrency"
     questions:
