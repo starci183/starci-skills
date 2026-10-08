@@ -295,7 +295,7 @@ const workerRow = (dispatchId, { run = 'run_a', terminalState = 'reclaimable', l
 const ranView = () => ({ ...view(), jobs: view().jobs.map((j) => ({ ...j, task: { taskId: `task-${j.jobId}`, runId: 'run_a', closed: true } })) });
 
 test('agents collector: Orca\'s reclaimable workers are released per nextAction, Run by Run (unverifiable liveness included: alpha5 1.6); release_unknown and another next action are reported, never touched', async () => {
-  const rows = [workerRow('ctx_ok'), workerRow('ctx_unv', { liveness: 'unverifiable' }), workerRow('ctx_unk', { terminalState: 'release_unknown' }),
+  const rows = [workerRow('ctx_ok'), workerRow('ctx_unv', { liveness: 'unverifiable' }), workerRow('ctx_unk', { terminalState: 'release_unknown', liveness: 'live' }), workerRow('ctx_unk_exited', { terminalState: 'release_unknown' }),
     workerRow('ctx_other', { next: 'stop' }), workerRow('ctx_live', { terminalState: 'active', liveness: 'live', next: 'none' }), workerRow('ctx_foreign', { run: 'run_owner' })];
   const asked = [], released = [];
   const deps = { ...gcDeps([]), ledgers: () => [ranView()], writeState: () => null, log: () => {}, lesson: () => null, settleMs: 0,
@@ -305,13 +305,14 @@ test('agents collector: Orca\'s reclaimable workers are released per nextAction,
   assert.deepEqual(asked, ['run_a'], 'only the Runs the runtime owns, each named with --run');
   assert.deepEqual(released, [], 'a dry run releases nothing');
   const items = Object.fromEntries(plan.items.filter((i) => i.class === 'worker').map((i) => [i.target, i]));
-  assert.deepEqual(Object.keys(items).sort(), ['ctx_ok', 'ctx_other', 'ctx_unk', 'ctx_unv']);
+  assert.deepEqual(Object.keys(items).sort(), ['ctx_ok', 'ctx_other', 'ctx_unk', 'ctx_unk_exited', 'ctx_unv']);
+  assert.equal(items.ctx_unk_exited.verdict, 'collect', 'a release Orca cannot confirm for an exited worker goes to the close that proves the terminal gone');
   assert.equal(items.ctx_ok.verdict, 'collect');
   assert.equal(items.ctx_unv.verdict, 'collect', 'a settled worker whose liveness Orca cannot verify is released like any other (E1)');
   for (const id of ['ctx_unk', 'ctx_other']) assert.deepEqual([id, items[id].verdict, items[id].code], [id, 'refuse', 'WORKER_RELEASE_REFUSED']);
   const live = await runGc({ apply: true, only: ['agents'], now: T, deps });
-  assert.deepEqual(released.sort(), ['ctx_ok', 'ctx_unv']);
-  assert.equal(live.counts.agents, 3, 'two releases and one close of the settled op terminal no worker row covers');
+  assert.deepEqual(released.sort(), ['ctx_ok', 'ctx_unk_exited', 'ctx_unv']);
+  assert.equal(live.counts.agents, 4, 'two releases and one close of the settled op terminal no worker row covers');
   assert.ok(!live.items.some((i) => i.target === 'term_ctx_ok' && i.action === 'close-terminal'), 'a worker Orca accounts for is never closed by tab');
 });
 

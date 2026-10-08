@@ -73,6 +73,21 @@ const stoppedIdentity = (receipt, identity) => receipt?.schema === OWNED_PROCESS
   && ['stopped', 'gone'].includes(receipt.outcome) && receipt.proof === 'process-handle-signaled'
   && receipt.pid === identity.pid && exactIdentity(receipt.identity, identity);
 
+// A release Orca cannot confirm: the outcome is unknown, the state release_unknown, or the Dispatch or its terminal handle belongs to a runtime that is gone.
+const UNCONFIRMED_RELEASE = /release_unknown|dispatch_not_found|terminal_handle_stale/;
+const releaseUnconfirmed = (release) => release?.ok !== true && release?.hostUnavailable !== true && (release?.outcome === 'unknown' || release?.state === 'release_unknown'
+  || UNCONFIRMED_RELEASE.test(String(release?.error ?? '')) || release?.error == null);
+
+/**
+ * The one rule for a release Orca cannot confirm: its purpose is to free the terminal, so when the terminal was positively gone or disconnected
+ * before and after the close and no process carries its handle (processes.verdict 'none'), the unconfirmed release is moot. An unreachable Orca
+ * (closed.ok false), a terminal still listed (before 'connected'), a census that is unreadable or non-empty, or a release that was refused for
+ * another reason never qualifies. Pure.
+ */
+const releaseMootTerminalGone = (release, closed, processes) => releaseUnconfirmed(release)
+  && closed?.ok === true && ['gone', 'disconnected'].includes(closed.proof) && ['gone', 'disconnected'].includes(closed.before)
+  && processes?.verdict === 'none';
+
 /** The exact worker terminal and its measured captured objects have ended, independently of release bookkeeping. Pure. */
 export const workerExitProven = (receipt, handle) => Boolean(handle)
   && receipt?.handle === handle && receipt.closed?.ok === true
@@ -242,8 +257,9 @@ export function closeWorker({ dispatch, handle = null, stopFirst = false, retryR
     ? { code: 'worker-process-survived', dispatch, handle: terminal, survivors: processes.survivors, stopped: processes.stopped }
     : null;
   logWorkerHygiene({ hygiene, processes, terminal, dispatch, deps });
-  const providerBudget = releaseClosedWorkerBudget(last, terminal, closed, processes, { env, deps });
-  return { ...last, ok: last?.ok === true, handle: terminal, closed, processes, hygiene, ...(providerBudget ? { providerBudget } : {}), ...(stopped ? { stop: stopped } : {}), ...(retry ? { retryRelease: retry } : {}) };
+  const moot = releaseMootTerminalGone(last, closed, processes);
+  const providerBudget = releaseClosedWorkerBudget({ ...last, ok: last?.ok === true || moot }, terminal, closed, processes, { env, deps });
+  return { ...last, ok: last?.ok === true || moot, ...(moot ? { released: 'moot-terminal-gone' } : {}), handle: terminal, closed, processes, hygiene, ...(providerBudget ? { providerBudget } : {}), ...(stopped ? { stop: stopped } : {}), ...(retry ? { retryRelease: retry } : {}) };
 }
 
 
@@ -252,7 +268,7 @@ const isOwnTerminal = (handle, env = process.env) => Boolean(handle) && env[HAND
 /** Fence and release worker `dispatch` through closeWorker (worker-stop first on the caller's proof, then release, close, verify). {dispatch, ok, stop, release, ...}. */
 export function stopAndRelease(dispatch, { handle = null, env = process.env, deps = {} } = {}) {
   const r = closeWorker({ dispatch, handle, stopFirst: true, env, deps });
-  return { dispatch, ok: r.ok, stop: { ok: r.stop?.ok === true, error: r.stop?.error ?? null }, release: { ok: r.ok, error: r.error ?? null },
+  return { dispatch, ok: r.ok, stop: { ok: r.stop?.ok === true, error: r.stop?.error ?? null }, release: { ok: r.ok, error: r.error ?? null, ...(r.released ? { released: r.released } : {}) },
     handle: r.handle, closed: r.closed, processes: r.processes, hygiene: r.hygiene };
 }
 

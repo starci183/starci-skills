@@ -140,6 +140,13 @@ export class WorkQueue {
     return step.delayMs;
   }
 
+  /** A new engine process is a new event for every parked key: its budget was spent against code and conditions that may have changed. Returns the keys re-armed. */
+  rearmParked(reason = 'engine-start') {
+    const parked = this.rows.all().filter((row) => row.due_at == null && Number(row.tries) > 0);
+    for (const { controller, key } of parked) this.rows.put({ controller, key, due_at: this.now(), tries: 0, last_error: null, reason });
+    return parked.map((row) => `${row.controller} ${row.key}`);
+  }
+
   /** Queue depth per controller: {controller: {queued, due, failing}}. */
   depth() {
     const out = {};

@@ -68,11 +68,12 @@ test('releasePlan: release a reclaimable worker (liveness live, exited or unveri
     row('missing', { liveness: null, argv: releaseArgv('missing') }),
     row('stop', { argv: ['orca', 'orchestration', 'worker-stop', '--dispatch', 'stop'] }),
     row('other', { argv: releaseArgv('someone-else') }),
-    row('unknown', { terminalState: 'release_unknown', argv: releaseArgv('unknown') }),
+    row('unknown', { terminalState: 'release_unknown', liveness: 'live', argv: releaseArgv('unknown') }),
+    row('unknown-exited', { terminalState: 'release_unknown', argv: releaseArgv('unknown-exited') }),
     row('active', { terminalState: 'active', liveness: 'live' }),
     row('retained', { terminalState: 'retained' }),
   ]).map((d) => [d.dispatchId, d.verdict]));
-  assert.deepEqual(plan, { ok: 'release', live: 'release', unv: 'release', missing: 'refuse', stop: 'refuse', other: 'refuse', unknown: 'refuse', active: 'keep', retained: 'keep' });
+  assert.deepEqual(plan, { ok: 'release', live: 'release', unv: 'release', missing: 'refuse', stop: 'refuse', other: 'refuse', unknown: 'refuse', 'unknown-exited': 'release', active: 'keep', retained: 'keep' });
 });
 
 test('workerTerminalHandles names every terminal Orca has not released; worktreePathOf reads Orca\'s worktree id', () => {

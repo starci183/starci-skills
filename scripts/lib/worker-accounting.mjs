@@ -52,6 +52,8 @@ export function releasePlan(rows = []) {
     const base = { dispatchId: row?.dispatchId ?? null, runId: row?.runId ?? null, terminalHandle: terminalHandleOf(row),
       terminalState: row?.terminalState ?? null, liveness: livenessOf(row) };
     const next = nextActionOf(row);
+    if (base.terminalState === 'release_unknown' && base.liveness === 'exited')
+      return { ...base, verdict: 'release', reason: `Orca could not confirm the release of ${base.dispatchId} and reports the worker exited: the close proves the terminal and its processes gone` };
     if (base.terminalState === 'release_unknown')
       return { ...base, verdict: 'refuse', reason: `Orca could not confirm the release of ${base.dispatchId} (release_unknown): ${next?.kind ?? 'no next action'}` };
     if (base.terminalState !== 'reclaimable') return { ...base, verdict: 'keep', reason: `terminal state ${base.terminalState ?? 'unknown'}` };

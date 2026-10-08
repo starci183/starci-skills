@@ -1,7 +1,8 @@
 // Machine-owned closure of provider slots whose launch can no longer be alive. A reservation is released only on
 // the proof its owner would have supplied (releaseProviderReservation): a terminal Orca no longer lists (or lists
 // disconnected) whose process census carries no member, a `reserved` receipt that never crossed worker-start, or
-// an `unknown` receipt whose job ledger already recorded every launch of its attempt settled to no effect.
+// an `unknown` receipt whose job ledger already recorded every launch of its attempt settled to no effect, or a receipt with no terminal
+// and no process that the host restart ended (provider-reservation-restart.mjs).
 import { withMachine, readMachine } from '../../engine/db/machine.mjs';
 import { allocationMs } from '../../engine/config.mjs';
 import { parseJson } from '../lib/json.mjs';
@@ -10,6 +11,7 @@ import { processList } from '../api/process/process-list.mjs';
 import { processEnv } from '../api/process/process-env.mjs';
 import { terminalTree } from './worker-close.mjs';
 import { providerBudgetClock, providerBudgetOptions } from './provider-budget-release.mjs';
+import { handleless, restartedReleases, heldPastBound, openHeldClocks, heldEntity } from './provider-reservation-restart.mjs';
 
 const HANDLE_ENV = 'ORCA_TERMINAL_HANDLE';
 const LAUNCHED = new Set(['launching', 'live', 'unknown']);
@@ -130,14 +132,21 @@ export function reapProviderReservations(options = {}, io = {}) {
     const stale = active.filter((row) => neverLaunched(row, now, staleMs)).map((row) => ({ row, why: 'never-launched',
       proof: { kind: 'failed-before-launch', confirmed: true, source: 'reservation-reap' } }));
     const recorded = recordedNoEffect(active.filter((row) => row.state === 'unknown' && !row.handle), settings);
+    const planned = new Set([...stale, ...recorded.proven].map(({ row }) => row.id));
+    const candidates = active.filter((row) => handleless(row) && !planned.has(row.id));
+    const restarted = restartedReleases(candidates, io);
     const { ended, kept } = endedTerminals(active.filter((row) => row.handle && LAUNCHED.has(row.state)), io);
     const proven = provenClosed(ended, io);
-    const releases = [...stale, ...recorded.proven, ...proven.closed.map(({ row, proof }) => ({ row, proof, why: `terminal-${proof.terminalProof}` }))];
-    out.kept.push(...kept, ...proven.kept, ...recorded.kept);
-    if (!releases.length) return out;
+    const releases = [...stale, ...recorded.proven, ...restarted.proven, ...proven.closed.map(({ row, proof }) => ({ row, proof, why: `terminal-${proof.terminalProof}` }))];
+    out.kept.push(...kept, ...proven.kept, ...restarted.kept, ...recorded.kept.filter((entry) => !candidates.some((row) => row.id === entry.id)));
+    const keptIds = new Set(restarted.kept.map((entry) => entry.id));
+    const held = heldPastBound(active.filter((row) => keptIds.has(row.id)), now);
+    if (!releases.length && !held.length) return out;
     withMachine((m) => {
+      out.held = openHeldClocks(m, held);
       for (const { row, proof, why } of releases) {
         const result = m.releaseProviderReservation({ ...row, proof });
+        if (result.ok) m.clearSla({ entity: heldEntity(row.id), reason: 'resolved' });
         if (result.ok && !result.reused) out.released.push({ id: row.id, fence: row.fence, attemptId: row.attemptId, role: row.role, why });
         else if (!result.ok) out.kept.push({ id: row.id, why: result.reason });
       }
