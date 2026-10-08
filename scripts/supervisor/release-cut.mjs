@@ -2,7 +2,8 @@
 // main and its tag together:
 //   1. the checkout is on `main` with no tracked change (nothing is stashed, reset or cleaned);
 //   2. the release tag `v<version>` is named, is not on the remote yet, and is either absent or an annotated tag already on HEAD; any other tag is refused;
-//   3. RELEASE_NOTES holds: the tag's CHANGELOG section exists and has no unfinished entries (scripts/hfs/runtime-rules/release-notes.mjs);
+//   3. RELEASE_NOTES holds: the tag's CHANGELOG section exists and has no unfinished entries (scripts/hfs/runtime-rules/release-notes.mjs), and the rest of the release
+//      definition that can hold before the suite ran (scripts/guards/release-definition.mjs: the version moved past the remote main's, a dated heading); `--plan` stops here and reports what the cut would run;
 //   4. the L4 row runs once (scripts/supervisor/release-l4.mjs: the example installs, every spec, lint, checks, tsc, images, the Sonar proof and the Linux parity step), each step to a log recorded in the result;
 //      every skipped test is reported with its reason, and a skip from missing infrastructure (or any skip but the declared browser ones) fails L4;
 //   5. main did not move meanwhile; the pushed range passes the secret scan;
@@ -27,6 +28,7 @@ import { updateRef } from '../api/git/update-ref.mjs';
 import { changelogSection, releaseNotesFindings } from '../hfs/runtime-rules/release-notes.mjs';
 import { runL4, skipReport } from './release-l4.mjs';
 import { scanRange } from './push-mains.mjs';
+import { definitionRefusal, planOf } from './release-cut-plan.mjs';
 import { withHostLock as holdHostLock } from '../machine/host-lock.mjs';
 import { writeL4Record } from '../guards/release-record.mjs';
 
@@ -121,7 +123,7 @@ async function releaseSuite({ repo, deps, out, refuse, lock }) {
  * Cut the release `tag` (v<version>) of `repo`: see the header. Async (the L4 Sonar gate is): a Promise of {ok, verdict, why, tag, head, suite, skips, declaredSkips, pushed, tagCreated}.
  * The tag is required, must be `v*`, and is created here, ANNOTATED, with the CHANGELOG section as its message (an existing annotated tag on HEAD is reused).
  */
-export async function cutRelease({ repo, remote = 'origin', branch = 'main', tag = null, deps = {} } = {}) {
+export async function cutRelease({ repo, remote = 'origin', branch = 'main', tag = null, plan = false, deps = {} } = {}) {
   const run = deps.git ?? git;
   const out = { ok: false, repo: path.basename(repo), verdict: null, why: null, tag, head: null, suite: [], pushed: false, tagCreated: false };
   const refuse = (verdict, why, extra = {}) => ({ ...out, ...extra, verdict, why });
@@ -134,6 +136,11 @@ export async function cutRelease({ repo, remote = 'origin', branch = 'main', tag
   const changelog = (deps.changelog ?? (() => fs.readFileSync(path.join(repo, 'CHANGELOG.md'), 'utf8')))();
   const notes = releaseNotesFindings({ tags: [tag], changelog });
   if (notes.length) return refuse('release-notes', notes.map((f) => f.message).join('; '), { findings: notes });
+
+  // The release definition (scripts/guards/release-definition.mjs) is what the pre-push hook enforces: what is already known to be missing stops the cut before the suite runs.
+  const unmet = definitionRefusal({ run, cwd, head, remote, branch, tag, deps });
+  if (unmet) return refuse(unmet.verdict, unmet.why, { findings: unmet.findings });
+  if (plan) return planOf({ repo, head, tag, remote, branch, out });
 
   // L4 reports every skipped test with its reason, and every test must have passed in at least one leg (the host run or the Linux container run): a skip that passed in the other leg is covered and listed with where it passed;
   // a skip nothing covered (missing infrastructure, a platform no leg has, any undeclared skip) fails L4.

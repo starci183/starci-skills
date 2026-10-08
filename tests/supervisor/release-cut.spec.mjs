@@ -21,11 +21,11 @@ const git = (cwd, ...args) => {
 const TAG = 'v1.0.0-alpha.4';
 const CHANGELOG = '# Changelog\n\n## [1.0.0-alpha.4] — 2026-10-04\n\n- shipped: the release notes\n\n## [1.0.0-alpha.3] — 2026-09-30\n\n- older\n';
 const step = (name, extra = {}) => ({ name, ok: true, log: `${name}.log`, ms: 1, skips: [], ...extra });
-const green = () => [step('npm test'), step('npm run check')];
+const green = () => [step('npm test'), step('npm run test:packages'), step('npm run check')];
 const scanOk = () => ({ ok: true, findings: [] });
 
 /** A work repo on main with a release commit (CHANGELOG), pushed to a bare "origin" that has the previous release's main. */
-function fixture(t, { changelog = CHANGELOG } = {}) {
+function fixture(t, { changelog = CHANGELOG, version = '1.0.0-alpha.4' } = {}) {
   const base = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'starci-release-cut-')));
   t.after(() => fs.rmSync(base, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
   const origin = path.join(base, 'origin.git'), repo = path.join(base, 'work');
@@ -34,10 +34,12 @@ function fixture(t, { changelog = CHANGELOG } = {}) {
   for (const [k, v] of [['user.email', 'spec@starci.test'], ['user.name', 'spec'], ['core.autocrlf', 'false']]) git(repo, 'config', k, v);
   git(repo, 'checkout', '-q', '-b', 'main');
   fs.writeFileSync(path.join(repo, 'a.txt'), 'one\n');
+  fs.writeFileSync(path.join(repo, 'package.json'), `${JSON.stringify({ name: 'rt', version: '1.0.0-alpha.3' })}\n`);
   git(repo, 'add', '-A');
   git(repo, 'commit', '-q', '-m', 'previous release');
   git(repo, 'push', '-q', 'origin', 'main');
   fs.writeFileSync(path.join(repo, 'CHANGELOG.md'), changelog);
+  fs.writeFileSync(path.join(repo, 'package.json'), `${JSON.stringify({ name: 'rt', version })}\n`);
   git(repo, 'add', '-A');
   git(repo, 'commit', '-q', '-m', 'release commit');
   const remoteMain = () => git(origin, 'rev-parse', 'refs/heads/main');
@@ -61,7 +63,7 @@ test('a green release creates the annotated tag with the CHANGELOG section as it
   const fx = fixture(t);
   const out = (await cut(fx));
   assert.deepEqual([out.ok, out.verdict, out.tag, out.tagCreated], [true, 'pushed', TAG, true], JSON.stringify(out));
-  assert.deepEqual(out.suite.map((s) => [s.name, s.log]), [['npm test', 'npm test.log'], ['npm run check', 'npm run check.log']]);
+  assert.deepEqual(out.suite.map((s) => [s.name, s.log]), [['npm test', 'npm test.log'], ['npm run test:packages', 'npm run test:packages.log'], ['npm run check', 'npm run check.log']]);
   assert.equal(fx.remoteMain(), git(fx.repo, 'rev-parse', 'HEAD'), 'main moved to the release commit');
   assert.deepEqual(fx.remoteTags(), [TAG]);
   assert.equal(git(fx.origin, 'cat-file', '-t', `refs/tags/${TAG}`), 'tag', 'the tag is annotated on the remote');
@@ -168,6 +170,7 @@ test('the L4 row: the runtime suite and check, every example script (lint, tsc, 
   fs.writeFileSync(path.join(app, 'package.json'), JSON.stringify({ name: 'shop', scripts: { lint: 'x', typecheck: 'x', test: 'x', 'test:e2e': 'x' } }));
   const plan = planL4(base, { runtimeRoot: base });
   const names = plan.steps.map((s) => s.name);
+  assert.deepEqual(names.filter((n) => n.startsWith('npm ')), ['npm test', 'npm run test:packages', 'npm run check'], 'the runtime rows: the root suite, the packages suites, the checks');
   for (const expected of ['shop: npm run lint', 'shop: npm run typecheck', 'shop: npm run test', 'shop: npm run test:e2e', 'shop: npm run docker:build', 'shop: npm run build:be']) assert.ok(names.includes(expected), expected);
   assert.deepEqual(plan.steps.filter((s) => s.absent).map((s) => s.name).sort(), ['shop: npm ci', 'shop: npm run build:be', 'shop: npm run build:fe', 'shop: npm run codegen', 'shop: npm run docker:build', 'shop: npm run format:check', 'shop: npm run test:contract', 'shop: npm run test:integration', 'shop: npm run typecheck:tests']);
   assert.deepEqual(plan.proofs, ['shop: sonar']);
@@ -219,7 +222,7 @@ test('the L4 record of HEAD is written after the tag and before the push, naming
   const head = git(fx.repo, 'rev-parse', 'HEAD');
   const record = readL4Record({ repo: fx.repo, head, tag: TAG });
   assert.equal(record.tag, TAG);
-  assert.deepEqual(record.logs.map((s) => s.name), ['npm test', 'npm run check']);
+  assert.deepEqual(record.logs.map((s) => s.name), ['npm test', 'npm run test:packages', 'npm run check']);
   assert.equal(out.l4Record, l4RecordPath({ commonDir: gitCommonDir(fx.repo), head }));
 
   const blocked = fixture(t);
@@ -281,4 +284,41 @@ test('the pre-push hook lets exactly the release the cut made through: a push of
   const ok = (await cut(fx, {}, { push: (args, o) => push(args, o) }));
   assert.equal(ok.ok, true, JSON.stringify(ok));
   assert.deepEqual(fx.remoteTags(), [TAG]);
+});
+
+test('a version that did not move past the remote main, or an undated heading, stops the release before L4 runs and names the fix', async (t) => {
+  let suites = 0;
+  const suite = () => { suites += 1; return green(); };
+  const old = '# Changelog\n\n## [1.0.0-alpha.3] — 2026-09-30\n\n- older\n';
+  const same = fixture(t, { version: '1.0.0-alpha.3', changelog: old });
+  const stale = (await cut(same, { tag: 'v1.0.0-alpha.3' }, { suite }));
+  assert.equal(stale.verdict, 'release-definition', JSON.stringify(stale));
+  assert.match(stale.why, /version 1\.0\.0-alpha\.3 is the version the remote main already carries/);
+  assert.equal(stale.findings[0].code, 'RELEASE_VERSION_UNCHANGED');
+  const wrongTag = fixture(t, { version: '1.0.0-alpha.3' });
+  const mismatch = (await cut(wrongTag, {}, { suite }));
+  assert.equal(mismatch.findings[0].code, 'RELEASE_TAG_VERSION', 'the tag must be v<version> of the commit');
+  const undated = fixture(t, { changelog: '# Changelog\n\n## [1.0.0-alpha.4]\n\n- the release\n' });
+  const heading = (await cut(undated, {}, { suite }));
+  assert.equal(heading.verdict, 'release-definition');
+  assert.match(heading.why, /dated heading/);
+  assert.equal(suites, 0);
+  untouched(same); untouched(wrongTag); untouched(undated);
+});
+
+test('--plan reports what the cut would run and require and runs, tags and pushes nothing; with a missing piece it refuses naming it', async (t) => {
+  const fx = fixture(t);
+  let suites = 0;
+  const planned = (await cut(fx, { plan: true }, { suite: () => { suites += 1; return green(); } }));
+  assert.deepEqual([planned.ok, planned.verdict, planned.tag], [true, 'plan', TAG], JSON.stringify(planned));
+  assert.deepEqual(planned.receiptSteps, ['npm test', 'npm run test:packages', 'npm run check']);
+  assert.ok(planned.steps.length > 0 && planned.steps.includes('linux parity'), planned.steps.join(', '));
+  assert.match(planned.why, /nothing was run, tagged or pushed/);
+  assert.equal(suites, 0);
+  assert.equal(git(fx.repo, 'tag', '-l'), '', 'no tag was created');
+  untouched(fx);
+  const stale = fixture(t, { version: '1.0.0-alpha.3' });
+  const refused = (await cut(stale, { plan: true }));
+  assert.deepEqual([refused.ok, refused.verdict], [false, 'release-definition']);
+  untouched(stale);
 });
