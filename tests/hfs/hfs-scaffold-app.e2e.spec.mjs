@@ -39,7 +39,7 @@ const timed = async (label, action) => {
   try { return await action(); } finally { console.log(`# scaffold e2e ${label}: ${elapsed(started)}ms`); }
 };
 
-/** The checkout's @starci/test-world, built (dist is build output, never committed; the build runs once when it is absent). */
+/** The checkout's @starci/test-world, built by this spec from the checked-out source (dist is build output, never committed, and one left by an earlier checkout is stale). */
 const TEST_WORLD = path.join(RUNTIME, 'packages', 'test-world');
 
 /** The runtime packages of `dir`'s package.json (dependencies and devDependencies, no @types) that its own node_modules lacks. */
@@ -56,10 +56,8 @@ function assertTestWorldInstalled(dir = TEST_WORLD) {
 }
 
 function testWorldRequire() {
-  if (!fs.existsSync(path.join(TEST_WORLD, 'dist', 'stack', 'index.js'))) {
-    const build = runNpm(['run', 'build'], { cwd: TEST_WORLD, timeout: 300_000 });
-    assert.equal(build.status, 0, `npm run build of packages/test-world failed: ${tail(build)}`);
-  }
+  const build = runNpm(['run', 'build'], { cwd: TEST_WORLD, timeout: 300_000 });
+  assert.equal(build.status, 0, `npm run build of packages/test-world failed: ${tail(build)}`);
   return createRequire(path.join(TEST_WORLD, 'package.json'));
 }
 
