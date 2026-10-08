@@ -185,11 +185,11 @@ const seedJob = (repo, { jobId, wf, files, admittedAt, env = process.env }) => {
   const ledger = openLedger({ file: ledgerFile });
   try {
     seedWorkflow(ledger, { id: wf, state: { phase: 'running', job: 'scope' },
-      jobs: [{ jobId, opId: 'scope.define', dispatchId: `ctx-${jobId}`, terminalHandle: `term-${jobId}`, status: 'running',
-        payload: { opId: 'scope.define', owned_paths: owned, orca: { dispatchId: `ctx-${jobId}`, agentTerminalHandle: `term-${jobId}` } } }] });
+      jobs: [{ jobId, opId: 'business.decide', dispatchId: `ctx-${jobId}`, terminalHandle: `term-${jobId}`, status: 'running',
+        payload: { opId: 'business.decide', owned_paths: owned, orca: { dispatchId: `ctx-${jobId}`, agentTerminalHandle: `term-${jobId}` } } }] });
     const attemptId = ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(jobId).attempt_id;
     ledger.transaction((db) => {
-      writeContract(db, { attemptId, markdown: '# contract', context: { worktree: repo, packet: { context: { selected_op: { contract: { id: 'scope.define', reads: [{ id: 'standard', path: 'docs/architecture.md' }] }, checks: { required: [], candidates: [] } }, readRefs: [{ path: 'docs/architecture.md', absolute: path.join(ROOT, 'docs/architecture.md'), rootKind: 'source', root: ROOT, sha256: sha256File(path.join(ROOT, 'docs/architecture.md')) }], owned_paths: placements.map(row => ({ root: row.base, path: row.path })), gate_binding: captureGateBinding(placements, { at: admittedAt }) } } }, createdAt: admittedAt });
+      writeContract(db, { attemptId, markdown: '# contract', context: { worktree: repo, packet: { context: { selected_op: { contract: { id: 'business.decide', reads: [{ id: 'standard', path: 'docs/architecture.md' }] }, checks: { required: [], candidates: [] } }, readRefs: [{ path: 'docs/architecture.md', absolute: path.join(ROOT, 'docs/architecture.md'), rootKind: 'source', root: ROOT, sha256: sha256File(path.join(ROOT, 'docs/architecture.md')) }], owned_paths: placements.map(row => ({ root: row.base, path: row.path })), gate_binding: captureGateBinding(placements, { at: admittedAt }) } } }, createdAt: admittedAt });
       fileReport(db, { attemptId, outcome: 'done', createdAt: Date.now(),
         report: { schema: 'starci/op-report@1', outcome: 'done', summary: 'wrote the sign-in accounts record', files,
           head: gitOk(repo, 'rev-parse', 'HEAD') } });
