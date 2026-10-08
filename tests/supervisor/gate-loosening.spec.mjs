@@ -132,3 +132,21 @@ rulings:
   assert.deepEqual(checkGateLoosening(dir), [], 'a ruling in the checked-out tree approves the earlier commit');
   assert.ok(release);
 });
+
+test('the self-check judges a loosening against the released state: what a lane added after the release and folded away is no finding', (t) => {
+  const { dir } = repo(t);
+  // after the release: a lane adds a check and a spec, then folds both into others before anything ships
+  write(dir, 'knowledge/hfs/runtime-slots.yaml', 'checks:\n  - {id: one}\n  - {id: two}\n  - {id: late}\n');
+  write(dir, 'tests/x/late.spec.mjs', 'assert.ok(1);\nassert.ok(2);\n');
+  write(dir, 'scripts/x/late.mjs', 'export const late = 1;\n');
+  commit(dir, 'a lane adds a check and its spec');
+  write(dir, 'knowledge/hfs/runtime-slots.yaml', 'checks:\n  - {id: one}\n  - {id: two}\n');
+  fs.rmSync(path.join(dir, 'tests/x/late.spec.mjs'));
+  write(dir, 'scripts/x/late.mjs', 'export const late = 2;\n');
+  commit(dir, 'the lane folds them away');
+  assert.deepEqual(checkGateLoosening(dir), [], 'neither was a gate of the release');
+  // a released check removed in the same history is still a finding
+  write(dir, 'knowledge/hfs/runtime-slots.yaml', 'checks:\n  - {id: one}\n');
+  commit(dir, 'drop a released check');
+  assert.equal(checkGateLoosening(dir).length, 1);
+});

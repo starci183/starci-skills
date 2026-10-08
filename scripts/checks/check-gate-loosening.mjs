@@ -6,7 +6,8 @@
 // scripts/lib/gate-loosening.mjs and modules/kernel/gate-loosening.yaml. A commit that loosens a gate or check is owner-class
 // (modules/kernel/roles.yaml rulings.loosening-is-owner-class): it is a finding unless the owner approved it, an owner-rulings entry
 // gate-loosening-<fingerprint> held by its parent or by the checked-out tree (history that reached the branch by a merge was not judged
-// when it was written: the owner approves it after the fact, in a commit of its own). The land gate refuses the same change before it reaches main
+// when it was written: the owner approves it after the fact, in a commit of its own). Only what the release shipped can be loosened
+// (scripts/checks/lib/released-state.mjs): a check or a spec added after the release and folded away before the next one is no finding. The land gate refuses the same change before it reaches main
 // (scripts/supervisor/land-gate-loosening.mjs).
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { isMain } from '../lib/is-main.mjs';
@@ -14,7 +15,8 @@ import { printFindings } from '../lib/check-scan.mjs';
 import { log } from '../api/git/log.mjs';
 import { revList } from '../api/git/rev-list.mjs';
 import { judgeChange, looseningRules, rulingsAt } from '../supervisor/land-gate-loosening.mjs';
-import { approved } from '../lib/gate-loosening.mjs';
+import { approvalIdOf, approved } from '../lib/gate-loosening.mjs';
+import { fileReader, loosensReleased } from './lib/released-state.mjs';
 
 export const CODE = 'RT_GATE_LOOSENING';
 const COMMIT_LIMIT = 400;
@@ -35,11 +37,14 @@ export function checkGateLoosening(root = skillRoot) {
   const listed = revList(['--no-merges', '--reverse', `--max-count=${COMMIT_LIMIT}`, `${base}..HEAD`], { cwd: root });
   if (listed.status !== 0) return [];
   const standing = rulingsAt(root, 'HEAD');
+  const read = fileReader(root);
   return listed.stdout.split(/\r?\n/).filter(Boolean).flatMap((sha) => {
     const judged = judgeChange({ dir: root, base: `${sha}^`, head: sha, rules });
     if (!judged || judged.approved || approved(judged.findings, standing)) return [];
-    const what = judged.findings.map((entry) => `${entry.kind} ${entry.file}: ${entry.detail}`).join('; ');
-    return [finding(sha, `loosens a gate (${what}) without the owner's approval: add the owner-rulings entry ${judged.id} first, or restore the gate`)];
+    const findings = judged.findings.filter((entry) => loosensReleased(entry, { base, read, rules }));
+    if (!findings.length || approved(findings, standing)) return [];
+    const what = findings.map((entry) => `${entry.kind} ${entry.file}: ${entry.detail}`).join('; ');
+    return [finding(sha, `loosens a gate (${what}) without the owner's approval: add the owner-rulings entry ${approvalIdOf(findings)} first, or restore the gate`)];
   });
 }
 
