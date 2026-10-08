@@ -16,7 +16,7 @@ services:
       container: starci-sonarqube
       publishedBy: cloudflared.yaml
     auth: token
-    qualityGate: starci-quality
+    qualityGate: starci-quality-lite
     projects:
       - {repository: lite-app, key: lite-app}
     credentials:

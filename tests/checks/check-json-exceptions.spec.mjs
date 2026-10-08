@@ -57,3 +57,19 @@ test('git-ignored spec scratch trees at the root are skipped; the same names nes
   const result = checkJsonExceptions({ root: dir, allowlistFile: allowlist });
   assert.deepEqual([...result.offenders].sort(), authored, 'only the exact root scratch prefixes are skipped');
 });
+
+test('build caches of an example app (.turbo) are build output, not authored JSON', async t => {
+  const { checkJsonExceptions } = await import(pathToFileURL(checkerFile).href);
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-json-turbo-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  fs.mkdirSync(path.join(dir, 'modules', 'kernel'), { recursive: true });
+  const allowlist = path.join(dir, 'modules', 'kernel', 'allowlist.yaml');
+  fs.writeFileSync(allowlist, 'schema: starci/allowlist@1\njson-exceptions:\n  exceptions: []\n');
+  for (const rel of ['examples/app/.turbo/cache/abc-meta.json', 'examples/app/authored.json']) {
+    const file = path.join(dir, ...rel.split('/'));
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, '{}\n');
+  }
+  const result = checkJsonExceptions({ root: dir, allowlistFile: allowlist });
+  assert.deepEqual([...result.offenders], ['examples/app/authored.json'], 'the turbo cache is skipped, authored JSON beside it is not');
+});

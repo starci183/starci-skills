@@ -23,6 +23,7 @@ COPY turbo.json ./
 COPY scripts scripts
 COPY fe/tsconfig.json fe/tsconfig.json
 COPY fe/apps/shape-slot fe/apps/shape-slot
+RUN mkdir -p fe/apps/shape-slot/public
 RUN npm run codegen --silent
 RUN node_modules/.bin/turbo run build --filter=@shape-slot/shape-slot
 

@@ -132,6 +132,16 @@ test('DB_MIGRATION_SHAPE: a migration on the base is immutable - an edit and a r
   assert.ok(gone.some((f) => f.message.includes('is gone here')));
 });
 
+test('DB_MIGRATION_SHAPE: an app nested in a larger repository reads the base content from its own root, so an untouched migration is not a finding and an edit is', async () => {
+  const hfs = JSON.stringify({ hfs: 2, kind: 'app', project: 'demo', edition: 'lite', supabase: SUPABASE, sides: { be: { apps: [] }, fe: { apps: [] } } });
+  const outer = committedRepo({ ...migration('20260101120000_old.sql', 'select 0;\n'), 'examples/demo/hfs.json': hfs, [`examples/demo/${MIGRATIONS}/20260101120000_old.sql`]: 'select 1;\n' });
+  const app = path.join(outer, 'examples', 'demo');
+  const file = `${MIGRATIONS}/20260101120000_old.sql`;
+  assert.deepEqual(only(await checkDatabase({ repoRoot: app, files: [file] }), 'DB_MIGRATION_SHAPE'), [], 'the nested copy equals its content on the base');
+  fs.writeFileSync(path.join(app, MIGRATIONS, '20260101120000_old.sql'), 'select 2;\n');
+  assert.ok(only(await checkDatabase({ repoRoot: app, files: [file] }), 'DB_MIGRATION_SHAPE').some((f) => f.message.includes('immutable')));
+});
+
 test('DB_MIGRATION_SHAPE: without a base ref ordering and immutability are simply not judged', async () => {
   const dir = repo(migration('20250101000000_first.sql', 'select 1;\n'));
   const findings = only(await checkDatabase({ repoRoot: dir, files: [`${MIGRATIONS}/20250101000000_first.sql`], git: noRemote }), 'DB_MIGRATION_SHAPE');

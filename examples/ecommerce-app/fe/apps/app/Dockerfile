@@ -24,6 +24,7 @@ COPY scripts scripts
 COPY fe/tsconfig.json fe/tsconfig.json
 COPY fe/packages fe/packages
 COPY fe/apps/app fe/apps/app
+RUN mkdir -p fe/apps/app/public
 RUN npm run codegen --silent
 RUN node_modules/.bin/turbo run build --filter=@ecommerce-app/app
 

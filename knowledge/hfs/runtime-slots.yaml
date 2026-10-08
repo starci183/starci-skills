@@ -153,6 +153,7 @@ ruleParams:
       - {id: specs, run: scripts/checks/check-specs.mjs}
       - {id: worktree-add, run: scripts/checks/check-worktree-add.mjs}
       - {id: examples-ci, run: scripts/checks/check-examples-ci.mjs}
+      - {id: example-render, run: scripts/checks/check-example-render.mjs}
       - {id: guidance-commands, run: scripts/checks/check-guidance-commands.mjs}
       - {id: port-once, run: scripts/checks/check-port-once.mjs}
       - {id: spec-budget, run: scripts/checks/check-spec-budget.mjs}

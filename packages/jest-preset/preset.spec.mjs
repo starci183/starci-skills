@@ -143,11 +143,20 @@ test('the unit project matches *.spec.ts only and never a file of src/tests/{wor
   assert.equal(ignored('/r/src/tests/fixtures/database.spec.ts'), false);
 });
 
+test('a spec file of a layer is matched whatever the checkout path holds, a dot-named folder on a Windows path included', () => {
+  const { globsToMatcher, replacePathSepForGlob } = require('jest-util');
+  const byName = Object.fromEntries(preset.starciJestConfig(OPTIONS).projects.map((p) => [p.displayName, p]));
+  const file = ['D:', 'Repositories', 'host', '.claude', 'examples', 'app', 'be', 'src', 'tests', 'contract', 'billing', 'events.contract-spec.ts'].join(path.win32.sep);
+  const matches = (project, name) => globsToMatcher(project.testMatch)(replacePathSepForGlob(name));
+  assert.equal(matches(byName.contract, file), true, 'the contract spec under a dot-named folder is found');
+  assert.equal(matches(byName.e2e, file), false, 'a contract spec is not an e2e spec');
+});
+
 test('each test kind is its own project, matched by folder and suffix together; contract is never unit or e2e', () => {
   const byName = Object.fromEntries(preset.starciJestConfig(OPTIONS).projects.map((p) => [p.displayName, p]));
-  assert.deepEqual(byName.integration.testMatch, ['<rootDir>/src/tests/integration/**/*.integration-spec.ts']);
-  assert.deepEqual(byName.e2e.testMatch, ['<rootDir>/src/tests/e2e/**/*.e2e-spec.ts']);
-  assert.deepEqual(byName.contract.testMatch, ['<rootDir>/src/tests/contract/**/*.contract-spec.ts']);
+  assert.deepEqual(byName.integration.testMatch, ['**/src/tests/integration/**/*.integration-spec.ts']);
+  assert.deepEqual(byName.e2e.testMatch, ['**/src/tests/e2e/**/*.e2e-spec.ts']);
+  assert.deepEqual(byName.contract.testMatch, ['**/src/tests/contract/**/*.contract-spec.ts']);
   for (const name of ['integration', 'e2e', 'contract']) {
     assert.equal(byName[name].runner, preset.WORLD_RUNNER, `${name} runs every file in a process of its own`);
     assert.equal('maxWorkers' in byName[name], false, `${name}: maxWorkers is a global option, a project never carries it`);
