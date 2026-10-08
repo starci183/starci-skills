@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { CATALOG } from '../../packages/cli/src/catalog.generated.mjs';
 import { checkCommand, docCommandFiles, extractCommands } from '../helpers/doc-commands.mjs';
+import { proseCommandFindings } from '../../scripts/checks/check-prose-commands.mjs';
 
 // Every `starci <group> <verb>` an agent or owner is told to run exists in the generated command catalog.
 // The extraction and the flag-level proof live in tests/helpers/doc-commands.mjs and tests/repo/doc-command-flags.spec.mjs.
@@ -22,4 +23,12 @@ test('docs, skills, op contracts, knowledge and hint scripts name only generated
     }
   }
   assert.deepEqual(bad, []);
+});
+
+// The two owners of "a documented command exists" (this helper and the prose-commands self-check) read a regex that
+// matches a command spelling the same way: as a pattern, never as a command that must exist.
+test('a regex pattern over a command spelling is not read as a command by either extractor', () => {
+  const pattern = "- {pattern: 'starci\s+supervisor\s+(?:tell|channel)', why: \"an Op never messages the Supervisor\"}";
+  assert.deepEqual(extractCommands(pattern), []);
+  assert.deepEqual(proseCommandFindings({ 'modules/kernel/roles.yaml': pattern }), []);
 });

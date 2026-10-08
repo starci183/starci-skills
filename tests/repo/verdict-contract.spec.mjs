@@ -16,14 +16,15 @@ import {openLedger,inspectLedger,ledgerFileFor,ensureWorkflow,changeWorkflowPhas
 import {proofRepo,writeGreenProofs} from '../helpers/sonar-scan.mjs';
 import {registerWorkflowWorktree} from '../../scripts/kernel/workflow-worktree.mjs';
 import {fileDispatchContract} from '../helpers/filed-contract.mjs';
+import {allocateDispatchedScratch,releaseDispatchedScratchAfter} from '../helpers/dispatched-scratch.mjs';
 
 const runApi=(args,{env={}}={})=>spawnSync(process.execPath,[API,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...process.env,...env}});
 
-const scratches=[],bindings=new Map();
+const bindings=new Map();
 const fixture=t=>{
   const dirs=[];
-  t.after(()=>{for(const dir of [...dirs,...scratches.splice(0)])fs.rmSync(dir,{recursive:true,force:true,maxRetries:20,retryDelay:25});});
-  return {repo(){const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-verdict-'));dirs.push(dir);fs.mkdirSync(path.join(dir,'docs'));proofRepo(t,dir);return dir;}};
+  t.after(()=>{for(const dir of dirs)fs.rmSync(dir,{recursive:true,force:true,maxRetries:20,retryDelay:25});});
+  return {repo(){const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-verdict-'));dirs.push(dir);releaseDispatchedScratchAfter(t,dir);fs.mkdirSync(path.join(dir,'docs'));proofRepo(t,dir);return dir;}};
 };
 
 /** One workflow + one dispatched op job (running + a contract-bound open attempt,
@@ -34,8 +35,7 @@ const seedJob=(repo,jobId)=>{
   const ledger=openLedger({file:ledgerFileFor(repo)});
   try{
     const wf='wf-verdict',dispatchId=`ctx-${jobId}`,unitId=`unit-${jobId}`;
-    const scratch=fs.mkdtempSync(path.join(os.tmpdir(),'starci-verdict-scratch-'));
-    scratches.push(scratch);
+    const scratch=allocateDispatchedScratch({repo,workflowId:wf,jobId});
     const at=Date.now();
     ledger.transaction(db=>{
       ensureWorkflow(db,{workflowId:wf,phase:'queued',title:'verdict fixture',by:'test-fixture',reason:'seed',at});

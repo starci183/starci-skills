@@ -9,6 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
+import {dispatchedScratch} from '../helpers/dispatched-scratch.mjs';
 import {createKernelSettleNextStepFixture} from '../helpers/kernel-settle-next-step-fixture.mjs';
 import {jobRowOf} from '../../scripts/kernel/verbs/shared/rows.mjs';
 import {unitSubjectKey} from '../../engine/admission.mjs';
@@ -252,8 +253,7 @@ test('a filed report carrying rootCause passes the envelope, and its node on ano
   w.job('build','backend.implement',{status:'succeeded',records:['feat.login'],paths:['.starciwork/features/login/','src/login/']});
   w.job('e2e','e2e.verify',{records:['feat.login'],paths:['.starciwork/features/login/evidence/']});
   // File the worker envelope through starci kernel report before settling its attempt.
-  const file=path.join(fs.mkdtempSync(path.join(os.tmpdir(),'starci-root-cause-')),'report.json');
-  t.after(()=>fs.rmSync(path.dirname(file),{recursive:true,force:true}));
+  const file=path.join(dispatchedScratch(t,{repo:fixture.repo,workflowId:w.wf,jobId:'e2e'}),'report.json');
   w.seed(ledger=>{
     const attemptId=ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get('e2e').attempt_id;
     ledger.write.updateAttempt({attemptId,scratchDir:path.dirname(file)});
