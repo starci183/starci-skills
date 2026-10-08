@@ -193,6 +193,31 @@ ORDER BY l.seq DESC LIMIT 50;
 | How many tokens did the Kernel use today? | `SELECT sum(input_tokens) AS tokens_in, sum(output_tokens) AS tokens_out FROM llm_usage WHERE subject_type = 'kernel-turn' AND at > :day0;` |
 | Where does this id appear? | `SELECT * FROM v_search_ids WHERE id = :id;` (in each database) |
 
+## The digest: the standard, the verdicts and the questions
+
+`starci debug digest` judges every running workflow against the operating standard in
+`modules/reconciler/operating-standard.yaml`: the ordered steps of a workflow, each with the role that acts, what must hold before
+it, the observable state when it is done, the time it may take and the rows that prove it. A step is done, waiting (inside its bound,
+or on a party whose wait is the design) or overdue; the first overdue step is the workflow's first departure and its actor owes the
+next move.
+
+Two classes of stop exist, and only two. A happy error is the system working as designed and meeting a stop: an op asked a question,
+a quota ran out and the next agent takes over, a check is red because the work is not good yet. The roles handle it inside the chain
+through the declared policy, and the digest only counts it. A BUG is a role or the runtime not doing what its contract says. The
+digest prints one verdict per role: the Supervisor, each Kernel, each Op attempt, the Critic runs and the Runtime. A verdict is no
+error, happy error (counted), or BUG with the broken duty, the evidence and the state of the remedy in
+`modules/reconciler/edge-cases.yaml`. Only a BUG is a problem line. A role the stores hold nothing for is unobserved and names the
+signal it needs.
+
+`modules/reconciler/debug-questions.yaml` declares the questions Debug asks, grouped by edge-case family. Each is answerable today by
+a check of the digest, or is a documented gap with the signal it needs. `starci debug digest --questions` lists every question with
+its answer or its missing signal. The digest also prints the standing of the debug role against its end condition.
+
+Three signals feed it: the `reconciler.boot` row the engine writes at every start (boot instant, uptime, boot id), the `checkedIn`
+list on the `op-settled` event (the directory, commit and tree of every check that ran), and the `ledger-written-outside-seat` event
+that marks a ledger write by a person at a shell. A verb the runtime itself runs carries a marker (`STARCI_ACTOR`, `STARCI_CALLER` or
+`STARCI_API_CHILD`) and is never counted as a person.
+
 ## Habits
 
 - Read `v_blocking` before anything else; it names who has to act.

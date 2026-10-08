@@ -1,0 +1,71 @@
+schema: starci/module-reconciler-debug-questions@1
+id: reconciler.debug-questions
+
+# The questions Debug asks of the system each tick, grouped by the families of modules/reconciler/edge-cases.yaml. A question is
+# `answerable: today` when the stores hold the rows that answer it and `starci debug digest` evaluates the named `check`
+# (scripts/reconciler/debug-questions.mjs), or `gap` when the answer needs a signal the runtime does not record yet; a gap names the
+# `signal` it needs, and a question whose signal this runtime now records carries `signalAdded`. A check returns ok (the answer is
+# the healthy one), attention (a role departed: the verdict section names which) or unknown (the stores hold nothing to judge by).
+
+groups:
+  - id: power-lifecycle
+    title: "Power and lifecycle"
+    questions:
+      - {id: pl-engine-leads, ask: "Does the reconciler lead, with every configured controller running in its configured mode?", answerable: today, check: engine-leads, source: "machine.sqlite engine_leader, controller_modes, config.yaml"}
+      - {id: pl-seats-match-terminals, ask: "Is every live seat (the Supervisor, each Kernel) backed by a live terminal that takes input?", answerable: today, check: seats-live, source: "machine.sqlite seats; the Kernel watchdog probe and the Supervisor health probe (read-only)"}
+      - {id: pl-restart-recovered, ask: "After the host restarted, did the engine come back, and did every workflow and reservation resume without a lost or repeated unit of work?", answerable: today, check: restart-recovered, signalAdded: "reconciler.boot (machine_logs): boot instant, uptime and boot id at every engine start", source: "machine_logs reconciler.boot rows, process_runs, jobs, provider_reservations"}
+      - {id: pl-power-loss-ledger, ask: "Did a ledger survive an unclean stop readable?", answerable: today, check: ledgers-readable, source: "the digest opens every ledger read-only; an unreadable one is a status-unreadable departure"}
+      - {id: pl-network-loss, ask: "Did a provider or network outage stop work, and did the work resume when it returned?", answerable: gap, signal: "provider-reachability event: the probe result, the time it turned unreachable and the time it returned", why: "provider-unavailable events record a refusal, not reachability"}
+  - id: change-under-running
+    title: "Change under a running system"
+    questions:
+      - {id: cu-engine-rev, ask: "Does the engine run the revision the live tree holds?", answerable: today, check: engine-rev, source: "engine_leader.rev against the live tree head"}
+      - {id: cu-kernel-rev, ask: "Did each Kernel ack the current runtime revision inside its bound?", answerable: today, check: kernel-rev, source: "status kernelRev, events runtime-rev-acked"}
+      - {id: cu-live-state-untouched, ask: "Did a source change close, restart or rewrite a live terminal, ledger or product file?", answerable: gap, signal: "runtime-change-applied event: the revision swap with the list of live things it touched", why: "a revision swap leaves no row of what it affected"}
+  - id: failure-while-running
+    title: "Failure while running"
+    questions:
+      - {id: fr-hold-steps, ask: "For every held or stopped job, did its policy next step happen inside the bound?", answerable: today, check: hold-steps, source: "status frontier.queued and legs against modules/kernel/op-incident-policy.yaml"}
+      - {id: fr-stale-gates, ask: "Is any Supervisor gate or Decision Item past its due time?", answerable: today, check: stale-decisions, source: "sup_decision_items and decision_items due_at"}
+      - {id: fr-retry-loops, ask: "Does any start, dispatch or retry repeat the same failure instead of reporting it?", answerable: today, check: retry-loops, source: "events kernel-start-failed, dispatch-rejected, jobs per op"}
+      - {id: fr-queue-failing, ask: "Does any reconciler queue key keep failing?", answerable: today, check: queue-failing, source: "engine_queue tries"}
+      - {id: fr-op-silent, ask: "Is any running op past its deadline without a report?", answerable: today, check: op-deadline, source: "jobs.deadline against now"}
+      - {id: fr-wake-acted, ask: "After a wake, did the woken agent act?", answerable: gap, signal: "agent-acted-after-wake event: the first tool call or ledger write of the seat after each wake delivery", why: "a delivered wake and an ignored wake look the same in the stores"}
+  - id: correctness
+    title: "Correctness of results"
+    questions:
+      - {id: co-done-on-evidence, ask: "Does every pass stand on checks that ran in the attempt's own tree?", answerable: today, check: done-on-evidence, signalAdded: "op-settled.checkedIn: the directory, commit and tree of every kernel or settler check", source: "events op-settled against op_attempts.worktree_path"}
+      - {id: co-claim-vs-rerun, ask: "Did a claimed check result differ from the runtime's own re-run?", answerable: today, check: claim-vs-rerun, source: "check_runs declared_exit_code against exit_code"}
+      - {id: co-critic-independent, ask: "Did each Critic run on another provider than the op, see only the product and have its verdict used?", answerable: gap, signal: "critic-run event on the attempt it judged: critic provider, op provider, inputs digest and the verdict's use", why: "the draw loop keeps the critique in its round file; the ledger holds no critic row"}
+      - {id: co-secret-in-transcript, ask: "Did a credential reach a transcript, a report or a log?", answerable: gap, signal: "a pattern-scan seam over the digest's own inputs (transcript snapshots, reports, logs) that counts matches without printing them", why: "redaction runs at write time and leaves no count of what it removed"}
+  - id: smooth-operation
+    title: "Smooth operation"
+    questions:
+      - {id: so-ready-dispatched, ask: "Is any ready leg waiting while its Kernel is idle?", answerable: today, check: ready-dispatched, source: "status frontier readyOperations, kernel-woken events"}
+      - {id: so-token-burn, ask: "What did each op attempt spend in tokens and turns?", answerable: today, check: token-burn, source: "status usage.byOp (llm_usage)"}
+      - {id: so-queue-length, ask: "How many jobs wait, and for which hold?", answerable: today, check: queue-length, source: "status frontier.queued"}
+  - id: record-vs-reality
+    title: "Record versus reality"
+    questions:
+      - {id: rr-reservations-vs-jobs, ask: "Is every live provider reservation backed by a running job, Kernel or seat?", answerable: today, check: reservations-backed, source: "provider_reservations against jobs, seats, sup_jobs"}
+      - {id: rr-placement-exists, ask: "Does the tree an unsettled attempt names exist on disk?", answerable: today, check: placement-exists, source: "op_attempts.worktree_path against the file system (read-only)"}
+      - {id: rr-claimed-vs-observed, ask: "Does the ledger say what the host shows: terminals, worktrees, processes?", answerable: gap, signal: "a drift event per kind of thing (terminal, worktree, process) when the host's list and the ledger's differ", why: "terminal-count drift is detected by one controller and not recorded as an event the digest can read"}
+  - id: authority-safety
+    title: "Authority and safety"
+    questions:
+      - {id: as-op-reports-to-kernel, ask: "Did an op address anyone but its Kernel?", answerable: today, check: op-refusals, source: "events op-caller-refused"}
+      - {id: as-interventions, ask: "Did a person write the ledger by hand during the run?", answerable: today, check: interventions, signalAdded: "ledger-written-outside-seat event: one per call of an unbound owner with no runtime marker", source: "events ledger-written-outside-seat"}
+      - {id: as-runtime-change-refused, ask: "Did the Supervisor try to change the runtime, and was it refused?", answerable: gap, signal: "guard-refusal row per refused verb with the role, the verb and the code", why: "RUNTIME_CHANGE_OWNED_BY_DEBUG is returned to the caller and not stored"}
+      - {id: as-gate-loosening, ask: "Did a land loosen a gate or a check without the owner's approval?", answerable: gap, signal: "land-loosening finding on the land record, with the owner approval id it needed", why: "the land gate compares the diff against no list of loosenings yet"}
+  - id: concurrency
+    title: "Concurrency"
+    questions:
+      - {id: cc-capacity-pressure, ask: "Is a workflow starved by a shared pool, port, lease or host lock?", answerable: today, check: capacity-holds, source: "status frontier.queued holds pool-full, path-lease, foundation-wait, host-resources-low"}
+      - {id: cc-port-claims, ask: "Do two workflows want one port, and who got it?", answerable: gap, signal: "port-claim event: the port, the claimant, the holder and the outcome", why: "server slots are rows with no refusal history"}
+  - id: ending
+    title: "Ending"
+    questions:
+      - {id: en-handover, ask: "Does every approved handover end in a finished workflow?", answerable: today, check: handover, source: "status frontier finish-ready, workflows.phase"}
+      - {id: en-resources-released, ask: "After a workflow ends, are its reservations, leases, worktrees and terminals gone?", answerable: today, check: resources-released, source: "provider_reservations against jobs and seats"}
+      - {id: en-open-edge-cases, ask: "Is any edge case of the registry still open?", answerable: today, check: open-edge-cases, source: "modules/reconciler/edge-cases.yaml"}
+      - {id: en-clean-run, ask: "How many consecutive workflows ran start to handover with zero departures and zero interventions?", answerable: today, check: clean-run, signalAdded: "ledger-written-outside-seat events make the interventions countable from now on; earlier workflows count as unproven", source: "finished workflows with their events and incidents"}

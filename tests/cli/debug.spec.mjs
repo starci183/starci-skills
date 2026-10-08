@@ -11,7 +11,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '.
 
 test('debug catalog resolves both handlers and their exact local flags', () => {
   const expected = {
-    digest: ['child-timeout', 'repo', 'workflow'],
+    digest: ['child-timeout', 'questions', 'repo', 'workflow'],
     run: ['child-timeout', 'repo', 'since-hours', 'token-spike', 'token-window'],
   };
   for (const [verb, flags] of Object.entries(expected)) {

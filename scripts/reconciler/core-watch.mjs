@@ -51,8 +51,8 @@ const LEG_BAD = /failed|blocked|cancel/;
 /* ------------------------------------------------------------ helpers */
 
 /** A read-only child call that always ends: {ok, stdout, error}. Never throws. */
-export function child(args, { timeoutMs, cwd = ROOT } = {}) {
-  return execNode(args, { cwd, timeout: timeoutMs, killSignal: 'SIGKILL', maxBuffer: 64 * 1024 * 1024 })
+export function child(args, { timeoutMs, cwd = ROOT, env = undefined } = {}) {
+  return execNode(args, { cwd, ...(env ? { env } : {}), timeout: timeoutMs, killSignal: 'SIGKILL', maxBuffer: 64 * 1024 * 1024 })
     .then(({ error, stdout, stderr }) => {
       let message = null;
       if (error?.killed) message = `timeout ${Math.round(timeoutMs / 1000)}s`;

@@ -369,12 +369,13 @@ run a fixed read-only inspector against the StarCi runtime
 
 ### starci debug digest
 
-print the read-only debug digest, with its problems ordered by blocked work
+print the read-only debug digest with a verdict per role (no error, happy error, BUG)
 
 | flag | type | |
 | --- | --- | --- |
 | `--repo` | list |  |
 | `--workflow` | list |  |
+| `--questions` | boolean |  |
 | `--child-timeout` | number |  |
 
 exit: 0 digest printed; 1 the machine store cannot be read; 2 bad usage
@@ -384,6 +385,7 @@ json: flag
 ```sh
 starci debug digest
 starci debug digest --json
+starci debug digest --questions
 starci debug digest --repo <path> --workflow <id>
 ```
 

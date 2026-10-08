@@ -9,9 +9,11 @@ import { eachInOrder } from '../lib/in-order.mjs';
 import { runtimeShaOf } from '../machine/contract-version.mjs';
 import { child, firstJson } from './core-watch.mjs';
 import { machineFacts } from './debug-digest-machine.mjs';
+import { attemptFacts, eventFacts, historyFacts } from './debug-digest-ledger.mjs';
+import { registryFacts, endCriteria } from './debug-docs.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const OPEN_PHASES = new Set(['running']);
+const OPEN_PHASES = new Set(['queued', 'running']);
 
 const jobOf = (r) => ({ jobId: r.job_id, kind: r.kind, opId: r.op_id, status: r.status, tryNo: r.try_no, retryOf: r.retry_of ?? null,
   workerId: r.worker_id, deadline: r.deadline ?? null, createdAt: r.created_at, updatedAt: r.updated_at });
@@ -22,13 +24,14 @@ const decisionOf = (r) => ({ id: r.di_id, kind: r.kind, decider: r.decider, stat
 export function ledgerFacts(file, workflowIds = null) {
   const db = openLedgerReader(file);
   try {
-    const workflows = db.prepare("SELECT workflow_id, display_name, title, phase FROM workflows WHERE archived_at IS NULL AND phase NOT IN ('finished','archived')").all()
+    const workflows = db.prepare("SELECT workflow_id, display_name, title, phase, created_at, updated_at FROM workflows WHERE archived_at IS NULL AND phase NOT IN ('finished','archived')").all()
       .filter((w) => OPEN_PHASES.has(w.phase) && (!workflowIds?.length || workflowIds.includes(w.workflow_id)));
     return workflows.map((w) => {
       const kernelJob = db.prepare('SELECT status, updated_at FROM jobs WHERE job_id=?').get(`kernel-${w.workflow_id}`) ?? null;
       const signal = db.prepare("SELECT value_json FROM signals WHERE scope='kernel' AND key=?").get(w.workflow_id);
       const woken = db.prepare("SELECT MAX(occurred_at) AS at FROM events WHERE workflow_id=? AND kind='kernel-woken'").get(w.workflow_id)?.at ?? null;
-      return { id: w.workflow_id, name: w.display_name ?? w.title ?? w.workflow_id, phase: w.phase,
+      return { id: w.workflow_id, name: w.display_name ?? w.title ?? w.workflow_id, phase: w.phase, createdAt: w.created_at, updatedAt: w.updated_at,
+        attempts: attemptFacts(db, w.workflow_id), events: eventFacts(db, w.workflow_id),
         jobs: db.prepare('SELECT * FROM jobs WHERE workflow_id=?').all(w.workflow_id).map(jobOf),
         incidents: db.prepare("SELECT * FROM incidents WHERE workflow_id=? AND status='open'").all(w.workflow_id).map(incidentOf),
         decisions: db.prepare("SELECT * FROM decision_items WHERE workflow_id=? AND status='open'").all(w.workflow_id).map(decisionOf),
@@ -36,6 +39,12 @@ export function ledgerFacts(file, workflowIds = null) {
         kernelSignal: parseJsonOr(signal?.value_json, null), lastKernelWakeAt: woken };
     });
   } finally { db.close(); }
+}
+
+/** The finished workflows of one ledger (the history the end condition counts). */
+function ledgerHistory(file) {
+  const db = openLedgerReader(file);
+  try { return historyFacts(db); } finally { db.close(); }
 }
 
 /** One child read of a JSON verb: the first JSON object, or null with the reason. */
@@ -62,17 +71,22 @@ async function supervisorHealth({ timeoutMs, run }) {
  * machine store. Filters: `repos` (ledger-owner paths) and `workflowIds`. Seams: machine, ledger, run, now.
  */
 export async function collectSnapshot({ env = process.env, repos = [], workflowIds = [], timeoutMs = 90_000, now = Date.now(),
-  machine = machineFacts, ledger = ledgerFacts, run = child, liveRev = () => runtimeShaOf(env.STARCI_KERNEL_REV_ROOT ?? ROOT) } = {}) {
+  machine = machineFacts, ledger = ledgerFacts, history = ledgerHistory, run: runChild = child, liveRev = () => runtimeShaOf(env.STARCI_KERNEL_REV_ROOT ?? ROOT) } = {}) {
+  // The read verbs run as the digest, never as a person: a verb that writes the ledger while it reads is not an intervention.
+  const run = (args, options) => runChild(args, { ...options, env: { ...env, STARCI_ACTOR: 'debug-digest' } });
   const facts = machine({ env });
   if (!facts) return { unavailable: 'machine store' };
   const wanted = facts.ledgers.filter((l) => !repos.length || repos.includes(l.repo_root));
   const workflows = [];
+  const finished = [];
+  const historyErrors = [];
   await eachInOrder(wanted, async (l) => {
     let found;
     try { found = ledger(l.file, workflowIds); } catch (e) { workflows.push({ id: null, name: l.name, ledger: l.name, repo: l.repo_root, phase: null, jobs: [], incidents: [], decisions: [], statusError: `ledger unreadable: ${String(e.message).slice(0, 100)}` }); return; }
     await eachInOrder(found, async (w) => { workflows.push({ ...w, ledger: l.name, repo: l.repo_root, ...(await workflowReads(w, l.repo_root, { timeoutMs, run })) }); });
+    try { finished.push(...history(l.file).map((h) => ({ ...h, ledger: l.name }))); } catch (e) { historyErrors.push(`${l.name}: ${String(e.message).slice(0, 100)}`); }
   });
   const health = await supervisorHealth({ timeoutMs, run });
   return { now, liveRev: liveRev(), engine: facts.engine, supervisor: { ...facts.supervisor, health }, reservations: facts.reservations,
-    seats: facts.seats, supJobs: facts.supJobs, workflows };
+    seats: facts.seats, supJobs: facts.supJobs, workflows, history: finished, historyErrors, registry: registryFacts(), criteria: endCriteria() };
 }

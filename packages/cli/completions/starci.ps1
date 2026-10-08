@@ -53,7 +53,7 @@ Register-ArgumentCompleter -Native -CommandName starci -ScriptBlock {
         'connect telegram' = @('--discover-chat','--ledger','--repo','--workflow','--dispatch','--json','--cwd','--quiet','--help','--edition')
         'connect telegram-media' = @('--ledger','--repo','--workflow','--job','--attempt','--op','--verdict','--dispatch','--json','--cwd','--quiet','--help','--edition')
         'connect tunnel' = @('--port','--fast','--json','--cwd','--quiet','--help','--edition')
-        'debug digest' = @('--repo','--workflow','--child-timeout','--json','--cwd','--quiet','--help','--edition')
+        'debug digest' = @('--repo','--workflow','--questions','--child-timeout','--json','--cwd','--quiet','--help','--edition')
         'debug run' = @('--repo','--since-hours','--child-timeout','--token-window','--token-spike','--json','--cwd','--quiet','--help','--edition')
         'docker build' = @('--tag','--no-cache','--json','--cwd','--quiet','--help','--edition')
         'docker down' = @('--env','--volumes','--json','--cwd','--quiet','--help','--edition')

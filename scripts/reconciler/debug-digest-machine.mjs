@@ -12,6 +12,15 @@ function ask(m, sql, args = [], fallback = []) {
   try { return m.db.prepare(sql).all(...args); } catch { return fallback; }
 }
 
+/** The engine starts the host remembers, newest first: the boot each named (reconciler.boot rows) and the process runs behind them. */
+function startsOf(m) {
+  const boots = ask(m, "SELECT at, data_json FROM machine_logs WHERE kind='reconciler.event' AND data_json LIKE '%reconciler.boot%' ORDER BY seq DESC LIMIT 100").map((r) => ({ at: r.at, ...parseJsonOr(r.data_json, {}) }))
+    .filter((b) => b.kind === 'reconciler.boot').map((b) => ({ at: b.at, bootAt: b.bootAt, bootId: b.bootId, pid: b.pid }));
+  const runs = ask(m, 'SELECT run_id, start_reason, started_at, ended_at, exit_reason FROM process_runs WHERE role=? ORDER BY run_id DESC LIMIT 100', ['engine'])
+    .map((r) => ({ runId: r.run_id, startReason: r.start_reason, startedAt: r.started_at, endedAt: r.ended_at, exitReason: r.exit_reason }));
+  return { boots, runs };
+}
+
 function engineOf(m) {
   const leader = ask(m, 'SELECT * FROM engine_leader WHERE name=?', [LEADER_NAME])[0] ?? null;
   const modes = Object.fromEntries(ask(m, 'SELECT controller, mode FROM controller_modes').map((r) => [r.controller, r.mode]));
@@ -20,7 +29,7 @@ function engineOf(m) {
     .map((r) => ({ controller: r.controller, n: Number(r.n) }));
   const config = reconcilerConfig();
   const configured = Object.fromEntries(CONTROLLER_NAMES.map((name) => [name, configuredMode(name, config)]));
-  return { leader: leader ? { pid: leader.pid, epoch: leader.epoch, heartbeatAt: leader.heartbeat_at, rev: leader.rev } : null, modes, configured, safe, failingQueue };
+  return { leader: leader ? { pid: leader.pid, epoch: leader.epoch, heartbeatAt: leader.heartbeat_at, rev: leader.rev } : null, modes, configured, safe, failingQueue, ...startsOf(m) };
 }
 
 function supervisorOf(m) {

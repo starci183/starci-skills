@@ -3,6 +3,10 @@
 // `policy`) and the numbers of modules/reconciler/debug-digest.yaml (`n`); it reads no store, runs no child and never decides a
 // repair. A problem carries a `code` and its `params`; scripts/reconciler/debug-digest-render.mjs words it in the owner's language.
 import { byCodeUnit } from '../lib/list.mjs';
+import { loadStandard, judgeStandard } from './debug-standard.mjs';
+import { classifyAll } from './debug-verdicts.mjs';
+import { roleRows } from './debug-roles.mjs';
+import { loadQuestions, answerQuestions, standingOf } from './debug-questions.mjs';
 
 const MIN = 60_000;
 const LIVE_JOB = new Set(['leased', 'running', 'answering', 'reported', 'deciding', 'effect_unknown']);
@@ -192,7 +196,7 @@ function workflowView(workflow, ctx) {
       .sort((a, b) => b.tokens - a.tokens),
     incidents: workflow.incidents, decisions: workflow.decisions };
   const failed = view.statusError === null ? [] : [problem('workflow', view.openWork + 1, `status-${view.id}`, 'status-unreadable', { name: view.name, error: view.statusError })];
-  return { ...view, problems: [...kernelProblems(view, ctx.n), ...stopProblems(view), ...failed] };
+  return { ...view, problems: [...kernelProblems(view, ctx.n), ...stopProblems(view), ...failed].map((p) => ({ ...p, workflowId: view.id })) };
 }
 
 /** Reservations live for a job that is not running, a Supervisor job that ended, or a seat that is gone. */
@@ -214,14 +218,26 @@ function admissionProblems(section) {
     { provider: r.provider, id: r.id.slice(0, 8), state: r.state, owner: r.jobId ?? r.seat ?? 'no job', min: minutes(r.ageMs) }, r));
 }
 
-/** The digest of one snapshot: sections plus the problems ordered by how much work each blocks. */
-export function analyze(snapshot, policy, n) {
+/** A snapshot workflow with the ledger rows the standard reads; a workflow collected without them has none. */
+const withRows = (w) => ({ ...w, attempts: w.attempts ?? [], events: w.events ?? [] });
+
+let loaded = null;
+/** The declared documents the verdicts are judged by, read once: the operating standard and the debug questions. */
+const declared = () => (loaded ??= { standard: loadStandard(), questions: loadQuestions() });
+
+/** The digest of one snapshot: sections, the operating-standard answers, the verdict of every role, and the problems (departures only) ordered by how much work each blocks. */
+export function analyze(snapshot, policy, n, docs = declared()) {
   const ctx = { snapshot, n, now: snapshot.now, index: policyIndex(policy) };
   const reconciler = reconcilerSection(ctx);
   const supervisor = supervisorSection(ctx);
   const workflows = snapshot.workflows.map((w) => workflowView(w, ctx));
   const admission = admissionSection(ctx);
-  const problems = [...reconcilerProblems(reconciler, n), ...supervisorProblems(supervisor, n), ...workflows.flatMap((w) => w.problems), ...admissionProblems(admission)]
-    .sort((a, b) => b.blocks - a.blocks || byCodeUnit(a.key, b.key));
-  return { schema: 'starci/debug-digest@1', at: snapshot.now, ok: problems.length === 0, reconciler, supervisor, workflows, admission, problems };
+  const legacy = [...reconcilerProblems(reconciler, n), ...supervisorProblems(supervisor, n), ...workflows.flatMap((w) => w.problems), ...admissionProblems(admission)];
+  const views = workflows.map((view, i) => ({ ...view, source: withRows(snapshot.workflows[i]) }));
+  const standard = judgeStandard(docs.standard, { now: snapshot.now, n, reconciler, supervisor, admission }, views);
+  const verdicts = classifyAll({ n, defs: docs.standard, standard, views, registry: snapshot.registry ?? [], problems: legacy });
+  const rows = roleRows({ bugs: verdicts.bugs, happy: verdicts.happy, views });
+  const digest = { schema: 'starci/debug-digest@2', at: snapshot.now, ok: verdicts.bugs.length === 0, reconciler, supervisor, workflows, admission, standard, roles: rows, problems: verdicts.bugs };
+  const debug = { standing: standingOf(snapshot, n), questions: answerQuestions(docs.questions, { ...digest, bugs: verdicts.bugs }, snapshot, n) };
+  return { ...digest, debug };
 }

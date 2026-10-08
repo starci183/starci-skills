@@ -944,7 +944,7 @@ _starci() {
         connect:telegram) COMPREPLY=( $(compgen -W "--discover-chat --ledger --repo --workflow --dispatch --json --cwd --quiet --help --edition" -- "$cur") );;
         connect:telegram-media) COMPREPLY=( $(compgen -W "--ledger --repo --workflow --job --attempt --op --verdict --dispatch --json --cwd --quiet --help --edition" -- "$cur") );;
         connect:tunnel) COMPREPLY=( $(compgen -W "--port --fast --json --cwd --quiet --help --edition" -- "$cur") );;
-        debug:digest) COMPREPLY=( $(compgen -W "--repo --workflow --child-timeout --json --cwd --quiet --help --edition" -- "$cur") );;
+        debug:digest) COMPREPLY=( $(compgen -W "--repo --workflow --questions --child-timeout --json --cwd --quiet --help --edition" -- "$cur") );;
         debug:run) COMPREPLY=( $(compgen -W "--repo --since-hours --child-timeout --token-window --token-spike --json --cwd --quiet --help --edition" -- "$cur") );;
         docker:build) COMPREPLY=( $(compgen -W "--tag --no-cache --json --cwd --quiet --help --edition" -- "$cur") );;
         docker:down) COMPREPLY=( $(compgen -W "--env --volumes --json --cwd --quiet --help --edition" -- "$cur") );;

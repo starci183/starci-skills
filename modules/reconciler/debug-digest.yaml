@@ -11,3 +11,9 @@ revDriftBlocks: 3
 staleGateBlocks: 5
 kernelIdleWakeMs: {ref: "modules/reconciler/job.yaml#decisionDueMs"}
 decisionDueMs: {ref: "modules/reconciler/job.yaml#decisionDueMs"}
+# startLoopMin: failed launches of one step (a Kernel start, a dispatch) since the last success that make a retry loop rather than a retry.
+# bootJitterMs: two engine starts whose boot instants differ by less than this name one host boot.
+# blocksDeparture: the weight of a departure from the operating standard when its workflow has no open work to add to it.
+startLoopMin: 5
+bootJitterMs: 120000
+blocksDeparture: 2

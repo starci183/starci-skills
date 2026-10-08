@@ -19,6 +19,7 @@ import { requireObservationFresh } from '../../mechanism-observation.mjs';
 import { isMeasurementLeg, measurementSplit } from '../../verify-failure.mjs';
 import { citeRecords } from '../../../work/validate/work-citations.mjs';
 import { recordWhy } from '../../why-record.mjs';
+import { checkedInOf } from './settle-checked-in.mjs';
 import { readEnv } from '../../../lib/env.mjs';
 
 // The job_transitions walk from the job's current status to its settled one. A pass settles only a job whose worker
@@ -385,6 +386,7 @@ function recordCutEvents(ctx, accepted) {
 /** The settlement transaction: rows, the `op-settled` event, follow-ups, why, the owner's approval and the cut events. */
 function writeSettle(ctx, locked, accepted) {
   const { db, ledger, st, jobId, verdict } = ctx;
+  const checkedIn = checkedInOf(db, st.settledAttemptId);
   ledger.transaction(() => {
     const { payload, result, status } = accepted;
     const job = st.job;
@@ -392,7 +394,7 @@ function writeSettle(ctx, locked, accepted) {
     closeSettledWork(ctx, accepted);
     ledger.appendEvent({
       workflowId: job.workflow_id, entityType: 'job', entityId: jobId, attemptId: st.settledAttemptId,
-      kind: 'op-settled', payload: { verdict, status, report: st.filedReport, reportFiled: st.reportFiled, reportOutcome: st.reportOutcome, checkEvidence: st.checkEvidence, claimOverruled: st.claimOverruled, awaitingOwner: st.awaitingOwner, leasesReleased: st.released, reportsConsumed: st.reportsConsumed,
+      kind: 'op-settled', payload: { verdict, status, report: st.filedReport, reportFiled: st.reportFiled, reportOutcome: st.reportOutcome, checkEvidence: st.checkEvidence, claimOverruled: st.claimOverruled, awaitingOwner: st.awaitingOwner, leasesReleased: st.released, reportsConsumed: st.reportsConsumed, ...(checkedIn ? { checkedIn } : {}),
         ...(st.citations ? { citations: { cited: st.citations.cited, unresolved: st.citations.unresolved.length } } : {}), ...(result.cutSet ? { cutSet: result.cutSet } : {}), ...(result.peerBlocked ? { peerBlocked: result.peerBlocked } : {}) },
     });
     followUpAfterSettle(ctx, accepted);
