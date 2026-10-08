@@ -13,8 +13,8 @@ function usdPerMTok(model, prices) {
   return Number.isFinite(Number(price.input)) && Number.isFinite(Number(price.output)) ? total : null;
 }
 
-/** The cheapest priced tier member meeting all smoke control-plane role floors, with its tier effort. */
-export function noopAgent({ runtimes = runtimeProfile(), prices = loadPrices(), settings = tierSettings() } = {}) {
+/** The cheapest priced tier member meeting all smoke control-plane role floors, with its tier effort; `provider` limits the pick to that provider's members. */
+export function noopAgent({ runtimes = runtimeProfile(), prices = loadPrices(), settings = tierSettings(), provider = null } = {}) {
   const policy = runtimes?.allocation?.admission, order = policy?.qualityOrder ?? [];
   const floors = ['kernel', 'supervisor', 'worker'].map((role) => order.indexOf(admissionQualityFloor(role, null, policy)));
   if (floors.some((rank) => rank < 0)) return { error: 'smoke role quality floors are not configured' };
@@ -23,7 +23,7 @@ export function noopAgent({ runtimes = runtimeProfile(), prices = loadPrices(), 
   for (const [tier, chain] of Object.entries(settings.tiers)) {
     for (const member of chain) {
       const pool = poolOf(member.agent), cost = usdPerMTok(member.model, prices);
-      if (!pool || cost === null || order.indexOf(runtimes?.models?.[member.model]?.tier) < minimum) continue;
+      if ((provider && member.agent !== provider) || !pool || cost === null || order.indexOf(runtimes?.models?.[member.model]?.tier) < minimum) continue;
       found.push({ provider: member.agent, model: member.model, effort: member.effort ?? null, pool, tier, usdPerMTok: cost });
     }
   }

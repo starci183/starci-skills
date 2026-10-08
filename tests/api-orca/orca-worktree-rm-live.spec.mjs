@@ -1,10 +1,15 @@
-// The real `orca worktree rm` against node_modules junctions (lane ORCAWT step 2, measured 2026-10-01): a throwaway repo
-// stands for the main checkout, with real files in node_modules and packages/node_modules; Orca creates a worktree of
-// it; the worktree's node_modules and packages/node_modules are junctions into the fake main; `orca worktree rm --force`
-// removes the worktree WITHOUT the runtime unlinking anything first; the fake main must be byte-identical (file list and
-// sha256 of every file). Then the runtime's own path (scripts/machine/worktree-orca.mjs removeOrcaWorktree: links unlinked
-// first, then Orca) is run the same way. Measured result: identical - Orca does not walk junctions; the runtime still
-// unlinks every link first.
+// The real `orca worktree rm` against node_modules junctions (lane ORCAWT step 2, 2026-10-01; lane LIVEORCA, 2026-10-09): a
+// throwaway repo stands for the main checkout, with real files in node_modules and packages/node_modules; Orca creates a
+// worktree of it; the worktree's node_modules and packages/node_modules are junctions into the fake main. Three things are
+// shown, in this order:
+//   1. the runtime's removal call (scripts/api/orca/worktree-rm.mjs worktreeRm) refuses that tree with worktree-links-present
+//      and never asks Orca: the fake main stays byte-identical and the tree stays. This is the protective invariant.
+//   2. the MEASUREMENT of the third-party tool: Orca asked to remove the same linked tree (measureWorktreeRm) either walks the
+//      junctions and deletes what they lead to or does not. That is a property of the installed Orca build, not of the runtime;
+//      the spec prints it (MEASURED-ORCA-WORKTREE-RM, with the Orca app version) and asserts nothing about it. Orca build
+//      1.4.221 walks them (registry entry orca-worktree-rm-walks-junctions-measured).
+//   3. the runtime's own removal (scripts/machine/worktree-orca.mjs removeOrcaWorktree: links unlinked first, then Orca) over a
+//      fresh linked tree, against the real Orca: the fake main is byte-identical.
 //
 // The probe talks to the LIVE Orca and registers a repository there that the CLI cannot remove, so a normal `npm test`
 // never runs it: it runs only on an explicit opt-in, STARCI_ORCA_LIVE=1, or STARCI_REQUIRE_ORCA_LIVE=1 (CI and the
@@ -24,7 +29,7 @@ import { status } from '../../scripts/api/orca/status.mjs';
 import { repoAdd } from '../../scripts/api/orca/repo-add.mjs';
 import { projectSetupDelete } from '../../scripts/api/orca/project-setup-delete.mjs';
 import { worktreeCreate } from '../../scripts/api/orca/worktree-create.mjs';
-import { worktreeRm } from '../../scripts/api/orca/worktree-rm.mjs';
+import { worktreeRm, measureWorktreeRm, LINKS_PRESENT } from '../../scripts/api/orca/worktree-rm.mjs';
 import { removeOrcaWorktree } from '../../scripts/machine/worktree-orca.mjs';
 
 export const REQUIRE_ORCA_LIVE = process.env.STARCI_REQUIRE_ORCA_LIVE === '1';
@@ -70,6 +75,17 @@ function picture(root) {
   walk(root);
   return out;
 }
+/** The real files of node_modules and packages/node_modules in the fake main (written again after a measurement that may have deleted them). */
+function fillModules() {
+  for (let i = 1; i <= 5; i += 1) {
+    fs.mkdirSync(path.join(PROBE, 'node_modules', 'left-pad', 'lib'), { recursive: true });
+    fs.mkdirSync(path.join(PROBE, 'packages', 'node_modules', '@x', 'y'), { recursive: true });
+    fs.writeFileSync(path.join(PROBE, 'node_modules', 'left-pad', 'lib', `f${i}.js`), `module ${i}
+`);
+    fs.writeFileSync(path.join(PROBE, 'packages', 'node_modules', '@x', 'y', `g${i}.js`), `pk ${i}
+`);
+  }
+}
 /** The throwaway "main": tracked files, real node_modules and packages/node_modules content, registered in Orca. Its repo id. */
 function fakeMain() {
   if (!fs.existsSync(path.join(PROBE, '.git'))) {
@@ -83,12 +99,7 @@ function fakeMain() {
     git(PROBE, 'add', '-A');
     git(PROBE, 'commit', '-q', '-m', 'init');
   }
-  for (let i = 1; i <= 5; i += 1) {
-    fs.mkdirSync(path.join(PROBE, 'node_modules', 'left-pad', 'lib'), { recursive: true });
-    fs.mkdirSync(path.join(PROBE, 'packages', 'node_modules', '@x', 'y'), { recursive: true });
-    fs.writeFileSync(path.join(PROBE, 'node_modules', 'left-pad', 'lib', `f${i}.js`), `module ${i}\n`);
-    fs.writeFileSync(path.join(PROBE, 'packages', 'node_modules', '@x', 'y', `g${i}.js`), `pk ${i}\n`);
-  }
+  fillModules();
   const added = repoAdd({ path: posix(PROBE) });
   assert.ok(added.ok, `orca repo add: ${added.error}`);
   return added.repoId;
@@ -107,7 +118,7 @@ function linkedTree(name) {
   return made.worktree;
 }
 
-test('orca worktree rm with junctions into the main checkout leaves it byte-identical; so does the runtime release', { skip: gate.skip, timeout: 600_000 }, (t) => {
+test('a linked Orca worktree is refused by the runtime removal call, Orca removal of it is measured, and the runtime release leaves the main checkout byte-identical', { skip: gate.skip, timeout: 600_000 }, (t) => {
   if (gate.required) assert.fail(gate.required);
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-orca-rm-probe-'));
   t.after(() => fs.rmSync(home, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
@@ -116,13 +127,23 @@ test('orca worktree rm with junctions into the main checkout leaves it byte-iden
   t.after(() => { const gone = projectSetupDelete({ setup: repoId }); assert.ok(gone.ok, `orca project setup-delete ${repoId}: ${gone.error}`); });
   const before = picture(PROBE);
   assert.equal(Object.keys(before).filter((f) => f.includes('node_modules')).length, 10, 'real files in both node_modules');
-  // 1. Orca alone, links still in place: the measurement.
-  const raw = linkedTree(`orcawt-probe-raw-${crypto.randomBytes(3).toString('hex')}`);
-  const rm = worktreeRm({ worktree: `id:${raw.id}`, force: true });
-  assert.ok(rm.ok, `orca worktree rm: ${rm.error}`);
-  assert.ok(!fs.existsSync(raw.path), 'the worktree is gone');
-  assert.deepEqual(picture(PROBE), before, 'Orca did not walk the junctions: the fake main is byte-identical');
-  // 2. The runtime's release: links unlinked first, then Orca.
+  // 1. The runtime's removal call over a linked tree: refused, Orca not asked.
+  const guarded = linkedTree(`orcawt-probe-guard-${crypto.randomBytes(3).toString('hex')}`);
+  const refused = worktreeRm({ worktree: `id:${guarded.id}`, force: true });
+  assert.deepEqual([refused.ok, refused.removed, refused.errorCode], [false, false, LINKS_PRESENT], JSON.stringify(refused));
+  assert.ok(fs.existsSync(guarded.path), 'the linked tree is kept');
+  assert.deepEqual(picture(PROBE), before, 'a refused removal leaves the fake main byte-identical');
+  // 2. The measurement of Orca itself over that same tree: a fact about the installed build, printed, not promised.
+  const measured = measureWorktreeRm({ worktree: `id:${guarded.id}`, force: true });
+  assert.ok(measured.ok, `orca worktree rm (measurement): ${measured.error}`);
+  const after = picture(PROBE);
+  const lost = Object.keys(before).filter((f) => !(f in after));
+  const walksJunctions = lost.length > 0;
+  console.log(`MEASURED-ORCA-WORKTREE-RM ${JSON.stringify({ orcaAppVersion: status().appVersion, walksJunctions, filesLost: lost.length, lost: lost.slice(0, 3) })}`);
+  assert.ok(!fs.existsSync(guarded.path), 'Orca removed the tree');
+  fillModules();
+  assert.deepEqual(picture(PROBE), before, 'the fake main is whole again');
+  // 3. The runtime's release: links unlinked first, then Orca.
   const env = { ...process.env, STARCI_TEST_MACHINE_FILE: path.join(path.dirname(PROBE), `machine-${process.pid}.sqlite`) };
   const tree = linkedTree(`orcawt-probe-rt-${crypto.randomBytes(3).toString('hex')}`);
   const out = removeOrcaWorktree({ repoRoot: PROBE, orcaId: tree.id, dir: tree.path, env });

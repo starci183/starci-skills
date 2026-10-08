@@ -80,6 +80,7 @@ internal:
   - {path: scripts/checks/check-providers.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
   - {path: scripts/checks/check-schema-catalog.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
   - {path: scripts/checks/check-worktree-add.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
+  - {path: scripts/checks/check-worktree-rm.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
   - {path: scripts/cli/main.mjs, why: "Runtime-side catalog dispatcher", usedBy: [packages/cli/src/main.mjs]}
   - {path: scripts/context/pack.mjs, why: "Operation context-pack builder", usedBy: [scripts/kernel/dispatch-op.mjs]}
   - {path: scripts/housekeeping/blob-gc.mjs, why: "Blob garbage-collection controller", usedBy: [scripts/housekeeping/hk-ledger.mjs]}

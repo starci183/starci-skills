@@ -14,6 +14,7 @@ import { withMachine } from '../../engine/db/machine.mjs';
 import { workflowWorktreeSpec, ensureWorkflowWorktree, registerWorkflowWorktree, setCheckpoint, opWorktreeArgs, sideOf, canDispatchConcurrently, workflowSideWait, releaseWorkflowWorktree, markReleasePending, workflowAppRepo, workflowWorktreePromptRules, WORKFLOW_SIDE_BUSY } from '../../scripts/kernel/workflow-worktree.mjs';
 import { createScratchWorktree } from '../../scripts/machine/worktree-git.mjs';
 import { createOrcaWorktree } from '../../scripts/machine/worktree-orca.mjs';
+import { worktreeRm, LINKS_PRESENT } from '../../scripts/api/orca/worktree-rm.mjs';
 import { isPendingRow } from '../../scripts/machine/worktree-registry.mjs';
 import { gcWorktrees } from '../../scripts/machine/worktrees.mjs';
 import { workflowWorktreeAt, workflowWorktreeOf } from '../../scripts/machine/workflow-tree.mjs';
@@ -191,6 +192,23 @@ test('a refused orca worktree rm keeps the row live with its error; a removal th
   const bad = releaseWorkflowWorktree({ env, orca: hostile }, 'wf-stuck');
   assert.deepEqual([bad.ok, bad.reason, bad.fatal], [false, 'main-checkout-damaged', true]);
   assert.match(bad.damage.join(' '), /tracked file deleted: be\/src\/main\.ts/);
+});
+
+test('a link that appears after the link step is refused by the Orca removal call itself: the tree stays and its target is untouched', (t) => {
+  const { app, env, orca } = fixture(t);
+  const ctx = { env, orca };
+  const rec = ensureWorkflowWorktree(ctx, { workflowId: 'wf-late', appRepo: app }).record;
+  const planting = { ...orca, remove: (a) => {
+    fs.symlinkSync(path.join(app, 'node_modules'), path.join(rec.path, 'node_modules'), LINK);
+    return worktreeRm(a);
+  } };
+  const before = picture(app);
+  const r = releaseWorkflowWorktree({ env, orca: planting }, 'wf-late');
+  assert.deepEqual([r.ok, r.reason], [false, LINKS_PRESENT]);
+  assert.ok(!orca.calls.some((c) => c[0] === 'remove'), 'Orca was never asked');
+  assert.ok(fs.existsSync(rec.path), 'the tree is kept');
+  assert.deepEqual(picture(app), before, 'the main checkout is byte-identical');
+  assert.equal(rows(env).find((x) => x.orca_id === rec.orcaWorktreeId).removed_at, null, 'still live: the GC retries');
 });
 
 test('sides: same side waits, across sides runs together, both-sides runs alone, Work-only never blocks', () => {
