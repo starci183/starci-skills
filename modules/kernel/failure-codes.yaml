@@ -9192,21 +9192,11 @@ link-stuck:
 worktree-links-present:
   title: "Orca was not asked to remove a tree that still holds a link"
   title_vi: "Không nhờ Orca gỡ cây làm việc còn chứa liên kết"
-  meaning_vi: "Orca đi xuyên qua junction và xoá cả nội dung mà junction trỏ tới, nên lời gọi worktree rm từ chối trước khi hỏi Orca khi cây còn một liên kết hoặc selector không chỉ ra thư mục nào. Cây được giữ nguyên."
+  meaning_vi: "Orca đi xuyên qua junction và xoá cả nội dung mà junction trỏ tới, nên runtime từ chối trước khi hỏi Orca khi cây còn một liên kết hoặc selector không chỉ ra thư mục nào. Cây được giữ nguyên."
   causes_vi:
     - "Một liên kết xuất hiện lại trong cây sau lượt gỡ liên kết"
     - "Selector của worktree không chứa đường dẫn thư mục"
   nextStep_vi: "Không có gì bị xoá. Gỡ liên kết như một liên kết (starci machine worktrees gc làm việc này) rồi thử lại; không chạy orca worktree rm bằng tay."
-  owner: runtime-core
-  kind: runtime-fault
-worktree-measure-refused:
-  title: "The Orca removal measurement was refused"
-  title_vi: "Phép đo việc Orca gỡ cây làm việc bị từ chối"
-  meaning_vi: "Phép đo cho Orca gỡ một cây còn liên kết chỉ chạy trên cây thử nghiệm có ít nhất một liên kết và mọi liên kết trỏ vào thư mục tạm; cây này không thoả điều kiện nên Orca không được hỏi."
-  causes_vi:
-    - "Cây không chứa liên kết nào để đo"
-    - "Một liên kết trỏ ra ngoài thư mục tạm"
-  nextStep_vi: "Không có gì bị xoá. Phép đo chỉ dùng cho spec tests/api-orca/orca-worktree-rm-live.spec.mjs trên cây thử nghiệm của chính nó."
   owner: runtime-core
   kind: runtime-fault
 live-not-on-main:

@@ -78,7 +78,7 @@ import { conflictHint, conflictPreflight, pickConflicts } from './land-conflicts
 import { makeTempDir } from '../api/fs/make-temp-dir.mjs';
 export { specsTouching, invariantRootsOf } from './land-specs.mjs'; export { conflictHunks } from './land-conflicts.mjs'; export { conflictPreflight };
 export { specsRedOnMainDecision } from './land-record.mjs';
-export const TREE_CHECKS = Object.freeze(['scripts/hfs/sync-runtime.mjs', 'scripts/checks/check-module-yaml.mjs', 'scripts/checks/check-contract-cites.mjs', 'scripts/checks/check-cli-parity.mjs', 'scripts/checks/check-worktree-add.mjs', 'scripts/checks/check-worktree-rm.mjs']);
+export const TREE_CHECKS = Object.freeze(['scripts/hfs/sync-runtime.mjs', 'scripts/checks/check-module-yaml.mjs', 'scripts/checks/check-contract-cites.mjs', 'scripts/checks/check-cli-parity.mjs', 'scripts/checks/check-worktree-add.mjs']);
 const MAX_MAIN_RETRIES = 3;
 export const LAND_WAIT_MS = allocationMs('landGate.waitMs');
 /** The spec run's timeout: a base plus a share per spec, so a 70-spec engine change is not cut off under load. */

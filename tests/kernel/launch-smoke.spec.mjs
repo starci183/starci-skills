@@ -504,7 +504,8 @@ test('the no-op agent is the cheapest priced tier member meeting the real role f
   const prices = { models: { big: { input: 4, output: 20 }, mid: { input: 2, output: 10 }, small: { input: 0.1, output: 0.5 }, unpriced: { input: null, output: null } } };
   assert.deepEqual(noopAgent({ runtimes, prices, settings }), { provider: 'codex', model: 'mid', effort: 'high', pool: 'b', tier: 'high', usdPerMTok: 12 });
   assert.equal(noopAgent({ runtimes, prices, settings, provider: 'claude' }).model, 'big', 'a provider limit takes the cheapest member of that provider');
-  assert.match(noopAgent({ runtimes, prices, settings, provider: 'devin' }).error, /no tier member/);
+  assert.equal(noopAgent({ runtimes, prices, settings, provider: 'devin' }).model, 'unpriced', 'a provider limit counts an unpriced member of that provider');
+  assert.match(noopAgent({ runtimes, prices, settings, provider: 'gemini' }).error, /no tier member/);
   const onlyUnpriced = { ...settings, tiers: { low: [{ agent: 'devin', model: 'unpriced' }] } };
   assert.match(noopAgent({ runtimes, prices, settings: onlyUnpriced }).error, /no tier member of modules\/models\/tiers\.yaml is priced/);
   const raised = structuredClone(runtimes);

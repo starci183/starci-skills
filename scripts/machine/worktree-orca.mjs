@@ -7,8 +7,8 @@
 // row by Orca's worktree id (orca_id) and the path Orca reported. reserveOrcaSlot takes the per-repo cap slot BEFORE Orca
 // creates anything (a pending row); bindOrcaWorktree turns it into the real row. removeOrcaWorktree removes every link in
 // the tree as a link and asserts zero (scripts/api/fs/safe-remove.mjs removeLinksUnder), then `orca worktree rm`
-// (scripts/api/orca/worktree-rm.mjs, which refuses a tree that still holds a link; this module is its one caller: check-worktree-rm), the
-// main checkout asserted untouched. Never git's worktree removal, never a raw delete.
+// (scripts/api/orca/worktree-rm.mjs, handed only a tree without a link: worktree-links-present; check-worktree-add keeps this module its one
+// caller), the main checkout asserted untouched. Never git's worktree removal, never a raw delete.
 // The Orca calls are scripts/api/orca/ call files, bundled as orcaWorktreeClient (the `orca` seam a spec fakes:
 // tests/helpers/fake-orca-worktrees.mjs); the git ones are scripts/api/git/ call files composed in worktree-git.mjs.
 import fs from 'node:fs';
@@ -19,16 +19,31 @@ import { posixPath } from '../lib/path-key.mjs';
 import { worktreeSettings, withRegistry, claimWorktree, pendingPathOf, releaseOrcaSlot, sameTree, isGone, markRemoved } from './worktree-registry.mjs';
 import { mainRootOf, registeredAt, preserveWork, mainCheckoutGuard, mainCheckoutDamage, deleteScratchBranch } from './worktree-git.mjs';
 import { worktreeCreate } from '../api/orca/worktree-create.mjs';
-import { worktreeRm, LINKS_PRESENT } from '../api/orca/worktree-rm.mjs';
+import { worktreeRm } from '../api/orca/worktree-rm.mjs';
 import { worktreePs } from '../api/orca/worktree-ps.mjs';
 import { repoAdd } from '../api/orca/repo-add.mjs';
 import { removeLinksUnder } from '../api/fs/remove-links-under.mjs';
+import { linksUnder } from '../api/fs/links-under.mjs';
+
+/**
+ * Orca's removal of the worktree `id:<repoId>::<dir>`, asked only while the tree holds no link: Orca walks a junction and deletes
+ * what it leads to (tests/api-orca/orca-worktree-rm-live.spec.mjs measures it). A tree with a link, or a selector that names no
+ * directory, is refused {ok:false, errorCode:'worktree-links-present'} and Orca is not asked.
+ */
+function removeLinkFree({ worktree, force = false }) {
+  const at = String(worktree).indexOf('::');
+  const dir = at >= 0 ? String(worktree).slice(at + 2) : null;
+  const links = dir && fs.existsSync(dir) ? linksUnder(dir) : [];
+  if (dir && links.length === 0) return worktreeRm({ worktree, force });
+  const error = dir ? `${dir} still holds ${links.length} link(s), first ${links[0]}` : `${worktree} names no directory to check for links`;
+  return { ok: false, removed: false, outcome: 'refused', errorCode: 'worktree-links-present', error, hostUnavailable: false };
+}
 
 /**
  * The Orca worktree calls the runtime makes, as one client object: createOrcaWorktree and removeOrcaWorktree take it as
  * their `orca` seam. ps (worktree-ps.mjs) is the worktree GC's source of truth (worktrees.mjs gcWorktrees).
  */
-export const orcaWorktreeClient = Object.freeze({ create: worktreeCreate, remove: worktreeRm, ps: worktreePs, addRepo: repoAdd });
+export const orcaWorktreeClient = Object.freeze({ create: worktreeCreate, remove: removeLinkFree, ps: worktreePs, addRepo: repoAdd });
 
 /**
  * Take the per-repo cap slot of an Orca worktree about to be created (a pending row). kind: one of ORCA_KINDS; slotKey:
@@ -138,9 +153,13 @@ function removeOrcaTree(out, target, { home, orcaId, git, orca, env }) {
       return { ...out, reason: 'main-checkout-damaged', fatal: true, damage };
     }
   }
+  if (rm?.errorCode === 'worktree-links-present') {
+    markRemoved(target, { error: `worktree-links-present: ${String(rm.error).slice(0, 200)}`, env });
+    return { ...out, reason: 'worktree-links-present', detail: String(rm.error).slice(0, 300) };
+  }
   if (!rm?.ok) {
     markRemoved(target, { error: `orca worktree rm: ${String(rm?.error ?? rm?.errorCode ?? 'refused').slice(0, 200)}`, env });
-    return { ...out, reason: rm?.errorCode === LINKS_PRESENT ? LINKS_PRESENT : 'orca-worktree-rm-failed', detail: String(rm?.error ?? rm?.errorCode ?? '').slice(0, 300), hostUnavailable: rm?.hostUnavailable === true };
+    return { ...out, reason: 'orca-worktree-rm-failed', detail: String(rm?.error ?? rm?.errorCode ?? '').slice(0, 300), hostUnavailable: rm?.hostUnavailable === true };
   }
   return null;
 }

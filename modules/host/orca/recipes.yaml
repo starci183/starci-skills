@@ -69,7 +69,7 @@ recipes:
     signal: 'Agent connection lost: agent child exited'
     note: 'A dead child never drains queued sends. The fresh agent must survey the tree for partial work — markers, not memory, carry state.'
 cliGotchas:
-  - 'orca worktree rm removes the worktree from Orca AND git — it deletes files on disk; never use it to "unregister" a path that must be kept.'
+  - 'orca worktree rm removes the worktree from Orca AND git — it deletes files on disk; it walks junctions and deletes what they lead to, and it never runs outside the runtime worktree API; never use it to "unregister" a path that must be kept.'
   - 'terminal read --screen shows tail only; idle detection uses lastOutputAt freshness, not scrollback.'
 forbiddenSequences:
   - chat-runs-the-kernel-loop
