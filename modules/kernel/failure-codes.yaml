@@ -16499,3 +16499,14 @@ gate-reraise-without-evidence:
   nextStep_vi: "Xử lý nguyên nhân trong workflow (thử lại, lập kế hoạch lại hoặc quyết định), hoặc dựng lại với --evidence mới."
   owner: op-retry
   kind: verb-refusal
+
+SONAR_BASELINE_STALE:
+  title: "A sonar-rules baseline entry outlived its finding"
+  title_vi: "Một mục baseline của sonar-rules còn lại khi phát hiện đã hết"
+  meaning_vi: "Section sonar-rules của modules/kernel/allowlist.yaml liệt kê một phát hiện Sonar (luật, tệp, dấu vân tay của nút bị gắn cờ) mà mã hiện tại không còn mắc. Baseline chỉ được thu nhỏ: commit sửa phát hiện phải xóa luôn mục của nó, nếu không kiểm tra sonar-rules đỏ."
+  causes_vi:
+    - "Commit sửa phát hiện nhưng không xóa mục tương ứng trong section sonar-rules"
+    - "Mã được viết lại hoặc xóa nên phát hiện biến mất cùng nút bị gắn cờ"
+  nextStep_vi: "Người sửa chạy starci runtime check --only sonar-rules -- --prune để xóa các mục đã hết phát hiện, rồi đưa thay đổi allowlist vào cùng commit."
+  owner: supervisor
+  kind: check-finding

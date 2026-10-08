@@ -3,8 +3,8 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { checkSonarRules, CODE_EMPTY, CODE_STALE } from '../../scripts/checks/check-sonar-rules.mjs';
-import { BASELINE_FILE } from '../../scripts/gates/sonar-rules-baseline.mjs';
+import { checkSonarRules, CODE_STALE } from '../../scripts/checks/check-sonar-rules.mjs';
+import { readBaseline } from '../../scripts/gates/sonar-rules-baseline.mjs';
 import { mkdtemp } from '../helpers/tmpdir.mjs';
 
 const SCRIPT = path.resolve(import.meta.dirname, '..', '..', 'scripts', 'checks', 'check-sonar-rules.mjs');
@@ -50,7 +50,7 @@ test('files outside the Sonar scope are not judged', async (t) => {
 test('--init writes the baseline of today\'s findings; a listed finding is green, a new one red, a fixed one stale', async (t) => {
   const root = checkout(t, { 'src/old.mjs': SORTS });
   assert.equal(run(root, '--init').status, 0);
-  assert.ok(fs.existsSync(path.join(root, BASELINE_FILE)));
+  assert.equal(readBaseline(root).entries.length, 1);
   assert.deepEqual((({ ok, listed }) => ({ ok, listed }))(await checkSonarRules({ root })), { ok: true, listed: 1 });
 
   put(root, 'src/new.mjs', SORTS);
@@ -67,24 +67,21 @@ test('--init writes the baseline of today\'s findings; a listed finding is green
   assert.match(fixed.findings[0].message, /src\/old\.mjs: the baseline lists S2871 .*--prune/);
 });
 
-test('--init never rewrites an existing baseline, and --prune only deletes entries (the file goes with the last)', async (t) => {
+test('--init never rewrites an existing section, and --prune only deletes entries (the section ends as [], which --init refuses to refill)', async (t) => {
   const root = checkout(t, { 'src/old.mjs': SORTS });
   run(root, '--init');
   put(root, 'src/new.mjs', SORTS);
   run(root, '--init');
-  assert.equal(JSON.parse(fs.readFileSync(path.join(root, BASELINE_FILE), 'utf8')).entries.length, 1, 'a new finding is not added to a baseline');
+  assert.equal(readBaseline(root).entries.length, 1, 'a new finding is not added to a baseline');
   fs.rmSync(path.join(root, 'src', 'new.mjs'));
   put(root, 'src/old.mjs', CLEAN);
   assert.equal(run(root, '--prune').status, 0);
-  assert.ok(!fs.existsSync(path.join(root, BASELINE_FILE)), 'the baseline is deleted when empty');
+  assert.deepEqual(readBaseline(root), { exists: true, entries: [] });
   assert.equal((await checkSonarRules({ root })).ok, true);
-});
-
-test('a baseline file that lists nothing is itself a finding', async (t) => {
-  const root = checkout(t, { 'src/ok.mjs': CLEAN });
-  put(root, BASELINE_FILE, '{"version":1,"entries":[]}\n');
-  const result = await checkSonarRules({ root });
-  assert.deepEqual(result.findings.map((f) => f.code), [CODE_EMPTY]);
+  put(root, 'src/again.mjs', SORTS);
+  run(root, '--init');
+  assert.equal(readBaseline(root).entries.length, 0, 'an emptied baseline is not regenerated from new findings');
+  assert.equal((await checkSonarRules({ root })).ok, false);
 });
 
 test('--json prints the findings as data', (t) => {

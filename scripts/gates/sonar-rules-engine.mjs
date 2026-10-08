@@ -13,7 +13,7 @@ function offsetOf(lineStarts, line, column) {
 
 function lineStartsOf(source) {
   const starts = [0];
-  for (let i = 0; i < source.length; i += 1) if (source.charCodeAt(i) === 10) starts.push(i + 1);
+  for (let i = 0; i < source.length; i += 1) if (source.codePointAt(i) === 10) starts.push(i + 1);
   return starts;
 }
 

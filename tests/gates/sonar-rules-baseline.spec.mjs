@@ -64,16 +64,26 @@ test('a listed cognitive-complexity function may not get worse', (t) => {
   assert.equal(compareToBaseline([scored(21)], entries, all).fresh.length, 1);
 });
 
-test('prune removes stale entries and deletes the file when the last one goes; an empty write deletes it too', (t) => {
+
+const ALLOWLIST = ['schema: starci/allowlist@1', 'not-codes: []', 'export-used: []', ''].join('\n');
+
+test('the section lives in the one allowlist, keeps the other sections, and ends as an empty list', (t) => {
   const root = mkdtemp(t, 'starci-sonar-baseline-');
   const file = path.join(root, BASELINE_FILE);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, ALLOWLIST);
+  assert.deepEqual(readBaseline(root), { exists: false, entries: [] });
   writeBaseline(root, [finding({ text: 'a.sort()' }), finding({ text: 'b.sort()' })]);
+  const written = fs.readFileSync(file, 'utf8');
+  assert.ok(written.startsWith(`${ALLOWLIST}\n# The findings of the sonar-rules self-check`), 'the other sections are kept, the section is appended');
+  assert.match(written, /\nsonar-rules:\n {2}- \{rule: "S2871"/);
   const { entries } = readBaseline(root);
+  assert.equal(entries.length, 2);
+  assert.ok(entries.every((entry) => entry.reason.length > 20 && entry.excerpt), 'every entry carries its reason');
   assert.equal(pruneBaseline(root, [entries[0]]).length, 1);
-  assert.ok(fs.existsSync(file));
+  assert.equal(readBaseline(root).entries.length, 1);
   assert.equal(pruneBaseline(root, readBaseline(root).entries).length, 0);
-  assert.ok(!fs.existsSync(file), 'the baseline is deleted when empty');
-  writeBaseline(root, [finding()]);
-  writeBaseline(root, []);
-  assert.ok(!fs.existsSync(file));
+  assert.deepEqual(readBaseline(root), { exists: true, entries: [] });
+  assert.ok(fs.readFileSync(file, 'utf8').endsWith('\nsonar-rules: []\n'));
+  assert.equal(fs.readFileSync(file, 'utf8').match(/^sonar-rules:/gm).length, 1, 'the section is replaced, never duplicated');
 });

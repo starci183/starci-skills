@@ -5,7 +5,7 @@
 //
 //   starci runtime check --only sonar-rules [-- --json]
 //   starci runtime check --only sonar-rules -- --staged        the staged files only, read from the index (the pre-commit hook)
-//   starci runtime check --only sonar-rules -- --init          write knowledge/sonar-baseline.json when none exists
+//   starci runtime check --only sonar-rules -- --init          write the `sonar-rules` section of modules/kernel/allowlist.yaml, once
 //   starci runtime check --only sonar-rules -- --prune         delete the baseline entries whose finding is gone
 //
 // Output: one `S<id> <file>:<line> <message>` line per finding that is not in the committed baseline, and one
@@ -19,11 +19,9 @@ import { catFile } from '../api/git/cat-file.mjs';
 import { diff } from '../api/git/diff.mjs';
 import { gitOutputOf } from '../lib/git.mjs';
 import { analysed, readSonarScope, scopeFiles } from '../gates/sonar-rules-scope.mjs';
-import { lintSources } from '../gates/sonar-rules-engine.mjs';
-import { BASELINE_FILE, compareToBaseline, pruneBaseline, readBaseline, writeBaseline } from '../gates/sonar-rules-baseline.mjs';
+import { BASELINE_FILE, BASELINE_SECTION, compareToBaseline, pruneBaseline, readBaseline, writeBaseline } from '../gates/sonar-rules-baseline.mjs';
 
 export const CODE_STALE = 'SONAR_BASELINE_STALE';
-export const CODE_EMPTY = 'SONAR_BASELINE_EMPTY';
 const FLAGS = Object.freeze(['--json', '--staged', '--init', '--prune', '--root']);
 const HELP = 'usage: check-sonar-rules [--root <dir>] [--staged] [--init | --prune] [--json]';
 
@@ -65,14 +63,15 @@ export async function checkSonarRules({ root = skillRoot, staged = false, init =
   const scope = readSonarScope(root);
   if (!scope) return { ok: true, skipped: 'no sonar-project.properties: not a source checkout', findings: [], listed: 0, stale: 0, checked: 0 };
   const plan = planOf(root, scope, staged);
+  // ESLint and its plugins are devDependencies: a source checkout has them, an installed runtime has no sonar-project.properties and returned above.
+  const { lintSources } = await import('../gates/sonar-rules-engine.mjs');
   const found = await lintSources(root, sourcesOf(root, plan.files, staged));
   const baseline = readBaseline(root);
   if (init && !baseline.exists) writeBaseline(root, found);
   const { entries } = init && !baseline.exists ? readBaseline(root) : baseline;
   const { fresh, stale, listed } = compareToBaseline(found, entries, plan.covered);
   if (prune && stale.length) pruneBaseline(root, stale);
-  const empty = baseline.exists && !entries.length ? [{ code: CODE_EMPTY, message: `${BASELINE_FILE} lists nothing: delete the file` }] : [];
-  const findings = [...fresh.map(line), ...(prune ? [] : stale.map(staleLine)), ...empty];
+  const findings = [...fresh.map(line), ...(prune ? [] : stale.map(staleLine))];
   return { ok: findings.length === 0, findings, listed: listed.length, stale: stale.length, checked: plan.files.length };
 }
 
@@ -92,7 +91,7 @@ export async function main(argv = process.argv.slice(2)) {
   if (options.help) { console.log(HELP); return 0; }
   if (options.error) { console.error(`check-sonar-rules: ${options.error}\n${HELP}`); return 2; }
   const result = await checkSonarRules(options);
-  const ok = result.skipped ? `sonar-rules: skipped (${result.skipped})` : `sonar-rules: ${result.checked} files, no new finding (${result.listed} listed in ${BASELINE_FILE})`;
+  const ok = result.skipped ? `sonar-rules: skipped (${result.skipped})` : `sonar-rules: ${result.checked} files, no new finding (${result.listed} listed in ${BASELINE_FILE}, section ${BASELINE_SECTION})`;
   return printFindings(result.findings, ok, { json: options.json });
 }
 

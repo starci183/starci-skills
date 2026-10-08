@@ -58,7 +58,7 @@ test('a commit staging a new finding is refused and names it; the fix goes throu
   gitOk(repo, env, 'commit', '--quiet', '-m', 'scope only');
   const init = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'checks', 'check-sonar-rules.mjs'), '--root', repo, '--init'], { encoding: 'utf8', env, windowsHide: true });
   assert.equal(init.status, 0, init.stderr);
-  gitOk(repo, env, 'add', 'src/old.mjs', 'knowledge/sonar-baseline.json');
+  gitOk(repo, env, 'add', 'src/old.mjs', 'modules/kernel/allowlist.yaml');
   const listed = git(repo, env, 'commit', '--quiet', '-m', 'the existing finding, listed');
   if (/cannot (?:run|spawn).*pre-commit|pre-commit.*No such file or directory/i.test(`${listed.stdout}${listed.stderr}`)) return t.skip('the shell required to execute git hooks is not installed');
   assert.equal(listed.status, 0, `a listed finding commits\n${listed.stdout}${listed.stderr}`);
@@ -79,7 +79,7 @@ test('a commit staging a new finding is refused and names it; the fix goes throu
   assert.notEqual(stale.status, 0, 'a fix that leaves its baseline entry listed is refused');
   assert.match(`${stale.stdout}\n${stale.stderr}`, /SONAR_BASELINE_STALE src\/old\.mjs/);
 
-  fs.rmSync(path.join(repo, 'knowledge', 'sonar-baseline.json'));
+  spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'checks', 'check-sonar-rules.mjs'), '--root', repo, '--prune'], { encoding: 'utf8', env, windowsHide: true });
   gitOk(repo, env, 'add', '-A');
   const fixed = git(repo, env, 'commit', '--quiet', '-m', 'fixed, entry deleted');
   assert.equal(fixed.status, 0, `${fixed.stdout}${fixed.stderr}`);

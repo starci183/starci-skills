@@ -4,20 +4,18 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { globExpression } from '../lib/glob.mjs';
-import { byCodeUnit } from '../lib/list.mjs';
+import { byCodeUnit, splitList } from '../lib/list.mjs';
 import { readProperties } from '../lib/properties.mjs';
 import { walkFiles } from '../lib/walk.mjs';
 
-export const PROPERTIES_FILE = 'sonar-project.properties';
-
-const list = (value) => (value ?? '').split(',').map((entry) => entry.trim()).filter(Boolean);
+const PROPERTIES_FILE = 'sonar-project.properties';
 
 /** The scope {sources, inclusions, exclusions} declared at `root`, or null when the checkout carries no properties file. */
 export function readSonarScope(root) {
   const file = path.join(root, PROPERTIES_FILE);
   if (!fs.existsSync(file)) return null;
   const props = readProperties(file);
-  return { sources: list(props['sonar.sources']), inclusions: list(props['sonar.inclusions']), exclusions: list(props['sonar.exclusions']) };
+  return { sources: splitList(props['sonar.sources']), inclusions: splitList(props['sonar.inclusions']), exclusions: splitList(props['sonar.exclusions']) };
 }
 
 /** Whether the posix path `rel` is analysed under `scope` (it is assumed to sit below one of the sources). */

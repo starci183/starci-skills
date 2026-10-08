@@ -1,30 +1,41 @@
-// sonar-rules-baseline.mjs - the committed baseline of the `sonar-rules` gate: the findings main already carries, and nothing else.
+// sonar-rules-baseline.mjs - the baseline of the `sonar-rules` gate: the findings main already carries, and nothing else. It is the
+// `sonar-rules` section of the ONE allowlist (modules/kernel/allowlist.yaml), every entry with the reason it exists.
 // An entry names rule + file + a fingerprint of the reported node's source (not its line) + the occurrence number among equal ones.
-//   a finding with no entry                 is NEW      -> red (a baseline is never a suppression list for new code)
-//   an entry whose finding is gone          is STALE    -> red (the fix commit removes its entry, so the file only shrinks)
+//   a finding with no entry                 is NEW      -> red (the baseline is never a suppression list for new code)
+//   an entry whose finding is gone          is STALE    -> red (the fix commit removes its entry, so the section only shrinks)
 //   an entry that has a finding             is LISTED   -> green
 //   a cognitive-complexity finding above the recorded `weight` is NEW (a listed function may not get worse)
-// The file is deleted when its last entry goes; an empty file is itself a finding.
+// The section ends as `sonar-rules: []`; it is written once (--init) and never again from findings.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { parseYaml } from '../../engine/yaml.mjs';
+import { ALLOWLIST_FILE } from '../lib/allowlist.mjs';
 
-export const BASELINE_FILE = 'knowledge/sonar-baseline.json';
-export const BASELINE_VERSION = 1;
+export const BASELINE_SECTION = 'sonar-rules';
+export const BASELINE_FILE = ALLOWLIST_FILE;
+export const ENTRY_REASON = 'present on main when the sonar-rules gate landed; fix the code and delete this entry (a fix commit removes its own)';
 const EXCERPT = 80;
+const SECTION_HEADER = `# The findings of the sonar-rules self-check (scripts/checks/check-sonar-rules.mjs) that main carried when the gate landed: rule, file, a
+# fingerprint of the flagged node, its occurrence number and, for cognitive complexity, the score it may not exceed. Not a suppression
+# list: a finding that is not listed is red, a listed finding that is gone is red too, so the section only shrinks.\n`;
 
 export const fingerprintOf = (finding) => crypto.createHash('sha256').update(`${finding.rule}\0${finding.text}`).digest('hex').slice(0, 12);
 
 const keyOf = (rule, file, fingerprint, n) => `${rule}\0${file}\0${fingerprint}\0${n}`;
+const entryKey = (entry) => keyOf(entry.rule, entry.file, entry.fingerprint, entry.n);
 const compareEntries = (a, b) => (a.file + a.rule + a.fingerprint + a.n).localeCompare(b.file + b.rule + b.fingerprint + b.n, 'en');
+const SECTION_START = new RegExp(String.raw`^(?:#[^\n]*\n)*${BASELINE_SECTION}:`, 'm');
+const fileOf = (root) => path.join(root, ...BASELINE_FILE.split('/'));
 
-/** The entries of the baseline at `root` ([] when the file is absent); a malformed file throws. */
+/** {exists, entries}: `exists` is whether the allowlist carries the section at all (an empty `[]` still exists). A malformed section throws. */
 export function readBaseline(root) {
-  const file = path.join(root, BASELINE_FILE);
+  const file = fileOf(root);
   if (!fs.existsSync(file)) return { exists: false, entries: [] };
-  const doc = JSON.parse(fs.readFileSync(file, 'utf8'));
-  if (doc.version !== BASELINE_VERSION || !Array.isArray(doc.entries)) throw new Error(`${BASELINE_FILE} is not a version ${BASELINE_VERSION} baseline`);
-  return { exists: true, entries: doc.entries };
+  const section = parseYaml(fs.readFileSync(file, 'utf8'))?.[BASELINE_SECTION];
+  if (section === undefined || section === null) return { exists: false, entries: [] };
+  if (!Array.isArray(section)) throw new Error(`${BASELINE_FILE}: ${BASELINE_SECTION} must be a list`);
+  return { exists: true, entries: section };
 }
 
 /** Findings numbered per (rule, file, fingerprint) in source order: each gets `fingerprint` and `n`. */
@@ -46,6 +57,7 @@ const entryOf = (finding) => ({
   n: finding.n,
   ...(finding.weight ? { weight: finding.weight } : {}),
   excerpt: finding.text.slice(0, EXCERPT),
+  reason: ENTRY_REASON,
 });
 
 /**
@@ -53,7 +65,7 @@ const entryOf = (finding) => ({
  * ones); an entry of an unlooked file is neither listed nor stale. -> {fresh: findings, stale: entries, listed: findings}.
  */
 export function compareToBaseline(findings, entries, covered) {
-  const byKey = new Map(entries.map((entry) => [keyOf(entry.rule, entry.file, entry.fingerprint, entry.n), entry]));
+  const byKey = new Map(entries.map((entry) => [entryKey(entry), entry]));
   const fresh = [];
   const listed = [];
   const used = new Set();
@@ -64,27 +76,34 @@ export function compareToBaseline(findings, entries, covered) {
     used.add(key);
     listed.push(finding);
   }
-  const stale = entries.filter((entry) => covered(entry.file) && !used.has(keyOf(entry.rule, entry.file, entry.fingerprint, entry.n)));
+  const stale = entries.filter((entry) => covered(entry.file) && !used.has(entryKey(entry)));
   return { fresh, stale, listed };
 }
 
-/** Write the baseline for `findings` (initial generation); deletes the file when there is nothing to list. */
-export function writeBaseline(root, findings) {
-  const file = path.join(root, BASELINE_FILE);
-  const entries = numbered(findings).map(entryOf).sort(compareEntries);
-  if (!entries.length) { fs.rmSync(file, { force: true }); return entries; }
+const scalar = (value) => JSON.stringify(value);
+const field = ([key, value]) => `${key}: ${scalar(value)}`;
+const entryLine = (entry) => `  - {${Object.entries(entry).map(field).join(', ')}}`;
+
+/** The text of the section for `entries`, header included: the last section of the allowlist file. */
+const sectionBody = (entries) => (entries.length ? `\n${entries.map(entryLine).join('\n')}` : ' []');
+const sectionText = (entries) => `${SECTION_HEADER}${BASELINE_SECTION}:${sectionBody(entries)}\n`;
+
+/** Replace (or append) the section in the allowlist file; the section is the last thing in the file. */
+function storeEntries(root, entries) {
+  const file = fileOf(root);
+  const body = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : 'schema: starci/allowlist@1\n';
+  const at = body.search(SECTION_START);
+  const head = at < 0 ? `${body.trimEnd()}\n\n` : body.slice(0, at);
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, `${JSON.stringify({ version: BASELINE_VERSION, entries }, null, 1)}\n`);
+  fs.writeFileSync(file, `${head}${sectionText(entries)}`);
   return entries;
 }
 
-/** Remove `stale` entries from the baseline (the only edit the writer allows once a baseline exists); lowers weights to the current ones. */
+/** Write the section for `findings` (initial generation; callers refuse it once the section exists). */
+export const writeBaseline = (root, findings) => storeEntries(root, numbered(findings).map(entryOf).sort(compareEntries));
+
+/** Remove `stale` entries from the section (the only edit the writer allows once it exists). */
 export function pruneBaseline(root, stale) {
-  const { entries } = readBaseline(root);
-  const gone = new Set(stale.map((entry) => keyOf(entry.rule, entry.file, entry.fingerprint, entry.n)));
-  const kept = entries.filter((entry) => !gone.has(keyOf(entry.rule, entry.file, entry.fingerprint, entry.n)));
-  const file = path.join(root, BASELINE_FILE);
-  if (!kept.length) fs.rmSync(file, { force: true });
-  else fs.writeFileSync(file, `${JSON.stringify({ version: BASELINE_VERSION, entries: kept }, null, 1)}\n`);
-  return kept;
+  const gone = new Set(stale.map(entryKey));
+  return storeEntries(root, readBaseline(root).entries.filter((entry) => !gone.has(entryKey(entry))));
 }

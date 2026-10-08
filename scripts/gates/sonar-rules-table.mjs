@@ -6,38 +6,38 @@ import sonarjs from 'eslint-plugin-sonarjs';
 import unicorn from 'eslint-plugin-unicorn';
 import { ownRules } from './sonar-own-rules.mjs';
 
-export const COGNITIVE_COMPLEXITY_LIMIT = 15;
-export const MAX_PARAMETERS = 7;
+const COGNITIVE_COMPLEXITY_LIMIT = 15;
+const MAX_PARAMETERS = 7;
 
 /** {sonar, rule, options?, type, note?}: `rule` is `<plugin>/<name>` (the core rules have no plugin). */
 export const RULES = Object.freeze([
-  { sonar: 'S3776', rule: 'sonarjs/cognitive-complexity', options: [COGNITIVE_COMPLEXITY_LIMIT], type: 'CODE_SMELL' },
-  { sonar: 'S107', rule: 'max-params', options: [MAX_PARAMETERS], type: 'CODE_SMELL' },
-  { sonar: 'S4624', rule: 'sonarjs/no-nested-template-literals', type: 'CODE_SMELL' },
-  { sonar: 'S3358', rule: 'sonarjs/no-nested-conditional', type: 'CODE_SMELL' },
-  { sonar: 'S1121', rule: 'sonarjs/no-nested-assignment', type: 'CODE_SMELL' },
-  { sonar: 'S1128', rule: 'sonarjs/unused-import', type: 'CODE_SMELL' },
-  { sonar: 'S2310', rule: 'sonarjs/updated-loop-counter', type: 'CODE_SMELL' },
-  { sonar: 'S1529', rule: 'sonarjs/bitwise-operators', type: 'BUG' },
-  { sonar: 'S2871', rule: 'starci-sonar/no-alphabetical-sort', type: 'BUG', note: 'own rule: the sonarjs port needs type information and reports nothing on plain JavaScript' },
-  { sonar: 'S5869', rule: 'sonarjs/duplicates-in-character-class', type: 'CODE_SMELL' },
-  { sonar: 'S8786', rule: 'sonarjs/super-linear-regex', type: 'CODE_SMELL' },
-  { sonar: 'S9382', rule: 'no-await-in-loop', type: 'CODE_SMELL', note: 'ESLint core; stricter than Sonar, which leaves some early-exit loops alone' },
-  { sonar: 'S4138', rule: 'unicorn/no-for-loop', type: 'CODE_SMELL' },
-  { sonar: 'S7727', rule: 'starci-sonar/callback-arity', type: 'BUG', note: 'own rule: unicorn/no-array-callback-reference would flag the 500+ one-parameter references Sonar accepts' },
-  { sonar: 'S7732', rule: 'unicorn/no-instanceof-builtins', type: 'CODE_SMELL' },
-  { sonar: 'S7740', rule: 'unicorn/no-this-assignment', type: 'CODE_SMELL' },
-  { sonar: 'S7744', rule: 'unicorn/no-useless-fallback-in-spread', type: 'CODE_SMELL' },
-  { sonar: 'S7747', rule: 'unicorn/no-useless-spread', type: 'CODE_SMELL' },
-  { sonar: 'S7758', rule: 'unicorn/prefer-code-point', type: 'CODE_SMELL' },
-  { sonar: 'S7767', rule: 'unicorn/prefer-math-trunc', type: 'CODE_SMELL' },
-  { sonar: 'S7770', rule: 'unicorn/prefer-native-coercion-functions', type: 'CODE_SMELL' },
-  { sonar: 'S7776', rule: 'unicorn/prefer-set-has', type: 'CODE_SMELL' },
-  { sonar: 'S7778', rule: 'unicorn/prefer-single-call', type: 'CODE_SMELL' },
-  { sonar: 'S7780', rule: 'unicorn/prefer-string-raw', type: 'CODE_SMELL' },
-  { sonar: 'S6582', rule: 'starci-sonar/prefer-optional-chain', type: 'CODE_SMELL', note: 'own rule: typescript-eslint\'s needs type information' },
-  { sonar: 'S9383', rule: 'starci-sonar/floating-promise', type: 'BUG', note: 'own rule, syntactic: Promise.*, open .then chains and same-file async functions; typescript-eslint\'s needs type information' },
-  { sonar: 'S1516', rule: 'starci-sonar/no-line-separator-escape', type: 'CODE_SMELL' },
+  { sonar: 'S3776', rule: 'sonarjs/cognitive-complexity', options: [COGNITIVE_COMPLEXITY_LIMIT], type: 'smell' },
+  { sonar: 'S107', rule: 'max-params', options: [MAX_PARAMETERS], type: 'smell' },
+  { sonar: 'S4624', rule: 'sonarjs/no-nested-template-literals', type: 'smell' },
+  { sonar: 'S3358', rule: 'sonarjs/no-nested-conditional', type: 'smell' },
+  { sonar: 'S1121', rule: 'sonarjs/no-nested-assignment', type: 'smell' },
+  { sonar: 'S1128', rule: 'sonarjs/unused-import', type: 'smell' },
+  { sonar: 'S2310', rule: 'sonarjs/updated-loop-counter', type: 'smell' },
+  { sonar: 'S1529', rule: 'sonarjs/bitwise-operators', type: 'bug' },
+  { sonar: 'S2871', rule: 'starci-sonar/no-alphabetical-sort', type: 'bug', note: 'own rule: the sonarjs port needs type information and reports nothing on plain JavaScript' },
+  { sonar: 'S5869', rule: 'sonarjs/duplicates-in-character-class', type: 'smell' },
+  { sonar: 'S8786', rule: 'sonarjs/super-linear-regex', type: 'smell' },
+  { sonar: 'S9382', rule: 'no-await-in-loop', type: 'smell', note: 'ESLint core; stricter than Sonar, which leaves some early-exit loops alone' },
+  { sonar: 'S4138', rule: 'unicorn/no-for-loop', type: 'smell' },
+  { sonar: 'S7727', rule: 'starci-sonar/callback-arity', type: 'bug', note: 'own rule: unicorn/no-array-callback-reference would flag the 500+ one-parameter references Sonar accepts' },
+  { sonar: 'S7732', rule: 'unicorn/no-instanceof-builtins', type: 'smell' },
+  { sonar: 'S7740', rule: 'unicorn/no-this-assignment', type: 'smell' },
+  { sonar: 'S7744', rule: 'unicorn/no-useless-fallback-in-spread', type: 'smell' },
+  { sonar: 'S7747', rule: 'unicorn/no-useless-spread', type: 'smell' },
+  { sonar: 'S7758', rule: 'unicorn/prefer-code-point', type: 'smell' },
+  { sonar: 'S7767', rule: 'unicorn/prefer-math-trunc', type: 'smell' },
+  { sonar: 'S7770', rule: 'unicorn/prefer-native-coercion-functions', type: 'smell' },
+  { sonar: 'S7776', rule: 'unicorn/prefer-set-has', type: 'smell' },
+  { sonar: 'S7778', rule: 'unicorn/prefer-single-call', type: 'smell' },
+  { sonar: 'S7780', rule: 'unicorn/prefer-string-raw', type: 'smell' },
+  { sonar: 'S6582', rule: 'starci-sonar/prefer-optional-chain', type: 'smell', note: 'own rule: typescript-eslint\'s needs type information' },
+  { sonar: 'S9383', rule: 'starci-sonar/floating-promise', type: 'bug', note: 'own rule, syntactic: Promise.*, open .then chains and same-file async functions; typescript-eslint\'s needs type information' },
+  { sonar: 'S1516', rule: 'starci-sonar/no-line-separator-escape', type: 'smell' },
 ]);
 
 /** The Sonar ids this project was flagged for that no local rule can judge, with the reason. */
