@@ -387,8 +387,7 @@ async function reconcileWorkflow(ctx, ledgerId, workflowId, settings) {
   const status = await ctx.status(ledgerId, workflowId);
   if (!status || status.phase === 'finished' || status.archivedAt) return { ok: true, action: 'ended' };
   const id = `${ledgerId}:${workflowId}`;
-  const moved = may(ctx, 'job.settle') ? await runMechanicalMoves(ctx, ledgerId, status, { facts: (jobId) => ctx.read(ledgerId, (db) => jobFacts(db, jobId, { now: ctx.now(), settings })), refused: (f, reason) => retryDecision(f, ledgerId, reason, { now: ctx.now(), settings }),
-    unmoved: { workflowId, openedBy: OPENED_BY, allowedVerbs: settings.allowedVerbs, decisionDueMs: settings.decisionDueMs } }) : [];
+  const moved = may(ctx, 'job.settle') ? await runMechanicalMoves(ctx, ledgerId, status, { facts: (jobId) => ctx.read(ledgerId, (db) => jobFacts(db, jobId, { now: ctx.now(), settings })), refused: (f, reason) => retryDecision(f, ledgerId, reason, { now: ctx.now(), settings }), workflowId, settings }) : [];
   if (moved.length) ctx.log('reconciler.act', `workflow ${id} ran ${moved.length} mechanical move(s)`, { moved });
   const plan = planWorkflow(status, { lastDispatchAt: lastDispatch.get(id) ?? 0, now: ctx.now(), settings });
   const entity = wfKey(ledgerId, workflowId);

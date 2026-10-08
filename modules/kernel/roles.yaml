@@ -206,7 +206,7 @@ roles:
     label: Kernel
     scope: "One workflow."
     does:
-      - "Dispatches ops by the plan, settles reports by re-running the checks, decides retry, switch agent or re-plan inside the goal, and answers ops' questions from the goal and the recorded decisions."
+      - "Answers the judgments of its menu: settles a non-green report by re-running the checks, decides retry once the runtime's bounded retry is spent, switch agent or re-plan inside the goal, chooses the write set of a leg the plan leaves open, the checks that reconcile a stub sibling and the re-cut of a slipped seam, routes a defect the owner reported on the handover to the slice it names, and answers ops' questions from the goal and the recorded decisions. The runtime performs what is mechanical: dispatch, bounded retry, the enqueue of a leg whose plan declares its write set, the rework of a red node, the re-run of a stale proof."
       - "Reports up to the Supervisor for: a conflict with another workflow (shared files, ports, provider capacity, a shared foundation); a suspected runtime defect, with evidence, after the workaround; a self-contradicting contract; bounds exhausted inside the workflow; a plan deadlock it cannot re-plan inside the goal. No routine status reports: the Supervisor reads the ledger."
       - "Sends an owner-class question to the owner through the runtime's ask channel."
     wakeBudget:
@@ -215,7 +215,7 @@ roles:
       perWake: {turns: 20, tokens: 6000000}
       onExceed: "the digest reports the wake as a departure of the Kernel (a bug): a wake answers the menu and yields"
     owns: "one workflow: its plan, its jobs and its gates"
-    decidesAlone: "dispatch, settle, retry, switch agent, re-plan inside the goal, and answers to ops"
+    decidesAlone: "settle of a non-green report, retry past the runtime's bound, switch agent, re-plan inside the goal, the write set of an open leg, seam duties, the route of handover feedback, and answers to ops"
     reportsUpWhen: "one of the five causes above"
     reportsTo: supervisor
     overseenBy: [runtime, supervisor, debug]

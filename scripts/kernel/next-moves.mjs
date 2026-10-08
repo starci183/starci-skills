@@ -4,13 +4,11 @@
 // origin; the Job controller (scripts/reconciler/mechanical-moves.mjs) runs it once. An action whose move cannot be built is no longer
 // mechanical: it takes the judgment origin its catalog row names (modules/kernel/kernel-menu.yaml `fallback`) and the Kernel's menu holds it.
 import { menuCatalog } from './kernel-menu.mjs';
-import { retryMoveOf } from './retry-move.mjs';
-
-const csv = (list) => (Array.isArray(list) ? list.map(String).filter(Boolean).join(',') : String(list ?? ''));
+import { csv, retryMoveOf } from './retry-move.mjs';
 
 /** The enqueue move of an op on a write set, or null when the write set is empty. `rest` holds the optional flags (`retry-of`, `params`, `reopen`, ...). */
 export function enqueueMove(workflow, { op, paths, ...rest }) {
-  const owned = csv(paths);
+  const owned = Array.isArray(paths) ? csv(paths) : String(paths ?? '');
   if (!op || !owned) return null;
   const args = { workflow, op, paths: owned };
   for (const [flag, value] of Object.entries(rest)) if (value != null && value !== '') args[flag] = String(value);
@@ -41,7 +39,7 @@ export function legPathsOf(goalJsonText) {
 }
 
 /** The judgment origin a mechanical origin falls back to when no move can be built (its own id when the catalog names none). */
-export const fallbackOriginOf = (origin) => menuCatalog().origins.find((row) => row.id === origin)?.fallback ?? origin;
+const fallbackOriginOf = (origin) => menuCatalog().origins.find((row) => row.id === origin)?.fallback ?? origin;
 
 /** The action with its move; without one, the action with the judgment origin it falls back to. */
 export const withMove = (action, move) => (move ? { ...action, move } : { ...action, origin: fallbackOriginOf(action.origin) });

@@ -9,6 +9,7 @@
 import { originOf } from '../kernel/kernel-menu.mjs';
 import { commandLine } from '../machine/decision-resolution.mjs';
 import { mapInOrder } from '../lib/in-order.mjs';
+import { OPENED_BY } from './job-keys.mjs';
 
 const attempted = new Map(); // `${ledgerId}:${key}` -> true while the move was made by this engine process
 const RETRYABLE = new Set(['failed', 'awaiting_owner']);
@@ -23,18 +24,18 @@ export function mechanicalMovesOf(status) {
 }
 
 /** The Decision Item of a refused move that follows no failed job: the Kernel sees the refusal and the command that was refused. */
-export function moveRefusedDecision(move, reason, { ledgerId, workflowId, openedBy, allowedVerbs, decisionDueMs, now }) {
+function moveRefusedDecision(move, reason, { ledgerId, workflowId, settings, now }) {
   const command = commandLine(move.move, 'repo');
   return { schema: 'starci/decision-item@1', kind: 'move-refused', idempotencyKey: `move-refused:${move.key}`, decider: 'kernel', ledger: ledgerId, workflowId,
     entity: { type: move.jobId ? 'job' : 'workflow', id: move.jobId ?? workflowId },
     summary: `${move.origin} ${move.op}: the runtime's move was refused (${String(reason).slice(0, 200)}); change what the refusal names and run it again, or take another way`,
     evidence: [{ ref: `origin:${move.origin}` }, ...(move.jobId ? [{ ref: `job:${move.jobId}` }] : [])],
     options: [{ key: 'run-move-again', verb: command.replace(' --repo repo', ''), title: `run the refused ${move.verb} again` }],
-    allowedVerbs, dueAt: now + decisionDueMs, escalateTo: 'supervisor', openedBy, openedAt: now };
+    allowedVerbs: settings.allowedVerbs, dueAt: now + settings.decisionDueMs, escalateTo: 'supervisor', openedBy: OPENED_BY, openedAt: now };
 }
 
 /**
- * Performs each mechanical move not yet made. `deps`: {facts(jobId), refused(facts, reason), unmoved: context of moveRefusedDecision minus ledgerId}.
+ * Performs each mechanical move not yet made. `deps`: {facts(jobId), refused(facts, reason), workflowId, settings: {allowedVerbs, decisionDueMs}}.
  * A refused move opens retry-decision when its job failed and nothing follows it, move-refused otherwise. Returns [{jobId, origin, ok}].
  */
 export async function runMechanicalMoves(ctx, ledgerId, status, deps) {
@@ -51,5 +52,5 @@ export async function runMechanicalMoves(ctx, ledgerId, status, deps) {
 async function openRefused(ctx, ledgerId, move, reason, deps) {
   const facts = move.jobId ? deps.facts(move.jobId) : null;
   if (facts && RETRYABLE.has(facts.status)) return ctx.openDecision(deps.refused(facts, reason));
-  return ctx.openDecision(moveRefusedDecision(move, reason, { ledgerId, ...deps.unmoved, now: ctx.now() }));
+  return ctx.openDecision(moveRefusedDecision(move, reason, { ledgerId, workflowId: deps.workflowId, settings: deps.settings, now: ctx.now() }));
 }

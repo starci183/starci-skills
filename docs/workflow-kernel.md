@@ -19,7 +19,7 @@ contract says.
 | --- | --- | --- | --- | --- |
 | Op | One unit of work of one workflow. | Owns one attempt and its worktree; decides alone how to do the work inside its contract | asks-a-question (ask-worker-question); asks-the-owner (ask-owner); red-check (error-work); provider-quota (quota-or-circuit); login-expired (error-login-expired) | records the evidence and keeps working inside its contract; it never fixes the bug and never works around it. Debug scans every role and removes the bug by changing .claude with a spec. |
 | Critic | One product of one op. | Owns one verdict; decides alone the score by the rubric | failing-verdict (error-work); no-independent-member (critic-no-independent-member); critic-unavailable (critic-unavailable); critic-quota-out (critic-quota-out) | records the evidence and keeps working inside its contract; it never fixes the bug and never works around it. Debug scans every role and removes the bug by changing .claude with a spec. |
-| Kernel | One workflow. | Owns one workflow: its plan, its jobs and its gates; decides alone dispatch, settle, retry, switch agent, re-plan inside the goal, and answers to ops | worker-question (worker-question); worker-stalled (worker-stalled); peer-wait (peer-wait); supervisor-gate (supervisor-gate); owner-gate (owner-gate); failed-leg (failed-no-step); orphaned-frontier (orphaned-frontier) | records the evidence and keeps working inside its contract; it never fixes the bug and never works around it. Debug scans every role and removes the bug by changing .claude with a spec. |
+| Kernel | One workflow. | Owns one workflow: its plan, its jobs and its gates; decides alone settle of a non-green report, retry past the runtime's bound, switch agent, re-plan inside the goal, the write set of an open leg, seam duties, the route of handover feedback, and answers to ops | worker-question (worker-question); worker-stalled (worker-stalled); peer-wait (peer-wait); supervisor-gate (supervisor-gate); owner-gate (owner-gate); failed-leg (failed-no-step); orphaned-frontier (orphaned-frontier) | records the evidence and keeps working inside its contract; it never fixes the bug and never works around it. Debug scans every role and removes the bug by changing .claude with a spec. |
 | Supervisor | All workflows on the machine, inside Orca. | Owns the machine's operations: the shared resources and the gates Kernels raise; decides alone gate rulings and the division of resources | gate-ruling (supervisor-gate); budget-gate (budget-gate); workflow-conflict (peer-dependency); resource-division (pool-full); runtime-defect (runtime-defect) | records the evidence and keeps working inside its contract; it never fixes the bug and never works around it. Debug scans every role and removes the bug by changing .claude with a spec. |
 | Debug | The owner's eyes: a loop of the owner's chat for a limited stabilisation period, not part of steady-state operation. | Owns the edge-case registry, the operating standard and the queue of runtime defects; decides alone which role failed which duty, which collector to trigger, the fix lanes it opens, and restarting a seat (the owner's authority) | owner-matter (owner-gate); owner-question (ask-owner) | removes the bug by changing .claude (contract, prompt, policy row, guard refusal or runtime code) with a spec and an edge-case entry. |
 <!-- roles:table:end -->
@@ -81,8 +81,10 @@ preserves the plan, jobs and events across restarts.
 ## Kernel decision cycle — `modules/kernel/driver-loop.yaml`
 
 The runtime drives and the Kernel answers. The controllers dispatch ready work, retry inside the bounds of the hold policy, switch
-agent, settle green reports, run the retry of a job whose gate resolved or whose ask was answered, and collect leftovers. What needs
-judgment is the Kernel's menu (`modules/kernel/kernel-menu.yaml`), one function of the ledger state: `starci kernel status` prints its
+agent, settle green reports, run the retry of a job whose gate resolved or whose ask was answered, enqueue an approved leg whose plan
+declares its write set, rework a red node, re-run a stale proof or attempt, enqueue the asset leg and the credential ask, redraw what the
+owner asked to redraw, redo a cut ordinal that does not reconcile with its seam, and collect leftovers; a move the ledger refuses reaches
+the Kernel as a Decision Item (`move-refused`, or `retry-decision` for a failed job). What needs judgment is the Kernel's menu (`modules/kernel/kernel-menu.yaml`), one function of the ledger state: `starci kernel status` prints its
 open items as the Decide section, and `menu[]` in its JSON.
 
 | Step | Call | Why |
@@ -97,7 +99,9 @@ The Kernel seat's shell is `starci`: the read verbs, `decide` and `kernel-ack-re
 mutating verb typed from habit is refused (`KERNEL_USE_DECIDE`) with the menu. A wake that spends more than the per-wake budget of the
 Kernel role (`modules/kernel/roles.yaml`) is reported by the digest as a departure.
 
-The kernel decides the open items of its menu. It never decides scope, identity or authority, never answers an `ask` itself, and never
+The kernel decides the open items of its menu: the write set of a leg the plan leaves open, the checks that reconcile a stub sibling, the
+re-cut of a slipped seam, a move the ledger could not build, and the handover step, where a defect the owner reported is routed by the
+typed choice `route-fix-<job>` of the slice it names (or `route-requirement-gap`, `route-design-gap`, `route-interface-gap`). It never decides scope, identity or authority, never answers an `ask` itself, and never
 edits the ledger by hand.
 
 ## The verbs — `modules/kernel/api.yaml`
@@ -325,7 +329,7 @@ dead agent's transcript.
 <!-- roles:begin kernel -->
 **Kernel** (modules/kernel/roles.yaml#kernel): One workflow.
 - Does:
-  - Dispatches ops by the plan, settles reports by re-running the checks, decides retry, switch agent or re-plan inside the goal, and answers ops' questions from the goal and the recorded decisions.
+  - Answers the judgments of its menu: settles a non-green report by re-running the checks, decides retry once the runtime's bounded retry is spent, switch agent or re-plan inside the goal, chooses the write set of a leg the plan leaves open, the checks that reconcile a stub sibling and the re-cut of a slipped seam, routes a defect the owner reported on the handover to the slice it names, and answers ops' questions from the goal and the recorded decisions. The runtime performs what is mechanical: dispatch, bounded retry, the enqueue of a leg whose plan declares its write set, the rework of a red node, the re-run of a stale proof.
   - Reports up to the Supervisor for: a conflict with another workflow (shared files, ports, provider capacity, a shared foundation); a suspected runtime defect, with evidence, after the workaround; a self-contradicting contract; bounds exhausted inside the workflow; a plan deadlock it cannot re-plan inside the goal. No routine status reports: the Supervisor reads the ledger.
   - Sends an owner-class question to the owner through the runtime's ask channel.
 - Must clean up:
@@ -340,7 +344,7 @@ dead agent's transcript.
   - works around a bug: a bug is none-fits, recorded for Debug
   - raises a supervisor-gate before the workaround its gate cause names (the gate ladder refuses it: modules/kernel/op-incident-policy.yaml gateCauses)
   - pins a model around a lineage exclusion without a recorded op-override decision
-- Owns: one workflow: its plan, its jobs and its gates. Decides alone: dispatch, settle, retry, switch agent, re-plan inside the goal, and answers to ops.
+- Owns: one workflow: its plan, its jobs and its gates. Decides alone: settle of a non-green report, retry past the runtime's bound, switch agent, re-plan inside the goal, the write set of an open leg, seam duties, the route of handover feedback, and answers to ops.
 - Reports to: Supervisor (one of the five causes above). Overseen by: the runtime, Supervisor, Debug.
 - Measure: legs done inside their bound with zero human untangling.
 - Wake budget (provisional): 20 turns and 6000000 tokens per wake; over it, the digest reports the wake as a departure of the Kernel (a bug): a wake answers the menu and yields.

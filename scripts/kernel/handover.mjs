@@ -248,7 +248,7 @@ export function handoverReason(handover, workflowId) {
       return `handover ask ${ask.dispatchId} was answered approve by ${ask.answeredBy ?? 'a delegate'}, and only the owner approves a handover; enqueue handover.review again so the owner is asked`;
     }
     if (ask.decision === 'feedback') {
-      return `the owner reported a defect on handover ask ${ask.dispatchId}; route the note to the fix op of the slice it names (modules/models/kinds.yaml route handover-feedback-repairs-the-build), and once that fix settles run handover.review again`;
+      return `the owner reported a defect on handover ask ${ask.dispatchId}; route the note to the fix op of the slice it names with the menu choice route-fix-<job> of item handover-step (modules/models/kinds.yaml route handover-feedback-repairs-the-build; route-requirement-gap, route-design-gap or route-interface-gap when the record itself is wrong), and once that fix settles run handover.review again`;
     }
     if (ask.decision === 'question') {
       return `the owner asked a question on handover ask ${ask.dispatchId}; enqueue handover.review again — the attempt answers it in the package and hands over again`;

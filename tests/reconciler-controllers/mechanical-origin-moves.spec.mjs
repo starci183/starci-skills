@@ -147,7 +147,7 @@ const fakeCtx = (answer) => {
   return { calls, opened, now: () => 1_000_000, api: async (_ledger, verb, argv) => { calls.push([verb, ...argv]); return answer; }, openDecision: async (di) => { opened.push(di); return { ok: true }; } };
 };
 const deps = { facts: (jobId) => (jobId === FAILED ? { jobId, workflowId: WF, op: 'work.author', status: 'failed', terminal: null } : { jobId, workflowId: WF, op: 'work.author', status: 'succeeded' }),
-  refused: (facts, reason) => ({ kind: 'retry-decision', entity: facts.jobId, reason }), unmoved: { workflowId: WF, openedBy: 'reconciler/job', allowedVerbs: ['enqueue'], decisionDueMs: 60_000 } };
+  refused: (facts, reason) => ({ kind: 'retry-decision', entity: facts.jobId, reason }), workflowId: WF, settings: { allowedVerbs: ['enqueue'], decisionDueMs: 60_000 } };
 
 test('the controller makes each origin\'s move once, skips a move a gate holds, and a refused move opens the Decision Item that fits', async () => {
   const move = (origin, args, extra = {}) => ({ kind: 'dispatch', origin, op: 'work.author', move: { verb: 'enqueue', args: { workflow: WF, op: 'work.author', paths: '.starciwork/x', ...args } }, ...extra });

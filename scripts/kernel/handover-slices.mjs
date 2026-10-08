@@ -13,7 +13,7 @@ const buildOpsOf = () => (buildOps ??= new Set(Object.entries(readModuleJson('mo
   .filter(([, kind]) => kind?.family === 'build').map(([id, kind]) => kind.operator ?? id)));
 
 /** A note as one line of at most `max` characters. */
-const lineOf = (text, max) => String(text ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
+const lineOf = (text, max) => String(text ?? '').split(/\s+/).filter(Boolean).join(' ').slice(0, max);
 
 /**
  * The defect the owner reported on a handover ask: {title, slices}. `slices` are [{jobId, op, label, move}], newest first, one per unit; `move`
