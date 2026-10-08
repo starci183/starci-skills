@@ -165,7 +165,7 @@ test('a stale short window cannot be hidden by a fresh weekly window or owner re
       resetsAt: snapshot.observedAt + 600000 });
     return snapshot;
   };
-  const result = launch(options, 'worker', 'worker:attempt:1', { bias: { roles: ['worker'], require: { provider: 'codex' } } });
+  const result = launch(options, 'worker', 'worker:attempt:1', { bias: { roles: ['worker'], only: [{ provider: 'codex' }] } });
   assert.equal(result.ok, false);
   assert.equal(providerBudgetUsage('codex', 'default', options).running, 0);
 });

@@ -6,7 +6,7 @@ import { refuseRemovedKeys } from '../../engine/model-config.mjs';
 import { normalizeOwnerRoutingBias } from '../../scripts/lib/owner-routing-bias.mjs';
 
 const SKILL = 'skills/starci/references/define-goal.md';
-const taught = 'an explicit requirement such as "must use Claude" becomes `require:{provider:claude}`.';
+const taught = 'an explicit requirement such as "must use Claude" becomes `require:{provider:claude}`.'; // [removed-list]
 
 test('the shipped tree spells no removed name outside the list, the changelog and marked blocks', () => {
   assert.deepEqual(checkRemovedVocabulary().map((finding) => finding.message), []);
@@ -21,7 +21,7 @@ test('a removed spelling planted in a skill file is an RT_REMOVED_VOCABULARY fin
 
 test('RT_REMOVED_VOCABULARY accepts the same spelling on a marked line, or under a bare marker until the blank line', () => {
   const inline = `${taught} <!-- ${MARKER} -->\n`;
-  const block = `<!-- ${MARKER} -->\n${taught}\nsecond line: models.pools\n\n${taught}\n`;
+  const block = `<!-- ${MARKER} -->\n${taught}\nsecond line: models.pools\n\n${taught}\n`; // [removed-list]
   assert.deepEqual(removedVocabularyFindings({ [SKILL]: inline }), []);
   assert.deepEqual(removedVocabularyFindings({ [SKILL]: block }).map((finding) => finding.line), [5]);
 });
@@ -33,9 +33,9 @@ test('the changelog, the list file and files outside the instruction surfaces ar
 });
 
 test('a config key, a flag, a verb and a code are found by their literal; a longer word is not', () => {
-  const text = 'set models.pools\nrun starci debug pass now\nuse --caller-model x\nerror workflow-debug-not-ready\nmodels.poolsize is unrelated\n';
+  const text = 'set models.pools\nrun starci debug pass now\nuse --caller-model x\nerror workflow-debug-not-ready\nmodels.poolsize is unrelated\n'; // [removed-list]
   assert.deepEqual(removedVocabularyFindings({ 'docs/a.md': text }).map((finding) => [finding.line, finding.name]),
-    [[1, 'models.pools'], [2, 'starci debug pass'], [3, '--caller-model'], [4, 'workflow-debug-not-ready']]);
+    [[1, 'models.pools'], [2, 'starci debug pass'], [3, '--caller-model'], [4, 'workflow-debug-not-ready']]); // [removed-list]
 });
 
 test('every entry declares its kind, replacement and release, and each config-key entry is refused by name with that replacement', () => {
@@ -63,4 +63,13 @@ test('a goal bias holding require is refused with the replacement and the member
   });
   assert.deepEqual(normalizeOwnerRoutingBias({ only: ['claude'] }).only, ['claude-agent']);
   assert.throws(() => normalizeOwnerRoutingBias({ nonsense: 1 }), (error) => !error.message.includes('is removed'));
+});
+
+test('RT_REMOVED_VOCABULARY: a spec spells a removed name only where it asserts the refusal', () => {
+  const stale = "test('routes a goal', () => {\n  launch({ bias: { require: { provider: 'codex' } } });\n});\n"; // [removed-list]
+  const refusing = "test('a goal bias with the removed field is refused', () => {\n  launch({ bias: { require: { provider: 'codex' } } });\n});\n"; // [removed-list]
+  const throwing = "assert.throws(() => validate({ coreDebug: 1 }));\n"; // [removed-list]
+  assert.deepEqual(removedVocabularyFindings({ 'tests/a/b.spec.mjs': stale }).map((finding) => [finding.line, finding.name]), [[2, 'require']]);
+  assert.deepEqual(removedVocabularyFindings({ 'tests/a/b.spec.mjs': refusing }), []);
+  assert.deepEqual(removedVocabularyFindings({ 'tests/a/b.spec.mjs': throwing }), []);
 });

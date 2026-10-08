@@ -165,7 +165,7 @@ Removing or renaming any key, flag, verb, field or code adds, in the same commit
 bare name is a common word), what replaced it, and the release that removed it. The runtime's refusal of that spelling reads
 the same entry, so the refusal says what to write instead. The self-check `removed-vocabulary` (`RT_REMOVED_VOCABULARY`)
 scans `skills/`, `docs/`, `README.md`, `CONTEXT.md`, `CONTRIBUTING.md`, `modules/` and `knowledge/` and refuses any removed
-spelling there, so the same commit rewrites every instruction that still teaches it. Exempt: the list file, `CHANGELOG.md`
+spelling there; a spec (`tests/**/*.spec.mjs`) may spell one only on a line, or under a test title, that says refuse, reject, removed, throws or unknown, so a spec of a removed thing is deleted or turned into a refusal assertion. The same commit rewrites every instruction that still teaches it. Exempt: the list file, `CHANGELOG.md`
 and a removed-list, which is a line carrying the marker `[removed-list]` or a block under a marker that stands alone on a
 comment line (`<!-- [removed-list] -->` in Markdown, `# [removed-list]` in yaml) up to the next blank line.
 
