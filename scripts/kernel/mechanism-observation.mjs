@@ -177,7 +177,7 @@ const sourceReadRevision = (file, captured, context) => {
   if (!/^[a-f0-9]{40,64}$/.test(tip) || mergeBaseQuery(['--is-ancestor', admitted, tip], options).status !== 0) return null;
   const later = revList(['--ancestry-path', `${admitted}..${tip}`, '--', file.path], options);
   if (later.status !== 0) return null;
-  for (const revision of [...new Set([tip, ...later.stdout.trim().split(/\s+/)])]) {
+  for (const revision of new Set([tip, ...later.stdout.trim().split(/\s+/)])) {
     if (revision === admitted || !/^[a-f0-9]{40,64}$/.test(revision)) continue;
     const blob = show([`${revision}:${file.path}`], { ...options, encoding: 'buffer' });
     if (blob.status === 0 && sha256(blob.stdout) === file.sha256) return revision;
@@ -185,28 +185,46 @@ const sourceReadRevision = (file, captured, context) => {
   return null;
 };
 
+/** The READ roles that name Source law rather than a target file. */
+const CANONICAL_ROLES = new Set(['pattern', 'example', 'knowledge']);
+
+/** The unusable detail of a READ entry whose path, digest, role or uniqueness is wrong, else null. */
+const digestFileShape = (file, rel, named) => {
+  if (!rel || path.isAbsolute(rel) || rel === '..' || rel.startsWith('../') || !/^[a-f0-9]{64}$/.test(String(file?.sha256 ?? '')) || named.has(rel)) return 'READ contains a malformed, foreign or duplicate input';
+  if (!CANONICAL_ROLES.has(file.role) && file.role !== 'read') return `READ has an unsupported input role: ${rel}`;
+  return null;
+};
+
+/** The unusable detail of a READ entry the admission captured; an admitted Source law can drift advisably (recorded in `sourceDrift`), the target's bytes cannot. */
+const capturedVerdict = (file, rel, captured, context, sourceDrift) => {
+  const canonical = CANONICAL_ROLES.has(file.role);
+  if (captured.sha256 !== file.sha256) {
+    const revision = canonical && captured.rootKind === 'source' ? sourceReadRevision({ ...file, path: rel }, captured, context) : null;
+    if (!revision) return `READ differs from its filed input: ${rel}`;
+    sourceDrift.push({ path: rel, admissionDigest: captured.sha256, readDigest: file.sha256, revision });
+  }
+  if (captured.rootKind !== 'source' && (!fs.lstatSync(plain(captured.absolute)).isFile() || sha256File(captured.absolute) !== file.sha256))
+    return `READ target input changed or is missing: ${rel}`;
+  return null;
+};
+
+/** The unusable detail of a READ entry the admission never captured: it must be a real file of the law root or the target root with the named digest. */
+const uncapturedVerdict = (file, rel, context, digest) => {
+  const root = CANONICAL_ROLES.has(file.role) ? context.skillRoot : digest.root, absolute = plain(path.resolve(root, rel));
+  if (!insidePath(path.resolve(root), absolute, { includeSelf: true }) || !fs.lstatSync(absolute).isFile() || sha256File(absolute) !== file.sha256) return `READ input is foreign, missing or changed: ${rel}`;
+  return null;
+};
+
 /** One READ-file's verdict detail (unusable), or null with any proven drift retained. */
 const digestFileVerdict = (file, named, context, digest, sourceDrift) => {
   const rel = normRel(file?.path ?? '');
-  if (!rel || path.isAbsolute(rel) || rel === '..' || rel.startsWith('../') || !/^[a-f0-9]{64}$/.test(String(file?.sha256 ?? '')) || named.has(rel)) return 'READ contains a malformed, foreign or duplicate input';
-  const canonical = ['pattern', 'example', 'knowledge'].includes(file.role);
-  if (!canonical && file.role !== 'read') return `READ has an unsupported input role: ${rel}`;
+  const shape = digestFileShape(file, rel, named);
+  if (shape) return shape;
+  const canonical = CANONICAL_ROLES.has(file.role);
   const captured = context.readRefs.find((row) => row.path === rel && (canonical ? row.rootKind === 'source' : row.rootKind !== 'source'));
   try {
-    if (captured) {
-      if (captured.sha256 !== file.sha256) {
-        const revision = canonical && captured.rootKind === 'source' ? sourceReadRevision({ ...file, path: rel }, captured, context) : null;
-        if (!revision) return `READ differs from its filed input: ${rel}`;
-        sourceDrift.push({ path: rel, admissionDigest: captured.sha256, readDigest: file.sha256, revision });
-      }
-      // An admitted Source law can drift advisably; the target's bytes cannot.
-      if (captured.rootKind !== 'source' && (!fs.lstatSync(plain(captured.absolute)).isFile() || sha256File(captured.absolute) !== file.sha256))
-        return `READ target input changed or is missing: ${rel}`;
-    }
-    else {
-      const root = canonical ? context.skillRoot : digest.root, absolute = plain(path.resolve(root, rel));
-      if (!insidePath(path.resolve(root), absolute, { includeSelf: true }) || !fs.lstatSync(absolute).isFile() || sha256File(absolute) !== file.sha256) return `READ input is foreign, missing or changed: ${rel}`;
-    }
+    const verdict = captured ? capturedVerdict(file, rel, captured, context, sourceDrift) : uncapturedVerdict(file, rel, context, digest);
+    if (verdict) return verdict;
   } catch { return `READ input is unreadable: ${rel}`; }
   named.set(rel, file);
   return null;
