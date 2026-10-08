@@ -2,7 +2,7 @@ import {isPlainObject as plain} from './plain-object.mjs';
 import {invalid} from './invalid-config.mjs';
 
 /** The keys of the sonar block. */
-export const SONAR_KEYS=Object.freeze(['organization']);
+const SONAR_KEYS=Object.freeze(['organization']);
 /** A SonarCloud organization key: lowercase letters, digits, hyphens and underscores, starting with a letter or a digit. */
 const ORGANIZATION=/^[a-z0-9][a-z0-9_-]*$/;
 

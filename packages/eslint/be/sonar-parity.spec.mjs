@@ -1,5 +1,5 @@
 /**
- * Tests for the Sonar parity law (R235 SONAR_PARITY): the shared syntax rules, each against the code SonarCloud flagged in the examples.
+ * Tests for the Sonar parity law (R235 SCAN_SMELL): the shared syntax rules, each against the code SonarCloud flagged in the examples.
  *
  *   node --test sonar-parity.spec.mjs
  */
@@ -83,7 +83,7 @@ test("S7780: a string that only escapes backslashes is written with String.raw",
       String.raw`const g = "has \\ and ${"`"}"`,
     ],
     invalid: [
-      { code: String.raw`const a = "C:\\dir\\file"`, errors: [{ messageId: "raw" }] },
+      { code: String.raw`const a = "a\\dir\\file"`, errors: [{ messageId: "raw" }] },
       { code: String.raw`const b = '\\d+'`, errors: [{ messageId: "raw" }] },
     ],
   })

@@ -16788,7 +16788,7 @@ RT_SECRET_TRACKED:
   owner: owner
   kind: check-finding
 
-SONAR_PARITY:
+SCAN_SMELL:
   title: "Code carries a smell SonarCloud measures"
   title_vi: "Mã mang một mùi mã mà SonarCloud đo"
   meaning_vi: "Tệp `<file>` có một đoạn mã mà SonarCloud sẽ báo thành code smell: `await` trong vòng lặp, `charCodeAt`, chuỗi chỉ thoát dấu gạch chéo ngược, biểu thức điều kiện lồng nhau, `void` trên giá trị không phải lời gọi, import không dùng, import chỉ để chuyển tiếp, prop khai báo mà component không đọc, API đã deprecated, đối tượng bị ép thành chuỗi hoặc hàm `async` không `await`; luật bắt ở máy trước khi bản quét đến."

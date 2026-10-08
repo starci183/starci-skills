@@ -1,5 +1,5 @@
 /**
- * Tests for the Sonar parity law (R235 SONAR_PARITY) on the front end: the rule only this axis publishes, and the registration of the shared ones.
+ * Tests for the Sonar parity law (R235 SCAN_SMELL) on the front end: the rule only this axis publishes, and the registration of the shared ones.
  *
  *   node --test sonar-parity.spec.mjs
  */
@@ -43,7 +43,7 @@ test("S7758: codePointAt instead of charCodeAt", () => {
 test("S7780: a string that only escapes backslashes is written with String.raw; a Next matcher keeps its escapes", () => {
   tester.run("prefer-string-raw", rule("prefer-string-raw"), {
     valid: [String.raw`const a = "no escapes"`, String.raw`export const config = { matcher: ["/((?!api|.*\\..*).*)"] }`],
-    invalid: [{ code: String.raw`const a = "C:\\dir\\file"`, errors: [{ messageId: "raw" }] }],
+    invalid: [{ code: String.raw`const a = "a\\dir\\file"`, errors: [{ messageId: "raw" }] }],
   })
 })
 

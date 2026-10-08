@@ -12,6 +12,7 @@ import { byCodeUnit } from '../../scripts/lib/list.mjs';
 import { runNode } from '../../scripts/api/node/run-node.mjs';
 import { runGit } from '../../scripts/api/git/lib.mjs';
 import { installInto, uninstall, runtimeInstalls, missingFrom, LINT_DEPENDENCIES, STARCI_PACKAGES } from '../helpers/hfs-app-install.mjs';
+import { nextBuildEnv } from '../../scripts/gates/build-env.mjs';
 import { testWorldDistProblem } from '../helpers/test-world-dist.mjs';
 
 const runtime = path.resolve(import.meta.dirname, '../..');
@@ -240,7 +241,7 @@ function installedApp(t, name, projects) {
     // may finish this process. The outer timeout bounds fixture custody when framework setup cannot finish.
     const lifetime = write(app, '.starci-next-typegen-lifetime.cjs', 'setInterval(() => {}, 1000);\n');
     const types = runNode(['--require', lifetime, require.resolve('next/dist/bin/next'), 'typegen', directory], { cwd: directory,
-      env: { ...process.env, CI: '1', NEXT_TELEMETRY_DISABLED: '1' }, timeout: 120_000, maxBuffer: 16 * 1024 * 1024 });
+      env: { ...nextBuildEnv(), CI: '1' }, timeout: 120_000, maxBuffer: 16 * 1024 * 1024 });
     assert.equal(types.status, 0, types.stderr || types.stdout);
     assert.equal(types.error ?? null, null); assert.equal(types.signal ?? null, null);
     assert.match(types.stdout, /Types generated successfully/, `the public Next CLI must finish its real typegen action: ${types.stderr || types.stdout}`);

@@ -1,6 +1,6 @@
 // release-sonarcloud.mjs - the SonarCloud side of the release's Sonar proof. The runtime repository is public and holds no secret file, so the three example apps are analysed on SonarCloud
 // with the ONE token of the runtime's untracked secret.env (SONAR_TOKEN) and the organization key of the owner config (config.yaml sonar.organization, the env SONAR_ORGANIZATION over it;
-// docs/application-stacks.md, STACKS_EXAMPLE_FORM): the same names the runtime's own ci.yml reads as a repository secret and variable. The values come through scripts/gates/runtime-host.mjs runtimeSecretEnv (engine/settings.mjs secretEnv), are held
+// docs/application-stacks.md, STACKS_EXAMPLE_FORM): the same names the runtime's own ci.yml reads as a repository secret and variable. The values come through scripts/gates/runtime-host.mjs runtimeSecretEnv (engine/secrets.mjs secretEnv), are held
 // in memory, travel only in an Authorization header and the scanner's environment, and are never printed. The project key on SonarCloud is <organization>_<key the example declares>.
 import fs from 'node:fs';
 import path from 'node:path';

@@ -76,6 +76,20 @@ export function runRuntimeOnly(name, args = [], {
   return runner(path.join(root, selected.run), [...selected.args, ...args], { cwd: root });
 }
 
+/**
+ * The last line of `starci runtime check`: the whole verdict in one place, so the self-check count alone is never read as green while the runtime HFS stage or the syntax stage failed.
+ * `parts` = {syntaxFailed, hfsFindings, selfFailed: [ids], selfRun}. Pure.
+ */
+export function verdictLine({ syntaxFailed, hfsFindings, selfFailed, selfRun }) {
+  const failures = [];
+  if (syntaxFailed) failures.push(`syntax ${syntaxFailed} file(s)`);
+  if (hfsFindings) failures.push(`runtime HFS ${hfsFindings} finding(s)`);
+  const selfPart = `self-checks ${selfRun - selfFailed.length} of ${selfRun}`;
+  if (!failures.length && !selfFailed.length) return `check: ok — runtime HFS clean; ${selfPart}`;
+  const selfTail = selfFailed.length ? ` (failed: ${selfFailed.join(', ')})` : '';
+  return `check: FAILED — ${[...failures, selfPart + selfTail].join('; ')}`;
+}
+
 /** The whole `starci runtime check` at `root`: {ok, syntax, runtime, selfChecks}. Prints as it goes (the runtime report as JSON with `json`). */
 function checkRuntime({ root = skillRoot, json = false } = {}) {
   const out = (text) => { if (!json) process.stdout.write(`${text}\n`); };
@@ -106,6 +120,7 @@ function checkRuntime({ root = skillRoot, json = false } = {}) {
   }
   const failedTail = failed.length ? ` (failed: ${failed.join(', ')})` : '';
   out(`self-checks: ${selfChecks.length - failed.length} of ${selfChecks.length} passed${failedTail}`);
+  out(verdictLine({ syntaxFailed: bad.length, hfsFindings: runtime.ok ? 0 : runtime.findings.length, selfFailed: failed, selfRun: selfChecks.length }));
   return { ok: bad.length === 0 && runtime.ok && failed.length === 0, syntax: { files: files.length, failed: bad.length }, runtime, selfChecks: { run: selfChecks.length, failed } };
 }
 

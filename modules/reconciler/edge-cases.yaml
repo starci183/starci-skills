@@ -381,8 +381,22 @@ cases:
     why: "the stack's compose files, sonar-local.mjs's admin-token reader and the product declarations still read ext/sonar/secrets; moving them touches the product Sonar server and the owner's own decrypt-and-append step, which no lane may run against real secrets; heldSecrets is the dated allowance (2026-10-08) and only shrinks"
   - id: examples-reached-release-with-sonar-smells
     family: correctness
-    finding: {role: runtime, duty: does, verdict: departs, evidence: "SonarCloud scanned the three example apps of the alpha.7 cut and their dashboards failed on 46 code smells (S9382 x23, S7503 x6, S1874 x6, S1128 x2 and nine others) although every L4 row before the scan was green: the sonar-rules self-check judged the runtime's .mjs only, the examples had been judged by an older self-hosted server, and neither lint canon carried a rule for these smells, so nothing refused them before the scan", remedy: {state: in-tree, change: "the smells are fixed in the code and in the templates that render it; both lint canons publish the law SONAR_PARITY (R235), and the sonar-rules self-check also judges the TypeScript each example scans, so the examples cannot regress before the scan"}}
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "SonarCloud scanned the three example apps of the alpha.7 cut and their dashboards failed on 46 code smells (S9382 x23, S7503 x6, S1874 x6, S1128 x2 and nine others) although every L4 row before the scan was green: the sonar-rules self-check judged the runtime's .mjs only, the examples had been judged by an older self-hosted server, and neither lint canon carried a rule for these smells, so nothing refused them before the scan", remedy: {state: in-tree, change: "the smells are fixed in the code and in the templates that render it; both lint canons publish the law SCAN_SMELL (R235), and the sonar-rules self-check also judges the TypeScript each example scans, so the examples cannot regress before the scan"}}
     met: {date: "2026-10-08", where: "release-proof analysis of the three examples on SonarCloud", evidence: "api/issues/search on starcidapride_starci-example-ecommerce-app, -lite-app, -shape-slot: 20, 10 and 16 open code smells"}
     rule: {file: scripts/lib/sonar-syntax-rules.mjs, anchor: "SONAR_SYNTAX_RULES"}
     spec: packages/eslint/be/sonar-parity.spec.mjs
+    status: covered
+  - id: check-count-read-as-green-while-hfs-failed
+    family: record-vs-reality
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "starci runtime check printed 'self-checks: 44 of 44 passed' while its runtime HFS stage had failed and the exit code was 1; a lane and the lead both reported the check green", remedy: {state: in-tree, change: "the last line of the check states the whole verdict: 'check: ok — runtime HFS clean; self-checks N of N' or 'check: FAILED — runtime HFS n finding(s); self-checks a of b (failed: ...)'"}}
+    met: {date: "2026-10-08", where: "lane f10 report and the alpha.7 integration branch", evidence: "ARCH_OWNER_CYCLE engine/config.mjs printed above the self-check lines"}
+    rule: {file: scripts/checks/check-runtime.mjs, anchor: "verdictLine"}
+    spec: tests/checks/check-runtime-only.spec.mjs
+    status: covered
+  - id: engine-config-imports-scripts-tier-for-spec-isolation
+    family: correctness
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "engine/config.mjs imported isSpecRun and insidePath from scripts/lib to keep the live config.yaml out of a spec: ARCH_OWNER_CYCLE engine -> scripts/lib -> engine", remedy: {state: in-tree, change: "the engine reads one generic confinement variable (STARCI_OWNER_CONFIG_WITHIN) and knows nothing of tests; the spec preload sets it to the spec's temp root"}}
+    met: {date: "2026-10-08", where: "commit 6ad9c7cca on the alpha.7 integration branch", evidence: "npm run check: ARCH_OWNER_CYCLE engine/config.mjs:13"}
+    rule: {file: engine/config.mjs, anchor: "confines the owner"}
+    spec: tests/engine/config.spec.mjs
     status: covered

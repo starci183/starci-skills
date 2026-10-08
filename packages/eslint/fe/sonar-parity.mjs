@@ -1,5 +1,5 @@
 /**
- * The law that keeps the code clear of the smells SonarCloud measures (R235 `SONAR_PARITY`).
+ * The law that keeps the code clear of the smells SonarCloud measures (R235 `SCAN_SMELL`).
  *
  * Each rule is the syntax-tree form of one Sonar rule, shared with the back-end canon (scripts/lib/sonar-syntax-rules.mjs,
  * bundled under `runtime/`): `no-await-in-loop` (S9382), `prefer-code-point` (S7758),
