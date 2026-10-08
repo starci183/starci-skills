@@ -1,0 +1,23 @@
+# The published payload of an example. npm reads this file INSTEAD of the app's .gitignore in this folder (the root `files` negations do not reach below a folder
+# that has an ignore file), so it names both what the .gitignore keeps out and the sealed credentials, which are tracked and so cannot be gitignored.
+**/secrets/**
+node_modules/
+dist/
+coverage/
+reports/
+test-results/
+*.tsbuildinfo
+.scannerwork/
+.turbo/
+.tools/
+__generated__/
+.env
+.env.*
+!.env.example
+.secrets/
+*.pem
+report*.json
+*.tmp.json
+*-lint.json
+.artifacts/
+.tmp-*

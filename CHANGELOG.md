@@ -56,6 +56,7 @@ Theme: the roles are one declared contract, the system recovers from a host rest
 - Two specs of the scaffold read stale state: the app scaffold spec expected the CLI pin `1.0.0` where the package is `1.0.1` (it now reads the pin from `packages/cli`), and the scaffold end-to-end spec used a `packages/test-world/dist` left by an earlier checkout (it builds the package from the checked-out source each run).
 - The last line of `starci runtime check` states the whole verdict (`check: ok — runtime HFS clean; self-checks 45 of 45` or `check: FAILED — runtime HFS 2 finding(s); self-checks 44 of 45 (failed: env)`): a failed runtime HFS stage was hidden behind an all-green self-check count.
 - The spec-run confinement of the owner `config.yaml` is a generic engine variable (`STARCI_OWNER_CONFIG_WITHIN`, set by the spec preload to the spec's temp root); the engine no longer imports the scripts tier for it.
+- The npm tarball ships no sealed example credential: npm reads an app's own ignore file instead of the root `files` negations, so each example app carries a `.npmignore` naming its `.starcistacks/<env>/secrets` folders (an optional `.npmignore` joins the `app.tool-config-optional` slot), and a spec holds the tarball free of them.
 
 ### Known limitations
 - SonarCloud has not scanned this commit; the local `sonar-rules` gate reproduces 16 of the 17 findings of the previous scan and misses optional chains that need type information.

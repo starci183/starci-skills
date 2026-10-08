@@ -386,7 +386,7 @@ slots:
     rules: [HFS_MANAGED_FILE_DRIFT, HFS_TOOL_CONFIG_LOCAL]
   - id: app.tool-config-optional
     profiles: [app]
-    path: .npmrc
+    path: "{.npmrc,.npmignore}"     # .npmignore: npm reads the nearest ignore file instead of the root files negations, so an app that ships inside another package keeps its sealed credentials out of the tarball here
     presence: optional
     tracked: tracked
     tier: none

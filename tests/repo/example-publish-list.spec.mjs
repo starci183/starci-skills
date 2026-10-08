@@ -1,6 +1,6 @@
 // example-publish-list.spec.mjs - what `npm pack` ships of examples/: every tracked example file except the declared private or generated ones, and no sealed credential.
-// npm reads the nearest ignore file in a folder instead of the root `files` negations, and every example app has a .gitignore, so a negation cannot keep
-// .starcistacks/<env>/secrets out of the tarball: the `files` list names what ships, and this spec holds it complete and free of credentials.
+// npm reads the nearest ignore file in a folder instead of the root `files` negations, and every example app has a .gitignore, so each app carries a .npmignore naming the credential folders (.starcistacks/<env>/secrets):
+// this spec holds the tarball free of them and complete otherwise.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -9,7 +9,7 @@ import { spawnSync } from 'node:child_process';
 
 const root = path.resolve(import.meta.dirname, '..', '..');
 const run = (command, args) => spawnSync(command, args, { cwd: root, encoding: 'utf8', windowsHide: true, maxBuffer: 64 * 1024 * 1024 });
-const NOT_SHIPPED = (file) => /(^|\/)\.gitignore$/.test(file) || file.includes('/.starciwork/') || file.startsWith('examples/.runtimes/') || /\/\.starcistacks\/[^/]+\/secrets\//.test(file);
+const NOT_SHIPPED = (file) => /(^|\/)\.(git|npm)ignore$/.test(file) || file.includes('/.starciwork/') || file.startsWith('examples/.runtimes/') || /\/\.starcistacks\/[^/]+\/secrets\//.test(file);
 
 test('npm pack ships every tracked example file except the private, generated and ignore files, and no sealed credential', () => {
   const tracked = run('git', ['ls-files', 'examples']);
