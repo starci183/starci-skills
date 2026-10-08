@@ -1273,9 +1273,11 @@ sharedWorkRecords:
   followUp: >-
     A `followUp` staleOperations row (breakingBy names the owner) owes ONE follow-up leg:
     a new attempt of that same op and cut ordinal (same --cut-id/--cut-ordinal/--cut-total)
-    that re-reads the owner's revision, enqueued now and never held behind a seam, never
-    widened to the other slices of its cut or to peers. It supersedes the row once it
-    settles on the new revision.
+    that re-reads the owner's revision, never held behind a seam, never widened to the
+    other slices of its cut or to peers. The Job controller enqueues it (kernel-menu.yaml
+    stale-ready is mechanical); you act only when it refused the move (menu item
+    move-unbuilt), and then you enqueue that one attempt by hand. It supersedes the row
+    once it settles on the new revision.
   ownWorkflow: >-
     Your own workflow's later legs writing what they own is planned progress, never
     staleness (unchanged). A peer writing a record YOUR workflow owns is a `foreignWrite`

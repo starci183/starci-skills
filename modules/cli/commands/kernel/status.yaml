@@ -117,7 +117,9 @@ returns:
     it, once per runnable work-graph node in `nodes` when the workflow has a work graph; a red
     runnable node is a dispatch of the op that last wrote its owned paths, `nodes` naming it.
     impact-check: a staleOperations row without heldBy, or a staleProofs row - a proof whose every
-    piece of evidence is stale re-runs only the check op that made it, as a new attempt.
+    piece of evidence is stale re-runs only the check op that made it, as a new attempt; the Job
+    controller performs the rerun (kernel-menu.yaml stale-ready, stale-proof), the Kernel only
+    when the move was refused.
     supervisor-gate (autopilot): an open supervisor-gate incident - the Supervisor's step, never the
     owner's; keep driving every other leg. owner-gate: an open owner-gate incident or a pending ask;
     under autopilot only the end-of-flow owner step (the handover, its credential checklist). Under

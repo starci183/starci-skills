@@ -185,7 +185,7 @@ test('a consumed-but-unsettled job a peer-wait holds is a deferred settle: heldS
   fx.seed(l=>seedConsumed(l,WORK,OTHER_SETTLE));
   const mixed=fx.frontier(WORK);
   assert.deepEqual([mixed.state,mixed.actionable,mixed.settleReadyJobs,mixed.heldSettleJobs.map(h=>h.jobId)],['settle-ready',false,[OTHER_SETTLE],[SETTLE_JOB]]);
-  assert.match(mixed.reason,new RegExp(`^${OTHER_SETTLE} filed a report you consumed but never settled`));
+  assert.match(mixed.reason,new RegExp(`^${OTHER_SETTLE} filed a report that was consumed but not settled yet`));
 });
 
 test('an owner-gate naming a consumed-but-unsettled job defers its settle: frontier awaiting-owner, not actionable',t=>{

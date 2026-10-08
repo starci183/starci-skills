@@ -202,7 +202,7 @@ test('status: frontier.actionable follows the menu, so work the controllers perf
   assert.equal(queued.state,'engaged','a queued job is an open operation');
   assert.equal(queued.readyOperations,1);
   assert.equal(queued.actionable,false,'an undispatched job is dispatched by the Workflow controller: the menu of the Kernel is empty');
-  assert.match(queued.reason??'',/route\/dispatch or reconcile them before yielding/);
+  assert.match(queued.reason??'',/the Workflow controller routes and dispatches them/);
 
   // The same job, running and owing a report: this is the wait the yield rule
   // exists for.

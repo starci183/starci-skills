@@ -11,8 +11,9 @@ import { push } from '../../scripts/api/git/push.mjs';
 import { renderRuntimeHooks } from '../../scripts/guards/git-hooks.mjs';
 import { gitCommonDir, l4RecordPath, readL4Record, writeL4Record } from '../../scripts/guards/release-record.mjs';
 import { classifySkip, planL4, runL4, skipReport, skipsOf } from '../../scripts/supervisor/release-l4.mjs';
+import { skillRoot } from '../../engine/runtime-root.mjs';
 import { releaseHostMissing } from '../../scripts/supervisor/release-host.mjs';
-import { leftoversRefusal } from '../../scripts/supervisor/release-cut-leftovers.mjs';
+import { leftoversRefusal } from '../../scripts/gates/release-leftovers.mjs';
 
 for (const key of ['GIT_DIR', 'GIT_COMMON_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_OBJECT_DIRECTORY', 'GIT_PREFIX']) delete process.env[key];
 const git = (cwd, ...args) => {
@@ -378,14 +379,10 @@ test('the cut refuses in seconds, before the host lock and any suite, when the c
   untouched(fx);
 });
 
-test('the leftovers inventory is the docs gate own: a real checkout with a stray JSON file is refused, and a clean one is not', (t) => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-leftovers-'));
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
-  fs.mkdirSync(path.join(root, 'modules', 'kernel'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'modules', 'kernel', 'allowlist.yaml'), 'schema: starci/allowlist@1\njson-exceptions:\n  exceptions: []\n  directories: []\n');
-  assert.equal(leftoversRefusal({ repo: root }), null);
-  fs.mkdirSync(path.join(root, 'examples', 'lite-app', 'reports'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'examples', 'lite-app', 'reports', 'lint.sonar.json'), '{}');
-  const refused = leftoversRefusal({ repo: root });
+test('the leftovers inventory is the docs gate own check script: this clean runtime is not refused, and the refusal lines of a stray file are read as offenders', () => {
+  assert.equal(leftoversRefusal({ repo: skillRoot }), null);
+  const stderr = 'Authored JSON outside modules/kernel/allowlist.yaml (1):\n  examples/lite-app/reports/lint.sonar.json\n';
+  const refused = leftoversRefusal({ repo: skillRoot, deps: { run: () => ({ status: 1, stderr }) } });
   assert.deepEqual(refused.findings.map((f) => f.fix.split(' if ')[0]), ['delete examples/lite-app/reports/lint.sonar.json']);
+  assert.throws(() => leftoversRefusal({ repo: skillRoot, deps: { run: () => ({ status: 2, stderr: 'boom' }) } }), /could not run \(exit 2\): boom/);
 });

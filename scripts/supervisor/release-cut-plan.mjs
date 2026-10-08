@@ -11,7 +11,7 @@ import { decisionLines } from './release-cut-rows.mjs';
 import { sonarCloudFindings } from './release-sonarcloud.mjs';
 import { buildPlan, planSummary } from '../gates/release-plan.mjs';
 import { npmRegistry } from '../gates/release-registry.mjs';
-import { leftoversRefusal } from './release-cut-leftovers.mjs';
+import { leftoversRefusal } from '../gates/release-leftovers.mjs';
 
 /** The head the remote main points at ('' for a remote with no main), or null when the remote cannot be read. */
 function remoteMainHead({ run, cwd, remote, branch }) {
