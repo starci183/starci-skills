@@ -6,5 +6,5 @@ export default createMiddleware(routing)
 
 /** Everything except the API, the health probe, framework files and files with an extension. */
 export const config = {
-    matcher: ["/((?!api|health|_next|_vercel|.*\\..*).*)"],
+    matcher: ["/((?!api|health|_next|_vercel|.*[.].*).*)"],
 }

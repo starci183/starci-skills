@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common"
 import type { OnApplicationBootstrap, OnApplicationShutdown } from "@nestjs/common"
 import { InjectLogger } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
+import { eachInOrder } from "@modules/platform/primitives"
 import type { QueueHandler } from "./queue.contracts"
 import { InjectQueueOptions, InjectQueueTransport } from "./queue.decorators"
 import { QueueLogEvent } from "./queue.log-events"
@@ -30,12 +31,14 @@ export class QueueWorkerService implements QueueWorkerRegistry, OnApplicationBoo
 
     /** Starts one worker per registered queue, then registers the schedulers of the options. */
     async onApplicationBootstrap(): Promise<void> {
-        for (const handler of this.handlers.values()) await this.transport.work(handler, this.options.concurrency)
-        for (const scheduler of this.options.schedulers) {
-            await this.transport.upsertScheduler(scheduler).catch((cause: unknown) => {
+        await eachInOrder([...this.handlers.values()], (handler) =>
+            this.transport.work(handler, this.options.concurrency),
+        )
+        await eachInOrder(this.options.schedulers, (scheduler) =>
+            this.transport.upsertScheduler(scheduler).catch((cause: unknown) => {
                 this.logger.error(QueueLogEvent.SchedulerFailed, cause, { scheduler: scheduler.id })
-            })
-        }
+            }),
+        )
     }
 
     /** Closes the workers and the queues. */

@@ -5,7 +5,7 @@ import { RunCli } from "./subs/run.cli"
 /** `cli @@group@@`: the @@group@@ group; its commands are the sub-commands (`cli @@group@@ run`). */
 export class @@Group@@Cli extends CommandRunner {
     /** Without a sub-command the group shows its help. */
-    async run(): Promise<void> {
-        this.command.help()
+    run(): Promise<void> {
+        return Promise.resolve(this.command.help())
     }
 }

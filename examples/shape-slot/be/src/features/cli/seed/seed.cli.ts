@@ -9,7 +9,7 @@ import { RunSeedsCli } from "./subs/run.cli"
 /** `cli seed`: the seed group; its commands are the sub-commands (`cli seed run`). */
 export class SeedCli extends CommandRunner {
     /** Without a sub-command the group shows its help. */
-    async run(): Promise<void> {
-        this.command.help()
+    run(): Promise<void> {
+        return Promise.resolve(this.command.help())
     }
 }

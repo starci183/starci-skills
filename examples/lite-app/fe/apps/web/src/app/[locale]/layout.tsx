@@ -1,5 +1,5 @@
 import { hasLocale } from "next-intl"
-import { getMessages, setRequestLocale } from "next-intl/server"
+import { getMessages } from "next-intl/server"
 import { notFound } from "next/navigation"
 import type { ReactNode } from "react"
 import { AppLayout, appLayoutMetadata } from "@/features/layouts/AppLayout"
@@ -20,7 +20,6 @@ export const generateMetadata = async (props: LayoutProps) => appLayoutMetadata(
 const Layout = async (props: LayoutProps) => {
     const { locale } = await props.params
     if (!hasLocale(routing.locales, locale)) notFound()
-    setRequestLocale(locale)
     const messages = await getMessages()
     return (
         <AppLayout

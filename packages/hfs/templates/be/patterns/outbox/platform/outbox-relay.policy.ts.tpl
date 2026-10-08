@@ -1,6 +1,7 @@
 import type { OnApplicationBootstrap, OnApplicationShutdown } from "@nestjs/common"
 import type { EntityManager } from "typeorm"
 import type { Logger } from "@modules/platform/logging"
+import { mapInOrder, repeatInOrder } from "@modules/platform/primitives"
 import { OutboxLogEvent } from "./outbox.log-events"
 
 /**
@@ -27,9 +28,8 @@ export abstract class OutboxRelayPolicy<Row extends { readonly id: string }>
 
     /** One pass over every connection: relays the oldest waiting rows of each and answers how many it relayed. */
     async relay(): Promise<number> {
-        let relayed = 0
-        for (const manager of this.managers) relayed += await this.relayOf(manager)
-        return relayed
+        const counts = await mapInOrder(this.managers, (manager) => this.relayOf(manager))
+        return counts.reduce((total, count) => total + count, 0)
     }
 
     /** Starts the relay loop over the outbox of every connection. */
@@ -67,12 +67,14 @@ export abstract class OutboxRelayPolicy<Row extends { readonly id: string }>
     }
 
     private async run(): Promise<void> {
-        while (this.running) {
+        await repeatInOrder(async () => {
+            if (!this.running) return true
             const relayed = await this.relay().catch((cause: unknown) => {
                 this.logger.error(OutboxLogEvent.RelayFailed, cause, { outbox: this.outbox })
                 return 0
             })
             if (relayed === 0 && this.running) await this.idle()
-        }
+            return undefined
+        })
     }
 }

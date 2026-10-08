@@ -43,11 +43,12 @@ export class MemoryRealtimeHubService implements RealtimeHub {
         open.add(subscription)
         this.subscriptions.set(topic.name, open)
         return {
-            next: async () => {
-                while (waiting.length === 0 && !closed) {
+            next: async function next(): Promise<IteratorResult<T>> {
+                if (waiting.length === 0 && !closed) {
                     await new Promise<void>((resolve) => {
                         wake = resolve
                     })
+                    return next()
                 }
                 const frame = waiting.shift()
                 return frame === undefined ? { done: true, value: undefined } : { done: false, value: frame }

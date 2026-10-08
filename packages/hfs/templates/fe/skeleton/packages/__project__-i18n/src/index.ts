@@ -1,7 +1,7 @@
 import "server-only"
 import { hasLocale } from "next-intl"
 import { createNavigation } from "next-intl/navigation"
-import { getMessages, getRequestConfig, setRequestLocale } from "next-intl/server"
+import { getMessages, getRequestConfig } from "next-intl/server"
 import { notFound } from "next/navigation"
 import { locale as routeLocale } from "next/root-params"
 import { PRODUCT_TIME_ZONE, routing } from "./routing"
@@ -43,7 +43,6 @@ export const createAppI18n = (app: string, loadMessages: LoadMessages) => ({
     readLocaleSegment: async (params: Promise<{ readonly locale: string }>) => {
         const { locale } = await params
         if (!hasLocale(routing.locales, locale)) notFound()
-        setRequestLocale(locale)
         return { locale, messages: await getMessages(), timeZone: PRODUCT_TIME_ZONE }
     },
 })

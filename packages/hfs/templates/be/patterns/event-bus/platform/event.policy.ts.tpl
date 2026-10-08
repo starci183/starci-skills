@@ -23,7 +23,10 @@ export const REQUEUED_HEADER = "requeued"
 export const DEAD_LETTER_ID_SEPARATOR = "|"
 
 /** The service an event belongs to: the part of its name before the first dot. */
-export const serviceOf = (eventName: string): string => eventName.replace(/\..*$/s, "")
+export const serviceOf = (eventName: string): string => {
+    const dot = eventName.indexOf(".")
+    return dot === -1 ? eventName : eventName.slice(0, dot)
+}
 
 /** The topic the events of a service travel on. */
 export const topicOf = (prefix: string, eventName: string): string => `${prefix}events.${serviceOf(eventName)}`

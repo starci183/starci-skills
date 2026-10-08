@@ -8,7 +8,7 @@ import {
     statusOfOutcome,
     type RequestInput,
 } from "@/modules/api"
-import type { Handoff, Order, SendAttempt, SendInput } from "@/modules/types"
+import type { Handoff, SendInput } from "@/modules/types"
 
 /** A failed call, carrying only the status `toSlot` reads. */
 type ApiError = { readonly status: number }

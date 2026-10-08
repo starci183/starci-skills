@@ -20,7 +20,15 @@ interface SignInInput {
 type SignInParse = { readonly success: true; readonly data: SignInInput } | { readonly success: false }
 
 const UUID = /^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$/u
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/u
+const ADDRESS = /^[^\s@]+@([^\s@]+)$/u
+
+/** Whether the text is one local part, one `@` and a domain with a dot that has a character on each side; linear in the length. */
+const isEmail = (value: string): boolean => {
+    const domain = ADDRESS.exec(value)?.[1]
+    if (domain === undefined) return false
+    const dot = domain.indexOf(".", 1)
+    return dot !== -1 && dot < domain.length - 1
+}
 
 /** The bounded UUID schema shared by generated table Server Actions. */
 export const rowSchema = {
@@ -82,7 +90,7 @@ export const signInInputSchema = {
         if (
             typeof email !== "string" ||
             email.length > 254 ||
-            !EMAIL.test(email) ||
+            !isEmail(email) ||
             typeof password !== "string" ||
             password.length < 8 ||
             password.length > 256

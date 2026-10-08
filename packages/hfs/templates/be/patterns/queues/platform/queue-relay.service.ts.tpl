@@ -4,6 +4,7 @@ import { InjectClock } from "@modules/platform/clock"
 import type { Clock } from "@modules/platform/clock"
 import { InjectLogger } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
+import { eachInOrder } from "@modules/platform/primitives"
 import { OutboxRelayPolicy } from "@modules/platform/outbox"
 import { InjectQueueOptions, InjectQueueRelayManagers, InjectQueueTransport } from "./queue.decorators"
 import type { QueueOptions } from "./queue.options"
@@ -34,8 +35,8 @@ export class QueueRelayService extends OutboxRelayPolicy<QueueRow> {
         return tx.query(SELECT_WAITING_ROWS, [this.options.relayBatch])
     }
 
-    protected async deliver(rows: ReadonlyArray<QueueRow>): Promise<void> {
-        for (const row of rows) await this.transport.add(row.queue, row.id, row.payload)
+    protected deliver(rows: ReadonlyArray<QueueRow>): Promise<void> {
+        return eachInOrder(rows, (row) => this.transport.add(row.queue, row.id, row.payload))
     }
 
     protected async mark(tx: EntityManager, rows: ReadonlyArray<QueueRow>): Promise<void> {

@@ -9,7 +9,10 @@ import { BookingFormBase } from "./component"
 type FormFailure = "refused" | "not-found" | "invalid" | "unavailable"
 type FormResult = "created" | FormFailure | undefined
 
-const valueOf = (input: FormData, name: string): string => String(input.get(name) ?? "")
+const valueOf = (input: FormData, name: string): string => {
+    const value = input.get(name)
+    return typeof value === "string" ? value : ""
+}
 
 /** The connected booking block writes resources and resource intervals through principal-aware Server Actions. */
 export const BookingForm = () => {

@@ -4,6 +4,7 @@ import { InjectClock } from "@modules/platform/clock"
 import type { Clock } from "@modules/platform/clock"
 import { InjectLogger } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
+import { repeatInOrder } from "@modules/platform/primitives"
 import type { BaseEvent } from "./event-bus.contracts"
 import { InjectEventBusOptions, InjectEventTransport } from "./event-bus.decorators"
 import { EventBusLogEvent } from "./event-bus.log-events"
@@ -74,11 +75,13 @@ export class EventRunnerService implements EventConsumerRegistry, OnApplicationB
         const pause = notBefore - this.clock.now().getTime()
         if (pause > 0) await this.transport.wait(pause)
         const failures: Array<unknown> = []
-        for (const consumer of consumers) {
+        const buried = await repeatInOrder(async (index) => {
+            const consumer = consumers[index]
+            if (consumer === undefined) return false
             const event = consumer.event.parse(envelope)
             if (event === null) {
                 await this.bury(message, eventName, attempt, "the envelope does not have the shape of the event")
-                return
+                return true
             }
             try {
                 await consumer.handle({ eventId: event.eventId, event, attempt })
@@ -86,7 +89,9 @@ export class EventRunnerService implements EventConsumerRegistry, OnApplicationB
                 this.logger.error(EventBusLogEvent.DeliveryFailed, cause, { event: eventName, attempt })
                 failures.push(cause)
             }
-        }
+            return undefined
+        })
+        if (buried) return
         const [first] = failures
         if (failures.length > 0) {
             await this.failed(message, eventName, attempt, first instanceof Error ? first.message : String(first))
