@@ -7,7 +7,7 @@
 // smoke set), so the specs behind the reader are selected, not only the specs that name the data path themselves.
 import fs from 'node:fs';
 import path from 'node:path';
-import { touchingSelection } from '../supervisor/land-specs.mjs';
+import { touchingSelection } from './land-specs.mjs';
 import { walkFiles } from '../lib/walk.mjs';
 import { byCodeUnit } from '../lib/list.mjs';
 import { escapeRegExp } from '../lib/regex.mjs';
@@ -29,7 +29,7 @@ export function readsData(text, rel) {
 }
 
 /** The runtime source files ([{file, text}] under scripts, engine, packages; no node_modules) that read one of `dataFiles`: [{file, reads:[data files]}]. */
-export function dataReaders({ dataFiles, sources }) {
+function dataReaders({ dataFiles, sources }) {
   return sources.map(({ file, text }) => ({ file, reads: dataFiles.filter((rel) => readsData(text, rel)) })).filter((entry) => entry.reads.length);
 }
 

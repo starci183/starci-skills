@@ -9,7 +9,7 @@ change that contradicts them is a bug in the code.
 ```sh
 npm ci
 npm run check   # starci runtime check
-npm test        # node --test tests/*.spec.mjs
+starci test affected --run   # the specs your change can break (see Verification)
 npm run test:packages   # starci release clean-test: the spec suite of every package under packages/
 ```
 
@@ -22,6 +22,20 @@ clean install of its own manifest and lockfile (about four minutes); `npm run te
 `-- --base <rev>` limits it to the packages those files belong to, a runtime file a package bundles into its generated
 `runtime/` copy (`scripts/hfs/**`, `scripts/lib/**`, `knowledge/**`) included. Run it after a change to such a file. CI runs it on
 every run and the land gate runs it for the packages a land touches.
+
+## Verification
+
+Everyday verification is `npm run check` plus `starci test affected --run`. The verb computes the spec files your diff can break with the
+land gate's own selection (the specs named after, importing or spawning the CLI behind a changed file, the invariant specs, and the specs behind
+a runtime module that reads a changed `modules/**` or `knowledge/**` file), runs each once, and ends with `affected: N files, P pass, F fail`.
+A red file is fixed and that file is run again, then the affected set once; the root `npm test` is never the answer to a red file or a small fix.
+`starci test affected --changed <file...>` names the files itself; a selection above the bound in `modules/supervisor/affected-tests.yaml` is printed and left to the lead.
+
+The full suite runs exactly twice in a change's life: once by the lead on the merged tree when many lanes meet, and once inside `starci release cut`
+(the pre-push gate refuses a push of `main` without the release record of that commit). A bound role (op, kernel, supervisor, critic, a lane's lead
+seat) that runs the root `npm test` is refused by the command policy and sent to the affected verb; the owner, unbound, is never refused.
+Reasons: a full run costs tens of minutes of a loaded host and answers no more than the affected set for a local change, while a hand-picked
+"the test I touched" misses the dependents (2026-10-08: a template fix broke the lite scaffold, one registry file broke 52 specs) - which is why the set is computed.
 
 The supported Node.js 22/24 branches are declared in `package.json` `engines.node` and summarized in
 [README prerequisites](README.md). Unflagged `node:sqlite` and the runtime capability checks are
@@ -48,7 +62,7 @@ parses TOML. `devDependencies` support contributor specs and tooling:
   `STARCI_TEMP_ROOT` (else the OS temp directory) and points `TEMP`, `TMP`, `TMPDIR` and `STARCI_TEMP_ROOT` at it, so
   `STARCI_TEMP_ROOT=<dir on another drive> node --test ...` puts the whole suite's files there. A spec run never reads the checkout's own `config.yaml` either:
   `loadConfig` and `inspectOwnerConfig` (`engine/config.mjs`) see an owner file only from under the directory `STARCI_OWNER_CONFIG_WITHIN` names (the spec preload sets it to the spec's temp root), where a fixture wrote it, so a lane clone, the release host and a clean checkout give one result.
-- The release cut runs the suite under conditions a plain `npm test` does not have (`STARCI_REQUIRE_APP_INSTALLS=1`, `STARCI_REQUIRE_ORCA_LIVE=1`, real `npm ci` of every example app, a fresh `packages/test-world` build, the host's concurrency budget, an Orca terminal, a Docker daemon). `starci release env-test` (`npm run test:release-env`) runs the suite exactly so (`--lane` leaves out the Orca requirement a lane clone cannot meet; `--reuse-installs` keeps installed example apps): run it before asking for a release cut, and after a change to a spec's isolation, a verb catalog row or a git-dependent gate.
+- The release cut runs the suite under conditions a plain run of the whole suite does not have (`STARCI_REQUIRE_APP_INSTALLS=1`, `STARCI_REQUIRE_ORCA_LIVE=1`, real `npm ci` of every example app, a fresh `packages/test-world` build, the host's concurrency budget, an Orca terminal, a Docker daemon). `starci release env-test` (`npm run test:release-env`) runs the suite exactly so (`--lane` leaves out the Orca requirement a lane clone cannot meet; `--reuse-installs` keeps installed example apps): run it before asking for a release cut, and after a change to a spec's isolation, a verb catalog row or a git-dependent gate.
 - No real network. Provider CLIs (`orca`, `devin`, `claude`, `codex`) are stubbed or recorded; a
   spec that would spawn a real agent is wrong.
 - Specs may spawn `starci <group> <verb>` under test with `spawnSync` — that is the sanctioned
@@ -181,7 +195,7 @@ comment line (`<!-- [removed-list] -->` in Markdown, `# [removed-list]` in yaml)
 
 ## Pushing and releasing
 
-The remote `main` of this repository is not pushed between releases. A land fast-forwards LOCAL main, and the work is verified locally (`npm run check` with the Sonar-rules gate, the full `npm test`, the cut's own spec conditions with `starci release env-test`, the packages suites with `npm run test:packages`); nobody pushes to obtain a CI or SonarCloud reading.
+The remote `main` of this repository is not pushed between releases. A land fast-forwards LOCAL main, and the work is verified locally (`npm run check` with the Sonar-rules gate, `starci test affected --run` for the change; the full suite runs once on the merged tree and once inside the cut, with the cut's own spec conditions from `starci release env-test`, and the packages suites with `npm run test:packages` for the packages a change touches); nobody pushes to obtain a CI or SonarCloud reading.
 Main goes to the remote exactly when a release milestone is cut, in one atomic push of main and one annotated `v*` tag, through `starci release cut --tag v<version>` (`--plan` reports what it would run and require; it runs nothing).
 The installed pre-push hook (`scripts/guards/release-push-gate.mjs`, written by `starci runtime link`) makes that mechanical: it refuses a push of `main` or of a `v*` tag unless the pushed commit is a release commit — the version moved past the remote main's, an annotated tag `v<version>` on it, a dated CHANGELOG heading for exactly that version, and the release record of that exact commit with a green full suite, packages suites and checks. The refusal names what is missing and the command that produces it; there is no bypass switch.
 R221 `CI_TRIGGERS_RELEASE_ONLY` refuses any other workflow trigger and R222 `RELEASE_NOTES` refuses a tag over unfinished CHANGELOG notes. The model, the release definition, the refusals and the risks are in [git governance](docs/git-governance.md).

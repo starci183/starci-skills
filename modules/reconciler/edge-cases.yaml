@@ -644,3 +644,10 @@ cases:
     rule: {file: scripts/reconciler/debug-questions.mjs, anchor: "wakeActed"}
     spec: tests/reconciler/debug-signals.spec.mjs
     status: covered
+  - id: verification-not-proportional-to-the-change
+    family: smooth-operation
+    finding: {role: debug, duty: does, verdict: departs, evidence: "about twelve full-suite runs on 2026-10-08, several on trees where the set of specs the diff can reach would have answered in minutes; a hand-picked file misses dependents (a template fix broke the lite scaffold, one registry file broke 52 specs)", remedy: {state: in-tree, change: "starci test affected computes the set with the land gate selection plus the readers of changed modules and knowledge data and runs each file once; the command policy sends a bound role that runs the root npm test to it; the full suite is the merged-tree run and the release cut"}}
+    met: {date: "2026-10-09", where: "the owner's rule on testing after the 2026-10-08 sessions", evidence: "no frequent full tests: fix a test, run that test again, then push"}
+    rule: {file: modules/kernel/command-policy.yaml, anchor: "starci test affected --run in the runtime"}
+    spec: tests/guards/role-rights.spec.mjs
+    status: covered

@@ -15,7 +15,7 @@ never checks anything out there.
 An operation that writes or changes code writes or updates the unit specs of that code, and what it runs is only those
 specs plus the specs that import the changed source, with lint, codegen and typecheck scoped by the op gate (`gate.mjs`). No
 operation, kernel, supervisor lane, land or `.claude` upgrade runs the whole suite (`config.yaml specs.harness`, default
-false = touching-only: the land gate runs `--specs touching` and refuses `--specs all`). The whole unit suite belongs to two
+false = touching-only: the land gate runs `--specs touching` and refuses `--specs all`). In the runtime tree the specs a change can break are `starci test affected --run` (the land gate's selection plus the readers of changed shared data), never the root suite. The whole unit suite belongs to two
 places: `unit.verify` (`starci gate unit --root <app>`, dispatched only when the goal or the owner asks for the full unit run) and the
 owner-approved native release cut (`starci release cut`, with the complete L4 scope and Linux parity
 defined in `docs/source-process.md`). The `/starci` entry loads the internal release procedure and

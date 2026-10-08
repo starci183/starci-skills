@@ -11,10 +11,10 @@ import { revParse } from '../api/git/rev-parse.mjs';
 import { execNode } from '../api/node/exec-node.mjs';
 import { readModuleJson } from '../../engine/runtime-root.mjs';
 import { readSpecs } from '../lib/spec-pool.mjs';
-import { changedExports, headRanges } from '../supervisor/land-specs.mjs';
+import { changedExports, headRanges } from './land-specs.mjs';
 import { affectedSelection, readSources } from './affected-select.mjs';
-import { pathList } from './test-ladder.mjs';
-import { resolveTestConcurrency } from './test-concurrency.mjs';
+import { pathList } from '../machine/test-ladder.mjs';
+import { resolveTestConcurrency } from '../machine/test-concurrency.mjs';
 import { byCodeUnit } from '../lib/list.mjs';
 
 const SCHEMA = 'starci/test-affected@1';

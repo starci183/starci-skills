@@ -2,7 +2,7 @@ group: test
 verb: affected
 owner: runtime
 summary: the specs a change can break, chosen by the land gate selection; --run runs each once
-impl: {module: scripts/machine/affected-test.mjs, export: testAffected}
+impl: {module: scripts/supervisor/affected-test.mjs, export: testAffected}
 effect: host
 roles: [worker, lead, coordinator, release, owner]
 conventions:

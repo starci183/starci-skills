@@ -12,7 +12,7 @@ repeated confirmation. Never supply missing approval from an agent's judgement.
 ## Qualified Source release
 
 1. Finish and qualify bounded lanes, then land locally through the native land owner. Lanes run the
-   targeted and dependent scopes in the test ladder; the coordinator freezes clean local main.
+   targeted and dependent scopes in the test ladder (`starci test affected --run`); the coordinator freezes clean local main.
 2. Follow the existing release owners for the version, finished CHANGELOG, package publication and
    example pins. Preserve actual package, image, UI/UAT and compatibility receipts required by scope.
 3. Invoke the native release cut for the accepted tag:

@@ -4,8 +4,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { affectedSelection, dataFilesOf, readsData } from '../../scripts/machine/affected-select.mjs';
-import { baseOf, runBounded, runSpecFile, testAffected } from '../../scripts/machine/affected-test.mjs';
+import { affectedSelection, dataFilesOf, readsData } from '../../scripts/supervisor/affected-select.mjs';
+import { baseOf, runBounded, runSpecFile, testAffected } from '../../scripts/supervisor/affected-test.mjs';
 import { readSpecs } from '../../scripts/lib/spec-pool.mjs';
 import { mkdtemp } from '../helpers/tmpdir.mjs';
 
