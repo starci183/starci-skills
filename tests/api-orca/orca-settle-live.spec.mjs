@@ -14,6 +14,7 @@ import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { status as orcaStatus } from '../../scripts/api/orca/status.mjs';
 import { startAgent } from '../../scripts/agent/lib.mjs';
+import { liveLaunchTrust } from '../helpers/live-launch-trust.mjs';
 import { noopAgent } from '../../scripts/kernel/launch-smoke-models.mjs';
 import { workerOutput } from '../../scripts/machine/worker-output.mjs';
 import { workerShow } from '../../scripts/api/orca/worker-show.mjs';
@@ -45,7 +46,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const agentPids = () => new Map((listHostProcesses({ where: AGENT_PROCESS_WHERE, timeoutMs: 30000 }) ?? []).map((p) => [p.pid, p]));
 
 // The runtime's one launch path (startAgent -> spawnAgent): pre-trusts the directory, so the first-run trust prompt
-// cannot hold the agent, creates the Run from this terminal, starts with --spec and attests the agent. The launch names
+// cannot hold the agent (the trust step runs on an environment without the test-runner marker: tests/helpers/live-launch-trust.mjs), creates the Run from this terminal, starts with --spec and attests the agent. The launch names
 // the cheapest priced tier member of the provider that meets the worker floors (noopAgent: the member modules/models/tiers.yaml
 // declares, its tier and effort), so the admission allow group is that one concrete member.
 async function startNoop(agent, label) {
@@ -54,9 +55,9 @@ async function startNoop(agent, label) {
   const started = startAgent({ provider: agent, model: member.model, effort: member.effort, role: 'worker', tier: member.tier,
     allowGroup: [{ provider: agent, model: member.model, pool: member.pool, effort: member.effort }],
     worktree: ROOT, title: `smoke settled ${label}`, prompt: NOOP_SPEC, objective: `smoke settled ${label}`,
-    entry: process.env.ORCA_TERMINAL_HANDLE, request: { smoke: 'settled', label, at: Date.now() } });
-  console.log(`SMOKE-START ${JSON.stringify({ label, member: `${member.model}/${member.effort ?? '-'}/${member.tier}`, ok: started.ok, dispatchId: started.dispatchId ?? null, runId: started.runId ?? null, step: started.step ?? null, error: started.error ?? null, refused: started.ok ? null : { detail: started.detail ?? null, rejected: started.decision?.rejected ?? null } })}`);
-  assert.ok(started.ok, `start ${agent}: ${started.error ?? started.step}${started.detail ? ` (${started.detail})` : ''}`);
+    io: { spawn: { trust: liveLaunchTrust } }, entry: process.env.ORCA_TERMINAL_HANDLE, request: { smoke: 'settled', label, at: Date.now() } });
+  console.log(`SMOKE-START ${JSON.stringify({ label, member: `${member.model}/${member.effort ?? '-'}/${member.tier}`, ok: started.ok, dispatchId: started.dispatchId ?? null, runId: started.runId ?? null, step: started.step ?? null, error: started.error ?? null, trust: started.trust ?? null, refused: started.ok ? null : { detail: started.detail ?? null, rejected: started.decision?.rejected ?? null } })}`);
+  assert.ok(started.ok, `start ${agent}: ${started.error ?? started.step}${started.detail ? ` (${started.detail})` : ''}${started.trust ? ` trust=${JSON.stringify({ status: started.trust.status, reason: started.trust.reason ?? null, errors: started.trust.errors ?? null })}` : ''}`);
   return started;
 }
 // Before any teardown: the dispatch id and the pane tail, so a stall (a trust prompt, a login) is diagnosable.
