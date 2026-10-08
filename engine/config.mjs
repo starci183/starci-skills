@@ -241,6 +241,8 @@ export function uatSettings(config=loadConfig()){
 const ALLOCATION_KEYS=Object.freeze(['grants']);
 const GRANT=/^([a-z0-9][a-z0-9.-]*)=(\d+)@([a-z]+(?:\+[a-z]+)*)$/;
 /** One grant string `<pool>=<slots>@<role>+<role>` as {pool, slots, roles}, or null when it is not that shape. */
+/** The closed set of top-level config.yaml blocks: the validator accepts these and refuses every other key. */
+export const CONFIG_BLOCKS=Object.freeze(['language','model','effort','models','allocation','kernel','budgets','supervisor','parallel','delegation','connectors','asks','uat','specs','reconciler','debugLoop','orca','roots','resources','launchTrust','retention']);
 export function parseAllocationGrant(text){
   const m=typeof text==='string'?GRANT.exec(text.trim()):null;
   return m?{pool:m[1],slots:Number(m[2]),roles:m[3].split('+')}:null;
@@ -313,7 +315,7 @@ const validateSupervisorBlock=(supervisor,profile)=>{
 const validateDelegationBlock=d=>{if(!plain(d)||Object.keys(d).some(key=>!['asks','until','excludes','note'].includes(key))||typeof d.asks!=='string'||!d.asks.trim()||typeof d.until!=='string'||Number.isNaN(Date.parse(d.until))||(d.excludes!==undefined&&(!Array.isArray(d.excludes)||d.excludes.some(x=>typeof x!=='string'))))throw new Error('Invalid config.yaml: delegation must be {asks: <delegate>, until: <ISO time>, excludes?: [<class>], note?} or null.');};
 const validateBudgetsBlock=budgets=>{if(!plain(budgets)||Object.keys(budgets).some(key=>!['maxOps'].includes(key))||Object.values(budgets).some(value=>value!==null&&!(Number.isInteger(value)&&value>0)))throw new Error('Invalid config.yaml: budgets must be {maxOps?} with positive-integer-or-null values.');};
 const validateRootKeys=(config)=>{
-  const allowed=new Set(['language','model','effort','models','allocation','kernel','budgets','supervisor','parallel','delegation','connectors','asks','uat','specs','reconciler','debugLoop','orca','roots','resources','launchTrust','retention']);
+  const allowed=new Set(CONFIG_BLOCKS);
   if(!plain(config)||Object.keys(config).some(key=>!allowed.has(key))||typeof config.language!=='string'||!/^[a-z]{2,3}(?:-[A-Za-z0-9]+)*$/.test(config.language)||!(config.model===null||typeof config.model==='string'&&config.model.trim())||!EFFORT_LEVELS.has(config.effort))
     throw new Error('Invalid config.yaml: expected language, model, effort and the closed set of config blocks.');
 };

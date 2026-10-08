@@ -37,6 +37,8 @@ Optional keys:
 - `allocation.grants` — `['<pool>=<slots>@<role>+<role>']`, the default grant every workflow gets; once
   declared it is the whole set, so a `capacityAuthority: explicit-workflow-quota` pool (Devin) routes only
   for the granted roles and up to the granted running slots
+- `orca` — `{maxWorkerDepth?}` or null: the worker depth the Orca app is set to; an integer from 1 to `MAX_WORKER_DEPTH_CEILING`,
+  absent or null meaning `ORCA_DEFAULTS` (both in `engine/orca-config.mjs`, read through `orcaSettings`)
 - `debugLoop` — `{interval?, worktreeLimit?}`: the cadence of the chat `/loop` that runs `starci debug digest`
   (`<n>s`, `<n>m` or `<n>h`, positive; shipped default `10m`) and the positive integer worktree alert threshold of
   `starci debug run core-watch` (shipped default 40). Both keys are optional and read through `engine/config.mjs`
