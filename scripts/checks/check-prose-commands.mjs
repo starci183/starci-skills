@@ -20,7 +20,17 @@ export const CODE = 'RT_PROSE_COMMAND_UNKNOWN';
 const SURFACE = /^(?:(?:skills|docs)\/.+\.md|(?:README|CONTEXT|CONTRIBUTING)\.md|modules\/.+\.(?:md|yaml))$/;
 const EXEMPT = /^(?:modules\/kernel\/(?:removed-vocabulary|failure-codes)\.yaml|packages\/.*)$/;
 const SPAN = /`([^`\n]+)`/g;
-const COMMAND = /(?<![\w/.-])starci ([a-z][a-z-]*) ([a-z][a-z-]*)([^→]*?)(?=\s*(?:→|\bstarci [a-z]|$))/g;
+const COMMAND_HEAD = /(?<![\w/.-])starci ([a-z][a-z-]*) ([a-z][a-z-]*)/g;
+/** Each `starci <group> <verb>` of a text with its own tail: up to the next command or the arrow that ends it. */
+function commandsOf(shown) {
+  const heads = [...shown.matchAll(COMMAND_HEAD)];
+  return heads.map((head, index) => {
+    const from = head.index + head[0].length;
+    const next = heads[index + 1]?.index ?? shown.length;
+    const arrow = shown.indexOf('→', from);
+    return [head[0], head[1], head[2], shown.slice(from, arrow >= 0 && arrow < next ? arrow : next)];
+  });
+}
 const PROSE_CLAUSE = /(?<![\w/.-])starci [a-z][a-z-]* [a-z][a-z-]*[^(),;:+→\n]*/g;
 const FLAG = /(?<![\w-])--([a-z][a-z0-9-]*[a-z0-9])(?![\w*-])/g;
 
@@ -45,7 +55,7 @@ function partsOf(line, fenced) {
 function commandFindings(part, table) {
   const found = [];
   const shown = part.split(/\s--\s/)[0];
-  for (const match of shown.matchAll(COMMAND)) {
+  for (const match of commandsOf(shown)) {
     const verbs = table.get(match[1]);
     if (!verbs) continue;
     const flags = verbs.get(match[2]);
