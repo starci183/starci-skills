@@ -9,7 +9,7 @@ import { spawnSync } from 'node:child_process';
 import { cutRelease } from '../../scripts/supervisor/release-cut.mjs';
 import { planL4 } from '../../scripts/supervisor/release-l4.mjs';
 import { selectionFor, decisionLines } from '../../scripts/supervisor/release-cut-rows.mjs';
-import { affectedRowExtras, ciPlan, ciPolicy } from '../../scripts/supervisor/release-ci-rows.mjs';
+import { affectedRowExtras, ciPlan, ciPolicy, ciSettings } from '../../scripts/supervisor/release-ci-rows.mjs';
 import { affectedRelease, rangeBase } from '../../scripts/supervisor/release-affected.mjs';
 import { readAffectedLedger } from '../../scripts/supervisor/release-affected-ledger.mjs';
 import { readL4Record } from '../../scripts/guards/release-record.mjs';
@@ -76,6 +76,8 @@ test('suite ci plans no root suite and no Linux row; it plans checks, packages, 
   assert.deepEqual(orca.args.filter((arg) => arg.endsWith('.spec.mjs') && !arg.startsWith('./')), ['tests/api-orca/orca-settle-live.spec.mjs', 'tests/api-orca/orca-worktree-rm-live.spec.mjs']);
   assert.equal(orca.env.STARCI_REQUIRE_ORCA_LIVE, '1', 'the live smokes run with the L4 env');
   assert.ok(plan.steps.find((s) => s.name === policy.affected.row).affected);
+  assert.equal(ciSettings(plan, { appsAfter: 'npm test' }).appsAfter, 'npm run check', 'the apps do not wait for a suite that is not planned');
+  assert.equal(ciSettings({ mode: 'local' }, { appsAfter: 'npm test' }).appsAfter, 'npm test');
   const selection = selectionFor({ repo: base, head: 'a'.repeat(40), rows: null, reuse: true, mode: 'ci', deps: { runtimeRoot: base, treeEntries: () => null, ledgers: () => [] } });
   assert.equal(selection.names.includes('linux-parity'), false);
   assert.equal(selection.names.includes('npm test'), false);

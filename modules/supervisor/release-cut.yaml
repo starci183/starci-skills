@@ -64,8 +64,8 @@ suite:
     orca:
       row: orca live smokes
       specs: [tests/api-orca/orca-settle-live.spec.mjs, tests/api-orca/orca-worktree-rm-live.spec.mjs]
-    # The example apps start after this row (the suite row they wait for in local mode is not planned).
-    appsAfter: orca live smokes
+    # The example apps start after this row (the suite row they wait for in local mode is not planned); the live Orca smokes, the longest local row, run beside the apps.
+    appsAfter: npm run check
     # The GitHub workflow whose run judges a `suite: ci` release (.github/workflows/ci.yml, name: ci) and the check names read as the Codecov and Sonar verdicts.
     workflow: ci
     statusPatterns: [codecov, sonar]
