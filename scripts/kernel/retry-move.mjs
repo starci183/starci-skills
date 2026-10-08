@@ -4,7 +4,7 @@
 // execute one definition.
 import { jobPayloadOf } from './verbs/shared/rows.mjs';
 
-const csv = (list) => (Array.isArray(list) ? list.map(String).filter(Boolean).join(',') : '');
+export const csv = (list) => (Array.isArray(list) ? list.map(String).filter(Boolean).join(',') : '');
 
 /** The enqueue arguments that retry `row` (a jobs row), or null when the job has no write set to repeat. */
 export function retryMoveOf(row, { op = row?.op_id ?? null, retryOf = row?.job_id ?? null } = {}) {

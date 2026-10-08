@@ -38,15 +38,18 @@ test('the catalog classifies every origin, and every kind that names a hold name
   const catalog = menuCatalog();
   const kinds = new Set(catalog.kinds.map((kind) => kind.id));
   for (const origin of catalog.origins) {
-    assert.ok(['mechanical', 'pending', 'wait', 'duty'].includes(origin.class), `${origin.id}: class`);
-    if (origin.class === 'pending' || origin.class === 'duty') assert.ok(kinds.has(origin.menu), `${origin.id} names its menu kind`);
+    assert.ok(['mechanical', 'judgment', 'wait', 'duty'].includes(origin.class), `${origin.id}: class`);
+    if (origin.class === 'judgment' || origin.class === 'duty') assert.ok(kinds.has(origin.menu), `${origin.id} names its menu kind`);
     else assert.ok(origin.doneBy, `${origin.id} says who does it`);
+    if (origin.class === 'judgment') assert.ok(origin.why || origin.class === 'duty', `${origin.id} says what the Kernel chooses`);
+    if (origin.fallback) assert.equal(catalog.origins.find((row) => row.id === origin.fallback)?.class, 'judgment', `${origin.id} falls back to a judgment`);
   }
   const holds = new Map(incidentPolicy().holds.map((hold) => [hold.id, hold]));
   for (const kind of catalog.kinds.filter((entry) => entry.hold)) assert.equal(holds.get(kind.hold)?.handler, 'kernel', `${kind.id}: hold ${kind.hold} is the Kernel's`);
   for (const state of catalog.frontier.filter((row) => row.class === 'judgment' || row.class === 'pending')) assert.ok(kinds.has(state.kind), `${state.state} names a kind`);
   assert.equal(originOf({ origin: 'ready-queued' }).class, 'mechanical');
-  assert.equal(originOf({ origin: 'approved-leg' }).class, 'pending');
+  assert.equal(originOf({ origin: 'approved-leg' }).class, 'mechanical');
+  assert.equal(originOf({ origin: 'approved-leg-open' }).class, 'judgment');
   assert.equal(originOf({ origin: 'supervisor-gate' }).class, 'wait');
 });
 
@@ -89,11 +92,11 @@ test('a gate that needs a ruling is the Supervisor\'s, and the work the controll
 test('the main kinds build their items: a stale runtime revision, a worker question, a peer message, a wedged worker, work the runtime does not yet do', () => {
   const menu = buildMenu(sources({ rev: { stale: true, acked: 'a'.repeat(40), current: 'b'.repeat(40) },
     questions: [{ messageId: 'msg-1', jobId: 'op-x-1', opId: 'x', question: 'which table?', askedAt: new Date(T0).toISOString() }], peers: [{ key: 'pm-1', from: 'wf-other', kind: 'request', subject: 'port', at: T0 }],
-    wedged: [{ jobId: 'op-x-2', opId: 'x' }], nextActions: [{ kind: 'dispatch', origin: 'approved-leg', op: 'architecture.decide', reason: 'approved leg has no job' }] }));
-  assert.deepEqual(menu.map((item) => item.id), ['rev-ack:wf-menu', 'worker-question:msg-1', 'peer-message:pm-1', 'worker-wedged:op-x-2', 'leg-ready:architecture.decide:approved-leg']);
+    wedged: [{ jobId: 'op-x-2', opId: 'x' }], nextActions: [{ kind: 'dispatch', origin: 'approved-leg-open', op: 'architecture.decide', reason: 'approved leg has no job' }] }));
+  assert.deepEqual(menu.map((item) => item.id), ['rev-ack:wf-menu', 'worker-question:msg-1', 'peer-message:pm-1', 'worker-wedged:op-x-2', 'leg-ready:architecture.decide:approved-leg-open']);
   assert.equal(menu[0].mode, 'duty');
   assert.equal(menu[0].options[0].direct, true);
-  assert.equal(menu.at(-1).mode, 'mechanical-pending');
+  assert.equal(menu.at(-1).mode, 'judgment');
   const question = menu[1];
   assert.deepEqual(question.options.map((o) => o.choice), ['answer', 'ask-owner', 'none-fits']);
   assert.equal(question.options[0].args.body, '$text', 'the caller\'s --text binds to the placeholder');

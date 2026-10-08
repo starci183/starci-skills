@@ -10,8 +10,9 @@ id: kernel.menu
 
 about:
   en: >-
-    Mechanical work never appears here: the runtime does it in its controllers. An item is a point of judgment, a duty only the Kernel
-    can attest (the runtime revision), or work the runtime does not yet do itself (mode mechanical-pending).
+    Mechanical work never appears here: the runtime does it in its controllers. An item is a point of judgment (more than one legitimate
+    answer given the ledger), a duty only the Kernel can attest (the runtime revision), or the handover step the runtime does not yet do
+    itself (mode mechanical-pending).
 
 # Every menu carries this typed escape. It records the decision, then escalates along the role chain of modules/kernel/roles.yaml.
 escape:
@@ -23,9 +24,12 @@ escape:
 snooze:
   ms: {ref: "modules/reconciler/job.yaml#decisionDueMs"}
 
-# Every origin of a `next` action of `starci kernel status`. `mechanical`: the runtime performs it; `doneBy` names where. `pending`: the
-# runtime does not yet perform it, so the Kernel's menu carries it (mode mechanical-pending) and the edge-case registry lists it as open.
-# `wait`: a wait or a gate that is the Supervisor's or the owner's step, never the Kernel's.
+# Every origin of a `next` action of `starci kernel status`. `mechanical`: one right action given the ledger; the next action carries its
+# typed move (scripts/kernel/next-moves.mjs, scripts/kernel/retry-move.mjs), the Job controller performs it once per engine process
+# (scripts/reconciler/mechanical-moves.mjs) and a refused move opens a Decision Item; `doneBy` names where. A mechanical origin whose move
+# cannot be built takes its `fallback` origin, a judgment. `judgment`: more than one legitimate answer, so the Kernel's menu carries it
+# (`menu` names the kind) and `why` says what the Kernel chooses. `wait`: a wait or a gate that is the Supervisor's or the owner's step,
+# never the Kernel's.
 origins:
   - {id: unstepped-failure, kind: retry, class: mechanical, doneBy: "Job controller: starci kernel reconcile --route-failure (a step that records none opens Decision Item retry-decision)"}
   - {id: unstepped-failure-wait, kind: wait, class: wait, doneBy: "the leg that cures the blocker; its retry is enqueued behind that leg once it has a job"}
@@ -35,23 +39,26 @@ origins:
   - {id: reopened-provisional, kind: retry, class: mechanical, doneBy: "Job controller: the retry move (scripts/reconciler/mechanical-moves.mjs)"}
   - {id: deferred-queued, kind: dispatch, class: mechanical, doneBy: "Workflow controller: starci kernel dispatch-ready routes the job, which settles it deferred"}
   - {id: ready-queued, kind: dispatch, class: mechanical, doneBy: "Workflow controller: starci kernel dispatch-ready (a root-verify job and a seam job included)"}
-  - {id: approved-leg, kind: dispatch, class: pending, menu: leg-ready}
-  - {id: red-node, kind: dispatch, class: pending, menu: node-rework}
-  - {id: stale-proof, kind: impact-check, class: pending, menu: stale-redispatch}
-  - {id: stale-ready, kind: impact-check, class: pending, menu: stale-redispatch}
-  - {id: asset-slots, kind: dispatch, class: pending, menu: asset-slots}
+  - {id: approved-leg, kind: dispatch, class: mechanical, fallback: approved-leg-open, doneBy: "Job controller: the enqueue move on the write set the plan leg declares (scripts/reconciler/mechanical-moves.mjs)"}
+  - {id: approved-leg-open, kind: dispatch, class: judgment, menu: leg-ready, why: "the plan leg declares no write set, or a work graph partitions it per node: the paths the leg owns are the Kernel's to choose"}
+  - {id: red-node, kind: dispatch, class: mechanical, fallback: move-unbuilt, doneBy: "Job controller: the enqueue move of the op that last wrote the node, on the node's owned paths (a failed last job is retried, a passed one is reopened)"}
+  - {id: stale-proof, kind: impact-check, class: mechanical, fallback: move-unbuilt, doneBy: "Job controller: the rerun move of the job that made the proof (a passed unit is reopened)"}
+  - {id: stale-ready, kind: impact-check, class: mechanical, fallback: move-unbuilt, doneBy: "Job controller: the rerun move of the job whose read records changed (a passed unit is reopened)"}
+  - {id: asset-slots, kind: dispatch, class: mechanical, fallback: move-unbuilt, doneBy: "Job controller: the enqueue move of interface.asset on the records that declare the slots"}
   - {id: supervisor-gate, kind: supervisor-gate, class: wait, doneBy: "the Supervisor rules on the gate; its resolution wakes the Kernel"}
   - {id: owner-gate, kind: owner-gate, class: wait, doneBy: "the owner's step; the answer wakes the Kernel"}
   - {id: pending-ask, kind: owner-gate, class: wait, doneBy: "the owner's answer (or the autopilot's) wakes the Kernel"}
-  - {id: credential-step, kind: dispatch, class: pending, menu: credential-step}
+  - {id: credential-step, kind: dispatch, class: mechanical, fallback: move-unbuilt, doneBy: "Job controller: the enqueue move of the one provision.ask whose question lists every deferred credential"}
   - {id: in-flight, kind: wait, class: wait, doneBy: "the running leg"}
   - {id: queued-wait, kind: wait, class: wait, doneBy: "the cause queuedBecause names; the runtime re-evaluates it on every pass"}
   - {id: peer-wait, kind: wait, class: wait, doneBy: "the peer workflow; a typed condition or its message releases it"}
   - {id: rev-reread, kind: reread, class: duty, menu: rev-ack}
-  - {id: draw-redraw, kind: retry, class: pending, menu: draw-redraw}
-  - {id: seam-reconcile, kind: impact-check, class: pending, menu: seam-duty}
-  - {id: seam-reconcile-red, kind: retry, class: pending, menu: seam-duty}
-  - {id: seam-recut, kind: retry, class: pending, menu: seam-duty}
+  - {id: draw-redraw, kind: retry, class: mechanical, fallback: draw-redraw-unbound, doneBy: "Job controller: the rerun move of the job the owner's redraw answer concerned; the packet carries the owner's notes"}
+  - {id: draw-redraw-unbound, kind: retry, class: judgment, menu: draw-redraw, why: "the owner's redraw answer names no job, so the write set of the redraw is the Kernel's to choose"}
+  - {id: seam-reconcile, kind: impact-check, class: judgment, menu: seam-duty, why: "which scoped checks (typecheck, build, the slice tests) verify the stub sibling against the landed seam is the Kernel's choice, and the result it records is the check's own exit code"}
+  - {id: seam-reconcile-red, kind: retry, class: mechanical, fallback: move-unbuilt, doneBy: "Job controller: the rerun move of that cut ordinal only, on its own write set and cut"}
+  - {id: seam-recut, kind: retry, class: judgment, menu: seam-duty, why: "how a slipped seam is cut smaller (which files it keeps, which move to the siblings) is a design choice of the Kernel"}
+  - {id: move-unbuilt, kind: any, class: judgment, menu: move-unbuilt, why: "a mechanical origin whose typed move could not be built from the ledger (its job or write set is missing): the Kernel enqueues the unit by hand"}
 
 # Frontier states that wake a Kernel, each classified. A state not listed here and not named by a kind below wakes nobody.
 frontier:
@@ -127,56 +134,47 @@ kinds:
     snoozeKinds: [progress-stall, stale-wait, stale-gate, worker-stalled, orphaned-frontier]
 
   - id: leg-ready
-    mode: mechanical-pending
-    source: "next action approved-leg"
-    question: "Approved leg {op} has no job and every plan leg before it succeeded."
+    mode: judgment
+    source: "next action approved-leg-open"
+    question: "Approved leg {op} has no job and every plan leg before it succeeded, but the plan declares no write set for it (or a work graph partitions it)."
     options:
       - {choice: enqueue-leg, text: paths, steps: [{verb: enqueue, args: {workflow: $workflow, op: $op, paths: $text}}], effect: "enqueues {op} on the paths in --text (its write set); the Workflow controller then routes and dispatches it"}
 
-  - id: node-rework
-    mode: mechanical-pending
-    source: "next action red-node"
-    question: "Work-graph node {node} turned red: {op} wrote it last."
-    options:
-      - {choice: rework-node, steps: [{verb: enqueue, args: {workflow: $workflow, op: $op, paths: $paths}}], effect: "enqueues {op} again on the node's owned paths"}
-
-  - id: stale-redispatch
-    mode: mechanical-pending
-    source: "next actions stale-proof and stale-ready"
-    question: "{op} {job}: {situation}"
-    options:
-      - {choice: redispatch, steps: [{verb: enqueue, args: {workflow: $workflow, op: $op, paths: $paths, retry-of: $job}}], effect: "enqueues a new attempt of {op} retrying {job}"}
-
-  - id: asset-slots
-    mode: mechanical-pending
-    source: "next action asset-slots"
-    question: "{situation}"
-    options:
-      - {choice: enqueue-asset-leg, steps: [{verb: enqueue, args: {workflow: $workflow, op: $op, paths: $paths}}], effect: "enqueues {op} on the records that declare the slots"}
-
-  - id: credential-step
-    mode: mechanical-pending
-    source: "next action credential-step"
-    question: "The end-of-flow owner step 'supply credentials' is due."
-    options:
-      - {choice: enqueue-credential-ask, steps: [{verb: enqueue, args: {workflow: $workflow, op: provision.ask, params: $params, paths: $paths}}], effect: "enqueues the one provision.ask whose question lists every deferred credential"}
-
   - id: draw-redraw
-    mode: mechanical-pending
-    source: "next action draw-redraw"
+    mode: judgment
+    source: "next action draw-redraw-unbound"
     question: "{situation}"
     options:
-      - {choice: redraw, steps: [{verb: enqueue, args: {workflow: $workflow, op: $op, paths: $paths, retry-of: $job}}], effect: "enqueues {op} again; the packet carries the owner's notes"}
+      - {choice: redraw, text: paths, steps: [{verb: enqueue, args: {workflow: $workflow, op: $op, paths: $text}}], effect: "enqueues {op} on the paths in --text; the packet carries the owner's notes"}
 
   - id: seam-duty
-    mode: mechanical-pending
-    source: "next actions seam-reconcile, seam-reconcile-red and seam-recut"
+    mode: judgment
+    source: "next actions seam-reconcile and seam-recut"
     question: "{situation}"
-    options: []
+    options:
+      - {choice: do-seam-duty, direct: true, effect: "run directly: reconcile re-runs the sibling's scoped checks and records starci kernel cut-seam --reconcile --job {job} --exit-code <n> --command <cmd>; recut cuts the slipped seam smaller as the situation lists"}
+
+  - id: move-unbuilt
+    mode: judgment
+    source: "a next action of a mechanical origin whose typed move could not be built"
+    question: "{op} {job}: {situation}"
+    options:
+      - {choice: enqueue-by-hand, direct: true, effect: "run directly: starci kernel enqueue as the situation names it, with the unit's write set"}
 
   - id: handover-step
     mode: mechanical-pending
     source: "frontier states handover-due and handover-answered"
     question: "{situation}"
+    # A defect the owner reported (answer feedback) is routed to the fix of the slice it names: one choice per slice the workflow built
+    # (scripts/kernel/handover-slices.mjs: the unit of a build-family op that passed), validated by `starci kernel decide` against the
+    # menu, and one choice per record gap (modules/models/kinds.yaml routes srs-gap, sds-gap, interface-gap) that takes the record in --text.
+    feedback:
+      maxSlices: 24
+      slicePrefix: "route-fix-"
+      sliceEffect: "reopens {op} {job} ({label}) as the fix of the reported defect, titled with the owner's note; once it settles pass the frontier reads handover-due"
+      gaps:
+        - {choice: route-requirement-gap, op: business.revise, effect: "the note says the requirement itself is wrong: enqueues business.revise on the record in --text"}
+        - {choice: route-design-gap, op: architecture.revise, effect: "the note says the design itself is wrong: enqueues architecture.revise on the record in --text"}
+        - {choice: route-interface-gap, op: interface.draw, effect: "the note says the drawing itself is wrong: enqueues interface.draw on the record in --text"}
     options:
       - {choice: rerun-handover-review, steps: [{verb: enqueue, args: {workflow: $workflow, op: handover.review, paths: $paths}}], effect: "enqueues handover.review, which asks the owner (or applies the owner's answer) and hands over again"}

@@ -218,3 +218,9 @@ removed:
     use: 'the examples are analysed on SonarCloud with the SONAR_TOKEN of the runtime secret.env (runtimeSecrets in their services.sonar declaration)'
     since: 1.0.0-alpha.7
     match: 'sonarqube-(?:lite-app|shape-slot|starci-ecommerce-app)-token'
+  - id: vocab-menu-kinds-moved-to-controllers
+    kind: vocabulary
+    name: the menu kinds of the origins the controllers now move
+    use: 'the Job controller enqueues a red node, a stale proof or attempt, the asset leg and the credential ask itself (scripts/kernel/next-moves.mjs); the Kernel menu keeps leg-ready, draw-redraw, seam-duty and move-unbuilt'
+    since: 1.0.0-alpha.8
+    match: '(?<![\w-])(?:node-rework|stale-redispatch|enqueue-asset-leg|enqueue-credential-ask|rework-node)(?![\w-])'

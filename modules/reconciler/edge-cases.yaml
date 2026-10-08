@@ -421,13 +421,15 @@ cases:
   - id: menu-mechanical-pending-next-actions
     family: smooth-operation
     met: {date: "2026-10-08", where: "the menu of this change", evidence: "modules/kernel/kernel-menu.yaml origins with class pending"}
-    status: open
-    why: "the enqueue of an approved leg, the rework of a red node, the re-dispatch of a stale proof, the asset leg, the credential ask, a redraw and the cut-seam duties are still next actions the Kernel answers from its menu (mode mechanical-pending); each moves into the controller with its bound from the policy table, one origin at a time"
+    rule: {file: scripts/reconciler/mechanical-moves.mjs, anchor: "mechanicalMovesOf"}
+    spec: tests/reconciler-controllers/mechanical-origin-moves.spec.mjs
+    status: covered
   - id: menu-handover-feedback-not-typed
     family: smooth-operation
     met: {date: "2026-10-08", where: "the menu of this change", evidence: "kernel-menu.yaml kind handover-step"}
-    status: open
-    why: "a defect the owner reports on the handover must be routed to the fix op of the slice it names; that routing is not yet a typed choice, so the item offers none-fits only"
+    rule: {file: scripts/kernel/handover-slices.mjs, anchor: "feedbackOfHandover"}
+    spec: tests/kernel/handover.spec.mjs
+    status: covered
   - id: kernel-wake-usage-attribution-coarse
     family: smooth-operation
     met: {date: "2026-10-08", where: "the per-wake budget of this change", evidence: "scripts/kernel/wake-budget.mjs"}
@@ -624,3 +626,8 @@ cases:
     rule: {file: modules/ops/ops/interface.draw.yaml, anchor: "declares no host tool"}
     spec: tests/agent/draw-devin-routing.spec.mjs
     status: covered
+  - id: menu-handover-rerun-still-pending
+    family: smooth-operation
+    met: {date: "2026-10-09", where: "the wave 3 pass over the pending menu origins", evidence: "modules/kernel/kernel-menu.yaml kind handover-step, mode mechanical-pending"}
+    status: open
+    why: "handover-due, and a handover answered approve or question, are each one enqueue of handover.review on the fixed handover evidence path: nothing is judged, yet the Kernel still answers them from its menu; the move needs the handover projection (state, due, ask decision) in the status the Job controller reads, then the same once-per-process move as the other origins"

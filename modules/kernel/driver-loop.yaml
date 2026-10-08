@@ -136,7 +136,12 @@ menu:
     Every wake: `starci kernel status`, then `starci kernel decide --workflow <wf> --item <id> --choice <choice> --reason <why>` for
     each item of its Decide section (`--text` where the option names an input). An empty menu is a wait: yield. A choice off the menu is
     refused with the menu. The mechanical work is the runtime's: dispatch of ready work, bounded retry, agent switch, the settle of green
-    reports, the retry of a job whose gate resolved or whose ask was answered, and the collection of leftovers.
+    reports, the retry of a job whose gate resolved or whose ask was answered, the enqueue of an approved leg whose plan declares its write
+    set, the rework of a red node, the re-run of a stale proof or attempt, the asset leg, the credential ask, the owner's redraw, the redo
+    of a cut ordinal that does not reconcile with its seam, and the collection of leftovers. A refused move of the runtime reaches the menu
+    as Decision Item move-refused (retry-decision for a failed job nothing follows). What stays the Kernel's is a judgment: the write set of
+    a leg the plan leaves open (leg-ready), the redraw of an answer that names no job (draw-redraw), the checks that reconcile a stub
+    sibling and the re-cut of a slipped seam (seam-duty), a move the ledger could not build (move-unbuilt), and the handover step.
   noneFits: >-
     `none-fits` is the typed exit of every item: it needs a reason and escalates the item to the Supervisor. A situation whose only way
     forward is a workaround around a bug of the runtime or of a role is never a choice: answer none-fits with the evidence, and the
@@ -993,7 +998,10 @@ handoverLoop:
     <ask dispatch>: <the note in a line>"`; the fix op reads the whole note in
     `starci kernel survey --workflow <id> --deliveries` handoverHistory. Once that fix
     settles pass the frontier reads `handover-due`: run handover.review again;
-    its package opens with what was fixed and how to re-test it.
+    its package opens with what was fixed and how to re-test it. The menu item handover-step carries the typed choices: route-fix-<job>
+    for each slice the workflow built (the passed unit of a build-family op; the choice reopens it titled with the note) and
+    route-requirement-gap, route-design-gap, route-interface-gap with the record in `--text`. A slice the workflow did not build is not
+    on the menu, so `decide` refuses it before anything is enqueued.
   question: >-
     `handover-answered` with decision question: enqueue handover.review again.
     The attempt reads the question from `starci kernel survey --deliveries`

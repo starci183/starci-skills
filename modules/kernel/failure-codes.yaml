@@ -17165,3 +17165,13 @@ stale-peer-wait:
   nextStep_vi: "Kernel kiểm tra lại điều kiện của peer và giải quyết hoặc gõ lại lần chờ; Supervisor phán quyết khi mục leo lên."
   owner: op-retry
   kind: blocker
+move-refused:
+  title: "A move the runtime made for the Kernel was refused"
+  title_vi: "Một bước runtime làm thay Kernel bị từ chối"
+  meaning_vi: "Runtime tự làm các bước cơ học của Kernel (đưa một chặng đã duyệt vào hàng chờ, làm lại một nút đỏ, chạy lại một bằng chứng cũ, hỏi thông tin đăng nhập, vẽ lại, làm lại một phần của lát cắt); khi lệnh đưa việc vào hàng chờ bị từ chối thì runtime mở mục quyết định này cho Kernel."
+  causes_vi:
+    - "Đơn vị việc đã dùng hết lượt thử hoặc đang có một lượt chạy mở"
+    - "Phạm vi ghi hoặc tham số của việc không còn hợp lệ"
+  nextStep_vi: "Kernel đọc lý do từ chối, sửa điều nó nêu (nâng ngân sách qua người có quyền, đổi phạm vi, chờ lượt đang mở) rồi chạy lại lệnh, hoặc chọn hướng khác."
+  owner: supervisor
+  kind: blocker

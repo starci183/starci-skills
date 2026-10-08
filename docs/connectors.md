@@ -101,7 +101,7 @@ Two kinds of ask, never mixed in one list or one message (owner, 2026-09-25;
    runs. `starci kernel status` reads such an ask as `awaiting-owner` (`frontier.askOnDemandDispatches`), not
    `ask-reserve`; credential asks (`frontier.credentialAskDispatches`) park the frontier only when every
    approved leg still owed is a live proof, else it reads `next-ready` (a plan is recorded and
-   `nextActions` names the next leg) and the Kernel enqueues that leg with placeholders. The supervisor digest tags an on-demand ask `on-demand`.
+   `nextActions` names the next leg) and the runtime enqueues that leg with placeholders when the plan declares its write set (else the Kernel's menu holds it). The supervisor digest tags an on-demand ask `on-demand`.
    With Telegram off (or a failed send, `ask-notify-failed`) `starci kernel serve-ask` serves the form at once,
    as before; `--now` does that on purpose while still sending the notice.
 2. **Generate URL.** The bridge answers the callback, launches `serve-ask.mjs --repo <r> --workflow <w>

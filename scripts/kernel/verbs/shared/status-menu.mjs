@@ -3,7 +3,8 @@
 // an empty menu is a wait, whatever the frontier state says. Everything mechanical is the runtime's (the controllers).
 import { listDecisions } from '../../../machine/decisions.mjs';
 import { JOB_KINDS, liveFor, pendingJobsOf, resolutionOf } from '../../../machine/decision-resolution.mjs';
-import { buildMenu, snoozeMs } from '../../kernel-menu.mjs';
+import { buildMenu, menuCatalog, snoozeMs } from '../../kernel-menu.mjs';
+import { feedbackOfHandover } from '../../handover-slices.mjs';
 import { decisionsOf } from '../../progress-rca.mjs';
 import { failureFactsOf } from '../../failure-class.mjs';
 
@@ -36,6 +37,11 @@ function snoozedOf(s) {
   return new Set(decisionsOf(s.db, s.workflowId).filter((d) => d.menu?.choice === 'keep-waiting' && d.at > since).map((d) => d.menu.item));
 }
 
+/** The defect the owner reported on the handover ({title, slices}); null unless the answer is feedback. */
+const feedbackOf = (s) => (s.handover?.ask?.decision === 'feedback' && s.handover.state === 'answered'
+  ? feedbackOfHandover(s.workflowJobs, s.handover.ask, { max: menuCatalog().kinds.find((kind) => kind.id === 'handover-step').feedback.maxSlices })
+  : null);
+
 /** s.menu: the ordered open decision points, and the frontier's `actionable` follows it. */
 export const menuPhase = (s) => {
   const { db, workflowId, wf, now } = s;
@@ -46,7 +52,7 @@ export const menuPhase = (s) => {
   s.menu = buildMenu({
     workflow: workflowId, rev: s.kernelRev, jobDecisions: jobDecisionsOf(s, live),
     questions: s.workerQuestions, peers: s.peerMessages, wedged: s.wedgedWorkers.map((w) => ({ jobId: w.jobId, opId: s.workflowJobs.find((row) => row.job_id === w.jobId)?.op_id ?? null })),
-    deadWaits: deadWaitsOf(s), decisions: live.filter((di) => !OWN_KIND.has(di.kind)), nextActions: s.graph.nextActions, handover: s.handover, snoozed: snoozedOf(s),
+    deadWaits: deadWaitsOf(s), decisions: live.filter((di) => !OWN_KIND.has(di.kind)), nextActions: s.graph.nextActions, handover: s.handover, feedback: feedbackOf(s), snoozed: snoozedOf(s),
   });
   s.actionable = s.menu.length > 0;
   s.frontier.actionable = s.actionable;

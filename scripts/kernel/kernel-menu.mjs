@@ -133,25 +133,34 @@ const waitItem = (wait, workflow) => itemOf('dead-wait', { key: wait.incidentId,
 
 const revItem = (rev, workflow) => itemOf('rev-ack', { key: workflow, subject: { workflow, acked: String(rev.acked ?? '').slice(0, 9), rev: rev.current }, evidence: [{ ref: `runtime-rev:${rev.current}` }] });
 
-/** The pending (mechanical-pending) items one next action raises, or [] when the action is a wait, a mechanical move or has no menu kind. */
-function pendingItemOf(action, workflow) {
+/** The items one next action raises, or [] when the action is a wait, a mechanical move the controllers perform or has no menu kind. */
+function actionItemOf(action, workflow) {
   const origin = originOf(action);
   // A move a supervisor-gate or a peer-wait holds is theirs to release, not the Kernel's to answer.
-  if (origin?.class !== 'pending' || action.heldBy) return [];
+  if (origin?.class !== 'judgment' || !origin.menu || action.heldBy) return [];
   const subject = { workflow, op: action.op ?? null, job: action.jobId ?? null, node: action.nodes?.[0] ?? null, paths: action.paths ?? null, params: action.params ?? null, situation: action.reason };
-  const key = [action.op, action.jobId ?? action.nodes?.[0] ?? action.cutId ?? origin.id].filter(Boolean).join(':');
+  const key = [action.op, action.jobId ?? action.nodes?.[0] ?? action.cutId, origin.id].filter(Boolean).join(':');
   return [itemOf(origin.menu, { key, subject, evidence: action.jobId ? [{ ref: `job:${action.jobId}` }] : [] })];
 }
 
-const handoverItems = (handover, workflow) => {
+/** The typed choices that route a reported defect: one per slice the workflow built, and one per record gap (requirement, design, interface). */
+function feedbackOptionsOf(feedback, slices, subject) {
+  const sliceOptions = slices.map((slice) => ({ choice: `${feedback.slicePrefix}${slice.jobId}`, verb: slice.move.verb, args: slice.move.args, steps: [slice.move],
+    effect: fillTemplate(feedback.sliceEffect, { op: slice.op, job: slice.jobId, label: slice.label }) }));
+  const gapOptions = feedback.gaps.map((gap) => optionOf({ choice: gap.choice, text: 'paths', effect: gap.effect,
+    steps: [{ verb: 'enqueue', args: { workflow: '$workflow', op: gap.op, paths: TEXT, title: '$title' } }] }, subject));
+  return [...sliceOptions, ...gapOptions];
+}
+
+const handoverItems = (handover, workflow, report) => {
   if (!['answered'].includes(handover?.state) && !handover?.due) return [];
   const paths = `.starciwork/evidence/${workflow}.handover`;
   const feedback = handover.state === 'answered' && handover.ask?.decision === 'feedback';
   const spec = kindOf('handover-step');
   const state = handover.state === 'answered' ? 'answered' : 'due';
   const situation = feedback ? `the owner reported a defect on handover ask ${handover.ask.dispatchId}` : `handover is ${state}`;
-  const subject = { workflow, paths, situation };
-  const options = feedback ? [] : (spec.options ?? []).map((option) => optionOf(option, subject));
+  const subject = { workflow, paths, situation, title: report?.title };
+  const options = feedback ? feedbackOptionsOf(spec.feedback, report?.slices ?? [], subject) : (spec.options ?? []).map((option) => optionOf(option, subject));
   return [itemOf('handover-step', { key: workflow, subject, options })];
 };
 
@@ -159,7 +168,7 @@ const sinceOf = (item) => item.deadline ?? Number.MAX_SAFE_INTEGER;
 
 /**
  * The menu: [{id, kind, mode, subject, question, options: [{choice, verb, args, steps, effect}], evidence, deadline, step, hold, di}].
- * `sources`: {workflow, rev, jobDecisions: [{di, resolution}], questions, peers, wedged, deadWaits, decisions, nextActions, handover, snoozed: Set of item ids}.
+ * `sources`: {workflow, rev, jobDecisions: [{di, resolution}], questions, peers, wedged, deadWaits, decisions, nextActions, handover, feedback ({title, slices}, scripts/kernel/handover-slices.mjs), snoozed: Set of item ids}.
  */
 export function buildMenu(sources) {
   const { workflow } = sources;
@@ -171,8 +180,8 @@ export function buildMenu(sources) {
     ...sources.wedged.map((w) => wedgedItem(w, workflow)),
     ...sources.deadWaits.map((wait) => waitItem(wait, workflow)),
     ...sources.decisions.map((di) => diItem(di, workflow)),
-    ...sources.nextActions.flatMap((action) => pendingItemOf(action, workflow)),
-    ...handoverItems(sources.handover, workflow),
+    ...sources.nextActions.flatMap((action) => actionItemOf(action, workflow)),
+    ...handoverItems(sources.handover, workflow, sources.feedback),
   ];
   const seen = new Set();
   return items.filter((item) => !sources.snoozed.has(item.id) && !seen.has(item.id) && seen.add(item.id))

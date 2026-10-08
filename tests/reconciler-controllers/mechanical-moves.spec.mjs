@@ -41,7 +41,7 @@ test('the retry of a job whose gate resolved is a mechanical next action with a 
 test('the controller runs each move once per engine process and hands a refused move to the Kernel as a retry-decision item', async () => {
   const status = { nextActions: [{ kind: 'retry', origin: 'answered-ask', op: 'x', jobId: 'op-x-1', move: { verb: 'enqueue', args: { workflow: WF, op: 'x', paths: 'p', 'retry-of': 'op-x-1' } } },
     { kind: 'retry', origin: 'unstepped-failure', op: 'x', jobId: 'op-x-2' },
-    { kind: 'dispatch', origin: 'approved-leg', op: 'y', move: { verb: 'enqueue', args: { workflow: WF, op: 'y', paths: 'p' } } }] };
+    { kind: 'dispatch', origin: 'approved-leg-open', op: 'y', move: { verb: 'enqueue', args: { workflow: WF, op: 'y', paths: 'p' } } }] };
   assert.deepEqual(mechanicalMovesOf(status).map((move) => move.jobId), ['op-x-1'], 'only a mechanical origin with a move is the controller\'s');
   const calls = [], opened = [];
   const ctx = { api: async (_ledger, verb, argv) => { calls.push([verb, ...argv]); return { ok: false, error: 'unit-try-budget-spent' }; }, openDecision: async (di) => { opened.push(di); return { ok: true }; } };
@@ -50,7 +50,7 @@ test('the controller runs each move once per engine process and hands a refused 
   assert.deepEqual(first, [{ jobId: 'op-x-1', origin: 'answered-ask', ok: false }]);
   assert.equal(calls.length, 1);
   assert.deepEqual(calls[0].slice(0, 3), ['enqueue', '--workflow', WF]);
-  assert.match(opened[0].reason, /answered-ask retry was refused: unit-try-budget-spent/);
+  assert.match(opened[0].reason, /answered-ask move was refused: unit-try-budget-spent/);
   assert.deepEqual(await runMechanicalMoves(ctx, 'ledger-moves', status, deps), [], 'a move made is not made again');
   assert.equal(calls.length, 1);
 });
