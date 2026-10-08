@@ -338,8 +338,7 @@ allocationFacts:
     balance: >-
       A head member picked tiers.yaml balance.maxStreak times in a row among the tier's recent picks, or holding more than
       maxSharePercent of the tier's running seats (running seats counted), yields to the next member that passes the hard
-      filter and the token step; with no such member the head stays. A bias skips this step. There are no per-provider
-      weights (the former allocation.shares are removed).
+      filter and the token step; with no such member the head stays. A bias skips this step.
     tokens: >-
       The first member below reservePercent (90) of its most used quota window; an automatic pick skips a member at or above
       it for this pick only, and the member stays in the chain. A member named by the owner bias (prefer or only), or by an

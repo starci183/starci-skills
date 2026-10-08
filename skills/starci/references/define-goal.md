@@ -32,20 +32,32 @@ change needs a new approval. Revisions retain their native content-bound token a
    `--project <name>` selects which bound project's runtime ledger
    receives the goal; `--repo <path>` is single-repo mode where the named
    repository owns the ledger. The two flags are mutually exclusive.
-2. **Extract routing bias** — read the owner prompt yourself and write
-   `{prefer:[], avoid:[]}` from its intent (e.g. "prefer codex", "use claude",
-   "don't use codex" → prefer/avoid those pools, in whatever language the owner
-   wrote it; aliases: codex/claude/devin → `<name>-agent`). Distinguish a preference
-   from an explicit requirement: "must use Claude" becomes `require:{provider:claude}`,
-   never a soft preference. Concrete selectors may name `pool`, `provider` and/or `model`.
-   `roles` declares the affected actors (`kernel`, `op`, `supervisor`, `worker`, `critic`);
-   without it the bias applies only to `op`. A constraint on an Op does not silently pin
-   its Critic. Questions or hypothetical examples are not routing instructions.
+2. **Extract routing bias** — read the owner prompt yourself and write the bias JSON from its
+   intent, in whatever language the owner wrote it. The fields are exactly these; any other field is
+   refused (`invalid-owner-routing-bias`):
+   - `prefer` moves the named members first in their tier chain. Owner: "prefer codex".
+     `{"prefer":["codex"]}`
+   - `avoid` removes the named members from the chain. Owner: "don't use devin".
+     `{"avoid":["devin"]}`
+   - `only` keeps just the named members of the tier chain and drops every other member; it is the
+     way to state a requirement. Owner: "must use Claude Opus".
+     `{"only":["claude/claude-opus-5-5"]}`. When no named member is left in a chain the request
+     is refused `bias-empties-chain` and the picker never drops the bias itself.
+   - `roles` lists the affected actors (`kernel`, `op`, `supervisor`, `worker`, `critic`), e.g.
+     `{"prefer":["codex"],"roles":["kernel","op"]}`; without it the bias applies only to `op`.
+     A constraint on an Op does not silently pin its Critic.
+   - `reserveOverride`, described below.
 
-   A requirement does not authorize using the provider reserve. Only an explicit owner
+   A member is written as `<agent>` (codex, claude, devin: the whole provider pool,
+   normalized to `<agent>-agent`), `<agent>/<model>` (one member), or a selector object
+   `{"pool":…,"provider":…,"model":…}` naming at least one of the three. "Prefer" is a soft
+   ranking; "must", "only" and "nothing but" are `only`. Questions or hypothetical examples are
+   not routing instructions.
+
+   An `only` does not authorize using the provider reserve. Only an explicit owner
    instruction to exceed the internal reserve for a specific attempt can supply
    `reserveOverride:{authorized:true,scopeId,role,provider,model,reason}` (and optional
-   `account`). Never invent that permission, infer it from "must use", or use a blanket
+   `account`). Never invent that permission, infer it from "must use" or from an `only`, or use a blanket
    future-task scope. Record the exact owner grant in the goal approval provenance; the
    admission adapter must independently verify it. If the task/attempt identity is not
    known at intake, preserve the owner's intent for its later approval rather than
@@ -55,7 +67,7 @@ change needs a new approval. Revisions retain their native content-bound token a
    wins conflicts):
 
    ```
-   starci workflow bias --normalize '{"prefer":["<agents>"],"avoid":["<agents>"]}'
+   starci workflow bias --normalize '{"prefer":["<agents>"],"avoid":["<agents>"],"only":["<agent>/<model>"]}'
    ```
 
    `starci workflow bias "<text>"` is the no-agent fallback for automation. Keep the JSON:
@@ -100,7 +112,7 @@ change needs a new approval. Revisions retain their native content-bound token a
 
    The IMPACT line is the planner's survey of the project's `.starciwork` (`route-plan --state`, `modules/goal/existing.yaml`): a goal that names an existing feature is an EXTEND, plans only the delta (done records of other features and specs the feature already settled are not re-planned), and keeps the backend lane when the feature holds backend records.
 
-   Add the step-2 bias (preferences, exclusions, concrete requirement, affected roles and
+   Add the step-2 bias (`prefer`, `avoid`, `only`, `roles` and
    any exact-scope owner reserve grant) in your own words — the planner
    does not print it. Per-leg estimate and tier come from the planner
    (`.claude/scripts/route/route-plan.mjs` +

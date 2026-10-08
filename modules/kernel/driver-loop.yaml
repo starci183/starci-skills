@@ -434,9 +434,9 @@ tick:
       of the cut. Route the set spread across
       the fan-out order by routing each slice with plain `starci kernel route --job
       <id>` in turn: persisted routes count queued and leased lanes and the
-      balanced shares pass a full pool's next slice down the order, so
+      the balance step (models.balance) passes a full member's next slice down the order, so
       parallel slices occupy the lanes concurrently instead of saturating one
-      pool. Do not inject work.author, duplicate the op in the
+      member. Do not inject work.author, duplicate the op in the
       derived goal plan, or create a mega-op. The semantic leg advances only
       after every ordinal in the cut set settles pass and the union of their
       declared paths equals the preflight closure. A failed slice, or any
