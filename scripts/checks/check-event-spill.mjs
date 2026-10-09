@@ -9,7 +9,8 @@
 // or a direct INSERT into the events table. Readers go through engine/db/event-payload.mjs.
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { isMain } from '../lib/is-main.mjs';
-import { printFindings, scopeFilter, trackedSources } from '../lib/check-scan.mjs';
+import { printFindings, scopeFilter } from '../lib/check-scan.mjs';
+import { trackedSources } from './lib/tracked-sources.mjs';
 
 export const CODE = 'RT_EVENT_SPILL_BYPASS';
 export const OWNER_FILES = Object.freeze(['engine/db/ledger.mjs', 'engine/db/event-compact.mjs']);
