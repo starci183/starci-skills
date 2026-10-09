@@ -3651,7 +3651,7 @@ exit: 0 verified: check and every affected spec passed on the exact commit, rece
 json: starci/runtime-verify@1
 
 ```sh
-starci runtime verify --base <tip the branch was cut from>
+starci runtime verify --base <tip>
 starci runtime verify --json
 ```
 

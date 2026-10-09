@@ -21,6 +21,6 @@ exit:
   "2": "bad usage"
 json: starci/runtime-verify@1
 examples:
-  - starci runtime verify --base <tip the branch was cut from>
+  - starci runtime verify --base <tip>
   - starci runtime verify --json
 editions: [full]
