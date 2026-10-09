@@ -30,7 +30,7 @@ _starci() {
         reconciler) COMPREPLY=( $(compgen -W "once reopen restart start status stop up" -- "$cur") );;
         release) COMPREPLY=( $(compgen -W "app-installs check ci-status clean-test cut env-test images launch-smoke notes proof publish sync-runtime" -- "$cur") );;
         route) COMPREPLY=( $(compgen -W "op" -- "$cur") );;
-        runtime) COMPREPLY=( $(compgen -W "architecture benchmark-snapshot check derived-fields doctor gen-catalog gen-ops housekeeping import-held-secret install ledger-hygiene link machine-db owner-claims-audit readme-blocks status update validate version" -- "$cur") );;
+        runtime) COMPREPLY=( $(compgen -W "architecture benchmark-snapshot check derived-fields doctor gen-catalog gen-ops housekeeping import-held-secret install ledger-hygiene link machine-db owner-claims-audit readme-blocks revision-scope status update validate version" -- "$cur") );;
         smoke) COMPREPLY=( $(compgen -W "scaffold" -- "$cur") );;
         supabase) COMPREPLY=( $(compgen -W "start status stop" -- "$cur") );;
         supervisor) COMPREPLY=( $(compgen -W "actions bridge channel decide direct-commits gate-stability gc land lesson-actions notify owed poll push push-mains ram-cap report revision-ack start status stop telegram-bridge tell watchdog workers" -- "$cur") );;
@@ -622,6 +622,9 @@ _starci() {
         runtime:machine-db:--product) return 0;;
         runtime:owner-claims-audit:--repo) return 0;;
         runtime:owner-claims-audit:--workflow) return 0;;
+        runtime:revision-scope:--from) return 0;;
+        runtime:revision-scope:--to) return 0;;
+        runtime:revision-scope:--root) return 0;;
         runtime:update:--hosts) return 0;;
         runtime:validate:--owned) return 0;;
         smoke:scaffold:--into) return 0;;
@@ -1117,6 +1120,7 @@ _starci() {
         runtime:machine-db) COMPREPLY=( $(compgen -W "--file --all --ledger-id --name --repo --ledger-file --product --create --json --cwd --quiet --help --edition" -- "$cur") );;
         runtime:owner-claims-audit) COMPREPLY=( $(compgen -W "--repo --workflow --json --cwd --quiet --help --edition" -- "$cur") );;
         runtime:readme-blocks) COMPREPLY=( $(compgen -W "--write --check --json --cwd --quiet --help --edition" -- "$cur") );;
+        runtime:revision-scope) COMPREPLY=( $(compgen -W "--from --to --root --json --cwd --quiet --help --edition" -- "$cur") );;
         runtime:status) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
         runtime:update) COMPREPLY=( $(compgen -W "--force --hosts --no-bootstrap --json --cwd --quiet --help --edition" -- "$cur") );;
         runtime:validate) COMPREPLY=( $(compgen -W "--strict --owned --json --cwd --quiet --help --edition" -- "$cur") );;

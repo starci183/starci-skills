@@ -39,7 +39,7 @@ import { stopAndRelease } from '../machine/worker-close.mjs';
 // worker-show states that end a worker (start-workflow.mjs MANAGED_DEAD_STATE).
 const DEAD_WORKER_STATE = /stop|fail|dead|exit|release|abandon/i;
 import { jsonFromStdout } from '../lib/json.mjs';
-import { revWakeLine } from './runtime-rev.mjs';
+import { revRootOf, revWakeLine } from './runtime-rev.mjs';
 import { openDecisionRow } from '../machine/decisions.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { arg as argvValue } from '../lib/cli-arg.mjs';
@@ -47,9 +47,9 @@ import { createKernelTick } from './kernel-watchdog-tick.mjs';
 import { workflowSender } from './workflow-startup.mjs';
 import { seatWakeOf } from './op-incident-policy.mjs';
 import { createKernelRotation, rotationRule } from './seat-rotation.mjs';
-import { recordReplaced, recordWoken, runtimePass } from '../reconciler/revision-ack.mjs';
-import { kernelSeat } from '../reconciler/revision-seats.mjs';
-import { noticeWakeLine } from '../reconciler/revision-notice.mjs';
+import { recordReplaced, recordWoken, runtimePass } from '../machine/revision-ack.mjs';
+import { kernelSeat } from '../machine/revision-seats.mjs';
+import { noticeWakeLine } from '../machine/revision-notice.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const apiFile = path.join(skillRoot, 'scripts', 'kernel', 'cli.mjs');
@@ -158,7 +158,7 @@ const replaceKernel = (base) => {
 };
 // A fresh Kernel read the tree at birth: the revision change it replaced is settled (revision-ack.mjs recordReplaced).
 const noteReplaced = (answer) => {
-  if (answer.action === 'restarted') withKernelLedger((ledger) => recordReplaced(kernelSeat({ ledger, workflowId }), answer.deathReason ?? 'replaced'));
+  if (answer.action === 'restarted') withKernelLedger((ledger) => recordReplaced(kernelSeat({ ledger, workflowId, root: revRootOf() }), answer.deathReason ?? 'replaced'));
   return answer;
 };
 
@@ -344,7 +344,7 @@ async function statusTick() {
   // started) workflow is left alone - nothing but the owner's starci kernel lifecycle --resume brings it back.
   if (phase !== 'running') return { ok: true, workflowId, phase, action: 'not-running' };
   // The runtime's own duty to the seat's revision notice: a change that concerns the Kernel nothing is settled here (a read-only probe writes nothing).
-  const revision = withKernelLedger((ledger) => runtimePass(kernelSeat({ ledger, workflowId }), { repair }));
+  const revision = withKernelLedger((ledger) => runtimePass(kernelSeat({ ledger, workflowId, root: revRootOf() }), { repair }));
   if (revision) status.value.revisionNotice = revision.notice;
   const result = kernelTick(status, phase);
   // Creation supplies the title, but a moved/restored tab can lose it. The sidebar reads
@@ -367,7 +367,7 @@ const finalKernelAction = (state) => {
   if (state === 'active') return 'active';
   return state === 'wedged' ? 'kernel-wedged' : 'observed';
 };
-const recordRevisionWoken = (notice) => withKernelLedger((ledger) => recordWoken(kernelSeat({ ledger, workflowId }), notice));
+const recordRevisionWoken = (notice) => withKernelLedger((ledger) => recordWoken(kernelSeat({ ledger, workflowId, root: revRootOf() }), notice));
 const kernelRotation = createKernelRotation({ workflowId, openLedger: withKernelLedger, close: closeKernelTerminal, replace: replaceKernel, sender: launchableSender });
 const kernelTick = createKernelTick({ api, kernelRotation, workflowId, repair, lostSeatWorker, exitedTwice, stopAndRelease, replaceKernel,
   workerShow, DEAD_WORKER_STATE, settledKernelVerdict, DEAD_VERDICTS, terminalRead, classifyKernelScreen, outputAgeOf,

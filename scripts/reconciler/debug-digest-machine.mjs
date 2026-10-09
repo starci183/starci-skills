@@ -9,9 +9,10 @@ import { SUPERVISOR_SEAT } from '../machine/home.mjs';
 import { supervisorWakeUsageOf } from '../kernel/wake-budget.mjs';
 import { supervisorSeatOf } from './seat-cost.mjs';
 import { supervisorLastSeenAt } from './supervisor-sign-of-life.mjs';
-import { noticeFor } from './revision-ack.mjs';
-import { noticeLine } from './revision-notice.mjs';
-import { supervisorSeat } from './revision-seats.mjs';
+import { noticeFor } from '../machine/revision-ack.mjs';
+import { noticeLine } from '../machine/revision-notice.mjs';
+import { supervisorSeat } from '../machine/revision-seats.mjs';
+import { revRootOf } from '../kernel/runtime-rev.mjs';
 import { digestNumbers } from './debug-digest-numbers.mjs';
 import { SIGNAL, signalRows } from '../machine/debug-signals.mjs';
 import { machineBlobItems, mergeScans, scanBlobs, scanLogs } from './debug-secret-scan.mjs';
@@ -61,7 +62,7 @@ function engineOf(m) {
 /** The Supervisor's revision notice as one line (revision-notice.mjs noticeLine); null when the runtime revision cannot be read. */
 function revisionLineOf(m) {
   try {
-    const notice = noticeFor(supervisorSeat({ m }));
+    const notice = noticeFor(supervisorSeat({ m, root: revRootOf() }));
     return notice.state === 'unknown-current' ? null : noticeLine(notice);
   } catch { return null; }
 }

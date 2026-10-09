@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { pendingFor } from './roles-table.mjs';
-import { NOTICE_EVENT } from '../reconciler/revision-notice.mjs';
+import { NOTICE_EVENT } from '../machine/revision-notice.mjs';
 
 const POLICY_FILE = 'modules/kernel/op-incident-policy.yaml';
 const COMMAND_POLICY_FILE = 'modules/kernel/command-policy.yaml';

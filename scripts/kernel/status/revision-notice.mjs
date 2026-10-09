@@ -1,8 +1,8 @@
 // revisionNotice — the `starci kernel status` field of what the last runtime revision change asks of this Kernel: its acked revision, whether the
-// change concerns it and the files owed, in one line (scripts/reconciler/revision-notice.mjs). Null when the runtime revision is unknown.
-import { noticeFor } from '../../reconciler/revision-ack.mjs';
-import { kernelSeat } from '../../reconciler/revision-seats.mjs';
-import { noticeLine } from '../../reconciler/revision-notice.mjs';
+// change concerns it and the files owed, in one line (scripts/machine/revision-notice.mjs). Null when the runtime revision is unknown.
+import { noticeFor } from '../../machine/revision-ack.mjs';
+import { kernelSeat } from '../../machine/revision-seats.mjs';
+import { noticeLine } from '../../machine/revision-notice.mjs';
 import { revRootOf } from '../runtime-rev.mjs';
 
 const SHOWN = 12;

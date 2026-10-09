@@ -6,17 +6,17 @@
 // between. It judges nothing and refuses nothing: the seam that decides what a moved rule means for the attempt (gate-newer-than-admission) reads
 // `proofsOwedUnder`.
 import { loopOps, loadOpGate } from '../gates/read-digest.mjs';
-import { enforcesOp } from '../kernel/sonar-settle.mjs';
-import { criticOwedBy } from '../kernel/critic-settle.mjs';
-import { proofsOf } from '../kernel/mechanism-proofs.mjs';
+import { enforcesOp } from './sonar-settle.mjs';
+import { criticOwedBy } from './critic-settle.mjs';
+import { proofsOf } from './mechanism-proofs.mjs';
 import { globExpression, braceVariants } from '../lib/glob.mjs';
 import { latestContractOf } from '../machine/contract-version.mjs';
 import { parseJson } from '../lib/json.mjs';
-import { currentRuntimeRev, revRootOf } from '../kernel/runtime-rev.mjs';
-import { changedFiles } from './revision-change.mjs';
-import { loadScope } from './revision-scope.mjs';
+import { currentRuntimeRev, revRootOf } from './runtime-rev.mjs';
+import { changedFiles } from '../machine/revision-change.mjs';
+import { loadScope } from '../machine/revision-scope.mjs';
 
-export const SETTLE_REVISION_EVENT = 'settle-revision-recorded';
+const SETTLE_REVISION_EVENT = 'settle-revision-recorded';
 const DRAW = 'interface.draw';
 const LISTED = 12;
 

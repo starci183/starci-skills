@@ -11,7 +11,7 @@ import { changeScope } from './revision-change.mjs';
 
 export const NOTICE_EVENT = 'runtime-rev-noticed';
 export const NOTICE_SCHEMA = 'starci/revision-notice@1';
-export const READ_SCHEMA = 'starci/revision-read@1';
+const READ_SCHEMA = 'starci/revision-read@1';
 /** The verdicts that settle a revision for a seat; `woken` only marks that the one wake of a revision was delivered. */
 export const SETTLED_VERDICTS = Object.freeze(['not-concerned', 'acked', 'replaced', 'baseline']);
 const OWED = new Set(['reread', 'replace']);

@@ -1,5 +1,5 @@
 # Which part of the runtime tree concerns which role, and what each role does when a path of it changes between two revisions.
-# Read by scripts/reconciler/revision-scope.mjs; the self-check `revision-scope` (scripts/checks/check-revision-scope.mjs) proves that
+# Read by scripts/machine/revision-scope.mjs; the self-check `revision-scope` (scripts/checks/check-revision-scope.mjs) proves that
 # every tracked path of the tree matches at least one row, that the engine-loaded set is derived from the import graph and never
 # hand-listed, and that the vocabulary below is the only one used.
 #
@@ -53,7 +53,7 @@ seatBoot:
 # What `starci kernel settle` judges at settle, read from the code (scripts/kernel/verbs/shared/settle-preflight.mjs and the judges it calls).
 # A judge reads its rules from the LIVE tree when the settle runs, not from the tree the attempt was admitted under: a rule that moved between
 # the admission and the settle is judged against the attempt. The settle records, per proof the op owes, whether the files of its judge moved
-# since the admission revision (scripts/reconciler/settle-revision.mjs); deciding what to do with a moved rule belongs to the
+# since the admission revision (scripts/kernel/settle-revision.mjs); deciding what to do with a moved rule belongs to the
 # gate-newer-than-admission seam (scripts/kernel/critic-settle.mjs `teaches` is the one judge that already asks the admission).
 #   admissionAware: the judge consults the admitted contract before it refuses.
 settleJudges:

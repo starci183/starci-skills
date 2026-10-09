@@ -2,7 +2,7 @@
 // is replaced by a fresh seat that boots from the stores (modules/kernel/revision-scope.yaml). It is distinct from the rotation by wakes or
 // tokens (modules/reconciler/seat-cost.yaml rotation) and uses the same replacement path; this module only decides that it is due and says why.
 
-export const CONTRACT_CHANGED = 'contract-changed';
+const CONTRACT_CHANGED = 'contract-changed';
 const NAMED = 3;
 
 /** The rotation-shaped reason {due, reason} of a notice in state replace-due, or null. */

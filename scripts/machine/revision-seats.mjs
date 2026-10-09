@@ -4,8 +4,8 @@
 import { putBlob } from '../../engine/db/blob.mjs';
 import { eventPayloadOf } from '../lib/event-payload.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
-import { supervisorEvent } from '../machine/home.mjs';
-import { currentRuntimeRev, revRootOf } from '../kernel/runtime-rev.mjs';
+import { supervisorEvent } from './home.mjs';
+import { runtimeShaOf } from './contract-version.mjs';
 import { NOTICE_EVENT, SETTLED_VERDICTS } from './revision-notice.mjs';
 
 const LEGACY_ACK = 'runtime-rev-acked';
@@ -17,8 +17,8 @@ const recordOf = (payload) => {
 };
 const listBytes = (rows) => Buffer.from(JSON.stringify(rows));
 
-/** The adapter of the Kernel of `workflowId` over its ledger handle `ledger` (openLedger). */
-export function kernelSeat({ ledger, workflowId, root = revRootOf(), current = currentRuntimeRev(root) }) {
+/** The adapter of the Kernel of `workflowId` over its ledger handle `ledger` (openLedger), at the runtime tree `root` (the caller names it: kernel/runtime-rev.mjs revRootOf). */
+export function kernelSeat({ ledger, workflowId, root, current = runtimeShaOf(root) }) {
   const db = ledger.db;
   return {
     role: 'kernel', root, current, workflowId,
@@ -35,7 +35,7 @@ export function kernelSeat({ ledger, workflowId, root = revRootOf(), current = c
 }
 
 /** The adapter of the Supervisor over its machine handle `m` (openMachine). */
-export function supervisorSeat({ m, root = revRootOf(), current = currentRuntimeRev(root), now = Date.now }) {
+export function supervisorSeat({ m, root, current = runtimeShaOf(root), now = Date.now }) {
   return {
     role: 'supervisor', root, current,
     records: () => m.supEvents({ kind: NOTICE_EVENT, limit: 500 }).reverse().map((event) => recordOf(event.payload ?? parseJsonOr(event.payload_json))).filter(Boolean),

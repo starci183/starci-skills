@@ -1,5 +1,5 @@
 // One decision pass over the Kernel seat; the host owns the cadence.
-import { contractReplacement } from '../reconciler/revision-replace.mjs';
+import { contractReplacement } from '../machine/revision-replace.mjs';
 const noTerminalResult = ({ workflowId, phase, terminal, repair, lostSeatWorker, exitedTwice, stopAndRelease, replaceKernel }) => {
   if (terminal) return null;
   if (!repair) return { ok: true, workflowId, phase, action: 'restart-needed', reason: 'kernel signal/terminal absent' };

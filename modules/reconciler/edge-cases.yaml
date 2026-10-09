@@ -1056,20 +1056,20 @@ cases:
     family: change-under-running
     finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: no seat acts on a rule the tree no longer has) a re-read adds the new text to a long-lived seat context but never removes the old rule, so a deleted or reversed rule kept being followed until the seat was replaced by hand.", remedy: {state: in-tree}}
     met: {date: "2026-10-09", where: "alpha.8 live, the Kernel and Supervisor seats", evidence: "a seat context grows by about a thousand tokens per turn and keeps every earlier contract read (seat-cost.yaml rotation); the contract-changed replacement is the only way a removed rule leaves a seat"}
-    rule: {file: scripts/reconciler/revision-replace.mjs, anchor: "contract-changed"}
+    rule: {file: scripts/machine/revision-replace.mjs, anchor: "contract-changed"}
     spec: tests/supervisor/supervisor-watchdog-revision.spec.mjs
     status: covered
   - id: wake-for-a-revision-change-loops-or-doubles
     family: change-under-running
     finding: {role: runtime, duty: bound, verdict: departs, evidence: "(duty: a seat is woken at most once for one revision change) a wake per tick for an unacked revision would count against the rotation and idle-replace bounds and replace a healthy seat.", remedy: {state: in-tree}}
     met: {date: "2026-10-09", where: "design review of the revision notice", evidence: "kernel-watchdog.mjs WAKE_IDLE_REPLACE counts delivered wakes with no move; the notice wake is recorded once per set of owed files and the ack is an activity record"}
-    rule: {file: scripts/reconciler/revision-notice.mjs, anchor: "woken.has(mine.digest)"}
+    rule: {file: scripts/machine/revision-notice.mjs, anchor: "woken.has(mine.digest)"}
     spec: tests/kernel/kernel-watchdog-revision.spec.mjs
     status: covered
   - id: attempt-in-flight-judged-by-a-rule-newer-than-its-admission
     family: change-under-running
     finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: an attempt keeps the rules of its admission) the settle judges against the live tree, so a proof added or tightened after the admission refuses a done the op could not have known; the settle recorded nothing about which revision each proof was owed under.", remedy: {state: in-tree}}
     met: {date: "2026-10-09", where: "alpha.8 live, a job admitted before a gate existed", evidence: "settle-preflight.mjs phases read knowledge/op-gate.yaml, knowledge/sonar-gate.yaml and modules/kernel/critic.yaml at settle time; only critic-settle.mjs consults the admitted contract"}
-    rule: {file: scripts/reconciler/settle-revision.mjs, anchor: "proofsOwedUnder"}
+    rule: {file: scripts/kernel/settle-revision.mjs, anchor: "proofsOwedUnder"}
     spec: tests/reconciler/revision-notice.spec.mjs
     status: covered

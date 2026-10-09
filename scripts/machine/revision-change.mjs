@@ -11,11 +11,11 @@ import { catFile } from '../api/git/cat-file.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { sha256 } from '../../engine/digest.mjs';
 import { byCodeUnit } from '../lib/list.mjs';
-import { REPLACE, actionsFor, engineLoadedSet, loadScope, opKindsOf } from './revision-scope.mjs';
+import { REPLACE, actionsFor, loadScope, opKindsOf } from './revision-scope.mjs';
 
-export const WORDING_TRAILER = 'Revision-Wording';
+const WORDING_TRAILER = 'Revision-Wording';
 const SEATS = ['kernel', 'supervisor'];
-const ALL_ROLES = [...SEATS, 'op', 'critic', 'engine'];
+const ALL_ROLES = [...SEATS, 'op', 'critic'];
 const SCALAR = 's';
 const GIT = { timeout: 30_000, maxBuffer: 64 * 1024 * 1024 };
 
@@ -38,7 +38,7 @@ export function changedFiles(root, from, to) {
 }
 
 /** The paths the commits in (from, to] declare wording-only through the trailer. */
-export function declaredWording(root, from, to) {
+function declaredWording(root, from, to) {
   const out = run(gitLog, root, ['--format=%B', `${from}..${to}`]) ?? '';
   const pattern = new RegExp(String.raw`^${WORDING_TRAILER}:\s*(.+)$`, 'gm');
   return [...new Set([...out.matchAll(pattern)].flatMap((m) => m[1].split(',').map((p) => p.trim()).filter(Boolean)))].sort(byCodeUnit);
@@ -94,15 +94,6 @@ function wordingVerdict(root, from, to, entries, declared) {
   return { declared, accepted, refused };
 }
 
-/** A predicate over the engine-loaded set, which is derived from the import graph the first time a file is asked about. */
-function lazyEngineSet(root, doc) {
-  let loaded = null;
-  return (file) => {
-    loaded ??= engineLoadedSet(root, doc).loaded;
-    return loaded.has(file);
-  };
-}
-
 const weight = (doc, action) => (action === REPLACE ? doc.order.length : doc.order.indexOf(action));
 const heaviest = (doc, actions) => actions.reduce((top, a) => (weight(doc, a) > weight(doc, top) ? a : top), 'none');
 const LISTED = new Set(['reread', REPLACE, 'restart']);
@@ -116,15 +107,13 @@ function roleScope(doc, role, perFile, accepted) {
 
 /**
  * The scope of the change from `from` to `to` in the tree at `root`: {known, from, to, fileCount, digest, wording, roles: {kernel: {action, count,
- * files, replaceFiles}, supervisor: {...}, op: {action, ..., kinds}, critic: {...}, engine: {...}}}. `roles` limits the roles computed (the
- * engine's import graph is read only when `engine` is asked for). `known` is false when git cannot say; the caller treats that as a replacement.
+ * files, replaceFiles}, supervisor: {...}, op: {action, ..., kinds}, critic: {...}, engine: {...}}}. `roles` limits the roles computed (the engine role needs `engineLoaded`, a predicate over the files the engine process loads: scripts/supervisor/engine-loaded.mjs). `known` is false when git cannot say; the caller treats that as a replacement.
  */
-export function changeScope(root, from, to, { doc = loadScope(root), roles = ALL_ROLES } = {}) {
+export function changeScope(root, from, to, { doc = loadScope(root), roles = ALL_ROLES, engineLoaded = () => false } = {}) {
   const entries = changedFiles(root, from, to);
   const none = { declared: [], accepted: [], refused: [] };
   if (!entries) return { known: false, from, to, fileCount: 0, digest: null, wording: none, roles: {} };
   const wording = wordingVerdict(root, from, to, entries, declaredWording(root, from, to));
-  const engineLoaded = roles.includes('engine') ? lazyEngineSet(root, doc) : () => false;
   const perFile = entries.map((entry) => ({ entry, ...actionsFor(doc, entry.path, { engineLoaded }) }));
   const result = Object.fromEntries(roles.map((role) => [role, roleScope(doc, role, perFile, wording.accepted)]));
   if (result.op) result.op.kinds = [...new Set(entries.flatMap((e) => opKindsOf(doc, e.path)))].sort(byCodeUnit);

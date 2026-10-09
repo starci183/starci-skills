@@ -10,9 +10,9 @@ import { readSupervisor, SKILL_ROOT, SUPERVISOR_ID } from '../../scripts/machine
 import { registerSupervisor } from '../../scripts/supervisor/telegram-bridge.mjs';
 import { watchdogPass } from '../../scripts/supervisor/supervisor-watchdog.mjs';
 import { withMachine } from '../../engine/db/machine.mjs';
-import { recordReplaced } from '../../scripts/reconciler/revision-ack.mjs';
-import { supervisorSeat } from '../../scripts/reconciler/revision-seats.mjs';
-import { NOTICE_EVENT } from '../../scripts/reconciler/revision-notice.mjs';
+import { recordReplaced } from '../../scripts/machine/revision-ack.mjs';
+import { supervisorSeat } from '../../scripts/machine/revision-seats.mjs';
+import { NOTICE_EVENT } from '../../scripts/machine/revision-notice.mjs';
 import { revisionRepo } from '../helpers/revision-repo.mjs';
 
 const MENU = 'modules/supervisor/supervisor-menu.yaml';

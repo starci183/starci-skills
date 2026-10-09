@@ -5,7 +5,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { braceVariants, globExpression } from '../lib/glob.mjs';
-import { readModules, buildGraph } from '../supervisor/affected-graph.mjs';
 
 export const SCOPE_FILE = 'modules/kernel/revision-scope.yaml';
 /** The action of a seat whose contract lost or reversed a rule, or whose boot prompt changed: heavier than every table action. */
@@ -53,25 +52,4 @@ export function opKindsOf(doc, file) {
   if (!rows.length) return [];
   const match = rows.map((row) => new RegExp(`^${row.opKinds.from}$`).exec(file)).find(Boolean);
   return match?.groups?.kind ? [match.groups.kind] : ['*'];
-}
-
-/** The tracked files the engine process loads: everything reachable from `engineEntries` through static and literal dynamic imports (a spawned process is not). */
-export function engineLoadedSet(root, doc) {
-  const modules = readModules(root);
-  const files = modules.map((m) => m.file);
-  const entries = doc.engineEntries.flatMap((entry) => { const rx = globExpression(entry); return files.filter((file) => rx.test(file)); });
-  const { importers } = buildGraph({ root, modules });
-  const forward = new Map();
-  for (const links of importers.values()) {
-    for (const link of links.filter((l) => l.kind !== 'spawn')) forward.set(link.from, [...(forward.get(link.from) ?? []), link.target]);
-  }
-  const seen = new Set();
-  const stack = [...entries];
-  while (stack.length) {
-    const file = stack.pop();
-    if (seen.has(file)) continue;
-    seen.add(file);
-    stack.push(...(forward.get(file) ?? []));
-  }
-  return { loaded: seen, entries };
 }

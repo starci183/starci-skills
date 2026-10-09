@@ -10,7 +10,7 @@ import { jobOpOf, jobPayloadOf, jobRowOf } from './shared/rows.mjs';
 import { releaseTypedWaits } from './shared/peer-waits.mjs';
 import { queueTail as queueSettleTail, startTail as startSettleTail } from '../settle/job-settle.mjs';
 import { OP_REV_DRIFT, shortRev } from '../runtime-rev.mjs';
-import { recordSettleRevision } from '../../reconciler/settle-revision.mjs';
+import { recordSettleRevision } from '../../kernel/settle-revision.mjs';
 import { unbindGuardTerminal } from '../../guards/hook-install.mjs';
 import { settlePreflight } from './shared/settle-preflight.mjs';
 import { newSettleState, settleUnderLock } from './shared/settle-accept.mjs';

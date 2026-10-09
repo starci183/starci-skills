@@ -3493,6 +3493,25 @@ starci runtime readme-blocks --check
 starci runtime readme-blocks --write
 ```
 
+### starci runtime revision-scope
+
+show what a deploy of the runtime tree asks of each role between two revisions
+
+| flag | type | |
+| --- | --- | --- |
+| `--from` | string | required |
+| `--to` | string |  |
+| `--root` | string |  |
+
+exit: 0 scope printed; 2 bad usage
+
+json: flag
+
+```sh
+starci runtime revision-scope --from <sha>
+starci runtime revision-scope --from <sha> --to <sha> --json
+```
+
 ### starci runtime status
 
 the runtime's version, tree root and manifest drift — a read-only summary

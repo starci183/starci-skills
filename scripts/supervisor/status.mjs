@@ -8,9 +8,10 @@ import { supervisorStatus } from './start-supervisor.mjs';
 import { readSupervisorMenu } from './supervisor-menu-sources.mjs';
 import { supervisorMenuLines } from './supervisor-menu.mjs';
 import { readSupervisor } from '../machine/home.mjs';
-import { noticeFor } from '../reconciler/revision-ack.mjs';
-import { noticeLine } from '../reconciler/revision-notice.mjs';
-import { supervisorSeat } from '../reconciler/revision-seats.mjs';
+import { noticeFor } from '../machine/revision-ack.mjs';
+import { noticeLine } from '../machine/revision-notice.mjs';
+import { supervisorSeat } from '../machine/revision-seats.mjs';
+import { revRootOf } from '../kernel/runtime-rev.mjs';
 
 const seatLine = (status) => {
   const enabled = { true: 'enabled', false: 'DISABLED' }[String(status.enabled)] ?? 'never started';
@@ -20,7 +21,7 @@ const seatLine = (status) => {
 /** The seat's revision notice in one line: its acked revision, whether the last change concerns it, the files owed; null when it cannot be read. */
 export function revisionLineOf() {
   try {
-    const notice = readSupervisor((m) => noticeFor(supervisorSeat({ m })));
+    const notice = readSupervisor((m) => noticeFor(supervisorSeat({ m, root: revRootOf() })));
     return notice && notice.state !== 'unknown-current' ? { notice, line: noticeLine(notice) } : null;
   } catch { return null; }
 }

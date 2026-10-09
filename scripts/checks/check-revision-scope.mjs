@@ -19,8 +19,9 @@ import { byCodeUnit } from '../lib/list.mjs';
 import { printFindings } from '../lib/check-scan.mjs';
 import { lsFiles } from '../api/git/ls-files.mjs';
 import { rolesContract } from '../machine/roles-contract.mjs';
-import { SCOPE_FILE, actionsFor, engineLoadedSet, loadScope, rowsOf } from '../reconciler/revision-scope.mjs';
-import { wordingOnly } from '../reconciler/revision-change.mjs';
+import { SCOPE_FILE, actionsFor, loadScope, rowsOf } from '../machine/revision-scope.mjs';
+import { engineLoadedSet } from '../supervisor/engine-loaded.mjs';
+import { wordingOnly } from '../machine/revision-change.mjs';
 
 export const CODE = 'RT_REVISION_SCOPE';
 const finding = (message) => ({ code: CODE, path: SCOPE_FILE, line: 0, message: `${SCOPE_FILE} ${message}` });

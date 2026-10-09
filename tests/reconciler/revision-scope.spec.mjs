@@ -4,17 +4,19 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { revisionRepo } from '../helpers/revision-repo.mjs';
-import { changeScope, structureOf, wordingOnly } from '../../scripts/reconciler/revision-change.mjs';
-import { actionsFor, loadScope } from '../../scripts/reconciler/revision-scope.mjs';
+import { changeScope, structureOf, wordingOnly } from '../../scripts/machine/revision-change.mjs';
+import { actionsFor, loadScope } from '../../scripts/machine/revision-scope.mjs';
+import { engineLoadedPredicate } from '../../scripts/supervisor/engine-loaded.mjs';
 import { checkRevisionScope } from '../../scripts/checks/check-revision-scope.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 
 const actionsOf = (scope) => Object.fromEntries(Object.entries(scope.roles).map(([role, r]) => [role, r.action]));
+const ALL = ['kernel', 'supervisor', 'op', 'critic', 'engine'];
 const NONE = { kernel: 'none', supervisor: 'none', op: 'none', critic: 'none', engine: 'none' };
 const scopeOf = (repo, changes, message = 'change') => {
   const from = repo.git('rev-parse', 'HEAD');
   const to = repo.commit(message, changes);
-  return changeScope(repo.root, from, to);
+  return changeScope(repo.root, from, to, { roles: ALL, engineLoaded: engineLoadedPredicate(repo.root, loadScope(repo.root)) });
 };
 const textOf = (repo, file) => fs.readFileSync(path.join(repo.root, file), 'utf8');
 
@@ -142,11 +144,11 @@ test('an ambiguous path takes the heaviest action of its rows and a path no row 
   assert.equal(actionsFor(doc, 'brand/new/thing.bin').rows.length, 0);
 });
 
-test('the shipped table covers every tracked path, derives the engine set and names the boot files of both seats', () => {
+test('RT_REVISION_SCOPE passes on the shipped table: it covers every tracked path, derives the engine set and names the boot files of both seats', () => {
   assert.deepEqual(checkRevisionScope(skillRoot).map((f) => f.message), []);
 });
 
-test('the self-check is red for a tracked path in no row, a hand-listed engine restart and a boot file the generator does not read', (t) => {
+test('RT_REVISION_SCOPE is red for a tracked path in no row, a hand-listed engine restart and a boot file the generator does not read', (t) => {
   const repo = revisionRepo(t);
   repo.commit('add', { 'strange/unmatched.zzz': 'x\n' });
   assert.match(checkRevisionScope(repo.root).map((f) => f.message).join('\n'), /covers no row for the tracked path strange\/unmatched\.zzz/);

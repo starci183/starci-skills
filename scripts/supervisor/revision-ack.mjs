@@ -7,13 +7,13 @@ import fs from 'node:fs';
 import { withMachine } from '../../engine/db/machine.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { arg } from '../lib/cli-arg.mjs';
-import { attest, planRead } from '../reconciler/revision-ack.mjs';
-import { supervisorSeat } from '../reconciler/revision-seats.mjs';
-import { resolveRev } from '../kernel/runtime-rev.mjs';
+import { attest, planRead } from '../machine/revision-ack.mjs';
+import { supervisorSeat } from '../machine/revision-seats.mjs';
+import { resolveRev, revRootOf } from '../kernel/runtime-rev.mjs';
 
 /** The answer of one revision-ack call over the machine handle `m`: {ok, ...} or a refusal {ok: false, code, error}. */
 export function revisionAck(m, { plan = false, rev = null, manifestFile = null } = {}) {
-  const seat = supervisorSeat({ m });
+  const seat = supervisorSeat({ m, root: revRootOf() });
   if (plan) {
     const { notice, manifest } = planRead(seat);
     return { ok: true, state: notice.state, readManifest: manifest };
