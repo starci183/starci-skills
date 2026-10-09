@@ -24,11 +24,11 @@ function seedHook(ledger, world) {
 }
 
 /** The walk world with every leg before `upTo` settled. Answers the walk (see walk-world.mjs) plus `prefix`: the ops seeded. */
-export async function seededWalk(t, upTo) {
+export async function seededWalk(t, upTo, { autopilot = 'on' } = {}) {
   const prefix = WALK_OPS.slice(0, WALK_OPS.indexOf(upTo)).filter((op) => op !== 'request.analyze');
   const fixture = walkFixture();
   fixture.jobs = prefix.map((op, index) => ({ id: `op-${op}-seed`, op, status: 'succeeded', at: { created: -3_600_000 + index * 1000, dispatched: -3_599_000 + index * 1000, updated: -3_000_000 + index * 1000 } }));
-  const walk = openWalk(t, { fixture, seed: seedHook });
+  const walk = openWalk(t, { fixture, seed: seedHook, autopilot });
   for (const op of prefix) {
     await PREFIX_PRODUCERS[op]?.(walk);
     walk.world.tree.commit(`checkpoint ${walk.world.wf}: op-${op}-seed`);

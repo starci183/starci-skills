@@ -7,7 +7,8 @@ import assert from 'node:assert/strict';
 import { seededWalk } from '../helpers/walk-seed.mjs';
 
 test('an op that requires a Kernel-set parameter is offered with the option that carries it, and the pick that cannot work is not offered', async (t) => {
-  const walk = await seededWalk(t, 'provision.ask');
+  // Autopilot off: under autopilot (the default) provision.ask is not planned mid-flow; the owner can switch it off per workflow (starci kernel autopilot --set off).
+  const walk = await seededWalk(t, 'provision.ask', { autopilot: 'off' });
   const item = walk.menuItem('provision.ask');
   assert.ok(item, 'the leg is offered');
   assert.deepEqual(item.options.map((option) => option.choice), ['enqueue-with-params', 'none-fits'], 'no plain pick or write-set escape that the enqueue would refuse');

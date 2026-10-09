@@ -40,11 +40,13 @@ function scaffoldApp(dir) {
 }
 
 /** The walk over `world`: verbs the Kernel, the engine and the op stand-in call. */
-export function openWalk(t, { fixture = walkFixture(), launch = true, seed = null } = {}) {
+export function openWalk(t, { fixture = walkFixture(), launch = true, seed = null, autopilot = 'on' } = {}) {
   const world = replayWorld(t, fixture, { tree: { scaffold: scaffoldApp }, launch, seed });
   const tree = world.tree.dir;
   // Orca hands every worker its own terminal handle; the ledger and the guard bind that handle to one job.
   world.env.STARCI_FAKE_ORCA_UNIQUE_TERMINALS = '1';
+  // Autopilot is on by default for every running workflow (modules/models/runtimes.yaml allocation.autopilot.enabled): the walk runs the way production does unless a case turns it off.
+  world.env.STARCI_AUTOPILOT = autopilot;
   const walk = { world, tree, jobs: new Map(), stops: [] };
   const cli = (verb, args, options) => world.cli(verb, [...args], options);
 
