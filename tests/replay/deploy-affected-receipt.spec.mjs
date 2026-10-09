@@ -6,48 +6,36 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
 import { runAffectedChild, affectedJudgement, provenFor } from '../../scripts/reconciler/runtime-deploy-affected.mjs';
-import { makeTempDir } from '../../scripts/api/fs/make-temp-dir.mjs';
+import { commit, git, loadFixture, replayWorld, write } from '../helpers/replay-world.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 
-const git = (cwd, ...args) => {
-  const r = spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { cwd, encoding: 'utf8', windowsHide: true });
-  assert.equal(r.status, 0, `git ${args.join(' ')}: ${r.stderr}`);
-  return r.stdout.trim();
-};
-const write = (root, rel, text) => { fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true }); fs.writeFileSync(path.join(root, rel), text); };
-
-/** A small repository with the four spec preloads of the runtime, one module and its specs; `redSpec` adds a spec that fails after the change. */
+/**
+ * The world is the sandbox (its base directory, its isolated environment and cleanup); the repository the deploy gate runs in is a real git repository inside it, with
+ * one module, its spec and the four spec preloads. `redSpec` makes the spec fail once the module changed. Answers {dir, base, tip, env}.
+ */
 function repository(t, { redSpec }) {
-  const dir = makeTempDir('starci-replay-affected-');
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 50 }));
+  const world = replayWorld(t, loadFixture('leg-ready'), {});
+  const dir = path.join(world.base, 'affected-repo');
+  fs.mkdirSync(dir, { recursive: true });
   git(dir, 'init', '-q', '-b', 'main');
-  for (const name of ['low-priority', 'isolated-temp', 'isolated-registry', 'runtime-copies']) write(dir, `tests/setup/${name}.mjs`, '');
-  for (const source of ['engine', 'packages', 'ui', 'ext', 'init']) write(dir, `${source}/keep.mjs`, 'export const keep = 0;\n');
-  write(dir, 'package.json', '{"name":"replay-affected","type":"module"}\n');
-  write(dir, 'scripts/answer.mjs', 'export const answer = () => 1;\n');
+  const files = { 'scripts/answer.mjs': 'export const answer = () => 1;\n', 'package.json': '{"name":"replay-affected","type":"module"}\n' };
+  for (const name of ['low-priority', 'isolated-temp', 'isolated-registry', 'runtime-copies']) files[`tests/setup/${name}.mjs`] = '';
+  for (const source of ['engine', 'packages']) files[`${source}/keep.mjs`] = 'export const keep = 0;\n';
   const expected = redSpec ? 'answer() === 1' : 'answer() >= 1';
-  write(dir, 'tests/answer.spec.mjs', `import test from 'node:test';
-import assert from 'node:assert/strict';
-import { answer } from '../scripts/answer.mjs';
-test('answer', () => assert.ok(${expected}));
-`);
-  git(dir, 'add', '-A');
-  git(dir, 'commit', '-q', '-m', 'base');
-  const base = git(dir, 'rev-parse', 'HEAD');
+  files['tests/answer.spec.mjs'] = [`import test from 'node:test';`, `import assert from 'node:assert/strict';`, `import { answer } from '../scripts/answer.mjs';`, `test('answer', () => assert.ok(${expected}));`, ''].join('\n');
+  for (const [rel, text] of Object.entries(files)) write(dir, rel, text);
+  const base = commit(dir, 'the module and its spec');
   write(dir, 'scripts/answer.mjs', 'export const answer = () => 2;\n');
-  git(dir, 'add', '-A');
-  git(dir, 'commit', '-q', '-m', 'change the answer');
-  return { dir, base, tip: git(dir, 'rev-parse', 'HEAD') };
+  return { dir, base, tip: commit(dir, 'change the answer'), env: world.env };
 }
 
 // The spec processes must not inherit the runner of this very test (NODE_TEST_CONTEXT makes a nested `node --test` report to its parent and exit 0 whatever it saw).
-const cleanEnv = () => Object.fromEntries(Object.entries(process.env).filter(([key]) => key !== 'NODE_TEST_CONTEXT'));
+const cleanEnv = (env) => Object.fromEntries(Object.entries(env).filter(([key]) => key !== 'NODE_TEST_CONTEXT'));
 
 // The production child runner, pointed at the runtime's real CLI, run against the repository (--root): the deploy starts it in the source clone itself.
-const runVerb = (repo) => runAffectedChild({ dir: repo.dir, base: repo.base, env: cleanEnv(), budgetMs: 240_000, marginMs: 60_000, pollMs: 100,
-  cli: path.join(skillRoot, 'packages', 'cli', 'bin', 'starci.mjs'), extraArgs: ['--root', repo.dir], runtime: skillRoot });
+const runVerb = (repo) => runAffectedChild({ dir: repo.dir, base: repo.base, env: cleanEnv(repo.env), budgetMs: 240_000, marginMs: 60_000, pollMs: 100,
+  cli: path.join(skillRoot, 'packages', 'cli', 'bin', 'starci.mjs'), runtime: skillRoot });
 
 test('a clean affected run leaves its receipt as a file the deploy judges, and the pair is then proven for the next deploy', async (t) => {
   const repo = repository(t, { redSpec: false });

@@ -4,6 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { runtimeStateDir } from '../../engine/runtime-root.mjs';
+import { readJsonFile } from '../lib/json.mjs';
 
 export const RECEIPT_SCHEMA = 'starci/affected-receipt@1';
 const SHORT = 12;
@@ -22,10 +23,8 @@ function writeReceiptFile(file, receipt) {
 
 /** A receipt file's content when it is a well-formed affected receipt, else null. */
 export function readReceiptFile(file) {
-  try {
-    const receipt = JSON.parse(fs.readFileSync(file, 'utf8'));
-    return receipt?.schema === RECEIPT_SCHEMA ? receipt : null;
-  } catch { return null; }
+  const receipt = readJsonFile(file, null);
+  return receipt?.schema === RECEIPT_SCHEMA ? receipt : null;
 }
 
 /** The files a finished run leaves: the caller's `--receipt-file`, and the proven receipt of a clean ok run. Returns the data fields that reference them. */

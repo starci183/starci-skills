@@ -59,12 +59,12 @@ async function waitFor(child, { errFile, timeoutMs, progress, pollMs, now = Date
  * Runs `starci test affected --run --base <base>` in the source clone `dir` as a real child: stdout and stderr to files, the receipt to a file.
  * Returns {exit: {exited, code, signal, timedOut}, receipt, answer, tail, red, unfinished}; the caller judges it (affectedRefusal).
  */
-export async function runAffectedChild({ dir, base, env, budgetMs, progress = () => {}, pollMs = 2000, cli = path.join(dir, CLI), marginMs = affectedMarginMs(), extraArgs = [], runtime = dir, now, sleep }) {
+export async function runAffectedChild({ dir, base, env, budgetMs, progress = () => {}, pollMs = 2000, cli = path.join(dir, CLI), marginMs = affectedMarginMs(), extraArgs = [], runtime = dir, cwd = dir, now, sleep }) {
   const scratch = makeTempDir('starci-deploy-affected-');
   const files = { out: path.join(scratch, 'answer.json'), err: path.join(scratch, 'progress.log'), receipt: path.join(scratch, 'receipt.json') };
   const out = fs.openSync(files.out, 'w'), err = fs.openSync(files.err, 'w');
   try {
-    const child = spawnNode([cli, 'test', 'affected', '--run', '--base', base, '--receipt-file', files.receipt, ...extraArgs, '--json'], { cwd: dir, env: { ...env, STARCI_RUNTIME: runtime }, stdio: ['ignore', out, err] });
+    const child = spawnNode([cli, 'test', 'affected', '--run', '--base', base, '--receipt-file', files.receipt, ...extraArgs, '--json'], { cwd, env: { ...env, STARCI_RUNTIME: runtime }, stdio: ['ignore', out, err] });
     const exit = await waitFor(child, { errFile: files.err, timeoutMs: budgetMs + marginMs, progress, pollMs, now, sleep });
     if (exit.timedOut && child.pid) stopTree(child.pid);
     const answer = parseJson(readText(files.out), null);
