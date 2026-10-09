@@ -23,6 +23,7 @@ import { worktreeRm } from '../api/orca/worktree-rm.mjs';
 import { worktreePs } from '../api/orca/worktree-ps.mjs';
 import { repoAdd } from '../api/orca/repo-add.mjs';
 import { removeLinksUnder } from '../api/fs/remove-links-under.mjs';
+import { sleepSync } from '../lib/sleep-sync.mjs';
 import { linksUnder } from '../api/fs/links-under.mjs';
 
 /**
@@ -137,6 +138,21 @@ function preserveOrcaTree(out, target, home, preserve, main, env) {
   return null;
 }
 
+// Orca's untyped refusal (no errorCode: git's own words) while another process holds a file of the tree open - an indexer, a scanner, a child that has not
+// exited yet. The git home retries a busy file (scripts/api/fs/safe-remove.mjs); the Orca home asks again the same way before it records a refusal.
+const HELD_FILE = /permission denied|used by another process|access is denied|resource busy|device or resource busy|directory not empty|unable to (?:delete|unlink)|failed to delete|cannot remove/i;
+const heldRefusal = (rm, target) => rm?.ok !== true && !rm?.errorCode && HELD_FILE.test(String(rm?.error ?? '')) && fs.existsSync(target);
+
+function removeThroughOrca(orca, orcaId, target) {
+  const { removeRetries, removeRetryMs } = worktreeSettings();
+  let rm = orca.remove({ worktree: `id:${orcaId}`, force: true });
+  for (let attempt = 0; attempt < removeRetries && heldRefusal(rm, target); attempt += 1) {
+    sleepSync(removeRetryMs * (attempt + 1));
+    rm = orca.remove({ worktree: `id:${orcaId}`, force: true });
+  }
+  return rm;
+}
+
 function removeOrcaTree(out, target, { home, orcaId, git, orca, env }) {
   const before = fs.existsSync(home) ? mainCheckoutGuard(home, { git }) : null;
   const unlinked = removeLinksUnder(target);
@@ -145,7 +161,7 @@ function removeOrcaTree(out, target, { home, orcaId, git, orca, env }) {
     markRemoved(target, { error: `link-stuck: ${unlinked.errors[0]?.path ?? ''}`.slice(0, 300), env });
     return { ...out, reason: 'link-stuck', errors: unlinked.errors.slice(0, 5) };
   }
-  const rm = fs.existsSync(target) || (fs.existsSync(home) && registeredAt(home, target, { git })) ? orca.remove({ worktree: `id:${orcaId}`, force: true }) : { ok: true, removed: true };
+  const rm = fs.existsSync(target) || (fs.existsSync(home) && registeredAt(home, target, { git })) ? removeThroughOrca(orca, orcaId, target) : { ok: true, removed: true };
   if (before) {
     const damage = mainCheckoutDamage(before, mainCheckoutGuard(home, { git }));
     if (damage.length) {

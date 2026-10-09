@@ -8,6 +8,8 @@ worktrees:
   ownerGoneMs: 1800000          # the GC removes a tree whose owner has been gone this long (after preserving it)
   gcEveryMs: 300000             # the reconciler GC controller's worktree pass (key gc:worktrees, always active)
   commandMs: 300000
+  removeRetries: 3              # an Orca removal refused because another process holds a file of the tree is asked again this many times (scripts/machine/worktree-orca.mjs), as the git home retries a busy file
+  removeRetryMs: 200            # the first wait between those asks; each next one waits one more step
   rebaseMilestoneBehind: 20     # a workflow branch is rebased mid-workflow once main is this many commits past its merge-base (scripts/lib/rebase-milestone.mjs)
 
 invariant:
