@@ -6,7 +6,7 @@ import { contractFilesOf, runtimeShaOf } from '../machine/contract-version.mjs';
 import { statusQuery } from '../api/git/status-query.mjs';
 import { INSTALL_MANIFEST_FILE, INSTALL_PROTOCOL_SCHEMA, installedPayloadDigest } from '../lib/install-custody.mjs';
 import { ENGINE_SCHEMA } from '../../engine/constants.mjs';
-import { parseJson } from '../lib/json.mjs';
+import { eventPayloadOf } from '../lib/event-payload.mjs';
 import { byCodeUnit } from '../lib/list.mjs';
 export const KERNEL_BOOT_FILES = Object.freeze(['modules/kernel/kernel-prompt.md', 'modules/kernel/driver-loop.yaml']);
 export const KERNEL_CONTRACT_FILES = Object.freeze([...KERNEL_BOOT_FILES, 'modules/kernel/api.yaml', 'modules/cli/commands/kernel', 'modules/kernel/owner-rulings.yaml']);
@@ -86,8 +86,8 @@ export function verifyKernelRead(submitted, required) {
 
 /** The latest attestation of this workflow when it is the current incarnation's and its digest holds; null otherwise. */
 function currentAttestation(db, workflowId, incarnation) {
-  const row = db.prepare("SELECT payload_json FROM events WHERE workflow_id=? AND kind='runtime-rev-acked' ORDER BY seq DESC LIMIT 1").get(workflowId);
-  const ack = parseJson(row?.payload_json)?.readManifest;
+  const row = db.prepare("SELECT payload_json, payload_sha FROM events WHERE workflow_id=? AND kind='runtime-rev-acked' ORDER BY seq DESC LIMIT 1").get(workflowId);
+  const ack = eventPayloadOf(row)?.readManifest;
   const { digest, ...body } = ack ?? {};
   const whole = ack?.schema === KERNEL_READ_SCHEMA && ack.workflowId === workflowId && ack.incarnation === incarnation
     && Array.isArray(ack.files) && Array.isArray(ack.ops) && ack.revision && digest === sha256(JSON.stringify(body));

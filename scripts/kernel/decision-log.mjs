@@ -4,12 +4,14 @@
 import { recordKernel, newId } from './kernel-authority.mjs';
 import { DECISION_KIND, DECISION_RESULT_KIND, opJobsOf, unitsOf } from './progress-rca.mjs';
 
-/** The progress counters an entry is judged against: units done and total, done in the last hour, ops running. */
+// The statuses of a job whose worker is alive: a reported job waits for its settle and a queued one for its slot, so neither is running.
+const WORKER_LIVE = new Set(['leased', 'running', 'answering']);
+/** The progress counters an entry is judged against: units done and total, done in the last hour, ops running (a live worker). */
 export const snapshotOf = (db, workflowId, now = Date.now()) => {
   const units = unitsOf(opJobsOf(db, workflowId)).filter((u) => u.state !== 'dropped');
   const done = units.filter((u) => u.state === 'done');
   return { at: now, unitsDone: done.length, unitsTotal: units.length, doneLastHour: done.filter((u) => u.doneAt >= now - 3_600_000).length,
-    running: units.reduce((n, u) => n + u.open.filter((j) => j.status !== 'queued').length, 0) };
+    running: units.reduce((n, u) => n + u.open.filter((j) => WORKER_LIVE.has(j.status)).length, 0) };
 };
 
 /** Opens an entry; `extra` rides in its payload (a menu answer names its item and choice there). Returns {id, baseline, payload}. */

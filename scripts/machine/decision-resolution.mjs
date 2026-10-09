@@ -58,10 +58,12 @@ const reportOf = (db, dispatchId) => {
 const appOf = (p) => /(?:^|\/)((?:apps|packages)\/[^/]+)/.exec(String(p).replaceAll('\\', '/'))?.[1] ?? '.';
 
 /** The steps that close a still-open attempt as a failure: the refusal as a recorded red check (a done claim), then the settle. */
+// A failed Critic verdict is the critique itself: its red check keeps every failed check the verdict names, because the retry is fed that evidence.
+const CRITIC_FAILED = 'op-critic-verdict-failed';
 const closeSteps = ({ outcome, code, failures, jobId }) => {
   const verdict = outcome === 'blocked' || outcome === 'ask' ? 'blocked' : 'fail';
   if (outcome !== 'done') return [{ verb: 'settle', args: { job: jobId, verdict } }];
-  const evidence = `${code}: ${failures.join('; ').replace(/\s+/g, ' ').slice(0, 200) || 'refused by the runtime'}`;
+  const evidence = `${code}: ${failures.join('; ').replace(/\s+/g, ' ').slice(0, code === CRITIC_FAILED ? 1500 : 200) || 'refused by the runtime'}`;
   return [{ verb: 'record-checks', args: { job: jobId, checks: JSON.stringify({ checks: [{ name: code, command: 'runtime settle', exitCode: 1, evidence }] }) } },
     { verb: 'settle', args: { job: jobId, verdict } }];
 };
@@ -95,11 +97,13 @@ function jobOptions(facts, di) {
   const enqueue = (ps, tag) => ({ verb: 'enqueue', args: { workflow: wf, op, paths: ps.join(','), 'retry-of': jobId,
     ...(Object.keys(params).length ? { params: JSON.stringify(params) } : {}), what: `${tag}: ${what}`.slice(0, 40), ...(di.id ? { resolves: di.id } : {}) } });
   const options = [];
-  if (open) options.push({ key: 'settle-fail', title: `settle it ${close.at(-1).args.verdict}: the route table queues the next step of its lineage`, steps: close });
-  options.push({ key: 'continue', title: `continue on the current base with the failing files added (${failing.length} file(s))`, steps: [...close, enqueue(paths, 'continue')] });
+  const critique = code === CRITIC_FAILED;
+  if (open) options.push({ key: 'settle-fail', title: critique ? 'settle it fail: the Critic\'s failed checks are recorded as the attempt\'s red check and the route table queues the retry that is fed that critique' : `settle it ${close.at(-1).args.verdict}: the route table queues the next step of its lineage`, steps: close });
+  options.push({ key: 'continue', title: critique ? 'close it as failed with the Critic\'s critique recorded and enqueue the retry yourself, on the current base' : `continue on the current base with the failing files added (${failing.length} file(s))`, steps: [...close, enqueue(paths, 'continue')] });
   const apps = [...new Set(paths.map(appOf))];
   if (apps.length > 1) options.push({ key: 'split-per-app', title: `split it per app (${apps.join(', ')})`, steps: [...close, ...apps.slice(0, 4).map((a) => enqueue(paths.filter((p) => appOf(p) === a), a.split('/').pop()))] });
-  if (open && outcome === 'done') options.push({ key: 'accept', title: 'accept it: the settle pass re-runs integration and parity on the current tip (only when the blocker the refusal names has since landed)', steps: [{ verb: 'settle', args: { job: jobId, verdict: 'pass' } }] });
+  // A failed Critic verdict never passes by being settled again, so accept is not offered against it.
+  if (open && outcome === 'done' && !critique) options.push({ key: 'accept', title: 'accept it: the settle pass re-runs integration and parity on the current tip (only when the blocker the refusal names has since landed)', steps: [{ verb: 'settle', args: { job: jobId, verdict: 'pass' } }] });
   return options;
 }
 

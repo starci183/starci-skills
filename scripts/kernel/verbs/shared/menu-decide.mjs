@@ -7,6 +7,7 @@ import { escalateDecision, openDecisionRow, resolveDecision } from '../../../mac
 import { findInOrder } from '../../../lib/in-order.mjs';
 import { refuseVerb } from './verb-exit.mjs';
 import { runVerbInProcess } from './verb-inproc.mjs';
+import { itemFactsOf } from '../../kernel-menu.mjs';
 import { menuLines } from './status-menu.mjs';
 
 const TEXT = '$text';
@@ -100,7 +101,7 @@ export async function decideMenuItem(ctx) {
   }
   const steps = boundSteps(option, text);
   const entry = openEntry({ ledger, repo, workflowId: wf, hypothesis: reason, actionKey: `${option.choice}:${item.id}:${now.toString(36)}`, metric: `${item.kind} ${item.id} resolved`,
-    command: stepsText(steps) || option.choice, now, extra: { menu: { item: item.id, choice: option.choice }, evidence: String(args.evidence ?? '').split(',').map((ref) => ref.trim()).filter(Boolean) } });
+    command: stepsText(steps) || option.choice, now, extra: { menu: { item: item.id, choice: option.choice, facts: itemFactsOf(item) }, evidence: String(args.evidence ?? '').split(',').map((ref) => ref.trim()).filter(Boolean) } });
   const done = option.escape ? [] : await runSteps(ctx, steps, entry.id);
   const failed = done.some((step) => !step.ok);
   const escalatedTo = option.escape ? escalate(ctx, item, reason) : null;

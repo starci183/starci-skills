@@ -94,7 +94,8 @@ function fixture(_t, { jobs = [], orca = fakeOrca(), pendingFails = false, ...se
     markReleasePending: (_ctx, id) => { pending.push(id); return pendingFails ? { ok: false, reason: 'registry-unavailable' } : { ok: true }; },
     TERMINAL_JOB_STATUSES: OCCUPYING,
   };
-  const ctx = { worktree, orca, db: fakeDb(jobs, reports), lockWaitMs: 5_000, gate: () => ({ exit: 0, counts: { new: 0 }, findings: [], errors: [] }), ...seams };
+  // The temp repository is reset by hand between cases: the runtime's history hook is exercised in tests/kernel/workflow-rewind-hook.spec.mjs.
+  const ctx = { worktree, orca, db: fakeDb(jobs, reports), ensureHistoryHook: () => ({ installed: false }), lockWaitMs: 5_000, gate: () => ({ exit: 0, counts: { new: 0 }, findings: [], errors: [] }), ...seams };
   return { base, repo, origin, dir, ctx, registry, checkpoints, pending, reports, orca };
 }
 

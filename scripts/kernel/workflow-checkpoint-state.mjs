@@ -3,14 +3,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 export { withLock, withWorkflowLock } from '../goal/workflow-lock.mjs';
-import { parseJson } from '../lib/json.mjs';
 import { pathKey } from '../lib/path-key.mjs';
 import { add as gitAdd } from '../api/git/add.mjs';
 import { readTree } from '../api/git/read-tree.mjs';
 import { writeTree } from '../api/git/write-tree.mjs';
 import { lsTree } from '../api/git/ls-tree.mjs';
 import { lsFiles } from '../api/git/ls-files.mjs';
-import { getBlob } from '../../engine/db/blob.mjs';
+import { eventPayloadOf } from '../lib/event-payload.mjs';
 import { redactData } from '../lib/redact.mjs';
 import { jsonClone } from '../lib/json-clone.mjs';
 import { tempPath } from '../api/fs/temp-path.mjs';
@@ -19,9 +18,7 @@ const SHA = /^[0-9a-f]{40,64}$/;
 const fail = ({ code }, message) => Object.assign(new Error(message), { code });
 export const literalPaths = (files) => files.map((file) => `:(literal)${file}`);
 
-export function receiptPayload(row) {
-  return row?.payload_sha ? JSON.parse(getBlob(row.payload_sha).toString('utf8')) : parseJson(row?.payload_json) ?? null;
-}
+export const receiptPayload = eventPayloadOf;
 export function appendEffectEvent(ctx, args) {
   try { return ctx.ledger.appendEvent(args); }
   catch (error) {

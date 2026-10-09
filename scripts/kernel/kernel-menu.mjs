@@ -3,6 +3,8 @@
 // kinds, options and the classification of every next-action origin are data in modules/kernel/kernel-menu.yaml. The menu adds
 // no policy: who handles a situation, its chain and its deadline come from the hold table (modules/kernel/op-incident-policy.yaml).
 import fs from 'node:fs';
+import { createHash } from 'node:crypto';
+import { redactText } from '../lib/redact.mjs';
 import { escapeOptionOf, fillTemplate } from '../lib/menu-parts.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -167,11 +169,29 @@ const handoverItems = (handover, workflow, report) => {
   return [itemOf('handover-step', { key: workflow, subject, options })];
 };
 
+/**
+ * The facts of an item an answer was given on: a fingerprint of its question and of what each option does. An item whose facts are the same as
+ * when the Kernel's step on it failed asks nothing new, so it is not asked again inside the snooze; a changed question or option is new.
+ */
+export const itemFactsOf = (item) => createHash('sha256').update(JSON.stringify([item.question, item.options.map((option) => [option.choice, option.effect])])).digest('hex').slice(0, 16);
+
+/**
+ * Whether the Kernel already answered this item and nothing changed: `snoozed` holds ids of a chosen wait, `answered` maps an id to the facts
+ * it had when a step of the Kernel's answer failed. A ledger event stores an id through the redaction filter (an id that carries a secret-like
+ * key word followed by a colon, such as a leg named forgot-password, is stored with its tail blanked), so both spellings of the id are looked up.
+ */
+function heldBack(sources, item) {
+  const spellings = [item.id, redactText(item.id)];
+  if (spellings.some((id) => sources.snoozed.has(id))) return true;
+  const facts = itemFactsOf(item);
+  return spellings.some((id) => sources.answered?.get(id) === facts);
+}
+
 const sinceOf = (item) => item.deadline ?? Number.MAX_SAFE_INTEGER;
 
 /**
  * The menu: [{id, kind, mode, subject, question, options: [{choice, verb, args, steps, effect}], evidence, deadline, step, hold, di}].
- * `sources`: {workflow, rev, jobDecisions: [{di, resolution}], shapeRefused: [{jobId, op, failedJobId, situation}], questions, peers, wedged, deadWaits, decisions, nextActions, handover, feedback ({title, slices}, scripts/kernel/handover-slices.mjs), snoozed: Set of item ids}.
+ * `sources`: {workflow, rev, jobDecisions: [{di, resolution}], shapeRefused: [{jobId, op, failedJobId, situation}], questions, peers, wedged, deadWaits, decisions, nextActions, handover, feedback ({title, slices}, scripts/kernel/handover-slices.mjs), snoozed: Set of item ids, answered: Map of item id to the facts a failed answer had (optional)}.
  */
 export function buildMenu(sources) {
   const { workflow } = sources;
@@ -188,6 +208,6 @@ export function buildMenu(sources) {
     ...handoverItems(sources.handover, workflow, sources.feedback),
   ];
   const seen = new Set();
-  return items.filter((item) => !sources.snoozed.has(item.id) && !seen.has(item.id) && seen.add(item.id))
+  return items.filter((item) => !heldBack(sources, item) && !seen.has(item.id) && seen.add(item.id))
     .sort((a, b) => (a.mode === 'duty' ? 0 : 1) - (b.mode === 'duty' ? 0 : 1) || sinceOf(a) - sinceOf(b));
 }

@@ -6,7 +6,7 @@ import { log as gitLog } from '../api/git/log.mjs';
 import { kernelNotesOf } from '../machine/land-kernel-note.mjs';
 import { fileURLToPath } from 'node:url';
 import { contractFilesOf, runtimeShaOf } from '../machine/contract-version.mjs';
-import { parseJson } from '../lib/json.mjs';
+import { eventPayloadOf } from '../lib/event-payload.mjs';
 import { underAny } from '../lib/path-key.mjs';
 
 export const KERNEL_REV_ACKED_EVENT = 'runtime-rev-acked';
@@ -80,8 +80,8 @@ export function landKernelNotes(root, from, to) {
 
 /** The latest runtime-rev-acked event of a workflow: {rev, at, source, files, attempt} or null. */
 function latestRevAck(db, workflowId) {
-  const row = db.prepare('SELECT payload_json,created_at FROM events WHERE workflow_id=? AND kind=? ORDER BY seq DESC LIMIT 1').get(workflowId, KERNEL_REV_ACKED_EVENT);
-  const payload = parseJson(row?.payload_json);
+  const row = db.prepare('SELECT payload_json,payload_sha,created_at FROM events WHERE workflow_id=? AND kind=? ORDER BY seq DESC LIMIT 1').get(workflowId, KERNEL_REV_ACKED_EVENT);
+  const payload = eventPayloadOf(row);
   if (!payload?.rev) return null;
   return { rev: payload.rev, at: row.created_at, source: payload.source ?? 'ack', files: Array.isArray(payload.files) ? payload.files : [], attempt: payload.attempt ?? null, readManifest: payload.readManifest ?? null };
 }

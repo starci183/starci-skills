@@ -32,7 +32,7 @@ import { allocationMs } from '../../engine/config.mjs';
 const here = path.dirname(fileURLToPath(import.meta.url));
 export { guardsRoot };
 const HOOK_MARKER = 'starci-history-guard';
-export const HOOK_VERSION = 7;
+export const HOOK_VERSION = 8;
 export const WORK_HOOK_MARKER = 'starci-work-guard';
 export const RUNTIME_GIT_HOOKS_MARKER = 'starci-git-hooks';
 const WORK_HOOK_VERSION = 1;
@@ -162,6 +162,9 @@ while read -r old new ref; do
       case "$old" in *[!0]*) ;; *) old=$(git rev-parse -q --verify "$ref^{commit}" 2>/dev/null) ;; esac
       [ -z "$old" ] && continue
       if ! git merge-base --is-ancestor "$old" "$new" 2>/dev/null; then
+        # The runtime rewinds a workflow branch to its last checkpoint (preserveAndReset) naming the target in STARCI_BRANCH_REWIND; that is
+        # allowed only while the commit it leaves is kept under refs/heads/preserved, so nothing is lost.
+        if [ "\${STARCI_BRANCH_REWIND:-}" = "$new" ] && [ -n "$(git for-each-ref --contains "$old" --format=x refs/heads/preserved 2>/dev/null)" ]; then continue; fi
         echo "starci history guard: refused moving protected branch $b from $old to $new - not a fast-forward (reset/amend/rebase rewrite a branch other workflows commit on; undo a commit with git revert)" >&2
         status=1; continue
       fi

@@ -66,6 +66,14 @@ function snoozedOf(s) {
   return new Set(decisionsOf(s.db, s.workflowId).filter((d) => ['keep-waiting', 'none-fits'].includes(d.menu?.choice) && d.at > since).map((d) => d.menu.item));
 }
 
+/** The items whose latest answer failed a step, by id, with the facts the item had then: asked again only when the item's facts change. */
+function answeredOf(s) {
+  const since = s.now - snoozeMs();
+  const latest = new Map();
+  for (const d of decisionsOf(s.db, s.workflowId)) if (d.menu?.item && d.at > since) latest.set(d.menu.item, d);
+  return new Map([...latest].filter(([, d]) => d.status === 'revert' && d.menu.facts).map(([id, d]) => [id, d.menu.facts]));
+}
+
 /** The defect the owner reported on the handover ({title, slices}); null unless the answer is feedback. */
 const feedbackOf = (s) => (s.handover?.ask?.decision === 'feedback' && s.handover.state === 'answered'
   ? feedbackOfHandover(s.workflowJobs, s.handover.ask, { max: menuCatalog().kinds.find((kind) => kind.id === 'handover-step').feedback.maxSlices })
@@ -81,7 +89,7 @@ export const menuPhase = (s) => {
   s.menu = buildMenu({
     workflow: workflowId, rev: s.kernelRev, jobDecisions: jobDecisionsOf(s, live), shapeRefused: shapeRefusedOf(s),
     questions: s.workerQuestions, peers: s.peerMessages, wedged: s.wedgedWorkers.map((w) => ({ jobId: w.jobId, opId: s.workflowJobs.find((row) => row.job_id === w.jobId)?.op_id ?? null })),
-    deadWaits: deadWaitsOf(s), decisions: live.filter((di) => !OWN_KIND.has(di.kind)), nextActions: s.graph.nextActions, handover: s.handover, feedback: feedbackOf(s), snoozed: snoozedOf(s),
+    deadWaits: deadWaitsOf(s), decisions: live.filter((di) => !OWN_KIND.has(di.kind)), nextActions: s.graph.nextActions, handover: s.handover, feedback: feedbackOf(s), snoozed: snoozedOf(s), answered: answeredOf(s),
   });
   s.actionable = s.menu.length > 0;
   s.frontier.actionable = s.actionable;

@@ -51,6 +51,7 @@ import { TERMINAL_JOB_STATUSES } from '../machine/worktree-registry.mjs';
 import { mergeGuard } from '../gates/gate.mjs';
 import { fastForwardLive } from '../machine/live-fast-forward.mjs';
 import { setCheckpoint, markReleasePending } from './workflow-worktree.mjs';
+import { ensureHistoryHook } from '../guards/hook-install.mjs';
 import { gateBaseOf, gateBasesOf, workflowWorktreeAt, workflowWorktreeOf } from '../machine/workflow-tree.mjs';
 import { normalizeOwnedPath } from '../../engine/admission.mjs';
 import { ownedPathsOf } from './verbs/shared/rows.mjs';
@@ -266,7 +267,9 @@ function preserveOwned(ctx, { workflowId, opId }) {
   if (head !== receipt.resetTo) {
     // Foreign commits past the checkpoint: the branch goes back; their changes now show against HEAD and are reset below
     // with the op's own. Another op's files are untouched by a soft reset.
-    const soft = git(gitReset, rec.path, ['--soft', receipt.resetTo]);
+    // The history hook keeps a workflow branch append-only; its current version lets this rewind through when the commit it leaves is kept under preserved/.
+    (ctx?.ensureHistoryHook ?? ensureHistoryHook)(rec.path);
+    const soft = git(gitReset, rec.path, ['--soft', receipt.resetTo], { env: { STARCI_BRANCH_REWIND: receipt.resetTo } });
     if (!soft.ok) throw fail({ code: 'workflow-reset-failed' }, `${rec.branch} could not go back to ${receipt.resetTo}: ${soft.stderr.slice(0, 200)}`);
   }
   phaseOf(ctx, 'branch-applied', receipt);

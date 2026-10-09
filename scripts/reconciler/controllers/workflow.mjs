@@ -40,6 +40,7 @@ import { slaCatalog, clocksOf, setClock, clearClock } from '../sla.mjs'; import 
 import { gateViewsFromLedger } from '../../kernel/gate-ladder.mjs';
 import { fixCandidatesOf } from '../gate-fix-candidates.mjs';
 import { closeGateItems, gateSightOf } from '../gate-close.mjs';
+import { strandedSupervisorDis } from '../supervisor-mirror.mjs';
 import { planWorkflow, stuckPrefix, workflowEntity, SUPERVISOR_LEDGER } from '../workflow-plan.mjs';
 import { eachInOrder, mapInOrder } from '../../lib/in-order.mjs';
 import { recordSwap } from '../revision-swap.mjs';
@@ -231,7 +232,8 @@ async function readFacts(ctx, readers, { key, ledgerId, workflowId, now, setting
   const open = await (ctx.openAsks ?? openAsks)(own.db, new Set([workflowId]));
   const asks = open.map((a) => ({ dispatchId: a.dispatch_id, liveness: a.liveness, lastServedAt: lastServedAt(own.db, workflowId, a.dispatch_id) }));
   const gates = gatesOf(status, own.db, workflowId, { now, timeoutMs: settings.supervisorGateMs });
-  return { base, findings, asks, status, unreadable, gates, sight: gateSightOf([own]) };
+  return { base, findings, asks, status, unreadable, gates, sight: gateSightOf([own]),
+    stranded: strandedSupervisorDis(own.db, { ledgerId, ledgerName: path.basename(own.repo), workflowId, now }) };
 }
 
 /**
@@ -294,7 +296,7 @@ export async function reconcileWorkflow(key, ctx, { settings = workflowSettings(
   let facts;
   try { facts = await readFacts(ctx, readers, { key, ledgerId, workflowId, now, settings }); } finally { closeAll(readers); }
   if (facts.early) return facts.early;
-  const { base, findings, asks, status, unreadable, gates, sight } = facts;
+  const { base, findings, asks, status, unreadable, gates, sight, stranded } = facts;
 
   const existing = clocksOf(ctx, { prefixes: [wfEntity, prefix] }).filter((c) => c.entity === wfEntity || c.entity.startsWith(prefix));
   const plan = planWorkflow({ ledgerId, workflowId, status, findings, goal: base.goal, asks, gates, clocks: existing, unreadable, now, settings });
@@ -303,6 +305,8 @@ export async function reconcileWorkflow(key, ctx, { settings = workflowSettings(
 
   // decisions, then one doorbell for the Kernel's
   const opened = await openDecisions(ctx, plan, now, settings);
+  // The items a Kernel verb opened for the Supervisor in this product ledger reach the Supervisor's own store.
+  await openDecisions(ctx, { decisions: stranded, lines: plan.lines }, now, settings);
   // The Supervisor's items of this workflow's gates close with the gate, and an older revision's item closes when the newer one stands.
   if (ctx.mode === 'active') closeGateItems(sight, { env: ctx.env ?? process.env, now });
   const kernelKeys = opened.filter((d) => d.decider === 'kernel').map((d) => d.idempotencyKey);
