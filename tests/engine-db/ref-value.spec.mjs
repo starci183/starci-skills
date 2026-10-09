@@ -1,4 +1,4 @@
-// The reader half of the storage convention (modules/schemas/storage-convention.yaml): a column holds the content inline (every row written before the convention) or a reference to
+// The reader half of the storage convention: a column holds the content inline (every row written before the convention) or a reference to
 // it in the blob store, and every handle either store opens returns the content whichever shape the row has, byte for byte. Nothing writes a reference yet: the writers and the
 // row migration come after the readers (the readers ship alone, so a store written by a later runtime is readable by this one).
 import test, { after } from 'node:test';
