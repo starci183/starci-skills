@@ -17,7 +17,7 @@ import { ASSET_OP } from '../work/asset-slot.mjs';
 import { retryMoveOf } from './retry-move.mjs';
 import { enqueueMove, legPathsOf, rerunMoveOf, withMove } from './next-moves.mjs';
 import { handoverReviewAction } from './handover-move.mjs';
-import { proposedLegPaths, treesOfWorkflow } from './leg-proposal.mjs';
+import { proposedLegPaths, requiredKernelParamsOf, treesOfWorkflow } from './leg-proposal.mjs';
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const ownerLanguage = () => ownerLanguageOf();
 
@@ -120,6 +120,8 @@ const approvedLegAction = (op, ctx, credentialOnly) => {
   const nodePaths = workGraph?.frontier?.[0]?.ownedPaths ?? [];
   const proposed = move || deferral ? '' : proposedLegPaths({ skillRoot, op, trees: treesOfWorkflow(ctx.db, ctx.wf.workflow_id), nodePaths });
   if (proposed) action.proposed = proposed;
+  const required = requiredKernelParamsOf({ skillRoot, op });
+  if (required.length && !move) action.paramsRequired = required.join(', ');
   if (deferral) {
     action.reason = `approved leg ${op} is deferred (${deferral.reason}): starci kernel enqueue --op ${op} with its paths records it - it settles deferred at once, never dispatched, no attempt spent - and the legs behind it do not wait on it`;
   } else {

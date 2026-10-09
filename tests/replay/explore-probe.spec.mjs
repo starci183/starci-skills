@@ -16,7 +16,8 @@ test('probe', { timeout: 600_000 }, async (t) => {
     const jobId = queued.jobId ?? walk.world.ledger((l) => l.db.prepare("SELECT job_id FROM jobs WHERE op_id=? AND role='op' ORDER BY created_at DESC LIMIT 1").get(PROBE)?.job_id);
     const d = walk.dispatch(); out.dispatch = d.json ?? d.stderr; out.jobId = jobId;
     try { fs.copyFileSync(packetOf(walk.world, jobId), 'D:/starci-tmp/triage/packet-' + PROBE + '.md'); out.packet = true; } catch (error) { out.packet = String(error.message); }
-    if (process.env.WALK_REPORT) {
+    out.job = walk.job(jobId);
+    if (process.env.WALK_REPORT && out.job.status === 'running') {
       const env = JSON.parse(process.env.WALK_REPORT);
       const filed = walk.file(jobId, { schema: 'starci/op-report@1', outcome: 'done', summary: 'probe', files: [], checks: [], ...env });
       out.filed = { status: filed.status, json: filed.json ?? filed.stderr };

@@ -25,6 +25,16 @@ export function featureFamiliesOf(brief) {
   return [...families].sort(byCodeUnit);
 }
 
+/**
+ * The names of the parameters the op's manifest requires and only the Kernel sets, with no default: `starci kernel enqueue` refuses the op without them (params-invalid), so the leg-ready
+ * item cannot offer a plain pick and asks for them instead.
+ */
+export function requiredKernelParamsOf({ skillRoot, op }) {
+  let brief;
+  try { brief = readOpManifest(path.join(skillRoot, 'modules', 'ops', 'ops', `${op}.yaml`)); } catch { return []; }
+  return Object.entries(brief?.params ?? {}).filter(([, spec]) => spec?.required === true && spec.setBy === 'kernel' && spec.default === undefined).map(([name]) => name).sort(byCodeUnit);
+}
+
 /** The literal resource directories (`.starciwork/_resources/identities`, ...) the manifest writes: the planned slots an op declares are granted with the leg. */
 export function resourceDirsOf(brief) {
   const dirs = new Set();

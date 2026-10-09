@@ -1576,3 +1576,9 @@ cases:
     rule: {file: scripts/kernel/graph-projection.mjs, anchor: "reachedIndexOf"}
     spec: tests/replay/first-leg-offered.spec.mjs
     status: covered
+  - id: leg-ready-offers-a-pick-the-enqueue-refuses-for-a-kernel-set-parameter
+    family: correctness
+    met: {date: "2026-10-09", where: "premortem walk of the authentication workflows, provision.ask and interface.audit", evidence: "both ops require a parameter only the Kernel sets (subject, audit); the leg-ready item offered enqueue-proposed and enqueue-leg, both refused params-invalid, and the Kernel seat cannot call enqueue itself"}
+    rule: {file: modules/kernel/kernel-menu.yaml, anchor: "enqueue-with-params"}
+    spec: tests/replay/leg-ready-with-params.spec.mjs
+    status: covered
