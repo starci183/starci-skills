@@ -1552,3 +1552,12 @@ cases:
     rule: {file: scripts/kernel/settle/rejudge.mjs, anchor: "admitRejudge"}
     spec: tests/replay/rejudge.spec.mjs
     status: covered
+  - id: components-resolve-the-tree-each-by-itself
+    family: correctness
+    found: live
+    replay: tests/replay/one-tree-resolver.spec.mjs
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "four times in two days a component read or wrote the wrong tree because it resolved which directory by itself: the grammar context read the brand record from the product's main checkout while the finished brand leg had written it in the workflow tree; the draw capture looked for Playwright and esbuild only in product directories; a CLI started from a clone wrote generated files into the tree a home record named; the Kernel start was gated by the UI build of another tree. The autopilot's direction and draw gates read the same records from the main checkout", remedy: {state: in-tree, change: "scripts/lib/roots.mjs names each root with one resolver (runtime tree, runtime state, temp root, invocation directory, Work directory) and the precedence of two trees holding one record (the workflow tree first, then the main checkout: workDirHolding, workRecordPath, toolSearchDirs); the grammar context, the autopilot gates and the render tool lookup use it; the root-adhoc self-check (R240) refuses a new file that spells process.cwd() or the Work directory name, and a file may not spell either more often than the tree the check landed on held it"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, Nivo and StarCi workflows", evidence: "registry entries grammar-context-reads-the-main-checkout-not-the-workflow-tree, draw-render-tool-resolved-from-the-product-only, the runtime-tree write refusal and the Kernel-start UI gate fixes of 2026-10-09"}
+    rule: {file: scripts/lib/roots.mjs, anchor: "workDirHolding"}
+    spec: tests/lib/roots.spec.mjs
+    status: covered

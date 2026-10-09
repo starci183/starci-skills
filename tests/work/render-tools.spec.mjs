@@ -5,7 +5,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { esbuildInstall, playwrightInstall, renderToolFix, renderToolStatus, toolDirs } from '../../scripts/work/render-tools.mjs';
+import { esbuildInstall, playwrightInstall, renderToolFix, renderToolStatus } from '../../scripts/work/render-tools.mjs';
+import { toolSearchDirs } from '../../scripts/lib/roots.mjs';
 
 const temp = (t) => {
   const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'starci-render-tools-')));
@@ -32,7 +33,7 @@ test('the project\'s install comes first and the runtime\'s is the last candidat
   fs.mkdirSync(bare);
   assert.equal(playwrightInstall([project], { runtime }).version, '2.0.0');
   assert.equal(playwrightInstall([bare], { runtime }).version, '1.0.0', 'a project with no install is served by the runtime');
-  assert.deepEqual(toolDirs([null, bare], runtime), [bare, runtime]);
+  assert.deepEqual(toolSearchDirs([null, bare], runtime), [bare, runtime]);
   assert.equal(playwrightInstall([bare], { runtime: null }), null);
 });
 

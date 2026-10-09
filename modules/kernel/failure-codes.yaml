@@ -15382,6 +15382,17 @@ RT_EVENT_SPILL_BYPASS:
   owner: supervisor
   kind: check-finding
 
+RT_ROOT_ADHOC:
+  title: "A root is resolved outside the root module"
+  title_vi: "Một thư mục gốc được tự phân giải ngoài mô-đun gốc"
+  meaning_vi: "Thư mục mà một thành phần đọc hoặc ghi chỉ được quyết định ở một mô-đun là scripts/lib/roots.mjs: cây runtime, thư mục trạng thái, thư mục tạm, thư mục nơi lệnh được gọi, tên thư mục Work và thứ tự thử hai cây cùng có thể giữ một bản ghi (cây làm việc trước, bản checkout chính sau). Tệp nguồn runtime tự viết process.cwd() hoặc literal tên thư mục Work là tự phân giải thư mục, và đã bốn lần trong hai ngày một thành phần đọc hay ghi nhầm cây vì vậy."
+  causes_vi:
+    - "Tệp mới nối đường dẫn từ process.cwd() hoặc từ literal .starciwork thay vì gọi mô-đun gốc"
+    - "Tệp đã có sẵn ở bản phát hành trước nhưng nay viết nhiều hơn số lần khi đó"
+  nextStep_vi: "Dùng invocationDir, workDirHolding, workRecordPath hoặc toolSearchDirs của scripts/lib/roots.mjs."
+  owner: supervisor
+  kind: check-finding
+
 RT_PORT_RESTATED:
   title: "A port literal is spelled outside its owner"
   title_vi: "Một literal cổng được viết ngoài tệp chủ sở hữu"
