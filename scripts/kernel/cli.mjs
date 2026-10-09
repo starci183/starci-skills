@@ -3667,7 +3667,7 @@ const API_INTERNALS = Object.freeze({
   heldSettleText, nextActionLabel, opRevDriftOf, poolLoadOf, queuedBecauseOf, recordDependencies,
   renewLiveWorkerLeases, rereadActionOf, seamActionsOf, staleLabel, statusWorkerRowsOf, typedLogWarningsOf,
   prefetchStatusOrcaReads, withStatusSpawnMemo, setStatusAsk: (value) => { statusAsk = value; },
-  refuseSettleBacklog, operationTerminalHandleOf, jobPayloadOf, settleCriticVerdict,
+  refuseSettleBacklog, operationTerminalHandleOf, jobPayloadOf, settleCriticVerdict, settleAcceptanceTrace,
   releaseTypedWaits, openPeerWaits, PEER_WAIT,
   goalJsonOf, latestGoal, csvList,
   lineageRouteAdjust, accountList, probeQuotaSafe,
@@ -3679,7 +3679,7 @@ const API_INTERNALS = Object.freeze({
   CUT_SLICE_CHECKS, VERDICT_OUTCOMES, agentOfJob, canonSettleFollowUp, enqueueNextStep, failureClassOf,
   failureShapeOf, enqueueFollowOn, latestKernelJobOf, recordOpRevDrift,
   recordSettledAssetSlots, recordSettledGrammarProposals, releasedWhileHeldOf, seamSettleReconciles,
-  settleAcceptanceTrace, settleDrawAcceptance, settleDrawMetrics, settleOpGate, settleOpProofs, settleProofMedia, settleSonarGate, settleWorkHygiene, widenCanonWire,
+  settleDrawAcceptance, settleDrawMetrics, settleOpGate, settleOpProofs, settleProofMedia, settleSonarGate, settleWorkHygiene, widenCanonWire,
 });
 let statusAsk = null;
 const runExtensionVerb = async (spec, args, repo) => {

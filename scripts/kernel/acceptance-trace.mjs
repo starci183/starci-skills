@@ -13,9 +13,9 @@ import { recordCheck } from '../machine/evidence-store.mjs';
 import { oneLine } from '../lib/clip.mjs';
 import { judgeRegistry } from './op-judge.mjs';
 import { byCodeUnit } from '../lib/list.mjs';
+import { WORK_DIR_NAME } from '../lib/roots.mjs';
 
-export const TRACE_CHECK = 'acceptance-trace';
-const WORK_ROOT = '.starciwork';
+const TRACE_CHECK = 'acceptance-trace';
 const AC_ID = /\bac(?:\.[a-z0-9]+(?:-[a-z0-9]+)*){3,}\b/g;
 const TEST_FILE = /\.(?:spec|test|e2e-spec)\.[cm]?[jt]sx?$/;
 const MAX_RECORDS = 4000;
@@ -75,11 +75,11 @@ export const traceLine = (trace) => `acceptance-trace: ${trace.cited} of ${trace
 /** Where a bound record of the job sits: the work root and the record file, or null. */
 function boundRecord(owned, roots) {
   const text = String(owned).replaceAll('\\', '/');
-  const at = text.indexOf(`${WORK_ROOT}/`);
+  const at = text.indexOf(`${WORK_DIR_NAME}/`);
   if (at < 0 || text.includes(':')) return null;
   for (const root of roots) {
     const file = path.join(root, text.endsWith('.yaml') ? text : `${text.replace(/\/$/, '')}/index.yaml`);
-    if (fs.existsSync(file)) return { workRoot: path.join(root, text.slice(0, at + WORK_ROOT.length)), file };
+    if (fs.existsSync(file)) return { workRoot: path.join(root, text.slice(0, at + WORK_DIR_NAME.length)), file };
   }
   return null;
 }
