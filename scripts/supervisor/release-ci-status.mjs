@@ -4,14 +4,14 @@
 //   ciStatus      `starci release ci-status [--tag v...] [--wait]`: read the verdict of a release commit, leave it in <git common dir>/starci-release/<sha>.ci.json (the digest and the reconciler
 //                 preflight read the newest one), and when it is RED for a release cut under `suite: ci` record it once as the runtime defect `runtime-defect:release-ci-red-<tag>` for Debug
 // A seam `deps.read` stands in for GitHub in specs; `deps.recordDefect` for the machine store write; `deps.sleep` and `deps.now` for the wait.
-import fs from 'node:fs';
 import path from 'node:path';
 import { workflowRuns } from '../api/gh/workflow-runs.mjs';
 import { commitChecks } from '../api/gh/commit-checks.mjs';
 import { revParseQuery } from '../api/git/rev-parse-query.mjs';
 import { tag as gitTag } from '../api/git/tag.mjs';
 import { runNode } from '../api/node/run-node.mjs';
-import { gitCommonDir, proofFileOf, proofFilesOf, readL4Record } from '../guards/release-record.mjs';
+import { gitCommonDir, readL4Record } from '../guards/release-record.mjs';
+import { proofFileOf, proofFilesOf, readProofFile, writeProofFile } from '../gates/commit-proof.mjs';
 import { sleep } from '../lib/sleep.mjs';
 import { RELEASE_DEFAULTS } from '../../engine/release-config.mjs';
 import { ciPolicy } from './release-ci-rows.mjs';
@@ -70,8 +70,7 @@ export function writeCiRecord({ repo, head, tag, suite, state, runs = [], checks
   if (!dir) return { ok: false, reason: 'the repository has no git common dir' };
   try {
     const file = proofFileOf({ commonDir: dir, sha: head, kind: 'ci' });
-    fs.mkdirSync(path.dirname(file), { recursive: true });
-    fs.writeFileSync(file, `${JSON.stringify({ schema: CI_SCHEMA, head, tag, suite, state, runs, checks, defect, at: now().toISOString() })}\n`);
+    writeProofFile(file, { schema: CI_SCHEMA, head, tag, suite, state, runs, checks, defect, at: now().toISOString() });
     return { ok: true, file };
   } catch (error) { return { ok: false, reason: error.message }; }
 }
@@ -79,12 +78,13 @@ export function writeCiRecord({ repo, head, tag, suite, state, runs = [], checks
 /** The CI record of `head`, or null. */
 export function readCiRecord({ repo, head, commonDir = null }) {
   const dir = commonDir ?? gitCommonDir(repo);
-  try { const record = JSON.parse(fs.readFileSync(proofFileOf({ commonDir: dir, sha: head, kind: 'ci' }), 'utf8')); return record?.schema === CI_SCHEMA && record.head === head ? record : null; } catch { return null; }
+  try { const record = readProofFile(proofFileOf({ commonDir: dir, sha: head, kind: 'ci' })); return record?.schema === CI_SCHEMA && record.head === head ? record : null; } catch { return null; }
 }
 
 /** One CI record file, or null when it is unreadable or another schema. */
 function readCiFile(file) {
-  try { const record = JSON.parse(fs.readFileSync(file, 'utf8')); return record?.schema === CI_SCHEMA ? record : null; } catch { return null; }
+  const record = readProofFile(file);
+  return record?.schema === CI_SCHEMA ? record : null;
 }
 
 /** The newest CI record of the repository (the last release's CI verdict), or null. */

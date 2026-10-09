@@ -519,6 +519,15 @@ slots:
     rules: [RT_TIER_DIRECTION, ARCH_OWNER_CYCLE, RT_EXTERNAL_OWNER, RT_SOURCE_NAME, HFS_SIZE_GROWTH]
 
   # ----- scripts: gates and runtime self-checks ---------------------------------------------------------------
+  - id: runtime.commit-proof
+    profiles: [runtime]
+    path: scripts/gates/commit-proof.mjs
+    presence: required
+    tracked: tracked
+    tier: gates
+    tests: none
+    coverage: required
+    rules: [RT_TIER_DIRECTION, RT_EXTERNAL_OWNER, RT_SOURCE_NAME, HFS_SIZE_GROWTH]
   - id: runtime.gates
     profiles: [runtime]
     # Product op/land gates and proof producers (schema starci/<gate>@N).

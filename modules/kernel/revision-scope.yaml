@@ -85,6 +85,10 @@ rows:
     why: "runtime code: the engine restarts only for the files its process loaded (derived from the import graph); every verb is a new process"
     paths: ["scripts/**/*.mjs", "engine/**/*.mjs", "packages/**/*.mjs", "ui/**/*.mjs"]
     roles: {engine: derived}
+  - id: commit-proof
+    why: "receipt locations and file IO are read by each command; the engine follows its loaded import graph"
+    paths: [scripts/gates/commit-proof.mjs]
+    roles: {engine: derived}
   - id: guards
     why: "guards and the command policy bite on the next command"
     paths: ["scripts/guards/**", modules/kernel/command-policy.yaml]

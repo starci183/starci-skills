@@ -5,25 +5,18 @@
 //   complete   every selected spec passed (passed = total, none left): what a deploy and a release need
 //   land       0 failed among those run, the specs the lane changed all ran, and the count not started inside the time budget is recorded: what a land needs on a shared, busy host
 // The file lives in the tree it verified: <runtime state dir>/verify/<sha>.json, beside the affected receipts.
-import crypto from 'node:crypto';
-import fs from 'node:fs';
 import path from 'node:path';
-import { runtimeStateDir } from '../../engine/runtime-root.mjs';
-import { readJsonFile } from '../lib/json.mjs';
-import { sameResolvedPath } from '../lib/path-key.mjs';
+import { judgedIn, proofBinds, proofDigest, proofFileOf, readProofFile, writeProofFile } from '../gates/commit-proof.mjs';
 
 const VERIFY_SCHEMA = 'starci/verify-receipt@1';
 const SHORT = 12;
 const RED_SHOWN = 12;
 export const short = (sha) => String(sha ?? '').slice(0, SHORT);
 
-/** The one rule of where specs ran: a receipt that names no root, or another tree's root, is that tree's proof and never `root`'s. Both the deploy receipt and the verify receipt use it. */
-export const judgedIn = (recorded, root) => typeof recorded === 'string' && recorded !== '' && sameResolvedPath(recorded, root);
+const verifyReceiptFile = (root, sha) => proofFileOf({ kind: 'verify', root, sha });
 
-const verifyReceiptFile = (root, sha) => path.join(runtimeStateDir(root), 'verify', `${sha}.json`);
-
-const digestOf = (r) => crypto.createHash('sha256').update([r.schema, r.sha, r.tree, r.root, r.base, r.at, r.check?.pass, r.check?.total, r.affected?.passed, r.affected?.total, r.affected?.failed,
-  r.affected?.notStarted, r.affected?.changedSpecsRan, r.affected?.reused, r.node].join('\n')).digest('hex');
+const digestOf = (r) => proofDigest([r.schema, r.sha, r.tree, r.root, r.base, r.at, r.check?.pass, r.check?.total, r.affected?.passed, r.affected?.total, r.affected?.failed,
+  r.affected?.notStarted, r.affected?.changedSpecsRan, r.affected?.reused, r.node]);
 
 /** The receipt record of a finished verification; `check` = {pass, total}, `affected` = {passed, total, failed, notStarted, changedSpecsRan, reused, files, ms}. */
 export function verifyRecord({ sha, tree, root, base, check, affected, at = Date.now(), nodeVersion = process.version }) {
@@ -33,12 +26,7 @@ export function verifyRecord({ sha, tree, root, base, check, affected, at = Date
 
 /** Writes `record` (tmp + rename: a reader never sees a torn file); returns the file. */
 export function writeVerifyReceipt(root, record) {
-  const file = verifyReceiptFile(root, record.sha);
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  const tmp = `${file}.${process.pid}.tmp`;
-  fs.writeFileSync(tmp, `${JSON.stringify(record, null, 2)}\n`);
-  fs.renameSync(tmp, file);
-  return file;
+  return writeProofFile(verifyReceiptFile(root, record.sha), record);
 }
 
 function affectedProblem(affected, need) {
@@ -53,7 +41,7 @@ function affectedProblem(affected, need) {
 function verifyProblem(record, { sha, tree, base, root, need }) {
   if (record?.schema !== VERIFY_SCHEMA) return 'no verify receipt';
   if (record.digest !== digestOf(record)) return 'the verify receipt does not match its digest (edited by hand)';
-  if (record.sha !== sha || record.tree !== tree) return `the verify receipt is for ${short(record.sha)}, not ${short(sha)}`;
+  if (!proofBinds(record, { sha, tree })) return `the verify receipt is for ${short(record.sha)}, not ${short(sha)}`;
   if (record.base !== base) return `the verify receipt proved the affected specs against ${short(record.base)}, not ${short(base)}`;
   if (!judgedIn(record.root, root)) return `the verify receipt's specs ran in ${record.root ?? 'no named tree'}, not in ${root}`;
   const { check } = record;
@@ -63,7 +51,7 @@ function verifyProblem(record, { sha, tree, base, root, need }) {
 
 /** The verify receipt of `sha` in the tree at `root` when it verifies `sha`/`tree` against `base` for `need` (default 'complete'): {record} or {problem}. */
 export function readVerifyReceipt({ root, sha, tree, base, need = 'complete' }) {
-  const record = readJsonFile(verifyReceiptFile(root, sha), null);
+  const record = readProofFile(verifyReceiptFile(root, sha));
   const problem = verifyProblem(record, { sha, tree, base, root, need });
   return problem ? { problem } : { record };
 }

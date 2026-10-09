@@ -9,10 +9,10 @@
 // `suite: ci` (the owner's choice, config.yaml release.suite) lists the rows CI judges as `delegated`, never as logs: a delegated row is not green, it did not run here.
 // The release cut (scripts/supervisor/release-cut.mjs, GOVERNANCE lane) calls writeL4Record after its full suite and check
 // passed and before the atomic push. Pure fs over the common dir path; the git call is injected (seam `commonDir`).
-import fs from 'node:fs';
 import path from 'node:path';
 import { revParseQuery } from '../api/git/rev-parse-query.mjs';
 import { RELEASE_DEFAULTS } from '../../engine/release-config.mjs';
+import { proofFileOf, readProofFile, writeProofFile } from '../gates/commit-proof.mjs';
 
 const L4_SCHEMA = 'starci/l4-record@1';
 const RELEASE_TAG = /^v\d[\w.+-]*$/;
@@ -23,21 +23,6 @@ export function gitCommonDir(repo, { run = revParseQuery } = {}) {
   const r = run(['--path-format=absolute', '--git-common-dir'], { cwd: repo });
   const out = String(r.stdout ?? '').trim();
   return r.status === 0 && out ? path.resolve(out) : null;
-}
-
-/**
- * Where the proof a release leaves for one commit lives: <git common dir>/starci-release/<sha>.<kind>.json, one file per kind - the L4 record (l4), the affected specs
- * that passed (affected), the rows a cut can reuse (rows), the CI verdict (ci) and the range report (report). The one place that spells the directory and the kinds.
- */
-const PROOF_KINDS = Object.freeze({ l4: 'l4', affected: 'affected', rows: 'l4-rows', ci: 'ci', report: 'affected-report' });
-export const proofDirOf = (commonDir) => path.join(commonDir, 'starci-release');
-export const proofFileOf = ({ commonDir, sha, kind }) => path.join(proofDirOf(commonDir), `${sha}.${PROOF_KINDS[kind]}.json`);
-
-/** Every proof file of one kind under `commonDir` (the commits that have one), unordered; [] when the directory does not exist. */
-export function proofFilesOf({ commonDir, kind }) {
-  const folder = proofDirOf(commonDir);
-  const suffix = `.${PROOF_KINDS[kind]}.json`;
-  return fs.existsSync(folder) ? fs.readdirSync(folder).filter((name) => name.endsWith(suffix)).map((name) => path.join(folder, name)) : [];
 }
 
 /** The record file of `head` under `commonDir`. */
@@ -57,8 +42,7 @@ export function writeL4Record({ repo, head, tag, logs = [], suite = RELEASE_DEFA
   const dir = commonDir ?? gitCommonDir(repo, { run });
   if (!dir) return { ok: false, reason: 'the repository has no git common dir' };
   const file = l4RecordPath({ commonDir: dir, head });
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, `${JSON.stringify({ schema: L4_SCHEMA, head, tag, suite, delegated, logs, at: now().toISOString() }, null, 2)}\n`);
+  writeProofFile(file, { schema: L4_SCHEMA, head, tag, suite, delegated, logs, at: now().toISOString() });
   return { ok: true, file };
 }
 
@@ -67,7 +51,7 @@ export function readL4Record({ repo, head, tag = null, commonDir = null, run = r
   const dir = commonDir ?? gitCommonDir(repo, { run });
   if (!dir) return null;
   try {
-    const record = JSON.parse(fs.readFileSync(l4RecordPath({ commonDir: dir, head }), 'utf8'));
+    const record = readProofFile(l4RecordPath({ commonDir: dir, head }));
     return record?.schema === L4_SCHEMA && record.head === head && (tag === null || record.tag === tag) ? record : null;
   } catch { return null; }
 }

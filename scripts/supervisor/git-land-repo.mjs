@@ -6,6 +6,7 @@ import { isLinkLike } from '../api/fs/is-link-like.mjs';
 import { merge as mergeCall } from '../api/git/merge.mjs';
 import { notes as notesCall } from '../api/git/notes.mjs';
 import { revParseQuery as revParseQueryCall } from '../api/git/rev-parse-query.mjs';
+import { LAND_NOTE_REF } from '../gates/commit-proof.mjs';
 
 const SKIP = new Set(['.git', 'dist', 'coverage', '.next']);
 export const gitCallResult = (r) => ({ ok: !r?.error && r?.status === 0, stdout: String(r?.stdout ?? '').trim(), stderr: String(r?.stderr ?? r?.error?.message ?? '').trim() });
@@ -55,7 +56,7 @@ export function landLocalMain({ worktree, ref, tip, trailers }, deps = {}) {
   if (!merged.ok) return { ok: false, cause: 'fast-forward', detail: merged.stderr || merged.stdout, primary: located.primary };
   const head = gitCallResult(query(['--verify', 'HEAD'], { cwd: located.primary }));
   if (!head.ok || head.stdout !== tip) return { ok: false, cause: 'tip-mismatch', detail: `local main is ${head.stdout || 'unreadable'}, expected ${tip}`, primary: located.primary };
-  const noted = gitCallResult(notes(['--ref=land', 'add', '-m', trailers.join('\n'), tip], { cwd: located.primary }));
+  const noted = gitCallResult(notes([`--ref=${LAND_NOTE_REF}`, 'add', '-m', trailers.join('\n'), tip], { cwd: located.primary }));
   if (!noted.ok) return { ok: false, cause: 'note', detail: noted.stderr || noted.stdout, primary: located.primary, landed: true };
   return { ok: true, primary: located.primary, landed: tip };
 }

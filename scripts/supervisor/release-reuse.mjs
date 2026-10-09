@@ -6,11 +6,11 @@
 //   run      anything else: no ledger row, a different digest, a row that always runs, a required row of the pre-push gate (it must have RUN on the exact pushed commit), --no-reuse
 // The input sets and which classes may cross commits are declared in modules/supervisor/release-cut.yaml. When anything cannot be read the answer is run.
 import fs from 'node:fs';
-import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { readModuleJson } from '../../engine/runtime-root.mjs';
 import { lsTree } from '../api/git/ls-tree.mjs';
-import { gitCommonDir, proofFileOf, proofFilesOf } from '../guards/release-record.mjs';
+import { gitCommonDir } from '../guards/release-record.mjs';
+import { proofFileOf, proofFilesOf, readProofFile, writeProofFile } from '../gates/commit-proof.mjs';
 import { byCodeUnit } from '../lib/list.mjs';
 
 const LEDGER_SCHEMA = 'starci/l4-rows@1';
@@ -68,9 +68,8 @@ export function writeLedger({ repo, head, tag, rows, digests, commonDir = null, 
   if (!dir) return { ok: false, reason: 'the repository has no git common dir' };
   try {
     const file = ledgerPath({ commonDir: dir, head });
-    fs.mkdirSync(path.dirname(file), { recursive: true });
     const green = rows.filter((row) => row.ok === true && !row.absent).map((row) => ({ name: row.name, digest: digests[row.name] ?? null, row }));
-    fs.writeFileSync(file, `${JSON.stringify({ schema: LEDGER_SCHEMA, head, tag, at: now().toISOString(), rows: green })}\n`);
+    writeProofFile(file, { schema: LEDGER_SCHEMA, head, tag, at: now().toISOString(), rows: green });
     prune(dir, keep);
     return { ok: true, file };
   } catch (error) { return { ok: false, reason: error.message }; }
@@ -87,7 +86,7 @@ export function readLedgers({ repo, commonDir = null }) {
   if (!dir) return [];
   const ledgers = proofFilesOf({ commonDir: dir, kind: 'rows' }).flatMap((file) => {
     try {
-      const ledger = JSON.parse(fs.readFileSync(file, 'utf8'));
+      const ledger = readProofFile(file);
       return ledger?.schema === LEDGER_SCHEMA && SHA.test(String(ledger.head)) && Array.isArray(ledger.rows) ? [ledger] : [];
     } catch { return []; }
   });

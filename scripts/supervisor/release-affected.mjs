@@ -7,13 +7,12 @@
 //                                         `maxCommits` and the specs past `maxRunFiles` are listed as not covered
 // The last stdout line is `RELEASE_AFFECTED {json}`: the range, the bound, files selected / run / reused / passed / failed, the commits per evidence and the specs NOT run locally (CI's). The full report is
 // <git common dir>/starci-release/<head>.affected-report.json. Exit 0 when every spec that ran passed, 1 when one was red or the range has no earlier release tag.
-import fs from 'node:fs';
-import path from 'node:path';
 import { revParseQuery } from '../api/git/rev-parse-query.mjs';
 import { tag as gitTag } from '../api/git/tag.mjs';
 import { readModuleJson } from '../../engine/runtime-root.mjs';
 import { isMain } from '../lib/is-main.mjs';
-import { gitCommonDir, proofFileOf } from '../guards/release-record.mjs';
+import { gitCommonDir } from '../guards/release-record.mjs';
+import { proofFileOf, writeProofFile } from '../gates/commit-proof.mjs';
 import { resolveTestConcurrency } from '../machine/test-concurrency.mjs';
 import { runBounded, runSpecFile, testAffected } from './affected-test.mjs';
 import { commitPlans } from './release-affected-commits.mjs';
@@ -53,8 +52,7 @@ function withReport(root, summary, plans) {
   const short = { ...summary, notCovered: summary.notCovered.slice(0, 20), notRun: summary.notRun.slice(0, 20), notRunCount: summary.notRun.length };
   if (!dir) return short;
   const file = proofFileOf({ commonDir: dir, sha: summary.head, kind: 'report' });
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, `${JSON.stringify({ ...summary, plans })}\n`);
+  writeProofFile(file, { ...summary, plans });
   return { ...short, report: file };
 }
 

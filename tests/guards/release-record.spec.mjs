@@ -5,7 +5,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { gitCommonDir, l4RecordPath, proofDirOf, proofFileOf, proofFilesOf, readL4Record, writeL4Record } from '../../scripts/guards/release-record.mjs';
+import { gitCommonDir, l4RecordPath, readL4Record, writeL4Record } from '../../scripts/guards/release-record.mjs';
+import { judgedIn, LAND_NOTE_REF, proofBinds, proofDigest, proofDirOf, proofFileOf, proofFilesOf, readProofFile, writeProofFile } from '../../scripts/gates/commit-proof.mjs';
 import { mkdtemp } from '../helpers/tmpdir.mjs';
 
 const HEAD = 'a'.repeat(40);
@@ -77,4 +78,35 @@ test('the proof of a commit has one home: <common dir>/starci-release/<sha>.<kin
   }
   assert.deepEqual(proofFilesOf({ commonDir, kind: 'affected' }), [path.join(dirOf, `${HEAD}.affected.json`)], 'an affected report is not an affected ledger');
   assert.deepEqual(proofFilesOf({ commonDir: path.join(commonDir, 'absent'), kind: 'ci' }), []);
+});
+
+test('the same owner places state receipts and the land note without moving existing evidence', (t) => {
+  const root = mkdtemp(t, 'starci-proof-state-');
+  const state = path.join(root, 'host-state');
+  const base = 'b'.repeat(40);
+  assert.equal(proofFileOf({ kind: 'verify', root, sha: HEAD }), path.join(root, '.runtime', 'verify', `${HEAD}.json`));
+  assert.equal(proofFileOf({ kind: 'affected-receipt', root, base, sha: HEAD }), path.join(root, '.runtime', 'affected', `${base.slice(0, 12)}-${HEAD.slice(0, 12)}.json`));
+  assert.equal(proofFileOf({ kind: 'deploy', sha: HEAD, env: { STARCI_LOCAL_ROOT: state } }), path.join(state, 'deploy', 'receipts', `${HEAD}.json`));
+  assert.equal(LAND_NOTE_REF, 'land');
+  assert.throws(() => proofFileOf({ kind: 'unknown', commonDir: root, sha: HEAD }), /unknown commit proof kind/);
+  assert.throws(() => proofFilesOf({ commonDir: root, kind: 'unknown' }), /unknown release proof kind/);
+});
+
+test('proof IO keeps complete documents and binding rejects another commit, tree or root', (t) => {
+  const root = mkdtemp(t, 'starci-proof-io-');
+  const file = proofFileOf({ kind: 'verify', root, sha: HEAD });
+  const record = { schema: 'spec-proof@1', sha: HEAD, tree: 'tree', root };
+  assert.equal(readProofFile(file), null);
+  assert.equal(writeProofFile(file, record), file);
+  assert.deepEqual(readProofFile(file), record);
+  assert.deepEqual(fs.readdirSync(path.dirname(file)), [`${HEAD}.json`], 'no incomplete temporary file remains');
+  assert.equal(proofBinds(record, { sha: HEAD, tree: 'tree' }), true);
+  assert.equal(proofBinds(record, { sha: 'other', tree: 'tree' }), false);
+  assert.equal(proofBinds(record, { sha: HEAD, tree: 'other' }), false);
+  assert.equal(judgedIn(root, root), true);
+  assert.equal(judgedIn('', root), false);
+  assert.equal(judgedIn(path.join(root, 'other'), root), false);
+  assert.notEqual(proofDigest(['schema', HEAD, 'tree']), proofDigest(['schema', HEAD, 'other']));
+  fs.writeFileSync(file, 'incomplete json');
+  assert.equal(readProofFile(file), null);
 });
