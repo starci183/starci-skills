@@ -17674,3 +17674,88 @@ rejudge-read-proof-failed:
   nextStep_vi: "Runtime ghi mã này vào sổ (job-rejudge-refused) và lượt đi theo đường chạy lại; không ai khác cần làm gì."
   owner: runtime-core
   kind: verb-refusal
+
+workflow-purge-unknown:
+  title: "The workflow is in no ledger of this repository"
+  title_vi: "Không có workflow này trong sổ nào của kho"
+  meaning_vi: "Lệnh dọn workflow không tìm thấy mã workflow trong sổ của kho được chỉ định, và nhật ký máy cũng chưa ghi lần dọn nào cho nó."
+  causes_vi:
+    - "Mã workflow hoặc đường dẫn kho gõ sai"
+    - "Workflow thuộc kho khác với kho đang chỉ định"
+  nextStep_vi: "Chủ sở hữu kiểm tra lại mã workflow và --repo rồi chạy lại phần kế hoạch của lệnh dọn."
+  owner: owner
+  kind: verb-refusal
+
+workflow-purge-not-archived:
+  title: "Only an archived workflow is purged"
+  title_vi: "Chỉ dọn workflow đã lưu trữ"
+  meaning_vi: "Workflow vẫn đang chạy, tạm dừng hoặc mới dừng nhưng chưa lưu trữ, nên lệnh dọn từ chối để không xoá cây làm việc đang dùng."
+  causes_vi:
+    - "Chưa chạy lệnh dừng workflow"
+    - "Workflow đang ở giai đoạn chạy hoặc tạm dừng"
+  nextStep_vi: "Chủ sở hữu dừng workflow bằng lệnh dừng (starci workflow stop) rồi chạy lại lệnh dọn."
+  owner: owner
+  kind: verb-refusal
+
+workflow-purge-live-job:
+  title: "A job, lease or Kernel signal of the workflow is still live"
+  title_vi: "Workflow còn việc, khoá hoặc tín hiệu Kernel đang sống"
+  meaning_vi: "Sổ vẫn ghi một việc chưa kết thúc, một dòng khoá hoặc tín hiệu Kernel còn giữ cho workflow này, nên chưa chứng minh được là nó đã dừng hẳn."
+  causes_vi:
+    - "Lệnh dừng chưa hoàn tất hoặc chạy dở"
+    - "Một việc đang báo cáo chưa được chốt"
+  nextStep_vi: "Chủ sở hữu đọc danh sách việc trong thông báo, hoàn tất lệnh dừng workflow rồi chạy lại lệnh dọn."
+  owner: owner
+  kind: verb-refusal
+
+workflow-purge-live-seat:
+  title: "A seat of the workflow is still live"
+  title_vi: "Workflow còn ghế đang sống"
+  meaning_vi: "Bảng ghế của máy vẫn ghi một ghế Kernel của workflow này ở trạng thái đang chạy, nên lệnh dọn không đụng tới cây và terminal của nó."
+  causes_vi:
+    - "Ghế Kernel chưa được đóng sau lệnh dừng"
+  nextStep_vi: "Chủ sở hữu chờ ghế đóng hẳn hoặc đóng nó bằng đường của bộ điều phối rồi chạy lại lệnh dọn."
+  owner: owner
+  kind: verb-refusal
+
+workflow-purge-worker-live:
+  title: "A worker of the workflow is still active in Orca"
+  title_vi: "Workflow còn worker đang hoạt động trong Orca"
+  meaning_vi: "Orca báo một worker thuộc Run của workflow vẫn đang hoạt động và chưa thoát, nên lệnh dọn từ chối để không cắt ngang việc đang chạy."
+  causes_vi:
+    - "Worker chưa dừng sau lệnh dừng workflow"
+  nextStep_vi: "Chủ sở hữu chờ worker thoát hoặc dừng nó bằng đường của Orca rồi chạy lại lệnh dọn."
+  owner: owner
+  kind: verb-refusal
+
+workflow-purge-orca-unreadable:
+  title: "Orca did not answer, so no leftover can be proven"
+  title_vi: "Orca không trả lời nên không chứng minh được phần còn sót"
+  meaning_vi: "Lệnh dọn cần đọc được Orca (cây, terminal, worker của từng Run) trước khi xoá bất cứ gì; một lần đọc lỗi không chứng minh được là không còn gì."
+  causes_vi:
+    - "Orca đang tắt hoặc không phản hồi"
+    - "Một Run mà sổ nêu tên không còn trong Orca"
+  nextStep_vi: "Chủ sở hữu mở lại Orca rồi chạy lại lệnh dọn."
+  owner: owner
+  kind: verb-refusal
+
+workflow-purge-host-busy:
+  title: "The host lock or the gc lock is held"
+  title_vi: "Khoá máy hoặc khoá dọn rác đang có người giữ"
+  meaning_vi: "Một việc nặng khác (đợt phát hành, hợp nhất, đợt dọn rác) đang chạy trên máy, nên lệnh dọn workflow chờ để không giẫm lên nó."
+  causes_vi:
+    - "Đang có đợt phát hành hoặc hợp nhất"
+    - "Đợt dọn rác của bộ điều phối đang chạy"
+  nextStep_vi: "Chủ sở hữu chờ việc kia xong rồi chạy lại lệnh dọn; không cần làm gì khác."
+  owner: owner
+  kind: verb-refusal
+
+workflow-purge-plan-changed:
+  title: "The plan changed since it was shown"
+  title_vi: "Kế hoạch dọn đã đổi so với bản đã xem"
+  meaning_vi: "Mã băm của kế hoạch lúc thi hành khác với mã chủ sở hữu đã xem, nên không có gì bị xoá."
+  causes_vi:
+    - "Một ref, cây hoặc terminal đổi trạng thái giữa lúc xem kế hoạch và lúc thi hành"
+  nextStep_vi: "Chủ sở hữu đọc lại kế hoạch bằng --plan và thi hành với mã mới."
+  owner: owner
+  kind: verb-refusal
