@@ -99,7 +99,7 @@ const kindOf = (id) => menuCatalog().kinds.find((kind) => kind.id === id);
 function itemOf(kind, { key, subject, options = null, since = null, evidence = [], di = null, deadlineAt = null, escape = true }) {
   const spec = kindOf(kind);
   const policy = policyOf(spec.hold, since);
-  const own = options ?? (spec.options ?? []).map((option) => optionOf(option, subject));
+  const own = options ?? (spec.options ?? []).filter((option) => !option.when || subject[option.when]).map((option) => optionOf(option, subject));
   return {
     id: `${kind}:${key}`, kind, mode: spec.mode, subject: { ...subject }, question: fillTemplate(spec.question, subject).trim(),
     options: escape ? [...own, escapeOption()] : own, evidence, deadline: deadlineAt ?? policy.deadlineAt, step: policy.step, hold: spec.hold ?? null, di,
@@ -116,7 +116,7 @@ const jobItem = ({ di, resolution }, workflow) => {
     evidence: [{ ref: `job:${resolution.jobId}` }, ...(di.evidence ?? []).slice(0, 6)], di: di.id ?? null });
 };
 
-const shapeItem = (refused, workflow) => itemOf('shape-refused', { key: refused.jobId, subject: { workflow, job: refused.jobId, op: refused.op, situation: refused.situation },
+const shapeItem = (refused, workflow) => itemOf('shape-refused', { key: refused.jobId, subject: { workflow, job: refused.jobId, op: refused.op, situation: refused.situation, reported: refused.reported ?? '' },
   evidence: [{ ref: `job:${refused.jobId}` }, { ref: `job:${refused.failedJobId}` }] });
 
 const questionItem = (q, workflow) => itemOf('worker-question', { key: q.messageId, subject: { workflow, message: q.messageId, job: q.jobId, op: q.opId, ask: q.question },
@@ -146,7 +146,7 @@ function actionItemOf(action, workflow) {
   const origin = originOf(action);
   // A move a supervisor-gate or a peer-wait holds is theirs to release, not the Kernel's to answer.
   if (origin?.class !== 'judgment' || !origin.menu || action.heldBy) return [];
-  const subject = { workflow, op: action.op ?? null, job: action.jobId ?? null, node: action.nodes?.[0] ?? null, paths: action.paths ?? null, params: action.params ?? null, situation: action.reason, attest: action.attest ?? '' };
+  const subject = { workflow, op: action.op ?? null, job: action.jobId ?? null, node: action.nodes?.[0] ?? null, paths: action.paths ?? null, params: action.params ?? null, situation: action.reason, attest: action.attest ?? '', proposed: action.proposed ?? '' };
   const key = [action.op, action.jobId ?? action.nodes?.[0] ?? action.cutId, origin.id].filter(Boolean).join(':');
   return [itemOf(origin.menu, { key, subject, evidence: action.jobId ? [{ ref: `job:${action.jobId}` }] : [] })];
 }

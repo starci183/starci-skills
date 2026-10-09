@@ -7,6 +7,7 @@ import test from 'node:test';
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import { loadFixture, replayWorld } from '../helpers/replay-world.mjs';
+import { getBlob } from '../../engine/db/blob.mjs';
 
 const INLINE_BOUND = 16384;
 const OP = 'review.verify';
@@ -39,7 +40,10 @@ test('the ack of a read plan that outgrew the inline event bound lands after an 
   assert.notEqual(second.json?.code, 'STARCI_EVENT_PAYLOAD_TOO_LARGE');
   const rows = ackRows(world);
   assert.equal(rows.length, 2);
-  assert.ok(rows[1].inline < 512, `the row keeps a pointer, not the attestation: ${rows[1].inline} bytes inline`);
+  assert.ok(rows[1].inline < 512, `the row keeps a bounded inline view of the scalars (${rows[1].inline} bytes), not the manifest`);
+  assert.ok(rows[1].inline < INLINE_BOUND / 8, 'and that view is a small fraction of the inline bound');
+  const whole = world.ledger((ledger) => ledger.db.prepare("SELECT payload_json, payload_sha FROM events WHERE kind='runtime-rev-acked' ORDER BY seq DESC LIMIT 1").get());
+  assert.ok(getBlob(whole.payload_sha, { root: world.env.STARCI_ARTIFACT_ROOT }).length > INLINE_BOUND, 'the whole attestation resolves behind the sha and is larger than the inline bound');
   assert.match(rows[1].payload_sha, /^[0-9a-f]{64}$/, 'the whole attestation is behind the sha');
 
   assert.equal(newLeg(world).json?.code, 'params-invalid', 'the READ gate passes: the verb now refuses only the params');

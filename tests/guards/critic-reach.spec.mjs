@@ -144,3 +144,17 @@ test('the job guard of a critic records the one directory and the one file, and 
   assert.match(CRITIC_TOOL_GUARD_MATCHER, /Read\|Grep\|Glob$/);
   assert.deepEqual(matcherOf('op'), [TOOL_GUARD_MATCHER], 'an op keeps the unchanged matcher: its Read calls pay no hook');
 });
+
+test('the one Task file the runtime wrote for the Critic outside its directory is readable, and no other outside file is', async () => {
+  const { criticCommandVerdict, criticReadVerdict } = await import('../../scripts/guards/critic-reach.mjs');
+  const dir = path.join(os.tmpdir(), 'starci-critic-dir'), taskFile = path.join(os.tmpdir(), 'starci-prompts', 'task.md');
+  const guard = { reach: { dir, verdictFile: 'verdict.json', taskFile } };
+  const bare = { reach: { dir, verdictFile: 'verdict.json' } };
+  assert.equal(criticReadVerdict({ paths: [taskFile], guard, tool: 'Read' }), null);
+  assert.notEqual(criticReadVerdict({ paths: [path.join(os.tmpdir(), 'starci-prompts', 'other.md')], guard, tool: 'Read' }), null, 'another file of that directory stays closed');
+  assert.notEqual(criticReadVerdict({ paths: [taskFile], guard: bare, tool: 'Read' }), null, 'a guard that names no task file opens none');
+  const critic = policy.roles?.critic ?? policy.critic ?? { read: ['cat'], write: [] };
+  assert.equal(criticCommandVerdict({ program: 'cat', args: [taskFile], cwd: dir, guard, critic: { read: ['cat'], write: [] }, text: `cat ${taskFile}` }), null);
+  assert.notEqual(criticCommandVerdict({ program: 'cat', args: [taskFile], cwd: dir, guard: bare, critic: { read: ['cat'], write: [] }, text: 'cat' }), null);
+  assert.ok(critic);
+});

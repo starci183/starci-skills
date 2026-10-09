@@ -21,6 +21,7 @@ import { receiptFor, writeReceipt } from './runtime-deploy-receipt.mjs';
 import { waitForQuiet, stepLine } from './runtime-deploy-inflight.mjs';
 import { verifyRestart } from './runtime-deploy-verify.mjs';
 import { DEPLOY, refusal } from './runtime-deploy-codes.mjs';
+import { affectedJudgement } from './runtime-deploy-affected.mjs';
 import { revParse } from '../api/git/rev-parse.mjs';
 import { symbolicRefQuery } from '../api/git/symbolic-ref-query.mjs';
 
@@ -101,31 +102,31 @@ function planResult(facts, refusals) {
 const refused = (facts, found, extra = {}) => result(1, false, `starci runtime deploy: REFUSED ${found.code}: ${found.detail}\nnothing was changed`,
   { mode: 'deploy', ...(facts.source?.ok ? summaryOf(facts) : null), refusals: [found], changed: false, ...extra });
 
-/** The affected-spec run of the source: {refusal} unless its receipt is ok, clean and on the source tip; else {affected: {base, tip, passed, total}}. */
-function affectedProof(run, source, base) {
-  const receipt = run.data?.receipt;
-  const ran = receipt && receipt.schema === 'starci/affected-receipt@1';
-  if (run.status === 2 || !ran) {
-    const why = run.status === 2 ? 'the time budget ended with spec files not started' : `no receipt came back (${run.stderr || 'exit ' + run.status})`;
-    return { refusal: refusal(DEPLOY.affectedRed, `starci test affected --run --base ${base.slice(0, 12)} did not finish: ${why}`) };
-  }
-  if (!receipt.ok || !receipt.clean || receipt.tip !== source.sha) {
-    const detail = `affected receipt ok=${receipt.ok} clean=${receipt.clean} tip=${String(receipt.tip).slice(0, 12)} (source ${source.sha.slice(0, 12)}), ${receipt.passed} of ${receipt.total} files passed`;
-    return { refusal: refusal(DEPLOY.affectedRed, detail) };
-  }
-  return { affected: { base: receipt.base, tip: receipt.tip, passed: receipt.passed, total: receipt.total } };
-}
-
 const tailOf = (output) => String(output ?? '').trim().split(/\r?\n/).slice(-6).join(' | ');
 
-/** The check, then the specs the change can break, in the clean source: {receipt} exists afterwards, or {refusal}. */
-function ensureCheck({ facts, seams, env, who }) {
-  if (facts.receipt) return { receipt: facts.receipt };
+/** The affected specs of the source against the host head: a receipt already proven for the pair, else a real run. {affected} or {refusal}. */
+async function affectedProof({ facts, seams, progress }) {
   const { source } = facts;
   const base = facts.host.head;
+  const proven = seams.provenAffected(source.dir, base, source.sha);
+  if (proven) {
+    progress(`affected: accepting the receipt already proven for ${base.slice(0, 12)}..${source.sha.slice(0, 12)} (${proven.passed} of ${proven.total} files passed); not run again`);
+    return { affected: { base: proven.base, tip: proven.tip, passed: proven.passed, total: proven.total } };
+  }
+  const plan = facts.affectedPlan ?? affectedPlanOf(seams, source.dir, base);
+  progress(`affected: running ${plan.files ?? 'an unknown number of'} spec file(s) in ${source.dir} against ${base.slice(0, 12)}, budget ${Math.round((plan.budgetMs ?? 0) / 60_000)} min; progress follows`);
+  const judged = affectedJudgement(await seams.runAffected(source.dir, base, progress), { sha: source.sha, base });
+  return judged.affected ? judged : { refusal: refusal(DEPLOY.affectedRed, `starci test affected --run --base ${base.slice(0, 12)} in ${source.dir}: ${judged.detail}`) };
+}
+
+/** The check, then the specs the change can break, in the clean source: {receipt} exists afterwards, or {refusal}. */
+async function ensureCheck({ facts, seams, env, who, progress }) {
+  if (facts.receipt) return { receipt: facts.receipt };
+  const { source } = facts;
+  progress(`check: running starci runtime check in ${source.dir} (minutes)`);
   const run = seams.runCheck(source.dir);
   if (!run.ok) return { refusal: refusal(DEPLOY.checkRed, `starci runtime check exited non-zero on ${source.sha.slice(0, 12)}: ${tailOf(run.output)}`) };
-  const proof = affectedProof(seams.runAffected(source.dir, base), source, base);
+  const proof = await affectedProof({ facts, seams, progress });
   if (proof.refusal) return proof;
   const after = resolveSource(source.dir, source.dir);
   if (after.sha !== source.sha || isDirty(source.dir)) return { refusal: refusal(DEPLOY.sourceDirty, 'the check or the specs changed the source tree or its HEAD moved while they ran; the receipt would not bind the commit') };
@@ -227,7 +228,9 @@ export async function runtimeDeploy(ctx, deps = {}) {
   const refusals = judge(facts);
   if (ctx.args.plan) return planResult(facts, refusals);
   if (refusals.length) return refused(facts, refusals[0], { refusals });
-  const checked = ensureCheck({ facts, seams, env, who: seams.who().user });
+  const progress = deps.progress ?? ((line) => ctx.io?.stderr?.(`${line}
+`));
+  const checked = await ensureCheck({ facts, seams, env, who: seams.who().user, progress });
   if (checked.refusal) return refused(facts, checked.refusal);
   const run = { facts: { ...facts, receipt: checked.receipt }, host, seams, numbers: deps.numbers ?? deployNumbers(), deps, moved: false, migrated: false, restarted: false,
     before: null, restartedAt: 0, waitedMs: 0, counts: null };

@@ -1,3 +1,4 @@
+import { installRefResolver } from './ref-value.mjs';
 // engine/db/machine.mjs — the ONE writer of machine.sqlite (DBTREE.sql Part B, schema 'starci/machine@1', user_version MACHINE_VERSION).
 //
 // machine.sqlite is the host's single operational store: the ledger registry, the Supervisor (sup_*), the engine
@@ -161,12 +162,12 @@ function openConnection(file, { readOnly = false, env = process.env, now = Date.
     let db;
     try {
       if (readOnly) {
-        db = new DatabaseSync(file, { readOnly: true, timeout: MACHINE_BUSY_TIMEOUT_MS });
+        db = installRefResolver(new DatabaseSync(file, { readOnly: true, timeout: MACHINE_BUSY_TIMEOUT_MS }));
         db.exec('PRAGMA query_only=ON; PRAGMA temp_store=MEMORY; PRAGMA cache_size=-16000;');
         checkSchema(db, file);
         return db;
       }
-      db = new DatabaseSync(file, { timeout: busyTimeoutOf(env) });
+      db = installRefResolver(new DatabaseSync(file, { timeout: busyTimeoutOf(env) }));
       const empty = Number(pragma(db, 'user_version')) === 0 && !db.prepare("SELECT 1 FROM sqlite_master WHERE name NOT GLOB 'sqlite_*' LIMIT 1").get();
       if (!empty) checkSchema(db, file); // Refuse a store that is not exactly the current schema before persistent WAL/facts changes.
       if (empty) db.exec('PRAGMA page_size=4096; PRAGMA auto_vacuum=INCREMENTAL;');
@@ -457,7 +458,7 @@ function forEachLedger(m, fn, { state = 'active' } = {}) {
     let db = null;
     try {
       need(fs.existsSync(ledger.file), `ledger file missing: ${ledger.file}`);
-      db = new DatabaseSync(ledger.file, { readOnly: true, timeout: MACHINE_BUSY_TIMEOUT_MS });
+      db = installRefResolver(new DatabaseSync(ledger.file, { readOnly: true, timeout: MACHINE_BUSY_TIMEOUT_MS }));
       db.exec('PRAGMA query_only=ON;');
       out.push({ ledger, result: fn({ ledger, db }) });
     } catch (error) { out.push({ ledger, error: String(error?.message ?? error) }); } finally { try { db?.close(); } catch { /* closed */ } }
