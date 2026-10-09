@@ -36,3 +36,5 @@ actionFailMin: 5
 actionFailMinMs: 1800000
 silentFreshMs: 900000
 silentRows: 20000
+# draftHeldMs: a person's draft that has stood in a Kernel's input this long (the seat's wake-repeat bound) is owed to the Supervisor as one Decision Item; none open is the runtime's departure.
+draftHeldMs: {ref: "modules/reconciler/seat-cost.yaml#kernel.wakeRepeatMs"}

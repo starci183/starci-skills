@@ -80,7 +80,7 @@ test('an answer that is not a failed launch (Orca not answering, a Kernel whose 
 // The codes on the Kernel-launch chain (catalogued surfacedBy decision-item / seat-unrecoverable): each reaches the start-hold through the watchdog journal.
 // The recovery's reasons ride in the refusal kernel-launch-unreconciled; the others are the refusal's own step.
 const RECOVERY_REASONS = ['kernel-launch-custody-incomplete', 'kernel-launch-host-unavailable', 'kernel-launch-dispatch-unsettled', 'kernel-launch-terminal-unproven',
-  'kernel-launch-runs-unreadable', 'kernel-launch-run-exists'];
+  'kernel-launch-runs-unreadable', 'kernel-launch-run-exists', 'kernel-launch-worker-live', 'kernel-launch-terminal-unnamed', 'kernel-launch-dispatch-mismatch'];
 const OWN_STEPS = ['kernel-start-reservation-lost', 'kernel-guard-unbound', 'kernel-seat-publication-failed', 'worktree-registry-unavailable'];
 
 for (const reason of RECOVERY_REASONS) {

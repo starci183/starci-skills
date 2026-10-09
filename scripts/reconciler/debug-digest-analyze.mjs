@@ -10,7 +10,7 @@ import { loadQuestions, answerQuestions, standingOf } from './debug-questions.mj
 import { bootBudget, exceededWakes, supervisorWakeBudget, wakeBudget } from '../kernel/wake-budget.mjs';
 import { noticeOwes } from '../kernel/kernel-notice.mjs';
 import { seatsOverEmptyBound } from './seat-cost.mjs';
-import { silentProblems } from './debug-digest-silent.mjs';
+import { draftProblems, silentProblems } from './debug-digest-silent.mjs';
 
 const MIN = 60_000;
 const LIVE_JOB = new Set(['leased', 'running', 'answering', 'reported', 'deciding', 'effect_unknown']);
@@ -237,7 +237,7 @@ function workflowView(workflow, ctx) {
       .sort((a, b) => b.tokens - a.tokens),
     incidents: workflow.incidents, decisions: workflow.decisions };
   const failed = view.statusError === null ? [] : [problem('workflow', view.openWork + 1, `status-${view.id}`, 'status-unreadable', { name: view.name, error: view.statusError })];
-  return { ...view, problems: [...kernelProblems(view, ctx.n), ...stopProblems(view), ...unownedLegProblems(workflow, view, ctx), ...failed].map((p) => ({ ...p, workflowId: view.id })) };
+  return { ...view, problems: [...kernelProblems(view, ctx.n), ...stopProblems(view), ...unownedLegProblems(workflow, view, ctx), ...draftProblems(workflow, ctx.now, ctx.n), ...failed].map((p) => ({ ...p, workflowId: view.id })) };
 }
 
 /** A secret that survived redaction in a stored artifact is a departure of the runtime's redaction duty: one problem per artifact and rule, never the text. */

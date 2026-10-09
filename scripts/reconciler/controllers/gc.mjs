@@ -35,7 +35,7 @@ import { parseYaml } from '../../../engine/yaml.mjs';
 import { claimDue, finishDuty } from '../schedules.mjs';
 import { SETTLED_JOB_LIST } from '../../../engine/admission.mjs';
 import { releasePlan, workerTerminalHandles } from '../../lib/worker-accounting.mjs';
-import { eachInOrder } from '../../lib/in-order.mjs';
+import { eachInOrder } from '../../lib/in-order.mjs'; import { untiedTreesDecision } from '../untied-tree-item.mjs';
 import { reconcileTreeStrays, treeStrayDeps } from '../gc-tree-strays.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
@@ -438,6 +438,7 @@ export function createGcController(overrides = {}) {
     }
     const stop = items.find((i) => i.action === 'stopped');
     if (stop) await stoppedDecision(ctx, { reason: stop.reason, path: items.find((i) => i.fatal)?.path ?? null, damage: items.find((i) => i.fatal)?.damage ?? [stop.error] });
+    await untiedTreesDecision(ctx, items, { complete: !stop });
     const removed = items.filter((i) => i.ok === true && i.action === 'remove').length;
     const failed = items.filter((i) => i.ok === false);
     if (items.length) {

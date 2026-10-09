@@ -64,3 +64,10 @@ export function silentProblems(silent, n, now) {
       { key: String(item.key).slice(0, KEY_LIMIT), kind: item.kind ?? 'unknown', code: item.code ?? 'unknown', count: item.count, min: Math.round((item.lastAt - item.firstAt) / MIN) }, item));
   return [...actions, ...refused];
 }
+
+/** A draft that has stood past the seat's wake-repeat bound with no open Supervisor item for it: the runtime owes the Supervisor the item (an open one overdue is the Supervisor's `decision-overdue`). */
+export function draftProblems(workflow, now, n) {
+  const draft = workflow.draft;
+  if (!draft || now - draft.since < n.draftHeldMs || (workflow.decisions ?? []).some((d) => d.kind === 'seat-draft-held')) return [];
+  return [problem(`draft-unowned-${workflow.id}`, 'draft-unowned', { name: workflow.name ?? workflow.id, min: Math.round((now - draft.since) / MIN), refusals: draft.refusals, terminal: draft.terminal ?? 'unknown' }, draft)];
+}

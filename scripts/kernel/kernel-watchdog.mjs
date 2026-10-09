@@ -27,7 +27,7 @@ import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalList } from '../api/orca/terminal-list.mjs';
 import { terminalRename } from '../api/orca/terminal-rename.mjs';
 import { tabTitlesOf } from './terminal-dedupe.mjs';
-import { classifyAgentScreen, staleAwareState, outputAgeOf, exitedAgentPromptRow } from '../lib/terminal-liveness.mjs';
+import { classifyAgentScreen, staleAwareState, outputAgeOf, exitedAgentPromptRow, draftOwnership, DEFAULT_STAGED_PATTERN } from '../lib/terminal-liveness.mjs';
 import { sendWakeWithProof, sendEnterWithProof, deliveryFieldsOf, wakeSendRefused, WAKE_BOUNDS, withWakeIdentity } from './wake-delivery.mjs';
 import { boundedWake } from './wake-bound.mjs';
 import { closeOperationTerminal } from './close-op-terminal.mjs';
@@ -53,6 +53,7 @@ import { seatCostConfig } from './seat-wakes.mjs';
 import { createKernelRotation, rotationRule } from './seat-rotation.mjs';
 import { runtimeRevNow, startFailureRun, startHoldBudget, startHoldOf } from './start-hold.mjs';
 import { journalRefusedStart, lastStartFailedSeq } from './start-refusal-journal.mjs';
+import { draftEpisode, draftRefused, recordDraftCleared, recordDraftHeld } from './draft-hold.mjs';
 import { recordReplaced, recordWoken, runtimePass } from '../machine/revision-ack.mjs';
 import { kernelSeat } from '../machine/revision-seats.mjs';
 
@@ -260,6 +261,10 @@ export const WAKE_FAIL_REPLACE = SEAT_WAKE.failReplace;
 export const WAKE_FAIL_WINDOW_MS = SEAT_WAKE.failWindowMs;
 const recordKernelWakeFailed = (terminal, detail) => withKernelLedger((ledger) => ledger.transaction(() => ledger.appendEvent({
   workflowId, entityType: 'kernel', entityId: workflowId, kind: KERNEL_WAKE_FAILED_EVENT, payload: { terminal, ...detail } })));
+const foreignDraft = (draft) => Boolean(draft) && draftOwnership(draft, { texts: [], stagedPattern: DEFAULT_STAGED_PATTERN }).kind === 'foreign';
+const draftHeld = () => Boolean(withKernelLedger((ledger) => draftEpisode(ledger.db, workflowId)));
+const holdDraft = (terminal, proof) => withKernelLedger((ledger) => recordDraftHeld(ledger, { workflowId, terminal, proof }));
+const clearDraftHold = (terminal) => withKernelLedger((ledger) => recordDraftCleared(ledger, { workflowId, terminal }));
 const kernelWakeFailures = (terminal) => withKernelLedger((ledger) => ledger.db.prepare(
   "SELECT created_at FROM events WHERE workflow_id=? AND kind=? AND json_extract(payload_json,'$.terminal')=? ORDER BY seq").all(workflowId, KERNEL_WAKE_FAILED_EVENT, terminal)
   .map((row) => row.created_at)) ?? [];
@@ -431,7 +436,7 @@ const kernelRotation = createKernelRotation({ workflowId, openLedger: withKernel
 const kernelTick = createKernelTick({ api, kernelRotation, workflowId, repair, lostSeatWorker, exitedTwice, stopAndRelease, replaceKernel,
   repeatedWake, menuOf, workerShow, DEAD_WORKER_STATE, settledKernelVerdict, DEAD_VERDICTS, terminalRead, classifyKernelScreen, outputAgeOf,
   staleAwareState, ACTIVE_STALE_MS, exitedAgentPromptRow, DEATH_SETTLE_MS, sleepSync, kernelWakeFailures,
-  wakeFailuresProveDead, replaceWakeDeadKernel, sendEnterWithProof, recordKernelWakeFailed, deliveryFieldsOf,
+  wakeFailuresProveDead, replaceWakeDeadKernel, sendEnterWithProof, recordKernelWakeFailed, deliveryFieldsOf, draftRefused, recordDraftHeld: holdDraft, recordDraftCleared: clearDraftHold, draftHeld, foreignDraft,
   kernelWakeRefusedAt, replaceUnwritableKernel, kernelIdleWakes, escalateIdleStall, replaceIdleKernel,
   sendWakeWithProof, wakePromptOf, recordKernelWoken, recordRevisionWoken, wakeSendRefused, wakeActionOf, finalKernelAction, jsonFromStdout });
 const printLineOf = (result) => {

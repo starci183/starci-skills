@@ -8423,8 +8423,9 @@ draft-stuck:
   nextStep_vi: "Lần đánh thức bị từ chối để không đè lên chữ đang có; cần người xóa tay ô nhập hoặc chờ lượt sau."
   owner: owner
   kind: runtime-fault
-  surfacedBy: open
-  openCase: draft-stuck-refusal-reaches-no-owner-item
+  surfacedBy: decision-item
+  surfacedAs: seat-draft-held
+  surfacedAt: scripts/reconciler/draft-plan.mjs
 draw-feedback-unaddressed:
   title: "Owner draw feedback not addressed"
   title_vi: "Chưa xử lý góp ý của chủ về bản vẽ"
@@ -11606,8 +11607,9 @@ unstamped-orphan:
   nextStep_vi: "Chủ xem sự cố worktree.orphan-review trong machine_logs rồi tự gỡ cây (còn việc chưa commit thì lấy ra trước) hoặc nhận lại nó; GC không làm thay."
   owner: owner
   kind: runtime-fault
-  surfacedBy: open
-  openCase: unstamped-orphan-tree-is-reported-in-a-log-row-only
+  surfacedBy: decision-item
+  surfacedAs: unregistered-trees
+  surfacedAt: scripts/reconciler/untied-tree-item.mjs
 
 unread-peer:
   title: "Peer message unread"

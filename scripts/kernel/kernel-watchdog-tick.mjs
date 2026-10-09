@@ -85,7 +85,8 @@ const sendIdleWake = (ctx, idle) => {
   const { status, workflowId, phase, terminal, stale, outputAgeMs, liveness, dispatch, replaceUnwritableKernel, sendWakeWithProof, wakePromptOf, read,
     recordKernelWakeFailed, recordKernelWoken, wakeSendRefused, wakeActionOf, deliveryFieldsOf, classified } = ctx;
   const proof = sendWakeWithProof({ terminal, text: wakePromptOf(workflowId, status.value), before: String(read.screen ?? '') });
-  if (!proof.ok && proof.delivery !== 'agent-exited') recordKernelWakeFailed(terminal, { state: classified.state, sendErrorCode: proof.sendErrorCode ?? null, delivery: proof.delivery ?? null });
+  if (ctx.draftRefused(proof)) ctx.recordDraftHeld(terminal, proof);
+  else if (!proof.ok && proof.delivery !== 'agent-exited') recordKernelWakeFailed(terminal, { state: classified.state, sendErrorCode: proof.sendErrorCode ?? null, delivery: proof.delivery ?? null });
   if (proof.ok) recordKernelWoken(terminal, { delivery: proof.delivery ?? null, idleWakes: idle.wakes + 1, ...ctx.menuOf?.(status.value) });
   if (proof.ok && status.value?.revisionNotice?.state === 'owed') ctx.recordRevisionWoken(status.value.revisionNotice);
   if (!proof.ok && liveness.staleActive && wakeSendRefused(proof))
@@ -98,9 +99,12 @@ const idleTurnResult = (ctx) => {
     dispatch, kernelWakeRefusedAt, replaceUnwritableKernel, kernelWakeFailures, wakeFailuresProveDead, replaceWakeDeadKernel,
     kernelIdleWakes, escalateIdleStall, replaceIdleKernel, kernelRotation } = ctx;
   if (classified.state !== 'turn-idle') return null;
+  if (!ctx.read.draft) ctx.recordDraftCleared(terminal);
   const owes = ['owed', 'replace-due'].includes(status.value?.revisionNotice?.state);
   if (status.value?.frontier?.actionable === false && !owes) return { ok: true, workflowId, phase, terminal, action: 'idle-waiting', ...stale, reason: status.value?.frontier?.reason ?? 'frontier not actionable', outputAgeMs };
   if (!repair) return { ok: true, workflowId, phase, terminal, action: 'wake-needed', ...stale, outputAgeMs };
+  // A person's draft wins: no replacement, rotation or clearing while one stands (draft-hold.mjs); the wake is tried again and refused again.
+  if (ctx.draftHeld() || ctx.foreignDraft(ctx.read.draft)) return sendIdleWake(ctx, kernelIdleWakes());
   const refusedAt = liveness.staleActive ? kernelWakeRefusedAt(terminal) : null;
   if (refusedAt != null && refusedAt > (lastOutputAt ?? 0))
     return replaceUnwritableKernel({ phase, terminal, dispatch, stale, outputAgeMs, refusedAt });

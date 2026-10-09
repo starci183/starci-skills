@@ -8,6 +8,7 @@
 //     it escaped, so no Kernel waits on an answer that will not come;
 //   - an item whose subject has ended (the job it names has settled) is closed by the runtime with that reason instead of being mirrored.
 import { listDecisions } from '../machine/decisions.mjs';
+import { DRAFT_ITEM_KIND, draftEpisode } from '../kernel/draft-hold.mjs';
 
 const SUPERVISOR_LEDGER_NAME = 'supervisor';
 const LIVE = new Set(['open', 'claimed']);
@@ -30,6 +31,7 @@ function jobOf(di) {
 
 /** Why a live item no longer needs the Supervisor, or null: the job it names has settled. */
 function staleReasonOf(db, di) {
+  if (di.kind === DRAFT_ITEM_KIND && !draftEpisode(db, di.workflowId)) return 'the draft is gone from the seat input and the seat is woken again';
   const job = jobOf(di);
   const row = job ? db.prepare('SELECT status FROM jobs WHERE job_id=?').get(job) : null;
   return row && SETTLED_JOB.has(row.status) ? `the job ${job} it names has ${row.status}` : null;

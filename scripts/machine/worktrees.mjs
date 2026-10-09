@@ -291,7 +291,7 @@ function reviewUnstamped({ dir, repoRoot, home, detail, apply, env }) {
       if (!seen) orphanIncident({ kind: 'worktree.orphan-review', msg: `unstamped ${home} tree ${dir} has no registry row and no owner: awaiting the owner's review, never removed by the GC`, data: { path: dir, home, ...detail }, env });
     } catch { /* the review item below still reports it */ }
   }
-  return { path: dir, repoRoot: repoRoot ? path.resolve(repoRoot) : null, reason: 'unstamped-orphan', action: 'review', home, ok: true };
+  return { path: dir, repoRoot: repoRoot ? path.resolve(repoRoot) : null, reason: 'unstamped-orphan', action: 'review', home, branch: detail?.branch ?? null, ok: true };
 }
 
 /** A registered Orca tree Orca no longer lists (orca-tree-unlisted): reported and marked, never removed by other means. */

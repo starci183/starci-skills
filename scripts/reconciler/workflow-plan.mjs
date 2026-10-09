@@ -9,6 +9,7 @@ import { CRITICAL_SUFFIX } from './sla.mjs';
 import { planSupervisorGates } from './gate-plan.mjs';
 import { planBudgetOverruns } from './budget-plan.mjs';
 import { planSupervisorOwed } from './owed-plan.mjs';
+import { planDraftHeld } from './draft-plan.mjs';
 
 const DI_SCHEMA = 'starci/decision-item@1';
 const OPENED_BY = 'workflow-controller';
@@ -195,7 +196,7 @@ function planFinish(p) {
   if (!hasOpenOperations) p.out.finish = true;
 }
 
-const SECTIONS = [planGoal, planStall, planOrphaned, planRev, planUnreadable, planFindings, planSupervisorGates, planBudgetOverruns, planSupervisorOwed, planStuckClocks, planAsks, planFinish];
+const SECTIONS = [planGoal, planStall, planOrphaned, planRev, planUnreadable, planFindings, planSupervisorGates, planBudgetOverruns, planSupervisorOwed, planDraftHeld, planStuckClocks, planAsks, planFinish];
 
 /**
  * Everything one pass decides for one running workflow. Pure: no ledger, no clock, no spawn.
@@ -208,14 +209,14 @@ const SECTIONS = [planGoal, planStall, planOrphaned, planRev, planUnreadable, pl
  *   unreadable  {misses, since, error, heldAt} when this pass could not read starci kernel status (holdStatus), else null
  * Returns {clocks: [{entity, state, slaMs, enteredAt}], decisions: [DI], reparks: [dispatchId], finish, stalled, lines}.
  */
-export function planWorkflow({ ledgerId, workflowId, status = null, findings = [], goal = { missing: false }, asks = [], gates = [], clocks = [], unreadable = null, now, settings }) {
+export function planWorkflow({ draft = null, ledgerId, workflowId, status = null, findings = [], goal = { missing: false }, asks = [], gates = [], clocks = [], unreadable = null, now, settings }) {
   const wfEntity = workflowEntity(ledgerId, workflowId);
   const out = { clocks: [], decisions: [], reparks: [], finish: false, stalled: false, lines: [] };
   const rca = status?.rca ?? null;
   const top = firstUntried(rca);
   const frontier = status?.frontier ?? null;
   const p = {
-    ledgerId, workflowId, status, findings, goal, asks, gates, unreadable, now, s: settings, wfEntity, out, rca, top, frontier,
+    draft, ledgerId, workflowId, status, findings, goal, asks, gates, unreadable, now, s: settings, wfEntity, out, rca, top, frontier,
     clock: (entity, state, slaMs, enteredAt) => { if (Number.isFinite(slaMs)) out.clocks.push({ entity, state, slaMs, enteredAt: Number.isFinite(enteredAt) ? enteredAt : now }); },
     openClock: (state) => clocks.find((c) => c.entity === wfEntity && c.state === state) ?? null,
     di: (args) => out.decisions.push(decisionOf({ ledgerId, workflowId, now, dueMs: settings.decisionDueMs, ...args })),
