@@ -1176,6 +1176,8 @@ cases:
     status: covered
   - id: grammar-context-reads-the-main-checkout-not-the-workflow-tree
     family: correctness
+    found: live
+    replay: tests/replay/ready-not-dispatched.spec.mjs
     finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: an op dispatched inside a workflow tree sees what the workflow's finished legs wrote) interface.draw was refused grammar-context-missing on every dispatch: the brand record brand.decide wrote lives in .starciwork of the workflow tree until the workflow finishes, and the grammar context was resolved against the repository's main checkout", remedy: {state: in-tree, change: "resolveGrammarContext takes the workflow tree and reads the brand record, the family CSS roots and the captures from it first, the main checkout after; dispatch-plan passes the tree"}}
     met: {date: "2026-10-09", where: "alpha.8 live, StarCi workflow", evidence: "starci push result: grammar-context-missing, no brand record, while the workflow tree holds .starciwork/brand/index.yaml and op-brand.decide-8bd6f3374d succeeded at 05:17Z"}
     rule: {file: scripts/kernel/grammar-context.mjs, anchor: "hasBrandRecord"}
@@ -1183,6 +1185,8 @@ cases:
     status: covered
   - id: run-fence-spends-pool-strikes-and-is-never-repaired
     family: failure-while-running
+    found: live
+    replay: tests/replay/ready-not-dispatched.spec.mjs
     finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: the workflow Run is bound to the Kernel terminal that dispatches into it, and a host binding fault is never the agent's) worker-start was refused consumer_fenced three times in two minutes; run-show named no coordinator, which the binder reads as bound, so nothing re-bound the Run; each refusal counted as a pool failure until both pools were excluded", remedy: {state: in-tree, change: "a launch refused consumer_fenced at worker-start re-binds the Run to the Kernel terminal once (unless run-show proves it is already the coordinator), records run-rebound, and retries the launch once; the refusals of the host's Run binding spend no pool strike"}}
     met: {date: "2026-10-09", where: "alpha.8 live, Nivo workflow", evidence: "nivo events 1038, 1046, 1052 dispatch-rejected consumer_fenced, route-decided lineageAdjust excluding claude-agent; run_322398621415 run-show coordinator null"}
     rule: {file: scripts/kernel/orca-runs.mjs, anchor: "rebindAfterFence"}
@@ -1190,8 +1194,18 @@ cases:
     status: covered
   - id: lineage-excludes-every-pool-of-the-tier
     family: failure-while-running
+    found: live
+    replay: tests/replay/ready-not-dispatched.spec.mjs
     finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a retry always has a pool to be tried on, bounded by its retry budget) a retry lineage that excluded every pool of the tier left the admission answering no-eligible-candidate for ever, with nobody owning the dead end", remedy: {state: in-tree, change: "pickOpModel yields the lineage exclusion when it would exclude every pool of the tier: the pools stay demoted, the order still prefers the least failed, and the job's retry budget bounds the tries"}}
     met: {date: "2026-10-09", where: "alpha.8 live, Nivo workflow", evidence: "push result: agent admission refused: no-eligible-candidate, both targets excluded for this retry lineage"}
     rule: {file: scripts/agent/op-pick.mjs, anchor: "yieldTotalExclusion"}
     spec: tests/kernel/live-ready-not-dispatched.spec.mjs
     status: covered
+  - id: run-fence-repair-retries-a-released-attempt
+    family: failure-while-running
+    found: live
+    replay: tests/replay/ready-not-dispatched.spec.mjs
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a launch the host refused for its own binding is repaired and dispatched in the same call) the replay of the live Nivo sequence on the merged tip: worker-start refused consumer_fenced, the Run is re-bound (run-rebound event), but the launch retried inside the same dispatch is refused attempt-released at admission - the first refusal released the provider reservation of the attempt - so it is recorded as a dispatch-rejected, strikes the pool (demoted) and the retry dispatches only on the next push", remedy: {state: open}}
+    met: {date: "2026-10-09", where: "replay of the alpha.8 live Nivo sequence (events 1038, 1046, 1052) on the merged tip", evidence: "tests/replay/ready-not-dispatched.spec.mjs, the todo test: first push result dispatch-rejected: attempt-released, second push dispatched; engine/db/provider-reservations.mjs answers attempt-released for a released reservation"}
+    status: open
+    why: "reproduced by the todo test of tests/replay/ready-not-dispatched.spec.mjs: the first push does not dispatch (dispatch-rejected: attempt-released at admission); the failing assertion is results.length === 1. The retry in spawnOperationAgent (scripts/kernel/verbs/shared/dispatch-agent.mjs) must take a fresh reservation or the failed launch must not release it; the lane that owns dispatch-agent fixes it and removes the todo, then this entry becomes covered."

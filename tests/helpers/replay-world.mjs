@@ -24,11 +24,14 @@ import { seedWorkflow } from './ledger-fixture.mjs';
 import { bindCurrentKernel } from './bound-kernel.mjs';
 import { registerWorkflowWorktree } from '../../scripts/kernel/workflow-worktree.mjs';
 import { openDecisionRow } from '../../scripts/machine/decisions.mjs';
+import { adoptLaunchTrust } from './launch-trust.mjs';
+import { fakeDevinQuotaEnv } from './fake-devin-quota.mjs';
 import { ensureHistoryHook } from '../../scripts/guards/hook-install.mjs';
 
 export const ROOT = path.resolve(import.meta.dirname, '..', '..');
 export const FIXTURES = path.join(ROOT, 'tests', 'fixtures', 'replay');
 export const CLI = path.join(ROOT, 'scripts', 'kernel', 'cli.mjs');
+const BRAND_RECORD = ['schema: work/brand@1', 'kind: brand', 'brand:', '  identity:', '    family: starci', '  sources:', '    - path: brand-theme.css', ''].join('\n');
 const GIB = 1024 ** 3;
 /** The host sample every replayed process reads: 64 GiB of RAM with 40 free, an idle CPU, 500 GB of disk, no worker running machine-wide. */
 export const ROOMY_HOST = Object.freeze({ totalRamBytes: 64 * GIB, freeRamBytes: 40 * GIB, freeRamPct: 62.5, freeDiskGb: 500, cpuBusy: 0.1, ops: [], kernels: 0 });
@@ -173,7 +176,7 @@ function seedLedger(ledgerFile, fixture, at, revs, bind, admit) {
  * Builds the world of `fixture` and registers its cleanup on `t`. Options: `tree` (a real workflow tree: a git repository registered as the workflow worktree)
  * and `seed(ledger, ctx)` for rows a case needs beyond the fixture vocabulary (called on an open ledger).
  */
-export function replayWorld(t, fixture, { tree = false, seed = null, bindKernel = true, admit = null } = {}) {
+export function replayWorld(t, fixture, { tree = false, seed = null, bindKernel = true, admit = null, launch = false } = {}) {
   const base = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'starci-replay-')));
   t.after(() => { rm(base); for (const name of SCRATCH_DIRS) rm(path.join(os.tmpdir(), name)); });
   const repo = path.join(base, 'product');
@@ -221,11 +224,15 @@ export function replayWorld(t, fixture, { tree = false, seed = null, bindKernel 
       write(dir, `${ownedPathOf(record)}/index.yaml`, `id: ${parts[1]}.${parts[0]}.${parts.slice(2).join('.')}\nkind: ${parts[1]}\n`);
       return `${ownedPathOf(record)}/index.yaml`;
     });
+    // A finished brand leg wrote the brand record into the workflow tree; the repository's main checkout has none until the workflow finishes.
+    if (fixture.tree?.brand) { write(dir, '.starciwork/brand/index.yaml', BRAND_RECORD); write(dir, 'brand-theme.css', ':root { --brand: #000; }\n'); }
     if (fixture.tree?.preserved) commit(dir, `preserve ${wf}/gc: uncommitted work of its worktree`);
     // The history hook of the revision under test guards the branch, as the host's does.
     ensureHistoryHook(dir);
     world.tree = { dir, branch, baseline, checkpoints, records, git: (...args) => git(dir, ...args), write: (rel, text) => write(dir, rel, text), commit: (message) => commit(dir, message) };
   }
+  // `launch`: the owner's launch trust is adopted for the world's roots and the Devin quota seat answers from loopback (a dispatch then reaches the Orca stub's worker-start).
+  if (launch) Object.assign(env, fakeDevinQuotaEnv(t, path.join(base, 'appdata')), adoptLaunchTrust(base, { roots: [repo, world.tree?.dir, base].filter(Boolean), ref: 'replay world adoption' }), { STARCI_SLEEP_SCALE: '0.02', STARCI_FAKE_ORCA_MODE: 'healthy' });
   seedLedger(ledgerFile, fixture, at, revs, bindKernel ? (ledger, id) => { kernelEnv = bindCurrentKernel(ledger, id); } : null, admit ? (ledger, job) => admit(world, ledger, job) : null);
   if (fixture.tree?.prepared) { const ledger = openLedger({ file: ledgerFile }); try { seedPrepared(ledger, world); } finally { ledger.close(); } }
   if (seed) { const ledger = openLedger({ file: ledgerFile }); try { seed(ledger, world); } finally { ledger.close(); } }
@@ -257,6 +264,8 @@ export function replayWorld(t, fixture, { tree = false, seed = null, bindKernel 
   };
   /** The reads of the real host the trap logged in any process of this world: [{read, pid, frame}]. */
   world.hostReads = () => { const file = env.STARCI_REPLAY_HOST_READS; return fs.existsSync(file) ? fs.readFileSync(file, 'utf8').split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line)) : []; };
+  /** The state the Orca stub kept (runs, run-uses, workers started): its own file, written by every stub call. */
+  world.orca = () => { try { return JSON.parse(fs.readFileSync(env.STARCI_FAKE_ORCA_STATE, 'utf8')); } catch { return {}; } };
   world.status = () => { const r = world.cli('status', ['--workflow', wf]); assert.equal(r.status, 0, `status: ${r.stderr || r.stdout}`); return r.json; };
   /** The runtime revision whose read plan has grown to the fixture's `grownTotal` files (the revision that outgrew the inline event bound). */
   world.growReadPlan = () => world.reviseRuntime(Object.fromEntries(planFiles({ count: readPlan.grownTotal - readPlan.total, pathBytes: readPlan.pathBytes, from: readPlan.total - fixed })),

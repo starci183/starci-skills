@@ -10,7 +10,8 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
-const OVERLAY = ['tests/replay', 'tests/fixtures/replay', ...fs.readdirSync(path.join(ROOT, 'tests', 'helpers')).filter((name) => name.startsWith('replay-')).map((name) => `tests/helpers/${name}`)];
+// The Orca stub carries the fence knob the replay needs; it overlays the old tree's copy.
+const OVERLAY = ['tests/replay', 'tests/fixtures/replay', 'tests/helpers/fake-orca.mjs', ...fs.readdirSync(path.join(ROOT, 'tests', 'helpers')).filter((name) => name.startsWith('replay-')).map((name) => `tests/helpers/${name}`)];
 const PRELOADS = ['low-priority', 'isolated-temp', 'isolated-registry', 'runtime-copies'].flatMap((name) => ['--import', `./tests/setup/${name}.mjs`]);
 
 /** Exports `sha` of this repository into `dir` (git archive piped into tar). */
