@@ -163,6 +163,13 @@ proofs:
         as its workflow's checkpoint when the operation settles green (scripts/kernel/workflow-checkpoint.mjs
         checkpointOp). The operation never commits and changes nothing outside its owned paths; settle
         refuses workflow-foreign-commit or workflow-foreign-change otherwise.
+judge:
+  - by: machine
+    measures: [declared-checks, contract-script]
+    proofs: [stack-declaration-read]
+    why: "the stack-declaration check is a runtime script the settler re-runs, and the settler re-runs the validators of the records written"
+  - by: owner
+    why: "the owner supplies the credential, account, dataset or go-ahead the op names; the op only verifies it is present"
 blockers:
   - code: QUESTION_UNCLEAR
     condition:

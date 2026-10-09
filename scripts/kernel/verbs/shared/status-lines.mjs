@@ -8,6 +8,7 @@ import { stuckLine } from '../../../machine/op-metrics.mjs';
 import { menuLines } from './status-menu.mjs';
 import { runtimeCriticLine } from './status-critic.mjs';
 import { seatCostConfig } from '../../seat-wakes.mjs';
+import { judgeTagOf } from '../../op-judge.mjs';
 
 const headline = (s, out) => {
   const mark = s.actionable ? ' ACTIONABLE' : ' (no actionable work)';
@@ -49,10 +50,11 @@ const stuckSummaryLine = (s) => {
   return `  stuck: ${s.stuck.length} wait(s), ${s.stuckPast.length} past SLA (${critical} critical)`;
 };
 
-const legsLine = (s) => {
+/** The legs line of the full status text: every leg with its colour and the one tag of who judges it. */
+export const legsLine = (s) => {
   const legs = s.graph.legs.map((leg) => {
     const deferred = leg.deferred ? '(deferred)' : '';
-    return `${leg.op}(${leg.label}):${leg.color}${deferred}`;
+    return `${leg.op}(${leg.label}):${leg.color}${deferred}[judge:${judgeTagOf(leg.op, s.internals.skillRoot)}]`;
   }).join(' ');
   return `  legs: ${legs}`;
 };

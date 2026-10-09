@@ -1700,3 +1700,28 @@ cases:
     rule: {file: scripts/kernel/verbs/shared/status-drift.mjs, anchor: "intakeLeg"}
     spec: tests/replay/first-leg-offered.spec.mjs
     status: covered
+
+  - id: op-product-has-no-declared-judge
+    family: record-vs-reality
+    finding: {role: runtime, duty: does, verdict: unjudged, evidence: "(duty: the maker never judges its own work, principle P2 of modules/kernel/roles.yaml) the judge of each op was implicit: an independent Critic ran for drawing and, by the runtime at settle, for scope.define and architecture.decide; the other ops were judged by re-run checks, native proofs, gates, a later reviewing leg or the owner, and nothing stated this per op, so nothing stopped an op from having no independent judge and nothing tied the Critic table to the contracts", remedy: {state: in-tree, change: "every op contract carries the required field judge (machine, critic, owner, next-leg, each with a why; nobody cannot be declared) read against modules/kernel/op-judges.yaml, and the op-judge self-check refuses an op with no judge, a measure the runtime does not own or apply, a Critic that departs from modules/kernel/critic.yaml coverage, an owner without an owner gate and a next-leg that is not a registered reviewer"}}
+    met: {date: "2026-10-09", where: "owner ruling 2026-10-09: every op declares who judges its product, in alpha.9 with today's behaviour unchanged", evidence: "the 38 contracts of modules/ops/ops were filled from what the settle path runs today (scripts/kernel/verbs/shared/settle-preflight.mjs phases, scripts/kernel/settle/job-settle-verify.mjs, knowledge/op-gate.yaml enforcedOps and opProofs, knowledge/sonar-gate.yaml, modules/kernel/critic.yaml coverage); no Critic, gate or check was added or removed"}
+    rule: {file: scripts/checks/check-op-judge.mjs, anchor: "opJudgeFindings"}
+    spec: tests/checks/check-op-judge.spec.mjs
+    status: covered
+  - id: op-judge-not-shown-to-the-leg-or-the-op
+    family: smooth-operation
+    finding: {role: runtime, duty: does, verdict: unjudged, evidence: "(duty: the Op knows what will judge its product) the op prompt named the independent Critic of two ops in a hand-written list and said nothing of the other judges, so an op could run a Critic of its own or offer its own tests as the proof; the status of a leg did not say who judges it", remedy: {state: in-tree, change: "the op prompt carries one judged_by line built from the judge field of its contract, and starci kernel status --full tags each leg [judge:...] from the same field (scripts/kernel/op-judge.mjs)"}}
+    met: {date: "2026-10-09", where: "owner ruling 2026-10-09: every op declares who judges its product", evidence: "scripts/kernel/op-prompt.mjs independent-critic line named scope.define and architecture.decide by hand"}
+    rule: {file: scripts/kernel/op-judge.mjs, anchor: "judgePromptLine"}
+    spec: tests/kernel/op-judge-surfaces.spec.mjs
+    status: covered
+  - id: op-judge-self-authored-tests
+    family: correctness
+    met: {date: "2026-10-09", where: "the judge declarations of backend.implement, e2e.verify and integration.verify", evidence: "backend.implement writes or updates the unit specs of the subjects it changes (modules/ops/ops/backend.implement.yaml, the unit-specs sentence of the implementation-quality step and the step 'Add or repair scoped unit tests') and the gate's specs and the Sonar coverage of 100 on the measured logic files count those specs; e2e.verify writes 'one scenario per assertion' at the allowlisted spec paths (sideEffects: end-to-end scenario spec authoring) and integration.verify writes the contract specs it then runs, and settle re-runs the world with the specs the same op wrote. The independent measures today are lint, typecheck and canon of the gate, the Sonar new-code issues, the test-world structural rules (no hand-rolled world, none skipped), the provider's own sandbox for integration.verify and the later review.verify; nothing checks that an authored case traces to an acceptance record of work.author"}
+    why: "The declarations say the truth (machine with the independent measures, plus next-leg review.verify where a reviewing leg exists) and the behaviour is unchanged. The owner decides whether a spec the same attempt wrote may stand as proof of behaviour: e.g. a settle measure that refuses an authored case with no assertion id of the work.author records, or a rule that the leg that runs the specs is not the leg that wrote them. Either tightens a gate, so it is the owner's."
+    status: open
+  - id: op-judge-substance-unjudged
+    family: correctness
+    met: {date: "2026-10-09", where: "the judge declarations of business.decide, content.generate, perf.verify, scope.finish and test.author", evidence: "each of these ops is judged by machine measures alone and none of them reads substance: the settler re-runs the record validators (shape, references, coverage of the records) and the READ digest is re-read, but no Critic, no reviewing leg and no owner gate judges whether the specified behaviour (business.decide), the generated content and its examples (content.generate), the measured numbers (perf.verify), the retention of live consumers and sole evidence copies (scope.finish) or the cases of the authored tests (test.author) are right; the op's own run is the evidence"}
+    why: "Adding a Critic row, a reviewing leg or an owner gate for an op changes who can fail a leg, which is the owner's decision per leg and not part of declaring today's behaviour. The declarations name the gap in their why so the op is told its checks are shape only."
+    status: open

@@ -380,6 +380,14 @@ proofs:
     requirement:
       en: "starci kernel settle re-reads the attached gate.json (exit 0 over the slice's changed files) and read-digest.json (a pattern file named for every touched file kind) and records the runtime check op-gate; a done without them, with a tool that could not run or with a new finding is refused, and the Kernel re-runs the same gate on the branch at landing."
       vi: "starci kernel settle tự đọc lại gate.json đính kèm (exit 0 trên các tệp slice đã đổi) và read-digest.json (có tệp pattern cho mọi loại tệp đã sửa) rồi ghi check op-gate; done thiếu chúng, có công cụ không chạy được hoặc có lỗi mới đều bị từ chối, và Kernel chạy lại đúng cổng đó trên nhánh khi land."
+judge:
+  - by: machine
+    measures: [declared-checks, op-gate, sonar-gate, canon-parity]
+    proofs: [regression-parity, canon-conformance, op-gate]
+    why: "the settler re-runs the declared regression check, settle re-reads the gate and the scanner summary, and a canon cut slice the declared checks cannot carry is measured again by the settler itself"
+  - by: next-leg
+    leg: review.verify
+    why: "the planned chain closes with review.verify, which re-runs the gate over the reviewed range and classifies every defect it finds without repairing the producer"
 blockers:
   - code: TEST_COVERAGE_ABSENT
     condition:

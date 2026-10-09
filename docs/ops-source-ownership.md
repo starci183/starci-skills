@@ -9,7 +9,8 @@ per file and no derived view to keep in step by hand.
 
 | Path | Role |
 | --- | --- |
-| `modules/ops/ops/<op>.yaml` | One executable operator contract per operation: its goal, reads, writes, steps, proofs, blockers, policy blocks and `route:` key |
+| `modules/ops/ops/<op>.yaml` | One executable operator contract per operation: its goal, reads, writes, steps, proofs, judge (who judges the product), blockers, policy blocks and `route:` key |
+| `modules/kernel/op-judges.yaml` | The vocabulary the `judge` field is held to: the measures a machine judge may cite, the owner gates and the reviewing legs |
 | `modules/ops/_common.yaml` | The vocabulary and rules every op manifest inherits |
 
 ## Generated — regenerate, never edit
