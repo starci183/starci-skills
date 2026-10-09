@@ -72,12 +72,13 @@ export const loadFixture = (name) => JSON.parse(fs.readFileSync(path.join(FIXTUR
 /** The neutral path an opaque fixture token (`d1.sds`) stands for in the work tree: dots are path separators under `.starciwork/features`. */
 export const ownedPathOf = (token) => `.starciwork/features/${String(token).split('.').join('/')}`;
 
-/** Files of the runtime root that make the Kernel's read plan: `count` neutral files of about `pathBytes` characters of path under the real read-plan directory. */
-function planFiles({ count, pathBytes = 40, from = 0 }) {
-  const dir = 'modules/cli/commands/kernel';
-  const pad = Math.max(0, Number(pathBytes) - dir.length - 12);
-  return Array.from({ length: Number(count) }, (_, i) => [`${dir}/v${String(from + i).padStart(3, '0')}${'x'.repeat(pad)}.yaml`, `verb: replay-${from + i}\n`]);
-}
+/**
+ * What makes the Kernel's read plan as large as the live one: the plan lists the contract of each op the Kernel is about to run, and an op's contract is its brief plus every schema or
+ * check the brief cites. `count` neutral schema files numbered from `from`: [[path, text], ...]; the brief of the op cites them (`citeText`).
+ */
+const planPath = (i) => `modules/schemas/replay-${String(i).padStart(3, '0')}.yaml`;
+const planFiles = ({ count, from = 0 }) => Array.from({ length: Number(count) }, (_, i) => [planPath(from + i), `id: replay-${from + i}\nnote: ${'n'.repeat(60)}\n`]);
+const citeText = (op, count) => `id: ${op}\n${Array.from({ length: Number(count) }, (_, i) => `cites: ${planPath(i)}`).join('\n')}\n`;
 
 const KERNEL_FILES = { 'modules/kernel/kernel-prompt.md': 'Kernel prompt\n', 'modules/kernel/driver-loop.yaml': 'tick: survey\n', 'modules/kernel/api.yaml': 'schema: replay\n',
   'modules/kernel/owner-rulings.yaml': 'rulings: []\n', 'modules/kernel/verdict-contract.yaml': 'verdict: pass\n', 'modules/ops/_common.yaml': 'common: replay\n', 'scripts/kernel/op-prompt.mjs': 'export {};\n' };
@@ -94,7 +95,10 @@ function runtimeRoot(dir, fixture) {
   // The read plan's size is the fixture's: `readPlan.total` files in all (the fixed Kernel files and the op files count), the rest neutral verb files.
   const fixed = Object.keys(KERNEL_FILES).length + ops.size;
   const plan = fixture.runtime?.readPlan ?? { total: fixed + 3 };
-  for (const [rel, text] of planFiles({ count: Math.max(0, plan.total - fixed), pathBytes: plan.pathBytes })) write(dir, rel, text);
+  const planOp = (fixture.ops ?? ['review.verify'])[0];
+  const cited = Math.max(0, plan.total - fixed);
+  for (const [rel, text] of planFiles({ count: cited })) write(dir, rel, text);
+  write(dir, `modules/ops/ops/${planOp}.yaml`, citeText(planOp, cited));
   return { runtime: dir, revs: [commit(dir, 'revision 1')], plan, fixed };
 }
 
@@ -273,7 +277,7 @@ export function replayWorld(t, fixture, { tree = false, seed = null, bindKernel 
   world.orca = () => { try { return JSON.parse(fs.readFileSync(env.STARCI_FAKE_ORCA_STATE, 'utf8')); } catch { return {}; } };
   world.status = () => { const r = world.cli('status', ['--workflow', wf]); assert.equal(r.status, 0, `status: ${r.stderr || r.stdout}`); return r.json; };
   /** The runtime revision whose read plan has grown to the fixture's `grownTotal` files (the revision that outgrew the inline event bound). */
-  world.growReadPlan = () => world.reviseRuntime(Object.fromEntries(planFiles({ count: readPlan.grownTotal - readPlan.total, pathBytes: readPlan.pathBytes, from: readPlan.total - fixed })),
+  world.growReadPlan = () => world.reviseRuntime({ ...Object.fromEntries(planFiles({ count: readPlan.grownTotal - fixed, from: 0 })), [`modules/ops/ops/${(fixture.ops ?? ['review.verify'])[0]}.yaml`]: citeText((fixture.ops ?? ["review.verify"])[0], readPlan.grownTotal - fixed), 'modules/kernel/api.yaml': 'schema: replay\ncontract: grown\n' },
     'revision with a larger read plan');
   /** The runtime revision changes here: `files` ({rel: text}) are written and committed in the runtime root. Answers the new revision. */
   world.reviseRuntime = (files = {}, message = `revision ${revs.length + 1}`) => {

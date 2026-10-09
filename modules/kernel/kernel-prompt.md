@@ -38,8 +38,8 @@ through `node {apiFile}` verbs.
 MANDATORY LOAD ORDER before any action:
   1. {skillRoot}/CONTEXT.md
   2. {skillRoot}/modules/kernel/driver-loop.yaml - your loop and the rulebooks you judge by
-  3. Every path `starci kernel kernel-ack-rev --workflow {workflowId} --plan` lists under unread: read it, write the complete READ
-     manifest the plan returns to a file, then attest it with `starci kernel kernel-ack-rev --workflow {workflowId} --rev <rev> --read-manifest <file>`.
+  3. `starci kernel kernel-ack-rev --workflow {workflowId} --plan` returns `bundle.file`: ONE file holding every unread path. Read that file with one call (never each path
+     on its own), write the complete READ manifest the plan returns to a file, then attest it with `starci kernel kernel-ack-rev --workflow {workflowId} --rev <rev> --read-manifest <file>`.
   You read these at runtime rev {runtimeRev}. A wake that names a newer `Runtime rev` puts a rev-ack item on your menu: do it first.
 
 YOUR LOOP, EVERY WAKE: the runtime does the mechanical work (dispatch, bounded retry, switching agent, settling green reports, enqueueing the leg a

@@ -1,6 +1,7 @@
 // kernel-ack-rev — project the required READ plan or attest its complete bytes as the current Kernel.
 import fs from 'node:fs';
 import { getWorkflow } from './shared/rows.mjs';
+import { writeReadBundle } from '../read-bundle.mjs';
 import { kernelAuthorityOf, kernelCustodyOf } from './shared/kernel-seat.mjs';
 import { kernelReadManifest, unreadFiles, verifyKernelRead } from '../required-read.mjs';
 import { KERNEL_REV_ACKED_EVENT, KERNEL_REV_UNKNOWN, resolveRev, revRootOf } from '../runtime-rev.mjs';
@@ -12,7 +13,7 @@ export default {
   kernelOnly: true,
   usageInCore: true,
   usage: '  kernel-ack-rev --workflow <id> --plan [--op <id>] | --rev <sha> --read-manifest <file> [--op <id>]   current-incarnation READ attestation',
-  run({ ledger, args, caller, emit }) {
+  run({ ledger, args, caller, emit, repo }) {
     const db = ledger.db, workflowId = args.workflow, root = revRootOf();
     const wf = getWorkflow(db, workflowId);
     if (!wf) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
@@ -22,7 +23,12 @@ export default {
       throw Object.assign(new Error('only the current Kernel may attest its READ'), { code: 'kernel-caller-stale' });
     const options = { root,authority,ops: args.op ? [String(args.op)] : [] };
     const required = kernelReadManifest(db,workflowId,options);
-    if (args.plan) return emit({ ok: true, workflowId, readManifest: required, unread: unreadFiles(db, workflowId, required) }, JSON.stringify(required), args.json);
+    if (args.plan) {
+      const unread = unreadFiles(db, workflowId, required);
+      // The unread files as ONE file to read with one call, not one tool call and one model turn per path.
+      const bundle = unread.length ? writeReadBundle({ repo, workflowId, root, rows: required.files.filter((row) => unread.includes(row.path)), digest: required.digest }) : null;
+      return emit({ ok: true, workflowId, readManifest: required, unread, ...(bundle ? { bundle } : {}) }, JSON.stringify(required), args.json);
+    }
     const rev = required.revision.kind === 'git' ? resolveRev(root,String(args.rev)) : String(args.rev);
     if (!rev || rev !== required.rev) throw Object.assign(new Error('READ revision is not the current deployed commit'), { code: KERNEL_REV_UNKNOWN });
     const file = String(args['read-manifest']), stat = fs.lstatSync(file);

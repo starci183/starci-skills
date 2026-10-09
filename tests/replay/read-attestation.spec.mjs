@@ -4,6 +4,7 @@
 // Real: the Kernel verbs as the bound Kernel (child processes), the reconciler engine (real controllers, a fresh process), the git runtime root with two revisions.
 // Stubbed: the Orca binary only (nothing here launches an agent). Fixture: tests/fixtures/replay/read-plan.json (extracted from a ledger copy, neutral).
 import test from 'node:test';
+import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import { loadFixture, replayWorld } from '../helpers/replay-world.mjs';
 
@@ -16,6 +17,10 @@ const ackRows = (world) => world.ledger((ledger) => ledger.db.prepare("SELECT le
 
 test('the ack of a read plan that outgrew the inline event bound lands after an engine restart and a revision change, and the next leg is admitted', (t) => {
   const world = replayWorld(t, fixture);
+  const plan = world.cli('kernel-ack-rev', ['--workflow', world.wf, '--plan', '--op', OP]).json;
+  assert.equal(plan.bundle.files, plan.unread.length, 'the whole unread set is ONE file to read, not one tool call per path');
+  const bundled = fs.readFileSync(plan.bundle.file, 'utf8');
+  for (const row of plan.readManifest.files) assert.ok(bundled.includes(`===== ${row.path} (${row.bytes} bytes, sha256 ${row.sha256}) =====`), row.path);
   const first = world.ack([OP]);
   assert.equal(first.status, 0, `the first plan fits and is attested: ${first.stderr}`);
   const [small] = ackRows(world);
@@ -34,7 +39,7 @@ test('the ack of a read plan that outgrew the inline event bound lands after an 
   assert.notEqual(second.json?.code, 'STARCI_EVENT_PAYLOAD_TOO_LARGE');
   const rows = ackRows(world);
   assert.equal(rows.length, 2);
-  assert.equal(rows[1].inline, null, 'the row keeps no inline JSON');
+  assert.ok(rows[1].inline < 512, `the row keeps a pointer, not the attestation: ${rows[1].inline} bytes inline`);
   assert.match(rows[1].payload_sha, /^[0-9a-f]{64}$/, 'the whole attestation is behind the sha');
 
   assert.equal(newLeg(world).json?.code, 'params-invalid', 'the READ gate passes: the verb now refuses only the params');
