@@ -27,6 +27,8 @@ routes:
   - {kind: retry-cap, diKinds: [retry-decision]}
   - {kind: undispatched, diKinds: [ready-undispatched]}
   - {kind: orphaned, diKinds: [orphaned-frontier]}
+  - {kind: seat-draft, diKinds: [seat-draft-held]}
+  - {kind: untied-trees, diKinds: [unregistered-trees]}
   - {kind: kernel-escape, diKinds: [menu-escape], keyPrefix: 'escalated:'}
   - {kind: runtime-defect, default: true}
 
@@ -110,6 +112,20 @@ kinds:
     options:
       - {choice: rule, text: ruling, steps: [{run: supervisor notify, args: {repo: $repo, workflow: $workflow, text: $text, item: $key}}], effect: "sends --text to the workflow's Kernel as a durable Supervisor ruling: name the next leg, or revise the plan"}
       - {choice: record-defect, text: cause, steps: [{run: supervisor actions, args: {_: record, item: "runtime-defect:$text", action: recorded, reason: $reason, workflow: $workflow, refs: $refs}}], effect: "records the runtime defect (an orphan that stays orphaned) for Debug and closes the item"}
+
+  - id: seat-draft
+    source: "Decision Item seat-draft-held: a person's draft has stood in a Kernel's input box past the seat's wake-repeat bound, so the seat cannot be woken (a person typing there wins: the runtime never clears or replaces the seat)"
+    question: "{summary}"
+    options:
+      - {choice: wait, steps: [], effect: "closes this item and leaves the seat alone; if the draft still stands after another wake-repeat bound the runtime opens the item again, and it closes by itself when the draft is gone"}
+      - {choice: record-defect, text: cause, steps: [{run: supervisor actions, args: {_: record, item: "runtime-defect:$text", action: recorded, reason: $reason, workflow: $workflow, refs: $refs}}], effect: "records the runtime cause (--text is a short cause slug) in the defect queue for Debug"}
+
+  - id: untied-trees
+    source: "Decision Item unregistered-trees: trees under a runtime-managed root that the runtime cannot tie to a workflow (one item per repository, with each tree's path, branch, last commit time and dirty or clean)"
+    question: "{summary}"
+    options:
+      - {choice: leave, steps: [], effect: "closes this item and leaves every listed tree alone (the runtime removes nothing it did not create); it opens again only when the set of trees changes"}
+      - {choice: record-defect, text: cause, steps: [{run: supervisor actions, args: {_: record, item: "runtime-defect:$text", action: recorded, reason: $reason, workflow: $workflow, refs: $refs}}], effect: "records the runtime cause (--text is a short cause slug) in the defect queue for Debug"}
 
   - id: runtime-defect
     source: "every other Decision Item decided by the Supervisor: a defect of the runtime, a seat or a push"

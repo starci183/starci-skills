@@ -38,7 +38,7 @@ export const DI_SCHEMA = 'starci/decision-item@1';
 export const DI_KINDS = Object.freeze(['settle-nongreen', 'worker-question', 'checks-needed', 'graph-edit-needed', 'progress-stall',
   'stale-gate', 'stale-wait', 'stale-peer-wait', 'unread-peer', 'orphaned-frontier', 'rev-ack', 'supervisor-ruling', 'cross-workflow', 'deadlock',
   'runtime-defect', 'kernel-proposal', 'seat-unrecoverable', 'service-quarantined', 'quota-exhausted', 'experiment-revert',
-  'push-refused', 'retry-decision', 'dispatch-refused', 'cap-starved', 'hypothesis', 'rebase-conflict', 'budget-overrun', 'menu-escape', 'ready-undispatched', 'move-refused']);
+  'push-refused', 'retry-decision', 'dispatch-refused', 'cap-starved', 'hypothesis', 'rebase-conflict', 'budget-overrun', 'menu-escape', 'ready-undispatched', 'move-refused', 'seat-draft-held', 'unregistered-trees']);
 const DECIDERS = Object.freeze(['kernel', 'supervisor', 'owner']);
 /**
  * Kinds the Supervisor decides unless the opener names another decider (DESIGN §6.4 escalation column: resource,
@@ -46,7 +46,7 @@ const DECIDERS = Object.freeze(['kernel', 'supervisor', 'owner']);
  * rc-gc-resource's Resource controller), next to `quota-exhausted`.
  */
 const SUPERVISOR_KINDS = Object.freeze(['cap-starved', 'quota-exhausted', 'runtime-defect', 'cross-workflow', 'deadlock',
-  'seat-unrecoverable', 'service-quarantined', 'experiment-revert', 'hypothesis', 'push-refused', 'kernel-proposal', 'menu-escape']);
+  'seat-unrecoverable', 'service-quarantined', 'experiment-revert', 'hypothesis', 'push-refused', 'kernel-proposal', 'menu-escape', 'seat-draft-held', 'unregistered-trees']);
 const defaultDeciderOf = (kind) => (SUPERVISOR_KINDS.includes(kind) ? 'supervisor' : 'kernel');
 /** Kinds the Supervisor may claim from a Kernel without an escalation (DESIGN §11.3 rule 1). */
 const CROSS_WORKFLOW_KINDS = Object.freeze(['cross-workflow', 'deadlock']);

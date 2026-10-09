@@ -48,6 +48,7 @@ import { eachInOrder, mapInOrder } from '../../lib/in-order.mjs';
 import { recordSwap } from '../revision-swap.mjs';
 import { runtimeHead } from '../../machine/self-reload.mjs';
 import { DECISION_WITHOUT_REPO } from '../decision-repo.mjs';
+import { draftFactsOf } from '../../kernel/draft-hold.mjs';
 export { planWorkflow, SUPERVISOR_LEDGER };
 const selfFile = fileURLToPath(import.meta.url);
 const skillRoot = path.resolve(path.dirname(selfFile), '..', '..', '..');
@@ -235,7 +236,7 @@ async function readFacts(ctx, readers, { key, ledgerId, workflowId, now, setting
   const open = await (ctx.openAsks ?? openAsks)(own.db, new Set([workflowId]));
   const asks = open.map((a) => ({ dispatchId: a.dispatch_id, liveness: a.liveness, lastServedAt: lastServedAt(own.db, workflowId, a.dispatch_id) }));
   const gates = gatesOf(status, own.db, workflowId, { now, timeoutMs: settings.supervisorGateMs });
-  return { base, findings, asks, status, unreadable, gates, sight: gateSightOf([own]),
+  return { base, findings, asks, status, unreadable, gates, draft: draftFactsOf(own.db, workflowId), sight: gateSightOf([own]),
     mirror: mirrorPlan(own.db, { ledgerId, ledgerName: path.basename(own.repo), workflowId, now, answers: twinAnswersOf(ctx.stateDb) }),
     rulings: contradictedRulings(own.db, ctx.stateDb, { workflowId, now }) };
 }
@@ -304,10 +305,10 @@ export async function reconcileWorkflow(key, ctx, { settings = workflowSettings(
   let facts;
   try { facts = await readFacts(ctx, readers, { key, ledgerId, workflowId, now, settings }); } finally { closeAll(readers); }
   if (facts.early) return facts.early;
-  const { base, findings, asks, status, unreadable, gates, sight, mirror, rulings } = facts;
+  const { base, findings, asks, status, unreadable, gates, sight, mirror, rulings, draft } = facts;
 
   const existing = clocksOf(ctx, { prefixes: [wfEntity, prefix] }).filter((c) => c.entity === wfEntity || c.entity.startsWith(prefix));
-  const plan = planWorkflow({ ledgerId, workflowId, status, findings, goal: base.goal, asks, gates, clocks: existing, unreadable, now, settings });
+  const plan = planWorkflow({ draft, ledgerId, workflowId, status, findings, goal: base.goal, asks, gates, clocks: existing, unreadable, now, settings });
 
   const cleared = await syncClocks(ctx, plan, existing, { ledgerId, workflowId, wfEntity, status });
 

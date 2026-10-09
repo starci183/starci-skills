@@ -49,16 +49,11 @@ returns: "{ok:true,jobId,nudged:true|false,action?:wake|submit-staged-input|answ
   of an agent's input box out of the frame and answers it as `draft`
   (scripts/api/orca/terminal-read.mjs); read without it, a send whose Enter was dropped sat
   invisible and each later send was appended to it. Liveness reads the draft in the input row (the
-  contract left there is staged-input); a draft the runtime did not type gets one Ctrl+U probe
-  (scripts/kernel/clear-draft.mjs probeDraft): text that changes is real - the part cut from a
-  one-row draft is typed back - and refuses `foreign-input` (inputSource draft, draftProbe) with no
-  wake typed; this same wake left there gets one Enter (evidence draft-submitted); runtime wakes
-  piled up or cut short are emptied with bounded Ctrl+U before the wake is typed, and a box that
-  shrinks but will not empty refuses `draft-stuck`. Orca blanks the input row of every screen read
-  that carries a draft, so the screen cannot tell a real draft from a stale one; a draft the FIRST
-  Ctrl+U leaves unchanged is stale on Orca's side (a Kernel's 'check status' draft once cleared no
-  key while the box was empty) and is never refused: the wake is typed as into an empty box, the
-  result and op-worker-nudged carry draftNote 'draft-stale' and staleDraft, and the delivery proof
+  contract left there is staged-input); a draft the runtime did not type refuses `foreign-input`
+  (inputSource draft, draftProbe) without sending keys. This same wake left there gets one Enter
+  (evidence draft-submitted); runtime wakes piled up or cut short are emptied with bounded Ctrl+U,
+  and a box that shrinks but will not empty refuses `draft-stuck`. Only runtime-owned text the first
+  Ctrl+U leaves unchanged carries draftNote 'draft-stale' and staleDraft. The delivery proof
   after the send stays the backstop. Delivery is proven from the screen
   (scripts/kernel/wake-delivery.mjs), not Orca's receipt alone: the frame is read before and after
   the send, and the wake text appearing (delivered) or a queued-message marker such as Claude's

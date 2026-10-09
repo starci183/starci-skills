@@ -14,6 +14,7 @@ import { attemptFacts, eventFacts, historyFacts } from './debug-digest-ledger.mj
 import { registryFacts, endCriteria } from './debug-docs.mjs';
 import { wakeUsageOf } from '../kernel/wake-budget.mjs';
 import { kernelSeatOf } from './seat-cost.mjs';
+import { draftEpisode } from '../kernel/draft-hold.mjs';
 import { digestNumbers } from './debug-digest-numbers.mjs';
 import { mergeScans, scanBlobs } from './debug-secret-scan.mjs';
 
@@ -56,7 +57,7 @@ export function ledgerFacts(file, workflowIds = null, { since = 0 } = {}) {
         incidents: db.prepare("SELECT * FROM incidents WHERE workflow_id=? AND status='open'").all(w.workflow_id).map((row) => incidentOf(row, heldBy(db, row))),
         decisions: db.prepare("SELECT * FROM decision_items WHERE workflow_id=? AND status='open'").all(w.workflow_id).map(decisionOf),
         kernelJob: kernelJob ? { status: kernelJob.status, updatedAt: kernelJob.updated_at } : null,
-        kernelSignal: parseJsonOr(signal?.value_json, null), lastStartFailure: lastStartFailureOf(db, w.workflow_id), lastKernelWakeAt: woken, kernelWakes: wakeUsageOf(db, w.workflow_id).filter((wake) => wake.at >= since), seatCost: kernelSeatOf(db, { workflowId: w.workflow_id, name: w.display_name ?? w.title ?? w.workflow_id, since }) };
+        kernelSignal: parseJsonOr(signal?.value_json, null), draft: draftEpisode(db, w.workflow_id), lastStartFailure: lastStartFailureOf(db, w.workflow_id), lastKernelWakeAt: woken, kernelWakes: wakeUsageOf(db, w.workflow_id).filter((wake) => wake.at >= since), seatCost: kernelSeatOf(db, { workflowId: w.workflow_id, name: w.display_name ?? w.title ?? w.workflow_id, since }) };
     });
   } finally { db.close(); }
 }

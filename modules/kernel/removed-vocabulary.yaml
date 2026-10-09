@@ -260,3 +260,9 @@ removed:
     use: 'allocation.promptFile.maxChars is the terminal bound owned by scripts/agent/prompt-file.mjs'
     since: 1.0.0-alpha.9
     match: '(?<![\w-])(?:allocation\.)?wake\.maxChars|\bwake:\s*\{\s*maxChars\b'
+  - id: vocab-draft-probe-mutations
+    kind: vocabulary
+    name: draft probe mutation fields
+    use: 'probeDraft reads only and returns verdict, draft and sends; a foreign draft receives no keys'
+    since: 1.0.0-alpha.9
+    match: '\b(?:draftProbe|probeDraft)\.(?:restore|restored|removed|after)\b'

@@ -465,7 +465,7 @@ slots:
     tracked: tracked
     tier: kernel
     owner: true
-    requires: [cli.mjs, start-workflow.mjs, verbs/, settle/]
+    requires: [cli.mjs, start-workflow.mjs, draft-hold.mjs, verbs/, settle/]
     allows: ["<name>.mjs", "verbs/<verb>.mjs", "verbs/shared/<name>.mjs", "status/<view>.mjs", "settle/<name>.mjs", api-boolean-flags.txt]
     forbids: [api-verbs/, api-lib/, api-status/]
     tests: none
@@ -531,7 +531,7 @@ slots:
     tracked: tracked
     tier: reconciler
     owner: true
-    requires: [boot.mjs, start.mjs, engine.mjs, controllers/]
+    requires: [boot.mjs, start.mjs, engine.mjs, draft-plan.mjs, untied-tree-item.mjs, controllers/]
     allows: ["<name>.mjs", "controllers/<controller>.mjs"]
     tests: none
     coverage: required

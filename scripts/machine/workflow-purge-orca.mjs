@@ -3,6 +3,7 @@
 // names its handle (a job, the Kernel signal, a launch or a failed launch) AND Orca places it inside one of the workflow's trees. Anything
 // that only looks like it belongs - a terminal in the tree the ledger never named, a named terminal elsewhere - is listed and never touched.
 // Pure over Orca's rows: the reads are workflow-purge-facts.mjs, the closing is workflow-purge-apply.mjs through worker-close.mjs.
+import { untiedWhy } from './untied-tree.mjs';
 import { releasePlan, terminalHandleOf, worktreePathOf } from '../lib/worker-accounting.mjs';
 import { insideTree, sameTree } from './worktree-registry.mjs';
 
@@ -35,7 +36,7 @@ function terminalVerdict(terminal, { named, treePaths, handledByWorker }) {
   if (handledByWorker.has(handle)) return null;
   if (named.has(handle) && inTree) return { close: { handle, cwd, title: terminal.title ?? null, connected: terminal.connected !== false } };
   if (named.has(handle)) return { listed: { kind: 'terminal', id: handle, why: `the ledger names it but Orca places it in ${cwd ?? 'no worktree'}, outside the trees of the workflow` } };
-  if (inTree) return { listed: { kind: 'terminal', id: handle, why: `it sits in ${cwd}, a tree of the workflow, but no ledger row names its handle` } };
+  if (inTree) return { listed: { kind: 'terminal', id: handle, why: untiedWhy(`it sits in ${cwd}, a tree of the workflow, but no ledger row names its handle`) } };
   return null;
 }
 
@@ -62,5 +63,5 @@ export function listStrangerWorkers({ rows, treePaths }) {
   return held.filter((row) => {
     const where = worktreePathOf(row);
     return Boolean(where) && treePaths.some((tree) => sameTree(where, tree) || insideTree(where, tree));
-  }).map((row) => ({ kind: 'worker', id: row.dispatchId, why: 'Orca holds it in a tree of the workflow, but its Run ' + row.runId + ' is not one the ledger names (terminal ' + (terminalHandleOf(row) ?? 'none') + ')' }));
+  }).map((row) => ({ kind: 'worker', id: row.dispatchId, why: untiedWhy('Orca holds it in a tree of the workflow, but its Run ' + row.runId + ' is not one the ledger names (terminal ' + (terminalHandleOf(row) ?? 'none') + ')') }));
 }

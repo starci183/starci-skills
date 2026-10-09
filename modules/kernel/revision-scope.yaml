@@ -70,6 +70,10 @@ settleJudges:
   - {proof: work-hygiene, files: ["scripts/work/validate/**", "modules/schemas/**"], admissionAware: false}
   - {proof: brand-consumable, files: [scripts/kernel/brand-product.mjs, scripts/kernel/grammar-context.mjs, scripts/lib/roots.mjs], admissionAware: false}
 rows:
+  - id: held-state-mechanisms
+    why: "draft holds, untied tree facts and their decision plans preserve human custody; loaded engine code follows the import graph"
+    paths: [scripts/kernel/draft-hold.mjs, scripts/reconciler/draft-plan.mjs, scripts/reconciler/untied-tree-item.mjs, scripts/machine/untied-tree.mjs]
+    roles: {engine: derived}
   - id: docs-and-notes
     why: "text a person reads; no role loads it"
     paths: ["docs/**", "**/*.md", CHANGELOG.md, LICENSE, THIRD_PARTY_NOTICES.md, "benchmark/**", codecov.yml, sonar-project.properties, .gitattributes, .gitignore, ".github/**", ".claude/**", "ext/**", "init/**", hfs.json]

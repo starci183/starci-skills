@@ -32,6 +32,7 @@ export const PROBLEM_TEXT = Object.freeze({
   'reservation-leak': 'The {provider} reservation {id} ({state}) is live for {owner}, which is not running; held {min} min.',
   'action-failing': 'The {controller} controller ran {verb} for {key} and it failed {count} times in a row over {min} min ({error}); nothing else reports it: the runtime owes the role it serves a line, a retry or an item.',
   'decision-refused': 'The Decision Item {key} ({kind}) was refused {count} times over {min} min ({code}); the role it was for is not being told.',
+  'draft-unowned': 'A draft has stood in the Kernel input of {name} for {min} min ({refusals} wake(s) refused, terminal {terminal}) and no Supervisor Decision Item says so: the runtime owes the Supervisor the item; it never clears or replaces a seat that holds a draft.',
   'secret-survived': 'A secret survived redaction in {artifact} ({kind}): the {rule} rule still matches {count} time(s) in the stored text.',
 });
 

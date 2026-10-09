@@ -8423,8 +8423,9 @@ draft-stuck:
   nextStep_vi: "Lần đánh thức bị từ chối để không đè lên chữ đang có; cần người xóa tay ô nhập hoặc chờ lượt sau."
   owner: owner
   kind: runtime-fault
-  surfacedBy: open
-  openCase: draft-stuck-refusal-reaches-no-owner-item
+  surfacedBy: decision-item
+  surfacedAs: seat-draft-held
+  surfacedAt: scripts/reconciler/draft-plan.mjs
 draw-feedback-unaddressed:
   title: "Owner draw feedback not addressed"
   title_vi: "Chưa xử lý góp ý của chủ về bản vẽ"
@@ -11606,8 +11607,9 @@ unstamped-orphan:
   nextStep_vi: "Chủ xem sự cố worktree.orphan-review trong machine_logs rồi tự gỡ cây (còn việc chưa commit thì lấy ra trước) hoặc nhận lại nó; GC không làm thay."
   owner: owner
   kind: runtime-fault
-  surfacedBy: open
-  openCase: unstamped-orphan-tree-is-reported-in-a-log-row-only
+  surfacedBy: decision-item
+  surfacedAs: unregistered-trees
+  surfacedAt: scripts/reconciler/untied-tree-item.mjs
 
 unread-peer:
   title: "Peer message unread"
@@ -18086,3 +18088,32 @@ workflow-purge-plan-changed:
   nextStep_vi: "Chủ sở hữu đọc lại kế hoạch bằng --plan và thi hành với mã mới."
   owner: owner
   kind: verb-refusal
+seat-draft-held:
+  title: "A draft stands in a seat's input box"
+  title_vi: "Có bản nháp trong ô nhập của ghế điều phối"
+  meaning_vi: "Một người đang gõ dở trong ô nhập của ghế Kernel nên lần đánh thức bị từ chối; runtime không bao giờ xóa, đè lên hay thay ghế đang giữ bản nháp."
+  causes_vi:
+    - "Người dùng thật đang gõ trong terminal của ghế"
+    - "Chữ nháp còn sót lại mà không ai gửi đi"
+  nextStep_vi: "Supervisor chọn chờ thêm (mục đóng và mở lại sau một chu kỳ nếu bản nháp còn) hoặc ghi nguyên nhân cho Debug; chọn none-fits để chuyển cho chủ sở hữu. Mục tự đóng khi bản nháp biến mất."
+  owner: supervisor
+  kind: blocker
+unregistered-trees:
+  title: "Trees the runtime cannot tie to a workflow"
+  title_vi: "Cây thư mục runtime không gắn được với workflow nào"
+  meaning_vi: "Dưới thư mục do runtime quản lý có cây worktree không thuộc workflow nào; runtime không xóa thứ nó không tạo ra, việc xóa là việc của con người."
+  causes_vi:
+    - "Cây được tạo trước khi có sổ đăng ký hoặc do một lần chạy bị chết giữa chừng"
+    - "Cây là việc dở của chủ sở hữu"
+  nextStep_vi: "Supervisor chọn để yên (mục đóng cho đến khi tập cây đổi) hoặc ghi nguyên nhân cho Debug; việc xóa do con người làm."
+  owner: supervisor
+  kind: blocker
+terminal-unreadable:
+  title: "The terminal input cannot be read safely"
+  title_vi: "Không đọc được ô nhập của terminal một cách an toàn"
+  meaning_vi: "Runtime chưa chứng minh được ô nhập trống hoặc chỉ giữ chữ của runtime nên không gửi lệnh thoát hay thay ghế."
+  causes_vi:
+    - "Orca không trả lời hoặc lần đọc terminal thất bại"
+  nextStep_vi: "Debug kiểm tra đường đọc terminal rồi thử lại; giữ nguyên bản nháp và ghế trong lúc chưa đọc được."
+  owner: runtime-core
+  kind: runtime-fault

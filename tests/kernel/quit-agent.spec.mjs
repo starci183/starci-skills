@@ -2,6 +2,16 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { quitAgent, QUIT_COMMAND } from '../../scripts/kernel/quit-agent.mjs';
 
+test('unknown input or a human draft at a shell holds the quit without keys', () => {
+  for (const frame of [{ ok: false }, { ok: true, screen: '$ ', draft: 'I am typing' }]) {
+    const sent = [];
+    const result = quitAgent({ handle: 'term-1', agent: 'codex', show: () => ({ ok: true, connected: true }),
+      read: () => frame, send: (keys) => { sent.push(keys); return { ok: true }; }, sleep: () => {} });
+    assert.deepEqual([result.sent, result.exited, sent], [false, false, []]);
+    assert.equal(result.reason, frame.ok ? 'foreign-input' : 'terminal-unreadable');
+  }
+});
+
 // Three Mia Mia architecture.decide Claude workers settled while their
 // processes kept running hidden; the reaper refused to guess among three
 // candidates started together. A settled agent now quits itself first.

@@ -3,14 +3,26 @@
 // did not rule on, and a contradicted ruling is withdrawn with its reason. Every close is a typed verb of the product ledger and a controller log row.
 import { eachInOrder } from '../lib/in-order.mjs';
 import { recordAction } from '../supervisor/actions.mjs';
+import { withSupervisor } from '../machine/home.mjs';
+import { supervisorDecisions } from '../machine/decisions.mjs';
 
 const resolveArgs = (closure) => ['--resolve', closure.id, '--by', closure.by, '--verb', closure.verb, '--note', closure.note];
+
+/** A stale product item also ends its live Supervisor twin after its ledger closure succeeds. */
+function closeTwin(ctx, closure) {
+  if (ctx.mode !== 'active' || !closure.twinKey) return;
+  withSupervisor((m) => {
+    const twin = supervisorDecisions(m).find((di) => di.idempotencyKey === closure.twinKey);
+    if (twin) m.setSupDecision(twin.id, { status: 'resolved', by: 'reconciler/mirror', verb: closure.verb, rationale: closure.note });
+  }, { env: ctx.env ?? process.env });
+}
 
 async function closeItems(ctx, { ledgerId, workflowId, closures, lines }) {
   await eachInOrder(closures, async (closure) => {
     const done = await ctx.api(ledgerId, 'decisions', resolveArgs(closure));
     ctx.log?.('reconciler.event', `supervisor item ${closure.id} closed (${closure.verb}): ${closure.note}`, { kind: 'reconciler.supervisor-item-closed', workflowId, item: closure.id, verb: closure.verb, ok: done?.ok !== false });
     if (done?.ok === false) lines.push(`close of ${closure.id} failed: ${String(done.error ?? done.stderr ?? '').slice(0, 120)}`);
+    else if (done?.ok === true) closeTwin(ctx, closure);
   });
 }
 

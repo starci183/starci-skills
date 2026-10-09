@@ -328,8 +328,8 @@ allocation:
   # reportWindowMs.
   workerJobs: {leaseTtlMs: 604800000, reportWindowMs: 604800000}
   # draft (scripts/kernel/clear-draft.mjs): the beat between one Ctrl+U and the re-read that judges
-  # the input box's answer - a TUI repaints a beat later. clearDraft and probeDraft default to it and
-  # the wake-delivery draft probe caps its own interval at it.
+  # the input box's answer - a TUI repaints a beat later. clearDraft defaults to it and
+  # wake-delivery caps its runtime-owned draft clear interval at it.
   draft: {intervalMs: 300}
   # housekeeping (scripts/housekeeping/housekeeping.mjs): every retention window and root the host
   # cleanup reads - no literal may live in the script. tmp: top-level %TEMP% entries whose name starts

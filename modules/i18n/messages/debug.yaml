@@ -177,3 +177,5 @@ messages:
     vi: "Controller {controller} chạy {verb} cho {key} và thất bại {count} lần liên tiếp trong {min} phút ({error}); không nơi nào khác báo việc này: runtime nợ vai trò mà nó phục vụ một dòng, một lần thử lại hoặc một mục."
   - en: "The Decision Item {key} ({kind}) was refused {count} times over {min} min ({code}); the role it was for is not being told."
     vi: "Decision Item {key} ({kind}) bị từ chối {count} lần trong {min} phút ({code}); vai trò mà nó dành cho không được báo."
+  - en: "A draft has stood in the Kernel input of {name} for {min} min ({refusals} wake(s) refused, terminal {terminal}) and no Supervisor Decision Item says so: the runtime owes the Supervisor the item; it never clears or replaces a seat that holds a draft."
+    vi: "Một bản nháp đã nằm trong ô nhập của Kernel {name} suốt {min} phút ({refusals} lần đánh thức bị từ chối, terminal {terminal}) mà không có Decision Item nào của Supervisor nói về nó: runtime nợ Supervisor một mục; runtime không bao giờ xóa hay thay seat đang giữ bản nháp."
