@@ -126,7 +126,7 @@ op declared (`declared_exit_code`), and only the raw one decides a verdict.
 
 `scripts/reconciler/engine.mjs` is the one host runtime loop. The scheduled task
 `StarCi-Reconciler` runs `starci reconciler start` at logon and periodically;
-`starci reconciler restart` is the restart entry; native host readiness brings the
+`starci reconciler restart` is the restart entry and `starci runtime deploy --from <clone>` carries a checked revision onto the host, migrates the installed artefacts of every live workflow and restarts it verified; native host readiness brings the
 whole host up and prints one green/red checklist (see "Start"). Every engine start, exit and cause is a
 `process_runs` row; every leadership epoch is a `leader_history` row. Each controller runs
 `off`, `shadow` or `active` (`controller_modes`, with every change recorded in `mode_changes`

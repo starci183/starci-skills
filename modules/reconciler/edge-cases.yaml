@@ -1045,3 +1045,38 @@ cases:
     rule: {file: scripts/reconciler/supervisor-sign-of-life.mjs, anchor: "supervisorLastSeenAt"}
     spec: tests/reconciler/supervisor-sign-of-life.spec.mjs
     status: covered
+  - id: deploy-carries-a-revision-that-failed-the-check
+    family: change-under-running
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a revision that reaches the running host passed the runtime check on that exact commit) the lead fast-forwarded the live checkout by hand and restarted the engine; a revision that failed npm run check was deployed and nothing verified the tree before it reached the host", remedy: {state: in-tree, change: "starci runtime deploy refuses unless the source is committed and clean, a fast-forward of the host and proven by a receipt bound to the commit and its tree (the verb runs the check itself in the clean source, or reads the land note); each refusal has a catalogued code"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, six hand deploys", evidence: "the lead's hand sequence (fetch, merge --ff-only, reconciler restart, debug digest) with no check on the deployed commit"}
+    rule: {file: scripts/reconciler/runtime-deploy.mjs, anchor: "ensureCheck"}
+    spec: tests/reconciler/runtime-deploy.spec.mjs
+    status: covered
+  - id: deploy-cuts-a-step-in-flight
+    family: change-under-running
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a restart never cuts a settle, a Critic run or a prepared decision in the middle) the engine restart stops the process tree of the engine, and with it the settler and the Critic run it owes; a prepared decision whose apply dies stays as a receipt every later settle has to recover", remedy: {state: in-tree, change: "starci runtime deploy reads the marks of the steps in flight (engine actions of the current epoch, running settle tails, prepared receipts under apply, live settler, land and push processes), waits for them to finish and refuses with their names when they do not; it stops none, and a dead apply is left for the settler to recover"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, hand restarts during settles", evidence: "prepared-settlement-withdrawn receipts after a restart in the middle of a fail settle"}
+    rule: {file: scripts/reconciler/runtime-deploy-inflight.mjs, anchor: "waitForQuiet"}
+    spec: tests/reconciler/runtime-deploy.spec.mjs
+    status: covered
+  - id: deploy-restart-is-not-verified
+    family: change-under-running
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: after a runtime change the host is shown to run it) the hand restart ended at reading the digest; whether the leader reported the new revision with a fresh heartbeat, kept every controller mode and left every seat alive was read by eye, and a failed deploy had no stated way back", remedy: {state: in-tree, change: "starci runtime deploy verifies from the stores after the restart (new revision, heartbeat written after the restart, new process, controller modes unchanged, no seat dead that was not before) and on a failure names the host state and the non-destructive way back (git revert of the range), journalling runtime-deploy-failed"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, hand deploys", evidence: "the lead's six hand restarts, each verified only by reading starci debug digest"}
+    rule: {file: scripts/reconciler/runtime-deploy-verify.mjs, anchor: "verifyProblems"}
+    spec: tests/reconciler/runtime-deploy-real.spec.mjs
+    status: covered
+  - id: installed-artefact-older-than-the-revision
+    family: change-under-running
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: no running workflow holds an artefact of an older revision) the history hook of a workflow worktree is installed outside the runtime tree with a version stamp; a new revision needed hook version 8 while the live workflow tree still held the old one and a settle step failed on the real tree", remedy: {state: in-tree, change: "modules/kernel/installed-artefacts.yaml declares every artefact the runtime installs outside its tree; starci runtime artefacts --migrate (run by the deploy from the new tree, and by the engine at start for anything the deploy could not reach) rewrites each stale artefact of every live workflow tree and verifies the stamp, idempotently, with a code per refusal"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, StarCi workflow tree", evidence: "history hook version 8 required, workflow worktree hook older, settle step failed on the real tree"}
+    rule: {file: scripts/reconciler/installed-artefacts.mjs, anchor: "migrateInstalledArtefacts"}
+    spec: tests/reconciler/installed-artefacts.spec.mjs
+    status: covered
+  - id: installer-outside-the-tree-is-not-declared
+    family: change-under-running
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: everything the runtime installs outside its tree can be migrated by a deploy) a new writer into a product tree or the machine home that is not on the declared list would never be migrated and would age silently", remedy: {state: in-tree, change: "the installed-artefacts self-check refuses a declared row without its writer or handler, and a runtime source file that resolves a repository hooks directory or carries a declared marker without being a declared writer"}}
+    met: {date: "2026-10-09", where: "alpha.8 lane design", evidence: "the artefact enumeration of the deploy lane found hooks, generated copies, guard files and worktree records by reading the writers"}
+    rule: {file: scripts/checks/check-installed-artefacts.mjs, anchor: "sourceFindings"}
+    spec: tests/reconciler/installed-artefacts.spec.mjs
+    status: covered

@@ -76,7 +76,7 @@ State which of the three you used. Do not claim a loop exists until the host con
     that queue, fixes each defect in `.claude` with a spec on a fix lane it opens, and verifies the fix is on the running
     host. The Supervisor changes no runtime code.
   - a seat that is down or drifted: `starci workflow start` or `starci supervisor start` from an Orca terminal;
-    `starci reconciler restart` for an engine on an old revision.
+    `starci runtime deploy --from <clone>` carries a new revision onto the host (below); `starci reconciler restart` alone is for an engine on the revision the host tree already holds.
 - A runtime defect is fixed at once and in parallel: split it by independent cause and open one fix lane per cause in the same turn, each in its own clone with the files it may touch named. Do not feed one lane one defect after another while others wait. Carry each lane's fix onto the host as soon as its own check is green, and leave nothing a lane found listed as later: fix it in that round or open another lane for it then. The fixes of a day are consolidated into one release cut at the end of that day (ruling `debug-fix-lanes` of `modules/kernel/roles.yaml`).
 - A fix lane verifies with `starci runtime check` and `starci test affected --run`: a red file is run again, then the affected set once. The whole suite is the merged-tree run and the release cut, never a lane's routine. "Related" means the changed symbols: `starci test affected` follows each changed function through the specs that import it and the specs behind its callers, and falls back to every importer of a file it cannot follow by name (yaml, a template, a statement that runs at load); the report names each fallback.
 - Every edge case met is an entry of the edge-case registry (`modules/reconciler/edge-cases.yaml`), added in the same change
@@ -87,6 +87,20 @@ State which of the three you used. Do not claim a loop exists until the host con
 - Report what was fixed and what is in progress, short. Do not ask the owner whether to fix something the rules above already
   assign.
 - Show the first lines as they are: a controllers alarm is the first line of the digest.
+
+## Carrying a fix onto the host
+
+One verb replaces the hand sequence (fetch, `git merge --ff-only` in the live checkout, `starci reconciler restart`, read the digest):
+
+```
+starci runtime deploy --from <clone-or-ref> --plan     # every step and every refusal, nothing changed
+starci runtime deploy --from <clone-or-ref>            # the deploy
+```
+
+- It refuses unless the source is committed and clean, a fast-forward of the host tree, and proven by a check receipt bound to that exact commit (the verb runs `starci runtime check` in the clean source itself; a lane cannot claim green). It refuses while a release cut holds the host lock.
+- It waits for the settles, Critic runs and prepared decisions in flight and stops none of them; when they do not finish in time it refuses and names them.
+- A tip several commits ahead is one revision change: one fast-forward, `starci runtime artefacts --migrate` from the new tree (generated copies and the hooks of every live workflow tree), one engine restart, then the verification (new revision with a fresh heartbeat, every controller in its mode, no seat dead) and one `runtime-deployed` event.
+- A failure after the fast-forward names the host state and the way back without destructive git: `git revert --no-edit <previous>..<new>` on the host tree, then `starci reconciler restart`.
 
 ## The role contract
 
