@@ -57,7 +57,7 @@ import { classifyAgentScreen, staleAwareState, outputAgeOf, wakeDeliveryOf, exit
 import { squash } from '../lib/clip.mjs';
 import { clearDraft, probeDraft, sameDraft, DRAFT_STALE, CLEAR_DRAFT_INTERVAL_MS } from './clear-draft.mjs';
 import { parseJson } from '../lib/json.mjs';
-import { kernelRevWakeLine } from './runtime-rev.mjs';
+import { kernelWakeRevLine } from './kernel-notice.mjs';
 import { boundedWake } from './wake-bound.mjs';
 import { gatedWake } from './wake-menu-gate.mjs';
 
@@ -372,8 +372,8 @@ const kernelAttemptOf = (db, workflowId) => {
 export const wakeIdentity = (workflowId, attempt) =>
   `Runtime wake for Kernel attempt ${attempt} of ${workflowId}: starci kernel status --workflow ${workflowId} shows kernel.attempt ${attempt} and kernel.you true on your terminal.`;
 /**
- * `text`, then the runtime-rev sentence (runtime-rev.mjs revWakeLine: `Runtime rev <short-sha>` and, when the
- * Kernel's acked rev is behind, what to re-read and ack), then the seat's wakeIdentity - which always ends the
+ * `text`, then the runtime-rev sentence (kernel-notice.mjs revisionWakeLine: `Runtime rev <short-sha>` and, while the
+ * Kernel notice is owed, what to re-read and attest), then the seat's wakeIdentity - which always ends the
  * wake. Each part is left out when unknown (no rev line, no kernel attempt in the ledger).
  */
 export const withWakeIdentity = (text, workflowId, attempt, revLine = null) =>
@@ -407,7 +407,7 @@ export function wakeKernel({ db, workflowId, text, pending = 'hold', activeStale
 const revLineOf = (db, workflowId, attempt, deps) => {
   if (attempt == null) return null;
   if (deps.revLine !== undefined) return deps.revLine;
-  return kernelRevWakeLine(db, workflowId);
+  return kernelWakeRevLine(db, workflowId);
 };
 
 // pending 'enter' on a staged/queued input: one proven Enter, never a second wake on top.

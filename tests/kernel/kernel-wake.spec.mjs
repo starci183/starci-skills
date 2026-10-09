@@ -55,7 +55,7 @@ test('the digest reports a Kernel wake over its budget as a departure of the Ker
   const job = { jobId: `kernel-${WF}`, kind: 'kernel', opId: null, status: 'running', tryNo: 1, retryOf: null, workerId: 'w', deadline: null, createdAt: NOW - MIN, updatedAt: NOW - MIN };
   const workflow = { id: WF, name: 'Wake', ledger: 'wake', repo: 'work/wake', phase: 'running', jobs: [job], incidents: [], decisions: [], kernelJob: { status: 'running', updatedAt: NOW }, kernelSignal: { terminal: 'term_k' },
     lastKernelWakeAt: NOW - MIN, statusError: null, seatProbe: { action: 'idle-waiting' }, kernelWakes: [{ at: NOW - 40 * MIN, turns: 61, tokens: 9_000_000 }],
-    status: { frontier: { state: 'idle', openOperations: 0, readyOperations: 0, queued: [] }, legs: [], awaitingOwner: [], menu: [], kernelRev: { current: 'a', acked: 'a', stale: false, fileCount: 0 }, usage: { byOp: [] } } };
+    status: { frontier: { state: 'idle', openOperations: 0, readyOperations: 0, queued: [] }, legs: [], awaitingOwner: [], menu: [], revisionNotice: { role: 'kernel', state: 'current', from: 'a', to: 'a', count: 0, files: [], line: 'kernel acked rev a' }, usage: { byOp: [] } } };
   const digest = analyze({ now: NOW, liveRev: 'a', engine: { leader: { pid: 1, epoch: 1, heartbeatAt: NOW, rev: 'a' }, modes: {}, configured: {}, safe: [], failingQueue: [] },
     supervisor: { seat: null, enabled: false, lastWakeAt: null, decisions: [], health: { live: true } }, reservations: [], seats: [], supJobs: [], workflows: [workflow] }, policy, digestNumbers());
   const problem = digest.problems.find((p) => p.code === 'kernel-wake-budget');

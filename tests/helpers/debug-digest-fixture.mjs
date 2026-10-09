@@ -14,7 +14,7 @@ export const digest = (snap) => analyze(snap, policy, numbers);
 export const job = (over = {}) => ({ jobId: 'op-x-1', kind: 'op', opId: 'x', status: 'running', tryNo: 1, retryOf: null, workerId: 'w', deadline: null,
   createdAt: NOW - 60 * MIN, updatedAt: NOW - 5 * MIN, ...over });
 export const status = (over = {}) => ({ frontier: { state: 'engaged', openOperations: 1, readyOperations: 0, queued: [] }, legs: [], awaitingOwner: [],
-  kernelRev: { current: REV, acked: REV, stale: false, fileCount: 0 }, usage: { byOp: [{ opId: 'x', tokens: 1200, turns: 3, attempts: 1, costUsd: 0.5 }] }, ...over });
+  revisionNotice: { role: 'kernel', state: 'current', from: REV, to: REV, count: 0, files: [], line: 'kernel acked rev x' }, usage: { byOp: [{ opId: 'x', tokens: 1200, turns: 3, attempts: 1, costUsd: 0.5 }] }, ...over });
 export const workflow = (over = {}) => ({ id: 'wf-1', name: 'Shop', ledger: 'shop', repo: 'work/shop', phase: 'running', jobs: [job(), job({ jobId: 'kernel-wf-1', kind: 'kernel', opId: null })],
   incidents: [], decisions: [], kernelJob: { status: 'running', updatedAt: NOW - MIN }, kernelSignal: { terminal: 'term_k' }, lastKernelWakeAt: NOW - 2 * MIN,
   status: status(), statusError: null, seatProbe: { action: 'idle-waiting' }, ...over });
