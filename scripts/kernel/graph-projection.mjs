@@ -127,12 +127,25 @@ const approvedLegAction = (op, ctx, credentialOnly) => {
   }
   return action;
 };
+/**
+ * The plan index the workflow stands at: its first leg with a job; before any leg started, the last leg of the external prefix (request.analyze runs in the chat intake, before
+ * the workflow exists, and has no job), so the first leg the workflow runs is offered; -1 when the plan has no external prefix. A workflow that offered nothing here started with an
+ * empty menu and a Kernel that cannot enqueue (its shell is `decide`): nothing ever began the first leg.
+ */
+function reachedIndexOf(legOps, jobsByOp) {
+  const started = legOps.findIndex((op) => jobsByOp.has(op));
+  if (started >= 0) return started;
+  const external = externalOpsOf(skillRoot);
+  let prefix = -1;
+  while (prefix + 1 < legOps.length && external.has(legOps[prefix + 1])) prefix += 1;
+  return prefix;
+}
+
 /** An approved plan leg with no job and nothing it waits on: a dispatch action (placeholder values when only a credential holds it). */
 const approvedLegActions = (actions, ctx) => {
   const { legOps, workflowJobs, jobsByOp, credentialWaitOps, autopilot } = ctx;
-  const firstReached = legOps.findIndex((op) => jobsByOp.has(op));
+  const firstReached = reachedIndexOf(legOps, jobsByOp);
   const succeeded = new Set(workflowJobs.filter((row) => row.status === 'succeeded').map((row) => row.op_id));
-  if (firstReached < 0) return;
   for (const [index, op] of legOps.entries()) {
     if (index <= firstReached || jobsByOp.has(op) || op === HANDOVER_OP) continue;
     // Autopilot: provision.ask is planned only at the end of the flow (the handover credential checklist below);

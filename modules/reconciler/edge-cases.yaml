@@ -1552,3 +1552,27 @@ cases:
     rule: {file: scripts/kernel/settle/rejudge.mjs, anchor: "admitRejudge"}
     spec: tests/replay/rejudge.spec.mjs
     status: covered
+  - id: contract-teaches-list-flag-values-the-cli-refuses
+    family: correctness
+    met: {date: "2026-10-09", where: "premortem walk of the authentication workflows, scope.define first work step", evidence: "every deciding op's READ step teaches `starci gate read --knowledge a b c`; the CLI answered `too many positional arguments for read`"}
+    rule: {file: packages/cli/src/validate-args.mjs, anchor: "listTail"}
+    spec: tests/cli/list-flag-values.spec.mjs
+    status: covered
+  - id: leg-proposal-omits-the-resource-slots-the-contract-declares
+    family: correctness
+    met: {date: "2026-10-09", where: "premortem walk of the authentication workflows, work.author", evidence: "the proposed write set of the leg-ready item listed only features/<feature>/<family>; the uat flow's identity resource slot lay outside owned_paths and the report was refused report-invalid"}
+    rule: {file: scripts/kernel/leg-proposal.mjs, anchor: "resourceDirsOf"}
+    spec: tests/kernel/dispatch-owners.spec.mjs
+    status: covered
+  - id: write-grant-judged-against-the-main-checkout-not-the-workflow-tree
+    family: correctness
+    met: {date: "2026-10-09", where: "premortem walk of the authentication workflows, backend.implement", evidence: "enqueue and dispatch refused grant-parent-missing for a directory the workflow tree holds and the main checkout does not; --new-module was the only way out"}
+    rule: {file: scripts/kernel/grant-parents.mjs, anchor: "checkGrantParents"}
+    spec: tests/replay/grant-in-workflow-tree.spec.mjs
+    status: covered
+  - id: fresh-workflow-offers-its-first-leg-to-nobody
+    family: smooth-operation
+    met: {date: "2026-10-09", where: "premortem walk of the authentication workflows, the world of a freshly approved goal", evidence: "status of a goal with no job: frontier orphaned-frontier and not actionable, menu empty, nextActions empty; the engine passes created no job; the Kernel seat cannot enqueue (KERNEL_USE_DECIDE), so no leg ever began and only the Supervisor's orphaned-frontier item after the grace would have been raised"}
+    rule: {file: scripts/kernel/graph-projection.mjs, anchor: "reachedIndexOf"}
+    spec: tests/replay/first-leg-offered.spec.mjs
+    status: covered
