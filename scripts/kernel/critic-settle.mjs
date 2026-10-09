@@ -1,5 +1,5 @@
 // critic-settle.mjs - the settle-time half of the Critic for the decision legs (modules/kernel/critic.yaml coverage rows of status covered
-// whose kind has a rubric in modules/kernel/critic-rubrics.yaml: scope.define, architecture.decide). `starci kernel settle` refuses a done
+// whose kind has a rubric in modules/kernel/critic-rubrics.yaml: scope.define, business.decide, architecture.decide). `starci kernel settle` refuses a done
 // unless the runtime's Critic run recorded a fresh passing typed verdict (starci/critic-verdict@1) for exactly the
 // decision records it wrote now. The verdict is the one the RUNTIME's own Critic run recorded (scripts/kernel/settle/critic-run.mjs, event
 // runtime-critic-run); a verdict file the op attached is never read, because the maker does not supply its own judge's verdict:

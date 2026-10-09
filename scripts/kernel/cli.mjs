@@ -3345,7 +3345,7 @@ function settleSonarGate(db, jobId, repo) {
   const judgment = judgeJob({ op: s.op, files });
   return judgment ? { ...judgment, workflowId: s.job.workflow_id, jobId: s.job.job_id, attemptId: s.filed.attemptId, status: s.job.status } : null;
 }
-const { settleOpGate, settleOpProofs, settleCriticVerdict } = mechanismGates({ skillRoot, settleJobContext, settleJobFiles, jobPlacements, opGateBasesOf });
+const { settleOpGate, settleOpProofs, settleCriticVerdict, settleAcceptanceTrace } = mechanismGates({ skillRoot, settleJobContext, settleJobFiles, jobPlacements, opGateBasesOf });
 // The draw acceptance an interface.draw pass owes (scripts/work/draw/draw-acceptance.mjs): every asset the pass binds -
 // written, adopted, inherited or already there - is a token-rendered shape, no drawing names a data status, and the pass
 // drew something under the current contract (a product's op-interface.draw-7c2821e002 adopted 40 image-gen files unchanged).
@@ -3679,7 +3679,7 @@ const API_INTERNALS = Object.freeze({
   CUT_SLICE_CHECKS, VERDICT_OUTCOMES, agentOfJob, canonSettleFollowUp, enqueueNextStep, failureClassOf,
   failureShapeOf, enqueueFollowOn, latestKernelJobOf, recordOpRevDrift,
   recordSettledAssetSlots, recordSettledGrammarProposals, releasedWhileHeldOf, seamSettleReconciles,
-  settleDrawAcceptance, settleDrawMetrics, settleOpGate, settleOpProofs, settleProofMedia, settleSonarGate, settleWorkHygiene, widenCanonWire,
+  settleAcceptanceTrace, settleDrawAcceptance, settleDrawMetrics, settleOpGate, settleOpProofs, settleProofMedia, settleSonarGate, settleWorkHygiene, widenCanonWire,
 });
 let statusAsk = null;
 const runExtensionVerb = async (spec, args, repo) => {

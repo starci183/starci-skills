@@ -4,6 +4,7 @@ import { recordSonarJudgment, refusalText } from '../../sonar-settle.mjs';
 import { loopRefusalText, proofRefusalText, recordLoopJudgment, recordProofJudgment } from '../../gate-settle.mjs';
 import { criticRefusalText, recordCriticJudgment } from '../../critic-settle.mjs';
 import { ownedByRuntime } from '../../gate-admission.mjs';
+import { recordTrace } from '../../acceptance-trace.mjs';
 import { refuseVerb } from './verb-exit.mjs';
 
 function mediaPhase(s, settleProofMedia) {
@@ -72,6 +73,12 @@ function criticPhase(s, settleCriticVerdict) {
   }
 }
 
+// The acceptance trace (report mode): evidence on the attempt, never a refusal.
+function tracePhase(s, settleAcceptanceTrace) {
+  const measured = !s.replay && s.verdict === 'pass' ? settleAcceptanceTrace?.(s.db, s.jobId, s.repo) ?? null : null;
+  if (measured) recordTrace(s.ledger, { attemptId: measured.attemptId, trace: measured.trace });
+}
+
 function drawnPhase(s, settleDrawAcceptance) {
   const drawn = !s.replay && s.verdict === 'pass' ? settleDrawAcceptance(s.db, s.jobId, s.repo, null, null) : null;
   if (!drawn) return;
@@ -105,12 +112,13 @@ function hygienePhase(s, settleWorkHygiene) {
  * its frozen decision; a fresh pass returns the exact native proof identity. */
 export async function settlePreflight({ ledger, args, repo, emit, internals, replay, verdict, jobId }) {
   const s = { db: ledger.db, ledger, args, repo, emit, replay, verdict, jobId };
-  const { settleProofMedia, settleSonarGate, settleOpGate, settleOpProofs, settleCriticVerdict, settleDrawAcceptance, settleDrawMetrics, settleWorkHygiene } = internals;
+  const { settleProofMedia, settleSonarGate, settleOpGate, settleOpProofs, settleCriticVerdict, settleAcceptanceTrace, settleDrawAcceptance, settleDrawMetrics, settleWorkHygiene } = internals;
   mediaPhase(s, settleProofMedia);
   sonarPhase(s, settleSonarGate);
   await loopPhase(s, settleOpGate);
   const proofs = await proofPhase(s, settleOpProofs);
   criticPhase(s, settleCriticVerdict);
+  tracePhase(s, settleAcceptanceTrace);
   drawnPhase(s, settleDrawAcceptance);
   await metricsPhase(s, settleDrawMetrics);
   hygienePhase(s, settleWorkHygiene);

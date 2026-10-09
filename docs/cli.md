@@ -4676,7 +4676,7 @@ judge a decision leg with the Critic and write a verdict (debug aid; settle igno
 
 | flag | type | |
 | --- | --- | --- |
-| `--kind` | enum scope.define|architecture.decide | required |
+| `--kind` | enum scope.define|business.decide|architecture.decide | required |
 | `--root` | string | required |
 | `--out` | string | required |
 | `--records` | string |  |

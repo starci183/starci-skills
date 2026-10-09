@@ -7,6 +7,7 @@ import { parseJson } from '../../lib/json.mjs';
 import { jobPayloadOf } from '../verbs/shared/rows.mjs';
 import { reboundBindingOf, reboundMapOf } from '../../machine/placement-rebound.mjs';
 import { runtimeCriticRunOf } from './critic-run.mjs';
+import { acceptanceTraceOf, traceOpsOf } from '../acceptance-trace.mjs';
 
 /** Bind the native consumers to the CLI's existing private context and placement
  * functions. The proof consumer stays synchronous for the workflow-lock recheck. */
@@ -53,5 +54,16 @@ function settleCriticVerdict(db, jobId, repo) {
   const judged = judgeCriticVerdict({ op: s.op, roots: [...new Set([...roots, repo].filter(Boolean))], owned, runtime });
   return judged ? { op: s.op, judged, jobId: s.job.job_id, attemptId: s.filed.attemptId, status: s.job.status } : null;
 }
-  return { settleOpGate, settleOpProofs, settleCriticVerdict };
+// The acceptance trace an implementing or verifying op's pass records (scripts/kernel/acceptance-trace.mjs, report mode): null when the op is not
+// measured, else {op, attemptId, trace}. Read-only here; a read that fails measures nothing and never fails the settle.
+function settleAcceptanceTrace(db, jobId, repo) {
+  const s = settleJobContext(db, jobId, { requiresReport: true });
+  if (!s || !traceOpsOf(skillRoot).includes(s.op)) return null;
+  try {
+    const { roots, envelope } = settleJobFiles(db, s.job, repo, s.filed, { jobId: s.job.job_id });
+    const owned = (jobPayloadOf(s.job).owned_paths ?? []).map((p) => (typeof p === 'string' ? p : p?.path)).filter((p) => typeof p === 'string');
+    return { op: s.op, attemptId: s.filed.attemptId, trace: acceptanceTraceOf({ roots: [...new Set([...roots, repo].filter(Boolean))], owned, reportFiles: envelope?.files }) };
+  } catch { return null; }
+}
+  return { settleOpGate, settleOpProofs, settleCriticVerdict, settleAcceptanceTrace };
 }

@@ -270,9 +270,9 @@ proofs:
     check: scripts/kernel/gate-settle.mjs
 judge:
   - by: machine
-    measures: [declared-checks, op-gate, op-proof:test-world, proof-media]
+    measures: [declared-checks, op-gate, op-proof:test-world, proof-media, acceptance-trace]
     proofs: [test-world, proof-media, op-gate]
-    why: "settle re-runs the test-world project natively and refuses a hand-rolled world, a skipped spec or a missing screenshot; the scenario specs it runs are written by this op, so a green run is evidence of the world and not an independent judgment of the scenarios (registry entry op-judge-self-authored-tests)"
+    why: "settle re-runs the test-world project natively and refuses a hand-rolled world, a skipped spec or a missing screenshot; the scenario specs it runs are written by this op, so a green run is evidence of the world and not an independent judgment of the scenarios unless they trace to acceptance records the op did not write (acceptance-trace, report mode until the first live run)"
 blockers:
   - code: ENVIRONMENT_NOT_READY
     condition:

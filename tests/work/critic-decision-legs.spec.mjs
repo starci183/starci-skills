@@ -19,12 +19,12 @@ import { fakeCriticOrca } from '../helpers/fake-critic-orca.mjs';
 import { fakeAdmission } from '../helpers/fake-admission.mjs';
 import { seedWorkflow, withLedger } from '../helpers/ledger-fixture.mjs';
 
-// The independent Critic of the two decision legs (scope.define, architecture.decide): the rubric of each kind is data, the Critic is
+// The independent Critic of the decision legs (scope.define, architecture.decide, business.decide): the rubric of each kind is data, the Critic is
 // handed the op's decision records and the records they cite, one single pass runs under the Critic standard, and the settle gate
 // requires a fresh passing verdict for exactly those bytes. The worker launch is a fake (the Orca client); a real run's cost is unmeasured.
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
-const KINDS = ['scope.define', 'architecture.decide'];
+const KINDS = ['scope.define', 'architecture.decide', 'business.decide'];
 const contract = criticContract();
 const rubrics = criticRubrics();
 const drawLoop = allocationSettings().drawLoop;
@@ -60,7 +60,8 @@ const verdictFor = (kind, score, { failing = [] } = {}) => ({ schema: 'starci/de
 const critique = (r, kind, orca, extra = {}) => critiqueDecision({ kind, workRoot: r.workRoot, maker: 'devin', orca, placement: { tmpRoot: r.root }, entry: 'term_op', ...clock(), ...extra });
 // the settle reads only the verdict the runtime's own Critic run recorded: `runtime` is that event's document
 const attach = (r, document) => document;
-const OWNED = { 'scope.define': ['.starciwork/features/shop/index.yaml'], 'architecture.decide': ['.starciwork/features/shop/sds', '.starciwork/features/shop/contract'] };
+const OWNED = { 'scope.define': ['.starciwork/features/shop/index.yaml'], 'architecture.decide': ['.starciwork/features/shop/sds', '.starciwork/features/shop/contract'],
+  'business.decide': ['.starciwork/features/shop/br', '.starciwork/features/shop/decision'] };
 const judge = (r, kind, runtime) => judgeCriticVerdict({ op: kind, roots: [r.root], owned: OWNED[kind], runtime });
 
 test('the rubric file validates: a rubric per kind, derived from its op contract, with checks, gates, anchors, a minimum and a token budget', () => {
@@ -127,6 +128,9 @@ test('the product is the op\'s decision records and the inputs are the records t
   assert.equal(small.unhanded.length, 2, 'what is past the bound stays cited and unhanded');
   const arch = kindEntryOf('architecture.decide', rubrics);
   assert.deepEqual(productFiles({ workRoot: r.workRoot, entry: arch }).map((f) => f.rel), ['features/shop/contract/billing-api/index.yaml', 'features/shop/sds/billing/index.yaml']);
+  const biz = kindEntryOf('business.decide', rubrics);
+  assert.deepEqual(productFiles({ workRoot: r.workRoot, entry: biz }).map((f) => f.rel), ['features/other/index.yaml', 'features/shop/br/pricing/index.yaml', 'features/shop/decision/currency/index.yaml', 'features/shop/index.yaml'], 'business.decide judges the requirement, rule, criterion and decision records and the feature record, never the design');
+  assert.equal(criticOwedBy('business.decide')?.id, 'business.decide', 'the runtime owes the business.decide Critic at settle');
   assert.equal(ownedRelOf('.starciwork/features/shop/sds/**'), 'features/shop/sds');
   assert.equal(ownedRelOf('src/x.ts'), null);
 });
@@ -237,7 +241,7 @@ test('the settle gate refuses without a verdict, with a stale one, with a failin
     if (document.product.length > 1) assert.equal(judge(r, kind, attach(r, partial)).code, 'CRITIC_VERDICT_STALE', 'a subset of the product is stale');
     assert.equal(judge(r, kind, attach(r, { ...document, product: [] })).code, 'CRITIC_VERDICT_STALE');
 
-    const failing = await critique(r, kind, fakeCriticOrca({ verdict: verdictFor(kind, 5, { failing: kind === 'scope.define' ? ['S1', 'S5'] : ['A1', 'A3'] }) }));
+    const failing = await critique(r, kind, fakeCriticOrca({ verdict: verdictFor(kind, 5, { failing: { 'scope.define': ['S1', 'S5'], 'architecture.decide': ['A1', 'A3'], 'business.decide': ['B1', 'B2'] }[kind] }) }));
     const refusal = judge(r, kind, attach(r, failing.document));
     assert.deepEqual([refusal.status, refusal.code], ['red', 'op-critic-verdict-failed']);
     assert.match(refusal.detail, new RegExp(`minimum for ${kind.replace('.', '\\.')} is 7`));

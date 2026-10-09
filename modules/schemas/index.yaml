@@ -893,7 +893,7 @@ moduleLocalDocumentKinds:
     governs: "The Critic as data: the seat whose tier it is picked from, the typed verdict, the codes of its holds and the op kinds that owe a Critic."
     files: [modules/kernel/critic.yaml]
   - id: starci/module-kernel-critic-rubrics@1
-    governs: "The rubric, minimum, product globs, cited fields and token budget of the Critic for each decision leg (scope.define, architecture.decide)."
+    governs: "The rubric, minimum, product globs, cited fields and token budget of the Critic for each decision leg (scope.define, business.decide, architecture.decide)."
     files: [modules/kernel/critic-rubrics.yaml]
   - id: starci/module-kernel-op-judges@1
     governs: "Who judges the product of each op: the kinds of judge, the measures a machine judge may cite, the owner gates and the reviewing legs the op contracts' `judge` field is held to."

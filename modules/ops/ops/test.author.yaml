@@ -220,9 +220,12 @@ proofs:
       vi: "starci kernel settle tự đọc lại gate.json đính kèm (exit 0 trên các tệp slice đã đổi) và read-digest.json (có tệp pattern cho mọi loại tệp đã sửa) rồi ghi check op-gate; done thiếu chúng, có công cụ không chạy được hoặc có lỗi mới đều bị từ chối, và Kernel chạy lại đúng cổng đó trên nhánh khi land."
 judge:
   - by: machine
-    measures: [declared-checks, work-hygiene, op-gate]
+    measures: [declared-checks, work-hygiene, op-gate, acceptance-trace]
     proofs: [op-gate]
-    why: "settle re-reads the gate over the authored files and the settler re-runs the validators; whether the cases are meaningful is not measured by anything but the op's own collection run (registry entry op-judge-substance-unjudged)"
+    why: "settle re-reads the gate over the authored files and the settler re-runs the validators; each authored test should cite an acceptance record it covers (acceptance-trace, report mode until the first live run), and in the canonical-workspace chain code.refactor runs the pinned tests before and after its change"
+  - by: next-leg
+    leg: code.refactor
+    why: "in the canonical-workspace chain (scope.define, test.author, code.refactor, workspace.manage, review.verify) code.refactor runs the regression check these tests pin verbatim before and after its change"
 blockers:
   - code: REQUIREMENT_UNSETTLED
     condition:

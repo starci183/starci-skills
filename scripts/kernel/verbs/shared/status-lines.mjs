@@ -202,6 +202,7 @@ export const statusText = (s, out) => [
   ...(s.stuck.length ? [stuckSummaryLine(s)] : []),
   ...s.stuckPast.slice(0, 8).map((item) => `    ${stuckLine(item)}`),
   ...(s.graph.legs.length ? [legsLine(s)] : []),
+  ...(s.acceptanceTraces ?? []).map((trace) => `  ${trace.line} (${trace.op} ${trace.jobId}; report mode until the first live run)`),
   ...s.graph.terminal.map(terminalLine),
   ...testsDeferredLines(s),
   ...(s.workGraph ? [workGraphLine(s)] : []),
