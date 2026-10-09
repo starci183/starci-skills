@@ -5,7 +5,7 @@ import { sha256, sha256File } from '../../engine/digest.mjs';
 import { getBlob } from '../../engine/db/blob.mjs';
 import { latestCheckRuns, stageBlob } from '../machine/evidence-store.mjs';
 import { admittedContractOf, latestContractOf } from '../machine/contract-version.mjs';
-import { supersedeDirs } from '../machine/placement-rebound.mjs';
+import { reboundMapOf, supersedeDir, supersedeDirs } from '../machine/placement-rebound.mjs';
 import { inputStamp } from '../gates/type-impact.mjs';
 import { DIGEST_SCHEMA } from '../gates/read-digest.mjs';
 import { isLinkLike } from '../api/fs/is-link-like.mjs';
@@ -158,9 +158,11 @@ const observationOf = (db, context, row, native) => {
  * attempt. Raw process status, indexed blob bytes, time and target must agree. */
 export function mechanismObservations(db, context) {
   const latest = new Map();
+  // A run in the tree an attempt was admitted in and a later run in the tree put back at another path are one subject: the newest stands.
+  const rebound = reboundMapOf(db, context.attemptId);
   for (const row of latestCheckRuns(db, context.attemptId).filter((row) => independent.has(row.runner))) {
     const native = parseJson(row.summary_json)?.native;
-    if (native?.schema) latest.set(JSON.stringify([native.schema, native.profile, native.project, native.subject]), { row, native });
+    if (native?.schema) latest.set(JSON.stringify([native.schema, native.profile, native.project, supersedeDir(rebound, native.subject)]), { row, native });
   }
   return [...latest.values()].map(({ row, native }) => observationOf(db, context, row, native));
 }
