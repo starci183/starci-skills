@@ -39,7 +39,7 @@ import { allocationSettings, loadConfig } from '../../engine/config.mjs'; import
 import { archiveRoot as archiveRootOf } from '../machine/home.mjs';
 import { httpUp } from '../api/http/http-up.mjs';
 import { repeatInOrder } from '../lib/in-order.mjs';
-import { nextRetry } from '../lib/retry-budget.mjs';
+import { doublingDelay } from '../lib/retry-budget.mjs';
 import { recordNewProbe, recordServiceEvents } from './service-events.mjs';
 import { connectorStartResult, outcomeOf, probeCommand, reopenCommand } from './service-commands.mjs';
 import { auditTasks } from '../machine/task-audit.mjs';
@@ -251,9 +251,6 @@ export const DOWN_STATES = new Set(['starting', 'degraded', 'failed', 'backoff',
 // The states that run the SERVICE_DOWN clock: one bad pass (`degraded`) is not down.
 export const OUTAGE_STATES = new Set(['starting', 'failed', 'backoff', 'quarantined']);
 
-/** Backoff before restart number n+1 (n restarts already in the window): the one retry budget, minMs doubling, at most maxMs. Pure. */
-export const backoffDelay = (n, { minMs, maxMs }) => nextRetry({ intervalMs: minMs, maxIntervalMs: maxMs }, { attempts: n + 1, now: 0, reason: 'restart' }).delayMs;
-
 export const newRecord = (name, now) => ({ name, state: 'declared', since: now, restarts: [], failStreak: 0, nextAttemptAt: null, downSince: null, lastProbe: null });
 
 const moveFailureState = (r, now, entry, to) => { switch (r.state) {
@@ -266,7 +263,7 @@ const moveFailureState = (r, now, entry, to) => { switch (r.state) {
 function restartAction(r, now, entry, backoff, quarantine, from, to) {
   let act = null, quarantined = false;
   r.restarts = r.restarts.filter((t) => now - t < quarantine.windowMs);
-  if (r.state === 'failed' && entry.restart !== false) { if (r.restarts.length >= quarantine.maxRestarts) { to('quarantined'); quarantined = true; } else { to('backoff'); r.nextAttemptAt = now + backoffDelay(r.restarts.length, backoff); } }
+  if (r.state === 'failed' && entry.restart !== false) { if (r.restarts.length >= quarantine.maxRestarts) { to('quarantined'); quarantined = true; } else { to('backoff'); r.nextAttemptAt = now + doublingDelay(r.restarts.length + 1, backoff); } }
   if (r.state === 'backoff' && now >= (r.nextAttemptAt ?? 0) && from === 'backoff') { to('starting'); r.restarts.push(now); r.nextAttemptAt = null; act = 'start'; } else if (r.state === 'quarantined' && !quarantined && now - r.since >= quarantine.retryMs && entry.restart !== false) { to('starting'); r.restarts = [now]; act = 'start'; }
   return { act, quarantined };
 }
