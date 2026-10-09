@@ -130,11 +130,13 @@ function settled(c) {
   return c.workflow.attempts.filter((a) => a.reportedAt !== null).map((a) => {
     const item = { attemptId: a.attemptId, op: a.op };
     if (a.settledAt !== null) return { ...item, ...done(`settled ${a.verdict} by ${a.settledBy ?? 'unknown'}`) };
-    const byRuntime = a.reportOutcome === 'done';
+    const handed = (c.workflow.status?.settleDecisions ?? []).find((d) => d.jobId === a.jobId) ?? null;
+    const byRuntime = a.reportOutcome === 'done' && !handed;
     const bound = byRuntime ? c.bound + c.boundChecks : c.boundKernel;
     if (c.now - Number(a.reportedAt) <= bound) return { ...item, ...waiting('reported; inside the settle bound') };
     const stuck = `reported ${minutes(c.now - Number(a.reportedAt))} min ago, outcome ${a.reportOutcome}, not settled`;
     if (a.treeExists === false) return { ...item, ...overdue(`${stuck}; the tree it was admitted in is gone: ${a.worktreePath}`, 'placement-lost') };
+    if (handed) return { ...item, ...overdue(`${stuck}; the runtime handed it to the Kernel (${handed.reason})`, 'settle-overdue-kernel') };
     return { ...item, ...overdue(stuck, byRuntime ? 'settle-overdue' : 'settle-overdue-kernel') };
   });
 }

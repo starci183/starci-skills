@@ -49,6 +49,7 @@ import { positiveNumber } from '../../lib/number.mjs';
 import { ownerOnlyQuestion } from '../../kernel/op-incident-policy.mjs';
 import { TERMINAL_HOLDS, holdView, terminalFactsOf } from '../../kernel/terminal-step.mjs';
 import { runMechanicalMoves } from '../mechanical-moves.mjs';
+import { currentRuntimeRev } from '../../kernel/runtime-rev.mjs';
 const selfFile = fileURLToPath(import.meta.url);
 const skillRoot = path.resolve(path.dirname(selfFile), '..', '..', '..');
 const JOB_FILE = path.join(skillRoot, 'modules', 'reconciler', 'job.yaml');
@@ -121,7 +122,7 @@ const wfRoute = (ev) => ev?.ledgerId !== SUPERVISOR_LEDGER && ev?.workflowId ? w
 
 const parse = (text) => { try { return JSON.parse(text); } catch { return null; } };
 /** Everything the planner needs about one job, from a read-only handle. Null when the job is not an op job. */
-export function jobFacts(db, jobId, { now = Date.now(), settings = jobSettings() } = {}) {
+export function jobFacts(db, jobId, { now = Date.now(), settings = jobSettings(), runtimeRev = currentRuntimeRev() } = {}) {
   const row = db.prepare("SELECT job_id, workflow_id, op_id, try_no AS attempt, status, worker_id, payload_json, created_at, updated_at FROM jobs WHERE job_id=? AND kind='op'").get(jobId);
   if (!row) return null;
   const payload = parse(row.payload_json) ?? {};
@@ -132,7 +133,8 @@ export function jobFacts(db, jobId, { now = Date.now(), settings = jobSettings()
     jobId: row.job_id, workflowId: row.workflow_id, op: row.op_id, attempt: row.attempt, status: row.status, workerId: row.worker_id,
     payload, createdAt: Number(row.created_at), updatedAt: Number(row.updated_at),
     report: reported ? { dispatchId: reported.dispatchId, outcome: reported.outcome, filedAt: reported.filedAt, consumedAt: reported.consumedAt } : null,
-    handover: handover ? { reason: handover.reason ?? null, detail: handover.detail ?? null, at: handover.at } : null,
+    handover: handover ? { reason: handover.reason ?? null, detail: handover.detail ?? null, at: handover.at, runtimeRev: handover.runtimeRev ?? null } : null,
+    runtimeRev,
     released, releaseProof: releaseProofOf(payload), settledAt: SETTLED.includes(row.status) ? Number(payload.settledAt ?? row.updated_at) : null,
     dispatchedAt: lastEventAt('op-dispatched'), questionAt: lastEventAt('worker-question-bridged'), now, windowMs: settings.settledWindowMs,
     terminal: terminalFactsOf(db, jobId),
@@ -187,9 +189,16 @@ export function planJob(f, { frontier = {}, questions = [], settings = jobSettin
   return { step, clocks };
 }
 
+/** A done report the settler handed to the Kernel under another runtime revision than the live one (a handover recorded before revisions were named counts as older). */
+const judgedByOlderRuntime = (f) => f.report.outcome === 'done' && !KERNEL_ONLY_OPS.includes(f.op) && Boolean(f.runtimeRev) && f.handover.runtimeRev !== f.runtimeRev;
+
 /** The clock and step of a live job with a report. Consume is part of settle (settle-runtime-service): SETTLE_OVERDUE / DECISION_OVERDUE time the report, no separate CONSUME_OVERDUE clock. */
 function planReport(f, clock, set) {
-  if (f.handover) {
+  if (f.handover && judgedByOlderRuntime(f)) {
+    // The runtime that handed the report over was an older one: the verdict is a function of the code, so the settler judges it again once per revision.
+    clock('SETTLE_OVERDUE', f.handover.at);
+    set({ kind: 'settle', concern: 'job.settle', rejudge: true });
+  } else if (f.handover) {
     clock('DECISION_OVERDUE', f.handover.at);
     set({ kind: 'settle-nongreen', concern: 'job.consume-check', reason: f.handover.reason });
   } else if (f.report.outcome !== 'done' || KERNEL_ONLY_OPS.includes(f.op)) {

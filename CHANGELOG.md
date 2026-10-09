@@ -66,6 +66,7 @@ until every S* row in `docs/goal.md` holds with fresh evidence, then `1.0.0` fre
 ## [1.0.0-alpha.7] — 2026-10-08
 
 Theme: the roles are one declared contract, the system recovers from a host restart by itself, no smell or bug enters at commit, and the remote main moves only with a release proven on the exact commit that is pushed.
+- A reported job the settler handed to the Kernel stayed the Kernel's forever: the handover is now recorded with the runtime revision that judged it (`runtimeRev` on `job-settle-needs-kernel`), and the Job controller has the settler judge a done report again once per revision. `starci work graph validate|show|diff` declared as a check is a check the settler can re-run (its header always said so; only the `node scripts/work/work-graph.mjs` form was classed). `starci debug digest` reads an attempt's tree through its `placement-rebound` events, so a rebound attempt is no longer reported as `placement-lost`, and a job handed to the Kernel names the handover reason.
 
 ### Changed
 - The packages of this release are versioned by what changed: `@starci/eslint-canon-be` 3.1.0 and `@starci/eslint-canon-fe` 8.1.0 (the new enforced law `SCAN_SMELL` R235; the front-end canon depends on `@typescript-eslint/eslint-plugin`), `@starci/hfs` 4.1.0 (templates, the platform sequence primitive, scaffold and sync), `@starci/cli` 1.1.0 (depends on hfs 4.1.0), `@starci/stylelint-canon` 2.0.6 and `@starci/jest-preset` 2.2.6. `starci release publish` plan mode names every package row and every blocker in its text and in the json `data.plan`.

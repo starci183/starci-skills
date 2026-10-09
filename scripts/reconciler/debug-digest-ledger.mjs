@@ -2,6 +2,7 @@
 // steps, and the history of the workflows that finished. Read only, through the reader the caller opened.
 import fs from 'node:fs';
 import { parseJsonOr } from '../lib/json.mjs';
+import { reboundMapOf, supersedeDir } from '../machine/placement-rebound.mjs';
 
 const STEP_EVENTS = Object.freeze(['phase-transition', 'kernel-booted', 'kernel-start-failed', 'runtime-rev-acked', 'op-dispatched', 'dispatch-rejected',
   'checks-recorded', 'op-settled', 'handover-approved', 'provider-unavailable', 'op-caller-refused', 'ledger-written-outside-seat', 'critic-run']);
@@ -20,17 +21,17 @@ const EVENTS_SQL = `SELECT kind, attempt_id, entity_id, created_at,
   json_extract(payload_json,'$.criticProvider') AS critic_provider, json_extract(payload_json,'$.opProvider') AS op_provider, json_extract(payload_json,'$.independent') AS independent, json_extract(payload_json,'$.code') AS code
   FROM events WHERE workflow_id=? AND kind IN (${STEP_EVENTS.map(() => '?').join(',')}) ORDER BY seq`;
 
-const attemptOf = (r, exists) => ({ attemptId: r.attempt_id, jobId: r.job_id, op: r.op_id, tryNo: r.try_no, agent: r.agent, provider: r.provider,
+const attemptOf = (r, exists, rebound) => ({ attemptId: r.attempt_id, jobId: r.job_id, op: r.op_id, tryNo: r.try_no, agent: r.agent, provider: r.provider,
   dispatchedAt: r.dispatched_at, startedAt: r.started_at, reportedAt: r.reported_at, settledAt: r.settled_at, reportOutcome: r.report_outcome,
   verdict: r.verdict, endState: r.end_state, settledBy: r.settled_by, worktreePath: r.worktree_path, transcriptSha: r.transcript_sha, claimMismatch: Number(r.claim_mismatch),
-  treeExists: r.worktree_path && r.settled_at === null && r.end_state === null ? exists(r.worktree_path) : null });
+  treeExists: r.worktree_path && r.settled_at === null && r.end_state === null ? exists(supersedeDir(rebound(r.attempt_id), r.worktree_path)) : null });
 
 const eventOf = (r) => ({ kind: r.kind, attemptId: r.attempt_id, entityId: r.entity_id, at: r.created_at, step: r.step, error: r.error, op: r.op, verb: r.verb,
   verdict: r.verdict, claimOverruled: r.claim_overruled === 1, checkedIn: parseJsonOr(r.checked_in, null),
   criticProvider: r.critic_provider, opProvider: r.op_provider, independent: r.independent === 1, code: r.code });
 
-/** The attempts of one workflow; `treeExists` says whether the tree an unsettled attempt names is on disk (null for a settled or ended attempt). */
-export const attemptFacts = (db, workflowId, { exists = fs.existsSync } = {}) => db.prepare(ATTEMPTS_SQL).all(workflowId).map((r) => attemptOf(r, exists));
+/** The attempts of one workflow; `treeExists` says whether the tree an unsettled attempt works in (its admitted tree read through its placement-rebound events) is on disk (null for a settled or ended attempt). */
+export const attemptFacts = (db, workflowId, { exists = fs.existsSync } = {}) => db.prepare(ATTEMPTS_SQL).all(workflowId).map((r) => attemptOf(r, exists, (attemptId) => reboundMapOf(db, attemptId)));
 
 /** The step-marking events of one workflow, oldest first. */
 export const eventFacts = (db, workflowId) => db.prepare(EVENTS_SQL).all(workflowId, ...STEP_EVENTS).map(eventOf);
