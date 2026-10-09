@@ -15372,6 +15372,17 @@ RT_STORAGE_UNDECLARED:
   owner: supervisor
   kind: check-finding
 
+RT_OP_JUDGE_UNDECLARED:
+  title: "An op does not declare who judges its product, or declares a judge the runtime does not provide"
+  title_vi: "Một op chưa khai báo ai chấm sản phẩm của nó, hoặc khai báo người chấm mà runtime không có"
+  meaning_vi: "Nguyên tắc P2: người làm không bao giờ tự chấm việc của mình. Hợp đồng của mỗi op (modules/ops/ops/<op>.yaml) có trường bắt buộc judge, danh sách ít nhất một người chấm: machine (phép đo độc lập mà runtime sở hữu và chạy lại lúc chốt, gọi tên trong modules/kernel/op-judges.yaml; tệp test do chính lượt làm viết thì không bao giờ tự nó là người chấm), critic (Critic độc lập, đúng cho những loại op mà bảng modules/kernel/critic.yaml đánh dấu covered), owner (chỉ nơi có cổng của chủ) hoặc next-leg (chặng sau có hợp đồng là duyệt sản phẩm này). Danh sách rỗng, thiếu trường, phép đo lạ, phép đo runtime không áp dụng cho op đó, Critic khai lệch bảng, owner không có cổng hoặc next-leg chưa đăng ký đều bị từ chối."
+  causes_vi:
+    - "Thêm một op mới mà chưa khai báo trường judge"
+    - "Khai báo một phép đo hoặc Critic mà runtime không chạy cho op đó, hoặc bảng của runtime đổi mà hợp đồng chưa đổi theo"
+  nextStep_vi: "Khai báo judge trong hợp đồng của op theo modules/kernel/op-judges.yaml, hoặc sửa bảng tương ứng của runtime cho khớp với hành vi thật."
+  owner: supervisor
+  kind: check-finding
+
 RT_EVENT_SPILL_BYPASS:
   title: "A ledger event payload is spilled by hand"
   title_vi: "Một payload sự kiện của sổ cái được tự chuyển sang blob"

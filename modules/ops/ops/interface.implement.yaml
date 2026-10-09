@@ -594,6 +594,17 @@ proofs:
     requirement:
       en: "starci kernel settle re-reads the attached gate.json (exit 0 over the slice's changed files) and read-digest.json (a pattern file named for every touched file kind) and records the runtime check op-gate; a done without them, with a tool that could not run or with a new finding is refused, and the Kernel re-runs the same gate on the branch at landing."
       vi: "starci kernel settle tự đọc lại gate.json đính kèm (exit 0 trên các tệp slice đã đổi) và read-digest.json (có tệp pattern cho mọi loại tệp đã sửa) rồi ghi check op-gate; done thiếu chúng, có công cụ không chạy được hoặc có lỗi mới đều bị từ chối, và Kernel chạy lại đúng cổng đó trên nhánh khi land."
+judge:
+  - by: machine
+    measures: [declared-checks, work-hygiene, op-gate, sonar-gate, contract-script]
+    proofs: [planned-brand-tokens, shell-layout, op-gate]
+    why: "settle re-reads the gate JSON and the scanner summary, and the brand-token and shell-layout checks are runtime scripts the settler re-runs; the rendered result is compared with the draws by the audit leg"
+  - by: next-leg
+    leg: interface.audit
+    why: "interface.audit re-captures the rendered result and compares it with the accepted draws, the installed Grammar and the brand, and routes every drift back"
+  - by: next-leg
+    leg: review.verify
+    why: "the planned chain closes with review.verify, which re-runs the gate over the reviewed range and classifies every defect it finds without repairing the producer"
 blockers:
   - code: APP_SHELL_UNSETTLED
     condition:

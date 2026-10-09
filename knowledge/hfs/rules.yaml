@@ -2126,3 +2126,12 @@ rules:
     failureCodes: ["RT_STORAGE_UNDECLARED"]
     enforcers:
       - {kind: runtime, id: storage-convention, at: scripts/checks/check-storage-convention.mjs}
+  - id: R240
+    code: "RT_OP_JUDGE_UNDECLARED"
+    law: "Every op declares who judges its product (principle P2: the maker never judges its own work). The contract of each op (modules/ops/ops/<op>.yaml) carries the required field `judge`, a list of at least one entry, each with a one-line why: machine (independent measures the runtime owns or re-runs at settle, named from modules/kernel/op-judges.yaml, and the contract proofs they rely on; a test file the same attempt wrote is never one by itself), critic (the independent Critic and its rubric, declared exactly for the op kinds that modules/kernel/critic.yaml coverage marks covered), owner (only where modules/kernel/op-judges.yaml ownerGates holds an owner gate) and next-leg (a registered reviewing leg whose contract is to review this product). Nobody cannot be declared. The registry and the contracts are checked against the runtime's own tables (op-gate and sonar-gate enforcedOps, opProofs, proof media, the Critic coverage), so the declarations and what the runtime does cannot drift apart. Surfaced in the full status text of a leg and in the op prompt."
+    scope: runtime
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RT_OP_JUDGE_UNDECLARED"]
+    enforcers:
+      - {kind: runtime, id: op-judge, at: scripts/checks/check-op-judge.mjs}

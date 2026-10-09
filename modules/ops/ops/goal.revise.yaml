@@ -127,6 +127,12 @@ proofs:
     requirement:
       en: Every derivation a changed section affects is named for invalidation, and no derivation, report
         or evidence settled on rev n was rewritten or counted toward rev n+1.
+judge:
+  - by: machine
+    measures: [declared-checks]
+    why: "the settler re-runs every check of the report it can run itself; whether the new goal still carries checkable metrics is read by the Kernel when it evaluates the goal"
+  - by: owner
+    why: "a change of scope or authority is escalated as an owner decision and never applied as an edit (policy.goalPolicy.authorityWidening)"
 blockers:
   - code: GOAL_CONTRACT_VIOLATION
     condition:
