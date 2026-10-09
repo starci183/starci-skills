@@ -1,3 +1,4 @@
 group: connect
 summary: operate owner connectors and their delivery services
 owner: runtime
+runtimeSide: host

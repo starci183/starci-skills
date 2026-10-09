@@ -1,3 +1,4 @@
 group: orca
 summary: call the runtime-owned Orca host boundary
 owner: runtime
+runtimeSide: host

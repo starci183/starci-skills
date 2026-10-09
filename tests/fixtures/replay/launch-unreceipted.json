@@ -1,0 +1,23 @@
+{
+ "schema": "replay-fixture@1",
+ "case": "launch-unreceipted",
+ "source": {
+  "copy": "hotfix"
+ },
+ "workflow": {
+  "id": "wf-1",
+  "phase": "running",
+  "goalRevision": 0
+ },
+ "jobs": [],
+ "launch": {
+  "state": "launch-unknown",
+  "terminalNamed": false,
+  "dispatchNamed": true,
+  "receiptHandleNamed": false,
+  "role": "kernel",
+  "provider": "codex",
+  "receiptState": "unknown",
+  "openSupervisorItems": 7
+ }
+}

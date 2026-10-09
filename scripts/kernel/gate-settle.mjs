@@ -203,6 +203,9 @@ const judgeRoot = async (root, ctx) => {
   return { op: ctx.op, judged, gateFile: gate?.file ?? null, digestFile: digest?.file ?? null };
 };
 
+/** Whether every placement of the job is a Work record directory (.starciwork): records are never app code, so no code gate is owed there. */
+const workRecordsOnly = (placements) => placements.length > 0 && placements.every((p) => normRel(p.path).split('/')[0] === '.starciwork');
+
 export async function judgeJobLoop({ op, files, roots = [], doc = loadOpGate(), gateBases = [], binding = null, mode = null,
   readDigest = buildReadDigest, kindResolver = kindsOf }) {
   if (!binding || (!Object.hasOwn(binding, 'at') && !Object.hasOwn(binding, 'targets')))
@@ -223,7 +226,11 @@ export async function judgeJobLoop({ op, files, roots = [], doc = loadOpGate(), 
       if (!outcome) return false;
       if (outcome.judged.status !== 'pass') { early = outcome; return true; }
       judgments.push(outcome);
-    } catch (error) { early = unavailable(`the current owned slice could not be bound: ${String(error?.message ?? error)}`); return true; }
+    } catch (error) {
+      // An op that owes no code loop and owns only Work records (.starciwork) has no gate tool to bind: a placement the admitted baseline no longer names is no gate failure.
+      if (!enforcesLoop(op, doc) && workRecordsOnly(placements)) return false;
+      early = unavailable(`the current owned slice could not be bound: ${String(error?.message ?? error)}`); return true;
+    }
     return false;
   });
   if (early) return early;

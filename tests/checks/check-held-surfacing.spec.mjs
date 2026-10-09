@@ -1,4 +1,4 @@
-// RT_HELD_UNSURFACED (R240): a runtime fault the catalogue gives to the Supervisor or the owner names a mechanism that reaches them, and the mechanism is wired in the file it names.
+// RT_HELD_UNSURFACED (R241): a runtime fault the catalogue gives to the Supervisor or the owner names a mechanism that reaches them, and the mechanism is wired in the file it names.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { checkHeldSurfacing, entryFindings, heldEntries, heldSurfacingFindings, MECHANISMS } from '../../scripts/checks/check-held-surfacing.mjs';

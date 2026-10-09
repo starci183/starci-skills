@@ -1,6 +1,7 @@
 group: runtime
 verb: link
 owner: runtime
+runtimeSide: host
 summary: point the per-user StarCi launcher at a live runtime checkout
 impl:
   script: packages/cli/src/runtime-link.mjs

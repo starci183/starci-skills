@@ -4,3 +4,4 @@
 group: runtime
 summary: install, update and check the StarCi runtime tree
 owner: runtime
+runtimeSide: tree

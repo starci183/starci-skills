@@ -46,8 +46,7 @@ function stoppedLine(tr, j) {
 function workflowLines(tr, w, now) {
   const k = w.kernel;
   const lines = [tr(TEXT.workflow, { name: w.name, ledger: w.ledger, phase: w.phase ?? '-' }),
-    tr(TEXT.kernel, { alive: k.alive ? tr(TEXT.alive) : tr(TEXT.notAlive), woken: agoOf(tr, k.lastWakeAgeMs), acked: String(k.ackedRev ?? '-').slice(0, 9),
-      current: String(k.currentRev ?? '-').slice(0, 9), state: k.frontierState ?? '-', ready: k.readyWork }),
+    tr(TEXT.kernel, { alive: k.alive ? tr(TEXT.alive) : tr(TEXT.notAlive), woken: agoOf(tr, k.lastWakeAgeMs), state: k.frontierState ?? '-', ready: k.readyWork }),
     ...(k.revision ? [tr(TEXT.revisionSeat, { line: k.revision })] : [])];
   const running = w.running.map((r) => `${r.op}(${r.status}, try ${r.tryNo}, ${minutes(r.ageMs)}m)`).join(', ');
   lines.push(tr(TEXT.running, { items: running || tr(TEXT.none) }));

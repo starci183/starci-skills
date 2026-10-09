@@ -1,3 +1,4 @@
 group: task
 summary: register and inspect the runtime's per-user Windows scheduled tasks
 owner: runtime
+runtimeSide: host

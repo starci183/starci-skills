@@ -129,7 +129,7 @@ function receiptOf({ root, base, picked, results, concurrency, startedAt, budget
   const passed = results.filter((r) => r.pass).length;
   const changedNow = String((deps.diff ?? diff)(['--name-only', 'HEAD'], { cwd: root }).stdout ?? '').trim();
   const untracked = String((deps.lsFiles ?? lsFiles)(['--others', '--exclude-standard'], { cwd: root }).stdout ?? '').trim();
-  return { schema: RECEIPT_SCHEMA, base: base ? String(base) : null, tip: tip ?? null, clean: !changedNow && !untracked, files: picked.files.length, passed, total: results.length,
+  return { schema: RECEIPT_SCHEMA, root: path.resolve(root), base: base ? String(base) : null, tip: tip ?? null, clean: !changedNow && !untracked, files: picked.files.length, passed, total: results.length,
     ok: results.length === picked.files.length && passed === results.length, ms: Date.now() - startedAt, budgetMs, concurrency: concurrency.concurrency };
 }
 

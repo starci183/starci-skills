@@ -23,6 +23,7 @@ import { artifactHoldReason } from '../../machine/artifact-hold.mjs';
 import {isFile} from '../../lib/fs-kind.mjs';
 import {ancestorsOf} from '../../lib/dom-tree.mjs';
 import { readEnv } from '../../lib/env.mjs';
+import { invocationDir } from '../../lib/roots.mjs';
 import { mapInOrder } from '../../lib/in-order.mjs';
 import { makeTempDir } from '../../api/fs/make-temp-dir.mjs';
 
@@ -290,7 +291,7 @@ async function main(argv) {
   if (!paths.length) { process.stderr.write('use: starci work draw-layer <render dir | part png>... [--playwright <product dir>] [--json]\n'); return 2; }
   const parts = partsUnder(paths);
   let playwright = null;
-  try { const { loadPlaywright } = await import('../draw-render.mjs'); playwright = loadPlaywright([opts.playwright, readEnv('STARCI_PLAYWRIGHT_DIR'), process.cwd()].filter(Boolean)); } catch { playwright = null; }
+  try { const { loadPlaywright } = await import('../draw-render.mjs'); playwright = loadPlaywright([opts.playwright, readEnv('STARCI_PLAYWRIGHT_DIR'), invocationDir()].filter(Boolean)); } catch { playwright = null; }
   const results = await layerFindingsForParts(parts, { playwright });
   const red = results.filter((r) => r.findings.length);
   if (opts.json) process.stdout.write(`${JSON.stringify({ schema: 'starci/draw-layer@1', parts: results.length, red: red.length, results }, null, 2)}\n`);

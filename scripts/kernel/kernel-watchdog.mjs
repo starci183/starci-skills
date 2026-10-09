@@ -105,7 +105,8 @@ export const buildWakePrompt = (workflow, attempt = null, revLine = null) => bou
 export const wakePromptOf = (workflow, statusValue) => {
   const rev = statusValue?.kernel ? revWakeLine(statusValue?.kernelRev, workflow) : null;
   const notice = noticeWakeLine(statusValue?.revisionNotice, `starci kernel revision-ack --workflow ${workflow}`);
-  return buildWakePrompt(workflow, statusValue?.kernel?.attempt ?? null, [rev, notice].filter(Boolean).join(' ') || null);
+  // ONE sentence about the runtime revision: what a change sends this Kernel when it owes one, else where its attestation stands.
+  return buildWakePrompt(workflow, statusValue?.kernel?.attempt ?? null, notice || rev || null);
 };
 
 /** Repair only the Orca tab title: the agent owns the pane title and may change it on every turn. */
@@ -377,7 +378,7 @@ async function statusTick() {
   // started) workflow is left alone - nothing but the owner's starci kernel lifecycle --resume brings it back.
   if (phase !== 'running') return { ok: true, workflowId, phase, action: 'not-running' };
   // The runtime's own duty to the seat's revision notice: a change that concerns the Kernel nothing is settled here (a read-only probe writes nothing).
-  const revision = withKernelLedger((ledger) => runtimePass(kernelSeat({ ledger, workflowId, root: revRootOf() }), { repair }));
+  const revision = withKernelLedger((ledger) => runtimePass(kernelSeat({ ledger, workflowId, root: revRootOf() }), { repair, adopt: true }));
   if (revision) status.value.revisionNotice = revision.notice;
   const result = kernelTick(status, phase);
   // Creation supplies the title, but a moved/restored tab can lose it. The sidebar reads

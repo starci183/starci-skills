@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// check-held-surfacing.mjs - RT_HELD_UNSURFACED (R240; part of `npm run check`).
+// check-held-surfacing.mjs - RT_HELD_UNSURFACED (R241; part of `npm run check`).
 //   runs in the check stage (self-check held-surfacing); --json prints the findings as JSON
 //
 // A failure code the catalogue gives to a role (`owner: supervisor` or `owner: owner`) with `kind: runtime-fault` is a state that role must be able to learn of. The runtime is built to

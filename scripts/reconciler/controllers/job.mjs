@@ -33,6 +33,7 @@
 //
 // Internal args (spawned by the reconciler engine): --dry [--repo <path>] [--workflow <id>] [--json].
 //     one read-only pass over the live ledgers: prints each job's plan (step + clocks); writes nothing.
+import { effectUnknownItem } from '../effect-unknown-item.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -320,7 +321,7 @@ async function actJob(ctx, ledgerId, jobId, f, s, settings) {
   const repo = ledgerOf(ctx, ledgerId)?.repo;
   switch (s.kind) {
     case 'dead-worker': case 'release-worker': case 'effect-unknown':
-      return { action: s.kind, ...(await ctx.api(ledgerId, s.verb, s.argv)) };
+      return { action: s.kind, ...(await ctx.api(ledgerId, s.verb, s.argv)), ...(await effectUnknownItem(ctx, ledgerId, f, s, settings)) };
     case 'settle':
       // The runtime settler for this one job: reconcileJobSettle (consume, re-verify / canon parity, starci kernel record-checks + settle, release).
       return { action: 'settle', ...(await ctx.run('node', [SETTLER_SCRIPT, '--repo', repo, '--job', jobId, '--json'], { timeoutMs: settings.settleRunTimeoutMs })) };

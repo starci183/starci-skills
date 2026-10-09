@@ -1,6 +1,7 @@
 group: runtime
 verb: deploy
 owner: runtime
+runtimeSide: host
 summary: carry a checked runtime revision onto the running host and verify the engine on it
 impl: {module: scripts/reconciler/runtime-deploy.mjs, export: runtimeDeploy}
 effect: host

@@ -24,6 +24,13 @@ import { revisionAck } from '../../scripts/supervisor/revision-ack.mjs';
 const WF = 'wf-notice';
 const KERNEL_FILE = 'modules/kernel/driver-loop.yaml';
 const SUPERVISOR_FILE = 'modules/supervisor/supervisor-menu.yaml';
+function withRevRoot(t, root) {
+  const saved = process.env.STARCI_KERNEL_REV_ROOT;
+  process.env.STARCI_KERNEL_REV_ROOT = root;
+  t.after(() => { if (saved === undefined) delete process.env.STARCI_KERNEL_REV_ROOT; else process.env.STARCI_KERNEL_REV_ROOT = saved; });
+}
+const GROWN_MENU = ['items:', '  - a', '  - b', ''].join(String.fromCodePoint(10));
+const GROWN_STEPS = ['steps:', '  - a', '  - b', ''].join(String.fromCodePoint(10));
 
 /** A repository, a Kernel ledger and a Supervisor machine store, all at temp paths; every seat starts fresh at the base revision. */
 function world(t, files = {}) {
@@ -137,38 +144,40 @@ test('a manifest that is not the complete current read is refused and settles no
   assert.throws(() => attest(w.supervisor(), manifest), /no revision change is owed/);
 });
 
-test('the Kernel verb and the Supervisor verb list the owed files and attest them', (t) => {
+test('the Supervisor verb lists the owed files and attests them by readToken or by file (the Kernel has the one attestation of kernel-ack-rev: tests/kernel/one-ack.spec.mjs)', (t) => {
   const w = world(t);
-  w.repo.commit('rules', { [KERNEL_FILE]: 'steps:\n  - a\n  - b\n', [SUPERVISOR_FILE]: 'items:\n  - a\n  - b\n' });
-  const saved = process.env.STARCI_KERNEL_REV_ROOT;
-  process.env.STARCI_KERNEL_REV_ROOT = w.repo.root;
-  t.after(() => { if (saved === undefined) delete process.env.STARCI_KERNEL_REV_ROOT; else process.env.STARCI_KERNEL_REV_ROOT = saved; });
-  let planned = null;
-  revisionAckVerb.run({ ledger: w.ledger, args: { workflow: WF, plan: true }, emit: (value) => { planned = value; } });
-  assert.equal(planned.state, 'owed');
-  assert.deepEqual(planned.readManifest.files.map((f) => f.path), [KERNEL_FILE]);
-  const file = path.join(w.repo.root, 'manifest.json');
-  fs.writeFileSync(file, JSON.stringify(planned.readManifest));
-  assert.throws(() => revisionAckVerb.run({ ledger: w.ledger, args: { workflow: WF, rev: w.head(), 'read-manifest': file }, caller: { role: 'op', workflowId: WF }, emit() {} }), /only the current Kernel/);
-  revisionAckVerb.run({ ledger: w.ledger, args: { workflow: WF, rev: w.head(), 'read-manifest': file }, caller: { role: 'kernel', workflowId: WF }, emit() {} });
-  assert.equal(noticeFor(w.kernel()).state, 'current');
+  withRevRoot(t, w.repo.root);
+  w.repo.commit('rules', { [SUPERVISOR_FILE]: GROWN_MENU });
   const plan = revisionAck(w.m, { plan: true });
   assert.deepEqual(plan.readManifest.files.map((f) => f.path), [SUPERVISOR_FILE]);
+  assert.equal(plan.readToken, plan.readManifest.digest);
+  const file = path.join(w.repo.root, 'manifest.json');
   fs.writeFileSync(file, JSON.stringify(plan.readManifest));
-  assert.equal(revisionAck(w.m, { rev: w.head(), manifestFile: file }).ok, true);
   assert.equal(revisionAck(w.m, { rev: 'f'.repeat(40), manifestFile: file }).ok, false);
+  assert.equal(revisionAck(w.m, { rev: w.head(), digest: 'f'.repeat(64) }).ok, false, 'a wrong token attests nothing');
+  assert.equal(revisionAck(w.m, { rev: w.head(), digest: plan.readToken }).ok, true);
+  assert.equal(noticeFor(w.supervisor()).state, 'current');
 });
 
-test('the Kernel own ack, when it attested every file owed, settles the notice; one that left a file out does not', (t) => {
+test('the Kernel ack of the current revision settles the update in place whichever files it covered: there is one ack', (t) => {
   const w = world(t);
-  w.repo.commit('rule', { [KERNEL_FILE]: 'steps:\n  - a\n  - b\n' });
-  const ack = (files) => w.ledger.transaction(() => w.ledger.appendEvent({ workflowId: WF, entityType: 'kernel', entityId: WF, kind: 'runtime-rev-acked', payload: { rev: w.head(), files, source: 'ack' }, createdAt: Date.now() }));
-  ack(['modules/kernel/api.yaml']);
-  assert.equal(noticeFor(w.kernel()).state, 'owed');
-  ack([KERNEL_FILE, 'modules/kernel/api.yaml']);
+  w.repo.commit('rule', { [KERNEL_FILE]: GROWN_STEPS });
+  w.ledger.transaction(() => w.ledger.appendEvent({ workflowId: WF, entityType: 'kernel', entityId: WF, kind: 'runtime-rev-acked', payload: { rev: w.head(), files: ['modules/kernel/api.yaml'], source: 'ack' }, createdAt: Date.now() }));
   const pass = runtimePass(w.kernel(), { repair: true });
   assert.equal(pass.wrote, 'acked');
   assert.equal(pass.notice.state, 'current');
+});
+
+test('a seat that never acked is owed the changes since it booted, not only those after its first look', (t) => {
+  const w = world(t);
+  w.repo.commit('rule', { [SUPERVISOR_FILE]: GROWN_MENU });
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-never-acked-'));
+  const fresh = openMachine({ file: path.join(dir, 'machine.sqlite') });
+  t.after(() => { fresh.close(); fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }); });
+  const seat = { ...supervisorSeat({ m: fresh, root: w.repo.root, current: w.head() }), bootRev: () => w.repo.base };
+  const first = runtimePass(seat, { repair: true, adopt: true });
+  assert.equal(first.wrote, 'baseline');
+  assert.equal(first.notice.from, w.repo.base, 'the baseline is the revision it booted on');
 });
 
 test('a removed rule is replace-due, never an update; the replacement settles the notice and a fresh seat is not replaced twice', (t) => {
