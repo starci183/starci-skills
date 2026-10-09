@@ -1479,3 +1479,13 @@ cases:
     rule: {file: engine/db/ref-value.mjs, anchor: "installRefResolver"}
     spec: tests/engine-db/ref-value.spec.mjs
     status: covered
+
+  - id: deploy-affected-gate-refuses-without-saying-why
+    family: change-under-running
+    found: live
+    replay: tests/replay/deploy-affected-receipt.spec.mjs
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a refusal names what happened) the first deploy through the affected gate ran 479 spec files for 19 minutes and was refused 'no receipt came back' with 479 PASS lines and no red file: the run's answer was read from a pipe, its progress shared the stream, the spawn had a buffer and a timeout of its own, and nothing said whether a file was red, unfinished, the budget ended or the child died", remedy: {state: in-tree, change: "starci test affected --run --receipt-file writes the receipt to a file (and every clean ok run leaves the proven receipt of its base..tip pair); the deploy runs the child with stdout and stderr in files, a timeout of the declared budget plus a margin, prints the progress while it runs and announces the run before it starts, accepts a receipt already proven for the pair, and refuses with the red files, the unfinished files, the budget that ended, or how the child died with its last lines"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, the first deploy through the affected gate", evidence: "deploy-2.log: REFUSED deploy-affected-red: no receipt came back (479 file(s), concurrency 9, budget 40 min, PASS lines only)"}
+    rule: {file: scripts/reconciler/runtime-deploy-affected.mjs, anchor: "affectedJudgement"}
+    spec: tests/reconciler/runtime-deploy-affected.spec.mjs
+    status: covered

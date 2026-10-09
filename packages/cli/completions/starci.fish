@@ -1187,6 +1187,7 @@ complete -c starci -n '__starci_using_command test affected' -l changed -r -d 'e
 complete -c starci -n '__starci_using_command test affected' -l by -r -d 'symbol (default: the specs related to the changed functions) or file (every spec importing a changed file)'
 complete -c starci -n '__starci_using_command test affected' -l run -d 'run the selected spec files, one per process, inside the time budget'
 complete -c starci -n '__starci_using_command test affected' -l plan -d 'print the selected files with the reason each is in the set; run nothing'
+complete -c starci -n '__starci_using_command test affected' -l receipt-file -r -d 'with --run, write the receipt to this file; the answer carries its path (a gate reads the file, not the output)'
 complete -c starci -n '__starci_using_command test affected' -l concurrency -r -d 'override automatic file concurrency with a positive integer'
 complete -c starci -n '__starci_using_command test affected' -l root -r -d 'repository root (default: the command cwd)'
 complete -c starci -n '__starci_using_command test run' -l level -r -a 'L1 L2 L3 L4' -d 'bounded local test level'

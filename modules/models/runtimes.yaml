@@ -201,8 +201,9 @@ allocation:
   # revision still differs from the live one that long past minIntervalMs + checkMs + handoverMs is a drift row (scripts/reconciler/drift.mjs).
   selfReload: {minIntervalMs: 300000, handoverMs: 30000, checkMs: 60000, driftGraceMs: 120000}
   # deploy (scripts/reconciler/runtime-deploy.mjs): a deploy waits up to waitMs, polling every pollMs, for the settles, Critic runs and prepared
-  # decisions in flight to finish; after the engine restart it waits up to verifyMs for the new leader's fresh heartbeat on the new revision.
-  deploy: {waitMs: 1800000, pollMs: 5000, verifyMs: 120000}
+  # decisions in flight to finish; after the engine restart it waits up to verifyMs for the new leader's fresh heartbeat on the new revision. The affected-spec child
+  # may run its declared budget (modules/supervisor/affected-tests.yaml) plus affectedMarginMs before the deploy stops it.
+  deploy: {waitMs: 1800000, pollMs: 5000, verifyMs: 120000, affectedMarginMs: 300000}
   # footprint (scripts/guards/footprint-scan.mjs): one host-wide scan at most every everyMs; a crashed
   # tick's claim lock is cleared after lockStaleMs.
   footprint: {everyMs: 600000, lockStaleMs: 60000}
