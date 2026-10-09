@@ -59,12 +59,14 @@ const gitRevision = (root) => {
 };
 
 /** Derive required paths from the actual workflow/op contracts; caller-supplied paths cannot remove any. */
-export function kernelReadManifest(db, workflowId, { root, authority, ops = [], clean = true, status = statusQuery } = {}) {
+export function kernelReadManifest(db, workflowId, { root, authority, ops = [], extra = [], clean = true, status = statusQuery } = {}) {
   try {
     const requiredOps = [...new Set([...db.prepare('SELECT DISTINCT op_id FROM jobs WHERE workflow_id=? AND op_id IS NOT NULL').all(workflowId).map(row => row.op_id), ...ops])].sort(byCodeUnit);
     // A verb contract the tree does not carry is not required (an installed tree ships the verbs it has); every other contract file absent refuses.
     const present = (relative) => !relative.startsWith(VERB_CONTRACTS) || fs.existsSync(path.join(root, relative));
-    const paths = [...KERNEL_CONTRACT_FILES.filter(present), ...requiredOps.flatMap(op => contractFilesOf(root, op)), ...(requiredOps.length ? [OP_PROMPT_FILE] : [])];
+    const paths = [...KERNEL_CONTRACT_FILES.filter(present), ...requiredOps.flatMap(op => contractFilesOf(root, op)), ...(requiredOps.length ? [OP_PROMPT_FILE] : []),
+      // `extra`: the files a revision change owes this Kernel beyond the contract (machine/revision-notice.mjs); one that no longer exists is gone, not owed.
+      ...extra.filter(relative => fs.existsSync(path.join(root, relative)))];
     const installed = !fs.existsSync(path.join(root,'.git'));
     const files = new Set([...paths, ...(installed ? ['package.json','engine/constants.mjs'] : [])].flatMap(relative => expand(root, relative)));
     const rows = [...files].sort(byCodeUnit).map(relative => {

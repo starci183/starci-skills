@@ -1,6 +1,8 @@
 // kernel-ack-rev — project the required READ plan or attest its complete bytes as the current Kernel.
 import fs from 'node:fs';
 import { getWorkflow } from './shared/rows.mjs';
+import { noticeFor } from '../../machine/revision-ack.mjs';
+import { kernelSeat } from '../../machine/revision-seats.mjs';
 import { kernelAuthorityOf, kernelCustodyOf } from './shared/kernel-seat.mjs';
 import { kernelReadManifest, unreadFiles, verifyKernelRead } from '../required-read.mjs';
 import { KERNEL_REV_ACKED_EVENT, KERNEL_REV_UNKNOWN, resolveRev, revRootOf } from '../runtime-rev.mjs';
@@ -33,7 +35,10 @@ export default {
     const authority = kernelAuthorityOf(db,workflowId,args.plan ? terminal : caller?.handle);
     if (!args.plan && (caller?.role !== 'kernel' || caller.workflowId !== workflowId))
       throw Object.assign(new Error('only the current Kernel may attest its READ'), { code: 'kernel-caller-stale' });
-    const options = { root,authority,ops: args.op ? [String(args.op)] : [] };
+    // ONE plan: the legacy required set UNION the files this revision change owes the Kernel; the token is the digest of exactly that union.
+    const notice = noticeFor(kernelSeat({ ledger, workflowId, root }));
+    const owed = ['owed', 'owed-woken', 'replace-due'].includes(notice.state) ? [...notice.files, ...(notice.replaceFiles ?? [])] : [];
+    const options = { root,authority,ops: args.op ? [String(args.op)] : [],extra: [...new Set(owed)] };
     const required = kernelReadManifest(db,workflowId,options);
     // The plan names the files to read and a short readToken: the attestation needs no file (a seat cannot redirect output into one: KERNEL_NO_FILE_WRITE).
     if (args.plan) return emit({ ok: true, workflowId, readToken: required.digest, readManifest: required, unread: unreadFiles(db, workflowId, required) }, JSON.stringify(required), args.json);
