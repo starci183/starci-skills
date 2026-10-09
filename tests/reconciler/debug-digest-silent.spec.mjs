@@ -1,4 +1,4 @@
-// Replay of the silent loops of the first alpha.8 day (registry: reconciler-action-fails-on-every-pass-unreported): the machine store of the live host held 490 failed runs of
+// The silent loops of the first alpha.8 day (registry: reconciler-action-fails-on-every-pass-unreported): the machine store of the live host held 490 failed runs of
 // `run node` for the key of one Kernel seat (a watchdog pass failing every two minutes for a day), 59 for the Supervisor seat, 24 for the ask tunnel and 44 for `kernel reconcile
 // health:all`, each with the verb's own `failed` row and nothing else: no queue retry (the action returned instead of throwing), no Decision Item, no clock, no digest line. And a
 // Decision Item the runtime refused to open (it named no repository) left one log row per pass and no item, so the role it was for never heard of it.

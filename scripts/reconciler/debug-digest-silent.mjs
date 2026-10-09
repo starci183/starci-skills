@@ -14,7 +14,7 @@ const REFUSED = '%reconciler.decision-refused%';
 const problem = (key, code, params, evidence, blocks = 1) => ({ area: 'reconciler', blocks, key, code, params, evidence });
 
 /** The unbroken runs of failure that end now: one per (controller, verb, key), {streak, firstAt, lastAt, signature}, newest rows first in `rows`. Pure. */
-export function failureRuns(rows) {
+function failureRuns(rows) {
   const runs = new Map();
   const closed = new Set();
   for (const row of rows) {
@@ -30,7 +30,7 @@ export function failureRuns(rows) {
 }
 
 /** The refused Decision Items on record, one per item key: {key, kind, code, count, firstAt, lastAt}. Pure. */
-export function refusedItems(rows) {
+function refusedItems(rows) {
   const items = new Map();
   for (const row of rows) {
     const data = parseJsonOr(row.data_json, {}) ?? {};

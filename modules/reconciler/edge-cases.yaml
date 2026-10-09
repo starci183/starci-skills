@@ -1539,10 +1539,8 @@ cases:
     why: "a wake or nudge refused because a real person's draft stands in the input box is counted as a missed wake and replaces the seat after the declared number of misses, but the draft belongs to the owner and no item asks the owner to clear it; the replacement would discard that draft. Which of the two is right (ask the owner first, or replace and keep the text) is the owner's decision, so the refusal stays unsurfaced to the owner until it is made"
   - id: reconciler-action-fails-on-every-pass-unreported
     family: failure-while-running
-    found: live
-    replay: tests/replay/silent-action-failures.spec.mjs
     finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a stop the runtime makes is a line with an owner, never a row nobody reads) a controller action that ends failed without throwing leaves no queue retry, no Decision Item, no clock and no digest line: the machine store of the first alpha.8 day held 490 failed runs of one Kernel seat watchdog (every two minutes for a day), 59 of the Supervisor seat, 24 of the ask tunnel and 44 of kernel reconcile health:all, each only a failed row of engine_actions; and a Decision Item the runtime refused to open (it named no repository) left one log row per pass and no item, so the role it was for never heard of it", remedy: {state: in-tree, change: "the digest reads the unbroken failing run of every (controller, verb, key) from engine_actions and the refused-item log rows, and prints action-failing and decision-refused problem lines of the runtime once a run is long, spans the declared time and is still happening (modules/reconciler/debug-digest.yaml)"}}
     met: {date: "2026-10-09", where: "alpha.8 live, machine.sqlite engine_actions", evidence: "ledger-copy-a8a: host run node seat:kernel:starci-monorepo:wf-starci-auth-test-wo failed 490, seat:supervisor failed 59, service:ask-tunnel failed 24, job starci kernel reconcile health:all failed 44, with no matching Decision Item"}
     rule: {file: scripts/reconciler/debug-digest-silent.mjs, anchor: "silentProblems"}
-    spec: tests/replay/silent-action-failures.spec.mjs
+    spec: tests/reconciler/debug-digest-silent.spec.mjs
     status: covered

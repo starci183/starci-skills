@@ -10,7 +10,7 @@ import { runtimeRevNow } from './start-hold.mjs';
  * The steps a start prints that are not a failed launch: Orca not answering (waited out by the host-outage clock), a Kernel whose Dispatch is alive (nothing to
  * start), the hold itself (already counted) and a stale terminal that could not be closed (the start records its own event and incident).
  */
-export const NOT_A_FAILED_LAUNCH = Object.freeze(['host-unavailable', 'kernel-worker-alive', 'kernel-start-held', 'kernel-stale-terminal-unclosed']);
+const NOT_A_FAILED_LAUNCH = Object.freeze(['host-unavailable', 'kernel-worker-alive', 'kernel-start-held', 'kernel-stale-terminal-unclosed']);
 
 const MESSAGE_LIMIT = 600;
 
@@ -18,7 +18,7 @@ const MESSAGE_LIMIT = 600;
 export const lastStartFailedSeq = (ledger, workflowId) => Number(ledger.db.prepare("SELECT MAX(seq) AS seq FROM events WHERE workflow_id=? AND kind='kernel-start-failed'").get(workflowId)?.seq ?? 0);
 
 /** The failed-launch payload of a printed refusal: its step, its message and the runtime revision it failed under. Pure. */
-export function refusalPayload(value, rev) {
+function refusalPayload(value, rev) {
   const step = String(value.step ?? 'start-workflow');
   const red = value.host?.items?.find?.((item) => item.status === 'red' && item.required)?.detail;
   const error = String(value.error ?? value.host?.error ?? red ?? value.recovery?.reason ?? step).slice(0, MESSAGE_LIMIT);
@@ -26,7 +26,7 @@ export function refusalPayload(value, rev) {
 }
 
 /** Whether a printed answer is a refusal that counts as a failed launch. Pure. */
-export const countsAsFailedLaunch = (value) => value?.ok === false && !NOT_A_FAILED_LAUNCH.includes(value.step);
+const countsAsFailedLaunch = (value) => value?.ok === false && !NOT_A_FAILED_LAUNCH.includes(value.step);
 
 /**
  * Journal the refusal of a start as a failed launch, unless the start recorded one itself during this run (`before` is the newest sequence number read
