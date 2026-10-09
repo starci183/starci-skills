@@ -1038,3 +1038,10 @@ cases:
     rule: {file: scripts/kernel/verbs/shared/status-menu.mjs, anchor: "standingAnswersOf"}
     spec: tests/kernel/menu-answered-hold.spec.mjs
     status: covered
+  - id: kept-prepared-fail-decision-hidden-from-the-kernel-and-the-settler
+    family: record-vs-reality
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a settle is owned by someone) after the settler kept the prepared fail receipt of Nivo op-architecture.decide-e78adc94cc (event 992, \"an apply to finish\") it handed the job over again under the new revision (event 994, code workflow-checkpoint-recovery-conflict); the menu read a kept receipt as the Kernel's only while it was newer than the newest hand-over, so the newer hand-over made the settle the runtime's, and the settler, which looks at a receipt once, had nothing left to do: reported, hidden from the Kernel, owned by nobody, accept still offered against it", remedy: {state: in-tree, change: "a kept receipt stands as the Kernel's apply until it is applied, withdrawn or replaced by a newer receipt (keptOpenOf), whichever hand-over is newest; accept is not offered against a prepared fail decision"}}
+    met: {date: "2026-10-09", where: "alpha.8 live 13:42, Nivo workflow", evidence: "nivo runtime.sqlite events 992 (workflow-op-preserved-kept), 994 (job-settle-needs-kernel at rev 6513ee8, recovery-conflict); status menu empty on the copy before the fix, the item on it after"}
+    rule: {file: scripts/kernel/settle/prepared-recovery.mjs, anchor: "keptOpenOf"}
+    spec: tests/kernel/menu-answered-hold.spec.mjs
+    status: covered

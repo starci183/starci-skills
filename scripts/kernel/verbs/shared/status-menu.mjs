@@ -6,6 +6,7 @@ import { JOB_KINDS, liveFor, pendingJobsOf, resolutionOf } from '../../../machin
 import { buildMenu, menuCatalog, snoozeMs } from '../../kernel-menu.mjs';
 import { feedbackOfHandover } from '../../handover-slices.mjs';
 import { decisionsOf } from '../../progress-rca.mjs';
+import { keptOpenOf } from '../../settle/prepared-recovery.mjs';
 import { currentRuntimeRev } from '../../runtime-rev.mjs';
 import { failureFactsOf } from '../../failure-class.mjs';
 import { failedShapesOf, jobRow, shapeOf } from '../../kernel-authority.mjs';
@@ -23,7 +24,7 @@ const RECOVERY_CONFLICT = 'workflow-checkpoint-recovery-conflict';
 /** Whether the settle of a handed-over job is the runtime's to finish. */
 const codesOf = (item) => [item.code, ...(item.detail ?? [])].filter(Boolean);
 const runtimeOwned = (db, item) => codesOf(item).some((code) => RUNTIME_OWED_CODES.has(code))
-  || (codesOf(item).includes(RECOVERY_CONFLICT) && db.prepare("SELECT 1 FROM events WHERE entity_id=? AND kind='workflow-op-preserved-kept' AND seq>(SELECT COALESCE(MAX(seq),0) FROM events WHERE entity_id=? AND kind='job-settle-needs-kernel') LIMIT 1").get(item.jobId, item.jobId) == null)
+  || (codesOf(item).includes(RECOVERY_CONFLICT) && !keptOpenOf(db, item.jobId))
   || db.prepare("SELECT 1 FROM events WHERE entity_id=? AND kind='job-settle-check-unavailable' AND seq>(SELECT COALESCE(MAX(seq),0) FROM events WHERE entity_id=? AND kind='job-settle-needs-kernel') LIMIT 1").get(item.jobId, item.jobId) != null;
 
 /**

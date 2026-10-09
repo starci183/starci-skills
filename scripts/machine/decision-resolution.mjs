@@ -60,6 +60,7 @@ const appOf = (p) => /(?:^|\/)((?:apps|packages)\/[^/]+)/.exec(String(p).replace
 /** The steps that close a still-open attempt as a failure: the refusal as a recorded red check (a done claim), then the settle. */
 // A failed Critic verdict is the critique itself: its red check keeps every failed check the verdict names, because the retry is fed that evidence.
 const CRITIC_FAILED = 'op-critic-verdict-failed';
+const RECOVERY_CONFLICT_CODE = 'workflow-checkpoint-recovery-conflict';
 const closeSteps = ({ outcome, code, failures, jobId }) => {
   const verdict = outcome === 'blocked' || outcome === 'ask' ? 'blocked' : 'fail';
   if (outcome !== 'done') return [{ verb: 'settle', args: { job: jobId, verdict } }];
@@ -83,13 +84,14 @@ function jobFacts(db, di, { now }) {
   const repoPrefix = owned.map((p) => p.replaceAll('\\', '/').match(/^([^/]+\/)(?:apps|packages|src)\//)?.[1]).find(Boolean) ?? '';
   const withPrefix = (p) => (repoPrefix && !String(p).startsWith(repoPrefix) && /^(apps|packages|src)\//.test(String(p)) ? `${repoPrefix}${p}` : String(p));
   const failing = [...new Set([...(refusal?.files ?? []), ...(refusal?.continuation?.files ?? []), ...((report?.owedToWire ?? []).map((o) => o?.path).filter(Boolean))].map(withPrefix))].slice(0, 20);
-  return { jobId, wf, job, payload, pending, refusal, report, code, outcome, failing, owned, paths: [...new Set([...owned, ...failing])],
+  const codes = [pending?.code, ...(pending?.detail ?? []), code].filter(Boolean).map(String);
+  return { jobId, wf, job, payload, pending, refusal, report, code, codes, outcome, failing, owned, paths: [...new Set([...owned, ...failing])],
     open: Boolean(job) && !SETTLED_JOB_LIST.includes(job.status), failures: (refusal?.failures ?? []).map(String) };
 }
 
 /** The typed options of one job item: [{key, title, steps}]. Settling the open attempt comes first, then the retry that owns the failing files. */
 function jobOptions(facts, di) {
-  const { jobId, wf, job, payload, code, outcome, failing, paths, open, failures, refusal } = facts;
+  const { jobId, wf, job, payload, code, codes, outcome, failing, paths, open, failures, refusal } = facts;
   const op = job?.op_id ?? facts.pending?.op ?? '<op>';
   const what = String(payload.displayWhat ?? payload.title ?? jobId);
   const params = { ...payload.params, ...(refusal?.continuation?.resumeFrom ? { resumeFrom: refusal.continuation.resumeFrom } : {}) };
@@ -97,13 +99,15 @@ function jobOptions(facts, di) {
   const enqueue = (ps, tag) => ({ verb: 'enqueue', args: { workflow: wf, op, paths: ps.join(','), 'retry-of': jobId,
     ...(Object.keys(params).length ? { params: JSON.stringify(params) } : {}), what: `${tag}: ${what}`.slice(0, 40), ...(di.id ? { resolves: di.id } : {}) } });
   const options = [];
-  const critique = code === CRITIC_FAILED;
+  const critique = codes.includes(CRITIC_FAILED);
+  // A prepared fail decision the runtime kept stands: finishing it is settle-fail, and a pass would only be refused against it.
+  const preparedFail = codes.includes(RECOVERY_CONFLICT_CODE);
   if (open) options.push({ key: 'settle-fail', title: critique ? 'settle it fail: the Critic\'s failed checks are recorded as the attempt\'s red check and the route table queues the retry that is fed that critique' : `settle it ${close.at(-1).args.verdict}: the route table queues the next step of its lineage`, steps: close });
   options.push({ key: 'continue', title: critique ? 'close it as failed with the Critic\'s critique recorded and enqueue the retry yourself, on the current base' : `continue on the current base with the failing files added (${failing.length} file(s))`, steps: [...close, enqueue(paths, 'continue')] });
   const apps = [...new Set(paths.map(appOf))];
   if (apps.length > 1) options.push({ key: 'split-per-app', title: `split it per app (${apps.join(', ')})`, steps: [...close, ...apps.slice(0, 4).map((a) => enqueue(paths.filter((p) => appOf(p) === a), a.split('/').pop()))] });
   // A failed Critic verdict never passes by being settled again, so accept is not offered against it.
-  if (open && outcome === 'done' && !critique) options.push({ key: 'accept', title: 'accept it: the settle pass re-runs integration and parity on the current tip (only when the blocker the refusal names has since landed)', steps: [{ verb: 'settle', args: { job: jobId, verdict: 'pass' } }] });
+  if (open && outcome === 'done' && !critique && !preparedFail) options.push({ key: 'accept', title: 'accept it: the settle pass re-runs integration and parity on the current tip (only when the blocker the refusal names has since landed)', steps: [{ verb: 'settle', args: { job: jobId, verdict: 'pass' } }] });
   return options;
 }
 

@@ -121,3 +121,23 @@ test('an answer whose step failed holds the item while the facts and the runtime
   answer(itemFactsOf(item), rev2);
   assert.deepEqual(status(world, revision.env).menu, [], 'failing again at the new revision holds it again until the next one');
 }));
+
+test('a prepared fail decision the runtime kept stays the Kernel\'s after the settler hands the job over again (Nivo 2026-10-09 13:42: kept, then re-handed at a new revision, hidden from both)', (t) => withLedger(t, (world) => {
+  const REPORTED = reportedWith(world.ledger, 'workflow-checkpoint-recovery-conflict');
+  const { attempt_id: attemptId, dispatch_id: dispatchId } = world.ledger.db.prepare('SELECT attempt_id, dispatch_id FROM op_attempts WHERE job_id=?').get(REPORTED);
+  const append = (kind, payload) => world.ledger.transaction(() => world.ledger.appendEvent({ workflowId: WF, entityType: 'job', entityId: REPORTED, attemptId, kind, payload }));
+  const handover = () => append('job-settle-needs-kernel', { dispatchId, reason: 'settle-refused', code: 'workflow-checkpoint-recovery-conflict', detail: ['settle must recover its prepared fail decision'], outcome: 'done', op: 'architecture.decide' });
+  append('workflow-op-preserved-prepared', { opId: REPORTED, attemptId, resetTo: 'a'.repeat(40) });
+  handover();
+  world.ledger.close();
+  assert.deepEqual(status(world).menu, [], 'a receipt nobody looked at yet is the settler\'s to withdraw or keep');
+  const writer = openLedger({ file: world.ledgerFile });
+  writer.transaction(() => writer.appendEvent({ workflowId: WF, entityType: 'job', entityId: REPORTED, attemptId, kind: 'workflow-op-preserved-kept', payload: { reason: 'the receipt aims at the live gate base' } }));
+  writer.transaction(() => writer.appendEvent({ workflowId: WF, entityType: 'job', entityId: REPORTED, attemptId, kind: 'job-settle-needs-kernel',
+    payload: { dispatchId, reason: 'settle-refused', code: 'workflow-checkpoint-recovery-conflict', detail: ['settle must recover its prepared fail decision'], outcome: 'done', op: 'architecture.decide', runtimeRev: 'b'.repeat(40) } }));
+  writer.close();
+  const [item] = status(world).menu;
+  assert.equal(item?.id, `job-decision:${REPORTED}`, 'a kept receipt is an apply to finish, whichever hand-over is the newest');
+  assert.ok(!item.options.some((option) => option.choice === 'accept'), 'a pass is refused against a prepared fail decision');
+  assert.ok(item.options.some((option) => option.choice === 'settle-fail'));
+}));
