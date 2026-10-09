@@ -49,7 +49,8 @@ async function affectedProof({ root, seams, base, sha, progress }) {
   progress(`affected: running the specs for ${base.slice(0, 12)}..${sha.slice(0, 12)} in ${root}; progress follows`);
   const run = await seams.runAffected(root, base, progress);
   const judged = affectedJudgement(run, { sha, base });
-  if (!judged.affected) return { detail: judged.detail, red: run.red ?? [] };
+  const resume = (run.unfinished ?? []).length ? ' Run starci runtime verify again: the files that passed are reused and the run continues with the rest.' : '';
+  if (!judged.affected) return { detail: judged.detail + resume, red: run.red ?? [] };
   const { receipt } = run;
   return { affected: { passed: judged.affected.passed, total: judged.affected.total, reused: receipt.reused ?? 0, files: receipt.files, ms: receipt.ms } };
 }

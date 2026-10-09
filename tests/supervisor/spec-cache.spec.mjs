@@ -108,3 +108,20 @@ test('test affected --run reuses an unchanged green file, counts it in the recei
   assert.equal(calls.length, 2);
   assert.equal(forced.data.receipt.reused, 0);
 });
+
+test('a run that ends on its time budget leaves its green files: the next run reuses them and finishes the rest', async (t) => {
+  const { root } = tree(t);
+  const slow = (calls) => (a) => { calls.push(a.at(-1)); return new Promise((resolve) => { setTimeout(() => resolve({ error: null, stdout: 'ok', stderr: '' }), 60); }); };
+  const base = { mergeBase: () => 'abcdef123456', exists: () => true, sources: [], root, revParse: () => 'tip0123456789', diff: () => ({ status: 0, stdout: '' }), lsFiles: () => ({ status: 0, stdout: '' }),
+    hostSample: () => ({ logicalThreads: 16, cpuBusy: 0, totalRamBytes: 64 * 1024 ** 3, freeRamBytes: 48 * 1024 ** 3 }), changedFiles: () => ['scripts/lib/core.mjs'], progress: () => {} };
+  const ctx = { args: { root, run: true, concurrency: 1 }, cwd: root };
+  const firstCalls = [];
+  const first = await testAffected(ctx, { ...base, execNode: slow(firstCalls), policy: { ...POLICY, budgetMs: 30 } });
+  assert.equal(first.code, 2, 'the budget ended with a file not started');
+  assert.equal(firstCalls.length, 1);
+  const secondCalls = [];
+  const second = await testAffected(ctx, { ...base, execNode: slow(secondCalls), policy: POLICY });
+  assert.equal(second.code, 0, second.text);
+  assert.equal(second.data.receipt.reused, 1, 'the file the first run finished is reused');
+  assert.deepEqual(secondCalls, [firstCalls[0] === 'tests/core.spec.mjs' ? 'tests/second.spec.mjs' : 'tests/core.spec.mjs'], 'only the file the first run never started is run');
+});

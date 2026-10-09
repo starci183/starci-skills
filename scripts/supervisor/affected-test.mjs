@@ -143,11 +143,12 @@ async function runSelection({ root, picked, args, deps, base, policy }) {
   const budgetMs = policy.budgetMs;
   const decision = resolveTestConcurrency(args.concurrency, deps);
   const progress = deps.progress ?? ((line) => process.stderr.write(line + '\n'));
-  const startedAt = Date.now();
   progress(`affected: ${picked.files.length} file(s), concurrency ${decision.concurrency}, budget ${minutes(budgetMs)}`);
-  const timedOut = () => Date.now() - startedAt >= budgetMs;
+  // The keys are computed before the budget clock starts: the budget is for running specs.
   const cached = withSpecCache({ root, files: picked.files, policy, preloads: PRELOADS, disabled: Boolean(args['no-cache']), deps, runOne: (file) => runSpecFile(root, file, deps) });
   if (cached.off) progress(`affected: spec cache off: ${cached.off}`);
+  const startedAt = Date.now();
+  const timedOut = () => Date.now() - startedAt >= budgetMs;
   const results = await runBounded(picked.files, decision.concurrency, (file) => (timedOut()
     ? Promise.resolve({ file, pass: false, ms: 0, tail: ['not started: the time budget ended'], failedTests: null, skipped: true })
     : cached.runOne(file).then((result) => { progress(verdictLine(result)); return result; })));

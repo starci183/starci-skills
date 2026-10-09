@@ -59,7 +59,7 @@ test('NOT VERIFIED, each with its reason: a dirty tree, no base, a red check (th
   assert.equal(redSpecs.out.code, 1);
   assert.match(last(redSpecs.out), /^NOT VERIFIED aaaaaaaaaaaa: 2 spec file\(s\) are red: tests\/a\.spec\.mjs, tests\/b\.spec\.mjs \[red: tests\/a\.spec\.mjs, tests\/b\.spec\.mjs\]$/);
   const unfinished = await verify(t, { runAffected: () => ({ exit: { exited: true, code: 2, signal: null, timedOut: false }, receipt: { ok: false, passed: 2, total: 3, files: 4, clean: true, tip: SHA, base: BASE }, answer: {}, tail: [], red: [], unfinished: ['tests/z.spec.mjs'] }) });
-  assert.match(last(unfinished.out), /^NOT VERIFIED .*the time budget ended with 1 spec file\(s\) not started/);
+  assert.match(last(unfinished.out), /^NOT VERIFIED .*the time budget ended with 1 spec file\(s\) not started.* Run starci runtime verify again: the files that passed are reused/);
   let calls = 0;
   const moved = await verify(t, { facts: () => ({ sha: calls++ ? 'c'.repeat(40) : SHA, tree: 't', dirty: false }) });
   assert.match(last(moved.out), /^NOT VERIFIED .*HEAD moved while they ran/);
