@@ -1819,3 +1819,34 @@ cases:
     spec: tests/replay/affected-child-capture.spec.mjs
     replay: tests/replay/affected-child-capture.spec.mjs
     status: covered
+
+  - id: watchdog-revision-baseline-without-host-observation
+    family: failure-while-running
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "runtimePass introduced by 6d6e1f910 records runtime-rev-noticed before the watchdog observes the seat; an unavailable host must only wait", remedy: {state: in-tree, change: "the watchdog adopts and settles revisions after a successful terminal read, before any wake; an outage before or after baseline adoption writes no ledger rows"}}
+    met: {date: "2026-10-10", where: "Orca outage spec on a Git runtime root", evidence: "both availability orders assert one baseline after observation and unchanged ledger rows during outage"}
+    rule: {file: scripts/kernel/kernel-watchdog-tick.mjs, anchor: "observeRevision"}
+    spec: tests/api-orca/orca-host-outage.spec.mjs
+    status: covered
+  - id: replay-housekeeping-archives-its-own-live-ledger
+    family: concurrency
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "the tree-stray replay introduced in 04475d4cd places live sources under the replay host's temp root; real housekeeping archives its ledger before the tree-strays key reads ownership", remedy: {state: in-tree, change: "the replay host owns an isolated temp root beside its repositories and isolated home paths; the driver runs real housekeeping and the spec proves the workflow ledger survives"}}
+    met: {date: "2026-10-10", where: "tree-stray replay with the housekeeping stub removed", evidence: "0 pass / 1 fail with inherited temp roots; 1 pass / 0 fail with separate host roots"}
+    rule: {file: tests/helpers/replay-world.mjs, anchor: "tempChildEnv"}
+    spec: tests/replay/tree-stray.spec.mjs
+    status: covered
+  - id: workflow-purge-spilled-custody-and-unknown-holders
+    family: correctness
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "purge reads payload_json alone and loses pointer-only or clipped Run, terminal and ref custody; unproved holders are listed but their tree remains removable", remedy: {state: in-tree, change: "hydrate ledger and machine events through eventPayloadOf; incomplete host reads and unknown tree custody refuse before any purge effect"}}
+    met: {date: "2026-10-10", where: "isolated real-writer and CLI replay", evidence: "pre-fix 6a034fdd5 loses proved custody and removes trees holding unknown workers or terminals; the fixed replay retains the tree and rows on refusal"}
+    rule: {file: scripts/machine/workflow-purge-plan.mjs, anchor: "export function buildPurgePlan"}
+    spec: tests/machine/workflow-purge.spec.mjs
+    replay: tests/replay/workflow-purge.spec.mjs
+    status: covered
+  - id: workflow-purge-incomplete-blob-archive
+    family: correctness
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "native purge archives job_artifacts only, omitting events, goal inputs, attempt and check streams and other declared reference owners", remedy: {state: in-tree, change: "one archive evidence helper reads blob_ref_columns, schema foreign keys, stored content references and storage-owned bundle membership; every referenced original is verified before effects and compared again under the ledger writer lock"}}
+    met: {date: "2026-10-10", where: "isolated archive replay and native purge spec", evidence: "pre-fix replay archives no bytes without job_artifacts and purges with missing or corrupt check evidence; the fixed ZIP alone restores the workflow blob closure, excluding foreign evidence"}
+    rule: {file: scripts/work/workflow-archive-evidence.mjs, anchor: "export function workflowArchiveEvidence"}
+    spec: tests/housekeeping/workflow-purge-archive.spec.mjs
+    replay: tests/replay/workflow-purge.spec.mjs
+    status: covered

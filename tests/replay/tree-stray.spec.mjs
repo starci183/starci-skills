@@ -9,18 +9,19 @@ import path from 'node:path';
 import { loadFixture, replayWorld } from '../helpers/replay-world.mjs';
 
 const fixture = loadFixture('handed-over');
-const OLD = new Date(Date.now() - 3_600_000);
 
 test('the GC controller collects the file named 0 from the workflow tree root and leaves the op\'s records and tracked files alone', (t) => {
   const world = replayWorld(t, fixture, { tree: true });
   const stray = path.join(world.tree.dir, '0');
+  const old = new Date(world.at(-3_600_000));
   fs.writeFileSync(stray, 'x\n');
-  fs.utimesSync(stray, OLD, OLD);
+  fs.utimesSync(stray, old, old);
   const record = path.join(world.tree.dir, world.tree.records[0]);
   assert.equal(fs.existsSync(record), true);
 
   const out = world.engine({ controllers: ['gc'], passes: 1 });
   assert.equal(out.ok, true, JSON.stringify(out).slice(0, 400));
+  assert.equal(fs.existsSync(world.ledgerFile), true, 'real housekeeping preserves the live workflow ledger');
   assert.equal(fs.existsSync(stray), false, 'the stray file is collected');
   assert.equal(fs.existsSync(record), true, 'the op\'s record (owned by a live job) stays');
   assert.equal(fs.existsSync(path.join(world.tree.dir, '.gitignore')), true, 'a tracked file stays');

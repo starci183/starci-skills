@@ -51,12 +51,15 @@ const resolveRow = (row) => {
  */
 /** A SQLite file opened read-only with the given busy timeout, its references resolving. */
 export const openReadOnlyDb = (file, timeoutMs) => installRefResolver(new (createRequire(import.meta.url)('node:sqlite').DatabaseSync)(file, { readOnly: true, timeout: timeoutMs }));
+
+/** A statement over exact stored cells, for self-contained archives that retain references and their original bytes. */
+export const prepareStored = (db, sql, ...rest) => Object.getPrototypeOf(db).prepare.call(db, sql, ...rest);
+
 export function installRefResolver(db) {
   if (db.__refResolver) return db;
   // The prototype's prepare is looked up at each call, so a later change of the driver's own method (a spec's mock, a corruption injection) still applies.
-  const prototype = Object.getPrototypeOf(db);
   db.prepare = (sql, ...rest) => {
-    const statement = prototype.prepare.call(db, sql, ...rest);
+    const statement = prepareStored(db, sql, ...rest);
     return new Proxy(statement, {
       get(target, name) {
         const member = target[name];

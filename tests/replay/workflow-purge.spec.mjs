@@ -11,6 +11,9 @@ import { git, replayWorld } from '../helpers/replay-world.mjs';
 import { openMachine } from '../../engine/db/machine.mjs';
 import { runtimeStampOf } from '../../scripts/lib/orca-orphans.mjs';
 import { registerWorkflowWorktree } from '../../scripts/kernel/workflow-worktree.mjs';
+import { blobPath, getBlob, putBundle } from '../../engine/db/blob.mjs';
+import { zipVisit } from '../../scripts/api/fs/zip-visit.mjs';
+import { seedWorkflow } from '../helpers/ledger-fixture.mjs';
 
 const wf = 'wf-1';
 const failedLaunch = (n) => ({ kind: 'kernel-start-failed', entity: wf, at: -3_600_000 + n, payload: { step: 'turn-start', error: 'turn_start_unobserved', terminal: `term-dead-${n}`, dispatch: `dsp-launch-${n}`, runId: 'run-launch', effectState: 'none' } });
@@ -95,4 +98,138 @@ test('a workflow that is not archived is refused by the real CLI and nothing mov
   assert.equal(refused.status, 1);
   assert.ok(refused.json.blockers.some((b) => b.code === 'workflow-purge-not-archived' || b.code === 'workflow-purge-live-job'));
   assert.equal(fs.existsSync(dir), true);
+});
+
+const stopWorld = (world) => {
+  const out = world.cli('archive', ['--workflow', wf, '--reason', 'fixture owner stop', '--by', 'owner'], { as: 'owner' });
+  assert.equal(out.status, 0, out.stderr || out.stdout);
+  world.purgeCallStart = orcaCalls(world).length;
+};
+const purgeArgs = (world, ...flags) => ['workflow', 'purge', '--repo', world.repo, '--workflow', wf, ...flags];
+const writeBooks = (world, update) => fs.writeFileSync(world.env.STARCI_FAKE_ORCA_STATE, JSON.stringify(update(world.orca())));
+const noPurgeEffects = (world, dir) => {
+  assert.equal(fs.existsSync(dir), true);
+  assert.equal(world.ledger((ledger) => ledger.db.prepare('SELECT count(*) n FROM workflows WHERE workflow_id=?').get(wf).n), 1);
+  assert.equal(orcaCalls(world).slice(world.purgeCallStart).some((call) => /^(terminal close|worktree rm|orchestration worker-release) /.test(call)), false);
+  assert.equal(git(world.repo, 'rev-parse', `refs/heads/wf-${wf}`), git(dir, 'rev-parse', 'HEAD'));
+};
+
+test('pointer-only ledger events and spilled machine events preserve Run, terminal and ref custody; a live proved worker refuses before any effect', (t) => {
+  const { world, dir } = stoppedWorld(t);
+  const preservedRef = 'preserved/private-spilled-evidence';
+  git(world.repo, 'branch', preservedRef, `wf-${wf}`);
+  world.ledger((ledger) => {
+    for (const [kind, payload] of [
+      ['kernel-start-failed', { runId: 'run-spilled', terminal: 'term-spilled', dispatch: 'dsp-spilled' }],
+      ['workflow-op-preserved', { preservedRef: `refs/heads/${preservedRef}` }],
+    ]) {
+      const blob = ledger.write.storeBlob({ content: Buffer.from(JSON.stringify(payload)), mediaType: 'application/json' });
+      ledger.appendEvent({ workflowId: wf, entityType: 'workflow', entityId: wf, kind, payloadSha: blob.sha256 });
+    }
+  });
+  stopWorld(world);
+  const machine = machineOf(world);
+  try { machine.supEvent({ entityType: 'kernel', entityId: wf, kind: 'kernel-start-failed', payload: { runId: 'run-machine-spill', terminal: 'term-machine-spill', dispatch: 'dsp-machine-spill', detail: 'fixture'.repeat(4000) } }); } finally { machine.close(); }
+  writeBooks(world, (books) => ({ ...books,
+    terminals: { ...books.terminals, 'term-machine-spill': { handle: 'term-machine-spill', title: 'codex', worktree: dir, connected: true } },
+    workerRows: [...books.workerRows, { dispatchId: 'dsp-spilled', runId: 'run-spilled', terminalState: 'release_unknown', resource: { terminalHandle: 'term-spilled', worktreeId: `repo-product::${dir}` }, projection: { liveness: { verdict: 'exited' } } }],
+  }));
+  const plan = world.starci(purgeArgs(world));
+  assert.equal(plan.status, 0, plan.stderr || plan.stdout);
+  assert.ok(plan.json.workers.some((worker) => worker.dispatchId === 'dsp-spilled'));
+  assert.ok(plan.json.terminals.some((terminal) => terminal.handle === 'term-machine-spill'));
+  assert.equal(plan.json.refs.find((ref) => ref.name === preservedRef)?.action, 'delete');
+  writeBooks(world, (books) => ({ ...books, workerRows: books.workerRows.map((worker) => worker.dispatchId === 'dsp-spilled' ? { ...worker, terminalState: 'active', projection: { liveness: { verdict: 'unknown' } } } : worker) }));
+  const refused = world.starci(purgeArgs(world, '--apply', '--ledger'));
+  assert.equal(refused.status, 1);
+  assert.ok(refused.json.blockers.some((blocker) => blocker.code === 'workflow-purge-worker-live'));
+  noPurgeEffects(world, dir);
+});
+
+for (const kind of ['worker', 'terminal']) test(`unknown ${kind} custody in a workflow tree refuses --apply --ledger before any effect`, (t) => {
+  const { world, dir } = stoppedWorld(t);
+  stopWorld(world);
+  writeBooks(world, (books) => kind === 'worker' ? { ...books, workerRows: [...books.workerRows, { dispatchId: 'dsp-foreign', runId: 'run-foreign', terminalState: 'active', resource: { terminalHandle: 'term-foreign', worktreeId: `repo-product::${dir}` }, projection: { liveness: { verdict: 'unknown' } } }] }
+    : { ...books, terminals: { ...books.terminals, 'term-foreign': { handle: 'term-foreign', title: 'owner shell', worktree: dir, connected: true } } });
+  const refused = world.starci(purgeArgs(world, '--apply', '--ledger'));
+  assert.equal(refused.status, 1, 'unproved custody never authorizes tree removal');
+  assert.ok(refused.json.blockers.some((blocker) => blocker.code === 'workflow-purge-custody-unknown'));
+  noPurgeEffects(world, dir);
+});
+
+/** Real storage writers, no job_artifacts: goal, attempt streams, check streams, event evidence and a bundle; the foreign workflow is excluded. */
+function archiveEvidence(world) {
+  const blobs = new Map();
+  const store = (ledger, name) => {
+    const bytes = Buffer.from(`private fixture ${name}\n`);
+    const blob = ledger.write.storeBlob({ content: bytes, mediaType: 'text/plain' });
+    blobs.set(blob.sha256, bytes);
+    return blob.sha256;
+  };
+  world.ledger((ledger) => {
+    const attemptId = ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get('job-1').attempt_id;
+    ledger.write.recordGoalInput({ workflowId: wf, key: 'source', goalRevision: 0, sha256: store(ledger, 'goal input'), origin: 'owner' });
+    ledger.write.setAttemptTranscript({ attemptId, promptSha: store(ledger, 'prompt'), transcriptSha: store(ledger, 'transcript'), sessionSha: store(ledger, 'session') });
+    ledger.write.recordTranscriptSnapshot({ attemptId, sha256: store(ledger, 'snapshot'), lines: 1, bytes: Buffer.byteLength('private fixture snapshot\n') });
+    ledger.write.recordCheckRun({ attemptId, name: 'archive-fixture', phase: 'verify', runner: 'op', status: 'pass', exitCode: 0, stdoutSha: store(ledger, 'stdout'), stderrSha: store(ledger, 'stderr'), outputSha: store(ledger, 'output') });
+    const bytes = Buffer.from(JSON.stringify({ evidence: 'fixture'.repeat(4000) }));
+    const event = ledger.appendEvent({ workflowId: wf, entityType: 'workflow', entityId: wf, kind: 'archive-fixture', payload: JSON.parse(bytes) });
+    blobs.set(event.payload_sha, getBlob(event.payload_sha));
+    const bundle = path.join(world.base, 'bundle-input');
+    fs.mkdirSync(bundle);
+    fs.writeFileSync(path.join(bundle, 'capture.txt'), 'private fixture bundle member\n');
+    const sha = putBundle(bundle);
+    blobs.set(sha, getBlob(sha));
+    const member = JSON.parse(getBlob(sha)).files['capture.txt'];
+    blobs.set(member, getBlob(member));
+    ledger.write.storeBlob({ content: getBlob(sha), mediaType: 'application/json' });
+    ledger.write.recordGoalInput({ workflowId: wf, key: 'bundle', goalRevision: 0, sha256: sha, origin: 'owner' });
+    seedWorkflow(ledger, { id: 'wf-foreign', state: { phase: 'running' } });
+    const foreign = ledger.write.storeBlob({ content: Buffer.from('private foreign bytes'), mediaType: 'text/plain' });
+    ledger.write.recordGoalInput({ workflowId: 'wf-foreign', key: 'source', goalRevision: 0, sha256: foreign.sha256, origin: 'owner' });
+    ledger.write.citeBlob({ recordId: 'foreign.record', recordPath: 'foreign/index.yaml', field: 'asset', sha256: foreign.sha256 });
+    world.foreignBlob = foreign.sha256;
+    assert.equal(ledger.db.prepare('SELECT count(*) n FROM job_artifacts').get().n, 0);
+  });
+  return blobs;
+}
+
+test('--ledger ZIP alone recovers every declared workflow blob and bundle member after fixture originals disappear; foreign bytes stay outside', (t) => {
+  const { world } = stoppedWorld(t);
+  const blobs = archiveEvidence(world);
+  stopWorld(world);
+  const applied = world.starci(purgeArgs(world, '--apply', '--ledger'));
+  assert.equal(applied.status, 0, applied.stderr || applied.stdout);
+  const restored = path.join(world.base, 'restored-blobs');
+  const entries = new Map();
+  zipVisit(applied.json.results.ledger.archive, (entry) => { entries.set(entry.name, entry.data); });
+  const archivedShas = [...entries.keys()].filter((name) => /^files\/blobs\/[a-f0-9]{64}$/.test(name)).map((name) => name.split('/').at(-1));
+  assert.deepEqual(archivedShas.sort(), [...blobs.keys()].sort(), 'the ZIP contains the complete reference closure, even with no job_artifacts');
+  assert.equal(entries.has(`files/blobs/${world.foreignBlob}`), false);
+  for (const [sha, bytes] of blobs) {
+    assert.deepEqual(entries.get(`files/blobs/${sha}`), bytes);
+    const original = blobPath(sha);
+    fs.rmSync(original);
+    fs.rmSync(`${original}.json`);
+    const file = path.join(restored, sha.slice(0, 2), sha);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, entries.get(`files/blobs/${sha}`));
+    fs.writeFileSync(`${file}.json`, entries.get(`files/blobs/${sha}.json`));
+    assert.deepEqual(getBlob(sha, { root: restored }), bytes, 'archive bytes and metadata recover through the real storage reader');
+  }
+  assert.ok(blobPath(world.foreignBlob), 'foreign workflow retains its original evidence');
+});
+
+for (const damage of ['missing', 'corrupt']) test(`${damage} check evidence refuses --ledger before host or ledger removal`, (t) => {
+  const { world, dir } = stoppedWorld(t);
+  archiveEvidence(world);
+  stopWorld(world);
+  const sha = world.ledger((ledger) => ledger.db.prepare("SELECT output_sha FROM check_runs WHERE name='archive-fixture'").get().output_sha);
+  const file = blobPath(sha);
+  if (damage === 'missing') fs.rmSync(file); else fs.writeFileSync(file, Buffer.alloc(fs.statSync(file).size));
+  const refused = world.starci(purgeArgs(world, '--apply', '--ledger'));
+  assert.equal(refused.status, 1);
+  assert.ok(refused.json.blockers.some((blocker) => blocker.code === 'workflow-purge-archive-incomplete'));
+  noPurgeEffects(world, dir);
+  assert.equal(fs.existsSync(world.env.STARCI_ARCHIVE_ROOT), false);
 });

@@ -9,8 +9,8 @@ import { draftOwnership } from '../../scripts/lib/terminal-liveness.mjs';
 const WF = 'wf-tick';
 const notice = (state, extra = {}) => ({ role: 'kernel', state, from: 'a'.repeat(40), to: 'b'.repeat(40), action: 'reread', count: 1, files: ['modules/kernel/driver-loop.yaml'], replaceFiles: [], ...extra });
 
-function tickWith({ frontier = { actionable: false, reason: 'nothing waits' }, revisionNotice = null, rotationDue = false, draft = null, dispatch = 'D1', workerState = 'running' } = {}) {
-  const log = { sent: [], revisionWoken: [], rotated: [], replaced: 0, held: [] };
+function tickWith({ frontier = { actionable: false, reason: 'nothing waits' }, revisionNotice = null, rotationDue = false, draft = null, dispatch = 'D1', workerState = 'running', overrides = {} } = {}) {
+  const log = { sent: [], revisionWoken: [], rotated: [], replaced: 0, held: [], observed: [] };
   const deps = {
     workflowId: WF, repair: true,
     recordDraftCleared: () => {}, draftHeld: () => false, foreignDraft: (text) => draftOwnership(text).kind === 'foreign', draftRefused: () => false,
@@ -25,6 +25,7 @@ function tickWith({ frontier = { actionable: false, reason: 'nothing waits' }, r
     sendWakeWithProof: (args) => { log.sent.push(args.text); return { ok: true, delivery: 'typed' }; }, wakePromptOf: (wf, value) => `wake ${value.revisionNotice?.state ?? 'none'}`,
     recordKernelWoken: () => {}, recordKernelWakeFailed: () => {}, wakeSendRefused: () => false, wakeActionOf: (proof) => (proof.ok ? 'woken' : 'wake-failed'),
     deliveryFieldsOf: () => ({}), finalKernelAction: () => 'observed', jsonFromStdout: (v) => v, recordRevisionWoken: (n) => log.revisionWoken.push(n.to),
+    observeRevision: (status) => log.observed.push(status.value), ...overrides,
   };
   const status = { value: { frontier, revisionNotice, kernel: { attempt: 1 } } };
   return { result: createKernelTick(deps)(status, 'running'), log };
@@ -37,6 +38,21 @@ test('a human draft holds both a missing worker and a dead worker before fencing
     assert.deepEqual([log.replaced, log.sent, log.rotated], [0, [], []]);
     assert.equal(log.held.length, 1);
   }
+});
+
+test('revision records wait for a responding host and a readable seat', () => {
+  const missingObservation = [
+    { api: () => ({ ok: false }) },
+    { workerShow: () => ({ hostUnavailable: true }) },
+    { settledKernelVerdict: () => ({ verdict: 'host-unavailable' }) },
+    { settledKernelVerdict: () => ({ verdict: 'unverified' }) },
+    { terminalRead: () => ({ ok: false, error: 'unreadable' }) },
+  ];
+  for (const overrides of missingObservation) {
+    assert.deepEqual(tickWith({ overrides }).log.observed, [], 'an unobserved seat writes no revision record');
+  }
+  const { log } = tickWith();
+  assert.equal(log.observed.length, 1, 'the readable seat is observed even when the menu is empty');
 });
 
 test('a concerned Kernel with an empty menu is woken once, with the notice in the wake', () => {

@@ -5,6 +5,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { starciLocalRoot } from '../../engine/runtime-root.mjs';
+import { artifactRoot } from '../../engine/db/blob.mjs';
+import { eventPayloadOf } from '../../engine/db/event-payload.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { parseRuntimeStamp, psCoverage } from '../lib/orca-orphans.mjs';
 import { worktreePs } from '../api/orca/worktree-ps.mjs';
@@ -34,7 +36,7 @@ function machineFactsOf(workflowId, env) {
       .map((di) => ({ diId: di.di_id, kind: di.kind, status: di.status })),
     purgedAt: m.db.prepare("SELECT created_at FROM sup_events WHERE kind='workflow-purged' AND entity_type='workflow' AND entity_id=? ORDER BY seq DESC LIMIT 1").get(workflowId)?.created_at ?? null,
     // A launch that failed after the stop is journalled here, not in the archived ledger (an archived ledger takes no event).
-    launchFailures: m.db.prepare("SELECT payload_json FROM sup_events WHERE kind='kernel-start-failed' AND entity_id=? ORDER BY seq").all(workflowId).map((row) => parseJson(row.payload_json, null) ?? {}),
+    launchFailures: m.db.prepare("SELECT CASE WHEN payload_sha IS NULL THEN payload_json END AS payload_json, payload_sha FROM sup_events WHERE kind='kernel-start-failed' AND entity_id=? ORDER BY seq").all(workflowId).map((row) => eventPayloadOf(row, { root: artifactRoot(env) }) ?? {}),
     inProgress: parseJson(m.db.prepare('SELECT value FROM machine_meta WHERE key=?').get(purgeMetaKey(workflowId))?.value, null),
   }), env);
 }
@@ -99,9 +101,13 @@ function workersOf(runIds, orca) {
     if (listed?.ok) rows.push(...listed.workers);
     else unreadable.push({ run, error: String(listed?.error ?? 'no answer').slice(0, 200) });
   }
-  // Every Run's workers, to list the ones in the workflow's trees that no ledger row ties to it; an unreadable listing only costs that list.
+  // Every Run's workers: an unreadable global listing cannot prove the workflow's trees have no unknown custody.
   let others = [];
-  try { const all = orca.workers(undefined); others = all?.ok ? all.workers.filter((w) => !runIds.includes(w.runId)) : []; } catch { others = []; }
+  try {
+    const all = orca.workers(undefined);
+    if (all?.ok) others = all.workers.filter((w) => !runIds.includes(w.runId));
+    else unreadable.push({ run: null, error: String(all?.error ?? 'no answer').slice(0, 200) });
+  } catch (error) { unreadable.push({ run: null, error: String(error?.message ?? error).slice(0, 200) }); }
   return { rows, unreadable, others };
 }
 

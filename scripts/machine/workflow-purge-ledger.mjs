@@ -3,6 +3,8 @@
 // to it. The purge (workflow-purge-plan.mjs) judges its preconditions and its leftovers from this.
 import fs from 'node:fs';
 import { ledgerFileFor, openLedgerReader } from '../../engine/db/ledger.mjs';
+import { artifactRoot } from '../../engine/db/blob.mjs';
+import { eventPayloadOf } from '../../engine/db/event-payload.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { jobPayload, jobRunIds, jobTerminalHandles, KERNEL_LAUNCH_EVENTS } from './terminal-ledger.mjs';
 import { SETTLED_JOBS } from './worktree-registry.mjs';
@@ -12,7 +14,7 @@ import { SETTLED_JOBS } from './worktree-registry.mjs';
 const EVIDENCE_EVENTS = Object.freeze(['kernel-start-failed', 'workflow-op-preserved', ...KERNEL_LAUNCH_EVENTS]);
 const OPEN_DECISION = "('open','claimed','escalated')";
 
-const countOf = (db, sql, workflowId) => { try { return Number(db.prepare(sql).get(workflowId)?.n ?? 0); } catch { return 0; } };
+const countOf = (db, sql, workflowId) => Number(db.prepare(sql).get(workflowId).n);
 const stringsOf = (values) => [...new Set(values.filter((value) => typeof value === 'string' && value).map(String))];
 
 // The jobs of the workflow with the terminal handles and Orca Runs their payloads bind.
@@ -24,8 +26,8 @@ function jobsOf(db, workflowId) {
 }
 
 // The payloads of the workflow's evidence events, newest first.
-const evidencePayloadsOf = (db, workflowId) => db.prepare(`SELECT kind, payload_json FROM events WHERE workflow_id=? AND kind IN (${EVIDENCE_EVENTS.map(() => '?').join(',')}) ORDER BY seq DESC LIMIT 2000`)
-  .all(workflowId, ...EVIDENCE_EVENTS).map((row) => ({ kind: row.kind, payload: parseJson(row.payload_json, null) ?? {} }));
+const evidencePayloadsOf = (db, workflowId, root) => db.prepare(`SELECT kind, CASE WHEN payload_sha IS NULL THEN payload_json END AS payload_json, payload_sha FROM events WHERE workflow_id=? AND kind IN (${EVIDENCE_EVENTS.map(() => '?').join(',')}) ORDER BY seq DESC`)
+  .all(workflowId, ...EVIDENCE_EVENTS).map((row) => ({ kind: row.kind, payload: eventPayloadOf(row, { root }) ?? {} }));
 
 const kernelSignalOf = (db, workflowId) => {
   const row = db.prepare("SELECT value_json FROM signals WHERE scope='kernel' AND key=?").get(workflowId);
@@ -43,10 +45,10 @@ function evidenceOf({ jobs, events, signal }) {
   };
 }
 
-function factsFrom(db, workflowId) {
+function factsFrom(db, workflowId, root) {
   const wf = db.prepare('SELECT phase, archived_at FROM workflows WHERE workflow_id=?').get(workflowId);
   if (!wf) return { found: false };
-  const jobs = jobsOf(db, workflowId), events = evidencePayloadsOf(db, workflowId), signal = kernelSignalOf(db, workflowId);
+  const jobs = jobsOf(db, workflowId), events = evidencePayloadsOf(db, workflowId, root), signal = kernelSignalOf(db, workflowId);
   let purge = null;
   try { purge = db.prepare('SELECT state FROM workflow_purges WHERE workflow_id=?').get(workflowId)?.state ?? null; } catch { purge = null; }
   return { found: true, phase: wf.phase, archivedAt: wf.archived_at ?? null, purgeState: purge, jobs, signal,
@@ -66,5 +68,5 @@ export function purgeLedgerFacts({ repo, workflowId, env = process.env }) {
   const file = ledgerFileFor(repo, { env });
   if (!fs.existsSync(file)) return { found: false, file };
   const db = openLedgerReader(file);
-  try { return { file, ...factsFrom(db, workflowId) }; } finally { db.close(); }
+  try { return { file, ...factsFrom(db, workflowId, artifactRoot(env)) }; } finally { db.close(); }
 }

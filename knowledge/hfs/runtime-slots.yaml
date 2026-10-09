@@ -8,7 +8,7 @@
 # named section of it and only shrinks.
 schema: starci/runtime-slots@1
 kind: runtime
-version: 1.2.0
+version: 1.3.0
 
 versioning:
   patch: wording, why text, examples; no check result can change.
@@ -541,11 +541,24 @@ slots:
   - id: runtime.domain
     profiles: [runtime]
     # One capability per folder; owners import each other without cycles.
-    path: "scripts/{agent,route,goal,context,connectors,guards,uat,example,install,housekeeping,work,cli}/"
+    path: "scripts/{agent,route,goal,context,connectors,guards,uat,example,install,housekeeping,cli}/"
     presence: required
     tracked: tracked
     tier: domain
     owner: true
+    allows: ["<name>.mjs", "<part>/<name>.mjs"]
+    tests: none
+    coverage: required
+    rules: [RT_TIER_DIRECTION, ARCH_OWNER_CYCLE, RT_EXTERNAL_OWNER, RT_SOURCE_NAME, HFS_SIZE_GROWTH]
+
+  - id: runtime.work
+    profiles: [runtime]
+    path: "scripts/work/"
+    presence: required
+    tracked: tracked
+    tier: domain
+    owner: true
+    requires: [workflow-archive-evidence.mjs]
     allows: ["<name>.mjs", "<part>/<name>.mjs"]
     tests: none
     coverage: required

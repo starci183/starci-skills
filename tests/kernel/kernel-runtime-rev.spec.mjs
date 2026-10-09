@@ -56,6 +56,8 @@ const runtime = (t) => {
   write(root, 'modules/ops/ops/code.refactor.yaml', 'id: code.refactor\n');
   write(root, 'scripts/kernel/op-prompt.mjs', 'export {};\n');
   write(root, 'README.md', 'x\n');
+  // the table that classifies a changed path per role is part of the tree the revision ack reads
+  write(root, 'modules/kernel/revision-scope.yaml', fs.readFileSync(path.join(import.meta.dirname, '..', '..', 'modules', 'kernel', 'revision-scope.yaml'), 'utf8'));
   git(root, 'add', '-A'); git(root, 'commit', '-qm', 'A');
   const A = git(root, 'rev-parse', 'HEAD');
   write(root, 'modules/ops/ops/interface.draw.yaml', 'id: interface.draw\nnew: rule\n');

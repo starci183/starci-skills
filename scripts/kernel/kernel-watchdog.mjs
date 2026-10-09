@@ -385,6 +385,19 @@ async function watchdogTick() {
   return statusTick();
 }
 
+// The notice the tick reads: a change the runtime settles by itself needs no wake.
+const revisionNoticeOf = (status) => {
+  const probe = withKernelLedger((ledger) => runtimePass(kernelSeat({ ledger, workflowId, root: revRootOf() }), { repair: false }));
+  if (!probe) return status.value.revisionNotice;
+  return ['not-concerned', 'acked'].includes(probe.notice.state) ? { ...probe.notice, state: 'current' } : probe.notice;
+};
+// A revision record describes a seat observed through a responding host.
+const observeRevision = (status) => {
+  if (!repair) return;
+  const settled = withKernelLedger((ledger) => runtimePass(kernelSeat({ ledger, workflowId, root: revRootOf() }), { repair, adopt: true }));
+  if (settled) status.value.revisionNotice = settled.notice;
+};
+
 async function statusTick() {
   const status = api('status');
   if (!status.ok || !status.value?.ok) return {
@@ -398,9 +411,8 @@ async function statusTick() {
   // Q14 / MB-08: only a running workflow's Kernel is repaired, woken or relaunched. A paused, stopped (or not yet
   // started) workflow is left alone - nothing but the owner's starci kernel lifecycle --resume brings it back.
   if (phase !== 'running') return { ok: true, workflowId, phase, action: 'not-running' };
-  // The runtime's own duty to the seat's revision notice: a change that concerns the Kernel nothing is settled here (a read-only probe writes nothing).
-  const revision = withKernelLedger((ledger) => runtimePass(kernelSeat({ ledger, workflowId, root: revRootOf() }), { repair, adopt: true }));
-  if (revision) status.value.revisionNotice = revision.notice;
+  // The tick reads the notice before probing the host; observing the seat settles it before any wake.
+  status.value.revisionNotice = revisionNoticeOf(status);
   const result = kernelTick(status, phase);
   // Creation supplies the title, but a moved/restored tab can lose it. The sidebar reads
   // visualLayouts' tab title, not terminal-list's agent-controlled pane title.
@@ -433,7 +445,7 @@ const startPreflight = () => {
 };
 const startHold = () => withKernelLedger((ledger) => startHoldOf(startFailureRun(ledger.db, workflowId), { now: Date.now(), budget: startHoldBudget(), rev: runtimeRevNow() })) ?? startPreflight();
 const kernelRotation = createKernelRotation({ workflowId, openLedger: withKernelLedger, close: closeKernelTerminal, replace: replaceKernel, sender: launchableSender, hold: startHold });
-const kernelTick = createKernelTick({ api, kernelRotation, workflowId, repair, lostSeatWorker, exitedTwice, stopAndRelease, replaceKernel,
+const kernelTick = createKernelTick({ api, kernelRotation, observeRevision, workflowId, repair, lostSeatWorker, exitedTwice, stopAndRelease, replaceKernel,
   repeatedWake, menuOf, workerShow, DEAD_WORKER_STATE, settledKernelVerdict, DEAD_VERDICTS, terminalRead, classifyKernelScreen, outputAgeOf,
   staleAwareState, ACTIVE_STALE_MS, exitedAgentPromptRow, DEATH_SETTLE_MS, sleepSync, kernelWakeFailures,
   wakeFailuresProveDead, replaceWakeDeadKernel, sendEnterWithProof, recordKernelWakeFailed, deliveryFieldsOf, draftRefused, recordDraftHeld: holdDraft, recordDraftCleared: clearDraftHold, draftHeld, foreignDraft,

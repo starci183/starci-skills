@@ -20,9 +20,9 @@ export function classifyWorkers(rows) {
   const close = [], live = [];
   rows.forEach((row, index) => {
     const plan = plans[index];
-    if (!HELD_STATES.has(plan.terminalState)) return;
+    if (plan.terminalState === 'released') return;
     const worker = workerRow(plan);
-    if (plan.terminalState === 'active' && plan.liveness !== 'exited') live.push(worker);
+    if (!HELD_STATES.has(plan.terminalState) || !plan.liveness || (plan.terminalState === 'active' && plan.liveness !== 'exited')) live.push(worker);
     else close.push(worker);
   });
   return { close, live };
@@ -36,7 +36,7 @@ function terminalVerdict(terminal, { named, treePaths, handledByWorker }) {
   if (handledByWorker.has(handle)) return null;
   if (named.has(handle) && inTree) return { close: { handle, cwd, title: terminal.title ?? null, connected: terminal.connected !== false } };
   if (named.has(handle)) return { listed: { kind: 'terminal', id: handle, why: `the ledger names it but Orca places it in ${cwd ?? 'no worktree'}, outside the trees of the workflow` } };
-  if (inTree) return { listed: { kind: 'terminal', id: handle, why: untiedWhy(`it sits in ${cwd}, a tree of the workflow, but no ledger row names its handle`) } };
+  if (inTree) return { listed: { kind: 'terminal', id: handle, holdsTree: true, why: untiedWhy(`it sits in ${cwd}, a tree of the workflow, but no ledger row names its handle`) } };
   return null;
 }
 
@@ -58,10 +58,12 @@ export function classifyTerminals({ terminals, evidence, treePaths, workerClose 
 
 
 /** The workers of other Runs that Orca holds inside a tree of the workflow: listed, never touched (no ledger row ties their Run to it). [{kind, id, why}] */
-export function listStrangerWorkers({ rows, treePaths }) {
-  const held = rows.filter((row) => HELD_STATES.has(row?.terminalState));
+export function listStrangerWorkers({ rows, treePaths, terminals = [] }) {
+  const held = rows.filter((row) => row?.terminalState !== 'released');
   return held.filter((row) => {
-    const where = worktreePathOf(row);
+    const terminal = terminals.find((item) => item.handle === terminalHandleOf(row));
+    const where = worktreePathOf(row) ?? cwdOf(terminal ?? {});
+    if (!where) return treePaths.length > 0 && row?.projection?.liveness?.verdict !== 'exited';
     return Boolean(where) && treePaths.some((tree) => sameTree(where, tree) || insideTree(where, tree));
-  }).map((row) => ({ kind: 'worker', id: row.dispatchId, why: untiedWhy('Orca holds it in a tree of the workflow, but its Run ' + row.runId + ' is not one the ledger names (terminal ' + (terminalHandleOf(row) ?? 'none') + ')') }));
+  }).map((row) => ({ kind: 'worker', id: row.dispatchId, holdsTree: true, why: untiedWhy('Orca has not proved it outside the workflow trees, and its Run ' + row.runId + ' is not one the ledger names (terminal ' + (terminalHandleOf(row) ?? 'none') + ')') }));
 }
