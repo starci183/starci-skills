@@ -49,7 +49,7 @@ renders:
 supervisor:
   # starci <group> <verb> words the Supervisor seat may run
   verbs:
-    supervisor: [status, decide, poll, actions, channel, workers, gc]
+    supervisor: [status, decide, poll, actions, channel, workers, gc, revision-ack]
     machine: [decisions]
     kernel: [status, logs, questions, messages, survey, hierarchy, artifacts, coverage, usage, observe, peers, foundations, extensions, decisions, inbox, log]
     workflow: [status]
@@ -237,7 +237,7 @@ orca:
 kernel:
   # starci <group> <verb> words the Kernel seat may run
   verbs:
-    kernel: [status, logs, questions, messages, survey, hierarchy, artifacts, coverage, usage, observe, peers, foundations, extensions, decisions, inbox, log, decide, kernel-ack-rev]
+    kernel: [status, logs, questions, messages, survey, hierarchy, artifacts, coverage, usage, observe, peers, foundations, extensions, decisions, inbox, log, decide, kernel-ack-rev, revision-ack]
     workflow: [status]
     gate: [read]
   # read verbs that also have mutating flags: refused when one of these flags is present

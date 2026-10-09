@@ -110,6 +110,7 @@ State which of the three you used. Do not claim a loop exists until the host con
 - Reports to: Owner (a result, or an owner-only action). Overseen by: Owner.
 - Measure: no edge case reaches it twice.
 - No budget: Debug is the owner's chat loop: its turns are the owner's session and no ledger row records them; it is bounded by its time box and its end condition, not by tokens.
+- Runtime changes: Debug is the owner's chat session and reads the tree itself each time it acts; it has no seat the runtime could wake or replace.
 - Guard: none by design; Debug is a loop of the owner's own chat session: it has no seat and no bound terminal, so the guard resolves its caller to the owner; its limits are the never list, the channels it speaks through and the gate-loosening check on what it changes.
 - Happy errors it handles (the system working as designed, handled inside the chain through the policy):
   - owner-matter (policy row owner-gate): a matter that is the owner's (credentials, spend, a release): Debug reports it to the owner and does not decide it

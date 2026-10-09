@@ -190,6 +190,7 @@ non-green decisions through `modules/kernel/driver-loop.yaml`
 - Reports to: Kernel (done, blocked, or a question). Overseen by: Kernel.
 - Measure: passes its gate first time.
 - Token budget (provisional): 6000000 per attempt; over it, the runtime measures each attempt from its usage rows when it settles, and a running attempt from its session file on the minute poll that snapshots it (the first reading past the budget is one attempt-budget-overrun event); for a job waiting on its Kernel it opens a Decision Item budget-overrun, once: the Kernel continues once, replaces the agent or re-scopes the leg; for an attempt still running it opens one whose only option is to let it finish (a retry is refused while a try is open and no verb stops a live worker), asked again after the snooze, and a second item with the retries opens when the attempt settles and its usage rows measure it.
+- Runtime changes: an Op keeps the rules of the revision it was admitted under for the whole attempt and is never updated or restarted inside it; the next try is admitted under the new rules.
 - Guard: its terminals are bound as the "op" role of modules/kernel/command-policy.yaml.
 - Happy errors it handles (the system working as designed, handled inside the chain through the policy):
   - asks-a-question (policy row ask-worker-question): the Op cannot decide inside its contract and reports an ask up to its Kernel, which answers from the goal and the recorded decisions
@@ -223,6 +224,7 @@ non-green decisions through `modules/kernel/driver-loop.yaml`
 - Reports to: Kernel (always, as the verdict attached to the op's attempt). Overseen by: Kernel, the runtime.
 - Measure: its verdict agrees with the later outcome.
 - Token budget (provisional): 1000000 per attempt; over it, the wall bound allocation.drawLoop.criticTimeoutMs stops and releases the worker with no verdict (a happy error, critic-unavailable); the token overrun is read from the usage rows once the attempt budget measurement covers Critic dispatches.
+- Runtime changes: a Critic is handed its rubric when it is launched and judges under it; the next Critic run reads the new rubric.
 - Guard: its terminals are bound as the "critic" role of modules/kernel/command-policy.yaml.
 - Happy errors it handles (the system working as designed, handled inside the chain through the policy):
   - failing-verdict (policy row error-work): the verdict fails the minimum: the work is not good yet; the op redraws (a decision leg revises its records and runs the Critic again) and the next round is judged again

@@ -9,6 +9,9 @@ import { SUPERVISOR_SEAT } from '../machine/home.mjs';
 import { supervisorWakeUsageOf } from '../kernel/wake-budget.mjs';
 import { supervisorSeatOf } from './seat-cost.mjs';
 import { supervisorLastSeenAt } from './supervisor-sign-of-life.mjs';
+import { noticeFor } from './revision-ack.mjs';
+import { noticeLine } from './revision-notice.mjs';
+import { supervisorSeat } from './revision-seats.mjs';
 import { digestNumbers } from './debug-digest-numbers.mjs';
 import { SIGNAL, signalRows } from '../machine/debug-signals.mjs';
 import { machineBlobItems, mergeScans, scanBlobs, scanLogs } from './debug-secret-scan.mjs';
@@ -55,6 +58,14 @@ function engineOf(m) {
   return { leader: leader ? { pid: leader.pid, epoch: leader.epoch, heartbeatAt: leader.heartbeat_at, rev: leader.rev } : null, revSince: revSinceOf(m, leader?.rev ?? null), modes, configured, safe, failingQueue, ...startsOf(m) };
 }
 
+/** The Supervisor's revision notice as one line (revision-notice.mjs noticeLine); null when the runtime revision cannot be read. */
+function revisionLineOf(m) {
+  try {
+    const notice = noticeFor(supervisorSeat({ m }));
+    return notice.state === 'unknown-current' ? null : noticeLine(notice);
+  } catch { return null; }
+}
+
 function supervisorOf(m, since = null) {
   const seat = ask(m, 'SELECT * FROM seats WHERE seat_id=?', [SUPERVISOR_SEAT.seatId])[0] ?? null;
   // Deaf is the live seat's: refused inputs from before it booted belong to the seat it replaced.
@@ -64,7 +75,7 @@ function supervisorOf(m, since = null) {
   const decisions = ask(m, "SELECT di_id, kind, decider, due_at, summary, workflow_id FROM sup_decision_items WHERE status='open'")
     .map((d) => ({ id: d.di_id, kind: d.kind, decider: d.decider, dueAt: d.due_at ?? null, summary: d.summary, workflowId: d.workflow_id }));
   return { seat: seat ? { state: seat.state, terminalHandle: seat.terminal_handle, lastSeenAt: supervisorLastSeenAt(seat.last_seen_at, (sql) => ask(m, sql)), lastInputOkAt: seat.last_input_ok_at, deaf } : null,
-    enabled, lastWakeAt: wake, wakes: supervisorWakeUsageOf(m.db), seatCost: supervisorSeatOf(m.db, { since: since ?? 0 }), decisions, health: null };
+    enabled, lastWakeAt: wake, wakes: supervisorWakeUsageOf(m.db), seatCost: supervisorSeatOf(m.db, { since: since ?? 0 }), decisions, health: null, revision: revisionLineOf(m) };
 }
 
 function reservationsOf(m) {

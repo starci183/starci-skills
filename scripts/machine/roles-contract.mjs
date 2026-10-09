@@ -37,6 +37,15 @@ function budgetLines(role) {
   return role.noBudget ? [`- No budget: ${role.noBudget}.`] : [];
 }
 
+/** The line that states how a role learns that the runtime tree changed (its revisionAck declaration). */
+function revisionLines(role) {
+  const decl = role.revisionAck;
+  if (!decl) return [];
+  if (decl.noAck) return [`- Runtime changes: ${decl.noAck}.`];
+  if (decl.admission) return [`- Runtime changes: ${decl.reason}.`];
+  return [`- Runtime changes (modules/kernel/revision-scope.yaml): woken once with exactly the changed files that concern it, it reads them and attests with ${decl.verb}; a change that concerns it nothing costs it nothing; it is replaced by a fresh seat, at its next yield, only when a rule of its contract was removed or reversed or its boot prompt changed.`];
+}
+
 /** The guard binding, the happy errors and the bug surface of a role that declares them (the owner's two classes of error). */
 function standardLines(role) {
   const unbound = role.noSeat ? [`- Guard: none by design; ${role.noSeatReason}.`] : [];
@@ -58,7 +67,7 @@ function debugLines(doc, role) {
 export function renderRoleBlock(doc, id) {
   const role = doc.roles.find((entry) => entry.id === id);
   const lines = [`**${role.label}** (${ROLES_FILE}#${id}): ${role.scope}`, ...bullets('Does', role.does), ...bullets('Must clean up', role.cleanup),
-    ...bullets('Never', role.never), ...chainLines(doc, role), ...budgetLines(role), ...standardLines(role), ...debugLines(doc, role), `- Principles: ${role.binds.join(' ')} (${ROLES_FILE}, principles).`];
+    ...bullets('Never', role.never), ...chainLines(doc, role), ...budgetLines(role), ...revisionLines(role), ...standardLines(role), ...debugLines(doc, role), `- Principles: ${role.binds.join(' ')} (${ROLES_FILE}, principles).`];
   return lines.join('\n');
 }
 

@@ -82,6 +82,7 @@ rulings:
   loosening-is-owner-class: "Any change that loosens a gate or check (a check removed from a list, a threshold lowered, an allowlist or baseline entry added, a test deleted or weakened with product code) is owner-class: nobody relaxes a gate to let a workflow pass. modules/kernel/gate-loosening.yaml defines it mechanically; the land gate refuses such a change and the gate-loosening self-check flags it unless the owner's approval of exactly that loosening (an owner-rulings entry gate-loosening-<fingerprint>) is already in the tree it is judged against."
   critic-coverage: "An independent Critic runs today for drawing. scope.define and architecture.decide are owed one single-pass Critic on the frontier tier from another provider than the op (registry entry critic-coverage-decision-legs)."
   debug-is-time-boxed: "Debug is a time-boxed auditor of role conformance for the stabilisation phase, bound to a chat session; the runtime is self-sufficient, every edge case Debug meets becomes a rule plus a spec, and the loop is set up no more once the end condition of the debug role holds."
+  updating-the-runtime: "The runtime tree can be updated while workflows run, and no running workflow conflicts with the update. What a change asks of each role is declared once in modules/kernel/revision-scope.yaml and checked against the tree. A change that concerns no role costs no seat anything. A live seat is updated in place by default: woken once per revision change, even with an empty menu, with exactly the changed files that concern it, it reads and attests them (one wake, never a second for the same revision; several commits deployed together are one change). A seat is replaced by a fresh one that boots from the stores only when a rule of its contract was removed or reversed (a line deleted or modified in its declared contract files; a commit may declare an edit wording-only, and the declaration holds only for a file that keeps its structure), when the files its launch prompt is built from changed, or when it is already due for rotation (the revision change folds into that replacement). A replacement happens at the seat's next yield, never in the middle of a decision. An Op is neither updated nor restarted inside an attempt: it keeps the rules of its admission, the next try and the next Critic run are admitted under the new rules, and only guards bite at once. The engine restarts only for the files its process loaded, derived from its import graph; every other command is a new process that reads the tree."
   debug-fix-lanes: "A runtime defect Debug catches is fixed at once, never queued behind another: Debug splits it by independent cause and opens one fix lane per cause in the same turn, each in its own clone with the files it may touch named, so the lanes run in parallel; each lane's fix reaches the host as soon as its own check is green. Nothing a lane found is left listed as later: it is fixed in that round or handed to another lane opened then. The fixes of a day are consolidated into one release cut at the end of that day."
   debug-channels: "Debug speaks only through runtime channels (starci supervisor tell; a durable ruling to a Kernel through the Supervisor's notify), never by typing into a seat's terminal, and never to an Op or a Critic."
 
@@ -106,6 +107,7 @@ standard:
     guard-binding: "`guard: {role}` naming a role of modules/kernel/command-policy.yaml roles.bound, or the explicit form `noSeat: true` with a `noSeatReason` for a role that owns no seat or terminal"
     budget: "`tokenBudget` or `wakeBudget` (turns or tokens per unit of the role's work), or `noBudget` with the reason the role has none"
     chain: "the role stands in the reporting chain (`chain.reports`, `chain.attached` or `chain.besides`)"
+    revision-ack: "`revisionAck`: how the role learns that the runtime tree changed: a seated role names the verb and event that attest the files it was sent (`scope`, `verb`, `file`, `event`); an Op or a Critic keeps the rules of its admission (`scope`, `admission: true`, `reason`); a role with no runtime to read says why (`noAck`). The table of what concerns whom is modules/kernel/revision-scope.yaml"
   onBug:
     chain: "records the evidence and keeps working inside its contract; it never fixes the bug and never works around it. Debug scans every role and removes the bug by changing .claude with a spec."
     debug: "removes the bug by changing .claude (contract, prompt, policy row, guard refusal or runtime code) with a spec and an edge-case entry."
@@ -151,6 +153,10 @@ roles:
       - {bug: "an Op runs a control-plane verb that is not its own", signal: "RIGHTS_OP_CONTROL_PLANE from the command guard", detectedBy: scripts/guards/op-starci.mjs}
       - {bug: "an Op writes outside the paths its attempt owns", signal: "RIGHTS_OP_OUTSIDE_OWNED from the file-write guard", detectedBy: scripts/guards/op-write-scope.mjs}
       - {bug: "an Op spends more tokens than its attempt budget", signal: "budget-overrun Decision Item and budgetOverruns in the Kernel status", detectedBy: scripts/reconciler/budget-plan.mjs}
+    revisionAck:
+      scope: op
+      admission: true
+      reason: "an Op keeps the rules of the revision it was admitted under for the whole attempt and is never updated or restarted inside it; the next try is admitted under the new rules"
     binds: [P2, P3, P4, P8]
     contradicts:
       - {pattern: 'starci\s+supervisor\s+(?:tell|channel|notify)', why: "an Op never messages the Supervisor"}
@@ -198,6 +204,10 @@ roles:
       - {bug: "the Critic judged other bytes than the attempt's product", signal: "CRITIC_VERDICT_STALE: the verdict's product digests do not match the installed part (a decision leg: the records the op owns now, judged by scripts/kernel/critic-settle.mjs at settle)", detectedBy: scripts/kernel/autopilot-state.mjs}
       - {bug: "the Critic reached a path outside its directory", signal: "RIGHTS_CRITIC_REACH refusals of the command guard, logged with the terminal", detectedBy: scripts/guards/critic-reach.mjs}
     escalatesTo: kernel
+    revisionAck:
+      scope: critic
+      admission: true
+      reason: "a Critic is handed its rubric when it is launched and judges under it; the next Critic run reads the new rubric"
     binds: [P2, P3, P7]
     contradicts:
       - {pattern: 'critic (?:may|can|should) (?:edit|fix|repair) the (?:product|screen|draw)', why: "a Critic never edits the product"}
@@ -252,6 +262,11 @@ roles:
       - {bug: "the Kernel uses a verb the runtime-driven menu replaces", signal: "KERNEL_USE_DECIDE from the seat guard", detectedBy: scripts/guards/kernel-seat.mjs}
       - {bug: "a Kernel wake spends more than the per-wake budget", signal: "kernel-wake-budget problem line of the digest", detectedBy: scripts/reconciler/debug-digest-analyze.mjs}
       - {bug: "a Kernel decision names a menu item or choice the menu does not hold, or a step fails", signal: "menu-item-unknown, menu-choice-unknown, menu-direct-option, menu-text-missing, menu-step-failed, menu-step-usage, menu-verb-unknown, menu-unreadable", detectedBy: scripts/kernel/verbs/shared/menu-decide.mjs}
+    revisionAck:
+      scope: kernel
+      verb: starci kernel revision-ack
+      file: scripts/kernel/verbs/revision-ack.mjs
+      event: runtime-rev-noticed
     binds: [P1, P2, P3, P4, P5, P6, P8]
     contradicts:
       - {pattern: 'the Kernel (?:edits|fixes|patches) (?:the )?(?:runtime|\.claude)', why: "the Kernel never changes the runtime"}
@@ -303,6 +318,11 @@ roles:
       - {bug: "a menu choice of the Supervisor fails to execute", signal: "SUPERVISOR_MENU_STEP_FAILED", detectedBy: scripts/supervisor/decide.mjs}
       - {bug: "a gate stands past its acknowledgement bound", signal: "gate-stale departure of the digest", detectedBy: scripts/reconciler/debug-digest-analyze.mjs}
       - {bug: "a Supervisor wake spends more tokens than its wake budget", signal: "supervisor-wake-budget problem line of the digest", detectedBy: scripts/reconciler/debug-digest-analyze.mjs}
+    revisionAck:
+      scope: supervisor
+      verb: starci supervisor revision-ack
+      file: scripts/supervisor/revision-ack.mjs
+      event: runtime-rev-noticed
     binds: [P1, P3, P4, P5, P6, P7, P8]
     contradicts:
       - {pattern: 'supervisor (?:may|can|should) (?:relax|loosen|waive) (?:a|the) gate', why: "loosening a gate is owner-class"}
@@ -353,6 +373,8 @@ roles:
       - {bug: "Debug loosens a gate or check to let a workflow pass", signal: "RT_GATE_LOOSENING over the commits since the last release", detectedBy: scripts/checks/check-gate-loosening.mjs}
       - {bug: "Debug changes the runtime without recording the case", signal: "RT_EDGE_CASE_REGISTRY: a covered entry without its rule and spec", detectedBy: scripts/checks/check-edge-case-registry.mjs}
       - {bug: "the loop runs on after its end condition holds, or its standing is not printed", signal: "the standing against each end-condition criterion in the digest", detectedBy: scripts/reconciler/debug-questions.mjs}
+    revisionAck:
+      noAck: "Debug is the owner's chat session and reads the tree itself each time it acts; it has no seat the runtime could wake or replace"
     binds: [P1, P5, P6, P7]
     contradicts:
       - {pattern: 'change nothing and fix nothing', why: "Debug fixes .claude so a role cannot repeat a departure"}

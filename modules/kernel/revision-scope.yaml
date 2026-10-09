@@ -50,6 +50,21 @@ seatBoot:
     generator: scripts/supervisor/start-supervisor.mjs
     dir: modules/supervisor
     files: [modules/supervisor/supervisor-prompt.md, modules/supervisor/supervise.yaml]
+# What `starci kernel settle` judges at settle, read from the code (scripts/kernel/verbs/shared/settle-preflight.mjs and the judges it calls).
+# A judge reads its rules from the LIVE tree when the settle runs, not from the tree the attempt was admitted under: a rule that moved between
+# the admission and the settle is judged against the attempt. The settle records, per proof the op owes, whether the files of its judge moved
+# since the admission revision (scripts/reconciler/settle-revision.mjs); deciding what to do with a moved rule belongs to the
+# gate-newer-than-admission seam (scripts/kernel/critic-settle.mjs `teaches` is the one judge that already asks the admission).
+#   admissionAware: the judge consults the admitted contract before it refuses.
+settleJudges:
+  - {proof: proof-media, files: ["modules/ops/**"], admissionAware: false}
+  - {proof: sonar-gate, files: [knowledge/sonar-gate.yaml, "scripts/gates/sonar-*.mjs"], admissionAware: false}
+  - {proof: op-gate, files: [knowledge/op-gate.yaml, "knowledge/patterns/**", "scripts/gates/read-digest.mjs", "scripts/gates/gate.mjs"], admissionAware: false}
+  - {proof: op-proof, files: [knowledge/op-gate.yaml, "scripts/kernel/mechanism-proofs.mjs"], admissionAware: false}
+  - {proof: independent-critic, files: [modules/kernel/critic.yaml, modules/kernel/critic-rubrics.yaml, "scripts/work/critic-*.mjs"], admissionAware: true}
+  - {proof: draw-acceptance, files: ["scripts/work/draw/**", "knowledge/ui/**"], admissionAware: false}
+  - {proof: draw-metrics, files: ["scripts/work/draw-loop-settle.mjs", "scripts/work/draw/**", "knowledge/ui/**"], admissionAware: false}
+  - {proof: work-hygiene, files: ["scripts/work/validate/**", "modules/schemas/**"], admissionAware: false}
 rows:
   - id: docs-and-notes
     why: "text a person reads; no role loads it"

@@ -91,3 +91,12 @@ export function manifestHolds(submitted, required) {
   return Boolean(submitted) && submitted.digest === required.digest && submitted.schema === required.schema
     && JSON.stringify({ ...submitted, digest: undefined }) === JSON.stringify({ ...required, digest: undefined });
 }
+
+const NAMED = 3;
+/** The short sentence a wake carries for an owed notice: the revision, how many files and the first few names, and the verb that lists and attests them. Empty for any other state. */
+export function noticeWakeLine(notice, command, short = (rev) => String(rev ?? '').slice(0, 12)) {
+  if (notice?.state !== 'owed') return '';
+  const names = notice.files.slice(0, NAMED).join(', ');
+  const more = notice.files.length > NAMED ? ` and ${notice.files.length - NAMED} more` : '';
+  return `Runtime rev ${short(notice.to)} changed ${notice.files.length} file(s) of your contract (${names}${more}): ${command} --plan lists them with hashes; read them, then attest. Nothing else is asked.`;
+}

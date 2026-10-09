@@ -22,7 +22,7 @@ _starci() {
         git) COMPREPLY=( $(compgen -W "backup commit land sync" -- "$cur") );;
         guard) COMPREPLY=( $(compgen -W "command footprint-scan raw seat-tools verify-commit" -- "$cur") );;
         harness) COMPREPLY=( $(compgen -W "open start status stop" -- "$cur") );;
-        kernel) COMPREPLY=( $(compgen -W "archive artifacts autopilot consume-report coverage cut-seam decide decisions dispatch dispatch-ready enqueue estimate extensions finish foundation foundations graph-edit hierarchy inbox incident kernel-ack-rev kernel-proposal lifecycle log logs messages notify nudge observe op-contract op-override peers plan provider-backoff provider-health questions reconcile record-change record-checks redesign rename reply report retire-ask route run-deferred-tests serve-ask settle settle-tail status survey unit usage verify-proofs" -- "$cur") );;
+        kernel) COMPREPLY=( $(compgen -W "archive artifacts autopilot consume-report coverage cut-seam decide decisions dispatch dispatch-ready enqueue estimate extensions finish foundation foundations graph-edit hierarchy inbox incident kernel-ack-rev kernel-proposal lifecycle log logs messages notify nudge observe op-contract op-override peers plan provider-backoff provider-health questions reconcile record-change record-checks redesign rename reply report retire-ask revision-ack route run-deferred-tests serve-ask settle settle-tail status survey unit usage verify-proofs" -- "$cur") );;
         lint) COMPREPLY=( $(compgen -W "run" -- "$cur") );;
         machine) COMPREPLY=( $(compgen -W "decisions kernel-watchdog lessons op-metrics seam-policy worktrees worktrees-clean" -- "$cur") );;
         npm) COMPREPLY=( $(compgen -W "ci install" -- "$cur") );;
@@ -33,7 +33,7 @@ _starci() {
         runtime) COMPREPLY=( $(compgen -W "architecture benchmark-snapshot check derived-fields doctor gen-catalog gen-ops housekeeping import-held-secret install ledger-hygiene link machine-db owner-claims-audit readme-blocks status update validate version" -- "$cur") );;
         smoke) COMPREPLY=( $(compgen -W "scaffold" -- "$cur") );;
         supabase) COMPREPLY=( $(compgen -W "start status stop" -- "$cur") );;
-        supervisor) COMPREPLY=( $(compgen -W "actions bridge channel decide direct-commits gate-stability gc land lesson-actions notify owed poll push push-mains ram-cap report start status stop telegram-bridge tell watchdog workers" -- "$cur") );;
+        supervisor) COMPREPLY=( $(compgen -W "actions bridge channel decide direct-commits gate-stability gc land lesson-actions notify owed poll push push-mains ram-cap report revision-ack start status stop telegram-bridge tell watchdog workers" -- "$cur") );;
         task) COMPREPLY=( $(compgen -W "list register show" -- "$cur") );;
         test) COMPREPLY=( $(compgen -W "affected run" -- "$cur") );;
         typecheck) COMPREPLY=( $(compgen -W "run" -- "$cur") );;
@@ -482,6 +482,10 @@ _starci() {
         kernel:retire-ask:--workflow) return 0;;
         kernel:retire-ask:--dispatch) return 0;;
         kernel:retire-ask:--reason) return 0;;
+        kernel:revision-ack:--repo) return 0;;
+        kernel:revision-ack:--workflow) return 0;;
+        kernel:revision-ack:--rev) return 0;;
+        kernel:revision-ack:--read-manifest) return 0;;
         kernel:route:--repo) return 0;;
         kernel:route:--job) return 0;;
         kernel:route:--difficulty) COMPREPLY=( $(compgen -W "easy medium hard insane" -- "$cur") ); return 0;;
@@ -709,6 +713,8 @@ _starci() {
         supervisor:ram-cap:--weight) return 0;;
         supervisor:ram-cap:--reserve) return 0;;
         supervisor:report:--repo) return 0;;
+        supervisor:revision-ack:--rev) return 0;;
+        supervisor:revision-ack:--read-manifest) return 0;;
         supervisor:start:--reason) return 0;;
         supervisor:tell:--timeout-ms) return 0;;
         supervisor:tell:--since) return 0;;
@@ -1053,6 +1059,7 @@ _starci() {
         kernel:reply) COMPREPLY=( $(compgen -W "--repo --workflow --message --body --to-owner --json --cwd --quiet --help --edition" -- "$cur") );;
         kernel:report) COMPREPLY=( $(compgen -W "--repo --job --report --attach --outcome --dispatch-capability --json --cwd --quiet --help --edition" -- "$cur") );;
         kernel:retire-ask) COMPREPLY=( $(compgen -W "--repo --workflow --dispatch --reason --json --cwd --quiet --help --edition" -- "$cur") );;
+        kernel:revision-ack) COMPREPLY=( $(compgen -W "--repo --workflow --rev --plan --read-manifest --json --cwd --quiet --help --edition" -- "$cur") );;
         kernel:route) COMPREPLY=( $(compgen -W "--repo --job --difficulty --json --cwd --quiet --help --edition" -- "$cur") );;
         kernel:run-deferred-tests) COMPREPLY=( $(compgen -W "--repo --workflow --kind --by --dry-run --json --cwd --quiet --help --edition" -- "$cur") );;
         kernel:serve-ask) COMPREPLY=( $(compgen -W "--repo --workflow --dispatch --ttl --now --json --cwd --quiet --help --edition" -- "$cur") );;
@@ -1134,6 +1141,7 @@ _starci() {
         supervisor:push-mains) COMPREPLY=( $(compgen -W "--repo --dry-run --hooks-only --json --cwd --quiet --help --edition" -- "$cur") );;
         supervisor:ram-cap) COMPREPLY=( $(compgen -W "--op --workflow --weight --reserve --json --cwd --quiet --help --edition" -- "$cur") );;
         supervisor:report) COMPREPLY=( $(compgen -W "--repo --send --json --cwd --quiet --help --edition" -- "$cur") );;
+        supervisor:revision-ack) COMPREPLY=( $(compgen -W "--plan --rev --read-manifest --json --cwd --quiet --help --edition" -- "$cur") );;
         supervisor:start) COMPREPLY=( $(compgen -W "--plan --reason --json --cwd --quiet --help --edition" -- "$cur") );;
         supervisor:status) COMPREPLY=( $(compgen -W "--menu --json --cwd --quiet --help --edition" -- "$cur") );;
         supervisor:stop) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;

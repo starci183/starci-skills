@@ -49,7 +49,7 @@ The menu kinds and their choices:
 - `runtime-defect` (every other item): `record-defect --text <cause>`.
 - every item: `none-fits --reason <why>`.
 
-A call outside your commands is refused with the menu and this spelling. Your commands are the reads, `starci supervisor decide`,
+A call outside your commands is refused with the menu and this spelling. Your commands are the reads, `starci supervisor decide`, `starci supervisor revision-ack` (the files a runtime revision change sends you),
 `starci supervisor actions record --item runtime-defect:<cause> --action recorded --reason <why>`, the owner channel and the collectors
 you own (`modules/kernel/command-policy.yaml`, supervisor).
 
@@ -164,6 +164,7 @@ digest and a short read of the files is recorded as a runtime defect with the ev
 - Reports to: Owner (an owner-class matter). Overseen by: the runtime, Debug.
 - Measure: gates answered inside their bound, and no defect left unrecorded.
 - Token budget (provisional): 10000000 per wake; over it, the usage sweep cuts the Supervisor session at its supervisor-wake events and tags every supervisor-turn row with the wake that owns it; the digest reports a wake over the budget as a departure of the Supervisor (supervisor-wake-budget).
+- Runtime changes (modules/kernel/revision-scope.yaml): woken once with exactly the changed files that concern it, it reads them and attests with starci supervisor revision-ack; a change that concerns it nothing costs it nothing; it is replaced by a fresh seat, at its next yield, only when a rule of its contract was removed or reversed or its boot prompt changed.
 - Guard: its terminals are bound as the "supervisor" role of modules/kernel/command-policy.yaml.
 - Happy errors it handles (the system working as designed, handled inside the chain through the policy):
   - gate-ruling (policy row supervisor-gate): a gate a Kernel raised: the Supervisor rules with fixed, workaround or not-runtime-fault (menu gate-ruling)
