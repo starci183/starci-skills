@@ -22,7 +22,7 @@ const publicVerbs = {
   owed: ['all', 'commits', 'force', 'item', 'reason', 'repo', 'workflow'],
   poll: ['interval-ms', 'once', 'repo', 'stall-minutes', 'workflow'],
   push: ['check', 'repo'],
-  'revision-ack': ['plan', 'read-manifest', 'rev'],
+  'revision-ack': ['digest', 'plan', 'read-manifest', 'rev'],
   'push-mains': ['dry-run', 'hooks-only', 'repo'],
   'ram-cap': ['op', 'reserve', 'weight', 'workflow'],
   status: ['menu'],
