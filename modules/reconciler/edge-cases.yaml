@@ -1080,3 +1080,10 @@ cases:
     rule: {file: scripts/kernel/verbs/shared/status-menu.mjs, anchor: "attestNoteOf"}
     spec: tests/kernel/menu-answered-hold.spec.mjs
     status: covered
+  - id: supervisor-ruling-never-reaches-the-kernel-menu
+    family: record-vs-reality
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a ruling the Supervisor gives is delivered to the Kernel as a fact) the Supervisor ruling for StarCi di-498134c6 (an SDS gap, not a narrow grant) was opened as a supervisor-ruling Decision Item and rung on the doorbell, but the Kernel menu excluded that kind as the runtime's own, so a Kernel whose menu was otherwise empty never saw it in its status and the ruling had to be rediscovered by reading the decisions list", remedy: {state: in-tree, change: "a supervisor-ruling is an item of the Kernel menu with an acknowledge choice that closes it after the Kernel has read and applied it"}}
+    met: {date: "2026-10-09", where: "alpha.8 live 13:36, StarCi workflow", evidence: "starci runtime.sqlite events 3017, 3018 (decision-opened supervisor-ruling, decision-doorbell); the menu of the Kernel did not list it"}
+    rule: {file: scripts/kernel/kernel-menu.mjs, anchor: "diItem"}
+    spec: tests/kernel/ruling-menu.spec.mjs
+    status: covered

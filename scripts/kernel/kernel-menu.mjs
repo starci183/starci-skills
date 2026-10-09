@@ -131,7 +131,9 @@ const diItem = (di, workflow) => {
   const subject = { workflow, summary: di.summary, di: di.id };
   const spec = kindOf('decision-item');
   const snoozable = spec.snoozeKinds.includes(di.kind) ? [{ choice: 'keep-waiting', verb: null, args: null, steps: [], snooze: true, effect: 'asks again after the snooze' }] : [];
-  return itemOf('decision-item', { key: di.id, subject, options: [...diOptionsOf(di, subject), ...snoozable], since: di.openedAt ?? null, deadlineAt: di.dueAt ?? null,
+  // A Supervisor ruling is a fact the Kernel receives on its menu: it is read and acted on through the other items, then acknowledged, which closes it.
+  const ruling = di.kind === 'supervisor-ruling' ? [{ choice: 'acknowledge', verb: null, args: null, steps: [], effect: 'records that the ruling was read and closes it; act on it through the other items of the menu' }] : [];
+  return itemOf('decision-item', { key: di.id, subject, options: [...ruling, ...diOptionsOf(di, subject), ...snoozable], since: di.openedAt ?? null, deadlineAt: di.dueAt ?? null,
     evidence: [{ ref: `decision:${di.id}` }, ...(di.evidence ?? []).slice(0, 6)], di: di.id });
 };
 
