@@ -22,6 +22,7 @@ import { canonParityVerdict, parityEligible, parityFingerprint, PARITY_REASONS, 
 import { checkRunStatusOf, checkVerdictOf } from './check-verdict.mjs';
 import { KERNEL_ONLY_OPS } from '../../machine/reported-jobs.mjs';
 import { checkRerunRootOf } from '../verbs/shared/check-evidence.mjs';
+import { verifyBrandProduct } from '../brand-product.mjs';
 
 const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const CUT_SLICE_CHECKS = ['cut-slice-postcondition', 'cut-regression-inventory'];
@@ -316,6 +317,8 @@ export async function verifyReported(db, item, { repo, settings = settlerSetting
   const loaded = await checksFromStore(db, item, { store });
   if (loaded.reason) return { green: false, reason: loaded.reason, detail: loaded.detail };
   item = loaded.item;
+  const product = await verifyBrandProduct(db, item, { repo, env, record });
+  if (product) return product;
   const plain = await verifyDeclared(db, item, { repo, settings, rerun, canon, env, record });
   // CANON PARITY (canon-parity-settle): a canon cut slice the declared checks cannot carry is measured by the settler
   // itself over its owned paths; it settles only when nothing is new there, else the Kernel gets the parity reason.

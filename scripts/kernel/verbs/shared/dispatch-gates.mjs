@@ -24,6 +24,7 @@ import { FOUNDATION_WAIT, gateShellFoundation, shellFoundationNeed } from '../..
 import { isSeamCut, seamStubForDispatch } from '../../seam-policy.mjs';
 import { selectDispatchContract } from '../../dispatch-admission.mjs';
 import { refuseVerb } from './verb-exit.mjs';
+import { grammarGapCause } from '../../brand-product.mjs';
 
 /** The queued (or ready) job of the call and its op; an unknown, settled or running job refuses with its code. */
 export function loadQueuedJob(d) {
@@ -190,7 +191,7 @@ export function refuseLaunchInputs(d) {
   }
   if (grammarMissing) {
     const detail = `${op} declares grammarContext: required and ${grammarMissing}. Fix the product's brand.sources or the Source knowledge, then dispatch again. The job stays queued.`;
-    refuseVerb(d, { ok: false, jobId, op, reason: 'grammar-context-missing', missing: grammarContext.missing, watch: grammarContext.watch ?? [], detail },
+    refuseVerb(d, { ok: false, jobId, op, reason: 'grammar-context-missing', cause: grammarGapCause(grammarContext.missing), missing: grammarContext.missing, watch: grammarContext.watch ?? [], detail },
       `dispatch REFUSED for ${jobId} (${op}): grammar-context-missing — ${detail}`);
   }
 }

@@ -6,6 +6,7 @@ import { criticRefusalText, recordCriticJudgment } from '../../critic-settle.mjs
 import { ownedByRuntime } from '../../gate-admission.mjs';
 import { recordTrace } from '../../acceptance-trace.mjs';
 import { refuseVerb } from './verb-exit.mjs';
+import { brandProductCheck, recordBrandProduct, requireBrandProduct } from '../../brand-product.mjs';
 
 function mediaPhase(s, settleProofMedia) {
   const media = !s.replay && s.verdict === 'pass' ? settleProofMedia(s.db, s.jobId, s.repo, null, null) : null;
@@ -112,6 +113,11 @@ function hygienePhase(s, settleWorkHygiene) {
  * its frozen decision; a fresh pass returns the exact native proof identity. */
 export async function settlePreflight({ ledger, args, repo, emit, internals, replay, verdict, jobId }) {
   const s = { db: ledger.db, ledger, args, repo, emit, replay, verdict, jobId };
+  if (!replay && verdict === 'pass') {
+    const check = brandProductCheck(s.db, jobId, { repo });
+    if (check) recordBrandProduct(ledger, jobId, check);
+    requireBrandProduct(s.db, jobId, { repo });
+  }
   const { settleProofMedia, settleSonarGate, settleOpGate, settleOpProofs, settleCriticVerdict, settleAcceptanceTrace, settleDrawAcceptance, settleDrawMetrics, settleWorkHygiene } = internals;
   mediaPhase(s, settleProofMedia);
   sonarPhase(s, settleSonarGate);

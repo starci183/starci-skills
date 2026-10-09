@@ -70,6 +70,12 @@ measures:
     applies: opProofs
     processProofs: [read-knowledge]
     what: "the native mechanism proof (knowledge/op-gate.yaml opProofs) is re-run or re-read at settle and recorded as the runtime check op-proof; read-knowledge reads how the op worked (the READ digest), every other proof reads the product"
+  brand-consumable:
+    kind: product
+    source: scripts/kernel/brand-product.mjs
+    independence: runtime
+    applies: {ops: [brand.decide]}
+    what: "the settler resolves the brand's family CSS with the interface.draw dispatch resolver, over the workflow tree and bound repositories; every declared non-reference CSS source exists and a family source resolves"
   draw-rerun:
     kind: product
     source: scripts/work/draw-loop-settle.mjs

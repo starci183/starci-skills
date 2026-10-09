@@ -21,9 +21,11 @@ const watchedState = (watch) => (watch ?? []).map((file) => { try { return Strin
 /** The latest ruling the ledger holds for the workflow (the seq of its newest ruling event), or 0. */
 const rulingSeq = (db, workflowId) => Number(db.prepare(`SELECT max(seq) AS seq FROM events WHERE workflow_id=? AND kind IN (${RULING_EVENTS.map(() => '?').join(',')})`).get(workflowId, ...RULING_EVENTS)?.seq ?? 0);
 
+const reasonOf = (refusal) => String(refusal.reason ?? refusal.detail ?? '').slice(0, 300);
+
 /** What a refusal depends on: its code and step, the detail with ids removed, the runtime revision, the newest ruling and the state of its watched files. */
 export function fingerprintOf({ db, workflowId, refusal, rev }) {
-  const detail = String(refusal.reason ?? refusal.detail ?? '').replace(VOLATILE, '#');
+  const detail = reasonOf(refusal).replace(VOLATILE, '#');
   return crypto.createHash('sha256').update(JSON.stringify([refusal.code, refusal.step ?? null, detail, rev ?? null, rulingSeq(db, workflowId), watchedState(refusal.watch)])).digest('hex').slice(0, 16);
 }
 
@@ -37,6 +39,6 @@ export const isHeld = (memo, { fingerprint, now }) => Boolean(memo) && memo.fing
 export function nextMemo(prev, { refusal, fingerprint, now }) {
   const same = prev && prev.fingerprint === fingerprint;
   const step = retryAfterFailure(refusalBudget(), same ? { attempts: prev.count, firstAt: prev.firstAt } : null, { now, reason: String(refusal.code) });
-  return { code: refusal.code, step: refusal.step ?? null, reason: String(refusal.reason ?? '').slice(0, 300), fingerprint, firstAt: step.firstAt, lastAt: now, count: step.attempts, nextAt: step.dueAt,
-    ...(refusal.watch?.length ? { watch: refusal.watch } : {}) };
+  return { code: refusal.code, step: refusal.step ?? null, reason: reasonOf(refusal), fingerprint, firstAt: step.firstAt, lastAt: now, count: step.attempts, nextAt: step.dueAt,
+    ...(refusal.cause ? { cause: refusal.cause } : {}), ...(refusal.watch?.length ? { watch: refusal.watch } : {}) };
 }

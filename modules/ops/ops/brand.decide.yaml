@@ -519,7 +519,7 @@ proofs:
     check: scripts/kernel/gate-settle.mjs
 judge:
   - by: machine
-    measures: [declared-checks, work-hygiene, contract-script, op-proof:read-knowledge]
+    measures: [declared-checks, work-hygiene, contract-script, brand-consumable, op-proof:read-knowledge]
     proofs: [direction, shell-capture, read-knowledge]
     why: "the brand and shell-conformance checks are runtime scripts the settler re-runs over the records, and the READ of the standard is re-read from the digest"
   - by: owner

@@ -36,6 +36,7 @@ test('RT_OP_JUDGE_UNDECLARED: a machine judge must be a measure the runtime owns
   assert.match(messages((copy) => { entry(copy, 'backend.implement', 'machine').measures = ['declared-checks', 'work-hygiene', 'sonar-gate']; }), /leaves out op-gate/);
   assert.match(messages((copy) => { entry(copy, 'unit.verify', 'machine').measures.push('sonar-gate'); }), /names sonar-gate, which the runtime does not apply to unit\.verify/);
   assert.match(messages((copy) => { entry(copy, 'unit.verify', 'machine').measures = ['declared-checks', 'op-gate']; }), /leaves out op-proof:unit-kit/);
+  assert.match(messages((copy) => { entry(copy, 'brand.decide', 'machine').measures = entry(copy, 'brand.decide', 'machine').measures.filter((id) => id !== 'brand-consumable'); }), /leaves out brand-consumable/);
   assert.match(messages((copy) => { entry(copy, 'business.decide', 'machine').measures = ['op-proof:read-knowledge']; }), /rests on process or report-mode measures alone/);
   assert.match(messages((copy) => { entry(copy, 'business.decide', 'machine').proofs = ['no-such-proof']; }), /cites the proof no-such-proof/);
   assert.match(messages((copy) => { entry(copy, 'review.verify', 'machine').proofs = ['review-gate']; }), /contract-script but cites no proof whose check: is a script of its own/);

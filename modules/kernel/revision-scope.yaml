@@ -68,6 +68,7 @@ settleJudges:
   - {proof: draw-acceptance, files: ["scripts/work/draw/**", "knowledge/ui/**"], admissionAware: false}
   - {proof: draw-metrics, files: ["scripts/work/draw-loop-settle.mjs", "scripts/work/draw/**", "knowledge/ui/**"], admissionAware: false}
   - {proof: work-hygiene, files: ["scripts/work/validate/**", "modules/schemas/**"], admissionAware: false}
+  - {proof: brand-consumable, files: [scripts/kernel/brand-product.mjs, scripts/kernel/grammar-context.mjs, scripts/lib/roots.mjs], admissionAware: false}
 rows:
   - id: docs-and-notes
     why: "text a person reads; no role loads it"
@@ -101,6 +102,10 @@ rows:
     why: "private settlement fixture code is used only by specs"
     paths: [tests/helpers/mechanism-proof-settle.mjs]
     roles: {}
+  - id: brand-consumable
+    why: "the brand measure and upstream dispatch gap are loaded by the derived engine graph; their replay is verification only"
+    paths: [scripts/kernel/brand-product.mjs, scripts/kernel/dispatch-gaps.mjs, tests/replay/brand-sources-gate.spec.mjs]
+    roles: {engine: derived}
   - id: guards
     why: "guards and the command policy bite on the next command"
     paths: ["scripts/guards/**", modules/kernel/command-policy.yaml]

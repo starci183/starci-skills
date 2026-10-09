@@ -164,6 +164,9 @@ properties:
           $ref: "#/$defs/openBlock"
         description: The real files the tokens were traced from, each with its digest. It is what turns a
           palette from an assertion into something a machine check can compare against the product.
+          A non-reference CSS entry carries path and optional repository; every such path resolves in that
+          repository. The family CSS comes from those entries or the installed grammar family export.
+          The runtime brand-consumable measure in modules/kernel/op-judges.yaml checks this at settle.
       direction:
         $ref: "#/$defs/direction"
         description: "The product's composition taste - how its pages are arranged, which DNA recipes they use,
