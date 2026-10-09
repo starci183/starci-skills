@@ -2,6 +2,7 @@
 // The plan is the default (it changes nothing); --apply acts, owner role only, under the host lock and the gc lock. What it judges and removes is
 // scripts/machine/workflow-purge-*.mjs; this file reads the flags, takes the locks, asks for the ledger purge (--ledger: scripts/work/purge-workflow.mjs, which
 // archives the rows to a verified zip before it drops them) and prints.
+import { invocationDir } from '../lib/roots.mjs';
 import path from 'node:path';
 import { purgeFactsOf } from '../machine/workflow-purge-facts.mjs';
 import { buildPurgePlan } from '../machine/workflow-purge-plan.mjs';
@@ -11,7 +12,6 @@ import { underHostLock } from '../machine/verb-lock.mjs';
 import { acquireGcLock } from '../machine/gc-lock.mjs';
 import { purgeWorkflow } from '../work/purge-workflow.mjs';
 import { guardsRoot } from '../guards/guards-root.mjs';
-import { invocationDir } from '../lib/roots.mjs';
 
 const MIN_EXPECT = 12;
 const refusal = ({ code, detail }) => ({ code: 1, text: `${code}: ${detail}`, data: { schema: 'starci/workflow-purge-refusal@1', ok: false, refusal: { code, detail } } });

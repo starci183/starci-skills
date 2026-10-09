@@ -19,7 +19,7 @@ function repository(t, { redSpec }) {
   const dir = path.join(world.base, 'affected-repo');
   fs.mkdirSync(dir, { recursive: true });
   git(dir, 'init', '-q', '-b', 'main');
-  const files = { 'scripts/answer.mjs': 'export const answer = () => 1;\n', 'package.json': '{"name":"replay-affected","type":"module"}\n' };
+  const files = { 'scripts/answer.mjs': 'export const answer = () => 1;\n', 'package.json': '{"name":"replay-affected","type":"module"}\n', '.gitignore': '.runtime/\n' };
   for (const name of ['low-priority', 'isolated-temp', 'isolated-registry', 'runtime-copies']) files[`tests/setup/${name}.mjs`] = '';
   for (const source of ['engine', 'packages']) files[`${source}/keep.mjs`] = 'export const keep = 0;\n';
   const expected = redSpec ? 'answer() === 1' : 'answer() >= 1';
@@ -42,7 +42,7 @@ test('a clean affected run leaves its receipt as a file the deploy judges, and t
   const result = await runVerb(repo);
   assert.equal(result.exit.code, 0, JSON.stringify(result.tail));
   assert.ok(result.receipt, 'the receipt came back as a file, not out of the output');
-  assert.deepEqual(affectedJudgement(result, { sha: repo.tip, base: repo.base }), { affected: { base: repo.base, tip: repo.tip, passed: 1, total: 1 } });
+  assert.deepEqual(affectedJudgement(result, { sha: repo.tip, base: repo.base }), { affected: { base: repo.base, tip: repo.tip, root: path.resolve(repo.dir), passed: 1, total: 1 } });
   assert.ok(provenFor({ dir: repo.dir, base: repo.base, tip: repo.tip }), 'a clean run leaves the proven receipt of its pair');
 });
 
