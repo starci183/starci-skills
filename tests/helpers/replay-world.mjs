@@ -285,9 +285,11 @@ export function replayWorld(t, fixture, { tree = false, seed = null, bindKernel 
   /**
    * The real reconciler Engine over this world for `passes` passes in a fresh process (an engine restart per call): {ok, passes: [{controllers: [...]}], ...}.
    * `controllers` names the controllers run active (default job, workflow); `critic` configures the stubbed Critic launch ({mode, verdict} for fake-critic-orca).
+   * `foregroundPush` runs the parallelism push the Job controller asks for in the foreground, so it ends with the pass: the detached push of the default outlives the pass and
+   * races a spec that attests a READ or pushes next.
    */
-  world.engine = ({ controllers = ['job', 'workflow'], passes = 1, critic = null, timeout = 300_000 } = {}) => {
-    const spec = { repo, ledgerFile, controllers, passes, critic, ledgerId: path.basename(repo), env: { STARCI_ORCA_COMMAND: env.STARCI_ORCA_COMMAND } };
+  world.engine = ({ controllers = ['job', 'workflow'], passes = 1, critic = null, foregroundPush = false, timeout = 300_000 } = {}) => {
+    const spec = { repo, ledgerFile, controllers, passes, critic, foregroundPush, ledgerId: path.basename(repo), env: { STARCI_ORCA_COMMAND: env.STARCI_ORCA_COMMAND } };
     const r = spawnSync(process.execPath, [DRIVER, JSON.stringify(spec)], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout, env: { ...env, ...kernelEnv } });
     const out = lastJson(r.stdout);
     assert.ok(out, `engine driver gave no JSON (exit ${r.status}): ${String(r.stderr).slice(-1500)}`);

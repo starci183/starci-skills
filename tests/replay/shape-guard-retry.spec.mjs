@@ -18,7 +18,7 @@ test('the retry the failure route queued behind its curing leg is dispatched, no
   const cause = causesOf({ status: 'failed', result: failed.result, report: { outcome: failed.report.outcome, blocker: { kind: failed.report.blocker.kind, detail: 'the fix needs files outside the owned paths' } } });
   assert.ok(cause.includes(failed.report.cause), `the world reproduces the live cause of the failed job (${cause.join(', ')})`);
 
-  assert.equal(world.engine({ controllers: ['job', 'workflow'], passes: 1 }).ok, true, 'the engine restarts over the queued retry');
+  assert.equal(world.engine({ controllers: ['job', 'workflow'], passes: 1, foregroundPush: true }).ok, true, 'the engine restarts over the queued retry');
   const status = world.status();
   assert.deepEqual(status.progress.readyJobs, [retry.id], 'the retry is ready: its curing leg landed');
   assert.deepEqual(status.menu.map((item) => item.id).filter((id) => id.startsWith('shape-refused:')), [], 'the Kernel is not asked to widen a grant that is not narrow');
