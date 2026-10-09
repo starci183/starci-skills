@@ -8,7 +8,7 @@ import { supervisorDecisions } from '../machine/decisions.mjs';
 import { withSupervisor } from '../machine/home.mjs';
 import { untiedTreeFacts, untiedTreeLine } from '../machine/untied-tree.mjs';
 
-export const UNTIED_ITEM_KIND = 'unregistered-trees';
+const UNTIED_ITEM_KIND = 'unregistered-trees';
 const LIVE = new Set(['open', 'claimed', 'escalated']);
 const hashOf = (text) => crypto.createHash('sha256').update(text).digest('hex').slice(0, 10);
 

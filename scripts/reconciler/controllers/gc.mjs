@@ -437,8 +437,7 @@ export function createGcController(overrides = {}) {
       return { ok: false, error: String(error?.message ?? error).slice(0, 200) };
     }
     const stop = items.find((i) => i.action === 'stopped');
-    if (stop) await stoppedDecision(ctx, { reason: stop.reason, path: items.find((i) => i.fatal)?.path ?? null, damage: items.find((i) => i.fatal)?.damage ?? [stop.error] });
-    await untiedTreesDecision(ctx, items, { complete: !stop });
+    if (stop) await stoppedDecision(ctx, { reason: stop.reason, path: items.find((i) => i.fatal)?.path ?? null, damage: items.find((i) => i.fatal)?.damage ?? [stop.error] }); await untiedTreesDecision(ctx, items, { complete: !stop });
     const removed = items.filter((i) => i.ok === true && i.action === 'remove').length;
     const failed = items.filter((i) => i.ok === false);
     if (items.length) {

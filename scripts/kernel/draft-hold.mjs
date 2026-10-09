@@ -4,9 +4,9 @@
 // kernel.wakeRepeatMs) ONE Supervisor Decision Item says that the seat cannot be woken; it closes by itself when a wake is delivered again.
 import { readModuleJson } from '../../engine/runtime-root.mjs';
 
-export const DRAFT_HELD_EVENT = 'kernel-wake-draft-held';
+const DRAFT_HELD_EVENT = 'kernel-wake-draft-held';
 export const DRAFT_ITEM_KIND = 'seat-draft-held';
-export const DRAFT_CLEARED_EVENT = 'kernel-wake-draft-cleared';
+const DRAFT_CLEARED_EVENT = 'kernel-wake-draft-cleared';
 const ENDS_EPISODE = [`'kernel-woken'`, `'${DRAFT_CLEARED_EVENT}'`].join(',');
 const DRAFT_DELIVERIES = Object.freeze(['foreign-input', 'draft-stuck']);
 
@@ -14,7 +14,7 @@ const DRAFT_DELIVERIES = Object.freeze(['foreign-input', 'draft-stuck']);
 export const draftRefused = (proof) => proof?.ok === false && DRAFT_DELIVERIES.includes(proof.delivery);
 
 /** The bound after which the Supervisor is told: the seat's wake-repeat time. */
-export const draftBoundMs = (read = readModuleJson) => Number(read('modules', 'reconciler', 'seat-cost.yaml')?.kernel?.wakeRepeatMs);
+const draftBoundMs = (read = readModuleJson) => Number(read('modules', 'reconciler', 'seat-cost.yaml')?.kernel?.wakeRepeatMs);
 
 /** The draft episode standing now, or null: {since, lastAt, refusals, terminal, delivery, draft}. It ends with the next delivered wake or with the draft being gone. */
 export function draftEpisode(db, workflowId) {
@@ -34,7 +34,7 @@ export function recordDraftHeld(ledger, { workflowId, terminal, proof }) {
 }
 
 /** How many items of this episode the Supervisor already answered (a wait snoozes the item for another bound). */
-export const answeredItems = (db, workflowId, since) => Number(db.prepare("SELECT COUNT(*) AS n FROM decision_items WHERE workflow_id=? AND kind=? AND idempotency_key LIKE ? AND status<>'open' AND status<>'claimed'")
+const answeredItems = (db, workflowId, since) => Number(db.prepare("SELECT COUNT(*) AS n FROM decision_items WHERE workflow_id=? AND kind=? AND idempotency_key LIKE ? AND status<>'open' AND status<>'claimed'")
   .get(workflowId, DRAFT_ITEM_KIND, `${DRAFT_ITEM_KIND}:${workflowId}:${since}:%`)?.n ?? 0);
 
 /** Record that the draft is gone (the seat's input box reads empty) while an episode stood; the episode ends. */

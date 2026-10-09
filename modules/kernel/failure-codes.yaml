@@ -18068,3 +18068,23 @@ workflow-purge-plan-changed:
   nextStep_vi: "Chủ sở hữu đọc lại kế hoạch bằng --plan và thi hành với mã mới."
   owner: owner
   kind: verb-refusal
+seat-draft-held:
+  title: "A draft stands in a seat's input box"
+  title_vi: "Có bản nháp trong ô nhập của ghế điều phối"
+  meaning_vi: "Một người đang gõ dở trong ô nhập của ghế Kernel nên lần đánh thức bị từ chối; runtime không bao giờ xóa, đè lên hay thay ghế đang giữ bản nháp."
+  causes_vi:
+    - "Người dùng thật đang gõ trong terminal của ghế"
+    - "Chữ nháp còn sót lại mà không ai gửi đi"
+  nextStep_vi: "Supervisor chọn chờ thêm (mục đóng và mở lại sau một chu kỳ nếu bản nháp còn) hoặc ghi nguyên nhân cho Debug; chọn none-fits để chuyển cho chủ sở hữu. Mục tự đóng khi bản nháp biến mất."
+  owner: supervisor
+  kind: blocker
+unregistered-trees:
+  title: "Trees the runtime cannot tie to a workflow"
+  title_vi: "Cây thư mục runtime không gắn được với workflow nào"
+  meaning_vi: "Dưới thư mục do runtime quản lý có cây worktree không thuộc workflow nào; runtime không xóa thứ nó không tạo ra, việc xóa là việc của con người."
+  causes_vi:
+    - "Cây được tạo trước khi có sổ đăng ký hoặc do một lần chạy bị chết giữa chừng"
+    - "Cây là việc dở của chủ sở hữu"
+  nextStep_vi: "Supervisor chọn để yên (mục đóng cho đến khi tập cây đổi) hoặc ghi nguyên nhân cho Debug; việc xóa do con người làm."
+  owner: supervisor
+  kind: blocker
