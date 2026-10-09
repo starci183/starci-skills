@@ -66,12 +66,13 @@ export function recordPayload(notice, verdict, { filesSha = null } = {}) {
     digest: notice.digest ?? null, filesSha };
 }
 
+const owedCount = (notice) => (notice.action === 'replace' ? `${notice.replaceFiles.length} changed rule file(s)` : `${notice.files.length} file(s)`);
+
 /** The one-line status of a seat's notice: revision acked, concerned or not, files owed. */
 export function noticeLine(notice, short = (rev) => String(rev ?? '').slice(0, 12)) {
   const rev = short(notice.to ?? notice.from);
   const owed = { owed: 'owes', 'owed-woken': 'owes (woken)', 'replace-due': 'is due for replacement' }[notice.state];
-  const count = notice.action === 'replace' ? `${notice.replaceFiles.length} changed rule file(s)` : `${notice.files.length} file(s)`;
-  if (owed) return `${notice.role} ${owed} ${count} of rev ${rev}`;
+  if (owed) return `${notice.role} ${owed} ${owedCount(notice)} of rev ${rev}`;
   const label = { current: 'acked rev', 'not-concerned': 'not concerned by rev', 'acked-legacy': 'acked rev', 'no-baseline': 'has no baseline at rev', 'unknown-current': 'rev unknown' }[notice.state] ?? notice.state;
   return `${notice.role} ${label} ${rev}`;
 }

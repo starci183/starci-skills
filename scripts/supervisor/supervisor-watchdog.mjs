@@ -224,7 +224,8 @@ async function hostDeps() {
   };
 }
 
-export { repairSupervisorTabTitles } from './tab-titles.mjs';
+import { repairSupervisorTabTitles } from './tab-titles.mjs';
+export { repairSupervisorTabTitles };
 
 // worker-show states that end a worker (start-workflow.mjs MANAGED_DEAD_STATE).
 const DEAD_WORKER_STATE = /stop|fail|dead|exit|release|abandon/i;

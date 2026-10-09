@@ -3,6 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { revisionRepo } from '../helpers/revision-repo.mjs';
 import { deployLine, deployRoles } from '../../scripts/reconciler/revision-deploy.mjs';
+import { revisionScope } from '../../scripts/cli/revision-scope.mjs';
 
 test('a deploy event carries one action and one count per role, never a file list, and the digest line reads them', (t) => {
   const repo = revisionRepo(t, { files: { 'modules/kernel/driver-loop.yaml': 'steps:\n  - a\n  - b\n', 'modules/supervisor/supervisor-menu.yaml': 'items:\n  - a\n  - b\n' } });
@@ -27,4 +28,12 @@ test('a docs-only deploy reads: every seat not concerned', (t) => {
 test('a change git cannot measure is reported as every seat replaced', (t) => {
   const repo = revisionRepo(t);
   assert.match(deployLine(deployRoles(repo.root, '0'.repeat(40), repo.base)), /cannot be measured; every seat is replaced/);
+});
+
+test('starci runtime revision-scope answers the payload and the line of a deploy before it is made', (t) => {
+  const repo = revisionRepo(t);
+  const to = repo.commit('docs', { 'docs/a.md': '# a\n' });
+  const answer = revisionScope({ root: repo.root, from: repo.base });
+  assert.equal(answer.payload.to, to, 'the target defaults to the HEAD of the tree');
+  assert.match(answer.line, /^revision [0-9a-f]{12}: Kernel not concerned/);
 });
