@@ -12,7 +12,7 @@ import { terminalList } from '../api/orca/terminal-list.mjs';
 import { runShow } from '../api/orca/run-show.mjs';
 import { SKILL_ROOT, supervisedSeatHandles } from '../machine/home.mjs';
 import { entryTerminalsOf, recordedSeatTerminals } from '../machine/seat-sessions.mjs';
-import { startFailureRun, startHoldBudget, startHoldOf, holdSummary } from './start-hold.mjs';
+import { runtimeRevNow, startFailureRun, startHoldBudget, startHoldOf, holdSummary } from './start-hold.mjs';
 
 async function workflowHost({ env }, run = execNode) {
   const args = [path.join(skillRoot, 'scripts/reconciler/workflow-up.mjs'), '--json'];
@@ -64,9 +64,9 @@ export function workflowSender({ env = process.env, launchedBy = 'supervisor', l
  * Why a Kernel launch is refused before it touches anything, as {step, fields} for the refusal, or null: the goal is not startable, or the
  * watchdog's launch is held because the same cause failed it as often as the declared bound allows (start-hold.mjs).
  */
-export function startBar({ authority, launchedBy, db, workflowId, now = Date.now(), budget = startHoldBudget }) {
+export function startBar({ authority, launchedBy, db, workflowId, now = Date.now(), budget = startHoldBudget, rev = runtimeRevNow() }) {
   if (!authority.ok) return { step: authority.reason, fields: { workflowId, authority } };
-  const hold = launchedBy === 'watchdog' ? startHoldOf(startFailureRun(db, workflowId), { now, budget: budget() }) : null;
+  const hold = launchedBy === 'watchdog' ? startHoldOf(startFailureRun(db, workflowId), { now, budget: budget(), rev }) : null;
   return hold ? { step: 'kernel-start-held', fields: { workflowId, reason: 'kernel-start-held', error: holdSummary(hold), hold } } : null;
 }
 
@@ -117,7 +117,7 @@ export function recordWorkflowStartFailure(ledger, { workflowId, token, holderPi
     const unknown = ['partial', 'unknown'].includes(extra.effectState);
     // An archived ledger rejects further events; the machine owns unresolved host custody after retirement.
     if (workflow?.phase === 'archived' || workflow?.archived_at != null || !workflow) {
-      const payload = { step, error, terminal: handle, ...extra, reservation: token, signalRetained: false };
+      const payload = { step, error, terminal: handle, ...extra, reservation: token, signalRetained: false, runtimeRev: runtimeRevNow() };
       try {
         const custody = machine((m) => m.transaction(() => {
           const event = m.supEvent({ entityType: 'kernel', entityId: workflowId, kind: 'kernel-start-failed', at,
@@ -143,7 +143,7 @@ export function recordWorkflowStartFailure(ledger, { workflowId, token, holderPi
       value: { state: 'launch-unknown', terminal: handle, dispatch: extra.dispatch ?? null,
         admission: extra.admission ?? null, hostRequestId: extra.hostRequestId ?? null, effectState: extra.effectState } }) : false;
     if (!unknown && owns) clearSignal(ledger.db, { scope: 'kernel', key: workflowId, token });
-    const payload = { step, error, terminal: handle, ...extra, reservation: token, signalRetained };
+    const payload = { step, error, terminal: handle, ...extra, reservation: token, signalRetained, runtimeRev: runtimeRevNow() };
     ledger.appendEvent({ workflowId, entityType: 'kernel', entityId: workflowId, generation,
       kind: 'kernel-start-failed', payload, createdAt: at });
     if (unknown && !signalRetained) openIncident(ledger.db, { incidentId: `inc-${crypto.randomUUID()}`, workflowId,

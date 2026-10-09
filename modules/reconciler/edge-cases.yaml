@@ -772,3 +772,10 @@ cases:
     rule: {file: engine/db/event-compact.mjs, anchor: "compactEventPayload"}
     spec: tests/engine-db/event-compact.spec.mjs
     status: covered
+  - id: start-hold-outlives-the-runtime-that-set-it
+    family: failure-while-running
+    finding: {role: runtime, duty: a remedy takes effect when it is deployed, verdict: departs, evidence: "both real Kernels were held after the alpha.8 deploy by failures whose cause the runtime had since fixed (1670 workflow-worktree-install failures of the old runtime; 3 kernel-seat-publication-failed failures fixed in b6f65f734); the watchdog still answered start-held with the next launch an hour away, and the Host seat quarantine kept the seat unlaunched for holdMs: nothing connected a changed runtime to a possibly gone cause", remedy: {state: in-tree, change: "every kernel-start-failed event records the runtime revision it failed under (runtimeRev); a failure of another revision, or a row with none, does not count toward the hold, so a changed runtime gets one probation launch at once and a failure of that launch starts the count; the Host seat quarantine records the revision that set it and is passed to the watchdog once the runtime differs; the hold text names the revision"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, both real Kernels, kernel-watchdog start-held", evidence: "start-held ... the next launch is due an hour later after the deploy and engine restart"}
+    rule: {file: scripts/kernel/start-hold.mjs, anchor: "failuresUnder"}
+    spec: tests/kernel/start-hold.spec.mjs
+    status: covered

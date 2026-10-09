@@ -227,7 +227,8 @@ test('archived-during-launch refuses publication and durably retains unknown cus
   assert.equal(decisions.length, 1);
   assert.equal(decisions[0].di_id, failure.custody.decision.diId);
   assert.deepEqual(decisions[0].evidence, { step: failure.step, error: failure.error, terminal: failure.terminal,
-    ...extra, reservation: token, signalRetained: false });
+    ...extra, reservation: token, signalRetained: false, runtimeRev: event.payload.runtimeRev });
+  assert.match(event.payload.runtimeRev, /^[0-9a-f]{40}$/, 'the failure records the runtime revision it failed under');
   const replay = recordWorkflowStartFailure(ledger, { ...ctx, step: failure.step, error: failure.error, handle: failure.terminal, extra });
   assert.equal(replay.custody.decision.diId, failure.custody.decision.diId);
   assert.equal(replay.custody.decision.created, false);

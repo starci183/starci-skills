@@ -15,11 +15,13 @@ export function seatStateOf(action) {
 }
 
 /**
- * Why the Host leaves a Kernel seat alone this pass, or null: a quarantined seat for holdMs, a restart the watchdog answered
- * restart-blocked (no sender terminal to launch from) for blockedRetryMs. Pure.
+ * Why the Host leaves a Kernel seat alone this pass, or null: a quarantined seat for holdMs (unless the runtime now running is not the
+ * one that quarantined it: a record with no revision is older, and a changed runtime gets a probation pass), a restart the watchdog
+ * answered restart-blocked (no sender terminal to launch from) for blockedRetryMs. Pure.
  */
-export function seatHold(rec, now, s) {
-  if (rec.state === 'quarantined' && now - rec.since < s.holdMs) return { ok: true, quarantined: true };
+export function seatHold(rec, now, s, rev = null) {
+  const sameRuntime = !rev || rec.quarantinedRev === rev;
+  if (rec.state === 'quarantined' && sameRuntime && now - rec.since < s.holdMs) return { ok: true, quarantined: true };
   if (rec.lastAction === 'restart-blocked' && now - rec.lastAt < s.blockedRetryMs) return { ok: true, held: 'restart-blocked', retryInMs: s.blockedRetryMs - (now - rec.lastAt) };
   return null;
 }

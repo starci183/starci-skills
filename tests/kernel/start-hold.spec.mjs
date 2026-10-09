@@ -6,11 +6,14 @@ import os from 'node:os';
 import path from 'node:path';
 import { startBar } from '../../scripts/kernel/workflow-startup.mjs';
 import { startCauseOf, startFailureRun, startHoldBudget, startHoldOf, holdSummary } from '../../scripts/kernel/start-hold.mjs';
+import { seatHold } from '../../scripts/reconciler/host-seats.mjs';
 import { withLedger, seedWorkflow } from '../helpers/ledger-fixture.mjs';
 
 const budget = { intervalMs: 60_000, maxIntervalMs: 900_000, maxAttempts: 3, heldRetryMs: 3_600_000 };
 const T0 = 1_800_000_000_000;
 const workflowId = 'wf-start-hold';
+const REV_OLD = 'a'.repeat(40);
+const REV_NEW = 'b'.repeat(40);
 const lockedFile = (name) => path.join(os.tmpdir(), 'starci-hold-tree', 'node_modules', `${name}.node`);
 const locked = (path) => ({ step: 'workflow-worktree-install', reason: 'workflow-worktree-install-locked', error: `npm error code EPERM\nnpm error path ${path}`,
   install: { receipt: { cause: 'file-locked', code: 'EPERM', path, holders: [{ pid: 4242, name: 'node.exe' }] } } });
@@ -90,13 +93,60 @@ test('the cause is the step and the typed reason, else the first line of the err
 });
 
 test('startBar refuses the watchdog launch of a held cause and leaves the Supervisor and a startable goal alone', (t) => world(t, (ledger) => {
-  for (const [i, at] of [T0, T0 + 100_000, T0 + 300_000].entries()) fail(ledger, at, locked(lockedFile(i)));
+  for (const [i, at] of [T0, T0 + 100_000, T0 + 300_000].entries()) fail(ledger, at, { ...locked(lockedFile(i)), runtimeRev: REV_NEW });
   const ok = { ok: true };
   const now = T0 + 400_000;
-  const barred = startBar({ authority: ok, launchedBy: 'watchdog', db: ledger.db, workflowId, now, budget: () => budget });
+  const barred = startBar({ authority: ok, launchedBy: 'watchdog', db: ledger.db, workflowId, now, budget: () => budget, rev: REV_NEW });
   assert.equal(barred.step, 'kernel-start-held');
   assert.equal(barred.fields.hold.state, 'held');
   assert.match(barred.fields.error, /held/);
   assert.equal(startBar({ authority: ok, launchedBy: 'supervisor', db: ledger.db, workflowId, now, budget: () => budget }), null);
   assert.equal(startBar({ authority: { ok: false, reason: 'workflow-approval-required' }, launchedBy: 'watchdog', db: ledger.db, workflowId, now, budget: () => budget }).step, 'workflow-approval-required');
 }));
+
+const underRev = (runtimeRev, name) => ({ ...locked(lockedFile(name)), runtimeRev });
+const three = (ledger, runtimeRev, first = T0) => [0, 100_000, 300_000].forEach((dt, i) => fail(ledger, first + dt, runtimeRev === undefined ? locked(lockedFile(i)) : underRev(runtimeRev, i)));
+
+test('failures recorded under an older runtime revision do not hold the launch: one probation launch is due at once', (t) => world(t, (ledger) => {
+  three(ledger, REV_OLD);
+  const run = startFailureRun(ledger.db, workflowId);
+  assert.equal(startHoldOf(run, { now: T0 + 400_000, budget, rev: REV_OLD }).state, 'held', 'the same revision keeps the hold');
+  assert.equal(startHoldOf(run, { now: T0 + 400_000, budget, rev: REV_NEW }), null, 'a newer runtime gets its launch at once');
+}));
+
+test('a probation launch that fails under the new revision starts the count from that failure', (t) => world(t, (ledger) => {
+  three(ledger, REV_OLD);
+  fail(ledger, T0 + 500_000, underRev(REV_NEW, 'p'));
+  const run = startFailureRun(ledger.db, workflowId);
+  const hold = startHoldOf(run, { now: T0 + 510_000, budget, rev: REV_NEW });
+  assert.equal(hold.state, 'backoff');
+  assert.equal(hold.count, 1);
+  assert.equal(hold.retryAtMs, T0 + 500_000 + budget.intervalMs);
+  assert.equal(hold.rev, REV_NEW);
+  assert.equal(startHoldOf(run, { now: T0 + 500_000 + budget.intervalMs, budget, rev: REV_NEW }), null);
+}));
+
+test('three failures under the new revision hold it again, and the text names that revision', (t) => world(t, (ledger) => {
+  three(ledger, REV_OLD);
+  three(ledger, REV_NEW, T0 + 500_000);
+  const hold = startHoldOf(startFailureRun(ledger.db, workflowId), { now: T0 + 1_000_000, budget, rev: REV_NEW });
+  assert.equal(hold.state, 'held');
+  assert.equal(hold.count, 3);
+  assert.match(holdSummary(hold), new RegExp(`under runtime ${REV_NEW.slice(0, 12)}`));
+}));
+
+test('rows with no recorded revision count as older than any current revision', (t) => world(t, (ledger) => {
+  three(ledger, undefined);
+  const run = startFailureRun(ledger.db, workflowId);
+  assert.equal(run.every((r) => r.rev === null), true);
+  assert.equal(startHoldOf(run, { now: T0 + 400_000, budget, rev: REV_NEW }), null);
+}));
+
+test('the Host seat quarantine holds for the runtime that set it and gives a changed runtime its probation pass', () => {
+  const s = { holdMs: 3_600_000, blockedRetryMs: 300_000 };
+  const rec = { state: 'quarantined', since: T0, quarantinedRev: REV_OLD };
+  assert.deepEqual(seatHold(rec, T0 + 60_000, s, REV_OLD), { ok: true, quarantined: true });
+  assert.equal(seatHold(rec, T0 + 60_000, s, REV_NEW), null, 'another runtime: the seat is passed to the watchdog at once');
+  assert.equal(seatHold({ state: 'quarantined', since: T0 }, T0 + 60_000, s, REV_NEW), null, 'a record with no revision is older');
+  assert.equal(seatHold(rec, T0 + 3_600_000, s, REV_OLD), null, 'the hour still ends the hold');
+});

@@ -204,10 +204,10 @@ test('a Kernel launch that keeps failing for the same cause after the restart is
   const budget = startHoldBudget();
   const lockedPath = path.join(w.tree, 'node_modules', 'x.node');
   const failed = (at) => w.ledger.appendEvent({ workflowId: WF, entityType: 'kernel', entityId: WF, generation: 1, kind: 'kernel-start-failed', createdAt: at,
-    payload: { step: 'workflow-worktree-install', reason: 'workflow-worktree-install-locked', error: 'npm error code EPERM', install: { receipt: { cause: 'file-locked', code: 'EPERM', path: lockedPath, holders: [{ pid: 7, name: 'node.exe' }] } } } });
+    payload: { runtimeRev: 'r'.repeat(40), step: 'workflow-worktree-install', reason: 'workflow-worktree-install-locked', error: 'npm error code EPERM', install: { receipt: { cause: 'file-locked', code: 'EPERM', path: lockedPath, holders: [{ pid: 7, name: 'node.exe' }] } } } });
   const at = Date.now();
   for (let i = 0; i < budget.maxAttempts; i += 1) failed(at + i * 1000);
-  const bar = startBar({ authority: { ok: true }, launchedBy: 'watchdog', db: w.ledger.db, workflowId: WF, now: at + 10_000 });
+  const bar = startBar({ authority: { ok: true }, launchedBy: 'watchdog', db: w.ledger.db, workflowId: WF, now: at + 10_000, rev: 'r'.repeat(40) });
   assert.equal(bar.step, 'kernel-start-held');
   assert.equal(bar.fields.hold.state, 'held');
   assert.equal(bar.fields.hold.reason, 'workflow-worktree-install-locked');

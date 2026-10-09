@@ -56,6 +56,7 @@ import { claimDue, finishDuty, listSchedules } from '../schedules.mjs';
 import { pathKey } from '../../lib/path-key.mjs';
 import os from 'node:os';
 import { seatStateOf, seatHold, seatQuarantine } from '../host-seats.mjs';
+import { runtimeRevNow } from '../../kernel/start-hold.mjs';
 import { runTerminalDrift, runtimeTerminalCount } from '../terminal-drift.mjs';
 import { createStaleTerminalStep } from '../host-stale.mjs';
 import { eachInOrder } from '../../lib/in-order.mjs';
@@ -367,7 +368,8 @@ export function createHostController(deps = {}) {
     const rec = rowOf(key, now);
     const problem = goalProblem(wf.goal, goalRefusal);
     if (problem) return refuseGoal(ctx, { ledgerId, workflowId, wf, rec, problem, now });
-    const hold = seatHold(rec, now, s); if (hold) return hold;
+    const rev = runtimeRevNow();
+    const hold = seatHold(rec, now, s, rev); if (hold) return hold;
     const { seatOut, action, acted } = await runSeatPass(ctx, { ledger, workflowId, s });
     const replaced = ctx.mode === 'active' ? REPLACED.has(action) : acted && action === 'restart-needed';
     const next = { ...rec, restarts: [...(rec.restarts ?? []).filter((t) => now - t < 3_600_000), ...(replaced ? [now] : [])], lastAction: action, lastAt: now, mode: ctx.mode };
@@ -376,6 +378,7 @@ export function createHostController(deps = {}) {
       seat = 'quarantined';
       await quarantineSeat(ctx, { key, rec, next, ledgerId, workflowId, action, now, hold: seatOut?.hold ?? null });
     }
+    if (seat === 'quarantined') next.quarantinedRev = rev;
     if (next.state !== seat) { next.state = seat; next.since = now; }
     await seatClocks(ctx, { key, seat, s, ledgerId, workflowId, action });
     const stale = seat === 'hostOutage' ? null : await staleTerminalStep(ctx, { ledgerId, workflowId, liveHandle: seatOut?.terminal ?? null });
