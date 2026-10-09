@@ -151,6 +151,11 @@ proofs:
       en: "starci kernel settle re-reads the attached doc-gate.json (runtime check op-proof, proof doc-gate): a done without it (op-doc-gate-missing), with a check that could not run (op-doc-gate-tool-failed) or with a finding (op-doc-gate-red) is refused."
       vi: "starci kernel settle tự đọc lại doc-gate.json đính kèm (check op-proof, proof doc-gate): done thiếu nó (op-doc-gate-missing), có bộ kiểm tra không chạy được (op-doc-gate-tool-failed) hoặc có lỗi (op-doc-gate-red) đều bị từ chối."
     check: scripts/kernel/gate-settle.mjs
+judge:
+  - by: machine
+    measures: [declared-checks, op-proof:doc-gate, op-proof:read-knowledge]
+    proofs: [binding, doc-gate, read-knowledge]
+    why: "the settler re-runs the validator over the references it names, the document gate is re-run natively and the READ of the standard is re-read from the digest"
 blockers:
   - code: RULE_OWNER_UNKNOWN
     condition:

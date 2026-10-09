@@ -1,6 +1,8 @@
 // The drift and handover side of `starci kernel status` (verbs/status.mjs): settled results whose inputs
 // moved, indexed proofs gone stale, artwork slots still owed, the autopilot projection, and the owner
 // handover projection.
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { openAssetSlots } from '../../../work/asset-slot.mjs';
 import { staleProofsOf } from '../../proof-integrity.mjs';
 import { peerDriftSummaryOf, sourceDriftSummaryOf, staleOperationsOf } from '../../input-digests.mjs';
@@ -8,6 +10,12 @@ import { HANDOVER_CREDENTIALS_SUBJECT, autopilotOn, autopilotProjection, credent
 import { isLiveProofOp } from '../../ask-server.mjs';
 import { HANDOVER_OP, handoverProjection } from '../../handover.mjs';
 import { jobPayloadOf } from './rows.mjs';
+import { externalOpsOf } from '../../leg-status-view.mjs';
+import { deferredTestsOf } from '../../../route/spec-deferral.mjs';
+
+const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..');
+// A leg the chat intake runs (request.analyze) is settled before the workflow exists and never has a job: it counts as settled for the handover and the credential checklist.
+const intakeLeg = (op) => externalOpsOf(skillRoot).has(op);
 
 // A settled result whose product Work inputs changed and owe work is work the Kernel owes now: an
 // owner-declared breaking change owes ONE follow-up leg (followUp), an unattributed edit of a record
@@ -35,7 +43,7 @@ export const driftPhase = (s) => {
   s.autopilotView = autopilotViewOf(s);
 };
 
-const opDone = (s, op, deferredJobIds) => (s.jobsByOp.get(op) ?? []).some((row) => row.status === 'succeeded')
+const opDone = (s, op, deferredJobIds) => intakeLeg(op) || (s.jobsByOp.get(op) ?? []).some((row) => row.status === 'succeeded')
   || (s.jobsByOp.get(op) ?? []).some((row) => deferredJobIds.has(row.job_id));
 
 const autopilotGraph = (s, view, owed, checklistDue) => ({
@@ -66,12 +74,13 @@ const autopilotViewOf = (s) => {
 // The owner handover (scripts/kernel/handover.mjs): an answered handover ask
 // is the Kernel's move, a current owner approval makes finish the next move,
 // and a chain whose every leg settled owes the handover leg.
+// A test leg the owner's specs switches deferred (a cancelled job with a deferred verdict) counts as settled too: it runs later, on request.
 // Autopilot: a leg deferred to the final review counts as settled for the handover, and so does a provision.ask
 // leg when nothing is owed to the end-of-flow credential checklist.
 export const handoverPhase = (s) => {
   const { db, workflowId } = s;
   s.autopilotSettled = settledForHandover(s);
-  s.handover = handoverProjection(db, workflowId, { legOps: s.legOps, alsoSettled: s.autopilotSettled });
+  s.handover = handoverProjection(db, workflowId, { legOps: s.legOps, alsoSettled: [...s.autopilotSettled, ...s.legOps.filter(intakeLeg), ...deferredTestsOf(db, workflowId).map((item) => item.op)] });
 };
 
 const settledForHandover = (s) => {

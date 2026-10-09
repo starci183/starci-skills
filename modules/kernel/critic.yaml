@@ -10,6 +10,8 @@ about:
   en: >-
     An independent judge of one product of one op. It sees only the product bytes and the rubric handed to it, returns one
     starci/critic-verdict@1, and is refused (never trusted) when its verdict names other bytes than the attempt's product.
+    Which ops are judged by a Critic is declared once, in the `judge` field of each op contract (modules/kernel/op-judges.yaml); the
+    coverage table below and those declarations are held to each other by the op-judge self-check (RT_OP_JUDGE_UNDECLARED).
 
 seat: critic
 independence: provider

@@ -107,6 +107,14 @@ proofs:
       en: "The evidence names the worktree API call behind every worktree the op inspected or retired (the registry row or the removeWorktree result) and the worker-start id behind every agent it launched; a raw git worktree, a recursive delete or a raw agent terminal makes the run a defect."
       vi: "Bằng chứng nêu lệnh API worktree đứng sau mọi worktree op đã xem hoặc gỡ (dòng registry hoặc kết quả removeWorktree) và id worker-start đứng sau mọi agent op đã khởi chạy; git worktree thô, xóa đệ quy hoặc terminal agent thô khiến lần chạy thành lỗi."
     check: scripts/machine/worktrees.mjs
+judge:
+  - by: machine
+    measures: [declared-checks, work-hygiene, contract-script]
+    proofs: [worktree-api]
+    why: "the settler re-runs the record validators and the worktree-api check refuses a run that touched a worktree or an agent outside the runtime API"
+  - by: next-leg
+    leg: review.verify
+    why: "the planned chain closes with review.verify, which re-runs the gate over the reviewed range and classifies every defect it finds without repairing the producer"
 blockers:
   - code: OPERATION_REQUIRED
     condition:

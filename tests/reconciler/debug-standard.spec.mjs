@@ -268,3 +268,35 @@ test('interventions by a person, the lost tree of an unsettled attempt and a cla
   assert.equal(answer('co-claim-vs-rerun').state, 'attention');
   assert.equal(answer('fr-stale-gates').state, 'ok');
 });
+
+test('an approved leg that stands without a job is waiting inside its bound and, past it, the runtime\'s departure when the plan fixes its write set and the Kernel\'s when it does not', () => {
+  const standing = (origin, settledAgo) => {
+    const events = [event('checks-recorded', { attemptId: 1 }), event('op-settled', { attemptId: 1, verdict: 'pass', at: NOW - settledAgo, checkedIn: [{ cwd: TREE }] })];
+    return digest(snapshot({ workflows: [withRows({ events, status: status({ nextActions: [{ kind: 'dispatch', origin, op: 'business.decide' }] }) })] }));
+  };
+  const fresh = standing('approved-leg', MIN);
+  assert.deepEqual(fresh.problems, []);
+  assert.equal(step(fresh, 'leg-enqueued').state, 'waiting');
+  const mechanical = standing('approved-leg', 40 * MIN);
+  assert.deepEqual(bugCodes(mechanical), ['leg-not-enqueued']);
+  assert.equal(mechanical.problems[0].role, 'runtime');
+  assert.equal(flow(mechanical).firstDeparture.id, 'leg-enqueued');
+  const open = standing('approved-leg-open', 40 * MIN);
+  assert.deepEqual(bugCodes(open), ['leg-open-unanswered']);
+  assert.equal(open.problems[0].role, 'kernel');
+  const held = digest(snapshot({ workflows: [withRows({ status: status({ nextActions: [{ kind: 'dispatch', origin: 'approved-leg', op: 'business.decide', heldBy: { incident: 'inc-1' } }] }) })] }));
+  assert.deepEqual(held.problems, [], 'a leg a supervisor-gate or a peer-wait holds is theirs to release');
+  assert.equal(step(held, 'leg-enqueued').state, 'done');
+});
+
+test('the end of the flow: a handover ask that waits on the owner is a wait, a due handover that is not enqueued is a runtime departure', () => {
+  const ending = (handover, ago) => digest(snapshot({ workflows: [withRows({ status: status({ frontier: { state: 'handover-due', openOperations: 0, readyOperations: 0, queued: [] }, handover }),
+    events: [event('checks-recorded', { attemptId: 1 }), event('op-settled', { attemptId: 1, verdict: 'pass', at: NOW - ago, checkedIn: [{ cwd: TREE }] })] })] }));
+  const asked = ending({ state: 'awaiting-owner', due: false }, 120 * MIN);
+  assert.deepEqual(asked.problems, []);
+  assert.deepEqual([step(asked, 'handover').state, step(asked, 'handover').happy], ['waiting', 'owner-wait']);
+  assert.equal(step(ending({ state: 'due', due: true }, MIN), 'handover').state, 'waiting');
+  const stuck = ending({ state: 'due', due: true }, 40 * MIN);
+  assert.deepEqual(bugCodes(stuck), ['handover-not-enqueued']);
+  assert.equal(stuck.problems[0].role, 'runtime');
+});

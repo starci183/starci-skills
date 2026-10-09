@@ -117,6 +117,26 @@ function legDispatched(c) {
   return k.readyWork > 0 ? waiting(`${k.readyWork} ready unit(s) inside the wake bound`) : done('no ready leg waits');
 }
 
+/** The departure code of an approved leg that stands without a job, by the origin of its next action: the runtime's own move, or the Kernel's leg-ready item. */
+const LEG_STANDS = Object.freeze({ 'approved-leg': 'leg-not-enqueued', 'approved-leg-open': 'leg-open-unanswered' });
+
+/**
+ * An approved plan leg with no job: the status names it as a next action. One whose write set the plan (or its deferral) fixes is the Job controller's move; one it leaves open is the
+ * Kernel's leg-ready item. The bound counts from the latest progress of the workflow (a settle, a start of the workflow or of its Kernel), so a new workflow is judged from its start.
+ */
+function legEnqueued(c) {
+  const w = c.workflow;
+  if (w.phase !== 'running') return na(`phase ${w.phase}`);
+  const stands = (w.status?.nextActions ?? []).filter((action) => LEG_STANDS[action.origin] && !action.heldBy);
+  if (!stands.length) return done('no approved leg stands without a job');
+  const since = Math.max(lastAt(eventsOf(w, 'op-settled')) ?? 0, lastAt(eventsOf(w, 'phase-transition')) ?? 0, lastLaunchAt(w) ?? 0, Number(w.updatedAt) || 0) || null;
+  const names = stands.map((action) => action.op).join(', ');
+  if (within(c, since)) return waiting(`approved leg(s) ${names} have no job yet, inside the bound`);
+  const first = stands.find((action) => action.origin === 'approved-leg') ?? stands[0];
+  const owner = first.origin === 'approved-leg' ? 'the Job controller owns the enqueue move' : 'the leg-ready item waits on the Kernel';
+  return overdue(`approved leg(s) ${names} without a job for ${minutes(c.now - since)} min; ${owner}`, LEG_STANDS[first.origin]);
+}
+
 function workerStarted(c) {
   return c.workflow.attempts.filter((a) => a.dispatchedAt !== null && a.endState === null && a.reportedAt === null).map((a) => {
     const item = { attemptId: a.attemptId, op: a.op };
@@ -189,7 +209,13 @@ function settleEvidence(c) {
 }
 
 function handover(c) {
-  if (c.workflow.status?.frontier?.state !== 'finish-ready') return done('the workflow is not waiting to finish');
+  const h = c.workflow.status?.handover;
+  if (c.workflow.status?.frontier?.state !== 'finish-ready') {
+    if (h?.state === 'awaiting-owner') return waiting('every leg settled; the handover ask waits on the owner', 'owner-wait');
+    if (!h?.due) return done('the workflow is not waiting to finish');
+    const since = lastAt(eventsOf(c.workflow, 'op-settled')) ?? c.workflow.updatedAt;
+    return within(c, since) ? waiting('the handover is due, inside the bound') : overdue(`every leg settled ${minutes(c.now - Number(since))} min ago and handover.review is not enqueued`, 'handover-not-enqueued');
+  }
   const since = lastAt(eventsOf(c.workflow, 'handover-approved')) ?? c.workflow.updatedAt;
   return within(c, since) ? waiting('finish-ready, inside the bound') : overdue('the handover is approved and the workflow does not finish', 'handover-stuck');
 }
@@ -202,5 +228,5 @@ function resourcesReleased(c) {
 }
 
 export const PROBES = Object.freeze({ 'host-ready': hostReady, 'supervisor-seat-live': supervisorSeatLive, 'goal-approved': goalApproved, 'workflow-started': workflowStarted,
-  'kernel-booted': kernelBooted, 'kernel-acked-rev': kernelAckedRev, 'leg-dispatched': legDispatched, 'worker-started': workerStarted, 'op-working': opWorking,
+  'kernel-booted': kernelBooted, 'kernel-acked-rev': kernelAckedRev, 'leg-enqueued': legEnqueued, 'leg-dispatched': legDispatched, 'worker-started': workerStarted, 'op-working': opWorking,
   'report-filed': reportFiled, 'checks-rerun': checksRerun, settled, 'settle-evidence': settleEvidence, handover, 'resources-released': resourcesReleased });
