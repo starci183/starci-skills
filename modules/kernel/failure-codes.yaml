@@ -18138,3 +18138,14 @@ terminal-unreadable:
   nextStep_vi: "Debug kiểm tra đường đọc terminal rồi thử lại; giữ nguyên bản nháp và ghế trong lúc chưa đọc được."
   owner: runtime-core
   kind: runtime-fault
+
+workflow-purge-ledger-dependency:
+  title: "Workflow deletion is held by a retained database dependency"
+  title_vi: "Dọn workflow bị giữ bởi tham chiếu trong sổ phải được giữ lại"
+  meaning_vi: "Preflight giữ tác động host khi phát hiện tham chiếu ngăn xóa hoặc schema chưa được hỗ trợ; kiểm lại trong khóa sổ giữ dòng workflow trước DELETE nếu phụ thuộc xuất hiện sau đó."
+  causes_vi:
+    - "Work còn trỏ tới artifact của workflow"
+    - "Schema chưa hỗ trợ định danh hoặc quan hệ xóa chính xác"
+  nextStep_vi: "Xử lý tham chiếu theo thẩm quyền sản phẩm hoặc sửa bộ kiểm schema rồi đọc lại kế hoạch; không xóa Work để vượt cổng."
+  owner: owner
+  kind: verb-refusal

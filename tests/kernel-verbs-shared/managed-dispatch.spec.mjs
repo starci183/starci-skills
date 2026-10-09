@@ -269,7 +269,8 @@ test('managed dispatch: route persists the decision, spawn marks the job running
   assert.ok(workerStartCall?.includes('--spec'),'the rendered packet rides on --spec');
   // Inspect the real launch transport, including a spilled packet; preview-only wiring cannot satisfy this regression.
   const taskSpec=workerStartCall[workerStartCall.indexOf('--spec')+1];
-  const packetPath=taskSpec.match(/^ {2}(.+packet\.a\d+\.md)$/m)?.[1];
+  const packetPath=taskSpec.match(/^PACKET FILE:[^\r\n]*\r?\n {2}([^\r\n]+)$/m)?.[1];
+  if(taskSpec.includes('PACKET FILE:'))assert.ok(packetPath,'the actual spilled Task spec names its packet file');
   if(packetPath){
     const rel=path.relative(fx.root,path.resolve(packetPath));
     assert.ok(rel!=='..'&&!rel.startsWith(`..${path.sep}`)&&!path.isAbsolute(rel),'packet spill remains in this private fixture');

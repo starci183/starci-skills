@@ -21,6 +21,9 @@ import { settleFixture } from '../helpers/workflow-settle-fixture.mjs';
 import { withoutGitLocalEnv } from '../../scripts/lib/git.mjs';
 import { captureGateBinding } from '../../scripts/kernel/gate-settle.mjs';
 import { sha256File } from '../../engine/digest.mjs';
+import { runtimeCriticFor, runtimeCriticRunOf } from '../../scripts/kernel/settle/critic-run.mjs';
+import { kindEntryOf } from '../../scripts/work/decision-critic-product.mjs';
+import { fakeCriticOrca } from '../helpers/fake-critic-orca.mjs';
 
 for (const key of ['GIT_DIR', 'GIT_COMMON_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_OBJECT_DIRECTORY', 'GIT_CONFIG_PARAMETERS', 'GIT_CONFIG_COUNT', 'GIT_PREFIX']) delete process.env[key];
 
@@ -173,12 +176,15 @@ const checkout = (t) => {
   fs.appendFileSync(path.join(repo, '.git', 'info', 'exclude'), '.starciwork/\n');
   return repo;
 };
-const seedJob = (repo, { jobId, wf, files, admittedAt, env = process.env }) => {
+const seedJob = async (repo, { jobId, wf, files, admittedAt, env = process.env }) => {
   const read = spawnSync(process.execPath, [path.join(ROOT, 'scripts/cli/gate-read.mjs'), '--root', repo, '--knowledge', 'docs/architecture.md'], { cwd: ROOT, env, encoding: 'utf8', windowsHide: true, timeout: 30000 });
   assert.equal(read.status, 0, read.stderr || read.stdout);
   // Native READ records the physical target root; keep this operational proof outside portable Work records.
   const evidence = put(repo, 'docs/checks/read-digest.json', JSON.stringify(JSON.parse(read.stdout)));
-  files = [...files, evidence];
+  // The decision job owns a real business record for its independent runtime Critic.
+  const business = put(repo, '.starciwork/features/login/br/sign-in/index.yaml',
+    'schema: work/business-rule@1\nid: br.login.sign-in\ntitle: Sign in\nstatement: A person with a valid account may sign in.\n');
+  files = [...files, evidence, business];
   const owned = ['src/', '.starciwork/', 'docs/checks/'];
   const placements = owned.map(path => ({ base: repo, path }));
   const ledgerFile = ledgerFileFor(repo, { env });
@@ -186,7 +192,7 @@ const seedJob = (repo, { jobId, wf, files, admittedAt, env = process.env }) => {
   try {
     seedWorkflow(ledger, { id: wf, state: { phase: 'running', job: 'scope' },
       jobs: [{ jobId, opId: 'business.decide', dispatchId: `ctx-${jobId}`, terminalHandle: `term-${jobId}`, status: 'running',
-        payload: { opId: 'business.decide', owned_paths: owned, orca: { dispatchId: `ctx-${jobId}`, agentTerminalHandle: `term-${jobId}` } } }] });
+        payload: { opId: 'business.decide', model: 'claude-agent', owned_paths: owned, orca: { dispatchId: `ctx-${jobId}`, agentTerminalHandle: `term-${jobId}` } } }] });
     const attemptId = ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(jobId).attempt_id;
     ledger.transaction((db) => {
       writeContract(db, { attemptId, markdown: '# contract', context: { worktree: repo, packet: { context: { selected_op: { contract: { id: 'business.decide', reads: [{ id: 'standard', path: 'docs/architecture.md' }] }, checks: { required: [], candidates: [] } }, readRefs: [{ path: 'docs/architecture.md', absolute: path.join(ROOT, 'docs/architecture.md'), rootKind: 'source', root: ROOT, sha256: sha256File(path.join(ROOT, 'docs/architecture.md')) }], owned_paths: placements.map(row => ({ root: row.base, path: row.path })), gate_binding: captureGateBinding(placements, { at: admittedAt }) } } }, createdAt: admittedAt });
@@ -206,6 +212,28 @@ const seedJob = (repo, { jobId, wf, files, admittedAt, env = process.env }) => {
     const observed = spawnSync(process.execPath, [API, 'record-checks', '--repo', repo, '--job', jobId, '--checks-file', checks, '--json'], { cwd: ROOT, env, encoding: 'utf8', windowsHide: true, timeout: 30000 });
     assert.equal(observed.status, 0, observed.stderr || observed.stdout);
   } finally { fs.rmSync(scratch, { recursive: true, force: true }); }
+  // Stub only the external Critic worker; native selection, byte hashing, writer and settle judge remain real.
+  const rubric = kindEntryOf('business.decide');
+  const orca = fakeCriticOrca({ verdict: {
+    schema: 'starci/decision-critique@1', score: 9, anchor: '9', summary: 'Private worker judged the handed business record. Its checks passed.',
+    checks: rubric.checks.map(check => ({ id: check.id, pass: true, evidence: 'br.login.sign-in statement', fix: null })),
+  } });
+  const previousArtifactRoot = process.env.STARCI_ARTIFACT_ROOT;
+  const judgedLedger = openLedger({ file: ledgerFile });
+  try {
+    if (env.STARCI_ARTIFACT_ROOT) process.env.STARCI_ARTIFACT_ROOT = env.STARCI_ARTIFACT_ROOT;
+    const judged = await runtimeCriticFor(judgedLedger, { jobId, workflowId: wf, op: 'business.decide', outcome: 'done' },
+      { tree: repo, entry: 'term-private-kernel', retryMs: 60000, orca });
+    assert.deepEqual([judged?.ran, judged?.pass], [true, true], JSON.stringify(judged));
+    const run = runtimeCriticRunOf(judgedLedger.db, jobId);
+    assert.equal(run.document.maker, 'claude');
+    assert.notEqual(run.document.critic.provider, run.document.maker, 'another provider judged the handed record');
+    assert.ok(run.document.product.length > 0, 'the native Critic hashed real business product bytes');
+  } finally {
+    judgedLedger.close();
+    if (previousArtifactRoot === undefined) delete process.env.STARCI_ARTIFACT_ROOT;
+    else process.env.STARCI_ARTIFACT_ROOT = previousArtifactRoot;
+  }
   return jobId;
 };
 const settle = (repo, jobId, env = process.env) => {
@@ -215,11 +243,11 @@ const settle = (repo, jobId, env = process.env) => {
 };
 const statusOf = (repo, jobId, env = process.env) => { const l = inspectLedger({ file: ledgerFileFor(repo, { env }) }); try { return l.db.prepare('SELECT status FROM jobs WHERE job_id=?').get(jobId).status; } finally { l.close(); } };
 
-test('starci kernel settle refuses an unparseable Work YAML and a literal password (work-hygiene-red), current hygiene also refuses an early admission and cannot invent other proof', (t) => {
+test('starci kernel settle refuses an unparseable Work YAML and a literal password (work-hygiene-red), current hygiene also refuses an early admission and cannot invent other proof', async (t) => {
   const at = Date.now() - 1000;
 
   const brokenRepo = checkout(t);
-  const broken = seedJob(brokenRepo, { jobId: 'op-scope-broken', wf: 'wf-broken', files: [put(brokenRepo, `${FLOW}/index.yaml`, BROKEN_YAML)], admittedAt: at });
+  const broken = await seedJob(brokenRepo, { jobId: 'op-scope-broken', wf: 'wf-broken', files: [put(brokenRepo, `${FLOW}/index.yaml`, BROKEN_YAML)], admittedAt: at });
   const refusedBroken = settle(brokenRepo, broken);
   assert.equal(refusedBroken.r.status, 1, refusedBroken.r.stdout || refusedBroken.r.stderr);
   assert.equal(refusedBroken.body.reason, 'work-hygiene-red');
@@ -227,7 +255,7 @@ test('starci kernel settle refuses an unparseable Work YAML and a literal passwo
   assert.equal(statusOf(brokenRepo, broken), 'running', 'a refused settle writes nothing');
 
   const literalRepo = checkout(t);
-  const literal = seedJob(literalRepo, { jobId: 'op-scope-literal', wf: 'wf-literal', files: [put(literalRepo, `${FLOW}/accounts.yaml`, LITERAL_ACCOUNTS)], admittedAt: at });
+  const literal = await seedJob(literalRepo, { jobId: 'op-scope-literal', wf: 'wf-literal', files: [put(literalRepo, `${FLOW}/accounts.yaml`, LITERAL_ACCOUNTS)], admittedAt: at });
   const refusedLiteral = settle(literalRepo, literal);
   assert.equal(refusedLiteral.r.status, 1, refusedLiteral.r.stdout || refusedLiteral.r.stderr);
   assert.equal(refusedLiteral.body.reason, 'work-hygiene-red');
@@ -235,14 +263,14 @@ test('starci kernel settle refuses an unparseable Work YAML and a literal passwo
   assert.ok(!JSON.stringify(refusedLiteral.body).includes('Zx9-qLm2'), 'the refusal never carries the value');
 
   const oldRepo = checkout(t);
-  const old = seedJob(oldRepo, { jobId: 'op-scope-old', wf: 'wf-old', files: [put(oldRepo, `${FLOW}/index.yaml`, BROKEN_YAML)], admittedAt: at - 24 * 3600 * 1000 });
+  const old = await seedJob(oldRepo, { jobId: 'op-scope-old', wf: 'wf-old', files: [put(oldRepo, `${FLOW}/index.yaml`, BROKEN_YAML)], admittedAt: at - 24 * 3600 * 1000 });
   const earlier = settle(oldRepo, old);
   assert.equal(earlier.r.status,1,earlier.r.stderr || earlier.r.stdout);
   assert.equal(earlier.body?.reason,'work-hygiene-red','an earlier admission does not waive current hygiene');
 
   // A passing Git op reaches native checkpointing, so use the existing real worktree/registry fixture.
   const cleanFixture = settleFixture(t), cleanRepo = cleanFixture.tree;
-  const clean = seedJob(cleanRepo, { jobId: 'op-scope-clean', wf: cleanFixture.workflowId, files: [put(cleanRepo, `${FLOW}/accounts.yaml`, CLEAN_ACCOUNTS)], admittedAt: at, env: cleanFixture.env });
+  const clean = await seedJob(cleanRepo, { jobId: 'op-scope-clean', wf: cleanFixture.workflowId, files: [put(cleanRepo, `${FLOW}/accounts.yaml`, CLEAN_ACCOUNTS)], admittedAt: at, env: cleanFixture.env });
   const passed = settle(cleanRepo, clean, cleanFixture.env);
   assert.equal(passed.r.status,0,passed.r.stderr || passed.r.stdout);
   assert.equal(statusOf(cleanRepo, clean, cleanFixture.env), 'succeeded','the clean Work record qualifies through its real independent READ');

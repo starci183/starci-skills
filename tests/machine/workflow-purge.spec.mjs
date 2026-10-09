@@ -7,6 +7,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { workflowPurge } from '../../scripts/kernel/workflow-purge.mjs';
 import { purgeFactsOf } from '../../scripts/machine/workflow-purge-facts.mjs';
+import { guardsRoot } from '../../scripts/guards/guards-root.mjs';
+import { starciLocalRoot } from '../../engine/runtime-root.mjs';
 import { blobPath } from '../../engine/db/blob.mjs';
 import { purgedWorkflowIds } from '../../scripts/machine/workflow-purged.mjs';
 import { machineFacts } from '../../scripts/reconciler/debug-digest-machine.mjs';
@@ -358,4 +360,93 @@ test('spilled machine custody reads the caller artifact root through the storage
     assert.ok(facts.evidence.runIds.includes('run-root-scoped'));
     assert.ok(facts.evidence.handles.includes('term-root-scoped'));
   } finally { fs.writeFileSync(original, bytes); }
+}));
+
+
+function citationArtifact(world, workflowId = ARCHIVED) {
+  const blob = world.ledger.write.storeBlob({ content: Buffer.from('private FK fixture evidence'), mediaType: 'text/plain' });
+  return world.ledger.write.recordArtifact({ workflowId, name: 'fixture-FK-evidence', sha256: blob.sha256, role: 'other', kind: 'file', origin: 'kernel' });
+}
+
+function citeArtifact(world, artifact) {
+  world.ledger.write.citeBlob({ recordId: 'fixture.kept', recordPath: 'owned/index.yaml', field: 'asset', artifactId: artifact.artifact_id, sha256: artifact.sha256 });
+}
+
+function dependencyEffects(world) {
+  return { host: snapshot(world), terminals: structuredClone(world.terminals), workers: structuredClone(world.workers),
+    decisions: world.machine.db.prepare('SELECT * FROM sup_decision_items ORDER BY di_id').all(),
+    progress: world.machine.db.prepare("SELECT * FROM machine_meta WHERE key LIKE 'workflow-purge:%' ORDER BY key").all(),
+    purges: world.ledger.db.prepare('SELECT * FROM workflow_purges ORDER BY workflow_id').all(),
+    archive: fs.existsSync(world.fkArchive),
+    files: world.fkFiles.map(file => ({ file, bytes: fs.existsSync(file) ? fs.readFileSync(file).toString('base64') : null })) };
+}
+
+function dependencyLeftovers(t, world) {
+  leftovers(world);
+  const previousArchiveRoot = process.env.STARCI_ARCHIVE_ROOT;
+  world.fkArchive = path.join(world.root, 'fixture-fk-archives');
+  process.env.STARCI_ARCHIVE_ROOT = world.fkArchive;
+  t.after(() => {
+    if (previousArchiveRoot === undefined) delete process.env.STARCI_ARCHIVE_ROOT;
+    else process.env.STARCI_ARCHIVE_ROOT = previousArchiveRoot;
+  });
+  const guard = path.join(guardsRoot(), 'jobs', 'fixture-fk.json');
+  const prompt = path.join(starciLocalRoot(), 'dispatch-prompts', 'fixture-fk.md');
+  for (const file of [guard, prompt]) fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(guard, JSON.stringify({ workflowId: ARCHIVED }));
+  fs.writeFileSync(prompt, `private fixture prompt ${ARCHIVED}`);
+  world.fkFiles = [guard, prompt];
+  world.machine.openSupDecision({ keyParts: { kind: 'fixture-fk', entity: ARCHIVED, signature: 'held' }, kind: 'runtime-defect', decider: 'supervisor', openedBy: 'spec',
+    ledgerId: world.ledger.ledgerId, workflowId: ARCHIVED, entityType: 'workflow', entityId: ARCHIVED,
+    summary: 'Private dependency fixture', evidence: {}, payload: {} });
+}
+
+test('a Work citation holds public ledger plan and apply before every host effect', t => purgeWorld(t, async world => {
+  dependencyLeftovers(t, world);
+  const artifact = citationArtifact(world);
+  citeArtifact(world, artifact);
+  const before = dependencyEffects(world);
+  for (const args of [{ plan: true, ledger: true }, { apply: true, ledger: true }]) {
+    const out = await run(world, args);
+    assert.equal(out.code, 1, out.text);
+    assert.ok(out.data.blockers.some(item => item.code === 'workflow-purge-ledger-dependency'), out.text);
+    assert.deepEqual(dependencyEffects(world), before);
+  }
+  assert.equal(world.ledger.db.prepare('SELECT count(*) n FROM work_citations WHERE artifact_id=?').get(artifact.artifact_id).n, 1);
+}));
+
+test('foreign Work citations and a host-only purge do not create ledger-drop false blockers', t => purgeWorld(t, async world => {
+  citeArtifact(world, citationArtifact(world, OTHER));
+  const foreignPlan = await run(world, { plan: true, ledger: true });
+  assert.equal(foreignPlan.code, 0, foreignPlan.text);
+  assert.deepEqual(foreignPlan.data.blockers, []);
+  const own = citationArtifact(world);
+  // A second field keeps both foreign and own citations; no fixture replacement hides the foreign row.
+  world.ledger.write.citeBlob({ recordId: 'fixture.own', recordPath: 'own/index.yaml', field: 'asset', artifactId: own.artifact_id, sha256: own.sha256 });
+  const hostPlan = await run(world, { plan: true });
+  assert.equal(hostPlan.code, 0, hostPlan.text);
+  const hostApply = await run(world, { apply: true, expect: hostPlan.data.sha });
+  assert.equal(hostApply.code, 0, hostApply.text);
+  assert.equal(world.ledger.db.prepare('SELECT count(*) n FROM workflows WHERE workflow_id=?').get(ARCHIVED).n, 1);
+  assert.equal(world.ledger.db.prepare('SELECT count(*) n FROM work_citations').get().n, 2);
+}));
+
+test('a dependency arriving at the GC lock is held by the fresh plan before host effects', t => purgeWorld(t, async world => {
+  dependencyLeftovers(t, world);
+  const artifact = citationArtifact(world);
+  const shown = await run(world, { plan: true, ledger: true });
+  assert.equal(shown.code, 0, shown.text);
+  let locked = false, afterMutation;
+  const out = await run(world, { apply: true, ledger: true, expect: shown.data.sha }, {
+    acquireGcLock: () => {
+      locked = true;
+      citeArtifact(world, artifact);
+      afterMutation = dependencyEffects(world);
+      return { ok: true, release() {} };
+    }
+  });
+  assert.equal(locked, true);
+  assert.equal(out.code, 1, out.text);
+  assert.deepEqual(dependencyEffects(world), afterMutation);
+  assert.ok(out.data.blockers.some(item => item.code === 'workflow-purge-ledger-dependency'), out.text);
 }));

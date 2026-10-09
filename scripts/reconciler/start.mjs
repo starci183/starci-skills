@@ -227,7 +227,7 @@ function orcaRow(orcaProbe) {
  */
 export async function gather({ env = process.env, config = safeRun(() => loadConfig(), null), orca = true, seats = true, workflowSeats = true, seatsRequested = true, depthProbe = null, platform = process.platform, guardProbe } = {}) {
   const items = [];
-  const push = (...rows) => items.push(...rows.flat());
+  const push = (...rows) => items.push(...rows.flat(Infinity));
   // preflight
   push(sqliteItem(), hostPlatformItem(platform), guardCommandRow({ probe: guardProbe }));
   const machine = machineDbRows(env);

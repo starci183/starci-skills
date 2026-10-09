@@ -32,7 +32,7 @@ import { zipWrite } from '../api/fs/zip-write.mjs';
 import { zipVisit } from '../api/fs/zip-visit.mjs';
 import { zipLimits } from '../api/fs/zip-limits.mjs';
 import { archiveRoot as archiveRootOf } from '../machine/home.mjs';
-import { workflowArchiveEvidence, workflowArchiveRows } from './workflow-archive-evidence.mjs';
+import { workflowArchiveEvidence, workflowArchiveRows, workflowPurgeDependencies } from './workflow-archive-evidence.mjs';
 
 const USAGE = 'Internal entry: spawned by scripts/housekeeping/hk-ledger.mjs; not invoked directly.\nargs: --repo <repo> --workflow <id> [--archive-root <dir>] [--apply --approved-by <who> --approval-ref <ref>] [--json]';
 const PURGE_MANIFEST_SCHEMA = 'starci/workflow-archive@1';
@@ -152,6 +152,10 @@ export function purgeWorkflow({ repo, workflowId, apply = false, approvedBy = nu
     const liveJobs = db.prepare('SELECT job_id, status FROM jobs WHERE workflow_id=?').all(workflowId).filter((j) => LIVE.has(j.status));
     // An archived workflow (starci kernel archive: owner or supervisor stop) is ended like a finished one (gc.mjs, owner 2026-09-28).
     const blockers = [...(wf.phase !== 'finished' && wf.archived_at == null ? [`phase is ${wf.phase ?? 'unset'}, not finished or archived`] : []), ...(liveJobs.length ? [`${liveJobs.length} job(s) still ${[...new Set(liveJobs.map((j) => j.status))].join('/')}`] : [])];
+    const dependencies = workflowPurgeDependencies(db, workflowId);
+    const dependencyDetails = dependencies.map(item => `${item.code}: ${item.detail}`);
+    blockers.push(...dependencyDetails);
+    if (apply && dependencies.length) throw refuse(dependencies[0].code, dependencyDetails.join('; '));
     const counts = rowCounts(db, workflowId);
     const { files, missing } = workflowArchiveEvidence(db, workflowId);
     const archive = prior?.archive_path ?? path.join(archiveRoot, path.basename(root), `${workflowId}-${date}.zip`);
@@ -166,7 +170,10 @@ export function purgeWorkflow({ repo, workflowId, apply = false, approvedBy = nu
     ensureArchive(ledger, db, { workflowId, root, archive, files, missing, counts, approvedBy, approvalRef, now });
 
     // 4. Delete: the guard opens for this workflow only while its row says 'deleting'.
-    const deleted = ledger.transaction(() => { assertCurrentArchive(db,root,workflowId); recordPurge(db, { workflowId, state: 'deleting' }); return deleteWorkflowRows(db, { workflowId }); });
+    const deleted = ledger.transaction(() => {
+      const dependencies = workflowPurgeDependencies(db, workflowId);
+      if (dependencies.length) throw refuse(dependencies[0].code, dependencies.map(item => item.detail).join('; '));
+      assertCurrentArchive(db,root,workflowId); recordPurge(db, { workflowId, state: 'deleting' }); return deleteWorkflowRows(db, { workflowId }); });
     ledger.transaction(() => recordPurge(db, { workflowId, state: 'purged', purgedAt: now(), countsJson: JSON.stringify({ archived: counts, deleted }) }));
     return { ...plan, ok: true, dryRun: false, deleted, purge: purgeRow(db, workflowId) };
   } finally { ledger.close(); }

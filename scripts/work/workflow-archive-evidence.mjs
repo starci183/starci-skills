@@ -77,3 +77,126 @@ export function workflowArchiveEvidence(db, workflowId, { root = artifactRoot(),
   }
   return { files: [...files.values()].sort((a, b) => a.rel.localeCompare(b.rel)), missing: [] };
 }
+
+const dependencyHold = detail => ({ code: 'workflow-purge-ledger-dependency', detail });
+
+// Deletion custody is rooted at workflows and follows CASCADE only; archive custody is broader.
+function purgeKeys(metadata, child, keys) {
+  const parent = metadata.get(keys[0].table);
+  if (!parent) throw new Error(`missing foreign-key parent ${keys[0].table}`);
+  const ordered = [...keys].sort((a, b) => a.seq - b.seq);
+  const primary = parent.columns.filter(column => column.pk > 0).sort((a, b) => a.pk - b.pk);
+  const implicit = ordered.every(key => !key.to);
+  if (implicit && primary.length !== ordered.length) throw new Error(`implicit parent key is incomplete: ${child} -> ${keys[0].table}`);
+  return ordered.map((key, index) => {
+    const to = implicit ? primary[index].name : key.to;
+    if (!to || !parent.columns.some(column => column.name === to)
+      || !metadata.get(child).columns.some(column => column.name === key.from))
+      throw new Error(`unresolved foreign-key columns: ${child} -> ${keys[0].table}`);
+    return { ...key, to };
+  });
+}
+
+function purgeMatches(db, child, keys, parentIds) {
+  const links = keys.map(key => `p.${quoted(key.to)}=c.${quoted(key.from)}`).join(' AND ');
+  return prepareStored(db, `SELECT DISTINCT CAST(c.rowid AS TEXT) AS purge_row
+    FROM ${quoted(child)} AS c JOIN ${quoted(keys[0].table)} AS p ON ${links}
+    WHERE CAST(p.rowid AS TEXT) IN (SELECT value FROM json_each(?))
+    ORDER BY CAST(c.rowid AS TEXT)`).all(JSON.stringify([...parentIds])).map(row => row.purge_row);
+}
+
+function purgeIdentity(db, listed, child, info) {
+  // A future storage shape must gain an exact identity adapter before deletion is admitted.
+  if (listed.get(child)?.wr || info.columns.some(column => ['rowid', '_rowid_', 'oid'].includes(column.name.toLowerCase())))
+    throw new Error(`unsupported deletion row identity: ${child}`);
+  prepareStored(db, `SELECT CAST(rowid AS TEXT) FROM ${quoted(child)} LIMIT 0`);
+}
+
+// Schema reachability is narrower than archive ownership: only CASCADE can delete a parent.
+function cascadeTables(metadata) {
+  const projected = new Set(['workflows']);
+  let changed;
+  do {
+    changed = false;
+    for (const [child, info] of metadata) {
+      if (projected.has(child)) continue;
+      const reachable = info.keys.some(keys => keys[0].on_delete === 'CASCADE' && projected.has(keys[0].table));
+      if (!reachable) continue;
+      projected.add(child);
+      changed = true;
+    }
+  } while (changed);
+  return projected;
+}
+
+function purgeEdges(db, metadata) {
+  const listed = new Map(db.prepare('PRAGMA table_list').all().map(table => [table.name, table]));
+  const projected = cascadeTables(metadata);
+  purgeIdentity(db, listed, 'workflows', metadata.get('workflows'));
+  return [...metadata].flatMap(([child, info]) => {
+    const relevant = info.keys.filter(keys => projected.has(keys[0].table));
+    if (!relevant.length) return [];
+    purgeIdentity(db, listed, child, info);
+    return relevant.map(keys => ({ child, keys: purgeKeys(metadata, child, keys) }));
+  });
+}
+
+function cascadeEdge(db, deleted, { child, keys }) {
+  const parents = deleted.get(keys[0].table);
+  if (keys[0].on_delete !== 'CASCADE' || !parents.size) return false;
+  let changed = false;
+  for (const rowid of purgeMatches(db, child, keys, parents)) {
+    if (deleted.get(child).has(rowid)) continue;
+    deleted.get(child).add(rowid);
+    changed = true;
+  }
+  return changed;
+}
+
+function purgeProjection(db, workflowId, metadata, edges) {
+  const deleted = new Map([...metadata.keys()].map(table => [table, new Set()]));
+  for (const row of prepareStored(db, 'SELECT CAST(rowid AS TEXT) AS purge_row FROM workflows WHERE workflow_id=?').all(workflowId))
+    deleted.get('workflows').add(row.purge_row);
+  let changed;
+  do {
+    changed = false;
+    for (const edge of edges) {
+      const expanded = cascadeEdge(db, deleted, edge);
+      changed = expanded || changed;
+    }
+  } while (changed);
+  return deleted;
+}
+
+function nullablePurgeKey(metadata, child, keys) {
+  return keys.every(key => {
+    const column = metadata.get(child).columns.find(item => item.name === key.from);
+    return column && !column.notnull && !column.pk;
+  });
+}
+
+function purgeEdgeDependencies(db, metadata, deleted, { child, keys }) {
+  const action = keys[0].on_delete, parents = deleted.get(keys[0].table);
+  if (!parents.size || action === 'CASCADE') return [];
+  if (action === 'SET NULL' && nullablePurgeKey(metadata, child, keys)) return [];
+  const matches = purgeMatches(db, child, keys, parents);
+  if (!['RESTRICT', 'NO ACTION'].includes(action)) {
+    return matches.length ? [dependencyHold(`${child} foreign key ${keys[0].id} -> ${keys[0].table} has unsupported deletion action ${action} for ${matches.length} row(s); ledger deletion remains held`)] : [];
+  }
+  // RESTRICT is immediate: a sibling cascade order is not evidence that it will succeed.
+  const held = matches.filter(rowid => action === 'RESTRICT' || !deleted.get(child).has(rowid));
+  return held.length ? [dependencyHold(`${child} foreign key ${keys[0].id} (${keys.map(key => key.from).join(', ')}) ${action} -> ${keys[0].table} retains ${held.length} row(s); ledger and host leftovers remain`)] : [];
+}
+
+/** Dependencies that native DELETE workflows cannot remove; read-only, including unsupported schema holds. */
+export function workflowPurgeDependencies(db, workflowId) {
+  try {
+    const metadata = tableMetadata(db);
+    if (!metadata.has('workflows')) throw new Error('workflow root table is missing');
+    const edges = purgeEdges(db, metadata);
+    const deleted = purgeProjection(db, workflowId, metadata, edges);
+    return edges.flatMap(edge => purgeEdgeDependencies(db, metadata, deleted, edge));
+  } catch (error) {
+    return [dependencyHold(`deletion dependencies cannot be proven from the schema: ${String(error?.message ?? error).slice(0, 300)}; ledger and host leftovers remain`)];
+  }
+}

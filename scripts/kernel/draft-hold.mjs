@@ -17,7 +17,11 @@ export const draftRefused = (proof) => proof?.ok === false && DRAFT_DELIVERIES.i
 /** Protect a draft before any worker fence, replacement or Enter send; an empty input ends its episode even without an actionable menu. */
 export function draftSeatResult(ctx) {
   const read = ctx.terminalRead({ terminal: ctx.terminal, screen: true });
-  if (!read.ok) return { ok: false, workflowId: ctx.workflowId, phase: ctx.phase, terminal: ctx.terminal, action: 'terminal-unreadable', error: read.error };
+  if (!read.ok) {
+    // A failed probe cannot end a known draft episode. Without one, the managed worker's host and liveness gates decide it.
+    if (ctx.signalValue?.dispatch && !ctx.draftHeld()) return null;
+    return { ok: false, workflowId: ctx.workflowId, phase: ctx.phase, terminal: ctx.terminal, action: 'terminal-unreadable', error: read.error };
+  }
   if (!read.draft) {
     if (ctx.repair) ctx.recordDraftCleared(ctx.terminal);
     return null;

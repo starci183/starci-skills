@@ -8,6 +8,7 @@ import {purgeWorkflow} from '../../scripts/work/purge-workflow.mjs';
 import {zipVisit} from '../../scripts/api/fs/zip-visit.mjs';
 import {withLedger,seedWorkflow} from '../helpers/ledger-fixture.mjs';
 import {blobPath,getBlob} from '../../engine/db/blob.mjs';
+import {workflowArchiveRows,workflowArchiveEvidence} from '../../scripts/work/workflow-archive-evidence.mjs';
 import {parseRef,putContent} from '../../engine/db/ref-value.mjs';
 test('the existing owner-approved workflow purge remains available with exact streamed archive proof',t=>withLedger(t,({root,repoRoot,ledger})=>{
   seedWorkflow(ledger,{id:'wf-approved',state:{phase:'finished'}});ledger.db.prepare("INSERT OR REPLACE INTO meta(key,value) VALUES('repo_root',?)").run(repoRoot);
@@ -27,7 +28,7 @@ function atPurgeState(run, hook) {
     const statement=prepare.call(this,sql,...rest);
     if(String(sql).startsWith('UPDATE workflow_purges SET state=')){
       const realRun=statement.run.bind(statement);
-      statement.run=(...args)=>hook(args[0],()=>realRun(...args));
+      statement.run=(...args)=>hook(args[0],()=>realRun(...args),this);
     }
     return statement;
   };
@@ -130,19 +131,26 @@ test('the schema catalog and foreign-key custody include a new reference owner w
   assert.equal(ledger.db.prepare('SELECT count(*) n FROM workflows WHERE workflow_id=?').get('wf-unowned').n,1);
 }));
 
-test('artifact-linked citations and proofs are archived through schema custody; a citation prevents destructive cascade',t=>withLedger(t,({root,repoRoot,ledger})=>{
+test('product citations hold native purge before record/archive while archive closure retains their evidence',t=>withLedger(t,({root,repoRoot,ledger})=>{
   const {sha}=evidenceWorld(ledger,repoRoot),options=evidenceOptions(root,repoRoot);
   const artifact=ledger.write.recordArtifact({workflowId:'wf-evidence',name:'fixture-evidence',sha256:sha,role:'other',kind:'file',origin:'kernel'});
   ledger.write.recordArtifactProof({artifactId:artifact.artifact_id,claims:{},deps:[]});
   const citation=ledger.write.storeBlob({content:Buffer.from('private citation-only bytes'),mediaType:'text/plain'});
   ledger.write.citeBlob({recordId:'owned.record',recordPath:'owned/index.yaml',field:'asset',artifactId:artifact.artifact_id,sha256:citation.sha256});
-  assert.throws(()=>purgeWorkflow(options),/FOREIGN KEY constraint failed/);
-  const row=ledger.db.prepare('SELECT * FROM workflow_purges WHERE workflow_id=?').get('wf-evidence'),entries=new Map();
-  assert.equal(row.state,'archived');
-  zipVisit(row.archive_path,entry=>{entries.set(entry.name,entry.data);});
-  assert.equal(JSON.parse(entries.get('ledger/work_citations.ndjson').toString('utf8').trim()).sha256,citation.sha256);
-  assert.deepEqual(entries.get(`files/blobs/${citation.sha256}`),getBlob(citation.sha256),'citation-only bytes are retained, even when the artifact names a different blob');
-  assert.equal(JSON.parse(entries.get('ledger/artifact_proofs.ndjson').toString('utf8').trim()).artifact_id,artifact.artifact_id);
+  const tables=workflowArchiveRows(ledger.db,'wf-evidence');
+  assert.equal(tables.get('work_citations').rows[0].sha256,citation.sha256);
+  assert.equal(tables.get('artifact_proofs').rows[0].artifact_id,artifact.artifact_id);
+  const closure=workflowArchiveEvidence(ledger.db,'wf-evidence');
+  const file=closure.files.find(item=>item.rel===`blobs/${citation.sha256}`);
+  assert.ok(file,'the citation-only blob remains in the direct archive closure');
+  assert.deepEqual(fs.readFileSync(file.abs),getBlob(citation.sha256));
+  assert.equal(file.metadata.size,fs.statSync(file.abs).size);
+  const preview=purgeWorkflow({...options,apply:false});
+  assert.equal(preview.ok,false);
+  assert.ok(preview.blockers.some(item=>item.includes('workflow-purge-ledger-dependency')));
+  assert.throws(()=>purgeWorkflow(options),error=>error.code==='workflow-purge-ledger-dependency');
+  assert.equal(ledger.db.prepare('SELECT count(*) n FROM workflow_purges').get().n,0);
+  assert.equal(fs.existsSync(options.archiveRoot),false);
   assert.equal(ledger.db.prepare('SELECT count(*) n FROM workflows WHERE workflow_id=?').get('wf-evidence').n,1);
   assert.equal(ledger.db.prepare('SELECT count(*) n FROM work_citations').get().n,1);
 }));
@@ -175,4 +183,28 @@ test('a check-only blob disappearing after ZIP verification is caught by the fin
   const entries=new Map();
   zipVisit(row.archive_path,entry=>{entries.set(entry.name,entry.data);});
   assert.ok(entries.has(`files/blobs/${sha}`),'verified recovery evidence is retained with the current ledger');
+}));
+
+
+test('a citation arriving after archive verification is held by the final writer-locked dependency recheck',t=>withLedger(t,({root,repoRoot,ledger})=>{
+  const {sha}=evidenceWorld(ledger,repoRoot),options=evidenceOptions(root,repoRoot);
+  const artifact=ledger.write.recordArtifact({workflowId:'wf-evidence',name:'late-fixture',sha256:sha,role:'other',kind:'file',origin:'kernel'});
+  let inserted=false;
+  assert.throws(()=>atPurgeState(()=>purgeWorkflow(options),(state,write,writerDb)=>{
+    const result=write();
+    if(state==='archived'){
+      writerDb.prepare('INSERT INTO work_citations(record_id,record_path,field,artifact_id,sha256,created_at) VALUES(?,?,?,?,?,?)').run('late.product','late/index.yaml','asset',artifact.artifact_id,sha,Date.now());
+      inserted=true;
+    }
+    return result;
+  }),error=>error.code==='workflow-purge-ledger-dependency');
+  assert.equal(inserted,true);
+  const row=ledger.db.prepare('SELECT * FROM workflow_purges WHERE workflow_id=?').get('wf-evidence');
+  assert.equal(row.state,'archived');
+  assert.ok(row.verified_at);
+  const checked=zipVisit(row.archive_path,()=>{});
+  assert.equal(checked.sha256,row.archive_sha256);
+  assert.ok(checked.entries.every(entry=>entry.crcOk));
+  assert.equal(ledger.db.prepare('SELECT count(*) n FROM workflows WHERE workflow_id=?').get('wf-evidence').n,1);
+  assert.equal(ledger.db.prepare('SELECT count(*) n FROM work_citations WHERE artifact_id=?').get(artifact.artifact_id).n,1);
 }));

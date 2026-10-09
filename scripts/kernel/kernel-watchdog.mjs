@@ -99,10 +99,10 @@ const classifyKernelScreen = classifyAgentScreen;
 // pasted_content block, which the Kernel model reads as untrusted pasted data and refused three times on 2026-10-07; the
 // whole typed wake (this text, the rev line, the seat identity) is bounded by wake-bound.mjs, so it arrives as the user's message.
 export const buildWakePrompt = (workflow, attempt = null, revLine = null) => boundedWake({ workflowId: workflow, attempt, revLine, compose: withWakeIdentity, text: [
-  `Watchdog liveness wake for ${workflow}: phase=running, your last turn ended at the prompt; act on it now.`,
-  'Read starci kernel status: its menu lists what waits on you. Answer each item with starci kernel decide.',
-  'When the menu is empty, yield the model turn immediately: the runtime wakes this Kernel again.',
-  'Never run Start-Sleep, shell sleep or a polling loop.',
+  `Watchdog liveness wake for ${workflow}: act on it now.`,
+  'Read starci kernel status; answer each menu item with starci kernel decide.',
+  'Empty menu: yield the model turn immediately; the runtime wakes this Kernel again.',
+  'Never run Start-Sleep, sleep or poll.',
   WAKE_BOUNDS,
 ].join(' ') });
 /** The liveness wake this tick would type, from one starci kernel status read: its seat attempt and its revisionNotice (kernel-notice.mjs, the one sentence about the runtime revision). */

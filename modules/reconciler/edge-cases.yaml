@@ -1850,3 +1850,9 @@ cases:
     spec: tests/housekeeping/workflow-purge-archive.spec.mjs
     replay: tests/replay/workflow-purge.spec.mjs
     status: covered
+  - id: workflow-purge-foreign-reference-after-host-removal
+    family: correctness
+    met: {date: "2026-10-10", where: "native purge protocol review and isolated CLI regression", evidence: "On 0b96a4217 the public plan admits a retained Work citation; when the citation arrives at the GC lock, host trees, refs, terminals and files are removed before the ledger DELETE fails."}
+    rule: {file: scripts/work/workflow-archive-evidence.mjs, anchor: "export function workflowPurgeDependencies"}
+    spec: tests/machine/workflow-purge.spec.mjs
+    status: covered

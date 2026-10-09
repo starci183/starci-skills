@@ -11,7 +11,7 @@ import { renderApply, renderPlan } from '../machine/workflow-purge-render.mjs';
 import { underHostLock } from '../machine/verb-lock.mjs';
 import { acquireGcLock } from '../machine/gc-lock.mjs';
 import { purgeWorkflow } from '../work/purge-workflow.mjs';
-import { workflowArchiveEvidence } from '../work/workflow-archive-evidence.mjs';
+import { workflowArchiveEvidence, workflowPurgeDependencies } from '../work/workflow-archive-evidence.mjs';
 import { openLedgerReader } from '../../engine/db/ledger.mjs';
 import { artifactRoot } from '../../engine/db/blob.mjs';
 import { guardsRoot } from '../guards/guards-root.mjs';
@@ -34,6 +34,8 @@ function archiveBlockersOf(facts, workflowId, env, ledgerMode) {
   let db;
   try {
     db = openLedgerReader(facts.ledger.file);
+    const dependencies = workflowPurgeDependencies(db, workflowId);
+    if (dependencies.length) return dependencies;
     workflowArchiveEvidence(db, workflowId, { root: artifactRoot(env) });
     return [];
   } catch (error) {

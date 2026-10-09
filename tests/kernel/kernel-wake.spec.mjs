@@ -23,8 +23,8 @@ const MIN = 60_000;
 
 test('the wake prompt asks for the menu and a yield, and teaches no command to compose', () => {
   const prompt = buildWakePrompt('wf-wake', 3);
-  assert.match(prompt, /Read starci kernel status: its menu lists what waits on you\. Answer each item with starci kernel decide\./);
-  assert.match(prompt, /When the menu is empty, yield the model turn immediately/);
+  assert.match(prompt, /Read starci kernel status; answer each menu item with starci kernel decide\./);
+  assert.match(prompt, /Empty menu: yield the model turn immediately/);
   for (const taught of [/dispatch-ready/, /enqueue/, /settle/, /reconcile/, /nextActions/, /ranked/, /--retry-of/]) assert.doesNotMatch(prompt, taught);
   assert.ok(prompt.length < 800);
 });

@@ -7,6 +7,7 @@ import {withLedger,seedWorkflow} from '../helpers/ledger-fixture.mjs';
 import {stallFindings,judgeGate,ownerGates,namedPaths,kernelTurnState,GATE_GRACE_MS} from '../../scripts/supervisor/stall.mjs';
 import { readInbox } from '../../scripts/machine/sup-messages.mjs';
 import {wakeKernel} from '../../scripts/kernel/wake-delivery.mjs';
+import { currentRuntimeRev, revRootOf } from '../../scripts/kernel/runtime-rev.mjs';
 
 // A nivo Collab workflow sat idle ~2 h behind an owner-gate ("resolve when
 // the shell record .starciwork/shell/index.yaml exists (peer heads-up)") after the record had landed
@@ -210,9 +211,11 @@ test('wakeKernel: no seat, a busy or gated Kernel and a shell refuse; an idle Ke
   ledger.db.prepare('UPDATE jobs SET worker_id=? WHERE job_id=?').run('term_k',`kernel-${WF}`);
   sends.length=0;
   assert.equal(wakeKernel({db:ledger.db,workflowId:WF,text,deps:deps([IDLE,IDLE,ACTIVE])}).action,'kernel-woken');
-  // Between them the runtime-rev sentence (scripts/kernel/runtime-rev.mjs): this seat never acknowledged a complete runtime READ, so it is asked for one full re-read.
+  // This fixture has no notice baseline: the one revision decider names the current SHA and invents no revision-change READ duty.
   assert.ok(sends[0].text.startsWith(`${text} Runtime rev `),sends[0].text);
-  assert.match(sends[0].text,/ Runtime rev [0-9a-f]{12}: no complete runtime READ is acknowledged; re-read modules\/kernel\/kernel-prompt\.md and modules\/kernel\/driver-loop\.yaml, then starci kernel kernel-ack-rev /);
+  assert.ok(sends[0].text.startsWith(`${text} Runtime rev ${currentRuntimeRev(revRootOf()).slice(0,12)}. Runtime wake for Kernel attempt 2`),sends[0].text);
+  assert.equal((sends[0].text.match(/Runtime rev [0-9a-f]{12}[ .:]/g)??[]).length,1,'the notice is the only revision wake decider');
+  assert.doesNotMatch(sends[0].text,/re-read|changed \d+ file|kernel-ack-rev/,'a no-baseline notice owes no revision-change instruction');
   assert.ok(sends[0].text.endsWith(` Runtime wake for Kernel attempt 2 of ${WF}: starci kernel status --workflow ${WF} shows kernel.attempt 2 and kernel.you true on your terminal.`));
 }));
 

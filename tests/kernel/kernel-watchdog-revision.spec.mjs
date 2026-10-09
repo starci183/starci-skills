@@ -40,6 +40,21 @@ test('a human draft holds both a missing worker and a dead worker before fencing
   }
 });
 
+test('a known human draft holds an unreadable seat before a dead managed worker is fenced or replaced', () => {
+  const effects = [];
+  const { result, log } = tickWith({ workerState: 'dead', overrides: {
+    draftHeld: () => true,
+    terminalRead: () => ({ ok: false, error: 'unreadable' }),
+    recordDraftCleared: () => effects.push('cleared'),
+    workerShow: () => { effects.push('worker-show'); return { ok: true, state: 'dead' }; },
+    stopAndRelease: () => { effects.push('fenced'); return { ok: true }; },
+  } });
+  assert.deepEqual([result.ok, result.action, result.terminal], [false, 'terminal-unreadable', 'T1']);
+  assert.equal(result.error, 'unreadable');
+  assert.deepEqual(effects, [], 'an unreadable probe neither ends the existing draft episode nor reaches managed death effects');
+  assert.deepEqual([log.replaced, log.sent, log.rotated, log.held, log.observed], [0, [], [], [], []]);
+});
+
 test('revision records wait for a responding host and a readable seat', () => {
   const missingObservation = [
     { api: () => ({ ok: false }) },
@@ -53,6 +68,12 @@ test('revision records wait for a responding host and a readable seat', () => {
   }
   const { log } = tickWith();
   assert.equal(log.observed.length, 1, 'the readable seat is observed even when the menu is empty');
+});
+
+test('an unreadable input on a seat without a managed worker holds before replacement', () => {
+  const { result, log } = tickWith({ dispatch: null, overrides: { terminalRead: () => ({ ok: false, error: 'unreadable' }) } });
+  assert.equal(result.action, 'terminal-unreadable');
+  assert.deepEqual([log.replaced, log.sent, log.rotated, log.held, log.observed], [0, [], [], [], []]);
 });
 
 test('a concerned Kernel with an empty menu is woken once, with the notice in the wake', () => {
