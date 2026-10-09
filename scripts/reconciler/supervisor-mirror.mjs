@@ -6,8 +6,8 @@
 import { listDecisions } from '../machine/decisions.mjs';
 
 /** The kinds a Kernel verb opens in a product ledger for the Supervisor. */
-export const MIRRORED_KINDS = new Set(['menu-escape']);
-export const SUPERVISOR_LEDGER_NAME = 'supervisor';
+const MIRRORED_KINDS = new Set(['menu-escape']);
+const SUPERVISOR_LEDGER_NAME = 'supervisor';
 
 /**
  * The Supervisor-ledger specs of one workflow's live product-ledger items that the Supervisor decides: [{kind, ledger: 'supervisor', idempotencyKey, ...}].
