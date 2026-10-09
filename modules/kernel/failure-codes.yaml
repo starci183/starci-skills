@@ -15351,6 +15351,16 @@ RT_PROSE_RESTATES_SLOTS:
   owner: supervisor
   kind: check-finding
 
+RT_EVENT_SPILL_BYPASS:
+  title: "A ledger event payload is spilled by hand"
+  title_vi: "Một payload sự kiện của sổ cái được tự chuyển sang blob"
+  meaning_vi: "Payload sự kiện lớn theo đầu vào (danh sách tệp, manifest, bản tóm tắt, báo cáo, lời phê bình, menu) chỉ đi vào kho blob qua một đường duy nhất là appendEvent: engine/db/event-compact.mjs giữ bản inline tối đa 16 KiB và toàn bộ payload sau events.payload_sha, người đọc giải qua engine/db/event-payload.mjs. Một tệp nguồn khác truyền payloadSha vào lệnh ghi, bắt lỗi payload quá lớn để tự chuyển, hoặc chèn thẳng vào bảng events là đi vòng."
+  causes_vi:
+    - "Người viết gặp STARCI_EVENT_PAYLOAD_TOO_LARGE rồi tự lưu blob và truyền payloadSha thay vì để appendEvent làm"
+  nextStep_vi: "Bỏ đoạn tự chuyển; gọi appendEvent với payload đầy đủ và đọc lại bằng eventPayloadOf."
+  owner: supervisor
+  kind: check-finding
+
 RT_PORT_RESTATED:
   title: "A port literal is spelled outside its owner"
   title_vi: "Một literal cổng được viết ngoài tệp chủ sở hữu"

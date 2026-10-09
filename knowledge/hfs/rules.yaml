@@ -2108,3 +2108,12 @@ rules:
     failureCodes: ["RT_REVISION_SCOPE"]
     enforcers:
       - {kind: runtime, id: revision-scope, at: scripts/checks/check-revision-scope.mjs}
+  - id: R238
+    code: "RT_EVENT_SPILL_BYPASS"
+    law: "A ledger event payload that grows with its input (a file list, a manifest, a digest, a report, a critique, a menu) goes to the blob store through the one path of appendEvent: engine/db/event-compact.mjs eventPayloadRecord keeps a bounded inline view of at most 16 KiB and the whole payload behind events.payload_sha, and readers resolve it through engine/db/event-payload.mjs. No runtime source file other than engine/db/ledger.mjs and engine/db/event-compact.mjs passes a payloadSha to a write, catches the payload-too-large refusal to spill by hand, or inserts into the events table directly. Specs, tests, node_modules, the generated runtime copies and packages are out of scope."
+    scope: runtime
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RT_EVENT_SPILL_BYPASS"]
+    enforcers:
+      - {kind: runtime, id: event-spill, at: scripts/checks/check-event-spill.mjs}
