@@ -263,7 +263,7 @@ async function settleReported(ledger, fresh, { repo, settings, env, now, dryRun,
   if (owed?.hold) return { target: 'skipped', row: await checkerUnavailable(ledger, fresh, { reason: 'checker-unavailable', detail: [`critic: ${owed.hold.code ?? 'CRITIC_UNAVAILABLE'}: ${owed.hold.error ?? ''}`] }, { now: now(), settings }) };
   // A report blocked only on a Critic hold is judged by the runtime's Critic now: its verdict settles the leg (pass, or the op's error-work), never the owner's.
   const rejudged = dryRun ? null : rejudgedVerdictOf(ledger.db, fresh.report, fresh.jobId, runtimeCriticRunOf);
-  const verdict = rejudged ? { green: rejudged === 'pass', reason: 'critic-rejudged', via: 'report-blocked+critic-rejudged' } : await verdictOf(ledger, fresh, { repo, settings, env, dryRun, verify });
+  const verdict = rejudged ? { green: rejudged === 'pass', via: 'report-blocked+critic-rejudged' } : await verdictOf(ledger, fresh, { repo, settings, env, dryRun, verify });
   let settleAs = rejudged ?? 'pass';
   let judged = verdict;
   if (!verdict.green && !rejudged) {
