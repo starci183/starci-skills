@@ -99,9 +99,12 @@ starci runtime deploy --from <clone-or-ref>            # the deploy
 ```
 
 - It refuses unless the source is committed and clean, a fast-forward of the host tree, and proven by a check receipt bound to that exact commit (the verb runs `starci runtime check` in the clean source itself; a lane cannot claim green). It refuses while a release cut holds the host lock.
+- After the check it runs the specs the change can break (`starci test affected --run --base <host head>`, in shards inside the stated budget) and requires a clean receipt on that exact commit: a red spec, a budget that ended with files not started, or a receipt of another tip is a refusal, and there is no bypass. `--plan` states the size of the set and the budget without running it. The receipt and the deploy event carry `{base, tip, passed, total}`.
 - It waits for the settles, Critic runs and prepared decisions in flight and stops none of them; when they do not finish in time it refuses and names them.
 - A tip several commits ahead is one revision change: one fast-forward, `starci runtime artefacts --migrate` from the new tree (generated copies and the hooks of every live workflow tree), one engine restart, then the verification (new revision with a fresh heartbeat, every controller in its mode, no seat dead) and one `runtime-deployed` event.
 - A failure after the fast-forward names the host state, the previous revision and the way back without destructive git (a revert of the range, never a reset), which the output of the verb prints.
+
+The first deploy of a tree that does not yet hold the verb (a host older than this section) is the hand sequence once: fast-forward the host checkout to the revision that adds the verb, restart the engine, read the digest. Every later deploy is the verb.
 
 ## The role contract
 

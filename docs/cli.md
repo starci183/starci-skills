@@ -3311,7 +3311,7 @@ Roles: coordinator, owner
 
 Conventions:
 
-- refuses unless the source is committed, clean, a fast-forward of the host and proven by a check receipt bound to that commit
+- refuses unless the source is clean, a fast-forward of the host and its check and affected specs are proven by a receipt on that commit
 - refuses while a release cut holds the host lock; waits for settles, Critic runs and prepared decisions in flight, stops none
 - several commits are one revision change, with one fast-forward, installed artefacts migrated, one engine restart, then verified
 - journals one runtime-deployed event; --plan prints every step and refusal and changes nothing

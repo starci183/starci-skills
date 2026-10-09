@@ -17533,3 +17533,14 @@ RENDER_TOOL_UNAVAILABLE:
   nextStep_vi: "Lệnh giao bị từ chối trước khi tốn một lượt thử, job đứng chờ với lý do host-tool-missing; Supervisor là người giữ máy chủ, cài công cụ nêu trong thông báo rồi job tự sẵn sàng lại ở lần đọc trạng thái sau; không cần op hay chủ dự án."
   owner: supervisor
   kind: dispatch-refusal
+deploy-affected-red:
+  title: "A deploy was refused: the specs the change can break did not all pass on the source commit"
+  title_vi: "Deploy bị từ chối: các spec mà thay đổi có thể làm hỏng không đạt hết trên commit nguồn"
+  meaning_vi: "Sau khi starci runtime check xanh, deploy chạy starci test affected --run --base <đầu cây host> trong clone nguồn và chỉ nhận biên nhận sạch, ok, đúng commit nguồn. Một spec đỏ, thời hạn kết thúc khi còn tệp chưa chạy (thoát 2), biên nhận của commit khác hoặc cây bị đổi trong lúc chạy đều bị từ chối; không có cờ bỏ qua."
+  causes_vi:
+    - "Một spec liên quan tới các hàm đã đổi đang đỏ"
+    - "Bộ spec lớn không chạy hết trong thời hạn khai báo của modules/supervisor/affected-tests.yaml"
+    - "Clone nguồn đổi HEAD hoặc có tệp mới trong lúc chạy"
+  nextStep_vi: "Sửa spec đỏ đầu tiên trong thông báo, commit, rồi chạy lại starci runtime deploy; với bộ spec quá lớn, chạy starci test affected --run trong clone để thấy tệp nào chưa kịp chạy rồi chạy lại."
+  owner: runtime-core
+  kind: verb-refusal
