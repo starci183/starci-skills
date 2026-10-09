@@ -12,7 +12,8 @@ import { renderRuntimeHooks } from '../../scripts/guards/git-hooks.mjs';
 import { gitCommonDir, l4RecordPath, readL4Record, writeL4Record } from '../../scripts/guards/release-record.mjs';
 import { classifySkip, planL4, runL4, skipReport, skipsOf } from '../../scripts/supervisor/release-l4.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
-import { releaseHostMissing, rootInstallProblem } from '../../scripts/supervisor/release-host.mjs';
+import { releaseHostMissing } from '../../scripts/supervisor/release-host.mjs';
+import { rootInstallProblem } from '../../scripts/machine/npm-install-state.mjs';
 import { leftoversRefusal } from '../../scripts/gates/release-leftovers.mjs';
 
 for (const key of ['GIT_DIR', 'GIT_COMMON_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_OBJECT_DIRECTORY', 'GIT_PREFIX']) delete process.env[key];

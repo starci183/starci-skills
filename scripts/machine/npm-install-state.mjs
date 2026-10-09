@@ -49,3 +49,25 @@ export function writeInstallMarker(cwd, { at = Date.now(), write = fs.writeFileS
 export function clearInstallMarker(cwd, remove = fs.rmSync) {
   try { remove(markerFile(cwd), { force: true }); return true; } catch { return false; }
 }
+
+/** Whether a lockfile entry is installed only on some platforms or only as an optional dependency, so its absence from node_modules is no drift. */
+const platformBound = (entry) => entry.optional === true || entry.os !== undefined || entry.cpu !== undefined;
+
+/**
+ * Why the root install of `root` is not the one its lockfile declares, or null: every package of package-lock.json that is not optional or platform-bound must be in node_modules/.package-lock.json at the same version.
+ * Reads two files; no process is started.
+ */
+export function rootInstallProblem(root) {
+  const read = (file) => { try { return JSON.parse(fs.readFileSync(path.join(root, file), 'utf8')).packages ?? null; } catch { return null; } };
+  const wanted = read('package-lock.json'), installed = read('node_modules/.package-lock.json');
+  if (!wanted) return null;
+  if (!installed) return 'node_modules holds no install record (node_modules/.package-lock.json)';
+  const drift = Object.entries(wanted).filter(([key, entry]) => key !== '' && !entry.link && !platformBound(entry) && installed[key]?.version !== entry.version).map(([key]) => key.slice(key.lastIndexOf('node_modules/') + 13));
+  return drift.length ? `${drift.length} package(s) of package-lock.json are missing or at another version in node_modules (${drift.slice(0, 5).join(', ')})` : null;
+}
+
+/** Whether node_modules holds the install the lockfile declares: the lockfile is readable and rootInstallProblem finds no drift. Two files read. */
+export function lockfileInstallPresent(cwd, { read = fs.readFileSync } = {}) {
+  try { JSON.parse(read(path.join(cwd, 'package-lock.json'), 'utf8')); } catch { return false; }
+  return rootInstallProblem(cwd) === null;
+}

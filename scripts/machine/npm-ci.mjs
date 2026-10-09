@@ -10,7 +10,7 @@ import { ci } from '../api/npm/ci.mjs';
 import { asList } from '../lib/list.mjs';
 import { refusal as verbRefusal, resultOk as success, resultOutput as output } from '../lib/verb-call.mjs';
 import { underHostLock, hostLockRetryBudget } from './verb-lock.mjs';
-import { installStateOf, writeInstallMarker, clearInstallMarker } from './npm-install-state.mjs';
+import { installStateOf, writeInstallMarker, clearInstallMarker, lockfileInstallPresent } from './npm-install-state.mjs';
 import { installFailureOf, treeHolders } from './npm-install-failure.mjs';
 
 const comparablePath = (value) => {
@@ -76,6 +76,7 @@ export async function npmCi(ctx, deps = {}) {
     installState: deps.installState ?? installStateOf,
     markInstalled: deps.markInstalled ?? writeInstallMarker,
     clearMarker: deps.clearMarker ?? clearInstallMarker,
+    lockInstalled: deps.lockInstalled ?? lockfileInstallPresent,
     holders: deps.holders ?? treeHolders
   };
   const role = ctx?.role ?? 'owner';
@@ -102,6 +103,9 @@ export async function npmCi(ctx, deps = {}) {
       const present = ctx?.ifNeeded === true && !workspaces.length ? api.installState(cwd) : null;
       if (present?.state === 'installed') return { code: 0, text: `npm ci skipped in ${cwd}: node_modules is a finished install of the current lockfile`,
         data: { schema: 'starci/npm-ci@1', ok: true, cwd, ms: 0, skipped: 'installed', digest: present.digest } };
+      // A tree with no marker that holds the lockfile's install is a finished install npm ci never marked (an older runtime): it is marked, not wiped and reinstalled, because the wipe is the step a running process's loaded native file fails.
+      if (present?.state === 'incomplete' && api.lockInstalled(cwd) && api.markInstalled(cwd, { at: api.now() })) return { code: 0, text: `npm ci skipped in ${cwd}: node_modules already holds the lockfile's install; marked finished`,
+        data: { schema: 'starci/npm-ci@1', ok: true, cwd, ms: 0, skipped: 'adopted', digest: present.digest } };
       api.clearMarker(cwd);
       const started = api.now();
       const result = await api.ci(cwd, { workspaces });

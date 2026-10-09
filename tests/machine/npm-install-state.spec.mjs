@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { INSTALL_MARKER, clearInstallMarker, installStateOf, manifestDigest, writeInstallMarker } from '../../scripts/machine/npm-install-state.mjs';
+import { INSTALL_MARKER, clearInstallMarker, installStateOf, lockfileInstallPresent, manifestDigest, writeInstallMarker } from '../../scripts/machine/npm-install-state.mjs';
 import { mkdtemp } from '../helpers/tmpdir.mjs';
 
 function tree(t, lock = '{"lockfileVersion":3,"packages":{}}\n') {
@@ -60,4 +60,14 @@ test('no manifest means no digest, no marker and an unknown state', (t) => {
   assert.equal(writeInstallMarker(cwd), false);
   fs.mkdirSync(path.join(cwd, 'node_modules'));
   assert.equal(installStateOf(cwd).state, 'unknown');
+});
+
+test('an install is present only when the lockfile reads and node_modules records its packages', (t) => {
+  const cwd = tree(t, '{"lockfileVersion":3,"packages":{"":{},"node_modules/a":{"version":"1.0.0"}}}\n');
+  assert.equal(lockfileInstallPresent(cwd), false, 'no install record');
+  fs.mkdirSync(path.join(cwd, 'node_modules'), { recursive: true });
+  fs.writeFileSync(path.join(cwd, 'node_modules', '.package-lock.json'), '{"packages":{"node_modules/a":{"version":"1.0.0"}}}');
+  assert.equal(lockfileInstallPresent(cwd), true);
+  fs.writeFileSync(path.join(cwd, 'package-lock.json'), '{not json');
+  assert.equal(lockfileInstallPresent(cwd), false, 'an unreadable lockfile proves nothing');
 });

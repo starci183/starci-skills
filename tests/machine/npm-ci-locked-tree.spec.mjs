@@ -148,3 +148,36 @@ test('the holders of a tree are the processes whose command line is inside it, o
   assert.equal(treeHolders(tree, { list: () => null, env: {} }), null, 'an unreadable table is null, not no holders');
   assert.equal(insideTree(`node ${forward}/a.js`, tree), true);
 });
+
+// A tree whose node_modules holds the lockfile's install but carries no completion marker (built by an older runtime) is marked, not wiped.
+function unmarkedInstall(t, installed) {
+  const cwd = mkdtemp(t, 'starci-npm-ci-adopt-');
+  const lock = { lockfileVersion: 3, packages: { '': {}, 'node_modules/a': { version: '1.0.0' } } };
+  fs.writeFileSync(path.join(cwd, 'package.json'), '{"name":"fixture"}\n');
+  fs.writeFileSync(path.join(cwd, 'package-lock.json'), JSON.stringify(lock));
+  fs.mkdirSync(path.join(cwd, 'node_modules', 'a'), { recursive: true });
+  fs.writeFileSync(path.join(cwd, 'node_modules', '.package-lock.json'), JSON.stringify({ packages: { 'node_modules/a': { version: installed } } }));
+  return cwd;
+}
+
+test('a tree that holds the lockfile install without a marker is marked finished and npm ci never runs', async (t) => {
+  const cwd = unmarkedInstall(t, '1.0.0');
+  assert.equal(installStateOf(cwd).state, 'incomplete');
+  const installer = standIn(cwd);
+  const result = await npmCi(ctx(cwd, { ifNeeded: true }), deps(installer));
+  assert.equal(result.code, 0);
+  assert.equal(result.data.skipped, 'adopted');
+  assert.equal(installer.runs.count, 0, 'no wipe of node_modules, so no loaded native file can fail it');
+  assert.equal(installStateOf(cwd).state, 'installed');
+});
+
+test('a tree whose install differs from the lockfile is a real npm ci, and an explicit npm ci never adopts', async (t) => {
+  const drifted = unmarkedInstall(t, '0.9.0');
+  const installer = standIn(drifted);
+  await npmCi(ctx(drifted, { ifNeeded: true }), deps(installer));
+  assert.equal(installer.runs.count, 1);
+  const whole = unmarkedInstall(t, '1.0.0');
+  const explicit = standIn(whole);
+  await npmCi(ctx(whole), deps(explicit));
+  assert.equal(explicit.runs.count, 1);
+});
