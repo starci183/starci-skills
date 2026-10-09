@@ -1140,7 +1140,7 @@ _starci() {
     'release:launch-smoke') _values 'flags' '--app-repo' '--entry' '--timeout-ms' '--out' '--as' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'release:notes') _values 'flags' '--tag' '--repo' '--out' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'release:proof') _values 'flags' '--repo' '--base' '--main' '--out' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
-    'release:publish') _values 'flags' '--publish' '--runtime-package' '--npm-user' '--poll-minutes' '--pre-land-ref' '--expect-sha' '--examples' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
+    'release:publish') _values 'flags' '--plan' '--publish' '--runtime-package' '--npm-user' '--poll-minutes' '--pre-land-ref' '--expect-sha' '--examples' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'release:sync-runtime') _values 'flags' '--check' '--prepare-grammar' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'route:op') _values 'flags' '--kind' '--node-kind' '--phase' '--intent' '--ops-dir' '--json' '--cwd' '--quiet' '--help' '--edition' ;;
     'runtime:architecture') _values 'flags' '--base' '--json' '--cwd' '--quiet' '--help' '--edition' ;;

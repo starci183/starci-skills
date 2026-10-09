@@ -3126,6 +3126,7 @@ plan or perform the owner-run package publication sequence
 
 | flag | type | |
 | --- | --- | --- |
+| `--plan` | boolean |  |
 | `--publish` | boolean |  |
 | `--runtime-package` | boolean |  |
 | `--npm-user` | string |  |
@@ -3154,6 +3155,7 @@ json: starci/release-publish-flow@1
 
 ```sh
 starci release publish
+starci release publish --plan --npm-user <name>
 starci release publish --publish --npm-user <name> --expect-sha <sha>
 starci release publish --runtime-package --publish --npm-user <name> --expect-sha <sha>
 ```

@@ -14,6 +14,7 @@ conventions:
   - runtime-package refuses changed inputs or registry state after its cold proof and never performs rebind or example writes
   - publication never commits, pushes or tags; release cut owns those effects
 flags:
+  - {name: plan, type: boolean, summary: explicitly print the read-only publication plan (the default)}
   - {name: publish, type: boolean, summary: perform the plan instead of reading it}
   - {name: runtime-package, type: boolean, summary: publish the final root runtime after the package phase and committed binding refresh}
   - {name: npm-user, type: string, summary: required logged-in npm account for publication}
@@ -29,6 +30,7 @@ exit:
 json: starci/release-publish-flow@1
 examples:
   - starci release publish
+  - starci release publish --plan --npm-user <name>
   - starci release publish --publish --npm-user <name> --expect-sha <sha>
   - starci release publish --runtime-package --publish --npm-user <name> --expect-sha <sha>
 editions: [full]

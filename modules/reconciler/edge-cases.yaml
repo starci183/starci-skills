@@ -1748,3 +1748,9 @@ cases:
     met: {date: "2026-10-09", where: "the judge declarations of business.decide, content.generate, perf.verify, scope.finish and test.author", evidence: "each of these ops is judged by machine measures alone and none of them reads substance: the settler re-runs the record validators (shape, references, coverage of the records) and the READ digest is re-read, but no Critic, no reviewing leg and no owner gate judges whether the specified behaviour (business.decide), the generated content and its examples (content.generate), the measured numbers (perf.verify), the retention of live consumers and sole evidence copies (scope.finish) or the cases of the authored tests (test.author) are right; the op's own run is the evidence"}
     why: "Adding a Critic row, a reviewing leg or an owner gate for an op changes who can fail a leg, which is the owner's decision per leg and not part of declaring today's behaviour. The declarations name the gap in their why so the op is told its checks are shape only."
     status: open
+  - id: release-publish-explicit-plan
+    family: authority-safety
+    met: {date: "2026-10-09", where: "release preparation", evidence: "release publish --plan was refused as an unknown option although publication defaults to a read-only plan"}
+    rule: {file: scripts/supervisor/release-publish-flow.mjs, anchor: "--plan and --publish are mutually exclusive"}
+    spec: tests/cli/release.spec.mjs
+    status: covered
