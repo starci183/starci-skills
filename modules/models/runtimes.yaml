@@ -210,6 +210,9 @@ allocation:
   # to the tree is stopped and given stopVerifyMs to end before the finding is raised.
   # A finished [Worker] job whose terminal has no recorded closure is closed again by the Job controller's worker sweep (scripts/supervisor/supervisor-watchdog.mjs):
   # every leftoverRetryMs (doubling to leftoverRetryMaxMs) for at most leftoverRetryAttempts attempts, each failure recorded with its reason on the job.
+  # uatSlot (scripts/uat/slot-collect.mjs, slot-lessee.mjs): a held UAT run checks its lessee (its attempt, the process that launched it) every watchMs and ends with it;
+  # the Host pass ends a slot whose lessee is gone, and a slot that recorded no lessee at all once it has been held unknownHoldMs (3 hours: a UAT run is minutes).
+  uatSlot: {watchMs: 5000, unknownHoldMs: 10800000}
   workerClose: {verifyMs: 10000, pollMs: 1000, stopVerifyMs: 5000, leftoverRetryMs: 60000, leftoverRetryMaxMs: 900000, leftoverRetryAttempts: 12}
   # providerReservation (scripts/machine/provider-reservation-reap.mjs): an admission whose receipt stayed `reserved` this long never reached
   # worker-start (the consume moves it to `launching` first), so its launcher died and the slot is released. A receipt with no terminal handle and no

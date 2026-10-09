@@ -226,7 +226,7 @@ Register-ArgumentCompleter -Native -CommandName starci -ScriptBlock {
         'test run' = @('--level','--changed','--against','--spec','--concurrency','--root','--release-cut','--json','--cwd','--quiet','--help','--edition')
         'typecheck run' = @('--level','--changed','--project','--json','--cwd','--quiet','--help','--edition')
         'uat assisted-runner' = @('--request','--receipt','--after','--value','--actor','--json','--cwd','--quiet','--help','--edition')
-        'uat slots' = @('--record-dir','--json','--cwd','--quiet','--help','--edition')
+        'uat slots' = @('--dry-run','--record-dir','--json','--cwd','--quiet','--help','--edition')
         'work asset-slot' = @('--json','--cwd','--quiet','--help','--edition')
         'work brand' = @('--source','--stage','--grammar-root','--json','--cwd','--quiet','--help','--edition')
         'work brand-direction' = @('--work','--archetype','--lang','--receipt','--write','--json','--cwd','--quiet','--help','--edition')

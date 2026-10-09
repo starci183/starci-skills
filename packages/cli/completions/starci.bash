@@ -1148,7 +1148,7 @@ _starci() {
         test:run) COMPREPLY=( $(compgen -W "--level --changed --against --spec --concurrency --root --release-cut --json --cwd --quiet --help --edition" -- "$cur") );;
         typecheck:run) COMPREPLY=( $(compgen -W "--level --changed --project --json --cwd --quiet --help --edition" -- "$cur") );;
         uat:assisted-runner) COMPREPLY=( $(compgen -W "--request --receipt --after --value --actor --json --cwd --quiet --help --edition" -- "$cur") );;
-        uat:slots) COMPREPLY=( $(compgen -W "--record-dir --json --cwd --quiet --help --edition" -- "$cur") );;
+        uat:slots) COMPREPLY=( $(compgen -W "--dry-run --record-dir --json --cwd --quiet --help --edition" -- "$cur") );;
         work:asset-slot) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
         work:brand) COMPREPLY=( $(compgen -W "--source --stage --grammar-root --json --cwd --quiet --help --edition" -- "$cur") );;
         work:brand-direction) COMPREPLY=( $(compgen -W "--work --archetype --lang --receipt --write --json --cwd --quiet --help --edition" -- "$cur") );;

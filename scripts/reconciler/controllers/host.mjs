@@ -28,7 +28,7 @@
 //                                 turnInterruptGraceMs later -> the seat terminal is closed (--turn-replace) and the
 //                                 seat's watchdog pass replaces it.
 //   host:processes                node/git counts over threshold (host-health hostVerdict -> log), orphan runtime loops
-//                                 (ORPHAN_PROCESS -> stop), the footprint scan, the Orca terminal count against Orca's
+//                                 (ORPHAN_PROCESS -> stop), UAT slots whose lessee is gone (host-slot-servers.mjs -> stop), the footprint scan, the Orca terminal count against Orca's
 //                                 own active workers over every Run (worker-list; TERMINAL_COUNT_DRIFT).
 //   host:transcripts              every 60 s (schedules host/transcripts): scrollback snapshots of every live op attempt
 //                                 (scripts/kernel/transcripts.mjs snapshot --repo) and of every live seat (snapshotSeats).
@@ -60,6 +60,8 @@ import { runtimeRevNow } from '../../kernel/start-hold.mjs';
 import { runTerminalDrift, runtimeTerminalCount } from '../terminal-drift.mjs';
 import { createStaleTerminalStep } from '../host-stale.mjs';
 import { eachInOrder } from '../../lib/in-order.mjs';
+import { reapOrphanProcesses } from '../host-orphans.mjs';
+import { reapSlotServers } from '../host-slot-servers.mjs';
 export { staleTerminalsOf, STALE_RETRY_MS, STALE_ESCALATE_TRIES, CLOSE_VERIFY } from '../host-stale.mjs'; export { seatStateOf };
 
 /**
@@ -462,19 +464,6 @@ export function createHostController(deps = {}) {
     return ids;
   }
 
-  // Each orphan runs an ORPHAN_PROCESS clock and is killed; the clock of a process that is gone closes.
-  async function reapOrphans(ctx, orphans, p) {
-    const seen = new Set();
-    await eachInOrder(orphans, async (o) => {
-      const entity = `process:${o.pid}`;
-      seen.add(entity);
-      await clock(ctx, entity, 'ORPHAN_PROCESS', p.orphanSlaMs, { code: 'ORPHAN_PROCESS', owner: 'host-controller', ledgerId: 'supervisor', repo: o.repo, workflowId: o.workflowId, script: o.script });
-      await ctx.run('taskkill.exe', ['/F', '/T', '/PID', String(o.pid)], { timeoutMs: 120_000 });
-    });
-    await eachInOrder(state.orphanClocks, async (entity) => { if (!seen.has(entity)) await clear(ctx, entity, 'ORPHAN_PROCESS'); });
-    state.orphanClocks = seen;
-  }
-
   // INV-H2: Orca's terminals against the workers Orca itself holds active (every seat, op and [Worker] is a
   // worker-start worker; worker-list is the one count). An Orca that does not answer for every Run proves nothing (null).
   const terminalDrift = (ctx, p) => runTerminalDrift({ ctx, p, state, orcaTerminals, activeWorkers, clock, clear, dedupeArgs: [SERVICES_FILE, '--dedupe', '--json'] });
@@ -491,7 +480,8 @@ export function createHostController(deps = {}) {
     const known = [...(ctx.ledgers ?? []).map((l) => l.repo).filter(Boolean)];
     const runningIds = await runningIdsOf(ctx);
     const orphans = findOrphans(procs, { knownRepos: known, runningWorkflows: runningIds, now, minAgeMs: p.orphanMinAgeMs, exclude: [process.pid, process.ppid] });
-    await reapOrphans(ctx, orphans, p);
+    await reapOrphanProcesses(ctx, orphans, p, { state, clock, clear });
+    out.slotServers = await reapSlotServers(ctx, procs);
     out.orphans.push(...orphans);
     if (await scanFootprint(ctx, p, now)) out.footprint = true;
     const terminals = await terminalDrift(ctx, p);

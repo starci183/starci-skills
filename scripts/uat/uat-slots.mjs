@@ -10,7 +10,8 @@
 // STARCI_UAT_MAX_CONCURRENT sets the ceiling (specs, one process tree). CLI: `status` prints holders and the
 // queue; `run [--record-dir <dir>] -- <command...>` runs one command (e.g. a project Playwright UAT) while
 // holding a slot; a Playwright test run records video, trace and screenshots into a fresh directory under
-// --record-dir (default <tmp>/starci-uat-recordings), printed first.
+// --record-dir (default <tmp>/starci-uat-recordings), printed first. A held run records its lessee (slot-lessee.mjs) and ends with it;
+// `collect [--dry-run]` ends every slot whose lessee is gone (slot-collect.mjs; `status` lists them as `collectable`).
 
 import '../api/process/hide-child-windows.mjs';
 import crypto from 'node:crypto';
@@ -19,16 +20,18 @@ import {startProgram} from '../api/process/start-program.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { repeatInOrder } from '../lib/in-order.mjs';
 import {machineFileFor, readMachine, withMachine} from '../../engine/db/machine.mjs';
-import {loadConfig, uatSettings, UAT_DEFAULTS} from '../../engine/config.mjs';
+import {allocationMs, loadConfig, uatSettings, UAT_DEFAULTS} from '../../engine/config.mjs';
 import {recordAlive} from '../connectors/lib.mjs';
+import {SLOT_LOCK,SLOT_PREFIX,TICKET_PREFIX,bindLessee,holderOf,locksLike} from './slot-store.mjs';
+import {attemptEnded,lesseeRecord,lesseeVerdict} from './slot-lessee.mjs';
+import {collectSlots,stopOrphanChild,stopTree} from './slot-collect.mjs';
+import {pidAlive} from '../lib/pid-alive.mjs';
 // launch.mjs, never assisted-runner.mjs: assisted-runner imports this module, and a dynamic import of it
 // under this module's own top-level await (`run`) is a cycle that never settles (inc-f681bbed166f).
 import {launchFor} from './launch.mjs';
 import {defaultRecordRoot,recordingDirUnder,withRecording} from './playwright-recording.mjs';
 
 export const DEFAULT_POLL_MS=2000;
-const SLOT_PREFIX='uat-slot-',TICKET_PREFIX='uat-ticket-';
-const SLOT_LOCK=/^uat-slot-(\d+)$/;
 // A slot or ticket is held for as long as its process lives; the expiry only feeds v_leaks.
 const HOLD_TTL_MS=24*3_600_000;
 
@@ -39,9 +42,7 @@ export function maxConcurrent({env=process.env,config}={}){
   try{return uatSettings(config===undefined?loadConfig():config).maxConcurrent;}catch{return UAT_DEFAULTS.maxConcurrent;}
 }
 
-const holderOf=row=>{try{return JSON.parse(row.holder??'null')??{};}catch{return {};}};
 const liveRow=row=>row.state!=='released'&&recordAlive({pid:row.holder_pid,startedAt:row.started_at});
-const locksLike=(m,prefix)=>m.db.prepare("SELECT * FROM host_locks WHERE substr(name,1,length(?))=? AND state<>'released' ORDER BY name").all(prefix,prefix);
 
 // The live holders on one handle; with `reclaim`, the stale slots found are released (inside the caller's transaction).
 function holdersOn(m,{reclaim}){
@@ -49,7 +50,7 @@ function holdersOn(m,{reclaim}){
   for(const row of locksLike(m,SLOT_PREFIX)){
     const match=SLOT_LOCK.exec(row.name);if(!match)continue;
     if(liveRow(row)){out.push({slot:Number(match[1]),pid:row.holder_pid,startedAt:new Date(row.started_at).toISOString(),runId:holderOf(row).runId??null});continue;}
-    if(reclaim){m.releaseHostLock({name:row.name,pid:row.holder_pid});m.releaseUatSlot(`slot-${match[1]}`);}
+    if(reclaim){stopOrphanChild(m,row);m.releaseHostLock({name:row.name,pid:row.holder_pid});m.releaseUatSlot(`slot-${match[1]}`);}
   }
   return out.sort((a,b)=>a.slot-b.slot);
 }
@@ -142,7 +143,8 @@ export async function acquireUatSlot({runId=null,env=process.env,limit=maxConcur
         };
         unhook=atExit(release);
         settleTicket();
-        return {slot:claimed.slot,limit,waited,release};
+        const bind=lessee=>withMachine(m=>bindLessee(m,claimed.name,record.token,lessee),{env});
+        return {slot:claimed.slot,limit,waited,release,bind};
       }
       waited=true;
       if(position!==lastPosition){lastPosition=position;try{await onQueued?.({position,limit,holders:holders.length});}catch{/* reporting never blocks the wait */}}
@@ -152,7 +154,21 @@ export async function acquireUatSlot({runId=null,env=process.env,limit=maxConcur
 }
 
 /** Holders, queue and ceiling, for `status`. */
-const slotStatus=({env=process.env}={})=>({store:machineFileFor(env),limit:maxConcurrent({env}),holders:slotHolders({env}),queue:slotQueue({env})});
+const slotStatus=({env=process.env}={})=>({store:machineFileFor(env),limit:maxConcurrent({env}),holders:slotHolders({env}),queue:slotQueue({env}),collectable:collectSlots({env,dryRun:true})});
+
+// The run ends with its lessee: once the attempt that asked for it has ended or the process that launched it is gone, nobody reads its output, so
+// the held command's tree is stopped, the slot released and the event recorded (slot-collect.mjs does the same from outside when this process is gone too).
+function endWithLessee({lessee,slot,child,env=process.env}){
+  const timer=setInterval(()=>{
+    const owner=lessee.owner&&pidAlive(lessee.owner.pid)?[lessee.owner]:[];
+    const verdict=lesseeVerdict({lessee,rows:owner,attempt:attemptEnded(lessee.scratchDir,readMachine,{env}),heldMs:0,unknownHoldMs:Infinity});
+    if(verdict.state==='live')return;
+    clearInterval(timer);stopTree(child.pid);
+    try{withMachine(m=>m.supEvent({entityType:'uat-slot',entityId:`slot-${slot.slot}`,kind:'uat-slot-collected',payload:{slot:slot.slot,state:verdict.state,why:verdict.why,stopped:[child.pid],by:'run'}}),{env});}catch{/* the store is gone */}
+    slot.release();process.exit(143);
+  },allocationMs('uatSlot.watchMs'));
+  timer.unref();
+}
 
 // An op's run records into its own folder (playwright-recording.mjs defaultRecordRoot), which settle indexes as its proof.
 async function runHolding(command,{recordDir=defaultRecordRoot()}={}){
@@ -163,6 +179,8 @@ async function runHolding(command,{recordDir=defaultRecordRoot()}={}){
   if(recording.outputDir)console.error(`[uat-slots] recording video, trace and screenshots into ${recording.outputDir}`);
   const launch=launchFor(recording.command);
   const child=startProgram(launch.file,launch.args,{stdio:'inherit',windowsHide:false});
+  const lessee=lesseeRecord({child:child.pid});
+  slot.bind(lessee);endWithLessee({lessee,slot,child});
   const code=await new Promise(resolve=>{child.once('exit',code=>resolve(Number.isInteger(code)?code:1));child.once('error',()=>resolve(1));});
   slot.release();process.exit(code);
 }
@@ -170,9 +188,10 @@ async function runHolding(command,{recordDir=defaultRecordRoot()}={}){
 if(isMain(import.meta.url)){
   const [command,...rest]=process.argv.slice(2);
   if(command==='status')process.stdout.write(`${JSON.stringify(slotStatus(),null,2)}\n`);
+  else if(command==='collect')process.stdout.write(`${JSON.stringify(collectSlots({dryRun:rest.includes('--dry-run')}),null,2)}\n`);
   else if(command==='run'){
     const record=rest[0]==='--record-dir'?rest[1]:null,args=record?rest.slice(2):rest;
     await runHolding(args[0]==='--'?args.slice(1):args,record?{recordDir:record}:{});
   }
-  else{console.error('use: starci uat slots <status|run [--record-dir <dir>] -- <command...>>');process.exit(2);}
+  else{console.error('use: starci uat slots <status|collect [--dry-run]|run [--record-dir <dir>] -- <command...>>');process.exit(2);}
 }

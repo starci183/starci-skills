@@ -12154,7 +12154,7 @@ workflow-worktree-install-locked:
   causes_vi:
     - "Một tiến trình của workflow trước hoặc của một op vẫn chạy trong cây (dev server, watcher)"
     - "Một cài đặt khác hoặc trình chống virus giữ file"
-  nextStep_vi: "Đọc đường dẫn bị khóa và danh sách tiến trình trong phiếu, dừng tiến trình giữ file rồi mở lại ghế bằng starci reconciler reopen <ghế>; runtime tự bỏ qua npm ci khi cây đã cài đúng lockfile."
+  nextStep_vi: "Đọc đường dẫn bị khóa và danh sách tiến trình trong phiếu, dừng tiến trình giữ file (cột via nói nó giữ bằng dòng lệnh, thư mục làm việc, file ánh xạ hay module đã nạp) rồi mở lại ghế bằng starci reconciler reopen <ghế>; runtime tự bỏ qua npm ci khi cây đã cài đúng lockfile."
   owner: runtime-core
   kind: verb-refusal
 kernel-start-held:
@@ -17250,3 +17250,13 @@ EXAMPLES_CI_LISTER_UNSAFE:
   nextStep_vi: "Thêm bước `starci release sync-runtime` ngay sau bước cài phụ thuộc và viết bước liệt kê dạng `x=$(lệnh)` rồi `echo \"x=$x\" >> \"$GITHUB_OUTPUT\"`."
   owner: runtime-core
   kind: check-finding
+workflow-worktree-install-slot-held:
+  title: "A UAT slot server of the workflow tree could not be stopped before npm ci"
+  title_vi: "Máy chủ UAT slot của cây workflow không dừng được trước khi npm ci"
+  meaning_vi: "Trước npm ci của cây workflow, runtime dừng các máy chủ slot UAT chạy từ chính cây đó (chúng tải file native trong node_modules). Một slot không dừng được, nên npm ci không chạy và không bị thử lại mù; phiếu nêu tên khóa slot và pid còn sống."
+  causes_vi:
+    - "Quyền hệ điều hành không cho dừng tiến trình giữ slot"
+    - "Tiến trình giữ slot đã đổi danh tính (pid được dùng lại) nên runtime từ chối dừng nhầm"
+  nextStep_vi: "Chạy starci uat slots collect (thêm --dry-run để chỉ xem), đọc pid trong phiếu, dừng tiến trình đó rồi mở lại ghế bằng starci reconciler reopen <ghế>."
+  owner: runtime-core
+  kind: verb-refusal

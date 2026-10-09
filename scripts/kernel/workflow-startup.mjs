@@ -12,6 +12,7 @@ import { terminalList } from '../api/orca/terminal-list.mjs';
 import { runShow } from '../api/orca/run-show.mjs';
 import { SKILL_ROOT, supervisedSeatHandles } from '../machine/home.mjs';
 import { entryTerminalsOf, recordedSeatTerminals } from '../machine/seat-sessions.mjs';
+import { stopSlotsInTree } from '../uat/slot-collect.mjs';
 import { runtimeRevNow, startFailureRun, startHoldBudget, startHoldOf, holdSummary } from './start-hold.mjs';
 
 async function workflowHost({ env }, run = execNode) {
@@ -164,14 +165,22 @@ export async function ensureWorkflowHost({ workflow, goal, env = process.env, pl
   return { ok: true, ready: true, authority, host };
 }
 
+const slotLine = (slot) => [slot.name, ' (pid ', (slot.survivors.length ? slot.survivors : slot.pids).join(', '), ')'].join('');
+
 export async function installWorkflowTree({ record, env = process.env } = {}, deps = {}) {
   if (!record?.path) return { ok: false, reason: 'workflow-worktree-missing' };
+  // The runtime's own UAT slot servers run from the tree and load its native files: they are ended (by their recorded identity) before npm ci
+  // deletes node_modules, and a slot that cannot be ended is a typed refusal naming the lease, never a blind retry of the install.
+  const slots = (deps.stopSlots ?? stopSlotsInTree)(record.path, { env }) ?? [];
+  const held = slots.filter((slot) => !slot.released);
+  if (held.length) return { ok: false, installed: false, reason: 'workflow-worktree-install-slot-held', path: record.path, slots: held,
+    error: `the UAT slot server(s) of this tree could not be stopped: ${held.map((slot) => slotLine(slot)).join('; ')}; end the lease with starci uat slots collect` };
   let result;
   try { result = await (deps.npmCi ?? npmCi)({ cwd: record.path, role: 'coordinator', env, args: {}, ifNeeded: true }); }
   catch (error) { return { ok: false, installed: false, reason: 'workflow-worktree-install-failed', path: record.path,
     receipt: null, error: String(error?.message ?? error) }; }
   const ok = result?.code === 0 && result?.data?.ok === true;
-  const done = { ok, installed: ok, path: record.path, receipt: result?.data ?? null };
+  const done = { ok, installed: ok, path: record.path, receipt: result?.data ?? null, ...(slots.length ? { stoppedSlots: slots } : {}) };
   const error = result?.text ?? 'npm ci did not return a successful receipt';
   if (ok) return done;
   return result?.data?.cause === 'file-locked' ? { ...done, reason: 'workflow-worktree-install-locked', error } : { ...done, reason: 'workflow-worktree-install-failed', error };

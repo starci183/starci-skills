@@ -4405,10 +4405,11 @@ starci uat assisted-runner signal --request <request.yaml> --receipt <receipt.ya
 
 ### starci uat slots
 
-inspect UAT slots or run a command while holding one
+inspect UAT slots, end the ones whose lessee is gone, or run a command while holding one
 
 | flag | type | |
 | --- | --- | --- |
+| `--dry-run` | boolean |  |
 | `--record-dir` | string |  |
 
 Positionals: action, command?
@@ -4419,6 +4420,7 @@ json: none
 
 ```sh
 starci uat slots status
+starci uat slots collect --dry-run
 starci uat slots run --record-dir <dir> -- npm test
 ```
 
