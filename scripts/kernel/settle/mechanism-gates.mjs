@@ -6,6 +6,7 @@ import { latestContractOf } from '../../machine/contract-version.mjs';
 import { parseJson } from '../../lib/json.mjs';
 import { jobPayloadOf } from '../verbs/shared/rows.mjs';
 import { reboundBindingOf, reboundMapOf } from '../../machine/placement-rebound.mjs';
+import { runtimeCriticRunOf } from './critic-run.mjs';
 
 /** Bind the native consumers to the CLI's existing private context and placement
  * functions. The proof consumer stays synchronous for the workflow-lock recheck. */
@@ -48,7 +49,9 @@ function settleCriticVerdict(db, jobId, repo) {
   if (!s) return null;
   const { roots, files } = settleJobFiles(db, s.job, repo, s.filed, { jobId: s.job.job_id });
   const owned = (jobPayloadOf(s.job).owned_paths ?? []).map((p) => (typeof p === 'string' ? p : p?.path)).filter((p) => typeof p === 'string' && !p.includes(':'));
-  const judged = judgeCriticVerdict({ op: s.op, files, roots: [...new Set([...roots, repo].filter(Boolean))], owned });
+  const runtime = runtimeCriticRunOf(db, s.job.job_id)?.document ?? null;
+  const teaches = String(latestContractOf(db, s.job.job_id)?.markdown ?? '').includes('decision-critic');
+  const judged = judgeCriticVerdict({ op: s.op, files, roots: [...new Set([...roots, repo].filter(Boolean))], owned, runtime, teaches });
   return judged ? { op: s.op, judged, jobId: s.job.job_id, attemptId: s.filed.attemptId, status: s.job.status } : null;
 }
   return { settleOpGate, settleOpProofs, settleCriticVerdict };

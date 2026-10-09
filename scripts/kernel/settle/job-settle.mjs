@@ -53,6 +53,7 @@ import { workflowWorktreeOf } from '../../machine/workflow-tree.mjs';
 import { reconcileAttemptPlacements } from '../attempt-placement.mjs';
 import { currentRuntimeRev } from '../runtime-rev.mjs';
 import { releaseEndedGates, recordGateRejudged } from '../gate-holds-ended.mjs';
+import { runtimeCriticFor } from './critic-run.mjs';
 import { settlerSettings, runtimeEnv, verifyReported, recordSettlerCheck, parse, slug, jsonOf } from './job-settle-verify.mjs';
 import { tempRoot } from '../../../engine/temp-root.mjs';
 export { classifyCheck, argvOf } from './check-command.mjs';
@@ -251,7 +252,10 @@ function settleRefused(ledger, fresh, settled, now) {
  * events). Returns {target: 'skipped'|'kernel'|'settled', row}; the caller pushes row onto out[target]. Ledger writes
  * stay serialized per job - sequential awaits are the ordering guarantee, not a performance bug.
  */
-async function settleReported(ledger, fresh, { repo, settings, env, now, dryRun, verify, api }) {
+async function settleReported(ledger, fresh, { repo, settings, env, now, dryRun, verify, api, critic = {} }) {
+  // A done decision leg without a Critic verdict of its own is judged with the one the runtime's Critic gives it; a Critic that could not judge holds the settle (the checker-unavailable path).
+  const owed = dryRun ? null : await runtimeCriticFor(ledger, fresh, { tree: critic.tree, retryMs: settings.tail.retryMs, now: now(), ...critic.seams });
+  if (owed?.hold) return { target: 'skipped', row: await checkerUnavailable(ledger, fresh, { reason: 'checker-unavailable', detail: [`critic: ${owed.hold.code ?? 'CRITIC_UNAVAILABLE'}: ${owed.hold.error ?? ''}`] }, { now: now(), settings }) };
   const verdict = await verdictOf(ledger, fresh, { repo, settings, env, dryRun, verify });
   let settleAs = 'pass';
   let judged = verdict;
@@ -281,7 +285,7 @@ function settlePlacement(ledger, item, { env, dryRun }) {
 }
 
 /** One reported job under its per-job lock: re-read, settle, and file the row into `out`; a throw is recorded, not rethrown. */
-async function settleItem(ledger, item, out, { repo, abs, settings, env, now, dryRun, verify, api, locks }) {
+async function settleItem(ledger, item, out, { repo, abs, settings, env, now, dryRun, verify, api, locks, criticSeams }) {
   const held = locks && !dryRun ? claimManager(lockName(repo, item.jobId), { env }) : { ok: true, release: () => {} };
   if (!held.ok) { out.skipped.push({ jobId: item.jobId, reason: 'in-progress' }); return; }
   try {
@@ -289,7 +293,7 @@ async function settleItem(ledger, item, out, { repo, abs, settings, env, now, dr
     const fresh = reportedJobs(ledger.db, { jobId: item.jobId })[0];
     if (!fresh) { out.skipped.push({ jobId: item.jobId, reason: 'no-longer-reported' }); return; }
     if (settlePlacement(ledger, fresh, { env, dryRun })?.ended.length) { out.skipped.push({ jobId: item.jobId, reason: 'placement-lost' }); return; }
-    const done = await settleReported(ledger, fresh, { repo: abs, settings, env, now, dryRun, verify, api });
+    const done = await settleReported(ledger, fresh, { repo: abs, settings, env, now, dryRun, verify, api, critic: { tree: dryRun ? null : workflowWorktreeOf({ env }, fresh.workflowId)?.path ?? null, seams: criticSeams } });
     out[done.target].push(done.row);
   } catch (error) {
     out.ok = false;
@@ -309,14 +313,14 @@ function retryAndSweep(ledger, out, { repo, workflowId, jobId, settings, env, no
  * released[], skipped[], errors[]}. Seams: verify (verifyReported), api (runApi), now.
  */
 export async function reconcileJobSettle({ repo, workflowId = null, jobId = null, dryRun = false, now = Date.now, env = process.env,
-  settings = settlerSettings(), verify = verifyReported, api = runApi, locks = true } = {}) {
+  settings = settlerSettings(), verify = verifyReported, api = runApi, locks = true, criticSeams = {} } = {}) {
   await loadDecisions();
   const abs = path.resolve(repo);
   const out = { ok: true, repo: abs, workflowId, jobId, settled: [], kernel: [], released: [], skipped: [], errors: [] };
   const ledger = openLedger({ file: ledgerFileFor(abs) });
   try {
     await eachInOrder(reportedJobs(ledger.db, { workflowId, jobId }), (item) => settleItem(ledger, item, out,
-      { repo, abs, settings, env, now, dryRun, verify, api, locks }));
+      { repo, abs, settings, env, now, dryRun, verify, api, locks, criticSeams }));
     try { out.released = await releaseSettled(ledger, { workflowId, jobId, now: now(), settings, dryRun }); }
     catch (error) { out.ok = false; out.errors.push({ step: 'release', error: String(error?.message ?? error).slice(0, 300) }); }
     if (!dryRun) retryAndSweep(ledger, out, { repo, workflowId, jobId, settings, env, now });

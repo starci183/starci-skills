@@ -21,8 +21,9 @@ const withFailure = (db, resolution) => (resolution.jobId ? { ...resolution, fai
  */
 function jobDecisionsOf(s, kernelDis) {
   const { db, workflowId, now, repo } = s;
-  const held = new Set((s.heldSettle ?? []).map((item) => item.jobId));
   const handed = [...(pendingJobsOf(db, workflowId, now)?.values() ?? [])];
+  // A settle refused only because a gate is newer than the job's admission is the runtime's (its settler supplies what the gate wants): no choice of the Kernel's can cure it.
+  const held = new Set([...(s.heldSettle ?? []).map((item) => item.jobId), ...handed.filter((item) => (item.detail ?? []).includes('gate-newer-than-admission')).map((item) => item.jobId)]);
   const byJob = new Map(kernelDis.filter((di) => JOB_KINDS.has(di.kind) && di.entity?.type === 'job').map((di) => [di.entity.id, di]));
   const virtual = handed.filter((item) => !byJob.has(item.jobId))
     .map((item) => ({ kind: 'settle-nongreen', workflowId, entity: { type: 'job', id: item.jobId }, summary: `${item.op} ${item.jobId} reported ${item.outcome}: the runtime did not settle it (${item.reason})`, evidence: [] }));

@@ -98,6 +98,31 @@ test('a reported job a supervisor-gate holds is offered no choice: the Kernel ca
   assert.equal(held.frontier.actionable, false);
 }));
 
+test('a settle refused only because a gate is newer than the admission of its job offers the Kernel no unusable choice (Nivo op-critic-verdict-missing)', (t) => withLedger(t, (world) => {
+  const { ledger } = world;
+  const REPORTED = 'op-architecture.decide-e78adc94cc';
+  seed(ledger, [{ jobId: REPORTED, unitId: REPORTED, opId: 'architecture.decide', status: 'reported', createdAt: T0, dispatchedAt: T0 + 1000, updatedAt: T0 + 120_000, payload: payload('architecture.decide') }]);
+  const { attempt_id: attemptId, dispatch_id: dispatchId } = ledger.db.prepare('SELECT attempt_id, dispatch_id FROM op_attempts WHERE job_id=?').get(REPORTED);
+  ledger.db.prepare("INSERT INTO contracts(attempt_id,workflow_id,job_id,markdown,created_at) VALUES(?,?,?,'m',?)").run(attemptId, WF, REPORTED, T0);
+  ledger.db.prepare('INSERT INTO reports(workflow_id,attempt_id,dispatch_id,job_id,outcome,report_json,consumed_at,created_at) VALUES(?,?,?,?,?,?,?,?)')
+    .run(WF, attemptId, dispatchId, REPORTED, 'done', '{}', T0 + 60_000, T0 + 30_000);
+  const handover = (target, code) => target.transaction(() => target.appendEvent({ workflowId: WF, entityType: 'job', entityId: REPORTED, attemptId, kind: 'job-settle-needs-kernel',
+    payload: { dispatchId, reason: 'settle-refused', code, detail: [code], outcome: 'done', op: 'architecture.decide' } }));
+  handover(ledger, 'op-critic-verdict-missing');
+  openDecisionRow(ledger, { workflowId: WF, kind: 'settle-nongreen', entity: { type: 'job', id: REPORTED }, summary: `${REPORTED} reported done: the runtime did not settle it`, by: 'reconciler/job' }, { now: T0 });
+  ledger.close();
+  const before = status(world).menu;
+  assert.deepEqual(before.map((item) => item.id), [`job-decision:${REPORTED}`], 'a refusal the op can cure stays with the Kernel');
+  const recordStep = before[0].options.find((option) => option.choice === 'settle-fail').steps.find((step) => step.verb === 'record-checks');
+  assert.ok(Array.isArray(JSON.parse(recordStep.args.checks).checks), 'the recorded refusal is the {checks:[...]} envelope record-checks takes (a bare array was refused checks-invalid, so settle-fail never ran)');
+  const writable = openLedger({ file: world.ledgerFile });
+  handover(writable, 'gate-newer-than-admission');
+  writable.close();
+  const out = status(world);
+  assert.deepEqual(out.menu, [], 'the runtime owes the verdict; the Kernel has nothing to choose');
+  assert.equal(out.frontier.actionable, false);
+}));
+
 test('a workflow with nothing to decide has an empty menu and is not actionable, whatever mechanical work is pending', (t) => withLedger(t, (world) => {
   const { ledger } = world;
   seed(ledger, [{ jobId: 'op-work.author-cccc3333', unitId: 'op-work.author-cccc3333', opId: 'work.author', status: 'queued', createdAt: T0, payload: payload('work.author') }]);

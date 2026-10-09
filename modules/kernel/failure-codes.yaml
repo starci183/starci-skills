@@ -17269,3 +17269,12 @@ gate-rejudge-pending:
   nextStep_vi: "Đợi settler phán xét lại (starci kernel status hiện gate-rejudged trên gate nếu vẫn đỏ), rồi trả lời lại; một phán xét xanh tự settle job và đóng gate."
   owner: runtime-core
   kind: verb-refusal
+gate-newer-than-admission:
+  title: "A settle gate is newer than the job it refused: the op owes nothing, the runtime owes the proof"
+  title_vi: "Một cổng settle mới hơn lúc job được nhận: op không nợ gì, runtime nợ bằng chứng"
+  meaning_vi: "Job được nhận và báo cáo trước khi cổng (phán quyết của Critic độc lập) ra đời; hợp đồng đã nhận của nó chưa bao giờ bảo op chạy Critic, worker đã mất, nên op không thể chữa lời từ chối. Settler tự chạy Critic trên sản phẩm đã báo cáo (một lần cho mỗi digest) và settle theo phán quyết đó; Critic không phán xét được là một chờ có kiểu, không phải từ chối."
+  causes_vi:
+    - "Báo cáo done của một chặng quyết định được nhận trước khi luật Critic có hiệu lực"
+  nextStep_vi: "Không cần làm gì: settler chạy Critic và settle; xem sự kiện runtime-critic-run của job."
+  owner: runtime-core
+  kind: verb-refusal

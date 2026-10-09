@@ -49,7 +49,7 @@ const closeSteps = ({ outcome, code, failures, jobId }) => {
   const verdict = outcome === 'blocked' || outcome === 'ask' ? 'blocked' : 'fail';
   if (outcome !== 'done') return [{ verb: 'settle', args: { job: jobId, verdict } }];
   const evidence = `${code}: ${failures.join('; ').replace(/\s+/g, ' ').slice(0, 200) || 'refused by the runtime'}`;
-  return [{ verb: 'record-checks', args: { job: jobId, checks: JSON.stringify([{ name: code, command: 'runtime settle', exitCode: 1, evidence }]) } },
+  return [{ verb: 'record-checks', args: { job: jobId, checks: JSON.stringify({ checks: [{ name: code, command: 'runtime settle', exitCode: 1, evidence }] }) } },
     { verb: 'settle', args: { job: jobId, verdict } }];
 };
 

@@ -926,3 +926,10 @@ cases:
     rule: {file: scripts/reconciler/job-plan-report.mjs, anchor: "planReport"}
     spec: tests/kernel-settle/handover-rejudge.spec.mjs
     status: covered
+  - id: gate-newer-than-the-job-it-refuses
+    family: correctness
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a gate added after a job's admission never turns its finished work into a refusal nobody can cure) Nivo op-architecture.decide-e78adc94cc, admitted and reported 2026-10-07, was refused op-critic-verdict-missing at 11:20 (check_runs op-proof, event 656) by the independent-Critic gate that landed after its admission: its worker is gone and its admitted contract never told it to run the Critic, so only settle-fail (a 26 million token leg redone) or an accept the menu itself marks as not honest were offered; the Kernel logged 'no valid choice' and yielded. Its settle-fail also never ran: the menu step recorded the refusal as a bare JSON array and record-checks answered checks-invalid (events 675, 676 and the same at 07:41)", remedy: {state: in-tree, change: "the settler runs the decision Critic itself for a done report of a covered kind that attaches no verdict (once per product digest; frontier tier, other provider than the maker, the same guard, rubric and bytes) and the settle gate judges that verdict: pass passes, a failing critique is the op's error-work with the critique, a Critic that cannot judge is a checker-unavailable hold; a refusal for a gate newer than the admission is typed gate-newer-than-admission and offers the Kernel no choice; the settle-fail step records the refusal in the {checks:[...]} envelope"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, Nivo job op-architecture.decide-e78adc94cc", evidence: "nivo runtime.sqlite events 656 (job-settle-needs-kernel op-critic-verdict-missing, 11:20:33), 675 and 676 (kernel-decision settle-fail, result revert: record-checks failed checks-invalid)"}
+    rule: {file: scripts/kernel/settle/critic-run.mjs, anchor: "runtimeCriticFor"}
+    spec: tests/kernel-settle/runtime-critic.spec.mjs
+    status: covered
