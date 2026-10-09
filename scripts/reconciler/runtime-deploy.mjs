@@ -9,7 +9,8 @@
 //      copies and every installed artefact of every live workflow, verified) and `reconciler restart`;
 //   4. verifies from the stores that the leader reports the new revision with a fresh heartbeat, that every controller kept its mode and that no seat died
 //      (runtime-deploy-verify.mjs); on a failed verification it says what state the host is in and the non-destructive way back;
-//   5. journals one `runtime-deployed` event (from, to, areas, who, the changed-file list as a blob, `roleActions` for the role notification).
+//   5. journals one `runtime-deployed` event (from, to, areas, who, the changed-file list as a blob, and `roleActions`: the per-role payload
+//      `starci/revision-deploy@1` of the new tree's `starci runtime revision-scope`, null where that tree has no such verb).
 // `--plan` runs every read and prints the steps and every refusal, changing nothing.
 import path from 'node:path';
 import { skillRoot } from '../../engine/runtime-root.mjs';
@@ -161,7 +162,7 @@ function succeeded(run, verified) {
   const { source, range } = facts;
   const payload = { schema: DEPLOY_SCHEMA, from: facts.host.head, to: source.sha, commits: range.commits, fileCount: range.files.length, areas: areasOf(range.files), who: seams.who(),
     receipt: facts.receipt?.via ?? 'check-run', artefacts: run.counts, engine: { pid: verified.leader.pid, epoch: verified.leader.epoch, rev: verified.leader.rev },
-    waitedMs: run.waitedMs, roleActions: deps.roleActions?.({ from: facts.host.head, to: source.sha, files: range.files }) ?? null };
+    waitedMs: run.waitedMs, roleActions: (deps.roleActions ?? ((input) => seams.roleActions(input.from, input.to)))({ from: facts.host.head, to: source.sha, files: range.files }) ?? null };
   const event = seams.journal(DEPLOY_EVENT, payload, range.files);
   const text = `starci runtime deploy: ${payload.from.slice(0, 12)} -> ${payload.to.slice(0, 12)} (${range.commits} commit(s), one revision change); engine pid ${payload.engine.pid} on the new revision; artefacts ${JSON.stringify(payload.artefacts)}; event seq ${event?.seq ?? '-'}`;
   return result(0, true, text, { mode: 'deploy', ...summaryOf(facts), changed: true, event: event ?? null, verification: { ok: true, waitedMs: verified.waitedMs }, artefacts: payload.artefacts, engine: payload.engine });

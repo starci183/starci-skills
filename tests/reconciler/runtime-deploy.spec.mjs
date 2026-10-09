@@ -62,7 +62,7 @@ function fakeEngine(host) {
 }
 
 const seamsOf = (w, extra = {}) => ({ lockOwner: () => null, leader: w.engine.leader, inFlight: () => [], snapshot: w.engine.snapshot, runCheck: () => ({ ok: true, pass: 3, total: 3 }),
-  migrate: w.engine.migrate, restart: w.engine.restart, ...extra });
+  migrate: w.engine.migrate, restart: w.engine.restart, roleActions: () => null, ...extra });
 const run = (w, args, { seams = {}, ...deps } = {}) => runtimeDeploy({ args, positionals: [], env: w.env, role: 'owner' }, { root: w.host, numbers: NUMBERS, seams: seamsOf(w, seams), sleep: async () => {}, ...deps });
 const events = (w, kind) => readMachine((m) => m.supEvents({ kind, entityType: 'runtime' }), [], { env: w.env });
 const headOf = (dir) => git(dir, 'rev-parse', 'HEAD');
@@ -148,6 +148,9 @@ test('the happy path: a tip three commits ahead is ONE revision change, checked,
   assert.equal(p.engine.rev, w.tip);
   assert.ok(p.who.user, 'who is recorded');
   assert.deepEqual(p.roleActions, { engine: 'restart' }, 'the field the role notification reads');
+  const bare = world(t);
+  assert.equal((await run(bare, { from: bare.clone })).code, 0);
+  assert.equal(events(bare, 'runtime-deployed')[0].payload.roleActions, null, 'a new tree without the verb leaves the field null');
   assert.ok(Buffer.byteLength(JSON.stringify(p)) < 4096, 'the payload is small');
   assert.deepEqual(JSON.parse(getBlob(p.filesSha).toString('utf8')).files.sort(), ['docs/c.md', 'modules/kernel/b.yaml', 'scripts/kernel/a.mjs']);
   assert.equal(fs.existsSync(receiptFile(w.tip, w.env)), true, 'the verb wrote the receipt after running the check itself');

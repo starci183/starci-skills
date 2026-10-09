@@ -46,6 +46,8 @@ export function hostSeams({ host, env }) {
       const filesSha = files ? putMachineBlob(machine, JSON.stringify({ files }), { mediaType: 'application/json' }) : null;
       return machine.supEvent({ entityType: 'runtime', entityId: payload.to, kind, payload: { ...payload, filesSha } });
     }, { env }),
+    // The per-role payload (starci/revision-deploy@1) the role notification reads: asked of the NEW tree's own verb; null where that tree has none.
+    roleActions: (from, to) => { const r = runHostVerb(host, ['runtime', 'revision-scope', '--from', from, '--to', to], env); return r.status === 0 ? r.data : null; },
     who: () => ({ actor: env.STARCI_ACTOR ?? null, user: os.userInfo().username, pid: process.pid }),
   };
 }
