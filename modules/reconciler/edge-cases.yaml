@@ -696,7 +696,7 @@ cases:
     family: smooth-operation
     found: live
     replay: tests/replay/wake-accounting.spec.mjs
-    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a seat is replaced when it wasted its life, never for the runtime's own wakes) the Nivo Kernel went through 16 attempts in a day and the status read 119 wakes, 78 empty (66%) OVER-BOUND; the rotation counted every delivered wake, and the watchdog typed a liveness wake every minute for a menu the Kernel was still working on"}
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a seat is replaced when it wasted its life, never for the runtime's own wakes) the Nivo Kernel went through 16 attempts in a day and the status read 119 wakes, 78 empty (66%) OVER-BOUND; the rotation counted every delivered wake, and the watchdog typed a liveness wake every minute for a menu the Kernel was still working on", remedy: {state: in-tree, change: "rotation counts only wakes with a menu; no repeat wake for an unanswered menu, none inside a boot"}}
     met: {date: "2026-10-09", where: "ledger copy a8live16, events since 10:15 local", evidence: "Nivo: 60 stall wakes with no decision in the window (idleWakes 1 to 8 a minute apart while a settle loop and op-critic-verdict-missing items stood), each series ended in kernel-rotated '8 wakes since its boot' (10 rotations, 10 restarts); StarCi: 15 empty stall wakes, 3 empty doorbells and 1 empty report-filed wake, 7 wakes in each of the 09:47Z and 10:17Z boots one to two minutes apart"}
     rule: {file: scripts/kernel/seat-wakes.mjs, anchor: "countsTowardRotation"}
     spec: tests/replay/wake-accounting.spec.mjs
@@ -705,7 +705,7 @@ cases:
     family: smooth-operation
     found: live
     replay: tests/replay/read-attestation.spec.mjs
-    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a boot costs what its reading costs, once) a Kernel boot took 14 to 17 model turns and 47 to 69 file-read tool calls, about 1.8 to 2.3M tokens, each turn re-reading a 100 to 120K context, one read call per path of the plan"}
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a boot costs what its reading costs, once) a Kernel boot took 14 to 17 model turns and 47 to 69 file-read tool calls, about 1.8 to 2.3M tokens, each turn re-reading a 100 to 120K context, one read call per path of the plan", remedy: {state: in-tree, change: "the read plan is one bundle file returned by kernel-ack-rev --plan"}}
     met: {date: "2026-10-09", where: "ledger copy a8live16, StarCi sessions 3720bbc7 and 63c88285", evidence: "llm_usage rows of the two sessions: 1.65M, 0.29M, 0.36M tokens in 14, 3, 3 turns (69, 2, 23 tool calls) and 1.82M tokens in 17 turns (47 calls)"}
     rule: {file: scripts/kernel/read-bundle.mjs, anchor: "writeReadBundle"}
     spec: tests/replay/read-attestation.spec.mjs

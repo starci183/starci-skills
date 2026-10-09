@@ -222,7 +222,10 @@ test('start-workflow delivers kernel-prompt.md to every new Kernel', (t) => {
     .filter((line) => line.trim().length > 80 && !/[{}]/.test(line));
   const distinctive = templateLines.sort((a, b) => b.length - a.length)[0];
   assert.ok(distinctive, 'kernel-prompt.md has a distinctive non-template line');
-  const prompt = Object.values(w.state().taskSpecs).at(-1);
+  // A prompt above the Task spec bound travels as a file the spec points at (task-spec.mjs): the whole prompt is the file's.
+  const spec = Object.values(w.state().taskSpecs).at(-1);
+  const file = /PACKET FILE[^\n]*\n\s+(\S.*)\n/.exec(spec)?.[1];
+  const prompt = file ? fs.readFileSync(file, 'utf8') : spec;
   assert.ok(prompt.includes(distinctive), `the boot prompt omitted this kernel-prompt.md line: ${distinctive}`);
 });
 
