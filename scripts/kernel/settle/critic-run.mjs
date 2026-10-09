@@ -23,7 +23,7 @@ const SUMMARY_MAX = 400;
 const clip = (text, max) => (typeof text === 'string' && text.length > max ? `${text.slice(0, max - 1)}…` : text);
 
 /** The verdict document with its prose bounded, so the event that carries it stays inside the ledger's event size. */
-export function compactVerdict(document) {
+function compactVerdict(document) {
   return { ...document, summary: clip(document.summary, SUMMARY_MAX),
     checks: (document.checks ?? []).map((check) => ({ ...check, evidence: clip(check.evidence, FIELD_MAX), fix: clip(check.fix, FIELD_MAX) })) };
 }

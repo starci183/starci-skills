@@ -17278,3 +17278,12 @@ gate-newer-than-admission:
   nextStep_vi: "Không cần làm gì: settler chạy Critic và settle; xem sự kiện runtime-critic-run của job."
   owner: runtime-core
   kind: verb-refusal
+runtime-copies-stale:
+  title: "The engine did not lead: the generated package runtime copies are stale and could not be regenerated"
+  title_vi: "Engine không dẫn dắt: bản sao runtime sinh ra của các gói đã cũ và không tạo lại được"
+  meaning_vi: "packages/hfs/runtime và packages/eslint/{be,fe}/runtime là đầu ra sinh từ mã nguồn runtime và bị git bỏ qua; sau khi main di chuyển chúng phải được tạo lại. Engine mới so chúng với nguồn khi khởi động, tạo lại phần lệch, và không dẫn dắt khi việc tạo lại thất bại (RT_GENERATED_DRIFT)."
+  causes_vi:
+    - "Một tệp trong bản sao đang bị tiến trình khác giữ mở hoặc không ghi được"
+  nextStep_vi: "Đóng tiến trình giữ tệp rồi chạy starci release sync-runtime; khởi động lại engine."
+  owner: runtime-core
+  kind: runtime-fault
