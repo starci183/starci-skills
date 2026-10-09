@@ -86,6 +86,9 @@ const KERNEL_FILES = { 'modules/kernel/kernel-prompt.md': 'Kernel prompt\n', 'mo
 function runtimeRoot(dir, fixture) {
   gitInit(dir);
   for (const [rel, text] of Object.entries(KERNEL_FILES)) write(dir, rel, text);
+  // The table that classifies a changed path per role is part of the runtime tree the revision notice reads; the tree under test carries it.
+  const scope = path.join(ROOT, 'modules', 'kernel', 'revision-scope.yaml');
+  if (fs.existsSync(scope)) write(dir, 'modules/kernel/revision-scope.yaml', fs.readFileSync(scope, 'utf8'));
   const ops = new Set([...(fixture.ops ?? ['review.verify']), ...(fixture.jobs ?? []).map((job) => job.op), ...(fixture.plan?.legs ?? []).map((leg) => leg.op)]);
   for (const op of ops) write(dir, `modules/ops/ops/${op}.yaml`, `id: ${op}\n`);
   // The read plan's size is the fixture's: `readPlan.total` files in all (the fixed Kernel files and the op files count), the rest neutral verb files.
@@ -166,6 +169,8 @@ function seedLedger(ledgerFile, fixture, at, revs, bind, admit) {
       created_at: at(event.at ?? -60_000), payload: revisionTokens(event.payload ?? {}, revs) }));
     seedWorkflow(ledger, { id: wf, state: { phase: fixture.workflow.phase ?? 'running', job: 'replay' }, goalIdentity: 'goal-1', goal, jobs: jobRows(fixture, at), events });
     seedExtras(ledger, wf, fixture, at, admit);
+    // The owner approved the goal (a Kernel start is refused without it).
+    ledger.db.prepare("UPDATE goals SET approved_by='owner' WHERE workflow_id=?").run(wf);
     for (const di of fixture.decisions ?? []) openDecisionRow(ledger, { workflowId: wf, kind: di.kind, decider: di.decider ?? 'kernel', entity: di.entity, summary: di.summary ?? `${di.kind} replay`, by: di.by ?? 'reconciler/job', ...(di.key ? { idempotencyKey: di.key } : {}) }, { now: at(di.at ?? -60_000) });
     if (fixture.workGraph) seedWorkGraph(ledger, wf, fixture.workGraph, at(-3_600_000));
     if (bind) bind(ledger, wf);

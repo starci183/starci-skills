@@ -907,6 +907,9 @@ moduleLocalDocumentKinds:
   - id: starci/module-reconciler-edge-cases@1
     governs: "The registry of every edge case met: family, real occurrence, the rule that handles it, the spec that reproduces it, and its status."
     files: [modules/reconciler/edge-cases.yaml]
+  - id: starci/module-reconciler-readiness@1
+    governs: "Which consumer each readiness row of starci reconciler up gates: the start of a workflow Kernel is gated by the rows a Kernel needs and by none that only the harness UI needs."
+    files: [modules/reconciler/readiness.yaml]
   - id: starci/module-reconciler-operating-standard@1
     governs: "The standard path of a workflow as ordered steps (actor, precondition, done-state, bound, evidence, probe), the departure table naming the role, duty and registry entry of each BUG, and the happy errors that are only counted."
     files: [modules/reconciler/operating-standard.yaml]

@@ -326,3 +326,24 @@ test('the affected specs refuse a budget that ended (exit 2), a receipt on anoth
     assert.equal(fs.existsSync(receiptFile(w.tip, w.env)), false, `${name}: no receipt is written`);
   }
 });
+
+test('a deploy that changes ui/package.json installs and builds the harness UI before the engine restarts; a host that cannot is a named failure and the engine is not restarted', async (t) => {
+  const ok = world(t);
+  commit(ok.clone, 'ui/package.json', '{"dependencies":{"@heroui/react":"3.0.0"}}\n', 'a ui dependency');
+  const built = await run(ok, { from: ok.clone }, { seams: { uiBuild: () => { ok.engine.order.push('ui'); return { status: 0, data: { items: [] }, stderr: '' }; } } });
+  assert.equal(built.code, 0, built.text);
+  assert.deepEqual(ok.engine.order.filter((step) => step === 'ui' || step === 'restart'), ['ui', 'restart'], 'the UI is installed and built first');
+
+  const red = world(t);
+  commit(red.clone, 'ui/package-lock.json', '{}\n', 'a ui lockfile');
+  const failed = await run(red, { from: red.clone }, { seams: { uiBuild: () => ({ status: 1, data: { items: [{ id: 'ui-build', status: 'red', required: true, detail: 'ui build FAILED: Cannot find module @heroui/react' }] }, stderr: '' }) } });
+  assert.equal(failed.code, 1, failed.text);
+  assert.equal(failed.data.refusals[0].code, 'deploy-ui-install-failed');
+  assert.match(failed.data.refusals[0].detail, /Cannot find module @heroui\/react/);
+  assert.equal(red.engine.restarts, 0, 'the engine was not restarted');
+  assert.ok(catalog['deploy-ui-install-failed']);
+
+  const none = world(t);
+  const untouched = await run(none, { from: none.clone }, { seams: { uiBuild: () => { throw new Error('no ui change, no ui build'); } } });
+  assert.equal(untouched.code, 0, untouched.text);
+});

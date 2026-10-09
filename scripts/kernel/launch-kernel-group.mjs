@@ -1,4 +1,5 @@
 // Kernel group launch: one admitted attempt, no-effect-only fallback and its ledger receipt.
+import { phase } from './start-phase.mjs';
 import { startAgent } from '../agent/lib.mjs';
 import { updateSignal } from '../../engine/db/ledger.mjs';
 import { commitWorkflowStart } from './workflow-startup.mjs';
@@ -37,6 +38,7 @@ const recordFallThrough = ({ ledger, workflowId, spawned, failure, next, selecte
 
 export function launchKernelGroup({ ledger, workflowId, token, expected, route, members, launch, reservationMs,
   hostUnavailableExit, memberLabel, failStart }, { start = startAgent, now = Date.now } = {}) {
+  phase('kernel-launch');
   const fellThrough = [];
   let spawned = null;
   const remaining = [...members];

@@ -14,6 +14,7 @@ export const DEPLOY = Object.freeze({
   migrationFailed: { code: 'deploy-artefact-migration-failed' },
   restartFailed: { code: 'deploy-restart-failed' },
   verifyFailed: { code: 'deploy-verify-failed' },
+  uiInstallFailed: { code: 'deploy-ui-install-failed' },
 });
 
 /** A refusal or failure: the catalogued code and what the person needs to read. */

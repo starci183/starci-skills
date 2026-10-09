@@ -1,7 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { runNpm } from '../api/npm/run-npm.mjs';
-import { ci } from '../api/npm/ci.mjs';
+import { install as npmInstall } from '../api/npm/install.mjs';
+import { installFailureOf, treeHolders } from '../machine/npm-install-failure.mjs';
 import { isLinkLike } from '../api/fs/is-link-like.mjs';
 import { linkedNodeModules, lockedValue } from '../machine/npm-ci.mjs';
 import { underHostLock } from '../machine/verb-lock.mjs';
@@ -41,9 +42,29 @@ export function uiBuildState({ uiDir = path.join(SKILL_ROOT, 'ui'), fsImpl = fs 
   return { stale: false, reason: 'ui/dist is newer than every ui source', srcMs, distMs };
 }
 
+/**
+ * Whether the manifest or lockfile of the UI is newer than the install in its node_modules (npm's hidden lockfile; none recorded: the tools decide): a dependency added on main that the host's install
+ * does not hold. Seam: fs.
+ */
+export function manifestNewerThanInstall(root, fsImpl = fs) {
+  const mtime = (file) => { try { return fsImpl.statSync(file).mtimeMs; } catch { return 0; } };
+  const installed = mtime(path.join(root, 'node_modules', '.package-lock.json'));
+  return installed > 0 && Math.max(mtime(path.join(root, 'package.json')), mtime(path.join(root, 'package-lock.json'))) > installed;
+}
+
+/** The one line a failed UI install is reported by: its cause, and the file and processes holding it when a running process does (the previous install is left in place). */
+export function installFailureLine(install, root, holders = treeHolders) {
+  const failure = installFailureOf(install?.stderr);
+  const base = `UI dependency install failed: ${String(install?.stderr ?? 'no successful receipt').slice(0, 300)}`;
+  if (failure.cause !== 'file-locked') return base;
+  let held = [];
+  try { held = holders(root); } catch { held = []; }
+  return `${base} - a running process holds ${failure.path ?? root}: ${JSON.stringify(held).slice(0, 300)}; node_modules was not deleted`;
+}
+
 /** The harness owns its local toolchain install and build, including an installed non-Git runtime. */
 export async function buildUi({ uiDir = path.join(SKILL_ROOT, 'ui'), env = process.env } = {}, deps = {}) {
-  const api = { fs, ci, npm: runNpm, isLinkLike, underHostLock, ...deps };
+  const api = { fs, install: npmInstall, holders: treeHolders, npm: runNpm, isLinkLike, underHostLock, ...deps };
   const root = path.resolve(uiDir), modules = path.join(root, 'node_modules');
   const toolEntries = ['vite/bin/vite.js', 'typescript/bin/tsc', 'eslint/bin/eslint.js'];
   const noLinks = (dir) => {
@@ -81,10 +102,10 @@ export async function buildUi({ uiDir = path.join(SKILL_ROOT, 'ui'), env = proce
     const result = await api.underHostLock({ role: 'coordinator', purpose: 'harness-ui-build', env }, async () => {
       const manifests = guard();
       let install = null;
-      if (!toolsReady()) {
-        install = await Promise.resolve(api.ci(root, { env }));
+      if (!toolsReady() || manifestNewerThanInstall(root, api.fs)) {
+        install = await Promise.resolve(api.install(root, { env }));
         if (install?.ok !== true || install?.status !== 0)
-          return { ok: false, install, output: `UI dependency install failed: ${String(install?.stderr ?? 'no successful receipt').slice(0, 300)}` };
+          return { ok: false, install, output: installFailureLine(install, root, api.holders) };
       }
       const current = guard();
       if (manifests.some((bytes, index) => !bytes.equals(current[index])))

@@ -1368,3 +1368,45 @@ cases:
     rule: {file: scripts/reconciler/runtime-deploy.mjs, anchor: "affectedProof"}
     spec: tests/reconciler/runtime-deploy.spec.mjs
     status: covered
+
+  - id: contract-replace-leaves-no-kernel-and-no-cause
+    family: failure-while-running
+    found: live
+    replay: tests/replay/contract-replace.spec.mjs
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a seat is replaced by one hand-over, and a failed start names its cause) the first live deploy with the role-scoped revision notice: both Kernels were replaced (contract-changed), the old seats closed, and the start of the new ones was killed by the watchdog's fixed 120 s bound with no answer (start-workflow prints its answer only at its end): restart-failed with detail empty, no kernel-start-failed event, so the start-hold rule never counted it; both workflows stood without a Kernel from 09:15Z while the Host retried the same killed start every two minutes", remedy: {state: in-tree, change: "the replacement start is bounded by allocation.liveness.kernelStartTimeoutMs (600 s, under the Host pass bound); a start that prints no answer is journalled kernel-start-failed (start-timeout or start-no-answer, with its last phase from the start-workflow phase lines) and the watchdog answer carries it; the rotation closes a working seat only when no start hold applies (replacement-held); the closed seat is not addressed by a nextWake"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, Nivo and StarCi workflows, runtime 70b853e44 at 09:15Z", evidence: "machine.sqlite engine_actions seat:kernel:* failed 09:15, 09:17, 09:20, 09:22 each ~130 s with result restart-failed and detail empty; no kernel-start-failed or workflow-worktree-installed event after the kernel-rotated event; normal rotations before it took 25 to 35 s"}
+    rule: {file: scripts/kernel/kernel-watchdog.mjs, anchor: "unansweredStart"}
+    spec: tests/kernel/start-unanswered.spec.mjs
+    status: covered
+  - id: kernel-start-gated-by-the-harness-ui-build
+    family: failure-while-running
+    found: live
+    replay: tests/replay/contract-replace.spec.mjs
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a workflow's Kernel starts whenever the host it runs on is ready) two commits on main added @heroui/react to ui/package.json; the host's ui/node_modules lacked it, so the readiness row services/ui-build (the built harness UI, which only the owner's screen reads) was red and required, and start-workflow, which runs the same readiness, refused workflow-host-not-ready for every Kernel start from the first engine start after those commits; its auto-apply ran the UI install and build for minutes, past the watchdog's 120 s bound, so the refusal never reached anyone", remedy: {state: in-tree, change: "modules/reconciler/readiness.yaml declares which consumer each readiness row gates; the Kernel start (workflow-up, consumer kernel-start) is gated by Orca, the ledgers, the guard, the engine and the pins, never by ui-build, harness-ui or harness-tunnel, and never builds the UI; the rotation also runs that readiness before it closes a working seat"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, runtime 70b853e44, both workflows without a Kernel from 09:15Z", evidence: "start-workflow run by hand answered step workflow-host-not-ready with services/ui-build red: ui/dist older than a ui source, ui build FAILED TS2307 Cannot find module @heroui/react"}
+    rule: {file: scripts/reconciler/readiness-consumers.mjs, anchor: "forConsumer"}
+    spec: tests/reconciler/readiness-consumers.spec.mjs
+    status: covered
+  - id: start-refusal-swallowed-by-the-watchdog
+    family: record-vs-reality
+    found: live
+    replay: tests/replay/contract-replace.spec.mjs
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a failed start names its step and message in the action journal, the digest and the Supervisor item) the watchdog answered restart-failed with an empty detail, the engine action error read 'action restart-failed', the digest read 'Kernel not alive (probe restart-needed)', and a refusal printed before the claim (workflow-host-not-ready) was recorded nowhere, so the start-hold rule never counted it", remedy: {state: in-tree, change: "the watchdog answer carries reason and error (Kernel start refused at <step>: <message>); a pre-claim refusal and a start that printed no answer are journalled kernel-start-failed under the revision, which the start-hold rule counts and the seat-unrecoverable item reports; the digest line of a dead Kernel adds its last failed start"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, runtime 70b853e44", evidence: "engine_actions seat:kernel:* result restart-failed with detail empty; no kernel-start-failed event after kernel-rotated"}
+    rule: {file: scripts/kernel/kernel-watchdog.mjs, anchor: "recordRefusedStart"}
+    spec: tests/kernel/start-unanswered.spec.mjs
+    status: covered
+  - id: ui-dependency-install-deletes-node-modules
+    family: failure-while-running
+    finding: {role: runtime, duty: never, verdict: departs, evidence: "(duty: a host install never leaves a tree half installed) the harness UI dependency install ran as npm ci, which deletes ui/node_modules first; it died EPERM on lightningcss.win32-x64-msvc.node, which a running vite dev server held, leaving 22 of 144 packages; and a dependency added on main was never installed while the build tools were present", remedy: {state: in-tree, change: "the UI installs with the non-destructive npm install (scripts/api/npm/install.mjs), whenever its manifest is newer than the install; a failure keeps node_modules and names the file and the holding processes"}}
+    met: {date: "2026-10-09", where: "alpha.8 live host, ui/", evidence: "starci reconciler up --services npm ci EPERM unlink; ui/node_modules left with 22 of 144 packages; repaired by npm install"}
+    rule: {file: scripts/reconciler/ui-build.mjs, anchor: "manifestNewerThanInstall"}
+    spec: tests/reconciler/ui-install.spec.mjs
+    status: covered
+  - id: ui-dependency-change-reaches-the-host-unchecked
+    family: change-under-running
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a deploy proves what it changed on the host) a change to ui/package.json on main reached the host with no install or build of the UI, discovered by the first Kernel start that needed readiness", remedy: {state: in-tree, change: "starci runtime deploy runs the new tree's starci reconciler up --services (non-destructive install, build) after the fast-forward when ui/package.json or its lockfile changed, before the engine restarts; a red row is the named failure deploy-ui-install-failed"}}
+    met: {date: "2026-10-09", where: "alpha.8 live host, deploy of 70b853e44", evidence: "commits 3ed49b389 and d3d985ab8 changed ui/package.json; ui/node_modules lacked @heroui/react"}
+    rule: {file: scripts/reconciler/runtime-deploy.mjs, anchor: "uiStage"}
+    spec: tests/reconciler/runtime-deploy.spec.mjs
+    status: covered

@@ -15,7 +15,7 @@ export const PROBLEM_TEXT = Object.freeze({
   'supervisor-deaf': 'The Supervisor terminal does not take its inputs.',
   'gate-stale': 'Stale gate {kind} ({decider}) is {min} min past due: {summary}',
   'decision-overdue': 'Decision Item {kind} ({decider}) is {min} min past due: {summary}',
-  'kernel-dead': 'The Kernel of {name} is not alive (job {job}, probe {probe}).',
+  'kernel-dead': 'The Kernel of {name} is not alive (job {job}, probe {probe}){why}.',
   'kernel-rev': 'The Kernel of {name} acked runtime {acked} while {current} is current ({files} file(s) behind).',
   'kernel-idle': 'The Kernel of {name} is idle with {ready} unit(s) of ready work, last woken {min} min ago.',
   'kernel-wake-budget': 'The Kernel of {name} spent {turns} turns and {tokens} tokens in one wake, over its budget of {budgetTurns} turns and {budgetTokens} tokens ({wakes} wake(s) over): a departure of the Kernel.',

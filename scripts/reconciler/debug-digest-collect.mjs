@@ -32,6 +32,13 @@ const heldBy = (db, row) => {
 const decisionOf = (r) => ({ id: r.di_id, kind: r.kind, decider: r.decider, status: r.status, dueAt: r.due_at ?? null, openedAt: r.opened_at, jobId: r.job_id, summary: r.summary });
 
 /** The ledger rows of one repository: its workflows, and per workflow its jobs, open incidents, open Decision Items and Kernel facts. */
+/** The newest failed Kernel launch of a workflow ({at, step, reason, error}), or null: why a dead Kernel is not being restarted. */
+function lastStartFailureOf(db, workflowId) {
+  const row = db.prepare("SELECT created_at, payload_json FROM events WHERE workflow_id=? AND kind='kernel-start-failed' ORDER BY seq DESC LIMIT 1").get(workflowId);
+  const p = parseJsonOr(row?.payload_json, null);
+  return row && p ? { at: Number(row.created_at), step: p.step ?? null, reason: p.reason ?? null, error: String(p.error ?? '').slice(0, 160) } : null;
+}
+
 export function ledgerFacts(file, workflowIds = null, { since = 0 } = {}) {
   const db = openLedgerReader(file);
   try {
@@ -47,7 +54,7 @@ export function ledgerFacts(file, workflowIds = null, { since = 0 } = {}) {
         incidents: db.prepare("SELECT * FROM incidents WHERE workflow_id=? AND status='open'").all(w.workflow_id).map((row) => incidentOf(row, heldBy(db, row))),
         decisions: db.prepare("SELECT * FROM decision_items WHERE workflow_id=? AND status='open'").all(w.workflow_id).map(decisionOf),
         kernelJob: kernelJob ? { status: kernelJob.status, updatedAt: kernelJob.updated_at } : null,
-        kernelSignal: parseJsonOr(signal?.value_json, null), lastKernelWakeAt: woken, kernelWakes: wakeUsageOf(db, w.workflow_id).filter((wake) => wake.at >= since), seatCost: kernelSeatOf(db, { workflowId: w.workflow_id, name: w.display_name ?? w.title ?? w.workflow_id, since }) };
+        kernelSignal: parseJsonOr(signal?.value_json, null), lastStartFailure: lastStartFailureOf(db, w.workflow_id), lastKernelWakeAt: woken, kernelWakes: wakeUsageOf(db, w.workflow_id).filter((wake) => wake.at >= since), seatCost: kernelSeatOf(db, { workflowId: w.workflow_id, name: w.display_name ?? w.title ?? w.workflow_id, since }) };
     });
   } finally { db.close(); }
 }
