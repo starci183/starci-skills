@@ -43,3 +43,24 @@ export function bindWorkflowRun({ runId, kernelHandle }, { show = runShow, use =
   }
   return { ok: true, runId, action: 'rebound', previousCoordinator };
 }
+
+/** Whether a refused launch says the terminal it was sent from is not the coordinator Orca has bound to the Run. */
+export const isRunFence = (launched) => launched?.ok === false && launched.step === 'worker-start' && /consumer_fenced/i.test(String(launched.error ?? ''));
+
+/**
+ * The reaction to a Run fence: a fence proves the binding is wrong even where run-show names no coordinator (bindWorkflowRun reads that as bound).
+ * One run-use from the Kernel terminal unless run-show proves it is already the coordinator (then the fence is another fault and nothing is issued).
+ * Returns {rebound, action: 'rebound'|'already-bound'|'failed', previousCoordinator, error?}.
+ */
+export function rebindAfterFence({ runId, kernelHandle }, { show = runShow, use = runUse } = {}) {
+  if (!runId || !kernelHandle) return { rebound: false, action: 'failed', previousCoordinator: null, error: 'no run or no kernel terminal' };
+  let shown;
+  try { shown = show({ id: runId }); } catch (error) { shown = { ok: false, error: String(error?.message ?? error) }; }
+  if (!shown?.ok) return { rebound: false, action: 'failed', previousCoordinator: null, error: `run-show ${runId}: ${shown?.error || 'no answer'}` };
+  const previousCoordinator = shown.coordinator ?? null;
+  if (previousCoordinator === kernelHandle) return { rebound: false, action: 'already-bound', previousCoordinator };
+  let used;
+  try { used = use({ id: runId, from: kernelHandle }); } catch (error) { used = { ok: false, error: String(error?.message ?? error) }; }
+  return used?.ok ? { rebound: true, action: 'rebound', previousCoordinator }
+    : { rebound: false, action: 'failed', previousCoordinator, error: `run-use ${runId} --from ${kernelHandle}: ${used?.error || 'refused'}` };
+}

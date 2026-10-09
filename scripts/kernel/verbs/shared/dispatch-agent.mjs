@@ -4,8 +4,28 @@ import { taskSpecOf } from '../../../machine/task-spec.mjs';
 import { biasForRole } from '../../../lib/owner-routing-bias.mjs';
 import { ownerReserveGrant, ownerBiasTrust } from '../../../agent/admission.mjs';
 import { latestGoal, goalJsonOf } from './rows.mjs';
+import { isRunFence, rebindAfterFence } from '../../orca-runs.mjs';
 
-export function spawnOperationAgent({ ledger, job, op, model, launchModel, payload, jobId, prompt, packetFile, ...launch }) {
+/**
+ * The op launch. A launch the host refuses consumer_fenced at worker-start (the Kernel terminal is not the coordinator Orca has bound to the workflow Run) is the
+ * runtime's to repair, never the agent's: the Run is re-bound to the Kernel terminal once and the launch retried once; a second fence is rejected as before.
+ */
+export function spawnOperationAgent(input, { rebind = rebindAfterFence, launch = launchOperationAgent } = {}) {
+  const first = launch(input);
+  if (!isRunFence(first)) return first;
+  const fix = rebind({ runId: input.run, kernelHandle: input.from });
+  if (!fix.rebound) return { ...first, runRebind: fix };
+  recordRunRebound(input, fix);
+  return { ...launch(input), runRebind: fix };
+}
+
+// The re-bind is a ledger fact: the digest and a later reader see why a launch was repeated.
+function recordRunRebound({ ledger, job, jobId, run, from }, fix) {
+  ledger.transaction(() => ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: jobId, kind: 'run-rebound',
+    payload: { runId: run, kernelTerminal: from, previousCoordinator: fix.previousCoordinator, by: jobId, reason: 'consumer_fenced at worker-start' } }));
+}
+
+function launchOperationAgent({ ledger, job, op, model, launchModel, payload, jobId, prompt, packetFile, ...launch }) {
   const modelId = launchModel.modelId, effort = launchModel.effort ?? null;
   const ownerGoalRow = latestGoal(ledger.db, job.workflow_id);
   const ownerGoal = goalJsonOf(ownerGoalRow);
