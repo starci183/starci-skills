@@ -204,6 +204,13 @@ const compareValues = (a, b) => {
   return a > b ? 1 : 0;
 };
 
+// The `inputs` of a contract's context, as the JSON text json_extract gave: read in JS because the context column may hold a reference to its content (engine/db/ref-value.mjs).
+const inputsOf = (context) => {
+  let inputs = null;
+  try { inputs = JSON.parse(context ?? 'null')?.inputs ?? null; } catch { inputs = null; }
+  return inputs !== null && typeof inputs === 'object' ? JSON.stringify(inputs) : inputs;
+};
+
 export function inputDrift(db, workflowId, { root, repo = null, workDir = '.starciwork', digest, workDigest,
   ownership = null, committed = undefined, recordChanges = null } = {}) {
   const jobs = db.prepare("SELECT job_id,op_id,try_no AS attempt,status,payload_json,created_at,updated_at FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND op_id IS NOT NULL ORDER BY created_at,job_id").all(workflowId);
@@ -218,11 +225,11 @@ export function inputDrift(db, workflowId, { root, repo = null, workDir = '.star
     && writer.owned.some((owned) => inside(file, owned)));
   const peerWritersOf = peerWriterFinder(db, workflowId);
   const candidates = db.prepare(`SELECT j.job_id,j.workflow_id,j.op_id,j.try_no AS attempt,j.payload_json,
-      CASE WHEN json_valid(c.context_json) THEN json_extract(c.context_json,'$.inputs') END AS inputs
+      c.context_json
     FROM jobs j JOIN contracts c ON c.attempt_id=(SELECT max(c2.attempt_id) FROM contracts c2 WHERE c2.job_id=j.job_id)
     WHERE j.workflow_id=? AND j.kind<>'kernel' AND (j.status='succeeded' OR (j.status='failed' AND EXISTS(
       SELECT 1 FROM reports r WHERE r.job_id=j.job_id AND r.outcome='partial')))
-    ORDER BY j.op_id,j.created_at,j.job_id`).all(workflowId);
+    ORDER BY j.op_id,j.created_at,j.job_id`).all(workflowId).map(({ context_json: context, ...row }) => ({ ...row, inputs: inputsOf(context) }));
   const sourceDrift = [], workChanged = [];
   for (const row of candidates) {
     const measured = measureCandidateInputs({ row, newest, groupOf, db, digest, workDigest, attributed });
