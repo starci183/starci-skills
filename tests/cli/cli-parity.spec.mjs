@@ -19,7 +19,7 @@ flags:
   - {name: help, type: boolean}
   - {name: edition, type: enum, enum: [full, lite]}
 `;
-const GROUP_YAML = `group: kernel\nsummary: kernel verbs\nowner: runtime\n`;
+const GROUP_YAML = `group: kernel\nsummary: kernel verbs\nowner: runtime\nruntimeSide: host\n`;
 const flagSig = (f) => (typeof f === 'string' ? `{name: ${f}, type: string, required: true}` : `{name: ${f[0]}, type: ${f[1]}${f[2] ? ', required: true' : ''}}`);
 const verbYaml = (verb, flags) => `group: kernel
 verb: ${verb}
@@ -110,7 +110,7 @@ test('a happy fixture passes and every resolved verb is reported', () => {
 
 test('an app group with no packages/hfs/src/main.mjs is skipped, not a finding', () => {
   const root = fixture((t, put) => {
-    put('modules/cli/commands/app/_group.yaml', 'group: app\nsummary: app verbs\nowner: "@starci/hfs"\n');
+    put('modules/cli/commands/app/_group.yaml', 'group: app\nsummary: app verbs\nowner: "@starci/hfs"\nruntimeSide: host\n');
     put('modules/cli/commands/app/lint.yaml', `group: app
 verb: lint
 owner: "@starci/hfs"
@@ -207,7 +207,7 @@ test('a host-effect module without a convention is a catalog parity finding', ()
 test('a direct kernel-owned script outside the kernel group needs no cli.mjs switch case', () => {
   const root = fixture((t, put) => {
     put('scripts/kernel/sample-tool.mjs', '#!/usr/bin/env node\nconsole.log("ok");\n');
-    put('modules/cli/commands/machine/_group.yaml', 'group: machine\nsummary: machine verbs\nowner: runtime\n');
+    put('modules/cli/commands/machine/_group.yaml', 'group: machine\nsummary: machine verbs\nowner: runtime\nruntimeSide: host\n');
     put('modules/cli/commands/machine/sample-tool.yaml', verbYaml('sample-tool', [])
       .replace('group: kernel', 'group: machine')
       .replace('impl: {script: scripts/kernel/cli.mjs, args: [sample-tool]}', 'impl: {script: scripts/kernel/sample-tool.mjs}')
