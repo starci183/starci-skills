@@ -10,7 +10,7 @@ import { runNode } from '../api/node/run-node.mjs';
 import { jsonFromStdout } from '../lib/json.mjs';
 import { clipLine } from '../lib/clip.mjs';
 import { isMain } from '../lib/is-main.mjs';
-import { eachInOrder } from '../lib/in-order.mjs';
+import { incompleteAnswer, missingText, pickOption, runUntilFailure, stepsFailed } from '../lib/menu-answer.mjs';
 import { openDecision } from '../machine/decisions.mjs';
 import { recordAction } from './actions.mjs';
 import { readSupervisorMenu } from './supervisor-menu-sources.mjs';
@@ -45,14 +45,7 @@ function runStep(step, caller, { env }) {
 }
 
 /** Runs the steps in order and stops at the first failure. */
-async function runSteps(steps, caller, ctx) {
-  const done = [];
-  await eachInOrder(steps, (step) => {
-    if (done.some((entry) => !entry.ok)) return;
-    done.push(runStep(step, caller, ctx));
-  });
-  return done;
-}
+const runSteps = (steps, caller, ctx) => runUntilFailure(steps, (step) => runStep(step, caller, ctx));
 
 /** Closes the item's Decision Item with this verb; {resolved, error?}. A Decision Item that lists other verbs stays open for its controller. */
 function resolveItem(item, note, { env }) {
@@ -67,8 +60,6 @@ async function handToOwner(item, reason, { env }) {
   return opened.ok ? { ok: true, owner: opened.json?.decision?.id ?? null } : { ok: false, error: opened.json?.error ?? 'the owner item could not be opened' };
 }
 
-const stepsFailed = (done) => done.find((entry) => !entry.ok) ?? null;
-
 function answerOf({ item, option, done, closed, owner }) {
   const failed = stepsFailed(done);
   const out = { ok: !failed && owner?.ok !== false, item: item.id, choice: option.choice, effect: option.effect, steps: done, ...(closed ? { resolved: closed.resolved, ...(closed.error ? { resolveNote: closed.error } : {}) } : {}),
@@ -78,20 +69,18 @@ function answerOf({ item, option, done, closed, owner }) {
   return { out, line };
 }
 
-const needsText = (option, text) => option.text && !option.escape && !text;
-
 /** Answer one item: validates, records, executes. Returns {out, line} (out.ok false for a refusal). */
 export async function decideItem({ item: itemId, choice, reason, text = '', env = process.env, now = Date.now() }) {
   const why = String(reason ?? '').trim();
   const menu = readSupervisorMenu({ env, now });
-  const refuse = (code, error) => ({ out: refusal(code, error, menu), line: [`decide REFUSED (${code}): ${error}`, ...supervisorMenuLines(menu)].join('\n') });
-  if (!choice || !why) return refuse('decide-answer-incomplete', 'decide needs --item <id>, --choice <choice> and --reason <why>');
-  const item = menu.find((entry) => entry.id === itemId);
-  if (!item) return refuse('menu-item-unknown', `${itemId ?? '(none)'} is not an open item of the Supervisor's menu`);
-  const option = item.options.find((entry) => entry.choice === choice);
-  if (!option) return refuse('menu-choice-unknown', `${choice} is not a choice of ${item.id} (${item.options.map((entry) => entry.choice).join(', ')})`);
+  const refuse = ({ code, error }) => ({ out: refusal(code, error, menu), line: [`decide REFUSED (${code}): ${error}`, ...supervisorMenuLines(menu)].join('\n') });
+  const incomplete = incompleteAnswer({ choice, reason: why });
+  if (incomplete) return refuse(incomplete);
+  const { item, option, refusal: unknown } = pickOption(menu, { itemId, choice, menuName: "the Supervisor's menu" });
+  if (unknown) return refuse(unknown);
   const input = String(text ?? '').trim();
-  if (needsText(option, input)) return refuse('menu-text-missing', `${item.id} ${option.choice} needs --text <${option.text}>`);
+  const lacking = missingText(item, option, input);
+  if (lacking) return refuse(lacking);
   recordAction({ item: item.id, action: `decide:${option.choice}`, reason: why, workflowId: item.subject.workflow, refs: [`di:${item.di}`], by: BY, env, now });
   const caller = { text: option.escape ? why : input, reason: why };
   const done = option.escape ? [] : await runSteps(option.steps, caller, { env });

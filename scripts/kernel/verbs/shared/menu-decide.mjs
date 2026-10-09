@@ -4,7 +4,7 @@
 // the menu is refused with a typed code and the menu. `none-fits` records the reason and escalates the item up the role chain.
 import { closeEntry, openEntry } from '../../decision-log.mjs';
 import { escalateDecision, openDecisionRow, resolveDecision } from '../../../machine/decisions.mjs';
-import { findInOrder } from '../../../lib/in-order.mjs';
+import { incompleteAnswer, missingText, pickOption, runUntilFailure, stepsFailed } from '../../../lib/menu-answer.mjs';
 import { refuseVerb } from './verb-exit.mjs';
 import { runVerbInProcess } from './verb-inproc.mjs';
 import { itemFactsOf } from '../../kernel-menu.mjs';
@@ -41,15 +41,10 @@ const KEPT = ['ok', 'job_id', 'jobId', 'op', 'status', 'verdict', 'unit', 'settl
 const briefOf = (out) => Object.fromEntries(KEPT.filter((key) => out?.[key] !== undefined).map((key) => [key, out[key]]));
 
 /** Runs the steps in order and stops at the first failure: [{verb, ok, out?, code?, error?}]. */
-async function runSteps(ctx, steps, decisionId) {
-  const done = [];
-  await findInOrder(steps, async (step) => {
-    const answer = await runVerbInProcess(ctx, step.verb, { ...step.args, repo: ctx.repo, json: true, decision: decisionId, ...(ctx.args.by ? { by: ctx.args.by } : {}) });
-    done.push({ verb: step.verb, ok: answer.ok, ...(answer.ok ? { out: briefOf(answer.out) } : { code: answer.code, error: String(answer.error ?? '').slice(0, 400) }) });
-    return !answer.ok;
-  });
-  return done;
-}
+const runSteps = (ctx, steps, decisionId) => runUntilFailure(steps, async (step) => {
+  const answer = await runVerbInProcess(ctx, step.verb, { ...step.args, repo: ctx.repo, json: true, decision: decisionId, ...(ctx.args.by ? { by: ctx.args.by } : {}) });
+  return { verb: step.verb, ok: answer.ok, ...(answer.ok ? { out: briefOf(answer.out) } : { code: answer.code, error: String(answer.error ?? '').slice(0, 400) }) };
+});
 
 /** Resolves the item's Decision Item with the first step verb it allows; false when it allows none or already closed. */
 function resolveItem(ctx, item, steps, decisionId) {
@@ -76,7 +71,7 @@ function escalate(ctx, item, reason) {
 
 /** The answer of a decide that executed: what ran, what it returned, the decision and the item it closed. */
 const answerOf = ({ ctx, item, option, entry, done, resolved, escalatedTo }) => {
-  const failed = done.find((step) => !step.ok) ?? null;
+  const failed = stepsFailed(done);
   const out = { ok: !failed, workflowId: ctx.args.workflow, item: item.id, choice: option.choice, decision: entry.id, effect: option.effect, steps: done,
     ...(resolved ? { resolved: item.di } : {}), ...(escalatedTo ? { escalated: escalatedTo } : {}),
     ...(failed ? { code: 'menu-step-failed', error: `${failed.verb}: ${failed.code ?? 'failed'}: ${failed.error ?? ''}`.slice(0, 500) } : {}) };
@@ -89,26 +84,24 @@ export async function decideMenuItem(ctx) {
   const { args, ledger, repo, emit } = ctx;
   const wf = args.workflow, now = Date.now();
   const reason = String(args.reason ?? '').trim();
-  if (!args.choice || !reason) throw Object.assign(new Error('decide --item needs --choice <choice> and --reason <why>'), { code: 'decide-answer-incomplete' });
+  const incomplete = incompleteAnswer({ choice: args.choice, reason });
+  if (incomplete) throw Object.assign(new Error(incomplete.error), { code: incomplete.code });
   const menu = await currentMenu(ctx);
-  const item = menu.find((entry) => entry.id === args.item);
-  if (!item) return refuseWithMenu(ctx, menu, { code: 'menu-item-unknown', error: `${args.item} is not an open item of ${wf}'s menu` });
-  const option = item.options.find((entry) => entry.choice === args.choice);
-  if (!option) return refuseWithMenu(ctx, menu, { code: 'menu-choice-unknown', error: `${args.choice} is not a choice of ${item.id} (${item.options.map((entry) => entry.choice).join(', ')})` });
+  const { item, option, refusal } = pickOption(menu, { itemId: args.item, choice: args.choice, menuName: `${wf}'s menu` });
+  if (refusal) return refuseWithMenu(ctx, menu, refusal);
   if (option.direct) return refuseWithMenu(ctx, menu, { code: 'menu-direct-option', error: `${option.choice} of ${item.id} is run directly: ${option.effect}` });
   const text = option.escape ? reason : String(args.text ?? '').trim();
-  if (option.text && !option.escape && !text && !option.optionalText && JSON.stringify(option.steps).includes(TEXT)) {
-    return refuseWithMenu(ctx, menu, { code: 'menu-text-missing', error: `${item.id} ${option.choice} needs --text <${option.text}>` });
-  }
+  const lacking = missingText(item, option, text, { demanded: !option.optionalText && JSON.stringify(option.steps).includes(TEXT) });
+  if (lacking) return refuseWithMenu(ctx, menu, lacking);
   const steps = boundSteps(option, text);
   const entry = openEntry({ ledger, repo, workflowId: wf, hypothesis: reason, actionKey: `${option.choice}:${item.id}:${now.toString(36)}`, metric: `${item.kind} ${item.id} resolved`,
     command: stepsText(steps) || option.choice, now, extra: { menu: { item: item.id, choice: option.choice, facts: itemFactsOf(item), rev: currentRuntimeRev() }, evidence: String(args.evidence ?? '').split(',').map((ref) => ref.trim()).filter(Boolean) } });
   const done = option.escape ? [] : await runSteps(ctx, steps, entry.id);
-  const failed = done.some((step) => !step.ok);
+  const failed = stepsFailed(done);
   const escalatedTo = option.escape ? escalate(ctx, item, reason) : null;
   const resolved = !failed && !option.escape && !option.snooze && resolveItem(ctx, item, steps, entry.id);
   closeEntry({ ledger, repo, workflowId: wf, entry: { id: entry.id, actionKey: entry.payload.actionKey, baseline: entry.baseline }, result: failed ? 'revert' : 'keep',
-    observed: failed ? `${done.find((step) => !step.ok).verb} failed: ${done.find((step) => !step.ok).code}` : `${option.choice} executed (${done.length} step(s))`, now: Date.now() });
+    observed: failed ? `${failed.verb} failed: ${failed.code}` : `${option.choice} executed (${done.length} step(s))`, now: Date.now() });
   const { out, text: line } = answerOf({ ctx, item, option, entry, done, resolved, escalatedTo });
   emit(out, line, args.json);
   if (failed) process.exitCode = 1;
