@@ -67,11 +67,14 @@ function grantParentDetail(violations) {
 
 /**
  * Check the owned paths of a job; {ok:true} or {ok:false, reason, violations, detail}. `worktree`: the workflow's own tree, where the legs before this one left their
- * directories (a checkpoint lands on main only when the workflow finishes), so a directory that exists there satisfies the grant.
+ * directories (a checkpoint lands on main only when the workflow finishes). A directory that exists in the tree or in the main checkout satisfies the grant: only a path
+ * neither holds could never be written into.
  */
 export function checkGrantParents({ op, payload, ownedPaths, repo, worktree = null, timeoutMs }) {
   const workDir = projectBinding(repo)?.workDir ?? '.starciwork';
-  const placements = ownedPathPlacements({ op, payload, ownedPaths, repo, worktree, timeoutMs });
-  const violations = grantParentViolations({ placements, newModules: newModulesOf(payload), workDir });
+  const newModules = newModulesOf(payload);
+  const violationsAt = (tree) => grantParentViolations({ placements: ownedPathPlacements({ op, payload, ownedPaths, repo, worktree: tree, timeoutMs }), newModules, workDir });
+  const inTree = violationsAt(worktree);
+  const violations = worktree && inTree.length ? inTree.filter((v) => violationsAt(null).some((w) => w.owned === v.owned && w.dir === v.dir)) : inTree;
   return violations.length ? { ok: false, reason: 'grant-parent-missing', violations, detail: grantParentDetail(violations) } : { ok: true };
 }
