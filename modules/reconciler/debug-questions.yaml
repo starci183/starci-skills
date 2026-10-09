@@ -20,7 +20,7 @@ groups:
     title: "Change under a running system"
     questions:
       - {id: cu-engine-rev, ask: "Does the engine run the revision the live tree holds?", answerable: today, check: engine-rev, source: "engine_leader.rev against the live tree head"}
-      - {id: cu-kernel-rev, ask: "Did each Kernel ack the current runtime revision inside its bound?", answerable: today, check: kernel-rev, source: "status kernelRev, events runtime-rev-acked"}
+      - {id: cu-kernel-rev, ask: "Did each Kernel ack the current runtime revision inside its bound?", answerable: today, check: kernel-rev, source: "status revisionNotice, events runtime-rev-acked"}
       - {id: cu-live-state-untouched, ask: "Did a source change close, restart or rewrite a live terminal, ledger or product file?", answerable: today, check: live-state-untouched, signalAdded: "signal.runtime-change-applied (machine_logs): written when an engine starts on a revision other than the previous engine's and when a land re-looks at the running workflows, with both revisions, the actions performed and the schema identity of the two stores", source: "machine_logs signal.runtime-change-applied"}
   - id: failure-while-running
     title: "Failure while running"

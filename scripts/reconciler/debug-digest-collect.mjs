@@ -120,6 +120,6 @@ export async function collectSnapshot({ env = process.env, repos = [], workflowI
   const health = await supervisorHealth({ timeoutMs, run });
   const attemptScan = scanBlobs(attemptTranscripts(workflows, numbers.secretScanArtifacts), { maxBytes: numbers.secretScanBytes, ...(readBlob ? { readBlob } : {}) });
   return { now, liveRev: liveRev(), releaseCi: releaseCiLine(env), engine: facts.engine, supervisor: { ...facts.supervisor, health }, reservations: facts.reservations,
-    seats: facts.seats, supJobs: facts.supJobs, lands: facts.lands ?? [], refusals: refusalFacts(env), workflows, history: finished, historyErrors, registry: registryFacts(), criteria: endCriteria(),
+    seats: facts.seats, supJobs: facts.supJobs, silent: facts.silent ?? null, lands: facts.lands ?? [], refusals: refusalFacts(env), workflows, history: finished, historyErrors, registry: registryFacts(), criteria: endCriteria(),
     providerEvents: facts.providerEvents ?? [], runtimeChanges: facts.runtimeChange ?? [], hostDrift: facts.hostDrift ?? [], portClaims: facts.portClaim ?? [], secrets: mergeScans(facts.secrets ?? { scanned: 0, unreadable: 0, hits: [] }, attemptScan) };
 }

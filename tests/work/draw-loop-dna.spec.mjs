@@ -37,6 +37,9 @@ import { withRationale, writeRationale } from '../helpers/draw-rationale-fixture
 import { seedWorkflow } from '../helpers/ledger-fixture.mjs';
 import { captureGateBinding } from '../../scripts/kernel/gate-settle.mjs';
 
+// The prompt of a Critic whose Task spec is a pointer: the text of the file the pointer names (the second line after PACKET FILE), read while the worker starts, before the runtime removes it.
+const taskOf = (spec) => { const lines = String(spec).split(String.fromCodePoint(10)).map((line) => line.trim()); const at = lines.findIndex((line) => line.startsWith('PACKET FILE:')); return at < 0 ? String(spec) : fs.readFileSync(lines[at + 1], 'utf8'); };
+
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const tmp = (t) => { const d = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-draw-loop-')); t.after(() => fs.rmSync(d, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 })); return d; };
 const codes = (list) => [...new Set(list.map((f) => f.code))].sort();
@@ -207,15 +210,12 @@ test('the critic: the product rubric or the default, a verdict parsed and gate-c
   fs.writeFileSync(png, encodePng(blankImage(4, 4, WHITE)));
   fs.writeFileSync(path.join(dir, 'a.html'), GOOD);
   let seen = null;
-  const orca = fakeCriticOrca({ verdict: passingVerdict(DEFAULT_RUBRIC, 9), onStart: (a) => {
-    const packet = /to:\r?\n\s+(\S+\.md)/.exec(a.spec)?.[1];
-    seen = { dir: a.worktree, files: fs.readdirSync(a.worktree).sort(), packet: packet ? fs.readFileSync(packet, 'utf8') : null };
-  } });
+  const orca = fakeCriticOrca({ verdict: passingVerdict(DEFAULT_RUBRIC, 9), onStart: (a) => { seen = { dir: a.worktree, files: fs.readdirSync(a.worktree).sort(), pointer: a.spec, task: taskOf(a.spec) }; } });
   const critique = await runCritic({ images: [{ path: png, label: 'desktop' }], html: path.join(dir, 'a.html'), rubric: DEFAULT_RUBRIC,
     critic: criticFor(allocationSettings().drawLoop, { provider: 'devin', model: 'swe-2-max' }).critic, placement: { tmpRoot: dir }, orca });
   assert.deepEqual(seen.files, ['render-1.png', 'rubric.yaml', 'screen.html'], 'the critic sees only the PNGs, the HTML and the rubric');
-  // a prompt over the paste bound is a file the runtime wrote: the Task spec is that file
-  const spec = seen.packet ?? orca.calls.find((c) => c[0] === 'worker-start')[1].spec;
+  assert.ok(!seen.files.includes('TASK.md'), 'the Task file is not in the Critic directory (06c13f369)');
+  const spec = seen.task;
   assert.match(spec, /did NOT draw this screen/);
   assert.equal(critique.outcome, 'judged');
   assert.equal(critique.verdict.beauty, 9);

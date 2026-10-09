@@ -15,6 +15,7 @@ import { supervisorSeat } from '../machine/revision-seats.mjs';
 import { purgedWorkflowIds } from '../machine/workflow-purged.mjs';
 import { revRootOf } from '../kernel/runtime-rev.mjs';
 import { digestNumbers } from './debug-digest-numbers.mjs';
+import { silentFacts } from './debug-digest-silent.mjs';
 import { SIGNAL, signalRows } from '../machine/debug-signals.mjs';
 import { machineBlobItems, mergeScans, scanBlobs, scanLogs } from './debug-secret-scan.mjs';
 import { CONTROLLER_NAMES, LEADER_NAME, configuredMode, reconcilerConfig } from './state.mjs';
@@ -133,7 +134,7 @@ export function machineFacts({ env = process.env, read = readMachine, numbers = 
     providerEvents: providerEventsOf(m, numbers.signalRows), ...signalsOf(m, numbers, readBlob),
     ledgers: ask(m, "SELECT ledger_id, name, repo_root, file FROM ledgers WHERE state='active' ORDER BY name"),
     engine: engineOf(m), supervisor: supervisorOf(m, revSinceOf(m, ask(m, 'SELECT rev FROM engine_leader')[0]?.rev ?? null)), reservations: reservationsOf(m),
-    seats: ask(m, 'SELECT seat_id FROM seats').map((r) => r.seat_id),
+    seats: ask(m, 'SELECT seat_id FROM seats').map((r) => r.seat_id), silent: silentFacts((sql, args) => ask(m, sql, args), numbers),
     supJobs: ask(m, 'SELECT job_id, status FROM sup_jobs').map((r) => ({ jobId: r.job_id, status: r.status })),
     lands: ask(m, "SELECT run_id, lane, result, started_at, json_extract(specs_json,'$.loosening.id') AS id, json_extract(specs_json,'$.loosening.approved') AS approved FROM land_runs WHERE json_extract(specs_json,'$.loosening') IS NOT NULL ORDER BY run_id DESC LIMIT 50")
       .map((r) => ({ runId: r.run_id, lane: r.lane, result: r.result, at: r.started_at, id: r.id, approved: r.approved === 1 })),

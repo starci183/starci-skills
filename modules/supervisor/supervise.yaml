@@ -108,7 +108,7 @@ mission:
     dead-kernel: "a Kernel the Host controller cannot self-heal arrives as DI seat-unrecoverable: record the seat's recorded failure as a runtime defect; the controller re-seats it once the cause is fixed."
     orphaned: "(menu kind orphaned once the frontier stays orphaned past the Supervisor grace) an orphaned frontier across ticks: the Kernel names its next step; one that stays orphaned is a runtime defect: record it. A plan that cannot continue is the owner's define-goal --revise."
     stalled: "a STALLED workflow with nothing ready: read starci kernel status; held by a stale gate/wait -> that item; unexplained -> a runtime defect to record."
-    contract-stale: "starci kernel status kernelRev.stale: the Kernel re-reads the changed runtime files it names and attests them (starci kernel kernel-ack-rev); a Kernel that does not is a runtime defect."
+    contract-stale: "starci kernel status revisionNotice.state owed: the Kernel re-reads the changed runtime files it names and attests them (starci kernel kernel-ack-rev); a Kernel that does not is a runtime defect."
     experiment-revert: "a self-learning experiment measured no improvement or a regression: record it as a runtime defect for Debug; the Supervisor reverts nothing."
     push-refused: "a refused push of a product repository main: classify it (secret / lint / test / hook) from the refusal and record it as a runtime defect; a secret is named only by custody ref; never --no-verify, never force."
   message:

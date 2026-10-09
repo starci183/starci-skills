@@ -6,7 +6,7 @@
 // Kernel that is idle between wakes once it has received `afterWakes` wakes or spent `afterTokens` tokens since its boot
 // (modules/reconciler/seat-cost.yaml rotation), through the same start-workflow path as every other replacement. The new seat's first
 // status read is its handover: the menu, and the ledger behind it.
-import { seatCostConfig, kernelWakeLog } from './seat-wakes.mjs';
+import { seatCostConfig, kernelWakeLog, countsTowardRotation } from './seat-wakes.mjs';
 
 /** The rule of a role: {afterWakes, afterTokens, event}, or null when the role is not rotated. */
 export const rotationRule = (role) => seatCostConfig().rotation?.[role] ?? null;
@@ -26,7 +26,7 @@ export const sessionOf = (turnRef, skip) => String(turnRef).split('@')[0].split(
 export function kernelSinceBoot(db, workflowId) {
   const boots = rotationRule('kernel').bootEvents;
   const bootAt = Number(db.prepare(`SELECT MAX(created_at) AS at FROM events WHERE workflow_id=? AND kind IN (${boots.map(() => '?').join(',')})`).get(workflowId, ...boots)?.at ?? 0);
-  const wakes = kernelWakeLog(db, workflowId).filter((wake) => wake.at >= bootAt).length;
+  const wakes = kernelWakeLog(db, workflowId).filter((wake) => wake.at >= bootAt && countsTowardRotation(wake)).length;
   const rows = db.prepare("SELECT turn_ref, at, COALESCE(input_tokens,0)+COALESCE(output_tokens,0)+COALESCE(cache_read_tokens,0)+COALESCE(cache_write_tokens,0) AS tokens FROM llm_usage WHERE workflow_id=? AND subject_type='kernel-turn'").all(workflowId);
   const older = new Set(rows.filter((row) => Number(row.at) < bootAt).map((row) => sessionOf(row.turn_ref, 2)));
   const tokens = rows.filter((row) => Number(row.at) >= bootAt && !older.has(sessionOf(row.turn_ref, 2))).reduce((sum, row) => sum + Number(row.tokens), 0);

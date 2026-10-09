@@ -33,7 +33,7 @@
 //
 // Internal args (spawned by the reconciler engine): --dry [--repo <path>] [--workflow <id>] [--json].
 //     one read-only pass over the live ledgers: prints each job's plan (step + clocks); writes nothing.
-import fs from 'node:fs';
+import fs from 'node:fs'; import { effectUnknownItem } from '../effect-unknown-item.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../../engine/yaml.mjs';
@@ -156,7 +156,7 @@ export function listKeysOf(db, ledgerId, { now = Date.now(), settings = jobSetti
   const keys = new Set();
   for (const r of [...live, ...settled, ...owing]) keys.add(jobKey(ledgerId, r.job_id));
   for (const id of openClockJobs) keys.add(jobKey(ledgerId, id));
-  for (const r of live) keys.add(wfKey(ledgerId, r.workflow_id));
+  for (const r of [...live, ...db.prepare("SELECT workflow_id FROM workflows WHERE archived_at IS NULL AND phase='running'").all()]) keys.add(wfKey(ledgerId, r.workflow_id));
   return [...keys];
 }
 
@@ -320,7 +320,7 @@ async function actJob(ctx, ledgerId, jobId, f, s, settings) {
   const repo = ledgerOf(ctx, ledgerId)?.repo;
   switch (s.kind) {
     case 'dead-worker': case 'release-worker': case 'effect-unknown':
-      return { action: s.kind, ...(await ctx.api(ledgerId, s.verb, s.argv)) };
+      return { action: s.kind, ...(await ctx.api(ledgerId, s.verb, s.argv)), ...(await effectUnknownItem(ctx, ledgerId, f, s, settings)) };
     case 'settle':
       // The runtime settler for this one job: reconcileJobSettle (consume, re-verify / canon parity, starci kernel record-checks + settle, release).
       return { action: 'settle', ...(await ctx.run('node', [SETTLER_SCRIPT, '--repo', repo, '--job', jobId, '--json'], { timeoutMs: settings.settleRunTimeoutMs })) };

@@ -10,8 +10,8 @@ import { renderApply, renderPlan } from '../machine/workflow-purge-render.mjs';
 import { underHostLock } from '../machine/verb-lock.mjs';
 import { acquireGcLock } from '../machine/gc-lock.mjs';
 import { purgeWorkflow } from '../work/purge-workflow.mjs';
-import { invocationDir } from '../lib/roots.mjs';
 import { guardsRoot } from '../guards/guards-root.mjs';
+import { invocationDir } from '../lib/roots.mjs';
 
 const MIN_EXPECT = 12;
 const refusal = ({ code, detail }) => ({ code: 1, text: `${code}: ${detail}`, data: { schema: 'starci/workflow-purge-refusal@1', ok: false, refusal: { code, detail } } });

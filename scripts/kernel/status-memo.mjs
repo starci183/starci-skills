@@ -33,7 +33,7 @@ import { tempRoot } from '../../engine/temp-root.mjs';
 const GIT_MEMO_SCHEMA = 'starci/status-git-memo@1';
 const GIT_READ_VERBS = new Set(['rev-parse', 'ls-tree', 'log', 'show', 'diff', 'cat-file']);
 // The flags a pinned read may carry: each shapes the answer from the named objects alone.
-const GIT_PINNED_FLAG_RX = /^(--verify|--quiet|-q|--name-only|--name-status|-r|-z|-\d+|-e|-t|-s|--batch|--batch-check|--format=.*|--pretty=.*)$/s;
+const GIT_PINNED_FLAG_RX = /^(--verify|--quiet|-q|--name-only|--name-status|--numstat|--no-renames|-r|-z|-\d+|-e|-t|-s|--batch|--batch-check|--format=.*|--pretty=.*)$/s;
 const GIT_PINNED_REV_RX = /^(HEAD|[0-9a-f]{40})(\^\{commit\}|:.*)?$/s;
 // One entry holds at most GIT_MEMO_MAX_BYTES (a product repo's committed-Work cat-file batch runs ~4 MB); the
 // directory is kept under GIT_MEMO_BUDGET_BYTES least-recently-used first (a hit refreshes its mtime), since

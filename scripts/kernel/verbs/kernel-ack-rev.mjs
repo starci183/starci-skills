@@ -1,6 +1,7 @@
 // kernel-ack-rev — project the required READ plan or attest its complete bytes as the current Kernel.
 import fs from 'node:fs';
 import { getWorkflow } from './shared/rows.mjs';
+import { writeReadBundle } from '../read-bundle.mjs';
 import { noticeFor } from '../../machine/revision-ack.mjs';
 import { kernelSeat } from '../../machine/revision-seats.mjs';
 import { kernelAuthorityOf, kernelCustodyOf } from './shared/kernel-seat.mjs';
@@ -27,7 +28,7 @@ export default {
   kernelOnly: true,
   usageInCore: true,
   usage: '  kernel-ack-rev --workflow <id> --plan [--op <id>] | --rev <sha> --digest <readToken> | --read-manifest <file> [--op <id>]   current-incarnation READ attestation (also spelled revision-ack)',
-  run({ ledger, args, caller, emit }) {
+  run({ ledger, args, caller, emit, repo }) {
     const db = ledger.db, workflowId = args.workflow, root = revRootOf();
     const wf = getWorkflow(db, workflowId);
     if (!wf) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
@@ -40,8 +41,12 @@ export default {
     const owed = ['owed', 'owed-woken', 'replace-due'].includes(notice.state) ? [...notice.files, ...(notice.replaceFiles ?? [])] : [];
     const options = { root,authority,ops: args.op ? [String(args.op)] : [],extra: [...new Set(owed)] };
     const required = kernelReadManifest(db,workflowId,options);
-    // The plan names the files to read and a short readToken: the attestation needs no file (a seat cannot redirect output into one: KERNEL_NO_FILE_WRITE).
-    if (args.plan) return emit({ ok: true, workflowId, readToken: required.digest, readManifest: required, unread: unreadFiles(db, workflowId, required) }, JSON.stringify(required), args.json);
+    // The plan names the files to read (as ONE bundle file, not one tool call per path) and a short readToken: the attestation needs no file (a seat cannot redirect output into one: KERNEL_NO_FILE_WRITE).
+    if (args.plan) {
+      const unread = unreadFiles(db, workflowId, required);
+      const bundle = unread.length && repo ? writeReadBundle({ repo, workflowId, root, rows: required.files.filter((row) => unread.includes(row.path)), digest: required.digest }) : null;
+      return emit({ ok: true, workflowId, readToken: required.digest, readManifest: required, unread, ...(bundle ? { bundle } : {}) }, JSON.stringify(required), args.json);
+    }
     const rev = required.revision.kind === 'git' ? resolveRev(root,String(args.rev)) : String(args.rev);
     if (!rev || rev !== required.rev) throw Object.assign(new Error('READ revision is not the current deployed commit'), { code: KERNEL_REV_UNKNOWN });
     const submitted = submittedOf(args, required);

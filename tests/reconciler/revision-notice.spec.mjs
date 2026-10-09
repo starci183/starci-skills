@@ -18,7 +18,7 @@ import { idleWakesOf } from '../../scripts/kernel/kernel-watchdog.mjs';
 import { proofsOwedUnder, settleRevisionPayload } from '../../scripts/kernel/settle-revision.mjs';
 import { EVENT_LIMITS } from '../../engine/db/event-compact.mjs';
 import revisionAckVerb from '../../scripts/kernel/verbs/revision-ack.mjs';
-import statusField from '../../scripts/kernel/status/revision-notice.mjs';
+import { kernelNoticeOf } from '../../scripts/kernel/kernel-notice.mjs';
 import { revisionAck } from '../../scripts/supervisor/revision-ack.mjs';
 
 const WF = 'wf-notice';
@@ -159,10 +159,13 @@ test('the Supervisor verb lists the owed files and attests them by readToken or 
   assert.equal(noticeFor(w.supervisor()).state, 'current');
 });
 
-test('the Kernel ack of the current revision settles the update in place whichever files it covered: there is one ack', (t) => {
+test('the Kernel ack of the current revision settles the update in place for the files it named: there is one ack, and a file it never named stays owed', (t) => {
   const w = world(t);
   w.repo.commit('rule', { [KERNEL_FILE]: GROWN_STEPS });
-  w.ledger.transaction(() => w.ledger.appendEvent({ workflowId: WF, entityType: 'kernel', entityId: WF, kind: 'runtime-rev-acked', payload: { rev: w.head(), files: [KERNEL_FILE], source: 'ack' }, createdAt: Date.now() }));
+  const ack = (files) => w.ledger.transaction(() => w.ledger.appendEvent({ workflowId: WF, entityType: 'kernel', entityId: WF, kind: 'runtime-rev-acked', payload: { rev: w.head(), files, source: 'ack' }, createdAt: Date.now() }));
+  ack(['modules/kernel/api.yaml']);
+  assert.equal(noticeFor(w.kernel()).state, 'owed', 'an ack that never named the owed file settles nothing');
+  ack([KERNEL_FILE]);
   const pass = runtimePass(w.kernel(), { repair: true });
   assert.equal(pass.wrote, 'acked');
   assert.equal(pass.notice.state, 'current');
@@ -242,9 +245,8 @@ test('one line per seat: revision acked, concerned or not, files owed', (t) => {
   const saved = process.env.STARCI_KERNEL_REV_ROOT;
   process.env.STARCI_KERNEL_REV_ROOT = w.repo.root;
   t.after(() => { if (saved === undefined) delete process.env.STARCI_KERNEL_REV_ROOT; else process.env.STARCI_KERNEL_REV_ROOT = saved; });
-  const field = statusField.compute({ ledger: w.ledger, workflowId: WF, wf: { phase: 'running' } });
+  const field = kernelNoticeOf(w.ledger.db, WF, { root: w.repo.root });
   assert.match(field.line, /^kernel owes 1 file/);
-  assert.deepEqual(statusField.lines(field), [`REVISION ${field.line}`]);
 });
 
 test('settle records, per proof the op owes, whether the rules of its judge moved since the admission', (t) => {

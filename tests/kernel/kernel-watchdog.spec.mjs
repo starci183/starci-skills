@@ -284,7 +284,7 @@ const watchdogWorld = async (t, { jobs = [], events = [], tabTitle = null, signa
     seedWorkflow(ledger, { id: workflowId, state: { phase: 'running' }, goal: { markdown: '# goal' },
       jobs: [{ jobId: `kernel-${workflowId}`, kind: 'kernel', status: 'running', workerId: KERNEL,
         payload: { hierarchy: { attempt: 2, runtime: { terminalHandle: KERNEL } } } }, ...jobs],
-      events: [{ kind: 'kernel-booted', entityType: 'kernel', payload: { terminal: KERNEL, launchedBy: 'supervisor', attempt: 2 } },
+      events: [{ kind: 'kernel-booted', entityType: 'kernel', createdAt: Date.now() - 3_600_000, payload: { terminal: KERNEL, launchedBy: 'supervisor', attempt: 2 } },
         // The Kernel acked the current runtime rev: an unacked seat gets a rev paragraph that pushes the wake past the delivery proof's window.
         { kind: KERNEL_REV_ACKED_EVENT, entityType: 'kernel', payload: { rev: currentRuntimeRev(), files: [], source: 'ack', attempt: 2 } }, ...events],
       signals: [{ key: workflowId, value: signalValue ?? { terminal: KERNEL, dispatch: 'dispatch-kernel-1', host: 'orca', agent: 'claude', launch: 'worker' } }] });
