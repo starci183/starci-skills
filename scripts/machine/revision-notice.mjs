@@ -6,6 +6,8 @@
 // The next change is measured from the newest settled revision, so several commits deployed together are ONE change, and a seat is woken at
 // most once per set of owed files it has not settled (a `woken` record keyed by the digest of the owed files: a revision that leaves them as they were wakes nobody again). No record carries a file list: it carries the two revisions, a count and the
 // diff hash; the list is the record's own `files`, which the event writer keeps in the blob store behind the sha when it is long, however many files.
+import fs from 'node:fs';
+import path from 'node:path';
 import { sha256 } from '../../engine/digest.mjs';
 import { changeScope } from './revision-change.mjs';
 
@@ -35,8 +37,10 @@ function foldRecords(records) {
   return { baseline: baseline ?? legacy?.rev ?? null, woken, legacy };
 }
 
-const owedNotice = ({ role, scope, mine, from, to, woken, legacy }) => {
-  const covered = legacy?.rev === to && mine.action === 'reread' && mine.files.every((file) => legacy.files.has(file));
+const owedNotice = ({ role, scope, mine, from, to, woken, legacy, root }) => {
+  // The Kernel's ack of the current revision settles an update in place: there is one attestation, and it is the Kernel's (a replacement is still owed when a rule was removed).
+  // The ack settles only what it listed: a file it never named is not recorded as read (a file the change deleted cannot be named).
+  const covered = legacy?.rev === to && mine.action === 'reread' && mine.files.every((file) => legacy.files.has(file) || !fs.existsSync(path.join(root, file)));
   const base = { role, from, to, action: mine.action, count: mine.count, digest: mine.digest, files: mine.files, replaceFiles: mine.replaceFiles, wording: scope.wording };
   if (covered) return { ...base, state: 'acked-legacy' };
   if (mine.action === 'replace') return { ...base, state: 'replace-due' };
@@ -57,7 +61,7 @@ export function noticeOf({ role, root, current, records, scopeFor = scopeOf }) {
   const scope = scopeFor(root, baseline, current, role);
   const mine = scope.known ? scope.roles[role] : { action: 'replace', count: 0, files: [], replaceFiles: [] };
   if (!OWED.has(mine.action)) return { role, state: 'not-concerned', from: baseline, to: current, action: mine.action, count: scope.fileCount, digest: scope.digest, files: [], replaceFiles: [] };
-  return owedNotice({ role, scope, mine, from: baseline, to: current, woken, legacy });
+  return owedNotice({ role, scope, mine, from: baseline, to: current, woken, legacy, root });
 }
 
 /** The payload of a settling or waking record: revisions, verdict, counts and hashes, and the list of files an attestation read (the writer spills a long list through the one event path). */
@@ -100,5 +104,5 @@ export function noticeWakeLine(notice, command, short = (rev) => String(rev ?? '
   if (notice?.state !== 'owed') return '';
   const names = notice.files.slice(0, NAMED).join(', ');
   const more = notice.files.length > NAMED ? ` and ${notice.files.length - NAMED} more` : '';
-  return `Runtime rev ${short(notice.to)} changed ${notice.files.length} file(s) of your contract (${names}${more}): ${command} --plan lists them with hashes; read them, then attest. Nothing else is asked.`;
+  return `Runtime rev ${short(notice.to)} changed ${notice.files.length} file(s) of your contract (${names}${more}): ${command} --plan lists them; read them, then attest with --rev <sha> --digest <readToken>. Nothing else is asked.`;
 }

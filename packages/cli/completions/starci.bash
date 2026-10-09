@@ -370,6 +370,7 @@ _starci() {
         kernel:kernel-ack-rev:--repo) return 0;;
         kernel:kernel-ack-rev:--workflow) return 0;;
         kernel:kernel-ack-rev:--rev) return 0;;
+        kernel:kernel-ack-rev:--digest) return 0;;
         kernel:kernel-ack-rev:--read-manifest) return 0;;
         kernel:kernel-ack-rev:--op) return 0;;
         kernel:kernel-proposal:--repo) return 0;;
@@ -485,7 +486,9 @@ _starci() {
         kernel:revision-ack:--repo) return 0;;
         kernel:revision-ack:--workflow) return 0;;
         kernel:revision-ack:--rev) return 0;;
+        kernel:revision-ack:--digest) return 0;;
         kernel:revision-ack:--read-manifest) return 0;;
+        kernel:revision-ack:--op) return 0;;
         kernel:route:--repo) return 0;;
         kernel:route:--job) return 0;;
         kernel:route:--difficulty) COMPREPLY=( $(compgen -W "easy medium hard insane" -- "$cur") ); return 0;;
@@ -720,6 +723,7 @@ _starci() {
         supervisor:ram-cap:--reserve) return 0;;
         supervisor:report:--repo) return 0;;
         supervisor:revision-ack:--rev) return 0;;
+        supervisor:revision-ack:--digest) return 0;;
         supervisor:revision-ack:--read-manifest) return 0;;
         supervisor:start:--reason) return 0;;
         supervisor:tell:--timeout-ms) return 0;;
@@ -1042,7 +1046,7 @@ _starci() {
         kernel:hierarchy) COMPREPLY=( $(compgen -W "--repo --workflow --json --cwd --quiet --help --edition" -- "$cur") );;
         kernel:inbox) COMPREPLY=( $(compgen -W "--repo --workflow --ack --disposition --json --cwd --quiet --help --edition" -- "$cur") );;
         kernel:incident) COMPREPLY=( $(compgen -W "--repo --workflow --kind --detail --op --holds --cause --workaround --no-workaround --because --evidence --resolution --commit --route --peer --refs --resolve --by --owner-answer --introduced-by --introducer --fix --attach --until-record --until-job --until-message --until-commit --until-incident --until-foundation --until-landed --until-runtime-has --until-admission --until-check --json --cwd --quiet --help --edition" -- "$cur") );;
-        kernel:kernel-ack-rev) COMPREPLY=( $(compgen -W "--repo --workflow --rev --plan --read-manifest --op --json --cwd --quiet --help --edition" -- "$cur") );;
+        kernel:kernel-ack-rev) COMPREPLY=( $(compgen -W "--repo --workflow --rev --plan --digest --read-manifest --op --json --cwd --quiet --help --edition" -- "$cur") );;
         kernel:kernel-proposal) COMPREPLY=( $(compgen -W "--repo --workflow --title --evidence --patch --files --decision --list --json --cwd --quiet --help --edition" -- "$cur") );;
         kernel:lifecycle) COMPREPLY=( $(compgen -W "--repo --workflow --pause --stop --resume --by --reason --json --cwd --quiet --help --edition" -- "$cur") );;
         kernel:log) COMPREPLY=( $(compgen -W "--repo --workflow --job --kind --msg --data --refs --level --node --actor --json --cwd --quiet --help --edition" -- "$cur") );;
@@ -1066,7 +1070,7 @@ _starci() {
         kernel:reply) COMPREPLY=( $(compgen -W "--repo --workflow --message --body --to-owner --json --cwd --quiet --help --edition" -- "$cur") );;
         kernel:report) COMPREPLY=( $(compgen -W "--repo --job --report --attach --outcome --dispatch-capability --json --cwd --quiet --help --edition" -- "$cur") );;
         kernel:retire-ask) COMPREPLY=( $(compgen -W "--repo --workflow --dispatch --reason --json --cwd --quiet --help --edition" -- "$cur") );;
-        kernel:revision-ack) COMPREPLY=( $(compgen -W "--repo --workflow --rev --plan --read-manifest --json --cwd --quiet --help --edition" -- "$cur") );;
+        kernel:revision-ack) COMPREPLY=( $(compgen -W "--repo --workflow --rev --plan --digest --read-manifest --op --json --cwd --quiet --help --edition" -- "$cur") );;
         kernel:route) COMPREPLY=( $(compgen -W "--repo --job --difficulty --json --cwd --quiet --help --edition" -- "$cur") );;
         kernel:run-deferred-tests) COMPREPLY=( $(compgen -W "--repo --workflow --kind --by --dry-run --json --cwd --quiet --help --edition" -- "$cur") );;
         kernel:serve-ask) COMPREPLY=( $(compgen -W "--repo --workflow --dispatch --ttl --now --json --cwd --quiet --help --edition" -- "$cur") );;
@@ -1152,7 +1156,7 @@ _starci() {
         supervisor:push-mains) COMPREPLY=( $(compgen -W "--repo --dry-run --hooks-only --json --cwd --quiet --help --edition" -- "$cur") );;
         supervisor:ram-cap) COMPREPLY=( $(compgen -W "--op --workflow --weight --reserve --json --cwd --quiet --help --edition" -- "$cur") );;
         supervisor:report) COMPREPLY=( $(compgen -W "--repo --send --json --cwd --quiet --help --edition" -- "$cur") );;
-        supervisor:revision-ack) COMPREPLY=( $(compgen -W "--plan --rev --read-manifest --json --cwd --quiet --help --edition" -- "$cur") );;
+        supervisor:revision-ack) COMPREPLY=( $(compgen -W "--plan --rev --digest --read-manifest --json --cwd --quiet --help --edition" -- "$cur") );;
         supervisor:start) COMPREPLY=( $(compgen -W "--plan --reason --json --cwd --quiet --help --edition" -- "$cur") );;
         supervisor:status) COMPREPLY=( $(compgen -W "--menu --json --cwd --quiet --help --edition" -- "$cur") );;
         supervisor:stop) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;

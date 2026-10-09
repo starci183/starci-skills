@@ -113,7 +113,7 @@ conventions:
   requiredRead: >-
     scripts/kernel/required-read.mjs derives the complete current Kernel and workflow/op contract paths
     and byte hashes. kernel-ack-rev --plan projects them; only the current Kernel attests the exact manifest
-    with --read-manifest. Boot records runtime-read-delivered provenance without acknowledgement. Relevant
+    with --digest <readToken> (or the complete manifest with --read-manifest); revision-ack is the same verb. Boot records runtime-read-delivered provenance without acknowledgement. Relevant
     dirty, unknown, incomplete or changed bytes and a replaced incarnation refuse affected new-leg admission.
     Git trees retain their actual SHA identity. Installed trees validate the existing install descriptor/package
     protocol and every required custody hash, deriving an explicit installed revision from current required bytes.

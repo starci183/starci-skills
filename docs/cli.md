@@ -1718,7 +1718,7 @@ starci kernel incident --repo <path> --workflow <workflow> --attach <incident> -
 
 ### starci kernel kernel-ack-rev
 
-project or attest the complete current Kernel READ manifest
+project or attest the Kernel READ manifest (also spelled revision-ack)
 
 | flag | type | |
 | --- | --- | --- |
@@ -1726,6 +1726,7 @@ project or attest the complete current Kernel READ manifest
 | `--workflow` | string | required |
 | `--rev` | string |  |
 | `--plan` | boolean |  |
+| `--digest` | string |  |
 | `--read-manifest` | string |  |
 | `--op` | string |  |
 
@@ -1735,6 +1736,7 @@ json: flag
 
 ```sh
 starci kernel kernel-ack-rev --repo <path> --workflow <workflow> --plan
+starci kernel kernel-ack-rev --repo <path> --workflow <workflow> --rev <rev> --digest <readToken>
 starci kernel kernel-ack-rev --repo <path> --workflow <workflow> --rev <rev> --read-manifest <file>
 ```
 
@@ -2236,7 +2238,7 @@ starci kernel retire-ask --repo <path> --workflow <workflow> --dispatch <dispatc
 
 ### starci kernel revision-ack
 
-project or attest the files a runtime revision change sends to this Kernel
+the same verb as kernel-ack-rev: project or attest the Kernel READ manifest
 
 | flag | type | |
 | --- | --- | --- |
@@ -2244,7 +2246,9 @@ project or attest the files a runtime revision change sends to this Kernel
 | `--workflow` | string | required |
 | `--rev` | string |  |
 | `--plan` | boolean |  |
+| `--digest` | string |  |
 | `--read-manifest` | string |  |
+| `--op` | string |  |
 
 exit: 0 planned or acknowledged; 1 refused or unavailable current identity/READ inputs; 2 bad usage: a required flag is missing or a flag has no value
 
@@ -2252,6 +2256,7 @@ json: flag
 
 ```sh
 starci kernel revision-ack --repo <path> --workflow <workflow> --plan
+starci kernel revision-ack --repo <path> --workflow <workflow> --rev <rev> --digest <readToken>
 starci kernel revision-ack --repo <path> --workflow <workflow> --rev <rev> --read-manifest <file>
 ```
 
@@ -4179,6 +4184,7 @@ read the files a runtime revision change sends to the Supervisor and attest them
 | --- | --- | --- |
 | `--plan` | boolean |  |
 | `--rev` | string |  |
+| `--digest` | string |  |
 | `--read-manifest` | string |  |
 
 exit: 0 planned or acknowledged; 1 refused; 2 bad usage: --plan, or --rev with --read-manifest

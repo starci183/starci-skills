@@ -723,3 +723,14 @@ test('coding READ selects complete topic references without forcing an unrelated
   put(base, 'knowledge/patterns/be/test.yaml', 'slots: [be.module.service]\nrules: [{relatedExamples: [unknown-reference]}]\n');
   await assert.rejects(buildReadDigest({ root, touch: ['be/src/target.ts'], base, doc, hfs: { dir: hfsDir, bin: 'unused' } }), /unknown example id/);
 });
+
+test('an op that owns only Work records is not refused op-gate-tool-failed when its placement moved off the admitted baseline (live Nivo architecture.decide: owned slice cannot be bound)', async (t) => {
+  const { root } = appFixture(t);
+  const moved = tmp(t, 'starci-op-gate-moved-');
+  const owned = '.starciwork/features/authentication/sds';
+  const admitted = [{ base: root, path: owned }];
+  const binding = { ...captureGateBinding(admitted, { at: Date.now() }), placements: [{ base: moved, path: owned }] };
+  assert.equal(await judgeJobLoop({ op: 'architecture.decide', files: [], binding, doc: loadOpGate() }), null, 'no code loop is owed to a records op');
+  const code = await judgeJobLoop({ op: 'backend.implement', files: [], binding: { ...binding, placements: [{ base: moved, path: 'be' }] }, doc: loadOpGate() });
+  assert.equal(code.judged.code, 'op-gate-tool-failed', 'a code op with the same drift still refuses');
+});

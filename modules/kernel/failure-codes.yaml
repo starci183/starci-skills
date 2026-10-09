@@ -17585,3 +17585,129 @@ SPEC_CACHE_KEY_BLIND:
   nextStep_vi: "Thêm loại đầu vào đó vào khóa trong scripts/supervisor/spec-cache-key.mjs hoặc spec-cache-reads.mjs rồi chạy lại starci runtime check --only spec-cache-key; không nới check."
   owner: runtime-core
   kind: check-finding
+rejudge-not-failed:
+  title: "The job is not a failed leg"
+  title_vi: "Việc không phải là lượt đã lỗi"
+  meaning_vi: "Chỉ lượt đã lỗi (trạng thái cuối) mới được chấm lại."
+  causes_vi:
+    - "Chỉ lượt đã lỗi (trạng thái cuối) mới được chấm lại."
+  nextStep_vi: "Runtime ghi mã này vào sổ (job-rejudge-refused) và lượt đi theo đường chạy lại; không ai khác cần làm gì."
+  owner: runtime-core
+  kind: verb-refusal
+
+rejudge-blocker-not-runtime-owed:
+  title: "The blocker is not one the runtime owes"
+  title_vi: "Điều chặn không phải việc của runtime"
+  meaning_vi: "Báo cáo bị chặn vì lý do khác: lượt đi theo đường chạy lại."
+  causes_vi:
+    - "Báo cáo bị chặn vì lý do khác: lượt đi theo đường chạy lại."
+  nextStep_vi: "Runtime ghi mã này vào sổ (job-rejudge-refused) và lượt đi theo đường chạy lại; không ai khác cần làm gì."
+  owner: runtime-core
+  kind: verb-refusal
+
+rejudge-nothing-to-judge:
+  title: "The op owes no runtime Critic"
+  title_vi: "Op không nợ Critic của runtime"
+  meaning_vi: "Loại op này không có phán quyết của Critic để chấm lại."
+  causes_vi:
+    - "Loại op này không có phán quyết của Critic để chấm lại."
+  nextStep_vi: "Runtime ghi mã này vào sổ (job-rejudge-refused) và lượt đi theo đường chạy lại; không ai khác cần làm gì."
+  owner: runtime-core
+  kind: verb-refusal
+
+rejudge-no-preserved-ref:
+  title: "No preserved product"
+  title_vi: "Không có sản phẩm được giữ lại"
+  meaning_vi: "Lượt lỗi không để lại ref preserved: đi theo đường chạy lại."
+  causes_vi:
+    - "Lượt lỗi không để lại ref preserved: đi theo đường chạy lại."
+  nextStep_vi: "Runtime ghi mã này vào sổ (job-rejudge-refused) và lượt đi theo đường chạy lại; không ai khác cần làm gì."
+  owner: runtime-core
+  kind: verb-refusal
+
+rejudge-product-mismatch:
+  title: "The preserved ref does not hold the reported files"
+  title_vi: "Ref được giữ không có đủ tệp báo cáo"
+  meaning_vi: "Ref preserved thiếu tệp mà báo cáo nêu: đi theo đường chạy lại."
+  causes_vi:
+    - "Ref preserved thiếu tệp mà báo cáo nêu: đi theo đường chạy lại."
+  nextStep_vi: "Runtime ghi mã này vào sổ (job-rejudge-refused) và lượt đi theo đường chạy lại; không ai khác cần làm gì."
+  owner: runtime-core
+  kind: verb-refusal
+
+rejudge-already-done:
+  title: "This product was already re-judged"
+  title_vi: "Sản phẩm này đã được chấm lại một lần"
+  meaning_vi: "Mỗi bản băm sản phẩm chỉ được chấm lại một lần."
+  causes_vi:
+    - "Mỗi bản băm sản phẩm chỉ được chấm lại một lần."
+  nextStep_vi: "Runtime ghi mã này vào sổ (job-rejudge-refused) và lượt đi theo đường chạy lại; không ai khác cần làm gì."
+  owner: runtime-core
+  kind: verb-refusal
+
+rejudge-not-enqueued:
+  title: "The lineage refused the next attempt"
+  title_vi: "Dòng dõi từ chối lượt kế tiếp"
+  meaning_vi: "Cổng của đơn vị không cho lượt kế tiếp: đi theo đường chạy lại."
+  causes_vi:
+    - "Cổng của đơn vị không cho lượt kế tiếp: đi theo đường chạy lại."
+  nextStep_vi: "Runtime ghi mã này vào sổ (job-rejudge-refused) và lượt đi theo đường chạy lại; không ai khác cần làm gì."
+  owner: runtime-core
+  kind: verb-refusal
+
+rejudge-failed:
+  title: "The re-judgment could not be admitted"
+  title_vi: "Không nhận được việc chấm lại"
+  meaning_vi: "Một bước nhận (hợp đồng, bằng chứng READ, khôi phục) lỗi; việc chấm lại kết thúc lỗi và đường chạy lại tiếp quản."
+  causes_vi:
+    - "Một bước nhận (hợp đồng, bằng chứng READ, khôi phục) lỗi; việc chấm lại kết thúc lỗi và đường chạy lại tiếp quản."
+  nextStep_vi: "Runtime ghi mã này vào sổ (job-rejudge-refused) và lượt đi theo đường chạy lại; không ai khác cần làm gì."
+  owner: runtime-core
+  kind: verb-refusal
+
+rejudge-no-mechanical-check:
+  title: "The failed report declared no check the runtime can re-run"
+  title_vi: "Báo cáo lỗi không khai kiểm tra nào runtime chạy lại được"
+  meaning_vi: "Không có bằng chứng cơ học để chấm lại: đi theo đường chạy lại."
+  causes_vi:
+    - "Không có bằng chứng cơ học để chấm lại: đi theo đường chạy lại."
+  nextStep_vi: "Runtime ghi mã này vào sổ (job-rejudge-refused) và lượt đi theo đường chạy lại; không ai khác cần làm gì."
+  owner: runtime-core
+  kind: verb-refusal
+
+rejudge-read-proof-failed:
+  title: "The READ proof of the restored product failed"
+  title_vi: "Bằng chứng READ của sản phẩm khôi phục lỗi"
+  meaning_vi: "Chạy bằng chứng đọc trên cây đã khôi phục thất bại."
+  causes_vi:
+    - "Chạy bằng chứng đọc trên cây đã khôi phục thất bại."
+  nextStep_vi: "Runtime ghi mã này vào sổ (job-rejudge-refused) và lượt đi theo đường chạy lại; không ai khác cần làm gì."
+  owner: runtime-core
+  kind: verb-refusal
+kernel-launch-worker-live:
+  title: "A held Kernel launch names a worker that may be running"
+  title_vi: "Lần khởi động Kernel đang giữ trỏ tới một worker có thể đang chạy"
+  meaning_vi: "Orca báo Dispatch của lần khởi động này có nhịp tim hoặc trạng thái đang chạy, nên đây có thể là ghế Kernel còn sống; runtime không đóng nó."
+  causes_vi:
+    - "Lượt đầu của worker đã bắt đầu dù câu trả lời của Orca không nêu cửa sổ"
+  nextStep_vi: "Một Decision Item của Supervisor nêu Dispatch và cửa sổ Orca báo; gắn ghế đó làm Kernel hoặc đóng nó bằng tay có kiểm chứng."
+  owner: supervisor
+  kind: runtime-fault
+kernel-launch-terminal-unnamed:
+  title: "Orca names no terminal for the held launch"
+  title_vi: "Orca không nêu cửa sổ cho lần khởi động đang giữ"
+  meaning_vi: "Orca trả lời về Dispatch của lần khởi động nhưng không nêu cửa sổ của worker, nên không có gì để nhận và đóng."
+  causes_vi:
+    - "Orca tạo worker rồi lỗi trước khi ghi cửa sổ"
+  nextStep_vi: "Supervisor đối chiếu danh sách cửa sổ trên Orca rồi đóng tay có kiểm chứng."
+  owner: supervisor
+  kind: runtime-fault
+kernel-launch-dispatch-mismatch:
+  title: "Orca answered for another Dispatch"
+  title_vi: "Orca trả lời về Dispatch khác"
+  meaning_vi: "Bản ghi Orca trả về mang mã Dispatch khác với mã lưu trong tín hiệu, nên không thể tin nó thuộc lần khởi động này."
+  causes_vi:
+    - "Mã Dispatch bị dùng lại hoặc đọc nhầm"
+  nextStep_vi: "Supervisor kiểm tra tín hiệu và Dispatch trên Orca; runtime không nhận cửa sổ của bản ghi lạ."
+  owner: supervisor
+  kind: runtime-fault
