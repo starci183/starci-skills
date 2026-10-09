@@ -17,6 +17,7 @@ import { ASSET_OP } from '../work/asset-slot.mjs';
 import { retryMoveOf } from './retry-move.mjs';
 import { enqueueMove, legPathsOf, rerunMoveOf, withMove } from './next-moves.mjs';
 import { handoverReviewAction } from './handover-move.mjs';
+import { proposedLegPaths, treesOfWorkflow } from './leg-proposal.mjs';
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const ownerLanguage = () => ownerLanguageOf();
 
@@ -115,6 +116,10 @@ const approvedLegAction = (op, ctx, credentialOnly) => {
   // The plan leg's own write set is the move; a work graph partitions the leg per node and a leg that declares none leaves the write set to the Kernel.
   const move = nodes.length ? null : enqueueMove(ctx.wf.workflow_id, { op, paths: ctx.legPaths.get(op) });
   const action = withMove({ kind: 'dispatch', origin: 'approved-leg', op, ...(nodes.length ? { nodes } : {}), ...(deferral ? { deferred: deferral.reason } : {}) }, move);
+  // The plan declared no write set: the op contract's own families are the proposal the Kernel picks (kernel-menu.yaml leg-ready), not a guess.
+  const nodePaths = workGraph?.frontier?.[0]?.ownedPaths ?? [];
+  const proposed = move || deferral ? '' : proposedLegPaths({ skillRoot, op, trees: treesOfWorkflow(ctx.db, ctx.wf.workflow_id), nodePaths });
+  if (proposed) action.proposed = proposed;
   if (deferral) {
     action.reason = `approved leg ${op} is deferred (${deferral.reason}): starci kernel enqueue --op ${op} with its paths records it - it settles deferred at once, never dispatched, no attempt spent - and the legs behind it do not wait on it`;
   } else {
