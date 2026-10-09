@@ -7,7 +7,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { withLedger, seedWorkflow } from '../helpers/ledger-fixture.mjs';
 import { TEST_REGISTRY_ENV } from '../../engine/db/machine.mjs';
-import { openLedger } from '../../engine/db/ledger.mjs';
+import { openLedger, openIncident } from '../../engine/db/ledger.mjs';
 import { openDecisionRow, listDecisions } from '../../scripts/machine/decisions.mjs';
 import { incidentPolicy } from '../../scripts/kernel/op-incident-policy.mjs';
 import { buildMenu, menuCatalog, originOf, parseKernelCommand, resolveArgs } from '../../scripts/kernel/kernel-menu.mjs';
@@ -72,6 +72,30 @@ test('a failed job with a retry-decision pending is a menu item with typed optio
   const text = cli(world, 'status', '--workflow', WF).stdout;
   assert.match(text, /^Decide \(1\)/m);
   assert.doesNotMatch(text, /^ {2}next \d+:/m, 'the next lines are not an actionable section any more');
+}));
+
+test('a reported job a supervisor-gate holds is offered no choice: the Kernel cannot settle it, so the frontier is not actionable (Nivo 2026-10-09)', (t) => withLedger(t, (world) => {
+  const { ledger } = world;
+  const REPORTED = 'op-architecture.decide-e78adc94cc';
+  seed(ledger, [{ jobId: REPORTED, unitId: REPORTED, opId: 'architecture.decide', status: 'reported', createdAt: T0, dispatchedAt: T0 + 1000, updatedAt: T0 + 120_000, payload: payload('architecture.decide') }]);
+  const { attempt_id: attemptId, dispatch_id: dispatchId } = ledger.db.prepare('SELECT attempt_id, dispatch_id FROM op_attempts WHERE job_id=?').get(REPORTED);
+  ledger.db.prepare("INSERT INTO contracts(attempt_id,workflow_id,job_id,markdown,created_at) VALUES(?,?,?,'m',?)").run(attemptId, WF, REPORTED, T0);
+  ledger.db.prepare('INSERT INTO reports(workflow_id,attempt_id,dispatch_id,job_id,outcome,report_json,consumed_at,created_at) VALUES(?,?,?,?,?,?,?,?)')
+    .run(WF, attemptId, dispatchId, REPORTED, 'done', '{}', T0 + 60_000, T0 + 30_000);
+  ledger.transaction(() => ledger.appendEvent({ workflowId: WF, entityType: 'job', entityId: REPORTED, attemptId, kind: 'job-settle-needs-kernel',
+    payload: { dispatchId, reason: 'check-not-reverifiable', outcome: 'done', op: 'architecture.decide' } }));
+  openDecisionRow(ledger, { workflowId: WF, kind: 'settle-nongreen', entity: { type: 'job', id: REPORTED }, summary: `${REPORTED} reported done: the runtime did not settle it`, by: 'reconciler/job' }, { now: T0 });
+  ledger.close();
+  const open = status(world);
+  assert.deepEqual(open.menu.map((item) => item.id), [`job-decision:${REPORTED}`], 'with no gate the handed-over job is the Kernel own');
+  const writable = openLedger({ file: world.ledgerFile });
+  openIncident(writable.db, { incidentId: 'inc-held', workflowId: WF, kind: 'supervisor-gate', opId: 'architecture.decide', detail: 'settle refused', lastProgress: '[supervisor-gate] settle refused' });
+  writable.db.prepare("UPDATE incidents SET job_id=? WHERE incident_id='inc-held'").run(REPORTED);
+  writable.close();
+  const held = status(world);
+  assert.deepEqual(held.frontier.heldSettleJobs.map((item) => item.jobId), [REPORTED]);
+  assert.deepEqual(held.menu, [], 'a settle a gate holds is to be released by the gate');
+  assert.equal(held.frontier.actionable, false);
 }));
 
 test('a workflow with nothing to decide has an empty menu and is not actionable, whatever mechanical work is pending', (t) => withLedger(t, (world) => {

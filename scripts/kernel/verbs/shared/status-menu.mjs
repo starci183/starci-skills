@@ -15,14 +15,18 @@ const OWN_KIND = new Set(['worker-question', 'rev-ack', 'unread-peer', 'supervis
 /** The resolution with the class its evidence decides (scripts/kernel/failure-class.mjs): the menu reads it to withhold the escape from a work failure. */
 const withFailure = (db, resolution) => (resolution.jobId ? { ...resolution, failure: failureFactsOf(db, resolution.jobId) } : resolution);
 
-/** The job items waiting on the Kernel: [{di, resolution}] for each reported job the settler handed over and each live retry-decision. */
+/**
+ * The job items waiting on the Kernel: [{di, resolution}] for each reported job the settler handed over and each live retry-decision. A job whose settle an
+ * open gate or wait holds (frontier.heldSettleJobs) is that wait's to release, as a held move is (kernel-menu.mjs actionItemOf): the Kernel is offered no choice there.
+ */
 function jobDecisionsOf(s, kernelDis) {
   const { db, workflowId, now, repo } = s;
+  const held = new Set((s.heldSettle ?? []).map((item) => item.jobId));
   const handed = [...(pendingJobsOf(db, workflowId, now)?.values() ?? [])];
   const byJob = new Map(kernelDis.filter((di) => JOB_KINDS.has(di.kind) && di.entity?.type === 'job').map((di) => [di.entity.id, di]));
   const virtual = handed.filter((item) => !byJob.has(item.jobId))
     .map((item) => ({ kind: 'settle-nongreen', workflowId, entity: { type: 'job', id: item.jobId }, summary: `${item.op} ${item.jobId} reported ${item.outcome}: the runtime did not settle it (${item.reason})`, evidence: [] }));
-  return [...byJob.values(), ...virtual].map((di) => ({ di, resolution: withFailure(db, resolutionOf(db, di, { repo, now })) }));
+  return [...byJob.values(), ...virtual].filter((di) => !held.has(di.entity.id)).map((di) => ({ di, resolution: withFailure(db, resolutionOf(db, di, { repo, now })) }));
 }
 
 /** The waits that can no longer end on their own: a peer-wait whose peer is not running and a typed wait with an unmeetable condition. */

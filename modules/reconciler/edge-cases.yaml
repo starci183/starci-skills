@@ -800,3 +800,10 @@ cases:
     rule: {file: scripts/reconciler/controllers/job.mjs, anchor: "judgedByOlderRuntime"}
     spec: tests/kernel-settle/handover-rejudge.spec.mjs
     status: covered
+  - id: kernel-woken-for-a-menu-item-a-gate-holds
+    family: concurrency
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a wake is typed only while the Kernel can answer a menu item) the Nivo Kernel booted on alpha.8 at 09:32 was woken 8 times in 9 minutes (kernel-woken idleWakes 1 to 8, events 565 to 579) and replaced by the idle-replace at 09:47 (kernel-replaced-idle, event 580), because its menu offered job-decision for op-architecture.decide-e78adc94cc while an open supervisor-gate held that job's settle (frontier supervisor-wait, heldSettleJobs): no choice of the item was the Kernel's to make, the frontier read actionable, and the idle streak (which a boot did not reset) ended in a replacement a minute after the Kernel had acked the new revision", remedy: {state: in-tree, change: "the menu offers no job-decision for a job whose settle an open gate or wait holds (heldSettleJobs), as it already offers no held next action, so the frontier reads not actionable and the watchdog sends no wake; a Kernel boot (kernel-booted, kernel-restarted) starts a new idle-wake count, so the wakes of an earlier incarnation never count against the next"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, Nivo Kernel term_e5af44cb", evidence: "nivo runtime.sqlite events 565 to 580; kernel status frontier supervisor-wait actionable true with a job-decision item for a job in heldSettleJobs"}
+    rule: {file: scripts/kernel/verbs/shared/status-menu.mjs, anchor: "jobDecisionsOf"}
+    spec: tests/kernel/kernel-menu.spec.mjs
+    status: covered
