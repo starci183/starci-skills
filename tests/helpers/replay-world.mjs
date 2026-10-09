@@ -284,11 +284,11 @@ export function replayWorld(t, fixture, { tree = false, seed = null, bindKernel 
   };
   /**
    * The real reconciler Engine over this world for `passes` passes in a fresh process (an engine restart per call): {ok, passes: [{controllers: [...]}], ...}.
-   * `controllers` names the controllers run active (default job, workflow); `critic` configures the stubbed Critic launch ({mode, verdict} for fake-critic-orca).
+   * `controllers` names the controllers run active (default job, workflow); `critic` configures the stubbed Critic launch ({mode, verdict} for fake-critic-orca); `unbound` runs the engine as the live one runs, with no Kernel identity in its environment (the default keeps the bound Kernel's).
    */
-  world.engine = ({ controllers = ['job', 'workflow'], passes = 1, critic = null, timeout = 300_000 } = {}) => {
+  world.engine = ({ controllers = ['job', 'workflow'], passes = 1, critic = null, timeout = 300_000, unbound = false } = {}) => {
     const spec = { repo, ledgerFile, controllers, passes, critic, ledgerId: path.basename(repo), env: { STARCI_ORCA_COMMAND: env.STARCI_ORCA_COMMAND } };
-    const r = spawnSync(process.execPath, [DRIVER, JSON.stringify(spec)], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout, env: { ...env, ...kernelEnv } });
+    const r = spawnSync(process.execPath, [DRIVER, JSON.stringify(spec)], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout, env: { ...env, ...(unbound ? {} : kernelEnv) } });
     const out = lastJson(r.stdout);
     assert.ok(out, `engine driver gave no JSON (exit ${r.status}): ${String(r.stderr).slice(-1500)}`);
     return out;

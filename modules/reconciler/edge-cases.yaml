@@ -1200,10 +1200,11 @@ cases:
     family: record-vs-reality
     found: live
     replay: tests/replay/supervisor-escape.spec.mjs
-    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: an item the Supervisor answered is closed) StarCi di-16537df8, di-866fd7b8 and di-498134c6, the Kernel's menu-escape items, were answered by the Supervisor (sup_decisions sdec-0c7c25c1, sdec-58acb53b, sdec-c7769daf) and the ruling reached the Kernel as a supervisor-ruling Decision Item, but each product-ledger menu-escape item stayed open: starci supervisor decide resolves the Supervisor's own twin in machine.sqlite and nothing resolves the item the twin mirrors", remedy: {state: open}}
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: an item the Supervisor answered is closed) StarCi di-16537df8, di-866fd7b8 and di-498134c6, the Kernel's menu-escape items, were answered by the Supervisor (sup_decisions sdec-0c7c25c1, sdec-58acb53b, sdec-c7769daf) and the ruling reached the Kernel as a supervisor-ruling Decision Item, but each product-ledger menu-escape item stayed open: starci supervisor decide resolves the Supervisor's own twin in machine.sqlite and nothing resolves the item the twin mirrors", remedy: {state: in-tree, change: "the Workflow controller resolves the product-ledger item (by supervisor, verb supervisor-<choice>) once the Supervisor answered its twin, and a Kernel escape answered without a ruling tells the Kernel, as a supervisor-ruling Decision Item with a doorbell, what became of it: record-defect (a runtime defect for Debug, no answer will follow, do not retry or work around) and none-fits (handed to the owner, nothing waits on the Kernel); a rule is told by the ruling itself"}}
     met: {date: "2026-10-09", where: "alpha.8 live, StarCi workflow, after the Supervisor ruled on the mirrored escapes", evidence: "starci runtime.sqlite decision_items di-16537df8, di-866fd7b8, di-498134c6 (kind menu-escape, status open) beside the supervisor-ruling items the rulings opened; machine.sqlite sup_decisions"}
-    status: open
-    why: "reproduced by the replay of tests/replay/supervisor-escape.spec.mjs (the todo test): after the Supervisor's decide rule on the twin, the product-ledger menu-escape item is still open - the failing assertion is notStrictEqual(status, 'open') on that item. Lane f3 owns the fix (it closes the mirrored item when its twin is resolved, in the Workflow controller's mirror pass or in the decide verb); when it lands the todo flag of that test is removed and this entry becomes covered."
+    rule: {file: scripts/reconciler/supervisor-mirror.mjs, anchor: "mirrorPlan"}
+    spec: tests/reconciler-controllers/supervisor-mirror-loop.spec.mjs
+    status: covered
   - id: ready-job-never-dispatched-no-owner
     family: smooth-operation
     found: live
@@ -1451,4 +1452,21 @@ cases:
     met: {date: "2026-10-09", where: "alpha.8 live, Nivo", evidence: "coordinator report: one dead codex terminal per retry in orca terminal list"}
     rule: {file: scripts/supervisor/gc-registry.mjs, anchor: "failedLaunchRunsOf"}
     spec: tests/replay/codex-turn-start.spec.mjs
+    status: covered
+  - id: supervisor-items-of-a-product-ledger-mirrored-for-one-kind-only
+    family: record-vs-reality
+    found: live
+    replay: tests/replay/supervisor-escape-defect.spec.mjs
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: an item handed to the Supervisor is owned by it, and a stale one is closed) the mirror opened twins for the Kernel's menu-escape only; StarCi di-bbb34b93 (seat-unrecoverable, opened by the host controller in the product ledger, decider supervisor) stood open since 02:33Z with no twin, and di-866fd7b8 (an escape about op-brand.decide-8bd6f3374d, settled hours before) stayed open after its twin was resolved", remedy: {state: in-tree, change: "every live product-ledger Decision Item whose decider is the Supervisor is mirrored; an item whose job has settled is closed by the runtime (verb supervisor-item-stale, the reason in its note and a controller log row) instead of being mirrored"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, StarCi workflow", evidence: "starci runtime.sqlite decision_items di-bbb34b93 (seat-unrecoverable, open), di-866fd7b8 (menu-escape, open); machine.sqlite sup_decision_items holds no twin of the first"}
+    rule: {file: scripts/reconciler/supervisor-mirror.mjs, anchor: "staleReasonOf"}
+    spec: tests/reconciler-controllers/supervisor-mirror-loop.spec.mjs
+    status: covered
+  - id: supervisor-ruling-contradicted-by-the-runtime-stands
+    family: record-vs-reality
+    found: live
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a standing Supervisor ruling is obeyed or withdrawn, never contradicted) the ruling di-ddda767e told the StarCi Kernel not to let op-work.author-ab81f9802d run again in the same shape (06:36Z) while the dispatch guard fix, deployed after it, dispatches that very job: the Kernel kept a fact on its menu that the runtime then falsified, and nothing told the Supervisor", remedy: {state: in-tree, change: "the Workflow controller withdraws a supervisor-ruling Decision Item about an escaped shape-refused job once the dispatch guard no longer refuses that shape: the ruling is resolved by the runtime (verb ruling-withdrawn) with the reason, a controller log row journals it and a Supervisor action record ruling-withdrawn:<id> shows it on supervisor actions"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, StarCi workflow", evidence: "starci runtime.sqlite decision_items di-ddda767e (supervisor-ruling, open) beside the shape-guard fix of 188a4811a that dispatches op-work.author-ab81f9802d"}
+    rule: {file: scripts/reconciler/supervisor-ruling-withdraw.mjs, anchor: "contradictedRulings"}
+    spec: tests/reconciler-controllers/supervisor-mirror-loop.spec.mjs
     status: covered
