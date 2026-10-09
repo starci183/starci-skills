@@ -7,7 +7,7 @@ import { parseJson } from '../../lib/json.mjs';
 import { jobPayloadOf } from '../verbs/shared/rows.mjs';
 import { reboundBindingOf, reboundMapOf } from '../../machine/placement-rebound.mjs';
 import { runtimeCriticRunOf } from './critic-run.mjs';
-import { acceptanceTraceOf, traceOpsOf } from '../acceptance-trace.mjs';
+import { acceptanceTraceOf, traceOpsOf, traceRunsOf } from '../acceptance-trace.mjs';
 
 /** Bind the native consumers to the CLI's existing private context and placement
  * functions. The proof consumer stays synchronous for the workflow-lock recheck. */
@@ -60,10 +60,12 @@ function settleAcceptanceTrace(db, jobId, repo) {
   const s = settleJobContext(db, jobId, { requiresReport: true });
   if (!s || !traceOpsOf(skillRoot).includes(s.op)) return null;
   try {
-    const { roots, envelope } = settleJobFiles(db, s.job, repo, s.filed, { jobId: s.job.job_id });
+    const { roots } = settleJobFiles(db, s.job, repo, s.filed, { jobId: s.job.job_id });
     const owned = (jobPayloadOf(s.job).owned_paths ?? []).map((p) => (typeof p === 'string' ? p : p?.path)).filter((p) => typeof p === 'string');
-    return { op: s.op, attemptId: s.filed.attemptId, trace: acceptanceTraceOf({ roots: [...new Set([...roots, repo].filter(Boolean))], owned, reportFiles: envelope?.files }) };
-  } catch { return null; }
+    const context = observationContextOf(db, s.job, { repo, skillRoot });
+    const testRuns = traceRunsOf(mechanismObservations(db, context));
+    return { op: s.op, attemptId: s.filed.attemptId, trace: acceptanceTraceOf({ roots: [...new Set([...roots, repo].filter(Boolean))], owned, testRuns }) };
+  } catch (error) { return { op: s.op, attemptId: s.filed.attemptId, trace: { total: 0, cited: 0, missing: [], tests: 0, uncitedTests: [], unavailable: error.message } }; }
 }
   return { settleOpGate, settleOpProofs, settleCriticVerdict, settleAcceptanceTrace };
 }

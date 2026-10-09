@@ -426,7 +426,7 @@ function runTests(root, pattern, cache) {
   const result = readCache(outputFile);
   if (!result) return { step: { pattern, exit: run.status }, findings: [], error: `jest produced no json result (exit ${run.status}): ${String(run.stderr || run.error?.message || '').trim().split('\n').at(-1)}` };
   const error = jestRunError(result, run);
-  const totals = reduceJest(result);
+  const totals = reduceJest(result, root);
   if (error) return { step: { pattern, exit: run.status, ...totals }, findings: [], error };
   const findings = [];
   for (const suite of result.testResults) {

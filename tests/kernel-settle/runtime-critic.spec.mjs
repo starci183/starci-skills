@@ -13,6 +13,8 @@ import { judgeCriticVerdict } from '../../scripts/kernel/critic-settle.mjs';
 import { criticFor } from '../../scripts/work/critic-pick.mjs';
 import { productDigests, productFiles, kindEntryOf, criticRubrics } from '../../scripts/work/decision-critic-product.mjs';
 import { allocationSettings } from '../../engine/config.mjs';
+import { fakeCriticOrca } from '../helpers/fake-critic-orca.mjs';
+import { criticVerdictFor } from '../helpers/replay-critic-verdict.mjs';
 
 const OP = 'architecture.decide';
 const rubrics = criticRubrics();
@@ -66,6 +68,27 @@ test('a done report admitted before the Critic rule settles after a runtime-run 
   const without = judgeCriticVerdict({ op: OP, roots: [tree], owned: ['.starciwork/features/authentication/sds'] });
   assert.equal(without.code, 'op-critic-verdict-missing', 'with no run recorded the refusal says the runtime owes it');
   assert.equal(judgeCriticVerdict({ op: OP, roots: [tree], owned: [] }).code, 'op-critic-verdict-missing');
+}));
+
+test('business.decide meets one runtime Critic pass with the walk stub verdict from another provider', (t) => withLedger(t, async ({ ledger, repoRoot }) => {
+  const scope = ['features/identity'];
+  const record = path.join(repoRoot, '.starciwork', 'features', 'identity', 'br', 'sign-in', 'index.yaml');
+  fs.mkdirSync(path.dirname(record), { recursive: true });
+  fs.writeFileSync(record, 'id: br.identity.sign-in\nschema: work/business-rule@1\n');
+  const owned = ['.starciwork/features/identity/br'];
+  seedWorkflow(ledger, { id: 'wf-business', jobs: [{ jobId: 'op-business', opId: 'business.decide', status: 'reported',
+    payload: { opId: 'business.decide', owned_paths: owned } }] });
+  ledger.db.prepare("UPDATE op_attempts SET provider='claude' WHERE job_id='op-business'").run();
+  const orca = fakeCriticOrca({ verdict: () => criticVerdictFor({ tree: repoRoot, op: 'business.decide', within: scope, maker: 'claude', critic: 'codex' }) });
+  const item = { jobId: 'op-business', workflowId: 'wf-business', op: 'business.decide', outcome: 'done' };
+  const options = { tree: repoRoot, retryMs: 60_000, orca, entry: 'term_kernel' };
+  const run = await runtimeCriticFor(ledger, item, options);
+  assert.deepEqual([run.ran, run.pass], [true, true]);
+  const recorded = runtimeCriticRunOf(ledger.db, item.jobId);
+  assert.deepEqual([recorded.op, recorded.outcome, recorded.pass, recorded.maker, recorded.critic.provider], ['business.decide', 'verdict', true, 'claude', 'codex']);
+  assert.equal(judgeCriticVerdict({ op: item.op, roots: [repoRoot], owned, runtime: recorded.document }).status, 'pass');
+  assert.equal(await runtimeCriticFor(ledger, item, options), null, 'the same product gets no second pass');
+  assert.equal(orca.calls.filter(([name]) => name === 'worker-start').length, 1);
 }));
 
 test('a failing critique is the op\'s error-work with the critique attached', (t) => world(t, async ({ ledger, tree, item }) => {

@@ -342,6 +342,7 @@ export function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
   if (ledger.readOnly) out.readOnly = true;
   out.opHealth = s.opHealth;
   out.kernelNotes = s.kernelNotes;
+  out.acceptanceTraces = s.acceptanceTraces;
   out.stuck = s.stuck;
   out.ramThrottle = s.ramThrottle;
   out.poolLoad = { running: s.poolLoad.byModel, routeHoldMs: s.poolLoad.routeHoldMs };

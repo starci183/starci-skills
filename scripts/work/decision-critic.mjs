@@ -3,8 +3,8 @@
 // standard Critic (draw-critic.mjs runCritic over critic-pick.mjs, critic-guard.mjs, critic-verdict.mjs; modules/kernel/critic.yaml):
 // a fresh Orca worker of the Critic tier and of another provider than the op, confined to a directory that holds only the op's decision
 // records, the records they cite, a manifest and the rubric of its kind (modules/kernel/critic-rubrics.yaml). It answers with one typed
-// verdict (starci/critic-verdict@1) carrying the sha256 of every byte it judged. The op runs this verb once its records are written;
-// starci kernel settle (scripts/kernel/critic-settle.mjs) requires the verdict for exactly those bytes.
+// verdict (starci/critic-verdict@1) carrying the sha256 of every byte it judged. The runtime settler calls critiqueDecision when the op reports done;
+// starci kernel settle (scripts/kernel/critic-settle.mjs) requires the verdict of that runtime run for exactly those bytes.
 //
 //   starci work decision-critic --kind scope.define|business.decide|architecture.decide --root <work root or repo> --out <STARCI_JOB_SCRATCH>/critic-verdict.json
 //       [--records <csv of record files or directories>] [--input <csv of extra files, e.g. the goal or request text>] [--maker <provider>] [--json]

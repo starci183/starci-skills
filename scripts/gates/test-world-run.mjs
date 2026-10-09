@@ -174,14 +174,18 @@ export function jestRunError(report, run) {
   return null;
 }
 
-/** jest's --json report, reduced: {total, passed, failed, skipped, files, failures[]}. */
-export function reduceJest(report) {
+/** Jest's totals and executed suite files; testFiles are relative to root when supplied. */
+export function reduceJest(report, root = null) {
+  const suites = Array.isArray(report?.testResults) ? report.testResults : [];
   const failures = [];
-  for (const file of Array.isArray(report?.testResults) ? report.testResults : []) for (const a of Array.isArray(file?.assertionResults) ? file.assertionResults : []) {
+  for (const file of suites) for (const a of Array.isArray(file?.assertionResults) ? file.assertionResults : []) {
     if (a.status === 'failed') failures.push({ file: posixPath(String(file.name ?? '')), test: a.fullName ?? a.title, message: String(a.failureMessages?.[0] ?? '').split('\n')[0].slice(0, 300) });
   }
   return { total: report?.numTotalTests ?? 0, passed: report?.numPassedTests ?? 0, failed: report?.numFailedTests ?? 0,
-    skipped: (report?.numPendingTests ?? 0) + (report?.numTodoTests ?? 0), files: report?.numTotalTestSuites ?? 0, failedFiles: report?.numFailedTestSuites ?? 0, failures: failures.slice(0, 100) };
+    skipped: (report?.numPendingTests ?? 0) + (report?.numTodoTests ?? 0), files: report?.numTotalTestSuites ?? 0, failedFiles: report?.numFailedTestSuites ?? 0, failures: failures.slice(0, 100),
+    testFiles: suites.filter((suite) => (suite.assertionResults ?? []).some((assertion) => ['passed', 'failed'].includes(assertion.status)))
+      .map((suite) => suite.name ?? suite.testFilePath).filter((file) => typeof file === 'string')
+      .map((file) => posixPath(root ? path.relative(root, path.resolve(root, file)) : file)) };
 }
 
 /** Run the managed `npm run test:<project>` with jest's JSON report; {command, exit, ...reduceJest, error}. */
@@ -194,7 +198,7 @@ function runWorldProject(root, project, tests = null, { npm = runNpm } = {}) {
   try { report = JSON.parse(fs.readFileSync(outFile, 'utf8')); } catch { report = null; }
   try { fs.rmSync(outFile, { force: true }); fs.rmdirSync(outDir); } catch { /* a temp file of this run */ }
   return { command: `npm ${args.filter((a) => !a.startsWith('--outputFile=')).join(' ')}`, exit: run.status ?? null,
-    ...(report ? reduceJest(report) : { total: 0, passed: 0, failed: 0, skipped: 0, files: 0, failedFiles: 0, failures: [] }),
+    ...(report ? reduceJest(report, root) : { total: 0, passed: 0, failed: 0, skipped: 0, files: 0, failedFiles: 0, failures: [] }),
     error: jestRunError(report, run) };
 }
 

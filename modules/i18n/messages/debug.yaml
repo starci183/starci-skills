@@ -3,6 +3,8 @@ area: debug
 scope: runtime
 purpose: Owner-visible Vietnamese of the lines of `starci debug digest` (scripts/reconciler/debug-digest-text.mjs), keyed from their English source (scripts/lib/i18n.mjs).
 messages:
+  - en: "  {line} ({op} {jobId}; report mode)"
+    vi: "  {line} ({op} {jobId}; chế độ báo cáo)"
   - en: "Controllers {names} are off although the config asks for them; nothing they own is being done."
     vi: "Các controller {names} đang tắt dù cấu hình yêu cầu chạy; không có việc nào của chúng được làm."
   - en: "The reconciler has no leader row; no controller runs."

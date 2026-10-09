@@ -9,7 +9,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { fileReport, inspectLedger, ledgerFileFor, openLedger, writeContract, recordCheckRun } from '../../engine/db/ledger.mjs';
+import { openLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
+import { runtimeCriticFor, runtimeCriticRunOf } from '../../scripts/kernel/settle/critic-run.mjs';
+import { fakeCriticOrca } from '../helpers/fake-critic-orca.mjs';
+import { criticVerdictFor } from '../helpers/replay-critic-verdict.mjs';
 import { DOC_PROFILE, GATE_SCHEMA, LINT_SCHEMA, parseGateArgs, runDocGate } from '../../scripts/gates/gate.mjs';
 import { DIGEST_SCHEMA, buildReadDigest, judgeKnowledgeDigest, loadOpGate } from '../../scripts/gates/read-digest.mjs';
 import { TEST_WORLD_RUN_SCHEMA, buildTestWorldRun, judgeSpec, testWorldRules } from '../../scripts/gates/test-world-run.mjs';
@@ -19,20 +22,15 @@ import {
   REVIEW_DEFECTS_SCHEMA, SECURITY_FINDINGS_SCHEMA, captureGateBinding, judgeDocGate, judgeJobLoop, judgeJobProofs, judgeKnowledgeRead, judgeLint, judgeRelease, judgeReviewDefects,
   judgeReviewGate, judgeSecurityLint, judgeTestWorld, judgeTestWorlds, judgeUnitRun, feRelevant, proofsOf, securityRelevant,
 } from '../../scripts/kernel/gate-settle.mjs';
+import { seedOp, settle, read, tmp, put, gitIn } from '../helpers/mechanism-proof-settle.mjs';
 import { sha256File } from '../../engine/digest.mjs';
 import { exampleSourcePaths } from '../../scripts/lib/example-refs.mjs';
 import { readCatalog } from '../../scripts/checks/check-failure-codes.mjs';
-import { seedWorkflow } from '../helpers/ledger-fixture.mjs';
-import { TEST_REGISTRY_ENV } from '../../engine/db/machine.mjs';
-import { registerWorkflowWorktree } from '../../scripts/kernel/workflow-worktree.mjs';
 import { greenDocGate, greenGate, greenLint, greenReadDigest, greenReleaseProof, greenReviewDefects, greenTestWorldRun, greenUnitRun } from '../helpers/sonar-scan.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const API = path.join(ROOT, 'scripts', 'kernel', 'cli.mjs');
 const SHA = 'a'.repeat(64);
-const tmp = (t, prefix = 'starci-op-proof-') => { const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), prefix))); t.after(() => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 })); return dir; };
-const put = (root, rel, body) => { const abs = path.join(root, rel); fs.mkdirSync(path.dirname(abs), { recursive: true }); fs.writeFileSync(abs, body); return rel; };
-const gitIn = (cwd) => (...args) => { const r = spawnSync('git', args, { cwd, encoding: 'utf8', windowsHide: true }); assert.equal(r.status, 0, `git ${args.join(' ')}: ${r.stderr}`); return r.stdout.trim(); };
 const codeOf = (judged) => judged.code;
 
 // ---- the data and the codes ----
@@ -377,55 +375,6 @@ test('judgeJobProofs refuses paper-only attachments even when every required sch
 
 // ---- starci kernel settle end to end ----
 
-function seedOp(t, { label, op, docs, admittedAt = null, current = false }) {
-  const base = tmp(t, 'starci-op-proof-settle-'), repo = path.join(base, 'main'), tree = path.join(base, 'workflow');
-  fs.mkdirSync(repo);
-  const env = { ...process.env, [TEST_REGISTRY_ENV]: path.join(base, 'machine.sqlite'), STARCI_LOCAL_ROOT: path.join(base, 'localappdata'),
-    STARCI_PROJECTS_ROOT: path.join(base, 'projects'), STARCI_ARTIFACT_ROOT: path.join(base, 'artifacts'),
-    STARCI_LOCAL_ROOT: path.join(base, 'local'), STARCI_OWNER_ROOT: path.join(base, 'owner'), STARCI_LANES_ROOT: path.join(base, 'lanes') };
-  delete env.STARCI_CALLER;
-  const git = gitIn(repo);
-  git('init', '--quiet', '-b', 'main');
-  for (const [k, v] of [['user.email', 'lane@starci.test'], ['user.name', 'lane'], ['core.autocrlf', 'false'], ['commit.gpgsign', 'false']]) git('config', k, v);
-  put(repo, 'docs/a.md', '# a\n');
-  git('add', '.'); git('commit', '--quiet', '-m', 'init');
-  const branch = 'branch-' + label;
-  git('worktree', 'add', '-q', '-b', branch, tree, 'main');
-  const treeGit = gitIn(tree);
-  registerWorkflowWorktree({ env }, { workflowId: `wf-${label}`, orcaWorktreeId: 'fixture::' + label, path: tree, branch });
-  const files = ['docs/a.md'];
-  // Accepted proof bytes remain owned changes until the real runtime checkpoint commits them.
-  const head = treeGit('rev-parse', 'HEAD');
-  // Capture admission before producing attachments; native observations are still independently required.
-  const admissionAt = admittedAt ?? Date.now() - 1000;
-  const proofDocs = typeof docs === 'function' ? docs({ repo, tree, base, env }) : docs;
-  for (const [name, doc] of Object.entries(proofDocs)) {
-    const proof = doc?.schema === GATE_SCHEMA ? { ...doc, root: tree, base: head, head } : doc;
-    files.push(put(tree, `docs/checks/${name}`, Buffer.isBuffer(proof) ? proof : JSON.stringify(proof)));
-  }
-  const jobId = `op-${op}-${label}`;
-  const ledger = openLedger({ file: ledgerFileFor(repo, { env }) });
-  try {
-    seedWorkflow(ledger, { id: `wf-${label}`, state: { phase: 'running', job: 'impl' },
-      jobs: [{ jobId, opId: op, dispatchId: `ctx-${jobId}`, terminalHandle: `term-${jobId}`, status: 'running',
-        payload: { opId: op, owned_paths: ['docs/'], orca: { dispatchId: `ctx-${jobId}`, agentTerminalHandle: `term-${jobId}` } } }] });
-    const attemptId = ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(jobId).attempt_id;
-    ledger.transaction((db) => {
-      writeContract(db, { attemptId, markdown: '# contract', context: { worktree: tree, packet: { context: {
-        selected_op: { mode: null, contract: { id: op, reads: [{ id: 'standard', path: 'docs/architecture.md' }] }, checks: { required: [], candidates: [] } },
-        readRefs: [{ path: 'docs/architecture.md', absolute: path.join(ROOT, 'docs/architecture.md'), rootKind: 'source', root: ROOT, sha256: sha256File(path.join(ROOT, 'docs/architecture.md')) }],
-        owned_paths: [{ root: tree, path: 'docs/' }],
-      gate_binding: captureGateBinding([{ base: tree, path: 'docs/' }], { at: admissionAt }) } } }, createdAt: admissionAt });
-      fileReport(db, { attemptId, outcome: 'done', createdAt: Date.now(),
-        report: { schema: 'starci/op-report@1', outcome: 'done', summary: 'slice', files, head: treeGit('rev-parse', 'HEAD') } });
-      for (const check of [{ name: 'owned-paths-committed', command: 'git show' }, { name: 'owned-paths-clean', command: 'git status' }, { name: 'head-ancestor', command: 'git merge-base' }])
-        recordCheckRun(db, { attemptId, name: check.name, phase: 'verify', runner: 'kernel', authority: 'runtime', status: 'pass', exitCode: 0, command: check.command });
-    });
-  } finally { ledger.close(); }
-  return { repo, tree, env, jobId, base };
-}
-const settle = ({ repo, env }, jobId) => { const r = spawnSync(process.execPath, [API, 'settle', '--repo', repo, '--job', jobId, '--verdict', 'pass', '--json'], { cwd: ROOT, env, encoding: 'utf8', windowsHide: true, timeout: 120000 }); let body = null; try { body = JSON.parse(r.stdout); } catch { /* judged below */ } return { r, body }; };
-const read = ({ repo, env }, fn) => { const l = inspectLedger({ file: ledgerFileFor(repo, { env }) }); try { return fn(l.db); } finally { l.close(); } };
 // A 1x1 PNG: e2e.verify owes an image of its run (proof-media) before its mechanism proofs are judged.
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
 const lastProofCheck = (seeded) => read(seeded, (db) => db.prepare("SELECT status FROM check_runs WHERE name='op-proof' ORDER BY check_id DESC").get()?.status ?? null);
@@ -468,9 +417,12 @@ test('native settlement refuses an unbound e2e loop before attachments can claim
 });
 
 
-test('current deciding-op route needs a real record-checks READ before native settle; a green attachment alone refuses', (t) => {
-  const create = (label) => seedOp(t, { label, op: 'business.decide', current: true, admittedAt: Date.now() - 1000,
+test('current deciding-op route needs a real record-checks READ and the runtime Critic before native settle; a green attachment alone refuses', async (t) => {
+  const record = '.starciwork/features/identity/br/sign-in/index.yaml';
+  const create = (label) => seedOp(t, { label, op: 'business.decide', admittedAt: Date.now() - 1000,
+    ownedPaths: ['docs/', '.starciwork/features/identity/br'], recordFiles: [record],
     docs: ({ tree, env }) => {
+      put(tree, record, 'schema: work/business-rule@1\nid: br.identity.sign-in\ntitle: Sign in\nstatement: A person with a valid account may sign in.\n');
       const r = spawnSync(process.execPath, [path.join(ROOT, 'scripts/cli/gate-read.mjs'), '--root', tree, '--knowledge', 'docs/architecture.md'], { cwd: ROOT, env, encoding: 'utf8', windowsHide: true, timeout: 30000 });
       assert.equal(r.status, 0, r.stderr || r.stdout);
       return { 'read-digest.json': JSON.parse(r.stdout) };
@@ -486,6 +438,18 @@ test('current deciding-op route needs a real record-checks READ before native se
   const raw = read(seeded, (db) => db.prepare("SELECT exit_code,authority,output_sha,cwd,summary_json FROM check_runs WHERE name='read-knowledge' ORDER BY check_id DESC").get());
   assert.equal(raw.exit_code, 0); assert.equal(raw.authority, 'runtime'); assert.equal(raw.cwd, seeded.tree); assert.ok(raw.output_sha);
   assert.equal(JSON.parse(raw.summary_json).native.schema, DIGEST_SCHEMA);
+  const unjudged = settle(seeded, seeded.jobId);
+  assert.equal(unjudged.r.status, 1, unjudged.r.stderr || unjudged.r.stdout);
+  assert.equal(unjudged.body?.reason, 'op-critic-verdict-missing');
+  const ledger = openLedger({ file: ledgerFileFor(seeded.repo, { env: seeded.env }) });
+  try {
+    ledger.db.prepare('UPDATE op_attempts SET provider=? WHERE job_id=?').run('claude', seeded.jobId);
+    const orca = fakeCriticOrca({ verdict: () => criticVerdictFor({ tree: seeded.tree, op: 'business.decide', within: ['features/identity'], maker: 'claude', critic: 'codex' }) });
+    const item = { jobId: seeded.jobId, workflowId: 'wf-current-native-read', op: 'business.decide', outcome: 'done' };
+    const judged = await runtimeCriticFor(ledger, item, { tree: seeded.tree, entry: 'term_kernel', retryMs: 60_000, orca });
+    assert.deepEqual([judged.ran, judged.pass], [true, true]);
+    assert.equal(runtimeCriticRunOf(ledger.db, seeded.jobId).pass, true);
+  } finally { ledger.close(); }
   const accepted = settle(seeded, seeded.jobId);
   assert.equal(accepted.r.status, 0, accepted.r.stderr || accepted.r.stdout);
   assert.equal(read(seeded, (db) => db.prepare('SELECT status FROM jobs WHERE job_id=?').get(seeded.jobId).status), 'succeeded');

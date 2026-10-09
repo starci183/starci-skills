@@ -52,6 +52,7 @@ function workflowLines(tr, w, now) {
   lines.push(tr(TEXT.running, { items: running || tr(TEXT.none) }));
   for (const h of w.held) lines.push(tr(TEXT.held, { op: h.op, hold: h.hold, handler: h.handler ?? '-', step: stepText(tr, h.step), deadline: deadlineOf(tr, h, now) }));
   for (const j of w.judgements) lines.push(stoppedLine(tr, j));
+  for (const trace of w.acceptanceTraces ?? []) lines.push(tr(TEXT.acceptanceTrace, { line: trace.line, op: trace.op, jobId: trace.jobId }));
   const burn = w.usage.map((u) => `${u.op} ${u.tokens} tok/${u.turns} turns/${u.attempts} try`).join(', ');
   if (burn) lines.push(tr(TEXT.burn, { items: burn }));
   return lines;

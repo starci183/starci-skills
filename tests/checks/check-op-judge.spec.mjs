@@ -67,7 +67,7 @@ test('RT_OP_JUDGE_UNDECLARED: a next-leg is a registered reviewer of the op, and
   assert.match(messages((copy) => { copy.registry.reviewers['review.verify'].anchor = 'a-sentence-the-goal-lacks'; }), /reviewers review\.verify: the goal of its contract no longer says/);
 });
 
-test('RT_OP_JUDGE_UNDECLARED: business.decide has the runtime Critic, test.author a next leg and the trace measure, and a report-mode measure is no judge alone (passing, violating)', () => {
+test('RT_OP_JUDGE_UNDECLARED: business.decide has the runtime Critic, test.author a next leg, and acceptance-trace is no judge alone (passing, violating)', () => {
   assert.equal(entry(BASE, 'business.decide', 'critic').runs, 'runtime');
   assert.ok(BASE.critic.coverage.some((row) => row.kind === 'business.decide' && row.status === 'covered'));
   assert.equal(entry(BASE, 'test.author', 'next-leg').leg, 'code.refactor');

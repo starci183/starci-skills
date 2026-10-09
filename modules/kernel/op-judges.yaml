@@ -93,7 +93,7 @@ measures:
     source: scripts/kernel/acceptance-trace.mjs
     independence: runtime
     mode: report
-    applies: {ops: [backend.implement, interface.implement, e2e.verify, integration.verify, test.author]}
+    applies: {ops: [backend.implement, interface.implement, e2e.verify, integration.verify]}
     what: "every acceptance record (ac.*) of the op's scope, which its bound implementation record proves directly or through a business rule, should be cited by id in at least one test the attempt ran, and a test that cites none of them is not counted toward the proof; the acceptance records are written by an earlier leg, never by the maker. Report mode until the first live run: the settle records \"acceptance-trace: N of M cited, K tests uncited\" as evidence on the attempt, shown by starci kernel status --full, and a miss fails and opens nothing (owner ruling acceptance-trace-report-mode)"
   contract-script:
     kind: product
