@@ -10,7 +10,7 @@ import { runNode } from '../api/node/run-node.mjs';
 import { jsonFromStdout } from '../lib/json.mjs';
 import { clipLine } from '../lib/clip.mjs';
 import { isMain } from '../lib/is-main.mjs';
-import { incompleteAnswer, missingText, pickOption, runUntilFailure, stepsFailed } from '../lib/menu-answer.mjs';
+import { answerMenuItem, answerOf, runUntilFailure } from '../lib/menu-answer.mjs';
 import { openDecision } from '../machine/decisions.mjs';
 import { recordAction } from './actions.mjs';
 import { readSupervisorMenu } from './supervisor-menu-sources.mjs';
@@ -60,10 +60,9 @@ async function handToOwner(item, reason, { env }) {
   return opened.ok ? { ok: true, owner: opened.json?.decision?.id ?? null } : { ok: false, error: opened.json?.error ?? 'the owner item could not be opened' };
 }
 
-function answerOf({ item, option, done, closed, owner }) {
-  const failed = stepsFailed(done);
-  const out = { ok: !failed && owner?.ok !== false, item: item.id, choice: option.choice, effect: option.effect, steps: done, ...(closed ? { resolved: closed.resolved, ...(closed.error ? { resolveNote: closed.error } : {}) } : {}),
-    ...(owner ? { owner } : {}), ...(failed ? { code: 'SUPERVISOR_MENU_STEP_FAILED', error: `${failed.run}: ${failed.code}: ${failed.error}` } : {}) };
+function renderAnswer({ item, option, done, failed, closed, escalation: owner }) {
+  const out = answerOf({ item, option, done }, { ok: !failed && owner?.ok !== false, ...(closed ? { resolved: closed.resolved, ...(closed.error ? { resolveNote: closed.error } : {}) } : {}),
+    ...(owner ? { owner } : {}), ...(failed ? { code: 'SUPERVISOR_MENU_STEP_FAILED', error: `${failed.run}: ${failed.code}: ${failed.error}` } : {}) });
   const handed = owner?.owner ? `; handed to the owner as ${owner.owner}` : '';
   const line = failed ? `decide FAILED at ${failed.run} (${failed.code}): ${failed.error}` : `decided ${item.id} -> ${option.choice}: ${option.effect}${handed}`;
   return { out, line };
@@ -74,21 +73,14 @@ export async function decideItem({ item: itemId, choice, reason, text = '', env 
   const why = String(reason ?? '').trim();
   const menu = readSupervisorMenu({ env, now });
   const refuse = ({ code, error }) => ({ out: refusal(code, error, menu), line: [`decide REFUSED (${code}): ${error}`, ...supervisorMenuLines(menu)].join('\n') });
-  const incomplete = incompleteAnswer({ choice, reason: why });
-  if (incomplete) return refuse(incomplete);
-  const { item, option, refusal: unknown } = pickOption(menu, { itemId, choice, menuName: "the Supervisor's menu" });
-  if (unknown) return refuse(unknown);
-  const input = String(text ?? '').trim();
-  const lacking = missingText(item, option, input);
-  if (lacking) return refuse(lacking);
-  recordAction({ item: item.id, action: `decide:${option.choice}`, reason: why, workflowId: item.subject.workflow, refs: [`di:${item.di}`], by: BY, env, now });
-  const caller = { text: option.escape ? why : input, reason: why };
-  const done = option.escape ? [] : await runSteps(option.steps, caller, { env });
-  const failed = stepsFailed(done);
-  const owner = option.escape ? await handToOwner(item, why, { env }) : null;
-  const closeable = !failed && !option.keepsOpen && (!option.escape || owner?.ok);
-  const closed = closeable ? resolveItem(item, `${option.choice}: ${why}`, { env }) : null;
-  return answerOf({ item, option, done, closed, owner });
+  const result = await answerMenuItem({ menu, answer: { item: itemId, choice, reason: why, text }, menuName: "the Supervisor's menu" }, {
+    record: ({ item, option, reason: note }) => recordAction({ item: item.id, action: `decide:${option.choice}`, reason: note, workflowId: item.subject.workflow, refs: [`di:${item.di}`], by: BY, env, now }),
+    execute: ({ option, text: input, reason: note }) => runSteps(option.steps, { text: input, reason: note }, { env }),
+    escalate: ({ item, reason: note }) => handToOwner(item, note, { env }),
+    closeEscape: true,
+    resolve: ({ item, option, reason: note }) => resolveItem(item, `${option.choice}: ${note}`, { env }),
+  });
+  return result.refusal ? refuse(result.refusal) : renderAnswer(result);
 }
 
 if (isMain(import.meta.url)) {

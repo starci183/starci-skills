@@ -156,7 +156,7 @@ test('a gate that needs a ruling is the Supervisor\'s, and the work the controll
 });
 
 test('the main kinds build their items: a stale runtime revision, a worker question, a peer message, a wedged worker, work the runtime does not yet do', () => {
-  const menu = buildMenu(sources({ rev: { stale: true, acked: 'a'.repeat(40), current: 'b'.repeat(40) },
+  const menu = buildMenu(sources({ rev: { state: 'owed', from: 'a'.repeat(40), to: 'b'.repeat(40) },
     questions: [{ messageId: 'msg-1', jobId: 'op-x-1', opId: 'x', question: 'which table?', askedAt: new Date(T0).toISOString() }], peers: [{ key: 'pm-1', from: 'wf-other', kind: 'request', subject: 'port', at: T0 }],
     wedged: [{ jobId: 'op-x-2', opId: 'x' }], nextActions: [{ kind: 'dispatch', origin: 'approved-leg-open', op: 'architecture.decide', reason: 'approved leg has no job' }] }));
   assert.deepEqual(menu.map((item) => item.id), ['rev-ack:wf-menu', 'worker-question:msg-1', 'peer-message:pm-1', 'worker-wedged:op-x-2', 'leg-ready:architecture.decide:approved-leg-open']);
