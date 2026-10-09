@@ -1037,7 +1037,7 @@ cases:
     replay: tests/replay/supervisor-escape.spec.mjs
     finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: an item handed to the Supervisor is owned by the Supervisor) StarCi di-16537df8, di-866fd7b8 and di-498134c6 (the menu-escape of the Kernel, decider supervisor) stood open in the product ledger while the digest read \"Supervisor 0 Decision Items open\": starci kernel decide opens the escape in the product ledger and the Supervisor reads machine.sqlite only, so no Supervisor menu, ring or digest line ever held them", remedy: {state: in-tree, change: "the Workflow controller opens the twin of every live menu-escape of its workflow in the Supervisor store, keyed escalated:<ledger>:<id> (the key the Supervisor menu routes to kernel-escape), once per item"}}
     met: {date: "2026-10-09", where: "alpha.8 live, StarCi workflow", evidence: "starci runtime.sqlite decision_items di-16537df8, di-866fd7b8, di-498134c6 (kind menu-escape, decider supervisor, status open); machine.sqlite sup_decision_items holds none of them"}
-    rule: {file: scripts/reconciler/supervisor-mirror.mjs, anchor: "strandedSupervisorDis"}
+    rule: {file: scripts/reconciler/supervisor-mirror.mjs, anchor: "mirrorPlan"}
     spec: tests/reconciler-controllers/supervisor-mirror.spec.mjs
     status: covered
   - id: decision-baseline-counts-a-reported-job-as-running
@@ -1465,6 +1465,7 @@ cases:
   - id: supervisor-ruling-contradicted-by-the-runtime-stands
     family: record-vs-reality
     found: live
+    replay: tests/replay/supervisor-ruling-withdrawn.spec.mjs
     finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a standing Supervisor ruling is obeyed or withdrawn, never contradicted) the ruling di-ddda767e told the StarCi Kernel not to let op-work.author-ab81f9802d run again in the same shape (06:36Z) while the dispatch guard fix, deployed after it, dispatches that very job: the Kernel kept a fact on its menu that the runtime then falsified, and nothing told the Supervisor", remedy: {state: in-tree, change: "the Workflow controller withdraws a supervisor-ruling Decision Item about an escaped shape-refused job once the dispatch guard no longer refuses that shape: the ruling is resolved by the runtime (verb ruling-withdrawn) with the reason, a controller log row journals it and a Supervisor action record ruling-withdrawn:<id> shows it on supervisor actions"}}
     met: {date: "2026-10-09", where: "alpha.8 live, StarCi workflow", evidence: "starci runtime.sqlite decision_items di-ddda767e (supervisor-ruling, open) beside the shape-guard fix of 188a4811a that dispatches op-work.author-ab81f9802d"}
     rule: {file: scripts/reconciler/supervisor-ruling-withdraw.mjs, anchor: "contradictedRulings"}
