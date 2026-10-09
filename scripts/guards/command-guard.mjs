@@ -289,10 +289,8 @@ async function rightsOfCall({ commands, command, cwd, ctx, guard }) {
     });
     if (refusal) return refusal;
   }
-  if (ctx.role === 'lead') {
-    const redirect = kernelRedirectVerdict({ command, cwd });
-    if (redirect) return { tool: 'shell', ...redirect };
-  }
+  const redirect = ctx.role === 'lead' ? kernelRedirectVerdict({ command, cwd }) : null;
+  if (redirect) return { tool: 'shell', ...redirect };
   for (const c of commands) {
     const v = policyVerdict({ role: ctx.role, command: c, guard, handle: ctx.handle, lockOwner: ctx.lockOwner, policy: ctx.policy });
     if (v) return policyToolVerdict(c, v);
