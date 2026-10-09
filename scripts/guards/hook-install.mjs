@@ -35,7 +35,7 @@ const HOOK_MARKER = 'starci-history-guard';
 export const HOOK_VERSION = 8;
 export const WORK_HOOK_MARKER = 'starci-work-guard';
 export const RUNTIME_GIT_HOOKS_MARKER = 'starci-git-hooks';
-const WORK_HOOK_VERSION = 1;
+export const WORK_HOOK_VERSION = 1;
 
 const normOwned = (p) => path.resolve(p).replaceAll('\\', '/');
 const safeName = (s) => String(s).replace(/[^A-Za-z0-9._-]/g, '_');

@@ -172,6 +172,7 @@ ruleParams:
       - {id: edge-case-registry, run: scripts/checks/check-edge-case-registry.mjs}
       - {id: gate-loosening, run: scripts/checks/check-gate-loosening.mjs}
       - {id: sonar-rules, run: scripts/checks/check-sonar-rules.mjs}
+      - {id: installed-artefacts, run: scripts/checks/check-installed-artefacts.mjs}
 
 slots:
 
