@@ -167,7 +167,7 @@ export function opRevStale(state, op, { root = revRootOf() } = {}) {
   return files.length ? { files } : null;
 }
 
-const ackCommand = (workflowId, rev) => `starci kernel kernel-ack-rev --workflow ${workflowId} --plan; read every returned path, then attest with --rev ${rev} --read-manifest <file>`;
+const ackCommand = (workflowId, rev) => `starci kernel kernel-ack-rev --workflow ${workflowId} --plan; read every returned path, then attest with --rev ${rev} --digest <readToken>`;
 
 /** What the lands since the acknowledged revision say a Kernel must do differently, verbatim; an empty string when no land carried a note. */
 const noteSentence = (notes) => (notes?.length ? ` What a Kernel must do differently: ${notes.join(' | ')}` : '');

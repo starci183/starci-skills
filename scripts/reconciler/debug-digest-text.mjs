@@ -45,7 +45,7 @@ export const TEXT = Object.freeze({
   supervisor: 'Supervisor: seat {state}, terminal {terminal}, last seen {seen}, last woken {woken}; {open} open Decision Item(s), {due} past due',
   workflow: 'Workflow {name} ({ledger}) phase {phase}',
   revisionSeat: '  Revision: {line}',
-  kernel: '  Kernel: {alive}, last woken {woken}, acked runtime {acked} of {current}, frontier {state}, {ready} unit(s) of ready work',
+  kernel: '  Kernel: {alive}, last woken {woken}, frontier {state}, {ready} unit(s) of ready work',
   alive: 'alive',
   notAlive: 'NOT alive',
   running: '  Running: {items}',

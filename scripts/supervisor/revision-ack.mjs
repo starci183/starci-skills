@@ -12,15 +12,18 @@ import { supervisorSeat } from '../machine/revision-seats.mjs';
 import { resolveRev, revRootOf } from '../kernel/runtime-rev.mjs';
 
 /** The answer of one revision-ack call over the machine handle `m`: {ok, ...} or a refusal {ok: false, code, error}. */
-export function revisionAck(m, { plan = false, rev = null, manifestFile = null } = {}) {
+export function revisionAck(m, { plan = false, rev = null, manifestFile = null, digest = null } = {}) {
   const seat = supervisorSeat({ m, root: revRootOf() });
   if (plan) {
     const { notice, manifest } = planRead(seat);
-    return { ok: true, state: notice.state, readManifest: manifest };
+    return { ok: true, state: notice.state, readToken: manifest?.digest ?? null, readManifest: manifest };
   }
   try {
     if (resolveRev(seat.root, String(rev)) !== seat.current) return { ok: false, code: 'supervisor-rev-unknown', error: 'the revision is not the current deployed commit' };
-    const done = attest(seat, JSON.parse(fs.readFileSync(String(manifestFile), 'utf8')));
+    // The attestation names the file it read, or the readToken the plan returned (a seat cannot redirect output into a file).
+    const owed = planRead(seat).manifest;
+    const byToken = owed?.digest === digest ? owed : null;
+    const done = attest(seat, manifestFile ? JSON.parse(fs.readFileSync(String(manifestFile), 'utf8')) : byToken);
     return { ok: true, rev: seat.current, count: done.manifest.files.length };
   } catch (error) { return { ok: false, code: error.code ?? 'revision-read-unverified', error: String(error?.message ?? error) }; }
 }
@@ -28,11 +31,11 @@ export function revisionAck(m, { plan = false, rev = null, manifestFile = null }
 if (isMain(import.meta.url)) {
   const argv = process.argv.slice(2);
   const plan = argv.includes('--plan');
-  if (!plan && !(arg(argv, 'rev') && arg(argv, 'read-manifest'))) {
-    console.error('use: starci supervisor revision-ack --plan | --rev <sha> --read-manifest <file> [--json]');
+  if (!plan && !(arg(argv, 'rev') && (arg(argv, 'read-manifest') || arg(argv, 'digest')))) {
+    console.error('use: starci supervisor revision-ack --plan | --rev <sha> --digest <readToken> | --read-manifest <file> [--json]');
     process.exit(2);
   }
-  const answer = withMachine((m) => revisionAck(m, { plan, rev: arg(argv, 'rev'), manifestFile: arg(argv, 'read-manifest') }));
+  const answer = withMachine((m) => revisionAck(m, { plan, rev: arg(argv, 'rev'), manifestFile: arg(argv, 'read-manifest'), digest: arg(argv, 'digest') }));
   const text = answer.ok ? JSON.stringify(answer.readManifest ?? answer) : `refused ${answer.code}: ${answer.error}`;
   console.log(argv.includes('--json') ? JSON.stringify(answer) : text);
   process.exitCode = answer.ok ? 0 : 1;

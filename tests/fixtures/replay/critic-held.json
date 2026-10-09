@@ -29,6 +29,9 @@
      {
       "name": "check-1"
      }
+    ],
+    "files": [
+     "d1.sds.rec-1"
     ]
    },
    "result": {

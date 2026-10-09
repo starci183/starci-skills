@@ -1535,3 +1535,82 @@ cases:
     rule: {file: scripts/kernel/dispatch-refusal-memo.mjs, anchor: "nextMemo"}
     spec: tests/kernel/dispatch-owners.spec.mjs
     status: covered
+
+  - id: two-revision-acks-disagree-and-one-needs-a-file-the-guard-refuses
+    family: record-vs-reality
+    found: live
+    replay: tests/replay/one-ack.spec.mjs
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a seat's acknowledged revision is one fact) kernel-ack-rev (runtime-rev-acked, the enqueue gate) and revision-ack (runtime-rev-noticed) ran side by side and the digest printed both: StarCi at 17:15 had acked 70b853e44 by the first and was 'due for replacement' by the second. The attestation also demanded a manifest FILE, which a Kernel seat can only write by redirecting output (`--plan > file`), and the seat guard refuses a redirection (KERNEL_NO_FILE_WRITE): the 'guard refused ack-rev' note of 12:56.", remedy: {state: in-tree, change: "revision-ack is the same verb as kernel-ack-rev (one handler, one event runtime-rev-acked, one gate); the plan returns a readToken and the attestation takes --digest <readToken>, so no file is written; the notice reads the Kernel's ack of the current revision as its settle; the digest prints one revision line; a seat that never acked has its baseline at the revision it booted on"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, StarCi and Nivo Kernels", evidence: "starci events 3394 to 3450 (kernel-rev-stale refusals while the Kernel could not attest), the digest lines 'acked runtime X of Y' and 'Revision: kernel acked rev Y' side by side"}
+    rule: {file: scripts/kernel/verbs/revision-ack.mjs, anchor: "the same verb as kernel-ack-rev"}
+    spec: tests/kernel/one-ack.spec.mjs
+    status: covered
+  - id: records-op-refused-op-gate-tool-failed-for-a-moved-placement
+    family: correctness
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: an op owes only the gates its kind owes) a Nivo architecture.decide, which owns only Work records (.starciwork) and is no member of enforcedOps, was refused op-gate-tool-failed 'owned slice cannot be bound' because its placement no longer matched the admitted baseline: the code loop's binding was checked before the loop was found not owed.", remedy: {state: in-tree, change: "judgeJobLoop treats a binding mismatch of an op that is not loop-enforced and owns only Work records as no judgment (gate-settle.mjs workRecordsOnly); a code op with the same drift is still refused"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, Nivo op-architecture.decide-e78adc94cc", evidence: "nivo events 490, 496, 497, 635 (settle pass refused op-gate-tool-failed), gate answered fixed at 8c5987174 only for the rebound placement"}
+    rule: {file: scripts/kernel/gate-settle.mjs, anchor: "workRecordsOnly"}
+    spec: tests/gates/op-gate-loop.spec.mjs
+    status: covered
+  - id: stray-file-in-a-workflow-tree-root-is-never-collected
+    family: smooth-operation
+    found: live
+    replay: tests/replay/tree-stray.spec.mjs
+    finding: {role: runtime, duty: cleanup, verdict: departs, evidence: "(duty: the runtime collects what no lease owns) the file named `0` that a redirection left in a StarCi workflow tree root blocked a settle; the settle was made tolerant and the guard refuses redirects, but nothing collected the leftover.", remedy: {state: in-tree, change: "the GC controller's key gc:tree-strays plans (shadow) or removes (active) an untracked, unignored, non-hidden regular file in a live workflow tree root that no live job owns, older than treeStrayMinAgeMs and smaller than treeStrayMaxBytes, and journals each one"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, StarCi workflow tree", evidence: "the settle blocked by the file named 0 in the tree root (f3's settle tolerance commit)"}
+    rule: {file: scripts/reconciler/gc-tree-strays.mjs, anchor: "reconcileTreeStrays"}
+    spec: tests/reconciler-controllers/gc-tree-strays.spec.mjs
+    status: covered
+  - id: failed-leg-with-runtime-owed-blocker-judged-by-the-runtime
+    family: correctness
+    found: live
+    replay: tests/replay/rejudge.spec.mjs
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: finished work is judged, not redone) a failed attempt is terminal and a Nivo architecture.decide blocked only on its own Critic that never started could not be re-judged, so the lineage was about to spend a third 13.4M-token attempt for a verdict the runtime can give over the bytes already written.", remedy: {state: in-tree, change: "the failure router prefers a `rejudge` job (settle/rejudge.mjs): precondition = the newest report is blocked on a runtime-owed blocker (checker-unavailable), the preserved ref exists and holds every file the report names, one re-judgment per product digest; it enqueues the lineage's next attempt, admits it without a worker (contract, READ proof), restores the preserved product onto the owned paths, files a runtime report and the settler runs the runtime Critic and settles on its verdict, with zero op tokens; every refusal is a typed code journalled as job-rejudge-refused and the leg then takes the retry route"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, Nivo workflow", evidence: "nivo jobs op-architecture.decide-8da14f299d failed (report 7 blocked CRITIC_UNAVAILABLE), event workflow-op-preserved with the preserved ref"}
+    rule: {file: scripts/kernel/settle/rejudge.mjs, anchor: "admitRejudge"}
+    spec: tests/replay/rejudge.spec.mjs
+    status: covered
+
+  - id: held-kernel-launch-without-a-terminal-has-no-owner
+    family: failure-while-running
+    found: live
+    replay: tests/replay/launch-unreceipted.spec.mjs
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a held launch is reconciled or owned) both workflows had no Kernel and could not get one: the codex Kernel launches ended outcome_unknown / turn_start_unobserved, Orca created the worker and its terminal but its answer named none, so the launch-unknown signal stored a Dispatch with no terminal and the provider receipt (state unknown) no handle; recoverWorkflowLaunch matched none of its three shapes (isUnboundLaunch needs no Dispatch, isUnadopted a receipt handle, isBoundLaunch both) and answered kernel-launch-custody-incomplete for ever; the provider capacity stayed held (49 minutes and counting) and no Supervisor item existed", remedy: {state: in-tree, change: "a held launch whose signal names a Dispatch and no terminal and whose receipt names no handle is reconciled from worker-show of THAT Dispatch (workflow-launch-settled.mjs unobservedLaunchTerminal): when Orca names its terminal and reports the start unknown/unobserved (or settled) with no heartbeat, the terminal is bound to the original reservation, the worker is stopped and released with the closure proof, the reservation released and the signal cleared in one guarded transaction (kernel-launch-reconciled with the evidence); a worker that may be running is never closed; every refusal keeps custody and opens ONE Supervisor Decision Item naming the Dispatch, the terminal and the evidence"}}
+    met: {date: "2026-10-09", where: "alpha.8 live 18:30, StarCi and Nivo Kernel starts", evidence: "start-workflow answer kernel-launch-unreconciled / kernel-launch-custody-incomplete for dispatches ctx_c43eb397ec5c and ctx_768a32aeb100; the held signal read from a copy of the StarCi ledger: launch-unknown, terminal null, receipt state unknown and no handle"}
+    rule: {file: scripts/kernel/workflow-launch-custody.mjs, anchor: "recoverUnreceipted"}
+    spec: tests/kernel/workflow-launch-unreceipted.spec.mjs
+    status: covered
+
+  - id: decide-enqueue-step-refused-for-bytes-that-did-not-change
+    family: correctness
+    found: live
+    replay: tests/replay/decide-enqueue-read.spec.mjs
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a menu choice that enqueues an op the Kernel attested its READ of is carried out) starci kernel decide --choice enqueue-leg was admitted once, with its READ baseline taken before its step ran; the nested enqueue wrote the new job, which adds the op's own files to the required set, and the recheck at that ledger write compared the whole sets and refused 'required bytes changed during this call' (kernel-read-unverified) though no byte had changed; the same enqueue run directly carries the op in its baseline and passes", remedy: {state: in-tree, change: "the recheck refuses a file of the admitted baseline that changed or vanished; a file new in the required set is judged by the enqueue's own READ gate (kernel-read-unverified until this Kernel life attested it), so an unattested op is still refused, by the right gate"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, StarCi workflow", evidence: "kernel-decision-result revert 'enqueue failed: kernel-read-unverified' for dec-47a88c5428, dec-97f398806a, dec-32e5ded724 (enqueue-leg of interface.draw)"}
+    rule: {file: scripts/kernel/caller-admission.mjs, anchor: "changedReads"}
+    spec: tests/replay/decide-enqueue-read.spec.mjs
+    status: covered
+  - id: nested-node-test-inherits-the-enclosing-run
+    family: correctness
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a verb that runs specs as a child reports them red when they are red) a node --test child that inherits NODE_TEST_CONTEXT believes it is a subtest of the enclosing run, reports to its parent and exits 0 whatever its tests did; starci test affected --run, the land gate, the release cut and the suite runner would pass red specs when started from inside a test process or from an environment carrying the variable", remedy: {state: in-tree, change: "the node launchers of scripts/api/node (nodeSpawn, nodeStart, nodeExecFile) clear the mark for any child that starts the test runner (withoutTestRunner of scripts/lib/env.mjs), npm children never carry it, and the test-spawn-seam self-check refuses a file outside scripts/api that carries --test and spawns itself, or a launcher that does not clear it"}}
+    met: {date: "2026-10-09", where: "alpha.8 lane, the affected-gate replay", evidence: "a red spec reported PASS by starci test affected --run started inside a node --test process"}
+    rule: {file: scripts/api/node/lib.mjs, anchor: "forChild"}
+    spec: tests/api/node-test-runner-seam.spec.mjs
+    status: covered
+
+  - id: components-resolve-the-tree-each-by-itself
+    family: correctness
+    found: live
+    replay: tests/replay/one-tree-resolver.spec.mjs
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "four times in two days a component read or wrote the wrong tree because it resolved which directory by itself: the grammar context read the brand record from the product's main checkout while the finished brand leg had written it in the workflow tree; the draw capture looked for Playwright and esbuild only in product directories; a CLI started from a clone wrote generated files into the tree a home record named; the Kernel start was gated by the UI build of another tree. The autopilot's direction and draw gates read the same records from the main checkout", remedy: {state: in-tree, change: "scripts/lib/roots.mjs names each root with one resolver (runtime tree, runtime state, temp root, invocation directory, Work directory) and the precedence of two trees holding one record (the workflow tree first, then the main checkout: workDirHolding, workRecordPath, toolSearchDirs); the grammar context, the autopilot gates and the render tool lookup use it; the root-adhoc self-check (R240) refuses a new file that spells process.cwd() or the Work directory name, and a file may not spell either more often than the tree the check landed on held it"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, Nivo and StarCi workflows", evidence: "registry entries grammar-context-reads-the-main-checkout-not-the-workflow-tree, draw-render-tool-resolved-from-the-product-only, the runtime-tree write refusal and the Kernel-start UI gate fixes of 2026-10-09"}
+    rule: {file: scripts/lib/roots.mjs, anchor: "workDirHolding"}
+    spec: tests/lib/roots.spec.mjs
+    status: covered
+  - id: tree-verb-ran-the-other-tree-through-the-home-record
+    family: correctness
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "a lane ran starci test affected --run inside its clone with STARCI_RUNTIME unset: the per-user home record outranks the checkout, so the CLI printed a notice and ran the live tree's code and specs for ten minutes, and the verdict was about the wrong tree. The refusal of 2026-10-09 covered only verbs that write the runtime tree", remedy: {state: in-tree, change: "every verb declares its side (runtimeSide, per group and per verb; the catalog refuses a group without one): a tree-side verb (about the runtime tree that owns the running bin: runtime check, test affected, release, gate, regeneration) runs this checkout unless STARCI_RUNTIME or its own --root chose a tree, a host-side verb runs the located runtime as before; the affected receipt names the root it judged and the deploy gate refuses a receipt that judged another tree's root"}}
+    met: {date: "2026-10-09", where: "a lane clone, test affected --run without STARCI_RUNTIME", evidence: "coordinator report of 2026-10-09: the CLI printed 'running the runtime at the live checkout (STARCI_RUNTIME/home record), not this checkout' and ran the other tree's specs"}
+    rule: {file: packages/cli/src/runtime-target.mjs, anchor: "targetOf"}
+    spec: tests/cli/runtime-side.spec.mjs
+    status: covered

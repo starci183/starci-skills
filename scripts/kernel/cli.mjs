@@ -1160,7 +1160,7 @@ function recordOpRevDrift(ledger, job) {
 
 /** The nextActions step a stale Kernel runs first: re-read what changed, then ack the current rev. */
 const rereadActionOf = (rev, workflowId) => ({ kind: 'reread', origin: 'rev-reread', rev: rev.current, acked: rev.acked, files: rev.full ? ['modules/kernel/kernel-prompt.md', 'modules/kernel/driver-loop.yaml'] : rev.files,
-  reason: `the runtime moved from the rev you acked (${shortRev(rev.acked)}) to ${shortRev(rev.current)}: re-read ${rev.full ? 'modules/kernel/kernel-prompt.md and modules/kernel/driver-loop.yaml in full' : rev.files.join(', ')}, then starci kernel kernel-ack-rev --workflow ${workflowId} --plan and submit the complete READ manifest with --rev ${rev.current} --read-manifest <file>; until then enqueue/dispatch of a leg whose op contract changed is refused ${KERNEL_REV_STALE}` });
+  reason: `the runtime moved from the rev you acked (${shortRev(rev.acked)}) to ${shortRev(rev.current)}: re-read ${rev.full ? 'modules/kernel/kernel-prompt.md and modules/kernel/driver-loop.yaml in full' : rev.files.join(', ')}, then starci kernel kernel-ack-rev --workflow ${workflowId} --plan and attest with --rev ${rev.current} --digest <readToken>; until then enqueue/dispatch of a leg whose op contract changed is refused ${KERNEL_REV_STALE}` });
 /**
  * The RUNNING legs whose op contract moved on the runtime since their dispatch (op-rev-drift before settle): the
  * worker still runs its brief, is judged by its admission, and hears it on its next nudge. [{jobId, op, attempt, from,
@@ -1196,7 +1196,7 @@ function refuseStaleKernelRev(db, workflowId, op, verb) {
   const hit = opRevStale(state, op, { root });
   if (!hit) return;
   const what = hit.files.join(', ');
-  throw Object.assign(new Error(`${KERNEL_REV_STALE}: ${verb} of ${op} refused - its op contract changed between the runtime rev you acked (${shortRev(state.acked)}) and the current one (${shortRev(state.current)}): ${what}. Re-read ${state.full ? 'modules/kernel/kernel-prompt.md and modules/kernel/driver-loop.yaml in full' : state.files.join(', ')}, then starci kernel kernel-ack-rev --workflow ${workflowId} --plan and attest its complete manifest with --rev ${state.current} --read-manifest <file>, then ${verb} again (starci kernel status kernelRev)`),
+  throw Object.assign(new Error(`${KERNEL_REV_STALE}: ${verb} of ${op} refused - its op contract changed between the runtime rev you acked (${shortRev(state.acked)}) and the current one (${shortRev(state.current)}): ${what}. Re-read ${state.full ? 'modules/kernel/kernel-prompt.md and modules/kernel/driver-loop.yaml in full' : state.files.join(', ')}, then starci kernel kernel-ack-rev --workflow ${workflowId} --plan and attest with --rev ${state.current} --digest <readToken>, then ${verb} again (starci kernel status kernelRev)`),
     { code: KERNEL_REV_STALE, op, acked: state.acked, current: state.current, files: hit.files });
 }
 
