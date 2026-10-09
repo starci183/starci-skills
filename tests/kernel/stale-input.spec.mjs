@@ -29,14 +29,17 @@ import { installGuardLauncher } from '../helpers/guard-launcher.mjs';
 
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
 const OP='code.refactor';
+const KERNEL_HANDLE='stale-input-kernel';
 const WORKFLOW='wf-stale-input';
 const RULES='knowledge/patterns/fe/index.yaml';
 const FR_DIR='.starciwork/features/task/fr/list';
 const require=createRequire(import.meta.url);
 const sha=text=>crypto.createHash('sha256').update(text).digest('hex');
 if(process.env.STARCI_TEST_TEMP_DIR){
-  const scratch=path.join(process.env.STARCI_TEST_TEMP_DIR,'starci-job-scratch');
-  after(()=>fs.rmSync(scratch,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
+  for(const name of ['starci-job-scratch','starci-kernel-scratch']){
+    const scratch=path.join(process.env.STARCI_TEST_TEMP_DIR,name);
+    after(()=>fs.rmSync(scratch,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
+  }
 }
 
 // The scenarios own disjoint runtime copies and ledgers. Let two of them overlap so the
@@ -103,7 +106,7 @@ const fixture=t=>{
   registerWorkflowWorktree({env},{workflowId:WORKFLOW,orcaWorktreeId:'stale-input::workflow',path:repo,branch});
   const api=path.join(skill,'scripts','kernel','cli.mjs');
   const run=(...args)=>new Promise(resolve=>{
-    const child=spawn(process.execPath,[api,...args,'--repo',repo,'--json'],{cwd:skill,windowsHide:true,env});
+    const child=spawn(process.execPath,[api,...args,'--repo',repo,'--json'],{cwd:skill,windowsHide:true,env:args[0]==='kernel-ack-rev'?{...env,ORCA_TERMINAL_HANDLE:KERNEL_HANDLE}:env});
     let stdout='',stderr='',timedOut=false;
     const timeout=setTimeout(()=>{timedOut=true;child.kill();},180000);
     child.stdout.on('data',chunk=>{stdout+=chunk;});
@@ -114,6 +117,22 @@ const fixture=t=>{
   const write=(rel,text)=>{const file=path.join(skill,rel);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,text);};
   const work=(rel,text)=>{const file=path.join(repo,'.starciwork',rel);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,text);};
   return {root,skill,repo,git,env,api,run,write,work};
+};
+// New admission owns a current Kernel and native READ acknowledgement; old contracts remain untouched.
+const admitRead=async(t,fx)=>{
+  proofRepo(t,fx.skill);
+  withLedger(fx,ledger=>seedWorkflow(ledger,{id:WORKFLOW,generation:1,
+    jobs:[{jobId:`kernel-${WORKFLOW}`,kind:'kernel',status:'running',workerId:KERNEL_HANDLE,generation:1,
+      payload:{managed:{agentTerminalHandle:KERNEL_HANDLE,dispatchId:'stale-input-kernel-dispatch'},
+        hierarchy:{role:'kernel',workflowId:WORKFLOW,generation:1,attempt:1,runtime:{terminalHandle:KERNEL_HANDLE}}}}],
+    signals:[{key:WORKFLOW,token:'stale-input-kernel-token',value:{terminal:KERNEL_HANDLE,dispatch:'stale-input-kernel-dispatch'},expiresAt:null}]}));
+  const planned=await fx.run('kernel-ack-rev','--workflow',WORKFLOW,'--plan');
+  assert.equal(planned.status,0,planned.stderr||planned.stdout);
+  const plan=json(planned);
+  assert.equal(plan.readManifest.revision.kind,'git');
+  const acked=await fx.run('kernel-ack-rev','--workflow',WORKFLOW,'--rev',plan.readManifest.rev,'--digest',plan.readToken);
+  assert.equal(acked.status,0,acked.stderr||acked.stdout);
+  assert.equal(json(acked).readManifest.digest,plan.readManifest.digest);
 };
 const json=r=>{try{return JSON.parse(r.stdout);}catch{const at=r.stdout.indexOf('{'),end=r.stdout.indexOf('\n}');return at<0||end<0?null:JSON.parse(r.stdout.slice(at,end+2));}};
 // A write grant names a directory that must exist in the target repository (grant-parent-missing): seeding a job under
@@ -192,6 +211,7 @@ scenario('dispatch records Source and Work digests by kind; settle re-baselines 
   withLedger(fx,ledger=>{
     enqueueSeed(ledger,{jobId:'job-refactor',workflowId:WORKFLOW,opId:OP,kind:'op',payload:{opId:OP,owned_paths:['src/refactor/'],model:'devin-agent',records:[FR_DIR,'src/refactor/a.ts']}});
   });
+  await admitRead(t,fx);
   const dispatched=await fx.run('dispatch','--job','job-refactor','--model','devin-agent','--spawn');
   assert.equal(dispatched.status,0,dispatched.stderr||dispatched.stdout);
   const readContext=inspect(fx,db=>JSON.parse(db.prepare('SELECT context_json FROM contracts WHERE job_id=?').get('job-refactor').context_json).packet.context);
@@ -492,6 +512,7 @@ scenario('an existing ledger: no schema change, digest-free rows never stale, ne
     ledger.write.createUnit({workflowId:WORKFLOW,unitId:'job-new',opId:OP,subjectKey:'job-new',goalRevision:1});
     enqueueSeed(ledger,{jobId:'job-new',workflowId:WORKFLOW,unitId:'job-new',opId:OP,kind:'op',payload:{opId:OP,owned_paths:['src/new/'],model:'devin-agent'}});
   });
+  await admitRead(t,fx);
   const dispatched=await fx.run('dispatch','--job','job-new','--model','devin-agent','--spawn');
   assert.equal(dispatched.status,0,dispatched.stderr||dispatched.stdout);
   const reopened=inspect(fx,db=>db.prepare('SELECT a.op_id,a.try_no,c.context_json FROM contracts c JOIN op_attempts a ON a.attempt_id=c.attempt_id WHERE c.workflow_id=? ORDER BY a.op_id,a.attempt_id').all(WORKFLOW)
