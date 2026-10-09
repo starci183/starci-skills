@@ -1368,3 +1368,10 @@ cases:
     rule: {file: scripts/reconciler/runtime-deploy.mjs, anchor: "affectedProof"}
     spec: tests/reconciler/runtime-deploy.spec.mjs
     status: covered
+  - id: reader-cannot-resolve-a-reference-held-in-a-column
+    family: record-vs-reality
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a reader gets the content of a column whichever shape the row has) the storage convention moves content out of the rows into the blob store (a row holds the reference), but every reader selected the column and parsed it as the content, so the first reference written would have been read as garbage by dozens of readers; the check constraints json_valid(data_json) also refused a non-JSON reference", remedy: {state: in-tree, change: "a reference is a JSON string literal naming the blob, and every handle either store opens (writer and reader, ledger and machine) installs the resolver of engine/db/ref-value.mjs, so get, all and iterate return the content byte for byte whichever shape the row has; the one json_extract over a migrating column (input-drift) reads it in JS. Nothing writes a reference yet: the readers ship alone"}}
+    met: {date: "2026-10-09", where: "design of the storage convention, owner ruling 2026-10-09", evidence: "migration plan for 34 columns of both stores; the read-only copy ledger-copy-a8live15; machine_logs.data_json CHECK json_valid"}
+    rule: {file: engine/db/ref-value.mjs, anchor: "installRefResolver"}
+    spec: tests/engine-db/ref-value.spec.mjs
+    status: covered
