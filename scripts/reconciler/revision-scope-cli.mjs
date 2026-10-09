@@ -6,7 +6,7 @@ import { isMain } from '../lib/is-main.mjs';
 import { arg } from '../lib/cli-arg.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { revParse } from '../api/git/rev-parse.mjs';
-import { deployLine, deployRoles } from '../reconciler/revision-deploy.mjs';
+import { deployLine, deployRoles } from './revision-deploy.mjs';
 
 /** The payload and the line of one scope query; `to` defaults to the HEAD of `root`. */
 export function revisionScope({ root = skillRoot, from, to = null }) {

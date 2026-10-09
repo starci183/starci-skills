@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { revisionRepo } from '../helpers/revision-repo.mjs';
 import { deployLine, deployRoles } from '../../scripts/reconciler/revision-deploy.mjs';
-import { revisionScope } from '../../scripts/cli/revision-scope.mjs';
+import { revisionScope } from '../../scripts/reconciler/revision-scope-cli.mjs';
 
 test('a deploy event carries one action and one count per role, never a file list, and the digest line reads them', (t) => {
   const repo = revisionRepo(t, { files: { 'modules/kernel/driver-loop.yaml': 'steps:\n  - a\n  - b\n', 'modules/supervisor/supervisor-menu.yaml': 'items:\n  - a\n  - b\n' } });

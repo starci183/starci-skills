@@ -17305,7 +17305,7 @@ revision-nothing-owed:
     - "Ghế đã xác nhận bản sửa này"
     - "Bản sửa chỉ chạm tệp không thuộc phạm vi của vai trò"
   nextStep_vi: "Không cần làm gì; xem dòng REVISION trong starci kernel status hoặc starci supervisor status."
-  owner: kernel
+  owner: runtime-core
   kind: verb-refusal
 revision-read-unverified:
   title: "The submitted read manifest is not the complete current one"
@@ -17315,7 +17315,7 @@ revision-read-unverified:
     - "Ghế bỏ sót một tệp trong danh sách --plan"
     - "Cây runtime đổi giữa lúc lấy --plan và lúc xác nhận"
   nextStep_vi: "Chạy lại revision-ack --plan, đọc đủ các tệp rồi nộp đúng bản kê nó trả về."
-  owner: kernel
+  owner: runtime-core
   kind: verb-refusal
 supervisor-rev-unknown:
   title: "The revision is not the current deployed commit"

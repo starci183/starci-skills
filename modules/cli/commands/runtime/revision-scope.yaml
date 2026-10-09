@@ -2,7 +2,7 @@ group: runtime
 verb: revision-scope
 owner: runtime
 summary: show what a deploy of the runtime tree asks of each role between two revisions
-impl: {script: scripts/cli/revision-scope.mjs}
+impl: {script: scripts/reconciler/revision-scope-cli.mjs}
 flags:
   - {name: from, type: string, required: true, summary: the revision the seats stand at}
   - {name: to, type: string, summary: the revision to deploy; the HEAD of the runtime tree by default}
