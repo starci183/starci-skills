@@ -128,8 +128,7 @@ export function findDeclaration(cwd){
   const repo=path.resolve(cwd);
   const own=path.join(repo,'.starcistacks',DECLARATION);
   if(fs.existsSync(own))return {file:own,repoRoot:repo};
-  const name=repositoryName(repo);
-  const parent=path.dirname(repositoryHome(repo));
+  const name=repositoryName(repo), parent=path.dirname(repositoryHome(repo));
   let siblings=[];
   try{siblings=fs.readdirSync(parent,{withFileTypes:true}).filter(e=>e.isDirectory()&&e.name!==name);}catch{/* no parent listing */}
   for(const entry of siblings){
