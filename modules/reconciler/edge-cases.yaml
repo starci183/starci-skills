@@ -863,3 +863,10 @@ cases:
     rule: {file: scripts/reconciler/debug-digest-machine.mjs, anchor: "revSinceOf"}
     spec: tests/reconciler/debug-digest.spec.mjs
     status: covered
+  - id: engine-status-read-never-parsed-the-indented-answer
+    family: failure-while-running
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a mechanical move may never fail silently) every starci kernel status --json read of the engine failed 'exited 0 with no JSON on stdout' since 2026-10-07 15:42 (238 status-unreadable Decision Items, workflow controller engine_actions 'decisions --open runtime-defect:<wf>:status-unreadable', the last at 10:20 on 10-09): the verb prints its answer indented over about 1600 lines and spawnJson read only the last line of stdout, so ctx.status was always null; the Job controller's pass of a workflow then returned 'ended' without a log, an SLA clock or an engine action: no dispatch-ready ran in the whole history of engine_actions, and the ready StarCi job op-brand.decide-2a722a1aa2 (queued 10-08 13:15, status progress readyJobs 1, dispatch-ready --dry-run would route and dispatch it) waited for 20 hours", remedy: {state: in-tree, change: "spawnJson reads a child's stdout as one JSON value first, then its last JSON line, then its first-to-last brace span; the Job controller's workflow pass names an unreadable status (status-unreadable, with the failure) instead of reporting the workflow ended"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, StarCi workflow wf-starci-auth-test-workflow-muxq4oyr", evidence: "machine.sqlite engine_actions: no dispatch-ready row ever, sla_episodes: no READY_UNDISPATCHED ever; scripts/api/process/spawn-capture read of status: 1604 lines, last line }"}
+    rule: {file: scripts/reconciler/ctx.mjs, anchor: "lastJsonLine"}
+    spec: tests/reconciler/status-read-indented-json.spec.mjs
+    status: covered

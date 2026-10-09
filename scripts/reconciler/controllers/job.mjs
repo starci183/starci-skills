@@ -372,9 +372,18 @@ async function routeFailure(ctx, ledgerId, f, s, settings) {
   return { action: 'route-failure', ...r, decision: (await ctx.openDecision(retryDecision(f, ledgerId, reason, { now: ctx.now(), settings }))) };
 }
 
+/** The status a workflow pass judges by: {status}, or {early} when the pass ends here (unreadable: named, never reported as ended; finished or archived: ended). */
+async function workflowStatusRead(ctx, ledgerId, workflowId) {
+  const read = typeof ctx.statusRead === 'function' ? await ctx.statusRead(ledgerId, workflowId) : { value: await ctx.status(ledgerId, workflowId), failure: null };
+  if (!read.value) return { early: { ok: true, action: 'status-unreadable', why: read.failure?.error ?? 'no status' } };
+  if (read.value.phase === 'finished' || read.value.archivedAt) return { early: { ok: true, action: 'ended' } };
+  return { status: read.value };
+}
+
 async function reconcileWorkflow(ctx, ledgerId, workflowId, settings) {
-  const status = await ctx.status(ledgerId, workflowId);
-  if (!status || status.phase === 'finished' || status.archivedAt) return { ok: true, action: 'ended' };
+  const read = await workflowStatusRead(ctx, ledgerId, workflowId);
+  if (read.early) return read.early;
+  const { status } = read;
   const id = `${ledgerId}:${workflowId}`;
   const moved = may(ctx, 'job.settle') ? await runMechanicalMoves(ctx, ledgerId, status, { facts: (jobId) => ctx.read(ledgerId, (db) => jobFacts(db, jobId, { now: ctx.now(), settings })), refused: (f, reason) => retryDecision(f, ledgerId, reason, { now: ctx.now(), settings }), workflowId, settings }) : [];
   if (moved.length) ctx.log('reconciler.act', `workflow ${id} ran ${moved.length} mechanical move(s)`, { moved });

@@ -39,6 +39,7 @@ import { CONCERN_OWNER } from './owns.mjs';
 import { openClock, slaCatalog } from './sla.mjs';
 import { SKILL_ROOT } from './state.mjs';
 import { clip } from '../lib/clip.mjs';
+import { jsonFromStdout } from '../lib/json.mjs';
 
 export const API_FILE = path.join(SKILL_ROOT, 'scripts', 'kernel', 'cli.mjs');
 export const DECISIONS_FILE = path.join(SKILL_ROOT, 'scripts', 'machine', 'decisions.mjs');
@@ -113,11 +114,13 @@ export function reconcilerLog(m, row, { env = process.env } = {}) {
   return m && !m.readOnly ? m.log(out) : machineLog(out, { env });
 }
 
-/** The last JSON line of a child's stdout, or null. Pure. */
+/** The answer of a child's stdout: the whole text as JSON (a verb prints `--json` indented over many lines), else its last JSON line, else its first-{-to-last-} span, or null. Pure. */
 function lastJsonLine(stdout) {
-  const lines = String(stdout ?? '').trim().split(/\r?\n/).filter(Boolean);
+  const text = String(stdout ?? '').trim();
+  try { return JSON.parse(text); } catch { /* more than one value: a log line before the answer, or an answer after other lines */ }
+  const lines = text.split(/\r?\n/).filter(Boolean);
   for (let i = lines.length - 1; i >= 0; i -= 1) { try { return JSON.parse(lines[i]); } catch { /* not JSON */ } }
-  return null;
+  return jsonFromStdout(text);
 }
 
 function refusalOf(value, stderr) {
