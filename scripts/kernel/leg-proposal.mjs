@@ -26,13 +26,17 @@ export function featureFamiliesOf(brief) {
 }
 
 /**
- * The names of the parameters the op's manifest requires and only the Kernel sets, with no default: `starci kernel enqueue` refuses the op without them (params-invalid), so the leg-ready
+ * The names of the parameters the op's manifest requires and only the Kernel sets, with no default or with a default dispatch refuses: `starci kernel enqueue` refuses the op without them (params-invalid), so the leg-ready
  * item cannot offer a plain pick and asks for them instead.
  */
 export function requiredKernelParamsOf({ skillRoot, op }) {
   let brief;
   try { brief = readOpManifest(path.join(skillRoot, 'modules', 'ops', 'ops', `${op}.yaml`)); } catch { return []; }
-  return Object.entries(brief?.params ?? {}).filter(([, spec]) => spec?.required === true && spec.setBy === 'kernel' && spec.default === undefined).map(([name]) => name).sort(byCodeUnit);
+  const required = Object.entries(brief?.params ?? {}).filter(([, spec]) => spec?.required === true && spec.setBy === 'kernel' && spec.default === undefined).map(([name]) => name);
+  // An op with execution modes runs one concrete mode; the default `select` is planning only (dispatch refuses it: params-invalid), so the Kernel names the mode.
+  const modes = brief?.policy?.executionModes;
+  const planningOnly = modes && typeof modes === 'object' && !Object.hasOwn(modes, brief.params?.mode?.default) ? ['mode'] : [];
+  return [...new Set([...required, ...planningOnly])].sort(byCodeUnit);
 }
 
 /** The literal resource directories (`.starciwork/_resources/identities`, ...) the manifest writes: the planned slots an op declares are granted with the leg. */

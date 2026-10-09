@@ -7,7 +7,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { proposedLegPaths, featureFamiliesOf } from '../../scripts/kernel/leg-proposal.mjs';
+import { proposedLegPaths, featureFamiliesOf, requiredKernelParamsOf } from '../../scripts/kernel/leg-proposal.mjs';
 import { buildMenu } from '../../scripts/kernel/kernel-menu.mjs';
 import { causesOf, isShapeCause, CAUSES } from '../../scripts/kernel/progress-rca.mjs';
 import { fingerprintOf, isHeld, memoOf, nextMemo } from '../../scripts/kernel/dispatch-refusal-memo.mjs';
@@ -21,6 +21,14 @@ const tree = (t, features) => {
   for (const feature of features) { fs.mkdirSync(path.join(dir, '.starciwork', 'features', feature), { recursive: true }); fs.writeFileSync(path.join(dir, '.starciwork', 'features', feature, 'index.yaml'), `id: ${feature}\n`); }
   return dir;
 };
+
+test('the parameters only the Kernel can set are named for the op that needs them', () => {
+  assert.deepEqual(requiredKernelParamsOf({ skillRoot, op: 'provision.ask' }), ['subject']);
+  assert.deepEqual(requiredKernelParamsOf({ skillRoot, op: 'interface.audit' }), ['audit']);
+  assert.deepEqual(requiredKernelParamsOf({ skillRoot, op: 'review.verify' }), ['mode'], 'the default mode `select` is planning only: dispatch refuses it');
+  assert.deepEqual(requiredKernelParamsOf({ skillRoot, op: 'scope.define' }), []);
+  assert.deepEqual(requiredKernelParamsOf({ skillRoot, op: 'no.such.op' }), []);
+});
 
 test('the proposed write set of a leg is the op contract\'s feature families of every feature the trees hold, never a guess', (t) => {
   const one = tree(t, ['authentication', 'system-health']);
