@@ -10,12 +10,12 @@ const item = (jobId, key) => ({ kind: 'budget-overrun', entity: { type: 'job', i
 test('the budget-overrun item of a running attempt closes when its job reports; the item of a settled attempt lives until a later try exists', (t) => withLedger(t, ({ ledger }) => {
   seedWorkflow(ledger, { id: 'wf-b', goal: { revision: 1, markdown: '# b' }, jobs: [
     { jobId: 'op-running', opId: 'brand.decide', status: 'running', payload: { opId: 'brand.decide', owned_paths: [] } },
-    { jobId: 'op-reported', opId: 'brand.decide', status: 'reported', payload: { opId: 'brand.decide', owned_paths: [] } },
+    { jobId: 'op-filed', opId: 'brand.decide', status: 'reported', payload: { opId: 'brand.decide', owned_paths: [] } },
     { jobId: 'op-failed', opId: 'brand.decide', status: 'failed', payload: { opId: 'brand.decide', owned_paths: [] } }] });
   const running = (id) => item(id, `budget-overrun:wf-b:attempt-12-running`);
   assert.equal(liveFor(running('op-running'), null, ledger.db), true, 'a running attempt can only be let finish');
-  assert.equal(liveFor(running('op-reported'), null, ledger.db), false, 'the job reported: the settler measures it, the running item is stale');
+  assert.equal(liveFor(running('op-filed'), null, ledger.db), false, 'the job reported: the settler measures it, the running item is stale');
   assert.equal(liveFor(item('op-failed', 'budget-overrun:wf-b:attempt-9'), null, ledger.db), true, 'a settled attempt waits for the Kernel until a later try exists');
-  assert.equal(liveFor(item('op-reported', 'budget-overrun:wf-b:attempt-9'), null, ledger.db), true, 'a reported job is not settled yet');
+  assert.equal(liveFor(item('op-filed', 'budget-overrun:wf-b:attempt-9'), null, ledger.db), true, 'a reported job is not settled yet');
   assert.equal(liveFor(item('op-gone', 'budget-overrun:wf-b:attempt-1'), null, ledger.db), false, 'no such job: nothing to decide');
 }));
