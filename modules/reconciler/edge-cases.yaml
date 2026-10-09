@@ -1543,6 +1543,7 @@ cases:
     met: {date: "2026-10-09", where: "alpha.8 live, machine.sqlite engine_actions", evidence: "ledger-copy-a8a: host run node seat:kernel:starci-monorepo:wf-starci-auth-test-wo failed 490, seat:supervisor failed 59, service:ask-tunnel failed 24, job starci kernel reconcile health:all failed 44, with no matching Decision Item"}
     rule: {file: scripts/reconciler/debug-digest-silent.mjs, anchor: "silentProblems"}
     spec: tests/reconciler/debug-digest-silent.spec.mjs
+    status: covered
   - id: two-revision-acks-disagree-and-one-needs-a-file-the-guard-refuses
     family: record-vs-reality
     found: live

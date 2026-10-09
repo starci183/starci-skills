@@ -16784,8 +16784,8 @@ kernel-launch-custody-incomplete:
   owner: supervisor
   kind: runtime-fault
   surfacedBy: decision-item
-  surfacedAs: seat-unrecoverable
-  surfacedAt: scripts/reconciler/host-seats.mjs
+  surfacedAs: runtime-defect
+  surfacedAt: scripts/kernel/workflow-launch-custody.mjs
 kernel-launch-host-unavailable:
   title: "Orca did not answer for the held Kernel launch Dispatch"
   title_vi: "Orca không trả lời về Dispatch của lần khởi động Kernel đang giữ"
@@ -16796,8 +16796,8 @@ kernel-launch-host-unavailable:
   owner: supervisor
   kind: runtime-fault
   surfacedBy: decision-item
-  surfacedAs: seat-unrecoverable
-  surfacedAt: scripts/reconciler/host-seats.mjs
+  surfacedAs: runtime-defect
+  surfacedAt: scripts/kernel/workflow-launch-custody.mjs
 kernel-launch-dispatch-unsettled:
   title: "The held Kernel launch Dispatch is not settled"
   title_vi: "Dispatch của lần khởi động Kernel đang giữ chưa kết thúc"
@@ -16808,8 +16808,8 @@ kernel-launch-dispatch-unsettled:
   owner: supervisor
   kind: runtime-fault
   surfacedBy: decision-item
-  surfacedAs: seat-unrecoverable
-  surfacedAt: scripts/reconciler/host-seats.mjs
+  surfacedAs: runtime-defect
+  surfacedAt: scripts/kernel/workflow-launch-custody.mjs
 kernel-launch-terminal-unproven:
   title: "The terminal of the held Kernel launch is not proven gone"
   title_vi: "Chưa chứng minh được cửa sổ của lần khởi động Kernel đang giữ đã đóng"
@@ -16820,8 +16820,8 @@ kernel-launch-terminal-unproven:
   owner: supervisor
   kind: runtime-fault
   surfacedBy: decision-item
-  surfacedAs: seat-unrecoverable
-  surfacedAt: scripts/reconciler/host-seats.mjs
+  surfacedAs: runtime-defect
+  surfacedAt: scripts/kernel/workflow-launch-custody.mjs
 check-rerun-worktree-unresolved:
   title: "The workflow worktree of a check re-run could not be resolved"
   title_vi: "Không xác định được worktree của workflow để chạy lại check"
@@ -16845,8 +16845,8 @@ kernel-launch-runs-unreadable:
   owner: supervisor
   kind: runtime-fault
   surfacedBy: decision-item
-  surfacedAs: seat-unrecoverable
-  surfacedAt: scripts/reconciler/host-seats.mjs
+  surfacedAs: runtime-defect
+  surfacedAt: scripts/kernel/workflow-launch-custody.mjs
 kernel-launch-run-exists:
   title: "A Kernel Run of this workflow exists since the held launch"
   title_vi: "Đã có Run Kernel của workflow này kể từ lần khởi động bị giữ"
@@ -16856,10 +16856,10 @@ kernel-launch-run-exists:
   nextStep_vi: "Supervisor kiểm tra Run đó và worker của nó, đóng đúng định danh rồi mới khởi động lại."
   owner: supervisor
   kind: runtime-fault
-  surfacedBy: decision-item
-  surfacedAs: seat-unrecoverable
-  surfacedAt: scripts/reconciler/host-seats.mjs
 # Proof: scripts/kernel/verbs/route.mjs refuseIneligibleOverride — a recorded op-override pin never falls through to another pool.
+  surfacedBy: decision-item
+  surfacedAs: runtime-defect
+  surfacedAt: scripts/kernel/workflow-launch-custody.mjs
 op-override-ineligible:
   title: "Op-override pinned pool is ineligible"
   title_vi: "Pool được ghim bởi op-override không đủ điều kiện"
@@ -17824,6 +17824,7 @@ RT_HELD_UNSURFACED:
     - "Mã trạng thái chưa có đường báo thì phải ghi surfacedBy open kèm mục đang mở trong sổ ca biên"
   nextStep_vi: "Khai báo surfacedBy, surfacedAs và surfacedAt trong mục của mã (decision-item, sla-clock, incident, digest, notifier, caller hoặc open) và làm cho tệp được trỏ tới thật sự báo cho vai trò giữ mã; nếu chưa làm được thì ghi open và thêm mục open vào modules/reconciler/edge-cases.yaml nêu đúng lý do."
   owner: supervisor
+  kind: check-finding
 rejudge-not-failed:
   title: "The job is not a failed leg"
   title_vi: "Việc không phải là lượt đã lỗi"
@@ -17932,6 +17933,9 @@ kernel-launch-worker-live:
   nextStep_vi: "Một Decision Item của Supervisor nêu Dispatch và cửa sổ Orca báo; gắn ghế đó làm Kernel hoặc đóng nó bằng tay có kiểm chứng."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: decision-item
+  surfacedAs: runtime-defect
+  surfacedAt: scripts/kernel/workflow-launch-custody.mjs
 kernel-launch-terminal-unnamed:
   title: "Orca names no terminal for the held launch"
   title_vi: "Orca không nêu cửa sổ cho lần khởi động đang giữ"
@@ -17941,6 +17945,9 @@ kernel-launch-terminal-unnamed:
   nextStep_vi: "Supervisor đối chiếu danh sách cửa sổ trên Orca rồi đóng tay có kiểm chứng."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: decision-item
+  surfacedAs: runtime-defect
+  surfacedAt: scripts/kernel/workflow-launch-custody.mjs
 kernel-launch-dispatch-mismatch:
   title: "Orca answered for another Dispatch"
   title_vi: "Orca trả lời về Dispatch khác"
@@ -17950,6 +17957,9 @@ kernel-launch-dispatch-mismatch:
   nextStep_vi: "Supervisor kiểm tra tín hiệu và Dispatch trên Orca; runtime không nhận cửa sổ của bản ghi lạ."
   owner: supervisor
   kind: runtime-fault
+  surfacedBy: decision-item
+  surfacedAs: runtime-defect
+  surfacedAt: scripts/kernel/workflow-launch-custody.mjs
 TEST_SPAWN_OUTSIDE_SEAM:
   title: "A test runner is started outside the one launcher that clears the enclosing spec run"
   title_vi: "Một bộ chạy test được khởi động ngoài bộ khởi chạy duy nhất xóa dấu của lần chạy spec bao quanh"
