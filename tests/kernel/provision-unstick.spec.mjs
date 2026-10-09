@@ -31,8 +31,11 @@ test('legOrderExemption: a row whose own wait names the queued job (or its linea
   assert.equal(legOrderExemption({row,job,typedGates:gate([row.job_id],[{type:'commit',repo:'r',target:'a'}])}),null);
 });
 
-test('taskSpecOf: a packet over the argv budget is written verbatim to the job dir and the spec points at it',t=>{
+test('taskSpecOf: a packet over the terminal bound is written verbatim to dispatch-prompts and the spec points at it',t=>{
   const dir=tmp(t,'starci-spec-');
+  const before=process.env.STARCI_LOCAL_ROOT;
+  process.env.STARCI_LOCAL_ROOT=dir;
+  t.after(()=>{if(before===undefined)delete process.env.STARCI_LOCAL_ROOT;else process.env.STARCI_LOCAL_ROOT=before;});
   const small='[Op] x\nowned_paths: a, b';
   assert.deepEqual(taskSpecOf({prompt:small,file:path.join(dir,'p.md'),op:'x',jobId:'j'}),{spec:small,spilled:false});
   assert.equal(fs.existsSync(path.join(dir,'p.md')),false,'a packet that fits writes nothing');
@@ -41,7 +44,8 @@ test('taskSpecOf: a packet over the argv budget is written verbatim to the job d
   const big=`[Op] business.decide\nowned_paths: ${owned.join(', ')}\n  cut: ...`;
   assert.ok(big.length>promptFileMaxChars());
   const file=packetFileOf(path.join(dir,'jobs','op-business.decide-cc63d20d87'),2);
-  assert.match(file,/packet\.a2\.md$/);
+  assert.equal(path.dirname(file),path.join(dir,'dispatch-prompts'));
+  assert.notEqual(file,packetFileOf(path.join(dir,'jobs','op-business.decide-cc63d20d87'),1),'each attempt has its own prompt');
   const out=taskSpecOf({prompt:big,file,op:'business.decide',jobId:'op-business.decide-cc63d20d87',attempt:2});
   assert.equal(out.spilled,true);
   assert.equal(fs.readFileSync(file,'utf8'),big,'the file is the rendered packet byte for byte');

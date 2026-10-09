@@ -457,12 +457,11 @@ try {
   // coordinator). worker-start blocks until the agent is ready, so the reservation is stretched past its timeout first.
   const priorManaged = parseJsonOr(priorKernelJob?.payload_json)?.managed ?? null;
   const entry = sender.handle;
-  const specFile = path.join(path.dirname(ledgerFileFor(repo)), 'kernel', `${workflowId}.a${kernelAttemptOf(priorKernelJob) + 1}.prompt.md`);
   const beforeLaunchAuthority = currentStartAuthority();
   if (!beforeLaunchAuthority.ok) failStart(beforeLaunchAuthority.reason, 'the accepted goal changed before Kernel launch', null,
     { reason: beforeLaunchAuthority.reason, authority: beforeLaunchAuthority, startup: hostStartup, workflowWorktree, install: workflowInstall });
   const kernelLaunch = launchKernelGroup({ ledger, workflowId, token, expected: startAuthority, route, members, reservationMs: KERNEL_START_RESERVATION_MS,
-    hostUnavailableExit: EXIT_HOST_UNAVAILABLE, memberLabel, failStart, launch: { worktree: kernelWorktree, title, prompt, specFile, config: route.ownerConfig,
+    hostUnavailableExit: EXIT_HOST_UNAVAILABLE, memberLabel, failStart, launch: { worktree: kernelWorktree, title, prompt, config: route.ownerConfig,
       role: 'kernel', scopeId: `${ledger.ledgerId ?? ledger.path}:${workflowId}:kernel-attempt:${kernelAttemptOf(priorKernelJob) + 1}`,
       bias: kernelBias(parseJsonOr(goal?.json)?.routing_bias, route), ownerGrant: ownerReserveGrant(goal), biasTrusted: ownerBiasTrust(goal) || Boolean(route.pin), tier: route.tier ?? null,
       objective: `[Kernel] ${kernelName} — ${workflowId}`, entry, priorRunId: priorManaged?.runId ?? null, onCreated: bindKernelGuard,

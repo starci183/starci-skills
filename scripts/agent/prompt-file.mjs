@@ -6,8 +6,7 @@
 // allocation.promptFile.maxChars (modules/models/runtimes.yaml, the only place the bound is declared) is written verbatim to a file and
 // the terminal or the Task spec is given a short pointer that names it.
 //
-// One directory: <state root>/dispatch-prompts, except the files that already are files and are cited, never re-written (an op's
-// packet in its job directory, a Kernel's state file). One cleanup rule: the writer that names a file in that directory removes the
+// One directory: <state root>/dispatch-prompts. One cleanup rule: the writer that names a file in that directory removes the
 // files older than allocation.promptFile.ttlMs first. Launch specs, follow-up delivery, wake bounds and Critic Task files use this owner.
 
 import fs from 'node:fs';
@@ -28,14 +27,14 @@ function promptFileNumber(key) {
 /** The longest text typed into a terminal or carried as a Task spec: the bound is a few short paragraphs, so an instruction line and a pointer always fit. */
 export const promptFileMaxChars = () => promptFileNumber('maxChars');
 
-/** The file a spilled packet is written to: <jobDir>/packet.a<attempt>.md. */
-export const packetFileOf = (jobDir, attempt) => path.join(jobDir, `packet.a${Number(attempt) || 1}.md`);
+/** The dispatch prompt of an operation attempt; its job directory supplies the unique identity. */
+export const packetFileOf = (jobDir, attempt) => promptFileOf(`packet:${jobDir}:attempt:${Number(attempt) || 1}`);
 
 /**
  * The file a launch or a follow-up with no file of its own spills to: <state>/dispatch-prompts/<hash of the identity>.md. The same call removes the
  * files of that directory older than allocation.promptFile.ttlMs, so the directory holds a day of prompts at most.
  */
-export function promptFileOf(identity, { dir = path.join(starciLocalRoot(), DISPATCH_PROMPTS_DIR), now = Date.now() } = {}) {
+export function promptFileOf(identity, { env = process.env, dir = path.join(starciLocalRoot(env), DISPATCH_PROMPTS_DIR), now = Date.now() } = {}) {
   const ttlMs = promptFileNumber('ttlMs');
   try {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {

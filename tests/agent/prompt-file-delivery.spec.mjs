@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { deliverPrompt, loadAdapter } from '../../scripts/agent/lib.mjs';
-import { promptFileMaxChars, promptFileOf, taskSpecOf } from '../../scripts/agent/prompt-file.mjs';
+import { packetFileOf, promptFileMaxChars, promptFileOf, taskSpecOf } from '../../scripts/agent/prompt-file.mjs';
 import { allocationSettings } from '../../engine/config.mjs';
 
 const temp = (t) => {
@@ -64,4 +64,21 @@ test('a launch with no file of its own spills to the state root\'s dispatch-prom
   assert.equal(file, promptFileOf('supervisor:abc', { dir, now }), 'the same launch identity names the same file');
   assert.equal(fs.existsSync(old), false);
   assert.equal(fs.existsSync(fresh), true);
+});
+
+test('operation packets use the shared state-root directory and have distinct job and attempt identities', (t) => {
+  const state = temp(t);
+  const before = process.env.STARCI_LOCAL_ROOT;
+  process.env.STARCI_LOCAL_ROOT = state;
+  t.after(() => { if (before === undefined) delete process.env.STARCI_LOCAL_ROOT; else process.env.STARCI_LOCAL_ROOT = before; });
+  const job = path.join(state, 'jobs', 'job-1');
+  const file = packetFileOf(job, 1);
+  assert.equal(path.dirname(file), path.join(state, 'dispatch-prompts'));
+  assert.equal(file, packetFileOf(job, 1));
+  assert.notEqual(file, packetFileOf(job, 2));
+  assert.notEqual(file, packetFileOf(path.join(state, 'jobs', 'job-2'), 1));
+  const prompt = 'x'.repeat(promptFileMaxChars() + 1);
+  assert.equal(taskSpecOf({ prompt, file, op: 'work.author', jobId: 'job-1' }).file, file);
+  assert.equal(fs.readFileSync(file, 'utf8'), prompt);
+  assert.equal(fs.existsSync(job), false, 'delivery creates no second prompt directory');
 });

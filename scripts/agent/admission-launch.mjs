@@ -350,7 +350,7 @@ export function startAgent({ provider, model = null, effort = null, worktree, re
   if (!admission.ok) return { ...admission, provider };
   provider = admission.selected.provider; model = admission.selected.model; effort = admission.selected.effort ?? effort;
   // Content is a file, what travels is the reference: a prompt above the inline bound is spilled to the caller's file, else to the state root's dispatch-prompts.
-  const spec = taskSpecOf({ prompt, file: specFile ?? (() => promptFileOf(launchScopeId(role, request))), heading: heading ?? title }).spec;
+  const spec = taskSpecOf({ prompt, file: specFile ?? (() => promptFileOf(launchScopeId(role, request), { env })), heading: heading ?? title }).spec;
   const launch = (runId) => spawnAgent({ provider, model, effort, worktree, repo, baseBranch, name, setup, title, spec, taskTitle: title, run: runId, from: entry,
     request, onCreated, parentDispatch, maxDepth, preflight, io: { ...io?.spawn, admission: io?.admission ?? io?.spawn?.admission },
     role, scopeId, allowGroup, admission, bias, ownerGrant, biasTrusted, tier, liveSeat, history, author, qualityFloor, kind, difficulty, config, env });

@@ -34,7 +34,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { openMachine, openMachineReader, pidAlive, starciLocalRoot } from '../../engine/db/machine.mjs';
+import { openMachine, openMachineReader, pidAlive } from '../../engine/db/machine.mjs';
 import { agentOfTerminal } from '../kernel/quit-agent.mjs';
 import {
   SKILL_ROOT, SUPERVISOR_ID, STARTUP_RESERVATION_MS,
@@ -342,7 +342,7 @@ async function spawnSeat({ m, d, seat, health, listing, recorded, dedupe, group,
   });
   const spawned = d.start({ provider: group[0].provider, model: group[0].model, effort: settings.effort, worktree: SKILL_ROOT, title: profile.title, prompt, env,
     role: 'supervisor', scopeId: `${profile.id}:attempt:${attempt}`, allowGroup: group, tier: group[0]?.tier ?? null, bias: seatBias(settings), biasTrusted: true,
-    specFile: path.join(starciLocalRoot(env), profile.seatId, `prompt.a${attempt}.md`), objective: `${profile.title} — ${profile.id}`,
+    objective: `${profile.title} — ${profile.id}`,
     entry, priorRunId: seat?.value?.runId ?? null,
     request: { seat: profile.id, attempt, token } });
   if (!spawned?.ok) return recordSpawnFailure({ m, spawned, token, attempt, profile, settings, now });
