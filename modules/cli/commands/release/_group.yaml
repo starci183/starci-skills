@@ -1,3 +1,4 @@
 group: release
 summary: prove, inspect and perform runtime release operations
 owner: runtime
+runtimeSide: tree

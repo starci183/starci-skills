@@ -8,15 +8,13 @@
 import fs from 'node:fs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { findPackage, requirePackage } from '../lib/package-at.mjs';
+import { toolSearchDirs } from '../lib/roots.mjs';
 
 /** The catalogued code of a host that cannot take a capture (modules/kernel/failure-codes.yaml). */
 export const RENDER_TOOL_UNAVAILABLE = 'RENDER_TOOL_UNAVAILABLE';
 /** The hint an op manifest carries in route.riskHints when its steps capture a render. */
 export const RENDER_CAPABILITY_HINT = 'host-capability-required:render';
 const PLAYWRIGHT_PACKAGES = Object.freeze(['playwright', '@playwright/test', 'playwright-core']);
-
-/** The directories a tool is looked up from: the caller's (project first), then the runtime. */
-export const toolDirs = (dirs, runtime = skillRoot) => [...dirs.filter(Boolean), runtime].filter(Boolean);
 
 /** The first install of `names` resolvable from each of `dirs` in turn, one per distinct package root. */
 function installsOf(dirs, names) {
@@ -39,12 +37,12 @@ function browserOf(found) {
  * (its launch then names the missing browser). Null when no directory resolves one.
  */
 export function playwrightInstall(dirs, { runtime = skillRoot } = {}) {
-  const installs = installsOf(toolDirs(dirs, runtime), PLAYWRIGHT_PACKAGES);
+  const installs = installsOf(toolSearchDirs(dirs, runtime), PLAYWRIGHT_PACKAGES);
   return installs.find(browserOf) ?? installs[0] ?? null;
 }
 
 /** The esbuild install a capture bundles with: the project's, else the runtime's; null when neither resolves one. */
-export const esbuildInstall = (dirs, { runtime = skillRoot } = {}) => findPackage(toolDirs(dirs, runtime), ['esbuild']);
+export const esbuildInstall = (dirs, { runtime = skillRoot } = {}) => findPackage(toolSearchDirs(dirs, runtime), ['esbuild']);
 
 /**
  * What this host can capture with, from `dirs` (the tree the op runs in) and the runtime: {ok, missing: [{tool, why}], playwright, esbuild}.

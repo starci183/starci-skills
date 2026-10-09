@@ -1,3 +1,4 @@
 group: work
 summary: design and UI proof tooling of the Work owner
 owner: runtime
+runtimeSide: host
