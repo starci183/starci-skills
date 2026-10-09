@@ -22,6 +22,8 @@ import { citeRecords } from '../../../work/validate/work-citations.mjs';
 import { recordWhy } from '../../why-record.mjs';
 import { checkedInOf } from './settle-checked-in.mjs';
 import { readEnv } from '../../../lib/env.mjs';
+import { rejudgedVerdictOf } from '../../critic-hold.mjs';
+import { runtimeCriticRunOf } from '../../settle/critic-run.mjs';
 
 // The job_transitions walk from the job's current status to its settled one. A pass settles only a job whose worker
 // filed a report (running/answering/effect_unknown go through reported); a fail or blocked with a filed report goes
@@ -123,6 +125,8 @@ function judgeFiledOutcome(ctx, { job, payload, envelope, measurementLeg, record
     refuseMeasuredFindings({ jobId, job, payload, measuredSplit });
   }
   if (internals.VERDICT_OUTCOMES[verdict].includes(envelope.outcome)) return;
+  // A report blocked on a Critic hold, judged by the runtime's own Critic: that verdict settles it (critic-hold.mjs).
+  if (rejudgedVerdictOf(ctx.db, envelope, jobId, runtimeCriticRunOf) === verdict) { result.rejudged = { by: 'runtime-critic' }; return; }
   if (verdict === 'fail' && envelope.outcome === 'done' && st.checkEvidence.failed > 0) {
     st.claimOverruled = true;
     result.claimOverruled = true;
@@ -160,7 +164,7 @@ function recordCutSet(ctx, { job, payload, recordedChecks, result }) {
 /** A pass needs a filed done report (or a measured one) and independently recorded green checks; a cut slice also its cut checks. */
 function requirePassEvidence(ctx, { job, payload, recordedChecks, result }) {
   const { st, jobId } = ctx;
-  if (st.reportOutcome !== 'done' && !result.measurement) throw refuse(`pass requires a filed done report for ${jobId}`, 'pass-report-missing');
+  if (st.reportOutcome !== 'done' && !result.measurement && !result.rejudged) throw refuse(`pass requires a filed done report for ${jobId}`, 'pass-report-missing');
   if (!st.checkEvidence.green) throw refuse(`pass requires independently recorded green checks for ${jobId}`, 'checks-not-green');
   if (payload.cut) recordCutSet(ctx, { job, payload, recordedChecks, result });
 }

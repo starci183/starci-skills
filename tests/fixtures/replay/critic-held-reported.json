@@ -1,0 +1,48 @@
+{
+ "schema": "replay-fixture@1",
+ "case": "critic-held-reported",
+ "source": {
+  "copy": "a8live13"
+ },
+ "workflow": {
+  "id": "wf-1",
+  "phase": "running",
+  "goalRevision": 0
+ },
+ "jobs": [
+  {
+   "id": "job-1",
+   "op": "architecture.decide",
+   "status": "reported",
+   "admitted": true,
+   "provider": "claude",
+   "owned": [
+    "d1.sds"
+   ],
+   "report": {
+    "outcome": "blocked",
+    "blocker": {
+     "kind": "authority"
+    },
+    "cause": "critic-hold",
+    "checks": [
+     {
+      "name": "check-1"
+     }
+    ]
+   },
+   "at": {
+    "created": -7200000,
+    "updated": -3600000
+   }
+  }
+ ],
+ "tree": {
+  "records": [
+   "d1.sds.rec-1"
+  ]
+ },
+ "decisions": [],
+ "events": [],
+ "live": {}
+}

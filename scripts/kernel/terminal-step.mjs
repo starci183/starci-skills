@@ -5,6 +5,7 @@
 // nobody owns. Status projects it as a `retry` action (scripts/kernel/graph-projection.mjs) and the Job controller
 // takes the step itself (scripts/reconciler/controllers/job.mjs -> `starci kernel reconcile --route-failure`).
 // Nothing here writes: upstreamPlanOf reads the ledger and says which step applies.
+import { effectiveBlockerKind } from './critic-hold.mjs';
 import { jobResult, JOB_STATUSES } from '../../engine/db/ledger.mjs';
 import { readModuleJson } from '../../engine/runtime-root.mjs';
 import { parseJson } from '../lib/json.mjs';
@@ -69,7 +70,7 @@ export function filedReportOf(db, jobId) {
   const row = db.prepare('SELECT r.outcome, r.report_json FROM reports r JOIN op_attempts a ON a.attempt_id=r.attempt_id WHERE a.job_id=? ORDER BY a.attempt_id DESC LIMIT 1').get(jobId);
   if (!row) return null;
   const envelope = parseJson(row.report_json, {}) ?? {};
-  return { outcome: row.outcome, blocker: row.outcome === 'blocked' ? envelope.blocker?.kind ?? null : null, envelope };
+  return { outcome: row.outcome, blocker: row.outcome === 'blocked' ? effectiveBlockerKind(envelope) : null, envelope };
 }
 
 const LIVE_DECISION = ['open', 'claimed', 'escalated'];

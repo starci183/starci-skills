@@ -1,0 +1,59 @@
+{
+ "schema": "replay-fixture@1",
+ "case": "critic-held",
+ "source": {
+  "copy": "a8live13"
+ },
+ "workflow": {
+  "id": "wf-1",
+  "phase": "running",
+  "goalRevision": 0
+ },
+ "jobs": [
+  {
+   "id": "job-1",
+   "op": "architecture.decide",
+   "status": "failed",
+   "admitted": false,
+   "provider": "claude",
+   "owned": [
+    "d1.sds"
+   ],
+   "report": {
+    "outcome": "blocked",
+    "blocker": {
+     "kind": "authority"
+    },
+    "cause": "critic-hold",
+    "checks": [
+     {
+      "name": "check-1"
+     }
+    ]
+   },
+   "result": {
+    "verdict": "blocked",
+    "nextStep": null
+   }
+  },
+  {
+   "id": "job-2",
+   "op": "work.author",
+   "status": "queued",
+   "owned": [
+    "own-1"
+   ],
+   "after": [
+    "job-1"
+   ]
+  }
+ ],
+ "tree": {
+  "records": [
+   "d1.sds.rec-1"
+  ]
+ },
+ "decisions": [],
+ "events": [],
+ "live": {}
+}

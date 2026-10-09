@@ -153,6 +153,7 @@ departures:
   reservation-leak: {role: runtime, duty: cleanup, registry: worker-reservations-leaked}
   secret-survived: {role: runtime, duty: does, registry: debug-questions-lacked-five-signals}
   hold-unlisted: {role: runtime, duty: does, registry: null}
+  leg-unowned: {role: runtime, duty: does, registry: critic-hold-filed-as-owner-authority}
   status-unreadable: {role: runtime, duty: does, registry: null}
   op-no-cause: {role: runtime, duty: does, registry: null}
   attempt-no-cause: {role: runtime, duty: does, registry: null}

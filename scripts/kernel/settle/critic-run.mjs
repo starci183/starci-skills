@@ -15,6 +15,7 @@ import { parseJson } from '../../lib/json.mjs';
 import { critiqueDecision } from '../../work/decision-critic.mjs';
 import { criticRubrics, ownedRelOf, productDigests, productFiles } from '../../work/decision-critic-product.mjs';
 import { criticOwedBy } from '../critic-settle.mjs';
+import { criticHoldOf } from '../critic-hold.mjs';
 
 /** The ledger event that records one runtime Critic run. */
 export const RUNTIME_CRITIC_EVENT = 'runtime-critic-run';
@@ -77,7 +78,7 @@ function noteIgnoredVerdict(ledger, item, digest, now) {
  * `maxAttempts` the bound of such runs per digest, `critique` the seam (the real Critic, or a fake).
  */
 export async function runtimeCriticFor(ledger, item, { tree, entry: coordinator = null, retryMs, maxAttempts = Infinity, now = Date.now(), critique = critiqueDecision, orca = null, rubrics = criticRubrics() }) {
-  const entry = item.outcome === 'done' ? criticOwedBy(item.op) : null;
+  const entry = item.outcome === 'done' || criticHoldOf(item.report) ? criticOwedBy(item.op) : null;
   if (!entry || !tree) return null;
   const workRoot = path.join(tree, WORK_ROOT_NAME);
   const payload = parseJson(ledger.db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(item.jobId)?.payload_json, {}) ?? {};

@@ -53,7 +53,8 @@ import { workflowWorktreeOf } from '../../machine/workflow-tree.mjs';
 import { reconcileAttemptPlacements } from '../attempt-placement.mjs';
 import { currentRuntimeRev } from '../runtime-rev.mjs';
 import { releaseEndedGates, recordGateRejudged } from '../gate-holds-ended.mjs';
-import { kernelTerminalOf, runtimeCriticFor } from './critic-run.mjs';
+import { kernelTerminalOf, runtimeCriticFor, runtimeCriticRunOf } from './critic-run.mjs';
+import { rejudgedVerdictOf } from '../critic-hold.mjs';
 import { RUNTIME_OWED_CODES } from '../gate-admission.mjs';
 import { recoverPreparedSettlement } from './prepared-recovery.mjs';
 import { settlerSettings, runtimeEnv, verifyReported, recordSettlerCheck, parse, slug, jsonOf } from './job-settle-verify.mjs';
@@ -260,10 +261,12 @@ async function settleReported(ledger, fresh, { repo, settings, env, now, dryRun,
   // A done decision leg without a Critic verdict of its own is judged with the one the runtime's Critic gives it; a Critic that could not judge holds the settle (the checker-unavailable path).
   const owed = dryRun ? null : await runtimeCriticFor(ledger, fresh, { tree: critic.tree, retryMs: settings.tail.retryMs, maxAttempts: settings.tail.maxAttempts, now: now(), entry: critic.tree ? kernelTerminalOf(ledger.db, fresh.workflowId) : null, ...critic.seams });
   if (owed?.hold) return { target: 'skipped', row: await checkerUnavailable(ledger, fresh, { reason: 'checker-unavailable', detail: [`critic: ${owed.hold.code ?? 'CRITIC_UNAVAILABLE'}: ${owed.hold.error ?? ''}`] }, { now: now(), settings }) };
-  const verdict = await verdictOf(ledger, fresh, { repo, settings, env, dryRun, verify });
-  let settleAs = 'pass';
+  // A report blocked only on a Critic hold is judged by the runtime's Critic now: its verdict settles the leg (pass, or the op's error-work), never the owner's.
+  const rejudged = dryRun ? null : rejudgedVerdictOf(ledger.db, fresh.report, fresh.jobId, runtimeCriticRunOf);
+  const verdict = rejudged ? { green: rejudged === 'pass', reason: 'critic-rejudged', via: 'report-blocked+critic-rejudged' } : await verdictOf(ledger, fresh, { repo, settings, env, dryRun, verify });
+  let settleAs = rejudged ?? 'pass';
   let judged = verdict;
-  if (!verdict.green) {
+  if (!verdict.green && !rejudged) {
     const redirect = await redRedirectOf(ledger, fresh, verdict, { now, settings, dryRun });
     if (redirect.result) return redirect.result;
     ({ settleAs, verdict: judged } = redirect);

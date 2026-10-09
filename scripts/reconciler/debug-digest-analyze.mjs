@@ -209,6 +209,21 @@ function stopProblems(view) {
   return out;
 }
 
+/**
+ * A leg that failed with its dependants held `dependency-failed` and nobody holding it: no open incident or Decision Item names it, no retry follows it, and the
+ * Kernel has no menu item. The runtime owes such a leg a step (a route, a retry-decision item): it is the runtime's departure, never a quiet wait.
+ */
+function unownedLegProblems(workflow, view, ctx) {
+  const menu = Array.isArray(workflow.status?.menu) ? workflow.status.menu : [];
+  const named = (jobId) => view.incidents.some((i) => i.jobId === jobId) || view.decisions.some((d) => d.jobId === jobId) || menu.some((item) => String(item.id).includes(jobId));
+  const held = (workflow.status?.frontier?.queued ?? []).filter((item) => item.queuedBecause === 'dependency-failed' && item.blockedBy?.job && !named(item.blockedBy.job));
+  return [...new Set(held.map((item) => item.blockedBy.job))].map((jobId) => {
+    const job = workflow.jobs.find((j) => j.jobId === jobId);
+    const ageMs = job ? ctx.now - Number(job.updatedAt) : null;
+    return problem('hold', 1 + held.length, `leg-unowned-${jobId}`, 'leg-unowned', { op: job?.opId ?? held[0].blockedBy.op, jobId, waiting: held.filter((item) => item.blockedBy.job === jobId).length, min: ageMs === null ? 0 : minutes(ageMs) }, { jobId });
+  });
+}
+
 function workflowView(workflow, ctx) {
   const jobs = jobsSection(workflow, ctx);
   const legs = (workflow.status?.legs ?? []).filter((l) => FAILED_LEG.has(l.status));
@@ -219,7 +234,7 @@ function workflowView(workflow, ctx) {
       .sort((a, b) => b.tokens - a.tokens),
     incidents: workflow.incidents, decisions: workflow.decisions };
   const failed = view.statusError === null ? [] : [problem('workflow', view.openWork + 1, `status-${view.id}`, 'status-unreadable', { name: view.name, error: view.statusError })];
-  return { ...view, problems: [...kernelProblems(view, ctx.n), ...stopProblems(view), ...failed].map((p) => ({ ...p, workflowId: view.id })) };
+  return { ...view, problems: [...kernelProblems(view, ctx.n), ...stopProblems(view), ...unownedLegProblems(workflow, view, ctx), ...failed].map((p) => ({ ...p, workflowId: view.id })) };
 }
 
 /** A secret that survived redaction in a stored artifact is a departure of the runtime's redaction duty: one problem per artifact and rule, never the text. */
