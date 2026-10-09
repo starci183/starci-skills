@@ -44,7 +44,7 @@ function slotRows(m) {
  * End one slot: stop its held command, then its holder, each only while the recorded identity is still the live process; release the lock and
  * the uat_slots row; append the event. Returns {slot, runId, why, stopped: [pid], survivors: [pid], released}. Seams: rows, stop, alive, env, dryRun.
  */
-export function endSlot(entry, { why, state, rows, stop = stopTree, alive = pidAlive, env = process.env, dryRun = false }) {
+function endSlot(entry, { why, state, rows, stop = stopTree, alive = pidAlive, env = process.env, dryRun = false }) {
   const { row, slot, name, holder, lessee } = entry;
   // A lease that recorded no identity is judged by its holder pid: it is stopped only while that process is a uat-slots run.
   const self = lessee?.self ?? holderIdentity(row, rows);
