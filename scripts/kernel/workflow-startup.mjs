@@ -1,3 +1,4 @@
+import { phase } from './start-phase.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import path from 'node:path';
 import { execNode } from '../api/node/exec-node.mjs';
@@ -51,6 +52,7 @@ export function headlessSenderOf({ listing, recorded = new Set(), seats = new Se
  * Supervisor start is refused without a terminal. The workflow's entry Run (its Kernel job's managed.runId) names the coordinator to prefer.
  */
 export function workflowSender({ env = process.env, launchedBy = 'supervisor', ledger = null, workflowId = null, root = SKILL_ROOT } = {}, { list = terminalList, show = runShow, machine = readMachine } = {}) {
+  phase('sender');
   const handle = String(readEnv('ORCA_TERMINAL_HANDLE', env) ?? '').trim();
   if (handle) return { ok: true, handle, source: 'caller' };
   if (launchedBy !== 'watchdog') return SENDER_MISSING('run starci workflow start inside an Orca terminal (ORCA_TERMINAL_HANDLE is not set here)');
@@ -154,6 +156,7 @@ export function recordWorkflowStartFailure(ledger, { workflowId, token, holderPi
 }
 
 export async function ensureWorkflowHost({ workflow, goal, env = process.env, plan = false } = {}, deps = {}) {
+  phase('workflow-host');
   const authority = workflowStartAuthority({ workflow, goal });
   if (!authority.ok) return { ...authority, ready: false };
   if (plan) return { ...authority, planned: true, ready: false };
@@ -168,6 +171,7 @@ export async function ensureWorkflowHost({ workflow, goal, env = process.env, pl
 const slotLine = (slot) => [slot.name, ' (pid ', (slot.survivors.length ? slot.survivors : slot.pids).join(', '), ')'].join('');
 
 export async function installWorkflowTree({ record, env = process.env } = {}, deps = {}) {
+  phase('workflow-worktree-install');
   if (!record?.path) return { ok: false, reason: 'workflow-worktree-missing' };
   // The runtime's own UAT slot servers run from the tree and load its native files: they are ended (by their recorded identity) before npm ci
   // deletes node_modules, and a slot that cannot be ended is a typed refusal naming the lease, never a blind retry of the install.
