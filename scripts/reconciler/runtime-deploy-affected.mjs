@@ -95,5 +95,5 @@ export function affectedJudgement(run, { sha, base }) {
   if (!receipt.clean) return { detail: 'the receipt says the source tree was not clean when the run ended: the run changed it or it changed meanwhile' };
   if (receipt.tip !== sha) return { detail: `the receipt is for tip ${String(receipt.tip).slice(0, 12)}, not the source ${sha.slice(0, 12)}` };
   if (receipt.base !== base) return { detail: `the receipt is against base ${String(receipt.base).slice(0, 12)}, not the host head ${base.slice(0, 12)}` };
-  return { affected: { base: receipt.base, tip: receipt.tip, root: receipt.root, passed: receipt.passed, total: receipt.total } };
+  return { affected: { base: receipt.base, tip: receipt.tip, ...(receipt.root ? { root: receipt.root } : {}), passed: receipt.passed, total: receipt.total } };
 }
