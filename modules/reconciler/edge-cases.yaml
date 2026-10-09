@@ -1532,6 +1532,7 @@ cases:
     met: {date: "2026-10-09", where: "design of the cache in the green-means-green lane", evidence: "reuse measured over five integration merges: a sound key reuses the few specs whose inputs are unchanged and none of the specs a change selected"}
     rule: {file: scripts/supervisor/spec-cache-key.mjs, anchor: "createKeyer"}
     spec: tests/supervisor/spec-cache-key.spec.mjs
+    status: covered
 
   - id: two-revision-acks-disagree-and-one-needs-a-file-the-guard-refuses
     family: record-vs-reality
