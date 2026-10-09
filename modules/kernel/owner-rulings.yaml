@@ -151,7 +151,7 @@ rulings:
     ruling: >-
       The owner's words are "truoc luc tat may thi xoa sach nhung test khong co y nghia nhu fake orca, chap nhan coverage thap hon; giu nhung specs dang giu, va phai giai thich vi sao";
       the delegation is "theo y tro di, thay cho phep khoi hoi". Under that delegation the lead's completed independent body and replacement review approves exactly the v4 narrowed prune on integration 8da72049bd3c0269c3c17d20aeea448ca2424b9a:
-      71 original-hash-qualified tests (D1 call/stand-in relay, D2 proved replay duplicate, D3 source-text duplicate, D4 empty literal/cardinality proof), recorded in D:/starci-tmp/codex/alpha9-prune-final-v4-candidates.json.
+      71 original-hash-qualified tests (D1 call/stand-in relay, D2 proved replay duplicate, D3 source-text duplicate, D4 empty literal/cardinality proof), recorded in ../../starci-tmp/codex/alpha9-prune-final-v4-candidates.json relative to the lane root.
       This raw fingerprint binds 55 native findings and the exact candidate diff, before deletion. All twelve reviewed KEEP statements remain whole, including Run selection, parser refusal, Critic cleanup and successful launch recovery;
       the three export-consequence removals remain Deferred. All changed, new and unreviewed specs, all replay/walk/judge/receipt/cache/owning assertions and the sixteen role-prompt pins remain.
       Consequences are only unused imports and pure declarations inside the same edited specs and one registry reproducer field pointing to the retained read-attestation replay; production exports, classifier, runtime coverage policy and example coverage are unchanged.
