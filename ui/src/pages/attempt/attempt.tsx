@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Link } from '@heroui/react';
 import { refreshQuery, useApiQuery } from '../../api/query';
 import type { AttemptDetailV3, EvidenceFile } from '../../contract';
 import { useRoute, type AttemptStep } from '../../router';
@@ -10,12 +11,13 @@ import { AttemptInputContext, AttemptOpGoal, useOpInfo } from '../../components/
 import { CheckList } from '../../components/attempt/check-list';
 import { verificationSummary } from '../../components/attempt/verification';
 import { ResultCard } from '../../components/attempt/result/result-card';
+import { AdmissionDetails } from '../../components/attempt/admission';
 import { ProductsCard } from '../../components/attempt/products/products-card';
 import { compactVi } from '../../components/usage-view';
 import { AttemptWhereCard } from '../../components/attempt/where-card';
 import { EvidenceBrowser } from '../../components/evidence/evidence-browser';
 import { AttemptHeader } from '../../components/attempt/frame/header';
-import { BareCards } from '../../components/attempt/frame/card';
+import { BareCards, Card } from '../../components/attempt/frame/card';
 import { AttemptDecisions, DiffSection, LandSection, TimelineCard, TranscriptSection } from '../../components/attempt/frame/sections';
 import { stepItems } from '../../components/attempt/frame/steps';
 import { formatBytes, formatSpan, hashParam, setHashParam } from '../../components/attempt/frame/util';
@@ -25,7 +27,7 @@ import { formatAbsolute } from '../../i18n/vi';
 export const concept: Concept = 'C7';
 const baseOf = (project: string, id: string) => `/api/attempts/${encodeURIComponent(project)}/${encodeURIComponent(id)}`;
 /** Where each step lives on the page; every step scrolls to its own section. Run/checks/land sections live under "Advanced" and open when targeted. */
-const anchors: Record<AttemptStep, string> = { dispatch: 'attempt-op-goal', run: 'attempt-step-run', report: 'attempt-result', checks: 'attempt-step-checks', commit: 'attempt-step-commit', verdict: 'attempt-result', land: 'attempt-step-land' };
+const anchors: Record<AttemptStep, string> = { dispatch: 'attempt-op-goal', run: 'attempt-step-run', report: 'attempt-result', checks: 'attempt-step-checks', commit: 'attempt-step-commit', verdict: 'attempt-step-verdict', land: 'attempt-step-land' };
 const advancedIds = new Set(['attempt-input', 'attempt-step-checks', 'attempt-where', 'attempt-evidence', 'attempt-step-run', 'attempt-step-diff', 'attempt-step-land', 'attempt-timeline', 'attempt-decisions']);
 
 function initialStep(attempt: AttemptDetailV3): AttemptStep {
@@ -47,7 +49,7 @@ function costSummary(a: AttemptDetailV3): string {
 /** One "Advanced" card. `nonce` > 0 means a deep link / step click asked for it open; a new nonce remounts it open. */
 function AdvancedSection({ id, title, summary, concept: c, nonce, children }: Readonly<{ id: string; title: string; summary: string; concept: Concept; nonce: number; children: React.ReactNode }>) {
   return <StaggerItem>
-    <ConceptBlock concept={c} as="section" id={id} className="min-w-0 scroll-mt-4">
+    <ConceptBlock concept={c} as="section" id={id} className="min-w-0 scroll-mt-24">
       <Advanced key={`${id}:${nonce}`} variant="card" title={title} summary={summary} defaultOpen={nonce > 0}>
         <BareCards value>{children}</BareCards>
       </Advanced>
@@ -90,7 +92,7 @@ function AttemptDetailPage({ project, attemptId, routeStep }: Readonly<{ project
     if (target) window.requestAnimationFrame(() => document.getElementById(target)?.scrollIntoView({ block: 'start' }));
   }, [data, picked, fileId]);
 
-  if (attempt.error && !data) return <div className="mx-auto max-w-6xl p-6"><a href="#/" className="text-sm hover:underline">{t('← Overview')}</a><div className="mt-4"><FeedbackState error onRetry={() => refreshQuery(baseOf(project, attemptId))}>{attempt.error}</FeedbackState></div></div>;
+  if (attempt.error && !data) return <div className="mx-auto max-w-6xl p-6"><Link href="#/" className="text-sm">{t('← Overview')}</Link><div className="mt-4"><FeedbackState error onRetry={() => refreshQuery(baseOf(project, attemptId))}>{attempt.error}</FeedbackState></div></div>;
   if (!data) return <div className="mx-auto max-w-6xl p-6"><PageSkeleton label={t('Reading the attempt…')} /></div>;
 
   const step = picked ?? initialStep(data);
@@ -107,13 +109,14 @@ function AttemptDetailPage({ project, attemptId, routeStep }: Readonly<{ project
   const where = data.where;
   const n = (id: string) => nonce[id] ?? 0;
 
-  return <div className="mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-6 pb-8 min-[760px]:gap-8">
+  return <div className="mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-6 pb-8">
     {attempt.error ? <FeedbackState error onRetry={() => refreshQuery(baseOf(project, attemptId))}>{t('Refresh failed; showing the last recorded snapshot.')} {attempt.observedAt != null ? t('Last successful API read at {at}', { at: formatAbsolute(attempt.observedAt) }) : null} · {attempt.error}</FeedbackState> : null}
     {attempt.meta?.stale?.length ? <FeedbackState error onRetry={() => refreshQuery(baseOf(project, attemptId))}>{t('Some sources could not be refreshed: {sources}', { sources: attempt.meta.stale.join(' · ') })}</FeedbackState> : null}
-    <Stagger className="flex min-w-0 flex-col gap-6 min-[760px]:gap-8">
+    <Stagger className="flex min-w-0 flex-col gap-6">
       <StaggerItem><AttemptHeader attempt={data} project={project} /></StaggerItem>
       <StaggerItem><StepBar steps={stepItems(data)} selected={step} onSelect={selectStep} /></StaggerItem>
       <StaggerItem><AttemptOpGoal attempt={data} info={info.info} loading={info.loading} reference={info} /></StaggerItem>
+      <StaggerItem><Card concept="C6" title={t('Admission at dispatch')} hint={t('Captured receipt and current matching receipt')}><AdmissionDetails attempt={data} /></Card></StaggerItem>
       <StaggerItem><ResultCard attempt={data} onShowChecks={() => selectStep('checks')} /></StaggerItem>
       <StaggerItem><ProductsCard project={project} attempt={data} /></StaggerItem>
     </Stagger>

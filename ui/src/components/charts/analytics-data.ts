@@ -22,6 +22,8 @@ export const attemptState = (row: AttemptRow): AttemptState => {
   // Ended without a verdict (refused launch, dead worker, unknown effect) is not running.
   if (row.endState != null) return 'unknown';
   if (row.reportedAt != null || row.reportOutcome != null) return 'settling';
+  // Terminal closure ends execution without establishing a report or runtime verdict.
+  if (row.terminalEndedAt != null) return 'unknown';
   return row.dispatchedAt != null ? 'run' : 'unknown';
 };
 export const stateTone: Record<AttemptState, Tone> = { pass: 'success', bad: 'failed', run: 'running', settling: 'warning', retry: 'warning', dropped: 'skipped', unknown: 'skipped' };

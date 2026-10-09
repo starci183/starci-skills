@@ -1,4 +1,5 @@
 import { CircleAlert } from 'lucide-react';
+import { Link } from '@heroui/react';
 import { useApiQuery } from '../../../api/query';
 import type { ActionRow, AttemptDetailV2, RecordedDecision, LogRow } from '../../../contract';
 import { formatAbsolute } from '../../../i18n/vi';
@@ -14,6 +15,8 @@ import type { Concept } from '../../concept';
 import { t } from '../../../i18n/t';
 import { workflowLandStatus } from '../land-state';
 import { ReadWarning } from './read-warning';
+import { Advanced } from '../../motion';
+import { Badge } from '../../ui/badge';
 
 export const concept: Concept = 'C7';
 
@@ -28,15 +31,17 @@ export function TranscriptSection({ project, attemptId, attempt }: Readonly<{ pr
   const terminal = attempt.terminal;
   return <Card id="attempt-step-run" concept="C7" title={t('Run · transcript')} hint={t('redacted scrollback, not a terminal screenshot')}
     right={terminal ? <span className="font-mono text-[11px] text-muted-foreground">{terminal.handle} · {terminal.snapshots} snapshot{terminal.live ? ` · ${t('open')}` : ''}</span> : null}>
-    <TranscriptViewer project={project} attemptId={attemptId} live={attempt.verdict == null && attempt.endState == null} />
-    <details className="mt-4"><summary className="cursor-pointer text-sm font-medium">{t('Job system log · {n}', { n: logs.data?.length ?? '—' })}</summary>
+    <TranscriptViewer project={project} attemptId={attemptId} live={attempt.verdict == null && attempt.endState == null && attempt.terminalEndedAt == null} />
+    <Advanced className="mt-4" title={t('Job system log · {n}', { n: logs.data?.length ?? '—' })} keepMounted>
+      <div className="grid min-w-0 gap-3">
       <p className="text-xs text-muted-foreground">{t('Job logs may include several dispatches; they are not exclusive Attempt evidence.')}</p>
       <ReadWarning read={logs} url={logsUrl} retained={Boolean(logs.data)} />
       {!logs.data && !logs.error ? <Empty>{t('Reading job logs…')}</Empty> : null}
       <div className="mt-2 divide-y">{logs.data?.map(item => <div key={item.key} className="py-2 text-xs"><span className="text-muted-foreground">{formatAbsolute(item.at)} · {item.level} · {item.actor}</span><p className="break-words">{item.msg}</p></div>)}</div>
       {logs.meta?.next ? <p className="text-xs text-muted-foreground">{t('This is one page of job logs; more rows are available.')}</p> : null}
       {logs.data && !logs.data.length ? <Empty>{t('No log lines for this job.')}</Empty> : null}
-    </details>
+      </div>
+    </Advanced>
   </Card>;
 }
 
@@ -60,7 +65,7 @@ export function LandSection({ attempt }: Readonly<{ attempt: AttemptDetailV2 }>)
   return <Card id="attempt-step-land" concept="C11" title={t('Workflow integration (Land)')} hint={t('the workflow integration record, separate from this attempt verdict')}
     right={<StatusChip status={workflowLandStatus(land)} label={land?.result ?? t('No workflow land record')} />}>
     <dl className="m-0 grid gap-4 text-sm sm:grid-cols-2">
-      <div className="flex flex-col gap-1"><dt className="text-xs text-muted-foreground">{t('Workflow')}</dt><dd className="m-0 break-all"><a href={`#/w/${encodeURIComponent(attempt.project)}/${encodeURIComponent(attempt.wf)}`} className="text-primary hover:underline">{attempt.wf}</a></dd></div>
+      <div className="flex flex-col gap-1"><dt className="text-xs text-muted-foreground">{t('Workflow')}</dt><dd className="m-0 break-all"><Link href={`#/w/${encodeURIComponent(attempt.project)}/${encodeURIComponent(attempt.wf)}`}>{attempt.wf}</Link></dd></div>
       <div className="flex flex-col gap-1"><dt className="text-xs text-muted-foreground">{t('Workflow repo / branch')}</dt><dd className="m-0"><PathLink path={land?.repo ?? null} kind="dir" /><span className="mt-1 block break-all font-mono text-xs">{land?.branch ?? t('Not recorded')}</span></dd></div>
       <div className="flex flex-col gap-1"><dt className="text-xs text-muted-foreground">{t('SHA after land')}</dt><dd className="m-0"><ShaId sha={land?.mergedSha} /></dd></div>
       <div className="flex flex-col gap-1"><dt className="text-xs text-muted-foreground">{t('At')}</dt><dd className="m-0">{formatAbsolute(land?.at)}</dd></div>
@@ -69,9 +74,9 @@ export function LandSection({ attempt }: Readonly<{ attempt: AttemptDetailV2 }>)
       <div className="flex flex-col gap-1"><dt className="text-xs text-muted-foreground">{t('Land receipt source')}</dt><dd className="m-0">{land?.source ?? t('Not recorded')}</dd></div>
     </dl>
     {land?.reason ? <p className="mb-0 mt-3 break-words text-sm text-muted-foreground">{land.reason}</p> : null}
-    {land?.output ? <a href={land.output.href} target="_blank" rel="noreferrer" className="mt-3 inline-block text-sm text-primary hover:underline">{t('Open land output ({size})', { size: formatBytes(land.output.bytes) })}</a> : null}
+    {land?.output ? <Link href={land.output.href} target="_blank" rel="noreferrer" className="mt-3 text-sm">{t('Open land output ({size})', { size: formatBytes(land.output.bytes) })}</Link> : null}
     <p className="mt-3 text-xs text-muted-foreground">{t('Attempt pass, workflow land, push and deployment are separate records. A matching head does not establish ancestry or deployment.')}</p>
-    {land?.steps?.length ? <details className="mt-3"><summary className="cursor-pointer text-xs font-medium">{t('Recorded land steps')}</summary><pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-md border bg-muted/30 p-2 font-mono text-xs">{jsonText(land.steps)}</pre></details> : null}
+    {land?.steps?.length ? <Advanced className="mt-4" title={t('Recorded land steps')} keepMounted><pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-md border bg-default p-2 font-mono text-xs">{jsonText(land.steps)}</pre></Advanced> : null}
   </Card>;
 }
 
@@ -93,10 +98,10 @@ function ActionRowView({ action }: Readonly<{ action: ActionRow }>) {
 
 function DecisionRowView({ decision }: Readonly<{ decision: RecordedDecision }>) {
   return <li className="min-w-0 py-2 text-sm">
-    <div className="flex flex-wrap items-center gap-2"><span className="rounded border px-2 py-1 text-[11px] text-muted-foreground">{decision.decider}</span><span className="min-w-0 flex-1 break-words">{decision.choice ?? t('Choice not recorded')}</span><span className="text-xs text-muted-foreground">{formatAbsolute(decision.at)}</span></div>
+    <div className="flex flex-wrap items-center gap-2"><Badge variant="outline">{decision.decider}</Badge><span className="min-w-0 flex-1 break-words">{decision.choice ?? t('Choice not recorded')}</span><span className="text-xs text-muted-foreground">{formatAbsolute(decision.at)}</span></div>
     <p className="mb-0 mt-1 text-xs text-muted-foreground">{decision.association === 'attempt' ? t('Exact Attempt association') : t('Job-wide association')}</p>
     <p className="mb-0 mt-2 break-words text-xs text-muted-foreground">{decision.rationale ?? t('Rationale not recorded')}</p>
-    <details className="mt-2"><summary className="cursor-pointer text-xs text-muted-foreground">{t('Recorded decision result')}</summary><div className="mt-2"><CopyId value={decision.id} /></div><pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-md border bg-muted/30 p-2 font-mono text-xs">{decision.result == null ? t('Not recorded') : jsonText(decision.result)}</pre></details>
+    <Advanced className="mt-4" title={t('Recorded decision result')} keepMounted><div className="grid min-w-0 gap-3"><CopyId value={decision.id} /><pre className="max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-md border bg-default p-2 font-mono text-xs">{decision.result == null ? t('Not recorded') : jsonText(decision.result)}</pre></div></Advanced>
   </li>;
 }
 

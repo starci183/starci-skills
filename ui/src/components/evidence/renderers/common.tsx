@@ -5,8 +5,9 @@ import { CheckIcon, CopyIcon } from 'lucide-react';
 import type { Tone } from '../../status';
 import { t } from '../../../i18n/t';
 import { Button } from '../../ui/button';
+import { Card, Toolbar as HeroToolbar } from '@heroui/react';
 
-export const toolbarBtn = 'inline-flex items-center gap-1 rounded-md border bg-background px-2 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-40';
+export const toolbarBtn = 'text-xs';
 
 export async function copyText(value: string): Promise<boolean> {
   try { await navigator.clipboard.writeText(value); return true; } catch { /* clipboard blocked: fall through */ }
@@ -37,28 +38,17 @@ const BEL = String.fromCodePoint(7);
 const ANSI_RE = new RegExp(String.raw`${ESC}\[[0-9;?]*[ -/]*[@-~]|${ESC}\][^${BEL}]*(?:${BEL}|${ESC}\\)|${ESC}[()][A-Za-z0-9]`, 'g');
 export function stripAnsi(text: string): string { return text.replace(ANSI_RE, ''); }
 
-/** Outcome-like words get a status tone wherever they appear as a value. */
-export function wordTone(word: string): Tone | null {
-  switch (word.toLowerCase()) {
-    case 'pass': case 'passed': case 'done': case 'success': case 'succeeded': case 'ok': return 'success';
-    case 'fail': case 'failed': case 'blocked': case 'error': return 'failed';
-    case 'partial': case 'retry': case 'warn': case 'warning': return 'warning';
-    case 'deferred': case 'skipped': case 'dropped': return 'skipped';
-    default: return null;
-  }
-}
-
 export function Toolbar({ children, right }: Readonly<{ children?: ReactNode; right?: ReactNode }>) {
   return (
-    <div className="flex flex-wrap items-center gap-2 border-b bg-muted/40 px-2 py-2">
+    <HeroToolbar aria-label={t('Evidence')} className="flex w-full flex-wrap items-center gap-2 border-b bg-default/40 px-4 py-3">
       {children}
       {right ? <div className="ml-auto flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">{right}</div> : null}
-    </div>
+    </HeroToolbar>
   );
 }
 
 export function Frame({ children, className = '' }: Readonly<{ children: ReactNode; className?: string }>) {
-  return <div className={`overflow-hidden rounded-lg border bg-card text-card-foreground ${className}`}>{children}</div>;
+  return <Card variant="transparent" className={`gap-0 overflow-hidden p-0 text-card-foreground ${className}`}>{children}</Card>;
 }
 
 /** One numbered line: gutter + content. */

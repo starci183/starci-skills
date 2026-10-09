@@ -542,8 +542,6 @@ json-exceptions:
     - path: packages/stylelint/package.json
       reason: >
         npm package manifest inside the packages workspace project; the npm toolchain requires JSON.
-    - path: ui/components.json
-      reason: shadcn component registry config for the StarCi Status console; the shadcn CLI requires JSON.
     - path: ui/package-lock.json
       reason: npm lockfile for the StarCi Status console; the npm toolchain requires JSON.
     - path: ui/package.json

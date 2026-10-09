@@ -18,7 +18,6 @@ const noLiteralColours = {
 
 export default [{
   files: ['src/app.tsx', 'src/router.ts', 'src/api/**/*.ts', 'src/i18n/**/*.ts', 'src/components/**/*.tsx', 'src/pages/**/*.tsx'],
-  ignores: ['src/components/ui/**'],
   languageOptions: { parser, parserOptions: { ecmaFeatures: { jsx: true }, sourceType: 'module' } },
   plugins: { starci: { rules: { 'no-literal-colours': noLiteralColours } } },
   rules: { 'starci/no-literal-colours': 'error' },

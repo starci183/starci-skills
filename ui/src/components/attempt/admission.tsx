@@ -4,6 +4,7 @@ import { t } from '../../i18n/t';
 import { CopyId, InfoChip, InfoRow } from '../infra/rows';
 import type { Concept } from '../concept';
 import { jsonText } from './frame/util';
+import { Advanced } from '../motion';
 
 export const concept: Concept = 'C6';
 
@@ -24,13 +25,12 @@ function ReceiptRows({ receipt, historical }: Readonly<{ receipt: AdmissionReser
 export function AdmissionDetails({ attempt }: Readonly<{ attempt: AttemptDetailV2 }>) {
   const admission = attempt.admission;
   const captured = admission?.source === 'contract';
-  return <section className="mt-3 border-t border-border pt-3">
-    <h4 className="m-0 mb-2 text-[13px] font-semibold">{t('Admission at dispatch')}</h4>
-    <p className="mb-3 mt-0 text-xs text-muted-foreground">{captured ? <>{t('Captured dispatch contract')} · {formatAbsolute(admission.recordedAt)}</> : t('No admission capture was recorded.')}</p>
+  return <section className="min-w-0" aria-label={t('Admission at dispatch')}>
+    <p className="mb-4 mt-0 text-xs text-muted-foreground">{captured ? <>{t('Captured dispatch contract')} · {formatAbsolute(admission.recordedAt)}</> : t('No admission capture was recorded.')}</p>
     <div className="grid gap-6 lg:grid-cols-2">
-      <section><h5 className="mb-2 mt-0 text-xs font-semibold text-muted-foreground">{t('Captured receipt')}</h5><ReceiptRows receipt={admission?.capturedReceipt ?? null} historical /></section>
-      <section><h5 className="mb-2 mt-0 text-xs font-semibold text-muted-foreground">{t('Current matching receipt')}</h5>{admission?.observed ? <ReceiptRows receipt={admission.receipt} historical={false} /> : <p className="m-0 text-sm text-muted-foreground">{t('Current admission table was not observed.')}</p>}</section>
+      <section className="min-w-0"><h3 className="mb-3 mt-0 text-sm font-medium">{t('Captured receipt')}</h3><ReceiptRows receipt={admission?.capturedReceipt ?? null} historical /></section>
+      <section className="min-w-0"><h3 className="mb-3 mt-0 text-sm font-medium">{t('Current matching receipt')}</h3>{admission?.observed ? <ReceiptRows receipt={admission.receipt} historical={false} /> : <p className="m-0 text-sm text-muted-foreground">{t('Current admission table was not observed.')}</p>}</section>
     </div>
-    {captured ? <details className="mt-3"><summary className="cursor-pointer text-xs font-medium">{t('Recorded routing and admission proof')}</summary><pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-md border bg-muted/30 p-2 font-mono text-xs">{jsonText({ selection: admission.selection, capturedReceipt: admission.capturedReceipt, currentReceipt: admission.receipt })}</pre></details> : null}
+    {captured ? <Advanced className="mt-4" title={t('Recorded routing and admission proof')} keepMounted><pre className="m-0 max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-default p-4 font-mono text-xs leading-5">{jsonText({ selection: admission.selection, capturedReceipt: admission.capturedReceipt, currentReceipt: admission.receipt })}</pre></Advanced> : null}
   </section>;
 }

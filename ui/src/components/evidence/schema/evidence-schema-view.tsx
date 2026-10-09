@@ -5,6 +5,7 @@ import { JsonView, MarkdownView, TextView, YamlView } from '../renderers';
 import { useBlobText } from '../use-blob-text';
 import { ScopeView } from './scope-view';
 import { t } from '../../../i18n/t';
+import { Alert, Skeleton } from '@heroui/react';
 
 export const concept: Concept = 'C8';
 
@@ -50,8 +51,8 @@ export function schemaOf(file: EvidenceFile & { schema?: string | null }, text: 
 /** Renders one evidence file by what it is: scope evidence, work graph, markdown, YAML, other JSON, plain text. */
 export function EvidenceSchemaView({ file, authorOp = '' }: Readonly<{ file: EvidenceFile & { schema?: string | null }; authorOp?: string }>) {
   const blob = useBlobText(file);
-  if (blob.status === 'idle' || blob.status === 'loading') return <p className="p-3 text-sm text-muted-foreground">{t('Reading {name}…', { name: file.base })}</p>;
-  if (blob.status === 'error') return <p role="alert" className="p-3 text-sm text-[var(--status-failed)]">{t('Could not read {name}: {error}', { name: file.base, error: blob.error ?? '' })}</p>;
+  if (blob.status === 'idle' || blob.status === 'loading') return <output className="block space-y-2" aria-label={t('Reading {name}…', { name: file.base })}><Skeleton className="h-4 w-2/3" /><Skeleton className="h-4 w-1/2" /></output>;
+  if (blob.status === 'error') return <Alert status={blob.httpStatus === 410 ? 'warning' : 'danger'}><Alert.Content><Alert.Description>{blob.httpStatus === 410 ? t('Archived evidence is unavailable.') : t('Could not read {name}: {error}', { name: file.base, error: blob.error ?? '' })}</Alert.Description></Alert.Content></Alert>;
   const schema = schemaOf(file, blob.text);
   const note = blob.truncated ? <p className="mb-2 text-xs text-muted-foreground">{t('Large file: only the first 2000 lines are shown.')}</p> : null;
   if (schema && file.kind === 'json' && !blob.truncated) {

@@ -193,7 +193,7 @@ unsettled/cancelled/dropped records from metrics that specifically claim settled
 The UI lead reviews the source matrix and identity/time rules, then implements within the
 owner-authorized scope. Disjoint owners repair API provenance/identity, Workflow graph binding,
 Attempt history/checkpoint/checks, System policy/telemetry, auxiliary pagination/read states,
-client contracts, shell/search, Overview scope, graph presentation and shadcn geometry.
+client contracts, shell/search, Overview scope, graph presentation and HeroUI anatomy.
 The engine owner supplies the reviewed schema-compatible observation reader; UI does not patch
 its ABI by importing mutable candidate internals. Unsupported source facts remain explicit.
 

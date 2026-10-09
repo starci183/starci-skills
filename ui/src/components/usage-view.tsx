@@ -1,8 +1,11 @@
 import type { ReactNode } from 'react';
+import { Meter, ProgressBar } from '@heroui/react';
 import type { Usage } from '../contract';
 import type { Concept } from './concept';
 import { InfoChip } from './infra/rows';
 import { t } from '../i18n/t';
+import { Advanced } from './motion';
+import { Table } from './ui/table';
 
 export const concept: Concept = 'C16';
 
@@ -39,11 +42,14 @@ export function TokenBar({ input, output, cache, complete: measurementsComplete 
   const parts: { key: string; label: string; value: number | null; tone: 'running' | 'success' | 'queued' }[] = [
     { key: 'in', label: t('in'), value: input, tone: 'running' }, { key: 'out', label: t('out'), value: output, tone: 'success' }, { key: 'cache', label: 'cache', value: cache, tone: 'queued' },
   ];
+  const distribution = parts.map(part => `${part.label} ${compactVi(part.value)}`).join(', ');
   return <div>
-    <div className="flex h-3 w-full gap-px overflow-hidden rounded-full bg-muted" role="img" aria-label={parts.map(p => `${p.label} ${compactVi(p.value)}`).join(', ')}>
-      {total != null && total > 0 ? parts.filter(p => p.value != null && p.value > 0).map(p => <span key={p.key} data-tone={p.tone} title={`${p.label}: ${vi(p.value, 0)}`} className="h-full bg-[var(--tone)]" style={{ width: `${(p.value! / total) * 100}%`, minWidth: 3 }} />) : null}
-    </div>
-    <ul className="m-0 mt-2 flex list-none flex-wrap gap-x-4 gap-y-1 p-0 text-[11px] text-muted-foreground">
+    {total != null ? <Meter value={total} maxValue={total > 0 ? total : 1} size="lg" aria-label={distribution} valueLabel={distribution}>
+      <Meter.Track className="flex gap-px rounded-full">
+        {total > 0 ? parts.filter(part => part.value != null && part.value > 0).map(part => <Meter.Fill key={part.key} data-tone={part.tone} title={`${part.label}: ${vi(part.value, 0)}`} style={{ flex: part.value!, position: 'relative', minWidth: 3, background: 'var(--tone)' }} />) : null}
+      </Meter.Track>
+    </Meter> : <ProgressBar isIndeterminate size="lg" aria-label={distribution}><ProgressBar.Track className="rounded-full" /></ProgressBar>}
+    <ul className="m-0 mt-2 flex list-none flex-wrap gap-x-4 gap-y-1 p-0 text-[13px] text-muted-foreground">
       {parts.map(p => <li key={p.key} data-tone={p.tone} className="inline-flex items-center gap-2"><span className="status-dot" />{p.label} <strong className="font-mono text-foreground">{compactVi(p.value)}</strong> {total != null && total > 0 ? <span className="tabular-nums">({vi((p.value! / total) * 100, 0)}%)</span> : null}</li>)}
     </ul>
   </div>;
@@ -51,11 +57,10 @@ export function TokenBar({ input, output, cache, complete: measurementsComplete 
 
 function Sources({ sources }: { readonly sources?: string[] }) {
   if (!sources?.length) return null;
-  return <span className="inline-flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">{t('Data sources:')} {sources.map(s => <InfoChip key={s} tone={s === 'provider-report' ? 'success' : 'running'}>{sourceLabel(s)}</InfoChip>)}</span>;
+  return <span className="inline-flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground">{t('Data sources:')} {sources.map(s => <InfoChip key={s} tone={s === 'provider-report' ? 'success' : 'running'}>{sourceLabel(s)}</InfoChip>)}</span>;
 }
 
-const th = 'border-b border-border px-2 py-1 font-medium';
-const td = 'px-2 py-1 font-mono tabular-nums';
+const td = 'font-mono tabular-nums';
 const tools = (row: UsageRow) => `${compactVi(row.toolCalls)}${row.toolErrors ? t(' / {n} errors', { n: row.toolErrors }) : ''}`;
 const cacheOf = (row: Pick<UsageRow, 'cacheRead' | 'cacheWrite'>) => row.cacheRead == null || row.cacheWrite == null ? null : row.cacheRead + row.cacheWrite;
 
@@ -63,16 +68,16 @@ const byModelLabel = (row: Usage['byModel'][number] & { provider?: string }) => 
 const byRecordLabel = (row: NonNullable<UsageV3['rows']>[number]) => <><span>{row.provider} · #{row.id}</span><span className="block text-muted-foreground">{t('Requested model')}: {row.requestModel ?? '—'}</span><span className="block text-muted-foreground">{t('Response model')}: {row.responseModel ?? '—'}</span><span className="block text-muted-foreground">{sourceLabel(row.source)}</span></>;
 
 function UsageTable({ title, first, rows, label, getKey }: { readonly title: string; readonly first: string; readonly rows: (UsageRow & { extra?: string })[]; readonly label: (row: never, index: number) => ReactNode; readonly getKey: (row: never) => string }) {
-  return <div className="overflow-x-auto">
-    <p className="m-0 mb-2 text-[11px] font-medium text-muted-foreground">{title}</p>
-    <table className="w-full min-w-[520px] border-collapse text-xs">
-      <thead><tr className="text-left text-muted-foreground">{[first, t('In'), t('Out'), t('Cache'), t('Reasoning'), t('Cost'), t('Turns'), t('Tools')].map(h => <th key={h} className={th}>{h}</th>)}</tr></thead>
-      <tbody>{rows.map((row, index) => <tr key={getKey(row as never)} className="border-b border-border last:border-b-0">
-        <td className="px-2 py-1 font-mono [overflow-wrap:anywhere]">{label(row as never, index)}</td>
-        <td className={td}>{compactVi(row.input)}</td><td className={td}>{compactVi(row.output)}</td><td className={td} title={t('read {read} · write {write}', { read: vi(row.cacheRead, 0), write: vi(row.cacheWrite, 0) })}>{compactVi(cacheOf(row))}</td>
-        <td className={td}>{compactVi(row.reasoning)}</td><td className={td} title={row.completeness?.fields.costUsd?.complete === false ? t('Recorded part') : undefined}>{costVi(row.costUsd)}{row.costUsd != null && row.completeness?.fields.costUsd?.complete === false ? ' *' : ''}</td><td className={td}>{compactVi(row.turns)}</td><td className={td}>{tools(row)}</td>
-      </tr>)}</tbody>
-    </table>
+  return <div className="min-w-0">
+    <p className="m-0 mb-2 text-[13px] font-medium text-muted-foreground">{title}</p>
+    <Table variant="secondary"><Table.ScrollContainer><Table.Content aria-label={title} className="min-w-[520px]">
+      <Table.Header>{[["label", first], ["input", t('In')], ["output", t('Out')], ["cache", t('Cache')], ["reasoning", t('Reasoning')], ["cost", t('Cost')], ["turns", t('Turns')], ["tools", t('Tools')]].map(([id, heading], index) => <Table.Column key={id} id={id} isRowHeader={index === 0}>{heading}</Table.Column>)}</Table.Header>
+      <Table.Body>{rows.map((row, index) => <Table.Row id={getKey(row as never)} key={getKey(row as never)}>
+        <Table.Cell className="font-mono whitespace-normal [overflow-wrap:anywhere]">{label(row as never, index)}</Table.Cell>
+        <Table.Cell className={td}>{compactVi(row.input)}</Table.Cell><Table.Cell className={td}>{compactVi(row.output)}</Table.Cell><Table.Cell className={td}><span title={t('read {read} · write {write}', { read: vi(row.cacheRead, 0), write: vi(row.cacheWrite, 0) })}>{compactVi(cacheOf(row))}</span></Table.Cell>
+        <Table.Cell className={td}>{compactVi(row.reasoning)}</Table.Cell><Table.Cell className={td}><span title={row.completeness?.fields.costUsd?.complete === false ? t('Recorded part') : undefined}>{costVi(row.costUsd)}{row.costUsd != null && row.completeness?.fields.costUsd?.complete === false ? ' *' : ''}</span></Table.Cell><Table.Cell className={td}>{compactVi(row.turns)}</Table.Cell><Table.Cell className={td}>{tools(row)}</Table.Cell>
+      </Table.Row>)}</Table.Body>
+    </Table.Content></Table.ScrollContainer></Table>
   </div>;
 }
 
@@ -107,7 +112,7 @@ export function UsageView({ usage: raw, compact = false }: { readonly usage: Usa
       </div>)}
     </dl>
     <Sources sources={usage.sources} />
-    {total.completeness ? <details className="text-xs text-muted-foreground"><summary className="cursor-pointer">{t('Measurement coverage')}</summary><dl className="mt-2 grid grid-cols-2 gap-2">{Object.entries(total.completeness.fields).map(([field, coverage]) => <div key={field}><dt className="font-mono">{field}</dt><dd className="m-0">{coverage.known}/{coverage.total}</dd></div>)}</dl></details> : null}
+    {total.completeness ? <Advanced title={t('Measurement coverage')} keepMounted className="text-xs text-muted-foreground"><dl className="m-0 grid grid-cols-2 gap-2">{Object.entries(total.completeness.fields).map(([field, coverage]) => <div key={field}><dt className="font-mono">{field}</dt><dd className="m-0">{coverage.known}/{coverage.total}</dd></div>)}</dl></Advanced> : null}
     {usage.byModel.length ? <UsageTable title={t('By model')} first="Model" rows={usage.byModel} getKey={((row: Usage['byModel'][number]) => `${row.subject_type}:${row.model}`) as never}
       label={byModelLabel as never} /> : null}
     {byOp.length > 0 && (byOp.length > 1 || byOp[0].op !== 'kernel') ? <UsageTable title={t('By op (leg)')} first="Op" rows={byOp} getKey={((row: UsageRow & { op: string }) => row.op) as never}

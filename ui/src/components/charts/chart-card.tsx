@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import { motion } from 'motion/react';
 import { DURATION, EASE } from '../motion';
 import { toneVar, type Tone } from '../status';
-import { FeedbackState, PageSkeleton } from '../feedback-state';
+import { FeedbackState, PageSkeleton, SourceWarning } from '../feedback-state';
 import { t } from '../../i18n/t';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { refreshQuery, type QuerySnapshot } from '../../api/query';
@@ -39,7 +39,7 @@ export function ReadQuality<T>({ query, url, onRetry }: Readonly<{ query: QueryS
   const retry = onRetry ?? (url ? () => refreshQuery(url) : undefined);
   return <>
     {query.error ? <FeedbackState error onRetry={retry}>{query.data !== null ? t('The source is failing; showing the last read. {error}', { error: query.error }) : t('Could not read the source: {error}', { error: query.error })}</FeedbackState> : null}
-    {partialSources(query).length ? <output className="shell-error block">{t('Source out of sync: {list}', { list: partialSources(query).join(', ') })}</output> : null}
+    {partialSources(query).length ? <SourceWarning>{t('Source out of sync: {list}', { list: partialSources(query).join(', ') })}</SourceWarning> : null}
     {query.data === null && !query.error ? query.meta ? <FeedbackState>{t('Unknown')}</FeedbackState> : <PageSkeleton label={t('Reading the data…')} /> : null}
   </>;
 }

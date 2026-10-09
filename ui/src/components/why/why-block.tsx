@@ -1,4 +1,5 @@
 import { ArrowRight } from 'lucide-react';
+import { Alert, Chip } from '@heroui/react';
 import type { Why } from '../../contract';
 import type { Concept } from '../concept';
 import { Advanced } from '../motion';
@@ -22,18 +23,21 @@ export function whyOwner(owner: string | null | undefined): { label: string; ton
 /** Render the source role label without implying a named person, launch, repair or completed outcome. */
 export function WhyOwnerBadge({ owner }: Readonly<{ owner: string | null | undefined }>) {
   const o = whyOwner(owner);
-  return <span data-tone={o.tone} className="inline-flex shrink-0 items-center gap-1.5 text-xs font-medium text-[var(--tone)]">
-    <span className="size-1.5 rounded-full bg-[var(--tone)]" aria-hidden="true" />{o.label}
-  </span>;
+  return <Chip size="sm" variant="tertiary" data-tone={o.tone} className="max-w-full text-[var(--tone)]">
+    <Chip.Label className="whitespace-normal break-words">{o.label}</Chip.Label>
+  </Chip>;
 }
 
 function CodeChips({ why }: Readonly<{ why: Why }>) {
   const items = why.codeInfo?.length ? why.codeInfo : why.codes.map(code => ({ code, known: false, title: code, meaning: null, next: null }));
   if (!items.length) return null;
-  return <div className="flex flex-wrap gap-2">{items.map(item => <span key={item.code} title={[item.title, item.meaning].filter(Boolean).join(' — ')}
-    className="inline-flex max-w-full items-center gap-1.5 rounded-md border bg-muted px-2 py-0.5 text-xs">
-    <span className="truncate">{item.title}</span><span className="shrink-0 font-mono text-[10.5px] text-muted-foreground">{item.code}</span>
-  </span>)}</div>;
+  return <div className="flex flex-wrap gap-2">{items.map(item => <Chip key={item.code} size="sm" variant="tertiary"
+    title={[item.title, item.meaning].filter(Boolean).join(' — ')} className="h-auto max-w-full">
+    <Chip.Label className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 whitespace-normal">
+      {item.title !== item.code && <span className="break-words">{item.title}</span>}
+      <code className="break-all font-mono text-xs text-muted-foreground">{item.code}</code>
+    </Chip.Label>
+  </Chip>)}</div>;
 }
 
 /**
@@ -50,9 +54,13 @@ export function WhyBlock({ why, compact = false, className = '' }: Readonly<{ wh
     <p className="m-0 min-w-0 text-[15px] font-medium leading-6">{why.headline}</p>
     {why.cause ? <p className="m-0 text-sm leading-6 text-muted-foreground">{why.cause}</p> : null}
     <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground"><span>{t('Handling role:')}</span><WhyOwnerBadge owner={why.owner} /></div>
-    {why.disagreement ? <div data-tone="warning" className="rounded-lg border border-[var(--tone-line)] bg-[var(--tone-bg)] p-3 text-sm leading-6">
-      <strong className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--tone)]">{t('Op and runtime disagree')}</strong>{why.disagreement}
-    </div> : null}
+    {why.disagreement ? <Alert status="warning" data-tone="warning">
+      <Alert.Indicator aria-hidden="true" />
+      <Alert.Content>
+        <Alert.Title>{t('Op and runtime disagree')}</Alert.Title>
+        <Alert.Description className="whitespace-pre-wrap break-words">{why.disagreement}</Alert.Description>
+      </Alert.Content>
+    </Alert> : null}
     {why.next ? <p className="m-0 flex items-start gap-2 text-sm leading-6"><ArrowRight className="mt-1 size-3.5 shrink-0 text-primary" aria-hidden="true" /><span><strong className="font-medium">{t('Next step:')}</strong> {why.next}</span></p> : null}
     {why.codes.length || why.refs?.length ? <Advanced summary={t('{codes} codes · {refs} references', { codes: why.codes.length, refs: why.refs?.length ?? 0 })}>
       <div className="flex flex-col gap-3">

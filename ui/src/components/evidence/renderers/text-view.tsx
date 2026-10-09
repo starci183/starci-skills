@@ -6,7 +6,7 @@ import type { Tone } from '../../status';
 import { CopyButton, Frame, Line, stripAnsi, Toolbar, toolbarBtn } from './common';
 import { t } from '../../../i18n/t';
 import { Button } from '../../ui/button';
-import { Input } from '../../ui/input';
+import { InputGroup } from '@heroui/react';
 
 const ERROR_RE = /error|fail|✗|SCHEMA_VIOLATION|exception|fatal|panic/i;
 const WARN_RE = /warn|⚠|deprecated/i;
@@ -111,12 +111,12 @@ export function TextView({ text, query, className = '' }: Readonly<{ text: strin
   return (
     <Frame className={`evidence-code-frame ${className}`}>
       <Toolbar right={<><span>{t('{n} lines', { n: lines.length.toLocaleString('vi-VN') })}</span>{windowed ? <span>{t('(windowed, no wrapping)')}</span> : null}</>}>
-        <label className="flex min-w-0 items-center gap-1 rounded-md border bg-background px-2 py-0.5 focus-within:outline-2 focus-within:outline-ring">
-          <SearchIcon className="size-3 shrink-0 text-muted-foreground" />
-          <Input value={q} onChange={e => setQ(e.target.value)} placeholder={t('Search in file')} aria-label={t('Search in file')}
+        <InputGroup className="w-40 min-w-0 sm:w-52">
+          <InputGroup.Prefix><SearchIcon className="size-4 text-muted-foreground" /></InputGroup.Prefix>
+          <InputGroup.Input value={q} onChange={e => setQ(e.target.value)} placeholder={t('Search in file')} aria-label={t('Search in file')}
             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); step(e.shiftKey ? -1 : 1); } }}
-            className="w-32 min-w-0 bg-transparent text-xs outline-none sm:w-44" />
-        </label>
+            className="min-w-0 text-sm" />
+        </InputGroup>
         {q ? <span className="text-[11px] tabular-nums text-muted-foreground" aria-live="polite">{hits.length ? `${current + 1}/${hits.length}${capped ? '+' : ''}` : t('None')}</span> : null}
         <Button variant="outline" size="xs" type="button" className={toolbarBtn} onClick={() => step(-1)} disabled={!hits.length} aria-label={t('Previous result')} title={t('Previous result (Shift+Enter)')}><ChevronUpIcon className="size-3" /></Button>
         <Button variant="outline" size="xs" type="button" className={toolbarBtn} onClick={() => step(1)} disabled={!hits.length} aria-label={t('Next result')} title={t('Next result (Enter)')}><ChevronDownIcon className="size-3" /></Button>

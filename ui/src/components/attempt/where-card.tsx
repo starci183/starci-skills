@@ -1,11 +1,11 @@
 import type { AttemptDetailV2 } from '../../contract';
+import { Link } from '@heroui/react';
 import type { Concept } from '../concept';
 import { StatusChip } from '../status-chip';
 import { PathLink } from '../path-link';
 import { UsageView } from '../usage-view';
 import { CopyId, InfoChip, InfoRow, ShaId } from '../infra/rows';
 import { t } from '../../i18n/t';
-import { AdmissionDetails } from './admission';
 
 export const concept: Concept = 'C6';
 
@@ -62,7 +62,7 @@ export function AttemptWhereCard({ attempt }: Readonly<{ attempt: AttemptDetailV
           <span className="inline-flex flex-wrap items-center gap-2"><CopyId value={w.job} />{w.jobStatus ? <InfoChip tone={w.jobStatus === 'failed' ? 'failed' : w.jobStatus === 'awaiting_owner' ? 'owner' : w.jobStatus === 'succeeded' || w.jobStatus === 'passed' ? 'success' : undefined}>{w.jobStatus}</InfoChip> : null}</span>
         </InfoRow>
         <InfoRow label={t('Session record')}>
-          {transcript ? <span className="inline-flex flex-wrap items-center gap-2"><a className="text-primary underline-offset-2 hover:underline" href={transcriptHref}>{t('View transcript')}</a>
+          {transcript ? <span className="inline-flex flex-wrap items-center gap-2"><Link href={transcriptHref}>{t('View transcript')}</Link>
             <span className="text-xs text-muted-foreground">{bytes(transcript.bytes)}{transcript.archived ? t(' · archived') : ''}</span>
             {attempt.terminal?.live ? <StatusChip status="running" label={t('running')} /> : null}</span>
             : <span className="text-muted-foreground">{t('no transcript yet')}</span>}
@@ -70,7 +70,6 @@ export function AttemptWhereCard({ attempt }: Readonly<{ attempt: AttemptDetailV
       </dl>
     </div>
     <p className="mt-2 text-xs text-muted-foreground">{t('Locations and launch IDs come from this dispatch; assigned paths come from its captured contract. Job status is current.')}</p>
-    <AdmissionDetails attempt={attempt} />
     <div className="mt-3 border-t border-border pt-3">
       <h4 className="m-0 mb-2 text-[13px] font-semibold">{t('Tokens & cost')}</h4>
       <UsageView usage={attempt.usage} />

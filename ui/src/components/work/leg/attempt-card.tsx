@@ -1,4 +1,5 @@
 import { ArrowRight } from 'lucide-react';
+import { Link } from '@heroui/react';
 import type { AttemptBrief } from '../../../contract';
 import { StatusChip, StatusDot } from '../../status-chip';
 import { statusFromOutcome, statusFromVerdict } from '../../status';
@@ -41,6 +42,6 @@ export function AttemptCard({ attempt, now }: Readonly<{ attempt: AttemptBrief; 
     </p>
     {attempt.checks > 0 && <p className="mt-2 text-xs text-muted-foreground">{t('{pass} pass · {red} red · {total} checks', { pass: attempt.checksPass, red: attempt.checksRed, total: attempt.checks })}</p>}
     {attempt.summary && <p className="mt-2 whitespace-pre-wrap break-words text-xs">{attempt.summary}</p>}
-    <a href={attempt.href} className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">{t('Open attempt')} <ArrowRight className="size-3" aria-hidden="true" /></a>
+    <Link href={attempt.href} className="mt-3 gap-1 text-xs font-medium">{t('Open attempt')} <ArrowRight className="size-3" aria-hidden="true" /></Link>
   </li>;
 }

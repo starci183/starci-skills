@@ -1,9 +1,9 @@
 import { Suspense, lazy, useEffect, useState, type ComponentType, type CSSProperties } from 'react';
 import { Activity, BarChart3, BookOpen, CircleAlert, CircleHelp, Moon, PanelsTopLeft, ScrollText, Sun } from 'lucide-react';
-import { Button } from './components/ui/button';
+import { Button, Link } from '@heroui/react';
 import { Enter } from './components/motion';
 import { Badge } from './components/ui/badge';
-import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider } from './components/ui/sidebar';
+import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarShell } from './components/ui/sidebar';
 import { SearchBox } from './components/search-box';
 import { FeedbackState, PageSkeleton } from './components/feedback-state';
 import { useApiQuery, useLiveStatus, useQueryHealth } from './api/query';
@@ -58,7 +58,7 @@ function routeTitle(route: Route): string {
 
 function PageSlot({ route }: Readonly<{ route: Route }>) {
   const path = routePage(route);
-  if (path == null) return <FeedbackState><strong>{t('Page not found')}</strong> · {t('Check the URL.')} <a href="#/" className="underline">{t('Back to Overview')}</a></FeedbackState>;
+  if (path == null) return <FeedbackState><strong>{t('Page not found')}</strong> · {t('Check the URL.')} <Link href="#/" className="underline">{t('Back to Overview')}</Link></FeedbackState>;
   const Page = pages[path];
   if (!Page) return <FeedbackState><strong>{t('Page is being prepared')}</strong> · {t('This page has no UI in the current build.')}</FeedbackState>;
   return <Suspense fallback={<PageSkeleton />}><Enter key={path}><Page /></Enter></Suspense>;
@@ -111,21 +111,19 @@ export default function App() {
   const hasReadIssues = health.staleCount > 0 || health.errorCount > 0 || Boolean(contract.error);
   const readTime = observedAt == null ? t('No data yet') : t('Last successful API read: {at}', { at: formatAbsolute(observedAt) });
   const provenance = [health.sources.length ? t('Sources: {list}', { list: `${health.sources.slice(0, 8).join(', ')}${health.sources.length > 8 ? ` +${health.sources.length - 8}` : ''}` }) : t('No sources'), health.stale.length ? t('Unavailable sources: {list}', { list: health.stale.join(', ') }) : '', health.errorCount ? t('{n} failing queries', { n: health.errorCount }) : ''].filter(Boolean).join(' · ');
-  return <SidebarProvider className="app-shell" style={shellStyle} enableKeyboardShortcut={false}>
-    <a href="#main-content" className="shell-skip-link" onClick={event => { event.preventDefault(); document.getElementById('main-content')?.focus(); }}>{t('Skip to main content')}</a>
-    <Sidebar collapsible="none" className="shell-sidebar" role="complementary" aria-label={t('Main navigation')}>
+  return <SidebarShell className="app-shell" style={shellStyle}>
+    <Link href="#main-content" className="shell-skip-link" onClick={event => { event.preventDefault(); document.getElementById('main-content')?.focus(); }}>{t('Skip to main content')}</Link>
+    <Sidebar className="shell-sidebar" aria-label={t('Main navigation')}>
       <SidebarHeader className="shell-sidebar-heading">
-        <a className="shell-brand" href="#/" aria-label={t('StarCi · Overview')}>
+        <Link className="shell-brand" href="#/" aria-label={t('StarCi · Overview')}>
           <span className="shell-brand-mark"><img src="/logos/starci-blue.png" alt="" aria-hidden="true" /></span>
           <span><strong>StarCi</strong><small>AI Operations Center</small></span>
-        </a>
+        </Link>
       </SidebarHeader>
       <SidebarContent className="shell-sidebar-navigation">
         <nav className="shell-nav" aria-label={t('Pages')}>
           <SidebarMenu>{navigation.map(({ kind, href, label, icon: Icon }) => <SidebarMenuItem key={kind}>
-            <SidebarMenuButton asChild isActive={selected === kind} className="shell-nav-link">
-              <a href={href} aria-current={selected === kind ? 'page' : undefined}><Icon aria-hidden="true" /><span>{label}</span></a>
-            </SidebarMenuButton>
+            <Link href={href} aria-current={selected === kind ? 'page' : undefined} className="shell-nav-link"><Icon aria-hidden="true" /><span>{label}</span></Link>
           </SidebarMenuItem>)}</SidebarMenu>
         </nav>
       </SidebarContent>
@@ -138,6 +136,7 @@ export default function App() {
     <div className="shell-content">
       <header className="shell-header">
         <div className="shell-header-left">
+          <Link href="#/" className="shell-mobile-brand shrink-0 min-[761px]:hidden" aria-label={t('StarCi · Overview')}><img src="/logos/starci-blue.png" className="size-7 object-contain" alt="" aria-hidden="true" /></Link>
           <output className="shell-live" data-status={live} title={live === 'live' ? t('SSE connection established') : live === 'hidden' ? t('Tab hidden, updates paused') : t('Polling periodically')}>
             <span className="shell-live-dot" aria-hidden="true" />
             <span>{live === 'live' ? t('SSE connected') : live === 'hidden' ? t('Paused') : t('Polling')}</span>
@@ -152,7 +151,7 @@ export default function App() {
         <div className="shell-header-right">
           <SearchBox />
           <Badge variant="outline" className="shell-readonly">{t('Public · read-only')}</Badge>
-          <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label={theme === 'dark' ? t('Switch to light theme') : t('Switch to dark theme')} title={theme === 'dark' ? t('Light theme') : t('Dark theme')}>
+          <Button variant="ghost" isIconOnly onPress={toggleTheme} aria-label={theme === 'dark' ? t('Switch to light theme') : t('Switch to dark theme')} render={props => <button {...props} title={theme === 'dark' ? t('Light theme') : t('Dark theme')} />}>
             {theme === 'dark' ? <Sun size={17} aria-hidden="true" /> : <Moon size={17} aria-hidden="true" />}
           </Button>
         </div>
@@ -161,9 +160,9 @@ export default function App() {
     </div>
 
     <nav className="shell-bottom-nav" aria-label={t('Mobile navigation')}>
-      {navigation.map(({ kind, href, label, icon: Icon }) => <a key={kind} href={href} aria-current={selected === kind ? 'page' : undefined}>
+      {navigation.map(({ kind, href, label, icon: Icon }) => <Link key={kind} href={href} aria-current={selected === kind ? 'page' : undefined}>
         <Icon aria-hidden="true" />{label}
-      </a>)}
+      </Link>)}
     </nav>
-  </SidebarProvider>;
+  </SidebarShell>;
 }
