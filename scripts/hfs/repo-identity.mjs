@@ -14,14 +14,28 @@ const real = (p) => { try { return fs.realpathSync(p); } catch { return path.res
 const GIT_SUFFIX_SOURCE = String.raw`\.git$`;
 const GIT_SUFFIX = new RegExp(GIT_SUFFIX_SOURCE, 'iu');
 
+// The identity of a folder that has its own .git entry holds while that entry is the same file system object (same inode, same modification time), so a
+// process asks Git once per such folder state instead of at every check. A folder with no .git entry of its own is asked every time.
+const known = new Map();
+const stateOf = (root) => { try { const stat = fs.statSync(path.join(root, '.git')); return `${real(root)}|${stat.ino}|${stat.mtimeMs}`; } catch { return null; } };
+
 /** { repositoryRoot, inWorkTree, home } for `root`: home is the main checkout folder when root is a repository top level. */
 function identityOf(root) {
+  const state = stateOf(root);
+  if (state === null) return askGit(root);
+  if (!known.has(state)) known.set(state, askGit(root));
+  return known.get(state);
+}
+
+function askGit(root) {
   let inWorkTree = false, repositoryRoot = false, home = null;
   try {
     // Identity comes from Git only when root IS a repository (or worktree) top level, never a folder inside one.
-    repositoryRoot = real(git(revParseQuery, root, ['--show-toplevel'])) === real(root);
+    // One git call answers both questions: the top level on the first line, the common git dir on the second.
+    const [top, commonDir] = git(revParseQuery, root, ['--show-toplevel', '--git-common-dir']).split(String.fromCodePoint(10)).map((line) => line.trim());
+    repositoryRoot = real(top) === real(root);
     inWorkTree = true;
-    const common = path.resolve(root, git(revParseQuery, root, ['--git-common-dir']));
+    const common = path.resolve(root, commonDir);
     if (repositoryRoot && path.basename(common) === '.git') home = path.dirname(common);
   } catch { /* Not a Git work tree; the caller falls back to the folder and package name. */ }
   return { inWorkTree, repositoryRoot, home };
