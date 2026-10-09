@@ -1,5 +1,5 @@
 // affected-test.spec.mjs - `starci test affected`: the selection is the land gate's plus the readers of changed shared data, the runner runs one
-// file per process with the four preloads at a bounded concurrency, and a selection above the declared bound is printed and not run.
+// file per process with the four preloads at a bounded concurrency, and a large selection is announced and run in shards inside a stated time budget, never refused.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -9,7 +9,7 @@ import { baseOf, runBounded, runSpecFile, testAffected } from '../../scripts/sup
 import { readSpecs } from '../../scripts/lib/spec-pool.mjs';
 import { mkdtemp } from '../helpers/tmpdir.mjs';
 
-const POLICY = { maxFiles: 10, dataRoots: ['modules', 'knowledge'], symbolDepth: 4 };
+const POLICY = { maxFiles: 10, dataRoots: ['modules', 'knowledge'], symbolDepth: 4, budgetMs: 600_000, generated: [] };
 
 function tree(t) {
   const root = mkdtemp(t, 'starci-affected-');
@@ -61,7 +61,7 @@ const passing = () => Promise.resolve({ error: null, stdout: 'ok', stderr: '' })
 const context = (args) => ({ args, cwd: process.cwd() });
 const deps = (t, extra = {}) => ({
   policy: POLICY, mergeBase: () => 'abcdef123456', exists: () => true, sources: [], hostSample: () => ({ logicalThreads: 16, cpuBusy: 0, totalRamBytes: 64 * 1024 ** 3, freeRamBytes: 48 * 1024 ** 3 }),
-  root: tree(t), ...extra,
+  root: tree(t), revParse: () => 'tip0123456789', diff: () => ({ status: 0, stdout: '' }), lsFiles: () => ({ status: 0, stdout: '' }), ...extra,
 });
 
 function ctxOf(d, args) { return { args: { root: d.root, ...args }, cwd: d.root }; }
@@ -86,7 +86,8 @@ test('--run runs each file once with the four preloads and ends with the counted
   d.progress = (line) => seen.push(line);
   const out = await testAffected(ctxOf(d, { run: true, concurrency: 1 }), d);
   assert.equal(out.code, 1);
-  assert.equal(seen.length, 2, 'each verdict line is shown as its file ends');
+  assert.equal(seen.length, 3, 'the budget line, then each verdict line as its file ends');
+  assert.match(seen[0], /budget/);
   assert.equal(calls.length, 2);
   for (const args of calls) {
     assert.deepEqual(args.filter((a, i) => args[i - 1] === '--import'), ['./tests/setup/low-priority.mjs', './tests/setup/isolated-temp.mjs', './tests/setup/isolated-registry.mjs', './tests/setup/runtime-copies.mjs']);
@@ -123,16 +124,36 @@ test('all green exits 0 and an empty selection runs nothing', async (t) => {
   assert.equal(none.text, 'affected: 0 files, 0 pass, 0 fail');
 });
 
-test('a selection above the declared bound is printed with the full suite named as the lead job, and --run refuses it', async (t) => {
+test('a large selection is announced and still run; --plan names the reason of each file', async (t) => {
   const calls = [];
   const d = deps(t, { policy: { ...POLICY, maxFiles: 1 }, changedFiles: () => ['scripts/lib/core.mjs', 'scripts/lib/other.mjs'], execNode: (a) => { calls.push(a); return passing(); } });
   const shown = await testAffected(ctxOf(d, {}), d);
   assert.equal(shown.code, 0);
-  assert.match(shown.text, /exceed the declared bound of 1/);
-  assert.match(shown.text, /full suite on the merged tree \(the lead\) and by the release cut/);
-  const refused = await testAffected(ctxOf(d, { run: true }), d);
-  assert.equal(refused.code, 2);
-  assert.deepEqual(calls, []);
+  assert.match(shown.text, /above the 1 of an ordinary change: run in parallel shards/);
+  const plan = await testAffected(ctxOf(d, { plan: true }), d);
+  assert.equal(plan.code, 0);
+  assert.deepEqual(calls, [], 'a plan runs nothing');
+  assert.ok(plan.data.scope.length > 1 && plan.text.split('\n').filter((line) => line.includes('  <- ')).length > 0, plan.text);
+  const ran = await testAffected(ctxOf(d, { run: true, progress: undefined }), { ...d, progress: () => {} });
+  assert.equal(ran.code, 0);
+  assert.equal(calls.length, ran.data.scope.length, 'every file of a large set runs');
+});
+
+test('a run states its budget first, lists the files not started when it ends, and carries a receipt a gate can require', async (t) => {
+  const seen = [];
+  const slow = () => new Promise((resolve) => setTimeout(() => resolve({ error: null, stdout: 'ok', stderr: '' }), 30));
+  const d = deps(t, { policy: { ...POLICY, budgetMs: 10 }, changedFiles: () => ['scripts/lib/core.mjs', 'scripts/lib/other.mjs'], execNode: slow, progress: (line) => seen.push(line), concurrency: 1 });
+  const ran = await testAffected({ args: { root: d.root, run: true, concurrency: 1 }, cwd: d.root }, d);
+  assert.match(seen[0], /^affected: \d+ file\(s\), concurrency 1, budget \d+ min$/);
+  assert.equal(ran.code, 2);
+  assert.match(ran.text, /SKIP .* \(budget\)/);
+  assert.match(ran.text, /not started inside the/);
+  const { receipt } = ran.data;
+  assert.deepEqual([receipt.schema, receipt.base, receipt.tip, receipt.clean, receipt.ok], ['starci/affected-receipt@1', 'abcdef123456', 'tip0123456789', true, false]);
+  assert.ok(receipt.passed < receipt.total && receipt.total === receipt.files);
+  const green = deps(t, { changedFiles: () => ['scripts/lib/core.mjs'], execNode: passing, progress: () => {} });
+  const ok = (await testAffected(ctxOf(green, { run: true }), green)).data.receipt;
+  assert.deepEqual([ok.ok, ok.passed, ok.total], [true, ok.files, ok.files]);
 });
 
 test('--changed names the files itself, and no base without --changed is a usage refusal', async (t) => {

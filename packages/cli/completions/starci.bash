@@ -1159,7 +1159,7 @@ _starci() {
         task:list) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
         task:register) COMPREPLY=( $(compgen -W "--apply --json --cwd --quiet --help --edition" -- "$cur") );;
         task:show) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
-        test:affected) COMPREPLY=( $(compgen -W "--base --changed --by --run --concurrency --root --json --cwd --quiet --help --edition" -- "$cur") );;
+        test:affected) COMPREPLY=( $(compgen -W "--base --changed --by --run --plan --concurrency --root --json --cwd --quiet --help --edition" -- "$cur") );;
         test:run) COMPREPLY=( $(compgen -W "--level --changed --against --spec --concurrency --root --release-cut --json --cwd --quiet --help --edition" -- "$cur") );;
         typecheck:run) COMPREPLY=( $(compgen -W "--level --changed --project --json --cwd --quiet --help --edition" -- "$cur") );;
         uat:assisted-runner) COMPREPLY=( $(compgen -W "--request --receipt --after --value --actor --json --cwd --quiet --help --edition" -- "$cur") );;

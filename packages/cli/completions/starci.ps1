@@ -227,7 +227,7 @@ Register-ArgumentCompleter -Native -CommandName starci -ScriptBlock {
         'task list' = @('--json','--cwd','--quiet','--help','--edition')
         'task register' = @('--apply','--json','--cwd','--quiet','--help','--edition')
         'task show' = @('--json','--cwd','--quiet','--help','--edition')
-        'test affected' = @('--base','--changed','--by','--run','--concurrency','--root','--json','--cwd','--quiet','--help','--edition')
+        'test affected' = @('--base','--changed','--by','--run','--plan','--concurrency','--root','--json','--cwd','--quiet','--help','--edition')
         'test run' = @('--level','--changed','--against','--spec','--concurrency','--root','--release-cut','--json','--cwd','--quiet','--help','--edition')
         'typecheck run' = @('--level','--changed','--project','--json','--cwd','--quiet','--help','--edition')
         'uat assisted-runner' = @('--request','--receipt','--after','--value','--actor','--json','--cwd','--quiet','--help','--edition')
