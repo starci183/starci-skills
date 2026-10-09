@@ -49,13 +49,25 @@ export function compactEventPayload(payload, depth = 0) {
   return { payload: compacted ? copy : payload, compacted };
 }
 
+/** A payload's bounded inline view when it went whole to the blob store: its top-level scalars (long strings clipped) and where the rest is. */
+function spilledView(redacted, bytes, sha) {
+  const flat = isPlainObject(redacted) ? scalars(redacted) : {};
+  return { ...flat, spilled: true, sha256: sha, bytes };
+}
+
 /**
- * The stored form of an event payload: `{payloadJson, payloadSha}`. The payload is redacted; when it carries an admission record the bounded
- * view is the inline JSON and `spill(bytes)` stores the whole redacted payload and returns its sha (kept when the caller already holds one).
+ * The stored form of an event payload: `{payloadJson, payloadSha}`. The payload is redacted. It goes whole to the blob store (`spill(bytes)`
+ * stores it and returns its sha, kept when the caller already holds one) when it carries an admission record (the bounded summary is the inline
+ * JSON) or when it is over the inline bound (the inline JSON is its top-level scalars and the sha). This is the one path of every event writer:
+ * a payload that grows with its input (a file list, a manifest, a critique, a menu) never fails the write, and a reader that needs the whole
+ * payload goes through scripts/lib/event-payload.mjs.
  */
 export function eventPayloadRecord(payload, payloadSha, spill) {
   if (payload === null || payload === undefined) return { payloadJson: null, payloadSha };
   const redacted = redactData(payload);
   const { payload: inline, compacted } = compactEventPayload(redacted);
-  return { payloadJson: JSON.stringify(inline), payloadSha: compacted && !payloadSha ? spill(Buffer.from(JSON.stringify(redacted))) : payloadSha };
+  const json = JSON.stringify(inline);
+  if (compacted || json.length <= EVENT_LIMITS.payloadBytes) return { payloadJson: json, payloadSha: compacted && !payloadSha ? spill(Buffer.from(JSON.stringify(redacted))) : payloadSha };
+  const sha = payloadSha ?? spill(Buffer.from(JSON.stringify(redacted)));
+  return { payloadJson: JSON.stringify(spilledView(redacted, json.length, sha)), payloadSha: sha };
 }

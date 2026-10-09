@@ -1,7 +1,5 @@
 // kernel-ack-rev — project the required READ plan or attest its complete bytes as the current Kernel.
 import fs from 'node:fs';
-import { EVENT_LIMITS } from '../../../engine/db/event-compact.mjs';
-import { redactData } from '../../lib/redact.mjs';
 import { getWorkflow } from './shared/rows.mjs';
 import { kernelAuthorityOf, kernelCustodyOf } from './shared/kernel-seat.mjs';
 import { kernelReadManifest, unreadFiles, verifyKernelRead } from '../required-read.mjs';
@@ -36,10 +34,7 @@ export default {
       if (fresh.digest !== required.digest) throw Object.assign(new Error('READ inputs changed before acknowledgement'), { code: 'kernel-read-unverified' });
       verifyKernelRead(submitted,fresh);
       const payload = { rev,files: fresh.files.map(row => row.path),source: 'ack',attempt: current.attempt,readManifest: fresh };
-      // A manifest of a large read plan outgrows the inline event bound: the whole payload goes to the blob store and readers resolve it (eventPayloadOf).
-      const whole = Buffer.from(JSON.stringify(redactData(payload)));
-      const payloadSha = whole.length > EVENT_LIMITS.payloadBytes ? ledger.write.storeBlob({ content: whole,mediaType: 'application/json',redaction: 'v1' }).sha256 : null;
-      ledger.appendEvent({ workflowId,entityType: 'kernel',entityId: workflowId,generation: current.generation,kind: KERNEL_REV_ACKED_EVENT,payload,payloadSha,createdAt: Date.now() });
+      ledger.appendEvent({ workflowId,entityType: 'kernel',entityId: workflowId,generation: current.generation,kind: KERNEL_REV_ACKED_EVENT,payload,createdAt: Date.now() });
     });
     emit({ ok: true,workflowId,rev,attempt: authority.attempt,readManifest: required }, `Kernel READ acknowledged ${workflowId} ${rev}`,args.json);
   },

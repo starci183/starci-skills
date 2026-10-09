@@ -160,6 +160,7 @@ ruleParams:
       - {id: example-render, run: scripts/checks/check-example-render.mjs}
       - {id: guidance-commands, run: scripts/checks/check-guidance-commands.mjs}
       - {id: port-once, run: scripts/checks/check-port-once.mjs}
+      - {id: event-spill, run: scripts/checks/check-event-spill.mjs}
       - {id: spec-budget, run: scripts/checks/check-spec-budget.mjs}
       - {id: default-once, run: scripts/checks/check-default-once.mjs}
       - {id: version-pin-once, run: scripts/checks/check-version-pin-once.mjs}

@@ -10,7 +10,6 @@ import { writeTree } from '../api/git/write-tree.mjs';
 import { lsTree } from '../api/git/ls-tree.mjs';
 import { lsFiles } from '../api/git/ls-files.mjs';
 import { eventPayloadOf } from '../../engine/db/event-payload.mjs';
-import { redactData } from '../lib/redact.mjs';
 import { jsonClone } from '../lib/json-clone.mjs';
 import { tempPath } from '../api/fs/temp-path.mjs';
 
@@ -19,18 +18,7 @@ const fail = ({ code }, message) => Object.assign(new Error(message), { code });
 export const literalPaths = (files) => files.map((file) => `:(literal)${file}`);
 
 export const receiptPayload = eventPayloadOf;
-export function appendEffectEvent(ctx, args) {
-  try { return ctx.ledger.appendEvent(args); }
-  catch (error) {
-    if (error.code !== 'STARCI_EVENT_PAYLOAD_TOO_LARGE') throw error;
-    // The event's blob foreign key needs the index row in the same ledger before its durable receipt.
-    return ctx.ledger.transaction(() => {
-      const blob = ctx.ledger.write.storeBlob({ content: Buffer.from(JSON.stringify(redactData(args.payload))), mediaType: 'application/json', redaction: 'v1' });
-      const { sha, before, committed, opId, attemptId, dispatchId, resetTo } = args.payload;
-      return ctx.ledger.appendEvent({ ...args, payload: { spilled: true, sha256: blob.sha256, sha, before, committed, opId, attemptId, dispatchId, resetTo }, payloadSha: blob.sha256 });
-    });
-  }
-}
+export const appendEffectEvent = (ctx, args) => ctx.ledger.appendEvent(args); // a receipt over the inline bound goes to the blob store inside appendEvent (engine/db/event-compact.mjs)
 /** The event kind that withdraws a prepared preserve receipt the runtime found void (scripts/kernel/settle/prepared-recovery.mjs). */
 export const PREPARED_WITHDRAWN = 'workflow-op-preserved-withdrawn';
 // A prepared receipt counts only while no withdrawal of its attempt is newer than it.

@@ -1080,3 +1080,10 @@ cases:
     rule: {file: scripts/kernel/verbs/shared/status-menu.mjs, anchor: "attestNoteOf"}
     spec: tests/kernel/menu-answered-hold.spec.mjs
     status: covered
+  - id: event-payload-over-the-inline-bound-is-spilled-by-each-writer
+    family: smooth-operation
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: no event writer fails for the size of its input) the 16 KiB inline bound of a ledger event refused two writers within a day, each fixed by its own spill: the Kernel launch admission (seat publication) and the read-plan attestation of kernel-ack-rev (19267 bytes); every other writer whose payload grows with its input (file lists, manifests, hand-over details, receipts, decisions, push results, critiques) was one input away from the same failure", remedy: {state: in-tree, change: "appendEvent spills any payload over the bound itself (engine/db/event-compact.mjs eventPayloadRecord: a bounded inline view of the top-level scalars plus the sha, the whole payload in the blob store), readers resolve it through engine/db/event-payload.mjs, and the event-spill check refuses a writer that spills by hand"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, StarCi and Nivo workflows", evidence: "starci runtime.sqlite events 2748, 2753 (STARCI_EVENT_PAYLOAD_TOO_LARGE 19267 > 16384 at kernel-ack-rev); the launch admission refusal of the seat publication"}
+    rule: {file: engine/db/event-compact.mjs, anchor: "eventPayloadRecord"}
+    spec: tests/checks/check-event-spill.spec.mjs
+    status: covered
