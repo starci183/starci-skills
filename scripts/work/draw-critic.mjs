@@ -38,8 +38,9 @@ import { slash } from '../lib/path-key.mjs';
 import { repeatInOrder } from '../lib/in-order.mjs';
 import { ownerRubricChecks } from './draw-feedback.mjs';
 import { startAgent } from '../agent/lib.mjs';
+import { defaultSpecFile } from '../machine/task-spec.mjs';
 import { criticFor } from './critic-pick.mjs';
-import { TASK_SPEC_FILE, codeOfOutcome, handedDigests, touchedByCritic, typedVerdict } from './critic-verdict.mjs';
+import { codeOfOutcome, handedDigests, touchedByCritic, typedVerdict } from './critic-verdict.mjs';
 import { bindCriticTerminal, criticBound, unbindCriticTerminal, writeCriticGuard } from './critic-guard.mjs';
 import { decisionKind } from '../agent/call-admission.mjs';
 import { renderRoleLines } from '../machine/roles-contract.mjs';
@@ -246,14 +247,16 @@ export function removeCriticWorkspace({ dir, repoRoot, orcaId, branch = null, en
  * (clientOf). The launch receipt of scripts/agent/lib.mjs startAgent.
  */
 export function launchCriticWorker({ critic, dir, prompt, entry = null, parentDispatch = null, orca = null, context = null, subject = DRAW_SUBJECT }) {
-  const guardFile = writeCriticGuard({ dir, verdictFile: VERDICT_FILE, context, id: path.basename(dir) });
-  return clientOf(orca).launch({ provider: critic.provider, model: critic.model, effort: critic.effort ?? null, worktree: dir, onCreated: bindCriticTerminal(guardFile),
+  // The Critic directory holds only the product it judges. The Task file the runtime writes for a prompt too long to paste lives in the state root's dispatch-prompts and is the one
+  // file outside the directory the guard lets the Critic read (reach.taskFile); cleanupCriticWorkspace removes it.
+  const specFile = defaultSpecFile(`critic:${path.basename(dir)}`);
+  const guardFile = writeCriticGuard({ dir, verdictFile: VERDICT_FILE, taskFile: specFile, context, id: path.basename(dir) });
+  return { ...clientOf(orca).launch({ provider: critic.provider, model: critic.model, effort: critic.effort ?? null, worktree: dir, onCreated: bindCriticTerminal(guardFile),
     role: 'critic', tier: critic.tier ?? null, author: critic.author, allowGroup: critic.allowGroup ?? [{ provider: critic.provider, model: critic.model, effort: critic.effort }],
     title: `[Critic] ${subject.title} ${critic.model}`, prompt, objective: subject.objective, entry, parentDispatch,
-    // The Task spec is a file in the placement (removed with it) once it is longer than a terminal should be pasted; the guard's own file is the critic's only other one.
-    specFile: path.join(dir, TASK_SPEC_FILE),
+    specFile,
     // Its clean directory is made once per round (criticWorkspace): the launch's ledger identity.
-    request: { critic: dir } });
+    request: { critic: dir } }), specFile };
 }
 
 /**
@@ -395,6 +398,7 @@ async function criticVerdict({ client, launched, entry, critic, pollMs, sleep, n
 }
 
 function cleanupCriticWorkspace({ launched, client, entry, orca, base, unplace, workspace, dir }) {
+  if (launched?.specFile) fs.rmSync(launched.specFile, { force: true });
   let placementSafe = launched?.effectState === 'none' || !launched;
   if (launched?.ok) {
     // Stop is a no-op for a worker that already settled; release frees its seat; the Task closes.

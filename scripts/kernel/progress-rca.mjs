@@ -33,7 +33,7 @@ import { importsBrokenOf } from './status/imports.mjs';
 import { blockingDecisions, resolutionOf } from '../machine/decisions.mjs';
 import { ownerLanguage, translator } from '../lib/i18n.mjs';
 import { HOUR, etaOf, stallOf } from './progress-stall.mjs';
-import { MISSING_PATHS_RE, GRANT_NARROW_RE, TOOL_TIMEOUT_RE, TEST_GAP_RE, CHECKER_UNAVAILABLE_RE } from './rca-matchers.mjs';
+import { primaryFirst, textCauses, typedCauses } from './rca-causes.mjs';
 
 const unitSpecsOff = () => { try { return specsOf({ skillRoot }).unit === false; } catch { return false; } };
 
@@ -199,6 +199,8 @@ export const CAUSES = Object.freeze({
   'checker-unavailable': { why: 'a required checker answered unavailable', authority: 'supervisor' },
   upstream: { why: 'the root cause lives in another workflow', authority: 'supervisor' },
   'product-defect': { why: 'the product code failed its checks', authority: 'kernel' },
+  // A gap in an upstream record (srs, sds, interface, brand): the route table queues the op that repairs it (kinds.yaml routes), the unit's own shape is not at fault.
+  'record-gap': { why: 'the blocker names a gap in an upstream record; the route table queues the repairing op', authority: 'kernel' },
   other: { why: 'unclassified', authority: 'kernel' },
 });
 const SHAPE_CAUSES = new Set(['missing-paths', 'grant-too-narrow', 'tool-timeout', 'test-gap', 'canon-conflict', 'product-defect']);
@@ -206,33 +208,19 @@ export const isShapeCause = (c) => SHAPE_CAUSES.has(c);
 
 const PATH_RE = /(?:^|[\s`'"(,:])((?:apps|packages|src|libs|e2e)\/[A-Za-z0-9_@.\-[\]()/]+?[A-Za-z0-9_\])])(?=[\s`'",;:)]|$)/g;
 
-/** The text-matched causes of one attempt (blocker kind + report/body text), appended via `add`. */
-const textCauses = ({ text, kind, causes, add }) => {
-  if (/guard file|bind(?:s|ing)? owned|role be, repo ledger|wrong repository/i.test(text)) add('binding-defect');
-  if (MISSING_PATHS_RE.test(text)) add('missing-paths');
-  if (kind === 'shared-change' || GRANT_NARROW_RE.test(text)) add('grant-too-narrow');
-  if (TOOL_TIMEOUT_RE.test(text)) add('tool-timeout');
-  if (kind === 'test-gap' || TEST_GAP_RE.test(text)) add('test-gap');
-  if (kind === 'grammar-gap' || /MONOREPO_TIER|monorepo-tier|canon rule .* forbids/i.test(text)) add('canon-conflict');
-  if (/IMPORTS_BROKEN_AFTER_MOVE|broken-import|Cannot find module ['"]?[@./]|Module not found: (?:Error: )?Can't resolve|TS2307|unresolved import|Failed to resolve import/i.test(text)) add('broken-import');
-  if (!causes.includes('broken-import') && CHECKER_UNAVAILABLE_RE.test(text) && kind === 'environment') add('checker-unavailable');
-};
-
 /** The causes of one failed/blocked attempt, primary first. Pure. */
 export function causesOf({ status = 'failed', result = {}, report = null }) {
   const blocker = report?.blocker ?? {}, kind = String(blocker.kind ?? '').toLowerCase();
   const text = [report?.summary, blocker.detail, report?.rootCause?.claim, JSON.stringify(report?.openItems ?? ''), ...(report?.checks ?? []).map((c) => `${c.name} ${c.evidence ?? ''} exit=${c.exitCode ?? ''}`)].join(' \n ');
   const causes = [], add = (c) => { if (!causes.includes(c)) causes.push(c); };
-  if (!report && (result?.worker?.liveness || result?.reportFiled === false)) { add('dead-worker'); } textCauses({ text, kind, causes, add });
+  if (!report && (result?.worker?.liveness || result?.reportFiled === false)) { add('dead-worker'); }
+  for (const cause of typedCauses({ kind, report })) add(cause);
+  textCauses({ text, kind, causes, add });
   if (report?.rootCause?.self === false && String(report?.rootCause?.node ?? '').startsWith('wf-')) add('upstream');
   if (report && preservedOf(result) && (report.outcome === 'blocked' || status === 'failed')) add('partial-work');
   if (!causes.length && report && (result?.verdict === 'fail' || report.outcome === 'failed')) add('product-defect');
   if (!causes.length) add(kind === 'environment' ? 'checker-unavailable' : 'other');
-  // An unresolved import is the cause even when the attempt also reads as something else (its checker "unavailable").
-  if (causes.includes('broken-import') && causes[0] !== 'broken-import') causes.unshift(...causes.splice(causes.indexOf('broken-import'), 1));
-  // Partial work is a secondary fact: the blocker that stopped the unit leads.
-  if (causes[0] === 'partial-work' && causes.length > 1) causes.push(causes.shift());
-  return causes;
+  return primaryFirst(causes);
 }
 
 /** The repository paths a report names that its unit does not own (the destinations a move needs). Pure. */

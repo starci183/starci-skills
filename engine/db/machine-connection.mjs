@@ -1,3 +1,4 @@
+import { installRefResolver } from './ref-value.mjs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { sleepSync as scaledSleepSync } from '../../scripts/lib/sleep-sync.mjs';
@@ -31,7 +32,7 @@ export function corruptDiagnostic(file, error, { retries, where }) {
   let check = null;
   try {
     const { DatabaseSync } = require('node:sqlite');
-    const db = new DatabaseSync(file, { readOnly: true, timeout: MACHINE_BUSY_TIMEOUT_MS });
+    const db = installRefResolver(new DatabaseSync(file, { readOnly: true, timeout: MACHINE_BUSY_TIMEOUT_MS }));
     try { check = db.prepare('PRAGMA quick_check').all().map((r) => r.quick_check).slice(0, 20); } finally { db.close(); }
   } catch (e) { check = [`quick_check failed: ${errText(e)}`]; }
   out.quickCheck = check;

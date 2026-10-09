@@ -188,7 +188,7 @@ export function refuseLaunchInputs(d) {
   }
   if (grammarMissing) {
     const detail = `${op} declares grammarContext: required and ${grammarMissing}. Fix the product's brand.sources or the Source knowledge, then dispatch again. The job stays queued.`;
-    refuseVerb(d, { ok: false, jobId, op, reason: 'grammar-context-missing', missing: grammarContext.missing, detail },
+    refuseVerb(d, { ok: false, jobId, op, reason: 'grammar-context-missing', missing: grammarContext.missing, watch: grammarContext.watch ?? [], detail },
       `dispatch REFUSED for ${jobId} (${op}): grammar-context-missing — ${detail}`);
   }
 }

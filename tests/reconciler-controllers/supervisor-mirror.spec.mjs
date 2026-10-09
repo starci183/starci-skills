@@ -7,7 +7,7 @@ import path from 'node:path';
 import { withLedger, seedWorkflow } from '../helpers/ledger-fixture.mjs';
 import { TEST_REGISTRY_ENV } from '../../engine/db/machine.mjs';
 import { openDecisionRow, openDecision, listSupervisorDecisions } from '../../scripts/machine/decisions.mjs';
-import { strandedSupervisorDis } from '../../scripts/reconciler/supervisor-mirror.mjs';
+import { mirrorPlan } from '../../scripts/reconciler/supervisor-mirror.mjs';
 import { readSupervisorMenu } from '../../scripts/supervisor/supervisor-menu-sources.mjs';
 import { snapshotOf } from '../../scripts/kernel/decision-log.mjs';
 
@@ -22,7 +22,7 @@ test('a menu-escape in the product ledger gets a Supervisor twin the Supervisor 
     summary: 'Kernel: no option of leg-ready:x fits: the plan declares no write set', by: 'kernel' }, { now: T0 }).di;
   openDecisionRow(ledger, { workflowId: WF, kind: 'retry-decision', entity: { type: 'job', id: 'op-x-1' }, summary: 'a Kernel item', by: 'reconciler/job' }, { now: T0 });
   const name = path.basename(world.repoRoot);
-  const specs = strandedSupervisorDis(ledger.db, { ledgerId: 'ledger-1', ledgerName: name, workflowId: WF, now: Date.now() });
+  const specs = mirrorPlan(ledger.db, { ledgerId: 'ledger-1', ledgerName: name, workflowId: WF, now: Date.now() }).twins;
   assert.equal(specs.length, 1, 'only the Supervisor-decided escape, not the Kernel own item');
   assert.equal(specs[0].idempotencyKey, `escalated:${name}:${di.id}`);
   assert.equal(specs[0].ledger, 'supervisor');

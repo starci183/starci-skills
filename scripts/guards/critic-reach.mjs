@@ -17,6 +17,8 @@ const TEXT_PROGRAMS = new Set(['echo', 'printf', 'write-output', 'write-host']);
 const deny = (text, reason) => refusal(CRITIC_REACH_CODE, text, reason, USE, USE);
 const inside = (file, dir) => sameOrUnder(pathKey(path.resolve(file)), pathKey(path.resolve(dir)));
 const same = (a, b) => pathKey(path.resolve(a)) === pathKey(path.resolve(b));
+/** Readable by the Critic: its directory, and the one Task file the runtime wrote for it outside that directory (reach.taskFile). */
+const readable = (file, guard) => inside(file, guard.reach.dir) || (typeof guard.reach.taskFile === 'string' && same(file, guard.reach.taskFile));
 const expands = (value, program) => /[$`]/.test(value) || (!TEXT_PROGRAMS.has(program) && (/%/.test(value) || /^~/.test(value)));
 
 /** The verdict file of the guard, absolute. */
@@ -32,10 +34,11 @@ function pathWords(args) {
 }
 
 /** The words of a read program outside the critic's directory, or an expansion no check can resolve. */
-function readReach({ program, args, cwd, dir }) {
+function readReach({ program, args, cwd, guard }) {
+  const dir = guard.reach.dir;
   if (!inside(cwd, dir)) return cwd;
   const words = TEXT_PROGRAMS.has(program) ? args.map(String).filter((word) => expands(word, program)) : pathWords(args);
-  return words.find((word) => expands(word, program) || (!TEXT_PROGRAMS.has(program) && !inside(path.resolve(cwd, word), dir))) ?? null;
+  return words.find((word) => expands(word, program) || (!TEXT_PROGRAMS.has(program) && !readable(path.resolve(cwd, word), guard))) ?? null;
 }
 
 /** The target path a writer program names: the -Path/-FilePath value, else its first non-option word. */
@@ -60,7 +63,7 @@ export function criticCommandVerdict({ program, args, cwd, guard, critic, text }
       : deny(text, `the critic writes only ${guard.reach.verdictFile} in its directory`);
   }
   if (!(critic?.read ?? []).includes(program)) return deny(text, `the critic runs only read-only commands (${program} is not one of them)`);
-  const outside = readReach({ program, args: args.map(String), cwd: base, dir });
+  const outside = readReach({ program, args: args.map(String), cwd: base, guard });
   return outside === null ? null : deny(text, `the critic reads only inside its own directory (${outside} is not)`);
 }
 
@@ -74,6 +77,6 @@ export function criticWriteVerdict({ filePath, guard, tool = 'shell' }) {
 export function criticReadVerdict({ paths, guard, tool }) {
   const dir = guard?.reach?.dir;
   if (!dir) return deny(tool, 'the critic guard names no directory, so nothing is readable');
-  const outside = paths.find((one) => !inside(one, dir));
+  const outside = paths.find((one) => !readable(one, guard));
   return outside ? deny(`${tool} ${outside}`, `the critic reads only inside its own directory (${tool} reached ${outside})`) : null;
 }

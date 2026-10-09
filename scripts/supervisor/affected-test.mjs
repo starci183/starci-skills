@@ -18,6 +18,7 @@ import { show } from '../api/git/show.mjs';
 import { pathList } from '../machine/test-ladder.mjs';
 import { resolveTestConcurrency } from '../machine/test-concurrency.mjs';
 import { byCodeUnit } from '../lib/list.mjs';
+import { leaveReceipts } from './affected-receipt-file.mjs';
 
 const SCHEMA = 'starci/test-affected@1';
 const RECEIPT_SCHEMA = 'starci/affected-receipt@1';
@@ -159,8 +160,19 @@ async function runSelection({ root, picked, args, deps, base, budgetMs }) {
   return reply(code, out.join('\n'), { ok: code === 0, scope: picked.files, results: rows, failedTests, concurrency: decision, receipt });
 }
 
-/** `starci test affected [--base <ref>] [--changed <file...>] [--by symbol|file] [--run] [--concurrency <n>]`. */
+/**
+ * `starci test affected [--base <ref>] [--changed <file...>] [--by symbol|file] [--run] [--receipt-file <path>] [--concurrency <n>]`. A --run answer carries its receipt as a
+ * file when asked (`receiptFile`) and as the proven receipt of its base..tip pair (`provenFile`, clean ok runs only): the content is the file, never a long output to parse.
+ */
 export async function testAffected(ctx, deps = {}) {
+  const answer = await affectedAnswer(ctx, deps);
+  const receipt = answer?.data?.receipt;
+  if (!ctx?.args?.run || !receipt) return answer;
+  const root = path.resolve(ctx?.cwd ?? process.cwd(), ctx?.args?.root ?? '.');
+  return { ...answer, data: { ...answer.data, ...leaveReceipts({ root, receipt, requested: ctx.args['receipt-file'] }) } };
+}
+
+async function affectedAnswer(ctx, deps) {
   const args = ctx?.args ?? {};
   if (args.by !== undefined && !['file', 'symbol'].includes(args.by)) return reply(2, 'starci test affected: --by is file or symbol', { ok: false, scope: [] });
   const root = path.resolve(ctx?.cwd ?? process.cwd(), args.root ?? '.');

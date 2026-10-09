@@ -16,7 +16,8 @@ test('the retry the failure route queued behind its curing leg is dispatched, no
   const { causesOf } = await import('../../scripts/kernel/progress-rca.mjs');
   const world = replayWorld(t, fixture, { tree: true });
   const cause = causesOf({ status: 'failed', result: failed.result, report: { outcome: failed.report.outcome, blocker: { kind: failed.report.blocker.kind, detail: 'the fix needs files outside the owned paths' } } });
-  assert.ok(cause.includes(failed.report.cause), `the world reproduces the live cause of the failed job (${cause.join(', ')})`);
+  // The live job was read as a too-narrow grant by the words of its blocker; its typed kind (sds-gap) names an upstream record gap, which the route table repairs.
+  assert.deepEqual(cause, ['record-gap'], `the typed blocker kind classifies the failed job (${cause.join(', ')})`);
 
   assert.equal(world.engine({ controllers: ['job', 'workflow'], passes: 1, foregroundPush: true }).ok, true, 'the engine restarts over the queued retry');
   const status = world.status();

@@ -4397,6 +4397,7 @@ the specs related to the changed functions (--by file: every importer); --run ru
 | `--by` | string |  |
 | `--run` | boolean |  |
 | `--plan` | boolean |  |
+| `--receipt-file` | string |  |
 | `--concurrency` | number |  |
 | `--root` | string |  |
 

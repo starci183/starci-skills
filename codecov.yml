@@ -64,6 +64,7 @@ flag_management:
         - "engine/db/machine-schema.mjs"
         - "engine/db/machine.mjs"
         - "engine/db/provider-reservations.mjs"
+        - "engine/db/ref-value.mjs"
         - "engine/digest.mjs"
         - "engine/invalid-config.mjs"
         - "engine/model-config.mjs"

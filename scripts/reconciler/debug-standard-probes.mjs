@@ -102,7 +102,9 @@ function readyUndispatched(c) {
   if (!ready.length) return null;
   const progressed = Math.max(lastAt(eventsOf(w, 'op-dispatched')) ?? 0, lastAt(eventsOf(w, 'op-settled')) ?? 0);
   const oldest = ready.map((job) => Math.max(Number(job.createdAt) || 0, progressed)).sort((a, b) => a - b)[0];
-  return within(c, oldest) ? null : overdue(`${ready.length} ready job(s) (${ready.map((job) => job.jobId).join(', ')}) not dispatched for ${minutes(c.now - oldest)} min; the Workflow controller owns the dispatch of ready work`, 'ready-not-dispatched');
+  const refused = ready.filter((job) => job.refusal).map((job) => `${job.jobId} refused ${job.refusal.count}x for ${job.refusal.code}${job.refusal.reason ? ': ' + firstLine(job.refusal.reason, 120) : ''}`);
+  const cause = refused.length ? `; ${refused.join('; ')}` : '';
+  return within(c, oldest) ? null : overdue(`${ready.length} ready job(s) (${ready.map((job) => job.jobId).join(', ')}) not dispatched for ${minutes(c.now - oldest)} min${cause}; the Workflow controller owns the dispatch of ready work`, 'ready-not-dispatched');
 }
 
 function legDispatched(c) {

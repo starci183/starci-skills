@@ -21,7 +21,9 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '.
 const OPEN_PHASES = new Set(['queued', 'running']);
 
 const jobOf = (r) => ({ jobId: r.job_id, kind: r.kind, opId: r.op_id, status: r.status, tryNo: r.try_no, retryOf: r.retry_of ?? null,
-  workerId: r.worker_id, deadline: r.deadline ?? null, createdAt: r.created_at, updatedAt: r.updated_at });
+  workerId: r.worker_id, deadline: r.deadline ?? null, createdAt: r.created_at, updatedAt: r.updated_at,
+  // The dispatch refusal the push remembered on the job (scripts/kernel/dispatch-refusal-memo.mjs): the cause that keeps a ready job from launching.
+  refusal: parseJsonOr(r.payload_json, {})?.dispatchRefusal ?? null });
 const incidentOf = (r, holds = []) => ({ id: r.incident_id, kind: r.kind, owner: r.owner, dueAt: r.due_at ?? null, jobId: r.job_id, opId: r.op_id, status: r.status, detail: r.detail, holds });
 /** The job ids (or op ids) a gate incident holds, from its raising event: a gate names the jobs it holds there and carries no job_id of its own. */
 const heldBy = (db, row) => {
