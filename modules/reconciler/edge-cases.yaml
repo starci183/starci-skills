@@ -1080,3 +1080,17 @@ cases:
     rule: {file: scripts/kernel/verbs/shared/status-menu.mjs, anchor: "attestNoteOf"}
     spec: tests/kernel/menu-answered-hold.spec.mjs
     status: covered
+  - id: supervisor-seat-spec-states-a-menu-the-code-no-longer-offers
+    family: record-vs-reality
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a spec on main is green) tests/guards/supervisor-seat.spec.mjs failed 16 of 19 on main: it expected a gate item to offer fixed, workaround and not-runtime-fault, while commit 503fad170 (a choice whose kernel step cannot bind its repository is not offered) lawfully withholds them from the spec's fixture gate, which names no repository (ledgerId none); that commit changed tests/supervisor/supervisor-menu.spec.mjs but not this spec, and `starci test affected --base 503fad170~1` does select this spec, so the red spec was selected and not run or not read before the commit landed", remedy: {state: in-tree, change: "the spec states the options an unbound gate offers (record-defect, none-fits) and that the unbindable choices are absent; the other specs importing the Supervisor menu modules were run one at a time and are green"}}
+    met: {date: "2026-10-09", where: "alpha.8 main 9ec024066", evidence: "node --test tests/guards/supervisor-seat.spec.mjs: pass 3, fail 16, actual choices line record-defect | none-fits"}
+    rule: {file: scripts/supervisor/supervisor-menu.mjs, anchor: "unboundOf"}
+    spec: tests/guards/supervisor-seat.spec.mjs
+    status: covered
+  - id: clone-cli-writes-the-live-runtime-tree
+    family: authority-safety
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a CLI started from tree X never writes tree Y by default) two lanes ran `node packages/cli/bin/starci.mjs runtime gen-catalog --write` inside their clone with STARCI_RUNTIME unset and the generated files landed in the live checkout: locateRuntime binds env, then the per-user record ~/.starci/runtime.json, then an upward .claude, then the embedded checkout, so the record (the live tree) outranks the clone the bin lives in, and the only protection was a stderr notice after the choice", remedy: {state: in-tree, change: "a verb that writes the runtime tree (catalog field writesRuntimeTree: runtime gen-catalog, derived-fields and readme-blocks with --write, release sync-runtime unless --check) is refused with RUNTIME_TREE_TARGET_FOREIGN when the located tree is not the tree that owns the running bin and neither STARCI_RUNTIME nor --root chose it; read verbs keep resolving the host runtime"}}
+    met: {date: "2026-10-09", where: "alpha.8 lanes, live checkout", evidence: "two lane reports: generated files written to the live checkout from a clone's bin"}
+    rule: {file: packages/cli/src/runtime-target.mjs, anchor: "treeTargetRefusal"}
+    spec: tests/cli/runtime-tree-target.spec.mjs
+    status: covered

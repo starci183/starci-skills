@@ -3,6 +3,7 @@ verb: gen-catalog
 owner: runtime
 summary: write or check the generated CLI catalog outputs, docs and shell completions
 impl: {script: scripts/cli/gen-catalog.mjs}
+writesRuntimeTree: write
 flags:
   - {name: write, type: boolean, summary: rewrite every generated output from modules/cli/commands}
   - {name: check, type: boolean, summary: exit 1 listing each output that differs}
