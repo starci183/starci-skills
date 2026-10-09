@@ -23,6 +23,8 @@ import { sha256File } from '../work/work-io.mjs';
 import { staleRefusal } from '../work/critic-verdict.mjs';
 import { AUTOPILOT_BY, AUTOPILOT_RULING, SUPERVISOR_GATE, openIncidents, kindOf, supervisorGatesOf } from './autopilot-budget.mjs';
 import { gateOwnerTold } from './gate-ladder.mjs';
+import { treesInOrder, workDirHolding } from '../lib/roots.mjs';
+import { workflowWorktreeOf } from '../machine/workflow-tree.mjs';
 
 export const HANDOVER_CREDENTIALS_SUBJECT = 'handover-credentials';
 export const PROVISIONAL_LABEL = 'self-accepted provisional';
@@ -186,9 +188,10 @@ const staleFindings = ({ rel, best, sha }) => {
  * beauty at least beautyMin, rationale evidence, DNA - the loop's metrics include the DNA gate): {ok, record,
  * parts[], findings[], beautyMin}. `reviewed` are the parts the ask showed ({path, sha256}); a part redrawn since fails.
  */
-export function drawGateEvidence({ repo, recordPath, reviewed = [], beautyMin = null }) {
+export function drawGateEvidence({ repo, tree = null, recordPath, reviewed = [], beautyMin = null }) {
   const findings = [];
-  const file = path.resolve(repo, String(recordPath ?? ''));
+  const asked = String(recordPath ?? '');
+  const file = treesInOrder({ tree, repo }).map((base) => path.resolve(base, asked)).find((candidate) => fs.existsSync(candidate)) ?? path.resolve(repo, asked);
   const dir = path.basename(file) === 'index.yaml' ? path.dirname(file) : file;
   let record = null;
   try { record = parseYaml(fs.readFileSync(path.join(dir, 'index.yaml'), 'utf8')); } catch (error) { return { ok: false, record: null, parts: [], findings: [{ code: 'RECORD_UNREADABLE', detail: `${slash(path.relative(repo, dir))}/index.yaml: ${error.message}` }], beautyMin }; }
@@ -223,15 +226,21 @@ const goldenGate = (brandDir, review) => {
   return { golden, findings };
 };
 
+/** The brand record exists in the Work directory `dir` and parses. */
+const hasBrandDirection = (dir) => { try { readBrandRecord(dir); return true; } catch { return false; } };
+
+/** The registered workflow tree of `workflowId` (the tree the records are written in until the workflow finishes), or null. */
+const workflowTreeOf = (workflowId) => { try { return workflowWorktreeOf({ env: process.env }, workflowId)?.path ?? null; } catch { return null; } };
+
 /**
  * The machine gates of one brand.direction archetype under review: the direction checks (shape, DNA mapping of every
  * recipe, rubric, golden bytes) with only the owner-acceptance problems set aside, the archetype declared with every
  * field, and the golden the ask showed still on disk. {ok, archetype, rev, findings[], golden[]}.
  */
-function directionGateEvidence({ repo, review }) {
+function directionGateEvidence({ repo, tree = null, review }) {
   const findings = [];
   let brand;
-  try { brand = readBrandRecord(repo); } catch (error) { return { ok: false, archetype: review?.archetype ?? null, findings: [{ code: 'BRAND_UNREADABLE', detail: error.message }] }; }
+  try { brand = readBrandRecord(workDirHolding(hasBrandDirection, { tree, repo })); } catch (error) { return { ok: false, archetype: review?.archetype ?? null, findings: [{ code: 'BRAND_UNREADABLE', detail: error.message }] }; }
   const direction = brand.brand?.direction;
   if (!direction) return { ok: false, archetype: review?.archetype ?? null, findings: [{ code: 'DIRECTION_MISSING', detail: 'the brand record carries no brand.direction' }] };
   const archetype = review?.archetype ?? null;
@@ -289,11 +298,12 @@ export function writeAnswer(ledger, { workflowId, report, question, optionIndex,
 
 // Provisional-accept or redraw/revise plan of one draw-review / direction-review ask (machine gates decide).
 export const planReview = ({ db, repo, workflowId, report, question, cls, base, settings, planAnswer, planEvent, now }) => {
+  const tree = workflowTreeOf(workflowId);
   const isDraw = cls.class === 'draw-review';
   const review = question.review ?? {};
   const gates = isDraw
-    ? drawGateEvidence({ repo, recordPath: review.recordPath ?? review.record, reviewed: review.parts })
-    : directionGateEvidence({ repo, review });
+    ? drawGateEvidence({ repo, tree, recordPath: review.recordPath ?? review.record, reviewed: review.parts })
+    : directionGateEvidence({ repo, tree, review });
   const record = isDraw ? (review.record ?? gates.record) : `brand.direction.${review.archetype ?? '?'}`;
   if (gates.ok) {
     const note = `autopilot provisional acceptance (owner ruling ${AUTOPILOT_RULING}): every machine gate passed; the owner reviews it once at handover. Never golden.`;

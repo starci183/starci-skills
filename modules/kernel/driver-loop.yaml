@@ -192,7 +192,7 @@ tick:
       `starci kernel kernel-ack-rev --workflow <id> --plan` with --op for the upcoming operation,
       read every path the plan lists under `unread` (the files this incarnation has not yet attested
       with these bytes: the whole set at boot, afterwards only the new or changed ones) and attest the exact
-      returned readManifest, complete, with --rev and --read-manifest. The current Kernel incarnation alone acknowledges READ.
+      returned readToken with --rev and --digest (the complete readManifest with --read-manifest still attests). The current Kernel incarnation alone acknowledges READ.
       Boot delivery is provenance, not acknowledgement. Git keeps its actual SHA; installed
       trees use explicitly installed current required-byte identity. Unknown, missing,
       changed relevant bytes or incomplete acknowledgements refuse affected enqueue/dispatch.

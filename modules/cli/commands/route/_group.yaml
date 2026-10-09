@@ -1,3 +1,4 @@
 group: route
 summary: resolve runtime operations from structured routing inputs
 owner: runtime
+runtimeSide: host

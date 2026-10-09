@@ -230,6 +230,17 @@ test('draw gates: provisional only when the loop passed, the critic scored at le
   assert.deepEqual(stale.findings.map((f) => f.code), ['REVIEW_PART_REDRAWN']);
 });
 
+test('draw gates: the record is read from the workflow tree first, then the main checkout (two trees holding different records)', (t) => {
+  const inTree = loopRecord(t);
+  const inMain = loopRecord(t, { beauty: 6 });
+  const empty = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-autopilot-empty-'));
+  t.after(() => fs.rmSync(empty, { recursive: true, force: true }));
+  const args = { recordPath: 'index.yaml', beautyMin: 8 };
+  assert.equal(drawGateEvidence({ repo: inMain.dir, tree: inTree.dir, ...args }).ok, true, 'the workflow tree\x27s record wins over the main checkout\x27s');
+  assert.deepEqual(drawGateEvidence({ repo: inMain.dir, tree: empty, ...args }).findings.map((f) => f.code), ['DRAW_BEAUTY_BELOW'], 'a tree without the record falls back to the main checkout');
+  assert.deepEqual(drawGateEvidence({ repo: inMain.dir, ...args }).findings.map((f) => f.code), ['DRAW_BEAUTY_BELOW'], 'no tree reads the main checkout');
+});
+
 test('draw gates: a verdict is accepted only for the bytes it judged; another digest or none is CRITIC_VERDICT_STALE', (t) => {
   const other = loopRecord(t, { judged: ['e'.repeat(64)] });
   assert.deepEqual(drawGateEvidence({ repo: other.dir, recordPath: 'index.yaml', beautyMin: 8 }).findings.map((f) => f.code), ['CRITIC_VERDICT_STALE']);

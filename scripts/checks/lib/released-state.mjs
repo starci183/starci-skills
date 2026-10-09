@@ -6,6 +6,7 @@
 //   spec-skipped        the spec exists at the release commit
 //   assertion-weakened  the spec exists at the release commit and holds fewer assertion lines now than it held there
 import { show } from '../../api/git/show.mjs';
+import { log } from '../../api/git/log.mjs';
 
 const BUFFER = 64 * 1024 * 1024;
 
@@ -34,4 +35,10 @@ export function loosensReleased(finding, { base, read, rules }) {
   if (finding.kind === 'check-removed') return before.split('\n').some((line) => line.trim().startsWith(shown(finding.detail)));
   if (finding.kind !== 'assertion-weakened') return true;
   return assertionsIn(read('HEAD', finding.file), rules.assertionMarkers) < assertionsIn(before, rules.assertionMarkers);
+}
+
+/** The release commit of the tree at `root`: the newest commit that changed the "version" line of package.json, or null. */
+export function releaseCommit(root) {
+  const found = log(['-1', '--format=%H', '-G"version":', '--', 'package.json'], { cwd: root });
+  return found.status === 0 ? found.stdout.trim() || null : null;
 }

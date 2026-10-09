@@ -167,6 +167,7 @@ import path from 'node:path';
 
 const FAKE_ORCA_SOURCE = String.raw`// fake orca — canned terminal + orchestration API for the dispatch specs.
 import fs from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 const ROOT = __STARCI_ROOT__, FAKE_REPO = process.cwd().replaceAll('\\', '/');
 const argv = process.argv.slice(2);
@@ -722,7 +723,11 @@ else if (verb === 'orchestration worker-release') {
         lastError: 'The agent terminal was closed but its process could not be confirmed stopped' } });
   }
   if (!(unknownReleases > 0 && state.releases <= unknownReleases)) {
-    state.workerStates = { ...(state.workerStates || {}), [arg('dispatch')]: 'released' }; save();
+    state.workerStates = { ...(state.workerStates || {}), [arg('dispatch')]: 'released' };
+    // state.releaseClosesTerminal: Orca closes the agent terminal of a Dispatch it releases (the live behaviour); unset, the terminal stays as seeded.
+    const closing = state.releaseClosesTerminal ? state.assignees?.[arg('dispatch')] : null;
+    if (closing && state.terminals?.[closing]) state.terminals[closing] = { ...state.terminals[closing], connected: false, writable: false, closed: true };
+    save();
     out({ ok: true, result: { dispatchId: arg('dispatch'), state: 'released' } });
   }
 }
@@ -821,6 +826,21 @@ else if (verb === 'orchestration reply') {
   out({ ok: true, result: { message: { id: 'msg_reply_' + state.replies.length, thread_id: arg('id') } } });
 }
 // ---- misc reads ----
+// state.worktrees seeds Orca's worktree accounting (worktree ps row shape: id, repoId, path, branch, comment, isMainWorktree, liveTerminalCount, status). rm removes a tree the way Orca
+// does (git worktree remove, the tree's own repository named by state.worktreeRepos[repoId]), forgets it, and keeps the branch; a terminal still open in the tree (state.terminals with its path) refuses it.
+else if (verb === 'worktree ps')
+  out({ ok: true, result: { worktrees: state.worktrees || [], truncated: false } });
+else if (verb === 'worktree rm') {
+  const id = String(arg('worktree')).replace(/^id:/, '');
+  const w = (state.worktrees || []).find(x => x.id === id);
+  if (!w) fail({ ok: false, error: { code: 'worktree_not_found', message: 'worktree_not_found' } });
+  const open = Object.values(state.terminals || {}).filter(t => !t.closed && t.worktree === w.path);
+  if (open.length) fail({ ok: false, error: { code: 'worktree_has_live_terminals', message: 'the worktree still has a live terminal: close it, then remove the worktree' } });
+  const removed = spawnSync('git', ['-C', (state.worktreeRepos || {})[w.repoId], 'worktree', 'remove', '--force', w.path], { encoding: 'utf8', windowsHide: true });
+  if (removed.status !== 0) fail({ ok: false, error: { code: 'worktree_remove_failed', message: String(removed.stderr || '').trim() } });
+  state.worktrees = state.worktrees.filter(x => x.id !== id); save();
+  out({ ok: true, result: { removed: true } });
+}
 else if (verb === 'worktree show')
   out({ ok: true, result: { worktree: { id: arg('worktree'), path: arg('worktree') } } });
 else if (verb === 'account list') {

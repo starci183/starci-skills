@@ -1,3 +1,4 @@
 group: debug
 summary: run a fixed read-only inspector against the StarCi runtime
 owner: runtime
+runtimeSide: host

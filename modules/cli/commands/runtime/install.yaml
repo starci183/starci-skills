@@ -1,6 +1,7 @@
 group: runtime
 verb: install
 owner: runtime
+runtimeSide: host
 summary: install the StarCi runtime — fetch the pinned package, then init or update <cwd>/.claude
 impl:
   script: scripts/install/install.mjs

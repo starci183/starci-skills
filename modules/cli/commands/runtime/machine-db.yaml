@@ -1,6 +1,7 @@
 group: runtime
 verb: machine-db
 owner: runtime
+runtimeSide: host
 summary: inspect or maintain the host machine database
 impl: {script: engine/db/machine.mjs}
 positional:

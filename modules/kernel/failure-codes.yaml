@@ -15382,6 +15382,17 @@ RT_EVENT_SPILL_BYPASS:
   owner: supervisor
   kind: check-finding
 
+RT_ROOT_ADHOC:
+  title: "A root is resolved outside the root module"
+  title_vi: "Một thư mục gốc được tự phân giải ngoài mô-đun gốc"
+  meaning_vi: "Thư mục mà một thành phần đọc hoặc ghi chỉ được quyết định ở một mô-đun là scripts/lib/roots.mjs: cây runtime, thư mục trạng thái, thư mục tạm, thư mục nơi lệnh được gọi, tên thư mục Work và thứ tự thử hai cây cùng có thể giữ một bản ghi (cây làm việc trước, bản checkout chính sau). Tệp nguồn runtime tự viết process.cwd() hoặc literal tên thư mục Work là tự phân giải thư mục, và đã bốn lần trong hai ngày một thành phần đọc hay ghi nhầm cây vì vậy."
+  causes_vi:
+    - "Tệp mới nối đường dẫn từ process.cwd() hoặc từ literal .starciwork thay vì gọi mô-đun gốc"
+    - "Tệp đã có sẵn ở bản phát hành trước nhưng nay viết nhiều hơn số lần khi đó"
+  nextStep_vi: "Dùng invocationDir, workDirHolding, workRecordPath hoặc toolSearchDirs của scripts/lib/roots.mjs."
+  owner: supervisor
+  kind: check-finding
+
 RT_PORT_RESTATED:
   title: "A port literal is spelled outside its owner"
   title_vi: "Một literal cổng được viết ngoài tệp chủ sở hữu"
@@ -17575,3 +17586,224 @@ TURN_START_UNOBSERVED:
   nextStep_vi: "Runtime đóng worker và terminal của lần khởi chạy đó trước khi thử lại, và bộ đếm giữ khởi chạy tính nó; không ai phải gõ vào terminal."
   owner: runtime-core
   kind: runtime-fault
+rejudge-not-failed:
+  title: "The job is not a failed leg"
+  title_vi: "Việc không phải là lượt đã lỗi"
+  meaning_vi: "Chỉ lượt đã lỗi (trạng thái cuối) mới được chấm lại."
+  causes_vi:
+    - "Chỉ lượt đã lỗi (trạng thái cuối) mới được chấm lại."
+  nextStep_vi: "Runtime ghi mã này vào sổ (job-rejudge-refused) và lượt đi theo đường chạy lại; không ai khác cần làm gì."
+  owner: runtime-core
+  kind: verb-refusal
+
+rejudge-blocker-not-runtime-owed:
+  title: "The blocker is not one the runtime owes"
+  title_vi: "Điều chặn không phải việc của runtime"
+  meaning_vi: "Báo cáo bị chặn vì lý do khác: lượt đi theo đường chạy lại."
+  causes_vi:
+    - "Báo cáo bị chặn vì lý do khác: lượt đi theo đường chạy lại."
+  nextStep_vi: "Runtime ghi mã này vào sổ (job-rejudge-refused) và lượt đi theo đường chạy lại; không ai khác cần làm gì."
+  owner: runtime-core
+  kind: verb-refusal
+
+rejudge-nothing-to-judge:
+  title: "The op owes no runtime Critic"
+  title_vi: "Op không nợ Critic của runtime"
+  meaning_vi: "Loại op này không có phán quyết của Critic để chấm lại."
+  causes_vi:
+    - "Loại op này không có phán quyết của Critic để chấm lại."
+  nextStep_vi: "Runtime ghi mã này vào sổ (job-rejudge-refused) và lượt đi theo đường chạy lại; không ai khác cần làm gì."
+  owner: runtime-core
+  kind: verb-refusal
+
+rejudge-no-preserved-ref:
+  title: "No preserved product"
+  title_vi: "Không có sản phẩm được giữ lại"
+  meaning_vi: "Lượt lỗi không để lại ref preserved: đi theo đường chạy lại."
+  causes_vi:
+    - "Lượt lỗi không để lại ref preserved: đi theo đường chạy lại."
+  nextStep_vi: "Runtime ghi mã này vào sổ (job-rejudge-refused) và lượt đi theo đường chạy lại; không ai khác cần làm gì."
+  owner: runtime-core
+  kind: verb-refusal
+
+rejudge-product-mismatch:
+  title: "The preserved ref does not hold the reported files"
+  title_vi: "Ref được giữ không có đủ tệp báo cáo"
+  meaning_vi: "Ref preserved thiếu tệp mà báo cáo nêu: đi theo đường chạy lại."
+  causes_vi:
+    - "Ref preserved thiếu tệp mà báo cáo nêu: đi theo đường chạy lại."
+  nextStep_vi: "Runtime ghi mã này vào sổ (job-rejudge-refused) và lượt đi theo đường chạy lại; không ai khác cần làm gì."
+  owner: runtime-core
+  kind: verb-refusal
+
+rejudge-already-done:
+  title: "This product was already re-judged"
+  title_vi: "Sản phẩm này đã được chấm lại một lần"
+  meaning_vi: "Mỗi bản băm sản phẩm chỉ được chấm lại một lần."
+  causes_vi:
+    - "Mỗi bản băm sản phẩm chỉ được chấm lại một lần."
+  nextStep_vi: "Runtime ghi mã này vào sổ (job-rejudge-refused) và lượt đi theo đường chạy lại; không ai khác cần làm gì."
+  owner: runtime-core
+  kind: verb-refusal
+
+rejudge-not-enqueued:
+  title: "The lineage refused the next attempt"
+  title_vi: "Dòng dõi từ chối lượt kế tiếp"
+  meaning_vi: "Cổng của đơn vị không cho lượt kế tiếp: đi theo đường chạy lại."
+  causes_vi:
+    - "Cổng của đơn vị không cho lượt kế tiếp: đi theo đường chạy lại."
+  nextStep_vi: "Runtime ghi mã này vào sổ (job-rejudge-refused) và lượt đi theo đường chạy lại; không ai khác cần làm gì."
+  owner: runtime-core
+  kind: verb-refusal
+
+rejudge-failed:
+  title: "The re-judgment could not be admitted"
+  title_vi: "Không nhận được việc chấm lại"
+  meaning_vi: "Một bước nhận (hợp đồng, bằng chứng READ, khôi phục) lỗi; việc chấm lại kết thúc lỗi và đường chạy lại tiếp quản."
+  causes_vi:
+    - "Một bước nhận (hợp đồng, bằng chứng READ, khôi phục) lỗi; việc chấm lại kết thúc lỗi và đường chạy lại tiếp quản."
+  nextStep_vi: "Runtime ghi mã này vào sổ (job-rejudge-refused) và lượt đi theo đường chạy lại; không ai khác cần làm gì."
+  owner: runtime-core
+  kind: verb-refusal
+
+rejudge-no-mechanical-check:
+  title: "The failed report declared no check the runtime can re-run"
+  title_vi: "Báo cáo lỗi không khai kiểm tra nào runtime chạy lại được"
+  meaning_vi: "Không có bằng chứng cơ học để chấm lại: đi theo đường chạy lại."
+  causes_vi:
+    - "Không có bằng chứng cơ học để chấm lại: đi theo đường chạy lại."
+  nextStep_vi: "Runtime ghi mã này vào sổ (job-rejudge-refused) và lượt đi theo đường chạy lại; không ai khác cần làm gì."
+  owner: runtime-core
+  kind: verb-refusal
+
+rejudge-read-proof-failed:
+  title: "The READ proof of the restored product failed"
+  title_vi: "Bằng chứng READ của sản phẩm khôi phục lỗi"
+  meaning_vi: "Chạy bằng chứng đọc trên cây đã khôi phục thất bại."
+  causes_vi:
+    - "Chạy bằng chứng đọc trên cây đã khôi phục thất bại."
+  nextStep_vi: "Runtime ghi mã này vào sổ (job-rejudge-refused) và lượt đi theo đường chạy lại; không ai khác cần làm gì."
+  owner: runtime-core
+  kind: verb-refusal
+kernel-launch-worker-live:
+  title: "A held Kernel launch names a worker that may be running"
+  title_vi: "Lần khởi động Kernel đang giữ trỏ tới một worker có thể đang chạy"
+  meaning_vi: "Orca báo Dispatch của lần khởi động này có nhịp tim hoặc trạng thái đang chạy, nên đây có thể là ghế Kernel còn sống; runtime không đóng nó."
+  causes_vi:
+    - "Lượt đầu của worker đã bắt đầu dù câu trả lời của Orca không nêu cửa sổ"
+  nextStep_vi: "Một Decision Item của Supervisor nêu Dispatch và cửa sổ Orca báo; gắn ghế đó làm Kernel hoặc đóng nó bằng tay có kiểm chứng."
+  owner: supervisor
+  kind: runtime-fault
+kernel-launch-terminal-unnamed:
+  title: "Orca names no terminal for the held launch"
+  title_vi: "Orca không nêu cửa sổ cho lần khởi động đang giữ"
+  meaning_vi: "Orca trả lời về Dispatch của lần khởi động nhưng không nêu cửa sổ của worker, nên không có gì để nhận và đóng."
+  causes_vi:
+    - "Orca tạo worker rồi lỗi trước khi ghi cửa sổ"
+  nextStep_vi: "Supervisor đối chiếu danh sách cửa sổ trên Orca rồi đóng tay có kiểm chứng."
+  owner: supervisor
+  kind: runtime-fault
+kernel-launch-dispatch-mismatch:
+  title: "Orca answered for another Dispatch"
+  title_vi: "Orca trả lời về Dispatch khác"
+  meaning_vi: "Bản ghi Orca trả về mang mã Dispatch khác với mã lưu trong tín hiệu, nên không thể tin nó thuộc lần khởi động này."
+  causes_vi:
+    - "Mã Dispatch bị dùng lại hoặc đọc nhầm"
+  nextStep_vi: "Supervisor kiểm tra tín hiệu và Dispatch trên Orca; runtime không nhận cửa sổ của bản ghi lạ."
+  owner: supervisor
+  kind: runtime-fault
+TEST_SPAWN_OUTSIDE_SEAM:
+  title: "A test runner is started outside the one launcher that clears the enclosing spec run"
+  title_vi: "Một bộ chạy test được khởi động ngoài bộ khởi chạy duy nhất xóa dấu của lần chạy spec bao quanh"
+  meaning_vi: "Một node --test con thừa kế NODE_TEST_CONTEXT tưởng mình là test con của lần chạy bao quanh: nó báo về cha và thoát 0 dù test đỏ, nên một verb chạy spec như tiến trình con (starci test affected, cổng land, release cut) sẽ cho spec đỏ qua khi được gọi từ trong một tiến trình test. Chỉ bộ khởi chạy node của scripts/api/node xóa dấu đó; một tệp ngoài scripts/api mang đối số --test và tự spawn, hoặc một bộ khởi chạy không đi qua forChild, bị từ chối."
+  causes_vi:
+    - "Một tệp mới tự gọi child_process hoặc runProgram với --test thay vì runNode, execNode hoặc spawnNode"
+    - "Một bộ khởi chạy trong scripts/api/node/lib.mjs bỏ lời gọi forChild"
+  nextStep_vi: "Khởi chạy test qua scripts/api/node (runNode, execNode, spawnNode) và giữ forChild trong ba bộ khởi chạy."
+  owner: runtime-core
+  kind: check-finding
+
+workflow-purge-unknown:
+  title: "The workflow is in no ledger of this repository"
+  title_vi: "Không có workflow này trong sổ nào của kho"
+  meaning_vi: "Lệnh dọn workflow không tìm thấy mã workflow trong sổ của kho được chỉ định, và nhật ký máy cũng chưa ghi lần dọn nào cho nó."
+  causes_vi:
+    - "Mã workflow hoặc đường dẫn kho gõ sai"
+    - "Workflow thuộc kho khác với kho đang chỉ định"
+  nextStep_vi: "Chủ sở hữu kiểm tra lại mã workflow và --repo rồi chạy lại phần kế hoạch của lệnh dọn."
+  owner: owner
+  kind: verb-refusal
+
+workflow-purge-not-archived:
+  title: "Only an archived workflow is purged"
+  title_vi: "Chỉ dọn workflow đã lưu trữ"
+  meaning_vi: "Workflow vẫn đang chạy, tạm dừng hoặc mới dừng nhưng chưa lưu trữ, nên lệnh dọn từ chối để không xoá cây làm việc đang dùng."
+  causes_vi:
+    - "Chưa chạy lệnh dừng workflow"
+    - "Workflow đang ở giai đoạn chạy hoặc tạm dừng"
+  nextStep_vi: "Chủ sở hữu dừng workflow bằng lệnh dừng (starci workflow stop) rồi chạy lại lệnh dọn."
+  owner: owner
+  kind: verb-refusal
+
+workflow-purge-live-job:
+  title: "A job, lease or Kernel signal of the workflow is still live"
+  title_vi: "Workflow còn việc, khoá hoặc tín hiệu Kernel đang sống"
+  meaning_vi: "Sổ vẫn ghi một việc chưa kết thúc, một dòng khoá hoặc tín hiệu Kernel còn giữ cho workflow này, nên chưa chứng minh được là nó đã dừng hẳn."
+  causes_vi:
+    - "Lệnh dừng chưa hoàn tất hoặc chạy dở"
+    - "Một việc đang báo cáo chưa được chốt"
+  nextStep_vi: "Chủ sở hữu đọc danh sách việc trong thông báo, hoàn tất lệnh dừng workflow rồi chạy lại lệnh dọn."
+  owner: owner
+  kind: verb-refusal
+
+workflow-purge-live-seat:
+  title: "A seat of the workflow is still live"
+  title_vi: "Workflow còn ghế đang sống"
+  meaning_vi: "Bảng ghế của máy vẫn ghi một ghế Kernel của workflow này ở trạng thái đang chạy, nên lệnh dọn không đụng tới cây và terminal của nó."
+  causes_vi:
+    - "Ghế Kernel chưa được đóng sau lệnh dừng"
+  nextStep_vi: "Chủ sở hữu chờ ghế đóng hẳn hoặc đóng nó bằng đường của bộ điều phối rồi chạy lại lệnh dọn."
+  owner: owner
+  kind: verb-refusal
+
+workflow-purge-worker-live:
+  title: "A worker of the workflow is still active in Orca"
+  title_vi: "Workflow còn worker đang hoạt động trong Orca"
+  meaning_vi: "Orca báo một worker thuộc Run của workflow vẫn đang hoạt động và chưa thoát, nên lệnh dọn từ chối để không cắt ngang việc đang chạy."
+  causes_vi:
+    - "Worker chưa dừng sau lệnh dừng workflow"
+  nextStep_vi: "Chủ sở hữu chờ worker thoát hoặc dừng nó bằng đường của Orca rồi chạy lại lệnh dọn."
+  owner: owner
+  kind: verb-refusal
+
+workflow-purge-orca-unreadable:
+  title: "Orca did not answer, so no leftover can be proven"
+  title_vi: "Orca không trả lời nên không chứng minh được phần còn sót"
+  meaning_vi: "Lệnh dọn cần đọc được Orca (cây, terminal, worker của từng Run) trước khi xoá bất cứ gì; một lần đọc lỗi không chứng minh được là không còn gì."
+  causes_vi:
+    - "Orca đang tắt hoặc không phản hồi"
+    - "Một Run mà sổ nêu tên không còn trong Orca"
+  nextStep_vi: "Chủ sở hữu mở lại Orca rồi chạy lại lệnh dọn."
+  owner: owner
+  kind: verb-refusal
+
+workflow-purge-host-busy:
+  title: "The host lock or the gc lock is held"
+  title_vi: "Khoá máy hoặc khoá dọn rác đang có người giữ"
+  meaning_vi: "Một việc nặng khác (đợt phát hành, hợp nhất, đợt dọn rác) đang chạy trên máy, nên lệnh dọn workflow chờ để không giẫm lên nó."
+  causes_vi:
+    - "Đang có đợt phát hành hoặc hợp nhất"
+    - "Đợt dọn rác của bộ điều phối đang chạy"
+  nextStep_vi: "Chủ sở hữu chờ việc kia xong rồi chạy lại lệnh dọn; không cần làm gì khác."
+  owner: owner
+  kind: verb-refusal
+
+workflow-purge-plan-changed:
+  title: "The plan changed since it was shown"
+  title_vi: "Kế hoạch dọn đã đổi so với bản đã xem"
+  meaning_vi: "Mã băm của kế hoạch lúc thi hành khác với mã chủ sở hữu đã xem, nên không có gì bị xoá."
+  causes_vi:
+    - "Một ref, cây hoặc terminal đổi trạng thái giữa lúc xem kế hoạch và lúc thi hành"
+  nextStep_vi: "Chủ sở hữu đọc lại kế hoạch bằng --plan và thi hành với mã mới."
+  owner: owner
+  kind: verb-refusal

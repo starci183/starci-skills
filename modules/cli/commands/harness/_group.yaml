@@ -1,3 +1,4 @@
 group: harness
 summary: start, stop, inspect or open the local StarCi harness
 owner: runtime
+runtimeSide: host

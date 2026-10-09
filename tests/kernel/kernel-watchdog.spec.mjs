@@ -376,12 +376,13 @@ test('a repair retains a seat whose missing worker Dispatch leaves its execution
 // An idle Kernel due for replacement (3 delivered wakes with no move, the first past the window)
 // whose seat cannot be fenced - Orca refuses worker-release - is replaced by nothing: the tick
 // answers kernel-terminal-close-failed, no kernel-replaced-idle is recorded and no start-workflow ran.
+// A wake given under another runtime revision starts the idle streak over (ae5a466d2), so these wakes carry the revision the tick runs under.
 test('an idle Kernel whose release is refused is close-failed, not replaced', async (t) => {
   const minute = 60_000, now = Date.now();
   const fx = await watchdogWorld(t, { events: [
-    { kind: 'kernel-woken', entityType: 'kernel', created_at: now - 12 * minute, payload: { terminal: KERNEL } },
-    { kind: 'kernel-woken', entityType: 'kernel', created_at: now - 11.5 * minute, payload: { terminal: KERNEL } },
-    { kind: 'kernel-woken', entityType: 'kernel', created_at: now - 11 * minute, payload: { terminal: KERNEL } },
+    { kind: 'kernel-woken', entityType: 'kernel', created_at: now - 12 * minute, payload: { terminal: KERNEL, rev: currentRuntimeRev() ?? null } },
+    { kind: 'kernel-woken', entityType: 'kernel', created_at: now - 11.5 * minute, payload: { terminal: KERNEL, rev: currentRuntimeRev() ?? null } },
+    { kind: 'kernel-woken', entityType: 'kernel', created_at: now - 11 * minute, payload: { terminal: KERNEL, rev: currentRuntimeRev() ?? null } },
   ] });
   const { result } = fx.tick({ STARCI_FAKE_ORCA_RELEASE_FAILS: '1', ORCA_TERMINAL_HANDLE: SENDER });
   assert.equal(result.action, 'kernel-terminal-close-failed', JSON.stringify(result));

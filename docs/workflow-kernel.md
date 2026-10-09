@@ -48,6 +48,7 @@ refuses any other; every change writes a `lifecycle_changes` row with who and wh
   stopped workflow, and no controller replaces the seat of a paused or stopped one.
 - A `finished` or `stopped` workflow can be `archived`; an archived workflow accepts no new event or
   job, and its open incidents were closed when it finished.
+- `starci workflow stop` archives and leaves the host footprint (trees, `wf-<id>` branches, `preserved/<id>/*` refs, workers and terminals Orca still holds). `starci workflow purge --plan` (the default) lists exactly what belongs to the workflow by evidence and what it only lists; `--apply` removes it under the host lock, owner role only; The ledger rows stay by default: they are the only record of why the workflow stopped and what it cost (reports, events, usage), an archived workflow accepts no new event, and the blob collector cannot yet delete (its apply is refused). `--ledger` archives the rows to a verified zip with the housekeeping purge (`scripts/work/purge-workflow.mjs`: archive, read back, then delete) and drops them, which leaves their blobs unreferenced for the collector.
 
 Kernel death is recoverable: re-running `start-workflow` with the same goal
 spawns a *replacement* kernel (attempt+1, same workflow generation) — durable
