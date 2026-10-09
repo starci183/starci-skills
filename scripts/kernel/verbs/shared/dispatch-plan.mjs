@@ -104,8 +104,8 @@ function addCutManifest(d, packet) {
 
 /** grammarContext: required rides the grammar sources in the packet; a missing one refuses the spawn (scripts/kernel/grammar-context.mjs). */
 function addGrammarContext(d, packet) {
-  const { repo, briefDoc, internals } = d;
-  const grammarContext = grammarContextRequired(briefDoc) ? resolveGrammarContext({ skillRoot: internals.skillRoot, repo, inputs: grammarInputsOf(briefDoc) }) : null;
+  const { repo, briefDoc, internals, workflowTree } = d;
+  const grammarContext = grammarContextRequired(briefDoc) ? resolveGrammarContext({ skillRoot: internals.skillRoot, repo, tree: workflowTree?.path ?? null, inputs: grammarInputsOf(briefDoc) }) : null;
   if (grammarContext) packet.context.grammar = { family: grammarContext.family, sources: grammarContext.sources };
   d.grammarContext = grammarContext;
   d.grammarMissing = grammarContext?.missing.length ? grammarMissingDetail(grammarContext.missing) : null;

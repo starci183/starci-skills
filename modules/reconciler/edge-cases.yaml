@@ -1080,3 +1080,31 @@ cases:
     rule: {file: scripts/kernel/verbs/shared/status-menu.mjs, anchor: "attestNoteOf"}
     spec: tests/kernel/menu-answered-hold.spec.mjs
     status: covered
+  - id: ready-job-never-dispatched-no-owner
+    family: smooth-operation
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a ready job is dispatched, or its stop is a problem line with an owner) two live workflows held a ready op job for 15 minutes with nothing running; the Workflow controller ran dispatch-ready every minute and each run answered a refusal that lives only in the detached push result file, so no ledger event, no menu item and no digest line named it", remedy: {state: in-tree, change: "the digest names an op job that stayed ready past the bound, counted from the later of its creation and the workflow's last dispatch or settle, as the departure ready-not-dispatched owned by the runtime (the Workflow controller owns the dispatch of ready work)"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, Nivo and StarCi workflows", evidence: "nivo op-architecture.decide-8da14f299d and starci op-interface.draw-b8fb07dca4 ready from 07:53Z to 08:09Z with kernel dispatch-ready done every 30 to 60 seconds and launched 0"}
+    rule: {file: scripts/reconciler/debug-standard-probes.mjs, anchor: "readyUndispatched"}
+    spec: tests/kernel/live-ready-not-dispatched.spec.mjs
+    status: covered
+  - id: grammar-context-reads-the-main-checkout-not-the-workflow-tree
+    family: correctness
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: an op dispatched inside a workflow tree sees what the workflow's finished legs wrote) interface.draw was refused grammar-context-missing on every dispatch: the brand record brand.decide wrote lives in .starciwork of the workflow tree until the workflow finishes, and the grammar context was resolved against the repository's main checkout", remedy: {state: in-tree, change: "resolveGrammarContext takes the workflow tree and reads the brand record, the family CSS roots and the captures from it first, the main checkout after; dispatch-plan passes the tree"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, StarCi workflow", evidence: "starci push result: grammar-context-missing, no brand record, while the workflow tree holds .starciwork/brand/index.yaml and op-brand.decide-8bd6f3374d succeeded at 05:17Z"}
+    rule: {file: scripts/kernel/grammar-context.mjs, anchor: "hasBrandRecord"}
+    spec: tests/kernel/live-ready-not-dispatched.spec.mjs
+    status: covered
+  - id: run-fence-spends-pool-strikes-and-is-never-repaired
+    family: failure-while-running
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: the workflow Run is bound to the Kernel terminal that dispatches into it, and a host binding fault is never the agent's) worker-start was refused consumer_fenced three times in two minutes; run-show named no coordinator, which the binder reads as bound, so nothing re-bound the Run; each refusal counted as a pool failure until both pools were excluded", remedy: {state: in-tree, change: "a launch refused consumer_fenced at worker-start re-binds the Run to the Kernel terminal once (unless run-show proves it is already the coordinator), records run-rebound, and retries the launch once; the refusals of the host's Run binding spend no pool strike"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, Nivo workflow", evidence: "nivo events 1038, 1046, 1052 dispatch-rejected consumer_fenced, route-decided lineageAdjust excluding claude-agent; run_322398621415 run-show coordinator null"}
+    rule: {file: scripts/kernel/orca-runs.mjs, anchor: "rebindAfterFence"}
+    spec: tests/kernel/live-ready-not-dispatched.spec.mjs
+    status: covered
+  - id: lineage-excludes-every-pool-of-the-tier
+    family: failure-while-running
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a retry always has a pool to be tried on, bounded by its retry budget) a retry lineage that excluded every pool of the tier left the admission answering no-eligible-candidate for ever, with nobody owning the dead end", remedy: {state: in-tree, change: "pickOpModel yields the lineage exclusion when it would exclude every pool of the tier: the pools stay demoted, the order still prefers the least failed, and the job's retry budget bounds the tries"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, Nivo workflow", evidence: "push result: agent admission refused: no-eligible-candidate, both targets excluded for this retry lineage"}
+    rule: {file: scripts/agent/op-pick.mjs, anchor: "yieldTotalExclusion"}
+    spec: tests/kernel/live-ready-not-dispatched.spec.mjs
+    status: covered

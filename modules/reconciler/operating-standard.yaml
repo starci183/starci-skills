@@ -160,6 +160,7 @@ departures:
   workflow-not-started: {role: runtime, duty: does, registry: null}
   worker-not-started: {role: runtime, duty: does, registry: null}
   dispatch-loop: {role: runtime, duty: does, registry: null}
+  ready-not-dispatched: {role: runtime, duty: does, registry: ready-job-never-dispatched-no-owner}
   checks-not-rerun: {role: runtime, duty: does, registry: null}
   settle-overdue: {role: runtime, duty: does, registry: null}
   placement-lost: {role: runtime, duty: does, registry: admitted-op-placement-names-a-lost-tree-path}
