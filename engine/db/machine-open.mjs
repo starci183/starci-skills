@@ -1,17 +1,16 @@
 import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import path from 'node:path';
-import { installRefResolver } from './ref-value.mjs';
+import { installRefResolver, openReadOnlyDb } from './ref-value.mjs';
 import { MACHINE_BUSY_TIMEOUT_MS, isBusyError } from './machine-connection.mjs';
 
 // engine/db/machine-open.mjs — how machine.sqlite is opened: the connection policy of the machine.mjs header, a reference-resolving handle.
 const require = createRequire(import.meta.url);
 const need = (ok, message, code = 'STARCI_MACHINE_DB') => { if (!ok) throw Object.assign(new Error(message), { code }); };
-export const busyTimeoutOf = (env = process.env) => { const n = Number(env?.STARCI_MACHINE_BUSY_TIMEOUT_MS); return Number.isInteger(n) && n > 0 ? n : MACHINE_BUSY_TIMEOUT_MS; };
+const busyTimeoutOf = (env = process.env) => { const n = Number(env?.STARCI_MACHINE_BUSY_TIMEOUT_MS); return Number.isInteger(n) && n > 0 ? n : MACHINE_BUSY_TIMEOUT_MS; };
 const writerPragmas = (env) => ({ synchronous: 'NORMAL', busy_timeout: busyTimeoutOf(env), temp_store: 'MEMORY', cache_size: -16000,
   journal_size_limit: 67108864, trusted_schema: 'OFF' });
 export const pragma = (db, name) => { const row = db.prepare(`PRAGMA ${name}`).get(); return row ? Object.values(row)[0] : null; };
-export const openReadOnlyFile = (file) => installRefResolver(new (require('node:sqlite').DatabaseSync)(file, { readOnly: true, timeout: MACHINE_BUSY_TIMEOUT_MS }));
 
 /** The connection opener bound to the schema methods and the corruption reporter of machine.mjs. */
 export function machineOpenMethods({ checkSchema, createSchema, openWithRetry, corruptIncident }) {
@@ -23,7 +22,7 @@ export function machineOpenMethods({ checkSchema, createSchema, openWithRetry, c
       let db;
       try {
         if (readOnly) {
-          db = installRefResolver(new DatabaseSync(file, { readOnly: true, timeout: MACHINE_BUSY_TIMEOUT_MS }));
+          db = openReadOnlyDb(file, MACHINE_BUSY_TIMEOUT_MS);
           db.exec('PRAGMA query_only=ON; PRAGMA temp_store=MEMORY; PRAGMA cache_size=-16000;');
           checkSchema(db, file);
           return db;

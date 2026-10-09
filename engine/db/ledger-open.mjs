@@ -7,8 +7,6 @@ import { installRefResolver } from './ref-value.mjs';
 const require=createRequire(import.meta.url);
 const need=(ok,message,code)=>{if(!ok)throw Object.assign(new Error(message),code?{code}:{});};
 export const applyPragmas=(db,pragmas)=>db.exec(Object.entries(pragmas).map(([k,v])=>`PRAGMA ${k}=${v};`).join(' '));
-/** A runtime.sqlite handle opened read-only with the given busy timeout. */
-export const openReadOnlyLedger=(file,busyTimeoutMs)=>installRefResolver(new (require('node:sqlite').DatabaseSync)(file,{readOnly:true,timeout:busyTimeoutMs}));
 const openSleep=ms=>Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,ms);
 // SQLITE_CANTOPEN is transient on Windows while a concurrent process closes the WAL files: a short bounded retry.
 const OPEN_RETRY_DELAYS_MS=[0,300,900];

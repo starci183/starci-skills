@@ -1,4 +1,5 @@
-import { machineOpenMethods, openReadOnlyFile, pragma } from './machine-open.mjs';
+import { machineOpenMethods, pragma } from './machine-open.mjs';
+import { openReadOnlyDb } from './ref-value.mjs';
 // engine/db/machine.mjs — the ONE writer of machine.sqlite (DBTREE.sql Part B, schema 'starci/machine@1', user_version MACHINE_VERSION).
 //
 // machine.sqlite is the host's single operational store: the ledger registry, the Supervisor (sup_*), the engine
@@ -412,7 +413,7 @@ function forEachLedger(m, fn, { state = 'active' } = {}) {
     let db = null;
     try {
       need(fs.existsSync(ledger.file), `ledger file missing: ${ledger.file}`);
-      db = openReadOnlyFile(ledger.file);
+      db = openReadOnlyDb(ledger.file, MACHINE_BUSY_TIMEOUT_MS);
       db.exec('PRAGMA query_only=ON;');
       out.push({ ledger, result: fn({ ledger, db }) });
     } catch (error) { out.push({ ledger, error: String(error?.message ?? error) }); } finally { try { db?.close(); } catch { /* closed */ } }

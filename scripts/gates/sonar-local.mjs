@@ -10,7 +10,7 @@ import {sopsIdentityEnv} from '../../engine/secrets.mjs';
 import {parseYaml} from '../../engine/yaml.mjs';
 import {safeRemove} from '../api/fs/safe-remove.mjs'; import {runNode} from '../api/node/run-node.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
-import {repositoryName} from '../hfs/repo-identity.mjs';
+import {repositoryName,repositoryHome} from '../hfs/repo-identity.mjs';
 import {findDeclaration} from './sonar-declaration.mjs';
 export {findDeclaration};
 import {resolveCustodyFile,resolveDeclaredRepository,runtimeHostRoot,runtimeSecretEnv} from './runtime-host.mjs';

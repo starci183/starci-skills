@@ -1,4 +1,5 @@
-import {applyPragmas,openDb as openLedgerFile,openReadOnlyLedger} from './ledger-open.mjs';
+import {applyPragmas,openDb as openLedgerFile} from './ledger-open.mjs';
+import {openReadOnlyDb} from './ref-value.mjs';
 import { assertMutationFence } from '../../scripts/lib/mutation-fence.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -197,7 +198,7 @@ export function ledgerIdOf(handle){
 // ---------------------------------------------------------------------------------------------------------
 /** A runtime.sqlite opened read-only with the enforced busy_timeout — what every reader outside the writer uses. */
 export function openLedgerReader(file,{busyTimeoutMs=LEDGER_BUSY_TIMEOUT_MS,verify=true,queryOnly=true}={}){
-  const db=openReadOnlyLedger(file,busyTimeoutMs);
+  const db=openReadOnlyDb(file,busyTimeoutMs);
   try{
     // queryOnly:false only for a backup's VACUUM INTO (the file itself stays read-only).
     applyPragmas(db,queryOnly?READ_PRAGMAS:{...READ_PRAGMAS,query_only:'OFF'});
