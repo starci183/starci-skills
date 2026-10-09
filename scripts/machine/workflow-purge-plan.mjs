@@ -59,7 +59,7 @@ function counts(plan) {
 export function buildPurgePlan({ facts, workflowId, repo, ledgerMode = false }) {
   const workers = classifyWorkers(facts.workers.rows);
   const treePaths = facts.trees.map((tree) => tree.path);
-  const terminals = classifyTerminals({ terminals: facts.terminals, evidence: facts.ledger.evidence ?? { handles: [] }, treePaths, workerClose: workers.close });
+  const terminals = classifyTerminals({ terminals: facts.terminals, evidence: facts.evidence, treePaths, workerClose: workers.close });
   // A workflow whose ledger rows are gone after a journalled purge is purged, not unknown.
   const gone = !facts.ledger.found && facts.machine.purgedAt != null;
   const blockers = gone ? [] : [...ledgerBlockers(facts, workflowId), ...(facts.ledger.found ? hostBlockers(facts, workers.live) : [])];

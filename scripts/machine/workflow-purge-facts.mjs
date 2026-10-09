@@ -33,6 +33,8 @@ function machineFactsOf(workflowId, env) {
     decisions: m.db.prepare(`SELECT di_id, kind, status FROM sup_decision_items WHERE workflow_id=? AND status IN ${OPEN_DECISION} ORDER BY opened_at`).all(workflowId)
       .map((di) => ({ diId: di.di_id, kind: di.kind, status: di.status })),
     purgedAt: m.db.prepare("SELECT created_at FROM sup_events WHERE kind='workflow-purged' AND entity_type='workflow' AND entity_id=? ORDER BY seq DESC LIMIT 1").get(workflowId)?.created_at ?? null,
+    // A launch that failed after the stop is journalled here, not in the archived ledger (an archived ledger takes no event).
+    launchFailures: m.db.prepare("SELECT payload_json FROM sup_events WHERE kind='kernel-start-failed' AND entity_id=? ORDER BY seq").all(workflowId).map((row) => parseJson(row.payload_json, null) ?? {}),
     inProgress: parseJson(m.db.prepare('SELECT value FROM machine_meta WHERE key=?').get(purgeMetaKey(workflowId))?.value, null),
   }), env);
 }
@@ -103,6 +105,13 @@ function workersOf(runIds, orca) {
   return { rows, unreadable, others };
 }
 
+// The ledger's evidence plus the failed launches the machine journal holds.
+const withLaunchFailures = (base, failures) => {
+  const more = (key) => failures.map((failure) => failure[key]).filter((value) => typeof value === 'string' && value);
+  return { handles: [...new Set([...base.handles, ...more('terminal')])], runIds: [...new Set([...base.runIds, ...more('runId')])],
+    dispatchIds: [...new Set([...base.dispatchIds, ...more('dispatch')])], preservedRefs: base.preservedRefs };
+};
+
 const reposOf = (trees, rows) => [...new Map([...trees.map((t) => t.repoRoot), ...rows.map((r) => r.repo_root)].filter((r) => r && fs.existsSync(r)).map((r) => [treeKey(r), mainRootOf(r)])).values()];
 
 /**
@@ -118,11 +127,12 @@ export function purgeFactsOf({ repo, workflowId, guardsDir, env = process.env, d
   let terminals;
   try { terminals = orca.terminals(); } catch (error) { terminals = { ok: false, terminals: [], error: String(error?.message ?? error) }; }
   const trees = treesOf({ rows: machine.rows, orcaPs: ps, workflowId });
+  const evidence = withLaunchFailures(ledger.evidence ?? { handles: [], runIds: [], dispatchIds: [], preservedRefs: [] }, machine.launchFailures);
   const jobIds = (ledger.jobs ?? []).map((job) => job.jobId);
   const rowBranches = machine.rows.filter((row) => row.kind === 'workflow' && row.branch).map((row) => row.branch);
-  const refs = reposOf(trees, machine.rows).flatMap((repoRoot) => workflowRefsOf({ repoRoot, workflowId, rowBranches, jobIds, preservedRefs: ledger.evidence?.preservedRefs ?? [], trees: trees.map((tree) => tree.path) }));
+  const refs = reposOf(trees, machine.rows).flatMap((repoRoot) => workflowRefsOf({ repoRoot, workflowId, rowBranches, jobIds, preservedRefs: evidence.preservedRefs, trees: trees.map((tree) => tree.path) }));
   const owner = (deps.lockOwner ?? hostLockOwner)({ env });
-  return { ledger, machine, trees, refs, workers: workersOf(ledger.evidence?.runIds ?? [], orca), terminals: terminals.ok ? terminals.terminals : [],
+  return { ledger, machine, trees, refs, evidence, workers: workersOf(evidence.runIds, orca), terminals: terminals.ok ? terminals.terminals : [],
     orca: { readable: ps.ok === true && terminals.ok === true, complete: psCoverage(ps).complete, error: ps.ok ? terminals.error ?? null : ps.error ?? null },
     guards: guardFilesOf(workflowId, guardsDir), prompts: promptFilesOf(workflowId, env), hostLock: owner && !owner.stale ? { role: owner.role, purpose: owner.purpose, pid: owner.pid } : null };
 }

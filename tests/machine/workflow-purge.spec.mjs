@@ -266,3 +266,19 @@ test('archive then purge: a workflow stopped after the fact is the same shape (a
     assert.deepEqual(planned.data.trees.map((tree) => path.basename(tree.path)), [path.basename(world.trees.other.path)]);
   }, { archiveIt: true });
 });
+
+test('a Kernel launch that failed after the stop is journalled in the machine store, and its Run and terminal tie to the workflow from there', (t) => {
+  return purgeWorld(t, async (world) => {
+    world.machine.supEvent({ entityType: 'kernel', entityId: ARCHIVED, kind: 'kernel-start-failed',
+      payload: { ledgerId: world.ledger.ledgerId, workflowId: ARCHIVED, step: 'turn-start', terminal: 'term-late-1', dispatch: 'dsp-late', runId: 'run-late', effectState: 'unknown' } });
+    world.terminals = [terminalRow('term-late-1', world.trees.second.path), terminalRow('term-late-2', world.trees.second.path)];
+    world.workers = [workerRow('dsp-late', 'run-late', 'term-late-1', 'release_unknown')];
+    const plan = (await run(world, {})).data;
+    assert.deepEqual(plan.workers.map((w) => w.dispatchId), ['dsp-late']);
+    assert.deepEqual(plan.listed.map((l) => l.id), ['term-late-2'], 'the terminal no event names is listed, not closed');
+    const out = await run(world, { apply: true });
+    assert.equal(out.code, 0, out.text);
+    assert.deepEqual(world.closed.workers, ['dsp-late']);
+    assert.deepEqual(world.terminals.map((c) => c.handle), ['term-late-2']);
+  });
+});
