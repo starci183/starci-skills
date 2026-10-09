@@ -31,7 +31,8 @@ export function renderPlan(plan) {
   const head = `workflow purge plan for ${plan.workflowId} in ${plan.repo} (plan ${short(plan.sha)})`;
   const refusals = plan.blockers.map((b) => `  REFUSED ${b.code}: ${b.detail}`);
   if (plan.already) return [head, '  already purged: the journal holds the purge and nothing of it remains'].join('\n');
-  const next = plan.ok ? [`  apply: starci workflow purge --repo ${plan.repo} --workflow ${plan.workflowId} --apply${plan.ledger.mode === 'purge' ? ' --ledger' : ''} --expect ${short(plan.sha)}`] : [];
+  const apply = ['starci workflow purge --repo', plan.repo, '--workflow', plan.workflowId, '--apply', ...(plan.ledger.mode === 'purge' ? ['--ledger'] : []), '--expect', short(plan.sha)].join(' ');
+  const next = plan.ok ? ['  apply: ' + apply] : [];
   return [head, ...refusals, ...planBody(plan), ledgerLine(plan), ...next].join('\n');
 }
 

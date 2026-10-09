@@ -11,6 +11,7 @@ export function releaseCiItems({ repo, latest = latestCiRecord } = {}) {
   if (!record) return [];
   const detail = `last release CI: ${ciLine(record)}`;
   if (record.state === 'green') return [green('preflight', 'release-ci', 'last release CI', detail, { required: false })];
-  const fix = `starci release ci-status --tag ${record.tag} --wait${record.state === 'red' ? ' (a red run is fixed forward with the next pre-release)' : ''}`;
+  const forward = record.state === 'red' ? ' (a red run is fixed forward with the next pre-release)' : '';
+  const fix = ['starci release ci-status --tag', record.tag, '--wait'].join(' ') + forward;
   return [warn('preflight', 'release-ci', 'last release CI', detail, fix)];
 }
