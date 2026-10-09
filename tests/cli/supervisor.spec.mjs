@@ -24,6 +24,8 @@ const publicVerbs = {
   'push-mains': ['dry-run', 'hooks-only', 'repo'],
   'ram-cap': ['op', 'reserve', 'weight', 'workflow'],
   status: ['menu'],
+  start: ['plan', 'reason'],
+  stop: [],
   report: ['repo', 'send'],
   'telegram-bridge': [],
   tell: ['limit', 'read', 'since', 'timeout-ms', 'wait'],
@@ -38,6 +40,18 @@ test('supervisor catalog resolves every added public handler and its exact local
     assert.equal(fs.existsSync(path.join(root, command.impl.script)), true, command.impl.script);
     assert.deepEqual(command.flags.map((flag) => flag.name).sort(), flags);
   }
+});
+
+// The options start-supervisor.mjs reads from its argv, less the ones other verbs own (status, stop) and the universal ones.
+const OTHER_VERBS = new Set(['help', 'json', 'status', 'stop']);
+// The options the script serves for the watchdog and the restart procedure, never as CLI flags.
+const INTERNAL_OPTIONS = ['replace', 'restart', 'rotate'];
+const flagsOfScript = (script) => [...new Set([...fs.readFileSync(path.join(root, script), 'utf8').matchAll(/(?:has|value)\('([a-z-]+)'\)/g)].map((m) => m[1]))].filter((name) => !OTHER_VERBS.has(name) && !INTERNAL_OPTIONS.includes(name)).sort();
+
+test('every supervisor verb of the catalog is listed with its flags, and start declares every public option its script reads', () => {
+  assert.deepEqual(Object.keys(catalog.groups.supervisor.verbs).filter((verb) => !(verb in publicVerbs)), [], 'a verb missing from publicVerbs is never compared');
+  const start = catalog.groups.supervisor.verbs.start;
+  assert.deepEqual(start.flags.map((flag) => flag.name).sort(), flagsOfScript(start.impl.script));
 });
 
 test('supervisor verbs resolve only the public status/start/stop modes', () => {
@@ -80,6 +94,7 @@ test('every added supervisor verb dispatches through the runtime seam', () => {
 
 test('supervisor internal watchdog flags are refused', () => {
   assert.equal(main(['supervisor', 'start', '--replace'], { catalog, stderr: () => {}, runScript: () => 0 }), 2);
+  assert.equal(main(['supervisor', 'start', '--rotate', '--reason', 'handover'], { catalog, stderr: () => {}, runScript: () => 0 }), 2);
   assert.equal(main(['supervisor', 'start', '--restart'], { catalog, stderr: () => {}, runScript: () => 0 }), 2);
   assert.equal(main(['supervisor', 'watchdog', '--once', '--replace'], { catalog, stderr: () => {}, runScript: () => 0 }), 2);
   assert.equal(main(['supervisor', 'watchdog', '--once', '--restart'], { catalog, stderr: () => {}, runScript: () => 0 }), 2);
