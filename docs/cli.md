@@ -3209,6 +3209,33 @@ starci runtime architecture <repo-root>
 starci runtime architecture <repo-root> --base <commit>
 ```
 
+### starci runtime artefacts
+
+judge or migrate the artefacts the runtime installs outside its tree
+
+| flag | type | |
+| --- | --- | --- |
+| `--migrate` | boolean |  |
+
+Effect: local-write
+
+Roles: worker, lead, coordinator, release, owner
+
+Conventions:
+
+- without --migrate it only reads; with --migrate it rewrites hooks and generated copies of the live workflows and the host tree
+- it never touches product content, only artefacts listed in modules/kernel/installed-artefacts.yaml
+- a deploy runs it from the new tree after the fast-forward; the engine runs the same migration when it starts
+
+exit: 0 every artefact is current, or was migrated and verified; 1 an artefact is stale in check mode, or a migration was refused; 2 bad usage
+
+json: starci/runtime-artefacts@1
+
+```sh
+starci runtime artefacts
+starci runtime artefacts --migrate --json
+```
+
 ### starci runtime benchmark-snapshot
 
 append one model-pool snapshot file under benchmark/snapshots
@@ -3246,6 +3273,37 @@ json: flag
 ```sh
 starci runtime check
 starci runtime check --only cli-parity -- --root <tree>
+```
+
+### starci runtime deploy
+
+carry a checked runtime revision onto the running host and verify the engine on it
+
+| flag | type | |
+| --- | --- | --- |
+| `--from` | string |  |
+| `--plan` | boolean |  |
+
+Effect: host
+
+Roles: coordinator, owner
+
+Conventions:
+
+- refuses unless the source is committed, clean, a fast-forward of the host and proven by a check receipt bound to that commit
+- refuses while a release cut holds the host lock; waits for settles, Critic runs and prepared decisions in flight, stops none
+- several commits are one revision change, with one fast-forward, installed artefacts migrated, one engine restart, then verified
+- journals one runtime-deployed event; --plan prints every step and refusal and changes nothing
+- a failed verification names the host state and the non-destructive way back (git revert of the range), never a reset
+
+exit: 0 the host runs the new revision, verified, and the deploy event is journalled (or the plan has no refusal); 1 refused before any change, or failed after the fast-forward with the host state named; 2 bad usage
+
+json: starci/runtime-deploy@1
+
+```sh
+starci runtime deploy --from <clone> --plan
+starci runtime deploy --from <clone> --json
+starci runtime deploy --from main
 ```
 
 ### starci runtime derived-fields

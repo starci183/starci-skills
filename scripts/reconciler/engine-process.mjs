@@ -4,6 +4,8 @@ import { reapProviderReservations } from '../machine/provider-reservation-reap.m
 import { bootIdentity } from './boot-id.mjs';
 import { previousBootRev, recordSwap } from './revision-swap.mjs';
 import { driftOfRuntime, syncRuntime } from '../hfs/sync-runtime.mjs';
+import { skillRoot } from '../../engine/runtime-root.mjs';
+import { migrateInstalledArtefacts } from './installed-artefacts.mjs';
 
 /** The text line of a `--once` result. */
 export const onceLine = (result) => '[reconciler --once] ' + ((result.ok && 'ok') || 'NOT OK') + ' ' + (result.controllers.map((c) => `${c.name}(${c.mode}) keys=${c.keys} ok=${c.ok} failed=${c.failed.length}`).join('; ') || 'no controller on') + ((result.error && ` ${result.error}`) || '');
@@ -48,7 +50,7 @@ export function ensureRuntimeCopies(engine, { driftOf = driftOfRuntime, sync = s
   }
 }
 
-export function startRecovery(engine, safeStart, { reap = reapProviderReservations, boot = bootIdentity, copies = ensureRuntimeCopies } = {}) {
+export function startRecovery(engine, safeStart, { reap = reapProviderReservations, boot = bootIdentity, copies = ensureRuntimeCopies, artefacts = migrateInstalledArtefacts } = {}) {
   if (safeStart.reevaluated) logSafeReevaluated(engine, safeStart);
   const priorRev = previousBootRev(engine.state);
   const applied = [{ action: 'engine-restarted', count: 1 }];
@@ -63,6 +65,14 @@ export function startRecovery(engine, safeStart, { reap = reapProviderReservatio
     if (!reaped.released.length) return;
     applied.push({ action: 'provider-receipts-released', count: reaped.released.length });
     engine.log('reconciler.event', `engine start released ${reaped.released.length} provider receipt(s) the host restart ended`, { kind: 'reconciler.provider-receipts-released', released: reaped.released, held: reaped.held ?? [] });
+  });
+  recoveryStep(engine, 'installed-artefacts', () => {
+    // What a deploy could not reach (a workflow that started, or a tree that appeared, after it): migrated here, lazily, for the revision this engine runs.
+    const report = artefacts({ root: skillRoot, machine: engine.state });
+    if (!report.counts.migrated && !report.counts.refused) return;
+    if (report.counts.migrated) applied.push({ action: 'installed-artefacts-migrated', count: report.counts.migrated });
+    engine.log(report.counts.refused ? 'reconciler.error' : 'reconciler.event', `engine start migrated ${report.counts.migrated} installed artefact(s), ${report.counts.refused} refused`,
+      { kind: 'reconciler.artefacts-migrated', counts: report.counts, refused: report.refused.slice(0, 10) });
   });
   recoveryStep(engine, 'queue', () => {
     const rearmed = engine.queue.rearmParked();
