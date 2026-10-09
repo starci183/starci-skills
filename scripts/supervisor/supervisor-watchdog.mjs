@@ -193,12 +193,13 @@ async function hostDeps() {
     list: () => terminalList({ includeVisualLayouts: true }), tabTitles: tabTitlesOf,
     rename: (terminal, title) => terminalRename({ terminal, title }),
     show: (dispatch) => workerShow({ dispatch }), stop: (dispatch) => workerStop({ dispatch }), release: (dispatch) => closeWorker({ dispatch }),
-    screen, settleMs: host.DEATH_SETTLE_MS, outputAge,
+    screen, exitedRow: liveness.exitedAgentPromptRow, settleMs: host.DEATH_SETTLE_MS, outputAge,
     // Escape (no Enter) leaves an input row that targets a subagent before the wake is typed.
     escape: (handle) => { try { return terminalSend({ terminal: handle, text: '\u001b', enter: false }); } catch (e) { return { ok: false, error: String(e?.message ?? e) }; } },
     state: (handle) => {
       const s = screen(handle);
       if (s == null) return 'unreadable';
+      if (liveness.exitedAgentPromptRow(s)) return 'agent-exited';
       let stale = null;
       try { stale = config.allocationMs('liveness.activeStaleMs'); } catch { /* none */ }
       return liveness.staleAwareState(liveness.classifyAgentScreen(s).state, outputAge(handle), stale).state;
@@ -430,12 +431,20 @@ function wakePlanFor({ m, env, now, terminal }) {
   return { plan, registered, sweep };
 }
 
+/** A seat whose terminal shows a shell prompt: nothing is typed (the shell would run it); the seat is replaced and the wake is withheld. */
+function replaceDeadSeat({ m, deps, env, now, terminal, plan }) {
+  m.transaction(() => supervisorEvent(m, { kind: 'supervisor-wake', now: now(), payload: { tags: plan.tags, delivered: false, action: 'seat-agent-exited', withheld: true } }));
+  m.close();
+  return replaceSeat(deps, env, 'agent-exited', { reason: 'seat-agent-exited', terminal, tags: plan.tags, withheld: true });
+}
+
 /** One pass over a live seat: repair tab titles, plan the wake, and deliver it (or report why not). */
 function wakeLiveSeat({ m, deps, env, now, settings, terminal }) {
   const titleRepairs = repairSupervisorTabTitles(terminal, jobsOf(m, ['running']), deps);
   const { plan, registered, sweep } = wakePlanFor({ m, env, now, terminal });
   if (!plan.text) return { ok: true, action: 'idle', terminal, registered, workers: sweep, ...(titleRepairs.length ? { titleRepairs } : {}) };
   const state = deps.state(terminal);
+  if (state === 'agent-exited') return replaceDeadSeat({ m, deps, env, now, terminal, plan });
   if (state === 'queued-input' || state === 'staged-input') {
     const proof = deps.enter(terminal);
     return { ok: proof?.ok === true, action: `${state}-sent`, terminal, tags: plan.tags };

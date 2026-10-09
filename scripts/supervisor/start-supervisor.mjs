@@ -13,12 +13,14 @@
 //
 //   starci supervisor start [--json] [--plan] [--reason <text>]
 //       enable the seat and launch it unless one is live
-//   starci supervisor start --replace [--json]      (the watchdog's call; never enables)
-//   starci supervisor start --rotate --reason <handover> [--json]   (the watchdog's call: close the idle live seat and start the standing prompt again; the seat stays enabled)
+//   start-supervisor.mjs --replace [--json]      (internal, the watchdog's call; never enables)
+//   start-supervisor.mjs --rotate --reason <handover> [--json]   (internal, the watchdog's call: close the idle live seat and start the standing prompt again; the seat stays enabled)
 //   starci supervisor status [--json]
 //   starci supervisor stop [--json]         disable, worker-stop + worker-release
-//   starci supervisor start --restart [--json]      stop + start (a contract reload)
+//   start-supervisor.mjs --restart [--json]      (internal) stop + start (a contract reload)
 //
+// The public verbs are status, start (--plan, --reason) and stop; --replace, --rotate and --restart are not CLI flags (the catalog
+// refuses them): the watchdog runs this script for them.
 // Singleton, three fences:
 //   1. a host lock (machine.sqlite host_locks 'supervisor-start'): two launchers never run at once;
 //   2. the seat (machine.sqlite seats row 'supervisor', scripts/machine/home.mjs seatOf/writeSeat): a 'starting'
@@ -26,6 +28,7 @@
 //      worker-show reports live is never replaced; an Orca that does not answer proves nothing (exit 75, nothing touched);
 //   3. dedupe by OWNERSHIP (seat-sessions.mjs): a terminal sup_events records as a seat session that is not the
 //      current seat is a duplicate: quit and closed. A terminal merely titled "[Supervisor]" is never touched.
+import { seatAgentGone, agentGoneHealth } from './seat-agent-gone.mjs';
 import '../api/process/hide-child-windows.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -147,7 +150,9 @@ export function seatHealth(seat, deps) {
   if (!dispatch) return healthWithoutDispatch(seat, terminal);
   let shown;
   try { shown = deps.show(dispatch); } catch (e) { shown = { ok: false, error: String(e?.message ?? e) }; }
-  return shownWorkerHealth(shown, terminal, dispatch);
+  const health = shownWorkerHealth(shown, terminal, dispatch);
+  const gone = health.live ? seatAgentGone(deps, terminal) : null;
+  return gone ? agentGoneHealth(gone, { terminal, dispatch }) : health;
 }
 
 function healthWithoutDispatch(seat, terminal) {

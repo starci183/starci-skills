@@ -13,6 +13,7 @@ import { DatabaseSync } from 'node:sqlite';
 import crypto from 'node:crypto';
 import { fakeAdmission } from '../helpers/fake-admission.mjs';
 
+import { exitedAgentPromptRow } from '../../scripts/lib/terminal-liveness.mjs';
 import { launchSupervisor, stopSupervisor, planSupervisorDedupe, doctrineOf, SEAT_DENIED_TOOLS, seatHealth } from '../../scripts/supervisor/start-supervisor.mjs';
 import { seatToolDecision } from '../../scripts/guards/seat-tools.mjs';
 import { withSupervisor, readSupervisor, seatOf, enabledOf, writeSeat, supervisorEvent, SUPERVISOR_ID, SKILL_ROOT } from '../../scripts/machine/home.mjs';
@@ -1177,4 +1178,33 @@ test('the push scan reads a diff file in chunks and keeps line numbers across ch
     forEachFileLine(file, (l) => scanner.line(l), { chunkBytes: 7 });
     assert.deepEqual(scanner.findings, [{ file: 'src/config.ts', line: 41, pattern: 'assigned-secret' }]);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('a seat the host lists as ready whose terminal shows a shell prompt is dead, not live', () => {
+  const seat = { value: { terminal: 'owned-terminal', dispatch: 'owned-dispatch' } };
+  const show = () => ({ ok: true, state: 'ready' });
+  const powershell = ["The '<' operator is reserved for future use.", 'PS D:\Repositories\starci-academy-backend\.claude>'].join('\n');
+  const bash = ["bash: syntax error near unexpected token `newline'", 'user@host:~/repo$'].join('\n');
+  for (const screen of [powershell, bash]) {
+    const health = seatHealth(seat, { show, screen: () => screen, exitedRow: exitedAgentPromptRow });
+    assert.equal(health.live, false);
+    assert.equal(health.dead, true);
+    assert.equal(health.agentExited, true);
+    assert.match(health.reason, /agent exited/);
+  }
+  const agent = ['● done', '─'.repeat(20), '❯', '─'.repeat(20), '  ⏵⏵ bypass permissions on'].join('\n');
+  assert.equal(seatHealth(seat, { show, screen: () => agent, exitedRow: exitedAgentPromptRow }).live, true);
+  assert.equal(seatHealth(seat, { show, screen: () => null, exitedRow: exitedAgentPromptRow }).live, true, 'an unreadable screen proves nothing');
+});
+
+test('the launch replaces a seat whose agent exited instead of answering already-live', async t => {
+  const host = fakeHost({ screens: {} });
+  const env = envOf(t);
+  const first = await launch(env, host);
+  host.screen = () => 'user@host:~/repo$';
+  host.exitedRow = exitedAgentPromptRow;
+  const again = await launch(env, host);
+  assert.notEqual(again.action, 'already-live', JSON.stringify(again));
+  assert.equal(again.action, 'restarted');
+  assert.notEqual(again.terminal, first.terminal);
 });

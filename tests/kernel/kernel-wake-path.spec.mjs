@@ -64,3 +64,22 @@ test('pending input: a transition wake submits it with one Enter; a stall or sup
     [['kernel-busy', 'staged-input']]);
   assert.equal(held.sends.length, 0);
 });
+
+// Frames of a terminal whose agent exited: the host shell is back (a Supervisor seat found so on 2026-10-09), possibly with the
+// parser errors of an earlier wake above its prompt. No wake path types into them.
+const PS_PARSER_ERRORS = ["starci supervisor decide --item <id> --choice <choice> --reason <why>", "The '<' operator is reserved for future use.",
+  '    + CategoryInfo          : ParserError: (:) [], ParentContainsErrorRecordException', '    + FullyQualifiedErrorId : RedirectionNotSupported'];
+const POWERSHELL_PROMPT = [...PS_PARSER_ERRORS, 'PS D:\Repositories\starci-academy-backend\.claude>'].join('\n');
+const BASH_PROMPT = ['bash: syntax error near unexpected token `newline\'', 'user@host:~/repo$'].join('\n');
+
+test('a terminal that holds a shell prompt is kernel-exited for every wake path, and nothing is typed', () => {
+  for (const frame of [POWERSHELL_PROMPT, BASH_PROMPT]) {
+    const ledger = kernelLedger();
+    const { deps, sends } = orca([frame]);
+    const r = wakeKernel({ db: ledger.db, workflowId: 'wf-a', text: '[decide] 3 open Supervisor decision(s)', deps });
+    assert.equal(r.action, 'kernel-exited', JSON.stringify(r));
+    assert.equal(r.delivered, false);
+    assert.equal(wakeAskAnswered(ledger, { workflowId: 'wf-a', dispatchId: 'ctx_1', receiptPath: 'r.json', deps }).delivered, false);
+    assert.deepEqual([sends.length, ledger.events.length], [0, 0]);
+  }
+});
