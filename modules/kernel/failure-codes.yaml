@@ -17674,3 +17674,30 @@ rejudge-read-proof-failed:
   nextStep_vi: "Runtime ghi mã này vào sổ (job-rejudge-refused) và lượt đi theo đường chạy lại; không ai khác cần làm gì."
   owner: runtime-core
   kind: verb-refusal
+kernel-launch-worker-live:
+  title: "A held Kernel launch names a worker that may be running"
+  title_vi: "Lần khởi động Kernel đang giữ trỏ tới một worker có thể đang chạy"
+  meaning_vi: "Orca báo Dispatch của lần khởi động này có nhịp tim hoặc trạng thái đang chạy, nên đây có thể là ghế Kernel còn sống; runtime không đóng nó."
+  causes_vi:
+    - "Lượt đầu của worker đã bắt đầu dù câu trả lời của Orca không nêu cửa sổ"
+  nextStep_vi: "Một Decision Item của Supervisor nêu Dispatch và cửa sổ Orca báo; gắn ghế đó làm Kernel hoặc đóng nó bằng tay có kiểm chứng."
+  owner: supervisor
+  kind: runtime-fault
+kernel-launch-terminal-unnamed:
+  title: "Orca names no terminal for the held launch"
+  title_vi: "Orca không nêu cửa sổ cho lần khởi động đang giữ"
+  meaning_vi: "Orca trả lời về Dispatch của lần khởi động nhưng không nêu cửa sổ của worker, nên không có gì để nhận và đóng."
+  causes_vi:
+    - "Orca tạo worker rồi lỗi trước khi ghi cửa sổ"
+  nextStep_vi: "Supervisor đối chiếu danh sách cửa sổ trên Orca rồi đóng tay có kiểm chứng."
+  owner: supervisor
+  kind: runtime-fault
+kernel-launch-dispatch-mismatch:
+  title: "Orca answered for another Dispatch"
+  title_vi: "Orca trả lời về Dispatch khác"
+  meaning_vi: "Bản ghi Orca trả về mang mã Dispatch khác với mã lưu trong tín hiệu, nên không thể tin nó thuộc lần khởi động này."
+  causes_vi:
+    - "Mã Dispatch bị dùng lại hoặc đọc nhầm"
+  nextStep_vi: "Supervisor kiểm tra tín hiệu và Dispatch trên Orca; runtime không nhận cửa sổ của bản ghi lạ."
+  owner: supervisor
+  kind: runtime-fault
