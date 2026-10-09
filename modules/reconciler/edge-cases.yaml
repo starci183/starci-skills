@@ -1562,3 +1562,20 @@ cases:
     rule: {file: scripts/kernel/workflow-launch-custody.mjs, anchor: "recoverUnreceipted"}
     spec: tests/kernel/workflow-launch-unreceipted.spec.mjs
     status: covered
+
+  - id: decide-enqueue-step-refused-for-bytes-that-did-not-change
+    family: correctness
+    found: live
+    replay: tests/replay/decide-enqueue-read.spec.mjs
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a menu choice that enqueues an op the Kernel attested its READ of is carried out) starci kernel decide --choice enqueue-leg was admitted once, with its READ baseline taken before its step ran; the nested enqueue wrote the new job, which adds the op's own files to the required set, and the recheck at that ledger write compared the whole sets and refused 'required bytes changed during this call' (kernel-read-unverified) though no byte had changed; the same enqueue run directly carries the op in its baseline and passes", remedy: {state: in-tree, change: "the recheck refuses a file of the admitted baseline that changed or vanished; a file new in the required set is judged by the enqueue's own READ gate (kernel-read-unverified until this Kernel life attested it), so an unattested op is still refused, by the right gate"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, StarCi workflow", evidence: "kernel-decision-result revert 'enqueue failed: kernel-read-unverified' for dec-47a88c5428, dec-97f398806a, dec-32e5ded724 (enqueue-leg of interface.draw)"}
+    rule: {file: scripts/kernel/caller-admission.mjs, anchor: "changedReads"}
+    spec: tests/replay/decide-enqueue-read.spec.mjs
+    status: covered
+  - id: nested-node-test-inherits-the-enclosing-run
+    family: correctness
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a verb that runs specs as a child reports them red when they are red) a node --test child that inherits NODE_TEST_CONTEXT believes it is a subtest of the enclosing run, reports to its parent and exits 0 whatever its tests did; starci test affected --run, the land gate, the release cut and the suite runner would pass red specs when started from inside a test process or from an environment carrying the variable", remedy: {state: in-tree, change: "the node launchers of scripts/api/node (nodeSpawn, nodeStart, nodeExecFile) clear the mark for any child that starts the test runner (withoutTestRunner of scripts/lib/env.mjs), npm children never carry it, and the test-spawn-seam self-check refuses a file outside scripts/api that carries --test and spawns itself, or a launcher that does not clear it"}}
+    met: {date: "2026-10-09", where: "alpha.8 lane, the affected-gate replay", evidence: "a red spec reported PASS by starci test affected --run started inside a node --test process"}
+    rule: {file: scripts/api/node/lib.mjs, anchor: "forChild"}
+    spec: tests/api/node-test-runner-seam.spec.mjs
+    status: covered

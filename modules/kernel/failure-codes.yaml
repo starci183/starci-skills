@@ -17701,3 +17701,13 @@ kernel-launch-dispatch-mismatch:
   nextStep_vi: "Supervisor kiểm tra tín hiệu và Dispatch trên Orca; runtime không nhận cửa sổ của bản ghi lạ."
   owner: supervisor
   kind: runtime-fault
+TEST_SPAWN_OUTSIDE_SEAM:
+  title: "A test runner is started outside the one launcher that clears the enclosing spec run"
+  title_vi: "Một bộ chạy test được khởi động ngoài bộ khởi chạy duy nhất xóa dấu của lần chạy spec bao quanh"
+  meaning_vi: "Một node --test con thừa kế NODE_TEST_CONTEXT tưởng mình là test con của lần chạy bao quanh: nó báo về cha và thoát 0 dù test đỏ, nên một verb chạy spec như tiến trình con (starci test affected, cổng land, release cut) sẽ cho spec đỏ qua khi được gọi từ trong một tiến trình test. Chỉ bộ khởi chạy node của scripts/api/node xóa dấu đó; một tệp ngoài scripts/api mang đối số --test và tự spawn, hoặc một bộ khởi chạy không đi qua forChild, bị từ chối."
+  causes_vi:
+    - "Một tệp mới tự gọi child_process hoặc runProgram với --test thay vì runNode, execNode hoặc spawnNode"
+    - "Một bộ khởi chạy trong scripts/api/node/lib.mjs bỏ lời gọi forChild"
+  nextStep_vi: "Khởi chạy test qua scripts/api/node (runNode, execNode, spawnNode) và giữ forChild trong ba bộ khởi chạy."
+  owner: runtime-core
+  kind: check-finding

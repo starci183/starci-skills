@@ -176,6 +176,7 @@ ruleParams:
       - {id: revision-scope, run: scripts/checks/check-revision-scope.mjs}
       - {id: sonar-rules, run: scripts/checks/check-sonar-rules.mjs}
       - {id: installed-artefacts, run: scripts/checks/check-installed-artefacts.mjs}
+      - {id: test-spawn-seam, run: scripts/checks/check-test-spawn-seam.mjs}
 
 slots:
 
