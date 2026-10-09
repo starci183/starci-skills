@@ -83,7 +83,7 @@ export function openWalk(t, { fixture = walkFixture(), launch = true, seed = nul
   };
 
   /** One engine start: job + workflow controllers (the settler included) with the stubbed Critic. */
-  walk.engine = ({ op, within, critic = 'codex', maker = 'claude', beauty, passes = 1 } = {}) => world.engine({ controllers: ['job', 'workflow'], passes,
+  walk.engine = ({ op, within, critic = 'codex', maker = 'claude', beauty, passes = 1, controllers = ['job'] } = {}) => world.engine({ controllers, passes,
     critic: op ? { tree, op, within: within ?? null, maker, critic, ...(beauty ? { beauty } : {}) } : null });
 
   walk.job = (jobId) => world.ledger((ledger) => ledger.db.prepare('SELECT job_id, op_id, status, try_no FROM jobs WHERE job_id=?').get(jobId));

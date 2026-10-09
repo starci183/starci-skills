@@ -17,7 +17,7 @@ export function enqueueLeg(walk, op) {
   // An op that writes source (<app>/<write-ceiling>) is granted its work-graph node's paths, which the proposal (records only) does not carry: the Kernel takes the escape.
   const proposed = choices.includes('enqueue-proposed') && LEG_PATHS[op].every((p) => p.startsWith('.starciwork'));
   const answered = walk.world.cli('decide', ['--workflow', walk.world.wf, '--item', item.id, '--choice', proposed ? 'enqueue-proposed' : 'enqueue-leg', ...(proposed ? [] : ['--text', paths]), '--reason', 'walk']);
-  const jobId = answered.json?.steps?.flatMap?.((s) => s.result?.job_id ?? []).at?.(0) ?? answered.json?.result?.job_id ?? null;
+  const jobId = answered.json?.steps?.flatMap?.((s) => s.out?.job_id ?? []).at?.(0) ?? null;
   return { via: 'decide', menu: { id: item.id, choices }, ok: answered.status === 0, result: answered, jobId };
 }
 

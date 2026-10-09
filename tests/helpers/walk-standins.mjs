@@ -197,3 +197,13 @@ STANDINS['backend.implement'] = ({ walk, jobId }) => {
   return { report, attach: [read.attach, ...(fs.existsSync(gateOut) ? [gateOut] : [])], steps: { read: read.result }, gate, blocked };
 };
 LEG_PATHS['backend.implement'] = [`${WORK}/features/${FEATURE}/impl/be/account`, 'be/src/modules/domain/account'];
+
+// The paths a correct Kernel grants the legs the walk only probes (a stand-in cannot complete them on this host): the contract's feature families and the app's existing directories.
+LEG_PATHS['interface.draw'] = [`${WORK}/shell`, `${WORK}/features/${FEATURE}/ui`];
+LEG_PATHS['provision.ask'] = [`${WORK}/features/${FEATURE}/evidence`];
+LEG_PATHS['interface.implement'] = [`${WORK}/features/${FEATURE}/impl/fe/web`, 'fe/apps/web/src/app'];
+LEG_PATHS['interface.audit'] = [`${WORK}/features/${FEATURE}/ui`];
+LEG_PATHS['e2e.verify'] = [`${WORK}/features/${FEATURE}/uat`, 'be/src'];
+LEG_PATHS['integration.verify'] = [`${WORK}/features/${FEATURE}/integration`, 'be/src'];
+LEG_PATHS['review.verify'] = [`${WORK}/evidence/review`];
+LEG_PATHS['handover.review'] = [`${WORK}/evidence/wf-walk.handover`];
