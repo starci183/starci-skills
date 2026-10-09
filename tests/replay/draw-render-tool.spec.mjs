@@ -1,8 +1,8 @@
 // Replay of the StarCi stall of 2026-10-09 (registry: draw-render-tool-resolved-from-the-product-only, op-needing-a-host-tool-spends-an-attempt-to-find-it-missing,
-// environment-blocker-gate-names-retry-cap-and-the-digest-misses-it): an interface.draw was dispatched, spent 8M tokens in 66 turns looking for Playwright and
+// environment-blocker-gate-names-retry-cap-and-the-digest-misses-it, draw-source-entry-never-settles): an interface.draw was dispatched, spent 8M tokens in 66 turns looking for Playwright and
 // esbuild in the product (which declares neither), reported blocked environment RENDER_TOOL_UNAVAILABLE, and the failure route opened a supervisor-gate whose recorded
 // workaround cause was `retry-cap` (route fired 0 of 1) while the digest, which matched incidents by job_id, said no incident followed the failed leg.
-// Sequences: (1) the op's own failing command run from the workflow tree - `starci work draw-render` found no Playwright; (2) the dispatch of the queued draw on a host with
+// Sequences: (1) the op's own failing commands run from the workflow tree - `starci work draw-render` found no Playwright, `starci work draw-source` exited 13 (4); (2) the dispatch of the queued draw on a host with
 // no browser downloaded; (3) the failure route over the blocked report under the autopilot, then the digest's facts of the ledger.
 // Real: the CLI as a child process from the tree (Playwright, esbuild and the Chromium of this host), dispatch-ready and its dispatch child, status, the failure route (reconcile
 // --route-failure), the digest's ledger reader. Stubbed: the Orca binary only. A host with no browser is PLAYWRIGHT_BROWSERS_PATH pointing at an empty directory (Playwright's own
@@ -88,4 +88,13 @@ test('3: a blocked environment report under the autopilot opens one supervisor-g
   const gate = facts.incidents.find((incident) => incident.holds.includes(draw.id));
   assert.ok(gate, 'the digest facts carry the jobs a gate holds');
   assert.equal(gate.jobId, null, 'the gate has no job_id of its own: the holds are the link');
+});
+
+test('4: the op\'s second failing command, starci work draw-source, answers from the tree instead of hanging on its own entry (registry: draw-source-entry-never-settles)', (t) => {
+  const world = replayWorld(t, fixture, { tree: true });
+  world.tree.write('Form.draw.tsx', 'export const FormBase = () => null;\n');
+  const r = spawnSync(process.execPath, [STARCI, 'work', 'draw-source', path.join(world.tree.dir, 'Form.draw.tsx'), '--json'], { cwd: world.tree.dir, encoding: 'utf8', windowsHide: true, timeout: 180_000, env: world.env });
+  assert.notEqual(r.status, 13, `the entry module settles (exit 13 is Node's unsettled top-level await): ${String(r.stderr).slice(-300)}`);
+  assert.ok([0, 1].includes(r.status), `the gate answered with a verdict (exit ${r.status}): ${String(r.stderr).slice(-300)}`);
+  assert.equal(typeof JSON.parse(r.stdout).ok, 'boolean', 'and printed it');
 });

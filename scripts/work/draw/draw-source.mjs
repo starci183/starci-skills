@@ -460,5 +460,6 @@ async function main(argv) {
 }
 
 if (isMain(import.meta.url)) {
-  try { process.exitCode = await main(process.argv.slice(2)); } catch (e) { process.stderr.write(`draw-source: ${e?.stack ?? e}\n`); process.exitCode = 2; }
+  // No top-level await: checkDrawSource imports draw-grammar.mjs, which imports this module, so an entry still pending on main() is a dependency that never settles.
+  main(process.argv.slice(2)).then((code) => { process.exitCode = code; }, (e) => { process.stderr.write(`draw-source: ${e?.stack ?? e}\n`); process.exitCode = 2; });
 }

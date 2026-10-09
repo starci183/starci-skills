@@ -1301,3 +1301,12 @@ cases:
     rule: {file: scripts/reconciler/debug-digest-analyze.mjs, anchor: "stepTaken"}
     spec: tests/reconciler/debug-digest-gate-holds.spec.mjs
     status: covered
+  - id: draw-source-entry-never-settles
+    family: correctness
+    found: live
+    replay: tests/replay/draw-render-tool.spec.mjs
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a verb the runtime ships answers) starci work draw-source, the standalone source gate interface.draw's contract runs, exited 13 (Node's unsettled top-level await) on every call: the entry module awaited main() at its top level, main() imports draw-grammar.mjs, and draw-grammar.mjs imports the entry, a dependency that never finishes evaluating while it waits; the op reported it as a second runtime defect", remedy: {state: in-tree, change: "the entry of scripts/work/draw/draw-source.mjs no longer awaits at the top level (main().then): the gate answers 0 or 1 with its verdict"}}
+    met: {date: "2026-10-09", where: "alpha.8 live 15:32 local, StarCi workflow", evidence: "starci runtime.sqlite report 12 of op-interface.draw-b8fb07dca4: check draw-source gate (standalone) exit 13, unsettled top-level await at draw-source.mjs:463"}
+    rule: {file: scripts/work/draw/draw-source.mjs, anchor: "No top-level await"}
+    spec: tests/replay/draw-render-tool.spec.mjs
+    status: covered
