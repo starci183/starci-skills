@@ -22,7 +22,7 @@ const PLAIN_VALUE = /^[\w.-]{4,}$/;
 const GENERIC_SPECS = 25;
 
 /** The generator entry ({output, generator}) of a generated file, or undefined. */
-export const generatorOf = (file, generated) => generated.find((entry) => prefixed(file, entry));
+const generatorOf = (file, generated) => generated.find((entry) => prefixed(file, entry));
 
 /** The key and the value of a yaml line (`- id: x`, `{choice: y, ...}`, `key: v`), or null when it is not a key line. */
 function keyOfLine(line) {

@@ -123,7 +123,7 @@ function planLines(picked) {
 }
 
 /** The receipt a deploy or land gate requires: which files ran for base..tip and how many passed; `clean` = no uncommitted change stood beside the commit. */
-export function receiptOf({ root, base, picked, results, concurrency, startedAt, budgetMs, deps = {} }) {
+function receiptOf({ root, base, picked, results, concurrency, startedAt, budgetMs, deps = {} }) {
   const tip = (deps.revParse ?? revParse)(root, 'HEAD');
   const passed = results.filter((r) => r.pass).length;
   const changedNow = String((deps.diff ?? diff)(['--name-only', 'HEAD'], { cwd: root }).stdout ?? '').trim();
