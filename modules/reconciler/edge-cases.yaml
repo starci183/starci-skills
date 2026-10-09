@@ -1384,7 +1384,7 @@ cases:
     replay: tests/replay/codex-turn-start.spec.mjs
     finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: content is a file, what travels is the reference) the Task spec of a launch was pasted into the agent terminal up to 16000 characters (plus the Orca preamble: a 16831-character paste) and a follow-up prompt up to the card limit (none for codex, claude and cursor, 16384 for devin); a seat launched without a spec file (the Critic, the Supervisor, a worker) pasted its whole prompt whatever its size", remedy: {state: in-tree, change: "every Task spec above 2000 characters is a file and a pointer (task-spec.mjs): the job packet file for an op, the Kernel state file, TASK.md in a Critic placement (removed with it), else <state>/dispatch-prompts/<launch hash>.md swept by the next launch after a day; the agent cards of codex, claude, cursor and devin declare file delivery above 2000 characters for follow-up prompts"}}
     met: {date: "2026-10-09", where: "alpha.8 live, Nivo Kernel start", evidence: "the pasted chip read [Pasted Content 16831 chars]"}
-    rule: {file: scripts/machine/task-spec.mjs, anchor: "TASK_SPEC_MAX_CHARS"}
+    rule: {file: scripts/machine/task-spec.mjs, anchor: "Content is a file; what travels is the reference"}
     spec: tests/agent/prompt-file-delivery.spec.mjs
     status: covered
   - id: dead-agent-terminals-of-failed-launches-uncollected

@@ -19,7 +19,7 @@ import { starciLocalRoot } from '../../engine/runtime-root.mjs';
 import { sha256 } from '../../engine/digest.mjs';
 
 // Content is a file; what travels is the reference. A prompt above this bound is never pasted into an agent's terminal: agent TUIs fold a large
-// paste into a chip ("[Pasted Content N chars]", Codex 0.160) and the Enter that follows may not submit it (turn_start_unobserved, Nivo Kernel
+// paste into a chip ("[Pasted Content N chars]", Codex 0.160) and the Enter that follows may not submit it (turn_start_unobserved, a Kernel start
 // 2026-10-09: a 16831-character paste, 15.9 KB of it the prompt under the old 16000 bound), and the argv of a command line is capped besides.
 // The bound is a few short paragraphs: an instruction line and a pointer always fit.
 export const TASK_SPEC_MAX_CHARS = 2000;
@@ -51,7 +51,7 @@ export function taskSpecOf({ prompt, file, op, jobId, attempt = 1, heading = nul
 }
 
 /** The state-root directory of prompt files no other owner holds (a Supervisor or [Worker] seat, a launch smoke): <state>/dispatch-prompts. */
-export const DISPATCH_PROMPTS_DIR = 'dispatch-prompts';
+const DISPATCH_PROMPTS_DIR = 'dispatch-prompts';
 /** How long a prompt file stays: the launch that wrote it is long attested by then, and the next launch removes it (the writer's own cleanup duty). */
 export const DISPATCH_PROMPT_TTL_MS = 24 * 60 * 60 * 1000;
 

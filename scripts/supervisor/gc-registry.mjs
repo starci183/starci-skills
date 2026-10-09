@@ -99,7 +99,7 @@ export function ledgerView(repo) {
 
 /**
  * The Orca Runs of Kernel launches that failed: no job names them (the launch died before a job existed), so the agents collector never listed their
- * workers and a dead agent TUI such a launch left stayed open and unowned (Nivo 2026-10-09: one dead codex terminal per retry).
+ * workers and a dead agent TUI such a launch left stayed open and unowned (a dead codex terminal per retry, 2026-10-09).
  */
 function failedLaunchRunsOf(db) {
   try {
