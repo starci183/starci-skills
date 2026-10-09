@@ -126,3 +126,10 @@ test('the required READ holds the verb contracts of the seat table only, not the
   for (const runtimeOwned of ['enqueue', 'settle', 'dispatch', 'dispatch-ready', 'graph-edit', 'record-checks']) assert.ok(!contracts.some((rel) => rel.endsWith(`/${runtimeOwned}.yaml`)), runtimeOwned);
   assert.ok(contracts.length < 25);
 });
+
+test('the revision scope names the same verb contracts as the required READ (a Kernel rereads what it reads, no more)', () => {
+  const scope = parseYaml(fs.readFileSync(path.resolve(import.meta.dirname, '..', '..', 'modules', 'kernel', 'revision-scope.yaml'), 'utf8'));
+  const row = scope.paths?.find((entry) => entry.id === 'kernel-cli-seat') ?? scope.rows?.find((entry) => entry.id === 'kernel-cli-seat');
+  assert.ok(row, 'the seat row exists');
+  assert.deepEqual([...row.paths].sort(), KERNEL_CONTRACT_FILES.filter((rel) => rel.startsWith('modules/cli/commands/kernel/')).sort());
+});

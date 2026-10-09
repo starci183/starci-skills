@@ -18,7 +18,9 @@ test('a read manifest over the inline event bound is attested, kept whole in the
   const saved = process.env.STARCI_KERNEL_REV_ROOT;
   process.env.STARCI_KERNEL_REV_ROOT = w.runtime;
   try {
-    for (let i = 0; i < 160; i += 1) w.write(`modules/cli/commands/kernel/extra-${i}.yaml`, `verb: fixture-${i}`);
+    // a leg whose brief cites 160 schema files: the read plan of that leg names every one
+    for (let i = 0; i < 160; i += 1) w.write(`modules/schemas/big-${i}.yaml`, `id: big-${i}`);
+    w.write('modules/ops/ops/review.verify.yaml', Array.from({ length: 160 }, (_, i) => `modules/schemas/big-${i}.yaml`).join(String.fromCodePoint(10)));
     w.git('add', '-A');
     w.git('commit', '-qm', 'a large read plan');
     const required = kernelReadManifest(w.ledger.db, w.workflowId, options(w));

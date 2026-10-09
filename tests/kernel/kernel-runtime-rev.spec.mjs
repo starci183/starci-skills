@@ -10,6 +10,7 @@ import { seedWorkflow } from '../helpers/ledger-fixture.mjs';
 import {
   KERNEL_REV_ACKED_EVENT, KERNEL_REV_STALE, REV_DIFF_MAX_FILES, kernelRevState, opRevDrift, opRevStale, revWakeLine, shortRev,
 } from '../../scripts/kernel/runtime-rev.mjs';
+import { KERNEL_CONTRACT_FILES } from '../../scripts/kernel/required-read.mjs';
 import { wakeKernel } from '../../scripts/kernel/wake-delivery.mjs';
 import { wakePromptOf } from '../../scripts/kernel/kernel-watchdog.mjs';
 import { rowsOfEvent } from '../../scripts/kernel/typed-logs.mjs';
@@ -56,7 +57,9 @@ const runtime = (t) => {
   write(root, 'README.md', 'not kernel relevant\n');
   git(root, 'add', '-A'); git(root, 'commit', '-qm', 'B');
   const B = git(root, 'rev-parse', 'HEAD');
-  for (let i = 0; i <= REV_DIFF_MAX_FILES; i += 1) write(root, `modules/cli/commands/kernel/k${i}.yaml`, `k: ${i}\n`);
+  // the verb contracts a Kernel seat reads are the group file and the verbs of its seat table (required-read.mjs): those are the kernel-relevant files of the verb directory
+  const seatContracts = KERNEL_CONTRACT_FILES.filter((rel) => rel.startsWith('modules/cli/commands/kernel/'));
+  for (let i = 0; i <= REV_DIFF_MAX_FILES; i += 1) write(root, seatContracts[i], `k: ${i}\n`);
   git(root, 'add', '-A'); git(root, 'commit', '-qm', 'C');
   const C = git(root, 'rev-parse', 'HEAD');
   return { root, A, B, C, checkout: (rev) => git(root, 'checkout', '-q', rev) };
