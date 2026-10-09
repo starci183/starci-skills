@@ -1,5 +1,5 @@
 // Two unhappy paths of the walk of the two authentication workflows in one sequence, on a late leg (work.author): the runtime revision changes while the op runs, and the engine restarts
-// between the report and its settle. The report still settles, and the Kernel owes its re-read of the one file it reads, later.
+// between the report and its settle. The admitted report still settles, and the one revision notice owes the Kernel the changed contract at once.
 // Real: status, decide, enqueue, dispatch, report, the engine (three separate processes), its settler and the revision notice. Stubbed: the Orca binary, the Critic agent launch, the op itself.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -13,6 +13,8 @@ test('the report of an op admitted under an older runtime revision settles in a 
   const work = await STANDINS['work.author']({ walk, jobId });
   walk.world.reviseRuntime({ 'docs/notes.md': 'a docs-only revision\n' }, 'docs-only revision');
   walk.world.reviseRuntime({ 'modules/ops/ops/work.author.yaml': 'id: work.author\nrevised: true\n' }, 'revision of the op contract');
+  assert.equal(walk.status().revisionNotice.state, 'owed', 'the notice owes the READ at once while the admitted op stays in flight');
+  assert.equal(walk.job(jobId).status, 'running', 'the revision change preserves the admitted attempt');
   assert.equal(walk.file(jobId, work.report, work.attach).status, 0);
   walk.engine({ controllers: ['workflow'], passes: 1 });
   assert.equal(walk.job(jobId).status, 'reported', 'a workflow-only engine process settles nothing');
@@ -24,5 +26,16 @@ test('the report of an op admitted under an older runtime revision settles in a 
   const status = walk.status();
   assert.equal(status.revisionNotice.state, 'owed');
   assert.deepEqual(status.revisionNotice.files, ['modules/ops/ops/work.author.yaml'], 'only the file the Kernel reads is owed; the docs-only revision costs nothing');
-  assert.ok(status.kernelRev.deferred, 'the re-read is deferred, not forced on a Kernel with work in flight');
+  assert.equal(status.kernelRev, undefined, 'the revision notice is the one authority');
+  const duty = status.menu.find((item) => item.kind === 'rev-ack');
+  assert.ok(duty, 'the Kernel is offered the owed READ attestation after settle');
+  assert.match(duty.options[0].effect, /--plan/);
+  assert.match(duty.options[0].effect, /--digest <readToken>/);
+  const reread = status.nextActions.find((action) => action.kind === 'reread');
+  assert.deepEqual(reread.files, status.revisionNotice.files, 'the next action names the same contract as the notice');
+  walk.ack('work.author');
+  const after = walk.status();
+  assert.ok(['current', 'acked-legacy'].includes(after.revisionNotice.state), after.revisionNotice.state);
+  assert.equal(after.menu.some((item) => item.kind === 'rev-ack'), false, 'one attestation clears the menu duty');
+  assert.equal(after.nextActions.some((action) => action.kind === 'reread'), false, 'the same attestation clears the next action');
 });
