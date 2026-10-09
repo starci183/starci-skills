@@ -9,7 +9,7 @@ import { RESOURCE_RECORDS, recordsOf } from './walk-records.mjs';
 
 export const WORK = '.starciwork';
 const readOp = (root, op) => parseYaml(fs.readFileSync(path.join(root, 'modules', 'ops', 'ops', `${op}.yaml`), 'utf8'));
-const put = (tree, rel, text) => { fs.mkdirSync(path.dirname(path.join(tree, rel)), { recursive: true }); fs.writeFileSync(path.join(tree, rel), text); return rel; };
+export const put = (tree, rel, text) => { fs.mkdirSync(path.dirname(path.join(tree, rel)), { recursive: true }); fs.writeFileSync(path.join(tree, rel), text); return rel; };
 const yamlOf = (lines) => `${lines.join('\n')}\n`;
 
 /** The knowledge files the op's `standard` read cites (the READ digest names them). */
@@ -174,3 +174,26 @@ STANDINS['brand.decide'] = async ({ walk, jobId }) => {
     steps: { ...made.steps, conformance, brandCheck, read: read.result, validate: validate.result } };
 };
 LEG_PATHS['brand.decide'] = [`${WORK}/brand`, `${WORK}/shell`];
+
+const SERVICE = ['import { Injectable } from "@nestjs/common";', '', '@Injectable()', 'export class AccountService {', '  /** True when the pair is a known one. */', '  public isKnownPair(email: string, password: string): boolean {', '    return email.length > 0 && password.length >= 8;', '  }', '}', ''].join(NL);
+const SERVICE_SPEC = ['import { AccountService } from "./account.service";', '', 'describe("AccountService", () => {', '  it("accepts a known pair", () => {', '    expect(new AccountService().isKnownPair("a@b.c", "password1")).toBe(true);', '  });', '});', ''].join(NL);
+
+/**
+ * backend.implement: the module of the planned implementation record, its unit spec, the READ and the gate the contract orders (`starci gate run --root <app> --changed <files> --out gate.json`).
+ * The op reports done only on a green gate (exit 0); a gate that could not run (exit 2: the tree holds no installed toolchain) is reported blocked with the typed kind `environment`.
+ */
+STANDINS['backend.implement'] = ({ walk, jobId }) => {
+  const dir = 'be/src/modules/domain/account';
+  const source = [put(walk.tree, `${dir}/account.service.ts`, SERVICE), put(walk.tree, `${dir}/account.service.spec.ts`, SERVICE_SPEC)];
+  const read = readCheck({ walk, jobId, op: 'backend.implement', touches: source });
+  const gateOut = path.join(scratchOf(walk.world, jobId), 'gate.json');
+  const base = walk.world.tree.baseline;
+  const gate = walk.sh(['gate', 'run', '--root', walk.tree, '--base', base, ...source.flatMap((f) => ['--changed', f]), '--out', gateOut], { jobId });
+  const checks = [read.check, { name: 'starci-gate', command: `starci gate run --root ${walk.tree} --base ${base} ${source.map((f) => `--changed ${f}`).join(' ')} --out ${gateOut}`, exitCode: gate.status ?? 1, phase: 'verify', evidence: 'op gate' }];
+  const blocked = gate.status !== 0;
+  const report = blocked
+    ? envelope('backend.implement', 'The routine gate could not run: the tree holds no installed toolchain.', source, checks, { outcome: 'blocked', blocker: { kind: 'environment', detail: 'starci gate run exited 2: the checker could not run (no installed dependencies in the workflow tree)' } })
+    : envelope('backend.implement', 'The account module and its unit spec are implemented and the gate is green.', source, checks);
+  return { report, attach: [read.attach, ...(fs.existsSync(gateOut) ? [gateOut] : [])], steps: { read: read.result }, gate, blocked };
+};
+LEG_PATHS['backend.implement'] = [`${WORK}/features/${FEATURE}/impl/be/account`, 'be/src/modules/domain/account'];

@@ -14,7 +14,8 @@ export function enqueueLeg(walk, op) {
     return { via: 'enqueue', menu: null, ...direct };
   }
   const choices = (item.options ?? item.choices ?? []).map((o) => o.choice ?? o.id);
-  const proposed = choices.includes('enqueue-proposed');
+  // An op that writes source (<app>/<write-ceiling>) is granted its work-graph node's paths, which the proposal (records only) does not carry: the Kernel takes the escape.
+  const proposed = choices.includes('enqueue-proposed') && LEG_PATHS[op].every((p) => p.startsWith('.starciwork'));
   const answered = walk.world.cli('decide', ['--workflow', walk.world.wf, '--item', item.id, '--choice', proposed ? 'enqueue-proposed' : 'enqueue-leg', ...(proposed ? [] : ['--text', paths]), '--reason', 'walk']);
   const jobId = answered.json?.steps?.flatMap?.((s) => s.result?.job_id ?? []).at?.(0) ?? answered.json?.result?.job_id ?? null;
   return { via: 'decide', menu: { id: item.id, choices }, ok: answered.status === 0, result: answered, jobId };
@@ -32,6 +33,7 @@ export async function walkLeg(walk, op, { within = null } = {}) {
   const dispatched = walk.dispatch();
   if (!note('dispatch', dispatched.json?.results?.[0]?.dispatched === true, dispatched)) return { op, jobId, steps, settled: false };
   const work = await STANDINS[op]({ walk, jobId });
+  if (work.report.outcome !== "done") note("report-outcome", true, work.report.outcome);
   note('work', Object.values(work.steps).every((r) => r.status === 0), Object.fromEntries(Object.entries(work.steps).map(([k, r]) => [k, { status: r.status, out: r.status === 0 ? undefined : (r.json?.refused ?? r.json ?? r.stdout), err: String(r.stderr ?? '').slice(0, 600) }])));
   const filed = walk.file(jobId, work.report, work.attach);
   if (!note('report', filed.status === 0, filed)) return { op, jobId, steps, settled: false };

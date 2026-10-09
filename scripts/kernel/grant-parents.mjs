@@ -65,10 +65,13 @@ function grantParentDetail(violations) {
   return `${violations.length} owned path(s) could never be satisfied: ${shown.join('; ')}. Fix the path to the real directory, or declare a new module with --new-module <repository-relative dir>`;
 }
 
-/** Check the owned paths of a job; {ok:true} or {ok:false, reason, violations, detail}. */
-export function checkGrantParents({ op, payload, ownedPaths, repo, timeoutMs }) {
+/**
+ * Check the owned paths of a job; {ok:true} or {ok:false, reason, violations, detail}. `worktree`: the workflow's own tree, where the legs before this one left their
+ * directories (a checkpoint lands on main only when the workflow finishes), so a directory that exists there satisfies the grant.
+ */
+export function checkGrantParents({ op, payload, ownedPaths, repo, worktree = null, timeoutMs }) {
   const workDir = projectBinding(repo)?.workDir ?? '.starciwork';
-  const placements = ownedPathPlacements({ op, payload, ownedPaths, repo, worktree: null, timeoutMs });
+  const placements = ownedPathPlacements({ op, payload, ownedPaths, repo, worktree, timeoutMs });
   const violations = grantParentViolations({ placements, newModules: newModulesOf(payload), workDir });
   return violations.length ? { ok: false, reason: 'grant-parent-missing', violations, detail: grantParentDetail(violations) } : { ok: true };
 }

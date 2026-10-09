@@ -3,12 +3,14 @@
 // The products come from the same producers the stand-in ops use (tests/helpers/walk-standins.mjs), so a seeded prefix and a walked prefix hold the same records.
 import path from 'node:path';
 import { WALK_OPS, openWalk, walkFixture } from './walk-world.mjs';
-import { GRAPH_V0, produceBrand, produceScope, writeFamilies } from './walk-standins.mjs';
+import { GRAPH_V0, produceBrand, produceScope, put, writeFamilies } from './walk-standins.mjs';
+import { RESOURCE_RECORDS } from './walk-records.mjs';
 
 const PREFIX_PRODUCERS = {
   'scope.define': (walk) => produceScope(walk),
   'business.decide': (walk) => writeFamilies(walk, ['fr', 'br']),
   'architecture.decide': (walk) => writeFamilies(walk, ['sds', 'contract', 'integration']),
+  'work.author': (walk) => [...writeFamilies(walk, ['impl', 'uat']), ...Object.entries(RESOURCE_RECORDS).map(([rel, text]) => put(walk.tree, `.starciwork/${rel}`, text))],
   'brand.decide': async (walk) => (await produceBrand(walk, { scratch: path.join(walk.world.base, 'seed-scratch') })).written,
 };
 export const SEEDABLE = Object.keys(PREFIX_PRODUCERS);
