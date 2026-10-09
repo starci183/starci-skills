@@ -30,8 +30,11 @@ function kernelCauseOf(kind, payload) {
 export function kernelWakeLog(db, workflowId) {
   const kinds = Object.keys(seatCostConfig().kernel.wakes);
   return db.prepare(`SELECT seq, created_at AS at, kind, payload_json FROM events WHERE workflow_id=? AND kind IN (${quoted(kinds)}) ORDER BY created_at, seq`).all(workflowId, ...kinds)
-    .map((row) => ({ seq: Number(row.seq), at: Number(row.at), kind: row.kind, cause: kernelCauseOf(row.kind, parseJsonOr(row.payload_json)) }));
+    .map((row) => ({ seq: Number(row.seq), at: Number(row.at), kind: row.kind, cause: kernelCauseOf(row.kind, parseJsonOr(row.payload_json)), menuItems: parseJsonOr(row.payload_json).menuItems ?? null }));
 }
+
+/** Whether a wake counts toward the rotation by wakes: one typed for an empty menu is the runtime's departure and never rotates the seat (a wake that recorded no menu is counted). */
+export const countsTowardRotation = (wake) => wake.menuItems !== 0;
 
 /** The wakes the runtime withheld because the menu held no item, as [{at, cause}] (event kernel.skipped). */
 export function kernelSkippedLog(db, workflowId) {

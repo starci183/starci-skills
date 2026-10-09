@@ -4,6 +4,7 @@
 import { clipLine } from '../lib/clip.mjs';
 import { stallNotice } from '../kernel/progress-rca.mjs';
 import { shortRev } from '../kernel/runtime-rev.mjs';
+import { noticeOwes } from '../kernel/kernel-notice.mjs';
 import { CRITICAL_SUFFIX } from './sla.mjs';
 import { planSupervisorGates } from './gate-plan.mjs';
 import { planBudgetOverruns } from './budget-plan.mjs';
@@ -92,22 +93,22 @@ function planOrphaned(p) {
 
 /**
  * The runtime rev not acked. Every runtime land makes every running Kernel's rev stale: that is no decision. The
- * Kernel's next wake carries the new rev (scripts/kernel/runtime-rev.mjs revWakeLine), so the plan only asks for a
+ * Kernel's next wake carries the new rev (scripts/kernel/kernel-notice.mjs revisionWakeLine), so the plan only asks for a
  * re-wake (out.rewake, one doorbell per rev); ONE rev-ack DI per workflow (subject 'runtime-rev', whatever the rev)
  * opens only once the ack is overdue past REV_ACK_OVERDUE (s.revAckMs), counted from the first stale read.
  */
 function planRev(p) {
-  const rev = p.status?.kernelRev ?? null;
-  if (rev?.stale !== true) return;
+  const rev = p.status?.revisionNotice ?? null;
+  if (!noticeOwes(rev)) return;
   const { s, now, workflowId } = p;
   const since = p.openClock('REV_ACK_OVERDUE')?.enteredAt ?? now;
   p.clock(p.wfEntity, 'REV_ACK_OVERDUE', s.revAckMs, since);
-  const cur = shortRev(rev.current) ?? 'unknown';
+  const cur = shortRev(rev.to) ?? 'unknown';
   if (now - since < s.revAckMs) {
     p.out.rewake = cur;
     p.out.lines.push(`rev-ack pending ${workflowId}: rev ${cur} rides the Kernel's next wake; a decision only after ${Math.round(s.revAckMs / 60_000)}m`);
-  } else p.di({ kind: 'rev-ack', subject: 'runtime-rev', summary: `runtime rev ${cur} not acked (acked ${shortRev(rev.acked) ?? 'none'}); re-read ${rev.full ? 'kernel-prompt.md and driver-loop.yaml in full' : (rev.files ?? []).slice(0, 6).join(', ')} then starci kernel kernel-ack-rev --workflow ${workflowId} --rev ${cur}`,
-    evidence: [`kernelRev acked ${rev.acked ?? 'none'} current ${rev.current ?? '-'}`, ...(rev.changes ?? []).slice(0, 3).map((c) => (typeof c === 'string' ? c : `change ${c.id ?? ''} ${c.summary ?? ''}`))] });
+  } else p.di({ kind: 'rev-ack', subject: 'runtime-rev', summary: `runtime rev ${cur} not settled (settled ${shortRev(rev.from) ?? 'none'}); re-read ${(rev.files ?? []).slice(0, 6).join(', ')} then starci kernel kernel-ack-rev --workflow ${workflowId} --rev ${cur}`,
+    evidence: [`revisionNotice settled ${rev.from ?? 'none'} current ${rev.to ?? '-'}: ${rev.line ?? ''}`] });
 }
 
 /**

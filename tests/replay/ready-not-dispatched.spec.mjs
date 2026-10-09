@@ -90,7 +90,9 @@ test('j: a fence the re-bind does not cure is rejected after one retry, leaks no
   world.env.STARCI_FAKE_ORCA_START_FENCED = 'always';
   assert.equal(world.ack([retry.op]).status, 0);
   const results = [push(world).results[0], push(world).results[0]];
-  assert.ok(results.every((r) => r.dispatched === false), `the fence stands: ${JSON.stringify(results.map((r) => r.error))}`);
+  assert.equal(results[0].dispatched, false, `the fence stands: ${results[0].error}`);
+  // The refusal is remembered (a refusal backoff, 48ddccaf7): the next push holds the job instead of launching into the same fence again, and says why.
+  assert.deepEqual([results[1].held, results[1].cause, results[1].count], ['refusal-backoff', 'dispatch-rejected', 1], `the second push is held by the backoff: ${JSON.stringify(results[1])}`);
   const rebinds = world.orca().runUses.length;
   assert.ok(rebinds >= 1 && rebinds <= results.length, `at most one re-bind per push, never a loop inside one (${rebinds})`);
   assert.deepEqual(readMachine((m) => m.providerReservations({ activeOnly: true }), [], { env: world.env }), [], 'no reservation is left held by a refused start');

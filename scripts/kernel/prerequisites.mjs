@@ -130,7 +130,7 @@ export function prerequisiteDetail({ op, jobId, unmet }) {
     return `${op} has an unmet prerequisite (${item.kind})`;
   });
   const hostOnly = unmet.every((item) => item.kind === 'host-capability-missing');
-  const next = hostOnly ? 'The host is not ready: raise starci kernel incident --kind tool-unavailable for the Supervisor, which owns the host; dispatch again once it holds the tool.' : 'Produce the missing record or finish the dependency through the op that owns it, then run starci kernel dispatch --job ${jobId} again; if the job binds the wrong record, enqueue a corrected job and settle this one --verdict blocked.';
+  const next = hostOnly ? 'The host is not ready: raise starci kernel incident --kind tool-unavailable for the Supervisor, which owns the host; dispatch again once it holds the tool.' : `Produce the missing record or finish the dependency through the op that owns it, then run starci kernel dispatch --job ${jobId} again; if the job binds the wrong record, enqueue a corrected job and settle this one --verdict blocked.`;
   return `${lines.join('; ')}. ${next} The job stays queued and nothing was reserved or launched.`;
 }
 

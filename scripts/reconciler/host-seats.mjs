@@ -1,5 +1,6 @@
 // host-seats.mjs — Host seat state classification and the hold policy of a Kernel seat.
 import { holdSummary } from '../kernel/start-hold.mjs';
+import { RECOVERY_REFUSAL, recoveryItemOpen } from '../kernel/launch-held-item.mjs';
 
 /** The seat state a watchdog action puts the seat in (DESIGN 9.4). Pure. */
 export function seatStateOf(action) {
@@ -32,6 +33,8 @@ export function seatHold(rec, now, s, rev = null) {
  */
 export async function seatQuarantine(ctx, { key, rec, next, ledgerId, workflowId, action, now, hold = null }, { di }) {
   if (rec.state === 'quarantined') return;
+  // The recovery's own Supervisor item owns a refused launch recovery; the hold still counts it, a second item is not opened.
+  if (hold?.step === RECOVERY_REFUSAL && recoveryItemOpen(ctx.stateDb, workflowId)) return;
   await ctx.openDecision(di({
     kind: 'seat-unrecoverable', ledger: ledgerId, workflowId, entity: { type: 'seat', id: key }, idempotencyKey: `seat-unrecoverable:${key}:${now}`,
     summary: hold ? `${workflowId}: ${holdSummary(hold)}; the Kernel seat is quarantined` : `${workflowId}: the Kernel seat was replaced ${next.restarts.length} times in an hour; quarantined`,

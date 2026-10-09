@@ -7,7 +7,7 @@
 // (modules/reconciler/seat-cost.yaml rotation), through the same start-workflow path as every other replacement. The new seat's first
 // status read is its handover: the menu, and the ledger behind it.
 import { usageTokensSql } from '../lib/usage-sql.mjs';
-import { seatCostConfig, kernelWakeLog } from './seat-wakes.mjs';
+import { seatCostConfig, kernelWakeLog, countsTowardRotation } from './seat-wakes.mjs';
 
 /** The rule of a role: {afterWakes, afterTokens, event}, or null when the role is not rotated. */
 export const rotationRule = (role) => seatCostConfig().rotation?.[role] ?? null;
@@ -38,7 +38,7 @@ export function tokensSinceBoot(db, { subjectType, workflowId = null, bootAt, sk
 export function kernelSinceBoot(db, workflowId) {
   const boots = rotationRule('kernel').bootEvents;
   const bootAt = Number(db.prepare(`SELECT MAX(created_at) AS at FROM events WHERE workflow_id=? AND kind IN (${boots.map(() => '?').join(',')})`).get(workflowId, ...boots)?.at ?? 0);
-  const wakes = kernelWakeLog(db, workflowId).filter((wake) => wake.at >= bootAt).length;
+  const wakes = kernelWakeLog(db, workflowId).filter((wake) => wake.at >= bootAt && countsTowardRotation(wake)).length;
   return { bootAt, wakes, tokens: tokensSinceBoot(db, { subjectType: 'kernel-turn', workflowId, bootAt, skip: 2 }) };
 }
 

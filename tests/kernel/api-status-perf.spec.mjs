@@ -25,7 +25,7 @@ test('starci kernel status runs no git read twice in one call, and a repeat call
   assert.match(fx.A, /^[0-9a-f]{40}$/, 'revision A of the runtime is a full commit sha');
   assert.notEqual(fx.A, fx.B, 'the world holds two revisions of the runtime');
   const cold = fx.status();
-  assert.equal(cold.out.kernelRev.stale, true, 'the fixture is a stale Kernel: runtime-rev diffs A..B');
+  assert.equal(cold.out.revisionNotice.state, 'owed', 'the fixture is a Kernel owing a re-read: the notice diffs A..B');
   assert.deepEqual(cold.out.runningOpRevDrift.map((w) => [w.jobId, w.from, w.to, w.files]),
     [['job-d1', fx.A, fx.B, ['modules/ops/ops/interface.draw.yaml']], ['job-d2', fx.A, fx.B, ['modules/ops/ops/interface.draw.yaml']]]);
   // Each cat-file --batch call has a different revision on stdin, which the spawn tracer cannot display.
@@ -55,7 +55,7 @@ test('starci kernel status output is identical with the memo off, cold and warm'
   assert.ok(cold.git.length > warm.git.length, `and across calls (${cold.git.length} -> ${warm.git.length})`);
   assert.deepEqual(stable(cold.out), stable(off.out));
   assert.deepEqual(stable(warm.out), stable(off.out));
-  assert.deepEqual([off.out.kernelRev.acked, off.out.kernelRev.current, off.out.kernelRev.files], [fx.A, fx.B, ['modules/ops/ops/interface.draw.yaml']]);
+  assert.deepEqual([off.out.revisionNotice.from, off.out.revisionNotice.to, off.out.revisionNotice.files], [fx.A, fx.B, ['modules/ops/ops/interface.draw.yaml']]);
   assert.equal(off.out.nextActions[0].kind, 'reread');
 });
 
@@ -78,10 +78,10 @@ test('the memo follows HEAD, and a revision git did not know is asked again, nev
   const D = git(clone, 'rev-parse', 'HEAD');
   fx.seed((l) => l.transaction(() => l.appendEvent({ workflowId: fx.wf, entityType: 'kernel', entityId: fx.wf, kind: KERNEL_REV_ACKED_EVENT, payload: { rev: D, files: [], source: 'ack' } })));
   const unknown = fx.status();
-  assert.deepEqual([unknown.out.kernelRev.acked, unknown.out.kernelRev.unknownDiff], [D, true]);
+  assert.deepEqual([unknown.out.revisionNotice.from, unknown.out.revisionNotice.state, unknown.out.revisionNotice.replaceFiles], [D, 'replace-due', []]);
   git(fx.rt, 'fetch', '-q', clone, 'HEAD');
   const known = fx.status();
-  assert.equal(known.out.kernelRev.unknownDiff, undefined, 'the failed resolve was not remembered');
+  assert.ok(known.out.revisionNotice.replaceFiles.length > 0, 'the failed resolve was not remembered: the diff now names its files');
   // D is B's child (the clone was taken at B): D..B is D's driver-loop edit alone.
-  assert.deepEqual([known.out.kernelRev.stale, known.out.kernelRev.files], [true, ['modules/kernel/driver-loop.yaml']]);
+  assert.deepEqual([known.out.revisionNotice.state, known.out.revisionNotice.replaceFiles], ['replace-due', ['modules/kernel/driver-loop.yaml']]);
 });

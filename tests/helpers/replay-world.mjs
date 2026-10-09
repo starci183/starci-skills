@@ -189,7 +189,7 @@ function seedLedger(ledgerFile, fixture, at, revs, bind, admit) {
  * Builds the world of `fixture` and registers its cleanup on `t`. Options: `tree` (a real workflow tree: a git repository registered as the workflow worktree)
  * and `seed(ledger, ctx)` for rows a case needs beyond the fixture vocabulary (called on an open ledger).
  */
-export function replayWorld(t, fixture, { tree = false, seed = null, bindKernel = true, admit = null, launch = false } = {}) {
+export function replayWorld(t, fixture, { tree = false, seed = null, bindKernel = true, admit = null, launch = false, linkedTree = false } = {}) {
   const base = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'starci-replay-')));
   t.after(() => { rm(base); for (const name of SCRATCH_DIRS) rm(path.join(os.tmpdir(), name)); });
   const repo = path.join(base, 'product');
@@ -222,11 +222,20 @@ export function replayWorld(t, fixture, { tree = false, seed = null, bindKernel 
   const world = { base, repo, runtime, env, machineFile, ledgerFile, wf, revs, now, at, tree: null, fixture, stubbed: STUBBED };
   if (tree) {
     const dir = path.join(base, 'tree');
-    gitInit(dir);
-    write(dir, '.gitignore', 'node_modules/\n');
-    commit(dir, 'chore(app): establish canonical hfs app baseline');
     const branch = `wf-${wf}`;
-    git(dir, 'checkout', '-q', '-b', branch);
+    if (linkedTree) {
+      // The workflow worktree of a real host is a LINKED worktree of the repository's main checkout (the primary checkout is the owner's: a Kernel start never installs in it).
+      const main = path.join(base, 'tree-main');
+      gitInit(main);
+      write(main, '.gitignore', 'node_modules/\n');
+      commit(main, 'chore(app): establish canonical hfs app baseline');
+      git(main, 'worktree', 'add', '-q', '-b', branch, dir);
+    } else {
+      gitInit(dir);
+      write(dir, '.gitignore', 'node_modules/\n');
+      commit(dir, 'chore(app): establish canonical hfs app baseline');
+      git(dir, 'checkout', '-q', '-b', branch);
+    }
     registerWorkflowWorktree({ env }, { workflowId: wf, orcaWorktreeId: `replay::${wf}`, path: dir, branch });
     const baseline = git(dir, 'rev-parse', 'HEAD');
     // The settled ops before this one: a chain of `checkpoint <workflow>: ...` commits on the branch (the registry record carries no pointer to them).
@@ -245,7 +254,7 @@ export function replayWorld(t, fixture, { tree = false, seed = null, bindKernel 
     world.tree = { dir, branch, baseline, checkpoints, records, git: (...args) => git(dir, ...args), write: (rel, text) => write(dir, rel, text), commit: (message) => commit(dir, message) };
   }
   // `launch`: the owner's launch trust is adopted for the world's roots and the Devin quota seat answers from loopback (a dispatch then reaches the Orca stub's worker-start).
-  if (launch) Object.assign(env, fakeDevinQuotaEnv(t, path.join(base, 'appdata')), adoptLaunchTrust(base, { roots: [repo, world.tree?.dir, base].filter(Boolean), ref: 'replay world adoption' }), { STARCI_SLEEP_SCALE: '0.02', STARCI_FAKE_ORCA_MODE: 'healthy' });
+  if (launch) Object.assign(env, fakeDevinQuotaEnv(t, path.join(base, 'appdata')), adoptLaunchTrust(base, { roots: [repo, world.tree?.dir, linkedTree ? path.join(base, 'tree-main') : null, base].filter(Boolean), ref: 'replay world adoption' }), { STARCI_SLEEP_SCALE: '0.02', STARCI_FAKE_ORCA_MODE: 'healthy' });
   seedLedger(ledgerFile, fixture, at, revs, bindKernel ? (ledger, id) => { kernelEnv = bindCurrentKernel(ledger, id); } : null, admit ? (ledger, job) => admit(world, ledger, job) : null);
   if (fixture.tree?.prepared) { const ledger = openLedger({ file: ledgerFile }); try { seedPrepared(ledger, world); } finally { ledger.close(); } }
   if (seed) { const ledger = openLedger({ file: ledgerFile }); try { seed(ledger, world); } finally { ledger.close(); } }
@@ -297,8 +306,8 @@ export function replayWorld(t, fixture, { tree = false, seed = null, bindKernel 
    * The real reconciler Engine over this world for `passes` passes in a fresh process (an engine restart per call): {ok, passes: [{controllers: [...]}], ...}.
    * `controllers` names the controllers run active (default job, workflow); `critic` configures the stubbed Critic launch ({mode, verdict} for fake-critic-orca); `unbound` runs the engine as the live one runs, with no Kernel identity in its environment (the default keeps the bound Kernel's).
    */
-  world.engine = ({ controllers = ['job', 'workflow'], passes = 1, critic = null, timeout = 300_000, unbound = false } = {}) => {
-    const spec = { repo, ledgerFile, controllers, passes, critic, ledgerId: path.basename(repo), env: { STARCI_ORCA_COMMAND: env.STARCI_ORCA_COMMAND } };
+  world.engine = ({ controllers = ['job', 'workflow'], passes = 1, critic = null, foregroundPush = false, timeout = 300_000, unbound = false } = {}) => {
+    const spec = { repo, ledgerFile, controllers, passes, critic, foregroundPush, ledgerId: path.basename(repo), env: { STARCI_ORCA_COMMAND: env.STARCI_ORCA_COMMAND } };
     const r = spawnSync(process.execPath, [DRIVER, JSON.stringify(spec)], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout, env: { ...env, ...(unbound ? {} : kernelEnv) } });
     const out = lastJson(r.stdout);
     assert.ok(out, `engine driver gave no JSON (exit ${r.status}): ${String(r.stderr).slice(-1500)}`);

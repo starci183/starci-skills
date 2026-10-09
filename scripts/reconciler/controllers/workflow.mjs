@@ -3,7 +3,7 @@
 // modules/reconciler/workflow.yaml. Engine contract: LANES.md "Shared contract" (lane rc-engine discovers this file).
 //
 // One key per running workflow, `workflow:<ledgerId>:<workflowId>`. Each pass reads ONE projection - the cached
-// `starci kernel status --json` (ctx.status: progress, rca, frontier, stuck[], kernelRev) and scripts/supervisor/stall.mjs
+// `starci kernel status --json` (ctx.status: progress, rca, frontier, stuck[], revisionNotice) and scripts/supervisor/stall.mjs
 // stallFindings over a read-only handle, its frontierOf answered from that same cached status - and from it:
 //   - keeps the SLA clocks of the workflow (stalled, orphaned, rev-ack, goal text, one per stuck[] wait);
 //   - opens one Decision Item per finding for the Kernel (progress-stall, stale-gate, stale-wait, stale-peer-wait,

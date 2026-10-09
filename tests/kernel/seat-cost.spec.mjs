@@ -86,7 +86,7 @@ test('the digest names the runtime, not the seat, for a seat woken with an empty
   const job = { jobId: `kernel-${WF}`, kind: 'kernel', opId: null, status: 'running', tryNo: 1, retryOf: null, workerId: 'w', deadline: null, createdAt: T0 - MIN, updatedAt: T0 - MIN };
   const workflow = { id: WF, name: 'Cost', ledger: 'cost', repo: 'work/cost', phase: 'running', jobs: [job], incidents: [], decisions: [], kernelJob: { status: 'running', updatedAt: T0 }, kernelSignal: { terminal: 'term_k' },
     lastKernelWakeAt: T0 - MIN, statusError: null, seatProbe: { action: 'idle-waiting' }, kernelWakes: [], seatCost,
-    status: { frontier: { state: 'idle', openOperations: 0, readyOperations: 0, queued: [] }, legs: [], awaitingOwner: [], menu: [], kernelRev: { current: 'a', acked: 'a', stale: false, fileCount: 0 }, usage: { byOp: [] } } };
+    status: { frontier: { state: 'idle', openOperations: 0, readyOperations: 0, queued: [] }, legs: [], awaitingOwner: [], menu: [], revisionNotice: { role: 'kernel', state: 'current', from: 'a', to: 'a', count: 0, files: [], line: 'kernel acked rev a' }, usage: { byOp: [] } } };
   const digest = analyze({ now: T0, liveRev: 'a', engine: { leader: { pid: 1, epoch: 1, heartbeatAt: T0, rev: 'a' }, modes: {}, configured: {}, safe: [], failingQueue: [] },
     supervisor: { seat: null, enabled: false, lastWakeAt: null, decisions: [], health: { live: true } }, reservations: [], seats: [], supJobs: [], workflows: [workflow] }, policy, digestNumbers());
   const problem = digest.problems.find((p) => p.code === 'seat-empty-wakes');
@@ -149,14 +149,14 @@ test('a bound seat reads its menu, bounded, on a ledger with a hundred open item
   const bounds = seatCostConfig().statusBounds;
   const menu = Array.from({ length: 100 }, (_, i) => ({ id: `item-${i}`, mode: 'decide', step: 's', question: `question ${i} ${'q'.repeat(400)}`, options: [{ choice: 'a', effect: 'e'.repeat(300) }, { choice: 'b', effect: 'f' }] }));
   const s = { title: 'T', workflowId: WF, actionable: true, frontierState: 'next-ready', byStatus: { queued: 100 }, workers: [], failures: { failed: 0, awaitingOwner: 0 }, leases: [], inboxPending: 0, reports: [], unconsumedReports: 0,
-    menu, kernelRev: { stale: true, acked: 'a', current: 'b', fileCount: 3 }, frontier: { reason: null } };
+    menu, revisionNotice: { role: 'kernel', state: 'owed', from: 'a', to: 'b', count: 3, files: [], line: 'kernel owes 3 file(s) of rev b' }, frontier: { reason: null } };
   const text = seatStatusText(s, { phase: 'running' });
   assert.ok(text.length <= bounds.kernelTextChars, `${text.length} chars against ${bounds.kernelTextChars}`);
   assert.match(text, /^.*phase=running frontier=next-ready ACTIONABLE/);
   assert.match(text, /Decide \(100\)/);
   assert.ok((text.match(/question \d+/g) ?? []).length <= bounds.kernelMenuItems);
   assert.match(text, /starci kernel status --full/);
-  const waiting = seatStatusText({ ...s, menu: [], actionable: false, kernelRev: { stale: false }, frontier: { reason: 'peer-wait on x' } }, { phase: 'running' });
+  const waiting = seatStatusText({ ...s, menu: [], actionable: false, revisionNotice: null, frontier: { reason: 'peer-wait on x' } }, { phase: 'running' });
   assert.match(waiting, /reason: peer-wait on x/);
   const lines = supervisorMenuLines(menu.map((item) => ({ ...item, kind: 'k' })));
   assert.ok(lines.join('\n').length <= bounds.supervisorTextChars + 1500, 'the capped Supervisor menu is a few items, not a hundred');

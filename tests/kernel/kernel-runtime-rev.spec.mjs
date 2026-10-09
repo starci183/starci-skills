@@ -1,4 +1,4 @@
-import test from 'node:test';
+import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -8,8 +8,11 @@ import { FAKE_ORCA } from '../helpers/fake-orca.mjs';
 import { inspectLedger, ledgerFileFor, openLedger } from '../../engine/db/ledger.mjs';
 import { seedWorkflow } from '../helpers/ledger-fixture.mjs';
 import {
-  KERNEL_REV_ACKED_EVENT, KERNEL_REV_STALE, REV_DIFF_MAX_FILES, kernelRevState, opRevDrift, opRevStale, revWakeLine, shortRev,
+  KERNEL_REV_ACKED_EVENT, KERNEL_REV_STALE, opRevDrift, opRevHold, shortRev,
 } from '../../scripts/kernel/runtime-rev.mjs';
+import { kernelNoticeOf, noticeOwes, revisionWakeLine } from '../../scripts/kernel/kernel-notice.mjs';
+import { recordWoken } from '../../scripts/machine/revision-ack.mjs';
+import { kernelSeat } from '../../scripts/machine/revision-seats.mjs';
 import { KERNEL_CONTRACT_FILES } from '../../scripts/kernel/required-read.mjs';
 import { wakeKernel } from '../../scripts/kernel/wake-delivery.mjs';
 import { wakePromptOf } from '../../scripts/kernel/kernel-watchdog.mjs';
@@ -22,6 +25,8 @@ import { INSTALL_MANIFEST_FILE, INSTALL_PROTOCOL_SCHEMA, installedPayloadDigest 
 // rev is behind, what to re-read; enqueue/dispatch of a leg whose op contract changed waits for the ack.
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const API = path.join(ROOT, 'scripts', 'kernel', 'cli.mjs');
+// The plan of kernel-ack-rev writes its read bundle under the Kernel's scratch in the temp root; the spec removes what its CLI runs wrote.
+after(() => fs.rmSync(path.join(os.tmpdir(), 'starci-kernel-scratch'), { recursive: true, force: true }));
 const json = (text) => { try { return JSON.parse(text); } catch { return null; } };
 const lastJson = (text) => json(String(text ?? '').trim()) ?? String(text ?? '').trim().split(/\r?\n/).reverse().map(json).find(Boolean) ?? null;
 
@@ -32,7 +37,7 @@ const git = (cwd, ...args) => {
 };
 const write = (root, rel, text) => { fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true }); fs.writeFileSync(path.join(root, rel), text); };
 
-// A runtime root with three revisions: A (base), B (the draw brief and a knowledge file), C (more than REV_DIFF_MAX_FILES kernel-relevant files).
+// A runtime root with three revisions: A (base), B (the draw brief and a knowledge file: a re-read), C (a line of the Kernel's driver loop modified and every seat verb contract rewritten: a replacement).
 const runtime = (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-runtime-rev-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
@@ -42,6 +47,7 @@ const runtime = (t) => {
   write(root, 'modules/kernel/driver-loop.yaml', 'loop: 1\n');
   write(root, 'modules/kernel/verdict-contract.yaml', 'v: 1\n');
   write(root, 'modules/kernel/api.yaml', 'schema: fixture\n');
+  write(root, 'modules/kernel/revision-scope.yaml', fs.readFileSync(path.join(ROOT, 'modules', 'kernel', 'revision-scope.yaml'), 'utf8'));
   write(root, 'modules/kernel/owner-rulings.yaml', 'rulings: []\n');
   write(root, 'modules/cli/commands/kernel/status.yaml', 'verb: status\n');
   write(root, 'modules/ops/_common.yaml', 'c: 1\n');
@@ -52,14 +58,14 @@ const runtime = (t) => {
   git(root, 'add', '-A'); git(root, 'commit', '-qm', 'A');
   const A = git(root, 'rev-parse', 'HEAD');
   write(root, 'modules/ops/ops/interface.draw.yaml', 'id: interface.draw\nnew: rule\n');
-  write(root, 'modules/kernel/driver-loop.yaml', 'loop: 2\n');
   write(root, 'knowledge/ui/rule.yaml', 'rule: 1\n');
   write(root, 'README.md', 'not kernel relevant\n');
   git(root, 'add', '-A'); git(root, 'commit', '-qm', 'B');
   const B = git(root, 'rev-parse', 'HEAD');
   // the verb contracts a Kernel seat reads are the group file and the verbs of its seat table (required-read.mjs): those are the kernel-relevant files of the verb directory
   const seatContracts = KERNEL_CONTRACT_FILES.filter((rel) => rel.startsWith('modules/cli/commands/kernel/'));
-  for (let i = 0; i <= REV_DIFF_MAX_FILES; i += 1) write(root, seatContracts[i], `k: ${i}\n`);
+  write(root, 'modules/kernel/driver-loop.yaml', 'loop: 2\n');
+  for (let i = 0; i < seatContracts.length; i += 1) write(root, seatContracts[i], `k: ${i}\n`);
   git(root, 'add', '-A'); git(root, 'commit', '-qm', 'C');
   const C = git(root, 'rev-parse', 'HEAD');
   return { root, A, B, C, checkout: (rev) => git(root, 'checkout', '-q', rev) };
@@ -75,56 +81,52 @@ const ledgerFixture = (t) => {
   return { l, db: l.db, wf, ack };
 };
 
-test('an acked rev behind HEAD is stale: the wake names the rev, the actual changed kernel files and complete READ route', (t) => {
+test('an acked rev behind HEAD: the notice owes the files the table names, the wake carries exactly them, and the gate holds only the op whose contract moved', (t) => {
   const rt = runtime(t); rt.checkout(rt.B);
   const { db, wf, ack } = ledgerFixture(t);
   ack(rt.A, 'boot');
-  const state = kernelRevState(db, wf, { root: rt.root, ops: ['interface.draw'] });
-  assert.deepEqual([state.current, state.acked, state.ackSource, state.stale, state.full ?? false], [rt.B, rt.A, 'boot', true, false]);
-  assert.deepEqual(state.files, ['modules/kernel/driver-loop.yaml', 'modules/ops/ops/interface.draw.yaml'], 'README.md and knowledge are not this Kernel\'s contract');
-  const line = revWakeLine(state, wf);
-  assert.ok(line.startsWith(`Runtime rev ${shortRev(rt.B)}: your acknowledged rev is ${shortRev(rt.A)}; re-read modules/kernel/driver-loop.yaml and modules/ops/ops/interface.draw.yaml`), line);
-  assert.match(line, new RegExp(`starci kernel kernel-ack-rev --workflow ${wf} --plan`));
-  assert.match(line,new RegExp(`--rev ${rt.B} --digest <readToken>`));
+  const notice = kernelNoticeOf(db, wf, { root: rt.root });
+  assert.deepEqual([notice.to, notice.from, notice.state], [rt.B, rt.A, 'owed']);
+  assert.ok(notice.files.includes('modules/ops/ops/interface.draw.yaml'), 'the op brief is the Kernel\'s contract (modules/kernel/revision-scope.yaml)');
+  assert.ok(!notice.files.includes('README.md'), 'README.md is not');
+  const line = revisionWakeLine(notice, wf, { root: rt.root });
+  assert.ok(line.startsWith(`Runtime rev ${shortRev(rt.B)} changed ${notice.files.length} file(s) of your contract (`), line);
+  assert.match(line, new RegExp(`starci kernel revision-ack --workflow ${wf} --plan`));
+  assert.match(line, /--rev <sha> --digest <readToken>/);
   assert.doesNotMatch(line, /\n/, 'one line: a newline would submit half a wake');
 
-  // The gate holds only the legs whose op contract moved.
-  assert.deepEqual(opRevStale(state, 'interface.draw', { root: rt.root }), { files: ['modules/ops/ops/interface.draw.yaml'] });
-  assert.equal(opRevStale(state, 'code.refactor', { root: rt.root }), null, 'other legs are unaffected');
+  // The gate holds only the legs whose op contract moved, from the same ack event.
+  assert.deepEqual(opRevHold(db, wf, 'interface.draw', { root: rt.root }), { acked: rt.A, current: rt.B, files: ['modules/ops/ops/interface.draw.yaml'] });
+  assert.equal(opRevHold(db, wf, 'code.refactor', { root: rt.root }), null, 'other legs are unaffected');
 
-  // The ack clears it.
+  // The ack settles the notice and lifts the gate: one answer everywhere.
   ack(rt.B);
-  const acked = kernelRevState(db, wf, { root: rt.root });
-  assert.deepEqual([acked.acked, acked.stale, acked.files], [rt.B, false, []]);
-  assert.equal(opRevStale(acked, 'interface.draw', { root: rt.root }), null);
-  assert.equal(revWakeLine(acked, wf), `Runtime rev ${shortRev(rt.B)}.`);
+  const settled = kernelNoticeOf(db, wf, { root: rt.root });
+  assert.ok(['current', 'acked-legacy'].includes(settled.state), settled.state);
+  assert.equal(noticeOwes(settled), false);
+  assert.equal(opRevHold(db, wf, 'interface.draw', { root: rt.root }), null);
+  assert.equal(revisionWakeLine(settled, wf, { root: rt.root }), `Runtime rev ${shortRev(rt.B)}.`);
 });
-
-test('past the file cap or for an unknown revision, the wake offers the complete READ route; an unacked state has no diff gate', (t) => {
+test('a rule of the Kernel contract changed is a replacement, not a re-read: the wake carries the revision only; a never-acked Kernel passes the gate, an unknown acked rev holds every leg', (t) => {
   const rt = runtime(t); rt.checkout(rt.C);
   const { db, wf, ack } = ledgerFixture(t);
-  const unacked = kernelRevState(db, wf, { root: rt.root });
-  assert.deepEqual([unacked.unacked, unacked.stale], [true, false]);
-  const unackedLine = revWakeLine(unacked, wf);
-  assert.ok(unackedLine.startsWith(`Runtime rev ${shortRev(rt.C)}: no complete runtime READ is acknowledged; re-read modules/kernel/kernel-prompt.md and modules/kernel/driver-loop.yaml`), unackedLine);
-  assert.ok(unackedLine.includes(`starci kernel kernel-ack-rev --workflow ${wf} --plan; read every returned path, then attest with --rev ${rt.C} --digest <readToken>`), unackedLine);
-  assert.equal(opRevStale(unacked, 'interface.draw', { root: rt.root }), null);
+  const unacked = kernelNoticeOf(db, wf, { root: rt.root });
+  assert.equal(unacked.state, 'no-baseline', 'a Kernel with no settled revision has nothing owed yet: the runtime adopts the baseline');
+  assert.equal(noticeOwes(unacked), false);
+  assert.equal(revisionWakeLine(unacked, wf, { root: rt.root }), `Runtime rev ${shortRev(rt.C)}.`);
+  assert.equal(opRevHold(db, wf, 'interface.draw', { root: rt.root }), null);
 
   ack(rt.A);
-  const full = kernelRevState(db, wf, { root: rt.root });
-  assert.deepEqual([full.stale, full.full, full.files.length, full.fileCount], [true, true, REV_DIFF_MAX_FILES, REV_DIFF_MAX_FILES + 2]);
-  const fullLine = revWakeLine(full, wf);
-  assert.match(fullLine, /re-read modules\/kernel\/kernel-prompt\.md and modules\/kernel\/driver-loop\.yaml, then starci kernel kernel-ack-rev/);
-  assert.ok(fullLine.includes(`--workflow ${wf} --plan; read every returned path, then attest with --rev ${rt.C} --digest <readToken>`), fullLine);
-  assert.ok(opRevStale(full, 'interface.draw', { root: rt.root }), 'the gate reads every changed file, not the capped list');
-  assert.equal(opRevStale(full, 'code.refactor', { root: rt.root }), null);
+  const replaced = kernelNoticeOf(db, wf, { root: rt.root });
+  assert.equal(replaced.state, 'replace-due', 'a line of an existing contract file was modified: the seat is replaced at its next yield');
+  assert.equal(noticeOwes(replaced), false, 'the Kernel owes no re-read for a replacement');
+  assert.equal(revisionWakeLine(replaced, wf, { root: rt.root }), `Runtime rev ${shortRev(rt.C)}.`);
+  assert.equal(opRevHold(db, wf, 'code.refactor', { root: rt.root }), null, 'the gate reads the op contract only');
 
   ack('0123456789abcdef0123456789abcdef01234567');
-  const unknown = kernelRevState(db, wf, { root: rt.root });
-  assert.deepEqual([unknown.stale, unknown.full, unknown.unknownDiff], [true, true, true]);
-  assert.ok(opRevStale(unknown, 'code.refactor', { root: rt.root }), 'an unknown acked rev holds every leg');
+  const hold = opRevHold(db, wf, 'code.refactor', { root: rt.root });
+  assert.ok(hold?.unknown, 'an unknown acked rev holds every leg');
 });
-
 test('every Kernel wake carries the runtime rev before its seat identity: wakeKernel and the watchdog liveness wake', (t) => {
   const rt = runtime(t); rt.checkout(rt.B);
   const { l, db, wf, ack } = ledgerFixture(t);
@@ -144,18 +146,17 @@ test('every Kernel wake carries the runtime rev before its seat identity: wakeKe
   wakeKernel({ db, workflowId: wf, text: 'Durable transition wake for workflow wf-rev: report-filed.', deps });
   assert.ok(sends.length >= 1 && sends[0].text, 'the wake was typed');
   const text = sends[0].text;
-  const state = kernelRevState(db, wf, { root: rt.root });
-  const revLine = revWakeLine(state, wf);
+  const notice = kernelNoticeOf(db, wf, { root: rt.root });
+  const revLine = revisionWakeLine(notice, wf, { root: rt.root });
   assert.ok(text.startsWith(`Durable transition wake for workflow wf-rev: report-filed. ${revLine} `), text);
   assert.match(text, /Runtime wake for Kernel attempt 2 of wf-rev: starci kernel status --workflow wf-rev shows kernel\.attempt 2 and kernel\.you true on your terminal\.$/, 'the seat identity still ends the wake');
 
-  // The watchdog builds its wake from one starci kernel status read.
-  const prompt = wakePromptOf(wf, { kernel: { attempt: 2 }, kernelRev: JSON.parse(JSON.stringify(state)) });
+  // The watchdog builds its wake from one starci kernel status read: the same sentence from the same field.
+  const prompt = wakePromptOf(wf, { kernel: { attempt: 2 }, revisionNotice: JSON.parse(JSON.stringify(notice)) });
   assert.ok(prompt.includes(revLine), prompt);
   assert.match(prompt, /Runtime wake for Kernel attempt 2 of wf-rev: .*your terminal\.$/);
-  assert.doesNotMatch(wakePromptOf(wf, { kernel: null, kernelRev: state }), /Runtime rev/, 'no seat, no rev line');
+  assert.doesNotMatch(wakePromptOf(wf, { kernel: { attempt: 2 }, revisionNotice: null }), /Runtime rev/, 'no known revision, no rev line');
 });
-
 test('op-rev-drift: the op contract files that moved after dispatch, and its typed log warning', (t) => {
   const rt = runtime(t);
   assert.deepEqual(opRevDrift(rt.root, 'interface.draw', rt.A, rt.B), { from: rt.A, to: rt.B, files: ['modules/ops/ops/interface.draw.yaml'] });
@@ -198,12 +199,13 @@ const apiFixture = (t, rt) => {
   return { repo, wf, api, ok, seed, read, readAck, manifestFile };
 };
 
-test('api: a stale Kernel is refused kernel-rev-stale for the changed op only, status shows kernelRev and a reread step, kernel-ack-rev clears it', (t) => {
+test('api: a Kernel owing a re-read is refused kernel-rev-stale for the changed op only, status shows revisionNotice and a reread step, kernel-ack-rev clears it', (t) => {
   const rt = runtime(t); rt.checkout(rt.B);
   const fx = apiFixture(t, rt);
-  // Never acked: nothing is gated, status says so.
+  // Never acked: nothing is owed or gated, status says so, and there is no second revision field.
   const fresh = fx.ok(['status', '--workflow', fx.wf]);
-  assert.deepEqual([fresh.kernelRev.current, fresh.kernelRev.acked, fresh.kernelRev.unacked, fresh.kernelRev.stale], [rt.B, null, true, false]);
+  assert.deepEqual([fresh.revisionNotice.to, fresh.revisionNotice.state], [rt.B, 'no-baseline']);
+  assert.equal(fresh.kernelRev, undefined);
   assert.notEqual(fresh.nextActions[0]?.kind, 'reread');
 
   rt.checkout(rt.A);
@@ -215,12 +217,13 @@ test('api: a stale Kernel is refused kernel-rev-stale for the changed op only, s
   assert.equal(lastJson(unknown.stderr)?.code, 'kernel-rev-unknown');
 
   const status = fx.ok(['status', '--workflow', fx.wf]);
-  assert.deepEqual([status.kernelRev.acked, status.kernelRev.stale], [rt.A, true]);
-  assert.deepEqual(status.kernelRev.files, ['modules/kernel/driver-loop.yaml'], 'no interface.draw leg yet: only the Kernel contract file asks for the re-read');
+  assert.deepEqual([status.revisionNotice.from, status.revisionNotice.to, noticeOwes(status.revisionNotice)], [rt.A, rt.B, true]);
+  assert.ok(status.revisionNotice.files.includes('modules/ops/ops/interface.draw.yaml'));
   assert.equal(status.nextActions[0].kind, 'reread');
   assert.match(status.nextActions[0].reason, new RegExp(`starci kernel kernel-ack-rev --workflow ${fx.wf} --plan`));
   assert.match(status.nextActions[0].reason, new RegExp(`--rev ${rt.B} --digest <readToken>`));
-  assert.equal(status.frontier.actionable, true, 'a stale Kernel has work: the re-read');
+  assert.equal(status.frontier.actionable, true, 'a Kernel that owes a re-read has work: the re-read');
+  assert.ok(status.menu.some((item) => item.kind === 'rev-ack'), 'and the menu says so once');
 
   const refused = fx.api(['enqueue', '--workflow', fx.wf, '--op', 'interface.draw', '--paths', 'docs/draw']);
   assert.equal(refused.status, 1, refused.stdout);
@@ -240,13 +243,12 @@ test('api: a stale Kernel is refused kernel-rev-stale for the changed op only, s
   const current = fx.readAck(rt.B);
   assert.equal(current.rev,rt.B);
   const after = fx.ok(['status', '--workflow', fx.wf]);
-  assert.deepEqual([after.kernelRev.acked, after.kernelRev.stale], [rt.B, false]);
+  assert.equal(noticeOwes(after.revisionNotice), false);
   assert.notEqual(after.nextActions[0]?.kind, 'reread');
   const enq = fx.api(['enqueue', '--workflow', fx.wf, '--op', 'interface.draw', '--paths', 'docs/draw2']);
   assert.notEqual(lastJson(enq.stderr)?.code, KERNEL_REV_STALE, 'the ack lifts the gate');
   assert.deepEqual(fx.read((db) => db.prepare('SELECT json_extract(payload_json,\'$.source\') s FROM events WHERE workflow_id=? AND kind=? ORDER BY seq').all(fx.wf, KERNEL_REV_ACKED_EVENT).map((r) => r.s)), ['ack', 'ack']);
 });
-
 test('starci kernel settle WARNs op-rev-drift when the op contract changed after dispatch; status lists it', (t) => {
   const rt = runtime(t); rt.checkout(rt.B);
   const fx = apiFixture(t, rt);
@@ -269,45 +271,42 @@ test('starci kernel settle WARNs op-rev-drift when the op contract changed after
   assert.deepEqual(status.opRevDrift.map((w) => [w.jobId, w.op, w.from, w.to]), [['job-d', 'interface.draw', rt.A, rt.B]]);
 });
 
-test('runtime churn: a land outside the Kernel contract is silent; an op-contract-only land is coalesced for 30 min after the last ack', (t) => {
+test('runtime churn: a land outside the Kernel contract owes nothing; an op-contract land is owed at once, wakes once, and the gate holds it', (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-runtime-churn-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
   git(root, 'init', '-q');
   git(root, 'config', 'user.email', 'spec@example.test'); git(root, 'config', 'user.name', 'spec'); git(root, 'config', 'commit.gpgsign', 'false');
   write(root, 'modules/kernel/kernel-prompt.md', 'prompt\n');
   write(root, 'modules/kernel/driver-loop.yaml', 'loop: 1\n');
+  write(root, 'modules/kernel/revision-scope.yaml', fs.readFileSync(path.join(ROOT, 'modules', 'kernel', 'revision-scope.yaml'), 'utf8'));
   write(root, 'modules/ops/ops/interface.draw.yaml', 'id: interface.draw\n');
   write(root, 'scripts/kernel/op-prompt.mjs', 'export {};\n');
   git(root, 'add', '-A'); git(root, 'commit', '-qm', 'A');
   const A = git(root, 'rev-parse', 'HEAD');
-  // A reconciler lane: code and runtimes.yaml numbers outside this Kernel's required contract.
+  // A reconciler lane: engine code outside this Kernel's contract.
   write(root, 'scripts/reconciler/engine.mjs', 'export {};\n');
-  write(root, 'modules/models/runtimes.yaml', 'allocation: {}\n');
   git(root, 'add', '-A'); git(root, 'commit', '-qm', 'B');
   const B = git(root, 'rev-parse', 'HEAD');
-  const { db, wf, ack } = ledgerFixture(t);
+  const { l, db, wf, ack } = ledgerFixture(t);
   ack(A);
-  const silent = kernelRevState(db, wf, { root, ops: ['interface.draw'] });
-  assert.deepEqual([silent.stale, silent.files], [false, []], 'no re-read, no ack');
-  assert.equal(revWakeLine(silent, wf), `Runtime rev ${shortRev(B)}.`);
-  // An op contract the workflow dispatches moves: coalesced within 30 min of the ack, asked after.
+  const silent = kernelNoticeOf(db, wf, { root });
+  assert.deepEqual([silent.state, noticeOwes(silent)], ['not-concerned', false], 'no re-read, no ack');
+  assert.equal(revisionWakeLine(silent, wf, { root }), `Runtime rev ${shortRev(B)}.`);
+  // An op contract moves: owed at once (the table decides; there is no second window), named in the wake, and held at the gate.
   write(root, 'modules/ops/ops/interface.draw.yaml', 'id: interface.draw\nnew: 1\n');
   git(root, 'add', '-A'); git(root, 'commit', '-qm', 'C');
-  const at = Date.now();
-  const soon = kernelRevState(db, wf, { root, ops: ['interface.draw'], now: at + 60_000 });
-  assert.equal(soon.stale, false);
-  assert.deepEqual(soon.deferred.files, ['modules/ops/ops/interface.draw.yaml']);
-  assert.ok(opRevStale(soon, 'interface.draw', { root }), 'the dispatch gate still holds the changed op');
-  const later = kernelRevState(db, wf, { root, ops: ['interface.draw'], now: at + 31 * 60_000 });
-  assert.deepEqual([later.stale, later.files], [true, ['modules/ops/ops/interface.draw.yaml']]);
-  // A Kernel contract file is never coalesced.
-  write(root, 'modules/kernel/kernel-prompt.md', 'prompt 2\n');
-  git(root, 'add', '-A'); git(root, 'commit', '-qm', 'D');
-  const contract = kernelRevState(db, wf, { root, ops: ['interface.draw'], now: at + 60_000 });
-  assert.equal(contract.stale, true);
-  assert.ok(contract.files.includes('modules/kernel/kernel-prompt.md'));
+  const C = git(root, 'rev-parse', 'HEAD');
+  const owed = kernelNoticeOf(db, wf, { root });
+  assert.deepEqual([owed.state, owed.files], ['owed', ['modules/ops/ops/interface.draw.yaml']]);
+  assert.match(revisionWakeLine(owed, wf, { root }), /^Runtime rev \w+ changed 1 file\(s\) of your contract \(modules\/ops\/ops\/interface\.draw\.yaml\)/);
+  assert.ok(opRevHold(db, wf, 'interface.draw', { root }), 'the dispatch gate holds the changed op');
+  // One wake per set of owed files: after it is recorded the next wake carries the revision only, and the notice stays owed.
+  recordWoken(kernelSeat({ ledger: l, workflowId: wf, root }), owed);
+  const woken = kernelNoticeOf(db, wf, { root });
+  assert.deepEqual([woken.state, noticeOwes(woken)], ['owed-woken', true]);
+  assert.equal(revisionWakeLine(woken, wf, { root }), `Runtime rev ${shortRev(C)}.`);
+  assert.ok(opRevHold(db, wf, 'interface.draw', { root }), 'and the gate still holds until the ack');
 });
-
 test('installed upcoming op keeps one READ revision through actual CLI enqueue and dispatch admission', t => {
   const rt = runtime(t); rt.checkout(rt.A);
   fs.renameSync(path.join(rt.root, '.git'), path.join(path.dirname(rt.root), path.basename(rt.root) + '-retained-git'));
@@ -334,8 +333,8 @@ test('installed upcoming op keeps one READ revision through actual CLI enqueue a
   fs.writeFileSync(fx.manifestFile, JSON.stringify(plan));
   const acked = fx.ok(['kernel-ack-rev', '--workflow', fx.wf, '--rev', plan.rev, '--read-manifest', fx.manifestFile, '--op', op], true);
   assert.equal(acked.rev, plan.rev);
-  const before = fx.ok(['status', '--workflow', fx.wf], true).kernelRev;
-  assert.deepEqual([before.current, before.acked, before.stale], [plan.rev, plan.rev, false], 'status retains acknowledged upcoming rows');
+  const before = fx.ok(['status', '--workflow', fx.wf], true);
+  assert.equal(before.revisionNotice, undefined, 'a tree with no git has no revision to compare: the notice is silent and the gate below reads the acknowledged installed rows');
   const args = ['enqueue', '--workflow', fx.wf, '--op', op, '--paths', 'docs/refactor'];
   const beyondGate = fx.api([...args, '--params', '{invalid'], true);
   assert.equal(beyondGate.status, 1);
@@ -373,26 +372,20 @@ test('a land that carries a Kernel note delivers it verbatim with the wake; a la
   const note = 'report with --evidence from now on; the old flag is refused';
   git(rt.root, 'notes', '--ref=land', 'add', '-m', `Land-Verified: ${rt.B}\nSpecs: 1/1\nKernel-Note: ${note}`, rt.B);
   ack(rt.A, 'boot');
-  const withNote = kernelRevState(db, wf, { root: rt.root, ops: ['interface.draw'] });
-  assert.deepEqual(withNote.notes, [note]);
-  const line = revWakeLine(withNote, wf);
+  const line = revisionWakeLine(kernelNoticeOf(db, wf, { root: rt.root }), wf, { root: rt.root });
   assert.ok(line.endsWith(` What a Kernel must do differently: ${note}`), line);
   assert.doesNotMatch(line, /\n/, 'one line');
-  // A note on a revision whose changed files are not this Kernel's contract still asks for the re-read and carries the line.
+  // A note on a revision whose changed files are not this Kernel's contract still carries the line until the revision is settled.
   const only = runtime(t); only.checkout(only.B);
   git(only.root, 'notes', '--ref=land', 'add', '-m', 'Kernel-Note: only the note changed', only.B);
   const silent = ledgerFixture(t);
   silent.ack(only.A, 'boot');
-  const state = kernelRevState(silent.db, silent.wf, { root: only.root, ops: ['code.refactor'] });
-  assert.equal(state.stale, true);
-  assert.match(revWakeLine(state, silent.wf), /What a Kernel must do differently: only the note changed/);
-  // Without a note on any land since the ack there is no line, and after the ack nothing is stale.
+  assert.match(revisionWakeLine(kernelNoticeOf(silent.db, silent.wf, { root: only.root }), silent.wf, { root: only.root }), /What a Kernel must do differently: only the note changed/);
+  // Without a note on any land since the ack there is no line, and after the ack nothing rides the wake.
   const none = runtime(t); none.checkout(none.B);
   const plain = ledgerFixture(t);
   plain.ack(none.A, 'boot');
-  assert.equal(kernelRevState(plain.db, plain.wf, { root: none.root, ops: ['interface.draw'] }).notes, undefined);
-  assert.doesNotMatch(revWakeLine(kernelRevState(plain.db, plain.wf, { root: none.root, ops: ['interface.draw'] }), plain.wf), /must do differently/);
+  assert.doesNotMatch(revisionWakeLine(kernelNoticeOf(plain.db, plain.wf, { root: none.root }), plain.wf, { root: none.root }), /must do differently/);
   ack(rt.B);
-  const acked = kernelRevState(db, wf, { root: rt.root });
-  assert.equal(revWakeLine(acked, wf), `Runtime rev ${shortRev(rt.B)}.`);
+  assert.equal(revisionWakeLine(kernelNoticeOf(db, wf, { root: rt.root }), wf, { root: rt.root }), `Runtime rev ${shortRev(rt.B)}.`);
 });

@@ -163,6 +163,7 @@ ruleParams:
       - {id: event-spill, run: scripts/checks/check-event-spill.mjs}
       - {id: root-adhoc, run: scripts/checks/check-root-adhoc.mjs}
       - {id: storage-convention, run: scripts/checks/check-storage-convention.mjs}
+      - {id: held-surfacing, run: scripts/checks/check-held-surfacing.mjs}
       - {id: spec-budget, run: scripts/checks/check-spec-budget.mjs}
       - {id: default-once, run: scripts/checks/check-default-once.mjs}
       - {id: version-pin-once, run: scripts/checks/check-version-pin-once.mjs}

@@ -121,7 +121,7 @@ import { squash } from '../lib/clip.mjs';
 import { wakeKernelForTransition } from './wake-delivery.mjs';
 import { FOUNDATION_WAIT, SHELL_FOUNDATION, shellFoundationWaitOf } from './shell-foundation.mjs';
 import {
-  KERNEL_REV_STALE, KERNEL_REV_UNKNOWN, OP_REV_DRIFT, currentRuntimeRev, kernelRevState, opRevDrift, opRevStale, revRootOf,
+  KERNEL_REV_STALE, KERNEL_REV_UNKNOWN, OP_REV_DRIFT, currentRuntimeRev, opRevDrift, opRevHold, revRootOf,
   shortRev,
 } from './runtime-rev.mjs';
 // Pool selection and launch-model resolution, plus the Orca orchestration
@@ -1159,8 +1159,8 @@ function recordOpRevDrift(ledger, job) {
 }
 
 /** The nextActions step a stale Kernel runs first: re-read what changed, then ack the current rev. */
-const rereadActionOf = (rev, workflowId) => ({ kind: 'reread', origin: 'rev-reread', rev: rev.current, acked: rev.acked, files: rev.full ? ['modules/kernel/kernel-prompt.md', 'modules/kernel/driver-loop.yaml'] : rev.files,
-  reason: `the runtime moved from the rev you acked (${shortRev(rev.acked)}) to ${shortRev(rev.current)}: re-read ${rev.full ? 'modules/kernel/kernel-prompt.md and modules/kernel/driver-loop.yaml in full' : rev.files.join(', ')}, then starci kernel kernel-ack-rev --workflow ${workflowId} --plan and attest with --rev ${rev.current} --digest <readToken>; until then enqueue/dispatch of a leg whose op contract changed is refused ${KERNEL_REV_STALE}` });
+const rereadActionOf = (notice, workflowId) => ({ kind: 'reread', origin: 'rev-reread', rev: notice.to, acked: notice.from, files: notice.files,
+  reason: `the runtime moved from the rev you settled (${shortRev(notice.from)}) to ${shortRev(notice.to)}: re-read ${notice.files.join(', ')}, then starci kernel kernel-ack-rev --workflow ${workflowId} --plan and attest with --rev ${notice.to} --digest <readToken>; until then enqueue/dispatch of a leg whose op contract changed is refused ${KERNEL_REV_STALE}` });
 /**
  * The RUNNING legs whose op contract moved on the runtime since their dispatch (op-rev-drift before settle): the
  * worker still runs its brief, is judged by its admission, and hears it on its next nudge. [{jobId, op, attempt, from,
@@ -1185,19 +1185,18 @@ const opRevDriftOf = (db, workflowId, limit = 5) => db.prepare('SELECT entity_id
 
 /**
  * enqueue/dispatch refuse kernel-rev-stale for a leg whose current op contract
- * changed between the runtime rev the Kernel acked and the current one (runtime-rev.mjs opRevStale). Other
+ * changed between the runtime rev the Kernel acked and the current one (runtime-rev.mjs opRevHold). Other
  * legs, a Kernel that never acked (booted before this gate) and an unreadable rev pass.
  */
 function refuseStaleKernelRev(db, workflowId, op, verb) {
   requireAdmittedKernelRead(db, workflowId, op);
   const root = revRootOf();
-  let state = null;
-  try { state = kernelRevState(db, workflowId, { root, ops: [op] }); } catch (error) { throw Object.assign(new Error(`runtime READ comparison unavailable: ${error.message}`), { code: KERNEL_REV_UNKNOWN }); }
-  const hit = opRevStale(state, op, { root });
+  let hit = null;
+  try { hit = opRevHold(db, workflowId, op, { root }); } catch (error) { throw Object.assign(new Error(`runtime READ comparison unavailable: ${error.message}`), { code: KERNEL_REV_UNKNOWN }); }
   if (!hit) return;
   const what = hit.files.join(', ');
-  throw Object.assign(new Error(`${KERNEL_REV_STALE}: ${verb} of ${op} refused - its op contract changed between the runtime rev you acked (${shortRev(state.acked)}) and the current one (${shortRev(state.current)}): ${what}. Re-read ${state.full ? 'modules/kernel/kernel-prompt.md and modules/kernel/driver-loop.yaml in full' : state.files.join(', ')}, then starci kernel kernel-ack-rev --workflow ${workflowId} --plan and attest with --rev ${state.current} --digest <readToken>, then ${verb} again (starci kernel status kernelRev)`),
-    { code: KERNEL_REV_STALE, op, acked: state.acked, current: state.current, files: hit.files });
+  throw Object.assign(new Error(`${KERNEL_REV_STALE}: ${verb} of ${op} refused - its op contract changed between the runtime rev you acked (${shortRev(hit.acked)}) and the current one (${shortRev(hit.current)}): ${what}. Re-read ${hit.files.join(', ')}, then starci kernel kernel-ack-rev --workflow ${workflowId} --plan and attest with --rev ${hit.current} --digest <readToken>, then ${verb} again (starci kernel status revisionNotice)`),
+    { code: KERNEL_REV_STALE, op, acked: hit.acked, current: hit.current, files: hit.files });
 }
 
 /**
