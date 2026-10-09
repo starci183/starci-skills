@@ -355,7 +355,11 @@ const unwritableWorld=t=>{
   assert.equal(boot.status,0,boot.stderr||boot.stdout);
   const terminal=json(boot.stdout)?.terminal;assert.ok(terminal,'the first kernel booted a terminal');
   const open=openLedger({file:w.ledgerFile()});
-  try{openDecisionRow(open,{workflowId,kind:'orphaned-frontier',entity:{type:'workflow',id:workflowId},summary:'nothing is open and nothing is owed',by:'reconciler/workflow'});}finally{open.close();}
+  try{
+    // The frozen frame belongs to an old boot, beyond its boot grace, not a newly reading Kernel.
+    open.transaction(()=>open.appendEvent({workflowId,entityType:'kernel',entityId:workflowId,kind:'kernel-booted',createdAt:Date.now()-19*60000,payload:{terminal}}));
+    openDecisionRow(open,{workflowId,kind:'orphaned-frontier',entity:{type:'workflow',id:workflowId},summary:'nothing is open and nothing is owed',by:'reconciler/workflow'});
+  }finally{open.close();}
   const tick=()=>{const r=run(WATCHDOG,['--repo',w.repo,'--workflow',workflowId,'--once','--repair','--json'],{ORCA_TERMINAL_HANDLE:'fake-sender-terminal'});
     return {status:r.status,result:json(r.stdout.trim().split('\n').at(-1)),stderr:r.stderr,stdout:r.stdout};};
   const events=kind=>{const l=inspectLedger({file:w.ledgerFile()});

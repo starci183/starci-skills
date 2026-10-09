@@ -18098,3 +18098,12 @@ unregistered-trees:
   nextStep_vi: "Supervisor chọn để yên (mục đóng cho đến khi tập cây đổi) hoặc ghi nguyên nhân cho Debug; việc xóa do con người làm."
   owner: supervisor
   kind: blocker
+terminal-unreadable:
+  title: "The terminal input cannot be read safely"
+  title_vi: "Không đọc được ô nhập của terminal một cách an toàn"
+  meaning_vi: "Runtime chưa chứng minh được ô nhập trống hoặc chỉ giữ chữ của runtime nên không gửi lệnh thoát hay thay ghế."
+  causes_vi:
+    - "Orca không trả lời hoặc lần đọc terminal thất bại"
+  nextStep_vi: "Debug kiểm tra đường đọc terminal rồi thử lại; giữ nguyên bản nháp và ghế trong lúc chưa đọc được."
+  owner: runtime-core
+  kind: runtime-fault

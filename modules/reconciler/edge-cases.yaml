@@ -17,6 +17,13 @@ families:
   - ending
 
 cases:
+  - id: unreadable-seat-input-receives-quit-keys
+    family: failure-while-running
+    met: {date: "2026-10-10", where: "held-state lane audit", evidence: "quitLive previously continued after an unreadable terminal input; quit-agent.spec.mjs reproduces the refusal"}
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "an unreadable terminal input does not prove that no human draft stands", remedy: {state: in-tree, change: "quitAgent holds without keys when input cannot be read; a foreign draft also holds a quit at a shell prompt"}}
+    rule: {file: scripts/kernel/quit-agent.mjs, anchor: quitAgent}
+    spec: tests/kernel/quit-agent.spec.mjs
+    status: covered
   - id: reboot-reservations-unprovable
     family: power-lifecycle
     met: {date: "2026-10-07", where: "host restart during the first real workflows", evidence: "AUDIT-starci-workflow.md issue 10; commit 870044c87"}
