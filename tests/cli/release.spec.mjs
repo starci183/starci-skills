@@ -30,6 +30,7 @@ const matching = (source, needle) => source.split(/\r?\n/).filter((line) => line
 
 const specs = {
   'app-installs': { script: 'scripts/gates/release-app-installs.mjs', usage: (s) => matching(s, 'starci release app-installs'), flags: ['keep'] },
+  'ci-status': { script: 'scripts/supervisor/release-ci-status-cli.mjs', usage: (s) => matching(s, '/** Parse'), flags: ['repo', 'tag', 'wait'] },
   check: { script: 'scripts/gates/release-check.mjs', usage: (s) => matching(s, '//   starci release check'), flags: ['final', 'only'] },
   cut: { script: 'scripts/supervisor/release-cut-cli.mjs', usage: (s) => matching(s, '/** Parse'), flags: ['branch', 'no-reuse', 'plan', 'remote', 'repo', 'rows', 'tag'] },
   'env-test': { script: 'scripts/supervisor/release-env-test.mjs', usage: (s) => declaration(s), flags: ['lane', 'reuse-installs'] },
