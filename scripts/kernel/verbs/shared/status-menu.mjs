@@ -13,6 +13,7 @@ import { kernelAuthorityOf, kernelCustodyOf } from './kernel-seat.mjs';
 import { failureFactsOf } from '../../failure-class.mjs';
 import { failedShapesOf, jobRow, shapeOf } from '../../kernel-authority.mjs';
 import { RUNTIME_OWED_CODES } from '../../gate-admission.mjs';
+import { dispatchGapsOf } from '../../dispatch-gaps.mjs';
 
 const LIVE_KERNEL = new Set(['open', 'claimed']);
 // Kinds with their own menu kind (or a notice): the generic decision-item kind never repeats them.
@@ -118,7 +119,7 @@ export const menuPhase = (s) => {
   const pending = pendingJobsOf(db, workflowId, now);
   const live = kernelDis.filter((di) => liveFor(di, pending, db));
   s.menu = buildMenu({
-    workflow: workflowId, rev: s.revisionNotice, jobDecisions: jobDecisionsOf(s, live), shapeRefused: shapeRefusedOf(s),
+    workflow: workflowId, rev: s.revisionNotice, jobDecisions: jobDecisionsOf(s, live), shapeRefused: shapeRefusedOf(s), dispatchGaps: dispatchGapsOf(s),
     questions: s.workerQuestions, peers: s.peerMessages, wedged: s.wedgedWorkers.map((w) => ({ jobId: w.jobId, opId: s.workflowJobs.find((row) => row.job_id === w.jobId)?.op_id ?? null })),
     deadWaits: deadWaitsOf(s), decisions: live.filter((di) => !OWN_KIND.has(di.kind)), nextActions: s.graph.nextActions.map((action) => ({ ...action, attest: attestNoteOf(s, action) })), handover: s.handover, feedback: feedbackOf(s), snoozed: snoozedOf(s), answered: answeredOf(s),
   });

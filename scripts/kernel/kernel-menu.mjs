@@ -119,6 +119,9 @@ const jobItem = ({ di, resolution }, workflow) => {
 const shapeItem = (refused, workflow) => itemOf('shape-refused', { key: refused.jobId, subject: { workflow, job: refused.jobId, op: refused.op, situation: refused.situation, reported: refused.reported ?? '' },
   evidence: [{ ref: `job:${refused.jobId}` }, { ref: `job:${refused.failedJobId}` }] });
 
+const dispatchGapItem = (gap, workflow) => itemOf('dispatch-gap', { key: gap.jobId, subject: { workflow, ...gap }, since: gap.since,
+  evidence: [{ ref: `job:${gap.jobId}` }, { ref: `job:${gap.upstreamJob}` }] });
+
 const questionItem = (q, workflow) => itemOf('worker-question', { key: q.messageId, subject: { workflow, message: q.messageId, job: q.jobId, op: q.opId, ask: q.question },
   since: q.askedAt ?? null, evidence: [{ ref: `worker-question:${q.messageId}` }] });
 
@@ -201,6 +204,7 @@ export function buildMenu(sources) {
     ...(['owed', 'owed-woken'].includes(sources.rev?.state) ? [revItem(sources.rev, workflow)] : []),
     ...sources.jobDecisions.map((entry) => jobItem(entry, workflow)),
     ...(sources.shapeRefused ?? []).map((refused) => shapeItem(refused, workflow)),
+    ...(sources.dispatchGaps ?? []).map((gap) => dispatchGapItem(gap, workflow)),
     ...sources.questions.map((q) => questionItem(q, workflow)),
     ...sources.peers.map((m) => peerItem(m, workflow)),
     ...sources.wedged.map((w) => wedgedItem(w, workflow)),

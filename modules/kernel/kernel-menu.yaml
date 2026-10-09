@@ -142,6 +142,13 @@ kinds:
       - {choice: enqueue-proposed, when: proposed, steps: [{verb: enqueue, args: {workflow: $workflow, op: $op, paths: $proposed}}], effect: "enqueues {op} on the write set its op contract proposes: {proposed}; the Workflow controller then routes and dispatches it"}
       - {choice: enqueue-leg, text: paths, steps: [{verb: enqueue, args: {workflow: $workflow, op: $op, paths: $text}}], effect: "escape: enqueues {op} on the paths in --text (its write set) when the proposal does not fit; the Workflow controller then routes and dispatches it"}
 
+  - id: dispatch-gap
+    mode: judgment
+    source: "a ready job's typed record-gap dispatch refusal of a settled upstream product"
+    question: "{reason}"
+    options:
+      - {choice: repair-upstream, when: paths, steps: [{verb: enqueue, args: {workflow: $workflow, op: $op, paths: $paths, reopen: $reason}}], effect: "reopens {op} on its own write set to repair {field}; the waiting job dispatches when the source resolves"}
+
   - id: shape-refused
     mode: judgment
     source: "a ready job the dispatch push skips because its shape (op, owned paths, params) is the shape of a failed job of its unit"

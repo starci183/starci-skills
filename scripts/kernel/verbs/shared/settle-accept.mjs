@@ -24,6 +24,7 @@ import { checkedInOf } from './settle-checked-in.mjs';
 import { readEnv } from '../../../lib/env.mjs';
 import { rejudgedVerdictOf } from '../../critic-hold.mjs';
 import { runtimeCriticRunOf } from '../../settle/critic-run.mjs';
+import { requireBrandProduct } from '../../brand-product.mjs';
 
 // The job_transitions walk from the job's current status to its settled one. A pass settles only a job whose worker
 // filed a report (running/answering/effect_unknown go through reported); a fail or blocked with a filed report goes
@@ -223,6 +224,7 @@ function acceptSettle(ctx) {
 /** The acceptance a fresh settle makes: the native mechanism proofs still hold, then the acceptance transaction. */
 function freshAcceptance(ctx) {
   const { db, jobId, repo, proofs, internals } = ctx;
+  if (ctx.verdict === 'pass') requireBrandProduct(db, jobId, { repo });
   if (proofs?.nativeCheckIds) {
     const fresh = internals.settleOpProofs(db, jobId, repo);
     if (fresh?.judged.status !== 'pass' || JSON.stringify(fresh.nativeCheckIds) !== JSON.stringify(proofs.nativeCheckIds))

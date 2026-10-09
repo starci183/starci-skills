@@ -1724,6 +1724,20 @@ cases:
     spec: tests/replay/first-leg-offered.spec.mjs
     status: covered
 
+  - id: settled-brand-product-cannot-feed-draw
+    family: correctness
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "A brand.decide product without family CSS settles and the following interface.draw is refused grammar-context-missing with an empty Kernel menu.", remedy: {state: in-tree, change: "The runtime brand-consumable measure reuses the dispatch grammar resolver at brand settle; a typed brand-gap/record-gap refusal exposes one upstream repair item immediately, preserves it through backoff, and names the owner and field in the digest."}}
+    met: {date: "2026-10-10", where: "workflow replay", evidence: "The replay fails on integration base 98b38a97a: no typed cause, no upstream item, and no independent brand measure."}
+    rule: {file: scripts/kernel/brand-product.mjs, anchor: "brandProductCheck"}
+    spec: tests/replay/brand-sources-gate.spec.mjs
+    status: covered
+  - id: refusal-fingerprint-truncates-only-the-memo
+    family: smooth-operation
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "A long grammar refusal fingerprints its full reason but stores only its prefix; the next push computes a different fingerprint from that prefix and repeats the refusal.", remedy: {state: in-tree, change: "The fingerprint and memo share reasonOf, so the first long refusal remains held on the declared backoff."}}
+    met: {date: "2026-10-10", where: "brand sources replay", evidence: "The first refusal reports count 1, then a second push repeats dispatch rather than returning refusal-backoff."}
+    rule: {file: scripts/kernel/dispatch-refusal-memo.mjs, anchor: "reasonOf"}
+    spec: tests/replay/brand-sources-gate.spec.mjs
+    status: covered
   - id: op-product-has-no-declared-judge
     family: record-vs-reality
     finding: {role: runtime, duty: does, verdict: unjudged, evidence: "(duty: the maker never judges its own work, principle P2 of modules/kernel/roles.yaml) the judge of each op was implicit: an independent Critic ran for drawing and, by the runtime at settle, for scope.define and architecture.decide; the other ops were judged by re-run checks, native proofs, gates, a later reviewing leg or the owner, and nothing stated this per op, so nothing stopped an op from having no independent judge and nothing tied the Critic table to the contracts", remedy: {state: in-tree, change: "every op contract carries the required field judge (machine, critic, owner, next-leg, each with a why; nobody cannot be declared) read against modules/kernel/op-judges.yaml, and the op-judge self-check refuses an op with no judge, a measure the runtime does not own or apply, a Critic that departs from modules/kernel/critic.yaml coverage, an owner without an owner gate and a next-leg that is not a registered reviewer"}}

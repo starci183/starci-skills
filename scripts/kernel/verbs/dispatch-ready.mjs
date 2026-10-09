@@ -45,7 +45,7 @@ function childRefusal(child, { db = null, jobId = null } = {}) {
     ?? (String(child?.err ?? child?.out ?? '').trim().slice(0, 300) || `exit ${child?.status}`);
   const step = rejected?.step ?? j.managed?.step ?? null;
   const watch = Array.isArray(j.watch) ? j.watch.filter((file) => typeof file === 'string') : [];
-  return { code, reason: String(reason).slice(0, 400), ...(step ? { step } : {}), ...(watch.length ? { watch } : {}) };
+  return { code, reason: String(reason).slice(0, 400), ...(j.cause ? { cause: j.cause } : {}), ...(step ? { step } : {}), ...(watch.length ? { watch } : {}) };
 }
 
 function routeReadyJob(jobId, repo, job, db) {

@@ -471,6 +471,30 @@ slots:
     tests: none
     coverage: required
     rules: [RT_TIER_DIRECTION, RT_EXTERNAL_OWNER, RT_SOURCE_NAME, HFS_SIZE_GROWTH, RT_PINNED_PATH_MOVED]
+  - id: runtime.brand-product
+    profiles: [runtime]
+    path: scripts/kernel/brand-product.mjs
+    presence: required
+    tracked: tracked
+    tier: kernel
+    tests: none
+    coverage: required
+  - id: runtime.dispatch-gaps
+    profiles: [runtime]
+    path: scripts/kernel/dispatch-gaps.mjs
+    presence: required
+    tracked: tracked
+    tier: kernel
+    tests: none
+    coverage: required
+  - id: runtime.brand-sources-replay
+    profiles: [runtime]
+    path: tests/replay/brand-sources-gate.spec.mjs
+    presence: required
+    tracked: tracked
+    tier: none
+    tests: none
+    coverage: none
   - id: runtime.kernel-verbs
     profiles: [runtime]
     # One file per modules/cli/commands/kernel/<verb>.yaml (check-cli-parity).
