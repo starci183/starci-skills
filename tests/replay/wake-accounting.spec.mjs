@@ -58,7 +58,7 @@ test('a Kernel woken for a menu and not yet answering is not woken again for the
   // The live pattern: the Kernel reads idle between its reads, a minute after the last wake, and the same menu stands.
   seedWake(world, { idleWakes: 2, menuItems: 1, menuFp: fingerprint(menu) }, 60_000);
   const again = tick(world);
-  assert.deepEqual([again.action, again.reason], ['wake-withheld', 'same-menu-unanswered']);
+  assert.deepEqual([again.action, again.reason], ['wake-withheld', 'unanswered']);
   const typed = wakes(world).length;
 
   seedWake(world, { idleWakes: 3, menuItems: 1, menuFp: fingerprint(menu) }, 6 * 60_000);

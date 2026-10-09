@@ -329,7 +329,7 @@ const repeatedWake = (statusValue) => {
     const last = ledger.db.prepare('SELECT seq, created_at, payload_json FROM events WHERE workflow_id=? AND kind=? ORDER BY seq DESC LIMIT 1').get(workflowId, KERNEL_WOKEN_EVENT);
     if (!last || parseJsonOr(last.payload_json).menuFp !== now.menuFp || Date.now() - Number(last.created_at) >= seatCostConfig().kernel.wakeRepeatMs) return null;
     const acted = ledger.db.prepare(`SELECT 1 FROM events WHERE workflow_id=? AND seq>? AND kind IN (${[...KERNEL_ACTIVITY, ...KERNEL_MOVES].map(() => '?').join(',')}) LIMIT 1`).get(workflowId, last.seq, ...KERNEL_ACTIVITY, ...KERNEL_MOVES);
-    return acted ? null : { reason: 'same-menu-unanswered', since: Number(last.created_at) };
+    return acted ? null : { reason: 'unanswered', since: Number(last.created_at) };
   }) ?? null;
 };
 const kernelIdleWakes = () => withKernelLedger((ledger) => idleWakesOf(ledger.db.prepare(

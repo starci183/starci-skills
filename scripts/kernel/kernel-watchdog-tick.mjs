@@ -86,7 +86,7 @@ const sendIdleWake = (ctx, idle) => {
     recordKernelWakeFailed, recordKernelWoken, wakeSendRefused, wakeActionOf, deliveryFieldsOf, classified } = ctx;
   const proof = sendWakeWithProof({ terminal, text: wakePromptOf(workflowId, status.value), before: String(read.screen ?? '') });
   if (!proof.ok && proof.delivery !== 'agent-exited') recordKernelWakeFailed(terminal, { state: classified.state, sendErrorCode: proof.sendErrorCode ?? null, delivery: proof.delivery ?? null });
-  if (proof.ok) recordKernelWoken(terminal, { delivery: proof.delivery ?? null, idleWakes: idle.wakes + 1, ...(ctx.menuOf?.(status.value) ?? {}) });
+  if (proof.ok) recordKernelWoken(terminal, { delivery: proof.delivery ?? null, idleWakes: idle.wakes + 1, ...ctx.menuOf?.(status.value) });
   if (proof.ok && status.value?.revisionNotice?.state === 'owed') ctx.recordRevisionWoken(status.value.revisionNotice);
   if (!proof.ok && liveness.staleActive && wakeSendRefused(proof))
     return replaceUnwritableKernel({ phase, terminal, dispatch, stale, outputAgeMs, proof });
