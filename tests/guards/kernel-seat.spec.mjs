@@ -95,3 +95,14 @@ test('the owner and the lead role are unaffected: the same mutating verb passes 
   assert.equal(policyVerdict({ role: 'lead', command, guard: { role: 'kernel' }, policy })?.code, 'KERNEL_USE_DECIDE', 'only the bound Kernel guard is restricted');
   assert.equal(policyVerdict({ role: 'op', command: { program: 'node', args: ['-e', '1'] }, guard: { role: 'op', op: 'x' }, policy })?.code, 'RIGHTS_RAW_TOOL', 'an op keeps its own table');
 });
+
+test('a Kernel seat redirecting output into a file is refused; the null devices and stream merges are not files', (t) => withLedger(t, async (world) => {
+  seedStuck(world);
+  const decide = seatOf(t, world.repoRoot);
+  for (const command of ['starci kernel logs --seq 595 --json > 0', 'starci kernel status --json 2>0', 'starci kernel status >> out.txt']) {
+    assert.equal((await decide(command))?.verdict?.code, 'KERNEL_NO_FILE_WRITE', command);
+  }
+  for (const command of ['starci kernel status --json 2>&1', 'starci kernel status --json 2>/dev/null', 'starci kernel status --json > /dev/null']) {
+    assert.equal((await decide(command))?.verdict?.code ?? null, null, command);
+  }
+}));

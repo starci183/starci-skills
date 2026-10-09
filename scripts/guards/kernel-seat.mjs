@@ -3,7 +3,7 @@
 // mutating verb is the runtime's, never the seat's. A refused verb carries the Kernel's menu, so the seat answers in one step.
 import path from 'node:path';
 import { plainWords } from '../lib/menu-parts.mjs';
-import { refusal } from './rights.mjs';
+import { redirectTargetsOf, refusal } from './rights.mjs';
 import { runNode } from '../api/node/run-node.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { kernelMailboxVerdict } from './install-verdict.mjs';
@@ -33,6 +33,18 @@ export function menuHintOf(guard, { env = process.env, root = skillRoot } = {}) 
     const end = lines.findIndex((line, index) => index > start && !line.startsWith(' '));
     return lines.slice(start, end < 0 ? undefined : end).join('\n');
   } catch { return ''; }
+}
+
+/**
+ * The refusal of a call that redirects output into a file, or null. The Kernel writes no file: a redirection (> file, 2>file, >> file) leaves a stray in the workflow
+ * tree it works in, which a later fail decision of that tree then has to recover from (live: a file named 0, left by a redirect, made every settle-fail of a job unrecoverable).
+ * The null devices are not files; the status text is read with --field, never redirected.
+ */
+export function kernelRedirectVerdict({ command, cwd }) {
+  const targets = redirectTargetsOf(command, cwd);
+  if (!targets.length) return null;
+  const use = 'read with starci kernel status --field <name> or starci kernel logs; the call needs no file';
+  return refusal('KERNEL_NO_FILE_WRITE', command, `the Kernel seat writes no file: the redirection into ${path.basename(targets[0])} would leave a stray file in its workflow tree`, use, use);
 }
 
 const useOf = (table, hint) => [table.use ?? 'starci kernel decide', hint].filter(Boolean).join('\n');

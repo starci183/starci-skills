@@ -16993,6 +16993,15 @@ KERNEL_USE_DECIDE:
   nextStep_vi: "Đọc menu in kèm lời từ chối, trả lời mục bằng starci kernel decide --workflow <workflow> --item <id> --choice <lựa chọn> --reason <lý do>."
   owner: op-retry
   kind: verb-refusal
+KERNEL_NO_FILE_WRITE:
+  title: "A Kernel seat redirected output into a file"
+  title_vi: "Kernel seat chuyển hướng đầu ra vào một tệp"
+  meaning_vi: "Kernel không ghi tệp nào: một chuyển hướng (> tệp, 2>tệp, >> tệp) để lại tệp rác trong cây workflow của nó, và quyết định fail của job trong cây đó sau này không phục hồi được."
+  causes_vi:
+    - "Kernel gõ starci ... > 0 hoặc 2>0 thay vì 2>&1 hoặc đọc bằng --field"
+  nextStep_vi: "Đọc trạng thái bằng starci kernel status --field <tên> hoặc starci kernel logs, không chuyển hướng ra tệp."
+  owner: op-retry
+  kind: verb-refusal
 KERNEL_STARCI_ONLY:
   title: "A Kernel seat ran a program that is not starci"
   title_vi: "Kernel seat chạy chương trình không phải starci"
