@@ -123,7 +123,7 @@ spawnAgent({provider, model, effort, worktree, title, spec, run, from, request})
 startAgent({…, prompt, objective, entry, priorRunId, request})
   run-create(objective, from = entry, --retry-request)
                                        → the agent's own Run (Kernel, Supervisor, [Worker])
-  spawnAgent(spec = prompt, ...)       → spilled to a file past the host argv (task-spec.mjs)
+  spawnAgent(spec = prompt, ...)       → spilled to a file past the host argv (prompt-file.mjs)
 ```
 
 Every mutation declares `replay` in `calls.yaml` (`idempotency`): `request`
@@ -223,7 +223,7 @@ Each parent creates and coordinates the Run of its child (`run-create --from <it
 placed on a runtime worktree detached at the empty tree (`draw-critic.mjs criticWorkspace`): Orca places a worker
 only on a worktree it resolves, and a bare temp directory is refused `selector_not_found`. The critic's terminal is bound
 to a job guard of role `critic` (`critic-guard.mjs`): its shell, file tools and, on Claude and Devin, its read tools reach
-that directory and its verdict file and nothing else (`scripts/guards/critic-reach.mjs`, `modules/kernel/command-policy.yaml` `critic`).
+that directory, its verdict file and the one Task file the runtime wrote for it outside the directory (`reach.taskFile`) and nothing else (`scripts/guards/critic-reach.mjs`, `modules/kernel/command-policy.yaml` `critic`).
 
 ## Checklist for a new agent card
 

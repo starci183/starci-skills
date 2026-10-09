@@ -164,7 +164,7 @@ depth 1 and its ops at depth 2. `settle` stops and releases the op's worker.
 
 The Critic is a standardised role: a fresh worker of the tier `modules/models/tiers.yaml` `seats.critic` names (frontier), never of the
 maker's provider (`scripts/work/critic-pick.mjs`, refusal `CRITIC_NO_INDEPENDENT_MEMBER`), bound to the `critic` guard that confines it to
-its directory and its verdict file, answering with one `starci/critic-verdict@1` that carries the sha256 of every byte it judged. A
+its directory, its verdict file and its one Task file, answering with one `starci/critic-verdict@1` that carries the sha256 of every byte it judged. A
 verdict that names other bytes than the attempt's product is `CRITIC_VERDICT_STALE`. The `coverage` table of `critic.yaml` lists the op
 kinds that owe one; three are covered:
 

@@ -7,7 +7,7 @@ classes:
   scalar: "an id, a state, a timestamp, a count, a short code or one line of reason: at most scalarBytes"
   bounded: "free text that is queried or shown whole and stays small: at most inlineBytes; anything longer is content"
   reference: "holds the sha (or the uri) of a blob, never the content"
-  spill: "a payload that may be any size: the writer is appendEvent / supEvent, which keeps a bounded inline view and the whole payload behind the sha (engine/db/event-compact.mjs)"
+  spill: "a payload that may be any size: the writer (appendEvent, supEvent) keeps the whole payload behind the sha and a small inline form: the bounded view of engine/db/event-compact.mjs for events, the reference stub of engine/db/ref-value.mjs for sup_events"
   migrate: "holds content inline today (measured above inlineBytes): the target is a reference column; the migration is proposed, not run (a runtime migration verb, idempotent and journalled)"
 scalarBytes: 256
 inlineBytes: 1024

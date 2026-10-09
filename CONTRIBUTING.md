@@ -31,15 +31,9 @@ a runtime module that reads a changed `modules/**` or `knowledge/**` file), runs
 A red file is fixed and that file is run again, then the affected set once; the root `npm test` is never the answer to a red file or a small fix.
 `starci test affected --changed <file...>` names the files itself; a selection above the bound in `modules/supervisor/affected-tests.yaml` is printed and left to the lead.
 
-Under `config.yaml` `release.suite: ci` (the owner's recorded choice, shipped default `local`) the cut's own full run does not exist: the GitHub `ci` workflow runs the suite after the push, the cut runs `npm run check`, `npm run test:packages`, the specs affected by the release range, the live Orca smokes and the example rows, and a red CI is fixed forward with the next pre-release (`starci release ci-status`; [releasing](docs/releasing.md#where-the-suite-runs)).
-
-**Related means the changed symbols.** If functions A and B changed, the specs to run are the ones related to A and B (owner, 2026-10-09). `starci test affected` compares each changed `.mjs` source with its version at the base, declaration by declaration, and follows the changed exported symbols through the import graph by name: the specs that import them (named, default, through a namespace or a re-export), the specs behind the declarations that call them (callers of callers, to `symbolDepth` in `modules/supervisor/affected-tests.yaml`), the specs that run the CLI verb whose handler reaches them, the spec named after the file, the specs that name its path, the invariant specs and the specs that read the file as data. Where a symbol cannot be followed by name - a changed file that is not parseable `.mjs` source (yaml, markdown, a template), a change outside every declaration (an import of a side effect, a statement that runs at load), no base version, a module-level statement or the depth bound that the walk meets - the file-level rule (every spec that imports the file) applies to that file, the report names the file and the reason, and nothing is dropped silently. The answer is never larger than the file-level one (`--by file`), which stays available; `--json` carries each symbol, its specs and why.
-
-The full suite runs exactly twice in a change's life: once by the lead on the merged tree when many lanes meet, and once inside `starci release cut`
-(the pre-push gate refuses a push of `main` without the release record of that commit). A bound role (op, kernel, supervisor, critic, a lane's lead
-seat) that runs the root `npm test` is refused by the command policy and sent to the affected verb; the owner, unbound, is never refused.
-Reasons: a full run costs tens of minutes of a loaded host and answers no more than the affected set for a local change, while a hand-picked
-"the test I touched" misses the dependents (2026-10-08: a template fix broke the lite scaffold, one registry file broke 52 specs) - which is why the set is computed.
+The selection algorithm is owned by `modules/cli/commands/test/affected.yaml` (`conventions`) and [verify-proof](docs/verify-proof.md); it is computed, never hand-picked.
+The full suite runs twice in a change's life, once by the lead on the merged tree and once inside `starci release cut` (the pre-push gate requires its record); where it runs under `release.suite: ci`
+is owned by [releasing](docs/releasing.md#where-the-suite-runs). A bound role (op, kernel, supervisor, critic, a lane's lead seat) that runs the root `npm test` is refused by the command policy and sent to the affected verb.
 
 The supported Node.js 22/24 branches are declared in `package.json` `engines.node` and summarized in
 [README prerequisites](README.md). Unflagged `node:sqlite` and the runtime capability checks are
@@ -100,7 +94,7 @@ record and is worse than a red check.
   enforces it — the install manifest hashes bytes).
 - **State:** project and host state use their SQLite writers in `engine/db/ledger.mjs` and
   `engine/db/machine.mjs`; [storage](docs/ledger-db.md) owns their placement and lifecycle.
-  Dispatch artifacts use the OS tmpdir or are deleted after delivery.
+  A prompt too long to type is a file under the state root's `dispatch-prompts/`; `scripts/agent/prompt-file.mjs` owns its bound, directory and cleanup.
 
 ## Single source of truth (no duplicates, no redundancy)
 

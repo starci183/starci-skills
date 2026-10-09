@@ -218,8 +218,8 @@ the `storage-convention` check (`RT_STORAGE_UNDECLARED`) and the `event-spill` c
   snapshot, an image or render, a diff.
 - **May stay inline:** ids, states, timestamps, counts, short codes and one-line reasons up to 256 bytes (`scalar`); other free text that is queried or shown whole up to
   1024 bytes (`bounded`); the sha or uri of a blob (`reference`).
-- **A payload of any size** (`events.payload_json`, `sup_events.payload_json`) goes through the one spill path: the writer keeps a bounded inline view (at most 16 KiB, the top-level
-  scalars) and the whole payload behind `payload_sha`; readers resolve it with `eventPayloadOf` (`engine/db/event-payload.mjs`).
+- **A payload of any size** is class `spill` and the whole payload sits behind `payload_sha`. `events.payload_json` keeps the bounded inline view of `eventPayloadRecord` (`engine/db/event-compact.mjs`, rule R238), read whole with
+  `eventPayloadOf` (`engine/db/event-payload.mjs`); `sup_events.payload_json` keeps the reference stub of `jsonOrBlob` (`engine/db/machine.mjs`), which the handle's resolver (`engine/db/ref-value.mjs`) replaces by the content on every read.
 - **Declared, not assumed:** every text column of the product ledger and of `machine.sqlite` has a class in the registry. A column that holds content inline today is class
   `migrate`, listed with the largest value measured in the read-only copies of the live stores; the migration of such a column to a reference is a proposed runtime step
   (idempotent, journalled), never a hand rewrite of a live store. Existing rows stay readable: a legacy inline value resolves as before.
