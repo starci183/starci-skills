@@ -186,6 +186,15 @@ function requireReceiptScope(ctx, rec, receipt) {
   const newer = [...mine, ...stray].filter((file) => !receipt.files.includes(file));
   if (newer.length) throw Object.assign(fail({ code: 'workflow-checkpoint-recovery-conflict' }, `newer files conflict with the prepared effect of ${receipt.opId}: ${newer.slice(0, 3).join(', ')}`), { files: newer });
 }
+/**
+ * Whether the only files newer than a prepared receipt are strays (under no lease): a file a Kernel's shell left in the tree (a redirect to a file named 0) is
+ * not the op's work and must not make a fail decision unrecoverable; the receipt is prepared again so it covers them. A newer file of the op's own scope stays a conflict.
+ */
+function onlyStrayIsNewer(ctx, rec, receipt) {
+  const leases = leasesOf(ctx, receipt);
+  const { mine, stray } = splitChanges(rec.path, { own: receipt.scope, others: leases.others });
+  return stray.some((file) => !receipt.files.includes(file)) && mine.every((file) => receipt.files.includes(file));
+}
 /** The durable applied receipt re-verified against the live tree, or null when the effect was never applied. */
 const appliedReceipt = (ctx, rec, workflowId, head, state) => {
   if (!state?.applied) return null;
@@ -256,7 +265,7 @@ function preserveOwned(ctx, { workflowId, opId }) {
   const leases = leasesOf(ctx, { workflowId, opId });
   const answer = () => { const { mine, stray } = splitChanges(rec.path, leases); return [...mine, ...stray]; };
   let receipt = state?.prepared;
-  if (!receipt) receipt = preparePreserve(ctx, { workflowId, opId, rec, head, state, leases, answer });
+  if (!receipt || (head === receipt.before && onlyStrayIsNewer(ctx, rec, receipt))) receipt = preparePreserve(ctx, { workflowId, opId, rec, head, state, leases, answer });
   if (head !== receipt.before && head !== receipt.resetTo) throw fail({ code: 'workflow-foreign-commit' }, `${rec.branch} moved outside the prepared reset of ${opId}: ${head}`);
   requireReceiptScope(ctx, rec, receipt);
   requireReceiptBytes(rec, receipt, [receipt.sha ?? receipt.before, receipt.resetTo], git);

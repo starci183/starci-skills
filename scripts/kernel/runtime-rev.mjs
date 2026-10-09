@@ -6,7 +6,7 @@ import { log as gitLog } from '../api/git/log.mjs';
 import { kernelNotesOf } from '../machine/land-kernel-note.mjs';
 import { fileURLToPath } from 'node:url';
 import { contractFilesOf, runtimeShaOf } from '../machine/contract-version.mjs';
-import { eventPayloadOf } from '../lib/event-payload.mjs';
+import { eventPayloadOf } from '../../engine/db/event-payload.mjs';
 import { underAny } from '../lib/path-key.mjs';
 
 export const KERNEL_REV_ACKED_EVENT = 'runtime-rev-acked';

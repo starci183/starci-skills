@@ -9,7 +9,7 @@ import { withKernelIngress } from '../helpers/kernel-ingress-fixture.mjs';
 import { kernelAuthorityOf } from '../../scripts/kernel/verbs/shared/kernel-seat.mjs';
 import { kernelReadManifest, requireKernelRead, unreadFiles } from '../../scripts/kernel/required-read.mjs';
 import { callerAdmission } from '../../scripts/kernel/caller-admission.mjs';
-import { eventPayloadOf } from '../../scripts/lib/event-payload.mjs';
+import { eventPayloadOf } from '../../engine/db/event-payload.mjs';
 import ackRev from '../../scripts/kernel/verbs/kernel-ack-rev.mjs';
 
 const options = (w) => ({ root: w.runtime, authority: kernelAuthorityOf(w.ledger.db, w.workflowId, w.handle), ops: ['review.verify'] });

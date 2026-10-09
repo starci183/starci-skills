@@ -39,7 +39,8 @@ import { stopAndRelease } from '../machine/worker-close.mjs';
 // worker-show states that end a worker (start-workflow.mjs MANAGED_DEAD_STATE).
 const DEAD_WORKER_STATE = /stop|fail|dead|exit|release|abandon/i;
 import { jsonFromStdout } from '../lib/json.mjs';
-import { revWakeLine } from './runtime-rev.mjs';
+import { currentRuntimeRev, revWakeLine } from './runtime-rev.mjs';
+import { parseJsonOr } from '../lib/json.mjs';
 import { openDecisionRow } from '../machine/decisions.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { arg as argvValue } from '../lib/cli-arg.mjs';
@@ -250,18 +251,20 @@ const KERNEL_MOVES = new Set(['job-enqueued', 'follow-on-enqueued', 'job-dropped
 const KERNEL_ACTIVITY = new Set(['op-dispatched', 'op-settled', 'kernel-decision', 'kernel-decision-result', 'kernel-proposal',
   'autopilot-deferred-to-handover', 'ask-superseded', 'ask-answered', 'peer-message-acked', 'runtime-rev-acked']);
 const recordKernelWoken = (terminal, detail) => withKernelLedger((ledger) => ledger.transaction(() => ledger.appendEvent({
-  workflowId, entityType: 'kernel', entityId: workflowId, kind: KERNEL_WOKEN_EVENT, payload: { terminal, ...detail } })));
+  workflowId, entityType: 'kernel', entityId: workflowId, kind: KERNEL_WOKEN_EVENT, payload: { terminal, ...detail, rev: currentRuntimeRev() ?? null } })));
 /**
  * {wakes, firstWakeAt, replaced, due}: delivered wakes since the Kernel's last move or record (firstWakeAt the
  * created_at of the first), idle replacements within IDLE_REPLACED_WINDOW_MS since its last job move, and whether H11
  * acts (WAKE_IDLE_REPLACE wakes, the first at least WAKE_IDLE_WINDOW_MS old). Pure over the ledger rows {kind, created_at}.
  */
-export function idleWakesOf(rows, { now = Date.now() } = {}) {
+export function idleWakesOf(rows, { now = Date.now(), rev } = {}) {
   let wakes = 0, firstWakeAt = null, replacedAts = [];
   for (const row of rows) {
     if (KERNEL_MOVES.has(row.kind)) { wakes = 0; firstWakeAt = null; replacedAts = []; }
     else if (KERNEL_BOOTS.has(row.kind)) { wakes = 0; firstWakeAt = null; }
     else if (KERNEL_ACTIVITY.has(row.kind)) { wakes = 0; firstWakeAt = null; }
+    // A wake given under another runtime revision is another situation: what the Kernel could not do then may be done now, so the streak starts over.
+    else if (row.kind === KERNEL_WOKEN_EVENT && rev !== undefined && (parseJsonOr(row.payload_json).rev ?? null) !== rev) { wakes = 0; firstWakeAt = null; }
     else if (row.kind === KERNEL_WOKEN_EVENT) { if (wakes === 0) { firstWakeAt = Number(row.created_at) || null; } wakes += 1; }
     else if (row.kind === KERNEL_IDLE_REPLACED_EVENT) { replacedAts.push(Number(row.created_at) || 0); wakes = 0; firstWakeAt = null; }
   }
@@ -271,8 +274,8 @@ export function idleWakesOf(rows, { now = Date.now() } = {}) {
 }
 const IDLE_KINDS = [...KERNEL_MOVES, ...KERNEL_BOOTS, ...KERNEL_ACTIVITY, KERNEL_WOKEN_EVENT, KERNEL_IDLE_REPLACED_EVENT];
 const kernelIdleWakes = () => withKernelLedger((ledger) => idleWakesOf(ledger.db.prepare(
-  `SELECT kind, created_at FROM events WHERE workflow_id=? AND kind IN (${IDLE_KINDS.map(() => '?').join(',')}) ORDER BY seq`)
-  .all(workflowId, ...IDLE_KINDS))) ?? { wakes: 0, firstWakeAt: null, replaced: 0, due: false };
+  `SELECT kind, created_at, payload_json FROM events WHERE workflow_id=? AND kind IN (${IDLE_KINDS.map(() => '?').join(',')}) ORDER BY seq`)
+  .all(workflowId, ...IDLE_KINDS), { rev: currentRuntimeRev() ?? null })) ?? { wakes: 0, firstWakeAt: null, replaced: 0, due: false };
 const escalateIdleStall = ({ phase, terminal, idle, outputAgeMs }) => {
   let decision = null;
   try {

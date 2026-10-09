@@ -1000,14 +1000,14 @@ cases:
     family: authority-safety
     finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: the settle of a failed op puts the workflow branch back on its last checkpoint) the Nivo settle-fail of op-architecture.decide-e78adc94cc prepared its reset receipt (events 770, 919) with the right target (the checkpoint 30d46eb) and died with workflow-reset-failed at the git reset --soft: the worktree garbage collector had committed the files of the op on the workflow branch (7ea9436, \"preserve ... uncommitted work of its worktree\"), and the reference-transaction hook the runtime installs keeps a workflow branch append-only, so it refused the runtime's own rewind (\"not a fast-forward\"); reproduced on a clone of the tree with the live hook", remedy: {state: in-tree, change: "the hook (version 8) lets a protected branch move to the target named in STARCI_BRANCH_REWIND when the commit it leaves is kept under refs/heads/preserved; preserveAndReset refreshes the hook of the tree and names the target on its reset, so nothing else rewrites the branch"}}
     met: {date: "2026-10-09", where: "alpha.8 live, Nivo workflow tree", evidence: "nivo runtime.sqlite events 770, 771, 842, 850, 919, 920; the reflog of the tree (no reset), HEAD 7ea9436 against the checkpoint 30d46eb, hook .husky/_/reference-transaction v7"}
-    rule: {file: scripts/guards/hook-install.mjs, anchor: "STARCI_BRANCH_REWIND"}
+    rule: {file: scripts/guards/hook-install.mjs, anchor: "historyHookBody"}
     spec: tests/kernel/workflow-rewind-hook.spec.mjs
     status: covered
   - id: failed-critic-verdict-offers-accept-and-clips-the-critique
     family: correctness
     finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: the choices of an item do what they say) the item of a done report refused op-critic-verdict-failed offered accept (\"only when the blocker the refusal names has since landed\"), a settle pass the runtime refuses again against the same failed verdict, and its red check kept 200 characters of the failed checks the retry is fed; the choices did not say what they do with the critique", remedy: {state: in-tree, change: "accept is not offered against op-critic-verdict-failed; settle-fail and continue say that the failed checks of the Critic are recorded as the red check of the attempt (up to 1500 characters) and fed to the retry"}}
     met: {date: "2026-10-09", where: "alpha.8 live, Nivo job op-architecture.decide-e78adc94cc", evidence: "nivo runtime.sqlite event 912 (job-settle-needs-kernel code op-critic-verdict-failed), the menu options of job-decision:op-architecture.decide-e78adc94cc"}
-    rule: {file: scripts/machine/decision-resolution.mjs, anchor: "CRITIC_FAILED"}
+    rule: {file: scripts/machine/decision-resolution.mjs, anchor: "jobOptions"}
     spec: tests/kernel/menu-answered-hold.spec.mjs
     status: covered
   - id: kernel-read-attestation-over-the-inline-event-bound
@@ -1028,7 +1028,7 @@ cases:
     family: record-vs-reality
     finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a counter says what it counts) every decision result of the Nivo Kernel read running:1 while the digest said nothing ran and the workers list was empty: the baseline counted every open job that is not queued, which includes the reported job waiting for its settle (op-architecture.decide-e78adc94cc, worker gone)", remedy: {state: in-tree, change: "running counts the open jobs whose worker is alive (leased, running, answering)"}}
     met: {date: "2026-10-09", where: "alpha.8 live, Nivo workflow", evidence: "nivo runtime.sqlite events 917 to 920 (baseline running 1, job status reported)"}
-    rule: {file: scripts/kernel/decision-log.mjs, anchor: "WORKER_LIVE"}
+    rule: {file: scripts/kernel/decision-log.mjs, anchor: "snapshotOf"}
     spec: tests/reconciler-controllers/supervisor-mirror.spec.mjs
     status: covered
   - id: shape-guard-refuses-the-retry-the-failure-route-queued
@@ -1044,4 +1044,39 @@ cases:
     met: {date: "2026-10-09", where: "alpha.8 live, StarCi workflow", evidence: "machine.sqlite seats supervisor (booted_at = last_seen_at), sup_decisions decided_at 1791527806878 to 1791527818050, machine_logs 16558 to 16566 supervisor.action"}
     rule: {file: scripts/reconciler/supervisor-sign-of-life.mjs, anchor: "supervisorLastSeenAt"}
     spec: tests/reconciler/supervisor-sign-of-life.spec.mjs
+    status: covered
+  - id: failed-step-answer-hides-its-item-past-the-revision-that-cures-it
+    family: record-vs-reality
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: an item the Kernel answered is hidden only while nothing that could change the outcome changed) 6513ee8ba holds an item off the Kernel menu while its latest answer failed a step and its facts are unchanged; the Nivo settle-fail failed on the history hook, which the same revision fixed, so after the restart the Critic-failed item was hidden, the frontier read settle-ready with zero ready work, and no Kernel would ever decide it (op-architecture.decide-e78adc94cc stayed reported)", remedy: {state: in-tree, change: "a menu answer records the runtime revision it was given at; a hold (a chosen wait or a failed step) stands only at that revision, so a new revision offers the item again once and the Kernel is woken for it; failing again at the new revision holds it again"}}
+    met: {date: "2026-10-09", where: "alpha.8 live 13:42, Nivo workflow", evidence: "nivo runtime.sqlite events 984 to 995 (settle-fail reverted workflow-checkpoint-recovery-conflict, rev 6513ee8 acked 13:36:48, no kernel-decision after); the item hidden by its recorded facts"}
+    rule: {file: scripts/kernel/verbs/shared/status-menu.mjs, anchor: "standingAnswersOf"}
+    spec: tests/kernel/menu-answered-hold.spec.mjs
+    status: covered
+  - id: kept-prepared-fail-decision-hidden-from-the-kernel-and-the-settler
+    family: record-vs-reality
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a settle is owned by someone) after the settler kept the prepared fail receipt of Nivo op-architecture.decide-e78adc94cc (event 992, \"an apply to finish\") it handed the job over again under the new revision (event 994, code workflow-checkpoint-recovery-conflict); the menu read a kept receipt as the Kernel's only while it was newer than the newest hand-over, so the newer hand-over made the settle the runtime's, and the settler, which looks at a receipt once, had nothing left to do: reported, hidden from the Kernel, owned by nobody, accept still offered against it", remedy: {state: in-tree, change: "a kept receipt stands as the Kernel's apply until it is applied, withdrawn or replaced by a newer receipt (keptOpenOf), whichever hand-over is newest; accept is not offered against a prepared fail decision"}}
+    met: {date: "2026-10-09", where: "alpha.8 live 13:42, Nivo workflow", evidence: "nivo runtime.sqlite events 992 (workflow-op-preserved-kept), 994 (job-settle-needs-kernel at rev 6513ee8, recovery-conflict); status menu empty on the copy before the fix, the item on it after"}
+    rule: {file: scripts/kernel/settle/prepared-recovery.mjs, anchor: "keptOpenOf"}
+    spec: tests/kernel/menu-answered-hold.spec.mjs
+    status: covered
+  - id: stray-file-in-the-workflow-tree-blocks-the-fail-decision-recovery
+    family: failure-while-running
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a failed op settles and the tree goes back on its checkpoint) every settle-fail of Nivo op-architecture.decide-e78adc94cc after 13:12 died workflow-checkpoint-recovery-conflict: the Kernel shell had left a file named 0 in the root of the workflow tree (a redirect, 91 bytes, 13:12:46), a file under no lease that appeared after the receipt was prepared, and the recovery refuses any newer file (\"newer files conflict with the prepared effect\"); the Kernel cannot delete a file, the settler looks at the receipt once", remedy: {state: in-tree, change: "when the only files newer than a prepared preserve receipt are strays (under no lease) and the branch has not moved, the receipt is prepared again so that the preserved commit and the reset cover them; a newer file of the op's own scope stays a conflict"}}
+    met: {date: "2026-10-09", where: "alpha.8 live 13:54, Nivo workflow tree", evidence: "the tree: untracked file 0 (13:12:46) at its root, HEAD 7ea9436, no reset in the reflog since 07:40; nivo runtime.sqlite events 979, 986, 990 (settle failed: workflow-checkpoint-recovery-conflict)"}
+    rule: {file: scripts/kernel/workflow-checkpoint.mjs, anchor: "onlyStrayIsNewer"}
+    spec: tests/kernel/workflow-checkpoint.spec.mjs
+    status: covered
+  - id: idle-wakes-of-an-earlier-revision-replace-the-kernel-after-the-deploy
+    family: smooth-operation
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a Kernel is replaced only when it is really dead or idle at the situation it was woken for) the StarCi Kernel received three idle wakes at 13:34 to 13:35 under revision 328a4d3; the deploy of 6513ee8 changed the situation and re-offered items, and at 13:48:41 the watchdog replaced the Kernel for the three old wakes (kernel-replaced-idle, attempt 12 to 13), twelve minutes after the deploy", remedy: {state: in-tree, change: "a kernel-woken event records the runtime revision it was given under, and the idle-wake streak counts only wakes of the live revision"}}
+    met: {date: "2026-10-09", where: "alpha.8 live 13:48, StarCi workflow", evidence: "starci runtime.sqlite events 3011 to 3014 (kernel-woken idleWakes 1 to 3), 3033 (kernel-replaced-idle wakes 3), 3041 (kernel-restarted attempt 13)"}
+    rule: {file: scripts/kernel/kernel-watchdog.mjs, anchor: "idleWakesOf"}
+    spec: tests/kernel/auth-seat-churn.spec.mjs
+    status: covered
+  - id: approved-leg-asks-no-attestation-the-enqueue-needs
+    family: smooth-operation
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: the menu says what the choice needs) the StarCi Kernel of attempt 13 chose enqueue-leg for interface.draw at 13:53 and was refused kernel-read-unverified: a Kernel life must attest the files of the leg it opens (84 to 103 files), the status shows only the attestation of an earlier life (\"acked 328a4d\"), and nothing on the leg-ready item said so, so three lives in a row answered the item without attesting", remedy: {state: in-tree, change: "the leg-ready item carries the unattested file count and the kernel-ack-rev steps while this life has not attested the READ of that leg"}}
+    met: {date: "2026-10-09", where: "alpha.8 live 13:54, StarCi workflow", evidence: "starci runtime.sqlite events 3052, 3053 (enqueue-leg reverted kernel-read-unverified at attempt 13); the plan on the copy lists 103 files, 103 unread; the attestation lands on the copy"}
+    rule: {file: scripts/kernel/verbs/shared/status-menu.mjs, anchor: "attestNoteOf"}
+    spec: tests/kernel/menu-answered-hold.spec.mjs
     status: covered
