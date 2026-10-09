@@ -1,3 +1,4 @@
 group: machine
 summary: inspect and maintain host machine state
 owner: runtime
+runtimeSide: host

@@ -1,3 +1,4 @@
 group: npm
 summary: install exact dependencies in one owned worktree under the host lock
 owner: runtime
+runtimeSide: host

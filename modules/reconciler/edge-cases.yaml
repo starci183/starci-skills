@@ -1579,3 +1579,20 @@ cases:
     rule: {file: scripts/api/node/lib.mjs, anchor: "forChild"}
     spec: tests/api/node-test-runner-seam.spec.mjs
     status: covered
+
+  - id: components-resolve-the-tree-each-by-itself
+    family: correctness
+    found: live
+    replay: tests/replay/one-tree-resolver.spec.mjs
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "four times in two days a component read or wrote the wrong tree because it resolved which directory by itself: the grammar context read the brand record from the product's main checkout while the finished brand leg had written it in the workflow tree; the draw capture looked for Playwright and esbuild only in product directories; a CLI started from a clone wrote generated files into the tree a home record named; the Kernel start was gated by the UI build of another tree. The autopilot's direction and draw gates read the same records from the main checkout", remedy: {state: in-tree, change: "scripts/lib/roots.mjs names each root with one resolver (runtime tree, runtime state, temp root, invocation directory, Work directory) and the precedence of two trees holding one record (the workflow tree first, then the main checkout: workDirHolding, workRecordPath, toolSearchDirs); the grammar context, the autopilot gates and the render tool lookup use it; the root-adhoc self-check (R240) refuses a new file that spells process.cwd() or the Work directory name, and a file may not spell either more often than the tree the check landed on held it"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, Nivo and StarCi workflows", evidence: "registry entries grammar-context-reads-the-main-checkout-not-the-workflow-tree, draw-render-tool-resolved-from-the-product-only, the runtime-tree write refusal and the Kernel-start UI gate fixes of 2026-10-09"}
+    rule: {file: scripts/lib/roots.mjs, anchor: "workDirHolding"}
+    spec: tests/lib/roots.spec.mjs
+    status: covered
+  - id: tree-verb-ran-the-other-tree-through-the-home-record
+    family: correctness
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "a lane ran starci test affected --run inside its clone with STARCI_RUNTIME unset: the per-user home record outranks the checkout, so the CLI printed a notice and ran the live tree's code and specs for ten minutes, and the verdict was about the wrong tree. The refusal of 2026-10-09 covered only verbs that write the runtime tree", remedy: {state: in-tree, change: "every verb declares its side (runtimeSide, per group and per verb; the catalog refuses a group without one): a tree-side verb (about the runtime tree that owns the running bin: runtime check, test affected, release, gate, regeneration) runs this checkout unless STARCI_RUNTIME or its own --root chose a tree, a host-side verb runs the located runtime as before; the affected receipt names the root it judged and the deploy gate refuses a receipt that judged another tree's root"}}
+    met: {date: "2026-10-09", where: "a lane clone, test affected --run without STARCI_RUNTIME", evidence: "coordinator report of 2026-10-09: the CLI printed 'running the runtime at the live checkout (STARCI_RUNTIME/home record), not this checkout' and ran the other tree's specs"}
+    rule: {file: packages/cli/src/runtime-target.mjs, anchor: "targetOf"}
+    spec: tests/cli/runtime-side.spec.mjs
+    status: covered

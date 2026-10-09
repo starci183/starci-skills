@@ -14,6 +14,7 @@ import { readBrandRecord } from '../work/brand/brand.mjs';
 import { projectBinding, bindingRepo } from './target-repo.mjs';
 import { isFile, isDir } from '../lib/fs-kind.mjs';
 import { byCodeUnit } from '../lib/list.mjs';
+import { treesInOrder, workDirHolding, workDirsInOrder } from '../lib/roots.mjs';
 
 export const GRAMMAR_PACKAGE = '@starci/grammar';
 const GRAMMAR_KNOWLEDGE_FAMILY = 'starci';
@@ -134,12 +135,12 @@ const watchOf = (watch, missing) => [...new Set([...watch, ...missing.map((m) =>
 export function resolveGrammarContext({ skillRoot, repo, binding = projectBinding(repo), inputs = 'reference', tree = null }) {
   const sources = [];
   const missing = [];
-  const roots = [...new Set([tree, repo, ...(binding?.repos ?? []).map((r) => r.root)].filter(Boolean).map((r) => path.resolve(r)))];
+  const roots = [...new Set([...treesInOrder({ tree, repo }), ...(binding?.repos ?? []).map((r) => r.root).filter(Boolean).map((r) => path.resolve(r))])];
   const workDirName = binding?.workDir ?? '.starciwork';
-  const workDir = [tree, repo].filter(Boolean).map((base) => path.join(base, workDirName)).find((dir) => isDir(dir) && hasBrandRecord(dir)) ?? path.join(repo, workDirName);
+  const workDir = workDirHolding((dir) => isDir(dir) && hasBrandRecord(dir), { tree, repo, workDirName });
 
   // The files whose appearance or change can cure a refusal: the brand record of the tree and of the checkout, and every file a missing source names.
-  const watch = [tree, repo].filter(Boolean).map((base) => path.join(base, workDirName, 'brand', 'index.yaml'));
+  const watch = workDirsInOrder({ tree, repo, workDirName }).map((dir) => path.join(dir, 'brand', 'index.yaml'));
   const family = familyCss({ skillRoot, repo, binding, roots, workDir, sources, missing });
   knowledgeInputs(skillRoot, sources, missing);
 

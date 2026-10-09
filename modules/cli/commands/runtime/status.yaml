@@ -1,6 +1,7 @@
 group: runtime
 verb: status
 owner: runtime
+runtimeSide: host
 summary: the runtime's version, tree root and manifest drift — a read-only summary
 impl:
   script: scripts/cli/lib/runtime-status.mjs
