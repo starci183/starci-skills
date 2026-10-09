@@ -145,6 +145,11 @@ proofs:
     requirement:
       en: Declared outcomes/claims are covered and supported; executable claims have actual executed
         proof, generated images are inspected, and unrun examples stay unverified.
+judge:
+  - by: machine
+    measures: [declared-checks]
+    proofs: [binding]
+    why: "the settler re-runs the record validator and every other check it can run itself; the examples and images the op ran or inspected are its own evidence (registry entry op-judge-substance-unjudged)"
 blockers:
   - code: CONTENT_AUTHORITY_MISSING
     condition:

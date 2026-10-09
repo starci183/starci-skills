@@ -144,6 +144,11 @@ proofs:
       en: "The report's head is git rev-parse HEAD of the tree this review verified. In a workflow worktree the finish lands only that exact head: the head the runtime recorded at this op's settle must equal the report's head and the head that lands (reviewVerifiedOf), else workflow-finish-verify-stale and review.verify runs again."
       vi: "head trong báo cáo là git rev-parse HEAD của cây mà lần review này đã kiểm. Trong worktree của workflow, finish chỉ đưa vào main đúng head đó: head mà runtime ghi lại khi settle op này phải trùng head trong báo cáo và head được đưa vào main (reviewVerifiedOf), nếu không là workflow-finish-verify-stale và phải chạy lại review.verify."
     check: scripts/kernel/workflow-checkpoint.mjs
+judge:
+  - by: machine
+    measures: [declared-checks, op-proof:review-gate, op-proof:review-defects, contract-script]
+    proofs: [review-gate, review-defects, verified-head]
+    why: "the gate is re-run read-only over the reviewed range, every defect must be classified, and the head it verified must equal the head that lands"
 blockers:
   - code: OPERATION_REQUIRED
     condition:

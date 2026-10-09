@@ -545,6 +545,11 @@ proofs:
       en: "starci kernel settle re-reads the attached lint.json (runtime check op-proof, proof fe-lint): a done without it (op-lint-proof-missing), with a lint that could not run (op-lint-tool-failed) or with a finding under fe/ (op-lint-findings) is refused."
       vi: "starci kernel settle tự đọc lại lint.json đính kèm (check op-proof, proof fe-lint): done thiếu nó (op-lint-proof-missing), có lint không chạy được (op-lint-tool-failed) hoặc có lỗi dưới fe/ (op-lint-findings) đều bị từ chối."
     check: scripts/kernel/gate-settle.mjs
+judge:
+  - by: machine
+    measures: [declared-checks, op-proof:fe-lint, proof-media, contract-script]
+    proofs: [fe-lint, deterministic-coverage, shell-conformance]
+    why: "the front-end lint is re-run natively, the shell-conformance check is a runtime script the settler re-runs, and a pass without the captures and the video is refused"
 blockers:
   - code: PRODUCT_DEFECT_OWNER
     condition:

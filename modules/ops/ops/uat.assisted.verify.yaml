@@ -278,6 +278,11 @@ proofs:
       en: The operation produces evidence only. Canonical Work remains state todo without completion edits
         until a separate final reconciliation binds current SRS, SDS, code, test/E2E and UAT to one
         delivery revision.
+judge:
+  - by: machine
+    measures: [declared-checks, proof-media, contract-script]
+    proofs: [evidence-integrity]
+    why: "the evidence files are read from the filed report and a pass without a screenshot and the session video is refused; the bindings are recomputed independently from the immutable receipts"
 blockers:
   - code: ENVIRONMENT_NOT_READY
     condition:

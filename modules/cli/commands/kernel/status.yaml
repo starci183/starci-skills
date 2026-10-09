@@ -12,7 +12,7 @@ flags:
     summary: comma list of dotted paths of the answer; prints only those fields as JSON
   - name: full
     type: boolean
-    summary: the whole text view (every section); the Kernel seat's own call prints its one-line state and its Decide section by default
+    summary: the whole text view (every section; the legs line tags each leg [judge:...] with who judges its product, the judge field of its op contract); the Kernel seat's own call prints its one-line state and its Decide section by default
   - name: repo
     type: string
     summary: managed repository whose .starciwork ledger the command uses

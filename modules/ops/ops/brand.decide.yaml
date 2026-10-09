@@ -517,6 +517,13 @@ proofs:
       en: "starci kernel settle re-reads the attached read-digest.json (runtime check op-proof, proof read-knowledge): a done whose digest is missing (op-read-digest-missing), names no knowledge file or leaves a written record without its hfs slot (op-read-digest-no-knowledge) is refused."
       vi: "starci kernel settle tự đọc lại read-digest.json đính kèm (check op-proof, proof read-knowledge): done thiếu bản tóm tắt (op-read-digest-missing), không nêu tệp knowledge nào hoặc có bản ghi đã viết thiếu slot hfs (op-read-digest-no-knowledge) đều bị từ chối."
     check: scripts/kernel/gate-settle.mjs
+judge:
+  - by: machine
+    measures: [declared-checks, work-hygiene, contract-script, op-proof:read-knowledge]
+    proofs: [direction, shell-capture, read-knowledge]
+    why: "the brand and shell-conformance checks are runtime scripts the settler re-runs over the records, and the READ of the standard is re-read from the digest"
+  - by: owner
+    why: "the brand direction is ready only on the owner's own receipt of its direction review ask for the current revision"
 blockers:
   - code: SHELL_RENDER_UNAVAILABLE
     condition:

@@ -321,6 +321,16 @@ proofs:
     requirement:
       en: "A Critic of another provider than this op, picked from the Critic tier, judged exactly the architecture.decide records written here and the records they cite against the rubric of modules/kernel/critic-rubrics.yaml, and its verdict passes the declared minimum. The runtime runs that Critic itself, once per version of the records, when this op reports done (scripts/kernel/settle/critic-run.mjs; the op runs no Critic and a verdict it attaches is ignored) and starci kernel settle judges the verdict of that run against the sha256 of the records now (scripts/kernel/critic-settle.mjs): a run not yet recorded (op-critic-verdict-missing, the runtime owes it), a verdict of other bytes (CRITIC_VERDICT_STALE) or a failing one (op-critic-verdict-failed, error-work: the next attempt is fed the critique) is refused."
     check: scripts/kernel/critic-settle.mjs
+judge:
+  - by: machine
+    measures: [declared-checks, work-hygiene, op-proof:read-knowledge]
+    proofs: [binding, read-knowledge]
+    why: "the settler re-runs the record validator over the records written, the Work files are checked for hygiene and the READ of the standard is re-read from the digest"
+  - by: critic
+    rubric: "modules/kernel/critic-rubrics.yaml#kinds[id=architecture.decide]"
+    runs: runtime
+    proofs: [independent-critic]
+    why: "the runtime runs an independent Critic of another provider over the sds, contract and integration records once per version of them, and settle judges its verdict"
 blockers:
   - code: OWNERSHIP_UNKNOWN
     condition:
