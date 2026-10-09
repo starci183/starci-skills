@@ -1527,3 +1527,13 @@ cases:
     rule: {file: scripts/kernel/start-refusal-journal.mjs, anchor: "journalRefusedStart"}
     spec: tests/replay/start-refusals-counted.spec.mjs
     status: covered
+  - id: unstamped-orphan-tree-is-reported-in-a-log-row-only
+    family: record-vs-reality
+    met: {date: "2026-10-09", where: "held-state sweep of the failure catalogue (lane fix/a8-held-states-have-owners)", evidence: "scripts/machine/worktrees.mjs reviewUnstamped: an unstamped tree with no registry row is never removed and is reported once as the machine log row worktree.orphan-review"}
+    status: open
+    why: "the catalogue gives unstamped-orphan to the owner, but the tree stays on disk until the owner looks and only a machine log row (once per path) and the GC report item action review name it: no Decision Item, no digest line and no clock follow it. A tree the GC never removes is the owner's to judge, so the item needs the owner's decision options (keep, remove) and a close when the tree is gone; that wants a decision of the owner on what removing an unregistered tree may touch"
+  - id: draft-stuck-refusal-reaches-no-owner-item
+    family: failure-while-running
+    met: {date: "2026-10-09", where: "held-state sweep of the failure catalogue (lane fix/a8-held-states-have-owners)", evidence: "scripts/kernel/clear-draft.mjs and quit-agent.mjs refuse draft-stuck; scripts/kernel/verbs/nudge.mjs refuseDraftDelivery"}
+    status: open
+    why: "a wake or nudge refused because a real person's draft stands in the input box is counted as a missed wake and replaces the seat after the declared number of misses, but the draft belongs to the owner and no item asks the owner to clear it; the replacement would discard that draft. Which of the two is right (ask the owner first, or replace and keep the text) is the owner's decision, so the refusal stays unsurfaced to the owner until it is made"

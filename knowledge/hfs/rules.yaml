@@ -2126,3 +2126,12 @@ rules:
     failureCodes: ["RT_STORAGE_UNDECLARED"]
     enforcers:
       - {kind: runtime, id: storage-convention, at: scripts/checks/check-storage-convention.mjs}
+  - id: R240
+    code: "RT_HELD_UNSURFACED"
+    law: "A failure code the catalogue gives to the Supervisor or the owner as a runtime fault is a state that role must be able to learn of; a stop that nobody is told of stands for hours until someone reads source. Each such entry of modules/kernel/failure-codes.yaml names the house mechanism that reaches its owner (surfacedBy: decision-item, sla-clock, incident, digest, notifier, caller or open) with surfacedAs (the item kind, clock code, incident kind, digest problem line or urgent class) and surfacedAt (the file that does it), and the check proves the mechanism exists and is wired in that file: the kind is a Decision Item kind and the file opens items naming it, the code is an SLA code with an owner and the file sets its clock, the problem line is a departure of the operating standard, a caller is a verb the owning role ran itself and never a reconciler file (a loop is no owner). An entry nothing reaches is surfacedBy open and names an open edge-case registry entry with the exact reason; it is never exempted silently."
+    scope: runtime
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RT_HELD_UNSURFACED"]
+    enforcers:
+      - {kind: runtime, id: held-surfacing, at: scripts/checks/check-held-surfacing.mjs}
