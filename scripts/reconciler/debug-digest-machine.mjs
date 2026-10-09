@@ -12,6 +12,7 @@ import { supervisorLastSeenAt } from './supervisor-sign-of-life.mjs';
 import { noticeFor } from '../machine/revision-ack.mjs';
 import { noticeLine } from '../machine/revision-notice.mjs';
 import { supervisorSeat } from '../machine/revision-seats.mjs';
+import { purgedWorkflowIds } from '../machine/workflow-purged.mjs';
 import { revRootOf } from '../kernel/runtime-rev.mjs';
 import { digestNumbers } from './debug-digest-numbers.mjs';
 import { SIGNAL, signalRows } from '../machine/debug-signals.mjs';
@@ -73,14 +74,17 @@ function supervisorOf(m, since = null) {
   const deaf = ask(m, 'SELECT seat_id, last_input_failure_at FROM v_deaf_seats').some((r) => r.seat_id === SUPERVISOR_SEAT.seatId && Number(r.last_input_failure_at ?? 0) >= Number(seat?.booted_at ?? 0));
   const enabled = parseJsonOr(ask(m, 'SELECT value_json FROM sup_signals WHERE scope=?', [SUPERVISOR_SEAT.enabledScope])[0]?.value_json)?.enabled ?? null;
   const wake = ask(m, "SELECT MAX(created_at) AS at FROM sup_events WHERE kind='supervisor-wake'")[0]?.at ?? null;
-  const decisions = ask(m, "SELECT di_id, kind, decider, due_at, summary, workflow_id FROM sup_decision_items WHERE status='open'")
+  const purged = purgedWorkflowIds(m);
+  const decisions = ask(m, "SELECT di_id, kind, decider, due_at, summary, workflow_id FROM sup_decision_items WHERE status='open'").filter((d) => !purged.has(d.workflow_id))
     .map((d) => ({ id: d.di_id, kind: d.kind, decider: d.decider, dueAt: d.due_at ?? null, summary: d.summary, workflowId: d.workflow_id }));
   return { seat: seat ? { state: seat.state, terminalHandle: seat.terminal_handle, lastSeenAt: supervisorLastSeenAt(seat.last_seen_at, (sql) => ask(m, sql)), lastInputOkAt: seat.last_input_ok_at, deaf } : null,
     enabled, lastWakeAt: wake, wakes: supervisorWakeUsageOf(m.db), seatCost: supervisorSeatOf(m.db, { since: since ?? 0 }), decisions, health: null, revision: revisionLineOf(m) };
 }
 
 function reservationsOf(m) {
-  return ask(m, 'SELECT id, provider, model, role, state, scope_json, created_at, updated_at, released_at FROM provider_reservations WHERE released_at IS NULL').map((r) => {
+  const purged = purgedWorkflowIds(m);
+  const rows = ask(m, 'SELECT id, provider, model, role, state, scope_json, created_at, updated_at, released_at FROM provider_reservations WHERE released_at IS NULL');
+  return rows.filter((r) => !purged.has(KERNEL_SCOPE.exec(parseJsonOr(r.scope_json)?.scopeId ?? '')?.[1])).map((r) => {
     const scope = parseJsonOr(r.scope_json) ?? {};
     const seat = scope.seat === SUPERVISOR_SEAT.id ? SUPERVISOR_SEAT.seatId : scope.seat ?? null;
     return { id: r.id, provider: r.provider, model: r.model, role: r.role, state: r.state, jobId: scope.jobId ?? null, seat,

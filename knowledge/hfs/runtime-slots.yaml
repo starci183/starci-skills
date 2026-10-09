@@ -384,7 +384,7 @@ slots:
   - id: runtime.db
     profiles: [runtime]
     # Store connection owners and their schema and receipt modules. No api import: a value a store needs from git is passed in.
-    path: "engine/db/{ledger,ledger-paths,machine,machine-connection,machine-schema,provider-reservations,blob,authorizer,attempt-overrun,event-compact,event-payload,ref-value}.mjs"
+    path: "engine/db/{ledger,ledger-paths,machine,machine-connection,machine-schema,provider-reservations,blob,authorizer,attempt-overrun,event-compact,event-payload,ref-value,ledger-open,machine-open}.mjs"
     presence: required
     tracked: tracked
     tier: db

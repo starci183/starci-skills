@@ -5584,6 +5584,41 @@ starci workflow define --text "Add password reset"
 starci workflow define --plan --text "Add password reset"
 ```
 
+### starci workflow purge
+
+remove what an archived workflow left on the host (plan by default)
+
+| flag | type | |
+| --- | --- | --- |
+| `--repo` | string |  |
+| `--workflow` | string | required |
+| `--plan` | boolean |  |
+| `--apply` | boolean |  |
+| `--ledger` | boolean |  |
+| `--expect` | string |  |
+
+Effect: host
+
+Roles: owner
+
+Conventions:
+
+- the plan is the default and changes nothing; --apply acts, under the host lock and the gc lock
+- only an archived workflow with no live job, lease, seat or worker is purged; Orca must answer
+- trees, refs, workers and terminals go through the worktree home, the git api and worker-close; never a raw recursive delete
+- a branch is deleted only with its proof (registry row, or name grammar with a tip in main or on the workflow's checkpoint chain); the plan prints every tip
+- what the ledger or Orca cannot tie to the workflow by evidence is listed and never touched
+- the ledger rows are kept unless --ledger archives them to a verified zip and drops them
+
+exit: 0 plan printed, or the purge finished (or was already done); 1 a precondition refused it, or a step failed and the purge can be resumed; 2 bad usage
+
+json: flag
+
+```sh
+starci workflow purge --repo <repo> --workflow <id>
+starci workflow purge --repo <repo> --workflow <id> --apply --expect <sha>
+```
+
 ### starci workflow start
 
 ensure the host, then claim an approved goal and boot its Kernel

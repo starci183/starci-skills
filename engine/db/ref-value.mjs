@@ -5,6 +5,7 @@
 // writes for a value it keeps in the blob store, {"truncated":true,"bytes":<n>,"sha256":"<sha>"} (valid JSON, so it also passes a column's json_valid check). Every handle either
 // store opens installs the resolver below, so a reader that selects such a column gets the content whichever shape the row has; a writer stores content with putContent, which
 // keeps a short value inline and puts a long one in the blob store. A value is resolved byte for byte: the blob holds exactly the text the writer was given.
+import { createRequire } from 'node:module';
 import { getBlob, putBlob } from './blob.mjs';
 
 const REF = /^\{"truncated":true,"bytes":(\d+),"sha256":"([0-9a-f]{64})"\}$/;
@@ -48,6 +49,8 @@ const resolveRow = (row) => {
  * Makes every row a statement of `db` returns resolve its reference values: get, all and iterate. The handle is changed in place and returned; a handle that was already
  * installed is left alone. Other statement methods (run, columns, ...) are the statement's own.
  */
+/** A SQLite file opened read-only with the given busy timeout, its references resolving. */
+export const openReadOnlyDb = (file, timeoutMs) => installRefResolver(new (createRequire(import.meta.url)('node:sqlite').DatabaseSync)(file, { readOnly: true, timeout: timeoutMs }));
 export function installRefResolver(db) {
   if (db.__refResolver) return db;
   // The prototype's prepare is looked up at each call, so a later change of the driver's own method (a spec's mock, a corruption injection) still applies.

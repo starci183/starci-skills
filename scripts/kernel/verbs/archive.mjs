@@ -126,10 +126,11 @@ export default {
   });
   const retention = retainAfterEnd(db, now);
   const out = { ok: true, workflowId, archived: true, archivedAt: now, reason, by, inboxClosed, incidentsClosed, decisionsClosed, jobsDropped, asksRetired,
-    kernelSignalsReleased, kernelJobsSettled, kernelTerminal, kernelTerminalCloseRequested: Boolean(kernelTerminal), retention };
+    kernelSignalsReleased, kernelJobsSettled, kernelTerminal, kernelTerminalCloseRequested: Boolean(kernelTerminal), retention,
+    next: { purge: `starci workflow purge --repo ${repo} --workflow ${workflowId} --plan` } };
   const askNote = asksRetired.length ? `; asks retired: ${asksRetired.length}` : '';
   const terminalNote = kernelTerminal ? `, terminal ${kernelTerminal} close requested` : '';
-  emit(out, `workflow ${workflowId} archived by ${by}: ${reason} — inbox rows closed: ${inboxClosed}; decisions closed: ${decisionsClosed.length}; jobs dropped: ${jobsDropped.length}${askNote}; kernel signal released=${kernelSignalsReleased}, kernel job settled=${kernelJobsSettled}${terminalNote}; history preserved`, args.json);
+  emit(out, `workflow ${workflowId} archived by ${by}: ${reason} — inbox rows closed: ${inboxClosed}; decisions closed: ${decisionsClosed.length}; jobs dropped: ${jobsDropped.length}${askNote}; kernel signal released=${kernelSignalsReleased}, kernel job settled=${kernelJobsSettled}${terminalNote}; history preserved; next: ${out.next.purge} (what the stop left on the host)`, args.json);
   closeKernelTerminal(kernelTerminal, { owner: `kernel:${workflowId}:archive` });
 
   },
