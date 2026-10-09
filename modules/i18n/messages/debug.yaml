@@ -35,6 +35,8 @@ messages:
     vi: "{op} ({jobId}) bị giữ bởi {hold}, quá hạn {min} phút; bên xử lý {handler}; hạn mức đã hết và {next} phải tiếp quản."
   - en: "{op} ({jobId}) is held by {hold}, which the hold policy table does not list."
     vi: "{op} ({jobId}) bị giữ bởi {hold}, mà bảng chính sách giữ việc không liệt kê."
+  - en: "{op} ({jobId}) failed {min} min ago and {waiting} job(s) wait on it as dependency-failed, but no incident, Decision Item, retry or Kernel menu item follows it: the runtime owes it a step."
+    vi: "{op} ({jobId}) đã lỗi {min} phút trước và {waiting} việc chờ nó với trạng thái dependency-failed, nhưng không có sự cố, Decision Item, lượt chạy lại hay mục menu Kernel nào theo sau: runtime nợ nó một bước."
   - en: "{op} is {status} and no cause is recorded for the stop."
     vi: "{op} ở trạng thái {status} và không có nguyên nhân nào được ghi cho lần dừng này."
   - en: "{op} is {status} waiting on the owner, but no owner ask is open."

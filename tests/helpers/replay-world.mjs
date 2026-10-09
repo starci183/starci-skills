@@ -96,7 +96,7 @@ function runtimeRoot(dir, fixture) {
 }
 
 /** The neutral sentence that makes the runtime's cause matcher (progress-rca causesOf) read a report as `cause`; the extractor verified the live report gave that cause. */
-const CAUSE_PHRASES = { 'grant-too-narrow': 'the fix needs files outside the owned paths' };
+const CAUSE_PHRASES = { 'grant-too-narrow': 'the fix needs files outside the owned paths', 'critic-hold': 'CRITIC_UNAVAILABLE: the independent Critic (decision-critic, exit 3) did not start - worker-start, turn start unobserved' };
 
 /** A declared check of a fixture report: the runtime's own read-only validation of the work records, which the settler re-runs in the tree (a stand-in for the op's declared check). */
 const checkOf = (check) => ({ name: check.name, command: 'starci runtime validate .starciwork --json', exitCode: 0 });

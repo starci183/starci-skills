@@ -78,7 +78,7 @@ vocabularies:
   # `test.author` and not to the user.
   # The one authority for blocker kinds: scripts/kernel/report-envelope.mjs loads this list as
   # BLOCKER_KINDS and modules/kernel/verdict-contract.yaml cites it.
-  blockers: [shared-change, srs-gap, sds-gap, interface-gap, brand-gap, grammar-gap, test-gap, environment, authority]
+  blockers: [shared-change, srs-gap, sds-gap, interface-gap, brand-gap, grammar-gap, test-gap, environment, authority, checker-unavailable]
   # Verdicts the kernel computes about an attempt (never the reporter's own claim) and routes on;
   # `no-report` is an attempt whose worker ended without filing one.
   verdicts: [pass, findings, rejected, gate-failed, no-report]
@@ -1227,6 +1227,17 @@ routes:
       missing credential is not such a blocker for a build op: it builds on a placeholder and lists
       credentialPending (modules/ops/_common.yaml), so only a live-proof leg reaches this route for
       a credential.
+  - id: checker-unavailable-is-the-runtimes
+    on: {blocker: checker-unavailable}
+    from: any
+    to: {kind: same}
+    limit: 2
+    then: retry
+    purpose: >-
+      A Critic or other checker that could not start or answer is the runtime's, never the user's and never a reason to redo finished work: the
+      runtime judges the product with its own Critic while the report is still unsettled (scripts/kernel/settle/job-settle.mjs), and the
+      operation is tried again, with the failure fed in, only for a settled leg (a terminal job is never reopened). The runtime assigns this kind itself to a report that names a Critic hold, whatever kind the
+      operation chose (scripts/kernel/critic-hold.mjs).
   - id: authority-needs-the-user
     on: {blocker: authority}
     from: any

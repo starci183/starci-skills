@@ -23,6 +23,7 @@ export const PROBLEM_TEXT = Object.freeze({
   'seat-empty-wakes': 'The runtime woke {name} {wakes} times and {empty} of them ({percent}%) found nothing to decide: each re-read the whole session for nothing, a departure of the runtime.',
   'hold-overdue': '{op} ({jobId}) is held by {hold} {min} min past its deadline; handler {handler}; the bound is spent and {next} must take over.',
   'hold-unlisted': '{op} ({jobId}) is held by {hold}, which the hold policy table does not list.',
+  'leg-unowned': '{op} ({jobId}) failed {min} min ago and {waiting} job(s) wait on it as dependency-failed, but no incident, Decision Item, retry or Kernel menu item follows it: the runtime owes it a step.',
   'op-no-cause': '{op} is {status} and no cause is recorded for the stop.',
   'op-owner-without-ask': '{op} is {status} waiting on the owner, but no owner ask is open.',
   'op-step-missing': '{op} is {status} for {min} min and neither a retry, a Decision Item nor an incident follows it. {cause}',

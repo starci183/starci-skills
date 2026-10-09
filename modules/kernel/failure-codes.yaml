@@ -12386,6 +12386,16 @@ worker-wedged:
   nextStep_vi: "Runtime/Supervisor kiểm tra môi trường; khi sẵn sàng Kernel chạy lại op."
   owner: supervisor
   kind: blocker
+"blocker:checker-unavailable":
+  title: "Blocked: a checker could not run"
+  title_vi: "Bị chặn: bộ kiểm tra không chạy được"
+  meaning_vi: "Critic độc lập hoặc một bộ kiểm tra khác không khởi động hay không trả lời. Đây là việc của runtime, không phải của owner và không phải lỗi của op."
+  causes_vi:
+    - "Critic không khởi động (đăng nhập, mạch ngắt, hết dung lượng, lượt đầu không quan sát được)"
+    - "Không có thành viên độc lập, hoặc hết quota"
+  nextStep_vi: "Runtime mở lại lượt settle và tự chạy Critic trên sản phẩm đã viết; chỉ khi phán quyết trượt mới chạy lại op, kèm lời phê."
+  owner: runtime-core
+  kind: blocker
 "blocker:authority":
   title: "Blocked: needs owner authority"
   title_vi: "Bị chặn: cần quyết định hoặc quyền của owner"
