@@ -15,6 +15,9 @@ import path from 'node:path';
 import { spawnNode } from '../../api/node/spawn-node.mjs';
 import { API_FILE, PUSH_KIND, apiRun, failedShapesOf, jobRow, newId, recordKernel, refuse, shapeOf } from '../kernel-authority.mjs';
 import { refuseDecisionsFirst } from '../../machine/decisions.mjs';
+import { updateJob } from '../../../engine/db/ledger.mjs';
+import { currentRuntimeRev } from '../runtime-rev.mjs';
+import { fingerprintOf, isHeld, memoOf, nextMemo } from '../dispatch-refusal-memo.mjs';
 
 function spawnDetached({ args, emit, repo, wf, pushId, dir, resultFile }) {
   fs.mkdirSync(dir, { recursive: true });
@@ -41,7 +44,8 @@ function childRefusal(child, { db = null, jobId = null } = {}) {
     ?? (j.managed?.step ? `managed dispatch failed at ${j.managed.step}` : null)
     ?? (String(child?.err ?? child?.out ?? '').trim().slice(0, 300) || `exit ${child?.status}`);
   const step = rejected?.step ?? j.managed?.step ?? null;
-  return { code, reason: String(reason).slice(0, 400), ...(step ? { step } : {}) };
+  const watch = Array.isArray(j.watch) ? j.watch.filter((file) => typeof file === 'string') : [];
+  return { code, reason: String(reason).slice(0, 400), ...(step ? { step } : {}), ...(watch.length ? { watch } : {}) };
 }
 
 function routeReadyJob(jobId, repo, job, db) {
@@ -66,16 +70,41 @@ function dispatchReadyJob({ db, repo, jobId, model }) {
   return { result, launched: dispatch.ok && !waiting ? 1 : 0, stop };
 }
 
-function processReadyJob({ db, repo, wf, jobId, dryRun }) {
+/** The refusal this push met for a job, remembered on the job: recorded at the first refusal of a cause and at each growing retry, never as a new row per push. */
+function rememberRefusal({ ledger, wf, job: before, refusal, now }) {
+  const { db } = ledger;
+  // The route and dispatch children wrote the row while they ran: the memo is added to what they left, never to the copy read before.
+  const job = jobRow(db, before.job_id) ?? before;
+  const fingerprint = fingerprintOf({ db, workflowId: wf, refusal, rev: currentRuntimeRev() ?? null });
+  const memo = nextMemo(memoOf(job.payload), { refusal, fingerprint, now });
+  ledger.transaction(() => updateJob(db, { jobId: job.job_id, at: job.updated_at, payload: { ...job.payload, dispatchRefusal: memo } }));
+  return memo;
+}
+
+/** The job is left alone while its last refusal stands: same cause, interval not run out. Returns the held result, or null. */
+function heldResult({ db, wf, job, now }) {
+  const memo = memoOf(job.payload);
+  if (!memo) return null;
+  const fingerprint = fingerprintOf({ db, workflowId: wf, refusal: { code: memo.code, step: memo.step, reason: memo.reason, watch: memo.watch }, rev: currentRuntimeRev() ?? null });
+  return isHeld(memo, { fingerprint, now })
+    ? { jobId: job.job_id, held: 'refusal-backoff', cause: memo.code, count: memo.count, since: memo.firstAt, until: memo.nextAt, reason: memo.reason } : null;
+}
+
+function processReadyJob({ ledger, repo, wf, jobId, dryRun, now = Date.now() }) {
+  const db = ledger.db;
   const job = jobRow(db, jobId);
   if (job?.status !== 'queued' && job?.status !== 'ready') return { result: { jobId, skipped: `status ${job?.status ?? 'gone'}` }, launched: 0, stop: false };
   const failed = failedShapesOf(db, wf, job).get(shapeOf(job.op_id, job.payload));
   if (failed) return { result: { jobId, skipped: `same-failing-shape as ${failed.jobId} (${failed.causes.join(', ')}): change it with starci kernel graph-edit (widen/params/split) first` }, launched: 0, stop: false };
+  const held = dryRun ? null : heldResult({ db, wf, job, now });
+  if (held) return { result: held, launched: 0, stop: false };
   if (dryRun) return { result: { jobId, would: job.payload.kernelModel ? `dispatch --model ${job.payload.kernelModel}` : 'route + dispatch --spawn' }, launched: 1, stop: false };
 
   const { model, refusal } = routeReadyJob(jobId, repo, job, db);
-  if (refusal) return refusal;
-  return dispatchReadyJob({ db, repo, jobId, model });
+  const outcome = refusal ?? dispatchReadyJob({ db, repo, jobId, model });
+  const refused = outcome.result.refusal;
+  if (refused) outcome.result.memo = rememberRefusal({ ledger, wf, job, refusal: refused, now });
+  return outcome;
 }
 
 function resultRows(results, includeWould, prefix) {
@@ -116,14 +145,15 @@ export default {
     let launched = 0;
     for (const jobId of p.readyJobs ?? []) {
       if (launched >= k) break;
-      const processed = processReadyJob({ db, repo, wf, jobId, dryRun: Boolean(args['dry-run']) });
+      const processed = processReadyJob({ ledger, repo, wf, jobId, dryRun: Boolean(args['dry-run']) });
       results.push(processed.result);
       launched += processed.launched;
       // A host refusal (RAM, disk, workers cap, a repository at its worktree cap) will refuse the next one too: stop and let the next wake retry.
       if (processed.stop) break;
     }
     const out = { ok: true, workflowId: wf, pushId, before: { running: p.running, allowed: p.allowedParallel, queuedReady: p.queuedReady }, target: k, launched, results, dryRun: Boolean(args['dry-run']) };
-    if (!args['dry-run']) {
+    // A push in which every job is held by a refusal it already recorded leaves no row: the cause was recorded when it was met.
+    if (!args['dry-run'] && (launched > 0 || results.some((result) => !result.held))) {
       recordKernel(ledger, { workflowId: wf, entityType: 'dispatch-push', entityId: pushId, kind: PUSH_KIND, repo, payload: out,
         msg: `dispatch-ready ${pushId}: ${launched}/${k} launched (running ${p.running} of ${p.allowedParallel} allowed)`,
         markdown: `Parallelism push **${pushId}**: running ${p.running} of ${p.allowedParallel} allowed, ${p.queuedReady} queued-ready. Launched ${launched} of ${k}.\n\n${resultRows(results, false, '- ')}` });

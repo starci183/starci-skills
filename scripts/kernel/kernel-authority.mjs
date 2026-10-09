@@ -31,7 +31,7 @@ import { familyGuardOf, familyViolations } from './write-families.mjs';
 import { readOpManifest } from '../lib/op-shared.mjs';
 import { openLogs, appendLog } from './typed-logs.mjs';
 import { spentTriesOf } from './units.mjs';
-import { OPEN_JOB, causesOf, decisionsOf, isShapeCause, progressSettings, reportsOf, unitsOf, opJobsOf } from './progress-rca.mjs';
+import { OPEN_JOB, causesOf, decisionsOf, destinationsOf, isShapeCause, progressSettings, reportsOf, unitsOf, opJobsOf } from './progress-rca.mjs';
 import { kernelDecisionItems } from '../machine/reported-jobs.mjs';
 import { CHILD_ENV, refuseDecisionsFirst } from '../machine/decisions.mjs';
 import { routedBehindUpstream } from './upstream-retry.mjs';
@@ -191,6 +191,12 @@ export function checkPaths(db, { repo, workflowId, op, payload = {}, current = [
 export const shapeOf = (op, payload = {}) => crypto.createHash('sha1').update(JSON.stringify([op,
   [...(payload.owned_paths ?? [])].map(slash).toSorted(byCodeUnit), payload.params ?? {}, payload.kernelOverride ?? {}, payload.kernelModel ?? null])).digest('hex').slice(0, 12);
 
+/** What the failed attempt itself reported: its blocker (kind and detail) and the paths it named that its grant does not own. */
+const evidenceOf = (report, payload) => ({
+  blocker: report?.blocker ? { kind: String(report.blocker.kind ?? ''), detail: String(report.blocker.detail ?? '').replace(/\s+/g, ' ').slice(0, 300) } : null,
+  reported: destinationsOf(report, payload?.owned_paths ?? []),
+});
+
 /** The shapes this unit already failed with for a shape-related cause (a dead worker is no shape verdict). */
 export function failedShapesOf(db, workflowId, job) {
   const jobs = opJobsOf(db, workflowId);
@@ -203,7 +209,7 @@ export function failedShapesOf(db, workflowId, job) {
     if (j.status !== 'failed' || j.job_id === job.job_id) continue;
     const causes = causesOf({ status: j.status, result: j.result, report: reports.get(j.job_id) ?? null });
     if (causes.includes('partial-work') || routedBehindUpstream(j.result)) continue; // the base moved, or the curing leg landed: a retry of the same shape is new work
-    if (causes.some(isShapeCause)) out.set(shapeOf(j.op_id, j.payload), { jobId: j.job_id, causes });
+    if (causes.some(isShapeCause)) out.set(shapeOf(j.op_id, j.payload), { jobId: j.job_id, causes, ...evidenceOf(reports.get(j.job_id) ?? null, j.payload) });
   }
   return out;
 }
