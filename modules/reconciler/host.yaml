@@ -11,10 +11,10 @@ resyncMs: 60000
 concurrency: 1
 
 # Service state machine (DESIGN 9.7): healthy -> degraded on one failed probe; degraded -> failed after failAfter
-# consecutive failed probes; failed -> backoff (minMs doubling by factor up to maxMs) -> starting; starting ->
+# consecutive failed probes; failed -> backoff (minMs doubling up to maxMs, the one retry budget) -> starting; starting ->
 # failed when no probe passes within startTimeoutMs; more than maxRestarts restarts within windowMs -> quarantined
 # (a DI service-quarantined for the Supervisor); quarantined -> starting again after retryMs.
-backoff: {minMs: 1000, maxMs: 300000, factor: 2}
+backoff: {minMs: 1000, maxMs: 300000}
 quarantine: {maxRestarts: 5, windowMs: 1800000, retryMs: 3600000}
 
 # One entry per registry service (services.mjs SERVICES). everyMs: the least time between two probes (the

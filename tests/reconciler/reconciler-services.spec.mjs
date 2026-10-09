@@ -24,7 +24,7 @@ test('host.yaml carries every number the registry needs', () => {
     assert.ok(S.services[name], name);
     for (const k of ['everyMs', 'probeTimeoutMs', 'failAfter', 'startTimeoutMs', 'slaMs']) assert.ok(S.services[name][k] > 0, `${name}.${k}`);
   }
-  assert.deepEqual(S.backoff, { minMs: 1000, maxMs: 300000, factor: 2 });
+  assert.deepEqual(S.backoff, { minMs: 1000, maxMs: 300000 });
   assert.deepEqual(S.quarantine, { maxRestarts: 5, windowMs: 1800000, retryMs: 3600000 });
   assert.equal(S.allowTaskRepair, false, 'the scheduled task is never re-created unless the owner flips allowTaskRepair');
   assert.throws(() => hostSettings({ resyncMs: 0 }), /resyncMs must be a positive number/);

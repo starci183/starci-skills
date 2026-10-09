@@ -39,6 +39,7 @@ import { allocationSettings, loadConfig } from '../../engine/config.mjs'; import
 import { archiveRoot as archiveRootOf } from '../machine/home.mjs';
 import { httpUp } from '../api/http/http-up.mjs';
 import { repeatInOrder } from '../lib/in-order.mjs';
+import { nextRetry } from '../lib/retry-budget.mjs';
 import { recordNewProbe, recordServiceEvents } from './service-events.mjs';
 import { connectorStartResult, outcomeOf, probeCommand, reopenCommand } from './service-commands.mjs';
 import { auditTasks } from '../machine/task-audit.mjs';
@@ -85,7 +86,7 @@ export function hostSettings(raw = parseYaml(fs.readFileSync(HOST_YAML, 'utf8'))
   return {
     resyncMs: positive(h.resyncMs, 'resyncMs'),
     concurrency: positive(h.concurrency, 'concurrency'),
-    backoff: section('backoff', ['minMs', 'maxMs', 'factor']),
+    backoff: section('backoff', ['minMs', 'maxMs']),
     quarantine: section('quarantine', ['maxRestarts', 'windowMs', 'retryMs']),
     services,
     checkers,
@@ -250,8 +251,8 @@ export const DOWN_STATES = new Set(['starting', 'degraded', 'failed', 'backoff',
 // The states that run the SERVICE_DOWN clock: one bad pass (`degraded`) is not down.
 export const OUTAGE_STATES = new Set(['starting', 'failed', 'backoff', 'quarantined']);
 
-/** Backoff before restart number n+1 (n restarts already in the window): minMs * factor^n, at most maxMs. Pure. */
-export const backoffDelay = (n, { minMs, maxMs, factor }) => Math.min(maxMs, minMs * factor ** Math.max(0, n));
+/** Backoff before restart number n+1 (n restarts already in the window): the one retry budget, minMs doubling, at most maxMs. Pure. */
+export const backoffDelay = (n, { minMs, maxMs }) => nextRetry({ intervalMs: minMs, maxIntervalMs: maxMs }, { attempts: n + 1, now: 0, reason: 'restart' }).delayMs;
 
 export const newRecord = (name, now) => ({ name, state: 'declared', since: now, restarts: [], failStreak: 0, nextAttemptAt: null, downSince: null, lastProbe: null });
 
