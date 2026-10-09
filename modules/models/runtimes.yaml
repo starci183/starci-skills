@@ -201,8 +201,12 @@ allocation:
   # revision still differs from the live one that long past minIntervalMs + checkMs + handoverMs is a drift row (scripts/reconciler/drift.mjs).
   selfReload: {minIntervalMs: 300000, handoverMs: 30000, checkMs: 60000, driftGraceMs: 120000}
   # deploy (scripts/reconciler/runtime-deploy.mjs): a deploy waits up to waitMs, polling every pollMs, for the settles, Critic runs and prepared
-  # decisions in flight to finish; after the engine restart it waits up to verifyMs for the new leader's fresh heartbeat on the new revision.
-  deploy: {waitMs: 1800000, pollMs: 5000, verifyMs: 120000}
+  # decisions in flight to finish; after the engine restart it waits up to verifyMs for the new leader's fresh heartbeat on the new revision. The affected-spec child
+  # may run its declared budget (modules/supervisor/affected-tests.yaml) plus affectedMarginMs before the deploy stops it.
+  deploy: {waitMs: 1800000, pollMs: 5000, verifyMs: 120000, affectedMarginMs: 300000}
+  # dispatchRefusal (scripts/kernel/dispatch-refusal-memo.mjs): a ready job whose dispatch is refused for the same cause is tried again after baseMs, then factor times longer each time, up to capMs; a change of
+  # the cause's fingerprint (runtime revision, a ruling, a resource the refusal names) tries it at once.
+  dispatchRefusal: {baseMs: 60000, factor: 2, capMs: 900000}
   # footprint (scripts/guards/footprint-scan.mjs): one host-wide scan at most every everyMs; a crashed
   # tick's claim lock is cleared after lockStaleMs.
   footprint: {everyMs: 600000, lockStaleMs: 60000}

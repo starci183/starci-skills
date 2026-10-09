@@ -1,3 +1,4 @@
+import { installRefResolver } from './ref-value.mjs';
 import { assertMutationFence } from '../../scripts/lib/mutation-fence.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -139,7 +140,7 @@ function openDb({file,busyTimeoutMs,journalMode='WAL',autoVacuum=false,label,pra
     if(delay)openSleep(delay);
     let db;
     try{
-      db=new DatabaseSync(file,{timeout:busyTimeoutMs});
+      db=installRefResolver(new DatabaseSync(file,{timeout:busyTimeoutMs}));
       // page_size/auto_vacuum only take on an empty database, before WAL and before the first table.
       if(autoVacuum&&Number(db.prepare('PRAGMA page_count').get().page_count)===0)db.exec('PRAGMA page_size=4096; PRAGMA auto_vacuum=INCREMENTAL;');
       const sqliteVersion=db.prepare('select sqlite_version() AS version').get().version;
@@ -227,7 +228,7 @@ export function ledgerIdOf(handle){
 /** A runtime.sqlite opened read-only with the enforced busy_timeout — what every reader outside the writer uses. */
 export function openLedgerReader(file,{busyTimeoutMs=LEDGER_BUSY_TIMEOUT_MS,verify=true,queryOnly=true}={}){
   const {DatabaseSync}=require('node:sqlite');
-  const db=new DatabaseSync(file,{readOnly:true,timeout:busyTimeoutMs});
+  const db=installRefResolver(new DatabaseSync(file,{readOnly:true,timeout:busyTimeoutMs}));
   try{
     // queryOnly:false only for a backup's VACUUM INTO (the file itself stays read-only).
     applyPragmas(db,queryOnly?READ_PRAGMAS:{...READ_PRAGMAS,query_only:'OFF'});

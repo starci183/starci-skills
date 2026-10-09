@@ -13,6 +13,8 @@ import { skillRoot } from '../../engine/runtime-root.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { printFindings } from '../lib/check-scan.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { safeRemove } from '../api/fs/safe-remove.mjs';
+import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 import { openLedger } from '../../engine/db/ledger.mjs';
 import { openMachine } from '../../engine/db/machine.mjs';
 
@@ -66,7 +68,7 @@ export function checkStorageConvention(root = skillRoot) {
       { ledger: textColumnsOf(ledger.db), machine: textColumnsOf(machine.db ?? machine.raw ?? machine) });
   } finally {
     for (const handle of [ledger, machine]) { try { handle?.close(); } catch { /* closed */ } }
-    fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 });
+    safeRemove(dir, { hold: artifactHoldReason });
   }
 }
 

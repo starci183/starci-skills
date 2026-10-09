@@ -49,12 +49,19 @@ function jobDecisionsOf(s, kernelDis) {
  * The ready jobs the dispatch push refuses for their shape (dispatch-ready: the same op, owned paths and params as a failed job of the unit, for a cause of the shape):
  * [{jobId, op, failedJobId, situation}]. Dispatching them again repeats the failure, so the Kernel changes the shape or says none-fits; until then nothing runs.
  */
+/** The sentence of a shape-refused item: the ready job, the failed attempt it repeats, and what that attempt itself reported. */
+function shapeSituation({ job, jobId, failed }) {
+  const blocker = failed.blocker ? ` Its blocker was ${failed.blocker.kind || 'untyped'}: ${failed.blocker.detail}.` : '';
+  const reached = failed.reported.length ? ` It named paths its grant does not own: ${failed.reported.join(', ')}.` : '';
+  return `${job.op_id} ${jobId} is ready but has the shape of ${failed.jobId}, which failed (${failed.causes.join(', ')}).${blocker}${reached} The push does not dispatch it again; widen its grant or change its shape.`;
+}
+
 function shapeRefusedOf(s) {
   const { db, workflowId } = s;
   return (s.queued ?? []).filter((item) => item.queuedBecause === 'ready').map((item) => item.jobId).flatMap((jobId) => {
     const job = jobRow(db, jobId);
     const failed = job ? failedShapesOf(db, workflowId, job).get(shapeOf(job.op_id, job.payload)) : null;
-    return failed ? [{ jobId, op: job.op_id, failedJobId: failed.jobId, situation: `${job.op_id} ${jobId} is ready but has the shape of ${failed.jobId}, which failed (${failed.causes.join(', ')}): the push does not dispatch it again; widen its grant or change its shape` }] : [];
+    return failed ? [{ jobId, op: job.op_id, failedJobId: failed.jobId, reported: failed.reported.join(','), situation: shapeSituation({ job, jobId, failed }) }] : [];
   });
 }
 

@@ -20,10 +20,10 @@ function escapedAndRuled(t) {
   const items = () => world.ledger((ledger) => ledger.db.prepare('SELECT di_id, kind, decider, status FROM decision_items ORDER BY rowid').all());
   const escape = items().find((di) => di.kind === 'menu-escape');
   assert.equal(escape?.decider, 'supervisor', 'the escape is the Supervisor\'s item, opened in the product ledger');
-  assert.equal(world.engine({ controllers: ['workflow'], passes: 1 }).ok, true, 'the engine starts: the Workflow controller mirrors the escape');
+  assert.equal(world.engine({ controllers: ['workflow'], passes: 1, unbound: true }).ok, true, 'the engine starts: the Workflow controller mirrors the escape');
   const twin = world.starci(['supervisor', 'status']).json.menu.find((item) => item.kind === 'kernel-escape');
   const ruled = twin ? world.starci(['supervisor', 'decide', '--item', twin.id, '--choice', 'rule', '--text', 'use the plan as written', '--reason', 'the plan names the write set']) : null;
-  assert.equal(world.engine({ controllers: ['workflow'], passes: 1 }).ok, true, 'and runs again (a restart) after the ruling');
+  assert.equal(world.engine({ controllers: ['workflow'], passes: 1, unbound: true }).ok, true, 'and runs again (a restart) after the ruling');
   return { world, escape, twin, ruled, items };
 }
 
@@ -43,11 +43,10 @@ test('a Kernel escape reaches the Supervisor menu, and the Supervisor\'s ruling 
   assert.equal(doorbell, 1, 'the Kernel is rung once for it');
 });
 
-// RED on this base (registry entry kernel-escape-ruling-leaves-the-product-item-open, lane f3 owns the fix): after the Supervisor's ruling the product-ledger
-// Decision Item menu-escape stays `open`; nothing closes it, so the digest counts a Kernel-escape as standing and the SLA ladder can escalate it again. The test
-// carries `todo` so the suite reports it without failing; the assertion is the exact one the fix must satisfy.
-test('the product-ledger menu-escape item closes once the Supervisor ruled on it', { todo: 'open: lane f3 owns the fix (the escape stays open after the ruling)' }, () => {
+// The mirror's loop closes (registry: kernel-escape-ruling-leaves-the-product-item-open): the Workflow controller resolves the product-ledger item once the Supervisor answered its twin.
+test('the product-ledger menu-escape item closes once the Supervisor ruled on it', () => {
   const { escape, items } = shared;
   const after = items().find((di) => di.di_id === escape.di_id);
   assert.notEqual(after.status, 'open', `menu-escape ${escape.di_id} is still ${after.status} after the Supervisor ruled`);
+  assert.equal(after.status, 'resolved');
 });
