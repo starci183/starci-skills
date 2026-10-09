@@ -79,9 +79,11 @@ cases:
     status: covered
   - id: worktree-gc-spec-red-once-under-load
     family: concurrency
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a removal the runtime owns survives a file another process holds for a moment) the pass over an ended workflow's Orca tree answered ok:false once under load (tests/api-git/worktree-lifecycle.spec.mjs, 18.4 s against 3 to 9 s): the git home of a removal retries a busy file with a backoff (scripts/api/fs/safe-remove.mjs, retries 5) and the Orca home asked Orca once and recorded the refusal, so a hold of an indexer, a scanner or a child still exiting turned the pass red; the removal in the spec is the only one of the three that goes through the Orca home", remedy: {state: in-tree, change: "removeOrcaWorktree asks Orca again, up to worktrees.removeRetries times with a growing wait (removeRetryMs), when the refusal is Orca's untyped one that names a held file and the tree is still there (removeThroughOrca); a typed refusal and a hold that does not pass are recorded as before, bounded"}}
     met: {date: "2026-10-08", where: "the alpha.6 full-suite run: tests/api-git/worktree-lifecycle.spec.mjs 'the GC reclaims orphans...' failed once at the assertion on the ended workflow's removal item, 18.4 s, then passed in 20 of 20 stress runs", evidence: "the alpha.6 clean-tree full-suite log and its 20 stress logs"}
-    status: open
-    why: "not reproduced: three runs of the spec beside six CPU-burning processes passed, and the item's reason was not recorded (the assertion then had no message; it now prints the removal item). The GC makes one Orca worktree remove per pass (kind mutation, replay none) and a refusal is recorded on the row for the next pass; the fake runs one git worktree remove --force. Whether a transient git refusal on Windows or something else failed that removal is not proven, so the fake is not changed on a guess. 2026-10-09 (wave 3 f7): read the pass for an ordering or clock assumption and found none (the time budget gcBudgetMs is 120 s against a real clock and the spec ran 18 s; every other time input is injected: now, ownerAlive, jobStatusOf); 15 serial runs beside six CPU burners and 16 runs four at a time beside eight burners all passed, so the cause is still unproven"
+    rule: {file: scripts/machine/worktree-orca.mjs, anchor: "removeThroughOrca"}
+    spec: tests/api-git/worktree-orca-held-file.spec.mjs
+    status: covered
   - id: quota-window-unstarted
     family: failure-while-running
     met: {date: "2026-10-08", where: "provider quota after re-login", evidence: "commit f4fca8baf"}
@@ -1065,4 +1067,17 @@ cases:
     met: {date: "2026-10-09", where: "alpha.8 audit of scripts/supervisor/start-supervisor.mjs against modules/cli/commands/supervisor/start.yaml", evidence: "main() takes has('rotate'); start.yaml declared plan and reason only; tests/cli/supervisor.spec.mjs asserted exit 2 and nothing about the message"}
     rule: {file: packages/cli/src/validate-args.mjs, anchor: "internal"}
     spec: tests/cli/supervisor.spec.mjs
+  - id: shape-guard-refuses-the-retry-the-failure-route-queued
+    family: correctness
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a retry the runtime itself routed is dispatched) StarCi op-work.author-c10c110700 was blocked on an SDS gap; the failure route upstream-lands-first (event 983) queued op-work.author-ab81f9802d behind the architecture leg that cured the gap, an input that had changed, and dispatch-ready then skipped that retry on every push for 23 hours as same-failing-shape of c10c110700 (grant-too-narrow, a cause the report text only matched): the guard and the route contradicted each other, and the Kernel menu offered only a widen for a gap that is no narrow grant, so the Kernel escaped it (di-498134c6) and the Supervisor ruled on a premise the retry had never been allowed to test", remedy: {state: in-tree, change: "failedShapesOf does not count a failed job whose recorded step is a retry on the upstream-lands-first route: the curing leg landed, so the same shape is new work (as a partial-work continuation is); that retry's own failure counts again"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, StarCi workflow", evidence: "starci runtime.sqlite events 982, 983 (follow-on-enqueued and failure-routed upstream-lands-first), kernel-dispatch-push events 2969 to 3028 (skipped same-failing-shape), op_attempts 3 of op-work.author-c10c110700 (settle_json.nextStep)"}
+    rule: {file: scripts/kernel/kernel-authority.mjs, anchor: "routedBehindUpstream"}
+    spec: tests/kernel/shape-guard-upstream-retry.spec.mjs
+    status: covered
+  - id: digest-judges-a-working-supervisor-by-a-column-nothing-writes
+    family: record-vs-reality
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a measure says what it measures) after the 06:36Z restart `starci debug digest` read Supervisor \"last seen 270 minutes ago, last woken 6 minutes ago, 0 Decision Items open\" while the seat had answered the three mirrored escapes between 06:36:46 and 06:36:58 (sup_decisions sdec-0c7c25c1, sdec-58acb53b, sdec-c7769daf): seats.last_seen_at is written once at boot (equal to booted_at) and nothing refreshes it, so a seat that works read as silent and the lane was sent looking for a deaf seat", remedy: {state: in-tree, change: "the digest reads the seat as last seen at the newest of the seat row, the Supervisor's latest decision and its latest logged action"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, StarCi workflow", evidence: "machine.sqlite seats supervisor (booted_at = last_seen_at), sup_decisions decided_at 1791527806878 to 1791527818050, machine_logs 16558 to 16566 supervisor.action"}
+    rule: {file: scripts/reconciler/supervisor-sign-of-life.mjs, anchor: "supervisorLastSeenAt"}
+    spec: tests/reconciler/supervisor-sign-of-life.spec.mjs
     status: covered
