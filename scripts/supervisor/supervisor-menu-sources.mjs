@@ -4,11 +4,13 @@ import { readSupervisor } from '../machine/home.mjs';
 import { supervisorDecisions } from '../machine/decisions.mjs';
 import { buildSupervisorMenu } from './supervisor-menu.mjs';
 
+/** The product ledger a Decision Item concerns: refs.ledgerId (the planners write the ledger's name there, the registry keys it by id), else its productLedger. */
 const ledgerOf = (m, di) => {
-  try {
-    if (di.refs?.ledgerId) return m.resolveLedger({ ledgerId: String(di.refs.ledgerId) });
-    return di.productLedger ? m.resolveLedger({ name: String(di.productLedger) }) : null;
-  } catch { return null; }
+  const tries = [di.refs?.ledgerId && { ledgerId: String(di.refs.ledgerId) }, di.refs?.ledgerId && { name: String(di.refs.ledgerId) }, di.productLedger && { name: String(di.productLedger) }].filter(Boolean);
+  for (const key of tries) {
+    try { const found = m.resolveLedger(key); if (found) return found; } catch { /* the next key */ }
+  }
+  return null;
 };
 
 /** The live Decision Items the Supervisor decides, each {di, ledger}, over a machine handle. */

@@ -898,3 +898,10 @@ cases:
     rule: {file: scripts/kernel/wake-budget.mjs, anchor: "kernelWakesOf"}
     spec: tests/kernel/usage-wake-cuts.spec.mjs
     status: covered
+  - id: gate-ruling-item-without-its-repository
+    family: concurrency
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: every offered choice can run) the Supervisor Decision Item sdi-3c462f95 of Nivo's gate carried refs.ledgerId 'nivo-monorepo' (the ledger's name, as every planner writes it) while the menu source resolved it as a ledger id (a UUID), so subject.repo was null and every kernel incident step ran against the runtime root: refusal ledger-root-is-runtime, a workaround attempt that failed and the recorded defect gate-ruling-menu-item-missing-repo", remedy: {state: in-tree, change: "the menu source resolves a Decision Item's ledger by id, then by registered name, then by its productLedger; a choice whose kernel step cannot bind its repository or workflow is not offered and the item lists it under unanswerable with what is missing"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, Nivo gate item sdi-3c462f95", evidence: "machine sup_decision_items sdi-3c462f95: payload refs {gateIncident, ledgerId: nivo-monorepo}; supervisor status menu: repo null"}
+    rule: {file: scripts/supervisor/supervisor-menu-sources.mjs, anchor: "ledgerOf"}
+    spec: tests/supervisor/supervisor-menu.spec.mjs
+    status: covered

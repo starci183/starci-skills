@@ -42,6 +42,10 @@ function resolveSupervisorArgs(args, subject) {
   return out;
 }
 
+/** The subject values a `kernel` step needs and the item does not carry: the runtime verbs run against a repository and a workflow, never against the runtime root. */
+const unboundOf = (spec, subject) => (spec.steps ?? []).filter((step) => String(step.run).startsWith('kernel ')).flatMap((step) => Object.values(step.args ?? {})
+  .flatMap((raw) => [...String(raw).matchAll(SUBJECT_TOKEN)].map((m) => m[1])).filter((name) => !CALLER_TOKENS.has(name) && (subject[name] == null || subject[name] === '')));
+
 const optionOf = (spec, subject) => {
   const steps = (spec.steps ?? []).map((step) => ({ run: step.run, args: resolveSupervisorArgs(step.args, subject) }));
   return { choice: spec.choice, steps, effect: fillTemplate(spec.effect, subject), ...(spec.text ? { text: spec.text } : {}), ...(spec.keepsOpen ? { keepsOpen: true } : {}) };
@@ -68,7 +72,10 @@ export function menuItemOf(di, ledger) {
   const kind = kindOfItem(di);
   const spec = supervisorMenuCatalog().kinds.find((entry) => entry.id === kind);
   const subject = subjectOf(di, ledger);
-  return { id: `${kind}:${di.id}`, kind, subject, question: fillTemplate(spec.question, subject), options: [...spec.options.map((option) => optionOf(option, subject)), escapeOption()],
+  // A choice whose step cannot bind its repository or workflow is not offered (it would run against the runtime root and fail); the item says why.
+  const offered = spec.options.filter((option) => unboundOf(option, subject).length === 0);
+  const unanswerable = spec.options.filter((option) => !offered.includes(option)).map((option) => ({ choice: option.choice, missing: [...new Set(unboundOf(option, subject))] }));
+  return { id: `${kind}:${di.id}`, kind, subject, question: fillTemplate(spec.question, subject), options: [...offered.map((option) => optionOf(option, subject)), escapeOption()], ...(unanswerable.length ? { unanswerable } : {}),
     evidence: [{ ref: `decision:${di.id}` }, ...(di.evidence ?? []).slice(0, 6)], deadline: di.dueAt ?? null, di: di.id, severity: di.severity ?? 'normal' };
 }
 

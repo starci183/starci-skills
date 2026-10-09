@@ -3,12 +3,15 @@
 // off the menu is refused with the menu, and a chosen option runs as the starci verb it names and closes the item.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { openMachine } from '../../engine/db/machine.mjs';
 import { openDecision, listSupervisorDecisions } from '../../scripts/machine/decisions.mjs';
 import { readSupervisorMenu } from '../../scripts/supervisor/supervisor-menu-sources.mjs';
 import { menuItemOf, supervisorMenuLines } from '../../scripts/supervisor/supervisor-menu.mjs';
 import { decideItem, stepArgv } from '../../scripts/supervisor/decide.mjs';
 
 let counter = 0;
+// A registered product ledger: the gate items resolve their repository from it (their refs name it by its registered name).
+{ const m = openMachine({ env: process.env }); try { m.registerLedger({ ledgerId: 'ledger-spec-0001', name: 'spec-ledger', repoRoot: 'work/spec-repo', file: 'work/spec-repo/.starciwork/runtime.sqlite' }); } finally { m.close(); } }
 const open = async (spec) => {
   counter += 1;
   const opened = await openDecision(null, { ledger: 'supervisor', decider: 'supervisor', by: 'reconciler/spec', idempotencyKey: `${spec.kind}:spec:${counter}`, entity: { type: 'workflow', id: spec.workflowId ?? 'wf-menu' }, ...spec });
@@ -19,7 +22,7 @@ const menuOf = () => readSupervisorMenu();
 const itemFor = (id) => menuOf().find((entry) => entry.di === id);
 
 test('every Decision Item of the Supervisor is one menu item of its kind, with the typed escape last', async () => {
-  const gate = await open({ kind: 'runtime-defect', workflowId: 'wf-gate', summary: 'supervisor-gate inc-1 (retry-cap) holds op-a', refs: { gateIncident: 'inc-1', ledgerId: 'none', cause: 'retry-cap' } });
+  const gate = await open({ kind: 'runtime-defect', workflowId: 'wf-gate', summary: 'supervisor-gate inc-1 (retry-cap) holds op-a', refs: { gateIncident: 'inc-1', ledgerId: 'spec-ledger', cause: 'retry-cap' } });
   const conflict = await open({ kind: 'cross-workflow', workflowId: 'wf-a', summary: 'two workflows share a seam' });
   const starved = await open({ kind: 'cap-starved', workflowId: 'wf-b', summary: 'priority workflow starved' });
   const defect = await open({ kind: 'push-refused', workflowId: 'wf-d', summary: 'a push was refused' });
@@ -47,14 +50,23 @@ test('an owner Decision Item is not on the Supervisor menu', async () => {
   assert.equal(itemFor(owner), undefined);
 });
 
-test('a gate option binds the incident, the workflow and the caller input into the kernel incident call', async () => {
-  const id = await open({ kind: 'runtime-defect', workflowId: 'wf-gate2', summary: 'supervisor-gate inc-9', refs: { gateIncident: 'inc-9', ledgerId: 'none', cause: 'budget' } });
-  const option = itemFor(id).options.find((entry) => entry.choice === 'workaround');
+const gateDi = (over = {}) => ({ id: 'sdi-gate', kind: 'runtime-defect', summary: 'supervisor-gate inc-9', workflowId: 'wf-gate2', refs: { gateIncident: 'inc-9', ledgerId: 'nivo-monorepo', cause: 'runtime-defect' }, evidence: [], ...over });
+
+test('a gate option binds the incident, the repository, the workflow and the caller input into the kernel incident call', () => {
+  const option = menuItemOf(gateDi(), { repoRoot: 'work/nivo-monorepo' }).options.find((entry) => entry.choice === 'workaround');
   const argv = stepArgv(option.steps[0], { text: 'pool-b', reason: 'pool-a is over its quota' }).slice(1);
   assert.deepEqual(argv.slice(0, 2), ['kernel', 'incident']);
   const flag = (name) => argv[argv.indexOf(`--${name}`) + 1];
-  assert.deepEqual({ workflow: flag('workflow'), resolve: flag('resolve'), by: flag('by'), resolution: flag('resolution'), route: flag('route'), detail: flag('detail') },
-    { workflow: 'wf-gate2', resolve: 'inc-9', by: 'supervisor', resolution: 'workaround', route: 'pool-b', detail: 'pool-a is over its quota' });
+  assert.deepEqual({ repo: flag('repo'), workflow: flag('workflow'), resolve: flag('resolve'), by: flag('by'), resolution: flag('resolution'), route: flag('route'), detail: flag('detail') },
+    { repo: 'work/nivo-monorepo', workflow: 'wf-gate2', resolve: 'inc-9', by: 'supervisor', resolution: 'workaround', route: 'pool-b', detail: 'pool-a is over its quota' });
+});
+
+test('a choice whose kernel step cannot bind its repository is not offered, and the item says which and why (Nivo sdi-3c462f95, repo null)', () => {
+  const item = menuItemOf(gateDi(), null);
+  assert.deepEqual(item.options.map((o) => o.choice), ['record-defect', 'none-fits'], 'only the choices that can run are offered');
+  assert.deepEqual(item.unanswerable.map((u) => u.choice).sort(), ['fixed', 'not-runtime-fault', 'workaround']);
+  assert.ok(item.unanswerable.every((u) => u.missing.includes('repo')));
+  assert.equal(menuItemOf(gateDi(), { repoRoot: 'r' }).unanswerable, undefined);
 });
 
 test('decide refuses an unknown item, an unknown choice and a missing input, each with the menu', async () => {
@@ -101,7 +113,7 @@ test('none-fits records the reason and hands the item to the owner', async () =>
 });
 
 test('a step that fails keeps the item open and reports the failing verb', async () => {
-  const id = await open({ kind: 'runtime-defect', workflowId: 'wf-fail', summary: 'supervisor-gate inc-x', refs: { gateIncident: 'inc-x', ledgerId: 'missing', cause: 'budget' } });
+  const id = await open({ kind: 'runtime-defect', workflowId: 'wf-fail', summary: 'supervisor-gate inc-x', refs: { gateIncident: 'inc-x', ledgerId: 'spec-ledger', cause: 'budget' } });
   const { out } = await decideItem({ item: itemFor(id).id, choice: 'not-runtime-fault', reason: 'the cause is a failing check of the product' });
   assert.equal(out.ok, false);
   assert.equal(out.code, 'SUPERVISOR_MENU_STEP_FAILED');
