@@ -21,7 +21,7 @@ export function enqueueLeg(walk, op) {
 }
 
 /** Walks one leg to its settlement. Answers {op, jobId, steps: [{step, ok, note}], settled}. */
-export function walkLeg(walk, op, { within = null } = {}) {
+export async function walkLeg(walk, op, { within = null } = {}) {
   const steps = [];
   let mark = Date.now();
   const note = (step, ok, detail) => { steps.push({ step, ok, detail, ms: Date.now() - mark }); mark = Date.now(); return ok; };
@@ -31,7 +31,7 @@ export function walkLeg(walk, op, { within = null } = {}) {
   assert.ok(jobId, `${op}: the enqueue left no job`);
   const dispatched = walk.dispatch();
   if (!note('dispatch', dispatched.json?.results?.[0]?.dispatched === true, dispatched)) return { op, jobId, steps, settled: false };
-  const work = STANDINS[op]({ walk, jobId });
+  const work = await STANDINS[op]({ walk, jobId });
   note('work', Object.values(work.steps).every((r) => r.status === 0), Object.fromEntries(Object.entries(work.steps).map(([k, r]) => [k, { status: r.status, out: r.status === 0 ? undefined : (r.json?.refused ?? r.json ?? r.stdout), err: String(r.stderr ?? '').slice(0, 600) }])));
   const filed = walk.file(jobId, work.report, work.attach);
   if (!note('report', filed.status === 0, filed)) return { op, jobId, steps, settled: false };
