@@ -5,6 +5,7 @@
 // spent before its first wake): a short wake reads its own turns and tokens, never the sum of its neighbours. Rows land when the
 // usage sweep runs, so the newest wake may still be short; a wake over budget is a departure of its seat (the digest reports it).
 import { rolesContract } from '../machine/roles-contract.mjs';
+import { usageTokensSql } from '../lib/usage-sql.mjs';
 
 const KERNEL_WAKE = 'kernel-woken';
 const KERNEL_BOOTS = ['kernel-booted', 'kernel-restarted'];
@@ -34,7 +35,7 @@ export const kernelWakesOf = (db, workflowId) => db.prepare(`SELECT seq, created
 export const supervisorWakesOf = (db) => db.prepare('SELECT seq, created_at AS at FROM sup_events WHERE kind=? ORDER BY seq').all(SUPERVISOR_WAKE)
   .map((row) => ({ seq: Number(row.seq), at: Number(row.at) }));
 
-const TOKENS = 'COALESCE(input_tokens,0)+COALESCE(output_tokens,0)+COALESCE(cache_read_tokens,0)+COALESCE(cache_write_tokens,0)';
+const TOKENS = usageTokensSql();
 
 /** What each wake spent, by the tag its rows carry: Map(tag -> {turns, tokens}). */
 function spentByTag(db, where, args) {

@@ -1,4 +1,4 @@
-// seat-rotation.mjs — when the idle Supervisor seat is replaced by a fresh session, and the handover its boot text carries.
+// supervisor-rotation.mjs — when the idle Supervisor seat is replaced by a fresh session, and the handover its boot text carries.
 //
 // The Supervisor's context grows about a thousand tokens per turn and every turn re-reads it: one session of 619 turns spent 270 M tokens
 // (context 50 k at the first turn, 718 k at the last). Its memory is the stores, not its transcript: the menu, the open Decision Items,
@@ -7,7 +7,7 @@
 // therefore stopped and started again with the standing prompt, the seat staying enabled. It rotates only while idle with nothing in
 // flight (no claimed Decision Item, no running worker job, no running land) and never twice inside `minIntervalMs`.
 import { seatCostConfig, supervisorWakeLog } from '../kernel/seat-wakes.mjs';
-import { rotationDue, sessionOf } from '../kernel/seat-rotation.mjs';
+import { rotationDue, tokensSinceBoot } from '../kernel/seat-rotation.mjs';
 import { clipLine } from '../lib/clip.mjs';
 import { supervisorEvent } from '../machine/home.mjs';
 
@@ -25,10 +25,7 @@ const marks = (list) => list.map(() => '?').join(',');
 export function supervisorSinceBoot(db, rule = supervisorRule()) {
   const bootAt = Number(db.prepare(`SELECT MAX(created_at) AS at FROM sup_events WHERE kind IN (${marks(rule.bootEvents)})`).get(...rule.bootEvents)?.at ?? 0);
   const wakes = supervisorWakeLog(db).filter((wake) => wake.at >= bootAt).length;
-  const rows = db.prepare("SELECT turn_ref, at, COALESCE(input_tokens,0)+COALESCE(output_tokens,0)+COALESCE(cache_read_tokens,0)+COALESCE(cache_write_tokens,0) AS tokens FROM llm_usage WHERE subject_type='supervisor-turn'").all();
-  const older = new Set(rows.filter((row) => Number(row.at) < bootAt).map((row) => sessionOf(row.turn_ref, 1)));
-  const tokens = rows.filter((row) => Number(row.at) >= bootAt && !older.has(sessionOf(row.turn_ref, 1))).reduce((sum, row) => sum + Number(row.tokens), 0);
-  return { bootAt, wakes, tokens };
+  return { bootAt, wakes, tokens: tokensSinceBoot(db, { subjectType: 'supervisor-turn', bootAt, skip: 1 }) };
 }
 
 /** What the seat has in flight: {claimed: [di ids], jobs: [job ids], lands: [ticket ids]}. A rotation waits for all three to be empty. */

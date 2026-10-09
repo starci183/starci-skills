@@ -12,7 +12,7 @@ import { registerSupervisor } from '../../scripts/supervisor/telegram-bridge.mjs
 import { appendInbox } from '../../scripts/machine/sup-messages.mjs';
 import { watchdogPass } from '../../scripts/supervisor/supervisor-watchdog.mjs';
 import { withMachine } from '../../engine/db/machine.mjs';
-import { inFlightOf, rotationHandover, rotationVerdict, supervisorRule, supervisorSinceBoot } from '../../scripts/supervisor/seat-rotation.mjs';
+import { inFlightOf, rotationHandover, rotationVerdict, supervisorRule, supervisorSinceBoot } from '../../scripts/supervisor/supervisor-rotation.mjs';
 import { seatStateOf } from '../../scripts/reconciler/host-seats.mjs';
 import { REPLACED } from '../../scripts/reconciler/controllers/host.mjs';
 

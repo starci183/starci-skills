@@ -6,6 +6,7 @@
 // Kernel that is idle between wakes once it has received `afterWakes` wakes or spent `afterTokens` tokens since its boot
 // (modules/reconciler/seat-cost.yaml rotation), through the same start-workflow path as every other replacement. The new seat's first
 // status read is its handover: the menu, and the ledger behind it.
+import { usageTokensSql } from '../lib/usage-sql.mjs';
 import { seatCostConfig, kernelWakeLog } from './seat-wakes.mjs';
 
 /** The rule of a role: {afterWakes, afterTokens, event}, or null when the role is not rotated. */
@@ -20,17 +21,25 @@ export function rotationDue(facts, rule) {
 }
 
 /** The session of a seat's usage row `<seat>:[<workflow>:]<session>@...`; `skip` is the number of leading parts before the session. */
-export const sessionOf = (turnRef, skip) => String(turnRef).split('@')[0].split(':').slice(skip).join(':');
+const sessionOf = (turnRef, skip) => String(turnRef).split('@')[0].split(':').slice(skip).join(':');
+
+/**
+ * The tokens a seat spent since `bootAt`, over the llm_usage rows of `subjectType` (one workflow's when `workflowId` is given): rows of a session that already spent
+ * before the boot are the old seat's and do not count. `skip` is the number of leading parts of a turn ref before its session. The Supervisor's rotation calls it too.
+ */
+export function tokensSinceBoot(db, { subjectType, workflowId = null, bootAt, skip }) {
+  const rows = db.prepare(`SELECT turn_ref, at, ${usageTokensSql()} AS tokens FROM llm_usage WHERE subject_type=?${workflowId === null ? '' : ' AND workflow_id=?'}`)
+    .all(subjectType, ...(workflowId === null ? [] : [workflowId]));
+  const older = new Set(rows.filter((row) => Number(row.at) < bootAt).map((row) => sessionOf(row.turn_ref, skip)));
+  return rows.filter((row) => Number(row.at) >= bootAt && !older.has(sessionOf(row.turn_ref, skip))).reduce((sum, row) => sum + Number(row.tokens), 0);
+}
 
 /** What the Kernel of a workflow has received and spent since its latest boot: {bootAt, wakes, tokens}. Ledger reads only. */
 export function kernelSinceBoot(db, workflowId) {
   const boots = rotationRule('kernel').bootEvents;
   const bootAt = Number(db.prepare(`SELECT MAX(created_at) AS at FROM events WHERE workflow_id=? AND kind IN (${boots.map(() => '?').join(',')})`).get(workflowId, ...boots)?.at ?? 0);
   const wakes = kernelWakeLog(db, workflowId).filter((wake) => wake.at >= bootAt).length;
-  const rows = db.prepare("SELECT turn_ref, at, COALESCE(input_tokens,0)+COALESCE(output_tokens,0)+COALESCE(cache_read_tokens,0)+COALESCE(cache_write_tokens,0) AS tokens FROM llm_usage WHERE workflow_id=? AND subject_type='kernel-turn'").all(workflowId);
-  const older = new Set(rows.filter((row) => Number(row.at) < bootAt).map((row) => sessionOf(row.turn_ref, 2)));
-  const tokens = rows.filter((row) => Number(row.at) >= bootAt && !older.has(sessionOf(row.turn_ref, 2))).reduce((sum, row) => sum + Number(row.tokens), 0);
-  return { bootAt, wakes, tokens };
+  return { bootAt, wakes, tokens: tokensSinceBoot(db, { subjectType: 'kernel-turn', workflowId, bootAt, skip: 2 }) };
 }
 
 /**

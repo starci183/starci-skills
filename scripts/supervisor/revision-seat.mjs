@@ -6,7 +6,7 @@ import { recordReplaced, recordWoken, runtimePass } from '../machine/revision-ac
 import { contractReplacement } from '../machine/revision-replace.mjs';
 import { supervisorSeat } from '../machine/revision-seats.mjs';
 import { revRootOf } from '../kernel/runtime-rev.mjs';
-import { inFlightOf, rotationHandover } from './seat-rotation.mjs';
+import { inFlightOf, rotationHandover } from './supervisor-rotation.mjs';
 
 const seatOf = (m) => supervisorSeat({ m, root: revRootOf() });
 

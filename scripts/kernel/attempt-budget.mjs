@@ -7,6 +7,7 @@
 // `attempt-budget-overrun` event, listed with live: true until the attempt settles and its usage rows replace the reading.
 import { rolesContract } from '../machine/roles-contract.mjs';
 import { parseJson } from '../lib/json.mjs';
+import { usageTokensSql } from '../lib/usage-sql.mjs';
 
 /** The declared budget: {perAttempt, status}. */
 export function attemptBudget(root) {
@@ -14,7 +15,7 @@ export function attemptBudget(root) {
   return { perAttempt: Number(tokenBudget.perAttempt.default), status: tokenBudget.status };
 }
 
-const TOKENS = 'sum(COALESCE(u.input_tokens,0)+COALESCE(u.output_tokens,0)+COALESCE(u.cache_read_tokens,0)+COALESCE(u.cache_write_tokens,0))';
+const TOKENS = `sum(${usageTokensSql('u.')})`;
 
 const withPaths = (budget, live) => ({ payload, ...row }) => ({ ...row, budget, live, ownedPaths: (parseJson(payload, {})?.owned_paths ?? []).map(String) });
 

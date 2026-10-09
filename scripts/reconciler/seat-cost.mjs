@@ -9,6 +9,10 @@ import { openLedgerReader } from '../../engine/db/ledger.mjs';
 import { readMachine } from '../../engine/db/machine.mjs';
 import { seatCostConfig, kernelWakeLog, kernelWorkAts, kernelSkippedLog, supervisorWakeLog, supervisorWorkAts, withWorked } from '../kernel/seat-wakes.mjs';
 import { supervisorWakeUsageOf, wakeUsageOf } from '../kernel/wake-budget.mjs';
+import { usageTokensSql } from '../lib/usage-sql.mjs';
+
+/** Every token the llm_usage rows that match `where` hold. */
+const tokensOf = (db, where, ...args) => Number(db.prepare(`SELECT COALESCE(SUM(${usageTokensSql()}),0) AS tokens FROM llm_usage WHERE ${where}`).get(...args).tokens);
 
 const percentile = (sorted, p) => (sorted.length ? sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * p))] : null);
 
@@ -46,15 +50,15 @@ export function seatRow({ seat, name, wakes, skipped = [], tokens = null }) {
 /** The Kernel row of one workflow from its ledger; `since` keeps the wakes from that instant on (the runtime revision now in force). */
 export function kernelSeatOf(db, { workflowId, name = workflowId, now = Date.now(), since = 0 }) {
   const wakes = wakesWithUsage(withWorked(kernelWakeLog(db, workflowId), kernelWorkAts(db, workflowId), { now }), wakeUsageOf(db, workflowId, { limit: 100000 })).filter((wake) => wake.at >= since);
-  const kernelTokens = db.prepare("SELECT COALESCE(SUM(COALESCE(input_tokens,0)+COALESCE(output_tokens,0)+COALESCE(cache_read_tokens,0)+COALESCE(cache_write_tokens,0)),0) AS tokens FROM llm_usage WHERE workflow_id=? AND subject_type='kernel-turn'").get(workflowId).tokens;
-  return seatRow({ seat: 'kernel', name, wakes, skipped: kernelSkippedLog(db, workflowId).filter((item) => item.at >= since), tokens: Number(kernelTokens) });
+  const kernelTokens = tokensOf(db, "workflow_id=? AND subject_type='kernel-turn'", workflowId);
+  return seatRow({ seat: 'kernel', name, wakes, skipped: kernelSkippedLog(db, workflowId).filter((item) => item.at >= since), tokens: kernelTokens });
 }
 
 /** The Supervisor row from machine.sqlite; `since` keeps the wakes from that instant on. */
 export function supervisorSeatOf(db, { now = Date.now(), since = 0 } = {}) {
   const wakes = wakesWithUsage(withWorked(supervisorWakeLog(db), supervisorWorkAts(db), { now }), supervisorWakeUsageOf(db, { limit: 100000 })).filter((wake) => wake.at >= since);
-  const tokens = db.prepare("SELECT COALESCE(SUM(COALESCE(input_tokens,0)+COALESCE(output_tokens,0)+COALESCE(cache_read_tokens,0)+COALESCE(cache_write_tokens,0)),0) AS tokens FROM llm_usage WHERE subject_type='supervisor-turn'").get().tokens;
-  return seatRow({ seat: 'supervisor', name: 'Supervisor', wakes, tokens: Number(tokens) });
+  const tokens = tokensOf(db, "subject_type='supervisor-turn'");
+  return seatRow({ seat: 'supervisor', name: 'Supervisor', wakes, tokens });
 }
 
 /** The rows with `sharePercent` of the total the machine recorded (`total` = seats + attempts). Pure. */
@@ -75,7 +79,7 @@ export function collectSeatCost({ machineDb, ledgers, now = Date.now() }) {
     const db = openLedgerReader(ledger.file);
     try {
       for (const wf of db.prepare("SELECT workflow_id, COALESCE(display_name, title, workflow_id) AS name FROM workflows").all()) rows.push(kernelSeatOf(db, { workflowId: wf.workflow_id, name: `${ledger.name ?? ledger.ledgerId}: ${wf.name}`, now }));
-      attemptTokens += Number(db.prepare("SELECT COALESCE(SUM(COALESCE(input_tokens,0)+COALESCE(output_tokens,0)+COALESCE(cache_read_tokens,0)+COALESCE(cache_write_tokens,0)),0) AS tokens FROM llm_usage WHERE subject_type='attempt'").get().tokens);
+      attemptTokens += tokensOf(db, "subject_type='attempt'");
     } finally { db.close(); }
   }
   if (machineDb) rows.push(supervisorSeatOf(machineDb, { now }));

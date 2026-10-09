@@ -36,7 +36,7 @@ import {
   supervisorMode, terminalSignalDb, supervisorLog, DEFAULTS,
 } from '../machine/home.mjs';
 import { seatHealth } from './start-supervisor.mjs';
-import { planRotation } from './seat-rotation.mjs';
+import { planRotation } from './supervisor-rotation.mjs';
 import { noticeWakeLine } from '../machine/revision-notice.mjs';
 import { contractReplacementOf, noteRevisionReplaced, noteRevisionWoken, revisionNoticeOf } from './revision-seat.mjs';
 import { jobsOf, reportOf } from './workers.mjs';
