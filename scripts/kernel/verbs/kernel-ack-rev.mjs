@@ -5,13 +5,26 @@ import { kernelAuthorityOf, kernelCustodyOf } from './shared/kernel-seat.mjs';
 import { kernelReadManifest, unreadFiles, verifyKernelRead } from '../required-read.mjs';
 import { KERNEL_REV_ACKED_EVENT, KERNEL_REV_UNKNOWN, resolveRev, revRootOf } from '../runtime-rev.mjs';
 
+const refused = (message) => Object.assign(new Error(message), { code: 'kernel-read-unverified' });
+
+/** The manifest a Kernel attests: the file it names, or (by its readToken) the manifest the plan returned, which must be the current one. */
+function submittedOf(args, required) {
+  if (args['read-manifest']) {
+    const file = String(args['read-manifest']), stat = fs.lstatSync(file);
+    if (!stat.isFile() || stat.isSymbolicLink()) throw refused('READ manifest must be a regular file');
+    return JSON.parse(fs.readFileSync(file, 'utf8'));
+  }
+  if (args.digest === required.digest) return required;
+  throw refused('the readToken is not the digest of the current required READ manifest: run --plan again');
+}
+
 export default {
   verb: 'kernel-ack-rev',
-  required: args => args.plan ? ['workflow'] : ['workflow','rev','read-manifest'],
+  required: args => args.plan ? ['workflow'] : ['workflow','rev'],
   flags: ['plan'],
   kernelOnly: true,
   usageInCore: true,
-  usage: '  kernel-ack-rev --workflow <id> --plan [--op <id>] | --rev <sha> --read-manifest <file> [--op <id>]   current-incarnation READ attestation',
+  usage: '  kernel-ack-rev --workflow <id> --plan [--op <id>] | --rev <sha> --digest <readToken> | --read-manifest <file> [--op <id>]   current-incarnation READ attestation (also spelled revision-ack)',
   run({ ledger, args, caller, emit }) {
     const db = ledger.db, workflowId = args.workflow, root = revRootOf();
     const wf = getWorkflow(db, workflowId);
@@ -22,12 +35,11 @@ export default {
       throw Object.assign(new Error('only the current Kernel may attest its READ'), { code: 'kernel-caller-stale' });
     const options = { root,authority,ops: args.op ? [String(args.op)] : [] };
     const required = kernelReadManifest(db,workflowId,options);
-    if (args.plan) return emit({ ok: true, workflowId, readManifest: required, unread: unreadFiles(db, workflowId, required) }, JSON.stringify(required), args.json);
+    // The plan names the files to read and a short readToken: the attestation needs no file (a seat cannot redirect output into one: KERNEL_NO_FILE_WRITE).
+    if (args.plan) return emit({ ok: true, workflowId, readToken: required.digest, readManifest: required, unread: unreadFiles(db, workflowId, required) }, JSON.stringify(required), args.json);
     const rev = required.revision.kind === 'git' ? resolveRev(root,String(args.rev)) : String(args.rev);
     if (!rev || rev !== required.rev) throw Object.assign(new Error('READ revision is not the current deployed commit'), { code: KERNEL_REV_UNKNOWN });
-    const file = String(args['read-manifest']), stat = fs.lstatSync(file);
-    if (!stat.isFile() || stat.isSymbolicLink()) throw Object.assign(new Error('READ manifest must be a regular file'), { code: 'kernel-read-unverified' });
-    const submitted = JSON.parse(fs.readFileSync(file,'utf8'));
+    const submitted = submittedOf(args, required);
     ledger.transaction(() => {
       const current = kernelAuthorityOf(db,workflowId,caller.handle);
       const fresh = kernelReadManifest(db,workflowId,{ ...options,authority: current });

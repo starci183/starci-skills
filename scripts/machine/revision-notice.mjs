@@ -36,7 +36,8 @@ function foldRecords(records) {
 }
 
 const owedNotice = ({ role, scope, mine, from, to, woken, legacy }) => {
-  const covered = legacy?.rev === to && mine.action === 'reread' && mine.files.every((file) => legacy.files.has(file));
+  // The Kernel's ack of the current revision settles an update in place: there is one attestation, and it is the Kernel's (a replacement is still owed when a rule was removed).
+  const covered = legacy?.rev === to && mine.action === 'reread';
   const base = { role, from, to, action: mine.action, count: mine.count, digest: mine.digest, files: mine.files, replaceFiles: mine.replaceFiles, wording: scope.wording };
   if (covered) return { ...base, state: 'acked-legacy' };
   if (mine.action === 'replace') return { ...base, state: 'replace-due' };
@@ -100,5 +101,5 @@ export function noticeWakeLine(notice, command, short = (rev) => String(rev ?? '
   if (notice?.state !== 'owed') return '';
   const names = notice.files.slice(0, NAMED).join(', ');
   const more = notice.files.length > NAMED ? ` and ${notice.files.length - NAMED} more` : '';
-  return `Runtime rev ${short(notice.to)} changed ${notice.files.length} file(s) of your contract (${names}${more}): ${command} --plan lists them with hashes; read them, then attest. Nothing else is asked.`;
+  return `Runtime rev ${short(notice.to)} changed ${notice.files.length} file(s) of your contract (${names}${more}): ${command} --plan lists them; read them, then attest with --rev <sha> --digest <readToken>. Nothing else is asked.`;
 }
