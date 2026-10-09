@@ -190,7 +190,35 @@ function codexTurnStart(copy) {
     live: { kernelStartFailures: failed.length, codexKernelStartFailures: codex.length, lastStep: wordOr(failed.at(-1)?.p.step), lastTerminalNamed: Boolean(failed.at(-1)?.p.terminal), promptChars: 16831, pasteChip: 'Pasted Content' } };
 }
 
-const RECIPES = { 'codex-turn-start': codexTurnStart, 'draw-render-tool': drawRenderTool, 'fenced-retry': fencedRetry, 'grammar-in-tree': grammarInTree, 'leg-ready': legReady, 'read-plan': readPlan, 'shape-guard': shapeGuard, 'handed-over': handedOver, 'prepared-fail': preparedFail };
+/**
+ * Cases k and l: an architecture.decide leg whose own Critic could not start (CRITIC_UNAVAILABLE) and that filed `blocked` with the kind `authority`. k is the leg failed with the
+ * work.author leg that proves against it queued behind; l is the same report still unsettled (reported), admitted, for the runtime's own Critic to judge.
+ */
+function criticHeldLeg(copy) {
+  const db = openLedger(copy, 'nivo');
+  const held = first(db, "SELECT j.* FROM jobs j JOIN reports r ON r.job_id=j.job_id WHERE j.op_id='architecture.decide' AND r.report_json LIKE '%CRITIC_UNAVAILABLE%' ORDER BY j.created_at DESC");
+  const dependant = first(db, "SELECT * FROM jobs WHERE op_id='work.author' AND status='queued' ORDER BY created_at DESC");
+  const attempt = first(db, 'SELECT provider, agent FROM op_attempts WHERE job_id=? ORDER BY attempt_id DESC LIMIT 1', held.job_id);
+  const ids = new Pseudonyms();
+  for (const row of [held, dependant]) ids.id('job', row.job_id);
+  return { held, dependant, ids, provider: wordOr(attempt.provider ?? attempt.agent),
+    report: { outcome: 'blocked', blocker: { kind: 'authority' }, cause: 'critic-hold', checks: [{ name: 'check-1' }] } };
+}
+
+function criticHeld(copy) {
+  const { held, dependant, ids, provider, report } = criticHeldLeg(copy);
+  const leg = jobOf(ids, held, { status: 'failed', admitted: false, provider, owned: ['d1.sds'], report, result: { verdict: 'blocked', nextStep: null } });
+  const author = jobOf(ids, dependant, { owned: ['own-1'], after: [leg.id] });
+  return { workflow: { id: WORKFLOW, phase: 'running', goalRevision: 0 }, jobs: [leg, author], tree: { records: ['d1.sds.rec-1'] }, decisions: [], events: [], live: {} };
+}
+
+function criticHeldReported(copy) {
+  const { held, ids, provider, report } = criticHeldLeg(copy);
+  const leg = jobOf(ids, held, { status: 'reported', admitted: true, provider, owned: ['d1.sds'], report, at: { created: -7_200_000, updated: -3_600_000 } });
+  return { workflow: { id: WORKFLOW, phase: 'running', goalRevision: 0 }, jobs: [leg], tree: { records: ['d1.sds.rec-1'] }, decisions: [], events: [], live: {} };
+}
+
+const RECIPES = { 'critic-held': criticHeld, 'critic-held-reported': criticHeldReported, 'codex-turn-start': codexTurnStart, 'draw-render-tool': drawRenderTool, 'fenced-retry': fencedRetry, 'grammar-in-tree': grammarInTree, 'leg-ready': legReady, 'read-plan': readPlan, 'shape-guard': shapeGuard, 'handed-over': handedOver, 'prepared-fail': preparedFail };
 export const CASES = Object.freeze(Object.keys(RECIPES));
 
 /** The fixture document of `name` extracted from `copy`; the source names the copy neutrally. */

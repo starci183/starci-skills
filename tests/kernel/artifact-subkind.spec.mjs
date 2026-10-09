@@ -222,7 +222,7 @@ test('start-workflow delivers kernel-prompt.md to every new Kernel', (t) => {
     .filter((line) => line.trim().length > 80 && !/[{}]/.test(line));
   const distinctive = templateLines.sort((a, b) => b.length - a.length)[0];
   assert.ok(distinctive, 'kernel-prompt.md has a distinctive non-template line');
-  const prompt = Object.values(w.state().taskSpecs).at(-1);
+  const prompt = deliveredPrompt(w.state());
   assert.ok(prompt.includes(distinctive), `the boot prompt omitted this kernel-prompt.md line: ${distinctive}`);
 });
 
