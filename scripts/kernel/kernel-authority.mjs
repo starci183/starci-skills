@@ -34,6 +34,7 @@ import { spentTriesOf } from './units.mjs';
 import { OPEN_JOB, causesOf, decisionsOf, isShapeCause, progressSettings, reportsOf, unitsOf, opJobsOf } from './progress-rca.mjs';
 import { kernelDecisionItems } from '../machine/reported-jobs.mjs';
 import { CHILD_ENV, refuseDecisionsFirst } from '../machine/decisions.mjs';
+import { routedBehindUpstream } from './upstream-retry.mjs';
 
 export const API_FILE = path.join(path.dirname(fileURLToPath(import.meta.url)), 'cli.mjs');
 export const OVERRIDE_KIND = 'kernel-op-override';
@@ -201,7 +202,7 @@ export function failedShapesOf(db, workflowId, job) {
   for (const j of unit.jobs) {
     if (j.status !== 'failed' || j.job_id === job.job_id) continue;
     const causes = causesOf({ status: j.status, result: j.result, report: reports.get(j.job_id) ?? null });
-    if (causes.includes('partial-work')) continue; // the base moved: a continuation of the same shape is new work
+    if (causes.includes('partial-work') || routedBehindUpstream(j.result)) continue; // the base moved, or the curing leg landed: a retry of the same shape is new work
     if (causes.some(isShapeCause)) out.set(shapeOf(j.op_id, j.payload), { jobId: j.job_id, causes });
   }
   return out;

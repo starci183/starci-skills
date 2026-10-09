@@ -8,6 +8,7 @@ import { parseJsonOr } from '../lib/json.mjs';
 import { SUPERVISOR_SEAT } from '../machine/home.mjs';
 import { supervisorWakeUsageOf } from '../kernel/wake-budget.mjs';
 import { supervisorSeatOf } from './seat-cost.mjs';
+import { supervisorLastSeenAt } from './supervisor-sign-of-life.mjs';
 import { digestNumbers } from './debug-digest-numbers.mjs';
 import { SIGNAL, signalRows } from '../machine/debug-signals.mjs';
 import { machineBlobItems, mergeScans, scanBlobs, scanLogs } from './debug-secret-scan.mjs';
@@ -62,7 +63,7 @@ function supervisorOf(m, since = null) {
   const wake = ask(m, "SELECT MAX(created_at) AS at FROM sup_events WHERE kind='supervisor-wake'")[0]?.at ?? null;
   const decisions = ask(m, "SELECT di_id, kind, decider, due_at, summary, workflow_id FROM sup_decision_items WHERE status='open'")
     .map((d) => ({ id: d.di_id, kind: d.kind, decider: d.decider, dueAt: d.due_at ?? null, summary: d.summary, workflowId: d.workflow_id }));
-  return { seat: seat ? { state: seat.state, terminalHandle: seat.terminal_handle, lastSeenAt: seat.last_seen_at, lastInputOkAt: seat.last_input_ok_at, deaf } : null,
+  return { seat: seat ? { state: seat.state, terminalHandle: seat.terminal_handle, lastSeenAt: supervisorLastSeenAt(seat.last_seen_at, (sql) => ask(m, sql)), lastInputOkAt: seat.last_input_ok_at, deaf } : null,
     enabled, lastWakeAt: wake, wakes: supervisorWakeUsageOf(m.db), seatCost: supervisorSeatOf(m.db, { since: since ?? 0 }), decisions, health: null };
 }
 
