@@ -1,25 +1,24 @@
-// ref-value.mjs — the one accessor of a column that holds content or a reference to it (the storage convention, modules/schemas/storage-convention.yaml: content is a file in
-// the blob store under the runtime state dir, a row holds the reference).
+// ref-value.mjs — the one accessor of a column that holds content or a reference to it (the storage convention: content is a file in the blob store under the runtime state
+// dir, a row holds the reference).
 //
-// A column of class migrate holds either the content inline (the legacy shape, every row written before the convention) or a REFERENCE: a JSON string literal that names the blob,
-// "\u0001ref:<sha256>:<bytes>" (the quotes and the backslash escape are part of the text, so it also passes a column's json_valid check). Every handle either store opens installs
-// the resolver below, so a reader that selects such a column gets the content whichever shape the row has; a writer stores content with `putContent`, which keeps a short value
-// inline and puts a long one in the blob store. A value is resolved byte for byte: the blob holds exactly the text the writer was given.
+// A column that may hold content holds either the content inline (the legacy shape, every row written before the convention) or a REFERENCE: the JSON stub machine.sqlite already
+// writes for a value it keeps in the blob store, {"truncated":true,"bytes":<n>,"sha256":"<sha>"} (valid JSON, so it also passes a column's json_valid check). Every handle either
+// store opens installs the resolver below, so a reader that selects such a column gets the content whichever shape the row has; a writer stores content with putContent, which
+// keeps a short value inline and puts a long one in the blob store. A value is resolved byte for byte: the blob holds exactly the text the writer was given.
 import { getBlob, putBlob } from './blob.mjs';
 
-const MARK = String.raw`"\u0001ref:`;
-const REF = new RegExp(`^${MARK.replaceAll('\\', '\\\\')}([0-9a-f]{64}):(\\d+)"$`);
+const REF = /^\{"truncated":true,"bytes":(\d+),"sha256":"([0-9a-f]{64})"\}$/;
 
 /** Whether a stored value is a reference. */
-export const isRef = (value) => typeof value === 'string' && value.charCodeAt(0) === 34 && REF.test(value);
+export const isRef = (value) => typeof value === 'string' && value.charCodeAt(0) === 123 && REF.test(value);
 
 /** The reference string of a blob. */
-export const refOf = (sha, bytes) => `${MARK}${sha}:${bytes}"`;
+export const refOf = (sha, bytes) => JSON.stringify({ truncated: true, bytes, sha256: sha });
 
 /** The {sha, bytes} a reference names, or null. */
 export function parseRef(value) {
-  const match = typeof value === 'string' && value.charCodeAt(0) === 34 ? REF.exec(value) : null;
-  return match ? { sha: match[1], bytes: Number(match[2]) } : null;
+  const match = typeof value === 'string' && value.charCodeAt(0) === 123 ? REF.exec(value) : null;
+  return match ? { sha: match[2], bytes: Number(match[1]) } : null;
 }
 
 /** The content behind a stored value: a reference is read from the blob store (utf8), anything else is the content itself. */

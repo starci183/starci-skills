@@ -14,7 +14,7 @@ import { openMachine, openMachineReader } from '../../engine/db/machine.mjs';
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-ref-value-'));
 after(() => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
-const big = 'é'.repeat(5000) + '\n{"x":1}';
+const big = '漢'.repeat(2500) + '\n{"x":1}';
 const stored = (text) => refOf(putBlob(Buffer.from(text, 'utf8'), { mediaType: 'text/plain' }).sha, Buffer.byteLength(text, 'utf8'));
 
 test('a reference names its blob and resolves to the exact content; a plain value, a lookalike and null pass through', () => {
@@ -23,8 +23,8 @@ test('a reference names its blob and resolves to the exact content; a plain valu
   JSON.parse(ref); // a reference is valid JSON: it passes a column's json_valid check
   assert.equal(parseRef(ref).bytes, Buffer.byteLength(big, 'utf8'));
   assert.equal(resolveValue(ref), big, 'byte for byte, multi-byte characters included');
-  for (const plain of ['{"a":1}', 'ref:abc', String.raw`"\u0001ref:abc"`, '"quoted"', '', null, 7]) assert.equal(resolveValue(plain), plain);
-  assert.equal(parseRef(String.raw`"\u0001ref:not-a-sha:3"`), null);
+  for (const plain of ['{"a":1}', 'ref:abc', '{"truncated":true}', '{"truncated":true,"bytes":3,"sha256":"abc"}', '"quoted"', '', null, 7]) assert.equal(resolveValue(plain), plain);
+  assert.equal(parseRef('{"truncated":true,"bytes":3,"sha256":"not-a-sha"}'), null);
 });
 
 test('putContent keeps a value that fits inline and puts a longer one in the blob store whole', () => {
