@@ -1623,3 +1623,22 @@ cases:
     rule: {file: packages/cli/src/runtime-target.mjs, anchor: "targetOf"}
     spec: tests/cli/runtime-side.spec.mjs
     status: covered
+
+  - id: archived-workflow-footprint-has-no-remover
+    family: smooth-operation
+    found: live
+    replay: tests/replay/workflow-purge.spec.mjs
+    finding: {role: runtime, duty: cleanup, verdict: departs, evidence: "(duty: a mechanism leaves no leftover) the owner stopped both live test workflows to run them again from scratch; `starci workflow stop` archived each (inbox, Decision Items, jobs, Kernel signal closed) and left their worktrees, their branches wf-<id> and wf-<id>-2, their preserved/<id>/* refs and one preserved/op-* ref, two workers Orca could not confirm released, two dead Codex terminals of failed Kernel launches, and their ledger rows; machine worktrees gc answered `nothing to collect` and supervisor gc refused or left alone every Orca leftover, so a run from scratch started beside a pile the next run's GC, digest and worktree caps would keep meeting", remedy: {state: in-tree, change: "`starci workflow purge --repo <repo> --workflow <id>` (owner role): a plan by default, `--apply` under the host lock and the gc lock. Preconditions are catalogued refusals (workflow-purge-not-archived, -live-job, -live-seat, -worker-live, -orca-unreadable, -host-busy). It removes the workflow's trees through the worktree home (removeOrcaWorktree with its held-file retry, removeScratchWorktree), its branches and preserved refs through the git api only when the plan proves them the workflow's (registry row, or name grammar with a tip in main or on its checkpoint chain; every tip is printed), its workers and terminals through worker-close and the terminal close only when the ledger names them (Run, handle) and Orca places them in the workflow's trees, its job guards and spilled dispatch prompts, its machine Decision Items; the ledger rows stay unless `--ledger` archives them to a verified zip (purge-workflow.mjs) and drops them. One workflow-purged event journals the plan sha, the counts and each deleted ref with its tip; the plan is stored first so a crashed apply resumes; the digest skips a purged workflow; `workflow stop` names the next step"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, Nivo and StarCi test workflows after the owner stop", evidence: "starci machine worktrees counts: one runtime tree per product repo; machine worktrees gc: nothing to collect; supervisor gc plan: two workers release_unknown and two terminals [unknown] bound to no ledger; branches wf-wf-<workflow> and -2 and preserved/<workflow>/* in each product repository"}
+    rule: {file: scripts/machine/workflow-purge-plan.mjs, anchor: "export function buildPurgePlan"}
+    spec: tests/machine/workflow-purge.spec.mjs
+    status: covered
+  - id: dead-launch-terminals-keep-an-archived-workflow-tree-from-collection
+    family: smooth-operation
+    found: live
+    replay: tests/replay/workflow-purge.spec.mjs
+    finding: {role: runtime, duty: cleanup, verdict: departs, evidence: "(duty: the collector removes what no live owner holds) the worktree GC removes a workflow tree only when Orca reports no live terminal in it; the dead Codex terminals of two failed Kernel launches sat in the archived workflows' trees, so the trees were never collectable, and the Supervisor GC classified those terminals unknown (bound to no ledger and not a plain shell) and left them", remedy: {state: in-tree, change: "workflow purge ties a terminal to the workflow by the ledger's own evidence (the handle a kernel-start-failed or launch event, a job or the Kernel signal names) and by Orca placing it in the workflow's tree, closes it with the proof of the terminal close before it removes the tree; a terminal in the tree the ledger never names is listed and left"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, Nivo and StarCi workflow trees", evidence: "supervisor gc plan: term_06ac94ed and term_e8442647 [unknown] in the workflow trees' directories; machine worktrees gc: nothing to collect"}
+    rule: {file: scripts/machine/workflow-purge-orca.mjs, anchor: "export function classifyTerminals"}
+    spec: tests/machine/workflow-purge.spec.mjs
+    status: covered

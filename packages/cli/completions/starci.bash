@@ -40,7 +40,7 @@ _starci() {
         uat) COMPREPLY=( $(compgen -W "assisted-runner slots" -- "$cur") );;
         work) COMPREPLY=( $(compgen -W "asset-slot brand brand-direction brand-palette check-example-work compose-direction decision-critic draw-acceptance draw-dna draw-feedback draw-gates draw-grammar draw-layer draw-loop draw-rationale draw-render draw-review draw-source draw-taste evidence-binding example-critique example-derive example-evidence example-verify grammar-geometry grammar-knowledge grammar-proposal grammar-registry-pin graph hygiene imagegen layout-render layout-tree render-proof shell-conformance ui-proof-brief" -- "$cur") );;
         worker) COMPREPLY=( $(compgen -W "close list read release show start stop" -- "$cur") );;
-        workflow) COMPREPLY=( $(compgen -W "assess bias custody define start status stop" -- "$cur") );;
+        workflow) COMPREPLY=( $(compgen -W "assess bias custody define purge start status stop" -- "$cur") );;
         completion) COMPREPLY=( $(compgen -W "bash zsh fish powershell" -- "$cur") );;
         explain) COMPREPLY=( $(compgen -W "app check connect debug docker gate git guard harness kernel lint machine npm orca reconciler release route runtime smoke supabase supervisor task test typecheck uat work worker workflow" -- "$cur") );;
             *) COMPREPLY=();;
@@ -961,6 +961,9 @@ _starci() {
         workflow:define:--approved-by) COMPREPLY=( $(compgen -W "supervisor" -- "$cur") ); return 0;;
         workflow:define:--bridge-id) return 0;;
         workflow:define:--routing-bias) return 0;;
+        workflow:purge:--repo) return 0;;
+        workflow:purge:--workflow) return 0;;
+        workflow:purge:--expect) return 0;;
         workflow:start:--repo) return 0;;
         workflow:start:--goal) return 0;;
         workflow:start:--agent) return 0;;
@@ -1216,6 +1219,7 @@ _starci() {
         workflow:bias) COMPREPLY=( $(compgen -W "--normalize --json --cwd --quiet --help --edition" -- "$cur") );;
         workflow:custody) COMPREPLY=( $(compgen -W "--repo --workflow --apply --json --cwd --quiet --help --edition" -- "$cur") );;
         workflow:define) COMPREPLY=( $(compgen -W "--repo --project --text --title --display-name --params --plan --revise --reason --approve-revision --defined-by --approved-by --bridge-id --routing-bias --json --cwd --quiet --help --edition" -- "$cur") );;
+        workflow:purge) COMPREPLY=( $(compgen -W "--repo --workflow --plan --apply --ledger --expect --json --cwd --quiet --help --edition" -- "$cur") );;
         workflow:start) COMPREPLY=( $(compgen -W "--repo --goal --agent --launched-by --plan --json --cwd --quiet --help --edition" -- "$cur") );;
         workflow:status) COMPREPLY=( $(compgen -W "--repo --workflow --json --cwd --quiet --help --edition" -- "$cur") );;
         workflow:stop) COMPREPLY=( $(compgen -W "--repo --workflow --reason --by --json --cwd --quiet --help --edition" -- "$cur") );;

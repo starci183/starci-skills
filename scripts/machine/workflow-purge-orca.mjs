@@ -1,0 +1,66 @@
+// workflow-purge-orca.mjs - which Orca workers and terminals belong to an archived workflow, by evidence only. A worker belongs to it when its
+// Run is one the ledger names for the workflow (a job's Run, or the Run of a failed Kernel launch). A terminal belongs to it when the ledger
+// names its handle (a job, the Kernel signal, a launch or a failed launch) AND Orca places it inside one of the workflow's trees. Anything
+// that only looks like it belongs - a terminal in the tree the ledger never named, a named terminal elsewhere - is listed and never touched.
+// Pure over Orca's rows: the reads are workflow-purge-facts.mjs, the closing is workflow-purge-apply.mjs through worker-close.mjs.
+import { releasePlan, terminalHandleOf, worktreePathOf } from '../lib/worker-accounting.mjs';
+import { insideTree, sameTree } from './worktree-registry.mjs';
+
+const HELD_STATES = new Set(['active', 'reclaimable', 'retained', 'release_pending', 'release_unknown']);
+
+const workerRow = (plan) => ({ dispatchId: plan.dispatchId, runId: plan.runId, terminal: plan.terminalHandle, state: plan.terminalState, liveness: plan.liveness, reason: plan.reason });
+
+/**
+ * The workers of the workflow's Runs: {close: [worker], live: [worker]}. A worker Orca holds (any held state) is closed, except one that is
+ * still active and not exited: that one is live, and a purge refuses while it exists.
+ */
+export function classifyWorkers(rows) {
+  const plans = releasePlan(rows);
+  const close = [], live = [];
+  rows.forEach((row, index) => {
+    const plan = plans[index];
+    if (!HELD_STATES.has(plan.terminalState)) return;
+    const worker = workerRow(plan);
+    if (plan.terminalState === 'active' && plan.liveness !== 'exited') live.push(worker);
+    else close.push(worker);
+  });
+  return { close, live };
+}
+
+const cwdOf = (terminal) => terminal.worktreePath ?? terminal.cwd ?? null;
+
+function terminalVerdict(terminal, { named, treePaths, handledByWorker }) {
+  const handle = terminal.handle, cwd = cwdOf(terminal);
+  const inTree = Boolean(cwd) && treePaths.some((tree) => sameTree(cwd, tree) || insideTree(cwd, tree));
+  if (handledByWorker.has(handle)) return null;
+  if (named.has(handle) && inTree) return { close: { handle, cwd, title: terminal.title ?? null, connected: terminal.connected !== false } };
+  if (named.has(handle)) return { listed: { kind: 'terminal', id: handle, why: `the ledger names it but Orca places it in ${cwd ?? 'no worktree'}, outside the trees of the workflow` } };
+  if (inTree) return { listed: { kind: 'terminal', id: handle, why: `it sits in ${cwd}, a tree of the workflow, but no ledger row names its handle` } };
+  return null;
+}
+
+/**
+ * The terminals to close and the terminals listed: {close: [{handle, cwd, title, connected}], listed: [{kind, id, why}]}.
+ * evidence: the ledger's {handles}; treePaths: the workflow's trees; workerClose: the workers being closed (their terminals close with them).
+ */
+export function classifyTerminals({ terminals, evidence, treePaths, workerClose }) {
+  const named = new Set(evidence.handles);
+  const handledByWorker = new Set(workerClose.map((worker) => worker.terminal).filter(Boolean));
+  const close = [], listed = [];
+  for (const terminal of terminals) {
+    const verdict = terminalVerdict(terminal, { named, treePaths, handledByWorker });
+    if (verdict?.close) close.push(verdict.close);
+    if (verdict?.listed) listed.push(verdict.listed);
+  }
+  return { close, listed };
+}
+
+
+/** The workers of other Runs that Orca holds inside a tree of the workflow: listed, never touched (no ledger row ties their Run to it). [{kind, id, why}] */
+export function listStrangerWorkers({ rows, treePaths }) {
+  const held = rows.filter((row) => HELD_STATES.has(row?.terminalState));
+  return held.filter((row) => {
+    const where = worktreePathOf(row);
+    return Boolean(where) && treePaths.some((tree) => sameTree(where, tree) || insideTree(where, tree));
+  }).map((row) => ({ kind: 'worker', id: row.dispatchId, why: 'Orca holds it in a tree of the workflow, but its Run ' + row.runId + ' is not one the ledger names (terminal ' + (terminalHandleOf(row) ?? 'none') + ')' }));
+}
