@@ -47,6 +47,9 @@ import { createKernelTick } from './kernel-watchdog-tick.mjs';
 import { workflowSender } from './workflow-startup.mjs';
 import { seatWakeOf } from './op-incident-policy.mjs';
 import { createKernelRotation, rotationRule } from './seat-rotation.mjs';
+import { recordReplaced, recordWoken, runtimePass } from '../reconciler/revision-ack.mjs';
+import { kernelSeat } from '../reconciler/revision-seats.mjs';
+import { noticeWakeLine } from '../reconciler/revision-notice.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const apiFile = path.join(skillRoot, 'scripts', 'kernel', 'cli.mjs');
@@ -95,8 +98,11 @@ export const buildWakePrompt = (workflow, attempt = null, revLine = null) => bou
   WAKE_BOUNDS,
 ].join(' ') });
 /** The liveness wake this tick would type, from one starci kernel status read: its seat attempt and its kernelRev (runtime-rev.mjs). */
-export const wakePromptOf = (workflow, statusValue) =>
-  buildWakePrompt(workflow, statusValue?.kernel?.attempt ?? null, statusValue?.kernel ? revWakeLine(statusValue?.kernelRev, workflow) : null);
+export const wakePromptOf = (workflow, statusValue) => {
+  const rev = statusValue?.kernel ? revWakeLine(statusValue?.kernelRev, workflow) : null;
+  const notice = noticeWakeLine(statusValue?.revisionNotice, `starci kernel revision-ack --workflow ${workflow}`);
+  return buildWakePrompt(workflow, statusValue?.kernel?.attempt ?? null, [rev, notice].filter(Boolean).join(' ') || null);
+};
 
 /** Repair only the Orca tab title: the agent owns the pane title and may change it on every turn. */
 export function repairKernelTabTitle(terminal, name, { list = () => terminalList({ includeVisualLayouts: true }), tabTitles = tabTitlesOf,
@@ -148,7 +154,12 @@ const replaceKernel = (base) => {
   if (step === 'kernel-start-held') return { ...base, ok: false, action: 'start-held', reason: step, hold: started.value?.hold ?? null, detail: started.value };
   if (step === 'kernel-worker-alive') return { ...base, ok: true, action: 'already-live', note: started.value?.error ?? null,
     replacementTerminal: null, detail: started.value };
-  return startAnswerOf(started, base);
+  return noteReplaced(startAnswerOf(started, base));
+};
+// A fresh Kernel read the tree at birth: the revision change it replaced is settled (revision-ack.mjs recordReplaced).
+const noteReplaced = (answer) => {
+  if (answer.action === 'restarted') withKernelLedger((ledger) => recordReplaced(kernelSeat({ ledger, workflowId }), answer.deathReason ?? 'replaced'));
+  return answer;
 };
 
 // Orca 1.4.209 binds a send to the terminal's process incarnation: a kernel terminal created before
@@ -332,6 +343,9 @@ async function statusTick() {
   // Q14 / MB-08: only a running workflow's Kernel is repaired, woken or relaunched. A paused, stopped (or not yet
   // started) workflow is left alone - nothing but the owner's starci kernel lifecycle --resume brings it back.
   if (phase !== 'running') return { ok: true, workflowId, phase, action: 'not-running' };
+  // The runtime's own duty to the seat's revision notice: a change that concerns the Kernel nothing is settled here (a read-only probe writes nothing).
+  const revision = withKernelLedger((ledger) => runtimePass(kernelSeat({ ledger, workflowId }), { repair }));
+  if (revision) status.value.revisionNotice = revision.notice;
   const result = kernelTick(status, phase);
   // Creation supplies the title, but a moved/restored tab can lose it. The sidebar reads
   // visualLayouts' tab title, not terminal-list's agent-controlled pane title.
@@ -353,13 +367,14 @@ const finalKernelAction = (state) => {
   if (state === 'active') return 'active';
   return state === 'wedged' ? 'kernel-wedged' : 'observed';
 };
+const recordRevisionWoken = (notice) => withKernelLedger((ledger) => recordWoken(kernelSeat({ ledger, workflowId }), notice));
 const kernelRotation = createKernelRotation({ workflowId, openLedger: withKernelLedger, close: closeKernelTerminal, replace: replaceKernel, sender: launchableSender });
 const kernelTick = createKernelTick({ api, kernelRotation, workflowId, repair, lostSeatWorker, exitedTwice, stopAndRelease, replaceKernel,
   workerShow, DEAD_WORKER_STATE, settledKernelVerdict, DEAD_VERDICTS, terminalRead, classifyKernelScreen, outputAgeOf,
   staleAwareState, ACTIVE_STALE_MS, exitedAgentPromptRow, DEATH_SETTLE_MS, sleepSync, kernelWakeFailures,
   wakeFailuresProveDead, replaceWakeDeadKernel, sendEnterWithProof, recordKernelWakeFailed, deliveryFieldsOf,
   kernelWakeRefusedAt, replaceUnwritableKernel, kernelIdleWakes, escalateIdleStall, replaceIdleKernel,
-  sendWakeWithProof, wakePromptOf, recordKernelWoken, wakeSendRefused, wakeActionOf, finalKernelAction, jsonFromStdout });
+  sendWakeWithProof, wakePromptOf, recordKernelWoken, recordRevisionWoken, wakeSendRefused, wakeActionOf, finalKernelAction, jsonFromStdout });
 const printLineOf = (result) => {
   const terminal = result.terminal ? ` terminal=${result.terminal}` : ''; let restart = '';
   if (/^reload|^already/.test(result.action ?? '')) {
