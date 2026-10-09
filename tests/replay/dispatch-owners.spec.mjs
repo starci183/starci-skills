@@ -46,7 +46,7 @@ function repeatWorld(blocker) {
 test('b: a blocker typed sds-gap is no too-narrow grant by its prose: the retry is not refused as the failed shape and the Kernel is not asked to widen', (t) => {
   const prose = 'the SDS leaves the session record out; the fix needs files outside the owned paths';
   const world = replayWorld(t, repeatWorld({ kind: 'sds-gap', detail: prose }), { tree: true, launch: true });
-  assert.equal(world.engine({ controllers: ['job', 'workflow'], passes: 1 }).ok, true);
+  assert.equal(world.engine({ controllers: ['job', 'workflow'], passes: 1, foregroundPush: true }).ok, true);
   const status = world.status();
   assert.deepEqual(status.menu.map((item) => item.id).filter((id) => id.startsWith('shape-refused:')), [], 'no widen is offered for a gap that is no narrow grant');
   assert.equal(world.ack(['work.author']).status, 0);
