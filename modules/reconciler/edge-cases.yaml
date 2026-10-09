@@ -930,6 +930,8 @@ cases:
     status: covered
   - id: gate-newer-than-the-job-it-refuses
     family: correctness
+    found: live
+    replay: tests/replay/handed-over-critic.spec.mjs
     finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a gate added after a job's admission never turns its finished work into a refusal nobody can cure) Nivo op-architecture.decide-e78adc94cc, admitted and reported 2026-10-07, was refused op-critic-verdict-missing at 11:20 (check_runs op-proof, event 656) by the independent-Critic gate that landed after its admission: its worker is gone and its admitted contract never told it to run the Critic, so only settle-fail (a 26 million token leg redone) or an accept the menu itself marks as not honest were offered; the Kernel logged 'no valid choice' and yielded. Its settle-fail also never ran: the menu step recorded the refusal as a bare JSON array and record-checks answered checks-invalid (events 675, 676 and the same at 07:41)", remedy: {state: in-tree, change: "the settler runs the decision Critic itself for a done report of a covered kind that attaches no verdict (once per product digest; frontier tier, other provider than the maker, the same guard, rubric and bytes) and the settle gate judges that verdict: pass passes, a failing critique is the op's error-work with the critique, a Critic that cannot judge is a checker-unavailable hold; a refusal for a gate newer than the admission is typed gate-newer-than-admission and offers the Kernel no choice; the settle-fail step records the refusal in the {checks:[...]} envelope"}}
     met: {date: "2026-10-09", where: "alpha.8 live, Nivo job op-architecture.decide-e78adc94cc", evidence: "nivo runtime.sqlite events 656 (job-settle-needs-kernel op-critic-verdict-missing, 11:20:33), 675 and 676 (kernel-decision settle-fail, result revert: record-checks failed checks-invalid)"}
     rule: {file: scripts/kernel/settle/critic-run.mjs, anchor: "runtimeCriticFor"}
@@ -951,6 +953,8 @@ cases:
     status: covered
   - id: runtime-critic-launched-without-a-sender-terminal
     family: power-lifecycle
+    found: live
+    replay: tests/replay/handed-over-critic.spec.mjs
     finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a runtime-owed proof can be produced) after the deploy of 4b8dbfde3 the settler ran the Critic for Nivo op-architecture.decide-e78adc94cc eight times in 15 minutes (runtime-critic-run events 737, 742, 753, 761, 773, 783, 787, 791, all hold CRITIC_UNAVAILABLE) because Orca refused the Critic's run-create: no_active_sender_terminal, the settler child having no terminal of its own to send from; each hold left the old handover op-critic-verdict-missing standing, so the Kernel menu kept offering settle-fail, continue and accept, which cannot work (the settle-fail of 11:53 reverted with workflow-reset-failed), the Kernel was woken every minute for an item it could only yield on, and two Kernels were rotated after 8 empty wakes each (events 725, 756; attempts 8 and 9); the StarCi Kernel rotated the same way after it chose none-fits on its own unusable item (events 2647, 2654)", remedy: {state: in-tree, change: "the settler launches the runtime Critic from the workflow's Kernel terminal (kernelTerminalOf); a handed-over job whose refusal is the Critic verdict, or that the settler has held for a checker that could not run since the handover, is the runtime's and not on the Kernel menu; an item the Kernel hands up with none-fits is not asked again inside the snooze"}}
     met: {date: "2026-10-09", where: "alpha.8 live, Nivo and StarCi Kernels", evidence: "nivo runtime.sqlite events 737 to 791 (runtime-critic-run hold, job-settle-check-unavailable try 1 to 8), 725 and 756 (kernel-rotated 8 wakes), 768 to 771 (settle-fail revert workflow-reset-failed); starci events 2643 to 2654"}
     rule: {file: scripts/kernel/settle/critic-run.mjs, anchor: "kernelTerminalOf"}
@@ -972,6 +976,8 @@ cases:
     status: covered
   - id: prepared-fail-decision-blocks-every-later-settle
     family: correctness
+    found: live
+    replay: tests/replay/prepared-fail-recovery.spec.mjs
     finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a prepared decision is completed or withdrawn, never left to block) a Kernel settle-fail of Nivo op-architecture.decide-e78adc94cc (dec-0b96c3dc82, 11:53, taken on a menu choice the runtime should not have offered) prepared a reset receipt (event 770, blob 70d1e3ae) whose resetTo was 6c1c096, the merge-base with main: the workflow tree registry record had lost its checkpoint pointer when the tree was put back (placement-rebound checkpoint null), so gateBaseOf fell back behind the two settled checkpoints a6f9998 and 30d46eb; the apply died with workflow-reset-failed (event 771; again at 12:27, event 850) and left the index half reset (11 records staged as deleted, HEAD 7ea9436 unmoved). The receipt then refused every later settle of the attempt, the passing and the failing alike, with workflow-checkpoint-recovery-conflict (event 844), although the runtime Critic had by then judged the report (event 842, score 4 of 7, failed checks A2 and A4 to A8)", remedy: {state: in-tree, change: "gateBaseOf follows the newest checkpoint commit of the workflow chain when the record has no pointer; the settler withdraws a prepared preserve receipt whose reset target is not the live gate base (journal event workflow-op-preserved-withdrawn, code prepared-settlement-withdrawn, the index of the files it had touched put back on HEAD when the branch never moved) and keeps one that aims at it (workflow-op-preserved-kept, looked at once); a withdrawn receipt no longer counts as prepared; the Job controller plans the settler for a report refused only for an unapplied prepared decision; the refusal is a runtime-owed item off the Kernel menu until the receipt is kept; a new refusal code under the same reason is recorded as a new handover"}}
     met: {date: "2026-10-09", where: "alpha.8 live, Nivo job op-architecture.decide-e78adc94cc", evidence: "nivo runtime.sqlite events 770, 771, 842, 844, 850; the live workflow tree (the -2 path): HEAD 7ea9436, git status 11 staged deletions and untracked records"}
     rule: {file: scripts/kernel/settle/prepared-recovery.mjs, anchor: "recoverPreparedSettlement"}
@@ -986,6 +992,8 @@ cases:
     status: covered
   - id: kernel-answer-stored-through-redaction-never-matches-its-item
     family: record-vs-reality
+    found: live
+    replay: tests/replay/leg-ready-none-fits.spec.mjs
     finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: an item the Kernel answered with no change is not asked again inside the snooze) the StarCi Kernel answered leg-ready:interface.draw:authentication.forgot-password:approved-leg-open with none-fits 14 times between 12:42 and 13:02 (the answer read \"no change\"), every answer a wake: the decision event stores menu.item through the ledger redaction filter, which blanks what follows password: (the leg is named forgot-password), so the stored id read leg-ready:interface.draw:authentication.forgot-password:[redacted] and never matched the live id; the snooze of a chosen wait (keep-waiting, none-fits) therefore never held, each wake counted toward the 8-wake rotation, and the StarCi Kernel was replaced at 12:28, 12:51 and 13:02", remedy: {state: in-tree, change: "the menu holds an item back when either spelling of its id, the live one or the one the redaction filter writes, is in the snoozed set"}}
     met: {date: "2026-10-09", where: "alpha.8 live, StarCi workflow", evidence: "starci runtime.sqlite events 2805 to 2894 (kernel-decision none-fits, menu.item ending forgot-password:[redacted]), kernel-rotated events 2777, 2843, 2895"}
     rule: {file: scripts/kernel/kernel-menu.mjs, anchor: "heldBack"}
@@ -1000,6 +1008,8 @@ cases:
     status: covered
   - id: runtime-rewind-refused-by-its-own-history-hook
     family: authority-safety
+    found: live
+    replay: tests/replay/prepared-fail-recovery.spec.mjs
     finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: the settle of a failed op puts the workflow branch back on its last checkpoint) the Nivo settle-fail of op-architecture.decide-e78adc94cc prepared its reset receipt (events 770, 919) with the right target (the checkpoint 30d46eb) and died with workflow-reset-failed at the git reset --soft: the worktree garbage collector had committed the files of the op on the workflow branch (7ea9436, \"preserve ... uncommitted work of its worktree\"), and the reference-transaction hook the runtime installs keeps a workflow branch append-only, so it refused the runtime's own rewind (\"not a fast-forward\"); reproduced on a clone of the tree with the live hook", remedy: {state: in-tree, change: "the hook (version 8) lets a protected branch move to the target named in STARCI_BRANCH_REWIND when the commit it leaves is kept under refs/heads/preserved; preserveAndReset refreshes the hook of the tree and names the target on its reset, so nothing else rewrites the branch"}}
     met: {date: "2026-10-09", where: "alpha.8 live, Nivo workflow tree", evidence: "nivo runtime.sqlite events 770, 771, 842, 850, 919, 920; the reflog of the tree (no reset), HEAD 7ea9436 against the checkpoint 30d46eb, hook .husky/_/reference-transaction v7"}
     rule: {file: scripts/guards/hook-install.mjs, anchor: "historyHookBody"}
@@ -1014,6 +1024,8 @@ cases:
     status: covered
   - id: kernel-read-attestation-over-the-inline-event-bound
     family: smooth-operation
+    found: live
+    replay: tests/replay/read-attestation.spec.mjs
     finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: the Kernel can attest the runtime revision it reads) the StarCi Kernel could not acknowledge revision a6b651ed128f nor 328a4d367424: kernel-ack-rev appended the whole read manifest (103 files, 19267 bytes) as the event payload and the ledger refused it STARCI_EVENT_PAYLOAD_TOO_LARGE (16384), so every enqueue of a new leg was refused kernel-read-unverified (dec-47a88c5428, dec-97f398806a) and the interface.draw leg of authentication.forgot-password never opened", remedy: {state: in-tree, change: "the attestation event keeps its whole payload in the blob store when it is over the inline bound, and its two readers (the admission and the revision gate) resolve the blob"}}
     met: {date: "2026-10-09", where: "alpha.8 live, StarCi workflow", evidence: "starci runtime.sqlite events 2748, 2753 (kernel-decision-result revert enqueue failed: kernel-read-unverified; none-fits naming STARCI_EVENT_PAYLOAD_TOO_LARGE 19267 > 16384)"}
     rule: {file: scripts/kernel/verbs/kernel-ack-rev.mjs, anchor: "payloadSha"}
@@ -1021,6 +1033,8 @@ cases:
     status: covered
   - id: kernel-escape-opened-in-the-product-ledger-is-owned-by-nobody
     family: record-vs-reality
+    found: live
+    replay: tests/replay/supervisor-escape.spec.mjs
     finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: an item handed to the Supervisor is owned by the Supervisor) StarCi di-16537df8, di-866fd7b8 and di-498134c6 (the menu-escape of the Kernel, decider supervisor) stood open in the product ledger while the digest read \"Supervisor 0 Decision Items open\": starci kernel decide opens the escape in the product ledger and the Supervisor reads machine.sqlite only, so no Supervisor menu, ring or digest line ever held them", remedy: {state: in-tree, change: "the Workflow controller opens the twin of every live menu-escape of its workflow in the Supervisor store, keyed escalated:<ledger>:<id> (the key the Supervisor menu routes to kernel-escape), once per item"}}
     met: {date: "2026-10-09", where: "alpha.8 live, StarCi workflow", evidence: "starci runtime.sqlite decision_items di-16537df8, di-866fd7b8, di-498134c6 (kind menu-escape, decider supervisor, status open); machine.sqlite sup_decision_items holds none of them"}
     rule: {file: scripts/reconciler/supervisor-mirror.mjs, anchor: "strandedSupervisorDis"}
@@ -1070,6 +1084,8 @@ cases:
     status: covered
   - id: shape-guard-refuses-the-retry-the-failure-route-queued
     family: correctness
+    found: live
+    replay: tests/replay/shape-guard-retry.spec.mjs
     finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a retry the runtime itself routed is dispatched) StarCi op-work.author-c10c110700 was blocked on an SDS gap; the failure route upstream-lands-first (event 983) queued op-work.author-ab81f9802d behind the architecture leg that cured the gap, an input that had changed, and dispatch-ready then skipped that retry on every push for 23 hours as same-failing-shape of c10c110700 (grant-too-narrow, a cause the report text only matched): the guard and the route contradicted each other, and the Kernel menu offered only a widen for a gap that is no narrow grant, so the Kernel escaped it (di-498134c6) and the Supervisor ruled on a premise the retry had never been allowed to test", remedy: {state: in-tree, change: "failedShapesOf does not count a failed job whose recorded step is a retry on the upstream-lands-first route: the curing leg landed, so the same shape is new work (as a partial-work continuation is); that retry's own failure counts again"}}
     met: {date: "2026-10-09", where: "alpha.8 live, StarCi workflow", evidence: "starci runtime.sqlite events 982, 983 (follow-on-enqueued and failure-routed upstream-lands-first), kernel-dispatch-push events 2969 to 3028 (skipped same-failing-shape), op_attempts 3 of op-work.author-c10c110700 (settle_json.nextStep)"}
     rule: {file: scripts/kernel/kernel-authority.mjs, anchor: "routedBehindUpstream"}
@@ -1117,3 +1133,74 @@ cases:
     rule: {file: scripts/kernel/verbs/shared/status-menu.mjs, anchor: "attestNoteOf"}
     spec: tests/kernel/menu-answered-hold.spec.mjs
     status: covered
+  - id: deploy-carries-a-revision-that-failed-the-check
+    family: change-under-running
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a revision that reaches the running host passed the runtime check on that exact commit) the lead fast-forwarded the live checkout by hand and restarted the engine; a revision that failed npm run check was deployed and nothing verified the tree before it reached the host", remedy: {state: in-tree, change: "starci runtime deploy refuses unless the source is committed and clean, a fast-forward of the host and proven by a receipt bound to the commit and its tree (the verb runs the check itself in the clean source, or reads the land note); each refusal has a catalogued code"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, six hand deploys", evidence: "the lead's hand sequence (fetch, merge --ff-only, reconciler restart, debug digest) with no check on the deployed commit"}
+    rule: {file: scripts/reconciler/runtime-deploy.mjs, anchor: "ensureCheck"}
+    spec: tests/reconciler/runtime-deploy.spec.mjs
+    status: covered
+  - id: deploy-cuts-a-step-in-flight
+    family: change-under-running
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a restart never cuts a settle, a Critic run or a prepared decision in the middle) the engine restart stops the process tree of the engine, and with it the settler and the Critic run it owes; a prepared decision whose apply dies stays as a receipt every later settle has to recover", remedy: {state: in-tree, change: "starci runtime deploy reads the marks of the steps in flight (engine actions of the current epoch, running settle tails, prepared receipts under apply, live settler, land and push processes), waits for them to finish and refuses with their names when they do not; it stops none, and a dead apply is left for the settler to recover"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, hand restarts during settles", evidence: "prepared-settlement-withdrawn receipts after a restart in the middle of a fail settle"}
+    rule: {file: scripts/reconciler/runtime-deploy-inflight.mjs, anchor: "waitForQuiet"}
+    spec: tests/reconciler/runtime-deploy.spec.mjs
+    status: covered
+  - id: deploy-restart-is-not-verified
+    family: change-under-running
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: after a runtime change the host is shown to run it) the hand restart ended at reading the digest; whether the leader reported the new revision with a fresh heartbeat, kept every controller mode and left every seat alive was read by eye, and a failed deploy had no stated way back", remedy: {state: in-tree, change: "starci runtime deploy verifies from the stores after the restart (new revision, heartbeat written after the restart, new process, controller modes unchanged, no seat dead that was not before) and on a failure names the host state and the non-destructive way back (git revert of the range), journalling runtime-deploy-failed"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, hand deploys", evidence: "the lead's six hand restarts, each verified only by reading starci debug digest"}
+    rule: {file: scripts/reconciler/runtime-deploy-verify.mjs, anchor: "verifyProblems"}
+    spec: tests/reconciler/runtime-deploy-real.spec.mjs
+    status: covered
+  - id: installed-artefact-older-than-the-revision
+    family: change-under-running
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: no running workflow holds an artefact of an older revision) the history hook of a workflow worktree is installed outside the runtime tree with a version stamp; a new revision needed hook version 8 while the live workflow tree still held the old one and a settle step failed on the real tree", remedy: {state: in-tree, change: "modules/kernel/installed-artefacts.yaml declares every artefact the runtime installs outside its tree; starci runtime artefacts --migrate (run by the deploy from the new tree, and by the engine at start for anything the deploy could not reach) rewrites each stale artefact of every live workflow tree and verifies the stamp, idempotently, with a code per refusal"}}
+    met: {date: "2026-10-09", where: "alpha.8 live, StarCi workflow tree", evidence: "history hook version 8 required, workflow worktree hook older, settle step failed on the real tree"}
+    rule: {file: scripts/reconciler/installed-artefacts.mjs, anchor: "migrateInstalledArtefacts"}
+    spec: tests/reconciler/installed-artefacts.spec.mjs
+    status: covered
+  - id: installer-outside-the-tree-is-not-declared
+    family: change-under-running
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: everything the runtime installs outside its tree can be migrated by a deploy) a new writer into a product tree or the machine home that is not on the declared list would never be migrated and would age silently", remedy: {state: in-tree, change: "the installed-artefacts self-check refuses a declared row without its writer or handler, and a runtime source file that resolves a repository hooks directory or carries a declared marker without being a declared writer"}}
+    met: {date: "2026-10-09", where: "alpha.8 lane design", evidence: "the artefact enumeration of the deploy lane found hooks, generated copies, guard files and worktree records by reading the writers"}
+    rule: {file: scripts/checks/check-installed-artefacts.mjs, anchor: "sourceFindings"}
+    spec: tests/reconciler/installed-artefacts.spec.mjs
+    status: covered
+  - id: revision-change-reaches-no-seat-with-an-empty-menu
+    family: change-under-running
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: a seat learns of a change that concerns it) a revision change produced no wake, so a Kernel or the Supervisor with an empty menu never learned of it; a docs-only commit changed the revision for every seat and nothing scoped a change to the roles it concerns; the Supervisor had no revision ack of its own.", remedy: {state: in-tree}}
+    met: {date: "2026-10-09", where: "alpha.8 live, deploys of 2026-10-09", evidence: "six hand deploys (fast-forward, reconciler restart, digest read); runtime-rev.mjs kernelRevState silent patch for files outside the Kernel contract paths; no Supervisor revision record in machine.sqlite sup_events"}
+    rule: {file: modules/kernel/revision-scope.yaml, anchor: "schema: starci/revision-scope@1"}
+    spec: tests/reconciler/revision-notice.spec.mjs
+    status: covered
+  - id: rule-removed-from-a-contract-stays-in-the-seat-context
+    family: change-under-running
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: no seat acts on a rule the tree no longer has) a re-read adds the new text to a long-lived seat context but never removes the old rule, so a deleted or reversed rule kept being followed until the seat was replaced by hand.", remedy: {state: in-tree}}
+    met: {date: "2026-10-09", where: "alpha.8 live, the Kernel and Supervisor seats", evidence: "a seat context grows by about a thousand tokens per turn and keeps every earlier contract read (seat-cost.yaml rotation); the contract-changed replacement is the only way a removed rule leaves a seat"}
+    rule: {file: scripts/machine/revision-replace.mjs, anchor: "contract-changed"}
+    spec: tests/supervisor/supervisor-watchdog-revision.spec.mjs
+    status: covered
+  - id: wake-for-a-revision-change-loops-or-doubles
+    family: change-under-running
+    finding: {role: runtime, duty: bound, verdict: departs, evidence: "(duty: a seat is woken at most once for one revision change) a wake per tick for an unacked revision would count against the rotation and idle-replace bounds and replace a healthy seat.", remedy: {state: in-tree}}
+    met: {date: "2026-10-09", where: "design review of the revision notice", evidence: "kernel-watchdog.mjs WAKE_IDLE_REPLACE counts delivered wakes with no move; the notice wake is recorded once per set of owed files and the ack is an activity record"}
+    rule: {file: scripts/machine/revision-notice.mjs, anchor: "woken.has(mine.digest)"}
+    spec: tests/kernel/kernel-watchdog-revision.spec.mjs
+    status: covered
+  - id: attempt-in-flight-judged-by-a-rule-newer-than-its-admission
+    family: change-under-running
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: an attempt keeps the rules of its admission) the settle judges against the live tree, so a proof added or tightened after the admission refuses a done the op could not have known; the settle recorded nothing about which revision each proof was owed under.", remedy: {state: in-tree}}
+    met: {date: "2026-10-09", where: "alpha.8 live, a job admitted before a gate existed", evidence: "settle-preflight.mjs phases read knowledge/op-gate.yaml, knowledge/sonar-gate.yaml and modules/kernel/critic.yaml at settle time; only critic-settle.mjs consults the admitted contract"}
+    rule: {file: scripts/kernel/settle-revision.mjs, anchor: "proofsOwedUnder"}
+    spec: tests/reconciler/revision-notice.spec.mjs
+    status: covered
+  - id: kernel-escape-ruling-leaves-the-product-item-open
+    family: record-vs-reality
+    found: live
+    replay: tests/replay/supervisor-escape.spec.mjs
+    finding: {role: runtime, duty: does, verdict: departs, evidence: "(duty: an item the Supervisor answered is closed) StarCi di-16537df8, di-866fd7b8 and di-498134c6, the Kernel's menu-escape items, were answered by the Supervisor (sup_decisions sdec-0c7c25c1, sdec-58acb53b, sdec-c7769daf) and the ruling reached the Kernel as a supervisor-ruling Decision Item, but each product-ledger menu-escape item stayed open: starci supervisor decide resolves the Supervisor's own twin in machine.sqlite and nothing resolves the item the twin mirrors", remedy: {state: open}}
+    met: {date: "2026-10-09", where: "alpha.8 live, StarCi workflow, after the Supervisor ruled on the mirrored escapes", evidence: "starci runtime.sqlite decision_items di-16537df8, di-866fd7b8, di-498134c6 (kind menu-escape, status open) beside the supervisor-ruling items the rulings opened; machine.sqlite sup_decisions"}
+    status: open
+    why: "reproduced by the replay of tests/replay/supervisor-escape.spec.mjs (the todo test): after the Supervisor's decide rule on the twin, the product-ledger menu-escape item is still open - the failing assertion is notStrictEqual(status, 'open') on that item. Lane f3 owns the fix (it closes the mirrored item when its twin is resolved, in the Workflow controller's mirror pass or in the decide verb); when it lands the todo flag of that test is removed and this entry becomes covered."

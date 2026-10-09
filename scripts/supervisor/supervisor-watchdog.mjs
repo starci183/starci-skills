@@ -32,11 +32,13 @@ import { INPUT_GLYPH_CLASS } from '../lib/input-glyph.mjs';
 import { getSupervisor, heartbeatSupervisor } from './telegram-bridge.mjs';
 import { readInbox } from '../machine/sup-messages.mjs';
 import {
-  SKILL_ROOT, SUPERVISOR_ID, SEAT_ID, SUPERVISOR_TITLE, WORKER_TITLE_PREFIX, seatOf, enabledOf, supervisorEvent, supervisorSettings,
+  SKILL_ROOT, SUPERVISOR_ID, SEAT_ID, seatOf, enabledOf, supervisorEvent, supervisorSettings,
   supervisorMode, terminalSignalDb, supervisorLog, DEFAULTS,
 } from '../machine/home.mjs';
 import { seatHealth } from './start-supervisor.mjs';
 import { planRotation } from './seat-rotation.mjs';
+import { noticeWakeLine } from '../machine/revision-notice.mjs';
+import { contractReplacementOf, noteRevisionReplaced, noteRevisionWoken, revisionNoticeOf } from './revision-seat.mjs';
 import { jobsOf, reportOf } from './workers.mjs';
 import { workerTerminalClosed } from './worker-state.mjs';
 import { openMachine, withMachine } from '../../engine/db/machine.mjs';
@@ -139,7 +141,7 @@ function decisionWakePart(openDis, diFresh, diRemind) {
   return '[decide] ' + openDis.length + ' open Supervisor decision(s)' + (diFresh.length ? ' (new ' + diFresh.join(',') + ')' : '') + (diRemind.length ? ' (still open ' + diRemind.join(',') + ')' : '') + ': starci supervisor status --json, then starci supervisor decide --item <id> --choice <choice> --reason <why> for each.';
 }
 
-function wakeText({ tags, unread, fresh, remind, openDis, diFresh, diRemind, land, report, workerDeaths }) {
+function wakeText({ tags, unread, fresh, remind, openDis, diFresh, diRemind, land, report, workerDeaths, revision = null }) {
   const parts = [];
   if (tags.includes('register')) parts.push(`[register] channel '${SUPERVISOR_ID}' is not registered from this terminal: starci supervisor channel register --id ${SUPERVISOR_ID} --label "Supervisor".`);
   if (tags.includes('inbox')) parts.push(inboxWakePart(unread, fresh, remind));
@@ -147,11 +149,12 @@ function wakeText({ tags, unread, fresh, remind, openDis, diFresh, diRemind, lan
   if (tags.includes('land')) parts.push(`[land] report(s) filed by ${land.join(', ')}: starci supervisor workers show --job <id>; a runtime change is Debug's, so record the defect (starci supervisor actions record --item runtime-defect:<cause>).`);
   if (tags.includes('report')) parts.push(`[report] ${report.join(', ')} filed a diagnosis or a blocked/failed report: starci supervisor workers show --job <id>, then record the defect it names (starci supervisor actions record --item runtime-defect:<cause>).`);
   if (tags.includes('worker')) parts.push(`[worker] ${workerDeaths.map((d) => d.jobId + ' (' + d.reason + ')').join(', ')}: record the worker death as a runtime defect (starci supervisor actions record --item runtime-defect:<cause>).`);
+  if (tags.includes('revision')) parts.push(`[revision] ${noticeWakeLine(revision, 'starci supervisor revision-ack')}`);
   const text = parts.length ? `${WAKE_TAG} ${parts.join(' ')} Act until nothing is executable, then yield; never sleep or poll in a turn.` : null;
   return text;
 }
 
-export function planWake({ now = Date.now(), wakes = [], unread = [], reported = [], filed = [], workerDeaths = [], registered = true, decisions = [] }) {
+export function planWake({ now = Date.now(), wakes = [], unread = [], reported = [], filed = [], workerDeaths = [], registered = true, decisions = [], revision = null }) {
   const tags = [];
   const announced = announcedAt(wakes, 'inbox');
   const fresh = unread.filter((m) => !announced.has(m.id)).map((m) => m.id);
@@ -173,9 +176,10 @@ export function planWake({ now = Date.now(), wakes = [], unread = [], reported =
   if (report.length) tags.push('report');
   if (workerDeaths.length) tags.push('worker');
   if (!registered) tags.push('register');
-  const text = wakeText({ tags, unread, fresh, remind, openDis, diFresh, diRemind, land, report, workerDeaths });
+  if (revision?.state === 'owed') tags.push('revision');
+  const text = wakeText({ tags, unread, fresh, remind, openDis, diFresh, diRemind, land, report, workerDeaths, revision });
   if (text && wakes.some((w) => w.payload.text === text)) return { tags: [], inbox: [], land: [], report: [], decisions: [], text: null, duplicate: true };
-  return { tags, inbox, land, report, decisions: decide, text };
+  return { tags, inbox, land, report, decisions: decide, text, revision: tags.includes('revision') ? revision.to : null, revisionNotice: tags.includes('revision') ? revision : null };
 }
 
 /* ------------------------------------------------------------ the pass */
@@ -220,39 +224,8 @@ async function hostDeps() {
   };
 }
 
-/** Restore runtime names in Orca's sidebar from the tab titles, never from agent-controlled pane titles. */
-function expectedSupervisorTitles(seatTerminal, workers) {
-  return [
-    { terminal: seatTerminal, title: SUPERVISOR_TITLE },
-    ...workers.filter((job) => job.worker_id && !job.payload?.self && !job.payload?.terminalClosed)
-      .map((job) => ({ terminal: job.worker_id, title: `${WORKER_TITLE_PREFIX} ${job.payload.cluster}`.slice(0, 80) })),
-  ];
-}
-
-function titleNeedsRepair(terminal, title, titles, listed) {
-  return terminal && titles.get(terminal) !== title && (listed.terminals ?? []).some((t) => t.handle === terminal && t.connected !== false);
-}
-
-function renameTitle(d, terminal, title) {
-  try {
-    const r = d.rename(terminal, title);
-    return { terminal, title, ok: r?.ok === true, ...(r?.ok ? {} : { error: r?.error ?? 'terminal rename failed' }) };
-  } catch (error) { return { terminal, title, ok: false, error: String(error?.message ?? error) }; }
-}
-
-export function repairSupervisorTabTitles(seatTerminal, workers, d) {
-  if (!d?.list || !d?.rename) return [];
-  let listed;
-  try { listed = d.list(); } catch { return []; }
-  if (!listed?.ok) return [];
-  const titles = (d.tabTitles ?? tabTitlesOf)(listed.visualLayouts ?? [], listed.terminals ?? []);
-  const repairs = [];
-  for (const { terminal, title } of expectedSupervisorTitles(seatTerminal, workers)) {
-    if (!titleNeedsRepair(terminal, title, titles, listed)) continue;
-    repairs.push(renameTitle(d, terminal, title));
-  }
-  return repairs;
-}
+import { repairSupervisorTabTitles } from './tab-titles.mjs';
+export { repairSupervisorTabTitles };
 
 // worker-show states that end a worker (start-workflow.mjs MANAGED_DEAD_STATE).
 const DEAD_WORKER_STATE = /stop|fail|dead|exit|release|abandon/i;
@@ -354,6 +327,8 @@ function replaceSeat(deps, env, label, fields = {}, handover = null) {
   const titleRepairs = replaced?.ok && replaced?.terminal ? repairSupervisorTabTitles(replaced.terminal, [], deps) : [];
   supervisorLog('watchdog', `${label}: ${JSON.stringify(replaced)}`, { env });
   const launched = replaced?.action === 'booted' || replaced?.action === 'restarted';
+  // A fresh seat read the tree at birth: the revision change it replaced is settled.
+  if (launched) noteRevisionReplaced(env, label);
   const launchedAction = handover ? 'rotated' : 'restarted';
   return { ok: replaced?.ok !== false, action: launched ? launchedAction : (replaced?.action ?? 'replace-failed'), ...fields, detail: replaced, ...(titleRepairs.length ? { titleRepairs } : {}) };
 }
@@ -391,9 +366,10 @@ function wakeFrozenSeat({ m, deps, env, now, settings, terminal, plan, sweep, bu
   noteInputOutcome(terminal, woke.action, { env });
   const after = deps.screen(terminal);
   const stillFrozen = after != null && busySignature(after) === signature;
-  m.transaction(() => supervisorEvent(m, { kind: 'supervisor-wake', now: now(), payload: { tags: plan.tags, inbox: plan.inbox, land: plan.land, report: plan.report, decisions: plan.decisions, text: plan.text,
+  m.transaction(() => supervisorEvent(m, { kind: 'supervisor-wake', now: now(), payload: { tags: plan.tags, inbox: plan.inbox, land: plan.land, report: plan.report, decisions: plan.decisions, revision: plan.revision ?? null, text: plan.text,
     delivered: woke.delivered === true, action: woke.action,
     frozen: { signature, since: frozen.state.since, reads: frozen.state.reads, outputAgeMs, state: busy, escaped: escaped == null ? null : escaped.ok === true } } }));
+  noteRevisionWoken(m, plan, woke);
   if (stillFrozen) {
     m.transaction(() => supervisorEvent(m, { kind: 'supervisor-frozen-replace', now: now(), payload: { terminal, signature, since: frozen.state.since, reads: frozen.state.reads, wake: woke.action ?? null } }));
     m.close();
@@ -406,7 +382,8 @@ function wakeFrozenSeat({ m, deps, env, now, settings, terminal, plan, sweep, bu
 function wakeIdleSeat({ m, deps, env, now, terminal, plan, sweep }) {
   m.db.prepare('DELETE FROM sup_signals WHERE scope=?').run(BUSY_SCOPE);
   const woke = deps.wake(terminal, plan.text);
-  m.transaction(() => supervisorEvent(m, { kind: 'supervisor-wake', now: now(), payload: { tags: plan.tags, inbox: plan.inbox, land: plan.land, report: plan.report, decisions: plan.decisions, text: plan.text, delivered: woke.delivered === true, action: woke.action } }));
+  m.transaction(() => supervisorEvent(m, { kind: 'supervisor-wake', now: now(), payload: { tags: plan.tags, inbox: plan.inbox, land: plan.land, report: plan.report, decisions: plan.decisions, revision: plan.revision ?? null, text: plan.text, delivered: woke.delivered === true, action: woke.action } }));
+  noteRevisionWoken(m, plan, woke);
   const deaf = noteInputOutcome(terminal, woke.action, { env });
   if (deaf.replace) {
     m.transaction(() => supervisorEvent(m, { kind: 'supervisor-deaf-replace', now: now(), payload: { terminal, failures: deaf.failures, since: deaf.since, last: woke.action } }));
@@ -427,8 +404,9 @@ function wakePlanFor({ m, env, now, terminal }) {
   try { decisions = supervisorDecisions(m, { now: now() }); } catch { decisions = []; }
   // [Worker] terminals (deaths, reported-worker close) are the Job controller's: it calls sweepWorkers itself.
   const sweep = { deaths: [], closed: [], action: 'job-controller' };
-  const plan = planWake({ now: now(), wakes: recentWakes(m), unread, reported, filed, workerDeaths: sweep.deaths, registered, decisions });
-  return { plan, registered, sweep };
+  const notice = revisionNoticeOf(m);
+  const plan = planWake({ now: now(), wakes: recentWakes(m), unread, reported, filed, workerDeaths: sweep.deaths, registered, decisions, revision: notice });
+  return { plan, registered, sweep, notice };
 }
 
 /** A seat whose terminal shows a shell prompt: nothing is typed (the shell would run it); the seat is replaced and the wake is withheld. */
@@ -441,7 +419,10 @@ function replaceDeadSeat({ m, deps, env, now, terminal, plan }) {
 /** One pass over a live seat: repair tab titles, plan the wake, and deliver it (or report why not). */
 function wakeLiveSeat({ m, deps, env, now, settings, terminal }) {
   const titleRepairs = repairSupervisorTabTitles(terminal, jobsOf(m, ['running']), deps);
-  const { plan, registered, sweep } = wakePlanFor({ m, env, now, terminal });
+  const { plan, registered, sweep, notice } = wakePlanFor({ m, env, now, terminal });
+  const idle = deps.state(terminal) === 'turn-idle' && !busyScreen(deps.screen(terminal));
+  const contract = contractReplacementOf({ m, now, notice, idle });
+  if (contract) { m.close(); return replaceSeat(deps, env, 'contract-changed', { terminal, rotation: contract.reason }, contract.handover); }
   if (!plan.text) return { ok: true, action: 'idle', terminal, registered, workers: sweep, ...(titleRepairs.length ? { titleRepairs } : {}) };
   const state = deps.state(terminal);
   if (state === 'agent-exited') return replaceDeadSeat({ m, deps, env, now, terminal, plan });

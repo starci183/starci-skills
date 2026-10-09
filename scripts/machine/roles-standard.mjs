@@ -5,10 +5,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { pendingFor } from './roles-table.mjs';
+import { NOTICE_EVENT } from '../machine/revision-notice.mjs';
 
 const POLICY_FILE = 'modules/kernel/op-incident-policy.yaml';
 const COMMAND_POLICY_FILE = 'modules/kernel/command-policy.yaml';
 const REGISTRY_FILE = 'modules/reconciler/edge-cases.yaml';
+const SCOPE_TABLE = 'modules/kernel/revision-scope.yaml';
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const present = (value) => value !== undefined && value !== null && !(typeof value === 'string' && !value.trim()) && !(Array.isArray(value) && !value.length);
 
@@ -62,7 +64,20 @@ function chainProblem(role, ctx) {
   return stands ? null : 'stands nowhere in the reporting chain';
 }
 
-const CHECKS = { fields: fieldsProblem, 'happy-errors': happyProblem, 'bug-surface': bugProblem, 'prompt-block': blockProblem,
+const longEnough = (text, min) => typeof text === 'string' && text.trim().length >= min;
+
+/** The revisionAck declaration: a seated role names the verb and event that attest a runtime revision change, an Op or Critic the admission that fixes its rules, Debug why it has none. */
+function revisionAckProblem(role, ctx) {
+  const decl = role.revisionAck;
+  if (!decl || typeof decl !== 'object') return 'declares no revisionAck';
+  if (decl.noAck !== undefined) return longEnough(decl.noAck, 20) ? null : 'declares revisionAck.noAck without the reason it has none';
+  if (!ctx.scopeRoles.includes(decl.scope)) return `revisionAck.scope ${decl.scope ?? '(none)'} is not a role of modules/kernel/revision-scope.yaml`;
+  if (decl.admission === true) return longEnough(decl.reason, 20) ? null : 'declares revisionAck.admission without the reason';
+  if (!fs.existsSync(path.join(ctx.root, String(decl.file ?? ''))) || !longEnough(decl.verb, 8)) return 'revisionAck names no existing verb file';
+  return decl.event === NOTICE_EVENT ? null : `revisionAck.event must be ${NOTICE_EVENT}`;
+}
+
+const CHECKS = { 'revision-ack': revisionAckProblem, fields: fieldsProblem, 'happy-errors': happyProblem, 'bug-surface': bugProblem, 'prompt-block': blockProblem,
   'guard-binding': guardProblem, budget: budgetProblem, chain: chainProblem };
 
 function pendingProblems(role, problems, known, openEntries) {
@@ -93,7 +108,7 @@ function standingOf(role, ctx) {
 
 /** The standing of every role of `doc.standard.roles` in the tree at `root`: [{id, cells, problems, issues}]. */
 export function roleStandings(doc, root) {
-  const ctx = { doc, root, policy: policyIds(root), bound: boundRoles(root), open: openEntries(root) };
+  const ctx = { doc, root, policy: policyIds(root), bound: boundRoles(root), open: openEntries(root), scopeRoles: readYaml(root, SCOPE_TABLE).roleIds };
   return doc.standard.roles.map((id) => standingOf(doc.roles.find((role) => role.id === id), ctx));
 }
 

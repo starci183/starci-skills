@@ -133,7 +133,9 @@ function world(t, { treeGone = false } = {}) {
 function recover() {
   const lines = [];
   const engine = { rev: 'rev-after-restart', now: () => Date.now(), log: (kind, message, data) => lines.push({ kind, message, data }), queue: { rearmParked: () => [] } };
-  startRecovery(engine, { reevaluated: false }, { reap: (options) => reapProviderReservations(options, restartedHost()), boot: () => ({ bootAt: NEW_BOOT, uptimeMs: 1000, bootId: 'boot-after-restart' }) });
+  startRecovery(engine, { reevaluated: false }, { reap: (options) => reapProviderReservations(options, restartedHost()), boot: () => ({ bootAt: NEW_BOOT, uptimeMs: 1000, bootId: 'boot-after-restart' }),
+    // This engine has no machine handle; the lazy artefact migration at start has its own spec (installed-artefacts.spec.mjs).
+    artefacts: () => ({ counts: { migrated: 0, refused: 0 }, refused: [] }) });
   return lines;
 }
 

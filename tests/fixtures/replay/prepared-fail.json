@@ -1,0 +1,79 @@
+{
+ "schema": "replay-fixture@1",
+ "case": "prepared-fail",
+ "source": {
+  "copy": "a8live6"
+ },
+ "workflow": {
+  "id": "wf-1",
+  "phase": "running",
+  "goalRevision": 0
+ },
+ "jobs": [
+  {
+   "id": "job-1",
+   "op": "architecture.decide",
+   "status": "reported",
+   "admitted": true,
+   "provider": "claude",
+   "owned": [
+    "d1.sds"
+   ],
+   "report": {
+    "outcome": "done",
+    "checks": [
+     {
+      "name": "check-1"
+     }
+    ]
+   },
+   "at": {
+    "created": -7200000,
+    "updated": -3600000
+   }
+  }
+ ],
+ "tree": {
+  "records": [
+   "d1.sds.rec-1"
+  ],
+  "checkpoints": 2,
+  "preserved": 1,
+  "prepared": {
+   "resetTo": "baseline",
+   "verdict": "fail",
+   "halfApplied": true
+  }
+ },
+ "decisions": [
+  {
+   "kind": "settle-nongreen",
+   "entity": {
+    "type": "job",
+    "id": "job-1"
+   }
+  }
+ ],
+ "events": [
+  {
+   "kind": "job-settle-needs-kernel",
+   "entity": "job-1",
+   "at": -60000,
+   "payload": {
+    "reason": "settle-refused",
+    "code": "workflow-checkpoint-recovery-conflict",
+    "detail": [
+     "workflow-checkpoint-recovery-conflict"
+    ],
+    "outcome": "done",
+    "op": "architecture.decide",
+    "attempt": 1,
+    "runtimeRev": "$rev:1"
+   }
+  }
+ ],
+ "live": {
+  "failedRewinds": 4,
+  "checkpointsBehind": 2
+ }
+}

@@ -368,6 +368,7 @@ dead agent's transcript.
 - Reports to: Supervisor (one of the five causes above). Overseen by: the runtime, Supervisor, Debug.
 - Measure: legs done inside their bound with zero human untangling.
 - Wake budget (provisional): 20 turns and 6000000 tokens per wake, 40 turns and 6000000 tokens for its boot (the contract files and the rev-ack manifest); over it, the digest reports the wake as a departure of the Kernel (a bug): a wake answers the menu and yields.
+- Runtime changes (modules/kernel/revision-scope.yaml): woken once with exactly the changed files that concern it, it reads them and attests with starci kernel revision-ack; a change that concerns it nothing costs it nothing; it is replaced by a fresh seat, at its next yield, only when a rule of its contract was removed or reversed or its boot prompt changed.
 - Guard: its terminals are bound as the "lead" role of modules/kernel/command-policy.yaml.
 - Happy errors it handles (the system working as designed, handled inside the chain through the policy):
   - worker-question (policy row worker-question): an Op asks: the Kernel answers from the goal (menu worker-question) or sends it to the owner
@@ -384,6 +385,37 @@ dead agent's transcript.
   - a Kernel decision names a menu item or choice the menu does not hold, or a step fails: menu-item-unknown, menu-choice-unknown, menu-direct-option, menu-text-missing, menu-step-failed, menu-step-usage, menu-verb-unknown, menu-unreadable
 - Principles: P1 P2 P3 P4 P5 P6 P8 (modules/kernel/roles.yaml, principles).
 <!-- roles:end kernel -->
+
+## Updating the runtime while workflows run
+
+The runtime tree can change while workflows run without any workflow conflicting with the update. What a change asks of each role is one table,
+`modules/kernel/revision-scope.yaml`, and the `revision-scope` self-check proves that every tracked path of the tree matches a row, that the files the
+engine loads are derived from its import graph, and that the files each seat's launch prompt is built from are the files its generator reads.
+
+| Change | Kernel and Supervisor | Op and Critic | Engine |
+|---|---|---|---|
+| docs, tests, changelog, tooling | nothing | nothing | nothing |
+| CLI verb code, a script no long-lived process imports | nothing: each command is a new process that reads the tree | nothing | nothing |
+| guards, command policy | bite on the next command | bite on the next command | nothing |
+| code the engine's process imports (derived) | nothing | nothing | one restart |
+| a seat's contract, menu or policy, rules only added | updated in place: woken once with exactly the changed files, reads and attests them | nothing | nothing |
+| a seat's contract, a rule removed or reversed (a line deleted or modified) | replaced by a fresh seat that boots from the stores, at its next yield | nothing | nothing |
+| the files a seat's launch prompt is built from | replaced the same way (the prompt is loaded once at birth) | nothing | nothing |
+| an op brief or the knowledge it reads | the Kernel re-reads before it enqueues the op | the attempt in flight continues under its admission; the next try is admitted under the new rules | nothing |
+| the Critic's rubric | the Kernel re-reads | the next Critic run reads it | nothing |
+
+A change that concerns a role nothing is written to that role as a `not-concerned` record with the diff hash, so it costs the seat no wake and blocks
+nothing. A concerned seat is woken once per revision change even when its menu is empty; several commits deployed together are one change, and the
+same revision never wakes a seat twice. A seat already due for rotation by wakes or tokens is replaced by that rotation and the revision change folds
+into it. A commit may declare a contract edit wording-only with the trailer `Revision-Wording: <path>`; the declaration holds only for a file that
+keeps its structure (every key, list entry, choice, heading and bullet), so an edit that deletes a list entry or a choice stays a replacement. A seat
+verifies its own state with `starci kernel status` (field `revisionNotice`) or `starci supervisor status`, and `starci debug digest` prints one line per
+seat: the revision it acked, whether the last change concerns it and the files it owes. `starci kernel revision-ack` and `starci supervisor
+revision-ack` list the owed files with their hashes (`--plan`) and attest them; the record carries two revisions, a count and a hash, and the file
+list lives in the blob store, so an attestation of any number of files stays under the event payload limit.
+
+At settle the runtime records, per proof the op owes, the revision the attempt was admitted under and whether the rules of the judge that decides it
+moved since (event `settle-revision-recorded`).
 
 ## Seat cost
 

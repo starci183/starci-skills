@@ -63,3 +63,20 @@ test('a finding names a known role, a duty, evidence and a remedy state, and a c
   const messages = checkEdgeCaseRegistry(treeWith(t, withFinding(bad))).map((f) => f.message).join('\n');
   for (const part of [/role nobody is not a role/, /duty mood is not a field/, /a correct error is no finding/, /names no evidence/, /remedy state must be/]) assert.match(messages, part);
 });
+
+test('a case found on a live host and covered names a replay spec of tests/replay/ that uses the replay harness', (t) => {
+  const live = (extra = '') => doc(`${covered.replace('status: covered', `found: live\n${extra}    status: covered`)}`);
+  const files = ['scripts/x.mjs', 'tests/x.spec.mjs'];
+  assert.match(checkEdgeCaseRegistry(treeWith(t, live(), files)).map((f) => f.message).join('\n'), /found live and is covered but names no replay spec/);
+  const wrongDir = checkEdgeCaseRegistry(treeWith(t, live('    replay: tests/x.spec.mjs\n'), files)).map((f) => f.message).join('\n');
+  assert.match(wrongDir, /replay tests\/x\.spec\.mjs is not a spec of tests\/replay\//);
+  assert.match(checkEdgeCaseRegistry(treeWith(t, live('    replay: tests/replay/y.spec.mjs\n'), files)).map((f) => f.message).join('\n'), /replay spec tests\/replay\/y\.spec\.mjs does not exist/);
+  assert.match(checkEdgeCaseRegistry(treeWith(t, live('    replay: tests/replay/y.spec.mjs\n'), [...files, 'tests/replay/y.spec.mjs'])).map((f) => f.message).join('\n'), /does not use the replay harness/);
+  const root = treeWith(t, live('    replay: tests/replay/y.spec.mjs\n'), files);
+  fs.mkdirSync(path.join(root, 'tests/replay'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'tests/replay/y.spec.mjs'), "import { replayWorld } from '../helpers/replay-world.mjs';\n");
+  assert.deepEqual(checkEdgeCaseRegistry(root), []);
+  assert.match(checkEdgeCaseRegistry(treeWith(t, doc(covered.replace('status: covered', 'found: seen\n    status: covered')), files)).map((f) => f.message).join('\n'), /found must be live/);
+  const open = doc(`${covered.replace(/    rule:.*\n    spec:.*\n/, '').replace('status: covered', 'found: live\n    status: open\n    why: not yet')}`);
+  assert.deepEqual(checkEdgeCaseRegistry(treeWith(t, open)), [], 'an open case found live may still lack its replay');
+});

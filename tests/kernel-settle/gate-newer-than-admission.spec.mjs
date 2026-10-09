@@ -21,17 +21,19 @@ const OP = 'unit.verify';
 function world(ledger, markdown, { jobId = 'op-u', outcome = 'done' } = {}) {
   seedWorkflow(ledger, { id: 'wf-g', goal: { revision: 1, markdown: '# g' }, jobs: [{ jobId, opId: OP, status: 'reported', payload: { opId: OP, owned_paths: [] } }] });
   const { attempt_id: attemptId, dispatch_id: dispatchId } = ledger.db.prepare('SELECT attempt_id, dispatch_id FROM op_attempts WHERE job_id=?').get(jobId);
-  ledger.db.prepare("INSERT INTO contracts(attempt_id,workflow_id,job_id,markdown,created_at) VALUES(?,'wf-g',?,?,?)").run(attemptId, jobId, markdown, Date.now());
+  ledger.db.prepare("INSERT INTO contracts(attempt_id,workflow_id,job_id,markdown,context_json,created_at) VALUES(?,'wf-g',?,?,?,?)").run(attemptId, jobId, markdown, JSON.stringify({ contract: { runtimeSha: 'a'.repeat(40) } }), Date.now());
   ledger.db.prepare("INSERT INTO reports(workflow_id,attempt_id,dispatch_id,job_id,outcome,report_json,created_at) VALUES('wf-g',?,?,?,?,?,?)")
     .run(attemptId, dispatchId, jobId, outcome, JSON.stringify({ head: 'abc', checks: [] }), Date.now() - 60_000);
   return { attemptId };
 }
 
+// The judge rules of op-proof moved since the admission revision (settle-revision.mjs proofsOwedUnder, as data), or did not.
+const seam = (moved) => ({ op: OP, proof: 'op-proof', owedUnder: () => ({ known: true, proofs: [{ proof: 'op-proof', moved }] }) });
 const missing = { status: 'missing', code: 'op-unit-proof-missing', detail: 'no unit run summary is attached', findings: [] };
 
 test('a missing proof the admitted contract never taught is classified once, for every gate; a taught one and a red one are not', (t) => withLedger(t, ({ ledger }) => {
   world(ledger, '# dispatch contract — [Op] unit.verify (job op-u)\n\nmachines:\n  starci-gate → starci gate run\n');
-  const owned = ownedByRuntime(ledger.db, 'op-u', missing);
+  const owned = ownedByRuntime(ledger.db, 'op-u', missing, seam(true));
   assert.equal(owned.code, GATE_NEWER_CODE);
   assert.equal(owned.gate, 'op-unit-proof-missing', 'the proof that refused is kept');
   assert.equal(owned.status, 'missing');
@@ -39,18 +41,28 @@ test('a missing proof the admitted contract never taught is classified once, for
   assert.equal(admissionTaught(ledger.db, 'op-u', 'op-gate-proof-missing'), true, 'the loop step is in this contract');
   assert.equal(admissionTaught(ledger.db, 'op-u', 'op-test-world-proof-missing'), false);
   const red = { status: 'red', code: 'op-unit-run-red', detail: 'x', findings: [] };
-  assert.equal(ownedByRuntime(ledger.db, 'op-u', red), red, 'a proof that ran red is the error-work of the op, whatever the age of the gate');
+  assert.equal(ownedByRuntime(ledger.db, 'op-u', red, seam(true)), red, 'a proof that ran red is the error-work of the op, whatever the age of the gate');
   const unlisted = { status: 'missing', code: 'op-critic-verdict-missing', detail: 'x', findings: [] };
-  assert.equal(ownedByRuntime(ledger.db, 'op-u', unlisted), unlisted, 'a proof no op step teaches keeps its own code (the runtime owes it: RUNTIME_OWED_CODES)');
+  assert.equal(ownedByRuntime(ledger.db, 'op-u', unlisted, seam(true)), unlisted, 'a proof no op step teaches keeps its own code (the runtime owes it: RUNTIME_OWED_CODES)');
   assert.ok(RUNTIME_OWED_CODES.has('op-critic-verdict-missing') && RUNTIME_OWED_CODES.has(GATE_NEWER_CODE));
 }));
 
 test('a contract that taught the step keeps the refusal of the op', (t) => withLedger(t, ({ ledger }) => {
   world(ledger, '# dispatch contract — [Op] unit.verify (job op-u)\n\nmachines:\n  starci-unit-run → starci gate unit --root <app>\n');
-  assert.equal(ownedByRuntime(ledger.db, 'op-u', missing), missing);
+  assert.equal(ownedByRuntime(ledger.db, 'op-u', missing, seam(true)), missing);
 }));
 
-test('the settle preflight reports the classified code for the proof phase', (t) => withLedger(t, async ({ ledger }) => {
+test('a judge whose rules did not move since the admission, or an admission with no recorded revision, never makes a proof newer than the job', (t) => withLedger(t, ({ ledger }) => {
+  world(ledger, '# dispatch contract — [Op] unit.verify (job op-u)\n\nmachines: nothing about proofs');
+  assert.equal(ownedByRuntime(ledger.db, 'op-u', missing, seam(false)), missing, 'the prompt lacks the step but nothing moved: the op skipped it');
+  ledger.db.prepare('UPDATE contracts SET context_json=NULL').run();
+  assert.equal(ownedByRuntime(ledger.db, 'op-u', missing, seam(true)), missing);
+  const unknown = { ...seam(true), owedUnder: () => ({ known: false, proofs: [{ proof: 'op-proof', moved: true }] }) };
+  ledger.db.prepare("UPDATE contracts SET context_json='{\"contract\":{\"runtimeSha\":\"b\"}}'").run();
+  assert.equal(ownedByRuntime(ledger.db, 'op-u', missing, unknown), missing, 'git cannot compare the two revisions: nothing is claimed');
+}));
+
+test('the settle preflight keeps the refusal of the op when the admission revision cannot be compared', (t) => withLedger(t, async ({ ledger }) => {
   const { attemptId } = world(ledger, '# dispatch contract — [Op] unit.verify (job op-u)\n\nmachines: nothing about proofs');
   const none = () => null;
   const settleOpProofs = () => ({ op: OP, jobId: 'op-u', attemptId, status: 'reported', proof: 'unit-kit', proofs: ['unit-kit'], judged: { ...missing } });
@@ -61,7 +73,7 @@ test('the settle preflight reports the classified code for the proof phase', (t)
       internals: { settleProofMedia: none, settleSonarGate: none, settleOpGate: none, settleOpProofs, settleCriticVerdict: none, settleDrawAcceptance: none, settleDrawMetrics: none, settleWorkHygiene: none } });
   } catch (error) { exit = error.exitCode; }
   assert.equal(exit, 1);
-  assert.equal(emitted[0][0].code, GATE_NEWER_CODE);
+  assert.equal(emitted[0][0].code, 'op-unit-proof-missing', 'the recorded admission revision is not a commit of this repository: no claim');
 }));
 
 test('the settler holds such a refusal bounded and opens a Supervisor item, never a Kernel handover', async (t) => withLedger(t, async ({ repoRoot, ledger, ledgerFile }) => {

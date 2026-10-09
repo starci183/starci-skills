@@ -946,7 +946,7 @@ autopilot:
     UX/UI is re-run in one batch; golden promotion stays the owner's own accept.
   rereadRev: >-
     These rules reach a running Kernel through the runtime-rev re-read (survey.runtimeRev): re-read this section and
-    api.yaml commands.autopilot when a wake names the rev that brought them, then starci kernel kernel-ack-rev. No restart.
+    api.yaml commands.autopilot when a wake names the rev that brought them, then starci kernel kernel-ack-rev. No restart for an addition; a rule removed or reversed replaces the seat (modules/kernel/revision-scope.yaml).
   citation: "scripts/kernel/autopilot-run.mjs; modules/models/runtimes.yaml allocation.autopilot; modules/kernel/api.yaml commands.autopilot"
 
 handoverLoop:

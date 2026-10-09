@@ -25,6 +25,8 @@ const parkedQueue = () => {
 };
 const BOOT = { bootAt: 500, uptimeMs: 500, bootId: 'boot0' };
 const boot = () => BOOT;
+// The lazy migration of installed artefacts at start has its own spec (installed-artefacts.spec.mjs); these engines have no machine handle.
+const NO_ARTEFACTS = () => ({ counts: { migrated: 0, refused: 0 }, refused: [] });
 const fakeEngine = (queue) => {
   const lines = [];
   return { queue, lines, log: (kind, message, data) => lines.push({ kind, message, data }) };
@@ -47,7 +49,7 @@ test('engine start releases the host restart receipts and re-arms the parked key
   const { queue } = parkedQueue();
   const engine = fakeEngine(queue);
   const reaped = { released: [{ id: 'r1', why: 'host-restarted' }], kept: [], held: [] };
-  startRecovery(engine, { reevaluated: false }, { reap: () => reaped, boot, copies: () => null });
+  startRecovery(engine, { reevaluated: false }, { reap: () => reaped, boot, copies: () => null, artefacts: NO_ARTEFACTS });
   assert.deepEqual(engine.lines.map((line) => line.data.kind), ['reconciler.boot', 'reconciler.provider-receipts-released', 'reconciler.queue-rearmed']);
   assert.deepEqual([engine.lines[0].data.bootId, engine.lines[0].data.bootAt], ['boot0', 500]);
   assert.deepEqual(engine.lines[2].data.keys.sort(), ['host ledger:one', 'host seat:supervisor']);
@@ -56,14 +58,14 @@ test('engine start releases the host restart receipts and re-arms the parked key
 test('a recovery step that throws is logged with its step and the next step still runs', () => {
   const { queue } = parkedQueue();
   const engine = fakeEngine(queue);
-  startRecovery(engine, { reevaluated: false }, { reap: () => { throw new Error('census down'); }, boot, copies: () => null });
+  startRecovery(engine, { reevaluated: false }, { reap: () => { throw new Error('census down'); }, boot, copies: () => null, artefacts: NO_ARTEFACTS });
   assert.deepEqual(engine.lines.map((line) => [line.data.kind, line.data.step]), [['reconciler.boot', undefined], ['reconciler.start-recovery-failed', 'provider-receipts'], ['reconciler.queue-rearmed', undefined]]);
 });
 
 test('a boot identity that cannot be read is a recovery step failure and the next steps still run', () => {
   const { queue } = parkedQueue();
   const engine = fakeEngine(queue);
-  startRecovery(engine, { reevaluated: false }, { reap: () => ({ released: [], kept: [], held: [] }), boot: () => { throw new Error('no uptime'); }, copies: () => null });
+  startRecovery(engine, { reevaluated: false }, { reap: () => ({ released: [], kept: [], held: [] }), boot: () => { throw new Error('no uptime'); }, copies: () => null, artefacts: NO_ARTEFACTS });
   assert.deepEqual(engine.lines.map((line) => [line.data.kind, line.data.step]), [['reconciler.start-recovery-failed', 'boot-id'], ['reconciler.queue-rearmed', undefined]]);
 });
 
@@ -76,7 +78,7 @@ test('a new engine regenerates the stale generated package copies before it lead
   assert.equal(engine.lines.at(-1).data.kind, 'reconciler.runtime-copies-synced');
   assert.equal(ensureRuntimeCopies(engine, { driftOf: () => [], sync: () => assert.fail('copies that agree are not written') }), null);
   const applied = [];
-  startRecovery(fakeEngine(parkedQueue().queue), { reevaluated: false }, { reap: () => ({ released: [], kept: [], held: [] }), boot, copies: () => { applied.push('copies'); return { action: 'runtime-copies-synced', count: 1 }; } });
+  startRecovery(fakeEngine(parkedQueue().queue), { reevaluated: false }, { reap: () => ({ released: [], kept: [], held: [] }), boot, copies: () => { applied.push('copies'); return { action: 'runtime-copies-synced', count: 1 }; }, artefacts: NO_ARTEFACTS });
   assert.deepEqual(applied, ['copies']);
 });
 

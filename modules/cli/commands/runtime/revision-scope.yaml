@@ -1,0 +1,15 @@
+group: runtime
+verb: revision-scope
+owner: runtime
+summary: show what a deploy of the runtime tree asks of each role between two revisions
+impl: {script: scripts/reconciler/revision-scope-cli.mjs}
+flags:
+  - {name: from, type: string, required: true, summary: the revision the seats stand at}
+  - {name: to, type: string, summary: the revision to deploy; the HEAD of the runtime tree by default}
+  - {name: root, type: string, summary: the runtime tree to read}
+exit: {"0": scope printed, "2": bad usage}
+json: flag
+examples:
+  - starci runtime revision-scope --from <sha>
+  - starci runtime revision-scope --from <sha> --to <sha> --json
+editions: [full]

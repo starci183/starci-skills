@@ -17296,3 +17296,191 @@ decision-item-without-repo:
   nextStep_vi: "Đăng ký lại ledger với kho của nó (starci machine-db hoặc đường dẫn .workspaces của dự án) rồi để controller lập lại; không mở mục bằng tay."
   owner: runtime-core
   kind: runtime-fault
+deploy-source-unresolved:
+  title: "A deploy was refused: the source names no commit"
+  title_vi: "Deploy bị từ chối: nguồn không chỉ tới commit nào"
+  meaning_vi: "Giá trị --from không phải thư mục clone có commit, cũng không phải ref của kho host, nên không có bản runtime nào để đưa lên."
+  causes_vi:
+    - "Đường dẫn clone sai hoặc clone chưa có commit"
+    - "Tên ref không tồn tại trong kho host"
+  nextStep_vi: "Chạy lại starci runtime deploy --from với đường dẫn clone đúng hoặc ref có thật."
+  owner: runtime-core
+  kind: verb-refusal
+deploy-source-dirty:
+  title: "A deploy was refused: the source tree is not committed and clean"
+  title_vi: "Deploy bị từ chối: cây nguồn chưa commit hoặc không sạch"
+  meaning_vi: "Biên nhận kiểm tra gắn với đúng một commit; cây có thay đổi chưa commit, hoặc bước kiểm tra làm thay đổi cây, thì biên nhận không chứng minh được gì cho bản sẽ chạy."
+  causes_vi:
+    - "Clone còn tệp sửa hoặc tệp mới chưa commit"
+    - "Bước kiểm tra sinh ra tệp trong cây nguồn"
+  nextStep_vi: "Commit hoặc bỏ phần thay đổi trong clone, rồi chạy lại starci runtime deploy --from."
+  owner: runtime-core
+  kind: verb-refusal
+deploy-host-dirty:
+  title: "A deploy was refused: the host tree has uncommitted changes to tracked files"
+  title_vi: "Deploy bị từ chối: cây host có thay đổi chưa commit ở tệp được theo dõi"
+  meaning_vi: "Fast-forward cây host sẽ ghi đè hoặc bị git từ chối khi có tệp theo dõi đang bị sửa tay; deploy không chạm vào thay đổi đó."
+  causes_vi:
+    - "Có người sửa tay một tệp trong checkout đang chạy"
+  nextStep_vi: "Đưa thay đổi đó vào một commit trên nhánh của lane (không sửa tay checkout đang chạy), rồi chạy lại deploy."
+  owner: runtime-core
+  kind: verb-refusal
+deploy-host-not-main:
+  title: "A deploy was refused: the host tree is not on main"
+  title_vi: "Deploy bị từ chối: cây host không ở nhánh main"
+  meaning_vi: "Cây host chỉ di chuyển bằng fast-forward của nhánh main; ở nhánh khác hoặc HEAD tách rời thì kết quả không phải bản main."
+  causes_vi:
+    - "Checkout host đang ở một nhánh khác hoặc detached HEAD"
+  nextStep_vi: "Đưa checkout host về main bằng người có thẩm quyền rồi chạy lại deploy."
+  owner: runtime-core
+  kind: verb-refusal
+deploy-not-fast-forward:
+  title: "A deploy was refused: the source is not a fast-forward of the host tree"
+  title_vi: "Deploy bị từ chối: nguồn không phải bản fast-forward của cây host"
+  meaning_vi: "Commit hiện tại của host không nằm trong lịch sử của nguồn (hoặc host đã di chuyển trong lúc chờ), nên đưa nguồn lên sẽ làm mất commit của host."
+  causes_vi:
+    - "Main của host đã có commit mới mà clone chưa gộp"
+    - "Một lane khác đã land trong lúc deploy chờ"
+  nextStep_vi: "Gộp main của host vào nguồn (starci git sync), kiểm tra lại rồi chạy lại deploy."
+  owner: runtime-core
+  kind: verb-refusal
+deploy-check-red:
+  title: "A deploy was refused: the runtime check failed on the source commit"
+  title_vi: "Deploy bị từ chối: kiểm tra runtime đỏ trên commit nguồn"
+  meaning_vi: "Deploy tự chạy starci runtime check trong clone sạch và nó thoát khác 0; bản đó không được đưa lên host."
+  causes_vi:
+    - "Commit làm hỏng một kiểm tra tự động của runtime"
+  nextStep_vi: "Sửa phát hiện đầu tiên trong đuôi kết quả, commit, rồi chạy lại deploy."
+  owner: runtime-core
+  kind: verb-refusal
+deploy-check-unproven:
+  title: "A deploy was refused: no check receipt binds the commit"
+  title_vi: "Deploy bị từ chối: không có biên nhận kiểm tra gắn với commit"
+  meaning_vi: "Nguồn là một ref không có clone để chạy kiểm tra, và không có biên nhận deploy hay ghi chú land xác nhận starci runtime check xanh trên đúng commit đó."
+  causes_vi:
+    - "Ref chưa từng được land hay kiểm tra qua deploy"
+  nextStep_vi: "Chạy deploy từ clone chứa commit đó để verb tự chạy kiểm tra, hoặc land commit bằng starci git land."
+  owner: runtime-core
+  kind: verb-refusal
+deploy-release-cut-running:
+  title: "A deploy was refused: a release cut is running"
+  title_vi: "Deploy bị từ chối: đang có một release cut chạy"
+  meaning_vi: "Release cut giữ khóa host và chạy bộ test đầy đủ trên cây host; đổi cây hoặc khởi động lại engine giữa chừng sẽ làm hỏng kết quả của nó."
+  causes_vi:
+    - "Khóa host có mục đích release-cut còn sống"
+  nextStep_vi: "Đợi release cut kết thúc (starci release cut báo xong), rồi chạy lại deploy."
+  owner: runtime-core
+  kind: verb-refusal
+deploy-host-lock-held:
+  title: "A deploy was refused: another heavy operation holds the host lock"
+  title_vi: "Deploy bị từ chối: một thao tác nặng khác đang giữ khóa host"
+  meaning_vi: "Khóa host chỉ có một người giữ; land, chuẩn bị grammar hoặc một deploy khác đang chạy."
+  causes_vi:
+    - "Một land hoặc deploy khác đang chạy"
+  nextStep_vi: "Đợi thao tác đang giữ khóa xong rồi chạy lại deploy."
+  owner: runtime-core
+  kind: verb-refusal
+deploy-in-flight:
+  title: "A deploy was refused: settles, Critic runs or prepared decisions are still in flight"
+  title_vi: "Deploy bị từ chối: còn bước settle, lượt Critic hoặc quyết định đã chuẩn bị đang chạy"
+  meaning_vi: "Khởi động lại engine giữa chừng sẽ cắt một bước đang làm dở. Deploy đã chờ hết thời hạn khai báo mà các bước vẫn chưa xong; nó không dừng bước nào và không đổi gì."
+  causes_vi:
+    - "Một lượt Critic hoặc settle kéo dài hơn thời hạn chờ của deploy"
+  nextStep_vi: "Chạy lại starci runtime deploy sau khi các bước nêu trong thông báo kết thúc."
+  owner: runtime-core
+  kind: verb-refusal
+deploy-artefact-migration-failed:
+  title: "A deploy fast-forwarded the host but an installed artefact could not be migrated"
+  title_vi: "Deploy đã fast-forward host nhưng không chuyển được một artefact đã cài"
+  meaning_vi: "Một hook hoặc bản sao sinh ra của một workflow đang chạy vẫn mang phiên bản cũ sau khi chạy starci runtime artefacts --migrate từ cây mới; engine chưa được khởi động lại."
+  causes_vi:
+    - "Tệp hook bị khóa hoặc không ghi được"
+  nextStep_vi: "Đọc các dòng refused của starci runtime artefacts, sửa nguyên nhân, chạy lại starci runtime artefacts --migrate rồi starci reconciler restart; hoặc quay về theo hướng dẫn trong thông báo."
+  owner: runtime-core
+  kind: runtime-fault
+deploy-restart-failed:
+  title: "A deploy fast-forwarded and migrated the host but the engine did not restart"
+  title_vi: "Deploy đã fast-forward và chuyển artefact nhưng engine không khởi động lại được"
+  meaning_vi: "Lệnh starci reconciler restart của cây mới trả lỗi; cây host đang ở revision mới."
+  causes_vi:
+    - "Engine mới không khởi động được"
+  nextStep_vi: "Đọc starci reconciler status, sửa lỗi rồi chạy starci reconciler restart; hoặc quay về bằng git revert như thông báo chỉ."
+  owner: runtime-core
+  kind: runtime-fault
+deploy-verify-failed:
+  title: "A deploy restarted the engine but the host did not verify on the new revision"
+  title_vi: "Deploy đã khởi động lại engine nhưng host không xác nhận được trên revision mới"
+  meaning_vi: "Sau restart, leader không báo revision mới với nhịp tim mới, hoặc một controller đổi chế độ, hoặc một ghế chết vì restart. Thông báo nêu từng điểm."
+  causes_vi:
+    - "Engine mới lỗi khi khởi động hoặc ở chế độ an toàn"
+    - "Một ghế không dựng lại được"
+  nextStep_vi: "Đọc starci reconciler status và starci debug digest, sửa nguyên nhân; nếu cần quay về, dùng git revert của dải commit rồi starci reconciler restart."
+  owner: runtime-core
+  kind: runtime-fault
+installed-artefact-failed:
+  title: "An installed artefact could not be read or rewritten for the new revision"
+  title_vi: "Không đọc hoặc ghi lại được một artefact đã cài cho revision mới"
+  meaning_vi: "Việc chuyển artefact (hook, bản sao sinh ra) gặp lỗi khi đọc dấu phiên bản hoặc khi ghi lại."
+  causes_vi:
+    - "Thư mục hook không ghi được hoặc kho git của cây workflow hỏng"
+  nextStep_vi: "Sửa quyền hoặc kho git được nêu, rồi chạy starci runtime artefacts --migrate."
+  owner: runtime-core
+  kind: runtime-fault
+installed-artefact-unverified:
+  title: "An installed artefact was rewritten but does not carry the new revision's stamp"
+  title_vi: "Một artefact đã cài được ghi lại nhưng không mang dấu phiên bản của revision mới"
+  meaning_vi: "Sau khi ghi lại, đọc lại dấu phiên bản vẫn khác phiên bản của cây mới; bước chuyển không được coi là xong."
+  causes_vi:
+    - "Một tiến trình khác ghi đè hook ngay sau khi ghi"
+  nextStep_vi: "Chạy lại starci runtime artefacts --migrate; nếu lặp lại, ghi lại một lỗi runtime kèm đường dẫn nêu trong thông báo."
+  owner: runtime-core
+  kind: runtime-fault
+INSTALLED_ARTEFACT_UNDECLARED:
+  title: "An installer of the runtime is not declared as an installed artefact"
+  title_vi: "Một đoạn mã cài thứ gì đó ra ngoài cây runtime nhưng chưa được khai báo là artefact đã cài"
+  meaning_vi: "Runtime cài ra ngoài cây của nó những thứ mang phiên bản logic của nó (hook git trong cây workflow, bản sao sinh ra). Deploy chỉ chuyển được những gì có trong modules/kernel/installed-artefacts.yaml; một tệp mới phân giải thư mục hook hoặc mang dấu của một artefact đã khai báo mà không phải bên ghi của nó sẽ bị từ chối, và một dòng khai báo thiếu bên ghi hoặc thiếu handler cũng vậy."
+  causes_vi:
+    - "Thêm một đoạn mã cài hook hoặc tệp vào cây sản phẩm mà không thêm dòng khai báo"
+    - "Dòng khai báo trỏ tới tệp hoặc hàm không còn tồn tại"
+  nextStep_vi: "Thêm dòng artefact vào modules/kernel/installed-artefacts.yaml cùng handler trong scripts/reconciler/installed-artefacts.mjs, hoặc sửa dòng đã lệch."
+  owner: runtime-core
+  kind: check-finding
+RT_REVISION_SCOPE:
+  title: "The revision-scope table does not match the runtime tree"
+  title_vi: "Bảng phạm vi bản sửa không khớp với cây runtime"
+  meaning_vi: "Một đường dẫn có trong cây không thuộc dòng nào của bảng phạm vi, bảng gọi tên vai trò hay hành động lạ, một tệp động cơ nạp bị liệt kê tay, tệp dựng lời nhắc khởi động của một ghế không khớp với bộ sinh, hoặc phép so sánh chỉ-sửa-lời-văn cho qua một thay đổi bỏ mục."
+  causes_vi:
+    - "Thêm một tệp hay thư mục mới mà chưa có dòng trong bảng"
+    - "Bộ sinh lời nhắc đọc thêm một tệp mà bảng seatBoot chưa ghi"
+  nextStep_vi: "Thêm dòng cho đường dẫn vào modules/kernel/revision-scope.yaml hoặc sửa seatBoot cho khớp bộ sinh."
+  owner: supervisor
+  kind: check-finding
+revision-nothing-owed:
+  title: "No runtime revision change is owed to this seat"
+  title_vi: "Không có thay đổi nào của runtime cần ghế này đọc"
+  meaning_vi: "Ghế gọi revision-ack khi không có thay đổi nào của cây runtime liên quan đến nó: bản sửa gần nhất không chạm tệp nào thuộc phạm vi của nó, hoặc nó đã xác nhận rồi."
+  causes_vi:
+    - "Ghế đã xác nhận bản sửa này"
+    - "Bản sửa chỉ chạm tệp không thuộc phạm vi của vai trò"
+  nextStep_vi: "Không cần làm gì; xem dòng REVISION trong starci kernel status hoặc starci supervisor status."
+  owner: runtime-core
+  kind: verb-refusal
+revision-read-unverified:
+  title: "The submitted read manifest is not the complete current one"
+  title_vi: "Bản kê các tệp đã đọc không phải bản đầy đủ hiện hành"
+  meaning_vi: "Bản kê ghế nộp khác bản kê runtime tính lại từ các byte đang nằm trên đĩa: thiếu tệp, sai băm hoặc đã có bản sửa mới hơn."
+  causes_vi:
+    - "Ghế bỏ sót một tệp trong danh sách --plan"
+    - "Cây runtime đổi giữa lúc lấy --plan và lúc xác nhận"
+  nextStep_vi: "Chạy lại revision-ack --plan, đọc đủ các tệp rồi nộp đúng bản kê nó trả về."
+  owner: runtime-core
+  kind: verb-refusal
+supervisor-rev-unknown:
+  title: "The revision is not the current deployed commit"
+  title_vi: "Bản sửa không phải commit đang triển khai"
+  meaning_vi: "Giá trị --rev của Supervisor không khớp commit hiện hành của cây runtime."
+  causes_vi:
+    - "Cây runtime đã chuyển sang commit mới sau khi lấy --plan"
+  nextStep_vi: "Chạy lại starci supervisor revision-ack --plan và dùng revision nó nêu."
+  owner: supervisor
+  kind: verb-refusal

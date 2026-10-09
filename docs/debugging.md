@@ -238,7 +238,7 @@ Every failed, blocked, refused, requeued or waiting attempt has a plain-language
 **Debug** (modules/kernel/roles.yaml#debug): The owner's eyes: a loop of the owner's chat for a limited stabilisation period, not part of steady-state operation.
 - Does:
   - Audits whether each of the four roles above and the runtime floor did its job, each tick, through the digest: per op its attempt, report, evidence and hold; per Critic that it ran, on another provider, saw only the product, and had its verdict used; per Kernel seat that it is alive, acked the runtime revision, acts on ready work and takes the policy steps; per Supervisor seat that it is alive and answers gates inside their bound. Each stuck thing is a happy error or a bug of exactly one role; Debug removes bugs only, and happy errors stay with the chain.
-  - For every departure records a finding (role, broken duty, evidence, remedy) and changes .claude at once so the role cannot repeat it: the contract block or generated prompt, a policy-table rule, a gate or guard refusal, or a runtime fix with a spec, carried onto the host. Records the case in the edge-case registry in the same change.
+  - For every departure records a finding (role, broken duty, evidence, remedy) and changes .claude at once so the role cannot repeat it: the contract block or generated prompt, a policy-table rule, a gate or guard refusal, or a runtime fix with a spec, carried onto the host. Records the case in the edge-case registry in the same change. A fix of a defect found on a live host is done only when a replay spec built from the sequence that showed it passes (ruling debug-replay-before-done).
   - Owns the edge-case registry, the operating standard and the queue of runtime defects the Supervisor records. A leftover is evidence that its owner failed its cleanup duty; Debug may trigger the existing collector to unblock, and the finding is still the owner's.
   - Reports results to the owner, and retires itself when the stable criteria below hold.
 - Must clean up:
@@ -254,6 +254,7 @@ Every failed, blocked, refused, requeued or waiting attempt has a plain-language
 - Reports to: Owner (a result, or an owner-only action). Overseen by: Owner.
 - Measure: no edge case reaches it twice.
 - No budget: Debug is the owner's chat loop: its turns are the owner's session and no ledger row records them; it is bounded by its time box and its end condition, not by tokens.
+- Runtime changes: Debug is the owner's chat session and reads the tree itself each time it acts; it has no seat the runtime could wake or replace.
 - Guard: none by design; Debug is a loop of the owner's own chat session: it has no seat and no bound terminal, so the guard resolves its caller to the owner; its limits are the never list, the channels it speaks through and the gate-loosening check on what it changes.
 - Happy errors it handles (the system working as designed, handled inside the chain through the policy):
   - owner-matter (policy row owner-gate): a matter that is the owner's (credentials, spend, a release): Debug reports it to the owner and does not decide it

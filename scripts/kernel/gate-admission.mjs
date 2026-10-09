@@ -5,7 +5,10 @@
 // the refusal is not an op failure and not a choice of the Kernel: it is classified `gate-newer-than-admission`, the runtime produces the proof
 // when it can (the Critic: scripts/kernel/settle/critic-run.mjs) and otherwise holds the settle, bounded, and names it to the Supervisor.
 // This is the one place a refusal is classified for it: every judged phase of the settle preflight passes its judgment through ownedByRuntime.
+import { parseJson } from '../lib/json.mjs';
 import { latestContractOf } from '../machine/contract-version.mjs';
+import { currentRuntimeRev, revRootOf } from './runtime-rev.mjs';
+import { proofsOwedUnder } from './settle-revision.mjs';
 
 const NEWER = Object.freeze({ code: 'gate-newer-than-admission' });
 /** The failure code of a refusal for a proof the job's admission never taught. */
@@ -40,11 +43,23 @@ export function admissionTaught(db, jobId, code) {
 }
 
 /**
- * The judgment as the settle reports it: a missing proof the admitted contract never taught becomes `gate-newer-than-admission` (the original code
- * kept in `gate`); every other judgment, a red one included, is returned unchanged.
+ * Whether the rules of the judge `proof` (a settleJudges row of modules/kernel/revision-scope.yaml) moved between the revision the job was admitted under and the
+ * live one (scripts/kernel/settle-revision.mjs proofsOwedUnder). False when git cannot compare the two or the admission recorded no revision.
  */
-export function ownedByRuntime(db, jobId, judged) {
-  if (judged?.status !== 'missing' || admissionTaught(db, jobId, judged.code)) return judged;
+export function judgeMovedSinceAdmission(db, jobId, op, proof, { root = revRootOf(), owedUnder = proofsOwedUnder } = {}) {
+  const admitted = parseJson(latestContractOf(db, jobId)?.context_json)?.contract?.runtimeSha ?? null;
+  if (!admitted) return false;
+  const owed = owedUnder(root, op, admitted, currentRuntimeRev(root));
+  return owed.known && owed.proofs.some((row) => row.proof === proof && row.moved);
+}
+
+/**
+ * The judgment as the settle reports it: a missing proof that is newer than the job becomes `gate-newer-than-admission` (the original code kept in `gate`) when
+ * BOTH hold: the rules of its judge `proof` moved since the admission revision (data, git) and the admitted dispatch prompt never taught the step that produces it.
+ * Every other judgment, a red one included, is returned unchanged.
+ */
+export function ownedByRuntime(db, jobId, judged, { op, proof, ...seams } = {}) {
+  if (judged?.status !== 'missing' || admissionTaught(db, jobId, judged.code) || !judgeMovedSinceAdmission(db, jobId, op, proof, seams)) return judged;
   return { ...judged, gate: judged.code, code: GATE_NEWER_CODE,
     detail: `the gate that refused (${judged.code}) is newer than this job: its admitted contract never taught the op the step that produces the proof, and its worker is gone; the proof is the runtime's, nothing is asked of the op or the Kernel (${judged.detail})` };
 }
