@@ -12,6 +12,9 @@ import { agentCliSpawns } from '../../scripts/checks/check-host-boundary.mjs';
 import { fakeCriticOrca, passingVerdict } from '../helpers/fake-critic-orca.mjs';
 import { fakeOrcaWorktrees } from '../helpers/fake-orca-worktrees.mjs';
 
+// The prompt of a Critic whose Task spec is a pointer: the text of the file the pointer names (the second line after PACKET FILE), read while the worker starts, before the runtime removes it.
+const taskOf = (spec) => { const lines = String(spec).split(String.fromCodePoint(10)).map((line) => line.trim()); const at = lines.findIndex((line) => line.startsWith('PACKET FILE:')); return at < 0 ? String(spec) : fs.readFileSync(lines[at + 1], 'utf8'); };
+
 // The draw loop's independent critic is an Orca worker started through orchestration worker-start with the provider,
 // model and effort of the member the Critic tier admits (scripts/work/critic-pick.mjs, draw-critic.mjs): it gets a Task spec naming its clean dir, the images and verdict.json, the runtime
 // waits for its worker_done through the orchestration commands, reads the verdict, then stops and releases the worker.
@@ -39,7 +42,7 @@ const cleanDirsLeft = (dir) => fs.readdirSync(dir).filter((n) => n.startsWith('s
 test('the critic is started through worker-start with the configured provider, model and effort; its verdict is read; the worker is released', async (t) => {
   const r = round(t);
   let seen = null;
-  const orca = fakeCriticOrca({ verdict: passingVerdict(DEFAULT_RUBRIC, 8), onStart: (a) => { seen = { dir: a.worktree, files: fs.readdirSync(a.worktree).sort() }; } });
+  const orca = fakeCriticOrca({ verdict: passingVerdict(DEFAULT_RUBRIC, 8), onStart: (a) => { seen = { dir: a.worktree, files: fs.readdirSync(a.worktree).sort(), pointer: a.spec, task: taskOf(a.spec) }; } });
   const critique = await runCritic({ ...r, rubric: DEFAULT_RUBRIC, critic: picked, orca, placement: { tmpRoot: r.dir }, entry: 'term_op', ...clock() });
   assert.equal(critique.outcome, 'judged', critique.error);
   assert.equal(critique.verdict.beauty, 8);
@@ -50,7 +53,8 @@ test('the critic is started through worker-start with the configured provider, m
   assert.equal(start.worktree, seen.dir, 'the worker is placed in the clean dir');
   assert.equal(start.from, 'term_op', 'the worker belongs to the Run of the terminal running the loop');
   assert.deepEqual(seen.files, ['render-1.png', 'rubric.yaml', 'screen.html'], 'the clean dir holds no drawing context');
-  const spec = orca.calls.find((c) => c[0] === 'worker-start')[1].spec;
+  assert.ok(!seen.files.includes('TASK.md'), 'the Task file is not in the Critic directory (06c13f369)');
+  const spec = seen.task;
   const at = (f) => path.join(seen.dir, f).replaceAll('\\', '/');
   for (const f of ['render-1.png', 'screen.html', 'rubric.yaml', VERDICT_FILE]) assert.ok(spec.includes(at(f)), `the Task spec names ${f}`);
   assert.match(spec, /the one file you may write is/, 'every other write is forbidden');

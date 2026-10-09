@@ -19,7 +19,7 @@ test('the retry the failure route queued behind its curing leg is dispatched, no
   // The live job was read as a too-narrow grant by the words of its blocker; its typed kind (sds-gap) names an upstream record gap, which the route table repairs.
   assert.deepEqual(cause, ['record-gap'], `the typed blocker kind classifies the failed job (${cause.join(', ')})`);
 
-  assert.equal(world.engine({ controllers: ['job', 'workflow'], passes: 1 }).ok, true, 'the engine restarts over the queued retry');
+  assert.equal(world.engine({ controllers: ['job', 'workflow'], passes: 1, foregroundPush: true }).ok, true, 'the engine restarts over the queued retry');
   const status = world.status();
   assert.deepEqual(status.progress.readyJobs, [retry.id], 'the retry is ready: its curing leg landed');
   assert.deepEqual(status.menu.map((item) => item.id).filter((id) => id.startsWith('shape-refused:')), [], 'the Kernel is not asked to widen a grant that is not narrow');
