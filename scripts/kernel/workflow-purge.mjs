@@ -10,9 +10,10 @@ import { renderApply, renderPlan } from '../machine/workflow-purge-render.mjs';
 import { underHostLock } from '../machine/verb-lock.mjs';
 import { acquireGcLock } from '../machine/gc-lock.mjs';
 import { purgeWorkflow } from '../work/purge-workflow.mjs';
+import { guardsRoot } from '../guards/guards-root.mjs';
 
 const MIN_EXPECT = 12;
-const refusal = (code, detail) => ({ code: 1, text: `${code}: ${detail}`, data: { schema: 'starci/workflow-purge-refusal@1', ok: false, refusal: { code, detail } } });
+const refusal = ({ code, detail }) => ({ code: 1, text: `${code}: ${detail}`, data: { schema: 'starci/workflow-purge-refusal@1', ok: false, refusal: { code, detail } } });
 const usage = (detail) => ({ code: 2, stderr: `starci workflow purge: ${detail}\n` });
 
 // The default ledger purge: the housekeeping purge archives every row of the workflow to a verified zip, then drops them. The owner's own --apply --ledger is the approval.
@@ -23,16 +24,16 @@ function purgeLedgerRows({ plan }) {
   } catch (error) { return { ok: false, error: `${error?.code ?? 'purge-failed'}: ${String(error?.message ?? error).slice(0, 300)}` }; }
 }
 
-const planOf = ({ repo, workflowId, env, ledgerMode, deps }) => buildPurgePlan({ facts: purgeFactsOf({ repo, workflowId, env, deps }), workflowId, repo, ledgerMode });
+const planOf = ({ repo, workflowId, env, ledgerMode, deps }) => buildPurgePlan({ facts: purgeFactsOf({ repo, workflowId, env, guardsDir: guardsRoot(undefined, env), deps }), workflowId, repo, ledgerMode });
 
 // The apply under the host lock and the gc lock, with the plan read again once the locks are ours (the plan shown may be old).
 async function applyLocked({ shown, args, env, deps }) {
   const gc = (deps.acquireGcLock ?? acquireGcLock)({ env, holder: 'workflow-purge' });
-  if (!gc.ok) return refusal('workflow-purge-host-busy', `the gc lock is held by ${gc.holder?.holder ?? 'another run'} (pid ${gc.holder?.pid ?? '?'})`);
+  if (!gc.ok) return refusal({ code: 'workflow-purge-host-busy', detail: `the gc lock is held by ${gc.holder?.holder ?? 'another run'} (pid ${gc.holder?.pid ?? '?'})` });
   try {
     const fresh = planOf({ repo: shown.repo, workflowId: shown.workflowId, env, ledgerMode: args.ledger === true, deps: { ...deps, lockOwner: () => null } });
     if (!fresh.ok) return { code: 1, text: renderPlan(fresh), data: fresh };
-    if (args.expect && !fresh.sha.startsWith(String(args.expect))) return refusal('workflow-purge-plan-changed', `the plan is now ${fresh.sha.slice(0, MIN_EXPECT)}, not ${args.expect}: read it again with --plan`);
+    if (args.expect && !fresh.sha.startsWith(String(args.expect))) return refusal({ code: 'workflow-purge-plan-changed', detail: `the plan is now ${fresh.sha.slice(0, MIN_EXPECT)}, not ${args.expect}: read it again with --plan` });
     const applied = applyPurgePlan({ plan: fresh, env, deps: { purgeLedger: purgeLedgerRows, ...deps } });
     return { code: applied.ok ? 0 : 1, text: renderApply(fresh, applied), data: { schema: 'starci/workflow-purge-result@1', plan: fresh, ...applied } };
   } finally { gc.release(); }
@@ -51,6 +52,6 @@ export async function workflowPurge(ctx, deps = {}) {
   if (!plan.ok) return { code: 1, text: renderPlan(plan), data: plan };
   if (plan.already) return { code: 0, text: renderPlan(plan), data: plan };
   const locked = await underHostLock({ role: 'owner', purpose: 'workflow-purge', env }, () => applyLocked({ shown: plan, args, env, deps }), deps);
-  if (locked.ok === false) return refusal('workflow-purge-host-busy', `the host lock is held (${locked.owner?.purpose ?? locked.owner?.role ?? 'another run'}); a purge waits for it`);
+  if (locked.ok === false) return refusal({ code: 'workflow-purge-host-busy', detail: `the host lock is held (${locked.owner?.purpose ?? locked.owner?.role ?? 'another run'}); a purge waits for it` });
   return locked.value;
 }

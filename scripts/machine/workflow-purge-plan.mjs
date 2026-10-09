@@ -6,34 +6,33 @@ import { canonicalJSON } from '../../engine/canonical-json.mjs';
 import { sha256 } from '../../engine/digest.mjs';
 import { classifyTerminals, classifyWorkers, listStrangerWorkers } from './workflow-purge-orca.mjs';
 
-export const PURGE_PLAN_SCHEMA = 'starci/workflow-purge-plan@1';
+const PURGE_PLAN_SCHEMA = 'starci/workflow-purge-plan@1';
 const LIVE_SEATS = new Set(['booting', 'live', 'busy', 'replacing']);
-const blocker = (code, detail) => ({ code, detail });
 
 // The refusals of the ledger and registry side: the workflow is known, archived, and nothing live names it.
 function ledgerBlockers(facts, workflowId) {
   const { ledger, machine } = facts;
-  if (!ledger.found) return [blocker('workflow-purge-unknown', `${workflowId} is in no ledger of this repository`)];
+  if (!ledger.found) return [{ code: 'workflow-purge-unknown', detail: `${workflowId} is in no ledger of this repository` }];
   const out = [];
-  if (ledger.phase !== 'archived' || ledger.archivedAt == null) out.push(blocker('workflow-purge-not-archived', `${workflowId} is ${ledger.phase}: only an archived workflow is purged (starci workflow stop first)`));
+  if (ledger.phase !== 'archived' || ledger.archivedAt == null) out.push({ code: 'workflow-purge-not-archived', detail: `${workflowId} is ${ledger.phase}: only an archived workflow is purged (starci workflow stop first)` });
   const liveJobs = ledger.jobs.filter((job) => job.live);
-  if (liveJobs.length) out.push(blocker('workflow-purge-live-job', `${liveJobs.length} job(s) still ${[...new Set(liveJobs.map((job) => job.status))].join('/')}: ${liveJobs.slice(0, 5).map((job) => job.jobId).join(', ')}`));
-  if (ledger.leases > 0) out.push(blocker('workflow-purge-live-job', `${ledger.leases} lease row(s) still name the workflow`));
-  if (ledger.signal.held) out.push(blocker('workflow-purge-live-job', 'the Kernel singleton signal is still held'));
+  if (liveJobs.length) out.push({ code: 'workflow-purge-live-job', detail: `${liveJobs.length} job(s) still ${[...new Set(liveJobs.map((job) => job.status))].join('/')}: ${liveJobs.slice(0, 5).map((job) => job.jobId).join(', ')}` });
+  if (ledger.leases > 0) out.push({ code: 'workflow-purge-live-job', detail: `${ledger.leases} lease row(s) still name the workflow` });
+  if (ledger.signal.held) out.push({ code: 'workflow-purge-live-job', detail: 'the Kernel singleton signal is still held' });
   const seats = machine.seats.filter((seat) => LIVE_SEATS.has(seat.state));
   const named = seats.map((seat) => seat.seatId + ' (' + seat.state + ')').join(', ');
-  if (seats.length) out.push(blocker('workflow-purge-live-seat', named + ' is a live seat of the workflow'));
+  if (seats.length) out.push({ code: 'workflow-purge-live-seat', detail: named + ' is a live seat of the workflow' });
   return out;
 }
 
 // The refusals of the host side: Orca must be readable (nothing is proven from a silent Orca), no worker may be live, the host lock must be free.
 function hostBlockers(facts, live) {
   const out = [];
-  if (!facts.orca.readable) out.push(blocker('workflow-purge-orca-unreadable', `Orca did not answer: ${facts.orca.error ?? 'no detail'}; no leftover can be proven or closed`));
-  for (const run of facts.workers.unreadable) out.push(blocker('workflow-purge-orca-unreadable', `worker-list for Run ${run.run} failed: ${run.error}`));
-  if (live.length) out.push(blocker('workflow-purge-worker-live', `${live.length} worker(s) of the workflow's Runs are active: ${live.map((w) => w.dispatchId).join(', ')}`));
+  if (!facts.orca.readable) out.push({ code: 'workflow-purge-orca-unreadable', detail: `Orca did not answer: ${facts.orca.error ?? 'no detail'}; no leftover can be proven or closed` });
+  for (const run of facts.workers.unreadable) out.push({ code: 'workflow-purge-orca-unreadable', detail: `worker-list for Run ${run.run} failed: ${run.error}` });
+  if (live.length) out.push({ code: 'workflow-purge-worker-live', detail: `${live.length} worker(s) of the workflow's Runs are active: ${live.map((w) => w.dispatchId).join(', ')}` });
   const held = facts.hostLock;
-  if (held) out.push(blocker('workflow-purge-host-busy', 'the host lock is held (' + [held.role, held.purpose].filter(Boolean).join(', ') + ', pid ' + held.pid + '); a purge waits for it'));
+  if (held) out.push({ code: 'workflow-purge-host-busy', detail: 'the host lock is held (' + [held.role, held.purpose].filter(Boolean).join(', ') + ', pid ' + held.pid + '); a purge waits for it' });
   return out;
 }
 

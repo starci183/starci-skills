@@ -1,4 +1,4 @@
-// Replay of the shape the owner ordered wiped on 2026-10-09 ("XÓA SẠCH CHẠY LẠI TỪ ĐẦU"): a workflow stopped by the owner, whose Kernel launches had failed twice and left a dead
+// Replay of the shape the owner ordered wiped and run again from scratch on 2026-10-09: a workflow stopped by the owner, whose Kernel launches had failed twice and left a dead
 // Codex terminal each in the workflow's tree; its tree, its branch and its preserved work still on the host, and an Orca worker whose release Orca could not confirm.
 // `starci workflow stop` names the next step; `starci workflow purge` plans (default) and then removes exactly that, through the real CLI in a child process.
 // Real: the CLI, the verbs, the ledger and registry, git (the product repository and its linked worktree), worker-close and the terminal close. Stubbed: the Orca binary

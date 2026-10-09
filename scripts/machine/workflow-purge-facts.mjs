@@ -4,7 +4,6 @@
 // Nothing here changes anything. The plan (workflow-purge-plan.mjs) judges these facts; the apply (workflow-purge-apply.mjs) acts on the plan.
 import fs from 'node:fs';
 import path from 'node:path';
-import { guardsRoot } from '../guards/guards-root.mjs';
 import { starciLocalRoot } from '../../engine/runtime-root.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { parseRuntimeStamp, psCoverage } from '../lib/orca-orphans.mjs';
@@ -18,7 +17,7 @@ import { purgeLedgerFacts } from './workflow-purge-ledger.mjs';
 import { workflowRefsOf } from './workflow-purge-refs.mjs';
 
 /** The Orca reads a purge makes, one seam: ps (worktrees), terminals, workers(run). A spec replaces it with a fake. */
-export const orcaReads = Object.freeze({ ps: () => worktreePs(), terminals: () => terminalList(), workers: (run) => workerListAll({ run }) });
+const orcaReads = Object.freeze({ ps: () => worktreePs(), terminals: () => terminalList(), workers: (run) => workerListAll({ run }) });
 
 /** The key of a purge in progress in machine_meta: its plan, so a crashed apply resumes and its event counts the whole run. */
 export const purgeMetaKey = (workflowId) => `workflow-purge:${workflowId}`;
@@ -57,9 +56,9 @@ function treesOf({ rows, orcaPs, workflowId }) {
   return [...trees.values()].filter((tree) => tree.repoRoot);
 }
 
-// The files under `dir` whose JSON names the workflow: the job guards (jobs/) and the terminal bindings (terminals/) under the guards root.
-function guardFilesOf(workflowId, env) {
-  const root = guardsRoot(undefined, env), out = [];
+// The files whose JSON names the workflow: the job guards (jobs/) and the terminal bindings (terminals/) under the guards root the caller names.
+function guardFilesOf(workflowId, root) {
+  const out = [];
   for (const sub of ['jobs', 'terminals']) {
     const dir = path.join(root, sub);
     let names = [];
@@ -108,9 +107,9 @@ const reposOf = (trees, rows) => [...new Map([...trees.map((t) => t.repoRoot), .
 
 /**
  * The facts of a purge: {ledger, machine, trees, refs, workers: {rows, unreadable}, terminals, orca: {readable, complete}, guards, prompts, hostLock}.
- * ledger.found false when the workflow is unknown. Seams (deps): orca (orcaReads' shape), lockOwner.
+ * ledger.found false when the workflow is unknown. guardsDir: the guards root, read by the caller (scripts/guards/guards-root.mjs). Seams (deps): orca (orcaReads' shape), lockOwner.
  */
-export function purgeFactsOf({ repo, workflowId, env = process.env, deps = {} }) {
+export function purgeFactsOf({ repo, workflowId, guardsDir, env = process.env, deps = {} }) {
   const orca = deps.orca ?? orcaReads;
   const ledger = purgeLedgerFacts({ repo, workflowId, env });
   const machine = machineFactsOf(workflowId, env);
@@ -125,5 +124,5 @@ export function purgeFactsOf({ repo, workflowId, env = process.env, deps = {} })
   const owner = (deps.lockOwner ?? hostLockOwner)({ env });
   return { ledger, machine, trees, refs, workers: workersOf(ledger.evidence?.runIds ?? [], orca), terminals: terminals.ok ? terminals.terminals : [],
     orca: { readable: ps.ok === true && terminals.ok === true, complete: psCoverage(ps).complete, error: ps.ok ? terminals.error ?? null : ps.error ?? null },
-    guards: guardFilesOf(workflowId, env), prompts: promptFilesOf(workflowId, env), hostLock: owner && !owner.stale ? { role: owner.role, purpose: owner.purpose, pid: owner.pid } : null };
+    guards: guardFilesOf(workflowId, guardsDir), prompts: promptFilesOf(workflowId, env), hostLock: owner && !owner.stale ? { role: owner.role, purpose: owner.purpose, pid: owner.pid } : null };
 }
